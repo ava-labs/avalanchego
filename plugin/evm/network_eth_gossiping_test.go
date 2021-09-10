@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"math/big"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -45,37 +46,26 @@ func fundAddressByGenesis(addr common.Address) (string, error) {
 	return string(bytes), err
 }
 
-func getValidEthTxs(key *ecdsa.PrivateKey) []*types.Transaction {
-	res := make([]*types.Transaction, 0)
+func getValidEthTxs(key *ecdsa.PrivateKey, count int) []*types.Transaction {
+	res := make([]*types.Transaction, count)
 
-	nonce := uint64(0)
 	to := common.Address{}
 	amount := big.NewInt(10000)
 	gaslimit := uint64(100000)
 	gasprice := big.NewInt(1)
 
-	tx1, _ := types.SignTx(
-		types.NewTransaction(nonce,
-			to,
-			amount,
-			gaslimit,
-			gasprice,
-			nil),
-		types.HomesteadSigner{}, key)
-	res = append(res, tx1)
-
-	nonce++
-	tx2, _ := types.SignTx(
-		types.NewTransaction(
-			nonce,
-			to,
-			amount,
-			gaslimit,
-			gasprice,
-			nil,
-		),
-		types.HomesteadSigner{}, key)
-	res = append(res, tx2)
+	for i := 0; i < count; i++ {
+		tx, _ := types.SignTx(
+			types.NewTransaction(
+				uint64(i),
+				to,
+				amount,
+				gaslimit,
+				gasprice,
+				[]byte(strings.Repeat("aaaaaaaaaa", 100))),
+			types.HomesteadSigner{}, key)
+		res[i] = tx
+	}
 	return res
 }
 
@@ -103,21 +93,185 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 	vm.chain.GetTxPool().SetGasPrice(common.Big1)
 	vm.chain.GetTxPool().SetMinFee(common.Big0)
 
-	var wg sync.WaitGroup
+	// create eth txes
+	ethTxs := getValidEthTxs(key, 3)
 
-	wg.Add(1)
+	var wg sync.WaitGroup
+	wg.Add(3)
 	sender.CantSendAppGossip = false
-	sender.SendAppGossipF = func([]byte) error {
+	signal1 := make(chan struct{})
+	signal2 := make(chan struct{})
+	seen := 0
+	sender.SendAppGossipF = func(gossipedBytes []byte) error {
+		if seen == 0 {
+			notifyMsgIntf, err := message.Parse(gossipedBytes)
+			assert.NoError(err)
+
+			requestMsg, ok := notifyMsgIntf.(*message.EthTxsNotify)
+			assert.True(ok)
+			assert.Empty(requestMsg.Txs)
+			assert.NotEmpty(requestMsg.TxsBytes)
+
+			txs := make([]*types.Transaction, 0)
+			assert.NoError(rlp.DecodeBytes(requestMsg.TxsBytes, &txs))
+			assert.Len(txs, 2)
+			assert.EqualValues(
+				[]common.Hash{ethTxs[0].Hash(), ethTxs[1].Hash()},
+				[]common.Hash{txs[0].Hash(), txs[1].Hash()},
+			)
+			seen++
+			close(signal1)
+		} else if seen == 1 {
+			notifyMsgIntf, err := message.Parse(gossipedBytes)
+			assert.NoError(err)
+
+			requestMsg, ok := notifyMsgIntf.(*message.EthTxsNotify)
+			assert.True(ok)
+			assert.Empty(requestMsg.TxsBytes)
+			assert.Len(requestMsg.Txs, 2)
+
+			assert.EqualValues(
+				[]common.Hash{ethTxs[0].Hash(), ethTxs[1].Hash()},
+				[]common.Hash{requestMsg.Txs[0].Hash, requestMsg.Txs[1].Hash},
+			)
+			seen++
+			close(signal2)
+		} else {
+			notifyMsgIntf, err := message.Parse(gossipedBytes)
+			assert.NoError(err)
+
+			requestMsg, ok := notifyMsgIntf.(*message.EthTxsNotify)
+			assert.True(ok)
+			assert.Empty(requestMsg.Txs)
+			assert.NotEmpty(requestMsg.TxsBytes)
+			txs := make([]*types.Transaction, 0)
+			assert.NoError(rlp.DecodeBytes(requestMsg.TxsBytes, &txs))
+			assert.Len(txs, 1)
+			assert.Equal(ethTxs[2].Hash(), txs[0].Hash())
+		}
 		wg.Done()
 		return nil
 	}
 
-	// create eth txes and notify VM about them
-	ethTxs := getValidEthTxs(key)
+	// Notify VM about eth txs
+	errs := vm.chain.GetTxPool().AddRemotesSync(ethTxs[:2])
+	for _, err := range errs {
+		assert.NoError(err, "failed adding coreth tx to mempool")
+	}
+
+	// Gossip txs again (should gossip hashes)
+	<-signal1 // wait until reorg processed
+	assert.NoError(vm.network.GossipEthTxs(ethTxs[:2]))
+
+	<-signal2 // wait until second gossip processed
+	errs = vm.chain.GetTxPool().AddRemotesSync(ethTxs)
+	assert.Contains(errs[0].Error(), "already known")
+	assert.Contains(errs[1].Error(), "already known")
+	assert.NoError(errs[2], "failed adding coreth tx to mempool")
+
+	wg.Wait()
+}
+
+// show that locally issued eth txs are chunked correctly
+func TestMempoolEthTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
+	assert := assert.New(t)
+
+	key, err := crypto.GenerateKey()
+	assert.NoError(err)
+
+	addr := crypto.PubkeyToAddress(key.PublicKey)
+
+	cfgJson, err := fundAddressByGenesis(addr)
+	assert.NoError(err)
+
+	_, vm, _, _, sender := GenesisVM(t, true, cfgJson, "", "")
+	defer func() {
+		err := vm.Shutdown()
+		assert.NoError(err)
+	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+	vm.chain.GetTxPool().SetGasPrice(common.Big1)
+	vm.chain.GetTxPool().SetMinFee(common.Big0)
+
+	// create eth txes
+	ethTxs := getValidEthTxs(key, 100)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	sender.CantSendAppGossip = false
+	seen := 0
+	signal := make(chan struct{})
+	sender.SendAppGossipF = func(gossipedBytes []byte) error {
+		if seen == 0 {
+			notifyMsgIntf, err := message.Parse(gossipedBytes)
+			assert.NoError(err)
+
+			requestMsg, ok := notifyMsgIntf.(*message.EthTxsNotify)
+			assert.True(ok)
+			assert.Empty(requestMsg.Txs)
+			assert.NotEmpty(requestMsg.TxsBytes)
+
+			txs := make([]*types.Transaction, 0)
+			assert.NoError(rlp.DecodeBytes(requestMsg.TxsBytes, &txs))
+			assert.Len(txs, 59)
+			for i, tx := range txs {
+				assert.Equal(ethTxs[i].Hash(), tx.Hash())
+			}
+			seen++
+		} else {
+			notifyMsgIntf, err := message.Parse(gossipedBytes)
+			assert.NoError(err)
+
+			requestMsg, ok := notifyMsgIntf.(*message.EthTxsNotify)
+			assert.True(ok)
+			assert.Empty(requestMsg.Txs)
+			assert.NotEmpty(requestMsg.TxsBytes)
+
+			txs := make([]*types.Transaction, 0)
+			assert.NoError(rlp.DecodeBytes(requestMsg.TxsBytes, &txs))
+			assert.Len(txs, 41)
+			for i, tx := range txs {
+				assert.Equal(ethTxs[i+59].Hash(), tx.Hash())
+			}
+			close(signal)
+		}
+		wg.Done()
+		return nil
+	}
+
+	// Notify VM about eth txs
 	errs := vm.chain.GetTxPool().AddRemotesSync(ethTxs)
 	for _, err := range errs {
 		assert.NoError(err, "failed adding coreth tx to mempool")
 	}
+
+	// Test chunking of hashes
+	<-signal
+	seen = 0
+	wg.Add(4)
+	sender.SendAppGossipF = func(gossipedBytes []byte) error {
+		notifyMsgIntf, err := message.Parse(gossipedBytes)
+		assert.NoError(err)
+
+		requestMsg, ok := notifyMsgIntf.(*message.EthTxsNotify)
+		assert.True(ok)
+		assert.Empty(requestMsg.TxsBytes)
+		var offset int
+		if seen < 3 {
+			assert.Len(requestMsg.Txs, 32)
+			offset = 32 * seen
+		} else {
+			assert.Len(requestMsg.Txs, 4)
+			offset = 96
+		}
+		for i, tx := range requestMsg.Txs {
+			assert.Equal(ethTxs[i+offset].Hash(), tx.Hash)
+		}
+		seen++
+		wg.Done()
+		return nil
+	}
+	assert.NoError(vm.GossipEthTxs(ethTxs))
 
 	wg.Wait()
 }
@@ -160,7 +314,7 @@ func TestMempoolEthTxsAppGossipHandling(t *testing.T) {
 	}
 
 	// prepare a tx
-	tx := getValidEthTxs(key)[0]
+	tx := getValidEthTxs(key, 2)[0]
 	txSender, err := types.Sender(types.LatestSigner(vm.chainConfig), tx)
 	assert.NoError(err, "could not retrieve sender")
 
@@ -226,7 +380,7 @@ func TestMempoolEthTxsAppResponseHandling(t *testing.T) {
 	}
 
 	// prepare a couple of txes
-	txs := getValidEthTxs(key)
+	txs := getValidEthTxs(key, 2)
 
 	txBytes, err := rlp.EncodeToBytes(txs)
 	assert.NoError(err)
@@ -301,13 +455,13 @@ func TestMempoolEthTxsAppRequestHandling(t *testing.T) {
 	}
 
 	// prepare a coreth tx
-	tx := getValidEthTxs(key)[0]
+	tx := getValidEthTxs(key, 2)[0]
 
 	txSender, err := types.Sender(types.LatestSigner(vm.chainConfig), tx)
 	if err != nil {
 		t.Fatal("could not retrieve tx address")
 	}
-	msg := message.EthTxsNotify{
+	msg := message.EthTxsRequest{
 		Txs: []message.EthTxNotify{{
 			Hash:   tx.Hash(),
 			Sender: txSender,

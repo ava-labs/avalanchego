@@ -27,13 +27,8 @@
 package core
 
 import (
-	"runtime"
-
 	"github.com/ava-labs/coreth/core/types"
 )
-
-// senderCacher is a concurrent transaction sender recoverer and cacher.
-var senderCacher = newTxSenderCacher(runtime.NumCPU())
 
 // txSenderCacherRequest is a request for recovering transaction senders with a
 // specific signature scheme and caching it into the transactions themselves.

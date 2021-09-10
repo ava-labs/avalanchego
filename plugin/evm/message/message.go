@@ -9,22 +9,27 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 const (
-	// TODO choose a sensible value
-
 	// MaxEthTxsLen must be updated inside of EthTxsNotify's struct definition
 	// as well when changed
-	MaxEthTxsLen int = 10
+	MaxEthTxsLen int = 32
+
+	// IdealEthMsgSize is the ideal size of encoded transaction bytes we send in
+	// any [EthTxsNotify] or [EthTxs] message. We do not limit inbound messages
+	// to this size, however. Max inbound message size is enforced by the codec
+	// (128KB).
+	IdealEthMsgSize = common.StorageSize(64 * units.KiB)
 )
 
 var (
-	// TODO: create a single gossip message used to notify peers of both EthTxs and
-	// AtomicTxs
 	_ Message = &AtomicTxNotify{}
+	_ Message = &AtomicTxRequest{}
 	_ Message = &AtomicTx{}
 	_ Message = &EthTxsNotify{}
+	_ Message = &EthTxsRequest{}
 	_ Message = &EthTxs{}
 
 	errUnexpectedCodecVersion = errors.New("unexpected codec version")
@@ -52,10 +57,21 @@ type AtomicTxNotify struct {
 	message
 
 	TxID ids.ID `serialize:"true"`
+	Tx   []byte `serialize:"true"`
 }
 
 func (msg *AtomicTxNotify) Handle(handler Handler, nodeID ids.ShortID, requestID uint32) error {
 	return handler.HandleAtomicTxNotify(nodeID, requestID, msg)
+}
+
+type AtomicTxRequest struct {
+	message
+
+	TxID ids.ID `serialize:"true"`
+}
+
+func (msg *AtomicTxRequest) Handle(handler Handler, nodeID ids.ShortID, requestID uint32) error {
+	return handler.HandleAtomicTxRequest(nodeID, requestID, msg)
 }
 
 type AtomicTx struct {
@@ -71,7 +87,8 @@ func (msg *AtomicTx) Handle(handler Handler, nodeID ids.ShortID, requestID uint3
 type EthTxsNotify struct {
 	message
 
-	Txs []EthTxNotify `serialize:"true" len:"10"`
+	Txs      []EthTxNotify `serialize:"true" len:"32"`
+	TxsBytes []byte        `serialize:"true"`
 }
 
 // Information about an Ethereum transaction for gossiping
@@ -88,6 +105,16 @@ type EthTxNotify struct {
 
 func (msg *EthTxsNotify) Handle(handler Handler, nodeID ids.ShortID, requestID uint32) error {
 	return handler.HandleEthTxsNotify(nodeID, requestID, msg)
+}
+
+type EthTxsRequest struct {
+	message
+
+	Txs []EthTxNotify `serialize:"true" len:"32"`
+}
+
+func (msg *EthTxsRequest) Handle(handler Handler, nodeID ids.ShortID, requestID uint32) error {
+	return handler.HandleEthTxsRequest(nodeID, requestID, msg)
 }
 
 type EthTxs struct {
