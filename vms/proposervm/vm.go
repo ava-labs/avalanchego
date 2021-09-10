@@ -42,8 +42,9 @@ type VM struct {
 	scheduler.Scheduler
 	timer.Clock
 
-	ctx *snow.Context
-	db  *versiondb.Database
+	ctx         *snow.Context
+	db          *versiondb.Database
+	toScheduler chan<- common.Message
 	// Block ID --> Block
 	// Each element is a block that passed verification but
 	// hasn't yet been accepted/rejected
@@ -79,6 +80,7 @@ func (vm *VM) Initialize(
 
 	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine)
 	vm.Scheduler = scheduler
+	vm.toScheduler = vmToEngine
 
 	go ctx.Log.RecoverAndPanic(func() {
 		scheduler.Dispatch(time.Now())
@@ -109,12 +111,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 
-	innerBlock, err := vm.ChainVM.BuildBlock()
-	if err != nil {
-		return nil, err
-	}
-
-	return preferredBlock.buildChild(innerBlock)
+	return preferredBlock.buildChild()
 }
 
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
@@ -351,4 +348,14 @@ func (vm *VM) verifyAndRecordInnerBlk(postFork PostForkBlock) error {
 
 	vm.verifiedBlocks[postFork.ID()] = postFork
 	return nil
+}
+
+// notifyInnerBlockReady tells the scheduler that the inner VM is ready to build
+// a new block
+func (vm *VM) notifyInnerBlockReady() {
+	select {
+	case vm.toScheduler <- common.PendingTxs:
+	default:
+		vm.ctx.Log.Debug("dropping message to consensus engine")
+	}
 }

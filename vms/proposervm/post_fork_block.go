@@ -147,12 +147,11 @@ func (b *postForkBlock) verifyPostForkOption(child *postForkOption) error {
 }
 
 // Return the child (a *postForkBlock) of this block
-func (b *postForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
+func (b *postForkBlock) buildChild() (Block, error) {
 	return b.postForkCommonComponents.buildChild(
 		b.ID(),
 		b.Timestamp(),
 		b.PChainHeight(),
-		innerBlock,
 	)
 }
 

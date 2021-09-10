@@ -103,7 +103,7 @@ func (b *postForkOption) verifyPostForkOption(child *postForkOption) error {
 	return errUnexpectedBlockType
 }
 
-func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
+func (b *postForkOption) buildChild() (Block, error) {
 	parentPChainHeight, err := b.pChainHeight()
 	if err != nil {
 		return nil, err
@@ -112,7 +112,6 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 		b.ID(),
 		b.Timestamp(),
 		parentPChainHeight,
-		innerBlock,
 	)
 }
 

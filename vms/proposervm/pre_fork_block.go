@@ -159,18 +159,22 @@ func (b *preForkBlock) verifyPostForkOption(child *postForkOption) error {
 	return errUnexpectedBlockType
 }
 
-func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
+func (b *preForkBlock) buildChild() (Block, error) {
 	parentTimestamp := b.Timestamp()
 	if parentTimestamp.Before(b.vm.activationTime) {
 		// The chain hasn't forked yet
-		res := &preForkBlock{
-			Block: innerBlock,
-			vm:    b.vm,
+		innerBlock, err := b.vm.ChainVM.BuildBlock()
+		if err != nil {
+			return nil, err
 		}
 
-		b.vm.ctx.Log.Info("built block %s - parent timestamp %v",
-			res.ID(), parentTimestamp)
-		return res, nil
+		b.vm.ctx.Log.Info("built block %s - parent timestamp %s",
+			innerBlock.ID(), parentTimestamp)
+
+		return &preForkBlock{
+			Block: innerBlock,
+			vm:    b.vm,
+		}, nil
 	}
 
 	// The chain is currently forking
@@ -182,6 +186,11 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 	}
 
 	pChainHeight, err := b.vm.ctx.ValidatorState.GetCurrentHeight()
+	if err != nil {
+		return nil, err
+	}
+
+	innerBlock, err := b.vm.ChainVM.BuildBlock()
 	if err != nil {
 		return nil, err
 	}

@@ -918,3 +918,169 @@ func TestPreFork_SetPreference(t *testing.T) {
 		t.Fatal("Preferred block should be parent of next built block")
 	}
 }
+
+func TestExpiredBuildBlock(t *testing.T) {
+	coreGenBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		HeightV:    0,
+		TimestampV: genesisTimestamp,
+		BytesV:     []byte{0},
+	}
+
+	coreVM := &block.TestVM{}
+	coreVM.T = t
+
+	coreVM.LastAcceptedF = func() (ids.ID, error) { return coreGenBlk.ID(), nil }
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	proVM := New(coreVM, time.Time{}, 0)
+
+	valState := &validators.TestState{
+		T: t,
+	}
+	valState.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		return map[ids.ShortID]uint64{
+			{1}: 100,
+		}, nil
+	}
+
+	ctx := &snow.Context{
+		NodeID:            hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw)),
+		Log:               logging.NoLog{},
+		StakingCertLeaf:   pTestCert.Leaf,
+		StakingLeafSigner: pTestCert.PrivateKey.(crypto.Signer),
+		ValidatorState:    valState,
+	}
+	ctx.Bootstrapped()
+
+	dbManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	toEngine := make(chan common.Message, 1)
+	var toScheduler chan<- common.Message
+
+	coreVM.InitializeF = func(
+		_ *snow.Context,
+		_ manager.Manager,
+		_ []byte,
+		_ []byte,
+		_ []byte,
+		toEngineChan chan<- common.Message,
+		_ []*common.Fx,
+		_ common.AppSender,
+	) error {
+		toScheduler = toEngineChan
+		return nil
+	}
+
+	// make sure that DBs are compressed correctly
+	if err := proVM.Initialize(ctx, dbManager, nil, nil, nil, toEngine, nil, nil); err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+
+	// Initialize shouldn't be called again
+	coreVM.InitializeF = nil
+
+	if err := proVM.SetPreference(coreGenBlk.IDV); err != nil {
+		t.Fatal(err)
+	}
+
+	// Make sure that passing a message works
+	toScheduler <- common.PendingTxs
+	<-toEngine
+
+	// Notify the proposer VM of a new block on the inner block side
+	toScheduler <- common.PendingTxs
+
+	coreBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk.ID(),
+		HeightV:    coreGenBlk.Height() + 1,
+		TimestampV: coreGenBlk.Timestamp(),
+	}
+	statelessBlock, err := statelessblock.BuildUnsigned(
+		coreGenBlk.ID(),
+		coreBlk.Timestamp(),
+		0,
+		coreBlk.Bytes(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case coreBlk.ID():
+			return coreBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, coreBlk.Bytes()):
+			return coreBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	proVM.Clock.Set(statelessBlock.Timestamp())
+
+	parsedBlock, err := proVM.ParseBlock(statelessBlock.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := parsedBlock.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := proVM.SetPreference(parsedBlock.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		t.Fatal("unexpectedly called build block")
+		panic("unexpectedly called build block")
+	}
+
+	// The first notification will be read from the consensus engine
+	<-toEngine
+
+	if _, err := proVM.BuildBlock(); err == nil {
+		t.Fatal("build block when the proposer window hasn't started")
+	}
+
+	proVM.Set(statelessBlock.Timestamp().Add(proposer.MaxDelay))
+	proVM.Scheduler.SetBuildBlockTime(time.Now())
+
+	// The engine should have been notified to attempt to build a block now that
+	// the window has started again
+	<-toEngine
+}
