@@ -12,13 +12,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
+// TODO: change name from Eth to Evm
 const (
 	// MaxEthTxsLen must be updated inside of EthTxsNotify's struct definition
 	// as well when changed
-	MaxEthTxsLen int = 10
+	MaxEthTxsLen int = 25
 
 	// TODO: Add test to force multiple messages
-	IdealETHNotifySize = 20 * units.KiB
+	IdealETHMsgSize = common.StorageSize(20 * units.KiB)
 )
 
 var (
@@ -86,7 +87,7 @@ func (msg *AtomicTx) Handle(handler Handler, nodeID ids.ShortID, requestID uint3
 type EthTxsNotify struct {
 	message
 
-	Txs      []EthTxNotify `serialize:"true" len:"10"`
+	Txs      []EthTxNotify `serialize:"true" len:"25"`
 	TxsBytes []byte        `serialize:"true"`
 }
 
@@ -109,7 +110,7 @@ func (msg *EthTxsNotify) Handle(handler Handler, nodeID ids.ShortID, requestID u
 type EthTxsRequest struct {
 	message
 
-	Txs []EthTxNotify `serialize:"true" len:"10"`
+	Txs []EthTxNotify `serialize:"true" len:"25"`
 }
 
 func (msg *EthTxsRequest) Handle(handler Handler, nodeID ids.ShortID, requestID uint32) error {
