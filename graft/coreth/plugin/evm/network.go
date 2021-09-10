@@ -310,6 +310,14 @@ func (h *RequestHandler) HandleAtomicTxRequest(nodeID ids.ShortID, requestID uin
 		"txID", msg.TxID,
 	)
 
+	if msg.TxID == (ids.ID{}) {
+		log.Warn(
+			"AppRequest received empty AtomicTxRequest Message",
+			"peerID", nodeID,
+		)
+		return nil
+	}
+
 	resTx, dropped, found := h.net.mempool.GetTx(msg.TxID)
 	if dropped || !found {
 		// tx is either invalid or isn't in the mempool
@@ -350,6 +358,14 @@ func (h *RequestHandler) HandleEthTxsRequest(nodeID ids.ShortID, requestID uint3
 		"requestID", requestID,
 		"len(txs)", len(msg.Txs),
 	)
+
+	if len(msg.Txs) == 0 {
+		log.Warn(
+			"AppRequest received empty EthTxsRequest Message",
+			"peerID", nodeID,
+		)
+		return nil
+	}
 
 	pool := h.net.chain.GetTxPool()
 	txs := make([]*types.Transaction, 0, len(msg.Txs))
@@ -438,6 +454,14 @@ func (h *ResponseHandler) HandleAtomicTx(nodeID ids.ShortID, requestID uint32, m
 	}
 	delete(h.net.requestsAtmContent, requestID)
 
+	if len(msg.Tx) == 0 {
+		log.Warn(
+			"AppResponse received empty AtomicTx Message",
+			"peerID", nodeID,
+		)
+		return nil
+	}
+
 	tx := &Tx{}
 	if _, err := Codec.Unmarshal(msg.Tx, tx); err != nil {
 		log.Trace(
@@ -496,6 +520,14 @@ func (h *ResponseHandler) HandleEthTxs(nodeID ids.ShortID, requestID uint32, msg
 		return nil
 	}
 	delete(h.net.requestsEthContent, requestID)
+
+	if len(msg.TxsBytes) == 0 {
+		log.Warn(
+			"AppResponse received empty EthTxs Message",
+			"peerID", nodeID,
+		)
+		return nil
+	}
 
 	txs := make([]*types.Transaction, 0)
 	if err := rlp.DecodeBytes(msg.TxsBytes, &txs); err != nil {
@@ -558,6 +590,14 @@ func (h *GossipHandler) HandleAtomicTxNotify(nodeID ids.ShortID, _ uint32, msg *
 		"peerID", nodeID,
 		"txID", msg.TxID,
 	)
+
+	if len(msg.Tx) == 0 && msg.TxID == (ids.ID{}) {
+		log.Warn(
+			"AppGossip received empty AtomicTxNotify Message",
+			"peerID", nodeID,
+		)
+		return nil
+	}
 
 	// In the case that the gossip message contains a transaction,
 	// attempt to parse it and add it as a remote.
@@ -635,6 +675,14 @@ func (h *GossipHandler) HandleEthTxsNotify(nodeID ids.ShortID, _ uint32, msg *me
 		"len(txs)", len(msg.Txs),
 		"len(txsBytes)", len(msg.TxsBytes),
 	)
+
+	if len(msg.TxsBytes) == 0 && len(msg.Txs) == 0 {
+		log.Warn(
+			"AppGossip received empty EthTxsNotify Message",
+			"peerID", nodeID,
+		)
+		return nil
+	}
 
 	// In the case that the gossip message contains transactions,
 	// attempt to parse it and add it as a remote. The maximum size of this
