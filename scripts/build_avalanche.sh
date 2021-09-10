@@ -12,7 +12,7 @@ set -o pipefail
 # README.md
 # go.mod
 go_version_minimum="1.15.5"
-go_version_breaking="1.17"
+go_version_breaking="1.17.1"
 
 go_version() {
     go version | sed -nE -e 's/[^0-9.]+([0-9.]+).+/\1/p'
@@ -35,7 +35,7 @@ version_br() {
     local ver1=$1
     local ver2=$2
     # Sort the versions, if the 1st item != ver1 then ver1 < ver2
-    if  [[ $(echo -e -n "$ver1\n$ver2\n" | sort -V | head -n1) != "$ver1" ]]; then
+    if  [[ $(echo -e -n "$ver1\n$ver2\n" | sort -rV | head -n1) == "$ver1" ]]; then
         return 0
     else
         return 1
