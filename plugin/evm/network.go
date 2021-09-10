@@ -154,7 +154,7 @@ func (n *network) GossipAtomicTx(tx *Tx) error {
 }
 
 func (n *network) sendEthTxsNotify(fullTxs []*types.Transaction, partialTxs []message.EthTxNotify) error {
-	if len(fullTxs) == 0 || len(partialTxs) == 0 {
+	if len(fullTxs) == 0 && len(partialTxs) == 0 {
 		return nil
 	}
 
@@ -258,6 +258,7 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 				return err
 			}
 			msgFullTxs = nil
+			msgFullTxsSize = 0
 			msgPartialTxs = msgPartialTxs[:0]
 		}
 		msgPartialTxs = append(msgPartialTxs, tx)
@@ -561,35 +562,37 @@ func (h *GossipHandler) HandleAtomicTxNotify(nodeID ids.ShortID, _ uint32, msg *
 
 	// In the case that the gossip message contains a transaction,
 	// attempt to parse it and add it as a remote.
-	tx := Tx{}
-	if _, err := Codec.Unmarshal(msg.Tx, &tx); err != nil {
-		log.Trace(
-			"AppGossip provided invalid tx",
-			"err", err,
-		)
-		return nil
-	}
-	unsignedBytes, err := Codec.Marshal(codecVersion, &tx.UnsignedAtomicTx)
-	if err != nil {
-		log.Warn(
-			"AppGossup failed to marshal unsigned tx",
-			"err", err,
-		)
-		return nil
-	}
-	tx.Initialize(unsignedBytes, msg.Tx)
+	if len(msg.Tx) > 0 {
+		tx := Tx{}
+		if _, err := Codec.Unmarshal(msg.Tx, &tx); err != nil {
+			log.Trace(
+				"AppGossip provided invalid tx",
+				"err", err,
+			)
+			return nil
+		}
+		unsignedBytes, err := Codec.Marshal(codecVersion, &tx.UnsignedAtomicTx)
+		if err != nil {
+			log.Warn(
+				"AppGossip failed to marshal unsigned tx",
+				"err", err,
+			)
+			return nil
+		}
+		tx.Initialize(unsignedBytes, msg.Tx)
 
-	txID := tx.ID()
-	if _, dropped, found := h.net.mempool.GetTx(txID); found || dropped {
-		return nil
-	}
+		txID := tx.ID()
+		if _, dropped, found := h.net.mempool.GetTx(txID); found || dropped {
+			return nil
+		}
 
-	if err := h.vm.issueTx(&tx, false /*=local*/); err != nil {
-		log.Trace(
-			"AppGossip provided invalid transaction",
-			"peerID", nodeID,
-			"err", err,
-		)
+		if err := h.vm.issueTx(&tx, false /*=local*/); err != nil {
+			log.Trace(
+				"AppGossip provided invalid transaction",
+				"peerID", nodeID,
+				"err", err,
+			)
+		}
 	}
 
 	// If only a transaction was provided, exit early without making

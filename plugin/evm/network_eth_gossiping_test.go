@@ -307,7 +307,7 @@ func TestMempoolEthTxsAppRequestHandling(t *testing.T) {
 	if err != nil {
 		t.Fatal("could not retrieve tx address")
 	}
-	msg := message.EthTxsNotify{
+	msg := message.EthTxsRequest{
 		Txs: []message.EthTxNotify{{
 			Hash:   tx.Hash(),
 			Sender: txSender,
