@@ -211,7 +211,6 @@ func TestMempoolAtmTxsAddGossiped(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 	mempool := vm.mempool
 	net := vm.network
 
@@ -271,7 +270,6 @@ func TestMempoolAtmTxsAppResponseHandling(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 	mempool := vm.mempool
 	net := vm.network
 
@@ -345,7 +343,6 @@ func TestMempoolAtmTxsAppResponseHandlingInvalidTx(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 	mempool := vm.mempool
 	net := vm.network
 
@@ -389,7 +386,6 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 	mempool := vm.mempool
 
 	nodeID := ids.GenerateTestShortID()
@@ -452,7 +448,6 @@ func TestMempoolAtmTxsAppGossipHandlingInvalidTx(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 	mempool := vm.mempool
 
 	var txRequested bool
@@ -496,7 +491,6 @@ func TestMempoolAtmTxsAppRequestHandling(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 	mempool := vm.mempool
 
 	var (
@@ -551,7 +545,6 @@ func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 
 	// Create a simple tx
 	tx := getValidTx(vm, sharedMemory, t)
@@ -600,5 +593,5 @@ func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 	<-signal
 	assert.NoError(vm.GossipAtomicTx(tx))
 
-	wg.Wait()
+	attemptAwait(t, &wg, 5*time.Second)
 }

@@ -93,7 +93,6 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 	vm.chain.GetTxPool().SetGasPrice(common.Big1)
 	vm.chain.GetTxPool().SetMinFee(common.Big0)
 
@@ -173,7 +172,7 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 	assert.Contains(errs[1].Error(), "already known")
 	assert.NoError(errs[2], "failed adding coreth tx to mempool")
 
-	wg.Wait()
+	attemptAwait(t, &wg, 5*time.Second)
 }
 
 // show that locally issued eth txs are chunked correctly
@@ -193,7 +192,6 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 	vm.chain.GetTxPool().SetGasPrice(common.Big1)
 	vm.chain.GetTxPool().SetMinFee(common.Big0)
 
@@ -277,7 +275,7 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 	}
 	assert.NoError(vm.GossipEthTxs(ethTxs))
 
-	wg.Wait()
+	attemptAwait(t, &wg, 5*time.Second)
 }
 
 // show that a geth tx discovered from gossip is requested to the same node that
@@ -298,7 +296,6 @@ func TestMempoolEthTxsAppGossipHandling(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 	vm.chain.GetTxPool().SetGasPrice(common.Big1)
 	vm.chain.GetTxPool().SetMinFee(common.Big0)
 
@@ -366,7 +363,6 @@ func TestMempoolEthTxsAppResponseHandling(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 	vm.chain.GetTxPool().SetGasPrice(common.Big1)
 	vm.chain.GetTxPool().SetMinFee(common.Big0)
 
@@ -418,7 +414,7 @@ func TestMempoolEthTxsAppResponseHandling(t *testing.T) {
 	err = vm.AppResponse(nodeID, 0, msgBytes)
 	assert.NoError(err)
 
-	wg.Wait()
+	attemptAwait(t, &wg, 5*time.Second)
 
 	has = pool.Has(txs[0].Hash())
 	assert.True(has, "responses with known requestID should be added to the mempool")
@@ -447,7 +443,6 @@ func TestMempoolEthTxsAppRequestHandling(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 	vm.chain.GetTxPool().SetGasPrice(common.Big1)
 	vm.chain.GetTxPool().SetMinFee(common.Big0)
 
