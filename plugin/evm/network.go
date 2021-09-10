@@ -202,10 +202,10 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 
 	// Attempt to gossip selectedTxs first
 	msgSelectedTxs := make([]*types.Transaction, 0)
-	msgSelectedTxsSize := 0
+	msgSelectedTxsSize := common.StorageSize(0)
 	for _, tx := range selectedTxs {
 		size := tx.Size()
-		if msgSelectedTxsSize+size > message.IdealETHNotifySize {
+		if msgSelectedTxsSize+size > message.IdealETHMsgSize {
 			// gossip existing
 			txBytes, err := rlp.EncodeToBytes(msgSelectedTxs)
 			if err != nil {
@@ -239,7 +239,7 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 		msgSelectedTxsSize += size
 	}
 
-	msgTxs := make([]EthTxNotify, 0)
+	msgTxs := make([]message.EthTxNotify, 0)
 	for _, txData := range txsData {
 		if len(msgTxs) > message.MaxEthTxsLen {
 			msg := message.EthTxsNotify{
@@ -395,10 +395,18 @@ func (h *RequestHandler) HandleEthTxsRequest(nodeID ids.ShortID, requestID uint3
 
 	pool := h.net.chain.GetTxPool()
 	txs := make([]*types.Transaction, 0, len(msg.Txs))
+	txsSize := common.StorageSize(0)
 	for _, txData := range msg.Txs {
 		tx := pool.Get(txData.Hash)
 		if tx != nil {
+			size := tx.Size()
+			if txsSize+size > message.IdealETHMsgSize {
+				// If the size of the response is larger than [IdealETHMsgSize], then
+				// we stop appending txs to the response.
+				break
+			}
 			txs = append(txs, tx)
+			txsSize += size
 		} else {
 			log.Trace(
 				"AppRequest asked for eth tx that isn't in the mempool",
@@ -676,14 +684,6 @@ func (h *GossipHandler) HandleEthTxsNotify(nodeID ids.ShortID, _ uint32, msg *me
 			)
 			return nil
 		}
-		// TODO: overhaul how limiting done here
-		if len(txs) > message.MaxEthTxsLen {
-			log.Trace(
-				"AppGossip provided too many txs",
-				"len(txs)", len(txs),
-			)
-			return nil
-		}
 		errs := h.net.chain.GetTxPool().AddRemotes(txs)
 		for _, err := range errs {
 			if err != nil {
@@ -693,6 +693,16 @@ func (h *GossipHandler) HandleEthTxsNotify(nodeID ids.ShortID, _ uint32, msg *me
 				)
 			}
 		}
+	}
+
+	// Truncate transactions to request if recieve more than gossiped.
+	if len(msg.Txs) > message.MaxEthTxsLen {
+		log.Trace(
+			"AppGossip provided > MaxEthTxsLen",
+			"len(msg.Txs)", len(msg.Txs),
+			"peerID", nodeID,
+		)
+		msg.Txs = msg.Txs[:message.MaxEthTxsLen]
 	}
 
 	// If message contains any transaction hashes, determine which hashes are
