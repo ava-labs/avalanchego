@@ -178,6 +178,39 @@ func TestSuggestTipCapNetworkUpgrades(t *testing.T) {
 	}
 }
 
+func TestSuggestTipCapEmptyExtDataGasUsage(t *testing.T) {
+	txTip := big.NewInt(55 * params.GWei)
+	applyGasPriceTest(t, suggestTipCapTest{
+		chainConfig:     params.TestChainConfig,
+		numBlocks:       1,
+		extDataGasUsage: nil,
+		genBlock: func(i int, b *core.BlockGen) {
+			b.SetCoinbase(common.Address{1})
+
+			signer := types.LatestSigner(params.TestChainConfig)
+			baseFee := b.BaseFee()
+			feeCap := new(big.Int).Add(baseFee, txTip)
+			for j := 0; j < 50; j++ {
+				tx := types.NewTx(&types.DynamicFeeTx{
+					ChainID:   params.TestChainConfig.ChainID,
+					Nonce:     b.TxNonce(addr),
+					To:        &common.Address{},
+					Gas:       params.TxGas,
+					GasFeeCap: feeCap,
+					GasTipCap: txTip,
+					Data:      []byte{},
+				})
+				tx, err := types.SignTx(tx, signer, key)
+				if err != nil {
+					t.Fatalf("failed to create tx: %s", err)
+				}
+				b.AddTx(tx)
+			}
+		},
+		expectedTip: big.NewInt(10_714_285_714),
+	})
+}
+
 func TestSuggestTipCapSimple(t *testing.T) {
 	txTip := big.NewInt(55 * params.GWei)
 	applyGasPriceTest(t, suggestTipCapTest{
