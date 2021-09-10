@@ -140,7 +140,7 @@ func (self *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, heade
 		return errBlockGasCostTooLarge
 	}
 	if header.BlockGasCost.Cmp(expectedBlockGasCost) != 0 {
-		return fmt.Errorf("expected block gas cost (%d), found (%d)", expectedBlockGasCost, header.BlockGasCost)
+		return fmt.Errorf("invalid block gas cost: have %d, want %d", header.BlockGasCost, expectedBlockGasCost)
 	}
 	// ExtDataGasUsed correctness is checked during block validation
 	// (when the validator has access to the block contents)
