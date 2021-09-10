@@ -200,8 +200,6 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 	fullTxs := make([]*types.Transaction, 0)
 	partialTxs := make([]message.EthTxNotify, 0)
 
-	// TODO: import SenderCacher correctly instead of using a global var
-	// Recover signatures before `core` package processing
 	if cache := n.chain.SenderCacher(); cache != nil {
 		cache.Recover(n.signer, txs)
 	}
@@ -258,7 +256,6 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 				return err
 			}
 			msgFullTxs = nil
-			msgFullTxsSize = 0
 			msgPartialTxs = msgPartialTxs[:0]
 		}
 		msgPartialTxs = append(msgPartialTxs, tx)
@@ -663,7 +660,7 @@ func (h *GossipHandler) HandleEthTxsNotify(nodeID ids.ShortID, _ uint32, msg *me
 		}
 	}
 
-	// Truncate transactions to request if recieve more than gossiped.
+	// Truncate transactions in request if receive more than max allowed.
 	if len(msg.Txs) > message.MaxEthTxsLen {
 		log.Trace(
 			"AppGossip provided > MaxEthTxsLen",

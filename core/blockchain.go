@@ -32,6 +32,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -173,6 +174,8 @@ type BlockChain struct {
 	badBlocks *lru.Cache // Bad block cache
 
 	lastAccepted *types.Block // Prevents reorgs past this height
+
+	senderCacher *TxSenderCacher
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -207,6 +210,7 @@ func NewBlockChain(
 		engine:        engine,
 		vmConfig:      vmConfig,
 		badBlocks:     badBlocks,
+		senderCacher:  newTxSenderCacher(runtime.NumCPU()),
 	}
 	bc.validator = NewBlockValidator(chainConfig, bc, engine)
 	bc.prefetcher = newStatePrefetcher(chainConfig, bc, engine)
@@ -260,7 +264,7 @@ func (bc *BlockChain) GetVMConfig() *vm.Config {
 
 // SenderCacher returns the *TxSenderCacher used within the core package.
 func (bc *BlockChain) SenderCacher() *TxSenderCacher {
-	return senderCacher
+	return bc.senderCacher
 }
 
 // empty returns an indicator whether the blockchain is empty.
@@ -1085,7 +1089,7 @@ func (bc *BlockChain) gatherBlockLogs(hash common.Hash, number uint64, removed b
 }
 
 func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
-	senderCacher.Recover(types.MakeSigner(bc.chainConfig, block.Number(), new(big.Int).SetUint64(block.Time())), block.Transactions())
+	bc.senderCacher.Recover(types.MakeSigner(bc.chainConfig, block.Number(), new(big.Int).SetUint64(block.Time())), block.Transactions())
 
 	err := bc.engine.VerifyHeader(bc, block.Header())
 	if err == nil {
