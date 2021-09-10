@@ -73,6 +73,7 @@ var (
 	apricotRulesPhase1 = params.Rules{IsApricotPhase1: true}
 	apricotRulesPhase2 = params.Rules{IsApricotPhase1: true, IsApricotPhase2: true}
 	apricotRulesPhase3 = params.Rules{IsApricotPhase1: true, IsApricotPhase2: true, IsApricotPhase3: true}
+	apricotRulesPhase4 = params.Rules{IsApricotPhase1: true, IsApricotPhase2: true, IsApricotPhase3: true, IsApricotPhase4: true}
 )
 
 func init() {
@@ -3924,11 +3925,11 @@ func TestBuildApricotPhase4Block(t *testing.T) {
 	}
 
 	ethBlk := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
-	if ethBlk.BlockGasCost() == nil || ethBlk.BlockGasCost().Cmp(common.Big0) != 0 {
-		t.Fatalf("expected blockGasCost to be 0 but got %d", ethBlk.BlockGasCost())
+	if eBlockGasCost := ethBlk.BlockGasCost(); eBlockGasCost == nil || eBlockGasCost.Cmp(common.Big0) != 0 {
+		t.Fatalf("expected blockGasCost to be 0 but got %d", eBlockGasCost)
 	}
-	if ethBlk.ExtDataGasUsed() == nil || ethBlk.ExtDataGasUsed().Cmp(big.NewInt(1230)) != 0 {
-		t.Fatalf("expected extDataGasUsed to be 1000 but got %d", ethBlk.ExtDataGasUsed())
+	if eExtDataGasUsed := ethBlk.ExtDataGasUsed(); eExtDataGasUsed == nil || eExtDataGasUsed.Cmp(big.NewInt(1230)) != 0 {
+		t.Fatalf("expected extDataGasUsed to be 1000 but got %d", eExtDataGasUsed)
 	}
 	minRequiredTip, err := dummy.MinRequiredTip(vm.chainConfig, ethBlk.Header())
 	if err != nil {

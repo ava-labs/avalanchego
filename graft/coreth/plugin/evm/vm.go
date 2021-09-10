@@ -216,7 +216,7 @@ func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
 
 // implements SnowmanPlusPlusVM interface
 func (vm *VM) GetActivationTime() time.Time {
-	return time.Unix(0, 0) // TODO: setup upon deploy
+	return time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0)
 }
 
 // Initialize implements the snowman.ChainVM interface
@@ -523,7 +523,7 @@ func (vm *VM) Shutdown() error {
 // buildBlock builds a block to be wrapped by ChainState
 func (vm *VM) buildBlock() (snowman.Block, error) {
 	block, err := vm.chain.GenerateBlock()
-	vm.builder.buildBlock()
+	vm.builder.handleGenerateBlock()
 	if err != nil {
 		vm.mempool.CancelCurrentTx()
 		return nil, err
@@ -548,7 +548,7 @@ func (vm *VM) buildBlock() (snowman.Block, error) {
 	// We call verify without writes here to avoid generating a reference
 	// to the blk state root in the triedb when we are going to call verify
 	// again from the consensus engine with writes enabled.
-	if err := blk.verify( /*writes*/ false); err != nil {
+	if err := blk.verify(false /*=writes*/); err != nil {
 		vm.mempool.CancelCurrentTx()
 		return nil, fmt.Errorf("block failed verification due to: %w", err)
 	}

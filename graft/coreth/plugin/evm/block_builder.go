@@ -126,7 +126,10 @@ func (b *blockBuilder) migrateAP4() {
 	}
 }
 
-func (b *blockBuilder) buildBlock() {
+// handleGenerateBlock should be called immediately after [BuildBlock].
+// [handleGenerateBlock] invocation could lead to quiesence, building a block with
+// some delay, or attempting to build another block immediately.
+func (b *blockBuilder) handleGenerateBlock() {
 	b.buildBlockLock.Lock()
 	defer b.buildBlockLock.Unlock()
 
