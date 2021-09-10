@@ -705,7 +705,7 @@ func getSubnetConfigs(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.Sub
 	}
 	var subnetConfigs map[ids.ID]chains.SubnetConfig
 	if len(subnetConfigPath) > 0 {
-		subnetConfigs, err = readSubnetConfigs(subnetConfigPath, subnetIDs)
+		subnetConfigs, err = readSubnetConfigs(subnetConfigPath, subnetIDs, defaultSubnetConfig(v))
 		if err != nil {
 			return nil, fmt.Errorf("couldn't read subnet configs: %w", err)
 		}
@@ -718,7 +718,7 @@ func getSubnetConfigs(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.Sub
 }
 
 // readSubnetConfigs reads subnet config files from a path and given subnetIDs and returns a map.
-func readSubnetConfigs(subnetConfigPath string, subnetIDs []ids.ID) (map[ids.ID]chains.SubnetConfig, error) {
+func readSubnetConfigs(subnetConfigPath string, subnetIDs []ids.ID, defaultSubnetConfig chains.SubnetConfig) (map[ids.ID]chains.SubnetConfig, error) {
 	subnetConfigs := make(map[ids.ID]chains.SubnetConfig)
 	for _, subnetID := range subnetIDs {
 		filePath := path.Join(subnetConfigPath, subnetID.String()+subnetConfigFileExt)
@@ -742,15 +742,24 @@ func readSubnetConfigs(subnetConfigPath string, subnetIDs []ids.ID) (map[ids.ID]
 			return nil, err
 		}
 
-		configData := chains.SubnetConfig{}
+		configData := defaultSubnetConfig
 		if err := json.Unmarshal(file, &configData); err != nil {
 			return nil, err
 		}
-
+		if err := configData.ConsensusParameters.Valid(); err != nil {
+			return nil, err
+		}
 		subnetConfigs[subnetID] = configData
 	}
 
 	return subnetConfigs, nil
+}
+
+func defaultSubnetConfig(v *viper.Viper) chains.SubnetConfig {
+	return chains.SubnetConfig{
+		ConsensusParameters: getConsensusConfig(v),
+		ValidatorOnly:       false,
+	}
 }
 
 // checks if C chain config bytes already set in map with alias key.

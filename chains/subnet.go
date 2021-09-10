@@ -4,9 +4,12 @@
 package chains
 
 import (
+	"bytes"
+	"encoding/json"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
@@ -22,6 +25,12 @@ type Subnet interface {
 
 	addChain(chainID ids.ID)
 	removeChain(chainID ids.ID)
+}
+
+type SubnetConfig struct {
+	// ValidatorOnly indicates that this Subnet's Chains are available to only subnet validators.
+	ValidatorOnly       bool                 `json:"validatorOnly"`
+	ConsensusParameters avalanche.Parameters `json:"consensusParameters"`
 }
 
 type subnet struct {
@@ -75,4 +84,19 @@ func (s *subnet) removeChain(chainID ids.ID) {
 	defer s.lock.Unlock()
 
 	s.bootstrapping.Remove(chainID)
+}
+
+func (config *SubnetConfig) UnmarshalJSON(data []byte) error {
+	// without a new type, unmarshal gets into a infinite loop
+	type xconfig SubnetConfig
+	sc := xconfig(*config)
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields() // Force errors
+
+	if err := dec.Decode(&sc); err != nil {
+		return err
+	}
+
+	*config = SubnetConfig(sc)
+	return nil
 }
