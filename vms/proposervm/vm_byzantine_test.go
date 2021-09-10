@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
@@ -204,6 +205,109 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 
 	if err := yBlock.Verify(); err == nil {
 		t.Fatal("unexpectedly passed block verification")
+	}
+}
+
+// Ensure that a byzantine node issuing an invalid PostForkBlock (B) when the
+// parent block (X) is issued into a PostForkBlock (A) will be marked as invalid
+// correctly.
+//     G
+//   / |
+// A - X
+//   / |
+// B - Y
+func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
+	forkTime := time.Unix(0, 0) // enable ProBlks
+	coreVM, _, proVM, gBlock := initTestProposerVM(t, forkTime, 0)
+
+	xBlock := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    gBlock.ID(),
+		HeightV:    gBlock.Height() + 1,
+		TimestampV: gBlock.Timestamp().Add(proposer.MaxDelay),
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return xBlock, nil }
+
+	aBlock, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatalf("proposerVM could not build block due to %s", err)
+	}
+
+	coreVM.BuildBlockF = nil
+
+	yBlockBytes := []byte{2}
+	yBlock := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     yBlockBytes,
+		ParentV:    xBlock.ID(),
+		HeightV:    xBlock.Height() + 1,
+		TimestampV: xBlock.Timestamp().Add(proposer.MaxDelay),
+	}
+
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case gBlock.ID():
+			return gBlock, nil
+		case xBlock.ID():
+			return xBlock, nil
+		case yBlock.ID():
+			return yBlock, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(blockBytes []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(blockBytes, gBlock.Bytes()):
+			return gBlock, nil
+		case bytes.Equal(blockBytes, xBlock.Bytes()):
+			return xBlock, nil
+		case bytes.Equal(blockBytes, yBlock.Bytes()):
+			return yBlock, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	bStatelessBlock, err := block.BuildUnsigned(
+		xBlock.ID(),
+		yBlock.Timestamp(),
+		0,
+		yBlockBytes,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bBlock, err := proVM.ParseBlock(bStatelessBlock.Bytes())
+	if err != nil {
+		// If there was an error parsing, then this is fine.
+		return
+	}
+
+	if err := aBlock.Verify(); err != nil {
+		t.Fatalf("could not verify valid block due to %s", err)
+	}
+
+	// If there wasn't an error parsing - verify must return an error
+	if err := bBlock.Verify(); err == nil {
+		t.Fatal("should have marked the parsed block as invalid")
+	}
+
+	if err := aBlock.Accept(); err != nil {
+		t.Fatalf("could not accept valid block due to %s", err)
+	}
+
+	// If there wasn't an error parsing - verify must return an error
+	if err := bBlock.Verify(); err == nil {
+		t.Fatal("should have marked the parsed block as invalid")
 	}
 }
 

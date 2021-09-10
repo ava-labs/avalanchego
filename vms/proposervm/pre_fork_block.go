@@ -72,26 +72,8 @@ func (b *preForkBlock) verifyPreForkChild(child *preForkBlock) error {
 			return err
 		}
 
-		if parentStatus := b.Status(); parentStatus == choices.Accepted {
-			_, err := b.vm.GetLastAccepted()
-			if err == nil {
-				// If the parent block is accepted and it was a preForkBlock,
-				// then there shouldn't have been an accepted postForkBlock yet.
-				// If there was an accepted postForkBlock, then the parent
-				// wasn't a preForkBlock and this child block is invalid.
-				return errUnexpectedBlockType
-			}
-			if err != database.ErrNotFound {
-				// If an unexpected error was returned - propagate that that
-				// error.
-				return err
-			}
-		} else if b.vm.Tree.Contains(b.Block) {
-			// If the parent block is a preForkBlock, then it's inner block
-			// shouldn't have been registered into the inner block tree. If the
-			// parent block was registered into the inner block tree, then the
-			// parent wasn't a preForkBlock and this child block is invalid.
-			return errUnexpectedBlockType
+		if err := b.verifyIsPreForkBlock(); err != nil {
+			return err
 		}
 
 		b.vm.ctx.Log.Debug("allowing pre-fork block %s after the fork time because the parent is an oracle block",
@@ -104,6 +86,10 @@ func (b *preForkBlock) verifyPreForkChild(child *preForkBlock) error {
 // This method only returns nil once (during the transition)
 func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 	if err := verifyIsNotOracleBlock(b.Block); err != nil {
+		return err
+	}
+
+	if err := b.verifyIsPreForkBlock(); err != nil {
 		return err
 	}
 
@@ -226,4 +212,27 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 
 func (b *preForkBlock) pChainHeight() (uint64, error) {
 	return 0, nil
+}
+
+func (b *preForkBlock) verifyIsPreForkBlock() error {
+	if status := b.Status(); status == choices.Accepted {
+		_, err := b.vm.GetLastAccepted()
+		if err == nil {
+			// If this block is accepted and it was a preForkBlock, then there
+			// shouldn't have been an accepted postForkBlock yet. If there was
+			// an accepted postForkBlock, then this block wasn't a preForkBlock.
+			return errUnexpectedBlockType
+		}
+		if err != database.ErrNotFound {
+			// If an unexpected error was returned - propagate that that
+			// error.
+			return err
+		}
+	} else if b.vm.Tree.Contains(b.Block) {
+		// If this block is a preForkBlock, then it's inner block shouldn't have
+		// been registered into the inner block tree. If this block was
+		// registered into the inner block tree, then it wasn't a preForkBlock.
+		return errUnexpectedBlockType
+	}
+	return nil
 }

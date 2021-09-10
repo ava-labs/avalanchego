@@ -65,13 +65,20 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time, minPChainHeight
 		return nil
 	}
 	coreVM.LastAcceptedF = func() (ids.ID, error) { return coreGenBlk.ID(), nil }
-	coreVM.GetBlockF = func(ids.ID) (snowman.Block, error) { return coreGenBlk, nil }
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch {
+		case blkID == coreGenBlk.ID():
+			return coreGenBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, coreGenBlk.Bytes()):
 			return coreGenBlk, nil
 		default:
-			return nil, fmt.Errorf("Unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -868,6 +875,16 @@ func TestPreFork_SetPreference(t *testing.T) {
 		t.Fatal("Could not build proposer block")
 	}
 
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case coreBlk0.ID():
+			return coreBlk0, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, coreGenBlk.Bytes()):
@@ -875,7 +892,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 		case bytes.Equal(b, coreBlk0.Bytes()):
 			return coreBlk0, nil
 		default:
-			return nil, fmt.Errorf("Unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 	if err = proVM.SetPreference(builtBlk.ID()); err != nil {
@@ -895,7 +912,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk1, nil }
 	nextBlk, err := proVM.BuildBlock()
 	if err != nil {
-		t.Fatal("Could not build proposer block")
+		t.Fatalf("Could not build proposer block %s", err)
 	}
 	if nextBlk.Parent() != builtBlk.ID() {
 		t.Fatal("Preferred block should be parent of next built block")
