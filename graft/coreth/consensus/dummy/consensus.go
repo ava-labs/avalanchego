@@ -61,6 +61,13 @@ func NewETHFaker() *DummyEngine {
 	}
 }
 
+func NewComplexETHFaker(cb *ConsensusCallbacks) *DummyEngine {
+	return &DummyEngine{
+		cb:       cb,
+		ethFaker: true,
+	}
+}
+
 func NewFaker() *DummyEngine {
 	return NewDummyEngine(new(ConsensusCallbacks))
 }
