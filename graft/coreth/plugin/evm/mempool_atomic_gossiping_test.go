@@ -5,7 +5,6 @@ package evm
 
 import (
 	"testing"
-	"time"
 
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
@@ -17,12 +16,11 @@ import (
 func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 	assert := assert.New(t)
 
-	issuer, vm, _, sharedMemory, _ := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	issuer, vm, _, sharedMemory, _ := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
 	defer func() {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 	mempool := vm.mempool
 
 	// add a tx to it
@@ -66,12 +64,11 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 func TestMempoolMaxMempoolSizeHandling(t *testing.T) {
 	assert := assert.New(t)
 
-	_, vm, _, sharedMemory, _ := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	_, vm, _, sharedMemory, _ := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
 	defer func() {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 	mempool := vm.mempool
 
 	// create candidate tx
