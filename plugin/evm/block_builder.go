@@ -56,8 +56,6 @@ type blockBuilder struct {
 	// [buildBlockTimer] is a two stage timer handling block production.
 	// Stage1 build a block if the batch size has been reached.
 	// Stage2 build a block regardless of the size.
-	//
-	// NOTE: Only used prior to AP4.
 	buildBlockTimer *timer.Timer
 
 	// buildStatus signals the phase of block building the VM is currently in.
@@ -88,11 +86,10 @@ func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *bl
 }
 
 func (b *blockBuilder) handleBlockBuilding() {
-	if !b.chainConfig.IsApricotPhase4(big.NewInt(time.Now().Unix())) {
-		b.buildBlockTimer = timer.NewStagedTimer(b.buildBlockTwoStageTimer)
-		go b.ctx.Log.RecoverAndPanic(b.buildBlockTimer.Dispatch)
+	b.buildBlockTimer = timer.NewStagedTimer(b.buildBlockTwoStageTimer)
+	go b.ctx.Log.RecoverAndPanic(b.buildBlockTimer.Dispatch)
 
-		// Stop [buildBlockTwoStageTimer] at the start of AP4.
+	if !b.chainConfig.IsApricotPhase4(big.NewInt(time.Now().Unix())) {
 		b.shutdownWg.Add(1)
 		go b.ctx.Log.RecoverAndPanic(b.migrateAP4)
 	} else {
