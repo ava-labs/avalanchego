@@ -26,9 +26,12 @@ const (
 	maxBlockTime = 3 * time.Second
 	batchSize    = 250
 
+	// AP4 Parameters
+	minBlockTimeAP4 = 500 * time.Millisecond
+
 	dontBuild        buildingBlkStatus = iota
 	conditionalBuild                   // Only used prior to AP4
-	mayBuild                           // Only used prior to AP4
+	mayBuild
 	building
 )
 
@@ -53,8 +56,6 @@ type blockBuilder struct {
 	// [buildBlockTimer] is a two stage timer handling block production.
 	// Stage1 build a block if the batch size has been reached.
 	// Stage2 build a block regardless of the size.
-	//
-	// NOTE: Only used prior to AP4.
 	buildBlockTimer *timer.Timer
 
 	// buildStatus signals the phase of block building the VM is currently in.
@@ -85,11 +86,10 @@ func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *bl
 }
 
 func (b *blockBuilder) handleBlockBuilding() {
-	if !b.chainConfig.IsApricotPhase4(big.NewInt(time.Now().Unix())) {
-		b.buildBlockTimer = timer.NewStagedTimer(b.buildBlockTwoStageTimer)
-		go b.ctx.Log.RecoverAndPanic(b.buildBlockTimer.Dispatch)
+	b.buildBlockTimer = timer.NewStagedTimer(b.buildBlockTwoStageTimer)
+	go b.ctx.Log.RecoverAndPanic(b.buildBlockTimer.Dispatch)
 
-		// Stop [buildBlockTwoStageTimer] at the start of AP4.
+	if !b.chainConfig.IsApricotPhase4(big.NewInt(time.Now().Unix())) {
 		b.shutdownWg.Add(1)
 		go b.ctx.Log.RecoverAndPanic(b.migrateAP4)
 	} else {
@@ -112,12 +112,12 @@ func (b *blockBuilder) migrateAP4() {
 	duration := time.Until(timestamp)
 	select {
 	case <-time.After(duration):
-		b.buildBlockTimer.Stop()
 		b.isAP4 = true
 		b.buildBlockLock.Lock()
-		b.buildBlockTimer = nil
 		// Flush any invalid statuses leftover from legacy block timer builder
-		b.buildStatus = dontBuild
+		if b.buildStatus == conditionalBuild {
+			b.buildStatus = mayBuild
+		}
 		b.buildBlockLock.Unlock()
 	case <-b.shutdownChan:
 		// buildBlockTimer will never be nil because we exit as soon as it is ever
@@ -148,11 +148,13 @@ func (b *blockBuilder) handleGenerateBlock() {
 		}
 	} else {
 		// If we still need to build a block immediately after building, we let the
-		// engine know right away. It is often the case in AP4 that a block (with
-		// the same txs) could be built after a few seconds of delay as the
-		// [baseFee] and/or [blockGasCost] decrease.
+		// engine know it [mayBuild] in [minBlockTimeAP4].
+		//
+		// It is often the case in AP4 that a block (with the same txs) could be built
+		// after a few seconds of delay as the [baseFee] and/or [blockGasCost] decrease.
 		if b.needToBuild() {
-			b.markBuilding()
+			b.buildStatus = mayBuild
+			b.buildBlockTimer.SetTimeoutIn(minBlockTimeAP4)
 		} else {
 			b.buildStatus = dontBuild
 		}
