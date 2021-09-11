@@ -43,7 +43,7 @@ import (
 
 var (
 	DefaultMaxPrice = big.NewInt(150 * params.GWei)
-	DefaultMinPrice = big.NewInt(10 * params.GWei)
+	DefaultMinPrice = big.NewInt(1 * params.GWei)
 )
 
 type Config struct {
