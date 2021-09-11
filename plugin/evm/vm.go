@@ -345,13 +345,14 @@ func (vm *VM) Initialize(
 	// initialize new gossip network
 	//
 	// NOTE: This network must be initialized after the atomic mempool.
-	vm.network = vm.NewNetwork(
-		time.Unix(0, 0), // TODO: setup upon deploy
-		appSender,
-		ethChain,
-		vm.mempool,
-		types.LatestSigner(g.Config),
-	)
+	if vm.chainConfig.ApricotPhase4BlockTimestamp != nil {
+		vm.network = vm.NewNetwork(
+			time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0),
+			appSender,
+			ethChain,
+			vm.mempool,
+		)
+	}
 
 	// start goroutines to manage block building
 	//

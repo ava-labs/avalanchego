@@ -4,7 +4,6 @@
 package evm
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -33,18 +32,8 @@ type network struct {
 	appSender commonEng.AppSender
 	chain     *coreth.ETHChain
 	mempool   *Mempool
-	signer    types.Signer
 
-	requestID uint32
-	// requestMaps allow checking that provided content matches the requested
-	// content. They are populated upon sending an AppRequest and cleaned up
-	// upon receipt of the corresponding AppResponse or AppRequestFailed.
-	requestsAtmContent map[uint32]ids.ID
-	requestsEthContent map[uint32]map[common.Hash]struct{}
-
-	requestHandler  message.Handler
-	responseHandler message.Handler
-	gossipHandler   message.Handler
+	gossipHandler message.Handler
 
 	recentAtomicTxs *cache.LRU
 	recentEthTxs    *cache.LRU
@@ -55,23 +44,14 @@ func (vm *VM) NewNetwork(
 	appSender commonEng.AppSender,
 	chain *coreth.ETHChain,
 	mempool *Mempool,
-	signer types.Signer,
 ) *network {
 	net := &network{
 		gossipActivationTime: activationTime,
 		appSender:            appSender,
 		chain:                chain,
 		mempool:              mempool,
-		signer:               signer,
-		requestsAtmContent:   make(map[uint32]ids.ID),
-		requestsEthContent:   make(map[uint32]map[common.Hash]struct{}),
 		recentAtomicTxs:      &cache.LRU{Size: recentCacheSize},
 		recentEthTxs:         &cache.LRU{Size: recentCacheSize},
-	}
-	net.requestHandler = &RequestHandler{net: net}
-	net.responseHandler = &ResponseHandler{
-		vm:  vm,
-		net: net,
 	}
 	net.gossipHandler = &GossipHandler{
 		vm:  vm,
@@ -313,88 +293,25 @@ func (h *GossipHandler) HandleEthTxsNotify(nodeID ids.ShortID, _ uint32, msg *me
 		return nil
 	}
 
-	// In the case that the gossip message contains transactions,
-	// attempt to parse it and add it as a remote. The maximum size of this
-	// encoded object is enforced by the codec.
-	if len(msg.TxsBytes) > 0 {
-		txs := make([]*types.Transaction, 0)
-		if err := rlp.DecodeBytes(msg.TxsBytes, &txs); err != nil {
-			log.Trace(
-				"AppGossip provided invalid txs",
-				"peerID", nodeID,
-				"err", err,
-			)
-			return nil
-		}
-		errs := h.net.chain.GetTxPool().AddRemotes(txs)
-		for _, err := range errs {
-			if err != nil {
-				log.Debug(
-					"AppGossip failed to issue AddRemotes",
-					"err", err,
-				)
-			}
-		}
-	}
-
-	// Truncate transactions in request if receive more than max allowed.
-	if len(msg.Txs) > message.MaxEthTxsLen {
+	// The maximum size of this encoded object is enforced by the codec.
+	txs := make([]*types.Transaction, 0)
+	if err := rlp.DecodeBytes(msg.Txs, &txs); err != nil {
 		log.Trace(
-			"AppGossip provided > MaxEthTxsLen",
-			"len(msg.Txs)", len(msg.Txs),
+			"AppGossip provided invalid txs",
 			"peerID", nodeID,
-		)
-		msg.Txs = msg.Txs[:message.MaxEthTxsLen]
-	}
-
-	// If message contains any transaction hashes, determine which hashes are
-	// interesting and request them.
-	pool := h.net.chain.GetTxPool()
-	dataToRequest := make([]message.EthTxNotify, 0, len(msg.Txs))
-	for _, txData := range msg.Txs {
-		if pool.Has(txData.Hash) {
-			continue
-		}
-
-		if err := pool.CheckNonceOrdering(txData.Sender, txData.Nonce); err != nil {
-			log.Trace(
-				"AppGossip eth tx's nonce is too old",
-				"hash", txData.Hash,
-			)
-			continue
-		}
-
-		dataToRequest = append(dataToRequest, txData)
-	}
-
-	if len(dataToRequest) == 0 {
-		return nil
-	}
-
-	reqMsg := message.EthTxsRequest{
-		Txs: dataToRequest,
-	}
-	reqMsgBytes, err := message.Build(&reqMsg)
-	if err != nil {
-		log.Warn(
-			"failed to build response EthTxsNotify message",
-			"len(txs)", len(dataToRequest),
 			"err", err,
 		)
 		return nil
 	}
-
-	nodes := ids.ShortSet{nodeID: struct{}{}}
-	h.net.requestID++
-	if err := h.net.appSender.SendAppRequest(nodes, h.net.requestID, reqMsgBytes); err != nil {
-		return fmt.Errorf("AppGossip: failed sending AppRequest with error %s", err)
+	errs := h.net.chain.GetTxPool().AddRemotes(txs)
+	for i, err := range errs {
+		if err != nil {
+			log.Debug(
+				"AppGossip failed to add to mempool",
+				"err", err,
+				"tx", txs[i].Hash(),
+			)
+		}
 	}
-
-	// record content to check response later on
-	requestedTxIDs := make(map[common.Hash]struct{}, len(dataToRequest))
-	for _, txData := range dataToRequest {
-		requestedTxIDs[txData.Hash] = struct{}{}
-	}
-	h.net.requestsEthContent[h.net.requestID] = requestedTxIDs
 	return nil
 }
