@@ -1334,7 +1334,7 @@ func TestGenerateChainInvalidBlockFee(t *testing.T, create func(db ethdb.Databas
 	if err == nil {
 		t.Fatal("should not have been able to build a block because of insufficient block fee")
 	}
-	if !strings.Contains(err.Error(), "insufficient gas (0) to cover the block cost (100)") {
+	if !strings.Contains(err.Error(), "insufficient gas (0) to cover the block cost (50000)") {
 		t.Fatalf("should have gotten insufficient block fee error but got %v instead", err)
 	}
 }
@@ -1404,7 +1404,7 @@ func TestInsertChainInvalidBlockFee(t *testing.T, create func(db ethdb.Database,
 	if err == nil {
 		t.Fatal("should not have been able to build a block because of insufficient block fee")
 	}
-	if !strings.Contains(err.Error(), "insufficient gas (0) to cover the block cost (100)") {
+	if !strings.Contains(err.Error(), "insufficient gas (0) to cover the block cost (50000)") {
 		t.Fatalf("should have gotten insufficient block fee error but got %v instead", err)
 	}
 }

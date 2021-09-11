@@ -182,7 +182,7 @@ func TestSuggestTipCapEmptyExtDataGasUsage(t *testing.T) {
 	txTip := big.NewInt(55 * params.GWei)
 	applyGasPriceTest(t, suggestTipCapTest{
 		chainConfig:     params.TestChainConfig,
-		numBlocks:       50,
+		numBlocks:       3,
 		extDataGasUsage: nil,
 		genBlock: func(i int, b *core.BlockGen) {
 			b.SetCoinbase(common.Address{1})
@@ -207,7 +207,7 @@ func TestSuggestTipCapEmptyExtDataGasUsage(t *testing.T) {
 				b.AddTx(tx)
 			}
 		},
-		expectedTip: big.NewInt(39_047_619_047),
+		expectedTip: big.NewInt(9_915_178_571),
 	})
 }
 
@@ -215,7 +215,7 @@ func TestSuggestTipCapSimple(t *testing.T) {
 	txTip := big.NewInt(55 * params.GWei)
 	applyGasPriceTest(t, suggestTipCapTest{
 		chainConfig:     params.TestChainConfig,
-		numBlocks:       50,
+		numBlocks:       3,
 		extDataGasUsage: common.Big0,
 		genBlock: func(i int, b *core.BlockGen) {
 			b.SetCoinbase(common.Address{1})
@@ -240,7 +240,7 @@ func TestSuggestTipCapSimple(t *testing.T) {
 				b.AddTx(tx)
 			}
 		},
-		expectedTip: big.NewInt(39_047_619_047),
+		expectedTip: big.NewInt(9_915_178_571),
 	})
 }
 
@@ -248,7 +248,7 @@ func TestSuggestTipCapSimpleFloor(t *testing.T) {
 	txTip := big.NewInt(55 * params.GWei)
 	applyGasPriceTest(t, suggestTipCapTest{
 		chainConfig:     params.TestChainConfig,
-		numBlocks:       3,
+		numBlocks:       1,
 		extDataGasUsage: common.Big0,
 		genBlock: func(i int, b *core.BlockGen) {
 			b.SetCoinbase(common.Address{1})
@@ -281,7 +281,7 @@ func TestSuggestTipCapSmallTips(t *testing.T) {
 	tip := big.NewInt(550 * params.GWei)
 	applyGasPriceTest(t, suggestTipCapTest{
 		chainConfig:     params.TestChainConfig,
-		numBlocks:       50,
+		numBlocks:       3,
 		extDataGasUsage: common.Big0,
 		genBlock: func(i int, b *core.BlockGen) {
 			b.SetCoinbase(common.Address{1})
@@ -321,7 +321,7 @@ func TestSuggestTipCapSmallTips(t *testing.T) {
 			}
 		},
 		// NOTE: small tips do not bias estimate
-		expectedTip: big.NewInt(39_047_619_047),
+		expectedTip: big.NewInt(9_915_178_571),
 	})
 }
 
@@ -329,7 +329,7 @@ func TestSuggestTipCapExtDataUsage(t *testing.T) {
 	txTip := big.NewInt(55 * params.GWei)
 	applyGasPriceTest(t, suggestTipCapTest{
 		chainConfig:     params.TestChainConfig,
-		numBlocks:       50,
+		numBlocks:       3,
 		extDataGasUsage: big.NewInt(10_000),
 		genBlock: func(i int, b *core.BlockGen) {
 			b.SetCoinbase(common.Address{1})
@@ -354,6 +354,6 @@ func TestSuggestTipCapExtDataUsage(t *testing.T) {
 				b.AddTx(tx)
 			}
 		},
-		expectedTip: big.NewInt(38_679_245_283),
+		expectedTip: big.NewInt(9_822_523_584),
 	})
 }
