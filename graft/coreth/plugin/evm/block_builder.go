@@ -117,7 +117,6 @@ func (b *blockBuilder) migrateAP4() {
 	case <-time.After(duration):
 		b.isAP4 = true
 		b.buildBlockLock.Lock()
-		b.buildBlockTimer = nil
 		// Flush any invalid statuses leftover from legacy block timer builder
 		if b.buildStatus == conditionalBuild {
 			b.buildStatus = mayBuild
