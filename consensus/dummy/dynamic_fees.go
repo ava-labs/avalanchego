@@ -24,7 +24,7 @@ var (
 	ApricotPhase3BlockGasFee       uint64 = 1_000_000
 	ApricotPhase4MinBlockGasCost          = common.Big0
 	ApricotPhase4MaxBlockGasCost          = big.NewInt(1_000_000)
-	ApricotPhase4BlockGasCostDelta        = big.NewInt(100)
+	ApricotPhase4BlockGasCostDelta        = big.NewInt(1000)
 	rollupWindow                   uint64 = 10
 )
 
