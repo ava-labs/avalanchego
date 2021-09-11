@@ -33,12 +33,12 @@ func TestAcceptSingleBlock(t *testing.T) {
 
 	tr := New()
 
-	contains := tr.Contains(block)
+	_, contains := tr.Get(block)
 	assert.False(contains)
 
 	tr.Add(block)
 
-	contains = tr.Contains(block)
+	_, contains = tr.Get(block)
 	assert.True(contains)
 
 	err := tr.Accept(block)
@@ -70,10 +70,10 @@ func TestAcceptBlockConflict(t *testing.T) {
 	tr.Add(blockToAccept)
 	tr.Add(blockToReject)
 
-	contains := tr.Contains(blockToAccept)
+	_, contains := tr.Get(blockToAccept)
 	assert.True(contains)
 
-	contains = tr.Contains(blockToReject)
+	_, contains = tr.Get(blockToReject)
 	assert.True(contains)
 
 	err := tr.Accept(blockToAccept)
@@ -115,13 +115,13 @@ func TestAcceptChainConflict(t *testing.T) {
 	tr.Add(blockToReject)
 	tr.Add(blockToRejectChild)
 
-	contains := tr.Contains(blockToAccept)
+	_, contains := tr.Get(blockToAccept)
 	assert.True(contains)
 
-	contains = tr.Contains(blockToReject)
+	_, contains = tr.Get(blockToReject)
 	assert.True(contains)
 
-	contains = tr.Contains(blockToRejectChild)
+	_, contains = tr.Get(blockToRejectChild)
 	assert.True(contains)
 
 	err := tr.Accept(blockToAccept)

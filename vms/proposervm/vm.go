@@ -361,11 +361,14 @@ func (vm *VM) verifyAndRecordInnerBlk(postFork PostForkBlock) error {
 	// Note that if [innerBlk.Verify] returns nil, this method returns nil. This
 	// must always remain the case to maintain the inner block's invariant that
 	// if it's Verify() returns nil, it is eventually accepted or rejected.
-	if innerBlk := postFork.getInnerBlk(); !vm.Tree.Contains(innerBlk) {
-		if err := innerBlk.Verify(); err != nil {
+	currentInnerBlk := postFork.getInnerBlk()
+	if originalInnerBlk, contains := vm.Tree.Get(currentInnerBlk); !contains {
+		if err := currentInnerBlk.Verify(); err != nil {
 			return err
 		}
-		vm.Tree.Add(innerBlk)
+		vm.Tree.Add(currentInnerBlk)
+	} else {
+		postFork.setInnerBlk(originalInnerBlk)
 	}
 
 	vm.verifiedBlocks[postFork.ID()] = postFork

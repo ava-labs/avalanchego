@@ -50,6 +50,7 @@ type PostForkBlock interface {
 
 	setStatus(choices.Status)
 	getStatelessBlk() block.Block
+	setInnerBlk(snowman.Block)
 }
 
 // field of postForkBlock and postForkOption
@@ -228,6 +229,14 @@ func (p *postForkCommonComponents) buildChild(
 		child.ID(), parentTimestamp, newTimestamp)
 	// Persist the child
 	return child, p.vm.storePostForkBlock(child)
+}
+
+func (p *postForkCommonComponents) getInnerBlk() snowman.Block {
+	return p.innerBlk
+}
+
+func (p *postForkCommonComponents) setInnerBlk(innerBlk snowman.Block) {
+	p.innerBlk = innerBlk
 }
 
 func verifyIsOracleBlock(b snowman.Block) error {

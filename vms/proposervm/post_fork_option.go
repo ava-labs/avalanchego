@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
@@ -74,10 +73,6 @@ func (b *postForkOption) Verify() error {
 	}
 	b.timestamp = parent.Timestamp()
 	return parent.verifyPostForkOption(b)
-}
-
-func (b *postForkOption) getInnerBlk() snowman.Block {
-	return b.innerBlk
 }
 
 func (b *postForkOption) verifyPreForkChild(child *preForkBlock) error {

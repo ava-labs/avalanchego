@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"crypto"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -33,6 +34,8 @@ var (
 
 	genesisUnixTimestamp int64 = 1000
 	genesisTimestamp           = time.Unix(genesisUnixTimestamp, 0)
+
+	errUnverifiedBlock = errors.New("unverified block")
 )
 
 func init() {
@@ -951,4 +954,135 @@ func TestExpiredBuildBlock(t *testing.T) {
 	// The engine should have been notified to attempt to build a block now that
 	// the window has started again
 	<-toEngine
+}
+
+type wrappedBlock struct {
+	snowman.Block
+	verified bool
+}
+
+func (b *wrappedBlock) Accept() error {
+	if !b.verified {
+		return errUnverifiedBlock
+	}
+	return b.Block.Accept()
+}
+
+func (b *wrappedBlock) Verify() error {
+	if err := b.Block.Verify(); err != nil {
+		return err
+	}
+	b.verified = true
+	return nil
+}
+
+func TestInnerBlockDeduplication(t *testing.T) {
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // disable ProBlks
+
+	coreBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk.ID(),
+		HeightV:    coreGenBlk.Height() + 1,
+		TimestampV: coreGenBlk.Timestamp(),
+	}
+	coreBlk0 := &wrappedBlock{
+		Block: coreBlk,
+	}
+	coreBlk1 := &wrappedBlock{
+		Block: coreBlk,
+	}
+	statelessBlock0, err := statelessblock.BuildUnsigned(
+		coreGenBlk.ID(),
+		coreBlk.Timestamp(),
+		0,
+		coreBlk.Bytes(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	statelessBlock1, err := statelessblock.BuildUnsigned(
+		coreGenBlk.ID(),
+		coreBlk.Timestamp(),
+		1,
+		coreBlk.Bytes(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case coreBlk0.ID():
+			return coreBlk0, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, coreBlk0.Bytes()):
+			return coreBlk0, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	parsedBlock0, err := proVM.ParseBlock(statelessBlock0.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := parsedBlock0.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := proVM.SetPreference(parsedBlock0.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case coreBlk1.ID():
+			return coreBlk1, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, coreBlk1.Bytes()):
+			return coreBlk1, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	parsedBlock1, err := proVM.ParseBlock(statelessBlock1.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := parsedBlock1.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := proVM.SetPreference(parsedBlock1.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := parsedBlock1.Accept(); err != nil {
+		t.Fatal(err)
+	}
 }

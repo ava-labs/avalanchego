@@ -113,10 +113,6 @@ func (b *postForkBlock) Options() ([2]snowman.Block, error) {
 	return outerOptions, nil
 }
 
-func (b *postForkBlock) getInnerBlk() snowman.Block {
-	return b.innerBlk
-}
-
 // A post-fork block can never have a pre-fork child
 func (b *postForkBlock) verifyPreForkChild(child *preForkBlock) error {
 	return errUnsignedChild

@@ -139,20 +139,8 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 		return err
 	}
 
-	// If inner block's Verify returned true, don't call it again.
-	// Note that if [child.innerBlk.Verify] returns nil,
-	// this method returns nil. This must always remain the case to
-	// maintain the inner block's invariant that if it's Verify()
-	// returns nil, it is eventually accepted/rejected.
-	if !b.vm.Tree.Contains(child.innerBlk) {
-		if err := child.innerBlk.Verify(); err != nil {
-			return err
-		}
-		b.vm.Tree.Add(child.innerBlk)
-	}
-
-	b.vm.verifiedBlocks[childID] = child
-	return nil
+	// Verify the inner block and track it as verified
+	return b.vm.verifyAndRecordInnerBlk(child)
 }
 
 func (b *preForkBlock) verifyPostForkOption(child *postForkOption) error {
@@ -237,7 +225,7 @@ func (b *preForkBlock) verifyIsPreForkBlock() error {
 			// error.
 			return err
 		}
-	} else if b.vm.Tree.Contains(b.Block) {
+	} else if _, contains := b.vm.Tree.Get(b.Block); contains {
 		// If this block is a preForkBlock, then it's inner block shouldn't have
 		// been registered into the inner block tree. If this block was
 		// registered into the inner block tree, then it wasn't a preForkBlock.
