@@ -422,6 +422,12 @@ func TestNewExportTx(t *testing.T) {
 			rules:   apricotRulesPhase3,
 			bal:     44446500,
 		},
+		{
+			name:    "apricot phase 4",
+			genesis: genesisJSONApricotPhase4,
+			rules:   apricotRulesPhase4,
+			bal:     44446500,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
