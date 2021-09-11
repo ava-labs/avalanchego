@@ -18,16 +18,15 @@ var _ Block = &postForkOption{}
 type postForkOption struct {
 	block.Block
 	postForkCommonComponents
+
+	timestamp time.Time
 }
 
 func (b *postForkOption) Timestamp() time.Time {
-	// A *postForkOption's timestamp is its parent's timestamp
-	parentID := b.Parent()
-	parent, err := b.vm.GetBlock(parentID)
-	if err != nil {
-		b.vm.ctx.Log.Error("Could not find option %v 's parent block %v to retrieve its timestamp", b.ID(), b.Parent())
+	if b.Status() == choices.Accepted {
+		return b.vm.lastAcceptedTime
 	}
-	return parent.Timestamp()
+	return b.timestamp
 }
 
 func (b *postForkOption) Accept() error {
@@ -73,6 +72,7 @@ func (b *postForkOption) Verify() error {
 	if err != nil {
 		return err
 	}
+	b.timestamp = parent.Timestamp()
 	return parent.verifyPostForkOption(b)
 }
 

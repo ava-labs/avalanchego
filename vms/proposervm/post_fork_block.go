@@ -35,6 +35,7 @@ func (b *postForkBlock) Accept() error {
 	}
 
 	delete(b.vm.verifiedBlocks, blkID)
+	b.vm.lastAcceptedTime = b.Timestamp()
 
 	// mark the inner block as accepted and all conflicting inner blocks as
 	// rejected

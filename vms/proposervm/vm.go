@@ -45,11 +45,15 @@ type VM struct {
 	ctx         *snow.Context
 	db          *versiondb.Database
 	toScheduler chan<- common.Message
+
 	// Block ID --> Block
 	// Each element is a block that passed verification but
 	// hasn't yet been accepted/rejected
 	verifiedBlocks map[ids.ID]PostForkBlock
 	preferred      ids.ID
+
+	// lastAcceptedTime is set to the last accepted PostForkBlock's timestamp.
+	lastAcceptedTime time.Time
 }
 
 func New(vm block.ChainVM, activationTime time.Time, minimumPChainHeight uint64) *VM {
@@ -102,7 +106,25 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	return vm.repairAcceptedChain()
+	if err := vm.repairAcceptedChain(); err != nil {
+		return err
+	}
+
+	lastAcceptedID, err := vm.GetLastAccepted()
+	switch err {
+	case nil:
+		lastAccepted, err := vm.getBlock(lastAcceptedID)
+		if err != nil {
+			return err
+		}
+		vm.lastAcceptedTime = lastAccepted.Timestamp()
+	case database.ErrNotFound:
+		// If the last accepted block wasn't a PostForkBlock, then we don't
+		// initialize the time.
+	default:
+		return err
+	}
+	return nil
 }
 
 func (vm *VM) BuildBlock() (snowman.Block, error) {
