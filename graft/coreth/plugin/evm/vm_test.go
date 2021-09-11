@@ -3987,8 +3987,8 @@ func TestBuildApricotPhase4Block(t *testing.T) {
 	}
 
 	ethBlk = blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
-	if ethBlk.BlockGasCost() == nil || ethBlk.BlockGasCost().Cmp(big.NewInt(90_000)) < 0 {
-		t.Fatalf("expected blockGasCost to be at least 90000 but got %d", ethBlk.BlockGasCost())
+	if ethBlk.BlockGasCost() == nil || ethBlk.BlockGasCost().Cmp(big.NewInt(100)) < 0 {
+		t.Fatalf("expected blockGasCost to be at least 100 but got %d", ethBlk.BlockGasCost())
 	}
 	if ethBlk.ExtDataGasUsed() == nil || ethBlk.ExtDataGasUsed().Cmp(common.Big0) != 0 {
 		t.Fatalf("expected extDataGasUsed to be 0 but got %d", ethBlk.ExtDataGasUsed())
@@ -3997,8 +3997,8 @@ func TestBuildApricotPhase4Block(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if minRequiredTip == nil || minRequiredTip.Cmp(big.NewInt(98*params.GWei)) < 0 {
-		t.Fatalf("expected minRequiredTip to be at least 98 gwei but got %d", minRequiredTip)
+	if minRequiredTip == nil || minRequiredTip.Cmp(big.NewInt(0.05*params.GWei)) < 0 {
+		t.Fatalf("expected minRequiredTip to be at least 0.05 gwei but got %d", minRequiredTip)
 	}
 
 	if status := blk.Status(); status != choices.Accepted {

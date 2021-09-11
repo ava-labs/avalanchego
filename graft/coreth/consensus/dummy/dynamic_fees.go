@@ -16,17 +16,16 @@ import (
 )
 
 var (
-	ApricotPhase3MinBaseFee            = big.NewInt(params.ApricotPhase3MinBaseFee)
-	ApricotPhase3MaxBaseFee            = big.NewInt(params.ApricotPhase3MaxBaseFee)
-	ApricotPhase4MinBaseFee            = big.NewInt(params.ApricotPhase4MinBaseFee)
-	ApricotPhase4MaxBaseFee            = big.NewInt(params.ApricotPhase4MaxBaseFee)
-	TargetGas                   uint64 = 10_000_000
-	ApricotPhase3BlockGasFee    uint64 = 1_000_000
-	ApricotPhase4MaxBlockGasFee uint64 = 100_000
-	rollupWindow                uint64 = 10
-	// The amount of time between consecutive blocks for the block fee to drop to 0.
-	ApricotPhase4BlockGasFeeDuration uint64 = 20 // in seconds
-	ApricotPhase4MaxBlockFee                = new(big.Int).SetUint64(ApricotPhase4MaxBlockGasFee)
+	ApricotPhase3MinBaseFee               = big.NewInt(params.ApricotPhase3MinBaseFee)
+	ApricotPhase3MaxBaseFee               = big.NewInt(params.ApricotPhase3MaxBaseFee)
+	ApricotPhase4MinBaseFee               = big.NewInt(params.ApricotPhase4MinBaseFee)
+	ApricotPhase4MaxBaseFee               = big.NewInt(params.ApricotPhase4MaxBaseFee)
+	TargetGas                      uint64 = 10_000_000
+	ApricotPhase3BlockGasFee       uint64 = 1_000_000
+	ApricotPhase4MinBlockGasCost          = common.Big0
+	ApricotPhase4MaxBlockGasCost          = big.NewInt(1_000_000)
+	ApricotPhase4BlockGasCostDelta        = big.NewInt(50_000)
+	rollupWindow                   uint64 = 10
 )
 
 // CalcBaseFee takes the previous header and the timestamp of its child block
@@ -77,7 +76,9 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 		switch {
 		// If ApricotPhase4 is enabled, use the updated block fee calculation.
 		case isApricotPhase4:
-			blockGasCost = calcBlockGasCost(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent.Time, timestamp).Uint64()
+			// NOTE: We no longer include the [blockGasCost] in the AP4 [baseFee]
+			// calculation. It is instead incorporated into the [blockFee] mechanism.
+
 			// On the boundary of AP3 and AP4, the parent may not have a populated
 			// [ExtDataGasUsed].
 			if parent.ExtDataGasUsed != nil {
@@ -87,6 +88,8 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 		default:
 			blockGasCost = ApricotPhase3BlockGasFee
 		}
+
+		// Compute the new state of the gas rolling window.
 		addedGas, overflow := math.SafeAdd(parent.GasUsed, parentExtraStateGasUsed)
 		if overflow {
 			addedGas = math.MaxUint64
@@ -236,31 +239,30 @@ func updateLongWindow(window []byte, start uint64, gasConsumed uint64) {
 
 // calcBlockGasCost calculates the required block gas cost. If [parentTime]
 // > [currentTime], the timeElapsed will be treated as 0.
-func calcBlockGasCost(maxBlockFee *big.Int, blockFeeDuration, parentTime, currentTime uint64) *big.Int {
+func calcBlockGasCost(
+	minBlockGasCost *big.Int,
+	maxBlockGasCost *big.Int,
+	blockGasCostDelta *big.Int,
+	parentBlockGasCost *big.Int,
+	parentTime, currentTime uint64,
+) *big.Int {
+	// Handle AP3/AP4 boundary by returning the minimum value as the boundary.
+	if parentBlockGasCost == nil {
+		return minBlockGasCost
+	}
+
 	var timeElapsed uint64
 	if parentTime <= currentTime {
 		timeElapsed = currentTime - parentTime
 	}
-
-	// If [blockFeeDuration] has already expired, set the block fee to 0
-	if timeElapsed > blockFeeDuration {
-		return big.NewInt(0)
+	blockGasCost := parentBlockGasCost
+	if timeElapsed == 0 {
+		blockGasCost = new(big.Int).Add(blockGasCost, blockGasCostDelta)
+	} else {
+		blockGasCostReduction := new(big.Int).Mul(blockGasCostDelta, new(big.Int).SetUint64(timeElapsed))
+		blockGasCost = new(big.Int).Sub(blockGasCost, blockGasCostReduction)
 	}
-
-	// blockGasCost = (maxBlockGasFee * (blockFeeDuration - timeElapsed)) / blockFeeDuration
-	bigBlockFeeDuration := new(big.Int).SetUint64(blockFeeDuration)
-	feeTimeRemaining := new(big.Int).Sub(
-		bigBlockFeeDuration,
-		new(big.Int).SetUint64(timeElapsed),
-	)
-	requiredBlockGasFeeNum := new(big.Int).Mul(
-		maxBlockFee,
-		feeTimeRemaining,
-	)
-	blockGasCost := new(big.Int).Div(
-		requiredBlockGasFeeNum,
-		bigBlockFeeDuration,
-	)
+	blockGasCost = selectBigWithinBounds(minBlockGasCost, blockGasCost, maxBlockGasCost)
 	if !blockGasCost.IsUint64() {
 		blockGasCost = new(big.Int).SetUint64(math.MaxUint64)
 	}

@@ -61,6 +61,13 @@ func NewETHFaker() *DummyEngine {
 	}
 }
 
+func NewComplexETHFaker(cb *ConsensusCallbacks) *DummyEngine {
+	return &DummyEngine{
+		cb:       cb,
+		ethFaker: true,
+	}
+}
+
 func NewFaker() *DummyEngine {
 	return NewDummyEngine(new(ConsensusCallbacks))
 }
@@ -132,7 +139,13 @@ func (self *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, heade
 	}
 
 	// Enforce Apricot Phase 4 constraints
-	expectedBlockGasCost := calcBlockGasCost(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent.Time, header.Time)
+	expectedBlockGasCost := calcBlockGasCost(
+		ApricotPhase4MinBlockGasCost,
+		ApricotPhase4MaxBlockGasCost,
+		ApricotPhase4BlockGasCostDelta,
+		parent.BlockGasCost,
+		parent.Time, header.Time,
+	)
 	if header.BlockGasCost == nil {
 		return errBlockGasCostNil
 	}
@@ -310,7 +323,13 @@ func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *type
 		if blockExtDataGasUsed := block.ExtDataGasUsed(); blockExtDataGasUsed == nil || !blockExtDataGasUsed.IsUint64() || blockExtDataGasUsed.Cmp(extDataGasUsed) != 0 {
 			return fmt.Errorf("invalid extDataGasUsed: have %d, want %d", blockExtDataGasUsed, extDataGasUsed)
 		}
-		blockGasCost := calcBlockGasCost(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent.Time, block.Time())
+		blockGasCost := calcBlockGasCost(
+			ApricotPhase4MinBlockGasCost,
+			ApricotPhase4MaxBlockGasCost,
+			ApricotPhase4BlockGasCostDelta,
+			parent.BlockGasCost,
+			parent.Time, block.Time(),
+		)
 		if blockBlockGasCost := block.BlockGasCost(); blockBlockGasCost == nil || !blockBlockGasCost.IsUint64() || blockBlockGasCost.Cmp(blockGasCost) != 0 {
 			return fmt.Errorf("invalid blockGasCost: have %d, want %d", blockBlockGasCost, blockGasCost)
 		}
@@ -349,7 +368,13 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 		if header.ExtDataGasUsed == nil {
 			header.ExtDataGasUsed = common.Big0
 		}
-		header.BlockGasCost = calcBlockGasCost(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent.Time, header.Time)
+		header.BlockGasCost = calcBlockGasCost(
+			ApricotPhase4MinBlockGasCost,
+			ApricotPhase4MaxBlockGasCost,
+			ApricotPhase4BlockGasCostDelta,
+			parent.BlockGasCost,
+			parent.Time, header.Time,
+		)
 		if err := self.verifyBlockFee(
 			header.BaseFee,
 			header.BlockGasCost,
