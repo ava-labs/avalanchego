@@ -1370,7 +1370,17 @@ func TestInsertChainInvalidBlockFee(t *testing.T, create func(db ethdb.Database,
 	signer := types.LatestSigner(params.TestChainConfig)
 	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
 	// to the BlockChain's database while generating blocks.
-	chain, _, err := GenerateChain(params.TestChainConfig, genesis, dummy.NewETHFaker(), genDB, 3, 0, func(i int, gen *BlockGen) {
+	eng := dummy.NewComplexETHFaker(&dummy.ConsensusCallbacks{
+		OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, *big.Int, error) {
+			sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(block.Number().Int64()))
+			return nil, nil, nil
+		},
+		OnFinalizeAndAssemble: func(header *types.Header, sdb *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
+			sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
+			return nil, nil, nil, nil
+		},
+	})
+	chain, _, err := GenerateChain(params.TestChainConfig, genesis, eng, genDB, 3, 0, func(i int, gen *BlockGen) {
 		tx := types.NewTx(&types.DynamicFeeTx{
 			ChainID:   params.TestChainConfig.ChainID,
 			Nonce:     gen.TxNonce(addr1),
