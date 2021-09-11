@@ -249,7 +249,7 @@ func (h *GossipHandler) HandleAtomicTxNotify(nodeID ids.ShortID, _ uint32, msg *
 	)
 
 	if len(msg.Tx) == 0 {
-		log.Warn(
+		log.Debug(
 			"AppGossip received empty AtomicTxNotify Message",
 			"peerID", nodeID,
 		)
@@ -300,7 +300,7 @@ func (h *GossipHandler) HandleEthTxsNotify(nodeID ids.ShortID, _ uint32, msg *me
 	)
 
 	if len(msg.Txs) == 0 {
-		log.Warn(
+		log.Debug(
 			"AppGossip received empty EthTxsNotify Message",
 			"peerID", nodeID,
 		)
