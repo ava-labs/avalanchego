@@ -286,7 +286,7 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 }
 
 // show that txs already marked as invalid are not re-requested on gossiping
-func TestMempoolAtmTxsAppGossipHandlingInvalidTx(t *testing.T) {
+func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 	assert := assert.New(t)
 
 	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
@@ -310,9 +310,10 @@ func TestMempoolAtmTxsAppGossipHandlingInvalidTx(t *testing.T) {
 	}
 
 	// create a tx and mark as invalid
-	tx := getValidTx(vm, sharedMemory, t)
+	tx := getInvalidTx(vm, sharedMemory, t)
 	txID := tx.ID()
 
+	// TODO: AddTx should reject a transaction like this
 	mempool.AddTx(tx)
 	mempool.NextTx()
 	mempool.DiscardCurrentTx()
