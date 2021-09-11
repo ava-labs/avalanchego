@@ -410,12 +410,16 @@ func (vm *VM) createConsensusCallbacks() *dummy.ConsensusCallbacks {
 }
 
 func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
-	snapshot := state.Snapshot()
 	for {
 		tx, exists := vm.mempool.NextTx()
 		if !exists {
 			break
 		}
+		// Take a snapshot of [state] before calling verifyTx so we can revert to the state as of this
+		// point if the transaction fails verification.
+		// Note: verifyTx may modify state, so we need to use the snapshot mechanism here to revert any
+		// changes from a transaction that do not end up being included in the block.
+		snapshot := state.Snapshot()
 		rules := vm.chainConfig.AvalancheRules(header.Number, new(big.Int).SetUint64(header.Time))
 		if err := vm.verifyTx(tx, header.ParentHash, header.BaseFee, state, rules); err != nil {
 			// Discard the transaction from the mempool on failed verification.
