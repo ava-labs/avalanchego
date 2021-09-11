@@ -91,12 +91,8 @@ func (n *network) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
 func (n *network) GossipAtomicTx(tx *Tx) error {
 	// If the network is not initialized (because the [ApricotPhase4Timestamp] is
 	// missing), we should not attempt to do anything when [GossipAtomicTx] is called.
-	if n == nil {
-		return nil
-	}
-
 	txID := tx.ID()
-	if time.Now().Before(n.gossipActivationTime) {
+	if n == nil || time.Now().Before(n.gossipActivationTime) {
 		log.Debug(
 			"not gossiping atomic tx before the gossiping activation time",
 			"txID", txID,
@@ -108,12 +104,11 @@ func (n *network) GossipAtomicTx(tx *Tx) error {
 	if _, has := n.recentAtomicTxs.Get(txID); has {
 		return nil
 	}
+	n.recentAtomicTxs.Put(txID, nil)
 
 	msg := message.AtomicTxNotify{
 		Tx: tx.Bytes(),
 	}
-	n.recentAtomicTxs.Put(txID, nil)
-
 	msgBytes, err := message.Build(&msg)
 	if err != nil {
 		return err
@@ -130,6 +125,7 @@ func (n *network) sendEthTxsNotify(txs []*types.Transaction) error {
 	if len(txs) == 0 {
 		return nil
 	}
+
 	txBytes, err := rlp.EncodeToBytes(txs)
 	if err != nil {
 		log.Warn(
@@ -146,6 +142,7 @@ func (n *network) sendEthTxsNotify(txs []*types.Transaction) error {
 	if err != nil {
 		return err
 	}
+
 	log.Debug(
 		"gossiping eth txs",
 		"len(txs)", len(txs),
@@ -157,11 +154,7 @@ func (n *network) sendEthTxsNotify(txs []*types.Transaction) error {
 func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 	// If the network is not initialized (because the [ApricotPhase4Timestamp] is
 	// missing), we should not attempt to do anything when [GossipEthTxs] is called.
-	if n == nil {
-		return nil
-	}
-
-	if time.Now().Before(n.gossipActivationTime) {
+	if n == nil || time.Now().Before(n.gossipActivationTime) {
 		log.Debug(
 			"not gossiping eth txs before the gossiping activation time",
 			"len(txs)", len(txs),
@@ -181,9 +174,9 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 		if _, has := n.recentEthTxs.Get(txHash); has {
 			continue
 		}
+		n.recentEthTxs.Put(txHash, nil)
 
 		selectedTxs = append(selectedTxs, tx)
-		n.recentEthTxs.Put(txHash, nil)
 	}
 
 	if len(selectedTxs) == 0 {
@@ -225,7 +218,10 @@ func (n *network) handle(
 		"len(msg)", len(msgBytes),
 	)
 
-	if time.Now().Before(n.gossipActivationTime) {
+	// network should already be checked to be non-nil in whatever public
+	// function calls [handle], however we add an extra check here to prevent an
+	// accidental panic.
+	if n == nil || time.Now().Before(n.gossipActivationTime) {
 		log.Debug("App message called before activation time")
 		return nil
 	}
