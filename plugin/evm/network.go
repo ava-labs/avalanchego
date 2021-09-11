@@ -73,6 +73,12 @@ func (n *network) AppResponse(nodeID ids.ShortID, requestID uint32, msgBytes []b
 }
 
 func (n *network) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
+	// If the network is not initialized (because the [ApricotPhase4Timestamp] is
+	// missing), we should not attempt to do anything when [AppGossip] is called.
+	if n == nil {
+		return nil
+	}
+
 	return n.handle(
 		n.gossipHandler,
 		"Gossip",
@@ -83,6 +89,12 @@ func (n *network) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
 }
 
 func (n *network) GossipAtomicTx(tx *Tx) error {
+	// If the network is not initialized (because the [ApricotPhase4Timestamp] is
+	// missing), we should not attempt to do anything when [GossipAtomicTx] is called.
+	if n == nil {
+		return nil
+	}
+
 	txID := tx.ID()
 	if time.Now().Before(n.gossipActivationTime) {
 		log.Debug(
@@ -143,6 +155,12 @@ func (n *network) sendEthTxsNotify(txs []*types.Transaction) error {
 }
 
 func (n *network) GossipEthTxs(txs []*types.Transaction) error {
+	// If the network is not initialized (because the [ApricotPhase4Timestamp] is
+	// missing), we should not attempt to do anything when [GossipEthTxs] is called.
+	if n == nil {
+		return nil
+	}
+
 	if time.Now().Before(n.gossipActivationTime) {
 		log.Debug(
 			"not gossiping eth txs before the gossiping activation time",
