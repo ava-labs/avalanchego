@@ -434,3 +434,101 @@ func TestCalcBaseFeeAP4(t *testing.T) {
 		assert.Equal(t, event.extDataFeeGreater, extDataHeader.BaseFee.Cmp(header.BaseFee) == 1, "unexpected cmp for index %d", index)
 	}
 }
+
+func TestCalcBlockGasCost(t *testing.T) {
+	tests := map[string]struct {
+		minBlockGasCost         *big.Int
+		maxBlockGasCost         *big.Int
+		blockGasCostDelta       *big.Int
+		parentBlockGasCost      *big.Int
+		parentTime, currentTime uint64
+
+		expected *big.Int
+	}{
+		"Nil parentBlockGasCost": {
+			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
+			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
+			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
+			parentBlockGasCost: nil,
+			parentTime:         1,
+			currentTime:        1,
+			expected:           ApricotPhase4MinBlockGasCost,
+		},
+		"Same timestamp from 0": {
+			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
+			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
+			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
+			parentBlockGasCost: big.NewInt(0),
+			parentTime:         1,
+			currentTime:        1,
+			expected:           big.NewInt(100),
+		},
+		"Same timestamp from non-zero": {
+			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
+			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
+			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
+			parentBlockGasCost: big.NewInt(1000),
+			parentTime:         1,
+			currentTime:        1,
+			expected:           big.NewInt(1100),
+		},
+		"1s Difference": {
+			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
+			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
+			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
+			parentBlockGasCost: big.NewInt(1000),
+			parentTime:         1,
+			currentTime:        2,
+			expected:           big.NewInt(900),
+		},
+		"2s Difference": {
+			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
+			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
+			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
+			parentBlockGasCost: big.NewInt(1000),
+			parentTime:         1,
+			currentTime:        3,
+			expected:           big.NewInt(800),
+		},
+		"10s Difference": {
+			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
+			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
+			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
+			parentBlockGasCost: big.NewInt(1000),
+			parentTime:         1,
+			currentTime:        11,
+			expected:           big.NewInt(0),
+		},
+		"20s Difference": {
+			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
+			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
+			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
+			parentBlockGasCost: big.NewInt(1000),
+			parentTime:         1,
+			currentTime:        21,
+			expected:           big.NewInt(0),
+		},
+		"-1s Difference": {
+			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
+			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
+			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
+			parentBlockGasCost: big.NewInt(1000),
+			parentTime:         1,
+			currentTime:        0,
+			expected:           big.NewInt(1100),
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Zero(t, test.expected.Cmp(calcBlockGasCost(
+				test.minBlockGasCost,
+				test.maxBlockGasCost,
+				test.blockGasCostDelta,
+				test.parentBlockGasCost,
+				test.parentTime,
+				test.currentTime,
+			)))
+		})
+	}
+}
