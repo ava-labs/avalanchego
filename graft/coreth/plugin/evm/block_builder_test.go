@@ -80,8 +80,8 @@ func TestBlockBuilderStopsTimer(t *testing.T) {
 	// completed the update.
 	attemptAwait(t, wg, 5*time.Second)
 
-	if builder.buildBlockTimer != nil {
-		t.Fatal("expected block timer to be nil")
+	if builder.buildBlockTimer == nil {
+		t.Fatal("expected block timer to be non-nil")
 	}
 	if builder.buildStatus != mayBuild {
 		t.Fatalf("expected build status to be %d but got %d", dontBuild, builder.buildStatus)
