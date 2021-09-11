@@ -454,8 +454,10 @@ func (t *Transitive) buildBlocks() error {
 		blk, err := t.VM.BuildBlock()
 		if err != nil {
 			t.Ctx.Log.Debug("VM.BuildBlock errored with: %s", err)
+			t.numBuildsFailed.Inc()
 			return nil
 		}
+		t.numBuilt.Inc()
 
 		// a newly created block is expected to be processing. If this check
 		// fails, there is potentially an error in the VM this engine is running

@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
@@ -97,13 +96,11 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time, minPChainHeight
 		return res, nil
 	}
 
-	ctx := &snow.Context{
-		NodeID:            hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw)),
-		Log:               logging.NoLog{},
-		StakingCertLeaf:   pTestCert.Leaf,
-		StakingLeafSigner: pTestCert.PrivateKey.(crypto.Signer),
-		ValidatorState:    valState,
-	}
+	ctx := snow.DefaultContextTest()
+	ctx.NodeID = hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw))
+	ctx.StakingCertLeaf = pTestCert.Leaf
+	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+	ctx.ValidatorState = valState
 	ctx.Bootstrapped()
 
 	dummyDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
@@ -836,13 +833,11 @@ func TestExpiredBuildBlock(t *testing.T) {
 		}, nil
 	}
 
-	ctx := &snow.Context{
-		NodeID:            hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw)),
-		Log:               logging.NoLog{},
-		StakingCertLeaf:   pTestCert.Leaf,
-		StakingLeafSigner: pTestCert.PrivateKey.(crypto.Signer),
-		ValidatorState:    valState,
-	}
+	ctx := snow.DefaultContextTest()
+	ctx.NodeID = hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw))
+	ctx.StakingCertLeaf = pTestCert.Leaf
+	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+	ctx.ValidatorState = valState
 	ctx.Bootstrapped()
 
 	dbManager := manager.NewMemDB(version.DefaultVersion1_0_0)

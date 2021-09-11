@@ -48,7 +48,7 @@ import (
 )
 
 const (
-	defaultChannelSize = 1024
+	defaultChannelSize = 1
 )
 
 var (

@@ -10,10 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-const (
-	fromVMSize = 1024
-)
-
 type Scheduler interface {
 	Dispatch(startTime time.Time)
 	SetBuildBlockTime(t time.Time)
@@ -39,8 +35,9 @@ type scheduler struct {
 }
 
 func New(log logging.Logger, toEngine chan<- common.Message) (Scheduler, chan<- common.Message) {
-	vmToEngine := make(chan common.Message, fromVMSize)
+	vmToEngine := make(chan common.Message, cap(toEngine))
 	return &scheduler{
+		log:               log,
 		fromVM:            vmToEngine,
 		toEngine:          toEngine,
 		newBuildBlockTime: make(chan time.Time),
