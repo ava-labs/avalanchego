@@ -23,7 +23,9 @@ import (
 )
 
 const (
-	recentCacheSize = 100
+	// We allow [recentCacheSize] to be fairly large because we only store hashes
+	// in the cache, not entire transactions.
+	recentCacheSize = 512
 )
 
 type network struct {
@@ -35,6 +37,8 @@ type network struct {
 
 	gossipHandler message.Handler
 
+	// [recentAtomicTxs] and [recentEthTxs] prevent us from over-gossiping the
+	// same transaction in a short period of time.
 	recentAtomicTxs *cache.LRU
 	recentEthTxs    *cache.LRU
 }
@@ -151,6 +155,10 @@ func (n *network) sendEthTxsNotify(txs []*types.Transaction) error {
 	return n.appSender.SendAppGossip(msgBytes)
 }
 
+// GossipEthTxs gossips the provided [txs] as soon as possible to reduce the
+// time to finality. In the future, we could attempt to be more conservative
+// with the number of messages we send and attempt to periodically send
+// a batch of messages.
 func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 	// If the network is not initialized (because the [ApricotPhase4Timestamp] is
 	// missing), we should not attempt to do anything when [GossipEthTxs] is called.
