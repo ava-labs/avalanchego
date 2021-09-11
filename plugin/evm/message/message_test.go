@@ -6,7 +6,6 @@ package message
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
 
@@ -16,9 +15,9 @@ import (
 func TestAtomicTxNotify(t *testing.T) {
 	assert := assert.New(t)
 
-	txID := ids.GenerateTestID()
+	msg := []byte("blah")
 	builtMsg := AtomicTxNotify{
-		TxID: txID,
+		Tx: msg,
 	}
 	builtMsgBytes, err := Build(&builtMsg)
 	assert.NoError(err)
@@ -31,36 +30,15 @@ func TestAtomicTxNotify(t *testing.T) {
 	parsedMsg, ok := parsedMsgIntf.(*AtomicTxNotify)
 	assert.True(ok)
 
-	assert.Equal(txID, parsedMsg.TxID)
-}
-
-func TestAtomicTx(t *testing.T) {
-	assert := assert.New(t)
-
-	tx := utils.RandomBytes(256 * units.KiB)
-	builtMsg := AtomicTx{
-		Tx: tx,
-	}
-	builtMsgBytes, err := Build(&builtMsg)
-	assert.NoError(err)
-	assert.Equal(builtMsgBytes, builtMsg.Bytes())
-
-	parsedMsgIntf, err := Parse(builtMsgBytes)
-	assert.NoError(err)
-	assert.Equal(builtMsgBytes, parsedMsgIntf.Bytes())
-
-	parsedMsg, ok := parsedMsgIntf.(*AtomicTx)
-	assert.True(ok)
-
-	assert.Equal(tx, parsedMsg.Tx)
+	assert.Equal(msg, parsedMsg.Tx)
 }
 
 func TestEthTxsNotify(t *testing.T) {
 	assert := assert.New(t)
 
-	txs := make([]EthTxNotify, MaxEthTxsLen)
+	msg := []byte("blah")
 	builtMsg := EthTxsNotify{
-		Txs: txs,
+		Txs: msg,
 	}
 	builtMsgBytes, err := Build(&builtMsg)
 	assert.NoError(err)
@@ -73,39 +51,17 @@ func TestEthTxsNotify(t *testing.T) {
 	parsedMsg, ok := parsedMsgIntf.(*EthTxsNotify)
 	assert.True(ok)
 
-	assert.Equal(txs, parsedMsg.Txs)
+	assert.Equal(msg, parsedMsg.Txs)
 }
 
 func TestEthTxsNotifyTooLarge(t *testing.T) {
 	assert := assert.New(t)
 
-	txs := make([]EthTxNotify, MaxEthTxsLen+1)
 	builtMsg := EthTxsNotify{
-		Txs: txs,
+		Txs: utils.RandomBytes(1024 * units.KiB),
 	}
 	_, err := Build(&builtMsg)
 	assert.Error(err)
-}
-
-func TestEthTxs(t *testing.T) {
-	assert := assert.New(t)
-
-	txs := utils.RandomBytes(256 * units.KiB)
-	builtMsg := EthTxs{
-		TxsBytes: txs,
-	}
-	builtMsgBytes, err := Build(&builtMsg)
-	assert.NoError(err)
-	assert.Equal(builtMsgBytes, builtMsg.Bytes())
-
-	parsedMsgIntf, err := Parse(builtMsgBytes)
-	assert.NoError(err)
-	assert.Equal(builtMsgBytes, parsedMsgIntf.Bytes())
-
-	parsedMsg, ok := parsedMsgIntf.(*EthTxs)
-	assert.True(ok)
-
-	assert.Equal(txs, parsedMsg.TxsBytes)
 }
 
 func TestParseGibberish(t *testing.T) {
