@@ -204,8 +204,7 @@ func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 
 	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 	}()
 
 	// Create a simple tx
@@ -248,8 +247,7 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 
 	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 	}()
 
 	nodeID := ids.GenerateTestShortID()
@@ -279,55 +277,58 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 	assert.NoError(err)
 
 	// show that unknown txID is requested
-	err = vm.AppGossip(nodeID, msgBytes)
-	assert.NoError(err)
+	assert.NoError(vm.AppGossip(nodeID, msgBytes))
 	assert.False(txRequested, "tx should not have been requested")
 	assert.Equal(1, txGossiped, "tx should have been gossiped")
 
-	err = vm.AppGossip(nodeID, msgBytes)
-	assert.NoError(err)
+	assert.NoError(vm.AppGossip(nodeID, msgBytes))
 	assert.Equal(1, txGossiped, "tx should have only been gossiped once")
 }
 
-// TODO: fix
-// // show that txs already marked as invalid are not re-requested on gossiping
-// func TestMempoolAtmTxsAppGossipHandlingInvalidTx(t *testing.T) {
-// 	assert := assert.New(t)
-//
-// 	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
-// 	defer func() {
-// 		err := vm.Shutdown()
-// 		assert.NoError(err)
-// 	}()
-// 	mempool := vm.mempool
-//
-// 	var txRequested bool
-// 	sender.CantSendAppGossip = false
-// 	sender.SendAppRequestF = func(ids.ShortSet, uint32, []byte) error {
-// 		txRequested = true
-// 		return nil
-// 	}
-//
-// 	// create a tx and mark as invalid
-// 	tx := getValidTx(vm, sharedMemory, t)
-// 	txID := tx.ID()
-//
-// 	mempool.AddTx(tx)
-// 	mempool.NextTx()
-// 	mempool.DiscardCurrentTx()
-//
-// 	has := mempool.has(txID)
-// 	assert.False(has)
-//
-// 	// gossip tx and check it is accepted and re-gossiped
-// 	nodeID := ids.GenerateTestShortID()
-// 	msg := message.AtomicTxNotify{
-// 		Tx: tx.Bytes(),
-// 	}
-// 	msgBytes, err := message.Build(&msg)
-// 	assert.NoError(err)
-//
-// 	err = vm.AppGossip(nodeID, msgBytes)
-// 	assert.NoError(err)
-// 	assert.False(txRequested, "rejected tx shouldn't be requested")
-// }
+// show that txs already marked as invalid are not re-requested on gossiping
+func TestMempoolAtmTxsAppGossipHandlingInvalidTx(t *testing.T) {
+	assert := assert.New(t)
+
+	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
+	defer func() {
+		assert.NoError(vm.Shutdown())
+	}()
+	mempool := vm.mempool
+
+	var (
+		txGossiped  int
+		txRequested bool
+	)
+	sender.CantSendAppGossip = false
+	sender.SendAppGossipF = func(_ []byte) error {
+		txGossiped++
+		return nil
+	}
+	sender.SendAppRequestF = func(ids.ShortSet, uint32, []byte) error {
+		txRequested = true
+		return nil
+	}
+
+	// create a tx and mark as invalid
+	tx := getValidTx(vm, sharedMemory, t)
+	txID := tx.ID()
+
+	mempool.AddTx(tx)
+	mempool.NextTx()
+	mempool.DiscardCurrentTx()
+
+	has := mempool.has(txID)
+	assert.False(has)
+
+	// gossip tx and check it is accepted and re-gossiped
+	nodeID := ids.GenerateTestShortID()
+	msg := message.AtomicTxNotify{
+		Tx: tx.Bytes(),
+	}
+	msgBytes, err := message.Build(&msg)
+	assert.NoError(err)
+
+	assert.NoError(vm.AppGossip(nodeID, msgBytes))
+	assert.False(txRequested, "tx shouldn't be requested")
+	assert.Zero(txGossiped, "tx should not have been gossiped")
+}
