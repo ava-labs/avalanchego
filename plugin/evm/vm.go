@@ -328,6 +328,11 @@ func (vm *VM) Initialize(
 		g.Config = params.AvalancheLocalChainConfig
 	}
 
+	// Free the memory of the extDataHash map that is not used (i.e. if mainnet
+	// config, free fuji)
+	fujiExtDataHashes = nil
+	mainnetExtDataHashes = nil
+
 	vm.chainID = g.Config.ChainID
 
 	ethConfig := ethconfig.NewDefaultConfig()
