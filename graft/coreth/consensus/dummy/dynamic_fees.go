@@ -76,8 +76,15 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 		switch {
 		// If ApricotPhase4 is enabled, use the updated block fee calculation.
 		case isApricotPhase4:
-			// NOTE: We no longer include the [blockGasCost] in the AP4 [baseFee]
-			// calculation. It is instead incorporated into the [blockFee] mechanism.
+			// The [blockGasCost] is paid by the effective tips in the block using
+			// the block's value of [baseFee].
+			blockGasCost = calcBlockGasCost(
+				ApricotPhase4MinBlockGasCost,
+				ApricotPhase4MaxBlockGasCost,
+				ApricotPhase4BlockGasCostDelta,
+				parent.BlockGasCost,
+				parent.Time, timestamp,
+			).Uint64()
 
 			// On the boundary of AP3 and AP4, the parent may not have a populated
 			// [ExtDataGasUsed].
