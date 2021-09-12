@@ -328,8 +328,8 @@ func (vm *VM) Initialize(
 		g.Config = params.AvalancheLocalChainConfig
 	}
 
-	// Allow ExtDataHashes to be garbage collected as soon as freed from block
-	// validator
+	// Free the memory of the extDataHash map that is not used (i.e. if mainnet
+	// config, free fuji)
 	fujiExtDataHashes = nil
 	mainnetExtDataHashes = nil
 
