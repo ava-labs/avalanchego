@@ -16,17 +16,17 @@ import (
 )
 
 var (
-	ApricotPhase3MinBaseFee               = big.NewInt(params.ApricotPhase3MinBaseFee)
-	ApricotPhase3MaxBaseFee               = big.NewInt(params.ApricotPhase3MaxBaseFee)
-	ApricotPhase4MinBaseFee               = big.NewInt(params.ApricotPhase4MinBaseFee)
-	ApricotPhase4MaxBaseFee               = big.NewInt(params.ApricotPhase4MaxBaseFee)
-	TargetGas                      uint64 = 10_000_000
-	ApricotPhase3BlockGasFee       uint64 = 1_000_000
-	ApricotPhase4MinBlockGasCost          = common.Big0
-	ApricotPhase4MaxBlockGasCost          = big.NewInt(1_000_000)
-	ApricotPhase4BlockGasCostDelta        = big.NewInt(50_000)
-	ApricotPhase4TargetBlockGap    uint64 = 1 // in seconds
-	rollupWindow                   uint64 = 10
+	ApricotPhase3MinBaseFee              = big.NewInt(params.ApricotPhase3MinBaseFee)
+	ApricotPhase3MaxBaseFee              = big.NewInt(params.ApricotPhase3MaxBaseFee)
+	ApricotPhase4MinBaseFee              = big.NewInt(params.ApricotPhase4MinBaseFee)
+	ApricotPhase4MaxBaseFee              = big.NewInt(params.ApricotPhase4MaxBaseFee)
+	TargetGas                     uint64 = 10_000_000
+	ApricotPhase3BlockGasFee      uint64 = 1_000_000
+	ApricotPhase4MinBlockGasCost         = common.Big0
+	ApricotPhase4MaxBlockGasCost         = big.NewInt(1_000_000)
+	ApricotPhase4BlockGasCostStep        = big.NewInt(50_000)
+	ApricotPhase4TargetBlockRate  uint64 = 1 // in seconds
+	rollupWindow                  uint64 = 10
 )
 
 // CalcBaseFee takes the previous header and the timestamp of its child block
@@ -80,9 +80,10 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 			// The [blockGasCost] is paid by the effective tips in the block using
 			// the block's value of [baseFee].
 			blockGasCost = calcBlockGasCost(
+				ApricotPhase4TargetBlockRate,
 				ApricotPhase4MinBlockGasCost,
 				ApricotPhase4MaxBlockGasCost,
-				ApricotPhase4BlockGasCostDelta,
+				ApricotPhase4BlockGasCostStep,
 				parent.BlockGasCost,
 				parent.Time, timestamp,
 			).Uint64()
@@ -247,10 +248,8 @@ func updateLongWindow(window []byte, start uint64, gasConsumed uint64) {
 
 // calcBlockGasCost calculates the required block gas cost. If [parentTime]
 // > [currentTime], the timeElapsed will be treated as 0.
-//
-// The algoritm...
 func calcBlockGasCost(
-	targetBlockGap uint64,
+	targetBlockRate uint64,
 	minBlockGasCost *big.Int,
 	maxBlockGasCost *big.Int,
 	blockGasCostStep *big.Int,
@@ -269,11 +268,11 @@ func calcBlockGasCost(
 	}
 
 	blockGasCost := parentBlockGasCost
-	if timeElapsed < targetBlockGap {
-		blockGasCostDelta := new(big.Int).Mul(blockGasCostStep, new(big.Int).SetUint64(targetBlockGap-timeElapsed))
+	if timeElapsed < targetBlockRate {
+		blockGasCostDelta := new(big.Int).Mul(blockGasCostStep, new(big.Int).SetUint64(targetBlockRate-timeElapsed))
 		blockGasCost = new(big.Int).Add(blockGasCost, blockGasCostDelta)
 	} else {
-		blockGasCostDelta := new(big.Int).Mul(blockGasCostStep, new(big.Int).SetUint64(timeElapsed-targetBlockGap))
+		blockGasCostDelta := new(big.Int).Mul(blockGasCostStep, new(big.Int).SetUint64(timeElapsed-targetBlockRate))
 		blockGasCost = new(big.Int).Sub(blockGasCost, blockGasCostDelta)
 	}
 
