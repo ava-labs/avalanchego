@@ -1087,3 +1087,275 @@ func TestInnerBlockDeduplication(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestInnerVMRollback(t *testing.T) {
+	coreGenBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		HeightV:    0,
+		TimestampV: genesisTimestamp,
+		BytesV:     []byte{0},
+	}
+
+	valState := &validators.TestState{
+		T: t,
+	}
+	valState.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		return map[ids.ShortID]uint64{
+			{1}: 100,
+		}, nil
+	}
+
+	coreVM := &block.TestVM{}
+	coreVM.T = t
+
+	coreVM.LastAcceptedF = func() (ids.ID, error) { return coreGenBlk.ID(), nil }
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	ctx := snow.DefaultContextTest()
+	ctx.NodeID = hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw))
+	ctx.StakingCertLeaf = pTestCert.Leaf
+	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+	ctx.ValidatorState = valState
+	ctx.Bootstrapped()
+
+	coreVM.InitializeF = func(
+		*snow.Context,
+		manager.Manager,
+		[]byte,
+		[]byte,
+		[]byte,
+		chan<- common.Message,
+		[]*common.Fx,
+		common.AppSender,
+	) error {
+		return nil
+	}
+
+	dbManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+
+	proVM := New(coreVM, time.Time{}, 0)
+
+	if err := proVM.Initialize(ctx, dbManager, nil, nil, nil, nil, nil, nil); err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+
+	if err := proVM.SetPreference(coreGenBlk.IDV); err != nil {
+		t.Fatal(err)
+	}
+
+	coreBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk.ID(),
+		HeightV:    coreGenBlk.Height() + 1,
+		TimestampV: coreGenBlk.Timestamp(),
+	}
+	statelessBlock, err := statelessblock.BuildUnsigned(
+		coreGenBlk.ID(),
+		coreBlk.Timestamp(),
+		0,
+		coreBlk.Bytes(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case coreBlk.ID():
+			return coreBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, coreBlk.Bytes()):
+			return coreBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	proVM.Clock.Set(statelessBlock.Timestamp())
+
+	parsedBlock, err := proVM.ParseBlock(statelessBlock.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if status := parsedBlock.Status(); status != choices.Processing {
+		t.Fatalf("expected status to be %s but was %s", choices.Processing, status)
+	}
+
+	if err := parsedBlock.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := proVM.SetPreference(parsedBlock.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := parsedBlock.Accept(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Restart the node and have the inner VM rollback state.
+
+	coreBlk.StatusV = choices.Processing
+
+	proVM = New(coreVM, time.Time{}, 0)
+
+	if err := proVM.Initialize(ctx, dbManager, nil, nil, nil, nil, nil, nil); err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+
+	lastAcceptedID, err := proVM.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if lastAcceptedID != coreGenBlk.IDV {
+		t.Fatalf("failed to roll back the VM to the last accepted block")
+	}
+
+	parsedBlock, err = proVM.ParseBlock(statelessBlock.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if status := parsedBlock.Status(); status != choices.Processing {
+		t.Fatalf("expected status to be %s but was %s", choices.Processing, status)
+	}
+}
+
+func TestBuildBlockDuringWindow(t *testing.T) {
+	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+
+	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		return map[ids.ShortID]uint64{
+			proVM.ctx.NodeID: 10,
+		}, nil
+	}
+
+	coreBlk0 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk.ID(),
+		HeightV:    coreGenBlk.Height() + 1,
+		TimestampV: coreGenBlk.Timestamp(),
+	}
+	coreBlk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{2},
+		ParentV:    coreBlk0.ID(),
+		HeightV:    coreBlk0.Height() + 1,
+		TimestampV: coreBlk0.Timestamp(),
+	}
+	statelessBlock0, err := statelessblock.BuildUnsigned(
+		coreGenBlk.ID(),
+		coreBlk0.Timestamp(),
+		0,
+		coreBlk0.Bytes(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case coreBlk0.ID():
+			return coreBlk0, nil
+		case coreBlk1.ID():
+			return coreBlk1, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, coreBlk0.Bytes()):
+			return coreBlk0, nil
+		case bytes.Equal(b, coreBlk1.Bytes()):
+			return coreBlk1, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	proVM.Clock.Set(statelessBlock0.Timestamp())
+
+	statefulBlock0, err := proVM.ParseBlock(statelessBlock0.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := statefulBlock0.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := proVM.SetPreference(statefulBlock0.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return coreBlk1, nil
+	}
+
+	statefulBlock1, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := statefulBlock1.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := proVM.SetPreference(statefulBlock1.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := statefulBlock0.Accept(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := statefulBlock1.Accept(); err != nil {
+		t.Fatal(err)
+	}
+}
