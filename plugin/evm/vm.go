@@ -132,6 +132,7 @@ var (
 	errNilBaseFeeApricotPhase3        = errors.New("nil base fee is invalid after apricotPhase3")
 	errNilExtDataGasUsedApricotPhase4 = errors.New("nil extDataGasUsed is invalid after apricotPhase4")
 	errNilBlockGasCostApricotPhase4   = errors.New("nil blockGasCost is invalid after apricotPhase4")
+	errConflictingAtomicTx            = errors.New("conflicting atomic tx present")
 	defaultLogLevel                   = log.LvlDebug
 )
 
