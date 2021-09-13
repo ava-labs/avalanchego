@@ -1,8 +1,8 @@
 syntax = "proto3";
-
 package vmproto;
-
 option go_package = "github.com/ava-labs/avalanchego/vms/rpcchainvm/vmproto";
+import "google/protobuf/empty.proto";
+
 
 // To compile: protoc --go_out=plugins=grpc:. vm.proto
 
@@ -43,8 +43,6 @@ message VersionedDBServer {
     uint32 dbServer = 1;
     string version = 2;
 }
-
-message EmptyMsg {}
 
 message CreateHandlersResponse {
     repeated Handler handlers = 1;
@@ -155,23 +153,23 @@ message AppGossipMsg {
 
 service VM {
     rpc Initialize(InitializeRequest) returns (InitializeResponse);
-    rpc Bootstrapping(EmptyMsg) returns (EmptyMsg);
-    rpc Bootstrapped(EmptyMsg) returns (EmptyMsg);
-    rpc Shutdown(EmptyMsg) returns (EmptyMsg);
-    rpc CreateHandlers(EmptyMsg) returns (CreateHandlersResponse);
-    rpc CreateStaticHandlers(EmptyMsg) returns (CreateStaticHandlersResponse);
-    rpc BuildBlock(EmptyMsg) returns (BuildBlockResponse);
+    rpc Bootstrapping(google.protobuf.Empty) returns (google.protobuf.Empty);
+    rpc Bootstrapped(google.protobuf.Empty) returns (google.protobuf.Empty);
+    rpc Shutdown(google.protobuf.Empty) returns (google.protobuf.Empty);
+    rpc CreateHandlers(google.protobuf.Empty) returns (CreateHandlersResponse);
+    rpc CreateStaticHandlers(google.protobuf.Empty) returns (CreateStaticHandlersResponse);
+    rpc BuildBlock(google.protobuf.Empty) returns (BuildBlockResponse);
     rpc ParseBlock(ParseBlockRequest) returns (ParseBlockResponse);
     rpc GetBlock(GetBlockRequest) returns (GetBlockResponse);
-    rpc SetPreference(SetPreferenceRequest) returns (EmptyMsg);
-    rpc Health(EmptyMsg) returns (HealthResponse);
-    rpc Version(EmptyMsg) returns (VersionResponse);
-    rpc AppRequest(AppRequestMsg) returns (EmptyMsg);
-    rpc AppRequestFailed(AppRequestFailedMsg) returns (EmptyMsg);
-    rpc AppResponse(AppResponseMsg) returns (EmptyMsg);
-    rpc AppGossip(AppGossipMsg) returns (EmptyMsg);
+    rpc SetPreference(SetPreferenceRequest) returns (google.protobuf.Empty);
+    rpc Health(google.protobuf.Empty) returns (HealthResponse);
+    rpc Version(google.protobuf.Empty) returns (VersionResponse);
+    rpc AppRequest(AppRequestMsg) returns (google.protobuf.Empty);
+    rpc AppRequestFailed(AppRequestFailedMsg) returns (google.protobuf.Empty);
+    rpc AppResponse(AppResponseMsg) returns (google.protobuf.Empty);
+    rpc AppGossip(AppGossipMsg) returns (google.protobuf.Empty);
 
     rpc BlockVerify(BlockVerifyRequest) returns (BlockVerifyResponse);
-    rpc BlockAccept(BlockAcceptRequest) returns (EmptyMsg);
-    rpc BlockReject(BlockRejectRequest) returns (EmptyMsg);
+    rpc BlockAccept(BlockAcceptRequest) returns (google.protobuf.Empty);
+    rpc BlockReject(BlockRejectRequest) returns (google.protobuf.Empty);
 }
