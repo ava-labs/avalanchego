@@ -28,7 +28,19 @@ const (
 	recentCacheSize = 512
 )
 
-type network struct {
+type Network interface {
+	// Message handling
+	AppRequestFailed(nodeID ids.ShortID, requestID uint32) error
+	AppRequest(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error
+	AppResponse(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error
+	AppGossip(nodeID ids.ShortID, msgBytes []byte) error
+
+	// Gossip entrypoints
+	GossipAtomicTx(tx *Tx) error
+	GossipEthTxs(txs []*types.Transaction) error
+}
+
+type pushNetwork struct {
 	gossipActivationTime time.Time
 
 	appSender commonEng.AppSender
@@ -43,13 +55,13 @@ type network struct {
 	recentEthTxs    *cache.LRU
 }
 
-func (vm *VM) NewNetwork(
+func (vm *VM) NewPushNetwork(
 	activationTime time.Time,
 	appSender commonEng.AppSender,
 	chain *coreth.ETHChain,
 	mempool *Mempool,
-) *network {
-	net := &network{
+) Network {
+	net := &pushNetwork{
 		gossipActivationTime: activationTime,
 		appSender:            appSender,
 		chain:                chain,
@@ -64,25 +76,19 @@ func (vm *VM) NewNetwork(
 	return net
 }
 
-func (n *network) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+func (n *pushNetwork) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 	return nil
 }
 
-func (n *network) AppRequest(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error {
+func (n *pushNetwork) AppRequest(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error {
 	return nil
 }
 
-func (n *network) AppResponse(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error {
+func (n *pushNetwork) AppResponse(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error {
 	return nil
 }
 
-func (n *network) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
-	// If the network is not initialized (because the [ApricotPhase4Timestamp] is
-	// missing), we should not attempt to do anything when [AppGossip] is called.
-	if n == nil {
-		return nil
-	}
-
+func (n *pushNetwork) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
 	return n.handle(
 		n.gossipHandler,
 		"Gossip",
@@ -92,11 +98,9 @@ func (n *network) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
 	)
 }
 
-func (n *network) GossipAtomicTx(tx *Tx) error {
-	// If the network is not initialized (because the [ApricotPhase4Timestamp] is
-	// missing), we should not attempt to do anything when [GossipAtomicTx] is called.
+func (n *pushNetwork) GossipAtomicTx(tx *Tx) error {
 	txID := tx.ID()
-	if n == nil || time.Now().Before(n.gossipActivationTime) {
+	if time.Now().Before(n.gossipActivationTime) {
 		log.Debug(
 			"not gossiping atomic tx before the gossiping activation time",
 			"txID", txID,
@@ -125,7 +129,7 @@ func (n *network) GossipAtomicTx(tx *Tx) error {
 	return n.appSender.SendAppGossip(msgBytes)
 }
 
-func (n *network) sendEthTxsNotify(txs []*types.Transaction) error {
+func (n *pushNetwork) sendEthTxsNotify(txs []*types.Transaction) error {
 	if len(txs) == 0 {
 		return nil
 	}
@@ -159,10 +163,8 @@ func (n *network) sendEthTxsNotify(txs []*types.Transaction) error {
 // time to finality. In the future, we could attempt to be more conservative
 // with the number of messages we send and attempt to periodically send
 // a batch of messages.
-func (n *network) GossipEthTxs(txs []*types.Transaction) error {
-	// If the network is not initialized (because the [ApricotPhase4Timestamp] is
-	// missing), we should not attempt to do anything when [GossipEthTxs] is called.
-	if n == nil || time.Now().Before(n.gossipActivationTime) {
+func (n *pushNetwork) GossipEthTxs(txs []*types.Transaction) error {
+	if time.Now().Before(n.gossipActivationTime) {
 		log.Debug(
 			"not gossiping eth txs before the gossiping activation time",
 			"len(txs)", len(txs),
@@ -211,7 +213,7 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 	return n.sendEthTxsNotify(msgTxs)
 }
 
-func (n *network) handle(
+func (n *pushNetwork) handle(
 	handler message.Handler,
 	handlerName string,
 	nodeID ids.ShortID,
@@ -247,7 +249,7 @@ type GossipHandler struct {
 	message.NoopHandler
 
 	vm  *VM
-	net *network
+	net *pushNetwork
 }
 
 func (h *GossipHandler) HandleAtomicTxNotify(nodeID ids.ShortID, _ uint32, msg *message.AtomicTxNotify) error {
@@ -335,5 +337,30 @@ func (h *GossipHandler) HandleEthTxsNotify(nodeID ids.ShortID, _ uint32, msg *me
 			)
 		}
 	}
+	return nil
+}
+
+// noopNetwork should be used when gossip communication is not supported
+type noopNetwork struct{}
+
+func NewNoopNetwork() Network {
+	return &noopNetwork{}
+}
+func (n *noopNetwork) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	return nil
+}
+func (n *noopNetwork) AppRequest(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error {
+	return nil
+}
+func (n *noopNetwork) AppResponse(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error {
+	return nil
+}
+func (n *noopNetwork) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
+	return nil
+}
+func (n *noopNetwork) GossipAtomicTx(tx *Tx) error {
+	return nil
+}
+func (n *noopNetwork) GossipEthTxs(txs []*types.Transaction) error {
 	return nil
 }
