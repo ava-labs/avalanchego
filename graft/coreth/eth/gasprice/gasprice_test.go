@@ -126,10 +126,11 @@ type suggestTipCapTest struct {
 	expectedTip     *big.Int
 }
 
-func applyGasPriceTest(t *testing.T, test suggestTipCapTest) {
+func applyGasPriceTest(t *testing.T, minGasUsed *big.Int, test suggestTipCapTest) {
 	config := Config{
 		Blocks:     20,
 		Percentile: 60,
+		MinGasUsed: minGasUsed,
 	}
 
 	if test.genBlock == nil {
@@ -173,14 +174,14 @@ func TestSuggestTipCapNetworkUpgrades(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			applyGasPriceTest(t, test)
+			applyGasPriceTest(t, nil, test)
 		})
 	}
 }
 
 func TestSuggestTipCapEmptyExtDataGasUsage(t *testing.T) {
 	txTip := big.NewInt(55 * params.GWei)
-	applyGasPriceTest(t, suggestTipCapTest{
+	applyGasPriceTest(t, common.Big0, suggestTipCapTest{
 		chainConfig:     params.TestChainConfig,
 		numBlocks:       3,
 		extDataGasUsage: nil,
@@ -213,7 +214,7 @@ func TestSuggestTipCapEmptyExtDataGasUsage(t *testing.T) {
 
 func TestSuggestTipCapSimple(t *testing.T) {
 	txTip := big.NewInt(55 * params.GWei)
-	applyGasPriceTest(t, suggestTipCapTest{
+	applyGasPriceTest(t, common.Big0, suggestTipCapTest{
 		chainConfig:     params.TestChainConfig,
 		numBlocks:       3,
 		extDataGasUsage: common.Big0,
@@ -246,7 +247,7 @@ func TestSuggestTipCapSimple(t *testing.T) {
 
 func TestSuggestTipCapSimpleFloor(t *testing.T) {
 	txTip := big.NewInt(55 * params.GWei)
-	applyGasPriceTest(t, suggestTipCapTest{
+	applyGasPriceTest(t, common.Big0, suggestTipCapTest{
 		chainConfig:     params.TestChainConfig,
 		numBlocks:       1,
 		extDataGasUsage: common.Big0,
@@ -273,13 +274,13 @@ func TestSuggestTipCapSimpleFloor(t *testing.T) {
 				b.AddTx(tx)
 			}
 		},
-		expectedTip: big.NewInt(1_000_000_000),
+		expectedTip: common.Big0,
 	})
 }
 
 func TestSuggestTipCapSmallTips(t *testing.T) {
 	tip := big.NewInt(550 * params.GWei)
-	applyGasPriceTest(t, suggestTipCapTest{
+	applyGasPriceTest(t, common.Big0, suggestTipCapTest{
 		chainConfig:     params.TestChainConfig,
 		numBlocks:       3,
 		extDataGasUsage: common.Big0,
@@ -327,7 +328,7 @@ func TestSuggestTipCapSmallTips(t *testing.T) {
 
 func TestSuggestTipCapExtDataUsage(t *testing.T) {
 	txTip := big.NewInt(55 * params.GWei)
-	applyGasPriceTest(t, suggestTipCapTest{
+	applyGasPriceTest(t, common.Big0, suggestTipCapTest{
 		chainConfig:     params.TestChainConfig,
 		numBlocks:       3,
 		extDataGasUsage: big.NewInt(10_000),
@@ -357,3 +358,5 @@ func TestSuggestTipCapExtDataUsage(t *testing.T) {
 		expectedTip: big.NewInt(9_826_945_754),
 	})
 }
+
+// TODO: add test with defalut minGasUsed

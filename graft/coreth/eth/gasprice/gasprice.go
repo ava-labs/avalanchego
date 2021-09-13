@@ -110,12 +110,12 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 		log.Warn("Sanitizing invalid gasprice oracle max price", "provided", config.MaxPrice, "updated", maxPrice)
 	}
 	minPrice := config.MinPrice
-	if minPrice == nil || minPrice.Int64() <= 0 {
+	if minPrice == nil || minPrice.Int64() < 0 {
 		minPrice = DefaultMinPrice
 		log.Warn("Sanitizing invalid gasprice oracle min price", "provided", config.MinPrice, "updated", minPrice)
 	}
 	minGasUsed := config.MinGasUsed
-	if minGasUsed == nil || minGasUsed.Int64() <= 0 {
+	if minGasUsed == nil || minGasUsed.Int64() < 0 {
 		minGasUsed = DefaultMinGasUsed
 		log.Warn("Sanitizing invalid gasprice oracle min gas used", "provided", config.MinGasUsed, "updated", minGasUsed)
 	}
