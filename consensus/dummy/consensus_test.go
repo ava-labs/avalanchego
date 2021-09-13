@@ -15,9 +15,6 @@ import (
 func TestVerifyBlockFee(t *testing.T) {
 	tests := map[string]struct {
 		baseFee                 *big.Int
-		minBlockGasCost         *big.Int
-		maxBlockGasCost         *big.Int
-		blockGasCostDelta       *big.Int
 		parentBlockGasCost      *big.Int
 		parentTime, currentTime uint64
 		txs                     []*types.Transaction
@@ -27,9 +24,6 @@ func TestVerifyBlockFee(t *testing.T) {
 	}{
 		"tx only base fee": {
 			baseFee:            big.NewInt(100),
-			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
-			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
-			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
 			parentBlockGasCost: big.NewInt(0),
 			parentTime:         10,
 			currentTime:        10,
@@ -44,9 +38,6 @@ func TestVerifyBlockFee(t *testing.T) {
 		},
 		"tx covers exactly block fee": {
 			baseFee:            big.NewInt(100),
-			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
-			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
-			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
 			parentBlockGasCost: big.NewInt(0),
 			parentTime:         10,
 			currentTime:        10,
@@ -61,9 +52,6 @@ func TestVerifyBlockFee(t *testing.T) {
 		},
 		"txs share block fee": {
 			baseFee:            big.NewInt(100),
-			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
-			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
-			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
 			parentBlockGasCost: big.NewInt(0),
 			parentTime:         10,
 			currentTime:        10,
@@ -80,9 +68,6 @@ func TestVerifyBlockFee(t *testing.T) {
 		},
 		"txs split block fee": {
 			baseFee:            big.NewInt(100),
-			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
-			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
-			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
 			parentBlockGasCost: big.NewInt(0),
 			parentTime:         10,
 			currentTime:        10,
@@ -99,9 +84,6 @@ func TestVerifyBlockFee(t *testing.T) {
 		},
 		"split block fee with extra state contribution": {
 			baseFee:            big.NewInt(100),
-			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
-			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
-			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
 			parentBlockGasCost: big.NewInt(0),
 			parentTime:         10,
 			currentTime:        10,
@@ -116,9 +98,6 @@ func TestVerifyBlockFee(t *testing.T) {
 		},
 		"extra state contribution insufficient": {
 			baseFee:                big.NewInt(100),
-			minBlockGasCost:        ApricotPhase4MinBlockGasCost,
-			maxBlockGasCost:        ApricotPhase4MaxBlockGasCost,
-			blockGasCostDelta:      ApricotPhase4BlockGasCostDelta,
 			parentBlockGasCost:     big.NewInt(0),
 			parentTime:             10,
 			currentTime:            10,
@@ -129,9 +108,6 @@ func TestVerifyBlockFee(t *testing.T) {
 		},
 		"negative extra state contribution": {
 			baseFee:                big.NewInt(100),
-			minBlockGasCost:        ApricotPhase4MinBlockGasCost,
-			maxBlockGasCost:        ApricotPhase4MaxBlockGasCost,
-			blockGasCostDelta:      ApricotPhase4BlockGasCostDelta,
 			parentBlockGasCost:     big.NewInt(0),
 			parentTime:             10,
 			currentTime:            10,
@@ -142,9 +118,6 @@ func TestVerifyBlockFee(t *testing.T) {
 		},
 		"extra state contribution covers block fee": {
 			baseFee:                big.NewInt(100),
-			minBlockGasCost:        ApricotPhase4MinBlockGasCost,
-			maxBlockGasCost:        ApricotPhase4MaxBlockGasCost,
-			blockGasCostDelta:      ApricotPhase4BlockGasCostDelta,
 			parentBlockGasCost:     big.NewInt(0),
 			parentTime:             10,
 			currentTime:            10,
@@ -155,9 +128,6 @@ func TestVerifyBlockFee(t *testing.T) {
 		},
 		"extra state contribution covers more than block fee": {
 			baseFee:                big.NewInt(100),
-			minBlockGasCost:        ApricotPhase4MinBlockGasCost,
-			maxBlockGasCost:        ApricotPhase4MaxBlockGasCost,
-			blockGasCostDelta:      ApricotPhase4BlockGasCostDelta,
 			parentBlockGasCost:     big.NewInt(0),
 			parentTime:             10,
 			currentTime:            10,
@@ -168,12 +138,9 @@ func TestVerifyBlockFee(t *testing.T) {
 		},
 		"tx only base fee after full time window": {
 			baseFee:            big.NewInt(100),
-			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
-			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
-			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
 			parentBlockGasCost: big.NewInt(500_000),
 			parentTime:         10,
-			currentTime:        20,
+			currentTime:        21, // 1s target + 20
 			txs: []*types.Transaction{
 				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 100, big.NewInt(100), nil),
 			},
@@ -185,9 +152,6 @@ func TestVerifyBlockFee(t *testing.T) {
 		},
 		"tx only base fee after large time window": {
 			baseFee:            big.NewInt(100),
-			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
-			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
-			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
 			parentBlockGasCost: big.NewInt(100_000),
 			parentTime:         0,
 			currentTime:        math.MaxUint64,
@@ -202,9 +166,6 @@ func TestVerifyBlockFee(t *testing.T) {
 		},
 		"parent time > current time": {
 			baseFee:                big.NewInt(100),
-			minBlockGasCost:        ApricotPhase4MinBlockGasCost,
-			maxBlockGasCost:        ApricotPhase4MaxBlockGasCost,
-			blockGasCostDelta:      ApricotPhase4BlockGasCostDelta,
 			parentBlockGasCost:     big.NewInt(0),
 			parentTime:             11,
 			currentTime:            10,
@@ -218,9 +179,10 @@ func TestVerifyBlockFee(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			blockGasCost := calcBlockGasCost(
-				test.minBlockGasCost,
-				test.maxBlockGasCost,
-				test.blockGasCostDelta,
+				ApricotPhase4TargetBlockRate,
+				ApricotPhase4MinBlockGasCost,
+				ApricotPhase4MaxBlockGasCost,
+				ApricotPhase4BlockGasCostStep,
 				test.parentBlockGasCost,
 				test.parentTime, test.currentTime,
 			)

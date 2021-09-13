@@ -437,90 +437,60 @@ func TestCalcBaseFeeAP4(t *testing.T) {
 
 func TestCalcBlockGasCost(t *testing.T) {
 	tests := map[string]struct {
-		minBlockGasCost         *big.Int
-		maxBlockGasCost         *big.Int
-		blockGasCostDelta       *big.Int
 		parentBlockGasCost      *big.Int
 		parentTime, currentTime uint64
 
 		expected *big.Int
 	}{
 		"Nil parentBlockGasCost": {
-			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
-			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
-			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
 			parentBlockGasCost: nil,
 			parentTime:         1,
 			currentTime:        1,
 			expected:           ApricotPhase4MinBlockGasCost,
 		},
 		"Same timestamp from 0": {
-			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
-			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
-			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
 			parentBlockGasCost: big.NewInt(0),
 			parentTime:         1,
 			currentTime:        1,
 			expected:           big.NewInt(50_000),
 		},
 		"Same timestamp from non-zero": {
-			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
-			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
-			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
 			parentBlockGasCost: big.NewInt(50_000),
 			parentTime:         1,
 			currentTime:        1,
 			expected:           big.NewInt(100_000),
 		},
 		"1s Difference": {
-			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
-			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
-			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
 			parentBlockGasCost: big.NewInt(1_000_000),
 			parentTime:         1,
 			currentTime:        2,
-			expected:           big.NewInt(950_000),
+			expected:           big.NewInt(1_000_000),
 		},
 		"2s Difference": {
-			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
-			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
-			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
 			parentBlockGasCost: big.NewInt(1_000_000),
 			parentTime:         1,
 			currentTime:        3,
-			expected:           big.NewInt(900_000),
+			expected:           big.NewInt(950_000),
 		},
 		"10s Difference": {
-			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
-			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
-			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
 			parentBlockGasCost: big.NewInt(1_000_000),
 			parentTime:         1,
 			currentTime:        11,
-			expected:           big.NewInt(500_000),
+			expected:           big.NewInt(550_000),
 		},
 		"20s Difference": {
-			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
-			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
-			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
 			parentBlockGasCost: big.NewInt(1_000_000),
 			parentTime:         1,
 			currentTime:        21,
-			expected:           big.NewInt(0),
+			expected:           big.NewInt(50_000),
 		},
 		"21s Difference": {
-			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
-			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
-			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
 			parentBlockGasCost: big.NewInt(1_000_000),
 			parentTime:         1,
 			currentTime:        22,
 			expected:           big.NewInt(0),
 		},
 		"-1s Difference": {
-			minBlockGasCost:    ApricotPhase4MinBlockGasCost,
-			maxBlockGasCost:    ApricotPhase4MaxBlockGasCost,
-			blockGasCostDelta:  ApricotPhase4BlockGasCostDelta,
 			parentBlockGasCost: big.NewInt(50_000),
 			parentTime:         1,
 			currentTime:        0,
@@ -531,9 +501,10 @@ func TestCalcBlockGasCost(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			assert.Zero(t, test.expected.Cmp(calcBlockGasCost(
-				test.minBlockGasCost,
-				test.maxBlockGasCost,
-				test.blockGasCostDelta,
+				ApricotPhase4TargetBlockRate,
+				ApricotPhase4MinBlockGasCost,
+				ApricotPhase4MaxBlockGasCost,
+				ApricotPhase4BlockGasCostStep,
 				test.parentBlockGasCost,
 				test.parentTime,
 				test.currentTime,
