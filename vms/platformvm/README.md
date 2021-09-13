@@ -6,26 +6,13 @@ The PlatformVM has a mempool which tracks unconfirmed transactions that are wait
 
 In conjunction with the introduction of [Snowman++](https://github.com/ava-labs/avalanchego/tree/master/vms/proposervm#readme), the mempool was opened to the network, allowing the gossiping of local transactions as well as the hosting of remote ones.
 
-### Mempool Gossiping workflow
+### Mempool Gossiping Workflow
 
 The PlatformVM's mempool performs the following workflow:
 
-- One or multiple unconfirmed transactions are accepted into `node A`'s mempool; immediately `node A` gossips around the transactions IDs encoding them into a `AppGossip` message. The node's engine randomly selects a number of validator peers (currently `20`) to send the unsolicited `AppGossip` message to.
-- Once `node B` learns about the existence of some remote transaction IDs, it checks whether its mempool contains the transactions or whether they have been recently rejected. If all transactions IDs are already known, the `AppGossip` message is simply dropped. If some transaction IDs are not known, `node B` issues an `AppRequest` message for the unknown transaction IDs to the node from which it received the `AppGossip` (`node A` in this scenario), in order to receive the full transactions. `node B` tracks the content of requests issued by their `requestID` for subsequent verifications.
-- Upon reception of an `AppRequest` message, `node A` tries to fetch the full transactions requested in the `AppRequest` message from its mempool. Note that the transactions advertised in the `AppGossip` message may not be anymore in the mempool, because they could have been included into a block, rejected or dropped. If some transactions are retrieved, they are encoded into an `AppResponse`. The `AppResponse` message carries the same `requestID` of the originating `AppRequest` message and it gets sent back to `node B`.
-- Once `node B` receives the `AppResponse` message, it decodes the transactions contained into it and verifies that their IDs match the content requested in the originating `AppRequest` messages. If content matches, transactions are validated and accepted into the mempool.
-- If the newly learned transactions are valid and accepted into the mempool a new round of `AppGossip` messages is sent around by `node B` to further propagate the transactions through the network. Note that the original `node A` could appear among the peers selected for the second round of `AppGossip` messages; in this case `node A` will simply drop the message.
-- It may happen that `node A` receives an `AppRequest` for a transactions which is not anymore in its mempool (it may have been already committed to a block for instance). In such case `node A` will ignore the `AppRequest` message; `node B` will receive an `AppRequestFailure` message from its engine when a suitable time has passed without hearing from `node A`. In such case `node B` does nothing and do not attempt anymore to learn about the transaction.
-
-Note that no banning mechanism specific to mempool gossiping has been introduced for misbehaving nodes sending around high rates of malformed or invalid transactions. The throttling mechanisms already deployed VM-wide protect mempool related communications from DoS attacks along with any other VM communications.
-
-### P-chain and C-chain gossiping nuances
-
-We list above the details which differ in P-chain and C-chain mempool gossiping:
-
-- In P-Chain VM, only one transaction ID at a time is gossiped around via `AppGossip` messages.
-- In C-chain VM, it can be gossiped either a single `atomic tx` ID or up to 10 `coreth tx` hashes.
-- In P-Chain VM a transaction received from an `AppResponse` message is only syntactically validated, to make sure it is well-formed; no state related checks are attempted to far.
-- In C-Chain VM transactions received from an `AppResponse` message are both syntactically validated and checked against the current blockchain state.
-
-Note that in both P-chain and C-chain VMs, the mempools can end up containing mutually incompatible transactions. It is responsibility of  up to the block build mechanism to clear up the mempool incompatibility so to generate valid blocks.
+- An unconfirmed transaction is provided to `node A`, either through mempool gossiping or direct issuance over a RPC. If this transaction isn't already in the local mempool, the transaction is issued into the mempool.
+- When `node A` issues a new transaction into its mempool, it will gossip the transaction ID by sending an `AppGossip` message. The node's engine will randomly select peers (currently defaulting to `20` nodes) to send the `AppGossip` message to.
+- When `node B` learns about the existence of a remote transaction ID, it will check if its mempool contains the transaction or if it has been recently dropped. If the transaction ID is not known, `node B` will generate a new `requestID` and respond with an `AppRequest` message with the unknown transaction's ID. `node B` will track the content of the request issued with `requestID` for response verification.
+- Upon reception of an `AppRequest` message, `node A` will attempt to fetch the transaction requested in the `AppRequest` message from its mempool. Note that a transaction advertised in an `AppGossip` message may no longer be in the mempool, because they may have been included into a block, rejected, or dropped. If the transaction is retrieved, it is encoded into an `AppResponse` message. The `AppResponse` message will carry the same `requestID` of the originating `AppRequest` message and it will be sent back to `node B`.
+- If `node B` receives an `AppResponse` message, it will decode the transaction and verifies that the ID matches the expected content from the original `AppRequest` message. If the content matches, the transaction is validated and issued into the mempool.
+- If `nodeB`'s engine decides it isn't likely to receive an `AppResponse` message, the engine will issue an `AppRequestFailure` message. In such a case `node B` will mark the `requestID` as failed and the request for the unknown transaction is aborted.
