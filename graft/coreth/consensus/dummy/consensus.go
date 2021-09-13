@@ -140,9 +140,10 @@ func (self *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, heade
 
 	// Enforce Apricot Phase 4 constraints
 	expectedBlockGasCost := calcBlockGasCost(
+		ApricotPhase4TargetBlockRate,
 		ApricotPhase4MinBlockGasCost,
 		ApricotPhase4MaxBlockGasCost,
-		ApricotPhase4BlockGasCostDelta,
+		ApricotPhase4BlockGasCostStep,
 		parent.BlockGasCost,
 		parent.Time, header.Time,
 	)
@@ -324,9 +325,10 @@ func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *type
 			return fmt.Errorf("invalid extDataGasUsed: have %d, want %d", blockExtDataGasUsed, extDataGasUsed)
 		}
 		blockGasCost := calcBlockGasCost(
+			ApricotPhase4TargetBlockRate,
 			ApricotPhase4MinBlockGasCost,
 			ApricotPhase4MaxBlockGasCost,
-			ApricotPhase4BlockGasCostDelta,
+			ApricotPhase4BlockGasCostStep,
 			parent.BlockGasCost,
 			parent.Time, block.Time(),
 		)
@@ -369,9 +371,10 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 			header.ExtDataGasUsed = common.Big0
 		}
 		header.BlockGasCost = calcBlockGasCost(
+			ApricotPhase4TargetBlockRate,
 			ApricotPhase4MinBlockGasCost,
 			ApricotPhase4MaxBlockGasCost,
-			ApricotPhase4BlockGasCostDelta,
+			ApricotPhase4BlockGasCostStep,
 			parent.BlockGasCost,
 			parent.Time, header.Time,
 		)
