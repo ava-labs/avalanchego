@@ -236,7 +236,7 @@ func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 	assert.Equal(1, gossiped)
 
 	// Test hash on retry
-	assert.NoError(vm.GossipAtomicTx(tx))
+	assert.NoError(vm.network.GossipAtomicTx(tx))
 	assert.Equal(1, gossiped)
 }
 
