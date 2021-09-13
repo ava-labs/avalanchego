@@ -5,7 +5,6 @@ package proposervm
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 	"time"
 
@@ -521,7 +520,7 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 		case bytes.Equal(b, coreBlk.Bytes()):
 			return coreBlk, nil
 		default:
-			return nil, fmt.Errorf("unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -651,7 +650,7 @@ func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 		case bytes.Equal(b, coreBlk.opts[1].Bytes()):
 			return coreBlk.opts[1], nil
 		default:
-			return nil, fmt.Errorf("Unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -750,7 +749,7 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 		case bytes.Equal(b, coreBlk.opts[1].Bytes()):
 			return coreBlk.opts[1], nil
 		default:
-			return nil, fmt.Errorf("Unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 

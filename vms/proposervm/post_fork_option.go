@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
@@ -18,16 +17,15 @@ var _ Block = &postForkOption{}
 type postForkOption struct {
 	block.Block
 	postForkCommonComponents
+
+	timestamp time.Time
 }
 
 func (b *postForkOption) Timestamp() time.Time {
-	// A *postForkOption's timestamp is its parent's timestamp
-	parentID := b.Parent()
-	parent, err := b.vm.GetBlock(parentID)
-	if err != nil {
-		b.vm.ctx.Log.Error("Could not find option %v 's parent block %v to retrieve its timestamp", b.ID(), b.Parent())
+	if b.Status() == choices.Accepted {
+		return b.vm.lastAcceptedTime
 	}
-	return parent.Timestamp()
+	return b.timestamp
 }
 
 func (b *postForkOption) Accept() error {
@@ -66,18 +64,15 @@ func (b *postForkOption) Parent() ids.ID {
 	return b.ParentID()
 }
 
-// If Verify returns nil, Accept or Reject is eventually called on
-// [b] a
+// If Verify returns nil, Accept or Reject is eventually called on [b] and
+// [b.innerBlk].
 func (b *postForkOption) Verify() error {
 	parent, err := b.vm.getBlock(b.ParentID())
 	if err != nil {
 		return err
 	}
+	b.timestamp = parent.Timestamp()
 	return parent.verifyPostForkOption(b)
-}
-
-func (b *postForkOption) getInnerBlk() snowman.Block {
-	return b.innerBlk
 }
 
 func (b *postForkOption) verifyPreForkChild(child *preForkBlock) error {
@@ -99,11 +94,11 @@ func (b *postForkOption) verifyPostForkChild(child *postForkBlock) error {
 }
 
 func (b *postForkOption) verifyPostForkOption(child *postForkOption) error {
-	// A *postForkOption's parent cant be a *postForkOption
+	// A *postForkOption's parent can't be a *postForkOption
 	return errUnexpectedBlockType
 }
 
-func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
+func (b *postForkOption) buildChild() (Block, error) {
 	parentPChainHeight, err := b.pChainHeight()
 	if err != nil {
 		return nil, err
@@ -112,7 +107,6 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 		b.ID(),
 		b.Timestamp(),
 		parentPChainHeight,
-		innerBlock,
 	)
 }
 

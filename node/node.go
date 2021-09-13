@@ -75,6 +75,7 @@ var (
 	errPNotCreated                  = errors.New("P-Chain not created")
 	errXNotCreated                  = errors.New("X-Chain not created")
 	errCNotCreated                  = errors.New("C-Chain not created")
+	errFailedToRegisterHealthCheck  = errors.New("couldn't register network health check")
 )
 
 // Node is an instance of an Avalanche node.
@@ -946,13 +947,13 @@ func (n *Node) initHealthAPI() error {
 	// Register the network layer with the health service
 	err = n.healthService.RegisterCheck("network", n.Net.HealthCheck)
 	if err != nil {
-		return fmt.Errorf("couldn't register network health check")
+		return errFailedToRegisterHealthCheck
 	}
 
 	// Register the router with the health service
 	err = n.healthService.RegisterCheck("router", n.Config.ConsensusRouter.HealthCheck)
 	if err != nil {
-		return fmt.Errorf("couldn't register router health check")
+		return errFailedToRegisterHealthCheck
 	}
 
 	handler, err := n.healthService.Handler()

@@ -63,7 +63,12 @@ func (b *statelessBlock) Bytes() []byte    { return b.bytes }
 
 func (b *statelessBlock) initialize(bytes []byte) error {
 	b.bytes = bytes
-	unsignedBytes := bytes[:len(bytes)-wrappers.IntLen-len(b.Signature)]
+
+	// The serialized form of the block is the unsignedBytes followed by the
+	// signature, which is prefixed by a uint32. So, we need to strip off the
+	// signature as well as it's length prefix to get the unsigned bytes.
+	lenUnsignedBytes := len(bytes) - wrappers.IntLen - len(b.Signature)
+	unsignedBytes := bytes[:lenUnsignedBytes]
 	b.id = hashing.ComputeHash256Array(unsignedBytes)
 
 	b.timestamp = time.Unix(b.StatelessBlock.Timestamp, 0)

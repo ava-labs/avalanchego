@@ -5,13 +5,13 @@ set -o nounset
 set -o pipefail
 
 # Changes to the minimum golang version must also be replicated in
-# scripts/ansible/roles/golang_based/defaults/main.yml (here)
+# scripts/ansible/roles/golang_base/defaults/main.yml (here)
 # scripts/build_avalanche.sh (here)
 # scripts/local.Dockerfile
 # Dockerfile
 # README.md
 # go.mod
-go_version_minimum="1.15.5"
+go_version_minimum="1.16.8"
 
 go_version() {
     go version | sed -nE -e 's/[^0-9.]+([0-9.]+).+/\1/p'

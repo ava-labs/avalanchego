@@ -9,8 +9,15 @@ import (
 )
 
 type Tree interface {
+	// Add places the block in the tree
 	Add(snowman.Block)
-	Contains(snowman.Block) bool
+
+	// Get returns the block that was added to this tree whose parent and ID
+	// match the provided block. If non-exists, then false will be returned.
+	Get(snowman.Block) (snowman.Block, bool)
+
+	// Accept marks the provided block as accepted and rejects every conflicting
+	// block.
 	Accept(snowman.Block) error
 }
 
@@ -36,12 +43,12 @@ func (t *tree) Add(blk snowman.Block) {
 	children[blkID] = blk
 }
 
-func (t *tree) Contains(blk snowman.Block) bool {
+func (t *tree) Get(blk snowman.Block) (snowman.Block, bool) {
 	parentID := blk.Parent()
 	children := t.nodes[parentID]
 	blkID := blk.ID()
-	_, exists := children[blkID]
-	return exists
+	originalBlk, exists := children[blkID]
+	return originalBlk, exists
 }
 
 func (t *tree) Accept(blk snowman.Block) error {

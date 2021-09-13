@@ -35,6 +35,7 @@ func (b *postForkBlock) Accept() error {
 	}
 
 	delete(b.vm.verifiedBlocks, blkID)
+	b.vm.lastAcceptedTime = b.Timestamp()
 
 	// mark the inner block as accepted and all conflicting inner blocks as
 	// rejected
@@ -58,8 +59,8 @@ func (b *postForkBlock) Parent() ids.ID {
 	return b.ParentID()
 }
 
-// If Verify() returns nil, Accept() or Reject() will eventually be called
-// on [b] and [b.innerBlk]
+// If Verify() returns nil, Accept() or Reject() will eventually be called on
+// [b] and [b.innerBlk]
 func (b *postForkBlock) Verify() error {
 	parent, err := b.vm.getBlock(b.ParentID())
 	if err != nil {
@@ -112,10 +113,6 @@ func (b *postForkBlock) Options() ([2]snowman.Block, error) {
 	return outerOptions, nil
 }
 
-func (b *postForkBlock) getInnerBlk() snowman.Block {
-	return b.innerBlk
-}
-
 // A post-fork block can never have a pre-fork child
 func (b *postForkBlock) verifyPreForkChild(child *preForkBlock) error {
 	return errUnsignedChild
@@ -147,12 +144,11 @@ func (b *postForkBlock) verifyPostForkOption(child *postForkOption) error {
 }
 
 // Return the child (a *postForkBlock) of this block
-func (b *postForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
+func (b *postForkBlock) buildChild() (Block, error) {
 	return b.postForkCommonComponents.buildChild(
 		b.ID(),
 		b.Timestamp(),
 		b.PChainHeight(),
-		innerBlock,
 	)
 }
 
