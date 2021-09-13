@@ -15,7 +15,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ethereum/go-ethereum/common"
@@ -40,14 +42,14 @@ type UnsignedExportTx struct {
 // InputUTXOs returns the address:nonce set of inputs. This is used to ensure
 // the atomic mempool does not contain any conflicting transactions.
 func (tx *UnsignedExportTx) InputUTXOs() ids.Set {
-	set := ids.Set{}
+	set := ids.NewSet(len(tx.Ins))
 	for _, in := range tx.Ins {
-		addrID, err := ids.ToID(in.Address.Bytes())
-		if err != nil {
-			// TODO: what should we do here?
-			panic(err)
+		packer := wrappers.Packer{
+			Bytes: make([]byte, wrappers.LongLen+common.AddressLength),
 		}
-		set.Add(addrID.Prefix(in.Nonce))
+		packer.PackLong(in.Nonce)
+		packer.PackBytes(in.Address.Bytes())
+		set.Add(hashing.ComputeHash256Array(packer.Bytes))
 	}
 	return set
 }
