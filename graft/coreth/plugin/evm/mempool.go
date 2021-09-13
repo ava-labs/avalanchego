@@ -98,7 +98,7 @@ func (m *Mempool) AddTx(tx *Tx) error {
 	// mempool
 	utxoSet := tx.InputUTXOs()
 	if overlaps := m.utxoSet.Overlaps(utxoSet); overlaps {
-		return nil
+		return errConflictingAtomicTx
 	}
 	m.utxoSet.Union(utxoSet)
 
@@ -223,14 +223,17 @@ func (m *Mempool) RemoveTx(txID ids.ID) {
 		removedTx = m.currentTx
 		m.currentTx = nil
 	}
+
 	if tx, ok := m.txs[txID]; ok {
 		removedTx = tx
-		delete(m.txs, txID)
 	}
+	delete(m.txs, txID)
+
 	if tx, ok := m.txs[txID]; ok {
 		removedTx = tx
-		delete(m.issuedTxs, txID)
 	}
+	delete(m.issuedTxs, txID)
+
 	m.discardedTxs.Evict(txID)
 
 	// Remove any UTXOs if non-nil

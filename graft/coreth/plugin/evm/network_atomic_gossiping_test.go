@@ -19,7 +19,8 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/message"
 )
 
-func getValidTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) *Tx {
+// getValidTx returns 2 transactions that conflict with each other (both valid)
+func getValidTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) (*Tx, *Tx) {
 	importAmount := uint64(50000000)
 	utxoID := avax.UTXOID{
 		TxID: ids.ID{
@@ -63,7 +64,12 @@ func getValidTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) *Tx {
 		t.Fatal(err)
 	}
 
-	return importTx
+	importTx2, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[1], initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return importTx, importTx2
 }
 
 func getInvalidTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) *Tx {
@@ -208,7 +214,7 @@ func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 	}()
 
 	// Create a simple tx
-	tx := getValidTx(vm, sharedMemory, t)
+	tx, _ := getValidTx(vm, sharedMemory, t)
 
 	var gossiped int
 	sender.CantSendAppGossip = false
@@ -267,7 +273,7 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 	}
 
 	// create a tx
-	tx := getValidTx(vm, sharedMemory, t)
+	tx, _ := getValidTx(vm, sharedMemory, t)
 
 	// gossip tx and check it is accepted and gossiped
 	msg := message.AtomicTxNotify{

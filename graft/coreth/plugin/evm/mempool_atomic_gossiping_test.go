@@ -13,6 +13,8 @@ import (
 
 // shows that a locally generated AtomicTx can be added to mempool and then
 // removed by inclusion in a block
+// TODO: also shows conflicting can't be added
+// TODO: attempt export conflicting
 func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 	assert := assert.New(t)
 
@@ -23,16 +25,26 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 	}()
 	mempool := vm.mempool
 
-	// add a tx to it
-	tx := getValidTx(vm, sharedMemory, t)
+	// generate a valid and conflicting tx
+	tx, conflictingTx := getValidTx(vm, sharedMemory, t)
 	txID := tx.ID()
+	conflictingTxID := conflictingTx.ID()
 
+	// add a tx to the mempool
 	err := vm.issueTx(tx, true /*=local*/)
 	assert.NoError(err)
+	has := mempool.has(txID)
+	assert.True(has, "valid tx not recorded into mempool")
+
+	// try to add a conflicting tx
+	err = vm.issueTx(conflictingTx, true /*=local*/)
+	assert.ErrorIs(err, errConflictingAtomicTx)
+	has = mempool.has(conflictingTxID)
+	assert.False(has, "conflicting tx in mempool")
 
 	<-issuer
 
-	has := mempool.has(txID)
+	has = mempool.has(txID)
 	assert.True(has, "valid tx not recorded into mempool")
 
 	// show that build block include that tx and tx is still in mempool
@@ -57,6 +69,13 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 
 	has = mempool.has(txID)
 	assert.False(has, "tx shouldn't be in mempool after block is accepted")
+
+	// try to add a conflicting tx again (don't use issueTx because will fail
+	// verification)
+	err = mempool.AddTx(conflictingTx)
+	assert.ErrorIs(err, errConflictingAtomicTx)
+	has = mempool.has(conflictingTxID)
+	assert.False(has, "conflicting tx in mempool")
 }
 
 // a valid tx shouldn't be added to the mempool if this would exceed the
@@ -72,13 +91,13 @@ func TestMempoolMaxMempoolSizeHandling(t *testing.T) {
 	mempool := vm.mempool
 
 	// create candidate tx
-	tx := getValidTx(vm, sharedMemory, t)
+	tx, _ := getValidTx(vm, sharedMemory, t)
 
 	// shortcut to simulated almost filled mempool
 	mempool.maxSize = 0
 
 	err := mempool.AddTx(tx)
-	assert.Equal(errTooManyAtomicTx, err, "max mempool size breached")
+	assert.ErrorIs(err, errTooManyAtomicTx, "max mempool size breached")
 
 	// shortcut to simulated empty mempool
 	mempool.maxSize = defaultMempoolSize
