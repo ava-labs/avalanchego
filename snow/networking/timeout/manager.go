@@ -5,7 +5,6 @@ package timeout
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -18,7 +17,6 @@ import (
 
 // Manager registers and fires timeouts for the snow API.
 type Manager struct {
-	lock         sync.Mutex
 	tm           timer.AdaptiveTimeoutManager
 	benchlistMgr benchlist.Manager
 	metrics      metrics
@@ -51,21 +49,18 @@ func (m *Manager) IsBenched(validatorID ids.ShortID, chainID ids.ID) bool {
 }
 
 func (m *Manager) RegisterChain(ctx *snow.Context, namespace string) error {
-	m.lock.Lock()
 	if err := m.metrics.RegisterChain(ctx, namespace); err != nil {
-		m.lock.Unlock()
 		return fmt.Errorf("couldn't register timeout metrics for chain %s: %w", ctx.ChainID, err)
 	}
-	m.lock.Unlock()
 	if err := m.benchlistMgr.RegisterChain(ctx, namespace); err != nil {
 		return fmt.Errorf("couldn't register chain %s with benchlist manager: %w", ctx.ChainID, err)
 	}
 	return nil
 }
 
-// RegisterRequests notes that we sent a request of type [msgType] to [validatorID]
-// regarding chain [chainID]. If we don't receive a response in time, [timeoutHandler]
-// is executed.
+// RegisterRequest notes that we sent a request of type [msgType] to
+// [validatorID] regarding chain [chainID]. If we don't receive a response in
+// time, [timeoutHandler]  is executed.
 func (m *Manager) RegisterRequest(
 	validatorID ids.ShortID,
 	chainID ids.ID,
@@ -90,9 +85,7 @@ func (m *Manager) RegisterResponse(
 	msgType constants.MsgType,
 	latency time.Duration,
 ) {
-	m.lock.Lock()
-	m.metrics.observe(chainID, msgType, latency)
-	m.lock.Unlock()
+	m.metrics.Observe(chainID, msgType, latency)
 	m.benchlistMgr.RegisterResponse(chainID, validatorID)
 	m.tm.Remove(uniqueRequestID)
 }
