@@ -32,15 +32,20 @@ type Mempool struct {
 	// Pending is a channel of length one, which the mempool ensures has an item on
 	// it as long as there is an unissued transaction remaining in [txs]
 	Pending chan struct{}
+	// utxoSet is a collection of all pending and issued UTXOs
+	utxoSet ids.Set
 }
 
 // NewMempool returns a Mempool with [maxSize]
+// TODO: check conflicting UTXOs
+// TODO: drop lowest priced mempool items
 func NewMempool(maxSize int) *Mempool {
 	return &Mempool{
 		txs:          make(map[ids.ID]*Tx),
 		issuedTxs:    make(map[ids.ID]*Tx),
 		discardedTxs: &cache.LRU{Size: discardedTxsCacheSize},
 		Pending:      make(chan struct{}, 1),
+		utxoSet:      ids.Set{},
 		maxSize:      maxSize,
 	}
 }
@@ -88,6 +93,14 @@ func (m *Mempool) AddTx(tx *Tx) error {
 	if _, exists := m.txs[txID]; exists {
 		return nil
 	}
+
+	// Check if the transaction's UTXOs conflict with what is already in the
+	// mempool
+	utxoSet := tx.InputUTXOs()
+	if overlaps := m.utxoSet.Overlaps(utxoSet); overlaps {
+		return nil
+	}
+	m.utxoSet.Union(utxoSet)
 
 	// If the transaction was recently discarded, log the event and evict from
 	// discarded transactions so it's not in two places within the mempool.
@@ -196,6 +209,7 @@ func (m *Mempool) DiscardCurrentTx() {
 	}
 
 	m.discardedTxs.Put(m.currentTx.ID(), m.currentTx)
+	m.utxoSet.Remove(m.currentTx.InputUTXOs().List()...)
 	m.currentTx = nil
 }
 
@@ -204,12 +218,25 @@ func (m *Mempool) RemoveTx(txID ids.ID) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
+	var removedTx *Tx
 	if m.currentTx != nil && m.currentTx.ID() == txID {
+		removedTx = m.currentTx
 		m.currentTx = nil
 	}
-	delete(m.txs, txID)
-	delete(m.issuedTxs, txID)
+	if tx, ok := m.txs[txID]; ok {
+		removedTx = tx
+		delete(m.txs, txID)
+	}
+	if tx, ok := m.txs[txID]; ok {
+		removedTx = tx
+		delete(m.issuedTxs, txID)
+	}
 	m.discardedTxs.Evict(txID)
+
+	// Remove any UTXOs if non-nil
+	if removedTx != nil {
+		m.utxoSet.Remove(removedTx.InputUTXOs().List()...)
+	}
 }
 
 // RejectTx marks [txID] as being rejected and attempts to re-issue
