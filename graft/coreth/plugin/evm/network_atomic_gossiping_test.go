@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -20,6 +21,7 @@ import (
 )
 
 // getValidTx returns 2 transactions that conflict with each other (both valid)
+// TODO: change to getValidImportTx
 func getValidTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) (*Tx, *Tx) {
 	importAmount := uint64(50000000)
 	utxoID := avax.UTXOID{
@@ -70,6 +72,101 @@ func getValidTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) (*Tx, *Tx) {
 	}
 
 	return importTx, importTx2
+}
+
+// getValidTx returns 2 transactions that conflict with each other (both valid)
+// TODO: change to getValidImportTx
+func getValidExportTx(vm *VM, issuer chan common.Message, sharedMemory *atomic.Memory, t *testing.T) (*Tx, *Tx) {
+	importAmount := uint64(50000000)
+	utxoID := avax.UTXOID{
+		TxID: ids.ID{
+			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+			0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+			0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+			0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+		},
+	}
+
+	utxo := &avax.UTXO{
+		UTXOID: utxoID,
+		Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: importAmount,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{testKeys[0].PublicKey().Address()},
+			},
+		},
+	}
+	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
+	inputID := utxo.InputID()
+	if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
+		Key:   inputID[:],
+		Value: utxoBytes,
+		Traits: [][]byte{
+			testKeys[0].PublicKey().Address().Bytes(),
+		},
+	}}}}); err != nil {
+		t.Fatal(err)
+	}
+
+	importTx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.issueTx(importTx, true /*=local*/); err != nil {
+		t.Fatal(err)
+	}
+
+	<-issuer
+
+	blk, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.SetPreference(blk.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Accept(); err != nil {
+		t.Fatal(err)
+	}
+
+	exportAmount := uint64(5000000)
+
+	testKeys1Addr := GetEthAddress(testKeys[0])
+	exportId1, err := ids.ToShortID(testKeys1Addr[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	testKeys2Addr := GetEthAddress(testKeys[1])
+	exportId2, err := ids.ToShortID(testKeys2Addr[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	exportTx1, err := vm.newExportTx(vm.ctx.AVAXAssetID, exportAmount, vm.ctx.XChainID, exportId1, initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	exportTx2, err := vm.newExportTx(vm.ctx.AVAXAssetID, exportAmount, vm.ctx.XChainID, exportId2, initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return exportTx1, exportTx2
 }
 
 func getInvalidTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) *Tx {
