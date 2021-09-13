@@ -53,6 +53,7 @@ const (
 
 var (
 	errUnknownChainID = errors.New("unknown chain ID")
+	errUnknownVMType  = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
 
 	_ Manager = &manager{}
 )
@@ -426,7 +427,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			return nil, fmt.Errorf("error while creating new snowman vm %w", err)
 		}
 	default:
-		return nil, fmt.Errorf("the vm should have type avalanche.DAGVM or snowman.ChainVM. Chain not created")
+		return nil, errUnknownVMType
 	}
 
 	// Register the chain with the timeout manager

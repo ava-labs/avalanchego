@@ -65,7 +65,7 @@ func InitNodeStakingKeyPair(keyPath, certPath string) error {
 		return fmt.Errorf("couldn't close key file: %w", err)
 	}
 	if err := os.Chmod(keyPath, perms.ReadOnly); err != nil { // Make key read-only
-		return fmt.Errorf("couldn't change permissions on key")
+		return fmt.Errorf("couldn't change permissions on key: %w", err)
 	}
 
 	return nil

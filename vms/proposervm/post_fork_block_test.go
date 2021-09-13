@@ -6,7 +6,6 @@ package proposervm
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -120,7 +119,7 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 		case bytes.Equal(b, prntCoreBlk.Bytes()):
 			return prntCoreBlk, nil
 		default:
-			return nil, fmt.Errorf("unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -217,7 +216,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		case bytes.Equal(b, prntCoreBlk.Bytes()):
 			return prntCoreBlk, nil
 		default:
-			return nil, fmt.Errorf("unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -403,7 +402,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 		case bytes.Equal(b, prntCoreBlk.Bytes()):
 			return prntCoreBlk, nil
 		default:
-			return nil, fmt.Errorf("unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -581,7 +580,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		case bytes.Equal(b, oracleCoreBlk.opts[1].Bytes()):
 			return oracleCoreBlk.opts[1], nil
 		default:
-			return nil, fmt.Errorf("Unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -737,7 +736,7 @@ func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 		case bytes.Equal(b, coreBlk.Bytes()):
 			return coreBlk, nil
 		default:
-			return nil, fmt.Errorf("unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -797,7 +796,7 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 		case bytes.Equal(b, coreBlk.Bytes()):
 			return coreBlk, nil
 		default:
-			return nil, fmt.Errorf("unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -974,7 +973,7 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 		case bytes.Equal(b, oracleCoreBlk.opts[1].Bytes()):
 			return oracleCoreBlk.opts[1], nil
 		default:
-			return nil, fmt.Errorf("Unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -1061,7 +1060,7 @@ func TestBlockVerify_PostForkBlock_PChainTooLow(t *testing.T) {
 		case bytes.Equal(b, coreBlk.Bytes()):
 			return coreBlk, nil
 		default:
-			return nil, fmt.Errorf("Unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 

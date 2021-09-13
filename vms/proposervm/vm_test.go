@@ -8,7 +8,6 @@ import (
 	"crypto"
 	"crypto/tls"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -35,7 +34,9 @@ var (
 	genesisUnixTimestamp int64 = 1000
 	genesisTimestamp           = time.Unix(genesisUnixTimestamp, 0)
 
-	errUnverifiedBlock = errors.New("unverified block")
+	errUnknownBlock      = errors.New("unknown block")
+	errUnverifiedBlock   = errors.New("unverified block")
+	errMarshallingFailed = errors.New("marshalling failed")
 )
 
 func init() {
@@ -417,7 +418,7 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 		TimestampV: proVM.Time(),
 	}
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
-		return nil, fmt.Errorf("Block marshalling failed")
+		return nil, errMarshallingFailed
 	}
 	slb, err := statelessblock.Build(
 		proVM.preferred,

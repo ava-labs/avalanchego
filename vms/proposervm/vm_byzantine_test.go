@@ -5,8 +5,6 @@ package proposervm
 
 import (
 	"bytes"
-	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -17,8 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
-
-var errUnknownBlock = errors.New("unknown block")
 
 // Ensure that a byzantine node issuing an invalid PreForkBlock (Y) when the
 // parent block (X) is issued into a PostForkBlock (A) will be marked as invalid
@@ -161,7 +157,7 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 		case bytes.Equal(b, xBlock.opts[1].Bytes()):
 			return xBlock.opts[1], nil
 		default:
-			return nil, fmt.Errorf("Unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -381,7 +377,7 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 		case bytes.Equal(b, xBlock.opts[1].Bytes()):
 			return xBlock.opts[1], nil
 		default:
-			return nil, fmt.Errorf("Unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 

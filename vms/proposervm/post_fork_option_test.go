@@ -6,7 +6,6 @@ package proposervm
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -92,7 +91,7 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 		case bytes.Equal(b, oracleCoreBlk.opts[1].Bytes()):
 			return oracleCoreBlk.opts[1], nil
 		default:
-			return nil, fmt.Errorf("Unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -218,7 +217,7 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 		case bytes.Equal(b, oracleCoreBlk.opts[1].Bytes()):
 			return oracleCoreBlk.opts[1], nil
 		default:
-			return nil, fmt.Errorf("Unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -325,7 +324,7 @@ func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 		case bytes.Equal(b, oracleCoreBlk.opts[1].Bytes()):
 			return oracleCoreBlk.opts[1], nil
 		default:
-			return nil, fmt.Errorf("Unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -443,7 +442,7 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 		case bytes.Equal(b, oracleCoreBlk.opts[1].Bytes()):
 			return oracleCoreBlk.opts[1], nil
 		default:
-			return nil, fmt.Errorf("Unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -547,7 +546,7 @@ func TestBlockVerify_PostForkOption_ParentIsNotOracleWithError(t *testing.T) {
 		case bytes.Equal(b, coreChildBlk.Bytes()):
 			return coreChildBlk, nil
 		default:
-			return nil, fmt.Errorf("Unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 
