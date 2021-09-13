@@ -147,8 +147,6 @@ func init() {
 
 // VM implements the snowman.ChainVM interface
 type VM struct {
-	*network
-
 	ctx *snow.Context
 	// *chain.State helps to implement the VM interface by wrapping blocks
 	// with an efficient caching layer.
@@ -172,6 +170,8 @@ type VM struct {
 	acceptedAtomicTxDB database.Database
 
 	builder *blockBuilder
+
+	network Network
 
 	baseCodec codec.Registry
 	codec     codec.Manager
@@ -346,12 +346,14 @@ func (vm *VM) Initialize(
 	//
 	// NOTE: This network must be initialized after the atomic mempool.
 	if vm.chainConfig.ApricotPhase4BlockTimestamp != nil {
-		vm.network = vm.NewNetwork(
+		vm.network = vm.NewPushNetwork(
 			time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0),
 			appSender,
 			ethChain,
 			vm.mempool,
 		)
+	} else {
+		vm.network = NewNoopNetwork()
 	}
 
 	// start goroutines to manage block building
@@ -876,7 +878,7 @@ func (vm *VM) issueTx(tx *Tx, local bool) error {
 	// add to mempool and possibly re-gossip
 	switch err := vm.mempool.AddTx(tx); err {
 	case nil:
-		return vm.GossipAtomicTx(tx)
+		return vm.network.GossipAtomicTx(tx)
 
 	case errTooManyAtomicTx:
 		if !local {
@@ -1222,4 +1224,20 @@ func (vm *VM) estimateBaseFee(ctx context.Context) (*big.Int, error) {
 	}
 
 	return baseFee, nil
+}
+
+func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+	return vm.network.AppRequest(nodeID, requestID, request)
+}
+
+func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	return vm.network.AppResponse(nodeID, requestID, response)
+}
+
+func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	return vm.network.AppRequestFailed(nodeID, requestID)
+}
+
+func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
+	return vm.network.AppGossip(nodeID, msg)
 }

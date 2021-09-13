@@ -41,7 +41,7 @@ type blockBuilder struct {
 
 	chain   *coreth.ETHChain
 	mempool *Mempool
-	network *network
+	network Network
 
 	shutdownChan <-chan struct{}
 	shutdownWg   *sync.WaitGroup
