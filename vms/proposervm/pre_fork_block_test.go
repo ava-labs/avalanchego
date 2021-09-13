@@ -42,7 +42,7 @@ func TestOracle_PreForkBlkImplementsInterface(t *testing.T) {
 }
 
 func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, timer.MaxTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, timer.MaxTime, 0)
 
 	// create pre fork oracle block ...
 	oracleCoreBlk := &TestOptionsBlock{
@@ -136,7 +136,7 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 
 func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	activationTime := genesisTimestamp.Add(10 * time.Second)
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, activationTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, 0)
 
 	// create pre fork oracle block pre activation time...
 	oracleCoreBlk := &TestOptionsBlock{
@@ -235,7 +235,7 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 
 func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 	activationTime := genesisTimestamp.Add(10 * time.Second)
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, activationTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, 0)
 
 	if !coreGenBlk.Timestamp().Before(activationTime) {
 		t.Fatal("This test requires parent block 's timestamp to be before fork activation time")
@@ -309,7 +309,7 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 
 func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	activationTime := genesisTimestamp.Add(10 * time.Second)
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, activationTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, 0)
 	if !coreGenBlk.Timestamp().Before(activationTime) {
 		t.Fatal("This test requires parent block 's timestamp to be before fork activation time")
 	}
@@ -452,7 +452,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 
 func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
 	activationTime := genesisTimestamp.Add(-1 * time.Second)
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, activationTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, 0)
 	proVM.Set(activationTime)
 
 	// build parent block after fork activation time ...
@@ -492,7 +492,7 @@ func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
 
 func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 	// setup
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, timer.MaxTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, timer.MaxTime, 0)
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -549,7 +549,7 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 
 // ProposerBlock.Reject tests section
 func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, timer.MaxTime, 0) // disable ProBlks
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, timer.MaxTime, 0) // disable ProBlks
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(111),
@@ -585,7 +585,7 @@ func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 
 func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 	activationTime := genesisTimestamp.Add(10 * time.Second)
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, activationTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, 0)
 	if !coreGenBlk.Timestamp().Before(activationTime) {
 		t.Fatal("This test requires parent block 's timestamp to be before fork activation time")
 	}
@@ -684,7 +684,7 @@ func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 
 func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 	activationTime := genesisTimestamp.Add(10 * time.Second)
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, activationTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, 0)
 	if !coreGenBlk.Timestamp().Before(activationTime) {
 		t.Fatal("This test requires parent block 's timestamp to be before fork activation time")
 	}

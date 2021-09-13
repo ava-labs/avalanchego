@@ -52,7 +52,9 @@ type VM struct {
 	verifiedBlocks map[ids.ID]PostForkBlock
 	preferred      ids.ID
 
-	// lastAcceptedTime is set to the last accepted PostForkBlock's timestamp.
+	// lastAcceptedOptionTime is set to the last accepted PostForkBlock's
+	// timestamp if the last accepted block has been a PostForkOption block
+	// since having initialized the VM.
 	lastAcceptedTime time.Time
 }
 
@@ -110,21 +112,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	lastAcceptedID, err := vm.GetLastAccepted()
-	switch err {
-	case nil:
-		lastAccepted, err := vm.getBlock(lastAcceptedID)
-		if err != nil {
-			return err
-		}
-		vm.lastAcceptedTime = lastAccepted.Timestamp()
-	case database.ErrNotFound:
-		// If the last accepted block wasn't a PostForkBlock, then we don't
-		// initialize the time.
-	default:
-		return err
-	}
-	return nil
+	return vm.setLastAcceptedOptionTime()
 }
 
 func (vm *VM) BuildBlock() (snowman.Block, error) {
@@ -242,6 +230,36 @@ func (vm *VM) repairAcceptedChain() error {
 			return err
 		}
 	}
+}
+
+func (vm *VM) setLastAcceptedOptionTime() error {
+	lastAcceptedID, err := vm.GetLastAccepted()
+	if err == database.ErrNotFound {
+		// If the last accepted block wasn't a PostFork block, then we don't
+		// initialize the time.
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	lastAccepted, _, err := vm.State.GetBlock(lastAcceptedID)
+	if err != nil {
+		return err
+	}
+
+	if _, ok := lastAccepted.(statelessblock.SignedBlock); ok {
+		// If the last accepted block wasn't a PostForkOption, then we don't
+		// initialize the time.
+		return nil
+	}
+
+	acceptedParent, err := vm.getPostForkBlock(lastAccepted.ParentID())
+	if err != nil {
+		return err
+	}
+	vm.lastAcceptedTime = acceptedParent.Timestamp()
+	return nil
 }
 
 func (vm *VM) parsePostForkBlock(b []byte) (PostForkBlock, error) {
