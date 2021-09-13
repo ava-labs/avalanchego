@@ -25,6 +25,7 @@ var (
 	ApricotPhase4MinBlockGasCost          = common.Big0
 	ApricotPhase4MaxBlockGasCost          = big.NewInt(1_000_000)
 	ApricotPhase4BlockGasCostDelta        = big.NewInt(50_000)
+	ApricotPhase4TargetBlockGap    uint64 = 1 // in seconds
 	rollupWindow                   uint64 = 10
 )
 
@@ -246,10 +247,13 @@ func updateLongWindow(window []byte, start uint64, gasConsumed uint64) {
 
 // calcBlockGasCost calculates the required block gas cost. If [parentTime]
 // > [currentTime], the timeElapsed will be treated as 0.
+//
+// The algoritm...
 func calcBlockGasCost(
+	targetBlockGap uint64,
 	minBlockGasCost *big.Int,
 	maxBlockGasCost *big.Int,
-	blockGasCostDelta *big.Int,
+	blockGasCostStep *big.Int,
 	parentBlockGasCost *big.Int,
 	parentTime, currentTime uint64,
 ) *big.Int {
@@ -258,17 +262,21 @@ func calcBlockGasCost(
 		return minBlockGasCost
 	}
 
+	// Treat an invalid parent/current time combination as 0 elapsed time.
 	var timeElapsed uint64
 	if parentTime <= currentTime {
 		timeElapsed = currentTime - parentTime
 	}
+
 	blockGasCost := parentBlockGasCost
-	if timeElapsed == 0 {
+	if timeElapsed < targetBlockGap {
+		blockGasCostDelta := new(big.Int).Mul(blockGasCostStep, new(big.Int).SetUint64(targetBlockGap-timeElapsed))
 		blockGasCost = new(big.Int).Add(blockGasCost, blockGasCostDelta)
 	} else {
-		blockGasCostReduction := new(big.Int).Mul(blockGasCostDelta, new(big.Int).SetUint64(timeElapsed))
-		blockGasCost = new(big.Int).Sub(blockGasCost, blockGasCostReduction)
+		blockGasCostDelta := new(big.Int).Mul(blockGasCostStep, new(big.Int).SetUint64(timeElapsed-targetBlockGap))
+		blockGasCost = new(big.Int).Sub(blockGasCost, blockGasCostDelta)
 	}
+
 	blockGasCost = selectBigWithinBounds(minBlockGasCost, blockGasCost, maxBlockGasCost)
 	if !blockGasCost.IsUint64() {
 		blockGasCost = new(big.Int).SetUint64(math.MaxUint64)
