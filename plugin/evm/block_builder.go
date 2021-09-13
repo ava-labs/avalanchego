@@ -189,32 +189,28 @@ func (b *blockBuilder) buildEarly() bool {
 // to the engine when the VM is ready to build a block.
 // If it should be called back again, it returns the timeout duration at
 // which it should be called again.
-//
-// NOTE: Only used prior to AP4.
 func (b *blockBuilder) buildBlockTwoStageTimer() (time.Duration, bool) {
 	b.buildBlockLock.Lock()
 	defer b.buildBlockLock.Unlock()
 
 	switch b.buildStatus {
 	case dontBuild:
-		return 0, false
 	case conditionalBuild:
 		if !b.buildEarly() {
 			b.buildStatus = mayBuild
 			return (maxBlockTime - minBlockTime), true
 		}
+		b.markBuilding()
 	case mayBuild:
+		b.markBuilding()
 	case building:
 		// If the status has already been set to building, there is no need
 		// to send an additional request to the consensus engine until the call
 		// to BuildBlock resets the block status.
-		return 0, false
 	default:
 		// Log an error if an invalid status is found.
 		log.Error("Found invalid build status in build block timer", "buildStatus", b.buildStatus)
 	}
-
-	b.markBuilding()
 
 	// No need for the timeout to fire again until BuildBlock is called.
 	return 0, false
