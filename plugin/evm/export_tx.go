@@ -37,8 +37,20 @@ type UnsignedExportTx struct {
 	ExportedOutputs []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
 }
 
-// InputUTXOs returns an empty set
-func (tx *UnsignedExportTx) InputUTXOs() ids.Set { return ids.Set{} }
+// InputUTXOs returns the address:nonce set of inputs. This is used to ensure
+// the atomic mempool does not contain any conflicting transactions.
+func (tx *UnsignedExportTx) InputUTXOs() ids.Set {
+	set := ids.Set{}
+	for _, in := range tx.Ins {
+		addrID, err := ids.ToID(in.Address.Bytes())
+		if err != nil {
+			// TODO: what should we do here?
+			panic(err)
+		}
+		set.Add(addrID.Prefix(in.Nonce))
+	}
+	return set
+}
 
 // Verify this transaction is well-formed
 func (tx *UnsignedExportTx) Verify(
