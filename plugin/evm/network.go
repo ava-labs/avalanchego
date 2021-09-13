@@ -40,6 +40,36 @@ type Network interface {
 	GossipEthTxs(txs []*types.Transaction) error
 }
 
+func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+	return vm.network.AppRequest(nodeID, requestID, request)
+}
+
+func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	return vm.network.AppResponse(nodeID, requestID, response)
+}
+
+func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	return vm.network.AppRequestFailed(nodeID, requestID)
+}
+
+func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
+	return vm.network.AppGossip(nodeID, msg)
+}
+
+// NewNetwork creates a new Network based on the [vm.chainConfig].
+func (vm *VM) NewNetwork(appSender commonEng.AppSender) Network {
+	if vm.chainConfig.ApricotPhase4BlockTimestamp != nil {
+		return vm.newPushNetwork(
+			time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0),
+			appSender,
+			vm.chain,
+			vm.mempool,
+		)
+	}
+
+	return &noopNetwork{}
+}
+
 type pushNetwork struct {
 	gossipActivationTime time.Time
 
@@ -55,7 +85,7 @@ type pushNetwork struct {
 	recentEthTxs    *cache.LRU
 }
 
-func (vm *VM) NewPushNetwork(
+func (vm *VM) newPushNetwork(
 	activationTime time.Time,
 	appSender commonEng.AppSender,
 	chain *coreth.ETHChain,
@@ -340,9 +370,6 @@ func (h *GossipHandler) HandleEthTxsNotify(nodeID ids.ShortID, _ uint32, msg *me
 // noopNetwork should be used when gossip communication is not supported
 type noopNetwork struct{}
 
-func NewNoopNetwork() Network {
-	return &noopNetwork{}
-}
 func (n *noopNetwork) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 	return nil
 }

@@ -345,16 +345,7 @@ func (vm *VM) Initialize(
 	// initialize new gossip network
 	//
 	// NOTE: This network must be initialized after the atomic mempool.
-	if vm.chainConfig.ApricotPhase4BlockTimestamp != nil {
-		vm.network = vm.NewPushNetwork(
-			time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0),
-			appSender,
-			ethChain,
-			vm.mempool,
-		)
-	} else {
-		vm.network = NewNoopNetwork()
-	}
+	vm.network = vm.NewNetwork(appSender)
 
 	// start goroutines to manage block building
 	//
@@ -1224,20 +1215,4 @@ func (vm *VM) estimateBaseFee(ctx context.Context) (*big.Int, error) {
 	}
 
 	return baseFee, nil
-}
-
-func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
-	return vm.network.AppRequest(nodeID, requestID, request)
-}
-
-func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
-	return vm.network.AppResponse(nodeID, requestID, response)
-}
-
-func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
-	return vm.network.AppRequestFailed(nodeID, requestID)
-}
-
-func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
-	return vm.network.AppGossip(nodeID, msg)
 }
