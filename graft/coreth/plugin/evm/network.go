@@ -228,10 +228,7 @@ func (n *pushNetwork) handle(
 		"len(msg)", len(msgBytes),
 	)
 
-	// network should already be checked to be non-nil in whatever public
-	// function calls [handle], however we add an extra check here to prevent an
-	// accidental panic.
-	if n == nil || time.Now().Before(n.gossipActivationTime) {
+	if time.Now().Before(n.gossipActivationTime) {
 		log.Debug("App message called before activation time")
 		return nil
 	}
