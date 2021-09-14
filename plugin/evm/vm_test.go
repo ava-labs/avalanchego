@@ -3685,11 +3685,25 @@ func TestAtomicTxFailsEVMStateTransferBuildBlock(t *testing.T) {
 	if err := vm.issueTx(exportTx2, true /*=local*/); err == nil {
 		t.Fatal("Should have failed to issue due to an invalid export tx")
 	}
-	// Force add transaction directly to the mempool to ensure it fails during build block
-	// as well.
-	if err := vm.mempool.AddTx(exportTx2); err != nil {
+
+	if err := vm.mempool.AddTx(exportTx2); err == nil {
+		t.Fatal("Should have failed to add because conflicting")
+	}
+
+	// Manually add transaction to mempool to bypass validation
+	vm.mempool.lock.Lock()
+	gasPrice, err := vm.mempool.atomicTxGasPrice(exportTx2)
+	if err != nil {
 		t.Fatal(err)
 	}
+	vm.mempool.txHeap.Push(&txEntry{
+		id:       exportTx2.ID(),
+		gasPrice: gasPrice,
+		tx:       exportTx2,
+	})
+	vm.mempool.addPending()
+	vm.mempool.lock.Unlock()
+
 	<-issuer
 
 	_, err = vm.BuildBlock()
