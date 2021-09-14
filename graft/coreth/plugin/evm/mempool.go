@@ -132,8 +132,8 @@ func (m *Mempool) AddTx(tx *Tx) error {
 		}
 	}
 
-	// Check if the submitted transaction's UTXOs conflict with what is already in the
-	// mempool
+	// Check if the submitted transaction's UTXOs conflict with what is already
+	// in the mempool
 	utxoSet := tx.InputUTXOs()
 	if overlaps := m.utxoSet.Overlaps(utxoSet); overlaps {
 		return errConflictingAtomicTx
@@ -274,11 +274,12 @@ func (m *Mempool) RemoveTx(txID ids.ID) {
 		removedTx = m.currentTx
 		m.currentTx = nil
 	}
-	var ok bool
-	if removedTx, ok = m.txHeap.Get(txID); ok {
+	if tx, ok := m.txHeap.Get(txID); ok {
+		removedTx = tx
 		m.txHeap.Remove(txID)
 	}
-	if removedTx, ok = m.issuedTxs[txID]; ok {
+	if tx, ok := m.issuedTxs[txID]; ok {
+		removedTx = tx
 		delete(m.issuedTxs, txID)
 	}
 	if removedTx != nil {
