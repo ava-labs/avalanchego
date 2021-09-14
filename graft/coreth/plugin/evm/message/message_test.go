@@ -6,40 +6,18 @@ package message
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestAtomicTxNotify(t *testing.T) {
-	assert := assert.New(t)
-
-	txID := ids.GenerateTestID()
-	builtMsg := AtomicTxNotify{
-		TxID: txID,
-	}
-	builtMsgBytes, err := Build(&builtMsg)
-	assert.NoError(err)
-	assert.Equal(builtMsgBytes, builtMsg.Bytes())
-
-	parsedMsgIntf, err := Parse(builtMsgBytes)
-	assert.NoError(err)
-	assert.Equal(builtMsgBytes, parsedMsgIntf.Bytes())
-
-	parsedMsg, ok := parsedMsgIntf.(*AtomicTxNotify)
-	assert.True(ok)
-
-	assert.Equal(txID, parsedMsg.TxID)
-}
-
 func TestAtomicTx(t *testing.T) {
 	assert := assert.New(t)
 
-	tx := utils.RandomBytes(256 * units.KiB)
+	msg := []byte("blah")
 	builtMsg := AtomicTx{
-		Tx: tx,
+		Tx: msg,
 	}
 	builtMsgBytes, err := Build(&builtMsg)
 	assert.NoError(err)
@@ -52,47 +30,15 @@ func TestAtomicTx(t *testing.T) {
 	parsedMsg, ok := parsedMsgIntf.(*AtomicTx)
 	assert.True(ok)
 
-	assert.Equal(tx, parsedMsg.Tx)
-}
-
-func TestEthTxsNotify(t *testing.T) {
-	assert := assert.New(t)
-
-	txs := make([]EthTxNotify, MaxEthTxsLen)
-	builtMsg := EthTxsNotify{
-		Txs: txs,
-	}
-	builtMsgBytes, err := Build(&builtMsg)
-	assert.NoError(err)
-	assert.Equal(builtMsgBytes, builtMsg.Bytes())
-
-	parsedMsgIntf, err := Parse(builtMsgBytes)
-	assert.NoError(err)
-	assert.Equal(builtMsgBytes, parsedMsgIntf.Bytes())
-
-	parsedMsg, ok := parsedMsgIntf.(*EthTxsNotify)
-	assert.True(ok)
-
-	assert.Equal(txs, parsedMsg.Txs)
-}
-
-func TestEthTxsNotifyTooLarge(t *testing.T) {
-	assert := assert.New(t)
-
-	txs := make([]EthTxNotify, MaxEthTxsLen+1)
-	builtMsg := EthTxsNotify{
-		Txs: txs,
-	}
-	_, err := Build(&builtMsg)
-	assert.Error(err)
+	assert.Equal(msg, parsedMsg.Tx)
 }
 
 func TestEthTxs(t *testing.T) {
 	assert := assert.New(t)
 
-	txs := utils.RandomBytes(256 * units.KiB)
+	msg := []byte("blah")
 	builtMsg := EthTxs{
-		TxsBytes: txs,
+		Txs: msg,
 	}
 	builtMsgBytes, err := Build(&builtMsg)
 	assert.NoError(err)
@@ -105,7 +51,17 @@ func TestEthTxs(t *testing.T) {
 	parsedMsg, ok := parsedMsgIntf.(*EthTxs)
 	assert.True(ok)
 
-	assert.Equal(txs, parsedMsg.TxsBytes)
+	assert.Equal(msg, parsedMsg.Txs)
+}
+
+func TestEthTxsTooLarge(t *testing.T) {
+	assert := assert.New(t)
+
+	builtMsg := EthTxs{
+		Txs: utils.RandomBytes(1024 * units.KiB),
+	}
+	_, err := Build(&builtMsg)
+	assert.Error(err)
 }
 
 func TestParseGibberish(t *testing.T) {

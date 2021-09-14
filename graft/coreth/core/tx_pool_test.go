@@ -109,6 +109,10 @@ func (bc *testBlockChain) SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) even
 	return bc.chainHeadFeed.Subscribe(ch)
 }
 
+func (bc *testBlockChain) SenderCacher() *TxSenderCacher {
+	return newTxSenderCacher(1)
+}
+
 func transaction(nonce uint64, gaslimit uint64, key *ecdsa.PrivateKey) *types.Transaction {
 	return pricedTransaction(nonce, gaslimit, big.NewInt(1), key)
 }

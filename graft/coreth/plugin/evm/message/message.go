@@ -9,22 +9,19 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 const (
-	// TODO choose a sensible value
-
-	// MaxEthTxsLen must be updated inside of EthTxsNotify's struct definition
-	// as well when changed
-	MaxEthTxsLen int = 10
+	// EthMsgSoftCapSize is the ideal size of encoded transaction bytes we send in
+	// any [EthTxs] or [EthTxs] message. We do not limit inbound messages to
+	// this size, however. Max inbound message size is enforced by the codec
+	// (512KB).
+	EthMsgSoftCapSize = common.StorageSize(64 * units.KiB)
 )
 
 var (
-	// TODO: create a single gossip message used to notify peers of both EthTxs and
-	// AtomicTxs
-	_ Message = &AtomicTxNotify{}
 	_ Message = &AtomicTx{}
-	_ Message = &EthTxsNotify{}
 	_ Message = &EthTxs{}
 
 	errUnexpectedCodecVersion = errors.New("unexpected codec version")
@@ -48,16 +45,6 @@ type message []byte
 func (m *message) initialize(bytes []byte) { *m = bytes }
 func (m *message) Bytes() []byte           { return *m }
 
-type AtomicTxNotify struct {
-	message
-
-	TxID ids.ID `serialize:"true"`
-}
-
-func (msg *AtomicTxNotify) Handle(handler Handler, nodeID ids.ShortID, requestID uint32) error {
-	return handler.HandleAtomicTxNotify(nodeID, requestID, msg)
-}
-
 type AtomicTx struct {
 	message
 
@@ -68,32 +55,10 @@ func (msg *AtomicTx) Handle(handler Handler, nodeID ids.ShortID, requestID uint3
 	return handler.HandleAtomicTx(nodeID, requestID, msg)
 }
 
-type EthTxsNotify struct {
-	message
-
-	Txs []EthTxNotify `serialize:"true" len:"10"`
-}
-
-// Information about an Ethereum transaction for gossiping
-type EthTxNotify struct {
-	// The transaction's hash
-	Hash common.Hash `serialize:"true"`
-
-	// The transaction's sender
-	Sender common.Address `serialize:"true"`
-
-	// The transaction's nonce
-	Nonce uint64 `serialize:"true"`
-}
-
-func (msg *EthTxsNotify) Handle(handler Handler, nodeID ids.ShortID, requestID uint32) error {
-	return handler.HandleEthTxsNotify(nodeID, requestID, msg)
-}
-
 type EthTxs struct {
 	message
 
-	TxsBytes []byte `serialize:"true"`
+	Txs []byte `serialize:"true"`
 }
 
 func (msg *EthTxs) Handle(handler Handler, nodeID ids.ShortID, requestID uint32) error {

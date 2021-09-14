@@ -42,8 +42,9 @@ import (
 )
 
 var (
-	DefaultMaxPrice = big.NewInt(150 * params.GWei)
-	DefaultMinPrice = big.NewInt(10 * params.GWei)
+	DefaultMaxPrice   = big.NewInt(150 * params.GWei)
+	DefaultMinPrice   = big.NewInt(0 * params.GWei)
+	DefaultMinGasUsed = big.NewInt(2_000_000) // block gas limit is 8,000,000
 )
 
 type Config struct {
@@ -51,6 +52,7 @@ type Config struct {
 	Percentile int
 	MaxPrice   *big.Int `toml:",omitempty"`
 	MinPrice   *big.Int `toml:",omitempty"`
+	MinGasUsed *big.Int `toml:",omitempty"`
 }
 
 // OracleBackend includes all necessary background APIs for oracle.
@@ -67,14 +69,17 @@ type Oracle struct {
 	backend   OracleBackend
 	lastHead  common.Hash
 	lastPrice *big.Int
-	// minPrice ensures we don't get into a positive feedback loop where tips
+	// [minPrice] ensures we don't get into a positive feedback loop where tips
 	// sink to 0 during a period of slow block production, such that nobody's
 	// transactions will be included until the full block fee duration has
 	// elapsed.
-	minPrice  *big.Int
-	maxPrice  *big.Int
-	cacheLock sync.RWMutex
-	fetchLock sync.Mutex
+	minPrice *big.Int
+	maxPrice *big.Int
+	// [minGasUsed] ensures we don't recommend users pay non-zero tips when other
+	// users are paying a tip to unnecessarily expedite block production.
+	minGasUsed *big.Int
+	cacheLock  sync.RWMutex
+	fetchLock  sync.Mutex
 
 	// clock to decide what set of rules to use when recommending a gas price
 	clock timer.Clock
@@ -105,15 +110,21 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 		log.Warn("Sanitizing invalid gasprice oracle max price", "provided", config.MaxPrice, "updated", maxPrice)
 	}
 	minPrice := config.MinPrice
-	if minPrice == nil || minPrice.Int64() <= 0 {
+	if minPrice == nil || minPrice.Int64() < 0 {
 		minPrice = DefaultMinPrice
 		log.Warn("Sanitizing invalid gasprice oracle min price", "provided", config.MinPrice, "updated", minPrice)
+	}
+	minGasUsed := config.MinGasUsed
+	if minGasUsed == nil || minGasUsed.Int64() < 0 {
+		minGasUsed = DefaultMinGasUsed
+		log.Warn("Sanitizing invalid gasprice oracle min gas used", "provided", config.MinGasUsed, "updated", minGasUsed)
 	}
 	return &Oracle{
 		backend:     backend,
 		lastPrice:   minPrice,
 		minPrice:    minPrice,
 		maxPrice:    maxPrice,
+		minGasUsed:  minGasUsed,
 		checkBlocks: blocks,
 		percentile:  percent,
 	}
@@ -273,6 +284,16 @@ func (oracle *Oracle) getBlockTips(ctx context.Context, blockNum uint64, result 
 	if header == nil {
 		select {
 		case result <- results{nil, err}:
+		case <-quit:
+		}
+		return
+	}
+
+	// Don't bias the estimate with blocks containing a limited number of transactions paying to
+	// expedite block production.
+	if header.GasUsed < oracle.minGasUsed.Uint64() {
+		select {
+		case result <- results{nil, nil}:
 		case <-quit:
 		}
 		return

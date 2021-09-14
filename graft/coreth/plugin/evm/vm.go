@@ -105,7 +105,7 @@ var (
 	errUnsupportedFXs                 = errors.New("unsupported feature extensions")
 	errInvalidBlock                   = errors.New("invalid block")
 	errInvalidAddr                    = errors.New("invalid hex address")
-	errTooManyAtomicTx                = errors.New("too many pending atomic txs")
+	errInsufficientAtomicTxFee        = errors.New("atomic tx fee too low for atomic mempool")
 	errAssetIDMismatch                = errors.New("asset IDs in the input don't match the utxo")
 	errNoImportInputs                 = errors.New("tx has no imported inputs")
 	errInputsNotSortedUnique          = errors.New("inputs not sorted and unique")
@@ -132,6 +132,8 @@ var (
 	errNilBaseFeeApricotPhase3        = errors.New("nil base fee is invalid after apricotPhase3")
 	errNilExtDataGasUsedApricotPhase4 = errors.New("nil extDataGasUsed is invalid after apricotPhase4")
 	errNilBlockGasCostApricotPhase4   = errors.New("nil blockGasCost is invalid after apricotPhase4")
+	errConflictingAtomicTx            = errors.New("conflicting atomic tx present")
+	errTooManyAtomicTx                = errors.New("too many atomic tx")
 	defaultLogLevel                   = log.LvlDebug
 )
 
@@ -147,8 +149,6 @@ func init() {
 
 // VM implements the snowman.ChainVM interface
 type VM struct {
-	*network
-
 	ctx *snow.Context
 	// *chain.State helps to implement the VM interface by wrapping blocks
 	// with an efficient caching layer.
@@ -172,6 +172,8 @@ type VM struct {
 	acceptedAtomicTxDB database.Database
 
 	builder *blockBuilder
+
+	network Network
 
 	baseCodec codec.Registry
 	codec     codec.Manager
@@ -216,7 +218,7 @@ func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
 
 // implements SnowmanPlusPlusVM interface
 func (vm *VM) GetActivationTime() time.Time {
-	return time.Unix(0, 0) // TODO: setup upon deploy
+	return time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0)
 }
 
 // Initialize implements the snowman.ChainVM interface
@@ -315,7 +317,7 @@ func (vm *VM) Initialize(
 	vm.codec = Codec
 
 	// TODO: read size from settings
-	vm.mempool = NewMempool(defaultMempoolSize)
+	vm.mempool = NewMempool(ctx.AVAXAssetID, defaultMempoolSize)
 
 	// Attempt to load last accepted block to determine if it is necessary to
 	// initialize state with the genesis block.
@@ -345,13 +347,7 @@ func (vm *VM) Initialize(
 	// initialize new gossip network
 	//
 	// NOTE: This network must be initialized after the atomic mempool.
-	vm.network = vm.NewNetwork(
-		time.Unix(0, 0), // TODO: setup upon deploy
-		appSender,
-		ethChain,
-		vm.mempool,
-		types.LatestSigner(g.Config),
-	)
+	vm.network = vm.NewNetwork(appSender)
 
 	// start goroutines to manage block building
 	//
@@ -409,12 +405,16 @@ func (vm *VM) createConsensusCallbacks() *dummy.ConsensusCallbacks {
 }
 
 func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
-	snapshot := state.Snapshot()
 	for {
 		tx, exists := vm.mempool.NextTx()
 		if !exists {
 			break
 		}
+		// Take a snapshot of [state] before calling verifyTx so we can revert to the state as of this
+		// point if the transaction fails verification.
+		// Note: verifyTx may modify state, so we need to use the snapshot mechanism here to revert any
+		// changes from a transaction that do not end up being included in the block.
+		snapshot := state.Snapshot()
 		rules := vm.chainConfig.AvalancheRules(header.Number, new(big.Int).SetUint64(header.Time))
 		if err := vm.verifyTx(tx, header.ParentHash, header.BaseFee, state, rules); err != nil {
 			// Discard the transaction from the mempool on failed verification.
@@ -523,7 +523,7 @@ func (vm *VM) Shutdown() error {
 // buildBlock builds a block to be wrapped by ChainState
 func (vm *VM) buildBlock() (snowman.Block, error) {
 	block, err := vm.chain.GenerateBlock()
-	vm.builder.buildBlock()
+	vm.builder.handleGenerateBlock()
 	if err != nil {
 		vm.mempool.CancelCurrentTx()
 		return nil, err
@@ -548,7 +548,7 @@ func (vm *VM) buildBlock() (snowman.Block, error) {
 	// We call verify without writes here to avoid generating a reference
 	// to the blk state root in the triedb when we are going to call verify
 	// again from the consensus engine with writes enabled.
-	if err := blk.verify( /*writes*/ false); err != nil {
+	if err := blk.verify(false /*=writes*/); err != nil {
 		vm.mempool.CancelCurrentTx()
 		return nil, fmt.Errorf("block failed verification due to: %w", err)
 	}
@@ -859,37 +859,36 @@ func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
 func (vm *VM) issueTx(tx *Tx, local bool) error {
 	if err := vm.verifyTxAtTip(tx); err != nil {
 		if !local {
-			// unlike local txes, currently invalid remote txes are recorded as discarded
+			// unlike local txs, invalid remote txs are recorded as discarded
 			// so that they won't be requested again
-			vm.mempool.discardedTxs.Put(tx.ID(), tx)
+			txID := tx.ID()
+			vm.mempool.discardedTxs.Put(txID, tx)
+			log.Debug("failed to verify remote tx being issued to the mempool",
+				"txID", txID,
+				"err", err,
+			)
 			return nil
 		}
-
 		return err
 	}
 
 	// add to mempool and possibly re-gossip
-	switch err := vm.mempool.AddTx(tx); err {
-	case nil:
-		return vm.GossipAtomicTx(tx)
-
-	case errTooManyAtomicTx:
+	if err := vm.mempool.AddTx(tx); err != nil {
 		if !local {
-			// tx has not been accepted to mempool due to size
-			// do not gossip since we cannot serve it
-			return nil
-		}
-
-		return errTooManyAtomicTx // backward compatibility for local txs
-
-	default:
-		if !local {
-			// unlike local txes, currently invalid remote txes are recorded as discarded
+			// unlike local txs, invalid remote txs are recorded as discarded
 			// so that they won't be requested again
+			txID := tx.ID()
 			vm.mempool.discardedTxs.Put(tx.ID(), tx)
+			log.Debug("failed to issue remote tx to mempool",
+				"txID", txID,
+				"err", err,
+			)
+			return nil
 		}
 		return err
 	}
+
+	return vm.network.GossipAtomicTx(tx)
 }
 
 // verifyTxAtTip verifies that [tx] is valid to be issued on top of the currently preferred block

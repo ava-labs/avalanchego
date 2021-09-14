@@ -32,6 +32,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -173,6 +174,8 @@ type BlockChain struct {
 	badBlocks *lru.Cache // Bad block cache
 
 	lastAccepted *types.Block // Prevents reorgs past this height
+
+	senderCacher *TxSenderCacher
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -207,6 +210,7 @@ func NewBlockChain(
 		engine:        engine,
 		vmConfig:      vmConfig,
 		badBlocks:     badBlocks,
+		senderCacher:  newTxSenderCacher(runtime.NumCPU()),
 	}
 	bc.validator = NewBlockValidator(chainConfig, bc, engine)
 	bc.prefetcher = newStatePrefetcher(chainConfig, bc, engine)
@@ -260,7 +264,7 @@ func (bc *BlockChain) GetVMConfig() *vm.Config {
 
 // SenderCacher returns the *TxSenderCacher used within the core package.
 func (bc *BlockChain) SenderCacher() *TxSenderCacher {
-	return senderCacher
+	return bc.senderCacher
 }
 
 // empty returns an indicator whether the blockchain is empty.
@@ -1085,7 +1089,7 @@ func (bc *BlockChain) gatherBlockLogs(hash common.Hash, number uint64, removed b
 }
 
 func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
-	senderCacher.Recover(types.MakeSigner(bc.chainConfig, block.Number(), new(big.Int).SetUint64(block.Time())), block.Transactions())
+	bc.senderCacher.Recover(types.MakeSigner(bc.chainConfig, block.Number(), new(big.Int).SetUint64(block.Time())), block.Transactions())
 
 	err := bc.engine.VerifyHeader(bc, block.Header())
 	if err == nil {
@@ -1190,14 +1194,16 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 			"parentHash", block.ParentHash(),
 			"uncles", len(block.Uncles()), "txs", len(block.Transactions()), "gas", block.GasUsed(),
 			"elapsed", common.PrettyDuration(time.Since(start)),
-			"root", block.Root())
+			"root", block.Root(), "baseFeePerGas", block.BaseFee(), "blockGasCost", block.BlockGasCost(),
+		)
 		// Only count canonical blocks for GC processing time
 	case SideStatTy:
 		log.Debug("Inserted forked block", "number", block.Number(), "hash", block.Hash(),
 			"parentHash", block.ParentHash(),
 			"diff", block.Difficulty(), "elapsed", common.PrettyDuration(time.Since(start)),
 			"txs", len(block.Transactions()), "gas", block.GasUsed(), "uncles", len(block.Uncles()),
-			"root", block.Root())
+			"root", block.Root(), "baseFeePerGas", block.BaseFee(), "blockGasCost", block.BlockGasCost(),
+		)
 	default:
 		// This in theory is impossible, but lets be nice to our future selves and leave
 		// a log, instead of trying to track down blocks imports that don't emit logs.
@@ -1205,7 +1211,8 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 			"parentHash", block.ParentHash(),
 			"diff", block.Difficulty(), "elapsed", common.PrettyDuration(time.Since(start)),
 			"txs", len(block.Transactions()), "gas", block.GasUsed(), "uncles", len(block.Uncles()),
-			"root", block.Root())
+			"root", block.Root(), "baseFeePerGas", block.BaseFee(), "blockGasCost", block.BlockGasCost(),
+		)
 	}
 
 	return err

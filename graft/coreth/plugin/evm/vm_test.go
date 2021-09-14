@@ -73,6 +73,7 @@ var (
 	apricotRulesPhase1 = params.Rules{IsApricotPhase1: true}
 	apricotRulesPhase2 = params.Rules{IsApricotPhase1: true, IsApricotPhase2: true}
 	apricotRulesPhase3 = params.Rules{IsApricotPhase1: true, IsApricotPhase2: true, IsApricotPhase3: true}
+	apricotRulesPhase4 = params.Rules{IsApricotPhase1: true, IsApricotPhase2: true, IsApricotPhase3: true, IsApricotPhase4: true}
 )
 
 func init() {
@@ -782,12 +783,12 @@ func TestConflictingImportTxs(t *testing.T) {
 			t.Fatal("Expected issueTx to fail due to conflicting transaction")
 		}
 		// Force issue transaction directly to the mempool
-		if err := vm.mempool.AddTx(tx); err != nil {
+		if err := vm.mempool.forceAddTx(tx); err != nil {
 			t.Fatal(err)
 		}
 		<-issuer
 
-		_, err := vm.BuildBlock()
+		_, err = vm.BuildBlock()
 		// The new block is verified in BuildBlock, so
 		// BuildBlock should fail due to an attempt to
 		// double spend an atomic UTXO.
@@ -1269,10 +1270,9 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 		t.Fatalf("Should not have been able to issue import tx with conflict")
 	}
 	// Force issue transaction directly into the mempool
-	if err := vm.mempool.AddTx(importTx0B); err != nil {
+	if err := vm.mempool.forceAddTx(importTx0B); err != nil {
 		t.Fatal(err)
 	}
-
 	<-issuer
 
 	_, err = vm.BuildBlock()
@@ -3684,9 +3684,13 @@ func TestAtomicTxFailsEVMStateTransferBuildBlock(t *testing.T) {
 	if err := vm.issueTx(exportTx2, true /*=local*/); err == nil {
 		t.Fatal("Should have failed to issue due to an invalid export tx")
 	}
-	// Force add transaction directly to the mempool to ensure it fails during build block
-	// as well.
-	if err := vm.mempool.AddTx(exportTx2); err != nil {
+
+	if err := vm.mempool.AddTx(exportTx2); err == nil {
+		t.Fatal("Should have failed to add because conflicting")
+	}
+
+	// Manually add transaction to mempool to bypass validation
+	if err := vm.mempool.forceAddTx(exportTx2); err != nil {
 		t.Fatal(err)
 	}
 	<-issuer
@@ -3924,11 +3928,11 @@ func TestBuildApricotPhase4Block(t *testing.T) {
 	}
 
 	ethBlk := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
-	if ethBlk.BlockGasCost() == nil || ethBlk.BlockGasCost().Cmp(common.Big0) != 0 {
-		t.Fatalf("expected blockGasCost to be 0 but got %d", ethBlk.BlockGasCost())
+	if eBlockGasCost := ethBlk.BlockGasCost(); eBlockGasCost == nil || eBlockGasCost.Cmp(common.Big0) != 0 {
+		t.Fatalf("expected blockGasCost to be 0 but got %d", eBlockGasCost)
 	}
-	if ethBlk.ExtDataGasUsed() == nil || ethBlk.ExtDataGasUsed().Cmp(big.NewInt(1230)) != 0 {
-		t.Fatalf("expected extDataGasUsed to be 1000 but got %d", ethBlk.ExtDataGasUsed())
+	if eExtDataGasUsed := ethBlk.ExtDataGasUsed(); eExtDataGasUsed == nil || eExtDataGasUsed.Cmp(big.NewInt(1230)) != 0 {
+		t.Fatalf("expected extDataGasUsed to be 1000 but got %d", eExtDataGasUsed)
 	}
 	minRequiredTip, err := dummy.MinRequiredTip(vm.chainConfig, ethBlk.Header())
 	if err != nil {
@@ -3987,8 +3991,8 @@ func TestBuildApricotPhase4Block(t *testing.T) {
 	}
 
 	ethBlk = blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
-	if ethBlk.BlockGasCost() == nil || ethBlk.BlockGasCost().Cmp(big.NewInt(90_000)) < 0 {
-		t.Fatalf("expected blockGasCost to be at least 90000 but got %d", ethBlk.BlockGasCost())
+	if ethBlk.BlockGasCost() == nil || ethBlk.BlockGasCost().Cmp(big.NewInt(100)) < 0 {
+		t.Fatalf("expected blockGasCost to be at least 100 but got %d", ethBlk.BlockGasCost())
 	}
 	if ethBlk.ExtDataGasUsed() == nil || ethBlk.ExtDataGasUsed().Cmp(common.Big0) != 0 {
 		t.Fatalf("expected extDataGasUsed to be 0 but got %d", ethBlk.ExtDataGasUsed())
@@ -3997,8 +4001,8 @@ func TestBuildApricotPhase4Block(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if minRequiredTip == nil || minRequiredTip.Cmp(big.NewInt(98*params.GWei)) < 0 {
-		t.Fatalf("expected minRequiredTip to be at least 98 gwei but got %d", minRequiredTip)
+	if minRequiredTip == nil || minRequiredTip.Cmp(big.NewInt(0.05*params.GWei)) < 0 {
+		t.Fatalf("expected minRequiredTip to be at least 0.05 gwei but got %d", minRequiredTip)
 	}
 
 	if status := blk.Status(); status != choices.Accepted {
@@ -4022,5 +4026,110 @@ func TestBuildApricotPhase4Block(t *testing.T) {
 		if ethBlkTxs[i].Hash() != tx.Hash() {
 			t.Fatalf("expected tx at index %d to have hash: %x but has: %x", i, txs[i].Hash(), tx.Hash())
 		}
+	}
+}
+
+// This is a regression test to ensure that if two consecutive atomic transactions fail verification
+// in onFinalizeAndAssemble it will not cause a panic due to calling RevertToSnapshot(revID) on the
+// same revision ID twice.
+func TestConsecutiveAtomicTransactionsRevertSnapshot(t *testing.T) {
+	issuer, vm, _, sharedMemory, _ := GenesisVM(t, true, genesisJSONApricotPhase1, "", "")
+
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
+
+	importAmount := uint64(1000000000)
+	utxoID := avax.UTXOID{
+		TxID: ids.ID{
+			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+			0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+			0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+			0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+		},
+	}
+
+	utxo := &avax.UTXO{
+		UTXOID: utxoID,
+		Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: importAmount,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{testKeys[0].PublicKey().Address()},
+			},
+		},
+	}
+	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
+	inputID := utxo.InputID()
+	if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
+		Key:   inputID[:],
+		Value: utxoBytes,
+		Traits: [][]byte{
+			testKeys[0].PublicKey().Address().Bytes(),
+		},
+	}}}}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create three conflicting import transactions
+	importTxs := make([]*Tx, 0, 3)
+	for i := 0; i < 3; i++ {
+		importTx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[i], initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+		if err != nil {
+			t.Fatal(err)
+		}
+		importTxs = append(importTxs, importTx)
+	}
+
+	if err := vm.issueTx(importTxs[0], true); err != nil {
+		t.Fatal(err)
+	}
+
+	<-issuer
+
+	blk, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if status := blk.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
+	}
+
+	if err := vm.SetPreference(blk.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Accept(); err != nil {
+		t.Fatal(err)
+	}
+
+	newHead := <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blk.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+
+	// Add the two conflicting transactions directly to the mempool, so that two consecutive transactions
+	// will fail verification when build block is called.
+	vm.mempool.AddTx(importTxs[1])
+	vm.mempool.AddTx(importTxs[2])
+
+	if _, err := vm.BuildBlock(); err == nil {
+		t.Fatal("Expected build block to fail due to empty block")
 	}
 }
