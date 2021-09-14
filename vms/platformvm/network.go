@@ -45,17 +45,20 @@ func newNetwork(activationTime time.Time, appSender common.AppSender, vm *VM) *n
 }
 
 func (n *network) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
-	// this is push-only version of mempool gossip
+	// This VM currently only supports gossiping of txs, so there are no
+	// requests.
 	return nil
 }
 
 func (n *network) AppRequest(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error {
-	// this is push-only version of mempool gossip
+	// This VM currently only supports gossiping of txs, so there are no
+	// requests.
 	return nil
 }
 
 func (n *network) AppResponse(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error {
-	// this is push-only version of mempool gossip
+	// This VM currently only supports gossiping of txs, so there are no
+	// requests.
 	return nil
 }
 
@@ -113,12 +116,12 @@ func (n *network) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
 		)
 		return nil
 	}
-	return n.GossipTx(tx)
+	return nil
 }
 
 func (n *network) GossipTx(tx *Tx) error {
 	txID := tx.ID()
-	// Don't gossip transaction if it has been recently gossiped.
+	// Don't gossip a transaction if it has been recently gossiped.
 	if _, has := n.recentTxs.Get(txID); has {
 		return nil
 	}
