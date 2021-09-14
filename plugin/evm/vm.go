@@ -859,10 +859,14 @@ func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
 func (vm *VM) issueTx(tx *Tx, local bool) error {
 	if err := vm.verifyTxAtTip(tx); err != nil {
 		if !local {
-			// TODO: add log with err (@stephen)
 			// unlike local txs, invalid remote txs are recorded as discarded
 			// so that they won't be requested again
-			vm.mempool.discardedTxs.Put(tx.ID(), tx)
+			txID := tx.ID()
+			vm.mempool.discardedTxs.Put(txID, tx)
+			log.Debug("failed to verify remote tx being issued to the mempool",
+				"txID", txID,
+				"err", err,
+			)
 			return nil
 		}
 		return err
@@ -871,10 +875,14 @@ func (vm *VM) issueTx(tx *Tx, local bool) error {
 	// add to mempool and possibly re-gossip
 	if err := vm.mempool.AddTx(tx); err != nil {
 		if !local {
-			// TODO: add log with err (@stephen)
 			// unlike local txs, invalid remote txs are recorded as discarded
 			// so that they won't be requested again
+			txID := tx.ID()
 			vm.mempool.discardedTxs.Put(tx.ID(), tx)
+			log.Debug("failed to issue remote tx to mempool",
+				"txID", txID,
+				"err", err,
+			)
 			return nil
 		}
 		return err
