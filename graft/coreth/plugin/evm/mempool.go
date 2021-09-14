@@ -118,12 +118,12 @@ func (m *Mempool) AddTx(tx *Tx) error {
 			// If the [gasPrice] of the lowest item is >= the [gasPrice] of the
 			// submitted item, discard the submitted item (we prefer items already in
 			// the mempool).
-			if txEntry.gasPrice >= gasPrice {
+			if txEntry.GasPrice >= gasPrice {
 				m.txHeap.Push(txEntry)
 				return errInsufficientAtomicTxFee
 			}
-			m.utxoSet.Remove(txEntry.tx.InputUTXOs().List()...)
-			m.discardedTxs.Evict(txEntry.id)
+			m.utxoSet.Remove(txEntry.Tx.InputUTXOs().List()...)
+			m.discardedTxs.Evict(txEntry.ID)
 		} else {
 			// This could occur if we have used our entire size allowance on
 			// transactions that are currently processing.
@@ -151,9 +151,9 @@ func (m *Mempool) AddTx(tx *Tx) error {
 	// Add the transaction to the [txHeap] so we can evaluate new entries based
 	// on how their [gasPrice] compares.
 	m.txHeap.Push(&txEntry{
-		id:       txID,
-		gasPrice: gasPrice,
-		tx:       tx,
+		ID:       txID,
+		GasPrice: gasPrice,
+		Tx:       tx,
 	})
 
 	// When adding [tx] to the mempool make sure that there is an item in Pending
@@ -173,7 +173,7 @@ func (m *Mempool) NextTx() (*Tx, bool) {
 	// We include atomic transactions in blocks sorted by the [gasPrice] they
 	// pay.
 	if m.txHeap.Len() > 0 {
-		tx := m.txHeap.Pop().tx
+		tx := m.txHeap.Pop().Tx
 		m.currentTx = tx
 		return tx, true
 	}
@@ -237,9 +237,9 @@ func (m *Mempool) CancelCurrentTx() {
 		gasPrice, err := m.atomicTxGasPrice(tx)
 		if err == nil {
 			m.txHeap.Push(&txEntry{
-				id:       tx.ID(),
-				gasPrice: gasPrice,
-				tx:       tx,
+				ID:       tx.ID(),
+				GasPrice: gasPrice,
+				Tx:       tx,
 			})
 		}
 		// If the err is not nil, we simply discard the transaction because it is
@@ -313,9 +313,9 @@ func (m *Mempool) RejectTx(txID ids.ID) {
 		return
 	}
 	m.txHeap.Push(&txEntry{
-		id:       txID,
-		gasPrice: gasPrice,
-		tx:       tx,
+		ID:       txID,
+		GasPrice: gasPrice,
+		Tx:       tx,
 	})
 	// Add an item to Pending to ensure the VM attempts to reissue
 	// [tx].
@@ -340,9 +340,9 @@ func (m *Mempool) forceAddTx(tx *Tx) error {
 		return err
 	}
 	m.txHeap.Push(&txEntry{
-		id:       tx.ID(),
-		gasPrice: gasPrice,
-		tx:       tx,
+		ID:       tx.ID(),
+		GasPrice: gasPrice,
+		Tx:       tx,
 	})
 	m.addPending()
 	return nil
