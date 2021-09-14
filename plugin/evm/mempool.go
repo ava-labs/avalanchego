@@ -288,7 +288,6 @@ func (m *Mempool) RemoveTx(txID ids.ID) {
 		removedTx = tx
 		delete(m.issuedTxs, txID)
 	}
-	m.txHeap.Remove(txID)
 	if removedTx != nil {
 		m.utxoSet.Remove(removedTx.InputUTXOs().List()...)
 	}
