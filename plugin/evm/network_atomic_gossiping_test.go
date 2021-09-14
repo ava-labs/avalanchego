@@ -183,7 +183,7 @@ func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 		notifyMsgIntf, err := message.Parse(gossipedBytes)
 		assert.NoError(err)
 
-		requestMsg, ok := notifyMsgIntf.(*message.AtomicTxNotify)
+		requestMsg, ok := notifyMsgIntf.(*message.AtomicTx)
 		assert.NotEmpty(requestMsg.Tx)
 		assert.True(ok)
 
@@ -241,7 +241,7 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 	tx, conflictingTx := getValidImportTx(vm, sharedMemory, t)
 
 	// gossip tx and check it is accepted and gossiped
-	msg := message.AtomicTxNotify{
+	msg := message.AtomicTx{
 		Tx: tx.Bytes(),
 	}
 	msgBytes, err := message.Build(&msg)
@@ -258,7 +258,7 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 	assert.Equal(1, txGossiped, "tx should have only been gossiped once")
 
 	// show that conflicting tx is not added to mempool
-	msg = message.AtomicTxNotify{
+	msg = message.AtomicTx{
 		Tx: conflictingTx.Bytes(),
 	}
 	msgBytes, err = message.Build(&msg)
@@ -306,7 +306,7 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 
 	// gossip tx and check it isn't accepted or gossiped
 	nodeID := ids.GenerateTestShortID()
-	msg := message.AtomicTxNotify{
+	msg := message.AtomicTx{
 		Tx: tx.Bytes(),
 	}
 	msgBytes, err := message.Build(&msg)
@@ -318,7 +318,7 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 
 	// gossip conflicting tx and ensure it is accepted and gossiped
 	nodeID = ids.GenerateTestShortID()
-	msg = message.AtomicTxNotify{
+	msg = message.AtomicTx{
 		Tx: conflictingTx.Bytes(),
 	}
 	msgBytes, err = message.Build(&msg)

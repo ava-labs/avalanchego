@@ -12,11 +12,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestAtomicTxNotify(t *testing.T) {
+func TestAtomicTx(t *testing.T) {
 	assert := assert.New(t)
 
 	msg := []byte("blah")
-	builtMsg := AtomicTxNotify{
+	builtMsg := AtomicTx{
 		Tx: msg,
 	}
 	builtMsgBytes, err := Build(&builtMsg)
@@ -27,17 +27,17 @@ func TestAtomicTxNotify(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(builtMsgBytes, parsedMsgIntf.Bytes())
 
-	parsedMsg, ok := parsedMsgIntf.(*AtomicTxNotify)
+	parsedMsg, ok := parsedMsgIntf.(*AtomicTx)
 	assert.True(ok)
 
 	assert.Equal(msg, parsedMsg.Tx)
 }
 
-func TestEthTxsNotify(t *testing.T) {
+func TestEthTxs(t *testing.T) {
 	assert := assert.New(t)
 
 	msg := []byte("blah")
-	builtMsg := EthTxsNotify{
+	builtMsg := EthTxs{
 		Txs: msg,
 	}
 	builtMsgBytes, err := Build(&builtMsg)
@@ -48,16 +48,16 @@ func TestEthTxsNotify(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(builtMsgBytes, parsedMsgIntf.Bytes())
 
-	parsedMsg, ok := parsedMsgIntf.(*EthTxsNotify)
+	parsedMsg, ok := parsedMsgIntf.(*EthTxs)
 	assert.True(ok)
 
 	assert.Equal(msg, parsedMsg.Txs)
 }
 
-func TestEthTxsNotifyTooLarge(t *testing.T) {
+func TestEthTxsTooLarge(t *testing.T) {
 	assert := assert.New(t)
 
-	builtMsg := EthTxsNotify{
+	builtMsg := EthTxs{
 		Txs: utils.RandomBytes(1024 * units.KiB),
 	}
 	_, err := Build(&builtMsg)
