@@ -190,7 +190,8 @@ func (c *Client) AddValidator(
 	jsonStakeAmount := cjson.Uint64(stakeAmount)
 	err := c.requester.SendRequest("addValidator", &AddValidatorArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
-			UserPass: user,
+			UserPass:      user,
+			JSONFromAddrs: api.JSONFromAddrs{From: from},
 		},
 		APIStaker: APIStaker{
 			NodeID:      nodeID,

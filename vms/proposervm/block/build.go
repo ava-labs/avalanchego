@@ -61,11 +61,17 @@ func Build(
 	}
 	var blockIntf SignedBlock = block
 
-	unsignedBytes, err := c.Marshal(version, &blockIntf)
+	unsignedBytesWithEmptySignature, err := c.Marshal(version, &blockIntf)
 	if err != nil {
 		return nil, err
 	}
-	unsignedBytes = unsignedBytes[:len(unsignedBytes)-wrappers.IntLen]
+
+	// The serialized form of the block is the unsignedBytes followed by the
+	// signature, which is prefixed by a uint32. Because we are marshalling the
+	// block with an empty signature, we only need to strip off the length
+	// prefix to get the unsigned bytes.
+	lenUnsignedBytes := len(unsignedBytesWithEmptySignature) - wrappers.IntLen
+	unsignedBytes := unsignedBytesWithEmptySignature[:lenUnsignedBytes]
 	block.id = hashing.ComputeHash256Array(unsignedBytes)
 
 	header, err := BuildHeader(chainID, parentID, block.id)

@@ -12,21 +12,11 @@ import (
 var _ Handler = NoopHandler{}
 
 type Handler interface {
-	HandleTxNotify(nodeID ids.ShortID, requestID uint32, msg *TxNotify) error
 	HandleTx(nodeID ids.ShortID, requestID uint32, msg *Tx) error
 }
 
 type NoopHandler struct {
 	Log logging.Logger
-}
-
-func (h NoopHandler) HandleTxNotify(nodeID ids.ShortID, requestID uint32, _ *TxNotify) error {
-	h.Log.Debug(
-		"dropping unexpected TxNotify message from %s with requestID %s",
-		nodeID.PrefixedString(constants.NodeIDPrefix),
-		requestID,
-	)
-	return nil
 }
 
 func (h NoopHandler) HandleTx(nodeID ids.ShortID, requestID uint32, _ *Tx) error {

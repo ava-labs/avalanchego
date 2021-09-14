@@ -5,8 +5,6 @@ package proposervm
 
 import (
 	"bytes"
-	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -14,10 +12,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
-
-var errUnknownBlock = errors.New("unknown block")
 
 // Ensure that a byzantine node issuing an invalid PreForkBlock (Y) when the
 // parent block (X) is issued into a PostForkBlock (A) will be marked as invalid
@@ -29,7 +26,7 @@ var errUnknownBlock = errors.New("unknown block")
 //     Y
 func TestInvalidByzantineProposerParent(t *testing.T) {
 	forkTime := time.Unix(0, 0) // enable ProBlks
-	coreVM, _, proVM, gBlock := initTestProposerVM(t, forkTime, 0)
+	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
 
 	xBlock := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -98,7 +95,7 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 //    / \
 //   Y   Z
 func TestInvalidByzantineProposerOracleParent(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
 
 	xBlockID := ids.GenerateTestID()
@@ -160,7 +157,7 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 		case bytes.Equal(b, xBlock.opts[1].Bytes()):
 			return xBlock.opts[1], nil
 		default:
-			return nil, fmt.Errorf("Unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -207,6 +204,109 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 	}
 }
 
+// Ensure that a byzantine node issuing an invalid PostForkBlock (B) when the
+// parent block (X) is issued into a PostForkBlock (A) will be marked as invalid
+// correctly.
+//     G
+//   / |
+// A - X
+//   / |
+// B - Y
+func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
+	forkTime := time.Unix(0, 0) // enable ProBlks
+	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
+
+	xBlock := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    gBlock.ID(),
+		HeightV:    gBlock.Height() + 1,
+		TimestampV: gBlock.Timestamp().Add(proposer.MaxDelay),
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return xBlock, nil }
+
+	aBlock, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatalf("proposerVM could not build block due to %s", err)
+	}
+
+	coreVM.BuildBlockF = nil
+
+	yBlockBytes := []byte{2}
+	yBlock := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     yBlockBytes,
+		ParentV:    xBlock.ID(),
+		HeightV:    xBlock.Height() + 1,
+		TimestampV: xBlock.Timestamp().Add(proposer.MaxDelay),
+	}
+
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case gBlock.ID():
+			return gBlock, nil
+		case xBlock.ID():
+			return xBlock, nil
+		case yBlock.ID():
+			return yBlock, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(blockBytes []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(blockBytes, gBlock.Bytes()):
+			return gBlock, nil
+		case bytes.Equal(blockBytes, xBlock.Bytes()):
+			return xBlock, nil
+		case bytes.Equal(blockBytes, yBlock.Bytes()):
+			return yBlock, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	bStatelessBlock, err := block.BuildUnsigned(
+		xBlock.ID(),
+		yBlock.Timestamp(),
+		0,
+		yBlockBytes,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bBlock, err := proVM.ParseBlock(bStatelessBlock.Bytes())
+	if err != nil {
+		// If there was an error parsing, then this is fine.
+		return
+	}
+
+	if err := aBlock.Verify(); err != nil {
+		t.Fatalf("could not verify valid block due to %s", err)
+	}
+
+	// If there wasn't an error parsing - verify must return an error
+	if err := bBlock.Verify(); err == nil {
+		t.Fatal("should have marked the parsed block as invalid")
+	}
+
+	if err := aBlock.Accept(); err != nil {
+		t.Fatalf("could not accept valid block due to %s", err)
+	}
+
+	// If there wasn't an error parsing - verify must return an error
+	if err := bBlock.Verify(); err == nil {
+		t.Fatal("should have marked the parsed block as invalid")
+	}
+}
+
 // Ensure that a byzantine node issuing an invalid OptionBlock (B) which
 // contains core block (Y) whose parent (G) doesn't match (B)'s parent (A)'s
 // inner block (X) will be marked as invalid correctly.
@@ -216,7 +316,7 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 // |     /
 // B - Y
 func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
 
 	xBlock := &TestOptionsBlock{
@@ -277,7 +377,7 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 		case bytes.Equal(b, xBlock.opts[1].Bytes()):
 			return xBlock.opts[1], nil
 		default:
-			return nil, fmt.Errorf("Unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 

@@ -59,7 +59,7 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 
 	nonValidatorDelay, err := w.Delay(1, 0, nonValidatorID)
 	assert.NoError(err)
-	assert.EqualValues(15*time.Second, nonValidatorDelay)
+	assert.EqualValues(MaxDelay, nonValidatorDelay)
 }
 
 // TODO: make sure this produces a "random enough" distribution when increasing
@@ -87,11 +87,10 @@ func TestWindowerChangeByHeight(t *testing.T) {
 	w := New(vdrState, subnetID, chainID)
 
 	expectedDelays1 := []time.Duration{
-		6 * time.Second,
-		3 * time.Second,
-		0 * time.Second,
-		9 * time.Second,
-		12 * time.Second,
+		2 * WindowDuration,
+		1 * WindowDuration,
+		0 * WindowDuration,
+		3 * WindowDuration,
 	}
 	for i, expectedDelay := range expectedDelays1 {
 		vdrID := validatorIDs[i]
@@ -102,11 +101,10 @@ func TestWindowerChangeByHeight(t *testing.T) {
 	}
 
 	expectedDelays2 := []time.Duration{
-		0 * time.Second,
-		3 * time.Second,
-		9 * time.Second,
-		6 * time.Second,
-		12 * time.Second,
+		1 * WindowDuration,
+		2 * WindowDuration,
+		0 * WindowDuration,
+		3 * WindowDuration,
 	}
 	for i, expectedDelay := range expectedDelays2 {
 		vdrID := validatorIDs[i]
@@ -146,11 +144,10 @@ func TestWindowerChangeByChain(t *testing.T) {
 	w1 := New(vdrState, subnetID, chainID1)
 
 	expectedDelays0 := []time.Duration{
-		6 * time.Second,
-		3 * time.Second,
-		12 * time.Second,
-		9 * time.Second,
-		0 * time.Second,
+		3 * WindowDuration,
+		2 * WindowDuration,
+		1 * WindowDuration,
+		0 * WindowDuration,
 	}
 	for i, expectedDelay := range expectedDelays0 {
 		vdrID := validatorIDs[i]
@@ -160,11 +157,10 @@ func TestWindowerChangeByChain(t *testing.T) {
 	}
 
 	expectedDelays1 := []time.Duration{
-		9 * time.Second,
-		3 * time.Second,
-		6 * time.Second,
-		0 * time.Second,
-		12 * time.Second,
+		3 * WindowDuration,
+		1 * WindowDuration,
+		2 * WindowDuration,
+		0 * WindowDuration,
 	}
 	for i, expectedDelay := range expectedDelays1 {
 		vdrID := validatorIDs[i]

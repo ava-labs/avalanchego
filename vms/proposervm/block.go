@@ -29,6 +29,7 @@ var (
 	errTimeTooAdvanced          = errors.New("time is too far advanced")
 	errProposerWindowNotStarted = errors.New("proposer window hasn't started")
 	errProposersNotActivated    = errors.New("proposers haven't been activated yet")
+	errPChainHeightTooLow       = errors.New("block P-chain height is too low")
 )
 
 type Block interface {
@@ -40,7 +41,7 @@ type Block interface {
 	verifyPostForkChild(child *postForkBlock) error
 	verifyPostForkOption(child *postForkOption) error
 
-	buildChild(innerBlock snowman.Block) (Block, error)
+	buildChild() (Block, error)
 
 	pChainHeight() (uint64, error)
 }
@@ -50,6 +51,7 @@ type PostForkBlock interface {
 
 	setStatus(choices.Status)
 	getStatelessBlk() block.Block
+	setInnerBlk(snowman.Block)
 }
 
 // field of postForkBlock and postForkOption
@@ -144,7 +146,6 @@ func (p *postForkCommonComponents) buildChild(
 	parentID ids.ID,
 	parentTimestamp time.Time,
 	parentPChainHeight uint64,
-	innerBlock snowman.Block,
 ) (Block, error) {
 	// Child's timestamp is the later of now and this block's timestamp
 	newTimestamp := p.vm.Time().Truncate(time.Second)
@@ -160,6 +161,34 @@ func (p *postForkCommonComponents) buildChild(
 	}
 
 	delay := newTimestamp.Sub(parentTimestamp)
+	if delay < proposer.MaxDelay {
+		parentHeight := p.innerBlk.Height()
+		proposerID := p.vm.ctx.NodeID
+		minDelay, err := p.vm.Windower.Delay(parentHeight+1, parentPChainHeight, proposerID)
+		if err != nil {
+			return nil, err
+		}
+
+		if delay < minDelay {
+			// It's not our turn to propose a block yet. This is likely caused
+			// by having previously notified the consensus engine to attempt to
+			// build a block on top of a block that is no longer the preferred
+			// block.
+			p.vm.ctx.Log.Debug("build block dropped; parent timestamp %s, expected delay %s, block timestamp %s",
+				parentTimestamp, minDelay, newTimestamp)
+
+			// In case the inner VM only issued one pendingTxs message, we
+			// should attempt to re-handle that once it is our turn to build the
+			// block.
+			p.vm.notifyInnerBlockReady()
+			return nil, errProposerWindowNotStarted
+		}
+	}
+
+	innerBlock, err := p.vm.ChainVM.BuildBlock()
+	if err != nil {
+		return nil, err
+	}
 
 	// Build the child
 	var statelessChild block.SignedBlock
@@ -174,22 +203,6 @@ func (p *postForkCommonComponents) buildChild(
 			return nil, err
 		}
 	} else {
-		// The following [minTimestamp] check should be able to be removed, but
-		// this is left here as a sanity check
-		childHeight := innerBlock.Height()
-		proposerID := p.vm.ctx.NodeID
-		minDelay, err := p.vm.Windower.Delay(childHeight, parentPChainHeight, proposerID)
-		if err != nil {
-			return nil, err
-		}
-
-		if delay < minDelay {
-			// It's not our turn to propose a block yet
-			p.vm.ctx.Log.Warn("build block dropped; parent timestamp %s, expected delay %s, block timestamp %s",
-				parentTimestamp, minDelay, newTimestamp)
-			return nil, errProposerWindowNotStarted
-		}
-
 		statelessChild, err = block.Build(
 			parentID,
 			newTimestamp,
@@ -217,6 +230,14 @@ func (p *postForkCommonComponents) buildChild(
 		child.ID(), parentTimestamp, newTimestamp)
 	// Persist the child
 	return child, p.vm.storePostForkBlock(child)
+}
+
+func (p *postForkCommonComponents) getInnerBlk() snowman.Block {
+	return p.innerBlk
+}
+
+func (p *postForkCommonComponents) setInnerBlk(innerBlk snowman.Block) {
+	p.innerBlk = innerBlk
 }
 
 func verifyIsOracleBlock(b snowman.Block) error {

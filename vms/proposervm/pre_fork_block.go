@@ -4,7 +4,6 @@
 package proposervm
 
 import (
-	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -14,11 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-var (
-	errPChainHeightTooLow = errors.New("block P-chain height is too low")
-
-	_ Block = &preForkBlock{}
-)
+var _ Block = &preForkBlock{}
 
 // preForkBlock implements proposervm.Block
 type preForkBlock struct {
@@ -31,7 +26,7 @@ func (b *preForkBlock) Parent() ids.ID {
 }
 
 func (b *preForkBlock) Verify() error {
-	parent, err := b.vm.getBlock(b.Block.Parent())
+	parent, err := b.vm.getPreForkBlock(b.Block.Parent())
 	if err != nil {
 		return err
 	}
@@ -72,26 +67,8 @@ func (b *preForkBlock) verifyPreForkChild(child *preForkBlock) error {
 			return err
 		}
 
-		if parentStatus := b.Status(); parentStatus == choices.Accepted {
-			_, err := b.vm.GetLastAccepted()
-			if err == nil {
-				// If the parent block is accepted and it was a preForkBlock,
-				// then there shouldn't have been an accepted postForkBlock yet.
-				// If there was an accepted postForkBlock, then the parent
-				// wasn't a preForkBlock and this child block is invalid.
-				return errUnexpectedBlockType
-			}
-			if err != database.ErrNotFound {
-				// If an unexpected error was returned - propagate that that
-				// error.
-				return err
-			}
-		} else if b.vm.Tree.Contains(b.Block) {
-			// If the parent block is a preForkBlock, then it's inner block
-			// shouldn't have been registered into the inner block tree. If the
-			// parent block was registered into the inner block tree, then the
-			// parent wasn't a preForkBlock and this child block is invalid.
-			return errUnexpectedBlockType
+		if err := b.verifyIsPreForkBlock(); err != nil {
+			return err
 		}
 
 		b.vm.ctx.Log.Debug("allowing pre-fork block %s after the fork time because the parent is an oracle block",
@@ -104,6 +81,10 @@ func (b *preForkBlock) verifyPreForkChild(child *preForkBlock) error {
 // This method only returns nil once (during the transition)
 func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 	if err := verifyIsNotOracleBlock(b.Block); err != nil {
+		return err
+	}
+
+	if err := b.verifyIsPreForkBlock(); err != nil {
 		return err
 	}
 
@@ -153,38 +134,30 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 		return err
 	}
 
-	// If inner block's Verify returned true, don't call it again.
-	// Note that if [child.innerBlk.Verify] returns nil,
-	// this method returns nil. This must always remain the case to
-	// maintain the inner block's invariant that if it's Verify()
-	// returns nil, it is eventually accepted/rejected.
-	if !b.vm.Tree.Contains(child.innerBlk) {
-		if err := child.innerBlk.Verify(); err != nil {
-			return err
-		}
-		b.vm.Tree.Add(child.innerBlk)
-	}
-
-	b.vm.verifiedBlocks[childID] = child
-	return nil
+	// Verify the inner block and track it as verified
+	return b.vm.verifyAndRecordInnerBlk(child)
 }
 
 func (b *preForkBlock) verifyPostForkOption(child *postForkOption) error {
 	return errUnexpectedBlockType
 }
 
-func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
+func (b *preForkBlock) buildChild() (Block, error) {
 	parentTimestamp := b.Timestamp()
 	if parentTimestamp.Before(b.vm.activationTime) {
 		// The chain hasn't forked yet
-		res := &preForkBlock{
-			Block: innerBlock,
-			vm:    b.vm,
+		innerBlock, err := b.vm.ChainVM.BuildBlock()
+		if err != nil {
+			return nil, err
 		}
 
-		b.vm.ctx.Log.Info("built block %s - parent timestamp %v",
-			res.ID(), parentTimestamp)
-		return res, nil
+		b.vm.ctx.Log.Info("built block %s - parent timestamp %s",
+			innerBlock.ID(), parentTimestamp)
+
+		return &preForkBlock{
+			Block: innerBlock,
+			vm:    b.vm,
+		}, nil
 	}
 
 	// The chain is currently forking
@@ -196,6 +169,11 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 	}
 
 	pChainHeight, err := b.vm.ctx.ValidatorState.GetCurrentHeight()
+	if err != nil {
+		return nil, err
+	}
+
+	innerBlock, err := b.vm.ChainVM.BuildBlock()
 	if err != nil {
 		return nil, err
 	}
@@ -226,4 +204,27 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 
 func (b *preForkBlock) pChainHeight() (uint64, error) {
 	return 0, nil
+}
+
+func (b *preForkBlock) verifyIsPreForkBlock() error {
+	if status := b.Status(); status == choices.Accepted {
+		_, err := b.vm.GetLastAccepted()
+		if err == nil {
+			// If this block is accepted and it was a preForkBlock, then there
+			// shouldn't have been an accepted postForkBlock yet. If there was
+			// an accepted postForkBlock, then this block wasn't a preForkBlock.
+			return errUnexpectedBlockType
+		}
+		if err != database.ErrNotFound {
+			// If an unexpected error was returned - propagate that that
+			// error.
+			return err
+		}
+	} else if _, contains := b.vm.Tree.Get(b.Block); contains {
+		// If this block is a preForkBlock, then it's inner block shouldn't have
+		// been registered into the inner block tree. If this block was
+		// registered into the inner block tree, then it wasn't a preForkBlock.
+		return errUnexpectedBlockType
+	}
+	return nil
 }

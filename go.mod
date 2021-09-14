@@ -1,13 +1,13 @@
 module github.com/ava-labs/avalanchego
 
 // Changes to the minimum golang version must also be replicated in
-// scripts/ansible/roles/golang_based/defaults/main.yml
+// scripts/ansible/roles/golang_base/defaults/main.yml
 // scripts/build_avalanche.sh
 // scripts/local.Dockerfile
 // Dockerfile
 // README.md
 // go.mod (here, only major.minor can be specified)
-go 1.15
+go 1.16
 
 require (
 	github.com/AppsFlyer/go-sundheit v0.2.0
@@ -55,5 +55,6 @@ require (
 	gonum.org/v1/gonum v0.9.1
 	google.golang.org/grpc v1.37.0
 	google.golang.org/protobuf v1.27.1
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gotest.tools v2.2.0+incompatible
 )

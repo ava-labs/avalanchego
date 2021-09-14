@@ -13,29 +13,12 @@ import (
 )
 
 type CounterHandler struct {
-	TxNotify, Tx int
-}
-
-func (h *CounterHandler) HandleTxNotify(ids.ShortID, uint32, *TxNotify) error {
-	h.TxNotify++
-	return nil
+	Tx int
 }
 
 func (h *CounterHandler) HandleTx(ids.ShortID, uint32, *Tx) error {
 	h.Tx++
 	return nil
-}
-
-func TestHandleTxNotify(t *testing.T) {
-	assert := assert.New(t)
-
-	handler := CounterHandler{}
-	msg := TxNotify{}
-
-	err := msg.Handle(&handler, ids.ShortEmpty, 0)
-	assert.NoError(err)
-	assert.Equal(1, handler.TxNotify)
-	assert.Zero(handler.Tx)
 }
 
 func TestHandleTx(t *testing.T) {
@@ -46,7 +29,6 @@ func TestHandleTx(t *testing.T) {
 
 	err := msg.Handle(&handler, ids.ShortEmpty, 0)
 	assert.NoError(err)
-	assert.Zero(handler.TxNotify)
 	assert.Equal(1, handler.Tx)
 }
 
@@ -57,9 +39,6 @@ func TestNoopHandler(t *testing.T) {
 		Log: logging.NoLog{},
 	}
 
-	err := handler.HandleTxNotify(ids.ShortEmpty, 0, nil)
-	assert.NoError(err)
-
-	err = handler.HandleTx(ids.ShortEmpty, 0, nil)
+	err := handler.HandleTx(ids.ShortEmpty, 0, nil)
 	assert.NoError(err)
 }

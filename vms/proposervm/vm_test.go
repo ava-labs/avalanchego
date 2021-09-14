@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"crypto"
 	"crypto/tls"
-	"fmt"
+	"errors"
 	"testing"
 	"time"
 
@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
@@ -34,6 +33,10 @@ var (
 
 	genesisUnixTimestamp int64 = 1000
 	genesisTimestamp           = time.Unix(genesisUnixTimestamp, 0)
+
+	errUnknownBlock      = errors.New("unknown block")
+	errUnverifiedBlock   = errors.New("unverified block")
+	errMarshallingFailed = errors.New("marshalling failed")
 )
 
 func init() {
@@ -44,7 +47,17 @@ func init() {
 	}
 }
 
-func initTestProposerVM(t *testing.T, proBlkStartTime time.Time, minPChainHeight uint64) (*block.TestVM, *validators.TestState, *VM, *snowman.TestBlock) {
+func initTestProposerVM(
+	t *testing.T,
+	proBlkStartTime time.Time,
+	minPChainHeight uint64,
+) (
+	*block.TestVM,
+	*validators.TestState,
+	*VM,
+	*snowman.TestBlock,
+	manager.Manager,
+) {
 	coreGenBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
@@ -65,13 +78,20 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time, minPChainHeight
 		return nil
 	}
 	coreVM.LastAcceptedF = func() (ids.ID, error) { return coreGenBlk.ID(), nil }
-	coreVM.GetBlockF = func(ids.ID) (snowman.Block, error) { return coreGenBlk, nil }
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch {
+		case blkID == coreGenBlk.ID():
+			return coreGenBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, coreGenBlk.Bytes()):
 			return coreGenBlk, nil
 		default:
-			return nil, fmt.Errorf("Unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -90,13 +110,11 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time, minPChainHeight
 		return res, nil
 	}
 
-	ctx := &snow.Context{
-		NodeID:            hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw)),
-		Log:               logging.NoLog{},
-		StakingCertLeaf:   pTestCert.Leaf,
-		StakingLeafSigner: pTestCert.PrivateKey.(crypto.Signer),
-		ValidatorState:    valState,
-	}
+	ctx := snow.DefaultContextTest()
+	ctx.NodeID = hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw))
+	ctx.StakingCertLeaf = pTestCert.Leaf
+	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+	ctx.ValidatorState = valState
 	ctx.Bootstrapped()
 
 	dummyDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
@@ -113,14 +131,14 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time, minPChainHeight
 		t.Fatal(err)
 	}
 
-	return coreVM, valState, proVM, coreGenBlk
+	return coreVM, valState, proVM, coreGenBlk, dummyDBManager
 }
 
 // VM.BuildBlock tests section
 
 func TestBuildBlockTimestampAreRoundedToSeconds(t *testing.T) {
 	// given the same core block, BuildBlock returns the same proposer block
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	skewedTimestamp := time.Now().Truncate(time.Second).Add(time.Millisecond)
 	proVM.Set(skewedTimestamp)
 
@@ -149,7 +167,7 @@ func TestBuildBlockTimestampAreRoundedToSeconds(t *testing.T) {
 
 func TestBuildBlockIsIdempotent(t *testing.T) {
 	// given the same core block, BuildBlock returns the same proposer block
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -181,7 +199,7 @@ func TestBuildBlockIsIdempotent(t *testing.T) {
 
 func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 	// setup
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -214,7 +232,7 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 
 // both core blocks and pro blocks must be built on preferred
 func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
 	// add two proBlks...
 	coreBlk1 := &snowman.TestBlock{
@@ -309,7 +327,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 }
 
 func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
 	coreBlk1 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -403,14 +421,14 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 
 // VM.ParseBlock tests section
 func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
-	coreVM, _, proVM, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	coreVM, _, proVM, _, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
 	innerBlk := &snowman.TestBlock{
 		BytesV:     []byte{1},
 		TimestampV: proVM.Time(),
 	}
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
-		return nil, fmt.Errorf("Block marshalling failed")
+		return nil, errMarshallingFailed
 	}
 	slb, err := statelessblock.Build(
 		proVM.preferred,
@@ -441,7 +459,7 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 }
 
 func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
-	coreVM, _, proVM, gencoreBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	coreVM, _, proVM, gencoreBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
 	// create two Proposer blocks at the same height
 	innerBlk := &snowman.TestBlock{
@@ -539,7 +557,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 
 // VM.BuildBlock and VM.ParseBlock interoperability tests section
 func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
 	// one block is built from this proVM
 	localcoreBlk := &snowman.TestBlock{
@@ -610,136 +628,9 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	}
 }
 
-// VM persistency test section
-// TODO: fix test
-func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
-
-	// build two blocks on top of genesis
-	coreBlk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV: ids.GenerateTestID(),
-		},
-		ParentV:    coreGenBlk.ID(),
-		BytesV:     []byte{1},
-		VerifyV:    nil,
-		TimestampV: coreGenBlk.Timestamp(),
-	}
-	coreBlk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV: ids.GenerateTestID(),
-		},
-		ParentV:    coreBlk1.ID(),
-		BytesV:     []byte{2},
-		VerifyV:    nil,
-		TimestampV: coreBlk1.Timestamp(),
-	}
-	coreBuildCalls := 0
-	coreVM.BuildBlockF = func() (snowman.Block, error) {
-		switch coreBuildCalls {
-		case 0:
-			coreBuildCalls++
-			return coreBlk1, nil
-		case 1:
-			coreBuildCalls++
-			return coreBlk2, nil
-		default:
-			t.Fatal("BuildBlock of coreVM called too many times")
-		}
-		return nil, nil
-	}
-	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
-		switch {
-		case bytes.Equal(b, coreGenBlk.Bytes()):
-			return coreGenBlk, nil
-		case bytes.Equal(b, coreBlk1.Bytes()):
-			return coreBlk1, nil
-		case bytes.Equal(b, coreBlk2.Bytes()):
-			return coreBlk2, nil
-		default:
-			t.Fatal("ParseBlock of coreVM called with unknown block")
-			return nil, nil
-		}
-	}
-
-	proVM.Set(proVM.Time().Add(proposer.MaxDelay))
-	proBlk1, err := proVM.BuildBlock()
-	if err != nil {
-		t.Fatal("Could not build block")
-	}
-
-	// update preference to build next block
-	if err := proVM.SetPreference(proBlk1.ID()); err != nil {
-		t.Fatal("Could not set preference")
-	}
-
-	proVM.Set(proVM.Time().Add(proposer.MaxDelay))
-	proBlk2, err := proVM.BuildBlock()
-	if err != nil {
-		t.Fatalf("failed to build block with %s", err)
-	}
-	// update preference to build next block
-	if err := proVM.SetPreference(proBlk2.ID()); err != nil {
-		t.Fatal("Could not set preference")
-	}
-
-	// forcefully wipe cache, as it would happen upon node shutdown
-	// proVM.clearCache()
-
-	// build a new block to show ops can resume smoothly
-	coreBlk3 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV: ids.GenerateTestID(),
-		},
-		ParentV:    coreBlk2.ID(),
-		BytesV:     []byte{3},
-		VerifyV:    nil,
-		TimestampV: coreBlk2.Timestamp(),
-	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) {
-		return coreBlk3, nil
-	}
-
-	proVM.Set(proVM.Time().Add(proposer.MaxDelay))
-	proBlk3, err := proVM.BuildBlock()
-	if err != nil {
-		t.Fatal("Could not build block")
-	}
-
-	if proBlk3.Parent() != proBlk2.ID() {
-		t.Fatal("Error in building Block")
-	}
-
-	// while inner cache, as it would happen upon node shutdown
-	// proVM.clearCache()
-
-	// check that getBlock still works on older blocks
-	rtrvdProBlk2, err := proVM.GetBlock(proBlk2.ID())
-	if err != nil {
-		t.Fatal("Could not get block after whiping off proposerVM cache")
-	}
-	if rtrvdProBlk2.ID() != proBlk2.ID() {
-		t.Fatal("blocks do not match following cache whiping")
-	}
-	if err = rtrvdProBlk2.Verify(); err != nil {
-		t.Fatal("block retrieved after cache whiping does not verify")
-	}
-
-	rtrvdProBlk1, err := proVM.GetBlock(proBlk1.ID())
-	if err != nil {
-		t.Fatal("Could not get block after whiping off proposerVM cache")
-	}
-	if rtrvdProBlk1.ID() != proBlk1.ID() {
-		t.Fatal("blocks do not match following cache whiping")
-	}
-	if err = rtrvdProBlk1.Verify(); err != nil {
-		t.Fatal("block retrieved after cache whiping does not verify")
-	}
-}
-
 // Pre Fork tests section
 func TestPreFork_Initialize(t *testing.T) {
-	_, _, proVM, coreGenBlk := initTestProposerVM(t, timer.MaxTime, 0) // disable ProBlks
+	_, _, proVM, coreGenBlk, _ := initTestProposerVM(t, timer.MaxTime, 0) // disable ProBlks
 
 	// checks
 	blkID, err := proVM.LastAccepted()
@@ -762,7 +653,7 @@ func TestPreFork_Initialize(t *testing.T) {
 
 func TestPreFork_BuildBlock(t *testing.T) {
 	// setup
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, timer.MaxTime, 0) // disable ProBlks
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, timer.MaxTime, 0) // disable ProBlks
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -804,7 +695,7 @@ func TestPreFork_BuildBlock(t *testing.T) {
 
 func TestPreFork_ParseBlock(t *testing.T) {
 	// setup
-	coreVM, _, proVM, _ := initTestProposerVM(t, timer.MaxTime, 0) // disable ProBlks
+	coreVM, _, proVM, _, _ := initTestProposerVM(t, timer.MaxTime, 0) // disable ProBlks
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -850,7 +741,7 @@ func TestPreFork_ParseBlock(t *testing.T) {
 }
 
 func TestPreFork_SetPreference(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, timer.MaxTime, 0) // disable ProBlks
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, timer.MaxTime, 0) // disable ProBlks
 
 	coreBlk0 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -868,6 +759,16 @@ func TestPreFork_SetPreference(t *testing.T) {
 		t.Fatal("Could not build proposer block")
 	}
 
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case coreBlk0.ID():
+			return coreBlk0, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, coreGenBlk.Bytes()):
@@ -875,7 +776,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 		case bytes.Equal(b, coreBlk0.Bytes()):
 			return coreBlk0, nil
 		default:
-			return nil, fmt.Errorf("Unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 	if err = proVM.SetPreference(builtBlk.ID()); err != nil {
@@ -895,10 +796,577 @@ func TestPreFork_SetPreference(t *testing.T) {
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk1, nil }
 	nextBlk, err := proVM.BuildBlock()
 	if err != nil {
-		t.Fatal("Could not build proposer block")
+		t.Fatalf("Could not build proposer block %s", err)
 	}
 	if nextBlk.Parent() != builtBlk.ID() {
 		t.Fatal("Preferred block should be parent of next built block")
+	}
+}
+
+func TestExpiredBuildBlock(t *testing.T) {
+	coreGenBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		HeightV:    0,
+		TimestampV: genesisTimestamp,
+		BytesV:     []byte{0},
+	}
+
+	coreVM := &block.TestVM{}
+	coreVM.T = t
+
+	coreVM.LastAcceptedF = func() (ids.ID, error) { return coreGenBlk.ID(), nil }
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	proVM := New(coreVM, time.Time{}, 0)
+
+	valState := &validators.TestState{
+		T: t,
+	}
+	valState.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		return map[ids.ShortID]uint64{
+			{1}: 100,
+		}, nil
+	}
+
+	ctx := snow.DefaultContextTest()
+	ctx.NodeID = hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw))
+	ctx.StakingCertLeaf = pTestCert.Leaf
+	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+	ctx.ValidatorState = valState
+	ctx.Bootstrapped()
+
+	dbManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	toEngine := make(chan common.Message, 1)
+	var toScheduler chan<- common.Message
+
+	coreVM.InitializeF = func(
+		_ *snow.Context,
+		_ manager.Manager,
+		_ []byte,
+		_ []byte,
+		_ []byte,
+		toEngineChan chan<- common.Message,
+		_ []*common.Fx,
+		_ common.AppSender,
+	) error {
+		toScheduler = toEngineChan
+		return nil
+	}
+
+	// make sure that DBs are compressed correctly
+	if err := proVM.Initialize(ctx, dbManager, nil, nil, nil, toEngine, nil, nil); err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+
+	// Initialize shouldn't be called again
+	coreVM.InitializeF = nil
+
+	if err := proVM.SetPreference(coreGenBlk.IDV); err != nil {
+		t.Fatal(err)
+	}
+
+	// Make sure that passing a message works
+	toScheduler <- common.PendingTxs
+	<-toEngine
+
+	// Notify the proposer VM of a new block on the inner block side
+	toScheduler <- common.PendingTxs
+
+	coreBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk.ID(),
+		HeightV:    coreGenBlk.Height() + 1,
+		TimestampV: coreGenBlk.Timestamp(),
+	}
+	statelessBlock, err := statelessblock.BuildUnsigned(
+		coreGenBlk.ID(),
+		coreBlk.Timestamp(),
+		0,
+		coreBlk.Bytes(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case coreBlk.ID():
+			return coreBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, coreBlk.Bytes()):
+			return coreBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	proVM.Clock.Set(statelessBlock.Timestamp())
+
+	parsedBlock, err := proVM.ParseBlock(statelessBlock.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := parsedBlock.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := proVM.SetPreference(parsedBlock.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		t.Fatal("unexpectedly called build block")
+		panic("unexpectedly called build block")
+	}
+
+	// The first notification will be read from the consensus engine
+	<-toEngine
+
+	if _, err := proVM.BuildBlock(); err == nil {
+		t.Fatal("build block when the proposer window hasn't started")
+	}
+
+	proVM.Set(statelessBlock.Timestamp().Add(proposer.MaxDelay))
+	proVM.Scheduler.SetBuildBlockTime(time.Now())
+
+	// The engine should have been notified to attempt to build a block now that
+	// the window has started again
+	<-toEngine
+}
+
+type wrappedBlock struct {
+	snowman.Block
+	verified bool
+}
+
+func (b *wrappedBlock) Accept() error {
+	if !b.verified {
+		return errUnverifiedBlock
+	}
+	return b.Block.Accept()
+}
+
+func (b *wrappedBlock) Verify() error {
+	if err := b.Block.Verify(); err != nil {
+		return err
+	}
+	b.verified = true
+	return nil
+}
+
+func TestInnerBlockDeduplication(t *testing.T) {
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // disable ProBlks
+
+	coreBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk.ID(),
+		HeightV:    coreGenBlk.Height() + 1,
+		TimestampV: coreGenBlk.Timestamp(),
+	}
+	coreBlk0 := &wrappedBlock{
+		Block: coreBlk,
+	}
+	coreBlk1 := &wrappedBlock{
+		Block: coreBlk,
+	}
+	statelessBlock0, err := statelessblock.BuildUnsigned(
+		coreGenBlk.ID(),
+		coreBlk.Timestamp(),
+		0,
+		coreBlk.Bytes(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	statelessBlock1, err := statelessblock.BuildUnsigned(
+		coreGenBlk.ID(),
+		coreBlk.Timestamp(),
+		1,
+		coreBlk.Bytes(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case coreBlk0.ID():
+			return coreBlk0, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, coreBlk0.Bytes()):
+			return coreBlk0, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	parsedBlock0, err := proVM.ParseBlock(statelessBlock0.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := parsedBlock0.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := proVM.SetPreference(parsedBlock0.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case coreBlk1.ID():
+			return coreBlk1, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, coreBlk1.Bytes()):
+			return coreBlk1, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	parsedBlock1, err := proVM.ParseBlock(statelessBlock1.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := parsedBlock1.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := proVM.SetPreference(parsedBlock1.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := parsedBlock1.Accept(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestInnerVMRollback(t *testing.T) {
+	coreGenBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		HeightV:    0,
+		TimestampV: genesisTimestamp,
+		BytesV:     []byte{0},
+	}
+
+	valState := &validators.TestState{
+		T: t,
+	}
+	valState.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		return map[ids.ShortID]uint64{
+			{1}: 100,
+		}, nil
+	}
+
+	coreVM := &block.TestVM{}
+	coreVM.T = t
+
+	coreVM.LastAcceptedF = func() (ids.ID, error) { return coreGenBlk.ID(), nil }
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	ctx := snow.DefaultContextTest()
+	ctx.NodeID = hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw))
+	ctx.StakingCertLeaf = pTestCert.Leaf
+	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+	ctx.ValidatorState = valState
+	ctx.Bootstrapped()
+
+	coreVM.InitializeF = func(
+		*snow.Context,
+		manager.Manager,
+		[]byte,
+		[]byte,
+		[]byte,
+		chan<- common.Message,
+		[]*common.Fx,
+		common.AppSender,
+	) error {
+		return nil
+	}
+
+	dbManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+
+	proVM := New(coreVM, time.Time{}, 0)
+
+	if err := proVM.Initialize(ctx, dbManager, nil, nil, nil, nil, nil, nil); err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+
+	if err := proVM.SetPreference(coreGenBlk.IDV); err != nil {
+		t.Fatal(err)
+	}
+
+	coreBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk.ID(),
+		HeightV:    coreGenBlk.Height() + 1,
+		TimestampV: coreGenBlk.Timestamp(),
+	}
+	statelessBlock, err := statelessblock.BuildUnsigned(
+		coreGenBlk.ID(),
+		coreBlk.Timestamp(),
+		0,
+		coreBlk.Bytes(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case coreBlk.ID():
+			return coreBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, coreBlk.Bytes()):
+			return coreBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	proVM.Clock.Set(statelessBlock.Timestamp())
+
+	parsedBlock, err := proVM.ParseBlock(statelessBlock.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if status := parsedBlock.Status(); status != choices.Processing {
+		t.Fatalf("expected status to be %s but was %s", choices.Processing, status)
+	}
+
+	if err := parsedBlock.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := proVM.SetPreference(parsedBlock.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := parsedBlock.Accept(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Restart the node and have the inner VM rollback state.
+
+	coreBlk.StatusV = choices.Processing
+
+	proVM = New(coreVM, time.Time{}, 0)
+
+	if err := proVM.Initialize(ctx, dbManager, nil, nil, nil, nil, nil, nil); err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+
+	lastAcceptedID, err := proVM.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if lastAcceptedID != coreGenBlk.IDV {
+		t.Fatalf("failed to roll back the VM to the last accepted block")
+	}
+
+	parsedBlock, err = proVM.ParseBlock(statelessBlock.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if status := parsedBlock.Status(); status != choices.Processing {
+		t.Fatalf("expected status to be %s but was %s", choices.Processing, status)
+	}
+}
+
+func TestBuildBlockDuringWindow(t *testing.T) {
+	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+
+	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		return map[ids.ShortID]uint64{
+			proVM.ctx.NodeID: 10,
+		}, nil
+	}
+
+	coreBlk0 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk.ID(),
+		HeightV:    coreGenBlk.Height() + 1,
+		TimestampV: coreGenBlk.Timestamp(),
+	}
+	coreBlk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{2},
+		ParentV:    coreBlk0.ID(),
+		HeightV:    coreBlk0.Height() + 1,
+		TimestampV: coreBlk0.Timestamp(),
+	}
+	statelessBlock0, err := statelessblock.BuildUnsigned(
+		coreGenBlk.ID(),
+		coreBlk0.Timestamp(),
+		0,
+		coreBlk0.Bytes(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case coreBlk0.ID():
+			return coreBlk0, nil
+		case coreBlk1.ID():
+			return coreBlk1, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, coreBlk0.Bytes()):
+			return coreBlk0, nil
+		case bytes.Equal(b, coreBlk1.Bytes()):
+			return coreBlk1, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	proVM.Clock.Set(statelessBlock0.Timestamp())
+
+	statefulBlock0, err := proVM.ParseBlock(statelessBlock0.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := statefulBlock0.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := proVM.SetPreference(statefulBlock0.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return coreBlk1, nil
+	}
+
+	statefulBlock1, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := statefulBlock1.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := proVM.SetPreference(statefulBlock1.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := statefulBlock0.Accept(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := statefulBlock1.Accept(); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -911,7 +1379,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 //        C(Z)
 func TestTwoForks_OneIsAccepted(t *testing.T) {
 	forkTime := time.Unix(0, 0)
-	coreVM, _, proVM, gBlock := initTestProposerVM(t, forkTime, 0)
+	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
 
 	// create pre-fork block X and post-fork block A
 	xBlock := &snowman.TestBlock{
@@ -1025,7 +1493,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 
 func TestTooFarAdvanced(t *testing.T) {
 	forkTime := time.Unix(0, 0)
-	coreVM, _, proVM, gBlock := initTestProposerVM(t, forkTime, 0)
+	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
 
 	xBlock := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{

@@ -42,13 +42,20 @@ type VM struct {
 	scheduler.Scheduler
 	timer.Clock
 
-	ctx *snow.Context
-	db  *versiondb.Database
+	ctx         *snow.Context
+	db          *versiondb.Database
+	toScheduler chan<- common.Message
+
 	// Block ID --> Block
 	// Each element is a block that passed verification but
 	// hasn't yet been accepted/rejected
 	verifiedBlocks map[ids.ID]PostForkBlock
 	preferred      ids.ID
+
+	// lastAcceptedOptionTime is set to the last accepted PostForkBlock's
+	// timestamp if the last accepted block has been a PostForkOption block
+	// since having initialized the VM.
+	lastAcceptedTime time.Time
 }
 
 func New(vm block.ChainVM, activationTime time.Time, minimumPChainHeight uint64) *VM {
@@ -79,6 +86,7 @@ func (vm *VM) Initialize(
 
 	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine)
 	vm.Scheduler = scheduler
+	vm.toScheduler = vmToEngine
 
 	go ctx.Log.RecoverAndPanic(func() {
 		scheduler.Dispatch(time.Now())
@@ -100,7 +108,11 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	return vm.repairAcceptedChain()
+	if err := vm.repairAcceptedChain(); err != nil {
+		return err
+	}
+
+	return vm.setLastAcceptedOptionTime()
 }
 
 func (vm *VM) BuildBlock() (snowman.Block, error) {
@@ -109,12 +121,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 
-	innerBlock, err := vm.ChainVM.BuildBlock()
-	if err != nil {
-		return nil, err
-	}
-
-	return preferredBlock.buildChild(innerBlock)
+	return preferredBlock.buildChild()
 }
 
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
@@ -223,6 +230,36 @@ func (vm *VM) repairAcceptedChain() error {
 			return err
 		}
 	}
+}
+
+func (vm *VM) setLastAcceptedOptionTime() error {
+	lastAcceptedID, err := vm.GetLastAccepted()
+	if err == database.ErrNotFound {
+		// If the last accepted block wasn't a PostFork block, then we don't
+		// initialize the time.
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	lastAccepted, _, err := vm.State.GetBlock(lastAcceptedID)
+	if err != nil {
+		return err
+	}
+
+	if _, ok := lastAccepted.(statelessblock.SignedBlock); ok {
+		// If the last accepted block wasn't a PostForkOption, then we don't
+		// initialize the time.
+		return nil
+	}
+
+	acceptedParent, err := vm.getPostForkBlock(lastAccepted.ParentID())
+	if err != nil {
+		return err
+	}
+	vm.lastAcceptedTime = acceptedParent.Timestamp()
+	return nil
 }
 
 func (vm *VM) parsePostForkBlock(b []byte) (PostForkBlock, error) {
@@ -342,13 +379,26 @@ func (vm *VM) verifyAndRecordInnerBlk(postFork PostForkBlock) error {
 	// Note that if [innerBlk.Verify] returns nil, this method returns nil. This
 	// must always remain the case to maintain the inner block's invariant that
 	// if it's Verify() returns nil, it is eventually accepted or rejected.
-	if innerBlk := postFork.getInnerBlk(); !vm.Tree.Contains(innerBlk) {
-		if err := innerBlk.Verify(); err != nil {
+	currentInnerBlk := postFork.getInnerBlk()
+	if originalInnerBlk, contains := vm.Tree.Get(currentInnerBlk); !contains {
+		if err := currentInnerBlk.Verify(); err != nil {
 			return err
 		}
-		vm.Tree.Add(innerBlk)
+		vm.Tree.Add(currentInnerBlk)
+	} else {
+		postFork.setInnerBlk(originalInnerBlk)
 	}
 
 	vm.verifiedBlocks[postFork.ID()] = postFork
 	return nil
+}
+
+// notifyInnerBlockReady tells the scheduler that the inner VM is ready to build
+// a new block
+func (vm *VM) notifyInnerBlockReady() {
+	select {
+	case vm.toScheduler <- common.PendingTxs:
+	default:
+		vm.ctx.Log.Debug("dropping message to consensus engine")
+	}
 }
