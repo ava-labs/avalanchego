@@ -4,7 +4,6 @@
 package evm
 
 import (
-	"container/heap"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -43,7 +42,7 @@ type Mempool struct {
 
 // NewMempool returns a Mempool with [maxSize]
 func NewMempool(AVAXAssetID ids.ID, maxSize int) *Mempool {
-	m := &Mempool{
+	return &Mempool{
 		AVAXAssetID:  AVAXAssetID,
 		issuedTxs:    make(map[ids.ID]*Tx),
 		discardedTxs: &cache.LRU{Size: discardedTxsCacheSize},
@@ -52,8 +51,6 @@ func NewMempool(AVAXAssetID ids.ID, maxSize int) *Mempool {
 		txHeap:       newTxHeap(maxSize),
 		maxSize:      maxSize,
 	}
-	heap.Init(m.txHeap)
-	return m
 }
 
 // Len returns the number of transactions in the mempool
