@@ -4,7 +4,6 @@
 package evm
 
 import (
-	"math/big"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -16,12 +15,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 )
 
 // getValidImportTx returns 2 transactions that conflict with each other (both valid)
-// TODO: return higher fee because useful for #2
 func getValidImportTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) (*Tx, *Tx) {
 	importAmount := uint64(50000000)
 	utxoID := avax.UTXOID{
@@ -66,7 +63,7 @@ func getValidImportTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) (*Tx, *
 		t.Fatal(err)
 	}
 
-	importTx2, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[1], initialBaseFee.Add(initialBaseFee, big.NewInt(1*params.GWei)), []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	importTx2, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[1], initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}

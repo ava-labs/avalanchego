@@ -106,6 +106,29 @@ func (m *Mempool) AddTx(tx *Tx) error {
 		return nil
 	}
 
+	// Add tx to heap sorted by gasPrice
+	gasPrice, err := m.atomicTxGasPrice(tx)
+	if err != nil {
+		return errInvalidAtomicTxFee
+	}
+	if m.length() >= m.maxSize {
+		if m.txHeap.Len() > 0 {
+			// Remove the lowest price item from [txHeap]
+			txEntry := m.txHeap.Drop()
+			// If the [gasPrice] of the lowest item is >= the [gasPrice] of the
+			// submitted item, discard the submitted item (we prefer items already in
+			// the mempool).
+			if txEntry.gasPrice >= gasPrice {
+				m.txHeap.Push(txEntry)
+				return errInsufficientAtomicTxFee
+			}
+			m.utxoSet.Remove(txEntry.tx.InputUTXOs().List()...)
+			m.discardedTxs.Evict(txEntry.id)
+		} else {
+			return errTooManyAtomicTx
+		}
+	}
+
 	// Check if the submitted transaction's UTXOs conflict with what is already in the
 	// mempool
 	utxoSet := tx.InputUTXOs()
@@ -113,25 +136,6 @@ func (m *Mempool) AddTx(tx *Tx) error {
 		return errConflictingAtomicTx
 	}
 	m.utxoSet.Union(utxoSet)
-
-	// Add tx to heap sorted by gasPrice
-	gasPrice, err := m.atomicTxGasPrice(tx)
-	if err != nil {
-		return errInvalidAtomicTxFee
-	}
-	if m.Len() >= m.maxSize && m.txHeap.Len() > 0 {
-		// Remove the lowest price item from [txHeap]
-		txEntry := m.txHeap.Drop()
-		// If the [gasPrice] of the lowest item is >= the [gasPrice] of the
-		// submitted item, discard the submitted item (we prefer items already in
-		// the mempool).
-		if txEntry.gasPrice >= gasPrice {
-			m.txHeap.Push(txEntry)
-			return errInsufficientAtomicTxFee
-		}
-		m.utxoSet.Remove(txEntry.tx.InputUTXOs().List()...)
-		m.discardedTxs.Evict(txEntry.id)
-	}
 
 	// If the transaction was recently discarded, log the event and evict from
 	// discarded transactions so it's not in two places within the mempool.
