@@ -2,7 +2,6 @@ package evm
 
 import (
 	"container/heap"
-	"sort"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
@@ -18,7 +17,6 @@ type txEntry struct {
 
 // internalTxHeap is used to track pending atomic transactions by [gasPrice]
 type internalTxHeap struct {
-	sort.Interface
 	items  []*txEntry
 	lookup map[ids.ID]*txEntry
 }

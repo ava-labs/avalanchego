@@ -32,11 +32,11 @@ func TestTxHeap(t *testing.T) {
 		}
 	)
 
-	assert := assert.New(t)
 	h := newTxHeap(3)
-	assert.Zero(h.Len())
+	assert.Zero(t, h.Len())
 
 	t.Run("add/remove single entry", func(t *testing.T) {
+		assert := assert.New(t)
 		h.Push(&txEntry{
 			ID:       id0,
 			GasPrice: 5,
@@ -59,6 +59,7 @@ func TestTxHeap(t *testing.T) {
 	})
 
 	t.Run("add other items", func(t *testing.T) {
+		assert := assert.New(t)
 		h.Push(&txEntry{
 			ID:       id1,
 			GasPrice: 10,
@@ -99,6 +100,22 @@ func TestTxHeap(t *testing.T) {
 		assert.False(gHas2)
 	})
 
+	verifyRemovalOrder := func(t *testing.T) {
+		assert := assert.New(t)
+		assert.Equal(id2, h.Drop().ID)
+		assert.True(h.Has(id0))
+		assert.True(h.Has(id1))
+		assert.False(h.Has(id2))
+		assert.Equal(id0, h.Drop().ID)
+		assert.False(h.Has(id0))
+		assert.True(h.Has(id1))
+		assert.False(h.Has(id2))
+		assert.Equal(id1, h.Drop().ID)
+		assert.False(h.Has(id0))
+		assert.False(h.Has(id1))
+		assert.False(h.Has(id2))
+	}
+
 	t.Run("drop", func(t *testing.T) {
 		h.Push(&txEntry{
 			ID:       id0,
@@ -115,17 +132,42 @@ func TestTxHeap(t *testing.T) {
 			GasPrice: 2,
 			Tx:       tx2,
 		})
-		assert.Equal(id2, h.Drop().ID)
-		assert.True(h.Has(id0))
-		assert.True(h.Has(id1))
-		assert.False(h.Has(id2))
-		assert.Equal(id0, h.Drop().ID)
-		assert.False(h.Has(id0))
-		assert.True(h.Has(id1))
-		assert.False(h.Has(id2))
-		assert.Equal(id1, h.Drop().ID)
-		assert.False(h.Has(id0))
-		assert.False(h.Has(id1))
-		assert.False(h.Has(id2))
+		verifyRemovalOrder(t)
+	})
+	t.Run("drop (alt order)", func(t *testing.T) {
+		h.Push(&txEntry{
+			ID:       id0,
+			GasPrice: 5,
+			Tx:       tx0,
+		})
+		h.Push(&txEntry{
+			ID:       id2,
+			GasPrice: 2,
+			Tx:       tx2,
+		})
+		h.Push(&txEntry{
+			ID:       id1,
+			GasPrice: 10,
+			Tx:       tx1,
+		})
+		verifyRemovalOrder(t)
+	})
+	t.Run("drop (alt order 2)", func(t *testing.T) {
+		h.Push(&txEntry{
+			ID:       id2,
+			GasPrice: 2,
+			Tx:       tx2,
+		})
+		h.Push(&txEntry{
+			ID:       id0,
+			GasPrice: 5,
+			Tx:       tx0,
+		})
+		h.Push(&txEntry{
+			ID:       id1,
+			GasPrice: 10,
+			Tx:       tx1,
+		})
+		verifyRemovalOrder(t)
 	})
 }
