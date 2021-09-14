@@ -4,6 +4,8 @@
 package evm
 
 import (
+	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -14,6 +16,8 @@ import (
 const (
 	discardedTxsCacheSize = 50
 )
+
+var errNoGasUsed = errors.New("no gas used")
 
 // Mempool is a simple mempool for atomic transactions
 type Mempool struct {
@@ -80,6 +84,9 @@ func (m *Mempool) atomicTxGasPrice(tx *Tx) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
+	if gasUsed == 0 {
+		return 0, errNoGasUsed
+	}
 	burned, err := tx.Burned(m.AVAXAssetID)
 	if err != nil {
 		return 0, err
@@ -126,7 +133,12 @@ func (m *Mempool) AddTx(tx *Tx) error {
 			// submitted item, discard the submitted item (we prefer items
 			// already in the mempool).
 			if minGasPrice >= gasPrice {
-				return errInsufficientAtomicTxFee
+				return fmt.Errorf(
+					"%w currentMin=%d provided=%d",
+					errInsufficientAtomicTxFee,
+					minGasPrice,
+					gasPrice,
+				)
 			}
 
 			tx := m.txHeap.PopMin()
