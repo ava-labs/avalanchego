@@ -463,12 +463,32 @@ func TestTooFarAdvanced(t *testing.T) {
 
 	ySlb, err := block.BuildUnsigned(
 		aBlock.ID(),
-		aBlock.Timestamp().Add(proposer.MaxDelay),
+		aBlock.Timestamp().Add(maxSkew),
 		uint64(2000),
 		yBlock.Bytes(),
 	)
 
 	bBlock := postForkBlock{
+		SignedBlock: ySlb,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: yBlock,
+			status:   choices.Processing,
+		},
+	}
+
+	if err = bBlock.Verify(); err != errProposerWindowNotStarted {
+		t.Fatal("should have errored errProposerWindowNotStarted")
+	}
+
+	ySlb, err = block.BuildUnsigned(
+		aBlock.ID(),
+		aBlock.Timestamp().Add(proposer.MaxDelay),
+		uint64(2000),
+		yBlock.Bytes(),
+	)
+
+	bBlock = postForkBlock{
 		SignedBlock: ySlb,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
