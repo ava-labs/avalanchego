@@ -10,9 +10,9 @@ import (
 // txEntry is used to track the [gasPrice] transactions pay to be included in
 // the mempool.
 type txEntry struct {
-	id       ids.ID
-	gasPrice uint64
-	tx       *Tx
+	ID       ids.ID
+	GasPrice uint64
+	Tx       *Tx
 	index    int
 }
 
@@ -34,7 +34,7 @@ func newInternalTxHeap(items int) *internalTxHeap {
 func (th internalTxHeap) Len() int { return len(th.items) }
 
 func (th internalTxHeap) Less(i, j int) bool {
-	return th.items[i].gasPrice > th.items[j].gasPrice
+	return th.items[i].GasPrice > th.items[j].GasPrice
 }
 
 func (th internalTxHeap) Swap(i, j int) {
@@ -45,11 +45,11 @@ func (th internalTxHeap) Swap(i, j int) {
 
 func (th *internalTxHeap) Push(x interface{}) {
 	entry := x.(*txEntry)
-	if th.Has(entry.id) {
+	if th.Has(entry.ID) {
 		return
 	}
 	th.items = append(th.items, entry)
-	th.lookup[entry.id] = entry
+	th.lookup[entry.ID] = entry
 }
 
 func (th *internalTxHeap) Pop() interface{} {
@@ -57,7 +57,7 @@ func (th *internalTxHeap) Pop() interface{} {
 	item := th.items[n-1]
 	th.items[n-1] = nil // avoid memory leak
 	th.items = th.items[0 : n-1]
-	delete(th.lookup, item.id)
+	delete(th.lookup, item.ID)
 	return item
 }
 
@@ -116,7 +116,7 @@ func (th *txHeap) Get(id ids.ID) (*Tx, bool) {
 	if !ok {
 		return nil, false
 	}
-	return txEntry.tx, true
+	return txEntry.Tx, true
 }
 
 func (th *txHeap) Has(id ids.ID) bool {

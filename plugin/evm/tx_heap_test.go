@@ -38,9 +38,9 @@ func TestTxHeap(t *testing.T) {
 
 	t.Run("add/remove single entry", func(t *testing.T) {
 		h.Push(&txEntry{
-			id:       id0,
-			gasPrice: 5,
-			tx:       tx0,
+			ID:       id0,
+			GasPrice: 5,
+			Tx:       tx0,
 		})
 		assert.True(h.Has(id0))
 		gTx0, gHas0 := h.Get(id0)
@@ -50,9 +50,9 @@ func TestTxHeap(t *testing.T) {
 		assert.False(h.Has(id0))
 		assert.Zero(h.Len())
 		h.Push(&txEntry{
-			id:       id0,
-			gasPrice: 5,
-			tx:       tx0,
+			ID:       id0,
+			GasPrice: 5,
+			Tx:       tx0,
 		})
 		assert.True(h.Has(id0))
 		assert.Equal(1, h.Len())
@@ -60,9 +60,9 @@ func TestTxHeap(t *testing.T) {
 
 	t.Run("add other items", func(t *testing.T) {
 		h.Push(&txEntry{
-			id:       id1,
-			gasPrice: 10,
-			tx:       tx1,
+			ID:       id1,
+			GasPrice: 10,
+			Tx:       tx1,
 		})
 		assert.True(h.Has(id1))
 		gTx1, gHas1 := h.Get(id1)
@@ -70,18 +70,18 @@ func TestTxHeap(t *testing.T) {
 		assert.True(gHas1)
 
 		h.Push(&txEntry{
-			id:       id2,
-			gasPrice: 2,
-			tx:       tx2,
+			ID:       id2,
+			GasPrice: 2,
+			Tx:       tx2,
 		})
 		assert.True(h.Has(id2))
 		gTx2, gHas2 := h.Get(id2)
 		assert.Equal(tx2, gTx2)
 		assert.True(gHas2)
 
-		assert.Equal(id1, h.Pop().id)
-		assert.Equal(id0, h.Pop().id)
-		assert.Equal(id2, h.Pop().id)
+		assert.Equal(id1, h.Pop().ID)
+		assert.Equal(id0, h.Pop().ID)
+		assert.Equal(id2, h.Pop().ID)
 
 		assert.False(h.Has(id0))
 		gTx0, gHas0 := h.Get(id0)
@@ -101,29 +101,29 @@ func TestTxHeap(t *testing.T) {
 
 	t.Run("drop", func(t *testing.T) {
 		h.Push(&txEntry{
-			id:       id0,
-			gasPrice: 5,
-			tx:       tx0,
+			ID:       id0,
+			GasPrice: 5,
+			Tx:       tx0,
 		})
 		h.Push(&txEntry{
-			id:       id1,
-			gasPrice: 10,
-			tx:       tx1,
+			ID:       id1,
+			GasPrice: 10,
+			Tx:       tx1,
 		})
 		h.Push(&txEntry{
-			id:       id2,
-			gasPrice: 2,
-			tx:       tx2,
+			ID:       id2,
+			GasPrice: 2,
+			Tx:       tx2,
 		})
-		assert.Equal(id2, h.Drop().id)
+		assert.Equal(id2, h.Drop().ID)
 		assert.True(h.Has(id0))
 		assert.True(h.Has(id1))
 		assert.False(h.Has(id2))
-		assert.Equal(id0, h.Drop().id)
+		assert.Equal(id0, h.Drop().ID)
 		assert.False(h.Has(id0))
 		assert.True(h.Has(id1))
 		assert.False(h.Has(id2))
-		assert.Equal(id1, h.Drop().id)
+		assert.Equal(id1, h.Drop().ID)
 		assert.False(h.Has(id0))
 		assert.False(h.Has(id1))
 		assert.False(h.Has(id2))
