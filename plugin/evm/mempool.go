@@ -125,6 +125,8 @@ func (m *Mempool) AddTx(tx *Tx) error {
 			m.utxoSet.Remove(txEntry.tx.InputUTXOs().List()...)
 			m.discardedTxs.Evict(txEntry.id)
 		} else {
+			// This could occur if we have used our entire size allowance on
+			// transactions that are currently processing.
 			return errTooManyAtomicTx
 		}
 	}
