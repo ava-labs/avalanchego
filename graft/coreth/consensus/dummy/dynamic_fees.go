@@ -258,7 +258,7 @@ func calcBlockGasCost(
 ) *big.Int {
 	// Handle AP3/AP4 boundary by returning the minimum value as the boundary.
 	if parentBlockGasCost == nil {
-		return minBlockGasCost
+		return new(big.Int).Set(minBlockGasCost)
 	}
 
 	// Treat an invalid parent/current time combination as 0 elapsed time.
