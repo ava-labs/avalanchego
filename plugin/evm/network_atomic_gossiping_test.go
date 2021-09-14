@@ -18,9 +18,8 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/message"
 )
 
-// getValidTx returns 2 transactions that conflict with each other (both valid)
-// TODO: change to getValidImportTx
-func getValidTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) (*Tx, *Tx) {
+// getValidImportTx returns 2 transactions that conflict with each other (both valid)
+func getValidImportTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) (*Tx, *Tx) {
 	importAmount := uint64(50000000)
 	utxoID := avax.UTXOID{
 		TxID: ids.ID{
@@ -72,8 +71,7 @@ func getValidTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) (*Tx, *Tx) {
 	return importTx, importTx2
 }
 
-// getValidTx returns 2 transactions that conflict with each other (both valid)
-// TODO: change to getValidImportTx
+// getValidExportTx returns 2 transactions that conflict with each other (both valid)
 func getValidExportTx(vm *VM, issuer chan common.Message, sharedMemory *atomic.Memory, t *testing.T) (*Tx, *Tx) {
 	importAmount := uint64(50000000)
 	utxoID := avax.UTXOID{
@@ -177,7 +175,7 @@ func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 	}()
 
 	// Create a simple tx
-	tx, conflictingTx := getValidTx(vm, sharedMemory, t)
+	tx, conflictingTx := getValidImportTx(vm, sharedMemory, t)
 
 	var gossiped int
 	sender.CantSendAppGossip = false
@@ -240,7 +238,7 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 	}
 
 	// create a tx
-	tx, conflictingTx := getValidTx(vm, sharedMemory, t)
+	tx, conflictingTx := getValidImportTx(vm, sharedMemory, t)
 
 	// gossip tx and check it is accepted and gossiped
 	msg := message.AtomicTxNotify{
@@ -296,7 +294,7 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 	}
 
 	// create a tx and mark as invalid
-	tx, conflictingTx := getValidTx(vm, sharedMemory, t)
+	tx, conflictingTx := getValidImportTx(vm, sharedMemory, t)
 	txID := tx.ID()
 
 	mempool.AddTx(tx)
