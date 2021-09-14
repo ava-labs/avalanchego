@@ -2,6 +2,7 @@ package evm
 
 import (
 	"container/heap"
+	"sort"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
@@ -16,6 +17,7 @@ type txEntry struct {
 
 // txHeap is used to track pending atomic transactions by [gasPrice]
 type txHeap struct {
+	sort.Interface
 	items  []*txEntry
 	lookup map[ids.ID]*txEntry
 }
@@ -29,13 +31,13 @@ func newTxHeap(items int) *txHeap {
 	return h
 }
 
-func (th *txHeap) Len() int { return len(th.items) }
+func (th txHeap) Len() int { return len(th.items) }
 
-func (th *txHeap) Less(i, j int) bool {
+func (th txHeap) Less(i, j int) bool {
 	return th.items[i].gasPrice < th.items[j].gasPrice
 }
 
-func (th *txHeap) Swap(i, j int) {
+func (th txHeap) Swap(i, j int) {
 	th.items[i], th.items[j] = th.items[j], th.items[i]
 }
 
