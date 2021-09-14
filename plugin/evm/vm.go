@@ -105,7 +105,7 @@ var (
 	errUnsupportedFXs                 = errors.New("unsupported feature extensions")
 	errInvalidBlock                   = errors.New("invalid block")
 	errInvalidAddr                    = errors.New("invalid hex address")
-	errTooManyAtomicTx                = errors.New("too many pending atomic txs")
+	errInsufficientAtomicTxFee        = errors.New("atomic tx fee too low for atomic mempool")
 	errAssetIDMismatch                = errors.New("asset IDs in the input don't match the utxo")
 	errNoImportInputs                 = errors.New("tx has no imported inputs")
 	errInputsNotSortedUnique          = errors.New("inputs not sorted and unique")
@@ -132,6 +132,8 @@ var (
 	errNilBaseFeeApricotPhase3        = errors.New("nil base fee is invalid after apricotPhase3")
 	errNilExtDataGasUsedApricotPhase4 = errors.New("nil extDataGasUsed is invalid after apricotPhase4")
 	errNilBlockGasCostApricotPhase4   = errors.New("nil blockGasCost is invalid after apricotPhase4")
+	errConflictingAtomicTx            = errors.New("conflicting atomic tx present")
+	errTooManyAtomicTx                = errors.New("too many atomic tx")
 	defaultLogLevel                   = log.LvlDebug
 )
 
@@ -315,7 +317,7 @@ func (vm *VM) Initialize(
 	vm.codec = Codec
 
 	// TODO: read size from settings
-	vm.mempool = NewMempool(defaultMempoolSize)
+	vm.mempool = NewMempool(ctx.AVAXAssetID, defaultMempoolSize)
 
 	// Attempt to load last accepted block to determine if it is necessary to
 	// initialize state with the genesis block.
@@ -857,37 +859,36 @@ func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
 func (vm *VM) issueTx(tx *Tx, local bool) error {
 	if err := vm.verifyTxAtTip(tx); err != nil {
 		if !local {
-			// unlike local txes, currently invalid remote txes are recorded as discarded
+			// unlike local txs, invalid remote txs are recorded as discarded
 			// so that they won't be requested again
-			vm.mempool.discardedTxs.Put(tx.ID(), tx)
+			txID := tx.ID()
+			vm.mempool.discardedTxs.Put(txID, tx)
+			log.Debug("failed to verify remote tx being issued to the mempool",
+				"txID", txID,
+				"err", err,
+			)
 			return nil
 		}
-
 		return err
 	}
 
 	// add to mempool and possibly re-gossip
-	switch err := vm.mempool.AddTx(tx); err {
-	case nil:
-		return vm.network.GossipAtomicTx(tx)
-
-	case errTooManyAtomicTx:
+	if err := vm.mempool.AddTx(tx); err != nil {
 		if !local {
-			// tx has not been accepted to mempool due to size
-			// do not gossip since we cannot serve it
-			return nil
-		}
-
-		return errTooManyAtomicTx // backward compatibility for local txs
-
-	default:
-		if !local {
-			// unlike local txes, currently invalid remote txes are recorded as discarded
+			// unlike local txs, invalid remote txs are recorded as discarded
 			// so that they won't be requested again
+			txID := tx.ID()
 			vm.mempool.discardedTxs.Put(tx.ID(), tx)
+			log.Debug("failed to issue remote tx to mempool",
+				"txID", txID,
+				"err", err,
+			)
+			return nil
 		}
 		return err
 	}
+
+	return vm.network.GossipAtomicTx(tx)
 }
 
 // verifyTxAtTip verifies that [tx] is valid to be issued on top of the currently preferred block

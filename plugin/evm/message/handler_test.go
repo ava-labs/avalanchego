@@ -12,41 +12,41 @@ import (
 )
 
 type CounterHandler struct {
-	AtomicTxNotify, EthTxsNotify int
+	AtomicTx, EthTxs int
 }
 
-func (h *CounterHandler) HandleAtomicTxNotify(ids.ShortID, uint32, *AtomicTxNotify) error {
-	h.AtomicTxNotify++
+func (h *CounterHandler) HandleAtomicTx(ids.ShortID, uint32, *AtomicTx) error {
+	h.AtomicTx++
 	return nil
 }
 
-func (h *CounterHandler) HandleEthTxsNotify(ids.ShortID, uint32, *EthTxsNotify) error {
-	h.EthTxsNotify++
+func (h *CounterHandler) HandleEthTxs(ids.ShortID, uint32, *EthTxs) error {
+	h.EthTxs++
 	return nil
 }
 
-func TestHandleAtomicTxNotify(t *testing.T) {
+func TestHandleAtomicTx(t *testing.T) {
 	assert := assert.New(t)
 
 	handler := CounterHandler{}
-	msg := AtomicTxNotify{}
+	msg := AtomicTx{}
 
 	err := msg.Handle(&handler, ids.ShortEmpty, 0)
 	assert.NoError(err)
-	assert.Equal(1, handler.AtomicTxNotify)
-	assert.Zero(handler.EthTxsNotify)
+	assert.Equal(1, handler.AtomicTx)
+	assert.Zero(handler.EthTxs)
 }
 
-func TestHandleEthTxsNotify(t *testing.T) {
+func TestHandleEthTxs(t *testing.T) {
 	assert := assert.New(t)
 
 	handler := CounterHandler{}
-	msg := EthTxsNotify{}
+	msg := EthTxs{}
 
 	err := msg.Handle(&handler, ids.ShortEmpty, 0)
 	assert.NoError(err)
-	assert.Zero(handler.AtomicTxNotify)
-	assert.Equal(1, handler.EthTxsNotify)
+	assert.Zero(handler.AtomicTx)
+	assert.Equal(1, handler.EthTxs)
 }
 
 func TestNoopHandler(t *testing.T) {
@@ -54,9 +54,9 @@ func TestNoopHandler(t *testing.T) {
 
 	handler := NoopHandler{}
 
-	err := handler.HandleAtomicTxNotify(ids.ShortEmpty, 0, nil)
+	err := handler.HandleAtomicTx(ids.ShortEmpty, 0, nil)
 	assert.NoError(err)
 
-	err = handler.HandleEthTxsNotify(ids.ShortEmpty, 0, nil)
+	err = handler.HandleEthTxs(ids.ShortEmpty, 0, nil)
 	assert.NoError(err)
 }

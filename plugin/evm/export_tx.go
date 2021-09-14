@@ -15,7 +15,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ethereum/go-ethereum/common"
@@ -37,8 +39,19 @@ type UnsignedExportTx struct {
 	ExportedOutputs []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
 }
 
-// InputUTXOs returns an empty set
-func (tx *UnsignedExportTx) InputUTXOs() ids.Set { return ids.Set{} }
+// InputUTXOs returns a set of all the hash(address:nonce) exporting funds.
+func (tx *UnsignedExportTx) InputUTXOs() ids.Set {
+	set := ids.NewSet(len(tx.Ins))
+	for _, in := range tx.Ins {
+		packer := wrappers.Packer{
+			Bytes: make([]byte, wrappers.LongLen+common.AddressLength),
+		}
+		packer.PackLong(in.Nonce)
+		packer.PackBytes(in.Address.Bytes())
+		set.Add(hashing.ComputeHash256Array(packer.Bytes))
+	}
+	return set
+}
 
 // Verify this transaction is well-formed
 func (tx *UnsignedExportTx) Verify(

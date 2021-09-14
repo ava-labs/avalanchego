@@ -109,7 +109,7 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 			notifyMsgIntf, err := message.Parse(gossipedBytes)
 			assert.NoError(err)
 
-			requestMsg, ok := notifyMsgIntf.(*message.EthTxsNotify)
+			requestMsg, ok := notifyMsgIntf.(*message.EthTxs)
 			assert.True(ok)
 			assert.NotEmpty(requestMsg.Txs)
 
@@ -127,7 +127,7 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 			notifyMsgIntf, err := message.Parse(gossipedBytes)
 			assert.NoError(err)
 
-			requestMsg, ok := notifyMsgIntf.(*message.EthTxsNotify)
+			requestMsg, ok := notifyMsgIntf.(*message.EthTxs)
 			assert.True(ok)
 			assert.NotEmpty(requestMsg.Txs)
 
@@ -195,7 +195,7 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 			notifyMsgIntf, err := message.Parse(gossipedBytes)
 			assert.NoError(err)
 
-			requestMsg, ok := notifyMsgIntf.(*message.EthTxsNotify)
+			requestMsg, ok := notifyMsgIntf.(*message.EthTxs)
 			assert.True(ok)
 			assert.NotEmpty(requestMsg.Txs)
 
@@ -210,7 +210,7 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 			notifyMsgIntf, err := message.Parse(gossipedBytes)
 			assert.NoError(err)
 
-			requestMsg, ok := notifyMsgIntf.(*message.EthTxsNotify)
+			requestMsg, ok := notifyMsgIntf.(*message.EthTxs)
 			assert.True(ok)
 			assert.NotEmpty(requestMsg.Txs)
 
@@ -277,7 +277,7 @@ func TestMempoolEthTxsAppGossipHandling(t *testing.T) {
 	// show that unknown coreth hashes is requested
 	txBytes, err := rlp.EncodeToBytes([]*types.Transaction{tx})
 	assert.NoError(err)
-	msg := message.EthTxsNotify{
+	msg := message.EthTxs{
 		Txs: txBytes,
 	}
 	msgBytes, err := message.Build(&msg)

@@ -144,7 +144,7 @@ func (n *pushNetwork) GossipAtomicTx(tx *Tx) error {
 	}
 	n.recentAtomicTxs.Put(txID, nil)
 
-	msg := message.AtomicTxNotify{
+	msg := message.AtomicTx{
 		Tx: tx.Bytes(),
 	}
 	msgBytes, err := message.Build(&msg)
@@ -159,7 +159,7 @@ func (n *pushNetwork) GossipAtomicTx(tx *Tx) error {
 	return n.appSender.SendAppGossip(msgBytes)
 }
 
-func (n *pushNetwork) sendEthTxsNotify(txs []*types.Transaction) error {
+func (n *pushNetwork) sendEthTxs(txs []*types.Transaction) error {
 	if len(txs) == 0 {
 		return nil
 	}
@@ -173,7 +173,7 @@ func (n *pushNetwork) sendEthTxsNotify(txs []*types.Transaction) error {
 		)
 		return nil
 	}
-	msg := message.EthTxsNotify{
+	msg := message.EthTxs{
 		Txs: txBytes,
 	}
 	msgBytes, err := message.Build(&msg)
@@ -229,7 +229,7 @@ func (n *pushNetwork) GossipEthTxs(txs []*types.Transaction) error {
 	for _, tx := range selectedTxs {
 		size := tx.Size()
 		if msgTxsSize+size > message.EthMsgSoftCapSize {
-			if err := n.sendEthTxsNotify(msgTxs); err != nil {
+			if err := n.sendEthTxs(msgTxs); err != nil {
 				return err
 			}
 			msgTxs = msgTxs[:0]
@@ -240,7 +240,7 @@ func (n *pushNetwork) GossipEthTxs(txs []*types.Transaction) error {
 	}
 
 	// Send any remaining [msgTxs]
-	return n.sendEthTxsNotify(msgTxs)
+	return n.sendEthTxs(msgTxs)
 }
 
 func (n *pushNetwork) handle(
@@ -279,15 +279,15 @@ type GossipHandler struct {
 	net *pushNetwork
 }
 
-func (h *GossipHandler) HandleAtomicTxNotify(nodeID ids.ShortID, _ uint32, msg *message.AtomicTxNotify) error {
+func (h *GossipHandler) HandleAtomicTx(nodeID ids.ShortID, _ uint32, msg *message.AtomicTx) error {
 	log.Debug(
-		"AppGossip called with AtomicTxNotify",
+		"AppGossip called with AtomicTx",
 		"peerID", nodeID,
 	)
 
 	if len(msg.Tx) == 0 {
 		log.Debug(
-			"AppGossip received empty AtomicTxNotify Message",
+			"AppGossip received empty AtomicTx Message",
 			"peerID", nodeID,
 		)
 		return nil
@@ -329,16 +329,16 @@ func (h *GossipHandler) HandleAtomicTxNotify(nodeID ids.ShortID, _ uint32, msg *
 	return nil
 }
 
-func (h *GossipHandler) HandleEthTxsNotify(nodeID ids.ShortID, _ uint32, msg *message.EthTxsNotify) error {
+func (h *GossipHandler) HandleEthTxs(nodeID ids.ShortID, _ uint32, msg *message.EthTxs) error {
 	log.Debug(
-		"AppGossip called with EthTxsNotify",
+		"AppGossip called with EthTxs",
 		"peerID", nodeID,
 		"size(txs)", len(msg.Txs),
 	)
 
 	if len(msg.Txs) == 0 {
 		log.Debug(
-			"AppGossip received empty EthTxsNotify Message",
+			"AppGossip received empty EthTxs Message",
 			"peerID", nodeID,
 		)
 		return nil
