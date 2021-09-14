@@ -356,6 +356,9 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 		uint64(2000),
 		yBlock.Bytes(),
 	)
+	if err != nil {
+		t.Fatalf("fail to manually build a block due to %s", err)
+	}
 
 	bBlock := postForkBlock{
 		SignedBlock: ySlb,
@@ -467,6 +470,9 @@ func TestTooFarAdvanced(t *testing.T) {
 		uint64(2000),
 		yBlock.Bytes(),
 	)
+	if err != nil {
+		t.Fatalf("fail to manually build a block due to %s", err)
+	}
 
 	bBlock := postForkBlock{
 		SignedBlock: ySlb,
@@ -487,6 +493,10 @@ func TestTooFarAdvanced(t *testing.T) {
 		uint64(2000),
 		yBlock.Bytes(),
 	)
+
+	if err != nil {
+		t.Fatalf("fail to manually build a block due to %s", err)
+	}
 
 	bBlock = postForkBlock{
 		SignedBlock: ySlb,
