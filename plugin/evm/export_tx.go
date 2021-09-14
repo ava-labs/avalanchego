@@ -39,8 +39,7 @@ type UnsignedExportTx struct {
 	ExportedOutputs []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
 }
 
-// InputUTXOs returns the address:nonce set of inputs. This is used to ensure
-// the atomic mempool does not contain any conflicting transactions.
+// InputUTXOs returns a set of all the hash(address:nonce) exporting funds.
 func (tx *UnsignedExportTx) InputUTXOs() ids.Set {
 	set := ids.NewSet(len(tx.Ins))
 	for _, in := range tx.Ins {
