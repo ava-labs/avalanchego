@@ -109,7 +109,7 @@ func (m *Mempool) AddTx(tx *Tx) error {
 	// Add tx to heap sorted by gasPrice
 	gasPrice, err := m.atomicTxGasPrice(tx)
 	if err != nil {
-		return errInvalidAtomicTxFee
+		return err
 	}
 	if m.length() >= m.maxSize {
 		if m.txHeap.Len() > 0 {
@@ -189,8 +189,8 @@ func (m *Mempool) GetTx(txID ids.ID) (*Tx, bool, bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	if tx, ok := m.txHeap.Get(txID); ok {
-		return tx, false, true
+	if txEntry, ok := m.txHeap.Get(txID); ok {
+		return txEntry.Tx, false, true
 	}
 	if tx, ok := m.issuedTxs[txID]; ok {
 		return tx, false, true
@@ -281,8 +281,8 @@ func (m *Mempool) RemoveTx(txID ids.ID) {
 		removedTx = m.currentTx
 		m.currentTx = nil
 	}
-	if tx, ok := m.txHeap.Get(txID); ok {
-		removedTx = tx
+	if txEntry, ok := m.txHeap.Get(txID); ok {
+		removedTx = txEntry.Tx
 		m.txHeap.Remove(txID)
 	}
 	if tx, ok := m.issuedTxs[txID]; ok {

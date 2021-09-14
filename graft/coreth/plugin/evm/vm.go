@@ -133,7 +133,6 @@ var (
 	errNilExtDataGasUsedApricotPhase4 = errors.New("nil extDataGasUsed is invalid after apricotPhase4")
 	errNilBlockGasCostApricotPhase4   = errors.New("nil blockGasCost is invalid after apricotPhase4")
 	errConflictingAtomicTx            = errors.New("conflicting atomic tx present")
-	errInvalidAtomicTxFee             = errors.New("invalid atomic tx fee")
 	errTooManyAtomicTx                = errors.New("too many atomic tx")
 	defaultLogLevel                   = log.LvlDebug
 )
@@ -860,6 +859,7 @@ func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
 func (vm *VM) issueTx(tx *Tx, local bool) error {
 	if err := vm.verifyTxAtTip(tx); err != nil {
 		if !local {
+			// TODO: add log with err (@stephen)
 			// unlike local txs, invalid remote txs are recorded as discarded
 			// so that they won't be requested again
 			vm.mempool.discardedTxs.Put(tx.ID(), tx)
@@ -871,6 +871,7 @@ func (vm *VM) issueTx(tx *Tx, local bool) error {
 	// add to mempool and possibly re-gossip
 	if err := vm.mempool.AddTx(tx); err != nil {
 		if !local {
+			// TODO: add log with err (@stephen)
 			// unlike local txs, invalid remote txs are recorded as discarded
 			// so that they won't be requested again
 			vm.mempool.discardedTxs.Put(tx.ID(), tx)

@@ -94,6 +94,7 @@ func (th *txHeap) Push(e *txEntry) {
 }
 
 // Assumes there is non-zero items in [txHeap]
+// TODO: need to remove this and replace with min-max heap (@Stephen)
 func (th *txHeap) Drop() *txEntry {
 	var (
 		n = th.Len()
@@ -133,12 +134,12 @@ func (th *txHeap) Len() int {
 	return th.internalTxHeap.Len()
 }
 
-func (th *txHeap) Get(id ids.ID) (*Tx, bool) {
+func (th *txHeap) Get(id ids.ID) (*txEntry, bool) {
 	txEntry, ok := th.internalTxHeap.Get(id)
 	if !ok {
 		return nil, false
 	}
-	return txEntry.Tx, true
+	return txEntry, true
 }
 
 func (th *txHeap) Has(id ids.ID) bool {
