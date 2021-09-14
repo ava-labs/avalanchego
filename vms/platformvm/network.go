@@ -114,7 +114,6 @@ func (n *network) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
 			nodeID.PrefixedString(constants.NodeIDPrefix),
 			err,
 		)
-		return nil
 	}
 	return nil
 }
