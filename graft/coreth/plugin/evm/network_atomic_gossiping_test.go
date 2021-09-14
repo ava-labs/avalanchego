@@ -311,7 +311,7 @@ func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 	}()
 
 	// Create a simple tx
-	tx, _ := getValidTx(vm, sharedMemory, t)
+	tx, conflictingTx := getValidTx(vm, sharedMemory, t)
 
 	var gossiped int
 	sender.CantSendAppGossip = false
@@ -340,6 +340,10 @@ func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 
 	// Test hash on retry
 	assert.NoError(vm.network.GossipAtomicTx(tx))
+	assert.Equal(1, gossiped)
+
+	// Attempt to gossip conflicting tx
+	assert.ErrorIs(vm.issueTx(conflictingTx, true /*=local*/), errConflictingAtomicTx)
 	assert.Equal(1, gossiped)
 }
 
@@ -370,7 +374,7 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 	}
 
 	// create a tx
-	tx, _ := getValidTx(vm, sharedMemory, t)
+	tx, conflictingTx := getValidTx(vm, sharedMemory, t)
 
 	// gossip tx and check it is accepted and gossiped
 	msg := message.AtomicTxNotify{
@@ -379,13 +383,26 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 	msgBytes, err := message.Build(&msg)
 	assert.NoError(err)
 
-	// show that unknown txID is requested
+	// show that no txID is requested
 	assert.NoError(vm.AppGossip(nodeID, msgBytes))
 	assert.False(txRequested, "tx should not have been requested")
 	assert.Equal(1, txGossiped, "tx should have been gossiped")
+	assert.True(vm.mempool.has(tx.ID()))
 
+	// show that tx is not re-gossiped
 	assert.NoError(vm.AppGossip(nodeID, msgBytes))
 	assert.Equal(1, txGossiped, "tx should have only been gossiped once")
+
+	// show that conflicting tx is not added to mempool
+	msg = message.AtomicTxNotify{
+		Tx: conflictingTx.Bytes(),
+	}
+	msgBytes, err = message.Build(&msg)
+	assert.NoError(err)
+	assert.NoError(vm.AppGossip(nodeID, msgBytes))
+	assert.False(txRequested, "tx should not have been requested")
+	assert.Equal(1, txGossiped, "tx should not have been gossiped")
+	assert.False(vm.mempool.has(conflictingTx.ID()), "conflicting tx should not be in the atomic mempool")
 }
 
 // show that txs already marked as invalid are not re-requested on gossiping
