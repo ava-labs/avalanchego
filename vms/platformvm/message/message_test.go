@@ -6,33 +6,11 @@ package message
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
 
 	"github.com/stretchr/testify/assert"
 )
-
-func TestTxNotify(t *testing.T) {
-	assert := assert.New(t)
-
-	txID := ids.GenerateTestID()
-	builtMsg := TxNotify{
-		TxID: txID,
-	}
-	builtMsgBytes, err := Build(&builtMsg)
-	assert.NoError(err)
-	assert.Equal(builtMsgBytes, builtMsg.Bytes())
-
-	parsedMsgIntf, err := Parse(builtMsgBytes)
-	assert.NoError(err)
-	assert.Equal(builtMsgBytes, parsedMsgIntf.Bytes())
-
-	parsedMsg, ok := parsedMsgIntf.(*TxNotify)
-	assert.True(ok)
-
-	assert.Equal(txID, parsedMsg.TxID)
-}
 
 func TestTx(t *testing.T) {
 	assert := assert.New(t)
