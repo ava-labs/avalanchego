@@ -14,15 +14,15 @@ import (
 
 const (
 	// EthMsgSoftCapSize is the ideal size of encoded transaction bytes we send in
-	// any [EthTxsNotify] or [EthTxs] message. We do not limit inbound messages
-	// to this size, however. Max inbound message size is enforced by the codec
+	// any [EthTxs] or [EthTxs] message. We do not limit inbound messages to
+	// this size, however. Max inbound message size is enforced by the codec
 	// (512KB).
 	EthMsgSoftCapSize = common.StorageSize(64 * units.KiB)
 )
 
 var (
-	_ Message = &AtomicTxNotify{}
-	_ Message = &EthTxsNotify{}
+	_ Message = &AtomicTx{}
+	_ Message = &EthTxs{}
 
 	errUnexpectedCodecVersion = errors.New("unexpected codec version")
 )
@@ -45,24 +45,24 @@ type message []byte
 func (m *message) initialize(bytes []byte) { *m = bytes }
 func (m *message) Bytes() []byte           { return *m }
 
-type AtomicTxNotify struct {
+type AtomicTx struct {
 	message
 
 	Tx []byte `serialize:"true"`
 }
 
-func (msg *AtomicTxNotify) Handle(handler Handler, nodeID ids.ShortID, requestID uint32) error {
-	return handler.HandleAtomicTxNotify(nodeID, requestID, msg)
+func (msg *AtomicTx) Handle(handler Handler, nodeID ids.ShortID, requestID uint32) error {
+	return handler.HandleAtomicTx(nodeID, requestID, msg)
 }
 
-type EthTxsNotify struct {
+type EthTxs struct {
 	message
 
 	Txs []byte `serialize:"true"`
 }
 
-func (msg *EthTxsNotify) Handle(handler Handler, nodeID ids.ShortID, requestID uint32) error {
-	return handler.HandleEthTxsNotify(nodeID, requestID, msg)
+func (msg *EthTxs) Handle(handler Handler, nodeID ids.ShortID, requestID uint32) error {
+	return handler.HandleEthTxs(nodeID, requestID, msg)
 }
 
 func Parse(bytes []byte) (Message, error) {

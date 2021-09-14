@@ -12,18 +12,18 @@ import (
 var _ Handler = NoopHandler{}
 
 type Handler interface {
-	HandleAtomicTxNotify(nodeID ids.ShortID, requestID uint32, msg *AtomicTxNotify) error
-	HandleEthTxsNotify(nodeID ids.ShortID, requestID uint32, msg *EthTxsNotify) error
+	HandleAtomicTx(nodeID ids.ShortID, requestID uint32, msg *AtomicTx) error
+	HandleEthTxs(nodeID ids.ShortID, requestID uint32, msg *EthTxs) error
 }
 
 type NoopHandler struct{}
 
-func (NoopHandler) HandleAtomicTxNotify(nodeID ids.ShortID, requestID uint32, _ *AtomicTxNotify) error {
-	log.Debug("dropping unexpected AtomicTxNotify message", "peerID", nodeID, "requestID", requestID)
+func (NoopHandler) HandleAtomicTx(nodeID ids.ShortID, requestID uint32, _ *AtomicTx) error {
+	log.Debug("dropping unexpected AtomicTx message", "peerID", nodeID, "requestID", requestID)
 	return nil
 }
 
-func (NoopHandler) HandleEthTxsNotify(nodeID ids.ShortID, requestID uint32, _ *EthTxsNotify) error {
-	log.Debug("dropping unexpected EthTxsNotify message", "peerID", nodeID, "requestID", requestID)
+func (NoopHandler) HandleEthTxs(nodeID ids.ShortID, requestID uint32, _ *EthTxs) error {
+	log.Debug("dropping unexpected EthTxs message", "peerID", nodeID, "requestID", requestID)
 	return nil
 }
