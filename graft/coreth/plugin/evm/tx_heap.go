@@ -1,6 +1,8 @@
 package evm
 
 import (
+	"container/heap"
+
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -15,14 +17,16 @@ type txEntry struct {
 // txHeap is used to track pending atomic transactions by [gasPrice]
 type txHeap struct {
 	items  []*txEntry
-	lookup map[ids.ID]int
+	lookup map[ids.ID]*txEntry
 }
 
 func newTxHeap(items int) *txHeap {
-	return &txHeap{
+	h := &txHeap{
 		items:  make([]*txEntry, 0, items),
-		lookup: map[ids.ID]int{},
+		lookup: map[ids.ID]*txEntry{},
 	}
+	heap.Init(h)
+	return h
 }
 
 func (th *txHeap) Len() int { return len(th.items) }
@@ -33,15 +37,15 @@ func (th *txHeap) Less(i, j int) bool {
 
 func (th *txHeap) Swap(i, j int) {
 	th.items[i], th.items[j] = th.items[j], th.items[i]
-	th.lookup[th.items[i].id] = i
-	th.lookup[th.items[j].id] = j
 }
 
 func (th *txHeap) Push(x interface{}) {
-	n := len(th.items)
-	rec := x.(*txEntry)
-	th.items = append(th.items, rec)
-	th.lookup[rec.id] = n
+	entry := x.(*txEntry)
+	if th.Has(entry.id) {
+		return
+	}
+	th.items = append(th.items, entry)
+	th.lookup[entry.id] = entry
 }
 
 func (th *txHeap) Pop() interface{} {
@@ -61,21 +65,30 @@ func (th *txHeap) Drop() *txEntry {
 	return item
 }
 
+// Remove is an expensive operation (worst case O(n)) and should be done
+// sparingly.
 func (th *txHeap) Remove(id ids.ID) {
-	index, ok := th.lookup[id]
+	_, ok := th.lookup[id]
 	if !ok {
 		return
 	}
 	delete(th.lookup, id)
-	th.items = append(th.items[0:index], th.items[index+1:]...)
+
+	for i, item := range th.items {
+		if item.id == id {
+			th.items[i] = nil
+			th.items = append(th.items[0:i], th.items[i+1:]...)
+			return
+		}
+	}
 }
 
 func (th *txHeap) Get(id ids.ID) (*Tx, bool) {
-	index, ok := th.lookup[id]
+	entry, ok := th.lookup[id]
 	if !ok {
 		return nil, false
 	}
-	return th.items[index].tx, true
+	return entry.tx, true
 }
 
 func (th *txHeap) Has(id ids.ID) bool {
