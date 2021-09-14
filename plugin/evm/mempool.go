@@ -167,7 +167,7 @@ func (m *Mempool) NextTx() (*Tx, bool) {
 	// We include atomic transactions in blocks sorted by the [gasPrice] they
 	// pay.
 	if m.txHeap.Len() > 0 {
-		tx := m.txHeap.Pop().(*txEntry).tx
+		tx := m.txHeap.Pop().tx
 		m.currentTx = tx
 		return tx, true
 	}
