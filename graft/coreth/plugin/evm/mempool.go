@@ -106,6 +106,22 @@ func (m *Mempool) AddTx(tx *Tx) error {
 		return nil
 	}
 
+	// If the transaction was recently discarded, log the event and evict from
+	// discarded transactions so it's not in two places within the mempool.
+	// We allow the transaction to be re-issued since it may have been invalid
+	// due to an atomic UTXO not being present yet.
+	if _, has := m.discardedTxs.Get(txID); has {
+		log.Debug("Adding recently discarded transaction %s back to the mempool", txID)
+		m.discardedTxs.Evict(txID)
+	}
+
+	// Check if the submitted transaction's UTXOs conflict with what is already
+	// in the mempool
+	utxoSet := tx.InputUTXOs()
+	if overlaps := m.utxoSet.Overlaps(utxoSet); overlaps {
+		return errConflictingAtomicTx
+	}
+
 	// Add tx to heap sorted by gasPrice
 	gasPrice, err := m.atomicTxGasPrice(tx)
 	if err != nil {
@@ -116,8 +132,8 @@ func (m *Mempool) AddTx(tx *Tx) error {
 			// Get the lowest price item from [txHeap]
 			_, minGasPrice := m.txHeap.PeekMin()
 			// If the [gasPrice] of the lowest item is >= the [gasPrice] of the
-			// submitted item, discard the submitted item (we prefer items already in
-			// the mempool).
+			// submitted item, discard the submitted item (we prefer items
+			// already in the mempool).
 			if minGasPrice >= gasPrice {
 				return errInsufficientAtomicTxFee
 			}
@@ -130,22 +146,6 @@ func (m *Mempool) AddTx(tx *Tx) error {
 			// transactions that are currently processing.
 			return errTooManyAtomicTx
 		}
-	}
-
-	// Check if the submitted transaction's UTXOs conflict with what is already
-	// in the mempool
-	utxoSet := tx.InputUTXOs()
-	if overlaps := m.utxoSet.Overlaps(utxoSet); overlaps {
-		return errConflictingAtomicTx
-	}
-
-	// If the transaction was recently discarded, log the event and evict from
-	// discarded transactions so it's not in two places within the mempool.
-	// We allow the transaction to be re-issued since it may have been invalid due
-	// to an atomic UTXO not being present yet.
-	if _, has := m.discardedTxs.Get(txID); has {
-		log.Debug("Adding recently discarded transaction %s back to the mempool", txID)
-		m.discardedTxs.Evict(txID)
 	}
 
 	// Add the transaction to the [txHeap] so we can evaluate new entries based
