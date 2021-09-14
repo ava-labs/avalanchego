@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
@@ -303,5 +304,180 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 	}
 	if err := opts[1].Verify(); err == nil {
 		t.Fatal("option 1 has invalid parent, should not verify")
+	}
+}
+
+//       G
+//     /    \
+//   A(X)   B(Y)
+//           |
+//          C(Z)
+func TestTwoForks_OneIsAccepted(t *testing.T) {
+	forkTime := time.Unix(0, 0)
+	coreVM, _, proVM, gBlock := initTestProposerVM(t, forkTime, 0)
+
+	// create pre-fork block X and post-fork block A
+	xBlock := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    gBlock.ID(),
+		HeightV:    gBlock.Height() + 1,
+		TimestampV: gBlock.Timestamp(),
+	}
+
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return xBlock, nil }
+	aBlock, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatalf("proposerVM could not build block due to %s", err)
+	}
+	coreVM.BuildBlockF = nil
+	if err := aBlock.Verify(); err != nil {
+		t.Fatalf("could not verify valid block due to %s", err)
+	}
+
+	// use a different way to constrcut pre-fork block Y and post-fork block B
+	yBlock := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{2},
+		ParentV:    gBlock.ID(),
+		HeightV:    gBlock.Height() + 1,
+		TimestampV: gBlock.Timestamp(),
+	}
+
+	ySlb, err := block.BuildUnsigned(
+		gBlock.ID(),
+		gBlock.Timestamp(),
+		uint64(2000),
+		yBlock.Bytes(),
+	)
+
+	bBlock := postForkBlock{
+		SignedBlock: ySlb,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: yBlock,
+			status:   choices.Processing,
+		},
+	}
+
+	if err := bBlock.Verify(); err != nil {
+		t.Fatalf("could not verify valid block due to %s", err)
+	}
+
+	// append Z/C to Y/B
+	zBlock := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{3},
+		ParentV:    yBlock.ID(),
+		HeightV:    yBlock.Height() + 1,
+		TimestampV: yBlock.Timestamp(),
+	}
+
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return zBlock, nil }
+	if err := proVM.SetPreference(bBlock.ID()); err != nil {
+		t.Fatal(err)
+	}
+	cBlock, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatalf("proposerVM could not build block due to %s", err)
+	}
+	coreVM.BuildBlockF = nil
+
+	if aBlock.Parent() != bBlock.Parent() ||
+		zBlock.Parent() != yBlock.ID() ||
+		cBlock.Parent() != bBlock.ID() {
+		t.Fatal("inconsistent parent")
+	}
+
+	if yBlock.Status() == choices.Rejected {
+		t.Fatal("yBlock should not be rejected")
+	}
+
+	// accept A
+	if err := aBlock.Accept(); err != nil {
+		t.Fatalf("could not accept valid block due to %s", err)
+	}
+
+	if xBlock.Status() != choices.Accepted {
+		t.Fatal("xBlock should be accepted because aBlock is accepted")
+	}
+
+	if yBlock.Status() != choices.Rejected {
+		t.Fatal("yBlock should be rejected")
+	}
+	if err := bBlock.Accept(); err == nil {
+		t.Fatalf("should not be able to accept bBlock because aBlock is accepted")
+	}
+	if err := cBlock.Reject(); err != nil {
+		t.Fatalf("fail to reject cBlock: %s", err)
+	}
+
+	if zBlock.Status() != choices.Processing {
+		t.Fatal("zBlock should not be rejected")
+	}
+}
+
+func TestTooFarAdvanced(t *testing.T) {
+	forkTime := time.Unix(0, 0)
+	coreVM, _, proVM, gBlock := initTestProposerVM(t, forkTime, 0)
+
+	xBlock := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    gBlock.ID(),
+		HeightV:    gBlock.Height() + 1,
+		TimestampV: gBlock.Timestamp(),
+	}
+
+	yBlock := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{2},
+		ParentV:    xBlock.ID(),
+		HeightV:    xBlock.Height() + 1,
+		TimestampV: xBlock.Timestamp(),
+	}
+
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return xBlock, nil }
+	aBlock, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatalf("proposerVM could not build block due to %s", err)
+	}
+	if err := aBlock.Verify(); err != nil {
+		t.Fatalf("could not verify valid block due to %s", err)
+	}
+
+	ySlb, err := block.BuildUnsigned(
+		aBlock.ID(),
+		aBlock.Timestamp().Add(proposer.MaxDelay),
+		uint64(2000),
+		yBlock.Bytes(),
+	)
+
+	bBlock := postForkBlock{
+		SignedBlock: ySlb,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: yBlock,
+			status:   choices.Processing,
+		},
+	}
+
+	if err = bBlock.Verify(); err != errTimeTooAdvanced {
+		t.Fatal("should have errored errTimeTooAdvanced")
 	}
 }
