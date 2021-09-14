@@ -84,6 +84,7 @@ func newTxHeap(maxSize int) *txHeap {
 	return th
 }
 
+// Assumes there is non-zero items in [txHeap]
 func (th *txHeap) Pop() *txEntry {
 	return heap.Pop(th.internalTxHeap).(*txEntry)
 }
@@ -92,9 +93,20 @@ func (th *txHeap) Push(e *txEntry) {
 	heap.Push(th.internalTxHeap, e)
 }
 
+// Assumes there is non-zero items in [txHeap]
 func (th *txHeap) Drop() *txEntry {
-	n := th.internalTxHeap.Len()
-	return heap.Remove(th.internalTxHeap, n-1).(*txEntry)
+	// TODO: find a faster way to do this
+	var (
+		lowestValue uint64
+		lowestIndex = -1
+	)
+	for i, entry := range th.internalTxHeap.items {
+		if entry.GasPrice < lowestValue || lowestIndex == -1 {
+			lowestValue = entry.GasPrice
+			lowestIndex = i
+		}
+	}
+	return heap.Remove(th.internalTxHeap, lowestIndex).(*txEntry)
 }
 
 func (th *txHeap) Remove(id ids.ID) *txEntry {
