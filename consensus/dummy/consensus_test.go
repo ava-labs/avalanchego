@@ -140,7 +140,7 @@ func TestVerifyBlockFee(t *testing.T) {
 			baseFee:            big.NewInt(100),
 			parentBlockGasCost: big.NewInt(500_000),
 			parentTime:         10,
-			currentTime:        21, // 1s target + 20
+			currentTime:        21, // 1s target + 10
 			txs: []*types.Transaction{
 				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 100, big.NewInt(100), nil),
 			},

@@ -44,7 +44,7 @@ import (
 var (
 	DefaultMaxPrice   = big.NewInt(150 * params.GWei)
 	DefaultMinPrice   = big.NewInt(0 * params.GWei)
-	DefaultMinGasUsed = big.NewInt(6_000_000) // block gas limit is 8,000,000
+	DefaultMinGasUsed = big.NewInt(2_000_000) // block gas limit is 8,000,000
 )
 
 type Config struct {
