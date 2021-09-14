@@ -269,7 +269,7 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 				log.Trace("New tx detected, trying to generate a block")
 				b.signalTxsReady()
 
-				// We only attempt to inoke [GossipEthTxs] once AP4 is activated.
+				// We only attempt to invoke [GossipEthTxs] once AP4 is activated.
 				if b.isAP4 && b.network != nil {
 					if err := b.network.GossipEthTxs(ethTxsEvent.Txs); err != nil {
 						log.Warn(
