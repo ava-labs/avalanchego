@@ -137,7 +137,6 @@ func (m *Mempool) AddTx(tx *Tx) error {
 	if overlaps := m.utxoSet.Overlaps(utxoSet); overlaps {
 		return errConflictingAtomicTx
 	}
-	m.utxoSet.Union(utxoSet)
 
 	// If the transaction was recently discarded, log the event and evict from
 	// discarded transactions so it's not in two places within the mempool.
@@ -149,12 +148,14 @@ func (m *Mempool) AddTx(tx *Tx) error {
 	}
 
 	// Add the transaction to the [txHeap] so we can evaluate new entries based
-	// on how their [gasPrice] compares.
+	// on how their [gasPrice] compares and add to [utxoSet] to make sure we can
+	// reject conflicting transactions.
 	m.txHeap.Push(&txEntry{
 		ID:       txID,
 		GasPrice: gasPrice,
 		Tx:       tx,
 	})
+	m.utxoSet.Union(utxoSet)
 
 	// When adding [tx] to the mempool make sure that there is an item in Pending
 	// to signal the VM to produce a block. Note: if the VM's buildStatus has already
@@ -328,22 +329,4 @@ func (m *Mempool) addPending() {
 	case m.Pending <- struct{}{}:
 	default:
 	}
-}
-
-// forceAddTx forcibly adds a *Tx to the mempool and bypasses all verification.
-// THIS SHOULD ONLY BE USED IN TESTS.
-func (m *Mempool) forceAddTx(tx *Tx) error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	gasPrice, err := m.atomicTxGasPrice(tx)
-	if err != nil {
-		return err
-	}
-	m.txHeap.Push(&txEntry{
-		ID:       tx.ID(),
-		GasPrice: gasPrice,
-		Tx:       tx,
-	})
-	m.addPending()
-	return nil
 }
