@@ -874,7 +874,7 @@ func (vm *VM) issueTx(tx *Tx, local bool) error {
 	case nil:
 		return vm.network.GossipAtomicTx(tx)
 
-	case errInsufficientAtomicTxFee, errInvalidAtomicTxFee, errTooManyAtomicTx:
+	case errInsufficientAtomicTxFee, errInvalidAtomicTxFee, errTooManyAtomicTx, errConflictingAtomicTx:
 		if !local {
 			// tx has not been accepted to mempool due to size
 			// do not gossip since we cannot serve it
