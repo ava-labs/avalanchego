@@ -95,18 +95,30 @@ func (th *txHeap) Push(e *txEntry) {
 
 // Assumes there is non-zero items in [txHeap]
 func (th *txHeap) Drop() *txEntry {
-	// TODO: find a faster way to do this
 	var (
-		lowestValue uint64
-		lowestIndex = -1
+		n = th.Len()
+		i = 0
 	)
-	for i, entry := range th.internalTxHeap.items {
-		if entry.GasPrice < lowestValue || lowestIndex == -1 {
-			lowestValue = entry.GasPrice
-			lowestIndex = i
+
+	// Finds the minimum gas price in the heap (the "lowest" priority...where
+	// [th.internalTxHeap.Less(i, j)] is true for all i and the item is j)
+	for {
+		j1 := 2*i + 1
+		if j1 >= n || j1 < 0 { // j1 < 0 after int overflow
+			break
 		}
+		j := j1 // left child
+		if j2 := j1 + 1; j2 < n && !th.internalTxHeap.Less(j2, j1) {
+			j = j2 // = 2*i + 2  // right child
+		}
+		if th.internalTxHeap.Less(j, i) {
+			break
+		}
+		i = j
 	}
-	return heap.Remove(th.internalTxHeap, lowestIndex).(*txEntry)
+
+	// Remove and re-heap the [internalTxHeap]
+	return heap.Remove(th.internalTxHeap, i).(*txEntry)
 }
 
 func (th *txHeap) Remove(id ids.ID) *txEntry {
