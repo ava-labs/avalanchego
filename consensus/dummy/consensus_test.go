@@ -42,7 +42,7 @@ func TestVerifyBlockFee(t *testing.T) {
 			parentTime:         10,
 			currentTime:        10,
 			txs: []*types.Transaction{
-				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 500_000, big.NewInt(200), nil),
+				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 50_000, big.NewInt(200), nil),
 			},
 			receipts: []*types.Receipt{
 				{GasUsed: 50_000},
@@ -56,8 +56,8 @@ func TestVerifyBlockFee(t *testing.T) {
 			parentTime:         10,
 			currentTime:        10,
 			txs: []*types.Transaction{
-				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 500_000, big.NewInt(200), nil),
-				types.NewTransaction(1, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 500_000, big.NewInt(100), nil),
+				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 50_000, big.NewInt(200), nil),
+				types.NewTransaction(1, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 50_000, big.NewInt(100), nil),
 			},
 			receipts: []*types.Receipt{
 				{GasUsed: 50_000},
@@ -72,8 +72,8 @@ func TestVerifyBlockFee(t *testing.T) {
 			parentTime:         10,
 			currentTime:        10,
 			txs: []*types.Transaction{
-				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 500_000, big.NewInt(150), nil),
-				types.NewTransaction(1, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 500_000, big.NewInt(150), nil),
+				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 50_000, big.NewInt(150), nil),
+				types.NewTransaction(1, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 50_000, big.NewInt(150), nil),
 			},
 			receipts: []*types.Receipt{
 				{GasUsed: 50_000},
@@ -88,7 +88,7 @@ func TestVerifyBlockFee(t *testing.T) {
 			parentTime:         10,
 			currentTime:        10,
 			txs: []*types.Transaction{
-				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 500_000, big.NewInt(150), nil),
+				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 50_000, big.NewInt(150), nil),
 			},
 			receipts: []*types.Receipt{
 				{GasUsed: 50_000},
