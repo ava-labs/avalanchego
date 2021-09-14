@@ -330,3 +330,21 @@ func (m *Mempool) addPending() {
 	default:
 	}
 }
+
+// forceAddTx forcibly adds a *Tx to the mempool and bypasses all verification.
+// THIS SHOULD ONLY BE USED IN TESTS.
+func (m *Mempool) forceAddTx(tx *Tx) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	gasPrice, err := m.atomicTxGasPrice(tx)
+	if err != nil {
+		return err
+	}
+	m.txHeap.Push(&txEntry{
+		id:       tx.ID(),
+		gasPrice: gasPrice,
+		tx:       tx,
+	})
+	m.addPending()
+	return nil
+}
