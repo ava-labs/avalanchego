@@ -134,6 +134,7 @@ var (
 	errNilBlockGasCostApricotPhase4   = errors.New("nil blockGasCost is invalid after apricotPhase4")
 	errConflictingAtomicTx            = errors.New("conflicting atomic tx present")
 	errInvalidAtomicTxFee             = errors.New("invalid atomic tx fee")
+	errTooManyAtomicTx                = errors.New("too many atomic tx")
 	defaultLogLevel                   = log.LvlDebug
 )
 
@@ -873,7 +874,7 @@ func (vm *VM) issueTx(tx *Tx, local bool) error {
 	case nil:
 		return vm.network.GossipAtomicTx(tx)
 
-	case errInsufficientAtomicTxFee, errInvalidAtomicTxFee:
+	case errInsufficientAtomicTxFee, errInvalidAtomicTxFee, errTooManyAtomicTx:
 		if !local {
 			// tx has not been accepted to mempool due to size
 			// do not gossip since we cannot serve it
