@@ -96,19 +96,23 @@ func TestMempoolMaxMempoolSizeHandling(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
+	mempool := vm.mempool
 
-	// create candidate tx
+	// create candidate tx (we will drop before validation)
 	tx, conflictingTx := getValidImportTx(vm, sharedMemory, t)
 
 	// shortcut to simulated almost filled mempool
-	mempool := NewMempool(vm.ctx.AVAXAssetID, 1)
+	mempool.maxSize = 1
 
-	err := mempool.AddTx(tx)
-	assert.ErrorIs(err, errTooManyAtomicTx, "max mempool size breached")
+	assert.NoError(mempool.AddTx(tx))
+	assert.True(mempool.has(tx.ID()))
+	assert.NoError(mempool.AddTx(conflictingTx))
+	assert.False(mempool.has(tx.ID()))
+	assert.True(mempool.has(conflictingTx.ID()))
+	assert.ErrorIs(mempool.AddTx(tx), errInsufficientAtomicTxFee)
 
 	// shortcut to simulated empty mempool
 	mempool.maxSize = defaultMempoolSize
 
-	err = mempool.AddTx(tx)
-	assert.NoError(err)
+	assert.ErrorIs(mempool.AddTx(tx), errConflictingAtomicTx)
 }
