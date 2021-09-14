@@ -29,6 +29,7 @@ var (
 	errTimeTooAdvanced          = errors.New("time is too far advanced")
 	errProposerWindowNotStarted = errors.New("proposer window hasn't started")
 	errProposersNotActivated    = errors.New("proposers haven't been activated yet")
+	errPChainHeightTooLow       = errors.New("block P-chain height is too low")
 )
 
 type Block interface {

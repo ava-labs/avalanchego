@@ -4,7 +4,6 @@
 package proposervm
 
 import (
-	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -14,11 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-var (
-	errPChainHeightTooLow = errors.New("block P-chain height is too low")
-
-	_ Block = &preForkBlock{}
-)
+var _ Block = &preForkBlock{}
 
 // preForkBlock implements proposervm.Block
 type preForkBlock struct {

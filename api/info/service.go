@@ -4,6 +4,7 @@
 package info
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -19,6 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 )
+
+var errNoChainProvided = errors.New("argument 'chain' not given")
 
 // Info is the API service for unprivileged info on a node
 type Info struct {
@@ -216,7 +219,7 @@ func (service *Info) IsBootstrapped(_ *http.Request, args *IsBootstrappedArgs, r
 	service.log.Debug("Info: IsBootstrapped called with chain: %s", args.Chain)
 
 	if args.Chain == "" {
-		return fmt.Errorf("argument 'chain' not given")
+		return errNoChainProvided
 	}
 	chainID, err := service.chainManager.Lookup(args.Chain)
 	if err != nil {

@@ -4,6 +4,7 @@
 package formatting
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -14,13 +15,19 @@ const (
 	addressSep = "-"
 )
 
+var (
+	errNoSeparator = errors.New("no separator found in address")
+	errBits5To8    = errors.New("unable to convert address from 5-bit to 8-bit formatting")
+	errBits8To5    = errors.New("unable to convert address from 8-bit to 5-bit formatting")
+)
+
 // ParseAddress takes in an address string and splits returns the corresponding
 // parts. This returns the chain ID alias, bech32 HRP, address bytes, and an
 // error if it occurs.
 func ParseAddress(addrStr string) (string, string, []byte, error) {
 	addressParts := strings.SplitN(addrStr, addressSep, 2)
 	if len(addressParts) < 2 {
-		return "", "", nil, fmt.Errorf("no separator found in address")
+		return "", "", nil, errNoSeparator
 	}
 	chainID := addressParts[0]
 	rawAddr := addressParts[1]
@@ -52,7 +59,7 @@ func ParseBech32(addrStr string) (string, []byte, error) {
 	}
 	addrBytes, err := bech32.ConvertBits(decoded, 5, 8, true)
 	if err != nil {
-		return "", nil, fmt.Errorf("unable to convert address from 5-bit to 8-bit formatting")
+		return "", nil, errBits5To8
 	}
 	return rawHRP, addrBytes, nil
 }
@@ -61,7 +68,7 @@ func ParseBech32(addrStr string) (string, []byte, error) {
 func FormatBech32(hrp string, payload []byte) (string, error) {
 	fiveBits, err := bech32.ConvertBits(payload, 8, 5, true)
 	if err != nil {
-		return "", fmt.Errorf("unable to convert address from 8-bit to 5-bit formatting")
+		return "", errBits8To5
 	}
 	addr, err := bech32.Encode(hrp, fiveBits)
 	if err != nil {

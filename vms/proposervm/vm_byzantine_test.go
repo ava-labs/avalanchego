@@ -5,8 +5,6 @@ package proposervm
 
 import (
 	"bytes"
-	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -18,8 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
-var errUnknownBlock = errors.New("unknown block")
-
 // Ensure that a byzantine node issuing an invalid PreForkBlock (Y) when the
 // parent block (X) is issued into a PostForkBlock (A) will be marked as invalid
 // correctly.
@@ -30,7 +26,7 @@ var errUnknownBlock = errors.New("unknown block")
 //     Y
 func TestInvalidByzantineProposerParent(t *testing.T) {
 	forkTime := time.Unix(0, 0) // enable ProBlks
-	coreVM, _, proVM, gBlock := initTestProposerVM(t, forkTime, 0)
+	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
 
 	xBlock := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -99,7 +95,7 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 //    / \
 //   Y   Z
 func TestInvalidByzantineProposerOracleParent(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
 
 	xBlockID := ids.GenerateTestID()
@@ -161,7 +157,7 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 		case bytes.Equal(b, xBlock.opts[1].Bytes()):
 			return xBlock.opts[1], nil
 		default:
-			return nil, fmt.Errorf("Unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -218,7 +214,7 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 // B - Y
 func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 	forkTime := time.Unix(0, 0) // enable ProBlks
-	coreVM, _, proVM, gBlock := initTestProposerVM(t, forkTime, 0)
+	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
 
 	xBlock := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -320,7 +316,7 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 // |     /
 // B - Y
 func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
 
 	xBlock := &TestOptionsBlock{
@@ -381,7 +377,7 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 		case bytes.Equal(b, xBlock.opts[1].Bytes()):
 			return xBlock.opts[1], nil
 		default:
-			return nil, fmt.Errorf("Unknown block")
+			return nil, errUnknownBlock
 		}
 	}
 
