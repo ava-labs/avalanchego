@@ -4,9 +4,9 @@
 package evm
 
 import (
-	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -22,85 +22,103 @@ import (
 	coreth "github.com/ava-labs/coreth/chain"
 )
 
-type network struct {
+const (
+	// We allow [recentCacheSize] to be fairly large because we only store hashes
+	// in the cache, not entire transactions.
+	recentCacheSize = 512
+)
+
+type Network interface {
+	// Message handling
+	AppRequestFailed(nodeID ids.ShortID, requestID uint32) error
+	AppRequest(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error
+	AppResponse(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error
+	AppGossip(nodeID ids.ShortID, msgBytes []byte) error
+
+	// Gossip entrypoints
+	GossipAtomicTx(tx *Tx) error
+	GossipEthTxs(txs []*types.Transaction) error
+}
+
+func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+	return vm.network.AppRequest(nodeID, requestID, request)
+}
+
+func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	return vm.network.AppResponse(nodeID, requestID, response)
+}
+
+func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	return vm.network.AppRequestFailed(nodeID, requestID)
+}
+
+func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
+	return vm.network.AppGossip(nodeID, msg)
+}
+
+// NewNetwork creates a new Network based on the [vm.chainConfig].
+func (vm *VM) NewNetwork(appSender commonEng.AppSender) Network {
+	if vm.chainConfig.ApricotPhase4BlockTimestamp != nil {
+		return vm.newPushNetwork(
+			time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0),
+			appSender,
+			vm.chain,
+			vm.mempool,
+		)
+	}
+
+	return &noopNetwork{}
+}
+
+type pushNetwork struct {
 	gossipActivationTime time.Time
 
 	appSender commonEng.AppSender
 	chain     *coreth.ETHChain
 	mempool   *Mempool
-	signer    types.Signer
 
-	requestID uint32
-	// requestMaps allow checking that provided content matches the requested
-	// content. They are populated upon sending an AppRequest and cleaned up
-	// upon receipt of the corresponding AppResponse or AppRequestFailed.
-	requestsAtmContent map[uint32]ids.ID
-	requestsEthContent map[uint32]map[common.Hash]struct{}
+	gossipHandler message.Handler
 
-	requestHandler  message.Handler
-	responseHandler message.Handler
-	gossipHandler   message.Handler
+	// [recentAtomicTxs] and [recentEthTxs] prevent us from over-gossiping the
+	// same transaction in a short period of time.
+	recentAtomicTxs *cache.LRU
+	recentEthTxs    *cache.LRU
 }
 
-func (vm *VM) NewNetwork(
+func (vm *VM) newPushNetwork(
 	activationTime time.Time,
 	appSender commonEng.AppSender,
 	chain *coreth.ETHChain,
 	mempool *Mempool,
-	signer types.Signer,
-) *network {
-	net := &network{
+) Network {
+	net := &pushNetwork{
 		gossipActivationTime: activationTime,
 		appSender:            appSender,
 		chain:                chain,
 		mempool:              mempool,
-		signer:               signer,
-		requestsAtmContent:   make(map[uint32]ids.ID),
-		requestsEthContent:   make(map[uint32]map[common.Hash]struct{}),
+		recentAtomicTxs:      &cache.LRU{Size: recentCacheSize},
+		recentEthTxs:         &cache.LRU{Size: recentCacheSize},
 	}
-	net.requestHandler = &RequestHandler{net: net}
-	net.responseHandler = &ResponseHandler{
+	net.gossipHandler = &GossipHandler{
 		vm:  vm,
 		net: net,
 	}
-	net.gossipHandler = &GossipHandler{net: net}
 	return net
 }
 
-func (n *network) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
-	log.Debug("AppRequestFailed called", "peerID", nodeID, "requestID", requestID)
-
-	if time.Now().Before(n.gossipActivationTime) {
-		log.Warn("AppRequestFailed called before activation time")
-		return nil
-	}
-
-	delete(n.requestsAtmContent, requestID)
-	delete(n.requestsEthContent, requestID)
+func (n *pushNetwork) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 	return nil
 }
 
-func (n *network) AppRequest(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error {
-	return n.handle(
-		n.requestHandler,
-		"Request",
-		nodeID,
-		requestID,
-		msgBytes,
-	)
+func (n *pushNetwork) AppRequest(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error {
+	return nil
 }
 
-func (n *network) AppResponse(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error {
-	return n.handle(
-		n.responseHandler,
-		"Response",
-		nodeID,
-		requestID,
-		msgBytes,
-	)
+func (n *pushNetwork) AppResponse(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error {
+	return nil
 }
 
-func (n *network) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
+func (n *pushNetwork) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
 	return n.handle(
 		n.gossipHandler,
 		"Gossip",
@@ -110,7 +128,7 @@ func (n *network) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
 	)
 }
 
-func (n *network) GossipAtomicTx(tx *Tx) error {
+func (n *pushNetwork) GossipAtomicTx(tx *Tx) error {
 	txID := tx.ID()
 	if time.Now().Before(n.gossipActivationTime) {
 		log.Debug(
@@ -120,8 +138,14 @@ func (n *network) GossipAtomicTx(tx *Tx) error {
 		return nil
 	}
 
-	msg := message.AtomicTxNotify{
-		TxID: txID,
+	// Don't gossip transaction if it has been recently gossiped.
+	if _, has := n.recentAtomicTxs.Get(txID); has {
+		return nil
+	}
+	n.recentAtomicTxs.Put(txID, nil)
+
+	msg := message.AtomicTx{
+		Tx: tx.Bytes(),
 	}
 	msgBytes, err := message.Build(&msg)
 	if err != nil {
@@ -135,7 +159,41 @@ func (n *network) GossipAtomicTx(tx *Tx) error {
 	return n.appSender.SendAppGossip(msgBytes)
 }
 
-func (n *network) GossipEthTxs(txs []*types.Transaction) error {
+func (n *pushNetwork) sendEthTxs(txs []*types.Transaction) error {
+	if len(txs) == 0 {
+		return nil
+	}
+
+	txBytes, err := rlp.EncodeToBytes(txs)
+	if err != nil {
+		log.Warn(
+			"failed to encode eth transactions",
+			"len(txs)", len(txs),
+			"err", err,
+		)
+		return nil
+	}
+	msg := message.EthTxs{
+		Txs: txBytes,
+	}
+	msgBytes, err := message.Build(&msg)
+	if err != nil {
+		return err
+	}
+
+	log.Debug(
+		"gossiping eth txs",
+		"len(txs)", len(txs),
+		"size(txs)", len(msg.Txs),
+	)
+	return n.appSender.SendAppGossip(msgBytes)
+}
+
+// GossipEthTxs gossips the provided [txs] as soon as possible to reduce the
+// time to finality. In the future, we could attempt to be more conservative
+// with the number of messages we send and attempt to periodically send
+// a batch of messages.
+func (n *pushNetwork) GossipEthTxs(txs []*types.Transaction) error {
 	if time.Now().Before(n.gossipActivationTime) {
 		log.Debug(
 			"not gossiping eth txs before the gossiping activation time",
@@ -145,61 +203,47 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 	}
 
 	pool := n.chain.GetTxPool()
-	txsData := make([]message.EthTxNotify, 0)
-
-	// Recover signatures before `core` package processing
-	if cache := n.chain.SenderCacher(); cache != nil {
-		cache.Recover(n.signer, txs)
-	}
-
+	selectedTxs := make([]*types.Transaction, 0)
 	for _, tx := range txs {
-		txStatus := pool.Status([]common.Hash{tx.Hash()})[0]
+		txHash := tx.Hash()
+		txStatus := pool.Status([]common.Hash{txHash})[0]
 		if txStatus != core.TxStatusPending {
 			continue
 		}
 
-		sender, err := types.Sender(n.signer, tx)
-		if err != nil {
-			log.Debug(
-				"couldn't retrieve sender for eth tx",
-				"err", err,
-			)
+		if _, has := n.recentEthTxs.Get(txHash); has {
 			continue
 		}
+		n.recentEthTxs.Put(txHash, nil)
 
-		txsData = append(txsData, message.EthTxNotify{
-			Hash:   tx.Hash(),
-			Sender: sender,
-			Nonce:  tx.Nonce(),
-		})
+		selectedTxs = append(selectedTxs, tx)
 	}
 
-	for start, end := 0, message.MaxEthTxsLen; start < len(txsData); start, end = end, end+message.MaxEthTxsLen {
-		if end > len(txsData) {
-			end = len(txsData)
-		}
-
-		data := txsData[start:end]
-		msg := message.EthTxsNotify{
-			Txs: data,
-		}
-		msgBytes, err := message.Build(&msg)
-		if err != nil {
-			return err
-		}
-
-		log.Debug(
-			"gossiping eth txs",
-			"len(txs)", len(data),
-		)
-		if err := n.appSender.SendAppGossip(msgBytes); err != nil {
-			return err
-		}
+	if len(selectedTxs) == 0 {
+		return nil
 	}
-	return nil
+
+	// Attempt to gossip [selectedTxs]
+	msgTxs := make([]*types.Transaction, 0)
+	msgTxsSize := common.StorageSize(0)
+	for _, tx := range selectedTxs {
+		size := tx.Size()
+		if msgTxsSize+size > message.EthMsgSoftCapSize {
+			if err := n.sendEthTxs(msgTxs); err != nil {
+				return err
+			}
+			msgTxs = msgTxs[:0]
+			msgTxsSize = 0
+		}
+		msgTxs = append(msgTxs, tx)
+		msgTxsSize += size
+	}
+
+	// Send any remaining [msgTxs]
+	return n.sendEthTxs(msgTxs)
 }
 
-func (n *network) handle(
+func (n *pushNetwork) handle(
 	handler message.Handler,
 	handlerName string,
 	nodeID ids.ShortID,
@@ -228,138 +272,33 @@ func (n *network) handle(
 	return msg.Handle(handler, nodeID, requestID)
 }
 
-type RequestHandler struct {
-	message.NoopHandler
-
-	net *network
-}
-
-func (h *RequestHandler) HandleAtomicTxNotify(nodeID ids.ShortID, requestID uint32, msg *message.AtomicTxNotify) error {
-	log.Debug(
-		"AppRequest called with AtomicTxNotify",
-		"peerID", nodeID,
-		"requestID", requestID,
-		"txID", msg.TxID,
-	)
-
-	resTx, dropped, found := h.net.mempool.GetTx(msg.TxID)
-	if dropped || !found {
-		// tx is either invalid or isn't in the mempool
-		log.Trace(
-			"AppRequest asked for tx that is either invalid or not in the mempool",
-			"peerID", nodeID,
-			"requestID", requestID,
-			"txID", msg.TxID,
-		)
-		return nil
-	}
-
-	reply := &message.AtomicTx{
-		Tx: resTx.Bytes(),
-	}
-	replyBytes, err := message.Build(reply)
-	if err != nil {
-		log.Warn(
-			"failed to build response AtomicTx message",
-			"peerID", nodeID,
-			"requestID", requestID,
-			"txID", msg.TxID,
-			"err", err,
-		)
-		return nil
-	}
-
-	if err := h.net.appSender.SendAppResponse(nodeID, requestID, replyBytes); err != nil {
-		return fmt.Errorf("failed to send AppResponse with: %s", err)
-	}
-	return nil
-}
-
-func (h *RequestHandler) HandleEthTxsNotify(nodeID ids.ShortID, requestID uint32, msg *message.EthTxsNotify) error {
-	log.Debug(
-		"AppRequest called with EthTxsNotify",
-		"peerID", nodeID,
-		"requestID", requestID,
-		"len(txs)", len(msg.Txs),
-	)
-
-	pool := h.net.chain.GetTxPool()
-	txs := make([]*types.Transaction, 0, len(msg.Txs))
-	for _, txData := range msg.Txs {
-		tx := pool.Get(txData.Hash)
-		if tx != nil {
-			txs = append(txs, tx)
-		} else {
-			log.Trace(
-				"AppRequest asked for eth tx that isn't in the mempool",
-				"hash", txData.Hash,
-			)
-		}
-	}
-	if len(txs) == 0 {
-		return nil
-	}
-
-	txBytes, err := rlp.EncodeToBytes(txs)
-	if err != nil {
-		txHashes := make([]common.Hash, len(txs))
-		for i, tx := range txs {
-			txHashes[i] = tx.Hash()
-		}
-		log.Warn(
-			"failed to encode eth transactions",
-			"hashes", txHashes,
-			"err", err,
-		)
-		return nil
-	}
-
-	reply := &message.EthTxs{
-		TxsBytes: txBytes,
-	}
-	replyBytes, err := message.Build(reply)
-	if err != nil {
-		log.Warn(
-			"failed to build response EthTxs message",
-			"len(txs)", len(txs),
-			"err", err,
-		)
-		return nil
-	}
-
-	if err := h.net.appSender.SendAppResponse(nodeID, requestID, replyBytes); err != nil {
-		return fmt.Errorf("failed to send AppResponse with: %s", err)
-	}
-	return nil
-}
-
-type ResponseHandler struct {
+type GossipHandler struct {
 	message.NoopHandler
 
 	vm  *VM
-	net *network
+	net *pushNetwork
 }
 
-func (h *ResponseHandler) HandleAtomicTx(nodeID ids.ShortID, requestID uint32, msg *message.AtomicTx) error {
+func (h *GossipHandler) HandleAtomicTx(nodeID ids.ShortID, _ uint32, msg *message.AtomicTx) error {
 	log.Debug(
-		"AppResponse called with AtomicTx",
+		"AppGossip called with AtomicTx",
 		"peerID", nodeID,
-		"requestID", requestID,
-		"len(tx)", len(msg.Tx),
 	)
 
-	// check that the received transaction matches the requested transaction
-	expectedTxID, ok := h.net.requestsAtmContent[requestID]
-	if !ok {
-		log.Trace("AppResponse provided unrequested tx")
+	if len(msg.Tx) == 0 {
+		log.Debug(
+			"AppGossip received empty AtomicTx Message",
+			"peerID", nodeID,
+		)
 		return nil
 	}
-	delete(h.net.requestsAtmContent, requestID)
 
-	tx := &Tx{}
-	if _, err := Codec.Unmarshal(msg.Tx, tx); err != nil {
+	// In the case that the gossip message contains a transaction,
+	// attempt to parse it and add it as a remote.
+	tx := Tx{}
+	if _, err := Codec.Unmarshal(msg.Tx, &tx); err != nil {
 		log.Trace(
-			"AppResponse provided invalid tx",
+			"AppGossip provided invalid tx",
 			"err", err,
 		)
 		return nil
@@ -367,7 +306,7 @@ func (h *ResponseHandler) HandleAtomicTx(nodeID ids.ShortID, requestID uint32, m
 	unsignedBytes, err := Codec.Marshal(codecVersion, &tx.UnsignedAtomicTx)
 	if err != nil {
 		log.Warn(
-			"AppResponse failed to marshal unsigned tx",
+			"AppGossip failed to marshal unsigned tx",
 			"err", err,
 		)
 		return nil
@@ -375,176 +314,77 @@ func (h *ResponseHandler) HandleAtomicTx(nodeID ids.ShortID, requestID uint32, m
 	tx.Initialize(unsignedBytes, msg.Tx)
 
 	txID := tx.ID()
-	if txID != expectedTxID {
-		log.Trace(
-			"AppResponse provided unrequested transaction ID",
-			"expectedTxID", expectedTxID,
-			"txID", txID,
-		)
-		return nil
-	}
-
 	if _, dropped, found := h.net.mempool.GetTx(txID); found || dropped {
 		return nil
 	}
 
-	if err := h.vm.issueTx(tx, false /*=local*/); err != nil {
+	if err := h.vm.issueTx(&tx, false /*=local*/); err != nil {
 		log.Trace(
-			"AppResponse provided invalid transaction",
+			"AppGossip provided invalid transaction",
 			"peerID", nodeID,
-			"requestID", requestID,
 			"err", err,
 		)
 	}
+
 	return nil
 }
 
-func (h *ResponseHandler) HandleEthTxs(nodeID ids.ShortID, requestID uint32, msg *message.EthTxs) error {
+func (h *GossipHandler) HandleEthTxs(nodeID ids.ShortID, _ uint32, msg *message.EthTxs) error {
 	log.Debug(
-		"AppResponse called with EthTxs",
+		"AppGossip called with EthTxs",
 		"peerID", nodeID,
-		"requestID", requestID,
-		"len(txsBytes)", len(msg.TxsBytes),
+		"size(txs)", len(msg.Txs),
 	)
 
-	// check that the received transactions matches the requested transactions
-	expectedHashes, ok := h.net.requestsEthContent[requestID]
-	if !ok {
-		log.Trace("AppResponse provided unrequested txs")
+	if len(msg.Txs) == 0 {
+		log.Debug(
+			"AppGossip received empty EthTxs Message",
+			"peerID", nodeID,
+		)
 		return nil
 	}
-	delete(h.net.requestsEthContent, requestID)
 
+	// The maximum size of this encoded object is enforced by the codec.
 	txs := make([]*types.Transaction, 0)
-	if err := rlp.DecodeBytes(msg.TxsBytes, &txs); err != nil {
+	if err := rlp.DecodeBytes(msg.Txs, &txs); err != nil {
 		log.Trace(
-			"AppResponse provided invalid txs",
+			"AppGossip provided invalid txs",
 			"peerID", nodeID,
-			"requestID", requestID,
 			"err", err,
 		)
 		return nil
 	}
-	if len(txs) > message.MaxEthTxsLen {
-		log.Trace(
-			"AppResponse provided too many txs",
-			"len(txs)", len(txs),
-		)
-		return nil
-	}
-
-	requestedTxs := make([]*types.Transaction, 0, len(expectedHashes))
-	for _, tx := range txs {
-		txHash := tx.Hash()
-		if _, ok := expectedHashes[txHash]; !ok {
-			log.Trace(
-				"AppResponse received unexpected eth tx",
-				"hash", txHash,
-			)
-			continue
-		}
-		requestedTxs = append(requestedTxs, tx)
-	}
-	if len(requestedTxs) == 0 {
-		log.Trace("AppResponse received only unrequested txs")
-		return nil
-	}
-
-	// submit to mempool expected transactions only
-	errs := h.net.chain.GetTxPool().AddRemotes(requestedTxs)
-	for _, err := range errs {
+	errs := h.net.chain.GetTxPool().AddRemotes(txs)
+	for i, err := range errs {
 		if err != nil {
 			log.Debug(
-				"AppResponse failed to issue AddRemotes",
+				"AppGossip failed to add to mempool",
 				"err", err,
+				"tx", txs[i].Hash(),
 			)
 		}
 	}
 	return nil
 }
 
-type GossipHandler struct {
-	message.NoopHandler
+// noopNetwork should be used when gossip communication is not supported
+type noopNetwork struct{}
 
-	net *network
-}
-
-func (h *GossipHandler) HandleAtomicTxNotify(nodeID ids.ShortID, _ uint32, msg *message.AtomicTxNotify) error {
-	log.Debug(
-		"AppGossip called with AtomicTxNotify",
-		"peerID", nodeID,
-		"txID", msg.TxID,
-	)
-
-	if _, _, found := h.net.mempool.GetTx(msg.TxID); found {
-		// we already know the tx, no need to request it
-		return nil
-	}
-
-	nodes := ids.ShortSet{nodeID: struct{}{}}
-	h.net.requestID++
-	if err := h.net.appSender.SendAppRequest(nodes, h.net.requestID, msg.Bytes()); err != nil {
-		return fmt.Errorf("AppGossip: failed sending AppRequest with error %s", err)
-	}
-
-	// record content to check response later on
-	h.net.requestsAtmContent[h.net.requestID] = msg.TxID
+func (n *noopNetwork) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 	return nil
 }
-
-func (h *GossipHandler) HandleEthTxsNotify(nodeID ids.ShortID, _ uint32, msg *message.EthTxsNotify) error {
-	log.Debug(
-		"AppGossip called with EthTxsNotify",
-		"peerID", nodeID,
-		"len(txs)", len(msg.Txs),
-	)
-
-	pool := h.net.chain.GetTxPool()
-	dataToRequest := make([]message.EthTxNotify, 0, len(msg.Txs))
-	for _, txData := range msg.Txs {
-		if pool.Has(txData.Hash) {
-			continue
-		}
-
-		if err := pool.CheckNonceOrdering(txData.Sender, txData.Nonce); err != nil {
-			log.Trace(
-				"AppGossip eth tx's nonce is too old",
-				"hash", txData.Hash,
-			)
-			continue
-		}
-
-		dataToRequest = append(dataToRequest, txData)
-	}
-
-	if len(dataToRequest) == 0 {
-		return nil
-	}
-
-	reqMsg := message.EthTxsNotify{
-		Txs: dataToRequest,
-	}
-	reqMsgBytes, err := message.Build(&reqMsg)
-	if err != nil {
-		log.Warn(
-			"failed to build response EthTxsNotify message",
-			"len(txs)", len(dataToRequest),
-			"err", err,
-		)
-		return nil
-	}
-
-	nodes := ids.ShortSet{nodeID: struct{}{}}
-	h.net.requestID++
-	if err := h.net.appSender.SendAppRequest(nodes, h.net.requestID, reqMsgBytes); err != nil {
-		return fmt.Errorf("AppGossip: failed sending AppRequest with error %s", err)
-	}
-
-	// record content to check response later on
-	requestedTxIDs := make(map[common.Hash]struct{}, len(dataToRequest))
-	for _, txData := range dataToRequest {
-		requestedTxIDs[txData.Hash] = struct{}{}
-	}
-	h.net.requestsEthContent[h.net.requestID] = requestedTxIDs
+func (n *noopNetwork) AppRequest(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error {
+	return nil
+}
+func (n *noopNetwork) AppResponse(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error {
+	return nil
+}
+func (n *noopNetwork) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
+	return nil
+}
+func (n *noopNetwork) GossipAtomicTx(tx *Tx) error {
+	return nil
+}
+func (n *noopNetwork) GossipEthTxs(txs []*types.Transaction) error {
 	return nil
 }

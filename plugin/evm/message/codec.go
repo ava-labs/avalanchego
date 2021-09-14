@@ -26,9 +26,7 @@ func init() {
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		lc.RegisterType(&AtomicTxNotify{}),
 		lc.RegisterType(&AtomicTx{}),
-		lc.RegisterType(&EthTxsNotify{}),
 		lc.RegisterType(&EthTxs{}),
 		c.RegisterCodec(codecVersion, lc),
 	)

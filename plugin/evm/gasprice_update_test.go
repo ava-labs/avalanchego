@@ -31,6 +31,13 @@ func (m *mockGasPriceSetter) SetMinFee(minFee *big.Int) {
 	m.minFee = minFee
 }
 
+func (m *mockGasPriceSetter) GetStatus() (*big.Int, *big.Int) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	return m.price, m.minFee
+}
+
 func attemptAwait(t *testing.T, wg *sync.WaitGroup, delay time.Duration) {
 	ticker := make(chan struct{})
 
@@ -88,8 +95,8 @@ func TestUpdateGasPriceInitializesPrice(t *testing.T) {
 	if gpu.setter.(*mockGasPriceSetter).price.Cmp(big.NewInt(0)) != 0 {
 		t.Fatalf("Expected price to match minimum base fee for apricot phase3")
 	}
-	if minFee := gpu.setter.(*mockGasPriceSetter).minFee; minFee == nil || minFee.Cmp(big.NewInt(params.ApricotPhase3MinBaseFee)) != 0 {
-		t.Fatalf("Expected min fee to match minimum fee for apricotPhase3, but found: %d", minFee)
+	if minFee := gpu.setter.(*mockGasPriceSetter).minFee; minFee == nil || minFee.Cmp(big.NewInt(params.ApricotPhase4MinBaseFee)) != 0 {
+		t.Fatalf("Expected min fee to match minimum fee for apricotPhase4, but found: %d", minFee)
 	}
 }
 
@@ -97,9 +104,10 @@ func TestUpdateGasPriceUpdatesPrice(t *testing.T) {
 	shutdownChan := make(chan struct{})
 	wg := &sync.WaitGroup{}
 	config := *params.TestChainConfig
-	// Set ApricotPhase3BlockTime one hour in the future so that it will
+	// Set ApricotPhase3BlockTime 250ms in the future so that it will
 	// create a goroutine waiting for the time to update the gas price
 	config.ApricotPhase3BlockTimestamp = big.NewInt(time.Now().Add(250 * time.Millisecond).Unix())
+	config.ApricotPhase4BlockTimestamp = big.NewInt(time.Now().Add(3 * time.Second).Unix())
 	gpu := &gasPriceUpdater{
 		setter:       &mockGasPriceSetter{price: big.NewInt(1)},
 		chainConfig:  &config,
@@ -108,15 +116,26 @@ func TestUpdateGasPriceUpdatesPrice(t *testing.T) {
 	}
 
 	gpu.start()
+
 	// With ApricotPhase3 set slightly in the future, the gas price updater should create a
 	// goroutine to sleep until its time to update and mark the wait group as done when it has
 	// completed the update.
-	attemptAwait(t, wg, 5*time.Second)
-
-	if gpu.setter.(*mockGasPriceSetter).price.Cmp(big.NewInt(0)) != 0 {
+	time.Sleep(1 * time.Second)
+	price, minFee := gpu.setter.(*mockGasPriceSetter).GetStatus()
+	if price.Cmp(big.NewInt(0)) != 0 {
 		t.Fatalf("Expected price to match minimum base fee for apricot phase3")
 	}
-	if minFee := gpu.setter.(*mockGasPriceSetter).minFee; minFee == nil || minFee.Cmp(big.NewInt(params.ApricotPhase3MinBaseFee)) != 0 {
+	if minFee == nil || minFee.Cmp(big.NewInt(params.ApricotPhase3MinBaseFee)) != 0 {
 		t.Fatalf("Expected min fee to match minimum fee for apricotPhase3, but found: %d", minFee)
+	}
+
+	// Confirm ApricotPhase4 settings are applied at the very end.
+	attemptAwait(t, wg, 5*time.Second)
+	price, minFee = gpu.setter.(*mockGasPriceSetter).GetStatus()
+	if price.Cmp(big.NewInt(0)) != 0 {
+		t.Fatalf("Expected price to match minimum base fee for apricot phase4")
+	}
+	if minFee == nil || minFee.Cmp(big.NewInt(params.ApricotPhase4MinBaseFee)) != 0 {
+		t.Fatalf("Expected min fee to match minimum fee for apricotPhase4, but found: %d", minFee)
 	}
 }

@@ -5,23 +5,21 @@ package evm
 
 import (
 	"testing"
-	"time"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 )
 
-func getValidTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) *Tx {
+// getValidImportTx returns 2 transactions that conflict with each other (both valid)
+func getValidImportTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) (*Tx, *Tx) {
 	importAmount := uint64(50000000)
 	utxoID := avax.UTXOID{
 		TxID: ids.ID{
@@ -65,10 +63,16 @@ func getValidTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) *Tx {
 		t.Fatal(err)
 	}
 
-	return importTx
+	importTx2, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[1], initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return importTx, importTx2
 }
 
-func getInvalidTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) *Tx {
+// getValidExportTx returns 2 transactions that conflict with each other (both valid)
+func getValidExportTx(vm *VM, issuer chan common.Message, sharedMemory *atomic.Memory, t *testing.T) (*Tx, *Tx) {
 	importAmount := uint64(50000000)
 	utxoID := avax.UTXOID{
 		TxID: ids.ID{
@@ -107,275 +111,104 @@ func getInvalidTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) *Tx {
 		t.Fatal(err)
 	}
 
-	// code below extracted from newImportTx to make an invalidTx
-	kc := secp256k1fx.NewKeychain()
-	kc.Add(testKeys[0])
-
-	atomicUTXOs, _, _, err := vm.GetAtomicUTXOs(vm.ctx.XChainID, kc.Addresses(),
-		ids.ShortEmpty, ids.Empty, -1)
+	importTx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	importedInputs := []*avax.TransferableInput{}
-	signers := [][]*crypto.PrivateKeySECP256K1R{}
-
-	importedAmount := make(map[ids.ID]uint64)
-	now := vm.clock.Unix()
-	for _, utxo := range atomicUTXOs {
-		inputIntf, utxoSigners, err := kc.Spend(utxo.Out, now)
-		if err != nil {
-			continue
-		}
-		input, ok := inputIntf.(avax.TransferableIn)
-		if !ok {
-			continue
-		}
-		aid := utxo.AssetID()
-		importedAmount[aid], err = math.Add64(importedAmount[aid], input.Amount())
-		if err != nil {
-			t.Fatal(err)
-		}
-		importedInputs = append(importedInputs, &avax.TransferableInput{
-			UTXOID: utxo.UTXOID,
-			Asset:  utxo.Asset,
-			In:     input,
-		})
-		signers = append(signers, utxoSigners)
-	}
-	avax.SortTransferableInputsWithSigners(importedInputs, signers)
-	importedAVAXAmount := importedAmount[vm.ctx.AVAXAssetID]
-	outs := []EVMOutput{}
-
-	txFeeWithoutChange := params.AvalancheAtomicTxFee
-	txFeeWithChange := params.AvalancheAtomicTxFee
-
-	// AVAX output
-	if importedAVAXAmount < txFeeWithoutChange { // imported amount goes toward paying tx fee
-		t.Fatal(errInsufficientFundsForFee)
-	} else if importedAVAXAmount > txFeeWithChange {
-		outs = append(outs, EVMOutput{
-			Address: testEthAddrs[0],
-			Amount:  importedAVAXAmount - txFeeWithChange,
-			AssetID: vm.ctx.AVAXAssetID,
-		})
-	}
-
-	// This will create unique outputs (in the context of sorting)
-	// since each output will have a unique assetID
-	for assetID, amount := range importedAmount {
-		// Skip the AVAX amount since it has already been included
-		// and skip any input with an amount of 0
-		if assetID == vm.ctx.AVAXAssetID || amount == 0 {
-			continue
-		}
-		outs = append(outs, EVMOutput{
-			Address: testEthAddrs[0],
-			Amount:  amount,
-			AssetID: assetID,
-		})
-	}
-
-	// If no outputs are produced, return an error.
-	// Note: this can happen if there is exactly enough AVAX to pay the
-	// transaction fee, but no other funds to be imported.
-	if len(outs) == 0 {
-		t.Fatal(errNoEVMOutputs)
-	}
-
-	SortEVMOutputs(outs)
-
-	// Create the transaction
-	utx := &UnsignedImportTx{
-		NetworkID:      vm.ctx.NetworkID,
-		BlockchainID:   vm.ctx.ChainID,
-		Outs:           outs,
-		ImportedInputs: importedInputs,
-		SourceChain:    ids.ID{'f', 'a', 'k', 'e'}, // This should make the tx invalid
-	}
-	tx := &Tx{UnsignedAtomicTx: utx}
-	if err := tx.Sign(vm.codec, signers); err != nil {
+	if err := vm.issueTx(importTx, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}
-	return tx
-}
-
-// shows that an atomic tx received as gossip response can be added to the
-// mempool and then removed by inclusion in a block
-func TestMempoolAtmTxsAddGossiped(t *testing.T) {
-	assert := assert.New(t)
-
-	issuer, vm, _, sharedMemory, _ := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
-	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
-	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
-	mempool := vm.mempool
-	net := vm.network
-
-	// create tx to be gossiped
-	tx := getValidTx(vm, sharedMemory, t)
-	txID := tx.ID()
-
-	// gossip tx and check it is accepted
-	nodeID := ids.GenerateTestShortID()
-	msg := message.AtomicTx{
-		Tx: tx.Bytes(),
-	}
-	msgBytes, err := message.Build(&msg)
-	assert.NoError(err)
-
-	net.requestID++
-	net.requestsAtmContent[net.requestID] = txID
-	err = vm.AppResponse(nodeID, net.requestID, msgBytes)
-	assert.NoError(err)
 
 	<-issuer
 
-	has := mempool.has(txID)
-	assert.True(has, "issued tx should be recorded into mempool")
-
-	// show that build block include that tx and tx is still in mempool
 	blk, err := vm.BuildBlock()
-	assert.NoError(err, "failed to build block from the mempool")
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	evmBlk, ok := blk.(*chain.BlockWrapper).Block.(*Block)
-	assert.True(ok, "unknown block type")
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
 
-	retrievedTx, err := vm.extractAtomicTx(evmBlk.ethBlock)
-	assert.NoError(err)
-	assert.Equal(txID, retrievedTx.ID(), "block contains wrong transaction")
+	if err := vm.SetPreference(blk.ID()); err != nil {
+		t.Fatal(err)
+	}
 
-	has = mempool.has(txID)
-	assert.True(has, "tx should stay in mempool till block is accepted")
+	if err := blk.Accept(); err != nil {
+		t.Fatal(err)
+	}
 
-	err = blk.Verify()
-	assert.NoError(err)
+	exportAmount := uint64(5000000)
 
-	err = blk.Accept()
-	assert.NoError(err)
+	testKeys1Addr := GetEthAddress(testKeys[0])
+	exportId1, err := ids.ToShortID(testKeys1Addr[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	testKeys2Addr := GetEthAddress(testKeys[1])
+	exportId2, err := ids.ToShortID(testKeys2Addr[:])
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	has = mempool.has(txID)
-	assert.False(has, "tx should have been removed from the mempool after it was accepted")
+	exportTx1, err := vm.newExportTx(vm.ctx.AVAXAssetID, exportAmount, vm.ctx.XChainID, exportId1, initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	exportTx2, err := vm.newExportTx(vm.ctx.AVAXAssetID, exportAmount, vm.ctx.XChainID, exportId2, initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return exportTx1, exportTx2
 }
 
-// show that a tx discovered by a GossipResponse is re-gossiped after being
-// added to the mempool
-func TestMempoolAtmTxsAppResponseHandling(t *testing.T) {
+// locally issued txs should be gossiped
+func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 	assert := assert.New(t)
 
-	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
-	mempool := vm.mempool
-	net := vm.network
 
-	var (
-		wasGossiped   bool
-		gossipedBytes []byte
-	)
+	// Create a simple tx
+	tx, conflictingTx := getValidImportTx(vm, sharedMemory, t)
+
+	var gossiped int
 	sender.CantSendAppGossip = false
-	sender.SendAppGossipF = func(b []byte) error {
-		wasGossiped = true
-		gossipedBytes = b
+	sender.SendAppGossipF = func(gossipedBytes []byte) error {
+		notifyMsgIntf, err := message.Parse(gossipedBytes)
+		assert.NoError(err)
+
+		requestMsg, ok := notifyMsgIntf.(*message.AtomicTx)
+		assert.NotEmpty(requestMsg.Tx)
+		assert.True(ok)
+
+		txg := Tx{}
+		_, err = Codec.Unmarshal(requestMsg.Tx, &txg)
+		assert.NoError(err)
+		unsignedBytes, err := Codec.Marshal(codecVersion, &txg.UnsignedAtomicTx)
+		assert.NoError(err)
+		txg.Initialize(unsignedBytes, requestMsg.Tx)
+		assert.Equal(tx.ID(), txg.ID())
+		gossiped++
 		return nil
 	}
 
-	// create tx to be received from AppGossipResponse
-	tx := getValidTx(vm, sharedMemory, t)
-	txID := tx.ID()
+	// Optimistically gossip raw tx
+	assert.NoError(vm.issueTx(tx, true /*=local*/))
+	assert.Equal(1, gossiped)
 
-	// responses with unknown requestID are rejected
-	nodeID := ids.GenerateTestShortID()
-	msg := message.AtomicTx{
-		Tx: tx.Bytes(),
-	}
-	msgBytes, err := message.Build(&msg)
-	assert.NoError(err)
+	// Test hash on retry
+	assert.NoError(vm.network.GossipAtomicTx(tx))
+	assert.Equal(1, gossiped)
 
-	net.requestID++
-	net.requestsAtmContent[net.requestID] = txID
-
-	// Should drop an unexpected response
-	unknownReqID := net.requestID + 1
-	err = vm.AppResponse(nodeID, unknownReqID, msgBytes)
-	assert.NoError(err)
-
-	has := mempool.has(txID)
-	assert.False(has, "responses with unknown requestID should not affect mempool")
-
-	assert.False(wasGossiped, "responses with unknown requestID should not result in gossiping")
-
-	// received tx and check it is accepted and re-gossiped
-	err = vm.AppResponse(nodeID, net.requestID, msgBytes)
-	assert.NoError(err)
-
-	has = mempool.has(txID)
-	assert.True(has, "valid tx not recorded into mempool")
-
-	assert.True(wasGossiped, "valid tx should have been re-gossiped")
-
-	// show that gossiped bytes can be duly decoded
-	_, err = message.Parse(gossipedBytes)
-	assert.NoError(err)
-
-	// show that if tx is not accepted to mempool is not re-gossiped
-	wasGossiped = false
-
-	net.requestID++
-	net.requestsAtmContent[net.requestID] = txID
-
-	err = vm.AppResponse(nodeID, net.requestID, msgBytes)
-	assert.NoError(err)
-
-	assert.False(wasGossiped, "unaccepted tx should have not been re-gossiped")
-}
-
-// show that invalid txs are not accepted to mempool, nor rejected
-func TestMempoolAtmTxsAppResponseHandlingInvalidTx(t *testing.T) {
-	assert := assert.New(t)
-
-	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
-	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
-	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
-	mempool := vm.mempool
-	net := vm.network
-
-	var wasGossiped bool
-	sender.CantSendAppGossip = false
-	sender.SendAppGossipF = func([]byte) error {
-		wasGossiped = true
-		return nil
-	}
-
-	// create an invalid tx
-	tx := getInvalidTx(vm, sharedMemory, t)
-	txID := tx.ID()
-
-	// gossip tx and check it is accepted and re-gossiped
-	nodeID := ids.GenerateTestShortID()
-	msg := message.AtomicTx{
-		Tx: tx.Bytes(),
-	}
-	msgBytes, err := message.Build(&msg)
-	assert.NoError(err)
-
-	net.requestID++
-	net.requestsAtmContent[net.requestID] = txID
-	err = vm.AppResponse(nodeID, net.requestID, msgBytes)
-	assert.NoError(err)
-
-	has := mempool.has(txID)
-	assert.False(has, "invalid tx should not be issued to mempool")
-
-	assert.False(wasGossiped, "invalid tx should not be re-gossiped")
+	// Attempt to gossip conflicting tx
+	assert.ErrorIs(vm.issueTx(conflictingTx, true /*=local*/), errConflictingAtomicTx)
+	assert.Equal(1, gossiped)
 }
 
 // show that a txID discovered from gossip is requested to the same node only if
@@ -383,86 +216,85 @@ func TestMempoolAtmTxsAppResponseHandlingInvalidTx(t *testing.T) {
 func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 	assert := assert.New(t)
 
-	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
-	mempool := vm.mempool
 
 	nodeID := ids.GenerateTestShortID()
 
 	var (
-		txRequested       bool
-		txRequestedByNode bool
-		requestedBytes    []byte
+		txGossiped  int
+		txRequested bool
 	)
 	sender.CantSendAppGossip = false
-	sender.SendAppRequestF = func(nodes ids.ShortSet, reqID uint32, resp []byte) error {
+	sender.SendAppGossipF = func(_ []byte) error {
+		txGossiped++
+		return nil
+	}
+	sender.SendAppRequestF = func(_ ids.ShortSet, _ uint32, _ []byte) error {
 		txRequested = true
-		if nodes.Contains(nodeID) {
-			txRequestedByNode = true
-		}
-		requestedBytes = resp
 		return nil
 	}
 
 	// create a tx
-	tx := getValidTx(vm, sharedMemory, t)
-	txID := tx.ID()
+	tx, conflictingTx := getValidImportTx(vm, sharedMemory, t)
 
-	// gossip tx and check it is accepted and re-gossiped
-	msg := message.AtomicTxNotify{
-		TxID: txID,
+	// gossip tx and check it is accepted and gossiped
+	msg := message.AtomicTx{
+		Tx: tx.Bytes(),
 	}
 	msgBytes, err := message.Build(&msg)
 	assert.NoError(err)
 
-	// show that unknown txID is requested
-	err = vm.AppGossip(nodeID, msgBytes)
-	assert.NoError(err)
-	assert.True(txRequested, "tx should have been requested")
-	assert.True(txRequestedByNode, "tx should have been by the gossiper node")
+	// show that no txID is requested
+	assert.NoError(vm.AppGossip(nodeID, msgBytes))
+	assert.False(txRequested, "tx should not have been requested")
+	assert.Equal(1, txGossiped, "tx should have been gossiped")
+	assert.True(vm.mempool.has(tx.ID()))
 
-	requestMsgIntf, err := message.Parse(requestedBytes)
-	assert.NoError(err)
+	// show that tx is not re-gossiped
+	assert.NoError(vm.AppGossip(nodeID, msgBytes))
+	assert.Equal(1, txGossiped, "tx should have only been gossiped once")
 
-	requestMsg, ok := requestMsgIntf.(*message.AtomicTxNotify)
-	assert.True(ok)
-	assert.Equal(txID, requestMsg.TxID)
-
-	// show that known txID is not requested
-	err = mempool.AddTx(tx)
+	// show that conflicting tx is not added to mempool
+	msg = message.AtomicTx{
+		Tx: conflictingTx.Bytes(),
+	}
+	msgBytes, err = message.Build(&msg)
 	assert.NoError(err)
-
-	txRequested = false
-	err = vm.AppGossip(nodeID, msgBytes)
-	assert.NoError(err)
-	assert.False(txRequested, "known txID should not be requested")
+	assert.NoError(vm.AppGossip(nodeID, msgBytes))
+	assert.False(txRequested, "tx should not have been requested")
+	assert.Equal(1, txGossiped, "tx should not have been gossiped")
+	assert.False(vm.mempool.has(conflictingTx.ID()), "conflicting tx should not be in the atomic mempool")
 }
 
 // show that txs already marked as invalid are not re-requested on gossiping
-func TestMempoolAtmTxsAppGossipHandlingInvalidTx(t *testing.T) {
+func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 	assert := assert.New(t)
 
-	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 	mempool := vm.mempool
 
-	var txRequested bool
+	var (
+		txGossiped  int
+		txRequested bool
+	)
 	sender.CantSendAppGossip = false
+	sender.SendAppGossipF = func(_ []byte) error {
+		txGossiped++
+		return nil
+	}
 	sender.SendAppRequestF = func(ids.ShortSet, uint32, []byte) error {
 		txRequested = true
 		return nil
 	}
 
 	// create a tx and mark as invalid
-	tx := getValidTx(vm, sharedMemory, t)
+	tx, conflictingTx := getValidImportTx(vm, sharedMemory, t)
 	txID := tx.ID()
 
 	mempool.AddTx(tx)
@@ -472,96 +304,27 @@ func TestMempoolAtmTxsAppGossipHandlingInvalidTx(t *testing.T) {
 	has := mempool.has(txID)
 	assert.False(has)
 
-	// gossip tx and check it is accepted and re-gossiped
+	// gossip tx and check it isn't accepted or gossiped
 	nodeID := ids.GenerateTestShortID()
-	msg := message.AtomicTxNotify{
-		TxID: txID,
+	msg := message.AtomicTx{
+		Tx: tx.Bytes(),
 	}
 	msgBytes, err := message.Build(&msg)
 	assert.NoError(err)
 
-	err = vm.AppGossip(nodeID, msgBytes)
-	assert.NoError(err)
-	assert.False(txRequested, "rejected tx shouldn't be requested")
-}
+	assert.NoError(vm.AppGossip(nodeID, msgBytes))
+	assert.False(txRequested, "tx shouldn't be requested")
+	assert.Zero(txGossiped, "tx should not have been gossiped")
 
-// show that a node answers to a request with a response if it has the requested
-// tx
-func TestMempoolAtmTxsAppRequestHandling(t *testing.T) {
-	assert := assert.New(t)
-
-	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
-	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
-	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
-	mempool := vm.mempool
-
-	var (
-		responded      bool
-		respondedBytes []byte
-	)
-	sender.CantSendAppGossip = false
-	sender.SendAppResponseF = func(nodeID ids.ShortID, reqID uint32, resp []byte) error {
-		responded = true
-		respondedBytes = resp
-		return nil
+	// gossip conflicting tx and ensure it is accepted and gossiped
+	nodeID = ids.GenerateTestShortID()
+	msg = message.AtomicTx{
+		Tx: conflictingTx.Bytes(),
 	}
-
-	// create a tx
-	tx := getValidTx(vm, sharedMemory, t)
-	txID := tx.ID()
-
-	// show that there is no response if tx is unknown
-	nodeID := ids.GenerateTestShortID()
-	msg := message.AtomicTxNotify{
-		TxID: txID,
-	}
-	msgBytes, err := message.Build(&msg)
+	msgBytes, err = message.Build(&msg)
 	assert.NoError(err)
 
-	err = vm.AppRequest(nodeID, 0, msgBytes)
-	assert.NoError(err)
-	assert.False(responded, "there should be no response with unknown tx")
-
-	// show that there is response if tx is known
-	err = mempool.AddTx(tx)
-	assert.NoError(err, "couldn't add tx to mempool")
-
-	err = vm.AppRequest(nodeID, 0, msgBytes)
-	assert.NoError(err)
-	assert.True(responded, "there should be a response with known tx")
-
-	replyIntf, err := message.Parse(respondedBytes)
-	assert.NoError(err)
-
-	reply, ok := replyIntf.(*message.AtomicTx)
-	assert.True(ok)
-	assert.Equal(tx.Bytes(), reply.Tx)
-}
-
-// locally issued txs should be gossiped
-func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
-	assert := assert.New(t)
-
-	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
-	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
-	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
-
-	var gossiped bool
-	sender.CantSendAppGossip = false
-	sender.SendAppGossipF = func([]byte) error {
-		gossiped = true
-		return nil
-	}
-
-	// add a tx to it
-	tx := getValidTx(vm, sharedMemory, t)
-	err := vm.issueTx(tx, true /*=local*/)
-	assert.NoError(err)
-	assert.True(gossiped, "expected call to SendAppGossip not issued")
+	assert.NoError(vm.AppGossip(nodeID, msgBytes))
+	assert.False(txRequested, "tx shouldn't be requested")
+	assert.Equal(1, txGossiped, "conflicting tx should have been gossiped")
 }
