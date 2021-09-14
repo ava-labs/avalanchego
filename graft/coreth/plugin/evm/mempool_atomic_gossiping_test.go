@@ -75,13 +75,6 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 
 			has = mempool.has(txID)
 			assert.False(has, "tx shouldn't be in mempool after block is accepted")
-
-			// try to add a conflicting tx again (don't use issueTx because will fail
-			// verification)
-			err = mempool.AddTx(conflictingTx)
-			assert.ErrorIs(err, errConflictingAtomicTx)
-			has = mempool.has(conflictingTxID)
-			assert.False(has, "conflicting tx in mempool")
 		})
 	}
 }
