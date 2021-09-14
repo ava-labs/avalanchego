@@ -15,6 +15,7 @@ const (
 	defaultEthApiEnabled               = true
 	defaultNetApiEnabled               = true
 	defaultWeb3ApiEnabled              = true
+	defaultPreimagesEnabled            = true
 	defaultPruningEnabled              = true
 	defaultSnapshotAsync               = true
 	defaultRpcGasCap                   = 2500000000 // 25000000 X 100
@@ -53,6 +54,7 @@ type Config struct {
 	Web3APIEnabled     bool `json:"web3-api-enabled"`
 
 	// Eth Settings
+	Preimages      bool `json:"preimages-enabled"`
 	Pruning        bool `json:"pruning-enabled"`
 	SnapshotAsync  bool `json:"snapshot-async"`
 	SnapshotVerify bool `json:"snapshot-verification-enabled"`
@@ -105,6 +107,7 @@ func (c *Config) SetDefaults() {
 	c.MaxBlocksPerRequest = defaultMaxBlocksPerRequest
 	c.ContinuousProfilerFrequency.Duration = defaultContinuousProfilerFrequency
 	c.ContinuousProfilerMaxFiles = defaultContinuousProfilerMaxFiles
+	c.Preimages = defaultPreimagesEnabled
 	c.Pruning = defaultPruningEnabled
 	c.SnapshotAsync = defaultSnapshotAsync
 }
