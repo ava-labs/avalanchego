@@ -783,12 +783,12 @@ func TestConflictingImportTxs(t *testing.T) {
 			t.Fatal("Expected issueTx to fail due to conflicting transaction")
 		}
 		// Force issue transaction directly to the mempool
-		if err := vm.mempool.AddTx(tx); err != nil {
+		if err := vm.mempool.forceAddTx(tx); err != nil {
 			t.Fatal(err)
 		}
 		<-issuer
 
-		_, err := vm.BuildBlock()
+		_, err = vm.BuildBlock()
 		// The new block is verified in BuildBlock, so
 		// BuildBlock should fail due to an attempt to
 		// double spend an atomic UTXO.
@@ -1270,10 +1270,9 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 		t.Fatalf("Should not have been able to issue import tx with conflict")
 	}
 	// Force issue transaction directly into the mempool
-	if err := vm.mempool.AddTx(importTx0B); err != nil {
+	if err := vm.mempool.forceAddTx(importTx0B); err != nil {
 		t.Fatal(err)
 	}
-
 	<-issuer
 
 	_, err = vm.BuildBlock()
@@ -3685,9 +3684,13 @@ func TestAtomicTxFailsEVMStateTransferBuildBlock(t *testing.T) {
 	if err := vm.issueTx(exportTx2, true /*=local*/); err == nil {
 		t.Fatal("Should have failed to issue due to an invalid export tx")
 	}
-	// Force add transaction directly to the mempool to ensure it fails during build block
-	// as well.
-	if err := vm.mempool.AddTx(exportTx2); err != nil {
+
+	if err := vm.mempool.AddTx(exportTx2); err == nil {
+		t.Fatal("Should have failed to add because conflicting")
+	}
+
+	// Manually add transaction to mempool to bypass validation
+	if err := vm.mempool.forceAddTx(exportTx2); err != nil {
 		t.Fatal(err)
 	}
 	<-issuer
