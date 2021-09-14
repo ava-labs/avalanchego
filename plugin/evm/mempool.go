@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"container/heap"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -15,9 +16,75 @@ const (
 	discardedTxsCacheSize = 50
 )
 
+type txRecord struct {
+	id       ids.ID
+	gasPrice uint64
+}
+
+// txQueue is used to track the pending transactions by [gasPrice]
+type txQueue struct {
+	items  []*txRecord
+	lookup map[ids.ID]int
+}
+
+func newTxQueue(items int) *txQueue {
+	return &txQueue{
+		items:  make([]*txRecord, 0, items),
+		lookup: map[ids.ID]int{},
+	}
+}
+
+func (tq *txQueue) Len() int { return len(tq.items) }
+
+func (tq *txQueue) Less(i, j int) bool {
+	return tq.items[i].gasPrice < tq.items[j].gasPrice
+}
+
+func (tq *txQueue) Swap(i, j int) {
+	tq.items[i], tq.items[j] = tq.items[j], tq.items[i]
+	tq.lookup[tq.items[i].id] = i
+	tq.lookup[tq.items[j].id] = j
+}
+
+func (tq *txQueue) Push(x interface{}) {
+	n := len(tq.items)
+	rec := x.(*txRecord)
+	tq.items = append(tq.items, rec)
+	tq.lookup[rec.id] = n
+}
+
+func (tq *txQueue) Pop() interface{} {
+	n := len(tq.items)
+	item := tq.items[n-1]
+	tq.items[n-1] = nil // avoid memory leak
+	tq.items = tq.items[0 : n-1]
+	delete(tq.lookup, item.id)
+	return item
+}
+
+func (tq *txQueue) Drop() interface{} {
+	item := tq.items[0]
+	tq.items[0] = nil // avoid memory leak
+	tq.items = tq.items[1:]
+	delete(tq.lookup, item.id)
+	return item
+}
+
+func (tq *txQueue) Remove(id ids.ID) {
+	index, ok := tq.lookup[id]
+	if !ok {
+		return
+	}
+	delete(tq.lookup, id)
+	tq.items = append(tq.items[0:index], tq.items[index+1:]...)
+}
+
 // Mempool is a simple mempool for atomic transactions
 type Mempool struct {
 	lock sync.RWMutex
+
+	AVAXAssetID ids.ID
+
 	// maxSize is the maximum number of transactions allowed to be kept in mempool
 	maxSize int
 	// currentTx is the transaction about to be added to a block.
@@ -34,20 +101,26 @@ type Mempool struct {
 	Pending chan struct{}
 	// utxoSet is a collection of all pending and issued UTXOs
 	utxoSet ids.Set
+	// txHeap is a sorted record of all txs in the mempool by price
+	// ONLY contains txs still processing
+	txHeap *txQueue
 }
 
 // NewMempool returns a Mempool with [maxSize]
-// TODO: check conflicting UTXOs
 // TODO: drop lowest priced mempool items
-func NewMempool(maxSize int) *Mempool {
-	return &Mempool{
+func NewMempool(AVAXAssetID ids.ID, maxSize int) *Mempool {
+	m := &Mempool{
+		AVAXAssetID:  AVAXAssetID,
 		txs:          make(map[ids.ID]*Tx),
 		issuedTxs:    make(map[ids.ID]*Tx),
 		discardedTxs: &cache.LRU{Size: discardedTxsCacheSize},
 		Pending:      make(chan struct{}, 1),
-		utxoSet:      ids.Set{},
+		utxoSet:      ids.NewSet(maxSize),
+		txHeap:       newTxQueue(maxSize),
 		maxSize:      maxSize,
 	}
+	heap.Init(m.txHeap)
+	return m
 }
 
 // Len returns the number of transactions in the mempool
@@ -86,8 +159,27 @@ func (m *Mempool) AddTx(tx *Tx) error {
 		return nil
 	}
 
+	// Add tx to heap sorted by gasPrice
+	// TODO: use invalid tx fee
+	gasUsed, err := tx.GasUsed()
+	if err != nil {
+		return errInvalidAtomicTxFee
+	}
+	burned, err := tx.Burned(m.AVAXAssetID)
+	if err != nil {
+		return errInvalidAtomicTxFee
+	}
+	gasPrice := burned / gasUsed
+
+	// TODO: get min item from heap (first item)
 	if m.length() >= m.maxSize {
-		return errTooManyAtomicTx
+		txRecord := m.txHeap.Drop().(*txRecord)
+		// prefer items already in the mempool
+		if txRecord.gasPrice >= gasPrice {
+			m.txHeap.Push(txRecord)
+			return errInsufficientAtomicTxFee
+		}
+		m.removePendingTx(txRecord.id)
 	}
 
 	if _, exists := m.txs[txID]; exists {
@@ -111,6 +203,11 @@ func (m *Mempool) AddTx(tx *Tx) error {
 		m.discardedTxs.Evict(txID)
 	}
 
+	m.txHeap.Push(&txRecord{
+		id:       txID,
+		gasPrice: gasPrice,
+	})
+
 	m.txs[txID] = tx
 	// When adding [tx] to the mempool make sure that there is an item in Pending
 	// to signal the VM to produce a block. Note: if the VM's buildStatus has already
@@ -126,8 +223,10 @@ func (m *Mempool) NextTx() (*Tx, bool) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	for txID, tx := range m.txs {
-		delete(m.txs, txID)
+	if m.txHeap.Len() > 0 {
+		txRec := m.txHeap.Pop().(*txRecord)
+		tx := m.txs[txRec.id]
+		delete(m.txs, txRec.id)
 		m.currentTx = tx
 		return tx, true
 	}
@@ -170,7 +269,7 @@ func (m *Mempool) IssueCurrentTx() {
 
 	// If there are more transactions to be issued, add an item
 	// to Pending.
-	if len(m.txs) > 0 {
+	if m.txHeap.Len() > 0 {
 		m.addPending()
 	}
 }
@@ -186,13 +285,32 @@ func (m *Mempool) CancelCurrentTx() {
 	// If building a block failed, put the currentTx back in [txs]
 	// if it exists.
 	if m.currentTx != nil {
-		m.txs[m.currentTx.ID()] = m.currentTx
+		// Add tx to heap sorted by gasPrice
+		tx := m.currentTx
+		var skip bool
+		var burned uint64
+		gasUsed, err := tx.GasUsed()
+		if err != nil {
+			skip = true
+		} else {
+			burned, err = tx.Burned(m.AVAXAssetID)
+			if err != nil {
+				skip = true
+			}
+		}
+		if !skip {
+			m.txHeap.Push(&txRecord{
+				id:       tx.ID(),
+				gasPrice: burned / gasUsed,
+			})
+			m.txs[m.currentTx.ID()] = tx
+		}
 		m.currentTx = nil
 	}
 
 	// If there are more transactions to be issued, add an item
 	// to Pending.
-	if len(m.txs) > 0 {
+	if m.txHeap.Len() > 0 {
 		m.addPending()
 	}
 }
@@ -208,9 +326,19 @@ func (m *Mempool) DiscardCurrentTx() {
 		return
 	}
 
-	m.discardedTxs.Put(m.currentTx.ID(), m.currentTx)
 	m.utxoSet.Remove(m.currentTx.InputUTXOs().List()...)
+	m.discardedTxs.Put(m.currentTx.ID(), m.currentTx)
 	m.currentTx = nil
+}
+
+// assume lock is held
+func (m *Mempool) removePendingTx(txID ids.ID) {
+	if tx, ok := m.txs[txID]; ok {
+		m.utxoSet.Remove(tx.InputUTXOs().List()...)
+		// this is only called by the heap so we don't remove from it
+		delete(m.txs, txID)
+	}
+	m.discardedTxs.Evict(txID)
 }
 
 // RemoveTx removes [txID] from the mempool completely.
@@ -223,23 +351,19 @@ func (m *Mempool) RemoveTx(txID ids.ID) {
 		removedTx = m.currentTx
 		m.currentTx = nil
 	}
-
 	if tx, ok := m.txs[txID]; ok {
 		removedTx = tx
+		delete(m.txs, txID)
 	}
-	delete(m.txs, txID)
-
-	if tx, ok := m.txs[txID]; ok {
+	if tx, ok := m.issuedTxs[txID]; ok {
 		removedTx = tx
+		delete(m.issuedTxs, txID)
 	}
-	delete(m.issuedTxs, txID)
-
-	m.discardedTxs.Evict(txID)
-
-	// Remove any UTXOs if non-nil
+	m.txHeap.Remove(txID)
 	if removedTx != nil {
 		m.utxoSet.Remove(removedTx.InputUTXOs().List()...)
 	}
+	m.discardedTxs.Evict(txID)
 }
 
 // RejectTx marks [txID] as being rejected and attempts to re-issue
@@ -255,6 +379,19 @@ func (m *Mempool) RejectTx(txID ids.ID) {
 	// If the transaction was issued by the mempool, add it back
 	// to transactions pending issuance.
 	delete(m.issuedTxs, txID)
+
+	gasUsed, err := tx.GasUsed()
+	if err != nil {
+		return
+	}
+	burned, err := tx.Burned(m.AVAXAssetID)
+	if err != nil {
+		return
+	}
+	m.txHeap.Push(&txRecord{
+		id:       tx.ID(),
+		gasPrice: burned / gasUsed,
+	})
 	m.txs[txID] = tx
 	// Add an item to Pending to ensure the VM attempts to reissue
 	// [tx].

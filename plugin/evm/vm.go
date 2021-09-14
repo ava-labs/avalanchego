@@ -105,7 +105,7 @@ var (
 	errUnsupportedFXs                 = errors.New("unsupported feature extensions")
 	errInvalidBlock                   = errors.New("invalid block")
 	errInvalidAddr                    = errors.New("invalid hex address")
-	errTooManyAtomicTx                = errors.New("too many pending atomic txs")
+	errInsufficientAtomicTxFee        = errors.New("atomic tx fee too low for atomic mempool")
 	errAssetIDMismatch                = errors.New("asset IDs in the input don't match the utxo")
 	errNoImportInputs                 = errors.New("tx has no imported inputs")
 	errInputsNotSortedUnique          = errors.New("inputs not sorted and unique")
@@ -133,6 +133,7 @@ var (
 	errNilExtDataGasUsedApricotPhase4 = errors.New("nil extDataGasUsed is invalid after apricotPhase4")
 	errNilBlockGasCostApricotPhase4   = errors.New("nil blockGasCost is invalid after apricotPhase4")
 	errConflictingAtomicTx            = errors.New("conflicting atomic tx present")
+	errInvalidAtomicTxFee             = errors.New("invalid atomic tx fee")
 	defaultLogLevel                   = log.LvlDebug
 )
 
@@ -316,7 +317,7 @@ func (vm *VM) Initialize(
 	vm.codec = Codec
 
 	// TODO: read size from settings
-	vm.mempool = NewMempool(defaultMempoolSize)
+	vm.mempool = NewMempool(ctx.AVAXAssetID, defaultMempoolSize)
 
 	// Attempt to load last accepted block to determine if it is necessary to
 	// initialize state with the genesis block.
@@ -872,14 +873,14 @@ func (vm *VM) issueTx(tx *Tx, local bool) error {
 	case nil:
 		return vm.network.GossipAtomicTx(tx)
 
-	case errTooManyAtomicTx:
+	case errInsufficientAtomicTxFee, errInvalidAtomicTxFee:
 		if !local {
 			// tx has not been accepted to mempool due to size
 			// do not gossip since we cannot serve it
 			return nil
 		}
 
-		return errTooManyAtomicTx // backward compatibility for local txs
+		return err // backward compatibility for local txs
 
 	default:
 		if !local {
