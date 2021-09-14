@@ -9,30 +9,34 @@ import (
 // txEntry is used to track the [gasPrice] transactions pay to be included in
 // the mempool.
 type txEntry struct {
-	ID       ids.ID
-	GasPrice uint64
-	Tx       *Tx
+	id       ids.ID
+	gasPrice uint64
+	tx       *Tx
 	index    int
 }
 
 // internalTxHeap is used to track pending atomic transactions by [gasPrice]
 type internalTxHeap struct {
-	items  []*txEntry
-	lookup map[ids.ID]*txEntry
+	isMinHeap bool
+	items     []*txEntry
+	lookup    map[ids.ID]*txEntry
 }
 
-func newInternalTxHeap(items int) *internalTxHeap {
-	h := &internalTxHeap{
-		items:  make([]*txEntry, 0, items),
-		lookup: map[ids.ID]*txEntry{},
+func newInternalTxHeap(items int, isMinHeap bool) *internalTxHeap {
+	return &internalTxHeap{
+		isMinHeap: isMinHeap,
+		items:     make([]*txEntry, 0, items),
+		lookup:    map[ids.ID]*txEntry{},
 	}
-	return h
 }
 
 func (th internalTxHeap) Len() int { return len(th.items) }
 
 func (th internalTxHeap) Less(i, j int) bool {
-	return th.items[i].GasPrice > th.items[j].GasPrice
+	if th.isMinHeap {
+		return th.items[i].gasPrice < th.items[j].gasPrice
+	}
+	return th.items[i].gasPrice > th.items[j].gasPrice
 }
 
 func (th internalTxHeap) Swap(i, j int) {
@@ -43,11 +47,11 @@ func (th internalTxHeap) Swap(i, j int) {
 
 func (th *internalTxHeap) Push(x interface{}) {
 	entry := x.(*txEntry)
-	if th.Has(entry.ID) {
+	if th.Has(entry.id) {
 		return
 	}
 	th.items = append(th.items, entry)
-	th.lookup[entry.ID] = entry
+	th.lookup[entry.id] = entry
 }
 
 func (th *internalTxHeap) Pop() interface{} {
@@ -55,7 +59,7 @@ func (th *internalTxHeap) Pop() interface{} {
 	item := th.items[n-1]
 	th.items[n-1] = nil // avoid memory leak
 	th.items = th.items[0 : n-1]
-	delete(th.lookup, item.ID)
+	delete(th.lookup, item.id)
 	return item
 }
 
@@ -73,76 +77,84 @@ func (th *internalTxHeap) Has(id ids.ID) bool {
 }
 
 type txHeap struct {
-	internalTxHeap *internalTxHeap
+	maxHeap *internalTxHeap
+	minHeap *internalTxHeap
 }
 
 func newTxHeap(maxSize int) *txHeap {
-	th := &txHeap{
-		internalTxHeap: newInternalTxHeap(maxSize),
+	return &txHeap{
+		maxHeap: newInternalTxHeap(maxSize, false),
+		minHeap: newInternalTxHeap(maxSize, true),
 	}
-	heap.Init(th.internalTxHeap)
-	return th
+}
+
+func (th *txHeap) Push(tx *Tx, gasPrice uint64) {
+	txID := tx.ID()
+	oldLen := th.Len()
+	heap.Push(th.maxHeap, &txEntry{
+		id:       txID,
+		gasPrice: gasPrice,
+		tx:       tx,
+		index:    oldLen,
+	})
+	heap.Push(th.minHeap, &txEntry{
+		id:       txID,
+		gasPrice: gasPrice,
+		tx:       tx,
+		index:    oldLen,
+	})
 }
 
 // Assumes there is non-zero items in [txHeap]
-func (th *txHeap) Pop() *txEntry {
-	return heap.Pop(th.internalTxHeap).(*txEntry)
-}
-
-func (th *txHeap) Push(e *txEntry) {
-	heap.Push(th.internalTxHeap, e)
+func (th *txHeap) PeekMax() (*Tx, uint64) {
+	txEntry := th.maxHeap.items[0]
+	return txEntry.tx, txEntry.gasPrice
 }
 
 // Assumes there is non-zero items in [txHeap]
-// TODO: need to remove this and replace with min-max heap (@Stephen)
-func (th *txHeap) Drop() *txEntry {
-	var (
-		n = th.Len()
-		i = 0
-	)
-
-	// Finds the minimum gas price in the heap (the "lowest" priority...where
-	// [th.internalTxHeap.Less(i, j)] is true for all i and the item is j)
-	for {
-		j1 := 2*i + 1
-		if j1 >= n || j1 < 0 { // j1 < 0 after int overflow
-			break
-		}
-		j := j1 // left child
-		if j2 := j1 + 1; j2 < n && !th.internalTxHeap.Less(j2, j1) {
-			j = j2 // = 2*i + 2  // right child
-		}
-		if th.internalTxHeap.Less(j, i) {
-			break
-		}
-		i = j
-	}
-
-	// Remove and re-heap the [internalTxHeap]
-	return heap.Remove(th.internalTxHeap, i).(*txEntry)
+func (th *txHeap) PeekMin() (*Tx, uint64) {
+	txEntry := th.minHeap.items[0]
+	return txEntry.tx, txEntry.gasPrice
 }
 
-func (th *txHeap) Remove(id ids.ID) *txEntry {
-	entry, ok := th.internalTxHeap.Get(id)
+// Assumes there is non-zero items in [txHeap]
+func (th *txHeap) PopMax() *Tx {
+	return th.Remove(th.maxHeap.items[0].id)
+}
+
+// Assumes there is non-zero items in [txHeap]
+func (th *txHeap) PopMin() *Tx {
+	return th.Remove(th.minHeap.items[0].id)
+}
+
+func (th *txHeap) Remove(id ids.ID) *Tx {
+	maxEntry, ok := th.maxHeap.Get(id)
 	if !ok {
 		return nil
 	}
-	return heap.Remove(th.internalTxHeap, entry.index).(*txEntry)
+	heap.Remove(th.maxHeap, maxEntry.index)
+
+	minEntry, ok := th.minHeap.Get(id)
+	if !ok {
+		// This should never happen, as that would mean the heaps are out of
+		// sync.
+		return nil
+	}
+	return heap.Remove(th.minHeap, minEntry.index).(*txEntry).tx
 }
 
 func (th *txHeap) Len() int {
-	return th.internalTxHeap.Len()
+	return th.maxHeap.Len()
 }
 
-func (th *txHeap) Get(id ids.ID) (*txEntry, bool) {
-	txEntry, ok := th.internalTxHeap.Get(id)
+func (th *txHeap) Get(id ids.ID) (*Tx, bool) {
+	txEntry, ok := th.maxHeap.Get(id)
 	if !ok {
 		return nil, false
 	}
-	return txEntry, true
+	return txEntry.tx, true
 }
 
 func (th *txHeap) Has(id ids.ID) bool {
-	_, ok := th.Get(id)
-	return ok
+	return th.maxHeap.Has(id)
 }

@@ -113,17 +113,18 @@ func (m *Mempool) AddTx(tx *Tx) error {
 	}
 	if m.length() >= m.maxSize {
 		if m.txHeap.Len() > 0 {
-			// Remove the lowest price item from [txHeap]
-			txEntry := m.txHeap.Drop()
+			// Get the lowest price item from [txHeap]
+			_, minGasPrice := m.txHeap.PeekMin()
 			// If the [gasPrice] of the lowest item is >= the [gasPrice] of the
 			// submitted item, discard the submitted item (we prefer items already in
 			// the mempool).
-			if txEntry.GasPrice >= gasPrice {
-				m.txHeap.Push(txEntry)
+			if minGasPrice >= gasPrice {
 				return errInsufficientAtomicTxFee
 			}
-			m.utxoSet.Remove(txEntry.Tx.InputUTXOs().List()...)
-			m.discardedTxs.Evict(txEntry.ID)
+
+			tx := m.txHeap.PopMin()
+			m.utxoSet.Remove(tx.InputUTXOs().List()...)
+			m.discardedTxs.Evict(tx.ID())
 		} else {
 			// This could occur if we have used our entire size allowance on
 			// transactions that are currently processing.
@@ -150,11 +151,7 @@ func (m *Mempool) AddTx(tx *Tx) error {
 	// Add the transaction to the [txHeap] so we can evaluate new entries based
 	// on how their [gasPrice] compares and add to [utxoSet] to make sure we can
 	// reject conflicting transactions.
-	m.txHeap.Push(&txEntry{
-		ID:       txID,
-		GasPrice: gasPrice,
-		Tx:       tx,
-	})
+	m.txHeap.Push(tx, gasPrice)
 	m.utxoSet.Union(utxoSet)
 
 	// When adding [tx] to the mempool make sure that there is an item in Pending
@@ -174,7 +171,7 @@ func (m *Mempool) NextTx() (*Tx, bool) {
 	// We include atomic transactions in blocks sorted by the [gasPrice] they
 	// pay.
 	if m.txHeap.Len() > 0 {
-		tx := m.txHeap.Pop().Tx
+		tx := m.txHeap.PopMax()
 		m.currentTx = tx
 		return tx, true
 	}
@@ -189,8 +186,8 @@ func (m *Mempool) GetTx(txID ids.ID) (*Tx, bool, bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	if txEntry, ok := m.txHeap.Get(txID); ok {
-		return txEntry.Tx, false, true
+	if tx, ok := m.txHeap.Get(txID); ok {
+		return tx, false, true
 	}
 	if tx, ok := m.issuedTxs[txID]; ok {
 		return tx, false, true
@@ -237,11 +234,7 @@ func (m *Mempool) CancelCurrentTx() {
 		tx := m.currentTx
 		gasPrice, err := m.atomicTxGasPrice(tx)
 		if err == nil {
-			m.txHeap.Push(&txEntry{
-				ID:       tx.ID(),
-				GasPrice: gasPrice,
-				Tx:       tx,
-			})
+			m.txHeap.Push(tx, gasPrice)
 		}
 		// If the err is not nil, we simply discard the transaction because it is
 		// invalid. This should never happen but we guard against the case it does.
@@ -281,12 +274,11 @@ func (m *Mempool) RemoveTx(txID ids.ID) {
 		removedTx = m.currentTx
 		m.currentTx = nil
 	}
-	if txEntry, ok := m.txHeap.Get(txID); ok {
-		removedTx = txEntry.Tx
+	var ok bool
+	if removedTx, ok = m.txHeap.Get(txID); ok {
 		m.txHeap.Remove(txID)
 	}
-	if tx, ok := m.issuedTxs[txID]; ok {
-		removedTx = tx
+	if removedTx, ok = m.issuedTxs[txID]; ok {
 		delete(m.issuedTxs, txID)
 	}
 	if removedTx != nil {
@@ -313,11 +305,7 @@ func (m *Mempool) RejectTx(txID ids.ID) {
 	if err != nil {
 		return
 	}
-	m.txHeap.Push(&txEntry{
-		ID:       txID,
-		GasPrice: gasPrice,
-		Tx:       tx,
-	})
+	m.txHeap.Push(tx, gasPrice)
 	// Add an item to Pending to ensure the VM attempts to reissue
 	// [tx].
 	m.addPending()
