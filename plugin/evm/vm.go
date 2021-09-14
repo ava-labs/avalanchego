@@ -860,37 +860,26 @@ func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
 func (vm *VM) issueTx(tx *Tx, local bool) error {
 	if err := vm.verifyTxAtTip(tx); err != nil {
 		if !local {
-			// unlike local txes, currently invalid remote txes are recorded as discarded
+			// unlike local txs, invalid remote txs are recorded as discarded
 			// so that they won't be requested again
 			vm.mempool.discardedTxs.Put(tx.ID(), tx)
 			return nil
 		}
-
 		return err
 	}
 
 	// add to mempool and possibly re-gossip
-	switch err := vm.mempool.AddTx(tx); err {
-	case nil:
-		return vm.network.GossipAtomicTx(tx)
-
-	case errInsufficientAtomicTxFee, errInvalidAtomicTxFee, errTooManyAtomicTx, errConflictingAtomicTx:
+	if err := vm.mempool.AddTx(tx); err != nil {
 		if !local {
-			// tx has not been accepted to mempool due to size
-			// do not gossip since we cannot serve it
-			return nil
-		}
-
-		return err // backward compatibility for local txs
-
-	default:
-		if !local {
-			// unlike local txes, currently invalid remote txes are recorded as discarded
+			// unlike local txs, invalid remote txs are recorded as discarded
 			// so that they won't be requested again
 			vm.mempool.discardedTxs.Put(tx.ID(), tx)
+			return nil
 		}
 		return err
 	}
+
+	return vm.network.GossipAtomicTx(tx)
 }
 
 // verifyTxAtTip verifies that [tx] is valid to be issued on top of the currently preferred block
