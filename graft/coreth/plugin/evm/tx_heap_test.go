@@ -48,12 +48,14 @@ func TestTxHeap(t *testing.T) {
 		assert.True(gHas0)
 		h.Remove(id0)
 		assert.False(h.Has(id0))
+		assert.Zero(h.Len())
 		h.Push(&txEntry{
 			id:       id0,
 			gasPrice: 5,
 			tx:       tx0,
 		})
 		assert.True(h.Has(id0))
+		assert.Equal(1, h.Len())
 	})
 
 	t.Run("add other items", func(t *testing.T) {
@@ -77,9 +79,9 @@ func TestTxHeap(t *testing.T) {
 		assert.Equal(tx2, gTx2)
 		assert.True(gHas2)
 
-		assert.Equal(id1, h.Pop().(*txEntry).id)
-		assert.Equal(id0, h.Pop().(*txEntry).id)
-		assert.Equal(id2, h.Pop().(*txEntry).id)
+		assert.Equal(id1, h.Pop().id)
+		assert.Equal(id0, h.Pop().id)
+		assert.Equal(id2, h.Pop().id)
 
 		assert.False(h.Has(id0))
 		gTx0, gHas0 := h.Get(id0)
