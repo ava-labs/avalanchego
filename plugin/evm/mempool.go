@@ -106,15 +106,6 @@ func (m *Mempool) AddTx(tx *Tx) error {
 		return nil
 	}
 
-	// If the transaction was recently discarded, log the event and evict from
-	// discarded transactions so it's not in two places within the mempool.
-	// We allow the transaction to be re-issued since it may have been invalid
-	// due to an atomic UTXO not being present yet.
-	if _, has := m.discardedTxs.Get(txID); has {
-		log.Debug("Adding recently discarded transaction %s back to the mempool", txID)
-		m.discardedTxs.Evict(txID)
-	}
-
 	// Check if the submitted transaction's UTXOs conflict with what is already
 	// in the mempool
 	utxoSet := tx.InputUTXOs()
@@ -146,6 +137,15 @@ func (m *Mempool) AddTx(tx *Tx) error {
 			// transactions that are currently processing.
 			return errTooManyAtomicTx
 		}
+	}
+
+	// If the transaction was recently discarded, log the event and evict from
+	// discarded transactions so it's not in two places within the mempool.
+	// We allow the transaction to be re-issued since it may have been invalid
+	// due to an atomic UTXO not being present yet.
+	if _, has := m.discardedTxs.Get(txID); has {
+		log.Debug("Adding recently discarded transaction %s back to the mempool", txID)
+		m.discardedTxs.Evict(txID)
 	}
 
 	// Add the transaction to the [txHeap] so we can evaluate new entries based
