@@ -72,7 +72,8 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 			has = mempool.has(txID)
 			assert.True(has, "valid tx not recorded into mempool")
 
-			// show that build block include that tx and tx is still in mempool
+			// Show that BuildBlock generates a block containing [txID] and that it is
+			// still present in the mempool.
 			blk, err := vm.BuildBlock()
 			assert.NoError(err, "could not build block out of mempool")
 
