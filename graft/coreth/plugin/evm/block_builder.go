@@ -72,7 +72,7 @@ type blockBuilder struct {
 }
 
 func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *blockBuilder {
-	return &blockBuilder{
+	b := &blockBuilder{
 		ctx:                  vm.ctx,
 		chainConfig:          vm.chainConfig,
 		chain:                vm.chain,
@@ -83,9 +83,7 @@ func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *bl
 		notifyBuildBlockChan: notifyBuildBlockChan,
 		buildStatus:          dontBuild,
 	}
-}
 
-func (b *blockBuilder) handleBlockBuilding() {
 	b.buildBlockTimer = timer.NewStagedTimer(b.buildBlockTwoStageTimer)
 	go b.ctx.Log.RecoverAndPanic(b.buildBlockTimer.Dispatch)
 
@@ -95,6 +93,8 @@ func (b *blockBuilder) handleBlockBuilding() {
 	} else {
 		b.isAP4 = true
 	}
+
+	return b
 }
 
 func (b *blockBuilder) migrateAP4() {
