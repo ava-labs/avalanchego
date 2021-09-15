@@ -84,6 +84,11 @@ func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *bl
 		buildStatus:          dontBuild,
 	}
 
+	b.handleBlockBuilding()
+	return b
+}
+
+func (b *blockBuilder) handleBlockBuilding() {
 	b.buildBlockTimer = timer.NewStagedTimer(b.buildBlockTwoStageTimer)
 	go b.ctx.Log.RecoverAndPanic(b.buildBlockTimer.Dispatch)
 
@@ -93,8 +98,6 @@ func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *bl
 	} else {
 		b.isAP4 = true
 	}
-
-	return b
 }
 
 func (b *blockBuilder) migrateAP4() {
