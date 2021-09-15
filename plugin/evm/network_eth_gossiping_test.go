@@ -188,39 +188,19 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 	sender.CantSendAppGossip = false
-	seen := 0
-	signal := make(chan struct{})
+	seen := map[common.Hash]struct{}{}
 	sender.SendAppGossipF = func(gossipedBytes []byte) error {
-		if seen == 0 {
-			notifyMsgIntf, err := message.Parse(gossipedBytes)
-			assert.NoError(err)
+		notifyMsgIntf, err := message.Parse(gossipedBytes)
+		assert.NoError(err)
 
-			requestMsg, ok := notifyMsgIntf.(*message.EthTxs)
-			assert.True(ok)
-			assert.NotEmpty(requestMsg.Txs)
+		requestMsg, ok := notifyMsgIntf.(*message.EthTxs)
+		assert.True(ok)
+		assert.NotEmpty(requestMsg.Txs)
 
-			txs := make([]*types.Transaction, 0)
-			assert.NoError(rlp.DecodeBytes(requestMsg.Txs, &txs))
-			assert.Len(txs, 59)
-			for i, tx := range txs {
-				assert.Equal(ethTxs[i].Hash(), tx.Hash())
-			}
-			seen++
-		} else {
-			notifyMsgIntf, err := message.Parse(gossipedBytes)
-			assert.NoError(err)
-
-			requestMsg, ok := notifyMsgIntf.(*message.EthTxs)
-			assert.True(ok)
-			assert.NotEmpty(requestMsg.Txs)
-
-			txs := make([]*types.Transaction, 0)
-			assert.NoError(rlp.DecodeBytes(requestMsg.Txs, &txs))
-			assert.Len(txs, 41)
-			for i, tx := range txs {
-				assert.Equal(ethTxs[i+59].Hash(), tx.Hash())
-			}
-			close(signal)
+		txs := make([]*types.Transaction, 0)
+		assert.NoError(rlp.DecodeBytes(requestMsg.Txs, &txs))
+		for _, tx := range txs {
+			seen[tx.Hash()] = struct{}{}
 		}
 		wg.Done()
 		return nil
@@ -233,6 +213,11 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 	}
 
 	attemptAwait(t, &wg, 5*time.Second)
+
+	for _, tx := range ethTxs {
+		_, ok := seen[tx.Hash()]
+		assert.True(ok, "missing hash: %v", tx.Hash())
+	}
 }
 
 // show that a geth tx discovered from gossip is requested to the same node that
