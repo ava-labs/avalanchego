@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -18,9 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-func TestBlockState(t *testing.T) {
-	assert := assert.New(t)
-
+func testBlockState(a *assert.Assertions, bs BlockState) {
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
@@ -28,7 +27,7 @@ func TestBlockState(t *testing.T) {
 	chainID := ids.ID{4}
 
 	tlsCert, err := staking.NewTLSCert()
-	assert.NoError(err)
+	a.NoError(err)
 
 	cert := tlsCert.Leaf
 	key := tlsCert.PrivateKey.(crypto.Signer)
@@ -42,36 +41,51 @@ func TestBlockState(t *testing.T) {
 		chainID,
 		key,
 	)
-	assert.NoError(err)
-
-	db := memdb.New()
-
-	bs := NewBlockState(db)
+	a.NoError(err)
 
 	_, _, err = bs.GetBlock(b.ID())
-	assert.Equal(database.ErrNotFound, err)
+	a.Equal(database.ErrNotFound, err)
 
 	_, _, err = bs.GetBlock(b.ID())
-	assert.Equal(database.ErrNotFound, err)
+	a.Equal(database.ErrNotFound, err)
 
 	err = bs.PutBlock(b, choices.Accepted)
-	assert.NoError(err)
+	a.NoError(err)
 
 	fetchedBlock, fetchedStatus, err := bs.GetBlock(b.ID())
-	assert.NoError(err)
-	assert.Equal(choices.Accepted, fetchedStatus)
-	assert.Equal(b.Bytes(), fetchedBlock.Bytes())
+	a.NoError(err)
+	a.Equal(choices.Accepted, fetchedStatus)
+	a.Equal(b.Bytes(), fetchedBlock.Bytes())
 
 	bs.clearCache()
 
 	fetchedBlock, fetchedStatus, err = bs.GetBlock(b.ID())
-	assert.NoError(err)
-	assert.Equal(choices.Accepted, fetchedStatus)
-	assert.Equal(b.Bytes(), fetchedBlock.Bytes())
+	a.NoError(err)
+	a.Equal(choices.Accepted, fetchedStatus)
+	a.Equal(b.Bytes(), fetchedBlock.Bytes())
 
 	err = bs.DeleteBlock(b.ID())
-	assert.NoError(err)
+	a.NoError(err)
 
 	_, _, err = bs.GetBlock(b.ID())
-	assert.Equal(database.ErrNotFound, err)
+	a.Equal(database.ErrNotFound, err)
+}
+
+func TestBlockState(t *testing.T) {
+	a := assert.New(t)
+
+	db := memdb.New()
+	bs := NewBlockState(db)
+
+	testBlockState(a, bs)
+}
+
+func TestMeteredBlockState(t *testing.T) {
+	a := assert.New(t)
+
+	db := memdb.New()
+	bs, err := NewMeteredBlockState(db, "", prometheus.NewRegistry())
+	a.NoError(err)
+
+	testBlockState(a, bs)
 }

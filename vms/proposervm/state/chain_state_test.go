@@ -13,37 +13,40 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-func TestChainState(t *testing.T) {
-	assert := assert.New(t)
-
+func testChainState(a *assert.Assertions, cs ChainState) {
 	lastAccepted := ids.GenerateTestID()
 
-	db := memdb.New()
-
-	cs := NewChainState(db)
-
 	_, err := cs.GetLastAccepted()
-	assert.Equal(database.ErrNotFound, err)
+	a.Equal(database.ErrNotFound, err)
 
 	err = cs.SetLastAccepted(lastAccepted)
-	assert.NoError(err)
+	a.NoError(err)
 
 	err = cs.SetLastAccepted(lastAccepted)
-	assert.NoError(err)
+	a.NoError(err)
 
 	cs.clearCache()
 
 	fetchedLastAccepted, err := cs.GetLastAccepted()
-	assert.NoError(err)
-	assert.Equal(lastAccepted, fetchedLastAccepted)
+	a.NoError(err)
+	a.Equal(lastAccepted, fetchedLastAccepted)
 
 	fetchedLastAccepted, err = cs.GetLastAccepted()
-	assert.NoError(err)
-	assert.Equal(lastAccepted, fetchedLastAccepted)
+	a.NoError(err)
+	a.Equal(lastAccepted, fetchedLastAccepted)
 
 	err = cs.DeleteLastAccepted()
-	assert.NoError(err)
+	a.NoError(err)
 
 	_, err = cs.GetLastAccepted()
-	assert.Equal(database.ErrNotFound, err)
+	a.Equal(database.ErrNotFound, err)
+}
+
+func TestChainState(t *testing.T) {
+	a := assert.New(t)
+
+	db := memdb.New()
+	cs := NewChainState(db)
+
+	testChainState(a, cs)
 }
