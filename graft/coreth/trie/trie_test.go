@@ -1080,7 +1080,7 @@ func TestDecodeNode(t *testing.T) {
 		hash  = make([]byte, 20)
 		elems = make([]byte, 20)
 	)
-	for i := 0; i < 5000000; i++ {
+	for i := 0; i < 5; i++ {
 		rand.Read(hash)
 		rand.Read(elems)
 		decodeNode(hash, elems)
