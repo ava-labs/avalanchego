@@ -40,11 +40,18 @@ func (ids *ShortSet) Add(idList ...ShortID) {
 	}
 }
 
-// Union adds all the ids from the provided sets to this set.
+// Union adds all the ids from the provided set to this set.
 func (ids *ShortSet) Union(idSet ShortSet) {
 	ids.init(2 * idSet.Len())
 	for id := range idSet {
 		(*ids)[id] = struct{}{}
+	}
+}
+
+// Difference removes all the ids from the provided set to this set.
+func (ids *ShortSet) Difference(idSet ShortSet) {
+	for id := range idSet {
+		delete(*ids, id)
 	}
 }
 

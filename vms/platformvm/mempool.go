@@ -15,6 +15,8 @@ const (
 	// droppedTxIDsCacheSize is the maximum number of dropped txIDs to cache
 	droppedTxIDsCacheSize = 50
 
+	initialConsumedUTXOsSize = 512
+
 	// maxMempoolSize is the maximum number of bytes allowed in the mempool
 	maxMempoolSize = 64 * units.MiB
 )
@@ -72,6 +74,7 @@ func NewMempool() Mempool {
 		unissuedDecisionTxs: NewTxHeapByAge(),
 		unissuedAtomicTxs:   NewTxHeapByAge(),
 		droppedTxIDs:        &cache.LRU{Size: droppedTxIDsCacheSize},
+		consumedUTXOs:       ids.NewSet(initialConsumedUTXOsSize),
 	}
 }
 
@@ -209,7 +212,5 @@ func (m *mempool) deregister(tx *Tx) {
 	m.totalBytesSize -= len(txBytes)
 
 	inputs := tx.InputIDs()
-	for input := range inputs {
-		m.consumedUTXOs.Remove(input)
-	}
+	m.consumedUTXOs.Difference(inputs)
 }
