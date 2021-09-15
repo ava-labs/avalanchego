@@ -247,6 +247,10 @@ func (m *Mempool) CancelCurrentTx() {
 		gasPrice, err := m.atomicTxGasPrice(tx)
 		if err == nil {
 			m.txHeap.Push(tx, gasPrice)
+		} else {
+			log.Error("failed to calculate atomic tx gas price while canceling current tx", "err", err)
+			m.utxoSet.Remove(tx.InputUTXOs().List()...)
+			m.discardedTxs.Put(tx.ID(), tx)
 		}
 		// If the err is not nil, we simply discard the transaction because it is
 		// invalid. This should never happen but we guard against the case it does.
