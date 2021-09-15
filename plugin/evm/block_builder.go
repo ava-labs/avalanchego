@@ -72,7 +72,7 @@ type blockBuilder struct {
 }
 
 func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *blockBuilder {
-	return &blockBuilder{
+	b := &blockBuilder{
 		ctx:                  vm.ctx,
 		chainConfig:          vm.chainConfig,
 		chain:                vm.chain,
@@ -83,6 +83,9 @@ func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *bl
 		notifyBuildBlockChan: notifyBuildBlockChan,
 		buildStatus:          dontBuild,
 	}
+
+	b.handleBlockBuilding()
+	return b
 }
 
 func (b *blockBuilder) handleBlockBuilding() {
