@@ -10,7 +10,6 @@ import (
 )
 
 var (
-	_ Message = &TxNotify{}
 	_ Message = &Tx{}
 
 	errUnexpectedCodecVersion = errors.New("unexpected codec version")
@@ -33,16 +32,6 @@ type message []byte
 
 func (m *message) initialize(bytes []byte) { *m = bytes }
 func (m *message) Bytes() []byte           { return *m }
-
-type TxNotify struct {
-	message
-
-	TxID ids.ID `serialize:"true"`
-}
-
-func (msg *TxNotify) Handle(handler Handler, nodeID ids.ShortID, requestID uint32) error {
-	return handler.HandleTxNotify(nodeID, requestID, msg)
-}
 
 type Tx struct {
 	message

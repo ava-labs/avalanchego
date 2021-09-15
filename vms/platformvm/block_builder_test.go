@@ -26,7 +26,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	mempool := &vm.blockBuilder
 
 	// add a tx to it
-	tx := getTheValidTx(vm, t)
+	tx := getValidTx(vm, t)
 	txID := tx.ID()
 
 	err := mempool.AddUnverifiedTx(tx)
@@ -65,7 +65,7 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	mempool := blockBuilder.Mempool.(*mempool)
 
 	// create candidate tx
-	tx := getTheValidTx(vm, t)
+	tx := getValidTx(vm, t)
 
 	// shortcut to simulated almost filled mempool
 	mempool.totalBytesSize = maxMempoolSize - len(tx.Bytes()) + 1
@@ -95,7 +95,7 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	mempool := blockBuilder.Mempool.(*mempool)
 
 	// create candidate tx
-	tx := getTheValidTx(vm, t)
+	tx := getValidTx(vm, t)
 	txID := tx.ID()
 
 	mempool.MarkDropped(txID)
