@@ -70,8 +70,14 @@ func (tx *UnsignedAddSubnetValidatorTx) SyntacticVerify(ctx *snow.Context) error
 	return nil
 }
 
-// SemanticVerify this transaction is valid.
-func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
+// Attempts to verify this transaction with the provided state.
+func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
+	_, _, _, _, err := tx.Execute(vm, parentState, stx)
+	return err
+}
+
+// Execute this transaction.
+func (tx *UnsignedAddSubnetValidatorTx) Execute(
 	vm *VM,
 	parentState MutableState,
 	stx *Tx,

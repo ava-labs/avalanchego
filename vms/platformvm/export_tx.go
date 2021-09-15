@@ -85,8 +85,14 @@ func (tx *UnsignedExportTx) SyntacticVerify(ctx *snow.Context) error {
 	return nil
 }
 
-// SemanticVerify this transaction is valid.
-func (tx *UnsignedExportTx) SemanticVerify(
+// Attempts to verify this transaction with the provided state.
+func (tx *UnsignedExportTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
+	_, err := tx.Execute(vm, parentState, stx)
+	return err
+}
+
+// Execute this transaction.
+func (tx *UnsignedExportTx) Execute(
 	vm *VM,
 	parentState MutableState,
 	stx *Tx,

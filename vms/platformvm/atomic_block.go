@@ -110,7 +110,7 @@ func (ab *AtomicBlock) Verify() error {
 	}
 
 	parentState := parent.onAccept()
-	onAccept, err := tx.SemanticVerify(ab.vm, parentState, &ab.Tx)
+	onAccept, err := tx.Execute(ab.vm, parentState, &ab.Tx)
 	if err != nil {
 		txID := tx.ID()
 		ab.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped

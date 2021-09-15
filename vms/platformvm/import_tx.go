@@ -56,6 +56,13 @@ func (tx *UnsignedImportTx) InputUTXOs() ids.Set {
 	return set
 }
 
+func (tx *UnsignedImportTx) InputIDs() ids.Set {
+	inputs := tx.BaseTx.InputIDs()
+	atomicInputs := tx.InputUTXOs()
+	inputs.Union(atomicInputs)
+	return inputs
+}
+
 // SyntacticVerify this transaction is well-formed
 func (tx *UnsignedImportTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
@@ -87,8 +94,14 @@ func (tx *UnsignedImportTx) SyntacticVerify(ctx *snow.Context) error {
 	return nil
 }
 
-// SemanticVerify this transaction is valid.
-func (tx *UnsignedImportTx) SemanticVerify(
+// Attempts to verify this transaction with the provided state.
+func (tx *UnsignedImportTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
+	_, err := tx.Execute(vm, parentState, stx)
+	return err
+}
+
+// Execute this transaction.
+func (tx *UnsignedImportTx) Execute(
 	vm *VM,
 	parentState MutableState,
 	stx *Tx,

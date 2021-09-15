@@ -13,6 +13,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+type dummyUnsignedTx struct {
+	BaseTx
+}
+
+func (du *dummyUnsignedTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
+	return nil
+}
+
 func TestSemanticVerifySpendUTXOs(t *testing.T) {
 	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()

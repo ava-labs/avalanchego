@@ -22,6 +22,7 @@ const (
 var (
 	errUnknownTxType = errors.New("unknown transaction type")
 	errDuplicatedTx  = errors.New("duplicated transaction")
+	errConflictingTx = errors.New("conflicting transaction")
 	errMempoolFull   = errors.New("mempool is full")
 
 	_ Mempool = &mempool{}
@@ -61,6 +62,8 @@ type mempool struct {
 	totalBytesSize      int
 
 	droppedTxIDs *cache.LRU
+
+	consumedUTXOs ids.Set
 }
 
 func NewMempool() Mempool {
@@ -82,6 +85,11 @@ func (m *mempool) Add(tx *Tx) error {
 		return errMempoolFull
 	}
 
+	inputs := tx.InputIDs()
+	if m.consumedUTXOs.Overlaps(inputs) {
+		return errConflictingTx
+	}
+
 	switch tx.UnsignedTx.(type) {
 	case TimedTx:
 		m.AddProposalTx(tx)
@@ -93,6 +101,10 @@ func (m *mempool) Add(tx *Tx) error {
 		return errUnknownTxType
 	}
 
+	// Mark these UTXOs as consumed in the mempool
+	m.consumedUTXOs.Union(inputs)
+
+	// ensure that a mempool tx is either dropped or available (not both)
 	m.droppedTxIDs.Evict(txID)
 	return nil
 }
@@ -195,4 +207,9 @@ func (m *mempool) register(tx *Tx) {
 func (m *mempool) deregister(tx *Tx) {
 	txBytes := tx.Bytes()
 	m.totalBytesSize -= len(txBytes)
+
+	inputs := tx.InputIDs()
+	for input := range inputs {
+		m.consumedUTXOs.Remove(input)
+	}
 }
