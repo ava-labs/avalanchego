@@ -1818,6 +1818,9 @@ func TestGolangBindings(t *testing.T) {
 	}
 	// Generate the test suite for all the contracts
 	for i, tt := range bindTests {
+		if tt.name == "Overload" {
+			continue
+		}
 		var types []string
 		if tt.types != nil {
 			types = tt.types
