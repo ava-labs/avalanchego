@@ -116,10 +116,10 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 			txs := make([]*types.Transaction, 0)
 			assert.NoError(rlp.DecodeBytes(requestMsg.Txs, &txs))
 			assert.Len(txs, 2)
-			hashes := []common.Hash{ethTxs[0].Hash(), ethTxs[1].Hash()}
-			assert.Contains(hashes, txs[0].Hash())
-			assert.Contains(hashes, txs[1].Hash())
-
+			assert.ElementsMatch(
+				[]common.Hash{ethTxs[0].Hash(), ethTxs[1].Hash()},
+				[]common.Hash{txs[0].Hash(), txs[1].Hash()},
+			)
 			seen++
 			close(signal1)
 		} else if seen == 1 {
