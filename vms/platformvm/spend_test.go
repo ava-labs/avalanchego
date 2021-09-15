@@ -34,7 +34,9 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 	// The VM time during a test, unless [chainTimestamp] is set
 	now := time.Unix(1607133207, 0)
 
-	unsignedTx := BaseTx{}
+	unsignedTx := dummyUnsignedTx{
+		BaseTx: BaseTx{},
+	}
 	unsignedTx.Initialize([]byte{0}, []byte{1})
 
 	// Note that setting [chainTimestamp] also set's the VM's clock.

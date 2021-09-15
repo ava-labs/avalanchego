@@ -849,16 +849,8 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	}
 
 	// trigger block creation
-	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
-		t.Fatal(err)
-	}
-	_, err = vm.BuildBlock()
-	if err == nil {
+	if err := vm.blockBuilder.AddUnverifiedTx(tx); err == nil {
 		t.Fatal("Expected BuildBlock to error due to adding a validator with a nodeID that is already in the validator set.")
-	}
-
-	if vm.blockBuilder.HasProposalTx() {
-		t.Fatal("Expected there to be 0 unissued proposal transactions after BuildBlock failed, but reported txs")
 	}
 }
 

@@ -461,10 +461,6 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 
 	// trigger block creation
 	err = vm.blockBuilder.AddUnverifiedTx(addThirdDelegatorTx)
-	assert.NoError(err)
-
-	// Verify the proposed tx is invalid
-	_, err = vm.BuildBlock()
 	assert.Error(err, "should have marked the delegator as being over delegated")
 }
 
