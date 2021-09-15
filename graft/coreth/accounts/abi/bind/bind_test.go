@@ -1464,7 +1464,7 @@ var bindTests = []struct {
 		// Initialize test accounts
 		key, _ := crypto.GenerateKey()
 		auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-		sim := backends.NewSimulatedBackend(core.GenesisAlloc{auth.From: {Balance: new(big.Int).Mul(big.NewInt(10000000000000000), big.NewInt(1000))}, 10000000)
+		sim := backends.NewSimulatedBackend(core.GenesisAlloc{auth.From: {Balance: new(big.Int).Mul(big.NewInt(10000000000000000), big.NewInt(1000))}}, 10000000)
 		defer sim.Close()
 
 		// deploy the test contract
