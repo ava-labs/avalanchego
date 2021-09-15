@@ -359,7 +359,6 @@ func (vm *VM) Initialize(
 	// NOTE: gossip network must be initialized first otherwie ETH tx gossip will
 	// not work.
 	vm.builder = vm.NewBlockBuilder(toEngine)
-	vm.builder.handleBlockBuilding()
 
 	vm.chain.Start()
 
