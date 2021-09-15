@@ -1472,8 +1472,6 @@ var bindTests = []struct {
 		if err != nil {
 			t.Fatalf("Failed to deploy contract: %v", err)
 		}
-		// Finish deploy.
-		sim.Commit()
 
 		resCh, stopCh := make(chan uint64), make(chan struct{})
 
@@ -1497,6 +1495,14 @@ var bindTests = []struct {
 				}
 			}
 		}()
+
+		time.Sleep(10)
+
+		// Finish deploy.
+		sim.Commit()
+
+		time.Sleep(1)
+
 		contract.Foo(auth, big.NewInt(1), big.NewInt(2))
 		sim.Commit()
 		select {
@@ -1504,7 +1510,7 @@ var bindTests = []struct {
 			if n != 3 {
 				t.Fatalf("Invalid bar0 event")
 			}
-		case <-time.NewTimer(3 * time.Second).C:
+		case <-time.NewTimer(10 * time.Second).C:
 			t.Fatalf("Wait bar0 event timeout")
 		}
 
@@ -1515,7 +1521,7 @@ var bindTests = []struct {
 			if n != 1 {
 				t.Fatalf("Invalid bar event")
 			}
-		case <-time.NewTimer(3 * time.Second).C:
+		case <-time.NewTimer(10 * time.Second).C:
 			t.Fatalf("Wait bar event timeout")
 		}
 		close(stopCh)
@@ -1818,9 +1824,6 @@ func TestGolangBindings(t *testing.T) {
 	}
 	// Generate the test suite for all the contracts
 	for i, tt := range bindTests {
-		if tt.name == "Overload" {
-			continue
-		}
 		var types []string
 		if tt.types != nil {
 			types = tt.types
