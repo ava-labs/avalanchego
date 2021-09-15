@@ -127,6 +127,8 @@ func (vm *VM) newPushNetwork(
 	return net
 }
 
+// awaitEthTxGossip periodically gossips transactions that have been queued for
+// gossip at least once every [ethTxsGossipInterval].
 func (n *pushNetwork) awaitEthTxGossip() {
 	n.shutdownWg.Add(1)
 	go n.ctx.Log.RecoverAndPanic(func() {
@@ -291,10 +293,9 @@ func (n *pushNetwork) gossipEthTxs() (int, error) {
 	return len(selectedTxs), n.sendEthTxs(msgTxs)
 }
 
-// GossipEthTxs gossips the provided [txs] as soon as possible to reduce the
-// time to finality. In the future, we could attempt to be more conservative
-// with the number of messages we send and attempt to periodically send
-// a batch of messages.
+// GossipEthTxs enqueues the provided [txs] for gossiping. At some point, the
+// [pushNetwork] will attempt to gossip the provided txs to other nodes
+// (usually right away if not under load).
 //
 // NOTE: We never return a non-nil error from this function but retain the
 // option to do so in case it becomes useful.
