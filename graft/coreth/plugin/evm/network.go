@@ -123,40 +123,42 @@ func (vm *VM) newPushNetwork(
 		vm:  vm,
 		net: net,
 	}
-	net.shutdownWg.Add(1)
-	go net.ctx.Log.RecoverAndPanic(net.batchEthTxGossip)
+	net.awaitEthTxGossip()
 	return net
 }
 
-func (n *pushNetwork) batchEthTxGossip() {
-	defer n.shutdownWg.Done()
+func (n *pushNetwork) awaitEthTxGossip() {
+	n.shutdownWg.Add(1)
+	go n.ctx.Log.RecoverAndPanic(func() {
+		defer n.shutdownWg.Done()
 
-	ticker := time.NewTicker(ethTxsGossipInterval)
-	for {
-		select {
-		case <-ticker.C:
-			if attempted, err := n.gossipEthTxs(); err != nil {
-				log.Warn(
-					"failed to send eth transactions",
-					"len(txs)", attempted,
-					"err", err,
-				)
+		ticker := time.NewTicker(ethTxsGossipInterval)
+		for {
+			select {
+			case <-ticker.C:
+				if attempted, err := n.gossipEthTxs(); err != nil {
+					log.Warn(
+						"failed to send eth transactions",
+						"len(txs)", attempted,
+						"err", err,
+					)
+				}
+			case txs := <-n.ethTxsToGossipChan:
+				for _, tx := range txs {
+					n.ethTxsToGossip[tx.Hash()] = tx
+				}
+				if attempted, err := n.gossipEthTxs(); err != nil {
+					log.Warn(
+						"failed to send eth transactions",
+						"len(txs)", attempted,
+						"err", err,
+					)
+				}
+			case <-n.shutdownChan:
+				return
 			}
-		case txs := <-n.ethTxsToGossipChan:
-			for _, tx := range txs {
-				n.ethTxsToGossip[tx.Hash()] = tx
-			}
-			if attempted, err := n.gossipEthTxs(); err != nil {
-				log.Warn(
-					"failed to send eth transactions",
-					"len(txs)", attempted,
-					"err", err,
-				)
-			}
-		case <-n.shutdownChan:
-			return
 		}
-	}
+	})
 }
 
 func (n *pushNetwork) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
