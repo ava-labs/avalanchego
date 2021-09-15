@@ -27,7 +27,7 @@
 // Package bind generates Ethereum contract Go bindings.
 //
 // Detailed usage document and tutorial available on the go-ethereum Wiki page:
-// https://github.com/ava-labs/coreth/wiki/Native-DApps:-Go-bindings-to-Ethereum-contracts
+// https://github.com/ethereum/go-ethereum/wiki/Native-DApps:-Go-bindings-to-Ethereum-contracts
 package bind
 
 import (
