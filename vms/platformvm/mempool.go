@@ -15,6 +15,8 @@ const (
 	// droppedTxIDsCacheSize is the maximum number of dropped txIDs to cache
 	droppedTxIDsCacheSize = 50
 
+	initialConsumedUTXOsSize = 512
+
 	// maxMempoolSize is the maximum number of bytes allowed in the mempool
 	maxMempoolSize = 64 * units.MiB
 )
@@ -22,6 +24,7 @@ const (
 var (
 	errUnknownTxType = errors.New("unknown transaction type")
 	errDuplicatedTx  = errors.New("duplicated transaction")
+	errConflictingTx = errors.New("conflicting transaction")
 	errMempoolFull   = errors.New("mempool is full")
 
 	_ Mempool = &mempool{}
@@ -61,6 +64,8 @@ type mempool struct {
 	totalBytesSize      int
 
 	droppedTxIDs *cache.LRU
+
+	consumedUTXOs ids.Set
 }
 
 func NewMempool() Mempool {
@@ -69,6 +74,7 @@ func NewMempool() Mempool {
 		unissuedDecisionTxs: NewTxHeapByAge(),
 		unissuedAtomicTxs:   NewTxHeapByAge(),
 		droppedTxIDs:        &cache.LRU{Size: droppedTxIDsCacheSize},
+		consumedUTXOs:       ids.NewSet(initialConsumedUTXOsSize),
 	}
 }
 
@@ -82,6 +88,11 @@ func (m *mempool) Add(tx *Tx) error {
 		return errMempoolFull
 	}
 
+	inputs := tx.InputIDs()
+	if m.consumedUTXOs.Overlaps(inputs) {
+		return errConflictingTx
+	}
+
 	switch tx.UnsignedTx.(type) {
 	case TimedTx:
 		m.AddProposalTx(tx)
@@ -93,6 +104,10 @@ func (m *mempool) Add(tx *Tx) error {
 		return errUnknownTxType
 	}
 
+	// Mark these UTXOs as consumed in the mempool
+	m.consumedUTXOs.Union(inputs)
+
+	// ensure that a mempool tx is either dropped or available (not both)
 	m.droppedTxIDs.Evict(txID)
 	return nil
 }
@@ -195,4 +210,7 @@ func (m *mempool) register(tx *Tx) {
 func (m *mempool) deregister(tx *Tx) {
 	txBytes := tx.Bytes()
 	m.totalBytesSize -= len(txBytes)
+
+	inputs := tx.InputIDs()
+	m.consumedUTXOs.Difference(inputs)
 }

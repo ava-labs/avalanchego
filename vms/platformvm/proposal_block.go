@@ -175,7 +175,7 @@ func (pb *ProposalBlock) Verify() error {
 	parentState := parent.onAccept()
 
 	var err TxError
-	pb.onCommitState, pb.onAbortState, pb.onCommitFunc, pb.onAbortFunc, err = tx.SemanticVerify(pb.vm, parentState, &pb.Tx)
+	pb.onCommitState, pb.onAbortState, pb.onCommitFunc, pb.onAbortFunc, err = tx.Execute(pb.vm, parentState, &pb.Tx)
 	if err != nil {
 		txID := tx.ID()
 		pb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped

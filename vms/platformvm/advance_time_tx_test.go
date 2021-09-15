@@ -24,7 +24,7 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 
 	if tx, err := vm.newAdvanceTimeTx(defaultGenesisTime); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've failed verification because proposed timestamp same as current timestamp")
 	}
 }
@@ -66,7 +66,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	tx, err := vm.newAdvanceTimeTx(pendingValidatorStartTime.Add(1 * time.Second))
 	if err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've failed verification because proposed timestamp is after pending validator start time")
 	}
 	if err := vm.Shutdown(); err != nil {
@@ -90,7 +90,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	// Proposes advancing timestamp to 1 second after genesis validators stop validating
 	if tx, err := vm.newAdvanceTimeTx(defaultValidateEndTime.Add(1 * time.Second)); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've failed verification because proposed timestamp is after pending validator start time")
 	}
 }
@@ -140,7 +140,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	onCommit, onAbort, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
+	onCommit, onAbort, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -334,7 +334,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers2(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			onCommitState, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
+			onCommitState, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
 			if err != nil {
 				t.Fatalf("failed test '%s': %s", tt.description, err)
 			}
@@ -435,7 +435,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	onCommitState, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
+	onCommitState, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
 	if err != nil {
 		t.Fatal(err)
 	}

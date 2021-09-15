@@ -72,8 +72,20 @@ func (m *blockBuilder) AddUnverifiedTx(tx *Tx) error {
 		return nil
 	}
 
-	if err := tx.UnsignedTx.SyntacticVerify(m.vm.ctx); err != nil {
-		txID := tx.ID()
+	// Get the preferred block (which we want to build off)
+	preferred, err := m.vm.Preferred()
+	if err != nil {
+		return fmt.Errorf("couldn't get preferred block: %w", err)
+	}
+
+	preferredDecision, ok := preferred.(decision)
+	if !ok {
+		// The preferred block should always be a decision block
+		return errInvalidBlockType
+	}
+
+	preferredState := preferredDecision.onAccept()
+	if err := tx.UnsignedTx.SemanticVerify(m.vm, preferredState, tx); err != nil {
 		m.MarkDropped(txID)
 		return err
 	}

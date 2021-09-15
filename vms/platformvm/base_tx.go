@@ -6,6 +6,7 @@ package platformvm
 import (
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -18,6 +19,14 @@ type BaseTx struct {
 
 	// true iff this transaction has already passed syntactic verification
 	syntacticallyVerified bool
+}
+
+func (tx *BaseTx) InputIDs() ids.Set {
+	inputIDs := ids.NewSet(len(tx.Ins))
+	for _, in := range tx.Ins {
+		inputIDs.Add(in.InputID())
+	}
+	return inputIDs
 }
 
 // InitCtx sets the FxID fields in the inputs and outputs of this [BaseTx]. Also

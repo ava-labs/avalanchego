@@ -79,7 +79,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			)
 			vs.SetTimestamp(test.time)
 
-			_, err = utx.SemanticVerify(vm, vs, tx)
+			_, err = utx.Execute(vm, vs, tx)
 			assert.Equal(test.expectsError, err != nil)
 		})
 	}

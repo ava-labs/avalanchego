@@ -88,7 +88,7 @@ func (sb *StandardBlock) Verify() error {
 			return errWrongTxType
 		}
 		txID := tx.ID()
-		onAccept, err := utx.SemanticVerify(sb.vm, sb.onAcceptState, tx)
+		onAccept, err := utx.Execute(sb.vm, sb.onAcceptState, tx)
 		if err != nil {
 			sb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
 			if err := sb.Reject(); err != nil {

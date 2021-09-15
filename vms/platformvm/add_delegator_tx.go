@@ -108,8 +108,14 @@ func (tx *UnsignedAddDelegatorTx) SyntacticVerify(ctx *snow.Context) error {
 	return nil
 }
 
-// SemanticVerify this transaction is valid.
-func (tx *UnsignedAddDelegatorTx) SemanticVerify(
+// Attempts to verify this transaction with the provided state.
+func (tx *UnsignedAddDelegatorTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
+	_, _, _, _, err := tx.Execute(vm, parentState, stx)
+	return err
+}
+
+// Execute this transaction.
+func (tx *UnsignedAddDelegatorTx) Execute(
 	vm *VM,
 	parentState MutableState,
 	stx *Tx,
