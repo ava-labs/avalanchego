@@ -42,10 +42,10 @@ func TestVerifyBlockFee(t *testing.T) {
 			parentTime:         10,
 			currentTime:        10,
 			txs: []*types.Transaction{
-				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 50_000, big.NewInt(200), nil),
+				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 100_000, big.NewInt(200), nil),
 			},
 			receipts: []*types.Receipt{
-				{GasUsed: 50_000},
+				{GasUsed: 100_000},
 			},
 			extraStateContribution: nil,
 			shouldErr:              false,
@@ -56,12 +56,12 @@ func TestVerifyBlockFee(t *testing.T) {
 			parentTime:         10,
 			currentTime:        10,
 			txs: []*types.Transaction{
-				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 50_000, big.NewInt(200), nil),
-				types.NewTransaction(1, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 50_000, big.NewInt(100), nil),
+				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 100_000, big.NewInt(200), nil),
+				types.NewTransaction(1, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 100_000, big.NewInt(100), nil),
 			},
 			receipts: []*types.Receipt{
-				{GasUsed: 50_000},
-				{GasUsed: 50_000},
+				{GasUsed: 100_000},
+				{GasUsed: 100_000},
 			},
 			extraStateContribution: nil,
 			shouldErr:              false,
@@ -72,12 +72,12 @@ func TestVerifyBlockFee(t *testing.T) {
 			parentTime:         10,
 			currentTime:        10,
 			txs: []*types.Transaction{
-				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 50_000, big.NewInt(150), nil),
-				types.NewTransaction(1, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 50_000, big.NewInt(150), nil),
+				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 100_000, big.NewInt(150), nil),
+				types.NewTransaction(1, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 100_000, big.NewInt(150), nil),
 			},
 			receipts: []*types.Receipt{
-				{GasUsed: 50_000},
-				{GasUsed: 50_000},
+				{GasUsed: 100_000},
+				{GasUsed: 100_000},
 			},
 			extraStateContribution: nil,
 			shouldErr:              false,
@@ -88,12 +88,12 @@ func TestVerifyBlockFee(t *testing.T) {
 			parentTime:         10,
 			currentTime:        10,
 			txs: []*types.Transaction{
-				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 50_000, big.NewInt(150), nil),
+				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 100_000, big.NewInt(150), nil),
 			},
 			receipts: []*types.Receipt{
-				{GasUsed: 50_000},
+				{GasUsed: 100_000},
 			},
-			extraStateContribution: big.NewInt(2_500_000),
+			extraStateContribution: big.NewInt(5_000_000),
 			shouldErr:              false,
 		},
 		"extra state contribution insufficient": {
@@ -103,7 +103,7 @@ func TestVerifyBlockFee(t *testing.T) {
 			currentTime:            10,
 			txs:                    nil,
 			receipts:               nil,
-			extraStateContribution: big.NewInt(4_999_999),
+			extraStateContribution: big.NewInt(9_999_999),
 			shouldErr:              true,
 		},
 		"negative extra state contribution": {
@@ -123,7 +123,7 @@ func TestVerifyBlockFee(t *testing.T) {
 			currentTime:            10,
 			txs:                    nil,
 			receipts:               nil,
-			extraStateContribution: big.NewInt(5_000_000),
+			extraStateContribution: big.NewInt(10_000_000),
 			shouldErr:              false,
 		},
 		"extra state contribution covers more than block fee": {
@@ -133,14 +133,14 @@ func TestVerifyBlockFee(t *testing.T) {
 			currentTime:            10,
 			txs:                    nil,
 			receipts:               nil,
-			extraStateContribution: big.NewInt(5_000_001),
+			extraStateContribution: big.NewInt(10_000_001),
 			shouldErr:              false,
 		},
 		"tx only base fee after full time window": {
 			baseFee:            big.NewInt(100),
 			parentBlockGasCost: big.NewInt(500_000),
 			parentTime:         10,
-			currentTime:        21, // 1s target + 10
+			currentTime:        22, // 2s target + 10
 			txs: []*types.Transaction{
 				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 100, big.NewInt(100), nil),
 			},
@@ -171,7 +171,7 @@ func TestVerifyBlockFee(t *testing.T) {
 			currentTime:            10,
 			txs:                    nil,
 			receipts:               nil,
-			extraStateContribution: big.NewInt(5_000_000),
+			extraStateContribution: big.NewInt(10_000_000),
 			shouldErr:              false,
 		},
 	}
