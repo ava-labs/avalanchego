@@ -241,16 +241,8 @@ func (oracle *Oracle) suggestDynamicTipCap(ctx context.Context) (*big.Int, error
 		exp--
 		if res.value != nil {
 			results = append(results, res.value)
-			continue
-		}
-		// In order to collect enough data for sampling, if nothing
-		// meaningful returned, try to query more blocks. But the maximum
-		// is 2*checkBlocks.
-		if len(results)+1+exp < oracle.checkBlocks*2 && number > 0 {
-			go oracle.getBlockTips(ctx, number, result, quit)
-			sent++
-			exp++
-			number--
+		} else {
+			results = append(results, new(big.Int).Set(common.Big0))
 		}
 	}
 	price := lastPrice
