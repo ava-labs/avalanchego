@@ -22,7 +22,7 @@ var (
 	ApricotPhase4MaxBaseFee              = big.NewInt(params.ApricotPhase4MaxBaseFee)
 	TargetGas                     uint64 = 10_000_000
 	ApricotPhase3BlockGasFee      uint64 = 1_000_000
-	ApricotPhase4MinBlockGasCost         = common.Big0
+	ApricotPhase4MinBlockGasCost         = new(big.Int).Set(common.Big0)
 	ApricotPhase4MaxBlockGasCost         = big.NewInt(1_000_000)
 	ApricotPhase4BlockGasCostStep        = big.NewInt(50_000)
 	ApricotPhase4TargetBlockRate  uint64 = 2 // in seconds

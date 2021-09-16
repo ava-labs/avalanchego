@@ -319,7 +319,7 @@ func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *type
 		// NOTE: This is a duplicate check of what is already performed in
 		// blockValidator but is done here for symmetry with FinalizeAndAssemble.
 		if extDataGasUsed == nil {
-			extDataGasUsed = common.Big0
+			extDataGasUsed = new(big.Int).Set(common.Big0)
 		}
 		if blockExtDataGasUsed := block.ExtDataGasUsed(); blockExtDataGasUsed == nil || !blockExtDataGasUsed.IsUint64() || blockExtDataGasUsed.Cmp(extDataGasUsed) != 0 {
 			return fmt.Errorf("invalid extDataGasUsed: have %d, want %d", blockExtDataGasUsed, extDataGasUsed)
@@ -363,12 +363,12 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 		}
 	}
 	if self.ethFaker {
-		extDataGasUsed = common.Big0
+		extDataGasUsed = new(big.Int).Set(common.Big0)
 	}
 	if chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
 		header.ExtDataGasUsed = extDataGasUsed
 		if header.ExtDataGasUsed == nil {
-			header.ExtDataGasUsed = common.Big0
+			header.ExtDataGasUsed = new(big.Int).Set(common.Big0)
 		}
 		header.BlockGasCost = calcBlockGasCost(
 			ApricotPhase4TargetBlockRate,
