@@ -183,4 +183,4 @@ docker run -t -i -v $(pwd):/opt/avalanche -w/opt/avalanche avalanche:protobuf_co
 
 **We and our community welcome responsible disclosures.**
 
-If you've discovered a security vulnerabilitiy, please report it via our [bug bounty program](https://hackenproof.com/avalanche/). Valid reports will be eligible for a reward (terms and conditions apply).
+If you've discovered a security vulnerability, please report it via our [bug bounty program](https://hackenproof.com/avalanche/). Valid reports will be eligible for a reward (terms and conditions apply).
