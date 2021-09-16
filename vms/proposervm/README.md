@@ -1,4 +1,4 @@
-# Snowman++: a congestion control for Snowman VMs
+# Snowman++: congestion control for Snowman VMs
 
 Snowman++ is a congestion control mechanism available for snowman VMs. Snowman++ can be activated on any snowman VM with no modifications to the VM internals. It is sufficient to wrap the target VM with a wrapper VM called `proposerVM` and to specify an activation time for the congestion-control mechanism. In this document we describe the high level features of Snowman++ and the implementation details of the `proposerVM`.
 
