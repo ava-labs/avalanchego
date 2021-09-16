@@ -167,7 +167,7 @@ func (oracle *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 		return tip, nil
 	}
 
-	return tip.Add(tip, nextBaseFee), nil
+	return new(big.Int).Add(tip, nextBaseFee), nil
 }
 
 // SuggestTipCap returns a tip cap so that newly created transaction can have a
