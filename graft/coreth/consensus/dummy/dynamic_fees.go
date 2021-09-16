@@ -25,7 +25,7 @@ var (
 	ApricotPhase4MinBlockGasCost         = common.Big0
 	ApricotPhase4MaxBlockGasCost         = big.NewInt(1_000_000)
 	ApricotPhase4BlockGasCostStep        = big.NewInt(50_000)
-	ApricotPhase4TargetBlockRate  uint64 = 1 // in seconds
+	ApricotPhase4TargetBlockRate  uint64 = 2 // in seconds
 	rollupWindow                  uint64 = 10
 )
 
