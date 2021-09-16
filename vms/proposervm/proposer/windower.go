@@ -16,8 +16,8 @@ import (
 
 // Proposer list constants
 const (
-	MaxWindows     = 4
-	WindowDuration = 4 * time.Second
+	MaxWindows     = 6
+	WindowDuration = 5 * time.Second
 	MaxDelay       = MaxWindows * WindowDuration
 )
 
