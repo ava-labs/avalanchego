@@ -452,43 +452,55 @@ func TestCalcBlockGasCost(t *testing.T) {
 			parentBlockGasCost: big.NewInt(0),
 			parentTime:         1,
 			currentTime:        1,
+			expected:           big.NewInt(100_000),
+		},
+		"1s from 0": {
+			parentBlockGasCost: big.NewInt(0),
+			parentTime:         1,
+			currentTime:        2,
 			expected:           big.NewInt(50_000),
 		},
 		"Same timestamp from non-zero": {
 			parentBlockGasCost: big.NewInt(50_000),
 			parentTime:         1,
 			currentTime:        1,
-			expected:           big.NewInt(100_000),
+			expected:           big.NewInt(150_000),
 		},
-		"1s Difference": {
+		"0s Difference (MAX)": {
+			parentBlockGasCost: big.NewInt(1_000_000),
+			parentTime:         1,
+			currentTime:        1,
+			expected:           big.NewInt(1_000_000),
+		},
+		"1s Difference (MAX)": {
 			parentBlockGasCost: big.NewInt(1_000_000),
 			parentTime:         1,
 			currentTime:        2,
 			expected:           big.NewInt(1_000_000),
 		},
 		"2s Difference": {
-			parentBlockGasCost: big.NewInt(1_000_000),
+			parentBlockGasCost: big.NewInt(900_000),
 			parentTime:         1,
 			currentTime:        3,
+			expected:           big.NewInt(900_000),
+		},
+		"3s Difference": {
+			parentBlockGasCost: big.NewInt(1_000_000),
+			parentTime:         1,
+			currentTime:        4,
 			expected:           big.NewInt(950_000),
 		},
 		"10s Difference": {
 			parentBlockGasCost: big.NewInt(1_000_000),
 			parentTime:         1,
 			currentTime:        11,
-			expected:           big.NewInt(550_000),
+			expected:           big.NewInt(600_000),
 		},
 		"20s Difference": {
 			parentBlockGasCost: big.NewInt(1_000_000),
 			parentTime:         1,
 			currentTime:        21,
-			expected:           big.NewInt(50_000),
-		},
-		"21s Difference": {
-			parentBlockGasCost: big.NewInt(1_000_000),
-			parentTime:         1,
-			currentTime:        22,
-			expected:           big.NewInt(0),
+			expected:           big.NewInt(100_000),
 		},
 		"22s Difference": {
 			parentBlockGasCost: big.NewInt(1_000_000),
@@ -496,11 +508,17 @@ func TestCalcBlockGasCost(t *testing.T) {
 			currentTime:        23,
 			expected:           big.NewInt(0),
 		},
+		"23s Difference": {
+			parentBlockGasCost: big.NewInt(1_000_000),
+			parentTime:         1,
+			currentTime:        24,
+			expected:           big.NewInt(0),
+		},
 		"-1s Difference": {
 			parentBlockGasCost: big.NewInt(50_000),
 			parentTime:         1,
 			currentTime:        0,
-			expected:           big.NewInt(100_000),
+			expected:           big.NewInt(150_000),
 		},
 	}
 
