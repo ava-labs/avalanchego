@@ -189,7 +189,7 @@ func (oracle *Oracle) suggestTipCap(ctx context.Context) (*big.Int, error) {
 	case oracle.backend.ChainConfig().IsApricotPhase4(bigTimestamp):
 		return oracle.suggestDynamicTipCap(ctx)
 	case oracle.backend.ChainConfig().IsApricotPhase3(bigTimestamp):
-		return common.Big0, nil
+		return new(big.Int).Set(common.Big0), nil
 	case oracle.backend.ChainConfig().IsApricotPhase1(bigTimestamp):
 		return big.NewInt(params.ApricotPhase1MinGasPrice), nil
 	default:
