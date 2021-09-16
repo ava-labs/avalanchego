@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -43,12 +42,13 @@ type UnsignedExportTx struct {
 func (tx *UnsignedExportTx) InputUTXOs() ids.Set {
 	set := ids.NewSet(len(tx.Ins))
 	for _, in := range tx.Ins {
-		packer := wrappers.Packer{
-			Bytes: make([]byte, wrappers.LongLen+common.AddressLength),
-		}
+		// Total populated bytes is 20 (Address) + 8 (Nonce), however, we allocate
+		// 32 bytes to make ids.ID casting easier.
+		var rawID [32]byte
+		packer := wrappers.Packer{Bytes: rawID[:]}
 		packer.PackLong(in.Nonce)
 		packer.PackBytes(in.Address.Bytes())
-		set.Add(hashing.ComputeHash256Array(packer.Bytes))
+		set.Add(ids.ID(rawID))
 	}
 	return set
 }

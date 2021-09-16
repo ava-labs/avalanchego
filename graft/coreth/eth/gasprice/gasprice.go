@@ -300,6 +300,13 @@ func (oracle *Oracle) getBlockTips(ctx context.Context, blockNum uint64, result 
 	}
 
 	// Compute minimum required tip to be included in previous block
+	//
+	// NOTE: Using this approach, we will never recommend that the caller
+	// provides a non-zero tip unless some block is produced faster than the
+	// target rate (which could only occur if some set of callers manually override the
+	// suggested tip). In the future, we may wish to start suggesting a non-zero
+	// tip when most blocks are full otherwise callers may observe an unexpected
+	// delay in transaction inclusion.
 	minTip, err := oracle.backend.MinRequiredTip(ctx, header)
 	select {
 	case result <- results{minTip, err}:
