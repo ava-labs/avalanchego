@@ -113,7 +113,7 @@ func (vm *VM) newPushNetwork(
 		chain:                chain,
 		mempool:              mempool,
 		ethTxsToGossipChan:   make(chan []*types.Transaction),
-		ethTxsToGossip:       map[common.Hash]*types.Transaction{},
+		ethTxsToGossip:       make(map[common.Hash]*types.Transaction),
 		shutdownChan:         vm.shutdownChan,
 		shutdownWg:           &vm.shutdownWg,
 		recentAtomicTxs:      &cache.LRU{Size: recentCacheSize},
@@ -188,7 +188,7 @@ func (n *pushNetwork) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
 func (n *pushNetwork) GossipAtomicTx(tx *Tx) error {
 	txID := tx.ID()
 	if time.Now().Before(n.gossipActivationTime) {
-		log.Debug(
+		log.Trace(
 			"not gossiping atomic tx before the gossiping activation time",
 			"txID", txID,
 		)
@@ -209,7 +209,7 @@ func (n *pushNetwork) GossipAtomicTx(tx *Tx) error {
 		return err
 	}
 
-	log.Debug(
+	log.Trace(
 		"gossiping atomic tx",
 		"txID", txID,
 	)
@@ -233,7 +233,7 @@ func (n *pushNetwork) sendEthTxs(txs []*types.Transaction) error {
 		return err
 	}
 
-	log.Debug(
+	log.Trace(
 		"gossiping eth txs",
 		"len(txs)", len(txs),
 		"size(txs)", len(msg.Txs),
@@ -301,7 +301,7 @@ func (n *pushNetwork) gossipEthTxs() (int, error) {
 // option to do so in case it becomes useful.
 func (n *pushNetwork) GossipEthTxs(txs []*types.Transaction) error {
 	if time.Now().Before(n.gossipActivationTime) {
-		log.Debug(
+		log.Trace(
 			"not gossiping eth txs before the gossiping activation time",
 			"len(txs)", len(txs),
 		)
@@ -319,7 +319,7 @@ func (n *pushNetwork) handle(
 	requestID uint32,
 	msgBytes []byte,
 ) error {
-	log.Debug(
+	log.Trace(
 		"App message handler called",
 		"handler", handlerName,
 		"peerID", nodeID,
@@ -328,13 +328,16 @@ func (n *pushNetwork) handle(
 	)
 
 	if time.Now().Before(n.gossipActivationTime) {
-		log.Debug("App message called before activation time")
+		log.Trace("App message called before activation time")
 		return nil
 	}
 
 	msg, err := message.Parse(msgBytes)
 	if err != nil {
-		log.Debug("dropping App message due to failing to parse message")
+		log.Trace(
+			"dropping App message due to failing to parse message",
+			"err", err,
+		)
 		return nil
 	}
 
@@ -349,13 +352,13 @@ type GossipHandler struct {
 }
 
 func (h *GossipHandler) HandleAtomicTx(nodeID ids.ShortID, _ uint32, msg *message.AtomicTx) error {
-	log.Debug(
+	log.Trace(
 		"AppGossip called with AtomicTx",
 		"peerID", nodeID,
 	)
 
 	if len(msg.Tx) == 0 {
-		log.Debug(
+		log.Trace(
 			"AppGossip received empty AtomicTx Message",
 			"peerID", nodeID,
 		)
@@ -374,7 +377,7 @@ func (h *GossipHandler) HandleAtomicTx(nodeID ids.ShortID, _ uint32, msg *messag
 	}
 	unsignedBytes, err := Codec.Marshal(codecVersion, &tx.UnsignedAtomicTx)
 	if err != nil {
-		log.Warn(
+		log.Trace(
 			"AppGossip failed to marshal unsigned tx",
 			"err", err,
 		)
@@ -399,14 +402,14 @@ func (h *GossipHandler) HandleAtomicTx(nodeID ids.ShortID, _ uint32, msg *messag
 }
 
 func (h *GossipHandler) HandleEthTxs(nodeID ids.ShortID, _ uint32, msg *message.EthTxs) error {
-	log.Debug(
+	log.Trace(
 		"AppGossip called with EthTxs",
 		"peerID", nodeID,
 		"size(txs)", len(msg.Txs),
 	)
 
 	if len(msg.Txs) == 0 {
-		log.Debug(
+		log.Trace(
 			"AppGossip received empty EthTxs Message",
 			"peerID", nodeID,
 		)
@@ -426,7 +429,7 @@ func (h *GossipHandler) HandleEthTxs(nodeID ids.ShortID, _ uint32, msg *message.
 	errs := h.net.chain.GetTxPool().AddRemotes(txs)
 	for i, err := range errs {
 		if err != nil {
-			log.Debug(
+			log.Trace(
 				"AppGossip failed to add to mempool",
 				"err", err,
 				"tx", txs[i].Hash(),
