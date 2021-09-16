@@ -282,7 +282,7 @@ func (s *StateDB) GetBalance(addr common.Address) *big.Int {
 	if stateObject != nil {
 		return stateObject.Balance()
 	}
-	return common.Big0
+	return new(big.Int).Set(common.Big0)
 }
 
 // Retrieve the balance from the given address or 0 if object not found
@@ -291,7 +291,7 @@ func (s *StateDB) GetBalanceMultiCoin(addr common.Address, coinID common.Hash) *
 	if stateObject != nil {
 		return stateObject.BalanceMultiCoin(coinID, s.db)
 	}
-	return common.Big0
+	return new(big.Int).Set(common.Big0)
 }
 
 func (s *StateDB) GetNonce(addr common.Address) uint64 {
