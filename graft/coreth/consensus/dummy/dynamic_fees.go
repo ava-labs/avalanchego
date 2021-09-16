@@ -267,13 +267,13 @@ func calcBlockGasCost(
 		timeElapsed = currentTime - parentTime
 	}
 
-	blockGasCost := parentBlockGasCost
+	var blockGasCost *big.Int
 	if timeElapsed < targetBlockRate {
 		blockGasCostDelta := new(big.Int).Mul(blockGasCostStep, new(big.Int).SetUint64(targetBlockRate-timeElapsed))
-		blockGasCost = new(big.Int).Add(blockGasCost, blockGasCostDelta)
+		blockGasCost = new(big.Int).Add(parentBlockGasCost, blockGasCostDelta)
 	} else {
 		blockGasCostDelta := new(big.Int).Mul(blockGasCostStep, new(big.Int).SetUint64(timeElapsed-targetBlockRate))
-		blockGasCost = new(big.Int).Sub(blockGasCost, blockGasCostDelta)
+		blockGasCost = new(big.Int).Sub(parentBlockGasCost, blockGasCostDelta)
 	}
 
 	blockGasCost = selectBigWithinBounds(minBlockGasCost, blockGasCost, maxBlockGasCost)
