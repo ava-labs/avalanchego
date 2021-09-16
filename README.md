@@ -18,7 +18,7 @@ Note that as network usage increases, hardware requirements may change.
 - OS: Ubuntu 18.04/20.04 or MacOS >= Catalina
 - Network: Reliable IPv4 or IPv6 network connection, with an open public port.
 - Software Dependencies:
-  - [Go](https://golang.org/doc/install) version >= 1.15.5 and set up [`$GOPATH`](https://github.com/golang/go/wiki/SettingGOPATH).
+  - [Go](https://golang.org/doc/install) version >= 1.16.8 and set up [`$GOPATH`](https://github.com/golang/go/wiki/SettingGOPATH).
   - [gcc](https://gcc.gnu.org/)
   - g++
 
