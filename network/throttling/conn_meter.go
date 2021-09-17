@@ -16,8 +16,8 @@ var (
 	_ InboundConnThrottler = &noInboundConnThrottler{}
 )
 
-// InboundConnThrottler decides whether to allow an inbound connection from IP [ipStr].
-// If Allow(ipStr) returns false, the connection to that IP should be closed.
+// InboundConnThrottler returns whether we should upgrade an inbound connection from IP [ipStr].
+// If ShouldUpgrade(ipStr) returns false, the connection to that IP should be closed.
 type InboundConnThrottler interface {
 	// Dispatch starts this InboundConnThrottler.
 	// Must be called before [ShouldUpgrade].
@@ -61,7 +61,7 @@ func NewInboundConnThrottler(log logging.Logger, config InboundConnUpgradeThrott
 	}
 }
 
-// noInboundConnThrottler allows all inbound connections
+// noInboundConnThrottler upgrades all inbound connections
 type noInboundConnThrottler struct{}
 
 func (*noInboundConnThrottler) Dispatch()                 {}
