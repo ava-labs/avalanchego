@@ -892,6 +892,7 @@ func (vm *VM) issueTx(tx *Tx, local bool) error {
 		return err
 	}
 
+	// TODO: handle in awaitSubmittedTxs
 	return vm.network.GossipAtomicTx(tx)
 }
 
