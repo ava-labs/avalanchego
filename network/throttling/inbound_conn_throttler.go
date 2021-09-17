@@ -14,6 +14,7 @@ var _ net.Listener = &throttledListener{}
 
 // Wraps [listener] and returns a net.Listener that will accept
 // at most [maxConnsPerSec] connections per second.
+// [maxConnsPerSec] must be positive.
 func NewThrottledListener(listener net.Listener, maxConnsPerSec int) net.Listener {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &throttledListener{
@@ -26,6 +27,9 @@ func NewThrottledListener(listener net.Listener, maxConnsPerSec int) net.Listene
 
 // [throttledListener] is a net.Listener that rate-limits
 // acceptance of incoming connections.
+// Note that InboundConnUpgradeThrottler rate-limits _upgrading_ of
+// inbound connections, whereas throttledListener rate-limits
+// _acceptance_ of inbound connections.
 type throttledListener struct {
 	// [ctx] is cancelled when Close() is called
 	ctx context.Context

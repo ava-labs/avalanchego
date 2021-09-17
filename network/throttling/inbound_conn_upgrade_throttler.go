@@ -18,6 +18,9 @@ var (
 
 // InboundConnUpgradeThrottler returns whether we should upgrade an inbound connection from IP [ipStr].
 // If ShouldUpgrade(ipStr) returns false, the connection to that IP should be closed.
+// Note that InboundConnUpgradeThrottler rate-limits _upgrading_ of
+// inbound connections, whereas throttledListener rate-limits
+// _acceptance_ of inbound connections.
 type InboundConnUpgradeThrottler interface {
 	// Dispatch starts this InboundConnUpgradeThrottler.
 	// Must be called before [ShouldUpgrade].

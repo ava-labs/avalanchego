@@ -18,7 +18,7 @@ const (
 	host4 = "127.0.0.4"
 )
 
-func TestNoInboundConnThrottler(t *testing.T) {
+func TestNoInboundConnUpgradeThrottler(t *testing.T) {
 	{
 		throttler := NewInboundConnUpgradeThrottler(
 			logging.NoLog{},
@@ -49,7 +49,7 @@ func TestNoInboundConnThrottler(t *testing.T) {
 	}
 }
 
-func TestInboundConnThrottler(t *testing.T) {
+func TestInboundConnUpgradeThrottler(t *testing.T) {
 	assert := assert.New(t)
 
 	cooldown := 5 * time.Second
