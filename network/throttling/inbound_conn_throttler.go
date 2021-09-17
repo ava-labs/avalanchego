@@ -5,7 +5,6 @@ package throttling
 
 import (
 	"context"
-	"math"
 	"net"
 
 	"golang.org/x/time/rate"
@@ -22,7 +21,7 @@ func NewThrottledListener(listener net.Listener, maxConnsPerSec float64) net.Lis
 		ctx:           ctx,
 		ctxCancelFunc: cancel,
 		listener:      listener,
-		limiter:       rate.NewLimiter(rate.Limit(maxConnsPerSec), int(math.Ceil(maxConnsPerSec))),
+		limiter:       rate.NewLimiter(rate.Limit(maxConnsPerSec), 1),
 	}
 }
 
