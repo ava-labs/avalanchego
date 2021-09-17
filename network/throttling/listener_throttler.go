@@ -15,15 +15,22 @@ var _ net.Listener = &throttledListener{}
 // Wraps [listener] and returns a net.Listener that will accept
 // at most [maxConnsPerSec] connections per second.
 func NewThrottledListener(listener net.Listener, maxConnsPerSec int) net.Listener {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &throttledListener{
-		listener: listener,
-		limiter:  rate.NewLimiter(rate.Limit(maxConnsPerSec), maxConnsPerSec),
+		ctx:           ctx,
+		ctxCancelFunc: cancel,
+		listener:      listener,
+		limiter:       rate.NewLimiter(rate.Limit(maxConnsPerSec), maxConnsPerSec),
 	}
 }
 
 // [throttledListener] is a net.Listener that rate-limits
 // acceptance of incoming connections.
 type throttledListener struct {
+	// [ctx] is cancelled when Close() is called
+	ctx context.Context
+	// [ctxCancelFunc] cancels [ctx] when it's called
+	ctxCancelFunc func()
 	// The underlying listener
 	listener net.Listener
 	// Handles rate-limiting
@@ -32,14 +39,17 @@ type throttledListener struct {
 
 func (l *throttledListener) Accept() (net.Conn, error) {
 	// Wait until the rate-limiter says to accept the
-	// next incoming connection
-	if err := l.limiter.Wait(context.Background()); err != nil {
+	// next incoming connection. If l.Close() is called,
+	// Wait will return immediately.
+	if err := l.limiter.Wait(l.ctx); err != nil {
 		return nil, err
 	}
 	return l.listener.Accept()
 }
 
 func (l *throttledListener) Close() error {
+	// Cancel [l.ctx] so Accept() will return immediately
+	l.ctxCancelFunc()
 	return l.listener.Close()
 }
 

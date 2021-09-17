@@ -20,7 +20,7 @@ const (
 
 func TestNoInboundConnThrottler(t *testing.T) {
 	{
-		throttler := NewInboundConnThrottler(
+		throttler := NewInboundConnUpgradeThrottler(
 			logging.NoLog{},
 			InboundConnUpgradeThrottlerConfig{
 				UpgradeCooldown:        0,
@@ -34,7 +34,7 @@ func TestNoInboundConnThrottler(t *testing.T) {
 		}
 	}
 	{
-		throttler := NewInboundConnThrottler(
+		throttler := NewInboundConnUpgradeThrottler(
 			logging.NoLog{},
 			InboundConnUpgradeThrottlerConfig{
 				UpgradeCooldown:        time.Second,
@@ -53,7 +53,7 @@ func TestInboundConnThrottler(t *testing.T) {
 	assert := assert.New(t)
 
 	cooldown := 5 * time.Second
-	throttlerIntf := NewInboundConnThrottler(
+	throttlerIntf := NewInboundConnUpgradeThrottler(
 		logging.NoLog{},
 		InboundConnUpgradeThrottlerConfig{
 			UpgradeCooldown:        cooldown,
@@ -77,7 +77,7 @@ func TestInboundConnThrottler(t *testing.T) {
 	assert.False(throttlerIntf.ShouldUpgrade(host3))
 
 	// Make sure [throttler.done] isn't closed
-	throttler := throttlerIntf.(*inboundConnThrottler)
+	throttler := throttlerIntf.(*inboundConnUpgradeThrottler)
 	select {
 	case <-throttler.done:
 		t.Fatal("shouldn't be done")

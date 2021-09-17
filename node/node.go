@@ -162,7 +162,7 @@ func (n *Node) initNetworking() error {
 		return err
 	}
 	// Wrap listener so it will only accept a certain number of incoming connections per second
-	listener = throttling.NewThrottledListener(listener, 100) // TODO make configurable
+	listener = throttling.NewThrottledListener(listener, n.Config.NetworkConfig.MaxIncomingConnsPerSec)
 
 	ipDesc, err := utils.ToIPDesc(listener.Addr().String())
 	if err != nil {

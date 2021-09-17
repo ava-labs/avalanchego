@@ -28,7 +28,7 @@ const (
 	DynamicUpdateDurationKey                  = "dynamic-update-duration"
 	DynamicPublicIPResolverKey                = "dynamic-public-ip"
 	InboundConnUpgradeThrottlerCooldownKey    = "inbound-connection-throttling-cooldown"
-	InboundConnUpgradeThrottlerMaxRecentKey   = "inbound-connection-throttling-max-recent"
+	InboundConnUpgradeThrottlerMaxRecentKey   = "inbound-connection-throttling-max-recent" // Deprecated starting in v1.6.0. TODO remove in a future release.
 	InboundThrottlerMaxConnsPerSecKey         = "inbound-connection-throttling-max-conns-per-sec"
 	OutboundConnectionThrottlingRps           = "outbound-connection-throttling-rps"
 	OutboundConnectionTimeout                 = "outbound-connection-timeout"
