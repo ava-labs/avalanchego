@@ -5,6 +5,7 @@ package throttling
 
 import (
 	"context"
+	"math"
 	"net"
 
 	"golang.org/x/time/rate"
@@ -12,16 +13,16 @@ import (
 
 var _ net.Listener = &throttledListener{}
 
-// Wraps [listener] and returns a net.Listener that will accept
-// at most [maxConnsPerSec] connections per second.
-// [maxConnsPerSec] must be positive.
-func NewThrottledListener(listener net.Listener, maxConnsPerSec int) net.Listener {
+// Wraps [listener] and returns a net.Listener that will accept at most
+// [maxConnsPerSec] connections per second.
+// [maxConnsPerSec] must be non-negative.
+func NewThrottledListener(listener net.Listener, maxConnsPerSec float64) net.Listener {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &throttledListener{
 		ctx:           ctx,
 		ctxCancelFunc: cancel,
 		listener:      listener,
-		limiter:       rate.NewLimiter(rate.Limit(maxConnsPerSec), maxConnsPerSec),
+		limiter:       rate.NewLimiter(rate.Limit(maxConnsPerSec), int(math.Ceil(maxConnsPerSec))),
 	}
 }
 

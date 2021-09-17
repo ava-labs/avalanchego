@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net"
 	"os"
 	"path"
@@ -236,13 +237,10 @@ func getRouterHealthConfig(v *viper.Viper, halflife time.Duration) (router.Healt
 func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, error) {
 	// Set the max number of recent inbound connections upgraded to be
 	// equal to the max number of inbound connections per second.
-	maxInboundConnsPerSec := int(v.GetUint(InboundThrottlerMaxConnsPerSecKey))
+	maxInboundConnsPerSec := v.GetFloat64(InboundThrottlerMaxConnsPerSecKey)
 	upgradeCooldown := v.GetDuration(InboundConnUpgradeThrottlerCooldownKey)
-	upgradeCooldownInSeconds := int(upgradeCooldown.Seconds())
-	maxRecentConnsUpgraded := 0
-	if upgradeCooldownInSeconds != 0 { // Make sure we don't divide by 0 :)
-		maxRecentConnsUpgraded = maxInboundConnsPerSec * upgradeCooldownInSeconds
-	}
+	upgradeCooldownInSeconds := upgradeCooldown.Seconds()
+	maxRecentConnsUpgraded := int(math.Ceil(maxInboundConnsPerSec * upgradeCooldownInSeconds))
 	config := network.Config{
 		// Throttling
 		MaxIncomingConnsPerSec: maxInboundConnsPerSec,

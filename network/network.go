@@ -244,7 +244,7 @@ type Config struct {
 	InboundThrottlerConfig            throttling.MsgThrottlerConfig                `json:"inboundThrottlerConfig"`
 	OutboundThrottlerConfig           throttling.MsgThrottlerConfig                `json:"outboundThrottlerConfig"`
 	DialerConfig                      dialer.Config                                `json:"dialerConfig"`
-	MaxIncomingConnsPerSec            int                                          `json:"maxIncomingConnsPerSec"`
+	MaxIncomingConnsPerSec            float64                                      `json:"maxIncomingConnsPerSec"`
 	// [Registerer] is set in node's initMetricsAPI method
 	MetricsRegisterer  prometheus.Registerer `json:"-"`
 	CompressionEnabled bool                  `json:"compressionEnabled"`
