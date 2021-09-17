@@ -600,7 +600,7 @@ func (b *SimulatedBackend) callContract(ctx context.Context, call interfaces.Cal
 		return nil, errors.New("both gasPrice and (maxFeePerGas or maxPriorityFeePerGas) specified")
 	}
 	head := b.blockchain.CurrentHeader()
-	if !b.blockchain.Config().IsApricotPhase3(head.Number) {
+	if !b.blockchain.Config().IsApricotPhase3(new(big.Int).SetUint64(head.Time)) {
 		// If there's no basefee, then it must be a non-1559 execution
 		if call.GasPrice == nil {
 			call.GasPrice = new(big.Int)
