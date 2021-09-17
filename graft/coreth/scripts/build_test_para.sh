@@ -6,9 +6,11 @@ set -o pipefail
 
 for i in `ls -d *`
 do
-	if [ ! -d "${i}" ]
+	if [[ ! -d "${i}" || "${i}" == "notes" || "${i}" == "scripts" ]]
 	then
 		continue
 	fi
-	go test -race -timeout="20m" -coverprofile="coverage.out" -covermode="atomic" ./${i}/... && exit $?
+	time go test -race -timeout="20m" -coverprofile="coverage.out" -covermode="atomic" ./${i}/... || exit $?
 done
+
+exit 0
