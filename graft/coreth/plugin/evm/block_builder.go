@@ -237,6 +237,8 @@ func (b *blockBuilder) signalTxsReady() {
 	b.buildBlockLock.Lock()
 	defer b.buildBlockLock.Unlock()
 
+	// TODO: signal if conditional build/already building
+
 	if b.buildStatus != dontBuild {
 		return
 	}
@@ -272,6 +274,8 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 				log.Trace("New tx detected, trying to generate a block")
 				b.signalTxsReady()
 
+				// TODO: WAIT xs to see if block produced before gossiping
+
 				// We only attempt to invoke [GossipEthTxs] once AP4 is activated.
 				if b.isAP4 && b.network != nil {
 					if err := b.network.GossipEthTxs(ethTxsEvent.Txs); err != nil {
@@ -286,6 +290,8 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 				b.signalTxsReady()
 				// Unlike EthTxs, AtomicTxs are gossiped in [issueTx] when they are
 				// successfully added to the mempool.
+
+				// TODO: gossip atomic txs here so can wait if block produced
 			case <-b.shutdownChan:
 				return
 			}
