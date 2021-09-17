@@ -161,6 +161,8 @@ func (n *Node) initNetworking() error {
 	if err != nil {
 		return err
 	}
+	// Wrap listener so it will only accept a certain number of incoming connections per second
+	listener = throttling.NewThrottledListener(listener, 100) // TODO make configurable
 
 	ipDesc, err := utils.ToIPDesc(listener.Addr().String())
 	if err != nil {
@@ -274,7 +276,7 @@ func (n *Node) initNetworking() error {
 		primaryNetworkValidators,
 		n.beacons,
 		consensusRouter,
-		n.Config.NetworkConfig.InboundConnThrottlerConfig,
+		n.Config.NetworkConfig.InboundConnUpgradeThrottlerConfig,
 		n.Config.NetworkConfig.HealthConfig,
 		n.benchlistManager,
 		n.Config.NetworkConfig.PeerAliasTimeout,

@@ -126,8 +126,8 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(DynamicPublicIPResolverKey, "", "'ifconfigco' (alias 'ifconfig') or 'opendns' or 'ifconfigme'. By default does not do dynamic public IP updates. If non-empty, ignores public-ip argument.")
 
 	// Inbound Connection Throttling
-	fs.Duration(InboundConnThrottlerCooldownKey, 2*time.Second, "Allow an inbound connection from a given IP at most once per this duration. If 0, don't rate-limit inbound connections.")
-	fs.Int(InboundConnThrottlerMaxRecentConnsKey, 1024, fmt.Sprintf("Allow at most this many inbound connection per [--%s]", InboundConnThrottlerCooldownKey))
+	fs.Duration(InboundConnUpgradeThrottlerCooldownKey, 2*time.Second, "Allow an inbound connection from a given IP at most once per this duration. If 0, don't rate-limit inbound connections.")
+	fs.Int(InboundConnUpgradeThrottlerMaxRecentKey, 1024, fmt.Sprintf("Allow at most this many inbound connection per [--%s]", InboundConnUpgradeThrottlerCooldownKey))
 	// Outbound Connection Throttling
 	fs.Uint(OutboundConnectionThrottlingRps, 50, "Make at most this number of outgoing peer connection attempts per second.")
 	fs.Duration(OutboundConnectionTimeout, 30*time.Second, "Timeout when dialing a peer.")

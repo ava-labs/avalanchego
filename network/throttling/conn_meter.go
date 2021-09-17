@@ -20,53 +20,53 @@ var (
 // If Allow(ipStr) returns false, the connection to that IP should be closed.
 type InboundConnThrottler interface {
 	// Dispatch starts this InboundConnThrottler.
-	// Must be called before [Allow].
+	// Must be called before [ShouldUpgrade].
 	// Blocks until [Stop] is called (i.e. should be called in a goroutine.)
 	Dispatch()
 	// Stop this InboundConnThrottler and causes [Dispatch] to return.
 	// Should be called when we're done with this InboundConnThrottler.
 	// This InboundConnThrottler must not be used after [Stop] is called.
 	Stop()
-	// Returns whether we should allow an inbound connection from [ipStr].
+	// Returns whether we should upgrade an inbound connection from [ipStr].
 	// Must only be called after [Dispatch] has been called.
 	// Must not be called after [Stop] has been called.
-	Allow(ipStr string) bool
+	ShouldUpgrade(ipStr string) bool
 }
 
-type InboundConnThrottlerConfig struct {
-	// Allow(ipStr) returns true if it has been at least [AllowCooldown]
-	// since the last time Allow(ipStr) returned true or if
-	// Allow(ipStr) has never been called.
+type InboundConnUpgradeThrottlerConfig struct {
+	// ShouldUpgrade(ipStr) returns true if it has been at least [UpgradeCooldown]
+	// since the last time ShouldUpgrade(ipStr) returned true or if
+	// ShouldUpgrade(ipStr) has never been called.
 	// If <= 0, inbound connections not rate-limited.
-	AllowCooldown time.Duration `json:"allowCooldown"`
-	// Maximum number of inbound connections allowed within [AllowCooldown].
-	// (As implemented in inboundConnThrottler, may actually allow
+	UpgradeCooldown time.Duration `json:"upgradeCooldown"`
+	// Maximum number of inbound connections upgraded within [UpgradeCooldown].
+	// (As implemented in inboundConnThrottler, may actually upgrade
 	// [MaxRecentConns+1] due to a race condition but that's fine.)
 	// If <= 0, inbound connections not rate-limited.
-	MaxRecentConns int `json:"maxRecentConns"`
+	MaxRecentConnsUpgraded int `json:"maxRecentConnsUpgraded"`
 }
 
-// Returns an InboundConnThrottler that allows an inbound connection from a given IP
-// every [AllowCooldown].
-func NewInboundConnThrottler(log logging.Logger, config InboundConnThrottlerConfig) InboundConnThrottler {
-	if config.AllowCooldown <= 0 || config.MaxRecentConns <= 0 {
+// Returns an InboundConnThrottler that upgrades an inbound
+// connection from a given IP at most every [UpgradeCooldown].
+func NewInboundConnThrottler(log logging.Logger, config InboundConnUpgradeThrottlerConfig) InboundConnThrottler {
+	if config.UpgradeCooldown <= 0 || config.MaxRecentConnsUpgraded <= 0 {
 		return &noInboundConnThrottler{}
 	}
 	return &inboundConnThrottler{
-		InboundConnThrottlerConfig: config,
-		log:                        log,
-		done:                       make(chan struct{}),
-		recentIPs:                  make(map[string]struct{}),
-		recentIPsAndTimes:          make(chan ipAndTime, config.MaxRecentConns),
+		InboundConnUpgradeThrottlerConfig: config,
+		log:                               log,
+		done:                              make(chan struct{}),
+		recentIPs:                         make(map[string]struct{}),
+		recentIPsAndTimes:                 make(chan ipAndTime, config.MaxRecentConnsUpgraded),
 	}
 }
 
 // noInboundConnThrottler allows all inbound connections
 type noInboundConnThrottler struct{}
 
-func (*noInboundConnThrottler) Dispatch()         {}
-func (*noInboundConnThrottler) Stop()             {}
-func (*noInboundConnThrottler) Allow(string) bool { return true }
+func (*noInboundConnThrottler) Dispatch()                 {}
+func (*noInboundConnThrottler) Stop()                     {}
+func (*noInboundConnThrottler) ShouldUpgrade(string) bool { return true }
 
 type ipAndTime struct {
 	ip                string
@@ -75,38 +75,38 @@ type ipAndTime struct {
 
 // inboundConnThrottler implements InboundConnThrottler
 type inboundConnThrottler struct {
-	InboundConnThrottlerConfig
+	InboundConnUpgradeThrottlerConfig
 	log  logging.Logger
 	lock sync.Mutex
 	// Useful for faking time in tests
 	clock timer.Clock
 	// When [done] is closed, Dispatch returns.
 	done chan struct{}
-	// IP --> Present if Allow(ipStr) returned true
-	// within the last [AllowCooldown].
+	// IP --> Present if ShouldUpgrade(ipStr) returned true
+	// within the last [UpgradeCooldown].
 	recentIPs map[string]struct{}
 	// Sorted in order of increasing time
-	// of last call to Allow that returned true.
-	// For each IP in this channel, Allow(ipStr)
-	// returned true within the last [AllowCooldown].
+	// of last call to ShouldUpgrade that returned true.
+	// For each IP in this channel, ShouldUpgrade(ipStr)
+	// returned true within the last [UpgradeCooldown].
 	recentIPsAndTimes chan ipAndTime
 }
 
-// Returns whether we should allow an inbound connection from [ipStr].
-func (n *inboundConnThrottler) Allow(ipStr string) bool {
+// Returns whether we should upgrade an inbound connection from [ipStr].
+func (n *inboundConnThrottler) ShouldUpgrade(ipStr string) bool {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
 	_, recentlyConnected := n.recentIPs[ipStr]
 	if recentlyConnected {
-		// We recently allowed an inbound connection from this IP
+		// We recently upgraded an inbound connection from this IP
 		return false
 	}
 
 	select {
 	case n.recentIPsAndTimes <- ipAndTime{
 		ip:                ipStr,
-		cooldownElapsedAt: n.clock.Time().Add(n.AllowCooldown),
+		cooldownElapsedAt: n.clock.Time().Add(n.UpgradeCooldown),
 	}:
 		n.recentIPs[ipStr] = struct{}{}
 		return true
@@ -124,7 +124,7 @@ func (n *inboundConnThrottler) Dispatch() {
 		case next := <-n.recentIPsAndTimes:
 			// Sleep until it's time to remove the next IP
 			time.Sleep(next.cooldownElapsedAt.Sub(n.clock.Time()))
-			// Remove the next IP (we'll allow another inbound connection from it)
+			// Remove the next IP (we'd upgrade another inbound connection from it)
 			n.lock.Lock()
 			delete(n.recentIPs, next.ip)
 			n.lock.Unlock()

@@ -235,9 +235,10 @@ func getRouterHealthConfig(v *viper.Viper, halflife time.Duration) (router.Healt
 func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, error) {
 	config := network.Config{
 		// Throttling
-		InboundConnThrottlerConfig: throttling.InboundConnThrottlerConfig{
-			AllowCooldown:  v.GetDuration(InboundConnThrottlerCooldownKey),
-			MaxRecentConns: v.GetInt(InboundConnThrottlerMaxRecentConnsKey),
+		MaxIncomingConnsPerSec: int(v.GetUint(InboundThrottlerMaxConnsPerSecKey)),
+		InboundConnUpgradeThrottlerConfig: throttling.InboundConnUpgradeThrottlerConfig{
+			UpgradeCooldown:        v.GetDuration(InboundConnUpgradeThrottlerCooldownKey),
+			MaxRecentConnsUpgraded: v.GetInt(InboundConnUpgradeThrottlerMaxRecentKey),
 		},
 		InboundThrottlerConfig: throttling.MsgThrottlerConfig{
 			AtLargeAllocSize:    v.GetUint64(InboundThrottlerAtLargeAllocSizeKey),
