@@ -103,11 +103,6 @@ func (c *common) HealthCheck() (interface{}, error) {
 		"outstandingTransactions": numOutstandingTxs,
 	}
 
-	// check for long running transactions
-	timeReqRunning := c.Latency.MeasureAndGetOldestDuration()
-	healthy = healthy && timeReqRunning <= c.params.MaxItemProcessingTime
-	details["longestRunningTx"] = timeReqRunning.String()
-
 	if !healthy {
 		return details, errUnhealthy
 	}
