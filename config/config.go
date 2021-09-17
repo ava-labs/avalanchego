@@ -51,7 +51,8 @@ const (
 
 var (
 	deprecatedKeys = map[string]string{
-		CorethConfigKey: "please use --config-file to specify C-Chain config",
+		CorethConfigKey:                         fmt.Sprintf("please use --%s to specify C-Chain config", ChainConfigDirKey),
+		InboundConnUpgradeThrottlerMaxRecentKey: fmt.Sprintf("please use --%s to specify connection upgrade throttling", InboundThrottlerMaxConnsPerSecKey),
 	}
 
 	errInvalidStakerWeights       = errors.New("staking weights must be positive")
@@ -233,9 +234,6 @@ func getRouterHealthConfig(v *viper.Viper, halflife time.Duration) (router.Healt
 }
 
 func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, error) {
-	if v.IsSet(InboundConnUpgradeThrottlerMaxRecentKey) {
-		fmt.Printf("flag %s has been deprecated. See documentation for flag %s.\n", InboundConnUpgradeThrottlerMaxRecentKey, InboundThrottlerMaxConnsPerSecKey)
-	}
 	// Set the max number of recent inbound connections upgraded to be
 	// equal to the max number of inbound connections per second.
 	maxInboundConnsPerSec := int(v.GetUint(InboundThrottlerMaxConnsPerSecKey))
@@ -243,7 +241,7 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 	upgradeCooldownInSeconds := int(upgradeCooldown.Seconds())
 	maxRecentConnsUpgraded := 0
 	if upgradeCooldownInSeconds != 0 { // Make sure we don't divide by 0 :)
-		maxRecentConnsUpgraded = 1 + maxInboundConnsPerSec/upgradeCooldownInSeconds
+		maxRecentConnsUpgraded = maxInboundConnsPerSec * upgradeCooldownInSeconds
 	}
 	config := network.Config{
 		// Throttling
