@@ -175,7 +175,7 @@ func TestRangeProof(t *testing.T) {
 		entries = append(entries, kv)
 	}
 	sort.Sort(entries)
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 500; i++ {
 		start := mrand.Intn(len(entries))
 		end := mrand.Intn(len(entries)-start) + start + 1
 
@@ -208,7 +208,7 @@ func TestRangeProofWithNonExistentProof(t *testing.T) {
 		entries = append(entries, kv)
 	}
 	sort.Sort(entries)
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 500; i++ {
 		start := mrand.Intn(len(entries))
 		end := mrand.Intn(len(entries)-start) + start + 1
 		proof := memorydb.New()
@@ -467,7 +467,7 @@ func TestAllElementsProof(t *testing.T) {
 
 // TestSingleSideRangeProof tests the range starts from zero.
 func TestSingleSideRangeProof(t *testing.T) {
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 64; i++ {
 		trie := new(Trie)
 		var entries entrySlice
 		for i := 0; i < 4096; i++ {
@@ -502,7 +502,7 @@ func TestSingleSideRangeProof(t *testing.T) {
 
 // TestReverseSingleSideRangeProof tests the range ends with 0xffff...fff.
 func TestReverseSingleSideRangeProof(t *testing.T) {
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 64; i++ {
 		trie := new(Trie)
 		var entries entrySlice
 		for i := 0; i < 4096; i++ {
@@ -546,7 +546,7 @@ func TestBadRangeProof(t *testing.T) {
 	}
 	sort.Sort(entries)
 
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 500; i++ {
 		start := mrand.Intn(len(entries))
 		end := mrand.Intn(len(entries)-start) + start + 1
 		proof := memorydb.New()
