@@ -1657,16 +1657,17 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// the other post-fork option should be rejected
-	if err := cBlock.Accept(); err == nil {
-		t.Fatal("the post-fork option block should have be rejected")
-	}
-	if cBlock.Status() == choices.Accepted {
-		t.Fatal("cBlock status should not be accepted")
-	}
-
-	// the other pre-fork option should be also rejected
+	// the other pre-fork option should be rejected
 	if xBlock.opts[1].Status() != choices.Rejected {
 		t.Fatal("the pre-fork option block should have be rejected")
+	}
+
+	// the other post-fork option should also be rejected
+	if err := cBlock.Reject(); err != nil {
+		t.Fatal("the post-fork option block should have be rejected")
+	}
+
+	if cBlock.Status() != choices.Rejected {
+		t.Fatal("cBlock status should not be accepted")
 	}
 }
