@@ -777,10 +777,6 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 		return node.Config{}, err
 	}
 
-	if nodeConfig.NetworkID == constants.MainnetID {
-		return node.Config{}, errors.New("mainnet is not supported")
-	}
-
 	// Database
 	nodeConfig.DatabaseConfig = getDatabaseConfig(v, nodeConfig.NetworkID)
 
