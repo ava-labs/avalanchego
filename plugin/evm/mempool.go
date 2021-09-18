@@ -326,8 +326,6 @@ func (m *Mempool) addPending() {
 }
 
 // GetNewTxs returns the array of [newTxs] and replaces it with a new array.
-//
-// NOTE: If there are no [newTxs], the returned array could be nil.
 func (m *Mempool) GetNewTxs() []*Tx {
 	m.lock.Lock()
 	defer m.lock.Unlock()

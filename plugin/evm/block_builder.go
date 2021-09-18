@@ -284,8 +284,11 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 
 				// We only attempt to invoke [GossipEthTxs] once AP4 is activated
 				if b.isAP4 && b.network != nil && len(ethTxsEvent.Txs) > 0 {
-					// Prevent race condition
+					// Give time for this node to build a block before attempting to
+					// gossip
 					time.Sleep(waitBlockTime)
+					// [GossipEthTxs] will block unless [pushNetwork.ethTxsToGossipChan] (an
+					// unbuffered channel) is listened on
 					if err := b.network.GossipEthTxs(ethTxsEvent.Txs); err != nil {
 						log.Warn(
 							"failed to gossip new eth transactions",
@@ -300,7 +303,8 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 				// We only attempt to invoke [GossipAtomicTxs] once AP4 is activated
 				newTxs := b.mempool.GetNewTxs()
 				if b.isAP4 && b.network != nil && len(newTxs) > 0 {
-					// Prevent race condition
+					// Give time for this node to build a block before attempting to
+					// gossip
 					time.Sleep(waitBlockTime)
 					if err := b.network.GossipAtomicTxs(newTxs); err != nil {
 						log.Warn(
