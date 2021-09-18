@@ -246,8 +246,6 @@ func (b *blockBuilder) signalTxsReady() {
 	b.buildBlockLock.Lock()
 	defer b.buildBlockLock.Unlock()
 
-	// TODO: signal if conditional build/already building
-
 	if b.buildStatus != dontBuild {
 		return
 	}
@@ -274,8 +272,10 @@ func (b *blockBuilder) waitBuildBlock() bool {
 
 	select {
 	case <-b.builtBlock:
+		log.Trace("Block build attempted while waiting")
 		return true
 	case <-time.After(waitBlockTime):
+		log.Trace("Block not built while waiting")
 		return false
 	}
 }
