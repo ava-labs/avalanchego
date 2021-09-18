@@ -1028,6 +1028,12 @@ func (pool *TxPool) Has(hash common.Hash) bool {
 	return pool.all.Get(hash) != nil
 }
 
+// Has returns an indicator whether txpool has a local transaction cached with
+// the given hash.
+func (pool *TxPool) HasLocal(hash common.Hash) bool {
+	return pool.all.GetLocal(hash) != nil
+}
+
 // removeTx removes a single transaction from the queue, moving all subsequent
 // transactions back to the future queue.
 func (pool *TxPool) removeTx(hash common.Hash, outofbound bool) {
