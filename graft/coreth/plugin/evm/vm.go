@@ -892,8 +892,7 @@ func (vm *VM) issueTx(tx *Tx, local bool) error {
 		return err
 	}
 
-	// NOTE: The issued [Tx] is gossiped inside of [AddTx] by the [BlockBuilder]
-	// if it passes all validation.
+	// NOTE: Gossiping of the issued [Tx] is handled in [AddTx]
 	return nil
 }
 
