@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 
@@ -42,7 +43,7 @@ type Network interface {
 	AppGossip(nodeID ids.ShortID, msgBytes []byte) error
 
 	// Gossip entrypoints
-	GossipAtomicTx(tx *Tx) error
+	GossipAtomicTxs(txs []*Tx) error
 	GossipEthTxs(txs []*types.Transaction) error
 }
 
@@ -185,16 +186,24 @@ func (n *pushNetwork) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
 	)
 }
 
-func (n *pushNetwork) GossipAtomicTx(tx *Tx) error {
-	txID := tx.ID()
+func (n *pushNetwork) GossipAtomicTxs(txs []*Tx) error {
 	if time.Now().Before(n.gossipActivationTime) {
 		log.Trace(
 			"not gossiping atomic tx before the gossiping activation time",
-			"txID", txID,
+			"txs", txs,
 		)
 		return nil
 	}
 
+	errs := wrappers.Errs{}
+	for _, tx := range txs {
+		errs.Add(n.gossipAtomicTx(tx))
+	}
+	return errs.Err
+}
+
+func (n *pushNetwork) gossipAtomicTx(tx *Tx) error {
+	txID := tx.ID()
 	// Don't gossip transaction if it has been recently gossiped.
 	if _, has := n.recentAtomicTxs.Get(txID); has {
 		return nil
@@ -454,7 +463,7 @@ func (n *noopNetwork) AppResponse(nodeID ids.ShortID, requestID uint32, msgBytes
 func (n *noopNetwork) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
 	return nil
 }
-func (n *noopNetwork) GossipAtomicTx(tx *Tx) error {
+func (n *noopNetwork) GossipAtomicTxs(tx []*Tx) error {
 	return nil
 }
 func (n *noopNetwork) GossipEthTxs(txs []*types.Transaction) error {
