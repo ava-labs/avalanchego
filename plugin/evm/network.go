@@ -254,10 +254,15 @@ func (n *pushNetwork) gossipEthTxs() (int, error) {
 
 	pool := n.chain.GetTxPool()
 	selectedTxs := make([]*types.Transaction, 0)
+	var onlyGossipRemotes = false
 	for _, tx := range txs {
 		txHash := tx.Hash()
 		txStatus := pool.Status([]common.Hash{txHash})[0]
 		if txStatus != core.TxStatusPending {
+			continue
+		}
+
+		if onlyGossipRemotes && pool.HasLocal(txHash) {
 			continue
 		}
 
