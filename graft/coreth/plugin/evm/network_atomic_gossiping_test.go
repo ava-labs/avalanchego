@@ -201,6 +201,9 @@ func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 
 	// Optimistically gossip raw tx
 	assert.NoError(vm.issueTx(tx, true /*=local*/))
+
+	// wait for [waitBlockTime]
+	time.Sleep(waitBlockTime + 10*time.Millisecond)
 	assert.Equal(1, gossiped)
 
 	// Test hash on retry
