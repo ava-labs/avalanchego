@@ -161,6 +161,8 @@ func (b *blockBuilder) handleGenerateBlock() {
 		} else {
 			b.buildStatus = dontBuild
 		}
+
+		// Set timeout down channel to make sure signaled
 	}
 }
 
@@ -288,10 +290,16 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 			case <-b.mempool.Pending:
 				log.Trace("New atomic Tx detected, trying to generate a block")
 				b.signalTxsReady()
-				// Unlike EthTxs, AtomicTxs are gossiped in [issueTx] when they are
-				// successfully added to the mempool.
-
-				// TODO: gossip atomic txs here so can wait if block produced
+			case atomicTx := <-b.mempool.Submitted:
+				// NOTE: this is different than pending bc
+				if b.isAP4 && b.network != nil {
+					if err := b.network.GossipAtomicTx(atomicTx); err != nil {
+						log.Warn(
+							"failed to gossip new atomic transaction",
+							"err", err,
+						)
+					}
+				}
 			case <-b.shutdownChan:
 				return
 			}
