@@ -206,9 +206,7 @@ func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 
 	// Optimistically gossip raw tx
 	assert.NoError(vm.issueTx(tx, true /*=local*/))
-
-	// wait for [waitBlockTime]
-	time.Sleep(waitBlockTime + 10*time.Millisecond)
+	time.Sleep(waitBlockTime * 3)
 	gossipedLock.Lock()
 	assert.Equal(1, gossiped)
 	gossipedLock.Unlock()
@@ -268,9 +266,7 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 
 	// show that no txID is requested
 	assert.NoError(vm.AppGossip(nodeID, msgBytes))
-
-	// wait for [waitBlockTime]
-	time.Sleep(waitBlockTime + 10*time.Millisecond)
+	time.Sleep(waitBlockTime * 3)
 
 	assert.False(txRequested, "tx should not have been requested")
 	txGossipedLock.Lock()
@@ -360,6 +356,7 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 	assert.NoError(err)
 
 	assert.NoError(vm.AppGossip(nodeID, msgBytes))
+	time.Sleep(waitBlockTime * 3)
 	assert.False(txRequested, "tx shouldn't be requested")
 	txGossipedLock.Lock()
 	assert.Equal(1, txGossiped, "conflicting tx should have been gossiped")
