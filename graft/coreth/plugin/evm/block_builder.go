@@ -287,12 +287,13 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 						)
 					}
 				}
-			case <-b.mempool.Pending:
+			case atomicTx := <-b.mempool.Pending:
 				log.Trace("New atomic Tx detected, trying to generate a block")
 				b.signalTxsReady()
-			case atomicTx := <-b.mempool.Submitted:
-				// NOTE: this is different than pending bc
-				if b.isAP4 && b.network != nil {
+
+				// TODO: WAIT to see if block produced before gossiping
+
+				if atomicTx != nil && b.isAP4 && b.network != nil {
 					if err := b.network.GossipAtomicTx(atomicTx); err != nil {
 						log.Warn(
 							"failed to gossip new atomic transaction",
