@@ -3522,16 +3522,19 @@ func TestReissueAtomicTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// SetPreference to parent before rejecting (will rollback state to genesis
+	// so that atomic transaction can be reissued, otherwise current block will
+	// conflict with UTXO to be reissued)
+	if err := vm.SetPreference(genesisBlkID); err != nil {
+		t.Fatal(err)
+	}
+
 	if err := blk.Reject(); err != nil {
 		t.Fatal(err)
 	}
 
 	if status := blk.Status(); status != choices.Rejected {
 		t.Fatalf("Expected status of rejected block to be %s, but found %s", choices.Rejected, status)
-	}
-
-	if err := vm.SetPreference(genesisBlkID); err != nil {
-		t.Fatal(err)
 	}
 
 	<-issuer

@@ -28,6 +28,15 @@ const (
 
 	// AP4 Parameters
 	minBlockTimeAP4 = 500 * time.Millisecond
+	// waitBlockTime is the amount of time to wait for BuildBlock to be
+	// called by the engine before deciding whether or not to gossip the
+	// transaction that triggered the PendingTxs message to the engine.
+	//
+	// This is done to reduce contention in the network when there is no
+	// preferred producer. If we did not wait here, we may gossip a new
+	// transaction to a peer while building a block that will conflict with
+	// whatever the peer makes.
+	waitBlockTime = 100 * time.Millisecond
 
 	dontBuild        buildingBlkStatus = iota
 	conditionalBuild                   // Only used prior to AP4
@@ -264,7 +273,8 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 	go b.ctx.Log.RecoverAndPanic(func() {
 		defer b.shutdownWg.Done()
 
-		// txSubmitChan is invoked on reorgs
+		// txSubmitChan is invoked when new transactions are issued as well as on re-orgs which
+		// may orphan transactions that were previously in a preferred block.
 		txSubmitChan := b.chain.GetTxSubmitCh()
 		for {
 			select {
@@ -272,8 +282,13 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 				log.Trace("New tx detected, trying to generate a block")
 				b.signalTxsReady()
 
-				// We only attempt to invoke [GossipEthTxs] once AP4 is activated.
-				if b.isAP4 && b.network != nil {
+				// We only attempt to invoke [GossipEthTxs] once AP4 is activated
+				if b.isAP4 && b.network != nil && len(ethTxsEvent.Txs) > 0 {
+					// Give time for this node to build a block before attempting to
+					// gossip
+					time.Sleep(waitBlockTime)
+					// [GossipEthTxs] will block unless [pushNetwork.ethTxsToGossipChan] (an
+					// unbuffered channel) is listened on
 					if err := b.network.GossipEthTxs(ethTxsEvent.Txs); err != nil {
 						log.Warn(
 							"failed to gossip new eth transactions",
@@ -284,8 +299,20 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 			case <-b.mempool.Pending:
 				log.Trace("New atomic Tx detected, trying to generate a block")
 				b.signalTxsReady()
-				// Unlike EthTxs, AtomicTxs are gossiped in [issueTx] when they are
-				// successfully added to the mempool.
+
+				// We only attempt to invoke [GossipAtomicTxs] once AP4 is activated
+				newTxs := b.mempool.GetNewTxs()
+				if b.isAP4 && b.network != nil && len(newTxs) > 0 {
+					// Give time for this node to build a block before attempting to
+					// gossip
+					time.Sleep(waitBlockTime)
+					if err := b.network.GossipAtomicTxs(newTxs); err != nil {
+						log.Warn(
+							"failed to gossip new atomic transactions",
+							"err", err,
+						)
+					}
+				}
 			case <-b.shutdownChan:
 				return
 			}
