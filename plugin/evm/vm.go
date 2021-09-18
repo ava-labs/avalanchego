@@ -526,6 +526,7 @@ func (vm *VM) Shutdown() error {
 
 // buildBlock builds a block to be wrapped by ChainState
 func (vm *VM) buildBlock() (snowman.Block, error) {
+	vm.builder.startGenerateBlock()
 	block, err := vm.chain.GenerateBlock()
 	vm.builder.handleGenerateBlock()
 	if err != nil {

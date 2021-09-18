@@ -140,6 +140,18 @@ func (b *blockBuilder) migrateAP4() {
 	}
 }
 
+// startGenerateBlock should be called immediately before starting block
+// generation.
+func (b *blockBuilder) startGenerateBlock() {
+	b.buildBlockLock.Lock()
+	defer b.buildBlockLock.Unlock()
+
+	// Set timeout down channel to make sure signaled
+	if b.builtBlock != nil {
+		close(b.builtBlock)
+	}
+}
+
 // handleGenerateBlock should be called immediately after [BuildBlock].
 // [handleGenerateBlock] invocation could lead to quiesence, building a block with
 // some delay, or attempting to build another block immediately.
@@ -172,11 +184,6 @@ func (b *blockBuilder) handleGenerateBlock() {
 		} else {
 			b.buildStatus = dontBuild
 		}
-	}
-
-	// Set timeout down channel to make sure signaled
-	if b.builtBlock != nil {
-		close(b.builtBlock)
 	}
 }
 
