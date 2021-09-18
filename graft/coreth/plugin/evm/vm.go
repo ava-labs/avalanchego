@@ -892,8 +892,9 @@ func (vm *VM) issueTx(tx *Tx, local bool) error {
 		return err
 	}
 
-	// TODO: handle in awaitSubmittedTxs
-	return vm.network.GossipAtomicTx(tx)
+	// NOTE: The issued [Tx] is gossiped inside of [AddTx] by the [BlockBuilder]
+	// if it passes all validation.
+	return nil
 }
 
 // verifyTxAtTip verifies that [tx] is valid to be issued on top of the currently preferred block

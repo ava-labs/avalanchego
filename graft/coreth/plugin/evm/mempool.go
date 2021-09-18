@@ -37,6 +37,8 @@ type Mempool struct {
 	// Pending is a channel of length one, which the mempool ensures has an item on
 	// it as long as there is an unissued transaction remaining in [txs]
 	Pending chan struct{}
+	// Submitted
+	Submitted chan *Tx
 	// utxoSet is a collection of all pending and issued UTXOs
 	utxoSet ids.Set
 	// txHeap is a sorted record of all txs in the mempool by [gasPrice]
@@ -51,6 +53,7 @@ func NewMempool(AVAXAssetID ids.ID, maxSize int) *Mempool {
 		issuedTxs:    make(map[ids.ID]*Tx),
 		discardedTxs: &cache.LRU{Size: discardedTxsCacheSize},
 		Pending:      make(chan struct{}, 1),
+		Submitted:    make(chan *Tx, 1),
 		utxoSet:      ids.NewSet(maxSize),
 		txHeap:       newTxHeap(maxSize),
 		maxSize:      maxSize,
@@ -172,6 +175,9 @@ func (m *Mempool) AddTx(tx *Tx) error {
 	// reset until the engine calls BuildBlock. This case is handled in IssueCurrentTx
 	// and CancelCurrentTx.
 	m.addPending()
+
+	// TODO: why is this different
+	m.Submitted <- tx
 	return nil
 }
 
