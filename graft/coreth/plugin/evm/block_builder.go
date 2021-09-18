@@ -21,7 +21,6 @@ import (
 type buildingBlkStatus uint8
 
 const (
-	waitBlockTime = 500 * time.Millisecond
 
 	// AP3 Parameters
 	minBlockTime = 2 * time.Second
@@ -30,6 +29,15 @@ const (
 
 	// AP4 Parameters
 	minBlockTimeAP4 = 500 * time.Millisecond
+	// waitBlockTime is the amount of time to wait the creation of a block when
+	// signaling for building before deciding to gossip the transaction that
+	// triggered signaling.
+	//
+	// This is done to reduce contention in the network when there is no
+	// preferred producer. If we did not wait here, we may gossip a new
+	// transaction to a peer while building a block that will conflict with
+	// whatever the peer makes.
+	waitBlockTime = 500 * time.Millisecond
 
 	dontBuild        buildingBlkStatus = iota
 	conditionalBuild                   // Only used prior to AP4
@@ -267,6 +275,8 @@ func (b *blockBuilder) signalTxsReady() bool {
 	return true
 }
 
+// waitBuildBlock either waits for a [BuildBlock] to be called (returns true)
+// or times out after [waitBlockTime] (returns false).
 func (b *blockBuilder) waitBuildBlock() bool {
 	select {
 	case <-b.builtBlock:
