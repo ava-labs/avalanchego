@@ -4,6 +4,8 @@
 package chains
 
 import (
+	"crypto"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"sync"
@@ -32,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/metervm"
+	"github.com/ava-labs/avalanchego/vms/proposervm"
 
 	dbManager "github.com/ava-labs/avalanchego/database/manager"
 
@@ -45,11 +48,12 @@ import (
 )
 
 const (
-	defaultChannelSize = 1024
+	defaultChannelSize = 1
 )
 
 var (
 	errUnknownChainID = errors.New("unknown chain ID")
+	errUnknownVMType  = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
 
 	_ Manager = &manager{}
 )
@@ -112,7 +116,6 @@ type chain struct {
 	Engine  common.Engine
 	Handler *router.Handler
 	Ctx     *snow.Context
-	VM      interface{}
 	Beacons validators.Set
 }
 
@@ -125,7 +128,8 @@ type ChainConfig struct {
 }
 
 type ManagerConfig struct {
-	StakingEnabled              bool // True iff the network has staking enabled
+	StakingEnabled              bool            // True iff the network has staking enabled
+	StakingCert                 tls.Certificate // needed to sign snowman++ blocks
 	Log                         logging.Logger
 	LogFactory                  logging.Factory
 	VMManager                   vms.Manager // Manage mappings from vm ID --> vm
@@ -164,6 +168,9 @@ type ManagerConfig struct {
 	// This node will only consider the first [MultiputMaxContainersReceived]
 	// containers in a multiput it receives.
 	BootstrapMultiputMaxContainersReceived int
+
+	ApricotPhase4Time            time.Time
+	ApricotPhase4MinPChainHeight uint64
 }
 
 type manager struct {
@@ -186,6 +193,9 @@ type manager struct {
 	// Key: Chain's ID
 	// Value: The chain
 	chains map[ids.ID]*router.Handler
+
+	// snowman++ related interface to allow validators retrival
+	validatorState validators.State
 }
 
 // New returns a new Manager
@@ -319,6 +329,9 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		Metrics:              m.ConsensusParams.Metrics,
 		EpochFirstTransition: m.EpochFirstTransition,
 		EpochDuration:        m.EpochDuration,
+		ValidatorState:       m.validatorState,
+		StakingCertLeaf:      m.StakingCert.Leaf,
+		StakingLeafSigner:    m.StakingCert.PrivateKey.(crypto.Signer),
 	}
 
 	// Get a factory for the vm we want to use on our chain
@@ -414,7 +427,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			return nil, fmt.Errorf("error while creating new snowman vm %w", err)
 		}
 	default:
-		return nil, fmt.Errorf("the vm should have type avalanche.DAGVM or snowman.ChainVM. Chain not created")
+		return nil, errUnknownVMType
 	}
 
 	// Register the chain with the timeout manager
@@ -441,7 +454,7 @@ func (m *manager) unblockChains() {
 func (m *manager) createAvalancheChain(
 	ctx *snow.Context,
 	genesisData []byte,
-	validators,
+	vdrs,
 	beacons validators.Set,
 	vm vertex.DAGVM,
 	fxs []*common.Fx,
@@ -494,7 +507,16 @@ func (m *manager) createAvalancheChain(
 	}
 
 	chainConfig := m.getChainConfig(ctx.ChainID)
-	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs, &sender); err != nil {
+	if err := vm.Initialize(
+		ctx,
+		vmDBManager,
+		genesisData,
+		chainConfig.Upgrade,
+		chainConfig.Config,
+		msgChan,
+		fxs,
+		&sender,
+	); err != nil {
 		return nil, fmt.Errorf("error during vm's Initialize: %w", err)
 	}
 
@@ -522,7 +544,7 @@ func (m *manager) createAvalancheChain(
 		Config: avbootstrap.Config{
 			Config: common.Config{
 				Ctx:                           ctx,
-				Validators:                    validators,
+				Validators:                    vdrs,
 				Beacons:                       beacons,
 				SampleK:                       sampleK,
 				StartupAlpha:                  (3*bootstrapWeight + 3) / 4,
@@ -565,7 +587,7 @@ func (m *manager) createAvalancheChain(
 
 	err = handler.Initialize(
 		engine,
-		validators,
+		vdrs,
 		msgChan,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
@@ -575,7 +597,6 @@ func (m *manager) createAvalancheChain(
 		Name:    chainAlias,
 		Engine:  engine,
 		Handler: handler,
-		VM:      vm,
 		Ctx:     ctx,
 	}, err
 }
@@ -584,7 +605,7 @@ func (m *manager) createAvalancheChain(
 func (m *manager) createSnowmanChain(
 	ctx *snow.Context,
 	genesisData []byte,
-	validators,
+	vdrs,
 	beacons validators.Set,
 	vm block.ChainVM,
 	fxs []*common.Fx,
@@ -630,9 +651,37 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
 	}
 
-	// Initialize the VM
+	// first vm to be init is P-Chain once, which provides validator interface to all ProposerVMs
+	if m.validatorState == nil {
+		valState, ok := vm.(validators.State)
+		if !ok {
+			return nil, fmt.Errorf("expected validators.State but got %T", vm)
+		}
+
+		// Initialize the validator state for future chains.
+		m.validatorState = validators.NewLockedState(&ctx.Lock, valState)
+
+		// Notice that this context is left unlocked. This is because the
+		// lock will already be held when accessing these values on the
+		// P-chain.
+		ctx.ValidatorState = valState
+	}
+
+	// enable ProposerVM on this VM
+	vm = proposervm.New(vm, m.ApricotPhase4Time, m.ApricotPhase4MinPChainHeight)
+
+	// Initialize the ProposerVM and the vm wrapped inside it
 	chainConfig := m.getChainConfig(ctx.ChainID)
-	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs, &sender); err != nil {
+	if err := vm.Initialize(
+		ctx,
+		vmDBManager,
+		genesisData,
+		chainConfig.Upgrade,
+		chainConfig.Config,
+		msgChan,
+		fxs,
+		&sender,
+	); err != nil {
 		return nil, err
 	}
 
@@ -655,7 +704,7 @@ func (m *manager) createSnowmanChain(
 		Config: smbootstrap.Config{
 			Config: common.Config{
 				Ctx:                           ctx,
-				Validators:                    validators,
+				Validators:                    vdrs,
 				Beacons:                       beacons,
 				SampleK:                       sampleK,
 				StartupAlpha:                  (3*bootstrapWeight + 3) / 4,
@@ -681,7 +730,7 @@ func (m *manager) createSnowmanChain(
 
 	err = handler.Initialize(
 		engine,
-		validators,
+		vdrs,
 		msgChan,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
@@ -709,7 +758,6 @@ func (m *manager) createSnowmanChain(
 		Name:    chainAlias,
 		Engine:  engine,
 		Handler: handler,
-		VM:      vm,
 		Ctx:     ctx,
 	}, nil
 }

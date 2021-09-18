@@ -107,6 +107,33 @@ func TestShortSetUnion(t *testing.T) {
 	}
 }
 
+func TestShortSetDifference(t *testing.T) {
+	set := ShortSet{}
+	diffSet := ShortSet{}
+
+	id0 := ShortID{0}
+	id1 := ShortID{1}
+
+	diffSet.Add(id0)
+	set.Add(id0, id1)
+
+	switch {
+	case !set.Contains(id0):
+		t.Fatalf("Set should contain %s", id0)
+	case !set.Contains(id1):
+		t.Fatalf("Set should contain %s", id1)
+	}
+
+	set.Difference(diffSet)
+
+	switch {
+	case set.Contains(id0):
+		t.Fatalf("Set shouldn't contain %s", id0)
+	case !set.Contains(id1):
+		t.Fatalf("Set should contain %s", id1)
+	}
+}
+
 func TestShortSetEquals(t *testing.T) {
 	set := ShortSet{}
 	otherSet := ShortSet{}

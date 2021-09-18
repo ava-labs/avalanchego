@@ -1,3 +1,6 @@
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package platformvm
 
 import (
@@ -7,11 +10,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
@@ -116,7 +118,7 @@ func (vm *VM) stake(
 		remainingValue := in.Amount()
 
 		// Stake any value that should be staked
-		amountToStake := safemath.Min64(
+		amountToStake := math.Min64(
 			amount-amountStaked, // Amount we still need to stake
 			remainingValue,      // Amount available to stake
 		)
@@ -207,7 +209,7 @@ func (vm *VM) stake(
 		remainingValue := in.Amount()
 
 		// Burn any value that should be burned
-		amountToBurn := safemath.Min64(
+		amountToBurn := math.Min64(
 			fee-amountBurned, // Amount we still need to burn
 			remainingValue,   // Amount available to burn
 		)
@@ -215,7 +217,7 @@ func (vm *VM) stake(
 		remainingValue -= amountToBurn
 
 		// Stake any value that should be staked
-		amountToStake := safemath.Min64(
+		amountToStake := math.Min64(
 			amount-amountStaked, // Amount we still need to stake
 			remainingValue,      // Amount available to stake
 		)
@@ -270,8 +272,8 @@ func (vm *VM) stake(
 	}
 
 	avax.SortTransferableInputsWithSigners(ins, signers) // sort inputs and keys
-	avax.SortTransferableOutputs(returnedOuts, vm.codec) // sort outputs
-	avax.SortTransferableOutputs(stakedOuts, vm.codec)   // sort outputs
+	avax.SortTransferableOutputs(returnedOuts, Codec)    // sort outputs
+	avax.SortTransferableOutputs(stakedOuts, Codec)      // sort outputs
 
 	return ins, returnedOuts, stakedOuts, signers, nil
 }
@@ -438,7 +440,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		amount := in.Amount()
 
 		if now >= locktime {
-			newUnlockedConsumed, err := safemath.Add64(unlockedConsumed, amount)
+			newUnlockedConsumed, err := math.Add64(unlockedConsumed, amount)
 			if err != nil {
 				return permError{err}
 			}
@@ -451,7 +453,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			return permError{errUnknownOwners}
 		}
 		owner := owned.Owners()
-		ownerBytes, err := vm.codec.Marshal(codecVersion, owner)
+		ownerBytes, err := Codec.Marshal(CodecVersion, owner)
 		if err != nil {
 			return tempError{
 				fmt.Errorf("couldn't marshal owner: %w", err),
@@ -463,7 +465,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			owners = make(map[ids.ID]uint64)
 			lockedConsumed[locktime] = owners
 		}
-		newAmount, err := safemath.Add64(owners[ownerID], amount)
+		newAmount, err := math.Add64(owners[ownerID], amount)
 		if err != nil {
 			return permError{err}
 		}
@@ -486,7 +488,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		amount := output.Amount()
 
 		if locktime == 0 {
-			newUnlockedProduced, err := safemath.Add64(unlockedProduced, amount)
+			newUnlockedProduced, err := math.Add64(unlockedProduced, amount)
 			if err != nil {
 				return permError{err}
 			}
@@ -499,7 +501,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			return permError{errUnknownOwners}
 		}
 		owner := owned.Owners()
-		ownerBytes, err := vm.codec.Marshal(codecVersion, owner)
+		ownerBytes, err := Codec.Marshal(CodecVersion, owner)
 		if err != nil {
 			return tempError{
 				fmt.Errorf("couldn't marshal owner: %w", err),
@@ -511,7 +513,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			owners = make(map[ids.ID]uint64)
 			lockedProduced[locktime] = owners
 		}
-		newAmount, err := safemath.Add64(owners[ownerID], amount)
+		newAmount, err := math.Add64(owners[ownerID], amount)
 		if err != nil {
 			return permError{err}
 		}

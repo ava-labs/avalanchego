@@ -105,7 +105,7 @@ func TestPeer_Close(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler,
-		throttling.InboundConnThrottlerConfig{},
+		throttling.InboundConnUpgradeThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,

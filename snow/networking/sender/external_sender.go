@@ -42,7 +42,7 @@ type ExternalSender interface {
 	SendGossip(subnetID, chainID, containerID ids.ID, container []byte)
 }
 
-// Sends app-level messages
+// AppSender sends app-level messages
 type AppSender interface {
 	// Send an application-level request
 	SendAppRequest(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, appRequestBytes []byte) []ids.ShortID

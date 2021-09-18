@@ -72,6 +72,9 @@ type Factory struct {
 
 	// Time of the AP3 network upgrade
 	ApricotPhase3Time time.Time
+
+	// Time of the AP4 network upgrade
+	ApricotPhase4Time time.Time
 }
 
 // New returns a new instance of the Platform Chain

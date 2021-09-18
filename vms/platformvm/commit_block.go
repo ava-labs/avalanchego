@@ -77,7 +77,7 @@ func (vm *VM) newCommitBlock(parentID ids.ID, height uint64) (*CommitBlock, erro
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := Block(commit)
-	bytes, err := Codec.Marshal(codecVersion, &blk)
+	bytes, err := Codec.Marshal(CodecVersion, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal commit block: %w", err)
 	}

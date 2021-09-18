@@ -491,7 +491,7 @@ func (h *Handler) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time
 	})
 }
 
-// AppRequest passes an application-level response from the given node to the consensus engine.
+// AppResponse passes an application-level response from the given node to the consensus engine.
 func (h *Handler) AppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte, onFinishedHandling func()) {
 	h.push(message{
 		messageType:    constants.AppResponseMsg,

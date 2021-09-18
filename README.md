@@ -18,7 +18,7 @@ Note that as network usage increases, hardware requirements may change.
 - OS: Ubuntu 18.04/20.04 or MacOS >= Catalina
 - Network: Reliable IPv4 or IPv6 network connection, with an open public port.
 - Software Dependencies:
-  - [Go](https://golang.org/doc/install) version >= 1.15.5 and set up [`$GOPATH`](https://github.com/golang/go/wiki/SettingGOPATH).
+  - [Go](https://golang.org/doc/install) version >= 1.16.8 and set up [`$GOPATH`](https://github.com/golang/go/wiki/SettingGOPATH).
   - [gcc](https://gcc.gnu.org/)
   - g++
 
@@ -183,4 +183,4 @@ docker run -t -i -v $(pwd):/opt/avalanche -w/opt/avalanche avalanche:protobuf_co
 
 **We and our community welcome responsible disclosures.**
 
-If you've discovered a security vulnerabilitiy, please report it via our [bug bounty program](https://hackenproof.com/avalanche/). Valid reports will be eligible for a reward (terms and conditions apply).
+If you've discovered a security vulnerability, please report it via our [bug bounty program](https://hackenproof.com/avalanche/). Valid reports will be eligible for a reward (terms and conditions apply).

@@ -1,3 +1,6 @@
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package platformvm
 
 import (
@@ -10,8 +13,16 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+type dummyUnsignedTx struct {
+	BaseTx
+}
+
+func (du *dummyUnsignedTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
+	return nil
+}
+
 func TestSemanticVerifySpendUTXOs(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -23,7 +34,9 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 	// The VM time during a test, unless [chainTimestamp] is set
 	now := time.Unix(1607133207, 0)
 
-	unsignedTx := avax.Metadata{}
+	unsignedTx := dummyUnsignedTx{
+		BaseTx: BaseTx{},
+	}
 	unsignedTx.Initialize([]byte{0}, []byte{1})
 
 	// Note that setting [chainTimestamp] also set's the VM's clock.

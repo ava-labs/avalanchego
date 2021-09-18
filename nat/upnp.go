@@ -125,7 +125,7 @@ func (r *upnpRouter) MapPort(protocol string, intPort, extPort uint16,
 	}
 	lifetime := duration.Seconds()
 	if lifetime < 0 || lifetime > math.MaxUint32 {
-		return fmt.Errorf("invalid lifetime duration range")
+		return errInvalidLifetime
 	}
 
 	return r.client.AddPortMapping("", extPort, protocol, intPort,
