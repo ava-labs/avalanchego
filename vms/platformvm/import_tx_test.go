@@ -17,7 +17,7 @@ import (
 )
 
 func TestNewImportTx(t *testing.T) {
-	vm, baseDB := defaultVM()
+	vm, baseDB, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -71,7 +71,7 @@ func TestNewImportTx(t *testing.T) {
 				},
 			},
 		}
-		utxoBytes, err := Codec.Marshal(codecVersion, utxo)
+		utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
 		if err != nil {
 			t.Fatal(err)
 		}

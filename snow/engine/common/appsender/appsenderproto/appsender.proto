@@ -1,6 +1,7 @@
 syntax = "proto3";
 package appsenderproto;
 option go_package = "github.com/ava-labs/avalanchego/snow/engine/common/appsender/appsenderproto";
+import "google/protobuf/empty.proto";
 
 message SendAppRequestMsg {
     // The nodes to send this request to
@@ -26,10 +27,8 @@ message SendAppGossipMsg {
     bytes msg = 1;
 }
 
-message EmptyMsg {}
-
 service AppSender {
-    rpc SendAppRequest(SendAppRequestMsg) returns (EmptyMsg);
-    rpc SendAppResponse(SendAppResponseMsg) returns (EmptyMsg);
-    rpc SendAppGossip(SendAppGossipMsg) returns (EmptyMsg);
+    rpc SendAppRequest(SendAppRequestMsg) returns (google.protobuf.Empty);
+    rpc SendAppResponse(SendAppResponseMsg) returns (google.protobuf.Empty);
+    rpc SendAppGossip(SendAppGossipMsg) returns (google.protobuf.Empty);
 }

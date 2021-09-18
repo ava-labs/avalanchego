@@ -456,7 +456,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 
 	response.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
-		bytes, err := service.vm.codec.Marshal(codecVersion, utxo)
+		bytes, err := Codec.Marshal(CodecVersion, utxo)
 		if err != nil {
 			return fmt.Errorf("couldn't serialize UTXO %q: %w", utxo.InputID(), err)
 		}
@@ -983,8 +983,8 @@ type AddValidatorArgs struct {
 	DelegationFeeRate json.Float32 `json:"delegationFeeRate"`
 }
 
-// AddValidator creates and signs and issues a transaction to add a
-// validator to the primary network
+// AddValidator creates and signs and issues a transaction to add a validator to
+// the primary network
 func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Debug("Platform: AddValidator called")
 
@@ -1096,7 +1096,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.mempool.IssueTx(tx),
+		service.vm.blockBuilder.AddUnverifiedTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1110,8 +1110,8 @@ type AddDelegatorArgs struct {
 	RewardAddress string `json:"rewardAddress"`
 }
 
-// AddDelegator creates and signs and issues a transaction to add a
-// delegator to the primary network
+// AddDelegator creates and signs and issues a transaction to add a delegator to
+// the primary network
 func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Debug("Platform: AddDelegator called")
 
@@ -1220,7 +1220,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.mempool.IssueTx(tx),
+		service.vm.blockBuilder.AddUnverifiedTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1235,8 +1235,8 @@ type AddSubnetValidatorArgs struct {
 	SubnetID string `json:"subnetID"`
 }
 
-// AddSubnetValidator creates and signs and issues a transaction to
-// add a validator to a subnet other than the primary network
+// AddSubnetValidator creates and signs and issues a transaction to add a
+// validator to a subnet other than the primary network
 func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorArgs, response *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Debug("Platform: AddSubnetValidator called")
 
@@ -1341,7 +1341,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.mempool.IssueTx(tx),
+		service.vm.blockBuilder.AddUnverifiedTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1435,7 +1435,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.mempool.IssueTx(tx),
+		service.vm.blockBuilder.AddUnverifiedTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1535,7 +1535,7 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.mempool.IssueTx(tx),
+		service.vm.blockBuilder.AddUnverifiedTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1629,7 +1629,7 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.mempool.IssueTx(tx),
+		service.vm.blockBuilder.AddUnverifiedTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1768,7 +1768,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.mempool.IssueTx(tx),
+		service.vm.blockBuilder.AddUnverifiedTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -2042,10 +2042,10 @@ func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}
 	tx := &Tx{}
-	if _, err := service.vm.codec.Unmarshal(txBytes, tx); err != nil {
+	if _, err := Codec.Unmarshal(txBytes, tx); err != nil {
 		return fmt.Errorf("couldn't parse tx: %w", err)
 	}
-	if err := service.vm.mempool.IssueTx(tx); err != nil {
+	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		return fmt.Errorf("couldn't issue tx: %w", err)
 	}
 
@@ -2101,7 +2101,7 @@ type GetTxStatusResponse struct {
 
 // GetTxStatus gets a tx's status
 func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *GetTxStatusResponse) error {
-	service.vm.ctx.Log.Debug("Platform: GetTxStatus called")
+	service.vm.ctx.Log.Debug("Platform: GetTxStatus called with txID: %s", args.TxID)
 
 	_, status, err := service.vm.internalState.GetTx(args.TxID)
 	if err == nil { // Found the status. Report it.
@@ -2133,6 +2133,12 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 	}
 	if err != database.ErrNotFound {
 		return err
+	}
+
+	if service.vm.blockBuilder.Has(args.TxID) {
+		// Found the tx in the mempool. Report tx is processing.
+		response.Status = Processing
+		return nil
 	}
 
 	reason, ok := service.vm.droppedTxCache.Get(args.TxID)
@@ -2294,7 +2300,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 	response.Staked = json.Uint64(totalStake)
 	response.Outputs = make([]string, len(stakedOuts))
 	for i, output := range stakedOuts {
-		bytes, err := service.vm.codec.Marshal(codecVersion, output)
+		bytes, err := Codec.Marshal(CodecVersion, output)
 		if err != nil {
 			return fmt.Errorf("couldn't serialize output %s: %w", output.ID, err)
 		}
@@ -2395,7 +2401,7 @@ func (service *Service) GetRewardUTXOs(_ *http.Request, args *api.GetTxArgs, rep
 	reply.NumFetched = json.Uint64(len(utxos))
 	reply.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
-		utxoBytes, err := GenesisCodec.Marshal(codecVersion, utxo)
+		utxoBytes, err := GenesisCodec.Marshal(CodecVersion, utxo)
 		if err != nil {
 			return fmt.Errorf("failed to encode UTXO to bytes: %w", err)
 		}

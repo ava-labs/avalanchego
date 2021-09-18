@@ -74,6 +74,7 @@ type InternalState interface {
 	uptime.State
 
 	SetHeight(height uint64)
+
 	AddCurrentStaker(tx *Tx, potentialReward uint64)
 	DeleteCurrentStaker(tx *Tx)
 	GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.ShortID]*ValidatorWeightDiff, error)
@@ -597,7 +598,7 @@ func (st *internalStateImpl) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 	utxos := []*avax.UTXO(nil)
 	for it.Next() {
 		utxo := &avax.UTXO{}
-		if _, err := GenesisCodec.Unmarshal(it.Value(), utxo); err != nil {
+		if _, err := Codec.Unmarshal(it.Value(), utxo); err != nil {
 			return nil, err
 		}
 		utxos = append(utxos, utxo)
@@ -726,12 +727,20 @@ func (st *internalStateImpl) DeleteCurrentStaker(tx *Tx) {
 	st.deletedCurrentStakers = append(st.deletedCurrentStakers, tx)
 }
 
+func (st *internalStateImpl) AddPendingStaker(tx *Tx) {
+	st.addedPendingStakers = append(st.addedPendingStakers, tx)
+}
+
+func (st *internalStateImpl) DeletePendingStaker(tx *Tx) {
+	st.deletedPendingStakers = append(st.deletedPendingStakers, tx)
+}
+
 func (st *internalStateImpl) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.ShortID]*ValidatorWeightDiff, error) {
 	prefixStruct := heightWithSubnet{
 		Height:   height,
 		SubnetID: subnetID,
 	}
-	prefixBytes, err := Codec.Marshal(codecVersion, prefixStruct)
+	prefixBytes, err := GenesisCodec.Marshal(CodecVersion, prefixStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -753,7 +762,7 @@ func (st *internalStateImpl) GetValidatorWeightDiffs(height uint64, subnetID ids
 		}
 
 		weightDiff := ValidatorWeightDiff{}
-		_, err = Codec.Unmarshal(diffIter.Value(), &weightDiff)
+		_, err = GenesisCodec.Unmarshal(diffIter.Value(), &weightDiff)
 		if err != nil {
 			return nil, err
 		}
@@ -763,14 +772,6 @@ func (st *internalStateImpl) GetValidatorWeightDiffs(height uint64, subnetID ids
 
 	st.validatorDiffsCache.Put(prefixStr, weightDiffs)
 	return weightDiffs, nil
-}
-
-func (st *internalStateImpl) AddPendingStaker(tx *Tx) {
-	st.addedPendingStakers = append(st.addedPendingStakers, tx)
-}
-
-func (st *internalStateImpl) DeletePendingStaker(tx *Tx) {
-	st.deletedPendingStakers = append(st.deletedPendingStakers, tx)
 }
 
 func (st *internalStateImpl) Abort() {
@@ -876,7 +877,7 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 				PotentialReward: potentialReward,
 			}
 
-			vdrBytes, err := GenesisCodec.Marshal(codecVersion, vdr)
+			vdrBytes, err := GenesisCodec.Marshal(CodecVersion, vdr)
 			if err != nil {
 				return err
 			}
@@ -939,6 +940,7 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 		switch tx := tx.UnsignedTx.(type) {
 		case *UnsignedAddValidatorTx:
 			db = st.currentValidatorList
+
 			delete(st.uptimes, tx.Validator.NodeID)
 			delete(st.updatedUptimes, tx.Validator.NodeID)
 
@@ -996,7 +998,7 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 			Height:   st.currentHeight,
 			SubnetID: subnetID,
 		}
-		prefixBytes, err := Codec.Marshal(codecVersion, prefixStruct)
+		prefixBytes, err := GenesisCodec.Marshal(CodecVersion, prefixStruct)
 		if err != nil {
 			return err
 		}
@@ -1007,11 +1009,12 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 				delete(nodeUpdates, nodeID)
 				continue
 			}
-			nodeDiffBytes, err := Codec.Marshal(codecVersion, nodeDiff)
+			nodeDiffBytes, err := GenesisCodec.Marshal(CodecVersion, nodeDiff)
 			if err != nil {
 				return err
 			}
 
+			// Copy so value passed into [Put] doesn't get overwritten next iteration
 			nodeID := nodeID
 			if err := diffDB.Put(nodeID[:], nodeDiffBytes); err != nil {
 				return err
@@ -1072,7 +1075,7 @@ func (st *internalStateImpl) writeUptimes() error {
 		uptime := st.uptimes[nodeID]
 		uptime.LastUpdated = uint64(uptime.lastUpdated.Unix())
 
-		uptimeBytes, err := GenesisCodec.Marshal(codecVersion, uptime)
+		uptimeBytes, err := GenesisCodec.Marshal(CodecVersion, uptime)
 		if err != nil {
 			return err
 		}
@@ -1092,7 +1095,7 @@ func (st *internalStateImpl) writeBlocks() error {
 			Blk:    blk.Bytes(),
 			Status: blk.Status(),
 		}
-		btxBytes, err := GenesisCodec.Marshal(codecVersion, &sblk)
+		btxBytes, err := GenesisCodec.Marshal(CodecVersion, &sblk)
 		if err != nil {
 			return err
 		}
@@ -1114,7 +1117,7 @@ func (st *internalStateImpl) writeTXs() error {
 			Tx:     txStatus.tx.Bytes(),
 			Status: txStatus.status,
 		}
-		txBytes, err := GenesisCodec.Marshal(codecVersion, &stx)
+		txBytes, err := GenesisCodec.Marshal(CodecVersion, &stx)
 		if err != nil {
 			return err
 		}
@@ -1138,7 +1141,7 @@ func (st *internalStateImpl) writeRewardUTXOs() error {
 		txDB := linkeddb.NewDefault(rawTxDB)
 
 		for _, utxo := range utxos {
-			utxoBytes, err := GenesisCodec.Marshal(codecVersion, utxo)
+			utxoBytes, err := GenesisCodec.Marshal(CodecVersion, utxo)
 			if err != nil {
 				return err
 			}

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -27,13 +29,29 @@ type UnsignedAdvanceTimeTx struct {
 	Time uint64 `serialize:"true" json:"time"`
 }
 
+func (tx *UnsignedAdvanceTimeTx) InitCtx(*snow.Context) {}
+
 // Timestamp returns the time this block is proposing the chain should be set to
 func (tx *UnsignedAdvanceTimeTx) Timestamp() time.Time {
 	return time.Unix(int64(tx.Time), 0)
 }
 
-// SemanticVerify this transaction is valid.
-func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
+func (tx *UnsignedAdvanceTimeTx) InputIDs() ids.Set {
+	return nil
+}
+
+func (tx *UnsignedAdvanceTimeTx) SyntacticVerify(*snow.Context) error {
+	return nil
+}
+
+// Attempts to verify this transaction with the provided state.
+func (tx *UnsignedAdvanceTimeTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
+	_, _, _, _, err := tx.Execute(vm, parentState, stx)
+	return err
+}
+
+// Execute this transaction.
+func (tx *UnsignedAdvanceTimeTx) Execute(
 	vm *VM,
 	parentState MutableState,
 	stx *Tx,
@@ -226,5 +244,5 @@ func (vm *VM) newAdvanceTimeTx(timestamp time.Time) (*Tx, error) {
 	tx := &Tx{UnsignedTx: &UnsignedAdvanceTimeTx{
 		Time: uint64(timestamp.Unix()),
 	}}
-	return tx, tx.Sign(vm.codec, nil)
+	return tx, tx.Sign(Codec, nil)
 }
