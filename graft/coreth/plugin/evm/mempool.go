@@ -52,8 +52,7 @@ func NewMempool(AVAXAssetID ids.ID, maxSize int) *Mempool {
 		AVAXAssetID:  AVAXAssetID,
 		issuedTxs:    make(map[ids.ID]*Tx),
 		discardedTxs: &cache.LRU{Size: discardedTxsCacheSize},
-		Pending:      make(chan struct{}),
-		newTxs:       make([]*Tx, 0),
+		Pending:      make(chan struct{}, 1),
 		utxoSet:      ids.NewSet(maxSize),
 		txHeap:       newTxHeap(maxSize),
 		maxSize:      maxSize,
@@ -341,11 +340,13 @@ func (m *Mempool) addPending() {
 }
 
 // GetNewTxs returns the array of [newTxs] and replaces it with a new array.
+//
+// NOTE: If there are no [newTxs], the returned array could be nil.
 func (m *Mempool) GetNewTxs() []*Tx {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	cpy := m.newTxs
-	m.newTxs = make([]*Tx, 0)
+	m.newTxs = nil
 	return cpy
 }
