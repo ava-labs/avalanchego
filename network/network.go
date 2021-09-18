@@ -155,7 +155,7 @@ type network struct {
 	pingFrequency                time.Duration
 	readBufferSize               uint32
 	readHandshakeTimeout         time.Duration
-	inboundConnThrottler         throttling.InboundConnThrottler
+	inboundConnUpgradeThrottler  throttling.InboundConnUpgradeThrottler
 	c                            message.Codec
 	b                            message.Builder
 
@@ -238,12 +238,13 @@ type network struct {
 }
 
 type Config struct {
-	HealthConfig                `json:"healthConfig"`
-	timer.AdaptiveTimeoutConfig `json:"adaptiveTimeoutConfig"`
-	InboundConnThrottlerConfig  throttling.InboundConnThrottlerConfig `json:"inboundConnThrottlerConfig"`
-	InboundThrottlerConfig      throttling.MsgThrottlerConfig         `json:"inboundThrottlerConfig"`
-	OutboundThrottlerConfig     throttling.MsgThrottlerConfig         `json:"outboundThrottlerConfig"`
-	DialerConfig                dialer.Config                         `json:"dialerConfig"`
+	HealthConfig                      `json:"healthConfig"`
+	timer.AdaptiveTimeoutConfig       `json:"adaptiveTimeoutConfig"`
+	InboundConnUpgradeThrottlerConfig throttling.InboundConnUpgradeThrottlerConfig `json:"inboundConnUpgradeThrottlerConfig"`
+	InboundThrottlerConfig            throttling.MsgThrottlerConfig                `json:"inboundThrottlerConfig"`
+	OutboundThrottlerConfig           throttling.MsgThrottlerConfig                `json:"outboundThrottlerConfig"`
+	DialerConfig                      dialer.Config                                `json:"dialerConfig"`
+	MaxIncomingConnsPerSec            float64                                      `json:"maxIncomingConnsPerSec"`
 	// [Registerer] is set in node's initMetricsAPI method
 	MetricsRegisterer  prometheus.Registerer `json:"-"`
 	CompressionEnabled bool                  `json:"compressionEnabled"`
@@ -269,7 +270,7 @@ func NewDefaultNetwork(
 	vdrs validators.Set,
 	beacons validators.Set,
 	router router.Router,
-	inboundConnThrottlerConfig throttling.InboundConnThrottlerConfig,
+	inboundConnUpgradeThrottlerConfig throttling.InboundConnUpgradeThrottlerConfig,
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
@@ -318,7 +319,7 @@ func NewDefaultNetwork(
 		defaultPingFrequency,
 		defaultReadBufferSize,
 		defaultReadHandshakeTimeout,
-		inboundConnThrottlerConfig,
+		inboundConnUpgradeThrottlerConfig,
 		healthConfig,
 		benchlistManager,
 		peerAliasTimeout,
@@ -364,7 +365,7 @@ func NewNetwork(
 	pingFrequency time.Duration,
 	readBufferSize uint32,
 	readHandshakeTimeout time.Duration,
-	inboundConnThrottlerConfig throttling.InboundConnThrottlerConfig,
+	inboundConnUpgradeThrottlerConfig throttling.InboundConnUpgradeThrottlerConfig,
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
@@ -416,7 +417,7 @@ func NewNetwork(
 		myIPs:                        map[string]struct{}{ip.IP().String(): {}},
 		readBufferSize:               readBufferSize,
 		readHandshakeTimeout:         readHandshakeTimeout,
-		inboundConnThrottler:         throttling.NewInboundConnThrottler(log, inboundConnThrottlerConfig),
+		inboundConnUpgradeThrottler:  throttling.NewInboundConnUpgradeThrottler(log, inboundConnUpgradeThrottlerConfig),
 		healthConfig:                 healthConfig,
 		benchlistManager:             benchlistManager,
 		tlsKey:                       tlsKey,
@@ -998,7 +999,7 @@ func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 		n.log.Debug("not upgrading connection to %s because it's an alias", ipStr)
 		return false
 	}
-	if !n.inboundConnThrottler.Allow(ipStr) {
+	if !n.inboundConnUpgradeThrottler.ShouldUpgrade(ipStr) {
 		n.log.Debug("not upgrading connection to %s due to rate-limiting", ipStr)
 		n.metrics.inboundConnRateLimited.Inc()
 		return false
@@ -1016,8 +1017,8 @@ func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 // Assumes [n.stateLock] is not held.
 func (n *network) Dispatch() error {
 	go n.gossipPeerList() // Periodically gossip peers
-	go n.inboundConnThrottler.Dispatch()
-	defer n.inboundConnThrottler.Stop()
+	go n.inboundConnUpgradeThrottler.Dispatch()
+	defer n.inboundConnUpgradeThrottler.Stop()
 	go func() {
 		duration := time.Until(n.versionCompatibility.MaskTime())
 		time.Sleep(duration)
