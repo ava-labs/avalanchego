@@ -242,18 +242,18 @@ func (b *blockBuilder) markBuilding() {
 // has not already begun from an earlier notification. If [buildStatus] is anything
 // other than [dontBuild], then the attempt has already begun and this notification
 // can be safely skipped.
-func (b *blockBuilder) signalTxsReady() {
+func (b *blockBuilder) signalTxsReady() bool {
 	b.buildBlockLock.Lock()
 	defer b.buildBlockLock.Unlock()
 
 	if b.buildStatus != dontBuild {
-		return
+		return false
 	}
 
 	if !b.isAP4 {
 		b.buildStatus = conditionalBuild
 		b.buildBlockTimer.SetTimeoutIn(minBlockTime)
-		return
+		return false
 	}
 
 	// We take a naive approach here and signal the engine that we should build
@@ -262,14 +262,12 @@ func (b *blockBuilder) signalTxsReady() {
 	// In the future, we may wish to add optimization here to only signal the
 	// engine if the sum of the projected tips in the mempool satisfies the
 	// required block fee.
+	b.builtBlock = make(chan struct{})
 	b.markBuilding()
+	return true
 }
 
 func (b *blockBuilder) waitBuildBlock() bool {
-	b.buildBlockLock.Lock()
-	b.builtBlock = make(chan struct{})
-	b.buildBlockLock.Unlock()
-
 	select {
 	case <-b.builtBlock:
 		log.Trace("Block build attempted while waiting")
@@ -294,10 +292,10 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 			select {
 			case ethTxsEvent := <-txSubmitChan:
 				log.Trace("New tx detected, trying to generate a block")
-				b.signalTxsReady()
+				signaled := b.signalTxsReady()
 
 				// We only attempt to invoke [GossipEthTxs] once AP4 is activated.
-				if b.isAP4 && b.network != nil && !b.waitBuildBlock() {
+				if b.isAP4 && b.network != nil && signaled && !b.waitBuildBlock() {
 					if err := b.network.GossipEthTxs(ethTxsEvent.Txs); err != nil {
 						log.Warn(
 							"failed to gossip new eth transactions",
@@ -307,10 +305,10 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 				}
 			case atomicTx := <-b.mempool.Pending:
 				log.Trace("New atomic Tx detected, trying to generate a block")
-				b.signalTxsReady()
+				signaled := b.signalTxsReady()
 
 				// We only attempt to invoke [GossipAtomicTx] once AP4 is activated.
-				if atomicTx != nil && b.isAP4 && b.network != nil && !b.waitBuildBlock() {
+				if atomicTx != nil && b.isAP4 && b.network != nil && signaled && !b.waitBuildBlock() {
 					if err := b.network.GossipAtomicTx(atomicTx); err != nil {
 						log.Warn(
 							"failed to gossip new atomic transaction",
