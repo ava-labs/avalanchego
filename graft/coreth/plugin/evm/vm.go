@@ -892,7 +892,8 @@ func (vm *VM) issueTx(tx *Tx, local bool) error {
 		return err
 	}
 
-	return vm.network.GossipAtomicTx(tx)
+	// NOTE: Gossiping of the issued [Tx] is handled in [AddTx]
+	return nil
 }
 
 // verifyTxAtTip verifies that [tx] is valid to be issued on top of the currently preferred block

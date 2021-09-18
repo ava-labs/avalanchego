@@ -4,7 +4,9 @@
 package evm
 
 import (
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
@@ -178,8 +180,12 @@ func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 	tx, conflictingTx := getValidImportTx(vm, sharedMemory, t)
 
 	var gossiped int
+	var gossipedLock sync.Mutex // needed to prevent race
 	sender.CantSendAppGossip = false
 	sender.SendAppGossipF = func(gossipedBytes []byte) error {
+		gossipedLock.Lock()
+		defer gossipedLock.Unlock()
+
 		notifyMsgIntf, err := message.Parse(gossipedBytes)
 		assert.NoError(err)
 
@@ -200,15 +206,22 @@ func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 
 	// Optimistically gossip raw tx
 	assert.NoError(vm.issueTx(tx, true /*=local*/))
+	time.Sleep(waitBlockTime * 3)
+	gossipedLock.Lock()
 	assert.Equal(1, gossiped)
+	gossipedLock.Unlock()
 
 	// Test hash on retry
-	assert.NoError(vm.network.GossipAtomicTx(tx))
+	assert.NoError(vm.network.GossipAtomicTxs([]*Tx{tx}))
+	gossipedLock.Lock()
 	assert.Equal(1, gossiped)
+	gossipedLock.Unlock()
 
 	// Attempt to gossip conflicting tx
 	assert.ErrorIs(vm.issueTx(conflictingTx, true /*=local*/), errConflictingAtomicTx)
+	gossipedLock.Lock()
 	assert.Equal(1, gossiped)
+	gossipedLock.Unlock()
 }
 
 // show that a txID discovered from gossip is requested to the same node only if
@@ -224,11 +237,15 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 	nodeID := ids.GenerateTestShortID()
 
 	var (
-		txGossiped  int
-		txRequested bool
+		txGossiped     int
+		txGossipedLock sync.Mutex
+		txRequested    bool
 	)
 	sender.CantSendAppGossip = false
 	sender.SendAppGossipF = func(_ []byte) error {
+		txGossipedLock.Lock()
+		defer txGossipedLock.Unlock()
+
 		txGossiped++
 		return nil
 	}
@@ -249,13 +266,19 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 
 	// show that no txID is requested
 	assert.NoError(vm.AppGossip(nodeID, msgBytes))
+	time.Sleep(waitBlockTime * 3)
+
 	assert.False(txRequested, "tx should not have been requested")
+	txGossipedLock.Lock()
 	assert.Equal(1, txGossiped, "tx should have been gossiped")
+	txGossipedLock.Unlock()
 	assert.True(vm.mempool.has(tx.ID()))
 
 	// show that tx is not re-gossiped
 	assert.NoError(vm.AppGossip(nodeID, msgBytes))
+	txGossipedLock.Lock()
 	assert.Equal(1, txGossiped, "tx should have only been gossiped once")
+	txGossipedLock.Unlock()
 
 	// show that conflicting tx is not added to mempool
 	msg = message.AtomicTx{
@@ -265,7 +288,9 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 	assert.NoError(err)
 	assert.NoError(vm.AppGossip(nodeID, msgBytes))
 	assert.False(txRequested, "tx should not have been requested")
+	txGossipedLock.Lock()
 	assert.Equal(1, txGossiped, "tx should not have been gossiped")
+	txGossipedLock.Unlock()
 	assert.False(vm.mempool.has(conflictingTx.ID()), "conflicting tx should not be in the atomic mempool")
 }
 
@@ -280,11 +305,15 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 	mempool := vm.mempool
 
 	var (
-		txGossiped  int
-		txRequested bool
+		txGossiped     int
+		txGossipedLock sync.Mutex
+		txRequested    bool
 	)
 	sender.CantSendAppGossip = false
 	sender.SendAppGossipF = func(_ []byte) error {
+		txGossipedLock.Lock()
+		defer txGossipedLock.Unlock()
+
 		txGossiped++
 		return nil
 	}
@@ -314,7 +343,9 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 
 	assert.NoError(vm.AppGossip(nodeID, msgBytes))
 	assert.False(txRequested, "tx shouldn't be requested")
+	txGossipedLock.Lock()
 	assert.Zero(txGossiped, "tx should not have been gossiped")
+	txGossipedLock.Unlock()
 
 	// gossip conflicting tx and ensure it is accepted and gossiped
 	nodeID = ids.GenerateTestShortID()
@@ -325,6 +356,9 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 	assert.NoError(err)
 
 	assert.NoError(vm.AppGossip(nodeID, msgBytes))
+	time.Sleep(waitBlockTime * 3)
 	assert.False(txRequested, "tx shouldn't be requested")
+	txGossipedLock.Lock()
 	assert.Equal(1, txGossiped, "conflicting tx should have been gossiped")
+	txGossipedLock.Unlock()
 }
