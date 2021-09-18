@@ -67,6 +67,7 @@ func (vm *VM) NewNetwork(appSender commonEng.AppSender) Network {
 	if vm.chainConfig.ApricotPhase4BlockTimestamp != nil {
 		return vm.newPushNetwork(
 			time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0),
+			vm.config.RemoteTxGossipOnlyEnabled,
 			appSender,
 			vm.chain,
 			vm.mempool,
@@ -79,6 +80,7 @@ func (vm *VM) NewNetwork(appSender commonEng.AppSender) Network {
 type pushNetwork struct {
 	ctx                  *snow.Context
 	gossipActivationTime time.Time
+	remoteTxGossipOnly   bool
 
 	appSender commonEng.AppSender
 	chain     *coreth.ETHChain
@@ -102,6 +104,7 @@ type pushNetwork struct {
 
 func (vm *VM) newPushNetwork(
 	activationTime time.Time,
+	remoteTxGossipOnly bool,
 	appSender commonEng.AppSender,
 	chain *coreth.ETHChain,
 	mempool *Mempool,
@@ -109,6 +112,7 @@ func (vm *VM) newPushNetwork(
 	net := &pushNetwork{
 		ctx:                  vm.ctx,
 		gossipActivationTime: activationTime,
+		remoteTxGossipOnly:   remoteTxGossipOnly,
 		appSender:            appSender,
 		chain:                chain,
 		mempool:              mempool,
@@ -254,7 +258,6 @@ func (n *pushNetwork) gossipEthTxs() (int, error) {
 
 	pool := n.chain.GetTxPool()
 	selectedTxs := make([]*types.Transaction, 0)
-	var onlyGossipRemotes = false
 	for _, tx := range txs {
 		txHash := tx.Hash()
 		txStatus := pool.Status([]common.Hash{txHash})[0]
@@ -262,7 +265,7 @@ func (n *pushNetwork) gossipEthTxs() (int, error) {
 			continue
 		}
 
-		if onlyGossipRemotes && pool.HasLocal(txHash) {
+		if n.remoteTxGossipOnly && pool.HasLocal(txHash) {
 			continue
 		}
 
