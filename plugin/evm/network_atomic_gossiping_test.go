@@ -5,6 +5,7 @@ package evm
 
 import (
 	"testing"
+	"time"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
@@ -249,6 +250,10 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 
 	// show that no txID is requested
 	assert.NoError(vm.AppGossip(nodeID, msgBytes))
+
+	// wait for [waitBlockTime]
+	time.Sleep(waitBlockTime + 10*time.Millisecond)
+
 	assert.False(txRequested, "tx should not have been requested")
 	assert.Equal(1, txGossiped, "tx should have been gossiped")
 	assert.True(vm.mempool.has(tx.ID()))
