@@ -322,7 +322,10 @@ func (n *pushNetwork) GossipEthTxs(txs []*types.Transaction) error {
 		return nil
 	}
 
-	n.ethTxsToGossipChan <- txs
+	select {
+	case n.ethTxsToGossipChan <- txs:
+	case <-n.shutdownChan:
+	}
 	return nil
 }
 
