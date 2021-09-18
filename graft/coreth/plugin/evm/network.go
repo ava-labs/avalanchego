@@ -208,6 +208,11 @@ func (n *pushNetwork) gossipAtomicTx(tx *Tx) error {
 	if _, has := n.recentAtomicTxs.Get(txID); has {
 		return nil
 	}
+	// If the transaction is not pending according to the mempool
+	// then there is no need to gossip it further.
+	if _, pending := n.mempool.GetPendingTx(txID); !pending {
+		return nil
+	}
 	n.recentAtomicTxs.Put(txID, nil)
 
 	msg := message.AtomicTx{
@@ -317,7 +322,10 @@ func (n *pushNetwork) GossipEthTxs(txs []*types.Transaction) error {
 		return nil
 	}
 
-	n.ethTxsToGossipChan <- txs
+	select {
+	case n.ethTxsToGossipChan <- txs:
+	case <-n.shutdownChan:
+	}
 	return nil
 }
 

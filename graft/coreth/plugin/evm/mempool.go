@@ -194,6 +194,16 @@ func (m *Mempool) NextTx() (*Tx, bool) {
 	return nil, false
 }
 
+// GetPendingTx returns the transaction [txID] and true if it is
+// currently in the [txHeap] waiting to be issued into a block.
+// Returns nil, false otherwise.
+func (m *Mempool) GetPendingTx(txID ids.ID) (*Tx, bool) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	return m.txHeap.Get(txID)
+}
+
 // GetTx returns the transaction [txID] if it was issued
 // by this node and returns whether it was dropped and whether
 // it exists.
@@ -305,30 +315,6 @@ func (m *Mempool) RemoveTx(txID ids.ID) {
 		m.utxoSet.Remove(removedTx.InputUTXOs().List()...)
 	}
 	m.discardedTxs.Evict(txID)
-}
-
-// RejectTx marks [txID] as being rejected and attempts to re-issue
-// it if it was previously in the mempool.
-func (m *Mempool) RejectTx(txID ids.ID) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	tx, ok := m.issuedTxs[txID]
-	if !ok {
-		return
-	}
-	// If the transaction was issued by the mempool, add it back
-	// to transactions pending issuance.
-	delete(m.issuedTxs, txID)
-
-	gasPrice, err := m.atomicTxGasPrice(tx)
-	if err != nil {
-		return
-	}
-	m.txHeap.Push(tx, gasPrice)
-	// Add an item to Pending to ensure the VM attempts to reissue
-	// [tx].
-	m.addPending()
 }
 
 // addPending makes sure that an item is in the Pending channel.

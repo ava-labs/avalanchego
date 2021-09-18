@@ -28,9 +28,9 @@ const (
 
 	// AP4 Parameters
 	minBlockTimeAP4 = 500 * time.Millisecond
-	// waitBlockTime is the amount of time to wait the creation of a block when
-	// signaling for building before deciding to gossip the transaction that
-	// triggered signaling.
+	// waitBlockTime is the amount of time to wait for BuildBlock to be
+	// called by the engine before deciding whether or not to gossip the
+	// transaction that triggered the PendingTxs message to the engine.
 	//
 	// This is done to reduce contention in the network when there is no
 	// preferred producer. If we did not wait here, we may gossip a new
@@ -78,8 +78,6 @@ type blockBuilder struct {
 	// getting the current time and comparing it to the *params.chainConfig more
 	// than once.
 	isAP4 bool
-
-	builtBlock chan struct{}
 }
 
 func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *blockBuilder {
@@ -137,18 +135,6 @@ func (b *blockBuilder) migrateAP4() {
 		// buildBlockTimer will never be nil because we exit as soon as it is ever
 		// set to nil.
 		b.buildBlockTimer.Stop()
-	}
-}
-
-// startGenerateBlock should be called immediately before starting block
-// generation.
-func (b *blockBuilder) startGenerateBlock() {
-	b.buildBlockLock.Lock()
-	defer b.buildBlockLock.Unlock()
-
-	// Set timeout down channel to make sure signaled
-	if b.builtBlock != nil {
-		close(b.builtBlock)
 	}
 }
 
@@ -256,18 +242,18 @@ func (b *blockBuilder) markBuilding() {
 // has not already begun from an earlier notification. If [buildStatus] is anything
 // other than [dontBuild], then the attempt has already begun and this notification
 // can be safely skipped.
-func (b *blockBuilder) signalTxsReady() bool {
+func (b *blockBuilder) signalTxsReady() {
 	b.buildBlockLock.Lock()
 	defer b.buildBlockLock.Unlock()
 
 	if b.buildStatus != dontBuild {
-		return false
+		return
 	}
 
 	if !b.isAP4 {
 		b.buildStatus = conditionalBuild
 		b.buildBlockTimer.SetTimeoutIn(minBlockTime)
-		return false
+		return
 	}
 
 	// We take a naive approach here and signal the engine that we should build
@@ -276,22 +262,7 @@ func (b *blockBuilder) signalTxsReady() bool {
 	// In the future, we may wish to add optimization here to only signal the
 	// engine if the sum of the projected tips in the mempool satisfies the
 	// required block fee.
-	b.builtBlock = make(chan struct{})
 	b.markBuilding()
-	return true
-}
-
-// waitBuildBlock either waits for a [BuildBlock] to be called (returns true)
-// or times out after [waitBlockTime] (returns false).
-func (b *blockBuilder) waitBuildBlock() bool {
-	select {
-	case <-b.builtBlock:
-		log.Trace("Block build attempted while waiting")
-		return true
-	case <-time.After(waitBlockTime):
-		log.Trace("Block not built while waiting")
-		return false
-	}
 }
 
 // awaitSubmittedTxs waits for new transactions to be submitted
@@ -302,16 +273,19 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 	go b.ctx.Log.RecoverAndPanic(func() {
 		defer b.shutdownWg.Done()
 
-		// txSubmitChan is invoked on reorgs
+		// txSubmitChan is invoked when new transactions are issued as well as on re-orgs which
+		// may orphan transactions that were previously in a preferred block.
 		txSubmitChan := b.chain.GetTxSubmitCh()
 		for {
 			select {
 			case ethTxsEvent := <-txSubmitChan:
 				log.Trace("New tx detected, trying to generate a block")
-				signaled := b.signalTxsReady()
+				b.signalTxsReady()
 
-				// We only attempt to invoke [GossipEthTxs] once AP4 is activated.
-				if b.isAP4 && b.network != nil && signaled && !b.waitBuildBlock() {
+				// We only attempt to invoke [GossipEthTxs] once AP4 is activated
+				if b.isAP4 && b.network != nil && len(ethTxsEvent.Txs) > 0 {
+					// Prevent race condition
+					time.Sleep(waitBlockTime)
 					if err := b.network.GossipEthTxs(ethTxsEvent.Txs); err != nil {
 						log.Warn(
 							"failed to gossip new eth transactions",
@@ -321,11 +295,13 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 				}
 			case <-b.mempool.Pending:
 				log.Trace("New atomic Tx detected, trying to generate a block")
-				signaled := b.signalTxsReady()
+				b.signalTxsReady()
 
-				// We only attempt to invoke [GossipAtomicTx] once AP4 is activated.
+				// We only attempt to invoke [GossipAtomicTxs] once AP4 is activated
 				newTxs := b.mempool.GetNewTxs()
-				if b.isAP4 && b.network != nil && signaled && len(newTxs) > 0 && !b.waitBuildBlock() {
+				if b.isAP4 && b.network != nil && len(newTxs) > 0 {
+					// Prevent race condition
+					time.Sleep(waitBlockTime)
 					if err := b.network.GossipAtomicTxs(newTxs); err != nil {
 						log.Warn(
 							"failed to gossip new atomic transactions",
