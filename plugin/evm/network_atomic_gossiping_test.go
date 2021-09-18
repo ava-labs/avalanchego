@@ -309,11 +309,15 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 	mempool := vm.mempool
 
 	var (
-		txGossiped  int
-		txRequested bool
+		txGossiped     int
+		txGossipedLock sync.Mutex
+		txRequested    bool
 	)
 	sender.CantSendAppGossip = false
 	sender.SendAppGossipF = func(_ []byte) error {
+		txGossipedLock.Lock()
+		defer txGossipedLock.Unlock()
+
 		txGossiped++
 		return nil
 	}
@@ -343,7 +347,9 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 
 	assert.NoError(vm.AppGossip(nodeID, msgBytes))
 	assert.False(txRequested, "tx shouldn't be requested")
+	txGossipedLock.Lock()
 	assert.Zero(txGossiped, "tx should not have been gossiped")
+	txGossipedLock.Unlock()
 
 	// gossip conflicting tx and ensure it is accepted and gossiped
 	nodeID = ids.GenerateTestShortID()
@@ -355,5 +361,7 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 
 	assert.NoError(vm.AppGossip(nodeID, msgBytes))
 	assert.False(txRequested, "tx shouldn't be requested")
+	txGossipedLock.Lock()
 	assert.Equal(1, txGossiped, "conflicting tx should have been gossiped")
+	txGossipedLock.Unlock()
 }
