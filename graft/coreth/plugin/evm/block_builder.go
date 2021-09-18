@@ -310,13 +310,11 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 				// We only attempt to invoke [GossipAtomicTx] once AP4 is activated.
 				newTxs := b.mempool.GetNewTxs()
 				if b.isAP4 && b.network != nil && signaled && len(newTxs) > 0 && !b.waitBuildBlock() {
-					for _, atomicTx := range newTxs {
-						if err := b.network.GossipAtomicTx(atomicTx); err != nil {
-							log.Warn(
-								"failed to gossip new atomic transaction",
-								"err", err,
-							)
-						}
+					if err := b.network.GossipAtomicTxs(newTxs); err != nil {
+						log.Warn(
+							"failed to gossip new atomic transactions",
+							"err", err,
+						)
 					}
 				}
 			case <-b.shutdownChan:
