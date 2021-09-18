@@ -32,7 +32,7 @@ func (t dialThrottler) Acquire(ctx context.Context) error {
 
 func NewDialThrottler(throttleLimit int) DialThrottler {
 	return dialThrottler{
-		limiter: rate.NewLimiter(rate.Limit(throttleLimit), 1),
+		limiter: rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
 	}
 }
 

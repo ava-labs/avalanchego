@@ -21,7 +21,7 @@ func NewThrottledListener(listener net.Listener, maxConnsPerSec float64) net.Lis
 		ctx:           ctx,
 		ctxCancelFunc: cancel,
 		listener:      listener,
-		limiter:       rate.NewLimiter(rate.Limit(maxConnsPerSec), 1),
+		limiter:       rate.NewLimiter(rate.Limit(maxConnsPerSec), int(maxConnsPerSec)+1),
 	}
 }
 
