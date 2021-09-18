@@ -21,7 +21,6 @@ import (
 type buildingBlkStatus uint8
 
 const (
-
 	// AP3 Parameters
 	minBlockTime = 2 * time.Second
 	maxBlockTime = 3 * time.Second
@@ -37,7 +36,7 @@ const (
 	// preferred producer. If we did not wait here, we may gossip a new
 	// transaction to a peer while building a block that will conflict with
 	// whatever the peer makes.
-	waitBlockTime = 500 * time.Millisecond
+	waitBlockTime = 100 * time.Millisecond
 
 	dontBuild        buildingBlkStatus = iota
 	conditionalBuild                   // Only used prior to AP4
