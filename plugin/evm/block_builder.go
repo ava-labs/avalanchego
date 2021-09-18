@@ -303,17 +303,20 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 						)
 					}
 				}
-			case atomicTx := <-b.mempool.Pending:
+			case <-b.mempool.Pending:
 				log.Trace("New atomic Tx detected, trying to generate a block")
 				signaled := b.signalTxsReady()
 
 				// We only attempt to invoke [GossipAtomicTx] once AP4 is activated.
-				if atomicTx != nil && b.isAP4 && b.network != nil && signaled && !b.waitBuildBlock() {
-					if err := b.network.GossipAtomicTx(atomicTx); err != nil {
-						log.Warn(
-							"failed to gossip new atomic transaction",
-							"err", err,
-						)
+				newTxs := b.mempool.GetNewTxs()
+				if b.isAP4 && b.network != nil && signaled && len(newTxs) > 0 && !b.waitBuildBlock() {
+					for _, atomicTx := range newTxs {
+						if err := b.network.GossipAtomicTx(atomicTx); err != nil {
+							log.Warn(
+								"failed to gossip new atomic transaction",
+								"err", err,
+							)
+						}
 					}
 				}
 			case <-b.shutdownChan:

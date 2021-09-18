@@ -36,7 +36,9 @@ type Mempool struct {
 	discardedTxs *cache.LRU
 	// Pending is a channel of length one, which the mempool ensures has an item on
 	// it as long as there is an unissued transaction remaining in [txs]
-	Pending chan *Tx
+	Pending chan struct{}
+	// newTxs is an array of [Tx] that are ready to be gossiped.
+	newTxs []*Tx
 	// utxoSet is a collection of all pending and issued UTXOs
 	utxoSet ids.Set
 	// txHeap is a sorted record of all txs in the mempool by [gasPrice]
@@ -50,7 +52,8 @@ func NewMempool(AVAXAssetID ids.ID, maxSize int) *Mempool {
 		AVAXAssetID:  AVAXAssetID,
 		issuedTxs:    make(map[ids.ID]*Tx),
 		discardedTxs: &cache.LRU{Size: discardedTxsCacheSize},
-		Pending:      make(chan *Tx),
+		Pending:      make(chan struct{}),
+		newTxs:       make([]*Tx, 0),
 		utxoSet:      ids.NewSet(maxSize),
 		txHeap:       newTxHeap(maxSize),
 		maxSize:      maxSize,
@@ -171,7 +174,8 @@ func (m *Mempool) AddTx(tx *Tx) error {
 	// been set to something other than [dontBuild], this will be ignored and won't be
 	// reset until the engine calls BuildBlock. This case is handled in IssueCurrentTx
 	// and CancelCurrentTx.
-	m.Pending <- tx
+	m.newTxs = append(m.newTxs, tx)
+	m.addPending()
 	return nil
 }
 
@@ -227,7 +231,7 @@ func (m *Mempool) IssueCurrentTx() {
 	// If there are more transactions to be issued, add an item
 	// to Pending.
 	if m.txHeap.Len() > 0 {
-		m.Pending <- nil
+		m.addPending()
 	}
 }
 
@@ -260,7 +264,7 @@ func (m *Mempool) CancelCurrentTx() {
 	// If there are more transactions to be issued, add an item
 	// to Pending.
 	if m.txHeap.Len() > 0 {
-		m.Pending <- nil
+		m.addPending()
 	}
 }
 
@@ -325,5 +329,23 @@ func (m *Mempool) RejectTx(txID ids.ID) {
 	m.txHeap.Push(tx, gasPrice)
 	// Add an item to Pending to ensure the VM attempts to reissue
 	// [tx].
-	m.Pending <- nil
+	m.addPending()
+}
+
+// addPending makes sure that an item is in the Pending channel.
+func (m *Mempool) addPending() {
+	select {
+	case m.Pending <- struct{}{}:
+	default:
+	}
+}
+
+// GetNewTxs returns the array of [newTxs] and replaces it with a new array.
+func (m *Mempool) GetNewTxs() []*Tx {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	cpy := m.newTxs
+	m.newTxs = make([]*Tx, 0)
+	return cpy
 }

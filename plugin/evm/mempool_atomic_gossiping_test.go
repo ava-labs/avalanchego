@@ -26,7 +26,7 @@ func (m *Mempool) forceAddTx(tx *Tx) error {
 		return err
 	}
 	m.txHeap.Push(tx, gasPrice)
-	m.Pending <- nil
+	m.addPending()
 	return nil
 }
 
