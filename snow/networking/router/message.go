@@ -27,6 +27,7 @@ type message struct {
 	received       time.Time // Time this message was received
 	deadline       time.Time // Time this message must be responded to
 	onDoneHandling func()
+	appMsgBytes    []byte
 }
 
 func (m message) doneHandling() {
@@ -60,6 +61,8 @@ func (m message) String() string {
 		sb.WriteString(fmt.Sprintf(", NumContainers: %d)", len(m.containers)))
 	case constants.NotifyMsg:
 		sb.WriteString(fmt.Sprintf(", Notification: %s)", m.notification))
+	case constants.AppRequestMsg, constants.AppResponseMsg, constants.AppGossipMsg:
+		sb.WriteString(fmt.Sprintf(", len(AppMsg): %d)", len(m.appMsgBytes)))
 	default:
 		sb.WriteString(")")
 	}

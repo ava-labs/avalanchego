@@ -59,12 +59,12 @@ func (s *Serializer) Initialize(ctx *snow.Context, vm vertex.DAGVM, db database.
 	s.edge.Add(s.state.Edge()...)
 }
 
-// Parse implements the avalanche.State interface
+// ParseVtx implements the avalanche.State interface
 func (s *Serializer) ParseVtx(b []byte) (avalanche.Vertex, error) {
 	return newUniqueVertex(s, b)
 }
 
-// Build implements the avalanche.State interface
+// BuildVtx implements the avalanche.State interface
 func (s *Serializer) BuildVtx(
 	epoch uint32,
 	parentIDs []ids.ID,
@@ -111,7 +111,7 @@ func (s *Serializer) BuildVtx(
 	return uVtx, uVtx.setVertex(vtx)
 }
 
-// Get implements the avalanche.State interface
+// GetVtx implements the avalanche.State interface
 func (s *Serializer) GetVtx(vtxID ids.ID) (avalanche.Vertex, error) { return s.getVertex(vtxID) }
 
 // Edge implements the avalanche.State interface

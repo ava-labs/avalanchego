@@ -14,7 +14,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var errOpenDNSNoIP = errors.New("opendns returned no ip")
+var (
+	errNoResolver  = errors.New("invalid resolver")
+	errOpenDNSNoIP = errors.New("opendns returned no ip")
+)
 
 // Resolver resolves our public IP
 type Resolver interface {
@@ -32,7 +35,7 @@ func (r *NoResolver) IsResolver() bool {
 }
 
 func (r *NoResolver) Resolve() (net.IP, error) {
-	return nil, errors.New("invalid resolver")
+	return nil, errNoResolver
 }
 
 // IFConfigResolves resolves our public IP using openDNS

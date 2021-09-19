@@ -47,7 +47,7 @@ func (u *user) getAddresses() ([]ids.ShortID, error) {
 		return nil, err
 	}
 	addresses := []ids.ShortID{}
-	if _, err := Codec.Unmarshal(bytes, &addresses); err != nil {
+	if _, err := GenesisCodec.Unmarshal(bytes, &addresses); err != nil {
 		return nil, err
 	}
 	return addresses, nil
@@ -91,14 +91,11 @@ func (u *user) putAddress(privKey *crypto.PrivateKeySECP256K1R) error {
 		}
 	}
 	addresses = append(addresses, address)
-	bytes, err := Codec.Marshal(codecVersion, addresses)
+	bytes, err := Codec.Marshal(CodecVersion, addresses)
 	if err != nil {
 		return err
 	}
-	if err := u.db.Put(addressesKey, bytes); err != nil {
-		return err
-	}
-	return nil
+	return u.db.Put(addressesKey, bytes)
 }
 
 // Key returns the private key that controls the given address

@@ -15,7 +15,7 @@ import (
 )
 
 func TestAddValidatorTxSyntacticVerify(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -32,15 +32,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: tx is nil
 	var unsignedTx *UnsignedAddValidatorTx
-	if err := unsignedTx.Verify(
-		vm.ctx,
-		vm.codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		defaultMinDelegationFee,
-	); err == nil {
+	if err := unsignedTx.SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because tx is nil")
 	}
 
@@ -62,15 +54,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).NetworkID++
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
-		vm.ctx,
-		vm.codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		defaultMinDelegationFee,
-	); err == nil {
+	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because the wrong network ID was used")
 	}
 
@@ -102,15 +86,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	}}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
-		vm.ctx,
-		vm.codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		defaultMinDelegationFee,
-	); err == nil {
+	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because stake owner has no addresses")
 	}
 
@@ -136,46 +112,8 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
-		vm.ctx,
-		vm.codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		defaultMinDelegationFee,
-	); err == nil {
+	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because rewards owner has no addresses")
-	}
-
-	// Case: Stake amount too small
-	tx, err = vm.newAddValidatorTx(
-		vm.MinValidatorStake,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateEndTime.Unix()),
-		nodeID,
-		nodeID,
-		PercentDenominator,
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-		ids.ShortEmpty, // change addr
-
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).Validator.Wght-- // 1 less than minimum amount
-	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
-		vm.ctx,
-		vm.codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		defaultMinDelegationFee,
-	); err == nil {
-		t.Fatal("should have errored because stake amount too small")
 	}
 
 	// Case: Too many shares
@@ -196,106 +134,8 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).Shares++ // 1 more than max amount
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
-		vm.ctx,
-		vm.codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		defaultMinDelegationFee,
-	); err == nil {
+	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because of too many shares")
-	}
-
-	// Case: Validation length is too short
-	tx, err = vm.newAddValidatorTx(
-		vm.MinValidatorStake,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix()),
-		nodeID,
-		nodeID,
-		PercentDenominator,
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-		ids.ShortEmpty, // change addr
-
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).Validator.End-- // 1 less than min duration
-	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
-		vm.ctx,
-		vm.codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		defaultMinDelegationFee,
-	); err == nil {
-		t.Fatal("should have errored because validation length too short")
-	}
-
-	// Case: Validation length is negative
-	tx, err = vm.newAddValidatorTx(
-		vm.MinValidatorStake,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix()),
-		nodeID,
-		nodeID,
-		PercentDenominator,
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-		ids.ShortEmpty, // change addr
-
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).Validator.End = tx.UnsignedTx.(*UnsignedAddValidatorTx).Validator.Start - 1
-	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
-		vm.ctx,
-		vm.codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		defaultMinDelegationFee,
-	); err == nil {
-		t.Fatal("should have errored because validation length too short")
-	}
-
-	// Case: Validation length is too long
-	tx, err = vm.newAddValidatorTx(
-		vm.MinValidatorStake,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateStartTime.Add(defaultMaxStakingDuration).Unix()),
-		nodeID,
-		nodeID,
-		PercentDenominator,
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-		ids.ShortEmpty, // change addr
-
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).Validator.End++ // 1 more than maximum duration
-	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
-		vm.ctx,
-		vm.codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		defaultMinDelegationFee,
-	); err == nil {
-		t.Fatal("should have errored because validation length too long")
 	}
 
 	// Case: Valid
@@ -311,22 +151,14 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 
 	); err != nil {
 		t.Fatal(err)
-	} else if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
-		vm.ctx,
-		vm.codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		defaultMinDelegationFee,
-	); err != nil {
+	} else if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticVerify(vm.ctx); err != nil {
 		t.Fatal(err)
 	}
 }
 
-// Test AddValidatorTx.SemanticVerify
-func TestAddValidatorTxSemanticVerify(t *testing.T) {
-	vm, _ := defaultVM()
+// Test AddValidatorTx.Execute
+func TestAddValidatorTxExecute(t *testing.T) {
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -353,7 +185,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've errored because start time too early")
 	}
 
@@ -369,7 +201,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've errored because start time too far in the future")
 	}
 
@@ -385,7 +217,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've errored because validator already validating")
 	}
 
@@ -418,7 +250,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed because validator in pending validator set")
 	}
 
@@ -444,7 +276,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		vm.internalState.DeleteUTXO(utxoID)
 	}
 	// Now keys[0] has no funds
-	if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed because tx fee paying key has no funds")
 	}
 }

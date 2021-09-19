@@ -54,7 +54,7 @@ var (
 				]
 			}
 		],
-		"startTime": 1599696000,
+		"startTime": 1630987200,
 		"initialStakeDuration": 31536000,
 		"initialStakeDurationOffset": 5400,
 		"initialStakedFunds": [
@@ -100,7 +100,7 @@ var (
 			CreateBlockchainTxFee: 100 * units.MilliAvax,
 		},
 		StakingConfig: StakingConfig{
-			UptimeRequirement:  .6, // 60%
+			UptimeRequirement:  .8, // 80%
 			MinValidatorStake:  2 * units.KiloAvax,
 			MaxValidatorStake:  3 * units.MegaAvax,
 			MinDelegatorStake:  25 * units.Avax,

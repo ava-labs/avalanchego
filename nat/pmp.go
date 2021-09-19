@@ -4,7 +4,7 @@
 package nat
 
 import (
-	"fmt"
+	"errors"
 	"math"
 	"net"
 	"time"
@@ -15,6 +15,8 @@ import (
 )
 
 var (
+	errInvalidLifetime = errors.New("invalid mapping duration range")
+
 	pmpClientTimeout        = 500 * time.Millisecond
 	_                Router = &pmpRouter{}
 )
@@ -44,7 +46,7 @@ func (r *pmpRouter) MapPort(
 	lifetime := mappingDuration.Seconds()
 	// Assumes the architecture is at least 32-bit
 	if lifetime < 0 || lifetime > math.MaxInt32 {
-		return fmt.Errorf("invalid mapping duration range")
+		return errInvalidLifetime
 	}
 
 	_, err := r.client.AddPortMapping(protocol, internalPort, externalPort, int(lifetime))
