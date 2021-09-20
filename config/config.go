@@ -620,14 +620,14 @@ func getPathFromDirKey(v *viper.Viper, configKey string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if !ok {
-		if v.IsSet(configKey) {
-			// user specified a config dir explicitly, but dir does not exist.
-			return "", fmt.Errorf("cannot read directory: %v", cleanPath)
-		}
-		return "", nil
+	if ok {
+		return cleanPath, nil
 	}
-	return cleanPath, nil
+	if v.IsSet(configKey) {
+		// user specified a config dir explicitly, but dir does not exist.
+		return "", fmt.Errorf("cannot read directory: %v", cleanPath)
+	}
+	return "", nil
 }
 
 // getChainConfigs reads & puts chainConfigs to node config
@@ -636,16 +636,15 @@ func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	var chainConfigs map[string]chains.ChainConfig
+
+	chainConfigs := make(map[string]chains.ChainConfig)
 	if len(chainConfigPath) > 0 {
 		chainConfigs, err = readChainConfigPath(chainConfigPath)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't read chain configs: %w", err)
 		}
-	} else {
-		// chain config path does not exist but not explicitly specified, so ignore it
-		chainConfigs = make(map[string]chains.ChainConfig)
 	}
+
 	// Coreth Plugin
 	if v.IsSet(CorethConfigKey) {
 		// error if C config is already populated
@@ -733,11 +732,11 @@ func readSubnetConfigs(subnetConfigPath string, subnetIDs []ids.ID) (map[ids.ID]
 	for _, subnetID := range subnetIDs {
 		filePath := path.Join(subnetConfigPath, subnetID.String()+subnetConfigFileExt)
 		fileInfo, err := os.Stat(filePath)
+		if errors.Is(err, os.ErrNotExist) {
+			// this subnet config does not exist, move to the next one
+			continue
+		}
 		if err != nil {
-			if errors.Is(err, os.ErrNotExist) {
-				// this subnet config does not exist, move to the next one
-				continue
-			}
 			return nil, err
 		}
 
