@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
 	"github.com/ava-labs/avalanchego/utils/profiler"
+	"github.com/ava-labs/avalanchego/utils/storage"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 )
@@ -48,6 +49,7 @@ const (
 	pluginsDirName       = "plugins"
 	chainConfigFileName  = "config"
 	chainUpgradeFileName = "upgrade"
+	subnetConfigFileExt  = ".json"
 )
 
 var (
@@ -56,16 +58,16 @@ var (
 		InboundConnUpgradeThrottlerMaxRecentKey: fmt.Sprintf("please use --%s to specify connection upgrade throttling", InboundThrottlerMaxConnsPerSecKey),
 	}
 
-	errInvalidStakerWeights       = errors.New("staking weights must be positive")
-	errAuthPasswordTooWeak        = errors.New("API auth password is not strong enough")
-	errInvalidUptimeRequirement   = errors.New("uptime requirement must be in the range [0, 1]")
-	errMinValidatorStakeAboveMax  = errors.New("minimum validator stake can't be greater than maximum validator stake")
-	errInvalidDelegationFee       = errors.New("delegation fee must be in the range [0, 1,000,000]")
-	errInvalidMinStakeDuration    = errors.New("min stake duration must be > 0")
-	errMinStakeDurationAboveMax   = errors.New("max stake duration can't be less than min stake duration")
-	errStakeMintingPeriodBelowMin = errors.New("stake minting period can't be less than max stake duration")
-
-	errDuplicatedCChainConfig = errors.New("C-Chain config is already provided in chain config files")
+	errInvalidStakerWeights          = errors.New("staking weights must be positive")
+	errAuthPasswordTooWeak           = errors.New("API auth password is not strong enough")
+	errInvalidUptimeRequirement      = errors.New("uptime requirement must be in the range [0, 1]")
+	errMinValidatorStakeAboveMax     = errors.New("minimum validator stake can't be greater than maximum validator stake")
+	errInvalidDelegationFee          = errors.New("delegation fee must be in the range [0, 1,000,000]")
+	errInvalidMinStakeDuration       = errors.New("min stake duration must be > 0")
+	errMinStakeDurationAboveMax      = errors.New("max stake duration can't be less than min stake duration")
+	errStakeMintingPeriodBelowMin    = errors.New("stake minting period can't be less than max stake duration")
+	errCannotWhitelistPrimaryNetwork = errors.New("cannot whitelist primary network")
+	errDuplicatedCChainConfig        = errors.New("C-Chain config is already provided in chain config files")
 )
 
 func GetProcessConfig(v *viper.Viper) (process.Config, error) {
@@ -566,6 +568,9 @@ func getWhitelistedSubnets(v *viper.Viper) (ids.Set, error) {
 		if err != nil {
 			return nil, fmt.Errorf("couldn't parse subnetID %q: %w", subnet, err)
 		}
+		if subnetID == constants.PrimaryNetworkID {
+			return nil, errCannotWhitelistPrimaryNetwork
+		}
 		whitelistedSubnetIDs.Add(subnetID)
 	}
 	return whitelistedSubnetIDs, nil
@@ -583,7 +588,7 @@ func getDatabaseConfig(v *viper.Viper, networkID uint32) node.DatabaseConfig {
 
 func getVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
 	aliasFilePath := path.Clean(v.GetString(VMAliasesFileKey))
-	exists, err := fileExists(aliasFilePath)
+	exists, err := storage.FileExists(aliasFilePath)
 	if err != nil {
 		return nil, err
 	}
@@ -607,28 +612,37 @@ func getVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
 	return vmAliasMap, nil
 }
 
+// getPathFromDirKey reads flag value from viper instance and then checks the folder existence
+func getPathFromDirKey(v *viper.Viper, configKey string) (string, error) {
+	configDir := os.ExpandEnv(v.GetString(configKey))
+	cleanPath := path.Clean(configDir)
+	ok, err := storage.FolderExists(cleanPath)
+	if err != nil {
+		return "", err
+	}
+	if ok {
+		return cleanPath, nil
+	}
+	if v.IsSet(configKey) {
+		// user specified a config dir explicitly, but dir does not exist.
+		return "", fmt.Errorf("cannot read directory: %v", cleanPath)
+	}
+	return "", nil
+}
+
 // getChainConfigs reads & puts chainConfigs to node config
 func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
-	chainConfigDir := v.GetString(ChainConfigDirKey)
-	chainsPath := path.Clean(chainConfigDir)
-	// user specified a chain config dir explicitly, but dir does not exist.
-	if v.IsSet(ChainConfigDirKey) {
-		info, err := os.Stat(chainsPath)
-		if err != nil {
-			return nil, err
-		}
-		if !info.IsDir() {
-			return nil, fmt.Errorf("not a directory: %v", chainsPath)
-		}
-	}
-	// gets direct subdirs
-	chainDirs, err := filepath.Glob(path.Join(chainsPath, "*"))
+	chainConfigPath, err := getPathFromDirKey(v, ChainConfigDirKey)
 	if err != nil {
 		return nil, err
 	}
-	chainConfigs, err := readChainConfigDirs(chainDirs)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't read chain configs: %w", err)
+
+	chainConfigs := make(map[string]chains.ChainConfig)
+	if len(chainConfigPath) > 0 {
+		chainConfigs, err = readChainConfigPath(chainConfigPath)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't read chain configs: %w", err)
+		}
 	}
 
 	// Coreth Plugin
@@ -658,7 +672,11 @@ func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
 
 // ReadsChainConfigs reads chain config files from static directories and returns map with contents,
 // if successful.
-func readChainConfigDirs(chainDirs []string) (map[string]chains.ChainConfig, error) {
+func readChainConfigPath(chainConfigPath string) (map[string]chains.ChainConfig, error) {
+	chainDirs, err := filepath.Glob(path.Join(chainConfigPath, "*"))
+	if err != nil {
+		return nil, err
+	}
 	chainConfigMap := make(map[string]chains.ChainConfig)
 	for _, chainDir := range chainDirs {
 		dirInfo, err := os.Stat(chainDir)
@@ -671,13 +689,13 @@ func readChainConfigDirs(chainDirs []string) (map[string]chains.ChainConfig, err
 		}
 
 		// chainconfigdir/chainId/config.*
-		configData, err := readSingleFile(chainDir, chainConfigFileName)
+		configData, err := storage.ReadFileWithName(chainDir, chainConfigFileName)
 		if err != nil {
 			return chainConfigMap, err
 		}
 
 		// chainconfigdir/chainId/upgrade.*
-		upgradeData, err := readSingleFile(chainDir, chainUpgradeFileName)
+		upgradeData, err := storage.ReadFileWithName(chainDir, chainUpgradeFileName)
 		if err != nil {
 			return chainConfigMap, err
 		}
@@ -690,43 +708,57 @@ func readChainConfigDirs(chainDirs []string) (map[string]chains.ChainConfig, err
 	return chainConfigMap, nil
 }
 
-// safeReadFile reads a file but does not return an error if there is no file exists at path
-func safeReadFile(path string) ([]byte, error) {
-	ok, err := fileExists(path)
-	if err == nil && ok {
-		return ioutil.ReadFile(path)
-	}
-	return nil, err
-}
-
-// fileExists checks if a file exists before we
-// try using it to prevent further errors.
-func fileExists(filePath string) (bool, error) {
-	info, err := os.Stat(filePath)
-	if err == nil {
-		return !info.IsDir(), nil
-	}
-	if errors.Is(err, os.ErrNotExist) {
-		return false, nil
-	}
-	return false, err
-}
-
-// readSingleFile reads a single file with name fileName without specifying any extension.
-// it errors when there are more than 1 file with the given fileName
-func readSingleFile(parentDir string, fileName string) ([]byte, error) {
-	filePath := path.Join(parentDir, fileName)
-	files, err := filepath.Glob(filePath + ".*") // all possible extensions
+// getSubnetConfigs reads SubnetConfigs to node config map
+func getSubnetConfigs(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.SubnetConfig, error) {
+	subnetConfigPath, err := getPathFromDirKey(v, SubnetConfigDirKey)
 	if err != nil {
 		return nil, err
 	}
-	if len(files) > 1 {
-		return nil, fmt.Errorf(`too many files matched "%s.*" in %s`, fileName, parentDir)
+	if len(subnetConfigPath) == 0 {
+		// subnet config path does not exist but not explicitly specified, so ignore it
+		return make(map[ids.ID]chains.SubnetConfig), nil
 	}
-	if len(files) == 0 { // no file found, return nothing
-		return nil, nil
+
+	subnetConfigs, err := readSubnetConfigs(subnetConfigPath, subnetIDs)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't read subnet configs: %w", err)
 	}
-	return safeReadFile(files[0])
+	return subnetConfigs, nil
+}
+
+// readSubnetConfigs reads subnet config files from a path and given subnetIDs and returns a map.
+func readSubnetConfigs(subnetConfigPath string, subnetIDs []ids.ID) (map[ids.ID]chains.SubnetConfig, error) {
+	subnetConfigs := make(map[ids.ID]chains.SubnetConfig)
+	for _, subnetID := range subnetIDs {
+		filePath := path.Join(subnetConfigPath, subnetID.String()+subnetConfigFileExt)
+		fileInfo, err := os.Stat(filePath)
+		if errors.Is(err, os.ErrNotExist) {
+			// this subnet config does not exist, move to the next one
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		if fileInfo.IsDir() {
+			return nil, fmt.Errorf("%q is a directory, expected a file", fileInfo.Name())
+		}
+
+		// subnetConfigDir/subnetID.json
+		file, err := ioutil.ReadFile(filePath)
+		if err != nil {
+			return nil, err
+		}
+
+		configData := chains.SubnetConfig{}
+		if err := json.Unmarshal(file, &configData); err != nil {
+			return nil, err
+		}
+
+		subnetConfigs[subnetID] = configData
+	}
+
+	return subnetConfigs, nil
 }
 
 // checks if C chain config bytes already set in map with alias key.
@@ -872,6 +904,13 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	if err != nil {
 		return node.Config{}, err
 	}
+
+	// Subnet Configs
+	subnetConfigs, err := getSubnetConfigs(v, nodeConfig.WhitelistedSubnets.List())
+	if err != nil {
+		return node.Config{}, err
+	}
+	nodeConfig.SubnetConfigs = subnetConfigs
 
 	// Chain Configs
 	nodeConfig.ChainConfigs, err = getChainConfigs(v)

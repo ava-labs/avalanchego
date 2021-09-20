@@ -119,6 +119,11 @@ type chain struct {
 	Beacons validators.Set
 }
 
+type SubnetConfig struct {
+	// ValidatorOnly indicates that this Subnet's Chains are available to only subnet validators.
+	ValidatorOnly bool `json:"validatorOnly"`
+}
+
 // ChainConfig is configuration settings for the current execution.
 // [Config] is the user-provided config blob for the chain.
 // [Upgrade] is a chain-specific blob for coordinating upgrades.
@@ -153,9 +158,10 @@ type ManagerConfig struct {
 	WhitelistedSubnets          ids.Set          // Subnets to validate
 	TimeoutManager              *timeout.Manager // Manages request timeouts when sending messages to other validators
 	HealthService               health.Service
-	RetryBootstrap              bool                   // Should Bootstrap be retried
-	RetryBootstrapWarnFrequency int                    // Max number of times to retry bootstrap before warning the node operator
-	ChainConfigs                map[string]ChainConfig // alias -> ChainConfig
+	RetryBootstrap              bool                    // Should Bootstrap be retried
+	RetryBootstrapWarnFrequency int                     // Max number of times to retry bootstrap before warning the node operator
+	SubnetConfigs               map[ids.ID]SubnetConfig // ID -> SubnetConfig
+	ChainConfigs                map[string]ChainConfig  // alias -> ChainConfig
 	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
 	ShutdownNodeFunc func(exitCode int)
 	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
@@ -250,11 +256,11 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 
 	sb, exists := m.subnets[chainParams.SubnetID]
 	if !exists {
-		sb = newSubnet(nil, chainParams.ID)
+		sb = newSubnet()
 		m.subnets[chainParams.SubnetID] = sb
-	} else {
-		sb.addChain(chainParams.ID)
 	}
+
+	sb.addChain(chainParams.ID)
 
 	chain, err := m.buildChain(chainParams, sb)
 	if err != nil {
