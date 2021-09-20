@@ -39,7 +39,7 @@ type State struct {
 	// Every value in [decidedBlocks] is a (*BlockWrapper)
 	decidedBlocks cache.Cacher
 	// unverifiedBlocks is an LRU cache of blocks with status processing
-	// that have not yet been verified.
+	// that have not yet passed verification.
 	// Every value in [unverifiedBlocks] is a (*BlockWrapper)
 	unverifiedBlocks cache.Cacher
 	// missingBlocks is an LRU cache of missing blocks

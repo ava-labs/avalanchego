@@ -37,6 +37,7 @@ function docker_tag_exists() {
     curl --silent -H "Authorization: JWT ${TOKEN}" -f --head -lL https://hub.docker.com/v2/repositories/$1/tags/$2/ > /dev/null
 }
 
+# Receives params for debug execution
 testBatch="${1:-}"
 shift 1
 

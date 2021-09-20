@@ -77,9 +77,15 @@ type ConsensusGossipConfig struct {
 	ConsensusGossipOnAcceptSize uint `json:"consensusGossipOnAcceptSize"`
 }
 
+type AppGossipConfig struct {
+	// Number of peers to gossip an AppGossip message
+	AppGossipSize uint `json:"appGossipSize"`
+}
+
 type GossipConfig struct {
 	PeerListGossipConfig
 	ConsensusGossipConfig
+	AppGossipConfig
 }
 
 type IPConfig struct {
@@ -107,8 +113,8 @@ type BootstrapConfig struct {
 	// Should Bootstrap be retried
 	RetryBootstrap bool `json:"retryBootstrap"`
 
-	// Max number of times to retry bootstrap
-	RetryBootstrapMaxAttempts int `json:"retryBootstrapMaxAttempts"`
+	// Max number of times to retry bootstrap before warning the node operator
+	RetryBootstrapWarnFrequency int `json:"retryBootstrapWarnFrequency"`
 
 	// Timeout when connecting to bootstrapping beacons
 	BootstrapBeaconConnectionTimeout time.Duration `json:"bootstrapBeaconConnectionTimeout"`

@@ -57,7 +57,7 @@ func main() {
 	log.Info("using build directory at path '%s'", processConfig.BuildDir)
 
 	nodeManager := newNodeManager(processConfig.BuildDir, log)
-	_ = utils.HandleSignals(
+	utils.HandleSignals(
 		func(os.Signal) {
 			// SIGINT and SIGTERM cause all running nodes to stop
 			nodeManager.shutdown()

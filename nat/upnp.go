@@ -125,7 +125,7 @@ func (r *upnpRouter) MapPort(protocol string, intPort, extPort uint16,
 	}
 	lifetime := duration.Seconds()
 	if lifetime < 0 || lifetime > math.MaxUint32 {
-		return fmt.Errorf("invalid lifetime duration range")
+		return errInvalidLifetime
 	}
 
 	return r.client.AddPortMapping("", extPort, protocol, intPort,
@@ -163,7 +163,7 @@ func discover(target string) *upnpRouter {
 			continue
 		}
 		go func(dev *goupnp.MaybeRootDevice) {
-			var r *upnpRouter = nil
+			var r *upnpRouter
 			dev.Root.Device.VisitServices(func(service *goupnp.Service) {
 				c := goupnp.ServiceClient{
 					SOAPClient: service.NewSOAPClient(),

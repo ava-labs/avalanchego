@@ -222,7 +222,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 
 	// Specify the validators that are validating the primary network at genesis.
-	validators := &EventHeap{}
+	validators := newTxHeapByEndTime()
 	for _, validator := range args.Validators {
 		weight := uint64(0)
 		stake := make([]*avax.TransferableOutput, len(validator.Staked))
@@ -336,10 +336,15 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		chains = append(chains, tx)
 	}
 
+	validatorTxs := make([]*Tx, validators.Len())
+	for i, tx := range validators.txs {
+		validatorTxs[i] = tx.tx
+	}
+
 	// genesis holds the genesis state
 	genesis := Genesis{
 		UTXOs:         utxos,
-		Validators:    validators.Txs,
+		Validators:    validatorTxs,
 		Chains:        chains,
 		Timestamp:     uint64(args.Time),
 		InitialSupply: uint64(args.InitialSupply),
@@ -347,7 +352,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 
 	// Marshal genesis to bytes
-	bytes, err := GenesisCodec.Marshal(codecVersion, genesis)
+	bytes, err := GenesisCodec.Marshal(CodecVersion, genesis)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal genesis: %w", err)
 	}

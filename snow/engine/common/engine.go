@@ -128,9 +128,40 @@ type AcceptedHandler interface {
 	GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error
 }
 
+type AppHandler interface {
+	// Notify this engine of a request for data from [nodeID].
+	// This node should send an AppResponse to [nodeID] in response to
+	// this message using the same request ID.
+	// The VM may choose to not send a response to this request.
+	// The meaning of [request], and what should be sent in response to it,
+	// is application (VM) defined.
+	AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error
+
+	// Notify this engine that an AppRequest message it sent to
+	// [nodeID] with request ID [requestID] failed.
+	// This may be because the request timed out or because the message
+	// couldn't be sent to [nodeID].
+	// An AppResponse with the same [nodeID] and [requestID] may be received
+	// later; if so, it should be ignored.
+	AppRequestFailed(nodeID ids.ShortID, requestID uint32) error
+
+	// Notify this engine of a response to the AppRequest message it sent
+	// to [nodeID] with request ID [requestID].
+	// The meaning of [response] is application (VM) defined.
+	AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error
+
+	// Notify this engine of a gossip message from [nodeID].
+	// This message is not expected in response to any event, and it does
+	// not need to be responded to.
+	// The meaning of [msg] is application (VM) defined.
+	AppGossip(nodeID ids.ShortID, msg []byte) error
+}
+
 // FetchHandler defines how a consensus engine reacts to retrieval messages from
 // other validators. Functions only return fatal errors if they occur.
 type FetchHandler interface {
+	AppHandler
+
 	// Notify this engine of a request for a container.
 	//
 	// This function can be called by any validator. It is not safe to assume

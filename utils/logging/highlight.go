@@ -11,14 +11,16 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-// Highlight mode to apply to displayed logs
-type Highlight int
-
 // Highlighting modes available
 const (
 	Plain Highlight = iota
 	Colors
 )
+
+var errUnknownHighlight = errors.New("unknown highlight")
+
+// Highlight mode to apply to displayed logs
+type Highlight int
 
 // ToHighlight chooses a highlighting mode
 func ToHighlight(h string, fd uintptr) (Highlight, error) {
@@ -44,6 +46,6 @@ func (h *Highlight) MarshalJSON() ([]byte, error) {
 	case Colors:
 		return []byte("\"COLORS\""), nil
 	default:
-		return nil, errors.New("unknown highlight")
+		return nil, errUnknownHighlight
 	}
 }
