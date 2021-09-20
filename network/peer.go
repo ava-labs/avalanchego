@@ -58,8 +58,7 @@ type peer struct {
 
 	// only send the version to this peer on handling a getVersion message if
 	// a version hasn't already been sent.
-	versionSent            utils.AtomicBool
-	versionWithSubnetsSent utils.AtomicBool
+	versionSent utils.AtomicBool
 
 	// only send the peerlist to this peer on handling a getPeerlist message if
 	// a peerlist hasn't already been sent.
@@ -160,7 +159,6 @@ func newPeer(net *network, conn net.Conn, ip utils.IPDesc) *peer {
 func (p *peer) Start() {
 	go func() {
 		// Make sure that the version is the first message sent
-		p.sendVersionWithSubnets()
 		p.sendVersion()
 
 		go p.ReadMessages()
@@ -430,10 +428,6 @@ func (p *peer) handle(msg message.Message, onFinishedHandling func()) {
 		p.handleVersion(msg)
 		onFinishedHandling()
 		return
-	case message.VersionWithSubnets:
-		p.handleVersionWithSubnets(msg)
-		onFinishedHandling()
-		return
 	case message.GetVersion:
 		p.handleGetVersion(msg)
 		onFinishedHandling()
@@ -563,6 +557,7 @@ func (p *peer) sendVersion() {
 		p.net.stateLock.RUnlock()
 		return
 	}
+	whitelistedSubnets := p.net.whitelistedSubnets
 	msg, err := p.net.b.Version(
 		p.net.networkID,
 		p.net.nodeID,
@@ -571,6 +566,7 @@ func (p *peer) sendVersion() {
 		p.net.versionCompatibility.Version().String(),
 		myVersionTime,
 		myVersionSig,
+		whitelistedSubnets.List(),
 	)
 	p.net.stateLock.RUnlock()
 	p.net.log.AssertNoError(err)
@@ -588,46 +584,6 @@ func (p *peer) sendVersion() {
 		p.versionSent.SetValue(true)
 	} else {
 		p.net.metrics.version.numFailed.Inc()
-		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
-	}
-}
-
-// assumes the [stateLock] is not held
-func (p *peer) sendVersionWithSubnets() {
-	p.net.stateLock.RLock()
-	myIP := p.net.ip.IP()
-	myVersionTime, myVersionSig, err := p.net.getVersion(myIP)
-	if err != nil {
-		p.net.stateLock.RUnlock()
-		return
-	}
-	whitelistedSubnets := p.net.whitelistedSubnets
-	msg, err := p.net.b.VersionWithSubnets(
-		p.net.networkID,
-		p.net.nodeID,
-		p.net.clock.Unix(),
-		myIP,
-		p.net.versionCompatibility.Version().String(),
-		myVersionTime,
-		myVersionSig,
-		whitelistedSubnets.List(),
-	)
-	p.net.stateLock.RUnlock()
-	p.net.log.AssertNoError(err)
-
-	lenMsg := len(msg.Bytes())
-	sent := p.Send(msg, true)
-	if sent {
-		p.net.metrics.versionWithSubnets.numSent.Inc()
-		p.net.metrics.versionWithSubnets.sentBytes.Add(float64(lenMsg))
-		// assume that if [saved] == 0, [msg] wasn't compressed
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			p.net.metrics.versionWithSubnets.savedSentBytes.Observe(float64(saved))
-		}
-		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
-		p.versionWithSubnetsSent.SetValue(true)
-	} else {
-		p.net.metrics.versionWithSubnets.numFailed.Inc()
 		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
 	}
 }
@@ -727,9 +683,6 @@ func (p *peer) sendPong() {
 
 // assumes the [stateLock] is not held
 func (p *peer) handleGetVersion(_ message.Message) {
-	if !p.versionWithSubnetsSent.GetValue() {
-		p.sendVersionWithSubnets()
-	}
 	if !p.versionSent.GetValue() {
 		p.sendVersion()
 	}
@@ -737,16 +690,11 @@ func (p *peer) handleGetVersion(_ message.Message) {
 
 // assumes the [stateLock] is not held
 func (p *peer) handleVersion(msg message.Message) {
-	p.versionCheck(msg, false)
+	p.versionCheck(msg)
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleVersionWithSubnets(msg message.Message) {
-	p.versionCheck(msg, true)
-}
-
-// assumes the [stateLock] is not held
-func (p *peer) versionCheck(msg message.Message, isVersionWithSubnets bool) {
+func (p *peer) versionCheck(msg message.Message) {
 	switch {
 	case p.gotVersion.GetValue():
 		p.net.log.Verbo("dropping duplicated version message from %s%s at %s", constants.NodeIDPrefix, p.nodeID, p.getIP())
@@ -831,24 +779,19 @@ func (p *peer) versionCheck(msg message.Message, isVersionWithSubnets bool) {
 		return
 	}
 
-	if isVersionWithSubnets {
-		subnetIDsBytes := msg.Get(message.TrackedSubnets).([][]byte)
-		for _, subnetIDBytes := range subnetIDsBytes {
-			subnetID, err := ids.ToID(subnetIDBytes)
-			if err != nil {
-				p.net.log.Debug("tracked subnet of %s%s at %s could not be parsed: %s", constants.NodeIDPrefix, p.nodeID, err)
-				p.discardIP()
-				return
-			}
-			// add only if we also track this subnet
-			if p.net.whitelistedSubnets.Contains(subnetID) {
-				p.trackedSubnets.Add(subnetID)
-			}
+	// handle subnet IDs
+	subnetIDsBytes := msg.Get(message.TrackedSubnets).([][]byte)
+	for _, subnetIDBytes := range subnetIDsBytes {
+		subnetID, err := ids.ToID(subnetIDBytes)
+		if err != nil {
+			p.net.log.Debug("tracked subnet of %s%s at %s could not be parsed: %s", constants.NodeIDPrefix, p.nodeID, err)
+			p.discardIP()
+			return
 		}
-	} else {
-		// this peer has old Version, we don't know what its interested in.
-		// so assume that it tracks all available subnets
-		p.trackedSubnets.Add(p.net.whitelistedSubnets.List()...)
+		// add only if we also track this subnet
+		if p.net.whitelistedSubnets.Contains(subnetID) {
+			p.trackedSubnets.Add(subnetID)
+		}
 	}
 
 	sig := msg.Get(message.SigBytes).([]byte)
