@@ -134,7 +134,7 @@ type ExternalRouter interface {
 	)
 }
 
-// Routes app-level messages
+// AppRouter routes app-level messages
 type AppRouter interface {
 	AppRequest(
 		nodeID ids.ShortID,
@@ -162,12 +162,15 @@ type AppRouter interface {
 // InternalRouter deals with messages internal to this node
 type InternalRouter interface {
 	benchlist.Benchable
+
 	GetAcceptedFrontierFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
 	GetAcceptedFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
 	GetFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
 	GetAncestorsFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
 	QueryFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
+
+	AppRequestFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
+
 	Connected(nodeID ids.ShortID)
 	Disconnected(nodeID ids.ShortID)
-	AppRequestFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
 }

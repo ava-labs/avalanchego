@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net"
 	"os"
 	"path"
@@ -53,7 +54,8 @@ const (
 
 var (
 	deprecatedKeys = map[string]string{
-		CorethConfigKey: "please use --config-file to specify C-Chain config",
+		CorethConfigKey:                         fmt.Sprintf("please use --%s to specify C-Chain config", ChainConfigDirKey),
+		InboundConnUpgradeThrottlerMaxRecentKey: fmt.Sprintf("please use --%s to specify connection upgrade throttling", InboundThrottlerMaxConnsPerSecKey),
 	}
 
 	errInvalidStakerWeights       = errors.New("staking weights must be positive")
@@ -235,11 +237,18 @@ func getRouterHealthConfig(v *viper.Viper, halflife time.Duration) (router.Healt
 }
 
 func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, error) {
+	// Set the max number of recent inbound connections upgraded to be
+	// equal to the max number of inbound connections per second.
+	maxInboundConnsPerSec := v.GetFloat64(InboundThrottlerMaxConnsPerSecKey)
+	upgradeCooldown := v.GetDuration(InboundConnUpgradeThrottlerCooldownKey)
+	upgradeCooldownInSeconds := upgradeCooldown.Seconds()
+	maxRecentConnsUpgraded := int(math.Ceil(maxInboundConnsPerSec * upgradeCooldownInSeconds))
 	config := network.Config{
 		// Throttling
-		InboundConnThrottlerConfig: throttling.InboundConnThrottlerConfig{
-			AllowCooldown:  v.GetDuration(InboundConnThrottlerCooldownKey),
-			MaxRecentConns: v.GetInt(InboundConnThrottlerMaxRecentConnsKey),
+		MaxIncomingConnsPerSec: maxInboundConnsPerSec,
+		InboundConnUpgradeThrottlerConfig: throttling.InboundConnUpgradeThrottlerConfig{
+			UpgradeCooldown:        upgradeCooldown,
+			MaxRecentConnsUpgraded: maxRecentConnsUpgraded,
 		},
 		InboundThrottlerConfig: throttling.MsgThrottlerConfig{
 			AtLargeAllocSize:    v.GetUint64(InboundThrottlerAtLargeAllocSizeKey),

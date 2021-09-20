@@ -7,12 +7,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -23,16 +21,19 @@ type UnsignedCreateSubnetTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// Who is authorized to manage this subnet
-	Owner verify.Verifiable `serialize:"true" json:"owner"`
+	Owner Owner `serialize:"true" json:"owner"`
 }
 
-// Verify this transaction is well-formed
-func (tx *UnsignedCreateSubnetTx) Verify(
-	ctx *snow.Context,
-	c codec.Manager,
-	feeAmount uint64,
-	feeAssetID ids.ID,
-) error {
+// InitCtx sets the FxID fields in the inputs and outputs of this
+// [UnsignedCreateSubnetTx]. Also sets the [ctx] to the given [vm.ctx] so that
+// the addresses can be json marshalled into human readable format
+func (tx *UnsignedCreateSubnetTx) InitCtx(ctx *snow.Context) {
+	tx.BaseTx.InitCtx(ctx)
+	tx.Owner.InitCtx(ctx)
+}
+
+// SyntacticVerify verifies that this transaction is well-formed
+func (tx *UnsignedCreateSubnetTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
 		return errNilTx
@@ -40,7 +41,7 @@ func (tx *UnsignedCreateSubnetTx) Verify(
 		return nil
 	}
 
-	if err := tx.BaseTx.Verify(ctx, c); err != nil {
+	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return err
 	}
 	if err := tx.Owner.Verify(); err != nil {
@@ -51,8 +52,19 @@ func (tx *UnsignedCreateSubnetTx) Verify(
 	return nil
 }
 
-// SemanticVerify returns nil if [tx] is valid given the state in [db]
-func (tx *UnsignedCreateSubnetTx) SemanticVerify(
+// Attempts to verify this transaction with the provided state.
+func (tx *UnsignedCreateSubnetTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
+	vs := newVersionedState(
+		parentState,
+		parentState.CurrentStakerChainState(),
+		parentState.PendingStakerChainState(),
+	)
+	_, err := tx.Execute(vm, vs, stx)
+	return err
+}
+
+// Execute this transaction.
+func (tx *UnsignedCreateSubnetTx) Execute(
 	vm *VM,
 	vs VersionedState,
 	stx *Tx,
@@ -60,14 +72,14 @@ func (tx *UnsignedCreateSubnetTx) SemanticVerify(
 	func() error,
 	TxError,
 ) {
-	timestamp := vs.GetTimestamp()
-	createSubnetTxFee := vm.getCreateSubnetTxFee(timestamp)
 	// Make sure this transaction is well formed.
-	if err := tx.Verify(vm.ctx, vm.codec, createSubnetTxFee, vm.ctx.AVAXAssetID); err != nil {
+	if err := tx.SyntacticVerify(vm.ctx); err != nil {
 		return nil, permError{err}
 	}
 
 	// Verify the flowcheck
+	timestamp := vs.GetTimestamp()
+	createSubnetTxFee := vm.getCreateSubnetTxFee(timestamp)
 	if err := vm.semanticVerifySpend(vs, tx, tx.Ins, tx.Outs, stx.Creds, createSubnetTxFee, vm.ctx.AVAXAssetID); err != nil {
 		return nil, err
 	}
@@ -115,10 +127,11 @@ func (vm *VM) newCreateSubnetTx(
 		},
 	}
 	tx := &Tx{UnsignedTx: utx}
-	if err := tx.Sign(vm.codec, signers); err != nil {
+	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.ctx, vm.codec, createSubnetTxFee, vm.ctx.AVAXAssetID)
+
+	return tx, utx.SyntacticVerify(vm.ctx)
 }
 
 func (vm *VM) getCreateSubnetTxFee(t time.Time) uint64 {

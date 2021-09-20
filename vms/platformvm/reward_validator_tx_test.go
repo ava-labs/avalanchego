@@ -21,8 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func TestUnsignedRewardValidatorTxSemanticVerifyOnCommit(t *testing.T) {
-	vm, _ := defaultVM()
+func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -41,7 +41,7 @@ func TestUnsignedRewardValidatorTxSemanticVerifyOnCommit(t *testing.T) {
 	// Case 1: Chain timestamp is wrong
 	if tx, err := vm.newRewardValidatorTx(toRemove.ID()); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := toRemove.SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err := toRemove.Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
 	}
 
@@ -51,7 +51,7 @@ func TestUnsignedRewardValidatorTxSemanticVerifyOnCommit(t *testing.T) {
 	// Case 2: Wrong validator
 	if tx, err := vm.newRewardValidatorTx(ids.GenerateTestID()); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := toRemove.SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err := toRemove.Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatalf("should have failed because validator ID is wrong")
 	}
 
@@ -61,7 +61,7 @@ func TestUnsignedRewardValidatorTxSemanticVerifyOnCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	onCommitState, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
+	onCommitState, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,8 +104,8 @@ func TestUnsignedRewardValidatorTxSemanticVerifyOnCommit(t *testing.T) {
 	}
 }
 
-func TestUnsignedRewardValidatorTxSemanticVerifyOnAbort(t *testing.T) {
-	vm, _ := defaultVM()
+func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -124,7 +124,7 @@ func TestUnsignedRewardValidatorTxSemanticVerifyOnAbort(t *testing.T) {
 	// Case 1: Chain timestamp is wrong
 	if tx, err := vm.newRewardValidatorTx(toRemove.ID()); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := toRemove.SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err := toRemove.Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
 	}
 
@@ -134,7 +134,7 @@ func TestUnsignedRewardValidatorTxSemanticVerifyOnAbort(t *testing.T) {
 	// Case 2: Wrong validator
 	if tx, err := vm.newRewardValidatorTx(ids.GenerateTestID()); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := toRemove.SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err := toRemove.Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatalf("should have failed because validator ID is wrong")
 	}
 
@@ -144,7 +144,7 @@ func TestUnsignedRewardValidatorTxSemanticVerifyOnAbort(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, onAbortState, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
+	_, onAbortState, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,10 +187,10 @@ func TestUnsignedRewardValidatorTxSemanticVerifyOnAbort(t *testing.T) {
 	}
 }
 
-func TestRewardDelegatorTxSemanticVerifyOnCommit(t *testing.T) {
+func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	assert := assert.New(t)
 
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown()
@@ -243,7 +243,7 @@ func TestRewardDelegatorTxSemanticVerifyOnCommit(t *testing.T) {
 	tx, err := vm.newRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 
-	onCommitState, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
+	onCommitState, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
 	assert.NoError(err)
 
 	vdrDestSet := ids.ShortSet{}
@@ -280,10 +280,10 @@ func TestRewardDelegatorTxSemanticVerifyOnCommit(t *testing.T) {
 	assert.Equal(expectedReward, delReward+vdrReward, "expected total reward to be %d but is %d", expectedReward, delReward+vdrReward)
 }
 
-func TestRewardDelegatorTxSemanticVerifyOnAbort(t *testing.T) {
+func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	assert := assert.New(t)
 
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown()
@@ -338,7 +338,7 @@ func TestRewardDelegatorTxSemanticVerifyOnAbort(t *testing.T) {
 	tx, err := vm.newRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 
-	_, onAbortState, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
+	_, onAbortState, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
 	assert.NoError(err)
 
 	vdrDestSet := ids.ShortSet{}
@@ -586,7 +586,8 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)
-	if err := vm.Initialize(ctx, db, genesisBytes, nil, nil, msgChan, nil, nil); err != nil {
+	appSender := &common.SenderTest{}
+	if err := vm.Initialize(ctx, db, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
 		t.Fatal(err)
 	}
 	defer func() {

@@ -8,7 +8,10 @@ jobs:
     name: build_unit_test
     runs-on: ubuntu-18.04
     steps:
-      - uses: actions/checkout@v2
-      - name: build_test
-        shell: bash
-        run: .github/workflows/build_and_test.sh
+    - uses: actions/checkout@v2
+    - uses: actions/setup-go@v2
+      with:
+         go-version: '1.17.1' # The Go version to download (if necessary) and use.
+    - name: build_test
+      shell: bash
+      run: .github/workflows/build_and_test.sh

@@ -128,7 +128,7 @@ func (cr *ChainRouter) removeRequest(id ids.ID) {
 	cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
 }
 
-// RegisterRequests marks that we should expect to receive a reply from the given validator
+// RegisterRequest marks that we should expect to receive a reply from the given validator
 // regarding the given chain and the reply should have the given requestID.
 // The type of message we sent the validator was [msgType].
 // Every registered request must be cleared either by receiving a valid reply

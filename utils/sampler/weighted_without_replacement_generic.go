@@ -43,3 +43,11 @@ func (s *weightedWithoutReplacementGeneric) Sample(count int) ([]int, error) {
 	}
 	return indices, nil
 }
+
+func (s *weightedWithoutReplacementGeneric) Seed(seed int64) {
+	s.u.Seed(seed)
+}
+
+func (s *weightedWithoutReplacementGeneric) ClearSeed() {
+	s.u.ClearSeed()
+}

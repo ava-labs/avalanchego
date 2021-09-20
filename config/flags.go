@@ -96,7 +96,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(DBPathKey, defaultDBDir, "Path to database directory")
 
 	// Coreth config
-	fs.String(CorethConfigKey, "", "Specifies config to pass into coreth")
+	fs.String(CorethConfigKey, "", "DEPRECATED")
 
 	// Logging
 	fs.String(LogsDirKey, "", "Logging directory for Avalanche")
@@ -127,8 +127,9 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(DynamicPublicIPResolverKey, "", "'ifconfigco' (alias 'ifconfig') or 'opendns' or 'ifconfigme'. By default does not do dynamic public IP updates. If non-empty, ignores public-ip argument.")
 
 	// Inbound Connection Throttling
-	fs.Duration(InboundConnThrottlerCooldownKey, 2*time.Second, "Allow an inbound connection from a given IP at most once per this duration. If 0, don't rate-limit inbound connections.")
-	fs.Int(InboundConnThrottlerMaxRecentConnsKey, 1024, fmt.Sprintf("Allow at most this many inbound connection per [--%s]", InboundConnThrottlerCooldownKey))
+	fs.Duration(InboundConnUpgradeThrottlerCooldownKey, 10*time.Second, "Upgrade an inbound connection from a given IP at most once per this duration. If 0, don't rate-limit inbound connection upgrades.")
+	fs.Int(InboundConnUpgradeThrottlerMaxRecentKey, 5120, "DEPRECATED") // Deprecated starting in v1.6.0. TODO remove in future release.
+	fs.Float64(InboundThrottlerMaxConnsPerSecKey, 512, "Max number of inbound connections to accept (from all peers) per second.")
 	// Outbound Connection Throttling
 	fs.Uint(OutboundConnectionThrottlingRps, 50, "Make at most this number of outgoing peer connection attempts per second.")
 	fs.Duration(OutboundConnectionTimeout, 30*time.Second, "Timeout when dialing a peer.")
@@ -155,7 +156,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(ConsensusShutdownTimeoutKey, 5*time.Second, "Timeout before killing an unresponsive chain.")
 	fs.Uint(ConsensusGossipAcceptedFrontierSizeKey, 35, "Number of peers to gossip to when gossiping accepted frontier")
 	fs.Uint(ConsensusGossipOnAcceptSizeKey, 20, "Number of peers to gossip to each accepted container to")
-	fs.Uint(AppGossipSizeKey, 20, "Number of peers to gossip an AppGossip message to")
+	fs.Uint(AppGossipSizeKey, 6, "Number of peers to gossip an AppGossip message to")
 
 	// Inbound Throttling
 	fs.Uint64(InboundThrottlerAtLargeAllocSizeKey, 32*units.MiB, "Size, in bytes, of at-large byte allocation in inbound message throttler.")

@@ -13,7 +13,7 @@ import (
 
 // Ensure semantic verification fails when proposed timestamp is at or before current timestamp
 func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -24,14 +24,14 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 
 	if tx, err := vm.newAdvanceTimeTx(defaultGenesisTime); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've failed verification because proposed timestamp same as current timestamp")
 	}
 }
 
 // Ensure semantic verification fails when proposed timestamp is after next validator set change time
 func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 
 	// Case: Timestamp is after next validator start time
@@ -66,7 +66,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	tx, err := vm.newAdvanceTimeTx(pendingValidatorStartTime.Add(1 * time.Second))
 	if err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've failed verification because proposed timestamp is after pending validator start time")
 	}
 	if err := vm.Shutdown(); err != nil {
@@ -75,7 +75,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	vm.ctx.Lock.Unlock()
 
 	// Case: Timestamp is after next validator end time
-	vm, _ = defaultVM()
+	vm, _, _ = defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -90,7 +90,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	// Proposes advancing timestamp to 1 second after genesis validators stop validating
 	if tx, err := vm.newAdvanceTimeTx(defaultValidateEndTime.Add(1 * time.Second)); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've failed verification because proposed timestamp is after pending validator start time")
 	}
 }
@@ -98,7 +98,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 // Ensure semantic verification updates the current and pending staker set
 // for the primary network
 func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -140,7 +140,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	onCommit, onAbort, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
+	onCommit, onAbort, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -293,7 +293,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers2(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		vm, _ := defaultVM()
+		vm, _, _ := defaultVM()
 		vm.ctx.Lock.Lock()
 		defer func() {
 			if err := vm.Shutdown(); err != nil {
@@ -334,7 +334,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers2(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			onCommitState, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
+			onCommitState, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
 			if err != nil {
 				t.Fatalf("failed test '%s': %s", tt.description, err)
 			}
@@ -366,7 +366,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers2(t *testing.T) {
 // when timestamp is advanced and there is a pending staker whose start time
 // is after the new timestamp
 func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -435,7 +435,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	onCommitState, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
+	onCommitState, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -455,7 +455,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 
 // Test method InitiallyPrefersCommit
 func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -485,7 +485,7 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 
 // Ensure marshaling/unmarshaling works
 func TestAdvanceTimeTxUnmarshal(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -499,7 +499,7 @@ func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bytes, err := Codec.Marshal(codecVersion, tx)
+	bytes, err := Codec.Marshal(CodecVersion, tx)
 	if err != nil {
 		t.Fatal(err)
 	}

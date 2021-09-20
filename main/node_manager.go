@@ -105,7 +105,6 @@ func (nm *nodeManager) stop(path string) error {
 		return nil
 	}
 	delete(nm.nodes, nodeProcess.path)
-
 	return nodeProcess.stop()
 }
 
