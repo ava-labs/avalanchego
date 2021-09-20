@@ -1,3 +1,6 @@
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package network
 
 import (
@@ -105,7 +108,7 @@ func TestPeer_Close(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler,
-		throttling.InboundConnThrottlerConfig{},
+		throttling.InboundConnUpgradeThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,

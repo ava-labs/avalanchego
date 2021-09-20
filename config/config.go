@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net"
 	"os"
 	"path"
@@ -53,19 +54,20 @@ const (
 
 var (
 	deprecatedKeys = map[string]string{
-		CorethConfigKey: "please use --config-file to specify C-Chain config",
+		CorethConfigKey:                         fmt.Sprintf("please use --%s to specify C-Chain config", ChainConfigDirKey),
+		InboundConnUpgradeThrottlerMaxRecentKey: fmt.Sprintf("please use --%s to specify connection upgrade throttling", InboundThrottlerMaxConnsPerSecKey),
 	}
 
-	errInvalidStakerWeights       = errors.New("staking weights must be positive")
-	errAuthPasswordTooWeak        = errors.New("API auth password is not strong enough")
-	errInvalidUptimeRequirement   = errors.New("uptime requirement must be in the range [0, 1]")
-	errMinValidatorStakeAboveMax  = errors.New("minimum validator stake can't be greater than maximum validator stake")
-	errInvalidDelegationFee       = errors.New("delegation fee must be in the range [0, 1,000,000]")
-	errInvalidMinStakeDuration    = errors.New("min stake duration must be > 0")
-	errMinStakeDurationAboveMax   = errors.New("max stake duration can't be less than min stake duration")
-	errStakeMintingPeriodBelowMin = errors.New("stake minting period can't be less than max stake duration")
-
-	errDuplicatedCChainConfig = errors.New("C-Chain config is already provided in chain config files")
+	errInvalidStakerWeights          = errors.New("staking weights must be positive")
+	errAuthPasswordTooWeak           = errors.New("API auth password is not strong enough")
+	errInvalidUptimeRequirement      = errors.New("uptime requirement must be in the range [0, 1]")
+	errMinValidatorStakeAboveMax     = errors.New("minimum validator stake can't be greater than maximum validator stake")
+	errInvalidDelegationFee          = errors.New("delegation fee must be in the range [0, 1,000,000]")
+	errInvalidMinStakeDuration       = errors.New("min stake duration must be > 0")
+	errMinStakeDurationAboveMax      = errors.New("max stake duration can't be less than min stake duration")
+	errStakeMintingPeriodBelowMin    = errors.New("stake minting period can't be less than max stake duration")
+	errCannotWhitelistPrimaryNetwork = errors.New("cannot whitelist primary network")
+	errDuplicatedCChainConfig        = errors.New("C-Chain config is already provided in chain config files")
 )
 
 func GetProcessConfig(v *viper.Viper) (process.Config, error) {
@@ -235,11 +237,18 @@ func getRouterHealthConfig(v *viper.Viper, halflife time.Duration) (router.Healt
 }
 
 func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, error) {
+	// Set the max number of recent inbound connections upgraded to be
+	// equal to the max number of inbound connections per second.
+	maxInboundConnsPerSec := v.GetFloat64(InboundThrottlerMaxConnsPerSecKey)
+	upgradeCooldown := v.GetDuration(InboundConnUpgradeThrottlerCooldownKey)
+	upgradeCooldownInSeconds := upgradeCooldown.Seconds()
+	maxRecentConnsUpgraded := int(math.Ceil(maxInboundConnsPerSec * upgradeCooldownInSeconds))
 	config := network.Config{
 		// Throttling
-		InboundConnThrottlerConfig: throttling.InboundConnThrottlerConfig{
-			AllowCooldown:  v.GetDuration(InboundConnThrottlerCooldownKey),
-			MaxRecentConns: v.GetInt(InboundConnThrottlerMaxRecentConnsKey),
+		MaxIncomingConnsPerSec: maxInboundConnsPerSec,
+		InboundConnUpgradeThrottlerConfig: throttling.InboundConnUpgradeThrottlerConfig{
+			UpgradeCooldown:        upgradeCooldown,
+			MaxRecentConnsUpgraded: maxRecentConnsUpgraded,
 		},
 		InboundThrottlerConfig: throttling.MsgThrottlerConfig{
 			AtLargeAllocSize:    v.GetUint64(InboundThrottlerAtLargeAllocSizeKey),
@@ -559,6 +568,9 @@ func getWhitelistedSubnets(v *viper.Viper) (ids.Set, error) {
 		if err != nil {
 			return nil, fmt.Errorf("couldn't parse subnetID %q: %w", subnet, err)
 		}
+		if subnetID == constants.PrimaryNetworkID {
+			return nil, errCannotWhitelistPrimaryNetwork
+		}
 		whitelistedSubnetIDs.Add(subnetID)
 	}
 	return whitelistedSubnetIDs, nil
@@ -602,20 +614,20 @@ func getVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
 
 // getPathFromDirKey reads flag value from viper instance and then checks the folder existence
 func getPathFromDirKey(v *viper.Viper, configKey string) (string, error) {
-	configDir := v.GetString(configKey)
+	configDir := os.ExpandEnv(v.GetString(configKey))
 	cleanPath := path.Clean(configDir)
 	ok, err := storage.FolderExists(cleanPath)
 	if err != nil {
 		return "", err
 	}
-	if !ok {
-		if v.IsSet(configKey) {
-			// user specified a config dir explicitly, but dir does not exist.
-			return "", fmt.Errorf("cannot read directory: %v", cleanPath)
-		}
-		return "", nil
+	if ok {
+		return cleanPath, nil
 	}
-	return cleanPath, nil
+	if v.IsSet(configKey) {
+		// user specified a config dir explicitly, but dir does not exist.
+		return "", fmt.Errorf("cannot read directory: %v", cleanPath)
+	}
+	return "", nil
 }
 
 // getChainConfigs reads & puts chainConfigs to node config
@@ -624,16 +636,15 @@ func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	var chainConfigs map[string]chains.ChainConfig
+
+	chainConfigs := make(map[string]chains.ChainConfig)
 	if len(chainConfigPath) > 0 {
 		chainConfigs, err = readChainConfigPath(chainConfigPath)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't read chain configs: %w", err)
 		}
-	} else {
-		// chain config path does not exist but not explicitly specified, so ignore it
-		chainConfigs = make(map[string]chains.ChainConfig)
 	}
+
 	// Coreth Plugin
 	if v.IsSet(CorethConfigKey) {
 		// error if C config is already populated
@@ -703,17 +714,15 @@ func getSubnetConfigs(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.Sub
 	if err != nil {
 		return nil, err
 	}
-	var subnetConfigs map[ids.ID]chains.SubnetConfig
-	if len(subnetConfigPath) > 0 {
-		subnetConfigs, err = readSubnetConfigs(subnetConfigPath, subnetIDs, defaultSubnetConfig(v))
-		if err != nil {
-			return nil, fmt.Errorf("couldn't read subnet configs: %w", err)
-		}
-	} else {
+	if len(subnetConfigPath) == 0 {
 		// subnet config path does not exist but not explicitly specified, so ignore it
-		subnetConfigs = make(map[ids.ID]chains.SubnetConfig)
+		return make(map[ids.ID]chains.SubnetConfig), nil
 	}
 
+	subnetConfigs, err := readSubnetConfigs(subnetConfigPath, subnetIDs, defaultSubnetConfig(v))
+	if err != nil {
+		return nil, fmt.Errorf("couldn't read subnet configs: %w", err)
+	}
 	return subnetConfigs, nil
 }
 
@@ -723,13 +732,12 @@ func readSubnetConfigs(subnetConfigPath string, subnetIDs []ids.ID, defaultSubne
 	for _, subnetID := range subnetIDs {
 		filePath := path.Join(subnetConfigPath, subnetID.String()+subnetConfigFileExt)
 		fileInfo, err := os.Stat(filePath)
+		if errors.Is(err, os.ErrNotExist) {
+			// this subnet config does not exist, move to the next one
+			continue
+		}
 		if err != nil {
-			if errors.Is(err, os.ErrNotExist) {
-				// this subnet config does not exist, move to the next one
-				continue
-			} else {
-				return nil, err
-			}
+			return nil, err
 		}
 
 		if fileInfo.IsDir() {

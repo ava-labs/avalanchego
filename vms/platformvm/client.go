@@ -173,7 +173,8 @@ func (c *Client) SampleValidators(subnetID ids.ID, sampleSize uint16) ([]string,
 	return res.Validators, err
 }
 
-// AddValidator issues a transaction to add a validator to the primary network and returns the txID
+// AddValidator issues a transaction to add a validator to the primary network
+// and returns the txID
 func (c *Client) AddValidator(
 	user api.UserPass,
 	from []string,
@@ -189,7 +190,8 @@ func (c *Client) AddValidator(
 	jsonStakeAmount := cjson.Uint64(stakeAmount)
 	err := c.requester.SendRequest("addValidator", &AddValidatorArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
-			UserPass: user,
+			UserPass:      user,
+			JSONFromAddrs: api.JSONFromAddrs{From: from},
 		},
 		APIStaker: APIStaker{
 			NodeID:      nodeID,
@@ -203,7 +205,8 @@ func (c *Client) AddValidator(
 	return res.TxID, err
 }
 
-// AddDelegator issues a transaction to add a delegator to the primary network and returns the txID
+// AddDelegator issues a transaction to add a delegator to the primary network
+// and returns the txID
 func (c *Client) AddDelegator(
 	user api.UserPass,
 	from []string,
@@ -232,7 +235,8 @@ func (c *Client) AddDelegator(
 	return res.TxID, err
 }
 
-// AddSubnetValidator issues a transaction to add validator [nodeID] to subnet with ID [subnetID] and returns the txID
+// AddSubnetValidator issues a transaction to add validator [nodeID] to subnet
+// with ID [subnetID] and returns the txID
 func (c *Client) AddSubnetValidator(
 	user api.UserPass,
 	from []string,
@@ -285,7 +289,7 @@ func (c *Client) CreateSubnet(
 	return res.TxID, err
 }
 
-// ExportAVAX issues an ExportAVAX transaction and returns the txID
+// ExportAVAX issues an ExportTx transaction and returns the txID
 func (c *Client) ExportAVAX(
 	user api.UserPass,
 	from []string,
@@ -306,7 +310,7 @@ func (c *Client) ExportAVAX(
 	return res.TxID, err
 }
 
-// ImportAVAX issues an ImportAVAX transaction and returns the txID
+// ImportAVAX issues an ImportTx transaction and returns the txID
 func (c *Client) ImportAVAX(
 	user api.UserPass,
 	from []string,
@@ -394,7 +398,7 @@ func (c *Client) GetBlockchains() ([]APIBlockchain, error) {
 	return res.Blockchains, err
 }
 
-// IssueTx issues the transaction and returns its transaction ID
+// IssueTx issues the transaction and returns its txID
 func (c *Client) IssueTx(txBytes []byte) (ids.ID, error) {
 	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, txBytes)
 	if err != nil {
@@ -409,7 +413,8 @@ func (c *Client) IssueTx(txBytes []byte) (ids.ID, error) {
 	return res.TxID, err
 }
 
-// GetTx returns the byte representation of the transaction corresponding to [txID]
+// GetTx returns the byte representation of the transaction corresponding to
+// [txID]
 func (c *Client) GetTx(txID ids.ID) ([]byte, error) {
 	res := &api.FormattedTx{}
 	err := c.requester.SendRequest("getTx", &api.GetTxArgs{

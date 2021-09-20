@@ -680,7 +680,7 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 	t.metrics.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len())) // Tracks performance statistics
 }
 
-// Health implements the common.Engine interface
+// HealthCheck implements the common.Engine interface
 func (t *Transitive) HealthCheck() (interface{}, error) {
 	var (
 		consensusIntf interface{} = struct{}{}

@@ -5,7 +5,6 @@ package timeout
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -18,7 +17,6 @@ import (
 
 // Manager registers and fires timeouts for the snow API.
 type Manager struct {
-	lock         sync.Mutex
 	tm           timer.AdaptiveTimeoutManager
 	benchlistMgr benchlist.Manager
 	metrics      metrics
@@ -60,9 +58,9 @@ func (m *Manager) RegisterChain(ctx *snow.Context, namespace string) error {
 	return nil
 }
 
-// RegisterRequests notes that we sent a request of type [msgType] to [validatorID]
-// regarding chain [chainID]. If we don't receive a response in time, [timeoutHandler]
-// is executed.
+// RegisterRequest notes that we sent a request of type [msgType] to
+// [validatorID] regarding chain [chainID]. If we don't receive a response in
+// time, [timeoutHandler]  is executed.
 func (m *Manager) RegisterRequest(
 	validatorID ids.ShortID,
 	chainID ids.ID,
@@ -87,9 +85,7 @@ func (m *Manager) RegisterResponse(
 	msgType constants.MsgType,
 	latency time.Duration,
 ) {
-	m.lock.Lock()
-	m.metrics.observe(chainID, msgType, latency)
-	m.lock.Unlock()
+	m.metrics.Observe(chainID, msgType, latency)
 	m.benchlistMgr.RegisterResponse(chainID, validatorID)
 	m.tm.Remove(uniqueRequestID)
 }

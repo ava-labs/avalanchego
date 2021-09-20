@@ -1,3 +1,6 @@
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package main
 
 import (
@@ -105,7 +108,6 @@ func (nm *nodeManager) stop(path string) error {
 		return nil
 	}
 	delete(nm.nodes, nodeProcess.path)
-
 	return nodeProcess.stop()
 }
 
