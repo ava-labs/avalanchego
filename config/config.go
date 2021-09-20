@@ -58,16 +58,16 @@ var (
 		InboundConnUpgradeThrottlerMaxRecentKey: fmt.Sprintf("please use --%s to specify connection upgrade throttling", InboundThrottlerMaxConnsPerSecKey),
 	}
 
-	errInvalidStakerWeights       = errors.New("staking weights must be positive")
-	errAuthPasswordTooWeak        = errors.New("API auth password is not strong enough")
-	errInvalidUptimeRequirement   = errors.New("uptime requirement must be in the range [0, 1]")
-	errMinValidatorStakeAboveMax  = errors.New("minimum validator stake can't be greater than maximum validator stake")
-	errInvalidDelegationFee       = errors.New("delegation fee must be in the range [0, 1,000,000]")
-	errInvalidMinStakeDuration    = errors.New("min stake duration must be > 0")
-	errMinStakeDurationAboveMax   = errors.New("max stake duration can't be less than min stake duration")
-	errStakeMintingPeriodBelowMin = errors.New("stake minting period can't be less than max stake duration")
-
-	errDuplicatedCChainConfig = errors.New("C-Chain config is already provided in chain config files")
+	errInvalidStakerWeights          = errors.New("staking weights must be positive")
+	errAuthPasswordTooWeak           = errors.New("API auth password is not strong enough")
+	errInvalidUptimeRequirement      = errors.New("uptime requirement must be in the range [0, 1]")
+	errMinValidatorStakeAboveMax     = errors.New("minimum validator stake can't be greater than maximum validator stake")
+	errInvalidDelegationFee          = errors.New("delegation fee must be in the range [0, 1,000,000]")
+	errInvalidMinStakeDuration       = errors.New("min stake duration must be > 0")
+	errMinStakeDurationAboveMax      = errors.New("max stake duration can't be less than min stake duration")
+	errStakeMintingPeriodBelowMin    = errors.New("stake minting period can't be less than max stake duration")
+	errCannotWhitelistPrimaryNetwork = errors.New("cannot whitelist primary network")
+	errDuplicatedCChainConfig        = errors.New("C-Chain config is already provided in chain config files")
 )
 
 func GetProcessConfig(v *viper.Viper) (process.Config, error) {
@@ -568,6 +568,9 @@ func getWhitelistedSubnets(v *viper.Viper) (ids.Set, error) {
 		if err != nil {
 			return nil, fmt.Errorf("couldn't parse subnetID %q: %w", subnet, err)
 		}
+		if subnetID == constants.PrimaryNetworkID {
+			return nil, errCannotWhitelistPrimaryNetwork
+		}
 		whitelistedSubnetIDs.Add(subnetID)
 	}
 	return whitelistedSubnetIDs, nil
@@ -611,7 +614,7 @@ func getVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
 
 // getPathFromDirKey reads flag value from viper instance and then checks the folder existence
 func getPathFromDirKey(v *viper.Viper, configKey string) (string, error) {
-	configDir := v.GetString(configKey)
+	configDir := os.ExpandEnv(v.GetString(configKey))
 	cleanPath := path.Clean(configDir)
 	ok, err := storage.FolderExists(cleanPath)
 	if err != nil {
@@ -712,17 +715,15 @@ func getSubnetConfigs(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.Sub
 	if err != nil {
 		return nil, err
 	}
-	var subnetConfigs map[ids.ID]chains.SubnetConfig
-	if len(subnetConfigPath) > 0 {
-		subnetConfigs, err = readSubnetConfigs(subnetConfigPath, subnetIDs)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't read subnet configs: %w", err)
-		}
-	} else {
+	if len(subnetConfigPath) == 0 {
 		// subnet config path does not exist but not explicitly specified, so ignore it
-		subnetConfigs = make(map[ids.ID]chains.SubnetConfig)
+		return make(map[ids.ID]chains.SubnetConfig), nil
 	}
 
+	subnetConfigs, err := readSubnetConfigs(subnetConfigPath, subnetIDs)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't read subnet configs: %w", err)
+	}
 	return subnetConfigs, nil
 }
 
@@ -736,9 +737,8 @@ func readSubnetConfigs(subnetConfigPath string, subnetIDs []ids.ID) (map[ids.ID]
 			if errors.Is(err, os.ErrNotExist) {
 				// this subnet config does not exist, move to the next one
 				continue
-			} else {
-				return nil, err
 			}
+			return nil, err
 		}
 
 		if fileInfo.IsDir() {

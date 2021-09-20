@@ -32,10 +32,9 @@ type subnet struct {
 }
 
 func newSubnet() Subnet {
-	sb := &subnet{
+	return &subnet{
 		bootstrappedSema: make(chan struct{}),
 	}
-	return sb
 }
 
 func (s *subnet) IsBootstrapped() bool {

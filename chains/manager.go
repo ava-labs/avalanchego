@@ -121,7 +121,7 @@ type chain struct {
 
 type SubnetConfig struct {
 	// ValidatorOnly indicates that this Subnet's Chains are available to only subnet validators.
-	ValidatorOnly bool
+	ValidatorOnly bool `json:"validatorOnly"`
 }
 
 // ChainConfig is configuration settings for the current execution.
