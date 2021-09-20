@@ -26,7 +26,6 @@ type parser struct {
 }
 
 func (p *parser) Parse(blkBytes []byte) (queue.Job, error) {
-	// TODO: should we add this one to processing blocks in bootstrapper?
 	blk, err := p.vm.ParseBlock(blkBytes)
 	if err != nil {
 		return nil, err

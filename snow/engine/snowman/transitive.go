@@ -821,8 +821,7 @@ func (t *Transitive) HealthCheck() (interface{}, error) {
 
 // GetBlock implements the snowman.Engine interface
 func (t *Transitive) GetBlock(blkID ids.ID) (snowman.Block, error) {
-	blk, ok := t.pending[blkID]
-	if ok {
+	if blk, ok := t.pending[blkID]; ok {
 		return blk, nil
 	}
 	return t.VM.GetBlock(blkID)
