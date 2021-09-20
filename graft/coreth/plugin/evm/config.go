@@ -57,10 +57,11 @@ type Config struct {
 	SnapshotAsync  bool `json:"snapshot-async"`
 	SnapshotVerify bool `json:"snapshot-verification-enabled"`
 
-	LocalTxsEnabled         bool     `json:"local-txs-enabled"`
-	APIMaxDuration          Duration `json:"api-max-duration"`
-	MaxBlocksPerRequest     int64    `json:"api-max-blocks-per-request"`
-	AllowUnfinalizedQueries bool     `json:"allow-unfinalized-queries"`
+	LocalTxsEnabled           bool     `json:"local-txs-enabled"`
+	RemoteTxGossipOnlyEnabled bool     `json:"remote-tx-gossip-only-enabled"`
+	APIMaxDuration            Duration `json:"api-max-duration"`
+	MaxBlocksPerRequest       int64    `json:"api-max-blocks-per-request"`
+	AllowUnfinalizedQueries   bool     `json:"allow-unfinalized-queries"`
 
 	// Keystore Settings
 	KeystoreDirectory             string `json:"keystore-directory"` // both absolute and relative supported

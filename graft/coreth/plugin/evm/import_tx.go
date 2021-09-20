@@ -39,7 +39,7 @@ type UnsignedImportTx struct {
 
 // InputUTXOs returns the UTXOIDs of the imported funds
 func (tx *UnsignedImportTx) InputUTXOs() ids.Set {
-	set := ids.Set{}
+	set := ids.NewSet(len(tx.ImportedInputs))
 	for _, in := range tx.ImportedInputs {
 		set.Add(in.InputID())
 	}
@@ -95,7 +95,7 @@ func (tx *UnsignedImportTx) Verify(
 	return nil
 }
 
-func (tx *UnsignedImportTx) Cost() (uint64, error) {
+func (tx *UnsignedImportTx) GasUsed() (uint64, error) {
 	cost := calcBytesCost(len(tx.UnsignedBytes()))
 	for _, in := range tx.ImportedInputs {
 		inCost, err := in.In.Cost()
@@ -154,11 +154,11 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	switch {
 	// Apply dynamic fees to import transactions as of Apricot Phase 3
 	case rules.IsApricotPhase3:
-		cost, err := stx.Cost()
+		gasUsed, err := stx.GasUsed()
 		if err != nil {
 			return err
 		}
-		txFee, err := calculateDynamicFee(cost, baseFee)
+		txFee, err := calculateDynamicFee(gasUsed, baseFee)
 		if err != nil {
 			return err
 		}
@@ -326,17 +326,17 @@ func (vm *VM) newImportTx(
 			return nil, err
 		}
 
-		costWithoutChange, err := tx.Cost()
+		gasUsedWithoutChange, err := tx.GasUsed()
 		if err != nil {
 			return nil, err
 		}
-		costWithChange := costWithoutChange + EVMOutputGas
+		gasUsedWithChange := gasUsedWithoutChange + EVMOutputGas
 
-		txFeeWithoutChange, err = calculateDynamicFee(costWithoutChange, baseFee)
+		txFeeWithoutChange, err = calculateDynamicFee(gasUsedWithoutChange, baseFee)
 		if err != nil {
 			return nil, err
 		}
-		txFeeWithChange, err = calculateDynamicFee(costWithChange, baseFee)
+		txFeeWithChange, err = calculateDynamicFee(gasUsedWithChange, baseFee)
 		if err != nil {
 			return nil, err
 		}

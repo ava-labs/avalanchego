@@ -92,7 +92,8 @@ func (in *EVMInput) Verify() error {
 type UnsignedTx interface {
 	Initialize(unsignedBytes, signedBytes []byte)
 	ID() ids.ID
-	Cost() (uint64, error)
+	GasUsed() (uint64, error)
+	Burned(assetID ids.ID) (uint64, error)
 	UnsignedBytes() []byte
 	Bytes() []byte
 }
@@ -150,6 +151,40 @@ func (tx *Tx) Sign(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) er
 	}
 	tx.Initialize(unsignedBytes, signedBytes)
 	return nil
+}
+
+// BlockFeeContribution calculates how much AVAX towards the block fee contribution was paid
+// for via this transaction denominated in [avaxAssetID] with [baseFee] used to calculate the
+// cost of this transaction. This function also returns the [gasUsed] by the
+// transaction for inclusion in the [baseFee] algorithm.
+func (tx *Tx) BlockFeeContribution(avaxAssetID ids.ID, baseFee *big.Int) (*big.Int, *big.Int, error) {
+	if baseFee == nil {
+		return nil, nil, errNilBaseFee
+	}
+	if baseFee.Cmp(common.Big0) <= 0 {
+		return nil, nil, fmt.Errorf("cannot calculate tip with base fee %d <= 0", baseFee)
+	}
+	gasUsed, err := tx.GasUsed()
+	if err != nil {
+		return nil, nil, err
+	}
+	txFee, err := calculateDynamicFee(gasUsed, baseFee)
+	if err != nil {
+		return nil, nil, err
+	}
+	burned, err := tx.Burned(avaxAssetID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if txFee > burned {
+		return nil, nil, fmt.Errorf("insufficient AVAX burned (%d) to cover import tx fee (%d)", burned, txFee)
+	}
+	excessBurned := burned - txFee
+
+	// Calculate the amount of AVAX that has been burned above the required fee denominated
+	// in C-Chain native 18 decimal places
+	blockFeeContribution := new(big.Int).Mul(new(big.Int).SetUint64(excessBurned), x2cRate)
+	return blockFeeContribution, new(big.Int).SetUint64(gasUsed), nil
 }
 
 // innerSortInputsAndSigners implements sort.Interface for EVMInput

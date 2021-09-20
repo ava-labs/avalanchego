@@ -95,18 +95,31 @@ type Header struct {
 
 	// BaseFee was added by EIP-1559 and is ignored in legacy headers.
 	BaseFee *big.Int `json:"baseFeePerGas" rlp:"optional"`
+
+	// ExtDataGasUsed was added by Apricot Phase 4 and is ignored in legacy
+	// headers.
+	//
+	// It is not a uint64 like GasLimit or GasUsed because it is not possible to
+	// correctly encode this field optionally with uint64.
+	ExtDataGasUsed *big.Int `json:"extDataGasUsed" rlp:"optional"`
+
+	// BlockGasCost was added by Apricot Phase 4 and is ignored in legacy
+	// headers.
+	BlockGasCost *big.Int `json:"blockGasCost" rlp:"optional"`
 }
 
 // field type overrides for gencodec
 type headerMarshaling struct {
-	Difficulty *hexutil.Big
-	Number     *hexutil.Big
-	GasLimit   hexutil.Uint64
-	GasUsed    hexutil.Uint64
-	Time       hexutil.Uint64
-	Extra      hexutil.Bytes
-	BaseFee    *hexutil.Big
-	Hash       common.Hash `json:"hash"` // adds call to Hash() in MarshalJSON
+	Difficulty     *hexutil.Big
+	Number         *hexutil.Big
+	GasLimit       hexutil.Uint64
+	GasUsed        hexutil.Uint64
+	Time           hexutil.Uint64
+	Extra          hexutil.Bytes
+	BaseFee        *hexutil.Big
+	ExtDataGasUsed *hexutil.Big
+	BlockGasCost   *hexutil.Big
+	Hash           common.Hash `json:"hash"` // adds call to Hash() in MarshalJSON
 }
 
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its
@@ -234,6 +247,12 @@ func CopyHeader(h *Header) *Header {
 	if h.BaseFee != nil {
 		cpy.BaseFee = new(big.Int).Set(h.BaseFee)
 	}
+	if h.ExtDataGasUsed != nil {
+		cpy.ExtDataGasUsed = new(big.Int).Set(h.ExtDataGasUsed)
+	}
+	if h.BlockGasCost != nil {
+		cpy.BlockGasCost = new(big.Int).Set(h.BlockGasCost)
+	}
 	if len(h.Extra) > 0 {
 		cpy.Extra = make([]byte, len(h.Extra))
 		copy(cpy.Extra, h.Extra)
@@ -333,6 +352,20 @@ func (b *Block) BaseFee() *big.Int {
 		return nil
 	}
 	return new(big.Int).Set(b.header.BaseFee)
+}
+
+func (b *Block) ExtDataGasUsed() *big.Int {
+	if b.header.ExtDataGasUsed == nil {
+		return nil
+	}
+	return new(big.Int).Set(b.header.ExtDataGasUsed)
+}
+
+func (b *Block) BlockGasCost() *big.Int {
+	if b.header.BlockGasCost == nil {
+		return nil
+	}
+	return new(big.Int).Set(b.header.BlockGasCost)
 }
 
 func (b *Block) Header() *Header { return CopyHeader(b.header) }
