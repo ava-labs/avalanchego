@@ -690,11 +690,6 @@ func (p *peer) handleGetVersion(_ message.Message) {
 
 // assumes the [stateLock] is not held
 func (p *peer) handleVersion(msg message.Message) {
-	p.versionCheck(msg)
-}
-
-// assumes the [stateLock] is not held
-func (p *peer) versionCheck(msg message.Message) {
 	switch {
 	case p.gotVersion.GetValue():
 		p.net.log.Verbo("dropping duplicated version message from %s%s at %s", constants.NodeIDPrefix, p.nodeID, p.getIP())
