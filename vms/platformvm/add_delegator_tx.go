@@ -111,6 +111,11 @@ func (tx *UnsignedAddDelegatorTx) SyntacticVerify(ctx *snow.Context) error {
 // Attempts to verify this transaction with the provided state.
 func (tx *UnsignedAddDelegatorTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
 	_, _, _, _, err := tx.Execute(vm, parentState, stx)
+	// We ignore [errFutureStakeTime] here because an advanceTimeTx will be
+	// issued before this transaction is issued.
+	if errors.Is(err, errFutureStakeTime) {
+		return nil
+	}
 	return err
 }
 
@@ -152,20 +157,13 @@ func (tx *UnsignedAddDelegatorTx) Execute(
 	if vm.bootstrapped {
 		currentTimestamp := parentState.GetTimestamp()
 		// Ensure the proposed validator starts after the current timestamp
-		if validatorStartTime := tx.StartTime(); !currentTimestamp.Before(validatorStartTime) {
+		validatorStartTime := tx.StartTime()
+		if !currentTimestamp.Before(validatorStartTime) {
 			return nil, nil, nil, nil, permError{
 				fmt.Errorf(
 					"chain timestamp (%s) not before validator's start time (%s)",
 					currentTimestamp,
 					validatorStartTime,
-				),
-			}
-		} else if validatorStartTime.After(currentTimestamp.Add(maxFutureStartTime)) {
-			return nil, nil, nil, nil, permError{
-				fmt.Errorf(
-					"validator start time (%s) more than two weeks after current chain timestamp (%s)",
-					validatorStartTime,
-					currentTimestamp,
 				),
 			}
 		}
@@ -262,6 +260,14 @@ func (tx *UnsignedAddDelegatorTx) Execute(
 					fmt.Errorf("failed semanticVerifySpend: %w", err),
 				}
 			}
+		}
+
+		// Make sure the tx doesn't start too far in the future. This is done
+		// last to allow SemanticVerification to explicitly check for this
+		// error.
+		maxStartTime := currentTimestamp.Add(maxFutureStartTime)
+		if validatorStartTime.After(maxStartTime) {
+			return nil, nil, nil, nil, permError{errFutureStakeTime}
 		}
 	}
 

@@ -173,7 +173,7 @@ func (p *peer) StartTicker() {
 }
 
 func (p *peer) sendPings() {
-	sendPingsTicker := time.NewTicker(p.net.pingFrequency)
+	sendPingsTicker := time.NewTicker(p.net.config.PingFrequency)
 	defer sendPingsTicker.Stop()
 
 	for {
@@ -194,7 +194,7 @@ func (p *peer) sendPings() {
 
 // request missing handshake messages from the peer
 func (p *peer) requestFinishHandshake() {
-	finishHandshakeTicker := time.NewTicker(p.net.getVersionTimeout)
+	finishHandshakeTicker := time.NewTicker(p.net.config.GetVersionTimeout)
 	defer finishHandshakeTicker.Stop()
 
 	for {
@@ -258,7 +258,7 @@ func (p *peer) ReadMessages() {
 		msgLen := binary.BigEndian.Uint32(msgLenBytes)
 
 		// Make sure the message length is valid.
-		if int64(msgLen) > p.net.maxMessageSize {
+		if int64(msgLen) > int64(constants.DefaultMaxMessageSize) {
 			p.net.log.Verbo("too large message length %d from %s%s at %s", msgLen, constants.NodeIDPrefix, p.nodeID, p.getIP())
 			return
 		}
@@ -410,7 +410,7 @@ func (p *peer) handle(msg message.Message, onFinishedHandling func()) {
 	msgLen := uint64(len(msg.Bytes()))
 
 	op := msg.Op()
-	msgMetrics := p.net.message(op)
+	msgMetrics := p.net.metrics.message(op)
 	if msgMetrics == nil {
 		p.net.log.Error("dropping an unknown message from %s%s at %s with op %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), op)
 		onFinishedHandling()
@@ -551,16 +551,16 @@ func (p *peer) sendGetVersion() {
 // assumes the [stateLock] is not held
 func (p *peer) sendVersion() {
 	p.net.stateLock.RLock()
-	myIP := p.net.ip.IP()
+	myIP := p.net.currentIP.IP()
 	myVersionTime, myVersionSig, err := p.net.getVersion(myIP)
 	if err != nil {
 		p.net.stateLock.RUnlock()
 		return
 	}
-	whitelistedSubnets := p.net.whitelistedSubnets
+	whitelistedSubnets := p.net.config.WhitelistedSubnets
 	msg, err := p.net.b.Version(
-		p.net.networkID,
-		p.net.nodeID,
+		p.net.config.NetworkID,
+		p.net.dummyNodeID,
 		p.net.clock.Unix(),
 		myIP,
 		p.net.versionCompatibility.Version().String(),
@@ -596,15 +596,15 @@ func (p *peer) sendGetPeerList() {
 	lenMsg := len(msg.Bytes())
 	sent := p.Send(msg, true)
 	if sent {
-		p.net.getPeerlist.numSent.Inc()
-		p.net.getPeerlist.sentBytes.Add(float64(lenMsg))
+		p.net.metrics.getPeerlist.numSent.Inc()
+		p.net.metrics.getPeerlist.sentBytes.Add(float64(lenMsg))
 		// assume that if [saved] == 0, [msg] wasn't compressed
 		if saved := msg.BytesSavedCompression(); saved != 0 {
 			p.net.metrics.getPeerlist.savedSentBytes.Observe(float64(saved))
 		}
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
 	} else {
-		p.net.getPeerlist.numFailed.Inc()
+		p.net.metrics.getPeerlist.numFailed.Inc()
 		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
 	}
 }
@@ -616,9 +616,7 @@ func (p *peer) sendPeerList() {
 		return
 	}
 
-	// Compress this message only if the peer can handle compressed
-	// messages and we have compression enabled
-	msg, err := p.net.b.PeerList(peers, p.net.compressionEnabled)
+	msg, err := p.net.b.PeerList(peers, p.net.config.CompressionEnabled)
 	if err != nil {
 		p.net.log.Warn("failed to send PeerList to %s%s at %s: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
 		return
@@ -627,8 +625,8 @@ func (p *peer) sendPeerList() {
 	lenMsg := len(msg.Bytes())
 	sent := p.Send(msg, true)
 	if sent {
-		p.net.peerList.numSent.Inc()
-		p.net.peerList.sentBytes.Add(float64(lenMsg))
+		p.net.metrics.peerList.numSent.Inc()
+		p.net.metrics.peerList.sentBytes.Add(float64(lenMsg))
 		// assume that if [saved] == 0, [msg] wasn't compressed
 		if saved := msg.BytesSavedCompression(); saved != 0 {
 			p.net.metrics.peerList.savedSentBytes.Observe(float64(saved))
@@ -636,7 +634,7 @@ func (p *peer) sendPeerList() {
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
 		p.peerListSent.SetValue(true)
 	} else {
-		p.net.peerList.numFailed.Inc()
+		p.net.metrics.peerList.numFailed.Inc()
 		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
 	}
 }
@@ -648,15 +646,15 @@ func (p *peer) sendPing() {
 	lenMsg := len(msg.Bytes())
 	sent := p.Send(msg, true)
 	if sent {
-		p.net.ping.numSent.Inc()
-		p.net.ping.sentBytes.Add(float64(lenMsg))
+		p.net.metrics.ping.numSent.Inc()
+		p.net.metrics.ping.sentBytes.Add(float64(lenMsg))
 		// assume that if [saved] == 0, [msg] wasn't compressed
 		if saved := msg.BytesSavedCompression(); saved != 0 {
 			p.net.metrics.ping.savedSentBytes.Observe(float64(saved))
 		}
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
 	} else {
-		p.net.ping.numFailed.Inc()
+		p.net.metrics.ping.numFailed.Inc()
 		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
 	}
 }
@@ -668,15 +666,15 @@ func (p *peer) sendPong() {
 	lenMsg := len(msg.Bytes())
 	sent := p.Send(msg, true)
 	if sent {
-		p.net.pong.numSent.Inc()
-		p.net.pong.sentBytes.Add(float64(lenMsg))
+		p.net.metrics.pong.numSent.Inc()
+		p.net.metrics.pong.sentBytes.Add(float64(lenMsg))
 		// assume that if [saved] == 0, [msg] wasn't compressed
 		if saved := msg.BytesSavedCompression(); saved != 0 {
 			p.net.metrics.pong.savedSentBytes.Observe(float64(saved))
 		}
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
 	} else {
-		p.net.pong.numFailed.Inc()
+		p.net.metrics.pong.numFailed.Inc()
 		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
 	}
 }
@@ -694,14 +692,14 @@ func (p *peer) handleVersion(msg message.Message) {
 	case p.gotVersion.GetValue():
 		p.net.log.Verbo("dropping duplicated version message from %s%s at %s", constants.NodeIDPrefix, p.nodeID, p.getIP())
 		return
-	case msg.Get(message.NodeID).(uint32) == p.net.nodeID:
+	case msg.Get(message.NodeID).(uint32) == p.net.dummyNodeID:
 		p.net.log.Debug("peer at %s has same node ID as me", p.getIP())
 		p.discardMyIP()
 		return
-	case msg.Get(message.NetworkID).(uint32) != p.net.networkID:
+	case msg.Get(message.NetworkID).(uint32) != p.net.config.NetworkID:
 		p.net.log.Debug(
 			"network ID of %s%s at %s (%d) doesn't match our's (%d)",
-			constants.NodeIDPrefix, p.nodeID, p.getIP(), msg.Get(message.NetworkID).(uint32), p.net.networkID,
+			constants.NodeIDPrefix, p.nodeID, p.getIP(), msg.Get(message.NetworkID).(uint32), p.net.config.NetworkID,
 		)
 		p.discardIP()
 		return
@@ -710,8 +708,8 @@ func (p *peer) handleVersion(msg message.Message) {
 	}
 	myTime := float64(p.net.clock.Unix())
 	peerTime := float64(msg.Get(message.MyTime).(uint64))
-	if math.Abs(peerTime-myTime) > p.net.maxClockDifference.Seconds() {
-		if p.net.beacons.Contains(p.nodeID) {
+	if math.Abs(peerTime-myTime) > p.net.config.MaxClockDifference.Seconds() {
+		if p.net.config.Beacons.Contains(p.nodeID) {
 			p.net.log.Warn(
 				"beacon %s%s at %s reports time (%d) that is too far out of sync with our's (%d)",
 				constants.NodeIDPrefix, p.nodeID, p.getIP(), uint64(peerTime), uint64(myTime),
@@ -736,7 +734,7 @@ func (p *peer) handleVersion(msg message.Message) {
 	}
 
 	if p.net.versionCompatibility.Version().Before(peerVersion) {
-		if p.net.beacons.Contains(p.nodeID) {
+		if p.net.config.Beacons.Contains(p.nodeID) {
 			p.net.log.Info(
 				"beacon %s%s at %s attempting to connect with newer version %s. You may want to update your client",
 				constants.NodeIDPrefix, p.nodeID, p.getIP(), peerVersion,
@@ -765,7 +763,7 @@ func (p *peer) handleVersion(msg message.Message) {
 		p.discardIP()
 		return
 	}
-	if float64(versionTime)-myTime > p.net.maxClockDifference.Seconds() {
+	if float64(versionTime)-myTime > p.net.config.MaxClockDifference.Seconds() {
 		p.net.log.Debug(
 			"peer %s%s at %s attempting to connect with version timestamp (%d) too far in the future",
 			constants.NodeIDPrefix, p.nodeID, p.getIP(), latestPeerIP.time,
@@ -784,7 +782,7 @@ func (p *peer) handleVersion(msg message.Message) {
 			return
 		}
 		// add only if we also track this subnet
-		if p.net.whitelistedSubnets.Contains(subnetID) {
+		if p.net.config.WhitelistedSubnets.Contains(subnetID) {
 			p.trackedSubnets.Add(subnetID)
 		}
 	}
@@ -843,21 +841,21 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 	defer p.net.stateLock.Unlock()
 
 	switch {
-	case peer.IPDesc.Equal(p.net.ip.IP()):
+	case peer.IPDesc.Equal(p.net.currentIP.IP()):
 		return
 	case peer.IPDesc.IsZero():
 		return
-	case !p.net.allowPrivateIPs && peer.IPDesc.IsPrivate():
+	case !p.net.config.AllowPrivateIPs && peer.IPDesc.IsPrivate():
 		return
 	}
 
-	if float64(peer.Time)-float64(p.net.clock.Unix()) > p.net.maxClockDifference.Seconds() {
+	if float64(peer.Time)-float64(p.net.clock.Unix()) > p.net.config.MaxClockDifference.Seconds() {
 		p.net.log.Debug("ignoring gossiped peer with version timestamp (%d) too far in the future", peer.Time)
 		return
 	}
 
 	nodeID := certToID(peer.Cert)
-	if !p.net.vdrs.Contains(nodeID) && !p.net.beacons.Contains(nodeID) {
+	if !p.net.config.Validators.Contains(nodeID) && !p.net.config.Beacons.Contains(nodeID) {
 		p.net.log.Verbo(
 			"not peering to %s at %s because they are not a validator or beacon",
 			nodeID.PrefixedString(constants.NodeIDPrefix), peer.IPDesc,
@@ -1335,13 +1333,13 @@ func (p *peer) addAlias(ip utils.IPDesc) {
 	p.net.peerAliasIPs[ip.String()] = struct{}{}
 	p.aliases = append(p.aliases, alias{
 		ip:     ip,
-		expiry: p.net.clock.Time().Add(p.net.peerAliasTimeout),
+		expiry: p.net.clock.Time().Add(p.net.config.PeerAliasTimeout),
 	})
 
 	// Set the [aliasTimer] if this ip is the first alias we put
 	// in [aliases].
 	if len(p.aliases) == 1 {
-		p.aliasTimer.SetTimeoutIn(p.net.peerAliasTimeout)
+		p.aliasTimer.SetTimeoutIn(p.net.config.PeerAliasTimeout)
 	}
 }
 
@@ -1406,7 +1404,7 @@ func (p *peer) releaseAllAliases() {
 }
 
 func (p *peer) nextTimeout() time.Time {
-	return p.net.clock.Time().Add(p.net.pingPongTimeout)
+	return p.net.clock.Time().Add(p.net.config.PingPongTimeout)
 }
 
 func ipAndTimeBytes(ip utils.IPDesc, timestamp uint64) []byte {
