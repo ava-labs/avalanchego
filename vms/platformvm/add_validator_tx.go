@@ -27,6 +27,7 @@ var (
 	errStakeTooShort             = errors.New("staking period is too short")
 	errStakeTooLong              = errors.New("staking period is too long")
 	errInsufficientDelegationFee = errors.New("staker charges an insufficient delegation fee")
+	errFutureStakeTime           = fmt.Errorf("staker is attempting to start staking more than %s ahead of the current chain time", maxFutureStartTime)
 	errTooManyShares             = fmt.Errorf("a staker can only require at most %d shares from delegators", PercentDenominator)
 
 	_ UnsignedProposalTx = &UnsignedAddValidatorTx{}
@@ -120,6 +121,9 @@ func (tx *UnsignedAddValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 // Attempts to verify this transaction with the provided state.
 func (tx *UnsignedAddValidatorTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
 	_, _, _, _, err := tx.Execute(vm, parentState, stx)
+	if errors.Is(err, errFutureStakeTime) {
+		return nil
+	}
 	return err
 }
 
@@ -167,18 +171,11 @@ func (tx *UnsignedAddValidatorTx) Execute(
 	if vm.bootstrapped {
 		currentTimestamp := parentState.GetTimestamp()
 		// Ensure the proposed validator starts after the current time
-		if startTime := tx.StartTime(); !currentTimestamp.Before(startTime) {
+		startTime := tx.StartTime()
+		if !currentTimestamp.Before(startTime) {
 			return nil, nil, nil, nil, permError{
 				fmt.Errorf(
 					"validator's start time (%s) at or before current timestamp (%s)",
-					startTime,
-					currentTimestamp,
-				),
-			}
-		} else if startTime.After(currentTimestamp.Add(maxFutureStartTime)) {
-			return nil, nil, nil, nil, permError{
-				fmt.Errorf(
-					"validator start time (%s) more than two weeks after current chain timestamp (%s)",
 					startTime,
 					currentTimestamp,
 				),
@@ -237,6 +234,14 @@ func (tx *UnsignedAddValidatorTx) Execute(
 					fmt.Errorf("failed semanticVerifySpend: %w", err),
 				}
 			}
+		}
+
+		// Make sure the tx doesn't start too far in the future. This is done
+		// last to allow SemanticVerification to explicitly check for this
+		// error.
+		maxStartTime := currentTimestamp.Add(maxFutureStartTime)
+		if startTime.After(maxStartTime) {
+			return nil, nil, nil, nil, permError{errFutureStakeTime}
 		}
 	}
 
