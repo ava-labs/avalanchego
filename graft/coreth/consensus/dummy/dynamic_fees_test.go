@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/stretchr/testify/assert"
 )
 
 func testRollup(t *testing.T, longs []uint64, roll int) {
@@ -92,8 +93,9 @@ func TestRollupWindow(t *testing.T) {
 }
 
 type blockDefinition struct {
-	timestamp uint64
-	gasUsed   uint64
+	timestamp      uint64
+	gasUsed        uint64
+	extDataGasUsed *big.Int
 }
 
 type test struct {
@@ -201,7 +203,7 @@ func testDynamicFeesStaysWithinRange(t *testing.T, test test) {
 	}
 
 	for index, block := range blocks[1:] {
-		nextExtraData, nextBaseFee, err := CalcBaseFee(params.TestChainConfig, header, block.timestamp)
+		nextExtraData, nextBaseFee, err := CalcBaseFee(params.TestApricotPhase3Config, header, block.timestamp)
 		if err != nil {
 			t.Fatalf("Failed to calculate base fee at index %d: %s", index, err)
 		}
@@ -313,6 +315,224 @@ func TestSelectBigWithinBounds(t *testing.T) {
 			if v.Cmp(test.expected) != 0 {
 				t.Fatalf("Expected (%d), found (%d)", test.expected, v)
 			}
+		})
+	}
+}
+
+// TestCalcBaseFeeAP4 confirms that the inclusion of ExtDataGasUsage increases
+// the base fee.
+func TestCalcBaseFeeAP4(t *testing.T) {
+	events := []struct {
+		block             blockDefinition
+		extDataFeeGreater bool
+	}{
+		{
+			block: blockDefinition{
+				timestamp:      1,
+				gasUsed:        1_000_000,
+				extDataGasUsed: big.NewInt(100_000),
+			},
+		},
+		{
+			block: blockDefinition{
+				timestamp:      3,
+				gasUsed:        1_000_000,
+				extDataGasUsed: big.NewInt(10_000),
+			},
+			extDataFeeGreater: true,
+		},
+		{
+			block: blockDefinition{
+				timestamp:      5,
+				gasUsed:        2_000_000,
+				extDataGasUsed: big.NewInt(50_000),
+			},
+			extDataFeeGreater: true,
+		},
+		{
+			block: blockDefinition{
+				timestamp:      5,
+				gasUsed:        6_000_000,
+				extDataGasUsed: big.NewInt(50_000),
+			},
+			extDataFeeGreater: true,
+		},
+		{
+			block: blockDefinition{
+				timestamp:      7,
+				gasUsed:        6_000_000,
+				extDataGasUsed: big.NewInt(0),
+			},
+			extDataFeeGreater: true,
+		},
+		{
+			block: blockDefinition{
+				timestamp:      1000,
+				gasUsed:        6_000_000,
+				extDataGasUsed: big.NewInt(0),
+			},
+		},
+		{
+			block: blockDefinition{
+				timestamp:      1001,
+				gasUsed:        6_000_000,
+				extDataGasUsed: big.NewInt(10_000),
+			},
+		},
+		{
+			block: blockDefinition{
+				timestamp:      1002,
+				gasUsed:        6_000_000,
+				extDataGasUsed: big.NewInt(0),
+			},
+			extDataFeeGreater: true,
+		},
+	}
+
+	header := &types.Header{
+		Time:    0,
+		GasUsed: 1_000_000,
+		Number:  big.NewInt(0),
+		BaseFee: big.NewInt(225 * params.GWei),
+		Extra:   nil,
+	}
+	extDataHeader := &types.Header{
+		Time:    0,
+		GasUsed: 1_000_000,
+		Number:  big.NewInt(0),
+		BaseFee: big.NewInt(225 * params.GWei),
+		Extra:   nil,
+		// ExtDataGasUsage is set to be nil to ensure CalcBaseFee can handle the
+		// AP3/AP4 boundary.
+	}
+
+	for index, event := range events {
+		block := event.block
+		nextExtraData, nextBaseFee, err := CalcBaseFee(params.TestApricotPhase4Config, header, block.timestamp)
+		assert.NoError(t, err)
+		log.Info("Update", "baseFee", nextBaseFee)
+		header = &types.Header{
+			Time:    block.timestamp,
+			GasUsed: block.gasUsed,
+			Number:  big.NewInt(int64(index) + 1),
+			BaseFee: nextBaseFee,
+			Extra:   nextExtraData,
+		}
+
+		nextExtraData, nextBaseFee, err = CalcBaseFee(params.TestApricotPhase4Config, extDataHeader, block.timestamp)
+		assert.NoError(t, err)
+		log.Info("Update", "baseFee (w/extData)", nextBaseFee)
+		extDataHeader = &types.Header{
+			Time:           block.timestamp,
+			GasUsed:        block.gasUsed,
+			Number:         big.NewInt(int64(index) + 1),
+			BaseFee:        nextBaseFee,
+			Extra:          nextExtraData,
+			ExtDataGasUsed: block.extDataGasUsed,
+		}
+
+		assert.Equal(t, event.extDataFeeGreater, extDataHeader.BaseFee.Cmp(header.BaseFee) == 1, "unexpected cmp for index %d", index)
+	}
+}
+
+func TestCalcBlockGasCost(t *testing.T) {
+	tests := map[string]struct {
+		parentBlockGasCost      *big.Int
+		parentTime, currentTime uint64
+
+		expected *big.Int
+	}{
+		"Nil parentBlockGasCost": {
+			parentBlockGasCost: nil,
+			parentTime:         1,
+			currentTime:        1,
+			expected:           ApricotPhase4MinBlockGasCost,
+		},
+		"Same timestamp from 0": {
+			parentBlockGasCost: big.NewInt(0),
+			parentTime:         1,
+			currentTime:        1,
+			expected:           big.NewInt(100_000),
+		},
+		"1s from 0": {
+			parentBlockGasCost: big.NewInt(0),
+			parentTime:         1,
+			currentTime:        2,
+			expected:           big.NewInt(50_000),
+		},
+		"Same timestamp from non-zero": {
+			parentBlockGasCost: big.NewInt(50_000),
+			parentTime:         1,
+			currentTime:        1,
+			expected:           big.NewInt(150_000),
+		},
+		"0s Difference (MAX)": {
+			parentBlockGasCost: big.NewInt(1_000_000),
+			parentTime:         1,
+			currentTime:        1,
+			expected:           big.NewInt(1_000_000),
+		},
+		"1s Difference (MAX)": {
+			parentBlockGasCost: big.NewInt(1_000_000),
+			parentTime:         1,
+			currentTime:        2,
+			expected:           big.NewInt(1_000_000),
+		},
+		"2s Difference": {
+			parentBlockGasCost: big.NewInt(900_000),
+			parentTime:         1,
+			currentTime:        3,
+			expected:           big.NewInt(900_000),
+		},
+		"3s Difference": {
+			parentBlockGasCost: big.NewInt(1_000_000),
+			parentTime:         1,
+			currentTime:        4,
+			expected:           big.NewInt(950_000),
+		},
+		"10s Difference": {
+			parentBlockGasCost: big.NewInt(1_000_000),
+			parentTime:         1,
+			currentTime:        11,
+			expected:           big.NewInt(600_000),
+		},
+		"20s Difference": {
+			parentBlockGasCost: big.NewInt(1_000_000),
+			parentTime:         1,
+			currentTime:        21,
+			expected:           big.NewInt(100_000),
+		},
+		"22s Difference": {
+			parentBlockGasCost: big.NewInt(1_000_000),
+			parentTime:         1,
+			currentTime:        23,
+			expected:           big.NewInt(0),
+		},
+		"23s Difference": {
+			parentBlockGasCost: big.NewInt(1_000_000),
+			parentTime:         1,
+			currentTime:        24,
+			expected:           big.NewInt(0),
+		},
+		"-1s Difference": {
+			parentBlockGasCost: big.NewInt(50_000),
+			parentTime:         1,
+			currentTime:        0,
+			expected:           big.NewInt(150_000),
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Zero(t, test.expected.Cmp(calcBlockGasCost(
+				ApricotPhase4TargetBlockRate,
+				ApricotPhase4MinBlockGasCost,
+				ApricotPhase4MaxBlockGasCost,
+				ApricotPhase4BlockGasCostStep,
+				test.parentBlockGasCost,
+				test.parentTime,
+				test.currentTime,
+			)))
 		})
 	}
 }

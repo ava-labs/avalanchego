@@ -143,7 +143,7 @@ func (b *SimulatedBackend) Rollback() {
 }
 
 func (b *SimulatedBackend) rollback(parent *types.Block) {
-	blocks, _ := core.GenerateChain(b.config, parent, dummy.NewFaker(), b.database, 1, func(int, *core.BlockGen) {})
+	blocks, _, _ := core.GenerateChain(b.config, parent, dummy.NewFaker(), b.database, 1, 10, func(int, *core.BlockGen) {})
 
 	b.pendingBlock = blocks[0]
 	b.pendingState, _ = state.New(b.pendingBlock.Root(), b.blockchain.StateCache(), nil)
@@ -671,7 +671,7 @@ func (b *SimulatedBackend) SendTransaction(ctx context.Context, tx *types.Transa
 		panic(fmt.Errorf("invalid transaction nonce: got %d, want %d", tx.Nonce(), nonce))
 	}
 	// Include tx in chain
-	blocks, _ := core.GenerateChain(b.config, block, dummy.NewFaker(), b.database, 1, func(number int, block *core.BlockGen) {
+	blocks, _, _ := core.GenerateChain(b.config, block, dummy.NewFaker(), b.database, 1, 10, func(number int, block *core.BlockGen) {
 		for _, tx := range b.pendingBlock.Transactions() {
 			block.AddTxWithChain(b.blockchain, tx)
 		}
@@ -789,7 +789,7 @@ func (b *SimulatedBackend) AdjustTime(adjustment time.Duration) error {
 		return errors.New("Could not adjust time on non-empty block")
 	}
 
-	blocks, _ := core.GenerateChain(b.config, b.blockchain.CurrentBlock(), dummy.NewFaker(), b.database, 1, func(number int, block *core.BlockGen) {
+	blocks, _, _ := core.GenerateChain(b.config, b.blockchain.CurrentBlock(), dummy.NewFaker(), b.database, 1, 10, func(number int, block *core.BlockGen) {
 		block.OffsetTime(int64(adjustment.Seconds()))
 	})
 	stateDB, _ := b.blockchain.State()
