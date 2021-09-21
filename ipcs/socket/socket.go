@@ -20,7 +20,7 @@ import (
 
 // ErrMessageTooLarge is returned when reading a message that is larger than
 // our max size
-var ErrMessageTooLarge = errors.New("message to large")
+var ErrMessageTooLarge = errors.New("message too large")
 
 // Socket manages sending messages over a socket to many subscribed clients
 type Socket struct {
