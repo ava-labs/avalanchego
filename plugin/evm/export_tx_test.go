@@ -173,9 +173,9 @@ func TestExportTxGasCost(t *testing.T) {
 		UnsignedExportTx *UnsignedExportTx
 		Keys             [][]*crypto.PrivateKeySECP256K1R
 
-		BaseFee      *big.Int
-		ExpectedCost uint64
-		ExpectedFee  uint64
+		BaseFee         *big.Int
+		ExpectedGasUsed uint64
+		ExpectedFee     uint64
 	}{
 		"simple export 1wei BaseFee": {
 			UnsignedExportTx: &UnsignedExportTx{
@@ -204,10 +204,10 @@ func TestExportTxGasCost(t *testing.T) {
 					},
 				},
 			},
-			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
-			ExpectedCost: 1230,
-			ExpectedFee:  1,
-			BaseFee:      big.NewInt(1),
+			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
+			ExpectedGasUsed: 1230,
+			ExpectedFee:     1,
+			BaseFee:         big.NewInt(1),
 		},
 		"simple export 25Gwei BaseFee": {
 			UnsignedExportTx: &UnsignedExportTx{
@@ -236,10 +236,10 @@ func TestExportTxGasCost(t *testing.T) {
 					},
 				},
 			},
-			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
-			ExpectedCost: 1230,
-			ExpectedFee:  30750,
-			BaseFee:      big.NewInt(25 * params.GWei),
+			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
+			ExpectedGasUsed: 1230,
+			ExpectedFee:     30750,
+			BaseFee:         big.NewInt(25 * params.GWei),
 		},
 		"simple export 225Gwei BaseFee": {
 			UnsignedExportTx: &UnsignedExportTx{
@@ -268,10 +268,10 @@ func TestExportTxGasCost(t *testing.T) {
 					},
 				},
 			},
-			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
-			ExpectedCost: 1230,
-			ExpectedFee:  276750,
-			BaseFee:      big.NewInt(225 * params.GWei),
+			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
+			ExpectedGasUsed: 1230,
+			ExpectedFee:     276750,
+			BaseFee:         big.NewInt(225 * params.GWei),
 		},
 		"complex export 25Gwei BaseFee": {
 			UnsignedExportTx: &UnsignedExportTx{
@@ -312,10 +312,10 @@ func TestExportTxGasCost(t *testing.T) {
 					},
 				},
 			},
-			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0], testKeys[0], testKeys[0]}},
-			ExpectedCost: 3366,
-			ExpectedFee:  84150,
-			BaseFee:      big.NewInt(25 * params.GWei),
+			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0], testKeys[0], testKeys[0]}},
+			ExpectedGasUsed: 3366,
+			ExpectedFee:     84150,
+			BaseFee:         big.NewInt(25 * params.GWei),
 		},
 		"complex export 225Gwei BaseFee": {
 			UnsignedExportTx: &UnsignedExportTx{
@@ -356,10 +356,10 @@ func TestExportTxGasCost(t *testing.T) {
 					},
 				},
 			},
-			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0], testKeys[0], testKeys[0]}},
-			ExpectedCost: 3366,
-			ExpectedFee:  757350,
-			BaseFee:      big.NewInt(225 * params.GWei),
+			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0], testKeys[0], testKeys[0]}},
+			ExpectedGasUsed: 3366,
+			ExpectedFee:     757350,
+			BaseFee:         big.NewInt(225 * params.GWei),
 		},
 	}
 
@@ -372,15 +372,15 @@ func TestExportTxGasCost(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			cost, err := tx.Cost()
+			gasUsed, err := tx.GasUsed()
 			if err != nil {
 				t.Fatal(err)
 			}
-			if cost != test.ExpectedCost {
-				t.Fatalf("Expected cost to be %d, but found %d", test.ExpectedCost, cost)
+			if gasUsed != test.ExpectedGasUsed {
+				t.Fatalf("Expected gasUsed to be %d, but found %d", test.ExpectedGasUsed, gasUsed)
 			}
 
-			fee, err := calculateDynamicFee(cost, test.BaseFee)
+			fee, err := calculateDynamicFee(gasUsed, test.BaseFee)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -422,10 +422,16 @@ func TestNewExportTx(t *testing.T) {
 			rules:   apricotRulesPhase3,
 			bal:     44446500,
 		},
+		{
+			name:    "apricot phase 4",
+			genesis: genesisJSONApricotPhase4,
+			rules:   apricotRulesPhase4,
+			bal:     44446500,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			issuer, vm, _, sharedMemory := GenesisVM(t, true, test.genesis, "", "")
+			issuer, vm, _, sharedMemory, _ := GenesisVM(t, true, test.genesis, "", "")
 
 			defer func() {
 				if err := vm.Shutdown(); err != nil {
@@ -477,7 +483,7 @@ func TestNewExportTx(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if err := vm.issueTx(tx); err != nil {
+			if err := vm.issueTx(tx, true /*=local*/); err != nil {
 				t.Fatal(err)
 			}
 

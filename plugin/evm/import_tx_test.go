@@ -161,7 +161,7 @@ func TestImportTxVerify(t *testing.T) {
 }
 
 func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
-	_, vm, _, sharedMemory := GenesisVM(t, false, genesisJSONApricotPhase0, "", "")
+	_, vm, _, sharedMemory, _ := GenesisVM(t, false, genesisJSONApricotPhase0, "", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -341,7 +341,7 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 }
 
 func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
-	_, vm, _, sharedMemory := GenesisVM(t, false, genesisJSONApricotPhase2, "", "")
+	_, vm, _, sharedMemory, _ := GenesisVM(t, false, genesisJSONApricotPhase2, "", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -570,7 +570,7 @@ func TestNewImportTx(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, vm, _, sharedMemory := GenesisVM(t, true, test.genesis, "", "")
+			_, vm, _, sharedMemory, _ := GenesisVM(t, true, test.genesis, "", "")
 
 			defer func() {
 				if err := vm.Shutdown(); err != nil {
@@ -667,9 +667,9 @@ func TestImportTxGasCost(t *testing.T) {
 		UnsignedImportTx *UnsignedImportTx
 		Keys             [][]*crypto.PrivateKeySECP256K1R
 
-		ExpectedCost uint64
-		ExpectedFee  uint64
-		BaseFee      *big.Int
+		ExpectedGasUsed uint64
+		ExpectedFee     uint64
+		BaseFee         *big.Int
 	}{
 		"simple import": {
 			UnsignedImportTx: &UnsignedImportTx{
@@ -697,10 +697,10 @@ func TestImportTxGasCost(t *testing.T) {
 					AssetID: avaxAssetID,
 				}},
 			},
-			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
-			ExpectedCost: 1230,
-			ExpectedFee:  30750,
-			BaseFee:      big.NewInt(25 * params.GWei),
+			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
+			ExpectedGasUsed: 1230,
+			ExpectedFee:     30750,
+			BaseFee:         big.NewInt(25 * params.GWei),
 		},
 		"simple import 1wei": {
 			UnsignedImportTx: &UnsignedImportTx{
@@ -728,10 +728,10 @@ func TestImportTxGasCost(t *testing.T) {
 					AssetID: avaxAssetID,
 				}},
 			},
-			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
-			ExpectedCost: 1230,
-			ExpectedFee:  1,
-			BaseFee:      big.NewInt(1),
+			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
+			ExpectedGasUsed: 1230,
+			ExpectedFee:     1,
+			BaseFee:         big.NewInt(1),
 		},
 		"simple ANT import": {
 			UnsignedImportTx: &UnsignedImportTx{
@@ -778,10 +778,10 @@ func TestImportTxGasCost(t *testing.T) {
 					},
 				},
 			},
-			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}, {testKeys[0]}},
-			ExpectedCost: 2318,
-			ExpectedFee:  57950,
-			BaseFee:      big.NewInt(25 * params.GWei),
+			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}, {testKeys[0]}},
+			ExpectedGasUsed: 2318,
+			ExpectedFee:     57950,
+			BaseFee:         big.NewInt(25 * params.GWei),
 		},
 		"complex ANT import": {
 			UnsignedImportTx: &UnsignedImportTx{
@@ -833,10 +833,10 @@ func TestImportTxGasCost(t *testing.T) {
 					},
 				},
 			},
-			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}, {testKeys[0]}},
-			ExpectedCost: 2378,
-			ExpectedFee:  59450,
-			BaseFee:      big.NewInt(25 * params.GWei),
+			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}, {testKeys[0]}},
+			ExpectedGasUsed: 2378,
+			ExpectedFee:     59450,
+			BaseFee:         big.NewInt(25 * params.GWei),
 		},
 		"multisig import": {
 			UnsignedImportTx: &UnsignedImportTx{
@@ -864,10 +864,10 @@ func TestImportTxGasCost(t *testing.T) {
 					AssetID: avaxAssetID,
 				}},
 			},
-			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0], testKeys[1]}},
-			ExpectedCost: 2234,
-			ExpectedFee:  55850,
-			BaseFee:      big.NewInt(25 * params.GWei),
+			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0], testKeys[1]}},
+			ExpectedGasUsed: 2234,
+			ExpectedFee:     55850,
+			BaseFee:         big.NewInt(25 * params.GWei),
 		},
 		"large import": {
 			UnsignedImportTx: &UnsignedImportTx{
@@ -1046,9 +1046,9 @@ func TestImportTxGasCost(t *testing.T) {
 				{testKeys[0]},
 				{testKeys[0]},
 			},
-			ExpectedCost: 11022,
-			ExpectedFee:  275550,
-			BaseFee:      big.NewInt(25 * params.GWei),
+			ExpectedGasUsed: 11022,
+			ExpectedFee:     275550,
+			BaseFee:         big.NewInt(25 * params.GWei),
 		},
 	}
 
@@ -1061,15 +1061,15 @@ func TestImportTxGasCost(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			cost, err := tx.Cost()
+			gasUsed, err := tx.GasUsed()
 			if err != nil {
 				t.Fatal(err)
 			}
-			if cost != test.ExpectedCost {
-				t.Fatalf("Expected cost to be %d, but found %d", test.ExpectedCost, cost)
+			if gasUsed != test.ExpectedGasUsed {
+				t.Fatalf("Expected gasUsed to be %d, but found %d", test.ExpectedGasUsed, gasUsed)
 			}
 
-			fee, err := calculateDynamicFee(cost, test.BaseFee)
+			fee, err := calculateDynamicFee(gasUsed, test.BaseFee)
 			if err != nil {
 				t.Fatal(err)
 			}
