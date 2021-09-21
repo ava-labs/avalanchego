@@ -4,15 +4,16 @@
 package galiasreader
 
 import (
-	"context"
-	"log"
 	"net"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/ids/galiasreader/galiasreaderproto"
+	"golang.org/x/net/context"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/ids/galiasreader/galiasreaderproto"
 )
 
 const (
@@ -27,7 +28,7 @@ func TestInterface(t *testing.T) {
 		galiasreaderproto.RegisterAliasReaderServer(server, NewServer(w))
 		go func() {
 			if err := server.Serve(listener); err != nil {
-				log.Fatalf("Server exited with error: %v", err)
+				t.Logf("Server exited with error: %v", err)
 			}
 		}()
 
