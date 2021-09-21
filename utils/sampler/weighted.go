@@ -27,3 +27,7 @@ func NewWeighted() Weighted {
 		benchmarkIterations: 100,
 	}
 }
+
+func NewDeterministicWeighted() Weighted {
+	return &weightedHeap{}
+}

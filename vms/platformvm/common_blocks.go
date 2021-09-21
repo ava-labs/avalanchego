@@ -6,6 +6,7 @@ package platformvm
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -130,11 +131,12 @@ type CommonBlock struct {
 	PrntID ids.ID `serialize:"true" json:"parentID"` // parent's ID
 	Hght   uint64 `serialize:"true" json:"height"`   // This block's height. The genesis block is at height 0.
 
-	self   Block // self is a reference to this block's implementing struct
-	id     ids.ID
-	bytes  []byte
-	status choices.Status
-	vm     *VM
+	self      Block // self is a reference to this block's implementing struct
+	id        ids.ID
+	bytes     []byte
+	timestamp time.Time // Time this block was proposed at
+	status    choices.Status
+	vm        *VM
 
 	// This block's children
 	children []Block
@@ -152,17 +154,28 @@ func (b *CommonBlock) initialize(vm *VM, bytes []byte, status choices.Status, se
 // ID returns the ID of this block
 func (b *CommonBlock) ID() ids.ID { return b.id }
 
-// Status returns the status of this block
+// Bytes returns the binary representation of this block
 func (b *CommonBlock) Bytes() []byte { return b.bytes }
 
 // Status returns the status of this block
 func (b *CommonBlock) Status() choices.Status { return b.status }
 
-// ParentID returns [b]'s parent's ID
+// Parent returns this block's parent's ID
 func (b *CommonBlock) Parent() ids.ID { return b.PrntID }
 
 // Height returns this block's height. The genesis block has height 0.
 func (b *CommonBlock) Height() uint64 { return b.Hght }
+
+// Timestamp returns this block's time.
+func (b *CommonBlock) Timestamp() time.Time {
+	// If this is the last accepted block and the block was loaded from disk
+	// since it was accepted, then the timestamp wouldn't be set correctly. So,
+	// we explicitly return the chain time.
+	if b.id == b.vm.lastAcceptedID {
+		return b.vm.internalState.GetTimestamp()
+	}
+	return b.timestamp
+}
 
 // Parent returns [b]'s parent
 func (b *CommonBlock) parentBlock() (Block, error) {
@@ -222,6 +235,7 @@ func (b *CommonBlock) Accept() error {
 	b.status = choices.Accepted
 	b.vm.internalState.AddBlock(b.self)
 	b.vm.internalState.SetLastAccepted(blkID)
+	b.vm.internalState.SetHeight(b.Hght)
 	b.vm.lastAcceptedID = blkID
 	return b.vm.metrics.AcceptBlock(b.self)
 }

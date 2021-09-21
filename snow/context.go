@@ -4,6 +4,8 @@
 package snow
 
 import (
+	"crypto"
+	"crypto/x509"
 	"sync"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
@@ -76,6 +79,11 @@ type Context struct {
 
 	// Indicates this chain is available to only validators.
 	validatorOnly utils.AtomicBool
+
+	// snowman++ attributes
+	ValidatorState    validators.State  // interface for P-Chain validators
+	StakingLeafSigner crypto.Signer     // block signer
+	StakingCertLeaf   *x509.Certificate // block certificate
 }
 
 // IsBootstrapped returns true iff this chain is done bootstrapping

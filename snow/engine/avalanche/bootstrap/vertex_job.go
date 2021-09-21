@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
+var errMissingVtxDependenciesOnAccept = errors.New("attempting to execute blocked vertex")
+
 type vtxParser struct {
 	log                     logging.Logger
 	numAccepted, numDropped prometheus.Counter
@@ -79,7 +81,7 @@ func (v *vertexJob) Execute() error {
 	}
 	if hasMissingDependencies {
 		v.numDropped.Inc()
-		return errors.New("attempting to execute blocked vertex")
+		return errMissingVtxDependenciesOnAccept
 	}
 	txs, err := v.vtx.Txs()
 	if err != nil {

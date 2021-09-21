@@ -5,6 +5,7 @@ package snowman
 
 import (
 	"sort"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -14,10 +15,11 @@ import (
 type TestBlock struct {
 	choices.TestDecidable
 
-	ParentV ids.ID
-	HeightV uint64
-	VerifyV error
-	BytesV  []byte
+	ParentV    ids.ID
+	HeightV    uint64
+	TimestampV time.Time
+	VerifyV    error
+	BytesV     []byte
 }
 
 // Parent implements the Block interface
@@ -25,6 +27,9 @@ func (b *TestBlock) Parent() ids.ID { return b.ParentV }
 
 // Height returns the height of the block
 func (b *TestBlock) Height() uint64 { return b.HeightV }
+
+// Timestamp returns the time of the block
+func (b *TestBlock) Timestamp() time.Time { return b.TimestampV }
 
 // Verify implements the Block interface
 func (b *TestBlock) Verify() error { return b.VerifyV }

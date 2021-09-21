@@ -1,10 +1,11 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
@@ -16,20 +17,41 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+type TimedTx interface {
+	ID() ids.ID
+	StartTime() time.Time
+	EndTime() time.Time
+	Weight() uint64
+	Bytes() []byte
+}
+
 // UnsignedTx is an unsigned transaction
 type UnsignedTx interface {
+	// TODO: Remove this initialization pattern from both the platformvm and the
+	// avm.
+	snow.ContextInitializable
+
 	Initialize(unsignedBytes, signedBytes []byte)
 	ID() ids.ID
 	UnsignedBytes() []byte
 	Bytes() []byte
+
+	// InputIDs returns the set of inputs this transaction consumes
+	InputIDs() ids.Set
+
+	// Attempts to verify this transaction without any provided state.
+	SyntacticVerify(ctx *snow.Context) error
+
+	// Attempts to verify this transaction with the provided state.
+	SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error
 }
 
 // UnsignedDecisionTx is an unsigned operation that can be immediately decided
 type UnsignedDecisionTx interface {
 	UnsignedTx
 
-	// Attempts to verify this transaction with the provided state.
-	SemanticVerify(vm *VM, vs VersionedState, stx *Tx) (
+	// Execute this transaction with the provided state.
+	Execute(vm *VM, vs VersionedState, stx *Tx) (
 		onAcceptFunc func() error,
 		err TxError,
 	)
@@ -40,7 +62,7 @@ type UnsignedProposalTx interface {
 	UnsignedTx
 
 	// Attempts to verify this transaction with the provided state.
-	SemanticVerify(vm *VM, state MutableState, stx *Tx) (
+	Execute(vm *VM, state MutableState, stx *Tx) (
 		onCommitState VersionedState,
 		onAbortState VersionedState,
 		onCommitFunc func() error,
@@ -56,8 +78,9 @@ type UnsignedAtomicTx interface {
 
 	// UTXOs this tx consumes
 	InputUTXOs() ids.Set
-	// Attempts to verify this transaction with the provided state.
-	SemanticVerify(vm *VM, parentState MutableState, stx *Tx) (VersionedState, TxError)
+
+	// Execute this transaction with the provided state.
+	Execute(vm *VM, parentState MutableState, stx *Tx) (VersionedState, TxError)
 
 	// Accept this transaction with the additionally provided state transitions.
 	Accept(ctx *snow.Context, batch database.Batch) error
@@ -74,7 +97,7 @@ type Tx struct {
 
 // Sign this transaction with the provided signers
 func (tx *Tx) Sign(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) error {
-	unsignedBytes, err := c.Marshal(codecVersion, &tx.UnsignedTx)
+	unsignedBytes, err := c.Marshal(CodecVersion, &tx.UnsignedTx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal UnsignedTx: %w", err)
 	}
@@ -95,7 +118,7 @@ func (tx *Tx) Sign(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) er
 		tx.Creds = append(tx.Creds, cred) // Attach credential
 	}
 
-	signedBytes, err := c.Marshal(codecVersion, tx)
+	signedBytes, err := c.Marshal(CodecVersion, tx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal ProposalTx: %w", err)
 	}

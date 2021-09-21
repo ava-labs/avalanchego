@@ -14,6 +14,7 @@ const (
 )
 
 var (
+	// DefaultVersion1_0_0 is a useful version to use in tests
 	DefaultVersion1_0_0 = NewDefaultVersion(1, 0, 0)
 
 	errDifferentMajor = errors.New("different major version")

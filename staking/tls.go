@@ -1,3 +1,6 @@
+// (c) 2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package staking
 
 import (
@@ -25,7 +28,7 @@ func InitNodeStakingKeyPair(keyPath, certPath string) error {
 		return nil
 	}
 
-	certBytes, keyBytes, err := newStakerKeys()
+	certBytes, keyBytes, err := NewCertAndKeyBytes()
 	if err != nil {
 		return err
 	}
@@ -65,7 +68,7 @@ func InitNodeStakingKeyPair(keyPath, certPath string) error {
 		return fmt.Errorf("couldn't close key file: %w", err)
 	}
 	if err := os.Chmod(keyPath, perms.ReadOnly); err != nil { // Make key read-only
-		return fmt.Errorf("couldn't change permissions on key")
+		return fmt.Errorf("couldn't change permissions on key: %w", err)
 	}
 
 	return nil
@@ -84,7 +87,7 @@ func LoadTLSCert(keyPath, certPath string) (*tls.Certificate, error) {
 }
 
 func NewTLSCert() (*tls.Certificate, error) {
-	certBytes, keyBytes, err := newStakerKeys()
+	certBytes, keyBytes, err := NewCertAndKeyBytes()
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +102,9 @@ func NewTLSCert() (*tls.Certificate, error) {
 	return &cert, nil
 }
 
-func newStakerKeys() ([]byte, []byte, error) {
+// Creates a new staking private key / staking certificate pair.
+// Returns the PEM byte representations of both.
+func NewCertAndKeyBytes() ([]byte, []byte, error) {
 	// Create key to sign cert with
 	key, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {

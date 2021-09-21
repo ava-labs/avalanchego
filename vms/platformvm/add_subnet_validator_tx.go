@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -50,15 +49,8 @@ func (tx *UnsignedAddSubnetValidatorTx) Weight() uint64 {
 	return tx.Validator.Weight()
 }
 
-// Verify return nil iff [tx] is valid
-func (tx *UnsignedAddSubnetValidatorTx) Verify(
-	ctx *snow.Context,
-	c codec.Manager,
-	feeAmount uint64,
-	feeAssetID ids.ID,
-	minStakeDuration time.Duration,
-	maxStakeDuration time.Duration,
-) error {
+// SyntacticVerify returns nil iff [tx] is valid
+func (tx *UnsignedAddSubnetValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
 		return errNilTx
@@ -66,15 +58,7 @@ func (tx *UnsignedAddSubnetValidatorTx) Verify(
 		return nil
 	}
 
-	duration := tx.Validator.Duration()
-	switch {
-	case duration < minStakeDuration: // Ensure staking length is not too short
-		return errStakeTooShort
-	case duration > maxStakeDuration: // Ensure staking length is not too long
-		return errStakeTooLong
-	}
-
-	if err := tx.BaseTx.Verify(ctx, c); err != nil {
+	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return err
 	}
 	if err := verify.All(&tx.Validator, tx.SubnetAuth); err != nil {
@@ -86,8 +70,19 @@ func (tx *UnsignedAddSubnetValidatorTx) Verify(
 	return nil
 }
 
-// SemanticVerify this transaction is valid.
-func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
+// Attempts to verify this transaction with the provided state.
+func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
+	_, _, _, _, err := tx.Execute(vm, parentState, stx)
+	// We ignore [errFutureStakeTime] here because an advanceTimeTx will be
+	// issued before this transaction is issued.
+	if errors.Is(err, errFutureStakeTime) {
+		return nil
+	}
+	return err
+}
+
+// Execute this transaction.
+func (tx *UnsignedAddSubnetValidatorTx) Execute(
 	vm *VM,
 	parentState MutableState,
 	stx *Tx,
@@ -98,19 +93,18 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 	func() error,
 	TxError,
 ) {
-	if err := tx.Verify(
-		vm.ctx,
-		vm.codec,
-		vm.TxFee,
-		vm.ctx.AVAXAssetID,
-		vm.MinStakeDuration,
-		vm.MaxStakeDuration,
-	); err != nil {
+	// Verify the tx is well-formed
+	if err := tx.SyntacticVerify(vm.ctx); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 
-	// Verify the tx is well-formed
-	if len(stx.Creds) == 0 {
+	duration := tx.Validator.Duration()
+	switch {
+	case duration < vm.MinStakeDuration: // Ensure staking length is not too short
+		return nil, nil, nil, nil, permError{errStakeTooShort}
+	case duration > vm.MaxStakeDuration: // Ensure staking length is not too long
+		return nil, nil, nil, nil, permError{errStakeTooLong}
+	case len(stx.Creds) == 0:
 		return nil, nil, nil, nil, permError{errWrongNumberOfCredentials}
 	}
 
@@ -120,20 +114,13 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 	if vm.bootstrapped {
 		currentTimestamp := parentState.GetTimestamp()
 		// Ensure the proposed validator starts after the current timestamp
-		if validatorStartTime := tx.StartTime(); !currentTimestamp.Before(validatorStartTime) {
+		validatorStartTime := tx.StartTime()
+		if !currentTimestamp.Before(validatorStartTime) {
 			return nil, nil, nil, nil, permError{
 				fmt.Errorf(
 					"validator's start time (%s) is at or after current chain timestamp (%s)",
 					currentTimestamp,
 					validatorStartTime,
-				),
-			}
-		} else if validatorStartTime.After(currentTimestamp.Add(maxFutureStartTime)) {
-			return nil, nil, nil, nil, permError{
-				fmt.Errorf(
-					"validator start time (%s) more than two weeks after current chain timestamp (%s)",
-					validatorStartTime,
-					currentTimestamp,
 				),
 			}
 		}
@@ -237,6 +224,14 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 		if err := vm.semanticVerifySpend(parentState, tx, tx.Ins, tx.Outs, baseTxCreds, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
 			return nil, nil, nil, nil, err
 		}
+
+		// Make sure the tx doesn't start too far in the future. This is done
+		// last to allow SemanticVerification to explicitly check for this
+		// error.
+		maxStartTime := currentTimestamp.Add(maxFutureStartTime)
+		if validatorStartTime.After(maxStartTime) {
+			return nil, nil, nil, nil, permError{errFutureStakeTime}
+		}
 	}
 
 	// Set up the state if this tx is committed
@@ -306,15 +301,8 @@ func (vm *VM) newAddSubnetValidatorTx(
 		SubnetAuth: subnetAuth,
 	}
 	tx := &Tx{UnsignedTx: utx}
-	if err := tx.Sign(vm.codec, signers); err != nil {
+	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(
-		vm.ctx,
-		vm.codec,
-		vm.TxFee,
-		vm.ctx.AVAXAssetID,
-		vm.MinStakeDuration,
-		vm.MaxStakeDuration,
-	)
+	return tx, utx.SyntacticVerify(vm.ctx)
 }

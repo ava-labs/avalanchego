@@ -133,6 +133,7 @@ func (vm *VM) Initialize(
 	configBytes []byte,
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
+	_ common.AppSender,
 ) error {
 	avmConfig := Config{}
 	if len(configBytes) > 0 {
@@ -491,7 +492,7 @@ func (vm *VM) FlushTxs() {
 		select {
 		case vm.toEngine <- common.PendingTxs:
 		default:
-			vm.ctx.Log.Warn("Delaying issuance of transactions due to contention")
+			vm.ctx.Log.Debug("dropping message to engine due to contention")
 			vm.timer.SetTimeoutIn(vm.batchTimeout)
 		}
 	}
@@ -1153,4 +1154,24 @@ func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
 		return assetID, nil
 	}
 	return ids.ID{}, fmt.Errorf("asset '%s' not found", asset)
+}
+
+// This VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+	return nil
+}
+
+// This VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	return nil
+}
+
+// This VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	return nil
+}
+
+// This VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
+	return nil
 }

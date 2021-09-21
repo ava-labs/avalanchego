@@ -15,18 +15,12 @@ import (
 	"syscall"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-)
-
-const (
-	// DefaultMaxMessageSize is the number of bytes to cap messages at by default
-	DefaultMaxMessageSize = 2 * units.MiB
 )
 
 // ErrMessageTooLarge is returned when reading a message that is larger than
 // our max size
-var ErrMessageTooLarge = errors.New("message to large")
+var ErrMessageTooLarge = errors.New("message too large")
 
 // Socket manages sending messages over a socket to many subscribed clients
 type Socket struct {
@@ -80,7 +74,7 @@ func (s *Socket) Listen() error {
 
 // Send writes the given message to all connection clients
 func (s *Socket) Send(msg []byte) {
-	var conns []net.Conn = nil
+	var conns []net.Conn
 
 	// Get a copy of connections
 	s.connLock.RLock()

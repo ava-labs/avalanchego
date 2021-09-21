@@ -1,8 +1,8 @@
 syntax = "proto3";
-
 package vmproto;
-
 option go_package = "github.com/ava-labs/avalanchego/vms/rpcchainvm/vmproto";
+import "google/protobuf/empty.proto";
+
 
 // To compile: protoc --go_out=plugins=grpc:. vm.proto
 
@@ -23,9 +23,11 @@ message InitializeRequest {
     uint32 sharedMemoryServer = 13;
     uint32 bcLookupServer = 14;
     uint32 snLookupServer = 15;
+    uint32 appSenderServer = 16;
 
-    bytes epochFirstTransition = 16;
-    uint64 EpochDuration = 17;
+    bytes epochFirstTransition = 17;
+    uint64 EpochDuration = 18;
+
 }
 
 message InitializeResponse {
@@ -34,6 +36,7 @@ message InitializeResponse {
     uint32 status = 3;
     uint64 height = 4;
     bytes bytes = 5;
+    bytes timestamp = 6;
 }
 
 message VersionedDBServer {
@@ -41,25 +44,9 @@ message VersionedDBServer {
     string version = 2;
 }
 
-message BootstrappingRequest {}
-
-message BootstrappingResponse {}
-
-message BootstrappedRequest {}
-
-message BootstrappedResponse {}
-
-message ShutdownRequest {}
-
-message ShutdownResponse {}
-
-message CreateHandlersRequest {}
-
 message CreateHandlersResponse {
     repeated Handler handlers = 1;
 }
-
-message CreateStaticHandlersRequest {}
 
 message CreateStaticHandlersResponse {
     repeated Handler handlers = 1;
@@ -71,13 +58,12 @@ message Handler {
     uint32 server = 3;
 }
 
-message BuildBlockRequest {}
-
 message BuildBlockResponse {
     bytes id = 1;
     bytes parentID = 2;
     bytes bytes = 3;
     uint64 height = 4;
+    bytes timestamp = 5;
     // status is always processing
 }
 
@@ -90,6 +76,7 @@ message ParseBlockResponse {
     bytes parentID = 2;
     uint32 status = 3;
     uint64 height = 4;
+    bytes timestamp = 5;
 }
 
 message GetBlockRequest {
@@ -101,59 +88,88 @@ message GetBlockResponse {
     bytes bytes = 2;
     uint32 status = 3;
     uint64 height = 4;
+    bytes timestamp = 5;
 }
 
 message SetPreferenceRequest {
     bytes id = 1;
 }
 
-message SetPreferenceResponse {}
-
 message BlockVerifyRequest {
     bytes bytes = 1;
 }
 
-message BlockVerifyResponse {}
+message BlockVerifyResponse {
+    bytes timestamp = 1;
+}
 
 message BlockAcceptRequest {
     bytes id = 1;
 }
 
-message BlockAcceptResponse {}
-
 message BlockRejectRequest {
     bytes id = 1;
 }
-
-message BlockRejectResponse {}
-
-message HealthRequest {}
 
 message HealthResponse {
     string details = 1;
 }
 
-message VersionRequest {}
-
 message VersionResponse {
     string version = 1;
 }
 
+message AppRequestMsg {
+    // The node that sent us this request
+    bytes nodeID = 1;
+    // The ID of this request
+    uint32 requestID = 2;
+    // The request body
+    bytes request = 3;
+}
+
+message AppRequestFailedMsg {
+    // The node that we failed to get a response from
+    bytes nodeID = 1;
+    // The ID of the request we sent and didn't get a response to
+    uint32 requestID = 2;
+}
+
+message AppResponseMsg {
+    // The node that we got a response from
+    bytes nodeID = 1;
+    // Request ID of request that this is in response to
+    uint32 requestID = 2;
+    // The response body
+    bytes response = 3;
+}
+
+message AppGossipMsg {
+    // The node that sent us a gossip message
+    bytes nodeID = 1;
+    // The message body
+    bytes msg = 2;
+}
+
 service VM {
     rpc Initialize(InitializeRequest) returns (InitializeResponse);
-    rpc Bootstrapping(BootstrappingRequest) returns (BootstrappingResponse);
-    rpc Bootstrapped(BootstrappedRequest) returns (BootstrappedResponse);
-    rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
-    rpc CreateHandlers(CreateHandlersRequest) returns (CreateHandlersResponse);
-    rpc CreateStaticHandlers(CreateStaticHandlersRequest) returns (CreateStaticHandlersResponse);
-    rpc BuildBlock(BuildBlockRequest) returns (BuildBlockResponse);
+    rpc Bootstrapping(google.protobuf.Empty) returns (google.protobuf.Empty);
+    rpc Bootstrapped(google.protobuf.Empty) returns (google.protobuf.Empty);
+    rpc Shutdown(google.protobuf.Empty) returns (google.protobuf.Empty);
+    rpc CreateHandlers(google.protobuf.Empty) returns (CreateHandlersResponse);
+    rpc CreateStaticHandlers(google.protobuf.Empty) returns (CreateStaticHandlersResponse);
+    rpc BuildBlock(google.protobuf.Empty) returns (BuildBlockResponse);
     rpc ParseBlock(ParseBlockRequest) returns (ParseBlockResponse);
     rpc GetBlock(GetBlockRequest) returns (GetBlockResponse);
-    rpc SetPreference(SetPreferenceRequest) returns (SetPreferenceResponse);
-    rpc Health(HealthRequest) returns (HealthResponse);
-    rpc Version(VersionRequest) returns (VersionResponse);
+    rpc SetPreference(SetPreferenceRequest) returns (google.protobuf.Empty);
+    rpc Health(google.protobuf.Empty) returns (HealthResponse);
+    rpc Version(google.protobuf.Empty) returns (VersionResponse);
+    rpc AppRequest(AppRequestMsg) returns (google.protobuf.Empty);
+    rpc AppRequestFailed(AppRequestFailedMsg) returns (google.protobuf.Empty);
+    rpc AppResponse(AppResponseMsg) returns (google.protobuf.Empty);
+    rpc AppGossip(AppGossipMsg) returns (google.protobuf.Empty);
 
     rpc BlockVerify(BlockVerifyRequest) returns (BlockVerifyResponse);
-    rpc BlockAccept(BlockAcceptRequest) returns (BlockAcceptResponse);
-    rpc BlockReject(BlockRejectRequest) returns (BlockRejectResponse);
+    rpc BlockAccept(BlockAcceptRequest) returns (google.protobuf.Empty);
+    rpc BlockReject(BlockRejectRequest) returns (google.protobuf.Empty);
 }

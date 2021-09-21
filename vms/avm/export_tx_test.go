@@ -1049,6 +1049,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 				},
 			},
 		},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1210,6 +1211,7 @@ func TestIssueExportTx(t *testing.T) {
 			ID: ids.Empty,
 			Fx: &secp256k1fx.Fx{},
 		}},
+		nil,
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -1346,6 +1348,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 			ID: ids.Empty,
 			Fx: &secp256k1fx.Fx{},
 		}},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)

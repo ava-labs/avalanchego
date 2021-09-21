@@ -23,12 +23,12 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	engine.ContextF = snow.DefaultContextTest
 	called := make(chan struct{})
 
-	engine.GetAcceptedFrontierF = func(validatorID ids.ShortID, requestID uint32) error {
+	engine.GetAcceptedFrontierF = func(nodeID ids.ShortID, requestID uint32) error {
 		t.Fatalf("GetAcceptedFrontier message should have timed out")
 		return nil
 	}
 
-	engine.GetAcceptedF = func(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+	engine.GetAcceptedF = func(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 		called <- struct{}{}
 		return nil
 	}
@@ -127,7 +127,7 @@ func TestHandlerDoesntDrop(t *testing.T) {
 
 	called := make(chan struct{}, 1)
 
-	engine.GetAcceptedFrontierF = func(validatorID ids.ShortID, requestID uint32) error {
+	engine.GetAcceptedFrontierF = func(nodeID ids.ShortID, requestID uint32) error {
 		called <- struct{}{}
 		return nil
 	}
@@ -164,7 +164,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	closed := make(chan struct{}, 1)
 
 	engine.ContextF = snow.DefaultContextTest
-	engine.GetAcceptedFrontierF = func(validatorID ids.ShortID, requestID uint32) error {
+	engine.GetAcceptedFrontierF = func(nodeID ids.ShortID, requestID uint32) error {
 		return errors.New("Engine error should cause handler to close")
 	}
 
@@ -207,7 +207,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	closed := make(chan struct{}, 1)
 
 	engine.ContextF = snow.DefaultContextTest
-	engine.GetFailedF = func(validatorID ids.ShortID, requestID uint32) error {
+	engine.GetFailedF = func(nodeID ids.ShortID, requestID uint32) error {
 		closed <- struct{}{}
 		return nil
 	}

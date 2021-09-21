@@ -48,11 +48,18 @@ func (ids *Set) Add(idList ...ID) {
 	}
 }
 
-// Union adds all the ids from the provided sets to this set.
+// Union adds all the ids from the provided set to this set.
 func (ids *Set) Union(set Set) {
 	ids.init(2 * set.Len())
 	for id := range set {
 		(*ids)[id] = struct{}{}
+	}
+}
+
+// Difference removes all the ids from the provided set to this set.
+func (ids *Set) Difference(set Set) {
+	for id := range set {
+		delete(*ids, id)
 	}
 }
 

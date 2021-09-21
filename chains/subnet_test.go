@@ -17,7 +17,7 @@ func TestSubnet(t *testing.T) {
 	chainID1 := ids.GenerateTestID()
 	chainID2 := ids.GenerateTestID()
 
-	s := newSubnet(nil)
+	s := newSubnet()
 	s.addChain(chainID0)
 	assert.False(s.IsBootstrapped(), "A subnet with one chain in bootstrapping shouldn't be considered bootstrapped")
 
