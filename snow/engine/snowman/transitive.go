@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -19,12 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-)
-
-const (
-	// TODO define this constant in one place rather than here and in snowman
-	// Max containers size in a MultiPut message
-	maxContainersLen = int(4 * network.DefaultMaxMessageSize / 5)
 )
 
 var _ Engine = &Transitive{}
@@ -191,7 +184,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 		blkBytes := blk.Bytes()
 		// Ensure response size isn't too large. Include wrappers.IntLen because the size of the message
 		// is included with each container, and the size is repr. by an int.
-		if newLen := wrappers.IntLen + ancestorsBytesLen + len(blkBytes); newLen < maxContainersLen {
+		if newLen := wrappers.IntLen + ancestorsBytesLen + len(blkBytes); newLen < constants.MaxContainersLen {
 			ancestorsBytes = append(ancestorsBytes, blkBytes)
 			ancestorsBytesLen = newLen
 		} else { // reached maximum response size

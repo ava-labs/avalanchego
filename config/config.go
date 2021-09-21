@@ -236,6 +236,30 @@ func getRouterHealthConfig(v *viper.Viper, halflife time.Duration) (router.Healt
 	return config, nil
 }
 
+func getAdaptiveTimeoutConfig(v *viper.Viper) (timer.AdaptiveTimeoutConfig, error) {
+	config := timer.AdaptiveTimeoutConfig{
+		InitialTimeout:     v.GetDuration(NetworkInitialTimeoutKey),
+		MinimumTimeout:     v.GetDuration(NetworkMinimumTimeoutKey),
+		MaximumTimeout:     v.GetDuration(NetworkMaximumTimeoutKey),
+		TimeoutHalflife:    v.GetDuration(NetworkTimeoutHalflifeKey),
+		TimeoutCoefficient: v.GetFloat64(NetworkTimeoutCoefficientKey),
+	}
+	switch {
+	case config.MinimumTimeout < 1:
+		return timer.AdaptiveTimeoutConfig{}, fmt.Errorf("%q must be positive", NetworkMinimumTimeoutKey)
+	case config.MinimumTimeout > config.MaximumTimeout:
+		return timer.AdaptiveTimeoutConfig{}, fmt.Errorf("%q must be >= %q", NetworkMaximumTimeoutKey, NetworkMinimumTimeoutKey)
+	case config.InitialTimeout < config.MinimumTimeout || config.InitialTimeout > config.MaximumTimeout:
+		return timer.AdaptiveTimeoutConfig{}, fmt.Errorf("%q must be in [%q, %q]", NetworkInitialTimeoutKey, NetworkMinimumTimeoutKey, NetworkMaximumTimeoutKey)
+	case config.TimeoutHalflife <= 0:
+		return timer.AdaptiveTimeoutConfig{}, fmt.Errorf("%q must > 0", NetworkTimeoutHalflifeKey)
+	case config.TimeoutCoefficient < 1:
+		return timer.AdaptiveTimeoutConfig{}, fmt.Errorf("%q must be >= 1", NetworkTimeoutCoefficientKey)
+	}
+
+	return config, nil
+}
+
 func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, error) {
 	// Set the max number of recent inbound connections upgraded to be
 	// equal to the max number of inbound connections per second.
@@ -245,22 +269,26 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 	maxRecentConnsUpgraded := int(math.Ceil(maxInboundConnsPerSec * upgradeCooldownInSeconds))
 	config := network.Config{
 		// Throttling
-		MaxIncomingConnsPerSec: maxInboundConnsPerSec,
-		InboundConnUpgradeThrottlerConfig: throttling.InboundConnUpgradeThrottlerConfig{
-			UpgradeCooldown:        upgradeCooldown,
-			MaxRecentConnsUpgraded: maxRecentConnsUpgraded,
+		ThrottlerConfig: network.ThrottlerConfig{
+			MaxIncomingConnsPerSec: maxInboundConnsPerSec,
+			InboundConnUpgradeThrottlerConfig: throttling.InboundConnUpgradeThrottlerConfig{
+				UpgradeCooldown:        upgradeCooldown,
+				MaxRecentConnsUpgraded: maxRecentConnsUpgraded,
+			},
+
+			InboundMsgThrottlerConfig: throttling.MsgThrottlerConfig{
+				AtLargeAllocSize:    v.GetUint64(InboundThrottlerAtLargeAllocSizeKey),
+				VdrAllocSize:        v.GetUint64(InboundThrottlerVdrAllocSizeKey),
+				NodeMaxAtLargeBytes: v.GetUint64(InboundThrottlerNodeMaxAtLargeBytesKey),
+			},
+
+			OutboundMsgThrottlerConfig: throttling.MsgThrottlerConfig{
+				AtLargeAllocSize:    v.GetUint64(OutboundThrottlerAtLargeAllocSizeKey),
+				VdrAllocSize:        v.GetUint64(OutboundThrottlerVdrAllocSizeKey),
+				NodeMaxAtLargeBytes: v.GetUint64(OutboundThrottlerNodeMaxAtLargeBytesKey),
+			},
 		},
-		InboundThrottlerConfig: throttling.MsgThrottlerConfig{
-			AtLargeAllocSize:    v.GetUint64(InboundThrottlerAtLargeAllocSizeKey),
-			VdrAllocSize:        v.GetUint64(InboundThrottlerVdrAllocSizeKey),
-			NodeMaxAtLargeBytes: v.GetUint64(InboundThrottlerNodeMaxAtLargeBytesKey),
-		},
-		OutboundThrottlerConfig: throttling.MsgThrottlerConfig{
-			AtLargeAllocSize:    v.GetUint64(OutboundThrottlerAtLargeAllocSizeKey),
-			VdrAllocSize:        v.GetUint64(OutboundThrottlerVdrAllocSizeKey),
-			NodeMaxAtLargeBytes: v.GetUint64(OutboundThrottlerNodeMaxAtLargeBytesKey),
-		},
-		// Network Health Check
+
 		HealthConfig: network.HealthConfig{
 			MaxTimeSinceMsgSent:          v.GetDuration(NetworkHealthMaxTimeSinceMsgSentKey),
 			MaxTimeSinceMsgReceived:      v.GetDuration(NetworkHealthMaxTimeSinceMsgReceivedKey),
@@ -269,35 +297,48 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 			MaxSendFailRate:              v.GetFloat64(NetworkHealthMaxSendFailRateKey),
 			MaxSendFailRateHalflife:      halflife,
 		},
-		AdaptiveTimeoutConfig: timer.AdaptiveTimeoutConfig{
-			InitialTimeout:     v.GetDuration(NetworkInitialTimeoutKey),
-			MinimumTimeout:     v.GetDuration(NetworkMinimumTimeoutKey),
-			MaximumTimeout:     v.GetDuration(NetworkMaximumTimeoutKey),
-			TimeoutHalflife:    v.GetDuration(NetworkTimeoutHalflifeKey),
-			TimeoutCoefficient: v.GetFloat64(NetworkTimeoutCoefficientKey),
-		},
-		CompressionEnabled: v.GetBool(NetworkCompressionEnabledKey),
+
 		DialerConfig: dialer.Config{
 			ThrottleRps:       v.GetUint32(OutboundConnectionThrottlingRps),
 			ConnectionTimeout: v.GetDuration(OutboundConnectionTimeout),
 		},
-		PeerAliasTimeout: v.GetDuration(PeerAliasTimeoutKey),
+
+		TimeoutConfig: network.TimeoutConfig{
+			PeerAliasTimeout:     v.GetDuration(PeerAliasTimeoutKey),
+			GetVersionTimeout:    v.GetDuration(NetworkGetVersionTimeoutKey),
+			PingPongTimeout:      v.GetDuration(NetworkPingTimeoutKey),
+			ReadHandshakeTimeout: v.GetDuration(NetworkReadHandshakeTimeoutKey),
+		},
+
+		PeerListGossipConfig: network.PeerListGossipConfig{
+			PeerListSize:                 v.GetUint32(NetworkPeerListSizeKey),
+			PeerListGossipFreq:           v.GetDuration(NetworkPeerListGossipFreqKey),
+			PeerListGossipSize:           v.GetUint32(NetworkPeerListGossipSizeKey),
+			PeerListStakerGossipFraction: v.GetUint32(NetworkPeerListStakerGossipFractionKey),
+		},
+
+		GossipConfig: network.GossipConfig{
+			GossipAcceptedFrontierSize: uint(v.GetUint32(ConsensusGossipAcceptedFrontierSizeKey)),
+			GossipOnAcceptSize:         uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey)),
+			AppGossipSize:              uint(v.GetUint32(AppGossipSizeKey)),
+		},
+
+		DelayConfig: network.DelayConfig{
+			MaxReconnectDelay:     v.GetDuration(NetworkMaxReconnectDelayKey),
+			InitialReconnectDelay: v.GetDuration(NetworkInitialReconnectDelayKey),
+		},
+
+		MaxClockDifference: v.GetDuration(NetworkMaxClockDifferenceKey),
+		CompressionEnabled: v.GetBool(NetworkCompressionEnabledKey),
+		PingFrequency:      v.GetDuration(NetworkPingFrequencyKey),
+		AllowPrivateIPs:    v.GetBool(NetworkAllowPrivateIPsKey),
 	}
+
 	switch {
-	case config.MinimumTimeout < 1:
-		return network.Config{}, fmt.Errorf("%q must be positive", NetworkMinimumTimeoutKey)
-	case config.MinimumTimeout > config.MaximumTimeout:
-		return network.Config{}, fmt.Errorf("%q must be >= %q", NetworkMaximumTimeoutKey, NetworkMinimumTimeoutKey)
-	case config.InitialTimeout < config.MinimumTimeout || config.InitialTimeout > config.MaximumTimeout:
-		return network.Config{}, fmt.Errorf("%q must be in [%q, %q]", NetworkInitialTimeoutKey, NetworkMinimumTimeoutKey, NetworkMaximumTimeoutKey)
-	case config.TimeoutHalflife <= 0:
-		return network.Config{}, fmt.Errorf("%q must > 0", NetworkTimeoutHalflifeKey)
-	case config.TimeoutCoefficient < 1:
-		return network.Config{}, fmt.Errorf("%q must be >= 1", NetworkTimeoutCoefficientKey)
 	case config.HealthConfig.MaxTimeSinceMsgSent < 0:
-		return network.Config{}, fmt.Errorf("%s must be > 0", NetworkHealthMaxTimeSinceMsgSentKey)
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkHealthMaxTimeSinceMsgSentKey)
 	case config.HealthConfig.MaxTimeSinceMsgReceived < 0:
-		return network.Config{}, fmt.Errorf("%s must be > 0", NetworkHealthMaxTimeSinceMsgReceivedKey)
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkHealthMaxTimeSinceMsgReceivedKey)
 	case config.HealthConfig.MaxSendFailRate < 0 || config.HealthConfig.MaxSendFailRate > 1:
 		return network.Config{}, fmt.Errorf("%s must be in [0,1]", NetworkHealthMaxSendFailRateKey)
 	case config.HealthConfig.MaxPortionSendQueueBytesFull < 0 || config.HealthConfig.MaxPortionSendQueueBytesFull > 1:
@@ -306,7 +347,30 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 		return network.Config{}, fmt.Errorf("%q must be >= 0", OutboundConnectionTimeout)
 	case config.PeerAliasTimeout < 0:
 		return network.Config{}, fmt.Errorf("%q must be >= 0", PeerAliasTimeoutKey)
+	case config.PeerListGossipFreq < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListGossipFreqKey)
+	case config.GetVersionTimeout < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkGetVersionTimeoutKey)
+	case config.PeerListStakerGossipFraction < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListStakerGossipFractionKey)
+	case config.MaxReconnectDelay < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkMaxReconnectDelayKey)
+	case config.InitialReconnectDelay < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkInitialReconnectDelayKey)
+	case config.MaxReconnectDelay < config.InitialReconnectDelay:
+		return network.Config{}, fmt.Errorf("%s must be >= %s", NetworkMaxReconnectDelayKey, NetworkInitialReconnectDelayKey)
+	case config.PingPongTimeout < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPingTimeoutKey)
+	case config.PingFrequency < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPingFrequencyKey)
+	case config.PingPongTimeout <= config.PingFrequency:
+		return network.Config{}, fmt.Errorf("%s must be > %s", NetworkPingTimeoutKey, NetworkPingFrequencyKey)
+	case config.ReadHandshakeTimeout < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkReadHandshakeTimeoutKey)
+	case config.MaxClockDifference < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkMaxClockDifferenceKey)
 	}
+
 	return config, nil
 }
 
@@ -364,32 +428,6 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap peer id: %w", err)
 		}
 		config.BootstrapIDs = append(config.BootstrapIDs, nodeID)
-	}
-	return config, nil
-}
-
-func getGossipConfig(v *viper.Viper) (node.GossipConfig, error) {
-	config := node.GossipConfig{
-		PeerListGossipConfig: node.PeerListGossipConfig{
-			// Node will gossip [PeerListSize] peers to [PeerListGossipSize] every [PeerListGossipFreq]
-			PeerListSize:       v.GetUint32(NetworkPeerListSizeKey),
-			PeerListGossipFreq: v.GetDuration(NetworkPeerListGossipFreqKey),
-			PeerListGossipSize: v.GetUint32(NetworkPeerListGossipSizeKey),
-		},
-		ConsensusGossipConfig: node.ConsensusGossipConfig{
-			ConsensusGossipFrequency:            v.GetDuration(ConsensusGossipFrequencyKey),
-			ConsensusGossipAcceptedFrontierSize: uint(v.GetUint32(ConsensusGossipAcceptedFrontierSizeKey)),
-			ConsensusGossipOnAcceptSize:         uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey)),
-		},
-		AppGossipConfig: node.AppGossipConfig{
-			AppGossipSize: uint(v.GetUint32(AppGossipSizeKey)),
-		},
-	}
-	switch {
-	case config.ConsensusGossipFrequency < 0:
-		return node.GossipConfig{}, fmt.Errorf("%s must be >= 0", ConsensusGossipFrequencyKey)
-	case config.PeerListGossipFreq < 0:
-		return node.GossipConfig{}, fmt.Errorf("%s must be >= 0", NetworkPeerListGossipFreqKey)
 	}
 	return config, nil
 }
@@ -791,12 +829,12 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	}
 
 	// Gossiping
-	var err error
-	nodeConfig.GossipConfig, err = getGossipConfig(v)
-	if err != nil {
-		return node.Config{}, err
+	nodeConfig.ConsensusGossipFrequency = v.GetDuration(ConsensusGossipFrequencyKey)
+	if nodeConfig.ConsensusGossipFrequency < 0 {
+		return node.Config{}, fmt.Errorf("%s must be >= 0", ConsensusGossipFrequencyKey)
 	}
 
+	var err error
 	// Logging
 	nodeConfig.LoggingConfig, err = getLoggingConfig(v)
 	if err != nil {
@@ -856,6 +894,12 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 
 	// Metrics
 	nodeConfig.MeterVMEnabled = v.GetBool(MeterVMsEnabledKey)
+
+	// Adaptive Timeout Config
+	nodeConfig.AdaptiveTimeoutConfig, err = getAdaptiveTimeoutConfig(v)
+	if err != nil {
+		return node.Config{}, err
+	}
 
 	// Network Config
 	nodeConfig.NetworkConfig, err = getNetworkConfig(v, healthCheckAveragerHalflife)
