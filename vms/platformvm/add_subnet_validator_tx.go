@@ -73,6 +73,8 @@ func (tx *UnsignedAddSubnetValidatorTx) SyntacticVerify(ctx *snow.Context) error
 // Attempts to verify this transaction with the provided state.
 func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
 	_, _, _, _, err := tx.Execute(vm, parentState, stx)
+	// We ignore [errFutureStakeTime] here because an advanceTimeTx will be
+	// issued before this transaction is issued.
 	if errors.Is(err, errFutureStakeTime) {
 		return nil
 	}
