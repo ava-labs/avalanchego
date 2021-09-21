@@ -154,7 +154,10 @@ func (b *Block) Reject() error {
 	log.Debug(fmt.Sprintf("Rejecting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
 	tx, _ := b.vm.extractAtomicTx(b.ethBlock)
 	if tx != nil {
-		b.vm.mempool.RejectTx(tx.ID())
+		b.vm.mempool.RemoveTx(tx.ID())
+		if err := b.vm.issueTx(tx, false /* set local to false when re-issuing */); err != nil {
+			log.Debug("Failed to re-issue transaction in rejected block", "txID", tx.ID(), "err", err)
+		}
 	}
 
 	return b.vm.chain.Reject(b.ethBlock)

@@ -41,18 +41,18 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-const sampleNumber = 3 // Number of transactions sampled in a block
-
 var (
-	DefaultMaxPrice    = big.NewInt(10 * params.GWei)
-	DefaultIgnorePrice = big.NewInt(2 * params.Wei)
+	DefaultMaxPrice   = big.NewInt(150 * params.GWei)
+	DefaultMinPrice   = big.NewInt(0 * params.GWei)
+	DefaultMinGasUsed = big.NewInt(2_000_000) // block gas limit is 8,000,000
 )
 
 type Config struct {
-	Blocks      int
-	Percentile  int
-	MaxPrice    *big.Int `toml:",omitempty"`
-	IgnorePrice *big.Int `toml:",omitempty"`
+	Blocks     int
+	Percentile int
+	MaxPrice   *big.Int `toml:",omitempty"`
+	MinPrice   *big.Int `toml:",omitempty"`
+	MinGasUsed *big.Int `toml:",omitempty"`
 }
 
 // OracleBackend includes all necessary background APIs for oracle.
@@ -60,18 +60,26 @@ type OracleBackend interface {
 	HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error)
 	BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error)
 	ChainConfig() *params.ChainConfig
+	MinRequiredTip(ctx context.Context, header *types.Header) (*big.Int, error)
 }
 
 // Oracle recommends gas prices based on the content of recent
 // blocks. Suitable for both light and full clients.
 type Oracle struct {
-	backend     OracleBackend
-	lastHead    common.Hash
-	lastPrice   *big.Int
-	maxPrice    *big.Int
-	ignorePrice *big.Int
-	cacheLock   sync.RWMutex
-	fetchLock   sync.Mutex
+	backend   OracleBackend
+	lastHead  common.Hash
+	lastPrice *big.Int
+	// [minPrice] ensures we don't get into a positive feedback loop where tips
+	// sink to 0 during a period of slow block production, such that nobody's
+	// transactions will be included until the full block fee duration has
+	// elapsed.
+	minPrice *big.Int
+	maxPrice *big.Int
+	// [minGasUsed] ensures we don't recommend users pay non-zero tips when other
+	// users are paying a tip to unnecessarily expedite block production.
+	minGasUsed *big.Int
+	cacheLock  sync.RWMutex
+	fetchLock  sync.Mutex
 
 	// clock to decide what set of rules to use when recommending a gas price
 	clock timer.Clock
@@ -99,20 +107,24 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 	maxPrice := config.MaxPrice
 	if maxPrice == nil || maxPrice.Int64() <= 0 {
 		maxPrice = DefaultMaxPrice
-		log.Warn("Sanitizing invalid gasprice oracle price cap", "provided", config.MaxPrice, "updated", maxPrice)
+		log.Warn("Sanitizing invalid gasprice oracle max price", "provided", config.MaxPrice, "updated", maxPrice)
 	}
-	ignorePrice := config.IgnorePrice
-	if ignorePrice == nil || ignorePrice.Int64() <= 0 {
-		ignorePrice = DefaultIgnorePrice
-		log.Warn("Sanitizing invalid gasprice oracle ignore price", "provided", config.IgnorePrice, "updated", ignorePrice)
-	} else if ignorePrice.Int64() > 0 {
-		log.Info("Gasprice oracle is ignoring threshold set", "threshold", ignorePrice)
+	minPrice := config.MinPrice
+	if minPrice == nil || minPrice.Int64() < 0 {
+		minPrice = DefaultMinPrice
+		log.Warn("Sanitizing invalid gasprice oracle min price", "provided", config.MinPrice, "updated", minPrice)
+	}
+	minGasUsed := config.MinGasUsed
+	if minGasUsed == nil || minGasUsed.Int64() < 0 {
+		minGasUsed = DefaultMinGasUsed
+		log.Warn("Sanitizing invalid gasprice oracle min gas used", "provided", config.MinGasUsed, "updated", minGasUsed)
 	}
 	return &Oracle{
 		backend:     backend,
-		lastPrice:   new(big.Int).Set(maxPrice),
+		lastPrice:   minPrice,
+		minPrice:    minPrice,
 		maxPrice:    maxPrice,
-		ignorePrice: ignorePrice,
+		minGasUsed:  minGasUsed,
 		checkBlocks: blocks,
 		percentile:  percent,
 	}
@@ -155,7 +167,7 @@ func (oracle *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 		return tip, nil
 	}
 
-	return tip.Add(tip, nextBaseFee), nil
+	return new(big.Int).Add(tip, nextBaseFee), nil
 }
 
 // SuggestTipCap returns a tip cap so that newly created transaction can have a
@@ -174,8 +186,10 @@ func (oracle *Oracle) suggestTipCap(ctx context.Context) (*big.Int, error) {
 	bigTimestamp := big.NewInt(oracle.clock.Time().Unix())
 
 	switch {
-	case oracle.backend.ChainConfig().IsApricotPhase3(bigTimestamp):
+	case oracle.backend.ChainConfig().IsApricotPhase4(bigTimestamp):
 		return oracle.suggestDynamicTipCap(ctx)
+	case oracle.backend.ChainConfig().IsApricotPhase3(bigTimestamp):
+		return new(big.Int).Set(common.Big0), nil
 	case oracle.backend.ChainConfig().IsApricotPhase1(bigTimestamp):
 		return big.NewInt(params.ApricotPhase1MinGasPrice), nil
 	default:
@@ -208,13 +222,12 @@ func (oracle *Oracle) suggestDynamicTipCap(ctx context.Context) (*big.Int, error
 	var (
 		sent, exp int
 		number    = head.Number.Uint64()
-		timestamp = head.Time
 		result    = make(chan results, oracle.checkBlocks)
 		quit      = make(chan struct{})
 		results   []*big.Int
 	)
 	for sent < oracle.checkBlocks && number > 0 {
-		go oracle.getBlockValues(ctx, types.MakeSigner(oracle.backend.ChainConfig(), big.NewInt(int64(number)), new(big.Int).SetUint64(timestamp)), number, sampleNumber, oracle.ignorePrice, result, quit)
+		go oracle.getBlockTips(ctx, number, result, quit)
 		sent++
 		exp++
 		number--
@@ -226,23 +239,11 @@ func (oracle *Oracle) suggestDynamicTipCap(ctx context.Context) (*big.Int, error
 			return new(big.Int).Set(lastPrice), res.err
 		}
 		exp--
-		// Nothing returned. There are two special cases here:
-		// - The block is empty
-		// - All the transactions included are sent by the miner itself.
-		// In these cases, use the latest calculated price for sampling.
-		if len(res.values) == 0 {
-			res.values = []*big.Int{lastPrice}
+		if res.value != nil {
+			results = append(results, res.value)
+		} else {
+			results = append(results, new(big.Int).Set(common.Big0))
 		}
-		// Besides, in order to collect enough data for sampling, if nothing
-		// meaningful returned, try to query more blocks. But the maximum
-		// is 2*checkBlocks.
-		if len(res.values) == 1 && len(results)+1+exp < oracle.checkBlocks*2 && number > 0 {
-			go oracle.getBlockValues(ctx, res.signer, number, sampleNumber, oracle.ignorePrice, result, quit)
-			sent++
-			exp++
-			number--
-		}
-		results = append(results, res.values...)
 	}
 	price := lastPrice
 	if len(results) > 0 {
@@ -251,6 +252,9 @@ func (oracle *Oracle) suggestDynamicTipCap(ctx context.Context) (*big.Int, error
 	}
 	if price.Cmp(oracle.maxPrice) > 0 {
 		price = new(big.Int).Set(oracle.maxPrice)
+	}
+	if price.Cmp(oracle.minPrice) < 0 {
+		price = new(big.Int).Set(oracle.minPrice)
 	}
 	oracle.cacheLock.Lock()
 	oracle.lastHead = headHash
@@ -261,70 +265,43 @@ func (oracle *Oracle) suggestDynamicTipCap(ctx context.Context) (*big.Int, error
 }
 
 type results struct {
-	values []*big.Int
-	signer types.Signer
-	err    error
+	value *big.Int
+	err   error
 }
 
-type txSorter struct {
-	txs     []*types.Transaction
-	baseFee *big.Int
-}
-
-func newSorter(txs []*types.Transaction, baseFee *big.Int) *txSorter {
-	return &txSorter{
-		txs:     txs,
-		baseFee: baseFee,
-	}
-}
-
-func (s *txSorter) Len() int { return len(s.txs) }
-func (s *txSorter) Swap(i, j int) {
-	s.txs[i], s.txs[j] = s.txs[j], s.txs[i]
-}
-func (s *txSorter) Less(i, j int) bool {
-	// It's okay to discard the error because a tx would never be
-	// accepted into a block with an invalid effective tip.
-	tip1, _ := s.txs[i].EffectiveGasTip(s.baseFee)
-	tip2, _ := s.txs[j].EffectiveGasTip(s.baseFee)
-	return tip1.Cmp(tip2) < 0
-}
-
-// getBlockPrices calculates the lowest transaction gas price in a given block
-// and sends it to the result channel. If the block is empty or all transactions
-// are sent by the miner itself(it doesn't make any sense to include this kind of
-// transaction prices for sampling), nil gasprice is returned.
-func (oracle *Oracle) getBlockValues(ctx context.Context, signer types.Signer, blockNum uint64, limit int, ignoreUnder *big.Int, result chan results, quit chan struct{}) {
-	block, err := oracle.backend.BlockByNumber(ctx, rpc.BlockNumber(blockNum))
-	if block == nil {
+// getBlockTips calculates the minimum required tip to be included in a given
+// block and sends the value to the result channel.
+func (oracle *Oracle) getBlockTips(ctx context.Context, blockNum uint64, result chan results, quit chan struct{}) {
+	header, err := oracle.backend.HeaderByNumber(ctx, rpc.BlockNumber(blockNum))
+	if header == nil {
 		select {
-		case result <- results{nil, nil, err}:
+		case result <- results{nil, err}:
 		case <-quit:
 		}
 		return
 	}
-	// Sort the transaction by effective tip in ascending sort.
-	txs := make([]*types.Transaction, len(block.Transactions()))
-	copy(txs, block.Transactions())
-	sorter := newSorter(txs, block.BaseFee())
-	sort.Sort(sorter)
 
-	var prices []*big.Int
-	for _, tx := range sorter.txs {
-		tip, _ := tx.EffectiveGasTip(block.BaseFee())
-		if ignoreUnder != nil && tip.Cmp(ignoreUnder) == -1 {
-			continue
+	// Don't bias the estimate with blocks containing a limited number of transactions paying to
+	// expedite block production.
+	if header.GasUsed < oracle.minGasUsed.Uint64() {
+		select {
+		case result <- results{nil, nil}:
+		case <-quit:
 		}
-		sender, err := types.Sender(signer, tx)
-		if err == nil && sender != block.Coinbase() {
-			prices = append(prices, tip)
-			if len(prices) >= limit {
-				break
-			}
-		}
+		return
 	}
+
+	// Compute minimum required tip to be included in previous block
+	//
+	// NOTE: Using this approach, we will never recommend that the caller
+	// provides a non-zero tip unless some block is produced faster than the
+	// target rate (which could only occur if some set of callers manually override the
+	// suggested tip). In the future, we may wish to start suggesting a non-zero
+	// tip when most blocks are full otherwise callers may observe an unexpected
+	// delay in transaction inclusion.
+	minTip, err := oracle.backend.MinRequiredTip(ctx, header)
 	select {
-	case result <- results{prices, signer, nil}:
+	case result <- results{minTip, err}:
 	case <-quit:
 	}
 }
