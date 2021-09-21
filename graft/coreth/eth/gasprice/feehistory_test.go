@@ -32,7 +32,12 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/core/types"
+
+	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 func TestFeeHistory(t *testing.T) {
@@ -66,7 +71,34 @@ func TestFeeHistory(t *testing.T) {
 			MaxHeaderHistory: c.maxHeader,
 			MaxBlockHistory:  c.maxBlock,
 		}
-		backend := newTestBackend(t, big.NewInt(16))
+		tip := big.NewInt(1 * params.GWei)
+		backend := newTestBackendFakerEngine(t, params.TestChainConfig, 32, common.Big0, func(i int, b *core.BlockGen) {
+
+			signer := types.LatestSigner(params.TestChainConfig)
+
+			b.SetCoinbase(common.Address{1})
+
+			baseFee := b.BaseFee()
+			feeCap := new(big.Int).Add(baseFee, tip)
+
+			var tx *types.Transaction
+			// if apricotPhase3BlockTimestamp != nil && b.Number().Cmp(apricotPhase3BlockTimestamp) >= 0 {
+			txdata := &types.DynamicFeeTx{
+				ChainID:   params.TestChainConfig.ChainID,
+				Nonce:     b.TxNonce(addr),
+				To:        &common.Address{},
+				Gas:       params.TxGas,
+				GasFeeCap: feeCap,
+				GasTipCap: tip,
+				Data:      []byte{},
+			}
+			tx = types.NewTx(txdata)
+			tx, err := types.SignTx(tx, signer, key)
+			if err != nil {
+				t.Fatalf("failed to create tx: %v", err)
+			}
+			b.AddTx(tx)
+		})
 		oracle := NewOracle(backend, config)
 
 		first, reward, baseFee, ratio, err := oracle.FeeHistory(context.Background(), c.count, c.last, c.percent)
