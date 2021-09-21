@@ -590,7 +590,7 @@ func TestNewExportTxMulticoin(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			issuer, vm, _, sharedMemory := GenesisVM(t, true, test.genesis, "", "")
+			issuer, vm, _, sharedMemory, _ := GenesisVM(t, true, test.genesis, "", "")
 
 			defer func() {
 				if err := vm.Shutdown(); err != nil {
@@ -679,7 +679,7 @@ func TestNewExportTxMulticoin(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if err := vm.issueTx(tx); err != nil {
+			if err := vm.issueTx(tx, false); err != nil {
 				t.Fatal(err)
 			}
 
