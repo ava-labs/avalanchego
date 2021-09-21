@@ -117,11 +117,10 @@ type network struct {
 	// This field just makes sure we don't connect to ourselves when TLS is
 	// disabled. So, cryptographically secure random number generation isn't
 	// used here.
-	dummyNodeID          uint32
-	clock                timer.Clock
-	inboundConnThrottler throttling.InboundConnThrottler
-	c                    message.Codec
-	b                    message.Builder
+	dummyNodeID uint32
+	clock       timer.Clock
+	c           message.Codec
+	b           message.Builder
 
 	stateLock sync.RWMutex
 	closed    utils.AtomicBool
@@ -179,7 +178,8 @@ type network struct {
 	byteSlicePool sync.Pool
 
 	// Rate-limits incoming messages
-	inboundMsgThrottler throttling.InboundMsgThrottler
+	inboundMsgThrottler         throttling.InboundMsgThrottler
+	inboundConnUpgradeThrottler throttling.InboundConnUpgradeThrottler
 
 	// Rate-limits outgoing messages
 	outboundMsgThrottler throttling.OutboundMsgThrottler
@@ -213,18 +213,23 @@ type GossipConfig struct {
 	AppGossipSize              uint `json:"appGossipSize"`
 }
 
+type ThrottlerConfig struct {
+	InboundConnUpgradeThrottlerConfig throttling.InboundConnUpgradeThrottlerConfig `json:"inboundConnUpgradeThrottlerConfig"`
+	InboundMsgThrottlerConfig         throttling.MsgThrottlerConfig                `json:"inboundMsgThrottlerConfig"`
+	OutboundMsgThrottlerConfig        throttling.MsgThrottlerConfig                `json:"outboundMsgThrottlerConfig"`
+	MaxIncomingConnsPerSec            float64                                      `json:"maxIncomingConnsPerSec"`
+}
+
 type Config struct {
 	HealthConfig         `json:"healthConfig"`
 	PeerListGossipConfig `json:"peerListGossipConfig"`
 	GossipConfig         `json:"gossipConfig"`
 	TimeoutConfig        `json:"timeoutConfigs"`
 	DelayConfig          `json:"delayConfig"`
+	ThrottlerConfig      ThrottlerConfig `json:"throttlerConfig"`
 
-	InboundConnThrottlerConfig throttling.InboundConnThrottlerConfig `json:"inboundConnThrottlerConfig"`
-	InboundMsgThrottlerConfig  throttling.MsgThrottlerConfig         `json:"inboundMsgThrottlerConfig"`
-	OutboundMsgThrottlerConfig throttling.MsgThrottlerConfig         `json:"outboundMsgThrottlerConfig"`
-	DialerConfig               dialer.Config                         `json:"dialerConfig"`
-	TLSConfig                  *tls.Config                           `json:"-"`
+	DialerConfig dialer.Config `json:"dialerConfig"`
+	TLSConfig    *tls.Config   `json:"-"`
 
 	Namespace          string              `json:"namespace"`
 	MyNodeID           ids.ShortID         `json:"myNodeID"`
@@ -254,20 +259,20 @@ func NewNetwork(
 ) (Network, error) {
 	// #nosec G404
 	netw := &network{
-		log:                  log,
-		currentIP:            config.MyIP,
-		parser:               version.NewDefaultApplicationParser(),
-		listener:             listener,
-		router:               router,
-		dummyNodeID:          rand.Uint32(),
-		disconnectedIPs:      make(map[string]struct{}),
-		connectedIPs:         make(map[string]struct{}),
-		peerAliasIPs:         make(map[string]struct{}),
-		retryDelay:           make(map[string]time.Duration),
-		myIPs:                map[string]struct{}{config.MyIP.IP().String(): {}},
-		inboundConnThrottler: throttling.NewInboundConnThrottler(log, config.InboundConnThrottlerConfig),
-		benchlistManager:     benchlistManager,
-		latestPeerIP:         make(map[ids.ShortID]signedPeerIP),
+		log:                         log,
+		currentIP:                   config.MyIP,
+		parser:                      version.NewDefaultApplicationParser(),
+		listener:                    listener,
+		router:                      router,
+		dummyNodeID:                 rand.Uint32(),
+		disconnectedIPs:             make(map[string]struct{}),
+		connectedIPs:                make(map[string]struct{}),
+		peerAliasIPs:                make(map[string]struct{}),
+		retryDelay:                  make(map[string]time.Duration),
+		myIPs:                       map[string]struct{}{config.MyIP.IP().String(): {}},
+		inboundConnUpgradeThrottler: throttling.NewInboundConnUpgradeThrottler(log, config.ThrottlerConfig.InboundConnUpgradeThrottlerConfig),
+		benchlistManager:            benchlistManager,
+		latestPeerIP:                make(map[ids.ShortID]signedPeerIP),
 		byteSlicePool: sync.Pool{
 			New: func() interface{} {
 				return make([]byte, 0, constants.DefaultByteSliceCap)
@@ -287,7 +292,7 @@ func NewNetwork(
 		config.Namespace,
 		metricsRegisterer,
 		config.Validators,
-		config.InboundMsgThrottlerConfig,
+		config.ThrottlerConfig.InboundMsgThrottlerConfig,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing inbound message throttler failed with: %s", err)
@@ -299,7 +304,7 @@ func NewNetwork(
 		config.Namespace,
 		metricsRegisterer,
 		config.Validators,
-		config.OutboundMsgThrottlerConfig,
+		config.ThrottlerConfig.OutboundMsgThrottlerConfig,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing outbound message throttler failed with: %s", err)
@@ -873,7 +878,7 @@ func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 		n.log.Debug("not upgrading connection to %s because it's an alias", ipStr)
 		return false
 	}
-	if !n.inboundConnThrottler.Allow(ipStr) {
+	if !n.inboundConnUpgradeThrottler.ShouldUpgrade(ipStr) {
 		n.log.Debug("not upgrading connection to %s due to rate-limiting", ipStr)
 		n.metrics.inboundConnRateLimited.Inc()
 		return false
@@ -891,8 +896,8 @@ func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 // Assumes [n.stateLock] is not held.
 func (n *network) Dispatch() error {
 	go n.gossipPeerList() // Periodically gossip peers
-	go n.inboundConnThrottler.Dispatch()
-	defer n.inboundConnThrottler.Stop()
+	go n.inboundConnUpgradeThrottler.Dispatch()
+	defer n.inboundConnUpgradeThrottler.Stop()
 	go func() {
 		duration := time.Until(n.versionCompatibility.MaskTime())
 		time.Sleep(duration)
@@ -1583,7 +1588,7 @@ func (n *network) disconnected(p *peer) {
 	n.metrics.disconnected.Inc()
 }
 
-// holds onto the peer object as a result of helper functions
+// PeerElement holds onto the peer object as a result of helper functions
 type PeerElement struct {
 	// the peer, if it wasn't a peer when we cloned the list this value will be
 	// nil

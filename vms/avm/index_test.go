@@ -526,6 +526,7 @@ func setupTestVM(t *testing.T, ctx *snow.Context, baseDBManager manager.Manager,
 	vm := &VM{}
 	avmConfigBytes, err := BuildAvmConfigBytes(config)
 	assert.NoError(t, err)
+	appSender := &common.SenderTest{}
 	if err := vm.Initialize(
 		ctx,
 		baseDBManager.NewPrefixDBManager([]byte{1}),
@@ -537,7 +538,7 @@ func setupTestVM(t *testing.T, ctx *snow.Context, baseDBManager manager.Manager,
 			ID: ids.Empty,
 			Fx: &secp256k1fx.Fx{},
 		}},
-		nil,
+		appSender,
 	); err != nil {
 		t.Fatal(err)
 	}

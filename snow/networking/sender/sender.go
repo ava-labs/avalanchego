@@ -332,9 +332,8 @@ func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, container
 
 	// Set timeouts so that if we don't hear back from these nodes, we register a failure.
 	for _, nodeID := range sentTo {
-		nID := nodeID // Prevent overwrite in next loop iteration
-		s.router.RegisterRequest(nID, s.ctx.ChainID, requestID, constants.PullQueryMsg)
-		nodeIDs.Remove(nID)
+		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, constants.PullQueryMsg)
+		nodeIDs.Remove(nodeID)
 	}
 
 	// Register failures for nodes we didn't even send a request to.
@@ -391,7 +390,8 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 	return nil
 }
 
-// Sends a response to an application-level request from the given node
+// SendAppResponse sends a response to an application-level request from the
+// given node
 func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte) error {
 	if nodeID == s.ctx.NodeID {
 		go s.router.AppResponse(nodeID, s.ctx.ChainID, requestID, appResponseBytes, func() {})
@@ -401,13 +401,13 @@ func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appRespon
 	return nil
 }
 
-// Sends an application-level gossip message.
+// SendAppGossip sends an application-level gossip message.
 func (s *Sender) SendAppGossip(appResponseBytes []byte) error {
 	s.sender.SendAppGossip(s.ctx.SubnetID, s.ctx.ChainID, appResponseBytes)
 	return nil
 }
 
-// Chits sends chits
+// SendChits sends chits
 func (s *Sender) SendChits(nodeID ids.ShortID, requestID uint32, votes []ids.ID) {
 	s.ctx.Log.Verbo("Sending Chits to node %s. RequestID: %d. Votes: %s", nodeID.PrefixedString(constants.NodeIDPrefix), requestID, votes)
 	// If [nodeID] is myself, send this message directly
@@ -419,7 +419,7 @@ func (s *Sender) SendChits(nodeID ids.ShortID, requestID uint32, votes []ids.ID)
 	}
 }
 
-// Gossip the provided container
+// SendGossip gossips the provided container
 func (s *Sender) SendGossip(containerID ids.ID, container []byte) {
 	s.ctx.Log.Verbo("Gossiping %s", containerID)
 	s.sender.SendGossip(s.ctx.SubnetID, s.ctx.ChainID, containerID, container)

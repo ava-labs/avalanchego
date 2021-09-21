@@ -98,24 +98,27 @@ func (t *Transitive) finishBootstrapping() error {
 
 	// to maintain the invariant that oracle blocks are issued in the correct
 	// preferences, we need to handle the case that we are bootstrapping into an oracle block
-	switch blk := lastAccepted.(type) {
-	case OracleBlock:
-		options, err := blk.Options()
-		if err != nil {
-			return err
-		}
-		for _, blk := range options {
-			// note that deliver will set the VM's preference
-			if err := t.deliver(blk); err != nil {
+	if oracleBlk, ok := lastAccepted.(snowman.OracleBlock); ok {
+		options, err := oracleBlk.Options()
+		switch {
+		case err == snowman.ErrNotOracle:
+			// if there aren't blocks we need to deliver on startup, we need to set
+			// the preference to the last accepted block
+			if err := t.VM.SetPreference(lastAcceptedID); err != nil {
 				return err
 			}
-		}
-	default:
-		// if there aren't blocks we need to deliver on startup, we need to set
-		// the preference to the last accepted block
-		if err := t.VM.SetPreference(lastAcceptedID); err != nil {
+		case err != nil:
 			return err
+		default:
+			for _, blk := range options {
+				// note that deliver will set the VM's preference
+				if err := t.deliver(blk); err != nil {
+					return err
+				}
+			}
 		}
+	} else if err := t.VM.SetPreference(lastAcceptedID); err != nil {
+		return err
 	}
 
 	t.Ctx.Log.Info("bootstrapping finished with %s as the last accepted block", lastAcceptedID)
@@ -444,8 +447,10 @@ func (t *Transitive) buildBlocks() error {
 		blk, err := t.VM.BuildBlock()
 		if err != nil {
 			t.Ctx.Log.Debug("VM.BuildBlock errored with: %s", err)
+			t.numBuildsFailed.Inc()
 			return nil
 		}
+		t.numBuilt.Inc()
 
 		// a newly created block is expected to be processing. If this check
 		// fails, there is potentially an error in the VM this engine is running
@@ -718,20 +723,23 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	// any potential reentrant bugs.
 	added := []snowman.Block{}
 	dropped := []snowman.Block{}
-	if blk, ok := blk.(OracleBlock); ok {
+	if blk, ok := blk.(snowman.OracleBlock); ok {
 		options, err := blk.Options()
-		if err != nil {
-			return err
-		}
-		for _, blk := range options {
-			if err := blk.Verify(); err != nil {
-				t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
-				dropped = append(dropped, blk)
-			} else {
-				if err := t.Consensus.Add(blk); err != nil {
-					return err
+		if err != snowman.ErrNotOracle {
+			if err != nil {
+				return err
+			}
+
+			for _, blk := range options {
+				if err := blk.Verify(); err != nil {
+					t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
+					dropped = append(dropped, blk)
+				} else {
+					if err := t.Consensus.Add(blk); err != nil {
+						return err
+					}
+					added = append(added, blk)
 				}
-				added = append(added, blk)
 			}
 		}
 	}
@@ -779,7 +787,7 @@ func (t *Transitive) IsBootstrapped() bool {
 	return t.Ctx.IsBootstrapped()
 }
 
-// Health implements the common.Engine interface
+// HealthCheck implements the common.Engine interface
 func (t *Transitive) HealthCheck() (interface{}, error) {
 	var (
 		consensusIntf interface{} = struct{}{}

@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/indexer"
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -69,6 +70,7 @@ var (
 	errPNotCreated                  = errors.New("P-Chain not created")
 	errXNotCreated                  = errors.New("X-Chain not created")
 	errCNotCreated                  = errors.New("C-Chain not created")
+	errFailedToRegisterHealthCheck  = errors.New("couldn't register network health check")
 )
 
 // Node is an instance of an Avalanche node.
@@ -158,6 +160,8 @@ func (n *Node) initNetworking() error {
 	if err != nil {
 		return err
 	}
+	// Wrap listener so it will only accept a certain number of incoming connections per second
+	listener = throttling.NewThrottledListener(listener, n.Config.NetworkConfig.ThrottlerConfig.MaxIncomingConnsPerSec)
 
 	ipDesc, err := utils.ToIPDesc(listener.Addr().String())
 	if err != nil {
@@ -603,6 +607,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
 		StakingEnabled:                         n.Config.EnableStaking,
+		StakingCert:                            n.Config.StakingTLSCert,
 		Log:                                    n.Log,
 		LogFactory:                             n.LogFactory,
 		VMManager:                              n.vmManager,
@@ -630,10 +635,13 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		RetryBootstrapWarnFrequency:            n.Config.RetryBootstrapWarnFrequency,
 		ShutdownNodeFunc:                       n.Shutdown,
 		MeterVMEnabled:                         n.Config.MeterVMEnabled,
+		SubnetConfigs:                          n.Config.SubnetConfigs,
 		ChainConfigs:                           n.Config.ChainConfigs,
 		BootstrapMaxTimeGetAncestors:           n.Config.BootstrapMaxTimeGetAncestors,
 		BootstrapMultiputMaxContainersSent:     n.Config.BootstrapMultiputMaxContainersSent,
 		BootstrapMultiputMaxContainersReceived: n.Config.BootstrapMultiputMaxContainersReceived,
+		ApricotPhase4Time:                      version.GetApricotPhase4Time(n.Config.NetworkID),
+		ApricotPhase4MinPChainHeight:           version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
 	})
 
 	vdrs := n.vdrs
@@ -666,6 +674,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			MaxStakeDuration:      n.Config.MaxStakeDuration,
 			StakeMintingPeriod:    n.Config.StakeMintingPeriod,
 			ApricotPhase3Time:     version.GetApricotPhase3Time(n.Config.NetworkID),
+			ApricotPhase4Time:     version.GetApricotPhase4Time(n.Config.NetworkID),
 		}),
 		n.vmManager.RegisterFactory(avm.ID, &avm.Factory{
 			TxFee:            n.Config.TxFee,
@@ -703,6 +712,10 @@ func (n *Node) registerRPCVMs() error {
 		// Strip any extension from the file. This is to support windows .exe
 		// files.
 		name = name[:len(name)-len(filepath.Ext(name))]
+		// Skip hidden files.
+		if len(name) == 0 {
+			continue
+		}
 
 		vmID, err := n.vmManager.Lookup(name)
 		if err != nil {
@@ -900,13 +913,13 @@ func (n *Node) initHealthAPI() error {
 	// Register the network layer with the health service
 	err = n.healthService.RegisterCheck("network", n.Net.HealthCheck)
 	if err != nil {
-		return fmt.Errorf("couldn't register network health check")
+		return errFailedToRegisterHealthCheck
 	}
 
 	// Register the router with the health service
 	err = n.healthService.RegisterCheck("router", n.Config.ConsensusRouter.HealthCheck)
 	if err != nil {
-		return fmt.Errorf("couldn't register router health check")
+		return errFailedToRegisterHealthCheck
 	}
 
 	handler, err := n.healthService.Handler()

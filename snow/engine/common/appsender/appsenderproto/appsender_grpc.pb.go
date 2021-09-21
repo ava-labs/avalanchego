@@ -7,6 +7,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -18,9 +19,9 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AppSenderClient interface {
-	SendAppRequest(ctx context.Context, in *SendAppRequestMsg, opts ...grpc.CallOption) (*EmptyMsg, error)
-	SendAppResponse(ctx context.Context, in *SendAppResponseMsg, opts ...grpc.CallOption) (*EmptyMsg, error)
-	SendAppGossip(ctx context.Context, in *SendAppGossipMsg, opts ...grpc.CallOption) (*EmptyMsg, error)
+	SendAppRequest(ctx context.Context, in *SendAppRequestMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SendAppResponse(ctx context.Context, in *SendAppResponseMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SendAppGossip(ctx context.Context, in *SendAppGossipMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type appSenderClient struct {
@@ -31,8 +32,8 @@ func NewAppSenderClient(cc grpc.ClientConnInterface) AppSenderClient {
 	return &appSenderClient{cc}
 }
 
-func (c *appSenderClient) SendAppRequest(ctx context.Context, in *SendAppRequestMsg, opts ...grpc.CallOption) (*EmptyMsg, error) {
-	out := new(EmptyMsg)
+func (c *appSenderClient) SendAppRequest(ctx context.Context, in *SendAppRequestMsg, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/appsenderproto.AppSender/SendAppRequest", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -40,8 +41,8 @@ func (c *appSenderClient) SendAppRequest(ctx context.Context, in *SendAppRequest
 	return out, nil
 }
 
-func (c *appSenderClient) SendAppResponse(ctx context.Context, in *SendAppResponseMsg, opts ...grpc.CallOption) (*EmptyMsg, error) {
-	out := new(EmptyMsg)
+func (c *appSenderClient) SendAppResponse(ctx context.Context, in *SendAppResponseMsg, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/appsenderproto.AppSender/SendAppResponse", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -49,8 +50,8 @@ func (c *appSenderClient) SendAppResponse(ctx context.Context, in *SendAppRespon
 	return out, nil
 }
 
-func (c *appSenderClient) SendAppGossip(ctx context.Context, in *SendAppGossipMsg, opts ...grpc.CallOption) (*EmptyMsg, error) {
-	out := new(EmptyMsg)
+func (c *appSenderClient) SendAppGossip(ctx context.Context, in *SendAppGossipMsg, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/appsenderproto.AppSender/SendAppGossip", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -62,9 +63,9 @@ func (c *appSenderClient) SendAppGossip(ctx context.Context, in *SendAppGossipMs
 // All implementations must embed UnimplementedAppSenderServer
 // for forward compatibility
 type AppSenderServer interface {
-	SendAppRequest(context.Context, *SendAppRequestMsg) (*EmptyMsg, error)
-	SendAppResponse(context.Context, *SendAppResponseMsg) (*EmptyMsg, error)
-	SendAppGossip(context.Context, *SendAppGossipMsg) (*EmptyMsg, error)
+	SendAppRequest(context.Context, *SendAppRequestMsg) (*emptypb.Empty, error)
+	SendAppResponse(context.Context, *SendAppResponseMsg) (*emptypb.Empty, error)
+	SendAppGossip(context.Context, *SendAppGossipMsg) (*emptypb.Empty, error)
 	mustEmbedUnimplementedAppSenderServer()
 }
 
@@ -72,13 +73,13 @@ type AppSenderServer interface {
 type UnimplementedAppSenderServer struct {
 }
 
-func (UnimplementedAppSenderServer) SendAppRequest(context.Context, *SendAppRequestMsg) (*EmptyMsg, error) {
+func (UnimplementedAppSenderServer) SendAppRequest(context.Context, *SendAppRequestMsg) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendAppRequest not implemented")
 }
-func (UnimplementedAppSenderServer) SendAppResponse(context.Context, *SendAppResponseMsg) (*EmptyMsg, error) {
+func (UnimplementedAppSenderServer) SendAppResponse(context.Context, *SendAppResponseMsg) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendAppResponse not implemented")
 }
-func (UnimplementedAppSenderServer) SendAppGossip(context.Context, *SendAppGossipMsg) (*EmptyMsg, error) {
+func (UnimplementedAppSenderServer) SendAppGossip(context.Context, *SendAppGossipMsg) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendAppGossip not implemented")
 }
 func (UnimplementedAppSenderServer) mustEmbedUnimplementedAppSenderServer() {}

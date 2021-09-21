@@ -176,6 +176,9 @@ type Config struct {
 	// Subnet Whitelist
 	WhitelistedSubnets ids.Set `json:"whitelistedSubnets"`
 
+	// SubnetConfigs
+	SubnetConfigs map[ids.ID]chains.SubnetConfig `json:"subnetConfigs"`
+
 	// ChainConfigs
 	ChainConfigs map[string]chains.ChainConfig `json:"-"`
 

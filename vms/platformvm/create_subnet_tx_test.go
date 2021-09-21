@@ -45,7 +45,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			vm, _ := defaultVM()
+			vm, _, _ := defaultVM()
 			vm.ApricotPhase3Time = ap3Time
 
 			vm.ctx.Lock.Lock()
@@ -69,7 +69,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 				Owner: &secp256k1fx.OutputOwners{},
 			}
 			tx := &Tx{UnsignedTx: utx}
-			err = tx.Sign(vm.codec, signers)
+			err = tx.Sign(Codec, signers)
 			assert.NoError(err)
 
 			vs := newVersionedState(
@@ -79,7 +79,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			)
 			vs.SetTimestamp(test.time)
 
-			_, err = tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vs, tx)
+			_, err = utx.Execute(vm, vs, tx)
 			assert.Equal(test.expectsError, err != nil)
 		})
 	}

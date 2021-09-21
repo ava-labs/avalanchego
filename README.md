@@ -12,11 +12,13 @@ a blockchains platform with high throughput, and blazing fast transactions.
 Avalanche is an incredibly lightweight protocol, so the minimum computer requirements are quite modest.
 Note that as network usage increases, hardware requirements may change.
 
-- Hardware: 2 GHz or faster CPU, 6 GB RAM, >= 200 GB storage.
-- OS: Ubuntu >= 18.04 or Mac OS X >= Catalina.
-- Network: IPv4 or IPv6 network connection, with an open public port.
+- CPU: Equivalent of 8 AWS vCPU
+- RAM: 16 GB
+- Storage: 200 GB
+- OS: Ubuntu 18.04/20.04 or MacOS >= Catalina
+- Network: Reliable IPv4 or IPv6 network connection, with an open public port.
 - Software Dependencies:
-  - [Go](https://golang.org/doc/install) version >= 1.15.5 and set up [`$GOPATH`](https://github.com/golang/go/wiki/SettingGOPATH).
+  - [Go](https://golang.org/doc/install) version >= 1.16.8 and set up [`$GOPATH`](https://github.com/golang/go/wiki/SettingGOPATH).
   - [gcc](https://gcc.gnu.org/)
   - g++
 
@@ -47,7 +49,7 @@ Install AvalancheGo using an `apt` repository.
 
 If you have already added the APT repository, you do not need to add it again.
 
-To add the repository on Ubuntu Bionic distributions, run:
+To add the repository on Ubuntu 18.04 (Bionic), run:
 
 ```sh
 sudo su -
@@ -56,7 +58,7 @@ echo "deb https://downloads.avax.network/apt bionic main" > /etc/apt/sources.lis
 exit
 ```
 
-To add the repository on Ubuntu Focal distributions, run:
+To add the repository on Ubuntu 20.04 (Focal), run:
 
 ```sh
 sudo su -
@@ -181,4 +183,4 @@ docker run -t -i -v $(pwd):/opt/avalanche -w/opt/avalanche avalanche:protobuf_co
 
 **We and our community welcome responsible disclosures.**
 
-If you've discovered a security vulnerabilitiy, please report it via our [bug bounty program](https://hackenproof.com/avalanche/). Valid reports will be eligible for a reward (terms and conditions apply).
+If you've discovered a security vulnerability, please report it via our [bug bounty program](https://hackenproof.com/avalanche/). Valid reports will be eligible for a reward (terms and conditions apply).

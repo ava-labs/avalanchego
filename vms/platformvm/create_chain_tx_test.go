@@ -18,7 +18,7 @@ import (
 )
 
 func TestUnsignedCreateChainTxVerify(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -143,7 +143,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 		}
 		tx.UnsignedTx.(*UnsignedCreateChainTx).syntacticallyVerified = false
 		tx.UnsignedTx = test.setup(tx.UnsignedTx.(*UnsignedCreateChainTx))
-		if err := tx.UnsignedTx.(*UnsignedCreateChainTx).Verify(vm.ctx, vm.codec, vm.TxFee, vm.ctx.AVAXAssetID); err != nil && !test.shouldErr {
+		if err := tx.UnsignedTx.(*UnsignedCreateChainTx).SyntacticVerify(vm.ctx); err != nil && !test.shouldErr {
 			t.Fatalf("test '%s' shouldn't have errored but got: %s", test.description, err)
 		} else if err == nil && test.shouldErr {
 			t.Fatalf("test '%s' didn't error but should have", test.description)
@@ -151,9 +151,9 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 	}
 }
 
-// Ensure SemanticVerify fails when there are not enough control sigs
+// Ensure Execute fails when there are not enough control sigs
 func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -183,14 +183,14 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 
 	// Remove a signature
 	tx.Creds[0].(*secp256k1fx.Credential).Sigs = tx.Creds[0].(*secp256k1fx.Credential).Sigs[1:]
-	if _, err := tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vs, tx); err == nil {
+	if _, err := tx.UnsignedTx.(UnsignedDecisionTx).Execute(vm, vs, tx); err == nil {
 		t.Fatal("should have errored because a sig is missing")
 	}
 }
 
-// Ensure SemanticVerify fails when an incorrect control signature is given
+// Ensure Execute fails when an incorrect control signature is given
 func TestCreateChainTxWrongControlSig(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -231,15 +231,15 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 		t.Fatal(err)
 	}
 	copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
-	if _, err = tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vs, tx); err == nil {
+	if _, err = tx.UnsignedTx.(UnsignedDecisionTx).Execute(vm, vs, tx); err == nil {
 		t.Fatal("should have failed verification because a sig is invalid")
 	}
 }
 
-// Ensure SemanticVerify fails when the Subnet the blockchain specifies as
+// Ensure Execute fails when the Subnet the blockchain specifies as
 // its validator set doesn't exist
 func TestCreateChainTxNoSuchSubnet(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -268,14 +268,14 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	)
 
 	tx.UnsignedTx.(*UnsignedCreateChainTx).SubnetID = ids.GenerateTestID()
-	if _, err := tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vs, tx); err == nil {
+	if _, err := tx.UnsignedTx.(UnsignedDecisionTx).Execute(vm, vs, tx); err == nil {
 		t.Fatal("should have failed because subent doesn't exist")
 	}
 }
 
 // Ensure valid tx passes semanticVerify
 func TestCreateChainTxValid(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -304,7 +304,7 @@ func TestCreateChainTxValid(t *testing.T) {
 		vm.internalState.PendingStakerChainState(),
 	)
 
-	_, err = tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vs, tx)
+	_, err = tx.UnsignedTx.(UnsignedDecisionTx).Execute(vm, vs, tx)
 	if err != nil {
 		t.Fatalf("expected tx to pass verification but got error: %v", err)
 	}
@@ -341,7 +341,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			vm, _ := defaultVM()
+			vm, _, _ := defaultVM()
 			vm.ApricotPhase3Time = ap3Time
 
 			vm.ctx.Lock.Lock()
@@ -360,6 +360,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			signers = append(signers, subnetSigners)
 
 			// Create the tx
+
 			utx := &UnsignedCreateChainTx{
 				BaseTx: BaseTx{BaseTx: avax.BaseTx{
 					NetworkID:    vm.ctx.NetworkID,
@@ -372,7 +373,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				SubnetAuth: subnetAuth,
 			}
 			tx := &Tx{UnsignedTx: utx}
-			err = tx.Sign(vm.codec, signers)
+			err = tx.Sign(Codec, signers)
 			assert.NoError(err)
 
 			vs := newVersionedState(
@@ -382,7 +383,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			)
 			vs.SetTimestamp(test.time)
 
-			_, err = tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vs, tx)
+			_, err = utx.Execute(vm, vs, tx)
 			assert.Equal(test.expectsError, err != nil)
 		})
 	}

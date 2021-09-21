@@ -492,7 +492,7 @@ func (vm *VM) FlushTxs() {
 		select {
 		case vm.toEngine <- common.PendingTxs:
 		default:
-			vm.ctx.Log.Warn("Delaying issuance of transactions due to contention")
+			vm.ctx.Log.Debug("dropping message to engine due to contention")
 			vm.timer.SetTimeoutIn(vm.batchTimeout)
 		}
 	}
