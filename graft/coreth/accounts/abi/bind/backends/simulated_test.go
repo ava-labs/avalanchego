@@ -94,14 +94,14 @@ func TestSimulatedBackend(t *testing.T) {
 		t.Fatal("transaction should have pending status")
 	}
 
-	sim.Commit()
-	// _, isPending, err = sim.TransactionByHash(context.Background(), txHash)
-	// if err != nil {
-	// 	t.Fatalf("error getting transaction with hash: %v", txHash.String())
-	// }
-	// if isPending {
-	// 	t.Fatal("transaction should not have pending status")
-	// }
+	sim.Commit(true)
+	_, isPending, err = sim.TransactionByHash(context.Background(), txHash)
+	if err != nil {
+		t.Fatalf("error getting transaction with hash: %v", txHash.String())
+	}
+	if isPending {
+		t.Fatal("transaction should not have pending status")
+	}
 }
 
 var testKey, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
@@ -189,7 +189,7 @@ func TestNewAdjustTimeFail(t *testing.T) {
 	if err := sim.AdjustTime(time.Second); err == nil {
 		t.Error("Expected adjust time to error on non-empty block")
 	}
-	sim.Commit()
+	sim.Commit(false)
 
 	prevTime := sim.pendingBlock.Time()
 	if err := sim.AdjustTime(time.Minute); err != nil {
@@ -207,7 +207,7 @@ func TestNewAdjustTimeFail(t *testing.T) {
 		t.Errorf("could not sign tx: %v", err)
 	}
 	sim.SendTransaction(context.Background(), signedTx2)
-	sim.Commit()
+	sim.Commit(false)
 	newTime = sim.pendingBlock.Time()
 	if newTime-prevTime >= uint64(time.Minute.Seconds()) {
 		t.Errorf("time adjusted, but shouldn't be: prev: %v, new: %v", prevTime, newTime)
@@ -268,7 +268,7 @@ func TestBlockByNumber(t *testing.T) {
 	}
 
 	// create one block
-	sim.Commit()
+	sim.Commit(false)
 
 	block, err = sim.BlockByNumber(bgCtx, nil)
 	if err != nil {
@@ -319,7 +319,7 @@ func TestNonceAt(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not add tx to pending block: %v", err)
 	}
-	sim.Commit()
+	sim.Commit(false)
 
 	newNonce, err := sim.NonceAt(bgCtx, testAddr, big.NewInt(1))
 	if err != nil {
@@ -330,7 +330,7 @@ func TestNonceAt(t *testing.T) {
 		t.Errorf("received incorrect nonce. expected 1, got %v", nonce)
 	}
 	// create some more blocks
-	sim.Commit()
+	sim.Commit(false)
 	// Check that we can get data for an older block/state
 	newNonce, err = sim.NonceAt(bgCtx, testAddr, big.NewInt(1))
 	if err != nil {
@@ -364,7 +364,7 @@ func TestSendTransaction(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not add tx to pending block: %v", err)
 	}
-	sim.Commit()
+	sim.Commit(false)
 
 	block, err := sim.BlockByNumber(bgCtx, big.NewInt(1))
 	if err != nil {
@@ -416,19 +416,19 @@ func TestTransactionByHash(t *testing.T) {
 		t.Errorf("did not received committed transaction. expected hash %v got hash %v", signedTx.Hash(), receivedTx.Hash())
 	}
 
-	sim.Commit()
+	sim.Commit(true)
 
 	// ensure tx is not and committed pending
-	// receivedTx, pending, err = sim.TransactionByHash(bgCtx, signedTx.Hash())
-	// if err != nil {
-	// 	t.Errorf("could not get transaction by hash %v: %v", signedTx.Hash(), err)
-	// }
-	// if pending {
-	// 	t.Errorf("expected transaction to not be in pending state")
-	// }
-	// if receivedTx.Hash() != signedTx.Hash() {
-	// 	t.Errorf("did not received committed transaction. expected hash %v got hash %v", signedTx.Hash(), receivedTx.Hash())
-	// }
+	receivedTx, pending, err = sim.TransactionByHash(bgCtx, signedTx.Hash())
+	if err != nil {
+		t.Errorf("could not get transaction by hash %v: %v", signedTx.Hash(), err)
+	}
+	if pending {
+		t.Errorf("expected transaction to not be in pending state")
+	}
+	if receivedTx.Hash() != signedTx.Hash() {
+		t.Errorf("did not received committed transaction. expected hash %v got hash %v", signedTx.Hash(), receivedTx.Hash())
+	}
 }
 
 func TestEstimateGas(t *testing.T) {
@@ -453,7 +453,7 @@ func TestEstimateGas(t *testing.T) {
 
 	parsed, _ := abi.JSON(strings.NewReader(contractAbi))
 	contractAddr, _, _, _ := bind.DeployContract(opts, parsed, common.FromHex(contractBin), sim)
-	sim.Commit()
+	sim.Commit(false)
 
 	var cases = []struct {
 		name        string
@@ -678,7 +678,7 @@ func TestHeaderByNumber(t *testing.T) {
 		t.Errorf("expected block header number 0, instead got %v", latestBlockHeader.Number.Uint64())
 	}
 
-	sim.Commit()
+	sim.Commit(false)
 
 	latestBlockHeader, err = sim.HeaderByNumber(bgCtx, nil)
 	if err != nil {
@@ -743,7 +743,7 @@ func TestTransactionCount(t *testing.T) {
 		t.Errorf("could not add tx to pending block: %v", err)
 	}
 
-	sim.Commit()
+	sim.Commit(false)
 
 	lastBlock, err := sim.BlockByNumber(bgCtx, nil)
 	if err != nil {
@@ -801,7 +801,7 @@ func TestTransactionInBlock(t *testing.T) {
 		t.Errorf("could not add tx to pending block: %v", err)
 	}
 
-	sim.Commit()
+	sim.Commit(false)
 
 	lastBlock, err := sim.BlockByNumber(bgCtx, nil)
 	if err != nil {
@@ -916,16 +916,16 @@ func TestTransactionReceipt(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not add tx to pending block: %v", err)
 	}
-	sim.Commit()
+	sim.Commit(true)
 
-	// receipt, err := sim.TransactionReceipt(bgCtx, signedTx.Hash())
-	// if err != nil {
-	// 	t.Errorf("could not get transaction receipt: %v", err)
-	// }
-	//
-	// if receipt.ContractAddress != testAddr && receipt.TxHash != signedTx.Hash() {
-	// 	t.Errorf("received receipt is not correct: %v", receipt)
-	// }
+	receipt, err := sim.TransactionReceipt(bgCtx, signedTx.Hash())
+	if err != nil {
+		t.Errorf("could not get transaction receipt: %v", err)
+	}
+
+	if receipt.ContractAddress != testAddr && receipt.TxHash != signedTx.Hash() {
+		t.Errorf("received receipt is not correct: %v", receipt)
+	}
 }
 
 func TestSuggestGasPrice(t *testing.T) {
@@ -1003,7 +1003,7 @@ func TestCodeAt(t *testing.T) {
 		t.Errorf("could not deploy contract: %v tx: %v contract: %v", err, tx, contract)
 	}
 
-	sim.Commit()
+	sim.Commit(false)
 	code, err = sim.CodeAt(bgCtx, contractAddr, nil)
 	if err != nil {
 		t.Errorf("could not get code at test addr: %v", err)
@@ -1058,7 +1058,7 @@ func TestPendingAndCallContract(t *testing.T) {
 		t.Errorf("response from calling contract was expected to be 'hello world' instead received %v", string(res))
 	}
 
-	sim.Commit()
+	sim.Commit(false)
 
 	// make sure you can call the contract
 	res, err = sim.CallContract(bgCtx, interfaces.CallMsg{
@@ -1184,7 +1184,7 @@ func TestCallContractRevert(t *testing.T) {
 		if res == nil {
 			t.Errorf("result from noRevert was nil")
 		}
-		sim.Commit()
+		sim.Commit(false)
 	}
 }
 
@@ -1207,7 +1207,7 @@ func TestFork(t *testing.T) {
 	// 2.
 	n := int(rand.Int31n(21))
 	for i := 0; i < n; i++ {
-		sim.Commit()
+		sim.Commit(false)
 	}
 	// 3.
 	if sim.blockchain.CurrentBlock().NumberU64() != uint64(n) {
@@ -1217,7 +1217,7 @@ func TestFork(t *testing.T) {
 	sim.Fork(context.Background(), parent.Hash())
 	// 5.
 	for i := 0; i < n+1; i++ {
-		sim.Commit()
+		sim.Commit(false)
 	}
 	// 6.
 	if sim.blockchain.CurrentBlock().NumberU64() != uint64(n+1) {
@@ -1234,133 +1234,131 @@ contract Callable {
     function Call() public { emit Called(); }
 }
 */
+// The fork tests are commented out because transactions are not indexed in coreth until they are marked
+// as accepted, which breaks the logic of these tests.
 // const callableAbi = "[{\"anonymous\":false,\"inputs\":[],\"name\":\"Called\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"Call\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
 
 // const callableBin = "6080604052348015600f57600080fd5b5060998061001e6000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c806334e2292114602d575b600080fd5b60336035565b005b7f81fab7a4a0aa961db47eefc81f143a5220e8c8495260dd65b1356f1d19d3c7b860405160405180910390a156fea2646970667358221220029436d24f3ac598ceca41d4d712e13ced6d70727f4cdc580667de66d2f51d8b64736f6c63430008010033"
 
-// TestForkLogsReborn check that the simulated reorgs
-// correctly remove and reborn logs.
-// Steps:
-//  1. Deploy the Callable contract.
-//  2. Set up an event subscription.
-//  3. Save the current block which will serve as parent for the fork.
-//  4. Send a transaction.
-//  5. Check that the event was included.
-//  6. Fork by using the parent block as ancestor.
-//  7. Mine two blocks to trigger a reorg.
-//  8. Check that the event was removed.
-//  9. Re-send the transaction and mine a block.
-// 10. Check that the event was reborn.
-/*
-func TestForkLogsReborn(t *testing.T) {
-	testAddr := crypto.PubkeyToAddress(testKey.PublicKey)
-	sim := simTestBackend(testAddr)
-	defer sim.Close()
-	// 1.
-	parsed, _ := abi.JSON(strings.NewReader(callableAbi))
-	auth, _ := bind.NewKeyedTransactorWithChainID(testKey, big.NewInt(1337))
-	_, _, contract, err := bind.DeployContract(auth, parsed, common.FromHex(callableBin), sim)
-	if err != nil {
-		t.Errorf("deploying contract: %v", err)
-	}
-	sim.Commit()
-	// 2.
-	logs, sub, err := contract.WatchLogs(nil, "Called")
-	if err != nil {
-		t.Errorf("watching logs: %v", err)
-	}
-	defer sub.Unsubscribe()
-	// 3.
-	parent := sim.blockchain.CurrentBlock()
-	// 4.
-	tx, err := contract.Transact(auth, "Call")
-	if err != nil {
-		t.Errorf("transacting: %v", err)
-	}
-	sim.Commit()
-	// 5.
-	log := <-logs
-	if log.TxHash != tx.Hash() {
-		t.Error("wrong event tx hash")
-	}
-	if log.Removed {
-		t.Error("Event should be included")
-	}
-	// 6.
-	if err := sim.Fork(context.Background(), parent.Hash()); err != nil {
-		t.Errorf("forking: %v", err)
-	}
-	// 7.
-	sim.Commit()
-	sim.Commit()
-	// 8.
-	log = <-logs
-	if log.TxHash != tx.Hash() {
-		t.Error("wrong event tx hash")
-	}
-	if !log.Removed {
-		t.Error("Event should be removed")
-	}
-	// 9.
-	if err := sim.SendTransaction(context.Background(), tx); err != nil {
-		t.Errorf("sending transaction: %v", err)
-	}
-	sim.Commit()
-	// 10.
-	log = <-logs
-	if log.TxHash != tx.Hash() {
-		t.Error("wrong event tx hash")
-	}
-	if log.Removed {
-		t.Error("Event should be included")
-	}
-}
-*/
+// // TestForkLogsReborn check that the simulated reorgs
+// // correctly remove and reborn logs.
+// // Steps:
+// //  1. Deploy the Callable contract.
+// //  2. Set up an event subscription.
+// //  3. Save the current block which will serve as parent for the fork.
+// //  4. Send a transaction.
+// //  5. Check that the event was included.
+// //  6. Fork by using the parent block as ancestor.
+// //  7. Mine two blocks to trigger a reorg.
+// //  8. Check that the event was removed.
+// //  9. Re-send the transaction and mine a block.
+// // 10. Check that the event was reborn.
+// func TestForkLogsReborn(t *testing.T) {
+// 	testAddr := crypto.PubkeyToAddress(testKey.PublicKey)
+// 	sim := simTestBackend(testAddr)
+// 	defer sim.Close()
+// 	// 1.
+// 	parsed, _ := abi.JSON(strings.NewReader(callableAbi))
+// 	auth, _ := bind.NewKeyedTransactorWithChainID(testKey, big.NewInt(1337))
+// 	_, _, contract, err := bind.DeployContract(auth, parsed, common.FromHex(callableBin), sim)
+// 	if err != nil {
+// 		t.Errorf("deploying contract: %v", err)
+// 	}
+// 	sim.Commit(false)
+// 	// 2.
+// 	logs, sub, err := contract.WatchLogs(nil, "Called")
+// 	if err != nil {
+// 		t.Errorf("watching logs: %v", err)
+// 	}
+// 	defer sub.Unsubscribe()
+// 	// 3.
+// 	parent := sim.blockchain.CurrentBlock()
+// 	// 4.
+// 	tx, err := contract.Transact(auth, "Call")
+// 	if err != nil {
+// 		t.Errorf("transacting: %v", err)
+// 	}
+// 	sim.Commit(false)
+// 	// 5.
+// 	log := <-logs
+// 	if log.TxHash != tx.Hash() {
+// 		t.Error("wrong event tx hash")
+// 	}
+// 	if log.Removed {
+// 		t.Error("Event should be included")
+// 	}
+// 	// 6.
+// 	if err := sim.Fork(context.Background(), parent.Hash()); err != nil {
+// 		t.Errorf("forking: %v", err)
+// 	}
+// 	// 7.
+// 	sim.Commit(false)
+// 	sim.Commit(false)
+// 	// 8.
+// 	log = <-logs
+// 	if log.TxHash != tx.Hash() {
+// 		t.Error("wrong event tx hash")
+// 	}
+// 	if !log.Removed {
+// 		t.Error("Event should be removed")
+// 	}
+// 	// 9.
+// 	if err := sim.SendTransaction(context.Background(), tx); err != nil {
+// 		t.Errorf("sending transaction: %v", err)
+// 	}
+// 	sim.Commit(false)
+// 	// 10.
+// 	log = <-logs
+// 	if log.TxHash != tx.Hash() {
+// 		t.Error("wrong event tx hash")
+// 	}
+// 	if log.Removed {
+// 		t.Error("Event should be included")
+// 	}
+// }
 
-// TestForkResendTx checks that re-sending a TX after a fork
-// is possible and does not cause a "nonce mismatch" panic.
-// Steps:
-//  1. Save the current block which will serve as parent for the fork.
-//  2. Send a transaction.
-//  3. Check that the TX is included in block 1.
-//  4. Fork by using the parent block as ancestor.
-//  5. Mine a block, Re-send the transaction and mine another one.
-//  6. Check that the TX is now included in block 2.
-/*
-func TestForkResendTx(t *testing.T) {
-	testAddr := crypto.PubkeyToAddress(testKey.PublicKey)
-	sim := simTestBackend(testAddr)
-	defer sim.Close()
-	// 1.
-	parent := sim.blockchain.CurrentBlock()
-	// 2.
-	head, _ := sim.HeaderByNumber(context.Background(), nil) // Should be child's, good enough
-	gasPrice := new(big.Int).Add(head.BaseFee, big.NewInt(1))
+// // TestForkResendTx checks that re-sending a TX after a fork
+// // is possible and does not cause a "nonce mismatch" panic.
+// // Steps:
+// //  1. Save the current block which will serve as parent for the fork.
+// //  2. Send a transaction.
+// //  3. Check that the TX is included in block 1.
+// //  4. Fork by using the parent block as ancestor.
+// //  5. Mine a block, Re-send the transaction and mine another one.
+// //  6. Check that the TX is now included in block 2.
+// func TestForkResendTx(t *testing.T) {
+// 	testAddr := crypto.PubkeyToAddress(testKey.PublicKey)
+// 	sim := simTestBackend(testAddr)
+// 	defer sim.Close()
+// 	// 1.
+// 	parent := sim.blockchain.CurrentBlock()
+// 	// 2.
+// 	head, _ := sim.HeaderByNumber(context.Background(), nil) // Should be child's, good enough
+// 	gasPrice := new(big.Int).Add(head.BaseFee, big.NewInt(1))
 
-	_tx := types.NewTransaction(0, testAddr, big.NewInt(1000), params.TxGas, gasPrice, nil)
-	signer := types.NewLondonSigner(big.NewInt(1337))
-	tx, _ := types.SignTx(_tx, signer, testKey)
-	sim.SendTransaction(context.Background(), tx)
-	sim.Commit()
-	// 3.
-	receipt, _ := sim.TransactionReceipt(context.Background(), tx.Hash())
-	if h := receipt.BlockNumber.Uint64(); h != 1 {
-		t.Errorf("TX included in wrong block: %d", h)
-	}
-	// 4.
-	if err := sim.Fork(context.Background(), parent.Hash()); err != nil {
-		t.Errorf("forking: %v", err)
-	}
-	// 5.
-	sim.Commit()
-	if err := sim.SendTransaction(context.Background(), tx); err != nil {
-		t.Errorf("sending transaction: %v", err)
-	}
-	sim.Commit()
-	// 6.
-	receipt, _ = sim.TransactionReceipt(context.Background(), tx.Hash())
-	if h := receipt.BlockNumber.Uint64(); h != 2 {
-		t.Errorf("TX included in wrong block: %d", h)
-	}
-}
-*/
+// 	_tx := types.NewTransaction(0, testAddr, big.NewInt(1000), params.TxGas, gasPrice, nil)
+// 	signer := types.NewLondonSigner(big.NewInt(1337))
+// 	tx, _ := types.SignTx(_tx, signer, testKey)
+// 	sim.SendTransaction(context.Background(), tx)
+// 	sim.Commit(false)
+// 	// 3.
+// 	receipt, _ := sim.TransactionReceipt(context.Background(), tx.Hash())
+// 	if h := receipt.BlockNumber.Uint64(); h != 1 {
+// 		t.Errorf("TX included in wrong block: %d", h)
+// 	}
+// 	// 4.
+// 	if err := sim.Fork(context.Background(), parent.Hash()); err != nil {
+// 		t.Errorf("forking: %v", err)
+// 	}
+// 	// 5.
+// 	sim.Commit(false)
+// 	if err := sim.SendTransaction(context.Background(), tx); err != nil {
+// 		t.Errorf("sending transaction: %v", err)
+// 	}
+// 	sim.Commit(false)
+// 	// 6.
+// 	receipt, _ = sim.TransactionReceipt(context.Background(), tx.Hash())
+// 	if h := receipt.BlockNumber.Uint64(); h != 2 {
+// 		t.Errorf("TX included in wrong block: %d", h)
+// 	}
+// }

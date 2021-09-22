@@ -122,12 +122,17 @@ func (b *SimulatedBackend) Close() error {
 
 // Commit imports all the pending transactions as a single block and starts a
 // fresh new state.
-func (b *SimulatedBackend) Commit() {
+func (b *SimulatedBackend) Commit(accept bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	if _, err := b.blockchain.InsertChain([]*types.Block{b.pendingBlock}); err != nil {
 		panic(err) // This cannot happen unless the simulator is wrong, fail in that case
+	}
+	if accept {
+		if err := b.blockchain.Accept(b.pendingBlock); err != nil {
+			panic(err)
+		}
 	}
 	// Using the last inserted block here makes it possible to build on a side
 	// chain after a fork.
