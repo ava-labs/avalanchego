@@ -777,7 +777,7 @@ func (p *peer) handleVersion(msg message.Message) {
 	for _, subnetIDBytes := range subnetIDsBytes {
 		subnetID, err := ids.ToID(subnetIDBytes)
 		if err != nil {
-			p.net.log.Debug("tracked subnet of %s%s at %s could not be parsed: %s", constants.NodeIDPrefix, p.nodeID, err)
+			p.net.log.Debug("tracked subnet of %s%s at %s could not be parsed: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
 			p.discardIP()
 			return
 		}
