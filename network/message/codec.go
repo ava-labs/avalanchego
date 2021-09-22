@@ -211,5 +211,6 @@ func (c *codec) Parse(bytes []byte) (InboundMessage, error) {
 		op:                    op,
 		bytes:                 p.Bytes,
 		bytesSavedCompression: bytesSaved,
+		fields:                fieldValues,
 	}, p.Err
 }
