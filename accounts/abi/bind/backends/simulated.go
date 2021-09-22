@@ -676,12 +676,15 @@ func (b *SimulatedBackend) SendTransaction(ctx context.Context, tx *types.Transa
 		panic(fmt.Errorf("invalid transaction nonce: got %d, want %d", tx.Nonce(), nonce))
 	}
 	// Include tx in chain
-	blocks, _, _ := core.GenerateChain(b.config, block, dummy.NewFaker(), b.database, 1, 10, func(number int, block *core.BlockGen) {
+	blocks, _, err := core.GenerateChain(b.config, block, dummy.NewETHFaker(), b.database, 1, 10, func(number int, block *core.BlockGen) {
 		for _, tx := range b.pendingBlock.Transactions() {
 			block.AddTxWithChain(b.blockchain, tx)
 		}
 		block.AddTxWithChain(b.blockchain, tx)
 	})
+	if err != nil {
+		return err
+	}
 	stateDB, _ := b.blockchain.State()
 
 	b.pendingBlock = blocks[0]
