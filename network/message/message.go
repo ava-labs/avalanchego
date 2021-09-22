@@ -8,26 +8,29 @@ var _ OutboundMessage = &outboundMessage{}
 
 // InboundMessage represents a set of fields for an inbound message that can be serialized into a byte stream
 type InboundMessage interface {
-	BytesSavedCompression() []byte
+	BytesSavedCompression() int
 	Op() Op
 	Bytes() []byte
-}
-
-// OutboundMessage represents a set of fields for an outbound message that can be serialized into a byte stream
-type OutboundMessage interface {
-	BytesSavedCompression() []byte
-	Bytes() []byte
+	Get(Field) interface{}
 }
 
 type inboundMessage struct {
 	op                    Op
 	bytes                 []byte
-	bytesSavedCompression []byte
+	bytesSavedCompression int
+	fields                map[Field]interface{}
 }
 
+// OutboundMessage represents a set of fields for an outbound message that can be serialized into a byte stream
+type OutboundMessage interface {
+	BytesSavedCompression() int
+	Bytes() []byte
+	Op() Op
+}
 type outboundMessage struct {
 	bytes                 []byte
-	bytesSavedCompression []byte
+	bytesSavedCompression int
+	op                    Op
 }
 
 // Op returns the value of the specified operation in this message
@@ -40,7 +43,13 @@ func (inMsg *inboundMessage) Bytes() []byte { return inMsg.bytes }
 // compression. That is, the number of bytes we did not receive over the
 // network due to the message being compressed. Empty slice for messages that were not
 // compressed.
-func (inMsg *inboundMessage) BytesSavedCompression() []byte { return inMsg.bytesSavedCompression }
+func (inMsg *inboundMessage) BytesSavedCompression() int { return inMsg.bytesSavedCompression }
+
+// Field returns the value of the specified field in this message
+func (inMsg *inboundMessage) Get(field Field) interface{} { return inMsg.fields[field] }
+
+// Op returns the value of the specified operation in this message
+func (outMsg *outboundMessage) Op() Op { return outMsg.op }
 
 // Bytes returns this message in bytes
 func (outMsg *outboundMessage) Bytes() []byte { return outMsg.bytes }
@@ -49,4 +58,4 @@ func (outMsg *outboundMessage) Bytes() []byte { return outMsg.bytes }
 // compression. That is, the number of bytes we did not send over the
 // network due to the message being compressed. Empty slice for messages that were not
 // compressed.
-func (outMsg *outboundMessage) BytesSavedCompression() []byte { return outMsg.bytesSavedCompression }
+func (outMsg *outboundMessage) BytesSavedCompression() int { return outMsg.bytesSavedCompression }

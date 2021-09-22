@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"math/big"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -29,7 +28,7 @@ type Codec interface {
 		op Op,
 		fieldValues map[Field]interface{},
 		compress bool,
-	) (InboundMessage, error)
+	) (OutboundMessage, error)
 
 	Parse(bytes []byte) (InboundMessage, error)
 }
@@ -97,7 +96,7 @@ func (c *codec) Pack(
 	op Op,
 	fieldValues map[Field]interface{},
 	compress bool,
-) (InboundMessage, error) {
+) (OutboundMessage, error) {
 	msgFields, ok := messages[op]
 	if !ok {
 		return nil, errBadOp
@@ -127,7 +126,7 @@ func (c *codec) Pack(
 	if p.Err != nil {
 		return nil, p.Err
 	}
-	msg := &inboundMessage{
+	msg := &outboundMessage{
 		op:    op,
 		bytes: p.Bytes,
 	}
@@ -145,7 +144,7 @@ func (c *codec) Pack(
 		return nil, fmt.Errorf("couldn't compress payload of %s message: %s", op, err)
 	}
 	c.compressTimeMetrics[op].Observe(float64(time.Since(startTime)))
-	msg.bytesSavedCompression = big.NewInt(int64(len(payloadBytes) - len(compressedPayloadBytes))).Bytes() // may be negative
+	msg.bytesSavedCompression = len(payloadBytes) - len(compressedPayloadBytes) // may be negative
 	// Remove the uncompressed payload (keep just the message type and isCompressed)
 	msg.bytes = msg.bytes[:wrappers.BoolLen+wrappers.ByteLen]
 	// Attach the compressed payload
@@ -211,6 +210,6 @@ func (c *codec) Parse(bytes []byte) (InboundMessage, error) {
 	return &inboundMessage{
 		op:                    op,
 		bytes:                 p.Bytes,
-		bytesSavedCompression: big.NewInt(int64(bytesSaved)).Bytes(),
+		bytesSavedCompression: bytesSaved,
 	}, p.Err
 }
