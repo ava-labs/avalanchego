@@ -214,18 +214,11 @@ func TestCodecPackParseGzip(t *testing.T) {
 		packedIntf, err := c.Pack(m.op, m.fields, m.op.Compressable())
 		assert.NoError(t, err, "failed to pack on operation %s", m.op)
 
-		_, err = c.Parse(packedIntf.Bytes())
+		unpackedIntf, err := c.Parse(packedIntf.Bytes())
 		assert.NoError(t, err, "failed to parse w/ compression on operation %s", m.op)
 
-		// packed := packedIntf.(*outboundMessage)
-		// unpacked := unpackedIntf.(*inboundMessage)
+		unpacked := unpackedIntf.(*inboundMessage)
 
-		// assert.EqualValues(t, len(packed.fields), len(unpacked.fields))
-		// for field := range packed.fields {
-		// 	if field == SignedPeers {
-		// 		continue // TODO get this to work
-		// 	}
-		// 	assert.EqualValues(t, packed.fields[field], unpacked.fields[field])
-		// }
+		assert.EqualValues(t, len(m.fields), len(unpacked.fields))
 	}
 }
