@@ -335,14 +335,6 @@ func TestGetSubnetConfigs(t *testing.T) {
 				assert.Empty(given)
 			},
 		},
-		"wrong field": {
-			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON: `{"stakerOnly": true}`,
-			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
-				assert.Nil(given)
-			},
-			errMessage: `json: unknown field "stakerOnly"`,
-		},
 		"invalid consensus parameters": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
 			givenJSON: `{"consensusParameters":{"k": 111, "alpha":1234} }`,

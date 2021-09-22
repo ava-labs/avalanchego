@@ -4,8 +4,6 @@
 package chains
 
 import (
-	"bytes"
-	"encoding/json"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -83,19 +81,4 @@ func (s *subnet) removeChain(chainID ids.ID) {
 	defer s.lock.Unlock()
 
 	s.bootstrapping.Remove(chainID)
-}
-
-func (config *SubnetConfig) UnmarshalJSON(data []byte) error {
-	// without a new type, unmarshal gets into a infinite loop
-	type xconfig SubnetConfig
-	sc := xconfig(*config)
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.DisallowUnknownFields() // Force errors
-
-	if err := dec.Decode(&sc); err != nil {
-		return err
-	}
-
-	*config = SubnetConfig(sc)
-	return nil
 }
