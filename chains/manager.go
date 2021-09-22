@@ -670,7 +670,7 @@ func (m *manager) createSnowmanChain(
 	// Initialize the ProposerVM and the vm wrapped inside it
 	chainConfig, err := m.getChainConfig(ctx.ChainID)
 	if err != nil {
-		return nil, fmt.Errorf("error during vm's Initialize: %w", err)
+		return nil, fmt.Errorf("error while fetching chain config: %w", err)
 	}
 
 	if err := vm.Initialize(

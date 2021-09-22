@@ -5,11 +5,14 @@ package ids
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAliaser(t *testing.T) {
+	assert := assert.New(t)
 	for _, test := range AliasTests {
 		aliaser := NewAliaser()
-		test(t, aliaser, aliaser)
+		test(assert, aliaser, aliaser)
 	}
 }

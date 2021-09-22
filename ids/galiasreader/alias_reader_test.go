@@ -12,6 +12,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ids/galiasreader/galiasreaderproto"
 )
@@ -21,6 +23,7 @@ const (
 )
 
 func TestInterface(t *testing.T) {
+	assert := assert.New(t)
 	for _, test := range ids.AliasTests {
 		listener := bufconn.Listen(bufSize)
 		server := grpc.NewServer()
@@ -40,12 +43,10 @@ func TestInterface(t *testing.T) {
 
 		ctx := context.Background()
 		conn, err := grpc.DialContext(ctx, "", dialer, grpc.WithInsecure())
-		if err != nil {
-			t.Fatalf("Failed to dial: %s", err)
-		}
+		assert.NoError(err)
 
 		r := NewClient(galiasreaderproto.NewAliasReaderClient(conn))
-		test(t, r, w)
+		test(assert, r, w)
 
 		server.Stop()
 		_ = conn.Close()

@@ -4,11 +4,10 @@
 package ids
 
 import (
-	"reflect"
-	"testing"
+	"github.com/stretchr/testify/assert"
 )
 
-var AliasTests = []func(t *testing.T, r AliaserReader, w AliaserWriter){
+var AliasTests = []func(assert *assert.Assertions, r AliaserReader, w AliaserWriter){
 	AliaserLookupErrorTest,
 	AliaserLookupTest,
 	AliaserAliasesEmptyTest,
@@ -18,130 +17,92 @@ var AliasTests = []func(t *testing.T, r AliaserReader, w AliaserWriter){
 	AliaserRemoveAliasTest,
 }
 
-func AliaserLookupErrorTest(t *testing.T, r AliaserReader, w AliaserWriter) {
+func AliaserLookupErrorTest(assert *assert.Assertions, r AliaserReader, w AliaserWriter) {
 	_, err := r.Lookup("Batman")
-	if err == nil {
-		t.Error("Expected an error due to missing alias")
-	}
+	assert.Error(err, "expected an error due to missing alias")
 }
 
-func AliaserLookupTest(t *testing.T, r AliaserReader, w AliaserWriter) {
+func AliaserLookupTest(assert *assert.Assertions, r AliaserReader, w AliaserWriter) {
 	id := ID{'K', 'a', 't', 'e', ' ', 'K', 'a', 'n', 'e'}
-	if err := w.Alias(id, "Batwoman"); err != nil {
-		t.Fatal(err)
-	}
+	err := w.Alias(id, "Batwoman")
+	assert.NoError(err)
 
 	res, err := r.Lookup("Batwoman")
-	if err != nil {
-		t.Fatalf("Unexpected error %q", err)
-	}
-	if id != res {
-		t.Fatalf("Got %v, expected %v", res, id)
-	}
+	assert.NoError(err)
+	assert.Equal(id, res)
 }
 
-func AliaserAliasesEmptyTest(t *testing.T, r AliaserReader, w AliaserWriter) {
+func AliaserAliasesEmptyTest(assert *assert.Assertions, r AliaserReader, w AliaserWriter) {
 	id := ID{'J', 'a', 'm', 'e', 's', ' ', 'G', 'o', 'r', 'd', 'o', 'n'}
 
 	aliases, err := r.Aliases(id)
-	if err != nil {
-		t.Fatalf("Unexpected error %q", err)
-	}
-	if len(aliases) != 0 {
-		t.Fatalf("Unexpected aliases %#v", aliases)
-	}
+	assert.NoError(err)
+	assert.Empty(aliases)
 }
 
-func AliaserAliasesTest(t *testing.T, r AliaserReader, w AliaserWriter) {
+func AliaserAliasesTest(assert *assert.Assertions, r AliaserReader, w AliaserWriter) {
 	id := ID{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'}
-	if err := w.Alias(id, "Batman"); err != nil {
-		t.Fatal(err)
-	}
-	if err := w.Alias(id, "Dark Knight"); err != nil {
-		t.Fatal(err)
-	}
+	err := w.Alias(id, "Batman")
+	assert.NoError(err)
+
+	err = w.Alias(id, "Dark Knight")
+	assert.NoError(err)
 
 	aliases, err := r.Aliases(id)
-	if err != nil {
-		t.Fatalf("Unexpected error %q", err)
-	}
+	assert.NoError(err)
 
 	expected := []string{"Batman", "Dark Knight"}
-	if !reflect.DeepEqual(aliases, expected) {
-		t.Fatalf("Got %v, expected %v", aliases, expected)
-	}
+	assert.Equal(expected, aliases)
 }
 
-func AliaserPrimaryAliasTest(t *testing.T, r AliaserReader, w AliaserWriter) {
+func AliaserPrimaryAliasTest(assert *assert.Assertions, r AliaserReader, w AliaserWriter) {
 	id1 := ID{'J', 'a', 'm', 'e', 's', ' ', 'G', 'o', 'r', 'd', 'o', 'n'}
 	id2 := ID{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'}
-	if err := w.Alias(id2, "Batman"); err != nil {
-		t.Fatal(err)
-	}
-	if err := w.Alias(id2, "Dark Knight"); err != nil {
-		t.Fatal(err)
-	}
+	err := w.Alias(id2, "Batman")
+	assert.NoError(err)
 
-	res, err := r.PrimaryAlias(id1)
-	if res != "" {
-		t.Fatalf("Unexpected alias for %v", id1)
-	}
-	if err == nil {
-		t.Fatal("Expected an error given an id with no aliases")
-	}
+	err = w.Alias(id2, "Dark Knight")
+	assert.NoError(err)
 
-	res, err = r.PrimaryAlias(id2)
+	_, err = r.PrimaryAlias(id1)
+	assert.Error(err)
+
 	expected := "Batman"
-	if res != expected {
-		t.Fatalf("Got %v, expected %v", res, expected)
-	}
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
+	res, err := r.PrimaryAlias(id2)
+	assert.NoError(err)
+	assert.Equal(expected, res)
 }
 
-func AliaserAliasClashTest(t *testing.T, r AliaserReader, w AliaserWriter) {
+func AliaserAliasClashTest(assert *assert.Assertions, r AliaserReader, w AliaserWriter) {
 	id1 := ID{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'}
 	id2 := ID{'D', 'i', 'c', 'k', ' ', 'G', 'r', 'a', 'y', 's', 'o', 'n'}
-	if err := w.Alias(id1, "Batman"); err != nil {
-		t.Fatal(err)
-	}
+	err := w.Alias(id1, "Batman")
+	assert.NoError(err)
 
-	err := w.Alias(id2, "Batman")
-	if err == nil {
-		t.Fatalf("Expected an error, due to an existing alias")
-	}
+	err = w.Alias(id2, "Batman")
+	assert.Error(err)
 }
 
-func AliaserRemoveAliasTest(t *testing.T, r AliaserReader, w AliaserWriter) {
+func AliaserRemoveAliasTest(assert *assert.Assertions, r AliaserReader, w AliaserWriter) {
 	id1 := ID{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'}
 	id2 := ID{'J', 'a', 'm', 'e', 's', ' ', 'G', 'o', 'r', 'd', 'o', 'n'}
-	if err := w.Alias(id1, "Batman"); err != nil {
-		t.Fatal(err)
-	}
-	if err := w.Alias(id1, "Dark Knight"); err != nil {
-		t.Fatal(err)
-	}
+	err := w.Alias(id1, "Batman")
+	assert.NoError(err)
+
+	err = w.Alias(id1, "Dark Knight")
+	assert.NoError(err)
 
 	w.RemoveAliases(id1)
 
-	_, err := r.PrimaryAlias(id1)
-	if err == nil {
-		t.Fatalf("PrimaryAlias should have errored while getting primary alias for removed ID")
-	}
+	_, err = r.PrimaryAlias(id1)
+	assert.Error(err)
 
 	err = w.Alias(id2, "Batman")
-	if err != nil {
-		t.Fatalf("Unexpected error: %s when re-assigning removed alias", err)
-	}
+	assert.NoError(err)
 
 	err = w.Alias(id2, "Dark Knight")
-	if err != nil {
-		t.Fatalf("Unexpected error: %s when re-assigning removed alias", err)
-	}
+	assert.NoError(err)
 
 	err = w.Alias(id1, "Dark Night Rises")
-	if err != nil {
-		t.Fatalf("Unexpected error: %s when re-assigning removed ID in aliaser", err)
-	}
+	assert.NoError(err)
 }
