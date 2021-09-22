@@ -3,8 +3,10 @@
 
 package message
 
-var _ InboundMessage = &inboundMessage{}
-var _ OutboundMessage = &outboundMessage{}
+var (
+	_ InboundMessage  = &inboundMessage{}
+	_ OutboundMessage = &outboundMessage{}
+)
 
 // InboundMessage represents a set of fields for an inbound message that can be serialized into a byte stream
 type InboundMessage interface {
@@ -27,6 +29,7 @@ type OutboundMessage interface {
 	Bytes() []byte
 	Op() Op
 }
+
 type outboundMessage struct {
 	bytes                 []byte
 	bytesSavedCompression int
