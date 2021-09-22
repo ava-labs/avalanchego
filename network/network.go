@@ -233,8 +233,8 @@ type network struct {
 	// Rate-limits outgoing messages
 	outboundMsgThrottler throttling.OutboundMsgThrottler
 
-	// WhitelistedSubnets of the node
-	whitelistedSubnets ids.Set
+	// AllowedSubnets of the node
+	allowedSubnets ids.Set
 }
 
 type Config struct {
@@ -284,7 +284,7 @@ func NewDefaultNetwork(
 	compressionEnabled bool,
 	inboundMsgThrottler throttling.InboundMsgThrottler,
 	outboundMsgThrottler throttling.OutboundMsgThrottler,
-	whitelistedSubnets ids.Set,
+	allowedSubnets ids.Set,
 ) (Network, error) {
 	return NewNetwork(
 		namespace,
@@ -327,7 +327,7 @@ func NewDefaultNetwork(
 		compressionEnabled,
 		inboundMsgThrottler,
 		outboundMsgThrottler,
-		whitelistedSubnets,
+		allowedSubnets,
 	)
 }
 
@@ -373,7 +373,7 @@ func NewNetwork(
 	compressionEnabled bool,
 	inboundMsgThrottler throttling.InboundMsgThrottler,
 	outboundMsgThrottler throttling.OutboundMsgThrottler,
-	whitelistedSubnets ids.Set,
+	allowedSubnets ids.Set,
 ) (Network, error) {
 	// #nosec G404
 	netw := &network{
@@ -430,7 +430,7 @@ func NewNetwork(
 		compressionEnabled:   compressionEnabled,
 		inboundMsgThrottler:  inboundMsgThrottler,
 		outboundMsgThrottler: outboundMsgThrottler,
-		whitelistedSubnets:   whitelistedSubnets,
+		allowedSubnets:       allowedSubnets,
 	}
 	codec, err := message.NewCodecWithAllocator(
 		fmt.Sprintf("%s_codec", namespace),

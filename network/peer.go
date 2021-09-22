@@ -601,7 +601,7 @@ func (p *peer) sendVersionWithSubnets() {
 		p.net.stateLock.RUnlock()
 		return
 	}
-	whitelistedSubnets := p.net.whitelistedSubnets
+	allowedSubnets := p.net.allowedSubnets
 	msg, err := p.net.b.VersionWithSubnets(
 		p.net.networkID,
 		p.net.nodeID,
@@ -610,7 +610,7 @@ func (p *peer) sendVersionWithSubnets() {
 		p.net.versionCompatibility.Version().String(),
 		myVersionTime,
 		myVersionSig,
-		whitelistedSubnets.List(),
+		allowedSubnets.List(),
 	)
 	p.net.stateLock.RUnlock()
 	p.net.log.AssertNoError(err)
@@ -841,14 +841,14 @@ func (p *peer) versionCheck(msg message.Message, isVersionWithSubnets bool) {
 				return
 			}
 			// add only if we also track this subnet
-			if p.net.whitelistedSubnets.Contains(subnetID) {
+			if p.net.allowedSubnets.Contains(subnetID) {
 				p.trackedSubnets.Add(subnetID)
 			}
 		}
 	} else {
 		// this peer has old Version, we don't know what its interested in.
 		// so assume that it tracks all available subnets
-		p.trackedSubnets.Add(p.net.whitelistedSubnets.List()...)
+		p.trackedSubnets.Add(p.net.allowedSubnets.List()...)
 	}
 
 	sig := msg.Get(message.SigBytes).([]byte)

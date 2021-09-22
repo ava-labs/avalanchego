@@ -84,7 +84,7 @@ const (
 	SnowMaxTimeProcessingKey                  = "snow-max-time-processing"
 	SnowEpochFirstTransitionKey               = "snow-epoch-first-transition"
 	SnowEpochDurationKey                      = "snow-epoch-duration"
-	WhitelistedSubnetsKey                     = "whitelisted-subnets"
+	AllowedSubnetsKey                         = "allowed-subnets"
 	AdminAPIEnabledKey                        = "api-admin-enabled"
 	InfoAPIEnabledKey                         = "api-info-enabled"
 	KeystoreAPIEnabledKey                     = "api-keystore-enabled"

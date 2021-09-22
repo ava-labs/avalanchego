@@ -195,8 +195,8 @@ type Config struct {
 	RouterHealthConfig       router.HealthConfig `json:"routerHealthConfig"`
 	ConsensusShutdownTimeout time.Duration       `json:"consensusShutdownTimeout"`
 
-	// Subnet Whitelist
-	WhitelistedSubnets ids.Set `json:"whitelistedSubnets"`
+	// Subnet Allowlist
+	AllowedSubnets ids.Set `json:"allowedSubnets"`
 
 	// ChainConfigs
 	ChainConfigs map[string]chains.ChainConfig `json:"-"`

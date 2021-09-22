@@ -217,7 +217,7 @@ func (vm *VM) initBlockchains() error {
 		}
 	}
 
-	for subnetID := range vm.WhitelistedSubnets {
+	for subnetID := range vm.AllowedSubnets {
 		chains, err := vm.internalState.GetChains(subnetID)
 		if err != nil {
 			return err
@@ -241,7 +241,7 @@ func (vm *VM) createChain(tx *Tx) error {
 
 	if vm.StakingEnabled && // Staking is enabled, so nodes might not validate all chains
 		constants.PrimaryNetworkID != unsignedTx.SubnetID && // All nodes must validate the primary network
-		!vm.WhitelistedSubnets.Contains(unsignedTx.SubnetID) { // This node doesn't validate this blockchain
+		!vm.AllowedSubnets.Contains(unsignedTx.SubnetID) { // This node doesn't validate this blockchain
 		return nil
 	}
 
@@ -536,7 +536,7 @@ func (vm *VM) updateValidators(force bool) error {
 	vm.localStake.Set(float64(weight))
 	vm.totalStake.Set(float64(primaryValidators.Weight()))
 
-	for subnetID := range vm.WhitelistedSubnets {
+	for subnetID := range vm.AllowedSubnets {
 		subnetValidators, err := currentValidators.ValidatorSet(subnetID)
 		if err != nil {
 			return err

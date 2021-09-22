@@ -221,7 +221,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	// Stake Minting Period
 	fs.Duration(StakeMintingPeriodKey, genesis.LocalParams.StakeMintingPeriod, "Consumption period of the staking function")
 	// Subnets
-	fs.String(WhitelistedSubnetsKey, "", "Whitelist of subnets to validate.")
+	fs.String(AllowedSubnetsKey, "", "Allowlist of subnets to validate.")
 
 	// Bootstrapping
 	fs.String(BootstrapIPsKey, "", "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")

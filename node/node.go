@@ -291,7 +291,7 @@ func (n *Node) initNetworking() error {
 		n.Config.NetworkConfig.CompressionEnabled,
 		inboundMsgThrottler,
 		outboundMsgThrottler,
-		n.Config.WhitelistedSubnets,
+		n.Config.AllowedSubnets,
 	)
 	return err
 }
@@ -669,7 +669,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		CriticalChains:                         criticalChains,
 		TimeoutManager:                         timeoutManager,
 		HealthService:                          n.healthService,
-		WhitelistedSubnets:                     n.Config.WhitelistedSubnets,
+		AllowedSubnets:                         n.Config.AllowedSubnets,
 		RetryBootstrap:                         n.Config.RetryBootstrap,
 		RetryBootstrapWarnFrequency:            n.Config.RetryBootstrapWarnFrequency,
 		ShutdownNodeFunc:                       n.Shutdown,
@@ -698,7 +698,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			Chains:                n.chainManager,
 			Validators:            vdrs,
 			StakingEnabled:        n.Config.EnableStaking,
-			WhitelistedSubnets:    n.Config.WhitelistedSubnets,
+			AllowedSubnets:        n.Config.AllowedSubnets,
 			TxFee:                 n.Config.TxFee,
 			CreateAssetTxFee:      n.Config.CreateAssetTxFee,
 			CreateSubnetTxFee:     n.Config.CreateSubnetTxFee,

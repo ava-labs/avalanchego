@@ -29,7 +29,7 @@ type Factory struct {
 	StakingEnabled bool
 
 	// Set of subnets that this node is validating
-	WhitelistedSubnets ids.Set
+	AllowedSubnets ids.Set
 
 	// Fee that must be burned by every create staker transaction
 	AddStakerTxFee uint64

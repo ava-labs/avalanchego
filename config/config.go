@@ -556,9 +556,9 @@ func getEpochConfig(v *viper.Viper, networkID uint32) (genesis.EpochConfig, erro
 	return genesis.GetEpochConfig(networkID), nil
 }
 
-func getWhitelistedSubnets(v *viper.Viper) (ids.Set, error) {
-	whitelistedSubnetIDs := ids.Set{}
-	for _, subnet := range strings.Split(v.GetString(WhitelistedSubnetsKey), ",") {
+func getAllowedSubnets(v *viper.Viper) (ids.Set, error) {
+	allowedSubnetIDs := ids.Set{}
+	for _, subnet := range strings.Split(v.GetString(AllowedSubnetsKey), ",") {
 		if subnet == "" {
 			continue
 		}
@@ -566,9 +566,9 @@ func getWhitelistedSubnets(v *viper.Viper) (ids.Set, error) {
 		if err != nil {
 			return nil, fmt.Errorf("couldn't parse subnetID %q: %w", subnet, err)
 		}
-		whitelistedSubnetIDs.Add(subnetID)
+		allowedSubnetIDs.Add(subnetID)
 	}
-	return whitelistedSubnetIDs, nil
+	return allowedSubnetIDs, nil
 }
 
 func getDatabaseConfig(v *viper.Viper, networkID uint32) node.DatabaseConfig {
@@ -792,8 +792,8 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 		return node.Config{}, err
 	}
 
-	// Whitelisted Subnets
-	nodeConfig.WhitelistedSubnets, err = getWhitelistedSubnets(v)
+	// Allowed Subnets
+	nodeConfig.AllowedSubnets, err = getAllowedSubnets(v)
 	if err != nil {
 		return node.Config{}, err
 	}
