@@ -31,6 +31,7 @@ import (
 	"errors"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/coreth/accounts/abi/bind"
 	"github.com/ava-labs/coreth/accounts/abi/bind/backends"
@@ -42,7 +43,6 @@ import (
 
 var testKey, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 
-/*
 var waitDeployedTests = map[string]struct {
 	code        string
 	gas         uint64
@@ -61,14 +61,12 @@ var waitDeployedTests = map[string]struct {
 		wantAddress: common.HexToAddress("0x3a220f351252089d385b29beca14e27f204c296a"),
 	},
 }
-*/
 
-/*
 func TestWaitDeployed(t *testing.T) {
 	for name, test := range waitDeployedTests {
 		backend := backends.NewSimulatedBackend(
 			core.GenesisAlloc{
-				crypto.PubkeyToAddress(testKey.PublicKey): {Balance: big.NewInt(10000000000000000)},
+				crypto.PubkeyToAddress(testKey.PublicKey): {Balance: new(big.Int).Mul(big.NewInt(10000000000000000), big.NewInt(1000))},
 			},
 			10000000,
 		)
@@ -95,8 +93,10 @@ func TestWaitDeployed(t *testing.T) {
 		}()
 
 		// Send and mine the transaction.
-		backend.SendTransaction(ctx, tx)
-		backend.Commit()
+		if err := backend.SendTransaction(ctx, tx); err != nil {
+			t.Errorf("Failed to send transaction: %s", err)
+		}
+		backend.Commit(true)
 
 		select {
 		case <-mined:
@@ -111,7 +111,6 @@ func TestWaitDeployed(t *testing.T) {
 		}
 	}
 }
-*/
 
 func TestWaitDeployedCornerCases(t *testing.T) {
 	backend := backends.NewSimulatedBackend(
@@ -132,7 +131,7 @@ func TestWaitDeployedCornerCases(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	backend.SendTransaction(ctx, tx)
-	backend.Commit()
+	backend.Commit(true)
 	notContentCreation := errors.New("tx is not contract creation")
 	if _, err := bind.WaitDeployed(ctx, backend, tx); err.Error() != notContentCreation.Error() {
 		t.Errorf("error missmatch: want %q, got %q, ", notContentCreation, err)
