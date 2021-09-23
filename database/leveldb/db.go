@@ -63,11 +63,11 @@ type Database struct {
 }
 
 type config struct {
-	OpenFilesCacheCapacity int `json:openFileCacheCapacity`
-	BlockCacheCapacity     int `json:blockCacheCapacity`
+	OpenFilesCacheCapacity int `json:"openFilesCacheCapacity"`
+	BlockCacheCapacity     int `json:"blockCacheCapacity"`
 	// There are two buffers of size WriteBuffer used.
-	WriteBuffer      int `json:writeBuffer`
-	FilterBitsPerKey int `json:filterBitsPerKey`
+	WriteBuffer      int `json:"writeBuffer"`
+	FilterBitsPerKey int `json:"filterBitsPerKey"`
 }
 
 // New returns a wrapped LevelDB object.

@@ -139,7 +139,6 @@ func new(
 	}
 
 	currentDB, err := newDB(currentDBPath, dbConfig, log)
-
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create db at %s: %w", currentDBPath, err)
 	}

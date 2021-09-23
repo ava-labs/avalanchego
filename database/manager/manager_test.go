@@ -26,7 +26,7 @@ func TestNewSingleLevelDB(t *testing.T) {
 	v1 := version.DefaultVersion1_0_0
 
 	dbPath := filepath.Join(dir, v1.String())
-	db, err := leveldb.New(dbPath, logging.NoLog{})
+	db, err := leveldb.New(dbPath, nil, logging.NoLog{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +36,7 @@ func TestNewSingleLevelDB(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager, err := NewLevelDB(dir, logging.NoLog{}, v1)
+	manager, err := NewLevelDB(dir, "", logging.NoLog{}, v1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestNewCreatesSingleDB(t *testing.T) {
 
 	v1 := version.DefaultVersion1_0_0
 
-	manager, err := NewLevelDB(dir, logging.NoLog{}, v1)
+	manager, err := NewLevelDB(dir, "", logging.NoLog{}, v1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,13 +86,13 @@ func TestNewInvalidMemberPresent(t *testing.T) {
 	v2 := version.NewDefaultVersion(1, 2, 0)
 
 	dbPath1 := filepath.Join(dir, v1.String())
-	db1, err := leveldb.New(dbPath1, logging.NoLog{})
+	db1, err := leveldb.New(dbPath1, nil, logging.NoLog{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	dbPath2 := filepath.Join(dir, v2.String())
-	db2, err := leveldb.New(dbPath2, logging.NoLog{})
+	db2, err := leveldb.New(dbPath2, nil, logging.NoLog{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func TestNewInvalidMemberPresent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = NewLevelDB(dir, logging.NoLog{}, v2)
+	_, err = NewLevelDB(dir, "", logging.NoLog{}, v2)
 	assert.Error(t, err, "expected to error creating the manager due to an open db")
 
 	err = db1.Close()
@@ -114,7 +114,7 @@ func TestNewInvalidMemberPresent(t *testing.T) {
 	err = f.Close()
 	assert.NoError(t, err)
 
-	db, err := NewLevelDB(dir, logging.NoLog{}, v1)
+	db, err := NewLevelDB(dir, "", logging.NoLog{}, v1)
 	assert.NoError(t, err, "expected not to error with a non-directory file being present")
 
 	err = db.Close()
@@ -134,7 +134,7 @@ func TestNewSortsDatabases(t *testing.T) {
 
 	for _, version := range vers {
 		dbPath := filepath.Join(dir, version.String())
-		db, err := leveldb.New(dbPath, logging.NoLog{})
+		db, err := leveldb.New(dbPath, nil, logging.NoLog{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -145,7 +145,7 @@ func TestNewSortsDatabases(t *testing.T) {
 		}
 	}
 
-	manager, err := NewLevelDB(dir, logging.NoLog{}, vers[0])
+	manager, err := NewLevelDB(dir, "", logging.NoLog{}, vers[0])
 	if err != nil {
 		t.Fatal(err)
 	}
