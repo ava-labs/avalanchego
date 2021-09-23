@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ethereum/go-ethereum/common"
@@ -37,8 +38,20 @@ type UnsignedExportTx struct {
 	ExportedOutputs []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
 }
 
-// InputUTXOs returns an empty set
-func (tx *UnsignedExportTx) InputUTXOs() ids.Set { return ids.Set{} }
+// InputUTXOs returns a set of all the hash(address:nonce) exporting funds.
+func (tx *UnsignedExportTx) InputUTXOs() ids.Set {
+	set := ids.NewSet(len(tx.Ins))
+	for _, in := range tx.Ins {
+		// Total populated bytes is 20 (Address) + 8 (Nonce), however, we allocate
+		// 32 bytes to make ids.ID casting easier.
+		var rawID [32]byte
+		packer := wrappers.Packer{Bytes: rawID[:]}
+		packer.PackLong(in.Nonce)
+		packer.PackBytes(in.Address.Bytes())
+		set.Add(ids.ID(rawID))
+	}
+	return set
+}
 
 // Verify this transaction is well-formed
 func (tx *UnsignedExportTx) Verify(
@@ -80,7 +93,7 @@ func (tx *UnsignedExportTx) Verify(
 	return nil
 }
 
-func (tx *UnsignedExportTx) Cost() (uint64, error) {
+func (tx *UnsignedExportTx) GasUsed() (uint64, error) {
 	byteCost := calcBytesCost(len(tx.UnsignedBytes()))
 	numSigs := uint64(len(tx.Ins))
 	sigCost, err := math.Mul64(numSigs, secp256k1fx.CostPerSignature)
@@ -134,11 +147,11 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	switch {
 	// Apply dynamic fees to export transactions as of Apricot Phase 3
 	case rules.IsApricotPhase3:
-		cost, err := stx.Cost()
+		gasUsed, err := stx.GasUsed()
 		if err != nil {
 			return err
 		}
-		txFee, err := calculateDynamicFee(cost, baseFee)
+		txFee, err := calculateDynamicFee(gasUsed, baseFee)
 		if err != nil {
 			return err
 		}
@@ -284,7 +297,7 @@ func (vm *VM) newExportTx(
 		}
 
 		var cost uint64
-		cost, err = tx.Cost()
+		cost, err = tx.GasUsed()
 		if err != nil {
 			return nil, err
 		}

@@ -88,7 +88,7 @@ func (api *SnowmanAPI) GetAcceptedFront(ctx context.Context) (*GetAcceptedFrontR
 func (api *SnowmanAPI) IssueBlock(ctx context.Context) error {
 	log.Info("Issuing a new block")
 
-	api.vm.signalTxsReady()
+	api.vm.builder.signalTxsReady()
 	return nil
 }
 
@@ -273,7 +273,7 @@ func (service *AvaxAPI) Import(_ *http.Request, args *ImportArgs, response *api.
 	}
 
 	response.TxID = tx.ID()
-	return service.vm.issueTx(tx)
+	return service.vm.issueTx(tx, true /*=local*/)
 }
 
 // ExportAVAXArgs are the arguments to ExportAVAX
@@ -367,7 +367,7 @@ func (service *AvaxAPI) Export(_ *http.Request, args *ExportArgs, response *api.
 	}
 
 	response.TxID = tx.ID()
-	return service.vm.issueTx(tx)
+	return service.vm.issueTx(tx, true /*=local*/)
 }
 
 // GetUTXOs gets all utxos for passed in addresses
@@ -467,7 +467,7 @@ func (service *AvaxAPI) IssueTx(r *http.Request, args *api.FormattedTx, response
 	}
 
 	response.TxID = tx.ID()
-	return service.vm.issueTx(tx)
+	return service.vm.issueTx(tx, true /*=local*/)
 }
 
 // GetAtomicTxStatusReply defines the GetAtomicTxStatus replies returned from the API

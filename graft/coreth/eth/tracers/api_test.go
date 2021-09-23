@@ -45,13 +45,13 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
+	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/internal/ethapi"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 var (
@@ -70,7 +70,7 @@ type testBackend struct {
 func newTestBackend(t *testing.T, n int, gspec *core.Genesis, generator func(i int, b *core.BlockGen)) *testBackend {
 	backend := &testBackend{
 		chainConfig: params.TestChainConfig,
-		engine:      dummy.NewFaker(),
+		engine:      dummy.NewETHFaker(),
 		chaindb:     rawdb.NewMemoryDatabase(),
 	}
 	// Generate blocks for testing
@@ -79,7 +79,10 @@ func newTestBackend(t *testing.T, n int, gspec *core.Genesis, generator func(i i
 		gendb   = rawdb.NewMemoryDatabase()
 		genesis = gspec.MustCommit(gendb)
 	)
-	blocks, _ := core.GenerateChain(backend.chainConfig, genesis, backend.engine, gendb, n, generator)
+	blocks, _, err := core.GenerateChain(backend.chainConfig, genesis, backend.engine, gendb, n, 10, generator)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Import the canonical chain
 	gspec.MustCommit(backend.chaindb)
@@ -430,24 +433,24 @@ func TestOverriddenTraceCall(t *testing.T) {
 			},
 		},
 	}
-	for _, testspec := range testSuite {
+	for i, testspec := range testSuite {
 		result, err := api.TraceCall(context.Background(), testspec.call, rpc.BlockNumberOrHash{BlockNumber: &testspec.blockNumber}, testspec.config)
 		if testspec.expectErr != nil {
 			if err == nil {
-				t.Errorf("Expect error %v, get nothing", testspec.expectErr)
+				t.Errorf("test %d: want error %v, have nothing", i, testspec.expectErr)
 				continue
 			}
 			if !errors.Is(err, testspec.expectErr) {
-				t.Errorf("Error mismatch, want %v, get %v", testspec.expectErr, err)
+				t.Errorf("test %d: error mismatch, want %v, have %v", i, testspec.expectErr, err)
 			}
 		} else {
 			if err != nil {
-				t.Errorf("Expect no error, get %v", err)
+				t.Errorf("test %d: want no error, have %v", i, err)
 				continue
 			}
 			ret := new(callTrace)
 			if err := json.Unmarshal(result.(json.RawMessage), ret); err != nil {
-				t.Fatalf("failed to unmarshal trace result: %v", err)
+				t.Fatalf("test %d: failed to unmarshal trace result: %v", i, err)
 			}
 			if !jsonEqual(ret, testspec.expect) {
 				// uncomment this for easier debugging

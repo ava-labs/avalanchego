@@ -39,7 +39,9 @@ import (
 var DefaultFullGPOConfig = gasprice.Config{
 	Blocks:     20,
 	Percentile: 60,
+	MinPrice:   gasprice.DefaultMinPrice,
 	MaxPrice:   gasprice.DefaultMaxPrice,
+	MinGasUsed: gasprice.DefaultMinGasUsed,
 }
 
 // DefaultConfig contains default settings for use on the Avalanche main net.
