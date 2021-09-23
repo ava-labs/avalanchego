@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/rocksdb"
 	"github.com/ava-labs/avalanchego/genesis"
-	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -120,6 +119,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Uint(NetworkPeerListSizeKey, 20, gossipHelpMsg)
 	fs.Uint(NetworkPeerListGossipSizeKey, 50, gossipHelpMsg)
 	fs.Duration(NetworkPeerListGossipFreqKey, time.Minute, gossipHelpMsg)
+	fs.Uint(NetworkPeerListStakerGossipFractionKey, 2, "Ratio of stakers to 'network-peer-list-gossip-size' in a gossiped peer list.")
 
 	// Public IP Resolution
 	fs.String(PublicIPKey, "", "Public IP of this node for P2P communication. If empty, try to discover with NAT. Ignored if dynamic-public-ip is non-empty.")
@@ -139,8 +139,14 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(NetworkMaximumTimeoutKey, 10*time.Second, "Maximum timeout value of the adaptive timeout manager.")
 	fs.Duration(NetworkTimeoutHalflifeKey, 5*time.Minute, "Halflife of average network response time. Higher value --> network timeout is less volatile. Can't be 0.")
 	fs.Float64(NetworkTimeoutCoefficientKey, 2, "Multiplied by average network response time to get the network timeout. Must be >= 1.")
-	fs.Bool(NetworkCompressionEnabledKey, true, "If true, compress Put, PushQuery, PeerList and Multiput messages sent to peers that support compression")
+	fs.Duration(NetworkGetVersionTimeoutKey, 10*time.Second, "Timeout for waiting GetVersion response from peers in handshake.")
+	fs.Duration(NetworkReadHandshakeTimeoutKey, 15*time.Second, "Timeout value for reading handshake messages.")
+	fs.Duration(NetworkPingTimeoutKey, constants.DefaultPingPongTimeout, "Timeout value for Ping-Pong with a peer.")
+	fs.Duration(NetworkPingFrequencyKey, constants.DefaultPingFrequency, "Frequency of pinging other peers.")
 
+	fs.Bool(NetworkCompressionEnabledKey, true, "If true, compress Put, PushQuery, PeerList and Multiput messages sent to peers that support compression")
+	fs.Duration(NetworkMaxClockDifferenceKey, time.Minute, "Max allowed clock difference value between this node and peers.")
+	fs.Bool(NetworkAllowPrivateIPsKey, true, "Allows the node to connect peers with private IPs")
 	// Peer alias configuration
 	fs.Duration(PeerAliasTimeoutKey, 10*time.Minute, "How often the node will attempt to connect "+
 		"to an IP address previously associated with a peer (i.e. a peer alias).")
@@ -161,12 +167,12 @@ func addNodeFlags(fs *flag.FlagSet) {
 	// Inbound Throttling
 	fs.Uint64(InboundThrottlerAtLargeAllocSizeKey, 32*units.MiB, "Size, in bytes, of at-large byte allocation in inbound message throttler.")
 	fs.Uint64(InboundThrottlerVdrAllocSizeKey, 32*units.MiB, "Size, in bytes, of validator byte allocation in inbound message throttler.")
-	fs.Uint64(InboundThrottlerNodeMaxAtLargeBytesKey, 2*uint64(network.DefaultMaxMessageSize), "Max number of bytes a node can take from the inbound message throttler's at-large allocation.")
+	fs.Uint64(InboundThrottlerNodeMaxAtLargeBytesKey, 2*uint64(constants.DefaultMaxMessageSize), "Max number of bytes a node can take from the inbound message throttler's at-large allocation.")
 
 	// Outbound Throttling
 	fs.Uint64(OutboundThrottlerAtLargeAllocSizeKey, 32*units.MiB, "Size, in bytes, of at-large byte allocation in outbound message throttler.")
 	fs.Uint64(OutboundThrottlerVdrAllocSizeKey, 32*units.MiB, "Size, in bytes, of validator byte allocation in outbound message throttler.")
-	fs.Uint64(OutboundThrottlerNodeMaxAtLargeBytesKey, 2*uint64(network.DefaultMaxMessageSize), "Max number of bytes a node can take from the outbound message throttler's at-large allocation.")
+	fs.Uint64(OutboundThrottlerNodeMaxAtLargeBytesKey, 2*uint64(constants.DefaultMaxMessageSize), "Max number of bytes a node can take from the outbound message throttler's at-large allocation.")
 
 	// HTTP APIs
 	fs.String(HTTPHostKey, "127.0.0.1", "Address of the HTTP server")
@@ -269,6 +275,10 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(ProfileContinuousFreqKey, 15*time.Minute, "How frequently to rotate performance profiles")
 	fs.Int(ProfileContinuousMaxFilesKey, 5, "Maximum number of historical profiles to keep")
 	fs.String(VMAliasesFileKey, defaultVMAliasFilePath, "Specifies a JSON file that maps vmIDs with custom aliases.")
+
+	// Delays
+	fs.Duration(NetworkInitialReconnectDelayKey, time.Second, "Initial delay duration must be waited before attempting to reconnect a peer.")
+	fs.Duration(NetworkMaxReconnectDelayKey, time.Hour, "Maximum delay duration must be waited before attempting to reconnect a peer.")
 }
 
 // BuildFlagSet returns a complete set of flags for avalanchego
