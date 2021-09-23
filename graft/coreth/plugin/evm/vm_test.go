@@ -3044,10 +3044,11 @@ func TestReissueAtomicTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	<-issuer
-	// Sleep for a minimum of two seconds to be sure that the timestamp on the block
-	// has changed, so that it is different from [blkA], which we has been marked as Rejected
+	// Sleep for a minimum of two seconds to ensure that [blkB] will have a different timestamp
+	// than [blkA] so that the block will be unique. This is necessary since we have marked [blkA]
+	// as Rejected.
 	time.Sleep(2 * time.Second)
+	<-issuer
 	blkB, err := vm.BuildBlock()
 	if err != nil {
 		t.Fatal(err)
