@@ -3008,12 +3008,12 @@ func TestReissueAtomicTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	importTxA, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	importTx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm.issueTx(importTxA, true /*=local*/); err != nil {
+	if err := vm.issueTx(importTx, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3039,6 +3039,7 @@ func TestReissueAtomicTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Rejecting [blkA] should cause [importTx] to be re-issued into the mempool.
 	if err := blkA.Reject(); err != nil {
 		t.Fatal(err)
 	}
@@ -3086,6 +3087,14 @@ func TestReissueAtomicTx(t *testing.T) {
 		t.Fatal(err)
 	} else if lastAcceptedID != blkB.ID() {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blkB.ID(), lastAcceptedID)
+	}
+
+	// Check that [importTx] has been indexed correctly after [blkB] is accepted.
+	_, height, err := vm.getAcceptedAtomicTx(importTx.ID())
+	if err != nil {
+		t.Fatal(err)
+	} else if height != blkB.Height() {
+		t.Fatalf("Expected indexed height of import tx to be %d, but found %d", blkB.Height(), height)
 	}
 }
 
