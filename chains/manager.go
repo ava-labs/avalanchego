@@ -373,13 +373,11 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		}
 	}
 
-	var consensusParams avcon.Parameters
+	consensusParams := m.ConsensusParams
 	if sbConfigs, ok := m.SubnetConfigs[chainParams.SubnetID]; ok && chainParams.SubnetID != constants.PrimaryNetworkID {
 		consensusParams = sbConfigs.ConsensusParameters
 		// TODO: move metrics to another place so this can be tidier
 		consensusParams.Metrics = m.ConsensusParams.Metrics
-	} else {
-		consensusParams = m.ConsensusParams
 	}
 	consensusParams.Namespace = fmt.Sprintf("%s_%s", constants.PlatformName, primaryAlias)
 
