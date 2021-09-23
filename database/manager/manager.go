@@ -6,6 +6,7 @@ package manager
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -79,12 +80,14 @@ type manager struct {
 // in the returned Manager.
 func NewRocksDB(
 	dbDirPath string,
+	dbConfigPath string,
 	log logging.Logger,
 	currentVersion version.Version,
 ) (Manager, error) {
 	return new(
 		rocksdb.New,
 		dbDirPath,
+		dbConfigPath,
 		log,
 		currentVersion,
 	)
@@ -96,12 +99,14 @@ func NewRocksDB(
 // in the returned Manager.
 func NewLevelDB(
 	dbDirPath string,
+	dbConfigPath string,
 	log logging.Logger,
 	currentVersion version.Version,
 ) (Manager, error) {
 	return new(
 		leveldb.New,
 		dbDirPath,
+		dbConfigPath,
 		log,
 		currentVersion,
 	)
@@ -112,14 +117,29 @@ func NewLevelDB(
 // [includePreviousVersions], opens previous database versions and includes them
 // in the returned Manager.
 func new(
-	newDB func(string, logging.Logger) (database.Database, error),
+	newDB func(string, []byte, logging.Logger) (database.Database, error),
 	dbDirPath string,
+	dbConfigPath string,
 	log logging.Logger,
 	currentVersion version.Version,
 ) (Manager, error) {
 	parser := version.NewDefaultParser()
 	currentDBPath := filepath.Join(dbDirPath, currentVersion.String())
-	currentDB, err := newDB(currentDBPath, log)
+
+	var dbConfig []byte
+	if dbConfigPath != "" {
+		dbConfigFile, err := os.Open(dbConfigPath)
+		if err != nil {
+			return nil, fmt.Errorf("error while opening db config file: %s", err)
+		}
+		dbConfig, err = ioutil.ReadAll(dbConfigFile)
+		if err != nil {
+			return nil, fmt.Errorf("error while reading db config: %s", err)
+		}
+	}
+
+	currentDB, err := newDB(currentDBPath, dbConfig, log)
+
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create db at %s: %w", currentDBPath, err)
 	}
@@ -166,7 +186,7 @@ func new(
 			return filepath.SkipDir
 		}
 
-		db, err := newDB(path, log)
+		db, err := newDB(path, dbConfig, log)
 		if err != nil {
 			return fmt.Errorf("couldn't create db at %s: %w", path, err)
 		}

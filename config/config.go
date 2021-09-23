@@ -621,6 +621,7 @@ func getDatabaseConfig(v *viper.Viper, networkID uint32) node.DatabaseConfig {
 			os.ExpandEnv(v.GetString(DBPathKey)),
 			constants.NetworkName(networkID),
 		),
+		ConfigPath: v.GetString(DBConfigKey),
 	}
 }
 

@@ -5,6 +5,8 @@ package leveldb
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
 	"sync/atomic"
 
 	"github.com/syndtr/goleveldb/leveldb"
@@ -60,16 +62,37 @@ type Database struct {
 	errored uint64
 }
 
+type config struct {
+	OpenFilesCacheCapacity int `json:openFileCacheCapacity`
+	BlockCacheCapacity     int `json:blockCacheCapacity`
+	// There are two buffers of size WriteBuffer used.
+	WriteBuffer      int `json:writeBuffer`
+	FilterBitsPerKey int `json:filterBitsPerKey`
+}
+
 // New returns a wrapped LevelDB object.
-func New(file string, log logging.Logger) (database.Database, error) {
-	// Open the db and recover any potential corruptions
-	db, err := leveldb.OpenFile(file, &opt.Options{
+func New(file string, dbConfig []byte, log logging.Logger) (database.Database, error) {
+	cfg := config{
 		OpenFilesCacheCapacity: HandleCap,
 		BlockCacheCapacity:     BlockCacheSize,
-		// There are two buffers of size WriteBuffer used.
-		WriteBuffer: WriteBufferSize / 2,
-		Filter:      filter.NewBloomFilter(BitsPerKey),
+		WriteBuffer:            WriteBufferSize / 2,
+		FilterBitsPerKey:       BitsPerKey,
+	}
+	if dbConfig != nil {
+		if err := json.Unmarshal(dbConfig, &cfg); err != nil {
+			return nil, fmt.Errorf("failed to parse db config: %s", err)
+		}
+	}
+	// Open the db and recover any potential corruptions
+	db, err := leveldb.OpenFile(file, &opt.Options{
+		OpenFilesCacheCapacity: cfg.OpenFilesCacheCapacity,
+		BlockCacheCapacity:     cfg.BlockCacheCapacity,
+		WriteBuffer:            cfg.WriteBuffer,
+		Filter:                 filter.NewBloomFilter(cfg.FilterBitsPerKey),
 	})
+
+	cfgInfo, _ := json.Marshal(cfg)
+	log.Debug(fmt.Sprintf("leveldb config: %s", string(cfgInfo)))
 	if _, corrupted := err.(*errors.ErrCorrupted); corrupted {
 		db, err = leveldb.RecoverFile(file, nil)
 	}
