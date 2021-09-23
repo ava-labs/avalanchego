@@ -39,12 +39,12 @@ import (
 	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
+	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 // StateTest checks transaction processing without block context.
@@ -72,9 +72,11 @@ type stJSON struct {
 }
 
 type stPostState struct {
-	Root    common.UnprefixedHash `json:"hash"`
-	Logs    common.UnprefixedHash `json:"logs"`
-	Indexes struct {
+	Root            common.UnprefixedHash `json:"hash"`
+	Logs            common.UnprefixedHash `json:"logs"`
+	TxBytes         hexutil.Bytes         `json:"txbytes"`
+	ExpectException string                `json:"expectException"`
+	Indexes         struct {
 		Data  int `json:"data"`
 		Gas   int `json:"gas"`
 		Value int `json:"value"`
@@ -251,6 +253,6 @@ func (tx *stTransaction) toMessage(ps stPostState, baseFee *big.Int) (core.Messa
 	}
 
 	msg := types.NewMessage(from, to, tx.Nonce, value, gasLimit, gasPrice,
-		tx.MaxFeePerGas, tx.MaxPriorityFeePerGas, data, accessList, true)
+		tx.MaxFeePerGas, tx.MaxPriorityFeePerGas, data, accessList, false)
 	return msg, nil
 }

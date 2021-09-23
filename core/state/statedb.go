@@ -37,12 +37,12 @@ import (
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/trie"
 )
 
 type revision struct {
@@ -282,7 +282,7 @@ func (s *StateDB) GetBalance(addr common.Address) *big.Int {
 	if stateObject != nil {
 		return stateObject.Balance()
 	}
-	return common.Big0
+	return new(big.Int).Set(common.Big0)
 }
 
 // Retrieve the balance from the given address or 0 if object not found
@@ -291,7 +291,7 @@ func (s *StateDB) GetBalanceMultiCoin(addr common.Address, coinID common.Hash) *
 	if stateObject != nil {
 		return stateObject.BalanceMultiCoin(coinID, s.db)
 	}
-	return common.Big0
+	return new(big.Int).Set(common.Big0)
 }
 
 func (s *StateDB) GetNonce(addr common.Address) uint64 {

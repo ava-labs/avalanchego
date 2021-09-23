@@ -33,10 +33,10 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/trie"
 )
 
 var (
@@ -92,9 +92,6 @@ func (bc *testBlockChain) CurrentBlock() *types.Block {
 }
 
 func (bc *testBlockChain) GetBlock(hash common.Hash, number uint64) *types.Block {
-	bc.lock.Lock()
-	defer bc.lock.Unlock()
-
 	return bc.CurrentBlock()
 }
 
@@ -110,6 +107,10 @@ func (bc *testBlockChain) SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) even
 	defer bc.lock.Unlock()
 
 	return bc.chainHeadFeed.Subscribe(ch)
+}
+
+func (bc *testBlockChain) SenderCacher() *TxSenderCacher {
+	return newTxSenderCacher(1)
 }
 
 func transaction(nonce uint64, gaslimit uint64, key *ecdsa.PrivateKey) *types.Transaction {

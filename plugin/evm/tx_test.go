@@ -101,7 +101,7 @@ func executeTxTest(t *testing.T, test atomicTxTest) {
 	if len(genesisJSON) == 0 {
 		genesisJSON = genesisJSONApricotPhase0
 	}
-	issuer, vm, _, sharedMemory := GenesisVM(t, !test.bootstrapping, genesisJSON, test.configJSON, test.upgradeJSON)
+	issuer, vm, _, sharedMemory, _ := GenesisVM(t, !test.bootstrapping, genesisJSON, test.configJSON, test.upgradeJSON)
 	rules := vm.currentRules()
 
 	tx := test.setup(t, vm, sharedMemory)
@@ -145,7 +145,7 @@ func executeTxTest(t *testing.T, test atomicTxTest) {
 		return
 	}
 
-	if err := vm.issueTx(tx); err != nil {
+	if err := vm.issueTx(tx, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}
 	<-issuer
