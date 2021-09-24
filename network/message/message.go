@@ -44,7 +44,7 @@ func (inMsg *inboundMessage) Bytes() []byte { return inMsg.bytes }
 
 // BytesSavedCompression returns the number of bytes this message saved due to
 // compression. That is, the number of bytes we did not receive over the
-// network due to the message being compressed. Empty slice for messages that were not
+// network due to the message being compressed. 0 for messages that were not
 // compressed.
 func (inMsg *inboundMessage) BytesSavedCompression() int { return inMsg.bytesSavedCompression }
 
@@ -59,6 +59,6 @@ func (outMsg *outboundMessage) Bytes() []byte { return outMsg.bytes }
 
 // BytesSavedCompression returns the number of bytes this message saved due to
 // compression. That is, the number of bytes we did not send over the
-// network due to the message being compressed. Empty slice for messages that were not
+// network due to the message being compressed. 0 for messages that were not
 // compressed.
 func (outMsg *outboundMessage) BytesSavedCompression() int { return outMsg.bytesSavedCompression }
