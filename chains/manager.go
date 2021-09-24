@@ -119,11 +119,6 @@ type chain struct {
 	Beacons validators.Set
 }
 
-type SubnetConfig struct {
-	// ValidatorOnly indicates that this Subnet's Chains are available to only subnet validators.
-	ValidatorOnly bool `json:"validatorOnly"`
-}
-
 // ChainConfig is configuration settings for the current execution.
 // [Config] is the user-provided config blob for the chain.
 // [Upgrade] is a chain-specific blob for coordinating upgrades.
@@ -379,6 +374,11 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	consensusParams := m.ConsensusParams
+	if sbConfigs, ok := m.SubnetConfigs[chainParams.SubnetID]; ok && chainParams.SubnetID != constants.PrimaryNetworkID {
+		consensusParams = sbConfigs.ConsensusParameters
+		// TODO: move metrics to another place so this can be tidier
+		consensusParams.Metrics = m.ConsensusParams.Metrics
+	}
 	consensusParams.Namespace = fmt.Sprintf("%s_%s", constants.PlatformName, primaryAlias)
 
 	// The validators of this blockchain

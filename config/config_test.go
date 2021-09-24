@@ -309,35 +309,54 @@ func TestGetVMAliasesDirNotExists(t *testing.T) {
 func TestGetSubnetConfigs(t *testing.T) {
 	tests := map[string]struct {
 		givenJSON  string
-		expected   map[ids.ID]chains.SubnetConfig
+		testF      func(*assert.Assertions, map[ids.ID]chains.SubnetConfig)
 		errMessage string
 		fileName   string
 	}{
 		"wrong config": {
-			fileName:   "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON:  `thisisnotjson`,
-			expected:   nil,
+			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
+			givenJSON: `thisisnotjson`,
+			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
+				assert.Nil(given)
+			},
 			errMessage: "couldn't read subnet configs",
 		},
 		"subnet is not whitelisted": {
 			fileName:  "Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU.json",
 			givenJSON: `{"validatorOnly": true}`,
-			expected:  map[ids.ID]chains.SubnetConfig{},
+			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
+				assert.Empty(given)
+			},
 		},
 		"wrong extension": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.yaml",
 			givenJSON: `{"validatorOnly": true}`,
-			expected:  map[ids.ID]chains.SubnetConfig{},
+			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
+				assert.Empty(given)
+			},
+		},
+		"invalid consensus parameters": {
+			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
+			givenJSON: `{"consensusParameters":{"k": 111, "alpha":1234} }`,
+			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
+				assert.Nil(given)
+			},
+			errMessage: "fails the condition that: alpha <= k",
 		},
 		"correct config": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON: `{"validatorOnly": true}`,
-			expected: func() map[ids.ID]chains.SubnetConfig {
-				m := map[ids.ID]chains.SubnetConfig{}
+			givenJSON: `{"validatorOnly": true, "consensusParameters":{"parents": 111, "alpha":16} }`,
+			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
-				m[id] = chains.SubnetConfig{ValidatorOnly: true}
-				return m
-			}(),
+				config, ok := given[id]
+				assert.True(ok)
+
+				assert.Equal(true, config.ValidatorOnly)
+				assert.Equal(111, config.ConsensusParameters.Parents)
+				assert.Equal(16, config.ConsensusParameters.Alpha)
+				// must still respect defaults
+				assert.Equal(20, config.ConsensusParameters.K)
+			},
 			errMessage: "",
 		},
 	}
@@ -359,7 +378,7 @@ func TestGetSubnetConfigs(t *testing.T) {
 				assert.Contains(err.Error(), test.errMessage)
 			} else {
 				assert.NoError(err)
-				assert.Equal(test.expected, subnetConfigs)
+				test.testF(assert, subnetConfigs)
 			}
 		})
 	}
