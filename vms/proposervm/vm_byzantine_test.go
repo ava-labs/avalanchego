@@ -455,10 +455,6 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		},
 	}
 
-	if err := xBlock.Verify(); err != nil {
-		t.Fatal(err)
-	}
-
 	xInnerOptions, err := xBlock.Options()
 	if err != nil {
 		t.Fatal(err)
