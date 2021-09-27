@@ -23,15 +23,17 @@ import (
 	"os"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
+	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 func BenchmarkInsertChain_empty_memdb(b *testing.B) {
@@ -89,7 +91,7 @@ func genValueTx(nbytes int) func(int, *BlockGen) {
 		toaddr := common.Address{}
 		data := make([]byte, nbytes)
 		gas, _ := IntrinsicGas(data, nil, false, false, false)
-		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(benchRootAddr), toaddr, big.NewInt(1), gas, nil, data), types.HomesteadSigner{}, benchRootKey)
+		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(benchRootAddr), toaddr, big.NewInt(1), gas, big.NewInt(225000000000), data), types.HomesteadSigner{}, benchRootKey)
 		gen.AddTx(tx)
 	}
 }
@@ -162,7 +164,7 @@ func benchInsertChain(b *testing.B, disk bool, gen func(int, *BlockGen)) {
 			b.Fatalf("cannot create temporary directory: %v", err)
 		}
 		defer os.RemoveAll(dir)
-		db, err = rawdb.NewLevelDBDatabase(dir, 128, 128, "", false)
+		db, err = NewLevelDBDatabase(dir, 128, 128, "", false)
 		if err != nil {
 			b.Fatalf("cannot create temporary database: %v", err)
 		}
@@ -176,11 +178,11 @@ func benchInsertChain(b *testing.B, disk bool, gen func(int, *BlockGen)) {
 		Alloc:  GenesisAlloc{benchRootAddr: {Balance: benchRootFunds}},
 	}
 	genesis := gspec.MustCommit(db)
-	chain, _ := GenerateChain(gspec.Config, genesis, dummy.NewFaker(), db, b.N, gen)
+	chain, _, _ := GenerateChain(gspec.Config, genesis, dummy.NewFaker(), db, b.N, 10, gen)
 
 	// Time the insertion of the new chain.
 	// State and blocks are stored in the same DB.
-	chainman, _ := NewBlockChain(db, defaultCacheConfig, gspec.Config, dummy.NewFaker(), vm.Config{}, common.Hash{})
+	chainman, _ := NewBlockChain(db, DefaultCacheConfig, gspec.Config, dummy.NewFaker(), vm.Config{}, common.Hash{})
 	defer chainman.Stop()
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -260,7 +262,7 @@ func benchWriteChain(b *testing.B, full bool, count uint64) {
 		if err != nil {
 			b.Fatalf("cannot create temporary directory: %v", err)
 		}
-		db, err := rawdb.NewLevelDBDatabase(dir, 128, 1024, "", false)
+		db, err := NewLevelDBDatabase(dir, 128, 1024, "", false)
 		if err != nil {
 			b.Fatalf("error opening database at %v: %v", dir, err)
 		}
@@ -277,7 +279,7 @@ func benchReadChain(b *testing.B, full bool, count uint64) {
 	}
 	defer os.RemoveAll(dir)
 
-	db, err := rawdb.NewLevelDBDatabase(dir, 128, 1024, "", false)
+	db, err := NewLevelDBDatabase(dir, 128, 1024, "", false)
 	if err != nil {
 		b.Fatalf("error opening database at %v: %v", dir, err)
 	}
@@ -288,11 +290,11 @@ func benchReadChain(b *testing.B, full bool, count uint64) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		db, err := rawdb.NewLevelDBDatabase(dir, 128, 1024, "", false)
+		db, err := NewLevelDBDatabase(dir, 128, 1024, "", false)
 		if err != nil {
 			b.Fatalf("error opening database at %v: %v", dir, err)
 		}
-		chain, err := NewBlockChain(db, defaultCacheConfig, params.TestChainConfig, dummy.NewFaker(), vm.Config{}, common.Hash{})
+		chain, err := NewBlockChain(db, DefaultCacheConfig, params.TestChainConfig, dummy.NewFaker(), vm.Config{}, common.Hash{})
 		if err != nil {
 			b.Fatalf("error creating chain: %v", err)
 		}
@@ -309,3 +311,50 @@ func benchReadChain(b *testing.B, full bool, count uint64) {
 		db.Close()
 	}
 }
+
+// NewLevelDBDatabase creates a persistent key-value database without a freezer
+// moving immutable chain segments into cold storage.
+func NewLevelDBDatabase(file string, cache int, handles int, namespace string, readonly bool) (ethdb.Database, error) {
+	//db, err := leveldb.New(file, cache, handles, namespace, readonly)
+	db, err := leveldb.New(file, nil)
+	if err != nil {
+		return nil, err
+	}
+	return rawdb.NewDatabase(Database{db}), nil
+}
+
+// Database implements ethdb.Database
+type Database struct{ database.Database }
+
+// NewBatch implements ethdb.Database
+func (db Database) NewBatch() ethdb.Batch { return Batch{db.Database.NewBatch()} }
+
+// NewIterator implements ethdb.Database
+//
+// Note: This method assumes that the prefix is NOT part of the start, so there's
+// no need for the caller to prepend the prefix to the start.
+func (db Database) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
+	// avalanchego's database implementation assumes that the prefix is part of the
+	// start, so it is added here (if it is provided).
+	if len(prefix) > 0 {
+		newStart := make([]byte, len(prefix)+len(start))
+		copy(newStart, prefix)
+		copy(newStart[len(prefix):], start)
+		start = newStart
+	}
+	return db.Database.NewIteratorWithStartAndPrefix(start, prefix)
+}
+
+// NewIteratorWithStart implements ethdb.Database
+func (db Database) NewIteratorWithStart(start []byte) ethdb.Iterator {
+	return db.Database.NewIteratorWithStart(start)
+}
+
+// Batch implements ethdb.Batch
+type Batch struct{ database.Batch }
+
+// ValueSize implements ethdb.Batch
+func (batch Batch) ValueSize() int { return batch.Batch.Size() }
+
+// Replay implements ethdb.Batch
+func (batch Batch) Replay(w ethdb.KeyValueWriter) error { return batch.Batch.Replay(w) }
