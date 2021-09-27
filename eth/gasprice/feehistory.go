@@ -282,7 +282,7 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 	}
 	var (
 		reward       = make([][]*big.Int, blocks)
-		baseFee      = make([]*big.Int, blocks+1)
+		baseFee      = make([]*big.Int, blocks)
 		gasUsedRatio = make([]float64, blocks)
 		firstMissing = blocks
 	)
@@ -309,6 +309,6 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 	} else {
 		reward = nil
 	}
-	baseFee, gasUsedRatio = baseFee[:firstMissing+1], gasUsedRatio[:firstMissing]
+	baseFee, gasUsedRatio = baseFee[:firstMissing], gasUsedRatio[:firstMissing]
 	return new(big.Int).SetUint64(oldestBlock), reward, baseFee, gasUsedRatio, nil
 }

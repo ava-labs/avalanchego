@@ -108,9 +108,6 @@ func TestFeeHistory(t *testing.T) {
 			expReward = 0
 		}
 		expBaseFee := c.expCount
-		if expBaseFee != 0 {
-			expBaseFee++
-		}
 
 		if first.Uint64() != c.expFirst {
 			t.Fatalf("Test case %d: first block mismatch, want %d, got %d", i, c.expFirst, first)
