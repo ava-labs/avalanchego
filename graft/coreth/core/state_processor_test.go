@@ -38,22 +38,22 @@ import (
 // contain invalid transactions
 func TestStateProcessorErrors(t *testing.T) {
 	var (
-	    config     = &params.ChainConfig{
-                    ChainID:                     big.NewInt(1),
-                    HomesteadBlock:              big.NewInt(0),
-                    EIP150Block:                 big.NewInt(0),
-                    EIP150Hash:                  common.Hash{},
-                    EIP155Block:                 big.NewInt(0),
-                    EIP158Block:                 big.NewInt(0),
-                    ByzantiumBlock:              big.NewInt(0),
-                    ConstantinopleBlock:         big.NewInt(0),
-                    PetersburgBlock:             big.NewInt(0),
-                    IstanbulBlock:               big.NewInt(0),
-                    MuirGlacierBlock:            big.NewInt(0),
-                    ApricotPhase1BlockTimestamp: big.NewInt(0),
-                    ApricotPhase2BlockTimestamp: big.NewInt(0),
-                    ApricotPhase3BlockTimestamp: big.NewInt(0),
-                    ApricotPhase4BlockTimestamp: big.NewInt(0),
+		config = &params.ChainConfig{
+			ChainID:                     big.NewInt(1),
+			HomesteadBlock:              big.NewInt(0),
+			EIP150Block:                 big.NewInt(0),
+			EIP150Hash:                  common.Hash{},
+			EIP155Block:                 big.NewInt(0),
+			EIP158Block:                 big.NewInt(0),
+			ByzantiumBlock:              big.NewInt(0),
+			ConstantinopleBlock:         big.NewInt(0),
+			PetersburgBlock:             big.NewInt(0),
+			IstanbulBlock:               big.NewInt(0),
+			MuirGlacierBlock:            big.NewInt(0),
+			ApricotPhase1BlockTimestamp: big.NewInt(0),
+			ApricotPhase2BlockTimestamp: big.NewInt(0),
+			ApricotPhase3BlockTimestamp: big.NewInt(0),
+			ApricotPhase4BlockTimestamp: big.NewInt(0),
 		}
 		signer     = types.LatestSigner(config)
 		testKey, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
@@ -123,7 +123,7 @@ func TestStateProcessorErrors(t *testing.T) {
 			},
 			{ // ErrInsufficientFundsForTransfer
 				txs: []*types.Transaction{
-                    makeTx(0, common.Address{}, big.NewInt(2000000000000000000), params.TxGas, big.NewInt(225000000000), nil),
+					makeTx(0, common.Address{}, big.NewInt(2000000000000000000), params.TxGas, big.NewInt(225000000000), nil),
 				},
 				want: "could not apply tx 0 [0xae1601ef55b676ebb824ee7e16a0d14af725b7f9cf5ec79e21f14833c26b5b35]: insufficient funds for gas * price + value: address 0x71562b71999873DB5b286dF957af199Ec94617F7 have 2000000000000000000 want 2004725000000000000",
 			},
@@ -183,7 +183,7 @@ func TestStateProcessorErrors(t *testing.T) {
 					mkDynamicTx(0, common.Address{}, params.TxGas, big.NewInt(1), big.NewInt(100000000000000)),
 				},
 				//want: "could not apply tx 0 [0x413603cd096a87f41b1660d3ed3e27d62e1da78eac138961c0a1314ed43bd129]: insufficient funds for gas * price + value: address 0x71562b71999873DB5b286dF957af199Ec94617F7 have 1000000000000000000 want 1050000000000000000",
-                want: "could not apply tx 0 [0x3388378ed60640e75d2edf728d5528a305f599997abc4f23ec46b351b6197499]: insufficient funds for gas * price + value: address 0x71562b71999873DB5b286dF957af199Ec94617F7 have 2000000000000000000 want 2100000000000000000",
+				want: "could not apply tx 0 [0x3388378ed60640e75d2edf728d5528a305f599997abc4f23ec46b351b6197499]: insufficient funds for gas * price + value: address 0x71562b71999873DB5b286dF957af199Ec94617F7 have 2000000000000000000 want 2100000000000000000",
 			},
 			{ // Another ErrInsufficientFunds, this one to ensure that feecap/tip of max u256 is allowed
 				txs: []*types.Transaction{
@@ -209,19 +209,19 @@ func TestStateProcessorErrors(t *testing.T) {
 			db    = rawdb.NewMemoryDatabase()
 			gspec = &Genesis{
 				Config: &params.ChainConfig{
-                    ChainID:                     big.NewInt(1),
-                    HomesteadBlock:              big.NewInt(0),
-                    EIP150Block:                 big.NewInt(0),
-                    EIP150Hash:                  common.Hash{},
-                    EIP155Block:                 big.NewInt(0),
-                    EIP158Block:                 big.NewInt(0),
-                    ByzantiumBlock:              big.NewInt(0),
-                    ConstantinopleBlock:         big.NewInt(0),
-                    PetersburgBlock:             big.NewInt(0),
-                    IstanbulBlock:               big.NewInt(0),
-                    MuirGlacierBlock:            big.NewInt(0),
-                    ApricotPhase1BlockTimestamp: big.NewInt(0),
-                    ApricotPhase2BlockTimestamp: big.NewInt(0),
+					ChainID:                     big.NewInt(1),
+					HomesteadBlock:              big.NewInt(0),
+					EIP150Block:                 big.NewInt(0),
+					EIP150Hash:                  common.Hash{},
+					EIP155Block:                 big.NewInt(0),
+					EIP158Block:                 big.NewInt(0),
+					ByzantiumBlock:              big.NewInt(0),
+					ConstantinopleBlock:         big.NewInt(0),
+					PetersburgBlock:             big.NewInt(0),
+					IstanbulBlock:               big.NewInt(0),
+					MuirGlacierBlock:            big.NewInt(0),
+					ApricotPhase1BlockTimestamp: big.NewInt(0),
+					ApricotPhase2BlockTimestamp: big.NewInt(0),
 				},
 				Alloc: GenesisAlloc{
 					common.HexToAddress("0x71562b71999873DB5b286dF957af199Ec94617F7"): GenesisAccount{
@@ -318,25 +318,25 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 		Time:      parent.Time() + 10,
 		UncleHash: types.EmptyUncleHash,
 	}
-    if config.IsApricotPhase3(new(big.Int).SetUint64(header.Time)) {
-        header.Extra = make([]byte, params.ApricotPhase3ExtraDataSize)
-    } else {
-        header.Extra = make([]byte, params.MaximumExtraDataSize)
-    }
+	if config.IsApricotPhase3(new(big.Int).SetUint64(header.Time)) {
+		header.Extra = make([]byte, params.ApricotPhase3ExtraDataSize)
+	} else {
+		header.Extra = make([]byte, params.MaximumExtraDataSize)
+	}
 	/*
 		if config.IsLondon(header.Number) {
 			header.BaseFee = misc.CalcBaseFee(config, parent.Header())
 		}
 	*/
-    if config.IsApricotPhase3(new(big.Int).SetUint64(header.Time)) {
-        _, header.BaseFee, _ = dummy.CalcBaseFee(config, parent.Header(), header.Time)
-    }
-    if config.IsApricotPhase3(new(big.Int).SetUint64(header.Time)) {
-	    header.BlockGasCost = big.NewInt(0)
-    }
-    if config.IsApricotPhase3(new(big.Int).SetUint64(header.Time)) {
-        header.ExtDataGasUsed = big.NewInt(0)
-    }
+	if config.IsApricotPhase3(new(big.Int).SetUint64(header.Time)) {
+		_, header.BaseFee, _ = dummy.CalcBaseFee(config, parent.Header(), header.Time)
+	}
+	if config.IsApricotPhase3(new(big.Int).SetUint64(header.Time)) {
+		header.BlockGasCost = big.NewInt(0)
+	}
+	if config.IsApricotPhase3(new(big.Int).SetUint64(header.Time)) {
+		header.ExtDataGasUsed = big.NewInt(0)
+	}
 	var receipts []*types.Receipt
 	// The post-state result doesn't need to be correct (this is a bad block), but we do need something there
 	// Preferably something unique. So let's use a combo of blocknum + txhash
