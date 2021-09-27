@@ -405,3 +405,216 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 		t.Fatal("option 1 has invalid parent, should not verify")
 	}
 }
+
+//   ,--G ----.
+//  /    \     \
+// A(X)  B(Y)  C(Z)
+// | \_ /_____/
+// |\  /   |
+// | \/    |
+// O2 O1   O3
+//
+// O1.parent = B (non-Oracle), O1.inner = first option of X (invalid)
+// O2.parent = A (original), O2.inner = first option of X (valid)
+// O3.parent = C (Oracle), O3.inner = first option of X (invalid parent)
+func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
+	proVM.Set(coreGenBlk.Timestamp())
+
+	// create an Oracle pre-fork block X
+	xBlockID := ids.GenerateTestID()
+	xBlock := &TestOptionsBlock{
+		TestBlock: snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     xBlockID,
+				StatusV: choices.Processing,
+			},
+			BytesV:     []byte{1},
+			ParentV:    coreGenBlk.ID(),
+			TimestampV: coreGenBlk.Timestamp(),
+		},
+		opts: [2]snowman.Block{
+			&snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.GenerateTestID(),
+					StatusV: choices.Processing,
+				},
+				BytesV:     []byte{2},
+				ParentV:    xBlockID,
+				TimestampV: coreGenBlk.Timestamp(),
+			},
+			&snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.GenerateTestID(),
+					StatusV: choices.Processing,
+				},
+				BytesV:     []byte{3},
+				ParentV:    xBlockID,
+				TimestampV: coreGenBlk.Timestamp(),
+			},
+		},
+	}
+
+	xInnerOptions, err := xBlock.Options()
+	if err != nil {
+		t.Fatal(err)
+	}
+	xInnerOption := xInnerOptions[0]
+
+	// create a non-Oracle pre-fork block Y
+	yBlock := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk.ID(),
+		HeightV:    coreGenBlk.Height() + 1,
+		TimestampV: coreGenBlk.Timestamp(),
+	}
+
+	ySlb, err := block.BuildUnsigned(
+		coreGenBlk.ID(),
+		coreGenBlk.Timestamp(),
+		uint64(2000),
+		yBlock.Bytes(),
+	)
+	if err != nil {
+		t.Fatalf("fail to manually build a block due to %s", err)
+	}
+
+	// create post-fork block B from Y
+	bBlock := postForkBlock{
+		SignedBlock: ySlb,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: yBlock,
+			status:   choices.Processing,
+		},
+	}
+
+	if err = bBlock.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	// generate O1
+	statelessOuterOption, err := block.BuildOption(
+		bBlock.ID(),
+		xInnerOption.Bytes(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	outerOption := &postForkOption{
+		Block: statelessOuterOption,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: xInnerOption,
+			status:   xInnerOption.Status(),
+		},
+	}
+
+	if err := outerOption.Verify(); err != errUnexpectedBlockType {
+		t.Fatal(err)
+	}
+
+	// generate A from X and O2
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return xBlock, nil }
+	aBlock, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	coreVM.BuildBlockF = nil
+	if err := aBlock.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	statelessOuterOption, err = block.BuildOption(
+		aBlock.ID(),
+		xInnerOption.Bytes(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	outerOption = &postForkOption{
+		Block: statelessOuterOption,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: xInnerOption,
+			status:   xInnerOption.Status(),
+		},
+	}
+
+	if err := outerOption.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	// create an Oracle pre-fork block Z
+	// create post-fork block B from Y
+	zBlockID := ids.GenerateTestID()
+	zBlock := &TestOptionsBlock{
+		TestBlock: snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     zBlockID,
+				StatusV: choices.Processing,
+			},
+			BytesV:     []byte{1},
+			ParentV:    coreGenBlk.ID(),
+			TimestampV: coreGenBlk.Timestamp(),
+		},
+		opts: [2]snowman.Block{
+			&snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.GenerateTestID(),
+					StatusV: choices.Processing,
+				},
+				BytesV:     []byte{2},
+				ParentV:    zBlockID,
+				TimestampV: coreGenBlk.Timestamp(),
+			},
+			&snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.GenerateTestID(),
+					StatusV: choices.Processing,
+				},
+				BytesV:     []byte{3},
+				ParentV:    zBlockID,
+				TimestampV: coreGenBlk.Timestamp(),
+			},
+		},
+	}
+
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return zBlock, nil }
+	cBlock, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	coreVM.BuildBlockF = nil
+	if err := cBlock.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	// generate O3
+	statelessOuterOption, err = block.BuildOption(
+		cBlock.ID(),
+		xInnerOption.Bytes(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	outerOption = &postForkOption{
+		Block: statelessOuterOption,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: xInnerOption,
+			status:   xInnerOption.Status(),
+		},
+	}
+
+	if err := outerOption.Verify(); err != errInnerParentMismatch {
+		t.Fatal(err)
+	}
+}
