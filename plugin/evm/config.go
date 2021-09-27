@@ -15,7 +15,7 @@ const (
 	defaultEthApiEnabled               = true
 	defaultNetApiEnabled               = true
 	defaultWeb3ApiEnabled              = true
-	defaultPreimagesEnabled            = true
+	defaultPreimagesEnabled            = false
 	defaultPruningEnabled              = true
 	defaultSnapshotAsync               = true
 	defaultRpcGasCap                   = 2500000000 // 25000000 X 100
