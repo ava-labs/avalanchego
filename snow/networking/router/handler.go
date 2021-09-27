@@ -119,13 +119,6 @@ func (h *Handler) Dispatch() {
 			continue
 		}
 
-		// check if this subnet is validator only, if so drop the non-validator related messages.
-		if h.ctx.IsValidatorOnly() && msg.nodeID != h.ctx.NodeID && !h.validators.Contains(msg.nodeID) {
-			h.ctx.Log.Verbo("Dropping message from %s%s due to %s is a validator only subnet. msg: %s", constants.NodeIDPrefix, msg.nodeID, h.ctx.SubnetID, msg)
-			msg.doneHandling()
-			continue
-		}
-
 		// Process the message.
 		// If there was an error, shut down this chain
 		if err := h.handleMsg(msg); err != nil {
@@ -640,4 +633,9 @@ func (h *Handler) dispatchInternal() {
 func (h *Handler) endInterval() {
 	now := h.clock.Time()
 	h.cpuTracker.EndInterval(now)
+}
+
+// if subnet is validator only and this is not a validator or self, returns false.
+func (h *Handler) isValidValidator(nodeID ids.ShortID) bool {
+	return !h.ctx.IsValidatorOnly() || nodeID == h.ctx.NodeID || h.validators.Contains(nodeID)
 }

@@ -341,3 +341,134 @@ func TestRouterClearTimeouts(t *testing.T) {
 
 	assert.Equal(t, chainRouter.timedRequests.Len(), 0)
 }
+
+func TestValidatorOnlyMessageDrops(t *testing.T) {
+	// Create a timeout manager
+	maxTimeout := 25 * time.Millisecond
+	tm := timeout.Manager{}
+	err := tm.Initialize(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     10 * time.Millisecond,
+			MinimumTimeout:     10 * time.Millisecond,
+			MaximumTimeout:     maxTimeout,
+			TimeoutCoefficient: 1,
+			TimeoutHalflife:    5 * time.Minute,
+		},
+		benchlist.NewNoBenchlist(),
+		"",
+		prometheus.NewRegistry(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go tm.Dispatch()
+
+	// Create a router
+	chainRouter := ChainRouter{}
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
+
+	// Create an engine and handler
+	engine := common.EngineTest{T: t}
+	engine.Default(false)
+
+	var (
+		calledGetFailed, calledGetAncestorsFailed,
+		calledQueryFailed, calledQueryFailed2,
+		calledGetAcceptedFailed, calledGetAcceptedFrontierFailed bool
+
+		wg = sync.WaitGroup{}
+	)
+
+	engine.GetFailedF = func(nodeID ids.ShortID, requestID uint32) error { wg.Done(); calledGetFailed = true; return nil }
+	engine.GetAncestorsFailedF = func(nodeID ids.ShortID, requestID uint32) error {
+		defer wg.Done()
+		calledGetAncestorsFailed = true
+		return nil
+	}
+	engine.QueryFailedF = func(nodeID ids.ShortID, requestID uint32) error {
+		defer wg.Done()
+		if !calledQueryFailed {
+			calledQueryFailed = true
+			return nil
+		}
+		calledQueryFailed2 = true
+		return nil
+	}
+	engine.GetAcceptedFailedF = func(nodeID ids.ShortID, requestID uint32) error {
+		defer wg.Done()
+		calledGetAcceptedFailed = true
+		return nil
+	}
+	engine.GetAcceptedFrontierFailedF = func(nodeID ids.ShortID, requestID uint32) error {
+		defer wg.Done()
+		calledGetAcceptedFrontierFailed = true
+		return nil
+	}
+
+	engine.ContextF = func() *snow.Context {
+		ctx := snow.DefaultContextTest()
+		ctx.SetValidatorOnly()
+		return ctx
+	}
+
+	handler := &Handler{}
+	vdrs := validators.NewSet()
+	vID := ids.GenerateTestShortID()
+	err = vdrs.AddWeight(vID, 1)
+	assert.NoError(t, err)
+	err = handler.Initialize(
+		&engine,
+		vdrs,
+		nil,
+		"",
+		prometheus.NewRegistry(),
+	)
+	assert.NoError(t, err)
+
+	chainRouter.AddChain(handler)
+	go handler.Dispatch()
+
+	// Register requests for each request type
+	msgs := []constants.MsgType{
+		constants.GetMsg,
+		constants.GetAncestorsMsg,
+		constants.PullQueryMsg,
+		constants.PushQueryMsg,
+		constants.GetAcceptedMsg,
+		constants.GetAcceptedFrontierMsg,
+	}
+
+	// generate a non-validator ID
+	nID := ids.GenerateTestShortID()
+	for i, msg := range msgs {
+		chainRouter.RegisterRequest(nID, handler.ctx.ChainID, uint32(i), msg)
+	}
+	// should not be called
+	assert.False(t, calledGetFailed && calledGetAncestorsFailed && calledQueryFailed2 && calledGetAcceptedFailed && calledGetAcceptedFrontierFailed)
+
+	// validator case
+	wg.Add(len(msgs))
+
+	for i, msg := range msgs {
+		chainRouter.RegisterRequest(vID, handler.ctx.ChainID, uint32(i), msg)
+	}
+
+	wg.Wait()
+
+	// should be called since this is a validator request
+	assert.True(t, calledGetFailed && calledGetAncestorsFailed && calledQueryFailed2 && calledGetAcceptedFailed && calledGetAcceptedFrontierFailed)
+
+	// register a validator request
+	reqID := uint32(3333)
+	chainRouter.RegisterRequest(vID, handler.ctx.ChainID, reqID, constants.GetMsg)
+	assert.Equal(t, 1, chainRouter.timedRequests.Len())
+	// remove it from validators
+	err = handler.validators.Set(validators.NewSet().List())
+	assert.NoError(t, err)
+	calledFinished := false
+	chainRouter.Put(vID, handler.ctx.ChainID, reqID, ids.GenerateTestID(), nil, func() { calledFinished = true })
+	assert.True(t, calledFinished)
+	// should clear out timed request
+	assert.Equal(t, 0, chainRouter.timedRequests.Len())
+}

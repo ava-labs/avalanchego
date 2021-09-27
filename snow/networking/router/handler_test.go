@@ -65,61 +65,6 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	}
 }
 
-func TestHandlerDropsNonValidatorMessages(t *testing.T) {
-	engine := common.EngineTest{T: t}
-	engine.Default(true)
-	engine.ContextF = func() *snow.Context {
-		defaultCtx := snow.DefaultContextTest()
-		defaultCtx.SetValidatorOnly()
-		return defaultCtx
-	}
-	called := make(chan struct{})
-
-	vdrs := validators.NewSet()
-	vdr0 := ids.GenerateTestShortID()
-	if err := vdrs.AddWeight(vdr0, 1); err != nil {
-		t.Fatal(err)
-	}
-
-	engine.GetAcceptedFrontierF = func(validatorID ids.ShortID, requestID uint32) error {
-		t.Fatalf("GetAcceptedFrontier message should have been dropped")
-		return nil
-	}
-
-	engine.GetAcceptedF = func(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-		if validatorID != vdr0 {
-			t.Fatalf("GetAccepted should not be called for non-validators.")
-		} else {
-			called <- struct{}{}
-		}
-		return nil
-	}
-
-	handler := &Handler{}
-
-	err := handler.Initialize(
-		&engine,
-		vdrs,
-		nil,
-		"",
-		prometheus.NewRegistry(),
-	)
-	assert.NoError(t, err)
-
-	handler.GetAcceptedFrontier(ids.GenerateTestShortID(), 1, time.Time{}, func() {})
-	handler.GetAccepted(vdr0, 1, time.Time{}, nil, func() {})
-
-	go handler.Dispatch()
-
-	ticker := time.NewTicker(50 * time.Millisecond)
-	defer ticker.Stop()
-	select {
-	case <-ticker.C:
-		t.Fatalf("Calling engine function timed out")
-	case <-called:
-	}
-}
-
 func TestHandlerDoesntDrop(t *testing.T) {
 	engine := common.EngineTest{T: t}
 	engine.Default(false)
