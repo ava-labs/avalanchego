@@ -68,9 +68,9 @@ type blockFees struct {
 
 // processedFees contains the results of a processed block and is also used for caching
 type processedFees struct {
-	reward               []*big.Int
-	baseFee, nextBaseFee *big.Int
-	gasUsedRatio         float64
+	reward       []*big.Int
+	baseFee      *big.Int
+	gasUsedRatio float64
 }
 
 // txGasAndReward is sorted in ascending order based on reward
@@ -293,7 +293,7 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 		}
 		i := int(fees.blockNumber - oldestBlock)
 		if fees.results.baseFee != nil {
-			reward[i], baseFee[i], baseFee[i+1], gasUsedRatio[i] = fees.results.reward, fees.results.baseFee, fees.results.nextBaseFee, fees.results.gasUsedRatio
+			reward[i], baseFee[i], gasUsedRatio[i] = fees.results.reward, fees.results.baseFee, fees.results.gasUsedRatio
 		} else {
 			// getting no block and no error means we are requesting into the future (might happen because of a reorg)
 			if i < firstMissing {
