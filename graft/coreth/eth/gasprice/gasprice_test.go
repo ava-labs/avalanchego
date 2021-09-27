@@ -132,7 +132,7 @@ func newTestBackend(t *testing.T, config *params.ChainConfig, numBlocks int, ext
 		OnExtraStateChange: func(block *types.Block, state *state.StateDB) (*big.Int, *big.Int, error) {
 			return common.Big0, extDataGasUsage, nil
 		},
-	})
+	}, false)
 	db := rawdb.NewMemoryDatabase()
 	genesis := gspec.MustCommit(db)
 
