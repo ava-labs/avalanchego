@@ -11,7 +11,7 @@ import (
 
 // These are globals that describe network upgrades and node versions
 var (
-	Current                      = NewDefaultVersion(1, 6, 0)
+	Current                      = NewDefaultVersion(1, 6, 1)
 	CurrentApp                   = NewDefaultApplication(constants.PlatformName, Current.Major(), Current.Minor(), Current.Patch())
 	MinimumCompatibleVersion     = NewDefaultApplication(constants.PlatformName, 1, 6, 0)
 	PrevMinimumCompatibleVersion = NewDefaultApplication(constants.PlatformName, 1, 5, 0)
@@ -49,15 +49,14 @@ var (
 	}
 	ApricotPhase3DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
-	// TODO: populate with real values
 	ApricotPhase4Times = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2029, time.August, 24, 14, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2029, time.August, 16, 19, 0, 0, 0, time.UTC),
+		constants.MainnetID: time.Date(2021, time.September, 22, 21, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(2021, time.September, 16, 21, 0, 0, 0, time.UTC),
 	}
 	ApricotPhase4DefaultTime     = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 	ApricotPhase4MinPChainHeight = map[uint32]uint64{
-		constants.MainnetID: 0,
-		constants.FujiID:    0,
+		constants.MainnetID: 793005,
+		constants.FujiID:    47437,
 	}
 	ApricotPhase4DefaultMinPChainHeight uint64
 )

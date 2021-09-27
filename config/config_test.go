@@ -139,20 +139,19 @@ func TestSetChainConfigsDirNotExist(t *testing.T) {
 	tests := map[string]struct {
 		structure  string
 		file       map[string]string
-		err        error
 		errMessage string
 		expected   map[string]chains.ChainConfig
 	}{
 		"cdir not exist": {
-			structure: "/",
-			file:      map[string]string{"config.ex": "noeffect"},
-			err:       os.ErrNotExist,
-			expected:  nil,
+			structure:  "/",
+			file:       map[string]string{"config.ex": "noeffect"},
+			errMessage: "cannot read directory",
+			expected:   nil,
 		},
 		"cdir is file ": {
 			structure:  "/",
 			file:       map[string]string{"cdir": "noeffect"},
-			errMessage: "not a directory",
+			errMessage: "cannot read directory",
 			expected:   nil,
 		},
 		"chain subdir not exist": {
@@ -189,8 +188,6 @@ func TestSetChainConfigsDirNotExist(t *testing.T) {
 			// don't read with getConfigFromViper since it's very slow.
 			chainConfigs, err := getChainConfigs(v)
 			switch {
-			case test.err != nil:
-				assert.ErrorIs(err, test.err)
 			case len(test.errMessage) > 0:
 				assert.Error(err)
 				assert.Contains(err.Error(), test.errMessage)
@@ -307,6 +304,84 @@ func TestGetVMAliasesDirNotExists(t *testing.T) {
 	vmAliases, err = getVMAliases(v)
 	assert.Nil(vmAliases)
 	assert.NoError(err)
+}
+
+func TestGetSubnetConfigs(t *testing.T) {
+	tests := map[string]struct {
+		givenJSON  string
+		testF      func(*assert.Assertions, map[ids.ID]chains.SubnetConfig)
+		errMessage string
+		fileName   string
+	}{
+		"wrong config": {
+			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
+			givenJSON: `thisisnotjson`,
+			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
+				assert.Nil(given)
+			},
+			errMessage: "couldn't read subnet configs",
+		},
+		"subnet is not whitelisted": {
+			fileName:  "Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU.json",
+			givenJSON: `{"validatorOnly": true}`,
+			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
+				assert.Empty(given)
+			},
+		},
+		"wrong extension": {
+			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.yaml",
+			givenJSON: `{"validatorOnly": true}`,
+			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
+				assert.Empty(given)
+			},
+		},
+		"invalid consensus parameters": {
+			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
+			givenJSON: `{"consensusParameters":{"k": 111, "alpha":1234} }`,
+			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
+				assert.Nil(given)
+			},
+			errMessage: "fails the condition that: alpha <= k",
+		},
+		"correct config": {
+			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
+			givenJSON: `{"validatorOnly": true, "consensusParameters":{"parents": 111, "alpha":16} }`,
+			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				config, ok := given[id]
+				assert.True(ok)
+
+				assert.Equal(true, config.ValidatorOnly)
+				assert.Equal(111, config.ConsensusParameters.Parents)
+				assert.Equal(16, config.ConsensusParameters.Alpha)
+				// must still respect defaults
+				assert.Equal(20, config.ConsensusParameters.K)
+			},
+			errMessage: "",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert := assert.New(t)
+			root := t.TempDir()
+			subnetPath := path.Join(root, "subnets")
+			configJSON := fmt.Sprintf(`{%q: %q}`, SubnetConfigDirKey, subnetPath)
+			configFilePath := setupConfigJSON(t, root, configJSON)
+			subnetID, err := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+			assert.NoError(err)
+			setupFile(t, subnetPath, test.fileName, test.givenJSON)
+			v := setupViper(configFilePath)
+			subnetConfigs, err := getSubnetConfigs(v, []ids.ID{subnetID})
+			if len(test.errMessage) > 0 {
+				assert.Error(err)
+				assert.Contains(err.Error(), test.errMessage)
+			} else {
+				assert.NoError(err)
+				test.testF(assert, subnetConfigs)
+			}
+		})
+	}
 }
 
 // setups config json file and writes content

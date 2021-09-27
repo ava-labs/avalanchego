@@ -172,7 +172,7 @@ func TestImportKey(t *testing.T) {
 	}
 }
 
-// Test issuing a tx, having it be dropped, and then re-issued and accepted
+// Test issuing a tx and accepted
 func TestGetTxStatus(t *testing.T) {
 	service := defaultService(t)
 	defaultAddress(t, service)
@@ -268,32 +268,8 @@ func TestGetTxStatus(t *testing.T) {
 	}
 
 	// put the chain in existing chain list
-	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
-		t.Fatal(err)
-	} else if _, err := service.vm.BuildBlock(); err == nil {
+	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err == nil {
 		t.Fatal("should have errored because of missing funds")
-	}
-
-	resp = GetTxStatusResponse{} // reset
-	err = service.GetTxStatus(nil, arg, &resp)
-	switch {
-	case err != nil:
-		t.Fatal(err)
-	case resp.Status != Dropped:
-		t.Fatalf("status should be Dropped but is %s", resp.Status)
-	case resp.Reason != "":
-		t.Fatal("reason should be empty when IncludeReason is false")
-	}
-
-	resp = GetTxStatusResponse{} // reset
-	err = service.GetTxStatus(nil, argIncludeReason, &resp)
-	switch {
-	case err != nil:
-		t.Fatal(err)
-	case resp.Status != Dropped:
-		t.Fatalf("status should be Dropped but is %s", resp.Status)
-	case resp.Reason == "":
-		t.Fatalf("reason shouldn't be empty")
 	}
 
 	service.vm.AtomicUTXOManager = newAtomicUTXOManager

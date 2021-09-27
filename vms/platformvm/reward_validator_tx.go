@@ -45,17 +45,27 @@ type UnsignedRewardValidatorTx struct {
 
 func (tx *UnsignedRewardValidatorTx) InitCtx(*snow.Context) {}
 
+func (tx *UnsignedRewardValidatorTx) InputIDs() ids.Set {
+	return nil
+}
+
 func (tx *UnsignedRewardValidatorTx) SyntacticVerify(*snow.Context) error {
 	return nil
 }
 
-// SemanticVerify this transaction performs a valid state transition.
+// Attempts to verify this transaction with the provided state.
+func (tx *UnsignedRewardValidatorTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
+	_, _, _, _, err := tx.Execute(vm, parentState, stx)
+	return err
+}
+
+// Execute this transaction.
 //
 // The current validating set must have at least one member.
 // The next validator to be removed must be the validator specified in this block.
 // The next validator to be removed must be have an end time equal to the current
 //   chain timestamp.
-func (tx *UnsignedRewardValidatorTx) SemanticVerify(
+func (tx *UnsignedRewardValidatorTx) Execute(
 	vm *VM,
 	parentState MutableState,
 	stx *Tx,

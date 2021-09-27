@@ -2,8 +2,10 @@
 // +build linux
 
 // ^ syscall.SysProcAttr only has field Pdeathsig on Linux
+
 // (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
+
 package subprocess
 
 import (

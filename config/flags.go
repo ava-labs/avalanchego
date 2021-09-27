@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/rocksdb"
 	"github.com/ava-labs/avalanchego/genesis"
-	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -38,6 +37,7 @@ var (
 	defaultChainConfigDir  = filepath.Join(defaultConfigDir, "chains")
 	defaultVMConfigDir     = filepath.Join(defaultConfigDir, "vms")
 	defaultVMAliasFilePath = filepath.Join(defaultVMConfigDir, "aliases.json")
+	defaultSubnetConfigDir = filepath.Join(defaultConfigDir, "subnets")
 
 	// Places to look for the build directory
 	defaultBuildDirs = []string{}
@@ -95,7 +95,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(DBPathKey, defaultDBDir, "Path to database directory")
 
 	// Coreth config
-	fs.String(CorethConfigKey, "", "Specifies config to pass into coreth")
+	fs.String(CorethConfigKey, "", "DEPRECATED")
 
 	// Logging
 	fs.String(LogsDirKey, "", "Logging directory for Avalanche")
@@ -119,6 +119,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Uint(NetworkPeerListSizeKey, 20, gossipHelpMsg)
 	fs.Uint(NetworkPeerListGossipSizeKey, 50, gossipHelpMsg)
 	fs.Duration(NetworkPeerListGossipFreqKey, time.Minute, gossipHelpMsg)
+	fs.Uint(NetworkPeerListStakerGossipFractionKey, 2, "Ratio of stakers to 'network-peer-list-gossip-size' in a gossiped peer list.")
 
 	// Public IP Resolution
 	fs.String(PublicIPKey, "", "Public IP of this node for P2P communication. If empty, try to discover with NAT. Ignored if dynamic-public-ip is non-empty.")
@@ -126,8 +127,9 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(DynamicPublicIPResolverKey, "", "'ifconfigco' (alias 'ifconfig') or 'opendns' or 'ifconfigme'. By default does not do dynamic public IP updates. If non-empty, ignores public-ip argument.")
 
 	// Inbound Connection Throttling
-	fs.Duration(InboundConnThrottlerCooldownKey, 2*time.Second, "Allow an inbound connection from a given IP at most once per this duration. If 0, don't rate-limit inbound connections.")
-	fs.Int(InboundConnThrottlerMaxRecentConnsKey, 1024, fmt.Sprintf("Allow at most this many inbound connection per [--%s]", InboundConnThrottlerCooldownKey))
+	fs.Duration(InboundConnUpgradeThrottlerCooldownKey, 10*time.Second, "Upgrade an inbound connection from a given IP at most once per this duration. If 0, don't rate-limit inbound connection upgrades.")
+	fs.Int(InboundConnUpgradeThrottlerMaxRecentKey, 5120, "DEPRECATED") // Deprecated starting in v1.6.0. TODO remove in future release.
+	fs.Float64(InboundThrottlerMaxConnsPerSecKey, 512, "Max number of inbound connections to accept (from all peers) per second.")
 	// Outbound Connection Throttling
 	fs.Uint(OutboundConnectionThrottlingRps, 50, "Make at most this number of outgoing peer connection attempts per second.")
 	fs.Duration(OutboundConnectionTimeout, 30*time.Second, "Timeout when dialing a peer.")
@@ -137,8 +139,14 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(NetworkMaximumTimeoutKey, 10*time.Second, "Maximum timeout value of the adaptive timeout manager.")
 	fs.Duration(NetworkTimeoutHalflifeKey, 5*time.Minute, "Halflife of average network response time. Higher value --> network timeout is less volatile. Can't be 0.")
 	fs.Float64(NetworkTimeoutCoefficientKey, 2, "Multiplied by average network response time to get the network timeout. Must be >= 1.")
-	fs.Bool(NetworkCompressionEnabledKey, true, "If true, compress Put, PushQuery, PeerList and Multiput messages sent to peers that support compression")
+	fs.Duration(NetworkGetVersionTimeoutKey, 10*time.Second, "Timeout for waiting GetVersion response from peers in handshake.")
+	fs.Duration(NetworkReadHandshakeTimeoutKey, 15*time.Second, "Timeout value for reading handshake messages.")
+	fs.Duration(NetworkPingTimeoutKey, constants.DefaultPingPongTimeout, "Timeout value for Ping-Pong with a peer.")
+	fs.Duration(NetworkPingFrequencyKey, constants.DefaultPingFrequency, "Frequency of pinging other peers.")
 
+	fs.Bool(NetworkCompressionEnabledKey, true, "If true, compress Put, PushQuery, PeerList and Multiput messages sent to peers that support compression")
+	fs.Duration(NetworkMaxClockDifferenceKey, time.Minute, "Max allowed clock difference value between this node and peers.")
+	fs.Bool(NetworkAllowPrivateIPsKey, true, "Allows the node to connect peers with private IPs")
 	// Peer alias configuration
 	fs.Duration(PeerAliasTimeoutKey, 10*time.Minute, "How often the node will attempt to connect "+
 		"to an IP address previously associated with a peer (i.e. a peer alias).")
@@ -154,17 +162,17 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(ConsensusShutdownTimeoutKey, 5*time.Second, "Timeout before killing an unresponsive chain.")
 	fs.Uint(ConsensusGossipAcceptedFrontierSizeKey, 35, "Number of peers to gossip to when gossiping accepted frontier")
 	fs.Uint(ConsensusGossipOnAcceptSizeKey, 20, "Number of peers to gossip to each accepted container to")
-	fs.Uint(AppGossipSizeKey, 20, "Number of peers to gossip an AppGossip message to")
+	fs.Uint(AppGossipSizeKey, 6, "Number of peers to gossip an AppGossip message to")
 
 	// Inbound Throttling
 	fs.Uint64(InboundThrottlerAtLargeAllocSizeKey, 32*units.MiB, "Size, in bytes, of at-large byte allocation in inbound message throttler.")
 	fs.Uint64(InboundThrottlerVdrAllocSizeKey, 32*units.MiB, "Size, in bytes, of validator byte allocation in inbound message throttler.")
-	fs.Uint64(InboundThrottlerNodeMaxAtLargeBytesKey, 2*uint64(network.DefaultMaxMessageSize), "Max number of bytes a node can take from the inbound message throttler's at-large allocation.")
+	fs.Uint64(InboundThrottlerNodeMaxAtLargeBytesKey, 2*uint64(constants.DefaultMaxMessageSize), "Max number of bytes a node can take from the inbound message throttler's at-large allocation.")
 
 	// Outbound Throttling
 	fs.Uint64(OutboundThrottlerAtLargeAllocSizeKey, 32*units.MiB, "Size, in bytes, of at-large byte allocation in outbound message throttler.")
 	fs.Uint64(OutboundThrottlerVdrAllocSizeKey, 32*units.MiB, "Size, in bytes, of validator byte allocation in outbound message throttler.")
-	fs.Uint64(OutboundThrottlerNodeMaxAtLargeBytesKey, 2*uint64(network.DefaultMaxMessageSize), "Max number of bytes a node can take from the outbound message throttler's at-large allocation.")
+	fs.Uint64(OutboundThrottlerNodeMaxAtLargeBytesKey, 2*uint64(constants.DefaultMaxMessageSize), "Max number of bytes a node can take from the outbound message throttler's at-large allocation.")
 
 	// HTTP APIs
 	fs.String(HTTPHostKey, "127.0.0.1", "Address of the HTTP server")
@@ -257,8 +265,9 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Bool(IndexEnabledKey, false, "If true, index all accepted containers and transactions and expose them via an API")
 	fs.Bool(IndexAllowIncompleteKey, false, "If true, allow running the node in such a way that could cause an index to miss transactions. Ignored if index is disabled.")
 
-	// Chain Config Dir
+	// Config Directories
 	fs.String(ChainConfigDirKey, defaultChainConfigDir, "Chain specific configurations parent directory. Defaults to $HOME/.avalanchego/configs/chains/")
+	fs.String(SubnetConfigDirKey, defaultSubnetConfigDir, "Subnet specific configurations parent directory. Defaults to $HOME/.avalanchego/configs/subnets/")
 
 	// Profiles
 	fs.String(ProfileDirKey, defaultProfileDir, "Path to the profile directory")
@@ -266,6 +275,10 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(ProfileContinuousFreqKey, 15*time.Minute, "How frequently to rotate performance profiles")
 	fs.Int(ProfileContinuousMaxFilesKey, 5, "Maximum number of historical profiles to keep")
 	fs.String(VMAliasesFileKey, defaultVMAliasFilePath, "Specifies a JSON file that maps vmIDs with custom aliases.")
+
+	// Delays
+	fs.Duration(NetworkInitialReconnectDelayKey, time.Second, "Initial delay duration must be waited before attempting to reconnect a peer.")
+	fs.Duration(NetworkMaxReconnectDelayKey, time.Hour, "Maximum delay duration must be waited before attempting to reconnect a peer.")
 }
 
 // BuildFlagSet returns a complete set of flags for avalanchego

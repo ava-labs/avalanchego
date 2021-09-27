@@ -52,8 +52,19 @@ func (tx *UnsignedCreateSubnetTx) SyntacticVerify(ctx *snow.Context) error {
 	return nil
 }
 
-// SemanticVerify returns nil if [tx] is valid given the state in [db]
-func (tx *UnsignedCreateSubnetTx) SemanticVerify(
+// Attempts to verify this transaction with the provided state.
+func (tx *UnsignedCreateSubnetTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
+	vs := newVersionedState(
+		parentState,
+		parentState.CurrentStakerChainState(),
+		parentState.PendingStakerChainState(),
+	)
+	_, err := tx.Execute(vm, vs, stx)
+	return err
+}
+
+// Execute this transaction.
+func (tx *UnsignedCreateSubnetTx) Execute(
 	vm *VM,
 	vs VersionedState,
 	stx *Tx,
