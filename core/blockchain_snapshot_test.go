@@ -28,8 +28,6 @@ import (
 	"strings"
 	"testing"
 
-	//"time"
-
 	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core/rawdb"
@@ -48,9 +46,8 @@ type snapshotTestBasic struct {
 
 	expCanonicalBlocks int    // Number of canonical blocks expected to remain in the database (excl. genesis)
 	expHeadHeader      uint64 // Block number of the expected head header
-	//expHeadFastBlock   uint64 // Block number of the expected head fast sync block
-	expHeadBlock      uint64 // Block number of the expected head full block
-	expSnapshotBottom uint64 // The block height corresponding to the snapshot disk layer
+	expHeadBlock       uint64 // Block number of the expected head full block
+	expSnapshotBottom  uint64 // The block height corresponding to the snapshot disk layer
 
 	// share fields, set in runtime
 	datadir string
@@ -58,7 +55,6 @@ type snapshotTestBasic struct {
 	gendb   ethdb.Database
 	engine  consensus.Engine
 
-	// restart logistic
 	lastAcceptedHash common.Hash
 }
 
@@ -93,7 +89,6 @@ func (basic *snapshotTestBasic) prepare(t *testing.T) (*BlockChain, []*types.Blo
 
 	// genesis as last accepted
 	basic.lastAcceptedHash = chain.GetBlockByNumber(0).Hash()
-	//basic.lastAcceptedHash = common.Hash{}
 
 	// Insert the blocks with configured settings.
 	var breakpoints []uint64
@@ -148,17 +143,9 @@ func (basic *snapshotTestBasic) verify(t *testing.T, chain *BlockChain, blocks [
 	verifyNoGaps(t, chain, true, blocks)
 	verifyCutoff(t, chain, true, blocks, basic.expCanonicalBlocks)
 
-	//fmt.Printf("CurrentHeader: %v\n", chain.CurrentHeader().Number.Uint64())
-	//fmt.Printf("CurrentBlock: %v\n", chain.CurrentBlock().NumberU64())
-
 	if head := chain.CurrentHeader(); head.Number.Uint64() != basic.expHeadHeader {
 		t.Errorf("Head header mismatch: have %d, want %d", head.Number, basic.expHeadHeader)
 	}
-	/*
-		if head := chain.CurrentFastBlock(); head.NumberU64() != basic.expHeadFastBlock {
-			t.Errorf("Head fast block mismatch: have %d, want %d", head.NumberU64(), basic.expHeadFastBlock)
-		}
-	*/
 	if head := chain.CurrentBlock(); head.NumberU64() != basic.expHeadBlock {
 		t.Errorf("Head block mismatch: have %d, want %d", head.NumberU64(), basic.expHeadBlock)
 	}
@@ -213,7 +200,6 @@ func (basic *snapshotTestBasic) dump() string {
 	}
 	fmt.Fprintf(buffer, "\n\n")
 	fmt.Fprintf(buffer, "Expected head header    : C%d\n", basic.expHeadHeader)
-	//fmt.Fprintf(buffer, "Expected head fast block: C%d\n", basic.expHeadFastBlock)
 	if basic.expHeadBlock == 0 {
 		fmt.Fprintf(buffer, "Expected head block     : G\n")
 	} else {
@@ -252,10 +238,6 @@ func (snaptest *snapshotTest) test(t *testing.T) {
 		t.Fatalf("Failed to recreate chain: %v", err)
 	}
 	defer newchain.Stop()
-
-	//fmt.Printf("%v\n", newchain.LastAcceptedBlock().NumberU64())
-	//fmt.Printf("%v\n", chain.snaps.Snapshots(blocks[7].Hash(), -1, false))
-	//fmt.Printf("%v\n", newchain.snaps.Snapshots(blocks[7].Hash(), -1, false))
 
 	snaptest.verify(t, newchain, blocks)
 }
@@ -326,8 +308,7 @@ func (snaptest *gappedSnapshotTest) test(t *testing.T) {
 	var cacheConfig = &CacheConfig{
 		TrieCleanLimit: 256,
 		TrieDirtyLimit: 256,
-		//TrieTimeLimit:  5 * time.Minute,
-		SnapshotLimit: 0,
+		SnapshotLimit:  0,
 	}
 	newchain, err := NewBlockChain(snaptest.db, cacheConfig, params.TestChainConfig, snaptest.engine, vm.Config{}, snaptest.lastAcceptedHash)
 	if err != nil {
@@ -346,37 +327,6 @@ func (snaptest *gappedSnapshotTest) test(t *testing.T) {
 	snaptest.verify(t, newchain, blocks)
 }
 
-/*
-// setHeadSnapshotTest is the test type used to test this scenario:
-// - have a complete snapshot
-// - set the head to a lower point
-// - restart
-type setHeadSnapshotTest struct {
-	snapshotTestBasic
-	setHead uint64 // Block number to set head back to
-}
-
-func (snaptest *setHeadSnapshotTest) test(t *testing.T) {
-	// It's hard to follow the test case, visualize the input
-	// log.Root().SetHandler(log.LvlFilterHandler(log.LvlTrace, log.StreamHandler(os.Stderr, log.TerminalFormat(true))))
-	// fmt.Println(tt.dump())
-	chain, blocks := snaptest.prepare(t)
-
-	// Rewind the chain if setHead operation is required.
-	chain.SetHead(snaptest.setHead)
-	chain.Stop()
-
-	newchain, err := NewBlockChain(snaptest.db, defaultCacheConfig, params.TestChainConfig, snaptest.engine, vm.Config{}, snaptest.lastAcceptedHash)
-	if err != nil {
-		t.Fatalf("Failed to recreate chain: %v", err)
-	}
-	defer newchain.Stop()
-
-	snaptest.verify(t, newchain, blocks)
-}
-*/
-
-/*
 // restartCrashSnapshotTest is the test type used to test this scenario:
 // - have a complete snapshot
 // - restart chain
@@ -424,7 +374,6 @@ func (snaptest *restartCrashSnapshotTest) test(t *testing.T) {
 
 	snaptest.verify(t, newchain, blocks)
 }
-*/
 
 // wipeCrashSnapshotTest is the test type used to test this scenario:
 // - have a complete snapshot
@@ -449,8 +398,7 @@ func (snaptest *wipeCrashSnapshotTest) test(t *testing.T) {
 	config := &CacheConfig{
 		TrieCleanLimit: 256,
 		TrieDirtyLimit: 256,
-		//TrieTimeLimit:  5 * time.Minute,
-		SnapshotLimit: 0,
+		SnapshotLimit:  0,
 	}
 	newchain, err := NewBlockChain(snaptest.db, config, params.TestChainConfig, snaptest.engine, vm.Config{}, snaptest.lastAcceptedHash)
 	if err != nil {
@@ -464,9 +412,7 @@ func (snaptest *wipeCrashSnapshotTest) test(t *testing.T) {
 	config = &CacheConfig{
 		TrieCleanLimit: 256,
 		TrieDirtyLimit: 256,
-		//TrieTimeLimit:  5 * time.Minute,
-		SnapshotLimit: 256,
-		//SnapshotWait:   false, // Don't wait rebuild
+		SnapshotLimit:  256,
 	}
 	newchain, err = NewBlockChain(snaptest.db, config, params.TestChainConfig, snaptest.engine, vm.Config{}, snaptest.lastAcceptedHash)
 	if err != nil {
@@ -509,9 +455,8 @@ func TestRestartWithNewSnapshot(t *testing.T) {
 			commitBlock:        0,
 			expCanonicalBlocks: 8,
 			expHeadHeader:      8,
-			//expHeadFastBlock:   8,
-			expHeadBlock:      4,
-			expSnapshotBottom: 4, // Initial disk layer built from genesis
+			expHeadBlock:       4,
+			expSnapshotBottom:  4, // Initial disk layer built from genesis
 		},
 	}
 	test.test(t)
@@ -548,9 +493,8 @@ func TestNoCommitCrashWithNewSnapshot(t *testing.T) {
 			commitBlock:        0,
 			expCanonicalBlocks: 8,
 			expHeadHeader:      8,
-			//expHeadFastBlock:   8,
-			expHeadBlock:      4,
-			expSnapshotBottom: 4, // Last committed disk layer, wait recovery
+			expHeadBlock:       4,
+			expSnapshotBottom:  4, // Last committed disk layer, wait recovery
 		},
 	}
 	test.test(t)
@@ -587,9 +531,8 @@ func TestLowCommitCrashWithNewSnapshot(t *testing.T) {
 			commitBlock:        2,
 			expCanonicalBlocks: 8,
 			expHeadHeader:      8,
-			//expHeadFastBlock:   8,
-			expHeadBlock:      4,
-			expSnapshotBottom: 4, // Last committed disk layer, wait recovery
+			expHeadBlock:       4,
+			expSnapshotBottom:  4, // Last committed disk layer, wait recovery
 		},
 	}
 	test.test(t)
@@ -626,9 +569,8 @@ func TestHighCommitCrashWithNewSnapshot(t *testing.T) {
 			commitBlock:        6,
 			expCanonicalBlocks: 8,
 			expHeadHeader:      8,
-			//expHeadFastBlock:   8,
-			expHeadBlock:      4,
-			expSnapshotBottom: 4, // Last committed disk layer, wait recovery
+			expHeadBlock:       4,
+			expSnapshotBottom:  4, // Last committed disk layer, wait recovery
 		},
 	}
 	test.test(t)
@@ -663,55 +605,14 @@ func TestGappedNewSnapshot(t *testing.T) {
 			commitBlock:        0,
 			expCanonicalBlocks: 10,
 			expHeadHeader:      8,
-			//expHeadFastBlock:   10,
-			expHeadBlock:      0,
-			expSnapshotBottom: 0, // Rebuilt snapshot from the latest HEAD
+			expHeadBlock:       0,
+			expSnapshotBottom:  0, // Rebuilt snapshot from the latest HEAD
 		},
 		gapped: 2,
 	}
 	test.test(t)
 	test.teardown()
 }
-
-/*
-// Tests the Geth was running with snapshot enabled and resetHead is applied.
-// In this case the head is rewound to the target(with state available). After
-// that the chain is restarted and the original disk layer is kept.
-func TestSetHeadWithNewSnapshot(t *testing.T) {
-	// Chain:
-	//   G->C1->C2->C3->C4->C5->C6->C7->C8 (HEAD)
-	//
-	// Commit:   G
-	// Snapshot: G
-	//
-	// SetHead(4)
-	//
-	// ------------------------------
-	//
-	// Expected in leveldb:
-	//   G->C1->C2->C3->C4
-	//
-	// Expected head header    : C4
-	// Expected head fast block: C4
-	// Expected head block     : C4
-	// Expected snapshot disk  : G
-	test := &setHeadSnapshotTest{
-		snapshotTestBasic: snapshotTestBasic{
-			chainBlocks:        8,
-			snapshotBlock:      0,
-			commitBlock:        0,
-			expCanonicalBlocks: 4,
-			expHeadHeader:      4,
-			//expHeadFastBlock:   4,
-			expHeadBlock:       4,
-			expSnapshotBottom:  0, // The initial disk layer is built from the genesis
-		},
-		setHead: 4,
-	}
-	test.test(t)
-	test.teardown()
-}
-*/
 
 // Tests the Geth was running with a complete snapshot and then imports a few
 // more new blocks on top without enabling the snapshot. After the restart,
@@ -741,118 +642,11 @@ func TestRecoverSnapshotFromWipingCrash(t *testing.T) {
 			commitBlock:        0,
 			expCanonicalBlocks: 10,
 			expHeadHeader:      8,
-			//expHeadFastBlock:   10,
-			expHeadBlock:      4,
-			expSnapshotBottom: 4,
+			expHeadBlock:       4,
+			expSnapshotBottom:  4,
 		},
 		newBlocks: 2,
 	}
 	test.test(t)
 	test.teardown()
-}
-
-// verifyNoGaps checks that there are no gaps after the initial set of blocks in
-// the database and errors if found.
-func verifyNoGaps(t *testing.T, chain *BlockChain, canonical bool, inserted types.Blocks) {
-	t.Helper()
-
-	var end uint64
-	for i := uint64(0); i <= uint64(len(inserted)); i++ {
-		header := chain.GetHeaderByNumber(i)
-		if header == nil && end == 0 {
-			end = i
-		}
-		if header != nil && end > 0 {
-			if canonical {
-				t.Errorf("Canonical header gap between #%d-#%d", end, i-1)
-			} else {
-				t.Errorf("Sidechain header gap between #%d-#%d", end, i-1)
-			}
-			end = 0 // Reset for further gap detection
-		}
-	}
-	end = 0
-	for i := uint64(0); i <= uint64(len(inserted)); i++ {
-		block := chain.GetBlockByNumber(i)
-		if block == nil && end == 0 {
-			end = i
-		}
-		if block != nil && end > 0 {
-			if canonical {
-				t.Errorf("Canonical block gap between #%d-#%d", end, i-1)
-			} else {
-				t.Errorf("Sidechain block gap between #%d-#%d", end, i-1)
-			}
-			end = 0 // Reset for further gap detection
-		}
-	}
-	end = 0
-	for i := uint64(1); i <= uint64(len(inserted)); i++ {
-		receipts := chain.GetReceiptsByHash(inserted[i-1].Hash())
-		if receipts == nil && end == 0 {
-			end = i
-		}
-		if receipts != nil && end > 0 {
-			if canonical {
-				t.Errorf("Canonical receipt gap between #%d-#%d", end, i-1)
-			} else {
-				t.Errorf("Sidechain receipt gap between #%d-#%d", end, i-1)
-			}
-			end = 0 // Reset for further gap detection
-		}
-	}
-}
-
-// verifyCutoff checks that there are no chain data available in the chain after
-// the specified limit, but that it is available before.
-func verifyCutoff(t *testing.T, chain *BlockChain, canonical bool, inserted types.Blocks, head int) {
-	t.Helper()
-
-	for i := 1; i <= len(inserted); i++ {
-		if i <= head {
-			if header := chain.GetHeader(inserted[i-1].Hash(), uint64(i)); header == nil {
-				if canonical {
-					t.Errorf("Canonical header   #%2d [%x...] missing before cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
-				} else {
-					t.Errorf("Sidechain header   #%2d [%x...] missing before cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
-				}
-			}
-			if block := chain.GetBlock(inserted[i-1].Hash(), uint64(i)); block == nil {
-				if canonical {
-					t.Errorf("Canonical block    #%2d [%x...] missing before cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
-				} else {
-					t.Errorf("Sidechain block    #%2d [%x...] missing before cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
-				}
-			}
-			if receipts := chain.GetReceiptsByHash(inserted[i-1].Hash()); receipts == nil {
-				if canonical {
-					t.Errorf("Canonical receipts #%2d [%x...] missing before cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
-				} else {
-					t.Errorf("Sidechain receipts #%2d [%x...] missing before cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
-				}
-			}
-		} else {
-			if header := chain.GetHeader(inserted[i-1].Hash(), uint64(i)); header != nil {
-				if canonical {
-					t.Errorf("Canonical header   #%2d [%x...] present after cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
-				} else {
-					t.Errorf("Sidechain header   #%2d [%x...] present after cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
-				}
-			}
-			if block := chain.GetBlock(inserted[i-1].Hash(), uint64(i)); block != nil {
-				if canonical {
-					t.Errorf("Canonical block    #%2d [%x...] present after cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
-				} else {
-					t.Errorf("Sidechain block    #%2d [%x...] present after cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
-				}
-			}
-			if receipts := chain.GetReceiptsByHash(inserted[i-1].Hash()); receipts != nil {
-				if canonical {
-					t.Errorf("Canonical receipts #%2d [%x...] present after cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
-				} else {
-					t.Errorf("Sidechain receipts #%2d [%x...] present after cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
-				}
-			}
-		}
-	}
 }
