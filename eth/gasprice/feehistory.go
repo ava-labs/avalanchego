@@ -36,7 +36,6 @@ import (
 	"sort"
 	"sync/atomic"
 
-	"github.com/ava-labs/coreth/consensus/dummy"
 	_ "github.com/ava-labs/coreth/consensus/misc"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/rpc"
@@ -95,14 +94,8 @@ func (s sortGasAndReward) Less(i, j int) bool {
 // the block field filled in, retrieves the block from the backend if not present yet and
 // fills in the rest of the fields.
 func (oracle *Oracle) processBlock(bf *blockFees, percentiles []float64) {
-	chainconfig := oracle.backend.ChainConfig()
 	if bf.results.baseFee = bf.header.BaseFee; bf.results.baseFee == nil {
 		bf.results.baseFee = new(big.Int)
-	}
-	var err error
-	_, bf.results.nextBaseFee, err = dummy.CalcBaseFee(chainconfig, bf.header, oracle.clock.Unix()) // misc.CalcBaseFee(chainconfig, bf.header)
-	if err != nil {
-		bf.results.nextBaseFee = new(big.Int)
 	}
 	bf.results.gasUsedRatio = float64(bf.header.GasUsed) / float64(bf.header.GasLimit)
 	if len(percentiles) == 0 {
