@@ -824,7 +824,7 @@ func (n *network) SendAppGossip(subnetID, chainID ids.ID, appGossipBytes []byte)
 	// in the network.
 	peersAll, err := n.peers.sample(subnetID, false, int(n.config.AppGossipNonValidatorSize))
 	if err != nil {
-		n.log.Debug("failed to sample %d peers for AppGossip: %s", n.config.AppGossipNonValidatorSize, err0)
+		n.log.Debug("failed to sample %d peers for AppGossip: %s", n.config.AppGossipNonValidatorSize, err)
 		n.stateLock.RUnlock()
 		return
 	}
@@ -835,7 +835,7 @@ func (n *network) SendAppGossip(subnetID, chainID ids.ID, appGossipBytes []byte)
 	peersValidators, err := n.peers.sample(subnetID, true, int(n.config.AppGossipValidatorSize))
 	n.stateLock.RUnlock()
 	if err != nil {
-		n.log.Debug("failed to sample %d validators for AppGossip: %s", n.config.AppGossipValidatorSize, err0)
+		n.log.Debug("failed to sample %d validators for AppGossip: %s", n.config.AppGossipValidatorSize, err)
 		return
 	}
 
