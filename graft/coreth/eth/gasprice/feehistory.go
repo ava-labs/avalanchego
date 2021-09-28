@@ -36,7 +36,6 @@ import (
 	"sort"
 	"sync/atomic"
 
-	"github.com/ava-labs/coreth/consensus/dummy"
 	_ "github.com/ava-labs/coreth/consensus/misc"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/rpc"
@@ -69,9 +68,9 @@ type blockFees struct {
 
 // processedFees contains the results of a processed block and is also used for caching
 type processedFees struct {
-	reward               []*big.Int
-	baseFee, nextBaseFee *big.Int
-	gasUsedRatio         float64
+	reward       []*big.Int
+	baseFee      *big.Int
+	gasUsedRatio float64
 }
 
 // txGasAndReward is sorted in ascending order based on reward
@@ -95,14 +94,8 @@ func (s sortGasAndReward) Less(i, j int) bool {
 // the block field filled in, retrieves the block from the backend if not present yet and
 // fills in the rest of the fields.
 func (oracle *Oracle) processBlock(bf *blockFees, percentiles []float64) {
-	chainconfig := oracle.backend.ChainConfig()
 	if bf.results.baseFee = bf.header.BaseFee; bf.results.baseFee == nil {
 		bf.results.baseFee = new(big.Int)
-	}
-	var err error
-	_, bf.results.nextBaseFee, err = dummy.CalcBaseFee(chainconfig, bf.header, oracle.clock.Unix()) // misc.CalcBaseFee(chainconfig, bf.header)
-	if err != nil {
-		bf.results.nextBaseFee = new(big.Int)
 	}
 	bf.results.gasUsedRatio = float64(bf.header.GasUsed) / float64(bf.header.GasLimit)
 	if len(percentiles) == 0 {
@@ -289,7 +282,7 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 	}
 	var (
 		reward       = make([][]*big.Int, blocks)
-		baseFee      = make([]*big.Int, blocks+1)
+		baseFee      = make([]*big.Int, blocks)
 		gasUsedRatio = make([]float64, blocks)
 		firstMissing = blocks
 	)
@@ -300,7 +293,7 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 		}
 		i := int(fees.blockNumber - oldestBlock)
 		if fees.results.baseFee != nil {
-			reward[i], baseFee[i], baseFee[i+1], gasUsedRatio[i] = fees.results.reward, fees.results.baseFee, fees.results.nextBaseFee, fees.results.gasUsedRatio
+			reward[i], baseFee[i], gasUsedRatio[i] = fees.results.reward, fees.results.baseFee, fees.results.gasUsedRatio
 		} else {
 			// getting no block and no error means we are requesting into the future (might happen because of a reorg)
 			if i < firstMissing {
@@ -316,6 +309,6 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 	} else {
 		reward = nil
 	}
-	baseFee, gasUsedRatio = baseFee[:firstMissing+1], gasUsedRatio[:firstMissing]
+	baseFee, gasUsedRatio = baseFee[:firstMissing], gasUsedRatio[:firstMissing]
 	return new(big.Int).SetUint64(oldestBlock), reward, baseFee, gasUsedRatio, nil
 }
