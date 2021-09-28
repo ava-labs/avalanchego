@@ -246,6 +246,11 @@ type Config struct {
 	Beacons            validators.Set `json:"beacons"`
 	// Set of current validators in the Avalanche network
 	Validators validators.Set `json:"validators"`
+
+	// TODO: move this to a better config location
+	// Require that all connections must have at least one validator between the
+	// 2 peers.
+	RequireValidatorToConnect bool `json:"requireValidatorToConnect"`
 }
 
 // NewNetwork returns a new Network implementation with the provided parameters.
@@ -891,6 +896,13 @@ func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 	return true
 }
 
+func (n *network) shouldHoldConnection(peerID ids.ShortID) bool {
+	return !n.config.RequireValidatorToConnect ||
+		n.config.Validators.Contains(n.config.MyNodeID) ||
+		n.config.Validators.Contains(peerID) ||
+		n.config.Beacons.Contains(peerID)
+}
+
 // Dispatch starts accepting connections from other nodes attempting to connect
 // to this node.
 // Assumes [n.stateLock] is not held.
@@ -1418,6 +1430,15 @@ func (n *network) tryAddPeer(p *peer) error {
 			n.myIPs[str] = struct{}{}
 		}
 		return errPeerIsMyself
+	}
+
+	if !n.shouldHoldConnection(p.nodeID) {
+		if !ip.IsZero() {
+			str := ip.String()
+			delete(n.disconnectedIPs, str)
+			delete(n.retryDelay, str)
+		}
+		return fmt.Errorf("non-validator connection from %s at %s", p.nodeID.PrefixedString(constants.NodeIDPrefix), ip)
 	}
 
 	// If I am already connected to this peer, then I should close this new

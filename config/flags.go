@@ -147,6 +147,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Bool(NetworkCompressionEnabledKey, true, "If true, compress Put, PushQuery, PeerList and Multiput messages sent to peers that support compression")
 	fs.Duration(NetworkMaxClockDifferenceKey, time.Minute, "Max allowed clock difference value between this node and peers.")
 	fs.Bool(NetworkAllowPrivateIPsKey, true, "Allows the node to connect peers with private IPs")
+	fs.Bool(NetworkRequireValidatorToConnectKey, false, "Requires a connection to have a least one validator to be made")
 	// Peer alias configuration
 	fs.Duration(PeerAliasTimeoutKey, 10*time.Minute, "How often the node will attempt to connect "+
 		"to an IP address previously associated with a peer (i.e. a peer alias).")

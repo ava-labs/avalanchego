@@ -72,6 +72,7 @@ const (
 	NetworkCompressionEnabledKey              = "network-compression-enabled"
 	NetworkMaxClockDifferenceKey              = "network-max-clock-difference"
 	NetworkAllowPrivateIPsKey                 = "network-allow-private-ips"
+	NetworkRequireValidatorToConnectKey       = "network-require-validator-to-connect"
 	BenchlistFailThresholdKey                 = "benchlist-fail-threshold"
 	BenchlistPeerSummaryEnabledKey            = "benchlist-peer-summary-enabled"
 	BenchlistDurationKey                      = "benchlist-duration"
