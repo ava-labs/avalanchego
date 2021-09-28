@@ -55,14 +55,13 @@ func BenchmarkInsertChain_valueTx_100kB_diskdb(b *testing.B) {
 	benchInsertChain(b, true, genValueTx(100*1024))
 }
 
-/*
 func BenchmarkInsertChain_uncles_memdb(b *testing.B) {
 	benchInsertChain(b, false, genUncles)
 }
 func BenchmarkInsertChain_uncles_diskdb(b *testing.B) {
 	benchInsertChain(b, true, genUncles)
 }
-*/
+
 func BenchmarkInsertChain_ring200_memdb(b *testing.B) {
 	benchInsertChain(b, false, genTxRing(200))
 }
@@ -115,6 +114,8 @@ func init() {
 // and fills the blocks with many small transactions.
 func genTxRing(naccounts int) func(int, *BlockGen) {
 	from := 0
+    fee := big.NewInt(0).SetUint64(params.TxGas*225000000000)
+    amount := big.NewInt(0).Set(benchRootFunds)
 	return func(i int, gen *BlockGen) {
 		block := gen.PrevBlock(i - 1)
 		gas := block.GasLimit()
@@ -127,9 +128,9 @@ func genTxRing(naccounts int) func(int, *BlockGen) {
 			tx := types.NewTransaction(
 				gen.TxNonce(ringAddrs[from]),
 				ringAddrs[to],
-				benchRootFunds,
+                amount.Sub(amount, fee),
 				params.TxGas,
-				nil,
+				big.NewInt(225000000000),
 				nil,
 			)
 			tx, _ = types.SignTx(tx, types.HomesteadSigner{}, ringKeys[from])
@@ -140,7 +141,6 @@ func genTxRing(naccounts int) func(int, *BlockGen) {
 }
 
 // genUncles generates blocks with two uncle headers.
-/*
 func genUncles(i int, gen *BlockGen) {
 	if i >= 6 {
 		b2 := gen.PrevBlock(i - 6).Header()
@@ -151,7 +151,6 @@ func genUncles(i int, gen *BlockGen) {
 		gen.AddUncle(b3)
 	}
 }
-*/
 
 func benchInsertChain(b *testing.B, disk bool, gen func(int, *BlockGen)) {
 	// Create the database in memory or in a temporary directory.
