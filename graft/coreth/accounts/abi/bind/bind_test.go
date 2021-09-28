@@ -940,7 +940,7 @@ var bindTests = []struct {
 			if err != nil {
 				t.Fatalf("Failed to deploy eventer contract: %v", err)
 			}
-			sim.Commit(true)
+			sim.Commit(false)
 
 			// Inject a few events into the contract, gradually more in each block
 			for i := 1; i <= 3; i++ {
@@ -949,7 +949,7 @@ var bindTests = []struct {
 						t.Fatalf("block %d, event %d: raise failed: %v", i, j, err)
 					}
 				}
-				sim.Commit(true)
+				sim.Commit(false)
 			}
 			// Test filtering for certain events and ensure they can be found
 			sit, err := eventer.FilterSimpleEvent(nil, []common.Address{common.Address{1}, common.Address{3}}, [][32]byte{{byte(1)}, {byte(2)}, {byte(3)}}, []bool{true})
@@ -985,7 +985,7 @@ var bindTests = []struct {
 			if _, err := eventer.RaiseNodataEvent(auth, big.NewInt(314), 141, 271); err != nil {
 				t.Fatalf("failed to raise nodata event: %v", err)
 			}
-			sim.Commit(true)
+			sim.Commit(false)
 
 			nit, err := eventer.FilterNodataEvent(nil, []*big.Int{big.NewInt(314)}, []int16{140, 141, 142}, []uint32{271})
 			if err != nil {
@@ -1009,7 +1009,7 @@ var bindTests = []struct {
 			if _, err := eventer.RaiseDynamicEvent(auth, "Hello", []byte("World")); err != nil {
 				t.Fatalf("failed to raise dynamic event: %v", err)
 			}
-			sim.Commit(true)
+			sim.Commit(false)
 
 			dit, err := eventer.FilterDynamicEvent(nil, []string{"Hi", "Hello", "Bye"}, [][]byte{[]byte("World")})
 			if err != nil {
@@ -1036,7 +1036,7 @@ var bindTests = []struct {
 			if _, err := eventer.RaiseFixedBytesEvent(auth, fblob); err != nil {
 				t.Fatalf("failed to raise fixed bytes event: %v", err)
 			}
-			sim.Commit(true)
+			sim.Commit(false)
 
 			fit, err := eventer.FilterFixedBytesEvent(nil, [][24]byte{fblob})
 			if err != nil {
@@ -1065,7 +1065,7 @@ var bindTests = []struct {
 			if _, err := eventer.RaiseSimpleEvent(auth, common.Address{255}, [32]byte{255}, true, big.NewInt(255)); err != nil {
 				t.Fatalf("failed to raise subscribed simple event: %v", err)
 			}
-			sim.Commit(true)
+			sim.Commit(false)
 
 			select {
 			case event := <-ch:
@@ -1081,7 +1081,7 @@ var bindTests = []struct {
 			if _, err := eventer.RaiseSimpleEvent(auth, common.Address{254}, [32]byte{254}, true, big.NewInt(254)); err != nil {
 				t.Fatalf("failed to raise subscribed simple event: %v", err)
 			}
-			sim.Commit(true)
+			sim.Commit(false)
 
 			select {
 			case event := <-ch:
@@ -1501,10 +1501,10 @@ var bindTests = []struct {
 		time.Sleep(5 * time.Second)
 
 		// Finish deploy.
-		sim.Commit(true)
+		sim.Commit(false)
 
 		contract.Foo(auth, big.NewInt(1), big.NewInt(2))
-		sim.Commit(true)
+		sim.Commit(false)
 
 		time.Sleep(5 * time.Second)
 
@@ -1523,7 +1523,7 @@ var bindTests = []struct {
 		bar0Timer.Stop()
 
 		contract.Foo0(auth, big.NewInt(1))
-		sim.Commit(true)
+		sim.Commit(false)
 
 		time.Sleep(5 * time.Second)
 
@@ -1820,6 +1820,8 @@ var bindTests = []struct {
 	},
 }
 
+// The binding tests have been modified to run in two separate test
+// functions to allow these tests to pass on GitHub Actions.
 func TestGolangBindingsOverload(t *testing.T) {
 	golangBindings(t, true)
 }
@@ -1849,9 +1851,11 @@ func golangBindings(t *testing.T, overload bool) {
 	}
 	// Generate the test suite for all the contracts
 	for i, tt := range bindTests {
+		// Skip the "Overload" test if [!overload]
 		if !overload && tt.name == "Overload" {
 			continue
 		}
+		// Skip all tests except for "Overload" if [overload]
 		if overload && tt.name != "Overload" {
 			continue
 		}
