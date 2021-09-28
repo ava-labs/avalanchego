@@ -19,10 +19,10 @@ type ExternalSender interface {
 	// Returns the IDs of validators that may receive the message.
 	// If we're not connected to a validator in [nodeIDs], for example,
 	// it will not be included in the return value.
-	SendGetAcceptedFrontier(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration) []ids.ShortID
+	SendGetAcceptedFrontier(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration)
 	SendAcceptedFrontier(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID)
 
-	SendGetAccepted(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) []ids.ShortID
+	SendGetAccepted(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID)
 	SendAccepted(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID)
 
 	// Request ancestors of container [containerID] in chain [chainID] from validator [nodeID].

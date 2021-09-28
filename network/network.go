@@ -339,12 +339,10 @@ func NewNetwork(
 
 // GetAcceptedFrontier implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration) []ids.ShortID {
+func (n *network) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration) {
 	msg, err := n.b.GetAcceptedFrontier(chainID, requestID, uint64(deadline))
 	n.log.AssertNoError(err)
-	msgLen := len(msg.Bytes())
 
-	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
 	now := n.clock.Time()
 	for _, peerElement := range n.getPeers(nodeIDs) {
 		peer := peerElement.peer
@@ -356,18 +354,18 @@ func (n *network) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, chainID ids.ID, 
 				requestID)
 			n.metrics.getAcceptedFrontier.numFailed.Inc()
 			n.sendFailRateCalculator.Observe(1, now)
-		} else {
-			sentTo = append(sentTo, nodeID)
-			n.metrics.getAcceptedFrontier.numSent.Inc()
-			n.sendFailRateCalculator.Observe(0, now)
-			n.metrics.getAcceptedFrontier.sentBytes.Add(float64(msgLen))
-			// assume that if [saved] == 0, [msg] wasn't compressed
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.getAcceptedFrontier.savedSentBytes.Observe(float64(saved))
-			}
+			continue
+		}
+
+		msgLen := len(msg.Bytes())
+		n.metrics.getAcceptedFrontier.numSent.Inc()
+		n.sendFailRateCalculator.Observe(0, now)
+		n.metrics.getAcceptedFrontier.sentBytes.Add(float64(msgLen))
+		// assume that if [saved] == 0, [msg] wasn't compressed
+		if saved := msg.BytesSavedCompression(); saved != 0 {
+			n.metrics.getAcceptedFrontier.savedSentBytes.Observe(float64(saved))
 		}
 	}
-	return sentTo
 }
 
 // AcceptedFrontier implements the Sender interface.
@@ -409,7 +407,7 @@ func (n *network) SendAcceptedFrontier(nodeID ids.ShortID, chainID ids.ID, reque
 
 // GetAccepted implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) SendGetAccepted(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) []ids.ShortID {
+func (n *network) SendGetAccepted(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) {
 	now := n.clock.Time()
 
 	msg, err := n.b.GetAccepted(chainID, requestID, uint64(deadline), containerIDs)
@@ -420,11 +418,9 @@ func (n *network) SendGetAccepted(nodeIDs ids.ShortSet, chainID ids.ID, requestI
 			containerIDs,
 			err)
 		n.sendFailRateCalculator.Observe(1, now)
-		return nil
+		return
 	}
-	msgLen := len(msg.Bytes())
 
-	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
 	for _, peerElement := range n.getPeers(nodeIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
@@ -436,18 +432,18 @@ func (n *network) SendGetAccepted(nodeIDs ids.ShortSet, chainID ids.ID, requestI
 				containerIDs)
 			n.metrics.getAccepted.numFailed.Inc()
 			n.sendFailRateCalculator.Observe(1, now)
-		} else {
-			n.metrics.getAccepted.numSent.Inc()
-			n.sendFailRateCalculator.Observe(0, now)
-			n.metrics.getAccepted.sentBytes.Add(float64(msgLen))
-			// assume that if [saved] == 0, [msg] wasn't compressed
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.getAccepted.savedSentBytes.Observe(float64(saved))
-			}
-			sentTo = append(sentTo, vID)
+			continue
+		}
+
+		msgLen := len(msg.Bytes())
+		n.metrics.getAccepted.numSent.Inc()
+		n.sendFailRateCalculator.Observe(0, now)
+		n.metrics.getAccepted.sentBytes.Add(float64(msgLen))
+		// assume that if [saved] == 0, [msg] wasn't compressed
+		if saved := msg.BytesSavedCompression(); saved != 0 {
+			n.metrics.getAccepted.savedSentBytes.Observe(float64(saved))
 		}
 	}
-	return sentTo
 }
 
 // Accepted implements the Sender interface.

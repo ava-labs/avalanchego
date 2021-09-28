@@ -2089,9 +2089,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	assert.NoError(t, err)
 
 	reqID := new(uint32)
-	externalSender.SendGetAcceptedFrontierF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration) []ids.ShortID {
+	externalSender.SendGetAcceptedFrontierF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration) {
 		*reqID = requestID
-		return ids.List()
 	}
 
 	isBootstrapped := false
@@ -2157,9 +2156,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	externalSender.SendGetAcceptedFrontierF = nil
-	externalSender.SendGetAcceptedF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration, _ []ids.ID) []ids.ShortID {
+	externalSender.SendGetAcceptedF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration, _ []ids.ID) {
 		*reqID = requestID
-		return ids.List()
 	}
 
 	frontier := []ids.ID{advanceTimeBlkID}

@@ -23,10 +23,10 @@ type ExternalSenderTest struct {
 	CantSendGossip,
 	CantSendAppRequest, CantSendAppResponse, CantSendAppGossip bool
 
-	SendGetAcceptedFrontierF func(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration) []ids.ShortID
+	SendGetAcceptedFrontierF func(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration)
 	SendAcceptedFrontierF    func(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID)
 
-	SendGetAcceptedF func(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) []ids.ShortID
+	SendGetAcceptedF func(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID)
 	SendAcceptedF    func(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID)
 
 	SendGetAncestorsF func(nodeID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool
@@ -72,16 +72,15 @@ func (s *ExternalSenderTest) Default(cant bool) {
 // SendGetAcceptedFrontier calls SendGetAcceptedFrontierF if it was initialized. If it
 // wasn't initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *ExternalSenderTest) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration) []ids.ShortID {
+func (s *ExternalSenderTest) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration) {
 	switch {
 	case s.SendGetAcceptedFrontierF != nil:
-		return s.SendGetAcceptedFrontierF(nodeIDs, chainID, requestID, deadline)
+		s.SendGetAcceptedFrontierF(nodeIDs, chainID, requestID, deadline)
 	case s.CantSendGetAcceptedFrontier && s.T != nil:
 		s.T.Fatalf("Unexpectedly called GetAcceptedFrontier")
 	case s.CantSendGetAcceptedFrontier && s.B != nil:
 		s.B.Fatalf("Unexpectedly called GetAcceptedFrontier")
 	}
-	return nil
 }
 
 // SendAcceptedFrontier calls SendAcceptedFrontierF if it was initialized. If it wasn't
@@ -101,16 +100,15 @@ func (s *ExternalSenderTest) SendAcceptedFrontier(nodeID ids.ShortID, chainID id
 // SendGetAccepted calls SendGetAcceptedF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *ExternalSenderTest) SendGetAccepted(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) []ids.ShortID {
+func (s *ExternalSenderTest) SendGetAccepted(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) {
 	switch {
 	case s.SendGetAcceptedF != nil:
-		return s.SendGetAcceptedF(nodeIDs, chainID, requestID, deadline, containerIDs)
+		s.SendGetAcceptedF(nodeIDs, chainID, requestID, deadline, containerIDs)
 	case s.CantSendGetAccepted && s.T != nil:
 		s.T.Fatalf("Unexpectedly called SendGetAccepted")
 	case s.CantSendGetAccepted && s.B != nil:
 		s.B.Fatalf("Unexpectedly called SendGetAccepted")
 	}
-	return nil
 }
 
 // SendAccepted calls SendAcceptedF if it was initialized. If it wasn't initialized and
