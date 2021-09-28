@@ -15,7 +15,6 @@ const (
 	defaultEthApiEnabled               = true
 	defaultNetApiEnabled               = true
 	defaultWeb3ApiEnabled              = true
-	defaultPreimagesEnabled            = false
 	defaultPruningEnabled              = true
 	defaultSnapshotAsync               = true
 	defaultRpcGasCap                   = 2500000000 // 25000000 X 100
@@ -107,7 +106,6 @@ func (c *Config) SetDefaults() {
 	c.MaxBlocksPerRequest = defaultMaxBlocksPerRequest
 	c.ContinuousProfilerFrequency.Duration = defaultContinuousProfilerFrequency
 	c.ContinuousProfilerMaxFiles = defaultContinuousProfilerMaxFiles
-	c.Preimages = defaultPreimagesEnabled
 	c.Pruning = defaultPruningEnabled
 	c.SnapshotAsync = defaultSnapshotAsync
 }
