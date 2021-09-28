@@ -2089,9 +2089,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	assert.NoError(t, err)
 
 	reqID := new(uint32)
-	externalSender.SendGetAcceptedFrontierF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration) {
-		*reqID = requestID
-	}
+	externalSender.SendGetAcceptedFrontierF =
+		func(nodeIDs ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration) []ids.ShortID {
+			*reqID = requestID
+			res := make([]ids.ShortID, 0)
+			return res
+		}
 
 	isBootstrapped := false
 	subnet := &common.SubnetTest{
@@ -2156,9 +2159,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	externalSender.SendGetAcceptedFrontierF = nil
-	externalSender.SendGetAcceptedF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration, _ []ids.ID) {
-		*reqID = requestID
-	}
+	externalSender.SendGetAcceptedF =
+		func(nodeIDs ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration, _ []ids.ID) []ids.ShortID {
+			*reqID = requestID
+			res := make([]ids.ShortID, 0)
+			return res
+		}
 
 	frontier := []ids.ID{advanceTimeBlkID}
 	if err := engine.AcceptedFrontier(peerID, *reqID, frontier); err != nil {

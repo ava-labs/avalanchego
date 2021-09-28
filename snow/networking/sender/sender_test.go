@@ -27,10 +27,12 @@ import (
 
 func TestSenderContext(t *testing.T) {
 	context := snow.DefaultContextTest()
+	externalSender := &ExternalSenderTest{T: t}
+	externalSender.Default(true)
 	sender := Sender{}
 	err := sender.Initialize(
 		context,
-		&ExternalSenderTest{},
+		externalSender,
 		&router.ChainRouter{},
 		&timeout.Manager{},
 		"",
@@ -69,8 +71,10 @@ func TestTimeout(t *testing.T) {
 	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
+	externalSender := &ExternalSenderTest{T: t}
+	externalSender.Default(false)
 	sender := Sender{}
-	err = sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm, "", prometheus.NewRegistry())
+	err = sender.Initialize(snow.DefaultContextTest(), externalSender, &chainRouter, &tm, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}
@@ -140,11 +144,14 @@ func TestReliableMessages(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second,
+		ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
+	externalSender := &ExternalSenderTest{T: t}
+	externalSender.Default(false)
 	sender := Sender{}
-	err = sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm, "", prometheus.NewRegistry())
+	err = sender.Initialize(snow.DefaultContextTest(), externalSender, &chainRouter, &tm, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}
@@ -229,7 +236,9 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	assert.NoError(t, err)
 
 	sender := Sender{}
-	err = sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm, "", prometheus.NewRegistry())
+	externalSender := &ExternalSenderTest{T: t}
+	externalSender.Default(false)
+	err = sender.Initialize(snow.DefaultContextTest(), externalSender, &chainRouter, &tm, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}

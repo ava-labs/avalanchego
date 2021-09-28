@@ -90,6 +90,12 @@ type Network interface {
 	health.Checkable
 }
 
+type msgProcessor struct {
+	canModifyMsg bool
+	meterSuccess func(msg message.Message)
+	meterFailure func(nodeID ids.ShortID, msg message.Message)
+}
+
 type network struct {
 	config *Config
 	// The metrics that this network tracks
@@ -117,10 +123,11 @@ type network struct {
 	// This field just makes sure we don't connect to ourselves when TLS is
 	// disabled. So, cryptographically secure random number generation isn't
 	// used here.
-	dummyNodeID uint32
-	clock       timer.Clock
-	c           message.Codec
-	b           message.Builder
+	dummyNodeID   uint32
+	clock         timer.Clock
+	c             message.Codec
+	b             message.Builder
+	msgProcessors map[constants.MsgType]msgProcessor
 
 	stateLock sync.RWMutex
 	closed    utils.AtomicBool
@@ -329,6 +336,8 @@ func NewNetwork(
 	}
 	netw.c = codec
 	netw.b = message.NewBuilder(codec)
+	netw.initMsgProcessors()
+
 	netw.peers.initialize()
 	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, config.MaxSendFailRateHalflife, netw.clock.Time()))
 	if err := netw.metrics.initialize(config.Namespace, metricsRegisterer); err != nil {
@@ -337,359 +346,323 @@ func NewNetwork(
 	return netw, nil
 }
 
-// GetAcceptedFrontier implements the Sender interface.
-// Assumes [n.stateLock] is not held.
-func (n *network) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration) {
-	msg, err := n.b.GetAcceptedFrontier(chainID, requestID, uint64(deadline))
-	n.log.AssertNoError(err)
+func (n *network) initMsgProcessors() {
+	n.msgProcessors = make(map[constants.MsgType]msgProcessor)
 
-	now := n.clock.Time()
-	for _, peerElement := range n.getPeers(nodeIDs) {
-		peer := peerElement.peer
-		nodeID := peerElement.id
-		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
+	// constants.GetAcceptedFrontierMsg
+	n.msgProcessors[constants.GetAcceptedFrontierMsg] = msgProcessor{
+		canModifyMsg: false,
+		meterSuccess: func(msg message.Message) {
+			var (
+				now    = n.clock.Time()
+				msgLen = len(msg.Bytes())
+			)
+
+			n.metrics.getAcceptedFrontier.numSent.Inc()
+			n.sendFailRateCalculator.Observe(0, now)
+			n.metrics.getAcceptedFrontier.sentBytes.Add(float64(msgLen))
+			// assume that if [saved] == 0, [msg] wasn't compressed
+			if saved := msg.BytesSavedCompression(); saved != 0 {
+				n.metrics.getAcceptedFrontier.savedSentBytes.Observe(float64(saved))
+			}
+		},
+		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
+			now := n.clock.Time()
+			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
+			reqID, _ := msg.Get(message.RequestID).(uint32)
 			n.log.Debug("failed to send GetAcceptedFrontier(%s, %s, %d)",
-				nodeID,
-				chainID,
-				requestID)
+				nodeID, chainID, reqID)
 			n.metrics.getAcceptedFrontier.numFailed.Inc()
 			n.sendFailRateCalculator.Observe(1, now)
-			continue
-		}
-
-		msgLen := len(msg.Bytes())
-		n.metrics.getAcceptedFrontier.numSent.Inc()
-		n.sendFailRateCalculator.Observe(0, now)
-		n.metrics.getAcceptedFrontier.sentBytes.Add(float64(msgLen))
-		// assume that if [saved] == 0, [msg] wasn't compressed
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			n.metrics.getAcceptedFrontier.savedSentBytes.Observe(float64(saved))
-		}
-	}
-}
-
-// AcceptedFrontier implements the Sender interface.
-// Assumes [n.stateLock] is not held.
-func (n *network) SendAcceptedFrontier(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
-	now := n.clock.Time()
-
-	peer := n.getPeer(nodeID)
-	msg, err := n.b.AcceptedFrontier(chainID, requestID, containerIDs)
-	if err != nil {
-		n.log.Error("failed to build AcceptedFrontier(%s, %d, %s): %s",
-			chainID,
-			requestID,
-			containerIDs,
-			err)
-		n.sendFailRateCalculator.Observe(1, now)
-		return // Packing message failed
+		},
 	}
 
-	msgLen := len(msg.Bytes())
-	if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
-		n.log.Debug("failed to send AcceptedFrontier(%s, %s, %d, %s)",
-			nodeID,
-			chainID,
-			requestID,
-			containerIDs)
-		n.metrics.acceptedFrontier.numFailed.Inc()
-		n.sendFailRateCalculator.Observe(1, now)
-	} else {
-		n.metrics.acceptedFrontier.numSent.Inc()
-		n.sendFailRateCalculator.Observe(0, now)
-		n.metrics.acceptedFrontier.sentBytes.Add(float64(msgLen))
-		// assume that if [saved] == 0, [msg] wasn't compressed
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			n.metrics.acceptedFrontier.savedSentBytes.Observe(float64(saved))
-		}
+	// constants.AcceptedFrontierMsg
+	n.msgProcessors[constants.AcceptedFrontierMsg] = msgProcessor{
+		canModifyMsg: true,
+		meterSuccess: func(msg message.Message) {
+			var (
+				now    = n.clock.Time()
+				msgLen = len(msg.Bytes())
+			)
+			n.metrics.acceptedFrontier.numSent.Inc()
+			n.sendFailRateCalculator.Observe(0, now)
+			n.metrics.acceptedFrontier.sentBytes.Add(float64(msgLen))
+			// assume that if [saved] == 0, [msg] wasn't compressed
+			if saved := msg.BytesSavedCompression(); saved != 0 {
+				n.metrics.acceptedFrontier.savedSentBytes.Observe(float64(saved))
+			}
+		},
+		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
+			now := n.clock.Time()
+			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
+			reqID, _ := msg.Get(message.RequestID).(uint32)
+
+			containerIDsBytes := msg.Get(message.ContainerIDs).([][]byte)
+			containerIDs := make([]ids.ID, len(containerIDsBytes))
+			for _, containerIDBytes := range containerIDsBytes {
+				containerID, _ := ids.ToID(containerIDBytes)
+				containerIDs = append(containerIDs, containerID)
+			}
+
+			n.log.Debug("failed to send AcceptedFrontier(%s, %s, %d, %s)",
+				nodeID,
+				chainID,
+				reqID,
+				containerIDs)
+			n.metrics.acceptedFrontier.numFailed.Inc()
+			n.sendFailRateCalculator.Observe(1, now)
+		},
 	}
-}
+	// constants.GetAcceptedMsg
+	n.msgProcessors[constants.GetAcceptedMsg] = msgProcessor{
+		canModifyMsg: false,
+		meterSuccess: func(msg message.Message) {
+			var (
+				now    = n.clock.Time()
+				msgLen = len(msg.Bytes())
+			)
 
-// GetAccepted implements the Sender interface.
-// Assumes [n.stateLock] is not held.
-func (n *network) SendGetAccepted(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) {
-	now := n.clock.Time()
+			n.metrics.getAccepted.numSent.Inc()
+			n.sendFailRateCalculator.Observe(0, now)
+			n.metrics.getAccepted.sentBytes.Add(float64(msgLen))
+			// assume that if [saved] == 0, [msg] wasn't compressed
+			if saved := msg.BytesSavedCompression(); saved != 0 {
+				n.metrics.getAccepted.savedSentBytes.Observe(float64(saved))
+			}
+		},
+		meterFailure: func(vID ids.ShortID, msg message.Message) {
+			now := n.clock.Time()
+			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
+			reqID, _ := msg.Get(message.RequestID).(uint32)
 
-	msg, err := n.b.GetAccepted(chainID, requestID, uint64(deadline), containerIDs)
-	if err != nil {
-		n.log.Error("failed to build GetAccepted(%s, %d, %s): %s",
-			chainID,
-			requestID,
-			containerIDs,
-			err)
-		n.sendFailRateCalculator.Observe(1, now)
-		return
-	}
-
-	for _, peerElement := range n.getPeers(nodeIDs) {
-		peer := peerElement.peer
-		vID := peerElement.id
-		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
+			containerIDsBytes := msg.Get(message.ContainerIDs).([][]byte)
+			containerIDs := make([]ids.ID, len(containerIDsBytes))
+			for _, containerIDBytes := range containerIDsBytes {
+				containerID, _ := ids.ToID(containerIDBytes)
+				containerIDs = append(containerIDs, containerID)
+			}
 			n.log.Debug("failed to send GetAccepted(%s, %s, %d, %s)",
 				vID,
 				chainID,
-				requestID,
+				reqID,
 				containerIDs)
 			n.metrics.getAccepted.numFailed.Inc()
 			n.sendFailRateCalculator.Observe(1, now)
-			continue
-		}
-
-		msgLen := len(msg.Bytes())
-		n.metrics.getAccepted.numSent.Inc()
-		n.sendFailRateCalculator.Observe(0, now)
-		n.metrics.getAccepted.sentBytes.Add(float64(msgLen))
-		// assume that if [saved] == 0, [msg] wasn't compressed
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			n.metrics.getAccepted.savedSentBytes.Observe(float64(saved))
-		}
-	}
-}
-
-// Accepted implements the Sender interface.
-// Assumes [n.stateLock] is not held.
-func (n *network) SendAccepted(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
-	now := n.clock.Time()
-
-	msg, err := n.b.Accepted(chainID, requestID, containerIDs)
-	if err != nil {
-		n.log.Error("failed to build Accepted(%s, %d, %s): %s",
-			chainID,
-			requestID,
-			containerIDs,
-			err)
-		n.sendFailRateCalculator.Observe(1, now)
-		return // Packing message failed
-	}
-	msgLen := len(msg.Bytes())
-
-	peer := n.getPeer(nodeID)
-	if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
-		n.log.Debug("failed to send Accepted(%s, %s, %d, %s)",
-			nodeID,
-			chainID,
-			requestID,
-			containerIDs)
-		n.metrics.accepted.numFailed.Inc()
-		n.sendFailRateCalculator.Observe(1, now)
-	} else {
-		n.sendFailRateCalculator.Observe(0, now)
-		n.metrics.accepted.numSent.Inc()
-		n.metrics.accepted.sentBytes.Add(float64(msgLen))
-		// assume that if [saved] == 0, [msg] wasn't compressed
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			n.metrics.accepted.savedSentBytes.Observe(float64(saved))
-		}
-	}
-}
-
-// GetAncestors implements the Sender interface.
-// Assumes [n.stateLock] is not held.
-func (n *network) SendGetAncestors(nodeID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool {
-	now := n.clock.Time()
-
-	peer := n.getPeer(nodeID)
-
-	msg, err := n.b.GetAncestors(chainID, requestID, uint64(deadline), containerID)
-	if err != nil {
-		n.log.Error("failed to build GetAncestors message: %s", err)
-		n.sendFailRateCalculator.Observe(1, now)
-		return false
+		},
 	}
 
-	msgLen := len(msg.Bytes())
-	if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
-		n.log.Debug("failed to send GetAncestors(%s, %s, %d, %s)",
-			nodeID,
-			chainID,
-			requestID,
-			containerID)
-		n.metrics.getAncestors.numFailed.Inc()
-		n.sendFailRateCalculator.Observe(1, now)
-		return false
-	}
-	n.metrics.getAncestors.numSent.Inc()
-	n.sendFailRateCalculator.Observe(0, now)
-	n.metrics.getAncestors.sentBytes.Add(float64(msgLen))
-	// assume that if [saved] == 0, [msg] wasn't compressed
-	if saved := msg.BytesSavedCompression(); saved != 0 {
-		n.metrics.getAncestors.savedSentBytes.Observe(float64(saved))
-	}
-	return true
-}
+	// constants.AcceptedMsg
+	n.msgProcessors[constants.AcceptedMsg] = msgProcessor{
+		canModifyMsg: true,
+		meterSuccess: func(msg message.Message) {
+			var (
+				now    = n.clock.Time()
+				msgLen = len(msg.Bytes())
+			)
 
-// MultiPut implements the Sender interface.
-// Assumes [n.stateLock] is not held.
-func (n *network) SendMultiPut(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte) {
-	now := n.clock.Time()
+			n.sendFailRateCalculator.Observe(0, now)
+			n.metrics.accepted.numSent.Inc()
+			n.metrics.accepted.sentBytes.Add(float64(msgLen))
+			// assume that if [saved] == 0, [msg] wasn't compressed
+			if saved := msg.BytesSavedCompression(); saved != 0 {
+				n.metrics.accepted.savedSentBytes.Observe(float64(saved))
+			}
+		},
+		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
+			now := n.clock.Time()
+			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
+			reqID, _ := msg.Get(message.RequestID).(uint32)
 
-	// Compress this message only if the peer can handle compressed
-	// messages and we have compression enabled
-	msg, err := n.b.MultiPut(chainID, requestID, containers, n.config.CompressionEnabled)
-	if err != nil {
-		n.log.Error("failed to build MultiPut message because of container of size %d", len(containers))
-		n.sendFailRateCalculator.Observe(1, now)
-		return
-	}
-
-	msgLen := len(msg.Bytes())
-	if peer := n.getPeer(nodeID); peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
-		n.log.Debug("failed to send MultiPut(%s, %s, %d, %d)",
-			nodeID,
-			chainID,
-			requestID,
-			len(containers))
-		n.metrics.multiPut.numFailed.Inc()
-		n.sendFailRateCalculator.Observe(1, now)
-	} else {
-		n.metrics.multiPut.numSent.Inc()
-		n.sendFailRateCalculator.Observe(0, now)
-		n.metrics.multiPut.sentBytes.Add(float64(msgLen))
-		// assume that if [saved] == 0, [msg] wasn't compressed
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			n.metrics.multiPut.savedSentBytes.Observe(float64(saved))
-		}
-	}
-}
-
-// Get implements the Sender interface.
-// Assumes [n.stateLock] is not held.
-func (n *network) SendGet(nodeID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool {
-	now := n.clock.Time()
-
-	msg, err := n.b.Get(chainID, requestID, uint64(deadline), containerID)
-	n.log.AssertNoError(err)
-
-	msgLen := len(msg.Bytes())
-	peer := n.getPeer(nodeID)
-	if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
-		n.log.Debug("failed to send Get(%s, %s, %d, %s)",
-			nodeID,
-			chainID,
-			requestID,
-			containerID)
-		n.metrics.get.numFailed.Inc()
-		n.sendFailRateCalculator.Observe(1, now)
-		return false
-	}
-	n.metrics.get.numSent.Inc()
-	n.sendFailRateCalculator.Observe(0, now)
-	n.metrics.get.sentBytes.Add(float64(msgLen))
-	// assume that if [saved] == 0, [msg] wasn't compressed
-	if saved := msg.BytesSavedCompression(); saved != 0 {
-		n.metrics.get.savedSentBytes.Observe(float64(saved))
-	}
-	return true
-}
-
-// Put implements the Sender interface.
-// Assumes [n.stateLock] is not held.
-func (n *network) SendPut(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
-	now := n.clock.Time()
-
-	// Compress this message only if the peer can handle compressed
-	// messages and we have compression enabled
-	msg, err := n.b.Put(chainID, requestID, containerID, container, n.config.CompressionEnabled)
-	if err != nil {
-		n.log.Error("failed to build Put(%s, %d, %s): %s. len(container) : %d",
-			chainID,
-			requestID,
-			containerID,
-			err,
-			len(container))
-		n.sendFailRateCalculator.Observe(1, now)
-		return
-	}
-	msgLen := len(msg.Bytes())
-
-	if peer := n.getPeer(nodeID); peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
-		n.log.Debug("failed to send Put(%s, %s, %d, %s)",
-			nodeID,
-			chainID,
-			requestID,
-			containerID)
-		n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
-		n.metrics.put.numFailed.Inc()
-		n.sendFailRateCalculator.Observe(1, now)
-	} else {
-		n.metrics.put.numSent.Inc()
-		n.sendFailRateCalculator.Observe(0, now)
-		n.metrics.put.sentBytes.Add(float64(msgLen))
-		// assume that if [saved] == 0, [msg] wasn't compressed
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			n.metrics.put.savedSentBytes.Observe(float64(saved))
-		}
-	}
-}
-
-// PushQuery implements the Sender interface.
-// Assumes [n.stateLock] is not held.
-func (n *network) SendPushQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID, container []byte) []ids.ShortID {
-	now := n.clock.Time()
-
-	msg, err := n.b.PushQuery(chainID, requestID, uint64(deadline), containerID, container, n.config.CompressionEnabled)
-	if err != nil {
-		n.log.Error("failed to build PushQuery(%s, %d, %s): %s. len(container): %d",
-			chainID,
-			requestID,
-			containerID,
-			err,
-			len(container))
-		n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
-		n.sendFailRateCalculator.Observe(1, now)
-		return nil // Packing message failed
-	}
-
-	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
-	for _, peerElement := range n.getPeers(nodeIDs) {
-		peer := peerElement.peer
-		vID := peerElement.id
-		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
-			n.log.Debug("failed to send PushQuery(%s, %s, %d, %s)",
-				vID,
+			containerIDsBytes := msg.Get(message.ContainerIDs).([][]byte)
+			containerIDs := make([]ids.ID, len(containerIDsBytes))
+			for _, containerIDBytes := range containerIDsBytes {
+				containerID, _ := ids.ToID(containerIDBytes)
+				containerIDs = append(containerIDs, containerID)
+			}
+			n.log.Debug("failed to send Accepted(%s, %s, %d, %s)",
+				nodeID,
 				chainID,
-				requestID,
+				reqID,
+				containerIDs)
+			n.metrics.accepted.numFailed.Inc()
+			n.sendFailRateCalculator.Observe(1, now)
+		},
+	}
+
+	// constants.GetAncestorsMsg
+	n.msgProcessors[constants.GetAncestorsMsg] = msgProcessor{
+		canModifyMsg: true,
+		meterSuccess: func(msg message.Message) {
+			var (
+				now    = n.clock.Time()
+				msgLen = len(msg.Bytes())
+			)
+
+			n.metrics.getAncestors.numSent.Inc()
+			n.sendFailRateCalculator.Observe(0, now)
+			n.metrics.getAncestors.sentBytes.Add(float64(msgLen))
+			// assume that if [saved] == 0, [msg] wasn't compressed
+			if saved := msg.BytesSavedCompression(); saved != 0 {
+				n.metrics.getAncestors.savedSentBytes.Observe(float64(saved))
+			}
+		},
+		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
+			now := n.clock.Time()
+			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
+			reqID, _ := msg.Get(message.RequestID).(uint32)
+			containerID, _ := ids.ToID(msg.Get(message.ContainerID).([]byte))
+			n.log.Debug("failed to send GetAncestors(%s, %s, %d, %s)",
+				nodeID,
+				chainID,
+				reqID,
+				containerID)
+			n.metrics.getAncestors.numFailed.Inc()
+			n.sendFailRateCalculator.Observe(1, now)
+		},
+	}
+
+	// constants.MultiPutMsg
+	n.msgProcessors[constants.MultiPutMsg] = msgProcessor{
+		canModifyMsg: true,
+		meterSuccess: func(msg message.Message) {
+			var (
+				now    = n.clock.Time()
+				msgLen = len(msg.Bytes())
+			)
+
+			n.metrics.multiPut.numSent.Inc()
+			n.sendFailRateCalculator.Observe(0, now)
+			n.metrics.multiPut.sentBytes.Add(float64(msgLen))
+			// assume that if [saved] == 0, [msg] wasn't compressed
+			if saved := msg.BytesSavedCompression(); saved != 0 {
+				n.metrics.multiPut.savedSentBytes.Observe(float64(saved))
+			}
+		},
+		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
+			now := n.clock.Time()
+			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
+			reqID, _ := msg.Get(message.RequestID).(uint32)
+			containers := msg.Get(message.MultiContainerBytes).([][]byte)
+			n.log.Debug("failed to send MultiPut(%s, %s, %d, %d)",
+				nodeID,
+				chainID,
+				reqID,
+				len(containers))
+			n.metrics.multiPut.numFailed.Inc()
+			n.sendFailRateCalculator.Observe(1, now)
+		},
+	}
+
+	// constants.GetMsg
+	n.msgProcessors[constants.GetMsg] = msgProcessor{
+		canModifyMsg: true,
+		meterSuccess: func(msg message.Message) {
+			var (
+				now    = n.clock.Time()
+				msgLen = len(msg.Bytes())
+			)
+
+			n.metrics.get.numSent.Inc()
+			n.sendFailRateCalculator.Observe(0, now)
+			n.metrics.get.sentBytes.Add(float64(msgLen))
+			// assume that if [saved] == 0, [msg] wasn't compressed
+			if saved := msg.BytesSavedCompression(); saved != 0 {
+				n.metrics.get.savedSentBytes.Observe(float64(saved))
+			}
+		},
+		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
+			now := n.clock.Time()
+			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
+			reqID, _ := msg.Get(message.RequestID).(uint32)
+			containerID, _ := ids.ToID(msg.Get(message.ContainerID).([]byte))
+			n.log.Debug("failed to send Get(%s, %s, %d, %s)",
+				nodeID,
+				chainID,
+				reqID,
+				containerID)
+			n.metrics.get.numFailed.Inc()
+			n.sendFailRateCalculator.Observe(1, now)
+		},
+	}
+
+	// constants.PutMsg
+	n.msgProcessors[constants.PutMsg] = msgProcessor{
+		canModifyMsg: true,
+		meterSuccess: func(msg message.Message) {
+			var (
+				now    = n.clock.Time()
+				msgLen = len(msg.Bytes())
+			)
+
+			n.metrics.put.numSent.Inc()
+			n.sendFailRateCalculator.Observe(0, now)
+			n.metrics.put.sentBytes.Add(float64(msgLen))
+			// assume that if [saved] == 0, [msg] wasn't compressed
+			if saved := msg.BytesSavedCompression(); saved != 0 {
+				n.metrics.put.savedSentBytes.Observe(float64(saved))
+			}
+		},
+		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
+			now := n.clock.Time()
+			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
+			reqID, _ := msg.Get(message.RequestID).(uint32)
+			containerID, _ := ids.ToID(msg.Get(message.ContainerID).([]byte))
+			container := msg.Get(message.ContainerBytes).([]byte)
+			n.log.Debug("failed to send Put(%s, %s, %d, %s)",
+				nodeID,
+				chainID,
+				reqID,
 				containerID)
 			n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
-			n.metrics.pushQuery.numFailed.Inc()
+			n.metrics.put.numFailed.Inc()
 			n.sendFailRateCalculator.Observe(1, now)
-		} else {
-			sentTo = append(sentTo, vID)
+		},
+	}
+
+	// constants.PushQueryMsg
+	n.msgProcessors[constants.PushQueryMsg] = msgProcessor{
+		canModifyMsg: false,
+		meterSuccess: func(msg message.Message) {
+			var (
+				now    = n.clock.Time()
+				msgLen = len(msg.Bytes())
+			)
+
 			n.metrics.pushQuery.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
-			n.metrics.pushQuery.sentBytes.Add(float64(len(msg.Bytes())))
+			n.metrics.pushQuery.sentBytes.Add(float64(msgLen))
 			// assume that if [saved] == 0, [msg] wasn't compressed
 			if saved := msg.BytesSavedCompression(); saved != 0 {
 				n.metrics.pushQuery.savedSentBytes.Observe(float64(saved))
 			}
-		}
-	}
-	return sentTo
-}
-
-// PullQuery implements the Sender interface.
-// Assumes [n.stateLock] is not held.
-func (n *network) SendPullQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) []ids.ShortID {
-	now := n.clock.Time()
-
-	msg, err := n.b.PullQuery(chainID, requestID, uint64(deadline), containerID)
-	n.log.AssertNoError(err)
-	msgLen := len(msg.Bytes())
-
-	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
-	for _, peerElement := range n.getPeers(nodeIDs) {
-		peer := peerElement.peer
-		vID := peerElement.id
-		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
-			n.log.Debug("failed to send PullQuery(%s, %s, %d, %s)",
+		},
+		meterFailure: func(vID ids.ShortID, msg message.Message) {
+			now := n.clock.Time()
+			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
+			reqID, _ := msg.Get(message.RequestID).(uint32)
+			containerID, _ := ids.ToID(msg.Get(message.ContainerID).([]byte))
+			container := msg.Get(message.ContainerBytes).([]byte)
+			n.log.Debug("failed to send PushQuery(%s, %s, %d, %s)",
 				vID,
 				chainID,
-				requestID,
+				reqID,
 				containerID)
-			n.metrics.pullQuery.numFailed.Inc()
+			n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
+			n.metrics.pushQuery.numFailed.Inc()
 			n.sendFailRateCalculator.Observe(1, now)
-		} else {
-			sentTo = append(sentTo, vID)
+		},
+	}
+
+	// constants.PullQueryMsg
+	n.msgProcessors[constants.PullQueryMsg] = msgProcessor{
+		canModifyMsg: false,
+		meterSuccess: func(msg message.Message) {
+			var (
+				now    = n.clock.Time()
+				msgLen = len(msg.Bytes())
+			)
+
 			n.metrics.pullQuery.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
 			n.metrics.pullQuery.sentBytes.Add(float64(msgLen))
@@ -697,109 +670,143 @@ func (n *network) SendPullQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID 
 			if saved := msg.BytesSavedCompression(); saved != 0 {
 				n.metrics.pullQuery.savedSentBytes.Observe(float64(saved))
 			}
-		}
-	}
-	return sentTo
-}
-
-// Chits implements the Sender interface.
-// Assumes [n.stateLock] is not held.
-func (n *network) SendChits(nodeID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID) {
-	now := n.clock.Time()
-
-	peer := n.getPeer(nodeID)
-	msg, err := n.b.Chits(chainID, requestID, votes)
-	if err != nil {
-		n.log.Error("failed to build Chits(%s, %d, %s): %s",
-			chainID,
-			requestID,
-			votes,
-			err)
-		n.sendFailRateCalculator.Observe(1, now)
-		return
-	}
-	msgLen := len(msg.Bytes())
-
-	if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
-		n.log.Debug("failed to send Chits(%s, %s, %d, %s)",
-			nodeID,
-			chainID,
-			requestID,
-			votes)
-		n.metrics.chits.numFailed.Inc()
-		n.sendFailRateCalculator.Observe(1, now)
-	} else {
-		n.sendFailRateCalculator.Observe(0, now)
-		n.metrics.chits.numSent.Inc()
-		n.metrics.chits.sentBytes.Add(float64(msgLen))
-		// assume that if [saved] == 0, [msg] wasn't compressed
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			n.metrics.chits.savedSentBytes.Observe(float64(saved))
-		}
-	}
-}
-
-// AppRequest implements the Sender interface.
-// assumes the stateLock is not held.
-func (n *network) SendAppRequest(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, appRequestBytes []byte) []ids.ShortID {
-	now := n.clock.Time()
-
-	msg, err := n.b.AppRequest(chainID, requestID, uint64(deadline), appRequestBytes, n.config.CompressionEnabled)
-	if err != nil {
-		n.log.Error("failed to build AppRequest(%s, %d): %s", chainID, requestID, err)
-		n.log.Verbo("message: %s", formatting.DumpBytes{Bytes: appRequestBytes})
-		n.sendFailRateCalculator.Observe(1, now)
-		return nil
-	}
-
-	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
-	for _, peerElement := range n.getPeers(nodeIDs) {
-		peer := peerElement.peer
-		nodeID := peerElement.id
-		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
-			n.log.Debug("failed to send AppRequest(%s, %s, %d)", nodeID, chainID, requestID)
-			n.log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appRequestBytes})
-			n.metrics.appRequest.numFailed.Inc()
+		},
+		meterFailure: func(vID ids.ShortID, msg message.Message) {
+			now := n.clock.Time()
+			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
+			reqID, _ := msg.Get(message.RequestID).(uint32)
+			containerID, _ := ids.ToID(msg.Get(message.ContainerID).([]byte))
+			n.log.Debug("failed to send PullQuery(%s, %s, %d, %s)",
+				vID,
+				chainID,
+				reqID,
+				containerID)
+			n.metrics.pullQuery.numFailed.Inc()
 			n.sendFailRateCalculator.Observe(1, now)
-		} else {
-			sentTo = append(sentTo, nodeID)
+		},
+	}
+
+	// constants.ChitsMsg
+	n.msgProcessors[constants.ChitsMsg] = msgProcessor{
+		canModifyMsg: true,
+		meterSuccess: func(msg message.Message) {
+			var (
+				now    = n.clock.Time()
+				msgLen = len(msg.Bytes())
+			)
+
+			n.sendFailRateCalculator.Observe(0, now)
+			n.metrics.chits.numSent.Inc()
+			n.metrics.chits.sentBytes.Add(float64(msgLen))
+			// assume that if [saved] == 0, [msg] wasn't compressed
+			if saved := msg.BytesSavedCompression(); saved != 0 {
+				n.metrics.chits.savedSentBytes.Observe(float64(saved))
+			}
+		},
+		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
+			now := n.clock.Time()
+			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
+			reqID, _ := msg.Get(message.RequestID).(uint32)
+
+			votesBytes := msg.Get(message.ContainerIDs).([][]byte)
+			votes := make([]ids.ID, len(votesBytes))
+			for _, voteBytes := range votesBytes {
+				vote, _ := ids.ToID(voteBytes)
+				votes = append(votes, vote)
+			}
+
+			n.log.Debug("failed to send Chits(%s, %s, %d, %s)",
+				nodeID,
+				chainID,
+				reqID,
+				votes)
+			n.metrics.chits.numFailed.Inc()
+			n.sendFailRateCalculator.Observe(1, now)
+		},
+	}
+
+	// constants.AppRequestMsg
+	n.msgProcessors[constants.AppRequestMsg] = msgProcessor{
+		canModifyMsg: false,
+		meterSuccess: func(msg message.Message) {
+			var (
+				now    = n.clock.Time()
+				msgLen = len(msg.Bytes())
+			)
+
 			n.metrics.appRequest.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
-			n.metrics.appRequest.sentBytes.Add(float64(len(msg.Bytes())))
+			n.metrics.appRequest.sentBytes.Add(float64(msgLen))
 			if saved := msg.BytesSavedCompression(); saved != 0 {
 				n.metrics.appRequest.savedSentBytes.Observe(float64(saved))
 			}
-		}
+		},
+		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
+			now := n.clock.Time()
+			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
+			reqID, _ := msg.Get(message.RequestID).(uint32)
+			appBytes := msg.Get(message.AppRequestBytes).([]byte)
+			n.log.Debug("failed to send AppRequest(%s, %s, %d)", nodeID, chainID, reqID)
+			n.log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appBytes})
+			n.metrics.appRequest.numFailed.Inc()
+			n.sendFailRateCalculator.Observe(1, now)
+		},
 	}
-	return sentTo
+
+	// constants.AppResponseMsg
+	n.msgProcessors[constants.AppResponseMsg] = msgProcessor{
+		canModifyMsg: true,
+		meterSuccess: func(msg message.Message) {
+			var (
+				now    = n.clock.Time()
+				msgLen = len(msg.Bytes())
+			)
+
+			n.metrics.appResponse.numSent.Inc()
+			n.sendFailRateCalculator.Observe(0, now)
+			n.metrics.appResponse.sentBytes.Add(float64(msgLen))
+			if saved := msg.BytesSavedCompression(); saved != 0 {
+				n.metrics.appResponse.savedSentBytes.Observe(float64(saved))
+			}
+		},
+		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
+			now := n.clock.Time()
+			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
+			reqID, _ := msg.Get(message.RequestID).(uint32)
+			appBytes := msg.Get(message.AppRequestBytes).([]byte)
+			n.log.Debug("failed to send AppResponse(%s, %s, %d)", nodeID, chainID, reqID)
+			n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: appBytes})
+			n.metrics.appResponse.numFailed.Inc()
+			n.sendFailRateCalculator.Observe(1, now)
+		},
+	}
 }
 
-// AppResponse implements the Sender interface.
-// assumes the stateLock is not held.
-func (n *network) SendAppResponse(nodeID ids.ShortID, chainID ids.ID, requestID uint32, appResponse []byte) {
-	now := n.clock.Time()
+// TODO: drop and find a better way to expose builder to sender
+func (n *network) GetMsgBuilder() message.Builder { return n.b }
+func (n *network) IsCompressionEnabled() bool     { return n.config.CompressionEnabled }
 
-	msg, err := n.b.AppResponse(chainID, requestID, appResponse, n.config.CompressionEnabled)
-	if err != nil {
-		n.log.Error("failed to build AppResponse(%s, %d): %s", chainID, requestID, err)
-		n.log.Verbo("message: %s", formatting.DumpBytes{Bytes: appResponse})
-		n.sendFailRateCalculator.Observe(1, now)
+// Assumes [n.stateLock] is not held.
+func (n *network) Send(msgType constants.MsgType, msg message.Message, nodeIDs ids.ShortSet) []ids.ShortID {
+	msgProc, ok := n.msgProcessors[msgType]
+	if ok {
+		n.log.Error("Unhandled message type %v. Sending nothing.", msgType)
+		return []ids.ShortID{}
 	}
 
-	peer := n.getPeer(nodeID)
-	if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
-		n.log.Debug("failed to send AppResponse(%s, %s, %d)", nodeID, chainID, requestID)
-		n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: appResponse})
-		n.metrics.appResponse.numFailed.Inc()
-		n.sendFailRateCalculator.Observe(1, now)
-	} else {
-		n.metrics.appResponse.numSent.Inc()
-		n.sendFailRateCalculator.Observe(0, now)
-		n.metrics.appResponse.sentBytes.Add(float64(len(msg.Bytes())))
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			n.metrics.appResponse.savedSentBytes.Observe(float64(saved))
+	res := make([]ids.ShortID, 0, nodeIDs.Len())
+	for _, peerElement := range n.getPeers(nodeIDs) {
+		peer := peerElement.peer
+		nodeID := peerElement.id
+		if peer != nil && peer.finishedHandshake.GetValue() && peer.Send(msg, msgProc.canModifyMsg) {
+			res = append(res, nodeID)
+			msgProc.meterSuccess(msg)
+			continue
 		}
+
+		msgProc.meterFailure(nodeID, msg)
 	}
+	return res
 }
 
 // AppGossip implements the Sender interface.
@@ -1661,20 +1668,6 @@ func (n *network) getAllPeers() []*peer {
 		}
 	}
 	return peers
-}
-
-// Safe find a single peer
-// Assumes [n.stateLock] is not held.
-func (n *network) getPeer(nodeID ids.ShortID) *peer {
-	n.stateLock.RLock()
-	defer n.stateLock.RUnlock()
-
-	if n.closed.GetValue() {
-		return nil
-	}
-
-	res, _ := n.peers.getByID(nodeID) // note: peer may be nil
-	return res
 }
 
 // HealthCheck returns information about several network layer health checks.
