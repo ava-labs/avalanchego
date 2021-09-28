@@ -332,6 +332,8 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 		CompressionEnabled: v.GetBool(NetworkCompressionEnabledKey),
 		PingFrequency:      v.GetDuration(NetworkPingFrequencyKey),
 		AllowPrivateIPs:    v.GetBool(NetworkAllowPrivateIPsKey),
+
+		RequireValidatorToConnect: v.GetBool(NetworkRequireValidatorToConnectKey),
 	}
 
 	switch {

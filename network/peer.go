@@ -916,6 +916,12 @@ func (p *peer) handlePing(_ message.Message) {
 
 // assumes the [stateLock] is not held
 func (p *peer) handlePong(_ message.Message) {
+	if !p.net.shouldHoldConnection(p.nodeID) {
+		p.net.log.Debug("disconnecting from peer %s%s at %s because the peer is not a validator", constants.NodeIDPrefix, p.nodeID, p.getIP())
+		p.discardIP()
+		return
+	}
+
 	if !p.finishedHandshake.GetValue() {
 		// If the handshake isn't finished - do nothing
 		return
