@@ -107,8 +107,8 @@ func init() {
 // and fills the blocks with many small transactions.
 func genTxRing(naccounts int) func(int, *BlockGen) {
 	from := 0
-    fee := big.NewInt(0).SetUint64(params.TxGas*225000000000)
-    amount := big.NewInt(0).Set(benchRootFunds)
+	fee := big.NewInt(0).SetUint64(params.TxGas * 225000000000)
+	amount := big.NewInt(0).Set(benchRootFunds)
 	return func(i int, gen *BlockGen) {
 		block := gen.PrevBlock(i - 1)
 		gas := block.GasLimit()
@@ -121,7 +121,7 @@ func genTxRing(naccounts int) func(int, *BlockGen) {
 			tx := types.NewTransaction(
 				gen.TxNonce(ringAddrs[from]),
 				ringAddrs[to],
-                amount.Sub(amount, fee),
+				amount.Sub(amount, fee),
 				params.TxGas,
 				big.NewInt(225000000000),
 				nil,

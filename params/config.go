@@ -398,6 +398,19 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, head *big.Int) *Confi
 		return newCompatError("Muir Glacier fork block", c.MuirGlacierBlock, newcfg.MuirGlacierBlock)
 	}
 	// TODO(aaronbuchwald) ensure that Avalanche Blocktimestamps are not modified
+	if !configNumEqual(c.ApricotPhase1BlockTimestamp, newcfg.ApricotPhase1BlockTimestamp) {
+		return newCompatError("ApricotPhase1 fork block", c.ApricotPhase1BlockTimestamp, newcfg.ApricotPhase1BlockTimestamp)
+	}
+	if !configNumEqual(c.ApricotPhase2BlockTimestamp, newcfg.ApricotPhase2BlockTimestamp) {
+		return newCompatError("ApricotPhase2 fork block", c.ApricotPhase2BlockTimestamp, newcfg.ApricotPhase2BlockTimestamp)
+	}
+	if !configNumEqual(c.ApricotPhase3BlockTimestamp, newcfg.ApricotPhase3BlockTimestamp) {
+		return newCompatError("ApricotPhase3 fork block", c.ApricotPhase3BlockTimestamp, newcfg.ApricotPhase3BlockTimestamp)
+	}
+	if !configNumEqual(c.ApricotPhase4BlockTimestamp, newcfg.ApricotPhase4BlockTimestamp) {
+		return newCompatError("ApricotPhase4 fork block", c.ApricotPhase4BlockTimestamp, newcfg.ApricotPhase4BlockTimestamp)
+	}
+
 	return nil
 }
 
