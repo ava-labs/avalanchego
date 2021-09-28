@@ -210,7 +210,8 @@ type DelayConfig struct {
 type GossipConfig struct {
 	GossipAcceptedFrontierSize uint `json:"gossipAcceptedFrontierSize"`
 	GossipOnAcceptSize         uint `json:"gossipOnAcceptSize"`
-	AppGossipSize              uint `json:"appGossipSize"`
+	AppGossipNonValidatorSize  uint `json:"appGossipNonValidatorSize"`
+	AppGossipValidatorSize     uint `json:"appGossipValidatorSize"`
 }
 
 type ThrottlerConfig struct {
@@ -819,26 +820,38 @@ func (n *network) SendAppGossip(subnetID, chainID ids.ID, appGossipBytes []byte)
 	}
 
 	n.stateLock.RLock()
-	peers, err := n.peers.sample(subnetID, int(n.config.AppGossipSize))
+	// Gossip the message to [n.config.AppGossipNonValidatorSize] random nodes
+	// in the network.
+	peers0, err0 := n.peers.sample(subnetID, false, int(n.config.AppGossipNonValidatorSize))
+	// Gossip the message to [n.config.AppGossipValidatorSize] random validators
+	// in the network. This does not gossip by stake - but uniformly to the
+	// validator set.
+	peers1, err1 := n.peers.sample(subnetID, true, int(n.config.AppGossipValidatorSize))
 	n.stateLock.RUnlock()
-	if err != nil {
-		n.log.Debug("failed to sample %d peers for AppGossip: %s", n.config.AppGossipSize, err)
+	if err0 != nil {
+		n.log.Debug("failed to sample %d peers for AppGossip: %s", n.config.AppGossipNonValidatorSize, err0)
+		return
+	}
+	if err1 != nil {
+		n.log.Debug("failed to sample %d validators for AppGossip: %s", n.config.AppGossipValidatorSize, err0)
 		return
 	}
 
-	for _, peer := range peers {
-		sent := peer.Send(msg, false)
-		if !sent {
-			n.log.Debug("failed to send AppGossip(%s, %s)", peer.nodeID, chainID)
-			n.log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
-			n.metrics.appGossip.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, now)
-		} else {
-			n.metrics.appGossip.numSent.Inc()
-			n.metrics.appGossip.sentBytes.Add(float64(len(msg.Bytes())))
-			n.sendFailRateCalculator.Observe(0, now)
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.appGossip.savedSentBytes.Observe(float64(saved))
+	for _, peers := range [][]*peer{peers0, peers1} {
+		for _, peer := range peers {
+			sent := peer.Send(msg, false)
+			if !sent {
+				n.log.Debug("failed to send AppGossip(%s, %s)", peer.nodeID, chainID)
+				n.log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
+				n.metrics.appGossip.numFailed.Inc()
+				n.sendFailRateCalculator.Observe(1, now)
+			} else {
+				n.metrics.appGossip.numSent.Inc()
+				n.metrics.appGossip.sentBytes.Add(float64(len(msg.Bytes())))
+				n.sendFailRateCalculator.Observe(0, now)
+				if saved := msg.BytesSavedCompression(); saved != 0 {
+					n.metrics.appGossip.savedSentBytes.Observe(float64(saved))
+				}
 			}
 		}
 	}
@@ -1095,7 +1108,7 @@ func (n *network) gossipContainer(subnetID, chainID, containerID ids.ID, contain
 	}
 
 	n.stateLock.RLock()
-	peers, err := n.peers.sample(subnetID, int(numToGossip))
+	peers, err := n.peers.sample(subnetID, false, int(numToGossip))
 	n.stateLock.RUnlock()
 	if err != nil {
 		return err
