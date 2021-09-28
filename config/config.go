@@ -320,7 +320,8 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 		GossipConfig: network.GossipConfig{
 			GossipAcceptedFrontierSize: uint(v.GetUint32(ConsensusGossipAcceptedFrontierSizeKey)),
 			GossipOnAcceptSize:         uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey)),
-			AppGossipSize:              uint(v.GetUint32(AppGossipSizeKey)),
+			AppGossipNonValidatorSize:  uint(v.GetUint32(AppGossipNonValidatorSizeKey)),
+			AppGossipValidatorSize:     uint(v.GetUint32(AppGossipValidatorSizeKey)),
 		},
 
 		DelayConfig: network.DelayConfig{
