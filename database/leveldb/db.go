@@ -63,8 +63,45 @@ type Database struct {
 }
 
 type config struct {
+	// BlockSize is the minimum uncompressed size in bytes of each 'sorted
+	// table' block.
+	BlockCacheCapacity int `json:"blockCacheCapacity"`
+	// BlockSize is the minimum uncompressed size in bytes of each 'sorted
+	// table' block.
+	BlockSize int `json:"blockSize"`
+	// CompactionExpandLimitFactor limits compaction size after expanded.  This
+	// will be multiplied by table size limit at compaction target level.
+	CompactionExpandLimitFactor int `json:"compactionExpandLimitFactor"`
+	// CompactionGPOverlapsFactor limits overlaps in grandparent (Level + 2)
+	// that a single 'sorted table' generates.  This will be multiplied by
+	// table size limit at grandparent level.
+	CompactionGPOverlapsFactor int `json:"compactionGPOverlapsFactor"`
+	// CompactionL0Trigger defines number of 'sorted table' at level-0 that will
+	// trigger compaction.
+	CompactionL0Trigger int `json:"compactionL0Trigger"`
+	// CompactionSourceLimitFactor limits compaction source size. This doesn't
+	// apply to level-0.  This will be multiplied by table size limit at
+	// compaction target level.
+	CompactionSourceLimitFactor int `json:"compactionSourceLimitFactor"`
+	// CompactionTableSize limits size of 'sorted table' that compaction
+	// generates.  The limits for each level will be calculated as:
+	//   CompactionTableSize * (CompactionTableSizeMultiplier ^ Level)
+	// The multiplier for each level can also fine-tuned using
+	// CompactionTableSizeMultiplierPerLevel.
+	CompactionTableSize int `json:"compactionTableSize"`
+	// CompactionTableSizeMultiplier defines multiplier for CompactionTableSize.
+	CompactionTableSizeMultiplier         float64   `json:"compactionTableSizeMultiplier"`
+	CompactionTableSizeMultiplierPerLevel []float64 `json:"compactionTableSizeMultiplierPerLevel"`
+	// CompactionTotalSize limits total size of 'sorted table' for each level.
+	// The limits for each level will be calculated as:
+	//   CompactionTotalSize * (CompactionTotalSizeMultiplier ^ Level)
+	// The multiplier for each level can also fine-tuned using
+	// CompactionTotalSizeMultiplierPerLevel.
+	CompactionTotalSize int
+	// CompactionTotalSizeMultiplier defines multiplier for CompactionTotalSize.
+	CompactionTotalSizeMultiplier float64 `json:"compactionTotalSizeMultiplier"`
+	// OpenFilesCacheCapacity defines the capacity of the open files caching.
 	OpenFilesCacheCapacity int `json:"openFilesCacheCapacity"`
-	BlockCacheCapacity     int `json:"blockCacheCapacity"`
 	// There are two buffers of size WriteBuffer used.
 	WriteBuffer      int `json:"writeBuffer"`
 	FilterBitsPerKey int `json:"filterBitsPerKey"`
@@ -73,8 +110,8 @@ type config struct {
 // New returns a wrapped LevelDB object.
 func New(file string, dbConfig []byte, log logging.Logger) (database.Database, error) {
 	cfg := config{
-		OpenFilesCacheCapacity: HandleCap,
 		BlockCacheCapacity:     BlockCacheSize,
+		OpenFilesCacheCapacity: HandleCap,
 		WriteBuffer:            WriteBufferSize / 2,
 		FilterBitsPerKey:       BitsPerKey,
 	}
@@ -85,10 +122,19 @@ func New(file string, dbConfig []byte, log logging.Logger) (database.Database, e
 	}
 	// Open the db and recover any potential corruptions
 	db, err := leveldb.OpenFile(file, &opt.Options{
-		OpenFilesCacheCapacity: cfg.OpenFilesCacheCapacity,
-		BlockCacheCapacity:     cfg.BlockCacheCapacity,
-		WriteBuffer:            cfg.WriteBuffer,
-		Filter:                 filter.NewBloomFilter(cfg.FilterBitsPerKey),
+		BlockCacheCapacity:            cfg.BlockCacheCapacity,
+		BlockSize:                     cfg.BlockSize,
+		CompactionExpandLimitFactor:   cfg.CompactionExpandLimitFactor,
+		CompactionGPOverlapsFactor:    cfg.CompactionGPOverlapsFactor,
+		CompactionL0Trigger:           cfg.CompactionL0Trigger,
+		CompactionSourceLimitFactor:   cfg.CompactionSourceLimitFactor,
+		CompactionTableSize:           cfg.CompactionTableSize,
+		CompactionTableSizeMultiplier: cfg.CompactionTableSizeMultiplier,
+		CompactionTotalSize:           cfg.CompactionTotalSize,
+		CompactionTotalSizeMultiplier: cfg.CompactionTotalSizeMultiplier,
+		OpenFilesCacheCapacity:        cfg.OpenFilesCacheCapacity,
+		WriteBuffer:                   cfg.WriteBuffer,
+		Filter:                        filter.NewBloomFilter(cfg.FilterBitsPerKey),
 	})
 
 	cfgInfo, _ := json.Marshal(cfg)
