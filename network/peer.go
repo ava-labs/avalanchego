@@ -306,7 +306,7 @@ func (p *peer) ReadMessages() {
 		// Handle the message. Note that when we are done handling
 		// this message, we must call [p.net.msgThrottler.Release]
 		// to release the bytes used by this message. See MsgThrottler.
-		p.handle(msg, onFinishedHandling)
+		p.handle(msg, float64(len(msgBytes)), onFinishedHandling)
 	}
 }
 
@@ -405,11 +405,10 @@ func (p *peer) Send(msg message.OutboundMessage, canModifyMsg bool) bool {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handle(msg message.InboundMessage, onFinishedHandling func()) {
+func (p *peer) handle(msg message.InboundMessage, msgLen float64, onFinishedHandling func()) {
 	now := p.net.clock.Time()
 	atomic.StoreInt64(&p.lastReceived, now.Unix())
 	atomic.StoreInt64(&p.net.lastMsgReceivedTime, now.Unix())
-	msgLen := uint64(len(msg.Bytes()))
 
 	op := msg.Op()
 	msgMetrics := p.net.message(op)
@@ -419,7 +418,7 @@ func (p *peer) handle(msg message.InboundMessage, onFinishedHandling func()) {
 		return
 	}
 	msgMetrics.numReceived.Inc()
-	msgMetrics.receivedBytes.Add(float64(msgLen))
+	msgMetrics.receivedBytes.Add(msgLen)
 	// assume that if [saved] == 0, [msg] wasn't compressed
 	if saved := msg.BytesSavedCompression(); saved != 0 {
 		msgMetrics.savedReceivedBytes.Observe(float64(saved))

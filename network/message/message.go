@@ -12,13 +12,11 @@ var (
 type InboundMessage interface {
 	BytesSavedCompression() int
 	Op() Op
-	Bytes() []byte
 	Get(Field) interface{}
 }
 
 type inboundMessage struct {
 	op                    Op
-	bytes                 []byte
 	bytesSavedCompression int
 	fields                map[Field]interface{}
 }
@@ -38,9 +36,6 @@ type outboundMessage struct {
 
 // Op returns the value of the specified operation in this message
 func (inMsg *inboundMessage) Op() Op { return inMsg.op }
-
-// Bytes returns this message in bytes
-func (inMsg *inboundMessage) Bytes() []byte { return inMsg.bytes }
 
 // BytesSavedCompression returns the number of bytes this message saved due to
 // compression. That is, the number of bytes we did not receive over the

@@ -72,7 +72,6 @@ func TestBuildVersion(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, Version, parsedMsg.Op())
-	assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
 	assert.EqualValues(t, networkID, parsedMsg.Get(NetworkID))
 	assert.EqualValues(t, nodeID, parsedMsg.Get(NodeID))
 	assert.EqualValues(t, myTime, parsedMsg.Get(MyTime))
@@ -113,7 +112,6 @@ func TestBuildVersionWithSubnets(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, VersionWithSubnets, parsedMsg.Op())
-	assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
 	assert.EqualValues(t, networkID, parsedMsg.Get(NetworkID))
 	assert.EqualValues(t, nodeID, parsedMsg.Get(NodeID))
 	assert.EqualValues(t, myTime, parsedMsg.Get(MyTime))
@@ -134,7 +132,6 @@ func TestBuildGetPeerList(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, GetPeerList, parsedMsg.Op())
-	assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
 }
 
 func TestBuildGetAcceptedFrontier(t *testing.T) {
@@ -154,7 +151,6 @@ func TestBuildGetAcceptedFrontier(t *testing.T) {
 	assert.Equal(t, chainID[:], parsedMsg.Get(ChainID))
 	assert.Equal(t, requestID, parsedMsg.Get(RequestID))
 	assert.Equal(t, deadline, parsedMsg.Get(Deadline))
-	assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
 }
 
 func TestBuildAcceptedFrontier(t *testing.T) {
@@ -175,7 +171,6 @@ func TestBuildAcceptedFrontier(t *testing.T) {
 	assert.Equal(t, chainID[:], parsedMsg.Get(ChainID))
 	assert.Equal(t, requestID, parsedMsg.Get(RequestID))
 	assert.Equal(t, containerIDs, parsedMsg.Get(ContainerIDs))
-	assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
 }
 
 func TestBuildGetAccepted(t *testing.T) {
@@ -198,7 +193,6 @@ func TestBuildGetAccepted(t *testing.T) {
 	assert.Equal(t, requestID, parsedMsg.Get(RequestID))
 	assert.Equal(t, deadline, parsedMsg.Get(Deadline))
 	assert.Equal(t, containerIDs, parsedMsg.Get(ContainerIDs))
-	assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
 }
 
 func TestBuildAccepted(t *testing.T) {
@@ -219,7 +213,6 @@ func TestBuildAccepted(t *testing.T) {
 	assert.Equal(t, chainID[:], parsedMsg.Get(ChainID))
 	assert.Equal(t, requestID, parsedMsg.Get(RequestID))
 	assert.Equal(t, containerIDs, parsedMsg.Get(ContainerIDs))
-	assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
 }
 
 func TestBuildGet(t *testing.T) {
@@ -241,7 +234,6 @@ func TestBuildGet(t *testing.T) {
 	assert.Equal(t, requestID, parsedMsg.Get(RequestID))
 	assert.Equal(t, deadline, parsedMsg.Get(Deadline))
 	assert.Equal(t, containerID[:], parsedMsg.Get(ContainerID))
-	assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
 }
 
 func TestBuildPut(t *testing.T) {
@@ -311,7 +303,6 @@ func TestBuildPullQuery(t *testing.T) {
 	assert.Equal(t, requestID, parsedMsg.Get(RequestID))
 	assert.Equal(t, deadline, parsedMsg.Get(Deadline))
 	assert.Equal(t, containerID[:], parsedMsg.Get(ContainerID))
-	assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
 }
 
 func TestBuildChits(t *testing.T) {
@@ -332,7 +323,6 @@ func TestBuildChits(t *testing.T) {
 	assert.Equal(t, chainID[:], parsedMsg.Get(ChainID))
 	assert.Equal(t, requestID, parsedMsg.Get(RequestID))
 	assert.Equal(t, containerIDs, parsedMsg.Get(ContainerIDs))
-	assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
 }
 
 func TestBuildMultiPut(t *testing.T) {
@@ -371,10 +361,10 @@ func TestBuildAppRequestMsg(t *testing.T) {
 		assert.NotNil(t, msg)
 		assert.Equal(t, AppRequest, msg.Op())
 
-		msg, err = TestCodec.Parse(msg.Bytes())
+		parsedMsg, err := TestCodec.Parse(msg.Bytes())
 		assert.NoError(t, err)
-		assert.NotNil(t, msg)
-		assert.Equal(t, AppRequest, msg.Op())
+		assert.NotNil(t, parsedMsg)
+		assert.Equal(t, AppRequest, parsedMsg.Op())
 	}
 }
 

@@ -210,7 +210,6 @@ func (c *codec) Parse(bytes []byte) (InboundMessage, error) {
 	return &inboundMessage{
 		op:                    op,
 		fields:                fieldValues,
-		bytes:                 p.Bytes,
 		bytesSavedCompression: bytesSaved,
 	}, p.Err
 }
