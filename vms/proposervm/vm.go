@@ -25,6 +25,10 @@ import (
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
+const (
+	minBlockDelay = 500 * time.Millisecond
+)
+
 var (
 	dbPrefix = []byte("proposervm")
 
@@ -164,6 +168,9 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 		// P-chain height. This will cause building blocks to return an error
 		// until the P-chain's height has advanced.
 		return nil
+	}
+	if minDelay < minBlockDelay {
+		minDelay = minBlockDelay
 	}
 
 	preferredTime := blk.Timestamp()
