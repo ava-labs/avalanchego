@@ -247,9 +247,9 @@ type Config struct {
 	// Set of current validators in the Avalanche network
 	Validators validators.Set `json:"validators"`
 
-	// TODO: move this to a better config location
 	// Require that all connections must have at least one validator between the
-	// 2 peers.
+	// 2 peers. This can be useful to enable if the node wants to connect to the
+	// minimum number of nodes without impacting the network negatively.
 	RequireValidatorToConnect bool `json:"requireValidatorToConnect"`
 }
 
@@ -896,6 +896,9 @@ func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 	return true
 }
 
+// shouldHoldConnection returns true if this node should have a connection to
+// the provided peerID. If the node is attempting to connect to the minimum number of peers, then it should only connect
+// if this node is a validator, or the peer is a validator/beacon.
 func (n *network) shouldHoldConnection(peerID ids.ShortID) bool {
 	return !n.config.RequireValidatorToConnect ||
 		n.config.Validators.Contains(n.config.MyNodeID) ||
