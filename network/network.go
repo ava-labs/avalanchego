@@ -822,23 +822,31 @@ func (n *network) SendAppGossip(subnetID, chainID ids.ID, appGossipBytes []byte)
 	n.stateLock.RLock()
 	// Gossip the message to [n.config.AppGossipNonValidatorSize] random nodes
 	// in the network.
-	peers0, err0 := n.peers.sample(subnetID, false, int(n.config.AppGossipNonValidatorSize))
+	peersAll, err := n.peers.sample(subnetID, false, int(n.config.AppGossipNonValidatorSize))
+	if err != nil {
+		n.log.Debug("failed to sample %d peers for AppGossip: %s", n.config.AppGossipNonValidatorSize, err0)
+		n.stateLock.RUnlock()
+		return
+	}
+
 	// Gossip the message to [n.config.AppGossipValidatorSize] random validators
 	// in the network. This does not gossip by stake - but uniformly to the
 	// validator set.
-	peers1, err1 := n.peers.sample(subnetID, true, int(n.config.AppGossipValidatorSize))
+	peersValidators, err := n.peers.sample(subnetID, true, int(n.config.AppGossipValidatorSize))
 	n.stateLock.RUnlock()
-	if err0 != nil {
-		n.log.Debug("failed to sample %d peers for AppGossip: %s", n.config.AppGossipNonValidatorSize, err0)
-		return
-	}
-	if err1 != nil {
+	if err != nil {
 		n.log.Debug("failed to sample %d validators for AppGossip: %s", n.config.AppGossipValidatorSize, err0)
 		return
 	}
 
-	for _, peers := range [][]*peer{peers0, peers1} {
+	sentPeers := ids.ShortSet{}
+	for _, peers := range [][]*peer{peersAll, peersValidators} {
 		for _, peer := range peers {
+			if sentPeers.Contains(peer.nodeID) {
+				continue
+			}
+			sentPeers.Add(peer.nodeID)
+
 			sent := peer.Send(msg, false)
 			if !sent {
 				n.log.Debug("failed to send AppGossip(%s, %s)", peer.nodeID, chainID)
