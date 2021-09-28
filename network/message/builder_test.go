@@ -54,46 +54,9 @@ func TestBuildVersion(t *testing.T) {
 	myVersion := version.NewDefaultVersion(1, 2, 3).String()
 	myVersionTime := uint64(time.Now().Unix())
 	sig := make([]byte, 65)
-	msg, err := TestBuilder.Version(
-		networkID,
-		nodeID,
-		myTime,
-		ip,
-		myVersion,
-		myVersionTime,
-		sig,
-	)
-	assert.NoError(t, err)
-	assert.NotNil(t, msg)
-	assert.Equal(t, Version, msg.Op())
-
-	parsedMsg, err := TestCodec.Parse(msg.Bytes())
-
-	assert.NoError(t, err)
-	assert.NotNil(t, parsedMsg)
-	assert.Equal(t, Version, parsedMsg.Op())
-	assert.EqualValues(t, networkID, parsedMsg.Get(NetworkID))
-	assert.EqualValues(t, nodeID, parsedMsg.Get(NodeID))
-	assert.EqualValues(t, myTime, parsedMsg.Get(MyTime))
-	assert.EqualValues(t, ip, parsedMsg.Get(IP))
-	assert.EqualValues(t, myVersion, parsedMsg.Get(VersionStr))
-	assert.EqualValues(t, myVersionTime, parsedMsg.Get(VersionTime))
-	assert.EqualValues(t, sig, parsedMsg.Get(SigBytes))
-}
-
-func TestBuildVersionWithSubnets(t *testing.T) {
-	networkID := uint32(12345)
-	nodeID := uint32(56789)
-	myTime := uint64(time.Now().Unix())
-	ip := utils.IPDesc{
-		IP: net.IPv4(1, 2, 3, 4),
-	}
-	myVersion := version.NewDefaultVersion(1, 2, 3).String()
-	myVersionTime := uint64(time.Now().Unix())
-	sig := make([]byte, 65)
 	subnetID := ids.Empty.Prefix(1)
 	subnetIDs := [][]byte{subnetID[:]}
-	msg, err := TestBuilder.VersionWithSubnets(
+	msg, err := TestBuilder.Version(
 		networkID,
 		nodeID,
 		myTime,
@@ -105,13 +68,13 @@ func TestBuildVersionWithSubnets(t *testing.T) {
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
-	assert.Equal(t, VersionWithSubnets, msg.Op())
+	assert.Equal(t, Version, msg.Op())
 
 	parsedMsg, err := TestCodec.Parse(msg.Bytes())
 
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
-	assert.Equal(t, VersionWithSubnets, parsedMsg.Op())
+	assert.Equal(t, Version, parsedMsg.Op())
 	assert.EqualValues(t, networkID, parsedMsg.Get(NetworkID))
 	assert.EqualValues(t, nodeID, parsedMsg.Get(NodeID))
 	assert.EqualValues(t, myTime, parsedMsg.Get(MyTime))

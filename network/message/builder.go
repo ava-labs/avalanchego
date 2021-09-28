@@ -21,16 +21,6 @@ type Builder interface {
 		myVersion string,
 		myVersionTime uint64,
 		sig []byte,
-	) (OutboundMessage, error)
-
-	VersionWithSubnets(
-		networkID,
-		nodeID uint32,
-		myTime uint64,
-		ip utils.IPDesc,
-		myVersion string,
-		myVersionTime uint64,
-		sig []byte,
 		trackedSubnets []ids.ID,
 	) (OutboundMessage, error)
 
@@ -165,30 +155,6 @@ func (b *builder) Version(
 	myVersion string,
 	myVersionTime uint64,
 	sig []byte,
-) (OutboundMessage, error) {
-	return b.c.Pack(
-		Version,
-		map[Field]interface{}{
-			NetworkID:   networkID,
-			NodeID:      nodeID,
-			MyTime:      myTime,
-			IP:          ip,
-			VersionStr:  myVersion,
-			VersionTime: myVersionTime,
-			SigBytes:    sig,
-		},
-		Version.Compressable(), // Version Messages can't be compressed
-	)
-}
-
-func (b *builder) VersionWithSubnets(
-	networkID,
-	nodeID uint32,
-	myTime uint64,
-	ip utils.IPDesc,
-	myVersion string,
-	myVersionTime uint64,
-	sig []byte,
 	trackedSubnets []ids.ID,
 ) (OutboundMessage, error) {
 	subnetIDBytes := make([][]byte, len(trackedSubnets))
@@ -197,7 +163,7 @@ func (b *builder) VersionWithSubnets(
 		subnetIDBytes[i] = copy[:]
 	}
 	return b.c.Pack(
-		VersionWithSubnets,
+		Version,
 		map[Field]interface{}{
 			NetworkID:      networkID,
 			NodeID:         nodeID,
@@ -208,7 +174,7 @@ func (b *builder) VersionWithSubnets(
 			SigBytes:       sig,
 			TrackedSubnets: subnetIDBytes,
 		},
-		VersionWithSubnets.Compressable(), // Version Messages can't be compressed
+		Version.Compressable(), // Version Messages can't be compressed
 	)
 }
 

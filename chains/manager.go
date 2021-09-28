@@ -153,9 +153,10 @@ type ManagerConfig struct {
 	WhitelistedSubnets          ids.Set          // Subnets to validate
 	TimeoutManager              *timeout.Manager // Manages request timeouts when sending messages to other validators
 	HealthService               health.Service
-	RetryBootstrap              bool                   // Should Bootstrap be retried
-	RetryBootstrapWarnFrequency int                    // Max number of times to retry bootstrap before warning the node operator
-	ChainConfigs                map[string]ChainConfig // alias -> ChainConfig
+	RetryBootstrap              bool                    // Should Bootstrap be retried
+	RetryBootstrapWarnFrequency int                     // Max number of times to retry bootstrap before warning the node operator
+	SubnetConfigs               map[ids.ID]SubnetConfig // ID -> SubnetConfig
+	ChainConfigs                map[string]ChainConfig  // alias -> ChainConfig
 	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
 	ShutdownNodeFunc func(exitCode int)
 	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
@@ -250,11 +251,11 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 
 	sb, exists := m.subnets[chainParams.SubnetID]
 	if !exists {
-		sb = newSubnet(nil, chainParams.ID)
+		sb = newSubnet()
 		m.subnets[chainParams.SubnetID] = sb
-	} else {
-		sb.addChain(chainParams.ID)
 	}
+
+	sb.addChain(chainParams.ID)
 
 	chain, err := m.buildChain(chainParams, sb)
 	if err != nil {
@@ -373,6 +374,11 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	consensusParams := m.ConsensusParams
+	if sbConfigs, ok := m.SubnetConfigs[chainParams.SubnetID]; ok && chainParams.SubnetID != constants.PrimaryNetworkID {
+		consensusParams = sbConfigs.ConsensusParameters
+		// TODO: move metrics to another place so this can be tidier
+		consensusParams.Metrics = m.ConsensusParams.Metrics
+	}
 	consensusParams.Namespace = fmt.Sprintf("%s_%s", constants.PlatformName, primaryAlias)
 
 	// The validators of this blockchain
