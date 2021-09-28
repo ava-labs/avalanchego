@@ -783,6 +783,7 @@ func (n *network) SendAppResponse(nodeID ids.ShortID, chainID ids.ID, requestID 
 		n.log.Error("failed to build AppResponse(%s, %d): %s", chainID, requestID, err)
 		n.log.Verbo("message: %s", formatting.DumpBytes{Bytes: appResponse})
 		n.sendFailRateCalculator.Observe(1, now)
+		return
 	}
 
 	peer := n.getPeer(nodeID)
@@ -811,6 +812,7 @@ func (n *network) SendAppGossip(subnetID, chainID ids.ID, appGossipBytes []byte)
 		n.log.Error("failed to build AppGossip(%s): %s", chainID, err)
 		n.log.Verbo("message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
 		n.sendFailRateCalculator.Observe(1, now)
+		return
 	}
 
 	n.stateLock.RLock()
