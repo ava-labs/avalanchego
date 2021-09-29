@@ -94,9 +94,6 @@ type network struct {
 	config *Config
 	// The metrics that this network tracks
 	metrics metrics
-	// Define the parameters used to determine whether
-	// the networking layer is healthy
-	healthConfig HealthConfig
 	// Unix time at which last message of any type received over network
 	// Must only be accessed atomically
 	lastMsgReceivedTime int64
@@ -210,7 +207,8 @@ type DelayConfig struct {
 type GossipConfig struct {
 	GossipAcceptedFrontierSize uint `json:"gossipAcceptedFrontierSize"`
 	GossipOnAcceptSize         uint `json:"gossipOnAcceptSize"`
-	AppGossipSize              uint `json:"appGossipSize"`
+	AppGossipNonValidatorSize  uint `json:"appGossipNonValidatorSize"`
+	AppGossipValidatorSize     uint `json:"appGossipValidatorSize"`
 }
 
 type ThrottlerConfig struct {
@@ -244,8 +242,13 @@ type Config struct {
 	// WhitelistedSubnets of the node
 	WhitelistedSubnets ids.Set        `json:"whitelistedSubnets"`
 	Beacons            validators.Set `json:"beacons"`
-	// Set of current validators in the Avalanche network
+	// Current validators in the Avalanche network
 	Validators validators.Manager `json:"validators"`
+
+	// Require that all connections must have at least one validator between the
+	// 2 peers. This can be useful to enable if the node wants to connect to the
+	// minimum number of nodes without impacting the network negatively.
+	RequireValidatorToConnect bool `json:"requireValidatorToConnect"`
 }
 
 // NewNetwork returns a new Network implementation with the provided parameters.
@@ -787,6 +790,7 @@ func (n *network) SendAppResponse(nodeID ids.ShortID, chainID ids.ID, requestID 
 		n.log.Error("failed to build AppResponse(%s, %d): %s", chainID, requestID, err)
 		n.log.Verbo("message: %s", formatting.DumpBytes{Bytes: appResponse})
 		n.sendFailRateCalculator.Observe(1, now)
+		return
 	}
 
 	peer := n.getPeer(nodeID)
@@ -815,41 +819,66 @@ func (n *network) SendAppGossip(subnetID, chainID ids.ID, appGossipBytes []byte,
 		n.log.Error("failed to build AppGossip(%s): %s", chainID, err)
 		n.log.Verbo("message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
 		n.sendFailRateCalculator.Observe(1, now)
+		return
 	}
 
-	var filterFn func(p *peer) bool
+	filterValidatorsFn := func(p *peer) bool {
+		return p.finishedHandshake.GetValue() && p.trackedSubnets.Contains(subnetID) &&
+			n.config.Validators.Contains(subnetID, p.nodeID)
+	}
+
+	var filterRandomFn func(p *peer) bool
+
 	if validatorOnly {
-		filterFn = func(p *peer) bool {
-			return p.finishedHandshake.GetValue() && p.trackedSubnets.Contains(subnetID) &&
-				n.config.Validators.Contains(subnetID, p.nodeID)
-		}
+		// this is a validator only subnet, so we don't do random peer sampling
+		filterRandomFn = filterValidatorsFn
 	} else {
-		filterFn = func(p *peer) bool {
+		filterRandomFn = func(p *peer) bool {
 			return p.finishedHandshake.GetValue() && p.trackedSubnets.Contains(subnetID)
 		}
 	}
 
 	n.stateLock.RLock()
-	peers, err := n.peers.filterSample(int(n.config.AppGossipSize), filterFn)
-	n.stateLock.RUnlock()
+	// Gossip the message to [n.config.AppGossipNonValidatorSize] random nodes
+	// in the network.
+	peersAll, err := n.peers.filterSample(int(n.config.AppGossipNonValidatorSize), filterRandomFn)
 	if err != nil {
-		n.log.Debug("failed to sample %d peers for AppGossip: %s", n.config.AppGossipSize, err)
+		n.log.Debug("failed to sample %d peers for AppGossip: %s", n.config.AppGossipNonValidatorSize, err)
+		n.stateLock.RUnlock()
 		return
 	}
 
-	for _, peer := range peers {
-		sent := peer.Send(msg, false)
-		if !sent {
-			n.log.Debug("failed to send AppGossip(%s, %s)", peer.nodeID, chainID)
-			n.log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
-			n.metrics.appGossip.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, now)
-		} else {
-			n.metrics.appGossip.numSent.Inc()
-			n.metrics.appGossip.sentBytes.Add(float64(len(msg.Bytes())))
-			n.sendFailRateCalculator.Observe(0, now)
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.appGossip.savedSentBytes.Observe(float64(saved))
+	// Gossip the message to [n.config.AppGossipValidatorSize] random validators
+	// in the network. This does not gossip by stake - but uniformly to the
+	// validator set.
+	peersValidators, err := n.peers.filterSample(int(n.config.AppGossipValidatorSize), filterValidatorsFn)
+	n.stateLock.RUnlock()
+	if err != nil {
+		n.log.Debug("failed to sample %d validators for AppGossip: %s", n.config.AppGossipValidatorSize, err)
+		return
+	}
+
+	sentPeers := ids.ShortSet{}
+	for _, peers := range [][]*peer{peersAll, peersValidators} {
+		for _, peer := range peers {
+			if sentPeers.Contains(peer.nodeID) {
+				continue
+			}
+			sentPeers.Add(peer.nodeID)
+
+			sent := peer.Send(msg, false)
+			if !sent {
+				n.log.Debug("failed to send AppGossip(%s, %s)", peer.nodeID, chainID)
+				n.log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
+				n.metrics.appGossip.numFailed.Inc()
+				n.sendFailRateCalculator.Observe(1, now)
+			} else {
+				n.metrics.appGossip.numSent.Inc()
+				n.metrics.appGossip.sentBytes.Add(float64(len(msg.Bytes())))
+				n.sendFailRateCalculator.Observe(0, now)
+				if saved := msg.BytesSavedCompression(); saved != 0 {
+					n.metrics.appGossip.savedSentBytes.Observe(float64(saved))
+				}
 			}
 		}
 	}
@@ -905,6 +934,16 @@ func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 	// [n.disconnectedIPs] because that could allow us to initialize
 	// a connection with a peer we've been attempting to dial.
 	return true
+}
+
+// shouldHoldConnection returns true if this node should have a connection to
+// the provided peerID. If the node is attempting to connect to the minimum number of peers, then it should only connect
+// if this node is a validator, or the peer is a validator/beacon.
+func (n *network) shouldHoldConnection(peerID ids.ShortID) bool {
+	return !n.config.RequireValidatorToConnect ||
+		n.config.Validators.Contains(constants.PrimaryNetworkID, n.config.MyNodeID) ||
+		n.config.Validators.Contains(constants.PrimaryNetworkID, peerID) ||
+		n.config.Beacons.Contains(peerID)
 }
 
 // Dispatch starts accepting connections from other nodes attempting to connect
@@ -1095,16 +1134,9 @@ func (n *network) gossipContainer(subnetID, chainID, containerID ids.ID, contain
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 	}
 
-	var filterFn func(p *peer) bool
-	if validatorOnly {
-		filterFn = func(p *peer) bool {
-			return p.finishedHandshake.GetValue() && p.trackedSubnets.Contains(subnetID) &&
-				n.config.Validators.Contains(subnetID, p.nodeID)
-		}
-	} else {
-		filterFn = func(p *peer) bool {
-			return p.finishedHandshake.GetValue() && p.trackedSubnets.Contains(subnetID)
-		}
+	filterFn := func(p *peer) bool {
+		return p.finishedHandshake.GetValue() && p.trackedSubnets.Contains(subnetID) &&
+			(!validatorOnly || n.config.Validators.Contains(subnetID, p.nodeID))
 	}
 
 	n.stateLock.RLock()
@@ -1448,6 +1480,15 @@ func (n *network) tryAddPeer(p *peer) error {
 		return errPeerIsMyself
 	}
 
+	if !n.shouldHoldConnection(p.nodeID) {
+		if !ip.IsZero() {
+			str := ip.String()
+			delete(n.disconnectedIPs, str)
+			delete(n.retryDelay, str)
+		}
+		return fmt.Errorf("non-validator connection from %s at %s", p.nodeID.PrefixedString(constants.NodeIDPrefix), ip)
+	}
+
 	// If I am already connected to this peer, then I should close this new
 	// connection and add an alias record.
 	if peer, ok := n.peers.getByID(p.nodeID); ok {
@@ -1702,7 +1743,7 @@ func (n *network) HealthCheck() (interface{}, error) {
 	n.stateLock.RUnlock()
 
 	// Make sure we're connected to at least the minimum number of peers
-	healthy := connectedTo >= int(n.healthConfig.MinConnectedPeers)
+	healthy := connectedTo >= int(n.config.HealthConfig.MinConnectedPeers)
 	details := map[string]interface{}{
 		"connectedPeers": connectedTo,
 	}
@@ -1712,19 +1753,19 @@ func (n *network) HealthCheck() (interface{}, error) {
 
 	lastMsgReceivedAt := time.Unix(atomic.LoadInt64(&n.lastMsgReceivedTime), 0)
 	timeSinceLastMsgReceived := now.Sub(lastMsgReceivedAt)
-	healthy = healthy && timeSinceLastMsgReceived <= n.healthConfig.MaxTimeSinceMsgReceived
+	healthy = healthy && timeSinceLastMsgReceived <= n.config.HealthConfig.MaxTimeSinceMsgReceived
 	details["timeSinceLastMsgReceived"] = timeSinceLastMsgReceived.String()
 	n.metrics.timeSinceLastMsgReceived.Set(float64(timeSinceLastMsgReceived))
 
 	// Make sure we've sent an outgoing message within the threshold
 	lastMsgSentAt := time.Unix(atomic.LoadInt64(&n.lastMsgSentTime), 0)
 	timeSinceLastMsgSent := now.Sub(lastMsgSentAt)
-	healthy = healthy && timeSinceLastMsgSent <= n.healthConfig.MaxTimeSinceMsgSent
+	healthy = healthy && timeSinceLastMsgSent <= n.config.HealthConfig.MaxTimeSinceMsgSent
 	details["timeSinceLastMsgSent"] = timeSinceLastMsgSent.String()
 	n.metrics.timeSinceLastMsgSent.Set(float64(timeSinceLastMsgSent))
 
 	// Make sure the message send failed rate isn't too high
-	healthy = healthy && sendFailRate <= n.healthConfig.MaxSendFailRate
+	healthy = healthy && sendFailRate <= n.config.HealthConfig.MaxSendFailRate
 	details["sendFailRate"] = sendFailRate
 	n.metrics.sendFailRate.Set(sendFailRate)
 

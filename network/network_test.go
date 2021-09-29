@@ -40,7 +40,8 @@ const (
 	defaultGossipPeerListTo           = 100
 	defaultGossipAcceptedFrontierSize = 35
 	defaultGossipOnAcceptSize         = 20
-	defaultAppGossipSize              = 20
+	defaultAppGossipNonValidatorSize  = 2
+	defaultAppGossipValidatorSize     = 4
 )
 
 var defaultValidators validators.Manager
@@ -2776,7 +2777,8 @@ func newDefaultConfig() Config {
 			ReadHandshakeTimeout: 15 * time.Second,
 		},
 		GossipConfig: GossipConfig{
-			AppGossipSize: defaultAppGossipSize,
+			AppGossipNonValidatorSize: defaultAppGossipNonValidatorSize,
+			AppGossipValidatorSize:    defaultAppGossipValidatorSize,
 		},
 		MaxClockDifference: time.Minute,
 		AllowPrivateIPs:    true,

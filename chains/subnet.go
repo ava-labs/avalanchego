@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
@@ -22,6 +23,12 @@ type Subnet interface {
 
 	addChain(chainID ids.ID)
 	removeChain(chainID ids.ID)
+}
+
+type SubnetConfig struct {
+	// ValidatorOnly indicates that this Subnet's Chains are available to only subnet validators.
+	ValidatorOnly       bool                 `json:"validatorOnly"`
+	ConsensusParameters avalanche.Parameters `json:"consensusParameters"`
 }
 
 type subnet struct {
