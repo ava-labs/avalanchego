@@ -119,7 +119,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Uint(NetworkPeerListSizeKey, 20, gossipHelpMsg)
 	fs.Uint(NetworkPeerListGossipSizeKey, 50, gossipHelpMsg)
 	fs.Duration(NetworkPeerListGossipFreqKey, time.Minute, gossipHelpMsg)
-	fs.Uint(NetworkPeerListStakerGossipFractionKey, 2, "Ratio of stakers to 'network-peer-list-gossip-size' in a gossiped peer list.")
+	fs.Uint(NetworkPeerListStakerGossipFractionKey, 2, fmt.Sprintf("1 of each %s peer list messages gossiped will be to validators", NetworkPeerListStakerGossipFractionKey))
 
 	// Public IP Resolution
 	fs.String(PublicIPKey, "", "Public IP of this node for P2P communication. If empty, try to discover with NAT. Ignored if dynamic-public-ip is non-empty.")
