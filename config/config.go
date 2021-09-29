@@ -353,8 +353,8 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListGossipFreqKey)
 	case config.GetVersionTimeout < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkGetVersionTimeoutKey)
-	case config.PeerListStakerGossipFraction < 0:
-		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListStakerGossipFractionKey)
+	case config.PeerListStakerGossipFraction < 1:
+		return network.Config{}, fmt.Errorf("%s must be >= 1", NetworkPeerListStakerGossipFractionKey)
 	case config.MaxReconnectDelay < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkMaxReconnectDelayKey)
 	case config.InitialReconnectDelay < 0:
@@ -772,15 +772,15 @@ func readSubnetConfigs(subnetConfigPath string, subnetIDs []ids.ID, defaultSubne
 	for _, subnetID := range subnetIDs {
 		filePath := filepath.Join(subnetConfigPath, subnetID.String()+subnetConfigFileExt)
 		fileInfo, err := os.Stat(filePath)
-		if errors.Is(err, os.ErrNotExist) {
+		switch {
+		case errors.Is(err, os.ErrNotExist):
 			// this subnet config does not exist, move to the next one
 			continue
+		case err != nil:
+			return nil, err
+		case fileInfo.IsDir():
 		}
 		if err != nil {
-			return nil, err
-		}
-
-		if fileInfo.IsDir() {
 			return nil, fmt.Errorf("%q is a directory, expected a file", fileInfo.Name())
 		}
 
