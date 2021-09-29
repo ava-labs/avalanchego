@@ -10,11 +10,11 @@ package manager
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
+	"filepath"
 	"github.com/ava-labs/avalanchego/database/rocksdb"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewSingleRocksDB(t *testing.T) {
