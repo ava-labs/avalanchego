@@ -1078,7 +1078,9 @@ func (cr *ChainRouter) Connected(validatorID ids.ShortID) {
 	}
 
 	for _, chain := range cr.chains {
-		chain.Connected(validatorID)
+		if chain.isValidValidator(validatorID) {
+			chain.Connected(validatorID)
+		}
 	}
 }
 
@@ -1093,7 +1095,10 @@ func (cr *ChainRouter) Disconnected(validatorID ids.ShortID) {
 	}
 
 	for _, chain := range cr.chains {
-		chain.Disconnected(validatorID)
+		if chain.isValidValidator(validatorID) {
+			// ASK: is this a right approach for disconnecteds?
+			chain.Disconnected(validatorID)
+		}
 	}
 }
 
@@ -1111,7 +1116,9 @@ func (cr *ChainRouter) Benched(chainID ids.ID, validatorID ids.ShortID) {
 	}
 
 	for _, chain := range cr.chains {
-		chain.Disconnected(validatorID)
+		if chain.isValidValidator(validatorID) {
+			chain.Disconnected(validatorID)
+		}
 	}
 }
 
@@ -1134,7 +1141,9 @@ func (cr *ChainRouter) Unbenched(chainID ids.ID, validatorID ids.ShortID) {
 	}
 
 	for _, chain := range cr.chains {
-		chain.Connected(validatorID)
+		if chain.isValidValidator(validatorID) {
+			chain.Connected(validatorID)
+		}
 	}
 }
 
