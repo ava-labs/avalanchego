@@ -1,3 +1,6 @@
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package health
 
 // Check is a health check. Returns the health check results and,
