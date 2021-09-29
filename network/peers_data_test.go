@@ -107,14 +107,14 @@ func TestPeersDataSample(t *testing.T) {
 	trackedSubnetIDs := ids.Set{}
 	trackedSubnetIDs.Add(constants.PrimaryNetworkID)
 	filterFn := func(p *peer) bool {
-		return p.finishedHandshake.GetValue()
+		return true
 	}
 	// Case: Empty
-	peers, err := data.filterSample(0, filterFn)
+	peers, err := data.filterSample(constants.PrimaryNetworkID, 0, filterFn)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 0)
 
-	peers, err = data.filterSample(1, filterFn)
+	peers, err = data.filterSample(constants.PrimaryNetworkID, 1, filterFn)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 0)
 
@@ -124,11 +124,11 @@ func TestPeersDataSample(t *testing.T) {
 		trackedSubnets: trackedSubnetIDs,
 	}
 	data.add(&peer1)
-	peers, err = data.filterSample(0, filterFn)
+	peers, err = data.filterSample(constants.PrimaryNetworkID, 0, filterFn)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 0)
 
-	peers, err = data.filterSample(1, filterFn)
+	peers, err = data.filterSample(constants.PrimaryNetworkID, 1, filterFn)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 0)
 
@@ -140,31 +140,31 @@ func TestPeersDataSample(t *testing.T) {
 	peer2.finishedHandshake.SetValue(true)
 	data.add(&peer2)
 
-	peers, err = data.filterSample(0, filterFn)
+	peers, err = data.filterSample(constants.PrimaryNetworkID, 0, filterFn)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 0)
 
-	peers, err = data.filterSample(1, filterFn)
+	peers, err = data.filterSample(constants.PrimaryNetworkID, 1, filterFn)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 1)
 	assert.EqualValues(t, peers[0].nodeID, peer2.nodeID)
 
-	peers, err = data.filterSample(2, filterFn)
+	peers, err = data.filterSample(constants.PrimaryNetworkID, 2, filterFn)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 1)
 	assert.EqualValues(t, peers[0].nodeID, peer2.nodeID)
 
 	// Case: 2 peers who have finished handshake
 	peer1.finishedHandshake.SetValue(true)
-	peers, err = data.filterSample(0, filterFn)
+	peers, err = data.filterSample(constants.PrimaryNetworkID, 0, filterFn)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 0)
 
-	peers, err = data.filterSample(1, filterFn)
+	peers, err = data.filterSample(constants.PrimaryNetworkID, 1, filterFn)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 1)
 
-	peers, err = data.filterSample(2, filterFn)
+	peers, err = data.filterSample(constants.PrimaryNetworkID, 2, filterFn)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 2)
 	// Ensure both peers are sampled once
@@ -173,7 +173,7 @@ func TestPeersDataSample(t *testing.T) {
 			(peers[0].nodeID == peer2.nodeID && peers[1].nodeID == peer1.nodeID),
 	)
 
-	peers, err = data.filterSample(3, filterFn)
+	peers, err = data.filterSample(constants.PrimaryNetworkID, 3, filterFn)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 2)
 	// Ensure both peers are sampled once
@@ -184,11 +184,8 @@ func TestPeersDataSample(t *testing.T) {
 
 	testSubnetID := ids.GenerateTestID()
 
-	filterSubnetFn := func(p *peer) bool {
-		return p.finishedHandshake.GetValue() && p.trackedSubnets.Contains(testSubnetID)
-	}
 	// no peers has this subnet
-	peers, err = data.filterSample(3, filterSubnetFn)
+	peers, err = data.filterSample(testSubnetID, 3, filterFn)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 0)
 
@@ -203,10 +200,18 @@ func TestPeersDataSample(t *testing.T) {
 	peer3.finishedHandshake.SetValue(true)
 	data.add(&peer3)
 
-	peers, err = data.filterSample(3, filterSubnetFn)
+	peers, err = data.filterSample(testSubnetID, 3, filterFn)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 1)
 
 	// Ensure peer is sampled
 	assert.Equal(t, peer3.nodeID, peers[0].nodeID)
+
+	// should not return any peer since filter returns false
+	filterFalseFn := func(p *peer) bool {
+		return false
+	}
+	peers, err = data.filterSample(constants.PrimaryNetworkID, 3, filterFalseFn)
+	assert.NoError(t, err)
+	assert.Len(t, peers, 0)
 }
