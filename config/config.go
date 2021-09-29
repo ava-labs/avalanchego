@@ -779,8 +779,6 @@ func readSubnetConfigs(subnetConfigPath string, subnetIDs []ids.ID, defaultSubne
 		case err != nil:
 			return nil, err
 		case fileInfo.IsDir():
-		}
-		if err != nil {
 			return nil, fmt.Errorf("%q is a directory, expected a file", fileInfo.Name())
 		}
 
