@@ -29,6 +29,16 @@ var (
 	errBaseFeeNil             = errors.New("base fee is nil")
 	errExtDataGasUsedNil      = errors.New("extDataGasUsed is nil")
 	errExtDataGasUsedTooLarge = errors.New("extDataGasUsed is not uint64")
+	errFakeFail               = errors.New("fake fail ocurred")
+)
+
+type Mode uint
+
+const (
+	ModeFake Mode = iota
+	ModeFakeFail
+	ModeFullFake
+	ModeEthFake
 )
 
 type (
@@ -43,39 +53,49 @@ type (
 	}
 
 	DummyEngine struct {
-		cb       *ConsensusCallbacks
-		ethFaker bool
-		isFullFaker bool
+		cb            *ConsensusCallbacks
+        consensusMode Mode
+	    fakeFail      uint64
 	}
 )
 
-func NewDummyEngine(cb *ConsensusCallbacks, isFullFaker bool) *DummyEngine {
+func NewDummyEngine(cb *ConsensusCallbacks) *DummyEngine {
 	return &DummyEngine{
 		cb:          cb,
-		isFullFaker: isFullFaker,
 	}
 }
 
 func NewETHFaker() *DummyEngine {
 	return &DummyEngine{
 		cb:       new(ConsensusCallbacks),
-		ethFaker: true,
+        consensusMode: ModeEthFake,
 	}
 }
 
 func NewComplexETHFaker(cb *ConsensusCallbacks) *DummyEngine {
 	return &DummyEngine{
 		cb:       cb,
-		ethFaker: true,
+        consensusMode: ModeEthFake,
 	}
 }
 
 func NewFaker() *DummyEngine {
-	return NewDummyEngine(new(ConsensusCallbacks), false)
+	return NewDummyEngine(new(ConsensusCallbacks))
+}
+
+func NewFakeFailer(fail uint64) *DummyEngine {
+	return &DummyEngine{
+		cb:       new(ConsensusCallbacks),
+		fakeFail: fail,
+        consensusMode: ModeFakeFail,
+	}
 }
 
 func NewFullFaker() *DummyEngine {
-	return NewDummyEngine(new(ConsensusCallbacks), true)
+	return &DummyEngine{
+		cb:       new(ConsensusCallbacks),
+        consensusMode: ModeFullFake,
+	}
 }
 
 func (self *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, header *types.Header, parent *types.Header) error {
@@ -219,7 +239,7 @@ func (self *DummyEngine) Author(header *types.Header) (common.Address, error) {
 
 func (self *DummyEngine) VerifyHeader(chain consensus.ChainHeaderReader, header *types.Header) error {
 	// If we're running a full engine faking, accept any input as valid
-	if self.isFullFaker {
+	if self.consensusMode == ModeFullFake {
 		return nil
 	}
 	// Short circuit if the header is known, or it's parent not
@@ -243,6 +263,9 @@ func (self *DummyEngine) VerifyUncles(chain consensus.ChainReader, block *types.
 }
 
 func (self *DummyEngine) VerifySeal(chain consensus.ChainHeaderReader, header *types.Header) error {
+    if self.consensusMode == ModeFakeFail && self.fakeFail == header.Number.Uint64() {
+        return errFakeFail
+    }
 	return nil
 }
 
@@ -258,7 +281,7 @@ func (self *DummyEngine) verifyBlockFee(
 	receipts []*types.Receipt,
 	extraStateChangeContribution *big.Int,
 ) error {
-	if self.ethFaker {
+	if self.consensusMode == ModeEthFake {
 		return nil
 	}
 	if baseFee == nil || baseFee.Sign() <= 0 {
@@ -372,7 +395,7 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 			return nil, err
 		}
 	}
-	if self.ethFaker {
+	if self.consensusMode == ModeEthFake {
 		extDataGasUsed = new(big.Int).Set(common.Big0)
 	}
 	if chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
