@@ -38,7 +38,7 @@ func TestArchiveBlockChain(t *testing.T) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
 					return nil, nil, nil, nil
 				},
-			}, false),
+			}),
 			vm.Config{},
 			lastAcceptedHash,
 		)
@@ -72,7 +72,7 @@ func TestArchiveBlockChainSnapsDisabled(t *testing.T) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
 					return nil, nil, nil, nil
 				},
-			}, false),
+			}),
 			vm.Config{},
 			lastAcceptedHash,
 		)
@@ -106,7 +106,7 @@ func TestPruningBlockChain(t *testing.T) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
 					return nil, nil, nil, nil
 				},
-			}, false),
+			}),
 			vm.Config{},
 			lastAcceptedHash,
 		)
@@ -140,7 +140,7 @@ func TestPruningBlockChainSnapsDisabled(t *testing.T) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
 					return nil, nil, nil, nil
 				},
-			}, false),
+			}),
 			vm.Config{},
 			lastAcceptedHash,
 		)
@@ -180,7 +180,7 @@ func TestPruningBlockChainUngracefulShutdown(t *testing.T) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
 					return nil, nil, nil, nil
 				},
-			}, false),
+			}),
 			vm.Config{},
 			lastAcceptedHash,
 		)
@@ -221,7 +221,7 @@ func TestPruningBlockChainUngracefulShutdownSnapsDisabled(t *testing.T) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
 					return nil, nil, nil, nil
 				},
-			}, false),
+			}),
 			vm.Config{},
 			lastAcceptedHash,
 		)
@@ -264,7 +264,7 @@ func TestEnableSnapshots(t *testing.T) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
 					return nil, nil, nil, nil
 				},
-			}, false),
+			}),
 			vm.Config{},
 			lastAcceptedHash,
 		)
@@ -307,7 +307,7 @@ func TestCorruptSnapshots(t *testing.T) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
 					return nil, nil, nil, nil
 				},
-			}, false),
+			}),
 			vm.Config{},
 			lastAcceptedHash,
 		)
