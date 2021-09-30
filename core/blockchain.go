@@ -1657,3 +1657,9 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64, report
 	}
 	return nil
 }
+
+// numberHash is just a container for a number and a hash, to represent a block
+type numberHash struct {
+	number uint64
+	hash   common.Hash
+}
