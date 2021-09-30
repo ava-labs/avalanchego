@@ -29,7 +29,7 @@ var (
 	errBaseFeeNil             = errors.New("base fee is nil")
 	errExtDataGasUsedNil      = errors.New("extDataGasUsed is nil")
 	errExtDataGasUsedTooLarge = errors.New("extDataGasUsed is not uint64")
-	errFakeFail               = errors.New("fake fail ocurred")
+	errFakeFail               = errors.New("fake fail occurred")
 )
 
 type Mode uint
@@ -54,28 +54,28 @@ type (
 
 	DummyEngine struct {
 		cb            *ConsensusCallbacks
-        consensusMode Mode
-	    fakeFail      uint64
+		consensusMode Mode
+		fakeFail      uint64
 	}
 )
 
 func NewDummyEngine(cb *ConsensusCallbacks) *DummyEngine {
 	return &DummyEngine{
-		cb:          cb,
+		cb: cb,
 	}
 }
 
 func NewETHFaker() *DummyEngine {
 	return &DummyEngine{
-		cb:       new(ConsensusCallbacks),
-        consensusMode: ModeEthFake,
+		cb:            new(ConsensusCallbacks),
+		consensusMode: ModeEthFake,
 	}
 }
 
 func NewComplexETHFaker(cb *ConsensusCallbacks) *DummyEngine {
 	return &DummyEngine{
-		cb:       cb,
-        consensusMode: ModeEthFake,
+		cb:            cb,
+		consensusMode: ModeEthFake,
 	}
 }
 
@@ -85,16 +85,16 @@ func NewFaker() *DummyEngine {
 
 func NewFakeFailer(fail uint64) *DummyEngine {
 	return &DummyEngine{
-		cb:       new(ConsensusCallbacks),
-		fakeFail: fail,
-        consensusMode: ModeFakeFail,
+		cb:            new(ConsensusCallbacks),
+		fakeFail:      fail,
+		consensusMode: ModeFakeFail,
 	}
 }
 
 func NewFullFaker() *DummyEngine {
 	return &DummyEngine{
-		cb:       new(ConsensusCallbacks),
-        consensusMode: ModeFullFake,
+		cb:            new(ConsensusCallbacks),
+		consensusMode: ModeFullFake,
 	}
 }
 
@@ -263,9 +263,9 @@ func (self *DummyEngine) VerifyUncles(chain consensus.ChainReader, block *types.
 }
 
 func (self *DummyEngine) VerifySeal(chain consensus.ChainHeaderReader, header *types.Header) error {
-    if self.consensusMode == ModeFakeFail && self.fakeFail == header.Number.Uint64() {
-        return errFakeFail
-    }
+	if self.consensusMode == ModeFakeFail && self.fakeFail == header.Number.Uint64() {
+		return errFakeFail
+	}
 	return nil
 }
 
