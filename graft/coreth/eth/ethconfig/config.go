@@ -69,6 +69,7 @@ func NewDefaultConfig() Config {
 
 //go:generate gencodec -type Config -formats toml -out gen_config.go
 
+// Config contains configuration options for of the ETH and LES protocols.
 type Config struct {
 	// The genesis block, which is inserted if the database is empty.
 	// If nil, the Ethereum main net block is used.
