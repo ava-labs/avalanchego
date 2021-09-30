@@ -521,12 +521,11 @@ type MatcherSession struct {
 	quit   chan struct{} // Quit channel to request pipeline termination
 
 	ctx context.Context // Context used by the light client to abort filtering
-
+	err     error // Global error to track retrieval failures deep in the chain
 	// A lock is used rather than atomic.Value because values panic with
 	// different concrete types - and should therefore not be used with
 	// interfaces.
 	errLock sync.Mutex
-	err     error // Global error to track retrieval failures deep in the chain
 
 	pend sync.WaitGroup
 }

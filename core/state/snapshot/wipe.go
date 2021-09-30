@@ -38,7 +38,8 @@ import (
 
 // wipeSnapshot starts a goroutine to iterate over the entire key-value database
 // and delete all the data associated with the snapshot (accounts, storage,
-// metadata).
+// metadata). After all is done, the snapshot range of the database is compacted
+// to free up unused data blocks.
 func wipeSnapshot(db ethdb.KeyValueStore, full bool) chan struct{} {
 	// Wipe the snapshot root marker synchronously
 	if full {
@@ -60,7 +61,8 @@ func wipeSnapshot(db ethdb.KeyValueStore, full bool) chan struct{} {
 // wipeContent iterates over the entire key-value database and deletes all the
 // data associated with the snapshot (accounts, storage), but not the root hash
 // as the wiper is meant to run on a background thread but the root needs to be
-// removed in sync to avoid data races.
+// removed in sync to avoid data races. After all is done, the snapshot range of
+// the database is compacted to free up unused data blocks.
 func wipeContent(db ethdb.KeyValueStore) error {
 	if err := wipeKeyRange(db, "accounts", rawdb.SnapshotAccountPrefix, nil, nil, len(rawdb.SnapshotAccountPrefix)+common.HashLength, true); err != nil {
 		return err
