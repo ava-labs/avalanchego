@@ -46,7 +46,10 @@ var (
 	errNetworkLayerUnhealthy = errors.New("network layer is unhealthy")
 )
 
-var _ Network = &network{}
+var (
+	_ Network               = (*network)(nil)
+	_ sender.ExternalSender = (*network)(nil)
+)
 
 func init() { rand.Seed(time.Now().UnixNano()) }
 
@@ -90,12 +93,6 @@ type Network interface {
 	health.Checkable
 }
 
-type msgProcessor struct {
-	canModifyMsg bool
-	meterSuccess func(msg message.Message)
-	meterFailure func(nodeID ids.ShortID, msg message.Message)
-}
-
 type network struct {
 	config *Config
 	// The metrics that this network tracks
@@ -123,11 +120,12 @@ type network struct {
 	// This field just makes sure we don't connect to ourselves when TLS is
 	// disabled. So, cryptographically secure random number generation isn't
 	// used here.
-	dummyNodeID   uint32
-	clock         timer.Clock
-	c             message.Codec
-	b             message.Builder
-	msgProcessors map[constants.MsgType]msgProcessor
+	dummyNodeID uint32
+	clock       timer.Clock
+	c           message.Codec
+	b           message.Builder
+	*msgsProcessor
+	*msgsGossiper
 
 	stateLock sync.RWMutex
 	closed    utils.AtomicBool
@@ -336,7 +334,8 @@ func NewNetwork(
 	}
 	netw.c = codec
 	netw.b = message.NewBuilder(codec)
-	netw.initMsgProcessors()
+	netw.msgsProcessor = newMsgsProcessor(netw)
+	netw.msgsGossiper = newMsgsGossiper(netw)
 
 	netw.peers.initialize()
 	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, config.MaxSendFailRateHalflife, netw.clock.Time()))
@@ -346,515 +345,9 @@ func NewNetwork(
 	return netw, nil
 }
 
-func (n *network) initMsgProcessors() {
-	n.msgProcessors = make(map[constants.MsgType]msgProcessor)
-
-	// constants.GetAcceptedFrontierMsg
-	n.msgProcessors[constants.GetAcceptedFrontierMsg] = msgProcessor{
-		canModifyMsg: false,
-		meterSuccess: func(msg message.Message) {
-			var (
-				now    = n.clock.Time()
-				msgLen = len(msg.Bytes())
-			)
-
-			n.metrics.getAcceptedFrontier.numSent.Inc()
-			n.sendFailRateCalculator.Observe(0, now)
-			n.metrics.getAcceptedFrontier.sentBytes.Add(float64(msgLen))
-			// assume that if [saved] == 0, [msg] wasn't compressed
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.getAcceptedFrontier.savedSentBytes.Observe(float64(saved))
-			}
-		},
-		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
-			now := n.clock.Time()
-			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
-			reqID, _ := msg.Get(message.RequestID).(uint32)
-			n.log.Debug("failed to send GetAcceptedFrontier(%s, %s, %d)",
-				nodeID, chainID, reqID)
-			n.metrics.getAcceptedFrontier.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, now)
-		},
-	}
-
-	// constants.AcceptedFrontierMsg
-	n.msgProcessors[constants.AcceptedFrontierMsg] = msgProcessor{
-		canModifyMsg: true,
-		meterSuccess: func(msg message.Message) {
-			var (
-				now    = n.clock.Time()
-				msgLen = len(msg.Bytes())
-			)
-			n.metrics.acceptedFrontier.numSent.Inc()
-			n.sendFailRateCalculator.Observe(0, now)
-			n.metrics.acceptedFrontier.sentBytes.Add(float64(msgLen))
-			// assume that if [saved] == 0, [msg] wasn't compressed
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.acceptedFrontier.savedSentBytes.Observe(float64(saved))
-			}
-		},
-		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
-			now := n.clock.Time()
-			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
-			reqID, _ := msg.Get(message.RequestID).(uint32)
-
-			containerIDsBytes := msg.Get(message.ContainerIDs).([][]byte)
-			containerIDs := make([]ids.ID, len(containerIDsBytes))
-			for _, containerIDBytes := range containerIDsBytes {
-				containerID, _ := ids.ToID(containerIDBytes)
-				containerIDs = append(containerIDs, containerID)
-			}
-
-			n.log.Debug("failed to send AcceptedFrontier(%s, %s, %d, %s)",
-				nodeID,
-				chainID,
-				reqID,
-				containerIDs)
-			n.metrics.acceptedFrontier.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, now)
-		},
-	}
-	// constants.GetAcceptedMsg
-	n.msgProcessors[constants.GetAcceptedMsg] = msgProcessor{
-		canModifyMsg: false,
-		meterSuccess: func(msg message.Message) {
-			var (
-				now    = n.clock.Time()
-				msgLen = len(msg.Bytes())
-			)
-
-			n.metrics.getAccepted.numSent.Inc()
-			n.sendFailRateCalculator.Observe(0, now)
-			n.metrics.getAccepted.sentBytes.Add(float64(msgLen))
-			// assume that if [saved] == 0, [msg] wasn't compressed
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.getAccepted.savedSentBytes.Observe(float64(saved))
-			}
-		},
-		meterFailure: func(vID ids.ShortID, msg message.Message) {
-			now := n.clock.Time()
-			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
-			reqID, _ := msg.Get(message.RequestID).(uint32)
-
-			containerIDsBytes := msg.Get(message.ContainerIDs).([][]byte)
-			containerIDs := make([]ids.ID, len(containerIDsBytes))
-			for _, containerIDBytes := range containerIDsBytes {
-				containerID, _ := ids.ToID(containerIDBytes)
-				containerIDs = append(containerIDs, containerID)
-			}
-			n.log.Debug("failed to send GetAccepted(%s, %s, %d, %s)",
-				vID,
-				chainID,
-				reqID,
-				containerIDs)
-			n.metrics.getAccepted.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, now)
-		},
-	}
-
-	// constants.AcceptedMsg
-	n.msgProcessors[constants.AcceptedMsg] = msgProcessor{
-		canModifyMsg: true,
-		meterSuccess: func(msg message.Message) {
-			var (
-				now    = n.clock.Time()
-				msgLen = len(msg.Bytes())
-			)
-
-			n.sendFailRateCalculator.Observe(0, now)
-			n.metrics.accepted.numSent.Inc()
-			n.metrics.accepted.sentBytes.Add(float64(msgLen))
-			// assume that if [saved] == 0, [msg] wasn't compressed
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.accepted.savedSentBytes.Observe(float64(saved))
-			}
-		},
-		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
-			now := n.clock.Time()
-			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
-			reqID, _ := msg.Get(message.RequestID).(uint32)
-
-			containerIDsBytes := msg.Get(message.ContainerIDs).([][]byte)
-			containerIDs := make([]ids.ID, len(containerIDsBytes))
-			for _, containerIDBytes := range containerIDsBytes {
-				containerID, _ := ids.ToID(containerIDBytes)
-				containerIDs = append(containerIDs, containerID)
-			}
-			n.log.Debug("failed to send Accepted(%s, %s, %d, %s)",
-				nodeID,
-				chainID,
-				reqID,
-				containerIDs)
-			n.metrics.accepted.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, now)
-		},
-	}
-
-	// constants.GetAncestorsMsg
-	n.msgProcessors[constants.GetAncestorsMsg] = msgProcessor{
-		canModifyMsg: true,
-		meterSuccess: func(msg message.Message) {
-			var (
-				now    = n.clock.Time()
-				msgLen = len(msg.Bytes())
-			)
-
-			n.metrics.getAncestors.numSent.Inc()
-			n.sendFailRateCalculator.Observe(0, now)
-			n.metrics.getAncestors.sentBytes.Add(float64(msgLen))
-			// assume that if [saved] == 0, [msg] wasn't compressed
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.getAncestors.savedSentBytes.Observe(float64(saved))
-			}
-		},
-		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
-			now := n.clock.Time()
-			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
-			reqID, _ := msg.Get(message.RequestID).(uint32)
-			containerID, _ := ids.ToID(msg.Get(message.ContainerID).([]byte))
-			n.log.Debug("failed to send GetAncestors(%s, %s, %d, %s)",
-				nodeID,
-				chainID,
-				reqID,
-				containerID)
-			n.metrics.getAncestors.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, now)
-		},
-	}
-
-	// constants.MultiPutMsg
-	n.msgProcessors[constants.MultiPutMsg] = msgProcessor{
-		canModifyMsg: true,
-		meterSuccess: func(msg message.Message) {
-			var (
-				now    = n.clock.Time()
-				msgLen = len(msg.Bytes())
-			)
-
-			n.metrics.multiPut.numSent.Inc()
-			n.sendFailRateCalculator.Observe(0, now)
-			n.metrics.multiPut.sentBytes.Add(float64(msgLen))
-			// assume that if [saved] == 0, [msg] wasn't compressed
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.multiPut.savedSentBytes.Observe(float64(saved))
-			}
-		},
-		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
-			now := n.clock.Time()
-			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
-			reqID, _ := msg.Get(message.RequestID).(uint32)
-			containers := msg.Get(message.MultiContainerBytes).([][]byte)
-			n.log.Debug("failed to send MultiPut(%s, %s, %d, %d)",
-				nodeID,
-				chainID,
-				reqID,
-				len(containers))
-			n.metrics.multiPut.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, now)
-		},
-	}
-
-	// constants.GetMsg
-	n.msgProcessors[constants.GetMsg] = msgProcessor{
-		canModifyMsg: true,
-		meterSuccess: func(msg message.Message) {
-			var (
-				now    = n.clock.Time()
-				msgLen = len(msg.Bytes())
-			)
-
-			n.metrics.get.numSent.Inc()
-			n.sendFailRateCalculator.Observe(0, now)
-			n.metrics.get.sentBytes.Add(float64(msgLen))
-			// assume that if [saved] == 0, [msg] wasn't compressed
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.get.savedSentBytes.Observe(float64(saved))
-			}
-		},
-		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
-			now := n.clock.Time()
-			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
-			reqID, _ := msg.Get(message.RequestID).(uint32)
-			containerID, _ := ids.ToID(msg.Get(message.ContainerID).([]byte))
-			n.log.Debug("failed to send Get(%s, %s, %d, %s)",
-				nodeID,
-				chainID,
-				reqID,
-				containerID)
-			n.metrics.get.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, now)
-		},
-	}
-
-	// constants.PutMsg
-	n.msgProcessors[constants.PutMsg] = msgProcessor{
-		canModifyMsg: true,
-		meterSuccess: func(msg message.Message) {
-			var (
-				now    = n.clock.Time()
-				msgLen = len(msg.Bytes())
-			)
-
-			n.metrics.put.numSent.Inc()
-			n.sendFailRateCalculator.Observe(0, now)
-			n.metrics.put.sentBytes.Add(float64(msgLen))
-			// assume that if [saved] == 0, [msg] wasn't compressed
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.put.savedSentBytes.Observe(float64(saved))
-			}
-		},
-		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
-			now := n.clock.Time()
-			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
-			reqID, _ := msg.Get(message.RequestID).(uint32)
-			containerID, _ := ids.ToID(msg.Get(message.ContainerID).([]byte))
-			container := msg.Get(message.ContainerBytes).([]byte)
-			n.log.Debug("failed to send Put(%s, %s, %d, %s)",
-				nodeID,
-				chainID,
-				reqID,
-				containerID)
-			n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
-			n.metrics.put.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, now)
-		},
-	}
-
-	// constants.PushQueryMsg
-	n.msgProcessors[constants.PushQueryMsg] = msgProcessor{
-		canModifyMsg: false,
-		meterSuccess: func(msg message.Message) {
-			var (
-				now    = n.clock.Time()
-				msgLen = len(msg.Bytes())
-			)
-
-			n.metrics.pushQuery.numSent.Inc()
-			n.sendFailRateCalculator.Observe(0, now)
-			n.metrics.pushQuery.sentBytes.Add(float64(msgLen))
-			// assume that if [saved] == 0, [msg] wasn't compressed
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.pushQuery.savedSentBytes.Observe(float64(saved))
-			}
-		},
-		meterFailure: func(vID ids.ShortID, msg message.Message) {
-			now := n.clock.Time()
-			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
-			reqID, _ := msg.Get(message.RequestID).(uint32)
-			containerID, _ := ids.ToID(msg.Get(message.ContainerID).([]byte))
-			container := msg.Get(message.ContainerBytes).([]byte)
-			n.log.Debug("failed to send PushQuery(%s, %s, %d, %s)",
-				vID,
-				chainID,
-				reqID,
-				containerID)
-			n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
-			n.metrics.pushQuery.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, now)
-		},
-	}
-
-	// constants.PullQueryMsg
-	n.msgProcessors[constants.PullQueryMsg] = msgProcessor{
-		canModifyMsg: false,
-		meterSuccess: func(msg message.Message) {
-			var (
-				now    = n.clock.Time()
-				msgLen = len(msg.Bytes())
-			)
-
-			n.metrics.pullQuery.numSent.Inc()
-			n.sendFailRateCalculator.Observe(0, now)
-			n.metrics.pullQuery.sentBytes.Add(float64(msgLen))
-			// assume that if [saved] == 0, [msg] wasn't compressed
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.pullQuery.savedSentBytes.Observe(float64(saved))
-			}
-		},
-		meterFailure: func(vID ids.ShortID, msg message.Message) {
-			now := n.clock.Time()
-			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
-			reqID, _ := msg.Get(message.RequestID).(uint32)
-			containerID, _ := ids.ToID(msg.Get(message.ContainerID).([]byte))
-			n.log.Debug("failed to send PullQuery(%s, %s, %d, %s)",
-				vID,
-				chainID,
-				reqID,
-				containerID)
-			n.metrics.pullQuery.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, now)
-		},
-	}
-
-	// constants.ChitsMsg
-	n.msgProcessors[constants.ChitsMsg] = msgProcessor{
-		canModifyMsg: true,
-		meterSuccess: func(msg message.Message) {
-			var (
-				now    = n.clock.Time()
-				msgLen = len(msg.Bytes())
-			)
-
-			n.sendFailRateCalculator.Observe(0, now)
-			n.metrics.chits.numSent.Inc()
-			n.metrics.chits.sentBytes.Add(float64(msgLen))
-			// assume that if [saved] == 0, [msg] wasn't compressed
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.chits.savedSentBytes.Observe(float64(saved))
-			}
-		},
-		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
-			now := n.clock.Time()
-			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
-			reqID, _ := msg.Get(message.RequestID).(uint32)
-
-			votesBytes := msg.Get(message.ContainerIDs).([][]byte)
-			votes := make([]ids.ID, len(votesBytes))
-			for _, voteBytes := range votesBytes {
-				vote, _ := ids.ToID(voteBytes)
-				votes = append(votes, vote)
-			}
-
-			n.log.Debug("failed to send Chits(%s, %s, %d, %s)",
-				nodeID,
-				chainID,
-				reqID,
-				votes)
-			n.metrics.chits.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, now)
-		},
-	}
-
-	// constants.AppRequestMsg
-	n.msgProcessors[constants.AppRequestMsg] = msgProcessor{
-		canModifyMsg: false,
-		meterSuccess: func(msg message.Message) {
-			var (
-				now    = n.clock.Time()
-				msgLen = len(msg.Bytes())
-			)
-
-			n.metrics.appRequest.numSent.Inc()
-			n.sendFailRateCalculator.Observe(0, now)
-			n.metrics.appRequest.sentBytes.Add(float64(msgLen))
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.appRequest.savedSentBytes.Observe(float64(saved))
-			}
-		},
-		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
-			now := n.clock.Time()
-			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
-			reqID, _ := msg.Get(message.RequestID).(uint32)
-			appBytes := msg.Get(message.AppRequestBytes).([]byte)
-			n.log.Debug("failed to send AppRequest(%s, %s, %d)", nodeID, chainID, reqID)
-			n.log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appBytes})
-			n.metrics.appRequest.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, now)
-		},
-	}
-
-	// constants.AppResponseMsg
-	n.msgProcessors[constants.AppResponseMsg] = msgProcessor{
-		canModifyMsg: true,
-		meterSuccess: func(msg message.Message) {
-			var (
-				now    = n.clock.Time()
-				msgLen = len(msg.Bytes())
-			)
-
-			n.metrics.appResponse.numSent.Inc()
-			n.sendFailRateCalculator.Observe(0, now)
-			n.metrics.appResponse.sentBytes.Add(float64(msgLen))
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.appResponse.savedSentBytes.Observe(float64(saved))
-			}
-		},
-		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
-			now := n.clock.Time()
-			chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
-			reqID, _ := msg.Get(message.RequestID).(uint32)
-			appBytes := msg.Get(message.AppRequestBytes).([]byte)
-			n.log.Debug("failed to send AppResponse(%s, %s, %d)", nodeID, chainID, reqID)
-			n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: appBytes})
-			n.metrics.appResponse.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, now)
-		},
-	}
-}
-
 // TODO: drop and find a better way to expose builder to sender
 func (n *network) GetMsgBuilder() message.Builder { return n.b }
 func (n *network) IsCompressionEnabled() bool     { return n.config.CompressionEnabled }
-
-// Assumes [n.stateLock] is not held.
-func (n *network) Send(msgType constants.MsgType, msg message.Message, nodeIDs ids.ShortSet) []ids.ShortID {
-	msgProc, ok := n.msgProcessors[msgType]
-	if ok {
-		n.log.Error("Unhandled message type %v. Sending nothing.", msgType)
-		return []ids.ShortID{}
-	}
-
-	res := make([]ids.ShortID, 0, nodeIDs.Len())
-	for _, peerElement := range n.getPeers(nodeIDs) {
-		peer := peerElement.peer
-		nodeID := peerElement.id
-		if peer != nil && peer.finishedHandshake.GetValue() && peer.Send(msg, msgProc.canModifyMsg) {
-			res = append(res, nodeID)
-			msgProc.meterSuccess(msg)
-			continue
-		}
-
-		msgProc.meterFailure(nodeID, msg)
-	}
-	return res
-}
-
-// AppGossip implements the Sender interface.
-// assumes the stateLock is not held.
-func (n *network) SendAppGossip(subnetID, chainID ids.ID, appGossipBytes []byte) {
-	now := n.clock.Time()
-
-	msg, err := n.b.AppGossip(chainID, appGossipBytes, n.config.CompressionEnabled)
-	if err != nil {
-		n.log.Error("failed to build AppGossip(%s): %s", chainID, err)
-		n.log.Verbo("message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
-		n.sendFailRateCalculator.Observe(1, now)
-	}
-
-	n.stateLock.RLock()
-	peers, err := n.peers.sample(subnetID, int(n.config.AppGossipSize))
-	n.stateLock.RUnlock()
-	if err != nil {
-		n.log.Debug("failed to sample %d peers for AppGossip: %s", n.config.AppGossipSize, err)
-		return
-	}
-
-	for _, peer := range peers {
-		sent := peer.Send(msg, false)
-		if !sent {
-			n.log.Debug("failed to send AppGossip(%s, %s)", peer.nodeID, chainID)
-			n.log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
-			n.metrics.appGossip.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, now)
-		} else {
-			n.metrics.appGossip.numSent.Inc()
-			n.metrics.appGossip.sentBytes.Add(float64(len(msg.Bytes())))
-			n.sendFailRateCalculator.Observe(0, now)
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.appGossip.savedSentBytes.Observe(float64(saved))
-			}
-		}
-	}
-}
-
-// SendGossip attempts to gossip the container to the network
-// Assumes [n.stateLock] is not held.
-func (n *network) SendGossip(subnetID, chainID, containerID ids.ID, container []byte) {
-	if err := n.gossipContainer(subnetID, chainID, containerID, container, n.config.GossipAcceptedFrontierSize); err != nil {
-		n.log.Debug("failed to Gossip(%s, %s): %s", chainID, containerID, err)
-		n.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
-	}
-}
 
 // Accept is called after every consensus decision
 // Assumes [n.stateLock] is not held.
@@ -863,7 +356,22 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 		// don't gossip during bootstrapping
 		return nil
 	}
-	return n.gossipContainer(ctx.SubnetID, ctx.ChainID, containerID, container, n.config.GossipOnAcceptSize)
+
+	var (
+		msgType    = constants.GossipMsg
+		now        = n.clock.Time()
+		sampleSize = int(n.config.GossipOnAcceptSize)
+	)
+
+	msg, err := n.b.Put(ctx.ChainID, constants.GossipMsgRequestID, containerID, container, n.config.CompressionEnabled)
+	if err != nil {
+		n.log.Debug("failed to build Put message for gossip (%s, %s): %s", ctx.ChainID, containerID, err)
+		n.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
+		n.sendFailRateCalculator.Observe(1, now)
+		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
+	}
+	n.gossip(msgType, msg, ctx.SubnetID, sampleSize)
+	return nil
 }
 
 // shouldUpgradeIncoming returns whether we should
@@ -1084,42 +592,6 @@ func (n *network) Track(ip utils.IPDesc, nodeID ids.ShortID) {
 
 func (n *network) IP() utils.IPDesc {
 	return n.currentIP.IP()
-}
-
-// Assumes [n.stateLock] is not held.
-func (n *network) gossipContainer(subnetID, chainID, containerID ids.ID, container []byte, numToGossip uint) error {
-	now := n.clock.Time()
-
-	// Sent to peers that handle compressed messages (and messages with the isCompress flag)
-	msg, err := n.b.Put(chainID, constants.GossipMsgRequestID, containerID, container, n.config.CompressionEnabled)
-	if err != nil {
-		n.sendFailRateCalculator.Observe(1, now)
-		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
-	}
-
-	n.stateLock.RLock()
-	peers, err := n.peers.sample(subnetID, int(numToGossip))
-	n.stateLock.RUnlock()
-	if err != nil {
-		return err
-	}
-
-	for _, peer := range peers {
-		sent := peer.Send(msg, false)
-		if sent {
-			n.metrics.put.numSent.Inc()
-			n.metrics.put.sentBytes.Add(float64(len(msg.Bytes())))
-			// assume that if [saved] == 0, [msg] wasn't compressed
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.put.savedSentBytes.Observe(float64(saved))
-			}
-			n.sendFailRateCalculator.Observe(0, now)
-		} else {
-			n.sendFailRateCalculator.Observe(1, now)
-			n.metrics.put.numFailed.Inc()
-		}
-	}
-	return nil
 }
 
 // assumes the stateLock is held.

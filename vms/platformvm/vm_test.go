@@ -2090,9 +2090,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	reqID := new(uint32)
 	externalSender.SendGetAcceptedFrontierF =
-		func(nodeIDs ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration) []ids.ShortID {
+		func(nodeIDs ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration) ids.ShortSet {
 			*reqID = requestID
-			res := make([]ids.ShortID, 0)
+			res := ids.NewShortSet(len(nodeIDs))
 			return res
 		}
 
@@ -2160,9 +2160,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	externalSender.SendGetAcceptedFrontierF = nil
 	externalSender.SendGetAcceptedF =
-		func(nodeIDs ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration, _ []ids.ID) []ids.ShortID {
+		func(nodeIDs ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration, _ []ids.ID) ids.ShortSet {
 			*reqID = requestID
-			res := make([]ids.ShortID, 0)
+			res := ids.NewShortSet(len(nodeIDs))
 			return res
 		}
 

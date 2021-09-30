@@ -2588,8 +2588,16 @@ func TestPeerGossip(t *testing.T) {
 	wg1.Wait()
 	wg2.Wait()
 
-	net0.SendGossip(testSubnetID, ids.GenerateTestID(), testSubnetContainerID, []byte("test"))
-	net0.SendGossip(constants.PrimaryNetworkID, ids.GenerateTestID(), testPrimaryContainerID, []byte("test2"))
+	msg1, err := net0.GetMsgBuilder().Put(ids.GenerateTestID(), constants.GossipMsgRequestID,
+		testSubnetContainerID, []byte("test"), net0.IsCompressionEnabled())
+	assert.NoError(t, err)
+	net0.Gossip(constants.GossipMsg, msg1, testSubnetID)
+
+	msg2, err := net0.GetMsgBuilder().Put(ids.GenerateTestID(), constants.GossipMsgRequestID,
+		testPrimaryContainerID, []byte("test2"), net0.IsCompressionEnabled())
+	net0.Gossip(constants.GossipMsg, msg2, constants.PrimaryNetworkID)
+
+	assert.NoError(t, err)
 
 	wg1P.Wait()
 	wg2P.Wait()
