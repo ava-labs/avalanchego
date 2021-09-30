@@ -35,11 +35,11 @@ func TestDAOForkRangeExtradata(t *testing.T) {
 	// Generate a common prefix for both pro-forkers and non-forkers
 	db := rawdb.NewMemoryDatabase()
 	gspec := &Genesis{
-        BaseFee: big.NewInt(params.ApricotPhase3InitialBaseFee),
-        Config: params.TestChainConfig,
-    }
-    gspec.Config.ApricotPhase3BlockTimestamp = nil
-    gspec.Config.ApricotPhase4BlockTimestamp = nil
+		BaseFee: big.NewInt(params.ApricotPhase3InitialBaseFee),
+		Config:  params.TestChainConfig,
+	}
+	gspec.Config.ApricotPhase3BlockTimestamp = nil
+	gspec.Config.ApricotPhase4BlockTimestamp = nil
 	genesis := gspec.MustCommit(db)
 	prefix, _, _ := GenerateChain(params.TestChainConfig, genesis, dummy.NewFaker(), db, int(forkBlock.Int64()-1), 10, func(i int, gen *BlockGen) {})
 
@@ -50,8 +50,8 @@ func TestDAOForkRangeExtradata(t *testing.T) {
 	proConf := *params.TestChainConfig
 	proConf.DAOForkBlock = forkBlock
 	proConf.DAOForkSupport = true
-    proConf.ApricotPhase3BlockTimestamp = nil
-    proConf.ApricotPhase4BlockTimestamp = nil
+	proConf.ApricotPhase3BlockTimestamp = nil
+	proConf.ApricotPhase4BlockTimestamp = nil
 
 	proBc, _ := NewBlockChain(proDb, DefaultCacheConfig, &proConf, dummy.NewFaker(), vm.Config{}, common.Hash{})
 	defer proBc.Stop()
@@ -62,8 +62,8 @@ func TestDAOForkRangeExtradata(t *testing.T) {
 	conConf := *params.TestChainConfig
 	conConf.DAOForkBlock = forkBlock
 	conConf.DAOForkSupport = false
-    conConf.ApricotPhase3BlockTimestamp = nil
-    conConf.ApricotPhase4BlockTimestamp = nil
+	conConf.ApricotPhase3BlockTimestamp = nil
+	conConf.ApricotPhase4BlockTimestamp = nil
 
 	conBc, _ := NewBlockChain(conDb, DefaultCacheConfig, &conConf, dummy.NewFaker(), vm.Config{}, common.Hash{})
 	defer conBc.Stop()

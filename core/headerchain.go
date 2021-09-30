@@ -32,7 +32,7 @@ import (
 	"math/big"
 	mrand "math/rand"
 	"sync/atomic"
-    "time"
+	"time"
 
 	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/core/rawdb"

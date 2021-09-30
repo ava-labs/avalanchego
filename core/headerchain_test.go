@@ -72,9 +72,9 @@ func TestHeaderInsertion(t *testing.T) {
 	var (
 		db      = rawdb.NewMemoryDatabase()
 		genesis = (&Genesis{
-            BaseFee: big.NewInt(params.ApricotPhase3InitialBaseFee),
-            Config: params.TestChainConfig,
-        }).MustCommit(db)
+			BaseFee: big.NewInt(params.ApricotPhase3InitialBaseFee),
+			Config:  params.TestChainConfig,
+		}).MustCommit(db)
 	)
 
 	hc, err := NewHeaderChain(db, params.TestChainConfig, dummy.NewFaker())
