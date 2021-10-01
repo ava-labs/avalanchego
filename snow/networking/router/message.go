@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-type message struct {
+type messageToRemove struct {
 	// Must always be set
 	messageType constants.MsgType
 	// Must always be set
@@ -30,7 +30,7 @@ type message struct {
 	appMsgBytes    []byte
 }
 
-func (m message) doneHandling() {
+func (m messageToRemove) doneHandling() {
 	if m.onDoneHandling != nil {
 		m.onDoneHandling()
 	}
@@ -38,12 +38,12 @@ func (m message) doneHandling() {
 
 // IsPeriodic returns true if this message is of a type that is sent on a
 // periodic basis.
-func (m message) IsPeriodic() bool {
+func (m messageToRemove) IsPeriodic() bool {
 	return m.requestID == constants.GossipMsgRequestID ||
 		m.messageType == constants.GossipMsg
 }
 
-func (m message) String() string {
+func (m messageToRemove) String() string {
 	sb := strings.Builder{}
 	sb.WriteString(fmt.Sprintf("(%s, NodeID: %s%s, RequestID: %d", m.messageType, constants.NodeIDPrefix, m.nodeID, m.requestID))
 	if !m.received.IsZero() {

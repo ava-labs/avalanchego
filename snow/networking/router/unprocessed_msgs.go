@@ -19,10 +19,10 @@ var _ unprocessedMsgs = &unprocessedMsgsImpl{}
 
 type unprocessedMsgs interface {
 	// Add an unprocessed message
-	Push(message)
+	Push(messageToRemove)
 	// Get and remove the unprocessed message that should
 	// be processed next. Must never be called when Len() == 0.
-	Pop() message
+	Pop() messageToRemove
 	// Returns the number of unprocessed messages
 	Len() int
 }
@@ -54,7 +54,7 @@ type unprocessedMsgsImpl struct {
 	// Node ID --> Messages this node has in [msgs]
 	nodeToUnprocessedMsgs map[ids.ShortID]int
 	// Unprocessed messages
-	msgs []message
+	msgs []messageToRemove
 	// Validator set for the chain associated with this
 	vdrs validators.Set
 	// Tracks CPU utilization of each node
@@ -63,7 +63,7 @@ type unprocessedMsgsImpl struct {
 	clock timer.Clock
 }
 
-func (u *unprocessedMsgsImpl) Push(msg message) {
+func (u *unprocessedMsgsImpl) Push(msg messageToRemove) {
 	u.msgs = append(u.msgs, msg)
 	u.nodeToUnprocessedMsgs[msg.nodeID]++
 	u.metrics.nodesWithUnprocessedMsgs.Set(float64(len(u.nodeToUnprocessedMsgs)))
@@ -73,7 +73,7 @@ func (u *unprocessedMsgsImpl) Push(msg message) {
 // Must never be called when [u.Len()] == 0.
 // FIFO, but skip over messages whose senders whose messages
 // have caused us to use excessive CPU recently.
-func (u *unprocessedMsgsImpl) Pop() message {
+func (u *unprocessedMsgsImpl) Pop() messageToRemove {
 	n := len(u.msgs)
 	i := 0
 	for {
@@ -110,7 +110,7 @@ func (u *unprocessedMsgsImpl) Len() int {
 }
 
 // canPop will return true for at least one message in [u.msgs]
-func (u *unprocessedMsgsImpl) canPop(msg *message) bool {
+func (u *unprocessedMsgsImpl) canPop(msg *messageToRemove) bool {
 	// If the deadline to handle [msg] has passed, always pop it.
 	// It will be dropped immediately.
 	if !msg.deadline.IsZero() && u.clock.Time().After(msg.deadline) {
