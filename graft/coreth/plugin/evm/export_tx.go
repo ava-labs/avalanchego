@@ -55,14 +55,14 @@ func (tx *UnsignedExportTx) InputUTXOs() ids.Set {
 
 // Verify this transaction is well-formed
 func (tx *UnsignedExportTx) Verify(
-	avmID ids.ID,
+	xChainID ids.ID,
 	ctx *snow.Context,
 	rules params.Rules,
 ) error {
 	switch {
 	case tx == nil:
 		return errNilTx
-	case tx.DestinationChain != avmID:
+	case tx.DestinationChain != xChainID:
 		return errWrongChainID
 	case len(tx.ExportedOutputs) == 0:
 		return errNoExportOutputs
@@ -317,6 +317,7 @@ func (vm *VM) newExportTx(
 	ins = append(ins, avaxIns...)
 	signers = append(signers, avaxSigners...)
 
+	avax.SortTransferableOutputs(outs, vm.codec)
 	SortEVMInputsAndSigners(ins, signers)
 
 	// Create the transaction

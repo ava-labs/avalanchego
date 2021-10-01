@@ -48,14 +48,14 @@ func (tx *UnsignedImportTx) InputUTXOs() ids.Set {
 
 // Verify this transaction is well-formed
 func (tx *UnsignedImportTx) Verify(
-	avmID ids.ID,
+	xChainID ids.ID,
 	ctx *snow.Context,
 	rules params.Rules,
 ) error {
 	switch {
 	case tx == nil:
 		return errNilTx
-	case tx.SourceChain != avmID:
+	case tx.SourceChain != xChainID:
 		return errWrongChainID
 	case len(tx.ImportedInputs) == 0:
 		return errNoImportInputs
@@ -69,13 +69,13 @@ func (tx *UnsignedImportTx) Verify(
 
 	for _, out := range tx.Outs {
 		if err := out.Verify(); err != nil {
-			return err
+			return fmt.Errorf("EVM Output failed verification: %w", err)
 		}
 	}
 
 	for _, in := range tx.ImportedInputs {
 		if err := in.Verify(); err != nil {
-			return err
+			return fmt.Errorf("atomic input failed verification: %w", err)
 		}
 	}
 	if !avax.IsSortedAndUniqueTransferableInputs(tx.ImportedInputs) {
@@ -180,7 +180,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	}
 
 	if len(stx.Creds) != len(tx.ImportedInputs) {
-		return fmt.Errorf("export tx contained mismatched number of inputs/credentials (%d vs. %d)", len(tx.ImportedInputs), len(stx.Creds))
+		return fmt.Errorf("import tx contained mismatched number of inputs/credentials (%d vs. %d)", len(tx.ImportedInputs), len(stx.Creds))
 	}
 
 	if !vm.ctx.IsBootstrapped() {
@@ -196,7 +196,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	// allUTXOBytes is guaranteed to be the same length as utxoIDs
 	allUTXOBytes, err := vm.ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
 	if err != nil {
-		return fmt.Errorf("failed to fetch import UTXOs from %s with %w", tx.SourceChain, err)
+		return fmt.Errorf("failed to fetch import UTXOs from %s due to: %w", tx.SourceChain, err)
 	}
 
 	for i, in := range tx.ImportedInputs {
@@ -204,7 +204,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 
 		utxo := &avax.UTXO{}
 		if _, err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
-			return err
+			return fmt.Errorf("failed to unmarshal UTXO: %w", err)
 		}
 
 		cred := stx.Creds[i]
@@ -216,7 +216,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 		}
 
 		if err := vm.fx.VerifyTransfer(tx, in.In, cred, utxo.Out); err != nil {
-			return err
+			return fmt.Errorf("import tx transfer failed verification: %w", err)
 		}
 	}
 

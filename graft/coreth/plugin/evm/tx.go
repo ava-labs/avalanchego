@@ -104,6 +104,9 @@ type UnsignedAtomicTx interface {
 
 	// UTXOs this tx consumes
 	InputUTXOs() ids.Set
+	// Verify attempts to verify that the transaction is well formed
+	// TODO: remove [xChainID] parameter since this is provided on [ctx]
+	Verify(xChainID ids.ID, ctx *snow.Context, rules params.Rules) error
 	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(vm *VM, stx *Tx, parent *Block, baseFee *big.Int, rules params.Rules) error
 
