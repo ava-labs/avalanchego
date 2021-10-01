@@ -1294,6 +1294,8 @@ func (p *peer) discardIP() {
 		p.setIP(utils.IPDesc{})
 
 		p.net.stateLock.Lock()
+		// Make sure the IP isn't marked as connected or disconnected to allow
+		// future connection attempts if the IP is heard from a peerlist gossip
 		delete(p.net.disconnectedIPs, ip.String())
 		delete(p.net.connectedIPs, ip.String())
 		p.net.stateLock.Unlock()
