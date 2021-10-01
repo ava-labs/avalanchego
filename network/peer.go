@@ -1295,6 +1295,7 @@ func (p *peer) discardIP() {
 
 		p.net.stateLock.Lock()
 		delete(p.net.disconnectedIPs, ip.String())
+		delete(p.net.connectedIPs, ip.String())
 		p.net.stateLock.Unlock()
 	}
 	p.Close()
