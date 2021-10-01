@@ -1077,6 +1077,8 @@ func (cr *ChainRouter) Connected(validatorID ids.ShortID) {
 		return
 	}
 
+	// TODO: fire up an event when validator state changes i.e when they leave set, disconnect.
+	// we cannot put a subnet-only validator check here since Disconnected would not be handled properly.
 	for _, chain := range cr.chains {
 		chain.Connected(validatorID)
 	}
@@ -1092,6 +1094,8 @@ func (cr *ChainRouter) Disconnected(validatorID ids.ShortID) {
 		return
 	}
 
+	// TODO: fire up an event when validator state changes i.e when they leave set, disconnect.
+	// we cannot put a subnet-only validator check here since if a validator connects then it leaves validator-set, it would not be disconnected properly.
 	for _, chain := range cr.chains {
 		chain.Disconnected(validatorID)
 	}
