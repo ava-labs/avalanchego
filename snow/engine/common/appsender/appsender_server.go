@@ -47,6 +47,7 @@ func (s *Server) SendAppResponse(_ context.Context, req *appsenderproto.SendAppR
 }
 
 func (s *Server) SendAppGossip(_ context.Context, req *appsenderproto.SendAppGossipMsg) (*emptypb.Empty, error) {
+	// ASK: need to handle this for validator only subnet?
 	err := s.appSender.SendAppGossip(req.Msg)
 	return &emptypb.Empty{}, err
 }

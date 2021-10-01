@@ -824,7 +824,7 @@ func (n *network) SendAppGossip(subnetID, chainID ids.ID, appGossipBytes []byte,
 
 	n.stateLock.RLock()
 	// Gossip the message to [n.config.AppGossipNonValidatorSize] random nodes
-	// in the network. If this is a validator only subnet selects only validators.
+	// in the network. If this is a validator only subnet, selects only validators.
 	peersAll, err := n.peers.sample(subnetID, validatorOnly, int(n.config.AppGossipNonValidatorSize))
 	if err != nil {
 		n.log.Debug("failed to sample %d peers for AppGossip: %s", n.config.AppGossipNonValidatorSize, err)
