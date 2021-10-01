@@ -1293,8 +1293,13 @@ func (p *peer) discardIP() {
 	if ip := p.getIP(); !ip.IsZero() {
 		p.setIP(utils.IPDesc{})
 
+		ipStr := ip.String()
+
 		p.net.stateLock.Lock()
-		delete(p.net.disconnectedIPs, ip.String())
+		// Make sure the IP isn't marked as connected or disconnected to allow
+		// future connection attempts if the IP is heard from a peerlist gossip
+		delete(p.net.disconnectedIPs, ipStr)
+		delete(p.net.connectedIPs, ipStr)
 		p.net.stateLock.Unlock()
 	}
 	p.Close()
