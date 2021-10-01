@@ -338,9 +338,10 @@ func NewNetwork(
 	return netw, nil
 }
 
-// TODO: drop and find a better way to expose builder to sender
-func (n *network) GetMsgBuilder() message.Builder { return n.b }
-func (n *network) IsCompressionEnabled() bool     { return n.config.CompressionEnabled }
+// TODO: drop and find a better way to expose builder/parser to sender
+func (n *network) Parse(bytes []byte) (message.InboundMessage, error) { return n.c.Parse(bytes) }
+func (n *network) GetMsgBuilder() message.Builder                     { return n.b }
+func (n *network) IsCompressionEnabled() bool                         { return n.config.CompressionEnabled }
 
 // Accept is called after every consensus decision
 // Assumes [n.stateLock] is not held.

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/message"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
@@ -20,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 func TestShutdown(t *testing.T) {
@@ -325,6 +327,13 @@ func TestRouterClearTimeouts(t *testing.T) {
 		constants.GetAcceptedFrontierMsg,
 	}
 
+	// create messages builder
+	codec, err := message.NewCodec("", prometheus.NewRegistry(), 2*units.MiB)
+	if err != nil {
+		panic(err)
+	}
+	tesBuilder := message.NewBuilder(codec)
+
 	vID := ids.GenerateTestShortID()
 	for i, msg := range msgs {
 		chainRouter.RegisterRequest(vID, handler.ctx.ChainID, uint32(i), msg)
@@ -332,12 +341,63 @@ func TestRouterClearTimeouts(t *testing.T) {
 
 	// Clear each timeout by simulating responses to the queries
 	// Note: Depends on the ordering of [msgs]
-	chainRouter.Put(vID, handler.ctx.ChainID, 0, ids.GenerateTestID(), nil, nil)
-	chainRouter.MultiPut(vID, handler.ctx.ChainID, 1, nil, nil)
-	chainRouter.Chits(vID, handler.ctx.ChainID, 2, nil, nil)
-	chainRouter.Chits(vID, handler.ctx.ChainID, 3, nil, nil)
-	chainRouter.Accepted(vID, handler.ctx.ChainID, 4, nil, nil)
-	chainRouter.AcceptedFrontier(vID, handler.ctx.ChainID, 5, nil, nil)
+	var outMsg message.OutboundMessage
+	var inMsg message.InboundMessage
+
+	// Put
+	outMsg, err = tesBuilder.Put(handler.ctx.ChainID, 0, ids.GenerateTestID(), nil, true)
+	assert.NoError(t, err)
+
+	// TODO ABENEGIA: trick following OutboundMessage/InboundMessage. Find cleaner solution
+	inMsg, err = codec.Parse(outMsg.Bytes())
+	assert.NoError(t, err)
+	chainRouter.HandleInbound(constants.PutMsg, inMsg, vID, nil)
+
+	// MultiPut
+	outMsg, err = tesBuilder.MultiPut(handler.ctx.ChainID, 1, nil, true)
+	assert.NoError(t, err)
+
+	// TODO ABENEGIA: trick following OutboundMessage/InboundMessage. Find cleaner solution
+	inMsg, err = codec.Parse(outMsg.Bytes())
+	assert.NoError(t, err)
+	chainRouter.HandleInbound(constants.MultiPutMsg, inMsg, vID, nil)
+
+	// Chits # 1
+	outMsg, err = tesBuilder.Chits(handler.ctx.ChainID, 2, nil)
+	assert.NoError(t, err)
+
+	// TODO ABENEGIA: trick following OutboundMessage/InboundMessage. Find cleaner solution
+	inMsg, err = codec.Parse(outMsg.Bytes())
+	assert.NoError(t, err)
+	chainRouter.HandleInbound(constants.ChitsMsg, inMsg, vID, nil)
+
+	// Chits # 2
+	outMsg, err = tesBuilder.Chits(handler.ctx.ChainID, 3, nil)
+	assert.NoError(t, err)
+
+	// TODO ABENEGIA: trick following OutboundMessage/InboundMessage. Find cleaner solution
+	inMsg, err = codec.Parse(outMsg.Bytes())
+	assert.NoError(t, err)
+	chainRouter.HandleInbound(constants.ChitsMsg, inMsg, vID, nil)
+
+	// Accepted
+	outMsg, err = tesBuilder.Accepted(handler.ctx.ChainID, 4, nil)
+	assert.NoError(t, err)
+
+	// TODO ABENEGIA: trick following OutboundMessage/InboundMessage. Find cleaner solution
+	inMsg, err = codec.Parse(outMsg.Bytes())
+	assert.NoError(t, err)
+	chainRouter.HandleInbound(constants.AcceptedMsg, inMsg, vID, nil)
+
+	// Accepted Frontier
+	outMsg, err = tesBuilder.AcceptedFrontier(handler.ctx.ChainID, 5, nil)
+	assert.NoError(t, err)
+
+	// TODO ABENEGIA: trick following OutboundMessage/InboundMessage. Find cleaner solution
+	inMsg, err = codec.Parse(outMsg.Bytes())
+	assert.NoError(t, err)
+
+	chainRouter.HandleInbound(constants.AcceptedFrontierMsg, inMsg, vID, nil)
 
 	assert.Equal(t, chainRouter.timedRequests.Len(), 0)
 }

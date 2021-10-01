@@ -21,6 +21,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/dialer"
+	"github.com/ava-labs/avalanchego/network/message"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -233,21 +234,29 @@ func (h *testHandler) Disconnected(id ids.ShortID) {
 	}
 }
 
-func (h *testHandler) Put(
-	validatorID ids.ShortID,
-	chainID ids.ID,
-	requestID uint32,
-	containerID ids.ID,
-	container []byte,
+func (h *testHandler) HandleInbound(
+	msgType constants.MsgType,
+	msg message.InboundMessage,
+	nodeID ids.ShortID,
 	onFinishedHandling func(),
 ) {
-	if h.PutF != nil {
-		h.PutF(validatorID,
-			chainID,
-			requestID,
-			containerID,
-			container,
-			onFinishedHandling)
+	switch msgType {
+	case constants.PutMsg:
+		chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
+		requestID, _ := msg.Get(message.RequestID).(uint32)
+		containerID, _ := ids.ToID(msg.Get(message.ContainerID).([]byte))
+		container, _ := msg.Get(message.ContainerBytes).([]byte)
+
+		if h.PutF != nil {
+			h.PutF(nodeID,
+				chainID,
+				requestID,
+				containerID,
+				container,
+				onFinishedHandling)
+		}
+	default:
+		return
 	}
 }
 

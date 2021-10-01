@@ -12,6 +12,7 @@ import (
 // ExternalSender sends consensus messages to other validators
 // Right now this is implemented in the networking package
 type ExternalSender interface {
+	Parse(bytes []byte) (message.InboundMessage, error)
 	GetMsgBuilder() message.Builder // TODO ABENEGIA: remove once a better place for msg builder is found
 	IsCompressionEnabled() bool     // TODO ABENEGIA: remove once this config is duly propagated to sender and network
 

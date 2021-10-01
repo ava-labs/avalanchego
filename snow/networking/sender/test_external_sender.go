@@ -88,6 +88,9 @@ func (s *ExternalSenderTest) Default(cant bool) {
 }
 
 // TODO ABENEGIA: fix or remove these mocks
+func (s *ExternalSenderTest) Parse(bytes []byte) (message.InboundMessage, error) {
+	return s.c.Parse(bytes)
+}
 func (s *ExternalSenderTest) GetMsgBuilder() message.Builder { return s.b }
 func (s *ExternalSenderTest) IsCompressionEnabled() bool     { return false }
 

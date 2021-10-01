@@ -130,13 +130,6 @@ type peer struct {
 	// The time in [sigAndTime] is the one mentioned above.
 	sigAndTime utils.AtomicInterface
 
-	// Used in [handleAcceptedFrontier], [handleAccepted],
-	// [handleGetAccepted], [handleChits].
-	// We use this one ids.Set rather than allocating one per method call.
-	// Should be cleared before use.
-	// Should only be used in peer's reader goroutine.
-	idSet ids.Set
-
 	// trackedSubnets hold subnetIDs that this peer is interested in.
 	trackedSubnets ids.Set
 }
@@ -464,33 +457,47 @@ func (p *peer) handle(msg message.InboundMessage, msgLen float64, onFinishedHand
 
 	switch op { // Consensus and app-level messages
 	case message.GetAcceptedFrontier:
-		p.handleGetAcceptedFrontier(msg, onFinishedHandling)
+		p.net.router.HandleInbound(constants.GetAcceptedFrontierMsg,
+			msg, p.nodeID, onFinishedHandling)
 	case message.AcceptedFrontier:
-		p.handleAcceptedFrontier(msg, onFinishedHandling)
+		p.net.router.HandleInbound(constants.AcceptedFrontierMsg,
+			msg, p.nodeID, onFinishedHandling)
 	case message.GetAccepted:
-		p.handleGetAccepted(msg, onFinishedHandling)
+		p.net.router.HandleInbound(constants.GetAcceptedMsg,
+			msg, p.nodeID, onFinishedHandling)
 	case message.Accepted:
-		p.handleAccepted(msg, onFinishedHandling)
+		p.net.router.HandleInbound(constants.AcceptedMsg,
+			msg, p.nodeID, onFinishedHandling)
 	case message.Get:
-		p.handleGet(msg, onFinishedHandling)
+		p.net.router.HandleInbound(constants.GetMsg,
+			msg, p.nodeID, onFinishedHandling)
 	case message.GetAncestors:
-		p.handleGetAncestors(msg, onFinishedHandling)
+		p.net.router.HandleInbound(constants.GetAncestorsMsg,
+			msg, p.nodeID, onFinishedHandling)
 	case message.Put:
-		p.handlePut(msg, onFinishedHandling)
+		p.net.router.HandleInbound(constants.PutMsg,
+			msg, p.nodeID, onFinishedHandling)
 	case message.MultiPut:
-		p.handleMultiPut(msg, onFinishedHandling)
+		p.net.router.HandleInbound(constants.MultiPutMsg,
+			msg, p.nodeID, onFinishedHandling)
 	case message.PushQuery:
-		p.handlePushQuery(msg, onFinishedHandling)
+		p.net.router.HandleInbound(constants.PushQueryMsg,
+			msg, p.nodeID, onFinishedHandling)
 	case message.PullQuery:
-		p.handlePullQuery(msg, onFinishedHandling)
+		p.net.router.HandleInbound(constants.PullQueryMsg,
+			msg, p.nodeID, onFinishedHandling)
 	case message.Chits:
-		p.handleChits(msg, onFinishedHandling)
+		p.net.router.HandleInbound(constants.ChitsMsg,
+			msg, p.nodeID, onFinishedHandling)
 	case message.AppRequest:
-		p.handleAppRequest(msg, onFinishedHandling)
+		p.net.router.HandleInbound(constants.AppRequestMsg,
+			msg, p.nodeID, onFinishedHandling)
 	case message.AppResponse:
-		p.handleAppResponse(msg, onFinishedHandling)
+		p.net.router.HandleInbound(constants.AppResponseMsg,
+			msg, p.nodeID, onFinishedHandling)
 	case message.AppGossip:
-		p.handleAppGossip(msg, onFinishedHandling)
+		p.net.router.HandleInbound(constants.AppGossipMsg,
+			msg, p.nodeID, onFinishedHandling)
 	default:
 		p.net.log.Debug("dropping an unknown message from %s%s at %s with op %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), op)
 		onFinishedHandling()
@@ -931,351 +938,6 @@ func (p *peer) handlePong(_ message.InboundMessage) {
 		p.net.log.Debug("disconnecting from peer %s%s at %s version (%s) not compatible: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), peerVersion, err)
 		p.discardIP()
 	}
-}
-
-// assumes the [stateLock] is not held
-func (p *peer) handleGetAcceptedFrontier(msg message.InboundMessage, onFinishedHandling func()) {
-	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
-	p.net.log.AssertNoError(err)
-	requestID := msg.Get(message.RequestID).(uint32)
-	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(message.Deadline).(uint64)))
-
-	p.net.router.GetAcceptedFrontier(
-		p.nodeID,
-		chainID,
-		requestID,
-		deadline,
-		onFinishedHandling,
-	)
-}
-
-// assumes the [stateLock] is not held
-func (p *peer) handleAcceptedFrontier(msg message.InboundMessage, onFinishedHandling func()) {
-	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
-	p.net.log.AssertNoError(err)
-	requestID := msg.Get(message.RequestID).(uint32)
-
-	containerIDsBytes := msg.Get(message.ContainerIDs).([][]byte)
-	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	p.idSet.Clear()
-	for i, containerIDBytes := range containerIDsBytes {
-		containerID, err := ids.ToID(containerIDBytes)
-		if err != nil {
-			p.net.log.Debug(
-				"error parsing ContainerID from %s%s at %s. ID: 0x%x. Error: %s",
-				constants.NodeIDPrefix, p.nodeID, p.getIP(), containerIDBytes, err,
-			)
-			onFinishedHandling()
-			p.net.metrics.failedToParse.Inc()
-			return
-		}
-		if p.idSet.Contains(containerID) {
-			p.net.log.Debug(
-				"message from %s%s at %s contains duplicate of container ID %s",
-				constants.NodeIDPrefix, p.nodeID, p.getIP(), containerID,
-			)
-			onFinishedHandling()
-			p.net.metrics.failedToParse.Inc()
-			return
-		}
-		containerIDs[i] = containerID
-		p.idSet.Add(containerID)
-	}
-
-	p.net.router.AcceptedFrontier(
-		p.nodeID,
-		chainID,
-		requestID,
-		containerIDs,
-		onFinishedHandling,
-	)
-}
-
-// assumes the [stateLock] is not held
-func (p *peer) handleGetAccepted(msg message.InboundMessage, onFinishedHandling func()) {
-	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
-	p.net.log.AssertNoError(err)
-	requestID := msg.Get(message.RequestID).(uint32)
-	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(message.Deadline).(uint64)))
-
-	containerIDsBytes := msg.Get(message.ContainerIDs).([][]byte)
-	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	p.idSet.Clear()
-	for i, containerIDBytes := range containerIDsBytes {
-		containerID, err := ids.ToID(containerIDBytes)
-		if err != nil {
-			p.net.log.Debug(
-				"error parsing ContainerID from %s%s at %s. ID: 0x%x. Error: %s",
-				constants.NodeIDPrefix, p.nodeID, p.getIP(), containerIDBytes, err,
-			)
-			onFinishedHandling()
-			p.net.metrics.failedToParse.Inc()
-			return
-		}
-		if p.idSet.Contains(containerID) {
-			p.net.log.Debug(
-				"message from %s%s at %s contains duplicate of container ID %s",
-				constants.NodeIDPrefix, p.nodeID, p.getIP(), containerID,
-			)
-			onFinishedHandling()
-			p.net.metrics.failedToParse.Inc()
-			return
-		}
-		containerIDs[i] = containerID
-		p.idSet.Add(containerID)
-	}
-
-	p.net.router.GetAccepted(
-		p.nodeID,
-		chainID,
-		requestID,
-		deadline,
-		containerIDs,
-		onFinishedHandling,
-	)
-}
-
-// assumes the [stateLock] is not held
-func (p *peer) handleAccepted(msg message.InboundMessage, onFinishedHandling func()) {
-	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
-	p.net.log.AssertNoError(err)
-	requestID := msg.Get(message.RequestID).(uint32)
-
-	containerIDsBytes := msg.Get(message.ContainerIDs).([][]byte)
-	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	p.idSet.Clear()
-	for i, containerIDBytes := range containerIDsBytes {
-		containerID, err := ids.ToID(containerIDBytes)
-		if err != nil {
-			p.net.log.Debug(
-				"error parsing ContainerID from %s%s at %s. ID: 0x%x. Error: %s",
-				constants.NodeIDPrefix, p.nodeID, p.getIP(), containerIDBytes, err,
-			)
-			onFinishedHandling()
-			p.net.metrics.failedToParse.Inc()
-			return
-		}
-		if p.idSet.Contains(containerID) {
-			p.net.log.Debug(
-				"message from %s%s at %s contains duplicate of container ID %s",
-				constants.NodeIDPrefix, p.nodeID, p.getIP(), containerID,
-			)
-			onFinishedHandling()
-			p.net.metrics.failedToParse.Inc()
-			return
-		}
-		containerIDs[i] = containerID
-		p.idSet.Add(containerID)
-	}
-
-	p.net.router.Accepted(
-		p.nodeID,
-		chainID,
-		requestID,
-		containerIDs,
-		onFinishedHandling,
-	)
-}
-
-// assumes the [stateLock] is not held
-func (p *peer) handleGet(msg message.InboundMessage, onFinishedHandling func()) {
-	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
-	p.net.log.AssertNoError(err)
-	requestID := msg.Get(message.RequestID).(uint32)
-	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(message.Deadline).(uint64)))
-	containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
-	p.net.log.AssertNoError(err)
-
-	p.net.router.Get(
-		p.nodeID,
-		chainID,
-		requestID,
-		deadline,
-		containerID,
-		onFinishedHandling,
-	)
-}
-
-func (p *peer) handleGetAncestors(msg message.InboundMessage, onFinishedHandling func()) {
-	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
-	p.net.log.AssertNoError(err)
-	requestID := msg.Get(message.RequestID).(uint32)
-	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(message.Deadline).(uint64)))
-	containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
-	p.net.log.AssertNoError(err)
-
-	p.net.router.GetAncestors(
-		p.nodeID,
-		chainID,
-		requestID,
-		deadline,
-		containerID,
-		onFinishedHandling,
-	)
-}
-
-// assumes the [stateLock] is not held
-func (p *peer) handlePut(msg message.InboundMessage, onFinishedHandling func()) {
-	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
-	p.net.log.AssertNoError(err)
-	requestID := msg.Get(message.RequestID).(uint32)
-	containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
-	p.net.log.AssertNoError(err)
-	container := msg.Get(message.ContainerBytes).([]byte)
-
-	p.net.router.Put(
-		p.nodeID,
-		chainID,
-		requestID,
-		containerID,
-		container,
-		onFinishedHandling,
-	)
-}
-
-// assumes the [stateLock] is not held
-func (p *peer) handleMultiPut(msg message.InboundMessage, onFinishedHandling func()) {
-	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
-	p.net.log.AssertNoError(err)
-	requestID := msg.Get(message.RequestID).(uint32)
-	containers := msg.Get(message.MultiContainerBytes).([][]byte)
-
-	p.net.router.MultiPut(
-		p.nodeID,
-		chainID,
-		requestID,
-		containers,
-		onFinishedHandling,
-	)
-}
-
-func (p *peer) handlePushQuery(msg message.InboundMessage, onFinishedHandling func()) {
-	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
-	p.net.log.AssertNoError(err)
-	requestID := msg.Get(message.RequestID).(uint32)
-	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(message.Deadline).(uint64)))
-	containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
-	p.net.log.AssertNoError(err)
-	container := msg.Get(message.ContainerBytes).([]byte)
-
-	p.net.router.PushQuery(
-		p.nodeID,
-		chainID,
-		requestID,
-		deadline,
-		containerID,
-		container,
-		onFinishedHandling,
-	)
-}
-
-// assumes the [stateLock] is not held
-func (p *peer) handlePullQuery(msg message.InboundMessage, onFinishedHandling func()) {
-	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
-	p.net.log.AssertNoError(err)
-	requestID := msg.Get(message.RequestID).(uint32)
-	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(message.Deadline).(uint64)))
-	containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
-	p.net.log.AssertNoError(err)
-
-	p.net.router.PullQuery(
-		p.nodeID,
-		chainID,
-		requestID,
-		deadline,
-		containerID,
-		onFinishedHandling,
-	)
-}
-
-// assumes the [stateLock] is not held
-func (p *peer) handleChits(msg message.InboundMessage, onFinishedHandling func()) {
-	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
-	p.net.log.AssertNoError(err)
-	requestID := msg.Get(message.RequestID).(uint32)
-
-	containerIDsBytes := msg.Get(message.ContainerIDs).([][]byte)
-	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	p.idSet.Clear()
-	for i, containerIDBytes := range containerIDsBytes {
-		containerID, err := ids.ToID(containerIDBytes)
-		if err != nil {
-			p.net.log.Debug(
-				"error parsing ContainerID from %s%s at %s 0x%x: %s",
-				constants.NodeIDPrefix, p.nodeID, p.getIP(), containerIDBytes, err,
-			)
-			onFinishedHandling()
-			p.net.metrics.failedToParse.Inc()
-			return
-		}
-		if p.idSet.Contains(containerID) {
-			p.net.log.Debug(
-				"message from %s%s at %s contains duplicate of container ID %s",
-				constants.NodeIDPrefix, p.nodeID, p.getIP(), containerID,
-			)
-			onFinishedHandling()
-			p.net.metrics.failedToParse.Inc()
-			return
-		}
-		containerIDs[i] = containerID
-		p.idSet.Add(containerID)
-	}
-
-	p.net.router.Chits(
-		p.nodeID,
-		chainID,
-		requestID,
-		containerIDs,
-		onFinishedHandling,
-	)
-}
-
-// assumes the [stateLock] is not held
-func (p *peer) handleAppRequest(msg message.InboundMessage, onFinishedHandling func()) {
-	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
-	p.net.log.AssertNoError(err)
-	requestID := msg.Get(message.RequestID).(uint32)
-	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(message.Deadline).(uint64)))
-	request := msg.Get(message.AppRequestBytes).([]byte)
-
-	p.net.router.AppRequest(
-		p.nodeID,
-		chainID,
-		requestID,
-		deadline,
-		request,
-		onFinishedHandling,
-	)
-}
-
-// assumes the [stateLock] is not held
-func (p *peer) handleAppResponse(msg message.InboundMessage, onFinishedHandling func()) {
-	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
-	p.net.log.AssertNoError(err)
-	requestID := msg.Get(message.RequestID).(uint32)
-	response := msg.Get(message.AppResponseBytes).([]byte)
-
-	p.net.router.AppResponse(
-		p.nodeID,
-		chainID,
-		requestID,
-		response,
-		onFinishedHandling,
-	)
-}
-
-// assumes the [stateLock] is not held
-func (p *peer) handleAppGossip(msg message.InboundMessage, onFinishedHandling func()) {
-	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
-	p.net.log.AssertNoError(err)
-	gossipedMsg := msg.Get(message.AppGossipBytes).([]byte)
-
-	p.net.router.AppGossip(
-		p.nodeID,
-		chainID,
-		gossipedMsg,
-		onFinishedHandling,
-	)
 }
 
 // assumes the [stateLock] is held
