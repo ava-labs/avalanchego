@@ -81,7 +81,7 @@ func (p *peersData) size() int {
 // If [n] > [p.size()], returns <= [p.size()] peers.
 // [n] must be >= 0.
 // [p] must not be modified while this method is executing.
-func (p *peersData) filterSample(subnetID ids.ID, n int, filterFn func(*peer) bool) ([]*peer, error) {
+func (p *peersData) filter(subnetID ids.ID, validatorOnly bool, n int) ([]*peer, error) {
 	numPeers := p.size()
 	if numPeers < n {
 		n = numPeers
@@ -102,9 +102,10 @@ func (p *peersData) filterSample(subnetID ids.ID, n int, filterFn func(*peer) bo
 			return peers, nil
 		}
 		peer := p.peersList[idx]
-		if peer.finishedHandshake.GetValue() && peer.trackedSubnets.Contains(subnetID) && filterFn(peer) {
-			peers = append(peers, peer)
+		if !peer.finishedHandshake.GetValue() || !peer.trackedSubnets.Contains(subnetID) || (validatorOnly && !peer.net.config.Validators.Contains(subnetID, peer.nodeID)) {
+			continue
 		}
+		peers = append(peers, peer)
 	}
 	return peers, nil
 }

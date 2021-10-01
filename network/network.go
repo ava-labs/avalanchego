@@ -822,26 +822,10 @@ func (n *network) SendAppGossip(subnetID, chainID ids.ID, appGossipBytes []byte,
 		return
 	}
 
-	filterValidatorsFn := func(p *peer) bool {
-		return n.config.Validators.Contains(subnetID, p.nodeID)
-	}
-
-	var filterRandomFn func(p *peer) bool
-
-	if validatorOnly {
-		// this is a validator only subnet, so we don't do random peer sampling
-		filterRandomFn = filterValidatorsFn
-	} else {
-		filterRandomFn = func(p *peer) bool {
-			// don't filter with anything
-			return true
-		}
-	}
-
 	n.stateLock.RLock()
 	// Gossip the message to [n.config.AppGossipNonValidatorSize] random nodes
-	// in the network.
-	peersAll, err := n.peers.filterSample(subnetID, int(n.config.AppGossipNonValidatorSize), filterRandomFn)
+	// in the network. If this is a validator only subnet selects only validators.
+	peersAll, err := n.peers.filter(subnetID, validatorOnly, int(n.config.AppGossipNonValidatorSize))
 	if err != nil {
 		n.log.Debug("failed to sample %d peers for AppGossip: %s", n.config.AppGossipNonValidatorSize, err)
 		n.stateLock.RUnlock()
@@ -851,7 +835,7 @@ func (n *network) SendAppGossip(subnetID, chainID ids.ID, appGossipBytes []byte,
 	// Gossip the message to [n.config.AppGossipValidatorSize] random validators
 	// in the network. This does not gossip by stake - but uniformly to the
 	// validator set.
-	peersValidators, err := n.peers.filterSample(subnetID, int(n.config.AppGossipValidatorSize), filterValidatorsFn)
+	peersValidators, err := n.peers.filter(subnetID, true, int(n.config.AppGossipValidatorSize))
 	n.stateLock.RUnlock()
 	if err != nil {
 		n.log.Debug("failed to sample %d validators for AppGossip: %s", n.config.AppGossipValidatorSize, err)
@@ -1134,12 +1118,8 @@ func (n *network) gossipContainer(subnetID, chainID, containerID ids.ID, contain
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 	}
 
-	filterFn := func(p *peer) bool {
-		return !validatorOnly || n.config.Validators.Contains(subnetID, p.nodeID)
-	}
-
 	n.stateLock.RLock()
-	peers, err := n.peers.filterSample(subnetID, int(numToGossip), filterFn)
+	peers, err := n.peers.filter(subnetID, validatorOnly, int(numToGossip))
 	n.stateLock.RUnlock()
 	if err != nil {
 		return err
