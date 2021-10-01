@@ -46,10 +46,7 @@ var (
 	errNetworkLayerUnhealthy = errors.New("network layer is unhealthy")
 )
 
-var (
-	_ Network               = (*network)(nil)
-	_ sender.ExternalSender = (*network)(nil)
-)
+var _ Network = (*network)(nil)
 
 func init() { rand.Seed(time.Now().UnixNano()) }
 
@@ -97,9 +94,6 @@ type network struct {
 	config *Config
 	// The metrics that this network tracks
 	metrics metrics
-	// Define the parameters used to determine whether
-	// the networking layer is healthy
-	healthConfig HealthConfig
 	// Unix time at which last message of any type received over network
 	// Must only be accessed atomically
 	lastMsgReceivedTime int64
@@ -125,7 +119,6 @@ type network struct {
 	c           message.Codec
 	b           message.Builder
 	*msgsProcessor
-	*msgsGossiper
 
 	stateLock sync.RWMutex
 	closed    utils.AtomicBool
@@ -215,7 +208,8 @@ type DelayConfig struct {
 type GossipConfig struct {
 	GossipAcceptedFrontierSize uint `json:"gossipAcceptedFrontierSize"`
 	GossipOnAcceptSize         uint `json:"gossipOnAcceptSize"`
-	AppGossipSize              uint `json:"appGossipSize"`
+	AppGossipNonValidatorSize  uint `json:"appGossipNonValidatorSize"`
+	AppGossipValidatorSize     uint `json:"appGossipValidatorSize"`
 }
 
 type ThrottlerConfig struct {
@@ -335,7 +329,6 @@ func NewNetwork(
 	netw.c = codec
 	netw.b = message.NewBuilder(codec)
 	netw.msgsProcessor = newMsgsProcessor(netw)
-	netw.msgsGossiper = newMsgsGossiper(netw)
 
 	netw.peers.initialize()
 	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, config.MaxSendFailRateHalflife, netw.clock.Time()))
@@ -358,7 +351,6 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 	}
 
 	var (
-		msgType    = constants.GossipMsg
 		now        = n.clock.Time()
 		sampleSize = int(n.config.GossipOnAcceptSize)
 	)
@@ -370,7 +362,7 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 		n.sendFailRateCalculator.Observe(1, now)
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 	}
-	n.gossip(msgType, msg, ctx.SubnetID, sampleSize)
+	_ = n.gossipContainer(msg, ctx.SubnetID, sampleSize)
 	return nil
 }
 
@@ -1159,7 +1151,7 @@ func (n *network) HealthCheck() (interface{}, error) {
 	n.stateLock.RUnlock()
 
 	// Make sure we're connected to at least the minimum number of peers
-	healthy := connectedTo >= int(n.healthConfig.MinConnectedPeers)
+	healthy := connectedTo >= int(n.config.HealthConfig.MinConnectedPeers)
 	details := map[string]interface{}{
 		"connectedPeers": connectedTo,
 	}
@@ -1169,19 +1161,19 @@ func (n *network) HealthCheck() (interface{}, error) {
 
 	lastMsgReceivedAt := time.Unix(atomic.LoadInt64(&n.lastMsgReceivedTime), 0)
 	timeSinceLastMsgReceived := now.Sub(lastMsgReceivedAt)
-	healthy = healthy && timeSinceLastMsgReceived <= n.healthConfig.MaxTimeSinceMsgReceived
+	healthy = healthy && timeSinceLastMsgReceived <= n.config.HealthConfig.MaxTimeSinceMsgReceived
 	details["timeSinceLastMsgReceived"] = timeSinceLastMsgReceived.String()
 	n.metrics.timeSinceLastMsgReceived.Set(float64(timeSinceLastMsgReceived))
 
 	// Make sure we've sent an outgoing message within the threshold
 	lastMsgSentAt := time.Unix(atomic.LoadInt64(&n.lastMsgSentTime), 0)
 	timeSinceLastMsgSent := now.Sub(lastMsgSentAt)
-	healthy = healthy && timeSinceLastMsgSent <= n.healthConfig.MaxTimeSinceMsgSent
+	healthy = healthy && timeSinceLastMsgSent <= n.config.HealthConfig.MaxTimeSinceMsgSent
 	details["timeSinceLastMsgSent"] = timeSinceLastMsgSent.String()
 	n.metrics.timeSinceLastMsgSent.Set(float64(timeSinceLastMsgSent))
 
 	// Make sure the message send failed rate isn't too high
-	healthy = healthy && sendFailRate <= n.healthConfig.MaxSendFailRate
+	healthy = healthy && sendFailRate <= n.config.HealthConfig.MaxSendFailRate
 	details["sendFailRate"] = sendFailRate
 	n.metrics.sendFailRate.Set(sendFailRate)
 

@@ -69,21 +69,12 @@ func TestBuildVersion(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, Version, msg.Op())
-	assert.EqualValues(t, networkID, msg.Get(NetworkID))
-	assert.EqualValues(t, nodeID, msg.Get(NodeID))
-	assert.EqualValues(t, myTime, msg.Get(MyTime))
-	assert.EqualValues(t, ip, msg.Get(IP))
-	assert.EqualValues(t, myVersion, msg.Get(VersionStr))
-	assert.EqualValues(t, myVersionTime, msg.Get(VersionTime))
-	assert.EqualValues(t, sig, msg.Get(SigBytes))
-	assert.EqualValues(t, subnetIDs, msg.Get(TrackedSubnets))
 
 	parsedMsg, err := TestCodec.Parse(msg.Bytes())
 
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, Version, parsedMsg.Op())
-	assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
 	assert.EqualValues(t, networkID, parsedMsg.Get(NetworkID))
 	assert.EqualValues(t, nodeID, parsedMsg.Get(NodeID))
 	assert.EqualValues(t, myTime, parsedMsg.Get(MyTime))
@@ -104,7 +95,6 @@ func TestBuildGetPeerList(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, GetPeerList, parsedMsg.Op())
-	assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
 }
 
 func TestBuildGetAcceptedFrontier(t *testing.T) {
@@ -116,9 +106,6 @@ func TestBuildGetAcceptedFrontier(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, GetAcceptedFrontier, msg.Op())
-	assert.Equal(t, chainID[:], msg.Get(ChainID))
-	assert.Equal(t, requestID, msg.Get(RequestID))
-	assert.Equal(t, deadline, msg.Get(Deadline))
 
 	parsedMsg, err := TestCodec.Parse(msg.Bytes())
 	assert.NoError(t, err)
@@ -127,7 +114,6 @@ func TestBuildGetAcceptedFrontier(t *testing.T) {
 	assert.Equal(t, chainID[:], parsedMsg.Get(ChainID))
 	assert.Equal(t, requestID, parsedMsg.Get(RequestID))
 	assert.Equal(t, deadline, parsedMsg.Get(Deadline))
-	assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
 }
 
 func TestBuildAcceptedFrontier(t *testing.T) {
@@ -140,9 +126,6 @@ func TestBuildAcceptedFrontier(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, AcceptedFrontier, msg.Op())
-	assert.Equal(t, chainID[:], msg.Get(ChainID))
-	assert.Equal(t, requestID, msg.Get(RequestID))
-	assert.Equal(t, containerIDs, msg.Get(ContainerIDs))
 
 	parsedMsg, err := TestCodec.Parse(msg.Bytes())
 	assert.NoError(t, err)
@@ -151,7 +134,6 @@ func TestBuildAcceptedFrontier(t *testing.T) {
 	assert.Equal(t, chainID[:], parsedMsg.Get(ChainID))
 	assert.Equal(t, requestID, parsedMsg.Get(RequestID))
 	assert.Equal(t, containerIDs, parsedMsg.Get(ContainerIDs))
-	assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
 }
 
 func TestBuildGetAccepted(t *testing.T) {
@@ -165,10 +147,6 @@ func TestBuildGetAccepted(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, GetAccepted, msg.Op())
-	assert.Equal(t, chainID[:], msg.Get(ChainID))
-	assert.Equal(t, requestID, msg.Get(RequestID))
-	assert.Equal(t, deadline, msg.Get(Deadline))
-	assert.Equal(t, containerIDs, msg.Get(ContainerIDs))
 
 	parsedMsg, err := TestCodec.Parse(msg.Bytes())
 	assert.NoError(t, err)
@@ -178,7 +156,6 @@ func TestBuildGetAccepted(t *testing.T) {
 	assert.Equal(t, requestID, parsedMsg.Get(RequestID))
 	assert.Equal(t, deadline, parsedMsg.Get(Deadline))
 	assert.Equal(t, containerIDs, parsedMsg.Get(ContainerIDs))
-	assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
 }
 
 func TestBuildAccepted(t *testing.T) {
@@ -191,9 +168,6 @@ func TestBuildAccepted(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, Accepted, msg.Op())
-	assert.Equal(t, chainID[:], msg.Get(ChainID))
-	assert.Equal(t, requestID, msg.Get(RequestID))
-	assert.Equal(t, containerIDs, msg.Get(ContainerIDs))
 
 	parsedMsg, err := TestCodec.Parse(msg.Bytes())
 	assert.NoError(t, err)
@@ -202,7 +176,6 @@ func TestBuildAccepted(t *testing.T) {
 	assert.Equal(t, chainID[:], parsedMsg.Get(ChainID))
 	assert.Equal(t, requestID, parsedMsg.Get(RequestID))
 	assert.Equal(t, containerIDs, parsedMsg.Get(ContainerIDs))
-	assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
 }
 
 func TestBuildGet(t *testing.T) {
@@ -215,10 +188,6 @@ func TestBuildGet(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, Get, msg.Op())
-	assert.Equal(t, chainID[:], msg.Get(ChainID))
-	assert.Equal(t, requestID, msg.Get(RequestID))
-	assert.Equal(t, deadline, msg.Get(Deadline))
-	assert.Equal(t, containerID[:], msg.Get(ContainerID))
 
 	parsedMsg, err := TestCodec.Parse(msg.Bytes())
 	assert.NoError(t, err)
@@ -228,7 +197,6 @@ func TestBuildGet(t *testing.T) {
 	assert.Equal(t, requestID, parsedMsg.Get(RequestID))
 	assert.Equal(t, deadline, parsedMsg.Get(Deadline))
 	assert.Equal(t, containerID[:], parsedMsg.Get(ContainerID))
-	assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
 }
 
 func TestBuildPut(t *testing.T) {
@@ -242,10 +210,6 @@ func TestBuildPut(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, Put, msg.Op())
-		assert.Equal(t, chainID[:], msg.Get(ChainID))
-		assert.Equal(t, requestID, msg.Get(RequestID))
-		assert.Equal(t, containerID[:], msg.Get(ContainerID))
-		assert.Equal(t, container, msg.Get(ContainerBytes))
 
 		parsedMsg, err := TestCodec.Parse(msg.Bytes())
 		assert.NoError(t, err)
@@ -270,11 +234,6 @@ func TestBuildPushQuery(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, PushQuery, msg.Op())
-		assert.Equal(t, chainID[:], msg.Get(ChainID))
-		assert.Equal(t, requestID, msg.Get(RequestID))
-		assert.Equal(t, deadline, msg.Get(Deadline))
-		assert.Equal(t, containerID[:], msg.Get(ContainerID))
-		assert.Equal(t, container, msg.Get(ContainerBytes))
 
 		parsedMsg, err := TestCodec.Parse(msg.Bytes())
 		assert.NoError(t, err)
@@ -298,10 +257,6 @@ func TestBuildPullQuery(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, PullQuery, msg.Op())
-	assert.Equal(t, chainID[:], msg.Get(ChainID))
-	assert.Equal(t, requestID, msg.Get(RequestID))
-	assert.Equal(t, deadline, msg.Get(Deadline))
-	assert.Equal(t, containerID[:], msg.Get(ContainerID))
 
 	parsedMsg, err := TestCodec.Parse(msg.Bytes())
 	assert.NoError(t, err)
@@ -311,7 +266,6 @@ func TestBuildPullQuery(t *testing.T) {
 	assert.Equal(t, requestID, parsedMsg.Get(RequestID))
 	assert.Equal(t, deadline, parsedMsg.Get(Deadline))
 	assert.Equal(t, containerID[:], parsedMsg.Get(ContainerID))
-	assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
 }
 
 func TestBuildChits(t *testing.T) {
@@ -324,9 +278,6 @@ func TestBuildChits(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, Chits, msg.Op())
-	assert.Equal(t, chainID[:], msg.Get(ChainID))
-	assert.Equal(t, requestID, msg.Get(RequestID))
-	assert.Equal(t, containerIDs, msg.Get(ContainerIDs))
 
 	parsedMsg, err := TestCodec.Parse(msg.Bytes())
 	assert.NoError(t, err)
@@ -335,7 +286,6 @@ func TestBuildChits(t *testing.T) {
 	assert.Equal(t, chainID[:], parsedMsg.Get(ChainID))
 	assert.Equal(t, requestID, parsedMsg.Get(RequestID))
 	assert.Equal(t, containerIDs, parsedMsg.Get(ContainerIDs))
-	assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
 }
 
 func TestBuildMultiPut(t *testing.T) {
@@ -350,9 +300,6 @@ func TestBuildMultiPut(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, MultiPut, msg.Op())
-		assert.Equal(t, chainID[:], msg.Get(ChainID))
-		assert.Equal(t, requestID, msg.Get(RequestID))
-		assert.Equal(t, containers, msg.Get(MultiContainerBytes))
 
 		parsedMsg, err := TestCodec.Parse(msg.Bytes())
 		assert.NoError(t, err)
@@ -376,19 +323,11 @@ func TestBuildAppRequestMsg(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, AppRequest, msg.Op())
-		assert.Equal(t, deadline, msg.Get(Deadline))
-		assert.EqualValues(t, 1, msg.Get(RequestID))
-		assert.Equal(t, appRequestBytes, msg.Get(AppRequestBytes))
-		assert.Equal(t, chainID[:], msg.Get(ChainID))
 
-		msg, err = TestCodec.Parse(msg.Bytes())
+		parsedMsg, err := TestCodec.Parse(msg.Bytes())
 		assert.NoError(t, err)
-		assert.NotNil(t, msg)
-		assert.Equal(t, AppRequest, msg.Op())
-		assert.Equal(t, deadline, msg.Get(Deadline))
-		assert.EqualValues(t, 1, msg.Get(RequestID))
-		assert.Equal(t, appRequestBytes, msg.Get(AppRequestBytes))
-		assert.Equal(t, chainID[:], msg.Get(ChainID))
+		assert.NotNil(t, parsedMsg)
+		assert.Equal(t, AppRequest, parsedMsg.Op())
 	}
 }
 
@@ -403,17 +342,14 @@ func TestBuildAppResponseMsg(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, AppResponse, msg.Op())
-		assert.EqualValues(t, 1, msg.Get(RequestID))
-		assert.Equal(t, appResponseBytes, msg.Get(AppResponseBytes))
-		assert.Equal(t, chainID[:], msg.Get(ChainID))
 
-		msg, err = TestCodec.Parse(msg.Bytes())
+		parsedMsg, err := TestCodec.Parse(msg.Bytes())
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, AppResponse, msg.Op())
-		assert.EqualValues(t, 1, msg.Get(RequestID))
-		assert.Equal(t, appResponseBytes, msg.Get(AppResponseBytes))
-		assert.Equal(t, chainID[:], msg.Get(ChainID))
+		assert.EqualValues(t, 1, parsedMsg.Get(RequestID))
+		assert.Equal(t, appResponseBytes, parsedMsg.Get(AppResponseBytes))
+		assert.Equal(t, chainID[:], parsedMsg.Get(ChainID))
 	}
 }
 
@@ -428,14 +364,12 @@ func TestBuildAppGossipMsg(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, AppGossip, msg.Op())
-		assert.Equal(t, appGossipBytes, msg.Get(AppGossipBytes))
-		assert.Equal(t, chainID[:], msg.Get(ChainID))
 
-		msg, err = TestCodec.Parse(msg.Bytes())
+		parsedMsg, err := TestCodec.Parse(msg.Bytes())
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, AppGossip, msg.Op())
-		assert.Equal(t, appGossipBytes, msg.Get(AppGossipBytes))
-		assert.Equal(t, chainID[:], msg.Get(ChainID))
+		assert.Equal(t, appGossipBytes, parsedMsg.Get(AppGossipBytes))
+		assert.Equal(t, chainID[:], parsedMsg.Get(ChainID))
 	}
 }

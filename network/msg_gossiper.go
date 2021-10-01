@@ -6,100 +6,96 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-type msgGossiper struct {
-	meterSuccess func(msg message.Message)
-	meterFailure func(nodeID ids.ShortID, msg message.Message)
+// Assumes [n.stateLock] is not held.
+func (n *network) Gossip(msgType constants.MsgType, msg message.OutboundMessage, subnetID ids.ID) bool {
+	switch msgType {
+	case constants.AppGossipMsg:
+		return n.appGossip(msg, subnetID)
+	case constants.GossipMsg:
+		return n.gossipContainer(msg, subnetID, int(n.config.GossipOnAcceptSize))
+	default:
+		n.log.Error("Unhandled message type %v. Gossiping nothing.", msgType)
+		return false
+	}
 }
 
-type msgsGossiper struct {
-	n         *network
-	gossipers map[constants.MsgType]msgGossiper
-}
-
-func newMsgsGossiper(netw *network) *msgsGossiper {
-	res := &msgsGossiper{
-		n:         netw,
-		gossipers: make(map[constants.MsgType]msgGossiper),
+func (n *network) appGossip(msg message.OutboundMessage, subnetID ids.ID) bool {
+	now := n.clock.Time()
+	n.stateLock.RLock()
+	// Gossip the message to [n.config.AppGossipNonValidatorSize] random nodes
+	// in the network.
+	peersAll, err := n.peers.sample(subnetID, false, int(n.config.AppGossipNonValidatorSize))
+	if err != nil {
+		n.log.Debug("failed to sample %d peers for AppGossip: %s", n.config.AppGossipNonValidatorSize, err)
+		n.stateLock.RUnlock()
+		return false
 	}
 
-	// initialize msgs gossiper
+	// Gossip the message to [n.config.AppGossipValidatorSize] random validators
+	// in the network. This does not gossip by stake - but uniformly to the
+	// validator set.
+	peersValidators, err := n.peers.sample(subnetID, true, int(n.config.AppGossipValidatorSize))
+	n.stateLock.RUnlock()
+	if err != nil {
+		n.log.Debug("failed to sample %d validators for AppGossip: %s", n.config.AppGossipValidatorSize, err)
+		return false
+	}
 
-	// constants.AppGossipMsg
-	res.gossipers[constants.AppGossipMsg] = msgGossiper{
-		meterSuccess: func(msg message.Message) {
-			var (
-				now    = res.n.clock.Time()
-				msgLen = len(msg.Bytes())
-			)
-			res.n.metrics.appGossip.numSent.Inc()
-			res.n.metrics.appGossip.sentBytes.Add(float64(msgLen))
-			res.n.sendFailRateCalculator.Observe(0, now)
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				res.n.metrics.appGossip.savedSentBytes.Observe(float64(saved))
+	sentPeers := ids.ShortSet{}
+	for _, peers := range [][]*peer{peersAll, peersValidators} {
+		for _, peer := range peers {
+			if sentPeers.Contains(peer.nodeID) {
+				continue
 			}
-		},
-		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
-			now := res.n.clock.Time()
-			res.n.metrics.appGossip.numFailed.Inc()
-			res.n.sendFailRateCalculator.Observe(1, now)
-		},
-	}
+			sentPeers.Add(peer.nodeID)
 
-	// constants.GossipMsg
-	res.gossipers[constants.GossipMsg] = msgGossiper{
-		meterSuccess: func(msg message.Message) {
-			var (
-				now    = res.n.clock.Time()
-				msgLen = len(msg.Bytes())
-			)
-
-			res.n.metrics.put.numSent.Inc()
-			res.n.metrics.put.sentBytes.Add(float64(msgLen))
-			// assume that if [saved] == 0, [msg] wasn't compressed
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				res.n.metrics.put.savedSentBytes.Observe(float64(saved))
+			sent := peer.Send(msg, false)
+			if !sent {
+				n.log.Debug("failed to send AppGossip(%s)", peer.nodeID)
+				n.metrics.appGossip.numFailed.Inc()
+				n.sendFailRateCalculator.Observe(1, now)
+				continue
 			}
-			res.n.sendFailRateCalculator.Observe(0, now)
-		},
-		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
-			now := res.n.clock.Time()
-			res.n.sendFailRateCalculator.Observe(1, now)
-			res.n.metrics.put.numFailed.Inc()
-		},
-	}
 
-	return res
+			n.metrics.appGossip.numSent.Inc()
+			n.metrics.appGossip.sentBytes.Add(float64(len(msg.Bytes())))
+			n.sendFailRateCalculator.Observe(0, now)
+			if saved := msg.BytesSavedCompression(); saved != 0 {
+				n.metrics.appGossip.savedSentBytes.Observe(float64(saved))
+			}
+		}
+	}
+	return true
 }
 
 // Assumes [n.stateLock] is not held.
-func (mg *msgsGossiper) Gossip(msgType constants.MsgType, msg message.Message, subnetID ids.ID) bool {
-	sampleSize := int(mg.n.config.AppGossipSize)
-	return mg.gossip(msgType, msg, subnetID, sampleSize)
-}
+func (n *network) gossipContainer(msg message.OutboundMessage, subnetID ids.ID, sampleSize int) bool {
+	now := n.clock.Time()
 
-func (mg *msgsGossiper) gossip(msgType constants.MsgType, msg message.Message, subnetID ids.ID, sampleSize int) bool {
-	msgGos, ok := mg.gossipers[msgType]
-	if !ok {
-		mg.n.log.Error("Unhandled message type %v. Gossiping nothing.", msgType)
-		return false
-	}
-
-	mg.n.stateLock.RLock()
-	peers, err := mg.n.peers.sample(subnetID, sampleSize)
-	mg.n.stateLock.RUnlock()
+	n.stateLock.RLock()
+	peers, err := n.peers.sample(subnetID, false, sampleSize)
+	n.stateLock.RUnlock()
 	if err != nil {
-		mg.n.log.Debug("failed to sample %d peers for Gossip: %s", sampleSize, err)
 		return false
 	}
 
-	res := false // gossip succeeds if at least one Send is successful
+	res := false // gossip is successful if at least one node gets gossiped
 	for _, peer := range peers {
-		if sent := peer.Send(msg, false); !sent {
-			msgGos.meterFailure(peer.nodeID, msg)
+		sent := peer.Send(msg, false)
+		if !sent {
+			n.sendFailRateCalculator.Observe(1, now)
+			n.metrics.put.numFailed.Inc()
 			continue
 		}
-		msgGos.meterSuccess(msg)
+
 		res = true
+		n.metrics.put.numSent.Inc()
+		n.metrics.put.sentBytes.Add(float64(len(msg.Bytes())))
+		// assume that if [saved] == 0, [msg] wasn't compressed
+		if saved := msg.BytesSavedCompression(); saved != 0 {
+			n.metrics.put.savedSentBytes.Observe(float64(saved))
+		}
+		n.sendFailRateCalculator.Observe(0, now)
 	}
 	return res
 }

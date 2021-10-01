@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"path"
 	"path/filepath"
 	"testing"
 
@@ -109,11 +108,11 @@ func TestSetChainConfigs(t *testing.T) {
 			chainsDir := root
 			// Create custom configs
 			for key, value := range test.configs {
-				chainDir := path.Join(chainsDir, key)
+				chainDir := filepath.Join(chainsDir, key)
 				setupFile(t, chainDir, chainConfigFileName+".ex", value)
 			}
 			for key, value := range test.upgrades {
-				chainDir := path.Join(chainsDir, key)
+				chainDir := filepath.Join(chainsDir, key)
 				setupFile(t, chainDir, chainUpgradeFileName+".ex", value)
 			}
 
@@ -170,11 +169,11 @@ func TestSetChainConfigsDirNotExist(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			assert := assert.New(t)
 			root := t.TempDir()
-			chainConfigDir := path.Join(root, "cdir")
+			chainConfigDir := filepath.Join(root, "cdir")
 			configJSON := fmt.Sprintf(`{%q: %q}`, ChainConfigDirKey, chainConfigDir)
 			configFile := setupConfigJSON(t, root, configJSON)
 
-			dirToCreate := path.Join(root, test.structure)
+			dirToCreate := filepath.Join(root, test.structure)
 			assert.NoError(os.MkdirAll(dirToCreate, 0o700))
 
 			for key, value := range test.file {
@@ -203,13 +202,13 @@ func TestSetChainConfigDefaultDir(t *testing.T) {
 	assert := assert.New(t)
 	root := t.TempDir()
 	// changes internal package variable, since using defaultDir (under user home) is risky.
-	defaultChainConfigDir = path.Join(root, "cdir")
+	defaultChainConfigDir = filepath.Join(root, "cdir")
 	configFilePath := setupConfigJSON(t, root, "{}")
 
 	v := setupViper(configFilePath)
 	assert.Equal(defaultChainConfigDir, v.GetString(ChainConfigDirKey))
 
-	chainsDir := path.Join(defaultChainConfigDir, "C")
+	chainsDir := filepath.Join(defaultChainConfigDir, "C")
 	setupFile(t, chainsDir, chainConfigFileName+".ex", "helloworld")
 	chainConfigs, err := getChainConfigs(v)
 	assert.NoError(err)
@@ -247,7 +246,7 @@ func TestGetVMAliases(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			assert := assert.New(t)
 			root := t.TempDir()
-			aliasPath := path.Join(root, "aliases.json")
+			aliasPath := filepath.Join(root, "aliases.json")
 			configJSON := fmt.Sprintf(`{%q: %q}`, VMAliasesFileKey, aliasPath)
 			configFilePath := setupConfigJSON(t, root, configJSON)
 			setupFile(t, root, "aliases.json", test.givenJSON)
@@ -365,7 +364,7 @@ func TestGetSubnetConfigs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			assert := assert.New(t)
 			root := t.TempDir()
-			subnetPath := path.Join(root, "subnets")
+			subnetPath := filepath.Join(root, "subnets")
 			configJSON := fmt.Sprintf(`{%q: %q}`, SubnetConfigDirKey, subnetPath)
 			configFilePath := setupConfigJSON(t, root, configJSON)
 			subnetID, err := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
@@ -386,7 +385,7 @@ func TestGetSubnetConfigs(t *testing.T) {
 
 // setups config json file and writes content
 func setupConfigJSON(t *testing.T, rootPath string, value string) string {
-	configFilePath := path.Join(rootPath, "config.json")
+	configFilePath := filepath.Join(rootPath, "config.json")
 	assert.NoError(t, ioutil.WriteFile(configFilePath, []byte(value), 0o600))
 	return configFilePath
 }

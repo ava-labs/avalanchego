@@ -15,6 +15,6 @@ type ExternalSender interface {
 	GetMsgBuilder() message.Builder // TODO ABENEGIA: remove once a better place for msg builder is found
 	IsCompressionEnabled() bool     // TODO ABENEGIA: remove once this config is duly propagated to sender and network
 
-	Send(msgType constants.MsgType, msg message.Message, nodeIDs ids.ShortSet) ids.ShortSet
-	Gossip(msgType constants.MsgType, msg message.Message, subnetID ids.ID) bool
+	Send(msgType constants.MsgType, msg message.OutboundMessage, nodeIDs ids.ShortSet) ids.ShortSet
+	Gossip(msgType constants.MsgType, msg message.OutboundMessage, subnetID ids.ID) bool
 }

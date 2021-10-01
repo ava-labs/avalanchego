@@ -19,6 +19,7 @@ type ExternalSenderTest struct {
 	T *testing.T
 	B *testing.B
 
+	c message.Codec
 	b message.Builder
 
 	CantSendGetAcceptedFrontier, CantSendAcceptedFrontier,
@@ -82,6 +83,7 @@ func (s *ExternalSenderTest) Default(cant bool) {
 		int64(constants.DefaultMaxMessageSize),
 	)
 	assert.NoError(err)
+	s.c = codec
 	s.b = message.NewBuilder(codec)
 }
 
@@ -91,8 +93,13 @@ func (s *ExternalSenderTest) IsCompressionEnabled() bool     { return false }
 
 // TODO ABENEGIA: fix return type
 // TODO ABENEGIA: refactor with template pattern
-func (s *ExternalSenderTest) Send(msgType constants.MsgType, msg message.Message, nodeIDs ids.ShortSet) ids.ShortSet {
+func (s *ExternalSenderTest) Send(msgType constants.MsgType, outMsg message.OutboundMessage, nodeIDs ids.ShortSet) ids.ShortSet {
 	assert := assert.New(s.T)
+
+	// turn  message.OutboundMessage into  message.InboundMessage so be able to retrieve fields
+	inMsg, err := s.c.Parse(outMsg.Bytes())
+	assert.NoError(err)
+
 	res := ids.NewShortSet(nodeIDs.Len())
 	switch msgType {
 	case constants.GetAcceptedFrontierMsg:
@@ -101,11 +108,11 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, msg message.Message
 		// initialized, then testing will fail.
 		switch {
 		case s.SendGetAcceptedFrontierF != nil:
-			chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
+			chainID, err := ids.ToID(inMsg.Get(message.ChainID).([]byte))
 			assert.NoError(err)
-			reqID, ok := msg.Get(message.RequestID).(uint32)
+			reqID, ok := inMsg.Get(message.RequestID).(uint32)
 			assert.True(ok)
-			deadline := time.Duration(msg.Get(message.Deadline).(uint64))
+			deadline := time.Duration(inMsg.Get(message.Deadline).(uint64))
 			return s.SendGetAcceptedFrontierF(nodeIDs, chainID, reqID, deadline)
 		case s.CantSendGetAcceptedFrontier && s.T != nil:
 			s.T.Fatalf("Unexpectedly called GetAcceptedFrontier")
@@ -119,11 +126,11 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, msg message.Message
 		// initialized, then testing will fail.
 		switch {
 		case s.SendAcceptedFrontierF != nil:
-			chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
+			chainID, err := ids.ToID(inMsg.Get(message.ChainID).([]byte))
 			assert.NoError(err)
-			reqID, ok := msg.Get(message.RequestID).(uint32)
+			reqID, ok := inMsg.Get(message.RequestID).(uint32)
 			assert.True(ok)
-			containerIDsBytes := msg.Get(message.ContainerIDs).([][]byte)
+			containerIDsBytes := inMsg.Get(message.ContainerIDs).([][]byte)
 			containerIDs := make([]ids.ID, len(containerIDsBytes))
 			for _, containerIDBytes := range containerIDsBytes {
 				containerID, err := ids.ToID(containerIDBytes)
@@ -144,13 +151,13 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, msg message.Message
 		// initialized, then testing will fail.
 		switch {
 		case s.SendGetAcceptedF != nil:
-			chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
+			chainID, err := ids.ToID(inMsg.Get(message.ChainID).([]byte))
 			assert.NoError(err)
-			reqID, ok := msg.Get(message.RequestID).(uint32)
+			reqID, ok := inMsg.Get(message.RequestID).(uint32)
 			assert.True(ok)
-			deadline := time.Duration(msg.Get(message.Deadline).(uint64))
+			deadline := time.Duration(inMsg.Get(message.Deadline).(uint64))
 
-			containerIDsBytes := msg.Get(message.ContainerIDs).([][]byte)
+			containerIDsBytes := inMsg.Get(message.ContainerIDs).([][]byte)
 			containerIDs := make([]ids.ID, len(containerIDsBytes))
 			for _, containerIDBytes := range containerIDsBytes {
 				containerID, err := ids.ToID(containerIDBytes)
@@ -168,12 +175,12 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, msg message.Message
 	case constants.AcceptedMsg:
 		switch {
 		case s.SendAcceptedF != nil:
-			chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
+			chainID, err := ids.ToID(inMsg.Get(message.ChainID).([]byte))
 			assert.NoError(err)
-			reqID, ok := msg.Get(message.RequestID).(uint32)
+			reqID, ok := inMsg.Get(message.RequestID).(uint32)
 			assert.True(ok)
 
-			containerIDsBytes := msg.Get(message.ContainerIDs).([][]byte)
+			containerIDsBytes := inMsg.Get(message.ContainerIDs).([][]byte)
 			containerIDs := make([]ids.ID, len(containerIDsBytes))
 			for _, containerIDBytes := range containerIDsBytes {
 				containerID, err := ids.ToID(containerIDBytes)
@@ -194,12 +201,12 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, msg message.Message
 		// fail.
 		switch {
 		case s.SendGetAncestorsF != nil:
-			chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
+			chainID, err := ids.ToID(inMsg.Get(message.ChainID).([]byte))
 			assert.NoError(err)
-			reqID, ok := msg.Get(message.RequestID).(uint32)
+			reqID, ok := inMsg.Get(message.RequestID).(uint32)
 			assert.True(ok)
-			deadline := time.Duration(msg.Get(message.Deadline).(uint64))
-			containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
+			deadline := time.Duration(inMsg.Get(message.Deadline).(uint64))
+			containerID, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte))
 			assert.NoError(err)
 			s.SendGetAncestorsF(nodeIDs.List()[0], chainID, reqID, deadline, containerID)
 		case s.CantSendGetAncestors && s.T != nil:
@@ -214,11 +221,11 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, msg message.Message
 		// fail.
 		switch {
 		case s.SendMultiPutF != nil:
-			chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
+			chainID, err := ids.ToID(inMsg.Get(message.ChainID).([]byte))
 			assert.NoError(err)
-			reqID, ok := msg.Get(message.RequestID).(uint32)
+			reqID, ok := inMsg.Get(message.RequestID).(uint32)
 			assert.True(ok)
-			containers := msg.Get(message.MultiContainerBytes).([][]byte)
+			containers := inMsg.Get(message.MultiContainerBytes).([][]byte)
 			s.SendMultiPutF(nodeIDs.List()[0], chainID, reqID, containers)
 		case s.CantSendMultiPut && s.T != nil:
 			s.T.Fatalf("Unexpectedly called SendMultiPut")
@@ -232,12 +239,12 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, msg message.Message
 		// fail.
 		switch {
 		case s.SendGetF != nil:
-			chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
+			chainID, err := ids.ToID(inMsg.Get(message.ChainID).([]byte))
 			assert.NoError(err)
-			reqID, ok := msg.Get(message.RequestID).(uint32)
+			reqID, ok := inMsg.Get(message.RequestID).(uint32)
 			assert.True(ok)
-			deadline := time.Duration(msg.Get(message.Deadline).(uint64))
-			containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
+			deadline := time.Duration(inMsg.Get(message.Deadline).(uint64))
+			containerID, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte))
 			assert.NoError(err)
 			s.SendGetF(nodeIDs.List()[0], chainID, reqID, deadline, containerID)
 		case s.CantSendGet && s.T != nil:
@@ -252,12 +259,12 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, msg message.Message
 		// fail.
 		switch {
 		case s.SendPutF != nil:
-			chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
+			chainID, err := ids.ToID(inMsg.Get(message.ChainID).([]byte))
 			assert.NoError(err)
-			reqID, ok := msg.Get(message.RequestID).(uint32)
+			reqID, ok := inMsg.Get(message.RequestID).(uint32)
 			assert.True(ok)
-			containerID, _ := ids.ToID(msg.Get(message.ContainerID).([]byte))
-			container := msg.Get(message.ContainerBytes).([]byte)
+			containerID, _ := ids.ToID(inMsg.Get(message.ContainerID).([]byte))
+			container := inMsg.Get(message.ContainerBytes).([]byte)
 			s.SendPutF(nodeIDs.List()[0], chainID, reqID, containerID, container)
 		case s.CantSendPut && s.T != nil:
 			s.T.Fatalf("Unexpectedly called SendPut")
@@ -268,14 +275,14 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, msg message.Message
 	case constants.PushQueryMsg:
 		switch {
 		case s.SendPushQueryF != nil:
-			chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
+			chainID, err := ids.ToID(inMsg.Get(message.ChainID).([]byte))
 			assert.NoError(err)
-			reqID, ok := msg.Get(message.RequestID).(uint32)
+			reqID, ok := inMsg.Get(message.RequestID).(uint32)
 			assert.True(ok)
-			deadline := time.Duration(msg.Get(message.Deadline).(uint64))
-			containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
+			deadline := time.Duration(inMsg.Get(message.Deadline).(uint64))
+			containerID, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte))
 			assert.NoError(err)
-			container := msg.Get(message.ContainerBytes).([]byte)
+			container := inMsg.Get(message.ContainerBytes).([]byte)
 			return s.SendPushQueryF(nodeIDs, chainID, reqID, deadline, containerID, container)
 		case s.CantSendPushQuery && s.T != nil:
 			s.T.Fatalf("Unexpectedly called SendPushQuery")
@@ -289,12 +296,12 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, msg message.Message
 		// testing will fail.
 		switch {
 		case s.SendPullQueryF != nil:
-			chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
+			chainID, err := ids.ToID(inMsg.Get(message.ChainID).([]byte))
 			assert.NoError(err)
-			reqID, ok := msg.Get(message.RequestID).(uint32)
+			reqID, ok := inMsg.Get(message.RequestID).(uint32)
 			assert.True(ok)
-			deadline := time.Duration(msg.Get(message.Deadline).(uint64))
-			containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
+			deadline := time.Duration(inMsg.Get(message.Deadline).(uint64))
+			containerID, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte))
 			assert.NoError(err)
 			return s.SendPullQueryF(nodeIDs, chainID, reqID, deadline, containerID)
 		case s.CantSendPullQuery && s.T != nil:
@@ -309,12 +316,12 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, msg message.Message
 		// fail.
 		switch {
 		case s.SendChitsF != nil:
-			chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
+			chainID, err := ids.ToID(inMsg.Get(message.ChainID).([]byte))
 			assert.NoError(err)
-			reqID, ok := msg.Get(message.RequestID).(uint32)
+			reqID, ok := inMsg.Get(message.RequestID).(uint32)
 			assert.True(ok)
 
-			votesBytes := msg.Get(message.ContainerIDs).([][]byte)
+			votesBytes := inMsg.Get(message.ContainerIDs).([][]byte)
 			votes := make([]ids.ID, len(votesBytes))
 			for _, voteBytes := range votesBytes {
 				vote, err := ids.ToID(voteBytes)
@@ -334,12 +341,12 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, msg message.Message
 		// fail.
 		switch {
 		case s.SendAppRequestF != nil:
-			chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
+			chainID, err := ids.ToID(inMsg.Get(message.ChainID).([]byte))
 			assert.NoError(err)
-			reqID, ok := msg.Get(message.RequestID).(uint32)
+			reqID, ok := inMsg.Get(message.RequestID).(uint32)
 			assert.True(ok)
-			deadline := time.Duration(msg.Get(message.Deadline).(uint64))
-			appBytes := msg.Get(message.AppRequestBytes).([]byte)
+			deadline := time.Duration(inMsg.Get(message.Deadline).(uint64))
+			appBytes := inMsg.Get(message.AppRequestBytes).([]byte)
 			return s.SendAppRequestF(nodeIDs, chainID, reqID, deadline, appBytes)
 		case s.CantSendAppRequest && s.T != nil:
 			s.T.Fatalf("Unexpectedly called SendAppRequest")
@@ -352,11 +359,11 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, msg message.Message
 		// fail.
 		switch {
 		case s.SendAppResponseF != nil:
-			chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
+			chainID, err := ids.ToID(inMsg.Get(message.ChainID).([]byte))
 			assert.NoError(err)
-			reqID, ok := msg.Get(message.RequestID).(uint32)
+			reqID, ok := inMsg.Get(message.RequestID).(uint32)
 			assert.True(ok)
-			appBytes := msg.Get(message.AppResponseBytes).([]byte)
+			appBytes := inMsg.Get(message.AppResponseBytes).([]byte)
 			s.SendAppResponseF(nodeIDs.List()[0], chainID, reqID, appBytes)
 		case s.CantSendAppResponse && s.T != nil:
 			s.T.Fatalf("Unexpectedly called SendAppResponse")
@@ -370,8 +377,13 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, msg message.Message
 	return res
 }
 
-func (s *ExternalSenderTest) Gossip(msgType constants.MsgType, msg message.Message, subnetID ids.ID) bool {
+func (s *ExternalSenderTest) Gossip(msgType constants.MsgType, outMsg message.OutboundMessage, subnetID ids.ID) bool {
 	assert := assert.New(s.T)
+
+	// turn  message.OutboundMessage into  message.InboundMessage so be able to retrieve fields
+	inMsg, err := s.c.Parse(outMsg.Bytes())
+	assert.NoError(err)
+
 	switch msgType {
 	case constants.AppGossipMsg:
 		// SendAppGossip calls SendAppGossipF if it was initialized. If it wasn't initialized and this
@@ -379,9 +391,9 @@ func (s *ExternalSenderTest) Gossip(msgType constants.MsgType, msg message.Messa
 		// fail.
 		switch {
 		case s.SendAppGossipF != nil:
-			chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
+			chainID, err := ids.ToID(inMsg.Get(message.ChainID).([]byte))
 			assert.NoError(err)
-			appBytes, ok := msg.Get(message.AppGossipBytes).([]byte)
+			appBytes, ok := inMsg.Get(message.AppGossipBytes).([]byte)
 			assert.True(ok)
 			return s.SendAppGossipF(subnetID, chainID, appBytes)
 		case s.CantSendAppGossip && s.T != nil:
@@ -395,11 +407,11 @@ func (s *ExternalSenderTest) Gossip(msgType constants.MsgType, msg message.Messa
 		// fail.
 		switch {
 		case s.SendGossipF != nil:
-			chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
+			chainID, err := ids.ToID(inMsg.Get(message.ChainID).([]byte))
 			assert.NoError(err)
-			containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
+			containerID, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte))
 			assert.NoError(err)
-			container := msg.Get(message.ContainerBytes).([]byte)
+			container := inMsg.Get(message.ContainerBytes).([]byte)
 			return s.SendGossipF(subnetID, chainID, containerID, container)
 		case s.CantSendGossip && s.T != nil:
 			s.T.Fatalf("Unexpectedly called SendGossip")

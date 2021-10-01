@@ -8,8 +8,8 @@ import (
 
 type msgProcessor struct {
 	canModifyMsg bool
-	meterSuccess func(msg message.Message)
-	meterFailure func(nodeID ids.ShortID, msg message.Message)
+	meterSuccess func(msg message.OutboundMessage)
+	meterFailure func(nodeID ids.ShortID, msg message.OutboundMessage)
 }
 
 type msgsProcessor struct {
@@ -28,7 +28,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 	// constants.GetAcceptedFrontierMsg
 	res.processors[constants.GetAcceptedFrontierMsg] = msgProcessor{
 		canModifyMsg: false,
-		meterSuccess: func(msg message.Message) {
+		meterSuccess: func(msg message.OutboundMessage) {
 			var (
 				now    = res.n.clock.Time()
 				msgLen = len(msg.Bytes())
@@ -42,7 +42,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 				res.n.metrics.getAcceptedFrontier.savedSentBytes.Observe(float64(saved))
 			}
 		},
-		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
+		meterFailure: func(nodeID ids.ShortID, msg message.OutboundMessage) {
 			now := res.n.clock.Time()
 			res.n.metrics.getAcceptedFrontier.numFailed.Inc()
 			res.n.sendFailRateCalculator.Observe(1, now)
@@ -52,7 +52,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 	// constants.AcceptedFrontierMsg
 	res.processors[constants.AcceptedFrontierMsg] = msgProcessor{
 		canModifyMsg: true,
-		meterSuccess: func(msg message.Message) {
+		meterSuccess: func(msg message.OutboundMessage) {
 			var (
 				now    = res.n.clock.Time()
 				msgLen = len(msg.Bytes())
@@ -65,7 +65,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 				res.n.metrics.acceptedFrontier.savedSentBytes.Observe(float64(saved))
 			}
 		},
-		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
+		meterFailure: func(nodeID ids.ShortID, msg message.OutboundMessage) {
 			now := res.n.clock.Time()
 			res.n.metrics.acceptedFrontier.numFailed.Inc()
 			res.n.sendFailRateCalculator.Observe(1, now)
@@ -74,7 +74,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 	// constants.GetAcceptedMsg
 	res.processors[constants.GetAcceptedMsg] = msgProcessor{
 		canModifyMsg: false,
-		meterSuccess: func(msg message.Message) {
+		meterSuccess: func(msg message.OutboundMessage) {
 			var (
 				now    = res.n.clock.Time()
 				msgLen = len(msg.Bytes())
@@ -88,7 +88,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 				res.n.metrics.getAccepted.savedSentBytes.Observe(float64(saved))
 			}
 		},
-		meterFailure: func(vID ids.ShortID, msg message.Message) {
+		meterFailure: func(vID ids.ShortID, msg message.OutboundMessage) {
 			now := res.n.clock.Time()
 			res.n.metrics.getAccepted.numFailed.Inc()
 			res.n.sendFailRateCalculator.Observe(1, now)
@@ -98,7 +98,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 	// constants.AcceptedMsg
 	res.processors[constants.AcceptedMsg] = msgProcessor{
 		canModifyMsg: true,
-		meterSuccess: func(msg message.Message) {
+		meterSuccess: func(msg message.OutboundMessage) {
 			var (
 				now    = res.n.clock.Time()
 				msgLen = len(msg.Bytes())
@@ -112,7 +112,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 				res.n.metrics.accepted.savedSentBytes.Observe(float64(saved))
 			}
 		},
-		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
+		meterFailure: func(nodeID ids.ShortID, msg message.OutboundMessage) {
 			now := res.n.clock.Time()
 			res.n.metrics.accepted.numFailed.Inc()
 			res.n.sendFailRateCalculator.Observe(1, now)
@@ -122,7 +122,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 	// constants.GetAncestorsMsg
 	res.processors[constants.GetAncestorsMsg] = msgProcessor{
 		canModifyMsg: true,
-		meterSuccess: func(msg message.Message) {
+		meterSuccess: func(msg message.OutboundMessage) {
 			var (
 				now    = res.n.clock.Time()
 				msgLen = len(msg.Bytes())
@@ -136,7 +136,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 				res.n.metrics.getAncestors.savedSentBytes.Observe(float64(saved))
 			}
 		},
-		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
+		meterFailure: func(nodeID ids.ShortID, msg message.OutboundMessage) {
 			now := res.n.clock.Time()
 			res.n.metrics.getAncestors.numFailed.Inc()
 			res.n.sendFailRateCalculator.Observe(1, now)
@@ -146,7 +146,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 	// constants.MultiPutMsg
 	res.processors[constants.MultiPutMsg] = msgProcessor{
 		canModifyMsg: true,
-		meterSuccess: func(msg message.Message) {
+		meterSuccess: func(msg message.OutboundMessage) {
 			var (
 				now    = res.n.clock.Time()
 				msgLen = len(msg.Bytes())
@@ -160,7 +160,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 				res.n.metrics.multiPut.savedSentBytes.Observe(float64(saved))
 			}
 		},
-		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
+		meterFailure: func(nodeID ids.ShortID, msg message.OutboundMessage) {
 			now := res.n.clock.Time()
 			res.n.metrics.multiPut.numFailed.Inc()
 			res.n.sendFailRateCalculator.Observe(1, now)
@@ -170,7 +170,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 	// constants.GetMsg
 	res.processors[constants.GetMsg] = msgProcessor{
 		canModifyMsg: true,
-		meterSuccess: func(msg message.Message) {
+		meterSuccess: func(msg message.OutboundMessage) {
 			var (
 				now    = res.n.clock.Time()
 				msgLen = len(msg.Bytes())
@@ -184,7 +184,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 				res.n.metrics.get.savedSentBytes.Observe(float64(saved))
 			}
 		},
-		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
+		meterFailure: func(nodeID ids.ShortID, msg message.OutboundMessage) {
 			now := res.n.clock.Time()
 			res.n.metrics.get.numFailed.Inc()
 			res.n.sendFailRateCalculator.Observe(1, now)
@@ -194,7 +194,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 	// constants.PutMsg
 	res.processors[constants.PutMsg] = msgProcessor{
 		canModifyMsg: true,
-		meterSuccess: func(msg message.Message) {
+		meterSuccess: func(msg message.OutboundMessage) {
 			var (
 				now    = res.n.clock.Time()
 				msgLen = len(msg.Bytes())
@@ -208,7 +208,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 				res.n.metrics.put.savedSentBytes.Observe(float64(saved))
 			}
 		},
-		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
+		meterFailure: func(nodeID ids.ShortID, msg message.OutboundMessage) {
 			now := res.n.clock.Time()
 			res.n.metrics.put.numFailed.Inc()
 			res.n.sendFailRateCalculator.Observe(1, now)
@@ -218,7 +218,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 	// constants.PushQueryMsg
 	res.processors[constants.PushQueryMsg] = msgProcessor{
 		canModifyMsg: false,
-		meterSuccess: func(msg message.Message) {
+		meterSuccess: func(msg message.OutboundMessage) {
 			var (
 				now    = res.n.clock.Time()
 				msgLen = len(msg.Bytes())
@@ -232,7 +232,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 				res.n.metrics.pushQuery.savedSentBytes.Observe(float64(saved))
 			}
 		},
-		meterFailure: func(vID ids.ShortID, msg message.Message) {
+		meterFailure: func(vID ids.ShortID, msg message.OutboundMessage) {
 			now := res.n.clock.Time()
 			res.n.metrics.pushQuery.numFailed.Inc()
 			res.n.sendFailRateCalculator.Observe(1, now)
@@ -242,7 +242,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 	// constants.PullQueryMsg
 	res.processors[constants.PullQueryMsg] = msgProcessor{
 		canModifyMsg: false,
-		meterSuccess: func(msg message.Message) {
+		meterSuccess: func(msg message.OutboundMessage) {
 			var (
 				now    = res.n.clock.Time()
 				msgLen = len(msg.Bytes())
@@ -256,7 +256,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 				res.n.metrics.pullQuery.savedSentBytes.Observe(float64(saved))
 			}
 		},
-		meterFailure: func(vID ids.ShortID, msg message.Message) {
+		meterFailure: func(vID ids.ShortID, msg message.OutboundMessage) {
 			now := res.n.clock.Time()
 			res.n.metrics.pullQuery.numFailed.Inc()
 			res.n.sendFailRateCalculator.Observe(1, now)
@@ -266,7 +266,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 	// constants.ChitsMsg
 	res.processors[constants.ChitsMsg] = msgProcessor{
 		canModifyMsg: true,
-		meterSuccess: func(msg message.Message) {
+		meterSuccess: func(msg message.OutboundMessage) {
 			var (
 				now    = res.n.clock.Time()
 				msgLen = len(msg.Bytes())
@@ -280,7 +280,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 				res.n.metrics.chits.savedSentBytes.Observe(float64(saved))
 			}
 		},
-		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
+		meterFailure: func(nodeID ids.ShortID, msg message.OutboundMessage) {
 			now := res.n.clock.Time()
 			res.n.metrics.chits.numFailed.Inc()
 			res.n.sendFailRateCalculator.Observe(1, now)
@@ -290,7 +290,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 	// constants.AppRequestMsg
 	res.processors[constants.AppRequestMsg] = msgProcessor{
 		canModifyMsg: false,
-		meterSuccess: func(msg message.Message) {
+		meterSuccess: func(msg message.OutboundMessage) {
 			var (
 				now    = res.n.clock.Time()
 				msgLen = len(msg.Bytes())
@@ -303,7 +303,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 				res.n.metrics.appRequest.savedSentBytes.Observe(float64(saved))
 			}
 		},
-		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
+		meterFailure: func(nodeID ids.ShortID, msg message.OutboundMessage) {
 			now := res.n.clock.Time()
 			res.n.metrics.appRequest.numFailed.Inc()
 			res.n.sendFailRateCalculator.Observe(1, now)
@@ -313,7 +313,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 	// constants.AppResponseMsg
 	res.processors[constants.AppResponseMsg] = msgProcessor{
 		canModifyMsg: true,
-		meterSuccess: func(msg message.Message) {
+		meterSuccess: func(msg message.OutboundMessage) {
 			var (
 				now    = res.n.clock.Time()
 				msgLen = len(msg.Bytes())
@@ -326,7 +326,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 				res.n.metrics.appResponse.savedSentBytes.Observe(float64(saved))
 			}
 		},
-		meterFailure: func(nodeID ids.ShortID, msg message.Message) {
+		meterFailure: func(nodeID ids.ShortID, msg message.OutboundMessage) {
 			now := res.n.clock.Time()
 			res.n.metrics.appResponse.numFailed.Inc()
 			res.n.sendFailRateCalculator.Observe(1, now)
@@ -337,7 +337,7 @@ func newMsgsProcessor(netw *network) *msgsProcessor {
 }
 
 // Assumes [n.stateLock] is not held.
-func (mp *msgsProcessor) Send(msgType constants.MsgType, msg message.Message, nodeIDs ids.ShortSet) ids.ShortSet {
+func (mp *msgsProcessor) Send(msgType constants.MsgType, msg message.OutboundMessage, nodeIDs ids.ShortSet) ids.ShortSet {
 	res := ids.NewShortSet(nodeIDs.Len())
 	msgProc, ok := mp.processors[msgType]
 	if ok {

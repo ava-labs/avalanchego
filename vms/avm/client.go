@@ -411,13 +411,6 @@ func (c *Client) MintNFT(
 	return res.TxID, err
 }
 
-// ImportAVAX sends an import transaction to import funds from [sourceChain] and
-// returns the ID of the newly created transaction
-// This is a deprecated name for Import
-func (c *Client) ImportAVAX(user api.UserPass, to, sourceChain string) (ids.ID, error) {
-	return c.Import(user, to, sourceChain)
-}
-
 // Import sends an import transaction to import funds from [sourceChain] and
 // returns the ID of the newly created transaction
 func (c *Client) Import(user api.UserPass, to, sourceChain string) (ids.ID, error) {
@@ -428,18 +421,6 @@ func (c *Client) Import(user api.UserPass, to, sourceChain string) (ids.ID, erro
 		SourceChain: sourceChain,
 	}, res)
 	return res.TxID, err
-}
-
-// ExportAVAX sends AVAX from this chain to the address specified by [to].
-// Returns the ID of the newly created atomic transaction
-func (c *Client) ExportAVAX(
-	user api.UserPass,
-	from []string,
-	changeAddr string,
-	amount uint64,
-	to string,
-) (ids.ID, error) {
-	return c.Export(user, from, changeAddr, amount, to, "AVAX")
 }
 
 // Export sends an asset from this chain to the P/C-Chain.
@@ -455,15 +436,13 @@ func (c *Client) Export(
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest("export", &ExportArgs{
-		ExportAVAXArgs: ExportAVAXArgs{
-			JSONSpendHeader: api.JSONSpendHeader{
-				UserPass:       user,
-				JSONFromAddrs:  api.JSONFromAddrs{From: from},
-				JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
-			},
-			Amount: cjson.Uint64(amount),
-			To:     to,
+		JSONSpendHeader: api.JSONSpendHeader{
+			UserPass:       user,
+			JSONFromAddrs:  api.JSONFromAddrs{From: from},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
 		},
+		Amount:  cjson.Uint64(amount),
+		To:      to,
 		AssetID: assetID,
 	}, res)
 	return res.TxID, err
