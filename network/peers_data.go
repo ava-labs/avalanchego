@@ -81,7 +81,7 @@ func (p *peersData) size() int {
 // If [n] > [p.size()], returns <= [p.size()] peers.
 // [n] must be >= 0.
 // [p] must not be modified while this method is executing.
-func (p *peersData) filter(subnetID ids.ID, validatorOnly bool, n int) ([]*peer, error) {
+func (p *peersData) sample(subnetID ids.ID, validatorOnly bool, n int) ([]*peer, error) {
 	numPeers := p.size()
 	if numPeers < n {
 		n = numPeers
