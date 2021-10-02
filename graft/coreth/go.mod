@@ -4,8 +4,8 @@ go 1.16
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.6.0
-	github.com/ava-labs/avalanchego v1.6.0
-	github.com/btcsuite/btcd v0.20.1-beta
+	github.com/ava-labs/avalanchego v1.6.1
+	github.com/btcsuite/btcd v0.21.0-beta // indirect
 	github.com/cespare/cp v0.1.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
