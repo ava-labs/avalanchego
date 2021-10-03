@@ -102,6 +102,20 @@ func (m *Mempool) AddTx(tx *Tx) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
+	return m.addTx(tx, false)
+}
+
+// forceAddTx forcibly adds a *Tx to the mempool and bypasses all verification.
+func (m *Mempool) ForceAddTx(tx *Tx) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	return m.addTx(tx, true)
+}
+
+// addTx adds [tx] to the mempool. Assumes [m.lock] is held.
+// If [force], skips conflict checks within the mempool.
+func (m *Mempool) addTx(tx *Tx, force bool) error {
 	txID := tx.ID()
 	// If [txID] has already been issued or is the currentTx
 	// there's no need to add it.
@@ -118,7 +132,7 @@ func (m *Mempool) AddTx(tx *Tx) error {
 	// Check if the submitted transaction's UTXOs conflict with what is already
 	// in the mempool
 	utxoSet := tx.InputUTXOs()
-	if overlaps := m.utxoSet.Overlaps(utxoSet); overlaps {
+	if overlaps := m.utxoSet.Overlaps(utxoSet); overlaps && !force {
 		return errConflictingAtomicTx
 	}
 

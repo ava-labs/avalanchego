@@ -17,19 +17,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// forceAddTx forcibly adds a *Tx to the mempool and bypasses all verification.
-func (m *Mempool) forceAddTx(tx *Tx) error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	gasPrice, err := m.atomicTxGasPrice(tx)
-	if err != nil {
-		return err
-	}
-	m.txHeap.Push(tx, gasPrice)
-	m.addPending()
-	return nil
-}
-
 // shows that a locally generated AtomicTx can be added to mempool and then
 // removed by inclusion in a block
 func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
