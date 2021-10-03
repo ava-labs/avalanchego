@@ -33,11 +33,15 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 			mempool := vm.mempool
 
 			// generate a valid and conflicting tx
-			var tx, conflictingTx *Tx
+			var (
+				tx, conflictingTx *Tx
+			)
 			if name == "import" {
-				tx, conflictingTx = getValidImportTx(vm, sharedMemory, t)
+				importTxs := createImportTxOptions(t, vm, sharedMemory)
+				tx, conflictingTx = importTxs[0], importTxs[1]
 			} else {
-				tx, conflictingTx = getValidExportTx(vm, issuer, sharedMemory, t)
+				exportTxs := createExportTxOptions(t, vm, issuer, sharedMemory)
+				tx, conflictingTx = exportTxs[0], exportTxs[1]
 			}
 			txID := tx.ID()
 			conflictingTxID := conflictingTx.ID()
@@ -99,7 +103,7 @@ func TestMempoolMaxMempoolSizeHandling(t *testing.T) {
 	mempool := vm.mempool
 
 	// create candidate tx (we will drop before validation)
-	tx, _ := getValidImportTx(vm, sharedMemory, t)
+	tx := createImportTxOptions(t, vm, sharedMemory)[0]
 
 	// shortcut to simulated almost filled mempool
 	mempool.maxSize = 0

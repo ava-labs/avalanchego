@@ -1150,14 +1150,7 @@ func TestBonusBlocksTxs(t *testing.T) {
 	}()
 
 	importAmount := uint64(10000000)
-	utxoID := avax.UTXOID{
-		TxID: ids.ID{
-			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
-			0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
-			0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
-			0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
-		},
-	}
+	utxoID := avax.UTXOID{TxID: ids.GenerateTestID()}
 
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,
@@ -2746,10 +2739,7 @@ func TestReissueAtomicTx(t *testing.T) {
 }
 
 func TestAtomicTxFailsEVMStateTransferBuildBlock(t *testing.T) {
-	importAmount := uint64(1000000000)
-	issuer, vm, _, _, _ := GenesisVMWithUTXOs(t, true, genesisJSONApricotPhase1, "", "", map[ids.ShortID]uint64{
-		testShortIDAddrs[0]: importAmount,
-	})
+	issuer, vm, _, sharedMemory, _ := GenesisVM(t, true, genesisJSONApricotPhase1, "", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -2757,56 +2747,8 @@ func TestAtomicTxFailsEVMStateTransferBuildBlock(t *testing.T) {
 		}
 	}()
 
-	importTx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := vm.issueTx(importTx, true /*=local*/); err != nil {
-		t.Fatal(err)
-	}
-
-	<-issuer
-
-	blk, err := vm.BuildBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := blk.Verify(); err != nil {
-		t.Fatal(err)
-	}
-
-	if status := blk.Status(); status != choices.Processing {
-		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
-	}
-
-	if err := vm.SetPreference(blk.ID()); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := blk.Accept(); err != nil {
-		t.Fatal(err)
-	}
-
-	if status := blk.Status(); status != choices.Accepted {
-		t.Fatalf("Expected status of accepted block to be %s, but found %s", choices.Accepted, status)
-	}
-
-	if lastAcceptedID, err := vm.LastAccepted(); err != nil {
-		t.Fatal(err)
-	} else if lastAcceptedID != blk.ID() {
-		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk.ID(), lastAcceptedID)
-	}
-
-	exportTx1, err := vm.newExportTx(vm.ctx.AVAXAssetID, importAmount-2*params.AvalancheAtomicTxFee, vm.ctx.XChainID, testShortIDAddrs[0], initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
-	if err != nil {
-		t.Fatal(err)
-	}
-	exportTx2, err := vm.newExportTx(vm.ctx.AVAXAssetID, importAmount-2*params.AvalancheAtomicTxFee, vm.ctx.XChainID, testShortIDAddrs[1], initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
-	if err != nil {
-		t.Fatal(err)
-	}
+	exportTxs := createExportTxOptions(t, vm, issuer, sharedMemory)
+	exportTx1, exportTx2 := exportTxs[0], exportTxs[1]
 
 	if err := vm.issueTx(exportTx1, true /*=local*/); err != nil {
 		t.Fatal(err)
@@ -3001,14 +2943,7 @@ func TestBuildApricotPhase4Block(t *testing.T) {
 	}
 
 	importAmount := uint64(1000000000)
-	utxoID := avax.UTXOID{
-		TxID: ids.ID{
-			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
-			0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
-			0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
-			0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
-		},
-	}
+	utxoID := avax.UTXOID{TxID: ids.GenerateTestID()}
 
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,
@@ -3176,10 +3111,7 @@ func TestBuildApricotPhase4Block(t *testing.T) {
 // in onFinalizeAndAssemble it will not cause a panic due to calling RevertToSnapshot(revID) on the
 // same revision ID twice.
 func TestConsecutiveAtomicTransactionsRevertSnapshot(t *testing.T) {
-	issuer, vm, _, _, _ := GenesisVMWithUTXOs(t, true, genesisJSONApricotPhase1, "", "",
-		map[ids.ShortID]uint64{
-			testKeys[0].PublicKey().Address(): uint64(1000000000),
-		})
+	issuer, vm, _, sharedMemory, _ := GenesisVM(t, true, genesisJSONApricotPhase1, "", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -3191,15 +3123,9 @@ func TestConsecutiveAtomicTransactionsRevertSnapshot(t *testing.T) {
 	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
 
 	// Create three conflicting import transactions
-	importTxs := make([]*Tx, 0, 3)
-	for i := 0; i < 3; i++ {
-		importTx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[i], initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
-		if err != nil {
-			t.Fatal(err)
-		}
-		importTxs = append(importTxs, importTx)
-	}
+	importTxs := createImportTxOptions(t, vm, sharedMemory)
 
+	// Issue the first import transaction, build, and accept the block.
 	if err := vm.issueTx(importTxs[0], true); err != nil {
 		t.Fatal(err)
 	}
