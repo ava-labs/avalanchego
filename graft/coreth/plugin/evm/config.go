@@ -12,17 +12,18 @@ import (
 )
 
 const (
-	defaultEthApiEnabled               = true
-	defaultNetApiEnabled               = true
-	defaultWeb3ApiEnabled              = true
-	defaultPruningEnabled              = true
-	defaultSnapshotAsync               = true
-	defaultRpcGasCap                   = 2500000000 // 25000000 X 100
-	defaultRpcTxFeeCap                 = 100        // 100 AVAX
-	defaultApiMaxDuration              = 0          // Default to no maximum API Call duration
-	defaultMaxBlocksPerRequest         = 0          // Default to no maximum on the number of blocks per getLogs request
-	defaultContinuousProfilerFrequency = 15 * time.Minute
-	defaultContinuousProfilerMaxFiles  = 5
+	defaultEthApiEnabled                        = true
+	defaultNetApiEnabled                        = true
+	defaultWeb3ApiEnabled                       = true
+	defaultPruningEnabled                       = true
+	defaultSnapshotAsync                        = true
+	defaultRpcGasCap                            = 2500000000 // 25000000 X 100
+	defaultRpcTxFeeCap                          = 100        // 100 AVAX
+	defaultApiMaxDuration                       = 0          // Default to no maximum API Call duration
+	defaultMaxBlocksPerRequest                  = 0          // Default to no maximum on the number of blocks per getLogs request
+	defaultContinuousProfilerFrequency          = 15 * time.Minute
+	defaultContinuousProfilerMaxFiles           = 5
+	defaultOfflinePruningBloomFilterSize uint64 = 512 // Default size (MB) for the offline pruner to use
 )
 
 type Duration struct {
@@ -57,6 +58,10 @@ type Config struct {
 	Pruning        bool `json:"pruning-enabled"`
 	SnapshotAsync  bool `json:"snapshot-async"`
 	SnapshotVerify bool `json:"snapshot-verification-enabled"`
+
+	// Offline Pruning Settings
+	OfflinePruning                bool   `json:"offline-pruning-enabled"`
+	OfflinePruningBloomFilterSize uint64 `json:"offline-pruning-bloom-filter-size"`
 
 	LocalTxsEnabled           bool     `json:"local-txs-enabled"`
 	RemoteTxGossipOnlyEnabled bool     `json:"remote-tx-gossip-only-enabled"`
@@ -109,6 +114,7 @@ func (c *Config) SetDefaults() {
 	c.ContinuousProfilerMaxFiles = defaultContinuousProfilerMaxFiles
 	c.Pruning = defaultPruningEnabled
 	c.SnapshotAsync = defaultSnapshotAsync
+	c.OfflinePruningBloomFilterSize = defaultOfflinePruningBloomFilterSize
 }
 
 func (d *Duration) UnmarshalJSON(data []byte) (err error) {

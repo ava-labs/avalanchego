@@ -308,6 +308,8 @@ func (vm *VM) Initialize(
 	ethConfig.Pruning = vm.config.Pruning
 	ethConfig.SnapshotAsync = vm.config.SnapshotAsync
 	ethConfig.SnapshotVerify = vm.config.SnapshotVerify
+	ethConfig.OfflinePruning = vm.config.OfflinePruning
+	ethConfig.OfflinePruningBloomFilterSize = vm.config.OfflinePruningBloomFilterSize
 
 	vm.chainConfig = g.Config
 	vm.networkID = ethConfig.NetworkId

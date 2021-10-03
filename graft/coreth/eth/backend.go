@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/bloombits"
 	"github.com/ava-labs/coreth/core/rawdb"
+	"github.com/ava-labs/coreth/core/state/pruner"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/eth/ethconfig"
@@ -132,10 +133,9 @@ func New(stack *node.Node, config *Config,
 	}
 	log.Info("Initialised chain configuration", "config", chainConfig)
 
-	// FIXME RecoverPruning once that package is migrated over
-	// if err := pruner.RecoverPruning(stack.ResolvePath(""), chainDb, stack.ResolvePath(config.TrieCleanCacheJournal)); err != nil {
-	//             log.Error("Failed to recover state", "error", err)
-	// }
+	if err := pruner.RecoverPruning(config.DataDirectory, chainDb); err != nil {
+		log.Error("Failed to recover state", "error", err)
+	}
 	eth := &Ethereum{
 		config:            config,
 		chainDb:           chainDb,
@@ -186,6 +186,20 @@ func New(stack *node.Node, config *Config,
 		return nil, err
 	}
 	eth.bloomIndexer.Start(eth.blockchain)
+
+	// Perform offline pruning after NewBlockChain has been called to ensure that we have rolled back the chain
+	// to the last accepted block before pruning begins.
+	if config.OfflinePruning {
+		pruner, err := pruner.NewPruner(chainDb, config.DataDirectory, config.OfflinePruningBloomFilterSize)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new pruner with data directory: %s, size: %d, due to: %w", config.DataDirectory, config.OfflinePruningBloomFilterSize, err)
+
+		}
+		targetRoot := eth.blockchain.LastAcceptedBlock().Root()
+		if err := pruner.Prune(targetRoot); err != nil {
+			return nil, fmt.Errorf("failed to prune blockchain with target root: %s due to: %w", targetRoot, err)
+		}
+	}
 
 	// Original code (requires disk):
 	// if config.TxPool.Journal != "" {
