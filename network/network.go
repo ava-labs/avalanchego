@@ -251,6 +251,16 @@ type Config struct {
 	RequireValidatorToConnect bool `json:"requireValidatorToConnect"`
 }
 
+// peerElement holds onto the peer object as a result of helper functions
+type peerElement struct {
+	// the peer, if it wasn't a peer when we cloned the list this value will be
+	// nil
+	peer *peer
+	// this is the validator id for the peer, we pass back to the caller for
+	// logging purposes
+	id ids.ShortID
+}
+
 // NewNetwork returns a new Network implementation with the provided parameters.
 func NewNetwork(
 	config *Config,
@@ -344,8 +354,9 @@ func (n *network) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, chainID ids.ID, 
 
 	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
 	now := n.clock.Time()
-	for _, peer := range n.getPeers(nodeIDs) {
-		nodeID := peer.nodeID
+	for _, p := range n.getPeerElements(nodeIDs) {
+		peer := p.peer
+		nodeID := p.id
 		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send GetAcceptedFrontier(%s, %s, %d)",
 				nodeID,
@@ -422,8 +433,9 @@ func (n *network) SendGetAccepted(nodeIDs ids.ShortSet, chainID ids.ID, requestI
 	msgLen := len(msg.Bytes())
 
 	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
-	for _, peer := range n.getPeers(nodeIDs) {
-		vID := peer.nodeID
+	for _, p := range n.getPeerElements(nodeIDs) {
+		peer := p.peer
+		vID := p.id
 		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send GetAccepted(%s, %s, %d, %s)",
 				vID,
@@ -641,8 +653,9 @@ func (n *network) SendPushQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID 
 	}
 
 	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
-	for _, peer := range n.getPeers(nodeIDs) {
-		vID := peer.nodeID
+	for _, p := range n.getPeerElements(nodeIDs) {
+		peer := p.peer
+		vID := p.id
 		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send PushQuery(%s, %s, %d, %s)",
 				vID,
@@ -676,8 +689,9 @@ func (n *network) SendPullQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID 
 	msgLen := len(msg.Bytes())
 
 	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
-	for _, peer := range n.getPeers(nodeIDs) {
-		vID := peer.nodeID
+	for _, p := range n.getPeerElements(nodeIDs) {
+		peer := p.peer
+		vID := p.id
 		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send PullQuery(%s, %s, %d, %s)",
 				vID,
@@ -751,8 +765,9 @@ func (n *network) SendAppRequest(nodeIDs ids.ShortSet, chainID ids.ID, requestID
 	}
 
 	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
-	for _, peer := range n.getPeers(nodeIDs) {
-		nodeID := peer.nodeID
+	for _, p := range n.getPeerElements(nodeIDs) {
+		peer := p.peer
+		nodeID := p.id
 		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send AppRequest(%s, %s, %d)", nodeID, chainID, requestID)
 			n.log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appRequestBytes})
@@ -1639,6 +1654,30 @@ func (n *network) disconnected(p *peer) {
 	n.metrics.disconnected.Inc()
 }
 
+// Safe copy the peers dressed as a peerElement
+// Assumes [n.stateLock] is not held.
+func (n *network) getPeerElements(nodeIDs ids.ShortSet) []*peerElement {
+	n.stateLock.RLock()
+	defer n.stateLock.RUnlock()
+
+	if n.closed.GetValue() {
+		return nil
+	}
+
+	peerElements := make([]*peerElement, nodeIDs.Len())
+	i := 0
+	for nodeID := range nodeIDs {
+		nodeID := nodeID                   // Prevent overwrite in next loop iteration
+		peer, _ := n.peers.getByID(nodeID) // note: peer may be nil
+		peerElements[i] = &peerElement{
+			peer: peer,
+			id:   nodeID,
+		}
+		i++
+	}
+	return peerElements
+}
+
 // Safe copy the peers
 // Assumes [n.stateLock] is not held.
 func (n *network) getPeers(nodeIDs ids.ShortSet) []*peer {
@@ -1649,12 +1688,13 @@ func (n *network) getPeers(nodeIDs ids.ShortSet) []*peer {
 		return nil
 	}
 
-	peers := make([]*peer, len(nodeIDs))
+	peers := make([]*peer, nodeIDs.Len())
 	for nodeID := range nodeIDs {
-		peer, _ := n.peers.getByID(nodeID) // note: peer may be nil
-		peers = append(peers, peer)
+		peer, ok := n.peers.getByID(nodeID) // note: peer may be nil
+		if ok {
+			peers = append(peers, peer)
+		}
 	}
-
 	return peers
 }
 

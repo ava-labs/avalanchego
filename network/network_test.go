@@ -1889,8 +1889,9 @@ func TestPeerSignature(t *testing.T) {
 		if lenhan == 6 {
 			break
 		}
-		peers := net0.(*network).getPeers(allPeers)
-		for _, peer := range peers {
+		peers := net0.(*network).getPeerElements(allPeers)
+		for _, p := range peers {
+			peer := p.peer
 			if peer == nil {
 				continue
 			}
