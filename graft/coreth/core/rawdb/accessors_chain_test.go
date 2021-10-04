@@ -28,7 +28,6 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"golang.org/x/crypto/sha3"
 )
@@ -446,6 +445,7 @@ func TestHashesInRange(t *testing.T) {
 }
 
 // makeTestBlocks creates fake blocks for the ancient write benchmark.
+/*
 func makeTestBlocks(nblock int, txsPerBlock int) []*types.Block {
 	key, _ := crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 	signer := types.LatestSignerForChainID(big.NewInt(8))
@@ -478,8 +478,10 @@ func makeTestBlocks(nblock int, txsPerBlock int) []*types.Block {
 	}
 	return blocks
 }
+*/
 
 // makeTestReceipts creates fake receipts for the ancient write benchmark.
+/*
 func makeTestReceipts(n int, nPerBlock int) []types.Receipts {
 	receipts := make([]*types.Receipt, nPerBlock)
 	for i := 0; i < len(receipts); i++ {
@@ -495,6 +497,7 @@ func makeTestReceipts(n int, nPerBlock int) []types.Receipts {
 	}
 	return allReceipts
 }
+*/
 
 type fullLogRLP struct {
 	Address     common.Address
