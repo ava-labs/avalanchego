@@ -8,14 +8,13 @@
 package manager
 
 import (
-	"path"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/database/rocksdb"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/stretchr/testify/assert"
+	"path/filepath"
 )
 
 func TestNewSingleRocksDB(t *testing.T) {
@@ -23,7 +22,7 @@ func TestNewSingleRocksDB(t *testing.T) {
 
 	v1 := version.DefaultVersion1_0_0
 
-	dbPath := path.Join(dir, v1.String())
+	dbPath := filepath.Join(dir, v1.String())
 	db, err := rocksdb.New(dbPath, logging.NoLog{})
 	if err != nil {
 		t.Fatal(err)

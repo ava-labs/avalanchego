@@ -106,19 +106,6 @@ func (as *apiServer) Health(_ *http.Request, _ *APIHealthArgs, reply *APIHealthR
 	return err
 }
 
-// GetLiveness returns a summation of the health of the node
-// Deprecated: in favor of Health
-func (as *apiServer) GetLiveness(_ *http.Request, _ *APIHealthArgs, reply *APIHealthReply) error {
-	as.log.Debug("Health.getLiveness called")
-	reply.Checks, reply.Healthy = as.Results()
-	if reply.Healthy {
-		return nil
-	}
-	replyStr, err := stdjson.Marshal(reply.Checks)
-	as.log.Warn("Health.getLiveness is returning an error: %s", string(replyStr))
-	return err
-}
-
 type noOp struct{}
 
 // NewNoOpService returns a NoOp version of health check

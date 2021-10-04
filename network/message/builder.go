@@ -11,7 +11,7 @@ import (
 var _ Builder = &builder{}
 
 type Builder interface {
-	GetVersion() (Message, error)
+	GetVersion() (OutboundMessage, error)
 
 	Version(
 		networkID,
@@ -21,75 +21,65 @@ type Builder interface {
 		myVersion string,
 		myVersionTime uint64,
 		sig []byte,
-	) (Message, error)
-
-	VersionWithSubnets(
-		networkID,
-		nodeID uint32,
-		myTime uint64,
-		ip utils.IPDesc,
-		myVersion string,
-		myVersionTime uint64,
-		sig []byte,
 		trackedSubnets []ids.ID,
-	) (Message, error)
+	) (OutboundMessage, error)
 
-	GetPeerList() (Message, error)
+	GetPeerList() (OutboundMessage, error)
 
 	PeerList(
 		peers []utils.IPCertDesc,
 		compress bool,
-	) (Message, error)
+	) (OutboundMessage, error)
 
-	Ping() (Message, error)
+	Ping() (OutboundMessage, error)
 
-	Pong() (Message, error)
+	Pong() (OutboundMessage, error)
 
 	GetAcceptedFrontier(
 		chainID ids.ID,
 		requestID uint32,
 		deadline uint64,
-	) (Message, error)
+	) (OutboundMessage, error)
 
 	AcceptedFrontier(
 		chainID ids.ID,
 		requestID uint32,
 		containerIDs []ids.ID,
-	) (Message, error)
+	) (OutboundMessage, error)
 
 	GetAccepted(
 		chainID ids.ID,
 		requestID uint32,
 		deadline uint64,
 		containerIDs []ids.ID,
-	) (Message, error)
+	) (OutboundMessage, error)
 
 	Accepted(
 		chainID ids.ID,
 		requestID uint32,
 		containerIDs []ids.ID,
-	) (Message, error)
+	) (OutboundMessage, error)
 
 	GetAncestors(
 		chainID ids.ID,
 		requestID uint32,
 		deadline uint64,
 		containerID ids.ID,
-	) (Message, error)
+	) (OutboundMessage, error)
 
 	MultiPut(
 		chainID ids.ID,
 		requestID uint32,
 		containers [][]byte,
 		compressed bool,
-	) (Message, error)
+	) (OutboundMessage, error)
 
 	Get(
 		chainID ids.ID,
 		requestID uint32,
 		deadline uint64,
 		containerID ids.ID,
-	) (Message, error)
+	) (OutboundMessage, error)
 
 	Put(
 		chainID ids.ID,
@@ -97,7 +87,7 @@ type Builder interface {
 		containerID ids.ID,
 		container []byte,
 		compress bool,
-	) (Message, error)
+	) (OutboundMessage, error)
 
 	PushQuery(
 		chainID ids.ID,
@@ -106,20 +96,20 @@ type Builder interface {
 		containerID ids.ID,
 		container []byte,
 		compress bool,
-	) (Message, error)
+	) (OutboundMessage, error)
 
 	PullQuery(
 		chainID ids.ID,
 		requestID uint32,
 		deadline uint64,
 		containerID ids.ID,
-	) (Message, error)
+	) (OutboundMessage, error)
 
 	Chits(
 		chainID ids.ID,
 		requestID uint32,
 		containerIDs []ids.ID,
-	) (Message, error)
+	) (OutboundMessage, error)
 
 	AppRequest(
 		chainID ids.ID,
@@ -127,20 +117,20 @@ type Builder interface {
 		deadline uint64,
 		msg []byte,
 		compress bool,
-	) (Message, error)
+	) (OutboundMessage, error)
 
 	AppResponse(
 		chainID ids.ID,
 		requestID uint32,
 		msg []byte,
 		compress bool,
-	) (Message, error)
+	) (OutboundMessage, error)
 
 	AppGossip(
 		chainID ids.ID,
 		msg []byte,
 		compress bool,
-	) (Message, error)
+	) (OutboundMessage, error)
 }
 
 type builder struct{ c Codec }
@@ -149,7 +139,7 @@ func NewBuilder(c Codec) Builder {
 	return &builder{c: c}
 }
 
-func (b *builder) GetVersion() (Message, error) {
+func (b *builder) GetVersion() (OutboundMessage, error) {
 	return b.c.Pack(
 		GetVersion,
 		nil,
@@ -165,39 +155,15 @@ func (b *builder) Version(
 	myVersion string,
 	myVersionTime uint64,
 	sig []byte,
-) (Message, error) {
-	return b.c.Pack(
-		Version,
-		map[Field]interface{}{
-			NetworkID:   networkID,
-			NodeID:      nodeID,
-			MyTime:      myTime,
-			IP:          ip,
-			VersionStr:  myVersion,
-			VersionTime: myVersionTime,
-			SigBytes:    sig,
-		},
-		Version.Compressable(), // Version Messages can't be compressed
-	)
-}
-
-func (b *builder) VersionWithSubnets(
-	networkID,
-	nodeID uint32,
-	myTime uint64,
-	ip utils.IPDesc,
-	myVersion string,
-	myVersionTime uint64,
-	sig []byte,
 	trackedSubnets []ids.ID,
-) (Message, error) {
+) (OutboundMessage, error) {
 	subnetIDBytes := make([][]byte, len(trackedSubnets))
 	for i, containerID := range trackedSubnets {
 		copy := containerID
 		subnetIDBytes[i] = copy[:]
 	}
 	return b.c.Pack(
-		VersionWithSubnets,
+		Version,
 		map[Field]interface{}{
 			NetworkID:      networkID,
 			NodeID:         nodeID,
@@ -208,11 +174,11 @@ func (b *builder) VersionWithSubnets(
 			SigBytes:       sig,
 			TrackedSubnets: subnetIDBytes,
 		},
-		VersionWithSubnets.Compressable(), // Version Messages can't be compressed
+		Version.Compressable(), // Version Messages can't be compressed
 	)
 }
 
-func (b *builder) GetPeerList() (Message, error) {
+func (b *builder) GetPeerList() (OutboundMessage, error) {
 	return b.c.Pack(
 		GetPeerList,
 		nil,
@@ -220,7 +186,7 @@ func (b *builder) GetPeerList() (Message, error) {
 	)
 }
 
-func (b *builder) PeerList(peers []utils.IPCertDesc, compress bool) (Message, error) {
+func (b *builder) PeerList(peers []utils.IPCertDesc, compress bool) (OutboundMessage, error) {
 	return b.c.Pack(
 		PeerList,
 		map[Field]interface{}{
@@ -230,7 +196,7 @@ func (b *builder) PeerList(peers []utils.IPCertDesc, compress bool) (Message, er
 	)
 }
 
-func (b *builder) Ping() (Message, error) {
+func (b *builder) Ping() (OutboundMessage, error) {
 	return b.c.Pack(
 		Ping,
 		nil,
@@ -238,11 +204,11 @@ func (b *builder) Ping() (Message, error) {
 	)
 }
 
-func (b *builder) Pong() (Message, error) {
+func (b *builder) Pong() (OutboundMessage, error) {
 	return b.c.Pack(
 		Pong,
 		nil,
-		Pong.Compressable(), // Ping messages can't be compressed
+		Pong.Compressable(), // Pong messages can't be compressed
 	)
 }
 
@@ -250,7 +216,7 @@ func (b *builder) GetAcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	deadline uint64,
-) (Message, error) {
+) (OutboundMessage, error) {
 	return b.c.Pack(
 		GetAcceptedFrontier,
 		map[Field]interface{}{
@@ -266,7 +232,7 @@ func (b *builder) AcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
-) (Message, error) {
+) (OutboundMessage, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	for i, containerID := range containerIDs {
 		copy := containerID
@@ -288,7 +254,7 @@ func (b *builder) GetAccepted(
 	requestID uint32,
 	deadline uint64,
 	containerIDs []ids.ID,
-) (Message, error) {
+) (OutboundMessage, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	for i, containerID := range containerIDs {
 		copy := containerID
@@ -310,7 +276,7 @@ func (b *builder) Accepted(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
-) (Message, error) {
+) (OutboundMessage, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	for i, containerID := range containerIDs {
 		copy := containerID
@@ -332,7 +298,7 @@ func (b *builder) GetAncestors(
 	requestID uint32,
 	deadline uint64,
 	containerID ids.ID,
-) (Message, error) {
+) (OutboundMessage, error) {
 	return b.c.Pack(
 		GetAncestors,
 		map[Field]interface{}{
@@ -350,7 +316,7 @@ func (b *builder) MultiPut(
 	requestID uint32,
 	containers [][]byte,
 	compressed bool,
-) (Message, error) {
+) (OutboundMessage, error) {
 	return b.c.Pack(
 		MultiPut,
 		map[Field]interface{}{
@@ -367,7 +333,7 @@ func (b *builder) Get(
 	requestID uint32,
 	deadline uint64,
 	containerID ids.ID,
-) (Message, error) {
+) (OutboundMessage, error) {
 	return b.c.Pack(
 		Get,
 		map[Field]interface{}{
@@ -386,7 +352,7 @@ func (b *builder) Put(
 	containerID ids.ID,
 	container []byte,
 	compress bool,
-) (Message, error) {
+) (OutboundMessage, error) {
 	return b.c.Pack(
 		Put,
 		map[Field]interface{}{
@@ -406,7 +372,7 @@ func (b *builder) PushQuery(
 	containerID ids.ID,
 	container []byte,
 	compress bool,
-) (Message, error) {
+) (OutboundMessage, error) {
 	return b.c.Pack(
 		PushQuery,
 		map[Field]interface{}{
@@ -425,7 +391,7 @@ func (b *builder) PullQuery(
 	requestID uint32,
 	deadline uint64,
 	containerID ids.ID,
-) (Message, error) {
+) (OutboundMessage, error) {
 	return b.c.Pack(
 		PullQuery,
 		map[Field]interface{}{
@@ -442,7 +408,7 @@ func (b *builder) Chits(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
-) (Message, error) {
+) (OutboundMessage, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	for i, containerID := range containerIDs {
 		copy := containerID
@@ -460,7 +426,7 @@ func (b *builder) Chits(
 }
 
 // Application level request
-func (b *builder) AppRequest(chainID ids.ID, requestID uint32, deadline uint64, msg []byte, compress bool) (Message, error) {
+func (b *builder) AppRequest(chainID ids.ID, requestID uint32, deadline uint64, msg []byte, compress bool) (OutboundMessage, error) {
 	return b.c.Pack(
 		AppRequest,
 		map[Field]interface{}{
@@ -474,7 +440,7 @@ func (b *builder) AppRequest(chainID ids.ID, requestID uint32, deadline uint64, 
 }
 
 // Application level response
-func (b *builder) AppResponse(chainID ids.ID, requestID uint32, msg []byte, compress bool) (Message, error) {
+func (b *builder) AppResponse(chainID ids.ID, requestID uint32, msg []byte, compress bool) (OutboundMessage, error) {
 	return b.c.Pack(
 		AppResponse,
 		map[Field]interface{}{
@@ -487,7 +453,7 @@ func (b *builder) AppResponse(chainID ids.ID, requestID uint32, msg []byte, comp
 }
 
 // Application level gossiped message
-func (b *builder) AppGossip(chainID ids.ID, msg []byte, compress bool) (Message, error) {
+func (b *builder) AppGossip(chainID ids.ID, msg []byte, compress bool) (OutboundMessage, error) {
 	return b.c.Pack(
 		AppGossip,
 		map[Field]interface{}{
