@@ -244,7 +244,7 @@ func TestClientWebsocketSevered(t *testing.T) {
 	severable.Sever()
 
 	// Wait for subscription error.
-	timeout := time.NewTimer(3 * wsPingInterval)
+	timeout := time.NewTimer(5 * wsPingInterval)
 	defer timeout.Stop()
 	for {
 		select {
