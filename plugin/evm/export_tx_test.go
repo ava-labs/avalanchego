@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	engCommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -17,6 +18,80 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 )
+
+// createExportTxOptions adds funds to shared memory, imports them, and returns a list of export transactions
+// that attempt to send the funds to each of the test keys (list of length 3).
+func createExportTxOptions(t *testing.T, vm *VM, issuer chan engCommon.Message, sharedMemory *atomic.Memory) []*Tx {
+	// Add a UTXO to shared memory
+	utxo := &avax.UTXO{
+		UTXOID: avax.UTXOID{TxID: ids.GenerateTestID()},
+		Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: uint64(50000000),
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{testKeys[0].PublicKey().Address()},
+			},
+		},
+	}
+	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
+	inputID := utxo.InputID()
+	if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
+		Key:   inputID[:],
+		Value: utxoBytes,
+		Traits: [][]byte{
+			testKeys[0].PublicKey().Address().Bytes(),
+		},
+	}}}}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Import the funds
+	importTx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.issueTx(importTx, true /*=local*/); err != nil {
+		t.Fatal(err)
+	}
+
+	<-issuer
+
+	blk, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.SetPreference(blk.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Accept(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Use the funds to create 3 conflicting export transactions sending the funds to each of the test addresses
+	exportTxs := make([]*Tx, 0, 3)
+	for _, addr := range testShortIDAddrs {
+		exportTx, err := vm.newExportTx(vm.ctx.AVAXAssetID, uint64(5000000), vm.ctx.XChainID, addr, initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+		if err != nil {
+			t.Fatal(err)
+		}
+		exportTxs = append(exportTxs, exportTx)
+	}
+
+	return exportTxs
+}
 
 func TestExportTxEVMStateTransfer(t *testing.T) {
 	key := testKeys[0]
@@ -1319,14 +1394,7 @@ func TestNewExportTx(t *testing.T) {
 
 			parent := vm.LastAcceptedBlockInternal().(*Block)
 			importAmount := uint64(50000000)
-			utxoID := avax.UTXOID{
-				TxID: ids.ID{
-					0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
-					0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
-					0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
-					0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
-				},
-			}
+			utxoID := avax.UTXOID{TxID: ids.GenerateTestID()}
 
 			utxo := &avax.UTXO{
 				UTXOID: utxoID,
@@ -1480,14 +1548,7 @@ func TestNewExportTxMulticoin(t *testing.T) {
 
 			parent := vm.LastAcceptedBlockInternal().(*Block)
 			importAmount := uint64(50000000)
-			utxoID := avax.UTXOID{
-				TxID: ids.ID{
-					0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
-					0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
-					0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
-					0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
-				},
-			}
+			utxoID := avax.UTXOID{TxID: ids.GenerateTestID()}
 
 			utxo := &avax.UTXO{
 				UTXOID: utxoID,
@@ -1509,14 +1570,7 @@ func TestNewExportTxMulticoin(t *testing.T) {
 
 			tid := ids.GenerateTestID()
 			importAmount2 := uint64(30000000)
-			utxoID2 := avax.UTXOID{
-				TxID: ids.ID{
-					0x1f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
-					0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
-					0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
-					0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
-				},
-			}
+			utxoID2 := avax.UTXOID{TxID: ids.GenerateTestID()}
 			utxo2 := &avax.UTXO{
 				UTXOID: utxoID2,
 				Asset:  avax.Asset{ID: tid},
