@@ -135,5 +135,7 @@ func (n *network) GossipTx(tx *Tx) error {
 	if err != nil {
 		return fmt.Errorf("GossipTx: failed to build Tx message with: %w", err)
 	}
+	// TODO: Decide how VM will work with AppGossipSpecific
+	// then add n.appSender.SendAppGossipSpecific(nodeIDs, msgBytes) here.
 	return n.appSender.SendAppGossip(msgBytes)
 }

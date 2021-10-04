@@ -401,9 +401,15 @@ func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appRespon
 	return nil
 }
 
-// SendAppGossip sends an application-level gossip message.
+// SendAppGossip sends an application-level gossip message to peers.
 func (s *Sender) SendAppGossip(appResponseBytes []byte) error {
 	s.sender.SendAppGossip(s.ctx.SubnetID, s.ctx.ChainID, appResponseBytes)
+	return nil
+}
+
+// SendAppGossip sends an application-level gossip message to specified peers.
+func (s *Sender) SendAppGossipSpecific(nodeIDs ids.ShortSet, appResponseBytes []byte) error {
+	s.sender.SendAppGossipSpecific(nodeIDs, s.ctx.SubnetID, s.ctx.ChainID, appResponseBytes)
 	return nil
 }
 
