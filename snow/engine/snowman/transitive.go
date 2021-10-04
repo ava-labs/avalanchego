@@ -48,6 +48,9 @@ type Transitive struct {
 	// Block ID --> Block
 	pending map[ids.ID]snowman.Block
 
+	// Block ID --> Parent ID
+	childPending map[ids.ID]ids.ID
+
 	// operations that are blocked on a block being issued. This could be
 	// issuing another block, responding to a query, or applying votes to consensus
 	blocked events.Blocker
@@ -67,6 +70,7 @@ func (t *Transitive) Initialize(config Config) error {
 	t.Params = config.Params
 	t.Consensus = config.Consensus
 	t.pending = make(map[ids.ID]snowman.Block)
+	t.childPending = make(map[ids.ID]ids.ID)
 
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t.polls = poll.NewSet(factory,
@@ -692,7 +696,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	// we are no longer waiting on adding the block to consensus, so it is no
 	// longer pending
 	blkID := blk.ID()
-	delete(t.pending, blkID)
+	t.removeFromPending(blk)
 	parentID := blk.Parent()
 	parent, err := t.GetBlock(parentID)
 	// Because the dependency must have been fulfilled by the time this function
@@ -770,13 +774,13 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		}
 
 		blkID := blk.ID()
-		delete(t.pending, blkID)
+		t.removeFromPending(blk)
 		t.blocked.Fulfill(blkID)
 		t.blkReqs.RemoveAny(blkID)
 	}
 	for _, blk := range dropped {
 		blkID := blk.ID()
-		delete(t.pending, blkID)
+		t.removeFromPending(blk)
 		t.blocked.Abandon(blkID)
 		t.blkReqs.RemoveAny(blkID)
 	}
@@ -836,4 +840,10 @@ func (t *Transitive) GetVM() common.VM {
 func (t *Transitive) pendingContains(blkID ids.ID) bool {
 	_, ok := t.pending[blkID]
 	return ok
+}
+
+func (t *Transitive) removeFromPending(blk snowman.Block) {
+	delete(t.pending, blk.ID())
+	// we might still need that one, so we can bubble vote to parent through this block
+	t.childPending[blk.ID()] = blk.Parent()
 }

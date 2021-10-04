@@ -2682,7 +2682,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 
 	asked := new(bool)
 	reqID := new(uint32)
-	sender.GetF = func(inVdr ids.ShortID, requestID uint32, blkID ids.ID) {
+	sender.SendGetF = func(inVdr ids.ShortID, requestID uint32, blkID ids.ID) {
 		*reqID = requestID
 		if *asked {
 			t.Fatalf("Asked multiple times")
@@ -2709,7 +2709,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	// [blk2] since it currently fails verification.
 	queried := new(bool)
 	queryRequestID := new(uint32)
-	sender.PushQueryF = func(inVdrs ids.ShortSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
+	sender.SendPushQueryF = func(inVdrs ids.ShortSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
 		if *queried {
 			t.Fatalf("Asked multiple times")
 		}
@@ -2731,18 +2731,45 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// now blk1 is verified, vm can return it
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case gBlk.ID():
+			return gBlk, nil
+		case blk1.ID():
+			return blk1, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
 	if !*queried {
 		t.Fatalf("Didn't ask for preferences regarding blk1")
 	}
 
+	sendReqID := new(uint32)
+	reqVdr := new(ids.ShortID)
 	// Update GetF to produce a more detailed error message in the case that receiving a Chits
 	// message causes us to send another Get request.
-	sender.GetF = func(inVdr ids.ShortID, requestID uint32, blkID ids.ID) {
+	sender.SendGetF = func(inVdr ids.ShortID, requestID uint32, blkID ids.ID) {
 		switch blkID {
 		case blk1.ID():
 			t.Fatal("Unexpectedly sent a Get request for blk1")
 		case blk2.ID():
-			t.Fatal("Unexpectedly sent a Get request for blk2")
+			*sendReqID = requestID
+			*reqVdr = inVdr
+			return
+		default:
+			t.Fatal("Unexpectedly sent a Get request for unknown block")
+		}
+	}
+
+	sender.SendPullQueryF = func(_ ids.ShortSet, _ uint32, blkID ids.ID) {
+		switch blkID {
+		case blk1.ID():
+			t.Fatal("Unexpectedly sent a Get request for blk1")
+		case blk2.ID():
+			t.Fatal("Unexpectedly sent a Get request for blk1")
 		default:
 			t.Fatal("Unexpectedly sent a Get request for unknown block")
 		}
@@ -2754,6 +2781,10 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := te.Put(*reqVdr, *sendReqID, blk2.ID(), blk2.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+
 	// The vote should be bubbled through [blk2], such that [blk1] gets marked as Accepted.
 	if blk1.Status() != choices.Accepted {
 		t.Fatalf("Expected blk1 to be Accepted, but found status: %s", blk1.Status())
@@ -2761,9 +2792,21 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 
 	// Now that [blk1] has been marked as Accepted, [blk2] can pass verification.
 	blk2.VerifyV = nil
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case gBlk.ID():
+			return gBlk, nil
+		case blk1.ID():
+			return blk1, nil
+		case blk2.ID():
+			return blk2, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
 	*queried = false
 	// Prepare to PushQuery [blk2] after receiving a Gossip message with [blk2].
-	sender.PushQueryF = func(inVdrs ids.ShortSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
+	sender.SendPushQueryF = func(inVdrs ids.ShortSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
 		if *queried {
 			t.Fatalf("Asked multiple times")
 		}
@@ -2791,6 +2834,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	if err := te.Chits(vdr, *queryRequestID, []ids.ID{blk2.ID()}); err != nil {
 		t.Fatal(err)
 	}
+
 	if blk2.Status() != choices.Accepted {
 		t.Fatalf("Expected blk2 to be Accepted, but found status: %s", blk2.Status())
 	}

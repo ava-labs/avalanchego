@@ -5,6 +5,7 @@ package snowman
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
 // Voter records chits received from [vdr] once its dependencies are met.
@@ -89,10 +90,10 @@ func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
 votesLoop:
 	for _, vote := range votes.List() {
 		count := votes.Count(vote)
-		blk, err := v.t.GetBlock(vote)
+		blk, err := v.getBlockOrParent(vote)
 		// If we cannot retrieve the block, drop [vote]
 		if err != nil {
-			v.t.Ctx.Log.Debug("Dropping %d vote(s) for %s because the block couldn't be fetched",
+			v.t.Ctx.Log.Debug("Dropping %d vote(s) for %s because the block or parent blocks couldn't be fetched",
 				count, vote)
 			continue
 		}
@@ -112,7 +113,10 @@ votesLoop:
 		// from [blk] to any of its ancestors that are also in consensus.
 		for status.Fetched() && !v.t.Consensus.DecidedOrProcessing(blk) {
 			blkID = blk.Parent()
-			blk, err = v.t.GetBlock(blkID)
+			// ASK: should we consider a case that one of non-verified blocks are sandwiched with 2 verified blocks?
+			// i.e: Verified -> NonVerified -> Verified -> Non-Verified?
+			// if we don't, we can rollback change below
+			blk, err = v.getBlockOrParent(blkID)
 			// If we cannot retrieve the block, drop [vote]
 			if err != nil {
 				v.t.Ctx.Log.Debug("Dropping %d vote(s) for %s because %s couldn't be fetched",
@@ -128,4 +132,17 @@ votesLoop:
 		}
 	}
 	return bubbledVotes
+}
+
+// tries to retrieves first available block searching from given block ID to pending parents.
+func (v *voter) getBlockOrParent(blkID ids.ID) (snowman.Block, error) {
+	blk, err := v.t.GetBlock(blkID)
+	for err != nil {
+		blkID, ok := v.t.childPending[blkID]
+		if !ok {
+			return nil, err
+		}
+		blk, err = v.t.GetBlock(blkID)
+	}
+	return blk, err
 }
