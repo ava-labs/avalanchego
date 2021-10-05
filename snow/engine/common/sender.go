@@ -116,4 +116,5 @@ type AppSender interface {
 	// Gossip an application-level message.
 	// A non-nil error should be considered fatal.
 	SendAppGossip(appGossipBytes []byte) error
+	SendAppGossipSpecific(nodeIDs ids.ShortSet, appGossipBytes []byte) error
 }
