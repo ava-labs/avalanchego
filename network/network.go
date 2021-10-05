@@ -1140,7 +1140,8 @@ func (n *network) appGossipPeers(peers []*peer, chainID ids.ID, appGossipBytes [
 
 	sentPeers := ids.ShortSet{}
 	for _, peer := range peers {
-		if sentPeers.Contains(peer.nodeID) {
+		// should never be nil but just in case
+		if peer == nil || sentPeers.Contains(peer.nodeID) {
 			continue
 		}
 		sentPeers.Add(peer.nodeID)
@@ -1689,7 +1690,7 @@ func (n *network) getPeers(nodeIDs ids.ShortSet) []*peer {
 		return nil
 	}
 
-	peers := make([]*peer, nodeIDs.Len())
+	peers := make([]*peer, 0, nodeIDs.Len())
 	for nodeID := range nodeIDs {
 		peer, ok := n.peers.getByID(nodeID)
 		if ok {
