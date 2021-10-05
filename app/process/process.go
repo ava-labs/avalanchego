@@ -191,7 +191,7 @@ func (p *process) Start() error {
 		}()
 
 		err := p.node.Dispatch()
-		log.Debug("distpatch returned with: %s", err)
+		log.Debug("dispatch returned with: %s", err)
 	}()
 	return nil
 }
