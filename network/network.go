@@ -1690,7 +1690,7 @@ func (n *network) getPeers(nodeIDs ids.ShortSet) []*peer {
 
 	peers := make([]*peer, nodeIDs.Len())
 	for nodeID := range nodeIDs {
-		peer, ok := n.peers.getByID(nodeID) // note: peer may be nil
+		peer, ok := n.peers.getByID(nodeID)
 		if ok {
 			peers = append(peers, peer)
 		}
