@@ -111,7 +111,6 @@ const (
 	AppGossipValidatorSizeKey                 = "consensus-app-gossip-validator-size"
 	ConsensusShutdownTimeoutKey               = "consensus-shutdown-timeout"
 	FdLimitKey                                = "fd-limit"
-	CorethConfigKey                           = "coreth-config"
 	IndexEnabledKey                           = "index-enabled"
 	IndexAllowIncompleteKey                   = "index-allow-incomplete"
 	RouterHealthMaxDropRateKey                = "router-health-max-drop-rate"

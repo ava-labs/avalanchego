@@ -53,7 +53,6 @@ const (
 
 var (
 	deprecatedKeys = map[string]string{
-		CorethConfigKey:                         fmt.Sprintf("please use --%s to specify C-Chain config", ChainConfigDirKey),
 		InboundConnUpgradeThrottlerMaxRecentKey: fmt.Sprintf("please use --%s to specify connection upgrade throttling", InboundThrottlerMaxConnsPerSecKey),
 	}
 
@@ -66,7 +65,6 @@ var (
 	errMinStakeDurationAboveMax      = errors.New("max stake duration can't be less than min stake duration")
 	errStakeMintingPeriodBelowMin    = errors.New("stake minting period can't be less than max stake duration")
 	errCannotWhitelistPrimaryNetwork = errors.New("cannot whitelist primary network")
-	errDuplicatedCChainConfig        = errors.New("C-Chain config is already provided in chain config files")
 )
 
 func GetProcessConfig(v *viper.Viper) (process.Config, error) {
@@ -677,35 +675,13 @@ func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
 		return nil, err
 	}
 
-	chainConfigs := make(map[string]chains.ChainConfig)
-	if len(chainConfigPath) > 0 {
-		chainConfigs, err = readChainConfigPath(chainConfigPath)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't read chain configs: %w", err)
-		}
+	if len(chainConfigPath) == 0 {
+		return make(map[string]chains.ChainConfig), nil
 	}
 
-	// Coreth Plugin
-	if v.IsSet(CorethConfigKey) {
-		// error if C config is already populated
-		if isCChainConfigSet(chainConfigs) {
-			return nil, errDuplicatedCChainConfig
-		}
-		corethConfigValue := v.Get(CorethConfigKey)
-		var corethConfigBytes []byte
-		switch value := corethConfigValue.(type) {
-		case string:
-			corethConfigBytes = []byte(value)
-		default:
-			corethConfigBytes, err = json.Marshal(value)
-			if err != nil {
-				return nil, fmt.Errorf("couldn't parse coreth config: %w", err)
-			}
-		}
-		cChainPrimaryAlias := genesis.GetCChainAliases()[0]
-		cChainConfig := chainConfigs[cChainPrimaryAlias]
-		cChainConfig.Config = corethConfigBytes
-		chainConfigs[cChainPrimaryAlias] = cChainConfig
+	chainConfigs, err := readChainConfigPath(chainConfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't read chain configs: %w", err)
 	}
 	return chainConfigs, nil
 }
@@ -806,19 +782,6 @@ func defaultSubnetConfig(v *viper.Viper) chains.SubnetConfig {
 		ConsensusParameters: getConsensusConfig(v),
 		ValidatorOnly:       false,
 	}
-}
-
-// checks if C chain config bytes already set in map with alias key.
-// it does only checks alias key, chainId is not available at this point.
-func isCChainConfigSet(chainConfigs map[string]chains.ChainConfig) bool {
-	cChainAliases := genesis.GetCChainAliases()
-	for _, alias := range cChainAliases {
-		val, ok := chainConfigs[alias]
-		if ok && len(val.Config) > 1 {
-			return true
-		}
-	}
-	return false
 }
 
 func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
