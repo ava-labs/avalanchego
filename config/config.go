@@ -12,7 +12,6 @@ import (
 	"math"
 	"net"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -318,7 +317,8 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 		GossipConfig: network.GossipConfig{
 			GossipAcceptedFrontierSize: uint(v.GetUint32(ConsensusGossipAcceptedFrontierSizeKey)),
 			GossipOnAcceptSize:         uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey)),
-			AppGossipSize:              uint(v.GetUint32(AppGossipSizeKey)),
+			AppGossipNonValidatorSize:  uint(v.GetUint32(AppGossipNonValidatorSizeKey)),
+			AppGossipValidatorSize:     uint(v.GetUint32(AppGossipValidatorSizeKey)),
 		},
 
 		DelayConfig: network.DelayConfig{
@@ -330,6 +330,8 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 		CompressionEnabled: v.GetBool(NetworkCompressionEnabledKey),
 		PingFrequency:      v.GetDuration(NetworkPingFrequencyKey),
 		AllowPrivateIPs:    v.GetBool(NetworkAllowPrivateIPsKey),
+
+		RequireValidatorToConnect: v.GetBool(NetworkRequireValidatorToConnectKey),
 	}
 
 	switch {
@@ -349,8 +351,8 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListGossipFreqKey)
 	case config.GetVersionTimeout < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkGetVersionTimeoutKey)
-	case config.PeerListStakerGossipFraction < 0:
-		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListStakerGossipFractionKey)
+	case config.PeerListStakerGossipFraction < 1:
+		return network.Config{}, fmt.Errorf("%s must be >= 1", NetworkPeerListStakerGossipFractionKey)
 	case config.MaxReconnectDelay < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkMaxReconnectDelayKey)
 	case config.InitialReconnectDelay < 0:
@@ -623,7 +625,7 @@ func getDatabaseConfig(v *viper.Viper, networkID uint32) node.DatabaseConfig {
 }
 
 func getVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
-	aliasFilePath := path.Clean(v.GetString(VMAliasesFileKey))
+	aliasFilePath := filepath.Clean(v.GetString(VMAliasesFileKey))
 	exists, err := storage.FileExists(aliasFilePath)
 	if err != nil {
 		return nil, err
@@ -651,7 +653,7 @@ func getVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
 // getPathFromDirKey reads flag value from viper instance and then checks the folder existence
 func getPathFromDirKey(v *viper.Viper, configKey string) (string, error) {
 	configDir := os.ExpandEnv(v.GetString(configKey))
-	cleanPath := path.Clean(configDir)
+	cleanPath := filepath.Clean(configDir)
 	ok, err := storage.FolderExists(cleanPath)
 	if err != nil {
 		return "", err
@@ -687,7 +689,7 @@ func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
 // ReadsChainConfigs reads chain config files from static directories and returns map with contents,
 // if successful.
 func readChainConfigPath(chainConfigPath string) (map[string]chains.ChainConfig, error) {
-	chainDirs, err := filepath.Glob(path.Join(chainConfigPath, "*"))
+	chainDirs, err := filepath.Glob(filepath.Join(chainConfigPath, "*"))
 	if err != nil {
 		return nil, err
 	}
@@ -744,17 +746,15 @@ func getSubnetConfigs(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.Sub
 func readSubnetConfigs(subnetConfigPath string, subnetIDs []ids.ID, defaultSubnetConfig chains.SubnetConfig) (map[ids.ID]chains.SubnetConfig, error) {
 	subnetConfigs := make(map[ids.ID]chains.SubnetConfig)
 	for _, subnetID := range subnetIDs {
-		filePath := path.Join(subnetConfigPath, subnetID.String()+subnetConfigFileExt)
+		filePath := filepath.Join(subnetConfigPath, subnetID.String()+subnetConfigFileExt)
 		fileInfo, err := os.Stat(filePath)
-		if errors.Is(err, os.ErrNotExist) {
+		switch {
+		case errors.Is(err, os.ErrNotExist):
 			// this subnet config does not exist, move to the next one
 			continue
-		}
-		if err != nil {
+		case err != nil:
 			return nil, err
-		}
-
-		if fileInfo.IsDir() {
+		case fileInfo.IsDir():
 			return nil, fmt.Errorf("%q is a directory, expected a file", fileInfo.Name())
 		}
 

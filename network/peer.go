@@ -58,8 +58,7 @@ type peer struct {
 
 	// only send the version to this peer on handling a getVersion message if
 	// a version hasn't already been sent.
-	versionSent            utils.AtomicBool
-	versionWithSubnetsSent utils.AtomicBool
+	versionSent utils.AtomicBool
 
 	// only send the peerlist to this peer on handling a getPeerlist message if
 	// a peerlist hasn't already been sent.
@@ -160,7 +159,6 @@ func newPeer(net *network, conn net.Conn, ip utils.IPDesc) *peer {
 func (p *peer) Start() {
 	go func() {
 		// Make sure that the version is the first message sent
-		p.sendVersionWithSubnets()
 		p.sendVersion()
 
 		go p.ReadMessages()
@@ -306,7 +304,7 @@ func (p *peer) ReadMessages() {
 		// Handle the message. Note that when we are done handling
 		// this message, we must call [p.net.msgThrottler.Release]
 		// to release the bytes used by this message. See MsgThrottler.
-		p.handle(msg, onFinishedHandling)
+		p.handle(msg, float64(len(msgBytes)), onFinishedHandling)
 	}
 }
 
@@ -369,7 +367,7 @@ func (p *peer) WriteMessages() {
 // If [canModifyMsg], [msg] may be modified by this method.
 // If ![canModifyMsg], [msg] will not be modified by this method.
 // [canModifyMsg] should be false if [msg] is sent in a loop, for example/.
-func (p *peer) Send(msg message.Message, canModifyMsg bool) bool {
+func (p *peer) Send(msg message.OutboundMessage, canModifyMsg bool) bool {
 	msgBytes := msg.Bytes()
 	msgLen := int64(len(msgBytes))
 
@@ -405,11 +403,10 @@ func (p *peer) Send(msg message.Message, canModifyMsg bool) bool {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handle(msg message.Message, onFinishedHandling func()) {
+func (p *peer) handle(msg message.InboundMessage, msgLen float64, onFinishedHandling func()) {
 	now := p.net.clock.Time()
 	atomic.StoreInt64(&p.lastReceived, now.Unix())
 	atomic.StoreInt64(&p.net.lastMsgReceivedTime, now.Unix())
-	msgLen := uint64(len(msg.Bytes()))
 
 	op := msg.Op()
 	msgMetrics := p.net.metrics.message(op)
@@ -419,7 +416,7 @@ func (p *peer) handle(msg message.Message, onFinishedHandling func()) {
 		return
 	}
 	msgMetrics.numReceived.Inc()
-	msgMetrics.receivedBytes.Add(float64(msgLen))
+	msgMetrics.receivedBytes.Add(msgLen)
 	// assume that if [saved] == 0, [msg] wasn't compressed
 	if saved := msg.BytesSavedCompression(); saved != 0 {
 		msgMetrics.savedReceivedBytes.Observe(float64(saved))
@@ -428,10 +425,6 @@ func (p *peer) handle(msg message.Message, onFinishedHandling func()) {
 	switch op { // Network-related message types
 	case message.Version:
 		p.handleVersion(msg)
-		onFinishedHandling()
-		return
-	case message.VersionWithSubnets:
-		p.handleVersionWithSubnets(msg)
 		onFinishedHandling()
 		return
 	case message.GetVersion:
@@ -563,6 +556,7 @@ func (p *peer) sendVersion() {
 		p.net.stateLock.RUnlock()
 		return
 	}
+	whitelistedSubnets := p.net.config.WhitelistedSubnets
 	msg, err := p.net.b.Version(
 		p.net.config.NetworkID,
 		p.net.dummyNodeID,
@@ -571,6 +565,7 @@ func (p *peer) sendVersion() {
 		p.net.versionCompatibility.Version().String(),
 		myVersionTime,
 		myVersionSig,
+		whitelistedSubnets.List(),
 	)
 	p.net.stateLock.RUnlock()
 	p.net.log.AssertNoError(err)
@@ -588,46 +583,6 @@ func (p *peer) sendVersion() {
 		p.versionSent.SetValue(true)
 	} else {
 		p.net.metrics.version.numFailed.Inc()
-		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
-	}
-}
-
-// assumes the [stateLock] is not held
-func (p *peer) sendVersionWithSubnets() {
-	p.net.stateLock.RLock()
-	myIP := p.net.currentIP.IP()
-	myVersionTime, myVersionSig, err := p.net.getVersion(myIP)
-	if err != nil {
-		p.net.stateLock.RUnlock()
-		return
-	}
-	whitelistedSubnets := p.net.config.WhitelistedSubnets
-	msg, err := p.net.b.VersionWithSubnets(
-		p.net.config.NetworkID,
-		p.net.dummyNodeID,
-		p.net.clock.Unix(),
-		myIP,
-		p.net.versionCompatibility.Version().String(),
-		myVersionTime,
-		myVersionSig,
-		whitelistedSubnets.List(),
-	)
-	p.net.stateLock.RUnlock()
-	p.net.log.AssertNoError(err)
-
-	lenMsg := len(msg.Bytes())
-	sent := p.Send(msg, true)
-	if sent {
-		p.net.metrics.versionWithSubnets.numSent.Inc()
-		p.net.metrics.versionWithSubnets.sentBytes.Add(float64(lenMsg))
-		// assume that if [saved] == 0, [msg] wasn't compressed
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			p.net.metrics.versionWithSubnets.savedSentBytes.Observe(float64(saved))
-		}
-		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
-		p.versionWithSubnetsSent.SetValue(true)
-	} else {
-		p.net.metrics.versionWithSubnets.numFailed.Inc()
 		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
 	}
 }
@@ -724,27 +679,14 @@ func (p *peer) sendPong() {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleGetVersion(_ message.Message) {
-	if !p.versionWithSubnetsSent.GetValue() {
-		p.sendVersionWithSubnets()
-	}
+func (p *peer) handleGetVersion(_ message.InboundMessage) {
 	if !p.versionSent.GetValue() {
 		p.sendVersion()
 	}
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleVersion(msg message.Message) {
-	p.versionCheck(msg, false)
-}
-
-// assumes the [stateLock] is not held
-func (p *peer) handleVersionWithSubnets(msg message.Message) {
-	p.versionCheck(msg, true)
-}
-
-// assumes the [stateLock] is not held
-func (p *peer) versionCheck(msg message.Message, isVersionWithSubnets bool) {
+func (p *peer) handleVersion(msg message.InboundMessage) {
 	switch {
 	case p.gotVersion.GetValue():
 		p.net.log.Verbo("dropping duplicated version message from %s%s at %s", constants.NodeIDPrefix, p.nodeID, p.getIP())
@@ -829,24 +771,19 @@ func (p *peer) versionCheck(msg message.Message, isVersionWithSubnets bool) {
 		return
 	}
 
-	if isVersionWithSubnets {
-		subnetIDsBytes := msg.Get(message.TrackedSubnets).([][]byte)
-		for _, subnetIDBytes := range subnetIDsBytes {
-			subnetID, err := ids.ToID(subnetIDBytes)
-			if err != nil {
-				p.net.log.Debug("tracked subnet of %s%s at %s could not be parsed: %s", constants.NodeIDPrefix, p.nodeID, err)
-				p.discardIP()
-				return
-			}
-			// add only if we also track this subnet
-			if p.net.config.WhitelistedSubnets.Contains(subnetID) {
-				p.trackedSubnets.Add(subnetID)
-			}
+	// handle subnet IDs
+	subnetIDsBytes := msg.Get(message.TrackedSubnets).([][]byte)
+	for _, subnetIDBytes := range subnetIDsBytes {
+		subnetID, err := ids.ToID(subnetIDBytes)
+		if err != nil {
+			p.net.log.Debug("tracked subnet of %s%s at %s could not be parsed: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
+			p.discardIP()
+			return
 		}
-	} else {
-		// this peer has old Version, we don't know what its interested in.
-		// so assume that it tracks all available subnets
-		p.trackedSubnets.Add(p.net.config.WhitelistedSubnets.List()...)
+		// add only if we also track this subnet
+		if p.net.config.WhitelistedSubnets.Contains(subnetID) {
+			p.trackedSubnets.Add(subnetID)
+		}
 	}
 
 	sig := msg.Get(message.SigBytes).([]byte)
@@ -892,7 +829,7 @@ func (p *peer) versionCheck(msg message.Message, isVersionWithSubnets bool) {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleGetPeerList(_ message.Message) {
+func (p *peer) handleGetPeerList(_ message.InboundMessage) {
 	if p.gotVersion.GetValue() && !p.peerListSent.GetValue() {
 		p.sendPeerList()
 	}
@@ -961,7 +898,7 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handlePeerList(msg message.Message) {
+func (p *peer) handlePeerList(msg message.InboundMessage) {
 	p.gotPeerList.SetValue(true)
 	p.tryMarkFinishedHandshake()
 
@@ -972,12 +909,18 @@ func (p *peer) handlePeerList(msg message.Message) {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handlePing(_ message.Message) {
+func (p *peer) handlePing(_ message.InboundMessage) {
 	p.sendPong()
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handlePong(_ message.Message) {
+func (p *peer) handlePong(_ message.InboundMessage) {
+	if !p.net.shouldHoldConnection(p.nodeID) {
+		p.net.log.Debug("disconnecting from peer %s%s at %s because the peer is not a validator", constants.NodeIDPrefix, p.nodeID, p.getIP())
+		p.discardIP()
+		return
+	}
+
 	if !p.finishedHandshake.GetValue() {
 		// If the handshake isn't finished - do nothing
 		return
@@ -991,7 +934,7 @@ func (p *peer) handlePong(_ message.Message) {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleGetAcceptedFrontier(msg message.Message, onFinishedHandling func()) {
+func (p *peer) handleGetAcceptedFrontier(msg message.InboundMessage, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(message.RequestID).(uint32)
@@ -1007,7 +950,7 @@ func (p *peer) handleGetAcceptedFrontier(msg message.Message, onFinishedHandling
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleAcceptedFrontier(msg message.Message, onFinishedHandling func()) {
+func (p *peer) handleAcceptedFrontier(msg message.InboundMessage, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(message.RequestID).(uint32)
@@ -1049,7 +992,7 @@ func (p *peer) handleAcceptedFrontier(msg message.Message, onFinishedHandling fu
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleGetAccepted(msg message.Message, onFinishedHandling func()) {
+func (p *peer) handleGetAccepted(msg message.InboundMessage, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(message.RequestID).(uint32)
@@ -1093,7 +1036,7 @@ func (p *peer) handleGetAccepted(msg message.Message, onFinishedHandling func())
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleAccepted(msg message.Message, onFinishedHandling func()) {
+func (p *peer) handleAccepted(msg message.InboundMessage, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(message.RequestID).(uint32)
@@ -1135,7 +1078,7 @@ func (p *peer) handleAccepted(msg message.Message, onFinishedHandling func()) {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleGet(msg message.Message, onFinishedHandling func()) {
+func (p *peer) handleGet(msg message.InboundMessage, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(message.RequestID).(uint32)
@@ -1153,7 +1096,7 @@ func (p *peer) handleGet(msg message.Message, onFinishedHandling func()) {
 	)
 }
 
-func (p *peer) handleGetAncestors(msg message.Message, onFinishedHandling func()) {
+func (p *peer) handleGetAncestors(msg message.InboundMessage, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(message.RequestID).(uint32)
@@ -1172,7 +1115,7 @@ func (p *peer) handleGetAncestors(msg message.Message, onFinishedHandling func()
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handlePut(msg message.Message, onFinishedHandling func()) {
+func (p *peer) handlePut(msg message.InboundMessage, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(message.RequestID).(uint32)
@@ -1191,7 +1134,7 @@ func (p *peer) handlePut(msg message.Message, onFinishedHandling func()) {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleMultiPut(msg message.Message, onFinishedHandling func()) {
+func (p *peer) handleMultiPut(msg message.InboundMessage, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(message.RequestID).(uint32)
@@ -1206,7 +1149,7 @@ func (p *peer) handleMultiPut(msg message.Message, onFinishedHandling func()) {
 	)
 }
 
-func (p *peer) handlePushQuery(msg message.Message, onFinishedHandling func()) {
+func (p *peer) handlePushQuery(msg message.InboundMessage, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(message.RequestID).(uint32)
@@ -1227,7 +1170,7 @@ func (p *peer) handlePushQuery(msg message.Message, onFinishedHandling func()) {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handlePullQuery(msg message.Message, onFinishedHandling func()) {
+func (p *peer) handlePullQuery(msg message.InboundMessage, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(message.RequestID).(uint32)
@@ -1246,7 +1189,7 @@ func (p *peer) handlePullQuery(msg message.Message, onFinishedHandling func()) {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleChits(msg message.Message, onFinishedHandling func()) {
+func (p *peer) handleChits(msg message.InboundMessage, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(message.RequestID).(uint32)
@@ -1288,7 +1231,7 @@ func (p *peer) handleChits(msg message.Message, onFinishedHandling func()) {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleAppRequest(msg message.Message, onFinishedHandling func()) {
+func (p *peer) handleAppRequest(msg message.InboundMessage, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(message.RequestID).(uint32)
@@ -1306,7 +1249,7 @@ func (p *peer) handleAppRequest(msg message.Message, onFinishedHandling func()) 
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleAppResponse(msg message.Message, onFinishedHandling func()) {
+func (p *peer) handleAppResponse(msg message.InboundMessage, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(message.RequestID).(uint32)
@@ -1322,7 +1265,7 @@ func (p *peer) handleAppResponse(msg message.Message, onFinishedHandling func())
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleAppGossip(msg message.Message, onFinishedHandling func()) {
+func (p *peer) handleAppGossip(msg message.InboundMessage, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	gossipedMsg := msg.Get(message.AppGossipBytes).([]byte)
@@ -1350,8 +1293,13 @@ func (p *peer) discardIP() {
 	if ip := p.getIP(); !ip.IsZero() {
 		p.setIP(utils.IPDesc{})
 
+		ipStr := ip.String()
+
 		p.net.stateLock.Lock()
-		delete(p.net.disconnectedIPs, ip.String())
+		// Make sure the IP isn't marked as connected or disconnected to allow
+		// future connection attempts if the IP is heard from a peerlist gossip
+		delete(p.net.disconnectedIPs, ipStr)
+		delete(p.net.connectedIPs, ipStr)
 		p.net.stateLock.Unlock()
 	}
 	p.Close()
