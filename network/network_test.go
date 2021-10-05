@@ -228,6 +228,10 @@ type testHandler struct {
 		container []byte,
 		onFinishedHandling func(),
 	)
+	AppGossipF func(nodeID ids.ShortID,
+		chainID ids.ID,
+		appGossipBytes []byte,
+		onFinishedHandling func())
 }
 
 func (h *testHandler) Connected(id ids.ShortID) {
@@ -257,6 +261,15 @@ func (h *testHandler) Put(
 			containerID,
 			container,
 			onFinishedHandling)
+	}
+}
+
+func (h *testHandler) AppGossip(nodeID ids.ShortID,
+	chainID ids.ID,
+	appGossipBytes []byte,
+	onFinishedHandling func()) {
+	if h.AppGossipF != nil {
+		h.AppGossipF(nodeID, chainID, appGossipBytes, onFinishedHandling)
 	}
 }
 
@@ -1930,7 +1943,7 @@ func TestPeerSignature(t *testing.T) {
 		if lenhan == 6 {
 			break
 		}
-		peers := net0.(*network).getPeers(allPeers)
+		peers := net0.(*network).getPeerElements(allPeers)
 		for _, p := range peers {
 			if p.peer == nil {
 				continue
@@ -2643,6 +2656,232 @@ func TestPeerGossip(t *testing.T) {
 
 	net0.SendGossip(testSubnetID, ids.GenerateTestID(), testSubnetContainerID, []byte("test"), false)
 	net0.SendGossip(constants.PrimaryNetworkID, ids.GenerateTestID(), testPrimaryContainerID, []byte("test2"), false)
+
+	wg1P.Wait()
+	wg2P.Wait()
+
+	err = net0.Close()
+	assert.NoError(t, err)
+
+	err = net1.Close()
+	assert.NoError(t, err)
+
+	err = net2.Close()
+	assert.NoError(t, err)
+}
+
+func TestAppGossip(t *testing.T) {
+	initCerts(t)
+
+	ip0 := utils.NewDynamicIPDesc(
+		net.IPv6loopback,
+		0,
+	)
+	ip1 := utils.NewDynamicIPDesc(
+		net.IPv6loopback,
+		1,
+	)
+	ip2 := utils.NewDynamicIPDesc(
+		net.IPv6loopback,
+		2,
+	)
+
+	id0 := certToID(cert0.Leaf)
+	id1 := certToID(cert1.Leaf)
+	id2 := certToID(cert2.Leaf)
+
+	listener0 := &testListener{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 0,
+		},
+		inbound: make(chan net.Conn, 1<<10),
+		closed:  make(chan struct{}),
+	}
+	caller0 := &testDialer{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 0,
+		},
+		outbounds: make(map[string]*testListener),
+	}
+	listener1 := &testListener{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 1,
+		},
+		inbound: make(chan net.Conn, 1<<10),
+		closed:  make(chan struct{}),
+	}
+	caller1 := &testDialer{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 1,
+		},
+		outbounds: make(map[string]*testListener),
+	}
+	listener2 := &testListener{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 2,
+		},
+		inbound: make(chan net.Conn, 1<<10),
+		closed:  make(chan struct{}),
+	}
+	caller2 := &testDialer{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 2,
+		},
+		outbounds: make(map[string]*testListener),
+	}
+
+	caller0.outbounds[ip1.IP().String()] = listener1
+	caller1.outbounds[ip0.IP().String()] = listener0
+	caller0.outbounds[ip2.IP().String()] = listener2
+	caller1.outbounds[ip2.IP().String()] = listener2
+
+	vdrs := getDefaultManager()
+	primaryVdrs := validators.NewSet()
+	_ = primaryVdrs.Set([]validators.Validator{validators.NewValidator(id2, math.MaxUint64)})
+	// id2 is a validator
+	_ = vdrs.Set(constants.PrimaryNetworkID, primaryVdrs)
+
+	beacons := validators.NewSet()
+
+	allPeers := ids.ShortSet{}
+	allPeers.Add(id0, id1, id2)
+
+	var (
+		wg0  sync.WaitGroup
+		wg1  sync.WaitGroup
+		wg1P sync.WaitGroup
+		wg2  sync.WaitGroup
+		wg2P sync.WaitGroup
+	)
+	wg0.Add(2)
+	wg1.Add(1)
+	wg1P.Add(1)
+	wg2.Add(1)
+	wg2P.Add(2)
+
+	testAppGossipBytes := []byte("appgossip")
+	testAppGossipSpecificBytes := []byte("appgossipspecific")
+	handler0 := &testHandler{
+		ConnectedF: func(id ids.ShortID) {
+			assert.NotEqual(t, id0, id)
+			wg0.Done()
+		},
+		AppGossipF: func(nodeID ids.ShortID,
+			chainID ids.ID,
+			appGossipBytes []byte,
+			onFinishedHandling func()) {
+			assert.Fail(t, "this should not receive any App Gossips")
+		},
+	}
+
+	handler1 := &testHandler{
+		ConnectedF: func(id ids.ShortID) {
+			assert.NotEqual(t, id1, id)
+			wg1.Done()
+		},
+		AppGossipF: func(nodeID ids.ShortID,
+			chainID ids.ID,
+			appGossipBytes []byte,
+			onFinishedHandling func()) {
+			assert.Equal(t, testAppGossipBytes, appGossipBytes)
+			wg1P.Done()
+		},
+	}
+
+	handler2 := &testHandler{
+		ConnectedF: func(id ids.ShortID) {
+			assert.NotEqual(t, id2, id)
+			wg2.Done()
+		},
+		AppGossipF: func(nodeID ids.ShortID,
+			chainID ids.ID,
+			appGossipBytes []byte,
+			onFinishedHandling func()) {
+			assert.Contains(t, [][]byte{testAppGossipBytes, testAppGossipSpecificBytes}, appGossipBytes)
+			wg2P.Done()
+		},
+	}
+
+	net0, err := newTestNetwork(
+		id0,
+		ip0,
+		defaultVersionManager,
+		vdrs,
+		beacons,
+		cert0.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig0,
+		listener0,
+		caller0,
+		handler0,
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, net0)
+
+	net1, err := newTestNetwork(
+		id1,
+		ip1,
+		defaultVersionManager,
+		vdrs,
+		beacons,
+		cert1.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig1,
+		listener1,
+		caller1,
+		handler1,
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, net1)
+
+	net2, err := newTestNetwork(
+		id2,
+		ip2,
+		defaultVersionManager,
+		vdrs,
+		beacons,
+		cert2.PrivateKey.(crypto.Signer),
+		ids.Set{}, // tracks no subnet
+		tlsConfig2,
+		listener2,
+		caller2,
+		handler2,
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, net2)
+
+	go func() {
+		err := net0.Dispatch()
+		assert.Error(t, err)
+	}()
+	go func() {
+		err := net1.Dispatch()
+		assert.Error(t, err)
+	}()
+	go func() {
+		err := net2.Dispatch()
+		assert.Error(t, err)
+	}()
+
+	// ip0 -> ip2 and ip0 -> ip1 connect
+	net0.Track(ip2.IP(), id2)
+	net0.Track(ip1.IP(), id1)
+
+	wg0.Wait()
+	wg1.Wait()
+	wg2.Wait()
+
+	chainID := ids.GenerateTestID()
+	net0.SendAppGossip(constants.PrimaryNetworkID, chainID, testAppGossipBytes, false)
+	specificNodeSet := ids.NewShortSet(1)
+	specificNodeSet.Add(id2)
+	net0.SendAppGossipSpecific(specificNodeSet, constants.PrimaryNetworkID, chainID, testAppGossipSpecificBytes)
 
 	wg1P.Wait()
 	wg2P.Wait()

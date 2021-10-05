@@ -50,4 +50,5 @@ type AppSender interface {
 	SendAppResponse(nodeID ids.ShortID, chainID ids.ID, requestID uint32, appResponseBytes []byte)
 	// Gossip an application-level message
 	SendAppGossip(subnetID, chainID ids.ID, appGossipBytes []byte, validatorOnly bool)
+	SendAppGossipSpecific(nodeIDs ids.ShortSet, subnetID, chainID ids.ID, appGossipBytes []byte)
 }

@@ -6,30 +6,35 @@ package plugin
 import (
 	"context"
 
-	appproto "github.com/ava-labs/avalanchego/app/plugin/proto"
-	"github.com/ava-labs/avalanchego/app/process"
+	"google.golang.org/protobuf/types/known/emptypb"
+
+	"github.com/ava-labs/avalanchego/app"
+	"github.com/ava-labs/avalanchego/app/plugin/pluginproto"
 )
 
 // Server wraps a node so it can be served with the hashicorp plugin harness
 type Server struct {
-	appproto.UnimplementedNodeServer
-	app *process.App
+	pluginproto.UnimplementedNodeServer
+	app app.App
 }
 
-func NewServer(app *process.App) *Server {
+func NewServer(app app.App) *Server {
 	return &Server{
 		app: app,
 	}
 }
 
-// Blocks until the node returns
-func (ns *Server) Start(_ context.Context, req *appproto.StartRequest) (*appproto.StartResponse, error) {
-	exitCode := ns.app.Start()
-	return &appproto.StartResponse{ExitCode: int32(exitCode)}, nil
+func (s *Server) Start(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
+	return &emptypb.Empty{}, s.app.Start()
 }
 
-// Blocks until the node is done shutting down
-func (ns *Server) Stop(_ context.Context, req *appproto.StopRequest) (*appproto.StopResponse, error) {
-	ns.app.Stop()
-	return &appproto.StopResponse{}, nil
+func (s *Server) Stop(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
+	return &emptypb.Empty{}, s.app.Stop()
+}
+
+func (s *Server) ExitCode(context.Context, *emptypb.Empty) (*pluginproto.ExitCodeResponse, error) {
+	exitCode, err := s.app.ExitCode()
+	return &pluginproto.ExitCodeResponse{
+		ExitCode: int32(exitCode),
+	}, err
 }
