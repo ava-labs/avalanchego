@@ -295,7 +295,6 @@ func benchReadChain(b *testing.B, full bool, count uint64) {
 // NewLevelDBDatabase creates a persistent key-value database without a freezer
 // moving immutable chain segments into cold storage.
 func NewLevelDBDatabase(file string, cache int, handles int, namespace string, readonly bool) (ethdb.Database, error) {
-	//db, err := leveldb.New(file, cache, handles, namespace, readonly)
 	db, err := leveldb.New(file, nil)
 	if err != nil {
 		return nil, err
