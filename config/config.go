@@ -18,7 +18,7 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/ava-labs/avalanchego/app/process"
+	"github.com/ava-labs/avalanchego/app/runner"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -69,8 +69,8 @@ var (
 	errDuplicatedCChainConfig        = errors.New("C-Chain config is already provided in chain config files")
 )
 
-func GetProcessConfig(v *viper.Viper) (process.Config, error) {
-	config := process.Config{
+func GetRunnerConfig(v *viper.Viper) (runner.Config, error) {
+	config := runner.Config{
 		DisplayVersionAndExit: v.GetBool(VersionKey),
 		BuildDir:              os.ExpandEnv(v.GetString(BuildDirKey)),
 		PluginMode:            v.GetBool(PluginModeKey),
@@ -105,7 +105,7 @@ func GetProcessConfig(v *viper.Viper) (process.Config, error) {
 		}
 	}
 	if !foundBuildDir {
-		return process.Config{}, fmt.Errorf(
+		return runner.Config{}, fmt.Errorf(
 			"couldn't find valid build directory in any of the default locations: %s",
 			defaultBuildDirs,
 		)

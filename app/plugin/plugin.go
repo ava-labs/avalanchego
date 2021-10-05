@@ -6,15 +6,16 @@ package plugin
 import (
 	"context"
 
-	appproto "github.com/ava-labs/avalanchego/app/plugin/proto"
-	"github.com/ava-labs/avalanchego/app/process"
 	"google.golang.org/grpc"
 
 	"github.com/hashicorp/go-plugin"
+
+	"github.com/ava-labs/avalanchego/app"
+	"github.com/ava-labs/avalanchego/app/plugin/pluginproto"
 )
 
 var Handshake = plugin.HandshakeConfig{
-	ProtocolVersion:  1,
+	ProtocolVersion:  2,
 	MagicCookieKey:   "NODE_PROCESS_PLUGIN",
 	MagicCookieValue: "dynamic",
 }
@@ -28,10 +29,10 @@ var PluginMap = map[string]plugin.Plugin{
 // Plugin implements plugin.GRPCPlugin
 type AppPlugin struct {
 	plugin.NetRPCUnsupportedPlugin
-	app *process.App
+	app app.App
 }
 
-func New(app *process.App) *AppPlugin {
+func New(app app.App) *AppPlugin {
 	return &AppPlugin{
 		app: app,
 	}
@@ -39,11 +40,11 @@ func New(app *process.App) *AppPlugin {
 
 // GRPCServer registers a new GRPC server.
 func (p *AppPlugin) GRPCServer(_ *plugin.GRPCBroker, s *grpc.Server) error {
-	appproto.RegisterNodeServer(s, NewServer(p.app))
+	pluginproto.RegisterNodeServer(s, NewServer(p.app))
 	return nil
 }
 
 // GRPCClient returns a new GRPC client
 func (p *AppPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
-	return NewClient(appproto.NewNodeClient(c)), nil
+	return NewClient(pluginproto.NewNodeClient(c)), nil
 }
