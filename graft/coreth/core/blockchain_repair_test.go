@@ -75,42 +75,6 @@ func testShortRepair(t *testing.T, snapshots bool) {
 }
 
 // Tests a recovery for a short canonical chain where the fast sync pivot point was
-// already committed, after which the process crashed. In this case we expect the full
-// chain to be rolled back to the committed block, but the chain data itself left in
-// the database for replaying.
-func TestShortFastSyncedRepair(t *testing.T)              { testShortFastSyncedRepair(t, false) }
-func TestShortFastSyncedRepairWithSnapshots(t *testing.T) { testShortFastSyncedRepair(t, true) }
-
-func testShortFastSyncedRepair(t *testing.T, snapshots bool) {
-	// Chain:
-	//   G->C1->C2->C3->C4->C5->C6->C7->C8 (HEAD)
-	//
-	// Frozen: none
-	// Commit: G, C4
-	// Pivot : C4
-	//
-	// CRASH
-	//
-	// ------------------------------
-	//
-	// Expected in leveldb:
-	//   G->C1->C2->C3->C4->C5->C6->C7->C8
-	//
-	// Expected head header    : C8
-	// Expected head fast block: C8
-	// Expected head block     : C4
-	testRepair(t, &rewindTest{
-		canonicalBlocks:    8,
-		sidechainBlocks:    0,
-		commitBlock:        4,
-		expCanonicalBlocks: 8,
-		expSidechainBlocks: 0,
-		expHeadHeader:      8,
-		expHeadBlock:       4,
-	}, snapshots)
-}
-
-// Tests a recovery for a short canonical chain where the fast sync pivot point was
 // not yet committed, but the process crashed. In this case we expect the chain to
 // detect that it was fast syncing and not delete anything, since we can just pick
 // up directly where we left off.
@@ -174,58 +138,20 @@ func testShortOldForkedRepair(t *testing.T, snapshots bool) {
 	// Expected head header    : C8
 	// Expected head fast block: C8
 	// Expected head block     : C4
-	testRepair(t, &rewindTest{
+    rt := &rewindTest{
 		canonicalBlocks:    8,
 		sidechainBlocks:    3,
 		commitBlock:        4,
 		expCanonicalBlocks: 8,
 		expSidechainBlocks: 3,
-		expHeadHeader:      8,
-		expHeadBlock:       4,
-	}, snapshots)
-}
-
-// Tests a recovery for a short canonical chain and a shorter side chain, where
-// the fast sync pivot point was already committed to disk and then the process
-// crashed. In this test scenario the side chain is below the committed block. In
-// this case we expect the canonical chain to be rolled back to the committed block,
-// but the chain data itself left in the database for replaying.
-func TestShortOldForkedFastSyncedRepair(t *testing.T) {
-	testShortOldForkedFastSyncedRepair(t, false)
-}
-func TestShortOldForkedFastSyncedRepairWithSnapshots(t *testing.T) {
-	testShortOldForkedFastSyncedRepair(t, true)
-}
-
-func testShortOldForkedFastSyncedRepair(t *testing.T, snapshots bool) {
-	// Chain:
-	//   G->C1->C2->C3->C4->C5->C6->C7->C8 (HEAD)
-	//   └->S1->S2->S3
-	//
-	// Frozen: none
-	// Commit: G, C4
-	// Pivot : C4
-	//
-	// CRASH
-	//
-	// ------------------------------
-	//
-	// Expected in leveldb:
-	//   G->C1->C2->C3->C4->C5->C6->C7->C8
-	//   └->S1->S2->S3
-	//
-	// Expected head header    : C8
-	// Expected head fast block: C8
-	// Expected head block     : C4
-	testRepair(t, &rewindTest{
-		canonicalBlocks:    8,
-		sidechainBlocks:    3,
-		commitBlock:        4,
-		expCanonicalBlocks: 8,
-		expSidechainBlocks: 3,
-		expHeadHeader:      8,
-		expHeadBlock:       4,
-	}, snapshots)
+		expHeadHeader:      3,
+		expHeadBlock:       0,
+	}
+    if snapshots {
+		rt.expHeadHeader = 8
+        rt.expHeadBlock = 4
+    }
+	testRepair(t, rt, snapshots)
 }
 
 // Tests a recovery for a short canonical chain and a shorter side chain, where
@@ -266,7 +192,7 @@ func testShortOldForkedFastSyncingRepair(t *testing.T, snapshots bool) {
 		commitBlock:        0,
 		expCanonicalBlocks: 8,
 		expSidechainBlocks: 3,
-		expHeadHeader:      8,
+		expHeadHeader:      3,
 		expHeadBlock:       0,
 	}, snapshots)
 }
@@ -299,58 +225,20 @@ func testShortNewlyForkedRepair(t *testing.T, snapshots bool) {
 	// Expected head header    : C8
 	// Expected head fast block: C8
 	// Expected head block     : C4
-	testRepair(t, &rewindTest{
+    rt := &rewindTest{
 		canonicalBlocks:    8,
 		sidechainBlocks:    6,
 		commitBlock:        4,
 		expCanonicalBlocks: 8,
 		expSidechainBlocks: 6,
-		expHeadHeader:      8,
-		expHeadBlock:       4,
-	}, snapshots)
-}
-
-// Tests a recovery for a short canonical chain and a shorter side chain, where
-// the fast sync pivot point was already committed to disk and then the process
-// crashed. In this test scenario the side chain reaches above the committed block.
-// In this case we expect the canonical chain to be rolled back to the committed
-// block, but the chain data itself left in the database for replaying.
-func TestShortNewlyForkedFastSyncedRepair(t *testing.T) {
-	testShortNewlyForkedFastSyncedRepair(t, false)
-}
-func TestShortNewlyForkedFastSyncedRepairWithSnapshots(t *testing.T) {
-	testShortNewlyForkedFastSyncedRepair(t, true)
-}
-
-func testShortNewlyForkedFastSyncedRepair(t *testing.T, snapshots bool) {
-	// Chain:
-	//   G->C1->C2->C3->C4->C5->C6->C7->C8 (HEAD)
-	//   └->S1->S2->S3->S4->S5->S6
-	//
-	// Frozen: none
-	// Commit: G, C4
-	// Pivot : C4
-	//
-	// CRASH
-	//
-	// ------------------------------
-	//
-	// Expected in leveldb:
-	//   G->C1->C2->C3->C4->C5->C6->C7->C8
-	//   └->S1->S2->S3->S4->S5->S6
-	//
-	// Expected head header    : C8
-	// Expected head fast block: C8
-	// Expected head block     : C4
-	testRepair(t, &rewindTest{
-		canonicalBlocks:    8,
-		sidechainBlocks:    6,
-		commitBlock:        4,
-		expCanonicalBlocks: 8,
-		expSidechainBlocks: 6,
-		expHeadHeader:      8,
-		expHeadBlock:       4,
-	}, snapshots)
+		expHeadHeader:      6,
+		expHeadBlock:       0,
+	}
+    if snapshots {
+		rt.expHeadHeader = 8
+		rt.expHeadBlock = 4
+    }
+	testRepair(t, rt, snapshots)
 }
 
 // Tests a recovery for a short canonical chain and a shorter side chain, where
@@ -391,7 +279,7 @@ func testShortNewlyForkedFastSyncingRepair(t *testing.T, snapshots bool) {
 		commitBlock:        0,
 		expCanonicalBlocks: 8,
 		expSidechainBlocks: 6,
-		expHeadHeader:      8,
+		expHeadHeader:      6,
 		expHeadBlock:       0,
 	}, snapshots)
 }
@@ -423,57 +311,20 @@ func testShortReorgedRepair(t *testing.T, snapshots bool) {
 	// Expected head header    : C8
 	// Expected head fast block: C8
 	// Expected head block     : C4
-	testRepair(t, &rewindTest{
+    rt := &rewindTest{
 		canonicalBlocks:    8,
 		sidechainBlocks:    10,
 		commitBlock:        4,
 		expCanonicalBlocks: 8,
 		expSidechainBlocks: 10,
-		expHeadHeader:      8,
-		expHeadBlock:       4,
-	}, snapshots)
-}
-
-// Tests a recovery for a short canonical chain and a longer side chain, where
-// the fast sync pivot point was already committed to disk and then the process
-// crashed. In this case we expect the canonical chain to be rolled back to the
-// committed block, but the chain data itself left in the database for replaying.
-func TestShortReorgedFastSyncedRepair(t *testing.T) {
-	testShortReorgedFastSyncedRepair(t, false)
-}
-func TestShortReorgedFastSyncedRepairWithSnapshots(t *testing.T) {
-	testShortReorgedFastSyncedRepair(t, true)
-}
-
-func testShortReorgedFastSyncedRepair(t *testing.T, snapshots bool) {
-	// Chain:
-	//   G->C1->C2->C3->C4->C5->C6->C7->C8 (HEAD)
-	//   └->S1->S2->S3->S4->S5->S6->S7->S8->S9->S10
-	//
-	// Frozen: none
-	// Commit: G, C4
-	// Pivot : C4
-	//
-	// CRASH
-	//
-	// ------------------------------
-	//
-	// Expected in leveldb:
-	//   G->C1->C2->C3->C4->C5->C6->C7->C8
-	//   └->S1->S2->S3->S4->S5->S6->S7->S8->S9->S10
-	//
-	// Expected head header    : C8
-	// Expected head fast block: C8
-	// Expected head block     : C4
-	testRepair(t, &rewindTest{
-		canonicalBlocks:    8,
-		sidechainBlocks:    10,
-		commitBlock:        4,
-		expCanonicalBlocks: 8,
-		expSidechainBlocks: 10,
-		expHeadHeader:      8,
-		expHeadBlock:       4,
-	}, snapshots)
+		expHeadHeader:      10,
+		expHeadBlock:       0,
+	}
+    if snapshots {
+		rt.expHeadHeader = 8
+		rt.expHeadBlock = 4
+    }
+	testRepair(t, rt, snapshots)
 }
 
 // Tests a recovery for a short canonical chain and a longer side chain, where
@@ -513,7 +364,7 @@ func testShortReorgedFastSyncingRepair(t *testing.T, snapshots bool) {
 		commitBlock:        0,
 		expCanonicalBlocks: 8,
 		expSidechainBlocks: 10,
-		expHeadHeader:      8,
+		expHeadHeader:      10,
 		expHeadBlock:       0,
 	}, snapshots)
 }
@@ -548,15 +399,19 @@ func testLongShallowRepair(t *testing.T, snapshots bool) {
 	// Expected head header    : C18
 	// Expected head fast block: C18
 	// Expected head block     : C4
-	testRepair(t, &rewindTest{
+    rt := &rewindTest{
 		canonicalBlocks:    18,
 		sidechainBlocks:    0,
 		commitBlock:        4,
 		expCanonicalBlocks: 18,
 		expSidechainBlocks: 0,
 		expHeadHeader:      18,
-		expHeadBlock:       4,
-	}, snapshots)
+		expHeadBlock:       0,
+	}
+    if snapshots {
+		rt.expHeadBlock = 4
+    }
+	testRepair(t, rt, snapshots)
 }
 
 // Tests a recovery for a long canonical chain with frozen blocks where a recent
@@ -588,15 +443,19 @@ func testLongDeepRepair(t *testing.T, snapshots bool) {
 	// Expected head header    : C4
 	// Expected head fast block: C4
 	// Expected head block     : C4
-	testRepair(t, &rewindTest{
+    rt := &rewindTest{
 		canonicalBlocks:    24,
 		sidechainBlocks:    0,
 		commitBlock:        4,
-		expCanonicalBlocks: 4,
+		expCanonicalBlocks: 24,
 		expSidechainBlocks: 0,
-		expHeadHeader:      4,
-		expHeadBlock:       4,
-	}, snapshots)
+		expHeadHeader:      24,
+		expHeadBlock:       0,
+	}
+    if snapshots {
+		rt.expHeadBlock = 4
+    }
+	testRepair(t, rt, snapshots)
 }
 
 // Tests a recovery for a long canonical chain with frozen blocks where the fast
@@ -633,15 +492,19 @@ func testLongFastSyncedShallowRepair(t *testing.T, snapshots bool) {
 	// Expected head header    : C18
 	// Expected head fast block: C18
 	// Expected head block     : C4
-	testRepair(t, &rewindTest{
+    rt := &rewindTest{
 		canonicalBlocks:    18,
 		sidechainBlocks:    0,
 		commitBlock:        4,
 		expCanonicalBlocks: 18,
 		expSidechainBlocks: 0,
 		expHeadHeader:      18,
-		expHeadBlock:       4,
-	}, snapshots)
+		expHeadBlock:       0,
+	}
+    if snapshots {
+		rt.expHeadBlock = 4
+    }
+    testRepair(t, rt, snapshots)
 }
 
 // Tests a recovery for a long canonical chain with frozen blocks where the fast
@@ -673,15 +536,19 @@ func testLongFastSyncedDeepRepair(t *testing.T, snapshots bool) {
 	// Expected head header    : C4
 	// Expected head fast block: C4
 	// Expected head block     : C4
-	testRepair(t, &rewindTest{
+	rt := &rewindTest{
 		canonicalBlocks:    24,
 		sidechainBlocks:    0,
 		commitBlock:        4,
-		expCanonicalBlocks: 4,
+		expCanonicalBlocks: 24,
 		expSidechainBlocks: 0,
-		expHeadHeader:      4,
-		expHeadBlock:       4,
-	}, snapshots)
+		expHeadHeader:      24,
+		expHeadBlock:       0,
+	}
+    if snapshots {
+		rt.expHeadBlock = 4
+    }
+    testRepair(t, rt, snapshots)
 }
 
 // Tests a recovery for a long canonical chain with frozen blocks where the fast
@@ -809,15 +676,20 @@ func testLongOldForkedShallowRepair(t *testing.T, snapshots bool) {
 	// Expected head header    : C18
 	// Expected head fast block: C18
 	// Expected head block     : C4
-	testRepair(t, &rewindTest{
+	rt := &rewindTest{
 		canonicalBlocks:    18,
 		sidechainBlocks:    3,
 		commitBlock:        4,
 		expCanonicalBlocks: 18,
-		expSidechainBlocks: 0,
-		expHeadHeader:      18,
-		expHeadBlock:       4,
-	}, snapshots)
+		expSidechainBlocks: 3,
+		expHeadHeader:      3,
+		expHeadBlock:       0,
+	}
+    if snapshots {
+		rt.expHeadHeader = 18
+		rt.expHeadBlock = 4
+    }
+	testRepair(t, rt, snapshots)
 }
 
 // Tests a recovery for a long canonical chain with frozen blocks and a shorter
@@ -852,15 +724,20 @@ func testLongOldForkedDeepRepair(t *testing.T, snapshots bool) {
 	// Expected head header    : C4
 	// Expected head fast block: C4
 	// Expected head block     : C4
-	testRepair(t, &rewindTest{
+	rt := &rewindTest{
 		canonicalBlocks:    24,
 		sidechainBlocks:    3,
 		commitBlock:        4,
-		expCanonicalBlocks: 4,
-		expSidechainBlocks: 0,
-		expHeadHeader:      4,
-		expHeadBlock:       4,
-	}, snapshots)
+		expCanonicalBlocks: 24,
+		expSidechainBlocks: 3,
+		expHeadHeader:      3,
+		expHeadBlock:       0,
+    }
+    if snapshots {
+		rt.expHeadHeader = 24
+		rt.expHeadBlock = 4
+    }
+    testRepair(t, rt, snapshots)
 }
 
 // Tests a recovery for a long canonical chain with frozen blocks and a shorter
@@ -900,15 +777,20 @@ func testLongOldForkedFastSyncedShallowRepair(t *testing.T, snapshots bool) {
 	// Expected head header    : C18
 	// Expected head fast block: C18
 	// Expected head block     : C4
-	testRepair(t, &rewindTest{
+	rt := &rewindTest{
 		canonicalBlocks:    18,
 		sidechainBlocks:    3,
 		commitBlock:        4,
 		expCanonicalBlocks: 18,
-		expSidechainBlocks: 0,
-		expHeadHeader:      18,
-		expHeadBlock:       4,
-	}, snapshots)
+		expSidechainBlocks: 3,
+		expHeadHeader:      3,
+		expHeadBlock:       0,
+	}
+    if snapshots {
+		rt.expHeadHeader = 18
+		rt.expHeadBlock = 4
+    }
+	testRepair(t, rt, snapshots)
 }
 
 // Tests a recovery for a long canonical chain with frozen blocks and a shorter
@@ -947,15 +829,20 @@ func testLongOldForkedFastSyncedDeepRepair(t *testing.T, snapshots bool) {
 	// Expected head header    : C4
 	// Expected head fast block: C4
 	// Expected head block     : C4
-	testRepair(t, &rewindTest{
+	rt := &rewindTest{
 		canonicalBlocks:    24,
 		sidechainBlocks:    3,
 		commitBlock:        4,
-		expCanonicalBlocks: 4,
-		expSidechainBlocks: 0,
-		expHeadHeader:      4,
-		expHeadBlock:       4,
-	}, snapshots)
+		expCanonicalBlocks: 24,
+		expSidechainBlocks: 3,
+		expHeadHeader:      3,
+		expHeadBlock:       0,
+	}
+	if snapshots {
+		rt.expHeadHeader = 24
+		rt.expHeadBlock = 4
+    }
+	testRepair(t, rt, snapshots)
 }
 
 // Tests a recovery for a long canonical chain with frozen blocks and a shorter
@@ -1000,8 +887,8 @@ func testLongOldForkedFastSyncingShallowRepair(t *testing.T, snapshots bool) {
 		sidechainBlocks:    3,
 		commitBlock:        0,
 		expCanonicalBlocks: 18,
-		expSidechainBlocks: 0,
-		expHeadHeader:      18,
+		expSidechainBlocks: 3,
+		expHeadHeader:      3,
 		expHeadBlock:       0,
 	}, snapshots)
 }
