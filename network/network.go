@@ -44,6 +44,7 @@ var (
 	errNetworkClosed         = errors.New("network closed")
 	errPeerIsMyself          = errors.New("peer is myself")
 	errNetworkLayerUnhealthy = errors.New("network layer is unhealthy")
+	errNoPrimaryValidators   = errors.New("no default subnet validators")
 )
 
 var _ Network = &network{}
@@ -291,7 +292,7 @@ func NewNetwork(
 	netw.dialer = dialer.NewDialer(constants.NetworkType, config.DialerConfig, log)
 	primaryNetworkValidators, ok := config.Validators.GetValidators(constants.PrimaryNetworkID)
 	if !ok {
-		return nil, errors.New("cannot get primary network validators")
+		return nil, errNoPrimaryValidators
 	}
 
 	inboundMsgThrottler, err := throttling.NewSybilInboundMsgThrottler(

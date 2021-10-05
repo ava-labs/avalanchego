@@ -67,7 +67,7 @@ func TestPeer_Close(t *testing.T) {
 		outbounds: make(map[string]*testListener),
 	}
 
-	vdrs := defaultValidators
+	vdrs := getDefaultManager()
 	beacons := validators.NewSet()
 	handler := &testHandler{}
 

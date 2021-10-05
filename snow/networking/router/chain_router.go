@@ -278,7 +278,7 @@ func (cr *ChainRouter) GetAcceptedFrontier(
 	}
 
 	// check if this subnet is validator only, if so drop the non-validator related messages.
-	if !chain.isValidValidator(validatorID) {
+	if !chain.isValidator(validatorID) {
 		onFinishedHandling()
 		cr.log.Debug("GetAcceptedFrontier(%s, %s, %d) from %s%s dropped due to %s is a validator only subnet",
 			validatorID, chainID, requestID, constants.NodeIDPrefix, validatorID, chain.ctx.SubnetID)
@@ -321,11 +321,11 @@ func (cr *ChainRouter) AcceptedFrontier(
 		return
 	}
 	request := requestIntf.(requestEntry)
-	cr.timedRequests.Delete(uniqueRequestID)
+	cr.removeRequest(uniqueRequestID)
 
 	// check if this subnet is validator only, if so drop the non-validator related messages.
 	// We drop it here so if any previous-validators sends a response, we will be able to remove related timedRequest.
-	if !chain.isValidValidator(validatorID) {
+	if !chain.isValidator(validatorID) {
 		onFinishedHandling()
 		cr.log.Debug("AcceptedFrontier(%s, %s, %d, %s) from %s%s dropped due to %s is a validator only subnet",
 			validatorID, chainID, requestID, containerIDs, constants.NodeIDPrefix, validatorID, chain.ctx.SubnetID)
@@ -366,14 +366,6 @@ func (cr *ChainRouter) GetAcceptedFrontierFailed(
 		cr.log.Debug("GetAcceptedFrontierFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 		return
 	}
-
-	// check if this subnet is validator only, if so drop the non-validator related messages.
-	if !chain.isValidValidator(validatorID) {
-		cr.log.Debug("GetAcceptedFrontierFailed(%s, %s, %d) from %s%s dropped due to %s is a validator only subnet",
-			validatorID, chainID, requestID, constants.NodeIDPrefix, validatorID, chain.ctx.SubnetID)
-		return
-	}
-
 	// Pass the response to the chain
 	chain.GetAcceptedFrontierFailed(validatorID, requestID)
 }
@@ -400,7 +392,7 @@ func (cr *ChainRouter) GetAccepted(
 	}
 
 	// check if this subnet is validator only, if so drop the non-validator related messages.
-	if !chain.isValidValidator(validatorID) {
+	if !chain.isValidator(validatorID) {
 		onFinishedHandling()
 		cr.log.Debug("GetAccepted(%s, %s, %d, %s) from %s%s dropped due to %s is a validator only subnet",
 			validatorID, chainID, requestID, containerIDs, constants.NodeIDPrefix, validatorID, chain.ctx.SubnetID)
@@ -443,11 +435,11 @@ func (cr *ChainRouter) Accepted(
 		return
 	}
 	request := requestIntf.(requestEntry)
-	cr.timedRequests.Delete(uniqueRequestID)
+	cr.removeRequest(uniqueRequestID)
 
 	// check if this subnet is validator only, if so drop the non-validator related messages.
 	// We drop it here so if any previous-validators sends a response, we will be able to remove related timedRequest.
-	if !chain.isValidValidator(validatorID) {
+	if !chain.isValidator(validatorID) {
 		onFinishedHandling()
 		cr.log.Debug("Accepted(%s, %s, %d, %s) from %s%s dropped due to %s is a validator only subnet",
 			validatorID, chainID, requestID, containerIDs, constants.NodeIDPrefix, validatorID, chain.ctx.SubnetID)
@@ -488,14 +480,6 @@ func (cr *ChainRouter) GetAcceptedFailed(
 		cr.log.Debug("GetAcceptedFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 		return
 	}
-
-	// check if this subnet is validator only, if so drop the non-validator related messages.
-	if !chain.isValidValidator(validatorID) {
-		cr.log.Debug("GetAcceptedFailed(%s, %s, %d) from %s%s dropped due to %s is a validator only subnet",
-			validatorID, chainID, requestID, constants.NodeIDPrefix, validatorID, chain.ctx.SubnetID)
-		return
-	}
-
 	// Pass the response to the chain
 	chain.GetAcceptedFailed(validatorID, requestID)
 }
@@ -523,7 +507,7 @@ func (cr *ChainRouter) GetAncestors(
 	}
 
 	// check if this subnet is validator only, if so drop the non-validator related messages.
-	if !chain.isValidValidator(validatorID) {
+	if !chain.isValidator(validatorID) {
 		onFinishedHandling()
 		cr.log.Debug("GetAncestors(%s, %s, %d) from %s%s dropped due to %s is a validator only subnet",
 			validatorID, chainID, requestID, constants.NodeIDPrefix, validatorID, chain.ctx.SubnetID)
@@ -565,11 +549,11 @@ func (cr *ChainRouter) MultiPut(
 		return
 	}
 	request := requestIntf.(requestEntry)
-	cr.timedRequests.Delete(uniqueRequestID)
+	cr.removeRequest(uniqueRequestID)
 
 	// check if this subnet is validator only, if so drop the non-validator related messages.
 	// We drop it here so if any previous-validators sends a response, we will be able to remove related timedRequest.
-	if !chain.isValidValidator(validatorID) {
+	if !chain.isValidator(validatorID) {
 		cr.log.Debug("MultiPut(%s, %s, %d, %d) from %s%s dropped due to %s is a validator only subnet",
 			validatorID, chainID, requestID, len(containers), constants.NodeIDPrefix, validatorID, chain.ctx.SubnetID)
 		onFinishedHandling()
@@ -609,14 +593,6 @@ func (cr *ChainRouter) GetAncestorsFailed(
 		cr.log.Debug("GetAncestorsFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 		return
 	}
-
-	// check if this subnet is validator only, if so drop the non-validator related messages.
-	if !chain.isValidValidator(validatorID) {
-		cr.log.Debug("GetAncestorsFailed(%s, %s, %d) from %s%s dropped due to %s is a validator only subnet",
-			validatorID, chainID, requestID, constants.NodeIDPrefix, validatorID, chain.ctx.SubnetID)
-		return
-	}
-
 	// Pass the response to the chain
 	chain.GetAncestorsFailed(validatorID, requestID)
 }
@@ -643,7 +619,7 @@ func (cr *ChainRouter) Get(
 	}
 
 	// check if this subnet is validator only, if so drop the non-validator related messages.
-	if !chain.isValidValidator(validatorID) {
+	if !chain.isValidator(validatorID) {
 		cr.log.Debug("Get(%s, %s, %d, %s) from %s%s dropped due to %s is a validator only subnet",
 			validatorID, chainID, requestID, containerID, constants.NodeIDPrefix, validatorID, chain.ctx.SubnetID)
 		onFinishedHandling()
@@ -683,7 +659,7 @@ func (cr *ChainRouter) Put(
 	}
 
 	// If this is a gossip message and from a valid validator, pass to the chain
-	if requestID == constants.GossipMsgRequestID && chain.isValidValidator(validatorID) {
+	if requestID == constants.GossipMsgRequestID && chain.isValidator(validatorID) {
 		chain.Put(validatorID, requestID, containerID, container, onFinishedHandling)
 		return
 	}
@@ -699,10 +675,10 @@ func (cr *ChainRouter) Put(
 		return
 	}
 	request := requestIntf.(requestEntry)
-	cr.timedRequests.Delete(uniqueRequestID)
+	cr.removeRequest(uniqueRequestID)
 
 	// check if this subnet is validator only, if so drop the non-validator related messages.
-	if !chain.isValidValidator(validatorID) {
+	if !chain.isValidator(validatorID) {
 		if requestID == constants.GossipMsgRequestID {
 			cr.log.Debug("Gossiped Put(%s, %s, %d, %s) from %s%s dropped due to %s is a validator only subnet Container: %s",
 				validatorID, chainID, requestID, containerID, formatting.DumpBytes{Bytes: container}, constants.NodeIDPrefix, validatorID, chain.ctx.SubnetID,
@@ -748,14 +724,6 @@ func (cr *ChainRouter) GetFailed(
 		cr.log.Debug("GetFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 		return
 	}
-
-	// check if this subnet is validator only, if so drop the non-validator related messages.
-	if !chain.isValidValidator(validatorID) {
-		cr.log.Debug("GetFailed(%s, %s, %d) from %s%s dropped due to %s is a validator only subnet",
-			validatorID, chainID, requestID, constants.NodeIDPrefix, validatorID, chain.ctx.SubnetID)
-		return
-	}
-
 	// Pass the response to the chain
 	chain.GetFailed(validatorID, requestID)
 }
@@ -783,7 +751,7 @@ func (cr *ChainRouter) PushQuery(
 	}
 
 	// check if this subnet is validator only, if so drop the non-validator related messages.
-	if !chain.isValidValidator(validatorID) {
+	if !chain.isValidator(validatorID) {
 		cr.log.Debug("PushQuery(%s, %s, %d, %s) from %s%s dropped due to %s is a validator only subnet",
 			validatorID, chainID, requestID, containerID, constants.NodeIDPrefix, validatorID, chain.ctx.SubnetID)
 		cr.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
@@ -816,7 +784,7 @@ func (cr *ChainRouter) PullQuery(
 	}
 
 	// check if this subnet is validator only, if so drop the non-validator related messages.
-	if !chain.isValidValidator(validatorID) {
+	if !chain.isValidator(validatorID) {
 		cr.log.Debug("PullQuery(%s, %s, %d, %s) from %s%s dropped due to %s is a validator only subnet",
 			validatorID, chainID, requestID, containerID, constants.NodeIDPrefix, validatorID, chain.ctx.SubnetID)
 		onFinishedHandling()
@@ -860,10 +828,10 @@ func (cr *ChainRouter) Chits(
 		return
 	}
 	request := requestIntf.(requestEntry)
-	cr.timedRequests.Delete(uniqueRequestID)
+	cr.removeRequest(uniqueRequestID)
 
 	// check if this subnet is validator only, if so drop the non-validator related messages.
-	if !chain.isValidValidator(validatorID) {
+	if !chain.isValidator(validatorID) {
 		cr.log.Debug("Chits(%s, %s, %d, %s) from %s%s dropped due to %s is a validator only subnet",
 			validatorID, chainID, requestID, votes, constants.NodeIDPrefix, validatorID, chain.ctx.SubnetID)
 		onFinishedHandling()
@@ -902,7 +870,7 @@ func (cr *ChainRouter) AppRequest(
 	}
 
 	// check if this subnet is validator only, if so drop the non-validator related messages.
-	if !chain.isValidValidator(nodeID) {
+	if !chain.isValidator(nodeID) {
 		cr.log.Debug("AppRequest(%s, %s, %d) from %s%s dropped due to %s is a validator only subnet",
 			nodeID, chainID, requestID, constants.NodeIDPrefix, nodeID, chain.ctx.SubnetID)
 		cr.log.Verbo("dropped message: %s", formatting.DumpBytes{Bytes: appRequestBytes})
@@ -950,10 +918,10 @@ func (cr *ChainRouter) AppResponse(
 		onFinishedHandling()
 		return
 	}
-	cr.timedRequests.Delete(uniqueRequestID)
+	cr.removeRequest(uniqueRequestID)
 
 	// check if this subnet is validator only, if so drop the non-validator related messages.
-	if !chain.isValidValidator(nodeID) {
+	if !chain.isValidator(nodeID) {
 		cr.log.Debug("AppResponse(%s, %s, %d) from %s%s dropped due to %s is a validator only subnet",
 			nodeID, chainID, requestID, constants.NodeIDPrefix, nodeID, chain.ctx.SubnetID)
 		cr.log.Verbo("dropped message: %s", formatting.DumpBytes{Bytes: appResponseBytes})
@@ -987,14 +955,6 @@ func (cr *ChainRouter) AppRequestFailed(nodeID ids.ShortID, chainID ids.ID, requ
 		cr.log.Debug("AppRequestFailed(%s, %s, %d) dropped due to unknown chain", nodeID, chainID, requestID)
 		return
 	}
-
-	// check if this subnet is validator only, if so drop the non-validator related messages.
-	if !chain.isValidValidator(nodeID) {
-		cr.log.Debug("AppRequestFailed(%s, %s, %d) from %s%s dropped due to %s is a validator only subnet",
-			nodeID, chainID, requestID, constants.NodeIDPrefix, nodeID, chain.ctx.SubnetID)
-		return
-	}
-
 	// Pass the response to the chain
 	chain.AppRequestFailed(nodeID, requestID)
 }
@@ -1019,8 +979,8 @@ func (cr *ChainRouter) AppGossip(
 	}
 
 	// check if this subnet is validator only, if so drop the non-validator related messages.
-	if !chain.isValidValidator(nodeID) {
-		cr.log.Debug("AppRequestFailed(%s, %s) from %s%s dropped due to %s is a validator only subnet",
+	if !chain.isValidator(nodeID) {
+		cr.log.Debug("AppGossip(%s, %s) from %s%s dropped due to %s is a validator only subnet",
 			nodeID, chainID, constants.NodeIDPrefix, nodeID, chain.ctx.SubnetID)
 		cr.log.Verbo("dropped message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
 		onFinishedHandling()
@@ -1054,14 +1014,6 @@ func (cr *ChainRouter) QueryFailed(
 		cr.log.Debug("QueryFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 		return
 	}
-
-	// check if this subnet is validator only, if so drop the non-validator related messages.
-	if !chain.isValidValidator(validatorID) {
-		cr.log.Debug("QueryFailed(%s, %s, %d) from %s%s dropped due to %s is a validator only subnet",
-			validatorID, chainID, constants.NodeIDPrefix, validatorID, chain.ctx.SubnetID)
-		return
-	}
-
 	// Pass the response to the chain
 	chain.QueryFailed(validatorID, requestID)
 }

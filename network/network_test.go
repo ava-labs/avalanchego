@@ -44,8 +44,6 @@ const (
 	defaultAppGossipValidatorSize     = 4
 )
 
-var defaultValidators validators.Manager
-
 var (
 	errClosed  = errors.New("closed")
 	errRefused = errors.New("connection refused")
@@ -70,12 +68,13 @@ type testListener struct {
 	closed  chan struct{}
 }
 
-func init() {
-	defaultValidators = validators.NewManager()
+func getDefaultManager() validators.Manager {
+	defaultValidators := validators.NewManager()
 	err := defaultValidators.Set(constants.PrimaryNetworkID, validators.NewSet())
 	if err != nil {
 		panic(err)
 	}
+	return defaultValidators
 }
 
 func (l *testListener) Accept() (net.Conn, error) {
@@ -337,7 +336,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 		closed:  make(chan struct{}),
 	}
 
-	vdrs := defaultValidators
+	vdrs := getDefaultManager()
 	beacons := validators.NewSet()
 	handler := &testHandler{}
 	net, err := newDefaultNetwork(
@@ -411,7 +410,7 @@ func TestEstablishConnection(t *testing.T) {
 	caller0.outbounds[ip1.IP().String()] = listener1
 	caller1.outbounds[ip0.IP().String()] = listener0
 
-	vdrs := defaultValidators
+	vdrs := getDefaultManager()
 	beacons := validators.NewSet()
 
 	var (
@@ -538,7 +537,7 @@ func TestDoubleTrack(t *testing.T) {
 	caller0.outbounds[ip1.IP().String()] = listener1
 	caller1.outbounds[ip0.IP().String()] = listener0
 
-	vdrs := defaultValidators
+	vdrs := getDefaultManager()
 	beacons := validators.NewSet()
 
 	var (
@@ -666,7 +665,7 @@ func TestDoubleClose(t *testing.T) {
 	caller0.outbounds[ip1.IP().String()] = listener1
 	caller1.outbounds[ip0.IP().String()] = listener0
 
-	vdrs := defaultValidators
+	vdrs := getDefaultManager()
 	beacons := validators.NewSet()
 
 	var (
@@ -799,7 +798,7 @@ func TestTrackConnected(t *testing.T) {
 	caller0.outbounds[ip1.IP().String()] = listener1
 	caller1.outbounds[ip0.IP().String()] = listener0
 
-	vdrs := defaultValidators
+	vdrs := getDefaultManager()
 	beacons := validators.NewSet()
 
 	var (
@@ -928,7 +927,7 @@ func TestTrackConnectedRace(t *testing.T) {
 	caller0.outbounds[ip1.IP().String()] = listener1
 	caller1.outbounds[ip0.IP().String()] = listener0
 
-	vdrs := defaultValidators
+	vdrs := getDefaultManager()
 	beacons := validators.NewSet()
 
 	handler := &testHandler{}
@@ -1091,7 +1090,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		},
 	}
 
-	vdrs := defaultValidators
+	vdrs := getDefaultManager()
 	beacons := validators.NewSet()
 
 	var (
@@ -1346,7 +1345,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 func TestPeerAliasesDisconnect(t *testing.T) {
 	initCerts(t)
 
-	vdrs := defaultValidators
+	vdrs := getDefaultManager()
 	beacons := validators.NewSet()
 
 	ip0 := utils.NewDynamicIPDesc(
@@ -1803,12 +1802,11 @@ func TestPeerSignature(t *testing.T) {
 	caller0.outbounds[ip2.IP().String()] = listener2
 	caller1.outbounds[ip2.IP().String()] = listener2
 
-	vdrs := defaultValidators
+	vdrs := getDefaultManager()
 	beacons := validators.NewSet()
 	// id2 is a validator
-	vdrSet := validators.NewSet()
-	_ = vdrSet.Set([]validators.Validator{validators.NewValidator(id2, math.MaxUint64)})
-	_ = vdrs.Set(constants.PrimaryNetworkID, vdrSet)
+	err := vdrs.AddWeight(constants.PrimaryNetworkID, id2, math.MaxUint64)
+	assert.NoError(t, err)
 
 	allPeers := ids.ShortSet{}
 	allPeers.Add(id0, id1, id2)
@@ -2219,7 +2217,7 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 	caller0.outbounds[ip1.IP().String()] = listener1
 	caller1.outbounds[ip0.IP().String()] = listener0
 
-	vdrs := defaultValidators
+	vdrs := getDefaultManager()
 	beacons := validators.NewSet()
 	assert.NoError(t, vdrs.AddWeight(constants.PrimaryNetworkID, id1, 1))
 	assert.NoError(t, vdrs.AddWeight(constants.PrimaryNetworkID, id0, 1))
@@ -2350,7 +2348,7 @@ func TestPeerTrackedSubnets(t *testing.T) {
 	caller0.outbounds[ip1.IP().String()] = listener1
 	caller1.outbounds[ip0.IP().String()] = listener0
 
-	vdrs := defaultValidators
+	vdrs := getDefaultManager()
 	beacons := validators.NewSet()
 
 	var (
@@ -2513,12 +2511,11 @@ func TestPeerGossip(t *testing.T) {
 	caller0.outbounds[ip2.IP().String()] = listener2
 	caller1.outbounds[ip2.IP().String()] = listener2
 
-	vdrs := defaultValidators
+	vdrs := getDefaultManager()
 	beacons := validators.NewSet()
 	// id2 is a validator
-	vdrSet := validators.NewSet()
-	_ = vdrSet.Set([]validators.Validator{validators.NewValidator(id2, math.MaxUint64)})
-	_ = vdrs.Set(constants.PrimaryNetworkID, vdrSet)
+	err := vdrs.AddWeight(constants.PrimaryNetworkID, id2, math.MaxUint64)
+	assert.NoError(t, err)
 
 	allPeers := ids.ShortSet{}
 	allPeers.Add(id0, id1, id2)
@@ -2686,7 +2683,7 @@ func addPeerToNetwork(targetNetwork *network, peerToAdd *peer, isValidator bool)
 
 func clearPeersData(targetNetwork *network) {
 	targetNetwork.peers.reset()
-	targetNetwork.config.Validators = defaultValidators
+	targetNetwork.config.Validators = getDefaultManager()
 }
 
 func isIPDescIn(targetIP utils.IPDesc, ipDescList []utils.IPCertDesc) bool {
