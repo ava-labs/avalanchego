@@ -1891,11 +1891,10 @@ func TestPeerSignature(t *testing.T) {
 		}
 		peers := net0.(*network).getPeerElements(allPeers)
 		for _, p := range peers {
-			peer := p.peer
-			if peer == nil {
+			if p.peer == nil {
 				continue
 			}
-			peer.sendPeerList()
+			p.peer.sendPeerList()
 		}
 		time.Sleep(500 * time.Millisecond)
 	}

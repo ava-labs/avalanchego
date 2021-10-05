@@ -354,9 +354,9 @@ func (n *network) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, chainID ids.ID, 
 
 	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
 	now := n.clock.Time()
-	for _, p := range n.getPeerElements(nodeIDs) {
-		peer := p.peer
-		nodeID := p.id
+	for _, peerElement := range n.getPeerElements(nodeIDs) {
+		peer := peerElement.peer
+		nodeID := peerElement.id
 		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send GetAcceptedFrontier(%s, %s, %d)",
 				nodeID,
@@ -433,9 +433,9 @@ func (n *network) SendGetAccepted(nodeIDs ids.ShortSet, chainID ids.ID, requestI
 	msgLen := len(msg.Bytes())
 
 	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
-	for _, p := range n.getPeerElements(nodeIDs) {
-		peer := p.peer
-		vID := p.id
+	for _, peerElement := range n.getPeerElements(nodeIDs) {
+		peer := peerElement.peer
+		vID := peerElement.id
 		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send GetAccepted(%s, %s, %d, %s)",
 				vID,
@@ -653,9 +653,9 @@ func (n *network) SendPushQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID 
 	}
 
 	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
-	for _, p := range n.getPeerElements(nodeIDs) {
-		peer := p.peer
-		vID := p.id
+	for _, peerElement := range n.getPeerElements(nodeIDs) {
+		peer := peerElement.peer
+		vID := peerElement.id
 		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send PushQuery(%s, %s, %d, %s)",
 				vID,
@@ -689,9 +689,9 @@ func (n *network) SendPullQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID 
 	msgLen := len(msg.Bytes())
 
 	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
-	for _, p := range n.getPeerElements(nodeIDs) {
-		peer := p.peer
-		vID := p.id
+	for _, peerElement := range n.getPeerElements(nodeIDs) {
+		peer := peerElement.peer
+		vID := peerElement.id
 		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send PullQuery(%s, %s, %d, %s)",
 				vID,
@@ -765,9 +765,9 @@ func (n *network) SendAppRequest(nodeIDs ids.ShortSet, chainID ids.ID, requestID
 	}
 
 	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
-	for _, p := range n.getPeerElements(nodeIDs) {
-		peer := p.peer
-		nodeID := p.id
+	for _, peerElement := range n.getPeerElements(nodeIDs) {
+		peer := peerElement.peer
+		nodeID := peerElement.id
 		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send AppRequest(%s, %s, %d)", nodeID, chainID, requestID)
 			n.log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appRequestBytes})
@@ -1128,6 +1128,7 @@ func (n *network) gossipContainer(subnetID, chainID, containerID ids.ID, contain
 	return nil
 }
 
+// helper method for SendAppGossip/SendAppGossipSpecific
 func (n *network) appGossipPeers(peers []*peer, chainID ids.ID, appGossipBytes []byte) error {
 	now := n.clock.Time()
 
