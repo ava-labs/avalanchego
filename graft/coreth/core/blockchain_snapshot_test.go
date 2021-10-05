@@ -439,15 +439,12 @@ func TestRestartWithNewSnapshot(t *testing.T) {
 	// Commit:   G
 	// Snapshot: G
 	//
-	// SetHead(0)
-	//
 	// ------------------------------
 	//
 	// Expected in leveldb:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8
 	//
 	// Expected head header    : C8
-	// Expected head fast block: C8
 	// Expected head block     : C8
 	// Expected snapshot disk  : G
 	test := &snapshotTest{
@@ -485,7 +482,6 @@ func TestNoCommitCrashWithNewSnapshot(t *testing.T) {
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8
 	//
 	// Expected head header    : C8
-	// Expected head fast block: C8
 	// Expected head block     : G
 	// Expected snapshot disk  : C4
 	test := &crashSnapshotTest{
@@ -523,7 +519,6 @@ func TestLowCommitCrashWithNewSnapshot(t *testing.T) {
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8
 	//
 	// Expected head header    : C8
-	// Expected head fast block: C8
 	// Expected head block     : C2
 	// Expected snapshot disk  : C4
 	test := &crashSnapshotTest{
@@ -561,7 +556,6 @@ func TestHighCommitCrashWithNewSnapshot(t *testing.T) {
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8
 	//
 	// Expected head header    : C8
-	// Expected head fast block: C8
 	// Expected head block     : G
 	// Expected snapshot disk  : C4
 	test := &crashSnapshotTest{
@@ -589,15 +583,12 @@ func TestGappedNewSnapshot(t *testing.T) {
 	// Commit:   G
 	// Snapshot: G
 	//
-	// SetHead(0)
-	//
 	// ------------------------------
 	//
 	// Expected in leveldb:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10
 	//
 	// Expected head header    : C10
-	// Expected head fast block: C10
 	// Expected head block     : C10
 	// Expected snapshot disk  : C10
 	test := &gappedSnapshotTest{
@@ -626,15 +617,12 @@ func TestRecoverSnapshotFromWipingCrash(t *testing.T) {
 	// Commit:   G
 	// Snapshot: G
 	//
-	// SetHead(0)
-	//
 	// ------------------------------
 	//
 	// Expected in leveldb:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10
 	//
 	// Expected head header    : C10
-	// Expected head fast block: C10
 	// Expected head block     : C8
 	// Expected snapshot disk  : C10
 	test := &wipeCrashSnapshotTest{
