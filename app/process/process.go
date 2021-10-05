@@ -187,6 +187,10 @@ func (p *process) Start() error {
 			if err := dbManager.Close(); err != nil {
 				log.Warn("failed to close the node's DB: %s", err)
 			}
+
+			// If [p.node.Dispatch()] panics, then we should log the panic and
+			// then re-raise the panic. This is why the above defer is broken
+			// into two parts.
 			log.StopOnPanic()
 		}()
 
