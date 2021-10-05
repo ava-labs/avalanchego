@@ -6,8 +6,9 @@ package app
 import (
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
+
+	"golang.org/x/sync/errgroup"
 )
 
 type App interface {
@@ -34,19 +35,13 @@ func Run(app App) int {
 	signal.Notify(signals, syscall.SIGTERM)
 
 	// start up a new go routine to handle attempts to kill the application
-	var (
-		stopErr error
-		wg      sync.WaitGroup
-	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	var eg errgroup.Group
+	eg.Go(func() error {
 		for range signals {
-			if err := app.Stop(); err != nil {
-				stopErr = err
-			}
+			return app.Stop()
 		}
-	}()
+		return nil
+	})
 
 	// wait for the app to exit and get the exit code response
 	exitCode, err := app.ExitCode()
@@ -54,10 +49,9 @@ func Run(app App) int {
 	// shut down the signal go routine
 	signal.Stop(signals)
 	close(signals)
-	wg.Wait()
 
 	// if there was an error closing the application, report that error
-	if stopErr != nil {
+	if err := eg.Wait(); err != nil {
 		return 1
 	}
 
