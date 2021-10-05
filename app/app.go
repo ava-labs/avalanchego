@@ -12,10 +12,13 @@ import (
 )
 
 type App interface {
-	// Start kicks off the application and returns immediately
+	// Start kicks off the application and returns immediately.
+	// Start should only be called once.
 	Start() error
 
-	// Stop notifies the application to exit and returns immediately
+	// Stop notifies the application to exit and returns immediately.
+	// Stop should only be called after [Start].
+	// It is safe to call Stop multiple times.
 	Stop() error
 
 	// ExitCode should only be called after [Start] returns with no error. It
@@ -24,7 +27,7 @@ type App interface {
 }
 
 func Run(app App) int {
-	// starting running the application
+	// start running the application
 	if err := app.Start(); err != nil {
 		return 1
 	}
@@ -50,13 +53,8 @@ func Run(app App) int {
 	signal.Stop(signals)
 	close(signals)
 
-	// if there was an error closing the application, report that error
-	if err := eg.Wait(); err != nil {
-		return 1
-	}
-
-	// if there was an error running the application, report that error
-	if err != nil {
+	// if there was an error closing or running the application, report that error
+	if eg.Wait() != nil || err != nil {
 		return 1
 	}
 

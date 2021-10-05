@@ -52,8 +52,8 @@ func NewApp(config node.Config) app.App {
 	}
 }
 
-// Run creates and starts running an AvalancheGo node. This function should
-// return immediately.
+// Start the business logic of the node (as opposed to config reading, etc).
+// Does not block until the node is done.
 func (p *process) Start() error {
 	// Set the data directory permissions to be read write.
 	if err := perms.ChmodR(p.config.DatabaseConfig.Path, true, perms.ReadWriteExecute); err != nil {
@@ -103,9 +103,9 @@ func (p *process) Start() error {
 
 	// Check if transaction signatures should be checked
 	if !p.config.EnableCrypto {
+		// TODO: actually disable crypto verification
 		log.Warn("transaction signatures are not being checked")
 	}
-	// TODO: disable crypto verification
 
 	// Track if assertions should be executed
 	if p.config.LoggingConfig.Assertions {
@@ -170,15 +170,16 @@ func (p *process) Start() error {
 		return err
 	}
 
+	// [p.ExitCode] will block until [p.exitWG.Done] is called
 	p.exitWG.Add(1)
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
 				fmt.Println("caught panic", r)
 			}
-			p.exitWG.Done()
 			log.Stop()
 			logFactory.Close()
+			p.exitWG.Done()
 		}()
 		defer func() {
 			mapper.UnmapAllPorts()

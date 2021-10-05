@@ -26,7 +26,7 @@ func Run(config Config, nodeConfig node.Config) {
 		plugin.Serve(&plugin.ServeConfig{
 			HandshakeConfig: appplugin.Handshake,
 			Plugins: map[string]plugin.Plugin{
-				"nodeProcess": appplugin.New(nodeApp),
+				appplugin.Name: appplugin.New(nodeApp),
 			},
 			GRPCServer: plugin.DefaultGRPCServer, // A non-nil value here enables gRPC serving for this plugin
 			Logger: hclog.New(&hclog.LoggerOptions{

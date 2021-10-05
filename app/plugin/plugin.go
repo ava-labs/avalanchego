@@ -14,6 +14,10 @@ import (
 	"github.com/ava-labs/avalanchego/app/plugin/pluginproto"
 )
 
+const (
+	Name = "nodeProcess"
+)
+
 var Handshake = plugin.HandshakeConfig{
 	ProtocolVersion:  2,
 	MagicCookieKey:   "NODE_PROCESS_PLUGIN",
@@ -22,7 +26,7 @@ var Handshake = plugin.HandshakeConfig{
 
 // PluginMap is the map of plugins we can dispense.
 var PluginMap = map[string]plugin.Plugin{
-	"nodeProcess": &AppPlugin{},
+	Name: &AppPlugin{},
 }
 
 // AppPlugin is can be served/consumed with the hashicorp plugin library.

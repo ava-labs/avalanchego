@@ -34,7 +34,7 @@ func Exec(path string, args []string, forwardIO bool) (app.App, *plugin.Client, 
 		return nil, nil, fmt.Errorf("couldn't get client at path %s: %w", path, err)
 	}
 
-	raw, err := rpcClient.Dispense("nodeProcess")
+	raw, err := rpcClient.Dispense(Name)
 	if err != nil {
 		client.Kill()
 		return nil, nil, fmt.Errorf("couldn't dispense plugin at path %s': %w", path, err)
