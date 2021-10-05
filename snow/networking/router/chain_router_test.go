@@ -372,37 +372,13 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	engine := common.EngineTest{T: t}
 	engine.Default(false)
 
-	var (
-		calledGetFailed, calledGetAncestorsFailed,
-		calledQueryFailed, calledQueryFailed2,
-		calledGetAcceptedFailed, calledGetAcceptedFrontierFailed bool
+	calledF := new(bool)
 
-		wg = sync.WaitGroup{}
-	)
+	wg := sync.WaitGroup{}
 
-	engine.GetFailedF = func(nodeID ids.ShortID, requestID uint32) error { wg.Done(); calledGetFailed = true; return nil }
-	engine.GetAncestorsFailedF = func(nodeID ids.ShortID, requestID uint32) error {
+	engine.PullQueryF = func(nodeID ids.ShortID, requestID uint32, containerID ids.ID) error {
 		defer wg.Done()
-		calledGetAncestorsFailed = true
-		return nil
-	}
-	engine.QueryFailedF = func(nodeID ids.ShortID, requestID uint32) error {
-		defer wg.Done()
-		if !calledQueryFailed {
-			calledQueryFailed = true
-			return nil
-		}
-		calledQueryFailed2 = true
-		return nil
-	}
-	engine.GetAcceptedFailedF = func(nodeID ids.ShortID, requestID uint32) error {
-		defer wg.Done()
-		calledGetAcceptedFailed = true
-		return nil
-	}
-	engine.GetAcceptedFrontierFailedF = func(nodeID ids.ShortID, requestID uint32) error {
-		defer wg.Done()
-		calledGetAcceptedFrontierFailed = true
+		*calledF = true
 		return nil
 	}
 
@@ -429,38 +405,25 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	chainRouter.AddChain(handler)
 	go handler.Dispatch()
 
-	// Register requests for each request type
-	msgs := []constants.MsgType{
-		constants.GetMsg,
-		constants.GetAncestorsMsg,
-		constants.PullQueryMsg,
-		constants.PushQueryMsg,
-		constants.GetAcceptedMsg,
-		constants.GetAcceptedFrontierMsg,
-	}
-
 	// generate a non-validator ID
 	nID := ids.GenerateTestShortID()
-	for i, msg := range msgs {
-		chainRouter.RegisterRequest(nID, handler.ctx.ChainID, uint32(i), msg)
-	}
+
+	*calledF = false
+	timeout := chainRouter.clock.Time().Add(30 * time.Second)
+	chainRouter.PullQuery(nID, handler.ctx.ChainID, uint32(1), timeout, ids.GenerateTestID(), func() {})
 	// should not be called
-	assert.False(t, calledGetFailed && calledGetAncestorsFailed && calledQueryFailed2 && calledGetAcceptedFailed && calledGetAcceptedFrontierFailed)
+	assert.False(t, *calledF)
 
 	// validator case
-	wg.Add(len(msgs))
-
-	for i, msg := range msgs {
-		chainRouter.RegisterRequest(vID, handler.ctx.ChainID, uint32(i), msg)
-	}
-
+	*calledF = false
+	wg.Add(1)
+	chainRouter.PullQuery(vID, handler.ctx.ChainID, uint32(2), timeout, ids.GenerateTestID(), func() {})
 	wg.Wait()
-
 	// should be called since this is a validator request
-	assert.True(t, calledGetFailed && calledGetAncestorsFailed && calledQueryFailed2 && calledGetAcceptedFailed && calledGetAcceptedFrontierFailed)
+	assert.True(t, *calledF)
 
 	// register a validator request
-	reqID := uint32(3333)
+	reqID := uint32(3)
 	chainRouter.RegisterRequest(vID, handler.ctx.ChainID, reqID, constants.GetMsg)
 	assert.Equal(t, 1, chainRouter.timedRequests.Len())
 	// remove it from validators
