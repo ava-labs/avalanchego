@@ -913,11 +913,6 @@ func (cr *ChainRouter) AppResponse(
 		return
 	}
 	request := requestIntf.(requestEntry)
-	if request.msgType != constants.AppRequestMsg {
-		// We got back a reply of wrong type. Ignore.
-		onFinishedHandling()
-		return
-	}
 	cr.removeRequest(uniqueRequestID)
 
 	// check if this subnet is validator only, if so drop the non-validator related messages.
