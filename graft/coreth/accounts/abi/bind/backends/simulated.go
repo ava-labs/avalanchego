@@ -394,8 +394,8 @@ func (b *SimulatedBackend) TransactionInBlock(ctx context.Context, blockHash com
 	return transactions[index], nil
 }
 
-// PendingCodeAt returns the code associated with an account in the pending state.
-func (b *SimulatedBackend) PendingCodeAt(ctx context.Context, contract common.Address) ([]byte, error) {
+// AcceptedCodeAt returns the code associated with an account in the pending state.
+func (b *SimulatedBackend) AcceptedCodeAt(ctx context.Context, contract common.Address) ([]byte, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -472,9 +472,9 @@ func (b *SimulatedBackend) PendingCallContract(ctx context.Context, call interfa
 	return res.Return(), res.Err
 }
 
-// PendingNonceAt implements PendingStateReader.PendingNonceAt, retrieving
+// AcceptedNonceAt implements PendingStateReader.AcceptedNonceAt, retrieving
 // the nonce currently pending for the account.
-func (b *SimulatedBackend) PendingNonceAt(ctx context.Context, account common.Address) (uint64, error) {
+func (b *SimulatedBackend) AcceptedNonceAt(ctx context.Context, account common.Address) (uint64, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 

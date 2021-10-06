@@ -776,7 +776,7 @@ func TestTransactionInBlock(t *testing.T) {
 	}
 
 	// expect pending nonce to be 0 since account has not been used
-	pendingNonce, err := sim.PendingNonceAt(bgCtx, testAddr)
+	pendingNonce, err := sim.AcceptedNonceAt(bgCtx, testAddr)
 	if err != nil {
 		t.Errorf("did not get the pending nonce: %v", err)
 	}
@@ -826,7 +826,7 @@ func TestTransactionInBlock(t *testing.T) {
 	}
 }
 
-func TestPendingNonceAt(t *testing.T) {
+func TestAcceptedNonceAt(t *testing.T) {
 	testAddr := crypto.PubkeyToAddress(testKey.PublicKey)
 
 	sim := simTestBackend(testAddr)
@@ -834,7 +834,7 @@ func TestPendingNonceAt(t *testing.T) {
 	bgCtx := context.Background()
 
 	// expect pending nonce to be 0 since account has not been used
-	pendingNonce, err := sim.PendingNonceAt(bgCtx, testAddr)
+	pendingNonce, err := sim.AcceptedNonceAt(bgCtx, testAddr)
 	if err != nil {
 		t.Errorf("did not get the pending nonce: %v", err)
 	}
@@ -861,7 +861,7 @@ func TestPendingNonceAt(t *testing.T) {
 	}
 
 	// expect pending nonce to be 1 since account has submitted one transaction
-	pendingNonce, err = sim.PendingNonceAt(bgCtx, testAddr)
+	pendingNonce, err = sim.AcceptedNonceAt(bgCtx, testAddr)
 	if err != nil {
 		t.Errorf("did not get the pending nonce: %v", err)
 	}
@@ -883,7 +883,7 @@ func TestPendingNonceAt(t *testing.T) {
 	}
 
 	// expect pending nonce to be 2 since account now has two transactions
-	pendingNonce, err = sim.PendingNonceAt(bgCtx, testAddr)
+	pendingNonce, err = sim.AcceptedNonceAt(bgCtx, testAddr)
 	if err != nil {
 		t.Errorf("did not get the pending nonce: %v", err)
 	}
@@ -944,7 +944,7 @@ func TestSuggestGasPrice(t *testing.T) {
 	}
 }
 
-func TestPendingCodeAt(t *testing.T) {
+func TestAcceptedCodeAt(t *testing.T) {
 	testAddr := crypto.PubkeyToAddress(testKey.PublicKey)
 	sim := simTestBackend(testAddr)
 	defer sim.Close()
@@ -967,7 +967,7 @@ func TestPendingCodeAt(t *testing.T) {
 		t.Errorf("could not deploy contract: %v tx: %v contract: %v", err, tx, contract)
 	}
 
-	code, err = sim.PendingCodeAt(bgCtx, contractAddr)
+	code, err = sim.AcceptedCodeAt(bgCtx, contractAddr)
 	if err != nil {
 		t.Errorf("could not get code at test addr: %v", err)
 	}

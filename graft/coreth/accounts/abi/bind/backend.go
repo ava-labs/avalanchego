@@ -67,8 +67,8 @@ type ContractCaller interface {
 // Call will try to discover this interface when access to the pending state is requested.
 // If the backend does not support the pending state, Call returns ErrNoPendingState.
 type PendingContractCaller interface {
-	// PendingCodeAt returns the code of the given account in the pending state.
-	PendingCodeAt(ctx context.Context, contract common.Address) ([]byte, error)
+	// AcceptedCodeAt returns the code of the given account in the pending state.
+	AcceptedCodeAt(ctx context.Context, contract common.Address) ([]byte, error)
 
 	// PendingCallContract executes an Ethereum contract call against the pending state.
 	PendingCallContract(ctx context.Context, call interfaces.CallMsg) ([]byte, error)
@@ -83,11 +83,11 @@ type ContractTransactor interface {
 	// number is nil, the latest known header is returned.
 	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)
 
-	// PendingCodeAt returns the code of the given account in the pending state.
-	PendingCodeAt(ctx context.Context, account common.Address) ([]byte, error)
+	// AcceptedCodeAt returns the code of the given account in the pending state.
+	AcceptedCodeAt(ctx context.Context, account common.Address) ([]byte, error)
 
-	// PendingNonceAt retrieves the current pending nonce associated with an account.
-	PendingNonceAt(ctx context.Context, account common.Address) (uint64, error)
+	// AcceptedNonceAt retrieves the current pending nonce associated with an account.
+	AcceptedNonceAt(ctx context.Context, account common.Address) (uint64, error)
 
 	// SuggestGasPrice retrieves the currently suggested gas price to allow a timely
 	// execution of a transaction.
