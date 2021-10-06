@@ -403,13 +403,13 @@ func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appRespon
 
 // SendAppGossip sends an application-level gossip message to peers.
 func (s *Sender) SendAppGossip(appResponseBytes []byte) error {
-	s.sender.SendAppGossip(s.ctx.SubnetID, s.ctx.ChainID, appResponseBytes)
+	s.sender.SendAppGossip(s.ctx.SubnetID, s.ctx.ChainID, appResponseBytes, s.ctx.IsValidatorOnly())
 	return nil
 }
 
 // SendAppGossip sends an application-level gossip message to specified peers.
 func (s *Sender) SendAppGossipSpecific(nodeIDs ids.ShortSet, appResponseBytes []byte) error {
-	s.sender.SendAppGossipSpecific(nodeIDs, s.ctx.SubnetID, s.ctx.ChainID, appResponseBytes)
+	s.sender.SendAppGossipSpecific(nodeIDs, s.ctx.SubnetID, s.ctx.ChainID, appResponseBytes, s.ctx.IsValidatorOnly())
 	return nil
 }
 
@@ -428,5 +428,5 @@ func (s *Sender) SendChits(nodeID ids.ShortID, requestID uint32, votes []ids.ID)
 // SendGossip gossips the provided container
 func (s *Sender) SendGossip(containerID ids.ID, container []byte) {
 	s.ctx.Log.Verbo("Gossiping %s", containerID)
-	s.sender.SendGossip(s.ctx.SubnetID, s.ctx.ChainID, containerID, container)
+	s.sender.SendGossip(s.ctx.SubnetID, s.ctx.ChainID, containerID, container, s.ctx.IsValidatorOnly())
 }

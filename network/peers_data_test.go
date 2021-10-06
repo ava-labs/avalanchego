@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/stretchr/testify/assert"
 )
@@ -106,6 +107,7 @@ func TestPeersDataSample(t *testing.T) {
 	data.initialize()
 	trackedSubnetIDs := ids.Set{}
 	trackedSubnetIDs.Add(constants.PrimaryNetworkID)
+	networkWithValidators := &network{config: &Config{Validators: validators.NewManager()}}
 	// Case: Empty
 	peers, err := data.sample(constants.PrimaryNetworkID, false, 0)
 	assert.NoError(t, err)
@@ -119,6 +121,7 @@ func TestPeersDataSample(t *testing.T) {
 	peer1 := peer{
 		nodeID:         ids.ShortID{0x01},
 		trackedSubnets: trackedSubnetIDs,
+		net:            networkWithValidators,
 	}
 	data.add(&peer1)
 	peers, err = data.sample(constants.PrimaryNetworkID, false, 0)
@@ -129,7 +132,7 @@ func TestPeersDataSample(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, peers, 0)
 
-	// Case: 1 peer who hasn't finished handshake, 1 who has
+	// Case-1: peer who hasn't finished handshake, 1 who has
 	peer2 := peer{
 		nodeID:         ids.ShortID{0x02},
 		trackedSubnets: trackedSubnetIDs,
@@ -151,7 +154,7 @@ func TestPeersDataSample(t *testing.T) {
 	assert.Len(t, peers, 1)
 	assert.EqualValues(t, peers[0].nodeID, peer2.nodeID)
 
-	// Case: 2 peers who have finished handshake
+	// Case-2: peers who have finished handshake
 	peer1.finishedHandshake.SetValue(true)
 	peers, err = data.sample(constants.PrimaryNetworkID, false, 0)
 	assert.NoError(t, err)
@@ -179,6 +182,7 @@ func TestPeersDataSample(t *testing.T) {
 			(peers[0].nodeID == peer2.nodeID && peers[1].nodeID == peer1.nodeID),
 	)
 
+	// Case-3: peers who track testSubnet
 	testSubnetID := ids.GenerateTestID()
 
 	// no peers has this subnet
@@ -203,4 +207,8 @@ func TestPeersDataSample(t *testing.T) {
 
 	// Ensure peer is sampled
 	assert.Equal(t, peer3.nodeID, peers[0].nodeID)
+
+	peers, err = data.sample(constants.PrimaryNetworkID, false, 3)
+	assert.NoError(t, err)
+	assert.Len(t, peers, 3)
 }

@@ -44,6 +44,7 @@ var (
 	errNetworkClosed         = errors.New("network closed")
 	errPeerIsMyself          = errors.New("peer is myself")
 	errNetworkLayerUnhealthy = errors.New("network layer is unhealthy")
+	errNoPrimaryValidators   = errors.New("no default subnet validators")
 )
 
 var _ Network = &network{}
@@ -242,8 +243,8 @@ type Config struct {
 	// WhitelistedSubnets of the node
 	WhitelistedSubnets ids.Set        `json:"whitelistedSubnets"`
 	Beacons            validators.Set `json:"beacons"`
-	// Set of current validators in the Avalanche network
-	Validators validators.Set `json:"validators"`
+	// Current validators in the Avalanche network
+	Validators validators.Manager `json:"validators"`
 
 	// Require that all connections must have at least one validator between the
 	// 2 peers. This can be useful to enable if the node wants to connect to the
@@ -299,12 +300,16 @@ func NewNetwork(
 	netw.clientUpgrader = NewTLSClientUpgrader(config.TLSConfig)
 
 	netw.dialer = dialer.NewDialer(constants.NetworkType, config.DialerConfig, log)
+	primaryNetworkValidators, ok := config.Validators.GetValidators(constants.PrimaryNetworkID)
+	if !ok {
+		return nil, errNoPrimaryValidators
+	}
 
 	inboundMsgThrottler, err := throttling.NewSybilInboundMsgThrottler(
 		log,
 		config.Namespace,
 		metricsRegisterer,
-		config.Validators,
+		primaryNetworkValidators,
 		config.ThrottlerConfig.InboundMsgThrottlerConfig,
 	)
 	if err != nil {
@@ -316,7 +321,7 @@ func NewNetwork(
 		log,
 		config.Namespace,
 		metricsRegisterer,
-		config.Validators,
+		primaryNetworkValidators,
 		config.ThrottlerConfig.OutboundMsgThrottlerConfig,
 	)
 	if err != nil {
@@ -817,11 +822,11 @@ func (n *network) SendAppResponse(nodeID ids.ShortID, chainID ids.ID, requestID 
 
 // AppGossip implements the Sender interface.
 // assumes the stateLock is not held.
-func (n *network) SendAppGossip(subnetID, chainID ids.ID, appGossipBytes []byte) {
+func (n *network) SendAppGossip(subnetID, chainID ids.ID, appGossipBytes []byte, validatorOnly bool) {
 	n.stateLock.RLock()
 	// Gossip the message to [n.config.AppGossipNonValidatorSize] random nodes
-	// in the network.
-	peersAll, err := n.peers.sample(subnetID, false, int(n.config.AppGossipNonValidatorSize))
+	// in the network. If this is a validator only subnet, selects only validators.
+	peersAll, err := n.peers.sample(subnetID, validatorOnly, int(n.config.AppGossipNonValidatorSize))
 	if err != nil {
 		n.log.Debug("failed to sample %d peers for AppGossip: %s", n.config.AppGossipNonValidatorSize, err)
 		n.stateLock.RUnlock()
@@ -845,8 +850,8 @@ func (n *network) SendAppGossip(subnetID, chainID ids.ID, appGossipBytes []byte)
 }
 
 // SendAppGossipSpecific attempts to gossip the container to specific peers.
-func (n *network) SendAppGossipSpecific(nodeIDs ids.ShortSet, subnetID, chainID ids.ID, appGossipBytes []byte) {
-	peers := n.getPeers(nodeIDs)
+func (n *network) SendAppGossipSpecific(nodeIDs ids.ShortSet, subnetID, chainID ids.ID, appGossipBytes []byte, validatorOnly bool) {
+	peers := n.getSubnetPeers(nodeIDs, subnetID, validatorOnly)
 	if err := n.appGossipPeers(peers, chainID, appGossipBytes); err != nil {
 		n.log.Debug("failed to SendAppGossipSpecific(%s, %s): %s", chainID, err)
 		n.log.Verbo("message:\n%s", formatting.DumpBytes{Bytes: appGossipBytes})
@@ -855,8 +860,8 @@ func (n *network) SendAppGossipSpecific(nodeIDs ids.ShortSet, subnetID, chainID 
 
 // SendGossip attempts to gossip the container to the network
 // Assumes [n.stateLock] is not held.
-func (n *network) SendGossip(subnetID, chainID, containerID ids.ID, container []byte) {
-	if err := n.gossipContainer(subnetID, chainID, containerID, container, n.config.GossipAcceptedFrontierSize); err != nil {
+func (n *network) SendGossip(subnetID, chainID, containerID ids.ID, container []byte, validatorOnly bool) {
+	if err := n.gossipContainer(subnetID, chainID, containerID, container, n.config.GossipAcceptedFrontierSize, validatorOnly); err != nil {
 		n.log.Debug("failed to Gossip(%s, %s): %s", chainID, containerID, err)
 		n.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
 	}
@@ -869,7 +874,7 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 		// don't gossip during bootstrapping
 		return nil
 	}
-	return n.gossipContainer(ctx.SubnetID, ctx.ChainID, containerID, container, n.config.GossipOnAcceptSize)
+	return n.gossipContainer(ctx.SubnetID, ctx.ChainID, containerID, container, n.config.GossipOnAcceptSize, ctx.IsValidatorOnly())
 }
 
 // shouldUpgradeIncoming returns whether we should
@@ -910,8 +915,8 @@ func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 // if this node is a validator, or the peer is a validator/beacon.
 func (n *network) shouldHoldConnection(peerID ids.ShortID) bool {
 	return !n.config.RequireValidatorToConnect ||
-		n.config.Validators.Contains(n.config.MyNodeID) ||
-		n.config.Validators.Contains(peerID) ||
+		n.config.Validators.Contains(constants.PrimaryNetworkID, n.config.MyNodeID) ||
+		n.config.Validators.Contains(constants.PrimaryNetworkID, peerID) ||
 		n.config.Beacons.Contains(peerID)
 }
 
@@ -1093,7 +1098,7 @@ func (n *network) IP() utils.IPDesc {
 }
 
 // Assumes [n.stateLock] is not held.
-func (n *network) gossipContainer(subnetID, chainID, containerID ids.ID, container []byte, numToGossip uint) error {
+func (n *network) gossipContainer(subnetID, chainID, containerID ids.ID, container []byte, numToGossip uint, validatorOnly bool) error {
 	now := n.clock.Time()
 
 	// Sent to peers that handle compressed messages (and messages with the isCompress flag)
@@ -1104,7 +1109,7 @@ func (n *network) gossipContainer(subnetID, chainID, containerID ids.ID, contain
 	}
 
 	n.stateLock.RLock()
-	peers, err := n.peers.sample(subnetID, false, int(numToGossip))
+	peers, err := n.peers.sample(subnetID, validatorOnly, int(numToGossip))
 	n.stateLock.RUnlock()
 	if err != nil {
 		return err
@@ -1213,7 +1218,7 @@ func (n *network) gossipPeerList() {
 		stakers := make([]*peer, 0, len(allPeers))
 		nonStakers := make([]*peer, 0, len(allPeers))
 		for _, peer := range allPeers {
-			if n.config.Validators.Contains(peer.nodeID) {
+			if n.config.Validators.Contains(constants.PrimaryNetworkID, peer.nodeID) {
 				stakers = append(stakers, peer)
 			} else {
 				nonStakers = append(nonStakers, peer)
@@ -1551,7 +1556,7 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 			continue
 		case peerIP.IsZero():
 			continue
-		case !n.config.Validators.Contains(peer.nodeID):
+		case !n.config.Validators.Contains(constants.PrimaryNetworkID, peer.nodeID):
 			continue
 		}
 
@@ -1644,7 +1649,7 @@ func (n *network) disconnected(p *peer) {
 		delete(n.disconnectedIPs, str)
 		delete(n.connectedIPs, str)
 
-		if n.config.Validators.Contains(p.nodeID) {
+		if n.config.Validators.Contains(constants.PrimaryNetworkID, p.nodeID) {
 			n.track(ip, p.nodeID)
 		}
 	}
@@ -1682,7 +1687,7 @@ func (n *network) getPeerElements(nodeIDs ids.ShortSet) []*peerElement {
 
 // Safe copy the peers
 // Assumes [n.stateLock] is not held.
-func (n *network) getPeers(nodeIDs ids.ShortSet) []*peer {
+func (n *network) getSubnetPeers(nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) []*peer {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
@@ -1693,7 +1698,7 @@ func (n *network) getPeers(nodeIDs ids.ShortSet) []*peer {
 	peers := make([]*peer, 0, nodeIDs.Len())
 	for nodeID := range nodeIDs {
 		peer, ok := n.peers.getByID(nodeID)
-		if ok {
+		if ok && peer.trackedSubnets.Contains(subnetID) && (!validatorOnly || n.config.Validators.Contains(subnetID, nodeID)) {
 			peers = append(peers, peer)
 		}
 	}
