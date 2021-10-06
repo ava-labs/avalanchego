@@ -1022,11 +1022,11 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 	timeReqRunning := now.Sub(processingRequest)
 	isOutstanding := timeReqRunning <= cr.healthConfig.MaxOutstandingDuration
 	healthy = healthy && isOutstanding
+	details["longestRunningRequest"] = timeReqRunning.String()
+	cr.metrics.longestRunningRequest.Set(float64(timeReqRunning))
 	if !isOutstanding {
 		errReasons = append(errReasons, fmt.Sprintf("time for outstanding requests %s > %s", timeReqRunning, cr.healthConfig.MaxOutstandingDuration))
 	}
-	details["longestRunningRequest"] = timeReqRunning.String()
-	cr.metrics.longestRunningRequest.Set(float64(timeReqRunning))
 
 	if len(errReasons) != 0 {
 		details[health.HealthErrorReason] = errReasons
