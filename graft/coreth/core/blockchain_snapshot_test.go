@@ -445,8 +445,8 @@ func TestRestartWithNewSnapshot(t *testing.T) {
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8
 	//
 	// Expected head header    : C8
-	// Expected head block     : C8
-	// Expected snapshot disk  : G
+	// Expected head block     : C4
+	// Expected snapshot disk  : C4
 	test := &snapshotTest{
 		snapshotTestBasic{
 			chainBlocks:        8,
@@ -482,7 +482,7 @@ func TestNoCommitCrashWithNewSnapshot(t *testing.T) {
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8
 	//
 	// Expected head header    : C8
-	// Expected head block     : G
+	// Expected head block     : C4
 	// Expected snapshot disk  : C4
 	test := &crashSnapshotTest{
 		snapshotTestBasic{
@@ -519,7 +519,7 @@ func TestLowCommitCrashWithNewSnapshot(t *testing.T) {
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8
 	//
 	// Expected head header    : C8
-	// Expected head block     : C2
+	// Expected head block     : C4
 	// Expected snapshot disk  : C4
 	test := &crashSnapshotTest{
 		snapshotTestBasic{
@@ -556,7 +556,7 @@ func TestHighCommitCrashWithNewSnapshot(t *testing.T) {
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8
 	//
 	// Expected head header    : C8
-	// Expected head block     : G
+	// Expected head block     : C4
 	// Expected snapshot disk  : C4
 	test := &crashSnapshotTest{
 		snapshotTestBasic{
@@ -588,9 +588,9 @@ func TestGappedNewSnapshot(t *testing.T) {
 	// Expected in leveldb:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10
 	//
-	// Expected head header    : C10
-	// Expected head block     : C10
-	// Expected snapshot disk  : C10
+	// Expected head header    : C8
+	// Expected head block     : G
+	// Expected snapshot disk  : G
 	test := &gappedSnapshotTest{
 		snapshotTestBasic: snapshotTestBasic{
 			chainBlocks:        8,
@@ -622,9 +622,9 @@ func TestRecoverSnapshotFromWipingCrash(t *testing.T) {
 	// Expected in leveldb:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10
 	//
-	// Expected head header    : C10
-	// Expected head block     : C8
-	// Expected snapshot disk  : C10
+	// Expected head header    : C8
+	// Expected head block     : C4
+	// Expected snapshot disk  : C4
 	test := &wipeCrashSnapshotTest{
 		snapshotTestBasic: snapshotTestBasic{
 			chainBlocks:        8,
