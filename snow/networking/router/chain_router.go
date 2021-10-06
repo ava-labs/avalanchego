@@ -6,6 +6,7 @@ package router
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/health"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
@@ -998,10 +1000,17 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
+	var errReasons []string
+
 	numOutstandingReqs := cr.timedRequests.Len()
-	healthy := numOutstandingReqs <= cr.healthConfig.MaxOutstandingRequests
+	isOutstandingReqs := numOutstandingReqs <= cr.healthConfig.MaxOutstandingRequests
+	healthy := isOutstandingReqs
 	details := map[string]interface{}{
 		"outstandingRequests": numOutstandingReqs,
+	}
+	if !isOutstandingReqs {
+		errReasons = append(errReasons,
+			fmt.Sprintf("number of outstanding requests %d > %d", numOutstandingReqs, cr.healthConfig.MaxOutstandingRequests))
 	}
 
 	// check for long running requests
@@ -1011,9 +1020,17 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 		processingRequest = longestRunning.(requestEntry).time
 	}
 	timeReqRunning := now.Sub(processingRequest)
-	healthy = healthy && timeReqRunning <= cr.healthConfig.MaxOutstandingDuration
+	isOutstanding := timeReqRunning <= cr.healthConfig.MaxOutstandingDuration
+	healthy = healthy && isOutstanding
+	if !isOutstanding {
+		errReasons = append(errReasons, fmt.Sprintf("time for outstanding requests %s > %s", timeReqRunning, cr.healthConfig.MaxOutstandingDuration))
+	}
 	details["longestRunningRequest"] = timeReqRunning.String()
 	cr.metrics.longestRunningRequest.Set(float64(timeReqRunning))
+
+	if len(errReasons) != 0 {
+		details[health.HealthErrorReason] = errReasons
+	}
 
 	if !healthy {
 		// The router is not healthy

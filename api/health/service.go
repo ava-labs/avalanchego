@@ -9,14 +9,15 @@ import (
 
 	stdjson "encoding/json"
 
+	healthlib "github.com/ava-labs/avalanchego/health"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	healthConstants "github.com/ava-labs/avalanchego/utils/health"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/gorilla/rpc/v2"
 	"github.com/prometheus/client_golang/prometheus"
 
 	health "github.com/AppsFlyer/go-sundheit"
-	healthlib "github.com/ava-labs/avalanchego/health"
 )
 
 var _ Service = &apiServer{}
@@ -91,13 +92,36 @@ type APIHealthArgs struct{}
 // APIHealthReply is the response for Health
 type APIHealthReply struct {
 	Checks  map[string]health.Result `json:"checks"`
+	Reasons *[]string                `json:"reasons,omitempty"`
 	Healthy bool                     `json:"healthy"`
+}
+
+func (as *apiServer) calculateErrorResponses(results map[string]health.Result) *[]string {
+	var errorResponses []string
+	for _, v := range results {
+		switch details := v.Details.(type) {
+		case map[string]interface{}:
+			for detailKey, detailValue := range details {
+				if detailKey == healthConstants.HealthErrorReason {
+					if errResp, ok := detailValue.([]string); ok {
+						errorResponses = append(errorResponses, errResp...)
+					}
+				}
+			}
+		default:
+		}
+	}
+	if len(errorResponses) != 0 {
+		return &errorResponses
+	}
+	return nil
 }
 
 // Health returns a summation of the health of the node
 func (as *apiServer) Health(_ *http.Request, _ *APIHealthArgs, reply *APIHealthReply) error {
 	as.log.Debug("Health.health called")
 	reply.Checks, reply.Healthy = as.Results()
+	reply.Reasons = as.calculateErrorResponses(reply.Checks)
 	if reply.Healthy {
 		return nil
 	}

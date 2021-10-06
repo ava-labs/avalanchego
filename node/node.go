@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"net"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/hashicorp/go-plugin"
@@ -43,6 +44,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	healthConstants "github.com/ava-labs/avalanchego/utils/health"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/profiler"
@@ -65,12 +67,11 @@ var (
 	genesisHashKey  = []byte("genesisID")
 	indexerDBPrefix = []byte{0x00}
 
-	errPrimarySubnetNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
-	errInvalidTLSKey                = errors.New("invalid TLS key")
-	errPNotCreated                  = errors.New("P-Chain not created")
-	errXNotCreated                  = errors.New("X-Chain not created")
-	errCNotCreated                  = errors.New("C-Chain not created")
-	errFailedToRegisterHealthCheck  = errors.New("couldn't register network health check")
+	errInvalidTLSKey               = errors.New("invalid TLS key")
+	errPNotCreated                 = errors.New("P-Chain not created")
+	errXNotCreated                 = errors.New("X-Chain not created")
+	errCNotCreated                 = errors.New("C-Chain not created")
+	errFailedToRegisterHealthCheck = errors.New("couldn't register network health check")
 )
 
 // Node is an instance of an Avalanche node.
@@ -891,6 +892,26 @@ func (n *Node) initHealthAPI() error {
 	}
 	n.healthService = healthService
 
+	isChainBootStrapped := func(pChainID ids.ID, xChainID ids.ID, cChainID ids.ID) ([]string, string, bool) {
+		pBooted := n.chainManager.IsBootstrapped(pChainID)
+		xBooted := n.chainManager.IsBootstrapped(xChainID)
+		cBooted := n.chainManager.IsBootstrapped(cChainID)
+		var chains []string
+		if !pBooted {
+			chains = append(chains, "'P'")
+		}
+		if !xBooted {
+			chains = append(chains, "'X'")
+		}
+		if !cBooted {
+			chains = append(chains, "'C'")
+		}
+		if len(chains) == 0 {
+			return chains, "", pBooted || xBooted || cBooted
+		}
+		return chains, strings.Join(chains, ","), pBooted || xBooted || cBooted
+	}
+
 	isBootstrappedFunc := func() (interface{}, error) {
 		if pChainID, err := n.chainManager.Lookup("P"); err != nil {
 			return nil, errPNotCreated
@@ -898,8 +919,15 @@ func (n *Node) initHealthAPI() error {
 			return nil, errXNotCreated
 		} else if cChainID, err := n.chainManager.Lookup("C"); err != nil {
 			return nil, errCNotCreated
-		} else if !n.chainManager.IsBootstrapped(pChainID) || !n.chainManager.IsBootstrapped(xChainID) || !n.chainManager.IsBootstrapped(cChainID) {
-			return nil, errPrimarySubnetNotBootstrapped
+		} else if chains, msg, ok := isChainBootStrapped(pChainID, xChainID, cChainID); !ok {
+			var chainReasons []string
+			for _, chain := range chains {
+				chainReasons = append(chainReasons, fmt.Sprintf("%s not bootstrapped", chain))
+			}
+			details := map[string]interface{}{
+				healthConstants.HealthErrorReason: chainReasons,
+			}
+			return details, fmt.Errorf("primary subnet %s chain not finished bootstrapping", msg)
 		}
 
 		return nil, nil

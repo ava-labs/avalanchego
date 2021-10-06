@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/metrics"
 	"github.com/ava-labs/avalanchego/snow/events"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/health"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
@@ -98,11 +99,14 @@ func (c *common) Finalized() bool {
 // HealthCheck returns information about the consensus health.
 func (c *common) HealthCheck() (interface{}, error) {
 	numOutstandingTxs := c.Latency.ProcessingLen()
-	healthy := numOutstandingTxs <= c.params.MaxOutstandingItems
+	isOutstandingTxs := numOutstandingTxs <= c.params.MaxOutstandingItems
+	healthy := isOutstandingTxs
 	details := map[string]interface{}{
 		"outstandingTransactions": numOutstandingTxs,
 	}
-
+	if !isOutstandingTxs {
+		details[health.HealthErrorReason] = []string{fmt.Sprintf("number of outstanding txs %d > %d", numOutstandingTxs, c.params.MaxOutstandingItems)}
+	}
 	if !healthy {
 		return details, errUnhealthy
 	}

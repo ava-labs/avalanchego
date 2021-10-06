@@ -5,6 +5,7 @@ package avalanche
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -236,9 +237,13 @@ func (ta *Topological) Finalized() bool { return ta.cg.Finalized() }
 // HealthCheck returns information about the consensus health.
 func (ta *Topological) HealthCheck() (interface{}, error) {
 	numOutstandingVtx := ta.Latency.ProcessingLen()
-	healthy := numOutstandingVtx <= ta.params.MaxOutstandingItems
+	isOutstandingVtx := numOutstandingVtx <= ta.params.MaxOutstandingItems
+	healthy := isOutstandingVtx
 	details := map[string]interface{}{
 		"outstandingVertices": numOutstandingVtx,
+	}
+	if !isOutstandingVtx {
+		details["errorResponse"] = []string{fmt.Sprintf("number outstanding vertexes %d > %d", numOutstandingVtx, ta.params.MaxOutstandingItems)}
 	}
 
 	snowstormReport, err := ta.cg.HealthCheck()
