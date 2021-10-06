@@ -253,6 +253,16 @@ type Config struct {
 	RequireValidatorToConnect bool `json:"requireValidatorToConnect"`
 }
 
+// peerElement holds onto the peer object as a result of helper functions
+type peerElement struct {
+	// the peer, if it wasn't a peer when we cloned the list this value will be
+	// nil
+	peer *peer
+	// this is the validator id for the peer, we pass back to the caller for
+	// logging purposes
+	id ids.ShortID
+}
+
 // NewNetwork returns a new Network implementation with the provided parameters.
 func NewNetwork(
 	config *Config,
@@ -346,7 +356,7 @@ func (n *network) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, chainID ids.ID, 
 
 	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
 	now := n.clock.Time()
-	for _, peerElement := range n.getPeers(nodeIDs) {
+	for _, peerElement := range n.getPeerElements(nodeIDs) {
 		peer := peerElement.peer
 		nodeID := peerElement.id
 		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
@@ -425,7 +435,7 @@ func (n *network) SendGetAccepted(nodeIDs ids.ShortSet, chainID ids.ID, requestI
 	msgLen := len(msg.Bytes())
 
 	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
-	for _, peerElement := range n.getPeers(nodeIDs) {
+	for _, peerElement := range n.getPeerElements(nodeIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
 		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
@@ -645,7 +655,7 @@ func (n *network) SendPushQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID 
 	}
 
 	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
-	for _, peerElement := range n.getPeers(nodeIDs) {
+	for _, peerElement := range n.getPeerElements(nodeIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
 		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
@@ -681,7 +691,7 @@ func (n *network) SendPullQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID 
 	msgLen := len(msg.Bytes())
 
 	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
-	for _, peerElement := range n.getPeers(nodeIDs) {
+	for _, peerElement := range n.getPeerElements(nodeIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
 		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
@@ -757,7 +767,7 @@ func (n *network) SendAppRequest(nodeIDs ids.ShortSet, chainID ids.ID, requestID
 	}
 
 	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
-	for _, peerElement := range n.getPeers(nodeIDs) {
+	for _, peerElement := range n.getPeerElements(nodeIDs) {
 		peer := peerElement.peer
 		nodeID := peerElement.id
 		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
@@ -810,16 +820,6 @@ func (n *network) SendAppResponse(nodeID ids.ShortID, chainID ids.ID, requestID 
 // AppGossip implements the Sender interface.
 // assumes the stateLock is not held.
 func (n *network) SendAppGossip(subnetID, chainID ids.ID, appGossipBytes []byte) {
-	now := n.clock.Time()
-
-	msg, err := n.b.AppGossip(chainID, appGossipBytes, n.config.CompressionEnabled)
-	if err != nil {
-		n.log.Error("failed to build AppGossip(%s): %s", chainID, err)
-		n.log.Verbo("message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
-		n.sendFailRateCalculator.Observe(1, now)
-		return
-	}
-
 	n.stateLock.RLock()
 	// Gossip the message to [n.config.AppGossipNonValidatorSize] random nodes
 	// in the network.
@@ -839,30 +839,19 @@ func (n *network) SendAppGossip(subnetID, chainID ids.ID, appGossipBytes []byte)
 		n.log.Debug("failed to sample %d validators for AppGossip: %s", n.config.AppGossipValidatorSize, err)
 		return
 	}
+	peersAll = append(peersAll, peersValidators...)
+	if err := n.appGossipPeers(peersAll, chainID, appGossipBytes); err != nil {
+		n.log.Debug("failed to SendAppGossip(%s, %s): %s", chainID, err)
+		n.log.Verbo("message:\n%s", formatting.DumpBytes{Bytes: appGossipBytes})
+	}
+}
 
-	sentPeers := ids.ShortSet{}
-	for _, peers := range [][]*peer{peersAll, peersValidators} {
-		for _, peer := range peers {
-			if sentPeers.Contains(peer.nodeID) {
-				continue
-			}
-			sentPeers.Add(peer.nodeID)
-
-			sent := peer.Send(msg, false)
-			if !sent {
-				n.log.Debug("failed to send AppGossip(%s, %s)", peer.nodeID, chainID)
-				n.log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
-				n.metrics.appGossip.numFailed.Inc()
-				n.sendFailRateCalculator.Observe(1, now)
-			} else {
-				n.metrics.appGossip.numSent.Inc()
-				n.metrics.appGossip.sentBytes.Add(float64(len(msg.Bytes())))
-				n.sendFailRateCalculator.Observe(0, now)
-				if saved := msg.BytesSavedCompression(); saved != 0 {
-					n.metrics.appGossip.savedSentBytes.Observe(float64(saved))
-				}
-			}
-		}
+// SendAppGossipSpecific attempts to gossip the container to specific peers.
+func (n *network) SendAppGossipSpecific(nodeIDs ids.ShortSet, subnetID, chainID ids.ID, appGossipBytes []byte) {
+	peers := n.getPeers(nodeIDs)
+	if err := n.appGossipPeers(peers, chainID, appGossipBytes); err != nil {
+		n.log.Debug("failed to SendAppGossipSpecific(%s, %s): %s", chainID, err)
+		n.log.Verbo("message:\n%s", formatting.DumpBytes{Bytes: appGossipBytes})
 	}
 }
 
@@ -1136,6 +1125,41 @@ func (n *network) gossipContainer(subnetID, chainID, containerID ids.ID, contain
 		} else {
 			n.sendFailRateCalculator.Observe(1, now)
 			n.metrics.put.numFailed.Inc()
+		}
+	}
+	return nil
+}
+
+// helper method for SendAppGossip/SendAppGossipSpecific
+func (n *network) appGossipPeers(peers []*peer, chainID ids.ID, appGossipBytes []byte) error {
+	now := n.clock.Time()
+
+	msg, err := n.b.AppGossip(chainID, appGossipBytes, n.config.CompressionEnabled)
+	if err != nil {
+		n.sendFailRateCalculator.Observe(1, now)
+		return fmt.Errorf("failed to build AppGossip(%s): %w", chainID, err)
+	}
+
+	sentPeers := ids.ShortSet{}
+	for _, peer := range peers {
+		// should never be nil but just in case
+		if peer == nil || sentPeers.Contains(peer.nodeID) {
+			continue
+		}
+		sentPeers.Add(peer.nodeID)
+		sent := peer.Send(msg, false)
+		if !sent {
+			n.log.Debug("failed to send AppGossip(%s, %s)", peer.nodeID, chainID)
+			n.log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
+			n.metrics.appGossip.numFailed.Inc()
+			n.sendFailRateCalculator.Observe(1, now)
+		} else {
+			n.metrics.appGossip.numSent.Inc()
+			n.metrics.appGossip.sentBytes.Add(float64(len(msg.Bytes())))
+			n.sendFailRateCalculator.Observe(0, now)
+			if saved := msg.BytesSavedCompression(); saved != 0 {
+				n.metrics.appGossip.savedSentBytes.Observe(float64(saved))
+			}
 		}
 	}
 	return nil
@@ -1634,19 +1658,9 @@ func (n *network) disconnected(p *peer) {
 	n.metrics.disconnected.Inc()
 }
 
-// PeerElement holds onto the peer object as a result of helper functions
-type PeerElement struct {
-	// the peer, if it wasn't a peer when we cloned the list this value will be
-	// nil
-	peer *peer
-	// this is the validator id for the peer, we pass back to the caller for
-	// logging purposes
-	id ids.ShortID
-}
-
-// Safe copy the peers dressed as a PeerElement
+// Safe copy the peers dressed as a peerElement
 // Assumes [n.stateLock] is not held.
-func (n *network) getPeers(nodeIDs ids.ShortSet) []*PeerElement {
+func (n *network) getPeerElements(nodeIDs ids.ShortSet) []*peerElement {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
@@ -1654,18 +1668,37 @@ func (n *network) getPeers(nodeIDs ids.ShortSet) []*PeerElement {
 		return nil
 	}
 
-	peers := make([]*PeerElement, nodeIDs.Len())
+	peerElements := make([]*peerElement, nodeIDs.Len())
 	i := 0
 	for nodeID := range nodeIDs {
 		nodeID := nodeID                   // Prevent overwrite in next loop iteration
 		peer, _ := n.peers.getByID(nodeID) // note: peer may be nil
-		peers[i] = &PeerElement{
+		peerElements[i] = &peerElement{
 			peer: peer,
 			id:   nodeID,
 		}
 		i++
 	}
+	return peerElements
+}
 
+// Safe copy the peers
+// Assumes [n.stateLock] is not held.
+func (n *network) getPeers(nodeIDs ids.ShortSet) []*peer {
+	n.stateLock.RLock()
+	defer n.stateLock.RUnlock()
+
+	if n.closed.GetValue() {
+		return nil
+	}
+
+	peers := make([]*peer, 0, nodeIDs.Len())
+	for nodeID := range nodeIDs {
+		peer, ok := n.peers.getByID(nodeID)
+		if ok {
+			peers = append(peers, peer)
+		}
+	}
 	return peers
 }
 

@@ -22,11 +22,10 @@ import (
 
 func TestSetChainConfigs(t *testing.T) {
 	tests := map[string]struct {
-		configs      map[string]string
-		upgrades     map[string]string
-		corethConfig string
-		errMessage   string
-		expected     map[string]chains.ChainConfig
+		configs    map[string]string
+		upgrades   map[string]string
+		errMessage string
+		expected   map[string]chains.ChainConfig
 	}{
 		"no chain configs": {
 			configs:  map[string]string{},
@@ -60,50 +59,13 @@ func TestSetChainConfigs(t *testing.T) {
 				return m
 			}(),
 		},
-		"coreth config only": {
-			configs:      map[string]string{},
-			upgrades:     map[string]string{},
-			corethConfig: "hello",
-			expected:     map[string]chains.ChainConfig{"C": {Config: []byte("hello"), Upgrade: []byte(nil)}},
-		},
-		"coreth with c alias chain config": {
-			configs:      map[string]string{"C": "hello", "X": "world"},
-			upgrades:     map[string]string{"C": "upgradess"},
-			corethConfig: "hellocoreth",
-			errMessage:   "is already provided",
-			expected:     nil,
-		},
-		"coreth with evm alias chain config": {
-			configs:      map[string]string{"evm": "hello", "X": "world"},
-			upgrades:     map[string]string{"evm": "upgradess"},
-			corethConfig: "hellocoreth",
-			errMessage:   "is already provided",
-			expected:     nil,
-		},
-		"coreth and c chain upgrades in config": {
-			configs:      map[string]string{"X": "world"},
-			upgrades:     map[string]string{"C": "upgradess"},
-			corethConfig: "hello",
-			expected: func() map[string]chains.ChainConfig {
-				m := map[string]chains.ChainConfig{}
-				m["C"] = chains.ChainConfig{Config: []byte("hello"), Upgrade: []byte("upgradess")}
-				m["X"] = chains.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
-
-				return m
-			}(),
-		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			assert := assert.New(t)
 			root := t.TempDir()
-			var configJSON string
-			if len(test.corethConfig) > 0 {
-				configJSON = fmt.Sprintf(`{%q: %q, %q: %q}`, ChainConfigDirKey, root, CorethConfigKey, test.corethConfig)
-			} else {
-				configJSON = fmt.Sprintf(`{%q: %q}`, ChainConfigDirKey, root)
-			}
+			configJSON := fmt.Sprintf(`{%q: %q}`, ChainConfigDirKey, root)
 			configFile := setupConfigJSON(t, root, configJSON)
 			chainsDir := root
 			// Create custom configs

@@ -94,9 +94,6 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(DBTypeKey, leveldb.Name, fmt.Sprintf("Database type to use. Should be one of {%s, %s, %s}", leveldb.Name, rocksdb.Name, memdb.Name))
 	fs.String(DBPathKey, defaultDBDir, "Path to database directory")
 
-	// Coreth config
-	fs.String(CorethConfigKey, "", "DEPRECATED")
-
 	// Logging
 	fs.String(LogsDirKey, "", "Logging directory for Avalanche")
 	fs.String(LogLevelKey, "info", "The log level. Should be one of {verbo, debug, trace, info, warn, error, fatal, off}")

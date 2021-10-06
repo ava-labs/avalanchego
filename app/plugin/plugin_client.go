@@ -6,32 +6,36 @@ package plugin
 import (
 	"context"
 
-	appproto "github.com/ava-labs/avalanchego/app/plugin/proto"
+	"google.golang.org/protobuf/types/known/emptypb"
+
+	"github.com/ava-labs/avalanchego/app/plugin/pluginproto"
 )
 
 type Client struct {
-	client appproto.NodeClient
+	client pluginproto.NodeClient
 }
 
-// NewServer returns a vm instance connected to a remote vm instance
-func NewClient(node appproto.NodeClient) *Client {
+// NewServer returns an app instance connected to a remote app instance
+func NewClient(node pluginproto.NodeClient) *Client {
 	return &Client{
 		client: node,
 	}
 }
 
-// Blocks until the node is done shutting down.
-// Returns the node's exit code.
-func (c *Client) Start() (int, error) {
-	resp, err := c.client.Start(context.Background(), &appproto.StartRequest{})
-	if err != nil {
-		return 1, err
-	}
-	return int(resp.ExitCode), nil
+func (c *Client) Start() error {
+	_, err := c.client.Start(context.Background(), &emptypb.Empty{})
+	return err
 }
 
-// Blocks until the node is done shutting down.
 func (c *Client) Stop() error {
-	_, err := c.client.Stop(context.Background(), &appproto.StopRequest{})
+	_, err := c.client.Stop(context.Background(), &emptypb.Empty{})
 	return err
+}
+
+func (c *Client) ExitCode() (int, error) {
+	resp, err := c.client.ExitCode(context.Background(), &emptypb.Empty{})
+	if err != nil {
+		return 0, err
+	}
+	return int(resp.ExitCode), nil
 }

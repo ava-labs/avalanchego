@@ -11,9 +11,10 @@ import (
 )
 
 var (
-	errSendAppRequest  = errors.New("unexpectedly called SendAppRequest")
-	errSendAppResponse = errors.New("unexpectedly called SendAppResponse")
-	errSendAppGossip   = errors.New("unexpectedly called SendAppGossip")
+	errSendAppRequest        = errors.New("unexpectedly called SendAppRequest")
+	errSendAppResponse       = errors.New("unexpectedly called SendAppResponse")
+	errSendAppGossip         = errors.New("unexpectedly called SendAppGossip")
+	errSendAppGossipSpecific = errors.New("unexpectedly called SendAppGossipSpecific")
 )
 
 // SenderTest is a test sender
@@ -25,7 +26,7 @@ type SenderTest struct {
 	CantSendGet, CantSendGetAncestors, CantSendPut, CantSendMultiPut,
 	CantSendPullQuery, CantSendPushQuery, CantSendChits,
 	CantSendGossip,
-	CantSendAppRequest, CantSendAppResponse, CantSendAppGossip bool
+	CantSendAppRequest, CantSendAppResponse, CantSendAppGossip, CantSendAppGossipSpecific bool
 
 	SendGetAcceptedFrontierF func(ids.ShortSet, uint32)
 	SendAcceptedFrontierF    func(ids.ShortID, uint32, []ids.ID)
@@ -42,6 +43,7 @@ type SenderTest struct {
 	SendAppRequestF          func(ids.ShortSet, uint32, []byte) error
 	SendAppResponseF         func(ids.ShortID, uint32, []byte) error
 	SendAppGossipF           func([]byte) error
+	SendAppGossipSpecificF   func(ids.ShortSet, []byte) error
 }
 
 // Default set the default callable value to [cant]
@@ -61,6 +63,7 @@ func (s *SenderTest) Default(cant bool) {
 	s.CantSendAppRequest = cant
 	s.CantSendAppResponse = cant
 	s.CantSendAppGossip = cant
+	s.CantSendAppGossipSpecific = cant
 }
 
 // SendGetAcceptedFrontier calls SendGetAcceptedFrontierF if it was initialized.
@@ -232,4 +235,17 @@ func (s *SenderTest) SendAppGossip(appGossipBytes []byte) error {
 		s.T.Fatal(errSendAppGossip)
 	}
 	return errSendAppGossip
+}
+
+// SendAppGossipSpecific calls SendAppGossipSpecificF if it was initialized. If it wasn't
+// initialized and this function shouldn't be called and testing was
+// initialized, then testing will fail.
+func (s *SenderTest) SendAppGossipSpecific(nodeIDs ids.ShortSet, appGossipBytes []byte) error {
+	switch {
+	case s.SendAppGossipSpecificF != nil:
+		return s.SendAppGossipSpecificF(nodeIDs, appGossipBytes)
+	case s.CantSendAppGossipSpecific && s.T != nil:
+		s.T.Fatal(errSendAppGossipSpecific)
+	}
+	return errSendAppGossipSpecific
 }
