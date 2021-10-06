@@ -409,7 +409,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	nID := ids.GenerateTestShortID()
 
 	*calledF = false
-	timeout := chainRouter.clock.Time().Add(30 * time.Second)
+	timeout := chainRouter.clock.Time().Add(time.Hour)
 	chainRouter.PullQuery(nID, handler.ctx.ChainID, uint32(1), timeout, ids.GenerateTestID(), func() {})
 	// should not be called
 	assert.False(t, *calledF)
@@ -432,6 +432,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	calledFinished := false
 	chainRouter.Put(vID, handler.ctx.ChainID, reqID, ids.GenerateTestID(), nil, func() { calledFinished = true })
 	assert.True(t, calledFinished)
-	// should clear out timed request
-	assert.Equal(t, 0, chainRouter.timedRequests.Len())
+	// shouldn't clear out timed request, as the request should be cleared when
+	// the GetFailed message is sent
+	assert.Equal(t, 1, chainRouter.timedRequests.Len())
 }
