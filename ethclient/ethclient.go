@@ -411,6 +411,17 @@ func toFilterArg(q interfaces.FilterQuery) (interface{}, error) {
 	return arg, nil
 }
 
+// PendingCodeAt returns the contract code of the given account in the pending state.
+func (ec *Client) AcceptedCodeAt(ctx context.Context, account common.Address) ([]byte, error) {
+	return ec.CodeAt(ctx, account, nil)
+}
+
+// PendingNonceAt returns the account nonce of the given account in the pending state.
+// This is the nonce that should be used for the next transaction.
+func (ec *Client) AcceptedNonceAt(ctx context.Context, account common.Address) (uint64, error) {
+	return ec.NonceAt(ctx, account, nil)
+}
+
 // Contract Calling
 
 // CallContract executes a message call transaction, which is directly executed in the VM

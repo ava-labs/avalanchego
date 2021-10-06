@@ -183,7 +183,7 @@ func (c *BoundContract) Call(opts *CallOpts, results *[]interface{}, method stri
 		output, err = pb.PendingCallContract(ctx, msg)
 		if err == nil && len(output) == 0 {
 			// Make sure we have a contract to operate on, and bail out otherwise.
-			if code, err = pb.PendingCodeAt(ctx, c.address); err != nil {
+			if code, err = pb.AcceptedCodeAt(ctx, c.address); err != nil {
 				return err
 			} else if len(code) == 0 {
 				return ErrNoCode
@@ -253,7 +253,7 @@ func (c *BoundContract) transact(opts *TransactOpts, contract *common.Address, i
 	}
 	var nonce uint64
 	if opts.Nonce == nil {
-		nonce, err = c.transactor.PendingNonceAt(ensureContext(opts.Context), opts.From)
+		nonce, err = c.transactor.AcceptedNonceAt(ensureContext(opts.Context), opts.From)
 		if err != nil {
 			return nil, fmt.Errorf("failed to retrieve account nonce: %v", err)
 		}
@@ -302,7 +302,7 @@ func (c *BoundContract) transact(opts *TransactOpts, contract *common.Address, i
 	if gasLimit == 0 {
 		// Gas estimation cannot succeed without code for method invocations
 		if contract != nil {
-			if code, err := c.transactor.PendingCodeAt(ensureContext(opts.Context), c.address); err != nil {
+			if code, err := c.transactor.AcceptedCodeAt(ensureContext(opts.Context), c.address); err != nil {
 				return nil, err
 			} else if len(code) == 0 {
 				return nil, ErrNoCode

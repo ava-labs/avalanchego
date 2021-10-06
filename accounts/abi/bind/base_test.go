@@ -60,7 +60,7 @@ func (mc *mockCaller) CallContract(ctx context.Context, call interfaces.CallMsg,
 	return nil, nil
 }
 
-func (mc *mockCaller) PendingCodeAt(ctx context.Context, contract common.Address) ([]byte, error) {
+func (mc *mockCaller) AcceptedCodeAt(ctx context.Context, contract common.Address) ([]byte, error) {
 	mc.pendingCodeAtCalled = true
 	return nil, nil
 }
