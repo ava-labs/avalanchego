@@ -34,6 +34,18 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+// rewindTest is a test case for chain rollback upon user request.
+type rewindTest struct {
+	canonicalBlocks int    // Number of blocks to generate for the canonical chain (heavier)
+	sidechainBlocks int    // Number of blocks to generate for the side chain (lighter)
+	commitBlock     uint64 // Block number for which to commit the state to disk
+
+	expCanonicalBlocks int    // Number of canonical blocks expected to remain in the database (excl. genesis)
+	expSidechainBlocks int    // Number of sidechain blocks expected to remain in the database (excl. genesis)
+	expHeadHeader      uint64 // Block number of the expected head header
+	expHeadBlock       uint64 // Block number of the expected head full block
+}
+
 // Tests a recovery for a short canonical chain where a recent block was already
 // committed to disk and then the process crashed. In this case we expect the full
 // chain to be rolled back to the committed block, but the chain data itself left
