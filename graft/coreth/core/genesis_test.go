@@ -1,3 +1,13 @@
+// (c) 2019-2021, Ava Labs, Inc.
+//
+// This file is a derived work, based on the go-ethereum library whose original
+// notices appear below.
+//
+// It is distributed under a license compatible with the licensing terms of the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********
 // Copyright 2017 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
@@ -57,7 +67,25 @@ func TestToBlock(t *testing.T) {
 	if block.Hash() != fakeRopstenGenesisHash {
 		t.Errorf("wrong ropsten genesis hash, got %v, want %v", block.Hash(), fakeRopstenGenesisHash)
 	}
+	block = fakeRinkebyGenesisBlock().ToBlock(nil)
+	if block.Hash() != fakeRinkebyGenesisHash {
+		t.Errorf("wrong ropsten genesis hash, got %v, want %v", block.Hash(), fakeRinkebyGenesisHash)
+	}
+	block = fakeGoerliGenesisBlock().ToBlock(nil)
+	if block.Hash() != fakeGoerliGenesisHash {
+		t.Errorf("wrong ropsten genesis hash, got %v, want %v", block.Hash(), fakeGoerliGenesisHash)
+	}
 }
+
+/*
+func TestInvalidCliqueConfig(t *testing.T) {
+	block := fakeGoerliGenesisBlock()
+	block.ExtraData = []byte{}
+	if _, err := block.Commit(nil); err == nil {
+		t.Fatal("Expected error on invalid clique config")
+	}
+}
+*/
 
 func TestSetupGenesis(t *testing.T) {
 	var (
