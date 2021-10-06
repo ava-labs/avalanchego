@@ -44,7 +44,7 @@ type ExternalSenderTest struct {
 	SendAppRequestF        func(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, appRequestBytes []byte) []ids.ShortID
 	SendAppResponseF       func(nodeIDs ids.ShortID, chainID ids.ID, requestID uint32, appResponseBytyes []byte)
 	SendAppGossipF         func(subnetID, chainID ids.ID, appGossipBytyes []byte, validatorOnly bool)
-	SendAppGossipSpecificF func(nodeIDs ids.ShortSet, subnetID, chainID ids.ID, appGossipBytyes []byte)
+	SendAppGossipSpecificF func(nodeIDs ids.ShortSet, subnetID, chainID ids.ID, appGossipBytyes []byte, validatorOnly bool)
 }
 
 // Default set the default callable value to [cant]
@@ -277,10 +277,10 @@ func (s *ExternalSenderTest) SendAppGossip(subnetID, chainID ids.ID, appGossipBy
 // SendAppGossipSpecific calls SendAppGossipSpecificF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *ExternalSenderTest) SendAppGossipSpecific(nodeIDs ids.ShortSet, subnetID, chainID ids.ID, appGossipBytes []byte) {
+func (s *ExternalSenderTest) SendAppGossipSpecific(nodeIDs ids.ShortSet, subnetID, chainID ids.ID, appGossipBytes []byte, validatorOnly bool) {
 	switch {
 	case s.SendAppGossipSpecificF != nil:
-		s.SendAppGossipSpecificF(nodeIDs, subnetID, chainID, appGossipBytes)
+		s.SendAppGossipSpecificF(nodeIDs, subnetID, chainID, appGossipBytes, validatorOnly)
 	case s.CantSendAppGossipSpecific && s.T != nil:
 		s.T.Fatalf("Unexpectedly called SendAppGossipSpecific")
 	case s.CantSendAppGossipSpecific && s.B != nil:

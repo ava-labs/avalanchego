@@ -850,8 +850,8 @@ func (n *network) SendAppGossip(subnetID, chainID ids.ID, appGossipBytes []byte,
 }
 
 // SendAppGossipSpecific attempts to gossip the container to specific peers.
-func (n *network) SendAppGossipSpecific(nodeIDs ids.ShortSet, subnetID, chainID ids.ID, appGossipBytes []byte) {
-	peers := n.getPeers(nodeIDs)
+func (n *network) SendAppGossipSpecific(nodeIDs ids.ShortSet, subnetID, chainID ids.ID, appGossipBytes []byte, validatorOnly bool) {
+	peers := n.getSubnetPeers(nodeIDs, subnetID, validatorOnly)
 	if err := n.appGossipPeers(peers, chainID, appGossipBytes); err != nil {
 		n.log.Debug("failed to SendAppGossipSpecific(%s, %s): %s", chainID, err)
 		n.log.Verbo("message:\n%s", formatting.DumpBytes{Bytes: appGossipBytes})
@@ -1687,7 +1687,7 @@ func (n *network) getPeerElements(nodeIDs ids.ShortSet) []*peerElement {
 
 // Safe copy the peers
 // Assumes [n.stateLock] is not held.
-func (n *network) getPeers(nodeIDs ids.ShortSet) []*peer {
+func (n *network) getSubnetPeers(nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) []*peer {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
@@ -1698,7 +1698,7 @@ func (n *network) getPeers(nodeIDs ids.ShortSet) []*peer {
 	peers := make([]*peer, 0, nodeIDs.Len())
 	for nodeID := range nodeIDs {
 		peer, ok := n.peers.getByID(nodeID)
-		if ok {
+		if ok && peer.trackedSubnets.Contains(subnetID) && (!validatorOnly || n.config.Validators.Contains(subnetID, nodeID)) {
 			peers = append(peers, peer)
 		}
 	}

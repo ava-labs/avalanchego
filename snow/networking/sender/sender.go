@@ -409,7 +409,7 @@ func (s *Sender) SendAppGossip(appResponseBytes []byte) error {
 
 // SendAppGossip sends an application-level gossip message to specified peers.
 func (s *Sender) SendAppGossipSpecific(nodeIDs ids.ShortSet, appResponseBytes []byte) error {
-	s.sender.SendAppGossipSpecific(nodeIDs, s.ctx.SubnetID, s.ctx.ChainID, appResponseBytes)
+	s.sender.SendAppGossipSpecific(nodeIDs, s.ctx.SubnetID, s.ctx.ChainID, appResponseBytes, s.ctx.IsValidatorOnly())
 	return nil
 }
 

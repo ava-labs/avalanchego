@@ -2881,7 +2881,7 @@ func TestAppGossip(t *testing.T) {
 	net0.SendAppGossip(constants.PrimaryNetworkID, chainID, testAppGossipBytes, false)
 	specificNodeSet := ids.NewShortSet(1)
 	specificNodeSet.Add(id2)
-	net0.SendAppGossipSpecific(specificNodeSet, constants.PrimaryNetworkID, chainID, testAppGossipSpecificBytes)
+	net0.SendAppGossipSpecific(specificNodeSet, constants.PrimaryNetworkID, chainID, testAppGossipSpecificBytes, false)
 
 	wg1P.Wait()
 	wg2P.Wait()
