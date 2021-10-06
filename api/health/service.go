@@ -9,7 +9,6 @@ import (
 
 	stdjson "encoding/json"
 
-	healthlib "github.com/ava-labs/avalanchego/health"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	healthConstants "github.com/ava-labs/avalanchego/utils/health"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -18,6 +17,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	health "github.com/AppsFlyer/go-sundheit"
+	healthlib "github.com/ava-labs/avalanchego/health"
 )
 
 var _ Service = &apiServer{}

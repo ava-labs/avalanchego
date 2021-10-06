@@ -892,7 +892,7 @@ func (n *Node) initHealthAPI() error {
 	}
 	n.healthService = healthService
 
-	isChainBootStrapped := func(pChainID ids.ID, xChainID ids.ID, cChainID ids.ID) ([]string, string, bool) {
+	isChainBootStrapped := func(pChainID ids.ID, xChainID ids.ID, cChainID ids.ID) ([]string, bool) {
 		pBooted := n.chainManager.IsBootstrapped(pChainID)
 		xBooted := n.chainManager.IsBootstrapped(xChainID)
 		cBooted := n.chainManager.IsBootstrapped(cChainID)
@@ -907,9 +907,9 @@ func (n *Node) initHealthAPI() error {
 			chains = append(chains, "'C'")
 		}
 		if len(chains) == 0 {
-			return chains, "", pBooted || xBooted || cBooted
+			return chains, pBooted || xBooted || cBooted
 		}
-		return chains, strings.Join(chains, ","), pBooted || xBooted || cBooted
+		return chains, pBooted || xBooted || cBooted
 	}
 
 	isBootstrappedFunc := func() (interface{}, error) {
@@ -919,7 +919,7 @@ func (n *Node) initHealthAPI() error {
 			return nil, errXNotCreated
 		} else if cChainID, err := n.chainManager.Lookup("C"); err != nil {
 			return nil, errCNotCreated
-		} else if chains, msg, ok := isChainBootStrapped(pChainID, xChainID, cChainID); !ok {
+		} else if chains, ok := isChainBootStrapped(pChainID, xChainID, cChainID); !ok {
 			var chainReasons []string
 			for _, chain := range chains {
 				chainReasons = append(chainReasons, fmt.Sprintf("%s not bootstrapped", chain))
@@ -927,7 +927,7 @@ func (n *Node) initHealthAPI() error {
 			details := map[string]interface{}{
 				healthConstants.HealthErrorReason: chainReasons,
 			}
-			return details, fmt.Errorf("primary subnet %s chain not finished bootstrapping", msg)
+			return details, fmt.Errorf("primary subnet %s chain not finished bootstrapping", strings.Join(chains, ", "))
 		}
 
 		return nil, nil
