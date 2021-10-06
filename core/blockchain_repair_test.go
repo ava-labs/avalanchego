@@ -55,7 +55,7 @@ func testShortRepair(t *testing.T, snapshots bool) {
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8
 	//
 	// Expected head header    : C8
-	// Expected head block     : C4
+	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    8,
 		sidechainBlocks:    0,
@@ -94,8 +94,8 @@ func testShortOldForkedRepair(t *testing.T, snapshots bool) {
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8
 	//   └->S1->S2->S3
 	//
-	// Expected head header    : C8
-	// Expected head block     : C4
+	// Expected head header    : C8 (C3 with no snapshots)
+	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    8,
 		sidechainBlocks:    3,
@@ -135,8 +135,8 @@ func testShortNewlyForkedRepair(t *testing.T, snapshots bool) {
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8
 	//   └->S1->S2->S3->S4->S5->S6
 	//
-	// Expected head header    : C8
-	// Expected head block     : C4
+	// Expected head header    : C8 (C6 with no snapshots)
+	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    8,
 		sidechainBlocks:    6,
@@ -175,8 +175,8 @@ func testShortReorgedRepair(t *testing.T, snapshots bool) {
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8
 	//   └->S1->S2->S3->S4->S5->S6->S7->S8->S9->S10
 	//
-	// Expected head header    : C8
-	// Expected head block     : C4
+	// Expected head header    : C8 (C10 with no snapshots)
+	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    8,
 		sidechainBlocks:    10,
@@ -193,10 +193,10 @@ func testShortReorgedRepair(t *testing.T, snapshots bool) {
 	testRepair(t, rt, snapshots)
 }
 
-// Tests a recovery for a long canonical chain with frozen blocks where a recent
-// block - newer than the ancient limit - was already committed to disk and then
-// the process crashed. In this case we expect the chain to be rolled back to the
-// committed block, with everything afterwads kept as fast sync data.
+// Tests a recovery for a long canonical chain where a recent block was already
+// committed to disk and then the process crashed. In this case we expect the chain
+// to be rolled back to the committed block, but the chain data itself left in the
+// database for replaying.
 func TestLongShallowRepair(t *testing.T)              { testLongShallowRepair(t, false) }
 func TestLongShallowRepairWithSnapshots(t *testing.T) { testLongShallowRepair(t, true) }
 
@@ -211,10 +211,10 @@ func testLongShallowRepair(t *testing.T, snapshots bool) {
 	// ------------------------------
 	//
 	// Expected in leveldb:
-	//   C2)->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18
+	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18
 	//
 	// Expected head header    : C18
-	// Expected head block     : C4
+	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    18,
 		sidechainBlocks:    0,
@@ -230,10 +230,9 @@ func testLongShallowRepair(t *testing.T, snapshots bool) {
 	testRepair(t, rt, snapshots)
 }
 
-// Tests a recovery for a long canonical chain with frozen blocks where a recent
-// block - older than the ancient limit - was already committed to disk and then
-// the process crashed. In this case we expect the chain to be rolled back to the
-// committed block, with everything afterwads deleted.
+// Tests a recovery for a long canonical chain where a recent block was already committed
+// to disk and then the process crashed. In this case we expect the chain to be rolled
+// back to the committed block, but the chain data itself left in the database for replaying.
 func TestLongDeepRepair(t *testing.T)              { testLongDeepRepair(t, false) }
 func TestLongDeepRepairWithSnapshots(t *testing.T) { testLongDeepRepair(t, true) }
 
@@ -248,9 +247,10 @@ func testLongDeepRepair(t *testing.T, snapshots bool) {
 	// ------------------------------
 	//
 	// Expected in leveldb: none
+	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18->C19->C20->C21->C22->C23->C24
 	//
-	// Expected head header    : C4
-	// Expected head block     : C4
+	// Expected head header    : C24
+	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    24,
 		sidechainBlocks:    0,
@@ -266,12 +266,11 @@ func testLongDeepRepair(t *testing.T, snapshots bool) {
 	testRepair(t, rt, snapshots)
 }
 
-// Tests a recovery for a long canonical chain with frozen blocks and a shorter
-// side chain, where a recent block - newer than the ancient limit - was already
-// committed to disk and then the process crashed. In this test scenario the side
-// chain is below the committed block. In this case we expect the chain to be
-// rolled back to the committed block, with everything afterwads kept as fast
-// sync data; the side chain completely nuked by the freezer.
+// Tests a recovery for a long canonical chain with a shorter side chain, where a recent
+// block was already committed to disk and then the process crashed. In this test scenario
+// the side chain is below the committed block. In this case we expect the chain to be
+// rolled back to the committed block, but the chain data itself left in the database
+// for replaying.
 func TestLongOldForkedShallowRepair(t *testing.T) {
 	testLongOldForkedShallowRepair(t, false)
 }
@@ -291,10 +290,11 @@ func testLongOldForkedShallowRepair(t *testing.T, snapshots bool) {
 	// ------------------------------
 	//
 	// Expected in leveldb:
-	//   C2)->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18
+	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18
+	//   └->S1->S2->S3
 	//
-	// Expected head header    : C18
-	// Expected head block     : C4
+	// Expected head header    : C18 (C3 with no snapshots)
+	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    18,
 		sidechainBlocks:    3,
@@ -311,12 +311,10 @@ func testLongOldForkedShallowRepair(t *testing.T, snapshots bool) {
 	testRepair(t, rt, snapshots)
 }
 
-// Tests a recovery for a long canonical chain with frozen blocks and a shorter
-// side chain, where a recent block - older than the ancient limit - was already
-// committed to disk and then the process crashed. In this test scenario the side
-// chain is below the committed block. In this case we expect the canonical chain
-// to be rolled back to the committed block, with everything afterwads deleted;
-// the side chain completely nuked by the freezer.
+// Tests a recovery for a long canonical chain a shorter side chain, where a recent block
+// was already committed to disk and then the process crashed. In this test scenario the side
+// chain is below the committed block. In this case we expect the canonical chain to be
+// rolled back to the committed block, but the chain data itself left in the database for replaying.
 func TestLongOldForkedDeepRepair(t *testing.T)              { testLongOldForkedDeepRepair(t, false) }
 func TestLongOldForkedDeepRepairWithSnapshots(t *testing.T) { testLongOldForkedDeepRepair(t, true) }
 
@@ -331,10 +329,12 @@ func testLongOldForkedDeepRepair(t *testing.T, snapshots bool) {
 	//
 	// ------------------------------
 	//
-	// Expected in leveldb: none
+	// Expected in leveldb:
+	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18->C19->C20->C21->C22->C23->C24
+	//   └->S1->S2->S3
 	//
-	// Expected head header    : C4
-	// Expected head block     : C4
+	// Expected head header    : C24 (C3 with no snapshots)
+	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    24,
 		sidechainBlocks:    3,
@@ -351,12 +351,10 @@ func testLongOldForkedDeepRepair(t *testing.T, snapshots bool) {
 	testRepair(t, rt, snapshots)
 }
 
-// Tests a recovery for a long canonical chain with frozen blocks and a shorter
-// side chain, where a recent block - newer than the ancient limit - was already
-// committed to disk and then the process crashed. In this test scenario the side
-// chain is above the committed block. In this case we expect the chain to be
-// rolled back to the committed block, with everything afterwads kept as fast
-// sync data; the side chain completely nuked by the freezer.
+// Tests a recovery for a long canonical chain with a shorter side chain, where a recent
+// block was already committed to disk and then the process crashed. In this test scenario
+// the side chain is above the committed block. In this case we expect the chain to be
+// rolled back to the committed block, but the chain data itself left in the database for replaying.
 func TestLongNewerForkedShallowRepair(t *testing.T) {
 	testLongNewerForkedShallowRepair(t, false)
 }
@@ -376,10 +374,11 @@ func testLongNewerForkedShallowRepair(t *testing.T, snapshots bool) {
 	// ------------------------------
 	//
 	// Expected in leveldb:
-	//   C2)->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18
+	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18
+	//   └->S1->S2->S3->S4->S5->S6->S7->S8->S9->S10->S11->S12
 	//
-	// Expected head header    : C18
-	// Expected head block     : C4
+	// Expected head header    : C18 (C12 with no snapshots)
+	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    18,
 		sidechainBlocks:    12,
@@ -396,12 +395,10 @@ func testLongNewerForkedShallowRepair(t *testing.T, snapshots bool) {
 	testRepair(t, rt, snapshots)
 }
 
-// Tests a recovery for a long canonical chain with frozen blocks and a shorter
-// side chain, where a recent block - older than the ancient limit - was already
-// committed to disk and then the process crashed. In this test scenario the side
-// chain is above the committed block. In this case we expect the canonical chain
-// to be rolled back to the committed block, with everything afterwads deleted;
-// the side chain completely nuked by the freezer.
+// Tests a recovery for a long canonical chain with a shorter side chain, where a recent block
+// was already committed to disk and then the process crashed. In this test scenario the side
+// chain is above the committed block. In this case we expect the canonical chain to be rolled
+// back to the committed block, but the chain data itself left in the database for replaying.
 func TestLongNewerForkedDeepRepair(t *testing.T)              { testLongNewerForkedDeepRepair(t, false) }
 func TestLongNewerForkedDeepRepairWithSnapshots(t *testing.T) { testLongNewerForkedDeepRepair(t, true) }
 
@@ -416,10 +413,12 @@ func testLongNewerForkedDeepRepair(t *testing.T, snapshots bool) {
 	//
 	// ------------------------------
 	//
-	// Expected in leveldb: none
+	// Expected in leveldb:
+	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18->C19->C20->C21->C22->C23->C24
+	//   └->S1->S2->S3->S4->S5->S6->S7->S8->S9->S10->S11->S12
 	//
-	// Expected head header    : C4
-	// Expected head block     : C4
+	// Expected head header    : C24 (C12 with no snapshots)
+	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    24,
 		sidechainBlocks:    12,
@@ -436,11 +435,9 @@ func testLongNewerForkedDeepRepair(t *testing.T, snapshots bool) {
 	testRepair(t, rt, snapshots)
 }
 
-// Tests a recovery for a long canonical chain with frozen blocks and a longer side
-// chain, where a recent block - newer than the ancient limit - was already committed
-// to disk and then the process crashed. In this case we expect the chain to be
-// rolled back to the committed block, with everything afterwads kept as fast sync
-// data. The side chain completely nuked by the freezer.
+// Tests a recovery for a long canonical chain with a longer side chain, where a recent block
+// was already committed to disk and then the process crashed. In this case we expect the chain to be
+// rolled back to the committed block, but the chain data itself left in the database for replaying.
 func TestLongReorgedShallowRepair(t *testing.T)              { testLongReorgedShallowRepair(t, false) }
 func TestLongReorgedShallowRepairWithSnapshots(t *testing.T) { testLongReorgedShallowRepair(t, true) }
 
@@ -456,10 +453,11 @@ func testLongReorgedShallowRepair(t *testing.T, snapshots bool) {
 	// ------------------------------
 	//
 	// Expected in leveldb:
-	//   C2)->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18
+	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18
+	//   └->S1->S2->S3->S4->S5->S6->S7->S8->S9->S10->S11->S12->S13->S14->S15->S16->S17->S18->S19->S20->S21->S22->S23->S24->S25->S26
 	//
-	// Expected head header    : C18
-	// Expected head block     : C4
+	// Expected head header    : C18 (C26 with no snapshots)
+	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    18,
 		sidechainBlocks:    26,
@@ -476,11 +474,10 @@ func testLongReorgedShallowRepair(t *testing.T, snapshots bool) {
 	testRepair(t, rt, snapshots)
 }
 
-// Tests a recovery for a long canonical chain with frozen blocks and a longer side
-// chain, where a recent block - older than the ancient limit - was already committed
-// to disk and then the process crashed. In this case we expect the canonical chains
-// to be rolled back to the committed block, with everything afterwads deleted. The
-// side chain completely nuked by the freezer.
+// Tests a recovery for a long canonical chain with a longer side chain, where a recent block
+// was already committed to disk and then the process crashed. In this case we expect the canonical
+// chains to be rolled back to the committed block, but the chain data itself left in the database
+// for replaying.
 func TestLongReorgedDeepRepair(t *testing.T)              { testLongReorgedDeepRepair(t, false) }
 func TestLongReorgedDeepRepairWithSnapshots(t *testing.T) { testLongReorgedDeepRepair(t, true) }
 
@@ -495,10 +492,12 @@ func testLongReorgedDeepRepair(t *testing.T, snapshots bool) {
 	//
 	// ------------------------------
 	//
-	// Expected in leveldb: none
+	// Expected in leveldb:
+	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18->C19->C20->C21->C22->C23->C24
+	//   └->S1->S2->S3->S4->S5->S6->S7->S8->S9->S10->S11->S12->S13->S14->S15->S16->S17->S18->S19->S20->S21->S22->S23->S24->S25->S26
 	//
-	// Expected head header    : C4
-	// Expected head block     : C4
+	// Expected head header    : C24 (C26 with no snapshots)
+	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    24,
 		sidechainBlocks:    26,
