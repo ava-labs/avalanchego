@@ -77,16 +77,6 @@ func TestToBlock(t *testing.T) {
 	}
 }
 
-/*
-func TestInvalidCliqueConfig(t *testing.T) {
-	block := fakeGoerliGenesisBlock()
-	block.ExtraData = []byte{}
-	if _, err := block.Commit(nil); err == nil {
-		t.Fatal("Expected error on invalid clique config")
-	}
-}
-*/
-
 func TestSetupGenesis(t *testing.T) {
 	var (
 		customghash = common.HexToHash("0x1099a11e9e454bd3ef31d688cf21936671966407bc330f051d754b5ce401e7ed")
