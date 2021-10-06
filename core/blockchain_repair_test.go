@@ -56,7 +56,7 @@ func testShortRepair(t *testing.T, snapshots bool) {
 	//
 	// Expected head header    : C8
 	// Expected head block     : C4
-    rt := &rewindTest{
+	rt := &rewindTest{
 		canonicalBlocks:    8,
 		sidechainBlocks:    0,
 		commitBlock:        4,
@@ -65,9 +65,9 @@ func testShortRepair(t *testing.T, snapshots bool) {
 		expHeadHeader:      8,
 		expHeadBlock:       0,
 	}
-    if snapshots {
-        rt.expHeadBlock = 4
-    }
+	if snapshots {
+		rt.expHeadBlock = 4
+	}
 	testRepair(t, rt, snapshots)
 }
 
@@ -96,7 +96,7 @@ func testShortOldForkedRepair(t *testing.T, snapshots bool) {
 	//
 	// Expected head header    : C8
 	// Expected head block     : C4
-    rt := &rewindTest{
+	rt := &rewindTest{
 		canonicalBlocks:    8,
 		sidechainBlocks:    3,
 		commitBlock:        4,
@@ -105,10 +105,10 @@ func testShortOldForkedRepair(t *testing.T, snapshots bool) {
 		expHeadHeader:      3,
 		expHeadBlock:       0,
 	}
-    if snapshots {
+	if snapshots {
 		rt.expHeadHeader = 8
-        rt.expHeadBlock = 4
-    }
+		rt.expHeadBlock = 4
+	}
 	testRepair(t, rt, snapshots)
 }
 
@@ -137,7 +137,7 @@ func testShortNewlyForkedRepair(t *testing.T, snapshots bool) {
 	//
 	// Expected head header    : C8
 	// Expected head block     : C4
-    rt := &rewindTest{
+	rt := &rewindTest{
 		canonicalBlocks:    8,
 		sidechainBlocks:    6,
 		commitBlock:        4,
@@ -146,10 +146,10 @@ func testShortNewlyForkedRepair(t *testing.T, snapshots bool) {
 		expHeadHeader:      6,
 		expHeadBlock:       0,
 	}
-    if snapshots {
+	if snapshots {
 		rt.expHeadHeader = 8
 		rt.expHeadBlock = 4
-    }
+	}
 	testRepair(t, rt, snapshots)
 }
 
@@ -177,7 +177,7 @@ func testShortReorgedRepair(t *testing.T, snapshots bool) {
 	//
 	// Expected head header    : C8
 	// Expected head block     : C4
-    rt := &rewindTest{
+	rt := &rewindTest{
 		canonicalBlocks:    8,
 		sidechainBlocks:    10,
 		commitBlock:        4,
@@ -186,10 +186,10 @@ func testShortReorgedRepair(t *testing.T, snapshots bool) {
 		expHeadHeader:      10,
 		expHeadBlock:       0,
 	}
-    if snapshots {
+	if snapshots {
 		rt.expHeadHeader = 8
 		rt.expHeadBlock = 4
-    }
+	}
 	testRepair(t, rt, snapshots)
 }
 
@@ -215,7 +215,7 @@ func testLongShallowRepair(t *testing.T, snapshots bool) {
 	//
 	// Expected head header    : C18
 	// Expected head block     : C4
-    rt := &rewindTest{
+	rt := &rewindTest{
 		canonicalBlocks:    18,
 		sidechainBlocks:    0,
 		commitBlock:        4,
@@ -224,9 +224,9 @@ func testLongShallowRepair(t *testing.T, snapshots bool) {
 		expHeadHeader:      18,
 		expHeadBlock:       0,
 	}
-    if snapshots {
+	if snapshots {
 		rt.expHeadBlock = 4
-    }
+	}
 	testRepair(t, rt, snapshots)
 }
 
@@ -251,7 +251,7 @@ func testLongDeepRepair(t *testing.T, snapshots bool) {
 	//
 	// Expected head header    : C4
 	// Expected head block     : C4
-    rt := &rewindTest{
+	rt := &rewindTest{
 		canonicalBlocks:    24,
 		sidechainBlocks:    0,
 		commitBlock:        4,
@@ -260,9 +260,9 @@ func testLongDeepRepair(t *testing.T, snapshots bool) {
 		expHeadHeader:      24,
 		expHeadBlock:       0,
 	}
-    if snapshots {
+	if snapshots {
 		rt.expHeadBlock = 4
-    }
+	}
 	testRepair(t, rt, snapshots)
 }
 
@@ -304,10 +304,10 @@ func testLongOldForkedShallowRepair(t *testing.T, snapshots bool) {
 		expHeadHeader:      3,
 		expHeadBlock:       0,
 	}
-    if snapshots {
+	if snapshots {
 		rt.expHeadHeader = 18
 		rt.expHeadBlock = 4
-    }
+	}
 	testRepair(t, rt, snapshots)
 }
 
@@ -343,12 +343,12 @@ func testLongOldForkedDeepRepair(t *testing.T, snapshots bool) {
 		expSidechainBlocks: 3,
 		expHeadHeader:      3,
 		expHeadBlock:       0,
-    }
-    if snapshots {
+	}
+	if snapshots {
 		rt.expHeadHeader = 24
 		rt.expHeadBlock = 4
-    }
-    testRepair(t, rt, snapshots)
+	}
+	testRepair(t, rt, snapshots)
 }
 
 // Tests a recovery for a long canonical chain with frozen blocks and a shorter
@@ -388,12 +388,12 @@ func testLongNewerForkedShallowRepair(t *testing.T, snapshots bool) {
 		expSidechainBlocks: 12,
 		expHeadHeader:      12,
 		expHeadBlock:       0,
-    }
-    if snapshots {
+	}
+	if snapshots {
 		rt.expHeadHeader = 18
 		rt.expHeadBlock = 4
-    }
-    testRepair(t, rt, snapshots)
+	}
+	testRepair(t, rt, snapshots)
 }
 
 // Tests a recovery for a long canonical chain with frozen blocks and a shorter
@@ -429,10 +429,10 @@ func testLongNewerForkedDeepRepair(t *testing.T, snapshots bool) {
 		expHeadHeader:      12,
 		expHeadBlock:       0,
 	}
-    if snapshots {
+	if snapshots {
 		rt.expHeadHeader = 24
 		rt.expHeadBlock = 4
-    }
+	}
 	testRepair(t, rt, snapshots)
 }
 
@@ -460,7 +460,7 @@ func testLongReorgedShallowRepair(t *testing.T, snapshots bool) {
 	//
 	// Expected head header    : C18
 	// Expected head block     : C4
-    rt := &rewindTest{
+	rt := &rewindTest{
 		canonicalBlocks:    18,
 		sidechainBlocks:    26,
 		commitBlock:        4,
@@ -469,10 +469,10 @@ func testLongReorgedShallowRepair(t *testing.T, snapshots bool) {
 		expHeadHeader:      26,
 		expHeadBlock:       0,
 	}
-    if snapshots {
+	if snapshots {
 		rt.expHeadHeader = 18
 		rt.expHeadBlock = 4
-    }
+	}
 	testRepair(t, rt, snapshots)
 }
 
@@ -499,7 +499,7 @@ func testLongReorgedDeepRepair(t *testing.T, snapshots bool) {
 	//
 	// Expected head header    : C4
 	// Expected head block     : C4
-    rt := &rewindTest{
+	rt := &rewindTest{
 		canonicalBlocks:    24,
 		sidechainBlocks:    26,
 		commitBlock:        4,
@@ -508,10 +508,10 @@ func testLongReorgedDeepRepair(t *testing.T, snapshots bool) {
 		expHeadHeader:      26,
 		expHeadBlock:       0,
 	}
-    if snapshots {
+	if snapshots {
 		rt.expHeadHeader = 24
 		rt.expHeadBlock = 4
-    }
+	}
 	testRepair(t, rt, snapshots)
 }
 
@@ -550,7 +550,7 @@ func testRepair(t *testing.T, tt *rewindTest, snapshots bool) {
 	if err != nil {
 		t.Fatalf("Failed to create chain: %v", err)
 	}
-    lastAcceptedHash := chain.GetBlockByNumber(0).Hash()
+	lastAcceptedHash := chain.GetBlockByNumber(0).Hash()
 
 	// If sidechain blocks are needed, make a light chain and import it
 	var sideblocks types.Blocks
