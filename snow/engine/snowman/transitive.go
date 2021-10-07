@@ -42,7 +42,7 @@ type Transitive struct {
 	pending map[ids.ID]snowman.Block
 
 	// Block ID --> Parent ID
-	childPending map[ids.ID]ids.ID
+	nonVerifieds AncestorTree
 
 	// operations that are blocked on a block being issued. This could be
 	// issuing another block, responding to a query, or applying votes to consensus
@@ -63,7 +63,7 @@ func (t *Transitive) Initialize(config Config) error {
 	t.Params = config.Params
 	t.Consensus = config.Consensus
 	t.pending = make(map[ids.ID]snowman.Block)
-	t.childPending = make(map[ids.ID]ids.ID)
+	t.nonVerifieds = NewAncestorTree()
 
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t.polls = poll.NewSet(factory,
@@ -718,7 +718,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 		return t.errs.Err
 	}
-
+	t.nonVerifieds.Remove(blkID)
 	t.Ctx.Log.Verbo("adding block to consensus: %s", blkID)
 	if err := t.Consensus.Add(blk); err != nil {
 		return err
@@ -741,6 +741,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 					t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
 					dropped = append(dropped, blk)
 				} else {
+					t.nonVerifieds.Remove(blk.ID())
 					if err := t.Consensus.Add(blk); err != nil {
 						return err
 					}
@@ -836,7 +837,20 @@ func (t *Transitive) pendingContains(blkID ids.ID) bool {
 }
 
 func (t *Transitive) removeFromPending(blk snowman.Block) {
-	delete(t.pending, blk.ID())
+	blkID := blk.ID()
+	delete(t.pending, blkID)
+	parentID := blk.Parent()
 	// we might still need that one, so we can bubble vote to parent through this block
-	t.childPending[blk.ID()] = blk.Parent()
+	// however if this parent is not in child pending nor issued to consensus, do not put this block to pending.
+	if t.nonVerifieds.Has(parentID) || t.parentDecidedOrProcessing(blk) {
+		t.nonVerifieds.Add(blkID, parentID)
+	}
+}
+
+func (t *Transitive) parentDecidedOrProcessing(blk snowman.Block) bool {
+	parentID := blk.Parent()
+	if parentBlk, err := t.GetBlock(parentID); err == nil && t.Consensus.DecidedOrProcessing(parentBlk) {
+		return true
+	}
+	return false
 }
