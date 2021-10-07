@@ -390,17 +390,17 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"4byte_tracer.js":    _4byte_tracerJs,
+	"4byte_tracer.js":        _4byte_tracerJs,
 	"4byte_tracer_legacy.js": _4byte_tracer_legacyJs,
-	"bigram_tracer.js":   bigram_tracerJs,
-	"call_tracer.js":     call_tracerJs,
+	"bigram_tracer.js":       bigram_tracerJs,
+	"call_tracer.js":         call_tracerJs,
 	"call_tracer_legacy.js":  call_tracer_legacyJs,
-	"evmdis_tracer.js":   evmdis_tracerJs,
-	"noop_tracer.js":     noop_tracerJs,
-	"opcount_tracer.js":  opcount_tracerJs,
-	"prestate_tracer.js": prestate_tracerJs,
-	"trigram_tracer.js":  trigram_tracerJs,
-	"unigram_tracer.js":  unigram_tracerJs,
+	"evmdis_tracer.js":       evmdis_tracerJs,
+	"noop_tracer.js":         noop_tracerJs,
+	"opcount_tracer.js":      opcount_tracerJs,
+	"prestate_tracer.js":     prestate_tracerJs,
+	"trigram_tracer.js":      trigram_tracerJs,
+	"unigram_tracer.js":      unigram_tracerJs,
 }
 
 // AssetDebug is true if the assets were built with the debug flag enabled.
@@ -447,17 +447,17 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"4byte_tracer.js":    {_4byte_tracerJs, map[string]*bintree{}},
+	"4byte_tracer.js":        {_4byte_tracerJs, map[string]*bintree{}},
 	"4byte_tracer_legacy.js": {_4byte_tracer_legacyJs, map[string]*bintree{}},
-	"bigram_tracer.js":   {bigram_tracerJs, map[string]*bintree{}},
-	"call_tracer.js":     {call_tracerJs, map[string]*bintree{}},
+	"bigram_tracer.js":       {bigram_tracerJs, map[string]*bintree{}},
+	"call_tracer.js":         {call_tracerJs, map[string]*bintree{}},
 	"call_tracer_legacy.js":  {call_tracer_legacyJs, map[string]*bintree{}},
-	"evmdis_tracer.js":   {evmdis_tracerJs, map[string]*bintree{}},
-	"noop_tracer.js":     {noop_tracerJs, map[string]*bintree{}},
-	"opcount_tracer.js":  {opcount_tracerJs, map[string]*bintree{}},
-	"prestate_tracer.js": {prestate_tracerJs, map[string]*bintree{}},
-	"trigram_tracer.js":  {trigram_tracerJs, map[string]*bintree{}},
-	"unigram_tracer.js":  {unigram_tracerJs, map[string]*bintree{}},
+	"evmdis_tracer.js":       {evmdis_tracerJs, map[string]*bintree{}},
+	"noop_tracer.js":         {noop_tracerJs, map[string]*bintree{}},
+	"opcount_tracer.js":      {opcount_tracerJs, map[string]*bintree{}},
+	"prestate_tracer.js":     {prestate_tracerJs, map[string]*bintree{}},
+	"trigram_tracer.js":      {trigram_tracerJs, map[string]*bintree{}},
+	"unigram_tracer.js":      {unigram_tracerJs, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

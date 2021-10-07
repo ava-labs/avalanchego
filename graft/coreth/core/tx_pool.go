@@ -126,12 +126,12 @@ var (
 	overflowedTxMeter  = metrics.NewRegisteredMeter("txpool/overflowed", nil)
 	// throttleTxMeter counts how many transactions are rejected due to too-many-changes between
 	// txpool reorgs.
-	// throttleTxMeter = metrics.NewRegisteredMeter("txpool/throttle", nil)
+	throttleTxMeter = metrics.NewRegisteredMeter("txpool/throttle", nil)
 	// reorgDurationTimer measures how long time a txpool reorg takes.
 	reorgDurationTimer = metrics.NewRegisteredTimer("txpool/reorgtime", nil)
 	// dropBetweenReorgHistogram counts how many drops we experience between two reorg runs. It is expected
 	// that this number is pretty low, since txpool reorgs happen very frequently.
-	// dropBetweenReorgHistogram = metrics.NewRegisteredHistogram("txpool/dropbetweenreorg", nil, metrics.NewExpDecaySample(1028, 0.015))
+	dropBetweenReorgHistogram = metrics.NewRegisteredHistogram("txpool/dropbetweenreorg", nil, metrics.NewExpDecaySample(1028, 0.015))
 
 	pendingGauge = metrics.NewRegisteredGauge("txpool/pending", nil)
 	queuedGauge  = metrics.NewRegisteredGauge("txpool/queued", nil)
@@ -289,9 +289,8 @@ type TxPool struct {
 	reorgShutdownCh     chan struct{} // requests shutdown of scheduleReorgLoop
 	generalShutdownChan chan struct{} // closed when the transaction pool is stopped. Any goroutine can listen
 	// to this to be notified if it should shut down.
-	wg sync.WaitGroup // tracks loop, scheduleReorgLoop
-
-	initDoneCh chan struct{} // is closed once the pool is initialized (for tests)
+	wg         sync.WaitGroup // tracks loop, scheduleReorgLoop
+	initDoneCh chan struct{}  // is closed once the pool is initialized (for tests)
 
 	changesSinceReorg int // A counter for how many drops we've performed in-between reorg.
 }
@@ -751,10 +750,10 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 		// analysis of what to remove and how, but it runs async. We don't want to
 		// do too many replacements between reorg-runs, so we cap the number of
 		// replacements to 25% of the slots
-		// if pool.changesSinceReorg > int(pool.config.GlobalSlots/4) {
-		// 	throttleTxMeter.Mark(1)
-		// 	return false, ErrTxPoolOverflow
-		// }
+		if pool.changesSinceReorg > int(pool.config.GlobalSlots/4) {
+			throttleTxMeter.Mark(1)
+			return false, ErrTxPoolOverflow
+		}
 
 		// New transaction is better than our worse ones, make room for it.
 		// If it's a local transaction, forcibly discard all available transactions.
@@ -767,8 +766,8 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 			overflowedTxMeter.Mark(1)
 			return false, ErrTxPoolOverflow
 		}
-		// // Bump the counter of rejections-since-reorg
-		// pool.changesSinceReorg += len(drop)
+		// Bump the counter of rejections-since-reorg
+		pool.changesSinceReorg += len(drop)
 		// Kick out the underpriced remote transactions.
 		for _, tx := range drop {
 			log.Trace("Discarding freshly underpriced transaction", "hash", tx.Hash(), "gasTipCap", tx.GasTipCap(), "gasFeeCap", tx.GasFeeCap())
@@ -1269,8 +1268,8 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 		highestPending := list.LastElement()
 		pool.pendingNonces.set(addr, highestPending.Nonce()+1)
 	}
-	// dropBetweenReorgHistogram.Update(int64(pool.changesSinceReorg))
-	// pool.changesSinceReorg = 0 // Reset change counter
+	dropBetweenReorgHistogram.Update(int64(pool.changesSinceReorg))
+	pool.changesSinceReorg = 0 // Reset change counter
 	pool.mu.Unlock()
 
 	if reset != nil && reset.newHead != nil {

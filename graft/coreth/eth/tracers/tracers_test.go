@@ -244,7 +244,7 @@ func testCallTracer(tracer string, dirPath string, t *testing.T) {
 			if err := rlp.DecodeBytes(common.FromHex(test.Input), tx); err != nil {
 				t.Fatalf("failed to parse testcase input: %v", err)
 			}
-			signer := types.MakeSigner(test.Genesis.Config, new(big.Int).SetUint64(uint64(test.Context.Number)), new(big.Int).SetUint64(uint64(test.Context.Number)))
+			signer := types.MakeSigner(test.Genesis.Config, new(big.Int).SetUint64(uint64(test.Context.Number)), new(big.Int).SetUint64(uint64(test.Context.Time)))
 			origin, _ := signer.Sender(tx)
 			txContext := vm.TxContext{
 				Origin:   origin,
@@ -317,4 +317,152 @@ func jsonEqual(x, y interface{}) bool {
 		return false
 	}
 	return reflect.DeepEqual(xTrace, yTrace)
+}
+
+func BenchmarkTransactionTrace(b *testing.B) {
+	key, _ := crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+	from := crypto.PubkeyToAddress(key.PublicKey)
+	gas := uint64(1000000) // 1M gas
+	to := common.HexToAddress("0x00000000000000000000000000000000deadbeef")
+	signer := types.LatestSignerForChainID(big.NewInt(1337))
+	tx, err := types.SignNewTx(key, signer,
+		&types.LegacyTx{
+			Nonce:    1,
+			GasPrice: big.NewInt(500),
+			Gas:      gas,
+			To:       &to,
+		})
+	if err != nil {
+		b.Fatal(err)
+	}
+	txContext := vm.TxContext{
+		Origin:   from,
+		GasPrice: tx.GasPrice(),
+	}
+	context := vm.BlockContext{
+		CanTransfer: core.CanTransfer,
+		Transfer:    core.Transfer,
+		Coinbase:    common.Address{},
+		BlockNumber: new(big.Int).SetUint64(uint64(5)),
+		Time:        new(big.Int).SetUint64(uint64(5)),
+		Difficulty:  big.NewInt(0xffffffff),
+		GasLimit:    gas,
+	}
+	alloc := core.GenesisAlloc{}
+	// The code pushes 'deadbeef' into memory, then the other params, and calls CREATE2, then returns
+	// the address
+	loop := []byte{
+		byte(vm.JUMPDEST), //  [ count ]
+		byte(vm.PUSH1), 0, // jumpdestination
+		byte(vm.JUMP),
+	}
+	alloc[common.HexToAddress("0x00000000000000000000000000000000deadbeef")] = core.GenesisAccount{
+		Nonce:   1,
+		Code:    loop,
+		Balance: big.NewInt(1),
+	}
+	alloc[from] = core.GenesisAccount{
+		Nonce:   1,
+		Code:    []byte{},
+		Balance: big.NewInt(500000000000000),
+	}
+	_, statedb := tests.MakePreState(rawdb.NewMemoryDatabase(), alloc, false)
+	// Create the tracer, the EVM environment and run it
+	tracer := vm.NewStructLogger(&vm.LogConfig{
+		Debug: false,
+		//DisableStorage: true,
+		//EnableMemory: false,
+		//EnableReturnData: false,
+	})
+	evm := vm.NewEVM(context, txContext, statedb, params.TestChainConfig, vm.Config{Debug: true, Tracer: tracer})
+	msg, err := tx.AsMessage(signer, nil)
+	if err != nil {
+		b.Fatalf("failed to prepare transaction for tracing: %v", err)
+	}
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		snap := statedb.Snapshot()
+		st := core.NewStateTransition(evm, msg, new(core.GasPool).AddGas(tx.Gas()))
+		_, err = st.TransitionDb()
+		if err != nil {
+			b.Fatal(err)
+		}
+		statedb.RevertToSnapshot(snap)
+		if have, want := len(tracer.StructLogs()), 244752; have != want {
+			b.Fatalf("trace wrong, want %d steps, have %d", want, have)
+		}
+		tracer.Reset()
+	}
+}
+
+func BenchmarkTracers(b *testing.B) {
+	files, err := ioutil.ReadDir(filepath.Join("testdata", "call_tracer"))
+	if err != nil {
+		b.Fatalf("failed to retrieve tracer test suite: %v", err)
+	}
+	for _, file := range files {
+		if !strings.HasSuffix(file.Name(), ".json") {
+			continue
+		}
+		file := file // capture range variable
+		b.Run(camel(strings.TrimSuffix(file.Name(), ".json")), func(b *testing.B) {
+			blob, err := ioutil.ReadFile(filepath.Join("testdata", "call_tracer", file.Name()))
+			if err != nil {
+				b.Fatalf("failed to read testcase: %v", err)
+			}
+			test := new(callTracerTest)
+			if err := json.Unmarshal(blob, test); err != nil {
+				b.Fatalf("failed to parse testcase: %v", err)
+			}
+			benchTracer("callTracer", test, b)
+		})
+	}
+}
+
+func benchTracer(tracerName string, test *callTracerTest, b *testing.B) {
+	// Configure a blockchain with the given prestate
+	tx := new(types.Transaction)
+	if err := rlp.DecodeBytes(common.FromHex(test.Input), tx); err != nil {
+		b.Fatalf("failed to parse testcase input: %v", err)
+	}
+	signer := types.MakeSigner(test.Genesis.Config, new(big.Int).SetUint64(uint64(test.Context.Number)), new(big.Int).SetUint64(uint64(test.Context.Time)))
+	msg, err := tx.AsMessage(signer, nil)
+	if err != nil {
+		b.Fatalf("failed to prepare transaction for tracing: %v", err)
+	}
+	origin, _ := signer.Sender(tx)
+	txContext := vm.TxContext{
+		Origin:   origin,
+		GasPrice: tx.GasPrice(),
+	}
+	context := vm.BlockContext{
+		CanTransfer: core.CanTransfer,
+		Transfer:    core.Transfer,
+		Coinbase:    test.Context.Miner,
+		BlockNumber: new(big.Int).SetUint64(uint64(test.Context.Number)),
+		Time:        new(big.Int).SetUint64(uint64(test.Context.Time)),
+		Difficulty:  (*big.Int)(test.Context.Difficulty),
+		GasLimit:    uint64(test.Context.GasLimit),
+	}
+	_, statedb := tests.MakePreState(rawdb.NewMemoryDatabase(), test.Genesis.Alloc, false)
+
+	// Create the tracer, the EVM environment and run it
+	tracer, err := New(tracerName, new(Context))
+	if err != nil {
+		b.Fatalf("failed to create call tracer: %v", err)
+	}
+	evm := vm.NewEVM(context, txContext, statedb, test.Genesis.Config, vm.Config{Debug: true, Tracer: tracer})
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		snap := statedb.Snapshot()
+		st := core.NewStateTransition(evm, msg, new(core.GasPool).AddGas(tx.Gas()))
+		if _, err = st.TransitionDb(); err != nil {
+			b.Fatalf("failed to execute transaction: %v", err)
+		}
+		statedb.RevertToSnapshot(snap)
+	}
 }

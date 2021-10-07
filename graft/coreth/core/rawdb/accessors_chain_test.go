@@ -444,61 +444,6 @@ func TestHashesInRange(t *testing.T) {
 	}
 }
 
-// makeTestBlocks creates fake blocks for the ancient write benchmark.
-/*
-func makeTestBlocks(nblock int, txsPerBlock int) []*types.Block {
-	key, _ := crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
-	signer := types.LatestSignerForChainID(big.NewInt(8))
-
-	// Create transactions.
-	txs := make([]*types.Transaction, txsPerBlock)
-	for i := 0; i < len(txs); i++ {
-		var err error
-		to := common.Address{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}
-		txs[i], err = types.SignNewTx(key, signer, &types.LegacyTx{
-			Nonce:    2,
-			GasPrice: big.NewInt(30000),
-			Gas:      0x45454545,
-			To:       &to,
-		})
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	// Create the blocks.
-	blocks := make([]*types.Block, nblock)
-	for i := 0; i < nblock; i++ {
-		header := &types.Header{
-			Number: big.NewInt(int64(i)),
-			Extra:  []byte("test block"),
-		}
-		blocks[i] = types.NewBlockWithHeader(header).WithBody(txs, nil, 0, nil)
-		blocks[i].Hash() // pre-cache the block hash
-	}
-	return blocks
-}
-*/
-
-// makeTestReceipts creates fake receipts for the ancient write benchmark.
-/*
-func makeTestReceipts(n int, nPerBlock int) []types.Receipts {
-	receipts := make([]*types.Receipt, nPerBlock)
-	for i := 0; i < len(receipts); i++ {
-		receipts[i] = &types.Receipt{
-			Status:            types.ReceiptStatusSuccessful,
-			CumulativeGasUsed: 0x888888888,
-			Logs:              make([]*types.Log, 5),
-		}
-	}
-	allReceipts := make([]types.Receipts, n)
-	for i := 0; i < n; i++ {
-		allReceipts[i] = receipts
-	}
-	return allReceipts
-}
-*/
-
 type fullLogRLP struct {
 	Address     common.Address
 	Topics      []common.Hash

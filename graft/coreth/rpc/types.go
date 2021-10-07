@@ -124,6 +124,8 @@ func (bn BlockNumber) MarshalText() ([]byte, error) {
 		return []byte("latest"), nil
 	case PendingBlockNumber:
 		return []byte("pending"), nil
+	case AcceptedBlockNumber:
+		return []byte("accepted"), nil
 	default:
 		return hexutil.Uint64(bn).MarshalText()
 	}
