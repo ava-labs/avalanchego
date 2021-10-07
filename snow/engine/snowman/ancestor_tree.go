@@ -10,7 +10,7 @@ import (
 )
 
 type AncestorTree interface {
-	Add(blkID ids.ID, parentID ids.ID) error
+	Add(blkID ids.ID, parentID ids.ID)
 	GetParent(blkID ids.ID) (ids.ID, bool)
 	Has(blkID ids.ID) bool
 	GetOldestAncestor(blkID ids.ID) (ids.ID, error)
@@ -30,8 +30,11 @@ func NewAncestorTree() AncestorTree {
 	}
 }
 
-func (p *childParentMap) Add(blkID ids.ID, parentID ids.ID) error {
+func (p *childParentMap) Add(blkID ids.ID, parentID ids.ID) {
 	// ASK: should we consider cases for circular dependencies or self reference etc?
+	if _, ok := p.childToParent[blkID]; ok {
+		return
+	}
 	p.childToParent[blkID] = parentID
 	children, ok := p.parentToChildren[parentID]
 	if !ok {
@@ -39,7 +42,6 @@ func (p *childParentMap) Add(blkID ids.ID, parentID ids.ID) error {
 	}
 	children.Add(blkID)
 	p.parentToChildren[parentID] = children
-	return nil
 }
 
 func (p *childParentMap) GetParent(blkID ids.ID) (ids.ID, bool) {
