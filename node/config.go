@@ -43,13 +43,6 @@ import (
 // P2P network layer of a protocol stack. These values can be further extended by
 // all registered services.
 type Config struct {
-	// DataDir is the file system folder the node should use for any data storage
-	// requirements. The configured data directory will not be directly shared with
-	// registered services, instead those can use utility methods to create/access
-	// databases or flat files. This enables ephemeral nodes which can fully reside
-	// in memory.
-	DataDir string
-
 	// KeyStoreDir is the file system folder that contains private keys. The directory can
 	// be specified as a relative path, in which case it is resolved relative to the
 	// current directory.
@@ -140,9 +133,6 @@ type Config struct {
 	// made against the server with a malicious host domain.
 	// Requests using ip address directly are not affected
 	GraphQLVirtualHosts []string `toml:",omitempty"`
-
-	// Logger is a custom logger to use with the p2p.Server.
-	Logger log.Logger `toml:",omitempty"`
 
 	CorethVersion string
 }

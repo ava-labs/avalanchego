@@ -18,40 +18,40 @@
 // callFrameTracer uses the new call frame tracing methods to report useful information
 // about internal messages of a transaction.
 {
-	callstack: [{}],
-	fault: function(log, db) {
+    callstack: [{}],
+    fault: function(log, db) {
         var len = this.callstack.length
         if (len > 1) {
             var call = this.callstack.pop()
             if (this.callstack[len-1].calls === undefined) {
                 this.callstack[len-1].calls = []
-		}
+            }
             this.callstack[len-1].calls.push(call)
-			}
-	},
-	result: function(ctx, db) {
-        // Prepare outer message info
-		var result = {
-			type:    ctx.type,
-			from:    toHex(ctx.from),
-			to:      toHex(ctx.to),
-			value:   '0x' + ctx.value.toString(16),
-			gas:     '0x' + bigInt(ctx.gas).toString(16),
-			gasUsed: '0x' + bigInt(ctx.gasUsed).toString(16),
-			input:   toHex(ctx.input),
-			output:  toHex(ctx.output),
         }
-		if (this.callstack[0].calls !== undefined) {
+    },
+    result: function(ctx, db) {
+        // Prepare outer message info
+        var result = {
+            type:    ctx.type,
+            from:    toHex(ctx.from),
+            to:      toHex(ctx.to),
+            value:   '0x' + ctx.value.toString(16),
+            gas:     '0x' + bigInt(ctx.gas).toString(16),
+            gasUsed: '0x' + bigInt(ctx.gasUsed).toString(16),
+            input:   toHex(ctx.input),
+            output:  toHex(ctx.output),
+        }
+        if (this.callstack[0].calls !== undefined) {
           result.calls = this.callstack[0].calls
-		}
-		if (this.callstack[0].error !== undefined) {
+        }
+        if (this.callstack[0].error !== undefined) {
           result.error = this.callstack[0].error
-		} else if (ctx.error !== undefined) {
+        } else if (ctx.error !== undefined) {
           result.error = ctx.error
-		}
-		if (result.error !== undefined && (result.error !== "execution reverted" || result.output ==="0x")) {
+        }
+        if (result.error !== undefined && (result.error !== "execution reverted" || result.output ==="0x")) {
           delete result.output
-		}
+        }
 
         return this.finalize(result)
     },
