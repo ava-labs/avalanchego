@@ -62,3 +62,21 @@ func (c *Client) SendAppGossip(msg []byte) error {
 	)
 	return err
 }
+
+func (c *Client) SendAppGossipSpecific(nodeIDs ids.ShortSet, msg []byte) error {
+	nodeIDsBytes := make([][]byte, nodeIDs.Len())
+	i := 0
+	for nodeID := range nodeIDs {
+		nodeID := nodeID // Prevent overwrite in next iteration
+		nodeIDsBytes[i] = nodeID[:]
+		i++
+	}
+	_, err := c.client.SendAppGossipSpecific(
+		context.Background(),
+		&appsenderproto.SendAppGossipSpecificMsg{
+			NodeIDs: nodeIDsBytes,
+			Msg:     msg,
+		},
+	)
+	return err
+}

@@ -22,6 +22,7 @@ type AppSenderClient interface {
 	SendAppRequest(ctx context.Context, in *SendAppRequestMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	SendAppResponse(ctx context.Context, in *SendAppResponseMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	SendAppGossip(ctx context.Context, in *SendAppGossipMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SendAppGossipSpecific(ctx context.Context, in *SendAppGossipSpecificMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type appSenderClient struct {
@@ -59,6 +60,15 @@ func (c *appSenderClient) SendAppGossip(ctx context.Context, in *SendAppGossipMs
 	return out, nil
 }
 
+func (c *appSenderClient) SendAppGossipSpecific(ctx context.Context, in *SendAppGossipSpecificMsg, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/appsenderproto.AppSender/SendAppGossipSpecific", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AppSenderServer is the server API for AppSender service.
 // All implementations must embed UnimplementedAppSenderServer
 // for forward compatibility
@@ -66,6 +76,7 @@ type AppSenderServer interface {
 	SendAppRequest(context.Context, *SendAppRequestMsg) (*emptypb.Empty, error)
 	SendAppResponse(context.Context, *SendAppResponseMsg) (*emptypb.Empty, error)
 	SendAppGossip(context.Context, *SendAppGossipMsg) (*emptypb.Empty, error)
+	SendAppGossipSpecific(context.Context, *SendAppGossipSpecificMsg) (*emptypb.Empty, error)
 	mustEmbedUnimplementedAppSenderServer()
 }
 
@@ -81,6 +92,9 @@ func (UnimplementedAppSenderServer) SendAppResponse(context.Context, *SendAppRes
 }
 func (UnimplementedAppSenderServer) SendAppGossip(context.Context, *SendAppGossipMsg) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendAppGossip not implemented")
+}
+func (UnimplementedAppSenderServer) SendAppGossipSpecific(context.Context, *SendAppGossipSpecificMsg) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SendAppGossipSpecific not implemented")
 }
 func (UnimplementedAppSenderServer) mustEmbedUnimplementedAppSenderServer() {}
 
@@ -149,6 +163,24 @@ func _AppSender_SendAppGossip_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AppSender_SendAppGossipSpecific_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SendAppGossipSpecificMsg)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AppSenderServer).SendAppGossipSpecific(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/appsenderproto.AppSender/SendAppGossipSpecific",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AppSenderServer).SendAppGossipSpecific(ctx, req.(*SendAppGossipSpecificMsg))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AppSender_ServiceDesc is the grpc.ServiceDesc for AppSender service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -167,6 +199,10 @@ var AppSender_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SendAppGossip",
 			Handler:    _AppSender_SendAppGossip_Handler,
+		},
+		{
+			MethodName: "SendAppGossipSpecific",
+			Handler:    _AppSender_SendAppGossipSpecific_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
