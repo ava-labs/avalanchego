@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/metrics"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
-	"github.com/ava-labs/avalanchego/utils/health"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 var errUnhealthy = errors.New("snowman consensus is not healthy")
@@ -291,15 +291,11 @@ func (ts *Topological) Finalized() bool { return len(ts.blocks) == 1 }
 
 // HealthCheck returns information about the consensus health.
 func (ts *Topological) HealthCheck() (interface{}, error) {
-	var errReasons []string
 	numOutstandingBlks := ts.Latency.ProcessingLen()
 	isOutstandingBlks := numOutstandingBlks <= ts.params.MaxOutstandingItems
 	healthy := isOutstandingBlks
 	details := map[string]interface{}{
 		"outstandingBlocks": numOutstandingBlks,
-	}
-	if !isOutstandingBlks {
-		errReasons = append(errReasons, fmt.Sprintf("number of outstanding blocks %d > %d", numOutstandingBlks, ts.params.MaxOutstandingItems))
 	}
 
 	// check for long running blocks
@@ -307,15 +303,16 @@ func (ts *Topological) HealthCheck() (interface{}, error) {
 	isProcessingTime := timeReqRunning <= ts.params.MaxItemProcessingTime
 	healthy = healthy && isProcessingTime
 	details["longestRunningBlock"] = timeReqRunning.String()
-	if !isProcessingTime {
-		errReasons = append(errReasons, fmt.Sprintf("block processing time %s > %s", timeReqRunning, ts.params.MaxItemProcessingTime))
-	}
-
-	if len(errReasons) != 0 {
-		details[health.HealthErrorReason] = errReasons
-	}
 
 	if !healthy {
+		var errReasons []string
+		if !isOutstandingBlks {
+			errReasons = append(errReasons, fmt.Sprintf("number of outstanding blocks %d > %d", numOutstandingBlks, ts.params.MaxOutstandingItems))
+		}
+		if !isProcessingTime {
+			errReasons = append(errReasons, fmt.Sprintf("block processing time %s > %s", timeReqRunning, ts.params.MaxItemProcessingTime))
+		}
+		details[constants.HealthErrorReasonKey] = errReasons
 		return details, errUnhealthy
 	}
 	return details, nil

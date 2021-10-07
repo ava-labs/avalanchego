@@ -10,7 +10,7 @@ import (
 	stdjson "encoding/json"
 
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	healthConstants "github.com/ava-labs/avalanchego/utils/health"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/gorilla/rpc/v2"
@@ -102,7 +102,7 @@ func (as *apiServer) calculateErrorResponses(results map[string]health.Result) *
 		switch details := v.Details.(type) {
 		case map[string]interface{}:
 			for detailKey, detailValue := range details {
-				if detailKey == healthConstants.HealthErrorReason {
+				if detailKey == constants.HealthErrorReasonKey {
 					if errResp, ok := detailValue.([]string); ok {
 						errorResponses = append(errorResponses, errResp...)
 					}
@@ -121,10 +121,10 @@ func (as *apiServer) calculateErrorResponses(results map[string]health.Result) *
 func (as *apiServer) Health(_ *http.Request, _ *APIHealthArgs, reply *APIHealthReply) error {
 	as.log.Debug("Health.health called")
 	reply.Checks, reply.Healthy = as.Results()
-	reply.Reasons = as.calculateErrorResponses(reply.Checks)
 	if reply.Healthy {
 		return nil
 	}
+	reply.Reasons = as.calculateErrorResponses(reply.Checks)
 	replyStr, err := stdjson.Marshal(reply.Checks)
 	as.log.Warn("Health.health is returning an error: %s", string(replyStr))
 	return err

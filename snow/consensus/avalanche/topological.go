@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/metrics"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 const (
@@ -242,15 +243,15 @@ func (ta *Topological) HealthCheck() (interface{}, error) {
 	details := map[string]interface{}{
 		"outstandingVertices": numOutstandingVtx,
 	}
-	if !isOutstandingVtx {
-		details["errorResponse"] = []string{fmt.Sprintf("number outstanding vertexes %d > %d", numOutstandingVtx, ta.params.MaxOutstandingItems)}
-	}
 
 	snowstormReport, err := ta.cg.HealthCheck()
 	healthy = healthy && err == nil
 	details["snowstorm"] = snowstormReport
 
 	if !healthy {
+		if !isOutstandingVtx {
+			details[constants.HealthErrorReasonKey] = []string{fmt.Sprintf("number outstanding vertexes %d > %d", numOutstandingVtx, ta.params.MaxOutstandingItems)}
+		}
 		return details, errUnhealthy
 	}
 	return details, nil

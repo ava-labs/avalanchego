@@ -15,8 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/metrics"
 	"github.com/ava-labs/avalanchego/snow/events"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/health"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
@@ -104,10 +104,10 @@ func (c *common) HealthCheck() (interface{}, error) {
 	details := map[string]interface{}{
 		"outstandingTransactions": numOutstandingTxs,
 	}
-	if !isOutstandingTxs {
-		details[health.HealthErrorReason] = []string{fmt.Sprintf("number of outstanding txs %d > %d", numOutstandingTxs, c.params.MaxOutstandingItems)}
-	}
 	if !healthy {
+		if !isOutstandingTxs {
+			details[constants.HealthErrorReasonKey] = []string{fmt.Sprintf("number of outstanding txs %d > %d", numOutstandingTxs, c.params.MaxOutstandingItems)}
+		}
 		return details, errUnhealthy
 	}
 	return details, nil

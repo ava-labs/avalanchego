@@ -44,7 +44,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	healthConstants "github.com/ava-labs/avalanchego/utils/health"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/profiler"
@@ -892,24 +891,18 @@ func (n *Node) initHealthAPI() error {
 	}
 	n.healthService = healthService
 
-	isChainBootStrapped := func(pChainID ids.ID, xChainID ids.ID, cChainID ids.ID) ([]string, bool) {
-		pBooted := n.chainManager.IsBootstrapped(pChainID)
-		xBooted := n.chainManager.IsBootstrapped(xChainID)
-		cBooted := n.chainManager.IsBootstrapped(cChainID)
+	chainsNotBootstrapped := func(pChainID ids.ID, xChainID ids.ID, cChainID ids.ID) []string {
 		var chains []string
-		if !pBooted {
+		if !n.chainManager.IsBootstrapped(pChainID) {
 			chains = append(chains, "'P'")
 		}
-		if !xBooted {
+		if !n.chainManager.IsBootstrapped(xChainID) {
 			chains = append(chains, "'X'")
 		}
-		if !cBooted {
+		if !n.chainManager.IsBootstrapped(cChainID) {
 			chains = append(chains, "'C'")
 		}
-		if len(chains) == 0 {
-			return chains, pBooted || xBooted || cBooted
-		}
-		return chains, pBooted || xBooted || cBooted
+		return chains
 	}
 
 	isBootstrappedFunc := func() (interface{}, error) {
@@ -919,13 +912,13 @@ func (n *Node) initHealthAPI() error {
 			return nil, errXNotCreated
 		} else if cChainID, err := n.chainManager.Lookup("C"); err != nil {
 			return nil, errCNotCreated
-		} else if chains, ok := isChainBootStrapped(pChainID, xChainID, cChainID); !ok {
+		} else if chains := chainsNotBootstrapped(pChainID, xChainID, cChainID); len(chains) != 0 {
 			var chainReasons []string
 			for _, chain := range chains {
 				chainReasons = append(chainReasons, fmt.Sprintf("%s not bootstrapped", chain))
 			}
 			details := map[string]interface{}{
-				healthConstants.HealthErrorReason: chainReasons,
+				constants.HealthErrorReasonKey: chainReasons,
 			}
 			return details, fmt.Errorf("primary subnet %s chain not finished bootstrapping", strings.Join(chains, ", "))
 		}
