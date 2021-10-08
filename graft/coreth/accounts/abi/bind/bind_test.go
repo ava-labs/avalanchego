@@ -1158,7 +1158,7 @@ var bindTests = []struct {
 
 			retrievedArr, err := testContract.RetrieveDeepArray(&bind.CallOpts{
 				From: auth.From,
-				Pending: false,
+				Accepted: false,
 			})
 			if err != nil {
 				t.Fatalf("Failed to retrieve nested array from test contract: %v", err)
@@ -1415,7 +1415,7 @@ var bindTests = []struct {
 			// by calling the contract's add function.
 			res, err := testContract.Add(&bind.CallOpts{
 				From: auth.From,
-				Pending: false,
+				Accepted: false,
 			}, big.NewInt(1), big.NewInt(2))
 			if err != nil {
 				t.Fatalf("Failed to call linked contract: %v", err)

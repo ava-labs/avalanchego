@@ -192,24 +192,6 @@ type GasPricer interface {
 	SuggestGasPrice(ctx context.Context) (*big.Int, error)
 }
 
-// A PendingStateReader provides access to the pending state, which is the result of all
-// known executable transactions which have not yet been included in the blockchain. It is
-// commonly used to display the result of ’unconfirmed’ actions (e.g. wallet value
-// transfers) initiated by the user. The AcceptedNonceAt operation is a good way to
-// retrieve the next available transaction nonce for a specific account.
-type PendingStateReader interface {
-	PendingBalanceAt(ctx context.Context, account common.Address) (*big.Int, error)
-	PendingStorageAt(ctx context.Context, account common.Address, key common.Hash) ([]byte, error)
-	AcceptedCodeAt(ctx context.Context, account common.Address) ([]byte, error)
-	AcceptedNonceAt(ctx context.Context, account common.Address) (uint64, error)
-	PendingTransactionCount(ctx context.Context) (uint, error)
-}
-
-// PendingContractCaller can be used to perform calls against the pending state.
-type PendingContractCaller interface {
-	PendingCallContract(ctx context.Context, call CallMsg) ([]byte, error)
-}
-
 // GasEstimator wraps EstimateGas, which tries to estimate the gas needed to execute a
 // specific transaction based on the pending state. There is no guarantee that this is the
 // true gas limit requirement as other transactions may be added or removed by miners, but

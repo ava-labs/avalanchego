@@ -43,7 +43,7 @@ var (
 	ErrNoCode = errors.New("no contract code at given address")
 
 	// ErrNoPendingState is raised when attempting to perform a pending state action
-	// on a backend that doesn't implement PendingContractCaller.
+	// on a backend that doesn't implement AcceptedContractCaller.
 	ErrNoPendingState = errors.New("backend does not support pending state")
 
 	// ErrNoCodeAfterDeploy is returned by WaitDeployed if contract creation leaves
@@ -63,15 +63,15 @@ type ContractCaller interface {
 	CallContract(ctx context.Context, call interfaces.CallMsg, blockNumber *big.Int) ([]byte, error)
 }
 
-// PendingContractCaller defines methods to perform contract calls on the pending state.
+// AcceptedContractCaller defines methods to perform contract calls on the pending state.
 // Call will try to discover this interface when access to the pending state is requested.
 // If the backend does not support the pending state, Call returns ErrNoPendingState.
-type PendingContractCaller interface {
-	// AcceptedCodeAt returns the code of the given account in the pending state.
+type AcceptedContractCaller interface {
+	// AcceptedCodeAt returns the code of the given account in the accepted state.
 	AcceptedCodeAt(ctx context.Context, contract common.Address) ([]byte, error)
 
-	// PendingCallContract executes an Ethereum contract call against the pending state.
-	PendingCallContract(ctx context.Context, call interfaces.CallMsg) ([]byte, error)
+	// AcceptedContractCaller executes an Ethereum contract call against the accepted state.
+	AcceptedContractCaller(ctx context.Context, call interfaces.CallMsg) ([]byte, error)
 }
 
 // ContractTransactor defines the methods needed to allow operating with a contract
@@ -83,10 +83,10 @@ type ContractTransactor interface {
 	// number is nil, the latest known header is returned.
 	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)
 
-	// AcceptedCodeAt returns the code of the given account in the pending state.
+	// AcceptedCodeAt returns the code of the given account in the accepted state.
 	AcceptedCodeAt(ctx context.Context, account common.Address) ([]byte, error)
 
-	// AcceptedNonceAt retrieves the current pending nonce associated with an account.
+	// AcceptedNonceAt retrieves the current accepted nonce associated with an account.
 	AcceptedNonceAt(ctx context.Context, account common.Address) (uint64, error)
 
 	// SuggestGasPrice retrieves the currently suggested gas price to allow a timely

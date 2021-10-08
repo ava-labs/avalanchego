@@ -48,7 +48,7 @@ type SignerFn func(common.Address, *types.Transaction) (*types.Transaction, erro
 
 // CallOpts is the collection of options to fine tune a contract call request.
 type CallOpts struct {
-	Pending     bool            // Whether to operate on the pending state or the last known one
+	Accepted    bool            // Whether to operate on the accepted state or the last known one
 	From        common.Address  // Optional the sender address, otherwise the first account is used
 	BlockNumber *big.Int        // Optional the block number on which the call should be performed
 	Context     context.Context // Network context to support cancellation and timeouts (nil = no timeout)
@@ -175,12 +175,12 @@ func (c *BoundContract) Call(opts *CallOpts, results *[]interface{}, method stri
 		code   []byte
 		output []byte
 	)
-	if opts.Pending {
-		pb, ok := c.caller.(PendingContractCaller)
+	if opts.Accepted {
+		pb, ok := c.caller.(AcceptedContractCaller)
 		if !ok {
 			return ErrNoPendingState
 		}
-		output, err = pb.PendingCallContract(ctx, msg)
+		output, err = pb.AcceptedContractCaller(ctx, msg)
 		if err == nil && len(output) == 0 {
 			// Make sure we have a contract to operate on, and bail out otherwise.
 			if code, err = pb.AcceptedCodeAt(ctx, c.address); err != nil {
