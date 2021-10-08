@@ -756,6 +756,12 @@ const (
 	SideStatTy
 )
 
+// numberHash is just a container for a number and a hash, to represent a block
+type numberHash struct {
+	number uint64
+	hash   common.Hash
+}
+
 // SetPreference attempts to update the head block to be the provided block and
 // emits a ChainHeadEvent if successful. This function will handle all reorg
 // side effects, if necessary.
@@ -1656,10 +1662,4 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64, report
 		return triedb.Commit(previousRoot, report, nil)
 	}
 	return nil
-}
-
-// numberHash is just a container for a number and a hash, to represent a block
-type numberHash struct {
-	number uint64
-	hash   common.Hash
 }
