@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/message"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -285,7 +285,7 @@ func (p *peer) ReadMessages() {
 		p.net.log.Verbo("parsing message from %s%s at %s:\n%s", constants.NodeIDPrefix, p.nodeID, p.getIP(), formatting.DumpBytes{Bytes: msgBytes})
 
 		// Parse the message
-		msg, err := p.net.c.Parse(msgBytes)
+		msg, err := p.net.mc.Parse(msgBytes)
 		if err != nil {
 			p.net.log.Verbo("failed to parse message from %s%s at %s:\n%s\n%s", constants.NodeIDPrefix, p.nodeID, p.getIP(), formatting.DumpBytes{Bytes: msgBytes}, err)
 			// Couldn't parse the message. Read the next one.
@@ -352,7 +352,7 @@ func (p *peer) WriteMessages() {
 		atomic.StoreInt64(&p.lastSent, now)
 		atomic.StoreInt64(&p.net.lastMsgSentTime, now)
 
-		p.net.byteSlicePool.Put(msg)
+		p.net.mc.ReturnBytes(msg)
 	}
 }
 
@@ -536,7 +536,7 @@ func (p *peer) close() {
 
 // assumes the [stateLock] is not held
 func (p *peer) sendGetVersion() {
-	msg, err := p.net.b.GetVersion()
+	msg, err := p.net.mc.GetVersion()
 	p.net.log.AssertNoError(err)
 	lenMsg := len(msg.Bytes())
 	sent := p.Send(msg, true)
@@ -564,7 +564,7 @@ func (p *peer) sendVersion() {
 		return
 	}
 	whitelistedSubnets := p.net.config.WhitelistedSubnets
-	msg, err := p.net.b.Version(
+	msg, err := p.net.mc.Version(
 		p.net.config.NetworkID,
 		p.net.dummyNodeID,
 		p.net.clock.Unix(),
@@ -596,7 +596,7 @@ func (p *peer) sendVersion() {
 
 // assumes the [stateLock] is not held
 func (p *peer) sendGetPeerList() {
-	msg, err := p.net.b.GetPeerList()
+	msg, err := p.net.mc.GetPeerList()
 	p.net.log.AssertNoError(err)
 
 	lenMsg := len(msg.Bytes())
@@ -622,7 +622,7 @@ func (p *peer) sendPeerList() {
 		return
 	}
 
-	msg, err := p.net.b.PeerList(peers, p.net.config.CompressionEnabled)
+	msg, err := p.net.mc.PeerList(peers)
 	if err != nil {
 		p.net.log.Warn("failed to send PeerList to %s%s at %s: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
 		return
@@ -647,7 +647,7 @@ func (p *peer) sendPeerList() {
 
 // assumes the [stateLock] is not held
 func (p *peer) sendPing() {
-	msg, err := p.net.b.Ping()
+	msg, err := p.net.mc.Ping()
 	p.net.log.AssertNoError(err)
 	lenMsg := len(msg.Bytes())
 	sent := p.Send(msg, true)
@@ -667,7 +667,7 @@ func (p *peer) sendPing() {
 
 // assumes the [stateLock] is not held
 func (p *peer) sendPong() {
-	msg, err := p.net.b.Pong()
+	msg, err := p.net.mc.Pong()
 	p.net.log.AssertNoError(err)
 	lenMsg := len(msg.Bytes())
 	sent := p.Send(msg, true)

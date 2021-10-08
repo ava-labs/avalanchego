@@ -19,8 +19,8 @@ import (
 )
 
 var (
-	TestBuilder Builder
-	TestCodec   Codec
+	UncompressingBuilder Builder
+	TestCodec            Codec
 )
 
 func init() {
@@ -29,11 +29,11 @@ func init() {
 		panic(err)
 	}
 	TestCodec = codec
-	TestBuilder = NewBuilder(codec)
+	UncompressingBuilder = NewBuilder(codec, false /*compress*/) // TODO: check whether this instantiation can be done here
 }
 
 func TestBuildGetVersion(t *testing.T) {
-	msg, err := TestBuilder.GetVersion()
+	msg, err := UncompressingBuilder.GetVersion()
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, GetVersion, msg.Op())
@@ -56,7 +56,7 @@ func TestBuildVersion(t *testing.T) {
 	sig := make([]byte, 65)
 	subnetID := ids.Empty.Prefix(1)
 	subnetIDs := [][]byte{subnetID[:]}
-	msg, err := TestBuilder.Version(
+	msg, err := UncompressingBuilder.Version(
 		networkID,
 		nodeID,
 		myTime,
@@ -86,7 +86,7 @@ func TestBuildVersion(t *testing.T) {
 }
 
 func TestBuildGetPeerList(t *testing.T) {
-	msg, err := TestBuilder.GetPeerList()
+	msg, err := UncompressingBuilder.GetPeerList()
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, GetPeerList, msg.Op())
@@ -102,7 +102,7 @@ func TestBuildGetAcceptedFrontier(t *testing.T) {
 	requestID := uint32(5)
 	deadline := uint64(15)
 
-	msg, err := TestBuilder.GetAcceptedFrontier(chainID, requestID, deadline)
+	msg, err := UncompressingBuilder.GetAcceptedFrontier(chainID, requestID, deadline)
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, GetAcceptedFrontier, msg.Op())
@@ -122,7 +122,7 @@ func TestBuildAcceptedFrontier(t *testing.T) {
 	containerID := ids.Empty.Prefix(1)
 	containerIDs := [][]byte{containerID[:]}
 
-	msg, err := TestBuilder.AcceptedFrontier(chainID, requestID, []ids.ID{containerID})
+	msg, err := UncompressingBuilder.AcceptedFrontier(chainID, requestID, []ids.ID{containerID})
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, AcceptedFrontier, msg.Op())
@@ -143,7 +143,7 @@ func TestBuildGetAccepted(t *testing.T) {
 	containerID := ids.Empty.Prefix(1)
 	containerIDs := [][]byte{containerID[:]}
 
-	msg, err := TestBuilder.GetAccepted(chainID, requestID, deadline, []ids.ID{containerID})
+	msg, err := UncompressingBuilder.GetAccepted(chainID, requestID, deadline, []ids.ID{containerID})
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, GetAccepted, msg.Op())
@@ -164,7 +164,7 @@ func TestBuildAccepted(t *testing.T) {
 	containerID := ids.Empty.Prefix(1)
 	containerIDs := [][]byte{containerID[:]}
 
-	msg, err := TestBuilder.Accepted(chainID, requestID, []ids.ID{containerID})
+	msg, err := UncompressingBuilder.Accepted(chainID, requestID, []ids.ID{containerID})
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, Accepted, msg.Op())
@@ -184,7 +184,7 @@ func TestBuildGet(t *testing.T) {
 	deadline := uint64(15)
 	containerID := ids.Empty.Prefix(1)
 
-	msg, err := TestBuilder.Get(chainID, requestID, deadline, containerID)
+	msg, err := UncompressingBuilder.Get(chainID, requestID, deadline, containerID)
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, Get, msg.Op())
@@ -206,7 +206,8 @@ func TestBuildPut(t *testing.T) {
 	container := []byte{2}
 
 	for _, compress := range []bool{false, true} {
-		msg, err := TestBuilder.Put(chainID, requestID, containerID, container, compress)
+		builder := NewBuilder(TestCodec, compress)
+		msg, err := builder.Put(chainID, requestID, containerID, container)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, Put, msg.Op())
@@ -230,7 +231,8 @@ func TestBuildPushQuery(t *testing.T) {
 	container := []byte{2}
 
 	for _, compress := range []bool{false, true} {
-		msg, err := TestBuilder.PushQuery(chainID, requestID, deadline, containerID, container, compress)
+		builder := NewBuilder(TestCodec, compress)
+		msg, err := builder.PushQuery(chainID, requestID, deadline, containerID, container)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, PushQuery, msg.Op())
@@ -253,7 +255,7 @@ func TestBuildPullQuery(t *testing.T) {
 	deadline := uint64(15)
 	containerID := ids.Empty.Prefix(1)
 
-	msg, err := TestBuilder.PullQuery(chainID, requestID, deadline, containerID)
+	msg, err := UncompressingBuilder.PullQuery(chainID, requestID, deadline, containerID)
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, PullQuery, msg.Op())
@@ -274,7 +276,7 @@ func TestBuildChits(t *testing.T) {
 	containerID := ids.Empty.Prefix(1)
 	containerIDs := [][]byte{containerID[:]}
 
-	msg, err := TestBuilder.Chits(chainID, requestID, []ids.ID{containerID})
+	msg, err := UncompressingBuilder.Chits(chainID, requestID, []ids.ID{containerID})
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, Chits, msg.Op())
@@ -296,7 +298,8 @@ func TestBuildMultiPut(t *testing.T) {
 	containers := [][]byte{container[:], container2[:]}
 
 	for _, compress := range []bool{false, true} {
-		msg, err := TestBuilder.MultiPut(chainID, requestID, containers, compress)
+		builder := NewBuilder(TestCodec, compress)
+		msg, err := builder.MultiPut(chainID, requestID, containers)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, MultiPut, msg.Op())
@@ -319,7 +322,8 @@ func TestBuildAppRequestMsg(t *testing.T) {
 	deadline := uint64(time.Now().Unix())
 
 	for _, compress := range []bool{false, true} {
-		msg, err := TestBuilder.AppRequest(chainID, 1, deadline, appRequestBytes, compress)
+		builder := NewBuilder(TestCodec, compress)
+		msg, err := builder.AppRequest(chainID, 1, deadline, appRequestBytes)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, AppRequest, msg.Op())
@@ -338,7 +342,8 @@ func TestBuildAppResponseMsg(t *testing.T) {
 	appResponseBytes[len(appResponseBytes)-1] = 1
 
 	for _, compress := range []bool{false, true} {
-		msg, err := TestBuilder.AppResponse(chainID, 1, appResponseBytes, compress)
+		builder := NewBuilder(TestCodec, compress)
+		msg, err := builder.AppResponse(chainID, 1, appResponseBytes)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, AppResponse, msg.Op())
@@ -360,7 +365,8 @@ func TestBuildAppGossipMsg(t *testing.T) {
 	appGossipBytes[len(appGossipBytes)-1] = 1
 
 	for _, compress := range []bool{false, true} {
-		msg, err := TestBuilder.AppGossip(chainID, appGossipBytes, compress)
+		testBuilder := NewBuilder(TestCodec, compress)
+		msg, err := testBuilder.AppGossip(chainID, appGossipBytes)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, AppGossip, msg.Op())

@@ -26,10 +26,7 @@ type Builder interface {
 
 	GetPeerList() (OutboundMessage, error)
 
-	PeerList(
-		peers []utils.IPCertDesc,
-		compress bool,
-	) (OutboundMessage, error)
+	PeerList(peers []utils.IPCertDesc) (OutboundMessage, error)
 
 	Ping() (OutboundMessage, error)
 
@@ -71,7 +68,6 @@ type Builder interface {
 		chainID ids.ID,
 		requestID uint32,
 		containers [][]byte,
-		compressed bool,
 	) (OutboundMessage, error)
 
 	Get(
@@ -86,7 +82,6 @@ type Builder interface {
 		requestID uint32,
 		containerID ids.ID,
 		container []byte,
-		compress bool,
 	) (OutboundMessage, error)
 
 	PushQuery(
@@ -95,7 +90,6 @@ type Builder interface {
 		deadline uint64,
 		containerID ids.ID,
 		container []byte,
-		compress bool,
 	) (OutboundMessage, error)
 
 	PullQuery(
@@ -116,27 +110,30 @@ type Builder interface {
 		requestID uint32,
 		deadline uint64,
 		msg []byte,
-		compress bool,
 	) (OutboundMessage, error)
 
 	AppResponse(
 		chainID ids.ID,
 		requestID uint32,
 		msg []byte,
-		compress bool,
 	) (OutboundMessage, error)
 
 	AppGossip(
 		chainID ids.ID,
 		msg []byte,
-		compress bool,
 	) (OutboundMessage, error)
 }
 
-type builder struct{ c Codec }
+type builder struct {
+	c        Codec
+	compress bool
+}
 
-func NewBuilder(c Codec) Builder {
-	return &builder{c: c}
+func NewBuilder(c Codec, enableCompression bool) Builder {
+	return &builder{
+		c:        c,
+		compress: enableCompression,
+	}
 }
 
 func (b *builder) GetVersion() (OutboundMessage, error) {
@@ -186,13 +183,13 @@ func (b *builder) GetPeerList() (OutboundMessage, error) {
 	)
 }
 
-func (b *builder) PeerList(peers []utils.IPCertDesc, compress bool) (OutboundMessage, error) {
+func (b *builder) PeerList(peers []utils.IPCertDesc) (OutboundMessage, error) {
 	return b.c.Pack(
 		PeerList,
 		map[Field]interface{}{
 			SignedPeers: peers,
 		},
-		compress && PeerList.Compressable(), // PeerList messages may be compressed
+		b.compress && PeerList.Compressable(), // PeerList messages may be compressed
 	)
 }
 
@@ -315,7 +312,6 @@ func (b *builder) MultiPut(
 	chainID ids.ID,
 	requestID uint32,
 	containers [][]byte,
-	compressed bool,
 ) (OutboundMessage, error) {
 	return b.c.Pack(
 		MultiPut,
@@ -324,7 +320,7 @@ func (b *builder) MultiPut(
 			RequestID:           requestID,
 			MultiContainerBytes: containers,
 		},
-		compressed && MultiPut.Compressable(), // MultiPut messages may be compressed
+		b.compress && MultiPut.Compressable(), // MultiPut messages may be compressed
 	)
 }
 
@@ -351,7 +347,6 @@ func (b *builder) Put(
 	requestID uint32,
 	containerID ids.ID,
 	container []byte,
-	compress bool,
 ) (OutboundMessage, error) {
 	return b.c.Pack(
 		Put,
@@ -361,7 +356,7 @@ func (b *builder) Put(
 			ContainerID:    containerID[:],
 			ContainerBytes: container,
 		},
-		compress && Put.Compressable(), // Put messages may be compressed
+		b.compress && Put.Compressable(), // Put messages may be compressed
 	)
 }
 
@@ -371,7 +366,6 @@ func (b *builder) PushQuery(
 	deadline uint64,
 	containerID ids.ID,
 	container []byte,
-	compress bool,
 ) (OutboundMessage, error) {
 	return b.c.Pack(
 		PushQuery,
@@ -382,7 +376,7 @@ func (b *builder) PushQuery(
 			ContainerID:    containerID[:],
 			ContainerBytes: container,
 		},
-		compress && PushQuery.Compressable(), // PushQuery messages may be compressed
+		b.compress && PushQuery.Compressable(), // PushQuery messages may be compressed
 	)
 }
 
@@ -426,7 +420,7 @@ func (b *builder) Chits(
 }
 
 // Application level request
-func (b *builder) AppRequest(chainID ids.ID, requestID uint32, deadline uint64, msg []byte, compress bool) (OutboundMessage, error) {
+func (b *builder) AppRequest(chainID ids.ID, requestID uint32, deadline uint64, msg []byte) (OutboundMessage, error) {
 	return b.c.Pack(
 		AppRequest,
 		map[Field]interface{}{
@@ -435,12 +429,12 @@ func (b *builder) AppRequest(chainID ids.ID, requestID uint32, deadline uint64, 
 			Deadline:        deadline,
 			AppRequestBytes: msg,
 		},
-		compress && AppRequest.Compressable(), // App messages may be compressed
+		b.compress && AppRequest.Compressable(), // App messages may be compressed
 	)
 }
 
 // Application level response
-func (b *builder) AppResponse(chainID ids.ID, requestID uint32, msg []byte, compress bool) (OutboundMessage, error) {
+func (b *builder) AppResponse(chainID ids.ID, requestID uint32, msg []byte) (OutboundMessage, error) {
 	return b.c.Pack(
 		AppResponse,
 		map[Field]interface{}{
@@ -448,18 +442,18 @@ func (b *builder) AppResponse(chainID ids.ID, requestID uint32, msg []byte, comp
 			RequestID:        requestID,
 			AppResponseBytes: msg,
 		},
-		compress && AppResponse.Compressable(), // App messages may be compressed
+		b.compress && AppResponse.Compressable(), // App messages may be compressed
 	)
 }
 
 // Application level gossiped message
-func (b *builder) AppGossip(chainID ids.ID, msg []byte, compress bool) (OutboundMessage, error) {
+func (b *builder) AppGossip(chainID ids.ID, msg []byte) (OutboundMessage, error) {
 	return b.c.Pack(
 		AppGossip,
 		map[Field]interface{}{
 			ChainID:        chainID[:],
 			AppGossipBytes: msg,
 		},
-		compress && AppGossip.Compressable(), // App messages may be compressed
+		b.compress && AppGossip.Compressable(), // App messages may be compressed
 	)
 }

@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/indexer"
 	"github.com/ava-labs/avalanchego/ipcs"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -101,6 +102,9 @@ type Node struct {
 
 	// Monitors node health and runs health checks
 	healthService health.Service
+
+	// Build and parse messages, for both network layer and chain manager
+	msgCreator message.MsgCreator
 
 	// Manages creation of blockchains and routing messages to them
 	chainManager chains.Manager
@@ -231,7 +235,7 @@ func (n *Node) initNetworking() error {
 		}
 	}
 
-	networkNamespace := fmt.Sprintf("%s_network", constants.PlatformName)
+	networkNamespace := n.msgCreator.ParentNamespace()
 
 	// add node configs to network config
 	n.Config.NetworkConfig.Namespace = networkNamespace
@@ -246,6 +250,7 @@ func (n *Node) initNetworking() error {
 
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
+		n.msgCreator,
 		n.MetricsRegisterer,
 		n.Log,
 		listener,
@@ -614,6 +619,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		DecisionEvents:                         n.DecisionDispatcher,
 		ConsensusEvents:                        n.ConsensusDispatcher,
 		DBManager:                              n.DBManager,
+		MsgCreator:                             n.msgCreator,
 		Router:                                 n.Config.ConsensusRouter,
 		Net:                                    n.Net,
 		ConsensusParams:                        n.Config.ConsensusParams,
@@ -1010,6 +1016,11 @@ func (n *Node) Initialize(
 	n.Log.Info("node version is: %s", version.CurrentApp)
 	n.Log.Info("node ID is: %s", n.ID.PrefixedString(constants.NodeIDPrefix))
 	n.Log.Info("current database version: %s", dbManager.Current().Version)
+
+	if n.msgCreator, err = message.NewMsgCreator(n.MetricsRegisterer,
+		n.Config.NetworkConfig.CompressionEnabled); err != nil {
+		return fmt.Errorf("problem TheOneCreator: %w", err)
+	}
 
 	httpLog, err := logFactory.Make("http")
 	if err != nil {

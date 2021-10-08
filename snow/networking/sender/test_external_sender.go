@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/message"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
@@ -19,8 +19,7 @@ type ExternalSenderTest struct {
 	T *testing.T
 	B *testing.B
 
-	c message.Codec
-	b message.Builder
+	mc message.MsgCreator
 
 	CantSendGetAcceptedFrontier, CantSendAcceptedFrontier,
 	CantSendGetAccepted, CantSendAccepted,
@@ -76,23 +75,11 @@ func (s *ExternalSenderTest) Default(cant bool) {
 	s.CantSendGossip = cant
 
 	assert := assert.New(s.T)
-	codec, err := message.NewCodecWithAllocator(
-		"test_codec",
-		prometheus.NewRegistry(),
-		func() []byte { return nil },
-		int64(constants.DefaultMaxMessageSize),
-	)
+	metrics := prometheus.NewRegistry()
+	mc, err := message.NewMsgCreator(metrics, true /*compress*/)
 	assert.NoError(err)
-	s.c = codec
-	s.b = message.NewBuilder(codec)
+	s.mc = mc
 }
-
-// TODO ABENEGIA: fix or remove these mocks
-func (s *ExternalSenderTest) Parse(bytes []byte) (message.InboundMessage, error) {
-	return s.c.Parse(bytes)
-}
-func (s *ExternalSenderTest) GetMsgBuilder() message.Builder { return s.b }
-func (s *ExternalSenderTest) IsCompressionEnabled() bool     { return false }
 
 // TODO ABENEGIA: fix return type
 // TODO ABENEGIA: refactor with template pattern
@@ -100,7 +87,7 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, outMsg message.Outb
 	assert := assert.New(s.T)
 
 	// turn  message.OutboundMessage into  message.InboundMessage so be able to retrieve fields
-	inMsg, err := s.c.Parse(outMsg.Bytes())
+	inMsg, err := s.mc.Parse(outMsg.Bytes())
 	assert.NoError(err)
 
 	res := ids.NewShortSet(nodeIDs.Len())
@@ -384,7 +371,7 @@ func (s *ExternalSenderTest) Gossip(msgType constants.MsgType, outMsg message.Ou
 	assert := assert.New(s.T)
 
 	// turn  message.OutboundMessage into  message.InboundMessage so be able to retrieve fields
-	inMsg, err := s.c.Parse(outMsg.Bytes())
+	inMsg, err := s.mc.Parse(outMsg.Bytes())
 	assert.NoError(err)
 
 	switch msgType {

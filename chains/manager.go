@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
@@ -136,9 +137,10 @@ type ManagerConfig struct {
 	DecisionEvents              *triggers.EventDispatcher
 	ConsensusEvents             *triggers.EventDispatcher
 	DBManager                   dbManager.Manager
-	Router                      router.Router    // Routes incoming messages to the appropriate chain
-	Net                         network.Network  // Sends consensus messages to other validators
-	ConsensusParams             avcon.Parameters // The consensus parameters (alpha, beta, etc.) for new chains
+	MsgCreator                  message.MsgCreator // message creator, shared with network
+	Router                      router.Router      // Routes incoming messages to the appropriate chain
+	Net                         network.Network    // Sends consensus messages to other validators
+	ConsensusParams             avcon.Parameters   // The consensus parameters (alpha, beta, etc.) for new chains
 	EpochFirstTransition        time.Time
 	EpochDuration               time.Duration
 	Validators                  validators.Manager // Validators validating on this chain
@@ -503,6 +505,7 @@ func (m *manager) createAvalancheChain(
 	sender := sender.Sender{}
 	if err := sender.Initialize(
 		ctx,
+		m.MsgCreator,
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
@@ -648,6 +651,7 @@ func (m *manager) createSnowmanChain(
 	sender := sender.Sender{}
 	if err := sender.Initialize(
 		ctx,
+		m.MsgCreator,
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,

@@ -10,10 +10,11 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/message"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -68,6 +69,9 @@ func TestPeer_Close(t *testing.T) {
 	}
 
 	vdrs := validators.NewSet()
+	metrics := prometheus.NewRegistry()
+	msgCreator, err := message.NewMsgCreator(metrics, true /*compressionEnabled*/)
+	assert.NoError(t, err)
 	handler := &testHandler{}
 
 	netwrk, err := newTestNetwork(
@@ -80,6 +84,8 @@ func TestPeer_Close(t *testing.T) {
 		tlsConfig0,
 		listener,
 		caller,
+		metrics,
+		msgCreator,
 		handler,
 	)
 	assert.NoError(t, err)

@@ -21,8 +21,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/health"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/dialer"
-	"github.com/ava-labs/avalanchego/network/message"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
@@ -116,8 +116,7 @@ type network struct {
 	// used here.
 	dummyNodeID uint32
 	clock       timer.Clock
-	c           message.Codec
-	b           message.Builder
+	mc          message.MsgCreator
 	*msgsProcessor
 
 	stateLock sync.RWMutex
@@ -170,10 +169,6 @@ type network struct {
 	// A node is present in this map if and only if we are actively
 	// trying to dial the node.
 	connAttempts sync.Map
-
-	// Contains []byte. Used as an optimization.
-	// Can be accessed by multiple goroutines concurrently.
-	byteSlicePool sync.Pool
 
 	// Rate-limits incoming messages
 	inboundMsgThrottler         throttling.InboundMsgThrottler
@@ -255,6 +250,7 @@ type Config struct {
 // NewNetwork returns a new Network implementation with the provided parameters.
 func NewNetwork(
 	config *Config,
+	theOneMsgCreator message.MsgCreator,
 	metricsRegisterer prometheus.Registerer,
 	log logging.Logger,
 	listener net.Listener,
@@ -277,13 +273,9 @@ func NewNetwork(
 		inboundConnUpgradeThrottler: throttling.NewInboundConnUpgradeThrottler(log, config.ThrottlerConfig.InboundConnUpgradeThrottlerConfig),
 		benchlistManager:            benchlistManager,
 		latestPeerIP:                make(map[ids.ShortID]signedPeerIP),
-		byteSlicePool: sync.Pool{
-			New: func() interface{} {
-				return make([]byte, 0, constants.DefaultByteSliceCap)
-			},
-		},
-		versionCompatibility: version.GetCompatibility(config.NetworkID),
-		config:               config,
+		versionCompatibility:        version.GetCompatibility(config.NetworkID),
+		config:                      config,
+		mc:                          theOneMsgCreator,
 	}
 
 	netw.serverUpgrader = NewTLSServerUpgrader(config.TLSConfig)
@@ -315,19 +307,6 @@ func NewNetwork(
 	}
 	netw.outboundMsgThrottler = outboundMsgThrottler
 
-	codec, err := message.NewCodecWithAllocator(
-		fmt.Sprintf("%s_codec", config.Namespace),
-		metricsRegisterer,
-		func() []byte {
-			return netw.byteSlicePool.Get().([]byte)
-		},
-		int64(constants.DefaultMaxMessageSize),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("initializing codec failed with: %s", err)
-	}
-	netw.c = codec
-	netw.b = message.NewBuilder(codec)
 	netw.msgsProcessor = newMsgsProcessor(netw)
 
 	netw.peers.initialize()
@@ -337,11 +316,6 @@ func NewNetwork(
 	}
 	return netw, nil
 }
-
-// TODO: drop and find a better way to expose builder/parser to sender
-func (n *network) Parse(bytes []byte) (message.InboundMessage, error) { return n.c.Parse(bytes) }
-func (n *network) GetMsgBuilder() message.Builder                     { return n.b }
-func (n *network) IsCompressionEnabled() bool                         { return n.config.CompressionEnabled }
 
 // Accept is called after every consensus decision
 // Assumes [n.stateLock] is not held.
@@ -356,7 +330,7 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 		sampleSize = int(n.config.GossipOnAcceptSize)
 	)
 
-	msg, err := n.b.Put(ctx.ChainID, constants.GossipMsgRequestID, containerID, container, n.config.CompressionEnabled)
+	msg, err := n.mc.Put(ctx.ChainID, constants.GossipMsgRequestID, containerID, container)
 	if err != nil {
 		n.log.Debug("failed to build Put message for gossip (%s, %s): %s", ctx.ChainID, containerID, err)
 		n.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
@@ -693,8 +667,7 @@ func (n *network) gossipPeerList() {
 			continue
 		}
 
-		// Sent to peers that handle compressed messages (and messages with the isCompress flag)
-		msg, err := n.b.PeerList(ipCerts, n.config.CompressionEnabled)
+		msg, err := n.mc.PeerList(ipCerts)
 		if err != nil {
 			n.log.Error("failed to build signed peerlist to gossip: %s. len(ips): %d",
 				err,

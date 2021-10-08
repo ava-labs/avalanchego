@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
@@ -2084,8 +2085,11 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	externalSender.Default(true)
 
 	// Passes messages from the consensus engine to the network
+	metrics := prometheus.NewRegistry()
+	msgCreator, err := message.NewMsgCreator(metrics, true /*compressionEnabled*/)
+	assert.NoError(t, err)
 	sender := sender.Sender{}
-	err = sender.Initialize(ctx, externalSender, chainRouter, &timeoutManager, "", prometheus.NewRegistry())
+	err = sender.Initialize(ctx, msgCreator, externalSender, chainRouter, &timeoutManager, "", metrics)
 	assert.NoError(t, err)
 
 	reqID := new(uint32)
