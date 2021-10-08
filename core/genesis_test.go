@@ -27,8 +27,8 @@
 package core
 
 import (
+	_ "embed"
 	"encoding/json"
-	"io/ioutil"
 	"math/big"
 	"reflect"
 	"strings"
@@ -46,7 +46,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-const genesisTestAllocDataFilename = "genesis_test_data.json"
+//go:embed "genesis_test_data.json"
+var genesisTestAllocJsonData []byte
 
 type genesisTestAllocData struct {
 	FakeMainnetAllocData []byte `json:"fakeMainnetAllocData"`
@@ -262,12 +263,8 @@ var fakeGoerliGenesisHash = common.HexToHash("0xff59f9571fa557f03d46cbfcfb508fe1
 var fakeRinkebyGenesisHash = common.HexToHash("0xa6f4addcecb90a03354cdf993f8c3c99d208c796735000aaa8954fb0540b4fe3")
 
 func loadGenesisTestAllocData() *genesisTestAllocData {
-	b, err := ioutil.ReadFile(genesisTestAllocDataFilename)
-	if err != nil {
-		panic(err)
-	}
 	m := genesisTestAllocData{}
-	err = json.Unmarshal(b, &m)
+	err := json.Unmarshal(genesisTestAllocJsonData, &m)
 	if err != nil {
 		panic(err)
 	}
