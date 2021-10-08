@@ -345,32 +345,32 @@ func TestRouterClearTimeouts(t *testing.T) {
 	// Put
 	inMsg, err = mc.InboundPut(handler.ctx.ChainID, 0, ids.GenerateTestID(), nil)
 	assert.NoError(t, err)
-	chainRouter.HandleInbound(constants.PutMsg, inMsg, vID, nil)
+	chainRouter.HandleInbound(message.Put, inMsg, vID, nil)
 
 	// MultiPut
 	inMsg, err = mc.InboundMultiPut(handler.ctx.ChainID, 1, nil)
 	assert.NoError(t, err)
-	chainRouter.HandleInbound(constants.MultiPutMsg, inMsg, vID, nil)
+	chainRouter.HandleInbound(message.MultiPut, inMsg, vID, nil)
 
 	// Chits # 1
 	inMsg, err = mc.InboundChits(handler.ctx.ChainID, 2, nil)
 	assert.NoError(t, err)
-	chainRouter.HandleInbound(constants.ChitsMsg, inMsg, vID, nil)
+	chainRouter.HandleInbound(message.Chits, inMsg, vID, nil)
 
 	// Chits # 2
 	inMsg, err = mc.InboundChits(handler.ctx.ChainID, 3, nil)
 	assert.NoError(t, err)
-	chainRouter.HandleInbound(constants.ChitsMsg, inMsg, vID, nil)
+	chainRouter.HandleInbound(message.Chits, inMsg, vID, nil)
 
 	// Accepted
 	inMsg, err = mc.InboundAccepted(handler.ctx.ChainID, 4, nil)
 	assert.NoError(t, err)
-	chainRouter.HandleInbound(constants.AcceptedMsg, inMsg, vID, nil)
+	chainRouter.HandleInbound(message.Accepted, inMsg, vID, nil)
 
 	// Accepted Frontier
 	inMsg, err = mc.InboundAcceptedFrontier(handler.ctx.ChainID, 5, nil)
 	assert.NoError(t, err)
 
-	chainRouter.HandleInbound(constants.AcceptedFrontierMsg, inMsg, vID, nil)
+	chainRouter.HandleInbound(message.AcceptedFrontier, inMsg, vID, nil)
 	assert.Equal(t, chainRouter.timedRequests.Len(), 0)
 }

@@ -455,53 +455,8 @@ func (p *peer) handle(msg message.InboundMessage, msgLen float64, onFinishedHand
 		return
 	}
 
-	switch op { // Consensus and app-level messages
-	case message.GetAcceptedFrontier:
-		p.net.router.HandleInbound(constants.GetAcceptedFrontierMsg,
-			msg, p.nodeID, onFinishedHandling)
-	case message.AcceptedFrontier:
-		p.net.router.HandleInbound(constants.AcceptedFrontierMsg,
-			msg, p.nodeID, onFinishedHandling)
-	case message.GetAccepted:
-		p.net.router.HandleInbound(constants.GetAcceptedMsg,
-			msg, p.nodeID, onFinishedHandling)
-	case message.Accepted:
-		p.net.router.HandleInbound(constants.AcceptedMsg,
-			msg, p.nodeID, onFinishedHandling)
-	case message.Get:
-		p.net.router.HandleInbound(constants.GetMsg,
-			msg, p.nodeID, onFinishedHandling)
-	case message.GetAncestors:
-		p.net.router.HandleInbound(constants.GetAncestorsMsg,
-			msg, p.nodeID, onFinishedHandling)
-	case message.Put:
-		p.net.router.HandleInbound(constants.PutMsg,
-			msg, p.nodeID, onFinishedHandling)
-	case message.MultiPut:
-		p.net.router.HandleInbound(constants.MultiPutMsg,
-			msg, p.nodeID, onFinishedHandling)
-	case message.PushQuery:
-		p.net.router.HandleInbound(constants.PushQueryMsg,
-			msg, p.nodeID, onFinishedHandling)
-	case message.PullQuery:
-		p.net.router.HandleInbound(constants.PullQueryMsg,
-			msg, p.nodeID, onFinishedHandling)
-	case message.Chits:
-		p.net.router.HandleInbound(constants.ChitsMsg,
-			msg, p.nodeID, onFinishedHandling)
-	case message.AppRequest:
-		p.net.router.HandleInbound(constants.AppRequestMsg,
-			msg, p.nodeID, onFinishedHandling)
-	case message.AppResponse:
-		p.net.router.HandleInbound(constants.AppResponseMsg,
-			msg, p.nodeID, onFinishedHandling)
-	case message.AppGossip:
-		p.net.router.HandleInbound(constants.AppGossipMsg,
-			msg, p.nodeID, onFinishedHandling)
-	default:
-		p.net.log.Debug("dropping an unknown message from %s%s at %s with op %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), op)
-		onFinishedHandling()
-	}
+	// Consensus and app-level messages
+	p.net.router.HandleInbound(op, msg, p.nodeID, onFinishedHandling)
 }
 
 // assumes the [stateLock] is not held

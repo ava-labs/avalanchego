@@ -43,7 +43,7 @@ type Router interface {
 // Handler of the consensus engine that the message is intended for
 type ExternalRouter interface {
 	HandleInbound(
-		msgType constants.MsgType,
+		msgType message.Op,
 		msg message.InboundMessage,
 		nodeID ids.ShortID,
 		onFinishedHandling func(),

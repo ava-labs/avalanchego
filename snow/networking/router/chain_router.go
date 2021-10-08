@@ -258,7 +258,7 @@ func (cr *ChainRouter) removeChain(chainID ids.ID) {
 }
 
 func (cr *ChainRouter) HandleInbound(
-	msgType constants.MsgType,
+	msgType message.Op,
 	inMsg message.InboundMessage,
 	nodeID ids.ShortID,
 	onFinishedHandling func(),
@@ -282,7 +282,7 @@ func (cr *ChainRouter) HandleInbound(
 
 	// Pass the message to the chain
 	switch msgType {
-	case constants.GetAcceptedFrontierMsg:
+	case message.GetAcceptedFrontier:
 		// GetAcceptedFrontier routes an incoming GetAcceptedFrontier request from the
 		// validator with ID [validatorID]  to the consensus engine working on the
 		// chain with ID [chainID]
@@ -291,7 +291,7 @@ func (cr *ChainRouter) HandleInbound(
 		chain.GetAcceptedFrontier(nodeID, requestID, deadline, onFinishedHandling)
 		return
 
-	case constants.AcceptedFrontierMsg:
+	case message.AcceptedFrontier:
 		// AcceptedFrontier routes an incoming AcceptedFrontier request from the
 		// validator with ID [validatorID]  to the consensus engine working on the
 		// chain with ID [chainID]
@@ -325,7 +325,7 @@ func (cr *ChainRouter) HandleInbound(
 		chain.AcceptedFrontier(nodeID, requestID, containerIDs, onFinishedHandling)
 		return
 
-	case constants.GetAcceptedMsg:
+	case message.GetAccepted:
 		// GetAccepted routes an incoming GetAccepted request from the
 		// validator with ID [validatorID]  to the consensus engine working on the
 		// chain with ID [chainID]
@@ -341,7 +341,7 @@ func (cr *ChainRouter) HandleInbound(
 		chain.GetAccepted(nodeID, requestID, deadline, containerIDs, onFinishedHandling)
 		return
 
-	case constants.AcceptedMsg:
+	case message.Accepted:
 		// Accepted routes an incoming Accepted request from the validator with ID
 		// [validatorID] to the consensus engine working on the chain with ID
 		// [chainID]
@@ -376,7 +376,7 @@ func (cr *ChainRouter) HandleInbound(
 		chain.Accepted(nodeID, requestID, containerIDs, onFinishedHandling)
 		return
 
-	case constants.GetAncestorsMsg:
+	case message.GetAncestors:
 		// GetAncestors routes an incoming GetAncestors message from the validator with ID [validatorID]
 		// to the consensus engine working on the chain with ID [chainID]
 		// The maximum number of ancestors to respond with is defined in snow/engine/common/bootstrapper.go
@@ -389,7 +389,7 @@ func (cr *ChainRouter) HandleInbound(
 		chain.GetAncestors(nodeID, requestID, deadline, containerID, onFinishedHandling)
 		return
 
-	case constants.MultiPutMsg:
+	case message.MultiPut:
 		// MultiPut routes an incoming MultiPut message from the validator with ID [validatorID]
 		// to the consensus engine working on the chain with ID [chainID]
 
@@ -418,7 +418,7 @@ func (cr *ChainRouter) HandleInbound(
 		chain.MultiPut(nodeID, requestID, containers, onFinishedHandling)
 		return
 
-	case constants.GetMsg:
+	case message.Get:
 		// Get routes an incoming Get request from the validator with ID [validatorID]
 		// to the consensus engine working on the chain with ID [chainID]
 
@@ -430,7 +430,7 @@ func (cr *ChainRouter) HandleInbound(
 		chain.Get(nodeID, requestID, deadline, containerID, onFinishedHandling)
 		return
 
-	case constants.PullQueryMsg:
+	case message.PullQuery:
 		// PullQuery routes an incoming PullQuery request from the validator with ID [validatorID]
 		// to the consensus engine working on the chain with ID [chainID]
 		// Pass the message to the chain
@@ -441,7 +441,7 @@ func (cr *ChainRouter) HandleInbound(
 		chain.PullQuery(nodeID, requestID, deadline, containerID, onFinishedHandling)
 		return
 
-	case constants.PushQueryMsg:
+	case message.PushQuery:
 		// PushQuery routes an incoming PushQuery request from the validator with ID [validatorID]
 		// to the consensus engine working on the chain with ID [chainID]
 
@@ -454,7 +454,7 @@ func (cr *ChainRouter) HandleInbound(
 		chain.PushQuery(nodeID, requestID, deadline, containerID, container, onFinishedHandling)
 		return
 
-	case constants.ChitsMsg:
+	case message.Chits:
 		// Chits routes an incoming Chits message from the validator with ID [validatorID]
 		// to the consensus engine working on the chain with ID [chainID]
 
@@ -490,7 +490,7 @@ func (cr *ChainRouter) HandleInbound(
 		chain.Chits(nodeID, requestID, votes, onFinishedHandling)
 		return
 
-	case constants.PutMsg:
+	case message.Put:
 		// Put routes an incoming Put request from the validator with ID [validatorID]
 		// to the consensus engine working on the chain with ID [chainID]
 
@@ -527,7 +527,7 @@ func (cr *ChainRouter) HandleInbound(
 		chain.Put(nodeID, requestID, containerID, container, onFinishedHandling)
 		return
 
-	case constants.AppRequestMsg:
+	case message.AppRequest:
 		// AppRequest routes an incoming application-level request from the given node
 		// to the consensus engine working on the given chain
 
@@ -538,7 +538,7 @@ func (cr *ChainRouter) HandleInbound(
 		chain.AppRequest(nodeID, requestID, deadline, request, onFinishedHandling)
 		return
 
-	case constants.AppResponseMsg:
+	case message.AppResponse:
 		response := inMsg.Get(message.AppResponseBytes).([]byte)
 
 		uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, constants.AppRequestMsg)
@@ -568,7 +568,7 @@ func (cr *ChainRouter) HandleInbound(
 		chain.AppResponse(nodeID, requestID, response, onFinishedHandling)
 		return
 
-	case constants.AppGossipMsg:
+	case message.AppGossip:
 		// AppGossip routes an incoming application-level gossip message from the given node
 		// to the consensus engine working on the given chain
 
