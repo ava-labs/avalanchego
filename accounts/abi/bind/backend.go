@@ -42,9 +42,9 @@ var (
 	// have any code associated with it (i.e. suicided).
 	ErrNoCode = errors.New("no contract code at given address")
 
-	// ErrNoPendingState is raised when attempting to perform a pending state action
+	// ErrNoAcceptedState is raised when attempting to perform a accepted state action
 	// on a backend that doesn't implement AcceptedContractCaller.
-	ErrNoPendingState = errors.New("backend does not support pending state")
+	ErrNoAcceptedState = errors.New("backend does not support accepted state")
 
 	// ErrNoCodeAfterDeploy is returned by WaitDeployed if contract creation leaves
 	// an empty contract behind.
@@ -64,8 +64,8 @@ type ContractCaller interface {
 }
 
 // AcceptedContractCaller defines methods to perform contract calls on the pending state.
-// Call will try to discover this interface when access to the pending state is requested.
-// If the backend does not support the pending state, Call returns ErrNoPendingState.
+// Call will try to discover this interface when access to the accepted state is requested.
+// If the backend does not support the pending state, Call returns ErrNoAcceptedState.
 type AcceptedContractCaller interface {
 	// AcceptedCodeAt returns the code of the given account in the accepted state.
 	AcceptedCodeAt(ctx context.Context, contract common.Address) ([]byte, error)

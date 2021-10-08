@@ -455,7 +455,7 @@ func (b *SimulatedBackend) CallContract(ctx context.Context, call interfaces.Cal
 	return res.Return(), res.Err
 }
 
-// AcceptedContractCaller executes a contract call on the pending state.
+// AcceptedContractCaller executes a contract call on the accepted state.
 func (b *SimulatedBackend) AcceptedContractCaller(ctx context.Context, call interfaces.CallMsg) ([]byte, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
