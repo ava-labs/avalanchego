@@ -27,13 +27,13 @@
 package core
 
 import (
+	"encoding/json"
+	"io/ioutil"
 	"math/big"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
-    "encoding/json"
-    "io/ioutil"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core/rawdb"
@@ -49,10 +49,10 @@ import (
 const genesisTestAllocDataFilename = "genesis_test_data.json"
 
 type genesisTestAllocData struct {
-    FakeMainnetAllocData []byte `json:"fakeMainnetAllocData"`
-    FakeRopstenAllocData []byte `json:"fakeRopstenAllocData"`
-    FakeRinkebyAllocData []byte `json:"fakeRinkebyAllocData"`
-    FakeGoerliAllocData []byte `json:"fakeGoerliAllocData"`
+	FakeMainnetAllocData []byte `json:"fakeMainnetAllocData"`
+	FakeRopstenAllocData []byte `json:"fakeRopstenAllocData"`
+	FakeRinkebyAllocData []byte `json:"fakeRinkebyAllocData"`
+	FakeGoerliAllocData  []byte `json:"fakeGoerliAllocData"`
 }
 
 func setupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig, common.Hash, error) {
@@ -262,20 +262,20 @@ var fakeGoerliGenesisHash = common.HexToHash("0xff59f9571fa557f03d46cbfcfb508fe1
 var fakeRinkebyGenesisHash = common.HexToHash("0xa6f4addcecb90a03354cdf993f8c3c99d208c796735000aaa8954fb0540b4fe3")
 
 func loadGenesisTestAllocData() *genesisTestAllocData {
-    b, err := ioutil.ReadFile(genesisTestAllocDataFilename)
-    if err != nil {
-        panic(err)
-    }
-    m := genesisTestAllocData{}
-    err = json.Unmarshal(b, &m)
-    if err != nil {
-        panic(err)
-    }
-    return &m
+	b, err := ioutil.ReadFile(genesisTestAllocDataFilename)
+	if err != nil {
+		panic(err)
+	}
+	m := genesisTestAllocData{}
+	err = json.Unmarshal(b, &m)
+	if err != nil {
+		panic(err)
+	}
+	return &m
 }
 
 func fakeMainnetGenesisBlock() *Genesis {
-    data := loadGenesisTestAllocData()
+	data := loadGenesisTestAllocData()
 	return &Genesis{
 		Config:     params.TestChainConfig,
 		Nonce:      66,
@@ -287,7 +287,7 @@ func fakeMainnetGenesisBlock() *Genesis {
 }
 
 func fakeRopstenGenesisBlock() *Genesis {
-    data := loadGenesisTestAllocData()
+	data := loadGenesisTestAllocData()
 	return &Genesis{
 		Config:     params.TestChainConfig,
 		Nonce:      66,
@@ -299,7 +299,7 @@ func fakeRopstenGenesisBlock() *Genesis {
 }
 
 func fakeRinkebyGenesisBlock() *Genesis {
-    data := loadGenesisTestAllocData()
+	data := loadGenesisTestAllocData()
 	return &Genesis{
 		Config:     params.TestChainConfig,
 		Timestamp:  1492009146,
@@ -311,7 +311,7 @@ func fakeRinkebyGenesisBlock() *Genesis {
 }
 
 func fakeGoerliGenesisBlock() *Genesis {
-    data := loadGenesisTestAllocData()
+	data := loadGenesisTestAllocData()
 	return &Genesis{
 		Config:     params.TestChainConfig,
 		Timestamp:  1548854791,
