@@ -72,7 +72,7 @@ var (
 // the background. Its main purpose is to allow for easy testing of contract bindings.
 // Simulated backend implements the following interfaces:
 // ChainReader, ChainStateReader, ContractBackend, ContractCaller, ContractFilterer, ContractTransactor,
-// DeployBackend, GasEstimator, GasPricer, LogFilterer, PendingContractCaller, TransactionReader, and TransactionSender
+// DeployBackend, GasEstimator, GasPricer, LogFilterer, AcceptedContractCaller, TransactionReader, and TransactionSender
 type SimulatedBackend struct {
 	database   ethdb.Database   // In memory database to store our testing data
 	blockchain *core.BlockChain // Ethereum blockchain to handle the consensus
@@ -394,7 +394,7 @@ func (b *SimulatedBackend) TransactionInBlock(ctx context.Context, blockHash com
 	return transactions[index], nil
 }
 
-// AcceptedCodeAt returns the code associated with an account in the pending state.
+// AcceptedCodeAt returns the code associated with an account in the accepted state.
 func (b *SimulatedBackend) AcceptedCodeAt(ctx context.Context, contract common.Address) ([]byte, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -455,8 +455,8 @@ func (b *SimulatedBackend) CallContract(ctx context.Context, call interfaces.Cal
 	return res.Return(), res.Err
 }
 
-// PendingCallContract executes a contract call on the pending state.
-func (b *SimulatedBackend) PendingCallContract(ctx context.Context, call interfaces.CallMsg) ([]byte, error) {
+// AcceptedContractCaller executes a contract call on the pending state.
+func (b *SimulatedBackend) AcceptedContractCaller(ctx context.Context, call interfaces.CallMsg) ([]byte, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	defer b.pendingState.RevertToSnapshot(b.pendingState.Snapshot())
@@ -472,8 +472,8 @@ func (b *SimulatedBackend) PendingCallContract(ctx context.Context, call interfa
 	return res.Return(), res.Err
 }
 
-// AcceptedNonceAt implements PendingStateReader.AcceptedNonceAt, retrieving
-// the nonce currently pending for the account.
+// AcceptedNonceAt implements AcceptedStateReader.AcceptedNonceAt, retrieving
+// the nonce currently accepted for the account.
 func (b *SimulatedBackend) AcceptedNonceAt(ctx context.Context, account common.Address) (uint64, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()

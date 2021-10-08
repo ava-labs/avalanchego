@@ -775,14 +775,14 @@ func TestTransactionInBlock(t *testing.T) {
 		t.Errorf("expected transaction to be nil but received %v", transaction)
 	}
 
-	// expect pending nonce to be 0 since account has not been used
-	pendingNonce, err := sim.AcceptedNonceAt(bgCtx, testAddr)
+	// expect accepted nonce to be 0 since account has not been used
+	acceptedNonce, err := sim.AcceptedNonceAt(bgCtx, testAddr)
 	if err != nil {
 		t.Errorf("did not get the pending nonce: %v", err)
 	}
 
-	if pendingNonce != uint64(0) {
-		t.Errorf("expected pending nonce of 0 got %v", pendingNonce)
+	if acceptedNonce != uint64(0) {
+		t.Errorf("expected pending nonce of 0 got %v", acceptedNonce)
 	}
 	// create a signed transaction to send
 	head, _ := sim.HeaderByNumber(context.Background(), nil) // Should be child's, good enough
@@ -833,14 +833,14 @@ func TestAcceptedNonceAt(t *testing.T) {
 	defer sim.Close()
 	bgCtx := context.Background()
 
-	// expect pending nonce to be 0 since account has not been used
-	pendingNonce, err := sim.AcceptedNonceAt(bgCtx, testAddr)
+	// expect accepted nonce to be 0 since account has not been used
+	acceptedNonce, err := sim.AcceptedNonceAt(bgCtx, testAddr)
 	if err != nil {
-		t.Errorf("did not get the pending nonce: %v", err)
+		t.Errorf("did not get the accepted nonce: %v", err)
 	}
 
-	if pendingNonce != uint64(0) {
-		t.Errorf("expected pending nonce of 0 got %v", pendingNonce)
+	if acceptedNonce != uint64(0) {
+		t.Errorf("expected accepted nonce of 0 got %v", acceptedNonce)
 	}
 
 	// create a signed transaction to send
@@ -860,14 +860,14 @@ func TestAcceptedNonceAt(t *testing.T) {
 		t.Errorf("could not add tx to pending block: %v", err)
 	}
 
-	// expect pending nonce to be 1 since account has submitted one transaction
-	pendingNonce, err = sim.AcceptedNonceAt(bgCtx, testAddr)
+	// expect accepted nonce to be 1 since account has submitted one transaction
+	acceptedNonce, err = sim.AcceptedNonceAt(bgCtx, testAddr)
 	if err != nil {
-		t.Errorf("did not get the pending nonce: %v", err)
+		t.Errorf("did not get the accepted nonce: %v", err)
 	}
 
-	if pendingNonce != uint64(1) {
-		t.Errorf("expected pending nonce of 1 got %v", pendingNonce)
+	if acceptedNonce != uint64(1) {
+		t.Errorf("expected accepted nonce of 1 got %v", acceptedNonce)
 	}
 
 	// make a new transaction with a nonce of 1
@@ -882,14 +882,14 @@ func TestAcceptedNonceAt(t *testing.T) {
 		t.Errorf("could not send tx: %v", err)
 	}
 
-	// expect pending nonce to be 2 since account now has two transactions
-	pendingNonce, err = sim.AcceptedNonceAt(bgCtx, testAddr)
+	// expect accepted nonce to be 2 since account now has two transactions
+	acceptedNonce, err = sim.AcceptedNonceAt(bgCtx, testAddr)
 	if err != nil {
-		t.Errorf("did not get the pending nonce: %v", err)
+		t.Errorf("did not get the accepted nonce: %v", err)
 	}
 
-	if pendingNonce != uint64(2) {
-		t.Errorf("expected pending nonce of 2 got %v", pendingNonce)
+	if acceptedNonce != uint64(2) {
+		t.Errorf("expected accepted nonce of 2 got %v", acceptedNonce)
 	}
 }
 
@@ -1041,7 +1041,7 @@ func TestPendingAndCallContract(t *testing.T) {
 	}
 
 	// make sure you can call the contract in pending state
-	res, err := sim.PendingCallContract(bgCtx, interfaces.CallMsg{
+	res, err := sim.AcceptedContractCaller(bgCtx, interfaces.CallMsg{
 		From: testAddr,
 		To:   &addr,
 		Data: input,
@@ -1129,7 +1129,7 @@ func TestCallContractRevert(t *testing.T) {
 
 	call := make([]func([]byte) ([]byte, error), 2)
 	call[0] = func(input []byte) ([]byte, error) {
-		return sim.PendingCallContract(bgCtx, interfaces.CallMsg{
+		return sim.AcceptedContractCaller(bgCtx, interfaces.CallMsg{
 			From: testAddr,
 			To:   &addr,
 			Data: input,
