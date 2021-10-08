@@ -26,19 +26,18 @@ const (
 	defaultContinuousProfilerMaxFiles  = 5
 	defaultTxRegossipFrequency         = 1 * time.Minute
 	defaultTxRegossipMaxSize           = 15
+	defaultLogLevel                    = "debug"
 )
 
-var (
-	defaultEnabledAPIs = []string{
-		"public-eth",
-		"public-eth-filter",
-		"net",
-		"web3",
-		"internal-public-eth",
-		"internal-public-blockchain",
-		"internal-public-transaction-pool",
-	}
-)
+var defaultEnabledAPIs = []string{
+	"public-eth",
+	"public-eth-filter",
+	"net",
+	"web3",
+	"internal-public-eth",
+	"internal-public-blockchain",
+	"internal-public-transaction-pool",
+}
 
 type Duration struct {
 	time.Duration
@@ -122,6 +121,7 @@ func (c *Config) SetDefaults() {
 	c.SnapshotAsync = defaultSnapshotAsync
 	c.TxRegossipFrequency.Duration = defaultTxRegossipFrequency
 	c.TxRegossipMaxSize = defaultTxRegossipMaxSize
+	c.LogLevel = defaultLogLevel
 }
 
 func (d *Duration) UnmarshalJSON(data []byte) (err error) {
