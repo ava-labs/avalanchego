@@ -178,7 +178,7 @@ func (c *BoundContract) Call(opts *CallOpts, results *[]interface{}, method stri
 	if opts.Accepted {
 		pb, ok := c.caller.(AcceptedContractCaller)
 		if !ok {
-			return ErrNoPendingState
+			return ErrNoAcceptedState
 		}
 		output, err = pb.AcceptedContractCaller(ctx, msg)
 		if err == nil && len(output) == 0 {

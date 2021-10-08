@@ -1040,7 +1040,7 @@ func TestPendingAndCallContract(t *testing.T) {
 		t.Errorf("could not pack receive function on contract: %v", err)
 	}
 
-	// make sure you can call the contract in pending state
+	// make sure you can call the contract in accepted state
 	res, err := sim.AcceptedContractCaller(bgCtx, interfaces.CallMsg{
 		From: testAddr,
 		To:   &addr,
