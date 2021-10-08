@@ -4,7 +4,15 @@
 package message
 
 import (
+	"errors"
+
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+)
+
+var (
+	ErrParsingContainerID    = errors.New("could not parse container ID")
+	ErrDuplicatedContainerID = errors.New("inbound message contains duplicated container ID")
 )
 
 // Field that may be packed into a message
@@ -167,4 +175,31 @@ func (f Field) String() string {
 	default:
 		return "Unknown Field"
 	}
+}
+
+func encodeContainerIDs(containerIDs []ids.ID) [][]byte {
+	containerIDBytes := make([][]byte, len(containerIDs))
+	for i, containerID := range containerIDs {
+		copy := containerID
+		containerIDBytes[i] = copy[:]
+	}
+	return containerIDBytes
+}
+
+func DecodeContainerIDs(inMsg InboundMessage) ([]ids.ID, error) {
+	containerIDsBytes := inMsg.Get(ContainerIDs).([][]byte)
+	res := make([]ids.ID, len(containerIDsBytes))
+	idSet := ids.NewSet(0)
+	for i, containerIDBytes := range containerIDsBytes {
+		containerID, err := ids.ToID(containerIDBytes)
+		if err != nil {
+			return nil, ErrParsingContainerID
+		}
+		if idSet.Contains(containerID) {
+			return nil, ErrDuplicatedContainerID
+		}
+		res[i] = containerID
+		idSet.Add(containerID)
+	}
+	return res, nil
 }

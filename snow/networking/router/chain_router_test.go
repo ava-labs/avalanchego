@@ -340,63 +340,37 @@ func TestRouterClearTimeouts(t *testing.T) {
 
 	// Clear each timeout by simulating responses to the queries
 	// Note: Depends on the ordering of [msgs]
-	var outMsg message.OutboundMessage
 	var inMsg message.InboundMessage
 
 	// Put
-	outMsg, err = mc.Put(handler.ctx.ChainID, 0, ids.GenerateTestID(), nil)
-	assert.NoError(t, err)
-
-	// TODO ABENEGIA: trick following OutboundMessage/InboundMessage. Find cleaner solution
-	inMsg, err = mc.Parse(outMsg.Bytes())
+	inMsg, err = mc.InboundPut(handler.ctx.ChainID, 0, ids.GenerateTestID(), nil)
 	assert.NoError(t, err)
 	chainRouter.HandleInbound(constants.PutMsg, inMsg, vID, nil)
 
 	// MultiPut
-	outMsg, err = mc.MultiPut(handler.ctx.ChainID, 1, nil)
-	assert.NoError(t, err)
-
-	// TODO ABENEGIA: trick following OutboundMessage/InboundMessage. Find cleaner solution
-	inMsg, err = mc.Parse(outMsg.Bytes())
+	inMsg, err = mc.InboundMultiPut(handler.ctx.ChainID, 1, nil)
 	assert.NoError(t, err)
 	chainRouter.HandleInbound(constants.MultiPutMsg, inMsg, vID, nil)
 
 	// Chits # 1
-	outMsg, err = mc.Chits(handler.ctx.ChainID, 2, nil)
-	assert.NoError(t, err)
-
-	// TODO ABENEGIA: trick following OutboundMessage/InboundMessage. Find cleaner solution
-	inMsg, err = mc.Parse(outMsg.Bytes())
+	inMsg, err = mc.InboundChits(handler.ctx.ChainID, 2, nil)
 	assert.NoError(t, err)
 	chainRouter.HandleInbound(constants.ChitsMsg, inMsg, vID, nil)
 
 	// Chits # 2
-	outMsg, err = mc.Chits(handler.ctx.ChainID, 3, nil)
-	assert.NoError(t, err)
-
-	// TODO ABENEGIA: trick following OutboundMessage/InboundMessage. Find cleaner solution
-	inMsg, err = mc.Parse(outMsg.Bytes())
+	inMsg, err = mc.InboundChits(handler.ctx.ChainID, 3, nil)
 	assert.NoError(t, err)
 	chainRouter.HandleInbound(constants.ChitsMsg, inMsg, vID, nil)
 
 	// Accepted
-	outMsg, err = mc.Accepted(handler.ctx.ChainID, 4, nil)
-	assert.NoError(t, err)
-
-	// TODO ABENEGIA: trick following OutboundMessage/InboundMessage. Find cleaner solution
-	inMsg, err = mc.Parse(outMsg.Bytes())
+	inMsg, err = mc.InboundAccepted(handler.ctx.ChainID, 4, nil)
 	assert.NoError(t, err)
 	chainRouter.HandleInbound(constants.AcceptedMsg, inMsg, vID, nil)
 
 	// Accepted Frontier
-	outMsg, err = mc.AcceptedFrontier(handler.ctx.ChainID, 5, nil)
-	assert.NoError(t, err)
-
-	// TODO ABENEGIA: trick following OutboundMessage/InboundMessage. Find cleaner solution
-	inMsg, err = mc.Parse(outMsg.Bytes())
+	inMsg, err = mc.InboundAcceptedFrontier(handler.ctx.ChainID, 5, nil)
 	assert.NoError(t, err)
 
 	chainRouter.HandleInbound(constants.AcceptedFrontierMsg, inMsg, vID, nil)
-
 	assert.Equal(t, chainRouter.timedRequests.Len(), 0)
 }

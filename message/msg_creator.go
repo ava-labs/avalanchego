@@ -11,10 +11,25 @@ import (
 var _ MsgCreator = (*msgCreator)(nil)
 
 type MsgCreator interface {
-	Builder
-	Parse(bytes []byte) (InboundMessage, error) // TODO ABENEGIA: not full codec interface, to be dropped
+	OutboundMsgBuilder
+	Parse(bytes []byte) (InboundMessage, error)
+	InboundMsgBuilder
+
 	ReturnBytes(msg interface{})
-	ParentNamespace() string
+
+	ParentNamespace() string // needed to init network and chainManager with the right namespace
+}
+
+type msgCreator struct {
+	Codec
+	OutboundMsgBuilder
+	InboundMsgBuilder
+
+	// Contains []byte. Used as an optimization.
+	// Can be accessed by multiple goroutines concurrently.
+	byteSlicePool *sync.Pool
+
+	parentNamespace string
 }
 
 func NewMsgCreator(metrics prometheus.Registerer, compressionEnabled bool) (MsgCreator, error) {
@@ -34,25 +49,16 @@ func NewMsgCreator(metrics prometheus.Registerer, compressionEnabled bool) (MsgC
 	if err != nil {
 		return nil, err
 	}
-	builder := NewBuilder(codec, compressionEnabled)
+	outBuilder := NewOutboundBuilder(codec, compressionEnabled)
+	inBuilder := NewInboundBuilder(codec)
 	res := &msgCreator{
-		Builder:         builder,
-		Codec:           codec,
-		byteSlicePool:   &pool,
-		parentNamespace: parentNamespace,
+		OutboundMsgBuilder: outBuilder,
+		InboundMsgBuilder:  inBuilder,
+		Codec:              codec,
+		byteSlicePool:      &pool,
+		parentNamespace:    parentNamespace,
 	}
 	return res, nil
-}
-
-type msgCreator struct {
-	Codec
-	Builder
-
-	// Contains []byte. Used as an optimization.
-	// Can be accessed by multiple goroutines concurrently.
-	byteSlicePool *sync.Pool
-
-	parentNamespace string // TODO ABENEGIA: needed to init network and chainManager with the right namespace
 }
 
 func (mc *msgCreator) ReturnBytes(msg interface{}) {

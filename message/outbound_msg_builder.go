@@ -8,9 +8,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-var _ Builder = &builder{}
+var _ OutboundMsgBuilder = &outMsgBuilder{}
 
-type Builder interface {
+type OutboundMsgBuilder interface {
 	GetVersion() (OutboundMessage, error)
 
 	Version(
@@ -124,19 +124,19 @@ type Builder interface {
 	) (OutboundMessage, error)
 }
 
-type builder struct {
+type outMsgBuilder struct {
 	c        Codec
 	compress bool
 }
 
-func NewBuilder(c Codec, enableCompression bool) Builder {
-	return &builder{
+func NewOutboundBuilder(c Codec, enableCompression bool) OutboundMsgBuilder {
+	return &outMsgBuilder{
 		c:        c,
 		compress: enableCompression,
 	}
 }
 
-func (b *builder) GetVersion() (OutboundMessage, error) {
+func (b *outMsgBuilder) GetVersion() (OutboundMessage, error) {
 	return b.c.Pack(
 		GetVersion,
 		nil,
@@ -144,7 +144,7 @@ func (b *builder) GetVersion() (OutboundMessage, error) {
 	)
 }
 
-func (b *builder) Version(
+func (b *outMsgBuilder) Version(
 	networkID,
 	nodeID uint32,
 	myTime uint64,
@@ -175,7 +175,7 @@ func (b *builder) Version(
 	)
 }
 
-func (b *builder) GetPeerList() (OutboundMessage, error) {
+func (b *outMsgBuilder) GetPeerList() (OutboundMessage, error) {
 	return b.c.Pack(
 		GetPeerList,
 		nil,
@@ -183,7 +183,7 @@ func (b *builder) GetPeerList() (OutboundMessage, error) {
 	)
 }
 
-func (b *builder) PeerList(peers []utils.IPCertDesc) (OutboundMessage, error) {
+func (b *outMsgBuilder) PeerList(peers []utils.IPCertDesc) (OutboundMessage, error) {
 	return b.c.Pack(
 		PeerList,
 		map[Field]interface{}{
@@ -193,7 +193,7 @@ func (b *builder) PeerList(peers []utils.IPCertDesc) (OutboundMessage, error) {
 	)
 }
 
-func (b *builder) Ping() (OutboundMessage, error) {
+func (b *outMsgBuilder) Ping() (OutboundMessage, error) {
 	return b.c.Pack(
 		Ping,
 		nil,
@@ -201,7 +201,7 @@ func (b *builder) Ping() (OutboundMessage, error) {
 	)
 }
 
-func (b *builder) Pong() (OutboundMessage, error) {
+func (b *outMsgBuilder) Pong() (OutboundMessage, error) {
 	return b.c.Pack(
 		Pong,
 		nil,
@@ -209,7 +209,7 @@ func (b *builder) Pong() (OutboundMessage, error) {
 	)
 }
 
-func (b *builder) GetAcceptedFrontier(
+func (b *outMsgBuilder) GetAcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	deadline uint64,
@@ -225,7 +225,7 @@ func (b *builder) GetAcceptedFrontier(
 	)
 }
 
-func (b *builder) AcceptedFrontier(
+func (b *outMsgBuilder) AcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
@@ -246,7 +246,7 @@ func (b *builder) AcceptedFrontier(
 	)
 }
 
-func (b *builder) GetAccepted(
+func (b *outMsgBuilder) GetAccepted(
 	chainID ids.ID,
 	requestID uint32,
 	deadline uint64,
@@ -269,7 +269,7 @@ func (b *builder) GetAccepted(
 	)
 }
 
-func (b *builder) Accepted(
+func (b *outMsgBuilder) Accepted(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
@@ -290,7 +290,7 @@ func (b *builder) Accepted(
 	)
 }
 
-func (b *builder) GetAncestors(
+func (b *outMsgBuilder) GetAncestors(
 	chainID ids.ID,
 	requestID uint32,
 	deadline uint64,
@@ -308,7 +308,7 @@ func (b *builder) GetAncestors(
 	)
 }
 
-func (b *builder) MultiPut(
+func (b *outMsgBuilder) MultiPut(
 	chainID ids.ID,
 	requestID uint32,
 	containers [][]byte,
@@ -324,7 +324,7 @@ func (b *builder) MultiPut(
 	)
 }
 
-func (b *builder) Get(
+func (b *outMsgBuilder) Get(
 	chainID ids.ID,
 	requestID uint32,
 	deadline uint64,
@@ -342,7 +342,7 @@ func (b *builder) Get(
 	)
 }
 
-func (b *builder) Put(
+func (b *outMsgBuilder) Put(
 	chainID ids.ID,
 	requestID uint32,
 	containerID ids.ID,
@@ -360,7 +360,7 @@ func (b *builder) Put(
 	)
 }
 
-func (b *builder) PushQuery(
+func (b *outMsgBuilder) PushQuery(
 	chainID ids.ID,
 	requestID uint32,
 	deadline uint64,
@@ -380,7 +380,7 @@ func (b *builder) PushQuery(
 	)
 }
 
-func (b *builder) PullQuery(
+func (b *outMsgBuilder) PullQuery(
 	chainID ids.ID,
 	requestID uint32,
 	deadline uint64,
@@ -398,7 +398,7 @@ func (b *builder) PullQuery(
 	)
 }
 
-func (b *builder) Chits(
+func (b *outMsgBuilder) Chits(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
@@ -420,7 +420,7 @@ func (b *builder) Chits(
 }
 
 // Application level request
-func (b *builder) AppRequest(chainID ids.ID, requestID uint32, deadline uint64, msg []byte) (OutboundMessage, error) {
+func (b *outMsgBuilder) AppRequest(chainID ids.ID, requestID uint32, deadline uint64, msg []byte) (OutboundMessage, error) {
 	return b.c.Pack(
 		AppRequest,
 		map[Field]interface{}{
@@ -434,7 +434,7 @@ func (b *builder) AppRequest(chainID ids.ID, requestID uint32, deadline uint64, 
 }
 
 // Application level response
-func (b *builder) AppResponse(chainID ids.ID, requestID uint32, msg []byte) (OutboundMessage, error) {
+func (b *outMsgBuilder) AppResponse(chainID ids.ID, requestID uint32, msg []byte) (OutboundMessage, error) {
 	return b.c.Pack(
 		AppResponse,
 		map[Field]interface{}{
@@ -447,7 +447,7 @@ func (b *builder) AppResponse(chainID ids.ID, requestID uint32, msg []byte) (Out
 }
 
 // Application level gossiped message
-func (b *builder) AppGossip(chainID ids.ID, msg []byte) (OutboundMessage, error) {
+func (b *outMsgBuilder) AppGossip(chainID ids.ID, msg []byte) (OutboundMessage, error) {
 	return b.c.Pack(
 		AppGossip,
 		map[Field]interface{}{

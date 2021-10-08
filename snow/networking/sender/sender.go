@@ -92,10 +92,7 @@ func (s *Sender) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, requestID uint32)
 		timeoutDuration := s.timeouts.TimeoutDuration()
 		deadline := uint64(time.Now().Add(timeoutDuration).Unix())
 
-		// TODO ABENEGIA: trick following OutboundMessage/InboundMessage. Find cleaner solution
-		outMsg, err := s.msgCreator.GetAcceptedFrontier(s.ctx.ChainID, requestID, deadline)
-		s.ctx.Log.AssertNoError(err)
-		inMsg, err := s.msgCreator.Parse(outMsg.Bytes())
+		inMsg, err := s.msgCreator.InboundGetAcceptedFrontier(s.ctx.ChainID, requestID, deadline)
 		s.ctx.Log.AssertNoError(err)
 
 		// Tell the router to expect a reply message from this node
@@ -125,6 +122,14 @@ func (s *Sender) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, requestID uint32)
 }
 
 func (s *Sender) SendAcceptedFrontier(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
+	if nodeID == s.ctx.NodeID {
+		inMsg, err := s.msgCreator.InboundAcceptedFrontier(s.ctx.ChainID, requestID, containerIDs)
+		s.ctx.Log.AssertNoError(err)
+
+		go s.router.HandleInbound(constants.AcceptedFrontierMsg, inMsg, nodeID, func() {})
+		return
+	}
+
 	outMsg, err := s.msgCreator.AcceptedFrontier(s.ctx.ChainID, requestID, containerIDs)
 	if err != nil {
 		s.ctx.Log.Error("failed to build AcceptedFrontier(%s, %d, %s): %s",
@@ -132,15 +137,6 @@ func (s *Sender) SendAcceptedFrontier(nodeID ids.ShortID, requestID uint32, cont
 			requestID,
 			containerIDs,
 			err)
-		return
-	}
-
-	if nodeID == s.ctx.NodeID {
-		// TODO ABENEGIA: trick following OutboundMessage/InboundMessage. Find cleaner solution
-		inMsg, err := s.msgCreator.Parse(outMsg.Bytes())
-		s.ctx.Log.AssertNoError(err)
-
-		go s.router.HandleInbound(constants.AcceptedFrontierMsg, inMsg, nodeID, func() {})
 		return
 	}
 
@@ -165,10 +161,7 @@ func (s *Sender) SendGetAccepted(nodeIDs ids.ShortSet, requestID uint32, contain
 		timeoutDuration := s.timeouts.TimeoutDuration()
 		deadline := uint64(time.Now().Add(timeoutDuration).Unix())
 
-		// TODO ABENEGIA: trick following OutboundMessage/InboundMessage. Find cleaner solution
-		outMsg, err := s.msgCreator.GetAcceptedFrontier(s.ctx.ChainID, requestID, deadline)
-		s.ctx.Log.AssertNoError(err)
-		inMsg, err := s.msgCreator.Parse(outMsg.Bytes())
+		inMsg, err := s.msgCreator.InboundGetAccepted(s.ctx.ChainID, requestID, deadline, containerIDs)
 		s.ctx.Log.AssertNoError(err)
 
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, constants.GetAcceptedMsg)
@@ -208,6 +201,13 @@ func (s *Sender) SendGetAccepted(nodeIDs ids.ShortSet, requestID uint32, contain
 }
 
 func (s *Sender) SendAccepted(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
+	if nodeID == s.ctx.NodeID {
+		inMsg, err := s.msgCreator.InboundAccepted(s.ctx.ChainID, requestID, containerIDs)
+		s.ctx.Log.AssertNoError(err)
+		go s.router.HandleInbound(constants.AcceptedMsg, inMsg, nodeID, func() {})
+		return
+	}
+
 	outMsg, err := s.msgCreator.Accepted(s.ctx.ChainID, requestID, containerIDs)
 	if err != nil {
 		s.ctx.Log.Error("failed to build Accepted(%s, %d, %s): %s",
@@ -215,13 +215,6 @@ func (s *Sender) SendAccepted(nodeID ids.ShortID, requestID uint32, containerIDs
 			requestID,
 			containerIDs,
 			err)
-		return
-	}
-
-	if nodeID == s.ctx.NodeID {
-		inMsg, err := s.msgCreator.Parse(outMsg.Bytes())
-		s.ctx.Log.AssertNoError(err)
-		go s.router.HandleInbound(constants.AcceptedMsg, inMsg, nodeID, func() {})
 		return
 	}
 
@@ -395,10 +388,7 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 		timeoutDuration := s.timeouts.TimeoutDuration()
 		deadline := uint64(time.Now().Add(timeoutDuration).Unix())
 
-		// TODO ABENEGIA: trick following OutboundMessage/InboundMessage. Find cleaner solution
-		outMsg, err := s.msgCreator.PushQuery(s.ctx.ChainID, requestID, deadline, containerID, container)
-		s.ctx.Log.AssertNoError(err)
-		inMsg, err := s.msgCreator.Parse(outMsg.Bytes())
+		inMsg, err := s.msgCreator.InboundPushQuery(s.ctx.ChainID, requestID, deadline, containerID, container)
 		s.ctx.Log.AssertNoError(err)
 
 		// Register a timeout in case I don't respond to myself
@@ -471,13 +461,8 @@ func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, container
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 
-		timeoutDuration := s.timeouts.TimeoutDuration()
 		deadline := uint64(time.Now().Add(timeoutDuration).Unix())
-
-		// TODO ABENEGIA: trick following OutboundMessage/InboundMessage. Find cleaner solution
-		outMsg, err := s.msgCreator.PullQuery(s.ctx.ChainID, requestID, deadline, containerID)
-		s.ctx.Log.AssertNoError(err)
-		inMsg, err := s.msgCreator.Parse(outMsg.Bytes())
+		inMsg, err := s.msgCreator.InboundPullQuery(s.ctx.ChainID, requestID, deadline, containerID)
 		s.ctx.Log.AssertNoError(err)
 
 		// Register a timeout in case I don't respond to myself
@@ -529,6 +514,13 @@ func (s *Sender) SendChits(nodeID ids.ShortID, requestID uint32, votes []ids.ID)
 	s.ctx.Log.Verbo("Sending Chits to node %s. RequestID: %d. Votes: %s", nodeID.PrefixedString(constants.NodeIDPrefix), requestID, votes)
 	// If [nodeID] is myself, send this message directly
 	// to my own router rather than sending it over the network
+	if nodeID == s.ctx.NodeID {
+		inMsg, err := s.msgCreator.InboundChits(s.ctx.ChainID, requestID, votes)
+		s.ctx.Log.AssertNoError(err)
+		go s.router.HandleInbound(constants.ChitsMsg, inMsg, nodeID, func() {})
+		return
+	}
+
 	outMsg, err := s.msgCreator.Chits(s.ctx.ChainID, requestID, votes)
 	if err != nil {
 		s.ctx.Log.Error("failed to build Chits(%s, %d, %s): %s",
@@ -536,14 +528,6 @@ func (s *Sender) SendChits(nodeID ids.ShortID, requestID uint32, votes []ids.ID)
 			requestID,
 			votes,
 			err)
-		return
-	}
-
-	if nodeID == s.ctx.NodeID {
-		// TODO ABENEGIA: trick following OutboundMessage/InboundMessage. Find cleaner solution
-		inMsg, err := s.msgCreator.Parse(outMsg.Bytes())
-		s.ctx.Log.AssertNoError(err)
-		go s.router.HandleInbound(constants.ChitsMsg, inMsg, nodeID, func() {})
 		return
 	}
 
@@ -572,13 +556,7 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 		nodeIDs.Remove(s.ctx.NodeID)
 
 		deadline := uint64(time.Now().Add(timeoutDuration).Unix())
-		outMsg, err := s.msgCreator.AppRequest(s.ctx.ChainID, requestID, deadline, appRequestBytes)
-		if err != nil {
-			s.ctx.Log.Error("failed to build AppRequest(%s, %d): %s", s.ctx.ChainID, requestID, err)
-			s.ctx.Log.Verbo("message: %s", formatting.DumpBytes{Bytes: appRequestBytes})
-			return nil
-		}
-		inMsg, err := s.msgCreator.Parse(outMsg.Bytes())
+		inMsg, err := s.msgCreator.InboundAppRequest(s.ctx.ChainID, requestID, deadline, appRequestBytes)
 		s.ctx.Log.AssertNoError(err)
 
 		// Register a timeout in case I don't respond to myself
@@ -631,17 +609,17 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 // SendAppResponse sends a response to an application-level request from the
 // given node
 func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte) error {
+	if nodeID == s.ctx.NodeID {
+		inMsg, err := s.msgCreator.InboundAppResponse(s.ctx.ChainID, requestID, appResponseBytes)
+		s.ctx.Log.AssertNoError(err)
+		go s.router.HandleInbound(constants.AppResponseMsg, inMsg, nodeID, func() {})
+		return nil
+	}
+
 	outMsg, err := s.msgCreator.AppResponse(s.ctx.ChainID, requestID, appResponseBytes)
 	if err != nil {
 		s.ctx.Log.Error("failed to build AppResponse(%s, %d): %s", s.ctx.ChainID, requestID, err)
 		s.ctx.Log.Verbo("message: %s", formatting.DumpBytes{Bytes: appResponseBytes})
-		return nil
-	}
-
-	if nodeID == s.ctx.NodeID {
-		inMsg, err := s.msgCreator.Parse(outMsg.Bytes())
-		s.ctx.Log.AssertNoError(err)
-		go s.router.HandleInbound(constants.AppResponseMsg, inMsg, nodeID, func() {})
 		return nil
 	}
 

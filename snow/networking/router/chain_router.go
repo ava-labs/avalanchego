@@ -27,7 +27,8 @@ const (
 )
 
 var (
-	errUnhealthy = errors.New("the router is not healthy")
+	errUnhealthy    = errors.New("the router is not healthy")
+	errUnknownChain = errors.New("received message for unknown chain")
 
 	_ Router = &ChainRouter{}
 )
@@ -256,30 +257,6 @@ func (cr *ChainRouter) removeChain(chainID ids.ID) {
 	}
 }
 
-var (
-	errParsingContainerID    = errors.New("could not parse container ID")
-	errDuplicatedContainerID = errors.New("inbound message contains duplicated container ID")
-	errUnknownChain          = errors.New("received message for unknown chain")
-)
-
-func DecodeContainerIDs(inMsg message.InboundMessage) ([]ids.ID, error) {
-	containerIDsBytes := inMsg.Get(message.ContainerIDs).([][]byte)
-	res := make([]ids.ID, len(containerIDsBytes))
-	idSet := ids.NewSet(0)
-	for i, containerIDBytes := range containerIDsBytes {
-		containerID, err := ids.ToID(containerIDBytes)
-		if err != nil {
-			return nil, errParsingContainerID
-		}
-		if idSet.Contains(containerID) {
-			return nil, errDuplicatedContainerID
-		}
-		res[i] = containerID
-		idSet.Add(containerID)
-	}
-	return res, nil
-}
-
 func (cr *ChainRouter) HandleInbound(
 	msgType constants.MsgType,
 	inMsg message.InboundMessage,
@@ -319,7 +296,7 @@ func (cr *ChainRouter) HandleInbound(
 		// validator with ID [validatorID]  to the consensus engine working on the
 		// chain with ID [chainID]
 
-		containerIDs, err := DecodeContainerIDs(inMsg)
+		containerIDs, err := message.DecodeContainerIDs(inMsg)
 		if err != nil {
 			cr.log.Debug("Message %s from (%s, %s, %d) dropped. Error: %s",
 				msgType.String(), nodeID, chainID, requestID, err)
@@ -354,7 +331,7 @@ func (cr *ChainRouter) HandleInbound(
 		// chain with ID [chainID]
 
 		deadline := cr.clock.Time().Add(time.Duration(inMsg.Get(message.Deadline).(uint64)))
-		containerIDs, err := DecodeContainerIDs(inMsg)
+		containerIDs, err := message.DecodeContainerIDs(inMsg)
 		if err != nil {
 			cr.log.Debug("Message %s from (%s, %s, %d) dropped. Error: %s",
 				msgType.String(), nodeID, chainID, requestID, err)
@@ -369,7 +346,7 @@ func (cr *ChainRouter) HandleInbound(
 		// [validatorID] to the consensus engine working on the chain with ID
 		// [chainID]
 
-		containerIDs, err := DecodeContainerIDs(inMsg)
+		containerIDs, err := message.DecodeContainerIDs(inMsg)
 		if err != nil {
 			cr.log.Debug("Message %s from (%s, %s, %d) dropped. Error: %s",
 				msgType.String(), nodeID, chainID, requestID, err)
@@ -481,7 +458,7 @@ func (cr *ChainRouter) HandleInbound(
 		// Chits routes an incoming Chits message from the validator with ID [validatorID]
 		// to the consensus engine working on the chain with ID [chainID]
 
-		votes, err := DecodeContainerIDs(inMsg)
+		votes, err := message.DecodeContainerIDs(inMsg)
 		if err != nil {
 			cr.log.Debug("Message %s from (%s, %s, %d) dropped. Error: %s",
 				msgType.String(), nodeID, chainID, requestID, err)
