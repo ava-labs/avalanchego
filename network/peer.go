@@ -816,7 +816,7 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 	}
 
 	nodeID := certToID(peer.Cert)
-	if !p.net.config.Validators.Contains(nodeID) && !p.net.config.Beacons.Contains(nodeID) {
+	if !p.net.config.Validators.Contains(constants.PrimaryNetworkID, nodeID) && !p.net.config.Beacons.Contains(nodeID) {
 		p.net.log.Verbo(
 			"not peering to %s at %s because they are not a validator or beacon",
 			nodeID.PrefixedString(constants.NodeIDPrefix), peer.IPDesc,
@@ -910,8 +910,13 @@ func (p *peer) discardIP() {
 	if ip := p.getIP(); !ip.IsZero() {
 		p.setIP(utils.IPDesc{})
 
+		ipStr := ip.String()
+
 		p.net.stateLock.Lock()
-		delete(p.net.disconnectedIPs, ip.String())
+		// Make sure the IP isn't marked as connected or disconnected to allow
+		// future connection attempts if the IP is heard from a peerlist gossip
+		delete(p.net.disconnectedIPs, ipStr)
+		delete(p.net.connectedIPs, ipStr)
 		p.net.stateLock.Unlock()
 	}
 	p.Close()

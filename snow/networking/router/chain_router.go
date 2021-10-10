@@ -273,7 +273,7 @@ func (cr *ChainRouter) HandleInbound(
 
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
-	if !exists {
+	if !exists || !chain.isValidator(nodeID) {
 		onFinishedHandling()
 		cr.log.Debug("Message %s from (%s. %s, %d) dropped. Error: %s",
 			msgType.String(), nodeID, chainID, requestID, errUnknownChain)
@@ -601,14 +601,12 @@ func (cr *ChainRouter) GetAcceptedFrontierFailed(
 	// Remove the outstanding request
 	cr.removeRequest(uniqueRequestID)
 
-	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
 	if !exists {
 		// Should only happen if node is shutting down
 		cr.log.Debug("GetAcceptedFrontierFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 		return
 	}
-
 	// Pass the response to the chain
 	chain.GetAcceptedFrontierFailed(validatorID, requestID)
 }
@@ -686,7 +684,6 @@ func (cr *ChainRouter) GetFailed(
 	// Remove the outstanding request
 	cr.removeRequest(uniqueRequestID)
 
-	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
 	if !exists {
 		cr.log.Debug("GetFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
@@ -713,7 +710,6 @@ func (cr *ChainRouter) AppRequestFailed(nodeID ids.ShortID, chainID ids.ID, requ
 		cr.log.Debug("AppRequestFailed(%s, %s, %d) dropped due to unknown chain", nodeID, chainID, requestID)
 		return
 	}
-
 	// Pass the response to the chain
 	chain.AppRequestFailed(nodeID, requestID)
 }
@@ -741,7 +737,6 @@ func (cr *ChainRouter) QueryFailed(
 		cr.log.Debug("QueryFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 		return
 	}
-
 	// Pass the response to the chain
 	chain.QueryFailed(validatorID, requestID)
 }
@@ -757,6 +752,8 @@ func (cr *ChainRouter) Connected(validatorID ids.ShortID) {
 		return
 	}
 
+	// TODO: fire up an event when validator state changes i.e when they leave set, disconnect.
+	// we cannot put a subnet-only validator check here since Disconnected would not be handled properly.
 	for _, chain := range cr.chains {
 		chain.Connected(validatorID)
 	}
@@ -772,6 +769,8 @@ func (cr *ChainRouter) Disconnected(validatorID ids.ShortID) {
 		return
 	}
 
+	// TODO: fire up an event when validator state changes i.e when they leave set, disconnect.
+	// we cannot put a subnet-only validator check here since if a validator connects then it leaves validator-set, it would not be disconnected properly.
 	for _, chain := range cr.chains {
 		chain.Disconnected(validatorID)
 	}

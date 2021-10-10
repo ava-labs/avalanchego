@@ -499,3 +499,14 @@ func (c *Client) GetTimestamp() (time.Time, error) {
 	err := c.requester.SendRequest("getTimestamp", struct{}{}, res)
 	return res.Timestamp, err
 }
+
+// GetValidatorsAt returns the weights of the validator set of a provided subnet
+// at the specified height.
+func (c *Client) GetValidatorsAt(subnetID ids.ID, height uint64) (map[string]uint64, error) {
+	res := &GetValidatorsAtReply{}
+	err := c.requester.SendRequest("getValidatorsAt", &GetValidatorsAtArgs{
+		SubnetID: subnetID,
+		Height:   cjson.Uint64(height),
+	}, res)
+	return res.Validators, err
+}

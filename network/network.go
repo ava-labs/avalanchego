@@ -44,6 +44,7 @@ var (
 	errNetworkClosed         = errors.New("network closed")
 	errPeerIsMyself          = errors.New("peer is myself")
 	errNetworkLayerUnhealthy = errors.New("network layer is unhealthy")
+	errNoPrimaryValidators   = errors.New("no default subnet validators")
 )
 
 var _ Network = (*network)(nil)
@@ -237,13 +238,23 @@ type Config struct {
 	// WhitelistedSubnets of the node
 	WhitelistedSubnets ids.Set        `json:"whitelistedSubnets"`
 	Beacons            validators.Set `json:"beacons"`
-	// Set of current validators in the Avalanche network
-	Validators validators.Set `json:"validators"`
+	// Current validators in the Avalanche network
+	Validators validators.Manager `json:"validators"`
 
 	// Require that all connections must have at least one validator between the
 	// 2 peers. This can be useful to enable if the node wants to connect to the
 	// minimum number of nodes without impacting the network negatively.
 	RequireValidatorToConnect bool `json:"requireValidatorToConnect"`
+}
+
+// peerElement holds onto the peer object as a result of helper functions
+type peerElement struct {
+	// the peer, if it wasn't a peer when we cloned the list this value will be
+	// nil
+	peer *peer
+	// this is the validator id for the peer, we pass back to the caller for
+	// logging purposes
+	id ids.ShortID
 }
 
 // NewNetwork returns a new Network implementation with the provided parameters.
@@ -281,12 +292,16 @@ func NewNetwork(
 	netw.clientUpgrader = NewTLSClientUpgrader(config.TLSConfig)
 
 	netw.dialer = dialer.NewDialer(constants.NetworkType, config.DialerConfig, log)
+	primaryNetworkValidators, ok := config.Validators.GetValidators(constants.PrimaryNetworkID)
+	if !ok {
+		return nil, errNoPrimaryValidators
+	}
 
 	inboundMsgThrottler, err := throttling.NewSybilInboundMsgThrottler(
 		log,
 		config.Namespace,
 		metricsRegisterer,
-		config.Validators,
+		primaryNetworkValidators,
 		config.ThrottlerConfig.InboundMsgThrottlerConfig,
 	)
 	if err != nil {
@@ -298,7 +313,7 @@ func NewNetwork(
 		log,
 		config.Namespace,
 		metricsRegisterer,
-		config.Validators,
+		primaryNetworkValidators,
 		config.ThrottlerConfig.OutboundMsgThrottlerConfig,
 	)
 	if err != nil {
@@ -315,7 +330,7 @@ func NewNetwork(
 }
 
 // Assumes [n.stateLock] is not held.
-func (n *network) Send(msgType constants.MsgType, msg message.OutboundMessage, nodeIDs ids.ShortSet) ids.ShortSet {
+func (n *network) Send(msg message.OutboundMessage, nodeIDs ids.ShortSet) ids.ShortSet {
 	var (
 		now    = n.clock.Time()
 		msgLen = len(msg.Bytes())
@@ -343,9 +358,8 @@ func (n *network) Send(msgType constants.MsgType, msg message.OutboundMessage, n
 		return res
 	}
 
-	for _, peerElement := range n.getPeers(nodeIDs) {
-		peer := peerElement.peer
-		nodeID := peerElement.id
+	for nodeID := range nodeIDs {
+		peer, _ := n.peers.getByID(nodeID) // note: peer may be nil
 		if peer != nil && peer.finishedHandshake.GetValue() && peer.Send(msg, canModifyMsg) {
 			res.Add(nodeID)
 
@@ -367,24 +381,24 @@ func (n *network) Send(msgType constants.MsgType, msg message.OutboundMessage, n
 }
 
 // Assumes [n.stateLock] is not held.
-func (n *network) Gossip(msgType constants.MsgType, msg message.OutboundMessage, subnetID ids.ID) bool {
-	switch msgType {
-	case constants.AppGossipMsg:
-		return n.appGossip(msg, subnetID)
-	case constants.GossipMsg:
-		return n.gossipContainer(msg, subnetID, int(n.config.GossipOnAcceptSize))
+func (n *network) Gossip(msg message.OutboundMessage, subnetID ids.ID, validatorOnly bool) bool {
+	switch msg.Op() {
+	case message.AppGossip:
+		return n.appGossip(msg, subnetID, validatorOnly)
+	case message.Put:
+		return n.gossipContainer(msg, subnetID, int(n.config.GossipOnAcceptSize), validatorOnly)
 	default:
-		n.log.Error("Unhandled message type %v. Gossiping nothing.", msgType)
+		n.log.Error("Unhandled message type %v. Gossiping nothing.", msg.Op())
 		return false
 	}
 }
 
-func (n *network) appGossip(msg message.OutboundMessage, subnetID ids.ID) bool {
+func (n *network) appGossip(msg message.OutboundMessage, subnetID ids.ID, validatorOnly bool) bool {
 	now := n.clock.Time()
 	n.stateLock.RLock()
 	// Gossip the message to [n.config.AppGossipNonValidatorSize] random nodes
-	// in the network.
-	peersAll, err := n.peers.sample(subnetID, false, int(n.config.AppGossipNonValidatorSize))
+	// in the network. If this is a validator only subnet, selects only validators.
+	peersAll, err := n.peers.sample(subnetID, validatorOnly, int(n.config.AppGossipNonValidatorSize))
 	if err != nil {
 		n.log.Debug("failed to sample %d peers for AppGossip: %s", n.config.AppGossipNonValidatorSize, err)
 		n.stateLock.RUnlock()
@@ -401,6 +415,7 @@ func (n *network) appGossip(msg message.OutboundMessage, subnetID ids.ID) bool {
 		return false
 	}
 
+	peersAll = append(peersAll, peersValidators...)
 	sentPeers := ids.ShortSet{}
 	for _, peers := range [][]*peer{peersAll, peersValidators} {
 		for _, peer := range peers {
@@ -409,20 +424,47 @@ func (n *network) appGossip(msg message.OutboundMessage, subnetID ids.ID) bool {
 			}
 			sentPeers.Add(peer.nodeID)
 
-			sent := peer.Send(msg, false)
-			if !sent {
+			if !peer.Send(msg, false) {
 				n.log.Debug("failed to send AppGossip(%s)", peer.nodeID)
 				n.metrics.appGossip.numFailed.Inc()
 				n.sendFailRateCalculator.Observe(1, now)
 				continue
 			}
 
+			n.sendFailRateCalculator.Observe(0, now)
 			n.metrics.appGossip.numSent.Inc()
 			n.metrics.appGossip.sentBytes.Add(float64(len(msg.Bytes())))
-			n.sendFailRateCalculator.Observe(0, now)
 			if saved := msg.BytesSavedCompression(); saved != 0 {
 				n.metrics.appGossip.savedSentBytes.Observe(float64(saved))
 			}
+		}
+	}
+	return true
+}
+
+func (n *network) SpecificGossip(msg message.OutboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) bool {
+	now := n.clock.Time()
+	peers := n.getSubnetPeers(nodeIDs, subnetID, validatorOnly)
+	sentPeers := ids.ShortSet{}
+	for _, peer := range peers {
+		// should never be nil but just in case
+		if peer == nil || sentPeers.Contains(peer.nodeID) {
+			continue
+		}
+		sentPeers.Add(peer.nodeID)
+
+		if !peer.Send(msg, false) {
+			n.log.Debug("failed to send AppGossip(%s)", peer.nodeID)
+			n.sendFailRateCalculator.Observe(1, now)
+			n.metrics.appGossip.numFailed.Inc()
+			continue
+		}
+
+		n.sendFailRateCalculator.Observe(0, now)
+		n.metrics.appGossip.numSent.Inc()
+		n.metrics.appGossip.sentBytes.Add(float64(len(msg.Bytes())))
+		if saved := msg.BytesSavedCompression(); saved != 0 {
+			n.metrics.appGossip.savedSentBytes.Observe(float64(saved))
 		}
 	}
 	return true
@@ -448,7 +490,9 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 		n.sendFailRateCalculator.Observe(1, now)
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 	}
-	_ = n.gossipContainer(msg, ctx.SubnetID, sampleSize)
+
+	// TODO ABENEGIA: mind return type.
+	_ = n.gossipContainer(msg, ctx.SubnetID, sampleSize, ctx.IsValidatorOnly())
 	return nil
 }
 
@@ -490,8 +534,8 @@ func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 // if this node is a validator, or the peer is a validator/beacon.
 func (n *network) shouldHoldConnection(peerID ids.ShortID) bool {
 	return !n.config.RequireValidatorToConnect ||
-		n.config.Validators.Contains(n.config.MyNodeID) ||
-		n.config.Validators.Contains(peerID) ||
+		n.config.Validators.Contains(constants.PrimaryNetworkID, n.config.MyNodeID) ||
+		n.config.Validators.Contains(constants.PrimaryNetworkID, peerID) ||
 		n.config.Beacons.Contains(peerID)
 }
 
@@ -673,11 +717,12 @@ func (n *network) IP() utils.IPDesc {
 }
 
 // Assumes [n.stateLock] is not held.
-func (n *network) gossipContainer(msg message.OutboundMessage, subnetID ids.ID, sampleSize int) bool {
+// TODO ABENEGIA: Consider returning error rather than a boolean
+func (n *network) gossipContainer(msg message.OutboundMessage, subnetID ids.ID, sampleSize int, validatorOnly bool) bool {
 	now := n.clock.Time()
 
 	n.stateLock.RLock()
-	peers, err := n.peers.sample(subnetID, false, sampleSize)
+	peers, err := n.peers.sample(subnetID, validatorOnly, sampleSize)
 	n.stateLock.RUnlock()
 	if err != nil {
 		return false
@@ -685,8 +730,7 @@ func (n *network) gossipContainer(msg message.OutboundMessage, subnetID ids.ID, 
 
 	res := false // gossip is successful if at least one node gets gossiped
 	for _, peer := range peers {
-		sent := peer.Send(msg, false)
-		if !sent {
+		if !peer.Send(msg, false) {
 			n.sendFailRateCalculator.Observe(1, now)
 			n.metrics.put.numFailed.Inc()
 			continue
@@ -754,7 +798,7 @@ func (n *network) gossipPeerList() {
 		stakers := make([]*peer, 0, len(allPeers))
 		nonStakers := make([]*peer, 0, len(allPeers))
 		for _, peer := range allPeers {
-			if n.config.Validators.Contains(peer.nodeID) {
+			if n.config.Validators.Contains(constants.PrimaryNetworkID, peer.nodeID) {
 				stakers = append(stakers, peer)
 			} else {
 				nonStakers = append(nonStakers, peer)
@@ -1091,7 +1135,7 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 			continue
 		case peerIP.IsZero():
 			continue
-		case !n.config.Validators.Contains(peer.nodeID):
+		case !n.config.Validators.Contains(constants.PrimaryNetworkID, peer.nodeID):
 			continue
 		}
 
@@ -1184,7 +1228,7 @@ func (n *network) disconnected(p *peer) {
 		delete(n.disconnectedIPs, str)
 		delete(n.connectedIPs, str)
 
-		if n.config.Validators.Contains(p.nodeID) {
+		if n.config.Validators.Contains(constants.PrimaryNetworkID, p.nodeID) {
 			n.track(ip, p.nodeID)
 		}
 	}
@@ -1196,19 +1240,9 @@ func (n *network) disconnected(p *peer) {
 	n.metrics.disconnected.Inc()
 }
 
-// PeerElement holds onto the peer object as a result of helper functions
-type PeerElement struct {
-	// the peer, if it wasn't a peer when we cloned the list this value will be
-	// nil
-	peer *peer
-	// this is the validator id for the peer, we pass back to the caller for
-	// logging purposes
-	id ids.ShortID
-}
-
-// Safe copy the peers dressed as a PeerElement
+// Safe copy the peers dressed as a peerElement
 // Assumes [n.stateLock] is not held.
-func (n *network) getPeers(nodeIDs ids.ShortSet) []*PeerElement {
+func (n *network) getPeerElements(nodeIDs ids.ShortSet) []*peerElement {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
@@ -1216,18 +1250,37 @@ func (n *network) getPeers(nodeIDs ids.ShortSet) []*PeerElement {
 		return nil
 	}
 
-	peers := make([]*PeerElement, nodeIDs.Len())
+	peerElements := make([]*peerElement, nodeIDs.Len())
 	i := 0
 	for nodeID := range nodeIDs {
 		nodeID := nodeID                   // Prevent overwrite in next loop iteration
 		peer, _ := n.peers.getByID(nodeID) // note: peer may be nil
-		peers[i] = &PeerElement{
+		peerElements[i] = &peerElement{
 			peer: peer,
 			id:   nodeID,
 		}
 		i++
 	}
+	return peerElements
+}
 
+// Safe copy the peers
+// Assumes [n.stateLock] is not held.
+func (n *network) getSubnetPeers(nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) []*peer {
+	n.stateLock.RLock()
+	defer n.stateLock.RUnlock()
+
+	if n.closed.GetValue() {
+		return nil
+	}
+
+	peers := make([]*peer, 0, nodeIDs.Len())
+	for nodeID := range nodeIDs {
+		peer, ok := n.peers.getByID(nodeID)
+		if ok && peer.trackedSubnets.Contains(subnetID) && (!validatorOnly || n.config.Validators.Contains(subnetID, nodeID)) {
+			peers = append(peers, peer)
+		}
+	}
 	return peers
 }
 

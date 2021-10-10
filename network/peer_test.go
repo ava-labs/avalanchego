@@ -68,7 +68,8 @@ func TestPeer_Close(t *testing.T) {
 		outbounds: make(map[string]*testListener),
 	}
 
-	vdrs := validators.NewSet()
+	vdrs := getDefaultManager()
+	beacons := validators.NewSet()
 	metrics := prometheus.NewRegistry()
 	msgCreator, err := message.NewMsgCreator(metrics, true /*compressionEnabled*/)
 	assert.NoError(t, err)
@@ -79,6 +80,7 @@ func TestPeer_Close(t *testing.T) {
 		ip,
 		defaultVersionManager,
 		vdrs,
+		beacons,
 		cert0.PrivateKey.(crypto.Signer),
 		ids.Set{},
 		tlsConfig0,

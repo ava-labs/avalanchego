@@ -370,7 +370,117 @@ func TestRouterClearTimeouts(t *testing.T) {
 	// Accepted Frontier
 	inMsg, err = mc.InboundAcceptedFrontier(handler.ctx.ChainID, 5, nil)
 	assert.NoError(t, err)
-
 	chainRouter.HandleInbound(message.AcceptedFrontier, inMsg, vID, nil)
+
 	assert.Equal(t, chainRouter.timedRequests.Len(), 0)
+}
+
+func TestValidatorOnlyMessageDrops(t *testing.T) {
+	// Create a timeout manager
+	maxTimeout := 25 * time.Millisecond
+	tm := timeout.Manager{}
+	err := tm.Initialize(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     10 * time.Millisecond,
+			MinimumTimeout:     10 * time.Millisecond,
+			MaximumTimeout:     maxTimeout,
+			TimeoutCoefficient: 1,
+			TimeoutHalflife:    5 * time.Minute,
+		},
+		benchlist.NewNoBenchlist(),
+		"",
+		prometheus.NewRegistry(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go tm.Dispatch()
+
+	// Create a router
+	chainRouter := ChainRouter{}
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
+
+	// Create an engine and handler
+	engine := common.EngineTest{T: t}
+	engine.Default(false)
+
+	calledF := new(bool)
+
+	wg := sync.WaitGroup{}
+
+	engine.PullQueryF = func(nodeID ids.ShortID, requestID uint32, containerID ids.ID) error {
+		defer wg.Done()
+		*calledF = true
+		return nil
+	}
+
+	engine.ContextF = func() *snow.Context {
+		ctx := snow.DefaultContextTest()
+		ctx.SetValidatorOnly()
+		return ctx
+	}
+
+	handler := &Handler{}
+	metrics := prometheus.NewRegistry()
+	vdrs := validators.NewSet()
+	vID := ids.GenerateTestShortID()
+	err = vdrs.AddWeight(vID, 1)
+	assert.NoError(t, err)
+	err = handler.Initialize(
+		&engine,
+		vdrs,
+		nil,
+		"",
+		metrics,
+	)
+	assert.NoError(t, err)
+
+	chainRouter.AddChain(handler)
+	go handler.Dispatch()
+
+	// create messages builder
+	mc, err := message.NewMsgCreator(metrics, true /*compress*/)
+	assert.NoError(t, err)
+
+	// generate a non-validator ID
+	nID := ids.GenerateTestShortID()
+
+	*calledF = false
+	timeout := chainRouter.clock.Time().Add(time.Hour)
+	var inMsg message.InboundMessage
+
+	inMsg, err = mc.InboundPullQuery(handler.ctx.ChainID, uint32(1), uint64(timeout.Unix()), ids.GenerateTestID())
+	assert.NoError(t, err)
+	chainRouter.HandleInbound(message.PullQuery, inMsg, nID, func() {})
+	assert.False(t, *calledF) // should not be called
+
+	// validator case
+	*calledF = false
+	wg.Add(1)
+	inMsg, err = mc.InboundPullQuery(handler.ctx.ChainID, uint32(2), uint64(timeout.Unix()), ids.GenerateTestID())
+	assert.NoError(t, err)
+	chainRouter.HandleInbound(message.PullQuery, inMsg, vID, func() {})
+
+	wg.Wait()
+	// should be called since this is a validator request
+	assert.True(t, *calledF)
+
+	// register a validator request
+	reqID := uint32(3)
+	chainRouter.RegisterRequest(vID, handler.ctx.ChainID, reqID, constants.GetMsg)
+	assert.Equal(t, 1, chainRouter.timedRequests.Len())
+
+	// remove it from validators
+	err = handler.validators.Set(validators.NewSet().List())
+	assert.NoError(t, err)
+	calledFinished := false
+	inMsg, err = mc.InboundPut(handler.ctx.ChainID, reqID, ids.GenerateTestID(), nil)
+	assert.NoError(t, err)
+	chainRouter.HandleInbound(message.Put, inMsg, nID, func() { calledFinished = true })
+
+	assert.True(t, calledFinished)
+	// shouldn't clear out timed request, as the request should be cleared when
+	// the GetFailed message is sent
+	assert.Equal(t, 1, chainRouter.timedRequests.Len())
 }

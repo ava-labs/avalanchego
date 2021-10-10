@@ -185,7 +185,7 @@ func (b *inMsgBuilder) InboundPushQuery(
 	fieldValues[ChainID] = chainID[:]
 	fieldValues[RequestID] = requestID
 	fieldValues[Deadline] = deadline
-	fieldValues[ContainerID] = containerID
+	fieldValues[ContainerID] = containerID[:]
 	fieldValues[ContainerBytes] = container
 
 	res := &inboundMessage{
@@ -208,7 +208,7 @@ func (b *inMsgBuilder) InboundPullQuery(
 	fieldValues[ChainID] = chainID[:]
 	fieldValues[RequestID] = requestID
 	fieldValues[Deadline] = deadline
-	fieldValues[ContainerID] = containerID
+	fieldValues[ContainerID] = containerID[:]
 
 	res := &inboundMessage{
 		op:                    inOp,

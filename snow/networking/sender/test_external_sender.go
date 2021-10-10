@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 )
@@ -27,7 +26,7 @@ type ExternalSenderTest struct {
 	CantSendGet, CantSendPut,
 	CantSendPullQuery, CantSendPushQuery, CantSendChits,
 	CantSendGossip,
-	CantSendAppRequest, CantSendAppResponse, CantSendAppGossip bool
+	CantSendAppRequest, CantSendAppResponse, CantSendAppGossip, CantSendAppGossipSpecific bool
 
 	SendGetAcceptedFrontierF func(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration) ids.ShortSet
 	SendAcceptedFrontierF    func(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID)
@@ -45,11 +44,12 @@ type ExternalSenderTest struct {
 	SendPullQueryF func(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) ids.ShortSet
 	SendChitsF     func(nodeID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID)
 
-	SendGossipF func(subnetID, chainID, containerID ids.ID, container []byte) bool
-
 	SendAppRequestF  func(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, appRequestBytes []byte) ids.ShortSet
 	SendAppResponseF func(nodeIDs ids.ShortID, chainID ids.ID, requestID uint32, appResponseBytyes []byte)
-	SendAppGossipF   func(subnetID, chainID ids.ID, appGossipBytyes []byte) bool
+
+	SendGossipF            func(subnetID, chainID, containerID ids.ID, container []byte, validatorOnly bool) bool
+	SendAppGossipF         func(subnetID, chainID ids.ID, appGossipBytyes []byte, validatorOnly bool) bool
+	SendAppGossipSpecificF func(nodeIDs ids.ShortSet, subnetID, chainID ids.ID, appGossipBytyes []byte, validatorOnly bool)
 }
 
 // Default set the default callable value to [cant]
@@ -74,6 +74,8 @@ func (s *ExternalSenderTest) Default(cant bool) {
 	s.CantSendAppGossip = cant
 	s.CantSendGossip = cant
 
+	s.CantSendAppGossipSpecific = cant
+
 	assert := assert.New(s.T)
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewMsgCreator(metrics, true /*compress*/)
@@ -83,7 +85,7 @@ func (s *ExternalSenderTest) Default(cant bool) {
 
 // TODO ABENEGIA: fix return type
 // TODO ABENEGIA: refactor with template pattern
-func (s *ExternalSenderTest) Send(msgType constants.MsgType, outMsg message.OutboundMessage, nodeIDs ids.ShortSet) ids.ShortSet {
+func (s *ExternalSenderTest) Send(outMsg message.OutboundMessage, nodeIDs ids.ShortSet) ids.ShortSet {
 	assert := assert.New(s.T)
 
 	// turn  message.OutboundMessage into  message.InboundMessage so be able to retrieve fields
@@ -91,8 +93,8 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, outMsg message.Outb
 	assert.NoError(err)
 
 	res := ids.NewShortSet(nodeIDs.Len())
-	switch msgType {
-	case constants.GetAcceptedFrontierMsg:
+	switch outMsg.Op() {
+	case message.GetAcceptedFrontier:
 		// SendGetAcceptedFrontier calls SendGetAcceptedFrontierF if it was initialized. If it
 		// wasn't initialized and this function shouldn't be called and testing was
 		// initialized, then testing will fail.
@@ -110,7 +112,7 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, outMsg message.Outb
 			s.B.Fatalf("Unexpectedly called GetAcceptedFrontier")
 		}
 
-	case constants.AcceptedFrontierMsg:
+	case message.AcceptedFrontier:
 		// SendAcceptedFrontier calls SendAcceptedFrontierF if it was initialized. If it wasn't
 		// initialized and this function shouldn't be called and testing was
 		// initialized, then testing will fail.
@@ -135,7 +137,7 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, outMsg message.Outb
 			s.B.Fatalf("Unexpectedly called SendAcceptedFrontier")
 		}
 
-	case constants.GetAcceptedMsg:
+	case message.GetAccepted:
 		// SendGetAccepted calls SendGetAcceptedF if it was initialized. If it wasn't
 		// initialized and this function shouldn't be called and testing was
 		// initialized, then testing will fail.
@@ -162,7 +164,7 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, outMsg message.Outb
 			s.B.Fatalf("Unexpectedly called SendGetAccepted")
 		}
 
-	case constants.AcceptedMsg:
+	case message.Accepted:
 		switch {
 		case s.SendAcceptedF != nil:
 			chainID, err := ids.ToID(inMsg.Get(message.ChainID).([]byte))
@@ -185,7 +187,7 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, outMsg message.Outb
 			s.B.Fatalf("Unexpectedly called Accepted")
 		}
 
-	case constants.GetAncestorsMsg:
+	case message.GetAncestors:
 		// SendGetAncestors calls SendGetAncestorsF if it was initialized. If it wasn't initialized and this
 		// function shouldn't be called and testing was initialized, then testing will
 		// fail.
@@ -205,7 +207,7 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, outMsg message.Outb
 			s.B.Fatalf("Unexpectedly called SendGetAncestors")
 		}
 
-	case constants.MultiPutMsg:
+	case message.MultiPut:
 		// SendMultiPut calls SendMultiPutF if it was initialized. If it wasn't initialized and this
 		// function shouldn't be called and testing was initialized, then testing will
 		// fail.
@@ -223,7 +225,7 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, outMsg message.Outb
 			s.B.Fatalf("Unexpectedly called SendMultiPut")
 		}
 
-	case constants.GetMsg:
+	case message.Get:
 		// SendGet calls SendGetF if it was initialized. If it wasn't initialized and this
 		// function shouldn't be called and testing was initialized, then testing will
 		// fail.
@@ -243,7 +245,7 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, outMsg message.Outb
 			s.B.Fatalf("Unexpectedly called SendGet")
 		}
 
-	case constants.PutMsg:
+	case message.Put:
 		// SendPut calls SendPutF if it was initialized. If it wasn't initialized and this
 		// function shouldn't be called and testing was initialized, then testing will
 		// fail.
@@ -262,7 +264,7 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, outMsg message.Outb
 			s.B.Fatalf("Unexpectedly called SendPut")
 		}
 
-	case constants.PushQueryMsg:
+	case message.PushQuery:
 		switch {
 		case s.SendPushQueryF != nil:
 			chainID, err := ids.ToID(inMsg.Get(message.ChainID).([]byte))
@@ -280,7 +282,7 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, outMsg message.Outb
 			s.B.Fatalf("Unexpectedly called SendPushQuery")
 		}
 
-	case constants.PullQueryMsg:
+	case message.PullQuery:
 		// SendPullQuery calls SendPullQueryF if it was initialized. If it wasn't initialized
 		// and this function shouldn't be called and testing was initialized, then
 		// testing will fail.
@@ -300,7 +302,7 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, outMsg message.Outb
 			s.B.Fatalf("Unexpectedly called SendPullQuery")
 		}
 
-	case constants.ChitsMsg:
+	case message.Chits:
 		// SendChits calls SendChitsF if it was initialized. If it wasn't initialized and this
 		// function shouldn't be called and testing was initialized, then testing will
 		// fail.
@@ -325,7 +327,7 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, outMsg message.Outb
 		case s.CantSendChits && s.B != nil:
 			s.B.Fatalf("Unexpectedly called SendChits")
 		}
-	case constants.AppRequestMsg:
+	case message.AppRequest:
 		// SendAppRequest calls SendAppRequestF if it was initialized. If it wasn't initialized and this
 		// function shouldn't be called and testing was initialized, then testing will
 		// fail.
@@ -343,7 +345,7 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, outMsg message.Outb
 		case s.CantSendAppRequest && s.B != nil:
 			s.B.Fatalf("Unexpectedly called SendAppRequest")
 		}
-	case constants.AppResponseMsg:
+	case message.AppResponse:
 		// SendAppResponse calls SendAppResponseF if it was initialized. If it wasn't initialized and this
 		// function shouldn't be called and testing was initialized, then testing will
 		// fail.
@@ -367,15 +369,17 @@ func (s *ExternalSenderTest) Send(msgType constants.MsgType, outMsg message.Outb
 	return res
 }
 
-func (s *ExternalSenderTest) Gossip(msgType constants.MsgType, outMsg message.OutboundMessage, subnetID ids.ID) bool {
+func (s *ExternalSenderTest) Gossip(outMsg message.OutboundMessage,
+	subnetID ids.ID,
+	validatorOnly bool) bool {
 	assert := assert.New(s.T)
 
 	// turn  message.OutboundMessage into  message.InboundMessage so be able to retrieve fields
 	inMsg, err := s.mc.Parse(outMsg.Bytes())
 	assert.NoError(err)
 
-	switch msgType {
-	case constants.AppGossipMsg:
+	switch outMsg.Op() {
+	case message.AppGossip:
 		// SendAppGossip calls SendAppGossipF if it was initialized. If it wasn't initialized and this
 		// function shouldn't be called and testing was initialized, then testing will
 		// fail.
@@ -385,13 +389,13 @@ func (s *ExternalSenderTest) Gossip(msgType constants.MsgType, outMsg message.Ou
 			assert.NoError(err)
 			appBytes, ok := inMsg.Get(message.AppGossipBytes).([]byte)
 			assert.True(ok)
-			return s.SendAppGossipF(subnetID, chainID, appBytes)
+			return s.SendAppGossipF(subnetID, chainID, appBytes, validatorOnly)
 		case s.CantSendAppGossip && s.T != nil:
 			s.T.Fatalf("Unexpectedly called SendAppGossip")
 		case s.CantSendAppGossip && s.B != nil:
 			s.B.Fatalf("Unexpectedly called SendAppGossip")
 		}
-	case constants.GossipMsg:
+	case message.Put:
 		// SendGossip calls SendGossipF if it was initialized. If it wasn't initialized and this
 		// function shouldn't be called and testing was initialized, then testing will
 		// fail.
@@ -402,7 +406,7 @@ func (s *ExternalSenderTest) Gossip(msgType constants.MsgType, outMsg message.Ou
 			containerID, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte))
 			assert.NoError(err)
 			container := inMsg.Get(message.ContainerBytes).([]byte)
-			return s.SendGossipF(subnetID, chainID, containerID, container)
+			return s.SendGossipF(subnetID, chainID, containerID, container, validatorOnly)
 		case s.CantSendGossip && s.T != nil:
 			s.T.Fatalf("Unexpectedly called SendGossip")
 		case s.CantSendGossip && s.B != nil:
@@ -412,4 +416,30 @@ func (s *ExternalSenderTest) Gossip(msgType constants.MsgType, outMsg message.Ou
 		return false
 	}
 	return false
+}
+
+// SendAppGossipSpecific calls SendAppGossipSpecificF if it was initialized. If it wasn't initialized and this
+// function shouldn't be called and testing was initialized, then testing will
+// fail.
+func (s *ExternalSenderTest) SpecificGossip(outMsg message.OutboundMessage,
+	nodeIDs ids.ShortSet,
+	subnetID ids.ID,
+	validatorOnly bool) bool {
+	assert := assert.New(s.T)
+	switch {
+	case s.SendAppGossipSpecificF != nil:
+		// turn  message.OutboundMessage into  message.InboundMessage so be able to retrieve fields
+		inMsg, err := s.mc.Parse(outMsg.Bytes())
+		assert.NoError(err)
+		chainID, err := ids.ToID(inMsg.Get(message.ChainID).([]byte))
+		assert.NoError(err)
+		appBytes, ok := inMsg.Get(message.AppGossipBytes).([]byte)
+		assert.True(ok)
+		s.SendAppGossipSpecificF(nodeIDs, subnetID, chainID, appBytes, validatorOnly)
+	case s.CantSendAppGossipSpecific && s.T != nil:
+		s.T.Fatalf("Unexpectedly called SendAppGossipSpecific")
+	case s.CantSendAppGossipSpecific && s.B != nil:
+		s.B.Fatalf("Unexpectedly called SendAppGossipSpecific")
+	}
+	return true
 }
