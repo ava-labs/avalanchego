@@ -19,6 +19,7 @@ type State interface {
 
 	// GetValidatorSet returns the weights of the nodeIDs for the provided
 	// subnet at the requested P-chain height.
+	// The returned map should not be modified.
 	GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error)
 }
 

@@ -37,6 +37,7 @@ type metrics struct {
 	numImportTxs,
 	numRewardValidatorTxs prometheus.Counter
 
+	validatorSetsCached     prometheus.Counter
 	validatorSetsCreated    prometheus.Counter
 	validatorSetsHeightDiff prometheus.Gauge
 	validatorSetsDuration   prometheus.Gauge
@@ -97,10 +98,15 @@ func (m *metrics) Initialize(
 	m.numImportTxs = newTxMetrics(namespace, "import")
 	m.numRewardValidatorTxs = newTxMetrics(namespace, "reward_validator")
 
+	m.validatorSetsCached = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "validator_sets_cached",
+		Help:      "Total number of validator sets cached",
+	})
 	m.validatorSetsCreated = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      "validator_sets_created",
-		Help:      "Total number of validator sets created for a specific height",
+		Help:      "Total number of validator sets created from applying difflayers",
 	})
 	m.validatorSetsHeightDiff = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
@@ -140,6 +146,7 @@ func (m *metrics) Initialize(
 		registerer.Register(m.numRewardValidatorTxs),
 
 		registerer.Register(m.validatorSetsCreated),
+		registerer.Register(m.validatorSetsCached),
 		registerer.Register(m.validatorSetsHeightDiff),
 		registerer.Register(m.validatorSetsDuration),
 	)
