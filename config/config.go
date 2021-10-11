@@ -12,14 +12,13 @@ import (
 	"math"
 	"net"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/spf13/viper"
 
-	"github.com/ava-labs/avalanchego/app/process"
+	"github.com/ava-labs/avalanchego/app/runner"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -54,7 +53,6 @@ const (
 
 var (
 	deprecatedKeys = map[string]string{
-		CorethConfigKey:                         fmt.Sprintf("please use --%s to specify C-Chain config", ChainConfigDirKey),
 		InboundConnUpgradeThrottlerMaxRecentKey: fmt.Sprintf("please use --%s to specify connection upgrade throttling", InboundThrottlerMaxConnsPerSecKey),
 	}
 
@@ -67,11 +65,10 @@ var (
 	errMinStakeDurationAboveMax      = errors.New("max stake duration can't be less than min stake duration")
 	errStakeMintingPeriodBelowMin    = errors.New("stake minting period can't be less than max stake duration")
 	errCannotWhitelistPrimaryNetwork = errors.New("cannot whitelist primary network")
-	errDuplicatedCChainConfig        = errors.New("C-Chain config is already provided in chain config files")
 )
 
-func GetProcessConfig(v *viper.Viper) (process.Config, error) {
-	config := process.Config{
+func GetRunnerConfig(v *viper.Viper) (runner.Config, error) {
+	config := runner.Config{
 		DisplayVersionAndExit: v.GetBool(VersionKey),
 		BuildDir:              os.ExpandEnv(v.GetString(BuildDirKey)),
 		PluginMode:            v.GetBool(PluginModeKey),
@@ -106,7 +103,7 @@ func GetProcessConfig(v *viper.Viper) (process.Config, error) {
 		}
 	}
 	if !foundBuildDir {
-		return process.Config{}, fmt.Errorf(
+		return runner.Config{}, fmt.Errorf(
 			"couldn't find valid build directory in any of the default locations: %s",
 			defaultBuildDirs,
 		)
@@ -320,7 +317,8 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 		GossipConfig: network.GossipConfig{
 			GossipAcceptedFrontierSize: uint(v.GetUint32(ConsensusGossipAcceptedFrontierSizeKey)),
 			GossipOnAcceptSize:         uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey)),
-			AppGossipSize:              uint(v.GetUint32(AppGossipSizeKey)),
+			AppGossipNonValidatorSize:  uint(v.GetUint32(AppGossipNonValidatorSizeKey)),
+			AppGossipValidatorSize:     uint(v.GetUint32(AppGossipValidatorSizeKey)),
 		},
 
 		DelayConfig: network.DelayConfig{
@@ -332,6 +330,8 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 		CompressionEnabled: v.GetBool(NetworkCompressionEnabledKey),
 		PingFrequency:      v.GetDuration(NetworkPingFrequencyKey),
 		AllowPrivateIPs:    v.GetBool(NetworkAllowPrivateIPsKey),
+
+		RequireValidatorToConnect: v.GetBool(NetworkRequireValidatorToConnectKey),
 	}
 
 	switch {
@@ -351,8 +351,8 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListGossipFreqKey)
 	case config.GetVersionTimeout < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkGetVersionTimeoutKey)
-	case config.PeerListStakerGossipFraction < 0:
-		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListStakerGossipFractionKey)
+	case config.PeerListStakerGossipFraction < 1:
+		return network.Config{}, fmt.Errorf("%s must be >= 1", NetworkPeerListStakerGossipFractionKey)
 	case config.MaxReconnectDelay < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkMaxReconnectDelayKey)
 	case config.InitialReconnectDelay < 0:
@@ -636,7 +636,7 @@ func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, e
 }
 
 func getVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
-	aliasFilePath := path.Clean(v.GetString(VMAliasesFileKey))
+	aliasFilePath := filepath.Clean(v.GetString(VMAliasesFileKey))
 	exists, err := storage.FileExists(aliasFilePath)
 	if err != nil {
 		return nil, err
@@ -664,7 +664,7 @@ func getVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
 // getPathFromDirKey reads flag value from viper instance and then checks the folder existence
 func getPathFromDirKey(v *viper.Viper, configKey string) (string, error) {
 	configDir := os.ExpandEnv(v.GetString(configKey))
-	cleanPath := path.Clean(configDir)
+	cleanPath := filepath.Clean(configDir)
 	ok, err := storage.FolderExists(cleanPath)
 	if err != nil {
 		return "", err
@@ -686,35 +686,13 @@ func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
 		return nil, err
 	}
 
-	chainConfigs := make(map[string]chains.ChainConfig)
-	if len(chainConfigPath) > 0 {
-		chainConfigs, err = readChainConfigPath(chainConfigPath)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't read chain configs: %w", err)
-		}
+	if len(chainConfigPath) == 0 {
+		return make(map[string]chains.ChainConfig), nil
 	}
 
-	// Coreth Plugin
-	if v.IsSet(CorethConfigKey) {
-		// error if C config is already populated
-		if isCChainConfigSet(chainConfigs) {
-			return nil, errDuplicatedCChainConfig
-		}
-		corethConfigValue := v.Get(CorethConfigKey)
-		var corethConfigBytes []byte
-		switch value := corethConfigValue.(type) {
-		case string:
-			corethConfigBytes = []byte(value)
-		default:
-			corethConfigBytes, err = json.Marshal(value)
-			if err != nil {
-				return nil, fmt.Errorf("couldn't parse coreth config: %w", err)
-			}
-		}
-		cChainPrimaryAlias := genesis.GetCChainAliases()[0]
-		cChainConfig := chainConfigs[cChainPrimaryAlias]
-		cChainConfig.Config = corethConfigBytes
-		chainConfigs[cChainPrimaryAlias] = cChainConfig
+	chainConfigs, err := readChainConfigPath(chainConfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't read chain configs: %w", err)
 	}
 	return chainConfigs, nil
 }
@@ -722,7 +700,7 @@ func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
 // ReadsChainConfigs reads chain config files from static directories and returns map with contents,
 // if successful.
 func readChainConfigPath(chainConfigPath string) (map[string]chains.ChainConfig, error) {
-	chainDirs, err := filepath.Glob(path.Join(chainConfigPath, "*"))
+	chainDirs, err := filepath.Glob(filepath.Join(chainConfigPath, "*"))
 	if err != nil {
 		return nil, err
 	}
@@ -768,7 +746,7 @@ func getSubnetConfigs(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.Sub
 		return make(map[ids.ID]chains.SubnetConfig), nil
 	}
 
-	subnetConfigs, err := readSubnetConfigs(subnetConfigPath, subnetIDs)
+	subnetConfigs, err := readSubnetConfigs(subnetConfigPath, subnetIDs, defaultSubnetConfig(v))
 	if err != nil {
 		return nil, fmt.Errorf("couldn't read subnet configs: %w", err)
 	}
@@ -776,20 +754,18 @@ func getSubnetConfigs(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.Sub
 }
 
 // readSubnetConfigs reads subnet config files from a path and given subnetIDs and returns a map.
-func readSubnetConfigs(subnetConfigPath string, subnetIDs []ids.ID) (map[ids.ID]chains.SubnetConfig, error) {
+func readSubnetConfigs(subnetConfigPath string, subnetIDs []ids.ID, defaultSubnetConfig chains.SubnetConfig) (map[ids.ID]chains.SubnetConfig, error) {
 	subnetConfigs := make(map[ids.ID]chains.SubnetConfig)
 	for _, subnetID := range subnetIDs {
-		filePath := path.Join(subnetConfigPath, subnetID.String()+subnetConfigFileExt)
+		filePath := filepath.Join(subnetConfigPath, subnetID.String()+subnetConfigFileExt)
 		fileInfo, err := os.Stat(filePath)
-		if errors.Is(err, os.ErrNotExist) {
+		switch {
+		case errors.Is(err, os.ErrNotExist):
 			// this subnet config does not exist, move to the next one
 			continue
-		}
-		if err != nil {
+		case err != nil:
 			return nil, err
-		}
-
-		if fileInfo.IsDir() {
+		case fileInfo.IsDir():
 			return nil, fmt.Errorf("%q is a directory, expected a file", fileInfo.Name())
 		}
 
@@ -799,28 +775,24 @@ func readSubnetConfigs(subnetConfigPath string, subnetIDs []ids.ID) (map[ids.ID]
 			return nil, err
 		}
 
-		configData := chains.SubnetConfig{}
+		configData := defaultSubnetConfig
 		if err := json.Unmarshal(file, &configData); err != nil {
 			return nil, err
 		}
-
+		if err := configData.ConsensusParameters.Valid(); err != nil {
+			return nil, err
+		}
 		subnetConfigs[subnetID] = configData
 	}
 
 	return subnetConfigs, nil
 }
 
-// checks if C chain config bytes already set in map with alias key.
-// it does only checks alias key, chainId is not available at this point.
-func isCChainConfigSet(chainConfigs map[string]chains.ChainConfig) bool {
-	cChainAliases := genesis.GetCChainAliases()
-	for _, alias := range cChainAliases {
-		val, ok := chainConfigs[alias]
-		if ok && len(val.Config) > 1 {
-			return true
-		}
+func defaultSubnetConfig(v *viper.Viper) chains.SubnetConfig {
+	return chains.SubnetConfig{
+		ConsensusParameters: getConsensusConfig(v),
+		ValidatorOnly:       false,
 	}
-	return false
 }
 
 func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {

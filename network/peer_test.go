@@ -67,7 +67,8 @@ func TestPeer_Close(t *testing.T) {
 		outbounds: make(map[string]*testListener),
 	}
 
-	vdrs := validators.NewSet()
+	vdrs := getDefaultManager()
+	beacons := validators.NewSet()
 	handler := &testHandler{}
 
 	netwrk, err := newTestNetwork(
@@ -75,6 +76,7 @@ func TestPeer_Close(t *testing.T) {
 		ip,
 		defaultVersionManager,
 		vdrs,
+		beacons,
 		cert0.PrivateKey.(crypto.Signer),
 		ids.Set{},
 		tlsConfig0,

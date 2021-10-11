@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 )
 
@@ -28,31 +27,33 @@ func FileExists(filePath string) (bool, error) {
 // ReadFileWithName reads a single file with name fileNameWithoutExt without specifying any extension.
 // it errors when there are more than 1 file with the given fileName
 func ReadFileWithName(parentDir string, fileNameNoExt string) ([]byte, error) {
-	filePath := path.Join(parentDir, fileNameNoExt)
+	filePath := filepath.Join(parentDir, fileNameNoExt)
 	files, err := filepath.Glob(filePath + ".*") // all possible extensions
-	if err != nil {
+	switch {
+	case err != nil:
 		return nil, err
-	}
-	if len(files) > 1 {
+	case len(files) > 1:
 		return nil, fmt.Errorf(`too many files matched "%s.*" in %s`, fileNameNoExt, parentDir)
-	}
-	if len(files) == 0 { // no file found, return nothing
+	case len(files) == 0:
+		// no file found, return nothing
 		return nil, nil
+	default:
+		return ioutil.ReadFile(files[0])
 	}
-	return ioutil.ReadFile(files[0])
 }
 
 // folderExists checks if a folder exists before we
 // try using it to prevent further errors.
 func FolderExists(filePath string) (bool, error) {
 	info, err := os.Stat(filePath)
-	if err == nil {
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		return false, nil
+	case err != nil:
+		return false, err
+	default:
 		return info.IsDir(), nil
 	}
-	if errors.Is(err, os.ErrNotExist) {
-		return false, nil
-	}
-	return false, err
 }
 
 func DirSize(path string) (uint64, error) {
