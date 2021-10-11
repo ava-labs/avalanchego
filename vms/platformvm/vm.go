@@ -42,9 +42,8 @@ const (
 	// PercentDenominator is the denominator used to calculate percentages
 	PercentDenominator = 1000000
 
-	droppedTxCacheSize           = 64
-	validatorSetsSubnetCacheSize = 16
-	validatorSetsCacheSize       = 64
+	droppedTxCacheSize     = 64
+	validatorSetsCacheSize = 64
 
 	maxUTXOsToFetch = 1024
 
@@ -127,10 +126,10 @@ type VM struct {
 	// Value: String repr. of the verification error
 	droppedTxCache cache.LRU
 
-	// Contains a cache of validator sets for a subnet.
+	// Maps caches for each subnet that is currently whitelisted.
 	// Key: Subnet ID
 	// Value: cache mapping height -> validator set map
-	validatorSetsSubnetCache cache.LRU
+	validatorSetCaches map[ids.ID]cache.Cacher
 
 	// Key: block ID
 	// Value: the block
@@ -176,7 +175,7 @@ func (vm *VM) Initialize(
 	}
 
 	vm.droppedTxCache = cache.LRU{Size: droppedTxCacheSize}
-	vm.validatorSetsSubnetCache = cache.LRU{Size: validatorSetsSubnetCacheSize}
+	vm.validatorSetCaches = make(map[ids.ID]cache.Cacher)
 	vm.currentBlocks = make(map[ids.ID]Block)
 
 	vm.blockBuilder.Initialize(vm)
@@ -465,17 +464,10 @@ func (vm *VM) Disconnected(vdrID ids.ShortID) error {
 // GetValidatorSet returns the validator set at the specified height for the
 // provided subnetID.
 func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-	var validatorSetsCache cache.Cacher
-	validatorSetsCacheIntf, exists := vm.validatorSetsSubnetCache.Get(subnetID)
-	if exists {
-		var ok bool
-		validatorSetsCache, ok = validatorSetsCacheIntf.(cache.Cacher)
-		if !ok {
-			return nil, errWrongCacheType
-		}
-	} else {
+	validatorSetsCache, exists := vm.validatorSetCaches[subnetID]
+	if !exists {
 		validatorSetsCache = &cache.LRU{Size: validatorSetsCacheSize}
-		vm.validatorSetsSubnetCache.Put(subnetID, validatorSetsCache)
+		vm.validatorSetCaches[subnetID] = validatorSetsCache
 	}
 
 	if validatorSetIntf, ok := validatorSetsCache.Get(height); ok {
