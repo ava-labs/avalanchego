@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler"
@@ -26,7 +27,8 @@ import (
 )
 
 const (
-	minBlockDelay = 500 * time.Millisecond
+	minBlockDelay             = 500 * time.Millisecond
+	optimalHeightDelay uint64 = 128
 )
 
 var (
@@ -408,4 +410,16 @@ func (vm *VM) notifyInnerBlockReady() {
 	default:
 		vm.ctx.Log.Debug("dropping message to consensus engine")
 	}
+}
+
+func (vm *VM) optimalPChainHeight(minPChainHeight uint64) (uint64, error) {
+	currentPChainHeight, err := vm.ctx.ValidatorState.GetCurrentHeight()
+	if err != nil {
+		return 0, err
+	}
+	if currentPChainHeight < optimalHeightDelay {
+		return minPChainHeight, nil
+	}
+	optimalHeight := currentPChainHeight - optimalHeightDelay
+	return math.Max64(optimalHeight, minPChainHeight), nil
 }

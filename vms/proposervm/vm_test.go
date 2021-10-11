@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -33,6 +35,8 @@ var (
 
 	genesisUnixTimestamp int64 = 1000
 	genesisTimestamp           = time.Unix(genesisUnixTimestamp, 0)
+
+	defaultPChainHeight uint64 = 2000
 
 	errUnknownBlock      = errors.New("unknown block")
 	errUnverifiedBlock   = errors.New("unverified block")
@@ -100,7 +104,7 @@ func initTestProposerVM(
 	valState := &validators.TestState{
 		T: t,
 	}
-	valState.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
 	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
 		res := make(map[ids.ShortID]uint64)
 		res[proVM.ctx.NodeID] = uint64(10)
@@ -840,7 +844,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	valState := &validators.TestState{
 		T: t,
 	}
-	valState.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
 	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
 		return map[ids.ShortID]uint64{
 			{1}: 100,
@@ -1112,7 +1116,7 @@ func TestInnerVMRollback(t *testing.T) {
 	valState := &validators.TestState{
 		T: t,
 	}
-	valState.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
 	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
 		return map[ids.ShortID]uint64{
 			{1}: 100,
@@ -1418,7 +1422,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 	ySlb, err := statelessblock.BuildUnsigned(
 		gBlock.ID(),
 		gBlock.Timestamp(),
-		uint64(2000),
+		defaultPChainHeight,
 		yBlock.Bytes(),
 	)
 	if err != nil {
@@ -1529,7 +1533,7 @@ func TestTooFarAdvanced(t *testing.T) {
 	ySlb, err := statelessblock.BuildUnsigned(
 		aBlock.ID(),
 		aBlock.Timestamp().Add(maxSkew),
-		uint64(2000),
+		defaultPChainHeight,
 		yBlock.Bytes(),
 	)
 	if err != nil {
@@ -1552,7 +1556,7 @@ func TestTooFarAdvanced(t *testing.T) {
 	ySlb, err = statelessblock.BuildUnsigned(
 		aBlock.ID(),
 		aBlock.Timestamp().Add(proposer.MaxDelay),
-		uint64(2000),
+		defaultPChainHeight,
 		yBlock.Bytes(),
 	)
 
@@ -1670,4 +1674,33 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 	if cBlock.Status() != choices.Rejected {
 		t.Fatal("cBlock status should not be accepted")
 	}
+}
+
+// Ensure that given the chance, built blocks will reference a lagged P-chain
+// height.
+func TestLaggedPChainHeight(t *testing.T) {
+	assert := assert.New(t)
+
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
+	proVM.Set(coreGenBlk.Timestamp())
+
+	innerBlock := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk.ID(),
+		TimestampV: coreGenBlk.Timestamp(),
+	}
+
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return innerBlock, nil }
+	blockIntf, err := proVM.BuildBlock()
+	assert.NoError(err)
+
+	block, ok := blockIntf.(*postForkBlock)
+	assert.True(ok, "expected post fork block")
+
+	pChainHeight := block.PChainHeight()
+	assert.Equal(pChainHeight, defaultPChainHeight-optimalHeightDelay)
 }
