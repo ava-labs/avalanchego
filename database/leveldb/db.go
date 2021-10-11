@@ -124,7 +124,7 @@ func New(file string, configBytes []byte, log logging.Logger) (database.Database
 	if err != nil {
 		return nil, err
 	}
-	log.Debug("leveldb config: %s", string(configJSON))
+	log.Info("leveldb config: %s", string(configJSON))
 
 	// Open the db and recover any potential corruptions
 	db, err := leveldb.OpenFile(file, &opt.Options{
