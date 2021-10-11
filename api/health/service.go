@@ -10,7 +10,6 @@ import (
 	stdjson "encoding/json"
 
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/gorilla/rpc/v2"
@@ -92,29 +91,7 @@ type APIHealthArgs struct{}
 // APIHealthReply is the response for Health
 type APIHealthReply struct {
 	Checks  map[string]health.Result `json:"checks"`
-	Reasons *[]string                `json:"reasons,omitempty"`
 	Healthy bool                     `json:"healthy"`
-}
-
-func (as *apiServer) calculateErrorResponses(results map[string]health.Result) *[]string {
-	var errorResponses []string
-	for _, v := range results {
-		switch details := v.Details.(type) {
-		case map[string]interface{}:
-			for detailKey, detailValue := range details {
-				if detailKey == constants.HealthErrorReasonKey {
-					if errResp, ok := detailValue.([]string); ok {
-						errorResponses = append(errorResponses, errResp...)
-					}
-				}
-			}
-		default:
-		}
-	}
-	if len(errorResponses) != 0 {
-		return &errorResponses
-	}
-	return nil
 }
 
 // Health returns a summation of the health of the node
@@ -124,7 +101,6 @@ func (as *apiServer) Health(_ *http.Request, _ *APIHealthArgs, reply *APIHealthR
 	if reply.Healthy {
 		return nil
 	}
-	reply.Reasons = as.calculateErrorResponses(reply.Checks)
 	replyStr, err := stdjson.Marshal(reply.Checks)
 	as.log.Warn("Health.health is returning an error: %s", string(replyStr))
 	return err
