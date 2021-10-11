@@ -35,7 +35,6 @@ import (
 	"github.com/ava-labs/coreth/accounts"
 	"github.com/ava-labs/coreth/accounts/external"
 	"github.com/ava-labs/coreth/accounts/keystore"
-
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -174,15 +173,8 @@ func (c *Config) ExtRPCEnabled() bool {
 	return c.HTTPHost != "" || c.WSHost != ""
 }
 
-// AccountConfig determines the settings for scrypt and keydirectory
-func (c *Config) AccountConfig() (int, int, string, error) {
-	scryptN := keystore.StandardScryptN
-	scryptP := keystore.StandardScryptP
-	if c.UseLightweightKDF {
-		scryptN = keystore.LightScryptN
-		scryptP = keystore.LightScryptP
-	}
-
+// KeyDirConfig determines the settings for keydirectory
+func (c *Config) KeyDirConfig() (string, error) {
 	var (
 		keydir string
 		err    error
@@ -193,21 +185,43 @@ func (c *Config) AccountConfig() (int, int, string, error) {
 	case c.KeyStoreDir != "":
 		keydir, err = filepath.Abs(c.KeyStoreDir)
 	}
-	return scryptN, scryptP, keydir, err
+	return keydir, err
 }
 
-func makeAccountManager(conf *Config) (*accounts.Manager, error) {
-	scryptN, scryptP, keydir, err := conf.AccountConfig()
-	// var ephemeral string
+// getKeyStoreDir retrieves the key directory and will create
+// and ephemeral one if necessary.
+func getKeyStoreDir(conf *Config) (string, bool, error) {
+	keydir, err := conf.KeyDirConfig()
+	if err != nil {
+		return "", false, err
+	}
+	isEphemeral := false
 	if keydir == "" {
 		// There is no datadir.
 		keydir, err = ioutil.TempDir("", "coreth-keystore")
+		isEphemeral = true
 	}
 
 	if err != nil {
-		return nil, err
+		return "", false, err
 	}
 	if err := os.MkdirAll(keydir, 0700); err != nil {
+		return "", false, err
+	}
+
+	return keydir, isEphemeral, nil
+}
+
+func makeAccountManager(conf *Config) (*accounts.Manager, error) {
+	scryptN := keystore.StandardScryptN
+	scryptP := keystore.StandardScryptP
+	if conf.UseLightweightKDF {
+		scryptN = keystore.LightScryptN
+		scryptP = keystore.LightScryptP
+	}
+
+	keydir, _, err := getKeyStoreDir(conf)
+	if err != nil {
 		return nil, err
 	}
 	// Assemble the account manager and supported backends
