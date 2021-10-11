@@ -17,6 +17,27 @@ type Client struct {
 	requester rpc.EndpointRequester
 }
 
+// Result represents the output of a health check execution.
+type Result struct {
+	// the details of task Result - may be nil
+	Details interface{} `json:"message,omitempty"`
+	// the error returned from a failed health check - an empty string when successful
+	Error string `json:"error,omitempty"`
+	// the time of the last health check
+	Timestamp time.Time `json:"timestamp"`
+	// the execution duration of the last check
+	Duration time.Duration `json:"duration,omitempty"`
+	// the number of failures that occurred in a row
+	ContiguousFailures int64 `json:"contiguousFailures"`
+	// the time of the initial transitional failure
+	TimeOfFirstFailure *time.Time `json:"timeOfFirstFailure"`
+}
+
+type APIHealthClientReply struct {
+	Checks  map[string]Result `json:"checks"`
+	Healthy bool              `json:"healthy"`
+}
+
 // NewClient returns a client to interact with Health API endpoint
 func NewClient(uri string, requestTimeout time.Duration) *Client {
 	return &Client{
@@ -25,8 +46,8 @@ func NewClient(uri string, requestTimeout time.Duration) *Client {
 }
 
 // Health returns a health check on the Avalanche node
-func (c *Client) Health() (*APIHealthReply, error) {
-	res := &APIHealthReply{}
+func (c *Client) Health() (*APIHealthClientReply, error) {
+	res := &APIHealthClientReply{}
 	err := c.requester.SendRequest("health", struct{}{}, res)
 	return res, err
 }
