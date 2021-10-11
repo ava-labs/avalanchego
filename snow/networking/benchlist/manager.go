@@ -168,4 +168,4 @@ func (noBenchlist) RegisterChain(*snow.Context, string) error { return nil }
 func (noBenchlist) RegisterResponse(ids.ID, ids.ShortID)      {}
 func (noBenchlist) RegisterFailure(ids.ID, ids.ShortID)       {}
 func (noBenchlist) IsBenched(ids.ShortID, ids.ID) bool        { return false }
-func (noBenchlist) GetBenched(ids.ShortID) []ids.ID           { return nil }
+func (noBenchlist) GetBenched(ids.ShortID) []ids.ID           { return []ids.ID{} }

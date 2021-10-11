@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
@@ -24,24 +25,23 @@ type Subnet interface {
 	removeChain(chainID ids.ID)
 }
 
-type subnet struct {
-	lock          sync.RWMutex
-	bootstrapping ids.Set
+type SubnetConfig struct {
+	// ValidatorOnly indicates that this Subnet's Chains are available to only subnet validators.
+	ValidatorOnly       bool                 `json:"validatorOnly"`
+	ConsensusParameters avalanche.Parameters `json:"consensusParameters"`
+}
 
-	once sync.Once
-	// If not nil, called when this subnet becomes marked as bootstrapped for
-	// the first time
-	onBootstrapped   func()
+type subnet struct {
+	lock             sync.RWMutex
+	bootstrapping    ids.Set
+	once             sync.Once
 	bootstrappedSema chan struct{}
 }
 
-func newSubnet(onBootstrapped func(), firstChainID ids.ID) Subnet {
-	sb := &subnet{
-		onBootstrapped:   onBootstrapped,
+func newSubnet() Subnet {
+	return &subnet{
 		bootstrappedSema: make(chan struct{}),
 	}
-	sb.addChain(firstChainID)
-	return sb
 }
 
 func (s *subnet) IsBootstrapped() bool {
@@ -61,9 +61,6 @@ func (s *subnet) Bootstrapped(chainID ids.ID) {
 	}
 
 	s.once.Do(func() {
-		if s.onBootstrapped != nil {
-			s.onBootstrapped()
-		}
 		close(s.bootstrappedSema)
 	})
 }

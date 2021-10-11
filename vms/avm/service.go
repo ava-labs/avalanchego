@@ -1501,11 +1501,6 @@ type ImportArgs struct {
 	To string `json:"to"`
 }
 
-// ImportAVAX is a deprecated name for Import.
-func (service *Service) ImportAVAX(_ *http.Request, args *ImportArgs, reply *api.JSONTxID) error {
-	return service.Import(nil, args, reply)
-}
-
 // Import imports an asset to this chain from the P/C-Chain.
 // The AVAX must have already been exported from the P/C-Chain.
 // Returns the ID of the newly created atomic transaction
@@ -1608,8 +1603,8 @@ func (service *Service) Import(_ *http.Request, args *ImportArgs, reply *api.JSO
 	return nil
 }
 
-// ExportAVAXArgs are arguments for passing into ExportAVA requests
-type ExportAVAXArgs struct {
+// ExportArgs are arguments for passing into ExportAVA requests
+type ExportArgs struct {
 	// User, password, from addrs, change addr
 	api.JSONSpendHeader
 	// Amount of nAVAX to send
@@ -1618,22 +1613,7 @@ type ExportAVAXArgs struct {
 	// ID of the address that will receive the AVAX. This address includes the
 	// chainID, which is used to determine what the destination chain is.
 	To string `json:"to"`
-}
 
-// ExportAVAX sends AVAX from this chain to the address specified by [to].
-// [to] specifies which chain to export funds to.
-// After this tx is accepted, the AVAX must be imported to the P/C chain with an importTx.
-// Returns the ID of the newly created atomic transaction
-func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply *api.JSONTxIDChangeAddr) error {
-	return service.Export(nil, &ExportArgs{
-		ExportAVAXArgs: *args,
-		AssetID:        service.vm.ctx.AVAXAssetID.String(),
-	}, reply)
-}
-
-// ExportArgs are arguments for passing into ExportAVA requests
-type ExportArgs struct {
-	ExportAVAXArgs
 	AssetID string `json:"assetID"`
 }
 
