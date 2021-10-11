@@ -110,7 +110,7 @@ type APIHealthReply struct {
 	Healthy bool                     `json:"healthy"`
 }
 
-type HealthReply struct {
+type Reply struct {
 	Checks  map[string]Result `json:"checks"`
 	Healthy bool              `json:"healthy"`
 }
