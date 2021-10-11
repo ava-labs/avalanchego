@@ -467,7 +467,10 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]u
 	validatorSetsCache, exists := vm.validatorSetCaches[subnetID]
 	if !exists {
 		validatorSetsCache = &cache.LRU{Size: validatorSetsCacheSize}
-		vm.validatorSetCaches[subnetID] = validatorSetsCache
+		// Only cache whitelisted subnets
+		if vm.WhitelistedSubnets.Contains(subnetID) || subnetID == constants.PrimaryNetworkID {
+			vm.validatorSetCaches[subnetID] = validatorSetsCache
+		}
 	}
 
 	if validatorSetIntf, ok := validatorSetsCache.Get(height); ok {
