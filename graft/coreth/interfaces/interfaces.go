@@ -176,6 +176,16 @@ type GasPricer interface {
 	SuggestGasPrice(ctx context.Context) (*big.Int, error)
 }
 
+// A AcceptedStateReceiver provides access to the accepted state, which is the result of all
+// known executable transactions which have not yet been included in the blockchain. It is
+// commonly used to display the result of ’confirmed’ actions (e.g. wallet value
+// transfers) initiated by the user. The AcceptedNonceAt operation is a good way to
+// retrieve the next available transaction nonce for a specific account.
+type AcceptedStateReceiver interface {
+	AcceptedCodeAt(ctx context.Context, account common.Address) ([]byte, error)
+	AcceptedNonceAt(ctx context.Context, account common.Address) (uint64, error)
+}
+
 // GasEstimator wraps EstimateGas, which tries to estimate the gas needed to execute a
 // specific transaction based on the pending state. There is no guarantee that this is the
 // true gas limit requirement as other transactions may be added or removed by miners, but
