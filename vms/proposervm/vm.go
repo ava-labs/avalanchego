@@ -28,7 +28,7 @@ import (
 
 const (
 	minBlockDelay             = 500 * time.Millisecond
-	optimalHeightDelay uint64 = 128
+	optimalHeightDelay uint64 = 256
 )
 
 var (
