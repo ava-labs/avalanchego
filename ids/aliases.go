@@ -58,8 +58,8 @@ func (a *aliaser) PrimaryAlias(id ID) (string, error) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
-	aliases, exists := a.aliases[id]
-	if !exists || len(aliases) == 0 {
+	aliases := a.aliases[id]
+	if len(aliases) == 0 {
 		return "", fmt.Errorf("there is no alias for ID %s", id)
 	}
 	return aliases[0], nil
