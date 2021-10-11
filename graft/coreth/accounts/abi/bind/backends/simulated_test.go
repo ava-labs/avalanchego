@@ -159,11 +159,11 @@ func TestAdjustTime(t *testing.T) {
 	)
 	defer sim.Close()
 
-	prevTime := sim.pendingBlock.Time()
+	prevTime := sim.acceptedBlock.Time()
 	if err := sim.AdjustTime(time.Second); err != nil {
 		t.Error(err)
 	}
-	newTime := sim.pendingBlock.Time()
+	newTime := sim.acceptedBlock.Time()
 
 	if newTime-prevTime != uint64(time.Second.Seconds()) {
 		t.Errorf("adjusted time not equal to a second. prev: %v, new: %v", prevTime, newTime)
@@ -191,11 +191,11 @@ func TestNewAdjustTimeFail(t *testing.T) {
 	}
 	sim.Commit(false)
 
-	prevTime := sim.pendingBlock.Time()
+	prevTime := sim.acceptedBlock.Time()
 	if err := sim.AdjustTime(time.Minute); err != nil {
 		t.Error(err)
 	}
-	newTime := sim.pendingBlock.Time()
+	newTime := sim.acceptedBlock.Time()
 	if newTime-prevTime != uint64(time.Minute.Seconds()) {
 		t.Errorf("adjusted time not equal to a minute. prev: %v, new: %v", prevTime, newTime)
 	}
@@ -208,7 +208,7 @@ func TestNewAdjustTimeFail(t *testing.T) {
 	}
 	sim.SendTransaction(context.Background(), signedTx2)
 	sim.Commit(false)
-	newTime = sim.pendingBlock.Time()
+	newTime = sim.acceptedBlock.Time()
 	if newTime-prevTime >= uint64(time.Minute.Seconds()) {
 		t.Errorf("time adjusted, but shouldn't be: prev: %v, new: %v", prevTime, newTime)
 	}
@@ -767,7 +767,7 @@ func TestTransactionInBlock(t *testing.T) {
 	defer sim.Close()
 	bgCtx := context.Background()
 
-	transaction, err := sim.TransactionInBlock(bgCtx, sim.pendingBlock.Hash(), uint(0))
+	transaction, err := sim.TransactionInBlock(bgCtx, sim.acceptedBlock.Hash(), uint(0))
 	if err == nil && err != errTransactionDoesNotExist {
 		t.Errorf("expected a transaction does not exist error to be received but received %v", err)
 	}
