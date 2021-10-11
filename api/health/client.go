@@ -25,8 +25,8 @@ func NewClient(uri string, requestTimeout time.Duration) *Client {
 }
 
 // Health returns a health check on the Avalanche node
-func (c *Client) Health() (*APIHealthReply, error) {
-	res := &APIHealthReply{}
+func (c *Client) Health() (*HealthReply, error) {
+	res := &HealthReply{}
 	err := c.requester.SendRequest("health", struct{}{}, res)
 	return res, err
 }

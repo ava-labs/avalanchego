@@ -88,10 +88,31 @@ func (as *apiServer) Handler() (*common.HTTPHandler, error) {
 // APIHealthArgs are the arguments for Health
 type APIHealthArgs struct{}
 
+// Result represents the output of a health check execution.
+type Result struct {
+	// the details of task Result - may be nil
+	Details interface{} `json:"message,omitempty"`
+	// the error returned from a failed health check - nil when successful
+	Error string `json:"error,omitempty"`
+	// the time of the last health check
+	Timestamp time.Time `json:"timestamp"`
+	// the execution duration of the last check
+	Duration time.Duration `json:"duration,omitempty"`
+	// the number of failures that occurred in a row
+	ContiguousFailures int64 `json:"contiguousFailures"`
+	// the time of the initial transitional failure
+	TimeOfFirstFailure *time.Time `json:"timeOfFirstFailure"`
+}
+
 // APIHealthReply is the response for Health
 type APIHealthReply struct {
 	Checks  map[string]health.Result `json:"checks"`
 	Healthy bool                     `json:"healthy"`
+}
+
+type HealthReply struct {
+	Checks  map[string]Result `json:"checks"`
+	Healthy bool              `json:"healthy"`
 }
 
 // Health returns a summation of the health of the node
