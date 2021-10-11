@@ -47,9 +47,7 @@ type nofreezedb struct {
 // NewDatabase creates a high level database on top of a given key-value data
 // store without a freezer moving immutable chain segments into cold storage.
 func NewDatabase(db ethdb.KeyValueStore) ethdb.Database {
-	return &nofreezedb{
-		KeyValueStore: db,
-	}
+	return &nofreezedb{KeyValueStore: db}
 }
 
 // NewMemoryDatabase creates an ephemeral in-memory key-value database without a
