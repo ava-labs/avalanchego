@@ -37,11 +37,13 @@ import (
 
 // DefaultFullGPOConfig contains default gasprice oracle settings for full node.
 var DefaultFullGPOConfig = gasprice.Config{
-	Blocks:     20,
-	Percentile: 60,
-	MinPrice:   gasprice.DefaultMinPrice,
-	MaxPrice:   gasprice.DefaultMaxPrice,
-	MinGasUsed: gasprice.DefaultMinGasUsed,
+	Blocks:           20,
+	Percentile:       60,
+	MaxHeaderHistory: 1024,
+	MaxBlockHistory:  1024,
+	MinPrice:         gasprice.DefaultMinPrice,
+	MaxPrice:         gasprice.DefaultMaxPrice,
+	MinGasUsed:       gasprice.DefaultMinGasUsed,
 }
 
 // DefaultConfig contains default settings for use on the Avalanche main net.
@@ -69,6 +71,7 @@ func NewDefaultConfig() Config {
 
 //go:generate gencodec -type Config -formats toml -out gen_config.go
 
+// Config contains configuration options for of the ETH and LES protocols.
 type Config struct {
 	// The genesis block, which is inserted if the database is empty.
 	// If nil, the Ethereum main net block is used.

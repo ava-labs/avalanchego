@@ -41,7 +41,10 @@ import (
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/event"
 )
+
+const testHead = 32
 
 var (
 	key, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
@@ -50,7 +53,8 @@ var (
 )
 
 type testBackend struct {
-	chain *core.BlockChain
+	chain   *core.BlockChain
+	pending bool // pending block available
 }
 
 func (b *testBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error) {
@@ -67,8 +71,52 @@ func (b *testBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumber)
 	return b.chain.GetBlockByNumber(uint64(number)), nil
 }
 
+func (b *testBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
+	return b.chain.GetReceiptsByHash(hash), nil
+}
+
+func (b *testBackend) PendingBlockAndReceipts() (*types.Block, types.Receipts) {
+	if b.pending {
+		block := b.chain.GetBlockByNumber(testHead + 1)
+		return block, b.chain.GetReceiptsByHash(block.Hash())
+	}
+	return nil, nil
+}
+
 func (b *testBackend) ChainConfig() *params.ChainConfig {
 	return b.chain.Config()
+}
+
+func (b *testBackend) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
+	return nil
+}
+
+func newTestBackendFakerEngine(t *testing.T, config *params.ChainConfig, numBlocks int, extDataGasUsage *big.Int, genBlocks func(i int, b *core.BlockGen)) *testBackend {
+	var gspec = &core.Genesis{
+		Config: config,
+		Alloc:  core.GenesisAlloc{addr: core.GenesisAccount{Balance: bal}},
+	}
+
+	engine := dummy.NewETHFaker()
+	db := rawdb.NewMemoryDatabase()
+	genesis := gspec.MustCommit(db)
+
+	// Generate testing blocks
+	blocks, _, err := core.GenerateChain(gspec.Config, genesis, engine, db, numBlocks, 0, genBlocks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Construct testing chain
+	diskdb := rawdb.NewMemoryDatabase()
+	gspec.Commit(diskdb)
+	chain, err := core.NewBlockChain(diskdb, core.DefaultCacheConfig, gspec.Config, engine, vm.Config{}, common.Hash{})
+	if err != nil {
+		t.Fatalf("Failed to create local chain, %v", err)
+	}
+	if _, err := chain.InsertChain(blocks); err != nil {
+		t.Fatalf("Failed to insert chain, %v", err)
+	}
+	return &testBackend{chain: chain}
 }
 
 func newTestBackend(t *testing.T, config *params.ChainConfig, numBlocks int, extDataGasUsage *big.Int, genBlocks func(i int, b *core.BlockGen)) *testBackend {

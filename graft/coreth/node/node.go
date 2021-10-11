@@ -29,10 +29,9 @@ package node
 import (
 	"sync"
 
-	"github.com/ethereum/go-ethereum/event"
-
 	"github.com/ava-labs/coreth/accounts"
 	"github.com/ava-labs/coreth/rpc"
+	"github.com/ethereum/go-ethereum/event"
 )
 
 // Node is a container on which services can be registered.

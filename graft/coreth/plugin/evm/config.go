@@ -53,6 +53,7 @@ type Config struct {
 	Web3APIEnabled     bool `json:"web3-api-enabled"`
 
 	// Eth Settings
+	Preimages      bool `json:"preimages-enabled"`
 	Pruning        bool `json:"pruning-enabled"`
 	SnapshotAsync  bool `json:"snapshot-async"`
 	SnapshotVerify bool `json:"snapshot-verification-enabled"`

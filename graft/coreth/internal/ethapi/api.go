@@ -94,64 +94,38 @@ func (s *PublicEthereumAPI) MaxPriorityFeePerGas(ctx context.Context) (*hexutil.
 	return (*hexutil.Big)(tipcap), err
 }
 
-// TODO(aaronbuchwald) enable after migrating v1.10.6 gasprice changes
-// type feeHistoryResult struct {
-// 	OldestBlock  *hexutil.Big     `json:"oldestBlock"`
-// 	Reward       [][]*hexutil.Big `json:"reward,omitempty"`
-// 	BaseFee      []*hexutil.Big   `json:"baseFeePerGas,omitempty"`
-// 	GasUsedRatio []float64        `json:"gasUsedRatio"`
-// }
+type feeHistoryResult struct {
+	OldestBlock  *hexutil.Big     `json:"oldestBlock"`
+	Reward       [][]*hexutil.Big `json:"reward,omitempty"`
+	BaseFee      []*hexutil.Big   `json:"baseFeePerGas,omitempty"`
+	GasUsedRatio []float64        `json:"gasUsedRatio"`
+}
 
-// func (s *PublicEthereumAPI) FeeHistory(ctx context.Context, blockCount rpc.DecimalOrHex, lastBlock rpc.BlockNumber, rewardPercentiles []float64) (*feeHistoryResult, error) {
-// 		oldest, reward, baseFee, gasUsed, err := s.b.FeeHistory(ctx, int(blockCount), lastBlock, rewardPercentiles)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	results := &feeHistoryResult{
-// 		OldestBlock:  (*hexutil.Big)(oldest),
-// 		GasUsedRatio: gasUsed,
-// 	}
-// 	if reward != nil {
-// 		results.Reward = make([][]*hexutil.Big, len(reward))
-// 		for i, w := range reward {
-// 			results.Reward[i] = make([]*hexutil.Big, len(w))
-// 			for j, v := range w {
-// 				results.Reward[i][j] = (*hexutil.Big)(v)
-// 			}
-// 		}
-// 	}
-// 	if baseFee != nil {
-// 		results.BaseFee = make([]*hexutil.Big, len(baseFee))
-// 		for i, v := range baseFee {
-// 			results.BaseFee[i] = (*hexutil.Big)(v)
-// 		}
-// 	}
-// 	return results, nil
-// }
-
-// Syncing returns false in case the node is currently not syncing with the network. It can be up to date or has not
-// yet received the latest block headers from its pears. In case it is synchronizing:
-// - startingBlock: block number this node started to synchronise from
-// - currentBlock:  block number this node is currently importing
-// - highestBlock:  block number of the highest block header this node has received from peers
-// - pulledStates:  number of state entries processed until now
-// - knownStates:   number of known state entries that still need to be pulled
-func (s *PublicEthereumAPI) Syncing() (interface{}, error) {
-	return nil, errors.New("not implemented in coreth") // Info or Health API should be used instead
-	// progress := s.b.Downloader().Progress()
-
-	// // Return not syncing if the synchronisation already completed
-	// if progress.CurrentBlock >= progress.HighestBlock {
-	// 	return false, nil
-	// }
-	// // Otherwise gather the block sync stats
-	// return map[string]interface{}{
-	// 	"startingBlock": hexutil.Uint64(progress.StartingBlock),
-	// 	"currentBlock":  hexutil.Uint64(progress.CurrentBlock),
-	// 	"highestBlock":  hexutil.Uint64(progress.HighestBlock),
-	// 	"pulledStates":  hexutil.Uint64(progress.PulledStates),
-	// 	"knownStates":   hexutil.Uint64(progress.KnownStates),
-	// }, nil
+func (s *PublicEthereumAPI) FeeHistory(ctx context.Context, blockCount rpc.DecimalOrHex, lastBlock rpc.BlockNumber, rewardPercentiles []float64) (*feeHistoryResult, error) {
+	oldest, reward, baseFee, gasUsed, err := s.b.FeeHistory(ctx, int(blockCount), lastBlock, rewardPercentiles)
+	if err != nil {
+		return nil, err
+	}
+	results := &feeHistoryResult{
+		OldestBlock:  (*hexutil.Big)(oldest),
+		GasUsedRatio: gasUsed,
+	}
+	if reward != nil {
+		results.Reward = make([][]*hexutil.Big, len(reward))
+		for i, w := range reward {
+			results.Reward[i] = make([]*hexutil.Big, len(w))
+			for j, v := range w {
+				results.Reward[i][j] = (*hexutil.Big)(v)
+			}
+		}
+	}
+	if baseFee != nil {
+		results.BaseFee = make([]*hexutil.Big, len(baseFee))
+		for i, v := range baseFee {
+			results.BaseFee[i] = (*hexutil.Big)(v)
+		}
+	}
+	return results, nil
 }
 
 // PublicTxPoolAPI offers and API for the transaction pool. It only operates on data that is non confidential.
