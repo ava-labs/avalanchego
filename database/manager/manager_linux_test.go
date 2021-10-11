@@ -23,7 +23,7 @@ func TestNewSingleRocksDB(t *testing.T) {
 	v1 := version.DefaultVersion1_0_0
 
 	dbPath := filepath.Join(dir, v1.String())
-	db, err := rocksdb.New(dbPath, logging.NoLog{})
+	db, err := rocksdb.New(dbPath, nil, logging.NoLog{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +33,7 @@ func TestNewSingleRocksDB(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager, err := NewRocksDB(dir, logging.NoLog{}, v1)
+	manager, err := NewRocksDB(dir, nil, logging.NoLog{}, v1)
 	if err != nil {
 		t.Fatal(err)
 	}

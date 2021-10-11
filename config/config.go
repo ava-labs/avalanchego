@@ -614,14 +614,25 @@ func getWhitelistedSubnets(v *viper.Viper) (ids.Set, error) {
 	return whitelistedSubnetIDs, nil
 }
 
-func getDatabaseConfig(v *viper.Viper, networkID uint32) node.DatabaseConfig {
+func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, error) {
+	var configBytes []byte
+	if v.IsSet(DBConfigFileKey) {
+		path := os.ExpandEnv(v.GetString(DBConfigFileKey))
+		var err error
+		configBytes, err = ioutil.ReadFile(path)
+		if err != nil {
+			return node.DatabaseConfig{}, err
+		}
+	}
+
 	return node.DatabaseConfig{
 		Name: v.GetString(DBTypeKey),
 		Path: filepath.Join(
 			os.ExpandEnv(v.GetString(DBPathKey)),
 			constants.NetworkName(networkID),
 		),
-	}
+		Config: configBytes,
+	}, nil
 }
 
 func getVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
@@ -820,7 +831,10 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	}
 
 	// Database
-	nodeConfig.DatabaseConfig = getDatabaseConfig(v, nodeConfig.NetworkID)
+	nodeConfig.DatabaseConfig, err = getDatabaseConfig(v, nodeConfig.NetworkID)
+	if err != nil {
+		return node.Config{}, err
+	}
 
 	// IP configuration
 	nodeConfig.IPConfig, err = getIPConfig(v)

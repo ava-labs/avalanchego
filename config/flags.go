@@ -93,6 +93,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	// Database
 	fs.String(DBTypeKey, leveldb.Name, fmt.Sprintf("Database type to use. Should be one of {%s, %s, %s}", leveldb.Name, rocksdb.Name, memdb.Name))
 	fs.String(DBPathKey, defaultDBDir, "Path to database directory")
+	fs.String(DBConfigFileKey, "", "Path to database config file")
 
 	// Logging
 	fs.String(LogsDirKey, "", "Logging directory for Avalanche")
@@ -160,8 +161,8 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(ConsensusShutdownTimeoutKey, 5*time.Second, "Timeout before killing an unresponsive chain.")
 	fs.Uint(ConsensusGossipAcceptedFrontierSizeKey, 35, "Number of peers to gossip to when gossiping accepted frontier")
 	fs.Uint(ConsensusGossipOnAcceptSizeKey, 20, "Number of peers to gossip to each accepted container to")
-	fs.Uint(AppGossipNonValidatorSizeKey, 2, "Number of peers (which may be validators or non-validators) to gossip an AppGossip message to")
-	fs.Uint(AppGossipValidatorSizeKey, 4, "Number of validators to gossip an AppGossip message to")
+	fs.Uint(AppGossipNonValidatorSizeKey, 0, "Number of peers (which may be validators or non-validators) to gossip an AppGossip message to")
+	fs.Uint(AppGossipValidatorSizeKey, 6, "Number of validators to gossip an AppGossip message to")
 
 	// Inbound Throttling
 	fs.Uint64(InboundThrottlerAtLargeAllocSizeKey, 6*units.MiB, "Size, in bytes, of at-large byte allocation in inbound message throttler.")
