@@ -1028,12 +1028,11 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 }
 
 func (n *network) NewPeerID(peer *peer) PeerID {
-	var publicIPStr string
-	if peer.ip.IsZero() {
-		publicIPStr = ""
-	} else {
+	publicIPStr := ""
+	if !peer.ip.IsZero() {
 		publicIPStr = peer.getIP().String()
 	}
+
 	return PeerID{
 		IP:           peer.conn.RemoteAddr().String(),
 		PublicIP:     publicIPStr,
