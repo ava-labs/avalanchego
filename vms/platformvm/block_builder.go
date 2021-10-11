@@ -132,6 +132,7 @@ func (m *blockBuilder) AddVerifiedTx(tx *Tx) error {
 		return errTxTooBig
 	}
 
+	tx.SetVM(m.vm)
 	if err := m.Add(tx); err != nil {
 		return err
 	}
