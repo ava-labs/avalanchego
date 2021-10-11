@@ -37,6 +37,10 @@ type metrics struct {
 	numImportTxs,
 	numRewardValidatorTxs prometheus.Counter
 
+	validatorSetsCreated    prometheus.Counter
+	validatorSetsHeightDiff prometheus.Gauge
+	validatorSetsDuration   prometheus.Gauge
+
 	apiRequestMetrics metric.APIInterceptor
 }
 
@@ -93,6 +97,22 @@ func (m *metrics) Initialize(
 	m.numImportTxs = newTxMetrics(namespace, "import")
 	m.numRewardValidatorTxs = newTxMetrics(namespace, "reward_validator")
 
+	m.validatorSetsCreated = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "validator_sets_created",
+		Help:      "Total number of validator sets created for a specific height",
+	})
+	m.validatorSetsHeightDiff = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "validator_sets_height_diff_sum",
+		Help:      "Total number of validator sets diffs applied for generating validator sets",
+	})
+	m.validatorSetsDuration = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "validator_sets_duration_sum",
+		Help:      "Total amount of time generating validator sets in nanoseconds",
+	})
+
 	apiRequestMetrics, err := metric.NewAPIInterceptor(namespace, registerer)
 	m.apiRequestMetrics = apiRequestMetrics
 	errs := wrappers.Errs{}
@@ -118,6 +138,10 @@ func (m *metrics) Initialize(
 		registerer.Register(m.numExportTxs),
 		registerer.Register(m.numImportTxs),
 		registerer.Register(m.numRewardValidatorTxs),
+
+		registerer.Register(m.validatorSetsCreated),
+		registerer.Register(m.validatorSetsHeightDiff),
+		registerer.Register(m.validatorSetsDuration),
 	)
 	return errs.Err
 }

@@ -464,6 +464,15 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]u
 		return nil, database.ErrNotFound
 	}
 
+	// track metrics
+	startTime := vm.Clock().Time()
+	defer func() {
+		endTime := vm.Clock().Time()
+		vm.metrics.validatorSetsCreated.Inc()
+		vm.metrics.validatorSetsDuration.Add(float64(endTime.Sub(startTime)))
+		vm.metrics.validatorSetsHeightDiff.Add(float64(lastAcceptedHeight - height))
+	}()
+
 	currentValidators, ok := vm.Validators.GetValidators(subnetID)
 	if !ok {
 		return nil, errNotEnoughValidators
