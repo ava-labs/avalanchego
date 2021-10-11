@@ -16,5 +16,5 @@ type PeerID struct {
 	Version      string    `json:"version"`
 	LastSent     time.Time `json:"lastSent"`
 	LastReceived time.Time `json:"lastReceived"`
-	Benched      []ids.ID  `json:"benched,omitempty"`
+	Benched      []ids.ID  `json:"benched"`
 }
