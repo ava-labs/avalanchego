@@ -30,7 +30,8 @@ const (
 
 // Parameters required for snowball consensus
 type Parameters struct {
-	Namespace         string                `json:"-"`
+	Namespace string `json:"-"`
+	// TODO: move metrics to a more suitable place
 	Metrics           prometheus.Registerer `json:"-"`
 	K                 int                   `json:"k"`
 	Alpha             int                   `json:"alpha"`

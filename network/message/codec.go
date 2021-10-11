@@ -28,9 +28,9 @@ type Codec interface {
 		op Op,
 		fieldValues map[Field]interface{},
 		compress bool,
-	) (Message, error)
+	) (OutboundMessage, error)
 
-	Parse(bytes []byte) (Message, error)
+	Parse(bytes []byte) (InboundMessage, error)
 }
 
 // codec defines the serialization and deserialization of network messages.
@@ -96,7 +96,7 @@ func (c *codec) Pack(
 	op Op,
 	fieldValues map[Field]interface{},
 	compress bool,
-) (Message, error) {
+) (OutboundMessage, error) {
 	msgFields, ok := messages[op]
 	if !ok {
 		return nil, errBadOp
@@ -126,10 +126,9 @@ func (c *codec) Pack(
 	if p.Err != nil {
 		return nil, p.Err
 	}
-	msg := &message{
-		op:     op,
-		fields: fieldValues,
-		bytes:  p.Bytes,
+	msg := &outboundMessage{
+		op:    op,
+		bytes: p.Bytes,
 	}
 	if !compress {
 		return msg, nil
@@ -155,7 +154,7 @@ func (c *codec) Pack(
 
 // Parse attempts to convert bytes into a message.
 // The first byte of the message is the opcode of the message.
-func (c *codec) Parse(bytes []byte) (Message, error) {
+func (c *codec) Parse(bytes []byte) (InboundMessage, error) {
 	p := wrappers.Packer{Bytes: bytes}
 
 	// Unpack the op code (message type)
@@ -208,10 +207,9 @@ func (c *codec) Parse(bytes []byte) (Message, error) {
 		return nil, fmt.Errorf("expected length %d but got %d", len(p.Bytes), p.Offset)
 	}
 
-	return &message{
+	return &inboundMessage{
 		op:                    op,
 		fields:                fieldValues,
-		bytes:                 p.Bytes,
 		bytesSavedCompression: bytesSaved,
 	}, p.Err
 }

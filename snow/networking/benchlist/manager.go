@@ -1,3 +1,6 @@
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package benchlist
 
 import (
@@ -165,4 +168,4 @@ func (noBenchlist) RegisterChain(*snow.Context, string) error { return nil }
 func (noBenchlist) RegisterResponse(ids.ID, ids.ShortID)      {}
 func (noBenchlist) RegisterFailure(ids.ID, ids.ShortID)       {}
 func (noBenchlist) IsBenched(ids.ShortID, ids.ID) bool        { return false }
-func (noBenchlist) GetBenched(ids.ShortID) []ids.ID           { return nil }
+func (noBenchlist) GetBenched(ids.ShortID) []ids.ID           { return []ids.ID{} }
