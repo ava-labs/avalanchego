@@ -27,6 +27,8 @@ import (
 )
 
 const (
+	// minBlockDelay should be kept as whole seconds because block timestamps
+	// are only specific to the second.
 	minBlockDelay             = time.Second
 	optimalHeightDelay uint64 = 256
 )
