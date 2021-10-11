@@ -108,47 +108,47 @@ type config struct {
 }
 
 // New returns a wrapped LevelDB object.
-func New(file string, dbConfig []byte, log logging.Logger) (database.Database, error) {
-	cfg := config{
+func New(file string, configBytes []byte, log logging.Logger) (database.Database, error) {
+	parsedConfig := config{
 		BlockCacheCapacity:     BlockCacheSize,
 		OpenFilesCacheCapacity: HandleCap,
 		WriteBuffer:            WriteBufferSize / 2,
 		FilterBitsPerKey:       BitsPerKey,
 	}
-	if dbConfig != nil {
-		if err := json.Unmarshal(dbConfig, &cfg); err != nil {
+	if len(configBytes) > 0 {
+		if err := json.Unmarshal(configBytes, &parsedConfig); err != nil {
 			return nil, fmt.Errorf("failed to parse db config: %s", err)
 		}
 	}
-	// Open the db and recover any potential corruptions
-	db, err := leveldb.OpenFile(file, &opt.Options{
-		BlockCacheCapacity:            cfg.BlockCacheCapacity,
-		BlockSize:                     cfg.BlockSize,
-		CompactionExpandLimitFactor:   cfg.CompactionExpandLimitFactor,
-		CompactionGPOverlapsFactor:    cfg.CompactionGPOverlapsFactor,
-		CompactionL0Trigger:           cfg.CompactionL0Trigger,
-		CompactionSourceLimitFactor:   cfg.CompactionSourceLimitFactor,
-		CompactionTableSize:           cfg.CompactionTableSize,
-		CompactionTableSizeMultiplier: cfg.CompactionTableSizeMultiplier,
-		CompactionTotalSize:           cfg.CompactionTotalSize,
-		CompactionTotalSizeMultiplier: cfg.CompactionTotalSizeMultiplier,
-		OpenFilesCacheCapacity:        cfg.OpenFilesCacheCapacity,
-		WriteBuffer:                   cfg.WriteBuffer,
-		Filter:                        filter.NewBloomFilter(cfg.FilterBitsPerKey),
-	})
-
-	cfgInfo, _ := json.Marshal(cfg)
-	log.Debug(fmt.Sprintf("leveldb config: %s", string(cfgInfo)))
-	if _, corrupted := err.(*errors.ErrCorrupted); corrupted {
-		db, err = leveldb.RecoverFile(file, nil)
-	}
+	configJSON, err := json.Marshal(&parsedConfig)
 	if err != nil {
 		return nil, err
+	}
+	log.Debug("leveldb config: %s", string(configJSON))
+
+	// Open the db and recover any potential corruptions
+	db, err := leveldb.OpenFile(file, &opt.Options{
+		BlockCacheCapacity:            parsedConfig.BlockCacheCapacity,
+		BlockSize:                     parsedConfig.BlockSize,
+		CompactionExpandLimitFactor:   parsedConfig.CompactionExpandLimitFactor,
+		CompactionGPOverlapsFactor:    parsedConfig.CompactionGPOverlapsFactor,
+		CompactionL0Trigger:           parsedConfig.CompactionL0Trigger,
+		CompactionSourceLimitFactor:   parsedConfig.CompactionSourceLimitFactor,
+		CompactionTableSize:           parsedConfig.CompactionTableSize,
+		CompactionTableSizeMultiplier: parsedConfig.CompactionTableSizeMultiplier,
+		CompactionTotalSize:           parsedConfig.CompactionTotalSize,
+		CompactionTotalSizeMultiplier: parsedConfig.CompactionTotalSizeMultiplier,
+		OpenFilesCacheCapacity:        parsedConfig.OpenFilesCacheCapacity,
+		WriteBuffer:                   parsedConfig.WriteBuffer,
+		Filter:                        filter.NewBloomFilter(parsedConfig.FilterBitsPerKey),
+	})
+	if _, corrupted := err.(*errors.ErrCorrupted); corrupted {
+		db, err = leveldb.RecoverFile(file, nil)
 	}
 	return &Database{
 		DB:  db,
 		log: log,
-	}, nil
+	}, err
 }
 
 // Has returns if the key is set in the database

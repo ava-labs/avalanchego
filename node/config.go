@@ -117,7 +117,7 @@ type DatabaseConfig struct {
 	Name string `json:"name"`
 
 	// Path to config file
-	ConfigPath string `json:"configPath"`
+	Config []byte `json:"-"`
 }
 
 // Config contains all of the configurations of an Avalanche node.
