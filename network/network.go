@@ -1016,15 +1016,7 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 		peers := make([]PeerID, 0, n.peers.size())
 		for _, peer := range n.peers.peersList {
 			if peer.finishedHandshake.GetValue() {
-				peers = append(peers, PeerID{
-					IP:           peer.conn.RemoteAddr().String(),
-					PublicIP:     peer.getIP().String(),
-					ID:           peer.nodeID.PrefixedString(constants.NodeIDPrefix),
-					Version:      peer.versionStr.GetValue().(string),
-					LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
-					LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
-					Benched:      n.benchlistManager.GetBenched(peer.nodeID),
-				})
+				peers = append(peers, n.NewPeerID(peer))
 			}
 		}
 		return peers
@@ -1033,18 +1025,27 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 	peers := make([]PeerID, 0, len(nodeIDs))
 	for _, nodeID := range nodeIDs { // Return info about given peers
 		if peer, ok := n.peers.getByID(nodeID); ok && peer.finishedHandshake.GetValue() {
-			peers = append(peers, PeerID{
-				IP:           peer.conn.RemoteAddr().String(),
-				PublicIP:     peer.getIP().String(),
-				ID:           peer.nodeID.PrefixedString(constants.NodeIDPrefix),
-				Version:      peer.versionStr.GetValue().(string),
-				LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
-				LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
-				Benched:      n.benchlistManager.GetBenched(peer.nodeID),
-			})
+			peers = append(peers, n.NewPeerID(peer))
 		}
 	}
 	return peers
+}
+
+func (n *network) NewPeerID(peer *peer) PeerID {
+	publicIPStr := ""
+	if !peer.ip.IsZero() {
+		publicIPStr = peer.getIP().String()
+	}
+
+	return PeerID{
+		IP:           peer.conn.RemoteAddr().String(),
+		PublicIP:     publicIPStr,
+		ID:           peer.nodeID.PrefixedString(constants.NodeIDPrefix),
+		Version:      peer.versionStr.GetValue().(string),
+		LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
+		LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
+		Benched:      n.benchlistManager.GetBenched(peer.nodeID),
+	}
 }
 
 // Close implements the Network interface
@@ -1702,7 +1703,7 @@ func (n *network) getSubnetPeers(nodeIDs ids.ShortSet, subnetID ids.ID, validato
 	peers := make([]*peer, 0, nodeIDs.Len())
 	for nodeID := range nodeIDs {
 		peer, ok := n.peers.getByID(nodeID)
-		if ok && peer.trackedSubnets.Contains(subnetID) && (!validatorOnly || n.config.Validators.Contains(subnetID, nodeID)) {
+		if ok && peer.finishedHandshake.GetValue() && peer.trackedSubnets.Contains(subnetID) && (!validatorOnly || n.config.Validators.Contains(subnetID, nodeID)) {
 			peers = append(peers, peer)
 		}
 	}
