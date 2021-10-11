@@ -24,7 +24,7 @@ const (
 	SignatureVerificationEnabledKey           = "signature-verification-enabled"
 	DBTypeKey                                 = "db-type"
 	DBPathKey                                 = "db-dir"
-	DBConfigKey                               = "db-config"
+	DBConfigFileKey                           = "db-config-file"
 	PublicIPKey                               = "public-ip"
 	DynamicUpdateDurationKey                  = "dynamic-update-duration"
 	DynamicPublicIPResolverKey                = "dynamic-public-ip"

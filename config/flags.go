@@ -93,7 +93,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	// Database
 	fs.String(DBTypeKey, leveldb.Name, fmt.Sprintf("Database type to use. Should be one of {%s, %s, %s}", leveldb.Name, rocksdb.Name, memdb.Name))
 	fs.String(DBPathKey, defaultDBDir, "Path to database directory")
-	fs.String(DBConfigKey, "", "Path to database config")
+	fs.String(DBConfigFileKey, "", "Path to database config file")
 
 	// Coreth config
 	fs.String(CorethConfigKey, "", "DEPRECATED")

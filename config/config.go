@@ -616,8 +616,8 @@ func getWhitelistedSubnets(v *viper.Viper) (ids.Set, error) {
 
 func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, error) {
 	var configBytes []byte
-	if v.IsSet(DBConfigKey) {
-		path := os.ExpandEnv(v.GetString(DBConfigKey))
+	if v.IsSet(DBConfigFileKey) {
+		path := os.ExpandEnv(v.GetString(DBConfigFileKey))
 		var err error
 		configBytes, err = ioutil.ReadFile(path)
 		if err != nil {
