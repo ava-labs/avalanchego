@@ -9,14 +9,13 @@ import (
 	"sync"
 	"time"
 
-	stdatomic "sync/atomic"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
@@ -70,8 +69,11 @@ type Context struct {
 	EpochDuration        time.Duration
 	Clock                timer.Clock
 
-	// Non-zero iff this chain bootstrapped. Should only be accessed atomically.
-	bootstrapped uint32
+	// Non-zero iff this chain bootstrapped.
+	bootstrapped utils.AtomicBool
+
+	// Indicates this chain is available to only validators.
+	validatorOnly utils.AtomicBool
 
 	// snowman++ attributes
 	ValidatorState    validators.State  // interface for P-Chain validators
@@ -81,12 +83,22 @@ type Context struct {
 
 // IsBootstrapped returns true iff this chain is done bootstrapping
 func (ctx *Context) IsBootstrapped() bool {
-	return stdatomic.LoadUint32(&ctx.bootstrapped) > 0
+	return ctx.bootstrapped.GetValue()
 }
 
 // Bootstrapped marks this chain as done bootstrapping
 func (ctx *Context) Bootstrapped() {
-	stdatomic.StoreUint32(&ctx.bootstrapped, 1)
+	ctx.bootstrapped.SetValue(true)
+}
+
+// IsValidatorOnly returns true iff this chain is available only to validators
+func (ctx *Context) IsValidatorOnly() bool {
+	return ctx.validatorOnly.GetValue()
+}
+
+// SetValidatorOnly  marks this chain as available only to validators
+func (ctx *Context) SetValidatorOnly() {
+	ctx.validatorOnly.SetValue(true)
 }
 
 // Epoch this context thinks it's in based on the wall clock time.
