@@ -14,7 +14,7 @@ type ShortSet map[ShortID]struct{}
 
 // Return a new ShortSet with initial capacity [size].
 // More or less than [size] elements can be added to this set.
-// Using NewSet() rather than ids.Set{} is just an optimization that can
+// Using NewShortSet() rather than ids.ShortSet{} is just an optimization that can
 // be used if you know how many elements will be put in this set.
 func NewShortSet(size int) ShortSet {
 	if size < 0 {
