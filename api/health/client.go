@@ -21,7 +21,7 @@ type Client struct {
 type Result struct {
 	// the details of task Result - may be nil
 	Details interface{} `json:"message,omitempty"`
-	// the error returned from a failed health check - nil when successful
+	// the error returned from a failed health check - an empty string when successful
 	Error string `json:"error,omitempty"`
 	// the time of the last health check
 	Timestamp time.Time `json:"timestamp"`
