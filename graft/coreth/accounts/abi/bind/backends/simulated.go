@@ -36,8 +36,6 @@ import (
 
 	"github.com/ava-labs/coreth/eth"
 
-	"github.com/ethereum/go-ethereum"
-
 	"github.com/ava-labs/coreth/accounts/abi"
 	"github.com/ava-labs/coreth/accounts/abi/bind"
 	"github.com/ava-labs/coreth/consensus/dummy"
@@ -288,7 +286,7 @@ func (b *SimulatedBackend) TransactionByHash(ctx context.Context, txHash common.
 	if tx != nil {
 		return tx, false, nil
 	}
-	return nil, false, ethereum.NotFound
+	return nil, false, interfaces.NotFound
 }
 
 // BlockByHash retrieves a block based on the block hash.
