@@ -59,8 +59,25 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-// This nil assignment ensures at compile time that SimulatedBackend implements bind.ContractBackend.
-var _ bind.ContractBackend = (*SimulatedBackend)(nil)
+// Verify that SimulatedBackend implements required interfaces
+var (
+	_ bind.AcceptedContractCaller = (*SimulatedBackend)(nil)
+	_ bind.ContractBackend        = (*SimulatedBackend)(nil)
+	_ bind.ContractFilterer       = (*SimulatedBackend)(nil)
+	_ bind.ContractTransactor     = (*SimulatedBackend)(nil)
+	_ bind.DeployBackend          = (*SimulatedBackend)(nil)
+
+	_ interfaces.ChainReader            = (*SimulatedBackend)(nil)
+	_ interfaces.ChainStateReader       = (*SimulatedBackend)(nil)
+	_ interfaces.TransactionReader      = (*SimulatedBackend)(nil)
+	_ interfaces.TransactionSender      = (*SimulatedBackend)(nil)
+	_ interfaces.ContractCaller         = (*SimulatedBackend)(nil)
+	_ interfaces.GasEstimator           = (*SimulatedBackend)(nil)
+	_ interfaces.GasPricer              = (*SimulatedBackend)(nil)
+	_ interfaces.LogFilterer            = (*SimulatedBackend)(nil)
+	_ interfaces.AcceptedStateReader    = (*SimulatedBackend)(nil)
+	_ interfaces.AcceptedContractCaller = (*SimulatedBackend)(nil)
+)
 
 var (
 	errBlockNumberUnsupported  = errors.New("simulatedBackend cannot access blocks other than the latest block")
@@ -455,8 +472,8 @@ func (b *SimulatedBackend) CallContract(ctx context.Context, call interfaces.Cal
 	return res.Return(), res.Err
 }
 
-// AcceptedContractCaller executes a contract call on the accepted state.
-func (b *SimulatedBackend) AcceptedContractCaller(ctx context.Context, call interfaces.CallMsg) ([]byte, error) {
+// AcceptedCallContract executes a contract call on the accepted state.
+func (b *SimulatedBackend) AcceptedCallContract(ctx context.Context, call interfaces.CallMsg) ([]byte, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	defer b.acceptedState.RevertToSnapshot(b.acceptedState.Snapshot())
@@ -761,7 +778,7 @@ func (b *SimulatedBackend) SubscribeFilterLogs(ctx context.Context, query interf
 }
 
 // SubscribeNewHead returns an event subscription for a new header.
-func (b *SimulatedBackend) SubscribeNewHead(ctx context.Context, ch chan<- *types.Header) (ethereum.Subscription, error) {
+func (b *SimulatedBackend) SubscribeNewHead(ctx context.Context, ch chan<- *types.Header) (interfaces.Subscription, error) {
 	// subscribe to a new head
 	sink := make(chan *types.Header)
 	sub := b.events.SubscribeNewHeads(sink)
