@@ -37,13 +37,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/coreth/interfaces"
-	"github.com/ethereum/go-ethereum"
-
 	"github.com/ava-labs/coreth/accounts/abi"
 	"github.com/ava-labs/coreth/accounts/abi/bind"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/interfaces"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -66,8 +64,8 @@ func TestSimulatedBackend(t *testing.T) {
 	if isPending {
 		t.Fatal("transaction should not be pending")
 	}
-	if err != ethereum.NotFound {
-		t.Fatalf("err should be `ethereum.NotFound` but received %v", err)
+	if err != interfaces.NotFound {
+		t.Fatalf("err should be `interfaces.NotFound` but received %v", err)
 	}
 
 	// generate a transaction and confirm you can retrieve it
