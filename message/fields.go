@@ -189,7 +189,7 @@ func encodeContainerIDs(containerIDs []ids.ID) [][]byte {
 func DecodeContainerIDs(inMsg InboundMessage) ([]ids.ID, error) {
 	containerIDsBytes := inMsg.Get(ContainerIDs).([][]byte)
 	res := make([]ids.ID, len(containerIDsBytes))
-	idSet := ids.NewSet(0)
+	idSet := ids.NewSet(len(containerIDsBytes))
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {

@@ -6,6 +6,7 @@ package router
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -257,6 +258,138 @@ func (cr *ChainRouter) removeChain(chainID ids.ID) {
 	}
 }
 
+func (cr *ChainRouter) checkMsg(inMsg message.InboundMessage) error {
+	// check relevant messages fields are well formed, before submitting them to the engine
+
+	switch inMsg.Op() {
+	case message.AcceptedFrontier:
+		_, err := message.DecodeContainerIDs(inMsg)
+		return err
+	case message.GetAccepted:
+		_, err := message.DecodeContainerIDs(inMsg)
+		return err
+	case message.Accepted:
+		_, err := message.DecodeContainerIDs(inMsg)
+		return err
+	case message.GetAncestors:
+		_, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte))
+		cr.log.AssertNoError(err)
+		return err
+	case message.MultiPut:
+		if _, ok := inMsg.Get(message.MultiContainerBytes).([][]byte); !ok {
+			return fmt.Errorf("malformed Multiput message. Could not parse MultiContainerBytes")
+		}
+		return nil
+	case message.Put:
+		if _, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte)); err != nil {
+			cr.log.AssertNoError(err)
+			return err
+		}
+		if _, ok := inMsg.Get(message.ContainerBytes).([]byte); !ok {
+			return fmt.Errorf("malformed Put message. Could not parse ContainerBytes")
+		}
+		return nil
+	case message.Get:
+		_, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte))
+		cr.log.AssertNoError(err)
+		return err
+	case message.PullQuery:
+		_, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte))
+		cr.log.AssertNoError(err)
+		return err
+	case message.PushQuery:
+		if _, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte)); err != nil {
+			cr.log.AssertNoError(err)
+			return err
+		}
+		if _, ok := inMsg.Get(message.ContainerBytes).([]byte); !ok {
+			return fmt.Errorf("malformed PushQuery message. Could not parse ContainerBytes")
+		}
+		return nil
+	case message.Chits:
+		_, err := message.DecodeContainerIDs(inMsg)
+		return err
+	case message.AppRequest:
+		if _, ok := inMsg.Get(message.AppRequestBytes).([]byte); !ok {
+			return fmt.Errorf("malformed AppRequest message. Could not parse AppRequestBytes")
+		}
+		return nil
+	case message.AppResponse:
+		if _, ok := inMsg.Get(message.AppResponseBytes).([]byte); !ok {
+			return fmt.Errorf("malformed AppResponse message. Could not parse AppResponseBytes")
+		}
+		return nil
+	case message.AppGossip:
+		if _, ok := inMsg.Get(message.AppGossipBytes).([]byte); !ok {
+			return fmt.Errorf("malformed AppGossip message. Could not parse AppGossipBytes")
+		}
+		return nil
+	}
+
+	// messages lacking explicit checks are deemed good
+	return nil
+}
+
+func (cr *ChainRouter) markFullfilled(
+	msgType constants.MsgType,
+	nodeID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+	matchReqType bool,
+) (ids.ID, *requestEntry) {
+	// Create the request ID of the request we sent that this message is (allegedly) in response to.
+	uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, msgType)
+
+	// Mark that an outstanding request has been fulfilled
+	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
+	if !exists {
+		return uniqueRequestID, nil
+	}
+	request := requestIntf.(requestEntry)
+	if matchReqType && request.msgType != msgType {
+		return uniqueRequestID, nil
+	}
+
+	cr.timedRequests.Delete(uniqueRequestID)
+	return uniqueRequestID, &request
+}
+
+// A map from Op to constants.MsgType
+func opToConstant(op message.Op) constants.MsgType {
+	switch op {
+	case message.GetAcceptedFrontier:
+		return constants.GetAcceptedFrontierMsg
+	case message.AcceptedFrontier:
+		return constants.AcceptedFrontierMsg
+	case message.GetAccepted:
+		return constants.GetAcceptedMsg
+	case message.Accepted:
+		return constants.AcceptedMsg
+	case message.GetAncestors:
+		return constants.GetAncestorsMsg
+	case message.MultiPut:
+		return constants.MultiPutMsg
+	case message.Get:
+		return constants.GetMsg
+	case message.Put:
+		return constants.PutMsg
+	case message.PullQuery:
+		return constants.PullQueryMsg
+	case message.PushQuery:
+		return constants.PushQueryMsg
+	case message.Chits:
+		return constants.ChitsMsg
+	case message.AppRequest:
+		return constants.AppRequestMsg
+	case message.AppResponse:
+		return constants.AppResponseMsg
+	case message.AppGossip:
+		return constants.AppGossipMsg
+	default:
+		return constants.NullMsg
+	}
+}
+
 func (cr *ChainRouter) HandleInbound(
 	inMsg message.InboundMessage,
 	nodeID ids.ShortID,
@@ -280,40 +413,34 @@ func (cr *ChainRouter) HandleInbound(
 		return
 	}
 
+	if err := cr.checkMsg(inMsg); err != nil {
+		cr.log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
+			msgType.String(), nodeID, chainID, requestID, err)
+		return
+	}
+
 	// Pass the message to the chain
 	switch msgType {
-	case message.GetAcceptedFrontier:
-		// GetAcceptedFrontier routes an incoming GetAcceptedFrontier request from the
-		// validator with ID [validatorID]  to the consensus engine working on the
-		// chain with ID [chainID]
+	case // handle msgs with no deadlines
+		message.GetAcceptedFrontier,
+		message.GetAccepted,
+		message.GetAncestors,
+		message.Get,
+		message.PullQuery,
+		message.PushQuery,
+		message.AppRequest,
+		message.AppGossip:
 
-		deadline := cr.clock.Time().Add(time.Duration(inMsg.Get(message.Deadline).(uint64)))
-		chain.GetAcceptedFrontier(nodeID, requestID, deadline, onFinishedHandling)
+		chain.PushMsgWithDeadline(opToConstant(msgType), inMsg, nodeID, requestID, onFinishedHandling)
 		return
 
 	case message.AcceptedFrontier:
-		// AcceptedFrontier routes an incoming AcceptedFrontier request from the
-		// validator with ID [validatorID]  to the consensus engine working on the
-		// chain with ID [chainID]
-
-		containerIDs, err := message.DecodeContainerIDs(inMsg)
-		if err != nil {
-			cr.log.Debug("Message %s from (%s, %s, %d) dropped. Error: %s",
-				msgType.String(), nodeID, chainID, requestID, err)
-			return
-		}
-		// Create the request ID of the request we sent that this message is (allegedly) in response to.
-		uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, constants.GetAcceptedFrontierMsg)
-
-		// Mark that an outstanding request has been fulfilled
-		requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
-		if !exists {
-			onFinishedHandling()
+		uniqueRequestID, request := cr.markFullfilled(constants.GetAcceptedFrontierMsg, nodeID, chainID, requestID, false)
+		if request == nil {
 			// We didn't request this message. Ignore.
+			onFinishedHandling()
 			return
 		}
-		request := requestIntf.(requestEntry)
-		cr.timedRequests.Delete(uniqueRequestID)
 
 		// Calculate how long it took [validatorID] to reply
 		latency := cr.clock.Time().Sub(request.time)
@@ -322,49 +449,16 @@ func (cr *ChainRouter) HandleInbound(
 		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, constants.GetAcceptedFrontierMsg, latency)
 
 		// Pass the response to the chain
-		chain.AcceptedFrontier(nodeID, requestID, containerIDs, onFinishedHandling)
-		return
-
-	case message.GetAccepted:
-		// GetAccepted routes an incoming GetAccepted request from the
-		// validator with ID [validatorID]  to the consensus engine working on the
-		// chain with ID [chainID]
-
-		deadline := cr.clock.Time().Add(time.Duration(inMsg.Get(message.Deadline).(uint64)))
-		containerIDs, err := message.DecodeContainerIDs(inMsg)
-		if err != nil {
-			cr.log.Debug("Message %s from (%s, %s, %d) dropped. Error: %s",
-				msgType.String(), nodeID, chainID, requestID, err)
-			return
-		}
-
-		chain.GetAccepted(nodeID, requestID, deadline, containerIDs, onFinishedHandling)
+		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID, onFinishedHandling)
 		return
 
 	case message.Accepted:
-		// Accepted routes an incoming Accepted request from the validator with ID
-		// [validatorID] to the consensus engine working on the chain with ID
-		// [chainID]
-
-		containerIDs, err := message.DecodeContainerIDs(inMsg)
-		if err != nil {
-			cr.log.Debug("Message %s from (%s, %s, %d) dropped. Error: %s",
-				msgType.String(), nodeID, chainID, requestID, err)
-			return
-		}
-
-		// Create the request ID of the request we sent that this message is (allegedly) in response to.
-		uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, constants.GetAcceptedMsg)
-
-		// Mark that an outstanding request has been fulfilled
-		requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
-		if !exists {
+		uniqueRequestID, request := cr.markFullfilled(constants.GetAcceptedMsg, nodeID, chainID, requestID, false)
+		if request == nil {
 			// We didn't request this message. Ignore.
 			onFinishedHandling()
 			return
 		}
-		request := requestIntf.(requestEntry)
-		cr.timedRequests.Delete(uniqueRequestID)
 
 		// Calculate how long it took [validatorID] to reply
 		latency := cr.clock.Time().Sub(request.time)
@@ -373,40 +467,16 @@ func (cr *ChainRouter) HandleInbound(
 		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, constants.GetAcceptedMsg, latency)
 
 		// Pass the response to the chain
-		chain.Accepted(nodeID, requestID, containerIDs, onFinishedHandling)
-		return
-
-	case message.GetAncestors:
-		// GetAncestors routes an incoming GetAncestors message from the validator with ID [validatorID]
-		// to the consensus engine working on the chain with ID [chainID]
-		// The maximum number of ancestors to respond with is defined in snow/engine/common/bootstrapper.go
-
-		deadline := cr.clock.Time().Add(time.Duration(inMsg.Get(message.Deadline).(uint64)))
-		containerID, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte))
-		cr.log.AssertNoError(err)
-
-		// Pass the message to the chain
-		chain.GetAncestors(nodeID, requestID, deadline, containerID, onFinishedHandling)
+		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID, onFinishedHandling)
 		return
 
 	case message.MultiPut:
-		// MultiPut routes an incoming MultiPut message from the validator with ID [validatorID]
-		// to the consensus engine working on the chain with ID [chainID]
-
-		containers := inMsg.Get(message.MultiContainerBytes).([][]byte)
-
-		// Create the request ID of the request we sent that this message is (allegedly) in response to.
-		uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, constants.GetAncestorsMsg)
-
-		// Mark that an outstanding request has been fulfilled
-		requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
-		if !exists {
+		uniqueRequestID, request := cr.markFullfilled(constants.GetAncestorsMsg, nodeID, chainID, requestID, false)
+		if request == nil {
 			// We didn't request this message. Ignore.
 			onFinishedHandling()
 			return
 		}
-		request := requestIntf.(requestEntry)
-		cr.timedRequests.Delete(uniqueRequestID)
 
 		// Calculate how long it took [validatorID] to reply
 		latency := cr.clock.Time().Sub(request.time)
@@ -415,70 +485,18 @@ func (cr *ChainRouter) HandleInbound(
 		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, constants.GetAncestorsMsg, latency)
 
 		// Pass the response to the chain
-		chain.MultiPut(nodeID, requestID, containers, onFinishedHandling)
-		return
-
-	case message.Get:
-		// Get routes an incoming Get request from the validator with ID [validatorID]
-		// to the consensus engine working on the chain with ID [chainID]
-
-		deadline := cr.clock.Time().Add(time.Duration(inMsg.Get(message.Deadline).(uint64)))
-		containerID, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte))
-		cr.log.AssertNoError(err)
-
-		// Pass the message to the chain
-		chain.Get(nodeID, requestID, deadline, containerID, onFinishedHandling)
-		return
-
-	case message.PullQuery:
-		// PullQuery routes an incoming PullQuery request from the validator with ID [validatorID]
-		// to the consensus engine working on the chain with ID [chainID]
-		// Pass the message to the chain
-		deadline := cr.clock.Time().Add(time.Duration(inMsg.Get(message.Deadline).(uint64)))
-		containerID, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte))
-		cr.log.AssertNoError(err)
-
-		chain.PullQuery(nodeID, requestID, deadline, containerID, onFinishedHandling)
-		return
-
-	case message.PushQuery:
-		// PushQuery routes an incoming PushQuery request from the validator with ID [validatorID]
-		// to the consensus engine working on the chain with ID [chainID]
-
-		deadline := cr.clock.Time().Add(time.Duration(inMsg.Get(message.Deadline).(uint64)))
-		containerID, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte))
-		cr.log.AssertNoError(err)
-		container := inMsg.Get(message.ContainerBytes).([]byte)
-
-		// Pass the message to the chain
-		chain.PushQuery(nodeID, requestID, deadline, containerID, container, onFinishedHandling)
+		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID, onFinishedHandling)
 		return
 
 	case message.Chits:
-		// Chits routes an incoming Chits message from the validator with ID [validatorID]
-		// to the consensus engine working on the chain with ID [chainID]
-
-		votes, err := message.DecodeContainerIDs(inMsg)
-		if err != nil {
-			cr.log.Debug("Message %s from (%s, %s, %d) dropped. Error: %s",
-				msgType.String(), nodeID, chainID, requestID, err)
-			return
-		}
-
-		// Create the request ID of the request we sent that this message is (allegedly) in response to.
 		// Note that we treat PullQueryMsg and PushQueryMsg the same for the sake of creating request IDs.
 		// See [createRequestID].
-		uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, constants.PullQueryMsg)
-
-		// Mark that an outstanding request has been fulfilled
-		requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
-		if !exists {
+		uniqueRequestID, request := cr.markFullfilled(constants.PullQueryMsg, nodeID, chainID, requestID, false)
+		if request == nil {
 			// We didn't request this message. Ignore.
 			onFinishedHandling()
 			return
 		}
-		request := requestIntf.(requestEntry)
-		cr.timedRequests.Delete(uniqueRequestID)
 
 		// Calculate how long it took [validatorID] to reply
 		latency := cr.clock.Time().Sub(request.time)
@@ -487,35 +505,22 @@ func (cr *ChainRouter) HandleInbound(
 		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, request.msgType, latency)
 
 		// Pass the response to the chain
-		chain.Chits(nodeID, requestID, votes, onFinishedHandling)
+		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID, onFinishedHandling)
 		return
 
 	case message.Put:
-		// Put routes an incoming Put request from the validator with ID [validatorID]
-		// to the consensus engine working on the chain with ID [chainID]
-
-		containerID, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte))
-		cr.log.AssertNoError(err)
-		container := inMsg.Get(message.ContainerBytes).([]byte)
-
 		// If this is a gossip message, pass to the chain
 		if requestID == constants.GossipMsgRequestID {
-			chain.Put(nodeID, requestID, containerID, container, onFinishedHandling)
+			chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID, onFinishedHandling)
 			return
 		}
 
-		// Create the request ID of the request we sent that this message is (allegedly) in response to.
-		uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, constants.GetMsg)
-
-		// Mark that an outstanding request has been fulfilled
-		requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
-		if !exists {
+		uniqueRequestID, request := cr.markFullfilled(constants.GetMsg, nodeID, chainID, requestID, false)
+		if request == nil {
 			// We didn't request this message. Ignore.
 			onFinishedHandling()
 			return
 		}
-		request := requestIntf.(requestEntry)
-		cr.timedRequests.Delete(uniqueRequestID)
 
 		// Calculate how long it took [nodeID] to reply
 		latency := cr.clock.Time().Sub(request.time)
@@ -524,39 +529,16 @@ func (cr *ChainRouter) HandleInbound(
 		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, constants.GetMsg, latency)
 
 		// Pass the response to the chain
-		chain.Put(nodeID, requestID, containerID, container, onFinishedHandling)
-		return
-
-	case message.AppRequest:
-		// AppRequest routes an incoming application-level request from the given node
-		// to the consensus engine working on the given chain
-
-		deadline := cr.clock.Time().Add(time.Duration(inMsg.Get(message.Deadline).(uint64)))
-		request := inMsg.Get(message.AppRequestBytes).([]byte)
-
-		// Pass the message to the chain
-		chain.AppRequest(nodeID, requestID, deadline, request, onFinishedHandling)
+		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID, onFinishedHandling)
 		return
 
 	case message.AppResponse:
-		response := inMsg.Get(message.AppResponseBytes).([]byte)
-
-		uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, constants.AppRequestMsg)
-
-		// Mark that an outstanding request has been fulfilled
-		requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
-		if !exists {
-			// We didn't request this message. Ignore.
+		uniqueRequestID, request := cr.markFullfilled(constants.AppRequestMsg, nodeID, chainID, requestID, true)
+		if request == nil {
+			// We didn't request this message, or it was the wrong type. Ignore.
 			onFinishedHandling()
 			return
 		}
-		request := requestIntf.(requestEntry)
-		if request.msgType != constants.AppRequestMsg {
-			// We got back a reply of wrong type. Ignore.
-			onFinishedHandling()
-			return
-		}
-		cr.timedRequests.Delete(uniqueRequestID)
 
 		// Calculate how long it took [nodeID] to reply
 		latency := cr.clock.Time().Sub(request.time)
@@ -565,17 +547,7 @@ func (cr *ChainRouter) HandleInbound(
 		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, request.msgType, latency)
 
 		// Pass the response to the chain
-		chain.AppResponse(nodeID, requestID, response, onFinishedHandling)
-		return
-
-	case message.AppGossip:
-		// AppGossip routes an incoming application-level gossip message from the given node
-		// to the consensus engine working on the given chain
-
-		appGossipBytes := inMsg.Get(message.AppGossipBytes).([]byte)
-
-		// Pass the message to the chain
-		chain.AppGossip(nodeID, appGossipBytes, onFinishedHandling)
+		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID, onFinishedHandling)
 		return
 
 	default:

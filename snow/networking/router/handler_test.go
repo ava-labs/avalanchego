@@ -12,9 +12,11 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 func TestHandlerDropsTimedOutMessages(t *testing.T) {
@@ -36,64 +38,41 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	handler := &Handler{}
 	vdrs := validators.NewSet()
 	vdr0 := ids.GenerateTestShortID()
-	if err := vdrs.AddWeight(vdr0, 1); err != nil {
-		t.Fatal(err)
-	}
-	err := handler.Initialize(
-		&engine,
-		vdrs,
-		nil,
-		"",
-		prometheus.NewRegistry(),
-	)
+	err := vdrs.AddWeight(vdr0, 1)
 	assert.NoError(t, err)
-
-	currentTime := time.Now()
-	handler.clock.Set(currentTime)
-
-	handler.GetAcceptedFrontier(ids.ShortID{}, 1, currentTime.Add(-time.Second), func() {})
-	handler.GetAccepted(ids.ShortID{}, 1, currentTime.Add(time.Second), nil, func() {})
-
-	go handler.Dispatch()
-
-	ticker := time.NewTicker(50 * time.Millisecond)
-	defer ticker.Stop()
-	select {
-	case <-ticker.C:
-		t.Fatalf("Calling engine function timed out")
-	case <-called:
-	}
-}
-
-func TestHandlerDoesntDrop(t *testing.T) {
-	engine := common.EngineTest{T: t}
-	engine.Default(false)
-	engine.ContextF = snow.DefaultContextTest
-
-	called := make(chan struct{}, 1)
-
-	engine.GetAcceptedFrontierF = func(nodeID ids.ShortID, requestID uint32) error {
-		called <- struct{}{}
-		return nil
-	}
-
-	handler := &Handler{}
-	vdrs := validators.NewSet()
-	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
+	metrics := prometheus.NewRegistry()
+	msgCreator, err := message.NewMsgCreator(metrics, true /*compressionEnabled*/)
 	assert.NoError(t, err)
 	err = handler.Initialize(
 		&engine,
 		vdrs,
 		nil,
 		"",
-		prometheus.NewRegistry(),
+		metrics,
 	)
 	assert.NoError(t, err)
 
-	handler.GetAcceptedFrontier(ids.ShortID{}, 1, time.Time{}, func() {})
+	pastTime := time.Now()
+	handler.clock.Set(pastTime)
+
+	reqID := uint32(1)
+	deadline := uint64(1)
+	chainID := ids.ID{}
+	msg, err := msgCreator.InboundGetAcceptedFrontier(chainID, reqID, deadline)
+	assert.NoError(t, err)
+	handler.PushMsgWithDeadline(constants.GetAcceptedFrontierMsg, msg, ids.ShortID{}, reqID, func() {})
+
+	currentTime := time.Now().Add(time.Second)
+	handler.clock.Set(currentTime)
+
+	reqID++
+	msg, err = msgCreator.InboundGetAccepted(chainID, reqID, deadline, nil)
+	assert.NoError(t, err)
+	handler.PushMsgWithDeadline(constants.GetAcceptedMsg, msg, ids.ShortID{}, reqID, func() {})
+
 	go handler.Dispatch()
 
-	ticker := time.NewTicker(20 * time.Millisecond)
+	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
 	select {
 	case <-ticker.C:
@@ -116,13 +95,16 @@ func TestHandlerClosesOnError(t *testing.T) {
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
+	metrics := prometheus.NewRegistry()
+	msgCreator, err := message.NewMsgCreator(metrics, true /*compressionEnabled*/)
+	assert.NoError(t, err)
 	handler := &Handler{}
 	err = handler.Initialize(
 		&engine,
 		vdrs,
 		nil,
 		"",
-		prometheus.NewRegistry(),
+		metrics,
 	)
 	assert.NoError(t, err)
 
@@ -133,7 +115,11 @@ func TestHandlerClosesOnError(t *testing.T) {
 	}
 	go handler.Dispatch()
 
-	handler.GetAcceptedFrontier(ids.ShortID{}, 1, time.Now().Add(time.Second), func() {})
+	reqID := uint32(1)
+	deadline := uint64(1)
+	msg, err := msgCreator.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline)
+	assert.NoError(t, err)
+	handler.PushMsgWithDeadline(constants.GetAcceptedFrontierMsg, msg, ids.ShortID{}, reqID, func() {})
 
 	ticker := time.NewTicker(20 * time.Millisecond)
 	select {

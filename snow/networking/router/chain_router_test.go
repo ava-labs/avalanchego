@@ -150,7 +150,13 @@ func TestShutdownTimesOut(t *testing.T) {
 	shutdownFinished := make(chan struct{}, 1)
 
 	go func() {
-		handler.MultiPut(ids.ShortID{}, 1, nil, func() {})
+		mc, err := message.NewMsgCreator(prometheus.NewRegistry(), true /*compressionEnabled*/)
+		assert.NoError(t, err)
+		chainID := ids.ID{}
+		msg, err := mc.InboundMultiPut(chainID, 1, nil)
+		assert.NoError(t, err)
+		handler.PushMsgWithoutDeadline(constants.MultiPutMsg, msg, ids.ShortID{}, 1, func() {})
+
 		time.Sleep(50 * time.Millisecond) // Pause to ensure message gets processed
 
 		chainRouter.Shutdown()

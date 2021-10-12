@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
@@ -174,87 +175,103 @@ func (h *Handler) handleMsg(msg messageToRemove) error {
 }
 
 // Assumes [h.ctx.Lock] is locked
+// Assumes all inboundMessage have been duly validated and freely retrieve relevant fields
 func (h *Handler) handleConsensusMsg(msg messageToRemove) error {
 	var err error
 	switch msg.messageType {
 	case constants.GetAcceptedFrontierMsg:
 		err = h.engine.GetAcceptedFrontier(msg.nodeID, msg.requestID)
 	case constants.AcceptedFrontierMsg:
-		err = h.engine.AcceptedFrontier(msg.nodeID, msg.requestID, msg.containerIDs)
+		containerIDs, _ := message.DecodeContainerIDs(msg.inMsg)
+		err = h.engine.AcceptedFrontier(msg.nodeID, msg.requestID, containerIDs)
 	case constants.GetAcceptedFrontierFailedMsg:
 		err = h.engine.GetAcceptedFrontierFailed(msg.nodeID, msg.requestID)
 	case constants.GetAcceptedMsg:
-		err = h.engine.GetAccepted(msg.nodeID, msg.requestID, msg.containerIDs)
+		containerIDs, _ := message.DecodeContainerIDs(msg.inMsg)
+		err = h.engine.GetAccepted(msg.nodeID, msg.requestID, containerIDs)
 	case constants.AcceptedMsg:
-		err = h.engine.Accepted(msg.nodeID, msg.requestID, msg.containerIDs)
+		containerIDs, _ := message.DecodeContainerIDs(msg.inMsg)
+		err = h.engine.Accepted(msg.nodeID, msg.requestID, containerIDs)
 	case constants.GetAcceptedFailedMsg:
 		err = h.engine.GetAcceptedFailed(msg.nodeID, msg.requestID)
 	case constants.GetAncestorsMsg:
-		err = h.engine.GetAncestors(msg.nodeID, msg.requestID, msg.containerID)
+		containerID, _ := ids.ToID(msg.inMsg.Get(message.ContainerID).([]byte))
+		err = h.engine.GetAncestors(msg.nodeID, msg.requestID, containerID)
 	case constants.GetAncestorsFailedMsg:
 		err = h.engine.GetAncestorsFailed(msg.nodeID, msg.requestID)
 	case constants.MultiPutMsg:
-		err = h.engine.MultiPut(msg.nodeID, msg.requestID, msg.containers)
+		containers, _ := msg.inMsg.Get(message.MultiContainerBytes).([][]byte)
+		err = h.engine.MultiPut(msg.nodeID, msg.requestID, containers)
 	case constants.GetMsg:
-		err = h.engine.Get(msg.nodeID, msg.requestID, msg.containerID)
+		containerID, _ := ids.ToID(msg.inMsg.Get(message.ContainerID).([]byte))
+		err = h.engine.Get(msg.nodeID, msg.requestID, containerID)
 	case constants.GetFailedMsg:
 		err = h.engine.GetFailed(msg.nodeID, msg.requestID)
 	case constants.PutMsg:
-		err = h.engine.Put(msg.nodeID, msg.requestID, msg.containerID, msg.container)
+		containerID, _ := ids.ToID(msg.inMsg.Get(message.ContainerID).([]byte))
+		container, _ := msg.inMsg.Get(message.ContainerBytes).([]byte)
+		err = h.engine.Put(msg.nodeID, msg.requestID, containerID, container)
 	case constants.PushQueryMsg:
-		err = h.engine.PushQuery(msg.nodeID, msg.requestID, msg.containerID, msg.container)
+		containerID, _ := ids.ToID(msg.inMsg.Get(message.ContainerID).([]byte))
+		container, _ := msg.inMsg.Get(message.ContainerBytes).([]byte)
+		err = h.engine.PushQuery(msg.nodeID, msg.requestID, containerID, container)
 	case constants.PullQueryMsg:
-		err = h.engine.PullQuery(msg.nodeID, msg.requestID, msg.containerID)
+		containerID, _ := ids.ToID(msg.inMsg.Get(message.ContainerID).([]byte))
+		err = h.engine.PullQuery(msg.nodeID, msg.requestID, containerID)
 	case constants.QueryFailedMsg:
 		err = h.engine.QueryFailed(msg.nodeID, msg.requestID)
 	case constants.ChitsMsg:
-		err = h.engine.Chits(msg.nodeID, msg.requestID, msg.containerIDs)
+		votes, _ := message.DecodeContainerIDs(msg.inMsg)
+		err = h.engine.Chits(msg.nodeID, msg.requestID, votes)
 	case constants.ConnectedMsg:
 		err = h.engine.Connected(msg.nodeID)
 	case constants.DisconnectedMsg:
 		err = h.engine.Disconnected(msg.nodeID)
-	case constants.AppGossipMsg:
-		err = h.engine.AppGossip(msg.nodeID, msg.appMsgBytes)
 	case constants.AppRequestMsg:
-		err = h.engine.AppRequest(msg.nodeID, msg.requestID, msg.appMsgBytes)
+		apRequestBytes, _ := msg.inMsg.Get(message.AppRequestBytes).([]byte)
+		err = h.engine.AppRequest(msg.nodeID, msg.requestID, apRequestBytes)
 	case constants.AppResponseMsg:
-		err = h.engine.AppResponse(msg.nodeID, msg.requestID, msg.appMsgBytes)
+		appResponseBytes, _ := msg.inMsg.Get(message.AppResponseBytes).([]byte)
+		err = h.engine.AppResponse(msg.nodeID, msg.requestID, appResponseBytes)
+	case constants.AppGossipMsg:
+		appGossipBytes, _ := msg.inMsg.Get(message.AppGossipBytes).([]byte)
+		err = h.engine.AppGossip(msg.nodeID, appGossipBytes)
 	}
 	return err
 }
 
-// GetAcceptedFrontier passes a GetAcceptedFrontier message received from the
-// network to the consensus engine.
-func (h *Handler) GetAcceptedFrontier(
+func (h *Handler) PushMsgWithDeadline(msgType constants.MsgType,
+	inMsg message.InboundMessage,
 	nodeID ids.ShortID,
 	requestID uint32,
-	deadline time.Time,
-	onDoneHandling func(),
-) {
+	onDoneHandling func()) {
+	received := h.clock.Time()
+	deadline := received.Add(time.Duration(inMsg.Get(message.Deadline).(uint64)))
+
 	h.push(messageToRemove{
-		messageType:    constants.GetAcceptedFrontierMsg,
+		messageType:    msgType,
+		inMsg:          inMsg,
 		nodeID:         nodeID,
 		requestID:      requestID,
+		received:       received,
 		deadline:       deadline,
-		received:       h.clock.Time(),
 		onDoneHandling: onDoneHandling,
 	})
 }
 
-// AcceptedFrontier passes a AcceptedFrontier message received from the network
-// to the consensus engine.
-func (h *Handler) AcceptedFrontier(
+func (h *Handler) PushMsgWithoutDeadline(msgType constants.MsgType,
+	inMsg message.InboundMessage,
 	nodeID ids.ShortID,
 	requestID uint32,
-	containerIDs []ids.ID,
-	onDoneHandling func(),
-) {
+	onDoneHandling func()) {
+	received := h.clock.Time()
+
 	h.push(messageToRemove{
-		messageType:    constants.AcceptedFrontierMsg,
+		messageType:    msgType,
+		inMsg:          inMsg,
 		nodeID:         nodeID,
 		requestID:      requestID,
-		containerIDs:   containerIDs,
-		received:       h.clock.Time(),
+		received:       received,
 		onDoneHandling: onDoneHandling,
 	})
 }
@@ -269,44 +286,6 @@ func (h *Handler) GetAcceptedFrontierFailed(nodeID ids.ShortID, requestID uint32
 	})
 }
 
-// GetAccepted passes a GetAccepted message received from the
-// network to the consensus engine.
-func (h *Handler) GetAccepted(
-	nodeID ids.ShortID,
-	requestID uint32,
-	deadline time.Time,
-	containerIDs []ids.ID,
-	onDoneHandling func(),
-) {
-	h.push(messageToRemove{
-		messageType:    constants.GetAcceptedMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		deadline:       deadline,
-		containerIDs:   containerIDs,
-		received:       h.clock.Time(),
-		onDoneHandling: onDoneHandling,
-	})
-}
-
-// Accepted passes a Accepted message received from the network to the consensus
-// engine.
-func (h *Handler) Accepted(
-	nodeID ids.ShortID,
-	requestID uint32,
-	containerIDs []ids.ID,
-	onDoneHandling func(),
-) {
-	h.push(messageToRemove{
-		messageType:    constants.AcceptedMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		containerIDs:   containerIDs,
-		received:       h.clock.Time(),
-		onDoneHandling: onDoneHandling,
-	})
-}
-
 // GetAcceptedFailed passes a GetAcceptedFailed message received from the
 // network to the consensus engine.
 func (h *Handler) GetAcceptedFailed(nodeID ids.ShortID, requestID uint32) {
@@ -314,42 +293,6 @@ func (h *Handler) GetAcceptedFailed(nodeID ids.ShortID, requestID uint32) {
 		messageType: constants.GetAcceptedFailedMsg,
 		nodeID:      nodeID,
 		requestID:   requestID,
-	})
-}
-
-// GetAncestors passes a GetAncestors message received from the network to the consensus engine.
-func (h *Handler) GetAncestors(
-	nodeID ids.ShortID,
-	requestID uint32,
-	deadline time.Time,
-	containerID ids.ID,
-	onDoneHandling func(),
-) {
-	h.push(messageToRemove{
-		messageType:    constants.GetAncestorsMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		deadline:       deadline,
-		containerID:    containerID,
-		received:       h.clock.Time(),
-		onDoneHandling: onDoneHandling,
-	})
-}
-
-// MultiPut passes a MultiPut message received from the network to the consensus engine.
-func (h *Handler) MultiPut(
-	nodeID ids.ShortID,
-	requestID uint32,
-	containers [][]byte,
-	onDoneHandling func(),
-) {
-	h.push(messageToRemove{
-		messageType:    constants.MultiPutMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		containers:     containers,
-		received:       h.clock.Time(),
-		onDoneHandling: onDoneHandling,
 	})
 }
 
@@ -370,102 +313,12 @@ func (h *Handler) Timeout() {
 	})
 }
 
-// Get passes a Get message received from the network to the consensus engine.
-func (h *Handler) Get(
-	nodeID ids.ShortID,
-	requestID uint32,
-	deadline time.Time,
-	containerID ids.ID,
-	onDoneHandling func(),
-) {
-	h.push(messageToRemove{
-		messageType:    constants.GetMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		deadline:       deadline,
-		containerID:    containerID,
-		received:       h.clock.Time(),
-		onDoneHandling: onDoneHandling,
-	})
-}
-
-// Put passes a Put message received from the network to the consensus engine.
-func (h *Handler) Put(
-	nodeID ids.ShortID,
-	requestID uint32,
-	containerID ids.ID,
-	container []byte,
-	onDoneHandling func(),
-) {
-	h.push(messageToRemove{
-		messageType:    constants.PutMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		containerID:    containerID,
-		container:      container,
-		received:       h.clock.Time(),
-		onDoneHandling: onDoneHandling,
-	})
-}
-
 // GetFailed passes a GetFailed message to the consensus engine.
 func (h *Handler) GetFailed(nodeID ids.ShortID, requestID uint32) {
 	h.push(messageToRemove{
 		messageType: constants.GetFailedMsg,
 		nodeID:      nodeID,
 		requestID:   requestID,
-	})
-}
-
-// PushQuery passes a PushQuery message received from the network to the consensus engine.
-func (h *Handler) PushQuery(
-	nodeID ids.ShortID,
-	requestID uint32,
-	deadline time.Time,
-	containerID ids.ID,
-	container []byte,
-	onDoneHandling func(),
-) {
-	h.push(messageToRemove{
-		messageType:    constants.PushQueryMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		deadline:       deadline,
-		containerID:    containerID,
-		container:      container,
-		received:       h.clock.Time(),
-		onDoneHandling: onDoneHandling,
-	})
-}
-
-// PullQuery passes a PullQuery message received from the network to the consensus engine.
-func (h *Handler) PullQuery(
-	nodeID ids.ShortID,
-	requestID uint32,
-	deadline time.Time,
-	containerID ids.ID,
-	onDoneHandling func(),
-) {
-	h.push(messageToRemove{
-		messageType:    constants.PullQueryMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		deadline:       deadline,
-		containerID:    containerID,
-		received:       h.clock.Time(),
-		onDoneHandling: onDoneHandling,
-	})
-}
-
-// Chits passes a Chits message received from the network to the consensus engine.
-func (h *Handler) Chits(nodeID ids.ShortID, requestID uint32, votes []ids.ID, onDoneHandling func()) {
-	h.push(messageToRemove{
-		messageType:    constants.ChitsMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		containerIDs:   votes,
-		received:       h.clock.Time(),
-		onDoneHandling: onDoneHandling,
 	})
 }
 
@@ -478,31 +331,6 @@ func (h *Handler) QueryFailed(nodeID ids.ShortID, requestID uint32) {
 	})
 }
 
-// AppRequest passes an application-level request from the given node to the consensus engine.
-func (h *Handler) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, appRequestBytes []byte, onFinishedHandling func()) {
-	h.push(messageToRemove{
-		messageType:    constants.AppRequestMsg,
-		nodeID:         nodeID,
-		deadline:       deadline,
-		requestID:      requestID,
-		appMsgBytes:    appRequestBytes,
-		received:       h.clock.Time(),
-		onDoneHandling: onFinishedHandling,
-	})
-}
-
-// AppResponse passes an application-level response from the given node to the consensus engine.
-func (h *Handler) AppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte, onFinishedHandling func()) {
-	h.push(messageToRemove{
-		messageType:    constants.AppResponseMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		appMsgBytes:    appResponseBytes,
-		received:       h.clock.Time(),
-		onDoneHandling: onFinishedHandling,
-	})
-}
-
 // AppRequestFailed notifies the consensus engine that an application-level request failed
 // and it won't receive a response to the request.
 func (h *Handler) AppRequestFailed(nodeID ids.ShortID, requestID uint32) {
@@ -510,17 +338,6 @@ func (h *Handler) AppRequestFailed(nodeID ids.ShortID, requestID uint32) {
 		messageType: constants.AppRequestFailedMsg,
 		nodeID:      nodeID,
 		requestID:   requestID,
-	})
-}
-
-// AppGossip passes an application-level gossip message from the given node to the consensus engine.
-func (h *Handler) AppGossip(nodeID ids.ShortID, appGossipBytes []byte, onFinishedHandling func()) {
-	h.push(messageToRemove{
-		messageType:    constants.AppGossipMsg,
-		nodeID:         nodeID,
-		appMsgBytes:    appGossipBytes,
-		received:       h.clock.Time(),
-		onDoneHandling: onFinishedHandling,
 	})
 }
 
