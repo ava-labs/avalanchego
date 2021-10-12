@@ -20,8 +20,6 @@ import (
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
-var unhealthy = "snowstorm consensus is not healthy"
-
 type common struct {
 	// metrics that describe this consensus instance
 	metrics.Latency
@@ -98,13 +96,12 @@ func (c *common) Finalized() bool {
 func (c *common) HealthCheck() (interface{}, error) {
 	numOutstandingTxs := c.Latency.ProcessingLen()
 	isOutstandingTxs := numOutstandingTxs <= c.params.MaxOutstandingItems
-	healthy := isOutstandingTxs
 	details := map[string]interface{}{
 		"outstandingTransactions": numOutstandingTxs,
 	}
-	if !healthy {
+	if !isOutstandingTxs {
 		errorReason := fmt.Sprintf("number of outstanding txs %d > %d", numOutstandingTxs, c.params.MaxOutstandingItems)
-		return details, fmt.Errorf("%s reason: %s", unhealthy, errorReason)
+		return details, fmt.Errorf("snowstorm consensus is not healthy reason: %s", errorReason)
 	}
 	return details, nil
 }

@@ -14,8 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
-var unhealthy = "snowman consensus is not healthy"
-
 // TopologicalFactory implements Factory by returning a topological struct
 type TopologicalFactory struct{}
 
@@ -311,7 +309,7 @@ func (ts *Topological) HealthCheck() (interface{}, error) {
 		if !isProcessingTime {
 			errorReasons = append(errorReasons, fmt.Sprintf("block processing time %s > %s", timeReqRunning, ts.params.MaxItemProcessingTime))
 		}
-		return details, fmt.Errorf("%s reason: %s", unhealthy, strings.Join(errorReasons, ", "))
+		return details, fmt.Errorf("snowman consensus is not healthy reason: %s", strings.Join(errorReasons, ", "))
 	}
 	return details, nil
 }

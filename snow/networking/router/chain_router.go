@@ -25,7 +25,6 @@ import (
 
 const (
 	defaultCPUInterval = 15 * time.Second
-	unhealthy          = "the router is not healthy"
 )
 
 var _ Router = &ChainRouter{}
@@ -1005,7 +1004,7 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 			errorReasons = append(errorReasons, fmt.Sprintf("time for outstanding requests %s > %s", timeReqRunning, cr.healthConfig.MaxOutstandingDuration))
 		}
 		// The router is not healthy
-		return details, fmt.Errorf("%s reason: %s", unhealthy, strings.Join(errorReasons, ", "))
+		return details, fmt.Errorf("the router is not healthy reason: %s", strings.Join(errorReasons, ", "))
 	}
 	return details, nil
 }
