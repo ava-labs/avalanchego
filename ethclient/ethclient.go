@@ -35,12 +35,16 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/coreth/accounts/abi/bind"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/interfaces"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
+
+// Ensure ethclient adheres to ContractBackend required by abigen
+var _ bind.ContractBackend = (*Client)(nil)
 
 // Client defines typed wrappers for the Ethereum RPC API.
 type Client struct {
