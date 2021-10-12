@@ -104,9 +104,9 @@ func (s *Sender) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, requestID uint32)
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := uint64(s.timeouts.TimeoutDuration())
-	msg, err := s.msgCreator.GetAcceptedFrontier(s.ctx.ChainID, requestID, deadline)
+	outMsg, err := s.msgCreator.GetAcceptedFrontier(s.ctx.ChainID, requestID, deadline)
 	s.ctx.Log.AssertNoError(err)
-	sentTo := s.sender.Send(msg, nodeIDs)
+	sentTo := s.sender.Send(outMsg, nodeIDs)
 
 	// Tell the router to expect a reply message from these validators.
 	// We register timeouts for all validators, regardless of if the message
@@ -172,17 +172,22 @@ func (s *Sender) SendGetAccepted(nodeIDs ids.ShortSet, requestID uint32, contain
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := uint64(s.timeouts.TimeoutDuration())
-	msg, err := s.msgCreator.GetAccepted(s.ctx.ChainID, requestID, deadline, containerIDs)
+	outMsg, err := s.msgCreator.GetAccepted(s.ctx.ChainID, requestID, deadline, containerIDs)
 	if err != nil {
 		s.ctx.Log.Error("failed to build GetAccepted(%s, %d, %s): %s",
 			s.ctx.ChainID,
 			requestID,
 			containerIDs,
 			err)
+
+		// duly register the failure
+		for nodeID := range nodeIDs {
+			go s.router.GetAcceptedFailed(nodeID, s.ctx.ChainID, requestID)
+		}
 		return
 	}
 
-	sentTo := s.sender.Send(msg, nodeIDs)
+	sentTo := s.sender.Send(outMsg, nodeIDs)
 
 	// Tell the router to expect a reply message from these validators
 	// We register timeouts for all validators, regardless of if the message
@@ -248,15 +253,16 @@ func (s *Sender) SendGetAncestors(nodeID ids.ShortID, requestID uint32, containe
 
 	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
 	deadline := uint64(s.timeouts.TimeoutDuration())
-	msg, err := s.msgCreator.GetAncestors(s.ctx.ChainID, requestID, deadline, containerID)
+	outMsg, err := s.msgCreator.GetAncestors(s.ctx.ChainID, requestID, deadline, containerID)
 	if err != nil {
 		s.ctx.Log.Error("failed to build GetAncestors message: %s", err)
+		go s.router.GetAncestorsFailed(nodeID, s.ctx.ChainID, requestID)
 		return
 	}
 
 	nodeIDs := ids.NewShortSet(1)
 	nodeIDs.Add(nodeID)
-	if sentTo := s.sender.Send(msg, nodeIDs); sentTo.Len() == 0 {
+	if sentTo := s.sender.Send(outMsg, nodeIDs); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send GetAncestors(%s, %s, %d, %s)",
 			nodeID,
 			s.ctx.ChainID,
@@ -277,7 +283,7 @@ func (s *Sender) SendGetAncestors(nodeID ids.ShortID, requestID uint32, containe
 func (s *Sender) SendMultiPut(nodeID ids.ShortID, requestID uint32, containers [][]byte) {
 	s.ctx.Log.Verbo("Sending MultiPut to node %s. RequestID: %d. NumContainers: %d", nodeID, requestID, len(containers))
 
-	msg, err := s.msgCreator.MultiPut(s.ctx.ChainID, requestID, containers)
+	outMsg, err := s.msgCreator.MultiPut(s.ctx.ChainID, requestID, containers)
 	if err != nil {
 		s.ctx.Log.Error("failed to build MultiPut message because of container of size %d",
 			len(containers))
@@ -286,7 +292,7 @@ func (s *Sender) SendMultiPut(nodeID ids.ShortID, requestID uint32, containers [
 
 	nodeIDs := ids.NewShortSet(1)
 	nodeIDs.Add(nodeID)
-	if sentTo := s.sender.Send(msg, nodeIDs); sentTo.Len() == 0 {
+	if sentTo := s.sender.Send(outMsg, nodeIDs); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send MultiPut(%s, %s, %d, %d)",
 			nodeID,
 			s.ctx.ChainID,
@@ -319,12 +325,12 @@ func (s *Sender) SendGet(nodeID ids.ShortID, requestID uint32, containerID ids.I
 
 	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
 	deadline := uint64(s.timeouts.TimeoutDuration())
-	msg, err := s.msgCreator.Get(s.ctx.ChainID, requestID, deadline, containerID)
+	outMsg, err := s.msgCreator.Get(s.ctx.ChainID, requestID, deadline, containerID)
 	s.ctx.Log.AssertNoError(err)
 
 	nodeIDs := ids.NewShortSet(1)
 	nodeIDs.Add(nodeID)
-	if sentTo := s.sender.Send(msg, nodeIDs); sentTo.Len() == 0 {
+	if sentTo := s.sender.Send(outMsg, nodeIDs); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send Get(%s, %s, %d, %s)",
 			nodeID,
 			s.ctx.ChainID,
@@ -347,7 +353,7 @@ func (s *Sender) SendGet(nodeID ids.ShortID, requestID uint32, containerID ids.I
 func (s *Sender) SendPut(nodeID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) {
 	s.ctx.Log.Verbo("Sending Put to node %s. RequestID: %d. ContainerID: %s", nodeID.PrefixedString(constants.NodeIDPrefix), requestID, containerID)
 
-	msg, err := s.msgCreator.Put(s.ctx.ChainID, requestID, containerID, container)
+	outMsg, err := s.msgCreator.Put(s.ctx.ChainID, requestID, containerID, container)
 	if err != nil {
 		s.ctx.Log.Error("failed to build Put(%s, %d, %s): %s. len(container) : %d",
 			s.ctx.ChainID,
@@ -360,7 +366,7 @@ func (s *Sender) SendPut(nodeID ids.ShortID, requestID uint32, containerID ids.I
 
 	nodeIDs := ids.NewShortSet(1)
 	nodeIDs.Add(nodeID)
-	if sentTo := s.sender.Send(msg, nodeIDs); sentTo.Len() == 0 {
+	if sentTo := s.sender.Send(outMsg, nodeIDs); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send Put(%s, %s, %d, %s)",
 			nodeID,
 			s.ctx.ChainID,
@@ -411,7 +417,7 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 	// Try to send the messages over the network.
 	// [sentTo] are the IDs of validators who may receive the message.
 	deadline := uint64(timeoutDuration)
-	msg, err := s.msgCreator.PushQuery(s.ctx.ChainID, requestID, deadline, containerID, container)
+	outMsg, err := s.msgCreator.PushQuery(s.ctx.ChainID, requestID, deadline, containerID, container)
 	if err != nil {
 		s.ctx.Log.Error("failed to build PushQuery(%s, %d, %s): %s. len(container): %d",
 			s.ctx.ChainID,
@@ -420,10 +426,15 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 			err,
 			len(container))
 		s.ctx.Log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
+
+		// duly register the failure
+		for nodeID := range nodeIDs {
+			go s.router.QueryFailed(nodeID, s.ctx.ChainID, requestID)
+		}
 		return // Packing message failed
 	}
 
-	sentTo := s.sender.Send(msg, nodeIDs)
+	sentTo := s.sender.Send(outMsg, nodeIDs)
 	for nodeID := range nodeIDs {
 		if sentTo.Contains(nodeID) {
 			// Tell the router to expect a reply message from this validator
@@ -484,9 +495,9 @@ func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, container
 
 	// Try to send the messages over the network.
 	deadline := uint64(timeoutDuration)
-	msg, err := s.msgCreator.PullQuery(s.ctx.ChainID, requestID, deadline, containerID)
+	outMsg, err := s.msgCreator.PullQuery(s.ctx.ChainID, requestID, deadline, containerID)
 	s.ctx.Log.AssertNoError(err)
-	sentTo := s.sender.Send(msg, nodeIDs)
+	sentTo := s.sender.Send(outMsg, nodeIDs)
 
 	for nodeID := range nodeIDs {
 		if sentTo.Contains(nodeID) {
@@ -579,14 +590,19 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 	// Try to send the messages over the network.
 	// [sentTo] are the IDs of nodes who may receive the message.
 	deadline := uint64(timeoutDuration)
-	msg, err := s.msgCreator.AppRequest(s.ctx.ChainID, requestID, deadline, appRequestBytes)
+	outMsg, err := s.msgCreator.AppRequest(s.ctx.ChainID, requestID, deadline, appRequestBytes)
 	if err != nil {
 		s.ctx.Log.Error("failed to build AppRequest(%s, %d): %s", s.ctx.ChainID, requestID, err)
 		s.ctx.Log.Verbo("message: %s", formatting.DumpBytes{Bytes: appRequestBytes})
+
+		// duly register the failure
+		for nodeID := range nodeIDs {
+			go s.router.AppRequestFailed(nodeID, s.ctx.ChainID, requestID)
+		}
 		return nil
 	}
 
-	sentTo := s.sender.Send(msg, nodeIDs)
+	sentTo := s.sender.Send(outMsg, nodeIDs)
 	for nodeID := range nodeIDs {
 		if sentTo.Contains(nodeID) {
 			// Tell the router to expect a reply message from this validator
@@ -634,13 +650,13 @@ func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appRespon
 }
 
 func (s *Sender) SendAppGossipSpecific(nodeIDs ids.ShortSet, appGossipBytes []byte) error {
-	msg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
+	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
 	if err != nil {
 		s.ctx.Log.Error("failed to build AppGossip(%s) for SpecificGossip: %s", s.ctx.ChainID, err)
 		s.ctx.Log.Verbo("message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
 	}
 
-	if !s.sender.SpecificGossip(msg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()) {
+	if !s.sender.SpecificGossip(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()) {
 		s.ctx.Log.Debug("failed to gossip SpecificGossip(%s)", s.ctx.ChainID)
 		s.ctx.Log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
 	}
@@ -649,13 +665,13 @@ func (s *Sender) SendAppGossipSpecific(nodeIDs ids.ShortSet, appGossipBytes []by
 
 // SendAppGossip sends an application-level gossip message.
 func (s *Sender) SendAppGossip(appGossipBytes []byte) error {
-	msg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
+	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
 	if err != nil {
 		s.ctx.Log.Error("failed to build AppGossip(%s): %s", s.ctx.ChainID, err)
 		s.ctx.Log.Verbo("message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
 	}
 
-	if !s.sender.Gossip(msg, s.ctx.SubnetID, s.ctx.IsValidatorOnly()) {
+	if !s.sender.Gossip(outMsg, s.ctx.SubnetID, s.ctx.IsValidatorOnly()) {
 		s.ctx.Log.Debug("failed to gossip AppGossip(%s)", s.ctx.ChainID)
 		s.ctx.Log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
 	}
@@ -665,7 +681,7 @@ func (s *Sender) SendAppGossip(appGossipBytes []byte) error {
 // SendGossip gossips the provided container
 func (s *Sender) SendGossip(containerID ids.ID, container []byte) {
 	s.ctx.Log.Verbo("Gossiping %s", containerID)
-	msg, err := s.msgCreator.Put(s.ctx.ChainID, constants.GossipMsgRequestID, containerID, container)
+	outMsg, err := s.msgCreator.Put(s.ctx.ChainID, constants.GossipMsgRequestID, containerID, container)
 	if err != nil {
 		s.ctx.Log.Error("failed to build Put message for gossip.\nContainer length %d, err :  %s",
 			len(container),
@@ -673,7 +689,7 @@ func (s *Sender) SendGossip(containerID ids.ID, container []byte) {
 		return
 	}
 
-	if !s.sender.Gossip(msg, s.ctx.SubnetID, s.ctx.IsValidatorOnly()) {
+	if !s.sender.Gossip(outMsg, s.ctx.SubnetID, s.ctx.IsValidatorOnly()) {
 		s.ctx.Log.Debug("failed to gossip GossipMsg(%s)", s.ctx.ChainID)
 	}
 }
