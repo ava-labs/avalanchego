@@ -11,6 +11,14 @@ import (
 
 // See inbound_msg_throttler.go
 
+func newInboundMsgBufferThrottler(maxProcessingMsgsPerNode uint64) *inboundMsgBufferThrottler {
+	return &inboundMsgBufferThrottler{
+		maxProcessingMsgsPerNode: maxProcessingMsgsPerNode,
+		awaitingAcquire:          make(map[ids.ShortID][]chan struct{}),
+		nodeToNumProcessingMsgs:  make(map[ids.ShortID]uint64),
+	}
+}
+
 // Rate-limits inbound messages based on the number of
 // messages from a given node that we're currently processing.
 type inboundMsgBufferThrottler struct {
@@ -29,6 +37,10 @@ type inboundMsgBufferThrottler struct {
 	nodeToNumProcessingMsgs map[ids.ShortID]uint64
 	// Node ID --> Channels where each channel, when closed,
 	// causes a goroutine waiting in Acquire to return.
+	// The first element corresponds to the goroutine that has been waiting
+	// longest to acquire space on the message buffer for the given node ID,
+	// the second element the second longest, etc.
+	// Must only be accessed when [lock] is held.
 	awaitingAcquire map[ids.ShortID][]chan struct{}
 }
 

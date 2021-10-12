@@ -6,14 +6,11 @@ package throttling
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var (
-	_ InboundMsgThrottler = &inboundMsgThrottler{}
-)
+var _ InboundMsgThrottler = &inboundMsgThrottler{}
 
 // InboundMsgThrottler rate-limits inbound messages from the network.
 type InboundMsgThrottler interface {
@@ -41,26 +38,19 @@ func NewInboundMsgThrottler(
 	vdrs validators.Set,
 	config InboundMsgThrottlerConfig,
 ) (InboundMsgThrottler, error) {
+	byteThrottler, err := newInboundMsgByteThrottler(
+		log,
+		namespace,
+		registerer,
+		vdrs,
+		config.MsgByteThrottlerConfig,
+	)
+	if err != nil {
+		return nil, err
+	}
 	t := &inboundMsgThrottler{
-		byteThrottler: inboundMsgByteThrottler{
-			commonMsgThrottler: commonMsgThrottler{
-				log:                    log,
-				vdrs:                   vdrs,
-				maxVdrBytes:            config.VdrAllocSize,
-				remainingVdrBytes:      config.VdrAllocSize,
-				remainingAtLargeBytes:  config.AtLargeAllocSize,
-				nodeMaxAtLargeBytes:    config.NodeMaxAtLargeBytes,
-				nodeToVdrBytesUsed:     make(map[ids.ShortID]uint64),
-				nodeToAtLargeBytesUsed: make(map[ids.ShortID]uint64),
-			},
-			waitingToAcquire:    linkedhashmap.New(),
-			nodeToWaitingMsgIDs: make(map[ids.ShortID][]uint64),
-		},
-		bufferThrottler: inboundMsgBufferThrottler{
-			maxProcessingMsgsPerNode: config.MaxProcessingMsgsPerNode,
-			nodeToNumProcessingMsgs:  make(map[ids.ShortID]uint64),
-			awaitingAcquire:          make(map[ids.ShortID][]chan struct{}),
-		},
+		byteThrottler:   byteThrottler,
+		bufferThrottler: newInboundMsgBufferThrottler(config.MaxProcessingMsgsPerNode),
 	}
 	return t, t.byteThrottler.metrics.initialize(namespace, registerer)
 }
@@ -78,10 +68,10 @@ func NewInboundMsgThrottler(
 type inboundMsgThrottler struct {
 	// Rate-limits based on number of messages from a given
 	// node that we're currently processing.
-	bufferThrottler inboundMsgBufferThrottler
+	bufferThrottler *inboundMsgBufferThrottler
 	// Rate-limits based on size of all messages from a given
 	// node that we're currently processing.
-	byteThrottler inboundMsgByteThrottler
+	byteThrottler *inboundMsgByteThrottler
 }
 
 // Returns when we can read a message of size [msgSize] from node [nodeID].

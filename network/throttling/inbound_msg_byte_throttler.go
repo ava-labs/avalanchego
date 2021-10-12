@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -18,6 +20,30 @@ import (
 var _ InboundMsgThrottler = &inboundMsgByteThrottler{}
 
 // See inbound_msg_throttler.go
+
+func newInboundMsgByteThrottler(
+	log logging.Logger,
+	namespace string,
+	registerer prometheus.Registerer,
+	vdrs validators.Set,
+	config MsgByteThrottlerConfig,
+) (*inboundMsgByteThrottler, error) {
+	t := &inboundMsgByteThrottler{
+		commonMsgThrottler: commonMsgThrottler{
+			log:                    log,
+			vdrs:                   vdrs,
+			maxVdrBytes:            config.VdrAllocSize,
+			remainingVdrBytes:      config.VdrAllocSize,
+			remainingAtLargeBytes:  config.AtLargeAllocSize,
+			nodeMaxAtLargeBytes:    config.NodeMaxAtLargeBytes,
+			nodeToVdrBytesUsed:     make(map[ids.ShortID]uint64),
+			nodeToAtLargeBytesUsed: make(map[ids.ShortID]uint64),
+		},
+		waitingToAcquire:    linkedhashmap.New(),
+		nodeToWaitingMsgIDs: make(map[ids.ShortID][]uint64),
+	}
+	return t, t.metrics.initialize(namespace, registerer)
+}
 
 // Information about a message waiting to be read.
 type msgMetadata struct {
