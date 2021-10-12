@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -41,10 +42,9 @@ import (
 )
 
 var (
-	errNetworkClosed         = errors.New("network closed")
-	errPeerIsMyself          = errors.New("peer is myself")
-	errNetworkLayerUnhealthy = errors.New("network layer is unhealthy")
-	errNoPrimaryValidators   = errors.New("no default subnet validators")
+	errNetworkClosed       = errors.New("network closed")
+	errPeerIsMyself        = errors.New("peer is myself")
+	errNoPrimaryValidators = errors.New("no default subnet validators")
 )
 
 var _ Network = &network{}
@@ -1757,7 +1757,8 @@ func (n *network) HealthCheck() (interface{}, error) {
 	n.stateLock.RUnlock()
 
 	// Make sure we're connected to at least the minimum number of peers
-	healthy := connectedTo >= int(n.config.HealthConfig.MinConnectedPeers)
+	isConnected := connectedTo >= int(n.config.HealthConfig.MinConnectedPeers)
+	healthy := isConnected
 	details := map[string]interface{}{
 		"connectedPeers": connectedTo,
 	}
@@ -1767,25 +1768,42 @@ func (n *network) HealthCheck() (interface{}, error) {
 
 	lastMsgReceivedAt := time.Unix(atomic.LoadInt64(&n.lastMsgReceivedTime), 0)
 	timeSinceLastMsgReceived := now.Sub(lastMsgReceivedAt)
-	healthy = healthy && timeSinceLastMsgReceived <= n.config.HealthConfig.MaxTimeSinceMsgReceived
+	isMsgRcvd := timeSinceLastMsgReceived <= n.config.HealthConfig.MaxTimeSinceMsgReceived
+	healthy = healthy && isMsgRcvd
 	details["timeSinceLastMsgReceived"] = timeSinceLastMsgReceived.String()
 	n.metrics.timeSinceLastMsgReceived.Set(float64(timeSinceLastMsgReceived))
 
 	// Make sure we've sent an outgoing message within the threshold
 	lastMsgSentAt := time.Unix(atomic.LoadInt64(&n.lastMsgSentTime), 0)
 	timeSinceLastMsgSent := now.Sub(lastMsgSentAt)
-	healthy = healthy && timeSinceLastMsgSent <= n.config.HealthConfig.MaxTimeSinceMsgSent
+	isMsgSent := timeSinceLastMsgSent <= n.config.HealthConfig.MaxTimeSinceMsgSent
+	healthy = healthy && isMsgSent
 	details["timeSinceLastMsgSent"] = timeSinceLastMsgSent.String()
 	n.metrics.timeSinceLastMsgSent.Set(float64(timeSinceLastMsgSent))
 
 	// Make sure the message send failed rate isn't too high
-	healthy = healthy && sendFailRate <= n.config.HealthConfig.MaxSendFailRate
+	isMsgFailRate := sendFailRate <= n.config.HealthConfig.MaxSendFailRate
+	healthy = healthy && isMsgFailRate
 	details["sendFailRate"] = sendFailRate
 	n.metrics.sendFailRate.Set(sendFailRate)
 
 	// Network layer is unhealthy
 	if !healthy {
-		return details, errNetworkLayerUnhealthy
+		var errorReasons []string
+		if !isConnected {
+			errorReasons = append(errorReasons, fmt.Sprintf("not connected to a minimum of %d peer(s) only %d", n.config.HealthConfig.MinConnectedPeers, connectedTo))
+		}
+		if !isMsgRcvd {
+			errorReasons = append(errorReasons, fmt.Sprintf("no messages from network received in %s > %s", timeSinceLastMsgReceived, n.config.HealthConfig.MaxTimeSinceMsgReceived))
+		}
+		if !isMsgSent {
+			errorReasons = append(errorReasons, fmt.Sprintf("no messages from network sent in %s > %s", timeSinceLastMsgSent, n.config.HealthConfig.MaxTimeSinceMsgSent))
+		}
+		if !isMsgFailRate {
+			errorReasons = append(errorReasons, fmt.Sprintf("messages failure send rate %g > %g", sendFailRate, n.config.HealthConfig.MaxSendFailRate))
+		}
+
+		return details, fmt.Errorf("network layer is unhealthy reason: %s", strings.Join(errorReasons, ", "))
 	}
 	return details, nil
 }

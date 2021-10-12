@@ -5,7 +5,8 @@ package router
 
 import (
 	"encoding/binary"
-	"errors"
+	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,11 +27,7 @@ const (
 	defaultCPUInterval = 15 * time.Second
 )
 
-var (
-	errUnhealthy = errors.New("the router is not healthy")
-
-	_ Router = &ChainRouter{}
-)
+var _ Router = &ChainRouter{}
 
 type requestEntry struct {
 	// When this request was registered
@@ -980,7 +977,8 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 	defer cr.lock.Unlock()
 
 	numOutstandingReqs := cr.timedRequests.Len()
-	healthy := numOutstandingReqs <= cr.healthConfig.MaxOutstandingRequests
+	isOutstandingReqs := numOutstandingReqs <= cr.healthConfig.MaxOutstandingRequests
+	healthy := isOutstandingReqs
 	details := map[string]interface{}{
 		"outstandingRequests": numOutstandingReqs,
 	}
@@ -992,13 +990,21 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 		processingRequest = longestRunning.(requestEntry).time
 	}
 	timeReqRunning := now.Sub(processingRequest)
-	healthy = healthy && timeReqRunning <= cr.healthConfig.MaxOutstandingDuration
+	isOutstanding := timeReqRunning <= cr.healthConfig.MaxOutstandingDuration
+	healthy = healthy && isOutstanding
 	details["longestRunningRequest"] = timeReqRunning.String()
 	cr.metrics.longestRunningRequest.Set(float64(timeReqRunning))
 
 	if !healthy {
+		var errorReasons []string
+		if !isOutstandingReqs {
+			errorReasons = append(errorReasons, fmt.Sprintf("number of outstanding requests %d > %d", numOutstandingReqs, cr.healthConfig.MaxOutstandingRequests))
+		}
+		if !isOutstanding {
+			errorReasons = append(errorReasons, fmt.Sprintf("time for outstanding requests %s > %s", timeReqRunning, cr.healthConfig.MaxOutstandingDuration))
+		}
 		// The router is not healthy
-		return details, errUnhealthy
+		return details, fmt.Errorf("the router is not healthy reason: %s", strings.Join(errorReasons, ", "))
 	}
 	return details, nil
 }
