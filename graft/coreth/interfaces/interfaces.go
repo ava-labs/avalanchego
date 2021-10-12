@@ -165,7 +165,7 @@ type LogFilterer interface {
 //
 // The transaction must be signed and have a valid nonce to be included. Consumers of the
 // API can use package accounts to maintain local private keys and need can retrieve the
-// next available nonce using PendingNonceAt.
+// next available nonce using AcceptedNonceAt.
 type TransactionSender interface {
 	SendTransaction(ctx context.Context, tx *types.Transaction) error
 }
@@ -176,22 +176,14 @@ type GasPricer interface {
 	SuggestGasPrice(ctx context.Context) (*big.Int, error)
 }
 
-// A PendingStateReader provides access to the pending state, which is the result of all
+// A AcceptedStateReceiver provides access to the accepted state, which is the result of all
 // known executable transactions which have not yet been included in the blockchain. It is
-// commonly used to display the result of ’unconfirmed’ actions (e.g. wallet value
-// transfers) initiated by the user. The PendingNonceAt operation is a good way to
+// commonly used to display the result of ’confirmed’ actions (e.g. wallet value
+// transfers) initiated by the user. The AcceptedNonceAt operation is a good way to
 // retrieve the next available transaction nonce for a specific account.
-type PendingStateReader interface {
-	PendingBalanceAt(ctx context.Context, account common.Address) (*big.Int, error)
-	PendingStorageAt(ctx context.Context, account common.Address, key common.Hash) ([]byte, error)
-	PendingCodeAt(ctx context.Context, account common.Address) ([]byte, error)
-	PendingNonceAt(ctx context.Context, account common.Address) (uint64, error)
-	PendingTransactionCount(ctx context.Context) (uint, error)
-}
-
-// PendingContractCaller can be used to perform calls against the pending state.
-type PendingContractCaller interface {
-	PendingCallContract(ctx context.Context, call CallMsg) ([]byte, error)
+type AcceptedStateReceiver interface {
+	AcceptedCodeAt(ctx context.Context, account common.Address) ([]byte, error)
+	AcceptedNonceAt(ctx context.Context, account common.Address) (uint64, error)
 }
 
 // GasEstimator wraps EstimateGas, which tries to estimate the gas needed to execute a
