@@ -12,7 +12,6 @@ import (
 )
 
 var (
-	_ InboundMsgThrottler = &inboundMsgByteThrottler{}
 	_ InboundMsgThrottler = &inboundMsgThrottler{}
 )
 

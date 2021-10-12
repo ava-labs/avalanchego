@@ -61,6 +61,9 @@ func (t *inboundMsgBufferThrottler) Release(nodeID ids.ShortID) {
 	defer t.lock.Unlock()
 
 	t.nodeToNumProcessingMsgs[nodeID]--
+	if t.nodeToNumProcessingMsgs[nodeID] == 0 {
+		delete(t.nodeToNumProcessingMsgs, nodeID)
+	}
 
 	// If we're waiting to acquire for messages from [nodeID],
 	// allow the one that had been waiting the longest to
