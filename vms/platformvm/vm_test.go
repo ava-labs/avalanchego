@@ -119,8 +119,7 @@ func defaultContext() *snow.Context {
 	ctx.NetworkID = testNetworkID
 	ctx.XChainID = avmID
 	ctx.AVAXAssetID = avaxAssetID
-	aliaser := &ids.Aliaser{}
-	aliaser.Initialize()
+	aliaser := ids.NewAliaser()
 
 	errs := wrappers.Errs{}
 	errs.Add(

@@ -148,7 +148,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 	vm.AddressManager = avax.NewAddressManager(ctx)
-	vm.Aliaser.Initialize()
+	vm.Aliaser = ids.NewAliaser()
 
 	db := dbManager.Current().Database
 	vm.ctx = ctx

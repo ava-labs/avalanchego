@@ -153,9 +153,9 @@ func (p *postForkCommonComponents) buildChild(
 		newTimestamp = parentTimestamp
 	}
 
-	// The child's P-Chain height is the P-Chain's height when it was proposed
-	// (i.e. now)
-	pChainHeight, err := p.vm.ctx.ValidatorState.GetCurrentHeight()
+	// The child's P-Chain height is proposed as the optimal P-Chain height that
+	// is at least the parent's P-Chain height
+	pChainHeight, err := p.vm.optimalPChainHeight(parentPChainHeight)
 	if err != nil {
 		return nil, err
 	}

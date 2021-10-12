@@ -4,7 +4,6 @@
 package rpcdb
 
 import (
-	"log"
 	"net"
 	"testing"
 
@@ -29,7 +28,7 @@ func TestInterface(t *testing.T) {
 		rpcdbproto.RegisterDatabaseServer(server, NewServer(memdb.New()))
 		go func() {
 			if err := server.Serve(listener); err != nil {
-				log.Fatalf("Server exited with error: %v", err)
+				t.Logf("Server exited with error: %v", err)
 			}
 		}()
 
@@ -63,7 +62,7 @@ func BenchmarkInterface(b *testing.B) {
 			rpcdbproto.RegisterDatabaseServer(server, NewServer(memdb.New()))
 			go func() {
 				if err := server.Serve(listener); err != nil {
-					log.Fatalf("Server exited with error: %v", err)
+					b.Logf("Server exited with error: %v", err)
 				}
 			}()
 

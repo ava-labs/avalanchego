@@ -16,6 +16,6 @@ import (
 var errUnsupportedDatabase = errors.New("database isn't suppported")
 
 // New returns an error.
-func New(file string, log logging.Logger) (database.Database, error) {
+func New(file string, dbConfig []byte, log logging.Logger) (database.Database, error) {
 	return nil, errUnsupportedDatabase
 }

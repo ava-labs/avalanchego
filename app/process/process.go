@@ -76,9 +76,9 @@ func (p *process) Start() error {
 	switch p.config.DatabaseConfig.Name {
 	case rocksdb.Name:
 		path := filepath.Join(p.config.DatabaseConfig.Path, rocksdb.Name)
-		dbManager, err = manager.NewRocksDB(path, log, version.CurrentDatabase)
+		dbManager, err = manager.NewRocksDB(path, p.config.DatabaseConfig.Config, log, version.CurrentDatabase)
 	case leveldb.Name:
-		dbManager, err = manager.NewLevelDB(p.config.DatabaseConfig.Path, log, version.CurrentDatabase)
+		dbManager, err = manager.NewLevelDB(p.config.DatabaseConfig.Path, p.config.DatabaseConfig.Config, log, version.CurrentDatabase)
 	case memdb.Name:
 		dbManager = manager.NewMemDB(version.CurrentDatabase)
 	default:

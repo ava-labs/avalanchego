@@ -64,9 +64,10 @@ var (
 //   * Create a chain
 //   * Add a registrant. When a chain is created, each registrant calls
 //     RegisterChain with the new chain as the argument.
-//   * Get the aliases associated with a given chain.
-//   * Get the ID of the chain associated with a given alias.
+//   * Manage the aliases of chains
 type Manager interface {
+	ids.Aliaser
+
 	// Return the router this Manager is using to route consensus messages to chains
 	Router() router.Router
 
@@ -85,12 +86,6 @@ type Manager interface {
 
 	// Given an alias, return the ID of the VM associated with that alias
 	LookupVM(string) (ids.ID, error)
-
-	// Return the aliases associated with a chain
-	Aliases(ids.ID) []string
-
-	// Add an alias to a chain
-	Alias(ids.ID, string) error
 
 	// Returns the ID of the subnet that is validating the provided chain
 	SubnetID(chainID ids.ID) (ids.ID, error)
@@ -203,13 +198,12 @@ type manager struct {
 
 // New returns a new Manager
 func New(config *ManagerConfig) Manager {
-	m := &manager{
+	return &manager{
+		Aliaser:       ids.NewAliaser(),
 		ManagerConfig: *config,
 		subnets:       make(map[ids.ID]Subnet),
 		chains:        make(map[ids.ID]*router.Handler),
 	}
-	m.Initialize()
-	return m
 }
 
 // Router that this chain manager is using to route consensus messages to chains
@@ -521,7 +515,10 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
 	}
 
-	chainConfig := m.getChainConfig(ctx.ChainID)
+	chainConfig, err := m.getChainConfig(ctx.ChainID)
+	if err != nil {
+		return nil, fmt.Errorf("error while fetching chain config: %w", err)
+	}
 	if err := vm.Initialize(
 		ctx,
 		vmDBManager,
@@ -687,7 +684,11 @@ func (m *manager) createSnowmanChain(
 	vm = proposervm.New(vm, m.ApricotPhase4Time, m.ApricotPhase4MinPChainHeight)
 
 	// Initialize the ProposerVM and the vm wrapped inside it
-	chainConfig := m.getChainConfig(ctx.ChainID)
+	chainConfig, err := m.getChainConfig(ctx.ChainID)
+	if err != nil {
+		return nil, fmt.Errorf("error while fetching chain config: %w", err)
+	}
+
 	if err := vm.Initialize(
 		ctx,
 		vmDBManager,
@@ -831,16 +832,19 @@ func (m *manager) isChainWithAlias(aliases ...string) (string, bool) {
 
 // getChainConfig returns value of a entry by looking at ID key and alias key
 // it first searches ID key, then falls back to it's corresponding primary alias
-func (m *manager) getChainConfig(id ids.ID) ChainConfig {
+func (m *manager) getChainConfig(id ids.ID) (ChainConfig, error) {
 	if val, ok := m.ManagerConfig.ChainConfigs[id.String()]; ok {
-		return val
+		return val, nil
 	}
-	aliases := m.Aliases(id)
+	aliases, err := m.Aliases(id)
+	if err != nil {
+		return ChainConfig{}, err
+	}
 	for _, alias := range aliases {
 		if val, ok := m.ManagerConfig.ChainConfigs[alias]; ok {
-			return val
+			return val, nil
 		}
 	}
 
-	return ChainConfig{}
+	return ChainConfig{}, nil
 }
