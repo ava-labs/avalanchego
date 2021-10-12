@@ -178,7 +178,12 @@ func (vm *VM) Initialize(
 	vm.validatorSetCaches = make(map[ids.ID]cache.Cacher)
 	vm.currentBlocks = make(map[ids.ID]Block)
 
-	vm.blockBuilder.Initialize(vm)
+	if err := vm.blockBuilder.Initialize(vm); err != nil {
+		return fmt.Errorf(
+			"failed to initialize the block builder: %w",
+			err,
+		)
+	}
 	vm.network = newNetwork(vm.ApricotPhase4Time, appSender, vm)
 
 	is, err := NewMeteredInternalState(vm, vm.dbManager.Current().Database, genesisBytes, ctx.Namespace, ctx.Metrics)
