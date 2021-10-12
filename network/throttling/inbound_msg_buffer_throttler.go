@@ -21,7 +21,6 @@ func newInboundMsgBufferThrottler(
 	maxProcessingMsgsPerNode uint64,
 ) (*inboundMsgBufferThrottler, error) {
 	t := &inboundMsgBufferThrottler{
-		metrics:                  inboundMsgBufferThrottlerMetrics{},
 		maxProcessingMsgsPerNode: maxProcessingMsgsPerNode,
 		awaitingAcquire:          make(map[ids.ShortID][]chan struct{}),
 		nodeToNumProcessingMsgs:  make(map[ids.ShortID]uint64),
@@ -77,6 +76,9 @@ func (t *inboundMsgBufferThrottler) Acquire(nodeID ids.ShortID) {
 	// We're currently processing the maximum number of
 	// messages from [nodeID]. Wait until we've finished
 	// processing some messages from [nodeID].
+	// [closeOnAcquireChan] will be closed inside Release()
+	// when we've acquired space on the inbound message buffer
+	// for this message.
 	closeOnAcquireChan := make(chan struct{})
 	t.awaitingAcquire[nodeID] = append(t.awaitingAcquire[nodeID], closeOnAcquireChan)
 	t.lock.Unlock()
@@ -94,9 +96,10 @@ func (t *inboundMsgBufferThrottler) Release(nodeID ids.ShortID) {
 		delete(t.nodeToNumProcessingMsgs, nodeID)
 	}
 
-	// If we're waiting to acquire for messages from [nodeID],
-	// allow the one that had been waiting the longest to
-	// proceed (i.e. for its call to Acquire to return.)
+	// If we're waiting to acquire space on the inbound message
+	// buffer for messages from [nodeID], allow the one that
+	// had been waiting the longest to proceed
+	// (i.e. for its call to Acquire to return.)
 	waiting := t.awaitingAcquire[nodeID]
 	if len(waiting) == 0 {
 		// We're not waiting to acquire for any messages from [nodeID]
