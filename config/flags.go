@@ -171,7 +171,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Uint64(InboundThrottlerMaxProcessingMsgsPerNodeKey, 1024, "Max number of messages currently processing from a given node.")
 
 	// Outbound Throttling
-	fs.Uint64(OutboundThrottlerAtLargeAllocSizeKey, 32*units.MiB, "Size, in bytes, of at-large byte allocation in outbound message throttler.")
+	fs.Uint64(OutboundThrottlerAtLargeAllocSizeKey, 6*units.MiB, "Size, in bytes, of at-large byte allocation in outbound message throttler.")
 	fs.Uint64(OutboundThrottlerVdrAllocSizeKey, 32*units.MiB, "Size, in bytes, of validator byte allocation in outbound message throttler.")
 	fs.Uint64(OutboundThrottlerNodeMaxAtLargeBytesKey, uint64(constants.DefaultMaxMessageSize), "Max number of bytes a node can take from the outbound message throttler's at-large allocation.")
 
