@@ -35,12 +35,16 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/coreth/accounts/abi/bind"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/interfaces"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
+
+// Ensure ethclient adheres to ContractBackend required by abigen
+var _ bind.ContractBackend = (*Client)(nil)
 
 // Client defines typed wrappers for the Ethereum RPC API.
 type Client struct {
@@ -409,6 +413,17 @@ func toFilterArg(q interfaces.FilterQuery) (interface{}, error) {
 		arg["toBlock"] = ToBlockNumArg(q.ToBlock)
 	}
 	return arg, nil
+}
+
+// AcceptedCodeAt returns the contract code of the given account in the accepted state.
+func (ec *Client) AcceptedCodeAt(ctx context.Context, account common.Address) ([]byte, error) {
+	return ec.CodeAt(ctx, account, nil)
+}
+
+// AcceptedNonceAt returns the account nonce of the given account in the accepted state.
+// This is the nonce that should be used for the next transaction.
+func (ec *Client) AcceptedNonceAt(ctx context.Context, account common.Address) (uint64, error) {
+	return ec.NonceAt(ctx, account, nil)
 }
 
 // Contract Calling
