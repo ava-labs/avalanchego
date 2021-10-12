@@ -19,15 +19,14 @@ type ExternalSenderTest struct {
 
 	mc message.MsgCreator
 
-	// set of message types for which sending is forbidden
-	disabledSend              map[message.Op]struct{}
-	disabledGossip            map[message.Op]struct{}
+	disabledSend map[message.Op]struct{}
+	sendFMap     map[message.Op]func(T *testing.T, inMsg message.InboundMessage, nodeIDs ids.ShortSet) ids.ShortSet
+
+	disabledGossip map[message.Op]struct{}
+	gossipFMap     map[message.Op]func(T *testing.T, inMsg message.InboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) bool
+
 	CantSendAppGossipSpecific bool
-
-	sendFMap   map[message.Op]func(T *testing.T, inMsg message.InboundMessage, nodeIDs ids.ShortSet) ids.ShortSet
-	gossipFMap map[message.Op]func(T *testing.T, inMsg message.InboundMessage, subnetID ids.ID, validatorOnly bool) bool
-
-	SendAppGossipSpecificF func(nodeIDs ids.ShortSet, subnetID, chainID ids.ID, appGossipBytyes []byte, validatorOnly bool)
+	appSpecificGossipF        func(T *testing.T, inMsg message.InboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) bool
 }
 
 // Default set the default callable value to [cant]
@@ -42,7 +41,7 @@ func (s *ExternalSenderTest) Default(cant bool) {
 	s.disabledGossip = make(map[message.Op]struct{})
 
 	s.sendFMap = make(map[message.Op]func(T *testing.T, inMsg message.InboundMessage, nodeIDs ids.ShortSet) ids.ShortSet)
-	s.gossipFMap = make(map[message.Op]func(T *testing.T, inMsg message.InboundMessage, subnetID ids.ID, validatorOnly bool) bool)
+	s.gossipFMap = make(map[message.Op]func(T *testing.T, inMsg message.InboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) bool)
 
 	if cant {
 		s.disabledSend[message.GetAcceptedFrontier] = struct{}{}
@@ -133,7 +132,9 @@ func (s *ExternalSenderTest) Send(outMsg message.OutboundMessage, nodeIDs ids.Sh
 // Given a msg type, the corresponding mock function is called if it was initialized.
 // If it wasn't initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *ExternalSenderTest) Gossip(outMsg message.OutboundMessage,
+func (s *ExternalSenderTest) Gossip(
+	outMsg message.OutboundMessage,
+	nodeIDs ids.ShortSet,
 	subnetID ids.ID,
 	validatorOnly bool) bool {
 	assert := assert.New(s.T)
@@ -145,49 +146,55 @@ func (s *ExternalSenderTest) Gossip(outMsg message.OutboundMessage,
 	_, isDisabled := s.disabledGossip[outMsg.Op()]
 
 	switch outMsg.Op() {
-	case
-		message.AppGossip,
-		message.Put:
+	case message.AppGossip:
+		if nodeIDs.Len() != 0 {
+			// nodes are specified. Call AppSpecificGossip
+			switch {
+			case s.appSpecificGossipF != nil:
+				return s.appSpecificGossipF(s.T, inMsg, nodeIDs, subnetID, validatorOnly)
+			case s.CantSendAppGossipSpecific && s.T != nil:
+				s.T.Fatalf("Unexpectedly called appSpecificGossip")
+				return false
+			case s.CantSendAppGossipSpecific && s.B != nil:
+				s.T.Fatalf("Unexpectedly called appSpecificGossip")
+				return false
+			default:
+				return false
+			}
+		}
+
+		// nodes not specified. Call AppGossip
 		if mock, ok := s.gossipFMap[outMsg.Op()]; ok {
-			return mock(s.T, inMsg, subnetID, validatorOnly)
+			return mock(s.T, inMsg, nodeIDs, subnetID, validatorOnly)
 		}
 
 		switch {
 		case isDisabled && s.T != nil:
 			s.T.Fatalf("Unexpectedly called gossip for %s msg type", outMsg.Op().String())
+			return false
 		case isDisabled && s.B != nil:
 			s.T.Fatalf("Unexpectedly called gossip for %s msg type", outMsg.Op().String())
+			return false
+		}
+
+	case message.Put:
+		if mock, ok := s.gossipFMap[outMsg.Op()]; ok {
+			return mock(s.T, inMsg, nodeIDs, subnetID, validatorOnly)
+		}
+
+		switch {
+		case isDisabled && s.T != nil:
+			s.T.Fatalf("Unexpectedly called gossip for %s msg type", outMsg.Op().String())
+			return false
+		case isDisabled && s.B != nil:
+			s.T.Fatalf("Unexpectedly called gossip for %s msg type", outMsg.Op().String())
+			return false
 		}
 
 	default:
 		s.T.Fatalf("Attempt to gossip unhandled message type")
+		return false
 	}
 
 	return false
-}
-
-// SendAppGossipSpecific calls SendAppGossipSpecificF if it was initialized. If it wasn't initialized and this
-// function shouldn't be called and testing was initialized, then testing will
-// fail.
-func (s *ExternalSenderTest) SpecificGossip(outMsg message.OutboundMessage,
-	nodeIDs ids.ShortSet,
-	subnetID ids.ID,
-	validatorOnly bool) bool {
-	assert := assert.New(s.T)
-	switch {
-	case s.SendAppGossipSpecificF != nil:
-		// turn  message.OutboundMessage into  message.InboundMessage so be able to retrieve fields
-		inMsg, err := s.mc.Parse(outMsg.Bytes())
-		assert.NoError(err)
-		chainID, err := ids.ToID(inMsg.Get(message.ChainID).([]byte))
-		assert.NoError(err)
-		appBytes, ok := inMsg.Get(message.AppGossipBytes).([]byte)
-		assert.True(ok)
-		s.SendAppGossipSpecificF(nodeIDs, subnetID, chainID, appBytes, validatorOnly)
-	case s.CantSendAppGossipSpecific && s.T != nil:
-		s.T.Fatalf("Unexpectedly called SendAppGossipSpecific")
-	case s.CantSendAppGossipSpecific && s.B != nil:
-		s.B.Fatalf("Unexpectedly called SendAppGossipSpecific")
-	}
-	return true
 }

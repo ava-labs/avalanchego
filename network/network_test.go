@@ -2811,11 +2811,11 @@ func TestPeerGossip(t *testing.T) {
 
 	gossipMsg0, err := msgCreator0.Put(ids.GenerateTestID(), constants.GossipMsgRequestID, testSubnetContainerID, []byte("test0"))
 	assert.NoError(t, err)
-	net0.Gossip(gossipMsg0, testSubnetID, false)
+	net0.Gossip(gossipMsg0, ids.ShortSet{}, testSubnetID, false)
 
 	gossipMsg1, err := msgCreator0.Put(ids.GenerateTestID(), constants.GossipMsgRequestID, testPrimaryContainerID, []byte("test1"))
 	assert.NoError(t, err)
-	net0.Gossip(gossipMsg1, constants.PrimaryNetworkID, false)
+	net0.Gossip(gossipMsg1, ids.ShortSet{}, constants.PrimaryNetworkID, false)
 
 	wg1P.Wait()
 	wg2P.Wait()
@@ -3055,13 +3055,13 @@ func TestAppGossip(t *testing.T) {
 	chainID := ids.GenerateTestID()
 	msg1, err := msgCreator0.AppGossip(chainID, testAppGossipBytes)
 	assert.NoError(t, err)
-	net0.Gossip(msg1, constants.PrimaryNetworkID, false)
+	net0.Gossip(msg1, ids.ShortSet{}, constants.PrimaryNetworkID, false)
 
 	specificNodeSet := ids.NewShortSet(1)
 	specificNodeSet.Add(id2)
 	msg2, err := msgCreator0.AppGossip(chainID, testAppGossipSpecificBytes)
 	assert.NoError(t, err)
-	net0.SpecificGossip(msg2, specificNodeSet, constants.PrimaryNetworkID, false)
+	net0.Gossip(msg2, specificNodeSet, constants.PrimaryNetworkID, false)
 
 	wg1P.Wait()
 	wg2P.Wait()

@@ -380,21 +380,45 @@ func (n *network) Send(msg message.OutboundMessage, nodeIDs ids.ShortSet) ids.Sh
 	return res
 }
 
-// Assumes [n.stateLock] is not held.
-func (n *network) Gossip(msg message.OutboundMessage, subnetID ids.ID, validatorOnly bool) bool {
-	switch msg.Op() {
-	case message.AppGossip:
-		return n.appGossip(msg, subnetID, validatorOnly)
-	case message.Put:
-		return n.gossipContainer(msg, subnetID, int(n.config.GossipOnAcceptSize), validatorOnly)
-	default:
-		n.log.Error("Unhandled message type %v. Gossiping nothing.", msg.Op())
-		return false
+func (n *network) handleGossip(
+	peersLists [][]*peer,
+	msg message.OutboundMessage,
+	msgMetrics *messageMetrics,
+) bool {
+	now := n.clock.Time()
+	res := false                // gossip is successful if at least one node gets gossiped
+	sentPeers := ids.ShortSet{} // do not re-gossip if some nodes appear multiple times in the lists
+	for _, peers := range peersLists {
+		if peers == nil {
+			continue
+		}
+		for _, peer := range peers {
+			if sentPeers.Contains(peer.nodeID) {
+				continue
+			}
+			sentPeers.Add(peer.nodeID)
+
+			if !peer.Send(msg, false) {
+				n.log.Debug("failed to send msg %s (%s)", msg.Op().String(), peer.nodeID)
+				n.sendFailRateCalculator.Observe(1, now)
+				msgMetrics.numFailed.Inc()
+				continue
+			}
+
+			res = true
+			n.sendFailRateCalculator.Observe(0, now)
+			msgMetrics.numSent.Inc()
+			msgMetrics.sentBytes.Add(float64(len(msg.Bytes())))
+			if saved := msg.BytesSavedCompression(); saved != 0 {
+				msgMetrics.savedSentBytes.Observe(float64(saved))
+			}
+		}
 	}
+	return res
 }
 
-func (n *network) appGossip(msg message.OutboundMessage, subnetID ids.ID, validatorOnly bool) bool {
-	now := n.clock.Time()
+func (n *network) selectPeersForAppGossip(subnetID ids.ID, validatorOnly bool) [][]*peer {
+	// Phase 1: select peers
 	n.stateLock.RLock()
 	// Gossip the message to [n.config.AppGossipNonValidatorSize] random nodes
 	// in the network. If this is a validator only subnet, selects only validators.
@@ -402,7 +426,7 @@ func (n *network) appGossip(msg message.OutboundMessage, subnetID ids.ID, valida
 	if err != nil {
 		n.log.Debug("failed to sample %d peers for AppGossip: %s", n.config.AppGossipNonValidatorSize, err)
 		n.stateLock.RUnlock()
-		return false
+		return nil
 	}
 
 	// Gossip the message to [n.config.AppGossipValidatorSize] random validators
@@ -412,62 +436,62 @@ func (n *network) appGossip(msg message.OutboundMessage, subnetID ids.ID, valida
 	n.stateLock.RUnlock()
 	if err != nil {
 		n.log.Debug("failed to sample %d validators for AppGossip: %s", n.config.AppGossipValidatorSize, err)
+		return nil
+	}
+	peersAll = append(peersAll, peersValidators...)
+	return [][]*peer{peersAll, peersValidators}
+}
+
+func (n *network) selectPeersForContainerGossip(subnetID ids.ID, validatorOnly bool) [][]*peer {
+	n.stateLock.RLock()
+	peers, err := n.peers.sample(subnetID, validatorOnly, int(n.config.GossipOnAcceptSize))
+	n.stateLock.RUnlock()
+	if err != nil {
+		return nil
+	}
+	return [][]*peer{peers}
+}
+
+// Assumes [n.stateLock] is not held.
+func (n *network) Gossip(
+	msg message.OutboundMessage,
+	nodeIDs ids.ShortSet,
+	subnetID ids.ID,
+	validatorOnly bool) bool {
+	msgMetrics := n.metrics.message(msg.Op())
+	if msgMetrics == nil {
+		n.log.Error("unregistered metric for message with op %s. Dropping it", msg.Op())
 		return false
 	}
 
-	peersAll = append(peersAll, peersValidators...)
-	sentPeers := ids.ShortSet{}
-	for _, peers := range [][]*peer{peersAll, peersValidators} {
-		for _, peer := range peers {
-			if sentPeers.Contains(peer.nodeID) {
-				continue
-			}
-			sentPeers.Add(peer.nodeID)
-
-			if !peer.Send(msg, false) {
-				n.log.Debug("failed to send AppGossip(%s)", peer.nodeID)
-				n.metrics.appGossip.numFailed.Inc()
-				n.sendFailRateCalculator.Observe(1, now)
-				continue
-			}
-
-			n.sendFailRateCalculator.Observe(0, now)
-			n.metrics.appGossip.numSent.Inc()
-			n.metrics.appGossip.sentBytes.Add(float64(len(msg.Bytes())))
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.appGossip.savedSentBytes.Observe(float64(saved))
-			}
+	var peersLists [][]*peer
+	switch msg.Op() {
+	case message.AppGossip:
+		if nodeIDs.Len() == 0 {
+			// no peers specified, let's sample
+			peersLists = n.selectPeersForAppGossip(subnetID, validatorOnly)
+		} else {
+			// nodes to gossip already selected. Retrieve peers
+			peers := n.getSubnetPeers(nodeIDs, subnetID, validatorOnly)
+			peersLists = [][]*peer{peers}
 		}
+
+		if peersLists == nil {
+			return false
+		}
+
+	case message.Put:
+		peersLists = n.selectPeersForContainerGossip(subnetID, validatorOnly)
+		if peersLists == nil {
+			return false
+		}
+
+	default:
+		n.log.Error("Unhandled message type %v. Gossiping nothing.", msg.Op())
+		return false
 	}
-	return true
-}
 
-func (n *network) SpecificGossip(msg message.OutboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) bool {
-	now := n.clock.Time()
-	peers := n.getSubnetPeers(nodeIDs, subnetID, validatorOnly)
-	sentPeers := ids.ShortSet{}
-	for _, peer := range peers {
-		// should never be nil but just in case
-		if peer == nil || sentPeers.Contains(peer.nodeID) {
-			continue
-		}
-		sentPeers.Add(peer.nodeID)
-
-		if !peer.Send(msg, false) {
-			n.log.Debug("failed to send AppGossip(%s)", peer.nodeID)
-			n.sendFailRateCalculator.Observe(1, now)
-			n.metrics.appGossip.numFailed.Inc()
-			continue
-		}
-
-		n.sendFailRateCalculator.Observe(0, now)
-		n.metrics.appGossip.numSent.Inc()
-		n.metrics.appGossip.sentBytes.Add(float64(len(msg.Bytes())))
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			n.metrics.appGossip.savedSentBytes.Observe(float64(saved))
-		}
-	}
-	return true
+	return n.handleGossip(peersLists, msg, msgMetrics)
 }
 
 // Accept is called after every consensus decision
@@ -478,11 +502,10 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 		return nil
 	}
 
-	var (
-		now        = n.clock.Time()
-		sampleSize = int(n.config.GossipOnAcceptSize)
-	)
+	msgMetrics := n.metrics.message(message.Put)
+	n.log.AssertTrue(msgMetrics != nil, "unregistered metric for put message")
 
+	now := n.clock.Time()
 	msg, err := n.mc.Put(ctx.ChainID, constants.GossipMsgRequestID, containerID, container)
 	if err != nil {
 		n.log.Debug("failed to build Put message for gossip (%s, %s): %s", ctx.ChainID, containerID, err)
@@ -491,8 +514,13 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 	}
 
-	// TODO ABENEGIA: mind return type.
-	_ = n.gossipContainer(msg, ctx.SubnetID, sampleSize, ctx.IsValidatorOnly())
+	peersLists := n.selectPeersForContainerGossip(ctx.SubnetID, ctx.IsValidatorOnly())
+	if peersLists == nil {
+		// TODO ABENEGIA: find a better way to handle the error
+		return fmt.Errorf("could not sample peers")
+	}
+
+	_ = n.handleGossip(peersLists, msg, msgMetrics)
 	return nil
 }
 
@@ -715,38 +743,6 @@ func (n *network) Track(ip utils.IPDesc, nodeID ids.ShortID) {
 
 func (n *network) IP() utils.IPDesc {
 	return n.currentIP.IP()
-}
-
-// Assumes [n.stateLock] is not held.
-// TODO ABENEGIA: Consider returning error rather than a boolean
-func (n *network) gossipContainer(msg message.OutboundMessage, subnetID ids.ID, sampleSize int, validatorOnly bool) bool {
-	now := n.clock.Time()
-
-	n.stateLock.RLock()
-	peers, err := n.peers.sample(subnetID, validatorOnly, sampleSize)
-	n.stateLock.RUnlock()
-	if err != nil {
-		return false
-	}
-
-	res := false // gossip is successful if at least one node gets gossiped
-	for _, peer := range peers {
-		if !peer.Send(msg, false) {
-			n.sendFailRateCalculator.Observe(1, now)
-			n.metrics.put.numFailed.Inc()
-			continue
-		}
-
-		res = true
-		n.metrics.put.numSent.Inc()
-		n.metrics.put.sentBytes.Add(float64(len(msg.Bytes())))
-		// assume that if [saved] == 0, [msg] wasn't compressed
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			n.metrics.put.savedSentBytes.Observe(float64(saved))
-		}
-		n.sendFailRateCalculator.Observe(0, now)
-	}
-	return res
 }
 
 // assumes the stateLock is held.

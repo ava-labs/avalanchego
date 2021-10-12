@@ -656,7 +656,7 @@ func (s *Sender) SendAppGossipSpecific(nodeIDs ids.ShortSet, appGossipBytes []by
 		s.ctx.Log.Verbo("message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
 	}
 
-	if !s.sender.SpecificGossip(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()) {
+	if !s.sender.Gossip(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()) {
 		s.ctx.Log.Debug("failed to gossip SpecificGossip(%s)", s.ctx.ChainID)
 		s.ctx.Log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
 	}
@@ -671,7 +671,7 @@ func (s *Sender) SendAppGossip(appGossipBytes []byte) error {
 		s.ctx.Log.Verbo("message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
 	}
 
-	if !s.sender.Gossip(outMsg, s.ctx.SubnetID, s.ctx.IsValidatorOnly()) {
+	if !s.sender.Gossip(outMsg, ids.ShortSet{}, s.ctx.SubnetID, s.ctx.IsValidatorOnly()) {
 		s.ctx.Log.Debug("failed to gossip AppGossip(%s)", s.ctx.ChainID)
 		s.ctx.Log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
 	}
@@ -689,7 +689,7 @@ func (s *Sender) SendGossip(containerID ids.ID, container []byte) {
 		return
 	}
 
-	if !s.sender.Gossip(outMsg, s.ctx.SubnetID, s.ctx.IsValidatorOnly()) {
+	if !s.sender.Gossip(outMsg, ids.ShortSet{}, s.ctx.SubnetID, s.ctx.IsValidatorOnly()) {
 		s.ctx.Log.Debug("failed to gossip GossipMsg(%s)", s.ctx.ChainID)
 	}
 }
