@@ -68,13 +68,13 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	tx := getValidTx(vm, t)
 
 	// shortcut to simulated almost filled mempool
-	mempool.totalBytesSize = maxMempoolSize - len(tx.Bytes()) + 1
+	mempool.bytesAvailable = len(tx.Bytes()) - 1
 
 	err := blockBuilder.AddVerifiedTx(tx)
 	assert.Equal(errMempoolFull, err, "max mempool size breached")
 
 	// shortcut to simulated almost filled mempool
-	mempool.totalBytesSize = maxMempoolSize - len(tx.Bytes())
+	mempool.bytesAvailable = len(tx.Bytes())
 
 	err = blockBuilder.AddVerifiedTx(tx)
 	assert.NoError(err, "should have added tx to mempool")
