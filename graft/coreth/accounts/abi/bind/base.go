@@ -180,7 +180,7 @@ func (c *BoundContract) Call(opts *CallOpts, results *[]interface{}, method stri
 		if !ok {
 			return ErrNoAcceptedState
 		}
-		output, err = pb.AcceptedContractCaller(ctx, msg)
+		output, err = pb.AcceptedCallContract(ctx, msg)
 		if err == nil && len(output) == 0 {
 			// Make sure we have a contract to operate on, and bail out otherwise.
 			if code, err = pb.AcceptedCodeAt(ctx, c.address); err != nil {

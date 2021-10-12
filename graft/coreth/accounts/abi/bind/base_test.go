@@ -65,7 +65,7 @@ func (mc *mockCaller) AcceptedCodeAt(ctx context.Context, contract common.Addres
 	return nil, nil
 }
 
-func (mc *mockCaller) AcceptedContractCaller(ctx context.Context, call interfaces.CallMsg) ([]byte, error) {
+func (mc *mockCaller) AcceptedCallContract(ctx context.Context, call interfaces.CallMsg) ([]byte, error) {
 	mc.acceptedCallContractCalled = true
 	return nil, nil
 }
