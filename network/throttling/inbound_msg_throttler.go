@@ -48,9 +48,6 @@ func NewInboundMsgThrottler(
 	if err != nil {
 		return nil, err
 	}
-	if err := byteThrottler.metrics.initialize(namespace, registerer); err != nil {
-		return nil, err
-	}
 	bufferThrottler, err := newInboundMsgBufferThrottler(
 		namespace,
 		registerer,
