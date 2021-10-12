@@ -83,9 +83,6 @@ func (s *ExternalSenderTest) ClearMockSend(msgType message.Op) {
 	delete(s.sendFMap, msgType)
 }
 
-// TODO ABENEGIA: fix return type
-// TODO ABENEGIA: refactor with template pattern
-
 // Given a msg type, the corresponding mock function is called if it was initialized.
 // If it wasn't initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.

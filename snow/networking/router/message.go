@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-type messageToRemove struct {
+type messageWrap struct {
 	messageType  constants.MsgType // Must always be set
 	inMsg        message.InboundMessage
 	notification common.Message
@@ -24,7 +24,7 @@ type messageToRemove struct {
 	onDoneHandling func()
 }
 
-func (m messageToRemove) doneHandling() {
+func (m messageWrap) doneHandling() {
 	if m.onDoneHandling != nil {
 		m.onDoneHandling()
 	}
@@ -32,7 +32,7 @@ func (m messageToRemove) doneHandling() {
 
 // IsPeriodic returns true if this message is of a type that is sent on a
 // periodic basis.
-func (m messageToRemove) IsPeriodic() bool {
+func (m messageWrap) IsPeriodic() bool {
 	return m.requestID == constants.GossipMsgRequestID ||
 		m.messageType == constants.GossipMsg
 }

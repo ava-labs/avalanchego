@@ -131,7 +131,7 @@ func (h *Handler) Dispatch() {
 }
 
 // Dispatch a message to the consensus engine.
-func (h *Handler) handleMsg(msg messageToRemove) error {
+func (h *Handler) handleMsg(msg messageWrap) error {
 	startTime := h.clock.Time()
 
 	isPeriodic := msg.IsPeriodic()
@@ -176,7 +176,7 @@ func (h *Handler) handleMsg(msg messageToRemove) error {
 
 // Assumes [h.ctx.Lock] is locked
 // Assumes all inboundMessage have been duly validated and freely retrieve relevant fields
-func (h *Handler) handleConsensusMsg(msg messageToRemove) error {
+func (h *Handler) handleConsensusMsg(msg messageWrap) error {
 	var err error
 	switch msg.messageType {
 	case constants.GetAcceptedFrontierMsg:
@@ -248,7 +248,7 @@ func (h *Handler) PushMsgWithDeadline(msgType constants.MsgType,
 	received := h.clock.Time()
 	deadline := received.Add(time.Duration(inMsg.Get(message.Deadline).(uint64)))
 
-	h.push(messageToRemove{
+	h.push(messageWrap{
 		messageType:    msgType,
 		inMsg:          inMsg,
 		nodeID:         nodeID,
@@ -266,7 +266,7 @@ func (h *Handler) PushMsgWithoutDeadline(msgType constants.MsgType,
 	onDoneHandling func()) {
 	received := h.clock.Time()
 
-	h.push(messageToRemove{
+	h.push(messageWrap{
 		messageType:    msgType,
 		inMsg:          inMsg,
 		nodeID:         nodeID,
@@ -279,7 +279,7 @@ func (h *Handler) PushMsgWithoutDeadline(msgType constants.MsgType,
 // GetAcceptedFrontierFailed passes a GetAcceptedFrontierFailed message received
 // from the network to the consensus engine.
 func (h *Handler) GetAcceptedFrontierFailed(nodeID ids.ShortID, requestID uint32) {
-	h.push(messageToRemove{
+	h.push(messageWrap{
 		messageType: constants.GetAcceptedFrontierFailedMsg,
 		nodeID:      nodeID,
 		requestID:   requestID,
@@ -289,7 +289,7 @@ func (h *Handler) GetAcceptedFrontierFailed(nodeID ids.ShortID, requestID uint32
 // GetAcceptedFailed passes a GetAcceptedFailed message received from the
 // network to the consensus engine.
 func (h *Handler) GetAcceptedFailed(nodeID ids.ShortID, requestID uint32) {
-	h.push(messageToRemove{
+	h.push(messageWrap{
 		messageType: constants.GetAcceptedFailedMsg,
 		nodeID:      nodeID,
 		requestID:   requestID,
@@ -298,7 +298,7 @@ func (h *Handler) GetAcceptedFailed(nodeID ids.ShortID, requestID uint32) {
 
 // GetAncestorsFailed passes a GetAncestorsFailed message to the consensus engine.
 func (h *Handler) GetAncestorsFailed(nodeID ids.ShortID, requestID uint32) {
-	h.push(messageToRemove{
+	h.push(messageWrap{
 		messageType: constants.GetAncestorsFailedMsg,
 		nodeID:      nodeID,
 		requestID:   requestID,
@@ -307,7 +307,7 @@ func (h *Handler) GetAncestorsFailed(nodeID ids.ShortID, requestID uint32) {
 
 // Timeout passes a new timeout notification to the consensus engine
 func (h *Handler) Timeout() {
-	h.push(messageToRemove{
+	h.push(messageWrap{
 		messageType: constants.TimeoutMsg,
 		nodeID:      h.ctx.NodeID,
 	})
@@ -315,7 +315,7 @@ func (h *Handler) Timeout() {
 
 // GetFailed passes a GetFailed message to the consensus engine.
 func (h *Handler) GetFailed(nodeID ids.ShortID, requestID uint32) {
-	h.push(messageToRemove{
+	h.push(messageWrap{
 		messageType: constants.GetFailedMsg,
 		nodeID:      nodeID,
 		requestID:   requestID,
@@ -324,7 +324,7 @@ func (h *Handler) GetFailed(nodeID ids.ShortID, requestID uint32) {
 
 // QueryFailed passes a QueryFailed message received from the network to the consensus engine.
 func (h *Handler) QueryFailed(nodeID ids.ShortID, requestID uint32) {
-	h.push(messageToRemove{
+	h.push(messageWrap{
 		messageType: constants.QueryFailedMsg,
 		nodeID:      nodeID,
 		requestID:   requestID,
@@ -334,7 +334,7 @@ func (h *Handler) QueryFailed(nodeID ids.ShortID, requestID uint32) {
 // AppRequestFailed notifies the consensus engine that an application-level request failed
 // and it won't receive a response to the request.
 func (h *Handler) AppRequestFailed(nodeID ids.ShortID, requestID uint32) {
-	h.push(messageToRemove{
+	h.push(messageWrap{
 		messageType: constants.AppRequestFailedMsg,
 		nodeID:      nodeID,
 		requestID:   requestID,
@@ -343,7 +343,7 @@ func (h *Handler) AppRequestFailed(nodeID ids.ShortID, requestID uint32) {
 
 // Connected passes a new connection notification to the consensus engine
 func (h *Handler) Connected(nodeID ids.ShortID) {
-	h.push(messageToRemove{
+	h.push(messageWrap{
 		messageType: constants.ConnectedMsg,
 		nodeID:      nodeID,
 	})
@@ -351,7 +351,7 @@ func (h *Handler) Connected(nodeID ids.ShortID) {
 
 // Disconnected passes a new connection notification to the consensus engine
 func (h *Handler) Disconnected(nodeID ids.ShortID) {
-	h.push(messageToRemove{
+	h.push(messageWrap{
 		messageType: constants.DisconnectedMsg,
 		nodeID:      nodeID,
 	})
@@ -363,7 +363,7 @@ func (h *Handler) Gossip() {
 		// Shouldn't send gossiping messages while the chain is bootstrapping
 		return
 	}
-	h.push(messageToRemove{
+	h.push(messageWrap{
 		messageType: constants.GossipMsg,
 		nodeID:      h.ctx.NodeID,
 	})
@@ -411,7 +411,7 @@ func (h *Handler) shutdown() {
 }
 
 // Assumes [h.unprocessedMsgsCond.L] is not held
-func (h *Handler) push(msg messageToRemove) {
+func (h *Handler) push(msg messageWrap) {
 	if msg.nodeID == ids.ShortEmpty {
 		// This should never happen
 		h.ctx.Log.Warn("message does not have node ID of sender. Message: %s", msg)
@@ -438,7 +438,7 @@ func (h *Handler) dispatchInternal() {
 				return
 			}
 			// handle a message from the VM
-			h.push(messageToRemove{
+			h.push(messageWrap{
 				messageType:  constants.NotifyMsg,
 				notification: msg,
 				nodeID:       h.ctx.NodeID,

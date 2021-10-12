@@ -26,7 +26,7 @@ func TestUnprocessedMsgs(t *testing.T) {
 	uIntf, err := newUnprocessedMsgs(logging.NoLog{}, vdrs, cpuTracker, "", prometheus.NewRegistry())
 	assert.NoError(err)
 	u := uIntf.(*unprocessedMsgsImpl)
-	msg1 := messageToRemove{
+	msg1 := messageWrap{
 		messageType: constants.PutMsg,
 		nodeID:      vdr1ID,
 	}
@@ -74,7 +74,7 @@ func TestUnprocessedMsgs(t *testing.T) {
 	assert.EqualValues(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	assert.EqualValues(1, u.Len())
 
-	msg2 := messageToRemove{
+	msg2 := messageWrap{
 		messageType: constants.GetMsg,
 		nodeID:      vdr2ID,
 	}
@@ -97,11 +97,11 @@ func TestUnprocessedMsgs(t *testing.T) {
 	// u is now empty
 	// Non-validators should be able to put messages onto [u]
 	nonVdrNodeID1, nonVdrNodeID2 := ids.GenerateTestShortID(), ids.GenerateTestShortID()
-	msg3 := messageToRemove{
+	msg3 := messageWrap{
 		messageType: constants.PullQueryMsg,
 		nodeID:      nonVdrNodeID1,
 	}
-	msg4 := messageToRemove{
+	msg4 := messageWrap{
 		messageType: constants.PushQueryMsg,
 		nodeID:      nonVdrNodeID2,
 	}
