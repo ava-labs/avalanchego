@@ -2091,13 +2091,16 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	err = sender.Initialize(ctx, msgCreator, externalSender, chainRouter, &timeoutManager, "", metrics)
 	assert.NoError(t, err)
 
-	reqID := new(uint32)
-	externalSender.SendGetAcceptedFrontierF =
-		func(nodeIDs ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration) ids.ShortSet {
-			*reqID = requestID
+	var reqID uint32
+	externalSender.MockSend(message.GetAcceptedFrontier,
+		func(T *testing.T, inMsg message.InboundMessage, nodeIDs ids.ShortSet) ids.ShortSet {
 			res := ids.NewShortSet(len(nodeIDs))
+			requestID, ok := inMsg.Get(message.RequestID).(uint32)
+			assert.True(t, ok)
+
+			reqID = requestID
 			return res
-		}
+		})
 
 	isBootstrapped := false
 	subnet := &common.SubnetTest{
@@ -2161,41 +2164,52 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	externalSender.SendGetAcceptedFrontierF = nil
-	externalSender.SendGetAcceptedF =
-		func(nodeIDs ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration, _ []ids.ID) ids.ShortSet {
-			*reqID = requestID
+	externalSender.ClearMockSend(message.GetAcceptedFrontier)
+	externalSender.MockSend(message.GetAccepted,
+		func(T *testing.T, inMsg message.InboundMessage, nodeIDs ids.ShortSet) ids.ShortSet {
 			res := ids.NewShortSet(len(nodeIDs))
+			requestID, ok := inMsg.Get(message.RequestID).(uint32)
+			assert.True(t, ok)
+
+			reqID = requestID
 			return res
-		}
+		})
 
 	frontier := []ids.ID{advanceTimeBlkID}
-	if err := engine.AcceptedFrontier(peerID, *reqID, frontier); err != nil {
+	if err := engine.AcceptedFrontier(peerID, reqID, frontier); err != nil {
 		t.Fatal(err)
 	}
 
-	externalSender.SendGetAcceptedF = nil
-	externalSender.SendGetAncestorsF = func(_ ids.ShortID, _ ids.ID, requestID uint32, _ time.Duration, containerID ids.ID) bool {
-		*reqID = requestID
-		if containerID != advanceTimeBlkID {
-			t.Fatalf("wrong block requested")
-		}
-		return true
-	}
+	externalSender.ClearMockSend(message.GetAccepted)
+	externalSender.MockSend(message.GetAncestors,
+		func(T *testing.T, inMsg message.InboundMessage, nodeIDs ids.ShortSet) ids.ShortSet {
+			res := ids.NewShortSet(len(nodeIDs))
+			requestID, ok := inMsg.Get(message.RequestID).(uint32)
+			assert.True(t, ok)
+			reqID = requestID
 
-	if err := engine.Accepted(peerID, *reqID, frontier); err != nil {
+			containerID, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte))
+			assert.NoError(t, err)
+			if containerID != advanceTimeBlkID {
+				t.Fatalf("wrong block requested")
+			}
+
+			return res
+		})
+
+	if err := engine.Accepted(peerID, reqID, frontier); err != nil {
 		t.Fatal(err)
 	}
 
-	externalSender.SendGetF = nil
-	externalSender.CantSendPushQuery = false
-	externalSender.CantSendPullQuery = false
+	externalSender.ClearMockSend(message.Get)
+	externalSender.EnableSend(message.PushQuery)
+	externalSender.EnableSend(message.PullQuery)
 
-	if err := engine.MultiPut(peerID, *reqID, [][]byte{advanceTimeBlkBytes}); err != nil {
+	if err := engine.MultiPut(peerID, reqID, [][]byte{advanceTimeBlkBytes}); err != nil {
 		t.Fatal(err)
 	}
 
-	externalSender.CantSendPushQuery = true
+	externalSender.DisableSend(message.PushQuery)
 
 	preferred, err = vm.Preferred()
 	if err != nil {
