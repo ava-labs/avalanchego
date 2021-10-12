@@ -345,32 +345,32 @@ func TestRouterClearTimeouts(t *testing.T) {
 	// Put
 	inMsg, err = mc.InboundPut(handler.ctx.ChainID, 0, ids.GenerateTestID(), nil)
 	assert.NoError(t, err)
-	chainRouter.HandleInbound(message.Put, inMsg, vID, nil)
+	chainRouter.HandleInbound(inMsg, vID, nil)
 
 	// MultiPut
 	inMsg, err = mc.InboundMultiPut(handler.ctx.ChainID, 1, nil)
 	assert.NoError(t, err)
-	chainRouter.HandleInbound(message.MultiPut, inMsg, vID, nil)
+	chainRouter.HandleInbound(inMsg, vID, nil)
 
 	// Chits # 1
 	inMsg, err = mc.InboundChits(handler.ctx.ChainID, 2, nil)
 	assert.NoError(t, err)
-	chainRouter.HandleInbound(message.Chits, inMsg, vID, nil)
+	chainRouter.HandleInbound(inMsg, vID, nil)
 
 	// Chits # 2
 	inMsg, err = mc.InboundChits(handler.ctx.ChainID, 3, nil)
 	assert.NoError(t, err)
-	chainRouter.HandleInbound(message.Chits, inMsg, vID, nil)
+	chainRouter.HandleInbound(inMsg, vID, nil)
 
 	// Accepted
 	inMsg, err = mc.InboundAccepted(handler.ctx.ChainID, 4, nil)
 	assert.NoError(t, err)
-	chainRouter.HandleInbound(message.Accepted, inMsg, vID, nil)
+	chainRouter.HandleInbound(inMsg, vID, nil)
 
 	// Accepted Frontier
 	inMsg, err = mc.InboundAcceptedFrontier(handler.ctx.ChainID, 5, nil)
 	assert.NoError(t, err)
-	chainRouter.HandleInbound(message.AcceptedFrontier, inMsg, vID, nil)
+	chainRouter.HandleInbound(inMsg, vID, nil)
 
 	assert.Equal(t, chainRouter.timedRequests.Len(), 0)
 }
@@ -452,7 +452,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 
 	inMsg, err = mc.InboundPullQuery(handler.ctx.ChainID, uint32(1), uint64(timeout.Unix()), ids.GenerateTestID())
 	assert.NoError(t, err)
-	chainRouter.HandleInbound(message.PullQuery, inMsg, nID, func() {})
+	chainRouter.HandleInbound(inMsg, nID, func() {})
 	assert.False(t, *calledF) // should not be called
 
 	// validator case
@@ -460,7 +460,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	wg.Add(1)
 	inMsg, err = mc.InboundPullQuery(handler.ctx.ChainID, uint32(2), uint64(timeout.Unix()), ids.GenerateTestID())
 	assert.NoError(t, err)
-	chainRouter.HandleInbound(message.PullQuery, inMsg, vID, func() {})
+	chainRouter.HandleInbound(inMsg, vID, func() {})
 
 	wg.Wait()
 	// should be called since this is a validator request
@@ -477,7 +477,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	calledFinished := false
 	inMsg, err = mc.InboundPut(handler.ctx.ChainID, reqID, ids.GenerateTestID(), nil)
 	assert.NoError(t, err)
-	chainRouter.HandleInbound(message.Put, inMsg, nID, func() { calledFinished = true })
+	chainRouter.HandleInbound(inMsg, nID, func() { calledFinished = true })
 
 	assert.True(t, calledFinished)
 	// shouldn't clear out timed request, as the request should be cleared when

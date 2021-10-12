@@ -456,7 +456,7 @@ func (p *peer) handle(msg message.InboundMessage, msgLen float64, onFinishedHand
 	}
 
 	// Consensus and app-level messages
-	p.net.router.HandleInbound(op, msg, p.nodeID, onFinishedHandling)
+	p.net.router.HandleInbound(msg, p.nodeID, onFinishedHandling)
 }
 
 // assumes the [stateLock] is not held

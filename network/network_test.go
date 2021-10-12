@@ -248,11 +248,11 @@ func (h *testHandler) Disconnected(id ids.ShortID) {
 }
 
 func (h *testHandler) HandleInbound(
-	msgType message.Op,
 	msg message.InboundMessage,
 	nodeID ids.ShortID,
 	onFinishedHandling func(),
 ) {
+	msgType := msg.Op()
 	switch msgType {
 	case message.Put:
 		chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))

@@ -258,7 +258,6 @@ func (cr *ChainRouter) removeChain(chainID ids.ID) {
 }
 
 func (cr *ChainRouter) HandleInbound(
-	msgType message.Op,
 	inMsg message.InboundMessage,
 	nodeID ids.ShortID,
 	onFinishedHandling func(),
@@ -266,6 +265,7 @@ func (cr *ChainRouter) HandleInbound(
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
+	msgType := inMsg.Op()
 	chainID, err := ids.ToID(inMsg.Get(message.ChainID).([]byte))
 	cr.log.AssertNoError(err)
 
