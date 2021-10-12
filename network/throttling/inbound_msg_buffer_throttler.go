@@ -5,24 +5,35 @@ package throttling
 
 import (
 	"sync"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/metric"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // See inbound_msg_throttler.go
 
-func newInboundMsgBufferThrottler(maxProcessingMsgsPerNode uint64) *inboundMsgBufferThrottler {
-	return &inboundMsgBufferThrottler{
+func newInboundMsgBufferThrottler(
+	namespace string,
+	registerer prometheus.Registerer,
+	maxProcessingMsgsPerNode uint64,
+) (*inboundMsgBufferThrottler, error) {
+	t := &inboundMsgBufferThrottler{
+		metrics:                  inboundMsgBufferThrottlerMetrics{},
 		maxProcessingMsgsPerNode: maxProcessingMsgsPerNode,
 		awaitingAcquire:          make(map[ids.ShortID][]chan struct{}),
 		nodeToNumProcessingMsgs:  make(map[ids.ShortID]uint64),
 	}
+	return t, t.metrics.initialize(namespace, registerer)
 }
 
 // Rate-limits inbound messages based on the number of
 // messages from a given node that we're currently processing.
 type inboundMsgBufferThrottler struct {
-	lock sync.Mutex
+	lock    sync.Mutex
+	metrics inboundMsgBufferThrottlerMetrics
 	// Max number of messages currently processing from a
 	// given node. We will stop reading messages from a
 	// node until we're processing less than this many
@@ -49,7 +60,13 @@ type inboundMsgBufferThrottler struct {
 // Release([nodeID]) must be called (!) when done processing the message
 // (or when we give up trying to read the message.)
 func (t *inboundMsgBufferThrottler) Acquire(nodeID ids.ShortID) {
-	// TODO add metrics
+	t.metrics.awaitingAcquire.Inc()
+	startTime := time.Now()
+	defer func() {
+		t.metrics.awaitingAcquire.Dec()
+		t.metrics.acquireLatency.Observe(float64(time.Since(startTime)))
+	}()
+
 	t.lock.Lock()
 	if t.nodeToNumProcessingMsgs[nodeID] < t.maxProcessingMsgsPerNode {
 		t.nodeToNumProcessingMsgs[nodeID]++
@@ -96,4 +113,29 @@ func (t *inboundMsgBufferThrottler) Release(nodeID ids.ShortID) {
 	} else {
 		t.awaitingAcquire[nodeID] = t.awaitingAcquire[nodeID][1:]
 	}
+}
+
+type inboundMsgBufferThrottlerMetrics struct {
+	acquireLatency  metric.Averager
+	awaitingAcquire prometheus.Gauge
+}
+
+func (m *inboundMsgBufferThrottlerMetrics) initialize(namespace string, reg prometheus.Registerer) error {
+	errs := wrappers.Errs{}
+	m.acquireLatency = metric.NewAveragerWithErrs(
+		namespace,
+		"buffer_throttler_inbound_acquire_latency",
+		"average time (in ns) to get space on the inbound message buffer",
+		reg,
+		&errs,
+	)
+	m.awaitingAcquire = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "buffer_throttler_inbound_awaiting_acquire",
+		Help:      "Number of inbound messages waiting to take space on the inbound message buffer",
+	})
+	errs.Add(
+		reg.Register(m.awaitingAcquire),
+	)
+	return errs.Err
 }

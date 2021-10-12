@@ -8,13 +8,15 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 )
 
 // Test inboundMsgBufferThrottler
 func TestMsgBufferThrottler(t *testing.T) {
 	assert := assert.New(t)
-	throttler := newInboundMsgBufferThrottler(3)
+	throttler, err := newInboundMsgBufferThrottler("", prometheus.NewRegistry(), 3)
+	assert.NoError(err)
 
 	nodeID1, nodeID2 := ids.GenerateTestShortID(), ids.GenerateTestShortID()
 	// Acquire shouldn't block for first 3

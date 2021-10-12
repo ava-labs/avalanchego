@@ -48,11 +48,21 @@ func NewInboundMsgThrottler(
 	if err != nil {
 		return nil, err
 	}
-	t := &inboundMsgThrottler{
-		byteThrottler:   byteThrottler,
-		bufferThrottler: newInboundMsgBufferThrottler(config.MaxProcessingMsgsPerNode),
+	if err := byteThrottler.metrics.initialize(namespace, registerer); err != nil {
+		return nil, err
 	}
-	return t, t.byteThrottler.metrics.initialize(namespace, registerer)
+	bufferThrottler, err := newInboundMsgBufferThrottler(
+		namespace,
+		registerer,
+		config.MaxProcessingMsgsPerNode,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &inboundMsgThrottler{
+		byteThrottler:   byteThrottler,
+		bufferThrottler: bufferThrottler,
+	}, nil
 }
 
 // A sybil-safe inbound message throttler.
