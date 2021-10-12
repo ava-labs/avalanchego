@@ -70,8 +70,8 @@ type AcceptedContractCaller interface {
 	// AcceptedCodeAt returns the code of the given account in the accepted state.
 	AcceptedCodeAt(ctx context.Context, contract common.Address) ([]byte, error)
 
-	// AcceptedContractCaller executes an Ethereum contract call against the accepted state.
-	AcceptedContractCaller(ctx context.Context, call interfaces.CallMsg) ([]byte, error)
+	// AcceptedCallContract executes an Ethereum contract call against the accepted state.
+	AcceptedCallContract(ctx context.Context, call interfaces.CallMsg) ([]byte, error)
 }
 
 // ContractTransactor defines the methods needed to allow operating with a contract

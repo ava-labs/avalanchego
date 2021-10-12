@@ -1041,7 +1041,7 @@ func TestPendingAndCallContract(t *testing.T) {
 	}
 
 	// make sure you can call the contract in accepted state
-	res, err := sim.AcceptedContractCaller(bgCtx, interfaces.CallMsg{
+	res, err := sim.AcceptedCallContract(bgCtx, interfaces.CallMsg{
 		From: testAddr,
 		To:   &addr,
 		Data: input,
@@ -1129,7 +1129,7 @@ func TestCallContractRevert(t *testing.T) {
 
 	call := make([]func([]byte) ([]byte, error), 2)
 	call[0] = func(input []byte) ([]byte, error) {
-		return sim.AcceptedContractCaller(bgCtx, interfaces.CallMsg{
+		return sim.AcceptedCallContract(bgCtx, interfaces.CallMsg{
 			From: testAddr,
 			To:   &addr,
 			Data: input,
