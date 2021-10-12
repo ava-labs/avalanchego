@@ -5,7 +5,6 @@ package snowstorm
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -15,14 +14,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/metrics"
 	"github.com/ava-labs/avalanchego/snow/events"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
-var errUnhealthy = errors.New("snowstorm consensus is not healthy")
+var unhealthy = "snowstorm consensus is not healthy"
 
 type common struct {
 	// metrics that describe this consensus instance
@@ -105,10 +103,8 @@ func (c *common) HealthCheck() (interface{}, error) {
 		"outstandingTransactions": numOutstandingTxs,
 	}
 	if !healthy {
-		if !isOutstandingTxs {
-			details[constants.HealthErrorReasonKey] = []string{fmt.Sprintf("number of outstanding txs %d > %d", numOutstandingTxs, c.params.MaxOutstandingItems)}
-		}
-		return details, errUnhealthy
+		errorReason := fmt.Sprintf("number of outstanding txs %d > %d", numOutstandingTxs, c.params.MaxOutstandingItems)
+		return details, fmt.Errorf("%s reason: %s", unhealthy, errorReason)
 	}
 	return details, nil
 }

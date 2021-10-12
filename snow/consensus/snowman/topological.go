@@ -4,18 +4,17 @@
 package snowman
 
 import (
-	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/metrics"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
-	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-var errUnhealthy = errors.New("snowman consensus is not healthy")
+var unhealthy = "snowman consensus is not healthy"
 
 // TopologicalFactory implements Factory by returning a topological struct
 type TopologicalFactory struct{}
@@ -305,15 +304,14 @@ func (ts *Topological) HealthCheck() (interface{}, error) {
 	details["longestRunningBlock"] = timeReqRunning.String()
 
 	if !healthy {
-		var errReasons []string
+		var errorReasons []string
 		if !isOutstandingBlks {
-			errReasons = append(errReasons, fmt.Sprintf("number of outstanding blocks %d > %d", numOutstandingBlks, ts.params.MaxOutstandingItems))
+			errorReasons = append(errorReasons, fmt.Sprintf("number of outstanding blocks %d > %d", numOutstandingBlks, ts.params.MaxOutstandingItems))
 		}
 		if !isProcessingTime {
-			errReasons = append(errReasons, fmt.Sprintf("block processing time %s > %s", timeReqRunning, ts.params.MaxItemProcessingTime))
+			errorReasons = append(errorReasons, fmt.Sprintf("block processing time %s > %s", timeReqRunning, ts.params.MaxItemProcessingTime))
 		}
-		details[constants.HealthErrorReasonKey] = errReasons
-		return details, errUnhealthy
+		return details, fmt.Errorf("%s reason: %s", unhealthy, strings.Join(errorReasons, ", "))
 	}
 	return details, nil
 }

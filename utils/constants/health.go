@@ -18,6 +18,4 @@ const (
 	// MinConnectedStake is the minimum percentage of the Primary Network's
 	// that this node must be connected to to be considered healthy
 	MinConnectedStake = float64(.80)
-
-	HealthErrorReasonKey = "errorReasons"
 )

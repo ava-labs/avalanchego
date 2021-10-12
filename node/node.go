@@ -913,14 +913,7 @@ func (n *Node) initHealthAPI() error {
 		} else if cChainID, err := n.chainManager.Lookup("C"); err != nil {
 			return nil, errCNotCreated
 		} else if chains := chainsNotBootstrapped(pChainID, xChainID, cChainID); len(chains) != 0 {
-			var chainReasons []string
-			for _, chain := range chains {
-				chainReasons = append(chainReasons, fmt.Sprintf("%s not bootstrapped", chain))
-			}
-			details := map[string]interface{}{
-				constants.HealthErrorReasonKey: chainReasons,
-			}
-			return details, fmt.Errorf("primary subnet %s chain not finished bootstrapping", strings.Join(chains, ", "))
+			return nil, fmt.Errorf("primary subnet %s chain not finished bootstrapping", strings.Join(chains, ", "))
 		}
 
 		return nil, nil

@@ -12,17 +12,17 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/metrics"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
-	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 const (
 	minMapSize = 16
 )
 
-var (
-	errUnhealthy = errors.New("avalanche consensus is not healthy")
-	errNoLeaves  = errors.New("couldn't pop a leaf from leaf set")
+const (
+	unhealthy = "avalanche consensus is not healthy"
 )
+
+var errNoLeaves = errors.New("couldn't pop a leaf from leaf set")
 
 var _ Consensus = &Topological{}
 
@@ -249,10 +249,8 @@ func (ta *Topological) HealthCheck() (interface{}, error) {
 	details["snowstorm"] = snowstormReport
 
 	if !healthy {
-		if !isOutstandingVtx {
-			details[constants.HealthErrorReasonKey] = []string{fmt.Sprintf("number outstanding vertexes %d > %d", numOutstandingVtx, ta.params.MaxOutstandingItems)}
-		}
-		return details, errUnhealthy
+		errorReason := fmt.Sprintf("number outstanding vertexes %d > %d", numOutstandingVtx, ta.params.MaxOutstandingItems)
+		return details, fmt.Errorf("%s reason: %s", unhealthy, errorReason)
 	}
 	return details, nil
 }

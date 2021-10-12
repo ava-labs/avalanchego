@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -40,15 +41,12 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-const (
-	networkIssuesMessage = "network is unable to send or receive messages check connectivity"
-)
+const networkLayerUnhealthy = "network layer is unhealthy"
 
 var (
-	errNetworkClosed         = errors.New("network closed")
-	errPeerIsMyself          = errors.New("peer is myself")
-	errNetworkLayerUnhealthy = errors.New("network layer is unhealthy")
-	errNoPrimaryValidators   = errors.New("no default subnet validators")
+	errNetworkClosed       = errors.New("network closed")
+	errPeerIsMyself        = errors.New("peer is myself")
+	errNoPrimaryValidators = errors.New("no default subnet validators")
 )
 
 var _ Network = &network{}
@@ -1793,25 +1791,21 @@ func (n *network) HealthCheck() (interface{}, error) {
 
 	// Network layer is unhealthy
 	if !healthy {
-		var errReasons []string
+		var errorReasons []string
 		if !isConnected {
-			errReasons = append(errReasons, fmt.Sprintf("not connected to a minimum of %d peer(s) only %d", n.config.HealthConfig.MinConnectedPeers, connectedTo))
+			errorReasons = append(errorReasons, fmt.Sprintf("not connected to a minimum of %d peer(s) only %d", n.config.HealthConfig.MinConnectedPeers, connectedTo))
 		}
 		if !isMsgRcvd {
-			errReasons = append(errReasons, fmt.Sprintf("no messages from network received in %s > %s", timeSinceLastMsgReceived, n.config.HealthConfig.MaxTimeSinceMsgReceived))
+			errorReasons = append(errorReasons, fmt.Sprintf("no messages from network received in %s > %s", timeSinceLastMsgReceived, n.config.HealthConfig.MaxTimeSinceMsgReceived))
 		}
 		if !isMsgSent {
-			errReasons = append(errReasons, fmt.Sprintf("no messages from network sent in %s > %s", timeSinceLastMsgSent, n.config.HealthConfig.MaxTimeSinceMsgSent))
+			errorReasons = append(errorReasons, fmt.Sprintf("no messages from network sent in %s > %s", timeSinceLastMsgSent, n.config.HealthConfig.MaxTimeSinceMsgSent))
 		}
 		if !isMsgFailRate {
-			errReasons = append(errReasons, fmt.Sprintf("messages failure send rate %g > %g", sendFailRate, n.config.HealthConfig.MaxSendFailRate))
+			errorReasons = append(errorReasons, fmt.Sprintf("messages failure send rate %g > %g", sendFailRate, n.config.HealthConfig.MaxSendFailRate))
 		}
-		if !isMsgRcvd || !isMsgSent || !isMsgFailRate {
-			errReasons = append(errReasons, networkIssuesMessage)
-		}
-		details[constants.HealthErrorReasonKey] = errReasons
 
-		return details, errNetworkLayerUnhealthy
+		return details, fmt.Errorf("%s reason: %s", networkLayerUnhealthy, strings.Join(errorReasons, ", "))
 	}
 	return details, nil
 }
