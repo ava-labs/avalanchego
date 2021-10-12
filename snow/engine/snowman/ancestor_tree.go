@@ -4,18 +4,15 @@
 package snowman
 
 import (
-	"fmt"
-
 	"github.com/ava-labs/avalanchego/ids"
 )
 
 type AncestorTree interface {
 	Add(blkID ids.ID, parentID ids.ID)
-	GetParent(blkID ids.ID) (ids.ID, bool)
 	Has(blkID ids.ID) bool
-	GetOldestAncestor(blkID ids.ID) (ids.ID, error)
+	GetRoot(blkID ids.ID) (ids.ID, bool)
 	Remove(blkID ids.ID)
-	Purge(blkID ids.ID)
+	RemoveSubtree(blkID ids.ID)
 }
 
 type childParentMap struct {
@@ -30,78 +27,74 @@ func NewAncestorTree() AncestorTree {
 	}
 }
 
+// Add maps given blkID to given parentID
 func (p *childParentMap) Add(blkID ids.ID, parentID ids.ID) {
-	// ASK: should we consider cases for circular dependencies or self reference etc?
-	if _, ok := p.childToParent[blkID]; ok {
-		return
-	}
 	p.childToParent[blkID] = parentID
-	children, ok := p.parentToChildren[parentID]
-	if !ok {
-		children = ids.NewSet(1)
-	}
+
+	children := p.parentToChildren[parentID]
 	children.Add(blkID)
 	p.parentToChildren[parentID] = children
 }
 
-func (p *childParentMap) GetParent(blkID ids.ID) (ids.ID, bool) {
-	parentID, ok := p.childToParent[blkID]
-	return parentID, ok
-}
-
-func (p *childParentMap) GetOldestAncestor(blkID ids.ID) (ids.ID, error) {
-	// might be ends up in an infinite loop in case of circular dependency
-	currentID := blkID
+// GetRoot returns the oldest parent of blkID
+func (p *childParentMap) GetRoot(blkID ids.ID) (ids.ID, bool) {
+	// return false if we cannot find any parent
+	currentID, ok := p.childToParent[blkID]
+	if !ok {
+		return currentID, false
+	}
 	for {
 		parentID, ok := p.childToParent[currentID]
-		switch {
-		case !ok:
-			return currentID, nil
-		case parentID == blkID:
-			return ids.ID{}, fmt.Errorf("found circularity")
+		// this is the furthest parent available, break loop and return currentID
+		if !ok {
+			return currentID, true
 		}
+		// continue to loop with parentID
 		currentID = parentID
 	}
 }
 
+// Has returns if blkID is in the tree or not
 func (p *childParentMap) Has(blkID ids.ID) bool {
 	_, ok := p.childToParent[blkID]
 	return ok
 }
 
+// Remove removes blkID from the tree
 func (p *childParentMap) Remove(blkID ids.ID) {
 	p.remove(blkID)
 }
 
-func (p *childParentMap) Purge(blkID ids.ID) {
-	p.remove(blkID)
-	children, ok := p.parentToChildren[blkID]
-	if !ok {
-		return
-	}
-	childrenList := children.List()
+// RemoveSubtree removes whole subtree that blkID holds
+func (p *childParentMap) RemoveSubtree(blkID ids.ID) {
+	childrenList := []ids.ID{blkID}
 	for len(childrenList) > 0 {
 		newChildrenSize := len(childrenList) - 1
 		childID := childrenList[newChildrenSize]
 		childrenList = childrenList[:newChildrenSize]
 		p.remove(childID)
+		// get children of child
 		for grandChildID := range p.parentToChildren[childID] {
 			childrenList = append(childrenList, grandChildID)
 		}
 	}
 }
 
+// remove is a helper to remove blkID from tree
 func (p *childParentMap) remove(blkID ids.ID) {
 	parent, ok := p.childToParent[blkID]
 	if !ok {
 		return
 	}
+	// remove blkID from children
 	children, ok := p.parentToChildren[parent]
 	if ok {
 		children.Remove(blkID)
+		// this parent has no more children, remove it from map
 		if children.Len() == 0 {
 			delete(p.parentToChildren, parent)
 		}
 	}
+	// finally delete actual blkID
 	delete(p.childToParent, blkID)
 }

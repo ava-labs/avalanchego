@@ -131,16 +131,18 @@ votesLoop:
 	return bubbledVotes
 }
 
-// tries to retrieves first available block searching from given block ID to pending parents.
+// tries to retrieve a block with given blkID or it's root ID in nonverified block tree.
 func (v *voter) getBlockOrParent(blkID ids.ID) (snowman.Block, error) {
 	blk, err := v.t.GetBlock(blkID)
 	if err == nil {
 		return blk, err
 	}
-	// try with oldest ancestor
-	ancestorID, err := v.t.nonVerifieds.GetOldestAncestor(blkID)
-	if err != nil {
-		return nil, err
+	// try with root
+	ancestorID, ok := v.t.nonVerifieds.GetRoot(blkID)
+	if ok {
+		// we have found an ancestor, get the block
+		return v.t.GetBlock(ancestorID)
 	}
-	return v.t.GetBlock(ancestorID)
+	// use blk and err from previous GetBlock call
+	return blk, err
 }

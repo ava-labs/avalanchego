@@ -15,14 +15,14 @@ type MemoryBlock struct {
 	tree AncestorTree
 }
 
-// Accept accepts the underlying block, removes sibling subtrees.
+// Accept accepts the underlying block & removes sibling subtrees
 func (mb *MemoryBlock) Accept() error {
-	mb.tree.Purge(mb.Parent())
+	mb.tree.RemoveSubtree(mb.Parent())
 	return mb.Block.Accept()
 }
 
-// Reject rejects the underlying block, removes child subtress
+// Reject rejects the underlying block & removes child subtrees
 func (mb *MemoryBlock) Reject() error {
-	mb.tree.Purge(mb.ID())
+	mb.tree.RemoveSubtree(mb.ID())
 	return mb.Block.Reject()
 }
