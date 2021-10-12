@@ -214,8 +214,8 @@ type GossipConfig struct {
 
 type ThrottlerConfig struct {
 	InboundConnUpgradeThrottlerConfig throttling.InboundConnUpgradeThrottlerConfig `json:"inboundConnUpgradeThrottlerConfig"`
-	InboundMsgThrottlerConfig         throttling.MsgThrottlerConfig                `json:"inboundMsgThrottlerConfig"`
-	OutboundMsgThrottlerConfig        throttling.MsgThrottlerConfig                `json:"outboundMsgThrottlerConfig"`
+	InboundMsgThrottlerConfig         throttling.InboundMsgThrottlerConfig         `json:"inboundMsgThrottlerConfig"`
+	OutboundMsgThrottlerConfig        throttling.MsgByteThrottlerConfig            `json:"outboundMsgThrottlerConfig"`
 	MaxIncomingConnsPerSec            float64                                      `json:"maxIncomingConnsPerSec"`
 }
 
@@ -305,7 +305,7 @@ func NewNetwork(
 		return nil, errNoPrimaryValidators
 	}
 
-	inboundMsgThrottler, err := throttling.NewSybilInboundMsgThrottler(
+	inboundMsgThrottler, err := throttling.NewInboundMsgThrottler(
 		log,
 		config.Namespace,
 		metricsRegisterer,
