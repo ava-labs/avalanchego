@@ -19,19 +19,96 @@ import (
 )
 
 var (
-	_ InboundMsgThrottler = &noInboundMsgThrottler{}
-	_ InboundMsgThrottler = &sybilInboundMsgThrottler{}
+	_ InboundMsgThrottler = &inboundMsgByteThrottler{}
+	_ InboundMsgThrottler = &inboundMsgThrottler{}
 )
 
-// InboundMsgThrottler rate-limits incoming messages from the network.
+// InboundMsgThrottler rate-limits inbound messages from the network.
 type InboundMsgThrottler interface {
 	// Blocks until node [nodeID] can put a message of
-	// size [msgSize] onto the incoming message buffer.
+	// size [msgSize] onto the inbound message buffer.
+	// Release([msgSize], [nodeID]) must be called (!) when done processing
+	// this message (or when we give up trying to read the message.)
 	Acquire(msgSize uint64, nodeID ids.ShortID)
 
-	// Mark that a message from [nodeID] of size [msgSize]
-	// has been removed from the incoming message buffer.
+	// Mark that we're done processing a message from [nodeID]
+	// of size [msgSize].
 	Release(msgSize uint64, nodeID ids.ShortID)
+}
+
+type InboundMsgThrottlerConfig struct {
+	MsgByteThrottlerConfig
+	MaxProcessingMsgsPerNode uint64 `json:"maxProcessingMsgsPerNode"`
+}
+
+// Returns a new, sybil-safe inbound message throttler.
+func NewInboundMsgThrottler(
+	log logging.Logger,
+	namespace string,
+	registerer prometheus.Registerer,
+	vdrs validators.Set,
+	config InboundMsgThrottlerConfig,
+) (InboundMsgThrottler, error) {
+	t := &inboundMsgThrottler{
+		byteThrottler: inboundMsgByteThrottler{
+			commonMsgThrottler: commonMsgThrottler{
+				log:                    log,
+				vdrs:                   vdrs,
+				maxVdrBytes:            config.VdrAllocSize,
+				remainingVdrBytes:      config.VdrAllocSize,
+				remainingAtLargeBytes:  config.AtLargeAllocSize,
+				nodeMaxAtLargeBytes:    config.NodeMaxAtLargeBytes,
+				nodeToVdrBytesUsed:     make(map[ids.ShortID]uint64),
+				nodeToAtLargeBytesUsed: make(map[ids.ShortID]uint64),
+			},
+			waitingToAcquire:    linkedhashmap.New(),
+			nodeToWaitingMsgIDs: make(map[ids.ShortID][]uint64),
+		},
+		bufferThrottler: inboundMsgBufferThrottler{
+			maxProcessingMsgsPerNode: config.MaxProcessingMsgsPerNode,
+			nodeToNumProcessingMsgs:  make(map[ids.ShortID]uint64),
+			awaitingAcquire:          make(map[ids.ShortID][]chan struct{}),
+		},
+	}
+	return t, t.byteThrottler.metrics.initialize(namespace, registerer)
+}
+
+// A sybil-safe inbound message throttler.
+// Rate-limits reading of inbound messages to prevent peers from
+// consuming excess resources.
+// The two resources are:
+// 1. An inbound message buffer, where each message from a peer
+//    that we're currently processing takes up 1 unit of space on the buffer.
+// 2. An inbound message byte buffer, where a message of length n
+//    that we're currently processing takes up n units of space on the buffer.
+// A call to Acquire([msgSize], [nodeID]) blocks until we've secured
+// enough of both these resources to read a message of size [msgSize] from [nodeID].
+type inboundMsgThrottler struct {
+	// Rate-limits based on number of messages from a given
+	// node that we're currently processing.
+	bufferThrottler inboundMsgBufferThrottler
+	// Rate-limits based on size of all messages from a given
+	// node that we're currently processing.
+	byteThrottler inboundMsgByteThrottler
+}
+
+// Returns when we can read a message of size [msgSize] from node [nodeID].
+// Release([msgSize], [nodeID]) must be called (!) when done with the message
+// or when we give up trying to read the message, if applicable.
+func (t *inboundMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
+	// Acquire space on the inbound message buffer
+	t.bufferThrottler.Acquire(nodeID)
+	// Acquire space on the inbound message byte buffer
+	t.byteThrottler.Acquire(msgSize, nodeID)
+}
+
+// Must correspond to a previous call of Acquire([msgSize], [nodeID]).
+// See InboundMsgThrottler interface.
+func (t *inboundMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
+	// Release space on the inbound message buffer
+	t.bufferThrottler.Release(nodeID)
+	// Release space on the inbound message byte buffer
+	t.byteThrottler.Release(msgSize, nodeID)
 }
 
 // Information about a message waiting to be read.
@@ -44,43 +121,13 @@ type msgMetadata struct {
 	closeOnAcquireChan chan struct{}
 }
 
-// Returns a new MsgThrottler.
-// If this function returns an error, the returned MsgThrottler may still be used.
-// However, some of its metrics may not be registered.
-func NewSybilInboundMsgThrottler(
-	log logging.Logger,
-	namespace string,
-	registerer prometheus.Registerer,
-	vdrs validators.Set,
-	config MsgThrottlerConfig,
-) (InboundMsgThrottler, error) {
-	t := &sybilInboundMsgThrottler{
-		commonMsgThrottler: commonMsgThrottler{
-			log:                    log,
-			vdrs:                   vdrs,
-			maxVdrBytes:            config.VdrAllocSize,
-			remainingVdrBytes:      config.VdrAllocSize,
-			remainingAtLargeBytes:  config.AtLargeAllocSize,
-			nodeMaxAtLargeBytes:    config.NodeMaxAtLargeBytes,
-			nodeToVdrBytesUsed:     make(map[ids.ShortID]uint64),
-			nodeToAtLargeBytesUsed: make(map[ids.ShortID]uint64),
-		},
-		waitingToAcquire:    linkedhashmap.New(),
-		nodeToWaitingMsgIDs: make(map[ids.ShortID][]uint64),
-	}
-	if err := t.metrics.initialize(namespace, registerer); err != nil {
-		return nil, err
-	}
-	return t, nil
-}
-
 // msgThrottler implements MsgThrottler.
 // It gives more space to validators with more stake.
 // Messages are guaranteed to make progress toward
 // acquiring enough bytes to be read.
-type sybilInboundMsgThrottler struct {
+type inboundMsgByteThrottler struct {
 	commonMsgThrottler
-	metrics   sybilInboundMsgThrottlerMetrics
+	metrics   inboundMsgByteThrottlerMetrics
 	nextMsgID uint64
 	// Node ID --> IDs of messages this node is waiting to acquire,
 	// order from oldest to most recent.
@@ -104,7 +151,7 @@ type sybilInboundMsgThrottler struct {
 // Returns when we can read a message of size [msgSize] from node [nodeID].
 // Release([msgSize], [nodeID]) must be called (!) when done with the message
 // or when we give up trying to read the message, if applicable.
-func (t *sybilInboundMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
+func (t *inboundMsgByteThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 	t.metrics.awaitingAcquire.Inc()
 	startTime := time.Now()
 	defer func() {
@@ -188,7 +235,7 @@ func (t *sybilInboundMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 }
 
 // Must correspond to a previous call of Acquire([msgSize], [nodeID])
-func (t *sybilInboundMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
+func (t *inboundMsgByteThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
 	t.lock.Lock()
 	defer func() {
 		t.metrics.remainingAtLargeBytes.Set(float64(t.remainingAtLargeBytes))
@@ -289,7 +336,7 @@ func (t *sybilInboundMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
 	}
 }
 
-type sybilInboundMsgThrottlerMetrics struct {
+type inboundMsgByteThrottlerMetrics struct {
 	acquireLatency        metric.Averager
 	remainingAtLargeBytes prometheus.Gauge
 	remainingVdrBytes     prometheus.Gauge
@@ -297,7 +344,7 @@ type sybilInboundMsgThrottlerMetrics struct {
 	awaitingRelease       prometheus.Gauge
 }
 
-func (m *sybilInboundMsgThrottlerMetrics) initialize(namespace string, reg prometheus.Registerer) error {
+func (m *inboundMsgByteThrottlerMetrics) initialize(namespace string, reg prometheus.Registerer) error {
 	errs := wrappers.Errs{}
 	m.acquireLatency = metric.NewAveragerWithErrs(
 		namespace,
@@ -335,21 +382,9 @@ func (m *sybilInboundMsgThrottlerMetrics) initialize(namespace string, reg prome
 	return errs.Err
 }
 
-func NewNoInboundThrottler() InboundMsgThrottler {
-	return &noInboundMsgThrottler{}
-}
-
-// noMsgThrottler implements MsgThrottler.
-// [Acquire] always returns immediately.
-type noInboundMsgThrottler struct{}
-
-func (*noInboundMsgThrottler) Acquire(uint64, ids.ShortID) {}
-
-func (*noInboundMsgThrottler) Release(uint64, ids.ShortID) {}
-
 // Rate-limits inbound messages based on the number of
-// messages from a given node that we're currently processing
-type inboundProcessingMsgsThrottler struct {
+// messages from a given node that we're currently processing.
+type inboundMsgBufferThrottler struct {
 	lock sync.Mutex
 	// Max number of messages currently processing from a
 	// given node. We will stop reading messages from a
@@ -372,7 +407,7 @@ type inboundProcessingMsgsThrottler struct {
 // buffer so that we can read a message from [nodeID].
 // Release([nodeID]) must be called (!) when done processing the message
 // (or when we give up trying to read the message.)
-func (t *inboundProcessingMsgsThrottler) Acquire(nodeID ids.ShortID) {
+func (t *inboundMsgBufferThrottler) Acquire(nodeID ids.ShortID) {
 	// TODO add metrics
 	t.lock.Lock()
 	if t.nodeToNumProcessingMsgs[nodeID] < t.maxProcessingMsgsPerNode {
@@ -392,7 +427,7 @@ func (t *inboundProcessingMsgsThrottler) Acquire(nodeID ids.ShortID) {
 
 // Release marks that we've finished processing a message from [nodeID]
 // and can release the space it took on the inbound message buffer.
-func (t *inboundProcessingMsgsThrottler) Release(nodeID ids.ShortID) {
+func (t *inboundMsgBufferThrottler) Release(nodeID ids.ShortID) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -406,6 +441,7 @@ func (t *inboundProcessingMsgsThrottler) Release(nodeID ids.ShortID) {
 	}
 	if len(waiting) > 0 {
 		waitingLongest := waiting[0]
+		t.nodeToNumProcessingMsgs[nodeID]++
 		close(waitingLongest)
 	}
 	// Update [t.awaitingAcquire]

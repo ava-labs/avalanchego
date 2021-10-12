@@ -273,13 +273,16 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 				MaxRecentConnsUpgraded: maxRecentConnsUpgraded,
 			},
 
-			InboundMsgThrottlerConfig: throttling.MsgThrottlerConfig{
-				AtLargeAllocSize:    v.GetUint64(InboundThrottlerAtLargeAllocSizeKey),
-				VdrAllocSize:        v.GetUint64(InboundThrottlerVdrAllocSizeKey),
-				NodeMaxAtLargeBytes: v.GetUint64(InboundThrottlerNodeMaxAtLargeBytesKey),
+			InboundMsgThrottlerConfig: throttling.InboundMsgThrottlerConfig{
+				MsgByteThrottlerConfig: throttling.MsgByteThrottlerConfig{
+					AtLargeAllocSize:    v.GetUint64(InboundThrottlerAtLargeAllocSizeKey),
+					VdrAllocSize:        v.GetUint64(InboundThrottlerVdrAllocSizeKey),
+					NodeMaxAtLargeBytes: v.GetUint64(InboundThrottlerNodeMaxAtLargeBytesKey),
+				},
+				MaxProcessingMsgsPerNode: v.GetUint64(InboundThrottlerMaxProcessingMsgsPerNodeKey),
 			},
 
-			OutboundMsgThrottlerConfig: throttling.MsgThrottlerConfig{
+			OutboundMsgThrottlerConfig: throttling.MsgByteThrottlerConfig{
 				AtLargeAllocSize:    v.GetUint64(OutboundThrottlerAtLargeAllocSizeKey),
 				VdrAllocSize:        v.GetUint64(OutboundThrottlerVdrAllocSizeKey),
 				NodeMaxAtLargeBytes: v.GetUint64(OutboundThrottlerNodeMaxAtLargeBytesKey),
