@@ -471,9 +471,6 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	if m.MeterVMEnabled {
-		vm = metervm.NewVertexVM(vm)
-	}
 	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
@@ -515,6 +512,10 @@ func (m *manager) createAvalancheChain(
 	chainConfig, err := m.getChainConfig(ctx.ChainID)
 	if err != nil {
 		return nil, fmt.Errorf("error while fetching chain config: %w", err)
+	}
+
+	if m.MeterVMEnabled {
+		vm = metervm.NewVertexVM(vm)
 	}
 	if err := vm.Initialize(
 		ctx,
@@ -625,9 +626,6 @@ func (m *manager) createSnowmanChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	if m.MeterVMEnabled {
-		vm = metervm.NewBlockVM(vm)
-	}
 	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
@@ -676,15 +674,18 @@ func (m *manager) createSnowmanChain(
 		ctx.ValidatorState = valState
 	}
 
-	// enable ProposerVM on this VM
-	vm = proposervm.New(vm, m.ApricotPhase4Time, m.ApricotPhase4MinPChainHeight)
-
 	// Initialize the ProposerVM and the vm wrapped inside it
 	chainConfig, err := m.getChainConfig(ctx.ChainID)
 	if err != nil {
 		return nil, fmt.Errorf("error while fetching chain config: %w", err)
 	}
 
+	// enable ProposerVM on this VM
+	vm = proposervm.New(vm, m.ApricotPhase4Time, m.ApricotPhase4MinPChainHeight)
+
+	if m.MeterVMEnabled {
+		vm = metervm.NewBlockVM(vm)
+	}
 	if err := vm.Initialize(
 		ctx,
 		vmDBManager,

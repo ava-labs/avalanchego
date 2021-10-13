@@ -42,7 +42,7 @@ func (vm *vertexVM) Initialize(
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
-	if err := vm.vertexMetrics.Initialize(fmt.Sprintf("metervm_%s", ctx.Namespace), ctx.Metrics); err != nil {
+	if err := vm.vertexMetrics.Initialize(fmt.Sprintf("%s_metervm", ctx.Namespace), ctx.Metrics); err != nil {
 		return err
 	}
 

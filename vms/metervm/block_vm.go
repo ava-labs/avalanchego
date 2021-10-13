@@ -43,7 +43,7 @@ func (vm *blockVM) Initialize(
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
-	if err := vm.blockMetrics.Initialize(fmt.Sprintf("metervm_%s", ctx.Namespace), ctx.Metrics); err != nil {
+	if err := vm.blockMetrics.Initialize(fmt.Sprintf("%s_metervm", ctx.Namespace), ctx.Metrics); err != nil {
 		return err
 	}
 
