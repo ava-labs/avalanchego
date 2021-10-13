@@ -18,13 +18,11 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-// LockedAmount ...
 type LockedAmount struct {
 	Amount   uint64 `json:"amount"`
 	Locktime uint64 `json:"locktime"`
 }
 
-// Allocation ...
 type Allocation struct {
 	ETHAddr        ids.ShortID    `json:"ethAddr"`
 	AVAXAddr       ids.ShortID    `json:"avaxAddr"`
@@ -32,7 +30,6 @@ type Allocation struct {
 	UnlockSchedule []LockedAmount `json:"unlockSchedule"`
 }
 
-// Unparse ...
 func (a Allocation) Unparse(networkID uint32) (UnparsedAllocation, error) {
 	ua := UnparsedAllocation{
 		InitialAmount:  a.InitialAmount,
@@ -48,14 +45,12 @@ func (a Allocation) Unparse(networkID uint32) (UnparsedAllocation, error) {
 	return ua, err
 }
 
-// Staker ...
 type Staker struct {
 	NodeID        ids.ShortID `json:"nodeID"`
 	RewardAddress ids.ShortID `json:"rewardAddress"`
 	DelegationFee uint32      `json:"delegationFee"`
 }
 
-// Unparse ...
 func (s Staker) Unparse(networkID uint32) (UnparsedStaker, error) {
 	avaxAddr, err := formatting.FormatAddress(
 		"X",
@@ -86,7 +81,6 @@ type Config struct {
 	Message string `json:"message"`
 }
 
-// Unparse ...
 func (c Config) Unparse() (UnparsedConfig, error) {
 	uc := UnparsedConfig{
 		NetworkID:                  c.NetworkID,
@@ -128,7 +122,6 @@ func (c Config) Unparse() (UnparsedConfig, error) {
 	return uc, nil
 }
 
-// InitialSupply ...
 func (c *Config) InitialSupply() (uint64, error) {
 	initialSupply := uint64(0)
 	for _, allocation := range c.Allocations {
@@ -193,7 +186,6 @@ func init() {
 	}
 }
 
-// GetConfig ...
 func GetConfig(networkID uint32) *Config {
 	switch networkID {
 	case constants.MainnetID:

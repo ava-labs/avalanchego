@@ -4,6 +4,7 @@
 package ids
 
 import (
+	"encoding/json"
 	"strings"
 )
 
@@ -47,11 +48,18 @@ func (ids *Set) Add(idList ...ID) {
 	}
 }
 
-// Union adds all the ids from the provided sets to this set.
+// Union adds all the ids from the provided set to this set.
 func (ids *Set) Union(set Set) {
 	ids.init(2 * set.Len())
 	for id := range set {
 		(*ids)[id] = struct{}{}
+	}
+}
+
+// Difference removes all the ids from the provided set to this set.
+func (ids *Set) Difference(set Set) {
+	for id := range set {
+		delete(*ids, id)
 	}
 }
 
@@ -107,6 +115,13 @@ func (ids Set) List() []ID {
 		i++
 	}
 	return idList
+}
+
+// SortedList returns this set as a sorted list
+func (ids Set) SortedList() []ID {
+	lst := ids.List()
+	SortIDs(lst)
+	return lst
 }
 
 // CappedList returns a list of length at most [size].
@@ -167,4 +182,10 @@ func (ids *Set) Pop() (ID, bool) {
 		return id, true
 	}
 	return ID{}, false
+}
+
+func (ids *Set) MarshalJSON() ([]byte, error) {
+	idsList := ids.List()
+	SortIDs(idsList)
+	return json.Marshal(idsList)
 }

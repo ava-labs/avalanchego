@@ -1,7 +1,10 @@
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package bloom
 
 import (
-	"fmt"
+	"errors"
 	"sync"
 
 	"github.com/spaolacci/murmur3"
@@ -9,7 +12,7 @@ import (
 	streakKnife "github.com/holiman/bloomfilter/v2"
 )
 
-var ErrMaxBytes = fmt.Errorf("too large")
+var errMaxBytes = errors.New("too large")
 
 type Filter interface {
 	// Add adds to filter, assumed thread safe
@@ -22,7 +25,7 @@ type Filter interface {
 func New(maxN uint64, p float64, maxBytes uint64) (Filter, error) {
 	neededBytes := bytesSteakKnifeFilter(maxN, p)
 	if neededBytes > maxBytes {
-		return nil, ErrMaxBytes
+		return nil, errMaxBytes
 	}
 	return newSteakKnifeFilter(maxN, p)
 }

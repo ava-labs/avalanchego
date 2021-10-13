@@ -1,3 +1,6 @@
+// (c) 2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package core
 
 import (
@@ -17,7 +20,7 @@ func TestBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b := NewBlock(parentID, 1)
+	b := NewBlock(parentID, 1, 1)
 
 	b.Initialize([]byte{1, 2, 3}, &SnowmanVM{
 		DB:    db,

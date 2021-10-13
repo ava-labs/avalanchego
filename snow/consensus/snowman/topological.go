@@ -4,7 +4,8 @@
 package snowman
 
 import (
-	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -12,8 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/metrics"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
-
-var errUnhealthy = errors.New("snowman consensus is not healthy")
 
 // TopologicalFactory implements Factory by returning a topological struct
 type TopologicalFactory struct{}
@@ -25,7 +24,11 @@ func (TopologicalFactory) New() Consensus { return &Topological{} }
 // strongly preferred branch. This tree structure amortizes network polls to
 // vote on more than just the next block.
 type Topological struct {
-	metrics.Metrics
+	metrics.Latency
+	metrics.Polls
+
+	// pollNumber is the number of times RecordPolls has been called
+	pollNumber uint64
 
 	// ctx is the context this snowman instance is executing in
 	ctx *snow.Context
@@ -84,7 +87,10 @@ func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters,
 	if err := params.Verify(); err != nil {
 		return err
 	}
-	if err := ts.Metrics.Initialize("blks", "block(s)", ctx.Log, params.Namespace, params.Metrics); err != nil {
+	if err := ts.Latency.Initialize("blks", "block(s)", ctx.Log, params.Namespace, params.Metrics); err != nil {
+		return err
+	}
+	if err := ts.Polls.Initialize(params.Namespace, params.Metrics); err != nil {
 		return err
 	}
 	ts.leaves = ids.Set{}
@@ -108,8 +114,7 @@ func (ts *Topological) NumProcessing() int { return len(ts.blocks) - 1 }
 
 // Add implements the Snowman interface
 func (ts *Topological) Add(blk Block) error {
-	parent := blk.Parent()
-	parentID := parent.ID()
+	parentID := blk.Parent()
 
 	blkID := blk.ID()
 	blkBytes := blk.Bytes()
@@ -121,7 +126,7 @@ func (ts *Topological) Add(blk Block) error {
 	if err := ts.ctx.ConsensusDispatcher.Issue(ts.ctx, blkID, blkBytes); err != nil {
 		return err
 	}
-	ts.Metrics.Issued(blkID)
+	ts.Latency.Issued(blkID, ts.pollNumber)
 
 	parentNode, ok := ts.blocks[parentID]
 	if !ok {
@@ -139,7 +144,7 @@ func (ts *Topological) Add(blk Block) error {
 		if err := ts.ctx.ConsensusDispatcher.Reject(ts.ctx, blkID, blkBytes); err != nil {
 			return err
 		}
-		ts.Metrics.Rejected(blkID)
+		ts.Latency.Rejected(blkID, ts.pollNumber)
 		return nil
 	}
 
@@ -164,28 +169,28 @@ func (ts *Topological) AcceptedOrProcessing(blk Block) bool {
 	if blk.Status() == choices.Accepted {
 		return true
 	}
-	// If the block is in the map of current blocks, then the block is currently
-	// processing.
-	_, ok := ts.blocks[blk.ID()]
-	return ok
+	return ts.processing(blk.ID())
 }
 
 // DecidedOrProcessing implements the Snowman interface
 func (ts *Topological) DecidedOrProcessing(blk Block) bool {
-	switch blk.Status() {
 	// If the block is decided, then it must have been previously issued.
-	case choices.Accepted, choices.Rejected:
+	if blk.Status().Decided() {
 		return true
+	}
 	// If the block is marked as fetched, we can check if it has been
 	// transitively rejected.
-	case choices.Processing:
-		if blk.Height() <= ts.height {
-			return true
-		}
+	if blk.Status() == choices.Processing && blk.Height() <= ts.height {
+		return true
 	}
+	return ts.processing(blk.ID())
+}
+
+// Processing implements the Snowman interface
+func (ts *Topological) processing(blkID ids.ID) bool {
 	// If the block is in the map of current blocks, then the block is currently
 	// processing.
-	_, ok := ts.blocks[blk.ID()]
+	_, ok := ts.blocks[blkID]
 	return ok
 }
 
@@ -225,6 +230,9 @@ func (ts *Topological) Preference() ids.ID { return ts.tail }
 // - Runtime = 3 * |live set| + |votes|
 // - Space = 2 * |live set| + |votes|
 func (ts *Topological) RecordPoll(voteBag ids.Bag) error {
+	// Register a new poll call
+	ts.pollNumber++
+
 	var voteStack []votes
 	if voteBag.Len() >= ts.params.Alpha {
 		// If there is no way for an alpha majority to occur, there is no need
@@ -264,7 +272,7 @@ func (ts *Topological) RecordPoll(voteBag ids.Bag) error {
 	// Traverse from the preferred ID to the last accepted ancestor.
 	for block := startBlock; !block.Accepted(); {
 		ts.preferredIDs.Add(block.blk.ID())
-		block = ts.blocks[block.blk.Parent().ID()]
+		block = ts.blocks[block.blk.Parent()]
 	}
 	// Traverse from the preferred ID to the preferred child until there are no
 	// children.
@@ -280,19 +288,28 @@ func (ts *Topological) Finalized() bool { return len(ts.blocks) == 1 }
 
 // HealthCheck returns information about the consensus health.
 func (ts *Topological) HealthCheck() (interface{}, error) {
-	numOutstandingBlks := ts.Metrics.ProcessingLen()
-	healthy := numOutstandingBlks <= ts.params.MaxOutstandingItems
+	numOutstandingBlks := ts.Latency.ProcessingLen()
+	isOutstandingBlks := numOutstandingBlks <= ts.params.MaxOutstandingItems
+	healthy := isOutstandingBlks
 	details := map[string]interface{}{
 		"outstandingBlocks": numOutstandingBlks,
 	}
 
 	// check for long running blocks
-	timeReqRunning := ts.Metrics.MeasureAndGetOldestDuration()
-	healthy = healthy && timeReqRunning <= ts.params.MaxItemProcessingTime
+	timeReqRunning := ts.Latency.MeasureAndGetOldestDuration()
+	isProcessingTime := timeReqRunning <= ts.params.MaxItemProcessingTime
+	healthy = healthy && isProcessingTime
 	details["longestRunningBlock"] = timeReqRunning.String()
 
 	if !healthy {
-		return details, errUnhealthy
+		var errorReasons []string
+		if !isOutstandingBlks {
+			errorReasons = append(errorReasons, fmt.Sprintf("number of outstanding blocks %d > %d", numOutstandingBlks, ts.params.MaxOutstandingItems))
+		}
+		if !isProcessingTime {
+			errorReasons = append(errorReasons, fmt.Sprintf("block processing time %s > %s", timeReqRunning, ts.params.MaxItemProcessingTime))
+		}
+		return details, fmt.Errorf("snowman consensus is not healthy reason: %s", strings.Join(errorReasons, ", "))
 	}
 	return details, nil
 }
@@ -323,8 +340,7 @@ func (ts *Topological) calculateInDegree(votes ids.Bag) {
 		}
 
 		// The parent contains the snowball instance of its children
-		parent := votedBlock.blk.Parent()
-		parentID := parent.ID()
+		parentID := votedBlock.blk.Parent()
 
 		// Add the votes for this block to the parent's set of responses
 		numVotes := votes.Count(vote)
@@ -344,8 +360,7 @@ func (ts *Topological) calculateInDegree(votes ids.Bag) {
 		// iterate through all the block's ancestors and set up the inDegrees of
 		// the blocks
 		for n := ts.blocks[parentID]; !n.Accepted(); n = ts.blocks[parentID] {
-			parent = n.blk.Parent()
-			parentID = parent.ID()
+			parentID = n.blk.Parent()
 
 			// Increase the inDegree by one
 			kahn := ts.kahnNodes[parentID]
@@ -395,8 +410,7 @@ func (ts *Topological) pushVotes() []votes {
 			continue
 		}
 
-		parent := block.blk.Parent()
-		parentID := parent.ID()
+		parentID := block.blk.Parent()
 
 		// Remove an inbound edge from the parent kahn node and push the votes.
 		parentKahnNode := ts.kahnNodes[parentID]
@@ -419,10 +433,13 @@ func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
 	// If the voteStack is empty, then the full tree should falter. This won't
 	// change the preferred branch.
 	if len(voteStack) == 0 {
-		ts.ctx.Log.Verbo("No progress was made after a vote with %d pending blocks", len(ts.blocks)-1)
-
 		headBlock := ts.blocks[ts.head]
 		headBlock.shouldFalter = true
+
+		if numProcessing := len(ts.blocks) - 1; numProcessing > 0 {
+			ts.ctx.Log.Verbo("No progress was made after a vote with %d pending blocks", numProcessing)
+			ts.Polls.Failed()
+		}
 		return ts.tail, nil
 	}
 
@@ -515,6 +532,8 @@ func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
 			}
 		}
 	}
+
+	ts.Polls.Successful()
 	return newPreferred, nil
 }
 
@@ -543,7 +562,7 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 		return err
 	}
 
-	ts.Metrics.Accepted(pref)
+	ts.Latency.Accepted(pref, ts.pollNumber)
 
 	// Because this is the newest accepted block, this is the new head.
 	ts.head = pref
@@ -575,7 +594,7 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 		if err := ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes); err != nil {
 			return err
 		}
-		ts.Metrics.Rejected(childID)
+		ts.Latency.Rejected(childID, ts.pollNumber)
 
 		// Track which blocks have been directly rejected
 		rejects = append(rejects, childID)
@@ -612,7 +631,7 @@ func (ts *Topological) rejectTransitively(rejected []ids.ID) error {
 			if err := ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes); err != nil {
 				return err
 			}
-			ts.Metrics.Rejected(childID)
+			ts.Latency.Rejected(childID, ts.pollNumber)
 
 			// add the newly rejected block to the end of the queue
 			rejected = append(rejected, childID)

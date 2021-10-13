@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -27,9 +28,17 @@ var (
 
 // Amounter is a data structure that has an amount of something associated with it
 type Amounter interface {
+	snow.ContextInitializable
 	// Amount returns how much value this element represents of the asset in its
 	// transaction.
 	Amount() uint64
+}
+
+// Coster is a data structure that has a cost associated with it
+type Coster interface {
+	// Cost returns how much this element costs to be included in its
+	// transaction.
+	Cost() (uint64, error)
 }
 
 // TransferableIn is the interface a feature extension must provide to transfer
@@ -37,20 +46,26 @@ type Amounter interface {
 type TransferableIn interface {
 	verify.Verifiable
 	Amounter
+	Coster
 }
 
 // TransferableOut is the interface a feature extension must provide to transfer
 // value between features extensions.
 type TransferableOut interface {
+	snow.ContextInitializable
 	verify.State
 	Amounter
 }
 
-// TransferableOutput ...
 type TransferableOutput struct {
 	Asset `serialize:"true"`
+	// FxID has serialize false because we don't want this to be encoded in bytes
+	FxID ids.ID          `serialize:"false" json:"fxID"`
+	Out  TransferableOut `serialize:"true" json:"output"`
+}
 
-	Out TransferableOut `serialize:"true" json:"output"`
+func (out *TransferableOutput) InitCtx(ctx *snow.Context) {
+	out.Out.InitCtx(ctx)
 }
 
 // Output returns the feature extension output that this Output is using.
@@ -110,12 +125,12 @@ func IsSortedTransferableOutputs(outs []*TransferableOutput, c codec.Manager) bo
 	return sort.IsSorted(&innerSortTransferableOutputs{outs: outs, codec: c})
 }
 
-// TransferableInput ...
 type TransferableInput struct {
 	UTXOID `serialize:"true"`
 	Asset  `serialize:"true"`
-
-	In TransferableIn `serialize:"true" json:"input"`
+	// FxID has serialize false because we don't want this to be encoded in bytes
+	FxID ids.ID         `serialize:"false" json:"fxID"`
+	In   TransferableIn `serialize:"true" json:"input"`
 }
 
 // Input returns the feature extension input that this Input is using.
@@ -151,10 +166,8 @@ func (ins innerSortTransferableInputs) Less(i, j int) bool {
 func (ins innerSortTransferableInputs) Len() int      { return len(ins) }
 func (ins innerSortTransferableInputs) Swap(i, j int) { ins[j], ins[i] = ins[i], ins[j] }
 
-// SortTransferableInputs ...
 func SortTransferableInputs(ins []*TransferableInput) { sort.Sort(innerSortTransferableInputs(ins)) }
 
-// IsSortedAndUniqueTransferableInputs ...
 func IsSortedAndUniqueTransferableInputs(ins []*TransferableInput) bool {
 	return utils.IsSortedAndUnique(innerSortTransferableInputs(ins))
 }

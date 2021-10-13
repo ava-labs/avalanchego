@@ -1,3 +1,6 @@
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package indexer
 
 import (
@@ -29,7 +32,7 @@ func newFormattedContainer(c Container, index uint64, enc formatting.Encoding) (
 		ID:       c.ID,
 		Index:    json.Uint64(index),
 	}
-	bytesStr, err := formatting.Encode(enc, c.Bytes)
+	bytesStr, err := formatting.EncodeWithChecksum(enc, c.Bytes)
 	if err != nil {
 		return fc, err
 	}

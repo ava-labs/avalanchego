@@ -8,26 +8,28 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func TestManagerFire(t *testing.T) {
 	manager := Manager{}
 	benchlist := benchlist.NewNoBenchlist()
-	err := manager.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:     time.Millisecond,
-		MinimumTimeout:     time.Millisecond,
-		MaximumTimeout:     10 * time.Second,
-		TimeoutCoefficient: 1.25,
-		TimeoutHalflife:    5 * time.Minute,
-		MetricsNamespace:   "",
-		Registerer:         prometheus.NewRegistry(),
-	}, benchlist)
+	err := manager.Initialize(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     time.Millisecond,
+			MinimumTimeout:     time.Millisecond,
+			MaximumTimeout:     10 * time.Second,
+			TimeoutCoefficient: 1.25,
+			TimeoutHalflife:    5 * time.Minute,
+		},
+		benchlist,
+		"",
+		prometheus.NewRegistry(),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,15 +46,18 @@ func TestManagerFire(t *testing.T) {
 func TestManagerCancel(t *testing.T) {
 	manager := Manager{}
 	benchlist := benchlist.NewNoBenchlist()
-	err := manager.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:     time.Millisecond,
-		MinimumTimeout:     time.Millisecond,
-		MaximumTimeout:     10 * time.Second,
-		TimeoutCoefficient: 1.25,
-		TimeoutHalflife:    5 * time.Minute,
-		MetricsNamespace:   "",
-		Registerer:         prometheus.NewRegistry(),
-	}, benchlist)
+	err := manager.Initialize(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     time.Millisecond,
+			MinimumTimeout:     time.Millisecond,
+			MaximumTimeout:     10 * time.Second,
+			TimeoutCoefficient: 1.25,
+			TimeoutHalflife:    5 * time.Minute,
+		},
+		benchlist,
+		"",
+		prometheus.NewRegistry(),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche/poll"
@@ -21,12 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-)
-
-const (
-	// TODO define this constant in one place rather than here and in snowman
-	// Max containers size in a MultiPut message
-	maxContainersLen = int(4 * network.DefaultMaxMessageSize / 5)
 )
 
 var _ Engine = &Transitive{}
@@ -119,7 +112,7 @@ func (t *Transitive) Gossip() error {
 	}
 
 	if err := t.uniformSampler.Initialize(uint64(len(edge))); err != nil {
-		return err // Should never really happen
+		return err // Should never happen
 	}
 	indices, err := t.uniformSampler.Sample(1)
 	if err != nil {
@@ -133,7 +126,7 @@ func (t *Transitive) Gossip() error {
 	}
 
 	t.Ctx.Log.Verbo("gossiping %s as accepted to the network", vtxID)
-	t.Sender.Gossip(vtxID, vtx.Bytes())
+	t.Sender.SendGossip(vtxID, vtx.Bytes())
 	return nil
 }
 
@@ -147,7 +140,7 @@ func (t *Transitive) Shutdown() error {
 func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error {
 	// If this engine has access to the requested vertex, provide it
 	if vtx, err := t.Manager.GetVtx(vtxID); err == nil {
-		t.Sender.Put(vdr, requestID, vtxID, vtx.Bytes())
+		t.Sender.SendPut(vdr, requestID, vtxID, vtx.Bytes())
 	}
 	return nil
 }
@@ -175,7 +168,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.I
 		vtxBytes := vtx.Bytes()
 		// Ensure response size isn't too large. Include wrappers.IntLen because the size of the message
 		// is included with each container, and the size is repr. by an int.
-		if newLen := wrappers.IntLen + ancestorsBytesLen + len(vtxBytes); newLen < maxContainersLen {
+		if newLen := wrappers.IntLen + ancestorsBytesLen + len(vtxBytes); newLen < constants.MaxContainersLen {
 			ancestorsBytes = append(ancestorsBytes, vtxBytes)
 			ancestorsBytesLen = newLen
 		} else { // reached maximum response size
@@ -197,7 +190,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.I
 	}
 
 	t.metrics.getAncestorsVtxs.Observe(float64(len(ancestorsBytes)))
-	t.Sender.MultiPut(vdr, requestID, ancestorsBytes)
+	t.Sender.SendMultiPut(vdr, requestID, ancestorsBytes)
 	return nil
 }
 
@@ -249,8 +242,10 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 	}
 
 	// Track performance statistics
-	t.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len()))
-	t.numMissingTxs.Set(float64(t.missingTxs.Len()))
+	t.metrics.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len()))
+	t.metrics.numMissingTxs.Set(float64(t.missingTxs.Len()))
+	t.metrics.blockerVtxs.Set(float64(t.vtxBlocked.Len()))
+	t.metrics.blockerTxs.Set(float64(t.txBlocked.Len()))
 	return t.attemptToIssueTxs()
 }
 
@@ -285,6 +280,7 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID) 
 
 	// Wait until [vtxID] and its dependencies have been added to consensus before sending chits
 	t.vtxBlocked.Register(c)
+	t.metrics.blockerVtxs.Set(float64(t.vtxBlocked.Len()))
 	return t.attemptToIssueTxs()
 }
 
@@ -332,12 +328,53 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) er
 	}
 
 	t.vtxBlocked.Register(v)
+	t.metrics.blockerVtxs.Set(float64(t.vtxBlocked.Len()))
 	return t.attemptToIssueTxs()
 }
 
 // QueryFailed implements the Engine interface
 func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
 	return t.Chits(vdr, requestID, nil)
+}
+
+// AppRequest implements the Engine interface
+func (t *Transitive) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+	if !t.Ctx.IsBootstrapped() {
+		t.Ctx.Log.Debug("dropping AppRequest(%s, %d) due to bootstrapping", nodeID, requestID)
+		return nil
+	}
+	// Notify the VM of this request
+	return t.VM.AppRequest(nodeID, requestID, request)
+}
+
+// AppResponse implements the Engine interface
+func (t *Transitive) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	if !t.Ctx.IsBootstrapped() {
+		t.Ctx.Log.Debug("dropping AppResponse(%s, %d) due to bootstrapping", nodeID, requestID)
+		return nil
+	}
+	// Notify the VM of a response to its request
+	return t.VM.AppResponse(nodeID, requestID, response)
+}
+
+// AppRequestFailed implements the Engine interface
+func (t *Transitive) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	if !t.Ctx.IsBootstrapped() {
+		t.Ctx.Log.Debug("dropping AppRequestFailed(%s, %d) due to bootstrapping", nodeID, requestID)
+		return nil
+	}
+	// Notify the VM that a request it made failed
+	return t.VM.AppRequestFailed(nodeID, requestID)
+}
+
+// AppGossip implements the Engine interface
+func (t *Transitive) AppGossip(nodeID ids.ShortID, msg []byte) error {
+	if !t.Ctx.IsBootstrapped() {
+		t.Ctx.Log.Debug("dropping AppGossip(%s) due to bootstrapping", nodeID)
+		return nil
+	}
+	// Notify the VM of this message which has been gossiped to it
+	return t.VM.AppGossip(nodeID, msg)
 }
 
 // Notify implements the Engine interface
@@ -350,6 +387,7 @@ func (t *Transitive) Notify(msg common.Message) error {
 	switch msg {
 	case common.PendingTxs:
 		t.pendingTxs = append(t.pendingTxs, t.VM.PendingTxs()...)
+		t.metrics.pendingTxs.Set(float64(len(t.pendingTxs)))
 		return t.attemptToIssueTxs()
 	default:
 		t.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
@@ -364,6 +402,7 @@ func (t *Transitive) attemptToIssueTxs() error {
 	}
 
 	t.pendingTxs, err = t.batch(t.pendingTxs, false /*=force*/, false /*=empty*/, true /*=limit*/)
+	t.metrics.pendingTxs.Set(float64(len(t.pendingTxs)))
 	return err
 }
 
@@ -500,9 +539,11 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 	}
 
 	// Track performance statistics
-	t.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len()))
-	t.numMissingTxs.Set(float64(t.missingTxs.Len()))
-	t.numPendingVts.Set(float64(t.pending.Len()))
+	t.metrics.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len()))
+	t.metrics.numMissingTxs.Set(float64(t.missingTxs.Len()))
+	t.metrics.numPendingVts.Set(float64(t.pending.Len()))
+	t.metrics.blockerVtxs.Set(float64(t.vtxBlocked.Len()))
+	t.metrics.blockerTxs.Set(float64(t.txBlocked.Len()))
 	return t.errs.Err
 }
 
@@ -584,7 +625,7 @@ func (t *Transitive) issueRepoll() {
 	// Poll the network
 	t.RequestID++
 	if err == nil && t.polls.Add(t.RequestID, vdrBag) {
-		t.Sender.PullQuery(vdrSet, t.RequestID, vtxID)
+		t.Sender.SendPullQuery(vdrSet, t.RequestID, vtxID)
 	} else if err != nil {
 		t.Ctx.Log.Error("re-query for %s was dropped due to an insufficient number of validators", vtxID)
 	}
@@ -628,11 +669,11 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 	}
 	t.RequestID++
 	t.outstandingVtxReqs.Add(vdr, t.RequestID, vtxID) // Mark that there is an outstanding request for this vertex
-	t.Sender.Get(vdr, t.RequestID, vtxID)
-	t.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len())) // Tracks performance statistics
+	t.Sender.SendGet(vdr, t.RequestID, vtxID)
+	t.metrics.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len())) // Tracks performance statistics
 }
 
-// Health implements the common.Engine interface
+// HealthCheck implements the common.Engine interface
 func (t *Transitive) HealthCheck() (interface{}, error) {
 	var (
 		consensusIntf interface{} = struct{}{}

@@ -10,13 +10,13 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
 
-// Client ...
 type Client struct {
 	requester rpc.EndpointRequester
 }
@@ -24,13 +24,13 @@ type Client struct {
 // NewClient returns an AVM client for interacting with avm [chain]
 func NewClient(uri, chain string, requestTimeout time.Duration) *Client {
 	return &Client{
-		requester: rpc.NewEndpointRequester(uri, fmt.Sprintf("/ext/bc/%s", chain), "avm", requestTimeout),
+		requester: rpc.NewEndpointRequester(uri, fmt.Sprintf("/ext/%s", constants.ChainAliasPrefix+chain), "avm", requestTimeout),
 	}
 }
 
 // IssueTx issues a transaction to a node and returns the TxID
 func (c *Client) IssueTx(txBytes []byte) (ids.ID, error) {
-	txStr, err := formatting.Encode(formatting.Hex, txBytes)
+	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, txBytes)
 	if err != nil {
 		return ids.ID{}, err
 	}
@@ -392,7 +392,7 @@ func (c *Client) MintNFT(
 	payload []byte,
 	to string,
 ) (ids.ID, error) {
-	payloadStr, err := formatting.Encode(formatting.Hex, payload)
+	payloadStr, err := formatting.EncodeWithChecksum(formatting.Hex, payload)
 	if err != nil {
 		return ids.ID{}, err
 	}
@@ -411,13 +411,6 @@ func (c *Client) MintNFT(
 	return res.TxID, err
 }
 
-// ImportAVAX sends an import transaction to import funds from [sourceChain] and
-// returns the ID of the newly created transaction
-// This is a deprecated name for Import
-func (c *Client) ImportAVAX(user api.UserPass, to, sourceChain string) (ids.ID, error) {
-	return c.Import(user, to, sourceChain)
-}
-
 // Import sends an import transaction to import funds from [sourceChain] and
 // returns the ID of the newly created transaction
 func (c *Client) Import(user api.UserPass, to, sourceChain string) (ids.ID, error) {
@@ -428,18 +421,6 @@ func (c *Client) Import(user api.UserPass, to, sourceChain string) (ids.ID, erro
 		SourceChain: sourceChain,
 	}, res)
 	return res.TxID, err
-}
-
-// ExportAVAX sends AVAX from this chain to the address specified by [to].
-// Returns the ID of the newly created atomic transaction
-func (c *Client) ExportAVAX(
-	user api.UserPass,
-	from []string,
-	changeAddr string,
-	amount uint64,
-	to string,
-) (ids.ID, error) {
-	return c.Export(user, from, changeAddr, amount, to, "AVAX")
 }
 
 // Export sends an asset from this chain to the P/C-Chain.
@@ -455,15 +436,13 @@ func (c *Client) Export(
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest("export", &ExportArgs{
-		ExportAVAXArgs: ExportAVAXArgs{
-			JSONSpendHeader: api.JSONSpendHeader{
-				UserPass:       user,
-				JSONFromAddrs:  api.JSONFromAddrs{From: from},
-				JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
-			},
-			Amount: cjson.Uint64(amount),
-			To:     to,
+		JSONSpendHeader: api.JSONSpendHeader{
+			UserPass:       user,
+			JSONFromAddrs:  api.JSONFromAddrs{From: from},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
 		},
+		Amount:  cjson.Uint64(amount),
+		To:      to,
 		AssetID: assetID,
 	}, res)
 	return res.TxID, err

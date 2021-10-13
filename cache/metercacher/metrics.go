@@ -12,19 +12,29 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-func newCounterMetric(namespace, name string) prometheus.Counter {
-	return prometheus.NewCounter(prometheus.CounterOpts{
+func newAveragerMetric(namespace, name string, reg prometheus.Registerer, errs *wrappers.Errs) metric.Averager {
+	return metric.NewAveragerWithErrs(
+		namespace,
+		name,
+		fmt.Sprintf("time (in ns) of a %s", name),
+		reg,
+		errs,
+	)
+}
+
+func newCounterMetric(namespace, name string, reg prometheus.Registerer, errs *wrappers.Errs) prometheus.Counter {
+	c := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      name,
 		Help:      fmt.Sprintf("# of times a %s occurred", name),
 	})
+	errs.Add(reg.Register(c))
+	return c
 }
 
 type metrics struct {
 	get,
-	put,
-	evict,
-	flush prometheus.Histogram
+	put metric.Averager
 
 	hit,
 	miss prometheus.Counter
@@ -32,23 +42,12 @@ type metrics struct {
 
 func (m *metrics) Initialize(
 	namespace string,
-	registerer prometheus.Registerer,
+	reg prometheus.Registerer,
 ) error {
-	m.get = metric.NewNanosecondsLatencyMetric(namespace, "get")
-	m.put = metric.NewNanosecondsLatencyMetric(namespace, "put")
-	m.evict = metric.NewNanosecondsLatencyMetric(namespace, "evict")
-	m.flush = metric.NewNanosecondsLatencyMetric(namespace, "flush")
-	m.hit = newCounterMetric(namespace, "hit")
-	m.miss = newCounterMetric(namespace, "miss")
-
 	errs := wrappers.Errs{}
-	errs.Add(
-		registerer.Register(m.get),
-		registerer.Register(m.put),
-		registerer.Register(m.evict),
-		registerer.Register(m.flush),
-		registerer.Register(m.hit),
-		registerer.Register(m.miss),
-	)
+	m.get = newAveragerMetric(namespace, "get", reg, &errs)
+	m.put = newAveragerMetric(namespace, "put", reg, &errs)
+	m.hit = newCounterMetric(namespace, "hit", reg, &errs)
+	m.miss = newCounterMetric(namespace, "miss", reg, &errs)
 	return errs.Err
 }

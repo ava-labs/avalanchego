@@ -17,7 +17,7 @@ import (
 )
 
 func TestNewImportTx(t *testing.T) {
-	vm, baseDB := defaultVM()
+	vm, baseDB, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -71,18 +71,18 @@ func TestNewImportTx(t *testing.T) {
 				},
 			},
 		}
-		utxoBytes, err := Codec.Marshal(codecVersion, utxo)
+		utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
 		if err != nil {
 			t.Fatal(err)
 		}
 		inputID := utxo.InputID()
-		if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+		if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 			Key:   inputID[:],
 			Value: utxoBytes,
 			Traits: [][]byte{
 				recipientKey.PublicKey().Address().Bytes(),
 			},
-		}}); err != nil {
+		}}}}); err != nil {
 			t.Fatal(err)
 		}
 

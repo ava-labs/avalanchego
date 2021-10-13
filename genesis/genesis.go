@@ -33,6 +33,15 @@ const (
 	configChainIDAlias = "X"
 )
 
+var (
+	errNoInitiallyStakedFunds = errors.New("initial staked funds cannot be empty")
+	errNoSupply               = errors.New("initial supply must be > 0")
+	errNoStakeDuration        = errors.New("initial stake duration must be > 0")
+	errNoStakers              = errors.New("initial stakers must be > 0")
+	errNoCChainGenesis        = errors.New("C-Chain genesis cannot be empty")
+	errNoTxs                  = errors.New("genesis creates no transactions")
+)
+
 // validateInitialStakedFunds ensures all staked
 // funds have allocations and that all staked
 // funds are unique.
@@ -41,7 +50,7 @@ const (
 // been checked for correctness.
 func validateInitialStakedFunds(config *Config) error {
 	if len(config.InitialStakedFunds) == 0 {
-		return errors.New("initial staked funds cannot be empty")
+		return errNoInitiallyStakedFunds
 	}
 
 	allocationSet := ids.ShortSet{}
@@ -112,7 +121,7 @@ func validateConfig(networkID uint32, config *Config) error {
 	case err != nil:
 		return fmt.Errorf("unable to calculate initial supply: %w", err)
 	case initialSupply == 0:
-		return errors.New("initial supply must be > 0")
+		return errNoSupply
 	}
 
 	startTime := time.Unix(int64(config.StartTime), 0)
@@ -128,11 +137,11 @@ func validateConfig(networkID uint32, config *Config) error {
 	// but recommend setting a minimum duration of at least
 	// 15 minutes.
 	if config.InitialStakeDuration == 0 {
-		return errors.New("initial stake duration must be > 0")
+		return errNoStakeDuration
 	}
 
 	if len(config.InitialStakers) == 0 {
-		return errors.New("initial stakers must be > 0")
+		return errNoStakers
 	}
 
 	offsetTimeRequired := config.InitialStakeDurationOffset * uint64(len(config.InitialStakers)-1)
@@ -150,7 +159,7 @@ func validateConfig(networkID uint32, config *Config) error {
 	}
 
 	if len(config.CChainGenesis) == 0 {
-		return errors.New("C-Chain genesis cannot be empty")
+		return errNoCChainGenesis
 	}
 
 	return nil
@@ -247,7 +256,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		}
 
 		var err error
-		avax.Memo, err = formatting.Encode(defaultEncoding, memoBytes)
+		avax.Memo, err = formatting.EncodeWithChecksum(defaultEncoding, memoBytes)
 		if err != nil {
 			return nil, ids.Empty, fmt.Errorf("couldn't parse memo bytes to string: %w", err)
 		}
@@ -302,7 +311,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		}
 		for _, unlock := range allocation.UnlockSchedule {
 			if unlock.Amount > 0 {
-				msgStr, err := formatting.Encode(defaultEncoding, allocation.ETHAddr.Bytes())
+				msgStr, err := formatting.EncodeWithChecksum(defaultEncoding, allocation.ETHAddr.Bytes())
 				if err != nil {
 					return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 				}
@@ -339,7 +348,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 				return nil, ids.ID{}, err
 			}
 			for _, unlock := range allocation.UnlockSchedule {
-				msgStr, err := formatting.Encode(defaultEncoding, allocation.ETHAddr.Bytes())
+				msgStr, err := formatting.EncodeWithChecksum(defaultEncoding, allocation.ETHAddr.Bytes())
 				if err != nil {
 					return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 				}
@@ -373,7 +382,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	}
 
 	// Specify the chains that exist upon this network's creation
-	genesisStr, err := formatting.Encode(defaultEncoding, []byte(config.CChainGenesis))
+	genesisStr, err := formatting.EncodeWithChecksum(defaultEncoding, []byte(config.CChainGenesis))
 	if err != nil {
 		return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 	}
@@ -474,7 +483,6 @@ func splitAllocations(allocations []Allocation, numSplits int) [][]Allocation {
 	return append(allNodeAllocations, currentNodeAllocation)
 }
 
-// VMGenesis ...
 func VMGenesis(genesisBytes []byte, vmID ids.ID) (*platformvm.Tx, error) {
 	genesis := platformvm.Genesis{}
 	if _, err := platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
@@ -492,7 +500,6 @@ func VMGenesis(genesisBytes []byte, vmID ids.ID) (*platformvm.Tx, error) {
 	return nil, fmt.Errorf("couldn't find blockchain with VM ID %s", vmID)
 }
 
-// AVAXAssetID ...
 func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
 	c := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
 	m := codec.NewManager(math.MaxUint32)
@@ -520,7 +527,7 @@ func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
 	}
 
 	if len(genesis.Txs) == 0 {
-		return ids.ID{}, errors.New("genesis creates no transactions")
+		return ids.ID{}, errNoTxs
 	}
 	genesisTx := genesis.Txs[0]
 

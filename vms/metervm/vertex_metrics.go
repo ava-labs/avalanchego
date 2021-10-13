@@ -19,34 +19,23 @@ type vertexMetrics struct {
 	verify,
 	verifyErr,
 	accept,
-	reject prometheus.Histogram
+	reject metric.Averager
 }
 
 func (m *vertexMetrics) Initialize(
 	namespace string,
-	registerer prometheus.Registerer,
+	reg prometheus.Registerer,
 ) error {
-	m.pending = metric.NewNanosecondsLatencyMetric(namespace, "pending_txs")
-	m.parse = metric.NewNanosecondsLatencyMetric(namespace, "parse_tx")
-	m.parseErr = metric.NewNanosecondsLatencyMetric(namespace, "parse_tx_err")
-	m.get = metric.NewNanosecondsLatencyMetric(namespace, "get_tx")
-	m.getErr = metric.NewNanosecondsLatencyMetric(namespace, "get_tx_err")
-	m.verify = metric.NewNanosecondsLatencyMetric(namespace, "verify_tx")
-	m.verifyErr = metric.NewNanosecondsLatencyMetric(namespace, "verify_tx_err")
-	m.accept = metric.NewNanosecondsLatencyMetric(namespace, "accept")
-	m.reject = metric.NewNanosecondsLatencyMetric(namespace, "reject")
-
 	errs := wrappers.Errs{}
-	errs.Add(
-		registerer.Register(m.pending),
-		registerer.Register(m.parse),
-		registerer.Register(m.parseErr),
-		registerer.Register(m.get),
-		registerer.Register(m.getErr),
-		registerer.Register(m.verify),
-		registerer.Register(m.verifyErr),
-		registerer.Register(m.accept),
-		registerer.Register(m.reject),
-	)
+	m.pending = newAverager(namespace, "pending_txs", reg, &errs)
+	m.parse = newAverager(namespace, "parse_tx", reg, &errs)
+	m.parseErr = newAverager(namespace, "parse_tx_err", reg, &errs)
+	m.get = newAverager(namespace, "get_tx", reg, &errs)
+	m.getErr = newAverager(namespace, "get_tx_err", reg, &errs)
+	m.verify = newAverager(namespace, "verify_tx", reg, &errs)
+	m.verifyErr = newAverager(namespace, "verify_tx_err", reg, &errs)
+	m.accept = newAverager(namespace, "accept", reg, &errs)
+	m.reject = newAverager(namespace, "reject", reg, &errs)
+
 	return errs.Err
 }

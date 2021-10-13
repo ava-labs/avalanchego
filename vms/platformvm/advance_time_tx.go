@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -27,13 +29,29 @@ type UnsignedAdvanceTimeTx struct {
 	Time uint64 `serialize:"true" json:"time"`
 }
 
+func (tx *UnsignedAdvanceTimeTx) InitCtx(*snow.Context) {}
+
 // Timestamp returns the time this block is proposing the chain should be set to
 func (tx *UnsignedAdvanceTimeTx) Timestamp() time.Time {
 	return time.Unix(int64(tx.Time), 0)
 }
 
-// SemanticVerify this transaction is valid.
-func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
+func (tx *UnsignedAdvanceTimeTx) InputIDs() ids.Set {
+	return nil
+}
+
+func (tx *UnsignedAdvanceTimeTx) SyntacticVerify(*snow.Context) error {
+	return nil
+}
+
+// Attempts to verify this transaction with the provided state.
+func (tx *UnsignedAdvanceTimeTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
+	_, _, _, _, err := tx.Execute(vm, parentState, stx)
+	return err
+}
+
+// Execute this transaction.
+func (tx *UnsignedAdvanceTimeTx) Execute(
 	vm *VM,
 	parentState MutableState,
 	stx *Tx,
@@ -51,24 +69,25 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 		return nil, nil, nil, nil, permError{errWrongNumberOfCredentials}
 	}
 
-	timestamp := tx.Timestamp()
+	txTimestamp := tx.Timestamp()
 	localTimestamp := vm.clock.Time()
-	if localTimestamp.Add(syncBound).Before(timestamp) {
+	localTimestampPlusSync := localTimestamp.Add(syncBound)
+	if localTimestampPlusSync.Before(txTimestamp) {
 		return nil, nil, nil, nil, tempError{
 			fmt.Errorf(
 				"proposed time (%s) is too far in the future relative to local time (%s)",
-				timestamp,
+				txTimestamp,
 				localTimestamp,
 			),
 		}
 	}
 
-	if currentTimestamp := parentState.GetTimestamp(); !timestamp.After(currentTimestamp) {
+	if chainTimestamp := parentState.GetTimestamp(); !txTimestamp.After(chainTimestamp) {
 		return nil, nil, nil, nil, permError{
 			fmt.Errorf(
 				"proposed timestamp (%s), not after current timestamp (%s)",
-				timestamp,
-				currentTimestamp,
+				txTimestamp,
+				chainTimestamp,
 			),
 		}
 	}
@@ -80,11 +99,11 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 		return nil, nil, nil, nil, tempError{err}
 	}
 
-	if timestamp.After(nextStakerChangeTime) {
+	if txTimestamp.After(nextStakerChangeTime) {
 		return nil, nil, nil, nil, permError{
 			fmt.Errorf(
 				"proposed timestamp (%s) later than next staker change time (%s)",
-				timestamp,
+				txTimestamp,
 				nextStakerChangeTime,
 			),
 		}
@@ -105,7 +124,7 @@ pendingStakerLoop:
 	for _, tx := range pendingStakers.Stakers() {
 		switch staker := tx.UnsignedTx.(type) {
 		case *UnsignedAddDelegatorTx:
-			if staker.StartTime().After(timestamp) {
+			if staker.StartTime().After(txTimestamp) {
 				break pendingStakerLoop
 			}
 
@@ -126,7 +145,7 @@ pendingStakerLoop:
 			})
 			numToRemoveFromPending++
 		case *UnsignedAddValidatorTx:
-			if staker.StartTime().After(timestamp) {
+			if staker.StartTime().After(txTimestamp) {
 				break pendingStakerLoop
 			}
 
@@ -147,13 +166,13 @@ pendingStakerLoop:
 			})
 			numToRemoveFromPending++
 		case *UnsignedAddSubnetValidatorTx:
-			if staker.StartTime().After(timestamp) {
+			if staker.StartTime().After(txTimestamp) {
 				break pendingStakerLoop
 			}
 
 			// If this staker should already be removed, then we should just
 			// never add them.
-			if staker.EndTime().After(timestamp) {
+			if staker.EndTime().After(txTimestamp) {
 				toAddWithoutRewardToCurrent = append(toAddWithoutRewardToCurrent, tx)
 			}
 			numToRemoveFromPending++
@@ -174,7 +193,7 @@ currentStakerLoop:
 	for _, tx := range currentStakers.Stakers() {
 		switch staker := tx.UnsignedTx.(type) {
 		case *UnsignedAddSubnetValidatorTx:
-			if staker.EndTime().After(timestamp) {
+			if staker.EndTime().After(txTimestamp) {
 				break currentStakerLoop
 			}
 
@@ -197,7 +216,7 @@ currentStakerLoop:
 	}
 
 	onCommitState := newVersionedState(parentState, newlyCurrentStakers, newlyPendingStakers)
-	onCommitState.SetTimestamp(timestamp)
+	onCommitState.SetTimestamp(txTimestamp)
 	onCommitState.SetCurrentSupply(currentSupply)
 
 	// State doesn't change if this proposal is aborted
@@ -217,7 +236,10 @@ currentStakerLoop:
 // InitiallyPrefersCommit returns true if the proposed time is at
 // or before the current time plus the synchrony bound
 func (tx *UnsignedAdvanceTimeTx) InitiallyPrefersCommit(vm *VM) bool {
-	return !tx.Timestamp().After(vm.clock.Time().Add(syncBound))
+	txTimestamp := tx.Timestamp()
+	localTimestamp := vm.clock.Time()
+	localTimestampPlusSync := localTimestamp.Add(syncBound)
+	return !txTimestamp.After(localTimestampPlusSync)
 }
 
 // newAdvanceTimeTx creates a new tx that, if it is accepted and followed by a
@@ -226,5 +248,5 @@ func (vm *VM) newAdvanceTimeTx(timestamp time.Time) (*Tx, error) {
 	tx := &Tx{UnsignedTx: &UnsignedAdvanceTimeTx{
 		Time: uint64(timestamp.Unix()),
 	}}
-	return tx, tx.Sign(vm.codec, nil)
+	return tx, tx.Sign(Codec, nil)
 }

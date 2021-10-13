@@ -17,7 +17,6 @@ const (
 	NoLock
 )
 
-// HTTPHandler ...
 type HTTPHandler struct {
 	LockOptions LockOption
 	Handler     http.Handler

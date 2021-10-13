@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -729,13 +730,25 @@ func TestBaseTxSemanticVerify(t *testing.T) {
 		vm:   vm,
 		txID: tx.ID(),
 	}
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err != nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Credentials()); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
-	genesisBytes, _, vm, _ := GenesisVM(t)
+	genesisBytes, _, vm, _ := GenesisVMWithArgs(
+		t,
+		[]*common.Fx{{
+			ID: ids.GenerateTestID(),
+			Fx: &FxTest{
+				InitializeF: func(vmIntf interface{}) error {
+					vm := vmIntf.(secp256k1fx.VM)
+					return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
+				},
+			},
+		}},
+		nil,
+	)
 	ctx := vm.ctx
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -743,10 +756,6 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 		}
 		ctx.Lock.Unlock()
 	}()
-
-	if err := vm.CodecRegistry().RegisterType(&avax.TestVerifiable{}); err != nil {
-		t.Fatal(err)
-	}
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
@@ -770,9 +779,9 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 				},
 			}},
 		}},
-		Creds: []verify.Verifiable{
-			&avax.TestVerifiable{},
-		},
+		Creds: []*FxCredential{{
+			Verifiable: &avax.TestVerifiable{},
+		}},
 	}
 	if err := tx.SignSECP256K1Fx(vm.codec, nil); err != nil {
 		t.Fatal(err)
@@ -785,7 +794,7 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 		vm:   vm,
 		txID: tx.ID(),
 	}
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Credentials()); err == nil {
 		t.Fatalf("should have errored due to an unknown feature extension")
 	}
 }
@@ -799,10 +808,6 @@ func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
 		}
 		ctx.Lock.Unlock()
 	}()
-
-	if err := vm.CodecRegistry().RegisterType(&avax.TestVerifiable{}); err != nil {
-		t.Fatal(err)
-	}
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
@@ -838,7 +843,7 @@ func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
 		txID: tx.ID(),
 	}
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Credentials()); err == nil {
 		t.Fatalf("should have errored due to an asset ID mismatch")
 	}
 }
@@ -855,7 +860,8 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 	}()
 
 	fx := &FxTest{}
-	fx.InitializeF = func(interface{}) error {
+	fx.InitializeF = func(vmIntf interface{}) error {
+		vm := vmIntf.(secp256k1fx.VM)
 		return vm.CodecRegistry().RegisterType(&avax.TestTransferable{})
 	}
 
@@ -863,7 +869,7 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		manager.NewDefaultMemDBManager(),
+		manager.NewMemDB(version.DefaultVersion1_0_0),
 		genesisBytes,
 		nil,
 		nil,
@@ -878,6 +884,7 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 				Fx: fx,
 			},
 		},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -921,7 +928,7 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 		txID: tx.ID(),
 	}
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Credentials()); err == nil {
 		t.Fatalf("should have errored due to an unsupported fx")
 	}
 }
@@ -958,9 +965,11 @@ func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
 				},
 			}},
 		}},
-		Creds: []verify.Verifiable{
-			&secp256k1fx.Credential{
-				Sigs: [][crypto.SECP256K1RSigLen]byte{{}},
+		Creds: []*FxCredential{
+			{
+				Verifiable: &secp256k1fx.Credential{
+					Sigs: [][crypto.SECP256K1RSigLen]byte{{}},
+				},
 			},
 		},
 	}
@@ -975,7 +984,7 @@ func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
 		vm:   vm,
 		txID: tx.ID(),
 	}
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Credentials()); err == nil {
 		t.Fatalf("Invalid credential should have failed verification")
 	}
 }
@@ -1024,7 +1033,7 @@ func TestBaseTxSemanticVerifyMissingUTXO(t *testing.T) {
 		txID: tx.ID(),
 	}
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Credentials()); err == nil {
 		t.Fatalf("Unknown UTXO should have failed verification")
 	}
 }
@@ -1073,7 +1082,7 @@ func TestBaseTxSemanticVerifyInvalidUTXO(t *testing.T) {
 		txID: tx.ID(),
 	}
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Credentials()); err == nil {
 		t.Fatalf("Invalid UTXO should have failed verification")
 	}
 }
@@ -1105,7 +1114,7 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: genesisTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.txFee,
+				Amt: startBalance - vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
@@ -1168,7 +1177,7 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 		txID: tx.ID(),
 	}
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Credentials()); err == nil {
 		t.Fatalf("Invalid UTXO should have failed verification")
 	}
 }
@@ -1200,7 +1209,7 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: genesisTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.txFee,
+				Amt: startBalance - vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
@@ -1264,7 +1273,7 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 		txID: tx.ID(),
 	}
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Credentials()); err == nil {
 		t.Fatalf("Wrong asset ID should have failed verification")
 	}
 }
@@ -1280,13 +1289,14 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 	vm := &VM{}
 
 	fx := &FxTest{}
-	fx.InitializeF = func(interface{}) error {
+	fx.InitializeF = func(vmIntf interface{}) error {
+		vm := vmIntf.(secp256k1fx.VM)
 		return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
 	}
 
 	err := vm.Initialize(
 		ctx,
-		manager.NewDefaultMemDBManager(),
+		manager.NewMemDB(version.DefaultVersion1_0_0),
 		genesisBytes,
 		nil,
 		nil,
@@ -1301,6 +1311,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 				Fx: fx,
 			},
 		},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1340,7 +1351,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: genesisTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.txFee,
+				Amt: startBalance - vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
@@ -1392,9 +1403,9 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 				},
 			}},
 		}},
-		Creds: []verify.Verifiable{
-			&avax.TestVerifiable{},
-		},
+		Creds: []*FxCredential{{
+			Verifiable: &avax.TestVerifiable{},
+		}},
 	}
 	if err := tx.SignSECP256K1Fx(vm.codec, nil); err != nil {
 		t.Fatal(err)
@@ -1408,7 +1419,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 		txID: tx.ID(),
 	}
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Credentials()); err == nil {
 		t.Fatalf("Unsupported feature extension should have failed verification")
 	}
 }
@@ -1424,13 +1435,14 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 	vm := &VM{}
 
 	fx := &FxTest{}
-	fx.InitializeF = func(interface{}) error {
+	fx.InitializeF = func(vmIntf interface{}) error {
+		vm := vmIntf.(secp256k1fx.VM)
 		return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
 	}
 
 	err := vm.Initialize(
 		ctx,
-		manager.NewDefaultMemDBManager(),
+		manager.NewMemDB(version.DefaultVersion1_0_0),
 		genesisBytes,
 		nil,
 		nil,
@@ -1445,6 +1457,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 				Fx: fx,
 			},
 		},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1484,7 +1497,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: genesisTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.txFee,
+				Amt: startBalance - vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
@@ -1536,9 +1549,11 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 				},
 			}},
 		}},
-		Creds: []verify.Verifiable{
-			&secp256k1fx.Credential{
-				Sigs: [][crypto.SECP256K1RSigLen]byte{{}},
+		Creds: []*FxCredential{
+			{
+				Verifiable: &secp256k1fx.Credential{
+					Sigs: [][crypto.SECP256K1RSigLen]byte{{}},
+				},
 			},
 		},
 	}
@@ -1553,7 +1568,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 		vm:   vm,
 		txID: tx.ID(),
 	}
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Credentials()); err == nil {
 		t.Fatalf("Invalid signature should have failed verification")
 	}
 }
@@ -1611,7 +1626,19 @@ func TestBaseTxSemanticVerifyMalformedOutput(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerifyInvalidFxOutput(t *testing.T) {
-	genesisBytes, _, vm, _ := GenesisVM(t)
+	genesisBytes, _, vm, _ := GenesisVMWithArgs(
+		t,
+		[]*common.Fx{{
+			ID: ids.GenerateTestID(),
+			Fx: &FxTest{
+				InitializeF: func(vmIntf interface{}) error {
+					vm := vmIntf.(secp256k1fx.VM)
+					return vm.CodecRegistry().RegisterType(&avax.TestTransferable{})
+				},
+			},
+		}},
+		nil,
+	)
 	ctx := vm.ctx
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1619,10 +1646,6 @@ func TestBaseTxSemanticVerifyInvalidFxOutput(t *testing.T) {
 		}
 		ctx.Lock.Unlock()
 	}()
-
-	if err := vm.CodecRegistry().RegisterType(&avax.TestTransferable{}); err != nil {
-		t.Fatal(err)
-	}
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
@@ -1663,7 +1686,7 @@ func TestBaseTxSemanticVerifyInvalidFxOutput(t *testing.T) {
 		txID: tx.ID(),
 	}
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Credentials()); err == nil {
 		t.Fatalf("should have errored due to sending funds to an un-authorized fx")
 	}
 }

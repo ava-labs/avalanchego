@@ -14,7 +14,7 @@ type ShortSet map[ShortID]struct{}
 
 // Return a new ShortSet with initial capacity [size].
 // More or less than [size] elements can be added to this set.
-// Using NewSet() rather than ids.Set{} is just an optimization that can
+// Using NewShortSet() rather than ids.ShortSet{} is just an optimization that can
 // be used if you know how many elements will be put in this set.
 func NewShortSet(size int) ShortSet {
 	if size < 0 {
@@ -40,11 +40,18 @@ func (ids *ShortSet) Add(idList ...ShortID) {
 	}
 }
 
-// Union adds all the ids from the provided sets to this set.
+// Union adds all the ids from the provided set to this set.
 func (ids *ShortSet) Union(idSet ShortSet) {
 	ids.init(2 * idSet.Len())
 	for id := range idSet {
 		(*ids)[id] = struct{}{}
+	}
+}
+
+// Difference removes all the ids from the provided set to this set.
+func (ids *ShortSet) Difference(idSet ShortSet) {
+	for id := range idSet {
+		delete(*ids, id)
 	}
 }
 
@@ -99,6 +106,13 @@ func (ids ShortSet) List() []ShortID {
 		i++
 	}
 	return idList
+}
+
+// SortedList returns this set as a sorted list
+func (ids ShortSet) SortedList() []ShortID {
+	lst := ids.List()
+	SortShortIDs(lst)
+	return lst
 }
 
 // Equals returns true if the sets contain the same elements

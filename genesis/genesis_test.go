@@ -25,7 +25,7 @@ func TestAliases(t *testing.T) {
 	genesisBytes, _, err := Genesis(constants.LocalID, "")
 	assert.NoError(err)
 
-	generalAliases, _, _, err := Aliases(genesisBytes)
+	generalAliases, _, err := Aliases(genesisBytes)
 	assert.NoError(err)
 
 	if _, exists := generalAliases["vm/"+platformvm.ID.String()]; !exists {
@@ -271,7 +271,7 @@ func TestGenesis(t *testing.T) {
 		},
 		"local": {
 			networkID: constants.LocalID,
-			expected:  "7fdadb09543651e4fa0952000d198034aefac33126759238af3d8e3407747e70",
+			expected:  "0495fd22c09aa8551664f0874abea2d90628c28ca897091e69188ed6052dc768",
 		},
 		"local (with custom specified)": {
 			networkID:    constants.LocalID,

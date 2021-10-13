@@ -21,6 +21,7 @@ const (
 var (
 	_ database.Database = &Database{}
 	_ database.Batch    = &batch{}
+	_ database.Iterator = &iterator{}
 )
 
 // Database implements the Database interface by living on top of another

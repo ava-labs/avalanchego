@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -83,7 +84,7 @@ func NewContext(tb testing.TB) *snow.Context {
 	ctx.ChainID = chainID
 	ctx.AVAXAssetID = tx.ID()
 	ctx.XChainID = ids.Empty.Prefix(0)
-	aliaser := ctx.BCLookup.(*ids.Aliaser)
+	aliaser := ctx.BCLookup.(ids.Aliaser)
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -234,10 +235,10 @@ func BuildGenesisTestWithArgs(tb testing.TB, args *BuildGenesisArgs) []byte {
 }
 
 func GenesisVM(tb testing.TB) ([]byte, chan common.Message, *VM, *atomic.Memory) {
-	return GenesisVMWithArgs(tb, nil)
+	return GenesisVMWithArgs(tb, nil, nil)
 }
 
-func GenesisVMWithArgs(tb testing.TB, args *BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
+func GenesisVMWithArgs(tb testing.TB, additionalFxs []*common.Fx, args *BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
 	var genesisBytes []byte
 
 	if args != nil {
@@ -248,7 +249,7 @@ func GenesisVMWithArgs(tb testing.TB, args *BuildGenesisArgs) ([]byte, chan comm
 
 	ctx := NewContext(tb)
 
-	baseDBManager := manager.NewDefaultMemDBManager()
+	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 
 	m := &atomic.Memory{}
 	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
@@ -271,27 +272,35 @@ func GenesisVMWithArgs(tb testing.TB, args *BuildGenesisArgs) ([]byte, chan comm
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
 
 	issuer := make(chan common.Message, 1)
-	vm := &VM{
-		txFee:         testTxFee,
-		creationTxFee: testTxFee,
+	vm := &VM{Factory: Factory{
+		TxFee:            testTxFee,
+		CreateAssetTxFee: testTxFee,
+	}}
+	configBytes, err := BuildAvmConfigBytes(Config{IndexTransactions: true})
+	if err != nil {
+		tb.Fatal("should not have caused error in creating avm config bytes")
 	}
 	err = vm.Initialize(
 		ctx,
 		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
 		nil,
-		nil,
+		configBytes,
 		issuer,
-		[]*common.Fx{
-			{
-				ID: ids.Empty,
-				Fx: &secp256k1fx.Fx{},
+		append(
+			[]*common.Fx{
+				{
+					ID: ids.Empty,
+					Fx: &secp256k1fx.Fx{},
+				},
+				{
+					ID: nftfx.ID,
+					Fx: &nftfx.Fx{},
+				},
 			},
-			{
-				ID: nftfx.ID,
-				Fx: &nftfx.Fx{},
-			},
-		},
+			additionalFxs...,
+		),
+		nil,
 	)
 	if err != nil {
 		tb.Fatal(err)
@@ -368,7 +377,7 @@ func setupIssueTx(t testing.TB) (chan common.Message, *VM, *snow.Context, []*Tx)
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.txFee,
+				Amt: startBalance - vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{key.PublicKey().Address()},
@@ -543,7 +552,7 @@ func TestTxSerialization(t *testing.T) {
 		Denomination: 0,
 		States: []*InitialState{
 			{
-				FxID: 0,
+				FxIndex: 0,
 				Outs: []verify.State{
 					&secp256k1fx.MintOutput{
 						OutputOwners: secp256k1fx.OutputOwners{
@@ -594,13 +603,14 @@ func TestInvalidGenesis(t *testing.T) {
 	}()
 
 	err := vm.Initialize(
-		ctx,                              // context
-		manager.NewDefaultMemDBManager(), // dbManager
-		nil,                              // genesisState
-		nil,                              // upgradeBytes
-		nil,                              // configBytes
-		make(chan common.Message, 1),     // engineMessenger
-		nil,                              // fxs
+		ctx, // context
+		manager.NewMemDB(version.DefaultVersion1_0_0), // dbManager
+		nil,                          // genesisState
+		nil,                          // upgradeBytes
+		nil,                          // configBytes
+		make(chan common.Message, 1), // engineMessenger
+		nil,                          // fxs
+		nil,                          // AppSender
 	)
 	if err == nil {
 		t.Fatalf("Should have errored due to an invalid genesis")
@@ -620,15 +630,16 @@ func TestInvalidFx(t *testing.T) {
 
 	genesisBytes := BuildGenesisTest(t)
 	err := vm.Initialize(
-		ctx,                              // context
-		manager.NewDefaultMemDBManager(), // dbManager
-		genesisBytes,                     // genesisState
-		nil,                              // upgradeBytes
-		nil,                              // configBytes
-		make(chan common.Message, 1),     // engineMessenger
+		ctx, // context
+		manager.NewMemDB(version.DefaultVersion1_0_0), // dbManager
+		genesisBytes,                 // genesisState
+		nil,                          // upgradeBytes
+		nil,                          // configBytes
+		make(chan common.Message, 1), // engineMessenger
 		[]*common.Fx{ // fxs
 			nil,
 		},
+		nil,
 	)
 	if err == nil {
 		t.Fatalf("Should have errored due to an invalid interface")
@@ -648,12 +659,12 @@ func TestFxInitializationFailure(t *testing.T) {
 
 	genesisBytes := BuildGenesisTest(t)
 	err := vm.Initialize(
-		ctx,                              // context
-		manager.NewDefaultMemDBManager(), // dbManager
-		genesisBytes,                     // genesisState
-		nil,                              // upgradeBytes
-		nil,                              // configBytes
-		make(chan common.Message, 1),     // engineMessenger
+		ctx, // context
+		manager.NewMemDB(version.DefaultVersion1_0_0), // dbManager
+		genesisBytes,                 // genesisState
+		nil,                          // upgradeBytes
+		nil,                          // configBytes
+		make(chan common.Message, 1), // engineMessenger
 		[]*common.Fx{{ // fxs
 			ID: ids.Empty,
 			Fx: &FxTest{
@@ -662,6 +673,7 @@ func TestFxInitializationFailure(t *testing.T) {
 				},
 			},
 		}},
+		nil,
 	)
 	if err == nil {
 		t.Fatalf("Should have errored due to an invalid fx initialization")
@@ -776,7 +788,7 @@ func TestGenesisGetPaginatedUTXOs(t *testing.T) {
 			},
 		},
 	}
-	_, _, vm, _ := GenesisVMWithArgs(t, genesisArgs)
+	_, _, vm, _ := GenesisVMWithArgs(t, nil, genesisArgs)
 	ctx := vm.ctx
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -874,7 +886,7 @@ func TestIssueNFT(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		manager.NewDefaultMemDBManager(),
+		manager.NewMemDB(version.DefaultVersion1_0_0),
 		genesisBytes,
 		nil,
 		nil,
@@ -889,6 +901,7 @@ func TestIssueNFT(t *testing.T) {
 				Fx: &nftfx.Fx{},
 			},
 		},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -914,7 +927,7 @@ func TestIssueNFT(t *testing.T) {
 		Symbol:       "TR",
 		Denomination: 0,
 		States: []*InitialState{{
-			FxID: 1,
+			FxIndex: 1,
 			Outs: []verify.State{
 				&nftfx.MintOutput{
 					GroupID: 1,
@@ -992,8 +1005,8 @@ func TestIssueNFT(t *testing.T) {
 				},
 			}},
 		},
-		Creds: []verify.Verifiable{
-			&nftfx.Credential{},
+		Creds: []*FxCredential{
+			{Verifiable: &nftfx.Credential{}},
 		},
 	}
 	if err := transferNFTTx.SignNFTFx(vm.codec, nil); err != nil {
@@ -1021,7 +1034,7 @@ func TestIssueProperty(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		manager.NewDefaultMemDBManager(),
+		manager.NewMemDB(version.DefaultVersion1_0_0),
 		genesisBytes,
 		nil,
 		nil,
@@ -1040,6 +1053,7 @@ func TestIssueProperty(t *testing.T) {
 				Fx: &propertyfx.Fx{},
 			},
 		},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1065,7 +1079,7 @@ func TestIssueProperty(t *testing.T) {
 		Symbol:       "TR",
 		Denomination: 0,
 		States: []*InitialState{{
-			FxID: 2,
+			FxIndex: 2,
 			Outs: []verify.State{
 				&propertyfx.MintOutput{
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -1123,10 +1137,12 @@ func TestIssueProperty(t *testing.T) {
 	fixedSig := [crypto.SECP256K1RSigLen]byte{}
 	copy(fixedSig[:], sig)
 
-	mintPropertyTx.Creds = append(mintPropertyTx.Creds, &propertyfx.Credential{
-		Credential: secp256k1fx.Credential{
-			Sigs: [][crypto.SECP256K1RSigLen]byte{
-				fixedSig,
+	mintPropertyTx.Creds = append(mintPropertyTx.Creds, &FxCredential{
+		Verifiable: &propertyfx.Credential{
+			Credential: secp256k1fx.Credential{
+				Sigs: [][crypto.SECP256K1RSigLen]byte{
+					fixedSig,
+				},
 			},
 		},
 	})
@@ -1156,7 +1172,7 @@ func TestIssueProperty(t *testing.T) {
 		}},
 	}}
 
-	burnPropertyTx.Creds = append(burnPropertyTx.Creds, &propertyfx.Credential{})
+	burnPropertyTx.Creds = append(burnPropertyTx.Creds, &FxCredential{Verifiable: &propertyfx.Credential{}})
 
 	unsignedBytes, err = vm.codec.Marshal(codecVersion, burnPropertyTx.UnsignedTx)
 	if err != nil {
@@ -1223,7 +1239,7 @@ func setupTxFeeAssets(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.M
 			},
 		},
 	}
-	genesisBytes, issuer, vm, m := GenesisVMWithArgs(t, customArgs)
+	genesisBytes, issuer, vm, m := GenesisVMWithArgs(t, nil, customArgs)
 	expectedID, err := vm.Aliaser.Lookup(assetAlias)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedID, vm.feeAssetID)
@@ -1512,7 +1528,7 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 			},
 			Asset: avax.Asset{ID: avaxTx.ID()},
 			In: &secp256k1fx.TransferInput{
-				Amt: startBalance - vm.txFee,
+				Amt: startBalance - vm.TxFee,
 				Input: secp256k1fx.Input{
 					SigIndices: []uint32{
 						0,
@@ -1523,7 +1539,7 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - 2*vm.txFee,
+				Amt: startBalance - 2*vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{key.PublicKey().Address()},

@@ -12,7 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
-// UnparsedAllocation ...
+var errInvalidETHAddress = errors.New("invalid eth address")
+
 type UnparsedAllocation struct {
 	ETHAddr        string         `json:"ethAddr"`
 	AVAXAddr       string         `json:"avaxAddr"`
@@ -20,7 +21,6 @@ type UnparsedAllocation struct {
 	UnlockSchedule []LockedAmount `json:"unlockSchedule"`
 }
 
-// Parse ...
 func (ua UnparsedAllocation) Parse() (Allocation, error) {
 	a := Allocation{
 		InitialAmount:  ua.InitialAmount,
@@ -28,7 +28,7 @@ func (ua UnparsedAllocation) Parse() (Allocation, error) {
 	}
 
 	if len(ua.ETHAddr) < 2 {
-		return a, errors.New("invalid eth address")
+		return a, errInvalidETHAddress
 	}
 
 	ethAddrBytes, err := hex.DecodeString(ua.ETHAddr[2:])
@@ -54,14 +54,12 @@ func (ua UnparsedAllocation) Parse() (Allocation, error) {
 	return a, nil
 }
 
-// UnparsedStaker ...
 type UnparsedStaker struct {
 	NodeID        string `json:"nodeID"`
 	RewardAddress string `json:"rewardAddress"`
 	DelegationFee uint32 `json:"delegationFee"`
 }
 
-// Parse ...
 func (us UnparsedStaker) Parse() (Staker, error) {
 	s := Staker{
 		DelegationFee: us.DelegationFee,
@@ -102,7 +100,6 @@ type UnparsedConfig struct {
 	Message string `json:"message"`
 }
 
-// Parse ...
 func (uc UnparsedConfig) Parse() (Config, error) {
 	c := Config{
 		NetworkID:                  uc.NetworkID,

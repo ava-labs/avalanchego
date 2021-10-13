@@ -15,8 +15,10 @@ const (
 )
 
 var (
-	headKey          = []byte{0x01}
-	_       LinkedDB = &linkedDB{}
+	headKey = []byte{0x01}
+
+	_ LinkedDB          = &linkedDB{}
+	_ database.Iterator = &iterator{}
 )
 
 // LinkedDB provides a key value interface while allowing iteration.

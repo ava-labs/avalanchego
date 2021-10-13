@@ -1,3 +1,6 @@
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package auth
 
 import (
@@ -11,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -42,7 +45,7 @@ var (
 		headerKey,
 		headerValStart,
 	)
-	errInvalidSigningMethod        = fmt.Errorf("auth token didn't specify the HS256 signing method correctly")
+	errInvalidSigningMethod        = errors.New("auth token didn't specify the HS256 signing method correctly")
 	errTokenRevoked                = errors.New("the provided auth token was revoked")
 	errTokenInsufficientPermission = errors.New("the provided auth token does not allow access to this endpoint")
 	errWrongPassword               = errors.New("incorrect password")

@@ -10,6 +10,7 @@ import (
 var (
 	_ database.Database = &Database{}
 	_ database.Batch    = &Batch{}
+	_ database.Iterator = &Iterator{}
 )
 
 // Database is a lightning fast key value store with probabilistic operations.

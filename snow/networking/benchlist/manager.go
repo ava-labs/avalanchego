@@ -1,3 +1,6 @@
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package benchlist
 
 import (
@@ -37,13 +40,13 @@ type Manager interface {
 
 // Config defines the configuration for a benchlist
 type Config struct {
-	Benchable              Benchable
-	Validators             validators.Manager
-	Threshold              int
-	MinimumFailingDuration time.Duration
-	Duration               time.Duration
-	MaxPortion             float64
-	PeerSummaryEnabled     bool
+	Benchable              Benchable          `json:"-"`
+	Validators             validators.Manager `json:"-"`
+	Threshold              int                `json:"threshold"`
+	MinimumFailingDuration time.Duration      `json:"minimumFailingDuration"`
+	Duration               time.Duration      `json:"duration"`
+	MaxPortion             float64            `json:"maxPortion"`
+	PeerSummaryEnabled     bool               `json:"peerSummaryEnabled"`
 }
 
 type manager struct {
@@ -165,4 +168,4 @@ func (noBenchlist) RegisterChain(*snow.Context, string) error { return nil }
 func (noBenchlist) RegisterResponse(ids.ID, ids.ShortID)      {}
 func (noBenchlist) RegisterFailure(ids.ID, ids.ShortID)       {}
 func (noBenchlist) IsBenched(ids.ShortID, ids.ID) bool        { return false }
-func (noBenchlist) GetBenched(ids.ShortID) []ids.ID           { return nil }
+func (noBenchlist) GetBenched(ids.ShortID) []ids.ID           { return []ids.ID{} }

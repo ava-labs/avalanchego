@@ -1,3 +1,6 @@
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package network
 
 import (
@@ -5,33 +8,29 @@ import (
 	"crypto"
 	"net"
 	"testing"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
+	"github.com/ava-labs/avalanchego/network/message"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/version"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 )
 
 type TestMsg struct {
-	op    Op
+	op    message.Op
 	bytes []byte
 }
 
-func newTestMsg(op Op, bits []byte) *TestMsg {
+func newTestMsg(op message.Op, bits []byte) *TestMsg {
 	return &TestMsg{op: op, bytes: bits}
 }
 
-func (m *TestMsg) Op() Op {
+func (m *TestMsg) Op() message.Op {
 	return m.op
 }
 
-func (*TestMsg) Get(Field) interface{} {
+func (*TestMsg) Get(message.Field) interface{} {
 	return nil
 }
 
@@ -39,16 +38,18 @@ func (m *TestMsg) Bytes() []byte {
 	return m.bytes
 }
 
+func (m *TestMsg) BytesSavedCompression() int {
+	return 0
+}
+
 func TestPeer_Close(t *testing.T) {
-	log := logging.NoLog{}
+	initCerts(t)
+
 	ip := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
 		0,
 	)
 	id := ids.ShortID(hashing.ComputeHash160Array([]byte(ip.IP().String())))
-	networkID := uint32(0)
-	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
-	versionParser := version.NewDefaultApplicationParser()
 
 	listener := &testListener{
 		addr: &net.TCPAddr{
@@ -65,52 +66,25 @@ func TestPeer_Close(t *testing.T) {
 		},
 		outbounds: make(map[string]*testListener),
 	}
-	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
-	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
 
-	vdrs := validators.NewSet()
+	vdrs := getDefaultManager()
+	beacons := validators.NewSet()
 	handler := &testHandler{}
 
-	versionManager := version.NewCompatibility(
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-	)
-
-	netwrk := NewDefaultNetwork(
-		prometheus.NewRegistry(),
-		log,
+	netwrk, err := newTestNetwork(
 		id,
 		ip,
-		networkID,
-		versionManager,
-		versionParser,
+		defaultVersionManager,
+		vdrs,
+		beacons,
+		cert0.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig0,
 		listener,
 		caller,
-		serverUpgrader0,
-		clientUpgrader0,
-		vdrs,
-		vdrs,
 		handler,
-		time.Duration(0),
-		0,
-		defaultSendQueueSize,
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert0.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		NewDialerConfig(0, 30*time.Second),
-		false,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, netwrk)
 
 	ip1 := utils.NewDynamicIPDesc(
@@ -127,17 +101,9 @@ func TestPeer_Close(t *testing.T) {
 
 	// fake a peer, and write a message
 	peer := newPeer(basenetwork, conn, ip1.IP())
-	peer.sender = make(chan []byte, 10)
-	testMsg := newTestMsg(GetVersion, newmsgbytes)
+	peer.sendQueue = [][]byte{}
+	testMsg := newTestMsg(message.GetVersion, newmsgbytes)
 	peer.Send(testMsg, true)
-
-	// make sure the net pending and peer pending bytes updated
-	if basenetwork.pendingBytes != int64(len(newmsgbytes)) {
-		t.Fatalf("pending bytes invalid")
-	}
-	if peer.pendingBytes != int64(len(newmsgbytes)) {
-		t.Fatalf("pending bytes invalid")
-	}
 
 	go func() {
 		err := netwrk.Close()
@@ -145,12 +111,4 @@ func TestPeer_Close(t *testing.T) {
 	}()
 
 	peer.Close()
-
-	// The network pending bytes should be reduced back to zero on close.
-	if basenetwork.pendingBytes != int64(0) {
-		t.Fatalf("pending bytes invalid")
-	}
-	if peer.pendingBytes != int64(len(newmsgbytes)) {
-		t.Fatalf("pending bytes invalid")
-	}
 }

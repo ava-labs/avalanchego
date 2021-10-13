@@ -1,3 +1,6 @@
+// (c) 2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package nftfx
 
 import (
@@ -10,8 +13,6 @@ var (
 	ID = ids.ID{'n', 'f', 't', 'f', 'x'}
 )
 
-// Factory ...
 type Factory struct{}
 
-// New ...
 func (f *Factory) New(*snow.Context) (interface{}, error) { return &Fx{}, nil }

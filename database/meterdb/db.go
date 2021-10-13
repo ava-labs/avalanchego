@@ -13,6 +13,7 @@ import (
 var (
 	_ database.Database = &Database{}
 	_ database.Batch    = &batch{}
+	_ database.Iterator = &iterator{}
 )
 
 // Database tracks the amount of time each operation takes and how many bytes

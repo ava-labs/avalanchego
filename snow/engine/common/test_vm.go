@@ -23,6 +23,11 @@ var (
 	errHealthCheck          = errors.New("unexpectedly called HealthCheck")
 	errConnected            = errors.New("unexpectedly called Connected")
 	errDisconnected         = errors.New("unexpectedly called Disconnected")
+	errVersion              = errors.New("unexpectedly called Version")
+	errAppRequest           = errors.New("unexpectedly called AppRequest")
+	errAppResponse          = errors.New("unexpectedly called AppResponse")
+	errAppRequestFailed     = errors.New("unexpectedly called AppRequestFailed")
+	errAppGossip            = errors.New("unexpectedly called AppGossip")
 
 	_ VM = &TestVM{}
 )
@@ -33,15 +38,20 @@ type TestVM struct {
 
 	CantInitialize, CantBootstrapping, CantBootstrapped,
 	CantShutdown, CantCreateHandlers, CantCreateStaticHandlers,
-	CantHealthCheck, CantConnected, CantDisconnected bool
+	CantHealthCheck, CantConnected, CantDisconnected, CantVersion,
+	CantAppRequest, CantAppResponse, CantAppGossip, CantAppRequestFailed bool
 
-	InitializeF                              func(*snow.Context, manager.Manager, []byte, []byte, []byte, chan<- Message, []*Fx) error
+	InitializeF                              func(*snow.Context, manager.Manager, []byte, []byte, []byte, chan<- Message, []*Fx, AppSender) error
 	BootstrappingF, BootstrappedF, ShutdownF func() error
 	CreateHandlersF                          func() (map[string]*HTTPHandler, error)
 	CreateStaticHandlersF                    func() (map[string]*HTTPHandler, error)
 	ConnectedF                               func(ids.ShortID) error
 	DisconnectedF                            func(ids.ShortID) error
 	HealthCheckF                             func() (interface{}, error)
+	AppRequestF, AppResponseF                func(nodeID ids.ShortID, requestID uint32, msg []byte) error
+	AppGossipF                               func(nodeID ids.ShortID, msg []byte) error
+	AppRequestFailedF                        func(nodeID ids.ShortID, requestID uint32) error
+	VersionF                                 func() (string, error)
 }
 
 func (vm *TestVM) Default(cant bool) {
@@ -52,11 +62,18 @@ func (vm *TestVM) Default(cant bool) {
 	vm.CantCreateHandlers = cant
 	vm.CantCreateStaticHandlers = cant
 	vm.CantHealthCheck = cant
+	vm.CantAppRequest = cant
+	vm.CantAppRequestFailed = cant
+	vm.CantAppResponse = cant
+	vm.CantAppGossip = cant
+	vm.CantVersion = cant
+	vm.CantConnected = cant
+	vm.CantDisconnected = cant
 }
 
-func (vm *TestVM) Initialize(ctx *snow.Context, db manager.Manager, genesisBytes, upgradeBytes, configBytes []byte, msgChan chan<- Message, fxs []*Fx) error {
+func (vm *TestVM) Initialize(ctx *snow.Context, db manager.Manager, genesisBytes, upgradeBytes, configBytes []byte, msgChan chan<- Message, fxs []*Fx, appSender AppSender) error {
 	if vm.InitializeF != nil {
-		return vm.InitializeF(ctx, db, genesisBytes, upgradeBytes, configBytes, msgChan, fxs)
+		return vm.InitializeF(ctx, db, genesisBytes, upgradeBytes, configBytes, msgChan, fxs, appSender)
 	}
 	if vm.CantInitialize && vm.T != nil {
 		vm.T.Fatal(errInitialize)
@@ -133,6 +150,58 @@ func (vm *TestVM) HealthCheck() (interface{}, error) {
 	return nil, errHealthCheck
 }
 
+func (vm *TestVM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	if vm.AppRequestFailedF != nil {
+		return vm.AppRequestFailedF(nodeID, requestID)
+	}
+	if !vm.CantAppRequestFailed {
+		return nil
+	}
+	if vm.T != nil {
+		vm.T.Fatal(errAppRequest)
+	}
+	return errAppRequest
+}
+
+func (vm *TestVM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+	if vm.AppRequestF != nil {
+		return vm.AppRequestF(nodeID, requestID, request)
+	}
+	if !vm.CantAppRequest {
+		return nil
+	}
+	if vm.T != nil {
+		vm.T.Fatal(errAppRequest)
+	}
+	return errAppRequest
+}
+
+func (vm *TestVM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	if vm.AppResponseF != nil {
+		return vm.AppResponseF(nodeID, requestID, response)
+	}
+	if !vm.CantAppResponse {
+		return nil
+	}
+	if vm.T != nil {
+		vm.T.Fatal(errAppResponse)
+	}
+	return errAppResponse
+}
+
+func (vm *TestVM) AppGossip(nodeID ids.ShortID, msg []byte) error {
+	if vm.AppGossipF != nil {
+		return vm.AppGossipF(nodeID, msg)
+	}
+	if !vm.CantAppGossip {
+		return nil
+	}
+	if vm.T != nil {
+		vm.T.Fatal(errAppGossip)
+	}
+	return errAppGossip
+}
+
 func (vm *TestVM) Connected(id ids.ShortID) error {
 	if vm.ConnectedF != nil {
 		return vm.ConnectedF(id)
@@ -151,4 +220,14 @@ func (vm *TestVM) Disconnected(id ids.ShortID) error {
 		vm.T.Fatal(errDisconnected)
 	}
 	return nil
+}
+
+func (vm *TestVM) Version() (string, error) {
+	if vm.VersionF != nil {
+		return vm.VersionF()
+	}
+	if vm.CantVersion && vm.T != nil {
+		vm.T.Fatal(errVersion)
+	}
+	return "", nil
 }

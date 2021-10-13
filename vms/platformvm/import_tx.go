@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -37,6 +37,16 @@ type UnsignedImportTx struct {
 	ImportedInputs []*avax.TransferableInput `serialize:"true" json:"importedInputs"`
 }
 
+// InitCtx sets the FxID fields in the inputs and outputs of this
+// [UnsignedImportTx]. Also sets the [ctx] to the given [vm.ctx] so that
+// the addresses can be json marshalled into human readable format
+func (tx *UnsignedImportTx) InitCtx(ctx *snow.Context) {
+	tx.BaseTx.InitCtx(ctx)
+	for _, in := range tx.ImportedInputs {
+		in.FxID = secp256k1fx.ID
+	}
+}
+
 // InputUTXOs returns the UTXOIDs of the imported funds
 func (tx *UnsignedImportTx) InputUTXOs() ids.Set {
 	set := ids.NewSet(len(tx.ImportedInputs))
@@ -46,27 +56,28 @@ func (tx *UnsignedImportTx) InputUTXOs() ids.Set {
 	return set
 }
 
-// Verify this transaction is well-formed
-func (tx *UnsignedImportTx) Verify(
-	avmID ids.ID,
-	ctx *snow.Context,
-	c codec.Manager,
-	feeAmount uint64,
-	feeAssetID ids.ID,
-) error {
+func (tx *UnsignedImportTx) InputIDs() ids.Set {
+	inputs := tx.BaseTx.InputIDs()
+	atomicInputs := tx.InputUTXOs()
+	inputs.Union(atomicInputs)
+	return inputs
+}
+
+// SyntacticVerify this transaction is well-formed
+func (tx *UnsignedImportTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.SourceChain != avmID:
+	case tx.SourceChain != ctx.XChainID:
 		// TODO: remove this check if we allow for P->C swaps
 		return errWrongChainID
 	case len(tx.ImportedInputs) == 0:
 		return errNoImportInputs
 	}
 
-	if err := tx.BaseTx.Verify(ctx, c); err != nil {
+	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return err
 	}
 
@@ -83,13 +94,19 @@ func (tx *UnsignedImportTx) Verify(
 	return nil
 }
 
-// SemanticVerify this transaction is valid.
-func (tx *UnsignedImportTx) SemanticVerify(
+// Attempts to verify this transaction with the provided state.
+func (tx *UnsignedImportTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
+	_, err := tx.Execute(vm, parentState, stx)
+	return err
+}
+
+// Execute this transaction.
+func (tx *UnsignedImportTx) Execute(
 	vm *VM,
 	parentState MutableState,
 	stx *Tx,
 ) (VersionedState, TxError) {
-	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, vm.codec, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
+	if err := tx.SyntacticVerify(vm.ctx); err != nil {
 		return nil, permError{err}
 	}
 
@@ -119,7 +136,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 
 		for i, utxoBytes := range allUTXOBytes {
 			utxo := &avax.UTXO{}
-			if _, err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
+			if _, err := Codec.Unmarshal(utxoBytes, utxo); err != nil {
 				return nil, tempError{
 					fmt.Errorf("failed to unmarshal UTXO: %w", err),
 				}
@@ -161,7 +178,7 @@ func (tx *UnsignedImportTx) Accept(ctx *snow.Context, batch database.Batch) erro
 		utxoID := in.InputID()
 		utxoIDs[i] = utxoID[:]
 	}
-	return ctx.SharedMemory.Remove(tx.SourceChain, utxoIDs, batch)
+	return ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{tx.SourceChain: {RemoveRequests: utxoIDs}}, batch)
 }
 
 // Create a new transaction
@@ -254,8 +271,8 @@ func (vm *VM) newImportTx(
 		ImportedInputs: importedInputs,
 	}
 	tx := &Tx{UnsignedTx: utx}
-	if err := tx.Sign(vm.codec, signers); err != nil {
+	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.codec, vm.TxFee, vm.ctx.AVAXAssetID)
+	return tx, utx.SyntacticVerify(vm.ctx)
 }

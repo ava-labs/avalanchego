@@ -34,15 +34,16 @@ func (ab *AtomicBlock) initialize(vm *VM, bytes []byte, status choices.Status, s
 	if err := ab.CommonDecisionBlock.initialize(vm, bytes, status, self); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-	unsignedBytes, err := vm.codec.Marshal(codecVersion, &ab.Tx.UnsignedTx)
+	unsignedBytes, err := Codec.Marshal(CodecVersion, &ab.Tx.UnsignedTx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
 	}
-	signedBytes, err := ab.vm.codec.Marshal(codecVersion, &ab.Tx)
+	signedBytes, err := Codec.Marshal(CodecVersion, &ab.Tx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
 	ab.Tx.Initialize(unsignedBytes, signedBytes)
+	ab.Tx.InitCtx(vm.ctx)
 	return nil
 }
 
@@ -55,7 +56,7 @@ func (ab *AtomicBlock) conflicts(s ids.Set) (bool, error) {
 	if ab.inputs.Overlaps(s) {
 		return true, nil
 	}
-	parent, err := ab.parent()
+	parent, err := ab.parentBlock()
 	if err != nil {
 		return false, err
 	}
@@ -88,7 +89,7 @@ func (ab *AtomicBlock) Verify() error {
 	}
 	ab.inputs = tx.InputUTXOs()
 
-	parentIntf, err := ab.parent()
+	parentIntf, err := ab.parentBlock()
 	if err != nil {
 		return err
 	}
@@ -109,7 +110,7 @@ func (ab *AtomicBlock) Verify() error {
 	}
 
 	parentState := parent.onAccept()
-	onAccept, err := tx.SemanticVerify(ab.vm, parentState, &ab.Tx)
+	onAccept, err := tx.Execute(ab.vm, parentState, &ab.Tx)
 	if err != nil {
 		txID := tx.ID()
 		ab.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
@@ -118,6 +119,9 @@ func (ab *AtomicBlock) Verify() error {
 	onAccept.AddTx(&ab.Tx, Committed)
 
 	ab.onAcceptState = onAccept
+	ab.timestamp = onAccept.GetTimestamp()
+
+	ab.vm.blockBuilder.RemoveAtomicTx(&ab.Tx)
 	ab.vm.currentBlocks[blkID] = ab
 	parentIntf.addChild(ab)
 	return nil
@@ -129,7 +133,7 @@ func (ab *AtomicBlock) Accept() error {
 		"Accepting Atomic Block %s at height %d with parent %s",
 		blkID,
 		ab.Height(),
-		ab.ParentID(),
+		ab.Parent(),
 	)
 
 	if err := ab.CommonBlock.Accept(); err != nil {
@@ -184,10 +188,10 @@ func (ab *AtomicBlock) Reject() error {
 		"Rejecting Atomic Block %s at height %d with parent %s",
 		ab.ID(),
 		ab.Height(),
-		ab.ParentID(),
+		ab.Parent(),
 	)
 
-	if err := ab.vm.mempool.IssueTx(&ab.Tx); err != nil {
+	if err := ab.vm.blockBuilder.AddVerifiedTx(&ab.Tx); err != nil {
 		ab.vm.ctx.Log.Debug(
 			"failed to reissue tx %q due to: %s",
 			ab.Tx.ID(),
@@ -213,9 +217,9 @@ func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx Tx) (*AtomicBloc
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := Block(ab)
-	bytes, err := Codec.Marshal(codecVersion, &blk)
+	bytes, err := Codec.Marshal(CodecVersion, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}
-	return ab, ab.CommonDecisionBlock.initialize(vm, bytes, choices.Processing, ab)
+	return ab, ab.initialize(vm, bytes, choices.Processing, ab)
 }

@@ -17,12 +17,26 @@ var (
 	errOperationsNotSortedUnique = errors.New("operations not sorted and unique")
 	errNoOperations              = errors.New("an operationTx must have at least one operation")
 	errDoubleSpend               = errors.New("inputs attempt to double spend an input")
+
+	_ UnsignedTx = &OperationTx{}
 )
 
 // OperationTx is a transaction with no credentials.
 type OperationTx struct {
 	BaseTx `serialize:"true"`
 	Ops    []*Operation `serialize:"true" json:"operations"`
+}
+
+func (t *OperationTx) Init(vm *VM) error {
+	for _, op := range t.Ops {
+		fx, err := vm.getParsedFx(op.Op)
+		if err != nil {
+			return err
+		}
+		op.FxID = fx.ID
+		op.Op.InitCtx(vm.ctx)
+	}
+	return t.BaseTx.Init(vm)
 }
 
 // Operations track which ops this transaction is performing. The returned array

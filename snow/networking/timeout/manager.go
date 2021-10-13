@@ -5,7 +5,6 @@ package timeout
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -13,23 +12,27 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Manager registers and fires timeouts for the snow API.
 type Manager struct {
-	lock         sync.Mutex
 	tm           timer.AdaptiveTimeoutManager
 	benchlistMgr benchlist.Manager
 	metrics      metrics
 }
 
 // Initialize this timeout manager.
-func (m *Manager) Initialize(timeoutConfig *timer.AdaptiveTimeoutConfig, benchlistMgr benchlist.Manager) error {
+func (m *Manager) Initialize(
+	timeoutConfig *timer.AdaptiveTimeoutConfig,
+	benchlistMgr benchlist.Manager,
+	metricsNamespace string,
+	metricsRegister prometheus.Registerer,
+) error {
 	m.benchlistMgr = benchlistMgr
-	return m.tm.Initialize(timeoutConfig)
+	return m.tm.Initialize(timeoutConfig, metricsNamespace, metricsRegister)
 }
 
-// Dispatch ...
 func (m *Manager) Dispatch() {
 	m.tm.Dispatch()
 }
@@ -45,7 +48,6 @@ func (m *Manager) IsBenched(validatorID ids.ShortID, chainID ids.ID) bool {
 	return m.benchlistMgr.IsBenched(validatorID, chainID)
 }
 
-// RegisterChain ...
 func (m *Manager) RegisterChain(ctx *snow.Context, namespace string) error {
 	if err := m.metrics.RegisterChain(ctx, namespace); err != nil {
 		return fmt.Errorf("couldn't register timeout metrics for chain %s: %w", ctx.ChainID, err)
@@ -56,9 +58,9 @@ func (m *Manager) RegisterChain(ctx *snow.Context, namespace string) error {
 	return nil
 }
 
-// RegisterRequests notes that we sent a request of type [msgType] to [validatorID]
-// regarding chain [chainID]. If we don't receive a response in time, [timeoutHandler]
-// is executed.
+// RegisterRequest notes that we sent a request of type [msgType] to
+// [validatorID] regarding chain [chainID]. If we don't receive a response in
+// time, [timeoutHandler]  is executed.
 func (m *Manager) RegisterRequest(
 	validatorID ids.ShortID,
 	chainID ids.ID,
@@ -83,9 +85,7 @@ func (m *Manager) RegisterResponse(
 	msgType constants.MsgType,
 	latency time.Duration,
 ) {
-	m.lock.Lock()
-	m.metrics.observe(chainID, msgType, latency)
-	m.lock.Unlock()
+	m.metrics.Observe(chainID, msgType, latency)
 	m.benchlistMgr.RegisterResponse(chainID, validatorID)
 	m.tm.Remove(uniqueRequestID)
 }

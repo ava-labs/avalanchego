@@ -25,6 +25,7 @@ const (
 var (
 	_ database.Database = &Database{}
 	_ database.Batch    = &batch{}
+	_ database.Iterator = &iterator{}
 )
 
 // Database encrypts all values that are provided

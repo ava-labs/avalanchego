@@ -6,9 +6,9 @@ package avm
 import (
 	"bytes"
 	"container/list"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"reflect"
 	"time"
 
@@ -16,8 +16,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -29,10 +27,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/index"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -46,8 +44,6 @@ const (
 	batchSize          = 30
 	assetToFxCacheSize = 1024
 	maxUTXOsToFetch    = 1024
-
-	codecVersion = 0
 )
 
 var (
@@ -58,13 +54,12 @@ var (
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 	errInsufficientFunds         = errors.New("insufficient funds")
 
-	_ vertex.DAGVM    = &VM{}
-	_ common.StaticVM = &VM{}
-	_ secp256k1fx.VM  = &VM{}
+	_ vertex.DAGVM = &VM{}
 )
 
 // VM implements the avalanche.DAGVM interface
 type VM struct {
+	Factory
 	metrics
 	avax.AddressManager
 	avax.AtomicUTXOManager
@@ -76,9 +71,8 @@ type VM struct {
 	// Used to check local time
 	clock timer.Clock
 
-	genesisCodec  codec.Manager
-	codec         codec.Manager
-	codecRegistry codec.Registry
+	genesisCodec codec.Manager
+	codec        codec.Manager
 
 	pubsub *pubsub.Server
 
@@ -90,10 +84,6 @@ type VM struct {
 
 	// asset id that will be used for fees
 	feeAssetID ids.ID
-	// fee that must be burned by every state creating transaction
-	creationTxFee uint64
-	// fee that must be burned by every non-state creating transaction
-	txFee uint64
 
 	// Asset ID --> Bit set with fx IDs the asset supports
 	assetToFxCache *cache.LRU
@@ -111,6 +101,8 @@ type VM struct {
 	fxs           []*parsedFx
 
 	walletService WalletService
+
+	addressTxsIndexer index.AddressTxsIndexer
 }
 
 func (vm *VM) Connected(id ids.ShortID) error {
@@ -127,6 +119,11 @@ func (vm *VM) Disconnected(id ids.ShortID) error {
  ******************************************************************************
  */
 
+type Config struct {
+	IndexTransactions    bool `json:"index-transactions"`
+	IndexAllowIncomplete bool `json:"index-allow-incomplete"`
+}
+
 // Initialize implements the avalanche.DAGVM interface
 func (vm *VM) Initialize(
 	ctx *snow.Context,
@@ -136,50 +133,33 @@ func (vm *VM) Initialize(
 	configBytes []byte,
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
+	_ common.AppSender,
 ) error {
-	if err := vm.metrics.Initialize(ctx.Namespace, ctx.Metrics); err != nil {
+	avmConfig := Config{}
+	if len(configBytes) > 0 {
+		if err := json.Unmarshal(configBytes, &avmConfig); err != nil {
+			return err
+		}
+		ctx.Log.Info("VM config initialized %+v", avmConfig)
+	}
+
+	err := vm.metrics.Initialize(ctx.Namespace, ctx.Metrics)
+	if err != nil {
 		return err
 	}
 	vm.AddressManager = avax.NewAddressManager(ctx)
-	vm.Aliaser.Initialize()
+	vm.Aliaser = ids.NewAliaser()
 
 	db := dbManager.Current().Database
 	vm.ctx = ctx
 	vm.toEngine = toEngine
 	vm.baseDB = db
 	vm.db = versiondb.New(db)
-	vm.typeToFxIndex = map[reflect.Type]int{}
 	vm.assetToFxCache = &cache.LRU{Size: assetToFxCacheSize}
 
 	vm.pubsub = pubsub.New(ctx.NetworkID, ctx.Log)
 
-	genesisCodec := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
-	c := linearcodec.NewDefault()
-
-	vm.genesisCodec = codec.NewManager(math.MaxInt32)
-	vm.codec = codec.NewDefaultManager()
-	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, vm.codec)
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		c.RegisterType(&BaseTx{}),
-		c.RegisterType(&CreateAssetTx{}),
-		c.RegisterType(&OperationTx{}),
-		c.RegisterType(&ImportTx{}),
-		c.RegisterType(&ExportTx{}),
-		vm.codec.RegisterCodec(codecVersion, c),
-
-		genesisCodec.RegisterType(&BaseTx{}),
-		genesisCodec.RegisterType(&CreateAssetTx{}),
-		genesisCodec.RegisterType(&OperationTx{}),
-		genesisCodec.RegisterType(&ImportTx{}),
-		genesisCodec.RegisterType(&ExportTx{}),
-		vm.genesisCodec.RegisterCodec(codecVersion, genesisCodec),
-	)
-	if errs.Errored() {
-		return errs.Err
-	}
-
+	typedFxs := make([]Fx, len(fxs))
 	vm.fxs = make([]*parsedFx, len(fxs))
 	for i, fxContainer := range fxs {
 		if fxContainer == nil {
@@ -189,19 +169,25 @@ func (vm *VM) Initialize(
 		if !ok {
 			return errIncompatibleFx
 		}
+		typedFxs[i] = fx
 		vm.fxs[i] = &parsedFx{
 			ID: fxContainer.ID,
 			Fx: fx,
 		}
-		vm.codecRegistry = &codecRegistry{
-			codecs:      []codec.Registry{genesisCodec, c},
-			index:       i,
-			typeToIndex: vm.typeToFxIndex,
-		}
-		if err := fx.Initialize(vm); err != nil {
-			return err
-		}
 	}
+
+	vm.typeToFxIndex = map[reflect.Type]int{}
+	vm.genesisCodec, vm.codec, err = newCustomCodecs(
+		vm.typeToFxIndex,
+		&vm.clock,
+		ctx.Log,
+		typedFxs,
+	)
+	if err != nil {
+		return err
+	}
+
+	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, vm.codec)
 
 	state, err := NewMeteredState(vm.db, vm.genesisCodec, vm.codec, ctx.Namespace, ctx.Metrics)
 	if err != nil {
@@ -226,6 +212,20 @@ func (vm *VM) Initialize(
 	vm.walletService.pendingTxMap = make(map[ids.ID]*list.Element)
 	vm.walletService.pendingTxOrdering = list.New()
 
+	// use no op impl when disabled in config
+	if avmConfig.IndexTransactions {
+		vm.ctx.Log.Info("address transaction indexing is enabled")
+		vm.addressTxsIndexer, err = index.NewIndexer(vm.db, vm.ctx.Log, ctx.Namespace, ctx.Metrics, avmConfig.IndexAllowIncomplete)
+		if err != nil {
+			return fmt.Errorf("failed to initialize address transaction indexer: %w", err)
+		}
+	} else {
+		vm.ctx.Log.Info("address transaction indexing is disabled")
+		vm.addressTxsIndexer, err = index.NewNoIndexer(vm.db, avmConfig.IndexAllowIncomplete)
+		if err != nil {
+			return fmt.Errorf("failed to initialize disabled indexer: %w", err)
+		}
+	}
 	return vm.db.Commit()
 }
 
@@ -265,6 +265,11 @@ func (vm *VM) Shutdown() error {
 	vm.ctx.Lock.Lock()
 
 	return vm.baseDB.Close()
+}
+
+// Get implements the avalanche.DAGVM interface
+func (vm *VM) Version() (string, error) {
+	return version.Current.String(), nil
 }
 
 // CreateHandlers implements the avalanche.DAGVM interface
@@ -386,8 +391,7 @@ func (vm *VM) getPaginatedUTXOs(
 	seen := make(ids.Set, limit) // IDs of UTXOs already in the list
 
 	// enforces the same ordering for pagination
-	addrsList := addrs.List()
-	ids.SortShortIDs(addrsList)
+	addrsList := addrs.SortedList()
 
 	for _, addr := range addrsList {
 		start := ids.Empty
@@ -432,8 +436,7 @@ func (vm *VM) getAllUTXOs(addrs ids.ShortSet) ([]*avax.UTXO, error) {
 	utxos := make([]*avax.UTXO, 0, maxUTXOsToFetch)
 
 	// enforces the same ordering for pagination
-	addrsList := addrs.List()
-	ids.SortShortIDs(addrsList)
+	addrsList := addrs.SortedList()
 
 	// iterate over the addresses and get all the utxos
 	for _, addr := range addrsList {
@@ -478,24 +481,6 @@ func (vm *VM) getAllUniqueAddressUTXOs(addr ids.ShortID, seen *ids.Set, utxos *[
 
 /*
  ******************************************************************************
- *********************************** Fx API ***********************************
- ******************************************************************************
- */
-
-// Clock returns a reference to the internal clock of this VM
-func (vm *VM) Clock() *timer.Clock { return &vm.clock }
-
-// Codec returns a reference to the internal codec of this VM
-func (vm *VM) Codec() codec.Manager { return vm.codec }
-
-// CodecRegistry returns a reference to the internal codec registry of this VM
-func (vm *VM) CodecRegistry() codec.Registry { return vm.codecRegistry }
-
-// Logger returns a reference to the internal logger of this VM
-func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
-
-/*
- ******************************************************************************
  ********************************** Timer API *********************************
  ******************************************************************************
  */
@@ -507,7 +492,7 @@ func (vm *VM) FlushTxs() {
 		select {
 		case vm.toEngine <- common.PendingTxs:
 		default:
-			vm.ctx.Log.Warn("Delaying issuance of transactions due to contention")
+			vm.ctx.Log.Debug("dropping message to engine due to contention")
 			vm.timer.SetTimeoutIn(vm.batchTimeout)
 		}
 	}
@@ -675,6 +660,18 @@ func (vm *VM) getFx(val interface{}) (int, error) {
 	return fx, nil
 }
 
+// getParsedFx returns the parsedFx object for a given TransferableInput
+// or TransferableOutput object
+func (vm *VM) getParsedFx(val interface{}) (*parsedFx, error) {
+	idx, err := vm.getFx(val)
+	if err != nil {
+		return nil, err
+	}
+
+	fx := vm.fxs[idx]
+	return fx, nil
+}
+
 func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	// Check cache to see whether this asset supports this fx
 	fxIDsIntf, assetInCache := vm.assetToFxCache.Get(assetID)
@@ -697,7 +694,7 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	}
 	fxIDs := ids.BitSet(0)
 	for _, state := range createAssetTx.States {
-		if state.FxID == uint32(fxID) {
+		if state.FxIndex == uint32(fxID) {
 			// Cache that this asset supports this fx
 			fxIDs.Add(uint(fxID))
 		}
@@ -801,7 +798,6 @@ func (vm *VM) LoadUser(
 	return utxos, kc, db.Close()
 }
 
-// Spend ...
 func (vm *VM) Spend(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
@@ -868,7 +864,6 @@ func (vm *VM) Spend(
 	return amountsSpent, ins, keys, nil
 }
 
-// SpendNFT ...
 func (vm *VM) SpendNFT(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
@@ -943,7 +938,6 @@ func (vm *VM) SpendNFT(
 	return ops, keys, nil
 }
 
-// SpendAll ...
 func (vm *VM) SpendAll(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
@@ -993,7 +987,6 @@ func (vm *VM) SpendAll(
 	return amountsSpent, ins, keys, nil
 }
 
-// Mint ...
 func (vm *VM) Mint(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
@@ -1067,7 +1060,6 @@ func (vm *VM) Mint(
 	return ops, keys, nil
 }
 
-// MintNFT ...
 func (vm *VM) MintNFT(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
@@ -1162,4 +1154,24 @@ func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
 		return assetID, nil
 	}
 	return ids.ID{}, fmt.Errorf("asset '%s' not found", asset)
+}
+
+// This VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+	return nil
+}
+
+// This VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	return nil
+}
+
+// This VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	return nil
+}
+
+// This VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
+	return nil
 }

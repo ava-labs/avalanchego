@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -51,24 +50,23 @@ func (m *Memory) Initialize(log logging.Logger, db database.Database) error {
 }
 
 // NewSharedMemory returns a new SharedMemory
-func (m *Memory) NewSharedMemory(id ids.ID) SharedMemory {
+func (m *Memory) NewSharedMemory(chainID ids.ID) SharedMemory {
 	return &sharedMemory{
 		m:           m,
-		thisChainID: id,
+		thisChainID: chainID,
 	}
 }
 
-// GetDatabase returns and locks the provided DB
-func (m *Memory) GetDatabase(sharedID ids.ID) (*versiondb.Database, database.Database) {
+// GetSharedDatabase returns a new locked prefix db on top of an existing
+// database
+func (m *Memory) GetSharedDatabase(db database.Database, sharedID ids.ID) database.Database {
 	lock := m.makeLock(sharedID)
 	lock.Lock()
-
-	vdb := versiondb.New(m.db)
-	return vdb, prefixdb.New(sharedID[:], vdb)
+	return prefixdb.NewNested(sharedID[:], db)
 }
 
-// ReleaseDatabase unlocks the provided DB
-func (m *Memory) ReleaseDatabase(sharedID ids.ID) {
+// ReleaseSharedDatabase unlocks the provided DB
+func (m *Memory) ReleaseSharedDatabase(sharedID ids.ID) {
 	lock := m.releaseLock(sharedID)
 	lock.Unlock()
 }

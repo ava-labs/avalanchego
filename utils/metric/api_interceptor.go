@@ -25,16 +25,25 @@ type contextKey int
 const requestTimestampKey contextKey = iota
 
 type apiInterceptor struct {
-	requestDuration *prometheus.HistogramVec
-	requestErrors   *prometheus.CounterVec
+	requestDurationCount *prometheus.CounterVec
+	requestDurationSum   *prometheus.GaugeVec
+	requestErrors        *prometheus.CounterVec
 }
 
 func NewAPIInterceptor(namespace string, registerer prometheus.Registerer) (APIInterceptor, error) {
-	requestDuration := prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
+	requestDurationCount := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
 			Namespace: namespace,
-			Name:      "request_duration_ms",
-			Buckets:   MillisecondsHTTPBuckets,
+			Name:      "request_duration_count",
+			Help:      "Number of times this type of request was made",
+		},
+		[]string{"method"},
+	)
+	requestDurationSum := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "request_duration_sum",
+			Help:      "Amount of time in nanoseconds that has been spent handling this type of request",
 		},
 		[]string{"method"},
 	)
@@ -48,12 +57,14 @@ func NewAPIInterceptor(namespace string, registerer prometheus.Registerer) (APII
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		registerer.Register(requestDuration),
+		registerer.Register(requestDurationCount),
+		registerer.Register(requestDurationSum),
 		registerer.Register(requestErrors),
 	)
 	return &apiInterceptor{
-		requestDuration: requestDuration,
-		requestErrors:   requestErrors,
+		requestDurationCount: requestDurationCount,
+		requestDurationSum:   requestDurationSum,
+		requestErrors:        requestErrors,
 	}, errs.Err
 }
 
@@ -70,11 +81,16 @@ func (apr *apiInterceptor) AfterRequest(i *rpc.RequestInfo) {
 		return
 	}
 
-	duration := time.Since(timestamp)
-	durationMetric := apr.requestDuration.With(prometheus.Labels{
+	durationMetricCount := apr.requestDurationCount.With(prometheus.Labels{
 		"method": i.Method,
 	})
-	durationMetric.Observe(float64(duration.Milliseconds()))
+	durationMetricCount.Inc()
+
+	duration := time.Since(timestamp)
+	durationMetricSum := apr.requestDurationSum.With(prometheus.Labels{
+		"method": i.Method,
+	})
+	durationMetricSum.Add(float64(duration))
 
 	if i.Error != nil {
 		errMetric := apr.requestErrors.With(prometheus.Labels{

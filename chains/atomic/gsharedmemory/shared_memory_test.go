@@ -6,7 +6,6 @@ package gsharedmemory
 import (
 	"context"
 	"io"
-	"log"
 	"net"
 	"testing"
 
@@ -21,10 +20,11 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 const (
-	bufSize = 1 << 20
+	bufSize = units.MiB
 )
 
 func TestInterface(t *testing.T) {
@@ -61,7 +61,7 @@ func wrapSharedMemory(t *testing.T, sm atomic.SharedMemory, db database.Database
 	gsharedmemoryproto.RegisterSharedMemoryServer(server, NewServer(sm, db))
 	go func() {
 		if err := server.Serve(listener); err != nil {
-			log.Fatalf("Server exited with error: %v", err)
+			t.Logf("Server exited with error: %v", err)
 		}
 	}()
 

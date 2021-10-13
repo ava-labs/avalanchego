@@ -28,9 +28,10 @@ func (sb *StandardBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 	for _, tx := range sb.Txs {
-		if err := tx.Sign(vm.codec, nil); err != nil {
+		if err := tx.Sign(Codec, nil); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)
 		}
+		tx.InitCtx(vm.ctx)
 	}
 	return nil
 }
@@ -54,7 +55,7 @@ func (sb *StandardBlock) Verify() error {
 		return err
 	}
 
-	parentIntf, err := sb.parent()
+	parentIntf, err := sb.parentBlock()
 	if err != nil {
 		return err
 	}
@@ -87,7 +88,7 @@ func (sb *StandardBlock) Verify() error {
 			return errWrongTxType
 		}
 		txID := tx.ID()
-		onAccept, err := utx.SemanticVerify(sb.vm, sb.onAcceptState, tx)
+		onAccept, err := utx.Execute(sb.vm, sb.onAcceptState, tx)
 		if err != nil {
 			sb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
 			if err := sb.Reject(); err != nil {
@@ -118,6 +119,9 @@ func (sb *StandardBlock) Verify() error {
 		}
 	}
 
+	sb.timestamp = sb.onAcceptState.GetTimestamp()
+
+	sb.vm.blockBuilder.RemoveDecisionTxs(sb.Txs)
 	sb.vm.currentBlocks[blkID] = sb
 	parentIntf.addChild(sb)
 	return nil
@@ -128,11 +132,11 @@ func (sb *StandardBlock) Reject() error {
 		"Rejecting Standard Block %s at height %d with parent %s",
 		sb.ID(),
 		sb.Height(),
-		sb.ParentID(),
+		sb.Parent(),
 	)
 
 	for _, tx := range sb.Txs {
-		if err := sb.vm.mempool.IssueTx(tx); err != nil {
+		if err := sb.vm.blockBuilder.AddVerifiedTx(tx); err != nil {
 			sb.vm.ctx.Log.Debug(
 				"failed to reissue tx %q due to: %s",
 				tx.ID(),
@@ -161,9 +165,9 @@ func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*Tx) (*Stan
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := Block(sb)
-	bytes, err := vm.codec.Marshal(codecVersion, &blk)
+	bytes, err := Codec.Marshal(CodecVersion, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}
-	return sb, sb.SingleDecisionBlock.initialize(vm, bytes, choices.Processing, sb)
+	return sb, sb.initialize(vm, bytes, choices.Processing, sb)
 }

@@ -3,13 +3,10 @@
 
 package wrappers
 
-// Errs ...
 type Errs struct{ Err error }
 
-// Errored ...
 func (errs *Errs) Errored() bool { return errs.Err != nil }
 
-// Add ...
 func (errs *Errs) Add(errors ...error) {
 	if errs.Err == nil {
 		for _, err := range errors {

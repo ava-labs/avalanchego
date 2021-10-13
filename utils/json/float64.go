@@ -1,18 +1,18 @@
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package json
 
 import (
 	"strconv"
 )
 
-// Float64 ...
 type Float64 float64
 
-// MarshalJSON ...
 func (f Float64) MarshalJSON() ([]byte, error) {
 	return []byte("\"" + strconv.FormatFloat(float64(f), byte('f'), 4, 64) + "\""), nil
 }
 
-// UnmarshalJSON ...
 func (f *Float64) UnmarshalJSON(b []byte) error {
 	str := string(b)
 	if str == Null {

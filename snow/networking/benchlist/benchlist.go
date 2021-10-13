@@ -1,3 +1,6 @@
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package benchlist
 
 import (
@@ -26,8 +29,6 @@ import (
 // Therefore, nodes that consistently fail are "benched" such that
 // queries to that node fail immediately to avoid waiting up to
 // the full network timeout for a response.
-
-// Benchlist ...
 type Benchlist interface {
 	// RegisterResponse registers the response to a query message
 	RegisterResponse(validatorID ids.ShortID)

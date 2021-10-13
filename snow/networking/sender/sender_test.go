@@ -44,17 +44,22 @@ func TestSenderContext(t *testing.T) {
 
 func TestTimeout(t *testing.T) {
 	vdrs := validators.NewSet()
+	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
+	assert.NoError(t, err)
 	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
-	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:     time.Millisecond,
-		MinimumTimeout:     time.Millisecond,
-		MaximumTimeout:     10 * time.Second,
-		TimeoutHalflife:    5 * time.Minute,
-		TimeoutCoefficient: 1.25,
-		MetricsNamespace:   "",
-		Registerer:         prometheus.NewRegistry(),
-	}, benchlist)
+	err = tm.Initialize(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     time.Millisecond,
+			MinimumTimeout:     time.Millisecond,
+			MaximumTimeout:     10 * time.Second,
+			TimeoutHalflife:    5 * time.Minute,
+			TimeoutCoefficient: 1.25,
+		},
+		benchlist,
+		"",
+		prometheus.NewRegistry(),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,8 +83,8 @@ func TestTimeout(t *testing.T) {
 	wg.Add(2)
 
 	failedVDRs := ids.ShortSet{}
-	engine.QueryFailedF = func(validatorID ids.ShortID, _ uint32) error {
-		failedVDRs.Add(validatorID)
+	engine.QueryFailedF = func(nodeID ids.ShortID, _ uint32) error {
+		failedVDRs.Add(nodeID)
 		wg.Done()
 		return nil
 	}
@@ -89,10 +94,6 @@ func TestTimeout(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		1,
-		router.DefaultMaxNonStakerPendingMsgs,
-		router.DefaultStakerPortion,
-		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -106,7 +107,7 @@ func TestTimeout(t *testing.T) {
 	vdrIDs.Add(ids.ShortID{255})
 	vdrIDs.Add(ids.ShortID{254})
 
-	sender.PullQuery(vdrIDs, 0, ids.Empty)
+	sender.SendPullQuery(vdrIDs, 0, ids.Empty)
 
 	wg.Wait()
 
@@ -117,17 +118,22 @@ func TestTimeout(t *testing.T) {
 
 func TestReliableMessages(t *testing.T) {
 	vdrs := validators.NewSet()
+	err := vdrs.AddWeight(ids.ShortID{1}, 1)
+	assert.NoError(t, err)
 	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
-	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:     time.Millisecond,
-		MinimumTimeout:     time.Millisecond,
-		MaximumTimeout:     10 * time.Second,
-		TimeoutHalflife:    5 * time.Minute,
-		TimeoutCoefficient: 1.25,
-		MetricsNamespace:   "",
-		Registerer:         prometheus.NewRegistry(),
-	}, benchlist)
+	err = tm.Initialize(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     time.Millisecond,
+			MinimumTimeout:     time.Millisecond,
+			MaximumTimeout:     time.Millisecond,
+			TimeoutHalflife:    5 * time.Minute,
+			TimeoutCoefficient: 1.25,
+		},
+		benchlist,
+		"",
+		prometheus.NewRegistry(),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +160,7 @@ func TestReliableMessages(t *testing.T) {
 		awaiting[i] = make(chan struct{}, 1)
 	}
 
-	engine.QueryFailedF = func(validatorID ids.ShortID, reqID uint32) error {
+	engine.QueryFailedF = func(nodeID ids.ShortID, reqID uint32) error {
 		close(awaiting[int(reqID)])
 		return nil
 	}
@@ -164,10 +170,6 @@ func TestReliableMessages(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		1,
-		router.DefaultMaxNonStakerPendingMsgs,
-		router.DefaultStakerPortion,
-		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -182,7 +184,7 @@ func TestReliableMessages(t *testing.T) {
 			vdrIDs := ids.ShortSet{}
 			vdrIDs.Add(ids.ShortID{1})
 
-			sender.PullQuery(vdrIDs, uint32(i), ids.Empty)
+			sender.SendPullQuery(vdrIDs, uint32(i), ids.Empty)
 			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
 		}
 	}()
@@ -202,16 +204,21 @@ func TestReliableMessages(t *testing.T) {
 func TestReliableMessagesToMyself(t *testing.T) {
 	benchlist := benchlist.NewNoBenchlist()
 	vdrs := validators.NewSet()
+	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
+	assert.NoError(t, err)
 	tm := timeout.Manager{}
-	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:     10 * time.Millisecond,
-		MinimumTimeout:     10 * time.Millisecond,
-		MaximumTimeout:     10 * time.Millisecond, // Timeout fires immediately
-		TimeoutHalflife:    5 * time.Minute,
-		TimeoutCoefficient: 1.25,
-		MetricsNamespace:   "",
-		Registerer:         prometheus.NewRegistry(),
-	}, benchlist)
+	err = tm.Initialize(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     10 * time.Millisecond,
+			MinimumTimeout:     10 * time.Millisecond,
+			MaximumTimeout:     10 * time.Millisecond, // Timeout fires immediately
+			TimeoutHalflife:    5 * time.Minute,
+			TimeoutCoefficient: 1.25,
+		},
+		benchlist,
+		"",
+		prometheus.NewRegistry(),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +245,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		awaiting[i] = make(chan struct{}, 1)
 	}
 
-	engine.QueryFailedF = func(validatorID ids.ShortID, reqID uint32) error {
+	engine.QueryFailedF = func(nodeID ids.ShortID, reqID uint32) error {
 		close(awaiting[int(reqID)])
 		return nil
 	}
@@ -248,10 +255,6 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		1,
-		router.DefaultMaxNonStakerPendingMsgs,
-		router.DefaultStakerPortion,
-		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -268,7 +271,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			// a query failed message
 			vdrIDs := ids.ShortSet{}
 			vdrIDs.Add(ids.GenerateTestShortID())
-			sender.PullQuery(vdrIDs, uint32(i), ids.Empty)
+			sender.SendPullQuery(vdrIDs, uint32(i), ids.Empty)
 		}
 	}()
 

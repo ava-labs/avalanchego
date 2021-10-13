@@ -50,7 +50,7 @@ func (pb *ProposalBlock) Accept() error {
 		"Accepting Proposal Block %s at height %d with parent %s",
 		blkID,
 		pb.Height(),
-		pb.ParentID(),
+		pb.Parent(),
 	)
 
 	pb.status = choices.Accepted
@@ -64,13 +64,13 @@ func (pb *ProposalBlock) Reject() error {
 		"Rejecting Proposal Block %s at height %d with parent %s",
 		pb.ID(),
 		pb.Height(),
-		pb.ParentID(),
+		pb.Parent(),
 	)
 
 	pb.onCommitState = nil
 	pb.onAbortState = nil
 
-	if err := pb.vm.mempool.IssueTx(&pb.Tx); err != nil {
+	if err := pb.vm.blockBuilder.AddVerifiedTx(&pb.Tx); err != nil {
 		pb.vm.ctx.Log.Verbo(
 			"failed to reissue tx %q due to: %s",
 			pb.Tx.ID(),
@@ -85,15 +85,16 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 		return err
 	}
 
-	unsignedBytes, err := pb.vm.codec.Marshal(codecVersion, &pb.Tx.UnsignedTx)
+	unsignedBytes, err := Codec.Marshal(CodecVersion, &pb.Tx.UnsignedTx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
 	}
-	signedBytes, err := pb.vm.codec.Marshal(codecVersion, &pb.Tx)
+	signedBytes, err := Codec.Marshal(CodecVersion, &pb.Tx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
 	pb.Tx.Initialize(unsignedBytes, signedBytes)
+	pb.Tx.InitCtx(vm.ctx)
 	return nil
 }
 
@@ -151,7 +152,7 @@ func (pb *ProposalBlock) Verify() error {
 		return errWrongTxType
 	}
 
-	parentIntf, parentErr := pb.parent()
+	parentIntf, parentErr := pb.parentBlock()
 	if parentErr != nil {
 		return parentErr
 	}
@@ -174,7 +175,7 @@ func (pb *ProposalBlock) Verify() error {
 	parentState := parent.onAccept()
 
 	var err TxError
-	pb.onCommitState, pb.onAbortState, pb.onCommitFunc, pb.onAbortFunc, err = tx.SemanticVerify(pb.vm, parentState, &pb.Tx)
+	pb.onCommitState, pb.onAbortState, pb.onCommitFunc, pb.onAbortFunc, err = tx.Execute(pb.vm, parentState, &pb.Tx)
 	if err != nil {
 		txID := tx.ID()
 		pb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
@@ -196,6 +197,9 @@ func (pb *ProposalBlock) Verify() error {
 	pb.onCommitState.AddTx(&pb.Tx, Committed)
 	pb.onAbortState.AddTx(&pb.Tx, Aborted)
 
+	pb.timestamp = parentState.GetTimestamp()
+
+	pb.vm.blockBuilder.RemoveProposalTx(&pb.Tx)
 	pb.vm.currentBlocks[blkID] = pb
 	parentIntf.addChild(pb)
 	return nil
@@ -259,7 +263,7 @@ func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx Tx) (*Proposal
 	// We marshal the block in this way (as a Block) so that we can unmarshal
 	// it into a Block (rather than a *ProposalBlock)
 	block := Block(pb)
-	bytes, err := Codec.Marshal(codecVersion, &block)
+	bytes, err := Codec.Marshal(CodecVersion, &block)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}

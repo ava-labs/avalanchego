@@ -14,7 +14,6 @@ var (
 	errEmptyAssetID = errors.New("empty asset ID is not valid")
 )
 
-// Asset ...
 type Asset struct {
 	ID ids.ID `serialize:"true" json:"assetID"`
 }

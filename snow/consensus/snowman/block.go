@@ -4,6 +4,9 @@
 package snowman
 
 import (
+	"time"
+
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
@@ -20,11 +23,8 @@ import (
 type Block interface {
 	choices.Decidable
 
-	// Parent returns the block that this block points to.
-	//
-	// If the parent block is not known, a Block should be returned with the
-	// status Unknown.
-	Parent() Block
+	// Parent returns the ID of this block's parent.
+	Parent() ids.ID
 
 	// Verify that the state transition this block would make if accepted is
 	// valid. If the state transition is invalid, a non-nil error should be
@@ -41,4 +41,10 @@ type Block interface {
 
 	// Height returns the height of this block in the chain.
 	Height() uint64
+
+	// Time this block was proposed at. This value should be consistent across
+	// all nodes. If this block hasn't been successfully verified, any value can
+	// be returned. If this block is the last accepted block, the timestamp must
+	// be returned correctly. Otherwise, accepted blocks can return any value.
+	Timestamp() time.Time
 }

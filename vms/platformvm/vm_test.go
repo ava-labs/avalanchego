@@ -39,18 +39,17 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/vms/timestampvm"
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 )
 
 var (
-	defaultMinStakingDuration        = 24 * time.Hour
-	defaultMaxStakingDuration        = 365 * 24 * time.Hour
-	defaultMinDelegationFee   uint32 = 0
+	defaultMinStakingDuration = 24 * time.Hour
+	defaultMaxStakingDuration = 365 * 24 * time.Hour
 
 	// AVAX asset ID in tests
 	avaxAssetID = ids.ID{'y', 'e', 'e', 't'}
@@ -70,11 +69,11 @@ var (
 	keys []*crypto.PrivateKeySECP256K1R
 
 	defaultMinValidatorStake = 5 * units.MilliAvax
-	defaultMaxValidatorStake = SupplyCap
+	defaultMaxValidatorStake = 500 * units.MilliAvax
 	defaultMinDelegatorStake = 1 * units.MilliAvax
 
 	// amount all genesis validators have in defaultVM
-	defaultBalance uint64 = 100 * defaultMinValidatorStake
+	defaultBalance = 100 * defaultMinValidatorStake
 
 	// subnet that exists at genesis in defaultVM
 	// Its controlKeys are keys[0], keys[1], keys[2]
@@ -119,8 +118,7 @@ func defaultContext() *snow.Context {
 	ctx.NetworkID = testNetworkID
 	ctx.XChainID = avmID
 	ctx.AVAXAssetID = avaxAssetID
-	aliaser := &ids.Aliaser{}
-	aliaser.Initialize()
+	aliaser := ids.NewAliaser()
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -283,20 +281,23 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 	return &buildGenesisArgs, genesisBytes
 }
 
-func defaultVM() (*VM, database.Database) {
+func defaultVM() (*VM, database.Database, *common.SenderTest) {
 	vm := &VM{Factory: Factory{
-		Chains:             chains.MockManager{},
-		Validators:         validators.NewManager(),
-		TxFee:              defaultTxFee,
-		MinValidatorStake:  defaultMinValidatorStake,
-		MaxValidatorStake:  defaultMaxValidatorStake,
-		MinDelegatorStake:  defaultMinDelegatorStake,
-		MinStakeDuration:   defaultMinStakingDuration,
-		MaxStakeDuration:   defaultMaxStakingDuration,
-		StakeMintingPeriod: defaultMaxStakingDuration,
+		Chains:                chains.MockManager{},
+		Validators:            validators.NewManager(),
+		TxFee:                 defaultTxFee,
+		CreateSubnetTxFee:     100 * defaultTxFee,
+		CreateBlockchainTxFee: 100 * defaultTxFee,
+		MinValidatorStake:     defaultMinValidatorStake,
+		MaxValidatorStake:     defaultMaxValidatorStake,
+		MinDelegatorStake:     defaultMinDelegatorStake,
+		MinStakeDuration:      defaultMinStakingDuration,
+		MaxStakeDuration:      defaultMaxStakingDuration,
+		StakeMintingPeriod:    defaultMaxStakingDuration,
+		ApricotPhase3Time:     defaultValidateEndTime,
 	}}
 
-	baseDBManager := manager.NewDefaultMemDBManager()
+	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
 	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
 
@@ -314,7 +315,11 @@ func defaultVM() (*VM, database.Database) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 	_, genesisBytes := defaultGenesis()
-	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
+	appSender := &common.SenderTest{}
+	appSender.CantSendAppGossip = true
+	appSender.SendAppGossipF = func([]byte) error { return nil }
+
+	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
 		panic(err)
 	}
 	if err := vm.Bootstrapped(); err != nil {
@@ -330,7 +335,7 @@ func defaultVM() (*VM, database.Database) {
 		keys[0].PublicKey().Address(),           // change addr
 	); err != nil {
 		panic(err)
-	} else if err := vm.mempool.IssueTx(tx); err != nil {
+	} else if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		panic(err)
 	} else if blk, err := vm.BuildBlock(); err != nil {
 		panic(err)
@@ -342,7 +347,7 @@ func defaultVM() (*VM, database.Database) {
 		testSubnet1 = tx.UnsignedTx.(*UnsignedCreateSubnetTx)
 	}
 
-	return vm, baseDBManager.Current().Database
+	return vm, baseDBManager.Current().Database, appSender
 }
 
 func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
@@ -366,7 +371,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 		StakeMintingPeriod: defaultMaxStakingDuration,
 	}}
 
-	baseDBManager := manager.NewDefaultMemDBManager()
+	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
 	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
 
@@ -384,7 +389,10 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
+	appSender := &common.SenderTest{}
+	appSender.CantSendAppGossip = true
+	appSender.SendAppGossipF = func([]byte) error { return nil }
+	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
 		t.Fatal(err)
 	}
 	if err := vm.Bootstrapped(); err != nil {
@@ -400,7 +408,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 		keys[0].PublicKey().Address(),           // change addr
 	); err != nil {
 		panic(err)
-	} else if err := vm.mempool.IssueTx(tx); err != nil {
+	} else if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		panic(err)
 	} else if blk, err := vm.BuildBlock(); err != nil {
 		panic(err)
@@ -417,7 +425,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 
 // Ensure genesis state is parsed from bytes and stored correctly
 func TestGenesis(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -584,7 +592,7 @@ func TestGenesisGetUTXOs(t *testing.T) {
 
 // accept proposal to add validator to primary network
 func TestAddValidatorCommit(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -617,7 +625,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	}
 
 	// trigger block creation
-	if err := vm.mempool.IssueTx(tx); err != nil {
+	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	}
 	blk, err := vm.BuildBlock()
@@ -664,7 +672,7 @@ func TestAddValidatorCommit(t *testing.T) {
 
 // verify invalid proposal to add validator to primary network
 func TestInvalidAddValidatorCommit(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -734,7 +742,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 
 // Reject proposal to add validator to primary network
 func TestAddValidatorReject(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -764,7 +772,7 @@ func TestAddValidatorReject(t *testing.T) {
 	}
 
 	// trigger block creation
-	if err := vm.mempool.IssueTx(tx); err != nil {
+	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	}
 	blk, err := vm.BuildBlock()
@@ -809,7 +817,7 @@ func TestAddValidatorReject(t *testing.T) {
 
 // Reject proposal to add validator to primary network
 func TestAddValidatorInvalidNotReissued(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -840,22 +848,14 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	}
 
 	// trigger block creation
-	if err := vm.mempool.IssueTx(tx); err != nil {
-		t.Fatal(err)
-	}
-	_, err = vm.BuildBlock()
-	if err == nil {
+	if err := vm.blockBuilder.AddUnverifiedTx(tx); err == nil {
 		t.Fatal("Expected BuildBlock to error due to adding a validator with a nodeID that is already in the validator set.")
-	}
-
-	if vm.mempool.unissuedProposalTxs.Len() > 0 {
-		t.Fatalf("Expected there to be 0 unissued proposal transactions after BuildBlock failed, but found %d", vm.mempool.unissuedProposalTxs.Len())
 	}
 }
 
 // Accept proposal to add validator to subnet
 func TestAddSubnetValidatorAccept(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -885,7 +885,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	}
 
 	// trigger block creation
-	if err := vm.mempool.IssueTx(tx); err != nil {
+	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	}
 	blk, err := vm.BuildBlock()
@@ -938,7 +938,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 
 // Reject proposal to add validator to subnet
 func TestAddSubnetValidatorReject(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -968,7 +968,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	}
 
 	// trigger block creation
-	if err := vm.mempool.IssueTx(tx); err != nil {
+	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	}
 	blk, err := vm.BuildBlock()
@@ -1021,7 +1021,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 
 // Test case where primary network validator rewarded
 func TestRewardValidatorAccept(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1120,7 +1120,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 
 // Test case where primary network validator not rewarded
 func TestRewardValidatorReject(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1208,7 +1208,7 @@ func TestRewardValidatorReject(t *testing.T) {
 
 // Test case where primary network validator is preferred to be rewarded
 func TestRewardValidatorPreferred(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1294,7 +1294,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 
 // Ensure BuildBlock errors when there is no block to build
 func TestUnneededBuildBlock(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1309,7 +1309,7 @@ func TestUnneededBuildBlock(t *testing.T) {
 
 // test acceptance of proposal to create a new chain
 func TestCreateChain(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1321,7 +1321,7 @@ func TestCreateChain(t *testing.T) {
 	tx, err := vm.newCreateChainTx(
 		testSubnet1.ID(),
 		nil,
-		timestampvm.ID,
+		ids.ID{'t', 'e', 's', 't', 'v', 'm'},
 		nil,
 		"name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -1329,7 +1329,7 @@ func TestCreateChain(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatal(err)
-	} else if err := vm.mempool.IssueTx(tx); err != nil {
+	} else if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	} else if blk, err := vm.BuildBlock(); err != nil { // should contain proposal to create chain
 		t.Fatal(err)
@@ -1365,7 +1365,7 @@ func TestCreateChain(t *testing.T) {
 // 3) Advance timestamp to validator's start time (moving the validator from pending to current)
 // 4) Advance timestamp to validator's end time (removing validator from current)
 func TestCreateSubnet(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1387,7 +1387,7 @@ func TestCreateSubnet(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatal(err)
-	} else if err := vm.mempool.IssueTx(createSubnetTx); err != nil {
+	} else if err := vm.blockBuilder.AddUnverifiedTx(createSubnetTx); err != nil {
 		t.Fatal(err)
 	} else if blk, err := vm.BuildBlock(); err != nil { // should contain proposal to create subnet
 		t.Fatal(err)
@@ -1431,7 +1431,7 @@ func TestCreateSubnet(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if err := vm.mempool.IssueTx(addValidatorTx); err != nil {
+	} else if err := vm.blockBuilder.AddUnverifiedTx(addValidatorTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1596,7 +1596,7 @@ func TestCreateSubnet(t *testing.T) {
 
 // test asset import
 func TestAtomicImport(t *testing.T) {
-	vm, baseDB := defaultVM()
+	vm, baseDB, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1643,18 +1643,18 @@ func TestAtomicImport(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
+	utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
 	inputID := utxo.InputID()
-	if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+	if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			recipientKey.PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1668,7 +1668,7 @@ func TestAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.mempool.IssueTx(tx); err != nil {
+	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	} else if blk, err := vm.BuildBlock(); err != nil {
 		t.Fatal(err)
@@ -1689,7 +1689,7 @@ func TestAtomicImport(t *testing.T) {
 
 // test optimistic asset import
 func TestOptimisticAtomicImport(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1715,7 +1715,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 			},
 		}},
 	}}
-	if err := tx.Sign(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{}}); err != nil {
+	if err := tx.Sign(Codec, [][]*crypto.PrivateKeySECP256K1R{{}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1764,7 +1764,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 // test restarting the node
 func TestRestartPartiallyAccepted(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-	db := manager.NewDefaultMemDBManager()
+	db := manager.NewMemDB(version.DefaultVersion1_0_0)
 
 	firstDB := db.NewPrefixDBManager([]byte{})
 	firstVM := &VM{Factory: Factory{
@@ -1779,7 +1779,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
-	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil); err != nil {
+	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1868,7 +1868,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 
 	secondDB := db.NewPrefixDBManager([]byte{})
 	secondMsgChan := make(chan common.Message, 1)
-	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil); err != nil {
+	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1885,8 +1885,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 func TestRestartFullyAccepted(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
 
-	db := manager.NewDefaultMemDBManager()
-
+	db := manager.NewMemDB(version.DefaultVersion1_0_0)
 	firstDB := db.NewPrefixDBManager([]byte{})
 	firstVM := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
@@ -1901,7 +1900,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
-	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil); err != nil {
+	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1940,23 +1939,6 @@ func TestRestartFullyAccepted(t *testing.T) {
 	} else if err := options[1].Reject(); err != nil {
 		t.Fatal(err)
 	}
-
-	/*
-		//This code, when uncommented, prints [secondAdvanceTimeBlkBytes]
-		secondAdvanceTimeTx, err := firstVM.newAdvanceTimeTx(defaultGenesisTime.Add(2 * time.Second))
-		if err != nil {
-			t.Fatal(err)
-		}
-		preferredHeight, err = firstVM.preferredHeight()
-		if err != nil {
-			t.Fatal(err)
-		}
-		secondAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), preferredHeight+1, *secondAdvanceTimeTx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Fatal(secondAdvanceTimeBlk.Bytes())
-	*/
 
 	// Byte representation of block that proposes advancing time to defaultGenesisTime + 2 seconds
 	secondAdvanceTimeBlkBytes := []byte{
@@ -2001,7 +1983,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	secondDB := db.NewPrefixDBManager([]byte{})
 	secondMsgChan := make(chan common.Message, 1)
-	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil); err != nil {
+	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	lastAccepted, err := secondVM.LastAccepted()
@@ -2017,8 +1999,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 func TestBootstrapPartiallyAccepted(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
 
-	baseDBManager := manager.NewDefaultMemDBManager()
-
+	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	vmDBManager := baseDBManager.NewPrefixDBManager([]byte("vm"))
 	bootstrappingDB := prefixdb.New([]byte("bootstrapping"), baseDBManager.Current().Database)
 
@@ -2040,7 +2021,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)
-	if err := vm.Initialize(ctx, vmDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, vmDBManager, genesisBytes, nil, nil, msgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2077,15 +2058,18 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	timeoutManager := timeout.Manager{}
 	benchlist := benchlist.NewNoBenchlist()
-	err = timeoutManager.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:     time.Millisecond,
-		MinimumTimeout:     time.Millisecond,
-		MaximumTimeout:     10 * time.Second,
-		TimeoutHalflife:    5 * time.Minute,
-		TimeoutCoefficient: 1.25,
-		MetricsNamespace:   "",
-		Registerer:         prometheus.NewRegistry(),
-	}, benchlist)
+	err = timeoutManager.Initialize(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     time.Millisecond,
+			MinimumTimeout:     time.Millisecond,
+			MaximumTimeout:     10 * time.Second,
+			TimeoutHalflife:    5 * time.Minute,
+			TimeoutCoefficient: 1.25,
+		},
+		benchlist,
+		"",
+		prometheus.NewRegistry(),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2104,7 +2088,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	assert.NoError(t, err)
 
 	reqID := new(uint32)
-	externalSender.GetAcceptedFrontierF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration) []ids.ShortID {
+	externalSender.SendGetAcceptedFrontierF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration) []ids.ShortID {
 		*reqID = requestID
 		return ids.List()
 	}
@@ -2158,10 +2142,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		&engine,
 		vdrs,
 		msgChan,
-		1024,
-		router.DefaultMaxNonStakerPendingMsgs,
-		router.DefaultStakerPortion,
-		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -2175,8 +2155,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	externalSender.GetAcceptedFrontierF = nil
-	externalSender.GetAcceptedF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration, _ []ids.ID) []ids.ShortID {
+	externalSender.SendGetAcceptedFrontierF = nil
+	externalSender.SendGetAcceptedF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration, _ []ids.ID) []ids.ShortID {
 		*reqID = requestID
 		return ids.List()
 	}
@@ -2186,8 +2166,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	externalSender.GetAcceptedF = nil
-	externalSender.GetAncestorsF = func(_ ids.ShortID, _ ids.ID, requestID uint32, _ time.Duration, containerID ids.ID) bool {
+	externalSender.SendGetAcceptedF = nil
+	externalSender.SendGetAncestorsF = func(_ ids.ShortID, _ ids.ID, requestID uint32, _ time.Duration, containerID ids.ID) bool {
 		*reqID = requestID
 		if containerID != advanceTimeBlkID {
 			t.Fatalf("wrong block requested")
@@ -2199,15 +2179,15 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	externalSender.GetF = nil
-	externalSender.CantPushQuery = false
-	externalSender.CantPullQuery = false
+	externalSender.SendGetF = nil
+	externalSender.CantSendPushQuery = false
+	externalSender.CantSendPullQuery = false
 
 	if err := engine.MultiPut(peerID, *reqID, [][]byte{advanceTimeBlkBytes}); err != nil {
 		t.Fatal(err)
 	}
 
-	externalSender.CantPushQuery = true
+	externalSender.CantSendPushQuery = true
 
 	preferred, err = vm.Preferred()
 	if err != nil {
@@ -2228,7 +2208,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 func TestUnverifiedParent(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
 
-	dbManager := manager.NewDefaultMemDBManager()
+	dbManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 
 	vm := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
@@ -2249,7 +2229,7 @@ func TestUnverifiedParent(t *testing.T) {
 	}()
 
 	msgChan := make(chan common.Message, 1)
-	if err := vm.Initialize(ctx, dbManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, dbManager, genesisBytes, nil, nil, msgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2291,8 +2271,7 @@ func TestUnverifiedParent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parentBlk := secondAdvanceTimeBlk.Parent()
-	if parentBlkID := parentBlk.ID(); parentBlkID != firstOption.ID() {
+	if parentBlkID := secondAdvanceTimeBlk.Parent(); parentBlkID != firstOption.ID() {
 		t.Fatalf("Wrong parent block ID returned")
 	} else if err := firstOption.Verify(); err != nil {
 		t.Fatal(err)
@@ -2304,7 +2283,7 @@ func TestUnverifiedParent(t *testing.T) {
 }
 
 func TestMaxStakeAmount(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -2382,7 +2361,7 @@ func TestMaxStakeAmount(t *testing.T) {
 func TestUnverifiedParentPanic(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
 
-	baseDBManager := manager.NewDefaultMemDBManager()
+	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 
 	vm := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
@@ -2403,7 +2382,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	}()
 
 	msgChan := make(chan common.Message, 1)
-	if err := vm.Initialize(ctx, baseDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, baseDBManager, genesisBytes, nil, nil, msgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 

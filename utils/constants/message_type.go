@@ -5,8 +5,7 @@ package constants
 
 import "fmt"
 
-// MsgType ...
-type MsgType int
+type MsgType byte
 
 const (
 	NullMsg MsgType = iota
@@ -31,6 +30,10 @@ const (
 	MultiPutMsg
 	GetAncestorsFailedMsg
 	TimeoutMsg
+	AppRequestMsg
+	AppRequestFailedMsg
+	AppResponseMsg
+	AppGossipMsg
 )
 
 func (t MsgType) String() string {
@@ -79,6 +82,14 @@ func (t MsgType) String() string {
 		return "Notify"
 	case GossipMsg:
 		return "Gossip"
+	case AppRequestMsg:
+		return "App Request"
+	case AppResponseMsg:
+		return "App Response"
+	case AppGossipMsg:
+		return "App Gossip"
+	case AppRequestFailedMsg:
+		return "App Request Failed"
 	default:
 		return fmt.Sprintf("Unknown Message Type: %d", t)
 	}

@@ -107,6 +107,33 @@ func TestShortSetUnion(t *testing.T) {
 	}
 }
 
+func TestShortSetDifference(t *testing.T) {
+	set := ShortSet{}
+	diffSet := ShortSet{}
+
+	id0 := ShortID{0}
+	id1 := ShortID{1}
+
+	diffSet.Add(id0)
+	set.Add(id0, id1)
+
+	switch {
+	case !set.Contains(id0):
+		t.Fatalf("Set should contain %s", id0)
+	case !set.Contains(id1):
+		t.Fatalf("Set should contain %s", id1)
+	}
+
+	set.Difference(diffSet)
+
+	switch {
+	case set.Contains(id0):
+		t.Fatalf("Set shouldn't contain %s", id0)
+	case !set.Contains(id1):
+		t.Fatalf("Set should contain %s", id1)
+	}
+}
+
 func TestShortSetEquals(t *testing.T) {
 	set := ShortSet{}
 	otherSet := ShortSet{}
@@ -264,4 +291,29 @@ func TestShortSetPop(t *testing.T) {
 
 	_, ok = s.Pop()
 	assert.False(t, ok)
+}
+
+func TestShortSortedList(t *testing.T) {
+	assert := assert.New(t)
+
+	set := ShortSet{}
+	assert.Len(set.SortedList(), 0)
+
+	set.Add(ShortID{0})
+	sorted := set.SortedList()
+	assert.Len(sorted, 1)
+	assert.Equal(ShortID{0}, sorted[0])
+
+	set.Add(ShortID{1})
+	sorted = set.SortedList()
+	assert.Len(sorted, 2)
+	assert.Equal(ShortID{0}, sorted[0])
+	assert.Equal(ShortID{1}, sorted[1])
+
+	set.Add(ShortID{2})
+	sorted = set.SortedList()
+	assert.Len(sorted, 3)
+	assert.Equal(ShortID{0}, sorted[0])
+	assert.Equal(ShortID{1}, sorted[1])
+	assert.Equal(ShortID{2}, sorted[2])
 }

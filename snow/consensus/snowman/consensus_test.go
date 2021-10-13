@@ -116,7 +116,7 @@ func NumProcessingTest(t *testing.T, factory Factory) {
 			IDV:     ids.Empty.Prefix(1),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 	}
 
 	if numProcessing := sm.NumProcessing(); numProcessing != 0 {
@@ -168,7 +168,7 @@ func AddToTailTest(t *testing.T, factory Factory) {
 			IDV:     ids.Empty.Prefix(1),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 	}
 
 	// Adding to the previous preference will update the preference
@@ -206,14 +206,14 @@ func AddToNonTailTest(t *testing.T, factory Factory) {
 			IDV:     ids.Empty.Prefix(1),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 	}
 	secondBlock := &TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(2),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 	}
 
 	// Adding to the previous preference will update the preference
@@ -263,7 +263,7 @@ func AddToUnknownTest(t *testing.T, factory Factory) {
 			IDV:     ids.Empty.Prefix(2),
 			StatusV: choices.Processing,
 		},
-		ParentV: parent,
+		ParentV: parent.IDV,
 	}
 
 	// Adding a block with an unknown parent means the parent must have already
@@ -331,7 +331,7 @@ func StatusOrProcessingPreviouslyRejectedTest(t *testing.T, factory Factory) {
 			IDV:     ids.Empty.Prefix(1),
 			StatusV: choices.Rejected,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 	}
 
 	if sm.AcceptedOrProcessing(block) {
@@ -369,7 +369,7 @@ func StatusOrProcessingUnissuedTest(t *testing.T, factory Factory) {
 			IDV:     ids.Empty.Prefix(1),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 		HeightV: 1,
 	}
 
@@ -408,7 +408,7 @@ func StatusOrProcessingIssuedTest(t *testing.T, factory Factory) {
 			IDV:     ids.Empty.Prefix(1),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 	}
 
 	if err := sm.Add(block); err != nil {
@@ -449,7 +449,7 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 			IDV:     ids.Empty.Prefix(1),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 	}
 
 	if err := sm.Add(block); err != nil {
@@ -501,14 +501,14 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 			IDV:     ids.Empty.Prefix(1),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 	}
 	secondBlock := &TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(2),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 	}
 
 	if err := sm.Add(firstBlock); err != nil {
@@ -597,21 +597,21 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 			IDV:     ids.Empty.Prefix(1),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 	}
 	block1 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(2),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 	}
 	block2 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(3),
 			StatusV: choices.Processing,
 		},
-		ParentV: block1,
+		ParentV: block1.IDV,
 	}
 
 	if err := sm.Add(block0); err != nil {
@@ -677,28 +677,28 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 			IDV:     ids.Empty.Prefix(1),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 	}
 	block1 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(2),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 	}
 	block2 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(3),
 			StatusV: choices.Processing,
 		},
-		ParentV: block1,
+		ParentV: block1.IDV,
 	}
 	block3 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(4),
 			StatusV: choices.Processing,
 		},
-		ParentV: block1,
+		ParentV: block1.IDV,
 	}
 
 	if err := sm.Add(block0); err != nil {
@@ -792,7 +792,7 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 			IDV:     ids.Empty.Prefix(1),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 	}
 	unknownBlockID := ids.Empty.Prefix(2)
 
@@ -843,35 +843,35 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 			IDV:     ids.Empty.Prefix(1),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 	}
 	block1 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(2),
 			StatusV: choices.Processing,
 		},
-		ParentV: block0,
+		ParentV: block0.IDV,
 	}
 	block2 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(3),
 			StatusV: choices.Processing,
 		},
-		ParentV: block1,
+		ParentV: block1.IDV,
 	}
 	block3 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(4),
 			StatusV: choices.Processing,
 		},
-		ParentV: block0,
+		ParentV: block0.IDV,
 	}
 	block4 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(5),
 			StatusV: choices.Processing,
 		},
-		ParentV: block3,
+		ParentV: block3.IDV,
 	}
 
 	if err := sm.Add(block0); err != nil {
@@ -985,28 +985,28 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 			IDV:     ids.ID{0x0f}, // 0b1111
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 	}
 	block1 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.ID{0x08}, // 0b1000
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 	}
 	block2 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.ID{0x01}, // 0b0001
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 	}
 	block3 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(1),
 			StatusV: choices.Processing,
 		},
-		ParentV: block2,
+		ParentV: block2.IDV,
 	}
 
 	if err := sm.Add(block0); err != nil {
@@ -1068,7 +1068,7 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 		HeightV: 1,
 	}
 	b1Block := &TestBlock{
@@ -1076,7 +1076,7 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 		HeightV: 1,
 	}
 	a2Block := &TestBlock{
@@ -1084,7 +1084,7 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		ParentV: a1Block,
+		ParentV: a1Block.IDV,
 		HeightV: 2,
 	}
 	b2Block := &TestBlock{
@@ -1092,7 +1092,7 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		ParentV: b1Block,
+		ParentV: b1Block.IDV,
 		HeightV: 2,
 	}
 
@@ -1228,7 +1228,7 @@ func MetricsAcceptedErrorTest(t *testing.T, factory Factory) {
 	numAccepted := prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: params.Namespace,
-			Name:      "blks_accepted",
+			Name:      "blks_accepted_count",
 		})
 
 	if err := params.Metrics.Register(numAccepted); err != nil {
@@ -1259,7 +1259,7 @@ func MetricsRejectedErrorTest(t *testing.T, factory Factory) {
 	numRejected := prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: params.Namespace,
-			Name:      "blks_rejected",
+			Name:      "blks_rejected_count",
 		})
 
 	if err := params.Metrics.Register(numRejected); err != nil {
@@ -1302,7 +1302,7 @@ func ErrorOnInitialRejectionTest(t *testing.T, factory Factory) {
 			RejectV: errors.New(""),
 			StatusV: choices.Processing,
 		},
-		ParentV: rejectedBlock,
+		ParentV: rejectedBlock.IDV,
 	}
 
 	if err := sm.Add(block); err == nil {
@@ -1336,7 +1336,7 @@ func ErrorOnAcceptTest(t *testing.T, factory Factory) {
 			AcceptV: errors.New(""),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 	}
 
 	if err := sm.Add(block); err != nil {
@@ -1375,7 +1375,7 @@ func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 			IDV:     ids.Empty.Prefix(1),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 	}
 	block1 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1383,7 +1383,7 @@ func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 			RejectV: errors.New(""),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 	}
 
 	if err := sm.Add(block0); err != nil {
@@ -1424,14 +1424,14 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 			IDV:     ids.Empty.Prefix(1),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 	}
 	block1 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(2),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 	}
 	block2 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1439,7 +1439,7 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 			RejectV: errors.New(""),
 			StatusV: choices.Processing,
 		},
-		ParentV: block1,
+		ParentV: block1.IDV,
 	}
 
 	if err := sm.Add(block0); err != nil {

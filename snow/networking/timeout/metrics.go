@@ -1,7 +1,11 @@
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package timeout
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -14,27 +18,23 @@ import (
 )
 
 const (
-	defaultRequestHelpMsg = "Time spent waiting for a response to this message in milliseconds"
+	defaultRequestHelpMsg = "time (in ns) spent waiting for a response to this message"
 	validatorIDLabel      = "validatorID"
 )
 
-func initHistogram(
+func initAverager(
 	namespace,
 	name string,
-	registerer prometheus.Registerer,
+	reg prometheus.Registerer,
 	errs *wrappers.Errs,
-) prometheus.Histogram {
-	histogram := prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespace,
-		Name:      name,
-		Help:      defaultRequestHelpMsg,
-		Buckets:   metric.MillisecondsBuckets,
-	})
-
-	if err := registerer.Register(histogram); err != nil {
-		errs.Add(fmt.Errorf("failed to register %s statistics: %w", name, err))
-	}
-	return histogram
+) metric.Averager {
+	return metric.NewAveragerWithErrs(
+		namespace,
+		name,
+		defaultRequestHelpMsg,
+		reg,
+		errs,
+	)
 }
 
 func initSummary(
@@ -56,26 +56,33 @@ func initSummary(
 }
 
 type metrics struct {
+	lock           sync.Mutex
 	chainToMetrics map[ids.ID]*chainMetrics
 }
 
 func (m *metrics) RegisterChain(ctx *snow.Context, namespace string) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	if m.chainToMetrics == nil {
 		m.chainToMetrics = map[ids.ID]*chainMetrics{}
 	}
 	if _, exists := m.chainToMetrics[ctx.ChainID]; exists {
 		return fmt.Errorf("chain %s has already been registered", ctx.ChainID)
 	}
-	cm := &chainMetrics{}
-	if err := cm.Initialize(ctx, namespace, false); err != nil {
-		return fmt.Errorf("couldn't initialize metrics for chain %s: %w", ctx.ChainID, err)
+	cm, err := newChainMetrics(ctx, namespace, false)
+	if err != nil {
+		return fmt.Errorf("couldn't create metrics for chain %s: %w", ctx.ChainID, err)
 	}
 	m.chainToMetrics[ctx.ChainID] = cm
 	return nil
 }
 
 // Record that a response to a message of type [msgType] regarding chain [chainID] took [latency]
-func (m *metrics) observe(chainID ids.ID, msgType constants.MsgType, latency time.Duration) {
+func (m *metrics) Observe(chainID ids.ID, msgType constants.MsgType, latency time.Duration) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	cm, exists := m.chainToMetrics[chainID]
 	if !exists {
 		// TODO should this log an error?
@@ -96,35 +103,34 @@ type chainMetrics struct {
 
 	getAcceptedFrontier, getAccepted,
 	getAncestors, get,
-	pushQuery, pullQuery prometheus.Histogram
+	pushQuery, pullQuery metric.Averager
 }
 
-// Initialize implements the Engine interface
-func (cm *chainMetrics) Initialize(ctx *snow.Context, namespace string, summaryEnabled bool) error {
-	cm.summaryEnabled = summaryEnabled
-	errs := wrappers.Errs{}
-
+func newChainMetrics(ctx *snow.Context, namespace string, summaryEnabled bool) (*chainMetrics, error) {
 	queryLatencyNamespace := fmt.Sprintf("%s_lat", namespace)
+	errs := wrappers.Errs{}
+	return &chainMetrics{
+		ctx:            ctx,
+		summaryEnabled: summaryEnabled,
 
-	cm.getAcceptedFrontierSummary = initSummary(queryLatencyNamespace, "get_accepted_frontier_peer", ctx.Metrics, &errs)
-	cm.getAcceptedSummary = initSummary(queryLatencyNamespace, "get_accepted_peer", ctx.Metrics, &errs)
-	cm.getAncestorsSummary = initSummary(queryLatencyNamespace, "get_ancestors_peer", ctx.Metrics, &errs)
-	cm.getSummary = initSummary(queryLatencyNamespace, "get_peer", ctx.Metrics, &errs)
-	cm.pushQuerySummary = initSummary(queryLatencyNamespace, "push_query_peer", ctx.Metrics, &errs)
-	cm.pullQuerySummary = initSummary(queryLatencyNamespace, "pull_query_peer", ctx.Metrics, &errs)
+		getAcceptedFrontierSummary: initSummary(queryLatencyNamespace, "get_accepted_frontier_peer", ctx.Metrics, &errs),
+		getAcceptedSummary:         initSummary(queryLatencyNamespace, "get_accepted_peer", ctx.Metrics, &errs),
+		getAncestorsSummary:        initSummary(queryLatencyNamespace, "get_ancestors_peer", ctx.Metrics, &errs),
+		getSummary:                 initSummary(queryLatencyNamespace, "get_peer", ctx.Metrics, &errs),
+		pushQuerySummary:           initSummary(queryLatencyNamespace, "push_query_peer", ctx.Metrics, &errs),
+		pullQuerySummary:           initSummary(queryLatencyNamespace, "pull_query_peer", ctx.Metrics, &errs),
 
-	cm.getAcceptedFrontier = initHistogram(queryLatencyNamespace, "get_accepted_frontier", ctx.Metrics, &errs)
-	cm.getAccepted = initHistogram(queryLatencyNamespace, "get_accepted", ctx.Metrics, &errs)
-	cm.getAncestors = initHistogram(queryLatencyNamespace, "get_ancestors", ctx.Metrics, &errs)
-	cm.get = initHistogram(queryLatencyNamespace, "get", ctx.Metrics, &errs)
-	cm.pushQuery = initHistogram(queryLatencyNamespace, "push_query", ctx.Metrics, &errs)
-	cm.pullQuery = initHistogram(queryLatencyNamespace, "pull_query", ctx.Metrics, &errs)
-
-	return errs.Err
+		getAcceptedFrontier: initAverager(queryLatencyNamespace, "get_accepted_frontier", ctx.Metrics, &errs),
+		getAccepted:         initAverager(queryLatencyNamespace, "get_accepted", ctx.Metrics, &errs),
+		getAncestors:        initAverager(queryLatencyNamespace, "get_ancestors", ctx.Metrics, &errs),
+		get:                 initAverager(queryLatencyNamespace, "get", ctx.Metrics, &errs),
+		pushQuery:           initAverager(queryLatencyNamespace, "push_query", ctx.Metrics, &errs),
+		pullQuery:           initAverager(queryLatencyNamespace, "pull_query", ctx.Metrics, &errs),
+	}, errs.Err
 }
 
 func (cm *chainMetrics) observe(validatorID ids.ShortID, msgType constants.MsgType, latency time.Duration) {
-	lat := float64(latency.Milliseconds())
+	lat := float64(latency)
 	switch msgType {
 	case constants.GetAcceptedFrontierMsg:
 		cm.getAcceptedFrontier.Observe(lat)
@@ -164,9 +170,10 @@ func (cm *chainMetrics) observe(validatorID ids.ShortID, msgType constants.MsgTy
 		return
 	}
 
-	if err == nil {
-		observer.Observe(lat)
-	} else {
-		cm.ctx.Log.Warn("Failed to get observer with validatorID label due to %s", err)
+	if err != nil {
+		cm.ctx.Log.Warn("failed to get observer with validatorID label due to %s", err)
+		return
 	}
+
+	observer.Observe(lat)
 }

@@ -18,6 +18,7 @@ var errUnknownBlockType = errors.New("unknown block type")
 
 type metrics struct {
 	percentConnected prometheus.Gauge
+	localStake       prometheus.Gauge
 	totalStake       prometheus.Gauge
 
 	numAbortBlocks,
@@ -35,6 +36,11 @@ type metrics struct {
 	numExportTxs,
 	numImportTxs,
 	numRewardValidatorTxs prometheus.Counter
+
+	validatorSetsCached     prometheus.Counter
+	validatorSetsCreated    prometheus.Counter
+	validatorSetsHeightDiff prometheus.Gauge
+	validatorSetsDuration   prometheus.Gauge
 
 	apiRequestMetrics metric.APIInterceptor
 }
@@ -65,6 +71,11 @@ func (m *metrics) Initialize(
 		Name:      "percent_connected",
 		Help:      "Percent of connected stake",
 	})
+	m.localStake = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "local_staked",
+		Help:      "Total amount of AVAX on this node staked",
+	})
 	m.totalStake = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "total_staked",
@@ -87,6 +98,27 @@ func (m *metrics) Initialize(
 	m.numImportTxs = newTxMetrics(namespace, "import")
 	m.numRewardValidatorTxs = newTxMetrics(namespace, "reward_validator")
 
+	m.validatorSetsCached = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "validator_sets_cached",
+		Help:      "Total number of validator sets cached",
+	})
+	m.validatorSetsCreated = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "validator_sets_created",
+		Help:      "Total number of validator sets created from applying difflayers",
+	})
+	m.validatorSetsHeightDiff = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "validator_sets_height_diff_sum",
+		Help:      "Total number of validator sets diffs applied for generating validator sets",
+	})
+	m.validatorSetsDuration = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "validator_sets_duration_sum",
+		Help:      "Total amount of time generating validator sets in nanoseconds",
+	})
+
 	apiRequestMetrics, err := metric.NewAPIInterceptor(namespace, registerer)
 	m.apiRequestMetrics = apiRequestMetrics
 	errs := wrappers.Errs{}
@@ -94,6 +126,7 @@ func (m *metrics) Initialize(
 		err,
 
 		registerer.Register(m.percentConnected),
+		registerer.Register(m.localStake),
 		registerer.Register(m.totalStake),
 
 		registerer.Register(m.numAbortBlocks),
@@ -111,6 +144,11 @@ func (m *metrics) Initialize(
 		registerer.Register(m.numExportTxs),
 		registerer.Register(m.numImportTxs),
 		registerer.Register(m.numRewardValidatorTxs),
+
+		registerer.Register(m.validatorSetsCreated),
+		registerer.Register(m.validatorSetsCached),
+		registerer.Register(m.validatorSetsHeightDiff),
+		registerer.Register(m.validatorSetsDuration),
 	)
 	return errs.Err
 }

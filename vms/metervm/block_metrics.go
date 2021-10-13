@@ -22,40 +22,26 @@ type blockMetrics struct {
 	verify,
 	verifyErr,
 	accept,
-	reject prometheus.Histogram
+	reject metric.Averager
 }
 
 func (m *blockMetrics) Initialize(
 	namespace string,
-	registerer prometheus.Registerer,
+	reg prometheus.Registerer,
 ) error {
-	m.buildBlock = metric.NewNanosecondsLatencyMetric(namespace, "build_block")
-	m.buildBlockErr = metric.NewNanosecondsLatencyMetric(namespace, "build_block_err")
-	m.parseBlock = metric.NewNanosecondsLatencyMetric(namespace, "parse_block")
-	m.parseBlockErr = metric.NewNanosecondsLatencyMetric(namespace, "parse_block_err")
-	m.getBlock = metric.NewNanosecondsLatencyMetric(namespace, "get_block")
-	m.getBlockErr = metric.NewNanosecondsLatencyMetric(namespace, "get_block_err")
-	m.setPreference = metric.NewNanosecondsLatencyMetric(namespace, "set_preference")
-	m.lastAccepted = metric.NewNanosecondsLatencyMetric(namespace, "last_accepted")
-	m.verify = metric.NewNanosecondsLatencyMetric(namespace, "verify")
-	m.verifyErr = metric.NewNanosecondsLatencyMetric(namespace, "verify_err")
-	m.accept = metric.NewNanosecondsLatencyMetric(namespace, "accept")
-	m.reject = metric.NewNanosecondsLatencyMetric(namespace, "reject")
-
 	errs := wrappers.Errs{}
-	errs.Add(
-		registerer.Register(m.buildBlock),
-		registerer.Register(m.buildBlockErr),
-		registerer.Register(m.parseBlock),
-		registerer.Register(m.parseBlockErr),
-		registerer.Register(m.getBlock),
-		registerer.Register(m.getBlockErr),
-		registerer.Register(m.setPreference),
-		registerer.Register(m.lastAccepted),
-		registerer.Register(m.verify),
-		registerer.Register(m.verifyErr),
-		registerer.Register(m.accept),
-		registerer.Register(m.reject),
-	)
+	m.buildBlock = newAverager(namespace, "build_block", reg, &errs)
+	m.buildBlockErr = newAverager(namespace, "build_block_err", reg, &errs)
+	m.parseBlock = newAverager(namespace, "parse_block", reg, &errs)
+	m.parseBlockErr = newAverager(namespace, "parse_block_err", reg, &errs)
+	m.getBlock = newAverager(namespace, "get_block", reg, &errs)
+	m.getBlockErr = newAverager(namespace, "get_block_err", reg, &errs)
+	m.setPreference = newAverager(namespace, "set_preference", reg, &errs)
+	m.lastAccepted = newAverager(namespace, "last_accepted", reg, &errs)
+	m.verify = newAverager(namespace, "verify", reg, &errs)
+	m.verifyErr = newAverager(namespace, "verify_err", reg, &errs)
+	m.accept = newAverager(namespace, "accept", reg, &errs)
+	m.reject = newAverager(namespace, "reject", reg, &errs)
+
 	return errs.Err
 }

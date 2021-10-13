@@ -14,16 +14,26 @@ import (
 )
 
 type message struct {
-	messageType  constants.MsgType
-	validatorID  ids.ShortID
-	requestID    uint32
-	containerID  ids.ID
-	container    []byte
-	containers   [][]byte
-	containerIDs []ids.ID
-	notification common.Message
-	received     time.Time // Time this message was received
-	deadline     time.Time // Time this message must be responded to
+	// Must always be set
+	messageType constants.MsgType
+	// Must always be set
+	nodeID         ids.ShortID
+	requestID      uint32
+	containerID    ids.ID
+	container      []byte
+	containers     [][]byte
+	containerIDs   []ids.ID
+	notification   common.Message
+	received       time.Time // Time this message was received
+	deadline       time.Time // Time this message must be responded to
+	onDoneHandling func()
+	appMsgBytes    []byte
+}
+
+func (m message) doneHandling() {
+	if m.onDoneHandling != nil {
+		m.onDoneHandling()
+	}
 }
 
 // IsPeriodic returns true if this message is of a type that is sent on a
@@ -35,7 +45,7 @@ func (m message) IsPeriodic() bool {
 
 func (m message) String() string {
 	sb := strings.Builder{}
-	sb.WriteString(fmt.Sprintf("(%s, ValidatorID: %s, RequestID: %d", m.messageType, m.validatorID, m.requestID))
+	sb.WriteString(fmt.Sprintf("(%s, NodeID: %s%s, RequestID: %d", m.messageType, constants.NodeIDPrefix, m.nodeID, m.requestID))
 	if !m.received.IsZero() {
 		sb.WriteString(fmt.Sprintf(", Received: %d", m.received.Unix()))
 	}
@@ -51,6 +61,8 @@ func (m message) String() string {
 		sb.WriteString(fmt.Sprintf(", NumContainers: %d)", len(m.containers)))
 	case constants.NotifyMsg:
 		sb.WriteString(fmt.Sprintf(", Notification: %s)", m.notification))
+	case constants.AppRequestMsg, constants.AppResponseMsg, constants.AppGossipMsg:
+		sb.WriteString(fmt.Sprintf(", len(AppMsg): %d)", len(m.appMsgBytes)))
 	default:
 		sb.WriteString(")")
 	}

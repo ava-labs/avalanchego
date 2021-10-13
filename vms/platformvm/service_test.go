@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -23,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -32,13 +34,13 @@ import (
 
 var (
 	// Test user username
-	testUsername string = "ScoobyUser"
+	testUsername = "ScoobyUser"
 
 	// Test user password, must meet minimum complexity/length requirements
-	testPassword string = "ShaggyPassword1Zoinks!"
+	testPassword = "ShaggyPassword1Zoinks!"
 
 	// Bytes docoded from CB58 "ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"
-	testPrivateKey []byte = []byte{
+	testPrivateKey = []byte{
 		0x56, 0x28, 0x9e, 0x99, 0xc9, 0x4b, 0x69, 0x12,
 		0xbf, 0xc1, 0x2a, 0xdc, 0x09, 0x3c, 0x9b, 0x51,
 		0x12, 0x4f, 0x0d, 0xc5, 0x4a, 0xc7, 0xa7, 0x66,
@@ -47,17 +49,14 @@ var (
 
 	// 3cb7d3842e8cee6a0ebd09f1fe884f6861e1b29c
 	// Platform address resulting from the above private key
-	testAddress string = "P-testing18jma8ppw3nhx5r4ap8clazz0dps7rv5umpc36y"
+	testAddress = "P-testing18jma8ppw3nhx5r4ap8clazz0dps7rv5umpc36y"
 )
 
 func defaultService(t *testing.T) *Service {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
-	ks, err := keystore.New(logging.NoLog{}, manager.NewDefaultMemDBManager())
-	if err != nil {
-		t.Fatal(err)
-	}
+	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.DefaultVersion1_0_0))
 	if err := ks.CreateUser(testUsername, testPassword); err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +172,7 @@ func TestImportKey(t *testing.T) {
 	}
 }
 
-// Test issuing a tx, having it be dropped, and then re-issued and accepted
+// Test issuing a tx and accepted
 func TestGetTxStatus(t *testing.T) {
 	service := defaultService(t)
 	defaultAddress(t, service)
@@ -217,18 +216,18 @@ func TestGetTxStatus(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := Codec.Marshal(codecVersion, utxo)
+	utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
 	inputID := utxo.InputID()
-	if err := peerSharedMemory.Put(service.vm.ctx.ChainID, []*atomic.Element{{
+	if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{service.vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			recipientKey.PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -269,38 +268,14 @@ func TestGetTxStatus(t *testing.T) {
 	}
 
 	// put the chain in existing chain list
-	if err := service.vm.mempool.IssueTx(tx); err != nil {
-		t.Fatal(err)
-	} else if _, err := service.vm.BuildBlock(); err == nil {
+	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err == nil {
 		t.Fatal("should have errored because of missing funds")
-	}
-
-	resp = GetTxStatusResponse{} // reset
-	err = service.GetTxStatus(nil, arg, &resp)
-	switch {
-	case err != nil:
-		t.Fatal(err)
-	case resp.Status != Dropped:
-		t.Fatalf("status should be Dropped but is %s", resp.Status)
-	case resp.Reason != "":
-		t.Fatal("reason should be empty when IncludeReason is false")
-	}
-
-	resp = GetTxStatusResponse{} // reset
-	err = service.GetTxStatus(nil, argIncludeReason, &resp)
-	switch {
-	case err != nil:
-		t.Fatal(err)
-	case resp.Status != Dropped:
-		t.Fatalf("status should be Dropped but is %s", resp.Status)
-	case resp.Reason == "":
-		t.Fatalf("reason shouldn't be empty")
 	}
 
 	service.vm.AtomicUTXOManager = newAtomicUTXOManager
 	service.vm.ctx.SharedMemory = sm
 
-	if err := service.vm.mempool.IssueTx(tx); err != nil {
+	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	} else if block, err := service.vm.BuildBlock(); err != nil {
 		t.Fatal(err)
@@ -397,7 +372,7 @@ func TestGetTx(t *testing.T) {
 		var response api.FormattedTx
 		if err := service.GetTx(nil, arg, &response); err == nil {
 			t.Fatalf("failed test '%s': haven't issued tx yet so shouldn't be able to get it", test.description)
-		} else if err := service.vm.mempool.IssueTx(tx); err != nil {
+		} else if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 			t.Fatalf("failed test '%s': %s", test.description, err)
 		} else if block, err := service.vm.BuildBlock(); err != nil {
 			t.Fatalf("failed test '%s': %s", test.description, err)
@@ -452,10 +427,10 @@ func TestGetBalance(t *testing.T) {
 			t.Fatal(err)
 		}
 		if reply.Balance != cjson.Uint64(defaultBalance) {
-			t.Fatalf("Wrong balance. Expected %d ; Returned %d", reply.Balance, defaultBalance)
+			t.Fatalf("Wrong balance. Expected %d ; Returned %d", defaultBalance, reply.Balance)
 		}
 		if reply.Unlocked != cjson.Uint64(defaultBalance) {
-			t.Fatalf("Wrong unlocked balance. Expected %d ; Returned %d", reply.Unlocked, defaultBalance)
+			t.Fatalf("Wrong unlocked balance. Expected %d ; Returned %d", defaultBalance, reply.Unlocked)
 		}
 		if reply.LockedStakeable != 0 {
 			t.Fatalf("Wrong locked stakeable balance. Expected %d ; Returned %d", reply.LockedStakeable, 0)
@@ -499,7 +474,7 @@ func TestGetStake(t *testing.T) {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[0])
 		assert.NoError(err)
 		var output avax.TransferableOutput
-		_, err = service.vm.codec.Unmarshal(outputBytes, &output)
+		_, err = Codec.Unmarshal(outputBytes, &output)
 		assert.NoError(err)
 		out, ok := output.Out.(*secp256k1fx.TransferOutput)
 		assert.True(ok)
@@ -526,7 +501,7 @@ func TestGetStake(t *testing.T) {
 		outputBytes, err := formatting.Decode(args.Encoding, outputStr)
 		assert.NoError(err)
 		var output avax.TransferableOutput
-		_, err = service.vm.codec.Unmarshal(outputBytes, &output)
+		_, err = Codec.Unmarshal(outputBytes, &output)
 		assert.NoError(err)
 		out, ok := output.Out.(*secp256k1fx.TransferOutput)
 		assert.True(ok)
@@ -572,7 +547,7 @@ func TestGetStake(t *testing.T) {
 	for i := range outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[i])
 		assert.NoError(err)
-		_, err = service.vm.codec.Unmarshal(outputBytes, &outputs[i])
+		_, err = Codec.Unmarshal(outputBytes, &outputs[i])
 		assert.NoError(err)
 	}
 	// Make sure the stake amount is as expected
@@ -614,7 +589,7 @@ func TestGetStake(t *testing.T) {
 	for i := range outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[i])
 		assert.NoError(err)
-		_, err = service.vm.codec.Unmarshal(outputBytes, &outputs[i])
+		_, err = Codec.Unmarshal(outputBytes, &outputs[i])
 		assert.NoError(err)
 	}
 	// Make sure the stake amount is as expected
@@ -748,4 +723,31 @@ func TestGetCurrentValidators(t *testing.T) {
 	if !found {
 		t.Fatalf("didnt find delegator")
 	}
+}
+
+func TestGetTimestamp(t *testing.T) {
+	assert := assert.New(t)
+
+	service := defaultService(t)
+	service.vm.ctx.Lock.Lock()
+	defer func() {
+		err := service.vm.Shutdown()
+		assert.NoError(err)
+
+		service.vm.ctx.Lock.Unlock()
+	}()
+
+	reply := GetTimestampReply{}
+	err := service.GetTimestamp(nil, nil, &reply)
+	assert.NoError(err)
+
+	assert.Equal(service.vm.internalState.GetTimestamp(), reply.Timestamp)
+
+	newTimestamp := reply.Timestamp.Add(time.Second)
+	service.vm.internalState.SetTimestamp(newTimestamp)
+
+	err = service.GetTimestamp(nil, nil, &reply)
+	assert.NoError(err)
+
+	assert.Equal(newTimestamp, reply.Timestamp)
 }

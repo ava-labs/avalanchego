@@ -4,6 +4,8 @@
 package chains
 
 import (
+	"crypto"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"sync"
@@ -32,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/metervm"
+	"github.com/ava-labs/avalanchego/vms/proposervm"
 
 	dbManager "github.com/ava-labs/avalanchego/database/manager"
 
@@ -45,12 +48,14 @@ import (
 )
 
 const (
-	defaultChannelSize = 1024
+	defaultChannelSize = 1
 )
 
 var (
-	BootstrappedKey         = []byte{0x00}
-	_               Manager = &manager{}
+	errUnknownChainID = errors.New("unknown chain ID")
+	errUnknownVMType  = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
+
+	_ Manager = &manager{}
 )
 
 // Manager manages the chains running on this node.
@@ -58,9 +63,10 @@ var (
 //   * Create a chain
 //   * Add a registrant. When a chain is created, each registrant calls
 //     RegisterChain with the new chain as the argument.
-//   * Get the aliases associated with a given chain.
-//   * Get the ID of the chain associated with a given alias.
+//   * Manage the aliases of chains
 type Manager interface {
+	ids.Aliaser
+
 	// Return the router this Manager is using to route consensus messages to chains
 	Router() router.Router
 
@@ -79,12 +85,6 @@ type Manager interface {
 
 	// Given an alias, return the ID of the VM associated with that alias
 	LookupVM(string) (ids.ID, error)
-
-	// Return the aliases associated with a chain
-	Aliases(ids.ID) []string
-
-	// Add an alias to a chain
-	Alias(ids.ID, string) error
 
 	// Returns the ID of the subnet that is validating the provided chain
 	SubnetID(chainID ids.ID) (ids.ID, error)
@@ -111,7 +111,6 @@ type chain struct {
 	Engine  common.Engine
 	Handler *router.Handler
 	Ctx     *snow.Context
-	VM      interface{}
 	Beacons validators.Set
 }
 
@@ -123,44 +122,36 @@ type ChainConfig struct {
 	Upgrade []byte
 }
 
-// ManagerConfig ...
 type ManagerConfig struct {
-	StakingEnabled            bool // True iff the network has staking enabled
-	MaxPendingMsgs            uint32
-	MaxNonStakerPendingMsgs   uint32
-	StakerMSGPortion          float64
-	StakerCPUPortion          float64
-	Log                       logging.Logger
-	LogFactory                logging.Factory
-	VMManager                 vms.Manager // Manage mappings from vm ID --> vm
-	DecisionEvents            *triggers.EventDispatcher
-	ConsensusEvents           *triggers.EventDispatcher
-	DBManager                 dbManager.Manager
-	Router                    router.Router    // Routes incoming messages to the appropriate chain
-	Net                       network.Network  // Sends consensus messages to other validators
-	ConsensusParams           avcon.Parameters // The consensus parameters (alpha, beta, etc.) for new chains
-	EpochFirstTransition      time.Time
-	EpochDuration             time.Duration
-	Validators                validators.Manager // Validators validating on this chain
-	NodeID                    ids.ShortID        // The ID of this node
-	NetworkID                 uint32             // ID of the network this node is connected to
-	Server                    *server.Server     // Handles HTTP API calls
-	Keystore                  keystore.Keystore
-	AtomicMemory              *atomic.Memory
-	AVAXAssetID               ids.ID
-	XChainID                  ids.ID
-	CriticalChains            ids.Set          // Chains that can't exit gracefully
-	WhitelistedSubnets        ids.Set          // Subnets to validate
-	TimeoutManager            *timeout.Manager // Manages request timeouts when sending messages to other validators
-	HealthService             health.Service
-	RetryBootstrap            bool                   // Should Bootstrap be retried
-	RetryBootstrapMaxAttempts int                    // Max number of times to retry bootstrap
-	ChainConfigs              map[string]ChainConfig // alias -> ChainConfig
-	// If true, shut down the node after the Primary Network has bootstrapped
-	// and use [FetchOnlyFrom] as beacons
-	FetchOnly bool
-	// [FetchOnlyFrom] ignored unless [FetchOnly] is true
-	FetchOnlyFrom validators.Set
+	StakingEnabled              bool            // True iff the network has staking enabled
+	StakingCert                 tls.Certificate // needed to sign snowman++ blocks
+	Log                         logging.Logger
+	LogFactory                  logging.Factory
+	VMManager                   vms.Manager // Manage mappings from vm ID --> vm
+	DecisionEvents              *triggers.EventDispatcher
+	ConsensusEvents             *triggers.EventDispatcher
+	DBManager                   dbManager.Manager
+	Router                      router.Router    // Routes incoming messages to the appropriate chain
+	Net                         network.Network  // Sends consensus messages to other validators
+	ConsensusParams             avcon.Parameters // The consensus parameters (alpha, beta, etc.) for new chains
+	EpochFirstTransition        time.Time
+	EpochDuration               time.Duration
+	Validators                  validators.Manager // Validators validating on this chain
+	NodeID                      ids.ShortID        // The ID of this node
+	NetworkID                   uint32             // ID of the network this node is connected to
+	Server                      *server.Server     // Handles HTTP API calls
+	Keystore                    keystore.Keystore
+	AtomicMemory                *atomic.Memory
+	AVAXAssetID                 ids.ID
+	XChainID                    ids.ID
+	CriticalChains              ids.Set          // Chains that can't exit gracefully
+	WhitelistedSubnets          ids.Set          // Subnets to validate
+	TimeoutManager              *timeout.Manager // Manages request timeouts when sending messages to other validators
+	HealthService               health.Service
+	RetryBootstrap              bool                    // Should Bootstrap be retried
+	RetryBootstrapWarnFrequency int                     // Max number of times to retry bootstrap before warning the node operator
+	SubnetConfigs               map[ids.ID]SubnetConfig // ID -> SubnetConfig
+	ChainConfigs                map[string]ChainConfig  // alias -> ChainConfig
 	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
 	ShutdownNodeFunc func(exitCode int)
 	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
@@ -173,6 +164,9 @@ type ManagerConfig struct {
 	// This node will only consider the first [MultiputMaxContainersReceived]
 	// containers in a multiput it receives.
 	BootstrapMultiputMaxContainersReceived int
+
+	ApricotPhase4Time            time.Time
+	ApricotPhase4MinPChainHeight uint64
 }
 
 type manager struct {
@@ -195,17 +189,19 @@ type manager struct {
 	// Key: Chain's ID
 	// Value: The chain
 	chains map[ids.ID]*router.Handler
+
+	// snowman++ related interface to allow validators retrival
+	validatorState validators.State
 }
 
 // New returns a new Manager
 func New(config *ManagerConfig) Manager {
-	m := &manager{
+	return &manager{
+		Aliaser:       ids.NewAliaser(),
 		ManagerConfig: *config,
 		subnets:       make(map[ids.ID]Subnet),
 		chains:        make(map[ids.ID]*router.Handler),
 	}
-	m.Initialize()
-	return m
 }
 
 // Router that this chain manager is using to route consensus messages to chains
@@ -249,32 +245,11 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 
 	sb, exists := m.subnets[chainParams.SubnetID]
 	if !exists {
-		var onBootstrapped func()
-		if chainParams.SubnetID == constants.PrimaryNetworkID {
-			onBootstrapped = func() {
-				// When this subnet is done bootstrapping, mark that we have
-				// bootstrapped this database version. If running in fetch only
-				// mode, shut down node since fetching is complete.
-				if err := m.DBManager.Current().Database.Put(BootstrappedKey, nil); err != nil {
-					m.Log.Fatal("couldn't mark database as bootstrapped: %s", err)
-					go m.ShutdownNodeFunc(1)
-				}
-				if m.ManagerConfig.FetchOnly {
-					m.Log.Info("done with fetch only mode. Starting node shutdown")
-					go m.ShutdownNodeFunc(constants.ExitCodeDoneMigrating)
-				}
-			}
-		}
-		sb = newSubnet(onBootstrapped, chainParams.ID)
+		sb = newSubnet()
 		m.subnets[chainParams.SubnetID] = sb
-	} else {
-		sb.addChain(chainParams.ID)
 	}
 
-	// In fetch-only mode, use custom bootstrap beacons
-	if m.FetchOnly {
-		chainParams.CustomBeacons = m.FetchOnlyFrom
-	}
+	sb.addChain(chainParams.ID)
 
 	chain, err := m.buildChain(chainParams, sb)
 	if err != nil {
@@ -349,6 +324,15 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		Metrics:              m.ConsensusParams.Metrics,
 		EpochFirstTransition: m.EpochFirstTransition,
 		EpochDuration:        m.EpochDuration,
+		ValidatorState:       m.validatorState,
+		StakingCertLeaf:      m.StakingCert.Leaf,
+		StakingLeafSigner:    m.StakingCert.PrivateKey.(crypto.Signer),
+	}
+
+	if sbConfigs, ok := m.SubnetConfigs[chainParams.SubnetID]; ok {
+		if sbConfigs.ValidatorOnly {
+			ctx.SetValidatorOnly()
+		}
 	}
 
 	// Get a factory for the vm we want to use on our chain
@@ -390,6 +374,11 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	consensusParams := m.ConsensusParams
+	if sbConfigs, ok := m.SubnetConfigs[chainParams.SubnetID]; ok && chainParams.SubnetID != constants.PrimaryNetworkID {
+		consensusParams = sbConfigs.ConsensusParameters
+		// TODO: move metrics to another place so this can be tidier
+		consensusParams.Metrics = m.ConsensusParams.Metrics
+	}
 	consensusParams.Namespace = fmt.Sprintf("%s_%s", constants.PlatformName, primaryAlias)
 
 	// The validators of this blockchain
@@ -444,7 +433,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			return nil, fmt.Errorf("error while creating new snowman vm %w", err)
 		}
 	default:
-		return nil, fmt.Errorf("the vm should have type avalanche.DAGVM or snowman.ChainVM. Chain not created")
+		return nil, errUnknownVMType
 	}
 
 	// Register the chain with the timeout manager
@@ -471,7 +460,7 @@ func (m *manager) unblockChains() {
 func (m *manager) createAvalancheChain(
 	ctx *snow.Context,
 	genesisData []byte,
-	validators,
+	vdrs,
 	beacons validators.Set,
 	vm vertex.DAGVM,
 	fxs []*common.Fx,
@@ -510,8 +499,33 @@ func (m *manager) createAvalancheChain(
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
-	chainConfig := m.getChainConfig(ctx.ChainID)
-	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
+	// Passes messages from the consensus engine to the network
+	sender := sender.Sender{}
+	if err := sender.Initialize(
+		ctx,
+		m.Net,
+		m.ManagerConfig.Router,
+		m.TimeoutManager,
+		consensusParams.Namespace,
+		consensusParams.Metrics,
+	); err != nil {
+		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
+	}
+
+	chainConfig, err := m.getChainConfig(ctx.ChainID)
+	if err != nil {
+		return nil, fmt.Errorf("error while fetching chain config: %w", err)
+	}
+	if err := vm.Initialize(
+		ctx,
+		vmDBManager,
+		genesisData,
+		chainConfig.Upgrade,
+		chainConfig.Config,
+		msgChan,
+		fxs,
+		&sender,
+	); err != nil {
 		return nil, fmt.Errorf("error during vm's Initialize: %w", err)
 	}
 
@@ -519,13 +533,6 @@ func (m *manager) createAvalancheChain(
 	// persistence of vertices
 	vtxManager := &state.Serializer{}
 	vtxManager.Initialize(ctx, vm, vertexDB)
-
-	// Passes messages from the consensus engine to the network
-	sender := sender.Sender{}
-	err = sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager, consensusParams.Namespace, consensusParams.Metrics)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
-	}
 
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
@@ -546,7 +553,7 @@ func (m *manager) createAvalancheChain(
 		Config: avbootstrap.Config{
 			Config: common.Config{
 				Ctx:                           ctx,
-				Validators:                    validators,
+				Validators:                    vdrs,
 				Beacons:                       beacons,
 				SampleK:                       sampleK,
 				StartupAlpha:                  (3*bootstrapWeight + 3) / 4,
@@ -555,7 +562,7 @@ func (m *manager) createAvalancheChain(
 				Subnet:                        sb,
 				Timer:                         timer,
 				RetryBootstrap:                m.RetryBootstrap,
-				RetryBootstrapMaxAttempts:     m.RetryBootstrapMaxAttempts,
+				RetryBootstrapWarnFrequency:   m.RetryBootstrapWarnFrequency,
 				MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
 				MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
 				MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
@@ -589,12 +596,8 @@ func (m *manager) createAvalancheChain(
 
 	err = handler.Initialize(
 		engine,
-		validators,
+		vdrs,
 		msgChan,
-		m.MaxPendingMsgs,
-		m.MaxNonStakerPendingMsgs,
-		m.StakerMSGPortion,
-		m.StakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
 	)
@@ -603,7 +606,6 @@ func (m *manager) createAvalancheChain(
 		Name:    chainAlias,
 		Engine:  engine,
 		Handler: handler,
-		VM:      vm,
 		Ctx:     ctx,
 	}, err
 }
@@ -612,7 +614,7 @@ func (m *manager) createAvalancheChain(
 func (m *manager) createSnowmanChain(
 	ctx *snow.Context,
 	genesisData []byte,
-	validators,
+	vdrs,
 	beacons validators.Set,
 	vm block.ChainVM,
 	fxs []*common.Fx,
@@ -645,24 +647,55 @@ func (m *manager) createSnowmanChain(
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
-	// Initialize the VM
-	chainConfig := m.getChainConfig(ctx.ChainID)
-	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
-		return nil, err
-	}
-
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-	err = sender.Initialize(
+	if err := sender.Initialize(
 		ctx,
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
 		consensusParams.Namespace,
 		consensusParams.Metrics,
-	)
-	if err != nil {
+	); err != nil {
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
+	}
+
+	// first vm to be init is P-Chain once, which provides validator interface to all ProposerVMs
+	if m.validatorState == nil {
+		valState, ok := vm.(validators.State)
+		if !ok {
+			return nil, fmt.Errorf("expected validators.State but got %T", vm)
+		}
+
+		// Initialize the validator state for future chains.
+		m.validatorState = validators.NewLockedState(&ctx.Lock, valState)
+
+		// Notice that this context is left unlocked. This is because the
+		// lock will already be held when accessing these values on the
+		// P-chain.
+		ctx.ValidatorState = valState
+	}
+
+	// enable ProposerVM on this VM
+	vm = proposervm.New(vm, m.ApricotPhase4Time, m.ApricotPhase4MinPChainHeight)
+
+	// Initialize the ProposerVM and the vm wrapped inside it
+	chainConfig, err := m.getChainConfig(ctx.ChainID)
+	if err != nil {
+		return nil, fmt.Errorf("error while fetching chain config: %w", err)
+	}
+
+	if err := vm.Initialize(
+		ctx,
+		vmDBManager,
+		genesisData,
+		chainConfig.Upgrade,
+		chainConfig.Config,
+		msgChan,
+		fxs,
+		&sender,
+	); err != nil {
+		return nil, err
 	}
 
 	sampleK := consensusParams.K
@@ -684,7 +717,7 @@ func (m *manager) createSnowmanChain(
 		Config: smbootstrap.Config{
 			Config: common.Config{
 				Ctx:                           ctx,
-				Validators:                    validators,
+				Validators:                    vdrs,
 				Beacons:                       beacons,
 				SampleK:                       sampleK,
 				StartupAlpha:                  (3*bootstrapWeight + 3) / 4,
@@ -693,7 +726,7 @@ func (m *manager) createSnowmanChain(
 				Subnet:                        sb,
 				Timer:                         timer,
 				RetryBootstrap:                m.RetryBootstrap,
-				RetryBootstrapMaxAttempts:     m.RetryBootstrapMaxAttempts,
+				RetryBootstrapWarnFrequency:   m.RetryBootstrapWarnFrequency,
 				MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
 				MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
 				MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
@@ -710,12 +743,8 @@ func (m *manager) createSnowmanChain(
 
 	err = handler.Initialize(
 		engine,
-		validators,
+		vdrs,
 		msgChan,
-		m.MaxPendingMsgs,
-		m.MaxNonStakerPendingMsgs,
-		m.StakerMSGPortion,
-		m.StakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
 	)
@@ -742,7 +771,6 @@ func (m *manager) createSnowmanChain(
 		Name:    chainAlias,
 		Engine:  engine,
 		Handler: handler,
-		VM:      vm,
 		Ctx:     ctx,
 	}, nil
 }
@@ -753,7 +781,7 @@ func (m *manager) SubnetID(chainID ids.ID) (ids.ID, error) {
 
 	chain, exists := m.chains[chainID]
 	if !exists {
-		return ids.ID{}, errors.New("unknown chain ID")
+		return ids.ID{}, errUnknownChainID
 	}
 	return chain.Context().SubnetID, nil
 }
@@ -800,16 +828,19 @@ func (m *manager) isChainWithAlias(aliases ...string) (string, bool) {
 
 // getChainConfig returns value of a entry by looking at ID key and alias key
 // it first searches ID key, then falls back to it's corresponding primary alias
-func (m *manager) getChainConfig(id ids.ID) ChainConfig {
+func (m *manager) getChainConfig(id ids.ID) (ChainConfig, error) {
 	if val, ok := m.ManagerConfig.ChainConfigs[id.String()]; ok {
-		return val
+		return val, nil
 	}
-	aliases := m.Aliases(id)
+	aliases, err := m.Aliases(id)
+	if err != nil {
+		return ChainConfig{}, err
+	}
 	for _, alias := range aliases {
 		if val, ok := m.ManagerConfig.ChainConfigs[alias]; ok {
-			return val
+			return val, nil
 		}
 	}
 
-	return ChainConfig{}
+	return ChainConfig{}, nil
 }

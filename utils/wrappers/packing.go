@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	// MaxStringLen ...
 	MaxStringLen = math.MaxUint16
 
 	// ByteLen is the number of bytes per byte...

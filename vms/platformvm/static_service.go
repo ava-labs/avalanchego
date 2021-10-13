@@ -154,7 +154,6 @@ type Genesis struct {
 	Message       string         `serialize:"true"`
 }
 
-// Initialize ...
 func (g *Genesis) Initialize() error {
 	for _, tx := range g.Validators {
 		if err := tx.Sign(GenesisCodec, nil); err != nil {
@@ -223,7 +222,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 
 	// Specify the validators that are validating the primary network at genesis.
-	validators := &EventHeap{}
+	validators := newTxHeapByEndTime()
 	for _, validator := range args.Validators {
 		weight := uint64(0)
 		stake := make([]*avax.TransferableOutput, len(validator.Staked))
@@ -337,10 +336,15 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		chains = append(chains, tx)
 	}
 
+	validatorTxs := make([]*Tx, validators.Len())
+	for i, tx := range validators.txs {
+		validatorTxs[i] = tx.tx
+	}
+
 	// genesis holds the genesis state
 	genesis := Genesis{
 		UTXOs:         utxos,
-		Validators:    validators.Txs,
+		Validators:    validatorTxs,
 		Chains:        chains,
 		Timestamp:     uint64(args.Time),
 		InitialSupply: uint64(args.InitialSupply),
@@ -348,11 +352,11 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 
 	// Marshal genesis to bytes
-	bytes, err := GenesisCodec.Marshal(codecVersion, genesis)
+	bytes, err := GenesisCodec.Marshal(CodecVersion, genesis)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal genesis: %w", err)
 	}
-	reply.Bytes, err = formatting.Encode(args.Encoding, bytes)
+	reply.Bytes, err = formatting.EncodeWithChecksum(args.Encoding, bytes)
 	if err != nil {
 		return fmt.Errorf("couldn't encode genesis as string: %w", err)
 	}

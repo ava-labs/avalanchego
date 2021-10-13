@@ -4,18 +4,17 @@
 package version
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
+// These are globals that describe network upgrades and node versions
 var (
-	String                       string // Printed when CLI arg --version is used
-	GitCommit                    string // Set in the build script (i.e. at compile time)
-	Current                      = NewDefaultApplication(constants.PlatformName, 1, 4, 9)
-	MinimumCompatibleVersion     = NewDefaultApplication(constants.PlatformName, 1, 4, 5)
-	PrevMinimumCompatibleVersion = NewDefaultApplication(constants.PlatformName, 1, 3, 0)
+	Current                      = NewDefaultVersion(1, 6, 2)
+	CurrentApp                   = NewDefaultApplication(constants.PlatformName, Current.Major(), Current.Minor(), Current.Patch())
+	MinimumCompatibleVersion     = NewDefaultApplication(constants.PlatformName, 1, 6, 0)
+	PrevMinimumCompatibleVersion = NewDefaultApplication(constants.PlatformName, 1, 5, 0)
 	MinimumUnmaskedVersion       = NewDefaultApplication(constants.PlatformName, 1, 1, 0)
 	PrevMinimumUnmaskedVersion   = NewDefaultApplication(constants.PlatformName, 1, 0, 0)
 	VersionParser                = NewDefaultApplicationParser()
@@ -43,21 +42,24 @@ var (
 		constants.FujiID:    time.Date(2021, time.May, 5, 14, 0, 0, 0, time.UTC),
 	}
 	ApricotPhase2DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
-)
 
-func init() {
-	format := "%s [database=%s"
-	args := []interface{}{
-		Current,
-		CurrentDatabase,
+	ApricotPhase3Times = map[uint32]time.Time{
+		constants.MainnetID: time.Date(2021, time.August, 24, 14, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(2021, time.August, 16, 19, 0, 0, 0, time.UTC),
 	}
-	if GitCommit != "" {
-		format += ", commit=%s"
-		args = append(args, GitCommit)
+	ApricotPhase3DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
+
+	ApricotPhase4Times = map[uint32]time.Time{
+		constants.MainnetID: time.Date(2021, time.September, 22, 21, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(2021, time.September, 16, 21, 0, 0, 0, time.UTC),
 	}
-	format += "]\n"
-	String = fmt.Sprintf(format, args...)
-}
+	ApricotPhase4DefaultTime     = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
+	ApricotPhase4MinPChainHeight = map[uint32]uint64{
+		constants.MainnetID: 793005,
+		constants.FujiID:    47437,
+	}
+	ApricotPhase4DefaultMinPChainHeight uint64
+)
 
 func GetApricotPhase0Time(networkID uint32) time.Time {
 	if upgradeTime, exists := ApricotPhase0Times[networkID]; exists {
@@ -80,11 +82,32 @@ func GetApricotPhase2Time(networkID uint32) time.Time {
 	return ApricotPhase2DefaultTime
 }
 
+func GetApricotPhase3Time(networkID uint32) time.Time {
+	if upgradeTime, exists := ApricotPhase3Times[networkID]; exists {
+		return upgradeTime
+	}
+	return ApricotPhase3DefaultTime
+}
+
+func GetApricotPhase4Time(networkID uint32) time.Time {
+	if upgradeTime, exists := ApricotPhase4Times[networkID]; exists {
+		return upgradeTime
+	}
+	return ApricotPhase4DefaultTime
+}
+
+func GetApricotPhase4MinPChainHeight(networkID uint32) uint64 {
+	if minHeight, exists := ApricotPhase4MinPChainHeight[networkID]; exists {
+		return minHeight
+	}
+	return ApricotPhase4DefaultMinPChainHeight
+}
+
 func GetCompatibility(networkID uint32) Compatibility {
 	return NewCompatibility(
-		Current,
+		CurrentApp,
 		MinimumCompatibleVersion,
-		GetApricotPhase2Time(networkID),
+		GetApricotPhase4Time(networkID),
 		PrevMinimumCompatibleVersion,
 		MinimumUnmaskedVersion,
 		GetApricotPhase0Time(networkID),

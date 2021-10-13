@@ -16,12 +16,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/uptime"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func TestUnsignedRewardValidatorTxSemanticVerifyOnCommit(t *testing.T) {
-	vm, _ := defaultVM()
+func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -40,7 +41,7 @@ func TestUnsignedRewardValidatorTxSemanticVerifyOnCommit(t *testing.T) {
 	// Case 1: Chain timestamp is wrong
 	if tx, err := vm.newRewardValidatorTx(toRemove.ID()); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := toRemove.SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err := toRemove.Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
 	}
 
@@ -50,7 +51,7 @@ func TestUnsignedRewardValidatorTxSemanticVerifyOnCommit(t *testing.T) {
 	// Case 2: Wrong validator
 	if tx, err := vm.newRewardValidatorTx(ids.GenerateTestID()); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := toRemove.SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err := toRemove.Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatalf("should have failed because validator ID is wrong")
 	}
 
@@ -60,7 +61,7 @@ func TestUnsignedRewardValidatorTxSemanticVerifyOnCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	onCommitState, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
+	onCommitState, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,8 +104,8 @@ func TestUnsignedRewardValidatorTxSemanticVerifyOnCommit(t *testing.T) {
 	}
 }
 
-func TestUnsignedRewardValidatorTxSemanticVerifyOnAbort(t *testing.T) {
-	vm, _ := defaultVM()
+func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -123,7 +124,7 @@ func TestUnsignedRewardValidatorTxSemanticVerifyOnAbort(t *testing.T) {
 	// Case 1: Chain timestamp is wrong
 	if tx, err := vm.newRewardValidatorTx(toRemove.ID()); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := toRemove.SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err := toRemove.Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
 	}
 
@@ -133,7 +134,7 @@ func TestUnsignedRewardValidatorTxSemanticVerifyOnAbort(t *testing.T) {
 	// Case 2: Wrong validator
 	if tx, err := vm.newRewardValidatorTx(ids.GenerateTestID()); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := toRemove.SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err := toRemove.Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatalf("should have failed because validator ID is wrong")
 	}
 
@@ -143,7 +144,7 @@ func TestUnsignedRewardValidatorTxSemanticVerifyOnAbort(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, onAbortState, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
+	_, onAbortState, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,10 +187,10 @@ func TestUnsignedRewardValidatorTxSemanticVerifyOnAbort(t *testing.T) {
 	}
 }
 
-func TestRewardDelegatorTxSemanticVerifyOnCommit(t *testing.T) {
+func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	assert := assert.New(t)
 
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown()
@@ -242,7 +243,7 @@ func TestRewardDelegatorTxSemanticVerifyOnCommit(t *testing.T) {
 	tx, err := vm.newRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 
-	onCommitState, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
+	onCommitState, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
 	assert.NoError(err)
 
 	vdrDestSet := ids.ShortSet{}
@@ -279,10 +280,10 @@ func TestRewardDelegatorTxSemanticVerifyOnCommit(t *testing.T) {
 	assert.Equal(expectedReward, delReward+vdrReward, "expected total reward to be %d but is %d", expectedReward, delReward+vdrReward)
 }
 
-func TestRewardDelegatorTxSemanticVerifyOnAbort(t *testing.T) {
+func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	assert := assert.New(t)
 
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown()
@@ -337,7 +338,7 @@ func TestRewardDelegatorTxSemanticVerifyOnAbort(t *testing.T) {
 	tx, err := vm.newRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 
-	_, onAbortState, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
+	_, onAbortState, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
 	assert.NoError(err)
 
 	vdrDestSet := ids.ShortSet{}
@@ -373,9 +374,9 @@ func TestRewardDelegatorTxSemanticVerifyOnAbort(t *testing.T) {
 	assert.Equal(initialSupply-expectedReward, newSupply, "should have removed un-rewarded tokens from the potential supply")
 }
 
-func TestUptimeDisallowed(t *testing.T) {
+func TestUptimeDisallowedWithRestart(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-	db := manager.NewDefaultMemDBManager()
+	db := manager.NewMemDB(version.DefaultVersion1_0_0)
 
 	firstDB := db.NewPrefixDBManager([]byte{})
 	firstVM := &VM{Factory: Factory{
@@ -389,7 +390,7 @@ func TestUptimeDisallowed(t *testing.T) {
 	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
-	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil); err != nil {
+	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -429,7 +430,7 @@ func TestUptimeDisallowed(t *testing.T) {
 	}()
 
 	secondMsgChan := make(chan common.Message, 1)
-	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil); err != nil {
+	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -564,6 +565,137 @@ func TestUptimeDisallowed(t *testing.T) {
 	}
 
 	currentStakers := secondVM.internalState.CurrentStakerChainState()
+	_, err = currentStakers.GetValidator(keys[1].PublicKey().Address())
+	if err == nil {
+		t.Fatal("should have removed a genesis validator")
+	}
+}
+
+func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
+	_, genesisBytes := defaultGenesis()
+	db := manager.NewMemDB(version.DefaultVersion1_0_0)
+
+	vm := &VM{Factory: Factory{
+		Chains:             chains.MockManager{},
+		UptimePercentage:   .2,
+		StakeMintingPeriod: defaultMaxStakingDuration,
+		Validators:         validators.NewManager(),
+	}}
+
+	ctx := defaultContext()
+	ctx.Lock.Lock()
+
+	msgChan := make(chan common.Message, 1)
+	appSender := &common.SenderTest{}
+	if err := vm.Initialize(ctx, db, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		ctx.Lock.Unlock()
+	}()
+
+	vm.clock.Set(defaultGenesisTime)
+	vm.Manager.(uptime.TestManager).SetTime(defaultGenesisTime)
+
+	if err := vm.Bootstrapping(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Fast forward clock to time for genesis validators to leave
+	vm.clock.Set(defaultValidateEndTime)
+	vm.Manager.(uptime.TestManager).SetTime(defaultValidateEndTime)
+
+	blk, err := vm.BuildBlock() // should contain proposal to advance time
+	if err != nil {
+		t.Fatal(err)
+	} else if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	// first the time will be advanced.
+	block := blk.(*ProposalBlock)
+	options, err := block.Options()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	commit, ok := options[0].(*CommitBlock)
+	if !ok {
+		t.Fatal(errShouldPrefCommit)
+	}
+	abort, ok := options[1].(*AbortBlock)
+	if !ok {
+		t.Fatal(errShouldPrefCommit)
+	}
+
+	if err := block.Accept(); err != nil {
+		t.Fatal(err)
+	}
+	if err := commit.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if err := abort.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	// advance the timestamp
+	if err := commit.Accept(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify that chain's timestamp has advanced
+	timestamp := vm.internalState.GetTimestamp()
+	if !timestamp.Equal(defaultValidateEndTime) {
+		t.Fatal("expected timestamp to have advanced")
+	}
+
+	// should contain proposal to reward genesis validator
+	blk, err = vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	block = blk.(*ProposalBlock)
+	options, err = block.Options()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	abort, ok = options[0].(*AbortBlock)
+	if !ok {
+		t.Fatal(errShouldPrefAbort)
+	}
+	commit, ok = options[1].(*CommitBlock)
+	if !ok {
+		t.Fatal(errShouldPrefAbort)
+	}
+
+	if err := blk.Accept(); err != nil {
+		t.Fatal(err)
+	}
+	if err := commit.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if err := abort.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	// do not reward the genesis validator
+	if err := abort.Accept(); err != nil {
+		t.Fatal(err)
+	}
+
+	currentStakers := vm.internalState.CurrentStakerChainState()
 	_, err = currentStakers.GetValidator(keys[1].PublicKey().Address())
 	if err == nil {
 		t.Fatal("should have removed a genesis validator")
