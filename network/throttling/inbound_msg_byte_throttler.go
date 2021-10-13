@@ -86,10 +86,8 @@ type inboundMsgByteThrottler struct {
 // Release([msgSize], [nodeID]) must be called (!) when done with the message
 // or when we give up trying to read the message, if applicable.
 func (t *inboundMsgByteThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
-	t.metrics.awaitingAcquire.Inc()
 	startTime := time.Now()
 	defer func() {
-		t.metrics.awaitingAcquire.Dec()
 		t.metrics.awaitingRelease.Inc()
 		t.metrics.acquireLatency.Observe(float64(time.Since(startTime)))
 	}()
@@ -165,7 +163,9 @@ func (t *inboundMsgByteThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 	t.nodeToWaitingMsgIDs[nodeID] = append(t.nodeToWaitingMsgIDs[nodeID], msgID)
 	t.lock.Unlock()
 
+	t.metrics.awaitingAcquire.Inc()
 	<-closeOnAcquireChan // We've acquired enough bytes
+	t.metrics.awaitingAcquire.Dec()
 }
 
 // Must correspond to a previous call of Acquire([msgSize], [nodeID])
