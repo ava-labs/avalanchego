@@ -1144,7 +1144,7 @@ func (n *network) appGossipPeers(peers []*peer, chainID ids.ID, appGossipBytes [
 		return fmt.Errorf("failed to build AppGossip(%s): %w", chainID, err)
 	}
 
-	sentPeers := ids.ShortSet{}
+	sentPeers := ids.NewShortSet(len(peers))
 	for _, peer := range peers {
 		// should never be nil but just in case
 		if peer == nil || sentPeers.Contains(peer.nodeID) {
