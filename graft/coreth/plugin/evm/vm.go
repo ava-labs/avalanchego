@@ -210,6 +210,11 @@ func (vm *VM) Clock() *timer.Clock { return &vm.clock }
 // Logger implements the secp256k1fx interface
 func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
 
+// SetLogLevel sets the log level with the original [os.StdErr] interface
+func (vm *VM) SetLogLevel(logLevel log.Lvl) {
+	log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.StreamHandler(originalStderr, log.TerminalFormat(false))))
+}
+
 /*
  ******************************************************************************
  ********************************* Snowman API ********************************
@@ -296,7 +301,7 @@ func (vm *VM) Initialize(
 		logLevel = configLogLevel
 	}
 
-	log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.StreamHandler(originalStderr, log.TerminalFormat(false))))
+	vm.SetLogLevel(logLevel)
 
 	// Set minimum price for mining and default gas price oracle value to the min
 	// gas price to prevent so transactions and blocks all use the correct fees

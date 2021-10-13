@@ -167,3 +167,14 @@ func (c *Client) Export(
 	}, res)
 	return res.TxID, err
 }
+
+// SetLogLevel dynamically sets the log level for the C Chain
+func (c *Client) SetLogLevel(
+	level string,
+) (bool, error) {
+	res := &api.SuccessResponse{}
+	err := c.requester.SendRequest("setLogLevel", &SetLogLevelArgs{
+		Level: level,
+	}, res)
+	return res.Success, err
+}

@@ -37,6 +37,7 @@ var (
 	errNoAddresses   = errors.New("no addresses provided")
 	errNoSourceChain = errors.New("no source chain provided")
 	errNilTxID       = errors.New("nil transaction ID")
+	errNoLogLevel    = errors.New("no log level provided")
 
 	initialBaseFee = big.NewInt(params.ApricotPhase3InitialBaseFee)
 )
@@ -526,5 +527,28 @@ func (service *AvaxAPI) GetAtomicTx(r *http.Request, args *api.GetTxArgs, reply 
 		jsonHeight := json.Uint64(height)
 		reply.BlockHeight = &jsonHeight
 	}
+	return nil
+}
+
+type SetLogLevelArgs struct {
+	Level string `json:"level"`
+}
+
+func (service *AvaxAPI) SetLogLevel(r *http.Request, args *SetLogLevelArgs, reply *api.SuccessResponse) error {
+	log.Info("EVM: SetLogLevel called", "logLevel", args.Level)
+
+	if len(args.Level) == 0 {
+		return errNoLogLevel
+	}
+
+	logLevel, err := log.LvlFromString(args.Level)
+
+	if err != nil {
+		return fmt.Errorf("failed to set logger to %s due to: %w ", args.Level, err)
+	}
+
+	service.vm.SetLogLevel(logLevel)
+
+	reply.Success = true
 	return nil
 }
