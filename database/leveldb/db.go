@@ -5,6 +5,8 @@ package leveldb
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
 	"sync/atomic"
 
 	"github.com/syndtr/goleveldb/leveldb"
@@ -60,26 +62,93 @@ type Database struct {
 	errored uint64
 }
 
+type config struct {
+	// BlockSize is the minimum uncompressed size in bytes of each 'sorted
+	// table' block.
+	BlockCacheCapacity int `json:"blockCacheCapacity"`
+	// BlockSize is the minimum uncompressed size in bytes of each 'sorted
+	// table' block.
+	BlockSize int `json:"blockSize"`
+	// CompactionExpandLimitFactor limits compaction size after expanded.  This
+	// will be multiplied by table size limit at compaction target level.
+	CompactionExpandLimitFactor int `json:"compactionExpandLimitFactor"`
+	// CompactionGPOverlapsFactor limits overlaps in grandparent (Level + 2)
+	// that a single 'sorted table' generates.  This will be multiplied by
+	// table size limit at grandparent level.
+	CompactionGPOverlapsFactor int `json:"compactionGPOverlapsFactor"`
+	// CompactionL0Trigger defines number of 'sorted table' at level-0 that will
+	// trigger compaction.
+	CompactionL0Trigger int `json:"compactionL0Trigger"`
+	// CompactionSourceLimitFactor limits compaction source size. This doesn't
+	// apply to level-0.  This will be multiplied by table size limit at
+	// compaction target level.
+	CompactionSourceLimitFactor int `json:"compactionSourceLimitFactor"`
+	// CompactionTableSize limits size of 'sorted table' that compaction
+	// generates.  The limits for each level will be calculated as:
+	//   CompactionTableSize * (CompactionTableSizeMultiplier ^ Level)
+	// The multiplier for each level can also fine-tuned using
+	// CompactionTableSizeMultiplierPerLevel.
+	CompactionTableSize int `json:"compactionTableSize"`
+	// CompactionTableSizeMultiplier defines multiplier for CompactionTableSize.
+	CompactionTableSizeMultiplier         float64   `json:"compactionTableSizeMultiplier"`
+	CompactionTableSizeMultiplierPerLevel []float64 `json:"compactionTableSizeMultiplierPerLevel"`
+	// CompactionTotalSize limits total size of 'sorted table' for each level.
+	// The limits for each level will be calculated as:
+	//   CompactionTotalSize * (CompactionTotalSizeMultiplier ^ Level)
+	// The multiplier for each level can also fine-tuned using
+	// CompactionTotalSizeMultiplierPerLevel.
+	CompactionTotalSize int `json:"compactionTotalSize"`
+	// CompactionTotalSizeMultiplier defines multiplier for CompactionTotalSize.
+	CompactionTotalSizeMultiplier float64 `json:"compactionTotalSizeMultiplier"`
+	// OpenFilesCacheCapacity defines the capacity of the open files caching.
+	OpenFilesCacheCapacity int `json:"openFilesCacheCapacity"`
+	// There are two buffers of size WriteBuffer used.
+	WriteBuffer      int `json:"writeBuffer"`
+	FilterBitsPerKey int `json:"filterBitsPerKey"`
+}
+
 // New returns a wrapped LevelDB object.
-func New(file string, log logging.Logger) (database.Database, error) {
+func New(file string, configBytes []byte, log logging.Logger) (database.Database, error) {
+	parsedConfig := config{
+		BlockCacheCapacity:     BlockCacheSize,
+		OpenFilesCacheCapacity: HandleCap,
+		WriteBuffer:            WriteBufferSize / 2,
+		FilterBitsPerKey:       BitsPerKey,
+	}
+	if len(configBytes) > 0 {
+		if err := json.Unmarshal(configBytes, &parsedConfig); err != nil {
+			return nil, fmt.Errorf("failed to parse db config: %s", err)
+		}
+	}
+	configJSON, err := json.Marshal(&parsedConfig)
+	if err != nil {
+		return nil, err
+	}
+	log.Info("leveldb config: %s", string(configJSON))
+
 	// Open the db and recover any potential corruptions
 	db, err := leveldb.OpenFile(file, &opt.Options{
-		OpenFilesCacheCapacity: HandleCap,
-		BlockCacheCapacity:     BlockCacheSize,
-		// There are two buffers of size WriteBuffer used.
-		WriteBuffer: WriteBufferSize / 2,
-		Filter:      filter.NewBloomFilter(BitsPerKey),
+		BlockCacheCapacity:            parsedConfig.BlockCacheCapacity,
+		BlockSize:                     parsedConfig.BlockSize,
+		CompactionExpandLimitFactor:   parsedConfig.CompactionExpandLimitFactor,
+		CompactionGPOverlapsFactor:    parsedConfig.CompactionGPOverlapsFactor,
+		CompactionL0Trigger:           parsedConfig.CompactionL0Trigger,
+		CompactionSourceLimitFactor:   parsedConfig.CompactionSourceLimitFactor,
+		CompactionTableSize:           parsedConfig.CompactionTableSize,
+		CompactionTableSizeMultiplier: parsedConfig.CompactionTableSizeMultiplier,
+		CompactionTotalSize:           parsedConfig.CompactionTotalSize,
+		CompactionTotalSizeMultiplier: parsedConfig.CompactionTotalSizeMultiplier,
+		OpenFilesCacheCapacity:        parsedConfig.OpenFilesCacheCapacity,
+		WriteBuffer:                   parsedConfig.WriteBuffer,
+		Filter:                        filter.NewBloomFilter(parsedConfig.FilterBitsPerKey),
 	})
 	if _, corrupted := err.(*errors.ErrCorrupted); corrupted {
 		db, err = leveldb.RecoverFile(file, nil)
 	}
-	if err != nil {
-		return nil, err
-	}
 	return &Database{
 		DB:  db,
 		log: log,
-	}, nil
+	}, err
 }
 
 // Has returns if the key is set in the database

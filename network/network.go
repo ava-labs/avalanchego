@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -41,10 +42,9 @@ import (
 )
 
 var (
-	errNetworkClosed         = errors.New("network closed")
-	errPeerIsMyself          = errors.New("peer is myself")
-	errNetworkLayerUnhealthy = errors.New("network layer is unhealthy")
-	errNoPrimaryValidators   = errors.New("no default subnet validators")
+	errNetworkClosed       = errors.New("network closed")
+	errPeerIsMyself        = errors.New("peer is myself")
+	errNoPrimaryValidators = errors.New("no default subnet validators")
 )
 
 var _ Network = &network{}
@@ -214,8 +214,8 @@ type GossipConfig struct {
 
 type ThrottlerConfig struct {
 	InboundConnUpgradeThrottlerConfig throttling.InboundConnUpgradeThrottlerConfig `json:"inboundConnUpgradeThrottlerConfig"`
-	InboundMsgThrottlerConfig         throttling.MsgThrottlerConfig                `json:"inboundMsgThrottlerConfig"`
-	OutboundMsgThrottlerConfig        throttling.MsgThrottlerConfig                `json:"outboundMsgThrottlerConfig"`
+	InboundMsgThrottlerConfig         throttling.InboundMsgThrottlerConfig         `json:"inboundMsgThrottlerConfig"`
+	OutboundMsgThrottlerConfig        throttling.MsgByteThrottlerConfig            `json:"outboundMsgThrottlerConfig"`
 	MaxIncomingConnsPerSec            float64                                      `json:"maxIncomingConnsPerSec"`
 }
 
@@ -305,7 +305,7 @@ func NewNetwork(
 		return nil, errNoPrimaryValidators
 	}
 
-	inboundMsgThrottler, err := throttling.NewSybilInboundMsgThrottler(
+	inboundMsgThrottler, err := throttling.NewInboundMsgThrottler(
 		log,
 		config.Namespace,
 		metricsRegisterer,
@@ -1012,15 +1012,7 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 		peers := make([]PeerID, 0, n.peers.size())
 		for _, peer := range n.peers.peersList {
 			if peer.finishedHandshake.GetValue() {
-				peers = append(peers, PeerID{
-					IP:           peer.conn.RemoteAddr().String(),
-					PublicIP:     peer.getIP().String(),
-					ID:           peer.nodeID.PrefixedString(constants.NodeIDPrefix),
-					Version:      peer.versionStr.GetValue().(string),
-					LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
-					LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
-					Benched:      n.benchlistManager.GetBenched(peer.nodeID),
-				})
+				peers = append(peers, n.NewPeerID(peer))
 			}
 		}
 		return peers
@@ -1029,18 +1021,27 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 	peers := make([]PeerID, 0, len(nodeIDs))
 	for _, nodeID := range nodeIDs { // Return info about given peers
 		if peer, ok := n.peers.getByID(nodeID); ok && peer.finishedHandshake.GetValue() {
-			peers = append(peers, PeerID{
-				IP:           peer.conn.RemoteAddr().String(),
-				PublicIP:     peer.getIP().String(),
-				ID:           peer.nodeID.PrefixedString(constants.NodeIDPrefix),
-				Version:      peer.versionStr.GetValue().(string),
-				LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
-				LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
-				Benched:      n.benchlistManager.GetBenched(peer.nodeID),
-			})
+			peers = append(peers, n.NewPeerID(peer))
 		}
 	}
 	return peers
+}
+
+func (n *network) NewPeerID(peer *peer) PeerID {
+	publicIPStr := ""
+	if !peer.ip.IsZero() {
+		publicIPStr = peer.getIP().String()
+	}
+
+	return PeerID{
+		IP:           peer.conn.RemoteAddr().String(),
+		PublicIP:     publicIPStr,
+		ID:           peer.nodeID.PrefixedString(constants.NodeIDPrefix),
+		Version:      peer.versionStr.GetValue().(string),
+		LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
+		LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
+		Benched:      n.benchlistManager.GetBenched(peer.nodeID),
+	}
 }
 
 // Close implements the Network interface
@@ -1143,7 +1144,7 @@ func (n *network) appGossipPeers(peers []*peer, chainID ids.ID, appGossipBytes [
 		return fmt.Errorf("failed to build AppGossip(%s): %w", chainID, err)
 	}
 
-	sentPeers := ids.ShortSet{}
+	sentPeers := ids.NewShortSet(len(peers))
 	for _, peer := range peers {
 		// should never be nil but just in case
 		if peer == nil || sentPeers.Contains(peer.nodeID) {
@@ -1698,7 +1699,7 @@ func (n *network) getSubnetPeers(nodeIDs ids.ShortSet, subnetID ids.ID, validato
 	peers := make([]*peer, 0, nodeIDs.Len())
 	for nodeID := range nodeIDs {
 		peer, ok := n.peers.getByID(nodeID)
-		if ok && peer.trackedSubnets.Contains(subnetID) && (!validatorOnly || n.config.Validators.Contains(subnetID, nodeID)) {
+		if ok && peer.finishedHandshake.GetValue() && peer.trackedSubnets.Contains(subnetID) && (!validatorOnly || n.config.Validators.Contains(subnetID, nodeID)) {
 			peers = append(peers, peer)
 		}
 	}
@@ -1756,7 +1757,8 @@ func (n *network) HealthCheck() (interface{}, error) {
 	n.stateLock.RUnlock()
 
 	// Make sure we're connected to at least the minimum number of peers
-	healthy := connectedTo >= int(n.config.HealthConfig.MinConnectedPeers)
+	isConnected := connectedTo >= int(n.config.HealthConfig.MinConnectedPeers)
+	healthy := isConnected
 	details := map[string]interface{}{
 		"connectedPeers": connectedTo,
 	}
@@ -1766,25 +1768,42 @@ func (n *network) HealthCheck() (interface{}, error) {
 
 	lastMsgReceivedAt := time.Unix(atomic.LoadInt64(&n.lastMsgReceivedTime), 0)
 	timeSinceLastMsgReceived := now.Sub(lastMsgReceivedAt)
-	healthy = healthy && timeSinceLastMsgReceived <= n.config.HealthConfig.MaxTimeSinceMsgReceived
+	isMsgRcvd := timeSinceLastMsgReceived <= n.config.HealthConfig.MaxTimeSinceMsgReceived
+	healthy = healthy && isMsgRcvd
 	details["timeSinceLastMsgReceived"] = timeSinceLastMsgReceived.String()
 	n.metrics.timeSinceLastMsgReceived.Set(float64(timeSinceLastMsgReceived))
 
 	// Make sure we've sent an outgoing message within the threshold
 	lastMsgSentAt := time.Unix(atomic.LoadInt64(&n.lastMsgSentTime), 0)
 	timeSinceLastMsgSent := now.Sub(lastMsgSentAt)
-	healthy = healthy && timeSinceLastMsgSent <= n.config.HealthConfig.MaxTimeSinceMsgSent
+	isMsgSent := timeSinceLastMsgSent <= n.config.HealthConfig.MaxTimeSinceMsgSent
+	healthy = healthy && isMsgSent
 	details["timeSinceLastMsgSent"] = timeSinceLastMsgSent.String()
 	n.metrics.timeSinceLastMsgSent.Set(float64(timeSinceLastMsgSent))
 
 	// Make sure the message send failed rate isn't too high
-	healthy = healthy && sendFailRate <= n.config.HealthConfig.MaxSendFailRate
+	isMsgFailRate := sendFailRate <= n.config.HealthConfig.MaxSendFailRate
+	healthy = healthy && isMsgFailRate
 	details["sendFailRate"] = sendFailRate
 	n.metrics.sendFailRate.Set(sendFailRate)
 
 	// Network layer is unhealthy
 	if !healthy {
-		return details, errNetworkLayerUnhealthy
+		var errorReasons []string
+		if !isConnected {
+			errorReasons = append(errorReasons, fmt.Sprintf("not connected to a minimum of %d peer(s) only %d", n.config.HealthConfig.MinConnectedPeers, connectedTo))
+		}
+		if !isMsgRcvd {
+			errorReasons = append(errorReasons, fmt.Sprintf("no messages from network received in %s > %s", timeSinceLastMsgReceived, n.config.HealthConfig.MaxTimeSinceMsgReceived))
+		}
+		if !isMsgSent {
+			errorReasons = append(errorReasons, fmt.Sprintf("no messages from network sent in %s > %s", timeSinceLastMsgSent, n.config.HealthConfig.MaxTimeSinceMsgSent))
+		}
+		if !isMsgFailRate {
+			errorReasons = append(errorReasons, fmt.Sprintf("messages failure send rate %g > %g", sendFailRate, n.config.HealthConfig.MaxSendFailRate))
+		}
+
+		return details, fmt.Errorf("network layer is unhealthy reason: %s", strings.Join(errorReasons, ", "))
 	}
 	return details, nil
 }

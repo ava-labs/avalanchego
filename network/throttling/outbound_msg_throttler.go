@@ -42,7 +42,7 @@ func NewSybilOutboundMsgThrottler(
 	namespace string,
 	registerer prometheus.Registerer,
 	vdrs validators.Set,
-	config MsgThrottlerConfig,
+	config MsgByteThrottlerConfig,
 ) (OutboundMsgThrottler, error) {
 	t := &outboundMsgThrottler{
 		commonMsgThrottler: commonMsgThrottler{

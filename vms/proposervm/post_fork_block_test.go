@@ -841,13 +841,13 @@ func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t
 	}
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
 
-	pChainHeight = 100 // proBlk1's pChainHeight
+	pChainHeight = optimalHeightDelay // proBlk1's pChainHeight
 	proBlk1, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("could not build proBlk1")
 	}
 
-	pChainHeight = 200 // proBlk2's pChainHeight
+	pChainHeight = optimalHeightDelay + 1 // proBlk2's pChainHeight
 	proBlk2, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("could not build proBlk2")

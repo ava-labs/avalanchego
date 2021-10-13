@@ -79,12 +79,14 @@ type manager struct {
 // in the returned Manager.
 func NewRocksDB(
 	dbDirPath string,
+	dbConfig []byte,
 	log logging.Logger,
 	currentVersion version.Version,
 ) (Manager, error) {
 	return new(
 		rocksdb.New,
 		dbDirPath,
+		dbConfig,
 		log,
 		currentVersion,
 	)
@@ -96,12 +98,14 @@ func NewRocksDB(
 // in the returned Manager.
 func NewLevelDB(
 	dbDirPath string,
+	dbConfig []byte,
 	log logging.Logger,
 	currentVersion version.Version,
 ) (Manager, error) {
 	return new(
 		leveldb.New,
 		dbDirPath,
+		dbConfig,
 		log,
 		currentVersion,
 	)
@@ -112,14 +116,16 @@ func NewLevelDB(
 // [includePreviousVersions], opens previous database versions and includes them
 // in the returned Manager.
 func new(
-	newDB func(string, logging.Logger) (database.Database, error),
+	newDB func(string, []byte, logging.Logger) (database.Database, error),
 	dbDirPath string,
+	dbConfig []byte,
 	log logging.Logger,
 	currentVersion version.Version,
 ) (Manager, error) {
 	parser := version.NewDefaultParser()
 	currentDBPath := filepath.Join(dbDirPath, currentVersion.String())
-	currentDB, err := newDB(currentDBPath, log)
+
+	currentDB, err := newDB(currentDBPath, dbConfig, log)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create db at %s: %w", currentDBPath, err)
 	}
@@ -166,7 +172,7 @@ func new(
 			return filepath.SkipDir
 		}
 
-		db, err := newDB(path, log)
+		db, err := newDB(path, dbConfig, log)
 		if err != nil {
 			return fmt.Errorf("couldn't create db at %s: %w", path, err)
 		}

@@ -29,11 +29,6 @@ type EventDispatcher interface {
 	Reject(ctx *Context, containerID ids.ID, container []byte) error
 }
 
-type AliasLookup interface {
-	Lookup(alias string) (ids.ID, error)
-	PrimaryAlias(id ids.ID) (string, error)
-}
-
 type SubnetLookup interface {
 	SubnetID(chainID ids.ID) (ids.ID, error)
 }
@@ -64,7 +59,7 @@ type Context struct {
 	Lock                sync.RWMutex
 	Keystore            keystore.BlockchainKeystore
 	SharedMemory        atomic.SharedMemory
-	BCLookup            AliasLookup
+	BCLookup            ids.AliaserReader
 	SNLookup            SubnetLookup
 	Namespace           string
 	Metrics             prometheus.Registerer
@@ -119,8 +114,6 @@ func (ctx *Context) Epoch() uint32 {
 }
 
 func DefaultContextTest() *Context {
-	aliaser := &ids.Aliaser{}
-	aliaser.Initialize()
 	return &Context{
 		NetworkID:           0,
 		SubnetID:            ids.Empty,
@@ -129,7 +122,7 @@ func DefaultContextTest() *Context {
 		Log:                 logging.NoLog{},
 		DecisionDispatcher:  emptyEventDispatcher{},
 		ConsensusDispatcher: emptyEventDispatcher{},
-		BCLookup:            aliaser,
+		BCLookup:            ids.NewAliaser(),
 		Namespace:           "",
 		Metrics:             prometheus.NewRegistry(),
 	}
