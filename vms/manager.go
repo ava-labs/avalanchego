@@ -26,10 +26,10 @@ type Factory interface {
 //		 VMFactory which, when New() is called upon it, creates a new instance of that VM.
 //	 2) Get a VM factory. Given the ID of a VM that has been
 //      registered, return the factory that the ID is associated with.
-//   3) Associate a VM with an alias
-//   4) Get the ID of the VM by the VM's alias
-//   5) Get the aliases of a VM
+//   3) Manage the aliases of VMs
 type Manager interface {
+	ids.Aliaser
+
 	// Returns a factory that can create new instances of the VM
 	// with the given ID
 	GetFactory(ids.ID) (Factory, error)
@@ -40,15 +40,6 @@ type Manager interface {
 
 	// Versions returns the versions of all the VMs that have been registered
 	Versions() (map[string]string, error)
-
-	// Given an alias, return the ID of the VM associated with that alias
-	Lookup(string) (ids.ID, error)
-
-	// Return the aliases associated with a VM
-	Aliases(ids.ID) []string
-
-	// Give an alias to a VM
-	Alias(ids.ID, string) error
 }
 
 // Implements Manager
@@ -74,14 +65,13 @@ type manager struct {
 
 // NewManager returns an instance of a VM manager
 func NewManager(apiServer *server.Server, log logging.Logger) Manager {
-	m := &manager{
+	return &manager{
+		Aliaser:   ids.NewAliaser(),
 		factories: make(map[ids.ID]Factory),
 		versions:  make(map[ids.ID]string),
 		apiServer: apiServer,
 		log:       log,
 	}
-	m.Initialize()
-	return m
 }
 
 // Return a factory that can create new instances of the vm whose

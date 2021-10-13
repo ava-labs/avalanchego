@@ -43,11 +43,18 @@ type blockBuilder struct {
 }
 
 // Initialize this builder.
-func (m *blockBuilder) Initialize(vm *VM) {
+func (m *blockBuilder) Initialize(vm *VM) error {
 	m.vm = vm
 
 	m.vm.ctx.Log.Verbo("initializing platformVM mempool")
-	m.Mempool = NewMempool()
+	mempool, err := NewMempool(
+		fmt.Sprintf("%s_mempool", vm.ctx.Namespace),
+		vm.ctx.Metrics,
+	)
+	if err != nil {
+		return err
+	}
+	m.Mempool = mempool
 
 	m.timer = timer.NewTimer(func() {
 		m.vm.ctx.Lock.Lock()
@@ -56,6 +63,7 @@ func (m *blockBuilder) Initialize(vm *VM) {
 		m.ResetTimer()
 	})
 	go m.vm.ctx.Log.RecoverAndPanic(m.timer.Dispatch)
+	return nil
 }
 
 // AddUnverifiedTx verifies a transaction and attempts to add it to the mempool

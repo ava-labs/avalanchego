@@ -5,7 +5,8 @@ package router
 
 import (
 	"encoding/binary"
-	"errors"
+	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,11 +27,7 @@ const (
 	defaultCPUInterval = 15 * time.Second
 )
 
-var (
-	errUnhealthy = errors.New("the router is not healthy")
-
-	_ Router = &ChainRouter{}
-)
+var _ Router = &ChainRouter{}
 
 type requestEntry struct {
 	// When this request was registered
@@ -269,11 +266,10 @@ func (cr *ChainRouter) GetAcceptedFrontier(
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
-	if !exists {
+	if !exists || !chain.isValidator(validatorID) {
 		onFinishedHandling()
-		cr.log.Debug("GetAcceptedFrontier(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
+		cr.log.Debug("GetAcceptedFrontier(%s, %s, %d) dropped", validatorID, chainID, requestID)
 		return
 	}
 
@@ -294,15 +290,15 @@ func (cr *ChainRouter) AcceptedFrontier(
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
-	if !exists {
+	if !exists || !chain.isValidator(validatorID) {
 		onFinishedHandling()
-		cr.log.Debug("AcceptedFrontier(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerIDs)
+		cr.log.Debug("AcceptedFrontier(%s, %s, %d, %s) dropped", validatorID, chainID, requestID, containerIDs)
 		return
 	}
 
-	// Create the request ID of the request we sent that this message is (allegedly) in response to.
+	// Create the request ID of the request we sent that this message is
+	// (allegedly) in response to.
 	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID, constants.GetAcceptedFrontierMsg)
 
 	// Mark that an outstanding request has been fulfilled
@@ -313,7 +309,7 @@ func (cr *ChainRouter) AcceptedFrontier(
 		return
 	}
 	request := requestIntf.(requestEntry)
-	cr.timedRequests.Delete(uniqueRequestID)
+	cr.removeRequest(uniqueRequestID)
 
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.time)
@@ -342,14 +338,12 @@ func (cr *ChainRouter) GetAcceptedFrontierFailed(
 	// Remove the outstanding request
 	cr.removeRequest(uniqueRequestID)
 
-	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
 	if !exists {
 		// Should only happen if node is shutting down
 		cr.log.Debug("GetAcceptedFrontierFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 		return
 	}
-
 	// Pass the response to the chain
 	chain.GetAcceptedFrontierFailed(validatorID, requestID)
 }
@@ -369,9 +363,9 @@ func (cr *ChainRouter) GetAccepted(
 	defer cr.lock.Unlock()
 
 	chain, exists := cr.chains[chainID]
-	if !exists {
+	if !exists || !chain.isValidator(validatorID) {
 		onFinishedHandling()
-		cr.log.Debug("GetAccepted(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerIDs)
+		cr.log.Debug("GetAccepted(%s, %s, %d, %s) dropped", validatorID, chainID, requestID, containerIDs)
 		return
 	}
 
@@ -392,11 +386,10 @@ func (cr *ChainRouter) Accepted(
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
-	if !exists {
+	if !exists || !chain.isValidator(validatorID) {
 		onFinishedHandling()
-		cr.log.Debug("Accepted(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerIDs)
+		cr.log.Debug("Accepted(%s, %s, %d, %s) dropped", validatorID, chainID, requestID, containerIDs)
 		return
 	}
 
@@ -411,7 +404,7 @@ func (cr *ChainRouter) Accepted(
 		return
 	}
 	request := requestIntf.(requestEntry)
-	cr.timedRequests.Delete(uniqueRequestID)
+	cr.removeRequest(uniqueRequestID)
 
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.time)
@@ -440,14 +433,12 @@ func (cr *ChainRouter) GetAcceptedFailed(
 	// Remove the outstanding request
 	cr.removeRequest(uniqueRequestID)
 
-	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
 	if !exists {
 		// Should only happen when shutting down
 		cr.log.Debug("GetAcceptedFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 		return
 	}
-
 	// Pass the response to the chain
 	chain.GetAcceptedFailed(validatorID, requestID)
 }
@@ -466,11 +457,10 @@ func (cr *ChainRouter) GetAncestors(
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
-	if !exists {
+	if !exists || !chain.isValidator(validatorID) {
 		onFinishedHandling()
-		cr.log.Debug("GetAncestors(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
+		cr.log.Debug("GetAncestors(%s, %s, %d) dropped", validatorID, chainID, requestID)
 		return
 	}
 
@@ -490,10 +480,9 @@ func (cr *ChainRouter) MultiPut(
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
-	if !exists {
-		cr.log.Debug("MultiPut(%s, %s, %d, %d) dropped due to unknown chain", validatorID, chainID, requestID, len(containers))
+	if !exists || !chain.isValidator(validatorID) {
+		cr.log.Debug("MultiPut(%s, %s, %d, %d) dropped", validatorID, chainID, requestID, len(containers))
 		onFinishedHandling()
 		return
 	}
@@ -509,7 +498,7 @@ func (cr *ChainRouter) MultiPut(
 		return
 	}
 	request := requestIntf.(requestEntry)
-	cr.timedRequests.Delete(uniqueRequestID)
+	cr.removeRequest(uniqueRequestID)
 
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.time)
@@ -537,14 +526,12 @@ func (cr *ChainRouter) GetAncestorsFailed(
 	// Remove the outstanding request
 	cr.removeRequest(uniqueRequestID)
 
-	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
 	if !exists {
 		// Should only happen if shutting down
 		cr.log.Debug("GetAncestorsFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 		return
 	}
-
 	// Pass the response to the chain
 	chain.GetAncestorsFailed(validatorID, requestID)
 }
@@ -562,10 +549,9 @@ func (cr *ChainRouter) Get(
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
-	if !exists {
-		cr.log.Debug("Get(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
+	if !exists || !chain.isValidator(validatorID) {
+		cr.log.Debug("Get(%s, %s, %d, %s) dropped", validatorID, chainID, requestID, containerID)
 		onFinishedHandling()
 		return
 	}
@@ -587,22 +573,21 @@ func (cr *ChainRouter) Put(
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
-	if !exists {
+	if !exists || !chain.isValidator(validatorID) {
 		if requestID == constants.GossipMsgRequestID {
-			cr.log.Verbo("Gossiped Put(%s, %s, %d, %s) dropped due to unknown chain. Container:",
+			cr.log.Debug("Gossiped Put(%s, %s, %d, %s) dropped. Container: %s",
 				validatorID, chainID, requestID, containerID, formatting.DumpBytes{Bytes: container},
 			)
 		} else {
-			cr.log.Debug("Put(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
-			cr.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
+			cr.log.Debug("Put(%s, %s, %d, %s) dropped", validatorID, chainID, requestID, containerID)
+			cr.log.Verbo("Container:\n%s", formatting.DumpBytes{Bytes: container})
 		}
 		onFinishedHandling()
 		return
 	}
 
-	// If this is a gossip message, pass to the chain
+	// If this is a gossip message pass to the chain
 	if requestID == constants.GossipMsgRequestID {
 		chain.Put(validatorID, requestID, containerID, container, onFinishedHandling)
 		return
@@ -619,7 +604,7 @@ func (cr *ChainRouter) Put(
 		return
 	}
 	request := requestIntf.(requestEntry)
-	cr.timedRequests.Delete(uniqueRequestID)
+	cr.removeRequest(uniqueRequestID)
 
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.time)
@@ -647,13 +632,11 @@ func (cr *ChainRouter) GetFailed(
 	// Remove the outstanding request
 	cr.removeRequest(uniqueRequestID)
 
-	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
 	if !exists {
 		cr.log.Debug("GetFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 		return
 	}
-
 	// Pass the response to the chain
 	chain.GetFailed(validatorID, requestID)
 }
@@ -673,8 +656,8 @@ func (cr *ChainRouter) PushQuery(
 	defer cr.lock.Unlock()
 
 	chain, exists := cr.chains[chainID]
-	if !exists {
-		cr.log.Debug("PushQuery(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
+	if !exists || !chain.isValidator(validatorID) {
+		cr.log.Debug("PushQuery(%s, %s, %d, %s) dropped", validatorID, chainID, requestID, containerID)
 		cr.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
 		onFinishedHandling()
 		return
@@ -698,8 +681,8 @@ func (cr *ChainRouter) PullQuery(
 	defer cr.lock.Unlock()
 
 	chain, exists := cr.chains[chainID]
-	if !exists {
-		cr.log.Debug("PullQuery(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
+	if !exists || !chain.isValidator(validatorID) {
+		cr.log.Debug("PullQuery(%s, %s, %d, %s) dropped", validatorID, chainID, requestID, containerID)
 		onFinishedHandling()
 		return
 	}
@@ -720,10 +703,9 @@ func (cr *ChainRouter) Chits(
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
-	if !exists {
-		cr.log.Debug("Chits(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, votes)
+	if !exists || !chain.isValidator(validatorID) {
+		cr.log.Debug("Chits(%s, %s, %d, %s) dropped", validatorID, chainID, requestID, votes)
 		onFinishedHandling()
 		return
 	}
@@ -741,7 +723,7 @@ func (cr *ChainRouter) Chits(
 		return
 	}
 	request := requestIntf.(requestEntry)
-	cr.timedRequests.Delete(uniqueRequestID)
+	cr.removeRequest(uniqueRequestID)
 
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.time)
@@ -767,8 +749,8 @@ func (cr *ChainRouter) AppRequest(
 	defer cr.lock.Unlock()
 
 	chain, exists := cr.chains[chainID]
-	if !exists {
-		cr.log.Debug("AppRequest(%s, %s, %d) dropped due to unknown chain", nodeID, chainID, requestID)
+	if !exists || !chain.isValidator(nodeID) {
+		cr.log.Debug("AppRequest(%s, %s, %d) dropped", nodeID, chainID, requestID)
 		cr.log.Verbo("dropped message: %s", formatting.DumpBytes{Bytes: appRequestBytes})
 		onFinishedHandling()
 		return
@@ -790,10 +772,9 @@ func (cr *ChainRouter) AppResponse(
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
-	if !exists {
-		cr.log.Debug("AppResponse(%s, %s, %d) dropped due to unknown chain", nodeID, chainID, requestID)
+	if !exists || !chain.isValidator(nodeID) {
+		cr.log.Debug("AppResponse(%s, %s, %d) dropped", nodeID, chainID, requestID)
 		cr.log.Verbo("dropped message: %s", formatting.DumpBytes{Bytes: appResponseBytes})
 		onFinishedHandling()
 		return
@@ -809,12 +790,7 @@ func (cr *ChainRouter) AppResponse(
 		return
 	}
 	request := requestIntf.(requestEntry)
-	if request.msgType != constants.AppRequestMsg {
-		// We got back a reply of wrong type. Ignore.
-		onFinishedHandling()
-		return
-	}
-	cr.timedRequests.Delete(uniqueRequestID)
+	cr.removeRequest(uniqueRequestID)
 
 	// Calculate how long it took [nodeID] to reply
 	latency := cr.clock.Time().Sub(request.time)
@@ -842,7 +818,6 @@ func (cr *ChainRouter) AppRequestFailed(nodeID ids.ShortID, chainID ids.ID, requ
 		cr.log.Debug("AppRequestFailed(%s, %s, %d) dropped due to unknown chain", nodeID, chainID, requestID)
 		return
 	}
-
 	// Pass the response to the chain
 	chain.AppRequestFailed(nodeID, requestID)
 }
@@ -859,8 +834,8 @@ func (cr *ChainRouter) AppGossip(
 	defer cr.lock.Unlock()
 
 	chain, exists := cr.chains[chainID]
-	if !exists {
-		cr.log.Debug("AppGossip(%s, %s) dropped due to unknown chain", nodeID, chainID)
+	if !exists || !chain.isValidator(nodeID) {
+		cr.log.Debug("AppGossip(%s, %s) dropped", nodeID, chainID)
 		cr.log.Verbo("dropped message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
 		onFinishedHandling()
 		return
@@ -893,7 +868,6 @@ func (cr *ChainRouter) QueryFailed(
 		cr.log.Debug("QueryFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 		return
 	}
-
 	// Pass the response to the chain
 	chain.QueryFailed(validatorID, requestID)
 }
@@ -909,6 +883,8 @@ func (cr *ChainRouter) Connected(validatorID ids.ShortID) {
 		return
 	}
 
+	// TODO: fire up an event when validator state changes i.e when they leave set, disconnect.
+	// we cannot put a subnet-only validator check here since Disconnected would not be handled properly.
 	for _, chain := range cr.chains {
 		chain.Connected(validatorID)
 	}
@@ -924,6 +900,8 @@ func (cr *ChainRouter) Disconnected(validatorID ids.ShortID) {
 		return
 	}
 
+	// TODO: fire up an event when validator state changes i.e when they leave set, disconnect.
+	// we cannot put a subnet-only validator check here since if a validator connects then it leaves validator-set, it would not be disconnected properly.
 	for _, chain := range cr.chains {
 		chain.Disconnected(validatorID)
 	}
@@ -999,7 +977,8 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 	defer cr.lock.Unlock()
 
 	numOutstandingReqs := cr.timedRequests.Len()
-	healthy := numOutstandingReqs <= cr.healthConfig.MaxOutstandingRequests
+	isOutstandingReqs := numOutstandingReqs <= cr.healthConfig.MaxOutstandingRequests
+	healthy := isOutstandingReqs
 	details := map[string]interface{}{
 		"outstandingRequests": numOutstandingReqs,
 	}
@@ -1011,13 +990,21 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 		processingRequest = longestRunning.(requestEntry).time
 	}
 	timeReqRunning := now.Sub(processingRequest)
-	healthy = healthy && timeReqRunning <= cr.healthConfig.MaxOutstandingDuration
+	isOutstanding := timeReqRunning <= cr.healthConfig.MaxOutstandingDuration
+	healthy = healthy && isOutstanding
 	details["longestRunningRequest"] = timeReqRunning.String()
 	cr.metrics.longestRunningRequest.Set(float64(timeReqRunning))
 
 	if !healthy {
+		var errorReasons []string
+		if !isOutstandingReqs {
+			errorReasons = append(errorReasons, fmt.Sprintf("number of outstanding requests %d > %d", numOutstandingReqs, cr.healthConfig.MaxOutstandingRequests))
+		}
+		if !isOutstanding {
+			errorReasons = append(errorReasons, fmt.Sprintf("time for outstanding requests %s > %s", timeReqRunning, cr.healthConfig.MaxOutstandingDuration))
+		}
 		// The router is not healthy
-		return details, errUnhealthy
+		return details, fmt.Errorf("the router is not healthy reason: %s", strings.Join(errorReasons, ", "))
 	}
 	return details, nil
 }

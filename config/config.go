@@ -18,7 +18,7 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/ava-labs/avalanchego/app/process"
+	"github.com/ava-labs/avalanchego/app/runner"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -53,7 +53,6 @@ const (
 
 var (
 	deprecatedKeys = map[string]string{
-		CorethConfigKey:                         fmt.Sprintf("please use --%s to specify C-Chain config", ChainConfigDirKey),
 		InboundConnUpgradeThrottlerMaxRecentKey: fmt.Sprintf("please use --%s to specify connection upgrade throttling", InboundThrottlerMaxConnsPerSecKey),
 	}
 
@@ -66,11 +65,10 @@ var (
 	errMinStakeDurationAboveMax      = errors.New("max stake duration can't be less than min stake duration")
 	errStakeMintingPeriodBelowMin    = errors.New("stake minting period can't be less than max stake duration")
 	errCannotWhitelistPrimaryNetwork = errors.New("cannot whitelist primary network")
-	errDuplicatedCChainConfig        = errors.New("C-Chain config is already provided in chain config files")
 )
 
-func GetProcessConfig(v *viper.Viper) (process.Config, error) {
-	config := process.Config{
+func GetRunnerConfig(v *viper.Viper) (runner.Config, error) {
+	config := runner.Config{
 		DisplayVersionAndExit: v.GetBool(VersionKey),
 		BuildDir:              os.ExpandEnv(v.GetString(BuildDirKey)),
 		PluginMode:            v.GetBool(PluginModeKey),
@@ -105,7 +103,7 @@ func GetProcessConfig(v *viper.Viper) (process.Config, error) {
 		}
 	}
 	if !foundBuildDir {
-		return process.Config{}, fmt.Errorf(
+		return runner.Config{}, fmt.Errorf(
 			"couldn't find valid build directory in any of the default locations: %s",
 			defaultBuildDirs,
 		)
@@ -275,13 +273,16 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 				MaxRecentConnsUpgraded: maxRecentConnsUpgraded,
 			},
 
-			InboundMsgThrottlerConfig: throttling.MsgThrottlerConfig{
-				AtLargeAllocSize:    v.GetUint64(InboundThrottlerAtLargeAllocSizeKey),
-				VdrAllocSize:        v.GetUint64(InboundThrottlerVdrAllocSizeKey),
-				NodeMaxAtLargeBytes: v.GetUint64(InboundThrottlerNodeMaxAtLargeBytesKey),
+			InboundMsgThrottlerConfig: throttling.InboundMsgThrottlerConfig{
+				MsgByteThrottlerConfig: throttling.MsgByteThrottlerConfig{
+					AtLargeAllocSize:    v.GetUint64(InboundThrottlerAtLargeAllocSizeKey),
+					VdrAllocSize:        v.GetUint64(InboundThrottlerVdrAllocSizeKey),
+					NodeMaxAtLargeBytes: v.GetUint64(InboundThrottlerNodeMaxAtLargeBytesKey),
+				},
+				MaxProcessingMsgsPerNode: v.GetUint64(InboundThrottlerMaxProcessingMsgsPerNodeKey),
 			},
 
-			OutboundMsgThrottlerConfig: throttling.MsgThrottlerConfig{
+			OutboundMsgThrottlerConfig: throttling.MsgByteThrottlerConfig{
 				AtLargeAllocSize:    v.GetUint64(OutboundThrottlerAtLargeAllocSizeKey),
 				VdrAllocSize:        v.GetUint64(OutboundThrottlerVdrAllocSizeKey),
 				NodeMaxAtLargeBytes: v.GetUint64(OutboundThrottlerNodeMaxAtLargeBytesKey),
@@ -616,14 +617,25 @@ func getWhitelistedSubnets(v *viper.Viper) (ids.Set, error) {
 	return whitelistedSubnetIDs, nil
 }
 
-func getDatabaseConfig(v *viper.Viper, networkID uint32) node.DatabaseConfig {
+func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, error) {
+	var configBytes []byte
+	if v.IsSet(DBConfigFileKey) {
+		path := os.ExpandEnv(v.GetString(DBConfigFileKey))
+		var err error
+		configBytes, err = ioutil.ReadFile(path)
+		if err != nil {
+			return node.DatabaseConfig{}, err
+		}
+	}
+
 	return node.DatabaseConfig{
 		Name: v.GetString(DBTypeKey),
 		Path: filepath.Join(
 			os.ExpandEnv(v.GetString(DBPathKey)),
 			constants.NetworkName(networkID),
 		),
-	}
+		Config: configBytes,
+	}, nil
 }
 
 func getVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
@@ -677,35 +689,13 @@ func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
 		return nil, err
 	}
 
-	chainConfigs := make(map[string]chains.ChainConfig)
-	if len(chainConfigPath) > 0 {
-		chainConfigs, err = readChainConfigPath(chainConfigPath)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't read chain configs: %w", err)
-		}
+	if len(chainConfigPath) == 0 {
+		return make(map[string]chains.ChainConfig), nil
 	}
 
-	// Coreth Plugin
-	if v.IsSet(CorethConfigKey) {
-		// error if C config is already populated
-		if isCChainConfigSet(chainConfigs) {
-			return nil, errDuplicatedCChainConfig
-		}
-		corethConfigValue := v.Get(CorethConfigKey)
-		var corethConfigBytes []byte
-		switch value := corethConfigValue.(type) {
-		case string:
-			corethConfigBytes = []byte(value)
-		default:
-			corethConfigBytes, err = json.Marshal(value)
-			if err != nil {
-				return nil, fmt.Errorf("couldn't parse coreth config: %w", err)
-			}
-		}
-		cChainPrimaryAlias := genesis.GetCChainAliases()[0]
-		cChainConfig := chainConfigs[cChainPrimaryAlias]
-		cChainConfig.Config = corethConfigBytes
-		chainConfigs[cChainPrimaryAlias] = cChainConfig
+	chainConfigs, err := readChainConfigPath(chainConfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't read chain configs: %w", err)
 	}
 	return chainConfigs, nil
 }
@@ -808,19 +798,6 @@ func defaultSubnetConfig(v *viper.Viper) chains.SubnetConfig {
 	}
 }
 
-// checks if C chain config bytes already set in map with alias key.
-// it does only checks alias key, chainId is not available at this point.
-func isCChainConfigSet(chainConfigs map[string]chains.ChainConfig) bool {
-	cChainAliases := genesis.GetCChainAliases()
-	for _, alias := range cChainAliases {
-		val, ok := chainConfigs[alias]
-		if ok && len(val.Config) > 1 {
-			return true
-		}
-	}
-	return false
-}
-
 func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig := node.Config{}
 
@@ -857,7 +834,10 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	}
 
 	// Database
-	nodeConfig.DatabaseConfig = getDatabaseConfig(v, nodeConfig.NetworkID)
+	nodeConfig.DatabaseConfig, err = getDatabaseConfig(v, nodeConfig.NetworkID)
+	if err != nil {
+		return node.Config{}, err
+	}
 
 	// IP configuration
 	nodeConfig.IPConfig, err = getIPConfig(v)

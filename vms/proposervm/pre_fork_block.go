@@ -168,7 +168,9 @@ func (b *preForkBlock) buildChild() (Block, error) {
 		newTimestamp = parentTimestamp
 	}
 
-	pChainHeight, err := b.vm.ctx.ValidatorState.GetCurrentHeight()
+	// The child's P-Chain height is proposed as the optimal P-Chain height that
+	// is at least the minimum height
+	pChainHeight, err := b.vm.optimalPChainHeight(b.vm.minimumPChainHeight)
 	if err != nil {
 		return nil, err
 	}
