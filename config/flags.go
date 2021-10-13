@@ -153,8 +153,8 @@ func addNodeFlags(fs *flag.FlagSet) {
 	// Benchlist
 	fs.Int(BenchlistFailThresholdKey, 10, "Number of consecutive failed queries before benchlisting a node.")
 	fs.Bool(BenchlistPeerSummaryEnabledKey, false, "Enables peer specific query latency metrics.")
-	fs.Duration(BenchlistDurationKey, 30*time.Minute, "Max amount of time a peer is benchlisted after surpassing the threshold.")
-	fs.Duration(BenchlistMinFailingDurationKey, 5*time.Minute, "Minimum amount of time messages to a peer must be failing before the peer is benched.")
+	fs.Duration(BenchlistDurationKey, 15*time.Minute, "Max amount of time a peer is benchlisted after surpassing the threshold.")
+	fs.Duration(BenchlistMinFailingDurationKey, 2*time.Minute+30*time.Second, "Minimum amount of time messages to a peer must be failing before the peer is benched.")
 
 	// Router
 	fs.Duration(ConsensusGossipFrequencyKey, 10*time.Second, "Frequency of gossiping accepted frontiers.")
@@ -168,9 +168,10 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Uint64(InboundThrottlerAtLargeAllocSizeKey, 6*units.MiB, "Size, in bytes, of at-large byte allocation in inbound message throttler.")
 	fs.Uint64(InboundThrottlerVdrAllocSizeKey, 32*units.MiB, "Size, in bytes, of validator byte allocation in inbound message throttler.")
 	fs.Uint64(InboundThrottlerNodeMaxAtLargeBytesKey, uint64(constants.DefaultMaxMessageSize), "Max number of bytes a node can take from the inbound message throttler's at-large allocation.")
+	fs.Uint64(InboundThrottlerMaxProcessingMsgsPerNodeKey, 1024, "Max number of messages currently processing from a given node.")
 
 	// Outbound Throttling
-	fs.Uint64(OutboundThrottlerAtLargeAllocSizeKey, 32*units.MiB, "Size, in bytes, of at-large byte allocation in outbound message throttler.")
+	fs.Uint64(OutboundThrottlerAtLargeAllocSizeKey, 6*units.MiB, "Size, in bytes, of at-large byte allocation in outbound message throttler.")
 	fs.Uint64(OutboundThrottlerVdrAllocSizeKey, 32*units.MiB, "Size, in bytes, of validator byte allocation in outbound message throttler.")
 	fs.Uint64(OutboundThrottlerNodeMaxAtLargeBytesKey, uint64(constants.DefaultMaxMessageSize), "Max number of bytes a node can take from the outbound message throttler's at-large allocation.")
 

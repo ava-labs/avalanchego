@@ -12,7 +12,7 @@ import (
 )
 
 // Used by the sybil-safe inbound and outbound message throttlers
-type MsgThrottlerConfig struct {
+type MsgByteThrottlerConfig struct {
 	VdrAllocSize        uint64 `json:"vdrAllocSize"`
 	AtLargeAllocSize    uint64 `json:"atLargeAllocSize"`
 	NodeMaxAtLargeBytes uint64 `json:"nodeMaxAtLargeBytes"`
