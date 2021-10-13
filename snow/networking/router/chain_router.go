@@ -436,8 +436,7 @@ func (cr *ChainRouter) HandleInbound(
 		message.Get,
 		message.PullQuery,
 		message.PushQuery,
-		message.AppRequest,
-		message.AppGossip:
+		message.AppRequest:
 
 		chain.PushMsgWithDeadline(opToConstant(msgType), inMsg, nodeID, requestID, onFinishedHandling)
 		return
@@ -555,6 +554,9 @@ func (cr *ChainRouter) HandleInbound(
 		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, request.msgType, latency)
 
 		// Pass the response to the chain
+		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID, onFinishedHandling)
+		return
+	case message.AppGossip:
 		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID, onFinishedHandling)
 		return
 
