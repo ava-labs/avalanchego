@@ -97,7 +97,7 @@ type config struct {
 	//   CompactionTotalSize * (CompactionTotalSizeMultiplier ^ Level)
 	// The multiplier for each level can also fine-tuned using
 	// CompactionTotalSizeMultiplierPerLevel.
-	CompactionTotalSize int
+	CompactionTotalSize int `json:"compactionTotalSize"`
 	// CompactionTotalSizeMultiplier defines multiplier for CompactionTotalSize.
 	CompactionTotalSizeMultiplier float64 `json:"compactionTotalSizeMultiplier"`
 	// OpenFilesCacheCapacity defines the capacity of the open files caching.
