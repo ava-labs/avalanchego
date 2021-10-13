@@ -1031,11 +1031,6 @@ func (n *Node) Initialize(
 	n.Log.Info("node ID is: %s", n.ID.PrefixedString(constants.NodeIDPrefix))
 	n.Log.Info("current database version: %s", dbManager.Current().Version)
 
-	if n.msgCreator, err = message.NewMsgCreator(n.MetricsRegisterer,
-		n.Config.NetworkConfig.CompressionEnabled); err != nil {
-		return fmt.Errorf("problem TheOneCreator: %w", err)
-	}
-
 	httpLog, err := logFactory.Make("http")
 	if err != nil {
 		return fmt.Errorf("problem initializing HTTP logger: %w", err)
@@ -1062,6 +1057,14 @@ func (n *Node) Initialize(
 
 	if err := n.initSharedMemory(); err != nil { // Initialize shared memory
 		return fmt.Errorf("problem initializing shared memory: %w", err)
+	}
+
+	// msgCreator is shared between networking and the engine.
+	// It must be initiated before networking (initNetworking)
+	// and the engine (initChains) but after the metrics (initMetricsAPI)
+	if n.msgCreator, err = message.NewMsgCreator(n.MetricsRegisterer,
+		n.Config.NetworkConfig.CompressionEnabled); err != nil {
+		return fmt.Errorf("problem TheOneCreator: %w", err)
 	}
 
 	if err = n.initNetworking(); err != nil { // Set up all networking
