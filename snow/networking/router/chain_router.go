@@ -402,7 +402,15 @@ func (cr *ChainRouter) HandleInbound(
 	chainID, err := ids.ToID(inMsg.Get(message.ChainID).([]byte))
 	cr.log.AssertNoError(err)
 
-	requestID := inMsg.Get(message.RequestID).(uint32)
+	// AppGossip is the only message currently not containing a requestID
+	// Here we assign the requestID already in use for gossiped containers
+	// to allow a uniform handling of all messages
+	var requestID uint32
+	if msgType == message.AppGossip {
+		requestID = constants.GossipMsgRequestID
+	} else {
+		requestID = inMsg.Get(message.RequestID).(uint32)
+	}
 
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
