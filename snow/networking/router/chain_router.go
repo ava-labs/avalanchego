@@ -350,7 +350,7 @@ func (cr *ChainRouter) markFullfilled(
 		return uniqueRequestID, nil
 	}
 
-	cr.timedRequests.Delete(uniqueRequestID)
+	cr.removeRequest(uniqueRequestID)
 	return uniqueRequestID, &request
 }
 
