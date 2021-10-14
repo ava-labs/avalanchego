@@ -122,6 +122,8 @@ type OutboundMsgBuilder interface {
 		chainID ids.ID,
 		msg []byte,
 	) (OutboundMessage, error)
+
+	ReturnBytes(msg interface{})
 }
 
 type outMsgBuilder struct {
@@ -456,4 +458,8 @@ func (b *outMsgBuilder) AppGossip(chainID ids.ID, msg []byte) (OutboundMessage, 
 		},
 		b.compress && AppGossip.Compressable(), // App messages may be compressed
 	)
+}
+
+func (b *outMsgBuilder) ReturnBytes(msg interface{}) {
+	b.c.ReturnBytes(msg)
 }

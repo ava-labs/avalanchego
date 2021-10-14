@@ -7,11 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/utils/compression"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -31,32 +33,29 @@ type Codec interface {
 	) (OutboundMessage, error)
 
 	Parse(bytes []byte) (InboundMessage, error)
+
+	ReturnBytes(msg interface{})
 }
 
 // codec defines the serialization and deserialization of network messages.
 // It's safe for multiple goroutines to call Pack and Parse concurrently.
 type codec struct {
-	// [getBytes] may return nil.
-	// [getBytes] must be safe for concurrent access by multiple goroutines.
-	getBytes func() []byte
+	// Contains []byte. Used as an optimization.
+	// Can be accessed by multiple goroutines concurrently.
+	byteSlicePool sync.Pool
 
 	compressTimeMetrics   map[Op]metric.Averager
 	decompressTimeMetrics map[Op]metric.Averager
 	compressor            compression.Compressor
 }
 
-func NewCodec(namespace string, metrics prometheus.Registerer, maxMessageSize int64) (Codec, error) {
-	return NewCodecWithAllocator(
-		namespace,
-		metrics,
-		func() []byte { return nil },
-		maxMessageSize,
-	)
-}
-
-func NewCodecWithAllocator(namespace string, metrics prometheus.Registerer, getBytes func() []byte, maxMessageSize int64) (Codec, error) {
+func NewCodecWithMemoryPool(namespace string, metrics prometheus.Registerer, maxMessageSize int64) (Codec, error) {
 	c := &codec{
-		getBytes:              getBytes,
+		byteSlicePool: sync.Pool{
+			New: func() interface{} {
+				return make([]byte, 0, constants.DefaultByteSliceCap)
+			},
+		},
 		compressTimeMetrics:   make(map[Op]metric.Averager, len(ops)),
 		decompressTimeMetrics: make(map[Op]metric.Averager, len(ops)),
 		compressor:            compression.NewGzipCompressor(maxMessageSize),
@@ -102,7 +101,7 @@ func (c *codec) Pack(
 		return nil, errBadOp
 	}
 
-	buffer := c.getBytes()
+	buffer := c.byteSlicePool.Get().([]byte)
 	p := wrappers.Packer{
 		MaxSize: math.MaxInt32,
 		Bytes:   buffer[:0],
@@ -212,4 +211,8 @@ func (c *codec) Parse(bytes []byte) (InboundMessage, error) {
 		fields:                fieldValues,
 		bytesSavedCompression: bytesSaved,
 	}, p.Err
+}
+
+func (c *codec) ReturnBytes(msg interface{}) {
+	c.byteSlicePool.Put(msg)
 }
