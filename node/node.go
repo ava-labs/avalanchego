@@ -104,7 +104,7 @@ type Node struct {
 	healthService health.Service
 
 	// Build and parse messages, for both network layer and chain manager
-	msgCreator message.MsgCreator
+	msgCreator message.Creator
 
 	// Manages creation of blockchains and routing messages to them
 	chainManager chains.Manager
@@ -1059,10 +1059,10 @@ func (n *Node) Initialize(
 		return fmt.Errorf("problem initializing shared memory: %w", err)
 	}
 
-	// msgCreator is shared between networking and the engine.
+	// message.Creator is shared between networking and the engine.
 	// It must be initiated before networking (initNetworking)
 	// and the engine (initChains) but after the metrics (initMetricsAPI)
-	if n.msgCreator, err = message.NewMsgCreator(n.MetricsRegisterer,
+	if n.msgCreator, err = message.NewCreator(n.MetricsRegisterer,
 		n.Config.NetworkConfig.CompressionEnabled); err != nil {
 		return fmt.Errorf("problem TheOneCreator: %w", err)
 	}

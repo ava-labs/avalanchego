@@ -11,26 +11,26 @@ type InboundMsgBuilder interface {
 		chainID ids.ID,
 		requestID uint32,
 		deadline uint64,
-	) (InboundMessage, error)
+	) InboundMessage
 
 	InboundAcceptedFrontier(
 		chainID ids.ID,
 		requestID uint32,
 		containerIDs []ids.ID,
-	) (InboundMessage, error)
+	) InboundMessage
 
 	InboundGetAccepted(
 		chainID ids.ID,
 		requestID uint32,
 		deadline uint64,
 		containerIDs []ids.ID,
-	) (InboundMessage, error)
+	) InboundMessage
 
 	InboundAccepted(
 		chainID ids.ID,
 		requestID uint32,
 		containerIDs []ids.ID,
-	) (InboundMessage, error)
+	) InboundMessage
 
 	InboundPushQuery(
 		chainID ids.ID,
@@ -38,46 +38,46 @@ type InboundMsgBuilder interface {
 		deadline uint64,
 		containerID ids.ID,
 		container []byte,
-	) (InboundMessage, error)
+	) InboundMessage
 
 	InboundPullQuery(
 		chainID ids.ID,
 		requestID uint32,
 		deadline uint64,
 		containerID ids.ID,
-	) (InboundMessage, error)
+	) InboundMessage
 
 	InboundChits(
 		chainID ids.ID,
 		requestID uint32,
 		containerIDs []ids.ID,
-	) (InboundMessage, error)
+	) InboundMessage
 
 	InboundAppRequest(
 		chainID ids.ID,
 		requestID uint32,
 		deadline uint64,
 		msg []byte,
-	) (InboundMessage, error)
+	) InboundMessage
 
 	InboundAppResponse(
 		chainID ids.ID,
 		requestID uint32,
 		msg []byte,
-	) (InboundMessage, error)
+	) InboundMessage
 
 	InboundPut(
 		chainID ids.ID,
 		requestID uint32,
 		containerID ids.ID,
 		container []byte,
-	) (InboundMessage, error) // used in UTs only
+	) InboundMessage // used in UTs only
 
 	InboundMultiPut(
 		chainID ids.ID,
 		requestID uint32,
 		containers [][]byte,
-	) (InboundMessage, error) // used in UTs only
+	) InboundMessage // used in UTs only
 }
 
 type inMsgBuilder struct {
@@ -94,40 +94,30 @@ func (b *inMsgBuilder) InboundGetAcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	deadline uint64,
-) (InboundMessage, error) {
-	inOp := GetAcceptedFrontier
-
-	fieldValues := make(map[Field]interface{})
-	fieldValues[ChainID] = chainID[:]
-	fieldValues[RequestID] = requestID
-	fieldValues[Deadline] = deadline
-
-	res := &inboundMessage{
-		op:                    inOp,
-		bytesSavedCompression: 0,
-		fields:                fieldValues,
+) InboundMessage {
+	return &inboundMessage{
+		op: GetAcceptedFrontier,
+		fields: map[Field]interface{}{
+			ChainID:   chainID[:],
+			RequestID: requestID,
+			Deadline:  deadline,
+		},
 	}
-	return res, nil
 }
 
 func (b *inMsgBuilder) InboundAcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
-) (InboundMessage, error) {
-	inOp := AcceptedFrontier
-
-	fieldValues := make(map[Field]interface{})
-	fieldValues[ChainID] = chainID[:]
-	fieldValues[RequestID] = requestID
-	fieldValues[ContainerIDs] = encodeContainerIDs(containerIDs)
-
-	res := &inboundMessage{
-		op:                    inOp,
-		bytesSavedCompression: 0,
-		fields:                fieldValues,
+) InboundMessage {
+	return &inboundMessage{
+		op: AcceptedFrontier,
+		fields: map[Field]interface{}{
+			ChainID:      chainID[:],
+			RequestID:    requestID,
+			ContainerIDs: encodeContainerIDs(containerIDs),
+		},
 	}
-	return res, nil
 }
 
 func (b *inMsgBuilder) InboundGetAccepted(
@@ -135,41 +125,31 @@ func (b *inMsgBuilder) InboundGetAccepted(
 	requestID uint32,
 	deadline uint64,
 	containerIDs []ids.ID,
-) (InboundMessage, error) {
-	inOp := GetAccepted
-
-	fieldValues := make(map[Field]interface{})
-	fieldValues[ChainID] = chainID[:]
-	fieldValues[RequestID] = requestID
-	fieldValues[Deadline] = deadline
-	fieldValues[ContainerIDs] = encodeContainerIDs(containerIDs)
-
-	res := &inboundMessage{
-		op:                    inOp,
-		bytesSavedCompression: 0,
-		fields:                fieldValues,
+) InboundMessage {
+	return &inboundMessage{
+		op: GetAccepted,
+		fields: map[Field]interface{}{
+			ChainID:      chainID[:],
+			RequestID:    requestID,
+			Deadline:     deadline,
+			ContainerIDs: encodeContainerIDs(containerIDs),
+		},
 	}
-	return res, nil
 }
 
 func (b *inMsgBuilder) InboundAccepted(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
-) (InboundMessage, error) {
-	inOp := Accepted
-
-	fieldValues := make(map[Field]interface{})
-	fieldValues[ChainID] = chainID[:]
-	fieldValues[RequestID] = requestID
-	fieldValues[ContainerIDs] = encodeContainerIDs(containerIDs)
-
-	res := &inboundMessage{
-		op:                    inOp,
-		bytesSavedCompression: 0,
-		fields:                fieldValues,
+) InboundMessage {
+	return &inboundMessage{
+		op: Accepted,
+		fields: map[Field]interface{}{
+			ChainID:      chainID[:],
+			RequestID:    requestID,
+			ContainerIDs: encodeContainerIDs(containerIDs),
+		},
 	}
-	return res, nil
 }
 
 func (b *inMsgBuilder) InboundPushQuery(
@@ -178,22 +158,17 @@ func (b *inMsgBuilder) InboundPushQuery(
 	deadline uint64,
 	containerID ids.ID,
 	container []byte,
-) (InboundMessage, error) {
-	inOp := PushQuery
-
-	fieldValues := make(map[Field]interface{})
-	fieldValues[ChainID] = chainID[:]
-	fieldValues[RequestID] = requestID
-	fieldValues[Deadline] = deadline
-	fieldValues[ContainerID] = containerID[:]
-	fieldValues[ContainerBytes] = container
-
-	res := &inboundMessage{
-		op:                    inOp,
-		bytesSavedCompression: 0,
-		fields:                fieldValues,
+) InboundMessage {
+	return &inboundMessage{
+		op: PushQuery,
+		fields: map[Field]interface{}{
+			ChainID:        chainID[:],
+			RequestID:      requestID,
+			Deadline:       deadline,
+			ContainerID:    containerID[:],
+			ContainerBytes: container,
+		},
 	}
-	return res, nil
 }
 
 func (b *inMsgBuilder) InboundPullQuery(
@@ -201,41 +176,31 @@ func (b *inMsgBuilder) InboundPullQuery(
 	requestID uint32,
 	deadline uint64,
 	containerID ids.ID,
-) (InboundMessage, error) {
-	inOp := PullQuery
-
-	fieldValues := make(map[Field]interface{})
-	fieldValues[ChainID] = chainID[:]
-	fieldValues[RequestID] = requestID
-	fieldValues[Deadline] = deadline
-	fieldValues[ContainerID] = containerID[:]
-
-	res := &inboundMessage{
-		op:                    inOp,
-		bytesSavedCompression: 0,
-		fields:                fieldValues,
+) InboundMessage {
+	return &inboundMessage{
+		op: PullQuery,
+		fields: map[Field]interface{}{
+			ChainID:     chainID[:],
+			RequestID:   requestID,
+			Deadline:    deadline,
+			ContainerID: containerID[:],
+		},
 	}
-	return res, nil
 }
 
 func (b *inMsgBuilder) InboundChits(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
-) (InboundMessage, error) {
-	inOp := Chits
-
-	fieldValues := make(map[Field]interface{})
-	fieldValues[ChainID] = chainID[:]
-	fieldValues[RequestID] = requestID
-	fieldValues[ContainerIDs] = encodeContainerIDs(containerIDs)
-
-	res := &inboundMessage{
-		op:                    inOp,
-		bytesSavedCompression: 0,
-		fields:                fieldValues,
+) InboundMessage {
+	return &inboundMessage{
+		op: Chits,
+		fields: map[Field]interface{}{
+			ChainID:      chainID[:],
+			RequestID:    requestID,
+			ContainerIDs: encodeContainerIDs(containerIDs),
+		},
 	}
-	return res, nil
 }
 
 func (b *inMsgBuilder) InboundAppRequest(
@@ -243,41 +208,31 @@ func (b *inMsgBuilder) InboundAppRequest(
 	requestID uint32,
 	deadline uint64,
 	msg []byte,
-) (InboundMessage, error) {
-	inOp := AppRequest
-
-	fieldValues := make(map[Field]interface{})
-	fieldValues[ChainID] = chainID[:]
-	fieldValues[RequestID] = requestID
-	fieldValues[Deadline] = deadline
-	fieldValues[AppRequestBytes] = AppRequestBytes
-
-	res := &inboundMessage{
-		op:                    inOp,
-		bytesSavedCompression: 0,
-		fields:                fieldValues,
+) InboundMessage {
+	return &inboundMessage{
+		op: AppRequest,
+		fields: map[Field]interface{}{
+			ChainID:         chainID[:],
+			RequestID:       requestID,
+			Deadline:        deadline,
+			AppRequestBytes: AppRequestBytes,
+		},
 	}
-	return res, nil
 }
 
 func (b *inMsgBuilder) InboundAppResponse(
 	chainID ids.ID,
 	requestID uint32,
 	msg []byte,
-) (InboundMessage, error) {
-	inOp := AppResponse
-
-	fieldValues := make(map[Field]interface{})
-	fieldValues[ChainID] = chainID[:]
-	fieldValues[RequestID] = requestID
-	fieldValues[AppResponseBytes] = msg
-
-	res := &inboundMessage{
-		op:                    inOp,
-		bytesSavedCompression: 0,
-		fields:                fieldValues,
+) InboundMessage {
+	return &inboundMessage{
+		op: AppResponse,
+		fields: map[Field]interface{}{
+			ChainID:          chainID[:],
+			RequestID:        requestID,
+			AppResponseBytes: msg,
+		},
 	}
-	return res, nil
 }
 
 func (b *inMsgBuilder) InboundPut(
@@ -285,39 +240,29 @@ func (b *inMsgBuilder) InboundPut(
 	requestID uint32,
 	containerID ids.ID,
 	container []byte,
-) (InboundMessage, error) { // used in UTs only
-	inOp := Put
-
-	fieldValues := make(map[Field]interface{})
-	fieldValues[ChainID] = chainID[:]
-	fieldValues[RequestID] = requestID
-	fieldValues[ContainerID] = containerID[:]
-	fieldValues[ContainerBytes] = container
-
-	res := &inboundMessage{
-		op:                    inOp,
-		bytesSavedCompression: 0,
-		fields:                fieldValues,
+) InboundMessage { // used in UTs only
+	return &inboundMessage{
+		op: Put,
+		fields: map[Field]interface{}{
+			ChainID:        chainID[:],
+			RequestID:      requestID,
+			ContainerID:    containerID[:],
+			ContainerBytes: container,
+		},
 	}
-	return res, nil
 }
 
 func (b *inMsgBuilder) InboundMultiPut(
 	chainID ids.ID,
 	requestID uint32,
 	containers [][]byte,
-) (InboundMessage, error) { // used in UTs only
-	inOp := MultiPut
-
-	fieldValues := make(map[Field]interface{})
-	fieldValues[ChainID] = chainID[:]
-	fieldValues[RequestID] = requestID
-	fieldValues[MultiContainerBytes] = containers
-
-	res := &inboundMessage{
-		op:                    inOp,
-		bytesSavedCompression: 0,
-		fields:                fieldValues,
+) InboundMessage { // used in UTs only
+	return &inboundMessage{
+		op: MultiPut,
+		fields: map[Field]interface{}{
+			ChainID:             chainID[:],
+			RequestID:           requestID,
+			MultiContainerBytes: containers,
+		},
 	}
-	return res, nil
 }

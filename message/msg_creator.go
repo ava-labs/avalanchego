@@ -8,19 +8,19 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var _ MsgCreator = (*msgCreator)(nil)
+var _ Creator = (*creator)(nil)
 
-type MsgCreator interface {
+type Creator interface {
 	OutboundMsgBuilder
-	Parse(bytes []byte) (InboundMessage, error)
 	InboundMsgBuilder
+	Parse(bytes []byte) (InboundMessage, error)
 
 	ReturnBytes(msg interface{})
 
 	ParentNamespace() string // needed to init network and chainManager with the right namespace
 }
 
-type msgCreator struct {
+type creator struct {
 	Codec
 	OutboundMsgBuilder
 	InboundMsgBuilder
@@ -32,7 +32,7 @@ type msgCreator struct {
 	parentNamespace string
 }
 
-func NewMsgCreator(metrics prometheus.Registerer, compressionEnabled bool) (MsgCreator, error) {
+func NewCreator(metrics prometheus.Registerer, compressionEnabled bool) (Creator, error) {
 	parentNamespace := fmt.Sprintf("%s_network", constants.PlatformName)
 	namespace := fmt.Sprintf("%s_codec", parentNamespace)
 	pool := sync.Pool{
@@ -51,7 +51,7 @@ func NewMsgCreator(metrics prometheus.Registerer, compressionEnabled bool) (MsgC
 	}
 	outBuilder := NewOutboundBuilder(codec, compressionEnabled)
 	inBuilder := NewInboundBuilder(codec)
-	res := &msgCreator{
+	res := &creator{
 		OutboundMsgBuilder: outBuilder,
 		InboundMsgBuilder:  inBuilder,
 		Codec:              codec,
@@ -61,8 +61,8 @@ func NewMsgCreator(metrics prometheus.Registerer, compressionEnabled bool) (MsgC
 	return res, nil
 }
 
-func (mc *msgCreator) ReturnBytes(msg interface{}) {
+func (mc *creator) ReturnBytes(msg interface{}) {
 	mc.byteSlicePool.Put(msg)
 }
 
-func (mc *msgCreator) ParentNamespace() string { return mc.parentNamespace }
+func (mc *creator) ParentNamespace() string { return mc.parentNamespace }

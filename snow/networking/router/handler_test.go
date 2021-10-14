@@ -41,7 +41,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	err := vdrs.AddWeight(vdr0, 1)
 	assert.NoError(t, err)
 	metrics := prometheus.NewRegistry()
-	msgCreator, err := message.NewMsgCreator(metrics, true /*compressionEnabled*/)
+	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/)
 	assert.NoError(t, err)
 	err = handler.Initialize(
 		&engine,
@@ -58,16 +58,14 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	reqID := uint32(1)
 	deadline := uint64(1)
 	chainID := ids.ID{}
-	msg, err := msgCreator.InboundGetAcceptedFrontier(chainID, reqID, deadline)
-	assert.NoError(t, err)
+	msg := msgCreator.InboundGetAcceptedFrontier(chainID, reqID, deadline)
 	handler.PushMsgWithDeadline(constants.GetAcceptedFrontierMsg, msg, ids.ShortID{}, reqID, func() {})
 
 	currentTime := time.Now().Add(time.Second)
 	handler.clock.Set(currentTime)
 
 	reqID++
-	msg, err = msgCreator.InboundGetAccepted(chainID, reqID, deadline, nil)
-	assert.NoError(t, err)
+	msg = msgCreator.InboundGetAccepted(chainID, reqID, deadline, nil)
 	handler.PushMsgWithDeadline(constants.GetAcceptedMsg, msg, ids.ShortID{}, reqID, func() {})
 
 	go handler.Dispatch()
@@ -96,7 +94,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
 	metrics := prometheus.NewRegistry()
-	msgCreator, err := message.NewMsgCreator(metrics, true /*compressionEnabled*/)
+	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/)
 	assert.NoError(t, err)
 	handler := &Handler{}
 	err = handler.Initialize(
@@ -117,8 +115,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 
 	reqID := uint32(1)
 	deadline := uint64(1)
-	msg, err := msgCreator.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline)
-	assert.NoError(t, err)
+	msg := msgCreator.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline)
 	handler.PushMsgWithDeadline(constants.GetAcceptedFrontierMsg, msg, ids.ShortID{}, reqID, func() {})
 
 	ticker := time.NewTicker(20 * time.Millisecond)

@@ -117,7 +117,7 @@ type network struct {
 	// used here.
 	dummyNodeID uint32
 	clock       timer.Clock
-	mc          message.MsgCreator
+	mc          message.Creator
 
 	stateLock sync.RWMutex
 	closed    utils.AtomicBool
@@ -260,7 +260,7 @@ type peerElement struct {
 // NewNetwork returns a new Network implementation with the provided parameters.
 func NewNetwork(
 	config *Config,
-	theOneMsgCreator message.MsgCreator,
+	msgCreator message.Creator,
 	metricsRegisterer prometheus.Registerer,
 	log logging.Logger,
 	listener net.Listener,
@@ -285,7 +285,7 @@ func NewNetwork(
 		latestPeerIP:                make(map[ids.ShortID]signedPeerIP),
 		versionCompatibility:        version.GetCompatibility(config.NetworkID),
 		config:                      config,
-		mc:                          theOneMsgCreator,
+		mc:                          msgCreator,
 	}
 
 	netw.serverUpgrader = NewTLSServerUpgrader(config.TLSConfig)
@@ -334,7 +334,7 @@ func (n *network) Send(msg message.OutboundMessage, nodeIDs ids.ShortSet) ids.Sh
 	var (
 		now    = n.clock.Time()
 		msgLen = len(msg.Bytes())
-		res    = ids.NewShortSet(nodeIDs.Len())
+		sentTo = ids.NewShortSet(nodeIDs.Len())
 	)
 
 	op := msg.Op()
@@ -355,13 +355,13 @@ func (n *network) Send(msg message.OutboundMessage, nodeIDs ids.ShortSet) ids.Sh
 	msgMetrics := n.metrics.message(op)
 	if msgMetrics == nil {
 		n.log.Error("unregistered metric for message with op %s. Dropping it", op)
-		return res
+		return sentTo
 	}
 
 	for nodeID := range nodeIDs {
 		peer, _ := n.peers.getByID(nodeID) // note: peer may be nil
 		if peer != nil && peer.finishedHandshake.GetValue() && peer.Send(msg, canModifyMsg) {
-			res.Add(nodeID)
+			sentTo.Add(nodeID)
 
 			// record metrics for success
 			n.sendFailRateCalculator.Observe(0, now)
@@ -377,7 +377,7 @@ func (n *network) Send(msg message.OutboundMessage, nodeIDs ids.ShortSet) ids.Sh
 		n.sendFailRateCalculator.Observe(1, now)
 		msgMetrics.numFailed.Inc()
 	}
-	return res
+	return sentTo
 }
 
 func (n *network) handleGossip(
@@ -386,7 +386,7 @@ func (n *network) handleGossip(
 	msgMetrics *messageMetrics,
 ) bool {
 	now := n.clock.Time()
-	res := false                // gossip is successful if at least one node gets gossiped
+	gossipedToAtLeastOne := false
 	sentPeers := ids.ShortSet{} // do not re-gossip if some nodes appear multiple times in the lists
 	for _, peers := range peersLists {
 		if peers == nil {
@@ -405,7 +405,7 @@ func (n *network) handleGossip(
 				continue
 			}
 
-			res = true
+			gossipedToAtLeastOne = true
 			n.sendFailRateCalculator.Observe(0, now)
 			msgMetrics.numSent.Inc()
 			msgMetrics.sentBytes.Add(float64(len(msg.Bytes())))
@@ -414,11 +414,13 @@ func (n *network) handleGossip(
 			}
 		}
 	}
-	return res
+	return gossipedToAtLeastOne
 }
 
+// Select peer lists to gossip to, for AppGossip messages.
+// The function parameter control the peers sampling
+// In analogy to the other select method below, multiple peers lists are returned
 func (n *network) selectPeersForAppGossip(subnetID ids.ID, validatorOnly bool) [][]*peer {
-	// Phase 1: select peers
 	n.stateLock.RLock()
 	// Gossip the message to [n.config.AppGossipNonValidatorSize] random nodes
 	// in the network. If this is a validator only subnet, selects only validators.
@@ -442,6 +444,9 @@ func (n *network) selectPeersForAppGossip(subnetID ids.ID, validatorOnly bool) [
 	return [][]*peer{peersAll, peersValidators}
 }
 
+// Select peer lists to gossip to, for AppGossip messages.
+// The function parameter control the peers sampling
+// In analogy to the other select method above, multiple peers lists are returned
 func (n *network) selectPeersForContainerGossip(subnetID ids.ID, validatorOnly bool) [][]*peer {
 	n.stateLock.RLock()
 	peers, err := n.peers.sample(subnetID, validatorOnly, int(n.config.GossipOnAcceptSize))
@@ -470,14 +475,13 @@ func (n *network) Gossip(
 		if nodeIDs.Len() == 0 {
 			// no peers specified, let's sample
 			peersLists = n.selectPeersForAppGossip(subnetID, validatorOnly)
+			if peersLists == nil {
+				return false
+			}
 		} else {
 			// nodes to gossip already selected. Retrieve peers
 			peers := n.getSubnetPeers(nodeIDs, subnetID, validatorOnly)
 			peersLists = [][]*peer{peers}
-		}
-
-		if peersLists == nil {
-			return false
 		}
 
 	case message.Put:

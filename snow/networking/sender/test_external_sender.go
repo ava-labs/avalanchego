@@ -17,7 +17,7 @@ type ExternalSenderTest struct {
 	T *testing.T
 	B *testing.B
 
-	mc message.MsgCreator
+	mc message.Creator
 
 	disabledSend map[message.Op]struct{}
 	sendFMap     map[message.Op]func(T *testing.T, inMsg message.InboundMessage, nodeIDs ids.ShortSet) ids.ShortSet
@@ -33,7 +33,7 @@ type ExternalSenderTest struct {
 func (s *ExternalSenderTest) Default(cant bool) {
 	assert := assert.New(s.T)
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewMsgCreator(metrics, true /*compress*/)
+	mc, err := message.NewCreator(metrics, true /*compress*/)
 	assert.NoError(err)
 	s.mc = mc
 

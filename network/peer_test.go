@@ -71,7 +71,7 @@ func TestPeer_Close(t *testing.T) {
 	vdrs := getDefaultManager()
 	beacons := validators.NewSet()
 	metrics := prometheus.NewRegistry()
-	msgCreator, err := message.NewMsgCreator(metrics, true /*compressionEnabled*/)
+	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/)
 	assert.NoError(t, err)
 	handler := &testHandler{}
 

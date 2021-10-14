@@ -150,11 +150,10 @@ func TestShutdownTimesOut(t *testing.T) {
 	shutdownFinished := make(chan struct{}, 1)
 
 	go func() {
-		mc, err := message.NewMsgCreator(prometheus.NewRegistry(), true /*compressionEnabled*/)
+		mc, err := message.NewCreator(prometheus.NewRegistry(), true /*compressionEnabled*/)
 		assert.NoError(t, err)
 		chainID := ids.ID{}
-		msg, err := mc.InboundMultiPut(chainID, 1, nil)
-		assert.NoError(t, err)
+		msg := mc.InboundMultiPut(chainID, 1, nil)
 		handler.PushMsgWithoutDeadline(constants.MultiPutMsg, msg, ids.ShortID{}, 1, func() {})
 
 		time.Sleep(50 * time.Millisecond) // Pause to ensure message gets processed
@@ -334,7 +333,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 
 	// create messages builder
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewMsgCreator(metrics, true /*compress*/)
+	mc, err := message.NewCreator(metrics, true /*compress*/)
 	if err != nil {
 		panic(err)
 	}
@@ -349,33 +348,27 @@ func TestRouterClearTimeouts(t *testing.T) {
 	var inMsg message.InboundMessage
 
 	// Put
-	inMsg, err = mc.InboundPut(handler.ctx.ChainID, 0, ids.GenerateTestID(), nil)
-	assert.NoError(t, err)
+	inMsg = mc.InboundPut(handler.ctx.ChainID, 0, ids.GenerateTestID(), nil)
 	chainRouter.HandleInbound(inMsg, vID, nil)
 
 	// MultiPut
-	inMsg, err = mc.InboundMultiPut(handler.ctx.ChainID, 1, nil)
-	assert.NoError(t, err)
+	inMsg = mc.InboundMultiPut(handler.ctx.ChainID, 1, nil)
 	chainRouter.HandleInbound(inMsg, vID, nil)
 
 	// Chits # 1
-	inMsg, err = mc.InboundChits(handler.ctx.ChainID, 2, nil)
-	assert.NoError(t, err)
+	inMsg = mc.InboundChits(handler.ctx.ChainID, 2, nil)
 	chainRouter.HandleInbound(inMsg, vID, nil)
 
 	// Chits # 2
-	inMsg, err = mc.InboundChits(handler.ctx.ChainID, 3, nil)
-	assert.NoError(t, err)
+	inMsg = mc.InboundChits(handler.ctx.ChainID, 3, nil)
 	chainRouter.HandleInbound(inMsg, vID, nil)
 
 	// Accepted
-	inMsg, err = mc.InboundAccepted(handler.ctx.ChainID, 4, nil)
-	assert.NoError(t, err)
+	inMsg = mc.InboundAccepted(handler.ctx.ChainID, 4, nil)
 	chainRouter.HandleInbound(inMsg, vID, nil)
 
 	// Accepted Frontier
-	inMsg, err = mc.InboundAcceptedFrontier(handler.ctx.ChainID, 5, nil)
-	assert.NoError(t, err)
+	inMsg = mc.InboundAcceptedFrontier(handler.ctx.ChainID, 5, nil)
 	chainRouter.HandleInbound(inMsg, vID, nil)
 
 	assert.Equal(t, chainRouter.timedRequests.Len(), 0)
@@ -446,7 +439,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	go handler.Dispatch()
 
 	// create messages builder
-	mc, err := message.NewMsgCreator(metrics, true /*compress*/)
+	mc, err := message.NewCreator(metrics, true /*compress*/)
 	assert.NoError(t, err)
 
 	// generate a non-validator ID
@@ -456,16 +449,14 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	timeout := chainRouter.clock.Time().Add(time.Hour)
 	var inMsg message.InboundMessage
 
-	inMsg, err = mc.InboundPullQuery(handler.ctx.ChainID, uint32(1), uint64(timeout.Unix()), ids.GenerateTestID())
-	assert.NoError(t, err)
+	inMsg = mc.InboundPullQuery(handler.ctx.ChainID, uint32(1), uint64(timeout.Unix()), ids.GenerateTestID())
 	chainRouter.HandleInbound(inMsg, nID, func() {})
 	assert.False(t, *calledF) // should not be called
 
 	// validator case
 	*calledF = false
 	wg.Add(1)
-	inMsg, err = mc.InboundPullQuery(handler.ctx.ChainID, uint32(2), uint64(timeout.Unix()), ids.GenerateTestID())
-	assert.NoError(t, err)
+	inMsg = mc.InboundPullQuery(handler.ctx.ChainID, uint32(2), uint64(timeout.Unix()), ids.GenerateTestID())
 	chainRouter.HandleInbound(inMsg, vID, func() {})
 
 	wg.Wait()
@@ -481,8 +472,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	err = handler.validators.Set(validators.NewSet().List())
 	assert.NoError(t, err)
 	calledFinished := false
-	inMsg, err = mc.InboundPut(handler.ctx.ChainID, reqID, ids.GenerateTestID(), nil)
-	assert.NoError(t, err)
+	inMsg = mc.InboundPut(handler.ctx.ChainID, reqID, ids.GenerateTestID(), nil)
 	chainRouter.HandleInbound(inMsg, nID, func() { calledFinished = true })
 
 	assert.True(t, calledFinished)

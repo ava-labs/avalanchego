@@ -132,10 +132,10 @@ type ManagerConfig struct {
 	DecisionEvents              *triggers.EventDispatcher
 	ConsensusEvents             *triggers.EventDispatcher
 	DBManager                   dbManager.Manager
-	MsgCreator                  message.MsgCreator // message creator, shared with network
-	Router                      router.Router      // Routes incoming messages to the appropriate chain
-	Net                         network.Network    // Sends consensus messages to other validators
-	ConsensusParams             avcon.Parameters   // The consensus parameters (alpha, beta, etc.) for new chains
+	MsgCreator                  message.Creator  // message creator, shared with network
+	Router                      router.Router    // Routes incoming messages to the appropriate chain
+	Net                         network.Network  // Sends consensus messages to other validators
+	ConsensusParams             avcon.Parameters // The consensus parameters (alpha, beta, etc.) for new chains
 	EpochFirstTransition        time.Time
 	EpochDuration               time.Duration
 	Validators                  validators.Manager // Validators validating on this chain
