@@ -2085,7 +2085,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	// Passes messages from the consensus engine to the network
 	metrics := prometheus.NewRegistry()
-	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/)
+	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	sender := sender.Sender{}
 	err = sender.Initialize(ctx, msgCreator, externalSender, chainRouter, &timeoutManager, "", metrics)

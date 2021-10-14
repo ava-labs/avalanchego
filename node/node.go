@@ -122,7 +122,8 @@ type Node struct {
 	IPCs *ipcs.ChainIPCs
 
 	// Net runs the networking stack
-	Net network.Network
+	networkNamespace string
+	Net              network.Network
 
 	// this node's initial connections to the network
 	beacons validators.Set
@@ -235,10 +236,8 @@ func (n *Node) initNetworking() error {
 		}
 	}
 
-	networkNamespace := n.msgCreator.ParentNamespace()
-
 	// add node configs to network config
-	n.Config.NetworkConfig.Namespace = networkNamespace
+	n.Config.NetworkConfig.Namespace = n.networkNamespace
 	n.Config.NetworkConfig.MyNodeID = n.ID
 	n.Config.NetworkConfig.MyIP = n.Config.IP
 	n.Config.NetworkConfig.NetworkID = n.Config.NetworkID
@@ -1062,8 +1061,11 @@ func (n *Node) Initialize(
 	// message.Creator is shared between networking and the engine.
 	// It must be initiated before networking (initNetworking)
 	// and the engine (initChains) but after the metrics (initMetricsAPI)
+	// message.Creator currently record metrics under network namespace
+	n.networkNamespace = fmt.Sprintf("%s_network", constants.PlatformName)
 	if n.msgCreator, err = message.NewCreator(n.MetricsRegisterer,
-		n.Config.NetworkConfig.CompressionEnabled); err != nil {
+		n.Config.NetworkConfig.CompressionEnabled,
+		n.networkNamespace); err != nil {
 		return fmt.Errorf("problem TheOneCreator: %w", err)
 	}
 

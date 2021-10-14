@@ -1,3 +1,6 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package message
 
 import (
@@ -13,27 +16,20 @@ var _ Creator = (*creator)(nil)
 type Creator interface {
 	OutboundMsgBuilder
 	InboundMsgBuilder
-	Parse(bytes []byte) (InboundMessage, error)
 
 	ReturnBytes(msg interface{})
-
-	ParentNamespace() string // needed to init network and chainManager with the right namespace
 }
 
 type creator struct {
-	Codec
 	OutboundMsgBuilder
 	InboundMsgBuilder
 
 	// Contains []byte. Used as an optimization.
 	// Can be accessed by multiple goroutines concurrently.
 	byteSlicePool *sync.Pool
-
-	parentNamespace string
 }
 
-func NewCreator(metrics prometheus.Registerer, compressionEnabled bool) (Creator, error) {
-	parentNamespace := fmt.Sprintf("%s_network", constants.PlatformName)
+func NewCreator(metrics prometheus.Registerer, compressionEnabled bool, parentNamespace string) (Creator, error) {
 	namespace := fmt.Sprintf("%s_codec", parentNamespace)
 	pool := sync.Pool{
 		New: func() interface{} {
@@ -54,9 +50,7 @@ func NewCreator(metrics prometheus.Registerer, compressionEnabled bool) (Creator
 	res := &creator{
 		OutboundMsgBuilder: outBuilder,
 		InboundMsgBuilder:  inBuilder,
-		Codec:              codec,
 		byteSlicePool:      &pool,
-		parentNamespace:    parentNamespace,
 	}
 	return res, nil
 }
@@ -64,5 +58,3 @@ func NewCreator(metrics prometheus.Registerer, compressionEnabled bool) (Creator
 func (mc *creator) ReturnBytes(msg interface{}) {
 	mc.byteSlicePool.Put(msg)
 }
-
-func (mc *creator) ParentNamespace() string { return mc.parentNamespace }

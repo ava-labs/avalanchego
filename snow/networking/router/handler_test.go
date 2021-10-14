@@ -41,7 +41,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	err := vdrs.AddWeight(vdr0, 1)
 	assert.NoError(t, err)
 	metrics := prometheus.NewRegistry()
-	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/)
+	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	err = handler.Initialize(
 		&engine,
@@ -94,7 +94,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
 	metrics := prometheus.NewRegistry()
-	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/)
+	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler := &Handler{}
 	err = handler.Initialize(

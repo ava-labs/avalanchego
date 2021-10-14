@@ -29,7 +29,7 @@ import (
 func TestSenderContext(t *testing.T) {
 	context := snow.DefaultContextTest()
 	metrics := prometheus.NewRegistry()
-	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/)
+	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	externalSender := &ExternalSenderTest{T: t}
 	externalSender.Default(true)
@@ -78,7 +78,7 @@ func TestTimeout(t *testing.T) {
 
 	context := snow.DefaultContextTest()
 	metrics := prometheus.NewRegistry()
-	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/)
+	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	externalSender := &ExternalSenderTest{T: t}
 	externalSender.Default(false)
@@ -159,7 +159,7 @@ func TestReliableMessages(t *testing.T) {
 
 	context := snow.DefaultContextTest()
 	metrics := prometheus.NewRegistry()
-	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/)
+	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	externalSender := &ExternalSenderTest{T: t}
 	externalSender.Default(false)
@@ -250,7 +250,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 
 	context := snow.DefaultContextTest()
 	metrics := prometheus.NewRegistry()
-	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/)
+	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	sender := Sender{}
 	externalSender := &ExternalSenderTest{T: t}

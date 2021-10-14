@@ -150,7 +150,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	shutdownFinished := make(chan struct{}, 1)
 
 	go func() {
-		mc, err := message.NewCreator(prometheus.NewRegistry(), true /*compressionEnabled*/)
+		mc, err := message.NewCreator(prometheus.NewRegistry(), true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 		assert.NoError(t, err)
 		chainID := ids.ID{}
 		msg := mc.InboundMultiPut(chainID, 1, nil)
@@ -333,7 +333,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 
 	// create messages builder
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true /*compress*/)
+	mc, err := message.NewCreator(metrics, true /*compress*/, "dummyNamespace" /*parentNamespace*/)
 	if err != nil {
 		panic(err)
 	}
@@ -439,7 +439,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	go handler.Dispatch()
 
 	// create messages builder
-	mc, err := message.NewCreator(metrics, true /*compress*/)
+	mc, err := message.NewCreator(metrics, true /*compress*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 
 	// generate a non-validator ID

@@ -359,7 +359,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 	vdrs := getDefaultManager()
 	beacons := validators.NewSet()
 	metrics := prometheus.NewRegistry()
-	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/)
+	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler := &testHandler{}
 	net, err := newDefaultNetwork(
@@ -446,7 +446,7 @@ func TestEstablishConnection(t *testing.T) {
 	wg1.Add(1)
 
 	metrics0 := prometheus.NewRegistry()
-	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/)
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler0 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -457,7 +457,7 @@ func TestEstablishConnection(t *testing.T) {
 	}
 
 	metrics1 := prometheus.NewRegistry()
-	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/)
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler1 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -583,7 +583,7 @@ func TestDoubleTrack(t *testing.T) {
 	wg1.Add(1)
 
 	metrics0 := prometheus.NewRegistry()
-	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/)
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler0 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -594,7 +594,7 @@ func TestDoubleTrack(t *testing.T) {
 	}
 
 	metrics1 := prometheus.NewRegistry()
-	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/)
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler1 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -721,7 +721,7 @@ func TestDoubleClose(t *testing.T) {
 	wg1.Add(1)
 
 	metrics0 := prometheus.NewRegistry()
-	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/)
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler0 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -732,7 +732,7 @@ func TestDoubleClose(t *testing.T) {
 	}
 
 	metrics1 := prometheus.NewRegistry()
-	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/)
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler1 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -864,7 +864,7 @@ func TestTrackConnected(t *testing.T) {
 	wg1.Add(1)
 
 	metrics0 := prometheus.NewRegistry()
-	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/)
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler0 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -875,7 +875,7 @@ func TestTrackConnected(t *testing.T) {
 	}
 
 	metrics1 := prometheus.NewRegistry()
-	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/)
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler1 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -995,11 +995,11 @@ func TestTrackConnectedRace(t *testing.T) {
 	vdrs := getDefaultManager()
 	beacons := validators.NewSet()
 	metrics0 := prometheus.NewRegistry()
-	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/)
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 
 	metrics1 := prometheus.NewRegistry()
-	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/)
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 
 	handler := &testHandler{}
@@ -1182,7 +1182,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 	wg2.Add(2)
 
 	metrics0 := prometheus.NewRegistry()
-	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/)
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler0 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -1203,7 +1203,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 	}
 
 	metrics1 := prometheus.NewRegistry()
-	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/)
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler1 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -1220,7 +1220,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 	}
 
 	metrics2 := prometheus.NewRegistry()
-	msgCreator2, err := message.NewCreator(metrics2, true /*compressionEnabled*/)
+	msgCreator2, err := message.NewCreator(metrics2, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler2 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -1233,7 +1233,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 	}
 
 	metrics3 := prometheus.NewRegistry()
-	msgCreator3, err := message.NewCreator(metrics3, true /*compressionEnabled*/)
+	msgCreator3, err := message.NewCreator(metrics3, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler3 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -1571,7 +1571,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	wg3.Add(2)
 
 	metrics0 := prometheus.NewRegistry()
-	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/)
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler0 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -1603,7 +1603,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	}
 
 	metrics1 := prometheus.NewRegistry()
-	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/)
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler1 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -1620,7 +1620,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	}
 
 	metrics2 := prometheus.NewRegistry()
-	msgCreator2, err := message.NewCreator(metrics2, true /*compressionEnabled*/)
+	msgCreator2, err := message.NewCreator(metrics2, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler2 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -1633,7 +1633,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	}
 
 	metrics3 := prometheus.NewRegistry()
-	msgCreator3, err := message.NewCreator(metrics3, true /*compressionEnabled*/)
+	msgCreator3, err := message.NewCreator(metrics3, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler3 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -1940,7 +1940,7 @@ func TestPeerSignature(t *testing.T) {
 	handled := make(map[string]struct{})
 
 	metrics0 := prometheus.NewRegistry()
-	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/)
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler0 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -1954,7 +1954,7 @@ func TestPeerSignature(t *testing.T) {
 	}
 
 	metrics1 := prometheus.NewRegistry()
-	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/)
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler1 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -1968,7 +1968,7 @@ func TestPeerSignature(t *testing.T) {
 	}
 
 	metrics2 := prometheus.NewRegistry()
-	msgCreator2, err := message.NewCreator(metrics2, true /*compressionEnabled*/)
+	msgCreator2, err := message.NewCreator(metrics2, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler2 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -2354,7 +2354,7 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 	assert.NoError(t, vdrs.AddWeight(constants.PrimaryNetworkID, id0, 1))
 
 	metrics0 := prometheus.NewRegistry()
-	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/)
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	net0Compatibility := version.NewCompatibility(
 		net0Version,
@@ -2367,7 +2367,7 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 	)
 
 	metrics1 := prometheus.NewRegistry()
-	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/)
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	net1Compatibility := version.NewCompatibility(
 		net1Version,
@@ -2501,7 +2501,7 @@ func TestPeerTrackedSubnets(t *testing.T) {
 	wg1.Add(1)
 
 	metrics0 := prometheus.NewRegistry()
-	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/)
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler0 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -2511,7 +2511,7 @@ func TestPeerTrackedSubnets(t *testing.T) {
 	}
 
 	metrics1 := prometheus.NewRegistry()
-	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/)
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler1 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -2690,7 +2690,7 @@ func TestPeerGossip(t *testing.T) {
 	allContainerIDs := []ids.ID{testSubnetContainerID, testPrimaryContainerID}
 
 	metrics0 := prometheus.NewRegistry()
-	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/)
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler0 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -2703,7 +2703,7 @@ func TestPeerGossip(t *testing.T) {
 	}
 
 	metrics1 := prometheus.NewRegistry()
-	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/)
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler1 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -2717,7 +2717,7 @@ func TestPeerGossip(t *testing.T) {
 	}
 
 	metrics2 := prometheus.NewRegistry()
-	msgCreator2, err := message.NewCreator(metrics2, true /*compressionEnabled*/)
+	msgCreator2, err := message.NewCreator(metrics2, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler2 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -2928,7 +2928,7 @@ func TestAppGossip(t *testing.T) {
 	testAppGossipBytes := []byte("appgossip")
 	testAppGossipSpecificBytes := []byte("appgossipspecific")
 	metrics0 := prometheus.NewRegistry()
-	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/)
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler0 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -2944,7 +2944,7 @@ func TestAppGossip(t *testing.T) {
 	}
 
 	metrics1 := prometheus.NewRegistry()
-	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/)
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler1 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
@@ -2961,7 +2961,7 @@ func TestAppGossip(t *testing.T) {
 	}
 
 	metrics2 := prometheus.NewRegistry()
-	msgCreator2, err := message.NewCreator(metrics2, true /*compressionEnabled*/)
+	msgCreator2, err := message.NewCreator(metrics2, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
 	handler2 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {

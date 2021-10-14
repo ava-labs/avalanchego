@@ -78,6 +78,8 @@ type InboundMsgBuilder interface {
 		requestID uint32,
 		containers [][]byte,
 	) InboundMessage // used in UTs only
+
+	Parse(bytes []byte) (InboundMessage, error)
 }
 
 type inMsgBuilder struct {
@@ -265,4 +267,8 @@ func (b *inMsgBuilder) InboundMultiPut(
 			MultiContainerBytes: containers,
 		},
 	}
+}
+
+func (b *inMsgBuilder) Parse(bytes []byte) (InboundMessage, error) {
+	return b.c.Parse(bytes)
 }

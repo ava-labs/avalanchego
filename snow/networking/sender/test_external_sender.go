@@ -33,7 +33,7 @@ type ExternalSenderTest struct {
 func (s *ExternalSenderTest) Default(cant bool) {
 	assert := assert.New(s.T)
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true /*compress*/)
+	mc, err := message.NewCreator(metrics, true /*compress*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(err)
 	s.mc = mc
 
