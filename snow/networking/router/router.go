@@ -42,11 +42,7 @@ type Router interface {
 // ExternalRouter routes messages from the network to the
 // Handler of the consensus engine that the message is intended for
 type ExternalRouter interface {
-	HandleInbound(
-		msg message.InboundMessage,
-		nodeID ids.ShortID,
-		onFinishedHandling func(),
-	)
+	HandleInbound(msg message.InboundMessage)
 
 	RegisterRequest(
 		nodeID ids.ShortID,

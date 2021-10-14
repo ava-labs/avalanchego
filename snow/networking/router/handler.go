@@ -243,36 +243,32 @@ func (h *Handler) handleConsensusMsg(msg messageWrap) error {
 func (h *Handler) PushMsgWithDeadline(msgType constants.MsgType,
 	inMsg message.InboundMessage,
 	nodeID ids.ShortID,
-	requestID uint32,
-	onDoneHandling func()) {
+	requestID uint32) {
 	received := h.clock.Time()
 	deadline := received.Add(time.Duration(inMsg.Get(message.Deadline).(uint64)))
 
 	h.push(messageWrap{
-		messageType:    msgType,
-		inMsg:          inMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		received:       received,
-		deadline:       deadline,
-		onDoneHandling: onDoneHandling,
+		messageType: msgType,
+		inMsg:       inMsg,
+		nodeID:      nodeID,
+		requestID:   requestID,
+		received:    received,
+		deadline:    deadline,
 	})
 }
 
 func (h *Handler) PushMsgWithoutDeadline(msgType constants.MsgType,
 	inMsg message.InboundMessage,
 	nodeID ids.ShortID,
-	requestID uint32,
-	onDoneHandling func()) {
+	requestID uint32) {
 	received := h.clock.Time()
 
 	h.push(messageWrap{
-		messageType:    msgType,
-		inMsg:          inMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		received:       received,
-		onDoneHandling: onDoneHandling,
+		messageType: msgType,
+		inMsg:       inMsg,
+		nodeID:      nodeID,
+		requestID:   requestID,
+		received:    received,
 	})
 }
 

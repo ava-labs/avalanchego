@@ -17,16 +17,15 @@ type messageWrap struct {
 	inMsg        message.InboundMessage
 	notification common.Message
 
-	nodeID         ids.ShortID // Must always be set
-	requestID      uint32
-	received       time.Time // Time this message was received
-	deadline       time.Time // Time this message must be responded to
-	onDoneHandling func()
+	nodeID    ids.ShortID // Must always be set
+	requestID uint32
+	received  time.Time // Time this message was received
+	deadline  time.Time // Time this message must be responded to
 }
 
 func (m messageWrap) doneHandling() {
-	if m.onDoneHandling != nil {
-		m.onDoneHandling()
+	if m.inMsg != nil {
+		m.inMsg.OnFinishedHandling()
 	}
 }
 

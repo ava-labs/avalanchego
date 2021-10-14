@@ -89,7 +89,9 @@ func (s *ExternalSenderTest) Send(outMsg message.OutboundMessage, nodeIDs ids.Sh
 	assert := assert.New(s.T)
 
 	// turn  message.OutboundMessage into  message.InboundMessage so be able to retrieve fields
-	inMsg, err := s.mc.Parse(outMsg.Bytes())
+	dummyNodeID := ids.ShortEmpty
+	dummyOnFinishedHandling := func() {}
+	inMsg, err := s.mc.Parse(outMsg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 	assert.NoError(err)
 
 	_, isDisabled := s.disabledSend[outMsg.Op()]
@@ -140,7 +142,9 @@ func (s *ExternalSenderTest) Gossip(
 	assert := assert.New(s.T)
 
 	// turn  message.OutboundMessage into  message.InboundMessage so be able to retrieve fields
-	inMsg, err := s.mc.Parse(outMsg.Bytes())
+	dummyNodeID := ids.ShortEmpty
+	dummyOnFinishedHandling := func() {}
+	inMsg, err := s.mc.Parse(outMsg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 	assert.NoError(err)
 
 	_, isDisabled := s.disabledGossip[outMsg.Op()]

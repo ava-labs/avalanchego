@@ -12,6 +12,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/metric"
@@ -32,7 +33,7 @@ type Codec interface {
 		compress bool,
 	) (OutboundMessage, error)
 
-	Parse(bytes []byte) (InboundMessage, error)
+	Parse(bytes []byte, nodeID ids.ShortID, onFinishedHandling func()) (InboundMessage, error)
 
 	ReturnBytes(msg interface{})
 }
@@ -153,7 +154,7 @@ func (c *codec) Pack(
 
 // Parse attempts to convert bytes into a message.
 // The first byte of the message is the opcode of the message.
-func (c *codec) Parse(bytes []byte) (InboundMessage, error) {
+func (c *codec) Parse(bytes []byte, nodeID ids.ShortID, onFinishedHandling func()) (InboundMessage, error) {
 	p := wrappers.Packer{Bytes: bytes}
 
 	// Unpack the op code (message type)
@@ -210,6 +211,8 @@ func (c *codec) Parse(bytes []byte) (InboundMessage, error) {
 		op:                    op,
 		fields:                fieldValues,
 		bytesSavedCompression: bytesSaved,
+		nodeID:                nodeID,
+		onFinishedHandling:    onFinishedHandling,
 	}, p.Err
 }
 

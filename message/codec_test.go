@@ -45,7 +45,7 @@ func TestCodecParseInvalidOp(t *testing.T) {
 	codec, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB)
 	assert.NoError(t, err)
 
-	_, err = codec.Parse([]byte{math.MaxUint8})
+	_, err = codec.Parse([]byte{math.MaxUint8}, dummyNodeID, dummyOnFinishedHandling)
 	assert.Error(t, err)
 }
 
@@ -53,10 +53,10 @@ func TestCodecParseExtraSpace(t *testing.T) {
 	codec, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB)
 	assert.NoError(t, err)
 
-	_, err = codec.Parse([]byte{byte(GetVersion), 0x00, 0x00})
+	_, err = codec.Parse([]byte{byte(GetVersion), 0x00, 0x00}, dummyNodeID, dummyOnFinishedHandling)
 	assert.Error(t, err)
 
-	_, err = codec.Parse([]byte{byte(GetVersion), 0x00, 0x01})
+	_, err = codec.Parse([]byte{byte(GetVersion), 0x00, 0x01}, dummyNodeID, dummyOnFinishedHandling)
 	assert.Error(t, err)
 }
 
@@ -202,7 +202,7 @@ func TestCodecPackParseGzip(t *testing.T) {
 		packedIntf, err := c.Pack(m.op, m.fields, m.op.Compressable())
 		assert.NoError(t, err, "failed to pack on operation %s", m.op)
 
-		unpackedIntf, err := c.Parse(packedIntf.Bytes())
+		unpackedIntf, err := c.Parse(packedIntf.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 		assert.NoError(t, err, "failed to parse w/ compression on operation %s", m.op)
 
 		unpacked := unpackedIntf.(*inboundMessage)

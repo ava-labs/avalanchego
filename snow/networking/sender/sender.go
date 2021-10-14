@@ -92,11 +92,11 @@ func (s *Sender) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, requestID uint32)
 		timeoutDuration := s.timeouts.TimeoutDuration()
 		deadline := uint64(time.Now().Add(timeoutDuration).Unix())
 
-		inMsg := s.msgCreator.InboundGetAcceptedFrontier(s.ctx.ChainID, requestID, deadline)
+		inMsg := s.msgCreator.InboundGetAcceptedFrontier(s.ctx.ChainID, requestID, deadline, s.ctx.NodeID, func() {})
 
 		// Tell the router to expect a reply message from this node
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, constants.GetAcceptedFrontierMsg)
-		go s.router.HandleInbound(inMsg, s.ctx.NodeID, func() {})
+		go s.router.HandleInbound(inMsg)
 	}
 
 	// Try to send the messages over the network.
@@ -122,8 +122,8 @@ func (s *Sender) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, requestID uint32)
 
 func (s *Sender) SendAcceptedFrontier(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
 	if nodeID == s.ctx.NodeID {
-		inMsg := s.msgCreator.InboundAcceptedFrontier(s.ctx.ChainID, requestID, containerIDs)
-		go s.router.HandleInbound(inMsg, nodeID, func() {})
+		inMsg := s.msgCreator.InboundAcceptedFrontier(s.ctx.ChainID, requestID, containerIDs, nodeID, func() {})
+		go s.router.HandleInbound(inMsg)
 		return
 	}
 
@@ -158,10 +158,10 @@ func (s *Sender) SendGetAccepted(nodeIDs ids.ShortSet, requestID uint32, contain
 		timeoutDuration := s.timeouts.TimeoutDuration()
 		deadline := uint64(time.Now().Add(timeoutDuration).Unix())
 
-		inMsg := s.msgCreator.InboundGetAccepted(s.ctx.ChainID, requestID, deadline, containerIDs)
+		inMsg := s.msgCreator.InboundGetAccepted(s.ctx.ChainID, requestID, deadline, containerIDs, s.ctx.NodeID, func() {})
 
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, constants.GetAcceptedMsg)
-		go s.router.HandleInbound(inMsg, s.ctx.NodeID, func() {})
+		go s.router.HandleInbound(inMsg)
 	}
 
 	// Try to send the messages over the network.
@@ -203,8 +203,8 @@ func (s *Sender) SendGetAccepted(nodeIDs ids.ShortSet, requestID uint32, contain
 
 func (s *Sender) SendAccepted(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
 	if nodeID == s.ctx.NodeID {
-		inMsg := s.msgCreator.InboundAccepted(s.ctx.ChainID, requestID, containerIDs)
-		go s.router.HandleInbound(inMsg, nodeID, func() {})
+		inMsg := s.msgCreator.InboundAccepted(s.ctx.ChainID, requestID, containerIDs, nodeID, func() {})
+		go s.router.HandleInbound(inMsg)
 		return
 	}
 
@@ -389,11 +389,11 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 		timeoutDuration := s.timeouts.TimeoutDuration()
 		deadline := uint64(time.Now().Add(timeoutDuration).Unix())
 
-		inMsg := s.msgCreator.InboundPushQuery(s.ctx.ChainID, requestID, deadline, containerID, container)
+		inMsg := s.msgCreator.InboundPushQuery(s.ctx.ChainID, requestID, deadline, containerID, container, s.ctx.NodeID, func() {})
 
 		// Register a timeout in case I don't respond to myself
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, constants.PushQueryMsg)
-		go s.router.HandleInbound(inMsg, s.ctx.NodeID, func() {})
+		go s.router.HandleInbound(inMsg)
 	}
 
 	// Some of [nodeIDs] may be benched. That is, they've been unresponsive
@@ -467,11 +467,11 @@ func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, container
 		nodeIDs.Remove(s.ctx.NodeID)
 
 		deadline := uint64(time.Now().Add(timeoutDuration).Unix())
-		inMsg := s.msgCreator.InboundPullQuery(s.ctx.ChainID, requestID, deadline, containerID)
+		inMsg := s.msgCreator.InboundPullQuery(s.ctx.ChainID, requestID, deadline, containerID, s.ctx.NodeID, func() {})
 
 		// Register a timeout in case I don't respond to myself
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, constants.PullQueryMsg)
-		go s.router.HandleInbound(inMsg, s.ctx.NodeID, func() {})
+		go s.router.HandleInbound(inMsg)
 	}
 
 	// Some of the nodes in [nodeIDs] may be benched. That is, they've been unresponsive
@@ -519,8 +519,8 @@ func (s *Sender) SendChits(nodeID ids.ShortID, requestID uint32, votes []ids.ID)
 	// If [nodeID] is myself, send this message directly
 	// to my own router rather than sending it over the network
 	if nodeID == s.ctx.NodeID {
-		inMsg := s.msgCreator.InboundChits(s.ctx.ChainID, requestID, votes)
-		go s.router.HandleInbound(inMsg, nodeID, func() {})
+		inMsg := s.msgCreator.InboundChits(s.ctx.ChainID, requestID, votes, nodeID, func() {})
+		go s.router.HandleInbound(inMsg)
 		return
 	}
 
@@ -559,11 +559,11 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 		nodeIDs.Remove(s.ctx.NodeID)
 
 		deadline := uint64(time.Now().Add(timeoutDuration).Unix())
-		inMsg := s.msgCreator.InboundAppRequest(s.ctx.ChainID, requestID, deadline, appRequestBytes)
+		inMsg := s.msgCreator.InboundAppRequest(s.ctx.ChainID, requestID, deadline, appRequestBytes, s.ctx.NodeID, func() {})
 
 		// Register a timeout in case I don't respond to myself
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, constants.AppRequestMsg)
-		go s.router.HandleInbound(inMsg, s.ctx.NodeID, func() {})
+		go s.router.HandleInbound(inMsg)
 	}
 
 	// Some of the nodes in [nodeIDs] may be benched. That is, they've been unresponsive
@@ -617,8 +617,8 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 // given node
 func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte) error {
 	if nodeID == s.ctx.NodeID {
-		inMsg := s.msgCreator.InboundAppResponse(s.ctx.ChainID, requestID, appResponseBytes)
-		go s.router.HandleInbound(inMsg, nodeID, func() {})
+		inMsg := s.msgCreator.InboundAppResponse(s.ctx.ChainID, requestID, appResponseBytes, nodeID, func() {})
+		go s.router.HandleInbound(inMsg)
 		return nil
 	}
 

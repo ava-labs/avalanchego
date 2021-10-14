@@ -21,6 +21,9 @@ import (
 var (
 	UncompressingBuilder OutboundMsgBuilder
 	TestCodec            Codec
+
+	dummyNodeID             = ids.ShortEmpty
+	dummyOnFinishedHandling = func() {}
 )
 
 func init() {
@@ -38,7 +41,7 @@ func TestBuildGetVersion(t *testing.T) {
 	assert.NotNil(t, msg)
 	assert.Equal(t, GetVersion, msg.Op())
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes())
+	parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, GetVersion, parsedMsg.Op())
@@ -70,7 +73,7 @@ func TestBuildVersion(t *testing.T) {
 	assert.NotNil(t, msg)
 	assert.Equal(t, Version, msg.Op())
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes())
+	parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
@@ -91,7 +94,7 @@ func TestBuildGetPeerList(t *testing.T) {
 	assert.NotNil(t, msg)
 	assert.Equal(t, GetPeerList, msg.Op())
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes())
+	parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, GetPeerList, parsedMsg.Op())
@@ -107,7 +110,7 @@ func TestBuildGetAcceptedFrontier(t *testing.T) {
 	assert.NotNil(t, msg)
 	assert.Equal(t, GetAcceptedFrontier, msg.Op())
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes())
+	parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, GetAcceptedFrontier, parsedMsg.Op())
@@ -127,7 +130,7 @@ func TestBuildAcceptedFrontier(t *testing.T) {
 	assert.NotNil(t, msg)
 	assert.Equal(t, AcceptedFrontier, msg.Op())
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes())
+	parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, AcceptedFrontier, parsedMsg.Op())
@@ -148,7 +151,7 @@ func TestBuildGetAccepted(t *testing.T) {
 	assert.NotNil(t, msg)
 	assert.Equal(t, GetAccepted, msg.Op())
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes())
+	parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, GetAccepted, parsedMsg.Op())
@@ -169,7 +172,7 @@ func TestBuildAccepted(t *testing.T) {
 	assert.NotNil(t, msg)
 	assert.Equal(t, Accepted, msg.Op())
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes())
+	parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, Accepted, parsedMsg.Op())
@@ -189,7 +192,7 @@ func TestBuildGet(t *testing.T) {
 	assert.NotNil(t, msg)
 	assert.Equal(t, Get, msg.Op())
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes())
+	parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, Get, parsedMsg.Op())
@@ -212,7 +215,7 @@ func TestBuildPut(t *testing.T) {
 		assert.NotNil(t, msg)
 		assert.Equal(t, Put, msg.Op())
 
-		parsedMsg, err := TestCodec.Parse(msg.Bytes())
+		parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 		assert.NoError(t, err)
 		assert.NotNil(t, parsedMsg)
 		assert.Equal(t, Put, parsedMsg.Op())
@@ -237,7 +240,7 @@ func TestBuildPushQuery(t *testing.T) {
 		assert.NotNil(t, msg)
 		assert.Equal(t, PushQuery, msg.Op())
 
-		parsedMsg, err := TestCodec.Parse(msg.Bytes())
+		parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 		assert.NoError(t, err)
 		assert.NotNil(t, parsedMsg)
 		assert.Equal(t, PushQuery, parsedMsg.Op())
@@ -260,7 +263,7 @@ func TestBuildPullQuery(t *testing.T) {
 	assert.NotNil(t, msg)
 	assert.Equal(t, PullQuery, msg.Op())
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes())
+	parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, PullQuery, parsedMsg.Op())
@@ -281,7 +284,7 @@ func TestBuildChits(t *testing.T) {
 	assert.NotNil(t, msg)
 	assert.Equal(t, Chits, msg.Op())
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes())
+	parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, Chits, parsedMsg.Op())
@@ -304,7 +307,7 @@ func TestBuildMultiPut(t *testing.T) {
 		assert.NotNil(t, msg)
 		assert.Equal(t, MultiPut, msg.Op())
 
-		parsedMsg, err := TestCodec.Parse(msg.Bytes())
+		parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 		assert.NoError(t, err)
 		assert.NotNil(t, parsedMsg)
 		assert.Equal(t, MultiPut, parsedMsg.Op())
@@ -328,7 +331,7 @@ func TestBuildAppRequestMsg(t *testing.T) {
 		assert.NotNil(t, msg)
 		assert.Equal(t, AppRequest, msg.Op())
 
-		parsedMsg, err := TestCodec.Parse(msg.Bytes())
+		parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 		assert.NoError(t, err)
 		assert.NotNil(t, parsedMsg)
 		assert.Equal(t, AppRequest, parsedMsg.Op())
@@ -348,7 +351,7 @@ func TestBuildAppResponseMsg(t *testing.T) {
 		assert.NotNil(t, msg)
 		assert.Equal(t, AppResponse, msg.Op())
 
-		parsedMsg, err := TestCodec.Parse(msg.Bytes())
+		parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, AppResponse, msg.Op())
@@ -371,7 +374,7 @@ func TestBuildAppGossipMsg(t *testing.T) {
 		assert.NotNil(t, msg)
 		assert.Equal(t, AppGossip, msg.Op())
 
-		parsedMsg, err := TestCodec.Parse(msg.Bytes())
+		parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, AppGossip, msg.Op())

@@ -23,6 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
+var dummyOnFinishedHandling = func() {}
+
 func TestShutdown(t *testing.T) {
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
@@ -89,6 +91,7 @@ func TestShutdown(t *testing.T) {
 }
 
 func TestShutdownTimesOut(t *testing.T) {
+	nodeID := ids.ShortEmpty
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
@@ -153,8 +156,8 @@ func TestShutdownTimesOut(t *testing.T) {
 		mc, err := message.NewCreator(prometheus.NewRegistry(), true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 		assert.NoError(t, err)
 		chainID := ids.ID{}
-		msg := mc.InboundMultiPut(chainID, 1, nil)
-		handler.PushMsgWithoutDeadline(constants.MultiPutMsg, msg, ids.ShortID{}, 1, func() {})
+		msg := mc.InboundMultiPut(chainID, 1, nil, nodeID, dummyOnFinishedHandling)
+		handler.PushMsgWithoutDeadline(constants.MultiPutMsg, msg, ids.ShortID{}, 1)
 
 		time.Sleep(50 * time.Millisecond) // Pause to ensure message gets processed
 
@@ -348,28 +351,28 @@ func TestRouterClearTimeouts(t *testing.T) {
 	var inMsg message.InboundMessage
 
 	// Put
-	inMsg = mc.InboundPut(handler.ctx.ChainID, 0, ids.GenerateTestID(), nil)
-	chainRouter.HandleInbound(inMsg, vID, nil)
+	inMsg = mc.InboundPut(handler.ctx.ChainID, 0, ids.GenerateTestID(), nil, vID, dummyOnFinishedHandling)
+	chainRouter.HandleInbound(inMsg)
 
 	// MultiPut
-	inMsg = mc.InboundMultiPut(handler.ctx.ChainID, 1, nil)
-	chainRouter.HandleInbound(inMsg, vID, nil)
+	inMsg = mc.InboundMultiPut(handler.ctx.ChainID, 1, nil, vID, dummyOnFinishedHandling)
+	chainRouter.HandleInbound(inMsg)
 
 	// Chits # 1
-	inMsg = mc.InboundChits(handler.ctx.ChainID, 2, nil)
-	chainRouter.HandleInbound(inMsg, vID, nil)
+	inMsg = mc.InboundChits(handler.ctx.ChainID, 2, nil, vID, dummyOnFinishedHandling)
+	chainRouter.HandleInbound(inMsg)
 
 	// Chits # 2
-	inMsg = mc.InboundChits(handler.ctx.ChainID, 3, nil)
-	chainRouter.HandleInbound(inMsg, vID, nil)
+	inMsg = mc.InboundChits(handler.ctx.ChainID, 3, nil, vID, dummyOnFinishedHandling)
+	chainRouter.HandleInbound(inMsg)
 
 	// Accepted
-	inMsg = mc.InboundAccepted(handler.ctx.ChainID, 4, nil)
-	chainRouter.HandleInbound(inMsg, vID, nil)
+	inMsg = mc.InboundAccepted(handler.ctx.ChainID, 4, nil, vID, dummyOnFinishedHandling)
+	chainRouter.HandleInbound(inMsg)
 
 	// Accepted Frontier
-	inMsg = mc.InboundAcceptedFrontier(handler.ctx.ChainID, 5, nil)
-	chainRouter.HandleInbound(inMsg, vID, nil)
+	inMsg = mc.InboundAcceptedFrontier(handler.ctx.ChainID, 5, nil, vID, dummyOnFinishedHandling)
+	chainRouter.HandleInbound(inMsg)
 
 	assert.Equal(t, chainRouter.timedRequests.Len(), 0)
 }
@@ -449,15 +452,24 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	timeout := chainRouter.clock.Time().Add(time.Hour)
 	var inMsg message.InboundMessage
 
-	inMsg = mc.InboundPullQuery(handler.ctx.ChainID, uint32(1), uint64(timeout.Unix()), ids.GenerateTestID())
-	chainRouter.HandleInbound(inMsg, nID, func() {})
+	inMsg = mc.InboundPullQuery(handler.ctx.ChainID, uint32(1),
+		uint64(timeout.Unix()),
+		ids.GenerateTestID(),
+		nID,
+		dummyOnFinishedHandling)
+	chainRouter.HandleInbound(inMsg)
 	assert.False(t, *calledF) // should not be called
 
 	// validator case
 	*calledF = false
 	wg.Add(1)
-	inMsg = mc.InboundPullQuery(handler.ctx.ChainID, uint32(2), uint64(timeout.Unix()), ids.GenerateTestID())
-	chainRouter.HandleInbound(inMsg, vID, func() {})
+	inMsg = mc.InboundPullQuery(handler.ctx.ChainID,
+		uint32(2),
+		uint64(timeout.Unix()),
+		ids.GenerateTestID(),
+		vID,
+		dummyOnFinishedHandling)
+	chainRouter.HandleInbound(inMsg)
 
 	wg.Wait()
 	// should be called since this is a validator request
@@ -472,8 +484,9 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	err = handler.validators.Set(validators.NewSet().List())
 	assert.NoError(t, err)
 	calledFinished := false
-	inMsg = mc.InboundPut(handler.ctx.ChainID, reqID, ids.GenerateTestID(), nil)
-	chainRouter.HandleInbound(inMsg, nID, func() { calledFinished = true })
+	onFinishedHandling := func() { calledFinished = true }
+	inMsg = mc.InboundPut(handler.ctx.ChainID, reqID, ids.GenerateTestID(), nil, nID, onFinishedHandling)
+	chainRouter.HandleInbound(inMsg)
 
 	assert.True(t, calledFinished)
 	// shouldn't clear out timed request, as the request should be cleared when

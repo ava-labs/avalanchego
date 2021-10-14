@@ -390,14 +390,11 @@ func opToConstant(op message.Op) constants.MsgType {
 	}
 }
 
-func (cr *ChainRouter) HandleInbound(
-	inMsg message.InboundMessage,
-	nodeID ids.ShortID,
-	onFinishedHandling func(),
-) {
+func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
+	nodeID := inMsg.NodeID()
 	msgType := inMsg.Op()
 	chainID, err := ids.ToID(inMsg.Get(message.ChainID).([]byte))
 	cr.log.AssertNoError(err)
@@ -415,7 +412,7 @@ func (cr *ChainRouter) HandleInbound(
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
 	if !exists || !chain.isValidator(nodeID) {
-		onFinishedHandling()
+		inMsg.OnFinishedHandling()
 		cr.log.Debug("Message %s from (%s. %s, %d) dropped. Error: %s",
 			msgType.String(), nodeID, chainID, requestID, errUnknownChain)
 		return
@@ -438,14 +435,14 @@ func (cr *ChainRouter) HandleInbound(
 		message.PushQuery,
 		message.AppRequest:
 
-		chain.PushMsgWithDeadline(opToConstant(msgType), inMsg, nodeID, requestID, onFinishedHandling)
+		chain.PushMsgWithDeadline(opToConstant(msgType), inMsg, nodeID, requestID)
 		return
 
 	case message.AcceptedFrontier:
 		uniqueRequestID, request := cr.markFullfilled(constants.GetAcceptedFrontierMsg, nodeID, chainID, requestID, false)
 		if request == nil {
 			// We didn't request this message. Ignore.
-			onFinishedHandling()
+			inMsg.OnFinishedHandling()
 			return
 		}
 
@@ -456,14 +453,14 @@ func (cr *ChainRouter) HandleInbound(
 		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, constants.GetAcceptedFrontierMsg, latency)
 
 		// Pass the response to the chain
-		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID, onFinishedHandling)
+		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID)
 		return
 
 	case message.Accepted:
 		uniqueRequestID, request := cr.markFullfilled(constants.GetAcceptedMsg, nodeID, chainID, requestID, false)
 		if request == nil {
 			// We didn't request this message. Ignore.
-			onFinishedHandling()
+			inMsg.OnFinishedHandling()
 			return
 		}
 
@@ -474,14 +471,14 @@ func (cr *ChainRouter) HandleInbound(
 		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, constants.GetAcceptedMsg, latency)
 
 		// Pass the response to the chain
-		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID, onFinishedHandling)
+		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID)
 		return
 
 	case message.MultiPut:
 		uniqueRequestID, request := cr.markFullfilled(constants.GetAncestorsMsg, nodeID, chainID, requestID, false)
 		if request == nil {
 			// We didn't request this message. Ignore.
-			onFinishedHandling()
+			inMsg.OnFinishedHandling()
 			return
 		}
 
@@ -492,7 +489,7 @@ func (cr *ChainRouter) HandleInbound(
 		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, constants.GetAncestorsMsg, latency)
 
 		// Pass the response to the chain
-		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID, onFinishedHandling)
+		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID)
 		return
 
 	case message.Chits:
@@ -501,7 +498,7 @@ func (cr *ChainRouter) HandleInbound(
 		uniqueRequestID, request := cr.markFullfilled(constants.PullQueryMsg, nodeID, chainID, requestID, false)
 		if request == nil {
 			// We didn't request this message. Ignore.
-			onFinishedHandling()
+			inMsg.OnFinishedHandling()
 			return
 		}
 
@@ -512,20 +509,20 @@ func (cr *ChainRouter) HandleInbound(
 		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, request.msgType, latency)
 
 		// Pass the response to the chain
-		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID, onFinishedHandling)
+		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID)
 		return
 
 	case message.Put:
 		// If this is a gossip message, pass to the chain
 		if requestID == constants.GossipMsgRequestID {
-			chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID, onFinishedHandling)
+			chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID)
 			return
 		}
 
 		uniqueRequestID, request := cr.markFullfilled(constants.GetMsg, nodeID, chainID, requestID, false)
 		if request == nil {
 			// We didn't request this message. Ignore.
-			onFinishedHandling()
+			inMsg.OnFinishedHandling()
 			return
 		}
 
@@ -536,14 +533,14 @@ func (cr *ChainRouter) HandleInbound(
 		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, constants.GetMsg, latency)
 
 		// Pass the response to the chain
-		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID, onFinishedHandling)
+		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID)
 		return
 
 	case message.AppResponse:
 		uniqueRequestID, request := cr.markFullfilled(constants.AppRequestMsg, nodeID, chainID, requestID, true)
 		if request == nil {
 			// We didn't request this message, or it was the wrong type. Ignore.
-			onFinishedHandling()
+			inMsg.OnFinishedHandling()
 			return
 		}
 
@@ -554,10 +551,10 @@ func (cr *ChainRouter) HandleInbound(
 		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, request.msgType, latency)
 
 		// Pass the response to the chain
-		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID, onFinishedHandling)
+		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID)
 		return
 	case message.AppGossip:
-		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID, onFinishedHandling)
+		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID)
 		return
 
 	default:

@@ -55,18 +55,20 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	pastTime := time.Now()
 	handler.clock.Set(pastTime)
 
+	nodeID := ids.ShortEmpty
+	dummyOnFinishedHandling := func() {}
 	reqID := uint32(1)
 	deadline := uint64(1)
 	chainID := ids.ID{}
-	msg := msgCreator.InboundGetAcceptedFrontier(chainID, reqID, deadline)
-	handler.PushMsgWithDeadline(constants.GetAcceptedFrontierMsg, msg, ids.ShortID{}, reqID, func() {})
+	msg := msgCreator.InboundGetAcceptedFrontier(chainID, reqID, deadline, nodeID, dummyOnFinishedHandling)
+	handler.PushMsgWithDeadline(constants.GetAcceptedFrontierMsg, msg, ids.ShortID{}, reqID)
 
 	currentTime := time.Now().Add(time.Second)
 	handler.clock.Set(currentTime)
 
 	reqID++
-	msg = msgCreator.InboundGetAccepted(chainID, reqID, deadline, nil)
-	handler.PushMsgWithDeadline(constants.GetAcceptedMsg, msg, ids.ShortID{}, reqID, func() {})
+	msg = msgCreator.InboundGetAccepted(chainID, reqID, deadline, nil, nodeID, dummyOnFinishedHandling)
+	handler.PushMsgWithDeadline(constants.GetAcceptedMsg, msg, ids.ShortID{}, reqID)
 
 	go handler.Dispatch()
 
@@ -113,10 +115,12 @@ func TestHandlerClosesOnError(t *testing.T) {
 	}
 	go handler.Dispatch()
 
+	nodeID := ids.ShortEmpty
+	dummyOnFinishedHandling := func() {}
 	reqID := uint32(1)
 	deadline := uint64(1)
-	msg := msgCreator.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline)
-	handler.PushMsgWithDeadline(constants.GetAcceptedFrontierMsg, msg, ids.ShortID{}, reqID, func() {})
+	msg := msgCreator.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID, dummyOnFinishedHandling)
+	handler.PushMsgWithDeadline(constants.GetAcceptedFrontierMsg, msg, ids.ShortID{}, reqID)
 
 	ticker := time.NewTicker(20 * time.Millisecond)
 	select {

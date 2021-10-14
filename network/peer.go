@@ -285,7 +285,7 @@ func (p *peer) ReadMessages() {
 		p.net.log.Verbo("parsing message from %s%s at %s:\n%s", constants.NodeIDPrefix, p.nodeID, p.getIP(), formatting.DumpBytes{Bytes: msgBytes})
 
 		// Parse the message
-		msg, err := p.net.mc.Parse(msgBytes)
+		msg, err := p.net.mc.Parse(msgBytes, p.nodeID, onFinishedHandling)
 		if err != nil {
 			p.net.log.Verbo("failed to parse message from %s%s at %s:\n%s\n%s", constants.NodeIDPrefix, p.nodeID, p.getIP(), formatting.DumpBytes{Bytes: msgBytes}, err)
 			// Couldn't parse the message. Read the next one.
@@ -297,7 +297,7 @@ func (p *peer) ReadMessages() {
 		// Handle the message. Note that when we are done handling
 		// this message, we must call [p.net.msgThrottler.Release]
 		// to release the bytes used by this message. See MsgThrottler.
-		p.handle(msg, float64(len(msgBytes)), onFinishedHandling)
+		p.handle(msg, float64(len(msgBytes)))
 	}
 }
 
@@ -396,7 +396,7 @@ func (p *peer) Send(msg message.OutboundMessage, canModifyMsg bool) bool {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handle(msg message.InboundMessage, msgLen float64, onFinishedHandling func()) {
+func (p *peer) handle(msg message.InboundMessage, msgLen float64) {
 	now := p.net.clock.Time()
 	atomic.StoreInt64(&p.lastReceived, now.Unix())
 	atomic.StoreInt64(&p.net.lastMsgReceivedTime, now.Unix())
@@ -405,7 +405,7 @@ func (p *peer) handle(msg message.InboundMessage, msgLen float64, onFinishedHand
 	msgMetrics := p.net.metrics.message(op)
 	if msgMetrics == nil {
 		p.net.log.Error("dropping an unknown message from %s%s at %s with op %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), op)
-		onFinishedHandling()
+		msg.OnFinishedHandling()
 		return
 	}
 	msgMetrics.numReceived.Inc()
@@ -418,27 +418,27 @@ func (p *peer) handle(msg message.InboundMessage, msgLen float64, onFinishedHand
 	switch op { // Network-related message types
 	case message.Version:
 		p.handleVersion(msg)
-		onFinishedHandling()
+		msg.OnFinishedHandling()
 		return
 	case message.GetVersion:
 		p.handleGetVersion(msg)
-		onFinishedHandling()
+		msg.OnFinishedHandling()
 		return
 	case message.Ping:
 		p.handlePing(msg)
-		onFinishedHandling()
+		msg.OnFinishedHandling()
 		return
 	case message.Pong:
 		p.handlePong(msg)
-		onFinishedHandling()
+		msg.OnFinishedHandling()
 		return
 	case message.GetPeerList:
 		p.handleGetPeerList(msg)
-		onFinishedHandling()
+		msg.OnFinishedHandling()
 		return
 	case message.PeerList:
 		p.handlePeerList(msg)
-		onFinishedHandling()
+		msg.OnFinishedHandling()
 		return
 	}
 	if !p.finishedHandshake.GetValue() {
@@ -451,12 +451,12 @@ func (p *peer) handle(msg message.InboundMessage, msgLen float64, onFinishedHand
 		if !p.gotPeerList.GetValue() {
 			p.sendGetPeerList()
 		}
-		onFinishedHandling()
+		msg.OnFinishedHandling()
 		return
 	}
 
 	// Consensus and app-level messages
-	p.net.router.HandleInbound(msg, p.nodeID, onFinishedHandling)
+	p.net.router.HandleInbound(msg)
 }
 
 // assumes the [stateLock] is not held

@@ -3,6 +3,8 @@
 
 package message
 
+import "github.com/ava-labs/avalanchego/ids"
+
 var (
 	_ InboundMessage  = &inboundMessage{}
 	_ OutboundMessage = &outboundMessage{}
@@ -13,12 +15,16 @@ type InboundMessage interface {
 	BytesSavedCompression() int
 	Op() Op
 	Get(Field) interface{}
+	NodeID() ids.ShortID
+	OnFinishedHandling()
 }
 
 type inboundMessage struct {
 	op                    Op
 	bytesSavedCompression int
 	fields                map[Field]interface{}
+	nodeID                ids.ShortID
+	onFinishedHandling    func()
 }
 
 // OutboundMessage represents a set of fields for an outbound message that can be serialized into a byte stream
@@ -45,6 +51,12 @@ func (inMsg *inboundMessage) BytesSavedCompression() int { return inMsg.bytesSav
 
 // Field returns the value of the specified field in this message
 func (inMsg *inboundMessage) Get(field Field) interface{} { return inMsg.fields[field] }
+
+// NodeID returns the node from which the msg was received
+func (inMsg *inboundMessage) NodeID() ids.ShortID { return inMsg.nodeID }
+
+// OnFinishedHandling is the function to be called once inboundMessage is complete
+func (inMsg *inboundMessage) OnFinishedHandling() { inMsg.onFinishedHandling() }
 
 // Op returns the value of the specified operation in this message
 func (outMsg *outboundMessage) Op() Op { return outMsg.op }

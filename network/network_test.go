@@ -247,11 +247,7 @@ func (h *testHandler) Disconnected(id ids.ShortID) {
 	}
 }
 
-func (h *testHandler) HandleInbound(
-	msg message.InboundMessage,
-	nodeID ids.ShortID,
-	onFinishedHandling func(),
-) {
+func (h *testHandler) HandleInbound(msg message.InboundMessage) {
 	msgType := msg.Op()
 	switch msgType {
 	case message.Put:
@@ -261,19 +257,19 @@ func (h *testHandler) HandleInbound(
 		container, _ := msg.Get(message.ContainerBytes).([]byte)
 
 		if h.PutF != nil {
-			h.PutF(nodeID,
+			h.PutF(msg.NodeID(),
 				chainID,
 				requestID,
 				containerID,
 				container,
-				onFinishedHandling)
+				msg.OnFinishedHandling)
 		}
 	case message.AppGossip:
 		chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
 		appGossipBytes := msg.Get(message.AppGossipBytes).([]byte)
 
 		if h.AppGossipF != nil {
-			h.AppGossipF(nodeID, chainID, appGossipBytes, onFinishedHandling)
+			h.AppGossipF(msg.NodeID(), chainID, appGossipBytes, msg.OnFinishedHandling)
 		}
 	default:
 		return
