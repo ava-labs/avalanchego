@@ -123,7 +123,9 @@ type OutboundMsgBuilder interface {
 		msg []byte,
 	) (OutboundMessage, error)
 
-	ReturnBytes(msg interface{})
+	// When you create a message with the message creator, that message can be used until
+	// ReturnBytes is called, after which point you may no longer use that message.
+	ReturnBytes(msg []byte)
 }
 
 type outMsgBuilder struct {
@@ -460,6 +462,6 @@ func (b *outMsgBuilder) AppGossip(chainID ids.ID, msg []byte) (OutboundMessage, 
 	)
 }
 
-func (b *outMsgBuilder) ReturnBytes(msg interface{}) {
+func (b *outMsgBuilder) ReturnBytes(msg []byte) {
 	b.c.ReturnBytes(msg)
 }

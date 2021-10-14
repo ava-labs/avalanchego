@@ -35,7 +35,7 @@ type Codec interface {
 
 	Parse(bytes []byte, nodeID ids.ShortID, onFinishedHandling func()) (InboundMessage, error)
 
-	ReturnBytes(msg interface{})
+	ReturnBytes(msg []byte)
 }
 
 // codec defines the serialization and deserialization of network messages.
@@ -216,6 +216,6 @@ func (c *codec) Parse(bytes []byte, nodeID ids.ShortID, onFinishedHandling func(
 	}, p.Err
 }
 
-func (c *codec) ReturnBytes(msg interface{}) {
+func (c *codec) ReturnBytes(msg []byte) {
 	c.byteSlicePool.Put(msg)
 }
