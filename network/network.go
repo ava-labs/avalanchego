@@ -381,37 +381,32 @@ func (n *network) Send(msg message.OutboundMessage, nodeIDs ids.ShortSet) ids.Sh
 }
 
 func (n *network) handleGossip(
-	peersLists [][]*peer,
+	peersLists []*peer,
 	msg message.OutboundMessage,
 	msgMetrics *messageMetrics,
 ) bool {
 	now := n.clock.Time()
 	gossipedToAtLeastOne := false
 	sentPeers := ids.ShortSet{} // do not re-gossip if some nodes appear multiple times in the lists
-	for _, peers := range peersLists {
-		if peers == nil {
+	for _, peer := range peersLists {
+		if sentPeers.Contains(peer.nodeID) {
 			continue
 		}
-		for _, peer := range peers {
-			if sentPeers.Contains(peer.nodeID) {
-				continue
-			}
-			sentPeers.Add(peer.nodeID)
+		sentPeers.Add(peer.nodeID)
 
-			if !peer.Send(msg, false) {
-				n.log.Debug("failed to send msg %s (%s)", msg.Op().String(), peer.nodeID)
-				n.sendFailRateCalculator.Observe(1, now)
-				msgMetrics.numFailed.Inc()
-				continue
-			}
+		if !peer.Send(msg, false) {
+			n.log.Debug("failed to send msg %s (%s)", msg.Op().String(), peer.nodeID)
+			n.sendFailRateCalculator.Observe(1, now)
+			msgMetrics.numFailed.Inc()
+			continue
+		}
 
-			gossipedToAtLeastOne = true
-			n.sendFailRateCalculator.Observe(0, now)
-			msgMetrics.numSent.Inc()
-			msgMetrics.sentBytes.Add(float64(len(msg.Bytes())))
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				msgMetrics.savedSentBytes.Observe(float64(saved))
-			}
+		gossipedToAtLeastOne = true
+		n.sendFailRateCalculator.Observe(0, now)
+		msgMetrics.numSent.Inc()
+		msgMetrics.sentBytes.Add(float64(len(msg.Bytes())))
+		if saved := msg.BytesSavedCompression(); saved != 0 {
+			msgMetrics.savedSentBytes.Observe(float64(saved))
 		}
 	}
 	return gossipedToAtLeastOne
@@ -419,8 +414,7 @@ func (n *network) handleGossip(
 
 // Select peer lists to gossip to, for AppGossip messages.
 // The function parameter control the peers sampling
-// In analogy to the other select method below, multiple peers lists are returned
-func (n *network) selectPeersForAppGossip(subnetID ids.ID, validatorOnly bool) [][]*peer {
+func (n *network) selectPeersForAppGossip(subnetID ids.ID, validatorOnly bool) []*peer {
 	n.stateLock.RLock()
 	// Gossip the message to [n.config.AppGossipNonValidatorSize] random nodes
 	// in the network. If this is a validator only subnet, selects only validators.
@@ -441,20 +435,19 @@ func (n *network) selectPeersForAppGossip(subnetID ids.ID, validatorOnly bool) [
 		return nil
 	}
 	peersAll = append(peersAll, peersValidators...)
-	return [][]*peer{peersAll, peersValidators}
+	return peersAll
 }
 
 // Select peer lists to gossip to, for AppGossip messages.
 // The function parameter control the peers sampling
-// In analogy to the other select method above, multiple peers lists are returned
-func (n *network) selectPeersForContainerGossip(subnetID ids.ID, validatorOnly bool) [][]*peer {
+func (n *network) selectPeersForContainerGossip(subnetID ids.ID, validatorOnly bool, sampleSize int) []*peer {
 	n.stateLock.RLock()
-	peers, err := n.peers.sample(subnetID, validatorOnly, int(n.config.GossipOnAcceptSize))
+	peers, err := n.peers.sample(subnetID, validatorOnly, sampleSize)
 	n.stateLock.RUnlock()
 	if err != nil {
 		return nil
 	}
-	return [][]*peer{peers}
+	return peers
 }
 
 // Assumes [n.stateLock] is not held.
@@ -469,7 +462,7 @@ func (n *network) Gossip(
 		return false
 	}
 
-	var peersLists [][]*peer
+	var peersLists []*peer
 	switch msg.Op() {
 	case message.AppGossip:
 		if nodeIDs.Len() == 0 {
@@ -480,12 +473,11 @@ func (n *network) Gossip(
 			}
 		} else {
 			// nodes to gossip already selected. Retrieve peers
-			peers := n.getSubnetPeers(nodeIDs, subnetID, validatorOnly)
-			peersLists = [][]*peer{peers}
+			peersLists = n.getSubnetPeers(nodeIDs, subnetID, validatorOnly)
 		}
 
 	case message.Put:
-		peersLists = n.selectPeersForContainerGossip(subnetID, validatorOnly)
+		peersLists = n.selectPeersForContainerGossip(subnetID, validatorOnly, int(n.config.GossipAcceptedFrontierSize))
 		if peersLists == nil {
 			return false
 		}
@@ -518,7 +510,7 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 	}
 
-	peersLists := n.selectPeersForContainerGossip(ctx.SubnetID, ctx.IsValidatorOnly())
+	peersLists := n.selectPeersForContainerGossip(ctx.SubnetID, ctx.IsValidatorOnly(), int(n.config.GossipOnAcceptSize))
 	if peersLists == nil {
 		// TODO ABENEGIA: find a better way to handle the error
 		return fmt.Errorf("could not sample peers")
