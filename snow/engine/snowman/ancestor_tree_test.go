@@ -17,8 +17,8 @@ func TestAdd(t *testing.T) {
 		"should return false if not found": {
 			method: func(assert *assert.Assertions, at AncestorTree) {
 				id1 := ids.GenerateTestID()
-				_, ok := at.GetRoot(id1)
-				assert.False(ok)
+				id := at.GetRoot(id1)
+				assert.Equal(id1, id)
 			},
 		},
 		"should add to tree and return id2 root": {
@@ -27,8 +27,7 @@ func TestAdd(t *testing.T) {
 				id2 := ids.GenerateTestID()
 				at.Add(id1, id2)
 				assert.True(at.Has(id1))
-				result, ok := at.GetRoot(id1)
-				assert.True(ok)
+				result := at.GetRoot(id1)
 				assert.Equal(result, id2)
 			},
 		},
@@ -40,8 +39,7 @@ func TestAdd(t *testing.T) {
 				at.Add(id1, id2)
 				at.Add(id2, id3)
 				assert.True(at.Has(id2))
-				result, ok := at.GetRoot(id1)
-				assert.True(ok)
+				result := at.GetRoot(id1)
 				assert.Equal(result, id3)
 			},
 		},
@@ -54,8 +52,7 @@ func TestAdd(t *testing.T) {
 				at.Add(id1, id2)
 				at.Add(id2, id3)
 				at.Add(id4, id2)
-				result, ok := at.GetRoot(id4)
-				assert.True(ok)
+				result := at.GetRoot(id4)
 				assert.Equal(result, id3)
 			},
 		},
@@ -84,11 +81,9 @@ func TestRemove(t *testing.T) {
 				assert.True(at.Has(id1))
 				assert.True(at.Has(id2))
 				assert.False(at.Has(id3))
-				id, ok := at.GetRoot(id2)
-				assert.True(ok)
+				id := at.GetRoot(id2)
 				assert.Equal(id3, id)
-				id, ok = at.GetRoot(id1)
-				assert.True(ok)
+				id = at.GetRoot(id1)
 				assert.Equal(id3, id)
 			},
 		},
@@ -101,12 +96,10 @@ func TestRemove(t *testing.T) {
 				at.Add(id1, id2)
 				at.Add(id2, id3)
 				at.Add(id3, id4)
-				id, ok := at.GetRoot(id1)
-				assert.True(ok)
+				id := at.GetRoot(id1)
 				assert.Equal(id4, id)
 				at.Remove(id3)
-				id, ok = at.GetRoot(id1)
-				assert.True(ok)
+				id = at.GetRoot(id1)
 				assert.Equal(id3, id)
 			},
 		},
@@ -135,10 +128,10 @@ func TestRemoveSubtree(t *testing.T) {
 				assert.False(at.Has(id1))
 				assert.False(at.Has(id2))
 				assert.False(at.Has(id3))
-				_, ok := at.GetRoot(id2)
-				assert.False(ok)
-				_, ok = at.GetRoot(id1)
-				assert.False(ok)
+				id := at.GetRoot(id2)
+				assert.Equal(id2, id)
+				id = at.GetRoot(id1)
+				assert.Equal(id1, id)
 			},
 		},
 		"remove subtree": {
@@ -156,11 +149,10 @@ func TestRemoveSubtree(t *testing.T) {
 				assert.False(at.Has(id1))
 				assert.False(at.Has(id2))
 				assert.False(at.Has(id3))
-				_, ok := at.GetRoot(id1)
-				assert.False(ok)
+				id := at.GetRoot(id1)
+				assert.Equal(id, id1)
 				assert.True(at.Has(id4))
-				id, ok := at.GetRoot(id4)
-				assert.True(ok)
+				id = at.GetRoot(id4)
 				assert.Equal(id5, id)
 			},
 		},

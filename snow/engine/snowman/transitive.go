@@ -720,7 +720,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	}
 	t.nonVerifieds.Remove(blkID)
 	t.Ctx.Log.Verbo("adding block to consensus: %s", blkID)
-	wrappedBlk := &MemoryBlock{
+	wrappedBlk := &memoryBlock{
 		Block: blk,
 		tree:  t.nonVerifieds,
 	}
@@ -746,7 +746,11 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 					dropped = append(dropped, blk)
 				} else {
 					t.nonVerifieds.Remove(blk.ID())
-					if err := t.Consensus.Add(blk); err != nil {
+					wrappedBlk := &memoryBlock{
+						Block: blk,
+						tree:  t.nonVerifieds,
+					}
+					if err := t.Consensus.Add(wrappedBlk); err != nil {
 						return err
 					}
 					added = append(added, blk)

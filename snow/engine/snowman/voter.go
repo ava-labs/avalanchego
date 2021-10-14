@@ -5,7 +5,6 @@ package snowman
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
 // Voter records chits received from [vdr] once its dependencies are met.
@@ -90,7 +89,9 @@ func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
 votesLoop:
 	for _, vote := range votes.List() {
 		count := votes.Count(vote)
-		blk, err := v.getBlockOrParent(vote)
+		// use rootID in case of this is a non-verified block ID
+		rootID := v.t.nonVerifieds.GetRoot(vote)
+		blk, err := v.t.GetBlock(rootID)
 		// If we cannot retrieve the block, drop [vote]
 		if err != nil {
 			v.t.Ctx.Log.Debug("Dropping %d vote(s) for %s because the block or parent blocks couldn't be fetched",
@@ -129,20 +130,4 @@ votesLoop:
 		}
 	}
 	return bubbledVotes
-}
-
-// tries to retrieve a block with given blkID or it's root ID in nonverified block tree.
-func (v *voter) getBlockOrParent(blkID ids.ID) (snowman.Block, error) {
-	blk, err := v.t.GetBlock(blkID)
-	if err == nil {
-		return blk, err
-	}
-	// try with root
-	ancestorID, ok := v.t.nonVerifieds.GetRoot(blkID)
-	if ok {
-		// we have found an ancestor, get the block
-		return v.t.GetBlock(ancestorID)
-	}
-	// use blk and err from previous GetBlock call
-	return blk, err
 }

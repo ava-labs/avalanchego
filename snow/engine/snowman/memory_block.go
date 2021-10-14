@@ -7,22 +7,21 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
-// BlockWrapper wraps a snowman Block while adding a smart caching layer to improve
-// VM performance.
-type MemoryBlock struct {
+// memoryBlock wraps a snowman Block to manage non-verified blocks
+type memoryBlock struct {
 	snowman.Block
 
 	tree AncestorTree
 }
 
 // Accept accepts the underlying block & removes sibling subtrees
-func (mb *MemoryBlock) Accept() error {
+func (mb *memoryBlock) Accept() error {
 	mb.tree.RemoveSubtree(mb.Parent())
 	return mb.Block.Accept()
 }
 
 // Reject rejects the underlying block & removes child subtrees
-func (mb *MemoryBlock) Reject() error {
+func (mb *memoryBlock) Reject() error {
 	mb.tree.RemoveSubtree(mb.ID())
 	return mb.Block.Reject()
 }
