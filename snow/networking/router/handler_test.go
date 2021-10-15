@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 func TestHandlerDropsTimedOutMessages(t *testing.T) {
@@ -41,9 +40,10 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	err := vdrs.AddWeight(vdr0, 1)
 	assert.NoError(t, err)
 	metrics := prometheus.NewRegistry()
-	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
 	assert.NoError(t, err)
 	err = handler.Initialize(
+		mc,
 		&engine,
 		vdrs,
 		nil,
@@ -60,15 +60,15 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	reqID := uint32(1)
 	deadline := uint64(1)
 	chainID := ids.ID{}
-	msg := msgCreator.InboundGetAcceptedFrontier(chainID, reqID, deadline, nodeID, dummyOnFinishedHandling)
-	handler.PushMsgWithDeadline(constants.GetAcceptedFrontierMsg, msg, ids.ShortID{}, reqID)
+	msg := mc.InboundGetAcceptedFrontier(chainID, reqID, deadline, nodeID, dummyOnFinishedHandling)
+	handler.PushMsgWithDeadline(msg, ids.ShortID{}, reqID)
 
 	currentTime := time.Now().Add(time.Second)
 	handler.clock.Set(currentTime)
 
 	reqID++
-	msg = msgCreator.InboundGetAccepted(chainID, reqID, deadline, nil, nodeID, dummyOnFinishedHandling)
-	handler.PushMsgWithDeadline(constants.GetAcceptedMsg, msg, ids.ShortID{}, reqID)
+	msg = mc.InboundGetAccepted(chainID, reqID, deadline, nil, nodeID, dummyOnFinishedHandling)
+	handler.PushMsgWithDeadline(msg, ids.ShortID{}, reqID)
 
 	go handler.Dispatch()
 
@@ -96,10 +96,11 @@ func TestHandlerClosesOnError(t *testing.T) {
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
 	metrics := prometheus.NewRegistry()
-	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
 	assert.NoError(t, err)
 	handler := &Handler{}
 	err = handler.Initialize(
+		mc,
 		&engine,
 		vdrs,
 		nil,
@@ -119,8 +120,8 @@ func TestHandlerClosesOnError(t *testing.T) {
 	dummyOnFinishedHandling := func() {}
 	reqID := uint32(1)
 	deadline := uint64(1)
-	msg := msgCreator.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID, dummyOnFinishedHandling)
-	handler.PushMsgWithDeadline(constants.GetAcceptedFrontierMsg, msg, ids.ShortID{}, reqID)
+	msg := mc.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID, dummyOnFinishedHandling)
+	handler.PushMsgWithDeadline(msg, ids.ShortID{}, reqID)
 
 	ticker := time.NewTicker(20 * time.Millisecond)
 	select {
@@ -147,13 +148,17 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
+	metrics := prometheus.NewRegistry()
+	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	assert.NoError(t, err)
 	handler := &Handler{}
 	err = handler.Initialize(
+		mc,
 		&engine,
 		vdrs,
 		nil,
 		"",
-		prometheus.NewRegistry(),
+		metrics,
 	)
 	assert.NoError(t, err)
 
@@ -162,7 +167,12 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	go handler.Dispatch()
 
 	handler.Gossip()
-	handler.GetFailed(ids.ShortEmpty, 1)
+
+	nodeID := ids.ShortEmpty
+	chainID := ids.Empty
+	reqID := uint32(1)
+	inMsg := mc.InternalGetFailed(nodeID, chainID, reqID)
+	handler.PushMsgWithoutDeadline(inMsg, nodeID, reqID)
 
 	ticker := time.NewTicker(20 * time.Millisecond)
 	select {
@@ -188,7 +198,11 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
+	metrics := prometheus.NewRegistry()
+	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	assert.NoError(t, err)
 	err = handler.Initialize(
+		mc,
 		&engine,
 		vdrs,
 		msgFromVMChan,

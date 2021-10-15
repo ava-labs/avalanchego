@@ -8,16 +8,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 type messageWrap struct {
-	messageType  constants.MsgType // Must always be set
-	inMsg        message.InboundMessage
-	notification common.Message
-
-	nodeID    ids.ShortID // Must always be set
+	inMsg     message.InboundMessage // Must always be set
+	nodeID    ids.ShortID            // Must always be set
 	requestID uint32
 	received  time.Time // Time this message was received
 	deadline  time.Time // Time this message must be responded to
@@ -33,5 +29,5 @@ func (m messageWrap) doneHandling() {
 // periodic basis.
 func (m messageWrap) IsPeriodic() bool {
 	return m.requestID == constants.GossipMsgRequestID ||
-		m.messageType == constants.GossipMsg
+		m.inMsg.Op() == message.GossipRequest
 }

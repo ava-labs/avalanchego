@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -25,6 +24,7 @@ type Router interface {
 	Initialize(
 		nodeID ids.ShortID,
 		log logging.Logger,
+		msgCreator message.Creator,
 		timeouts *timeout.Manager,
 		gossipFrequency,
 		shutdownTimeout time.Duration,
@@ -48,21 +48,13 @@ type ExternalRouter interface {
 		nodeID ids.ShortID,
 		chainID ids.ID,
 		requestID uint32,
-		msgType constants.MsgType,
+		msgType message.Op,
 	)
 }
 
 // InternalRouter deals with messages internal to this node
 type InternalRouter interface {
 	benchlist.Benchable
-
-	GetAcceptedFrontierFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
-	GetAcceptedFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
-	GetFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
-	GetAncestorsFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
-	QueryFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
-
-	AppRequestFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
 
 	Connected(nodeID ids.ShortID)
 	Disconnected(nodeID ids.ShortID)

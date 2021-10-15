@@ -45,6 +45,14 @@ type InboundMsgBuilder interface {
 		onFinishedHandling func(),
 	) InboundMessage
 
+	InboundMultiPut(
+		chainID ids.ID,
+		requestID uint32,
+		containers [][]byte,
+		nodeID ids.ShortID,
+		onFinishedHandling func(),
+	) InboundMessage // used in UTs only
+
 	InboundPushQuery(
 		chainID ids.ID,
 		requestID uint32,
@@ -89,19 +97,20 @@ type InboundMsgBuilder interface {
 		onFinishedHandling func(),
 	) InboundMessage
 
+	InboundGet(
+		chainID ids.ID,
+		requestID uint32,
+		deadline uint64,
+		containerID ids.ID,
+		nodeID ids.ShortID,
+		onFinishedHandling func(),
+	) InboundMessage
+
 	InboundPut(
 		chainID ids.ID,
 		requestID uint32,
 		containerID ids.ID,
 		container []byte,
-		nodeID ids.ShortID,
-		onFinishedHandling func(),
-	) InboundMessage // used in UTs only
-
-	InboundMultiPut(
-		chainID ids.ID,
-		requestID uint32,
-		containers [][]byte,
 		nodeID ids.ShortID,
 		onFinishedHandling func(),
 	) InboundMessage // used in UTs only
@@ -292,6 +301,27 @@ func (b *inMsgBuilder) InboundAppResponse(
 			ChainID:          chainID[:],
 			RequestID:        requestID,
 			AppResponseBytes: msg,
+		},
+		nodeID:             nodeID,
+		onFinishedHandling: onFinishedHandling,
+	}
+}
+
+func (b *inMsgBuilder) InboundGet(
+	chainID ids.ID,
+	requestID uint32,
+	deadline uint64,
+	containerID ids.ID,
+	nodeID ids.ShortID,
+	onFinishedHandling func(),
+) InboundMessage { // used in UTs only
+	return &inboundMessage{
+		op: Put,
+		fields: map[Field]interface{}{
+			ChainID:     chainID[:],
+			RequestID:   requestID,
+			Deadline:    deadline,
+			ContainerID: containerID[:],
 		},
 		nodeID:             nodeID,
 		onFinishedHandling: onFinishedHandling,

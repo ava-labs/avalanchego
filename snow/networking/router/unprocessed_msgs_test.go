@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
@@ -26,9 +26,19 @@ func TestUnprocessedMsgs(t *testing.T) {
 	uIntf, err := newUnprocessedMsgs(logging.NoLog{}, vdrs, cpuTracker, "", prometheus.NewRegistry())
 	assert.NoError(err)
 	u := uIntf.(*unprocessedMsgsImpl)
+
+	mc, err := message.NewCreator(prometheus.NewRegistry(), true /*compressionEnabled*/, "dummyNamespace")
+	assert.NoError(err)
+	inPutMsg := mc.InboundPut(ids.Empty,
+		0,
+		ids.GenerateTestID(),
+		nil,
+		vdr1ID,
+		dummyOnFinishedHandling)
+
 	msg1 := messageWrap{
-		messageType: constants.PutMsg,
-		nodeID:      vdr1ID,
+		inMsg:  inPutMsg,
+		nodeID: vdr1ID,
 	}
 
 	// Push then pop should work regardless of utilization when there are
@@ -74,9 +84,10 @@ func TestUnprocessedMsgs(t *testing.T) {
 	assert.EqualValues(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	assert.EqualValues(1, u.Len())
 
+	inGetMsg := mc.InboundGet(ids.Empty, 0, 0, ids.Empty, ids.ShortEmpty, dummyOnFinishedHandling)
 	msg2 := messageWrap{
-		messageType: constants.GetMsg,
-		nodeID:      vdr2ID,
+		inMsg:  inGetMsg,
+		nodeID: vdr2ID,
 	}
 	// Push msg2 from vdr2ID
 	u.Push(msg2)
@@ -97,13 +108,16 @@ func TestUnprocessedMsgs(t *testing.T) {
 	// u is now empty
 	// Non-validators should be able to put messages onto [u]
 	nonVdrNodeID1, nonVdrNodeID2 := ids.GenerateTestShortID(), ids.GenerateTestShortID()
+	inPullQueryMsg := mc.InboundPullQuery(ids.Empty, 0, 0, ids.Empty, nonVdrNodeID1, dummyOnFinishedHandling)
 	msg3 := messageWrap{
-		messageType: constants.PullQueryMsg,
-		nodeID:      nonVdrNodeID1,
+		inMsg:  inPullQueryMsg,
+		nodeID: nonVdrNodeID1,
 	}
+
+	inPushQueryMsg := mc.InboundPushQuery(ids.Empty, 0, 0, ids.Empty, nil, nonVdrNodeID2, dummyOnFinishedHandling)
 	msg4 := messageWrap{
-		messageType: constants.PushQueryMsg,
-		nodeID:      nonVdrNodeID2,
+		inMsg:  inPushQueryMsg,
+		nodeID: nonVdrNodeID2,
 	}
 	u.Push(msg3)
 	u.Push(msg4)

@@ -73,17 +73,17 @@ func TestTimeout(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	metrics := prometheus.NewRegistry()
+	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	context := snow.DefaultContextTest()
-	metrics := prometheus.NewRegistry()
-	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
-	assert.NoError(t, err)
 	externalSender := &ExternalSenderTest{T: t}
 	externalSender.Default(false)
 	sender := Sender{}
-	err = sender.Initialize(context, msgCreator, externalSender, &chainRouter, &tm, "", metrics)
+	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, "", metrics)
 	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}
@@ -104,6 +104,7 @@ func TestTimeout(t *testing.T) {
 
 	handler := router.Handler{}
 	err = handler.Initialize(
+		mc,
 		&engine,
 		vdrs,
 		nil,
@@ -153,18 +154,19 @@ func TestReliableMessages(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second,
+	metrics := prometheus.NewRegistry()
+	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Hour, time.Second,
 		ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	context := snow.DefaultContextTest()
-	metrics := prometheus.NewRegistry()
-	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
-	assert.NoError(t, err)
+
 	externalSender := &ExternalSenderTest{T: t}
 	externalSender.Default(false)
 	sender := Sender{}
-	err = sender.Initialize(context, msgCreator, externalSender, &chainRouter, &tm, "", metrics)
+	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, "", metrics)
 	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}
@@ -187,6 +189,7 @@ func TestReliableMessages(t *testing.T) {
 
 	handler := router.Handler{}
 	err = handler.Initialize(
+		mc,
 		&engine,
 		vdrs,
 		nil,
@@ -245,17 +248,18 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	metrics := prometheus.NewRegistry()
+	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	context := snow.DefaultContextTest()
-	metrics := prometheus.NewRegistry()
-	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
-	assert.NoError(t, err)
+
 	sender := Sender{}
 	externalSender := &ExternalSenderTest{T: t}
 	externalSender.Default(false)
-	err = sender.Initialize(context, msgCreator, externalSender, &chainRouter, &tm, "", metrics)
+	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, "", metrics)
 	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}
@@ -278,6 +282,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 
 	handler := router.Handler{}
 	err = handler.Initialize(
+		mc,
 		&engine,
 		vdrs,
 		nil,

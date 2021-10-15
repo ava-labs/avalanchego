@@ -11,8 +11,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -79,7 +79,7 @@ func (m *metrics) RegisterChain(ctx *snow.Context, namespace string) error {
 }
 
 // Record that a response to a message of type [msgType] regarding chain [chainID] took [latency]
-func (m *metrics) Observe(chainID ids.ID, msgType constants.MsgType, latency time.Duration) {
+func (m *metrics) Observe(chainID ids.ID, msgType message.Op, latency time.Duration) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -129,18 +129,18 @@ func newChainMetrics(ctx *snow.Context, namespace string, summaryEnabled bool) (
 	}, errs.Err
 }
 
-func (cm *chainMetrics) observe(validatorID ids.ShortID, msgType constants.MsgType, latency time.Duration) {
+func (cm *chainMetrics) observe(validatorID ids.ShortID, msgType message.Op, latency time.Duration) {
 	lat := float64(latency)
 	switch msgType {
-	case constants.GetAcceptedFrontierMsg:
+	case message.GetAcceptedFrontier:
 		cm.getAcceptedFrontier.Observe(lat)
-	case constants.GetAcceptedMsg:
+	case message.GetAccepted:
 		cm.getAccepted.Observe(lat)
-	case constants.GetMsg:
+	case message.Get:
 		cm.get.Observe(lat)
-	case constants.PushQueryMsg:
+	case message.PushQuery:
 		cm.pushQuery.Observe(lat)
-	case constants.PullQueryMsg:
+	case message.PullQuery:
 		cm.pullQuery.Observe(lat)
 	}
 
@@ -156,15 +156,15 @@ func (cm *chainMetrics) observe(validatorID ids.ShortID, msgType constants.MsgTy
 		err      error
 	)
 	switch msgType {
-	case constants.GetAcceptedFrontierMsg:
+	case message.GetAcceptedFrontier:
 		observer, err = cm.getAcceptedFrontierSummary.GetMetricWith(labels)
-	case constants.GetAcceptedMsg:
+	case message.GetAccepted:
 		observer, err = cm.getAcceptedSummary.GetMetricWith(labels)
-	case constants.GetMsg:
+	case message.Get:
 		observer, err = cm.getSummary.GetMetricWith(labels)
-	case constants.PushQueryMsg:
+	case message.PushQuery:
 		observer, err = cm.pushQuerySummary.GetMetricWith(labels)
-	case constants.PullQueryMsg:
+	case message.PullQuery:
 		observer, err = cm.pullQuerySummary.GetMetricWith(labels)
 	default:
 		return

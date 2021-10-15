@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -64,7 +64,7 @@ func (m *Manager) RegisterChain(ctx *snow.Context, namespace string) error {
 func (m *Manager) RegisterRequest(
 	validatorID ids.ShortID,
 	chainID ids.ID,
-	msgType constants.MsgType,
+	msgType message.Op,
 	uniqueRequestID ids.ID,
 	timeoutHandler func(),
 ) (time.Time, bool) {
@@ -82,7 +82,7 @@ func (m *Manager) RegisterResponse(
 	validatorID ids.ShortID,
 	chainID ids.ID,
 	uniqueRequestID ids.ID,
-	msgType constants.MsgType,
+	msgType message.Op,
 	latency time.Duration,
 ) {
 	m.metrics.Observe(chainID, msgType, latency)

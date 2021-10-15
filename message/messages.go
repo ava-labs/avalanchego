@@ -60,6 +60,7 @@ func (inMsg *inboundMessage) Get(field Field) interface{} { return inMsg.fields[
 func (inMsg *inboundMessage) NodeID() ids.ShortID { return inMsg.nodeID }
 
 // OnFinishedHandling is the function to be called once inboundMessage is complete
+// inMsg.onFinishedHandling() must be not-nil
 func (inMsg *inboundMessage) OnFinishedHandling() { inMsg.onFinishedHandling() }
 
 // Op returns the value of the specified operation in this message

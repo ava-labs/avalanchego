@@ -6,6 +6,8 @@ package message
 // Op is an opcode
 type Op byte
 
+const MaxOp Op = 255
+
 // Types of messages that may be sent between nodes
 // Note: If you add a new Op below, you must also add it to ops (declared below)
 const (
@@ -39,6 +41,22 @@ const (
 	AppGossip
 )
 
+// Failure messages, inbound only, created
+// to signal request timeout
+const (
+	GetAcceptedFrontierFailed Op = MaxOp
+	GetAcceptedFailed            = MaxOp - 1
+	GetFailed                    = MaxOp - 2
+	QueryFailed                  = MaxOp - 3
+	GetAncestorsFailed           = MaxOp - 4
+	AppRequestFailed             = MaxOp - 5
+	Timeout                      = MaxOp - 6
+	Connected                    = MaxOp - 7
+	Disconnected                 = MaxOp - 8
+	Notify                       = MaxOp - 9
+	GossipRequest                = MaxOp - 10
+)
+
 var (
 	// List of all message types
 	ops = []Op{
@@ -62,6 +80,18 @@ var (
 		AppRequest,
 		AppResponse,
 		AppGossip,
+
+		GetAcceptedFrontierFailed,
+		GetAcceptedFailed,
+		GetFailed,
+		QueryFailed,
+		GetAncestorsFailed,
+		AppRequestFailed,
+		Timeout,
+		Connected,
+		Disconnected,
+		Notify,
+		GossipRequest,
 	}
 
 	// Defines the messages that can be sent/received with this network
@@ -144,6 +174,29 @@ func (op Op) String() string {
 		return "app_response"
 	case AppGossip:
 		return "app_gossip"
+
+	case GetAcceptedFrontierFailed:
+		return "get_accepted_frontier_falied"
+	case GetAcceptedFailed:
+		return "get_accepted_failed"
+	case GetFailed:
+		return "get_failed"
+	case QueryFailed:
+		return "query_failed"
+	case GetAncestorsFailed:
+		return "get_ancestors_failed"
+	case AppRequestFailed:
+		return "app_request_failed"
+	case Timeout:
+		return "timeout"
+	case Connected:
+		return "connected"
+	case Disconnected:
+		return "disconnected"
+	case Notify:
+		return "notify"
+	case GossipRequest:
+		return "gossip_request"
 	default:
 		return "Unknown Op"
 	}

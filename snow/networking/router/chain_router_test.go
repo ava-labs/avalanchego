@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
@@ -49,7 +48,11 @@ func TestShutdown(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	metrics := prometheus.NewRegistry()
+	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	assert.NoError(t, err)
+
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Hour, time.Second, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}
@@ -62,6 +65,7 @@ func TestShutdown(t *testing.T) {
 
 	handler := &Handler{}
 	err = handler.Initialize(
+		mc,
 		&engine,
 		vdrs,
 		nil,
@@ -97,6 +101,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	assert.NoError(t, err)
 	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
+	metrics := prometheus.NewRegistry()
 	// Ensure that the MultiPut request does not timeout
 	err = tm.Initialize(
 		&timer.AdaptiveTimeoutConfig{
@@ -108,7 +113,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		},
 		benchlist,
 		"",
-		prometheus.NewRegistry(),
+		metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -116,7 +121,22 @@ func TestShutdownTimesOut(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+
+	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	assert.NoError(t, err)
+
+	err = chainRouter.Initialize(ids.ShortEmpty,
+		logging.NoLog{},
+		mc,
+		&tm,
+		time.Hour,
+		time.Millisecond,
+		ids.Set{},
+		nil,
+		HealthConfig{},
+		"",
+		metrics,
+	)
 	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}
@@ -138,11 +158,12 @@ func TestShutdownTimesOut(t *testing.T) {
 
 	handler := &Handler{}
 	err = handler.Initialize(
+		mc,
 		&engine,
 		vdrs,
 		nil,
 		"",
-		prometheus.NewRegistry(),
+		metrics,
 	)
 	assert.NoError(t, err)
 
@@ -153,11 +174,9 @@ func TestShutdownTimesOut(t *testing.T) {
 	shutdownFinished := make(chan struct{}, 1)
 
 	go func() {
-		mc, err := message.NewCreator(prometheus.NewRegistry(), true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
-		assert.NoError(t, err)
 		chainID := ids.ID{}
 		msg := mc.InboundMultiPut(chainID, 1, nil, nodeID, dummyOnFinishedHandling)
-		handler.PushMsgWithoutDeadline(constants.MultiPutMsg, msg, ids.ShortID{}, 1)
+		handler.PushMsgWithoutDeadline(msg, ids.ShortID{}, 1)
 
 		time.Sleep(50 * time.Millisecond) // Pause to ensure message gets processed
 
@@ -196,7 +215,11 @@ func TestRouterTimeout(t *testing.T) {
 
 	// Create a router
 	chainRouter := ChainRouter{}
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	metrics := prometheus.NewRegistry()
+	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	assert.NoError(t, err)
+
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Hour, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	// Create an engine and handler
@@ -244,6 +267,7 @@ func TestRouterTimeout(t *testing.T) {
 	err = vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
 	err = handler.Initialize(
+		mc,
 		&engine,
 		vdrs,
 		nil,
@@ -256,13 +280,13 @@ func TestRouterTimeout(t *testing.T) {
 	go handler.Dispatch()
 
 	// Register requests for each request type
-	msgs := []constants.MsgType{
-		constants.GetMsg,
-		constants.GetAncestorsMsg,
-		constants.PullQueryMsg,
-		constants.PushQueryMsg,
-		constants.GetAcceptedMsg,
-		constants.GetAcceptedFrontierMsg,
+	msgs := []message.Op{
+		message.Get,
+		message.GetAncestors,
+		message.PullQuery,
+		message.PushQuery,
+		message.GetAccepted,
+		message.GetAcceptedFrontier,
 	}
 
 	wg.Add(len(msgs))
@@ -299,7 +323,12 @@ func TestRouterClearTimeouts(t *testing.T) {
 
 	// Create a router
 	chainRouter := ChainRouter{}
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	metrics := prometheus.NewRegistry()
+	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	assert.NoError(t, err)
+
+	assert.NoError(t, err)
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Hour, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	// Create an engine and handler
@@ -313,11 +342,12 @@ func TestRouterClearTimeouts(t *testing.T) {
 	assert.NoError(t, err)
 	handler := &Handler{}
 	err = handler.Initialize(
+		mc,
 		&engine,
 		vdrs,
 		nil,
 		"",
-		prometheus.NewRegistry(),
+		metrics,
 	)
 	assert.NoError(t, err)
 
@@ -325,20 +355,13 @@ func TestRouterClearTimeouts(t *testing.T) {
 	go handler.Dispatch()
 
 	// Register requests for each request type
-	msgs := []constants.MsgType{
-		constants.GetMsg,
-		constants.GetAncestorsMsg,
-		constants.PullQueryMsg,
-		constants.PushQueryMsg,
-		constants.GetAcceptedMsg,
-		constants.GetAcceptedFrontierMsg,
-	}
-
-	// create messages builder
-	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true /*compress*/, "dummyNamespace" /*parentNamespace*/)
-	if err != nil {
-		panic(err)
+	msgs := []message.Op{
+		message.Get,
+		message.GetAncestors,
+		message.PullQuery,
+		message.PushQuery,
+		message.GetAccepted,
+		message.GetAcceptedFrontier,
 	}
 
 	vID := ids.GenerateTestShortID()
@@ -400,7 +423,11 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 
 	// Create a router
 	chainRouter := ChainRouter{}
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	metrics := prometheus.NewRegistry()
+	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	assert.NoError(t, err)
+
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Hour, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	// Create an engine and handler
@@ -424,12 +451,12 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	}
 
 	handler := &Handler{}
-	metrics := prometheus.NewRegistry()
 	vdrs := validators.NewSet()
 	vID := ids.GenerateTestShortID()
 	err = vdrs.AddWeight(vID, 1)
 	assert.NoError(t, err)
 	err = handler.Initialize(
+		mc,
 		&engine,
 		vdrs,
 		nil,
@@ -440,10 +467,6 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 
 	chainRouter.AddChain(handler)
 	go handler.Dispatch()
-
-	// create messages builder
-	mc, err := message.NewCreator(metrics, true /*compress*/, "dummyNamespace" /*parentNamespace*/)
-	assert.NoError(t, err)
 
 	// generate a non-validator ID
 	nID := ids.GenerateTestShortID()
@@ -477,7 +500,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 
 	// register a validator request
 	reqID := uint32(3)
-	chainRouter.RegisterRequest(vID, handler.ctx.ChainID, reqID, constants.GetMsg)
+	chainRouter.RegisterRequest(vID, handler.ctx.ChainID, reqID, message.Get)
 	assert.Equal(t, 1, chainRouter.timedRequests.Len())
 
 	// remove it from validators

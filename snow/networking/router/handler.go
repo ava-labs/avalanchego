@@ -28,6 +28,7 @@ type Handler struct {
 	ctx *snow.Context
 	// Useful for faking time in tests
 	clock   timer.Clock
+	mc      message.Creator
 	metrics handlerMetrics
 	// The validator set that validates this chain
 	validators validators.Set
@@ -52,6 +53,7 @@ type Handler struct {
 // Initialize this consensus handler
 // [engine] must be initialized before initializing this handler
 func (h *Handler) Initialize(
+	mc message.Creator,
 	engine common.Engine,
 	validators validators.Set,
 	msgFromVMChan <-chan common.Message,
@@ -62,6 +64,7 @@ func (h *Handler) Initialize(
 	if err := h.metrics.Initialize(metricsNamespace, metricsRegisterer); err != nil {
 		return fmt.Errorf("initializing handler metrics errored with: %s", err)
 	}
+	h.mc = mc
 	h.closed = make(chan struct{})
 	h.msgFromVMChan = msgFromVMChan
 	h.engine = engine
@@ -131,45 +134,47 @@ func (h *Handler) Dispatch() {
 }
 
 // Dispatch a message to the consensus engine.
-func (h *Handler) handleMsg(msg messageWrap) error {
+func (h *Handler) handleMsg(wrp messageWrap) error {
 	startTime := h.clock.Time()
 
-	isPeriodic := msg.IsPeriodic()
+	isPeriodic := wrp.IsPeriodic()
 	if isPeriodic {
-		h.ctx.Log.Verbo("Forwarding message to consensus: %s", msg)
+		h.ctx.Log.Verbo("Forwarding message to consensus: %s", wrp)
 	} else {
-		h.ctx.Log.Debug("Forwarding message to consensus: %s", msg)
+		h.ctx.Log.Debug("Forwarding message to consensus: %s", wrp)
 	}
 
 	h.ctx.Lock.Lock()
 	defer h.ctx.Lock.Unlock()
 
 	var err error
-	switch msg.messageType {
-	case constants.NotifyMsg:
-		err = h.engine.Notify(msg.notification)
+	msgType := wrp.inMsg.Op()
+	switch msgType {
+	case message.Notify:
+		vmMsg := wrp.inMsg.Get(message.VMMessage).(uint32)
+		err = h.engine.Notify(common.Message(vmMsg))
 		h.metrics.notify.Observe(float64(h.clock.Time().Sub(startTime)))
-	case constants.GossipMsg:
+	case message.GossipRequest:
 		err = h.engine.Gossip()
 		h.metrics.gossip.Observe(float64(h.clock.Time().Sub(startTime)))
-	case constants.TimeoutMsg:
+	case message.Timeout:
 		err = h.engine.Timeout()
 		h.metrics.timeout.Observe(float64(h.clock.Time().Sub(startTime)))
 	default:
-		err = h.handleConsensusMsg(msg)
+		err = h.handleConsensusMsg(wrp)
 		endTime := h.clock.Time()
 		handleDuration := endTime.Sub(startTime)
-		histogram := h.metrics.getMSGHistogram(msg.messageType)
+		histogram := h.metrics.getMSGHistogram(wrp.inMsg.Op())
 		histogram.Observe(float64(handleDuration))
-		h.cpuTracker.UtilizeTime(msg.nodeID, startTime, endTime)
+		h.cpuTracker.UtilizeTime(wrp.nodeID, startTime, endTime)
 	}
 
-	msg.doneHandling()
+	wrp.doneHandling()
 
 	if isPeriodic {
-		h.ctx.Log.Verbo("Finished handling message: %s", msg.messageType)
+		h.ctx.Log.Verbo("Finished handling message: %s", msgType)
 	} else {
-		h.ctx.Log.Debug("Finished handling message: %s", msg.messageType)
+		h.ctx.Log.Debug("Finished handling message: %s", msgType)
 	}
 	return err
 }
@@ -178,11 +183,11 @@ func (h *Handler) handleMsg(msg messageWrap) error {
 // Relevant fields in msgs must be validated before being dispatched to the engine.
 // An invalid msg is logged and dropped silently since err would cause a chain shutdown.
 func (h *Handler) handleConsensusMsg(wrp messageWrap) error {
-	switch wrp.messageType {
-	case constants.GetAcceptedFrontierMsg:
+	switch wrp.inMsg.Op() {
+	case message.GetAcceptedFrontier:
 		return h.engine.GetAcceptedFrontier(wrp.nodeID, wrp.requestID)
 
-	case constants.AcceptedFrontierMsg:
+	case message.AcceptedFrontier:
 		containerIDs, err := message.DecodeContainerIDs(wrp.inMsg)
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
@@ -191,10 +196,10 @@ func (h *Handler) handleConsensusMsg(wrp messageWrap) error {
 		}
 		return h.engine.AcceptedFrontier(wrp.nodeID, wrp.requestID, containerIDs)
 
-	case constants.GetAcceptedFrontierFailedMsg:
+	case message.GetAcceptedFrontierFailed:
 		return h.engine.GetAcceptedFrontierFailed(wrp.nodeID, wrp.requestID)
 
-	case constants.GetAcceptedMsg:
+	case message.GetAccepted:
 		containerIDs, err := message.DecodeContainerIDs(wrp.inMsg)
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
@@ -203,7 +208,7 @@ func (h *Handler) handleConsensusMsg(wrp messageWrap) error {
 		}
 		return h.engine.GetAccepted(wrp.nodeID, wrp.requestID, containerIDs)
 
-	case constants.AcceptedMsg:
+	case message.Accepted:
 		containerIDs, err := message.DecodeContainerIDs(wrp.inMsg)
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
@@ -212,10 +217,10 @@ func (h *Handler) handleConsensusMsg(wrp messageWrap) error {
 		}
 		return h.engine.Accepted(wrp.nodeID, wrp.requestID, containerIDs)
 
-	case constants.GetAcceptedFailedMsg:
+	case message.GetAcceptedFailed:
 		return h.engine.GetAcceptedFailed(wrp.nodeID, wrp.requestID)
 
-	case constants.GetAncestorsMsg:
+	case message.GetAncestors:
 		containerID, err := ids.ToID(wrp.inMsg.Get(message.ContainerID).([]byte))
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
@@ -223,10 +228,10 @@ func (h *Handler) handleConsensusMsg(wrp messageWrap) error {
 			return nil
 		}
 		return h.engine.GetAncestors(wrp.nodeID, wrp.requestID, containerID)
-	case constants.GetAncestorsFailedMsg:
+	case message.GetAncestorsFailed:
 		return h.engine.GetAncestorsFailed(wrp.nodeID, wrp.requestID)
 
-	case constants.MultiPutMsg:
+	case message.MultiPut:
 		containers, ok := wrp.inMsg.Get(message.MultiContainerBytes).([][]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse MultiContainerBytes",
@@ -235,15 +240,15 @@ func (h *Handler) handleConsensusMsg(wrp messageWrap) error {
 		}
 		return h.engine.MultiPut(wrp.nodeID, wrp.requestID, containers)
 
-	case constants.GetMsg:
+	case message.Get:
 		containerID, err := ids.ToID(wrp.inMsg.Get(message.ContainerID).([]byte))
 		h.ctx.Log.AssertNoError(err)
 		return h.engine.Get(wrp.nodeID, wrp.requestID, containerID)
 
-	case constants.GetFailedMsg:
+	case message.GetFailed:
 		return h.engine.GetFailed(wrp.nodeID, wrp.requestID)
 
-	case constants.PutMsg:
+	case message.Put:
 		containerID, err := ids.ToID(wrp.inMsg.Get(message.ContainerID).([]byte))
 		h.ctx.Log.AssertNoError(err)
 		container, ok := wrp.inMsg.Get(message.ContainerBytes).([]byte)
@@ -254,7 +259,7 @@ func (h *Handler) handleConsensusMsg(wrp messageWrap) error {
 		}
 		return h.engine.Put(wrp.nodeID, wrp.requestID, containerID, container)
 
-	case constants.PushQueryMsg:
+	case message.PushQuery:
 		containerID, err := ids.ToID(wrp.inMsg.Get(message.ContainerID).([]byte))
 		h.ctx.Log.AssertNoError(err)
 		container, ok := wrp.inMsg.Get(message.ContainerBytes).([]byte)
@@ -265,15 +270,15 @@ func (h *Handler) handleConsensusMsg(wrp messageWrap) error {
 		}
 		return h.engine.PushQuery(wrp.nodeID, wrp.requestID, containerID, container)
 
-	case constants.PullQueryMsg:
+	case message.PullQuery:
 		containerID, err := ids.ToID(wrp.inMsg.Get(message.ContainerID).([]byte))
 		h.ctx.Log.AssertNoError(err)
 		return h.engine.PullQuery(wrp.nodeID, wrp.requestID, containerID)
 
-	case constants.QueryFailedMsg:
+	case message.QueryFailed:
 		return h.engine.QueryFailed(wrp.nodeID, wrp.requestID)
 
-	case constants.ChitsMsg:
+	case message.Chits:
 		votes, err := message.DecodeContainerIDs(wrp.inMsg)
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
@@ -282,13 +287,13 @@ func (h *Handler) handleConsensusMsg(wrp messageWrap) error {
 		}
 		return h.engine.Chits(wrp.nodeID, wrp.requestID, votes)
 
-	case constants.ConnectedMsg:
+	case message.Connected:
 		return h.engine.Connected(wrp.nodeID)
 
-	case constants.DisconnectedMsg:
+	case message.Disconnected:
 		return h.engine.Disconnected(wrp.nodeID)
 
-	case constants.AppRequestMsg:
+	case message.AppRequest:
 		appRequestBytes, ok := wrp.inMsg.Get(message.AppRequestBytes).([]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppRequestBytes",
@@ -297,7 +302,7 @@ func (h *Handler) handleConsensusMsg(wrp messageWrap) error {
 		}
 		return h.engine.AppRequest(wrp.nodeID, wrp.requestID, appRequestBytes)
 
-	case constants.AppResponseMsg:
+	case message.AppResponse:
 		appResponseBytes, ok := wrp.inMsg.Get(message.AppResponseBytes).([]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppResponseBytes",
@@ -306,7 +311,7 @@ func (h *Handler) handleConsensusMsg(wrp messageWrap) error {
 		}
 		return h.engine.AppResponse(wrp.nodeID, wrp.requestID, appResponseBytes)
 
-	case constants.AppGossipMsg:
+	case message.AppGossip:
 		appGossipBytes, ok := wrp.inMsg.Get(message.AppGossipBytes).([]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppGossipBytes",
@@ -322,7 +327,7 @@ func (h *Handler) handleConsensusMsg(wrp messageWrap) error {
 	}
 }
 
-func (h *Handler) PushMsgWithDeadline(msgType constants.MsgType,
+func (h *Handler) PushMsgWithDeadline(
 	inMsg message.InboundMessage,
 	nodeID ids.ShortID,
 	requestID uint32) {
@@ -330,108 +335,52 @@ func (h *Handler) PushMsgWithDeadline(msgType constants.MsgType,
 	deadline := received.Add(time.Duration(inMsg.Get(message.Deadline).(uint64)))
 
 	h.push(messageWrap{
-		messageType: msgType,
-		inMsg:       inMsg,
-		nodeID:      nodeID,
-		requestID:   requestID,
-		received:    received,
-		deadline:    deadline,
+		inMsg:     inMsg,
+		nodeID:    nodeID,
+		requestID: requestID,
+		received:  received,
+		deadline:  deadline,
 	})
 }
 
-func (h *Handler) PushMsgWithoutDeadline(msgType constants.MsgType,
+func (h *Handler) PushMsgWithoutDeadline(
 	inMsg message.InboundMessage,
 	nodeID ids.ShortID,
 	requestID uint32) {
 	received := h.clock.Time()
 
 	h.push(messageWrap{
-		messageType: msgType,
-		inMsg:       inMsg,
-		nodeID:      nodeID,
-		requestID:   requestID,
-		received:    received,
-	})
-}
-
-// GetAcceptedFrontierFailed passes a GetAcceptedFrontierFailed message received
-// from the network to the consensus engine.
-func (h *Handler) GetAcceptedFrontierFailed(nodeID ids.ShortID, requestID uint32) {
-	h.push(messageWrap{
-		messageType: constants.GetAcceptedFrontierFailedMsg,
-		nodeID:      nodeID,
-		requestID:   requestID,
-	})
-}
-
-// GetAcceptedFailed passes a GetAcceptedFailed message received from the
-// network to the consensus engine.
-func (h *Handler) GetAcceptedFailed(nodeID ids.ShortID, requestID uint32) {
-	h.push(messageWrap{
-		messageType: constants.GetAcceptedFailedMsg,
-		nodeID:      nodeID,
-		requestID:   requestID,
-	})
-}
-
-// GetAncestorsFailed passes a GetAncestorsFailed message to the consensus engine.
-func (h *Handler) GetAncestorsFailed(nodeID ids.ShortID, requestID uint32) {
-	h.push(messageWrap{
-		messageType: constants.GetAncestorsFailedMsg,
-		nodeID:      nodeID,
-		requestID:   requestID,
+		inMsg:     inMsg,
+		nodeID:    nodeID,
+		requestID: requestID,
+		received:  received,
 	})
 }
 
 // Timeout passes a new timeout notification to the consensus engine
 func (h *Handler) Timeout() {
+	inMsg := h.mc.InternalTimeout(h.ctx.NodeID)
 	h.push(messageWrap{
-		messageType: constants.TimeoutMsg,
-		nodeID:      h.ctx.NodeID,
-	})
-}
-
-// GetFailed passes a GetFailed message to the consensus engine.
-func (h *Handler) GetFailed(nodeID ids.ShortID, requestID uint32) {
-	h.push(messageWrap{
-		messageType: constants.GetFailedMsg,
-		nodeID:      nodeID,
-		requestID:   requestID,
-	})
-}
-
-// QueryFailed passes a QueryFailed message received from the network to the consensus engine.
-func (h *Handler) QueryFailed(nodeID ids.ShortID, requestID uint32) {
-	h.push(messageWrap{
-		messageType: constants.QueryFailedMsg,
-		nodeID:      nodeID,
-		requestID:   requestID,
-	})
-}
-
-// AppRequestFailed notifies the consensus engine that an application-level request failed
-// and it won't receive a response to the request.
-func (h *Handler) AppRequestFailed(nodeID ids.ShortID, requestID uint32) {
-	h.push(messageWrap{
-		messageType: constants.AppRequestFailedMsg,
-		nodeID:      nodeID,
-		requestID:   requestID,
+		inMsg:  inMsg,
+		nodeID: h.ctx.NodeID,
 	})
 }
 
 // Connected passes a new connection notification to the consensus engine
 func (h *Handler) Connected(nodeID ids.ShortID) {
+	inMsg := h.mc.InternalConnected(h.ctx.NodeID)
 	h.push(messageWrap{
-		messageType: constants.ConnectedMsg,
-		nodeID:      nodeID,
+		inMsg:  inMsg,
+		nodeID: nodeID,
 	})
 }
 
 // Disconnected passes a new connection notification to the consensus engine
 func (h *Handler) Disconnected(nodeID ids.ShortID) {
+	inMsg := h.mc.InternalDisconnected(h.ctx.NodeID)
 	h.push(messageWrap{
-		messageType: constants.DisconnectedMsg,
-		nodeID:      nodeID,
+		inMsg:  inMsg,
+		nodeID: nodeID,
 	})
 }
 
@@ -441,9 +390,11 @@ func (h *Handler) Gossip() {
 		// Shouldn't send gossiping messages while the chain is bootstrapping
 		return
 	}
+
+	inMsg := h.mc.InternalGossipRequest(h.ctx.NodeID)
 	h.push(messageWrap{
-		messageType: constants.GossipMsg,
-		nodeID:      h.ctx.NodeID,
+		inMsg:  inMsg,
+		nodeID: h.ctx.NodeID,
 	})
 }
 
@@ -494,10 +445,6 @@ func (h *Handler) push(msg messageWrap) {
 		// This should never happen
 		h.ctx.Log.Warn("message does not have node ID of sender. Message: %s", msg)
 	}
-	if msg.messageType == constants.NullMsg {
-		// This should never happen
-		h.ctx.Log.Warn("message has message type %s", constants.NullMsg)
-	}
 
 	h.unprocessedMsgsCond.L.Lock()
 	defer h.unprocessedMsgsCond.L.Unlock()
@@ -516,10 +463,10 @@ func (h *Handler) dispatchInternal() {
 				return
 			}
 			// handle a message from the VM
+			inMsg := h.mc.InternalVMMessage(h.ctx.NodeID, uint32(msg))
 			h.push(messageWrap{
-				messageType:  constants.NotifyMsg,
-				notification: msg,
-				nodeID:       h.ctx.NodeID,
+				inMsg:  inMsg,
+				nodeID: h.ctx.NodeID,
 			})
 		}
 	}

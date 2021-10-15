@@ -599,6 +599,7 @@ func (m *manager) createAvalancheChain(
 	}
 
 	err = handler.Initialize(
+		m.MsgCreator,
 		engine,
 		vdrs,
 		msgChan,
@@ -747,6 +748,7 @@ func (m *manager) createSnowmanChain(
 	}
 
 	err = handler.Initialize(
+		m.MsgCreator,
 		engine,
 		vdrs,
 		msgChan,

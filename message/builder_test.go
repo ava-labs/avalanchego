@@ -8,14 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/stretchr/testify/assert"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/version"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -54,7 +51,11 @@ func TestBuildVersion(t *testing.T) {
 	ip := utils.IPDesc{
 		IP: net.IPv4(1, 2, 3, 4),
 	}
-	myVersion := version.NewDefaultVersion(1, 2, 3).String()
+
+	// cannot use due to import cycle
+	// TODO ABENEGIA: fix it up
+	// myVersion := version.NewDefaultVersion(1, 2, 3).String()
+	myVersion := "v1.2.3"
 	myVersionTime := uint64(time.Now().Unix())
 	sig := make([]byte, 65)
 	subnetID := ids.Empty.Prefix(1)

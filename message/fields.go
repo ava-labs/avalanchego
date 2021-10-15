@@ -40,6 +40,7 @@ const (
 	AppRequestBytes                  // Used at application level
 	AppResponseBytes                 // Used at application level
 	AppGossipBytes                   // Used at application level
+	VMMessage                        // Used internally
 )
 
 // Packer returns the packer function that can be used to pack this field.
@@ -81,6 +82,8 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPackIPCertList
 	case TrackedSubnets:
 		return wrappers.TryPackHashes
+	case VMMessage:
+		return wrappers.TryPackInt
 	default:
 		return nil
 	}
@@ -125,6 +128,8 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackIPCertList
 	case TrackedSubnets:
 		return wrappers.TryUnpackHashes
+	case VMMessage:
+		return wrappers.TryUnpackInt
 	default:
 		return nil
 	}
@@ -172,6 +177,8 @@ func (f Field) String() string {
 		return "SignedPeers"
 	case TrackedSubnets:
 		return "TrackedSubnets"
+	case VMMessage:
+		return "VmMessage"
 	default:
 		return "Unknown Field"
 	}

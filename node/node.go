@@ -589,6 +589,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	err = n.Config.ConsensusRouter.Initialize(
 		n.ID,
 		n.Log,
+		n.msgCreator,
 		timeoutManager,
 		n.Config.ConsensusGossipFrequency,
 		n.Config.ConsensusShutdownTimeout,
@@ -1058,8 +1059,8 @@ func (n *Node) Initialize(
 		return fmt.Errorf("problem initializing shared memory: %w", err)
 	}
 
-	// message.Creator is shared between networking and the engine.
-	// It must be initiated before networking (initNetworking)
+	// message.Creator is shared between networking, chainManager and the engine.
+	// It must be initiated before networking (initNetworking), chain manager (initChainManager)
 	// and the engine (initChains) but after the metrics (initMetricsAPI)
 	// message.Creator currently record metrics under network namespace
 	n.networkNamespace = fmt.Sprintf("%s_network", constants.PlatformName)

@@ -8,7 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -90,53 +90,53 @@ func (m *handlerMetrics) Initialize(namespace string, reg prometheus.Registerer)
 	return errs.Err
 }
 
-func (m *handlerMetrics) getMSGHistogram(msg constants.MsgType) metric.Averager {
+func (m *handlerMetrics) getMSGHistogram(msg message.Op) metric.Averager {
 	switch msg {
-	case constants.GetAcceptedFrontierMsg:
+	case message.GetAcceptedFrontier:
 		return m.getAcceptedFrontier
-	case constants.AcceptedFrontierMsg:
+	case message.AcceptedFrontier:
 		return m.acceptedFrontier
-	case constants.GetAcceptedFrontierFailedMsg:
+	case message.GetAcceptedFrontierFailed:
 		return m.getAcceptedFrontierFailed
-	case constants.GetAcceptedMsg:
+	case message.GetAccepted:
 		return m.getAccepted
-	case constants.AcceptedMsg:
+	case message.Accepted:
 		return m.accepted
-	case constants.GetAcceptedFailedMsg:
+	case message.GetAcceptedFailed:
 		return m.getAcceptedFailed
-	case constants.GetAncestorsMsg:
+	case message.GetAncestors:
 		return m.getAncestors
-	case constants.GetAncestorsFailedMsg:
+	case message.GetAncestorsFailed:
 		return m.getAncestorsFailed
-	case constants.MultiPutMsg:
+	case message.MultiPut:
 		return m.multiPut
-	case constants.TimeoutMsg:
+	case message.Timeout:
 		return m.timeout
-	case constants.GetMsg:
+	case message.Get:
 		return m.get
-	case constants.GetFailedMsg:
+	case message.GetFailed:
 		return m.getFailed
-	case constants.PutMsg:
+	case message.Put:
 		return m.put
-	case constants.PushQueryMsg:
+	case message.PushQuery:
 		return m.pushQuery
-	case constants.PullQueryMsg:
+	case message.PullQuery:
 		return m.pullQuery
-	case constants.QueryFailedMsg:
+	case message.QueryFailed:
 		return m.queryFailed
-	case constants.ChitsMsg:
+	case message.Chits:
 		return m.chits
-	case constants.ConnectedMsg:
+	case message.Connected:
 		return m.connected
-	case constants.DisconnectedMsg:
+	case message.Disconnected:
 		return m.disconnected
-	case constants.AppRequestMsg:
+	case message.AppRequest:
 		return m.appRequest
-	case constants.AppResponseMsg:
+	case message.AppResponse:
 		return m.appResponse
-	case constants.AppGossipMsg:
+	case message.AppGossip:
 		return m.appGossip
-	case constants.AppRequestFailedMsg:
+	case message.AppRequestFailed:
 		return m.appRequestFailed
 	default:
 		panic(fmt.Sprintf("unknown message type %s", msg))

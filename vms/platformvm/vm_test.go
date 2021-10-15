@@ -2077,23 +2077,28 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	go timeoutManager.Dispatch()
 
 	chainRouter := &router.ChainRouter{}
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &timeoutManager, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	metrics := prometheus.NewRegistry()
+	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	assert.NoError(t, err)
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &timeoutManager, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	externalSender := &sender.ExternalSenderTest{T: t}
 	externalSender.Default(true)
 
 	// Passes messages from the consensus engine to the network
-	metrics := prometheus.NewRegistry()
-	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
-	assert.NoError(t, err)
 	sender := sender.Sender{}
-	err = sender.Initialize(ctx, msgCreator, externalSender, chainRouter, &timeoutManager, "", metrics)
+	err = sender.Initialize(ctx, mc, externalSender, chainRouter, &timeoutManager, "", metrics)
 	assert.NoError(t, err)
 
 	var reqID uint32
 	externalSender.MockSend(message.GetAcceptedFrontier,
-		func(T *testing.T, inMsg message.InboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) ids.ShortSet {
+		func(T *testing.T,
+			inMsg message.InboundMessage,
+			nodeIDs ids.ShortSet,
+			subnetID ids.ID,
+			validatorOnly bool,
+		) ids.ShortSet {
 			res := ids.NewShortSet(len(nodeIDs))
 			requestID, ok := inMsg.Get(message.RequestID).(uint32)
 			assert.True(t, ok)
@@ -2148,6 +2153,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}
 	err = handler.Initialize(
+		mc,
 		&engine,
 		vdrs,
 		msgChan,
@@ -2166,7 +2172,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	externalSender.ClearMockSend(message.GetAcceptedFrontier)
 	externalSender.MockSend(message.GetAccepted,
-		func(T *testing.T, inMsg message.InboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) ids.ShortSet {
+		func(T *testing.T,
+			inMsg message.InboundMessage,
+			nodeIDs ids.ShortSet,
+			subnetID ids.ID,
+			validatorOnly bool,
+		) ids.ShortSet {
 			res := ids.NewShortSet(len(nodeIDs))
 			requestID, ok := inMsg.Get(message.RequestID).(uint32)
 			assert.True(t, ok)
@@ -2182,7 +2193,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	externalSender.ClearMockSend(message.GetAccepted)
 	externalSender.MockSend(message.GetAncestors,
-		func(T *testing.T, inMsg message.InboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) ids.ShortSet {
+		func(T *testing.T,
+			inMsg message.InboundMessage,
+			nodeIDs ids.ShortSet,
+			subnetID ids.ID,
+			validatorOnly bool,
+		) ids.ShortSet {
 			res := ids.NewShortSet(len(nodeIDs))
 			requestID, ok := inMsg.Get(message.RequestID).(uint32)
 			assert.True(t, ok)

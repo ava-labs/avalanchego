@@ -38,7 +38,7 @@ type requestEntry struct {
 	// When this request was registered
 	time time.Time
 	// The type of request that was made
-	msgType constants.MsgType
+	msgType message.Op
 }
 
 // ChainRouter routes incoming messages from the validator network
@@ -46,10 +46,11 @@ type requestEntry struct {
 // Note that consensus engines are uniquely identified by the ID of the chain
 // that they are working on.
 type ChainRouter struct {
-	clock  timer.Clock
-	log    logging.Logger
-	lock   sync.Mutex
-	chains map[ids.ID]*Handler
+	clock      timer.Clock
+	log        logging.Logger
+	msgCreator message.Creator
+	lock       sync.Mutex
+	chains     map[ids.ID]*Handler
 
 	// It is only safe to call [RegisterResponse] with the router lock held. Any
 	// other calls to the timeout manager with the router lock held could cause
@@ -88,6 +89,7 @@ type ChainRouter struct {
 func (cr *ChainRouter) Initialize(
 	nodeID ids.ShortID,
 	log logging.Logger,
+	msgCreator message.Creator,
 	timeoutManager *timeout.Manager,
 	gossipFrequency time.Duration,
 	closeTimeout time.Duration,
@@ -98,6 +100,7 @@ func (cr *ChainRouter) Initialize(
 	metricsRegisterer prometheus.Registerer,
 ) error {
 	cr.log = log
+	cr.msgCreator = msgCreator
 	cr.chains = make(map[ids.ID]*Handler)
 	cr.timeoutManager = timeoutManager
 	cr.gossiper = timer.NewRepeater(cr.Gossip, gossipFrequency)
@@ -140,7 +143,7 @@ func (cr *ChainRouter) RegisterRequest(
 	nodeID ids.ShortID,
 	chainID ids.ID,
 	requestID uint32,
-	msgType constants.MsgType,
+	msgType message.Op,
 ) {
 	cr.lock.Lock()
 	// When we receive a response message type (Chits, Put, Accepted, etc.)
@@ -159,25 +162,28 @@ func (cr *ChainRouter) RegisterRequest(
 	cr.lock.Unlock()
 
 	// Register a timeout to fire if we don't get a reply in time.
+	var inMsg message.InboundMessage
 	var timeoutHandler func() // Called upon timeout
 	switch msgType {
-	case constants.PullQueryMsg, constants.PushQueryMsg:
-		timeoutHandler = func() { cr.QueryFailed(nodeID, chainID, requestID) }
-	case constants.GetMsg:
-		timeoutHandler = func() { cr.GetFailed(nodeID, chainID, requestID) }
-	case constants.GetAncestorsMsg:
-		timeoutHandler = func() { cr.GetAncestorsFailed(nodeID, chainID, requestID) }
-	case constants.GetAcceptedMsg:
-		timeoutHandler = func() { cr.GetAcceptedFailed(nodeID, chainID, requestID) }
-	case constants.GetAcceptedFrontierMsg:
-		timeoutHandler = func() { cr.GetAcceptedFrontierFailed(nodeID, chainID, requestID) }
-	case constants.AppRequestMsg:
-		timeoutHandler = func() { cr.AppRequestFailed(nodeID, chainID, requestID) }
+	case message.PullQuery, message.PushQuery:
+		inMsg = cr.msgCreator.InternalQueryFailed(nodeID, chainID, requestID)
+	case message.Get:
+		inMsg = cr.msgCreator.InternalGetFailed(nodeID, chainID, requestID)
+	case message.GetAncestors:
+		inMsg = cr.msgCreator.InternalGetAncestorsFailed(nodeID, chainID, requestID)
+	case message.GetAccepted:
+		inMsg = cr.msgCreator.InternalGetAcceptedFailed(nodeID, chainID, requestID)
+	case message.GetAcceptedFrontier:
+		inMsg = cr.msgCreator.InternalGetAcceptedFrontierFailed(nodeID, chainID, requestID)
+	case message.AppRequest:
+		inMsg = cr.msgCreator.InternalAppRequestFailed(nodeID, chainID, requestID)
 	default:
 		// This should never happen
 		cr.log.Error("expected message type to be one of GetMsg, PullQueryMsg, PushQueryMsg, GetAcceptedFrontierMsg, GetAcceptedMsg, AppRequestMsg, but got %s", msgType)
 		return
 	}
+
+	timeoutHandler = func() { cr.HandleInbound(inMsg) }
 	cr.timeoutManager.RegisterRequest(nodeID, chainID, msgType, uniqueRequestID, timeoutHandler)
 }
 
@@ -259,7 +265,7 @@ func (cr *ChainRouter) removeChain(chainID ids.ID) {
 }
 
 func (cr *ChainRouter) markFullfilled(
-	msgType constants.MsgType,
+	msgType message.Op,
 	nodeID ids.ShortID,
 	chainID ids.ID,
 	requestID uint32,
@@ -280,42 +286,6 @@ func (cr *ChainRouter) markFullfilled(
 
 	cr.removeRequest(uniqueRequestID)
 	return uniqueRequestID, &request
-}
-
-// A map from Op to constants.MsgType
-func opToConstant(op message.Op) constants.MsgType {
-	switch op {
-	case message.GetAcceptedFrontier:
-		return constants.GetAcceptedFrontierMsg
-	case message.AcceptedFrontier:
-		return constants.AcceptedFrontierMsg
-	case message.GetAccepted:
-		return constants.GetAcceptedMsg
-	case message.Accepted:
-		return constants.AcceptedMsg
-	case message.GetAncestors:
-		return constants.GetAncestorsMsg
-	case message.MultiPut:
-		return constants.MultiPutMsg
-	case message.Get:
-		return constants.GetMsg
-	case message.Put:
-		return constants.PutMsg
-	case message.PullQuery:
-		return constants.PullQueryMsg
-	case message.PushQuery:
-		return constants.PushQueryMsg
-	case message.Chits:
-		return constants.ChitsMsg
-	case message.AppRequest:
-		return constants.AppRequestMsg
-	case message.AppResponse:
-		return constants.AppResponseMsg
-	case message.AppGossip:
-		return constants.AppGossipMsg
-	default:
-		return constants.NullMsg
-	}
 }
 
 func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
@@ -357,11 +327,21 @@ func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
 		message.PushQuery,
 		message.AppRequest:
 
-		chain.PushMsgWithDeadline(opToConstant(msgType), inMsg, nodeID, requestID)
+		chain.PushMsgWithDeadline(inMsg, nodeID, requestID)
 		return
+
+	case message.GetAcceptedFrontierFailed:
+		// Create the request ID of the request we sent that this message is (allegedly) in response to.
+		uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, message.GetAcceptedFrontier)
+
+		// Remove the outstanding request
+		cr.removeRequest(uniqueRequestID)
+
+		// Pass the response to the chain
+		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
 
 	case message.AcceptedFrontier:
-		uniqueRequestID, request := cr.markFullfilled(constants.GetAcceptedFrontierMsg, nodeID, chainID, requestID, false)
+		uniqueRequestID, request := cr.markFullfilled(message.GetAcceptedFrontier, nodeID, chainID, requestID, false)
 		if request == nil {
 			// We didn't request this message. Ignore.
 			inMsg.OnFinishedHandling()
@@ -372,14 +352,24 @@ func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
 		latency := cr.clock.Time().Sub(request.time)
 
 		// Tell the timeout manager we got a response
-		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, constants.GetAcceptedFrontierMsg, latency)
+		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, message.GetAcceptedFrontier, latency)
 
 		// Pass the response to the chain
-		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID)
+		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
 		return
+
+	case message.GetAcceptedFailed:
+		// Create the request ID of the request we sent that this message is (allegedly) in response to.
+		uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, message.GetAccepted)
+
+		// Remove the outstanding request
+		cr.removeRequest(uniqueRequestID)
+
+		// Pass the response to the chain
+		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
 
 	case message.Accepted:
-		uniqueRequestID, request := cr.markFullfilled(constants.GetAcceptedMsg, nodeID, chainID, requestID, false)
+		uniqueRequestID, request := cr.markFullfilled(message.GetAccepted, nodeID, chainID, requestID, false)
 		if request == nil {
 			// We didn't request this message. Ignore.
 			inMsg.OnFinishedHandling()
@@ -390,14 +380,24 @@ func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
 		latency := cr.clock.Time().Sub(request.time)
 
 		// Tell the timeout manager we got a response
-		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, constants.GetAcceptedMsg, latency)
+		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, message.GetAccepted, latency)
 
 		// Pass the response to the chain
-		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID)
+		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
 		return
+
+	case message.GetAncestorsFailed:
+		// Create the request ID of the request we sent that this message is (allegedly) in response to.
+		uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, message.GetAncestors)
+
+		// Remove the outstanding request
+		cr.removeRequest(uniqueRequestID)
+
+		// Pass the response to the chain
+		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
 
 	case message.MultiPut:
-		uniqueRequestID, request := cr.markFullfilled(constants.GetAncestorsMsg, nodeID, chainID, requestID, false)
+		uniqueRequestID, request := cr.markFullfilled(message.GetAncestors, nodeID, chainID, requestID, false)
 		if request == nil {
 			// We didn't request this message. Ignore.
 			inMsg.OnFinishedHandling()
@@ -408,16 +408,28 @@ func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
 		latency := cr.clock.Time().Sub(request.time)
 
 		// Tell the timeout manager we got a response
-		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, constants.GetAncestorsMsg, latency)
+		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, message.GetAncestors, latency)
 
 		// Pass the response to the chain
-		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID)
+		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
 		return
+
+	case message.QueryFailed:
+		// Create the request ID of the request we sent that this message is (allegedly) in response to.
+		// Note that we treat PullQueryMsg and PushQueryMsg the same for the sake of creating request IDs.
+		// See [createRequestID].
+		uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, message.PullQuery)
+
+		// Remove the outstanding request
+		cr.removeRequest(uniqueRequestID)
+
+		// Pass the response to the chain
+		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
 
 	case message.Chits:
 		// Note that we treat PullQueryMsg and PushQueryMsg the same for the sake of creating request IDs.
 		// See [createRequestID].
-		uniqueRequestID, request := cr.markFullfilled(constants.PullQueryMsg, nodeID, chainID, requestID, false)
+		uniqueRequestID, request := cr.markFullfilled(message.PullQuery, nodeID, chainID, requestID, false)
 		if request == nil {
 			// We didn't request this message. Ignore.
 			inMsg.OnFinishedHandling()
@@ -431,17 +443,27 @@ func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
 		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, request.msgType, latency)
 
 		// Pass the response to the chain
-		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID)
+		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
 		return
+
+	case message.GetFailed:
+		// Create the request ID of the request we sent that this message is (allegedly) in response to.
+		uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, message.Get)
+
+		// Remove the outstanding request
+		cr.removeRequest(uniqueRequestID)
+
+		// Pass the response to the chain
+		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
 
 	case message.Put:
 		// If this is a gossip message, pass to the chain
 		if requestID == constants.GossipMsgRequestID {
-			chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID)
+			chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
 			return
 		}
 
-		uniqueRequestID, request := cr.markFullfilled(constants.GetMsg, nodeID, chainID, requestID, false)
+		uniqueRequestID, request := cr.markFullfilled(message.Get, nodeID, chainID, requestID, false)
 		if request == nil {
 			// We didn't request this message. Ignore.
 			inMsg.OnFinishedHandling()
@@ -452,14 +474,14 @@ func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
 		latency := cr.clock.Time().Sub(request.time)
 
 		// Tell the timeout manager we got a response
-		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, constants.GetMsg, latency)
+		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, message.Get, latency)
 
 		// Pass the response to the chain
-		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID)
+		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
 		return
 
 	case message.AppResponse:
-		uniqueRequestID, request := cr.markFullfilled(constants.AppRequestMsg, nodeID, chainID, requestID, true)
+		uniqueRequestID, request := cr.markFullfilled(message.AppRequest, nodeID, chainID, requestID, true)
 		if request == nil {
 			// We didn't request this message, or it was the wrong type. Ignore.
 			inMsg.OnFinishedHandling()
@@ -473,173 +495,16 @@ func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
 		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, request.msgType, latency)
 
 		// Pass the response to the chain
-		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID)
+		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
 		return
 	case message.AppGossip:
-		chain.PushMsgWithoutDeadline(opToConstant(msgType), inMsg, nodeID, requestID)
+		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
 		return
 
 	default:
 		cr.log.Error("Unhandled message type %v. Dropping it.", msgType)
 		return
 	}
-}
-
-// GetAcceptedFrontierFailed routes an incoming GetAcceptedFrontierFailed
-// request from the validator with ID [validatorID] to the consensus engine
-// working on the chain with ID [chainID]
-func (cr *ChainRouter) GetAcceptedFrontierFailed(
-	validatorID ids.ShortID,
-	chainID ids.ID,
-	requestID uint32,
-) {
-	cr.lock.Lock()
-	defer cr.lock.Unlock()
-
-	// Create the request ID of the request we sent that this message is (allegedly) in response to.
-	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID, constants.GetAcceptedFrontierMsg)
-
-	// Remove the outstanding request
-	cr.removeRequest(uniqueRequestID)
-
-	chain, exists := cr.chains[chainID]
-	if !exists {
-		// Should only happen if node is shutting down
-		cr.log.Debug("GetAcceptedFrontierFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
-		return
-	}
-	// Pass the response to the chain
-	chain.GetAcceptedFrontierFailed(validatorID, requestID)
-}
-
-// GetAcceptedFailed routes an incoming GetAcceptedFailed request from the
-// validator with ID [validatorID]  to the consensus engine working on the
-// chain with ID [chainID]
-func (cr *ChainRouter) GetAcceptedFailed(
-	validatorID ids.ShortID,
-	chainID ids.ID,
-	requestID uint32,
-) {
-	cr.lock.Lock()
-	defer cr.lock.Unlock()
-
-	// Create the request ID of the request we sent that this message is (allegedly) in response to.
-	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID, constants.GetAcceptedMsg)
-
-	// Remove the outstanding request
-	cr.removeRequest(uniqueRequestID)
-
-	// Get the chain, if it exists
-	chain, exists := cr.chains[chainID]
-	if !exists {
-		// Should only happen when shutting down
-		cr.log.Debug("GetAcceptedFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
-		return
-	}
-
-	// Pass the response to the chain
-	chain.GetAcceptedFailed(validatorID, requestID)
-}
-
-// GetAncestorsFailed routes an incoming GetAncestorsFailed message from the validator with ID [validatorID]
-// to the consensus engine working on the chain with ID [chainID]
-func (cr *ChainRouter) GetAncestorsFailed(
-	validatorID ids.ShortID,
-	chainID ids.ID,
-	requestID uint32,
-) {
-	cr.lock.Lock()
-	defer cr.lock.Unlock()
-
-	// Create the request ID of the request we sent that this message is (allegedly) in response to.
-	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID, constants.GetAncestorsMsg)
-
-	// Remove the outstanding request
-	cr.removeRequest(uniqueRequestID)
-
-	// Get the chain, if it exists
-	chain, exists := cr.chains[chainID]
-	if !exists {
-		// Should only happen if shutting down
-		cr.log.Debug("GetAncestorsFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
-		return
-	}
-
-	// Pass the response to the chain
-	chain.GetAncestorsFailed(validatorID, requestID)
-}
-
-// GetFailed routes an incoming GetFailed message from the validator with ID [validatorID]
-// to the consensus engine working on the chain with ID [chainID]
-func (cr *ChainRouter) GetFailed(
-	validatorID ids.ShortID,
-	chainID ids.ID,
-	requestID uint32,
-) {
-	cr.lock.Lock()
-	defer cr.lock.Unlock()
-
-	// Create the request ID of the request we sent that this message is (allegedly) in response to.
-	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID, constants.GetMsg)
-
-	// Remove the outstanding request
-	cr.removeRequest(uniqueRequestID)
-
-	chain, exists := cr.chains[chainID]
-	if !exists {
-		cr.log.Debug("GetFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
-		return
-	}
-
-	// Pass the response to the chain
-	chain.GetFailed(validatorID, requestID)
-}
-
-// AppRequestFailed notifies the given chain that it will not receive a response to its request
-// with the given ID to the given node.
-func (cr *ChainRouter) AppRequestFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32) {
-	cr.lock.Lock()
-	defer cr.lock.Unlock()
-
-	uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, constants.AppRequestMsg)
-
-	// Remove the outstanding request
-	cr.removeRequest(uniqueRequestID)
-
-	chain, exists := cr.chains[chainID]
-	if !exists {
-		cr.log.Debug("AppRequestFailed(%s, %s, %d) dropped due to unknown chain", nodeID, chainID, requestID)
-		return
-	}
-	// Pass the response to the chain
-	chain.AppRequestFailed(nodeID, requestID)
-}
-
-// QueryFailed routes an incoming QueryFailed message from the validator with ID [validatorID]
-// to the consensus engine working on the chain with ID [chainID]
-func (cr *ChainRouter) QueryFailed(
-	validatorID ids.ShortID,
-	chainID ids.ID,
-	requestID uint32,
-) {
-	cr.lock.Lock()
-	defer cr.lock.Unlock()
-
-	// Create the request ID of the request we sent that this message is (allegedly) in response to.
-	// Note that we treat PullQueryMsg and PushQueryMsg the same for the sake of creating request IDs.
-	// See [createRequestID].
-	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID, constants.PullQueryMsg)
-
-	// Remove the outstanding request
-	cr.removeRequest(uniqueRequestID)
-
-	chain, exists := cr.chains[chainID]
-	if !exists {
-		cr.log.Debug("QueryFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
-		return
-	}
-	// Pass the response to the chain
-	chain.QueryFailed(validatorID, requestID)
 }
 
 // Connected routes an incoming notification that a validator was just connected
@@ -781,12 +646,12 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 
 // Assumes [cr.lock] is held.
 // Assumes [constants.msgType] is an alias of byte.
-func (cr *ChainRouter) createRequestID(nodeID ids.ShortID, chainID ids.ID, requestID uint32, msgType constants.MsgType) ids.ID {
+func (cr *ChainRouter) createRequestID(nodeID ids.ShortID, chainID ids.ID, requestID uint32, msgType message.Op) ids.ID {
 	// If we receive Chits, they may be in response to either a PullQuery or a PushQuery.
 	// Treat PullQuery and PushQuery messages as being the same for the sake of validating
 	// that Chits we receive are in response to a query (either push or pull) that we sent.
-	if msgType == constants.PullQueryMsg {
-		msgType = constants.PushQueryMsg
+	if msgType == message.PullQuery {
+		msgType = message.PushQuery
 	}
 	copy(cr.requestIDBytes, nodeID[:])
 	copy(cr.requestIDBytes[hashing.HashLen:], chainID[:])
