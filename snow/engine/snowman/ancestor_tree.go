@@ -13,6 +13,7 @@ type AncestorTree interface {
 	GetRoot(blkID ids.ID) ids.ID
 	Remove(blkID ids.ID)
 	RemoveSubtree(blkID ids.ID)
+	RemoveSiblings(blkID ids.ID)
 }
 
 type ancestorTree struct {
@@ -38,7 +39,6 @@ func (p *ancestorTree) Add(blkID ids.ID, parentID ids.ID) {
 
 // GetRoot returns the oldest parent of blkID, might return blkID if no parent is available.
 func (p *ancestorTree) GetRoot(blkID ids.ID) ids.ID {
-	// return false if we cannot find any parent
 	for {
 		parentID, ok := p.childToParent[blkID]
 		// this is the furthest parent available, break loop and return blkID
@@ -63,16 +63,21 @@ func (p *ancestorTree) Remove(blkID ids.ID) {
 
 // RemoveSubtree removes whole subtree that blkID holds
 func (p *ancestorTree) RemoveSubtree(blkID ids.ID) {
-	childrenList := []ids.ID{blkID}
-	for len(childrenList) > 0 {
-		newChildrenSize := len(childrenList) - 1
-		childID := childrenList[newChildrenSize]
-		childrenList = childrenList[:newChildrenSize]
-		p.remove(childID)
-		// get children of child
-		for grandChildID := range p.parentToChildren[childID] {
-			childrenList = append(childrenList, grandChildID)
+	p.removeSubtree(blkID)
+}
+
+// RemoveSiblings removes blkID's sibling subtrees
+func (p *ancestorTree) RemoveSiblings(blkID ids.ID) {
+	parent, ok := p.childToParent[blkID]
+	if !ok {
+		return
+	}
+	children := p.parentToChildren[parent]
+	for childID := range children {
+		if childID == blkID {
+			continue
 		}
+		p.removeSubtree(childID)
 	}
 }
 
@@ -90,5 +95,19 @@ func (p *ancestorTree) remove(blkID ids.ID) {
 	// this parent has no more children, remove it from map
 	if children.Len() == 0 {
 		delete(p.parentToChildren, parent)
+	}
+}
+
+func (p *ancestorTree) removeSubtree(blkID ids.ID) {
+	childrenList := []ids.ID{blkID}
+	for len(childrenList) > 0 {
+		newChildrenSize := len(childrenList) - 1
+		childID := childrenList[newChildrenSize]
+		childrenList = childrenList[:newChildrenSize]
+		p.remove(childID)
+		// get children of child
+		for grandChildID := range p.parentToChildren[childID] {
+			childrenList = append(childrenList, grandChildID)
+		}
 	}
 }

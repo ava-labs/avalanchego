@@ -713,6 +713,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
 
 		// if verify fails, then all descendants are also invalid
+		t.addToNonVerifieds(blk)
 		t.blocked.Abandon(blkID)
 		t.metrics.numBlocked.Set(float64(len(t.pending))) // Tracks performance statistics
 		t.metrics.numBlockers.Set(float64(t.blocked.Len()))
@@ -744,7 +745,11 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 				if err := blk.Verify(); err != nil {
 					t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
 					dropped = append(dropped, blk)
+					// block fails verification, hold this in memory for bubbling
+					t.addToNonVerifieds(blk)
 				} else {
+					// correctly verified will be passed to consensus as processing block
+					// no need to keep it anymore
 					t.nonVerifieds.Remove(blk.ID())
 					wrappedBlk := &memoryBlock{
 						Block: blk,
@@ -845,19 +850,28 @@ func (t *Transitive) pendingContains(blkID ids.ID) bool {
 }
 
 func (t *Transitive) removeFromPending(blk snowman.Block) {
-	blkID := blk.ID()
-	delete(t.pending, blkID)
+	delete(t.pending, blk.ID())
+}
+
+func (t *Transitive) addToNonVerifieds(blk snowman.Block) {
+	// don't add this blk if it's decided or processing
+	// this should not be happening, but just in case.
+	if t.Consensus.DecidedOrProcessing(blk) {
+		return
+	}
 	parentID := blk.Parent()
 	// we might still need that one, so we can bubble vote to parent through this block
-	// however if this parent is not in child pending nor issued to consensus, do not put this block to pending.
-	if t.nonVerifieds.Has(parentID) || t.parentDecidedOrProcessing(blk) {
-		t.nonVerifieds.Add(blkID, parentID)
+	// only add blocks with parent already in tree or processing.
+	// decided parents should not be in this map.
+	if t.nonVerifieds.Has(parentID) || t.parentProcessing(blk) {
+		t.nonVerifieds.Add(blk.ID(), parentID)
 	}
 }
 
-func (t *Transitive) parentDecidedOrProcessing(blk snowman.Block) bool {
+func (t *Transitive) parentProcessing(blk snowman.Block) bool {
 	parentID := blk.Parent()
-	if parentBlk, err := t.GetBlock(parentID); err == nil && t.Consensus.DecidedOrProcessing(parentBlk) {
+	if parentBlk, err := t.GetBlock(parentID); err == nil &&
+		!parentBlk.Status().Decided() && t.Consensus.DecidedOrProcessing(parentBlk) {
 		return true
 	}
 	return false
