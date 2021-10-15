@@ -59,10 +59,8 @@ type inboundMsgBufferThrottler struct {
 // Release([nodeID]) must be called (!) when done processing the message
 // (or when we give up trying to read the message.)
 func (t *inboundMsgBufferThrottler) Acquire(nodeID ids.ShortID) {
-	t.metrics.awaitingAcquire.Inc()
 	startTime := time.Now()
 	defer func() {
-		t.metrics.awaitingAcquire.Dec()
 		t.metrics.acquireLatency.Observe(float64(time.Since(startTime)))
 	}()
 
@@ -82,7 +80,9 @@ func (t *inboundMsgBufferThrottler) Acquire(nodeID ids.ShortID) {
 	closeOnAcquireChan := make(chan struct{})
 	t.awaitingAcquire[nodeID] = append(t.awaitingAcquire[nodeID], closeOnAcquireChan)
 	t.lock.Unlock()
+	t.metrics.awaitingAcquire.Inc()
 	<-closeOnAcquireChan
+	t.metrics.awaitingAcquire.Dec()
 }
 
 // Release marks that we've finished processing a message from [nodeID]
