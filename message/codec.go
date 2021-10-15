@@ -127,8 +127,9 @@ func (c *codec) Pack(
 		return nil, p.Err
 	}
 	msg := &outboundMessage{
-		op:    op,
-		bytes: p.Bytes,
+		op:           op,
+		bytes:        p.Bytes,
+		ReturnBytesF: c.ReturnBytes,
 	}
 	if !compress {
 		return msg, nil

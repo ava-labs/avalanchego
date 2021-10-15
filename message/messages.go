@@ -32,12 +32,16 @@ type OutboundMessage interface {
 	BytesSavedCompression() int
 	Bytes() []byte
 	Op() Op
+
+	Clone() OutboundMessage
+	ReturnBytes()
 }
 
 type outboundMessage struct {
 	bytes                 []byte
 	bytesSavedCompression int
 	op                    Op
+	ReturnBytesF          func([]byte)
 }
 
 // Op returns the value of the specified operation in this message
@@ -69,3 +73,21 @@ func (outMsg *outboundMessage) Bytes() []byte { return outMsg.bytes }
 // network due to the message being compressed. 0 for messages that were not
 // compressed.
 func (outMsg *outboundMessage) BytesSavedCompression() int { return outMsg.bytesSavedCompression }
+
+func (outMsg *outboundMessage) Clone() OutboundMessage {
+	copiedBytes := make([]byte, len(outMsg.bytes))
+	copy(copiedBytes, outMsg.bytes)
+
+	return &outboundMessage{
+		bytes:                 copiedBytes,
+		bytesSavedCompression: outMsg.bytesSavedCompression,
+		op:                    outMsg.op,
+		ReturnBytesF:          outMsg.ReturnBytesF,
+	}
+}
+
+// release msg bytes to a memory pool for subsequent reuse
+// msg cannot be used anymore once ReturnBytes is called
+func (outMsg *outboundMessage) ReturnBytes() {
+	outMsg.ReturnBytesF(outMsg.bytes)
+}

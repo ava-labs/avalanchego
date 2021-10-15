@@ -43,6 +43,18 @@ func (m *TestMsg) BytesSavedCompression() int {
 	return 0
 }
 
+func (m *TestMsg) Clone() message.OutboundMessage {
+	copiedBytes := make([]byte, len(m.bytes))
+	copy(copiedBytes, m.bytes)
+
+	return &TestMsg{
+		bytes: copiedBytes,
+		op:    m.op,
+	}
+}
+
+func (m *TestMsg) ReturnBytes() {}
+
 func TestPeer_Close(t *testing.T) {
 	initCerts(t)
 
@@ -107,7 +119,7 @@ func TestPeer_Close(t *testing.T) {
 
 	// fake a peer, and write a message
 	peer := newPeer(basenetwork, conn, ip1.IP())
-	peer.sendQueue = [][]byte{}
+	peer.sendQueue = make([]message.OutboundMessage, 0)
 	testMsg := newTestMsg(message.GetVersion, newmsgbytes)
 	peer.Send(testMsg, true)
 

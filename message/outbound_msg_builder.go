@@ -122,10 +122,6 @@ type OutboundMsgBuilder interface {
 		chainID ids.ID,
 		msg []byte,
 	) (OutboundMessage, error)
-
-	// When you create a message with the message creator, that message can be used until
-	// ReturnBytes is called, after which point you may no longer use that message.
-	ReturnBytes(msg []byte)
 }
 
 type outMsgBuilder struct {

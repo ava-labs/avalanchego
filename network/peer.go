@@ -78,7 +78,7 @@ type peer struct {
 	closed utils.AtomicBool
 
 	// queue of messages to be sent to this peer
-	sendQueue [][]byte
+	sendQueue []message.OutboundMessage
 
 	// Signalled when a message is added to [sendQueue],
 	// and when [p.closed] is set to true.
@@ -325,12 +325,12 @@ func (p *peer) WriteMessages() {
 		p.sendQueue = p.sendQueue[1:]
 		p.sendQueueCond.L.Unlock()
 
-		msgLen := uint32(len(msg))
+		msgLen := uint32(len(msg.Bytes()))
 		p.net.outboundMsgThrottler.Release(uint64(msgLen), p.nodeID)
-		p.net.log.Verbo("sending message to %s%s at %s:\n%s", constants.NodeIDPrefix, p.nodeID, p.getIP(), formatting.DumpBytes{Bytes: msg})
+		p.net.log.Verbo("sending message to %s%s at %s:\n%s", constants.NodeIDPrefix, p.nodeID, p.getIP(), formatting.DumpBytes{Bytes: msg.Bytes()})
 		msgb := [wrappers.IntLen]byte{}
 		binary.BigEndian.PutUint32(msgb[:], msgLen)
-		for _, byteSlice := range [2][]byte{msgb[:], msg} {
+		for _, byteSlice := range [2][]byte{msgb[:], msg.Bytes()} {
 			reader.Reset(byteSlice)
 			if err := p.conn.SetWriteDeadline(p.nextTimeout()); err != nil {
 				p.net.log.Verbo("error setting write deadline to %s%s at %s due to: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
@@ -352,7 +352,7 @@ func (p *peer) WriteMessages() {
 		atomic.StoreInt64(&p.lastSent, now)
 		atomic.StoreInt64(&p.net.lastMsgSentTime, now)
 
-		p.net.mc.ReturnBytes(msg)
+		msg.ReturnBytes()
 	}
 }
 
@@ -384,10 +384,9 @@ func (p *peer) Send(msg message.OutboundMessage, canModifyMsg bool) bool {
 
 	// If the flag says to not modify [msgBytes], copy it so that the copy,
 	// not [msgBytes], will be put back into the []byte pool after it's written.
-	toSend := msgBytes
+	toSend := msg
 	if !canModifyMsg {
-		toSend = make([]byte, msgLen)
-		copy(toSend, msgBytes)
+		toSend = msg.Clone()
 	}
 
 	p.sendQueue = append(p.sendQueue, toSend)
@@ -478,7 +477,7 @@ func (p *peer) close() {
 	p.sendQueueCond.L.Lock()
 	// Release the bytes of the unsent messages to the outbound message throttler
 	for i := 0; i < len(p.sendQueue); i++ {
-		p.net.outboundMsgThrottler.Release(uint64(len(p.sendQueue[i])), p.nodeID)
+		p.net.outboundMsgThrottler.Release(uint64(len(p.sendQueue[i].Bytes())), p.nodeID)
 	}
 	p.sendQueue = nil
 	p.sendQueueCond.L.Unlock()
