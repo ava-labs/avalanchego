@@ -175,69 +175,151 @@ func (h *Handler) handleMsg(msg messageWrap) error {
 }
 
 // Assumes [h.ctx.Lock] is locked
-// Assumes all inboundMessage have been duly validated and freely retrieve relevant fields
-func (h *Handler) handleConsensusMsg(msg messageWrap) error {
-	var err error
-	switch msg.messageType {
+// Relevant fields in msgs must be validated before being dispatched to the engine.
+// An invalid msg is logged and dropped silently since err would cause a chain shutdown.
+func (h *Handler) handleConsensusMsg(wrp messageWrap) error {
+	switch wrp.messageType {
 	case constants.GetAcceptedFrontierMsg:
-		err = h.engine.GetAcceptedFrontier(msg.nodeID, msg.requestID)
+		return h.engine.GetAcceptedFrontier(wrp.nodeID, wrp.requestID)
+
 	case constants.AcceptedFrontierMsg:
-		containerIDs, _ := message.DecodeContainerIDs(msg.inMsg)
-		err = h.engine.AcceptedFrontier(msg.nodeID, msg.requestID, containerIDs)
+		containerIDs, err := message.DecodeContainerIDs(wrp.inMsg)
+		if err != nil {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
+				wrp.inMsg.Op(), wrp.nodeID, h.engine.Context().ChainID, wrp.requestID, err)
+			return nil
+		}
+		return h.engine.AcceptedFrontier(wrp.nodeID, wrp.requestID, containerIDs)
+
 	case constants.GetAcceptedFrontierFailedMsg:
-		err = h.engine.GetAcceptedFrontierFailed(msg.nodeID, msg.requestID)
+		return h.engine.GetAcceptedFrontierFailed(wrp.nodeID, wrp.requestID)
+
 	case constants.GetAcceptedMsg:
-		containerIDs, _ := message.DecodeContainerIDs(msg.inMsg)
-		err = h.engine.GetAccepted(msg.nodeID, msg.requestID, containerIDs)
+		containerIDs, err := message.DecodeContainerIDs(wrp.inMsg)
+		if err != nil {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
+				wrp.inMsg.Op(), wrp.nodeID, h.engine.Context().ChainID, wrp.requestID, err)
+			return nil
+		}
+		return h.engine.GetAccepted(wrp.nodeID, wrp.requestID, containerIDs)
+
 	case constants.AcceptedMsg:
-		containerIDs, _ := message.DecodeContainerIDs(msg.inMsg)
-		err = h.engine.Accepted(msg.nodeID, msg.requestID, containerIDs)
+		containerIDs, err := message.DecodeContainerIDs(wrp.inMsg)
+		if err != nil {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
+				wrp.inMsg.Op(), wrp.nodeID, h.engine.Context().ChainID, wrp.requestID, err)
+			return nil
+		}
+		return h.engine.Accepted(wrp.nodeID, wrp.requestID, containerIDs)
+
 	case constants.GetAcceptedFailedMsg:
-		err = h.engine.GetAcceptedFailed(msg.nodeID, msg.requestID)
+		return h.engine.GetAcceptedFailed(wrp.nodeID, wrp.requestID)
+
 	case constants.GetAncestorsMsg:
-		containerID, _ := ids.ToID(msg.inMsg.Get(message.ContainerID).([]byte))
-		err = h.engine.GetAncestors(msg.nodeID, msg.requestID, containerID)
+		containerID, err := ids.ToID(wrp.inMsg.Get(message.ContainerID).([]byte))
+		if err != nil {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
+				wrp.inMsg.Op(), wrp.nodeID, h.engine.Context().ChainID, wrp.requestID, err)
+			return nil
+		}
+		return h.engine.GetAncestors(wrp.nodeID, wrp.requestID, containerID)
 	case constants.GetAncestorsFailedMsg:
-		err = h.engine.GetAncestorsFailed(msg.nodeID, msg.requestID)
+		return h.engine.GetAncestorsFailed(wrp.nodeID, wrp.requestID)
+
 	case constants.MultiPutMsg:
-		containers, _ := msg.inMsg.Get(message.MultiContainerBytes).([][]byte)
-		err = h.engine.MultiPut(msg.nodeID, msg.requestID, containers)
+		containers, ok := wrp.inMsg.Get(message.MultiContainerBytes).([][]byte)
+		if !ok {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse MultiContainerBytes",
+				wrp.inMsg.Op(), wrp.nodeID, h.engine.Context().ChainID, wrp.requestID)
+			return nil
+		}
+		return h.engine.MultiPut(wrp.nodeID, wrp.requestID, containers)
+
 	case constants.GetMsg:
-		containerID, _ := ids.ToID(msg.inMsg.Get(message.ContainerID).([]byte))
-		err = h.engine.Get(msg.nodeID, msg.requestID, containerID)
+		containerID, err := ids.ToID(wrp.inMsg.Get(message.ContainerID).([]byte))
+		h.ctx.Log.AssertNoError(err)
+		return h.engine.Get(wrp.nodeID, wrp.requestID, containerID)
+
 	case constants.GetFailedMsg:
-		err = h.engine.GetFailed(msg.nodeID, msg.requestID)
+		return h.engine.GetFailed(wrp.nodeID, wrp.requestID)
+
 	case constants.PutMsg:
-		containerID, _ := ids.ToID(msg.inMsg.Get(message.ContainerID).([]byte))
-		container, _ := msg.inMsg.Get(message.ContainerBytes).([]byte)
-		err = h.engine.Put(msg.nodeID, msg.requestID, containerID, container)
+		containerID, err := ids.ToID(wrp.inMsg.Get(message.ContainerID).([]byte))
+		h.ctx.Log.AssertNoError(err)
+		container, ok := wrp.inMsg.Get(message.ContainerBytes).([]byte)
+		if !ok {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse ContainerBytes",
+				wrp.inMsg.Op(), wrp.nodeID, h.engine.Context().ChainID, wrp.requestID)
+			return nil
+		}
+		return h.engine.Put(wrp.nodeID, wrp.requestID, containerID, container)
+
 	case constants.PushQueryMsg:
-		containerID, _ := ids.ToID(msg.inMsg.Get(message.ContainerID).([]byte))
-		container, _ := msg.inMsg.Get(message.ContainerBytes).([]byte)
-		err = h.engine.PushQuery(msg.nodeID, msg.requestID, containerID, container)
+		containerID, err := ids.ToID(wrp.inMsg.Get(message.ContainerID).([]byte))
+		h.ctx.Log.AssertNoError(err)
+		container, ok := wrp.inMsg.Get(message.ContainerBytes).([]byte)
+		if !ok {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse ContainerBytes",
+				wrp.inMsg.Op(), wrp.nodeID, h.engine.Context().ChainID, wrp.requestID)
+			return nil
+		}
+		return h.engine.PushQuery(wrp.nodeID, wrp.requestID, containerID, container)
+
 	case constants.PullQueryMsg:
-		containerID, _ := ids.ToID(msg.inMsg.Get(message.ContainerID).([]byte))
-		err = h.engine.PullQuery(msg.nodeID, msg.requestID, containerID)
+		containerID, err := ids.ToID(wrp.inMsg.Get(message.ContainerID).([]byte))
+		h.ctx.Log.AssertNoError(err)
+		return h.engine.PullQuery(wrp.nodeID, wrp.requestID, containerID)
+
 	case constants.QueryFailedMsg:
-		err = h.engine.QueryFailed(msg.nodeID, msg.requestID)
+		return h.engine.QueryFailed(wrp.nodeID, wrp.requestID)
+
 	case constants.ChitsMsg:
-		votes, _ := message.DecodeContainerIDs(msg.inMsg)
-		err = h.engine.Chits(msg.nodeID, msg.requestID, votes)
+		votes, err := message.DecodeContainerIDs(wrp.inMsg)
+		if err != nil {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
+				wrp.inMsg.Op(), wrp.nodeID, h.engine.Context().ChainID, wrp.requestID, err)
+			return nil
+		}
+		return h.engine.Chits(wrp.nodeID, wrp.requestID, votes)
+
 	case constants.ConnectedMsg:
-		err = h.engine.Connected(msg.nodeID)
+		return h.engine.Connected(wrp.nodeID)
+
 	case constants.DisconnectedMsg:
-		err = h.engine.Disconnected(msg.nodeID)
+		return h.engine.Disconnected(wrp.nodeID)
+
 	case constants.AppRequestMsg:
-		apRequestBytes, _ := msg.inMsg.Get(message.AppRequestBytes).([]byte)
-		err = h.engine.AppRequest(msg.nodeID, msg.requestID, apRequestBytes)
+		appRequestBytes, ok := wrp.inMsg.Get(message.AppRequestBytes).([]byte)
+		if !ok {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppRequestBytes",
+				wrp.inMsg.Op(), wrp.nodeID, h.engine.Context().ChainID, wrp.requestID)
+			return nil
+		}
+		return h.engine.AppRequest(wrp.nodeID, wrp.requestID, appRequestBytes)
+
 	case constants.AppResponseMsg:
-		appResponseBytes, _ := msg.inMsg.Get(message.AppResponseBytes).([]byte)
-		err = h.engine.AppResponse(msg.nodeID, msg.requestID, appResponseBytes)
+		appResponseBytes, ok := wrp.inMsg.Get(message.AppResponseBytes).([]byte)
+		if !ok {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppResponseBytes",
+				wrp.inMsg.Op(), wrp.nodeID, h.engine.Context().ChainID, wrp.requestID)
+			return nil
+		}
+		return h.engine.AppResponse(wrp.nodeID, wrp.requestID, appResponseBytes)
+
 	case constants.AppGossipMsg:
-		appGossipBytes, _ := msg.inMsg.Get(message.AppGossipBytes).([]byte)
-		err = h.engine.AppGossip(msg.nodeID, appGossipBytes)
+		appGossipBytes, ok := wrp.inMsg.Get(message.AppGossipBytes).([]byte)
+		if !ok {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppGossipBytes",
+				wrp.inMsg.Op(), wrp.nodeID, h.engine.Context().ChainID, wrp.requestID)
+			return nil
+		}
+		return h.engine.AppGossip(wrp.nodeID, appGossipBytes)
+
+	default:
+		h.ctx.Log.Warn("Attempt to submit to engine unhandled consensus msg %s from from (%s, %s, %d). Dropping it",
+			wrp.inMsg.Op(), wrp.nodeID, h.engine.Context().ChainID, wrp.requestID)
+		return nil
 	}
-	return err
 }
 
 func (h *Handler) PushMsgWithDeadline(msgType constants.MsgType,

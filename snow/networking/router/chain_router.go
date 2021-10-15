@@ -258,78 +258,6 @@ func (cr *ChainRouter) removeChain(chainID ids.ID) {
 	}
 }
 
-func (cr *ChainRouter) checkMsg(inMsg message.InboundMessage) error {
-	// check relevant messages fields are well formed, before submitting them to the engine
-
-	switch inMsg.Op() {
-	case message.AcceptedFrontier:
-		_, err := message.DecodeContainerIDs(inMsg)
-		return err
-	case message.GetAccepted:
-		_, err := message.DecodeContainerIDs(inMsg)
-		return err
-	case message.Accepted:
-		_, err := message.DecodeContainerIDs(inMsg)
-		return err
-	case message.GetAncestors:
-		_, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte))
-		cr.log.AssertNoError(err)
-		return err
-	case message.MultiPut:
-		if _, ok := inMsg.Get(message.MultiContainerBytes).([][]byte); !ok {
-			return fmt.Errorf("malformed Multiput message. Could not parse MultiContainerBytes")
-		}
-		return nil
-	case message.Put:
-		if _, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte)); err != nil {
-			cr.log.AssertNoError(err)
-			return err
-		}
-		if _, ok := inMsg.Get(message.ContainerBytes).([]byte); !ok {
-			return fmt.Errorf("malformed Put message. Could not parse ContainerBytes")
-		}
-		return nil
-	case message.Get:
-		_, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte))
-		cr.log.AssertNoError(err)
-		return err
-	case message.PullQuery:
-		_, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte))
-		cr.log.AssertNoError(err)
-		return err
-	case message.PushQuery:
-		if _, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte)); err != nil {
-			cr.log.AssertNoError(err)
-			return err
-		}
-		if _, ok := inMsg.Get(message.ContainerBytes).([]byte); !ok {
-			return fmt.Errorf("malformed PushQuery message. Could not parse ContainerBytes")
-		}
-		return nil
-	case message.Chits:
-		_, err := message.DecodeContainerIDs(inMsg)
-		return err
-	case message.AppRequest:
-		if _, ok := inMsg.Get(message.AppRequestBytes).([]byte); !ok {
-			return fmt.Errorf("malformed AppRequest message. Could not parse AppRequestBytes")
-		}
-		return nil
-	case message.AppResponse:
-		if _, ok := inMsg.Get(message.AppResponseBytes).([]byte); !ok {
-			return fmt.Errorf("malformed AppResponse message. Could not parse AppResponseBytes")
-		}
-		return nil
-	case message.AppGossip:
-		if _, ok := inMsg.Get(message.AppGossipBytes).([]byte); !ok {
-			return fmt.Errorf("malformed AppGossip message. Could not parse AppGossipBytes")
-		}
-		return nil
-	}
-
-	// messages lacking explicit checks are deemed good
-	return nil
-}
-
 func (cr *ChainRouter) markFullfilled(
 	msgType constants.MsgType,
 	nodeID ids.ShortID,
@@ -415,12 +343,6 @@ func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
 		inMsg.OnFinishedHandling()
 		cr.log.Debug("Message %s from (%s. %s, %d) dropped. Error: %s",
 			msgType.String(), nodeID, chainID, requestID, errUnknownChain)
-		return
-	}
-
-	if err := cr.checkMsg(inMsg); err != nil {
-		cr.log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
-			msgType.String(), nodeID, chainID, requestID, err)
 		return
 	}
 
