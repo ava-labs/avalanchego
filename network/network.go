@@ -330,7 +330,7 @@ func NewNetwork(
 }
 
 // Assumes [n.stateLock] is not held.
-func (n *network) Send(msg message.OutboundMessage, nodeIDs ids.ShortSet) ids.ShortSet {
+func (n *network) Send(msg message.OutboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) ids.ShortSet {
 	var (
 		now    = n.clock.Time()
 		msgLen = len(msg.Bytes())
@@ -358,10 +358,26 @@ func (n *network) Send(msg message.OutboundMessage, nodeIDs ids.ShortSet) ids.Sh
 		return sentTo
 	}
 
-	for nodeID := range nodeIDs {
-		peer, _ := n.peers.getByID(nodeID) // note: peer may be nil
+	// retrieve target peers
+	peersList := make([]*peer, 0, len(nodeIDs))
+	switch op {
+	case message.AppGossip:
+		peersList = n.getSubnetPeers(nodeIDs, subnetID, validatorOnly)
+		if peersList == nil {
+			return sentTo
+		}
+	default:
+		for nodeID := range nodeIDs {
+			peer, _ := n.peers.getByID(nodeID)
+			peersList = append(peersList, peer)
+		}
+	}
+
+	// send to peer and update metrics
+	// note: peer may be nil
+	for _, peer := range peersList {
 		if peer != nil && peer.finishedHandshake.GetValue() && peer.Send(msg, canModifyMsg) {
-			sentTo.Add(nodeID)
+			sentTo.Add(peer.nodeID)
 
 			// record metrics for success
 			n.sendFailRateCalculator.Observe(0, now)
@@ -453,7 +469,6 @@ func (n *network) selectPeersForContainerGossip(subnetID ids.ID, validatorOnly b
 // Assumes [n.stateLock] is not held.
 func (n *network) Gossip(
 	msg message.OutboundMessage,
-	nodeIDs ids.ShortSet,
 	subnetID ids.ID,
 	validatorOnly bool) bool {
 	msgMetrics := n.metrics.message(msg.Op())
@@ -465,15 +480,9 @@ func (n *network) Gossip(
 	var peersLists []*peer
 	switch msg.Op() {
 	case message.AppGossip:
-		if nodeIDs.Len() == 0 {
-			// no peers specified, let's sample
-			peersLists = n.selectPeersForAppGossip(subnetID, validatorOnly)
-			if peersLists == nil {
-				return false
-			}
-		} else {
-			// nodes to gossip already selected. Retrieve peers
-			peersLists = n.getSubnetPeers(nodeIDs, subnetID, validatorOnly)
+		peersLists = n.selectPeersForAppGossip(subnetID, validatorOnly)
+		if peersLists == nil {
+			return false
 		}
 
 	case message.Put:

@@ -2093,7 +2093,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	var reqID uint32
 	externalSender.MockSend(message.GetAcceptedFrontier,
-		func(T *testing.T, inMsg message.InboundMessage, nodeIDs ids.ShortSet) ids.ShortSet {
+		func(T *testing.T, inMsg message.InboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) ids.ShortSet {
 			res := ids.NewShortSet(len(nodeIDs))
 			requestID, ok := inMsg.Get(message.RequestID).(uint32)
 			assert.True(t, ok)
@@ -2166,7 +2166,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	externalSender.ClearMockSend(message.GetAcceptedFrontier)
 	externalSender.MockSend(message.GetAccepted,
-		func(T *testing.T, inMsg message.InboundMessage, nodeIDs ids.ShortSet) ids.ShortSet {
+		func(T *testing.T, inMsg message.InboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) ids.ShortSet {
 			res := ids.NewShortSet(len(nodeIDs))
 			requestID, ok := inMsg.Get(message.RequestID).(uint32)
 			assert.True(t, ok)
@@ -2182,7 +2182,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	externalSender.ClearMockSend(message.GetAccepted)
 	externalSender.MockSend(message.GetAncestors,
-		func(T *testing.T, inMsg message.InboundMessage, nodeIDs ids.ShortSet) ids.ShortSet {
+		func(T *testing.T, inMsg message.InboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) ids.ShortSet {
 			res := ids.NewShortSet(len(nodeIDs))
 			requestID, ok := inMsg.Get(message.RequestID).(uint32)
 			assert.True(t, ok)

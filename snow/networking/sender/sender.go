@@ -105,7 +105,7 @@ func (s *Sender) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, requestID uint32)
 	deadline := uint64(s.timeouts.TimeoutDuration())
 	outMsg, err := s.msgCreator.GetAcceptedFrontier(s.ctx.ChainID, requestID, deadline)
 	s.ctx.Log.AssertNoError(err)
-	sentTo := s.sender.Send(outMsg, nodeIDs)
+	sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, false)
 
 	// Tell the router to expect a reply message from these validators.
 	// We register timeouts for all validators, regardless of if the message
@@ -139,7 +139,7 @@ func (s *Sender) SendAcceptedFrontier(nodeID ids.ShortID, requestID uint32, cont
 
 	nodeIDs := ids.NewShortSet(1)
 	nodeIDs.Add(nodeID)
-	if sentTo := s.sender.Send(outMsg, nodeIDs); sentTo.Len() == 0 {
+	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, false); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send AcceptedFrontier(%s, %s, %d, %s)",
 			nodeID,
 			s.ctx.ChainID,
@@ -183,7 +183,7 @@ func (s *Sender) SendGetAccepted(nodeIDs ids.ShortSet, requestID uint32, contain
 		return
 	}
 
-	sentTo := s.sender.Send(outMsg, nodeIDs)
+	sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, false)
 
 	// Tell the router to expect a reply message from these validators
 	// We register timeouts for all validators, regardless of if the message
@@ -220,7 +220,7 @@ func (s *Sender) SendAccepted(nodeID ids.ShortID, requestID uint32, containerIDs
 
 	nodeIDs := ids.NewShortSet(1)
 	nodeIDs.Add(nodeID)
-	if sentTo := s.sender.Send(outMsg, nodeIDs); sentTo.Len() == 0 {
+	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, false); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send Accepted(%s, %s, %d, %s)",
 			nodeID,
 			s.ctx.ChainID,
@@ -257,7 +257,7 @@ func (s *Sender) SendGetAncestors(nodeID ids.ShortID, requestID uint32, containe
 
 	nodeIDs := ids.NewShortSet(1)
 	nodeIDs.Add(nodeID)
-	if sentTo := s.sender.Send(outMsg, nodeIDs); sentTo.Len() == 0 {
+	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, false); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send GetAncestors(%s, %s, %d, %s)",
 			nodeID,
 			s.ctx.ChainID,
@@ -287,7 +287,7 @@ func (s *Sender) SendMultiPut(nodeID ids.ShortID, requestID uint32, containers [
 
 	nodeIDs := ids.NewShortSet(1)
 	nodeIDs.Add(nodeID)
-	if sentTo := s.sender.Send(outMsg, nodeIDs); sentTo.Len() == 0 {
+	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, false); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send MultiPut(%s, %s, %d, %d)",
 			nodeID,
 			s.ctx.ChainID,
@@ -325,7 +325,7 @@ func (s *Sender) SendGet(nodeID ids.ShortID, requestID uint32, containerID ids.I
 
 	nodeIDs := ids.NewShortSet(1)
 	nodeIDs.Add(nodeID)
-	if sentTo := s.sender.Send(outMsg, nodeIDs); sentTo.Len() == 0 {
+	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, false); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send Get(%s, %s, %d, %s)",
 			nodeID,
 			s.ctx.ChainID,
@@ -361,7 +361,7 @@ func (s *Sender) SendPut(nodeID ids.ShortID, requestID uint32, containerID ids.I
 
 	nodeIDs := ids.NewShortSet(1)
 	nodeIDs.Add(nodeID)
-	if sentTo := s.sender.Send(outMsg, nodeIDs); sentTo.Len() == 0 {
+	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, false); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send Put(%s, %s, %d, %s)",
 			nodeID,
 			s.ctx.ChainID,
@@ -428,7 +428,7 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 		return // Packing message failed
 	}
 
-	sentTo := s.sender.Send(outMsg, nodeIDs)
+	sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, false)
 	for nodeID := range nodeIDs {
 		if sentTo.Contains(nodeID) {
 			// Tell the router to expect a reply message from this validator
@@ -490,7 +490,7 @@ func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, container
 	deadline := uint64(timeoutDuration)
 	outMsg, err := s.msgCreator.PullQuery(s.ctx.ChainID, requestID, deadline, containerID)
 	s.ctx.Log.AssertNoError(err)
-	sentTo := s.sender.Send(outMsg, nodeIDs)
+	sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, false)
 
 	for nodeID := range nodeIDs {
 		if sentTo.Contains(nodeID) {
@@ -536,7 +536,7 @@ func (s *Sender) SendChits(nodeID ids.ShortID, requestID uint32, votes []ids.ID)
 
 	nodeIDs := ids.NewShortSet(1)
 	nodeIDs.Add(nodeID)
-	if sentTo := s.sender.Send(outMsg, nodeIDs); sentTo.Len() == 0 {
+	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, false); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send Chits(%s, %s, %d, %s)",
 			nodeID,
 			s.ctx.ChainID,
@@ -593,7 +593,7 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 		return nil
 	}
 
-	sentTo := s.sender.Send(outMsg, nodeIDs)
+	sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, false)
 	for nodeID := range nodeIDs {
 		if sentTo.Contains(nodeID) {
 			// Tell the router to expect a reply message from this validator
@@ -631,7 +631,7 @@ func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appRespon
 
 	nodeIDs := ids.NewShortSet(1)
 	nodeIDs.Add(nodeID)
-	if sentTo := s.sender.Send(outMsg, nodeIDs); sentTo.Len() == 0 {
+	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, false); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send AppResponse(%s, %s, %d)", nodeID, s.ctx.ChainID, requestID)
 		s.ctx.Log.Verbo("container: %s", formatting.DumpBytes{Bytes: appResponseBytes})
 	}
@@ -646,7 +646,9 @@ func (s *Sender) SendAppGossipSpecific(nodeIDs ids.ShortSet, appGossipBytes []by
 		s.ctx.Log.Verbo("message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
 	}
 
-	if !s.sender.Gossip(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()) {
+	// TODO ABENEGIA: add subnet and isValidator to send
+	// if !s.sender.Gossip(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()) {
+	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, false); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to gossip SpecificGossip(%s)", s.ctx.ChainID)
 		s.ctx.Log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
 	}
@@ -661,7 +663,7 @@ func (s *Sender) SendAppGossip(appGossipBytes []byte) error {
 		s.ctx.Log.Verbo("message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
 	}
 
-	if !s.sender.Gossip(outMsg, ids.ShortSet{}, s.ctx.SubnetID, s.ctx.IsValidatorOnly()) {
+	if !s.sender.Gossip(outMsg, s.ctx.SubnetID, s.ctx.IsValidatorOnly()) {
 		s.ctx.Log.Debug("failed to gossip AppGossip(%s)", s.ctx.ChainID)
 		s.ctx.Log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
 	}
@@ -679,7 +681,7 @@ func (s *Sender) SendGossip(containerID ids.ID, container []byte) {
 		return
 	}
 
-	if !s.sender.Gossip(outMsg, ids.ShortSet{}, s.ctx.SubnetID, s.ctx.IsValidatorOnly()) {
+	if !s.sender.Gossip(outMsg, s.ctx.SubnetID, s.ctx.IsValidatorOnly()) {
 		s.ctx.Log.Debug("failed to gossip GossipMsg(%s)", s.ctx.ChainID)
 	}
 }
