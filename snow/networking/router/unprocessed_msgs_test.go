@@ -37,8 +37,7 @@ func TestUnprocessedMsgs(t *testing.T) {
 		dummyOnFinishedHandling)
 
 	msg1 := messageWrap{
-		inMsg:  inPutMsg,
-		nodeID: vdr1ID,
+		inMsg: inPutMsg,
 	}
 
 	// Push then pop should work regardless of utilization when there are
@@ -84,10 +83,9 @@ func TestUnprocessedMsgs(t *testing.T) {
 	assert.EqualValues(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	assert.EqualValues(1, u.Len())
 
-	inGetMsg := mc.InboundGet(ids.Empty, 0, 0, ids.Empty, ids.ShortEmpty, dummyOnFinishedHandling)
+	inGetMsg := mc.InboundGet(ids.Empty, 0, 0, ids.Empty, vdr2ID, dummyOnFinishedHandling)
 	msg2 := messageWrap{
-		inMsg:  inGetMsg,
-		nodeID: vdr2ID,
+		inMsg: inGetMsg,
 	}
 	// Push msg2 from vdr2ID
 	u.Push(msg2)
@@ -110,14 +108,12 @@ func TestUnprocessedMsgs(t *testing.T) {
 	nonVdrNodeID1, nonVdrNodeID2 := ids.GenerateTestShortID(), ids.GenerateTestShortID()
 	inPullQueryMsg := mc.InboundPullQuery(ids.Empty, 0, 0, ids.Empty, nonVdrNodeID1, dummyOnFinishedHandling)
 	msg3 := messageWrap{
-		inMsg:  inPullQueryMsg,
-		nodeID: nonVdrNodeID1,
+		inMsg: inPullQueryMsg,
 	}
 
 	inPushQueryMsg := mc.InboundPushQuery(ids.Empty, 0, 0, ids.Empty, nil, nonVdrNodeID2, dummyOnFinishedHandling)
 	msg4 := messageWrap{
-		inMsg:  inPushQueryMsg,
-		nodeID: nonVdrNodeID2,
+		inMsg: inPushQueryMsg,
 	}
 	u.Push(msg3)
 	u.Push(msg4)

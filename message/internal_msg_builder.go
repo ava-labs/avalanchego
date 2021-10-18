@@ -159,6 +159,7 @@ func (b *internalMsgBuilder) InternalGetFailed(
 func (b *internalMsgBuilder) InternalTimeout(nodeID ids.ShortID) InboundMessage {
 	return &inboundMessage{
 		op:                 Timeout,
+		fields:             make(map[Field]interface{}),
 		nodeID:             nodeID,
 		onFinishedHandling: func() {},
 	}
@@ -167,6 +168,7 @@ func (b *internalMsgBuilder) InternalTimeout(nodeID ids.ShortID) InboundMessage 
 func (b *internalMsgBuilder) InternalConnected(nodeID ids.ShortID) InboundMessage {
 	return &inboundMessage{
 		op:                 Connected,
+		fields:             make(map[Field]interface{}),
 		nodeID:             nodeID,
 		onFinishedHandling: func() {},
 	}
@@ -176,6 +178,7 @@ func (b *internalMsgBuilder) InternalDisconnected(nodeID ids.ShortID) InboundMes
 	return &inboundMessage{
 		op:                 Disconnected,
 		nodeID:             nodeID,
+		fields:             make(map[Field]interface{}),
 		onFinishedHandling: func() {},
 	}
 }
@@ -199,6 +202,7 @@ func (b *internalMsgBuilder) InternalGossipRequest(
 ) InboundMessage {
 	return &inboundMessage{
 		op:                 GossipRequest,
+		fields:             make(map[Field]interface{}),
 		nodeID:             nodeID,
 		onFinishedHandling: func() {},
 	}

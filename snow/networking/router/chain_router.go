@@ -327,7 +327,7 @@ func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
 		message.PushQuery,
 		message.AppRequest:
 
-		chain.PushMsgWithDeadline(inMsg, nodeID, requestID)
+		chain.PushMsgWithDeadline(inMsg, nodeID)
 		return
 
 	case message.GetAcceptedFrontierFailed:

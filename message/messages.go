@@ -3,7 +3,9 @@
 
 package message
 
-import "github.com/ava-labs/avalanchego/ids"
+import (
+	"github.com/ava-labs/avalanchego/ids"
+)
 
 var (
 	_ InboundMessage  = &inboundMessage{}

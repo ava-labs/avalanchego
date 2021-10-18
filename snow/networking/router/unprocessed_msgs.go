@@ -65,7 +65,8 @@ type unprocessedMsgsImpl struct {
 
 func (u *unprocessedMsgsImpl) Push(msg messageWrap) {
 	u.msgs = append(u.msgs, msg)
-	u.nodeToUnprocessedMsgs[msg.nodeID]++
+	nodeID := msg.inMsg.NodeID()
+	u.nodeToUnprocessedMsgs[nodeID]++
 	u.metrics.nodesWithUnprocessedMsgs.Set(float64(len(u.nodeToUnprocessedMsgs)))
 	u.metrics.len.Inc()
 }
@@ -81,6 +82,7 @@ func (u *unprocessedMsgsImpl) Pop() messageWrap {
 			u.log.Warn("canPop is false for all %d unprocessed messages", n)
 		}
 		msg := u.msgs[0]
+		nodeID := msg.inMsg.NodeID()
 		// See if it's OK to process [msg] next
 		if u.canPop(&msg) || i == n { // i should never == n but handle anyway as a fail-safe
 			if cap(u.msgs) == 1 {
@@ -88,9 +90,9 @@ func (u *unprocessedMsgsImpl) Pop() messageWrap {
 			} else {
 				u.msgs = u.msgs[1:]
 			}
-			u.nodeToUnprocessedMsgs[msg.nodeID]--
-			if u.nodeToUnprocessedMsgs[msg.nodeID] == 0 {
-				delete(u.nodeToUnprocessedMsgs, msg.nodeID)
+			u.nodeToUnprocessedMsgs[nodeID]--
+			if u.nodeToUnprocessedMsgs[nodeID] == 0 {
+				delete(u.nodeToUnprocessedMsgs, nodeID)
 			}
 			u.metrics.nodesWithUnprocessedMsgs.Set(float64(len(u.nodeToUnprocessedMsgs)))
 			u.metrics.len.Dec()
@@ -119,7 +121,8 @@ func (u *unprocessedMsgsImpl) canPop(msg *messageWrap) bool {
 	// Every node has some allowed CPU allocation depending on
 	// the number of nodes with unprocessed messages.
 	baseMaxCPU := 1 / float64(len(u.nodeToUnprocessedMsgs))
-	weight, isVdr := u.vdrs.GetWeight(msg.nodeID)
+	nodeID := msg.inMsg.NodeID()
+	weight, isVdr := u.vdrs.GetWeight(nodeID)
 	if !isVdr {
 		weight = 0
 	}
@@ -131,7 +134,7 @@ func (u *unprocessedMsgsImpl) canPop(msg *messageWrap) bool {
 		portionWeight = float64(weight) / float64(totalVdrsWeight)
 	}
 	// Validators are allowed to use more CPU. More weight --> more CPU use allowed.
-	recentCPUUtilized := u.cpuTracker.Utilization(msg.nodeID, u.clock.Time())
+	recentCPUUtilized := u.cpuTracker.Utilization(nodeID, u.clock.Time())
 	maxCPU := baseMaxCPU + (1.0-baseMaxCPU)*portionWeight
 	return recentCPUUtilized <= maxCPU
 }
