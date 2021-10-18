@@ -660,18 +660,22 @@ func (m *manager) createSnowmanChain(
 
 	// first vm to be init is P-Chain once, which provides validator interface to all ProposerVMs
 	if m.validatorState == nil {
-		valState, ok := vm.(validators.State)
-		if !ok {
-			return nil, fmt.Errorf("expected validators.State but got %T", vm)
-		}
+		if m.ManagerConfig.StakingEnabled {
+			valState, ok := vm.(validators.State)
+			if !ok {
+				return nil, fmt.Errorf("expected validators.State but got %T", vm)
+			}
 
-		// Initialize the validator state for future chains.
-		m.validatorState = validators.NewLockedState(&ctx.Lock, valState)
+			// Initialize the validator state for future chains.
+			m.validatorState = validators.NewLockedState(&ctx.Lock, valState)
+		} else {
+			m.validatorState = validators.NewNoState()
+		}
 
 		// Notice that this context is left unlocked. This is because the
 		// lock will already be held when accessing these values on the
 		// P-chain.
-		ctx.ValidatorState = valState
+		ctx.ValidatorState = m.validatorState
 	}
 
 	// Initialize the ProposerVM and the vm wrapped inside it

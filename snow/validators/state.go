@@ -48,3 +48,17 @@ func (s *lockedState) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.S
 
 	return s.s.GetValidatorSet(height, subnetID)
 }
+
+type noState struct{}
+
+func NewNoState() State {
+	return &noState{}
+}
+
+func (s *noState) GetCurrentHeight() (uint64, error) {
+	return 0, nil
+}
+
+func (s *noState) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+	return nil, nil
+}
