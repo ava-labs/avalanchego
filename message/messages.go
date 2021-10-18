@@ -4,6 +4,8 @@
 package message
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -18,6 +20,7 @@ type InboundMessage interface {
 	Op() Op
 	Get(Field) interface{}
 	NodeID() ids.ShortID
+	ExpirationTime() time.Time
 	OnFinishedHandling()
 }
 
@@ -26,6 +29,7 @@ type inboundMessage struct {
 	bytesSavedCompression int
 	fields                map[Field]interface{}
 	nodeID                ids.ShortID
+	expirationTime        time.Time
 	onFinishedHandling    func()
 }
 
@@ -60,6 +64,10 @@ func (inMsg *inboundMessage) Get(field Field) interface{} { return inMsg.fields[
 
 // NodeID returns the node from which the msg was received
 func (inMsg *inboundMessage) NodeID() ids.ShortID { return inMsg.nodeID }
+
+// ExpirationTime returns the // Time this message must be responded to
+// a zero time means message does not expire
+func (inMsg *inboundMessage) ExpirationTime() time.Time { return inMsg.expirationTime }
 
 // OnFinishedHandling is the function to be called once inboundMessage is complete
 // inMsg.onFinishedHandling() must be not-nil

@@ -7,10 +7,11 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -19,10 +20,10 @@ var _ unprocessedMsgs = &unprocessedMsgsImpl{}
 
 type unprocessedMsgs interface {
 	// Add an unprocessed message
-	Push(messageWrap)
+	Push(message.InboundMessage)
 	// Get and remove the unprocessed message that should
 	// be processed next. Must never be called when Len() == 0.
-	Pop() messageWrap
+	Pop() message.InboundMessage
 	// Returns the number of unprocessed messages
 	Len() int
 }
@@ -54,18 +55,18 @@ type unprocessedMsgsImpl struct {
 	// Node ID --> Messages this node has in [msgs]
 	nodeToUnprocessedMsgs map[ids.ShortID]int
 	// Unprocessed messages
-	msgs []messageWrap
+	msgs []message.InboundMessage
 	// Validator set for the chain associated with this
 	vdrs validators.Set
 	// Tracks CPU utilization of each node
 	cpuTracker tracker.TimeTracker
 	// Useful for faking time in tests
-	clock timer.Clock
+	clock mockable.Clock
 }
 
-func (u *unprocessedMsgsImpl) Push(msg messageWrap) {
+func (u *unprocessedMsgsImpl) Push(msg message.InboundMessage) {
 	u.msgs = append(u.msgs, msg)
-	nodeID := msg.inMsg.NodeID()
+	nodeID := msg.NodeID()
 	u.nodeToUnprocessedMsgs[nodeID]++
 	u.metrics.nodesWithUnprocessedMsgs.Set(float64(len(u.nodeToUnprocessedMsgs)))
 	u.metrics.len.Inc()
@@ -74,7 +75,7 @@ func (u *unprocessedMsgsImpl) Push(msg messageWrap) {
 // Must never be called when [u.Len()] == 0.
 // FIFO, but skip over messages whose senders whose messages
 // have caused us to use excessive CPU recently.
-func (u *unprocessedMsgsImpl) Pop() messageWrap {
+func (u *unprocessedMsgsImpl) Pop() message.InboundMessage {
 	n := len(u.msgs)
 	i := 0
 	for {
@@ -82,9 +83,9 @@ func (u *unprocessedMsgsImpl) Pop() messageWrap {
 			u.log.Warn("canPop is false for all %d unprocessed messages", n)
 		}
 		msg := u.msgs[0]
-		nodeID := msg.inMsg.NodeID()
+		nodeID := msg.NodeID()
 		// See if it's OK to process [msg] next
-		if u.canPop(&msg) || i == n { // i should never == n but handle anyway as a fail-safe
+		if u.canPop(msg) || i == n { // i should never == n but handle anyway as a fail-safe
 			if cap(u.msgs) == 1 {
 				u.msgs = nil // Give back memory if possible
 			} else {
@@ -112,16 +113,16 @@ func (u *unprocessedMsgsImpl) Len() int {
 }
 
 // canPop will return true for at least one message in [u.msgs]
-func (u *unprocessedMsgsImpl) canPop(msg *messageWrap) bool {
+func (u *unprocessedMsgsImpl) canPop(msg message.InboundMessage) bool {
 	// If the deadline to handle [msg] has passed, always pop it.
 	// It will be dropped immediately.
-	if !msg.deadline.IsZero() && u.clock.Time().After(msg.deadline) {
+	if !msg.ExpirationTime().IsZero() && u.clock.Time().After(msg.ExpirationTime()) {
 		return true
 	}
 	// Every node has some allowed CPU allocation depending on
 	// the number of nodes with unprocessed messages.
 	baseMaxCPU := 1 / float64(len(u.nodeToUnprocessedMsgs))
-	nodeID := msg.inMsg.NodeID()
+	nodeID := msg.NodeID()
 	weight, isVdr := u.vdrs.GetWeight(nodeID)
 	if !isVdr {
 		weight = 0

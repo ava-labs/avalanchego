@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 var (
@@ -82,7 +82,7 @@ type inboundConnUpgradeThrottler struct {
 	log  logging.Logger
 	lock sync.Mutex
 	// Useful for faking time in tests
-	clock timer.Clock
+	clock mockable.Clock
 	// When [done] is closed, Dispatch returns.
 	done chan struct{}
 	// IP --> Present if ShouldUpgrade(ipStr) returned true

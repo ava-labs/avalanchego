@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -46,7 +47,7 @@ type requestEntry struct {
 // Note that consensus engines are uniquely identified by the ID of the chain
 // that they are working on.
 type ChainRouter struct {
-	clock      timer.Clock
+	clock      mockable.Clock
 	log        logging.Logger
 	msgCreator message.Creator
 	lock       sync.Mutex
@@ -327,7 +328,7 @@ func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
 		message.PushQuery,
 		message.AppRequest:
 
-		chain.PushMsgWithDeadline(inMsg, nodeID)
+		chain.push(inMsg)
 		return
 
 	case message.GetAcceptedFrontierFailed:
@@ -338,7 +339,7 @@ func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
 		cr.removeRequest(uniqueRequestID)
 
 		// Pass the response to the chain
-		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
+		chain.push(inMsg)
 
 	case message.AcceptedFrontier:
 		uniqueRequestID, request := cr.markFullfilled(message.GetAcceptedFrontier, nodeID, chainID, requestID, false)
@@ -355,7 +356,7 @@ func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
 		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, message.GetAcceptedFrontier, latency)
 
 		// Pass the response to the chain
-		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
+		chain.push(inMsg)
 		return
 
 	case message.GetAcceptedFailed:
@@ -366,7 +367,7 @@ func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
 		cr.removeRequest(uniqueRequestID)
 
 		// Pass the response to the chain
-		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
+		chain.push(inMsg)
 
 	case message.Accepted:
 		uniqueRequestID, request := cr.markFullfilled(message.GetAccepted, nodeID, chainID, requestID, false)
@@ -383,7 +384,7 @@ func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
 		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, message.GetAccepted, latency)
 
 		// Pass the response to the chain
-		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
+		chain.push(inMsg)
 		return
 
 	case message.GetAncestorsFailed:
@@ -394,7 +395,7 @@ func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
 		cr.removeRequest(uniqueRequestID)
 
 		// Pass the response to the chain
-		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
+		chain.push(inMsg)
 
 	case message.MultiPut:
 		uniqueRequestID, request := cr.markFullfilled(message.GetAncestors, nodeID, chainID, requestID, false)
@@ -411,7 +412,7 @@ func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
 		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, message.GetAncestors, latency)
 
 		// Pass the response to the chain
-		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
+		chain.push(inMsg)
 		return
 
 	case message.QueryFailed:
@@ -424,7 +425,7 @@ func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
 		cr.removeRequest(uniqueRequestID)
 
 		// Pass the response to the chain
-		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
+		chain.push(inMsg)
 
 	case message.Chits:
 		// Note that we treat PullQueryMsg and PushQueryMsg the same for the sake of creating request IDs.
@@ -443,7 +444,7 @@ func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
 		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, request.msgType, latency)
 
 		// Pass the response to the chain
-		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
+		chain.push(inMsg)
 		return
 
 	case message.GetFailed:
@@ -454,12 +455,12 @@ func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
 		cr.removeRequest(uniqueRequestID)
 
 		// Pass the response to the chain
-		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
+		chain.push(inMsg)
 
 	case message.Put:
 		// If this is a gossip message, pass to the chain
 		if requestID == constants.GossipMsgRequestID {
-			chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
+			chain.push(inMsg)
 			return
 		}
 
@@ -477,7 +478,7 @@ func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
 		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, message.Get, latency)
 
 		// Pass the response to the chain
-		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
+		chain.push(inMsg)
 		return
 
 	case message.AppResponse:
@@ -495,10 +496,11 @@ func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
 		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, request.msgType, latency)
 
 		// Pass the response to the chain
-		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
+		chain.push(inMsg)
 		return
+
 	case message.AppGossip:
-		chain.PushMsgWithoutDeadline(inMsg, nodeID, requestID)
+		chain.push(inMsg)
 		return
 
 	default:

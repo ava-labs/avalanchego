@@ -6,7 +6,6 @@ package router
 import (
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -18,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/uptime"
 )
 
@@ -27,7 +26,7 @@ import (
 type Handler struct {
 	ctx *snow.Context
 	// Useful for faking time in tests
-	clock   timer.Clock
+	clock   mockable.Clock
 	mc      message.Creator
 	metrics handlerMetrics
 	// The validator set that validates this chain
@@ -116,12 +115,12 @@ func (h *Handler) Dispatch() {
 		h.unprocessedMsgsCond.L.Unlock()
 
 		// If this message's deadline has passed, don't process it.
-		if !msg.deadline.IsZero() && h.clock.Time().After(msg.deadline) {
-			nodeID := msg.inMsg.NodeID()
+		if !msg.ExpirationTime().IsZero() && h.clock.Time().After(msg.ExpirationTime()) {
+			nodeID := msg.NodeID()
 			h.ctx.Log.Verbo("Dropping message from %s%s due to timeout. msg: %s",
 				constants.NodeIDPrefix, nodeID, msg)
 			h.metrics.expired.Inc()
-			msg.inMsg.OnFinishedHandling()
+			msg.OnFinishedHandling()
 			continue
 		}
 
@@ -156,24 +155,24 @@ func isPeriodic(inMsg message.InboundMessage) bool {
 }
 
 // Dispatch a message to the consensus engine.
-func (h *Handler) handleMsg(wrp messageWrap) error {
+func (h *Handler) handleMsg(msg message.InboundMessage) error {
 	startTime := h.clock.Time()
 
-	isPeriodic := isPeriodic(wrp.inMsg)
+	isPeriodic := isPeriodic(msg)
 	if isPeriodic {
-		h.ctx.Log.Verbo("Forwarding message to consensus: %s", wrp)
+		h.ctx.Log.Verbo("Forwarding message to consensus: %s", msg)
 	} else {
-		h.ctx.Log.Debug("Forwarding message to consensus: %s", wrp)
+		h.ctx.Log.Debug("Forwarding message to consensus: %s", msg)
 	}
 
 	h.ctx.Lock.Lock()
 	defer h.ctx.Lock.Unlock()
 
 	var err error
-	msgType := wrp.inMsg.Op()
+	msgType := msg.Op()
 	switch msgType {
 	case message.Notify:
-		vmMsg := wrp.inMsg.Get(message.VMMessage).(uint32)
+		vmMsg := msg.Get(message.VMMessage).(uint32)
 		err = h.engine.Notify(common.Message(vmMsg))
 		h.metrics.notify.Observe(float64(h.clock.Time().Sub(startTime)))
 	case message.GossipRequest:
@@ -183,16 +182,16 @@ func (h *Handler) handleMsg(wrp messageWrap) error {
 		err = h.engine.Timeout()
 		h.metrics.timeout.Observe(float64(h.clock.Time().Sub(startTime)))
 	default:
-		err = h.handleConsensusMsg(wrp)
+		err = h.handleConsensusMsg(msg)
 		endTime := h.clock.Time()
 		handleDuration := endTime.Sub(startTime)
-		histogram := h.metrics.getMSGHistogram(wrp.inMsg.Op())
+		histogram := h.metrics.getMSGHistogram(msg.Op())
 		histogram.Observe(float64(handleDuration))
-		nodeID := wrp.inMsg.NodeID()
+		nodeID := msg.NodeID()
 		h.cpuTracker.UtilizeTime(nodeID, startTime, endTime)
 	}
 
-	wrp.inMsg.OnFinishedHandling()
+	msg.OnFinishedHandling()
 
 	if isPeriodic {
 		h.ctx.Log.Verbo("Finished handling message: %s", msgType)
@@ -205,126 +204,126 @@ func (h *Handler) handleMsg(wrp messageWrap) error {
 // Assumes [h.ctx.Lock] is locked
 // Relevant fields in msgs must be validated before being dispatched to the engine.
 // An invalid msg is logged and dropped silently since err would cause a chain shutdown.
-func (h *Handler) handleConsensusMsg(wrp messageWrap) error {
-	nodeID := wrp.inMsg.NodeID()
+func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
+	nodeID := msg.NodeID()
 
-	switch wrp.inMsg.Op() {
+	switch msg.Op() {
 	case message.GetAcceptedFrontier:
-		reqID := wrp.inMsg.Get(message.RequestID).(uint32)
+		reqID := msg.Get(message.RequestID).(uint32)
 		return h.engine.GetAcceptedFrontier(nodeID, reqID)
 
 	case message.AcceptedFrontier:
-		reqID := wrp.inMsg.Get(message.RequestID).(uint32)
-		containerIDs, err := message.DecodeContainerIDs(wrp.inMsg)
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerIDs, err := message.DecodeContainerIDs(msg)
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
-				wrp.inMsg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
 			return nil
 		}
 		return h.engine.AcceptedFrontier(nodeID, reqID, containerIDs)
 
 	case message.GetAcceptedFrontierFailed:
-		reqID := wrp.inMsg.Get(message.RequestID).(uint32)
+		reqID := msg.Get(message.RequestID).(uint32)
 		return h.engine.GetAcceptedFrontierFailed(nodeID, reqID)
 
 	case message.GetAccepted:
-		reqID := wrp.inMsg.Get(message.RequestID).(uint32)
-		containerIDs, err := message.DecodeContainerIDs(wrp.inMsg)
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerIDs, err := message.DecodeContainerIDs(msg)
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
-				wrp.inMsg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
 			return nil
 		}
 		return h.engine.GetAccepted(nodeID, reqID, containerIDs)
 
 	case message.Accepted:
-		reqID := wrp.inMsg.Get(message.RequestID).(uint32)
-		containerIDs, err := message.DecodeContainerIDs(wrp.inMsg)
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerIDs, err := message.DecodeContainerIDs(msg)
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
-				wrp.inMsg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
 			return nil
 		}
 		return h.engine.Accepted(nodeID, reqID, containerIDs)
 
 	case message.GetAcceptedFailed:
-		reqID := wrp.inMsg.Get(message.RequestID).(uint32)
+		reqID := msg.Get(message.RequestID).(uint32)
 		return h.engine.GetAcceptedFailed(nodeID, reqID)
 
 	case message.GetAncestors:
-		reqID := wrp.inMsg.Get(message.RequestID).(uint32)
-		containerID, err := ids.ToID(wrp.inMsg.Get(message.ContainerID).([]byte))
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
-				wrp.inMsg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
 			return nil
 		}
 		return h.engine.GetAncestors(nodeID, reqID, containerID)
 
 	case message.GetAncestorsFailed:
-		reqID := wrp.inMsg.Get(message.RequestID).(uint32)
+		reqID := msg.Get(message.RequestID).(uint32)
 		return h.engine.GetAncestorsFailed(nodeID, reqID)
 
 	case message.MultiPut:
-		reqID := wrp.inMsg.Get(message.RequestID).(uint32)
-		containers, ok := wrp.inMsg.Get(message.MultiContainerBytes).([][]byte)
+		reqID := msg.Get(message.RequestID).(uint32)
+		containers, ok := msg.Get(message.MultiContainerBytes).([][]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse MultiContainerBytes",
-				wrp.inMsg.Op(), nodeID, h.engine.Context().ChainID, reqID)
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
 		return h.engine.MultiPut(nodeID, reqID, containers)
 
 	case message.Get:
-		reqID := wrp.inMsg.Get(message.RequestID).(uint32)
-		containerID, err := ids.ToID(wrp.inMsg.Get(message.ContainerID).([]byte))
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
 		h.ctx.Log.AssertNoError(err)
 		return h.engine.Get(nodeID, reqID, containerID)
 
 	case message.GetFailed:
-		reqID := wrp.inMsg.Get(message.RequestID).(uint32)
+		reqID := msg.Get(message.RequestID).(uint32)
 		return h.engine.GetFailed(nodeID, reqID)
 
 	case message.Put:
-		reqID := wrp.inMsg.Get(message.RequestID).(uint32)
-		containerID, err := ids.ToID(wrp.inMsg.Get(message.ContainerID).([]byte))
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
 		h.ctx.Log.AssertNoError(err)
-		container, ok := wrp.inMsg.Get(message.ContainerBytes).([]byte)
+		container, ok := msg.Get(message.ContainerBytes).([]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse ContainerBytes",
-				wrp.inMsg.Op(), nodeID, h.engine.Context().ChainID, reqID)
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
 		return h.engine.Put(nodeID, reqID, containerID, container)
 
 	case message.PushQuery:
-		reqID := wrp.inMsg.Get(message.RequestID).(uint32)
-		containerID, err := ids.ToID(wrp.inMsg.Get(message.ContainerID).([]byte))
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
 		h.ctx.Log.AssertNoError(err)
-		container, ok := wrp.inMsg.Get(message.ContainerBytes).([]byte)
+		container, ok := msg.Get(message.ContainerBytes).([]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse ContainerBytes",
-				wrp.inMsg.Op(), nodeID, h.engine.Context().ChainID, reqID)
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
 		return h.engine.PushQuery(nodeID, reqID, containerID, container)
 
 	case message.PullQuery:
-		reqID := wrp.inMsg.Get(message.RequestID).(uint32)
-		containerID, err := ids.ToID(wrp.inMsg.Get(message.ContainerID).([]byte))
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
 		h.ctx.Log.AssertNoError(err)
 		return h.engine.PullQuery(nodeID, reqID, containerID)
 
 	case message.QueryFailed:
-		reqID := wrp.inMsg.Get(message.RequestID).(uint32)
+		reqID := msg.Get(message.RequestID).(uint32)
 		return h.engine.QueryFailed(nodeID, reqID)
 
 	case message.Chits:
-		reqID := wrp.inMsg.Get(message.RequestID).(uint32)
-		votes, err := message.DecodeContainerIDs(wrp.inMsg)
+		reqID := msg.Get(message.RequestID).(uint32)
+		votes, err := message.DecodeContainerIDs(msg)
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
-				wrp.inMsg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
 			return nil
 		}
 		return h.engine.Chits(nodeID, reqID, votes)
@@ -336,84 +335,57 @@ func (h *Handler) handleConsensusMsg(wrp messageWrap) error {
 		return h.engine.Disconnected(nodeID)
 
 	case message.AppRequest:
-		reqID := wrp.inMsg.Get(message.RequestID).(uint32)
-		appRequestBytes, ok := wrp.inMsg.Get(message.AppRequestBytes).([]byte)
+		reqID := msg.Get(message.RequestID).(uint32)
+		appRequestBytes, ok := msg.Get(message.AppRequestBytes).([]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppRequestBytes",
-				wrp.inMsg.Op(), nodeID, h.engine.Context().ChainID, reqID)
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
 		return h.engine.AppRequest(nodeID, reqID, appRequestBytes)
 
 	case message.AppResponse:
-		reqID := wrp.inMsg.Get(message.RequestID).(uint32)
-		appResponseBytes, ok := wrp.inMsg.Get(message.AppResponseBytes).([]byte)
+		reqID := msg.Get(message.RequestID).(uint32)
+		appResponseBytes, ok := msg.Get(message.AppResponseBytes).([]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppResponseBytes",
-				wrp.inMsg.Op(), nodeID, h.engine.Context().ChainID, reqID)
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
 		return h.engine.AppResponse(nodeID, reqID, appResponseBytes)
 
 	case message.AppGossip:
-		appGossipBytes, ok := wrp.inMsg.Get(message.AppGossipBytes).([]byte)
+		appGossipBytes, ok := msg.Get(message.AppGossipBytes).([]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppGossipBytes",
-				wrp.inMsg.Op(), nodeID, h.engine.Context().ChainID, constants.GossipMsgRequestID)
+				msg.Op(), nodeID, h.engine.Context().ChainID, constants.GossipMsgRequestID)
 			return nil
 		}
 		return h.engine.AppGossip(nodeID, appGossipBytes)
 
 	default:
 		h.ctx.Log.Warn("Attempt to submit to engine unhandled consensus msg %s from from (%s, %s). Dropping it",
-			wrp.inMsg.Op(), nodeID, h.engine.Context().ChainID)
+			msg.Op(), nodeID, h.engine.Context().ChainID)
 		return nil
 	}
-}
-
-func (h *Handler) PushMsgWithDeadline(
-	inMsg message.InboundMessage,
-	nodeID ids.ShortID) {
-	received := h.clock.Time()
-	deadline := received.Add(time.Duration(inMsg.Get(message.Deadline).(uint64)))
-
-	h.push(messageWrap{
-		inMsg:    inMsg,
-		deadline: deadline,
-	})
-}
-
-func (h *Handler) PushMsgWithoutDeadline(
-	inMsg message.InboundMessage,
-	nodeID ids.ShortID,
-	requestID uint32) {
-	h.push(messageWrap{
-		inMsg: inMsg,
-	})
 }
 
 // Timeout passes a new timeout notification to the consensus engine
 func (h *Handler) Timeout() {
 	inMsg := h.mc.InternalTimeout(h.ctx.NodeID)
-	h.push(messageWrap{
-		inMsg: inMsg,
-	})
+	h.push(inMsg)
 }
 
 // Connected passes a new connection notification to the consensus engine
 func (h *Handler) Connected(nodeID ids.ShortID) {
 	inMsg := h.mc.InternalConnected(nodeID)
-	h.push(messageWrap{
-		inMsg: inMsg,
-	})
+	h.push(inMsg)
 }
 
 // Disconnected passes a new connection notification to the consensus engine
 func (h *Handler) Disconnected(nodeID ids.ShortID) {
 	inMsg := h.mc.InternalDisconnected(nodeID)
-	h.push(messageWrap{
-		inMsg: inMsg,
-	})
+	h.push(inMsg)
 }
 
 // Gossip passes a gossip request to the consensus engine
@@ -424,9 +396,7 @@ func (h *Handler) Gossip() {
 	}
 
 	inMsg := h.mc.InternalGossipRequest(h.ctx.NodeID)
-	h.push(messageWrap{
-		inMsg: inMsg,
-	})
+	h.push(inMsg)
 }
 
 // StartShutdown starts the shutdown process for this handler/engine.
@@ -471,8 +441,8 @@ func (h *Handler) shutdown() {
 }
 
 // Assumes [h.unprocessedMsgsCond.L] is not held
-func (h *Handler) push(msg messageWrap) {
-	nodeID := msg.inMsg.NodeID()
+func (h *Handler) push(msg message.InboundMessage) {
+	nodeID := msg.NodeID()
 	if nodeID == ids.ShortEmpty {
 		// This should never happen
 		h.ctx.Log.Warn("message does not have node ID of sender. Message: %s", msg)
@@ -496,9 +466,7 @@ func (h *Handler) dispatchInternal() {
 			}
 			// handle a message from the VM
 			inMsg := h.mc.InternalVMMessage(h.ctx.NodeID, uint32(msg))
-			h.push(messageWrap{
-				inMsg: inMsg,
-			})
+			h.push(inMsg)
 		}
 	}
 }

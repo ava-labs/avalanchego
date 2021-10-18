@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -74,7 +75,7 @@ type AdaptiveTimeoutConfig struct {
 type AdaptiveTimeoutManager struct {
 	lock sync.Mutex
 	// Tells the time. Can be faked for testing.
-	clock                            Clock
+	clock                            mockable.Clock
 	networkTimeoutMetric, avgLatency prometheus.Gauge
 	numTimeouts                      prometheus.Counter
 	// Averages the response time from all peers

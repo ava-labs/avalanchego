@@ -27,7 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -90,7 +90,7 @@ type VM struct {
 	*network
 
 	// Used to get time. Useful for faking time during tests.
-	clock timer.Clock
+	clock mockable.Clock
 
 	// Used to create and use keys.
 	factory crypto.FactorySECP256K1R
@@ -596,7 +596,7 @@ func (vm *VM) nextStakerChangeTime(vs ValidatorState) (time.Time, error) {
 	currentStakers := vs.CurrentStakerChainState()
 	pendingStakers := vs.PendingStakerChainState()
 
-	earliest := timer.MaxTime
+	earliest := mockable.MaxTime
 	if currentStakers := currentStakers.Stakers(); len(currentStakers) > 0 {
 		nextStakerToRemove := currentStakers[0]
 		staker, ok := nextStakerToRemove.UnsignedTx.(TimedTx)
@@ -624,7 +624,7 @@ func (vm *VM) nextStakerChangeTime(vs ValidatorState) (time.Time, error) {
 
 func (vm *VM) CodecRegistry() codec.Registry { return vm.codecRegistry }
 
-func (vm *VM) Clock() *timer.Clock { return &vm.clock }
+func (vm *VM) Clock() *mockable.Clock { return &vm.clock }
 
 func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
 

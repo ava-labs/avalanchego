@@ -1,12 +1,17 @@
 package message
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 var _ InboundMsgBuilder = &inMsgBuilder{}
 
 type InboundMsgBuilder interface {
+	SetTime(t time.Time) // useful in UTs
+
 	Parse(bytes []byte,
 		nodeID ids.ShortID,
 		onFinishedHandling func(),
@@ -117,13 +122,18 @@ type InboundMsgBuilder interface {
 }
 
 type inMsgBuilder struct {
-	c Codec
+	c     Codec
+	clock mockable.Clock
 }
 
 func NewInboundBuilder(c Codec) InboundMsgBuilder {
 	return &inMsgBuilder{
 		c: c,
 	}
+}
+
+func (b *inMsgBuilder) SetTime(t time.Time) {
+	b.clock.Set(t)
 }
 
 func (b *inMsgBuilder) InboundGetAcceptedFrontier(
@@ -133,6 +143,7 @@ func (b *inMsgBuilder) InboundGetAcceptedFrontier(
 	nodeID ids.ShortID,
 	onFinishedHandling func(),
 ) InboundMessage {
+	received := b.clock.Time()
 	return &inboundMessage{
 		op: GetAcceptedFrontier,
 		fields: map[Field]interface{}{
@@ -141,6 +152,7 @@ func (b *inMsgBuilder) InboundGetAcceptedFrontier(
 			Deadline:  deadline,
 		},
 		nodeID:             nodeID,
+		expirationTime:     received.Add(time.Duration(deadline)),
 		onFinishedHandling: onFinishedHandling,
 	}
 }
@@ -172,6 +184,7 @@ func (b *inMsgBuilder) InboundGetAccepted(
 	nodeID ids.ShortID,
 	onFinishedHandling func(),
 ) InboundMessage {
+	received := b.clock.Time()
 	return &inboundMessage{
 		op: GetAccepted,
 		fields: map[Field]interface{}{
@@ -181,6 +194,7 @@ func (b *inMsgBuilder) InboundGetAccepted(
 			ContainerIDs: encodeContainerIDs(containerIDs),
 		},
 		nodeID:             nodeID,
+		expirationTime:     received.Add(time.Duration(deadline)),
 		onFinishedHandling: onFinishedHandling,
 	}
 }
@@ -213,6 +227,7 @@ func (b *inMsgBuilder) InboundPushQuery(
 	nodeID ids.ShortID,
 	onFinishedHandling func(),
 ) InboundMessage {
+	received := b.clock.Time()
 	return &inboundMessage{
 		op: PushQuery,
 		fields: map[Field]interface{}{
@@ -223,6 +238,7 @@ func (b *inMsgBuilder) InboundPushQuery(
 			ContainerBytes: container,
 		},
 		nodeID:             nodeID,
+		expirationTime:     received.Add(time.Duration(deadline)),
 		onFinishedHandling: onFinishedHandling,
 	}
 }
@@ -235,6 +251,7 @@ func (b *inMsgBuilder) InboundPullQuery(
 	nodeID ids.ShortID,
 	onFinishedHandling func(),
 ) InboundMessage {
+	received := b.clock.Time()
 	return &inboundMessage{
 		op: PullQuery,
 		fields: map[Field]interface{}{
@@ -244,6 +261,7 @@ func (b *inMsgBuilder) InboundPullQuery(
 			ContainerID: containerID[:],
 		},
 		nodeID:             nodeID,
+		expirationTime:     received.Add(time.Duration(deadline)),
 		onFinishedHandling: onFinishedHandling,
 	}
 }
@@ -275,6 +293,7 @@ func (b *inMsgBuilder) InboundAppRequest(
 	nodeID ids.ShortID,
 	onFinishedHandling func(),
 ) InboundMessage {
+	received := b.clock.Time()
 	return &inboundMessage{
 		op: AppRequest,
 		fields: map[Field]interface{}{
@@ -284,6 +303,7 @@ func (b *inMsgBuilder) InboundAppRequest(
 			AppRequestBytes: AppRequestBytes,
 		},
 		nodeID:             nodeID,
+		expirationTime:     received.Add(time.Duration(deadline)),
 		onFinishedHandling: onFinishedHandling,
 	}
 }
@@ -315,6 +335,7 @@ func (b *inMsgBuilder) InboundGet(
 	nodeID ids.ShortID,
 	onFinishedHandling func(),
 ) InboundMessage { // used in UTs only
+	received := b.clock.Time()
 	return &inboundMessage{
 		op: Put,
 		fields: map[Field]interface{}{
@@ -324,6 +345,7 @@ func (b *inMsgBuilder) InboundGet(
 			ContainerID: containerID[:],
 		},
 		nodeID:             nodeID,
+		expirationTime:     received.Add(time.Duration(deadline)),
 		onFinishedHandling: onFinishedHandling,
 	}
 }

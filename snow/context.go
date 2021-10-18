@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 type EventDispatcher interface {
@@ -67,7 +67,7 @@ type Context struct {
 	// Epoch management
 	EpochFirstTransition time.Time
 	EpochDuration        time.Duration
-	Clock                timer.Clock
+	Clock                mockable.Clock
 
 	// Non-zero iff this chain bootstrapped.
 	bootstrapped utils.AtomicBool

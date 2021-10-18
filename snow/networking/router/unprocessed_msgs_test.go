@@ -5,6 +5,7 @@ package router
 
 import (
 	"testing"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -26,19 +27,18 @@ func TestUnprocessedMsgs(t *testing.T) {
 	uIntf, err := newUnprocessedMsgs(logging.NoLog{}, vdrs, cpuTracker, "", prometheus.NewRegistry())
 	assert.NoError(err)
 	u := uIntf.(*unprocessedMsgsImpl)
+	currentTime := time.Now()
+	u.clock.Set(currentTime)
 
 	mc, err := message.NewCreator(prometheus.NewRegistry(), true /*compressionEnabled*/, "dummyNamespace")
 	assert.NoError(err)
-	inPutMsg := mc.InboundPut(ids.Empty,
+	mc.SetTime(currentTime)
+	msg1 := mc.InboundPut(ids.Empty,
 		0,
 		ids.GenerateTestID(),
 		nil,
 		vdr1ID,
 		dummyOnFinishedHandling)
-
-	msg1 := messageWrap{
-		inMsg: inPutMsg,
-	}
 
 	// Push then pop should work regardless of utilization when there are
 	// no other messages on [u.msgs]
@@ -83,10 +83,8 @@ func TestUnprocessedMsgs(t *testing.T) {
 	assert.EqualValues(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	assert.EqualValues(1, u.Len())
 
-	inGetMsg := mc.InboundGet(ids.Empty, 0, 0, ids.Empty, vdr2ID, dummyOnFinishedHandling)
-	msg2 := messageWrap{
-		inMsg: inGetMsg,
-	}
+	msg2 := mc.InboundGet(ids.Empty, 0, 0, ids.Empty, vdr2ID, dummyOnFinishedHandling)
+
 	// Push msg2 from vdr2ID
 	u.Push(msg2)
 	assert.EqualValues(2, u.Len())
@@ -106,15 +104,8 @@ func TestUnprocessedMsgs(t *testing.T) {
 	// u is now empty
 	// Non-validators should be able to put messages onto [u]
 	nonVdrNodeID1, nonVdrNodeID2 := ids.GenerateTestShortID(), ids.GenerateTestShortID()
-	inPullQueryMsg := mc.InboundPullQuery(ids.Empty, 0, 0, ids.Empty, nonVdrNodeID1, dummyOnFinishedHandling)
-	msg3 := messageWrap{
-		inMsg: inPullQueryMsg,
-	}
-
-	inPushQueryMsg := mc.InboundPushQuery(ids.Empty, 0, 0, ids.Empty, nil, nonVdrNodeID2, dummyOnFinishedHandling)
-	msg4 := messageWrap{
-		inMsg: inPushQueryMsg,
-	}
+	msg3 := mc.InboundPullQuery(ids.Empty, 0, 0, ids.Empty, nonVdrNodeID1, dummyOnFinishedHandling)
+	msg4 := mc.InboundPushQuery(ids.Empty, 0, 0, ids.Empty, nil, nonVdrNodeID2, dummyOnFinishedHandling)
 	u.Push(msg3)
 	u.Push(msg4)
 	u.Push(msg1)

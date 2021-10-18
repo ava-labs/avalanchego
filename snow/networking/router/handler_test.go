@@ -53,6 +53,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	assert.NoError(t, err)
 
 	pastTime := time.Now()
+	mc.SetTime(pastTime)
 	handler.clock.Set(pastTime)
 
 	nodeID := ids.ShortEmpty
@@ -61,14 +62,15 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	deadline := uint64(1)
 	chainID := ids.ID{}
 	msg := mc.InboundGetAcceptedFrontier(chainID, reqID, deadline, nodeID, dummyOnFinishedHandling)
-	handler.PushMsgWithDeadline(msg, ids.ShortID{})
+	handler.push(msg)
 
 	currentTime := time.Now().Add(time.Second)
+	mc.SetTime(currentTime)
 	handler.clock.Set(currentTime)
 
 	reqID++
 	msg = mc.InboundGetAccepted(chainID, reqID, deadline, nil, nodeID, dummyOnFinishedHandling)
-	handler.PushMsgWithDeadline(msg, ids.ShortID{})
+	handler.push(msg)
 
 	go handler.Dispatch()
 
@@ -121,7 +123,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	reqID := uint32(1)
 	deadline := uint64(1)
 	msg := mc.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID, dummyOnFinishedHandling)
-	handler.PushMsgWithDeadline(msg, ids.ShortID{})
+	handler.push(msg)
 
 	ticker := time.NewTicker(20 * time.Millisecond)
 	select {
@@ -172,7 +174,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	chainID := ids.Empty
 	reqID := uint32(1)
 	inMsg := mc.InternalGetFailed(nodeID, chainID, reqID)
-	handler.PushMsgWithoutDeadline(inMsg, nodeID, reqID)
+	handler.push(inMsg)
 
 	ticker := time.NewTicker(20 * time.Millisecond)
 	select {

@@ -37,7 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -116,7 +116,7 @@ type network struct {
 	// disabled. So, cryptographically secure random number generation isn't
 	// used here.
 	dummyNodeID uint32
-	clock       timer.Clock
+	clock       mockable.Clock
 	mc          message.Creator
 
 	stateLock sync.RWMutex

@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	"github.com/ava-labs/avalanchego/codec"
@@ -109,7 +109,7 @@ func NewIndexer(config Config) (Indexer, error) {
 // indexer implements Indexer
 type indexer struct {
 	codec  codec.Manager
-	clock  timer.Clock
+	clock  mockable.Clock
 	lock   sync.RWMutex
 	log    logging.Logger
 	db     database.Database
