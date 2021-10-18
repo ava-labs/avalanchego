@@ -65,11 +65,6 @@ type Bootstrapper struct {
 	parser *parser
 
 	awaitingTimeout bool
-
-	// Cache of blocks.
-	// Key: Block ID
-	// Value: The block
-	processingBlocks map[ids.ID]snowman.Block
 }
 
 // Initialize this engine.
@@ -85,7 +80,6 @@ func (b *Bootstrapper) Initialize(
 	b.OnFinished = onFinished
 	b.executedStateTransitions = math.MaxInt32
 	b.startingAcceptedFrontier = ids.Set{}
-	b.processingBlocks = make(map[ids.ID]snowman.Block)
 
 	lastAcceptedID, err := b.VM.LastAccepted()
 	if err != nil {
@@ -155,7 +149,6 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 			}
 			if blk.Status() == choices.Accepted {
 				b.Blocked.RemoveMissingID(blkID)
-				delete(b.processingBlocks, blkID)
 			} else {
 				toProcess = append(toProcess, blk)
 			}
@@ -169,7 +162,7 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 
 	// Process received blocks
 	for _, blk := range toProcess {
-		if err := b.process(blk); err != nil {
+		if err := b.process(blk, nil); err != nil {
 			return err
 		}
 	}
@@ -236,7 +229,9 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 			wantedBlk, actualID)
 		return b.fetch(wantedBlkID)
 	}
-	b.processingBlocks[wantedBlkID] = wantedBlk
+
+	processingBlocks := make(map[ids.ID]snowman.Block, lenBlks)
+	processingBlocks[wantedBlkID] = wantedBlk
 
 	for _, blkBytes := range blks[1:] {
 		blk, err := b.VM.ParseBlock(blkBytes)
@@ -244,11 +239,11 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 			b.Ctx.Log.Debug("Failed to parse block: %s", err)
 			b.Ctx.Log.Verbo("block: %s", formatting.DumpBytes{Bytes: blkBytes})
 		} else {
-			b.processingBlocks[blk.ID()] = blk
+			processingBlocks[blk.ID()] = blk
 		}
 	}
 
-	return b.process(wantedBlk)
+	return b.process(wantedBlk, processingBlocks)
 }
 
 // GetAncestorsFailed is called when a GetAncestors message we sent fails
@@ -276,7 +271,7 @@ func (b *Bootstrapper) Timeout() error {
 }
 
 // process a block
-func (b *Bootstrapper) process(blk snowman.Block) error {
+func (b *Bootstrapper) process(blk snowman.Block, processingBlocks map[ids.ID]snowman.Block) error {
 	status := blk.Status()
 	blkID := blk.ID()
 	blkHeight := blk.Height()
@@ -304,11 +299,19 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 
 		// Traverse to the next block regardless of if the block is pushed
 		blkID = blk.Parent()
-		blk, err = b.GetBlock(blkID)
-		if err != nil {
-			status = choices.Unknown
-		} else {
+		processingBlock, ok := processingBlocks[blkID]
+		// first check processing blocks
+		if ok {
+			blk = processingBlock
 			status = blk.Status()
+		} else {
+			// if not available in processing blocks, get block
+			blk, err = b.GetBlock(blkID)
+			if err != nil {
+				status = choices.Unknown
+			} else {
+				status = blk.Status()
+			}
 		}
 
 		if !pushed {
@@ -414,7 +417,6 @@ func (b *Bootstrapper) finish() error {
 		return err
 	}
 	b.Ctx.Bootstrapped()
-	b.processingBlocks = make(map[ids.ID]snowman.Block)
 	return nil
 }
 
@@ -441,8 +443,5 @@ func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
 // GetBlock gets the most up-to date block with ID [id].
 // Return an error if the block can't be found.
 func (b *Bootstrapper) GetBlock(id ids.ID) (snowman.Block, error) {
-	if block, ok := b.processingBlocks[id]; ok {
-		return block, nil
-	}
 	return b.VM.GetBlock(id)
 }
