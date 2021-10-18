@@ -256,7 +256,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(SnowEpochDurationKey, genesis.LocalParams.EpochDuration, "Duration of each epoch")
 
 	// Metrics
-	fs.Bool(MeterVMsEnabledKey, false, "Enable Meter VMs to track VM performance with more granularity")
+	fs.Bool(MeterVMsEnabledKey, true, "Enable Meter VMs to track VM performance with more granularity")
 
 	// IPC
 	fs.String(IpcsChainIDsKey, "", "Comma separated list of chain ids to add to the IPC engine. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
