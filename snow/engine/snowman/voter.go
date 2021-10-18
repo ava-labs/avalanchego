@@ -94,8 +94,7 @@ votesLoop:
 		blk, err := v.t.GetBlock(rootID)
 		// If we cannot retrieve the block, drop [vote]
 		if err != nil {
-			v.t.Ctx.Log.Debug("Dropping %d vote(s) for %s because the block or parent blocks couldn't be fetched",
-				count, vote)
+			v.t.Ctx.Log.Debug("Dropping %d vote(s) for %s because %s couldn't be fetched", count, vote, rootID)
 			continue
 		}
 

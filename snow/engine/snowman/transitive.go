@@ -720,10 +720,12 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		return t.errs.Err
 	}
 	t.nonVerifieds.Remove(blkID)
+	t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
 	t.Ctx.Log.Verbo("adding block to consensus: %s", blkID)
 	wrappedBlk := &memoryBlock{
-		Block: blk,
-		tree:  t.nonVerifieds,
+		Block:   blk,
+		metrics: &t.metrics,
+		tree:    t.nonVerifieds,
 	}
 	if err := t.Consensus.Add(wrappedBlk); err != nil {
 		return err
@@ -751,9 +753,11 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 					// correctly verified will be passed to consensus as processing block
 					// no need to keep it anymore
 					t.nonVerifieds.Remove(blk.ID())
+					t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
 					wrappedBlk := &memoryBlock{
-						Block: blk,
-						tree:  t.nonVerifieds,
+						Block:   blk,
+						metrics: &t.metrics,
+						tree:    t.nonVerifieds,
 					}
 					if err := t.Consensus.Add(wrappedBlk); err != nil {
 						return err
@@ -865,14 +869,12 @@ func (t *Transitive) addToNonVerifieds(blk snowman.Block) {
 	// decided parents should not be in this map.
 	if t.nonVerifieds.Has(parentID) || t.parentProcessing(blk) {
 		t.nonVerifieds.Add(blk.ID(), parentID)
+		t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
 	}
 }
 
 func (t *Transitive) parentProcessing(blk snowman.Block) bool {
 	parentID := blk.Parent()
-	if parentBlk, err := t.GetBlock(parentID); err == nil &&
-		!parentBlk.Status().Decided() && t.Consensus.DecidedOrProcessing(parentBlk) {
-		return true
-	}
-	return false
+	parentBlk, err := t.GetBlock(parentID)
+	return err == nil && !parentBlk.Status().Decided() && t.Consensus.DecidedOrProcessing(parentBlk)
 }

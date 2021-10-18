@@ -13,6 +13,7 @@ type AncestorTree interface {
 	GetRoot(blkID ids.ID) ids.ID
 	Remove(blkID ids.ID)
 	RemoveSubtree(blkID ids.ID)
+	Len() int
 }
 
 type ancestorTree struct {
@@ -57,26 +58,6 @@ func (p *ancestorTree) Has(blkID ids.ID) bool {
 
 // Remove removes blkID from the tree
 func (p *ancestorTree) Remove(blkID ids.ID) {
-	p.remove(blkID)
-}
-
-// RemoveSubtree removes whole subtree that blkID holds
-func (p *ancestorTree) RemoveSubtree(blkID ids.ID) {
-	childrenList := []ids.ID{blkID}
-	for len(childrenList) > 0 {
-		newChildrenSize := len(childrenList) - 1
-		childID := childrenList[newChildrenSize]
-		childrenList = childrenList[:newChildrenSize]
-		p.remove(childID)
-		// get children of child
-		for grandChildID := range p.parentToChildren[childID] {
-			childrenList = append(childrenList, grandChildID)
-		}
-	}
-}
-
-// remove is a helper to remove blkID from tree
-func (p *ancestorTree) remove(blkID ids.ID) {
 	parent, ok := p.childToParent[blkID]
 	if !ok {
 		return
@@ -89,5 +70,25 @@ func (p *ancestorTree) remove(blkID ids.ID) {
 	// this parent has no more children, remove it from map
 	if children.Len() == 0 {
 		delete(p.parentToChildren, parent)
+	}
+}
+
+// Returns tree length
+func (p *ancestorTree) Len() int {
+	return len(p.childToParent)
+}
+
+// RemoveSubtree removes whole subtree that blkID holds
+func (p *ancestorTree) RemoveSubtree(blkID ids.ID) {
+	childrenList := []ids.ID{blkID}
+	for len(childrenList) > 0 {
+		newChildrenSize := len(childrenList) - 1
+		childID := childrenList[newChildrenSize]
+		childrenList = childrenList[:newChildrenSize]
+		p.Remove(childID)
+		// get children of child
+		for grandChildID := range p.parentToChildren[childID] {
+			childrenList = append(childrenList, grandChildID)
+		}
 	}
 }
