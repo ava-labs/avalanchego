@@ -668,14 +668,15 @@ func (m *manager) createSnowmanChain(
 
 			// Initialize the validator state for future chains.
 			m.validatorState = validators.NewLockedState(&ctx.Lock, valState)
+
+			// Notice that this context is left unlocked. This is because the
+			// lock will already be held when accessing these values on the
+			// P-chain.
+			ctx.ValidatorState = valState
 		} else {
 			m.validatorState = validators.NewNoState()
+			ctx.ValidatorState = m.validatorState
 		}
-
-		// Notice that this context is left unlocked. This is because the
-		// lock will already be held when accessing these values on the
-		// P-chain.
-		ctx.ValidatorState = m.validatorState
 	}
 
 	// Initialize the ProposerVM and the vm wrapped inside it
