@@ -16,7 +16,7 @@ type memoryBlock struct {
 
 // Accept accepts the underlying block & removes sibling subtrees
 func (mb *memoryBlock) Accept() error {
-	mb.tree.RemoveSiblings(mb.ID())
+	mb.tree.RemoveSubtree(mb.Parent())
 	return mb.Block.Accept()
 }
 
