@@ -45,9 +45,9 @@ var (
 	errNetworkClosed       = errors.New("network closed")
 	errPeerIsMyself        = errors.New("peer is myself")
 	errNoPrimaryValidators = errors.New("no default subnet validators")
-)
 
-var _ Network = (*network)(nil)
+	_ Network = &network{}
+)
 
 func init() { rand.Seed(time.Now().UnixNano()) }
 
@@ -335,22 +335,8 @@ func (n *network) Send(msg message.OutboundMessage, nodeIDs ids.ShortSet, subnet
 		now    = n.clock.Time()
 		msgLen = len(msg.Bytes())
 		sentTo = ids.NewShortSet(nodeIDs.Len())
+		op     = msg.Op()
 	)
-
-	op := msg.Op()
-
-	canModifyMsg := false
-	switch op {
-	case message.AcceptedFrontier,
-		message.Accepted,
-		message.GetAncestors,
-		message.MultiPut,
-		message.Get,
-		message.Put,
-		message.Chits,
-		message.AppResponse:
-		canModifyMsg = true
-	}
 
 	msgMetrics := n.metrics.message(op)
 	if msgMetrics == nil {
@@ -359,23 +345,13 @@ func (n *network) Send(msg message.OutboundMessage, nodeIDs ids.ShortSet, subnet
 	}
 
 	// retrieve target peers
-	peersList := make([]*peer, 0, len(nodeIDs))
-	switch op {
-	case message.AppGossip:
-		peersList = n.getSubnetPeers(nodeIDs, subnetID, validatorOnly)
-		if peersList == nil {
-			return sentTo
-		}
-	default:
-		for nodeID := range nodeIDs {
-			peer, _ := n.peers.getByID(nodeID)
-			peersList = append(peersList, peer)
-		}
-	}
+	peers := n.getPeers(nodeIDs, subnetID, validatorOnly)
+
+	canModifyMsg := nodeIDs.Len() == 0
 
 	// send to peer and update metrics
 	// note: peer may be nil
-	for _, peer := range peersList {
+	for _, peer := range peers {
 		if peer != nil && peer.finishedHandshake.GetValue() && peer.Send(msg, canModifyMsg) {
 			sentTo.Add(peer.nodeID)
 
@@ -1268,7 +1244,7 @@ func (n *network) getPeerElements(nodeIDs ids.ShortSet) []*peerElement {
 
 // Safe copy the peers
 // Assumes [n.stateLock] is not held.
-func (n *network) getSubnetPeers(nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) []*peer {
+func (n *network) getPeers(nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) []*peer {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
@@ -1276,12 +1252,19 @@ func (n *network) getSubnetPeers(nodeIDs ids.ShortSet, subnetID ids.ID, validato
 		return nil
 	}
 
-	peers := make([]*peer, 0, nodeIDs.Len())
+	var (
+		peers = make([]*peer, nodeIDs.Len())
+		index int
+	)
 	for nodeID := range nodeIDs {
 		peer, ok := n.peers.getByID(nodeID)
-		if ok && peer.finishedHandshake.GetValue() && peer.trackedSubnets.Contains(subnetID) && (!validatorOnly || n.config.Validators.Contains(subnetID, nodeID)) {
-			peers = append(peers, peer)
+		if ok &&
+			peer.finishedHandshake.GetValue() &&
+			(subnetID == constants.PrimaryNetworkID || peer.trackedSubnets.Contains(subnetID)) &&
+			(!validatorOnly || n.config.Validators.Contains(subnetID, nodeID)) {
+			peers[index] = peer
 		}
+		index++
 	}
 	return peers
 }
