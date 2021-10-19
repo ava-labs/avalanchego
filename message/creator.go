@@ -10,7 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var _ Creator = (*creator)(nil)
+var _ Creator = &creator{}
 
 type Creator interface {
 	OutboundMsgBuilder
@@ -30,13 +30,9 @@ func NewCreator(metrics prometheus.Registerer, compressionEnabled bool, parentNa
 	if err != nil {
 		return nil, err
 	}
-	outBuilder := NewOutboundBuilder(codec, compressionEnabled)
-	inBuilder := NewInboundBuilder(codec)
-	intBuilder := NewInternalBuilder(codec)
-	res := &creator{
-		OutboundMsgBuilder: outBuilder,
-		InboundMsgBuilder:  inBuilder,
-		InternalMsgBuilder: intBuilder,
-	}
-	return res, nil
+	return &creator{
+		OutboundMsgBuilder: NewOutboundBuilder(codec, compressionEnabled),
+		InboundMsgBuilder:  NewInboundBuilder(codec),
+		InternalMsgBuilder: NewInternalBuilder(),
+	}, nil
 }

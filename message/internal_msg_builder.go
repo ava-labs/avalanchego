@@ -4,7 +4,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ InternalMsgBuilder = &internalMsgBuilder{}
+var _ InternalMsgBuilder = internalMsgBuilder{}
 
 type InternalMsgBuilder interface {
 	InternalGetAcceptedFrontierFailed(
@@ -50,17 +50,13 @@ type InternalMsgBuilder interface {
 	InternalGossipRequest(nodeID ids.ShortID) InboundMessage
 }
 
-type internalMsgBuilder struct {
-	c Codec
+type internalMsgBuilder struct{}
+
+func NewInternalBuilder() InternalMsgBuilder {
+	return internalMsgBuilder{}
 }
 
-func NewInternalBuilder(c Codec) InternalMsgBuilder {
-	return &internalMsgBuilder{
-		c: c,
-	}
-}
-
-func (b *internalMsgBuilder) InternalGetAcceptedFrontierFailed(
+func (internalMsgBuilder) InternalGetAcceptedFrontierFailed(
 	nodeID ids.ShortID,
 	chainID ids.ID,
 	requestID uint32,
@@ -75,7 +71,7 @@ func (b *internalMsgBuilder) InternalGetAcceptedFrontierFailed(
 	}
 }
 
-func (b *internalMsgBuilder) InternalGetAcceptedFailed(
+func (internalMsgBuilder) InternalGetAcceptedFailed(
 	nodeID ids.ShortID,
 	chainID ids.ID,
 	requestID uint32,
@@ -90,7 +86,7 @@ func (b *internalMsgBuilder) InternalGetAcceptedFailed(
 	}
 }
 
-func (b *internalMsgBuilder) InternalGetAncestorsFailed(
+func (internalMsgBuilder) InternalGetAncestorsFailed(
 	nodeID ids.ShortID,
 	chainID ids.ID,
 	requestID uint32,
@@ -105,7 +101,7 @@ func (b *internalMsgBuilder) InternalGetAncestorsFailed(
 	}
 }
 
-func (b *internalMsgBuilder) InternalQueryFailed(
+func (internalMsgBuilder) InternalQueryFailed(
 	nodeID ids.ShortID,
 	chainID ids.ID,
 	requestID uint32,
@@ -120,7 +116,7 @@ func (b *internalMsgBuilder) InternalQueryFailed(
 	}
 }
 
-func (b *internalMsgBuilder) InternalAppRequestFailed(
+func (internalMsgBuilder) InternalAppRequestFailed(
 	nodeID ids.ShortID,
 	chainID ids.ID,
 	requestID uint32,
@@ -135,7 +131,7 @@ func (b *internalMsgBuilder) InternalAppRequestFailed(
 	}
 }
 
-func (b *internalMsgBuilder) InternalGetFailed(
+func (internalMsgBuilder) InternalGetFailed(
 	nodeID ids.ShortID,
 	chainID ids.ID,
 	requestID uint32,
@@ -150,7 +146,7 @@ func (b *internalMsgBuilder) InternalGetFailed(
 	}
 }
 
-func (b *internalMsgBuilder) InternalTimeout(nodeID ids.ShortID) InboundMessage {
+func (internalMsgBuilder) InternalTimeout(nodeID ids.ShortID) InboundMessage {
 	return &inboundMessage{
 		op:     Timeout,
 		fields: make(map[Field]interface{}),
@@ -158,7 +154,7 @@ func (b *internalMsgBuilder) InternalTimeout(nodeID ids.ShortID) InboundMessage 
 	}
 }
 
-func (b *internalMsgBuilder) InternalConnected(nodeID ids.ShortID) InboundMessage {
+func (internalMsgBuilder) InternalConnected(nodeID ids.ShortID) InboundMessage {
 	return &inboundMessage{
 		op:     Connected,
 		fields: make(map[Field]interface{}),
@@ -166,7 +162,7 @@ func (b *internalMsgBuilder) InternalConnected(nodeID ids.ShortID) InboundMessag
 	}
 }
 
-func (b *internalMsgBuilder) InternalDisconnected(nodeID ids.ShortID) InboundMessage {
+func (internalMsgBuilder) InternalDisconnected(nodeID ids.ShortID) InboundMessage {
 	return &inboundMessage{
 		op:     Disconnected,
 		nodeID: nodeID,
@@ -174,7 +170,7 @@ func (b *internalMsgBuilder) InternalDisconnected(nodeID ids.ShortID) InboundMes
 	}
 }
 
-func (b *internalMsgBuilder) InternalVMMessage(
+func (internalMsgBuilder) InternalVMMessage(
 	nodeID ids.ShortID,
 	notification uint32,
 ) InboundMessage {
@@ -187,7 +183,7 @@ func (b *internalMsgBuilder) InternalVMMessage(
 	}
 }
 
-func (b *internalMsgBuilder) InternalGossipRequest(
+func (internalMsgBuilder) InternalGossipRequest(
 	nodeID ids.ShortID,
 ) InboundMessage {
 	return &inboundMessage{
