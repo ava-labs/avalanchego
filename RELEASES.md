@@ -31,7 +31,7 @@ This version is backwards compatible to [v1.6.0](https://github.com/ava-labs/ava
 
 ### Coreth
 
-- Updated Geth dependency to `v1.10.10`.
+- Applied callTracer fault handling fix.
 - Initialized multicoin functions in the runtime environment.
 
 ### ProposerVM
