@@ -215,7 +215,3 @@ func (c *codec) Parse(bytes []byte, nodeID ids.ShortID, onFinishedHandling func(
 		onFinishedHandling:    onFinishedHandling,
 	}, p.Err
 }
-
-func (c *codec) ReturnBytes(msg []byte) {
-	c.byteSlicePool.Put(msg)
-}

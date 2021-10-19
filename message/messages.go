@@ -100,8 +100,8 @@ func (outMsg *outboundMessage) AddRef() {
 	outMsg.refs++
 }
 
-// release msg bytes to a memory pool for subsequent reuse
-// msg cannot be used anymore once ReturnBytes is called
+// Once the reference count of this message goes to 0, the byte slice should not
+// be inspected.
 func (outMsg *outboundMessage) DecRef() {
 	outMsg.refLock.Lock()
 	defer outMsg.refLock.Unlock()
