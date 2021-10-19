@@ -82,8 +82,6 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPackIPCertList
 	case TrackedSubnets:
 		return wrappers.TryPackHashes
-	case VMMessage:
-		return wrappers.TryPackInt
 	default:
 		return nil
 	}
@@ -128,8 +126,6 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackIPCertList
 	case TrackedSubnets:
 		return wrappers.TryUnpackHashes
-	case VMMessage:
-		return wrappers.TryUnpackInt
 	default:
 		return nil
 	}
@@ -178,7 +174,7 @@ func (f Field) String() string {
 	case TrackedSubnets:
 		return "TrackedSubnets"
 	case VMMessage:
-		return "VmMessage"
+		return "VMMessage"
 	default:
 		return "Unknown Field"
 	}
