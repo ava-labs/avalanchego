@@ -92,7 +92,7 @@ func (s *Sender) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, requestID uint32)
 		timeoutDuration := s.timeouts.TimeoutDuration()
 		deadline := uint64(time.Now().Add(timeoutDuration).Unix())
 
-		inMsg := s.msgCreator.InboundGetAcceptedFrontier(s.ctx.ChainID, requestID, deadline, s.ctx.NodeID, func() {})
+		inMsg := s.msgCreator.InboundGetAcceptedFrontier(s.ctx.ChainID, requestID, deadline, s.ctx.NodeID)
 
 		// Tell the router to expect a reply message from this node
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.GetAcceptedFrontier)
@@ -122,7 +122,7 @@ func (s *Sender) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, requestID uint32)
 
 func (s *Sender) SendAcceptedFrontier(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
 	if nodeID == s.ctx.NodeID {
-		inMsg := s.msgCreator.InboundAcceptedFrontier(s.ctx.ChainID, requestID, containerIDs, nodeID, func() {})
+		inMsg := s.msgCreator.InboundAcceptedFrontier(s.ctx.ChainID, requestID, containerIDs, nodeID)
 		go s.router.HandleInbound(inMsg)
 		return
 	}
@@ -158,7 +158,7 @@ func (s *Sender) SendGetAccepted(nodeIDs ids.ShortSet, requestID uint32, contain
 		timeoutDuration := s.timeouts.TimeoutDuration()
 		deadline := uint64(time.Now().Add(timeoutDuration).Unix())
 
-		inMsg := s.msgCreator.InboundGetAccepted(s.ctx.ChainID, requestID, deadline, containerIDs, s.ctx.NodeID, func() {})
+		inMsg := s.msgCreator.InboundGetAccepted(s.ctx.ChainID, requestID, deadline, containerIDs, s.ctx.NodeID)
 
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.GetAccepted)
 		go s.router.HandleInbound(inMsg)
@@ -204,7 +204,7 @@ func (s *Sender) SendGetAccepted(nodeIDs ids.ShortSet, requestID uint32, contain
 
 func (s *Sender) SendAccepted(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
 	if nodeID == s.ctx.NodeID {
-		inMsg := s.msgCreator.InboundAccepted(s.ctx.ChainID, requestID, containerIDs, nodeID, func() {})
+		inMsg := s.msgCreator.InboundAccepted(s.ctx.ChainID, requestID, containerIDs, nodeID)
 		go s.router.HandleInbound(inMsg)
 		return
 	}
@@ -397,7 +397,7 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 		timeoutDuration := s.timeouts.TimeoutDuration()
 		deadline := uint64(time.Now().Add(timeoutDuration).Unix())
 
-		inMsg := s.msgCreator.InboundPushQuery(s.ctx.ChainID, requestID, deadline, containerID, container, s.ctx.NodeID, func() {})
+		inMsg := s.msgCreator.InboundPushQuery(s.ctx.ChainID, requestID, deadline, containerID, container, s.ctx.NodeID)
 
 		// Register a timeout in case I don't respond to myself
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.PushQuery)
@@ -478,7 +478,7 @@ func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, container
 		nodeIDs.Remove(s.ctx.NodeID)
 
 		deadline := uint64(time.Now().Add(timeoutDuration).Unix())
-		inMsg := s.msgCreator.InboundPullQuery(s.ctx.ChainID, requestID, deadline, containerID, s.ctx.NodeID, func() {})
+		inMsg := s.msgCreator.InboundPullQuery(s.ctx.ChainID, requestID, deadline, containerID, s.ctx.NodeID)
 
 		// Register a timeout in case I don't respond to myself
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.PullQuery)
@@ -532,7 +532,7 @@ func (s *Sender) SendChits(nodeID ids.ShortID, requestID uint32, votes []ids.ID)
 	// If [nodeID] is myself, send this message directly
 	// to my own router rather than sending it over the network
 	if nodeID == s.ctx.NodeID {
-		inMsg := s.msgCreator.InboundChits(s.ctx.ChainID, requestID, votes, nodeID, func() {})
+		inMsg := s.msgCreator.InboundChits(s.ctx.ChainID, requestID, votes, nodeID)
 		go s.router.HandleInbound(inMsg)
 		return
 	}
@@ -572,7 +572,7 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 		nodeIDs.Remove(s.ctx.NodeID)
 
 		deadline := uint64(time.Now().Add(timeoutDuration).Unix())
-		inMsg := s.msgCreator.InboundAppRequest(s.ctx.ChainID, requestID, deadline, appRequestBytes, s.ctx.NodeID, func() {})
+		inMsg := s.msgCreator.InboundAppRequest(s.ctx.ChainID, requestID, deadline, appRequestBytes, s.ctx.NodeID)
 
 		// Register a timeout in case I don't respond to myself
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.AppRequest)
@@ -634,7 +634,7 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 // given node
 func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte) error {
 	if nodeID == s.ctx.NodeID {
-		inMsg := s.msgCreator.InboundAppResponse(s.ctx.ChainID, requestID, appResponseBytes, nodeID, func() {})
+		inMsg := s.msgCreator.InboundAppResponse(s.ctx.ChainID, requestID, appResponseBytes, nodeID)
 		go s.router.HandleInbound(inMsg)
 		return nil
 	}

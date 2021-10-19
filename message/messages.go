@@ -71,7 +71,11 @@ func (inMsg *inboundMessage) ExpirationTime() time.Time { return inMsg.expiratio
 
 // OnFinishedHandling is the function to be called once inboundMessage is complete
 // inMsg.onFinishedHandling() must be not-nil
-func (inMsg *inboundMessage) OnFinishedHandling() { inMsg.onFinishedHandling() }
+func (inMsg *inboundMessage) OnFinishedHandling() {
+	if inMsg.onFinishedHandling != nil {
+		inMsg.onFinishedHandling()
+	}
+}
 
 // Op returns the value of the specified operation in this message
 func (outMsg *outboundMessage) Op() Op { return outMsg.op }

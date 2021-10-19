@@ -22,7 +22,6 @@ type InboundMsgBuilder interface {
 		requestID uint32,
 		deadline uint64,
 		nodeID ids.ShortID,
-		onFinishedHandling func(),
 	) InboundMessage
 
 	InboundAcceptedFrontier(
@@ -30,7 +29,6 @@ type InboundMsgBuilder interface {
 		requestID uint32,
 		containerIDs []ids.ID,
 		nodeID ids.ShortID,
-		onFinishedHandling func(),
 	) InboundMessage
 
 	InboundGetAccepted(
@@ -39,7 +37,6 @@ type InboundMsgBuilder interface {
 		deadline uint64,
 		containerIDs []ids.ID,
 		nodeID ids.ShortID,
-		onFinishedHandling func(),
 	) InboundMessage
 
 	InboundAccepted(
@@ -47,7 +44,6 @@ type InboundMsgBuilder interface {
 		requestID uint32,
 		containerIDs []ids.ID,
 		nodeID ids.ShortID,
-		onFinishedHandling func(),
 	) InboundMessage
 
 	InboundMultiPut(
@@ -55,7 +51,6 @@ type InboundMsgBuilder interface {
 		requestID uint32,
 		containers [][]byte,
 		nodeID ids.ShortID,
-		onFinishedHandling func(),
 	) InboundMessage // used in UTs only
 
 	InboundPushQuery(
@@ -65,7 +60,6 @@ type InboundMsgBuilder interface {
 		containerID ids.ID,
 		container []byte,
 		nodeID ids.ShortID,
-		onFinishedHandling func(),
 	) InboundMessage
 
 	InboundPullQuery(
@@ -74,7 +68,6 @@ type InboundMsgBuilder interface {
 		deadline uint64,
 		containerID ids.ID,
 		nodeID ids.ShortID,
-		onFinishedHandling func(),
 	) InboundMessage
 
 	InboundChits(
@@ -82,7 +75,6 @@ type InboundMsgBuilder interface {
 		requestID uint32,
 		containerIDs []ids.ID,
 		nodeID ids.ShortID,
-		onFinishedHandling func(),
 	) InboundMessage
 
 	InboundAppRequest(
@@ -91,7 +83,6 @@ type InboundMsgBuilder interface {
 		deadline uint64,
 		msg []byte,
 		nodeID ids.ShortID,
-		onFinishedHandling func(),
 	) InboundMessage
 
 	InboundAppResponse(
@@ -99,7 +90,6 @@ type InboundMsgBuilder interface {
 		requestID uint32,
 		msg []byte,
 		nodeID ids.ShortID,
-		onFinishedHandling func(),
 	) InboundMessage
 
 	InboundGet(
@@ -108,7 +98,6 @@ type InboundMsgBuilder interface {
 		deadline uint64,
 		containerID ids.ID,
 		nodeID ids.ShortID,
-		onFinishedHandling func(),
 	) InboundMessage
 
 	InboundPut(
@@ -117,7 +106,6 @@ type InboundMsgBuilder interface {
 		containerID ids.ID,
 		container []byte,
 		nodeID ids.ShortID,
-		onFinishedHandling func(),
 	) InboundMessage // used in UTs only
 }
 
@@ -141,7 +129,6 @@ func (b *inMsgBuilder) InboundGetAcceptedFrontier(
 	requestID uint32,
 	deadline uint64,
 	nodeID ids.ShortID,
-	onFinishedHandling func(),
 ) InboundMessage {
 	received := b.clock.Time()
 	return &inboundMessage{
@@ -151,9 +138,8 @@ func (b *inMsgBuilder) InboundGetAcceptedFrontier(
 			RequestID: requestID,
 			Deadline:  deadline,
 		},
-		nodeID:             nodeID,
-		expirationTime:     received.Add(time.Duration(deadline)),
-		onFinishedHandling: onFinishedHandling,
+		nodeID:         nodeID,
+		expirationTime: received.Add(time.Duration(deadline)),
 	}
 }
 
@@ -162,7 +148,6 @@ func (b *inMsgBuilder) InboundAcceptedFrontier(
 	requestID uint32,
 	containerIDs []ids.ID,
 	nodeID ids.ShortID,
-	onFinishedHandling func(),
 ) InboundMessage {
 	return &inboundMessage{
 		op: AcceptedFrontier,
@@ -171,8 +156,7 @@ func (b *inMsgBuilder) InboundAcceptedFrontier(
 			RequestID:    requestID,
 			ContainerIDs: encodeContainerIDs(containerIDs),
 		},
-		nodeID:             nodeID,
-		onFinishedHandling: onFinishedHandling,
+		nodeID: nodeID,
 	}
 }
 
@@ -182,7 +166,6 @@ func (b *inMsgBuilder) InboundGetAccepted(
 	deadline uint64,
 	containerIDs []ids.ID,
 	nodeID ids.ShortID,
-	onFinishedHandling func(),
 ) InboundMessage {
 	received := b.clock.Time()
 	return &inboundMessage{
@@ -193,9 +176,8 @@ func (b *inMsgBuilder) InboundGetAccepted(
 			Deadline:     deadline,
 			ContainerIDs: encodeContainerIDs(containerIDs),
 		},
-		nodeID:             nodeID,
-		expirationTime:     received.Add(time.Duration(deadline)),
-		onFinishedHandling: onFinishedHandling,
+		nodeID:         nodeID,
+		expirationTime: received.Add(time.Duration(deadline)),
 	}
 }
 
@@ -204,7 +186,6 @@ func (b *inMsgBuilder) InboundAccepted(
 	requestID uint32,
 	containerIDs []ids.ID,
 	nodeID ids.ShortID,
-	onFinishedHandling func(),
 ) InboundMessage {
 	return &inboundMessage{
 		op: Accepted,
@@ -213,8 +194,7 @@ func (b *inMsgBuilder) InboundAccepted(
 			RequestID:    requestID,
 			ContainerIDs: encodeContainerIDs(containerIDs),
 		},
-		nodeID:             nodeID,
-		onFinishedHandling: onFinishedHandling,
+		nodeID: nodeID,
 	}
 }
 
@@ -225,7 +205,6 @@ func (b *inMsgBuilder) InboundPushQuery(
 	containerID ids.ID,
 	container []byte,
 	nodeID ids.ShortID,
-	onFinishedHandling func(),
 ) InboundMessage {
 	received := b.clock.Time()
 	return &inboundMessage{
@@ -237,9 +216,8 @@ func (b *inMsgBuilder) InboundPushQuery(
 			ContainerID:    containerID[:],
 			ContainerBytes: container,
 		},
-		nodeID:             nodeID,
-		expirationTime:     received.Add(time.Duration(deadline)),
-		onFinishedHandling: onFinishedHandling,
+		nodeID:         nodeID,
+		expirationTime: received.Add(time.Duration(deadline)),
 	}
 }
 
@@ -249,7 +227,6 @@ func (b *inMsgBuilder) InboundPullQuery(
 	deadline uint64,
 	containerID ids.ID,
 	nodeID ids.ShortID,
-	onFinishedHandling func(),
 ) InboundMessage {
 	received := b.clock.Time()
 	return &inboundMessage{
@@ -260,9 +237,8 @@ func (b *inMsgBuilder) InboundPullQuery(
 			Deadline:    deadline,
 			ContainerID: containerID[:],
 		},
-		nodeID:             nodeID,
-		expirationTime:     received.Add(time.Duration(deadline)),
-		onFinishedHandling: onFinishedHandling,
+		nodeID:         nodeID,
+		expirationTime: received.Add(time.Duration(deadline)),
 	}
 }
 
@@ -271,7 +247,6 @@ func (b *inMsgBuilder) InboundChits(
 	requestID uint32,
 	containerIDs []ids.ID,
 	nodeID ids.ShortID,
-	onFinishedHandling func(),
 ) InboundMessage {
 	return &inboundMessage{
 		op: Chits,
@@ -280,8 +255,7 @@ func (b *inMsgBuilder) InboundChits(
 			RequestID:    requestID,
 			ContainerIDs: encodeContainerIDs(containerIDs),
 		},
-		nodeID:             nodeID,
-		onFinishedHandling: onFinishedHandling,
+		nodeID: nodeID,
 	}
 }
 
@@ -291,7 +265,6 @@ func (b *inMsgBuilder) InboundAppRequest(
 	deadline uint64,
 	msg []byte,
 	nodeID ids.ShortID,
-	onFinishedHandling func(),
 ) InboundMessage {
 	received := b.clock.Time()
 	return &inboundMessage{
@@ -302,9 +275,8 @@ func (b *inMsgBuilder) InboundAppRequest(
 			Deadline:        deadline,
 			AppRequestBytes: AppRequestBytes,
 		},
-		nodeID:             nodeID,
-		expirationTime:     received.Add(time.Duration(deadline)),
-		onFinishedHandling: onFinishedHandling,
+		nodeID:         nodeID,
+		expirationTime: received.Add(time.Duration(deadline)),
 	}
 }
 
@@ -313,7 +285,6 @@ func (b *inMsgBuilder) InboundAppResponse(
 	requestID uint32,
 	msg []byte,
 	nodeID ids.ShortID,
-	onFinishedHandling func(),
 ) InboundMessage {
 	return &inboundMessage{
 		op: AppResponse,
@@ -322,8 +293,7 @@ func (b *inMsgBuilder) InboundAppResponse(
 			RequestID:        requestID,
 			AppResponseBytes: msg,
 		},
-		nodeID:             nodeID,
-		onFinishedHandling: onFinishedHandling,
+		nodeID: nodeID,
 	}
 }
 
@@ -333,7 +303,6 @@ func (b *inMsgBuilder) InboundGet(
 	deadline uint64,
 	containerID ids.ID,
 	nodeID ids.ShortID,
-	onFinishedHandling func(),
 ) InboundMessage { // used in UTs only
 	received := b.clock.Time()
 	return &inboundMessage{
@@ -344,9 +313,8 @@ func (b *inMsgBuilder) InboundGet(
 			Deadline:    deadline,
 			ContainerID: containerID[:],
 		},
-		nodeID:             nodeID,
-		expirationTime:     received.Add(time.Duration(deadline)),
-		onFinishedHandling: onFinishedHandling,
+		nodeID:         nodeID,
+		expirationTime: received.Add(time.Duration(deadline)),
 	}
 }
 
@@ -356,7 +324,6 @@ func (b *inMsgBuilder) InboundPut(
 	containerID ids.ID,
 	container []byte,
 	nodeID ids.ShortID,
-	onFinishedHandling func(),
 ) InboundMessage { // used in UTs only
 	return &inboundMessage{
 		op: Put,
@@ -366,8 +333,7 @@ func (b *inMsgBuilder) InboundPut(
 			ContainerID:    containerID[:],
 			ContainerBytes: container,
 		},
-		nodeID:             nodeID,
-		onFinishedHandling: onFinishedHandling,
+		nodeID: nodeID,
 	}
 }
 
@@ -376,7 +342,6 @@ func (b *inMsgBuilder) InboundMultiPut(
 	requestID uint32,
 	containers [][]byte,
 	nodeID ids.ShortID,
-	onFinishedHandling func(),
 ) InboundMessage { // used in UTs only
 	return &inboundMessage{
 		op: MultiPut,
@@ -385,8 +350,7 @@ func (b *inMsgBuilder) InboundMultiPut(
 			RequestID:           requestID,
 			MultiContainerBytes: containers,
 		},
-		nodeID:             nodeID,
-		onFinishedHandling: onFinishedHandling,
+		nodeID: nodeID,
 	}
 }
 

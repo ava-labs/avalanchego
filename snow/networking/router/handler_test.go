@@ -57,11 +57,10 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	handler.clock.Set(pastTime)
 
 	nodeID := ids.ShortEmpty
-	dummyOnFinishedHandling := func() {}
 	reqID := uint32(1)
 	deadline := uint64(1)
 	chainID := ids.ID{}
-	msg := mc.InboundGetAcceptedFrontier(chainID, reqID, deadline, nodeID, dummyOnFinishedHandling)
+	msg := mc.InboundGetAcceptedFrontier(chainID, reqID, deadline, nodeID)
 	handler.push(msg)
 
 	currentTime := time.Now().Add(time.Second)
@@ -69,7 +68,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	handler.clock.Set(currentTime)
 
 	reqID++
-	msg = mc.InboundGetAccepted(chainID, reqID, deadline, nil, nodeID, dummyOnFinishedHandling)
+	msg = mc.InboundGetAccepted(chainID, reqID, deadline, nil, nodeID)
 	handler.push(msg)
 
 	go handler.Dispatch()
@@ -119,10 +118,9 @@ func TestHandlerClosesOnError(t *testing.T) {
 	go handler.Dispatch()
 
 	nodeID := ids.ShortEmpty
-	dummyOnFinishedHandling := func() {}
 	reqID := uint32(1)
 	deadline := uint64(1)
-	msg := mc.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID, dummyOnFinishedHandling)
+	msg := mc.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID)
 	handler.push(msg)
 
 	ticker := time.NewTicker(20 * time.Millisecond)

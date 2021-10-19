@@ -38,7 +38,7 @@ func TestUnprocessedMsgs(t *testing.T) {
 		ids.GenerateTestID(),
 		nil,
 		vdr1ID,
-		dummyOnFinishedHandling)
+	)
 
 	// Push then pop should work regardless of utilization when there are
 	// no other messages on [u.msgs]
@@ -83,7 +83,7 @@ func TestUnprocessedMsgs(t *testing.T) {
 	assert.EqualValues(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	assert.EqualValues(1, u.Len())
 
-	msg2 := mc.InboundGet(ids.Empty, 0, 0, ids.Empty, vdr2ID, dummyOnFinishedHandling)
+	msg2 := mc.InboundGet(ids.Empty, 0, 0, ids.Empty, vdr2ID)
 
 	// Push msg2 from vdr2ID
 	u.Push(msg2)
@@ -104,8 +104,8 @@ func TestUnprocessedMsgs(t *testing.T) {
 	// u is now empty
 	// Non-validators should be able to put messages onto [u]
 	nonVdrNodeID1, nonVdrNodeID2 := ids.GenerateTestShortID(), ids.GenerateTestShortID()
-	msg3 := mc.InboundPullQuery(ids.Empty, 0, 0, ids.Empty, nonVdrNodeID1, dummyOnFinishedHandling)
-	msg4 := mc.InboundPushQuery(ids.Empty, 0, 0, ids.Empty, nil, nonVdrNodeID2, dummyOnFinishedHandling)
+	msg3 := mc.InboundPullQuery(ids.Empty, 0, 0, ids.Empty, nonVdrNodeID1)
+	msg4 := mc.InboundPushQuery(ids.Empty, 0, 0, ids.Empty, nil, nonVdrNodeID2)
 	u.Push(msg3)
 	u.Push(msg4)
 	u.Push(msg1)
