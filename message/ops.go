@@ -6,8 +6,6 @@ package message
 // Op is an opcode
 type Op byte
 
-const MaxOp Op = 255
-
 // Types of messages that may be sent between nodes
 // Note: If you add a new Op below, you must also add it to ops (declared below)
 const (
@@ -39,22 +37,19 @@ const (
 	AppRequest
 	AppResponse
 	AppGossip
-)
 
-// Failure messages, inbound only, created
-// to signal request timeout
-const (
-	GetAcceptedFrontierFailed Op = MaxOp
-	GetAcceptedFailed            = MaxOp - 1
-	GetFailed                    = MaxOp - 2
-	QueryFailed                  = MaxOp - 3
-	GetAncestorsFailed           = MaxOp - 4
-	AppRequestFailed             = MaxOp - 5
-	Timeout                      = MaxOp - 6
-	Connected                    = MaxOp - 7
-	Disconnected                 = MaxOp - 8
-	Notify                       = MaxOp - 9
-	GossipRequest                = MaxOp - 10
+	// Internal messages (External messages should be added above these):
+	GetAcceptedFrontierFailed
+	GetAcceptedFailed
+	GetFailed
+	QueryFailed
+	GetAncestorsFailed
+	AppRequestFailed
+	Timeout
+	Connected
+	Disconnected
+	Notify
+	GossipRequest
 )
 
 var (
