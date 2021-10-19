@@ -352,7 +352,7 @@ func (p *peer) WriteMessages() {
 		atomic.StoreInt64(&p.lastSent, now)
 		atomic.StoreInt64(&p.net.lastMsgSentTime, now)
 
-		msg.ReturnBytes()
+		msg.DecRef()
 	}
 }
 
@@ -382,14 +382,12 @@ func (p *peer) Send(msg message.OutboundMessage, canModifyMsg bool) bool {
 		return false
 	}
 
-	// If the flag says to not modify [msgBytes], copy it so that the copy,
-	// not [msgBytes], will be put back into the []byte pool after it's written.
-	toSend := msg
+	// If the flag says to not modify [msgBytes], increase the reference counts.
 	if !canModifyMsg {
-		toSend = msg.Clone()
+		msg.AddRef()
 	}
 
-	p.sendQueue = append(p.sendQueue, toSend)
+	p.sendQueue = append(p.sendQueue, msg)
 	p.sendQueueCond.Signal()
 	return true
 }

@@ -457,7 +457,3 @@ func (b *outMsgBuilder) AppGossip(chainID ids.ID, msg []byte) (OutboundMessage, 
 		b.compress && AppGossip.Compressable(), // App messages may be compressed
 	)
 }
-
-func (b *outMsgBuilder) ReturnBytes(msg []byte) {
-	b.c.ReturnBytes(msg)
-}

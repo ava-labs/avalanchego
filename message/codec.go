@@ -34,8 +34,6 @@ type Codec interface {
 	) (OutboundMessage, error)
 
 	Parse(bytes []byte, nodeID ids.ShortID, onFinishedHandling func()) (InboundMessage, error)
-
-	ReturnBytes(msg []byte)
 }
 
 // codec defines the serialization and deserialization of network messages.
@@ -127,9 +125,10 @@ func (c *codec) Pack(
 		return nil, p.Err
 	}
 	msg := &outboundMessage{
-		op:           op,
-		bytes:        p.Bytes,
-		ReturnBytesF: c.ReturnBytes,
+		op:    op,
+		bytes: p.Bytes,
+		refs:  1,
+		c:     c,
 	}
 	if !compress {
 		return msg, nil

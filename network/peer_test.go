@@ -43,17 +43,9 @@ func (m *TestMsg) BytesSavedCompression() int {
 	return 0
 }
 
-func (m *TestMsg) Clone() message.OutboundMessage {
-	copiedBytes := make([]byte, len(m.bytes))
-	copy(copiedBytes, m.bytes)
+func (m *TestMsg) AddRef() {}
 
-	return &TestMsg{
-		bytes: copiedBytes,
-		op:    m.op,
-	}
-}
-
-func (m *TestMsg) ReturnBytes() {}
+func (m *TestMsg) DecRef() {}
 
 func TestPeer_Close(t *testing.T) {
 	initCerts(t)

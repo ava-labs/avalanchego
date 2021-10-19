@@ -71,8 +71,7 @@ func (b *internalMsgBuilder) InternalGetAcceptedFrontierFailed(
 			ChainID:   chainID[:],
 			RequestID: requestID,
 		},
-		nodeID:             nodeID,
-		onFinishedHandling: func() {},
+		nodeID: nodeID,
 	}
 }
 
@@ -87,8 +86,7 @@ func (b *internalMsgBuilder) InternalGetAcceptedFailed(
 			ChainID:   chainID[:],
 			RequestID: requestID,
 		},
-		nodeID:             nodeID,
-		onFinishedHandling: func() {},
+		nodeID: nodeID,
 	}
 }
 
@@ -103,8 +101,7 @@ func (b *internalMsgBuilder) InternalGetAncestorsFailed(
 			ChainID:   chainID[:],
 			RequestID: requestID,
 		},
-		nodeID:             nodeID,
-		onFinishedHandling: func() {},
+		nodeID: nodeID,
 	}
 }
 
@@ -119,8 +116,7 @@ func (b *internalMsgBuilder) InternalQueryFailed(
 			ChainID:   chainID[:],
 			RequestID: requestID,
 		},
-		nodeID:             nodeID,
-		onFinishedHandling: func() {},
+		nodeID: nodeID,
 	}
 }
 
@@ -135,8 +131,7 @@ func (b *internalMsgBuilder) InternalAppRequestFailed(
 			ChainID:   chainID[:],
 			RequestID: requestID,
 		},
-		nodeID:             nodeID,
-		onFinishedHandling: func() {},
+		nodeID: nodeID,
 	}
 }
 
@@ -151,35 +146,31 @@ func (b *internalMsgBuilder) InternalGetFailed(
 			ChainID:   chainID[:],
 			RequestID: requestID,
 		},
-		nodeID:             nodeID,
-		onFinishedHandling: func() {},
+		nodeID: nodeID,
 	}
 }
 
 func (b *internalMsgBuilder) InternalTimeout(nodeID ids.ShortID) InboundMessage {
 	return &inboundMessage{
-		op:                 Timeout,
-		fields:             make(map[Field]interface{}),
-		nodeID:             nodeID,
-		onFinishedHandling: func() {},
+		op:     Timeout,
+		fields: make(map[Field]interface{}),
+		nodeID: nodeID,
 	}
 }
 
 func (b *internalMsgBuilder) InternalConnected(nodeID ids.ShortID) InboundMessage {
 	return &inboundMessage{
-		op:                 Connected,
-		fields:             make(map[Field]interface{}),
-		nodeID:             nodeID,
-		onFinishedHandling: func() {},
+		op:     Connected,
+		fields: make(map[Field]interface{}),
+		nodeID: nodeID,
 	}
 }
 
 func (b *internalMsgBuilder) InternalDisconnected(nodeID ids.ShortID) InboundMessage {
 	return &inboundMessage{
-		op:                 Disconnected,
-		nodeID:             nodeID,
-		fields:             make(map[Field]interface{}),
-		onFinishedHandling: func() {},
+		op:     Disconnected,
+		nodeID: nodeID,
+		fields: make(map[Field]interface{}),
 	}
 }
 
@@ -192,8 +183,7 @@ func (b *internalMsgBuilder) InternalVMMessage(
 		fields: map[Field]interface{}{
 			VMMessage: notification,
 		},
-		nodeID:             nodeID,
-		onFinishedHandling: func() {},
+		nodeID: nodeID,
 	}
 }
 
@@ -201,9 +191,8 @@ func (b *internalMsgBuilder) InternalGossipRequest(
 	nodeID ids.ShortID,
 ) InboundMessage {
 	return &inboundMessage{
-		op:                 GossipRequest,
-		fields:             make(map[Field]interface{}),
-		nodeID:             nodeID,
-		onFinishedHandling: func() {},
+		op:     GossipRequest,
+		fields: make(map[Field]interface{}),
+		nodeID: nodeID,
 	}
 }

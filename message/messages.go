@@ -4,6 +4,7 @@
 package message
 
 import (
+	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -33,23 +34,6 @@ type inboundMessage struct {
 	onFinishedHandling    func()
 }
 
-// OutboundMessage represents a set of fields for an outbound message that can be serialized into a byte stream
-type OutboundMessage interface {
-	BytesSavedCompression() int
-	Bytes() []byte
-	Op() Op
-
-	Clone() OutboundMessage
-	ReturnBytes()
-}
-
-type outboundMessage struct {
-	bytes                 []byte
-	bytesSavedCompression int
-	op                    Op
-	ReturnBytesF          func([]byte)
-}
-
 // Op returns the value of the specified operation in this message
 func (inMsg *inboundMessage) Op() Op { return inMsg.op }
 
@@ -77,6 +61,26 @@ func (inMsg *inboundMessage) OnFinishedHandling() {
 	}
 }
 
+// OutboundMessage represents a set of fields for an outbound message that can be serialized into a byte stream
+type OutboundMessage interface {
+	BytesSavedCompression() int
+	Bytes() []byte
+	Op() Op
+
+	AddRef()
+	DecRef()
+}
+
+type outboundMessage struct {
+	bytes                 []byte
+	bytesSavedCompression int
+	op                    Op
+
+	refLock sync.Mutex
+	refs    int
+	c       *codec
+}
+
 // Op returns the value of the specified operation in this message
 func (outMsg *outboundMessage) Op() Op { return outMsg.op }
 
@@ -89,20 +93,21 @@ func (outMsg *outboundMessage) Bytes() []byte { return outMsg.bytes }
 // compressed.
 func (outMsg *outboundMessage) BytesSavedCompression() int { return outMsg.bytesSavedCompression }
 
-func (outMsg *outboundMessage) Clone() OutboundMessage {
-	copiedBytes := make([]byte, len(outMsg.bytes))
-	copy(copiedBytes, outMsg.bytes)
+func (outMsg *outboundMessage) AddRef() {
+	outMsg.refLock.Lock()
+	defer outMsg.refLock.Unlock()
 
-	return &outboundMessage{
-		bytes:                 copiedBytes,
-		bytesSavedCompression: outMsg.bytesSavedCompression,
-		op:                    outMsg.op,
-		ReturnBytesF:          outMsg.ReturnBytesF,
-	}
+	outMsg.refs++
 }
 
 // release msg bytes to a memory pool for subsequent reuse
 // msg cannot be used anymore once ReturnBytes is called
-func (outMsg *outboundMessage) ReturnBytes() {
-	outMsg.ReturnBytesF(outMsg.bytes)
+func (outMsg *outboundMessage) DecRef() {
+	outMsg.refLock.Lock()
+	defer outMsg.refLock.Unlock()
+
+	outMsg.refs--
+	if outMsg.refs == 0 {
+		outMsg.c.byteSlicePool.Put(outMsg.bytes)
+	}
 }
