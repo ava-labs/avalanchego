@@ -372,15 +372,73 @@ func (n *network) Send(msg message.OutboundMessage, nodeIDs ids.ShortSet, subnet
 	return sentTo
 }
 
-func (n *network) handleGossip(
-	peersLists []*peer,
+// Assumes [n.stateLock] is not held.
+func (n *network) Gossip(
 	msg message.OutboundMessage,
-	msgMetrics *messageMetrics,
+	subnetID ids.ID,
+	validatorOnly bool,
 ) bool {
+	var (
+		peers []*peer
+		err   error
+	)
+	switch msg.Op() {
+	case message.AppGossip:
+		peers, err = n.selectPeersForGossip(subnetID, validatorOnly, int(n.config.AppGossipValidatorSize), int(n.config.AppGossipNonValidatorSize))
+	case message.Put:
+		peers, err = n.selectPeersForGossip(subnetID, validatorOnly, 0, int(n.config.GossipAcceptedFrontierSize))
+	default:
+		err = fmt.Errorf("failed to gossip unexpected message type %s", msg.Op())
+	}
+
+	if err != nil {
+		n.log.Error("failed to sampling peers: %s", err)
+		return false
+	}
+
+	return n.handleGossip(peers, msg)
+}
+
+// Accept is called after every consensus decision
+// Assumes [n.stateLock] is not held.
+func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte) error {
+	if !ctx.IsBootstrapped() {
+		// don't gossip during bootstrapping
+		return nil
+	}
+
+	now := n.clock.Time()
+	msg, err := n.mc.Put(ctx.ChainID, constants.GossipMsgRequestID, containerID, container)
+	if err != nil {
+		n.log.Debug("failed to build Put message for gossip (%s, %s): %s", ctx.ChainID, containerID, err)
+		n.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
+		n.sendFailRateCalculator.Observe(1, now)
+		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
+	}
+
+	peers, err := n.selectPeersForGossip(ctx.SubnetID, ctx.IsValidatorOnly(), 0, int(n.config.GossipOnAcceptSize))
+	if err != nil {
+		return err
+	}
+
+	_ = n.handleGossip(peers, msg)
+	return nil
+}
+
+func (n *network) handleGossip(
+	peers []*peer,
+	msg message.OutboundMessage,
+) bool {
+	msgMetrics := n.metrics.message(msg.Op())
+	if msgMetrics == nil {
+		n.log.Error("unregistered metric for message with op %s. Dropping it", msg.Op())
+		return false
+	}
+
 	now := n.clock.Time()
 	gossipedToAtLeastOne := false
 	sentPeers := ids.ShortSet{} // do not re-gossip if some nodes appear multiple times in the lists
-	for _, peer := range peersLists {
+	for _, peer := range peers {
 		if sentPeers.Contains(peer.nodeID) {
 			continue
 		}
@@ -404,105 +462,29 @@ func (n *network) handleGossip(
 	return gossipedToAtLeastOne
 }
 
-// Select peer lists to gossip to, for AppGossip messages.
-// The function parameter control the peers sampling
-func (n *network) selectPeersForAppGossip(subnetID ids.ID, validatorOnly bool) []*peer {
+// Select peers to gossip to.
+func (n *network) selectPeersForGossip(subnetID ids.ID, validatorOnly bool, numValidatorsToSample, numNonValidatorsToSample int) ([]*peer, error) {
 	n.stateLock.RLock()
-	// Gossip the message to [n.config.AppGossipNonValidatorSize] random nodes
-	// in the network. If this is a validator only subnet, selects only validators.
-	peersAll, err := n.peers.sample(subnetID, validatorOnly, int(n.config.AppGossipNonValidatorSize))
+	// Gossip the message to numNonValidatorsToSample random nodes in the
+	// network. If this is a validator only subnet, selects only validators.
+	peersAll, err := n.peers.sample(subnetID, validatorOnly, numNonValidatorsToSample)
 	if err != nil {
-		n.log.Debug("failed to sample %d peers for AppGossip: %s", n.config.AppGossipNonValidatorSize, err)
+		n.log.Debug("failed to sample %d peers: %s", numNonValidatorsToSample, err)
 		n.stateLock.RUnlock()
-		return nil
+		return nil, err
 	}
 
-	// Gossip the message to [n.config.AppGossipValidatorSize] random validators
-	// in the network. This does not gossip by stake - but uniformly to the
-	// validator set.
-	peersValidators, err := n.peers.sample(subnetID, true, int(n.config.AppGossipValidatorSize))
+	// Gossip the message to numValidatorsToSample random validators in the
+	// network. This does not gossip by stake - but uniformly to the validator
+	// set.
+	peersValidators, err := n.peers.sample(subnetID, true, numValidatorsToSample)
 	n.stateLock.RUnlock()
 	if err != nil {
-		n.log.Debug("failed to sample %d validators for AppGossip: %s", n.config.AppGossipValidatorSize, err)
-		return nil
+		n.log.Debug("failed to sample %d validators: %s", numValidatorsToSample, err)
+		return nil, err
 	}
 	peersAll = append(peersAll, peersValidators...)
-	return peersAll
-}
-
-// Select peer lists to gossip to, for AppGossip messages.
-// The function parameter control the peers sampling
-func (n *network) selectPeersForContainerGossip(subnetID ids.ID, validatorOnly bool, sampleSize int) []*peer {
-	n.stateLock.RLock()
-	peers, err := n.peers.sample(subnetID, validatorOnly, sampleSize)
-	n.stateLock.RUnlock()
-	if err != nil {
-		return nil
-	}
-	return peers
-}
-
-// Assumes [n.stateLock] is not held.
-func (n *network) Gossip(
-	msg message.OutboundMessage,
-	subnetID ids.ID,
-	validatorOnly bool) bool {
-	msgMetrics := n.metrics.message(msg.Op())
-	if msgMetrics == nil {
-		n.log.Error("unregistered metric for message with op %s. Dropping it", msg.Op())
-		return false
-	}
-
-	var peersLists []*peer
-	switch msg.Op() {
-	case message.AppGossip:
-		peersLists = n.selectPeersForAppGossip(subnetID, validatorOnly)
-		if peersLists == nil {
-			return false
-		}
-
-	case message.Put:
-		peersLists = n.selectPeersForContainerGossip(subnetID, validatorOnly, int(n.config.GossipAcceptedFrontierSize))
-		if peersLists == nil {
-			return false
-		}
-
-	default:
-		n.log.Error("Unhandled message type %v. Gossiping nothing.", msg.Op())
-		return false
-	}
-
-	return n.handleGossip(peersLists, msg, msgMetrics)
-}
-
-// Accept is called after every consensus decision
-// Assumes [n.stateLock] is not held.
-func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte) error {
-	if !ctx.IsBootstrapped() {
-		// don't gossip during bootstrapping
-		return nil
-	}
-
-	msgMetrics := n.metrics.message(message.Put)
-	n.log.AssertTrue(msgMetrics != nil, "unregistered metric for put message")
-
-	now := n.clock.Time()
-	msg, err := n.mc.Put(ctx.ChainID, constants.GossipMsgRequestID, containerID, container)
-	if err != nil {
-		n.log.Debug("failed to build Put message for gossip (%s, %s): %s", ctx.ChainID, containerID, err)
-		n.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
-		n.sendFailRateCalculator.Observe(1, now)
-		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
-	}
-
-	peersLists := n.selectPeersForContainerGossip(ctx.SubnetID, ctx.IsValidatorOnly(), int(n.config.GossipOnAcceptSize))
-	if peersLists == nil {
-		// TODO ABENEGIA: find a better way to handle the error
-		return fmt.Errorf("could not sample peers")
-	}
-
-	_ = n.handleGossip(peersLists, msg, msgMetrics)
-	return nil
+	return peersAll, nil
 }
 
 // shouldUpgradeIncoming returns whether we should
@@ -539,8 +521,9 @@ func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 }
 
 // shouldHoldConnection returns true if this node should have a connection to
-// the provided peerID. If the node is attempting to connect to the minimum number of peers, then it should only connect
-// if this node is a validator, or the peer is a validator/beacon.
+// the provided peerID. If the node is attempting to connect to the minimum
+// number of peers, then it should only connect if this node is a validator, or
+// the peer is a validator/beacon.
 func (n *network) shouldHoldConnection(peerID ids.ShortID) bool {
 	return !n.config.RequireValidatorToConnect ||
 		n.config.Validators.Contains(constants.PrimaryNetworkID, n.config.MyNodeID) ||
