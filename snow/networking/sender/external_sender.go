@@ -12,11 +12,21 @@ import (
 // Right now this is implemented in the networking package
 type ExternalSender interface {
 
-	// Send a message to a specific node
-	Send(msg message.OutboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) ids.ShortSet
+	// Send a message to a specific set of nodes
+	Send(
+		msg message.OutboundMessage,
+		nodeIDs ids.ShortSet,
+		subnetID ids.ID,
+		validatorOnly bool,
+	) ids.ShortSet
 
-	// gossip message to set of nodes in a given subnet.
-	// nodes are sampled by Gossip implementation (subnet and validatorOnly participates this sampling)
-	// TODO ABENEGIA: check if subnet is still relevant here
-	Gossip(msg message.OutboundMessage, subnetID ids.ID, validatorOnly bool) bool
+	// Send a message to a random group of nodes in a subnet.
+	// Nodes are sampled based on their validator status.
+	Gossip(
+		msg message.OutboundMessage,
+		subnetID ids.ID,
+		validatorOnly bool,
+		numValidatorsToSend int,
+		numNonValidatorsToSend int,
+	) ids.ShortSet
 }

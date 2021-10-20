@@ -31,7 +31,7 @@ func TestSenderContext(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
-	externalSender := &ExternalSenderTest{T: t}
+	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(true)
 	sender := Sender{}
 	err = sender.Initialize(
@@ -42,6 +42,9 @@ func TestSenderContext(t *testing.T) {
 		&timeout.Manager{},
 		"",
 		metrics,
+		2,
+		2,
+		2,
 	)
 	assert.NoError(t, err)
 	if res := sender.Context(); !reflect.DeepEqual(res, context) {
@@ -80,10 +83,10 @@ func TestTimeout(t *testing.T) {
 	assert.NoError(t, err)
 
 	context := snow.DefaultContextTest()
-	externalSender := &ExternalSenderTest{T: t}
+	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 	sender := Sender{}
-	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, "", metrics)
+	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, "", metrics, 2, 2, 2)
 	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}
@@ -163,10 +166,10 @@ func TestReliableMessages(t *testing.T) {
 
 	context := snow.DefaultContextTest()
 
-	externalSender := &ExternalSenderTest{T: t}
+	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 	sender := Sender{}
-	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, "", metrics)
+	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, "", metrics, 2, 2, 2)
 	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}
@@ -257,9 +260,9 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	context := snow.DefaultContextTest()
 
 	sender := Sender{}
-	externalSender := &ExternalSenderTest{T: t}
+	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
-	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, "", metrics)
+	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, "", metrics, 2, 2, 2)
 	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}

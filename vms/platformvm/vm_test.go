@@ -2083,29 +2083,27 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &timeoutManager, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
-	externalSender := &sender.ExternalSenderTest{T: t}
+	externalSender := &sender.ExternalSenderTest{TB: t}
 	externalSender.Default(true)
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-	err = sender.Initialize(ctx, mc, externalSender, chainRouter, &timeoutManager, "", metrics)
+	err = sender.Initialize(ctx, mc, externalSender, chainRouter, &timeoutManager, "", metrics, 1, 1, 1)
 	assert.NoError(t, err)
 
 	var reqID uint32
-	externalSender.MockSend(message.GetAcceptedFrontier,
-		func(T *testing.T,
-			inMsg message.InboundMessage,
-			nodeIDs ids.ShortSet,
-			subnetID ids.ID,
-			validatorOnly bool,
-		) ids.ShortSet {
-			res := ids.NewShortSet(len(nodeIDs))
-			requestID, ok := inMsg.Get(message.RequestID).(uint32)
-			assert.True(t, ok)
+	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) ids.ShortSet {
+		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+		assert.NoError(t, err)
+		assert.Equal(t, message.GetAcceptedFrontier, inMsg.Op())
 
-			reqID = requestID
-			return res
-		})
+		res := ids.NewShortSet(len(nodeIDs))
+		requestID, ok := inMsg.Get(message.RequestID).(uint32)
+		assert.True(t, ok)
+
+		reqID = requestID
+		return res
+	}
 
 	isBootstrapped := false
 	subnet := &common.SubnetTest{
@@ -2170,62 +2168,53 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	externalSender.ClearMockSend(message.GetAcceptedFrontier)
-	externalSender.MockSend(message.GetAccepted,
-		func(T *testing.T,
-			inMsg message.InboundMessage,
-			nodeIDs ids.ShortSet,
-			subnetID ids.ID,
-			validatorOnly bool,
-		) ids.ShortSet {
-			res := ids.NewShortSet(len(nodeIDs))
-			requestID, ok := inMsg.Get(message.RequestID).(uint32)
-			assert.True(t, ok)
+	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) ids.ShortSet {
+		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+		assert.NoError(t, err)
+		assert.Equal(t, message.GetAccepted, inMsg.Op())
 
-			reqID = requestID
-			return res
-		})
+		res := ids.NewShortSet(len(nodeIDs))
+		requestID, ok := inMsg.Get(message.RequestID).(uint32)
+		assert.True(t, ok)
+
+		reqID = requestID
+		return res
+	}
 
 	frontier := []ids.ID{advanceTimeBlkID}
 	if err := engine.AcceptedFrontier(peerID, reqID, frontier); err != nil {
 		t.Fatal(err)
 	}
 
-	externalSender.ClearMockSend(message.GetAccepted)
-	externalSender.MockSend(message.GetAncestors,
-		func(T *testing.T,
-			inMsg message.InboundMessage,
-			nodeIDs ids.ShortSet,
-			subnetID ids.ID,
-			validatorOnly bool,
-		) ids.ShortSet {
-			res := ids.NewShortSet(len(nodeIDs))
-			requestID, ok := inMsg.Get(message.RequestID).(uint32)
-			assert.True(t, ok)
-			reqID = requestID
+	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) ids.ShortSet {
+		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+		assert.NoError(t, err)
+		assert.Equal(t, message.GetAncestors, inMsg.Op())
 
-			containerID, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte))
-			assert.NoError(t, err)
-			if containerID != advanceTimeBlkID {
-				t.Fatalf("wrong block requested")
-			}
+		res := ids.NewShortSet(len(nodeIDs))
+		requestID, ok := inMsg.Get(message.RequestID).(uint32)
+		assert.True(t, ok)
+		reqID = requestID
 
-			return res
-		})
+		containerID, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte))
+		assert.NoError(t, err)
+		if containerID != advanceTimeBlkID {
+			t.Fatalf("wrong block requested")
+		}
+
+		return res
+	}
 
 	if err := engine.Accepted(peerID, reqID, frontier); err != nil {
 		t.Fatal(err)
 	}
 
-	externalSender.ClearMockSend(message.Get)
-	externalSender.EnableSend(message.PushQuery)
-	externalSender.EnableSend(message.PullQuery)
+	externalSender.SendF = nil
+	externalSender.CantSend = false
 
 	if err := engine.MultiPut(peerID, reqID, [][]byte{advanceTimeBlkBytes}); err != nil {
 		t.Fatal(err)
 	}
-
-	externalSender.DisableSend(message.PushQuery)
 
 	preferred, err = vm.Preferred()
 	if err != nil {

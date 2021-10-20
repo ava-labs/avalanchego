@@ -158,6 +158,10 @@ type ManagerConfig struct {
 	ShutdownNodeFunc func(exitCode int)
 	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
 
+	AppGossipValidatorSize     int
+	AppGossipNonValidatorSize  int
+	GossipAcceptedFrontierSize int
+
 	// Max Time to spend fetching a container and its
 	// ancestors when responding to a GetAncestors
 	BootstrapMaxTimeGetAncestors time.Duration
@@ -508,6 +512,9 @@ func (m *manager) createAvalancheChain(
 		m.TimeoutManager,
 		consensusParams.Namespace,
 		consensusParams.Metrics,
+		m.AppGossipValidatorSize,
+		m.AppGossipNonValidatorSize,
+		m.GossipAcceptedFrontierSize,
 	); err != nil {
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
 	}
@@ -659,6 +666,9 @@ func (m *manager) createSnowmanChain(
 		m.TimeoutManager,
 		consensusParams.Namespace,
 		consensusParams.Metrics,
+		m.AppGossipValidatorSize,
+		m.AppGossipNonValidatorSize,
+		m.GossipAcceptedFrontierSize,
 	); err != nil {
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
 	}

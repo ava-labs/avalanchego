@@ -331,45 +331,9 @@ func NewNetwork(
 
 // Assumes [n.stateLock] is not held.
 func (n *network) Send(msg message.OutboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) ids.ShortSet {
-	var (
-		now    = n.clock.Time()
-		msgLen = len(msg.Bytes())
-		sentTo = ids.NewShortSet(nodeIDs.Len())
-		op     = msg.Op()
-	)
-
-	msgMetrics := n.metrics.message(op)
-	if msgMetrics == nil {
-		n.log.Error("unregistered metric for message with op %s. Dropping it", op)
-		return sentTo
-	}
-
 	// retrieve target peers
 	peers := n.getPeers(nodeIDs, subnetID, validatorOnly)
-
-	canModifyMsg := nodeIDs.Len() == 0
-
-	// send to peer and update metrics
-	// note: peer may be nil
-	for _, peer := range peers {
-		if peer != nil && peer.finishedHandshake.GetValue() && peer.Send(msg, canModifyMsg) {
-			sentTo.Add(peer.nodeID)
-
-			// record metrics for success
-			n.sendFailRateCalculator.Observe(0, now)
-			msgMetrics.numSent.Inc()
-			msgMetrics.sentBytes.Add(float64(msgLen))
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				msgMetrics.savedSentBytes.Observe(float64(saved))
-			}
-			continue
-		}
-
-		// record metrics for failure
-		n.sendFailRateCalculator.Observe(1, now)
-		msgMetrics.numFailed.Inc()
-	}
-	return sentTo
+	return n.send(msg, peers)
 }
 
 // Assumes [n.stateLock] is not held.
@@ -377,26 +341,15 @@ func (n *network) Gossip(
 	msg message.OutboundMessage,
 	subnetID ids.ID,
 	validatorOnly bool,
-) bool {
-	var (
-		peers []*peer
-		err   error
-	)
-	switch msg.Op() {
-	case message.AppGossip:
-		peers, err = n.selectPeersForGossip(subnetID, validatorOnly, int(n.config.AppGossipValidatorSize), int(n.config.AppGossipNonValidatorSize))
-	case message.Put:
-		peers, err = n.selectPeersForGossip(subnetID, validatorOnly, 0, int(n.config.GossipAcceptedFrontierSize))
-	default:
-		err = fmt.Errorf("failed to gossip unexpected message type %s", msg.Op())
-	}
-
+	numValidatorsToSend int,
+	numNonValidatorsToSend int,
+) ids.ShortSet {
+	peers, err := n.selectPeersForGossip(subnetID, validatorOnly, numValidatorsToSend, numNonValidatorsToSend)
 	if err != nil {
-		n.log.Error("failed to sampling peers: %s", err)
-		return false
+		n.log.Error("failed to sample peers: %s", err)
+		return nil
 	}
-
-	return n.handleGossip(peers, msg)
+	return n.send(msg, peers)
 }
 
 // Accept is called after every consensus decision
@@ -416,50 +369,8 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 	}
 
-	peers, err := n.selectPeersForGossip(ctx.SubnetID, ctx.IsValidatorOnly(), 0, int(n.config.GossipOnAcceptSize))
-	if err != nil {
-		return err
-	}
-
-	_ = n.handleGossip(peers, msg)
+	_ = n.Gossip(msg, ctx.SubnetID, ctx.IsValidatorOnly(), 0, int(n.config.GossipOnAcceptSize))
 	return nil
-}
-
-func (n *network) handleGossip(
-	peers []*peer,
-	msg message.OutboundMessage,
-) bool {
-	msgMetrics := n.metrics.message(msg.Op())
-	if msgMetrics == nil {
-		n.log.Error("unregistered metric for message with op %s. Dropping it", msg.Op())
-		return false
-	}
-
-	now := n.clock.Time()
-	gossipedToAtLeastOne := false
-	sentPeers := ids.ShortSet{} // do not re-gossip if some nodes appear multiple times in the lists
-	for _, peer := range peers {
-		if sentPeers.Contains(peer.nodeID) {
-			continue
-		}
-		sentPeers.Add(peer.nodeID)
-
-		if !peer.Send(msg, false) {
-			n.log.Debug("failed to send msg %s (%s)", msg.Op().String(), peer.nodeID)
-			n.sendFailRateCalculator.Observe(1, now)
-			msgMetrics.numFailed.Inc()
-			continue
-		}
-
-		gossipedToAtLeastOne = true
-		n.sendFailRateCalculator.Observe(0, now)
-		msgMetrics.numSent.Inc()
-		msgMetrics.sentBytes.Add(float64(len(msg.Bytes())))
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			msgMetrics.savedSentBytes.Observe(float64(saved))
-		}
-	}
-	return gossipedToAtLeastOne
 }
 
 // Select peers to gossip to.
@@ -485,6 +396,48 @@ func (n *network) selectPeersForGossip(subnetID ids.ID, validatorOnly bool, numV
 	}
 	peersAll = append(peersAll, peersValidators...)
 	return peersAll, nil
+}
+
+func (n *network) send(msg message.OutboundMessage, peers []*peer) ids.ShortSet {
+	var (
+		now    = n.clock.Time()
+		msgLen = len(msg.Bytes())
+		sentTo = ids.NewShortSet(len(peers))
+		op     = msg.Op()
+	)
+
+	msgMetrics := n.metrics.message(op)
+	if msgMetrics == nil {
+		n.log.Error("unregistered metric for message with op %s. Dropping it", op)
+		return sentTo
+	}
+
+	canModifyMsg := len(peers) == 1
+
+	// send to peer and update metrics
+	// note: peer may be nil
+	for _, peer := range peers {
+		if peer != nil &&
+			peer.finishedHandshake.GetValue() &&
+			!sentTo.Contains(peer.nodeID) &&
+			peer.Send(msg, canModifyMsg) {
+			sentTo.Add(peer.nodeID)
+
+			// record metrics for success
+			n.sendFailRateCalculator.Observe(0, now)
+			msgMetrics.numSent.Inc()
+			msgMetrics.sentBytes.Add(float64(msgLen))
+			if saved := msg.BytesSavedCompression(); saved != 0 {
+				msgMetrics.savedSentBytes.Observe(float64(saved))
+			}
+			continue
+		}
+
+		// record metrics for failure
+		n.sendFailRateCalculator.Observe(1, now)
+		msgMetrics.numFailed.Inc()
+	}
+	return sentTo
 }
 
 // shouldUpgradeIncoming returns whether we should

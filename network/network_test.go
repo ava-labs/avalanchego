@@ -2807,11 +2807,11 @@ func TestPeerGossip(t *testing.T) {
 
 	gossipMsg0, err := msgCreator0.Put(ids.GenerateTestID(), constants.GossipMsgRequestID, testSubnetContainerID, []byte("test0"))
 	assert.NoError(t, err)
-	net0.Gossip(gossipMsg0, testSubnetID, false)
+	net0.Gossip(gossipMsg0, testSubnetID, false, 0, int(net0.(*network).config.GossipAcceptedFrontierSize))
 
 	gossipMsg1, err := msgCreator0.Put(ids.GenerateTestID(), constants.GossipMsgRequestID, testPrimaryContainerID, []byte("test1"))
 	assert.NoError(t, err)
-	net0.Gossip(gossipMsg1, constants.PrimaryNetworkID, false)
+	net0.Gossip(gossipMsg1, constants.PrimaryNetworkID, false, 0, int(net0.(*network).config.GossipAcceptedFrontierSize))
 
 	wg1P.Wait()
 	wg2P.Wait()
@@ -3051,7 +3051,7 @@ func TestAppGossip(t *testing.T) {
 	chainID := ids.GenerateTestID()
 	msg1, err := msgCreator0.AppGossip(chainID, testAppGossipBytes)
 	assert.NoError(t, err)
-	net0.Gossip(msg1, constants.PrimaryNetworkID, false)
+	net0.Gossip(msg1, constants.PrimaryNetworkID, false, int(net0.(*network).config.AppGossipValidatorSize), int(net0.(*network).config.AppGossipNonValidatorSize))
 
 	specificNodeSet := ids.NewShortSet(1)
 	specificNodeSet.Add(id2)
