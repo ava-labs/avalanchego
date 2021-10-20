@@ -3,6 +3,8 @@
 package mocks
 
 import (
+	"time"
+
 	avalanche "github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	common "github.com/ava-labs/avalanchego/snow/engine/common"
 
@@ -62,13 +64,13 @@ func (_m *Engine) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	return r0
 }
 
-// AppRequest provides a mock function with given fields: nodeID, requestID, request
-func (_m *Engine) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
-	ret := _m.Called(nodeID, requestID, request)
+// AppRequest provides a mock function with given fields: nodeID, requestID, deadline, request
+func (_m *Engine) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
+	ret := _m.Called(nodeID, requestID, request, deadline)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, []byte) error); ok {
-		r0 = rf(nodeID, requestID, request)
+	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, time.Time, []byte) error); ok {
+		r0 = rf(nodeID, requestID, deadline, request)
 	} else {
 		r0 = ret.Error(0)
 	}

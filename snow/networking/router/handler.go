@@ -216,7 +216,7 @@ func (h *Handler) handleConsensusMsg(msg message) error {
 	case constants.AppGossipMsg:
 		err = h.engine.AppGossip(msg.nodeID, msg.appMsgBytes)
 	case constants.AppRequestMsg:
-		err = h.engine.AppRequest(msg.nodeID, msg.requestID, msg.appMsgBytes)
+		err = h.engine.AppRequest(msg.nodeID, msg.requestID, msg.deadline, msg.appMsgBytes)
 	case constants.AppResponseMsg:
 		err = h.engine.AppResponse(msg.nodeID, msg.requestID, msg.appMsgBytes)
 	}

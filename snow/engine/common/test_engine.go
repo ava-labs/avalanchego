@@ -6,6 +6,7 @@ package common
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -398,7 +399,7 @@ func (e *EngineTest) QueryFailed(nodeID ids.ShortID, requestID uint32) error {
 	return errQueryFailed
 }
 
-func (e *EngineTest) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+func (e *EngineTest) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
 	if e.AppRequestF != nil {
 		return e.AppRequestF(nodeID, requestID, request)
 	}

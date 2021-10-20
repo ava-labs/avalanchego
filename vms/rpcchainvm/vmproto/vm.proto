@@ -124,8 +124,10 @@ message AppRequestMsg {
     bytes nodeID = 1;
     // The ID of this request
     uint32 requestID = 2;
+    // deadline for this request
+    uint64 deadline = 3;
     // The request body
-    bytes request = 3;
+    bytes request = 4;
 }
 
 message AppRequestFailedMsg {

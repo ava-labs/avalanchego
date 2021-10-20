@@ -425,7 +425,7 @@ func (vm *VMServer) AppRequest(_ context.Context, req *vmproto.AppRequestMsg) (*
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.AppRequest(nodeID, req.RequestID, req.Request)
+	return &emptypb.Empty{}, vm.vm.AppRequest(nodeID, req.RequestID, time.Unix(int64(req.GetDeadline()), 0), req.Request)
 }
 
 func (vm *VMServer) AppRequestFailed(_ context.Context, req *vmproto.AppRequestFailedMsg) (*emptypb.Empty, error) {
