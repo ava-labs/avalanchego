@@ -223,6 +223,7 @@ func (vm *VMClient) Initialize(
 			GetBlock:            vm.getBlock,
 			UnmarshalBlock:      vm.parseBlock,
 			BuildBlock:          vm.buildBlock,
+			GetAncestors:        vm.GetAncestors,
 		},
 	)
 	if err != nil {
@@ -512,6 +513,29 @@ func (vm *VMClient) AppGossip(nodeID ids.ShortID, msg []byte) error {
 		},
 	)
 	return err
+}
+
+func (vm *VMClient) GetAncestors(
+	blkID ids.ID,
+	maxBlocksNum int,
+	maxBlocksSize int,
+	maxBlocksRetrivalTime time.Duration,
+) [][]byte {
+	res := make([][]byte, 0)
+	resp, err := vm.client.GetAncestors(context.Background(), &vmproto.GetAncestorsRequest{
+		BlkID:                 blkID[:],
+		MaxBlocksNum:          int32(maxBlocksNum),
+		MaxBlocksSize:         int32(maxBlocksSize),
+		MaxBlocksRetrivalTime: int64(maxBlocksRetrivalTime),
+	})
+	if err != nil {
+		return res
+	}
+
+	for _, blkBytes := range resp.BlksBytes {
+		res = append(res, blkBytes.BlkBytes)
+	}
+	return res
 }
 
 func (vm *VMClient) Version() (string, error) {

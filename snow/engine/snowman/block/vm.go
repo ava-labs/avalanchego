@@ -4,6 +4,8 @@
 package block
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -61,4 +63,16 @@ type Getter interface {
 	// TODO: Update the invariant to report database.ErrNotFound if the
 	//       operation is missing.
 	GetBlock(ids.ID) (snowman.Block, error)
+}
+
+// RemoteVM extends the minimal functionalities exposed by ChainVM for VMs communicating
+// over network (gRPC in our case). This allows more efficient operations since
+// calls over network can be duly batched
+type RemoteVM interface {
+	GetAncestors(
+		blkID ids.ID, // first requested block
+		maxBlocksNum int, // max number of blocks to be retrieved
+		maxBlocksSize int, // max cumulated byte size of retrieved blocks
+		maxBlocksRetrivalTime time.Duration, // max duration of retrival operation
+	) [][]byte // slice containing retrieved ancestors bytes appended one to another
 }

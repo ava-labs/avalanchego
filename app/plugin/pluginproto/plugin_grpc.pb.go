@@ -4,10 +4,10 @@ package pluginproto
 
 import (
 	context "context"
+	empty "github.com/golang/protobuf/ptypes/empty"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -19,9 +19,9 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type NodeClient interface {
-	Start(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	ExitCode(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ExitCodeResponse, error)
-	Stop(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	Start(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*empty.Empty, error)
+	ExitCode(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*ExitCodeResponse, error)
+	Stop(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*empty.Empty, error)
 }
 
 type nodeClient struct {
@@ -32,8 +32,8 @@ func NewNodeClient(cc grpc.ClientConnInterface) NodeClient {
 	return &nodeClient{cc}
 }
 
-func (c *nodeClient) Start(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *nodeClient) Start(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*empty.Empty, error) {
+	out := new(empty.Empty)
 	err := c.cc.Invoke(ctx, "/pluginproto.Node/Start", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -41,7 +41,7 @@ func (c *nodeClient) Start(ctx context.Context, in *emptypb.Empty, opts ...grpc.
 	return out, nil
 }
 
-func (c *nodeClient) ExitCode(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ExitCodeResponse, error) {
+func (c *nodeClient) ExitCode(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*ExitCodeResponse, error) {
 	out := new(ExitCodeResponse)
 	err := c.cc.Invoke(ctx, "/pluginproto.Node/ExitCode", in, out, opts...)
 	if err != nil {
@@ -50,8 +50,8 @@ func (c *nodeClient) ExitCode(ctx context.Context, in *emptypb.Empty, opts ...gr
 	return out, nil
 }
 
-func (c *nodeClient) Stop(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *nodeClient) Stop(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*empty.Empty, error) {
+	out := new(empty.Empty)
 	err := c.cc.Invoke(ctx, "/pluginproto.Node/Stop", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -63,9 +63,9 @@ func (c *nodeClient) Stop(ctx context.Context, in *emptypb.Empty, opts ...grpc.C
 // All implementations must embed UnimplementedNodeServer
 // for forward compatibility
 type NodeServer interface {
-	Start(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
-	ExitCode(context.Context, *emptypb.Empty) (*ExitCodeResponse, error)
-	Stop(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
+	Start(context.Context, *empty.Empty) (*empty.Empty, error)
+	ExitCode(context.Context, *empty.Empty) (*ExitCodeResponse, error)
+	Stop(context.Context, *empty.Empty) (*empty.Empty, error)
 	mustEmbedUnimplementedNodeServer()
 }
 
@@ -73,13 +73,13 @@ type NodeServer interface {
 type UnimplementedNodeServer struct {
 }
 
-func (UnimplementedNodeServer) Start(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
+func (UnimplementedNodeServer) Start(context.Context, *empty.Empty) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Start not implemented")
 }
-func (UnimplementedNodeServer) ExitCode(context.Context, *emptypb.Empty) (*ExitCodeResponse, error) {
+func (UnimplementedNodeServer) ExitCode(context.Context, *empty.Empty) (*ExitCodeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ExitCode not implemented")
 }
-func (UnimplementedNodeServer) Stop(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
+func (UnimplementedNodeServer) Stop(context.Context, *empty.Empty) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Stop not implemented")
 }
 func (UnimplementedNodeServer) mustEmbedUnimplementedNodeServer() {}
@@ -96,7 +96,7 @@ func RegisterNodeServer(s grpc.ServiceRegistrar, srv NodeServer) {
 }
 
 func _Node_Start_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
+	in := new(empty.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -108,13 +108,13 @@ func _Node_Start_Handler(srv interface{}, ctx context.Context, dec func(interfac
 		FullMethod: "/pluginproto.Node/Start",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(NodeServer).Start(ctx, req.(*emptypb.Empty))
+		return srv.(NodeServer).Start(ctx, req.(*empty.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _Node_ExitCode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
+	in := new(empty.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -126,13 +126,13 @@ func _Node_ExitCode_Handler(srv interface{}, ctx context.Context, dec func(inter
 		FullMethod: "/pluginproto.Node/ExitCode",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(NodeServer).ExitCode(ctx, req.(*emptypb.Empty))
+		return srv.(NodeServer).ExitCode(ctx, req.(*empty.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _Node_Stop_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
+	in := new(empty.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -144,7 +144,7 @@ func _Node_Stop_Handler(srv interface{}, ctx context.Context, dec func(interface
 		FullMethod: "/pluginproto.Node/Stop",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(NodeServer).Stop(ctx, req.(*emptypb.Empty))
+		return srv.(NodeServer).Stop(ctx, req.(*empty.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }

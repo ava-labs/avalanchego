@@ -4,10 +4,10 @@ package vmproto
 
 import (
 	context "context"
+	empty "github.com/golang/protobuf/ptypes/empty"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -20,24 +20,25 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type VMClient interface {
 	Initialize(ctx context.Context, in *InitializeRequest, opts ...grpc.CallOption) (*InitializeResponse, error)
-	Bootstrapping(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	Bootstrapped(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	Shutdown(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	CreateHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateHandlersResponse, error)
-	CreateStaticHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateStaticHandlersResponse, error)
-	BuildBlock(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*BuildBlockResponse, error)
+	Bootstrapping(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*empty.Empty, error)
+	Bootstrapped(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*empty.Empty, error)
+	Shutdown(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*empty.Empty, error)
+	CreateHandlers(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*CreateHandlersResponse, error)
+	CreateStaticHandlers(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*CreateStaticHandlersResponse, error)
+	BuildBlock(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*BuildBlockResponse, error)
 	ParseBlock(ctx context.Context, in *ParseBlockRequest, opts ...grpc.CallOption) (*ParseBlockResponse, error)
 	GetBlock(ctx context.Context, in *GetBlockRequest, opts ...grpc.CallOption) (*GetBlockResponse, error)
-	SetPreference(ctx context.Context, in *SetPreferenceRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	Health(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HealthResponse, error)
-	Version(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*VersionResponse, error)
-	AppRequest(ctx context.Context, in *AppRequestMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	AppRequestFailed(ctx context.Context, in *AppRequestFailedMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	AppResponse(ctx context.Context, in *AppResponseMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	AppGossip(ctx context.Context, in *AppGossipMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SetPreference(ctx context.Context, in *SetPreferenceRequest, opts ...grpc.CallOption) (*empty.Empty, error)
+	Health(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*HealthResponse, error)
+	Version(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*VersionResponse, error)
+	AppRequest(ctx context.Context, in *AppRequestMsg, opts ...grpc.CallOption) (*empty.Empty, error)
+	AppRequestFailed(ctx context.Context, in *AppRequestFailedMsg, opts ...grpc.CallOption) (*empty.Empty, error)
+	AppResponse(ctx context.Context, in *AppResponseMsg, opts ...grpc.CallOption) (*empty.Empty, error)
+	AppGossip(ctx context.Context, in *AppGossipMsg, opts ...grpc.CallOption) (*empty.Empty, error)
 	BlockVerify(ctx context.Context, in *BlockVerifyRequest, opts ...grpc.CallOption) (*BlockVerifyResponse, error)
-	BlockAccept(ctx context.Context, in *BlockAcceptRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	BlockReject(ctx context.Context, in *BlockRejectRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	BlockAccept(ctx context.Context, in *BlockAcceptRequest, opts ...grpc.CallOption) (*empty.Empty, error)
+	BlockReject(ctx context.Context, in *BlockRejectRequest, opts ...grpc.CallOption) (*empty.Empty, error)
+	GetAncestors(ctx context.Context, in *GetAncestorsRequest, opts ...grpc.CallOption) (*GetAncestorsResponse, error)
 }
 
 type vMClient struct {
@@ -57,8 +58,8 @@ func (c *vMClient) Initialize(ctx context.Context, in *InitializeRequest, opts .
 	return out, nil
 }
 
-func (c *vMClient) Bootstrapping(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *vMClient) Bootstrapping(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*empty.Empty, error) {
+	out := new(empty.Empty)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/Bootstrapping", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -66,8 +67,8 @@ func (c *vMClient) Bootstrapping(ctx context.Context, in *emptypb.Empty, opts ..
 	return out, nil
 }
 
-func (c *vMClient) Bootstrapped(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *vMClient) Bootstrapped(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*empty.Empty, error) {
+	out := new(empty.Empty)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/Bootstrapped", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -75,8 +76,8 @@ func (c *vMClient) Bootstrapped(ctx context.Context, in *emptypb.Empty, opts ...
 	return out, nil
 }
 
-func (c *vMClient) Shutdown(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *vMClient) Shutdown(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*empty.Empty, error) {
+	out := new(empty.Empty)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/Shutdown", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -84,7 +85,7 @@ func (c *vMClient) Shutdown(ctx context.Context, in *emptypb.Empty, opts ...grpc
 	return out, nil
 }
 
-func (c *vMClient) CreateHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateHandlersResponse, error) {
+func (c *vMClient) CreateHandlers(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*CreateHandlersResponse, error) {
 	out := new(CreateHandlersResponse)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/CreateHandlers", in, out, opts...)
 	if err != nil {
@@ -93,7 +94,7 @@ func (c *vMClient) CreateHandlers(ctx context.Context, in *emptypb.Empty, opts .
 	return out, nil
 }
 
-func (c *vMClient) CreateStaticHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateStaticHandlersResponse, error) {
+func (c *vMClient) CreateStaticHandlers(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*CreateStaticHandlersResponse, error) {
 	out := new(CreateStaticHandlersResponse)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/CreateStaticHandlers", in, out, opts...)
 	if err != nil {
@@ -102,7 +103,7 @@ func (c *vMClient) CreateStaticHandlers(ctx context.Context, in *emptypb.Empty, 
 	return out, nil
 }
 
-func (c *vMClient) BuildBlock(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*BuildBlockResponse, error) {
+func (c *vMClient) BuildBlock(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*BuildBlockResponse, error) {
 	out := new(BuildBlockResponse)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/BuildBlock", in, out, opts...)
 	if err != nil {
@@ -129,8 +130,8 @@ func (c *vMClient) GetBlock(ctx context.Context, in *GetBlockRequest, opts ...gr
 	return out, nil
 }
 
-func (c *vMClient) SetPreference(ctx context.Context, in *SetPreferenceRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *vMClient) SetPreference(ctx context.Context, in *SetPreferenceRequest, opts ...grpc.CallOption) (*empty.Empty, error) {
+	out := new(empty.Empty)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/SetPreference", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -138,7 +139,7 @@ func (c *vMClient) SetPreference(ctx context.Context, in *SetPreferenceRequest, 
 	return out, nil
 }
 
-func (c *vMClient) Health(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HealthResponse, error) {
+func (c *vMClient) Health(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*HealthResponse, error) {
 	out := new(HealthResponse)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/Health", in, out, opts...)
 	if err != nil {
@@ -147,7 +148,7 @@ func (c *vMClient) Health(ctx context.Context, in *emptypb.Empty, opts ...grpc.C
 	return out, nil
 }
 
-func (c *vMClient) Version(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*VersionResponse, error) {
+func (c *vMClient) Version(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*VersionResponse, error) {
 	out := new(VersionResponse)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/Version", in, out, opts...)
 	if err != nil {
@@ -156,8 +157,8 @@ func (c *vMClient) Version(ctx context.Context, in *emptypb.Empty, opts ...grpc.
 	return out, nil
 }
 
-func (c *vMClient) AppRequest(ctx context.Context, in *AppRequestMsg, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *vMClient) AppRequest(ctx context.Context, in *AppRequestMsg, opts ...grpc.CallOption) (*empty.Empty, error) {
+	out := new(empty.Empty)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/AppRequest", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -165,8 +166,8 @@ func (c *vMClient) AppRequest(ctx context.Context, in *AppRequestMsg, opts ...gr
 	return out, nil
 }
 
-func (c *vMClient) AppRequestFailed(ctx context.Context, in *AppRequestFailedMsg, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *vMClient) AppRequestFailed(ctx context.Context, in *AppRequestFailedMsg, opts ...grpc.CallOption) (*empty.Empty, error) {
+	out := new(empty.Empty)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/AppRequestFailed", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -174,8 +175,8 @@ func (c *vMClient) AppRequestFailed(ctx context.Context, in *AppRequestFailedMsg
 	return out, nil
 }
 
-func (c *vMClient) AppResponse(ctx context.Context, in *AppResponseMsg, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *vMClient) AppResponse(ctx context.Context, in *AppResponseMsg, opts ...grpc.CallOption) (*empty.Empty, error) {
+	out := new(empty.Empty)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/AppResponse", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -183,8 +184,8 @@ func (c *vMClient) AppResponse(ctx context.Context, in *AppResponseMsg, opts ...
 	return out, nil
 }
 
-func (c *vMClient) AppGossip(ctx context.Context, in *AppGossipMsg, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *vMClient) AppGossip(ctx context.Context, in *AppGossipMsg, opts ...grpc.CallOption) (*empty.Empty, error) {
+	out := new(empty.Empty)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/AppGossip", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -201,8 +202,8 @@ func (c *vMClient) BlockVerify(ctx context.Context, in *BlockVerifyRequest, opts
 	return out, nil
 }
 
-func (c *vMClient) BlockAccept(ctx context.Context, in *BlockAcceptRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *vMClient) BlockAccept(ctx context.Context, in *BlockAcceptRequest, opts ...grpc.CallOption) (*empty.Empty, error) {
+	out := new(empty.Empty)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/BlockAccept", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -210,9 +211,18 @@ func (c *vMClient) BlockAccept(ctx context.Context, in *BlockAcceptRequest, opts
 	return out, nil
 }
 
-func (c *vMClient) BlockReject(ctx context.Context, in *BlockRejectRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *vMClient) BlockReject(ctx context.Context, in *BlockRejectRequest, opts ...grpc.CallOption) (*empty.Empty, error) {
+	out := new(empty.Empty)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/BlockReject", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) GetAncestors(ctx context.Context, in *GetAncestorsRequest, opts ...grpc.CallOption) (*GetAncestorsResponse, error) {
+	out := new(GetAncestorsResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/GetAncestors", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -224,24 +234,25 @@ func (c *vMClient) BlockReject(ctx context.Context, in *BlockRejectRequest, opts
 // for forward compatibility
 type VMServer interface {
 	Initialize(context.Context, *InitializeRequest) (*InitializeResponse, error)
-	Bootstrapping(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
-	Bootstrapped(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
-	Shutdown(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
-	CreateHandlers(context.Context, *emptypb.Empty) (*CreateHandlersResponse, error)
-	CreateStaticHandlers(context.Context, *emptypb.Empty) (*CreateStaticHandlersResponse, error)
-	BuildBlock(context.Context, *emptypb.Empty) (*BuildBlockResponse, error)
+	Bootstrapping(context.Context, *empty.Empty) (*empty.Empty, error)
+	Bootstrapped(context.Context, *empty.Empty) (*empty.Empty, error)
+	Shutdown(context.Context, *empty.Empty) (*empty.Empty, error)
+	CreateHandlers(context.Context, *empty.Empty) (*CreateHandlersResponse, error)
+	CreateStaticHandlers(context.Context, *empty.Empty) (*CreateStaticHandlersResponse, error)
+	BuildBlock(context.Context, *empty.Empty) (*BuildBlockResponse, error)
 	ParseBlock(context.Context, *ParseBlockRequest) (*ParseBlockResponse, error)
 	GetBlock(context.Context, *GetBlockRequest) (*GetBlockResponse, error)
-	SetPreference(context.Context, *SetPreferenceRequest) (*emptypb.Empty, error)
-	Health(context.Context, *emptypb.Empty) (*HealthResponse, error)
-	Version(context.Context, *emptypb.Empty) (*VersionResponse, error)
-	AppRequest(context.Context, *AppRequestMsg) (*emptypb.Empty, error)
-	AppRequestFailed(context.Context, *AppRequestFailedMsg) (*emptypb.Empty, error)
-	AppResponse(context.Context, *AppResponseMsg) (*emptypb.Empty, error)
-	AppGossip(context.Context, *AppGossipMsg) (*emptypb.Empty, error)
+	SetPreference(context.Context, *SetPreferenceRequest) (*empty.Empty, error)
+	Health(context.Context, *empty.Empty) (*HealthResponse, error)
+	Version(context.Context, *empty.Empty) (*VersionResponse, error)
+	AppRequest(context.Context, *AppRequestMsg) (*empty.Empty, error)
+	AppRequestFailed(context.Context, *AppRequestFailedMsg) (*empty.Empty, error)
+	AppResponse(context.Context, *AppResponseMsg) (*empty.Empty, error)
+	AppGossip(context.Context, *AppGossipMsg) (*empty.Empty, error)
 	BlockVerify(context.Context, *BlockVerifyRequest) (*BlockVerifyResponse, error)
-	BlockAccept(context.Context, *BlockAcceptRequest) (*emptypb.Empty, error)
-	BlockReject(context.Context, *BlockRejectRequest) (*emptypb.Empty, error)
+	BlockAccept(context.Context, *BlockAcceptRequest) (*empty.Empty, error)
+	BlockReject(context.Context, *BlockRejectRequest) (*empty.Empty, error)
+	GetAncestors(context.Context, *GetAncestorsRequest) (*GetAncestorsResponse, error)
 	mustEmbedUnimplementedVMServer()
 }
 
@@ -252,22 +263,22 @@ type UnimplementedVMServer struct {
 func (UnimplementedVMServer) Initialize(context.Context, *InitializeRequest) (*InitializeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Initialize not implemented")
 }
-func (UnimplementedVMServer) Bootstrapping(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
+func (UnimplementedVMServer) Bootstrapping(context.Context, *empty.Empty) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Bootstrapping not implemented")
 }
-func (UnimplementedVMServer) Bootstrapped(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
+func (UnimplementedVMServer) Bootstrapped(context.Context, *empty.Empty) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Bootstrapped not implemented")
 }
-func (UnimplementedVMServer) Shutdown(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
+func (UnimplementedVMServer) Shutdown(context.Context, *empty.Empty) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Shutdown not implemented")
 }
-func (UnimplementedVMServer) CreateHandlers(context.Context, *emptypb.Empty) (*CreateHandlersResponse, error) {
+func (UnimplementedVMServer) CreateHandlers(context.Context, *empty.Empty) (*CreateHandlersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateHandlers not implemented")
 }
-func (UnimplementedVMServer) CreateStaticHandlers(context.Context, *emptypb.Empty) (*CreateStaticHandlersResponse, error) {
+func (UnimplementedVMServer) CreateStaticHandlers(context.Context, *empty.Empty) (*CreateStaticHandlersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateStaticHandlers not implemented")
 }
-func (UnimplementedVMServer) BuildBlock(context.Context, *emptypb.Empty) (*BuildBlockResponse, error) {
+func (UnimplementedVMServer) BuildBlock(context.Context, *empty.Empty) (*BuildBlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BuildBlock not implemented")
 }
 func (UnimplementedVMServer) ParseBlock(context.Context, *ParseBlockRequest) (*ParseBlockResponse, error) {
@@ -276,35 +287,38 @@ func (UnimplementedVMServer) ParseBlock(context.Context, *ParseBlockRequest) (*P
 func (UnimplementedVMServer) GetBlock(context.Context, *GetBlockRequest) (*GetBlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetBlock not implemented")
 }
-func (UnimplementedVMServer) SetPreference(context.Context, *SetPreferenceRequest) (*emptypb.Empty, error) {
+func (UnimplementedVMServer) SetPreference(context.Context, *SetPreferenceRequest) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetPreference not implemented")
 }
-func (UnimplementedVMServer) Health(context.Context, *emptypb.Empty) (*HealthResponse, error) {
+func (UnimplementedVMServer) Health(context.Context, *empty.Empty) (*HealthResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Health not implemented")
 }
-func (UnimplementedVMServer) Version(context.Context, *emptypb.Empty) (*VersionResponse, error) {
+func (UnimplementedVMServer) Version(context.Context, *empty.Empty) (*VersionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Version not implemented")
 }
-func (UnimplementedVMServer) AppRequest(context.Context, *AppRequestMsg) (*emptypb.Empty, error) {
+func (UnimplementedVMServer) AppRequest(context.Context, *AppRequestMsg) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AppRequest not implemented")
 }
-func (UnimplementedVMServer) AppRequestFailed(context.Context, *AppRequestFailedMsg) (*emptypb.Empty, error) {
+func (UnimplementedVMServer) AppRequestFailed(context.Context, *AppRequestFailedMsg) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AppRequestFailed not implemented")
 }
-func (UnimplementedVMServer) AppResponse(context.Context, *AppResponseMsg) (*emptypb.Empty, error) {
+func (UnimplementedVMServer) AppResponse(context.Context, *AppResponseMsg) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AppResponse not implemented")
 }
-func (UnimplementedVMServer) AppGossip(context.Context, *AppGossipMsg) (*emptypb.Empty, error) {
+func (UnimplementedVMServer) AppGossip(context.Context, *AppGossipMsg) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AppGossip not implemented")
 }
 func (UnimplementedVMServer) BlockVerify(context.Context, *BlockVerifyRequest) (*BlockVerifyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BlockVerify not implemented")
 }
-func (UnimplementedVMServer) BlockAccept(context.Context, *BlockAcceptRequest) (*emptypb.Empty, error) {
+func (UnimplementedVMServer) BlockAccept(context.Context, *BlockAcceptRequest) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BlockAccept not implemented")
 }
-func (UnimplementedVMServer) BlockReject(context.Context, *BlockRejectRequest) (*emptypb.Empty, error) {
+func (UnimplementedVMServer) BlockReject(context.Context, *BlockRejectRequest) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BlockReject not implemented")
+}
+func (UnimplementedVMServer) GetAncestors(context.Context, *GetAncestorsRequest) (*GetAncestorsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAncestors not implemented")
 }
 func (UnimplementedVMServer) mustEmbedUnimplementedVMServer() {}
 
@@ -338,7 +352,7 @@ func _VM_Initialize_Handler(srv interface{}, ctx context.Context, dec func(inter
 }
 
 func _VM_Bootstrapping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
+	in := new(empty.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -350,13 +364,13 @@ func _VM_Bootstrapping_Handler(srv interface{}, ctx context.Context, dec func(in
 		FullMethod: "/vmproto.VM/Bootstrapping",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).Bootstrapping(ctx, req.(*emptypb.Empty))
+		return srv.(VMServer).Bootstrapping(ctx, req.(*empty.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _VM_Bootstrapped_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
+	in := new(empty.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -368,13 +382,13 @@ func _VM_Bootstrapped_Handler(srv interface{}, ctx context.Context, dec func(int
 		FullMethod: "/vmproto.VM/Bootstrapped",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).Bootstrapped(ctx, req.(*emptypb.Empty))
+		return srv.(VMServer).Bootstrapped(ctx, req.(*empty.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _VM_Shutdown_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
+	in := new(empty.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -386,13 +400,13 @@ func _VM_Shutdown_Handler(srv interface{}, ctx context.Context, dec func(interfa
 		FullMethod: "/vmproto.VM/Shutdown",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).Shutdown(ctx, req.(*emptypb.Empty))
+		return srv.(VMServer).Shutdown(ctx, req.(*empty.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _VM_CreateHandlers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
+	in := new(empty.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -404,13 +418,13 @@ func _VM_CreateHandlers_Handler(srv interface{}, ctx context.Context, dec func(i
 		FullMethod: "/vmproto.VM/CreateHandlers",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).CreateHandlers(ctx, req.(*emptypb.Empty))
+		return srv.(VMServer).CreateHandlers(ctx, req.(*empty.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _VM_CreateStaticHandlers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
+	in := new(empty.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -422,13 +436,13 @@ func _VM_CreateStaticHandlers_Handler(srv interface{}, ctx context.Context, dec 
 		FullMethod: "/vmproto.VM/CreateStaticHandlers",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).CreateStaticHandlers(ctx, req.(*emptypb.Empty))
+		return srv.(VMServer).CreateStaticHandlers(ctx, req.(*empty.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _VM_BuildBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
+	in := new(empty.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -440,7 +454,7 @@ func _VM_BuildBlock_Handler(srv interface{}, ctx context.Context, dec func(inter
 		FullMethod: "/vmproto.VM/BuildBlock",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).BuildBlock(ctx, req.(*emptypb.Empty))
+		return srv.(VMServer).BuildBlock(ctx, req.(*empty.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -500,7 +514,7 @@ func _VM_SetPreference_Handler(srv interface{}, ctx context.Context, dec func(in
 }
 
 func _VM_Health_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
+	in := new(empty.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -512,13 +526,13 @@ func _VM_Health_Handler(srv interface{}, ctx context.Context, dec func(interface
 		FullMethod: "/vmproto.VM/Health",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).Health(ctx, req.(*emptypb.Empty))
+		return srv.(VMServer).Health(ctx, req.(*empty.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _VM_Version_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
+	in := new(empty.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -530,7 +544,7 @@ func _VM_Version_Handler(srv interface{}, ctx context.Context, dec func(interfac
 		FullMethod: "/vmproto.VM/Version",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).Version(ctx, req.(*emptypb.Empty))
+		return srv.(VMServer).Version(ctx, req.(*empty.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -661,6 +675,24 @@ func _VM_BlockReject_Handler(srv interface{}, ctx context.Context, dec func(inte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VM_GetAncestors_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAncestorsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).GetAncestors(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/GetAncestors",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).GetAncestors(ctx, req.(*GetAncestorsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // VM_ServiceDesc is the grpc.ServiceDesc for VM service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -743,6 +775,10 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "BlockReject",
 			Handler:    _VM_BlockReject_Handler,
+		},
+		{
+			MethodName: "GetAncestors",
+			Handler:    _VM_GetAncestors_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

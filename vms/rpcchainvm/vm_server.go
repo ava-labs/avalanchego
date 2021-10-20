@@ -6,6 +6,7 @@ package rpcchainvm
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"google.golang.org/grpc"
@@ -356,6 +357,35 @@ func (vm *VMServer) ParseBlock(_ context.Context, req *vmproto.ParseBlockRequest
 		Height:    blk.Height(),
 		Timestamp: timeBytes,
 	}, err
+}
+
+func (vm *VMServer) GetAncestors(_ context.Context,
+	req *vmproto.GetAncestorsRequest) (*vmproto.GetAncestorsResponse, error) {
+	res := &vmproto.GetAncestorsResponse{
+		BlksBytes: make([]*vmproto.BlkBytes, 0),
+	}
+	rVM, ok := vm.vm.(block.RemoteVM)
+	if !ok {
+		// should not happen
+		return nil, fmt.Errorf("plugin does not implement RemoteVM interface")
+	}
+
+	blkID, err := ids.ToID(req.BlkID)
+	if err != nil {
+		return nil, err
+	}
+	maxBlksNum := int(req.MaxBlocksNum)
+	maxBlksSize := int(req.MaxBlocksSize)
+	maxBlocksRetrivalTime := time.Duration(req.MaxBlocksRetrivalTime)
+
+	blksBytes := rVM.GetAncestors(blkID, maxBlksNum, maxBlksSize, maxBlocksRetrivalTime)
+
+	for _, blkBytes := range blksBytes {
+		blkRes := vmproto.BlkBytes{BlkBytes: blkBytes}
+		res.BlksBytes = append(res.BlksBytes, &blkRes)
+	}
+
+	return res, nil
 }
 
 func (vm *VMServer) GetBlock(_ context.Context, req *vmproto.GetBlockRequest) (*vmproto.GetBlockResponse, error) {
