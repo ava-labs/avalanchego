@@ -471,9 +471,6 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	if m.MeterVMEnabled {
-		vm = metervm.NewVertexVM(vm)
-	}
 	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
@@ -515,6 +512,10 @@ func (m *manager) createAvalancheChain(
 	chainConfig, err := m.getChainConfig(ctx.ChainID)
 	if err != nil {
 		return nil, fmt.Errorf("error while fetching chain config: %w", err)
+	}
+
+	if m.MeterVMEnabled {
+		vm = metervm.NewVertexVM(vm)
 	}
 	if err := vm.Initialize(
 		ctx,
@@ -625,9 +626,6 @@ func (m *manager) createSnowmanChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	if m.MeterVMEnabled {
-		vm = metervm.NewBlockVM(vm)
-	}
 	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
@@ -662,22 +660,24 @@ func (m *manager) createSnowmanChain(
 
 	// first vm to be init is P-Chain once, which provides validator interface to all ProposerVMs
 	if m.validatorState == nil {
-		valState, ok := vm.(validators.State)
-		if !ok {
-			return nil, fmt.Errorf("expected validators.State but got %T", vm)
+		if m.ManagerConfig.StakingEnabled {
+			valState, ok := vm.(validators.State)
+			if !ok {
+				return nil, fmt.Errorf("expected validators.State but got %T", vm)
+			}
+
+			// Initialize the validator state for future chains.
+			m.validatorState = validators.NewLockedState(&ctx.Lock, valState)
+
+			// Notice that this context is left unlocked. This is because the
+			// lock will already be held when accessing these values on the
+			// P-chain.
+			ctx.ValidatorState = valState
+		} else {
+			m.validatorState = validators.NewNoState()
+			ctx.ValidatorState = m.validatorState
 		}
-
-		// Initialize the validator state for future chains.
-		m.validatorState = validators.NewLockedState(&ctx.Lock, valState)
-
-		// Notice that this context is left unlocked. This is because the
-		// lock will already be held when accessing these values on the
-		// P-chain.
-		ctx.ValidatorState = valState
 	}
-
-	// enable ProposerVM on this VM
-	vm = proposervm.New(vm, m.ApricotPhase4Time, m.ApricotPhase4MinPChainHeight)
 
 	// Initialize the ProposerVM and the vm wrapped inside it
 	chainConfig, err := m.getChainConfig(ctx.ChainID)
@@ -685,6 +685,12 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("error while fetching chain config: %w", err)
 	}
 
+	// enable ProposerVM on this VM
+	vm = proposervm.New(vm, m.ApricotPhase4Time, m.ApricotPhase4MinPChainHeight)
+
+	if m.MeterVMEnabled {
+		vm = metervm.NewBlockVM(vm)
+	}
 	if err := vm.Initialize(
 		ctx,
 		vmDBManager,
