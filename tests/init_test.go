@@ -154,10 +154,9 @@ func (tm *testMatcher) findSkip(name string) (reason string, skipload bool) {
 }
 
 // findConfig returns the chain config matching defined patterns.
-func (tm *testMatcher) findConfig(name string) *params.ChainConfig {
-	// TODO(fjl): name can be derived from testing.T when min Go version is 1.8
+func (tm *testMatcher) findConfig(t *testing.T) *params.ChainConfig {
 	for _, m := range tm.configpat {
-		if m.p.MatchString(name) {
+		if m.p.MatchString(t.Name()) {
 			return &m.config
 		}
 	}
@@ -166,7 +165,6 @@ func (tm *testMatcher) findConfig(name string) *params.ChainConfig {
 
 // checkFailure checks whether a failure is expected.
 func (tm *testMatcher) checkFailure(t *testing.T, name string, err error) error {
-	// TODO(fjl): name can be derived from t when min Go version is 1.8
 	failReason := ""
 	for _, m := range tm.failpat {
 		if m.p.MatchString(name) {
@@ -277,15 +275,13 @@ func runTestFunc(runTest interface{}, t *testing.T, name string, m reflect.Value
 	})
 }
 
-/*
-func TestMatcherWhitelist(t *testing.T) {
-	t.Parallel()
-	tm := new(testMatcher)
-	tm.whitelist("invalid*")
-	tm.walk(t, rlpTestDir, func(t *testing.T, name string, test *RLPTest) {
-		if name[:len("invalidRLPTest.json")] != "invalidRLPTest.json" {
-			t.Fatalf("invalid test found: %s != invalidRLPTest.json", name)
-		}
-	})
-}
-*/
+// func TestMatcherRunonlylist(t *testing.T) {
+// 	t.Parallel()
+// 	tm := new(testMatcher)
+// 	tm.runonly("invalid*")
+// 	tm.walk(t, rlpTestDir, func(t *testing.T, name string, test *RLPTest) {
+// 		if name[:len("invalidRLPTest.json")] != "invalidRLPTest.json" {
+// 			t.Fatalf("invalid test found: %s != invalidRLPTest.json", name)
+// 		}
+// 	})
+// }
