@@ -4,6 +4,10 @@
 
 This version is backwards compatible to [v1.6.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.6.0). It is optional, but encouraged.
 
+### Indexer
+
+- Added method `GetContainerByID` to client implementation.
+
 ### Subnet & Custom VMs
 
 - Ensured that all possible chains are run in `--staking-enabled=false` networks.
