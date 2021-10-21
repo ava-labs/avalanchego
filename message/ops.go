@@ -7,7 +7,8 @@ package message
 type Op byte
 
 // Types of messages that may be sent between nodes
-// Note: If you add a new Op below, you must also add it to ops (declared below)
+// Note: If you add a new parseable Op below, you must also add it to ops
+// (declared below)
 const (
 	// Handshake:
 	GetVersion Op = iota
@@ -54,7 +55,7 @@ const (
 
 var (
 	// List of all message types
-	ops = []Op{
+	Ops = []Op{
 		GetVersion,
 		GetPeerList,
 		Ping,
@@ -75,18 +76,6 @@ var (
 		AppRequest,
 		AppResponse,
 		AppGossip,
-
-		GetAcceptedFrontierFailed,
-		GetAcceptedFailed,
-		GetFailed,
-		QueryFailed,
-		GetAncestorsFailed,
-		AppRequestFailed,
-		Timeout,
-		Connected,
-		Disconnected,
-		Notify,
-		GossipRequest,
 	}
 
 	// Defines the messages that can be sent/received with this network

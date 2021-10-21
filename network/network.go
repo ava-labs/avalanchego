@@ -418,7 +418,7 @@ func (n *network) send(msg message.OutboundMessage, connectedOnly bool, peers []
 		op     = msg.Op()
 	)
 
-	msgMetrics := n.metrics.message(op)
+	msgMetrics := n.metrics.messageMetrics[op]
 	if msgMetrics == nil {
 		n.log.Error("unregistered metric for message with op %s. Dropping it", op)
 

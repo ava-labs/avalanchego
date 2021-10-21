@@ -18,63 +18,62 @@ type messageMetrics struct {
 	savedReceivedBytes, savedSentBytes                        metric.Averager
 }
 
-func (mm *messageMetrics) initialize(msgType message.Op, namespace string, metrics prometheus.Registerer) error {
-	mm.numSent = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_sent", msgType),
-		Help:      fmt.Sprintf("Number of %s messages sent over the network", msgType),
-	})
-	mm.numFailed = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_failed", msgType),
-		Help:      fmt.Sprintf("Number of %s messages that failed to be sent over the network", msgType),
-	})
-	mm.numReceived = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_received", msgType),
-		Help:      fmt.Sprintf("Number of %s messages received from the network", msgType),
-	})
-	mm.receivedBytes = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_received_bytes", msgType),
-		Help:      fmt.Sprintf("Number of bytes of %s messages received from the network", msgType),
-	})
-	mm.sentBytes = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_sent_bytes", msgType),
-		Help:      fmt.Sprintf("Size of bytes of %s messages received from the network", msgType),
-	})
-
-	errs := wrappers.Errs{}
+func newMessageMetrics(msgType message.Op, namespace string, metrics prometheus.Registerer, errs *wrappers.Errs) *messageMetrics {
+	msg := &messageMetrics{
+		numSent: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      fmt.Sprintf("%s_sent", msgType),
+			Help:      fmt.Sprintf("Number of %s messages sent over the network", msgType),
+		}),
+		numFailed: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      fmt.Sprintf("%s_failed", msgType),
+			Help:      fmt.Sprintf("Number of %s messages that failed to be sent over the network", msgType),
+		}),
+		numReceived: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      fmt.Sprintf("%s_received", msgType),
+			Help:      fmt.Sprintf("Number of %s messages received from the network", msgType),
+		}),
+		receivedBytes: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      fmt.Sprintf("%s_received_bytes", msgType),
+			Help:      fmt.Sprintf("Number of bytes of %s messages received from the network", msgType),
+		}),
+		sentBytes: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      fmt.Sprintf("%s_sent_bytes", msgType),
+			Help:      fmt.Sprintf("Size of bytes of %s messages received from the network", msgType),
+		}),
+	}
+	errs.Add(
+		metrics.Register(msg.numSent),
+		metrics.Register(msg.numFailed),
+		metrics.Register(msg.numReceived),
+		metrics.Register(msg.receivedBytes),
+		metrics.Register(msg.sentBytes),
+	)
 
 	if msgType.Compressable() {
-		mm.savedReceivedBytes = metric.NewAveragerWithErrs(
+		msg.savedReceivedBytes = metric.NewAveragerWithErrs(
 			namespace,
 			fmt.Sprintf("%s_compression_saved_received_bytes", msgType),
 			fmt.Sprintf("bytes saved (not received) due to compression of %s messages", msgType),
 			metrics,
-			&errs,
+			errs,
 		)
-		mm.savedSentBytes = metric.NewAveragerWithErrs(
+		msg.savedSentBytes = metric.NewAveragerWithErrs(
 			namespace,
 			fmt.Sprintf("%s_compression_saved_sent_bytes", msgType),
 			fmt.Sprintf("bytes saved (not sent) due to compression of %s messages", msgType),
 			metrics,
-			&errs,
+			errs,
 		)
 	} else {
-		mm.savedReceivedBytes = metric.NewNoAverager()
-		mm.savedSentBytes = metric.NewNoAverager()
+		msg.savedReceivedBytes = metric.NewNoAverager()
+		msg.savedSentBytes = metric.NewNoAverager()
 	}
-
-	errs.Add(
-		metrics.Register(mm.numSent),
-		metrics.Register(mm.numFailed),
-		metrics.Register(mm.numReceived),
-		metrics.Register(mm.receivedBytes),
-		metrics.Register(mm.sentBytes),
-	)
-	return errs.Err
+	return msg
 }
 
 type metrics struct {
@@ -89,15 +88,7 @@ type metrics struct {
 	inboundConnRateLimited   prometheus.Counter
 	inboundConnAllowed       prometheus.Counter
 
-	getVersion, version,
-	getPeerlist, peerList,
-	ping, pong,
-	getAcceptedFrontier, acceptedFrontier,
-	getAccepted, accepted,
-	getAncestors, multiPut,
-	get, put,
-	pushQuery, pullQuery, chits,
-	appRequest, appResponse, appGossip messageMetrics
+	messageMetrics map[message.Op]*messageMetrics
 }
 
 func (m *metrics) initialize(namespace string, registerer prometheus.Registerer) error {
@@ -164,74 +155,11 @@ func (m *metrics) initialize(namespace string, registerer prometheus.Registerer)
 		registerer.Register(m.disconnected),
 		registerer.Register(m.inboundConnAllowed),
 		registerer.Register(m.inboundConnRateLimited),
-
-		m.getVersion.initialize(message.GetVersion, namespace, registerer),
-		m.version.initialize(message.Version, namespace, registerer),
-		m.getPeerlist.initialize(message.GetPeerList, namespace, registerer),
-		m.peerList.initialize(message.PeerList, namespace, registerer),
-		m.ping.initialize(message.Ping, namespace, registerer),
-		m.pong.initialize(message.Pong, namespace, registerer),
-		m.getAcceptedFrontier.initialize(message.GetAcceptedFrontier, namespace, registerer),
-		m.acceptedFrontier.initialize(message.AcceptedFrontier, namespace, registerer),
-		m.getAccepted.initialize(message.GetAccepted, namespace, registerer),
-		m.accepted.initialize(message.Accepted, namespace, registerer),
-		m.getAncestors.initialize(message.GetAncestors, namespace, registerer),
-		m.multiPut.initialize(message.MultiPut, namespace, registerer),
-		m.get.initialize(message.Get, namespace, registerer),
-		m.put.initialize(message.Put, namespace, registerer),
-		m.pushQuery.initialize(message.PushQuery, namespace, registerer),
-		m.pullQuery.initialize(message.PullQuery, namespace, registerer),
-		m.chits.initialize(message.Chits, namespace, registerer),
-		m.appRequest.initialize(message.AppRequest, namespace, registerer),
-		m.appResponse.initialize(message.AppResponse, namespace, registerer),
-		m.appGossip.initialize(message.AppGossip, namespace, registerer),
 	)
-	return errs.Err
-}
 
-func (m *metrics) message(msgType message.Op) *messageMetrics {
-	switch msgType {
-	case message.GetVersion:
-		return &m.getVersion
-	case message.Version:
-		return &m.version
-	case message.GetPeerList:
-		return &m.getPeerlist
-	case message.PeerList:
-		return &m.peerList
-	case message.Ping:
-		return &m.ping
-	case message.Pong:
-		return &m.pong
-	case message.GetAcceptedFrontier:
-		return &m.getAcceptedFrontier
-	case message.AcceptedFrontier:
-		return &m.acceptedFrontier
-	case message.GetAccepted:
-		return &m.getAccepted
-	case message.Accepted:
-		return &m.accepted
-	case message.GetAncestors:
-		return &m.getAncestors
-	case message.MultiPut:
-		return &m.multiPut
-	case message.Get:
-		return &m.get
-	case message.Put:
-		return &m.put
-	case message.PushQuery:
-		return &m.pushQuery
-	case message.PullQuery:
-		return &m.pullQuery
-	case message.Chits:
-		return &m.chits
-	case message.AppRequest:
-		return &m.appRequest
-	case message.AppResponse:
-		return &m.appResponse
-	case message.AppGossip:
-		return &m.appGossip
-	default:
-		return nil
+	m.messageMetrics = make(map[message.Op]*messageMetrics, len(message.Ops))
+	for _, op := range message.Ops {
+		m.messageMetrics[op] = newMessageMetrics(op, namespace, registerer, &errs)
 	}
+	return errs.Err
 }

@@ -397,7 +397,7 @@ func (p *peer) handle(msg message.InboundMessage, msgLen float64) {
 	atomic.StoreInt64(&p.net.lastMsgReceivedTime, now.Unix())
 
 	op := msg.Op()
-	msgMetrics := p.net.metrics.message(op)
+	msgMetrics := p.net.metrics.messageMetrics[op]
 	if msgMetrics == nil {
 		p.net.log.Error("dropping an unknown message from %s%s at %s with op %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), op)
 		msg.OnFinishedHandling()
