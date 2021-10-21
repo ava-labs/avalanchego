@@ -333,7 +333,7 @@ func NewNetwork(
 func (n *network) Send(msg message.OutboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) ids.ShortSet {
 	// retrieve target peers
 	peers := n.getPeers(nodeIDs, subnetID, validatorOnly)
-	return n.send(msg, peers)
+	return n.send(msg, true, peers)
 }
 
 // Assumes [n.stateLock] is not held.
@@ -347,9 +347,14 @@ func (n *network) Gossip(
 	peers, err := n.selectPeersForGossip(subnetID, validatorOnly, numValidatorsToSend, numNonValidatorsToSend)
 	if err != nil {
 		n.log.Error("failed to sample peers: %s", err)
+
+		// Because we failed to sample the peers, the message will never be
+		// sent. This means that we should return the bytes allocated for the
+		// message.
+		msg.DecRef()
 		return nil
 	}
-	return n.send(msg, peers)
+	return n.send(msg, true, peers)
 }
 
 // Accept is called after every consensus decision
@@ -398,7 +403,14 @@ func (n *network) selectPeersForGossip(subnetID ids.ID, validatorOnly bool, numV
 	return peersAll, nil
 }
 
-func (n *network) send(msg message.OutboundMessage, peers []*peer) ids.ShortSet {
+// Send the message to the provided peers.
+//
+// Send takes ownership of the provided message reference. So, the provided
+// message should only be inspected if the reference has been externally
+// increased.
+//
+// Assumes stateLock is not held.
+func (n *network) send(msg message.OutboundMessage, connectedOnly bool, peers []*peer) ids.ShortSet {
 	var (
 		now    = n.clock.Time()
 		msgLen = len(msg.Bytes())
@@ -409,18 +421,23 @@ func (n *network) send(msg message.OutboundMessage, peers []*peer) ids.ShortSet 
 	msgMetrics := n.metrics.message(op)
 	if msgMetrics == nil {
 		n.log.Error("unregistered metric for message with op %s. Dropping it", op)
+
+		// The message wasn't passed to any peers, so we can remove the
+		// reference that was added.
+		msg.DecRef()
 		return sentTo
 	}
-
-	canModifyMsg := len(peers) == 1
 
 	// send to peer and update metrics
 	// note: peer may be nil
 	for _, peer := range peers {
+		// Add a reference to the message so that if it is sent, it won't be
+		// collected until it is done being processed.
+		msg.AddRef()
 		if peer != nil &&
-			peer.finishedHandshake.GetValue() &&
+			(!connectedOnly || peer.finishedHandshake.GetValue()) &&
 			!sentTo.Contains(peer.nodeID) &&
-			peer.Send(msg, canModifyMsg) {
+			peer.Send(msg) {
 			sentTo.Add(peer.nodeID)
 
 			// record metrics for success
@@ -430,19 +447,25 @@ func (n *network) send(msg message.OutboundMessage, peers []*peer) ids.ShortSet 
 			if saved := msg.BytesSavedCompression(); saved != 0 {
 				msgMetrics.savedSentBytes.Observe(float64(saved))
 			}
-			continue
-		}
+		} else {
+			// record metrics for failure
+			n.sendFailRateCalculator.Observe(1, now)
+			msgMetrics.numFailed.Inc()
 
-		// record metrics for failure
-		n.sendFailRateCalculator.Observe(1, now)
-		msgMetrics.numFailed.Inc()
+			// The message wasn't passed to the peer, so we should remove the
+			// reference that was added.
+			msg.DecRef()
+		}
 	}
+
+	// The message has been passed to all peers that it will be sent to, so we
+	// can decrease the sender reference now.
+	msg.DecRef()
 	return sentTo
 }
 
-// shouldUpgradeIncoming returns whether we should
-// upgrade an incoming connection from a peer
-// at the IP whose string repr. is [ipStr].
+// shouldUpgradeIncoming returns whether we should upgrade an incoming
+// connection from a peer at the IP whose string repr. is [ipStr].
 // Assumes stateLock is not held.
 func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 	n.stateLock.RLock()

@@ -360,7 +360,7 @@ func (p *peer) WriteMessages() {
 // If [canModifyMsg], [msg] may be modified by this method.
 // If ![canModifyMsg], [msg] will not be modified by this method.
 // [canModifyMsg] should be false if [msg] is sent in a loop, for example/.
-func (p *peer) Send(msg message.OutboundMessage, canModifyMsg bool) bool {
+func (p *peer) Send(msg message.OutboundMessage) bool {
 	msgBytes := msg.Bytes()
 	msgLen := int64(len(msgBytes))
 
@@ -380,11 +380,6 @@ func (p *peer) Send(msg message.OutboundMessage, canModifyMsg bool) bool {
 		p.net.log.Debug("dropping message to %s%s at %s due to a closed connection", constants.NodeIDPrefix, p.nodeID, p.getIP())
 		p.net.outboundMsgThrottler.Release(uint64(msgLen), p.nodeID)
 		return false
-	}
-
-	// If the flag says to not modify [msgBytes], increase the reference counts.
-	if !canModifyMsg {
-		msg.AddRef()
 	}
 
 	p.sendQueue = append(p.sendQueue, msg)
@@ -490,20 +485,7 @@ func (p *peer) close() {
 func (p *peer) sendGetVersion() {
 	msg, err := p.net.mc.GetVersion()
 	p.net.log.AssertNoError(err)
-	lenMsg := len(msg.Bytes())
-	sent := p.Send(msg, true)
-	if sent {
-		p.net.metrics.getVersion.numSent.Inc()
-		p.net.metrics.getVersion.sentBytes.Add(float64(lenMsg))
-		// assume that if [saved] == 0, [msg] wasn't compressed
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			p.net.metrics.getVersion.savedSentBytes.Observe(float64(saved))
-		}
-		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
-	} else {
-		p.net.metrics.getVersion.numFailed.Inc()
-		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
-	}
+	p.net.send(msg, false, []*peer{p})
 }
 
 // assumes the [stateLock] is not held
@@ -529,21 +511,7 @@ func (p *peer) sendVersion() {
 	p.net.stateLock.RUnlock()
 	p.net.log.AssertNoError(err)
 
-	lenMsg := len(msg.Bytes())
-	sent := p.Send(msg, true)
-	if sent {
-		p.net.metrics.version.numSent.Inc()
-		p.net.metrics.version.sentBytes.Add(float64(lenMsg))
-		// assume that if [saved] == 0, [msg] wasn't compressed
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			p.net.metrics.version.savedSentBytes.Observe(float64(saved))
-		}
-		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
-		p.versionSent.SetValue(true)
-	} else {
-		p.net.metrics.version.numFailed.Inc()
-		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
-	}
+	p.net.send(msg, false, []*peer{p})
 }
 
 // assumes the [stateLock] is not held
@@ -551,20 +519,7 @@ func (p *peer) sendGetPeerList() {
 	msg, err := p.net.mc.GetPeerList()
 	p.net.log.AssertNoError(err)
 
-	lenMsg := len(msg.Bytes())
-	sent := p.Send(msg, true)
-	if sent {
-		p.net.metrics.getPeerlist.numSent.Inc()
-		p.net.metrics.getPeerlist.sentBytes.Add(float64(lenMsg))
-		// assume that if [saved] == 0, [msg] wasn't compressed
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			p.net.metrics.getPeerlist.savedSentBytes.Observe(float64(saved))
-		}
-		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
-	} else {
-		p.net.metrics.getPeerlist.numFailed.Inc()
-		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
-	}
+	p.net.send(msg, false, []*peer{p})
 }
 
 // assumes the stateLock is not held
@@ -580,61 +535,23 @@ func (p *peer) sendPeerList() {
 		return
 	}
 
-	lenMsg := len(msg.Bytes())
-	sent := p.Send(msg, true)
-	if sent {
-		p.net.metrics.peerList.numSent.Inc()
-		p.net.metrics.peerList.sentBytes.Add(float64(lenMsg))
-		// assume that if [saved] == 0, [msg] wasn't compressed
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			p.net.metrics.peerList.savedSentBytes.Observe(float64(saved))
-		}
-		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
-		p.peerListSent.SetValue(true)
-	} else {
-		p.net.metrics.peerList.numFailed.Inc()
-		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
-	}
+	p.net.send(msg, false, []*peer{p})
 }
 
 // assumes the [stateLock] is not held
 func (p *peer) sendPing() {
 	msg, err := p.net.mc.Ping()
 	p.net.log.AssertNoError(err)
-	lenMsg := len(msg.Bytes())
-	sent := p.Send(msg, true)
-	if sent {
-		p.net.metrics.ping.numSent.Inc()
-		p.net.metrics.ping.sentBytes.Add(float64(lenMsg))
-		// assume that if [saved] == 0, [msg] wasn't compressed
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			p.net.metrics.ping.savedSentBytes.Observe(float64(saved))
-		}
-		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
-	} else {
-		p.net.metrics.ping.numFailed.Inc()
-		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
-	}
+
+	p.net.send(msg, false, []*peer{p})
 }
 
 // assumes the [stateLock] is not held
 func (p *peer) sendPong() {
 	msg, err := p.net.mc.Pong()
 	p.net.log.AssertNoError(err)
-	lenMsg := len(msg.Bytes())
-	sent := p.Send(msg, true)
-	if sent {
-		p.net.metrics.pong.numSent.Inc()
-		p.net.metrics.pong.sentBytes.Add(float64(lenMsg))
-		// assume that if [saved] == 0, [msg] wasn't compressed
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			p.net.metrics.pong.savedSentBytes.Observe(float64(saved))
-		}
-		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
-	} else {
-		p.net.metrics.pong.numFailed.Inc()
-		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
-	}
+
+	p.net.send(msg, false, []*peer{p})
 }
 
 // assumes the [stateLock] is not held

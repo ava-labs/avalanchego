@@ -10,6 +10,9 @@ import (
 
 var _ OutboundMsgBuilder = &outMsgBuilder{}
 
+// OutboundMsgBuilder builds outbound messages. Outbound messages are returned
+// with a reference count of 1. Once the reference count hits 0, the message
+// bytes should no longer be accessed.
 type OutboundMsgBuilder interface {
 	GetVersion() (OutboundMessage, error)
 

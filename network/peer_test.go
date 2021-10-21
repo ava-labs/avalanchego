@@ -113,7 +113,7 @@ func TestPeer_Close(t *testing.T) {
 	peer := newPeer(basenetwork, conn, ip1.IP())
 	peer.sendQueue = make([]message.OutboundMessage, 0)
 	testMsg := newTestMsg(message.GetVersion, newmsgbytes)
-	peer.Send(testMsg, true)
+	peer.Send(testMsg)
 
 	go func() {
 		err := netwrk.Close()
