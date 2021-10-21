@@ -219,7 +219,7 @@ func (m *manager) CreateChain(chain ChainParameters) {
 // Create a chain, this is only called from the P-chain thread, except for
 // creating the P-chain.
 func (m *manager) ForceCreateChain(chainParams ChainParameters) {
-	if chainParams.SubnetID != constants.PrimaryNetworkID && !m.WhitelistedSubnets.Contains(chainParams.SubnetID) {
+	if m.StakingEnabled && chainParams.SubnetID != constants.PrimaryNetworkID && !m.WhitelistedSubnets.Contains(chainParams.SubnetID) {
 		m.Log.Debug("Skipped creating non-whitelisted chain:\n"+
 			"    ID: %s\n"+
 			"    VMID:%s",
@@ -660,18 +660,23 @@ func (m *manager) createSnowmanChain(
 
 	// first vm to be init is P-Chain once, which provides validator interface to all ProposerVMs
 	if m.validatorState == nil {
-		valState, ok := vm.(validators.State)
-		if !ok {
-			return nil, fmt.Errorf("expected validators.State but got %T", vm)
+		if m.ManagerConfig.StakingEnabled {
+			valState, ok := vm.(validators.State)
+			if !ok {
+				return nil, fmt.Errorf("expected validators.State but got %T", vm)
+			}
+
+			// Initialize the validator state for future chains.
+			m.validatorState = validators.NewLockedState(&ctx.Lock, valState)
+
+			// Notice that this context is left unlocked. This is because the
+			// lock will already be held when accessing these values on the
+			// P-chain.
+			ctx.ValidatorState = valState
+		} else {
+			m.validatorState = validators.NewNoState()
+			ctx.ValidatorState = m.validatorState
 		}
-
-		// Initialize the validator state for future chains.
-		m.validatorState = validators.NewLockedState(&ctx.Lock, valState)
-
-		// Notice that this context is left unlocked. This is because the
-		// lock will already be held when accessing these values on the
-		// P-chain.
-		ctx.ValidatorState = valState
 	}
 
 	// Initialize the ProposerVM and the vm wrapped inside it
