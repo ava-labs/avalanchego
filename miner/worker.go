@@ -160,10 +160,7 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	}
 
 	// Fill the block with all available pending transactions.
-	pending, err := w.eth.TxPool().Pending(true)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch pending transactions: %w", err)
-	}
+	pending := w.eth.TxPool().Pending(true)
 
 	// Split the pending transactions into locals and remotes
 	localTxs := make(map[common.Address]types.Transactions)

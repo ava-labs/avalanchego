@@ -189,6 +189,9 @@ type Tree struct {
 	stateLayers map[common.Hash]map[common.Hash]snapshot
 	verified    bool // Indicates if snapshot integrity has been verified
 	lock        sync.RWMutex
+
+	// Test hooks
+	onFlatten func() // Hook invoked when the bottom most diff layers are flattened
 }
 
 // New attempts to load an already existing snapshot from a persistent key-value
@@ -409,9 +412,13 @@ func (t *Tree) Flatten(blockHash common.Hash) error {
 		return fmt.Errorf("snapshot missing parent layer: %s", diff.parent.BlockHash())
 	}
 
-	diff.lock.RLock()
+	diff.lock.Lock()
+	// Invoke the hook if it's registered. Ugly hack.
+	if t.onFlatten != nil {
+		t.onFlatten()
+	}
 	base, snapshotGenerated, err := diffToDisk(diff)
-	diff.lock.RUnlock()
+	diff.lock.Unlock()
 	if err != nil {
 		return err
 	}
