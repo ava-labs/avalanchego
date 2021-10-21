@@ -369,7 +369,7 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 	}
 
-	_ = n.Gossip(msg, ctx.SubnetID, ctx.IsValidatorOnly(), 0, int(n.config.GossipOnAcceptSize))
+	n.Gossip(msg, ctx.SubnetID, ctx.IsValidatorOnly(), 0, int(n.config.GossipOnAcceptSize))
 	return nil
 }
 
@@ -704,59 +704,6 @@ func (n *network) gossipPeerList() {
 			return
 		}
 
-		allPeers := n.getAllPeers()
-		if len(allPeers) == 0 {
-			continue
-		}
-
-		stakers := make([]*peer, 0, len(allPeers))
-		nonStakers := make([]*peer, 0, len(allPeers))
-		for _, peer := range allPeers {
-			if n.config.Validators.Contains(constants.PrimaryNetworkID, peer.nodeID) {
-				stakers = append(stakers, peer)
-			} else {
-				nonStakers = append(nonStakers, peer)
-			}
-		}
-
-		numStakersToSend := int((n.config.PeerListGossipSize + n.config.PeerListStakerGossipFraction - 1) / n.config.PeerListStakerGossipFraction)
-		if len(stakers) < numStakersToSend {
-			numStakersToSend = len(stakers)
-		}
-		numNonStakersToSend := int(n.config.PeerListGossipSize) - numStakersToSend
-		if len(nonStakers) < numNonStakersToSend {
-			numNonStakersToSend = len(nonStakers)
-		}
-
-		s := sampler.NewUniform()
-		if err := s.Initialize(uint64(len(stakers))); err != nil {
-			n.log.Error("failed to select stakers to sample: %s. len(stakers): %d",
-				err,
-				len(stakers))
-			continue
-		}
-		stakerIndices, err := s.Sample(numStakersToSend)
-		if err != nil {
-			n.log.Error("failed to select stakers to sample: %s. len(stakers): %d",
-				err,
-				len(stakers))
-			continue
-		}
-
-		if err := s.Initialize(uint64(len(nonStakers))); err != nil {
-			n.log.Error("failed to select non-stakers to sample: %s. len(nonStakers): %d",
-				err,
-				len(nonStakers))
-			continue
-		}
-		nonStakerIndices, err := s.Sample(numNonStakersToSend)
-		if err != nil {
-			n.log.Error("failed to select non-stakers to sample: %s. len(nonStakers): %d",
-				err,
-				len(nonStakers))
-			continue
-		}
-
 		ipCerts, err := n.validatorIPs()
 		if err != nil {
 			n.log.Error("failed to fetch validator IPs: %s", err)
@@ -776,14 +723,10 @@ func (n *network) gossipPeerList() {
 			continue
 		}
 
-		for _, index := range stakerIndices {
-			peer := stakers[int(index)]
-			peer.Send(msg, false)
-		}
-		for _, index := range nonStakerIndices {
-			peer := nonStakers[int(index)]
-			peer.Send(msg, false)
-		}
+		numStakersToSend := int((n.config.PeerListGossipSize + n.config.PeerListStakerGossipFraction - 1) / n.config.PeerListStakerGossipFraction)
+		numNonStakersToSend := int(n.config.PeerListGossipSize) - numStakersToSend
+
+		n.Gossip(msg, constants.PrimaryNetworkID, false, numStakersToSend, numNonStakersToSend)
 	}
 }
 
@@ -1201,26 +1144,6 @@ func (n *network) getPeers(nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly 
 			peers[index] = peer
 		}
 		index++
-	}
-	return peers
-}
-
-// Returns a copy of the peer set.
-// Only includes peers that have finished the handshake.
-// Assumes [n.stateLock] is not held.
-func (n *network) getAllPeers() []*peer {
-	n.stateLock.RLock()
-	defer n.stateLock.RUnlock()
-
-	if n.closed.GetValue() {
-		return nil
-	}
-
-	peers := make([]*peer, 0, n.peers.size())
-	for _, peer := range n.peers.peersList {
-		if peer.finishedHandshake.GetValue() {
-			peers = append(peers, peer)
-		}
 	}
 	return peers
 }
