@@ -4,6 +4,7 @@
 package router
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -20,6 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/uptime"
 )
+
+var errDuplicatedContainerID = errors.New("inbound message contains duplicated container ID")
 
 // Handler passes incoming messages from the network to the consensus engine.
 // (Actually, it receives the incoming messages from a ChainRouter, but same difference.)
@@ -210,7 +213,6 @@ func (h *Handler) handleMsg(msg message.InboundMessage) error {
 // An invalid msg is logged and dropped silently since err would cause a chain shutdown.
 func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 	nodeID := msg.NodeID()
-
 	switch msg.Op() {
 	case message.GetAcceptedFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -218,7 +220,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 
 	case message.AcceptedFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
-		containerIDs, err := message.DecodeContainerIDs(msg)
+		containerIDs, err := getContainerIDs(msg)
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
@@ -232,7 +234,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 
 	case message.GetAccepted:
 		reqID := msg.Get(message.RequestID).(uint32)
-		containerIDs, err := message.DecodeContainerIDs(msg)
+		containerIDs, err := getContainerIDs(msg)
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
@@ -242,7 +244,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 
 	case message.Accepted:
 		reqID := msg.Get(message.RequestID).(uint32)
-		containerIDs, err := message.DecodeContainerIDs(msg)
+		containerIDs, err := getContainerIDs(msg)
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
@@ -324,7 +326,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 
 	case message.Chits:
 		reqID := msg.Get(message.RequestID).(uint32)
-		votes, err := message.DecodeContainerIDs(msg)
+		votes, err := getContainerIDs(msg)
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
@@ -483,4 +485,22 @@ func (h *Handler) endInterval() {
 // if subnet is validator only and this is not a validator or self, returns false.
 func (h *Handler) isValidator(nodeID ids.ShortID) bool {
 	return !h.ctx.IsValidatorOnly() || nodeID == h.ctx.NodeID || h.validators.Contains(nodeID)
+}
+
+func getContainerIDs(msg message.InboundMessage) ([]ids.ID, error) {
+	containerIDsBytes := msg.Get(message.ContainerIDs).([][]byte)
+	res := make([]ids.ID, len(containerIDsBytes))
+	idSet := ids.NewSet(len(containerIDsBytes))
+	for i, containerIDBytes := range containerIDsBytes {
+		containerID, err := ids.ToID(containerIDBytes)
+		if err != nil {
+			return nil, err
+		}
+		if idSet.Contains(containerID) {
+			return nil, errDuplicatedContainerID
+		}
+		res[i] = containerID
+		idSet.Add(containerID)
+	}
+	return res, nil
 }

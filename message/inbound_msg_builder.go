@@ -150,12 +150,14 @@ func (b *inMsgBuilder) InboundAcceptedFrontier(
 	containerIDs []ids.ID,
 	nodeID ids.ShortID,
 ) InboundMessage {
+	containerIDBytes := make([][]byte, len(containerIDs))
+	encodeContainerIDs(containerIDs, containerIDBytes)
 	return &inboundMessage{
 		op: AcceptedFrontier,
 		fields: map[Field]interface{}{
 			ChainID:      chainID[:],
 			RequestID:    requestID,
-			ContainerIDs: encodeContainerIDs(containerIDs),
+			ContainerIDs: containerIDBytes,
 		},
 		nodeID: nodeID,
 	}
@@ -169,13 +171,15 @@ func (b *inMsgBuilder) InboundGetAccepted(
 	nodeID ids.ShortID,
 ) InboundMessage {
 	received := b.clock.Time()
+	containerIDBytes := make([][]byte, len(containerIDs))
+	encodeContainerIDs(containerIDs, containerIDBytes)
 	return &inboundMessage{
 		op: GetAccepted,
 		fields: map[Field]interface{}{
 			ChainID:      chainID[:],
 			RequestID:    requestID,
 			Deadline:     deadline,
-			ContainerIDs: encodeContainerIDs(containerIDs),
+			ContainerIDs: containerIDBytes,
 		},
 		nodeID:         nodeID,
 		expirationTime: received.Add(time.Duration(deadline)),
@@ -188,12 +192,14 @@ func (b *inMsgBuilder) InboundAccepted(
 	containerIDs []ids.ID,
 	nodeID ids.ShortID,
 ) InboundMessage {
+	containerIDBytes := make([][]byte, len(containerIDs))
+	encodeContainerIDs(containerIDs, containerIDBytes)
 	return &inboundMessage{
 		op: Accepted,
 		fields: map[Field]interface{}{
 			ChainID:      chainID[:],
 			RequestID:    requestID,
-			ContainerIDs: encodeContainerIDs(containerIDs),
+			ContainerIDs: containerIDBytes,
 		},
 		nodeID: nodeID,
 	}
@@ -249,12 +255,14 @@ func (b *inMsgBuilder) InboundChits(
 	containerIDs []ids.ID,
 	nodeID ids.ShortID,
 ) InboundMessage {
+	containerIDBytes := make([][]byte, len(containerIDs))
+	encodeContainerIDs(containerIDs, containerIDBytes)
 	return &inboundMessage{
 		op: Chits,
 		fields: map[Field]interface{}{
 			ChainID:      chainID[:],
 			RequestID:    requestID,
-			ContainerIDs: encodeContainerIDs(containerIDs),
+			ContainerIDs: containerIDBytes,
 		},
 		nodeID: nodeID,
 	}
@@ -357,4 +365,11 @@ func (b *inMsgBuilder) InboundMultiPut(
 
 func (b *inMsgBuilder) Parse(bytes []byte, nodeID ids.ShortID, onFinishedHandling func()) (InboundMessage, error) {
 	return b.c.Parse(bytes, nodeID, onFinishedHandling)
+}
+
+func encodeContainerIDs(containerIDs []ids.ID, result [][]byte) {
+	for i, containerID := range containerIDs {
+		copy := containerID
+		result[i] = copy[:]
+	}
 }
