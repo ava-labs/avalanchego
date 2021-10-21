@@ -168,35 +168,39 @@ func (h *Handler) handleMsg(msg message.InboundMessage) error {
 	h.ctx.Lock.Lock()
 	defer h.ctx.Lock.Unlock()
 
-	var err error
-	msgType := msg.Op()
-	switch msgType {
+	var (
+		err error
+		op  = msg.Op()
+	)
+	switch op {
 	case message.Notify:
 		vmMsg := msg.Get(message.VMMessage).(uint32)
 		err = h.engine.Notify(common.Message(vmMsg))
-		h.metrics.notify.Observe(float64(h.clock.Time().Sub(startTime)))
 	case message.GossipRequest:
 		err = h.engine.Gossip()
-		h.metrics.gossip.Observe(float64(h.clock.Time().Sub(startTime)))
 	case message.Timeout:
 		err = h.engine.Timeout()
-		h.metrics.timeout.Observe(float64(h.clock.Time().Sub(startTime)))
 	default:
 		err = h.handleConsensusMsg(msg)
-		endTime := h.clock.Time()
-		handleDuration := endTime.Sub(startTime)
-		histogram := h.metrics.getMSGHistogram(msg.Op())
-		histogram.Observe(float64(handleDuration))
+	}
+
+	endTime := h.clock.Time()
+	// If the message was caused by another node, track their CPU time.
+	if op != message.Notify && op != message.GossipRequest && op != message.Timeout {
 		nodeID := msg.NodeID()
 		h.cpuTracker.UtilizeTime(nodeID, startTime, endTime)
 	}
 
+	// Track how long the operation took.
+	histogram := h.metrics.messages[op]
+	histogram.Observe(float64(endTime.Sub(startTime)))
+
 	msg.OnFinishedHandling()
 
 	if isPeriodic {
-		h.ctx.Log.Verbo("Finished handling message: %s", msgType)
+		h.ctx.Log.Verbo("Finished handling message: %s", op)
 	} else {
-		h.ctx.Log.Debug("Finished handling message: %s", msgType)
+		h.ctx.Log.Debug("Finished handling message: %s", op)
 	}
 	return err
 }

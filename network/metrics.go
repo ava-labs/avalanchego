@@ -157,8 +157,8 @@ func (m *metrics) initialize(namespace string, registerer prometheus.Registerer)
 		registerer.Register(m.inboundConnRateLimited),
 	)
 
-	m.messageMetrics = make(map[message.Op]*messageMetrics, len(message.Ops))
-	for _, op := range message.Ops {
+	m.messageMetrics = make(map[message.Op]*messageMetrics, len(message.ExternalOps))
+	for _, op := range message.ExternalOps {
 		m.messageMetrics[op] = newMessageMetrics(op, namespace, registerer, &errs)
 	}
 	return errs.Err

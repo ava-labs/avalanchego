@@ -54,8 +54,8 @@ const (
 )
 
 var (
-	// List of all message types
-	Ops = []Op{
+	// List of all external message types
+	ExternalOps = []Op{
 		GetVersion,
 		GetPeerList,
 		Ping,
@@ -76,6 +76,20 @@ var (
 		AppRequest,
 		AppResponse,
 		AppGossip,
+	}
+	// List of all internal message types
+	InternalOps = []Op{
+		GetAcceptedFrontierFailed,
+		GetAcceptedFailed,
+		GetFailed,
+		QueryFailed,
+		GetAncestorsFailed,
+		AppRequestFailed,
+		Timeout,
+		Connected,
+		Disconnected,
+		Notify,
+		GossipRequest,
 	}
 
 	// Defines the messages that can be sent/received with this network
