@@ -164,7 +164,6 @@ func (cr *ChainRouter) RegisterRequest(
 
 	// Register a timeout to fire if we don't get a reply in time.
 	var inMsg message.InboundMessage
-	var timeoutHandler func() // Called upon timeout
 	switch msgType {
 	case message.PullQuery, message.PushQuery:
 		inMsg = cr.msgCreator.InternalQueryFailed(nodeID, chainID, requestID)
@@ -184,8 +183,9 @@ func (cr *ChainRouter) RegisterRequest(
 		return
 	}
 
-	timeoutHandler = func() { cr.HandleInbound(inMsg) }
-	cr.timeoutManager.RegisterRequest(nodeID, chainID, msgType, uniqueRequestID, timeoutHandler)
+	cr.timeoutManager.RegisterRequest(nodeID, chainID, msgType, uniqueRequestID, func() {
+		cr.HandleInbound(inMsg)
+	})
 }
 
 // Shutdown shuts down this router

@@ -116,7 +116,7 @@ func (u *unprocessedMsgsImpl) Len() int {
 func (u *unprocessedMsgsImpl) canPop(msg message.InboundMessage) bool {
 	// If the deadline to handle [msg] has passed, always pop it.
 	// It will be dropped immediately.
-	if !msg.ExpirationTime().IsZero() && u.clock.Time().After(msg.ExpirationTime()) {
+	if expirationTime := msg.ExpirationTime(); !expirationTime.IsZero() && u.clock.Time().After(expirationTime) {
 		return true
 	}
 	// Every node has some allowed CPU allocation depending on

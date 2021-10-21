@@ -12,7 +12,8 @@ var _ InboundMsgBuilder = &inMsgBuilder{}
 type InboundMsgBuilder interface {
 	SetTime(t time.Time) // useful in UTs
 
-	Parse(bytes []byte,
+	Parse(
+		bytes []byte,
 		nodeID ids.ShortID,
 		onFinishedHandling func(),
 	) (InboundMessage, error)

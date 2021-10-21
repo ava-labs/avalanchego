@@ -115,7 +115,7 @@ func (h *Handler) Dispatch() {
 		h.unprocessedMsgsCond.L.Unlock()
 
 		// If this message's deadline has passed, don't process it.
-		if !msg.ExpirationTime().IsZero() && h.clock.Time().After(msg.ExpirationTime()) {
+		if expirationTime := msg.ExpirationTime(); !expirationTime.IsZero() && h.clock.Time().After(expirationTime) {
 			nodeID := msg.NodeID()
 			h.ctx.Log.Verbo("Dropping message from %s%s due to timeout. msg: %s",
 				constants.NodeIDPrefix, nodeID, msg)
