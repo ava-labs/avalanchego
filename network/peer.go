@@ -334,10 +334,12 @@ func (p *peer) WriteMessages() {
 			reader.Reset(byteSlice)
 			if err := p.conn.SetWriteDeadline(p.nextTimeout()); err != nil {
 				p.net.log.Verbo("error setting write deadline to %s%s at %s due to: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
+				msg.DecRef()
 				return
 			}
 			if _, err := io.CopyN(writer, &reader, int64(len((byteSlice)))); err != nil {
 				p.net.log.Verbo("error writing to %s%s at %s due to: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
+				msg.DecRef()
 				return
 			}
 			p.tickerOnce.Do(p.StartTicker)
@@ -345,6 +347,7 @@ func (p *peer) WriteMessages() {
 		// Make sure the peer got the entire message
 		if err := writer.Flush(); err != nil {
 			p.net.log.Verbo("couldn't flush writer to %s%s at %s: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
+			msg.DecRef()
 			return
 		}
 
@@ -470,7 +473,9 @@ func (p *peer) close() {
 	p.sendQueueCond.L.Lock()
 	// Release the bytes of the unsent messages to the outbound message throttler
 	for i := 0; i < len(p.sendQueue); i++ {
-		p.net.outboundMsgThrottler.Release(uint64(len(p.sendQueue[i].Bytes())), p.nodeID)
+		msg := p.sendQueue[i]
+		p.net.outboundMsgThrottler.Release(uint64(len(msg.Bytes())), p.nodeID)
+		msg.DecRef()
 	}
 	p.sendQueue = nil
 	p.sendQueueCond.L.Unlock()
