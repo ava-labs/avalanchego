@@ -220,25 +220,39 @@ func (vm *VM) Initialize(
 
 // Create all chains that exist that this node validates.
 func (vm *VM) initBlockchains() error {
-	chains, err := vm.internalState.GetChains(constants.PrimaryNetworkID)
+	if err := vm.createSubnet(constants.PrimaryNetworkID); err != nil {
+		return err
+	}
+
+	if vm.StakingEnabled {
+		for subnetID := range vm.WhitelistedSubnets {
+			if err := vm.createSubnet(subnetID); err != nil {
+				return err
+			}
+		}
+	} else {
+		subnets, err := vm.internalState.GetSubnets()
+		if err != nil {
+			return err
+		}
+		for _, subnet := range subnets {
+			if err := vm.createSubnet(subnet.ID()); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// Create the subnet with ID [subnetID]
+func (vm *VM) createSubnet(subnetID ids.ID) error {
+	chains, err := vm.internalState.GetChains(subnetID)
 	if err != nil {
 		return err
 	}
 	for _, chain := range chains {
 		if err := vm.createChain(chain); err != nil {
 			return err
-		}
-	}
-
-	for subnetID := range vm.WhitelistedSubnets {
-		chains, err := vm.internalState.GetChains(subnetID)
-		if err != nil {
-			return err
-		}
-		for _, chain := range chains {
-			if err := vm.createChain(chain); err != nil {
-				return err
-			}
 		}
 	}
 	return nil
