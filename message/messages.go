@@ -46,15 +46,15 @@ func (inMsg *inboundMessage) BytesSavedCompression() int { return inMsg.bytesSav
 // Field returns the value of the specified field in this message
 func (inMsg *inboundMessage) Get(field Field) interface{} { return inMsg.fields[field] }
 
-// NodeID returns the node from which the msg was received
+// NodeID returns the node that the msg was sent by.
 func (inMsg *inboundMessage) NodeID() ids.ShortID { return inMsg.nodeID }
 
-// ExpirationTime returns the // Time this message must be responded to
-// a zero time means message does not expire
+// ExpirationTime returns the time this message doesn't need to be responded to.
+// A zero time means message does not expire.
 func (inMsg *inboundMessage) ExpirationTime() time.Time { return inMsg.expirationTime }
 
-// OnFinishedHandling is the function to be called once inboundMessage is complete
-// inMsg.onFinishedHandling() must be not-nil
+// OnFinishedHandling is the function to be called once inboundMessage is
+// complete.
 func (inMsg *inboundMessage) OnFinishedHandling() {
 	if inMsg.onFinishedHandling != nil {
 		inMsg.onFinishedHandling()
