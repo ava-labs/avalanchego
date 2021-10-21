@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 )
@@ -29,7 +30,7 @@ func init() {
 		panic(err)
 	}
 	TestCodec = codec
-	UncompressingBuilder = NewOutboundBuilder(codec, false /*compress*/) // TODO: check whether this instantiation can be done here
+	UncompressingBuilder = NewOutboundBuilder(codec, false /*compress*/)
 }
 
 func TestBuildGetVersion(t *testing.T) {
@@ -52,10 +53,7 @@ func TestBuildVersion(t *testing.T) {
 		IP: net.IPv4(1, 2, 3, 4),
 	}
 
-	// cannot use due to import cycle
-	// TODO ABENEGIA: fix it up
-	// myVersion := version.NewDefaultVersion(1, 2, 3).String()
-	myVersion := "v1.2.3"
+	myVersion := version.NewDefaultVersion(1, 2, 3).String()
 	myVersionTime := uint64(time.Now().Unix())
 	sig := make([]byte, 65)
 	subnetID := ids.Empty.Prefix(1)
