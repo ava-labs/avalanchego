@@ -167,6 +167,7 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, blkID ids.ID) error 
 // GetAncestors implements the Engine interface
 func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
 	ancestorsBytes := make([][]byte, 1, t.Config.MultiputMaxContainersSent)
+
 	if rVM, ok := t.VM.(block.RemoteVM); ok {
 		// push all GetAncestor logic to remoteVM to reduce network overhead
 		ancestorsBytes = rVM.GetAncestors(blkID,
@@ -174,40 +175,39 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 			constants.MaxContainersLen,
 			t.Config.MaxTimeGetAncestors,
 		)
+
+		if len(ancestorsBytes) == 0 {
+			t.Ctx.Log.Verbo("couldn't get block %s. dropping GetAncestors(%s, %d, %s)",
+				blkID, vdr, requestID, blkID)
+			return nil
+		}
 	} else { // local logic is good enough
-		currentByteLength := 0
 		startTime := time.Now()
-		var currentDuration time.Duration
+		blk, err := t.GetBlock(blkID)
+		if err != nil { // Don't have the block. Drop this request.
+			t.Ctx.Log.Verbo("couldn't get block %s. dropping GetAncestors(%s, %d, %s)",
+				blkID, vdr, requestID, blkID)
+			return nil
+		}
 
-		for cnt := 0; ; cnt++ {
-			currentDuration = time.Since(startTime)
-			if cnt >= t.Config.MultiputMaxContainersSent || currentDuration >= t.Config.MaxTimeGetAncestors {
+		// First elt is byte repr. of [blk], then its parent, then grandparent, etc.
+		ancestorsBytes[0] = blk.Bytes()
+		ancestorsBytesLen := len(blk.Bytes()) + wrappers.IntLen // length, in bytes, of all elements of ancestors
+
+		for numFetched := 1; numFetched < t.Config.MultiputMaxContainersSent && time.Since(startTime) < t.Config.MaxTimeGetAncestors; numFetched++ {
+			if blk, err = t.GetBlock(blk.Parent()); err != nil {
 				break
 			}
-
-			blk, err := t.GetBlock(blkID)
-			if err != nil {
-				break
-			}
-
 			blkBytes := blk.Bytes()
 			// Ensure response size isn't too large. Include wrappers.IntLen because the size of the message
 			// is included with each container, and the size is repr. by an int.
-			if newLen := currentByteLength + wrappers.IntLen + len(blkBytes); newLen < constants.MaxContainersLen {
+			if newLen := ancestorsBytesLen + len(blkBytes) + wrappers.IntLen; newLen < constants.MaxContainersLen {
 				ancestorsBytes = append(ancestorsBytes, blkBytes)
-				currentByteLength = newLen
-				blkID = blk.Parent()
-				continue
+				ancestorsBytesLen = newLen
+			} else { // reached maximum response size
+				break
 			}
-
-			break // reached maximum response size,
 		}
-	}
-
-	if len(ancestorsBytes) == 0 {
-		t.Ctx.Log.Verbo("couldn't get block %s. dropping GetAncestors(%s, %d, %s)",
-			blkID, vdr, requestID, blkID)
-		return nil
 	}
 
 	t.metrics.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
