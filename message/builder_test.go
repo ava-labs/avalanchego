@@ -106,7 +106,7 @@ func TestBuildGetAcceptedFrontier(t *testing.T) {
 	requestID := uint32(5)
 	deadline := uint64(15)
 
-	msg, err := UncompressingBuilder.GetAcceptedFrontier(chainID, requestID, deadline)
+	msg, err := UncompressingBuilder.GetAcceptedFrontier(chainID, requestID, time.Duration(deadline))
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, GetAcceptedFrontier, msg.Op())
@@ -147,7 +147,7 @@ func TestBuildGetAccepted(t *testing.T) {
 	containerID := ids.Empty.Prefix(1)
 	containerIDs := [][]byte{containerID[:]}
 
-	msg, err := UncompressingBuilder.GetAccepted(chainID, requestID, deadline, []ids.ID{containerID})
+	msg, err := UncompressingBuilder.GetAccepted(chainID, requestID, time.Duration(deadline), []ids.ID{containerID})
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, GetAccepted, msg.Op())
@@ -188,7 +188,7 @@ func TestBuildGet(t *testing.T) {
 	deadline := uint64(15)
 	containerID := ids.Empty.Prefix(1)
 
-	msg, err := UncompressingBuilder.Get(chainID, requestID, deadline, containerID)
+	msg, err := UncompressingBuilder.Get(chainID, requestID, time.Duration(deadline), containerID)
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, Get, msg.Op())
@@ -236,7 +236,7 @@ func TestBuildPushQuery(t *testing.T) {
 
 	for _, compress := range []bool{false, true} {
 		builder := NewOutboundBuilder(TestCodec, compress)
-		msg, err := builder.PushQuery(chainID, requestID, deadline, containerID, container)
+		msg, err := builder.PushQuery(chainID, requestID, time.Duration(deadline), containerID, container)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, PushQuery, msg.Op())
@@ -259,7 +259,7 @@ func TestBuildPullQuery(t *testing.T) {
 	deadline := uint64(15)
 	containerID := ids.Empty.Prefix(1)
 
-	msg, err := UncompressingBuilder.PullQuery(chainID, requestID, deadline, containerID)
+	msg, err := UncompressingBuilder.PullQuery(chainID, requestID, time.Duration(deadline), containerID)
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, PullQuery, msg.Op())
@@ -327,7 +327,7 @@ func TestBuildAppRequestMsg(t *testing.T) {
 
 	for _, compress := range []bool{false, true} {
 		builder := NewOutboundBuilder(TestCodec, compress)
-		msg, err := builder.AppRequest(chainID, 1, deadline, appRequestBytes)
+		msg, err := builder.AppRequest(chainID, 1, time.Duration(deadline), appRequestBytes)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, AppRequest, msg.Op())

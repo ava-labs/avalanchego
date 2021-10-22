@@ -58,7 +58,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 
 	nodeID := ids.ShortEmpty
 	reqID := uint32(1)
-	deadline := uint64(1)
+	deadline := time.Nanosecond
 	chainID := ids.ID{}
 	msg := mc.InboundGetAcceptedFrontier(chainID, reqID, deadline, nodeID)
 	handler.push(msg)
@@ -119,7 +119,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 
 	nodeID := ids.ShortEmpty
 	reqID := uint32(1)
-	deadline := uint64(1)
+	deadline := time.Nanosecond
 	msg := mc.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID)
 	handler.push(msg)
 

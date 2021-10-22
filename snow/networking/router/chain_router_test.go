@@ -470,11 +470,10 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	nID := ids.GenerateTestShortID()
 
 	*calledF = false
-	timeout := chainRouter.clock.Time().Add(time.Hour)
 	var inMsg message.InboundMessage
 
 	inMsg = mc.InboundPullQuery(handler.ctx.ChainID, uint32(1),
-		uint64(timeout.Unix()),
+		time.Hour,
 		ids.GenerateTestID(),
 		nID,
 	)
@@ -486,7 +485,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	wg.Add(1)
 	inMsg = mc.InboundPullQuery(handler.ctx.ChainID,
 		uint32(2),
-		uint64(timeout.Unix()),
+		time.Hour,
 		ids.GenerateTestID(),
 		vID,
 	)
