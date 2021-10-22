@@ -803,6 +803,7 @@ func (cr *ChainRouter) AppResponse(
 		chain.AppResponse(nodeID, requestID, appResponseBytes, onFinishedHandling)
 	} else {
 		cr.log.Info("AppResponse(%s, %s, %d) dropped as timeout has already occurred", nodeID, chainID, requestID)
+		onFinishedHandling()
 	}
 }
 
