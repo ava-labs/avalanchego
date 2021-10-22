@@ -62,30 +62,19 @@ func (s *Sender) Initialize(
 
 	// Register metrics
 	// Message type --> String representation for metrics
-	requestTypes := map[message.Op]string{
-		message.Get:                 "get",
-		message.GetAccepted:         "get_accepted",
-		message.GetAcceptedFrontier: "get_accepted_frontier",
-		message.GetAncestors:        "get_ancestors",
-		message.PullQuery:           "pull_query",
-		message.PushQuery:           "push_query",
-		message.AppRequest:          "app_request",
-	}
-
-	s.failedDueToBench = make(map[message.Op]prometheus.Counter, len(requestTypes))
-
-	for msgType, asStr := range requestTypes {
+	s.failedDueToBench = make(map[message.Op]prometheus.Counter, len(message.ConsensusRequestOps))
+	for _, op := range message.ConsensusRequestOps {
 		counter := prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Namespace: metricsNamespace,
-				Name:      fmt.Sprintf("%s_failed_benched", asStr),
-				Help:      fmt.Sprintf("# of times a %s request was not sent because the node was benched", asStr),
+				Name:      fmt.Sprintf("%s_failed_benched", op),
+				Help:      fmt.Sprintf("# of times a %s request was not sent because the node was benched", op),
 			},
 		)
 		if err := metricsRegisterer.Register(counter); err != nil {
-			return fmt.Errorf("couldn't register metric for %s: %w", msgType, err)
+			return fmt.Errorf("couldn't register metric for %s: %w", op, err)
 		}
-		s.failedDueToBench[msgType] = counter
+		s.failedDueToBench[op] = counter
 	}
 	return nil
 }
