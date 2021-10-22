@@ -69,6 +69,7 @@ type Backend interface {
 	HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error)
 	BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error)
 	BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error)
+	BadBlocks() []*types.Block
 	GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error)
 	RPCGasCap() uint64
 	ChainConfig() *params.ChainConfig
@@ -445,6 +446,27 @@ func (api *API) TraceBlock(ctx context.Context, blob []byte, config *TraceConfig
 	block := new(types.Block)
 	if err := rlp.Decode(bytes.NewReader(blob), block); err != nil {
 		return nil, fmt.Errorf("could not decode block: %v", err)
+	}
+	return api.traceBlock(ctx, block, config)
+}
+
+// TraceBadBlock returns the structured logs created during the execution of
+// EVM against a block pulled from the pool of bad ones and returns them as a JSON
+// object.
+func (api *API) TraceBadBlock(ctx context.Context, hash common.Hash, config *TraceConfig) ([]*txTraceResult, error) {
+	// Search for the bad block corresponding to [hash].
+	var (
+		badBlocks = api.backend.BadBlocks()
+		block     *types.Block
+	)
+	for _, badBlock := range badBlocks {
+		if hash == block.Hash() {
+			block = badBlock
+			break
+		}
+	}
+	if block == nil {
+		return nil, fmt.Errorf("bad block %#x not found", hash)
 	}
 	return api.traceBlock(ctx, block, config)
 }
