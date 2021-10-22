@@ -7,37 +7,8 @@ import (
 var _ InternalMsgBuilder = internalMsgBuilder{}
 
 type InternalMsgBuilder interface {
-	InternalGetAcceptedFrontierFailed(
-		nodeID ids.ShortID,
-		chainID ids.ID,
-		requestID uint32,
-	) InboundMessage
-
-	InternalGetAcceptedFailed(
-		nodeID ids.ShortID,
-		chainID ids.ID,
-		requestID uint32,
-	) InboundMessage
-
-	InternalGetAncestorsFailed(
-		nodeID ids.ShortID,
-		chainID ids.ID,
-		requestID uint32,
-	) InboundMessage
-
-	InternalQueryFailed(
-		nodeID ids.ShortID,
-		chainID ids.ID,
-		requestID uint32,
-	) InboundMessage
-
-	InternalAppRequestFailed(
-		nodeID ids.ShortID,
-		chainID ids.ID,
-		requestID uint32,
-	) InboundMessage
-
-	InternalGetFailed(
+	InternalFailedRequest(
+		op Op,
 		nodeID ids.ShortID,
 		chainID ids.ID,
 		requestID uint32,
@@ -56,88 +27,14 @@ func NewInternalBuilder() InternalMsgBuilder {
 	return internalMsgBuilder{}
 }
 
-func (internalMsgBuilder) InternalGetAcceptedFrontierFailed(
+func (internalMsgBuilder) InternalFailedRequest(
+	op Op,
 	nodeID ids.ShortID,
 	chainID ids.ID,
 	requestID uint32,
 ) InboundMessage {
 	return &inboundMessage{
-		op: GetAcceptedFrontierFailed,
-		fields: map[Field]interface{}{
-			ChainID:   chainID[:],
-			RequestID: requestID,
-		},
-		nodeID: nodeID,
-	}
-}
-
-func (internalMsgBuilder) InternalGetAcceptedFailed(
-	nodeID ids.ShortID,
-	chainID ids.ID,
-	requestID uint32,
-) InboundMessage {
-	return &inboundMessage{
-		op: GetAcceptedFailed,
-		fields: map[Field]interface{}{
-			ChainID:   chainID[:],
-			RequestID: requestID,
-		},
-		nodeID: nodeID,
-	}
-}
-
-func (internalMsgBuilder) InternalGetAncestorsFailed(
-	nodeID ids.ShortID,
-	chainID ids.ID,
-	requestID uint32,
-) InboundMessage {
-	return &inboundMessage{
-		op: GetAncestorsFailed,
-		fields: map[Field]interface{}{
-			ChainID:   chainID[:],
-			RequestID: requestID,
-		},
-		nodeID: nodeID,
-	}
-}
-
-func (internalMsgBuilder) InternalQueryFailed(
-	nodeID ids.ShortID,
-	chainID ids.ID,
-	requestID uint32,
-) InboundMessage {
-	return &inboundMessage{
-		op: QueryFailed,
-		fields: map[Field]interface{}{
-			ChainID:   chainID[:],
-			RequestID: requestID,
-		},
-		nodeID: nodeID,
-	}
-}
-
-func (internalMsgBuilder) InternalAppRequestFailed(
-	nodeID ids.ShortID,
-	chainID ids.ID,
-	requestID uint32,
-) InboundMessage {
-	return &inboundMessage{
-		op: AppRequestFailed,
-		fields: map[Field]interface{}{
-			ChainID:   chainID[:],
-			RequestID: requestID,
-		},
-		nodeID: nodeID,
-	}
-}
-
-func (internalMsgBuilder) InternalGetFailed(
-	nodeID ids.ShortID,
-	chainID ids.ID,
-	requestID uint32,
-) InboundMessage {
-	return &inboundMessage{
-		op: GetFailed,
+		op: op,
 		fields: map[Field]interface{}{
 			ChainID:   chainID[:],
 			RequestID: requestID,

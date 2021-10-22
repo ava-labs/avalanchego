@@ -171,7 +171,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	nodeID := ids.ShortEmpty
 	chainID := ids.Empty
 	reqID := uint32(1)
-	inMsg := mc.InternalGetFailed(nodeID, chainID, reqID)
+	inMsg := mc.InternalFailedRequest(message.GetFailed, nodeID, chainID, reqID)
 	handler.push(inMsg)
 
 	ticker := time.NewTicker(20 * time.Millisecond)

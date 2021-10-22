@@ -166,17 +166,17 @@ func (cr *ChainRouter) RegisterRequest(
 	var inMsg message.InboundMessage
 	switch msgType {
 	case message.PullQuery, message.PushQuery:
-		inMsg = cr.msgCreator.InternalQueryFailed(nodeID, chainID, requestID)
+		inMsg = cr.msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, chainID, requestID)
 	case message.Get:
-		inMsg = cr.msgCreator.InternalGetFailed(nodeID, chainID, requestID)
+		inMsg = cr.msgCreator.InternalFailedRequest(message.GetFailed, nodeID, chainID, requestID)
 	case message.GetAncestors:
-		inMsg = cr.msgCreator.InternalGetAncestorsFailed(nodeID, chainID, requestID)
+		inMsg = cr.msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, chainID, requestID)
 	case message.GetAccepted:
-		inMsg = cr.msgCreator.InternalGetAcceptedFailed(nodeID, chainID, requestID)
+		inMsg = cr.msgCreator.InternalFailedRequest(message.GetAcceptedFailed, nodeID, chainID, requestID)
 	case message.GetAcceptedFrontier:
-		inMsg = cr.msgCreator.InternalGetAcceptedFrontierFailed(nodeID, chainID, requestID)
+		inMsg = cr.msgCreator.InternalFailedRequest(message.GetAcceptedFrontierFailed, nodeID, chainID, requestID)
 	case message.AppRequest:
-		inMsg = cr.msgCreator.InternalAppRequestFailed(nodeID, chainID, requestID)
+		inMsg = cr.msgCreator.InternalFailedRequest(message.AppRequestFailed, nodeID, chainID, requestID)
 	default:
 		// This should never happen
 		cr.log.Error("expected message type to be one of GetMsg, PullQueryMsg, PushQueryMsg, GetAcceptedFrontierMsg, GetAcceptedMsg, AppRequestMsg, but got %s", msgType)

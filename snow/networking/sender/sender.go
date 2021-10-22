@@ -237,7 +237,7 @@ func (s *Sender) SendGetAncestors(nodeID ids.ShortID, requestID uint32, containe
 	s.ctx.Log.Verbo("Sending GetAncestors to node %s. RequestID: %d. ContainerID: %s", nodeID.PrefixedString(constants.NodeIDPrefix), requestID, containerID)
 	// Sending a GetAncestors to myself will always fail
 	if nodeID == s.ctx.NodeID {
-		inMsg := s.msgCreator.InternalGetAncestorsFailed(nodeID, s.ctx.ChainID, requestID)
+		inMsg := s.msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, s.ctx.ChainID, requestID)
 		go s.router.HandleInbound(inMsg)
 		return
 	}
@@ -247,7 +247,7 @@ func (s *Sender) SendGetAncestors(nodeID ids.ShortID, requestID uint32, containe
 	if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
 		s.failedDueToBench[message.GetAncestors].Inc() // update metric
 		s.timeouts.RegisterRequestToUnreachableValidator()
-		inMsg := s.msgCreator.InternalGetAncestorsFailed(nodeID, s.ctx.ChainID, requestID)
+		inMsg := s.msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, s.ctx.ChainID, requestID)
 		go s.router.HandleInbound(inMsg)
 		return
 	}
@@ -258,7 +258,7 @@ func (s *Sender) SendGetAncestors(nodeID ids.ShortID, requestID uint32, containe
 	outMsg, err := s.msgCreator.GetAncestors(s.ctx.ChainID, requestID, deadline, containerID)
 	if err != nil {
 		s.ctx.Log.Error("failed to build GetAncestors message: %s", err)
-		inMsg := s.msgCreator.InternalGetAncestorsFailed(nodeID, s.ctx.ChainID, requestID)
+		inMsg := s.msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, s.ctx.ChainID, requestID)
 		go s.router.HandleInbound(inMsg)
 		return
 	}
@@ -274,7 +274,7 @@ func (s *Sender) SendGetAncestors(nodeID ids.ShortID, requestID uint32, containe
 			containerID,
 		)
 		s.timeouts.RegisterRequestToUnreachableValidator()
-		inMsg := s.msgCreator.InternalGetAncestorsFailed(nodeID, s.ctx.ChainID, requestID)
+		inMsg := s.msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, s.ctx.ChainID, requestID)
 		go s.router.HandleInbound(inMsg)
 		return
 	}
@@ -325,7 +325,7 @@ func (s *Sender) SendGet(nodeID ids.ShortID, requestID uint32, containerID ids.I
 
 	// Sending a Get to myself will always fail
 	if nodeID == s.ctx.NodeID {
-		inMsg := s.msgCreator.InternalGetFailed(nodeID, s.ctx.ChainID, requestID)
+		inMsg := s.msgCreator.InternalFailedRequest(message.GetFailed, nodeID, s.ctx.ChainID, requestID)
 		go s.router.HandleInbound(inMsg)
 		return
 	}
@@ -335,7 +335,7 @@ func (s *Sender) SendGet(nodeID ids.ShortID, requestID uint32, containerID ids.I
 	if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
 		s.failedDueToBench[message.Get].Inc() // update metric
 		s.timeouts.RegisterRequestToUnreachableValidator()
-		inMsg := s.msgCreator.InternalGetFailed(nodeID, s.ctx.ChainID, requestID)
+		inMsg := s.msgCreator.InternalFailedRequest(message.GetFailed, nodeID, s.ctx.ChainID, requestID)
 		go s.router.HandleInbound(inMsg)
 		return
 	}
@@ -358,7 +358,7 @@ func (s *Sender) SendGet(nodeID ids.ShortID, requestID uint32, containerID ids.I
 		)
 
 		s.timeouts.RegisterRequestToUnreachableValidator()
-		inMsg := s.msgCreator.InternalGetFailed(nodeID, s.ctx.ChainID, requestID)
+		inMsg := s.msgCreator.InternalFailedRequest(message.GetFailed, nodeID, s.ctx.ChainID, requestID)
 		go s.router.HandleInbound(inMsg)
 		return
 	}
@@ -442,7 +442,7 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 			nodeIDs.Remove(nodeID)
 			s.timeouts.RegisterRequestToUnreachableValidator()
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
-			inMsg := s.msgCreator.InternalQueryFailed(nodeID, s.ctx.ChainID, requestID)
+			inMsg := s.msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, requestID)
 			go s.router.HandleInbound(inMsg)
 		}
 	}
@@ -485,7 +485,7 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 	// Register failures for nodes we didn't even send a request to.
 	for nodeID := range nodeIDs {
 		s.timeouts.RegisterRequestToUnreachableValidator()
-		inMsg := s.msgCreator.InternalQueryFailed(nodeID, s.ctx.ChainID, requestID)
+		inMsg := s.msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, requestID)
 		go s.router.HandleInbound(inMsg)
 	}
 }
@@ -525,7 +525,7 @@ func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, container
 			nodeIDs.Remove(nodeID)
 			s.timeouts.RegisterRequestToUnreachableValidator()
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
-			inMsg := s.msgCreator.InternalQueryFailed(nodeID, s.ctx.ChainID, requestID)
+			inMsg := s.msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, requestID)
 			go s.router.HandleInbound(inMsg)
 		}
 	}
@@ -554,7 +554,7 @@ func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, container
 	// Register failures for nodes we didn't even send a request to.
 	for nodeID := range nodeIDs {
 		s.timeouts.RegisterRequestToUnreachableValidator()
-		inMsg := s.msgCreator.InternalQueryFailed(nodeID, s.ctx.ChainID, requestID)
+		inMsg := s.msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, requestID)
 		go s.router.HandleInbound(inMsg)
 	}
 }
@@ -635,7 +635,7 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 			s.timeouts.RegisterRequestToUnreachableValidator()
 
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
-			inMsg := s.msgCreator.InternalAppRequestFailed(nodeID, s.ctx.ChainID, requestID)
+			inMsg := s.msgCreator.InternalFailedRequest(message.AppRequestFailed, nodeID, s.ctx.ChainID, requestID)
 			go s.router.HandleInbound(inMsg)
 		}
 	}
@@ -675,7 +675,7 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 	// Register failures for nodes we didn't even send a request to.
 	for nodeID := range nodeIDs {
 		s.timeouts.RegisterRequestToUnreachableValidator()
-		inMsg := s.msgCreator.InternalAppRequestFailed(nodeID, s.ctx.ChainID, requestID)
+		inMsg := s.msgCreator.InternalFailedRequest(message.AppRequestFailed, nodeID, s.ctx.ChainID, requestID)
 		go s.router.HandleInbound(inMsg)
 	}
 	return nil
