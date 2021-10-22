@@ -21,7 +21,7 @@ type InboundMsgBuilder interface {
 	InboundGetAcceptedFrontier(
 		chainID ids.ID,
 		requestID uint32,
-		deadline uint64,
+		deadline time.Duration,
 		nodeID ids.ShortID,
 	) InboundMessage
 
@@ -35,7 +35,7 @@ type InboundMsgBuilder interface {
 	InboundGetAccepted(
 		chainID ids.ID,
 		requestID uint32,
-		deadline uint64,
+		deadline time.Duration,
 		containerIDs []ids.ID,
 		nodeID ids.ShortID,
 	) InboundMessage
@@ -57,7 +57,7 @@ type InboundMsgBuilder interface {
 	InboundPushQuery(
 		chainID ids.ID,
 		requestID uint32,
-		deadline uint64,
+		deadline time.Duration,
 		containerID ids.ID,
 		container []byte,
 		nodeID ids.ShortID,
@@ -66,7 +66,7 @@ type InboundMsgBuilder interface {
 	InboundPullQuery(
 		chainID ids.ID,
 		requestID uint32,
-		deadline uint64,
+		deadline time.Duration,
 		containerID ids.ID,
 		nodeID ids.ShortID,
 	) InboundMessage
@@ -81,7 +81,7 @@ type InboundMsgBuilder interface {
 	InboundAppRequest(
 		chainID ids.ID,
 		requestID uint32,
-		deadline uint64,
+		deadline time.Duration,
 		msg []byte,
 		nodeID ids.ShortID,
 	) InboundMessage
@@ -96,7 +96,7 @@ type InboundMsgBuilder interface {
 	InboundGet(
 		chainID ids.ID,
 		requestID uint32,
-		deadline uint64,
+		deadline time.Duration,
 		containerID ids.ID,
 		nodeID ids.ShortID,
 	) InboundMessage
@@ -128,7 +128,7 @@ func (b *inMsgBuilder) SetTime(t time.Time) {
 func (b *inMsgBuilder) InboundGetAcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
-	deadline uint64,
+	deadline time.Duration,
 	nodeID ids.ShortID,
 ) InboundMessage {
 	received := b.clock.Time()
@@ -137,10 +137,10 @@ func (b *inMsgBuilder) InboundGetAcceptedFrontier(
 		fields: map[Field]interface{}{
 			ChainID:   chainID[:],
 			RequestID: requestID,
-			Deadline:  deadline,
+			Deadline:  uint64(deadline),
 		},
 		nodeID:         nodeID,
-		expirationTime: received.Add(time.Duration(deadline)),
+		expirationTime: received.Add(deadline),
 	}
 }
 
@@ -166,7 +166,7 @@ func (b *inMsgBuilder) InboundAcceptedFrontier(
 func (b *inMsgBuilder) InboundGetAccepted(
 	chainID ids.ID,
 	requestID uint32,
-	deadline uint64,
+	deadline time.Duration,
 	containerIDs []ids.ID,
 	nodeID ids.ShortID,
 ) InboundMessage {
@@ -178,11 +178,11 @@ func (b *inMsgBuilder) InboundGetAccepted(
 		fields: map[Field]interface{}{
 			ChainID:      chainID[:],
 			RequestID:    requestID,
-			Deadline:     deadline,
+			Deadline:     uint64(deadline),
 			ContainerIDs: containerIDBytes,
 		},
 		nodeID:         nodeID,
-		expirationTime: received.Add(time.Duration(deadline)),
+		expirationTime: received.Add(deadline),
 	}
 }
 
@@ -208,7 +208,7 @@ func (b *inMsgBuilder) InboundAccepted(
 func (b *inMsgBuilder) InboundPushQuery(
 	chainID ids.ID,
 	requestID uint32,
-	deadline uint64,
+	deadline time.Duration,
 	containerID ids.ID,
 	container []byte,
 	nodeID ids.ShortID,
@@ -219,19 +219,19 @@ func (b *inMsgBuilder) InboundPushQuery(
 		fields: map[Field]interface{}{
 			ChainID:        chainID[:],
 			RequestID:      requestID,
-			Deadline:       deadline,
+			Deadline:       uint64(deadline),
 			ContainerID:    containerID[:],
 			ContainerBytes: container,
 		},
 		nodeID:         nodeID,
-		expirationTime: received.Add(time.Duration(deadline)),
+		expirationTime: received.Add(deadline),
 	}
 }
 
 func (b *inMsgBuilder) InboundPullQuery(
 	chainID ids.ID,
 	requestID uint32,
-	deadline uint64,
+	deadline time.Duration,
 	containerID ids.ID,
 	nodeID ids.ShortID,
 ) InboundMessage {
@@ -241,11 +241,11 @@ func (b *inMsgBuilder) InboundPullQuery(
 		fields: map[Field]interface{}{
 			ChainID:     chainID[:],
 			RequestID:   requestID,
-			Deadline:    deadline,
+			Deadline:    uint64(deadline),
 			ContainerID: containerID[:],
 		},
 		nodeID:         nodeID,
-		expirationTime: received.Add(time.Duration(deadline)),
+		expirationTime: received.Add(deadline),
 	}
 }
 
@@ -271,7 +271,7 @@ func (b *inMsgBuilder) InboundChits(
 func (b *inMsgBuilder) InboundAppRequest(
 	chainID ids.ID,
 	requestID uint32,
-	deadline uint64,
+	deadline time.Duration,
 	msg []byte,
 	nodeID ids.ShortID,
 ) InboundMessage {
@@ -281,11 +281,11 @@ func (b *inMsgBuilder) InboundAppRequest(
 		fields: map[Field]interface{}{
 			ChainID:         chainID[:],
 			RequestID:       requestID,
-			Deadline:        deadline,
+			Deadline:        uint64(deadline),
 			AppRequestBytes: AppRequestBytes,
 		},
 		nodeID:         nodeID,
-		expirationTime: received.Add(time.Duration(deadline)),
+		expirationTime: received.Add(deadline),
 	}
 }
 
@@ -309,7 +309,7 @@ func (b *inMsgBuilder) InboundAppResponse(
 func (b *inMsgBuilder) InboundGet(
 	chainID ids.ID,
 	requestID uint32,
-	deadline uint64,
+	deadline time.Duration,
 	containerID ids.ID,
 	nodeID ids.ShortID,
 ) InboundMessage { // used in UTs only
@@ -319,11 +319,11 @@ func (b *inMsgBuilder) InboundGet(
 		fields: map[Field]interface{}{
 			ChainID:     chainID[:],
 			RequestID:   requestID,
-			Deadline:    deadline,
+			Deadline:    uint64(deadline),
 			ContainerID: containerID[:],
 		},
 		nodeID:         nodeID,
-		expirationTime: received.Add(time.Duration(deadline)),
+		expirationTime: received.Add(deadline),
 	}
 }
 

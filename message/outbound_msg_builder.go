@@ -4,6 +4,8 @@
 package message
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 )
@@ -38,7 +40,7 @@ type OutboundMsgBuilder interface {
 	GetAcceptedFrontier(
 		chainID ids.ID,
 		requestID uint32,
-		deadline uint64,
+		deadline time.Duration,
 	) (OutboundMessage, error)
 
 	AcceptedFrontier(
@@ -50,7 +52,7 @@ type OutboundMsgBuilder interface {
 	GetAccepted(
 		chainID ids.ID,
 		requestID uint32,
-		deadline uint64,
+		deadline time.Duration,
 		containerIDs []ids.ID,
 	) (OutboundMessage, error)
 
@@ -63,7 +65,7 @@ type OutboundMsgBuilder interface {
 	GetAncestors(
 		chainID ids.ID,
 		requestID uint32,
-		deadline uint64,
+		deadline time.Duration,
 		containerID ids.ID,
 	) (OutboundMessage, error)
 
@@ -76,7 +78,7 @@ type OutboundMsgBuilder interface {
 	Get(
 		chainID ids.ID,
 		requestID uint32,
-		deadline uint64,
+		deadline time.Duration,
 		containerID ids.ID,
 	) (OutboundMessage, error)
 
@@ -90,7 +92,7 @@ type OutboundMsgBuilder interface {
 	PushQuery(
 		chainID ids.ID,
 		requestID uint32,
-		deadline uint64,
+		deadline time.Duration,
 		containerID ids.ID,
 		container []byte,
 	) (OutboundMessage, error)
@@ -98,7 +100,7 @@ type OutboundMsgBuilder interface {
 	PullQuery(
 		chainID ids.ID,
 		requestID uint32,
-		deadline uint64,
+		deadline time.Duration,
 		containerID ids.ID,
 	) (OutboundMessage, error)
 
@@ -111,7 +113,7 @@ type OutboundMsgBuilder interface {
 	AppRequest(
 		chainID ids.ID,
 		requestID uint32,
-		deadline uint64,
+		deadline time.Duration,
 		msg []byte,
 	) (OutboundMessage, error)
 
@@ -215,14 +217,14 @@ func (b *outMsgBuilder) Pong() (OutboundMessage, error) {
 func (b *outMsgBuilder) GetAcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
-	deadline uint64,
+	deadline time.Duration,
 ) (OutboundMessage, error) {
 	return b.c.Pack(
 		GetAcceptedFrontier,
 		map[Field]interface{}{
 			ChainID:   chainID[:],
 			RequestID: requestID,
-			Deadline:  deadline,
+			Deadline:  uint64(deadline),
 		},
 		GetAcceptedFrontier.Compressable(), // GetAcceptedFrontier messages can't be compressed
 	)
@@ -252,7 +254,7 @@ func (b *outMsgBuilder) AcceptedFrontier(
 func (b *outMsgBuilder) GetAccepted(
 	chainID ids.ID,
 	requestID uint32,
-	deadline uint64,
+	deadline time.Duration,
 	containerIDs []ids.ID,
 ) (OutboundMessage, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
@@ -265,7 +267,7 @@ func (b *outMsgBuilder) GetAccepted(
 		map[Field]interface{}{
 			ChainID:      chainID[:],
 			RequestID:    requestID,
-			Deadline:     deadline,
+			Deadline:     uint64(deadline),
 			ContainerIDs: containerIDBytes,
 		},
 		GetAccepted.Compressable(), // GetAccepted messages can't be compressed
@@ -296,7 +298,7 @@ func (b *outMsgBuilder) Accepted(
 func (b *outMsgBuilder) GetAncestors(
 	chainID ids.ID,
 	requestID uint32,
-	deadline uint64,
+	deadline time.Duration,
 	containerID ids.ID,
 ) (OutboundMessage, error) {
 	return b.c.Pack(
@@ -304,7 +306,7 @@ func (b *outMsgBuilder) GetAncestors(
 		map[Field]interface{}{
 			ChainID:     chainID[:],
 			RequestID:   requestID,
-			Deadline:    deadline,
+			Deadline:    uint64(deadline),
 			ContainerID: containerID[:],
 		},
 		GetAncestors.Compressable(), // GetAncestors messages can't be compressed
@@ -330,7 +332,7 @@ func (b *outMsgBuilder) MultiPut(
 func (b *outMsgBuilder) Get(
 	chainID ids.ID,
 	requestID uint32,
-	deadline uint64,
+	deadline time.Duration,
 	containerID ids.ID,
 ) (OutboundMessage, error) {
 	return b.c.Pack(
@@ -338,7 +340,7 @@ func (b *outMsgBuilder) Get(
 		map[Field]interface{}{
 			ChainID:     chainID[:],
 			RequestID:   requestID,
-			Deadline:    deadline,
+			Deadline:    uint64(deadline),
 			ContainerID: containerID[:],
 		},
 		Get.Compressable(), // Get messages can't be compressed
@@ -366,7 +368,7 @@ func (b *outMsgBuilder) Put(
 func (b *outMsgBuilder) PushQuery(
 	chainID ids.ID,
 	requestID uint32,
-	deadline uint64,
+	deadline time.Duration,
 	containerID ids.ID,
 	container []byte,
 ) (OutboundMessage, error) {
@@ -375,7 +377,7 @@ func (b *outMsgBuilder) PushQuery(
 		map[Field]interface{}{
 			ChainID:        chainID[:],
 			RequestID:      requestID,
-			Deadline:       deadline,
+			Deadline:       uint64(deadline),
 			ContainerID:    containerID[:],
 			ContainerBytes: container,
 		},
@@ -386,7 +388,7 @@ func (b *outMsgBuilder) PushQuery(
 func (b *outMsgBuilder) PullQuery(
 	chainID ids.ID,
 	requestID uint32,
-	deadline uint64,
+	deadline time.Duration,
 	containerID ids.ID,
 ) (OutboundMessage, error) {
 	return b.c.Pack(
@@ -394,7 +396,7 @@ func (b *outMsgBuilder) PullQuery(
 		map[Field]interface{}{
 			ChainID:     chainID[:],
 			RequestID:   requestID,
-			Deadline:    deadline,
+			Deadline:    uint64(deadline),
 			ContainerID: containerID[:],
 		},
 		PullQuery.Compressable(), // PullQuery messages can't be compressed
@@ -423,13 +425,18 @@ func (b *outMsgBuilder) Chits(
 }
 
 // Application level request
-func (b *outMsgBuilder) AppRequest(chainID ids.ID, requestID uint32, deadline uint64, msg []byte) (OutboundMessage, error) {
+func (b *outMsgBuilder) AppRequest(
+	chainID ids.ID,
+	requestID uint32,
+	deadline time.Duration,
+	msg []byte,
+) (OutboundMessage, error) {
 	return b.c.Pack(
 		AppRequest,
 		map[Field]interface{}{
 			ChainID:         chainID[:],
 			RequestID:       requestID,
-			Deadline:        deadline,
+			Deadline:        uint64(deadline),
 			AppRequestBytes: msg,
 		},
 		b.compress && AppRequest.Compressable(), // App messages may be compressed

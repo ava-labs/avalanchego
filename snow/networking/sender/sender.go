@@ -5,7 +5,6 @@ package sender
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -83,25 +82,23 @@ func (s *Sender) Initialize(
 func (s *Sender) Context() *snow.Context { return s.ctx }
 
 func (s *Sender) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, requestID uint32) {
+	// Note that this timeout duration won't exactly match the one that gets
+	// registered. That's OK.
+	deadline := s.timeouts.TimeoutDuration()
+
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
-		// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
-		timeoutDuration := s.timeouts.TimeoutDuration()
-		deadline := uint64(time.Now().Add(timeoutDuration).Unix())
-
-		inMsg := s.msgCreator.InboundGetAcceptedFrontier(s.ctx.ChainID, requestID, deadline, s.ctx.NodeID)
 
 		// Tell the router to expect a reply message from this node
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.GetAcceptedFrontier)
+
+		inMsg := s.msgCreator.InboundGetAcceptedFrontier(s.ctx.ChainID, requestID, deadline, s.ctx.NodeID)
 		go s.router.HandleInbound(inMsg)
 	}
 
 	// Try to send the messages over the network.
-	// Note that this timeout duration won't exactly match the one that gets
-	// registered. That's OK.
-	deadline := uint64(s.timeouts.TimeoutDuration())
 	outMsg, err := s.msgCreator.GetAcceptedFrontier(s.ctx.ChainID, requestID, deadline)
 	s.ctx.Log.AssertNoError(err)
 	sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
@@ -148,25 +145,22 @@ func (s *Sender) SendAcceptedFrontier(nodeID ids.ShortID, requestID uint32, cont
 }
 
 func (s *Sender) SendGetAccepted(nodeIDs ids.ShortSet, requestID uint32, containerIDs []ids.ID) {
+	// Note that this timeout duration won't exactly match the one that gets
+	// registered. That's OK.
+	deadline := s.timeouts.TimeoutDuration()
+
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 
-		// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
-		timeoutDuration := s.timeouts.TimeoutDuration()
-		deadline := uint64(time.Now().Add(timeoutDuration).Unix())
+		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.GetAccepted)
 
 		inMsg := s.msgCreator.InboundGetAccepted(s.ctx.ChainID, requestID, deadline, containerIDs, s.ctx.NodeID)
-
-		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.GetAccepted)
 		go s.router.HandleInbound(inMsg)
 	}
 
 	// Try to send the messages over the network.
-	// Note that this timeout duration won't exactly match the one that gets
-	// registered. That's OK.
-	deadline := uint64(s.timeouts.TimeoutDuration())
 	outMsg, err := s.msgCreator.GetAccepted(s.ctx.ChainID, requestID, deadline, containerIDs)
 	if err != nil {
 		s.ctx.Log.Error("failed to build GetAccepted(%s, %d, %s): %s",
@@ -248,8 +242,9 @@ func (s *Sender) SendGetAncestors(nodeID ids.ShortID, requestID uint32, containe
 		return
 	}
 
-	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
-	deadline := uint64(s.timeouts.TimeoutDuration())
+	// Note that this timeout duration won't exactly match the one that gets
+	// registered. That's OK.
+	deadline := s.timeouts.TimeoutDuration()
 	outMsg, err := s.msgCreator.GetAncestors(s.ctx.ChainID, requestID, deadline, containerID)
 	if err != nil {
 		s.ctx.Log.Error("failed to build GetAncestors message: %s", err)
@@ -324,8 +319,9 @@ func (s *Sender) SendGet(nodeID ids.ShortID, requestID uint32, containerID ids.I
 		return
 	}
 
-	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
-	deadline := uint64(s.timeouts.TimeoutDuration())
+	// Note that this timeout duration won't exactly match the one that gets
+	// registered. That's OK.
+	deadline := s.timeouts.TimeoutDuration()
 	outMsg, err := s.msgCreator.Get(s.ctx.ChainID, requestID, deadline, containerID)
 	s.ctx.Log.AssertNoError(err)
 
@@ -385,21 +381,19 @@ func (s *Sender) SendPut(nodeID ids.ShortID, requestID uint32, containerID ids.I
 func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, containerID ids.ID, container []byte) {
 	s.ctx.Log.Verbo("Sending PushQuery to nodes %v. RequestID: %d. ContainerID: %s", nodeIDs, requestID, containerID)
 
-	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
-	timeoutDuration := s.timeouts.TimeoutDuration()
+	// Note that this timeout duration won't exactly match the one that gets
+	// registered. That's OK.
+	deadline := s.timeouts.TimeoutDuration()
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Do so asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 
-		timeoutDuration := s.timeouts.TimeoutDuration()
-		deadline := uint64(time.Now().Add(timeoutDuration).Unix())
-
-		inMsg := s.msgCreator.InboundPushQuery(s.ctx.ChainID, requestID, deadline, containerID, container, s.ctx.NodeID)
-
 		// Register a timeout in case I don't respond to myself
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.PushQuery)
+
+		inMsg := s.msgCreator.InboundPushQuery(s.ctx.ChainID, requestID, deadline, containerID, container, s.ctx.NodeID)
 		go s.router.HandleInbound(inMsg)
 	}
 
@@ -418,7 +412,6 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 
 	// Try to send the messages over the network.
 	// [sentTo] are the IDs of validators who may receive the message.
-	deadline := uint64(timeoutDuration)
 	outMsg, err := s.msgCreator.PushQuery(s.ctx.ChainID, requestID, deadline, containerID, container)
 	if err != nil {
 		s.ctx.Log.Error("failed to build PushQuery(%s, %d, %s): %s. len(container): %d",
@@ -468,19 +461,19 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, containerID ids.ID) {
 	s.ctx.Log.Verbo("Sending PullQuery. RequestID: %d. ContainerID: %s", requestID, containerID)
 
-	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
-	timeoutDuration := s.timeouts.TimeoutDuration()
+	// Note that this timeout duration won't exactly match the one that gets
+	// registered. That's OK.
+	deadline := s.timeouts.TimeoutDuration()
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Do so asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 
-		deadline := uint64(time.Now().Add(timeoutDuration).Unix())
-		inMsg := s.msgCreator.InboundPullQuery(s.ctx.ChainID, requestID, deadline, containerID, s.ctx.NodeID)
-
 		// Register a timeout in case I don't respond to myself
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.PullQuery)
+
+		inMsg := s.msgCreator.InboundPullQuery(s.ctx.ChainID, requestID, deadline, containerID, s.ctx.NodeID)
 		go s.router.HandleInbound(inMsg)
 	}
 
@@ -498,7 +491,6 @@ func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, container
 	}
 
 	// Try to send the messages over the network.
-	deadline := uint64(timeoutDuration)
 	outMsg, err := s.msgCreator.PullQuery(s.ctx.ChainID, requestID, deadline, containerID)
 	s.ctx.Log.AssertNoError(err)
 	sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
@@ -562,19 +554,19 @@ func (s *Sender) SendChits(nodeID ids.ShortID, requestID uint32, votes []ids.ID)
 func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appRequestBytes []byte) error {
 	s.ctx.Log.Verbo("Sending AppRequest. RequestID: %d. Message: %s", requestID, formatting.DumpBytes{Bytes: appRequestBytes})
 
-	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
-	timeoutDuration := s.timeouts.TimeoutDuration()
+	// Note that this timeout duration won't exactly match the one that gets
+	// registered. That's OK.
+	deadline := s.timeouts.TimeoutDuration()
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Do so asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 
-		deadline := uint64(time.Now().Add(timeoutDuration).Unix())
-		inMsg := s.msgCreator.InboundAppRequest(s.ctx.ChainID, requestID, deadline, appRequestBytes, s.ctx.NodeID)
-
 		// Register a timeout in case I don't respond to myself
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.AppRequest)
+
+		inMsg := s.msgCreator.InboundAppRequest(s.ctx.ChainID, requestID, deadline, appRequestBytes, s.ctx.NodeID)
 		go s.router.HandleInbound(inMsg)
 	}
 
@@ -594,7 +586,6 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 
 	// Try to send the messages over the network.
 	// [sentTo] are the IDs of nodes who may receive the message.
-	deadline := uint64(timeoutDuration)
 	outMsg, err := s.msgCreator.AppRequest(s.ctx.ChainID, requestID, deadline, appRequestBytes)
 	if err != nil {
 		s.ctx.Log.Error("failed to build AppRequest(%s, %d): %s", s.ctx.ChainID, requestID, err)
