@@ -54,29 +54,32 @@ const (
 )
 
 var (
+	// List of all consensus request message types
+	ConsensusRequestOps = []Op{
+		GetAcceptedFrontier,
+		GetAccepted,
+		GetAncestors,
+		Get,
+		PushQuery,
+		PullQuery,
+		AppRequest,
+	}
 	// List of all external message types
-	ExternalOps = []Op{
+	ExternalOps = append(ConsensusRequestOps,
 		GetVersion,
 		GetPeerList,
 		Ping,
 		Pong,
-		GetAcceptedFrontier,
 		AcceptedFrontier,
-		GetAccepted,
 		Accepted,
-		GetAncestors,
 		MultiPut,
-		Get,
 		Put,
-		PushQuery,
-		PullQuery,
 		Chits,
 		PeerList,
 		Version,
-		AppRequest,
 		AppResponse,
 		AppGossip,
-	}
+	)
 	// List of all internal message types
 	InternalOps = []Op{
 		GetAcceptedFrontierFailed,
