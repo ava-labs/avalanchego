@@ -84,10 +84,10 @@ func (m *Manager) RegisterResponse(
 	uniqueRequestID ids.ID,
 	msgType constants.MsgType,
 	latency time.Duration,
-) {
+) bool {
 	m.metrics.Observe(chainID, msgType, latency)
 	m.benchlistMgr.RegisterResponse(chainID, validatorID)
-	m.tm.Remove(uniqueRequestID)
+	return m.tm.Remove(uniqueRequestID)
 }
 
 // RegisterRequestToUnreachableValidator registers that we would have sent

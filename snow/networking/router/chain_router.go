@@ -796,10 +796,14 @@ func (cr *ChainRouter) AppResponse(
 	latency := cr.clock.Time().Sub(request.time)
 
 	// Tell the timeout manager we got a response
-	cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, request.msgType, latency)
+	registered := cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, request.msgType, latency)
 
 	// Pass the response to the chain
-	chain.AppResponse(nodeID, requestID, appResponseBytes, onFinishedHandling)
+	if registered {
+		chain.AppResponse(nodeID, requestID, appResponseBytes, onFinishedHandling)
+	} else {
+		cr.log.Info("AppResponse(%s, %s, %d) dropped as timeout has already occurred", nodeID, chainID, requestID)
+	}
 }
 
 // AppRequestFailed notifies the given chain that it will not receive a response to its request

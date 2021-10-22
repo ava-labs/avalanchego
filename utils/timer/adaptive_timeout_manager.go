@@ -180,17 +180,17 @@ func (tm *AdaptiveTimeoutManager) put(id ids.ID, msgType constants.MsgType, hand
 
 // Remove the timeout associated with [id].
 // Its timeout handler will not be called.
-func (tm *AdaptiveTimeoutManager) Remove(id ids.ID) {
+func (tm *AdaptiveTimeoutManager) Remove(id ids.ID) bool {
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
-	tm.remove(id, tm.clock.Time())
+	return tm.remove(id, tm.clock.Time())
 }
 
 // Assumes [tm.lock] is held
-func (tm *AdaptiveTimeoutManager) remove(id ids.ID, now time.Time) {
+func (tm *AdaptiveTimeoutManager) remove(id ids.ID, now time.Time) bool {
 	timeout, exists := tm.timeoutMap[id]
 	if !exists {
-		return
+		return false
 	}
 
 	// Observe the response time to update average network response time
@@ -208,6 +208,7 @@ func (tm *AdaptiveTimeoutManager) remove(id ids.ID, now time.Time) {
 
 	// Remove the timeout from the queue
 	heap.Remove(&tm.timeoutQueue, timeout.index)
+	return true
 }
 
 // Timeout registers a timeout
