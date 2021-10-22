@@ -820,10 +820,11 @@ func (cr *ChainRouter) AppRequestFailed(nodeID ids.ShortID, chainID ids.ID, requ
 
 	chain, exists := cr.chains[chainID]
 	if !exists {
-		cr.log.Debug("AppRequestFailed(%s, %s, %d) dropped due to unknown chain", nodeID, chainID, requestID)
+		cr.log.Info("AppRequestFailed(%s, %s, %d) dropped due to unknown chain", nodeID, chainID, requestID)
 		return
 	}
 	// Pass the response to the chain
+	cr.log.Info("AppRequestFailed(%s, %s, %d) sent", nodeID, chainID, requestID)
 	chain.AppRequestFailed(nodeID, requestID)
 }
 
