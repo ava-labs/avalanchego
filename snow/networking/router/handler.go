@@ -350,6 +350,10 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		}
 		return h.engine.AppRequest(nodeID, reqID, appRequestBytes)
 
+	case message.AppRequestFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return h.engine.AppRequestFailed(nodeID, reqID)
+
 	case message.AppResponse:
 		reqID := msg.Get(message.RequestID).(uint32)
 		appResponseBytes, ok := msg.Get(message.AppResponseBytes).([]byte)

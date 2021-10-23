@@ -72,15 +72,15 @@ func newChainMetrics(ctx *snow.Context, namespace string, summaryEnabled bool) (
 	cm := &chainMetrics{
 		ctx: ctx,
 
-		messageLatencies: make(map[message.Op]metric.Averager, len(message.ConsensusRequestOps)),
+		messageLatencies: make(map[message.Op]metric.Averager, len(message.ConsensusResponseOps)),
 
 		summaryEnabled:   summaryEnabled,
-		messageSummaries: make(map[message.Op]*prometheus.SummaryVec, len(message.ConsensusRequestOps)),
+		messageSummaries: make(map[message.Op]*prometheus.SummaryVec, len(message.ConsensusResponseOps)),
 	}
 
 	queryLatencyNamespace := fmt.Sprintf("%s_lat", namespace)
 	errs := wrappers.Errs{}
-	for _, op := range message.ConsensusRequestOps {
+	for _, op := range message.ConsensusResponseOps {
 		cm.messageLatencies[op] = metric.NewAveragerWithErrs(
 			namespace,
 			op.String(),
