@@ -29,6 +29,11 @@ This version is backwards compatible to [v1.6.0](https://github.com/ava-labs/ava
   - Added `avalanche_{DAGID}_vm_metervm_accept_{count,sum}`.
   - Added `avalanche_{DAGID}_vm_metervm_reject_{count,sum}`.
 
+### Coreth
+
+- Applied callTracer fault handling fix.
+- Initialized multicoin functions in the runtime environment.
+
 ### ProposerVM
 
 - Updated block `Delay` in `--staking-enabled=false` networks to be `0`.
