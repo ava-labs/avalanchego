@@ -27,7 +27,7 @@ type adaptiveTimeout struct {
 	handler  func()        // Function to execute if timed out
 	duration time.Duration // How long this timeout was set for
 	deadline time.Time     // When this timeout should be fired
-	msgType  message.Op    // Type of this outstanding request
+	op       message.Op    // Type of this outstanding request
 }
 
 // A timeoutQueue implements heap.Interface and holds adaptiveTimeouts.
@@ -154,14 +154,14 @@ func (tm *AdaptiveTimeoutManager) Stop() { tm.timer.Stop() }
 // Put registers a timeout for [id]. If the timeout occurs, [timeoutHandler] is called.
 // Returns the time at which the timeout will fire if it is not first
 // removed by calling [tm.Remove].
-func (tm *AdaptiveTimeoutManager) Put(id ids.ID, msgType message.Op, timeoutHandler func()) time.Time {
+func (tm *AdaptiveTimeoutManager) Put(id ids.ID, op message.Op, timeoutHandler func()) time.Time {
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
-	return tm.put(id, msgType, timeoutHandler)
+	return tm.put(id, op, timeoutHandler)
 }
 
 // Assumes [tm.lock] is held
-func (tm *AdaptiveTimeoutManager) put(id ids.ID, msgType message.Op, handler func()) time.Time {
+func (tm *AdaptiveTimeoutManager) put(id ids.ID, op message.Op, handler func()) time.Time {
 	currentTime := tm.clock.Time()
 	tm.remove(id, currentTime)
 
@@ -170,7 +170,7 @@ func (tm *AdaptiveTimeoutManager) put(id ids.ID, msgType message.Op, handler fun
 		handler:  handler,
 		duration: tm.currentTimeout,
 		deadline: currentTime.Add(tm.currentTimeout),
-		msgType:  msgType,
+		op:       op,
 	}
 	tm.timeoutMap[id] = timeout
 	heap.Push(&tm.timeoutQueue, timeout)
@@ -198,7 +198,7 @@ func (tm *AdaptiveTimeoutManager) remove(id ids.ID, now time.Time) {
 	// Don't include Get requests in calculation, since an adversary
 	// can cause you to issue a Get request and then cause it to timeout,
 	// increasing your timeout.
-	if timeout.msgType != message.Get {
+	if timeout.op != message.Get {
 		timeoutRegisteredAt := timeout.deadline.Add(-1 * timeout.duration)
 		latency := now.Sub(timeoutRegisteredAt)
 		tm.observeLatencyAndUpdateTimeout(latency, now)

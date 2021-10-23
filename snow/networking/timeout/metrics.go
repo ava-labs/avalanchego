@@ -45,8 +45,8 @@ func (m *metrics) RegisterChain(ctx *snow.Context, namespace string) error {
 	return nil
 }
 
-// Record that a response to a message of type [msgType] regarding chain [chainID] took [latency]
-func (m *metrics) Observe(chainID ids.ID, msgType message.Op, latency time.Duration) {
+// Record that a response of type [op] took [latency]
+func (m *metrics) Observe(chainID ids.ID, op message.Op, latency time.Duration) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -55,7 +55,7 @@ func (m *metrics) Observe(chainID ids.ID, msgType message.Op, latency time.Durat
 		// TODO should this log an error?
 		return
 	}
-	cm.observe(ids.ShortEmpty, msgType, latency)
+	cm.observe(ids.ShortEmpty, op, latency)
 }
 
 // chainMetrics contains message response time metrics for a chain

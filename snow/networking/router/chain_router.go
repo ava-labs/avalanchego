@@ -39,7 +39,7 @@ type requestEntry struct {
 	// When this request was registered
 	time time.Time
 	// The type of request that was made
-	msgType message.Op
+	op message.Op
 }
 
 // ChainRouter routes incoming messages from the validator network
@@ -72,8 +72,6 @@ type ChainRouter struct {
 	healthConfig HealthConfig
 	// aggregator of requests based on their time
 	timedRequests linkedhashmap.LinkedHashmap
-	// Last time at which there were no outstanding requests
-	lastTimeNoOutstanding time.Time
 	// Must only be accessed in method [createRequestID].
 	// [lock] must be held when [requestIDBytes] is accessed.
 	requestIDBytes []byte
@@ -113,7 +111,7 @@ func (cr *ChainRouter) Initialize(
 	cr.timedRequests = linkedhashmap.New()
 	cr.peers.Add(nodeID)
 	cr.healthConfig = healthConfig
-	cr.requestIDBytes = make([]byte, 2*hashing.HashLen+wrappers.IntLen+wrappers.ByteLen) // Validator ID, Chain ID, Request ID, Msg Type
+	cr.requestIDBytes = make([]byte, hashing.AddrLen+hashing.HashLen+wrappers.IntLen+wrappers.ByteLen) // Validator ID, Chain ID, Request ID, Msg Type
 
 	// Register metrics
 	rMetrics, err := newRouterMetrics(metricsNamespace, metricsRegisterer)
@@ -127,19 +125,14 @@ func (cr *ChainRouter) Initialize(
 	return nil
 }
 
-// Remove a request from [cr.requests]
-// Assumes [cr.lock] is held
-func (cr *ChainRouter) removeRequest(id ids.ID) {
-	cr.timedRequests.Delete(id)
-	cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
-}
-
-// RegisterRequest marks that we should expect to receive a reply from the given validator
-// regarding the given chain and the reply should have the given requestID.
-// The type of message we sent the validator was [msgType].
+// RegisterRequest marks that we should expect to receive a reply from the given
+// validator regarding the given chain and the reply should have the given
+// requestID.
+// The type of message we expect is [op].
 // Every registered request must be cleared either by receiving a valid reply
-// and passing it to the appropriate chain or by a call to GetFailed, GetAncestorsFailed, etc.
-// This method registers a timeout that calls such methods if we don't get a reply in time.
+// and passing it to the appropriate chain or by a timeout.
+// This method registers a timeout that calls such methods if we don't get a
+// reply in time.
 func (cr *ChainRouter) RegisterRequest(
 	nodeID ids.ShortID,
 	chainID ids.ID,
@@ -151,18 +144,15 @@ func (cr *ChainRouter) RegisterRequest(
 	// we validate that we actually sent the corresponding request.
 	// Give this request a unique ID so we can do that validation.
 	uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, op)
-	if cr.timedRequests.Len() == 0 {
-		cr.lastTimeNoOutstanding = cr.clock.Time()
-	}
 	// Add to the set of unfulfilled requests
 	cr.timedRequests.Put(uniqueRequestID, requestEntry{
-		time:    cr.clock.Time(),
-		msgType: op,
+		time: cr.clock.Time(),
+		op:   op,
 	})
 	cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
 	cr.lock.Unlock()
 
-	failedOp, exists := message.RequestToFailedOps[op]
+	failedOp, exists := message.ResponseToFailedOps[op]
 	if !exists {
 		// This should never happen
 		cr.log.Error("failed to convert operation type: %s", op)
@@ -171,9 +161,80 @@ func (cr *ChainRouter) RegisterRequest(
 
 	// Register a timeout to fire if we don't get a reply in time.
 	cr.timeoutManager.RegisterRequest(nodeID, chainID, op, uniqueRequestID, func() {
-		inMsg := cr.msgCreator.InternalFailedRequest(failedOp, nodeID, chainID, requestID)
-		cr.HandleInbound(inMsg)
+		msg := cr.msgCreator.InternalFailedRequest(failedOp, nodeID, chainID, requestID)
+		cr.HandleInbound(msg)
 	})
+}
+
+func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
+	nodeID := msg.NodeID()
+	op := msg.Op()
+	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
+	cr.log.AssertNoError(err)
+
+	// AppGossip is the only message currently not containing a requestID
+	// Here we assign the requestID already in use for gossiped containers
+	// to allow a uniform handling of all messages
+	var requestID uint32
+	if op == message.AppGossip {
+		requestID = constants.GossipMsgRequestID
+	} else {
+		requestID = msg.Get(message.RequestID).(uint32)
+	}
+
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
+
+	// Get the chain, if it exists
+	chain, exists := cr.chains[chainID]
+	if !exists || !chain.isValidator(nodeID) {
+		cr.log.Debug(
+			"Message %s from (%s. %s) dropped. Error: %s",
+			op,
+			nodeID,
+			chainID,
+			errUnknownChain,
+		)
+
+		msg.OnFinishedHandling()
+		return
+	}
+
+	if _, notRequested := message.UnrequestedOps[op]; notRequested || (op == message.Put && requestID == constants.GossipMsgRequestID) {
+		chain.push(msg)
+		return
+	}
+
+	if expectedResponse, isFailed := message.FailedToResponseOps[op]; isFailed {
+		// Create the request ID of the request we sent that this message is in
+		// response to.
+		_, req := cr.clearRequest(expectedResponse, nodeID, chainID, requestID)
+		if req == nil {
+			// This was a duplicated response.
+			msg.OnFinishedHandling()
+			return
+		}
+
+		// Pass the failure to the chain
+		chain.push(msg)
+		return
+	}
+
+	uniqueRequestID, req := cr.clearRequest(op, nodeID, chainID, requestID)
+	if req == nil {
+		// We didn't request this message.
+		msg.OnFinishedHandling()
+		return
+	}
+
+	// Calculate how long it took [nodeID] to reply
+	latency := cr.clock.Time().Sub(req.time)
+
+	// Tell the timeout manager we got a response
+	cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, req.op, latency)
+
+	// Pass the response to the chain
+	chain.push(msg)
 }
 
 // Shutdown shuts down this router
@@ -222,278 +283,6 @@ func (cr *ChainRouter) AddChain(chain *Handler) {
 		if _, benched := cr.benched[validatorID]; !benched {
 			chain.Connected(validatorID)
 		}
-	}
-}
-
-// RemoveChain removes the specified chain so that incoming
-// messages can't be routed to it
-func (cr *ChainRouter) removeChain(chainID ids.ID) {
-	cr.lock.Lock()
-	chain, exists := cr.chains[chainID]
-	if !exists {
-		cr.log.Debug("can't remove unknown chain %s", chainID)
-		cr.lock.Unlock()
-		return
-	}
-	delete(cr.chains, chainID)
-	cr.lock.Unlock()
-
-	chain.StartShutdown()
-
-	ticker := time.NewTicker(cr.closeTimeout)
-	select {
-	case <-chain.closed:
-	case <-ticker.C:
-		chain.Context().Log.Warn("timed out while shutting down")
-	}
-	ticker.Stop()
-
-	if cr.onFatal != nil && cr.criticalChains.Contains(chainID) {
-		go cr.onFatal(1)
-	}
-}
-
-func (cr *ChainRouter) markFullfilled(
-	msgType message.Op,
-	nodeID ids.ShortID,
-	chainID ids.ID,
-	requestID uint32,
-	matchReqType bool,
-) (ids.ID, *requestEntry) {
-	// Create the request ID of the request we sent that this message is (allegedly) in response to.
-	uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, msgType)
-
-	// Mark that an outstanding request has been fulfilled
-	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
-	if !exists {
-		return uniqueRequestID, nil
-	}
-	request := requestIntf.(requestEntry)
-	if matchReqType && request.msgType != msgType {
-		return uniqueRequestID, nil
-	}
-
-	cr.removeRequest(uniqueRequestID)
-	return uniqueRequestID, &request
-}
-
-func (cr *ChainRouter) HandleInbound(inMsg message.InboundMessage) {
-	cr.lock.Lock()
-	defer cr.lock.Unlock()
-
-	nodeID := inMsg.NodeID()
-	msgType := inMsg.Op()
-	chainID, err := ids.ToID(inMsg.Get(message.ChainID).([]byte))
-	cr.log.AssertNoError(err)
-
-	// AppGossip is the only message currently not containing a requestID
-	// Here we assign the requestID already in use for gossiped containers
-	// to allow a uniform handling of all messages
-	var requestID uint32
-	if msgType == message.AppGossip {
-		requestID = constants.GossipMsgRequestID
-	} else {
-		requestID = inMsg.Get(message.RequestID).(uint32)
-	}
-
-	// Get the chain, if it exists
-	chain, exists := cr.chains[chainID]
-	if !exists || !chain.isValidator(nodeID) {
-		inMsg.OnFinishedHandling()
-		cr.log.Debug("Message %s from (%s. %s, %d) dropped. Error: %s",
-			msgType.String(), nodeID, chainID, requestID, errUnknownChain)
-		return
-	}
-
-	// Pass the message to the chain
-	switch msgType {
-	case // handle msgs with no deadlines
-		message.GetAcceptedFrontier,
-		message.GetAccepted,
-		message.GetAncestors,
-		message.Get,
-		message.PullQuery,
-		message.PushQuery,
-		message.AppRequest:
-
-		chain.push(inMsg)
-		return
-
-	case message.GetAcceptedFrontierFailed:
-		// Create the request ID of the request we sent that this message is (allegedly) in response to.
-		uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, message.GetAcceptedFrontier)
-
-		// Remove the outstanding request
-		cr.removeRequest(uniqueRequestID)
-
-		// Pass the response to the chain
-		chain.push(inMsg)
-
-	case message.AcceptedFrontier:
-		uniqueRequestID, request := cr.markFullfilled(message.GetAcceptedFrontier, nodeID, chainID, requestID, false)
-		if request == nil {
-			// We didn't request this message. Ignore.
-			inMsg.OnFinishedHandling()
-			return
-		}
-
-		// Calculate how long it took [validatorID] to reply
-		latency := cr.clock.Time().Sub(request.time)
-
-		// Tell the timeout manager we got a response
-		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, message.GetAcceptedFrontier, latency)
-
-		// Pass the response to the chain
-		chain.push(inMsg)
-		return
-
-	case message.GetAcceptedFailed:
-		// Create the request ID of the request we sent that this message is (allegedly) in response to.
-		uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, message.GetAccepted)
-
-		// Remove the outstanding request
-		cr.removeRequest(uniqueRequestID)
-
-		// Pass the response to the chain
-		chain.push(inMsg)
-
-	case message.Accepted:
-		uniqueRequestID, request := cr.markFullfilled(message.GetAccepted, nodeID, chainID, requestID, false)
-		if request == nil {
-			// We didn't request this message. Ignore.
-			inMsg.OnFinishedHandling()
-			return
-		}
-
-		// Calculate how long it took [validatorID] to reply
-		latency := cr.clock.Time().Sub(request.time)
-
-		// Tell the timeout manager we got a response
-		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, message.GetAccepted, latency)
-
-		// Pass the response to the chain
-		chain.push(inMsg)
-		return
-
-	case message.GetAncestorsFailed:
-		// Create the request ID of the request we sent that this message is (allegedly) in response to.
-		uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, message.GetAncestors)
-
-		// Remove the outstanding request
-		cr.removeRequest(uniqueRequestID)
-
-		// Pass the response to the chain
-		chain.push(inMsg)
-
-	case message.MultiPut:
-		uniqueRequestID, request := cr.markFullfilled(message.GetAncestors, nodeID, chainID, requestID, false)
-		if request == nil {
-			// We didn't request this message. Ignore.
-			inMsg.OnFinishedHandling()
-			return
-		}
-
-		// Calculate how long it took [validatorID] to reply
-		latency := cr.clock.Time().Sub(request.time)
-
-		// Tell the timeout manager we got a response
-		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, message.GetAncestors, latency)
-
-		// Pass the response to the chain
-		chain.push(inMsg)
-		return
-
-	case message.QueryFailed:
-		// Create the request ID of the request we sent that this message is (allegedly) in response to.
-		// Note that we treat PullQueryMsg and PushQueryMsg the same for the sake of creating request IDs.
-		// See [createRequestID].
-		uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, message.PullQuery)
-
-		// Remove the outstanding request
-		cr.removeRequest(uniqueRequestID)
-
-		// Pass the response to the chain
-		chain.push(inMsg)
-
-	case message.Chits:
-		// Note that we treat PullQueryMsg and PushQueryMsg the same for the sake of creating request IDs.
-		// See [createRequestID].
-		uniqueRequestID, request := cr.markFullfilled(message.PullQuery, nodeID, chainID, requestID, false)
-		if request == nil {
-			// We didn't request this message. Ignore.
-			inMsg.OnFinishedHandling()
-			return
-		}
-
-		// Calculate how long it took [validatorID] to reply
-		latency := cr.clock.Time().Sub(request.time)
-
-		// Tell the timeout manager we got a response
-		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, request.msgType, latency)
-
-		// Pass the response to the chain
-		chain.push(inMsg)
-		return
-
-	case message.GetFailed:
-		// Create the request ID of the request we sent that this message is (allegedly) in response to.
-		uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, message.Get)
-
-		// Remove the outstanding request
-		cr.removeRequest(uniqueRequestID)
-
-		// Pass the response to the chain
-		chain.push(inMsg)
-
-	case message.Put:
-		// If this is a gossip message, pass to the chain
-		if requestID == constants.GossipMsgRequestID {
-			chain.push(inMsg)
-			return
-		}
-
-		uniqueRequestID, request := cr.markFullfilled(message.Get, nodeID, chainID, requestID, false)
-		if request == nil {
-			// We didn't request this message. Ignore.
-			inMsg.OnFinishedHandling()
-			return
-		}
-
-		// Calculate how long it took [nodeID] to reply
-		latency := cr.clock.Time().Sub(request.time)
-
-		// Tell the timeout manager we got a response
-		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, message.Get, latency)
-
-		// Pass the response to the chain
-		chain.push(inMsg)
-		return
-
-	case message.AppResponse:
-		uniqueRequestID, request := cr.markFullfilled(message.AppRequest, nodeID, chainID, requestID, true)
-		if request == nil {
-			// We didn't request this message, or it was the wrong type. Ignore.
-			inMsg.OnFinishedHandling()
-			return
-		}
-
-		// Calculate how long it took [nodeID] to reply
-		latency := cr.clock.Time().Sub(request.time)
-
-		// Tell the timeout manager we got a response
-		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, request.msgType, latency)
-
-		// Pass the response to the chain
-		chain.push(inMsg)
-		return
-
-	case message.AppGossip:
-		chain.push(inMsg)
-		return
-
-	default:
-		cr.log.Error("Unhandled message type %v. Dropping it.", msgType)
-		return
 	}
 }
 
@@ -634,18 +423,62 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 	return details, nil
 }
 
-// Assumes [cr.lock] is held.
-// Assumes [constants.msgType] is an alias of byte.
-func (cr *ChainRouter) createRequestID(nodeID ids.ShortID, chainID ids.ID, requestID uint32, msgType message.Op) ids.ID {
-	// If we receive Chits, they may be in response to either a PullQuery or a PushQuery.
-	// Treat PullQuery and PushQuery messages as being the same for the sake of validating
-	// that Chits we receive are in response to a query (either push or pull) that we sent.
-	if msgType == message.PullQuery {
-		msgType = message.PushQuery
+// RemoveChain removes the specified chain so that incoming
+// messages can't be routed to it
+func (cr *ChainRouter) removeChain(chainID ids.ID) {
+	cr.lock.Lock()
+	chain, exists := cr.chains[chainID]
+	if !exists {
+		cr.log.Debug("can't remove unknown chain %s", chainID)
+		cr.lock.Unlock()
+		return
 	}
+	delete(cr.chains, chainID)
+	cr.lock.Unlock()
+
+	chain.StartShutdown()
+
+	ticker := time.NewTicker(cr.closeTimeout)
+	select {
+	case <-chain.closed:
+	case <-ticker.C:
+		chain.Context().Log.Warn("timed out while shutting down")
+	}
+	ticker.Stop()
+
+	if cr.onFatal != nil && cr.criticalChains.Contains(chainID) {
+		go cr.onFatal(1)
+	}
+}
+
+func (cr *ChainRouter) clearRequest(
+	op message.Op,
+	nodeID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+) (ids.ID, *requestEntry) {
+	// Create the request ID of the request we sent that this message is (allegedly) in response to.
+	uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, op)
+
+	// Mark that an outstanding request has been fulfilled
+	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
+	if !exists {
+		return uniqueRequestID, nil
+	}
+
+	cr.timedRequests.Delete(uniqueRequestID)
+	cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
+
+	request := requestIntf.(requestEntry)
+	return uniqueRequestID, &request
+}
+
+// Assumes [cr.lock] is held.
+// Assumes [message.Op] is an alias of byte.
+func (cr *ChainRouter) createRequestID(nodeID ids.ShortID, chainID ids.ID, requestID uint32, op message.Op) ids.ID {
 	copy(cr.requestIDBytes, nodeID[:])
-	copy(cr.requestIDBytes[hashing.HashLen:], chainID[:])
-	binary.BigEndian.PutUint32(cr.requestIDBytes[2*hashing.HashLen:], requestID)
-	cr.requestIDBytes[2*hashing.HashLen+wrappers.IntLen] = byte(msgType)
+	copy(cr.requestIDBytes[hashing.AddrLen:], chainID[:])
+	binary.BigEndian.PutUint32(cr.requestIDBytes[hashing.AddrLen+hashing.HashLen:], requestID)
+	cr.requestIDBytes[hashing.AddrLen+hashing.HashLen+wrappers.IntLen] = byte(op)
 	return hashing.ComputeHash256Array(cr.requestIDBytes)
 }

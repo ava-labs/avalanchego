@@ -92,7 +92,7 @@ func (s *Sender) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, requestID uint32)
 		nodeIDs.Remove(s.ctx.NodeID)
 
 		// Tell the router to expect a reply message from this node
-		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.GetAcceptedFrontier)
+		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.AcceptedFrontier)
 
 		inMsg := s.msgCreator.InboundGetAcceptedFrontier(s.ctx.ChainID, requestID, deadline, s.ctx.NodeID)
 		go s.router.HandleInbound(inMsg)
@@ -116,7 +116,7 @@ func (s *Sender) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, requestID uint32)
 				requestID,
 			)
 		}
-		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.GetAcceptedFrontier)
+		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.AcceptedFrontier)
 	}
 }
 
@@ -162,7 +162,7 @@ func (s *Sender) SendGetAccepted(nodeIDs ids.ShortSet, requestID uint32, contain
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 
-		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.GetAccepted)
+		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.Accepted)
 
 		inMsg := s.msgCreator.InboundGetAccepted(s.ctx.ChainID, requestID, deadline, containerIDs, s.ctx.NodeID)
 		go s.router.HandleInbound(inMsg)
@@ -198,7 +198,7 @@ func (s *Sender) SendGetAccepted(nodeIDs ids.ShortSet, requestID uint32, contain
 				containerIDs,
 			)
 		}
-		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.GetAccepted)
+		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Accepted)
 	}
 }
 
@@ -280,7 +280,7 @@ func (s *Sender) SendGetAncestors(nodeID ids.ShortID, requestID uint32, containe
 	}
 
 	// Tell the router to expect a reply message from this node
-	s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.GetAncestors)
+	s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.MultiPut)
 }
 
 // SendMultiPut sends a MultiPut message to the consensus engine running on the specified chain
@@ -364,7 +364,7 @@ func (s *Sender) SendGet(nodeID ids.ShortID, requestID uint32, containerID ids.I
 	}
 
 	// Tell the router to expect a reply message from this node
-	s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Get)
+	s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Put)
 }
 
 // SendPut sends a Put message to the consensus engine running on the specified chain
@@ -428,7 +428,7 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 		nodeIDs.Remove(s.ctx.NodeID)
 
 		// Register a timeout in case I don't respond to myself
-		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.PushQuery)
+		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.Chits)
 
 		inMsg := s.msgCreator.InboundPushQuery(s.ctx.ChainID, requestID, deadline, containerID, container, s.ctx.NodeID)
 		go s.router.HandleInbound(inMsg)
@@ -468,7 +468,7 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 	for nodeID := range nodeIDs {
 		if sentTo.Contains(nodeID) {
 			// Tell the router to expect a reply message from this validator
-			s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.PushQuery)
+			s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Chits)
 			nodeIDs.Remove(nodeID)
 		} else {
 			s.ctx.Log.Debug(
@@ -511,7 +511,7 @@ func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, container
 		nodeIDs.Remove(s.ctx.NodeID)
 
 		// Register a timeout in case I don't respond to myself
-		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.PullQuery)
+		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.Chits)
 
 		inMsg := s.msgCreator.InboundPullQuery(s.ctx.ChainID, requestID, deadline, containerID, s.ctx.NodeID)
 		go s.router.HandleInbound(inMsg)
@@ -538,7 +538,7 @@ func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, container
 	for nodeID := range nodeIDs {
 		if sentTo.Contains(nodeID) {
 			// Tell the router to expect a reply message from this validator
-			s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.PullQuery)
+			s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Chits)
 			nodeIDs.Remove(nodeID)
 		} else {
 			s.ctx.Log.Debug(
@@ -620,7 +620,7 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 		nodeIDs.Remove(s.ctx.NodeID)
 
 		// Register a timeout in case I don't respond to myself
-		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.AppRequest)
+		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.AppResponse)
 
 		inMsg := s.msgCreator.InboundAppRequest(s.ctx.ChainID, requestID, deadline, appRequestBytes, s.ctx.NodeID)
 		go s.router.HandleInbound(inMsg)
@@ -659,7 +659,7 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 	for nodeID := range nodeIDs {
 		if sentTo.Contains(nodeID) {
 			// Tell the router to expect a reply message from this validator
-			s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.AppRequest)
+			s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.AppResponse)
 			nodeIDs.Remove(nodeID)
 		} else {
 			s.ctx.Log.Debug(

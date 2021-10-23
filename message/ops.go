@@ -64,22 +64,24 @@ var (
 		PullQuery,
 		AppRequest,
 	}
-	// List of all external message types
-	ExternalOps = append(ConsensusRequestOps,
-		GetVersion,
-		GetPeerList,
-		Ping,
-		Pong,
+	ConsensusResponseOps = []Op{
 		AcceptedFrontier,
 		Accepted,
 		MultiPut,
 		Put,
 		Chits,
+		AppResponse,
+	}
+	// List of all external message types
+	ExternalOps = append(ConsensusRequestOps, append(ConsensusResponseOps,
+		GetVersion,
+		GetPeerList,
+		Ping,
+		Pong,
 		PeerList,
 		Version,
-		AppResponse,
 		AppGossip,
-	)
+	)...)
 	// List of all internal message types
 	InternalOps = []Op{
 		GetAcceptedFrontierFailed,
@@ -94,14 +96,40 @@ var (
 		Notify,
 		GossipRequest,
 	}
-	RequestToFailedOps = map[Op]Op{
-		GetAcceptedFrontier: GetAcceptedFrontierFailed,
-		GetAccepted:         GetAcceptedFailed,
-		GetAncestors:        GetAncestorsFailed,
-		Get:                 GetFailed,
-		PushQuery:           QueryFailed,
-		PullQuery:           QueryFailed,
-		AppRequest:          AppRequestFailed,
+	RequestToResponseOps = map[Op]Op{
+		GetAcceptedFrontier: AcceptedFrontier,
+		GetAccepted:         Accepted,
+		GetAncestors:        MultiPut,
+		Get:                 Put,
+		PushQuery:           Chits,
+		PullQuery:           Chits,
+		AppRequest:          AppResponse,
+	}
+	ResponseToFailedOps = map[Op]Op{
+		AcceptedFrontier: GetAcceptedFrontierFailed,
+		Accepted:         GetAcceptedFailed,
+		MultiPut:         GetAncestorsFailed,
+		Put:              GetFailed,
+		Chits:            QueryFailed,
+		AppResponse:      AppRequestFailed,
+	}
+	FailedToResponseOps = map[Op]Op{
+		GetAcceptedFrontierFailed: AcceptedFrontier,
+		GetAcceptedFailed:         Accepted,
+		GetAncestorsFailed:        MultiPut,
+		GetFailed:                 Put,
+		QueryFailed:               Chits,
+		AppRequestFailed:          AppResponse,
+	}
+	UnrequestedOps = map[Op]struct{}{
+		GetAcceptedFrontier: {},
+		GetAccepted:         {},
+		GetAncestors:        {},
+		Get:                 {},
+		PushQuery:           {},
+		PullQuery:           {},
+		AppRequest:          {},
+		AppGossip:           {},
 	}
 
 	// Defines the messages that can be sent/received with this network

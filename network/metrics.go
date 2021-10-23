@@ -18,32 +18,32 @@ type messageMetrics struct {
 	savedReceivedBytes, savedSentBytes                        metric.Averager
 }
 
-func newMessageMetrics(msgType message.Op, namespace string, metrics prometheus.Registerer, errs *wrappers.Errs) *messageMetrics {
+func newMessageMetrics(op message.Op, namespace string, metrics prometheus.Registerer, errs *wrappers.Errs) *messageMetrics {
 	msg := &messageMetrics{
 		numSent: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
-			Name:      fmt.Sprintf("%s_sent", msgType),
-			Help:      fmt.Sprintf("Number of %s messages sent over the network", msgType),
+			Name:      fmt.Sprintf("%s_sent", op),
+			Help:      fmt.Sprintf("Number of %s messages sent over the network", op),
 		}),
 		numFailed: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
-			Name:      fmt.Sprintf("%s_failed", msgType),
-			Help:      fmt.Sprintf("Number of %s messages that failed to be sent over the network", msgType),
+			Name:      fmt.Sprintf("%s_failed", op),
+			Help:      fmt.Sprintf("Number of %s messages that failed to be sent over the network", op),
 		}),
 		numReceived: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
-			Name:      fmt.Sprintf("%s_received", msgType),
-			Help:      fmt.Sprintf("Number of %s messages received from the network", msgType),
+			Name:      fmt.Sprintf("%s_received", op),
+			Help:      fmt.Sprintf("Number of %s messages received from the network", op),
 		}),
 		receivedBytes: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
-			Name:      fmt.Sprintf("%s_received_bytes", msgType),
-			Help:      fmt.Sprintf("Number of bytes of %s messages received from the network", msgType),
+			Name:      fmt.Sprintf("%s_received_bytes", op),
+			Help:      fmt.Sprintf("Number of bytes of %s messages received from the network", op),
 		}),
 		sentBytes: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
-			Name:      fmt.Sprintf("%s_sent_bytes", msgType),
-			Help:      fmt.Sprintf("Size of bytes of %s messages received from the network", msgType),
+			Name:      fmt.Sprintf("%s_sent_bytes", op),
+			Help:      fmt.Sprintf("Size of bytes of %s messages received from the network", op),
 		}),
 	}
 	errs.Add(
@@ -54,18 +54,18 @@ func newMessageMetrics(msgType message.Op, namespace string, metrics prometheus.
 		metrics.Register(msg.sentBytes),
 	)
 
-	if msgType.Compressable() {
+	if op.Compressable() {
 		msg.savedReceivedBytes = metric.NewAveragerWithErrs(
 			namespace,
-			fmt.Sprintf("%s_compression_saved_received_bytes", msgType),
-			fmt.Sprintf("bytes saved (not received) due to compression of %s messages", msgType),
+			fmt.Sprintf("%s_compression_saved_received_bytes", op),
+			fmt.Sprintf("bytes saved (not received) due to compression of %s messages", op),
 			metrics,
 			errs,
 		)
 		msg.savedSentBytes = metric.NewAveragerWithErrs(
 			namespace,
-			fmt.Sprintf("%s_compression_saved_sent_bytes", msgType),
-			fmt.Sprintf("bytes saved (not sent) due to compression of %s messages", msgType),
+			fmt.Sprintf("%s_compression_saved_sent_bytes", op),
+			fmt.Sprintf("bytes saved (not sent) due to compression of %s messages", op),
 			metrics,
 			errs,
 		)

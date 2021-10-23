@@ -48,7 +48,7 @@ type ExternalRouter interface {
 		nodeID ids.ShortID,
 		chainID ids.ID,
 		requestID uint32,
-		msgType message.Op,
+		op message.Op,
 	)
 }
 
