@@ -82,7 +82,7 @@ func newChainMetrics(ctx *snow.Context, namespace string, summaryEnabled bool) (
 	errs := wrappers.Errs{}
 	for _, op := range message.ConsensusResponseOps {
 		cm.messageLatencies[op] = metric.NewAveragerWithErrs(
-			namespace,
+			queryLatencyNamespace,
 			op.String(),
 			defaultRequestHelpMsg,
 			ctx.Metrics,
