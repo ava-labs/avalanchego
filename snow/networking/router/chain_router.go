@@ -144,46 +144,34 @@ func (cr *ChainRouter) RegisterRequest(
 	nodeID ids.ShortID,
 	chainID ids.ID,
 	requestID uint32,
-	msgType message.Op,
+	op message.Op,
 ) {
 	cr.lock.Lock()
 	// When we receive a response message type (Chits, Put, Accepted, etc.)
 	// we validate that we actually sent the corresponding request.
 	// Give this request a unique ID so we can do that validation.
-	uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, msgType)
+	uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, op)
 	if cr.timedRequests.Len() == 0 {
 		cr.lastTimeNoOutstanding = cr.clock.Time()
 	}
 	// Add to the set of unfulfilled requests
 	cr.timedRequests.Put(uniqueRequestID, requestEntry{
 		time:    cr.clock.Time(),
-		msgType: msgType,
+		msgType: op,
 	})
 	cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
 	cr.lock.Unlock()
 
-	// Register a timeout to fire if we don't get a reply in time.
-	var inMsg message.InboundMessage
-	switch msgType {
-	case message.PullQuery, message.PushQuery:
-		inMsg = cr.msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, chainID, requestID)
-	case message.Get:
-		inMsg = cr.msgCreator.InternalFailedRequest(message.GetFailed, nodeID, chainID, requestID)
-	case message.GetAncestors:
-		inMsg = cr.msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, chainID, requestID)
-	case message.GetAccepted:
-		inMsg = cr.msgCreator.InternalFailedRequest(message.GetAcceptedFailed, nodeID, chainID, requestID)
-	case message.GetAcceptedFrontier:
-		inMsg = cr.msgCreator.InternalFailedRequest(message.GetAcceptedFrontierFailed, nodeID, chainID, requestID)
-	case message.AppRequest:
-		inMsg = cr.msgCreator.InternalFailedRequest(message.AppRequestFailed, nodeID, chainID, requestID)
-	default:
+	failedOp, exists := message.RequestToFailedOps[op]
+	if !exists {
 		// This should never happen
-		cr.log.Error("expected message type to be one of GetMsg, PullQueryMsg, PushQueryMsg, GetAcceptedFrontierMsg, GetAcceptedMsg, AppRequestMsg, but got %s", msgType)
+		cr.log.Error("failed to convert operation type: %s", op)
 		return
 	}
 
-	cr.timeoutManager.RegisterRequest(nodeID, chainID, msgType, uniqueRequestID, func() {
+	// Register a timeout to fire if we don't get a reply in time.
+	cr.timeoutManager.RegisterRequest(nodeID, chainID, op, uniqueRequestID, func() {
+		inMsg := cr.msgCreator.InternalFailedRequest(failedOp, nodeID, chainID, requestID)
 		cr.HandleInbound(inMsg)
 	})
 }

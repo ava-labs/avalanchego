@@ -94,6 +94,15 @@ var (
 		Notify,
 		GossipRequest,
 	}
+	RequestToFailedOps = map[Op]Op{
+		GetAcceptedFrontier: GetAcceptedFrontierFailed,
+		GetAccepted:         GetAcceptedFailed,
+		GetAncestors:        GetAncestorsFailed,
+		Get:                 GetFailed,
+		PushQuery:           QueryFailed,
+		PullQuery:           QueryFailed,
+		AppRequest:          AppRequestFailed,
+	}
 
 	// Defines the messages that can be sent/received with this network
 	messages = map[Op][]Field{
