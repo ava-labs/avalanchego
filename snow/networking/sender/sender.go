@@ -234,7 +234,16 @@ func (s *Sender) SendAccepted(nodeID ids.ShortID, requestID uint32, containerIDs
 }
 
 func (s *Sender) SendGetAncestors(nodeID ids.ShortID, requestID uint32, containerID ids.ID) {
-	s.ctx.Log.Verbo("Sending GetAncestors to node %s. RequestID: %d. ContainerID: %s", nodeID.PrefixedString(constants.NodeIDPrefix), requestID, containerID)
+	s.ctx.Log.Verbo(
+		"Sending GetAncestors to node %s. RequestID: %d. ContainerID: %s",
+		nodeID.PrefixedString(constants.NodeIDPrefix),
+		requestID,
+		containerID,
+	)
+
+	// Tell the router to expect a reply message from this node
+	s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.MultiPut)
+
 	// Sending a GetAncestors to myself will always fail
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, s.ctx.ChainID, requestID)
@@ -276,11 +285,7 @@ func (s *Sender) SendGetAncestors(nodeID ids.ShortID, requestID uint32, containe
 		s.timeouts.RegisterRequestToUnreachableValidator()
 		inMsg := s.msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, s.ctx.ChainID, requestID)
 		go s.router.HandleInbound(inMsg)
-		return
 	}
-
-	// Tell the router to expect a reply message from this node
-	s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.MultiPut)
 }
 
 // SendMultiPut sends a MultiPut message to the consensus engine running on the specified chain
@@ -323,6 +328,9 @@ func (s *Sender) SendGet(nodeID ids.ShortID, requestID uint32, containerID ids.I
 		containerID,
 	)
 
+	// Tell the router to expect a reply message from this node
+	s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Put)
+
 	// Sending a Get to myself will always fail
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InternalFailedRequest(message.GetFailed, nodeID, s.ctx.ChainID, requestID)
@@ -360,11 +368,7 @@ func (s *Sender) SendGet(nodeID ids.ShortID, requestID uint32, containerID ids.I
 		s.timeouts.RegisterRequestToUnreachableValidator()
 		inMsg := s.msgCreator.InternalFailedRequest(message.GetFailed, nodeID, s.ctx.ChainID, requestID)
 		go s.router.HandleInbound(inMsg)
-		return
 	}
-
-	// Tell the router to expect a reply message from this node
-	s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Put)
 }
 
 // SendPut sends a Put message to the consensus engine running on the specified chain
@@ -427,7 +431,6 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 
-		// Register a timeout in case I don't respond to myself
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.Chits)
 
 		inMsg := s.msgCreator.InboundPushQuery(s.ctx.ChainID, requestID, deadline, containerID, container, s.ctx.NodeID)
@@ -437,10 +440,13 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 	// Some of [nodeIDs] may be benched. That is, they've been unresponsive
 	// so we don't even bother sending messages to them. We just have them immediately fail.
 	for nodeID := range nodeIDs {
+		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Chits)
+
 		if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
 			s.failedDueToBench[message.PushQuery].Inc() // update metric
 			nodeIDs.Remove(nodeID)
 			s.timeouts.RegisterRequestToUnreachableValidator()
+
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
 			inMsg := s.msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, requestID)
 			go s.router.HandleInbound(inMsg)
@@ -466,11 +472,9 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 	}
 
 	for nodeID := range nodeIDs {
-		if sentTo.Contains(nodeID) {
-			// Tell the router to expect a reply message from this validator
-			s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Chits)
-			nodeIDs.Remove(nodeID)
-		} else {
+		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Chits)
+
+		if !sentTo.Contains(nodeID) {
 			s.ctx.Log.Debug(
 				"failed to send PushQuery(%s, %s, %d, %s)",
 				nodeID,
@@ -479,14 +483,12 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 				containerID,
 			)
 			s.ctx.Log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
-		}
-	}
 
-	// Register failures for nodes we didn't even send a request to.
-	for nodeID := range nodeIDs {
-		s.timeouts.RegisterRequestToUnreachableValidator()
-		inMsg := s.msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, requestID)
-		go s.router.HandleInbound(inMsg)
+			// Register failures for nodes we didn't send a request to.
+			s.timeouts.RegisterRequestToUnreachableValidator()
+			inMsg := s.msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, requestID)
+			go s.router.HandleInbound(inMsg)
+		}
 	}
 }
 
@@ -520,6 +522,8 @@ func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, container
 	// Some of the nodes in [nodeIDs] may be benched. That is, they've been unresponsive
 	// so we don't even bother sending messages to them. We just have them immediately fail.
 	for nodeID := range nodeIDs {
+		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Chits)
+
 		if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
 			s.failedDueToBench[message.PullQuery].Inc() // update metric
 			nodeIDs.Remove(nodeID)
@@ -536,11 +540,7 @@ func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, container
 	sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
 
 	for nodeID := range nodeIDs {
-		if sentTo.Contains(nodeID) {
-			// Tell the router to expect a reply message from this validator
-			s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Chits)
-			nodeIDs.Remove(nodeID)
-		} else {
+		if !sentTo.Contains(nodeID) {
 			s.ctx.Log.Debug(
 				"failed to send PullQuery(%s, %s, %d, %s)",
 				nodeID,
@@ -548,14 +548,12 @@ func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, container
 				requestID,
 				containerID,
 			)
-		}
-	}
 
-	// Register failures for nodes we didn't even send a request to.
-	for nodeID := range nodeIDs {
-		s.timeouts.RegisterRequestToUnreachableValidator()
-		inMsg := s.msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, requestID)
-		go s.router.HandleInbound(inMsg)
+			// Register failures for nodes we didn't send a request to.
+			s.timeouts.RegisterRequestToUnreachableValidator()
+			inMsg := s.msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, requestID)
+			go s.router.HandleInbound(inMsg)
+		}
 	}
 }
 
@@ -629,6 +627,8 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 	// Some of the nodes in [nodeIDs] may be benched. That is, they've been unresponsive
 	// so we don't even bother sending messages to them. We just have them immediately fail.
 	for nodeID := range nodeIDs {
+		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.AppResponse)
+
 		if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
 			s.failedDueToBench[message.AppRequest].Inc() // update metric
 			nodeIDs.Remove(nodeID)
@@ -657,11 +657,7 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 	}
 
 	for nodeID := range nodeIDs {
-		if sentTo.Contains(nodeID) {
-			// Tell the router to expect a reply message from this validator
-			s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.AppResponse)
-			nodeIDs.Remove(nodeID)
-		} else {
+		if !sentTo.Contains(nodeID) {
 			s.ctx.Log.Debug(
 				"failed to send AppRequest(%s, %s, %d)",
 				nodeID,
@@ -669,14 +665,12 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 				requestID,
 			)
 			s.ctx.Log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appRequestBytes})
-		}
-	}
 
-	// Register failures for nodes we didn't even send a request to.
-	for nodeID := range nodeIDs {
-		s.timeouts.RegisterRequestToUnreachableValidator()
-		inMsg := s.msgCreator.InternalFailedRequest(message.AppRequestFailed, nodeID, s.ctx.ChainID, requestID)
-		go s.router.HandleInbound(inMsg)
+			// Register failures for nodes we didn't send a request to.
+			s.timeouts.RegisterRequestToUnreachableValidator()
+			inMsg := s.msgCreator.InternalFailedRequest(message.AppRequestFailed, nodeID, s.ctx.ChainID, requestID)
+			go s.router.HandleInbound(inMsg)
+		}
 	}
 	return nil
 }

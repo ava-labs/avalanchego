@@ -10,13 +10,7 @@ import (
 var _ InboundMsgBuilder = &inMsgBuilder{}
 
 type InboundMsgBuilder interface {
-	SetTime(t time.Time) // useful in UTs
-
-	Parse(
-		bytes []byte,
-		nodeID ids.ShortID,
-		onFinishedHandling func(),
-	) (InboundMessage, error)
+	Parser
 
 	InboundGetAcceptedFrontier(
 		chainID ids.ID,
@@ -111,18 +105,19 @@ type InboundMsgBuilder interface {
 }
 
 type inMsgBuilder struct {
-	c     Codec
+	Codec
 	clock mockable.Clock
 }
 
 func NewInboundBuilder(c Codec) InboundMsgBuilder {
 	return &inMsgBuilder{
-		c: c,
+		Codec: c,
 	}
 }
 
 func (b *inMsgBuilder) SetTime(t time.Time) {
 	b.clock.Set(t)
+	b.Codec.SetTime(t)
 }
 
 func (b *inMsgBuilder) InboundGetAcceptedFrontier(
@@ -361,10 +356,6 @@ func (b *inMsgBuilder) InboundMultiPut(
 		},
 		nodeID: nodeID,
 	}
-}
-
-func (b *inMsgBuilder) Parse(bytes []byte, nodeID ids.ShortID, onFinishedHandling func()) (InboundMessage, error) {
-	return b.c.Parse(bytes, nodeID, onFinishedHandling)
 }
 
 func encodeContainerIDs(containerIDs []ids.ID, result [][]byte) {

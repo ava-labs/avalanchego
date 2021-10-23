@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/metric"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -26,14 +27,22 @@ var (
 	_ Codec = &codec{}
 )
 
-type Codec interface {
+type Packer interface {
 	Pack(
 		op Op,
 		fieldValues map[Field]interface{},
 		compress bool,
 	) (OutboundMessage, error)
+}
 
+type Parser interface {
+	SetTime(t time.Time) // useful in UTs
 	Parse(bytes []byte, nodeID ids.ShortID, onFinishedHandling func()) (InboundMessage, error)
+}
+
+type Codec interface {
+	Packer
+	Parser
 }
 
 // codec defines the serialization and deserialization of network messages.
@@ -42,6 +51,8 @@ type codec struct {
 	// Contains []byte. Used as an optimization.
 	// Can be accessed by multiple goroutines concurrently.
 	byteSlicePool sync.Pool
+
+	clock mockable.Clock
 
 	compressTimeMetrics   map[Op]metric.Averager
 	decompressTimeMetrics map[Op]metric.Averager
@@ -82,6 +93,10 @@ func NewCodecWithMemoryPool(namespace string, metrics prometheus.Registerer, max
 		)
 	}
 	return c, errs.Err
+}
+
+func (c *codec) SetTime(t time.Time) {
+	c.clock.Set(t)
 }
 
 // Pack attempts to pack a map of fields into a message.
@@ -207,11 +222,17 @@ func (c *codec) Parse(bytes []byte, nodeID ids.ShortID, onFinishedHandling func(
 		return nil, fmt.Errorf("expected length %d but got %d", len(p.Bytes), p.Offset)
 	}
 
+	var expirationTime time.Time
+	if deadline, hasDeadline := fieldValues[Deadline]; hasDeadline {
+		expirationTime = c.clock.Time().Add(time.Duration(deadline.(uint64)))
+	}
+
 	return &inboundMessage{
 		op:                    op,
 		fields:                fieldValues,
 		bytesSavedCompression: bytesSaved,
 		nodeID:                nodeID,
+		expirationTime:        expirationTime,
 		onFinishedHandling:    onFinishedHandling,
 	}, p.Err
 }

@@ -279,12 +279,12 @@ func TestRouterTimeout(t *testing.T) {
 
 	// Register requests for each request type
 	msgs := []message.Op{
-		message.Get,
-		message.GetAncestors,
-		message.PullQuery,
-		message.PushQuery,
-		message.GetAccepted,
-		message.GetAcceptedFrontier,
+		message.Put,
+		message.MultiPut,
+		message.Chits,
+		message.Chits,
+		message.Accepted,
+		message.AcceptedFrontier,
 	}
 
 	wg.Add(len(msgs))
@@ -294,6 +294,7 @@ func TestRouterTimeout(t *testing.T) {
 	}
 
 	wg.Wait()
+
 	chainRouter.lock.Lock()
 	defer chainRouter.lock.Unlock()
 	assert.True(t, calledGetFailed && calledGetAncestorsFailed && calledQueryFailed2 && calledGetAcceptedFailed && calledGetAcceptedFrontierFailed)
@@ -353,18 +354,17 @@ func TestRouterClearTimeouts(t *testing.T) {
 	go handler.Dispatch()
 
 	// Register requests for each request type
-	msgs := []message.Op{
-		message.Get,
-		message.GetAncestors,
-		message.PullQuery,
-		message.PushQuery,
-		message.GetAccepted,
-		message.GetAcceptedFrontier,
+	ops := []message.Op{
+		message.Put,
+		message.MultiPut,
+		message.Chits,
+		message.Accepted,
+		message.AcceptedFrontier,
 	}
 
 	vID := ids.GenerateTestShortID()
-	for i, msg := range msgs {
-		chainRouter.RegisterRequest(vID, handler.ctx.ChainID, uint32(i), msg)
+	for i, op := range ops {
+		chainRouter.RegisterRequest(vID, handler.ctx.ChainID, uint32(i), op)
 	}
 
 	// Clear each timeout by simulating responses to the queries
@@ -379,20 +379,16 @@ func TestRouterClearTimeouts(t *testing.T) {
 	inMsg = mc.InboundMultiPut(handler.ctx.ChainID, 1, nil, vID)
 	chainRouter.HandleInbound(inMsg)
 
-	// Chits # 1
+	// Chits
 	inMsg = mc.InboundChits(handler.ctx.ChainID, 2, nil, vID)
 	chainRouter.HandleInbound(inMsg)
 
-	// Chits # 2
-	inMsg = mc.InboundChits(handler.ctx.ChainID, 3, nil, vID)
-	chainRouter.HandleInbound(inMsg)
-
 	// Accepted
-	inMsg = mc.InboundAccepted(handler.ctx.ChainID, 4, nil, vID)
+	inMsg = mc.InboundAccepted(handler.ctx.ChainID, 3, nil, vID)
 	chainRouter.HandleInbound(inMsg)
 
 	// Accepted Frontier
-	inMsg = mc.InboundAcceptedFrontier(handler.ctx.ChainID, 5, nil, vID)
+	inMsg = mc.InboundAcceptedFrontier(handler.ctx.ChainID, 4, nil, vID)
 	chainRouter.HandleInbound(inMsg)
 
 	assert.Equal(t, chainRouter.timedRequests.Len(), 0)
