@@ -141,20 +141,16 @@ func (h *Handler) Dispatch() {
 // IsPeriodic returns true if this message is of a type that is sent on a
 // periodic basis.
 func isPeriodic(inMsg message.InboundMessage) bool {
-	var reqID uint32
-	if inMsg.Op() == message.AppGossip {
-		reqID = constants.GossipMsgRequestID
-	} else {
-		reqIDInf := inMsg.Get(message.RequestID)
-		if reqIDInf == nil {
-			return false
-		}
-
-		reqID = reqIDInf.(uint32)
+	op := inMsg.Op()
+	if op == message.AppGossip || op == message.GossipRequest {
+		return true
+	}
+	if op != message.Put {
+		return false
 	}
 
-	return reqID == constants.GossipMsgRequestID ||
-		inMsg.Op() == message.GossipRequest
+	reqID := inMsg.Get(message.RequestID).(uint32)
+	return reqID == constants.GossipMsgRequestID
 }
 
 // Dispatch a message to the consensus engine.
