@@ -50,3 +50,16 @@ func (s *Server) SendAppGossip(_ context.Context, req *appsenderproto.SendAppGos
 	err := s.appSender.SendAppGossip(req.Msg)
 	return &emptypb.Empty{}, err
 }
+
+func (s *Server) SendAppGossipSpecific(_ context.Context, req *appsenderproto.SendAppGossipSpecificMsg) (*emptypb.Empty, error) {
+	nodeIDs := ids.NewShortSet(len(req.NodeIDs))
+	for _, nodeIDBytes := range req.NodeIDs {
+		nodeID, err := ids.ToShortID(nodeIDBytes)
+		if err != nil {
+			return nil, err
+		}
+		nodeIDs.Add(nodeID)
+	}
+	err := s.appSender.SendAppGossipSpecific(nodeIDs, req.Msg)
+	return &emptypb.Empty{}, err
+}

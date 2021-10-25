@@ -51,3 +51,9 @@ func (c *Client) IsAccepted(args *GetIndexArgs) (bool, error) {
 	err := c.SendRequest("isAccepted", args, &response)
 	return response, err
 }
+
+func (c *Client) GetContainerByID(args *GetIndexArgs) (FormattedContainer, error) {
+	var response FormattedContainer
+	err := c.SendRequest("getContainerByID", args, &response)
+	return response, err
+}

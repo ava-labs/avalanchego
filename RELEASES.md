@@ -17,6 +17,10 @@ This version is backwards compatible to [v1.6.0](https://github.com/ava-labs/ava
 - Combined `avalanche_{ChainID}_lat_pull_query_{count,sum}` and `avalanche_{ChainID}_lat_push_query_{count,sum}` to `avalanche_{ChainID}_lat_chits_{count,sum}`.
 - Added `avalanche_{ChainID}_app_response_{count,sum}`.
 
+### Indexer
+
+- Added method `GetContainerByID` to client implementation.
+
 ### Subnet & Custom VMs
 
 - Ensured that all possible chains are run in `--staking-enabled=false` networks.
