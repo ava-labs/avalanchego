@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -47,7 +47,7 @@ func (cr *codecRegistry) RegisterType(val interface{}) error {
 func NewCodecs(fxs []Fx) (codec.Manager, codec.Manager, error) {
 	return newCustomCodecs(
 		make(map[reflect.Type]int),
-		&timer.Clock{},
+		&mockable.Clock{},
 		logging.NoLog{},
 		fxs,
 	)
@@ -55,7 +55,7 @@ func NewCodecs(fxs []Fx) (codec.Manager, codec.Manager, error) {
 
 func newCustomCodecs(
 	typeToFxIndex map[reflect.Type]int,
-	clock *timer.Clock,
+	clock *mockable.Clock,
 	log logging.Logger,
 	fxs []Fx,
 ) (codec.Manager, codec.Manager, error) {
@@ -106,11 +106,11 @@ func newCustomCodecs(
 type fxVM struct {
 	typeToFxIndex map[reflect.Type]int
 
-	clock         *timer.Clock
+	clock         *mockable.Clock
 	log           logging.Logger
 	codecRegistry codec.Registry
 }
 
-func (vm *fxVM) Clock() *timer.Clock           { return vm.clock }
+func (vm *fxVM) Clock() *mockable.Clock        { return vm.clock }
 func (vm *fxVM) CodecRegistry() codec.Registry { return vm.codecRegistry }
 func (vm *fxVM) Logger() logging.Logger        { return vm.log }

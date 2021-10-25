@@ -7,6 +7,8 @@ import (
 	"container/list"
 	"sync"
 	"time"
+
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 var _ Meter = &TimedMeter{}
@@ -15,7 +17,7 @@ var _ Meter = &TimedMeter{}
 type TimedMeter struct {
 	lock sync.Mutex
 	// Can be used to fake time in tests
-	Clock *Clock
+	Clock *mockable.Clock
 	// Amount of time to keep a tick
 	Duration time.Duration
 	// TODO: Currently this list has an entry for each tick... This isn't really
@@ -45,7 +47,7 @@ func (tm *TimedMeter) init() {
 		tm.tickList = list.New()
 	}
 	if tm.Clock == nil {
-		tm.Clock = &Clock{}
+		tm.Clock = &mockable.Clock{}
 	}
 }
 

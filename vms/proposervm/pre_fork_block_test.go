@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
@@ -42,7 +42,7 @@ func TestOracle_PreForkBlkImplementsInterface(t *testing.T) {
 }
 
 func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, timer.MaxTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0)
 
 	// create pre fork oracle block ...
 	oracleCoreBlk := &TestOptionsBlock{
@@ -492,7 +492,7 @@ func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
 
 func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 	// setup
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, timer.MaxTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0)
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -549,7 +549,7 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 
 // ProposerBlock.Reject tests section
 func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, timer.MaxTime, 0) // disable ProBlks
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(111),

@@ -12,12 +12,12 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
@@ -46,7 +46,11 @@ func TestShutdown(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	metrics := prometheus.NewRegistry()
+	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	assert.NoError(t, err)
+
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Hour, time.Second, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}
@@ -59,6 +63,7 @@ func TestShutdown(t *testing.T) {
 
 	handler := &Handler{}
 	err = handler.Initialize(
+		mc,
 		&engine,
 		vdrs,
 		nil,
@@ -88,11 +93,13 @@ func TestShutdown(t *testing.T) {
 }
 
 func TestShutdownTimesOut(t *testing.T) {
+	nodeID := ids.ShortEmpty
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
 	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
+	metrics := prometheus.NewRegistry()
 	// Ensure that the MultiPut request does not timeout
 	err = tm.Initialize(
 		&timer.AdaptiveTimeoutConfig{
@@ -104,7 +111,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		},
 		benchlist,
 		"",
-		prometheus.NewRegistry(),
+		metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -112,7 +119,22 @@ func TestShutdownTimesOut(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+
+	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	assert.NoError(t, err)
+
+	err = chainRouter.Initialize(ids.ShortEmpty,
+		logging.NoLog{},
+		mc,
+		&tm,
+		time.Hour,
+		time.Millisecond,
+		ids.Set{},
+		nil,
+		HealthConfig{},
+		"",
+		metrics,
+	)
 	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}
@@ -134,11 +156,12 @@ func TestShutdownTimesOut(t *testing.T) {
 
 	handler := &Handler{}
 	err = handler.Initialize(
+		mc,
 		&engine,
 		vdrs,
 		nil,
 		"",
-		prometheus.NewRegistry(),
+		metrics,
 	)
 	assert.NoError(t, err)
 
@@ -149,7 +172,10 @@ func TestShutdownTimesOut(t *testing.T) {
 	shutdownFinished := make(chan struct{}, 1)
 
 	go func() {
-		handler.MultiPut(ids.ShortID{}, 1, nil, func() {})
+		chainID := ids.ID{}
+		msg := mc.InboundMultiPut(chainID, 1, nil, nodeID)
+		handler.Push(msg)
+
 		time.Sleep(50 * time.Millisecond) // Pause to ensure message gets processed
 
 		chainRouter.Shutdown()
@@ -187,7 +213,11 @@ func TestRouterTimeout(t *testing.T) {
 
 	// Create a router
 	chainRouter := ChainRouter{}
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	metrics := prometheus.NewRegistry()
+	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	assert.NoError(t, err)
+
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Hour, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	// Create an engine and handler
@@ -235,6 +265,7 @@ func TestRouterTimeout(t *testing.T) {
 	err = vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
 	err = handler.Initialize(
+		mc,
 		&engine,
 		vdrs,
 		nil,
@@ -247,13 +278,13 @@ func TestRouterTimeout(t *testing.T) {
 	go handler.Dispatch()
 
 	// Register requests for each request type
-	msgs := []constants.MsgType{
-		constants.GetMsg,
-		constants.GetAncestorsMsg,
-		constants.PullQueryMsg,
-		constants.PushQueryMsg,
-		constants.GetAcceptedMsg,
-		constants.GetAcceptedFrontierMsg,
+	msgs := []message.Op{
+		message.Put,
+		message.MultiPut,
+		message.Chits,
+		message.Chits,
+		message.Accepted,
+		message.AcceptedFrontier,
 	}
 
 	wg.Add(len(msgs))
@@ -263,6 +294,7 @@ func TestRouterTimeout(t *testing.T) {
 	}
 
 	wg.Wait()
+
 	chainRouter.lock.Lock()
 	defer chainRouter.lock.Unlock()
 	assert.True(t, calledGetFailed && calledGetAncestorsFailed && calledQueryFailed2 && calledGetAcceptedFailed && calledGetAcceptedFrontierFailed)
@@ -290,7 +322,12 @@ func TestRouterClearTimeouts(t *testing.T) {
 
 	// Create a router
 	chainRouter := ChainRouter{}
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	metrics := prometheus.NewRegistry()
+	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	assert.NoError(t, err)
+
+	assert.NoError(t, err)
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Hour, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	// Create an engine and handler
@@ -304,11 +341,12 @@ func TestRouterClearTimeouts(t *testing.T) {
 	assert.NoError(t, err)
 	handler := &Handler{}
 	err = handler.Initialize(
+		mc,
 		&engine,
 		vdrs,
 		nil,
 		"",
-		prometheus.NewRegistry(),
+		metrics,
 	)
 	assert.NoError(t, err)
 
@@ -316,28 +354,42 @@ func TestRouterClearTimeouts(t *testing.T) {
 	go handler.Dispatch()
 
 	// Register requests for each request type
-	msgs := []constants.MsgType{
-		constants.GetMsg,
-		constants.GetAncestorsMsg,
-		constants.PullQueryMsg,
-		constants.PushQueryMsg,
-		constants.GetAcceptedMsg,
-		constants.GetAcceptedFrontierMsg,
+	ops := []message.Op{
+		message.Put,
+		message.MultiPut,
+		message.Chits,
+		message.Accepted,
+		message.AcceptedFrontier,
 	}
 
 	vID := ids.GenerateTestShortID()
-	for i, msg := range msgs {
-		chainRouter.RegisterRequest(vID, handler.ctx.ChainID, uint32(i), msg)
+	for i, op := range ops {
+		chainRouter.RegisterRequest(vID, handler.ctx.ChainID, uint32(i), op)
 	}
 
 	// Clear each timeout by simulating responses to the queries
 	// Note: Depends on the ordering of [msgs]
-	chainRouter.Put(vID, handler.ctx.ChainID, 0, ids.GenerateTestID(), nil, nil)
-	chainRouter.MultiPut(vID, handler.ctx.ChainID, 1, nil, nil)
-	chainRouter.Chits(vID, handler.ctx.ChainID, 2, nil, nil)
-	chainRouter.Chits(vID, handler.ctx.ChainID, 3, nil, nil)
-	chainRouter.Accepted(vID, handler.ctx.ChainID, 4, nil, nil)
-	chainRouter.AcceptedFrontier(vID, handler.ctx.ChainID, 5, nil, nil)
+	var inMsg message.InboundMessage
+
+	// Put
+	inMsg = mc.InboundPut(handler.ctx.ChainID, 0, ids.GenerateTestID(), nil, vID)
+	chainRouter.HandleInbound(inMsg)
+
+	// MultiPut
+	inMsg = mc.InboundMultiPut(handler.ctx.ChainID, 1, nil, vID)
+	chainRouter.HandleInbound(inMsg)
+
+	// Chits
+	inMsg = mc.InboundChits(handler.ctx.ChainID, 2, nil, vID)
+	chainRouter.HandleInbound(inMsg)
+
+	// Accepted
+	inMsg = mc.InboundAccepted(handler.ctx.ChainID, 3, nil, vID)
+	chainRouter.HandleInbound(inMsg)
+
+	// Accepted Frontier
+	inMsg = mc.InboundAcceptedFrontier(handler.ctx.ChainID, 4, nil, vID)
+	chainRouter.HandleInbound(inMsg)
 
 	assert.Equal(t, chainRouter.timedRequests.Len(), 0)
 }
@@ -365,7 +417,11 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 
 	// Create a router
 	chainRouter := ChainRouter{}
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	metrics := prometheus.NewRegistry()
+	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	assert.NoError(t, err)
+
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Hour, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	// Create an engine and handler
@@ -394,11 +450,12 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	err = vdrs.AddWeight(vID, 1)
 	assert.NoError(t, err)
 	err = handler.Initialize(
+		mc,
 		&engine,
 		vdrs,
 		nil,
 		"",
-		prometheus.NewRegistry(),
+		metrics,
 	)
 	assert.NoError(t, err)
 
@@ -409,29 +466,43 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	nID := ids.GenerateTestShortID()
 
 	*calledF = false
-	timeout := chainRouter.clock.Time().Add(time.Hour)
-	chainRouter.PullQuery(nID, handler.ctx.ChainID, uint32(1), timeout, ids.GenerateTestID(), func() {})
-	// should not be called
-	assert.False(t, *calledF)
+	var inMsg message.InboundMessage
+
+	inMsg = mc.InboundPullQuery(handler.ctx.ChainID, uint32(1),
+		time.Hour,
+		ids.GenerateTestID(),
+		nID,
+	)
+	chainRouter.HandleInbound(inMsg)
+	assert.False(t, *calledF) // should not be called
 
 	// validator case
 	*calledF = false
 	wg.Add(1)
-	chainRouter.PullQuery(vID, handler.ctx.ChainID, uint32(2), timeout, ids.GenerateTestID(), func() {})
+	inMsg = mc.InboundPullQuery(handler.ctx.ChainID,
+		uint32(2),
+		time.Hour,
+		ids.GenerateTestID(),
+		vID,
+	)
+	chainRouter.HandleInbound(inMsg)
+
 	wg.Wait()
 	// should be called since this is a validator request
 	assert.True(t, *calledF)
 
 	// register a validator request
 	reqID := uint32(3)
-	chainRouter.RegisterRequest(vID, handler.ctx.ChainID, reqID, constants.GetMsg)
+	chainRouter.RegisterRequest(vID, handler.ctx.ChainID, reqID, message.Get)
 	assert.Equal(t, 1, chainRouter.timedRequests.Len())
+
 	// remove it from validators
 	err = handler.validators.Set(validators.NewSet().List())
 	assert.NoError(t, err)
-	calledFinished := false
-	chainRouter.Put(vID, handler.ctx.ChainID, reqID, ids.GenerateTestID(), nil, func() { calledFinished = true })
-	assert.True(t, calledFinished)
+
+	inMsg = mc.InboundPut(handler.ctx.ChainID, reqID, ids.GenerateTestID(), nil, nID)
+	chainRouter.HandleInbound(inMsg)
+
 	// shouldn't clear out timed request, as the request should be cleared when
 	// the GetFailed message is sent
 	assert.Equal(t, 1, chainRouter.timedRequests.Len())

@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 var _ TestManager = &manager{}
@@ -40,7 +40,7 @@ type TestManager interface {
 
 type manager struct {
 	// Used to get time. Useful for faking time during tests.
-	clock timer.Clock
+	clock mockable.Clock
 
 	state           State
 	connections     map[ids.ShortID]time.Time

@@ -7,7 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 var (
@@ -21,7 +21,7 @@ var (
 type Database struct {
 	metrics
 	db    database.Database
-	clock timer.Clock
+	clock mockable.Clock
 }
 
 // New returns a new database with added metrics

@@ -13,20 +13,21 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var errNonPositiveHalflife = errors.New("timeout halflife must be positive")
 
 type adaptiveTimeout struct {
-	index    int               // Index in the wait queue
-	id       ids.ID            // Unique ID of this timeout
-	handler  func()            // Function to execute if timed out
-	duration time.Duration     // How long this timeout was set for
-	deadline time.Time         // When this timeout should be fired
-	msgType  constants.MsgType // Type of this outstanding request
+	index    int           // Index in the wait queue
+	id       ids.ID        // Unique ID of this timeout
+	handler  func()        // Function to execute if timed out
+	duration time.Duration // How long this timeout was set for
+	deadline time.Time     // When this timeout should be fired
+	op       message.Op    // Type of this outstanding request
 }
 
 // A timeoutQueue implements heap.Interface and holds adaptiveTimeouts.
@@ -74,7 +75,7 @@ type AdaptiveTimeoutConfig struct {
 type AdaptiveTimeoutManager struct {
 	lock sync.Mutex
 	// Tells the time. Can be faked for testing.
-	clock                            Clock
+	clock                            mockable.Clock
 	networkTimeoutMetric, avgLatency prometheus.Gauge
 	numTimeouts                      prometheus.Counter
 	// Averages the response time from all peers
@@ -153,14 +154,14 @@ func (tm *AdaptiveTimeoutManager) Stop() { tm.timer.Stop() }
 // Put registers a timeout for [id]. If the timeout occurs, [timeoutHandler] is called.
 // Returns the time at which the timeout will fire if it is not first
 // removed by calling [tm.Remove].
-func (tm *AdaptiveTimeoutManager) Put(id ids.ID, msgType constants.MsgType, timeoutHandler func()) time.Time {
+func (tm *AdaptiveTimeoutManager) Put(id ids.ID, op message.Op, timeoutHandler func()) time.Time {
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
-	return tm.put(id, msgType, timeoutHandler)
+	return tm.put(id, op, timeoutHandler)
 }
 
 // Assumes [tm.lock] is held
-func (tm *AdaptiveTimeoutManager) put(id ids.ID, msgType constants.MsgType, handler func()) time.Time {
+func (tm *AdaptiveTimeoutManager) put(id ids.ID, op message.Op, handler func()) time.Time {
 	currentTime := tm.clock.Time()
 	tm.remove(id, currentTime)
 
@@ -169,7 +170,7 @@ func (tm *AdaptiveTimeoutManager) put(id ids.ID, msgType constants.MsgType, hand
 		handler:  handler,
 		duration: tm.currentTimeout,
 		deadline: currentTime.Add(tm.currentTimeout),
-		msgType:  msgType,
+		op:       op,
 	}
 	tm.timeoutMap[id] = timeout
 	heap.Push(&tm.timeoutQueue, timeout)
@@ -197,7 +198,7 @@ func (tm *AdaptiveTimeoutManager) remove(id ids.ID, now time.Time) {
 	// Don't include Get requests in calculation, since an adversary
 	// can cause you to issue a Get request and then cause it to timeout,
 	// increasing your timeout.
-	if timeout.msgType != constants.GetMsg {
+	if timeout.op != message.Get {
 		timeoutRegisteredAt := timeout.deadline.Add(-1 * timeout.duration)
 		latency := now.Sub(timeoutRegisteredAt)
 		tm.observeLatencyAndUpdateTimeout(latency, now)
