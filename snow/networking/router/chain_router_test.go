@@ -174,7 +174,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	go func() {
 		chainID := ids.ID{}
 		msg := mc.InboundMultiPut(chainID, 1, nil, nodeID)
-		handler.push(msg)
+		handler.Push(msg)
 
 		time.Sleep(50 * time.Millisecond) // Pause to ensure message gets processed
 

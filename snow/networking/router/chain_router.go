@@ -201,7 +201,7 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	}
 
 	if _, notRequested := message.UnrequestedOps[op]; notRequested || (op == message.Put && requestID == constants.GossipMsgRequestID) {
-		chain.push(msg)
+		chain.Push(msg)
 		return
 	}
 
@@ -216,7 +216,7 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 		}
 
 		// Pass the failure to the chain
-		chain.push(msg)
+		chain.Push(msg)
 		return
 	}
 
@@ -234,7 +234,7 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, req.op, latency)
 
 	// Pass the response to the chain
-	chain.push(msg)
+	chain.Push(msg)
 }
 
 // Shutdown shuts down this router
@@ -281,7 +281,8 @@ func (cr *ChainRouter) AddChain(chain *Handler) {
 	for validatorID := range cr.peers {
 		// If this validator is benched on any chain, treat them as disconnected on all chains
 		if _, benched := cr.benched[validatorID]; !benched {
-			chain.Connected(validatorID)
+			msg := cr.msgCreator.InternalConnected(validatorID)
+			chain.Push(msg)
 		}
 	}
 }
@@ -297,10 +298,12 @@ func (cr *ChainRouter) Connected(validatorID ids.ShortID) {
 		return
 	}
 
+	msg := cr.msgCreator.InternalConnected(validatorID)
+
 	// TODO: fire up an event when validator state changes i.e when they leave set, disconnect.
 	// we cannot put a subnet-only validator check here since Disconnected would not be handled properly.
 	for _, chain := range cr.chains {
-		chain.Connected(validatorID)
+		chain.Push(msg)
 	}
 }
 
@@ -314,10 +317,12 @@ func (cr *ChainRouter) Disconnected(validatorID ids.ShortID) {
 		return
 	}
 
+	msg := cr.msgCreator.InternalDisconnected(validatorID)
+
 	// TODO: fire up an event when validator state changes i.e when they leave set, disconnect.
 	// we cannot put a subnet-only validator check here since if a validator connects then it leaves validator-set, it would not be disconnected properly.
 	for _, chain := range cr.chains {
-		chain.Disconnected(validatorID)
+		chain.Push(msg)
 	}
 }
 
@@ -334,8 +339,10 @@ func (cr *ChainRouter) Benched(chainID ids.ID, validatorID ids.ShortID) {
 		return
 	}
 
+	msg := cr.msgCreator.InternalDisconnected(validatorID)
+
 	for _, chain := range cr.chains {
-		chain.Disconnected(validatorID)
+		chain.Push(msg)
 	}
 }
 
@@ -357,8 +364,10 @@ func (cr *ChainRouter) Unbenched(chainID ids.ID, validatorID ids.ShortID) {
 		return
 	}
 
+	msg := cr.msgCreator.InternalConnected(validatorID)
+
 	for _, chain := range cr.chains {
-		chain.Connected(validatorID)
+		chain.Push(msg)
 	}
 }
 

@@ -88,6 +88,21 @@ func (h *Handler) Engine() common.Engine { return h.engine }
 // SetEngine sets the engine for this handler to dispatch to
 func (h *Handler) SetEngine(engine common.Engine) { h.engine = engine }
 
+// Push the message onto the handler's queue
+func (h *Handler) Push(msg message.InboundMessage) {
+	nodeID := msg.NodeID()
+	if nodeID == ids.ShortEmpty {
+		// This should never happen
+		h.ctx.Log.Warn("message does not have node ID of sender. Message: %s", msg)
+	}
+
+	h.unprocessedMsgsCond.L.Lock()
+	defer h.unprocessedMsgsCond.L.Unlock()
+
+	h.unprocessedMsgs.Push(msg)
+	h.unprocessedMsgsCond.Signal()
+}
+
 // Dispatch waits for incoming messages from the router
 // and, when they arrive, sends them to the consensus engine
 func (h *Handler) Dispatch() {
@@ -378,20 +393,8 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 
 // Timeout passes a new timeout notification to the consensus engine
 func (h *Handler) Timeout() {
-	inMsg := h.mc.InternalTimeout(h.ctx.NodeID)
-	h.push(inMsg)
-}
-
-// Connected passes a new connection notification to the consensus engine
-func (h *Handler) Connected(nodeID ids.ShortID) {
-	inMsg := h.mc.InternalConnected(nodeID)
-	h.push(inMsg)
-}
-
-// Disconnected passes a new connection notification to the consensus engine
-func (h *Handler) Disconnected(nodeID ids.ShortID) {
-	inMsg := h.mc.InternalDisconnected(nodeID)
-	h.push(inMsg)
+	msg := h.mc.InternalTimeout(h.ctx.NodeID)
+	h.Push(msg)
 }
 
 // Gossip passes a gossip request to the consensus engine
@@ -402,7 +405,7 @@ func (h *Handler) Gossip() {
 	}
 
 	inMsg := h.mc.InternalGossipRequest(h.ctx.NodeID)
-	h.push(inMsg)
+	h.Push(inMsg)
 }
 
 // StartShutdown starts the shutdown process for this handler/engine.
@@ -446,21 +449,6 @@ func (h *Handler) shutdown() {
 	close(h.closed)
 }
 
-// Assumes [h.unprocessedMsgsCond.L] is not held
-func (h *Handler) push(msg message.InboundMessage) {
-	nodeID := msg.NodeID()
-	if nodeID == ids.ShortEmpty {
-		// This should never happen
-		h.ctx.Log.Warn("message does not have node ID of sender. Message: %s", msg)
-	}
-
-	h.unprocessedMsgsCond.L.Lock()
-	defer h.unprocessedMsgsCond.L.Unlock()
-
-	h.unprocessedMsgs.Push(msg)
-	h.unprocessedMsgsCond.Signal()
-}
-
 func (h *Handler) dispatchInternal() {
 	for {
 		select {
@@ -472,7 +460,7 @@ func (h *Handler) dispatchInternal() {
 			}
 			// handle a message from the VM
 			inMsg := h.mc.InternalVMMessage(h.ctx.NodeID, uint32(msg))
-			h.push(inMsg)
+			h.Push(inMsg)
 		}
 	}
 }
