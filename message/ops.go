@@ -216,7 +216,7 @@ func (op Op) String() string {
 		return "app_gossip"
 
 	case GetAcceptedFrontierFailed:
-		return "get_accepted_frontier_falied"
+		return "get_accepted_frontier_failed"
 	case GetAcceptedFailed:
 		return "get_accepted_failed"
 	case GetFailed:
