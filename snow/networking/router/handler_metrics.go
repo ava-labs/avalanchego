@@ -30,8 +30,8 @@ func (m *handlerMetrics) Initialize(namespace string, reg prometheus.Registerer)
 	errs := wrappers.Errs{}
 	errs.Add(reg.Register(m.expired))
 
-	m.messages = make(map[message.Op]metric.Averager, len(message.Ops))
-	for _, op := range message.Ops {
+	m.messages = make(map[message.Op]metric.Averager, len(message.ConsensusOps))
+	for _, op := range message.ConsensusOps {
 		opStr := op.String()
 		m.messages[op] = metric.NewAveragerWithErrs(
 			namespace,

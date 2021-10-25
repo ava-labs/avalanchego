@@ -54,6 +54,15 @@ const (
 )
 
 var (
+	HandshakeOps = []Op{
+		GetVersion,
+		Version,
+		GetPeerList,
+		PeerList,
+		Ping,
+		Pong,
+	}
+
 	// List of all consensus request message types
 	ConsensusRequestOps = []Op{
 		GetAcceptedFrontier,
@@ -72,18 +81,16 @@ var (
 		Chits,
 		AppResponse,
 	}
-	// List of all external message types
-	ExternalOps = append(ConsensusRequestOps, append(ConsensusResponseOps,
-		GetVersion,
-		GetPeerList,
-		Ping,
-		Pong,
-		PeerList,
-		Version,
-		AppGossip,
-	)...)
-	// List of all internal message types
-	InternalOps = []Op{
+	// AppGossip is the only message that is sent unrequested without the
+	// expectation of a response
+	ConsensusExternalOps = append(
+		ConsensusRequestOps,
+		append(
+			ConsensusResponseOps,
+			AppGossip,
+		)...,
+	)
+	ConsensusInternalOps = []Op{
 		GetAcceptedFrontierFailed,
 		GetAcceptedFailed,
 		GetFailed,
@@ -96,8 +103,10 @@ var (
 		Notify,
 		GossipRequest,
 	}
-	// List of all message types
-	Ops                  = append(ExternalOps, InternalOps...)
+	ConsensusOps = append(ConsensusExternalOps, ConsensusInternalOps...)
+
+	ExternalOps = append(ConsensusExternalOps, HandshakeOps...)
+
 	RequestToResponseOps = map[Op]Op{
 		GetAcceptedFrontier: AcceptedFrontier,
 		GetAccepted:         Accepted,
