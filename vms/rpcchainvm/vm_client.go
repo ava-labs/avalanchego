@@ -542,12 +542,21 @@ func (vm *VMClient) getAncestors(
 func (vm *VMClient) batchedParseBlock(
 	blksBytes [][]byte,
 ) ([]snowman.Block, error) {
-	req := make([]*vmproto.ParseBlockRequest, len(blksBytes))
-	for idx, blkBytes := range blksBytes {
-		req[idx] = &vmproto.ParseBlockRequest{
+	req := make([]*vmproto.ParseBlockRequest, 0, len(blksBytes))
+	for _, blkBytes := range blksBytes {
+		req = append(req, &vmproto.ParseBlockRequest{
 			Bytes: blkBytes,
-		}
+		})
 	}
+
+	// TODO ABENEGIA: VERSION BELOW DOES NOT WORK. INVESTIGATE WHY
+	// req := make([]*vmproto.ParseBlockRequest, len(blksBytes))
+	// for idx, blkBytes := range blksBytes {
+	// 	blkBytes := blkBytes
+	// 	req[idx] = &vmproto.ParseBlockRequest{
+	// 		Bytes: blkBytes,
+	// 	}
+	// }
 
 	resp, err := vm.client.BatchedParseBlock(context.Background(), &vmproto.BatchedParseBlockRequest{
 		Request: req,
