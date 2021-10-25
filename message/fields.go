@@ -32,6 +32,7 @@ const (
 	AppRequestBytes                  // Used at application level
 	AppResponseBytes                 // Used at application level
 	AppGossipBytes                   // Used at application level
+	VMMessage                        // Used internally
 )
 
 // Packer returns the packer function that can be used to pack this field.
@@ -164,6 +165,8 @@ func (f Field) String() string {
 		return "SignedPeers"
 	case TrackedSubnets:
 		return "TrackedSubnets"
+	case VMMessage:
+		return "VMMessage"
 	default:
 		return "Unknown Field"
 	}

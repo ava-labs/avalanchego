@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,7 +29,7 @@ func TestIndex(t *testing.T) {
 	db := versiondb.New(baseDB)
 	ctx := snow.DefaultContextTest()
 
-	indexIntf, err := newIndex(db, logging.NoLog{}, codec, timer.Clock{})
+	indexIntf, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
 	assert.NoError(err)
 	idx := indexIntf.(*index)
 
@@ -83,7 +83,7 @@ func TestIndex(t *testing.T) {
 	assert.NoError(db.Commit())
 	assert.NoError(idx.Close())
 	db = versiondb.New(baseDB)
-	indexIntf, err = newIndex(db, logging.NoLog{}, codec, timer.Clock{})
+	indexIntf, err = newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
 	assert.NoError(err)
 	idx = indexIntf.(*index)
 
@@ -118,7 +118,7 @@ func TestIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 	assert.NoError(err)
 	db := memdb.New()
 	ctx := snow.DefaultContextTest()
-	indexIntf, err := newIndex(db, logging.NoLog{}, codec, timer.Clock{})
+	indexIntf, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
 	assert.NoError(err)
 	idx := indexIntf.(*index)
 
@@ -160,7 +160,7 @@ func TestDontIndexSameContainerTwice(t *testing.T) {
 	assert.NoError(err)
 	db := memdb.New()
 	ctx := snow.DefaultContextTest()
-	idx, err := newIndex(db, logging.NoLog{}, codec, timer.Clock{})
+	idx, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
 	assert.NoError(err)
 
 	// Accept the same container twice

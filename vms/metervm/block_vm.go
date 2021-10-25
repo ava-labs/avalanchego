@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 var (
@@ -30,7 +30,7 @@ func NewBlockVM(vm block.ChainVM) *BlockVM {
 type BlockVM struct {
 	block.ChainVM
 	blockMetrics
-	clock timer.Clock
+	clock mockable.Clock
 }
 
 func (vm *BlockVM) Initialize(

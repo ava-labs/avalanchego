@@ -101,17 +101,18 @@ func (s *State) BatchedParseBlock(blksBytes [][]byte) ([]snowman.Block, error) {
 		blkBytes := respBlk.Bytes()
 		s.bytesToIDCache.Put(string(blkBytes), blkID)
 
+		missingIdx := missingIdxs[idx]
+
 		// Check for an existing block, so we can return a unique block
 		// if processing or simply allow this block to be immediately
 		// garbage collected if it is already cached.
 		if cachedBlk, ok := s.getCachedBlock(blkID); ok {
-			missingIdx := missingIdxs[idx]
 			res[missingIdx] = cachedBlk
 			continue
 		}
 
 		s.missingBlocks.Evict(blkID)
-		res[idx], err = s.addBlockOutsideConsensus(respBlk)
+		res[missingIdx], err = s.addBlockOutsideConsensus(respBlk)
 		if err != nil {
 			return nil, err
 		}

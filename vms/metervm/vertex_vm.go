@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 var (
@@ -29,7 +29,7 @@ func NewVertexVM(vm vertex.DAGVM) vertex.DAGVM {
 type vertexVM struct {
 	vertex.DAGVM
 	vertexMetrics
-	clock timer.Clock
+	clock mockable.Clock
 }
 
 func (vm *vertexVM) Initialize(

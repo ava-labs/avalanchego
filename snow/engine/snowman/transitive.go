@@ -41,7 +41,11 @@ type Transitive struct {
 	blkReqs common.Requests
 
 	// blocks that are queued to be issued to consensus once missing dependencies are fetched
-	pending ids.Set
+	// Block ID --> Block
+	pending map[ids.ID]snowman.Block
+
+	// Block ID --> Parent ID
+	nonVerifieds AncestorTree
 
 	// operations that are blocked on a block being issued. This could be
 	// issuing another block, responding to a query, or applying votes to consensus
@@ -61,6 +65,8 @@ func (t *Transitive) Initialize(config Config) error {
 
 	t.Params = config.Params
 	t.Consensus = config.Consensus
+	t.pending = make(map[ids.ID]snowman.Block)
+	t.nonVerifieds = NewAncestorTree()
 
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t.polls = poll.NewSet(factory,
@@ -542,7 +548,7 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error)
 	// If the block has been decided, we don't need to issue it.
 	// If the block is processing, we don't need to issue it.
 	// If the block is queued to be issued, we don't need to issue it.
-	for !t.Consensus.DecidedOrProcessing(blk) && !t.pending.Contains(blkID) {
+	for !t.Consensus.DecidedOrProcessing(blk) && !t.pendingContains(blkID) {
 		if err := t.issue(blk); err != nil {
 			return false, err
 		}
@@ -582,7 +588,7 @@ func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 	blkID := blk.ID()
 	// issue [blk] and its ancestors into consensus
 	status := blk.Status()
-	for status.Fetched() && !t.Consensus.DecidedOrProcessing(blk) && !t.pending.Contains(blkID) {
+	for status.Fetched() && !t.Consensus.DecidedOrProcessing(blk) && !t.pendingContains(blkID) {
 		if err := t.issue(blk); err != nil {
 			return false, err
 		}
@@ -618,7 +624,7 @@ func (t *Transitive) issue(blk snowman.Block) error {
 	blkID := blk.ID()
 
 	// mark that the block is queued to be added to consensus once its ancestors have been
-	t.pending.Add(blkID)
+	t.pending[blkID] = blk
 
 	// Remove any outstanding requests for this block
 	t.blkReqs.RemoveAny(blkID)
@@ -640,7 +646,7 @@ func (t *Transitive) issue(blk snowman.Block) error {
 
 	// Tracks performance statistics
 	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
-	t.metrics.numBlocked.Set(float64(t.pending.Len()))
+	t.metrics.numBlocked.Set(float64(len(t.pending)))
 	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 	return t.errs.Err
 }
@@ -712,7 +718,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	// we are no longer waiting on adding the block to consensus, so it is no
 	// longer pending
 	blkID := blk.ID()
-	t.pending.Remove(blkID)
+	t.removeFromPending(blk)
 	parentID := blk.Parent()
 	parent, err := t.GetBlock(parentID)
 	// Because the dependency must have been fulfilled by the time this function
@@ -722,7 +728,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		// if the parent isn't processing or the last accepted block, then this
 		// block is effectively rejected
 		t.blocked.Abandon(blkID)
-		t.metrics.numBlocked.Set(float64(t.pending.Len())) // Tracks performance statistics
+		t.metrics.numBlocked.Set(float64(len(t.pending))) // Tracks performance statistics
 		t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 		return t.errs.Err
 	}
@@ -736,14 +742,21 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
 
 		// if verify fails, then all descendants are also invalid
+		t.addToNonVerifieds(blk)
 		t.blocked.Abandon(blkID)
-		t.metrics.numBlocked.Set(float64(t.pending.Len())) // Tracks performance statistics
+		t.metrics.numBlocked.Set(float64(len(t.pending))) // Tracks performance statistics
 		t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 		return t.errs.Err
 	}
-
+	t.nonVerifieds.Remove(blkID)
+	t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
 	t.Ctx.Log.Verbo("adding block to consensus: %s", blkID)
-	if err := t.Consensus.Add(blk); err != nil {
+	wrappedBlk := &memoryBlock{
+		Block:   blk,
+		metrics: &t.metrics,
+		tree:    t.nonVerifieds,
+	}
+	if err := t.Consensus.Add(wrappedBlk); err != nil {
 		return err
 	}
 
@@ -763,8 +776,19 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 				if err := blk.Verify(); err != nil {
 					t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
 					dropped = append(dropped, blk)
+					// block fails verification, hold this in memory for bubbling
+					t.addToNonVerifieds(blk)
 				} else {
-					if err := t.Consensus.Add(blk); err != nil {
+					// correctly verified will be passed to consensus as processing block
+					// no need to keep it anymore
+					t.nonVerifieds.Remove(blk.ID())
+					t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
+					wrappedBlk := &memoryBlock{
+						Block:   blk,
+						metrics: &t.metrics,
+						tree:    t.nonVerifieds,
+					}
+					if err := t.Consensus.Add(wrappedBlk); err != nil {
 						return err
 					}
 					added = append(added, blk)
@@ -790,13 +814,13 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		}
 
 		blkID := blk.ID()
-		t.pending.Remove(blkID)
+		t.removeFromPending(blk)
 		t.blocked.Fulfill(blkID)
 		t.blkReqs.RemoveAny(blkID)
 	}
 	for _, blk := range dropped {
 		blkID := blk.ID()
-		t.pending.Remove(blkID)
+		t.removeFromPending(blk)
 		t.blocked.Abandon(blkID)
 		t.blkReqs.RemoveAny(blkID)
 	}
@@ -806,7 +830,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 
 	// Tracks performance statistics
 	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
-	t.metrics.numBlocked.Set(float64(t.pending.Len()))
+	t.metrics.numBlocked.Set(float64(len(t.pending)))
 	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 	return t.errs.Err
 }
@@ -841,10 +865,45 @@ func (t *Transitive) HealthCheck() (interface{}, error) {
 
 // GetBlock implements the snowman.Engine interface
 func (t *Transitive) GetBlock(blkID ids.ID) (snowman.Block, error) {
+	if blk, ok := t.pending[blkID]; ok {
+		return blk, nil
+	}
 	return t.VM.GetBlock(blkID)
 }
 
 // GetVM implements the snowman.Engine interface
 func (t *Transitive) GetVM() common.VM {
 	return t.VM
+}
+
+// Returns true if the block whose ID is [blkID] is waiting to be issued to consensus
+func (t *Transitive) pendingContains(blkID ids.ID) bool {
+	_, ok := t.pending[blkID]
+	return ok
+}
+
+func (t *Transitive) removeFromPending(blk snowman.Block) {
+	delete(t.pending, blk.ID())
+}
+
+func (t *Transitive) addToNonVerifieds(blk snowman.Block) {
+	// don't add this blk if it's decided or processing
+	// this should not be happening, but just in case.
+	if t.Consensus.DecidedOrProcessing(blk) {
+		return
+	}
+	parentID := blk.Parent()
+	// we might still need that one, so we can bubble vote to parent through this block
+	// only add blocks with parent already in tree or processing.
+	// decided parents should not be in this map.
+	if t.nonVerifieds.Has(parentID) || t.parentProcessing(blk) {
+		t.nonVerifieds.Add(blk.ID(), parentID)
+		t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
+	}
+}
+
+func (t *Transitive) parentProcessing(blk snowman.Block) bool {
+	parentID := blk.Parent()
+	parentBlk, err := t.GetBlock(parentID)
+	return err == nil && !parentBlk.Status().Decided() && t.Consensus.DecidedOrProcessing(parentBlk)
 }
