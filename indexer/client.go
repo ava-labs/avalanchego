@@ -76,10 +76,10 @@ func (c *Client) GetLastAccepted(args *GetLastAcceptedArgs) (Container, error) {
 	}, nil
 }
 
-func (c *Client) GetIndex(args *GetIndexArgs) (GetIndexResponse, error) {
+func (c *Client) GetIndex(args *GetIndexArgs) (uint64, error) {
 	var index GetIndexResponse
 	err := c.SendRequest("getIndex", args, &index)
-	return index, err
+	return uint64(index.Index), err
 }
 
 func (c *Client) IsAccepted(args *GetIndexArgs) (bool, error) {

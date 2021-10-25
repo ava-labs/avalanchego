@@ -38,7 +38,7 @@ func TestIndexClient(t *testing.T) {
 		}
 		index, err := client.GetIndex(&GetIndexArgs{ContainerID: ids.Empty, Encoding: formatting.Hex})
 		assert.NoError(err)
-		assert.EqualValues(5, index.Index)
+		assert.EqualValues(5, index)
 	}
 	{
 		// Test GetLastAccepted
