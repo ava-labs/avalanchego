@@ -10,10 +10,11 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/message"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -42,6 +43,10 @@ func (m *TestMsg) BytesSavedCompression() int {
 	return 0
 }
 
+func (m *TestMsg) AddRef() {}
+
+func (m *TestMsg) DecRef() {}
+
 func TestPeer_Close(t *testing.T) {
 	initCerts(t)
 
@@ -69,6 +74,9 @@ func TestPeer_Close(t *testing.T) {
 
 	vdrs := getDefaultManager()
 	beacons := validators.NewSet()
+	metrics := prometheus.NewRegistry()
+	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler := &testHandler{}
 
 	netwrk, err := newTestNetwork(
@@ -82,6 +90,8 @@ func TestPeer_Close(t *testing.T) {
 		tlsConfig0,
 		listener,
 		caller,
+		metrics,
+		msgCreator,
 		handler,
 	)
 	assert.NoError(t, err)
@@ -101,9 +111,9 @@ func TestPeer_Close(t *testing.T) {
 
 	// fake a peer, and write a message
 	peer := newPeer(basenetwork, conn, ip1.IP())
-	peer.sendQueue = [][]byte{}
+	peer.sendQueue = make([]message.OutboundMessage, 0)
 	testMsg := newTestMsg(message.GetVersion, newmsgbytes)
-	peer.Send(testMsg, true)
+	peer.Send(testMsg)
 
 	go func() {
 		err := netwrk.Close()

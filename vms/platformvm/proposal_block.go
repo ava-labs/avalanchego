@@ -225,16 +225,6 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 		)
 	}
 
-	pb.vm.internalState.AddBlock(commit)
-	pb.vm.internalState.AddBlock(abort)
-
-	if err := pb.vm.internalState.Commit(); err != nil {
-		return [2]snowman.Block{}, fmt.Errorf(
-			"failed to commit VM's database: %w",
-			err,
-		)
-	}
-
 	tx, ok := pb.Tx.UnsignedTx.(UnsignedProposalTx)
 	if !ok {
 		return [2]snowman.Block{}, errWrongTxType

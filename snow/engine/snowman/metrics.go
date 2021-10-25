@@ -11,9 +11,9 @@ import (
 )
 
 type metrics struct {
-	numRequests, numBlocked, numBlockers prometheus.Gauge
-	numBuilt, numBuildsFailed            prometheus.Counter
-	getAncestorsBlks                     metric.Averager
+	numRequests, numBlocked, numBlockers, numNonVerifieds prometheus.Gauge
+	numBuilt, numBuildsFailed                             prometheus.Counter
+	getAncestorsBlks                                      metric.Averager
 }
 
 // Initialize the metrics
@@ -51,6 +51,11 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		reg,
 		&errs,
 	)
+	m.numNonVerifieds = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "non_verified_blks",
+		Help:      "Number of non-verified blocks in the memory",
+	})
 
 	errs.Add(
 		reg.Register(m.numRequests),
@@ -58,6 +63,7 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		reg.Register(m.numBlockers),
 		reg.Register(m.numBuilt),
 		reg.Register(m.numBuildsFailed),
+		reg.Register(m.numNonVerifieds),
 	)
 	return errs.Err
 }

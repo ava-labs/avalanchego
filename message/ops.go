@@ -7,7 +7,8 @@ package message
 type Op byte
 
 // Types of messages that may be sent between nodes
-// Note: If you add a new Op below, you must also add it to ops (declared below)
+// Note: If you add a new parseable Op below, you must also add it to ops
+// (declared below)
 const (
 	// Handshake:
 	GetVersion Op = iota
@@ -37,31 +38,109 @@ const (
 	AppRequest
 	AppResponse
 	AppGossip
+
+	// Internal messages (External messages should be added above these):
+	GetAcceptedFrontierFailed
+	GetAcceptedFailed
+	GetFailed
+	QueryFailed
+	GetAncestorsFailed
+	AppRequestFailed
+	Timeout
+	Connected
+	Disconnected
+	Notify
+	GossipRequest
 )
 
 var (
-	// List of all message types
-	ops = []Op{
+	HandshakeOps = []Op{
 		GetVersion,
+		Version,
 		GetPeerList,
+		PeerList,
 		Ping,
 		Pong,
+	}
+
+	// List of all consensus request message types
+	ConsensusRequestOps = []Op{
 		GetAcceptedFrontier,
-		AcceptedFrontier,
 		GetAccepted,
-		Accepted,
 		GetAncestors,
-		MultiPut,
 		Get,
-		Put,
 		PushQuery,
 		PullQuery,
-		Chits,
-		PeerList,
-		Version,
 		AppRequest,
+	}
+	ConsensusResponseOps = []Op{
+		AcceptedFrontier,
+		Accepted,
+		MultiPut,
+		Put,
+		Chits,
 		AppResponse,
-		AppGossip,
+	}
+	// AppGossip is the only message that is sent unrequested without the
+	// expectation of a response
+	ConsensusExternalOps = append(
+		ConsensusRequestOps,
+		append(
+			ConsensusResponseOps,
+			AppGossip,
+		)...,
+	)
+	ConsensusInternalOps = []Op{
+		GetAcceptedFrontierFailed,
+		GetAcceptedFailed,
+		GetFailed,
+		QueryFailed,
+		GetAncestorsFailed,
+		AppRequestFailed,
+		Timeout,
+		Connected,
+		Disconnected,
+		Notify,
+		GossipRequest,
+	}
+	ConsensusOps = append(ConsensusExternalOps, ConsensusInternalOps...)
+
+	ExternalOps = append(ConsensusExternalOps, HandshakeOps...)
+
+	RequestToResponseOps = map[Op]Op{
+		GetAcceptedFrontier: AcceptedFrontier,
+		GetAccepted:         Accepted,
+		GetAncestors:        MultiPut,
+		Get:                 Put,
+		PushQuery:           Chits,
+		PullQuery:           Chits,
+		AppRequest:          AppResponse,
+	}
+	ResponseToFailedOps = map[Op]Op{
+		AcceptedFrontier: GetAcceptedFrontierFailed,
+		Accepted:         GetAcceptedFailed,
+		MultiPut:         GetAncestorsFailed,
+		Put:              GetFailed,
+		Chits:            QueryFailed,
+		AppResponse:      AppRequestFailed,
+	}
+	FailedToResponseOps = map[Op]Op{
+		GetAcceptedFrontierFailed: AcceptedFrontier,
+		GetAcceptedFailed:         Accepted,
+		GetAncestorsFailed:        MultiPut,
+		GetFailed:                 Put,
+		QueryFailed:               Chits,
+		AppRequestFailed:          AppResponse,
+	}
+	UnrequestedOps = map[Op]struct{}{
+		GetAcceptedFrontier: {},
+		GetAccepted:         {},
+		GetAncestors:        {},
+		Get:                 {},
+		PushQuery:           {},
+		PullQuery:           {},
+		AppRequest:          {},
+		AppGossip:           {},
 	}
 
 	// Defines the messages that can be sent/received with this network
@@ -144,6 +223,29 @@ func (op Op) String() string {
 		return "app_response"
 	case AppGossip:
 		return "app_gossip"
+
+	case GetAcceptedFrontierFailed:
+		return "get_accepted_frontier_failed"
+	case GetAcceptedFailed:
+		return "get_accepted_failed"
+	case GetFailed:
+		return "get_failed"
+	case QueryFailed:
+		return "query_failed"
+	case GetAncestorsFailed:
+		return "get_ancestors_failed"
+	case AppRequestFailed:
+		return "app_request_failed"
+	case Timeout:
+		return "timeout"
+	case Connected:
+		return "connected"
+	case Disconnected:
+		return "disconnected"
+	case Notify:
+		return "notify"
+	case GossipRequest:
+		return "gossip_request"
 	default:
 		return "Unknown Op"
 	}

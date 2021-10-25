@@ -7,7 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 var _ cache.Cacher = &Cache{}
@@ -16,7 +16,7 @@ type Cache struct {
 	metrics
 	cache.Cacher
 
-	clock timer.Clock
+	clock mockable.Clock
 }
 
 func New(

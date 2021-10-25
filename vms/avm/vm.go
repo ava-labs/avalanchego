@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/index"
@@ -69,7 +70,7 @@ type VM struct {
 	ctx *snow.Context
 
 	// Used to check local time
-	clock timer.Clock
+	clock mockable.Clock
 
 	genesisCodec codec.Manager
 	codec        codec.Manager

@@ -80,6 +80,7 @@ func (b *Bootstrapper) Initialize(
 	b.OnFinished = onFinished
 	b.executedStateTransitions = math.MaxInt32
 	b.startingAcceptedFrontier = ids.Set{}
+
 	lastAcceptedID, err := b.VM.LastAccepted()
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted ID: %s", err)
@@ -161,7 +162,7 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 
 	// Process received blocks
 	for _, blk := range toProcess {
-		if err := b.process(blk); err != nil {
+		if err := b.process(blk, nil); err != nil {
 			return err
 		}
 	}
@@ -229,14 +230,20 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 		return b.fetch(wantedBlkID)
 	}
 
+	processingBlocks := make(map[ids.ID]snowman.Block, lenBlks)
+	processingBlocks[wantedBlkID] = wantedBlk
+
 	for _, blkBytes := range blks[1:] {
-		if _, err := b.VM.ParseBlock(blkBytes); err != nil { // persists the block
+		blk, err := b.VM.ParseBlock(blkBytes)
+		if err != nil {
 			b.Ctx.Log.Debug("Failed to parse block: %s", err)
 			b.Ctx.Log.Verbo("block: %s", formatting.DumpBytes{Bytes: blkBytes})
+		} else {
+			processingBlocks[blk.ID()] = blk
 		}
 	}
 
-	return b.process(wantedBlk)
+	return b.process(wantedBlk, processingBlocks)
 }
 
 // GetAncestorsFailed is called when a GetAncestors message we sent fails
@@ -264,7 +271,7 @@ func (b *Bootstrapper) Timeout() error {
 }
 
 // process a block
-func (b *Bootstrapper) process(blk snowman.Block) error {
+func (b *Bootstrapper) process(blk snowman.Block, processingBlocks map[ids.ID]snowman.Block) error {
 	status := blk.Status()
 	blkID := blk.ID()
 	blkHeight := blk.Height()
@@ -292,11 +299,19 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 
 		// Traverse to the next block regardless of if the block is pushed
 		blkID = blk.Parent()
-		blk, err = b.VM.GetBlock(blkID)
-		if err != nil {
-			status = choices.Unknown
-		} else {
+		processingBlock, ok := processingBlocks[blkID]
+		// first check processing blocks
+		if ok {
+			blk = processingBlock
 			status = blk.Status()
+		} else {
+			// if not available in processing blocks, get block
+			blk, err = b.VM.GetBlock(blkID)
+			if err != nil {
+				status = choices.Unknown
+			} else {
+				status = blk.Status()
+			}
 		}
 
 		if !pushed {
