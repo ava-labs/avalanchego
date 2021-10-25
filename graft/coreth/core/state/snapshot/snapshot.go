@@ -440,7 +440,9 @@ func (t *Tree) Flatten(blockHash common.Hash) error {
 	for _, snap := range t.blockLayers {
 		if diff, ok := snap.(*diffLayer); ok {
 			if base.blockHash == diff.parent.BlockHash() {
+				diff.lock.Lock()
 				diff.parent = base
+				diff.lock.Unlock()
 			}
 		}
 	}
