@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/index"
@@ -69,7 +70,7 @@ type VM struct {
 	ctx *snow.Context
 
 	// Used to check local time
-	clock timer.Clock
+	clock mockable.Clock
 
 	genesisCodec codec.Manager
 	codec        codec.Manager
@@ -148,7 +149,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 	vm.AddressManager = avax.NewAddressManager(ctx)
-	vm.Aliaser.Initialize()
+	vm.Aliaser = ids.NewAliaser()
 
 	db := dbManager.Current().Database
 	vm.ctx = ctx
@@ -492,7 +493,7 @@ func (vm *VM) FlushTxs() {
 		select {
 		case vm.toEngine <- common.PendingTxs:
 		default:
-			vm.ctx.Log.Warn("Delaying issuance of transactions due to contention")
+			vm.ctx.Log.Debug("dropping message to engine due to contention")
 			vm.timer.SetTimeoutIn(vm.batchTimeout)
 		}
 	}

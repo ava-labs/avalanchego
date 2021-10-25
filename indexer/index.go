@@ -1,3 +1,6 @@
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package indexer
 
 import (
@@ -14,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -53,7 +56,7 @@ type Index interface {
 // indexer indexes all accepted transactions by the order in which they were accepted
 type index struct {
 	codec codec.Manager
-	clock timer.Clock
+	clock mockable.Clock
 	lock  sync.RWMutex
 	// The index of the next accepted transaction
 	nextAcceptedIndex uint64
@@ -74,7 +77,7 @@ func newIndex(
 	baseDB database.Database,
 	log logging.Logger,
 	codec codec.Manager,
-	clock timer.Clock,
+	clock mockable.Clock,
 ) (Index, error) {
 	vDB := versiondb.New(baseDB)
 	indexToContainer := prefixdb.New(indexToContainerPrefix, vDB)

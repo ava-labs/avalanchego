@@ -1,3 +1,6 @@
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package auth
 
 import (
@@ -17,7 +20,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
@@ -42,7 +45,7 @@ var (
 		headerKey,
 		headerValStart,
 	)
-	errInvalidSigningMethod        = fmt.Errorf("auth token didn't specify the HS256 signing method correctly")
+	errInvalidSigningMethod        = errors.New("auth token didn't specify the HS256 signing method correctly")
 	errTokenRevoked                = errors.New("the provided auth token was revoked")
 	errTokenInsufficientPermission = errors.New("the provided auth token does not allow access to this endpoint")
 	errWrongPassword               = errors.New("incorrect password")
@@ -88,7 +91,7 @@ type Auth interface {
 
 type auth struct {
 	// Used to mock time.
-	clock timer.Clock
+	clock mockable.Clock
 
 	log      logging.Logger
 	endpoint string

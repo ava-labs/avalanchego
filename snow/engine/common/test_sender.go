@@ -11,9 +11,10 @@ import (
 )
 
 var (
-	errSendAppRequest  = errors.New("unexpectedly called SendAppRequest")
-	errSendAppResponse = errors.New("unexpectedly called SendAppResponse")
-	errSendAppGossip   = errors.New("unexpectedly called SendAppGossip")
+	errSendAppRequest        = errors.New("unexpectedly called SendAppRequest")
+	errSendAppResponse       = errors.New("unexpectedly called SendAppResponse")
+	errSendAppGossip         = errors.New("unexpectedly called SendAppGossip")
+	errSendAppGossipSpecific = errors.New("unexpectedly called SendAppGossipSpecific")
 )
 
 // SenderTest is a test sender
@@ -25,7 +26,7 @@ type SenderTest struct {
 	CantSendGet, CantSendGetAncestors, CantSendPut, CantSendMultiPut,
 	CantSendPullQuery, CantSendPushQuery, CantSendChits,
 	CantSendGossip,
-	CantSendAppRequest, CantSendAppResponse, CantSendAppGossip bool
+	CantSendAppRequest, CantSendAppResponse, CantSendAppGossip, CantSendAppGossipSpecific bool
 
 	SendGetAcceptedFrontierF func(ids.ShortSet, uint32)
 	SendAcceptedFrontierF    func(ids.ShortID, uint32, []ids.ID)
@@ -42,6 +43,7 @@ type SenderTest struct {
 	SendAppRequestF          func(ids.ShortSet, uint32, []byte) error
 	SendAppResponseF         func(ids.ShortID, uint32, []byte) error
 	SendAppGossipF           func([]byte) error
+	SendAppGossipSpecificF   func(ids.ShortSet, []byte) error
 }
 
 // Default set the default callable value to [cant]
@@ -61,11 +63,12 @@ func (s *SenderTest) Default(cant bool) {
 	s.CantSendAppRequest = cant
 	s.CantSendAppResponse = cant
 	s.CantSendAppGossip = cant
+	s.CantSendAppGossipSpecific = cant
 }
 
-// SendGetAcceptedFrontier calls SendGetAcceptedFrontierF if it was initialized. If it
-// wasn't initialized and this function shouldn't be called and testing was
-// initialized, then testing will fail.
+// SendGetAcceptedFrontier calls SendGetAcceptedFrontierF if it was initialized.
+// If it wasn't initialized and this function shouldn't be called and testing
+// was initialized, then testing will fail.
 func (s *SenderTest) SendGetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32) {
 	if s.SendGetAcceptedFrontierF != nil {
 		s.SendGetAcceptedFrontierF(validatorIDs, requestID)
@@ -74,8 +77,8 @@ func (s *SenderTest) SendGetAcceptedFrontier(validatorIDs ids.ShortSet, requestI
 	}
 }
 
-// SendAcceptedFrontier calls SendAcceptedFrontierF if it was initialized. If it wasn't
-// initialized and this function shouldn't be called and testing was
+// SendAcceptedFrontier calls SendAcceptedFrontierF if it was initialized. If it
+// wasn't initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
 func (s *SenderTest) SendAcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
 	if s.SendAcceptedFrontierF != nil {
@@ -96,9 +99,9 @@ func (s *SenderTest) SendGetAccepted(nodeIDs ids.ShortSet, requestID uint32, con
 	}
 }
 
-// SendAccepted calls SendAcceptedF if it was initialized. If it wasn't initialized and
-// this function shouldn't be called and testing was initialized, then testing
-// will fail.
+// SendAccepted calls SendAcceptedF if it was initialized. If it wasn't
+// initialized and this function shouldn't be called and testing was
+// initialized, then testing will fail.
 func (s *SenderTest) SendAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
 	if s.SendAcceptedF != nil {
 		s.SendAcceptedF(validatorID, requestID, containerIDs)
@@ -107,9 +110,9 @@ func (s *SenderTest) SendAccepted(validatorID ids.ShortID, requestID uint32, con
 	}
 }
 
-// SendGet calls SendGetF if it was initialized. If it wasn't initialized and this
-// function shouldn't be called and testing was initialized, then testing will
-// fail.
+// SendGet calls SendGetF if it was initialized. If it wasn't initialized and
+// this function shouldn't be called and testing was initialized, then testing
+// will fail.
 func (s *SenderTest) SendGet(vdr ids.ShortID, requestID uint32, vtxID ids.ID) {
 	if s.SendGetF != nil {
 		s.SendGetF(vdr, requestID, vtxID)
@@ -118,8 +121,8 @@ func (s *SenderTest) SendGet(vdr ids.ShortID, requestID uint32, vtxID ids.ID) {
 	}
 }
 
-// SendGetAncestors calls SendGetAncestorsF if it was initialized. If it
-// wasn't initialized and this function shouldn't be called and testing was
+// SendGetAncestors calls SendGetAncestorsF if it was initialized. If it wasn't
+// initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
 func (s *SenderTest) SendGetAncestors(validatorID ids.ShortID, requestID uint32, vtxID ids.ID) {
 	if s.SendGetAncestorsF != nil {
@@ -129,9 +132,9 @@ func (s *SenderTest) SendGetAncestors(validatorID ids.ShortID, requestID uint32,
 	}
 }
 
-// SendPut calls SendPutF if it was initialized. If it wasn't initialized and this
-// function shouldn't be called and testing was initialized, then testing will
-// fail.
+// SendPut calls SendPutF if it was initialized. If it wasn't initialized and
+// this function shouldn't be called and testing was initialized, then testing
+// will fail.
 func (s *SenderTest) SendPut(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtx []byte) {
 	if s.SendPutF != nil {
 		s.SendPutF(vdr, requestID, vtxID, vtx)
@@ -140,9 +143,9 @@ func (s *SenderTest) SendPut(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vt
 	}
 }
 
-// SendMultiPut calls SendMultiPutF if it was initialized. If it wasn't initialized and this
-// function shouldn't be called and testing was initialized, then testing will
-// fail.
+// SendMultiPut calls SendMultiPutF if it was initialized. If it wasn't
+// initialized and this function shouldn't be called and testing was
+// initialized, then testing will fail.
 func (s *SenderTest) SendMultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte) {
 	if s.SendMultiPutF != nil {
 		s.SendMultiPutF(vdr, requestID, vtxs)
@@ -151,9 +154,9 @@ func (s *SenderTest) SendMultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]by
 	}
 }
 
-// SendPushQuery calls SendPushQueryF if it was initialized. If it wasn't initialized
-// and this function shouldn't be called and testing was initialized, then
-// testing will fail.
+// SendPushQuery calls SendPushQueryF if it was initialized. If it wasn't
+// initialized and this function shouldn't be called and testing was
+// initialized, then testing will fail.
 func (s *SenderTest) SendPushQuery(vdrs ids.ShortSet, requestID uint32, vtxID ids.ID, vtx []byte) {
 	if s.SendPushQueryF != nil {
 		s.SendPushQueryF(vdrs, requestID, vtxID, vtx)
@@ -162,9 +165,9 @@ func (s *SenderTest) SendPushQuery(vdrs ids.ShortSet, requestID uint32, vtxID id
 	}
 }
 
-// SendPullQuery calls SendPullQueryF if it was initialized. If it wasn't initialized
-// and this function shouldn't be called and testing was initialized, then
-// testing will fail.
+// SendPullQuery calls SendPullQueryF if it was initialized. If it wasn't
+// initialized and this function shouldn't be called and testing was
+// initialized, then testing will fail.
 func (s *SenderTest) SendPullQuery(vdrs ids.ShortSet, requestID uint32, vtxID ids.ID) {
 	if s.SendPullQueryF != nil {
 		s.SendPullQueryF(vdrs, requestID, vtxID)
@@ -173,9 +176,9 @@ func (s *SenderTest) SendPullQuery(vdrs ids.ShortSet, requestID uint32, vtxID id
 	}
 }
 
-// SendChits calls SendChitsF if it was initialized. If it wasn't initialized and this
-// function shouldn't be called and testing was initialized, then testing will
-// fail.
+// SendChits calls SendChitsF if it was initialized. If it wasn't initialized
+// and this function shouldn't be called and testing was initialized, then
+// testing will fail.
 func (s *SenderTest) SendChits(vdr ids.ShortID, requestID uint32, votes []ids.ID) {
 	if s.SendChitsF != nil {
 		s.SendChitsF(vdr, requestID, votes)
@@ -184,9 +187,9 @@ func (s *SenderTest) SendChits(vdr ids.ShortID, requestID uint32, votes []ids.ID
 	}
 }
 
-// SendGossip calls SendGossipF if it was initialized. If it wasn't initialized and this
-// function shouldn't be called and testing was initialized, then testing will
-// fail.
+// SendGossip calls SendGossipF if it was initialized. If it wasn't initialized
+// and this function shouldn't be called and testing was initialized, then
+// testing will fail.
 func (s *SenderTest) SendGossip(containerID ids.ID, container []byte) {
 	if s.SendGossipF != nil {
 		s.SendGossipF(containerID, container)
@@ -195,9 +198,9 @@ func (s *SenderTest) SendGossip(containerID ids.ID, container []byte) {
 	}
 }
 
-// SendAppRequest calls SendAppRequestF if it was initialized. If it wasn't initialized and this
-// function shouldn't be called and testing was initialized, then testing will
-// fail.
+// SendAppRequest calls SendAppRequestF if it was initialized. If it wasn't
+// initialized and this function shouldn't be called and testing was
+// initialized, then testing will fail.
 func (s *SenderTest) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appRequestBytes []byte) error {
 	switch {
 	case s.SendAppRequestF != nil:
@@ -208,9 +211,9 @@ func (s *SenderTest) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appR
 	return errSendAppRequest
 }
 
-// SendAppResponse calls SendAppResponseF if it was initialized. If it wasn't initialized and this
-// function shouldn't be called and testing was initialized, then testing will
-// fail.
+// SendAppResponse calls SendAppResponseF if it was initialized. If it wasn't
+// initialized and this function shouldn't be called and testing was
+// initialized, then testing will fail.
 func (s *SenderTest) SendAppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte) error {
 	switch {
 	case s.SendAppResponseF != nil:
@@ -221,9 +224,9 @@ func (s *SenderTest) SendAppResponse(nodeID ids.ShortID, requestID uint32, appRe
 	return errSendAppResponse
 }
 
-// SendAppGossip calls SendAppGossipF if it was initialized. If it wasn't initialized and this
-// function shouldn't be called and testing was initialized, then testing will
-// fail.
+// SendAppGossip calls SendAppGossipF if it was initialized. If it wasn't
+// initialized and this function shouldn't be called and testing was
+// initialized, then testing will fail.
 func (s *SenderTest) SendAppGossip(appGossipBytes []byte) error {
 	switch {
 	case s.SendAppGossipF != nil:
@@ -232,4 +235,17 @@ func (s *SenderTest) SendAppGossip(appGossipBytes []byte) error {
 		s.T.Fatal(errSendAppGossip)
 	}
 	return errSendAppGossip
+}
+
+// SendAppGossipSpecific calls SendAppGossipSpecificF if it was initialized. If it wasn't
+// initialized and this function shouldn't be called and testing was
+// initialized, then testing will fail.
+func (s *SenderTest) SendAppGossipSpecific(nodeIDs ids.ShortSet, appGossipBytes []byte) error {
+	switch {
+	case s.SendAppGossipSpecificF != nil:
+		return s.SendAppGossipSpecificF(nodeIDs, appGossipBytes)
+	case s.CantSendAppGossipSpecific && s.T != nil:
+		s.T.Fatal(errSendAppGossipSpecific)
+	}
+	return errSendAppGossipSpecific
 }

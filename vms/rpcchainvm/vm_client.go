@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/hashicorp/go-plugin"
 
@@ -21,6 +22,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/rpcdb"
 	"github.com/ava-labs/avalanchego/database/rpcdb/rpcdbproto"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/ids/galiasreader"
+	"github.com/ava-labs/avalanchego/ids/galiasreader/galiasreaderproto"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -30,8 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/galiaslookup"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/galiaslookup/galiaslookupproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/ghttpproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
@@ -66,7 +67,7 @@ type VMClient struct {
 	messenger    *messenger.Server
 	keystore     *gkeystore.Server
 	sharedMemory *gsharedmemory.Server
-	bcLookup     *galiaslookup.Server
+	bcLookup     *galiasreader.Server
 	snLookup     *gsubnetlookup.Server
 	appSender    *appsender.Server
 
@@ -127,7 +128,7 @@ func (vm *VMClient) Initialize(
 	vm.messenger = messenger.NewServer(toEngine)
 	vm.keystore = gkeystore.NewServer(ctx.Keystore, vm.broker)
 	vm.sharedMemory = gsharedmemory.NewServer(ctx.SharedMemory, dbManager.Current().Database)
-	vm.bcLookup = galiaslookup.NewServer(ctx.BCLookup)
+	vm.bcLookup = galiasreader.NewServer(ctx.BCLookup)
 	vm.snLookup = gsubnetlookup.NewServer(ctx.SNLookup)
 	vm.appSender = appsender.NewServer(appSender)
 
@@ -272,7 +273,7 @@ func (vm *VMClient) startSharedMemoryServer(opts []grpc.ServerOption) *grpc.Serv
 func (vm *VMClient) startBCLookupServer(opts []grpc.ServerOption) *grpc.Server {
 	server := grpc.NewServer(opts...)
 	vm.serverCloser.Add(server)
-	galiaslookupproto.RegisterAliasLookupServer(server, vm.bcLookup)
+	galiasreaderproto.RegisterAliasReaderServer(server, vm.bcLookup)
 	return server
 }
 
@@ -291,18 +292,18 @@ func (vm *VMClient) startAppSenderServer(opts []grpc.ServerOption) *grpc.Server 
 }
 
 func (vm *VMClient) Bootstrapping() error {
-	_, err := vm.client.Bootstrapping(context.Background(), &vmproto.EmptyMsg{})
+	_, err := vm.client.Bootstrapping(context.Background(), &emptypb.Empty{})
 	return err
 }
 
 func (vm *VMClient) Bootstrapped() error {
-	_, err := vm.client.Bootstrapped(context.Background(), &vmproto.EmptyMsg{})
+	_, err := vm.client.Bootstrapped(context.Background(), &emptypb.Empty{})
 	return err
 }
 
 func (vm *VMClient) Shutdown() error {
 	errs := wrappers.Errs{}
-	_, err := vm.client.Shutdown(context.Background(), &vmproto.EmptyMsg{})
+	_, err := vm.client.Shutdown(context.Background(), &emptypb.Empty{})
 	errs.Add(err)
 
 	vm.serverCloser.Stop()
@@ -315,7 +316,7 @@ func (vm *VMClient) Shutdown() error {
 }
 
 func (vm *VMClient) CreateHandlers() (map[string]*common.HTTPHandler, error) {
-	resp, err := vm.client.CreateHandlers(context.Background(), &vmproto.EmptyMsg{})
+	resp, err := vm.client.CreateHandlers(context.Background(), &emptypb.Empty{})
 	if err != nil {
 		return nil, err
 	}
@@ -337,7 +338,7 @@ func (vm *VMClient) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 }
 
 func (vm *VMClient) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
-	resp, err := vm.client.CreateStaticHandlers(context.Background(), &vmproto.EmptyMsg{})
+	resp, err := vm.client.CreateStaticHandlers(context.Background(), &emptypb.Empty{})
 	if err != nil {
 		return nil, err
 	}
@@ -359,7 +360,7 @@ func (vm *VMClient) CreateStaticHandlers() (map[string]*common.HTTPHandler, erro
 }
 
 func (vm *VMClient) buildBlock() (snowman.Block, error) {
-	resp, err := vm.client.BuildBlock(context.Background(), &vmproto.EmptyMsg{})
+	resp, err := vm.client.BuildBlock(context.Background(), &emptypb.Empty{})
 	if err != nil {
 		return nil, err
 	}
@@ -463,7 +464,7 @@ func (vm *VMClient) SetPreference(id ids.ID) error {
 func (vm *VMClient) HealthCheck() (interface{}, error) {
 	return vm.client.Health(
 		context.Background(),
-		&vmproto.EmptyMsg{},
+		&emptypb.Empty{},
 	)
 }
 
@@ -516,7 +517,7 @@ func (vm *VMClient) AppGossip(nodeID ids.ShortID, msg []byte) error {
 func (vm *VMClient) Version() (string, error) {
 	resp, err := vm.client.Version(
 		context.Background(),
-		&vmproto.EmptyMsg{},
+		&emptypb.Empty{},
 	)
 	if err != nil {
 		return "", err

@@ -5,20 +5,18 @@ package timeout
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Manager registers and fires timeouts for the snow API.
 type Manager struct {
-	lock         sync.Mutex
 	tm           timer.AdaptiveTimeoutManager
 	benchlistMgr benchlist.Manager
 	metrics      metrics
@@ -60,13 +58,13 @@ func (m *Manager) RegisterChain(ctx *snow.Context, namespace string) error {
 	return nil
 }
 
-// RegisterRequests notes that we sent a request of type [msgType] to [validatorID]
-// regarding chain [chainID]. If we don't receive a response in time, [timeoutHandler]
-// is executed.
+// RegisterRequest notes that we expect a response of type [op] from
+// [validatorID] regarding chain [chainID]. If we don't receive a response in
+// time, [timeoutHandler]  is executed.
 func (m *Manager) RegisterRequest(
 	validatorID ids.ShortID,
 	chainID ids.ID,
-	msgType constants.MsgType,
+	op message.Op,
 	uniqueRequestID ids.ID,
 	timeoutHandler func(),
 ) (time.Time, bool) {
@@ -75,7 +73,7 @@ func (m *Manager) RegisterRequest(
 		m.benchlistMgr.RegisterFailure(chainID, validatorID)
 		timeoutHandler()
 	}
-	return m.tm.Put(uniqueRequestID, msgType, newTimeoutHandler), true
+	return m.tm.Put(uniqueRequestID, op, newTimeoutHandler), true
 }
 
 // RegisterResponse registers that we received a response from [validatorID]
@@ -84,12 +82,10 @@ func (m *Manager) RegisterResponse(
 	validatorID ids.ShortID,
 	chainID ids.ID,
 	uniqueRequestID ids.ID,
-	msgType constants.MsgType,
+	op message.Op,
 	latency time.Duration,
 ) {
-	m.lock.Lock()
-	m.metrics.observe(chainID, msgType, latency)
-	m.lock.Unlock()
+	m.metrics.Observe(chainID, op, latency)
 	m.benchlistMgr.RegisterResponse(chainID, validatorID)
 	m.tm.Remove(uniqueRequestID)
 }

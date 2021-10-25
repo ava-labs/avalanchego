@@ -8,7 +8,7 @@ set -o pipefail
 avalanche_testing_repo="avaplatform/avalanche-testing"
 avalanchego_byzantine_repo="avaplatform/avalanche-byzantine"
 
-# Define default versions to use
+# Define avalanche-testing and avalanche-byzantine versions to use
 avalanche_testing_image="avaplatform/avalanche-testing:master"
 avalanchego_byzantine_image="avaplatform/avalanche-byzantine:master"
 
@@ -31,37 +31,11 @@ source "$AVALANCHE_PATH"/scripts/constants.sh
 # Login to docker
 echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
 
-# Checks available docker tags exist
-function docker_tag_exists() {
-    TOKEN=$(curl -s -H "Content-Type: application/json" -X POST -d '{"username": "'${DOCKER_USERNAME}'", "password": "'${DOCKER_PASS}'"}' https://hub.docker.com/v2/users/login/ | jq -r .token)
-    curl --silent -H "Authorization: JWT ${TOKEN}" -f --head -lL https://hub.docker.com/v2/repositories/$1/tags/$2/ > /dev/null
-}
-
+# Receives params for debug execution
 testBatch="${1:-}"
 shift 1
 
 echo "Running Test Batch: ${testBatch}"
-
-# Defines the avalanche-testing tag to use
-# Either uses the same tag as the current branch or uses the default
-if docker_tag_exists $avalanche_testing_repo $current_branch; then
-    echo "$avalanche_testing_repo:$current_branch exists; using this image to run e2e tests"
-    avalanche_testing_image="$avalanche_testing_repo:$current_branch"
-else
-    echo "$avalanche_testing_repo $current_branch does NOT exist; using the default image to run e2e tests"
-fi
-
-# Defines the avalanchego-byzantine tag to use
-# Either uses the same tag as the current branch or uses the default
-if docker_tag_exists $avalanchego_byzantine_repo $current_branch; then
-    echo "$avalanchego_byzantine_repo:$current_branch exists; using this image to run e2e tests"
-    avalanchego_byzantine_image="$avalanchego_byzantine_repo:$current_branch"
-else
-    echo "$avalanchego_byzantine_repo $current_branch does NOT exist; using the default image to run e2e tests"
-fi
-
-echo "Using $avalanche_testing_image for e2e tests"
-echo "Using $avalanchego_byzantine_image for e2e tests"
 
 # pulling the avalanche-testing image
 docker pull $avalanche_testing_image
@@ -84,7 +58,6 @@ echo "Running Avalanche Testing Image: ${avalanche_testing_image}"
 echo "Running Avalanche Byzantine Image: ${avalanchego_byzantine_image}"
 echo "Git Commit ID : ${git_commit_id}"
 echo ""
-
 
 # >>>>>>>> avalanche-testing custom parameters <<<<<<<<<<<<<
 custom_params_json="{

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche/poll"
@@ -21,12 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-)
-
-const (
-	// TODO define this constant in one place rather than here and in snowman
-	// Max containers size in a MultiPut message
-	maxContainersLen = int(4 * network.DefaultMaxMessageSize / 5)
 )
 
 var _ Engine = &Transitive{}
@@ -175,7 +168,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.I
 		vtxBytes := vtx.Bytes()
 		// Ensure response size isn't too large. Include wrappers.IntLen because the size of the message
 		// is included with each container, and the size is repr. by an int.
-		if newLen := wrappers.IntLen + ancestorsBytesLen + len(vtxBytes); newLen < maxContainersLen {
+		if newLen := wrappers.IntLen + ancestorsBytesLen + len(vtxBytes); newLen < constants.MaxContainersLen {
 			ancestorsBytes = append(ancestorsBytes, vtxBytes)
 			ancestorsBytesLen = newLen
 		} else { // reached maximum response size
@@ -548,7 +541,7 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 	// Track performance statistics
 	t.metrics.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len()))
 	t.metrics.numMissingTxs.Set(float64(t.missingTxs.Len()))
-	t.metrics.numPendingVts.Set(float64(t.pending.Len()))
+	t.metrics.numPendingVts.Set(float64(len(t.pending)))
 	t.metrics.blockerVtxs.Set(float64(t.vtxBlocked.Len()))
 	t.metrics.blockerTxs.Set(float64(t.txBlocked.Len()))
 	return t.errs.Err
@@ -680,7 +673,7 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 	t.metrics.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len())) // Tracks performance statistics
 }
 
-// Health implements the common.Engine interface
+// HealthCheck implements the common.Engine interface
 func (t *Transitive) HealthCheck() (interface{}, error) {
 	var (
 		consensusIntf interface{} = struct{}{}

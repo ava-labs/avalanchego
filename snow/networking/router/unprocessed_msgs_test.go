@@ -5,11 +5,12 @@ package router
 
 import (
 	"testing"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
@@ -26,10 +27,18 @@ func TestUnprocessedMsgs(t *testing.T) {
 	uIntf, err := newUnprocessedMsgs(logging.NoLog{}, vdrs, cpuTracker, "", prometheus.NewRegistry())
 	assert.NoError(err)
 	u := uIntf.(*unprocessedMsgsImpl)
-	msg1 := message{
-		messageType: constants.PutMsg,
-		nodeID:      vdr1ID,
-	}
+	currentTime := time.Now()
+	u.clock.Set(currentTime)
+
+	mc, err := message.NewCreator(prometheus.NewRegistry(), true /*compressionEnabled*/, "dummyNamespace")
+	assert.NoError(err)
+	mc.SetTime(currentTime)
+	msg1 := mc.InboundPut(ids.Empty,
+		0,
+		ids.GenerateTestID(),
+		nil,
+		vdr1ID,
+	)
 
 	// Push then pop should work regardless of utilization when there are
 	// no other messages on [u.msgs]
@@ -74,10 +83,8 @@ func TestUnprocessedMsgs(t *testing.T) {
 	assert.EqualValues(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	assert.EqualValues(1, u.Len())
 
-	msg2 := message{
-		messageType: constants.GetMsg,
-		nodeID:      vdr2ID,
-	}
+	msg2 := mc.InboundGet(ids.Empty, 0, 0, ids.Empty, vdr2ID)
+
 	// Push msg2 from vdr2ID
 	u.Push(msg2)
 	assert.EqualValues(2, u.Len())
@@ -97,14 +104,8 @@ func TestUnprocessedMsgs(t *testing.T) {
 	// u is now empty
 	// Non-validators should be able to put messages onto [u]
 	nonVdrNodeID1, nonVdrNodeID2 := ids.GenerateTestShortID(), ids.GenerateTestShortID()
-	msg3 := message{
-		messageType: constants.PullQueryMsg,
-		nodeID:      nonVdrNodeID1,
-	}
-	msg4 := message{
-		messageType: constants.PushQueryMsg,
-		nodeID:      nonVdrNodeID2,
-	}
+	msg3 := mc.InboundPullQuery(ids.Empty, 0, 0, ids.Empty, nonVdrNodeID1)
+	msg4 := mc.InboundPushQuery(ids.Empty, 0, 0, ids.Empty, nil, nonVdrNodeID2)
 	u.Push(msg3)
 	u.Push(msg4)
 	u.Push(msg1)

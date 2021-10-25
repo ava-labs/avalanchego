@@ -15,7 +15,7 @@ import (
 
 func TestSybilOutboundMsgThrottler(t *testing.T) {
 	assert := assert.New(t)
-	config := MsgThrottlerConfig{
+	config := MsgByteThrottlerConfig{
 		VdrAllocSize:        1024,
 		AtLargeAllocSize:    1024,
 		NodeMaxAtLargeBytes: 1024,
@@ -147,7 +147,7 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 // Ensure that the limit on taking from the at-large allocation is enforced
 func TestSybilOutboundMsgThrottlerMaxNonVdr(t *testing.T) {
 	assert := assert.New(t)
-	config := MsgThrottlerConfig{
+	config := MsgByteThrottlerConfig{
 		VdrAllocSize:        100,
 		AtLargeAllocSize:    100,
 		NodeMaxAtLargeBytes: 10,

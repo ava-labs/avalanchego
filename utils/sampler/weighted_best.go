@@ -8,9 +8,8 @@ import (
 	"math"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/timer"
-
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 var errNoValidWeightedSamplers = errors.New("no valid weighted samplers found")
@@ -26,7 +25,7 @@ type weightedBest struct {
 	Weighted
 	samplers            []Weighted
 	benchmarkIterations int
-	clock               timer.Clock
+	clock               mockable.Clock
 }
 
 func (s *weightedBest) Initialize(weights []uint64) error {

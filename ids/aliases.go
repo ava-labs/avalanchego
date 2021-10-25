@@ -8,23 +8,42 @@ import (
 	"sync"
 )
 
+// AliaserReader allows one to lookup the aliases given to an ID.
+type AliaserReader interface {
+	Lookup(alias string) (ID, error)
+	PrimaryAlias(id ID) (string, error)
+	Aliases(id ID) ([]string, error)
+}
+
+// Aliaser allows one to give an ID aliases. An ID can have arbitrarily many
+// aliases; two IDs may not have the same alias.
+type AliaserWriter interface {
+	Alias(id ID, alias string) error
+	RemoveAliases(id ID)
+}
+
 // Aliaser allows one to give an ID aliases and lookup the aliases given to an
-// ID. An ID can have arbitrarily many aliases; two IDs may not have the same
-// alias.
-type Aliaser struct {
+// ID.
+type Aliaser interface {
+	AliaserReader
+	AliaserWriter
+}
+
+type aliaser struct {
 	lock    sync.RWMutex
 	dealias map[string]ID
 	aliases map[ID][]string
 }
 
-// Initialize the aliaser to have no aliases
-func (a *Aliaser) Initialize() {
-	a.dealias = make(map[string]ID)
-	a.aliases = make(map[ID][]string)
+func NewAliaser() Aliaser {
+	return &aliaser{
+		dealias: make(map[string]ID),
+		aliases: make(map[ID][]string),
+	}
 }
 
 // Lookup returns the ID associated with alias
-func (a *Aliaser) Lookup(alias string) (ID, error) {
+func (a *aliaser) Lookup(alias string) (ID, error) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
@@ -34,28 +53,28 @@ func (a *Aliaser) Lookup(alias string) (ID, error) {
 	return ID{}, fmt.Errorf("there is no ID with alias %s", alias)
 }
 
-// Aliases returns the aliases of an ID
-func (a *Aliaser) Aliases(id ID) []string {
-	a.lock.RLock()
-	defer a.lock.RUnlock()
-
-	return a.aliases[id]
-}
-
 // PrimaryAlias returns the first alias of [id]
-func (a *Aliaser) PrimaryAlias(id ID) (string, error) {
+func (a *aliaser) PrimaryAlias(id ID) (string, error) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
-	aliases, exists := a.aliases[id]
-	if !exists || len(aliases) == 0 {
+	aliases := a.aliases[id]
+	if len(aliases) == 0 {
 		return "", fmt.Errorf("there is no alias for ID %s", id)
 	}
 	return aliases[0], nil
 }
 
+// Aliases returns the aliases of an ID
+func (a *aliaser) Aliases(id ID) ([]string, error) {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+
+	return a.aliases[id], nil
+}
+
 // Alias gives [id] the alias [alias]
-func (a *Aliaser) Alias(id ID, alias string) error {
+func (a *aliaser) Alias(id ID, alias string) error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
@@ -69,7 +88,7 @@ func (a *Aliaser) Alias(id ID, alias string) error {
 }
 
 // RemoveAliases of the provided ID
-func (a *Aliaser) RemoveAliases(id ID) {
+func (a *aliaser) RemoveAliases(id ID) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 

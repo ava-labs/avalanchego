@@ -42,7 +42,7 @@ func (c *Client) MemoryProfile() (bool, error) {
 
 func (c *Client) LockProfile() (bool, error) {
 	res := &api.SuccessResponse{}
-	err := c.requester.SendRequest("memoryProfile", struct{}{}, res)
+	err := c.requester.SendRequest("lockProfile", struct{}{}, res)
 	return res.Success, err
 }
 

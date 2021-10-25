@@ -383,11 +383,8 @@ func TestServiceDeleteUser(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			if err := db.Put([]byte("hello"), []byte("world")); err != nil {
-				return err
-			}
 
-			return nil
+			return db.Put([]byte("hello"), []byte("world"))
 		},
 		request: &api.UserPass{Username: testUser, Password: password},
 		want:    &api.SuccessResponse{Success: true},

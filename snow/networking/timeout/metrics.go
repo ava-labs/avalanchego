@@ -1,14 +1,18 @@
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package timeout
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -18,120 +22,99 @@ const (
 	validatorIDLabel      = "validatorID"
 )
 
-func initAverager(
-	namespace,
-	name string,
-	reg prometheus.Registerer,
-	errs *wrappers.Errs,
-) metric.Averager {
-	return metric.NewAveragerWithErrs(
-		namespace,
-		name,
-		defaultRequestHelpMsg,
-		reg,
-		errs,
-	)
-}
-
-func initSummary(
-	namespace,
-	name string,
-	registerer prometheus.Registerer,
-	errs *wrappers.Errs,
-) *prometheus.SummaryVec {
-	summary := prometheus.NewSummaryVec(prometheus.SummaryOpts{
-		Namespace: namespace,
-		Name:      name,
-		Help:      defaultRequestHelpMsg,
-	}, []string{validatorIDLabel})
-
-	if err := registerer.Register(summary); err != nil {
-		errs.Add(fmt.Errorf("failed to register %s statistics: %w", name, err))
-	}
-	return summary
-}
-
 type metrics struct {
+	lock           sync.Mutex
 	chainToMetrics map[ids.ID]*chainMetrics
 }
 
 func (m *metrics) RegisterChain(ctx *snow.Context, namespace string) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	if m.chainToMetrics == nil {
 		m.chainToMetrics = map[ids.ID]*chainMetrics{}
 	}
 	if _, exists := m.chainToMetrics[ctx.ChainID]; exists {
 		return fmt.Errorf("chain %s has already been registered", ctx.ChainID)
 	}
-	cm := &chainMetrics{}
-	if err := cm.Initialize(ctx, namespace, false); err != nil {
-		return fmt.Errorf("couldn't initialize metrics for chain %s: %w", ctx.ChainID, err)
+	cm, err := newChainMetrics(ctx, namespace, false)
+	if err != nil {
+		return fmt.Errorf("couldn't create metrics for chain %s: %w", ctx.ChainID, err)
 	}
 	m.chainToMetrics[ctx.ChainID] = cm
 	return nil
 }
 
-// Record that a response to a message of type [msgType] regarding chain [chainID] took [latency]
-func (m *metrics) observe(chainID ids.ID, msgType constants.MsgType, latency time.Duration) {
+// Record that a response of type [op] took [latency]
+func (m *metrics) Observe(chainID ids.ID, op message.Op, latency time.Duration) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	cm, exists := m.chainToMetrics[chainID]
 	if !exists {
 		// TODO should this log an error?
 		return
 	}
-	cm.observe(ids.ShortEmpty, msgType, latency)
+	cm.observe(ids.ShortEmpty, op, latency)
 }
 
 // chainMetrics contains message response time metrics for a chain
 type chainMetrics struct {
 	ctx *snow.Context
 
-	summaryEnabled bool
+	messageLatencies map[message.Op]metric.Averager
 
-	getAcceptedFrontierSummary, getAcceptedSummary,
-	getAncestorsSummary, getSummary,
-	pushQuerySummary, pullQuerySummary *prometheus.SummaryVec
-
-	getAcceptedFrontier, getAccepted,
-	getAncestors, get,
-	pushQuery, pullQuery metric.Averager
+	summaryEnabled   bool
+	messageSummaries map[message.Op]*prometheus.SummaryVec
 }
 
-// Initialize implements the Engine interface
-func (cm *chainMetrics) Initialize(ctx *snow.Context, namespace string, summaryEnabled bool) error {
-	cm.summaryEnabled = summaryEnabled
-	errs := wrappers.Errs{}
+func newChainMetrics(ctx *snow.Context, namespace string, summaryEnabled bool) (*chainMetrics, error) {
+	cm := &chainMetrics{
+		ctx: ctx,
+
+		messageLatencies: make(map[message.Op]metric.Averager, len(message.ConsensusResponseOps)),
+
+		summaryEnabled:   summaryEnabled,
+		messageSummaries: make(map[message.Op]*prometheus.SummaryVec, len(message.ConsensusResponseOps)),
+	}
 
 	queryLatencyNamespace := fmt.Sprintf("%s_lat", namespace)
+	errs := wrappers.Errs{}
+	for _, op := range message.ConsensusResponseOps {
+		cm.messageLatencies[op] = metric.NewAveragerWithErrs(
+			queryLatencyNamespace,
+			op.String(),
+			defaultRequestHelpMsg,
+			ctx.Metrics,
+			&errs,
+		)
 
-	cm.getAcceptedFrontierSummary = initSummary(queryLatencyNamespace, "get_accepted_frontier_peer", ctx.Metrics, &errs)
-	cm.getAcceptedSummary = initSummary(queryLatencyNamespace, "get_accepted_peer", ctx.Metrics, &errs)
-	cm.getAncestorsSummary = initSummary(queryLatencyNamespace, "get_ancestors_peer", ctx.Metrics, &errs)
-	cm.getSummary = initSummary(queryLatencyNamespace, "get_peer", ctx.Metrics, &errs)
-	cm.pushQuerySummary = initSummary(queryLatencyNamespace, "push_query_peer", ctx.Metrics, &errs)
-	cm.pullQuerySummary = initSummary(queryLatencyNamespace, "pull_query_peer", ctx.Metrics, &errs)
+		if !summaryEnabled {
+			continue
+		}
 
-	cm.getAcceptedFrontier = initAverager(queryLatencyNamespace, "get_accepted_frontier", ctx.Metrics, &errs)
-	cm.getAccepted = initAverager(queryLatencyNamespace, "get_accepted", ctx.Metrics, &errs)
-	cm.getAncestors = initAverager(queryLatencyNamespace, "get_ancestors", ctx.Metrics, &errs)
-	cm.get = initAverager(queryLatencyNamespace, "get", ctx.Metrics, &errs)
-	cm.pushQuery = initAverager(queryLatencyNamespace, "push_query", ctx.Metrics, &errs)
-	cm.pullQuery = initAverager(queryLatencyNamespace, "pull_query", ctx.Metrics, &errs)
+		summaryName := fmt.Sprintf("%s_peer", op)
+		summary := prometheus.NewSummaryVec(
+			prometheus.SummaryOpts{
+				Namespace: queryLatencyNamespace,
+				Name:      summaryName,
+				Help:      defaultRequestHelpMsg,
+			},
+			[]string{validatorIDLabel},
+		)
+		cm.messageSummaries[op] = summary
 
-	return errs.Err
+		if err := ctx.Metrics.Register(summary); err != nil {
+			errs.Add(fmt.Errorf("failed to register %s statistics: %w", summaryName, err))
+		}
+	}
+	return cm, errs.Err
 }
 
-func (cm *chainMetrics) observe(validatorID ids.ShortID, msgType constants.MsgType, latency time.Duration) {
+func (cm *chainMetrics) observe(validatorID ids.ShortID, op message.Op, latency time.Duration) {
 	lat := float64(latency)
-	switch msgType {
-	case constants.GetAcceptedFrontierMsg:
-		cm.getAcceptedFrontier.Observe(lat)
-	case constants.GetAcceptedMsg:
-		cm.getAccepted.Observe(lat)
-	case constants.GetMsg:
-		cm.get.Observe(lat)
-	case constants.PushQueryMsg:
-		cm.pushQuery.Observe(lat)
-	case constants.PullQueryMsg:
-		cm.pullQuery.Observe(lat)
+	if msg, exists := cm.messageLatencies[op]; exists {
+		msg.Observe(lat)
 	}
 
 	if !cm.summaryEnabled {
@@ -141,28 +124,16 @@ func (cm *chainMetrics) observe(validatorID ids.ShortID, msgType constants.MsgTy
 	labels := prometheus.Labels{
 		validatorIDLabel: validatorID.String(),
 	}
-	var (
-		observer prometheus.Observer
-		err      error
-	)
-	switch msgType {
-	case constants.GetAcceptedFrontierMsg:
-		observer, err = cm.getAcceptedFrontierSummary.GetMetricWith(labels)
-	case constants.GetAcceptedMsg:
-		observer, err = cm.getAcceptedSummary.GetMetricWith(labels)
-	case constants.GetMsg:
-		observer, err = cm.getSummary.GetMetricWith(labels)
-	case constants.PushQueryMsg:
-		observer, err = cm.pushQuerySummary.GetMetricWith(labels)
-	case constants.PullQueryMsg:
-		observer, err = cm.pullQuerySummary.GetMetricWith(labels)
-	default:
+
+	msg, exists := cm.messageSummaries[op]
+	if !exists {
 		return
 	}
 
-	if err == nil {
-		observer.Observe(lat)
-	} else {
-		cm.ctx.Log.Warn("Failed to get observer with validatorID label due to %s", err)
+	observer, err := msg.GetMetricWith(labels)
+	if err != nil {
+		cm.ctx.Log.Warn("failed to get observer with validatorID label due to %s", err)
+		return
 	}
+	observer.Observe(lat)
 }

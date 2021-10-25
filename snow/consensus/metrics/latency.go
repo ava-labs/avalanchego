@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -24,7 +24,7 @@ type opStart struct {
 // Latency reports commonly used consensus latency metrics.
 type Latency struct {
 	// Clock gives access to the current wall clock time
-	Clock timer.Clock
+	Clock mockable.Clock
 
 	// ProcessingEntries keeps track of the [opStart] that each item was issued
 	// into the consensus instance. This is used to calculate the amount of time

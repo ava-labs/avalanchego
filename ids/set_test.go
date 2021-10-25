@@ -57,6 +57,15 @@ func TestSet(t *testing.T) {
 	if !ids.Overlaps(ids2) {
 		t.Fatalf("Sets overlap")
 	}
+
+	ids2.Difference(ids)
+	if ids2.Contains(id1) {
+		t.Fatalf("Value not difference removed correctly")
+	}
+
+	if ids.Overlaps(ids2) {
+		t.Fatalf("Sets don't overlap")
+	}
 }
 
 func TestSetCappedList(t *testing.T) {

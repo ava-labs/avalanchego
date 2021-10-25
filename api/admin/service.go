@@ -159,8 +159,8 @@ func (service *Admin) GetChainAliases(_ *http.Request, args *GetChainAliasesArgs
 		return err
 	}
 
-	reply.Aliases = service.ChainManager.Aliases(id)
-	return nil
+	reply.Aliases, err = service.ChainManager.Aliases(id)
+	return err
 }
 
 // Stacktrace returns the current global stacktrace

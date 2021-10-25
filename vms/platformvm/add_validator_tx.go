@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -28,6 +27,7 @@ var (
 	errStakeTooShort             = errors.New("staking period is too short")
 	errStakeTooLong              = errors.New("staking period is too long")
 	errInsufficientDelegationFee = errors.New("staker charges an insufficient delegation fee")
+	errFutureStakeTime           = fmt.Errorf("staker is attempting to start staking more than %s ahead of the current chain time", maxFutureStartTime)
 	errTooManyShares             = fmt.Errorf("a staker can only require at most %d shares from delegators", PercentDenominator)
 
 	_ UnsignedProposalTx = &UnsignedAddValidatorTx{}
@@ -43,10 +43,22 @@ type UnsignedAddValidatorTx struct {
 	// Where to send staked tokens when done validating
 	Stake []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send staking rewards when done validating
-	RewardsOwner verify.Verifiable `serialize:"true" json:"rewardsOwner"`
+	RewardsOwner Owner `serialize:"true" json:"rewardsOwner"`
 	// Fee this validator charges delegators as a percentage, times 10,000
 	// For example, if this validator has Shares=300,000 then they take 30% of rewards from delegators
 	Shares uint32 `serialize:"true" json:"shares"`
+}
+
+// InitCtx sets the FxID fields in the inputs and outputs of this
+// [UnsignedAddValidatorTx]. Also sets the [ctx] to the given [vm.ctx] so that
+// the addresses can be json marshalled into human readable format
+func (tx *UnsignedAddValidatorTx) InitCtx(ctx *snow.Context) {
+	tx.BaseTx.InitCtx(ctx)
+	for _, out := range tx.Stake {
+		out.FxID = secp256k1fx.ID
+		out.InitCtx(ctx)
+	}
+	tx.RewardsOwner.InitCtx(ctx)
 }
 
 // StartTime of this validator
@@ -64,40 +76,18 @@ func (tx *UnsignedAddValidatorTx) Weight() uint64 {
 	return tx.Validator.Weight()
 }
 
-// Verify return nil iff [tx] is valid
-func (tx *UnsignedAddValidatorTx) Verify(
-	ctx *snow.Context,
-	c codec.Manager,
-	minStake uint64,
-	maxStake uint64,
-	minStakeDuration time.Duration,
-	maxStakeDuration time.Duration,
-	minDelegationFee uint32,
-) error {
+// SyntacticVerify returns nil iff [tx] is valid
+func (tx *UnsignedAddValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.Validator.Wght < minStake: // Ensure validator is staking at least the minimum amount
-		return errWeightTooSmall
-	case tx.Validator.Wght > maxStake: // Ensure validator isn't staking too much
-		return errWeightTooLarge
 	case tx.Shares > PercentDenominator: // Ensure delegators shares are in the allowed amount
 		return errTooManyShares
-	case tx.Shares < minDelegationFee:
-		return errInsufficientDelegationFee
 	}
 
-	duration := tx.Validator.Duration()
-	switch {
-	case duration < minStakeDuration: // Ensure staking length is not too short
-		return errStakeTooShort
-	case duration > maxStakeDuration: // Ensure staking length is not too long
-		return errStakeTooLong
-	}
-
-	if err := tx.BaseTx.Verify(ctx, c); err != nil {
+	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
 	if err := verify.All(&tx.Validator, tx.RewardsOwner); err != nil {
@@ -128,8 +118,19 @@ func (tx *UnsignedAddValidatorTx) Verify(
 	return nil
 }
 
-// SemanticVerify this transaction is valid.
-func (tx *UnsignedAddValidatorTx) SemanticVerify(
+// Attempts to verify this transaction with the provided state.
+func (tx *UnsignedAddValidatorTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
+	_, _, _, _, err := tx.Execute(vm, parentState, stx)
+	// We ignore [errFutureStakeTime] here because an advanceTimeTx will be
+	// issued before this transaction is issued.
+	if errors.Is(err, errFutureStakeTime) {
+		return nil
+	}
+	return err
+}
+
+// Execute this transaction.
+func (tx *UnsignedAddValidatorTx) Execute(
 	vm *VM,
 	parentState MutableState,
 	stx *Tx,
@@ -141,16 +142,25 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	TxError,
 ) {
 	// Verify the tx is well-formed
-	if err := tx.Verify(
-		vm.ctx,
-		vm.codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		vm.MinStakeDuration,
-		vm.MaxStakeDuration,
-		vm.MinDelegationFee,
-	); err != nil {
+	if err := tx.SyntacticVerify(vm.ctx); err != nil {
 		return nil, nil, nil, nil, permError{err}
+	}
+
+	switch {
+	case tx.Validator.Wght < vm.MinValidatorStake: // Ensure validator is staking at least the minimum amount
+		return nil, nil, nil, nil, permError{errWeightTooSmall}
+	case tx.Validator.Wght > vm.MaxValidatorStake: // Ensure validator isn't staking too much
+		return nil, nil, nil, nil, permError{errWeightTooLarge}
+	case tx.Shares < vm.MinDelegationFee:
+		return nil, nil, nil, nil, permError{errInsufficientDelegationFee}
+	}
+
+	duration := tx.Validator.Duration()
+	switch {
+	case duration < vm.MinStakeDuration: // Ensure staking length is not too short
+		return nil, nil, nil, nil, permError{errStakeTooShort}
+	case duration > vm.MaxStakeDuration: // Ensure staking length is not too long
+		return nil, nil, nil, nil, permError{errStakeTooLong}
 	}
 
 	currentStakers := parentState.CurrentStakerChainState()
@@ -163,18 +173,11 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	if vm.bootstrapped {
 		currentTimestamp := parentState.GetTimestamp()
 		// Ensure the proposed validator starts after the current time
-		if startTime := tx.StartTime(); !currentTimestamp.Before(startTime) {
+		startTime := tx.StartTime()
+		if !currentTimestamp.Before(startTime) {
 			return nil, nil, nil, nil, permError{
 				fmt.Errorf(
 					"validator's start time (%s) at or before current timestamp (%s)",
-					startTime,
-					currentTimestamp,
-				),
-			}
-		} else if startTime.After(currentTimestamp.Add(maxFutureStartTime)) {
-			return nil, nil, nil, nil, permError{
-				fmt.Errorf(
-					"validator start time (%s) more than two weeks after current chain timestamp (%s)",
 					startTime,
 					currentTimestamp,
 				),
@@ -233,6 +236,14 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 					fmt.Errorf("failed semanticVerifySpend: %w", err),
 				}
 			}
+		}
+
+		// Make sure the tx doesn't start too far in the future. This is done
+		// last to allow SemanticVerification to explicitly check for this
+		// error.
+		maxStartTime := currentTimestamp.Add(maxFutureStartTime)
+		if startTime.After(maxStartTime) {
+			return nil, nil, nil, nil, permError{errFutureStakeTime}
 		}
 	}
 
@@ -300,16 +311,8 @@ func (vm *VM) newAddValidatorTx(
 		Shares: shares,
 	}
 	tx := &Tx{UnsignedTx: utx}
-	if err := tx.Sign(vm.codec, signers); err != nil {
+	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(
-		vm.ctx,
-		vm.codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		vm.MinStakeDuration,
-		vm.MaxStakeDuration,
-		vm.MinDelegationFee,
-	)
+	return tx, utx.SyntacticVerify(vm.ctx)
 }

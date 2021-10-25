@@ -134,7 +134,7 @@ type CommonBlock struct {
 	self      Block // self is a reference to this block's implementing struct
 	id        ids.ID
 	bytes     []byte
-	timestamp time.Time
+	timestamp time.Time // Time this block was proposed at
 	status    choices.Status
 	vm        *VM
 
@@ -168,6 +168,9 @@ func (b *CommonBlock) Height() uint64 { return b.Hght }
 
 // Timestamp returns this block's time.
 func (b *CommonBlock) Timestamp() time.Time {
+	// If this is the last accepted block and the block was loaded from disk
+	// since it was accepted, then the timestamp wouldn't be set correctly. So,
+	// we explicitly return the chain time.
 	if b.id == b.vm.lastAcceptedID {
 		return b.vm.internalState.GetTimestamp()
 	}
@@ -222,6 +225,7 @@ func (b *CommonBlock) Reject() error {
 	defer b.free()
 
 	b.status = choices.Rejected
+	// TODO: don't write rejected blocks to disk
 	b.vm.internalState.AddBlock(b.self)
 	return b.vm.internalState.Commit()
 }
@@ -268,6 +272,7 @@ func (cdb *CommonDecisionBlock) Reject() error {
 	defer cdb.free()
 
 	cdb.status = choices.Rejected
+	// TODO: don't write rejected blocks to disk
 	cdb.vm.internalState.AddBlock(cdb.self)
 	return cdb.vm.internalState.Commit()
 }

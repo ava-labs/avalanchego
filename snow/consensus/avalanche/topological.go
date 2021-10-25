@@ -5,6 +5,8 @@ package avalanche
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -17,10 +19,7 @@ const (
 	minMapSize = 16
 )
 
-var (
-	errUnhealthy = errors.New("avalanche consensus is not healthy")
-	errNoLeaves  = errors.New("couldn't pop a leaf from leaf set")
-)
+var errNoLeaves = errors.New("couldn't pop a leaf from leaf set")
 
 var _ Consensus = &Topological{}
 
@@ -236,22 +235,25 @@ func (ta *Topological) Finalized() bool { return ta.cg.Finalized() }
 // HealthCheck returns information about the consensus health.
 func (ta *Topological) HealthCheck() (interface{}, error) {
 	numOutstandingVtx := ta.Latency.ProcessingLen()
-	healthy := numOutstandingVtx <= ta.params.MaxOutstandingItems
+	isOutstandingVtx := numOutstandingVtx <= ta.params.MaxOutstandingItems
+	healthy := isOutstandingVtx
 	details := map[string]interface{}{
 		"outstandingVertices": numOutstandingVtx,
 	}
-
-	// check for long running vertices
-	timeReqRunning := ta.Latency.MeasureAndGetOldestDuration()
-	healthy = healthy && timeReqRunning <= ta.params.MaxItemProcessingTime
-	details["longestRunningVertex"] = timeReqRunning.String()
 
 	snowstormReport, err := ta.cg.HealthCheck()
 	healthy = healthy && err == nil
 	details["snowstorm"] = snowstormReport
 
 	if !healthy {
-		return details, errUnhealthy
+		var errorReasons []string
+		if isOutstandingVtx {
+			errorReasons = append(errorReasons, fmt.Sprintf("number outstanding vertexes %d > %d", numOutstandingVtx, ta.params.MaxOutstandingItems))
+		}
+		if err != nil {
+			errorReasons = append(errorReasons, err.Error())
+		}
+		return details, fmt.Errorf("avalanche consensus is not healthy reason: %s", strings.Join(errorReasons, ", "))
 	}
 	return details, nil
 }

@@ -5,7 +5,6 @@ package snowstorm
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -20,8 +19,6 @@ import (
 
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
-
-var errUnhealthy = errors.New("snowstorm consensus is not healthy")
 
 type common struct {
 	// metrics that describe this consensus instance
@@ -98,18 +95,13 @@ func (c *common) Finalized() bool {
 // HealthCheck returns information about the consensus health.
 func (c *common) HealthCheck() (interface{}, error) {
 	numOutstandingTxs := c.Latency.ProcessingLen()
-	healthy := numOutstandingTxs <= c.params.MaxOutstandingItems
+	isOutstandingTxs := numOutstandingTxs <= c.params.MaxOutstandingItems
 	details := map[string]interface{}{
 		"outstandingTransactions": numOutstandingTxs,
 	}
-
-	// check for long running transactions
-	timeReqRunning := c.Latency.MeasureAndGetOldestDuration()
-	healthy = healthy && timeReqRunning <= c.params.MaxItemProcessingTime
-	details["longestRunningTx"] = timeReqRunning.String()
-
-	if !healthy {
-		return details, errUnhealthy
+	if !isOutstandingTxs {
+		errorReason := fmt.Sprintf("number of outstanding txs %d > %d", numOutstandingTxs, c.params.MaxOutstandingItems)
+		return details, fmt.Errorf("snowstorm consensus is not healthy reason: %s", errorReason)
 	}
 	return details, nil
 }
