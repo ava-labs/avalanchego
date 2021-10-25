@@ -96,6 +96,8 @@ var (
 		Notify,
 		GossipRequest,
 	}
+	// List of all message types
+	Ops                  = append(ExternalOps, InternalOps...)
 	RequestToResponseOps = map[Op]Op{
 		GetAcceptedFrontier: AcceptedFrontier,
 		GetAccepted:         Accepted,
