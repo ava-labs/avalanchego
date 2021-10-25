@@ -75,4 +75,6 @@ type RemoteVM interface {
 		maxBlocksSize int, // max cumulated byte size of retrieved blocks
 		maxBlocksRetrivalTime time.Duration, // max duration of retrival operation
 	) [][]byte // slice containing retrieved ancestors bytes appended one to another
+
+	BatchedParseBlock(blks [][]byte) ([]snowman.Block, error)
 }

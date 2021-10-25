@@ -39,6 +39,7 @@ type VMClient interface {
 	BlockAccept(ctx context.Context, in *BlockAcceptRequest, opts ...grpc.CallOption) (*empty.Empty, error)
 	BlockReject(ctx context.Context, in *BlockRejectRequest, opts ...grpc.CallOption) (*empty.Empty, error)
 	GetAncestors(ctx context.Context, in *GetAncestorsRequest, opts ...grpc.CallOption) (*GetAncestorsResponse, error)
+	BatchedParseBlock(ctx context.Context, in *BatchedParseBlockRequest, opts ...grpc.CallOption) (*BatchedParseBlockResponse, error)
 }
 
 type vMClient struct {
@@ -229,6 +230,15 @@ func (c *vMClient) GetAncestors(ctx context.Context, in *GetAncestorsRequest, op
 	return out, nil
 }
 
+func (c *vMClient) BatchedParseBlock(ctx context.Context, in *BatchedParseBlockRequest, opts ...grpc.CallOption) (*BatchedParseBlockResponse, error) {
+	out := new(BatchedParseBlockResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/BatchedParseBlock", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // VMServer is the server API for VM service.
 // All implementations must embed UnimplementedVMServer
 // for forward compatibility
@@ -253,6 +263,7 @@ type VMServer interface {
 	BlockAccept(context.Context, *BlockAcceptRequest) (*empty.Empty, error)
 	BlockReject(context.Context, *BlockRejectRequest) (*empty.Empty, error)
 	GetAncestors(context.Context, *GetAncestorsRequest) (*GetAncestorsResponse, error)
+	BatchedParseBlock(context.Context, *BatchedParseBlockRequest) (*BatchedParseBlockResponse, error)
 	mustEmbedUnimplementedVMServer()
 }
 
@@ -319,6 +330,9 @@ func (UnimplementedVMServer) BlockReject(context.Context, *BlockRejectRequest) (
 }
 func (UnimplementedVMServer) GetAncestors(context.Context, *GetAncestorsRequest) (*GetAncestorsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAncestors not implemented")
+}
+func (UnimplementedVMServer) BatchedParseBlock(context.Context, *BatchedParseBlockRequest) (*BatchedParseBlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BatchedParseBlock not implemented")
 }
 func (UnimplementedVMServer) mustEmbedUnimplementedVMServer() {}
 
@@ -693,6 +707,24 @@ func _VM_GetAncestors_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VM_BatchedParseBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BatchedParseBlockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).BatchedParseBlock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/BatchedParseBlock",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).BatchedParseBlock(ctx, req.(*BatchedParseBlockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // VM_ServiceDesc is the grpc.ServiceDesc for VM service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -779,6 +811,10 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAncestors",
 			Handler:    _VM_GetAncestors_Handler,
+		},
+		{
+			MethodName: "BatchedParseBlock",
+			Handler:    _VM_BatchedParseBlock_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -223,7 +223,8 @@ func (vm *VMClient) Initialize(
 			GetBlock:            vm.getBlock,
 			UnmarshalBlock:      vm.parseBlock,
 			BuildBlock:          vm.buildBlock,
-			GetAncestors:        vm.GetAncestors,
+			GetAncestors:        vm.getAncestors,
+			BatchedParseBlock:   vm.batchedParseBlock,
 		},
 	)
 	if err != nil {
@@ -515,7 +516,7 @@ func (vm *VMClient) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	return err
 }
 
-func (vm *VMClient) GetAncestors(
+func (vm *VMClient) getAncestors(
 	blkID ids.ID,
 	maxBlocksNum int,
 	maxBlocksSize int,
@@ -536,6 +537,56 @@ func (vm *VMClient) GetAncestors(
 		res = append(res, blkBytes.BlkBytes)
 	}
 	return res
+}
+
+func (vm *VMClient) batchedParseBlock(
+	blksBytes [][]byte,
+) ([]snowman.Block, error) {
+	req := make([]*vmproto.ParseBlockRequest, len(blksBytes))
+	for idx, blkBytes := range blksBytes {
+		req[idx].Bytes = blkBytes
+	}
+
+	resp, err := vm.client.BatchedParseBlock(context.Background(), &vmproto.BatchedParseBlockRequest{
+		Request: req,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(blksBytes) != len(resp.Response) {
+		return nil, fmt.Errorf("BatchedParse block returned different number of blocks than expected")
+	}
+
+	res := make([]snowman.Block, 0, len(blksBytes))
+	for idx, blkResp := range resp.Response {
+		id, err := ids.ToID(blkResp.Id)
+		vm.ctx.Log.AssertNoError(err)
+
+		parentID, err := ids.ToID(blkResp.ParentID)
+		vm.ctx.Log.AssertNoError(err)
+
+		status := choices.Status(blkResp.Status)
+		vm.ctx.Log.AssertDeferredNoError(status.Valid)
+
+		timestamp := time.Time{}
+		if err := timestamp.UnmarshalBinary(blkResp.Timestamp); err != nil {
+			return nil, err
+		}
+
+		blk := &BlockClient{
+			vm:       vm,
+			id:       id,
+			parentID: parentID,
+			status:   status,
+			bytes:    req[idx].Bytes,
+			height:   blkResp.Height,
+			time:     timestamp,
+		}
+
+		res = append(res, blk)
+	}
+
+	return res, nil
 }
 
 func (vm *VMClient) Version() (string, error) {

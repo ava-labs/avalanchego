@@ -16,12 +16,16 @@ import (
 )
 
 var (
-	_ block.ChainVM       = &blockVM{}
+	_ BlockVM             = &blockVM{}
 	_ snowman.Block       = &meterBlock{}
 	_ snowman.OracleBlock = &meterBlock{}
 )
 
-func NewBlockVM(vm block.ChainVM) block.ChainVM {
+type BlockVM interface {
+	block.ChainVM
+}
+
+func NewBlockVM(vm block.ChainVM) BlockVM {
 	return &blockVM{
 		ChainVM: vm,
 	}

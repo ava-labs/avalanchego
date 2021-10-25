@@ -388,6 +388,45 @@ func (vm *VMServer) GetAncestors(_ context.Context,
 	return res, nil
 }
 
+func (vm *VMServer) BatchedParseBlock(_ context.Context,
+	req *vmproto.BatchedParseBlockRequest,
+) (*vmproto.BatchedParseBlockResponse, error) {
+	rVM, ok := vm.vm.(block.RemoteVM)
+	if !ok {
+		// should not happen
+		return nil, fmt.Errorf("plugin does not implement RemoteVM interface")
+	}
+	blkBytes := make([][]byte, len(req.Request))
+	for idx, reqBytes := range req.Request {
+		blkBytes[idx] = reqBytes.Bytes
+	}
+
+	blks, err := rVM.BatchedParseBlock(blkBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]*vmproto.ParseBlockResponse, len(blks))
+	for _, blk := range blks {
+		blkID := blk.ID()
+		parentID := blk.Parent()
+		timeBytes, err := blk.Timestamp().MarshalBinary()
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, &vmproto.ParseBlockResponse{
+			Id:        blkID[:],
+			ParentID:  parentID[:],
+			Status:    uint32(blk.Status()),
+			Height:    blk.Height(),
+			Timestamp: timeBytes,
+		})
+	}
+	return &vmproto.BatchedParseBlockResponse{
+		Response: res,
+	}, nil
+}
+
 func (vm *VMServer) GetBlock(_ context.Context, req *vmproto.GetBlockRequest) (*vmproto.GetBlockResponse, error) {
 	id, err := ids.ToID(req.Id)
 	if err != nil {

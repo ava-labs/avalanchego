@@ -37,6 +37,8 @@ type State struct {
 		maxBlocksNum int, maxBlocksSize int, maxBlocksRetrivalTime time.Duration,
 	) [][]byte
 
+	batchedParseBlock func(blksBytes [][]byte) ([]snowman.Block, error)
+
 	// verifiedBlocks is a map of blocks that have been verified and are
 	// therefore currently in consensus.
 	verifiedBlocks map[ids.ID]*BlockWrapper
@@ -68,6 +70,7 @@ type Config struct {
 	GetAncestors       func(blkID ids.ID,
 		maxBlocksNum int, maxBlocksSize int, maxBlocksRetrivalTime time.Duration,
 	) [][]byte
+	BatchedParseBlock func([][]byte) ([]snowman.Block, error)
 }
 
 // Block is an interface wrapping the normal snowman.Block interface to be used in
@@ -114,6 +117,7 @@ func (s *State) initialize(config *Config) {
 	s.getBlock = config.GetBlock
 	s.buildBlock = config.BuildBlock
 	s.getAncestors = config.GetAncestors
+	s.batchedParseBlock = config.BatchedParseBlock
 	s.unmarshalBlock = config.UnmarshalBlock
 	if config.GetBlockIDAtHeight == nil {
 		s.getStatus = func(blk snowman.Block) (choices.Status, error) { return blk.Status(), nil }

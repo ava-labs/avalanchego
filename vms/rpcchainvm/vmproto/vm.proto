@@ -156,7 +156,7 @@ message GetAncestorsRequest {
     bytes blkID = 1;
     int32 maxBlocksNum = 2;
     int32 maxBlocksSize = 3;
-    int64 maxBlocksRetrivalTime = 4; // TODO ABENEGIA: find better representation for duration
+    int64 maxBlocksRetrivalTime = 4;
 }
 
 message BlkBytes {
@@ -165,6 +165,14 @@ message BlkBytes {
 
 message GetAncestorsResponse {
     repeated BlkBytes blksBytes = 1;
+}
+
+message BatchedParseBlockRequest {
+    repeated ParseBlockRequest request = 1;
+}
+
+message BatchedParseBlockResponse {
+    repeated ParseBlockResponse response = 1;
 }
 // end of RemoteVM section
 
@@ -191,4 +199,5 @@ service VM {
     rpc BlockReject(BlockRejectRequest) returns (google.protobuf.Empty);
 
     rpc GetAncestors(GetAncestorsRequest) returns (GetAncestorsResponse);
+    rpc BatchedParseBlock(BatchedParseBlockRequest) returns (BatchedParseBlockResponse);
 }

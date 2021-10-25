@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/metervm"
 )
 
 var _ Engine = &Transitive{}
@@ -168,45 +169,52 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, blkID ids.ID) error 
 func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
 	ancestorsBytes := make([][]byte, 1, t.Config.MultiputMaxContainersSent)
 
-	if rVM, ok := t.VM.(block.RemoteVM); ok {
-		// push all GetAncestor logic to remoteVM to reduce network overhead
-		ancestorsBytes = rVM.GetAncestors(blkID,
-			t.Config.MultiputMaxContainersSent,
-			constants.MaxContainersLen,
-			t.Config.MaxTimeGetAncestors,
-		)
+	if mVM, ok := t.VM.(metervm.BlockVM); ok {
+		if rVM, ok := mVM.(block.RemoteVM); ok {
+			// push all GetAncestor logic to remoteVM to reduce network overhead
+			ancestorsBytes = rVM.GetAncestors(blkID,
+				t.Config.MultiputMaxContainersSent,
+				constants.MaxContainersLen,
+				t.Config.MaxTimeGetAncestors,
+			)
 
-		if len(ancestorsBytes) == 0 {
-			t.Ctx.Log.Verbo("couldn't get block %s. dropping GetAncestors(%s, %d, %s)",
-				blkID, vdr, requestID, blkID)
+			if len(ancestorsBytes) == 0 {
+				t.Ctx.Log.Verbo("couldn't get block %s. dropping GetAncestors(%s, %d, %s)",
+					blkID, vdr, requestID, blkID)
+				return nil
+			}
+
+			t.metrics.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
+			t.Sender.SendMultiPut(vdr, requestID, ancestorsBytes)
 			return nil
 		}
-	} else { // local logic is good enough
-		startTime := time.Now()
-		blk, err := t.GetBlock(blkID)
-		if err != nil { // Don't have the block. Drop this request.
-			t.Ctx.Log.Verbo("couldn't get block %s. dropping GetAncestors(%s, %d, %s)",
-				blkID, vdr, requestID, blkID)
-			return nil
+	}
+
+	// RemoteVM did not work, try local logic
+	startTime := time.Now()
+	blk, err := t.GetBlock(blkID)
+	if err != nil { // Don't have the block. Drop this request.
+		t.Ctx.Log.Verbo("couldn't get block %s. dropping GetAncestors(%s, %d, %s)",
+			blkID, vdr, requestID, blkID)
+		return nil
+	}
+
+	// First elt is byte repr. of [blk], then its parent, then grandparent, etc.
+	ancestorsBytes[0] = blk.Bytes()
+	ancestorsBytesLen := len(blk.Bytes()) + wrappers.IntLen // length, in bytes, of all elements of ancestors
+
+	for numFetched := 1; numFetched < t.Config.MultiputMaxContainersSent && time.Since(startTime) < t.Config.MaxTimeGetAncestors; numFetched++ {
+		if blk, err = t.GetBlock(blk.Parent()); err != nil {
+			break
 		}
-
-		// First elt is byte repr. of [blk], then its parent, then grandparent, etc.
-		ancestorsBytes[0] = blk.Bytes()
-		ancestorsBytesLen := len(blk.Bytes()) + wrappers.IntLen // length, in bytes, of all elements of ancestors
-
-		for numFetched := 1; numFetched < t.Config.MultiputMaxContainersSent && time.Since(startTime) < t.Config.MaxTimeGetAncestors; numFetched++ {
-			if blk, err = t.GetBlock(blk.Parent()); err != nil {
-				break
-			}
-			blkBytes := blk.Bytes()
-			// Ensure response size isn't too large. Include wrappers.IntLen because the size of the message
-			// is included with each container, and the size is repr. by an int.
-			if newLen := ancestorsBytesLen + len(blkBytes) + wrappers.IntLen; newLen < constants.MaxContainersLen {
-				ancestorsBytes = append(ancestorsBytes, blkBytes)
-				ancestorsBytesLen = newLen
-			} else { // reached maximum response size
-				break
-			}
+		blkBytes := blk.Bytes()
+		// Ensure response size isn't too large. Include wrappers.IntLen because the size of the message
+		// is included with each container, and the size is repr. by an int.
+		if newLen := ancestorsBytesLen + len(blkBytes) + wrappers.IntLen; newLen < constants.MaxContainersLen {
+			ancestorsBytes = append(ancestorsBytes, blkBytes)
+			ancestorsBytesLen = newLen
+		} else { // reached maximum response size
+			break
 		}
 	}
 

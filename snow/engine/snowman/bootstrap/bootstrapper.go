@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/vms/metervm"
 )
 
 // Parameters for delaying bootstrapping to avoid potential CPU burns
@@ -230,6 +231,17 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 		return b.fetch(wantedBlkID)
 	}
 
+	if mVM, ok := b.VM.(metervm.BlockVM); ok {
+		if rVM, ok := mVM.(block.RemoteVM); ok {
+			if _, err := rVM.BatchedParseBlock(blks[1:]); err == nil {
+				return b.process(wantedBlk)
+			}
+
+			b.Ctx.Log.Debug("Failed parsing block via RemoteVM: %s", err)
+		}
+	}
+
+	// RemoteVM did not work, try local logic
 	for _, blkBytes := range blks[1:] {
 		if _, err := b.VM.ParseBlock(blkBytes); err != nil { // persists the block
 			b.Ctx.Log.Debug("Failed to parse block: %s", err)
