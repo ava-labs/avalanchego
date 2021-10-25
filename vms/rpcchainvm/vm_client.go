@@ -544,7 +544,9 @@ func (vm *VMClient) batchedParseBlock(
 ) ([]snowman.Block, error) {
 	req := make([]*vmproto.ParseBlockRequest, len(blksBytes))
 	for idx, blkBytes := range blksBytes {
-		req[idx].Bytes = blkBytes
+		req[idx] = &vmproto.ParseBlockRequest{
+			Bytes: blkBytes,
+		}
 	}
 
 	resp, err := vm.client.BatchedParseBlock(context.Background(), &vmproto.BatchedParseBlockRequest{

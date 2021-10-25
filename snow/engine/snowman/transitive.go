@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/metervm"
+	"github.com/ava-labs/avalanchego/vms/proposervm"
 )
 
 var _ Engine = &Transitive{}
@@ -169,24 +170,26 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, blkID ids.ID) error 
 func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
 	ancestorsBytes := make([][]byte, 1, t.Config.MultiputMaxContainersSent)
 
-	if mVM, ok := t.VM.(metervm.BlockVM); ok {
-		if rVM, ok := mVM.(block.RemoteVM); ok {
-			// push all GetAncestor logic to remoteVM to reduce network overhead
-			ancestorsBytes = rVM.GetAncestors(blkID,
-				t.Config.MultiputMaxContainersSent,
-				constants.MaxContainersLen,
-				t.Config.MaxTimeGetAncestors,
-			)
+	// try batching GetAncestors requests to reduce network overhead
+	if mVM, ok := t.VM.(*metervm.BlockVM); ok {
+		if pVM, ok := mVM.ChainVM.(*proposervm.VM); ok {
+			if rVM, ok := pVM.ChainVM.(block.RemoteVM); ok {
+				ancestorsBytes = rVM.GetAncestors(blkID,
+					t.Config.MultiputMaxContainersSent,
+					constants.MaxContainersLen,
+					t.Config.MaxTimeGetAncestors,
+				)
 
-			if len(ancestorsBytes) == 0 {
-				t.Ctx.Log.Verbo("couldn't get block %s. dropping GetAncestors(%s, %d, %s)",
-					blkID, vdr, requestID, blkID)
+				if len(ancestorsBytes) == 0 {
+					t.Ctx.Log.Verbo("couldn't get block %s. dropping GetAncestors(%s, %d, %s)",
+						blkID, vdr, requestID, blkID)
+					return nil
+				}
+
+				t.metrics.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
+				t.Sender.SendMultiPut(vdr, requestID, ancestorsBytes)
 				return nil
 			}
-
-			t.metrics.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
-			t.Sender.SendMultiPut(vdr, requestID, ancestorsBytes)
-			return nil
 		}
 	}
 

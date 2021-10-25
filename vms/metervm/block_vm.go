@@ -16,28 +16,24 @@ import (
 )
 
 var (
-	_ BlockVM             = &blockVM{}
+	_ block.ChainVM       = &BlockVM{}
 	_ snowman.Block       = &meterBlock{}
 	_ snowman.OracleBlock = &meterBlock{}
 )
 
-type BlockVM interface {
-	block.ChainVM
-}
-
-func NewBlockVM(vm block.ChainVM) BlockVM {
-	return &blockVM{
+func NewBlockVM(vm block.ChainVM) *BlockVM {
+	return &BlockVM{
 		ChainVM: vm,
 	}
 }
 
-type blockVM struct {
+type BlockVM struct {
 	block.ChainVM
 	blockMetrics
 	clock timer.Clock
 }
 
-func (vm *blockVM) Initialize(
+func (vm *BlockVM) Initialize(
 	ctx *snow.Context,
 	db manager.Manager,
 	genesisBytes,
@@ -54,7 +50,7 @@ func (vm *blockVM) Initialize(
 	return vm.ChainVM.Initialize(ctx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender)
 }
 
-func (vm *blockVM) BuildBlock() (snowman.Block, error) {
+func (vm *BlockVM) BuildBlock() (snowman.Block, error) {
 	start := vm.clock.Time()
 	blk, err := vm.ChainVM.BuildBlock()
 	end := vm.clock.Time()
@@ -70,7 +66,7 @@ func (vm *blockVM) BuildBlock() (snowman.Block, error) {
 	}, nil
 }
 
-func (vm *blockVM) ParseBlock(b []byte) (snowman.Block, error) {
+func (vm *BlockVM) ParseBlock(b []byte) (snowman.Block, error) {
 	start := vm.clock.Time()
 	blk, err := vm.ChainVM.ParseBlock(b)
 	end := vm.clock.Time()
@@ -86,7 +82,7 @@ func (vm *blockVM) ParseBlock(b []byte) (snowman.Block, error) {
 	}, nil
 }
 
-func (vm *blockVM) GetBlock(id ids.ID) (snowman.Block, error) {
+func (vm *BlockVM) GetBlock(id ids.ID) (snowman.Block, error) {
 	start := vm.clock.Time()
 	blk, err := vm.ChainVM.GetBlock(id)
 	end := vm.clock.Time()
@@ -102,7 +98,7 @@ func (vm *blockVM) GetBlock(id ids.ID) (snowman.Block, error) {
 	}, nil
 }
 
-func (vm *blockVM) SetPreference(id ids.ID) error {
+func (vm *BlockVM) SetPreference(id ids.ID) error {
 	start := vm.clock.Time()
 	err := vm.ChainVM.SetPreference(id)
 	end := vm.clock.Time()
@@ -110,7 +106,7 @@ func (vm *blockVM) SetPreference(id ids.ID) error {
 	return err
 }
 
-func (vm *blockVM) LastAccepted() (ids.ID, error) {
+func (vm *BlockVM) LastAccepted() (ids.ID, error) {
 	start := vm.clock.Time()
 	lastAcceptedID, err := vm.ChainVM.LastAccepted()
 	end := vm.clock.Time()
@@ -121,7 +117,7 @@ func (vm *blockVM) LastAccepted() (ids.ID, error) {
 type meterBlock struct {
 	snowman.Block
 
-	vm *blockVM
+	vm *BlockVM
 }
 
 func (mb *meterBlock) Verify() error {
