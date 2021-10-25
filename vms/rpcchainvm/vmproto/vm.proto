@@ -168,7 +168,7 @@ message GetAncestorsResponse {
 }
 
 message BatchedParseBlockRequest {
-    repeated ParseBlockRequest request = 1;
+    repeated bytes request = 1;
 }
 
 message BatchedParseBlockResponse {

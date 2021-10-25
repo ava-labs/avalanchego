@@ -68,6 +68,7 @@ func (s *State) BatchedParseBlock(blksBytes [][]byte) ([]snowman.Block, error) {
 	remoteReqs := make([][]byte, 0, len(blksBytes)) // blks to be parsed by remoteVM
 	missingIdxs := make([]int, 0, len(blksBytes))   // idxs of blks to be parsed by remoteVM
 	for idx, blkBytes := range blksBytes {
+		blkBytes := blkBytes
 		// See if we've cached this block's ID by its byte repr.
 		blkIDIntf, blkIDCached := s.bytesToIDCache.Get(string(blkBytes))
 		if blkIDCached {

@@ -396,17 +396,12 @@ func (vm *VMServer) BatchedParseBlock(_ context.Context,
 		// should not happen
 		return nil, fmt.Errorf("plugin does not implement RemoteVM interface")
 	}
-	blkBytes := make([][]byte, len(req.Request))
-	for idx, reqBytes := range req.Request {
-		blkBytes[idx] = reqBytes.Bytes
-	}
-
-	blks, err := rVM.BatchedParseBlock(blkBytes)
+	blks, err := rVM.BatchedParseBlock(req.Request)
 	if err != nil {
 		return nil, err
 	}
 
-	res := make([]*vmproto.ParseBlockResponse, len(blks))
+	res := make([]*vmproto.ParseBlockResponse, 0, len(blks))
 	for _, blk := range blks {
 		blkID := blk.ID()
 		parentID := blk.Parent()

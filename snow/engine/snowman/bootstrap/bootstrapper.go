@@ -232,16 +232,21 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 		return b.fetch(wantedBlkID)
 	}
 
-	// Peel off till remoteVM, to try and batch ParseBlock requests (it reduces network overhead)
+	// Peel off till a RemoteVM, to try and batch ParseBlock requests (it reduces network overhead)
 	if mVM, ok := b.VM.(*metervm.BlockVM); ok {
 		if pVM, ok := mVM.ChainVM.(*proposervm.VM); ok {
-			if rVM, ok := pVM.ChainVM.(block.RemoteVM); ok {
-				if _, err := rVM.BatchedParseBlock(blks[1:]); err == nil {
-					return b.process(wantedBlk)
+			_, err := pVM.BatchedParseBlock(blks[1:])
+			if err == nil {
+				if !b.Restarted {
+					b.Ctx.Log.Info("Parsed a batch of %d blocks", len(blks[1:]))
+				} else {
+					b.Ctx.Log.Debug("Parsed a batch of %d blocks", len(blks[1:]))
 				}
-
-				b.Ctx.Log.Debug("Failed parsing block via RemoteVM: %s", err)
+				return b.process(wantedBlk)
 			}
+
+			// batch processing failed. Log and re-attempt one-by-one
+			b.Ctx.Log.Debug("Failed parsing block via RemoteVM: %s", err)
 		}
 	}
 
