@@ -541,7 +541,7 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 	// Track performance statistics
 	t.metrics.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len()))
 	t.metrics.numMissingTxs.Set(float64(t.missingTxs.Len()))
-	t.metrics.numPendingVts.Set(float64(t.pending.Len()))
+	t.metrics.numPendingVts.Set(float64(len(t.pending)))
 	t.metrics.blockerVtxs.Set(float64(t.vtxBlocked.Len()))
 	t.metrics.blockerTxs.Set(float64(t.txBlocked.Len()))
 	return t.errs.Err
