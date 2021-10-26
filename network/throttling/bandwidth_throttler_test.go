@@ -43,8 +43,8 @@ func TestBandwidthThrottler(t *testing.T) {
 
 	// Make several goroutines that acquire bytes.
 	wg := sync.WaitGroup{}
-	wg.Add(10)
-	for i := 0; i < 10; i++ {
+	wg.Add(int(config.MaxBurstSize) + 5)
+	for i := uint64(0); i < config.MaxBurstSize+5; i++ {
 		go func() {
 			throttler.Acquire(1, nodeID1)
 			wg.Done()

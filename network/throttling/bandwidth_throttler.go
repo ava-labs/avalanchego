@@ -41,8 +41,8 @@ type BandwidthThrottler interface {
 }
 
 type BandwidthThrottlerConfig struct {
-	RefillRate   uint64
-	MaxBurstSize uint64
+	RefillRate   uint64 `json:"bandwidthRefillRate"`
+	MaxBurstSize uint64 `json:"bandwidthMaxBurstRate"`
 }
 
 func NewBandwidthThrottler(log logging.Logger, config BandwidthThrottlerConfig) BandwidthThrottler {

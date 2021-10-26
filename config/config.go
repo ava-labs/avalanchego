@@ -279,6 +279,10 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 					VdrAllocSize:        v.GetUint64(InboundThrottlerVdrAllocSizeKey),
 					NodeMaxAtLargeBytes: v.GetUint64(InboundThrottlerNodeMaxAtLargeBytesKey),
 				},
+				BandwidthThrottlerConfig: throttling.BandwidthThrottlerConfig{
+					RefillRate:   v.GetUint64(InboundThrottlerBandwidthRefillRateKey),
+					MaxBurstSize: v.GetUint64(InboundThrottlerBandwidthMaxBurstSizeKey),
+				},
 				MaxProcessingMsgsPerNode: v.GetUint64(InboundThrottlerMaxProcessingMsgsPerNodeKey),
 			},
 
