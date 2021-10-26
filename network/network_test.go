@@ -265,10 +265,10 @@ func (h *testHandler) HandleInbound(msg message.InboundMessage) {
 		}
 	case message.AppGossip:
 		chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
-		appGossipBytes := msg.Get(message.AppGossipBytes).([]byte)
+		appBytes := msg.Get(message.AppBytes).([]byte)
 
 		if h.AppGossipF != nil {
-			h.AppGossipF(msg.NodeID(), chainID, appGossipBytes, msg.OnFinishedHandling)
+			h.AppGossipF(msg.NodeID(), chainID, appBytes, msg.OnFinishedHandling)
 		}
 	default:
 		return

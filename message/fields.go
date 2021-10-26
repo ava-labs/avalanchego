@@ -29,9 +29,7 @@ const (
 	VersionTime                      // Used in handshake / peer gossiping
 	SignedPeers                      // Used in peer gossiping
 	TrackedSubnets                   // Used in handshake / peer gossiping
-	AppRequestBytes                  // Used at application level
-	AppResponseBytes                 // Used at application level
-	AppGossipBytes                   // Used at application level
+	AppBytes                         // Used at application level
 	VMMessage                        // Used internally
 )
 
@@ -64,7 +62,7 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPackHashes
 	case MultiContainerBytes:
 		return wrappers.TryPack2DBytes
-	case AppRequestBytes, AppResponseBytes, AppGossipBytes:
+	case AppBytes:
 		return wrappers.TryPackBytes
 	case SigBytes:
 		return wrappers.TryPackBytes
@@ -108,7 +106,7 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackHashes
 	case MultiContainerBytes:
 		return wrappers.TryUnpack2DBytes
-	case AppRequestBytes, AppResponseBytes, AppGossipBytes:
+	case AppBytes:
 		return wrappers.TryUnpackBytes
 	case SigBytes:
 		return wrappers.TryUnpackBytes
@@ -151,12 +149,8 @@ func (f Field) String() string {
 		return "Container IDs"
 	case MultiContainerBytes:
 		return "MultiContainerBytes"
-	case AppRequestBytes:
-		return "AppRequestBytes"
-	case AppResponseBytes:
-		return "AppResponseBytes"
-	case AppGossipBytes:
-		return "AppGossipBytes"
+	case AppBytes:
+		return "AppBytes"
 	case SigBytes:
 		return "SigBytes"
 	case VersionTime:

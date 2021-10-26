@@ -357,7 +357,7 @@ func TestBuildAppResponseMsg(t *testing.T) {
 		assert.NotNil(t, msg)
 		assert.Equal(t, AppResponse, msg.Op())
 		assert.EqualValues(t, 1, parsedMsg.Get(RequestID))
-		assert.Equal(t, appResponseBytes, parsedMsg.Get(AppResponseBytes))
+		assert.Equal(t, appResponseBytes, parsedMsg.Get(AppBytes))
 		assert.Equal(t, chainID[:], parsedMsg.Get(ChainID))
 	}
 }
@@ -379,7 +379,7 @@ func TestBuildAppGossipMsg(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, AppGossip, msg.Op())
-		assert.Equal(t, appGossipBytes, parsedMsg.Get(AppGossipBytes))
+		assert.Equal(t, appGossipBytes, parsedMsg.Get(AppBytes))
 		assert.Equal(t, chainID[:], parsedMsg.Get(ChainID))
 	}
 }

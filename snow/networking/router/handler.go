@@ -353,13 +353,13 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 
 	case message.AppRequest:
 		reqID := msg.Get(message.RequestID).(uint32)
-		appRequestBytes, ok := msg.Get(message.AppRequestBytes).([]byte)
+		appBytes, ok := msg.Get(message.AppBytes).([]byte)
 		if !ok {
-			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppRequestBytes",
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppBytes",
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
-		return h.engine.AppRequest(nodeID, reqID, appRequestBytes)
+		return h.engine.AppRequest(nodeID, reqID, appBytes)
 
 	case message.AppRequestFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -367,22 +367,22 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 
 	case message.AppResponse:
 		reqID := msg.Get(message.RequestID).(uint32)
-		appResponseBytes, ok := msg.Get(message.AppResponseBytes).([]byte)
+		appBytes, ok := msg.Get(message.AppBytes).([]byte)
 		if !ok {
-			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppResponseBytes",
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppBytes",
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
-		return h.engine.AppResponse(nodeID, reqID, appResponseBytes)
+		return h.engine.AppResponse(nodeID, reqID, appBytes)
 
 	case message.AppGossip:
-		appGossipBytes, ok := msg.Get(message.AppGossipBytes).([]byte)
+		appBytes, ok := msg.Get(message.AppBytes).([]byte)
 		if !ok {
-			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppGossipBytes",
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppBytes",
 				msg.Op(), nodeID, h.engine.Context().ChainID, constants.GossipMsgRequestID)
 			return nil
 		}
-		return h.engine.AppGossip(nodeID, appGossipBytes)
+		return h.engine.AppGossip(nodeID, appBytes)
 
 	default:
 		h.ctx.Log.Warn("Attempt to submit to engine unhandled consensus msg %s from from (%s, %s). Dropping it",
