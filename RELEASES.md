@@ -20,6 +20,7 @@ This version is backwards compatible to [v1.6.0](https://github.com/ava-labs/ava
 ### Indexer
 
 - Added method `GetContainerByID` to client implementation.
+- Client methods now return `[]byte` rather than `string` representations of a container.
 
 ### Subnet & Custom VMs
 

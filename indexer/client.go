@@ -4,8 +4,10 @@
 package indexer
 
 import (
+	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
@@ -22,38 +24,82 @@ func NewClient(host, endpoint string, requestTimeout time.Duration) *Client {
 	}
 }
 
-func (c *Client) GetContainerRange(args *GetContainerRangeArgs) ([]FormattedContainer, error) {
-	var response GetContainerRangeResponse
-	err := c.SendRequest("getContainerRange", args, &response)
-	return response.Containers, err
+func (c *Client) GetContainerRange(args *GetContainerRangeArgs) ([]Container, error) {
+	var fcs GetContainerRangeResponse
+	if err := c.SendRequest("getContainerRange", args, &fcs); err != nil {
+		return nil, err
+	}
+	response := make([]Container, len(fcs.Containers))
+	for i, resp := range fcs.Containers {
+		containerBytes, err := formatting.Decode(resp.Encoding, resp.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't decode container %s: %w", resp.ID, err)
+		}
+		response[i] = Container{
+			ID:        resp.ID,
+			Timestamp: resp.Timestamp.Unix(),
+			Bytes:     containerBytes,
+		}
+	}
+	return response, nil
 }
 
-func (c *Client) GetContainerByIndex(args *GetContainer) (FormattedContainer, error) {
-	var response FormattedContainer
-	err := c.SendRequest("getContainerByIndex", args, &response)
-	return response, err
+func (c *Client) GetContainerByIndex(args *GetContainer) (Container, error) {
+	var fc FormattedContainer
+	if err := c.SendRequest("getContainerByIndex", args, &fc); err != nil {
+		return Container{}, err
+	}
+	containerBytes, err := formatting.Decode(fc.Encoding, fc.Bytes)
+	if err != nil {
+		return Container{}, fmt.Errorf("couldn't decode container %s: %w", fc.ID, err)
+	}
+	return Container{
+		ID:        fc.ID,
+		Timestamp: fc.Timestamp.Unix(),
+		Bytes:     containerBytes,
+	}, nil
 }
 
-func (c *Client) GetLastAccepted(args *GetLastAcceptedArgs) (FormattedContainer, error) {
-	var response FormattedContainer
-	err := c.SendRequest("getLastAccepted", args, &response)
-	return response, err
+func (c *Client) GetLastAccepted(args *GetLastAcceptedArgs) (Container, error) {
+	var fc FormattedContainer
+	if err := c.SendRequest("getLastAccepted", args, &fc); err != nil {
+		return Container{}, nil
+	}
+	containerBytes, err := formatting.Decode(fc.Encoding, fc.Bytes)
+	if err != nil {
+		return Container{}, fmt.Errorf("couldn't decode container %s: %w", fc.ID, err)
+	}
+	return Container{
+		ID:        fc.ID,
+		Timestamp: fc.Timestamp.Unix(),
+		Bytes:     containerBytes,
+	}, nil
 }
 
-func (c *Client) GetIndex(args *GetIndexArgs) (GetIndexResponse, error) {
-	var response GetIndexResponse
-	err := c.SendRequest("getIndex", args, &response)
-	return response, err
+func (c *Client) GetIndex(args *GetIndexArgs) (uint64, error) {
+	var index GetIndexResponse
+	err := c.SendRequest("getIndex", args, &index)
+	return uint64(index.Index), err
 }
 
 func (c *Client) IsAccepted(args *GetIndexArgs) (bool, error) {
-	var response bool
-	err := c.SendRequest("isAccepted", args, &response)
-	return response, err
+	var isAccepted bool
+	err := c.SendRequest("isAccepted", args, &isAccepted)
+	return isAccepted, err
 }
 
-func (c *Client) GetContainerByID(args *GetIndexArgs) (FormattedContainer, error) {
-	var response FormattedContainer
-	err := c.SendRequest("getContainerByID", args, &response)
-	return response, err
+func (c *Client) GetContainerByID(args *GetIndexArgs) (Container, error) {
+	var fc FormattedContainer
+	if err := c.SendRequest("getContainerByID", args, &fc); err != nil {
+		return Container{}, err
+	}
+	containerBytes, err := formatting.Decode(fc.Encoding, fc.Bytes)
+	if err != nil {
+		return Container{}, fmt.Errorf("couldn't decode container %s: %w", fc.ID, err)
+	}
+	return Container{
+		ID:        fc.ID,
+		Timestamp: fc.Timestamp.Unix(),
+		Bytes:     containerBytes,
+	}, nil
 }
