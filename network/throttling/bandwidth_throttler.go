@@ -1,0 +1,97 @@
+package throttling
+
+import (
+	"context"
+	"sync"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"golang.org/x/time/rate"
+)
+
+var _ BandwidthThrottler = &bandwidthThrottler{}
+
+// Returns a bandwidth throttler that uses a token bucket
+// model, where each token is 1 byte, to rate-limit bandwidth usage.
+// See https://pkg.go.dev/golang.org/x/time/rate#Limiter
+type BandwidthThrottler interface {
+	// Blocks until [nodeID] can read a message of size [msgSize].
+	// Register([nodeID], ...) must have been called since
+	// the last time RemoveNode([nodeID]) was called, if any.
+	// It's safe for multiple goroutines to concurrently call Acquire.
+	Acquire(msgSize uint64, nodeID ids.ShortID)
+
+	// Add a new node to this throttler.
+	// Must be called before Acquire(..., [nodeID]) is called.
+	// RemoveNode([nodeID]) must have been called since the last time
+	// AddNode([nodeID], ...) was called, if any.
+	// Its bandwidth allocation refills at a rate of [refillRate].
+	// Its bandwidth allocation can hold up to [maxBurstSize] at a time.
+	// [maxBurstSize] must be at least the maximum message size.
+	// It's safe for multiple goroutines to concurrently call AddNode.
+	AddNode(nodeID ids.ShortID, refillRate, maxBurstSize uint64)
+
+	// Remove a node from this throttler.
+	// AddNode([nodeID], ...) must have been called since
+	// the last time RemoveNode([nodeID]) was called, if any.
+	// Must be called when we stop reading messages from [nodeID].
+	// It's safe for multiple goroutines to concurrently call RemoveNode.
+	RemoveNode(nodeID ids.ShortID)
+}
+
+func NewBandwidthThrottler(log logging.Logger) (BandwidthThrottler, error) {
+	return &bandwidthThrottler{
+		log:      log,
+		limiters: make(map[ids.ShortID]*rate.Limiter),
+	}, nil
+}
+
+type bandwidthThrottler struct {
+	log  logging.Logger
+	lock sync.RWMutex
+	// Node ID --> token bucket based rate limiter where each token
+	// is a byte of bandwidth.
+	limiters map[ids.ShortID]*rate.Limiter
+}
+
+// See BandwidthThrottler.
+func (t *bandwidthThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
+	t.lock.RLock()
+	limiter, ok := t.limiters[nodeID]
+	t.lock.RUnlock()
+	if !ok {
+		// This should never happen. If it is, the caller is misusing this struct.
+		t.log.Warn("tried to acquire %d bytes for %s but that node isn't registered", msgSize, nodeID.PrefixedString(constants.NodeIDPrefix))
+		return
+	}
+	// TODO Allow cancellation using context
+	if err := limiter.WaitN(context.Background(), int(msgSize)); err != nil {
+		// This should never happen.
+		t.log.Warn("error while awaiting %d bytes for %s: %s", msgSize, nodeID.PrefixedString(constants.NodeIDPrefix), err)
+	}
+}
+
+// See BandwidthThrottler.
+func (t *bandwidthThrottler) AddNode(nodeID ids.ShortID, refillRate, maxBurstSize uint64) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	if _, ok := t.limiters[nodeID]; ok {
+		// This should never happen. If it is, the caller is misusing this struct.
+		t.log.Warn("tried to add %s but it's already registered", nodeID.PrefixedString(constants.NodeIDPrefix))
+	}
+	t.limiters[nodeID] = rate.NewLimiter(rate.Limit(refillRate), int(maxBurstSize))
+}
+
+// See BandwidthThrottler.
+func (t *bandwidthThrottler) RemoveNode(nodeID ids.ShortID) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	if _, ok := t.limiters[nodeID]; !ok {
+		// This should never happen. If it is, the caller is misusing this struct.
+		t.log.Warn("tried to remove %s but it isn't registered", nodeID.PrefixedString(constants.NodeIDPrefix))
+	}
+	delete(t.limiters, nodeID)
+}
