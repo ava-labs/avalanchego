@@ -202,7 +202,6 @@ func (api *PublicDebugAPI) DumpBlock(blockNr rpc.BlockNumber) (state.Dump, error
 	} else {
 		block = api.eth.blockchain.GetBlockByNumber(uint64(blockNr))
 	}
-
 	if block == nil {
 		return state.Dump{}, fmt.Errorf("block #%d not found", blockNr)
 	}

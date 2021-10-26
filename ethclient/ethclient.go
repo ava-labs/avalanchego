@@ -35,11 +35,32 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/coreth/accounts/abi/bind"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/interfaces"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+)
+
+// Verify that Client implements required interfaces
+var (
+	_ bind.AcceptedContractCaller = (*Client)(nil)
+	_ bind.ContractBackend        = (*Client)(nil)
+	_ bind.ContractFilterer       = (*Client)(nil)
+	_ bind.ContractTransactor     = (*Client)(nil)
+	_ bind.DeployBackend          = (*Client)(nil)
+
+	_ interfaces.ChainReader            = (*Client)(nil)
+	_ interfaces.ChainStateReader       = (*Client)(nil)
+	_ interfaces.TransactionReader      = (*Client)(nil)
+	_ interfaces.TransactionSender      = (*Client)(nil)
+	_ interfaces.ContractCaller         = (*Client)(nil)
+	_ interfaces.GasEstimator           = (*Client)(nil)
+	_ interfaces.GasPricer              = (*Client)(nil)
+	_ interfaces.LogFilterer            = (*Client)(nil)
+	_ interfaces.AcceptedStateReader    = (*Client)(nil)
+	_ interfaces.AcceptedContractCaller = (*Client)(nil)
 )
 
 // Client defines typed wrappers for the Ethereum RPC API.
@@ -409,6 +430,23 @@ func toFilterArg(q interfaces.FilterQuery) (interface{}, error) {
 		arg["toBlock"] = ToBlockNumArg(q.ToBlock)
 	}
 	return arg, nil
+}
+
+// AcceptedCodeAt returns the contract code of the given account in the accepted state.
+func (ec *Client) AcceptedCodeAt(ctx context.Context, account common.Address) ([]byte, error) {
+	return ec.CodeAt(ctx, account, nil)
+}
+
+// AcceptedNonceAt returns the account nonce of the given account in the accepted state.
+// This is the nonce that should be used for the next transaction.
+func (ec *Client) AcceptedNonceAt(ctx context.Context, account common.Address) (uint64, error) {
+	return ec.NonceAt(ctx, account, nil)
+}
+
+// AcceptedCallContract executes a message call transaction in the accepted
+// state.
+func (ec *Client) AcceptedCallContract(ctx context.Context, msg interfaces.CallMsg) ([]byte, error) {
+	return ec.CallContract(ctx, msg, nil)
 }
 
 // Contract Calling

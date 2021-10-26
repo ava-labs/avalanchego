@@ -48,7 +48,7 @@ type SignerFn func(common.Address, *types.Transaction) (*types.Transaction, erro
 
 // CallOpts is the collection of options to fine tune a contract call request.
 type CallOpts struct {
-	Pending     bool            // Whether to operate on the pending state or the last known one
+	Accepted    bool            // Whether to operate on the accepted state or the last known one
 	From        common.Address  // Optional the sender address, otherwise the first account is used
 	BlockNumber *big.Int        // Optional the block number on which the call should be performed
 	Context     context.Context // Network context to support cancellation and timeouts (nil = no timeout)
@@ -175,15 +175,15 @@ func (c *BoundContract) Call(opts *CallOpts, results *[]interface{}, method stri
 		code   []byte
 		output []byte
 	)
-	if opts.Pending {
-		pb, ok := c.caller.(PendingContractCaller)
+	if opts.Accepted {
+		pb, ok := c.caller.(AcceptedContractCaller)
 		if !ok {
-			return ErrNoPendingState
+			return ErrNoAcceptedState
 		}
-		output, err = pb.PendingCallContract(ctx, msg)
+		output, err = pb.AcceptedCallContract(ctx, msg)
 		if err == nil && len(output) == 0 {
 			// Make sure we have a contract to operate on, and bail out otherwise.
-			if code, err = pb.PendingCodeAt(ctx, c.address); err != nil {
+			if code, err = pb.AcceptedCodeAt(ctx, c.address); err != nil {
 				return err
 			} else if len(code) == 0 {
 				return ErrNoCode
@@ -253,7 +253,7 @@ func (c *BoundContract) transact(opts *TransactOpts, contract *common.Address, i
 	}
 	var nonce uint64
 	if opts.Nonce == nil {
-		nonce, err = c.transactor.PendingNonceAt(ensureContext(opts.Context), opts.From)
+		nonce, err = c.transactor.AcceptedNonceAt(ensureContext(opts.Context), opts.From)
 		if err != nil {
 			return nil, fmt.Errorf("failed to retrieve account nonce: %v", err)
 		}
@@ -302,7 +302,7 @@ func (c *BoundContract) transact(opts *TransactOpts, contract *common.Address, i
 	if gasLimit == 0 {
 		// Gas estimation cannot succeed without code for method invocations
 		if contract != nil {
-			if code, err := c.transactor.PendingCodeAt(ensureContext(opts.Context), c.address); err != nil {
+			if code, err := c.transactor.AcceptedCodeAt(ensureContext(opts.Context), c.address); err != nil {
 				return nil, err
 			} else if len(code) == 0 {
 				return nil, ErrNoCode
@@ -441,6 +441,9 @@ func (c *BoundContract) WatchLogs(opts *WatchOpts, name string, query ...[]inter
 
 // UnpackLog unpacks a retrieved log into the provided output structure.
 func (c *BoundContract) UnpackLog(out interface{}, event string, log types.Log) error {
+	if log.Topics[0] != c.abi.Events[event].ID {
+		return fmt.Errorf("event signature mismatch")
+	}
 	if len(log.Data) > 0 {
 		if err := c.abi.UnpackIntoInterface(out, event, log.Data); err != nil {
 			return err
@@ -457,6 +460,9 @@ func (c *BoundContract) UnpackLog(out interface{}, event string, log types.Log) 
 
 // UnpackLogIntoMap unpacks a retrieved log into the provided map.
 func (c *BoundContract) UnpackLogIntoMap(out map[string]interface{}, event string, log types.Log) error {
+	if log.Topics[0] != c.abi.Events[event].ID {
+		return fmt.Errorf("event signature mismatch")
+	}
 	if len(log.Data) > 0 {
 		if err := c.abi.UnpackIntoMap(out, event, log.Data); err != nil {
 			return err

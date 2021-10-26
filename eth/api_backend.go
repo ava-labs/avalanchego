@@ -46,7 +46,6 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/event"
 )
 
@@ -175,6 +174,10 @@ func (b *EthAPIBackend) BlockByNumberOrHash(ctx context.Context, blockNrOrHash r
 	return nil, errors.New("invalid arguments; neither block nor hash specified")
 }
 
+func (b *EthAPIBackend) BadBlocks() []*types.Block {
+	return b.eth.blockchain.BadBlocks()
+}
+
 func (b *EthAPIBackend) PendingBlockAndReceipts() (*types.Block, types.Receipts) {
 	return nil, nil
 }
@@ -227,13 +230,14 @@ func (b *EthAPIBackend) GetLogs(ctx context.Context, hash common.Hash) ([][]*typ
 	if deadline, exists := ctx.Deadline(); exists && time.Until(deadline) < 0 {
 		return nil, errExpired
 	}
-	receipts := b.eth.blockchain.GetReceiptsByHash(hash)
-	if receipts == nil {
-		return nil, nil
+	db := b.eth.ChainDb()
+	number := rawdb.ReadHeaderNumber(db, hash)
+	if number == nil {
+		return nil, errors.New("failed to get block number from hash")
 	}
-	logs := make([][]*types.Log, len(receipts))
-	for i, receipt := range receipts {
-		logs[i] = receipt.Logs
+	logs := rawdb.ReadLogs(db, hash, *number)
+	if logs == nil {
+		return nil, errors.New("failed to get logs for block")
 	}
 	return logs, nil
 }
@@ -350,10 +354,6 @@ func (b *EthAPIBackend) TxPool() *core.TxPool {
 
 func (b *EthAPIBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
 	return b.eth.TxPool().SubscribeNewTxsEvent(ch)
-}
-
-func (b *EthAPIBackend) Downloader() *downloader.Downloader {
-	return b.eth.Downloader()
 }
 
 func (b *EthAPIBackend) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
