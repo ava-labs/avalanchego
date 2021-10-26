@@ -4,10 +4,13 @@
 package message
 
 import (
+	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 var (
@@ -17,6 +20,8 @@ var (
 
 // InboundMessage represents a set of fields for an inbound message that can be serialized into a byte stream
 type InboundMessage interface {
+	fmt.Stringer
+
 	BytesSavedCompression() int
 	Op() Op
 	Get(Field) interface{}
@@ -59,6 +64,33 @@ func (inMsg *inboundMessage) OnFinishedHandling() {
 	if inMsg.onFinishedHandling != nil {
 		inMsg.onFinishedHandling()
 	}
+}
+
+func (inMsg *inboundMessage) String() string {
+	sb := strings.Builder{}
+	sb.WriteString(fmt.Sprintf("(Op: %s, NodeID: %s%s", inMsg.op, constants.NodeIDPrefix, inMsg.nodeID))
+	if requestIDIntf, exists := inMsg.fields[RequestID]; exists {
+		sb.WriteString(fmt.Sprintf(", RequestID: %d", requestIDIntf.(uint32)))
+	}
+	if !inMsg.expirationTime.IsZero() {
+		sb.WriteString(fmt.Sprintf(", Deadline: %d", inMsg.expirationTime.Unix()))
+	}
+	switch inMsg.op {
+	case GetAccepted, Accepted, Chits, AcceptedFrontier:
+		sb.WriteString(fmt.Sprintf(", NumContainerIDs: %d)", len(inMsg.fields[ContainerIDs].([][]byte))))
+	case Get, GetAncestors, Put, PushQuery, PullQuery:
+		sb.WriteString(fmt.Sprintf(", ContainerID: 0x%x)", inMsg.fields[ContainerID].([]byte)))
+	case MultiPut:
+		sb.WriteString(fmt.Sprintf(", NumContainers: %d)", len(inMsg.fields[ContainerIDs].([][]byte))))
+	case Notify:
+		sb.WriteString(fmt.Sprintf(", Notification: %d)", inMsg.fields[VMMessage].(uint32)))
+	case AppRequest, AppResponse, AppGossip:
+		sb.WriteString(fmt.Sprintf(", len(AppMsg): %d)", inMsg.fields[AppBytes].([]byte)))
+	default:
+		sb.WriteString(")")
+	}
+
+	return sb.String()
 }
 
 // OutboundMessage represents a set of fields for an outbound message that can be serialized into a byte stream
