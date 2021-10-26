@@ -17,7 +17,7 @@ var _ BandwidthThrottler = &bandwidthThrottler{}
 // See https://pkg.go.dev/golang.org/x/time/rate#Limiter
 type BandwidthThrottler interface {
 	// Blocks until [nodeID] can read a message of size [msgSize].
-	// Register([nodeID], ...) must have been called since
+	// AddNode([nodeID], ...) must have been called since
 	// the last time RemoveNode([nodeID]) was called, if any.
 	// It's safe for multiple goroutines to concurrently call Acquire.
 	Acquire(msgSize uint64, nodeID ids.ShortID)
@@ -41,7 +41,9 @@ type BandwidthThrottler interface {
 }
 
 type BandwidthThrottlerConfig struct {
-	RefillRate   uint64 `json:"bandwidthRefillRate"`
+	// Rate at which the inbound bandwidth consumable by a peer replenishes
+	RefillRate uint64 `json:"bandwidthRefillRate"`
+	// Max amount of consumable bandwidth that can accumulate for a given peer
 	MaxBurstSize uint64 `json:"bandwidthMaxBurstRate"`
 }
 
@@ -72,7 +74,7 @@ func (t *bandwidthThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 		t.log.Warn("tried to acquire %d bytes for %s but that node isn't registered", msgSize, nodeID.PrefixedString(constants.NodeIDPrefix))
 		return
 	}
-	// TODO Allow cancellation using context
+	// TODO Allow cancellation using context?
 	if err := limiter.WaitN(context.Background(), int(msgSize)); err != nil {
 		// This should never happen.
 		t.log.Warn("error while awaiting %d bytes for %s: %s", msgSize, nodeID.PrefixedString(constants.NodeIDPrefix), err)
