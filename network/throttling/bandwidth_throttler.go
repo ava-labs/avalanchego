@@ -30,7 +30,7 @@ type BandwidthThrottler interface {
 	// Its bandwidth allocation can hold up to [maxBurstSize] at a time.
 	// [maxBurstSize] must be at least the maximum message size.
 	// It's safe for multiple goroutines to concurrently call AddNode.
-	AddNode(nodeID ids.ShortID, refillRate, maxBurstSize uint64)
+	AddNode(nodeID ids.ShortID)
 
 	// Remove a node from this throttler.
 	// AddNode([nodeID], ...) must have been called since
@@ -40,14 +40,21 @@ type BandwidthThrottler interface {
 	RemoveNode(nodeID ids.ShortID)
 }
 
-func NewBandwidthThrottler(log logging.Logger) (BandwidthThrottler, error) {
+type BandwidthThrottlerConfig struct {
+	RefillRate   uint64
+	MaxBurstSize uint64
+}
+
+func NewBandwidthThrottler(log logging.Logger, config BandwidthThrottlerConfig) BandwidthThrottler {
 	return &bandwidthThrottler{
-		log:      log,
-		limiters: make(map[ids.ShortID]*rate.Limiter),
-	}, nil
+		BandwidthThrottlerConfig: config,
+		log:                      log,
+		limiters:                 make(map[ids.ShortID]*rate.Limiter),
+	}
 }
 
 type bandwidthThrottler struct {
+	BandwidthThrottlerConfig
 	log  logging.Logger
 	lock sync.RWMutex
 	// Node ID --> token bucket based rate limiter where each token
@@ -73,7 +80,7 @@ func (t *bandwidthThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 }
 
 // See BandwidthThrottler.
-func (t *bandwidthThrottler) AddNode(nodeID ids.ShortID, refillRate, maxBurstSize uint64) {
+func (t *bandwidthThrottler) AddNode(nodeID ids.ShortID) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -81,7 +88,7 @@ func (t *bandwidthThrottler) AddNode(nodeID ids.ShortID, refillRate, maxBurstSiz
 		// This should never happen. If it is, the caller is misusing this struct.
 		t.log.Warn("tried to add %s but it's already registered", nodeID.PrefixedString(constants.NodeIDPrefix))
 	}
-	t.limiters[nodeID] = rate.NewLimiter(rate.Limit(refillRate), int(maxBurstSize))
+	t.limiters[nodeID] = rate.NewLimiter(rate.Limit(t.RefillRate), int(t.MaxBurstSize))
 }
 
 // See BandwidthThrottler.
