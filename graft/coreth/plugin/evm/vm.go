@@ -665,18 +665,23 @@ func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 	enabledAPIs := vm.config.EthAPIs()
 	vm.chain.AttachEthService(handler, enabledAPIs)
 
+	primaryAlias, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get primary alias for chain due to %w", err)
+	}
+
 	errs := wrappers.Errs{}
 	if vm.config.SnowmanAPIEnabled {
 		errs.Add(handler.RegisterName("snowman", &SnowmanAPI{vm}))
 		enabledAPIs = append(enabledAPIs, "snowman")
 	}
 	if vm.config.CorethAdminAPIEnabled {
-		primaryAlias, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get primary alias for chain due to %w", err)
-		}
-		errs.Add(handler.RegisterName("performance", NewPerformanceService(fmt.Sprintf("coreth_performance_%s", primaryAlias))))
+		errs.Add(handler.RegisterName("admin", &AdminAPI{vm}))
 		enabledAPIs = append(enabledAPIs, "coreth-admin")
+	}
+	if vm.config.CorethPerformanceAPIEnabled {
+		errs.Add(handler.RegisterName("performance", NewPerformanceService(fmt.Sprintf("coreth_performance_%s", primaryAlias))))
+		enabledAPIs = append(enabledAPIs, "coreth-performance")
 	}
 	if vm.config.NetAPIEnabled {
 		errs.Add(handler.RegisterName("net", &NetAPI{vm}))
