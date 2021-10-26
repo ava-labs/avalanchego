@@ -531,24 +531,12 @@ func (service *AvaxAPI) GetAtomicTx(r *http.Request, args *api.GetTxArgs, reply 
 }
 
 type SetLogLevelArgs struct {
-	Level string `json:"level"`
+	Level log.Lvl `json:"level"`
 }
 
 func (service *AvaxAPI) SetLogLevel(r *http.Request, args *SetLogLevelArgs, reply *api.SuccessResponse) error {
 	log.Info("EVM: SetLogLevel called", "logLevel", args.Level)
-
-	if len(args.Level) == 0 {
-		return errNoLogLevel
-	}
-
-	logLevel, err := log.LvlFromString(args.Level)
-
-	if err != nil {
-		return fmt.Errorf("failed to set logger to %s due to: %w ", args.Level, err)
-	}
-
-	service.vm.SetLogLevel(logLevel)
-
+	service.vm.SetLogLevel(args.Level)
 	reply.Success = true
 	return nil
 }

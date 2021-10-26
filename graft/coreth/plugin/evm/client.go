@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // Client ...
@@ -170,7 +171,7 @@ func (c *Client) Export(
 
 // SetLogLevel dynamically sets the log level for the C Chain
 func (c *Client) SetLogLevel(
-	level string,
+	level log.Lvl,
 ) (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.requester.SendRequest("setLogLevel", &SetLogLevelArgs{
