@@ -17,19 +17,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// forceAddTx forcibly adds a *Tx to the mempool and bypasses all verification.
-func (m *Mempool) forceAddTx(tx *Tx) error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	gasPrice, err := m.atomicTxGasPrice(tx)
-	if err != nil {
-		return err
-	}
-	m.txHeap.Push(tx, gasPrice)
-	m.addPending()
-	return nil
-}
-
 // shows that a locally generated AtomicTx can be added to mempool and then
 // removed by inclusion in a block
 func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
@@ -46,11 +33,15 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 			mempool := vm.mempool
 
 			// generate a valid and conflicting tx
-			var tx, conflictingTx *Tx
+			var (
+				tx, conflictingTx *Tx
+			)
 			if name == "import" {
-				tx, conflictingTx = getValidImportTx(vm, sharedMemory, t)
+				importTxs := createImportTxOptions(t, vm, sharedMemory)
+				tx, conflictingTx = importTxs[0], importTxs[1]
 			} else {
-				tx, conflictingTx = getValidExportTx(vm, issuer, sharedMemory, t)
+				exportTxs := createExportTxOptions(t, vm, issuer, sharedMemory)
+				tx, conflictingTx = exportTxs[0], exportTxs[1]
 			}
 			txID := tx.ID()
 			conflictingTxID := conflictingTx.ID()
@@ -112,7 +103,7 @@ func TestMempoolMaxMempoolSizeHandling(t *testing.T) {
 	mempool := vm.mempool
 
 	// create candidate tx (we will drop before validation)
-	tx, _ := getValidImportTx(vm, sharedMemory, t)
+	tx := createImportTxOptions(t, vm, sharedMemory)[0]
 
 	// shortcut to simulated almost filled mempool
 	mempool.maxSize = 0
