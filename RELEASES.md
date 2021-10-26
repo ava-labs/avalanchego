@@ -7,6 +7,7 @@ This version is backwards compatible to [v1.6.0](https://github.com/ava-labs/ava
 ### Networking
 
 - Updated peerlist gossiping to use the same mechanism as other gossip calls.
+- Added inbound message throttling based on recent bandwidth usage.
 
 ### Metrics
 
@@ -16,6 +17,8 @@ This version is backwards compatible to [v1.6.0](https://github.com/ava-labs/ava
 - Updated `avalanche_{ChainID}_lat_get_ancestors_{count,sum}` to `avalanche_{ChainID}_lat_multi_put_{count,sum}`.
 - Combined `avalanche_{ChainID}_lat_pull_query_{count,sum}` and `avalanche_{ChainID}_lat_push_query_{count,sum}` to `avalanche_{ChainID}_lat_chits_{count,sum}`.
 - Added `avalanche_{ChainID}_app_response_{count,sum}`.
+- Added `avalanche_network_bandwidth_throttler_inbound_acquire_latency_{count,sum}`
+- Added `avalanche_network_bandwidth_throttler_inbound_awaiting_acquire`
 
 ### Indexer
 
