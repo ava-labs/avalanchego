@@ -6,6 +6,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,7 +17,8 @@ func TestBandwidthThrottler(t *testing.T) {
 		RefillRate:   8,
 		MaxBurstSize: 10,
 	}
-	throttlerIntf := NewBandwidthThrottler(logging.NoLog{}, config)
+	throttlerIntf, err := NewBandwidthThrottler(logging.NoLog{}, "", prometheus.NewRegistry(), config)
+	assert.NoError(err)
 	throttler, ok := throttlerIntf.(*bandwidthThrottler)
 	assert.True(ok)
 	assert.NotNil(throttler.log)

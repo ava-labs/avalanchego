@@ -3,10 +3,14 @@ package throttling
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/metric"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/time/rate"
 )
 
@@ -47,18 +51,46 @@ type BandwidthThrottlerConfig struct {
 	MaxBurstSize uint64 `json:"bandwidthMaxBurstRate"`
 }
 
-func NewBandwidthThrottler(log logging.Logger, config BandwidthThrottlerConfig) BandwidthThrottler {
-	return &bandwidthThrottler{
+func NewBandwidthThrottler(
+	log logging.Logger,
+	namespace string,
+	registerer prometheus.Registerer,
+	config BandwidthThrottlerConfig,
+) (BandwidthThrottler, error) {
+	errs := wrappers.Errs{}
+	t := &bandwidthThrottler{
 		BandwidthThrottlerConfig: config,
 		log:                      log,
 		limiters:                 make(map[ids.ShortID]*rate.Limiter),
+		metrics: bandwidthThrottlerMetrics{
+			acquireLatency: metric.NewAveragerWithErrs(
+				namespace,
+				"bandwidth_throttler_inbound_acquire_latency",
+				"average time (in ns) to acquire bytes from the inbound bandwidth throttler",
+				registerer,
+				&errs,
+			),
+			awaitingAcquire: prometheus.NewGauge(prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "bandwidth_throttler_inbound_awaiting_acquire",
+				Help:      "Number of inbound messages waiting to acquire bandwidth from the inbound bandwidth throttler",
+			}),
+		},
 	}
+	errs.Add(registerer.Register(t.metrics.awaitingAcquire))
+	return t, errs.Err
+}
+
+type bandwidthThrottlerMetrics struct {
+	acquireLatency  metric.Averager
+	awaitingAcquire prometheus.Gauge
 }
 
 type bandwidthThrottler struct {
 	BandwidthThrottlerConfig
-	log  logging.Logger
-	lock sync.RWMutex
+	metrics bandwidthThrottlerMetrics
+	log     logging.Logger
+	lock    sync.RWMutex
 	// Node ID --> token bucket based rate limiter where each token
 	// is a byte of bandwidth.
 	limiters map[ids.ShortID]*rate.Limiter
@@ -66,6 +98,13 @@ type bandwidthThrottler struct {
 
 // See BandwidthThrottler.
 func (t *bandwidthThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
+	startTime := time.Now()
+	defer func() {
+		t.metrics.acquireLatency.Observe(float64(time.Since(startTime)))
+		t.metrics.awaitingAcquire.Dec()
+	}()
+
+	t.metrics.awaitingAcquire.Inc()
 	t.lock.RLock()
 	limiter, ok := t.limiters[nodeID]
 	t.lock.RUnlock()

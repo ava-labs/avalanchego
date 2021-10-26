@@ -59,7 +59,15 @@ func NewInboundMsgThrottler(
 	if err != nil {
 		return nil, err
 	}
-	bandwidthThrottler := NewBandwidthThrottler(log, config.BandwidthThrottlerConfig)
+	bandwidthThrottler, err := NewBandwidthThrottler(
+		log,
+		namespace,
+		registerer,
+		config.BandwidthThrottlerConfig,
+	)
+	if err != nil {
+		return nil, err
+	}
 	return &inboundMsgThrottler{
 		byteThrottler:      byteThrottler,
 		bufferThrottler:    bufferThrottler,
