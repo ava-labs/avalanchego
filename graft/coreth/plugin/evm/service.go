@@ -37,7 +37,6 @@ var (
 	errNoAddresses   = errors.New("no addresses provided")
 	errNoSourceChain = errors.New("no source chain provided")
 	errNilTxID       = errors.New("nil transaction ID")
-	errNoLogLevel    = errors.New("no log level provided")
 
 	initialBaseFee = big.NewInt(params.ApricotPhase3InitialBaseFee)
 )
@@ -531,12 +530,16 @@ func (service *AvaxAPI) GetAtomicTx(r *http.Request, args *api.GetTxArgs, reply 
 }
 
 type SetLogLevelArgs struct {
-	Level log.Lvl `json:"level"`
+	Level string `json:"level"`
 }
 
 func (service *AvaxAPI) SetLogLevel(r *http.Request, args *SetLogLevelArgs, reply *api.SuccessResponse) error {
 	log.Info("EVM: SetLogLevel called", "logLevel", args.Level)
-	service.vm.SetLogLevel(args.Level)
+	logLevel, err := log.LvlFromString(args.Level)
+	if err != nil {
+		return fmt.Errorf("failed to parse log level: %w ", err)
+	}
+	service.vm.setLogLevel(logLevel)
 	reply.Success = true
 	return nil
 }

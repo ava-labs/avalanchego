@@ -211,7 +211,7 @@ func (vm *VM) Clock() *timer.Clock { return &vm.clock }
 func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
 
 // SetLogLevel sets the log level with the original [os.StdErr] interface
-func (vm *VM) SetLogLevel(logLevel log.Lvl) {
+func (vm *VM) setLogLevel(logLevel log.Lvl) {
 	log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.StreamHandler(originalStderr, log.TerminalFormat(false))))
 }
 
@@ -301,7 +301,7 @@ func (vm *VM) Initialize(
 		logLevel = configLogLevel
 	}
 
-	vm.SetLogLevel(logLevel)
+	vm.setLogLevel(logLevel)
 
 	// Set minimum price for mining and default gas price oracle value to the min
 	// gas price to prevent so transactions and blocks all use the correct fees
