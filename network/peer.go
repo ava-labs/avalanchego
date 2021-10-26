@@ -229,7 +229,15 @@ func (p *peer) monitorAliases() {
 // Read and handle messages from this peer.
 // When this method returns, the connection is closed.
 func (p *peer) ReadMessages() {
-	defer p.Close()
+	defer func() {
+		p.net.inboundMsgThrottler.RemoveNode(p.nodeID)
+		p.Close()
+	}()
+
+	// Register this node with the inbound message throttler.
+	// Note: we must call [p.net.inboundMsgThrottler.RemoveNode(p.nodeID)]
+	// after we stop reading messages from [p.nodeID]
+	p.net.inboundMsgThrottler.AddNode(p.nodeID)
 
 	// Continuously read and handle messages from this peer.
 	reader := bufio.NewReader(p.conn)
