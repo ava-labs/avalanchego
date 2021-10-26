@@ -229,14 +229,12 @@ func (p *peer) monitorAliases() {
 // Read and handle messages from this peer.
 // When this method returns, the connection is closed.
 func (p *peer) ReadMessages() {
-	defer func() {
-		p.net.inboundMsgThrottler.RemoveNode(p.nodeID)
-		p.Close()
-	}()
+	defer p.Close()
 
 	// Register this node with the inbound message throttler.
 	// Note: we must call [p.net.inboundMsgThrottler.RemoveNode(p.nodeID)]
-	// after we stop reading messages from [p.nodeID]
+	// after we stop reading messages from [p.nodeID].
+	// This happens in [p.Close].
 	p.net.inboundMsgThrottler.AddNode(p.nodeID)
 
 	// Continuously read and handle messages from this peer.
@@ -468,6 +466,9 @@ func (p *peer) Close() { p.once.Do(p.close) }
 // assumes only [peer.Close] calls this.
 // By the time this message returns, [p] has been removed from [p.net.peers]
 func (p *peer) close() {
+	// Remove this node from the throttler.
+	p.net.inboundMsgThrottler.RemoveNode(p.nodeID)
+
 	// If the connection is closing, we can immediately cancel the ticker
 	// goroutines.
 	close(p.tickerCloser)
