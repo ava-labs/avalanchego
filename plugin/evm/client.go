@@ -175,7 +175,7 @@ func (c *Client) SetLogLevel(
 ) (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.requester.SendRequest("setLogLevel", &SetLogLevelArgs{
-		Level: level,
+		Level: level.String(),
 	}, res)
 	return res.Success, err
 }
