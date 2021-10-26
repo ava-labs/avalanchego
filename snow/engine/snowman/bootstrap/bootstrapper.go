@@ -254,8 +254,13 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 				return b.process(wantedBlk, processingBlocks)
 			}
 
-			// batch processing failed. Log and re-attempt one-by-one
-			b.Ctx.Log.Debug("Failed parsing block via RemoteVM: %s", err)
+			if err != block.ErrRemoteVMNotImplemented {
+				b.Ctx.Log.Debug("Failed parsing block via RemoteVM: %s", err)
+				return err
+			}
+
+			// while ProposerVM implements RemoteVM, its core VM does not.
+			b.Ctx.Log.Debug("MultiPut: fallback to non-batched processing")
 		}
 	}
 

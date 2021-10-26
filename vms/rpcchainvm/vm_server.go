@@ -6,7 +6,6 @@ package rpcchainvm
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"google.golang.org/grpc"
@@ -367,7 +366,7 @@ func (vm *VMServer) GetAncestors(_ context.Context,
 	rVM, ok := vm.vm.(block.RemoteVM)
 	if !ok {
 		// should not happen
-		return nil, fmt.Errorf("plugin does not implement RemoteVM interface")
+		return nil, block.ErrRemoteVMNotImplemented
 	}
 
 	blkID, err := ids.ToID(req.BlkID)
@@ -378,7 +377,10 @@ func (vm *VMServer) GetAncestors(_ context.Context,
 	maxBlksSize := int(req.MaxBlocksSize)
 	maxBlocksRetrivalTime := time.Duration(req.MaxBlocksRetrivalTime)
 
-	blksBytes := rVM.GetAncestors(blkID, maxBlksNum, maxBlksSize, maxBlocksRetrivalTime)
+	blksBytes, err := rVM.GetAncestors(blkID, maxBlksNum, maxBlksSize, maxBlocksRetrivalTime)
+	if err != nil {
+		return nil, err
+	}
 
 	for _, blkBytes := range blksBytes {
 		blkRes := vmproto.BlkBytes{BlkBytes: blkBytes}
@@ -394,7 +396,7 @@ func (vm *VMServer) BatchedParseBlock(_ context.Context,
 	rVM, ok := vm.vm.(block.RemoteVM)
 	if !ok {
 		// should not happen
-		return nil, fmt.Errorf("plugin does not implement RemoteVM interface")
+		return nil, block.ErrRemoteVMNotImplemented
 	}
 	blks, err := rVM.BatchedParseBlock(req.Request)
 	if err != nil {

@@ -16,7 +16,7 @@ func (s *State) GetAncestors(
 	maxBlocksNum int,
 	maxBlocksSize int,
 	maxBlocksRetrivalTime time.Duration,
-) [][]byte {
+) ([][]byte, error) {
 	res := make([][]byte, 0, maxBlocksNum)
 	currentByteLength := 0
 	startTime := time.Now()
@@ -25,14 +25,14 @@ func (s *State) GetAncestors(
 	for cnt := 0; ; cnt++ {
 		currentDuration = time.Since(startTime)
 		if cnt >= maxBlocksNum || currentDuration >= maxBlocksRetrivalTime {
-			return res // return what we have
+			return res, nil // return what we have
 		}
 
 		blk, ok := s.getCachedBlock(blkID)
 		if !ok {
 			if _, ok := s.missingBlocks.Get(blkID); ok {
 				// currently requested block is not cached nor available over wire.
-				return res // return what we have
+				return res, nil // return what we have
 			}
 
 			// currently requested block and its ancestors may be available over wire
@@ -50,7 +50,7 @@ func (s *State) GetAncestors(
 		}
 
 		// reached maximum response size, return what we have
-		return res
+		return res, nil
 	}
 
 	wireBlkID := blkID
@@ -60,7 +60,7 @@ func (s *State) GetAncestors(
 
 	wireRes := s.getAncestors(wireBlkID, wireMaxBlkNum, wireMaxBlocksSize, wireMaxBlocksRetrivalTime)
 	res = append(res, wireRes...)
-	return res
+	return res, nil
 }
 
 func (s *State) BatchedParseBlock(blksBytes [][]byte) ([]snowman.Block, error) {

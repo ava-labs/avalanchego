@@ -4,6 +4,7 @@
 package block
 
 import (
+	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -74,7 +75,9 @@ type RemoteVM interface {
 		maxBlocksNum int, // max number of blocks to be retrieved
 		maxBlocksSize int, // max cumulated byte size of retrieved blocks
 		maxBlocksRetrivalTime time.Duration, // max duration of retrival operation
-	) [][]byte // slice containing retrieved ancestors bytes appended one to another
+	) ([][]byte, error)
 
 	BatchedParseBlock(blks [][]byte) ([]snowman.Block, error)
 }
+
+var ErrRemoteVMNotImplemented = errors.New("vm does not implement RemoteVM interface")

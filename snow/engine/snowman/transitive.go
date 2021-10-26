@@ -174,18 +174,19 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, blkID ids.ID) error 
 
 // GetAncestors implements the Engine interface
 func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
-	ancestorsBytes := make([][]byte, 1, t.Config.MultiputMaxContainersSent)
+	var ancestorsBytes [][]byte
 
 	// try batching GetAncestors requests to reduce network overhead
 	if mVM, ok := t.VM.(*metervm.BlockVM); ok {
 		if pVM, ok := mVM.ChainVM.(*proposervm.VM); ok {
-			if rVM, ok := pVM.ChainVM.(block.RemoteVM); ok {
-				ancestorsBytes = rVM.GetAncestors(blkID,
-					t.Config.MultiputMaxContainersSent,
-					constants.MaxContainersLen,
-					t.Config.MaxTimeGetAncestors,
-				)
+			var err error
+			ancestorsBytes, err = pVM.GetAncestors(blkID,
+				t.Config.MultiputMaxContainersSent,
+				constants.MaxContainersLen,
+				t.Config.MaxTimeGetAncestors,
+			)
 
+			if err != block.ErrRemoteVMNotImplemented {
 				if len(ancestorsBytes) == 0 {
 					t.Ctx.Log.Verbo("couldn't get block %s. dropping GetAncestors(%s, %d, %s)",
 						blkID, vdr, requestID, blkID)
@@ -196,6 +197,8 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 				t.Sender.SendMultiPut(vdr, requestID, ancestorsBytes)
 				return nil
 			}
+			// while ProposerVM implements RemoteVM, its core VM does not.
+			t.Ctx.Log.Debug("GetAncestors: fallback to non-batched processing")
 		}
 	}
 
@@ -209,6 +212,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 	}
 
 	// First elt is byte repr. of [blk], then its parent, then grandparent, etc.
+	ancestorsBytes = make([][]byte, 1, t.Config.MultiputMaxContainersSent)
 	ancestorsBytes[0] = blk.Bytes()
 	ancestorsBytesLen := len(blk.Bytes()) + wrappers.IntLen // length, in bytes, of all elements of ancestors
 
