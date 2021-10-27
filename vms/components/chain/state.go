@@ -32,6 +32,12 @@ type State struct {
 	// getStatus returns the status of the block
 	getStatus func(snowman.Block) (choices.Status, error)
 
+	// connected signals that this node has established connection with validator vdrID
+	connected func(vdrID ids.ShortID) error
+
+	// disconnected signals that this node has not anymore connection with validator vdrID
+	disconnected func(vdrID ids.ShortID) error
+
 	// verifiedBlocks is a map of blocks that have been verified and are
 	// therefore currently in consensus.
 	verifiedBlocks map[ids.ID]*BlockWrapper
@@ -60,6 +66,9 @@ type Config struct {
 	UnmarshalBlock     func([]byte) (snowman.Block, error)
 	BuildBlock         func() (snowman.Block, error)
 	GetBlockIDAtHeight func(uint64) (ids.ID, error)
+
+	Connected    func(vdrID ids.ShortID) error
+	Disconnected func(vdrID ids.ShortID) error
 }
 
 // Block is an interface wrapping the normal snowman.Block interface to be used in
@@ -111,6 +120,8 @@ func (s *State) initialize(config *Config) {
 	} else {
 		s.getStatus = produceGetStatus(s, config.GetBlockIDAtHeight)
 	}
+	s.connected = config.Connected
+	s.disconnected = config.Disconnected
 	s.lastAcceptedBlock = &BlockWrapper{
 		Block: config.LastAcceptedBlock,
 		state: s,
@@ -339,4 +350,12 @@ func (s *State) LastAcceptedBlock() *BlockWrapper {
 // LastAcceptedBlockInternal returns the internal snowman.Block that was last accepted
 func (s *State) LastAcceptedBlockInternal() snowman.Block {
 	return s.LastAcceptedBlock().Block
+}
+
+func (s *State) Connected(vdrID ids.ShortID) error {
+	return s.connected(vdrID)
+}
+
+func (s *State) Disconnected(vdrID ids.ShortID) error {
+	return s.disconnected(vdrID)
 }

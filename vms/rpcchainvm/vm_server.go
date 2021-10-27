@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
@@ -356,6 +357,24 @@ func (vm *VMServer) ParseBlock(_ context.Context, req *vmproto.ParseBlockRequest
 		Height:    blk.Height(),
 		Timestamp: timeBytes,
 	}, err
+}
+
+func (vm *VMServer) Connected(_ context.Context, req *vmproto.ConnectedRequest) (*empty.Empty, error) {
+	vdrID, err := ids.ToShortID(req.ValidatorID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &emptypb.Empty{}, vm.vm.Connected(vdrID)
+}
+
+func (vm *VMServer) Disconnected(_ context.Context, req *vmproto.DisconnectedRequest) (*empty.Empty, error) {
+	vdrID, err := ids.ToShortID(req.ValidatorID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &emptypb.Empty{}, vm.vm.Disconnected(vdrID)
 }
 
 func (vm *VMServer) GetBlock(_ context.Context, req *vmproto.GetBlockRequest) (*vmproto.GetBlockResponse, error) {

@@ -151,6 +151,17 @@ message AppGossipMsg {
     bytes msg = 2;
 }
 
+// validator.Connector related messages
+message ConnectedRequest {
+   bytes validatorID = 1; 
+}
+
+message DisconnectedRequest {
+   bytes validatorID = 1; 
+}
+
+// end of validator.Connector related messages
+
 service VM {
     rpc Initialize(InitializeRequest) returns (InitializeResponse);
     rpc Bootstrapping(google.protobuf.Empty) returns (google.protobuf.Empty);
@@ -158,6 +169,8 @@ service VM {
     rpc Shutdown(google.protobuf.Empty) returns (google.protobuf.Empty);
     rpc CreateHandlers(google.protobuf.Empty) returns (CreateHandlersResponse);
     rpc CreateStaticHandlers(google.protobuf.Empty) returns (CreateStaticHandlersResponse);
+    rpc Connected(ConnectedRequest) returns (google.protobuf.Empty);
+    rpc Disconnected(DisconnectedRequest) returns (google.protobuf.Empty);
     rpc BuildBlock(google.protobuf.Empty) returns (BuildBlockResponse);
     rpc ParseBlock(ParseBlockRequest) returns (ParseBlockResponse);
     rpc GetBlock(GetBlockRequest) returns (GetBlockResponse);

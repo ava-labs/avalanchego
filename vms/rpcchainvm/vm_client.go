@@ -223,6 +223,8 @@ func (vm *VMClient) Initialize(
 			GetBlock:            vm.getBlock,
 			UnmarshalBlock:      vm.parseBlock,
 			BuildBlock:          vm.buildBlock,
+			Connected:           vm.connected,
+			Disconnected:        vm.disconnected,
 		},
 	)
 	if err != nil {
@@ -575,12 +577,18 @@ func (b *BlockClient) Bytes() []byte        { return b.bytes }
 func (b *BlockClient) Height() uint64       { return b.height }
 func (b *BlockClient) Timestamp() time.Time { return b.time }
 
-// AV-590, quantify overhead of passing these over RPC
+func (vm *VMClient) connected(vdrID ids.ShortID) error {
+	_, err := vm.client.Connected(context.Background(), &vmproto.ConnectedRequest{
+		ValidatorID: vdrID[:],
+	})
 
-func (vm *VMClient) Connected(id ids.ShortID) error {
-	return nil // noop
+	return err
 }
 
-func (vm *VMClient) Disconnected(id ids.ShortID) error {
-	return nil // noop
+func (vm *VMClient) disconnected(vdrID ids.ShortID) error {
+	_, err := vm.client.Disconnected(context.Background(), &vmproto.DisconnectedRequest{
+		ValidatorID: vdrID[:],
+	})
+
+	return err
 }
