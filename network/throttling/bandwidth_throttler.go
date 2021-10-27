@@ -126,8 +126,7 @@ func (t *bandwidthThrottler) AddNode(nodeID ids.ShortID) {
 	defer t.lock.Unlock()
 
 	if _, ok := t.limiters[nodeID]; ok {
-		// This should never happen. If it is, the caller is misusing this struct.
-		t.log.Warn("tried to add %s but it's already registered", nodeID.PrefixedString(constants.NodeIDPrefix))
+		t.log.Debug("tried to add %s but it's already registered", nodeID.PrefixedString(constants.NodeIDPrefix))
 	}
 	t.limiters[nodeID] = rate.NewLimiter(rate.Limit(t.RefillRate), int(t.MaxBurstSize))
 }
@@ -138,8 +137,7 @@ func (t *bandwidthThrottler) RemoveNode(nodeID ids.ShortID) {
 	defer t.lock.Unlock()
 
 	if _, ok := t.limiters[nodeID]; !ok {
-		// This should never happen. If it is, the caller is misusing this struct.
-		t.log.Warn("tried to remove %s but it isn't registered", nodeID.PrefixedString(constants.NodeIDPrefix))
+		t.log.Debug("tried to remove %s but it isn't registered", nodeID.PrefixedString(constants.NodeIDPrefix))
 	}
 	delete(t.limiters, nodeID)
 }
