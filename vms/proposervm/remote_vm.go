@@ -52,7 +52,7 @@ func (vm *VM) BatchedParseBlock(blks [][]byte) ([]snowman.Block, error) {
 	// duly rebuild ProposerVM blocks given all the innerBlks
 	for idx, innerBlk := range innerBlks {
 		var blk snowman.Block
-		if idx <= len(blksToBeCompleted) {
+		if idx < len(blksToBeCompleted) {
 			// build postForkBlock given statelessBlk and innerBlk
 			statelessBlock := blksToBeCompleted[idx]
 			if statelessSignedBlock, ok := statelessBlock.(statelessblock.SignedBlock); ok {
