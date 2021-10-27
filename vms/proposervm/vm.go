@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler"
@@ -23,6 +24,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/tree"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
+)
+
+const (
+	// minBlockDelay should be kept as whole seconds because block timestamps
+	// are only specific to the second.
+	minBlockDelay             = time.Second
+	optimalHeightDelay uint64 = 256
 )
 
 var (
@@ -164,6 +172,9 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 		// P-chain height. This will cause building blocks to return an error
 		// until the P-chain's height has advanced.
 		return nil
+	}
+	if minDelay < minBlockDelay {
+		minDelay = minBlockDelay
 	}
 
 	preferredTime := blk.Timestamp()
@@ -401,4 +412,16 @@ func (vm *VM) notifyInnerBlockReady() {
 	default:
 		vm.ctx.Log.Debug("dropping message to consensus engine")
 	}
+}
+
+func (vm *VM) optimalPChainHeight(minPChainHeight uint64) (uint64, error) {
+	currentPChainHeight, err := vm.ctx.ValidatorState.GetCurrentHeight()
+	if err != nil {
+		return 0, err
+	}
+	if currentPChainHeight < optimalHeightDelay {
+		return minPChainHeight, nil
+	}
+	optimalHeight := currentPChainHeight - optimalHeightDelay
+	return math.Max64(optimalHeight, minPChainHeight), nil
 }

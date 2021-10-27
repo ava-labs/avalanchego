@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -33,6 +35,8 @@ var (
 
 	genesisUnixTimestamp int64 = 1000
 	genesisTimestamp           = time.Unix(genesisUnixTimestamp, 0)
+
+	defaultPChainHeight uint64 = 2000
 
 	errUnknownBlock      = errors.New("unknown block")
 	errUnverifiedBlock   = errors.New("unverified block")
@@ -100,7 +104,7 @@ func initTestProposerVM(
 	valState := &validators.TestState{
 		T: t,
 	}
-	valState.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
 	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
 		res := make(map[ids.ShortID]uint64)
 		res[proVM.ctx.NodeID] = uint64(10)
@@ -840,7 +844,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	valState := &validators.TestState{
 		T: t,
 	}
-	valState.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
 	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
 		return map[ids.ShortID]uint64{
 			{1}: 100,
@@ -1112,7 +1116,7 @@ func TestInnerVMRollback(t *testing.T) {
 	valState := &validators.TestState{
 		T: t,
 	}
-	valState.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
 	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
 		return map[ids.ShortID]uint64{
 			{1}: 100,
@@ -1418,7 +1422,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 	ySlb, err := statelessblock.BuildUnsigned(
 		gBlock.ID(),
 		gBlock.Timestamp(),
-		uint64(2000),
+		defaultPChainHeight,
 		yBlock.Bytes(),
 	)
 	if err != nil {
@@ -1529,7 +1533,7 @@ func TestTooFarAdvanced(t *testing.T) {
 	ySlb, err := statelessblock.BuildUnsigned(
 		aBlock.ID(),
 		aBlock.Timestamp().Add(maxSkew),
-		uint64(2000),
+		defaultPChainHeight,
 		yBlock.Bytes(),
 	)
 	if err != nil {
@@ -1552,7 +1556,7 @@ func TestTooFarAdvanced(t *testing.T) {
 	ySlb, err = statelessblock.BuildUnsigned(
 		aBlock.ID(),
 		aBlock.Timestamp().Add(proposer.MaxDelay),
-		uint64(2000),
+		defaultPChainHeight,
 		yBlock.Bytes(),
 	)
 
@@ -1572,4 +1576,131 @@ func TestTooFarAdvanced(t *testing.T) {
 	if err = bBlock.Verify(); err != errTimeTooAdvanced {
 		t.Fatal("should have errored errTimeTooAdvanced")
 	}
+}
+
+// Ensure that Accepting a PostForkOption (B) causes both the other option and
+// the core block in the other option to be rejected.
+//     G
+//     |
+//    A(X)
+//   /====\
+//  B(...) C(...)
+//
+// B(...) is B(X.opts[0])
+// B(...) is C(X.opts[1])
+func TestTwoOptions_OneIsAccepted(t *testing.T) {
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
+	proVM.Set(coreGenBlk.Timestamp())
+
+	xBlockID := ids.GenerateTestID()
+	xBlock := &TestOptionsBlock{
+		TestBlock: snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     xBlockID,
+				StatusV: choices.Processing,
+			},
+			BytesV:     []byte{1},
+			ParentV:    coreGenBlk.ID(),
+			TimestampV: coreGenBlk.Timestamp(),
+		},
+		opts: [2]snowman.Block{
+			&snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.GenerateTestID(),
+					StatusV: choices.Processing,
+				},
+				BytesV:     []byte{2},
+				ParentV:    xBlockID,
+				TimestampV: coreGenBlk.Timestamp(),
+			},
+			&snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.GenerateTestID(),
+					StatusV: choices.Processing,
+				},
+				BytesV:     []byte{3},
+				ParentV:    xBlockID,
+				TimestampV: coreGenBlk.Timestamp(),
+			},
+		},
+	}
+
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return xBlock, nil }
+	aBlockIntf, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("could not build post fork oracle block")
+	}
+
+	aBlock, ok := aBlockIntf.(*postForkBlock)
+	if !ok {
+		t.Fatal("expected post fork block")
+	}
+
+	opts, err := aBlock.Options()
+	if err != nil {
+		t.Fatal("could not retrieve options from post fork oracle block")
+	}
+
+	if err := aBlock.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	bBlock := opts[0]
+	if err := bBlock.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	cBlock := opts[1]
+	if err := cBlock.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := aBlock.Accept(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bBlock.Accept(); err != nil {
+		t.Fatal(err)
+	}
+
+	// the other pre-fork option should be rejected
+	if xBlock.opts[1].Status() != choices.Rejected {
+		t.Fatal("the pre-fork option block should have be rejected")
+	}
+
+	// the other post-fork option should also be rejected
+	if err := cBlock.Reject(); err != nil {
+		t.Fatal("the post-fork option block should have be rejected")
+	}
+
+	if cBlock.Status() != choices.Rejected {
+		t.Fatal("cBlock status should not be accepted")
+	}
+}
+
+// Ensure that given the chance, built blocks will reference a lagged P-chain
+// height.
+func TestLaggedPChainHeight(t *testing.T) {
+	assert := assert.New(t)
+
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
+	proVM.Set(coreGenBlk.Timestamp())
+
+	innerBlock := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk.ID(),
+		TimestampV: coreGenBlk.Timestamp(),
+	}
+
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return innerBlock, nil }
+	blockIntf, err := proVM.BuildBlock()
+	assert.NoError(err)
+
+	block, ok := blockIntf.(*postForkBlock)
+	assert.True(ok, "expected post fork block")
+
+	pChainHeight := block.PChainHeight()
+	assert.Equal(pChainHeight, defaultPChainHeight-optimalHeightDelay)
 }

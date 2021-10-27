@@ -1,7 +1,7 @@
 // (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package process
+package runner
 
 type Config struct {
 	// If true, displays version and exits during startup

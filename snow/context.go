@@ -9,14 +9,13 @@ import (
 	"sync"
 	"time"
 
-	stdatomic "sync/atomic"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
@@ -28,11 +27,6 @@ type EventDispatcher interface {
 	// Accept must be called before [containerID] is committed to the VM as accepted.
 	Accept(ctx *Context, containerID ids.ID, container []byte) error
 	Reject(ctx *Context, containerID ids.ID, container []byte) error
-}
-
-type AliasLookup interface {
-	Lookup(alias string) (ids.ID, error)
-	PrimaryAlias(id ids.ID) (string, error)
 }
 
 type SubnetLookup interface {
@@ -65,7 +59,7 @@ type Context struct {
 	Lock                sync.RWMutex
 	Keystore            keystore.BlockchainKeystore
 	SharedMemory        atomic.SharedMemory
-	BCLookup            AliasLookup
+	BCLookup            ids.AliaserReader
 	SNLookup            SubnetLookup
 	Namespace           string
 	Metrics             prometheus.Registerer
@@ -75,8 +69,11 @@ type Context struct {
 	EpochDuration        time.Duration
 	Clock                timer.Clock
 
-	// Non-zero iff this chain bootstrapped. Should only be accessed atomically.
-	bootstrapped uint32
+	// Non-zero iff this chain bootstrapped.
+	bootstrapped utils.AtomicBool
+
+	// Indicates this chain is available to only validators.
+	validatorOnly utils.AtomicBool
 
 	// snowman++ attributes
 	ValidatorState    validators.State  // interface for P-Chain validators
@@ -86,12 +83,22 @@ type Context struct {
 
 // IsBootstrapped returns true iff this chain is done bootstrapping
 func (ctx *Context) IsBootstrapped() bool {
-	return stdatomic.LoadUint32(&ctx.bootstrapped) > 0
+	return ctx.bootstrapped.GetValue()
 }
 
 // Bootstrapped marks this chain as done bootstrapping
 func (ctx *Context) Bootstrapped() {
-	stdatomic.StoreUint32(&ctx.bootstrapped, 1)
+	ctx.bootstrapped.SetValue(true)
+}
+
+// IsValidatorOnly returns true iff this chain is available only to validators
+func (ctx *Context) IsValidatorOnly() bool {
+	return ctx.validatorOnly.GetValue()
+}
+
+// SetValidatorOnly  marks this chain as available only to validators
+func (ctx *Context) SetValidatorOnly() {
+	ctx.validatorOnly.SetValue(true)
 }
 
 // Epoch this context thinks it's in based on the wall clock time.
@@ -107,8 +114,6 @@ func (ctx *Context) Epoch() uint32 {
 }
 
 func DefaultContextTest() *Context {
-	aliaser := &ids.Aliaser{}
-	aliaser.Initialize()
 	return &Context{
 		NetworkID:           0,
 		SubnetID:            ids.Empty,
@@ -117,7 +122,7 @@ func DefaultContextTest() *Context {
 		Log:                 logging.NoLog{},
 		DecisionDispatcher:  emptyEventDispatcher{},
 		ConsensusDispatcher: emptyEventDispatcher{},
-		BCLookup:            aliaser,
+		BCLookup:            ids.NewAliaser(),
 		Namespace:           "",
 		Metrics:             prometheus.NewRegistry(),
 	}

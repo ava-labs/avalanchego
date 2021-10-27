@@ -74,7 +74,7 @@ func (as *apiServer) Handler() (*common.HTTPHandler, error) {
 		}
 		// The encoder will call write on the writer, which will write the
 		// header with a 200.
-		err := stdjson.NewEncoder(w).Encode(APIHealthReply{
+		err := stdjson.NewEncoder(w).Encode(APIHealthServerReply{
 			Checks:  checks,
 			Healthy: healthy,
 		})
@@ -89,13 +89,13 @@ func (as *apiServer) Handler() (*common.HTTPHandler, error) {
 type APIHealthArgs struct{}
 
 // APIHealthReply is the response for Health
-type APIHealthReply struct {
+type APIHealthServerReply struct {
 	Checks  map[string]health.Result `json:"checks"`
 	Healthy bool                     `json:"healthy"`
 }
 
 // Health returns a summation of the health of the node
-func (as *apiServer) Health(_ *http.Request, _ *APIHealthArgs, reply *APIHealthReply) error {
+func (as *apiServer) Health(_ *http.Request, _ *APIHealthArgs, reply *APIHealthServerReply) error {
 	as.log.Debug("Health.health called")
 	reply.Checks, reply.Healthy = as.Results()
 	if reply.Healthy {
@@ -103,19 +103,6 @@ func (as *apiServer) Health(_ *http.Request, _ *APIHealthArgs, reply *APIHealthR
 	}
 	replyStr, err := stdjson.Marshal(reply.Checks)
 	as.log.Warn("Health.health is returning an error: %s", string(replyStr))
-	return err
-}
-
-// GetLiveness returns a summation of the health of the node
-// Deprecated: in favor of Health
-func (as *apiServer) GetLiveness(_ *http.Request, _ *APIHealthArgs, reply *APIHealthReply) error {
-	as.log.Debug("Health.getLiveness called")
-	reply.Checks, reply.Healthy = as.Results()
-	if reply.Healthy {
-		return nil
-	}
-	replyStr, err := stdjson.Marshal(reply.Checks)
-	as.log.Warn("Health.getLiveness is returning an error: %s", string(replyStr))
 	return err
 }
 

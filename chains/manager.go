@@ -63,9 +63,10 @@ var (
 //   * Create a chain
 //   * Add a registrant. When a chain is created, each registrant calls
 //     RegisterChain with the new chain as the argument.
-//   * Get the aliases associated with a given chain.
-//   * Get the ID of the chain associated with a given alias.
+//   * Manage the aliases of chains
 type Manager interface {
+	ids.Aliaser
+
 	// Return the router this Manager is using to route consensus messages to chains
 	Router() router.Router
 
@@ -84,12 +85,6 @@ type Manager interface {
 
 	// Given an alias, return the ID of the VM associated with that alias
 	LookupVM(string) (ids.ID, error)
-
-	// Return the aliases associated with a chain
-	Aliases(ids.ID) []string
-
-	// Add an alias to a chain
-	Alias(ids.ID, string) error
 
 	// Returns the ID of the subnet that is validating the provided chain
 	SubnetID(chainID ids.ID) (ids.ID, error)
@@ -153,9 +148,10 @@ type ManagerConfig struct {
 	WhitelistedSubnets          ids.Set          // Subnets to validate
 	TimeoutManager              *timeout.Manager // Manages request timeouts when sending messages to other validators
 	HealthService               health.Service
-	RetryBootstrap              bool                   // Should Bootstrap be retried
-	RetryBootstrapWarnFrequency int                    // Max number of times to retry bootstrap before warning the node operator
-	ChainConfigs                map[string]ChainConfig // alias -> ChainConfig
+	RetryBootstrap              bool                    // Should Bootstrap be retried
+	RetryBootstrapWarnFrequency int                     // Max number of times to retry bootstrap before warning the node operator
+	SubnetConfigs               map[ids.ID]SubnetConfig // ID -> SubnetConfig
+	ChainConfigs                map[string]ChainConfig  // alias -> ChainConfig
 	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
 	ShutdownNodeFunc func(exitCode int)
 	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
@@ -200,13 +196,12 @@ type manager struct {
 
 // New returns a new Manager
 func New(config *ManagerConfig) Manager {
-	m := &manager{
+	return &manager{
+		Aliaser:       ids.NewAliaser(),
 		ManagerConfig: *config,
 		subnets:       make(map[ids.ID]Subnet),
 		chains:        make(map[ids.ID]*router.Handler),
 	}
-	m.Initialize()
-	return m
 }
 
 // Router that this chain manager is using to route consensus messages to chains
@@ -250,11 +245,11 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 
 	sb, exists := m.subnets[chainParams.SubnetID]
 	if !exists {
-		sb = newSubnet(nil, chainParams.ID)
+		sb = newSubnet()
 		m.subnets[chainParams.SubnetID] = sb
-	} else {
-		sb.addChain(chainParams.ID)
 	}
+
+	sb.addChain(chainParams.ID)
 
 	chain, err := m.buildChain(chainParams, sb)
 	if err != nil {
@@ -334,6 +329,12 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		StakingLeafSigner:    m.StakingCert.PrivateKey.(crypto.Signer),
 	}
 
+	if sbConfigs, ok := m.SubnetConfigs[chainParams.SubnetID]; ok {
+		if sbConfigs.ValidatorOnly {
+			ctx.SetValidatorOnly()
+		}
+	}
+
 	// Get a factory for the vm we want to use on our chain
 	vmFactory, err := m.VMManager.GetFactory(vmID)
 	if err != nil {
@@ -373,6 +374,11 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	consensusParams := m.ConsensusParams
+	if sbConfigs, ok := m.SubnetConfigs[chainParams.SubnetID]; ok && chainParams.SubnetID != constants.PrimaryNetworkID {
+		consensusParams = sbConfigs.ConsensusParameters
+		// TODO: move metrics to another place so this can be tidier
+		consensusParams.Metrics = m.ConsensusParams.Metrics
+	}
 	consensusParams.Namespace = fmt.Sprintf("%s_%s", constants.PlatformName, primaryAlias)
 
 	// The validators of this blockchain
@@ -465,9 +471,6 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	if m.MeterVMEnabled {
-		vm = metervm.NewVertexVM(vm)
-	}
 	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
@@ -506,7 +509,14 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
 	}
 
-	chainConfig := m.getChainConfig(ctx.ChainID)
+	chainConfig, err := m.getChainConfig(ctx.ChainID)
+	if err != nil {
+		return nil, fmt.Errorf("error while fetching chain config: %w", err)
+	}
+
+	if m.MeterVMEnabled {
+		vm = metervm.NewVertexVM(vm)
+	}
 	if err := vm.Initialize(
 		ctx,
 		vmDBManager,
@@ -616,9 +626,6 @@ func (m *manager) createSnowmanChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	if m.MeterVMEnabled {
-		vm = metervm.NewBlockVM(vm)
-	}
 	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
@@ -653,25 +660,37 @@ func (m *manager) createSnowmanChain(
 
 	// first vm to be init is P-Chain once, which provides validator interface to all ProposerVMs
 	if m.validatorState == nil {
-		valState, ok := vm.(validators.State)
-		if !ok {
-			return nil, fmt.Errorf("expected validators.State but got %T", vm)
+		if m.ManagerConfig.StakingEnabled {
+			valState, ok := vm.(validators.State)
+			if !ok {
+				return nil, fmt.Errorf("expected validators.State but got %T", vm)
+			}
+
+			// Initialize the validator state for future chains.
+			m.validatorState = validators.NewLockedState(&ctx.Lock, valState)
+
+			// Notice that this context is left unlocked. This is because the
+			// lock will already be held when accessing these values on the
+			// P-chain.
+			ctx.ValidatorState = valState
+		} else {
+			m.validatorState = validators.NewNoState()
+			ctx.ValidatorState = m.validatorState
 		}
+	}
 
-		// Initialize the validator state for future chains.
-		m.validatorState = validators.NewLockedState(&ctx.Lock, valState)
-
-		// Notice that this context is left unlocked. This is because the
-		// lock will already be held when accessing these values on the
-		// P-chain.
-		ctx.ValidatorState = valState
+	// Initialize the ProposerVM and the vm wrapped inside it
+	chainConfig, err := m.getChainConfig(ctx.ChainID)
+	if err != nil {
+		return nil, fmt.Errorf("error while fetching chain config: %w", err)
 	}
 
 	// enable ProposerVM on this VM
 	vm = proposervm.New(vm, m.ApricotPhase4Time, m.ApricotPhase4MinPChainHeight)
 
-	// Initialize the ProposerVM and the vm wrapped inside it
-	chainConfig := m.getChainConfig(ctx.ChainID)
+	if m.MeterVMEnabled {
+		vm = metervm.NewBlockVM(vm)
+	}
 	if err := vm.Initialize(
 		ctx,
 		vmDBManager,
@@ -815,16 +834,19 @@ func (m *manager) isChainWithAlias(aliases ...string) (string, bool) {
 
 // getChainConfig returns value of a entry by looking at ID key and alias key
 // it first searches ID key, then falls back to it's corresponding primary alias
-func (m *manager) getChainConfig(id ids.ID) ChainConfig {
+func (m *manager) getChainConfig(id ids.ID) (ChainConfig, error) {
 	if val, ok := m.ManagerConfig.ChainConfigs[id.String()]; ok {
-		return val
+		return val, nil
 	}
-	aliases := m.Aliases(id)
+	aliases, err := m.Aliases(id)
+	if err != nil {
+		return ChainConfig{}, err
+	}
 	for _, alias := range aliases {
 		if val, ok := m.ManagerConfig.ChainConfigs[alias]; ok {
-			return val
+			return val, nil
 		}
 	}
 
-	return ChainConfig{}
+	return ChainConfig{}, nil
 }

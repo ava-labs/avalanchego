@@ -5,6 +5,9 @@ package platformvm
 
 import (
 	"errors"
+	"fmt"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
@@ -58,24 +61,76 @@ type Mempool interface {
 // Transactions from clients that have not yet been put into blocks and added to
 // consensus
 type mempool struct {
-	unissuedProposalTxs TxHeap
+	bytesAvailableMetric prometheus.Gauge
+	bytesAvailable       int
+
 	unissuedDecisionTxs TxHeap
 	unissuedAtomicTxs   TxHeap
-	totalBytesSize      int
+	unissuedProposalTxs TxHeap
+	unknownTxs          prometheus.Counter
 
 	droppedTxIDs *cache.LRU
 
 	consumedUTXOs ids.Set
 }
 
-func NewMempool() Mempool {
-	return &mempool{
-		unissuedProposalTxs: NewTxHeapByStartTime(),
-		unissuedDecisionTxs: NewTxHeapByAge(),
-		unissuedAtomicTxs:   NewTxHeapByAge(),
-		droppedTxIDs:        &cache.LRU{Size: droppedTxIDsCacheSize},
-		consumedUTXOs:       ids.NewSet(initialConsumedUTXOsSize),
+func NewMempool(namespace string, registerer prometheus.Registerer) (Mempool, error) {
+	bytesAvailableMetric := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "bytes_available",
+		Help:      "Number of bytes of space currently available in the mempool",
+	})
+	if err := registerer.Register(bytesAvailableMetric); err != nil {
+		return nil, err
 	}
+
+	unissuedDecisionTxs, err := NewTxHeapWithMetrics(
+		NewTxHeapByAge(),
+		fmt.Sprintf("%s_decision_txs", namespace),
+		registerer,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	unissuedAtomicTxs, err := NewTxHeapWithMetrics(
+		NewTxHeapByAge(),
+		fmt.Sprintf("%s_atomic_txs", namespace),
+		registerer,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	unissuedProposalTxs, err := NewTxHeapWithMetrics(
+		NewTxHeapByStartTime(),
+		fmt.Sprintf("%s_proposal_txs", namespace),
+		registerer,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	unknownTxs := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "unknown_txs_count",
+		Help:      "Number of unknown tx types seen by the mempool",
+	})
+	if err := registerer.Register(unknownTxs); err != nil {
+		return nil, err
+	}
+
+	bytesAvailableMetric.Set(maxMempoolSize)
+	return &mempool{
+		bytesAvailableMetric: bytesAvailableMetric,
+		bytesAvailable:       maxMempoolSize,
+		unissuedDecisionTxs:  unissuedDecisionTxs,
+		unissuedAtomicTxs:    unissuedAtomicTxs,
+		unissuedProposalTxs:  unissuedProposalTxs,
+		unknownTxs:           unknownTxs,
+		droppedTxIDs:         &cache.LRU{Size: droppedTxIDsCacheSize},
+		consumedUTXOs:        ids.NewSet(initialConsumedUTXOsSize),
+	}, nil
 }
 
 func (m *mempool) Add(tx *Tx) error {
@@ -84,7 +139,7 @@ func (m *mempool) Add(tx *Tx) error {
 	if m.Has(txID) {
 		return errDuplicatedTx
 	}
-	if txBytes := tx.Bytes(); m.totalBytesSize+len(txBytes) > maxMempoolSize {
+	if txBytes := tx.Bytes(); len(txBytes) > m.bytesAvailable {
 		return errMempoolFull
 	}
 
@@ -101,6 +156,7 @@ func (m *mempool) Add(tx *Tx) error {
 	case UnsignedAtomicTx:
 		m.AddAtomicTx(tx)
 	default:
+		m.unknownTxs.Inc()
 		return errUnknownTxType
 	}
 
@@ -150,21 +206,24 @@ func (m *mempool) HasProposalTx() bool { return m.unissuedProposalTxs.Len() > 0 
 func (m *mempool) RemoveDecisionTxs(txs []*Tx) {
 	for _, tx := range txs {
 		txID := tx.ID()
-		m.unissuedDecisionTxs.Remove(txID)
-		m.deregister(tx)
+		if m.unissuedDecisionTxs.Remove(txID) != nil {
+			m.deregister(tx)
+		}
 	}
 }
 
 func (m *mempool) RemoveAtomicTx(tx *Tx) {
 	txID := tx.ID()
-	m.unissuedAtomicTxs.Remove(txID)
-	m.deregister(tx)
+	if m.unissuedAtomicTxs.Remove(txID) != nil {
+		m.deregister(tx)
+	}
 }
 
 func (m *mempool) RemoveProposalTx(tx *Tx) {
 	txID := tx.ID()
-	m.unissuedProposalTxs.Remove(txID)
-	m.deregister(tx)
+	if m.unissuedProposalTxs.Remove(txID) != nil {
+		m.deregister(tx)
+	}
 }
 
 func (m *mempool) PopDecisionTxs(numTxs int) []*Tx {
@@ -204,12 +263,14 @@ func (m *mempool) WasDropped(txID ids.ID) bool {
 
 func (m *mempool) register(tx *Tx) {
 	txBytes := tx.Bytes()
-	m.totalBytesSize += len(txBytes)
+	m.bytesAvailable -= len(txBytes)
+	m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
 }
 
 func (m *mempool) deregister(tx *Tx) {
 	txBytes := tx.Bytes()
-	m.totalBytesSize -= len(txBytes)
+	m.bytesAvailable += len(txBytes)
+	m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
 
 	inputs := tx.InputIDs()
 	m.consumedUTXOs.Difference(inputs)

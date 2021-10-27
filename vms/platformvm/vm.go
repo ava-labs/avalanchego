@@ -42,7 +42,8 @@ const (
 	// PercentDenominator is the denominator used to calculate percentages
 	PercentDenominator = 1000000
 
-	droppedTxCacheSize = 50
+	droppedTxCacheSize     = 64
+	validatorSetsCacheSize = 64
 
 	maxUTXOsToFetch = 1024
 
@@ -71,6 +72,7 @@ var (
 	errDSCantValidate    = errors.New("new blockchain can't be validated by primary network")
 	errStartTimeTooEarly = errors.New("start time is before the current chain time")
 	errStartAfterEndTime = errors.New("start time is after the end time")
+	errWrongCacheType    = errors.New("unexpectedly cached type")
 
 	_ block.ChainVM        = &VM{}
 	_ validators.Connector = &VM{}
@@ -124,6 +126,11 @@ type VM struct {
 	// Value: String repr. of the verification error
 	droppedTxCache cache.LRU
 
+	// Maps caches for each subnet that is currently whitelisted.
+	// Key: Subnet ID
+	// Value: cache mapping height -> validator set map
+	validatorSetCaches map[ids.ID]cache.Cacher
+
 	// Key: block ID
 	// Value: the block
 	currentBlocks map[ids.ID]Block
@@ -168,9 +175,15 @@ func (vm *VM) Initialize(
 	}
 
 	vm.droppedTxCache = cache.LRU{Size: droppedTxCacheSize}
+	vm.validatorSetCaches = make(map[ids.ID]cache.Cacher)
 	vm.currentBlocks = make(map[ids.ID]Block)
 
-	vm.blockBuilder.Initialize(vm)
+	if err := vm.blockBuilder.Initialize(vm); err != nil {
+		return fmt.Errorf(
+			"failed to initialize the block builder: %w",
+			err,
+		)
+	}
 	vm.network = newNetwork(vm.ApricotPhase4Time, appSender, vm)
 
 	is, err := NewMeteredInternalState(vm, vm.dbManager.Current().Database, genesisBytes, ctx.Namespace, ctx.Metrics)
@@ -456,6 +469,24 @@ func (vm *VM) Disconnected(vdrID ids.ShortID) error {
 // GetValidatorSet returns the validator set at the specified height for the
 // provided subnetID.
 func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+	validatorSetsCache, exists := vm.validatorSetCaches[subnetID]
+	if !exists {
+		validatorSetsCache = &cache.LRU{Size: validatorSetsCacheSize}
+		// Only cache whitelisted subnets
+		if vm.WhitelistedSubnets.Contains(subnetID) || subnetID == constants.PrimaryNetworkID {
+			vm.validatorSetCaches[subnetID] = validatorSetsCache
+		}
+	}
+
+	if validatorSetIntf, ok := validatorSetsCache.Get(height); ok {
+		validatorSet, ok := validatorSetIntf.(map[ids.ShortID]uint64)
+		if !ok {
+			return nil, errWrongCacheType
+		}
+		vm.metrics.validatorSetsCached.Inc()
+		return validatorSet, nil
+	}
+
 	lastAcceptedHeight, err := vm.GetCurrentHeight()
 	if err != nil {
 		return nil, err
@@ -463,6 +494,9 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]u
 	if lastAcceptedHeight < height {
 		return nil, database.ErrNotFound
 	}
+
+	// get the start time to track metrics
+	startTime := vm.Clock().Time()
 
 	currentValidators, ok := vm.Validators.GetValidators(subnetID)
 	if !ok {
@@ -504,6 +538,14 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]u
 			}
 		}
 	}
+
+	// cache the validator set
+	validatorSetsCache.Put(height, vdrSet)
+
+	endTime := vm.Clock().Time()
+	vm.metrics.validatorSetsCreated.Inc()
+	vm.metrics.validatorSetsDuration.Add(float64(endTime.Sub(startTime)))
+	vm.metrics.validatorSetsHeightDiff.Add(float64(lastAcceptedHeight - height))
 	return vdrSet, nil
 }
 

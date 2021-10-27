@@ -12,14 +12,13 @@ import (
 	"math"
 	"net"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/spf13/viper"
 
-	"github.com/ava-labs/avalanchego/app/process"
+	"github.com/ava-labs/avalanchego/app/runner"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -40,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
 	"github.com/ava-labs/avalanchego/utils/profiler"
+	"github.com/ava-labs/avalanchego/utils/storage"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 )
@@ -48,28 +48,27 @@ const (
 	pluginsDirName       = "plugins"
 	chainConfigFileName  = "config"
 	chainUpgradeFileName = "upgrade"
+	subnetConfigFileExt  = ".json"
 )
 
 var (
 	deprecatedKeys = map[string]string{
-		CorethConfigKey:                         fmt.Sprintf("please use --%s to specify C-Chain config", ChainConfigDirKey),
 		InboundConnUpgradeThrottlerMaxRecentKey: fmt.Sprintf("please use --%s to specify connection upgrade throttling", InboundThrottlerMaxConnsPerSecKey),
 	}
 
-	errInvalidStakerWeights       = errors.New("staking weights must be positive")
-	errAuthPasswordTooWeak        = errors.New("API auth password is not strong enough")
-	errInvalidUptimeRequirement   = errors.New("uptime requirement must be in the range [0, 1]")
-	errMinValidatorStakeAboveMax  = errors.New("minimum validator stake can't be greater than maximum validator stake")
-	errInvalidDelegationFee       = errors.New("delegation fee must be in the range [0, 1,000,000]")
-	errInvalidMinStakeDuration    = errors.New("min stake duration must be > 0")
-	errMinStakeDurationAboveMax   = errors.New("max stake duration can't be less than min stake duration")
-	errStakeMintingPeriodBelowMin = errors.New("stake minting period can't be less than max stake duration")
-
-	errDuplicatedCChainConfig = errors.New("C-Chain config is already provided in chain config files")
+	errInvalidStakerWeights          = errors.New("staking weights must be positive")
+	errAuthPasswordTooWeak           = errors.New("API auth password is not strong enough")
+	errInvalidUptimeRequirement      = errors.New("uptime requirement must be in the range [0, 1]")
+	errMinValidatorStakeAboveMax     = errors.New("minimum validator stake can't be greater than maximum validator stake")
+	errInvalidDelegationFee          = errors.New("delegation fee must be in the range [0, 1,000,000]")
+	errInvalidMinStakeDuration       = errors.New("min stake duration must be > 0")
+	errMinStakeDurationAboveMax      = errors.New("max stake duration can't be less than min stake duration")
+	errStakeMintingPeriodBelowMin    = errors.New("stake minting period can't be less than max stake duration")
+	errCannotWhitelistPrimaryNetwork = errors.New("cannot whitelist primary network")
 )
 
-func GetProcessConfig(v *viper.Viper) (process.Config, error) {
-	config := process.Config{
+func GetRunnerConfig(v *viper.Viper) (runner.Config, error) {
+	config := runner.Config{
 		DisplayVersionAndExit: v.GetBool(VersionKey),
 		BuildDir:              os.ExpandEnv(v.GetString(BuildDirKey)),
 		PluginMode:            v.GetBool(PluginModeKey),
@@ -104,7 +103,7 @@ func GetProcessConfig(v *viper.Viper) (process.Config, error) {
 		}
 	}
 	if !foundBuildDir {
-		return process.Config{}, fmt.Errorf(
+		return runner.Config{}, fmt.Errorf(
 			"couldn't find valid build directory in any of the default locations: %s",
 			defaultBuildDirs,
 		)
@@ -234,6 +233,30 @@ func getRouterHealthConfig(v *viper.Viper, halflife time.Duration) (router.Healt
 	return config, nil
 }
 
+func getAdaptiveTimeoutConfig(v *viper.Viper) (timer.AdaptiveTimeoutConfig, error) {
+	config := timer.AdaptiveTimeoutConfig{
+		InitialTimeout:     v.GetDuration(NetworkInitialTimeoutKey),
+		MinimumTimeout:     v.GetDuration(NetworkMinimumTimeoutKey),
+		MaximumTimeout:     v.GetDuration(NetworkMaximumTimeoutKey),
+		TimeoutHalflife:    v.GetDuration(NetworkTimeoutHalflifeKey),
+		TimeoutCoefficient: v.GetFloat64(NetworkTimeoutCoefficientKey),
+	}
+	switch {
+	case config.MinimumTimeout < 1:
+		return timer.AdaptiveTimeoutConfig{}, fmt.Errorf("%q must be positive", NetworkMinimumTimeoutKey)
+	case config.MinimumTimeout > config.MaximumTimeout:
+		return timer.AdaptiveTimeoutConfig{}, fmt.Errorf("%q must be >= %q", NetworkMaximumTimeoutKey, NetworkMinimumTimeoutKey)
+	case config.InitialTimeout < config.MinimumTimeout || config.InitialTimeout > config.MaximumTimeout:
+		return timer.AdaptiveTimeoutConfig{}, fmt.Errorf("%q must be in [%q, %q]", NetworkInitialTimeoutKey, NetworkMinimumTimeoutKey, NetworkMaximumTimeoutKey)
+	case config.TimeoutHalflife <= 0:
+		return timer.AdaptiveTimeoutConfig{}, fmt.Errorf("%q must > 0", NetworkTimeoutHalflifeKey)
+	case config.TimeoutCoefficient < 1:
+		return timer.AdaptiveTimeoutConfig{}, fmt.Errorf("%q must be >= 1", NetworkTimeoutCoefficientKey)
+	}
+
+	return config, nil
+}
+
 func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, error) {
 	// Set the max number of recent inbound connections upgraded to be
 	// equal to the max number of inbound connections per second.
@@ -243,22 +266,29 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 	maxRecentConnsUpgraded := int(math.Ceil(maxInboundConnsPerSec * upgradeCooldownInSeconds))
 	config := network.Config{
 		// Throttling
-		MaxIncomingConnsPerSec: maxInboundConnsPerSec,
-		InboundConnUpgradeThrottlerConfig: throttling.InboundConnUpgradeThrottlerConfig{
-			UpgradeCooldown:        upgradeCooldown,
-			MaxRecentConnsUpgraded: maxRecentConnsUpgraded,
+		ThrottlerConfig: network.ThrottlerConfig{
+			MaxIncomingConnsPerSec: maxInboundConnsPerSec,
+			InboundConnUpgradeThrottlerConfig: throttling.InboundConnUpgradeThrottlerConfig{
+				UpgradeCooldown:        upgradeCooldown,
+				MaxRecentConnsUpgraded: maxRecentConnsUpgraded,
+			},
+
+			InboundMsgThrottlerConfig: throttling.InboundMsgThrottlerConfig{
+				MsgByteThrottlerConfig: throttling.MsgByteThrottlerConfig{
+					AtLargeAllocSize:    v.GetUint64(InboundThrottlerAtLargeAllocSizeKey),
+					VdrAllocSize:        v.GetUint64(InboundThrottlerVdrAllocSizeKey),
+					NodeMaxAtLargeBytes: v.GetUint64(InboundThrottlerNodeMaxAtLargeBytesKey),
+				},
+				MaxProcessingMsgsPerNode: v.GetUint64(InboundThrottlerMaxProcessingMsgsPerNodeKey),
+			},
+
+			OutboundMsgThrottlerConfig: throttling.MsgByteThrottlerConfig{
+				AtLargeAllocSize:    v.GetUint64(OutboundThrottlerAtLargeAllocSizeKey),
+				VdrAllocSize:        v.GetUint64(OutboundThrottlerVdrAllocSizeKey),
+				NodeMaxAtLargeBytes: v.GetUint64(OutboundThrottlerNodeMaxAtLargeBytesKey),
+			},
 		},
-		InboundThrottlerConfig: throttling.MsgThrottlerConfig{
-			AtLargeAllocSize:    v.GetUint64(InboundThrottlerAtLargeAllocSizeKey),
-			VdrAllocSize:        v.GetUint64(InboundThrottlerVdrAllocSizeKey),
-			NodeMaxAtLargeBytes: v.GetUint64(InboundThrottlerNodeMaxAtLargeBytesKey),
-		},
-		OutboundThrottlerConfig: throttling.MsgThrottlerConfig{
-			AtLargeAllocSize:    v.GetUint64(OutboundThrottlerAtLargeAllocSizeKey),
-			VdrAllocSize:        v.GetUint64(OutboundThrottlerVdrAllocSizeKey),
-			NodeMaxAtLargeBytes: v.GetUint64(OutboundThrottlerNodeMaxAtLargeBytesKey),
-		},
-		// Network Health Check
+
 		HealthConfig: network.HealthConfig{
 			MaxTimeSinceMsgSent:          v.GetDuration(NetworkHealthMaxTimeSinceMsgSentKey),
 			MaxTimeSinceMsgReceived:      v.GetDuration(NetworkHealthMaxTimeSinceMsgReceivedKey),
@@ -267,35 +297,51 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 			MaxSendFailRate:              v.GetFloat64(NetworkHealthMaxSendFailRateKey),
 			MaxSendFailRateHalflife:      halflife,
 		},
-		AdaptiveTimeoutConfig: timer.AdaptiveTimeoutConfig{
-			InitialTimeout:     v.GetDuration(NetworkInitialTimeoutKey),
-			MinimumTimeout:     v.GetDuration(NetworkMinimumTimeoutKey),
-			MaximumTimeout:     v.GetDuration(NetworkMaximumTimeoutKey),
-			TimeoutHalflife:    v.GetDuration(NetworkTimeoutHalflifeKey),
-			TimeoutCoefficient: v.GetFloat64(NetworkTimeoutCoefficientKey),
-		},
-		CompressionEnabled: v.GetBool(NetworkCompressionEnabledKey),
+
 		DialerConfig: dialer.Config{
 			ThrottleRps:       v.GetUint32(OutboundConnectionThrottlingRps),
 			ConnectionTimeout: v.GetDuration(OutboundConnectionTimeout),
 		},
-		PeerAliasTimeout: v.GetDuration(PeerAliasTimeoutKey),
+
+		TimeoutConfig: network.TimeoutConfig{
+			PeerAliasTimeout:     v.GetDuration(PeerAliasTimeoutKey),
+			GetVersionTimeout:    v.GetDuration(NetworkGetVersionTimeoutKey),
+			PingPongTimeout:      v.GetDuration(NetworkPingTimeoutKey),
+			ReadHandshakeTimeout: v.GetDuration(NetworkReadHandshakeTimeoutKey),
+		},
+
+		PeerListGossipConfig: network.PeerListGossipConfig{
+			PeerListSize:                 v.GetUint32(NetworkPeerListSizeKey),
+			PeerListGossipFreq:           v.GetDuration(NetworkPeerListGossipFreqKey),
+			PeerListGossipSize:           v.GetUint32(NetworkPeerListGossipSizeKey),
+			PeerListStakerGossipFraction: v.GetUint32(NetworkPeerListStakerGossipFractionKey),
+		},
+
+		GossipConfig: network.GossipConfig{
+			GossipAcceptedFrontierSize: uint(v.GetUint32(ConsensusGossipAcceptedFrontierSizeKey)),
+			GossipOnAcceptSize:         uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey)),
+			AppGossipNonValidatorSize:  uint(v.GetUint32(AppGossipNonValidatorSizeKey)),
+			AppGossipValidatorSize:     uint(v.GetUint32(AppGossipValidatorSizeKey)),
+		},
+
+		DelayConfig: network.DelayConfig{
+			MaxReconnectDelay:     v.GetDuration(NetworkMaxReconnectDelayKey),
+			InitialReconnectDelay: v.GetDuration(NetworkInitialReconnectDelayKey),
+		},
+
+		MaxClockDifference: v.GetDuration(NetworkMaxClockDifferenceKey),
+		CompressionEnabled: v.GetBool(NetworkCompressionEnabledKey),
+		PingFrequency:      v.GetDuration(NetworkPingFrequencyKey),
+		AllowPrivateIPs:    v.GetBool(NetworkAllowPrivateIPsKey),
+
+		RequireValidatorToConnect: v.GetBool(NetworkRequireValidatorToConnectKey),
 	}
+
 	switch {
-	case config.MinimumTimeout < 1:
-		return network.Config{}, fmt.Errorf("%q must be positive", NetworkMinimumTimeoutKey)
-	case config.MinimumTimeout > config.MaximumTimeout:
-		return network.Config{}, fmt.Errorf("%q must be >= %q", NetworkMaximumTimeoutKey, NetworkMinimumTimeoutKey)
-	case config.InitialTimeout < config.MinimumTimeout || config.InitialTimeout > config.MaximumTimeout:
-		return network.Config{}, fmt.Errorf("%q must be in [%q, %q]", NetworkInitialTimeoutKey, NetworkMinimumTimeoutKey, NetworkMaximumTimeoutKey)
-	case config.TimeoutHalflife <= 0:
-		return network.Config{}, fmt.Errorf("%q must > 0", NetworkTimeoutHalflifeKey)
-	case config.TimeoutCoefficient < 1:
-		return network.Config{}, fmt.Errorf("%q must be >= 1", NetworkTimeoutCoefficientKey)
 	case config.HealthConfig.MaxTimeSinceMsgSent < 0:
-		return network.Config{}, fmt.Errorf("%s must be > 0", NetworkHealthMaxTimeSinceMsgSentKey)
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkHealthMaxTimeSinceMsgSentKey)
 	case config.HealthConfig.MaxTimeSinceMsgReceived < 0:
-		return network.Config{}, fmt.Errorf("%s must be > 0", NetworkHealthMaxTimeSinceMsgReceivedKey)
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkHealthMaxTimeSinceMsgReceivedKey)
 	case config.HealthConfig.MaxSendFailRate < 0 || config.HealthConfig.MaxSendFailRate > 1:
 		return network.Config{}, fmt.Errorf("%s must be in [0,1]", NetworkHealthMaxSendFailRateKey)
 	case config.HealthConfig.MaxPortionSendQueueBytesFull < 0 || config.HealthConfig.MaxPortionSendQueueBytesFull > 1:
@@ -304,7 +350,30 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 		return network.Config{}, fmt.Errorf("%q must be >= 0", OutboundConnectionTimeout)
 	case config.PeerAliasTimeout < 0:
 		return network.Config{}, fmt.Errorf("%q must be >= 0", PeerAliasTimeoutKey)
+	case config.PeerListGossipFreq < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListGossipFreqKey)
+	case config.GetVersionTimeout < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkGetVersionTimeoutKey)
+	case config.PeerListStakerGossipFraction < 1:
+		return network.Config{}, fmt.Errorf("%s must be >= 1", NetworkPeerListStakerGossipFractionKey)
+	case config.MaxReconnectDelay < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkMaxReconnectDelayKey)
+	case config.InitialReconnectDelay < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkInitialReconnectDelayKey)
+	case config.MaxReconnectDelay < config.InitialReconnectDelay:
+		return network.Config{}, fmt.Errorf("%s must be >= %s", NetworkMaxReconnectDelayKey, NetworkInitialReconnectDelayKey)
+	case config.PingPongTimeout < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPingTimeoutKey)
+	case config.PingFrequency < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPingFrequencyKey)
+	case config.PingPongTimeout <= config.PingFrequency:
+		return network.Config{}, fmt.Errorf("%s must be > %s", NetworkPingTimeoutKey, NetworkPingFrequencyKey)
+	case config.ReadHandshakeTimeout < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkReadHandshakeTimeoutKey)
+	case config.MaxClockDifference < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkMaxClockDifferenceKey)
 	}
+
 	return config, nil
 }
 
@@ -362,32 +431,6 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap peer id: %w", err)
 		}
 		config.BootstrapIDs = append(config.BootstrapIDs, nodeID)
-	}
-	return config, nil
-}
-
-func getGossipConfig(v *viper.Viper) (node.GossipConfig, error) {
-	config := node.GossipConfig{
-		PeerListGossipConfig: node.PeerListGossipConfig{
-			// Node will gossip [PeerListSize] peers to [PeerListGossipSize] every [PeerListGossipFreq]
-			PeerListSize:       v.GetUint32(NetworkPeerListSizeKey),
-			PeerListGossipFreq: v.GetDuration(NetworkPeerListGossipFreqKey),
-			PeerListGossipSize: v.GetUint32(NetworkPeerListGossipSizeKey),
-		},
-		ConsensusGossipConfig: node.ConsensusGossipConfig{
-			ConsensusGossipFrequency:            v.GetDuration(ConsensusGossipFrequencyKey),
-			ConsensusGossipAcceptedFrontierSize: uint(v.GetUint32(ConsensusGossipAcceptedFrontierSizeKey)),
-			ConsensusGossipOnAcceptSize:         uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey)),
-		},
-		AppGossipConfig: node.AppGossipConfig{
-			AppGossipSize: uint(v.GetUint32(AppGossipSizeKey)),
-		},
-	}
-	switch {
-	case config.ConsensusGossipFrequency < 0:
-		return node.GossipConfig{}, fmt.Errorf("%s must be >= 0", ConsensusGossipFrequencyKey)
-	case config.PeerListGossipFreq < 0:
-		return node.GossipConfig{}, fmt.Errorf("%s must be >= 0", NetworkPeerListGossipFreqKey)
 	}
 	return config, nil
 }
@@ -566,24 +609,38 @@ func getWhitelistedSubnets(v *viper.Viper) (ids.Set, error) {
 		if err != nil {
 			return nil, fmt.Errorf("couldn't parse subnetID %q: %w", subnet, err)
 		}
+		if subnetID == constants.PrimaryNetworkID {
+			return nil, errCannotWhitelistPrimaryNetwork
+		}
 		whitelistedSubnetIDs.Add(subnetID)
 	}
 	return whitelistedSubnetIDs, nil
 }
 
-func getDatabaseConfig(v *viper.Viper, networkID uint32) node.DatabaseConfig {
+func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, error) {
+	var configBytes []byte
+	if v.IsSet(DBConfigFileKey) {
+		path := os.ExpandEnv(v.GetString(DBConfigFileKey))
+		var err error
+		configBytes, err = ioutil.ReadFile(path)
+		if err != nil {
+			return node.DatabaseConfig{}, err
+		}
+	}
+
 	return node.DatabaseConfig{
 		Name: v.GetString(DBTypeKey),
 		Path: filepath.Join(
 			os.ExpandEnv(v.GetString(DBPathKey)),
 			constants.NetworkName(networkID),
 		),
-	}
+		Config: configBytes,
+	}, nil
 }
 
 func getVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
-	aliasFilePath := path.Clean(v.GetString(VMAliasesFileKey))
-	exists, err := fileExists(aliasFilePath)
+	aliasFilePath := filepath.Clean(v.GetString(VMAliasesFileKey))
+	exists, err := storage.FileExists(aliasFilePath)
 	if err != nil {
 		return nil, err
 	}
@@ -607,58 +664,49 @@ func getVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
 	return vmAliasMap, nil
 }
 
+// getPathFromDirKey reads flag value from viper instance and then checks the folder existence
+func getPathFromDirKey(v *viper.Viper, configKey string) (string, error) {
+	configDir := os.ExpandEnv(v.GetString(configKey))
+	cleanPath := filepath.Clean(configDir)
+	ok, err := storage.FolderExists(cleanPath)
+	if err != nil {
+		return "", err
+	}
+	if ok {
+		return cleanPath, nil
+	}
+	if v.IsSet(configKey) {
+		// user specified a config dir explicitly, but dir does not exist.
+		return "", fmt.Errorf("cannot read directory: %v", cleanPath)
+	}
+	return "", nil
+}
+
 // getChainConfigs reads & puts chainConfigs to node config
 func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
-	chainConfigDir := v.GetString(ChainConfigDirKey)
-	chainsPath := path.Clean(chainConfigDir)
-	// user specified a chain config dir explicitly, but dir does not exist.
-	if v.IsSet(ChainConfigDirKey) {
-		info, err := os.Stat(chainsPath)
-		if err != nil {
-			return nil, err
-		}
-		if !info.IsDir() {
-			return nil, fmt.Errorf("not a directory: %v", chainsPath)
-		}
-	}
-	// gets direct subdirs
-	chainDirs, err := filepath.Glob(path.Join(chainsPath, "*"))
+	chainConfigPath, err := getPathFromDirKey(v, ChainConfigDirKey)
 	if err != nil {
 		return nil, err
 	}
-	chainConfigs, err := readChainConfigDirs(chainDirs)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't read chain configs: %w", err)
+
+	if len(chainConfigPath) == 0 {
+		return make(map[string]chains.ChainConfig), nil
 	}
 
-	// Coreth Plugin
-	if v.IsSet(CorethConfigKey) {
-		// error if C config is already populated
-		if isCChainConfigSet(chainConfigs) {
-			return nil, errDuplicatedCChainConfig
-		}
-		corethConfigValue := v.Get(CorethConfigKey)
-		var corethConfigBytes []byte
-		switch value := corethConfigValue.(type) {
-		case string:
-			corethConfigBytes = []byte(value)
-		default:
-			corethConfigBytes, err = json.Marshal(value)
-			if err != nil {
-				return nil, fmt.Errorf("couldn't parse coreth config: %w", err)
-			}
-		}
-		cChainPrimaryAlias := genesis.GetCChainAliases()[0]
-		cChainConfig := chainConfigs[cChainPrimaryAlias]
-		cChainConfig.Config = corethConfigBytes
-		chainConfigs[cChainPrimaryAlias] = cChainConfig
+	chainConfigs, err := readChainConfigPath(chainConfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't read chain configs: %w", err)
 	}
 	return chainConfigs, nil
 }
 
 // ReadsChainConfigs reads chain config files from static directories and returns map with contents,
 // if successful.
-func readChainConfigDirs(chainDirs []string) (map[string]chains.ChainConfig, error) {
+func readChainConfigPath(chainConfigPath string) (map[string]chains.ChainConfig, error) {
+	chainDirs, err := filepath.Glob(filepath.Join(chainConfigPath, "*"))
+	if err != nil {
+		return nil, err
+	}
 	chainConfigMap := make(map[string]chains.ChainConfig)
 	for _, chainDir := range chainDirs {
 		dirInfo, err := os.Stat(chainDir)
@@ -671,13 +719,13 @@ func readChainConfigDirs(chainDirs []string) (map[string]chains.ChainConfig, err
 		}
 
 		// chainconfigdir/chainId/config.*
-		configData, err := readSingleFile(chainDir, chainConfigFileName)
+		configData, err := storage.ReadFileWithName(chainDir, chainConfigFileName)
 		if err != nil {
 			return chainConfigMap, err
 		}
 
 		// chainconfigdir/chainId/upgrade.*
-		upgradeData, err := readSingleFile(chainDir, chainUpgradeFileName)
+		upgradeData, err := storage.ReadFileWithName(chainDir, chainUpgradeFileName)
 		if err != nil {
 			return chainConfigMap, err
 		}
@@ -690,56 +738,64 @@ func readChainConfigDirs(chainDirs []string) (map[string]chains.ChainConfig, err
 	return chainConfigMap, nil
 }
 
-// safeReadFile reads a file but does not return an error if there is no file exists at path
-func safeReadFile(path string) ([]byte, error) {
-	ok, err := fileExists(path)
-	if err == nil && ok {
-		return ioutil.ReadFile(path)
-	}
-	return nil, err
-}
-
-// fileExists checks if a file exists before we
-// try using it to prevent further errors.
-func fileExists(filePath string) (bool, error) {
-	info, err := os.Stat(filePath)
-	if err == nil {
-		return !info.IsDir(), nil
-	}
-	if errors.Is(err, os.ErrNotExist) {
-		return false, nil
-	}
-	return false, err
-}
-
-// readSingleFile reads a single file with name fileName without specifying any extension.
-// it errors when there are more than 1 file with the given fileName
-func readSingleFile(parentDir string, fileName string) ([]byte, error) {
-	filePath := path.Join(parentDir, fileName)
-	files, err := filepath.Glob(filePath + ".*") // all possible extensions
+// getSubnetConfigs reads SubnetConfigs to node config map
+func getSubnetConfigs(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.SubnetConfig, error) {
+	subnetConfigPath, err := getPathFromDirKey(v, SubnetConfigDirKey)
 	if err != nil {
 		return nil, err
 	}
-	if len(files) > 1 {
-		return nil, fmt.Errorf(`too many files matched "%s.*" in %s`, fileName, parentDir)
+	if len(subnetConfigPath) == 0 {
+		// subnet config path does not exist but not explicitly specified, so ignore it
+		return make(map[ids.ID]chains.SubnetConfig), nil
 	}
-	if len(files) == 0 { // no file found, return nothing
-		return nil, nil
+
+	subnetConfigs, err := readSubnetConfigs(subnetConfigPath, subnetIDs, defaultSubnetConfig(v))
+	if err != nil {
+		return nil, fmt.Errorf("couldn't read subnet configs: %w", err)
 	}
-	return safeReadFile(files[0])
+	return subnetConfigs, nil
 }
 
-// checks if C chain config bytes already set in map with alias key.
-// it does only checks alias key, chainId is not available at this point.
-func isCChainConfigSet(chainConfigs map[string]chains.ChainConfig) bool {
-	cChainAliases := genesis.GetCChainAliases()
-	for _, alias := range cChainAliases {
-		val, ok := chainConfigs[alias]
-		if ok && len(val.Config) > 1 {
-			return true
+// readSubnetConfigs reads subnet config files from a path and given subnetIDs and returns a map.
+func readSubnetConfigs(subnetConfigPath string, subnetIDs []ids.ID, defaultSubnetConfig chains.SubnetConfig) (map[ids.ID]chains.SubnetConfig, error) {
+	subnetConfigs := make(map[ids.ID]chains.SubnetConfig)
+	for _, subnetID := range subnetIDs {
+		filePath := filepath.Join(subnetConfigPath, subnetID.String()+subnetConfigFileExt)
+		fileInfo, err := os.Stat(filePath)
+		switch {
+		case errors.Is(err, os.ErrNotExist):
+			// this subnet config does not exist, move to the next one
+			continue
+		case err != nil:
+			return nil, err
+		case fileInfo.IsDir():
+			return nil, fmt.Errorf("%q is a directory, expected a file", fileInfo.Name())
 		}
+
+		// subnetConfigDir/subnetID.json
+		file, err := ioutil.ReadFile(filePath)
+		if err != nil {
+			return nil, err
+		}
+
+		configData := defaultSubnetConfig
+		if err := json.Unmarshal(file, &configData); err != nil {
+			return nil, err
+		}
+		if err := configData.ConsensusParameters.Valid(); err != nil {
+			return nil, err
+		}
+		subnetConfigs[subnetID] = configData
 	}
-	return false
+
+	return subnetConfigs, nil
+}
+
+func defaultSubnetConfig(v *viper.Viper) chains.SubnetConfig {
+	return chains.SubnetConfig{
+		ConsensusParameters: getConsensusConfig(v),
+		ValidatorOnly:       false,
+	}
 }
 
 func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
@@ -759,12 +815,12 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	}
 
 	// Gossiping
-	var err error
-	nodeConfig.GossipConfig, err = getGossipConfig(v)
-	if err != nil {
-		return node.Config{}, err
+	nodeConfig.ConsensusGossipFrequency = v.GetDuration(ConsensusGossipFrequencyKey)
+	if nodeConfig.ConsensusGossipFrequency < 0 {
+		return node.Config{}, fmt.Errorf("%s must be >= 0", ConsensusGossipFrequencyKey)
 	}
 
+	var err error
 	// Logging
 	nodeConfig.LoggingConfig, err = getLoggingConfig(v)
 	if err != nil {
@@ -778,7 +834,10 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	}
 
 	// Database
-	nodeConfig.DatabaseConfig = getDatabaseConfig(v, nodeConfig.NetworkID)
+	nodeConfig.DatabaseConfig, err = getDatabaseConfig(v, nodeConfig.NetworkID)
+	if err != nil {
+		return node.Config{}, err
+	}
 
 	// IP configuration
 	nodeConfig.IPConfig, err = getIPConfig(v)
@@ -824,6 +883,12 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 
 	// Metrics
 	nodeConfig.MeterVMEnabled = v.GetBool(MeterVMsEnabledKey)
+
+	// Adaptive Timeout Config
+	nodeConfig.AdaptiveTimeoutConfig, err = getAdaptiveTimeoutConfig(v)
+	if err != nil {
+		return node.Config{}, err
+	}
 
 	// Network Config
 	nodeConfig.NetworkConfig, err = getNetworkConfig(v, healthCheckAveragerHalflife)
@@ -872,6 +937,13 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	if err != nil {
 		return node.Config{}, err
 	}
+
+	// Subnet Configs
+	subnetConfigs, err := getSubnetConfigs(v, nodeConfig.WhitelistedSubnets.List())
+	if err != nil {
+		return node.Config{}, err
+	}
+	nodeConfig.SubnetConfigs = subnetConfigs
 
 	// Chain Configs
 	nodeConfig.ChainConfigs, err = getChainConfigs(v)

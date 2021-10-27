@@ -634,3 +634,8 @@ func (h *Handler) endInterval() {
 	now := h.clock.Time()
 	h.cpuTracker.EndInterval(now)
 }
+
+// if subnet is validator only and this is not a validator or self, returns false.
+func (h *Handler) isValidator(nodeID ids.ShortID) bool {
+	return !h.ctx.IsValidatorOnly() || nodeID == h.ctx.NodeID || h.validators.Contains(nodeID)
+}
