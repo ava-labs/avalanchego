@@ -3,12 +3,13 @@
 
 package ids
 
-var offset = uint64(0)
+import "go.uber.org/atomic"
+
+var offset = atomic.NewUint64(0)
 
 // GenerateTestID returns a new ID that should only be used for testing
 func GenerateTestID() ID {
-	offset++
-	return Empty.Prefix(offset)
+	return Empty.Prefix(offset.Inc())
 }
 
 // GenerateTestShortID returns a new ID that should only be used for testing
