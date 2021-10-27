@@ -469,13 +469,17 @@ func (vm *VMClient) HealthCheck() (interface{}, error) {
 }
 
 func (vm *VMClient) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
-	_, err := vm.client.AppRequest(
+	deadlineBytes, err := deadline.MarshalBinary()
+	if err != nil {
+		return err
+	}
+	_, err = vm.client.AppRequest(
 		context.Background(),
 		&vmproto.AppRequestMsg{
 			NodeID:    nodeID[:],
 			RequestID: requestID,
 			Request:   request,
-			Deadline:  uint64(deadline.Unix()),
+			Deadline:  deadlineBytes,
 		},
 	)
 	return err
