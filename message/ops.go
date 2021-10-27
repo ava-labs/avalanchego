@@ -166,9 +166,9 @@ var (
 		PullQuery: {ChainID, RequestID, Deadline, ContainerID},
 		Chits:     {ChainID, RequestID, ContainerIDs},
 		// Application level:
-		AppRequest:  {ChainID, RequestID, Deadline, AppRequestBytes},
-		AppResponse: {ChainID, RequestID, AppResponseBytes},
-		AppGossip:   {ChainID, AppGossipBytes},
+		AppRequest:  {ChainID, RequestID, Deadline, AppBytes},
+		AppResponse: {ChainID, RequestID, AppBytes},
+		AppGossip:   {ChainID, AppBytes},
 	}
 )
 

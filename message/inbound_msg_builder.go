@@ -274,10 +274,10 @@ func (b *inMsgBuilder) InboundAppRequest(
 	return &inboundMessage{
 		op: AppRequest,
 		fields: map[Field]interface{}{
-			ChainID:         chainID[:],
-			RequestID:       requestID,
-			Deadline:        uint64(deadline),
-			AppRequestBytes: AppRequestBytes,
+			ChainID:   chainID[:],
+			RequestID: requestID,
+			Deadline:  uint64(deadline),
+			AppBytes:  msg,
 		},
 		nodeID:         nodeID,
 		expirationTime: received.Add(deadline),
@@ -293,9 +293,9 @@ func (b *inMsgBuilder) InboundAppResponse(
 	return &inboundMessage{
 		op: AppResponse,
 		fields: map[Field]interface{}{
-			ChainID:          chainID[:],
-			RequestID:        requestID,
-			AppResponseBytes: msg,
+			ChainID:   chainID[:],
+			RequestID: requestID,
+			AppBytes:  msg,
 		},
 		nodeID: nodeID,
 	}

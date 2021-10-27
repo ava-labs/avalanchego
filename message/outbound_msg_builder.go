@@ -434,10 +434,10 @@ func (b *outMsgBuilder) AppRequest(
 	return b.c.Pack(
 		AppRequest,
 		map[Field]interface{}{
-			ChainID:         chainID[:],
-			RequestID:       requestID,
-			Deadline:        uint64(deadline),
-			AppRequestBytes: msg,
+			ChainID:   chainID[:],
+			RequestID: requestID,
+			Deadline:  uint64(deadline),
+			AppBytes:  msg,
 		},
 		b.compress && AppRequest.Compressable(), // App messages may be compressed
 	)
@@ -448,9 +448,9 @@ func (b *outMsgBuilder) AppResponse(chainID ids.ID, requestID uint32, msg []byte
 	return b.c.Pack(
 		AppResponse,
 		map[Field]interface{}{
-			ChainID:          chainID[:],
-			RequestID:        requestID,
-			AppResponseBytes: msg,
+			ChainID:   chainID[:],
+			RequestID: requestID,
+			AppBytes:  msg,
 		},
 		b.compress && AppResponse.Compressable(), // App messages may be compressed
 	)
@@ -461,8 +461,8 @@ func (b *outMsgBuilder) AppGossip(chainID ids.ID, msg []byte) (OutboundMessage, 
 	return b.c.Pack(
 		AppGossip,
 		map[Field]interface{}{
-			ChainID:        chainID[:],
-			AppGossipBytes: msg,
+			ChainID:  chainID[:],
+			AppBytes: msg,
 		},
 		b.compress && AppGossip.Compressable(), // App messages may be compressed
 	)
