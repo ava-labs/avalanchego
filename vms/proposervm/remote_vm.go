@@ -3,7 +3,9 @@ package proposervm
 import (
 	"time"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -15,18 +17,73 @@ func (vm *VM) BatchedParseBlock(blks [][]byte) ([]snowman.Block, error) {
 	if !ok {
 		return nil, block.ErrRemoteVMNotImplemented
 	}
-	innerBlks := make([][]byte, 0, len(blks))
-	for _, outerBlkBytes := range blks {
-		var innerBlkBytes []byte
-		if statelessBlock, err := statelessblock.Parse(outerBlkBytes); err == nil {
-			innerBlkBytes = statelessBlock.Block() // Retrieve core bytes
-		} else {
-			// assume it is a preForkBlock and defer parsing to VM
-			innerBlkBytes = outerBlkBytes
+
+	res := make([]snowman.Block, 0, len(blks))
+	blksToBeCompleted := make([]statelessblock.Block, 0, len(blks))
+	innerBytes := make([][]byte, 0, len(blks))
+	for _, blkBytes := range blks {
+		if statelessBlock, err := statelessblock.Parse(blkBytes); err == nil {
+			blkID := statelessBlock.ID()
+			if blk, err := vm.getPostForkBlock(blkID); err == nil {
+				// blk already known, move on.
+				res = append(res, blk)
+				continue
+			}
+			if err != database.ErrNotFound {
+				// blk not known. Batch-parse innerBytes and then batch-build
+				blksToBeCompleted = append(blksToBeCompleted, statelessBlock)
+				innerBytes = append(innerBytes, statelessBlock.Block())
+				continue
+			}
+
+			return res, err
 		}
-		innerBlks = append(innerBlks, innerBlkBytes)
+
+		// assume it is a preForkBlock and defer parsing to VM
+		innerBytes = append(innerBytes, blkBytes)
 	}
-	return rVM.BatchedParseBlock(innerBlks)
+
+	// parse all inner blocks at once
+	innerBlks, err := rVM.BatchedParseBlock(innerBytes)
+	if err != nil {
+		return res, err
+	}
+
+	// duly rebuild ProposerVM blocks given all the innerBlks
+	for idx, innerBlk := range innerBlks {
+		var blk snowman.Block
+		if idx <= len(blksToBeCompleted) {
+			// build postForkBlock given statelessBlk and innerBlk
+			statelessBlock := blksToBeCompleted[idx]
+			if statelessSignedBlock, ok := statelessBlock.(statelessblock.SignedBlock); ok {
+				blk = &postForkBlock{
+					SignedBlock: statelessSignedBlock,
+					postForkCommonComponents: postForkCommonComponents{
+						vm:       vm,
+						innerBlk: innerBlk,
+						status:   choices.Processing,
+					},
+				}
+			} else {
+				blk = &postForkOption{
+					Block: statelessBlock,
+					postForkCommonComponents: postForkCommonComponents{
+						vm:       vm,
+						innerBlk: innerBlk,
+						status:   choices.Processing,
+					},
+				}
+			}
+		} else {
+			blk = &preForkBlock{
+				Block: innerBlk,
+				vm:    vm,
+			}
+		}
+		res = append(res, blk)
+	}
+
+	return res, nil
 }
 
 func (vm *VM) GetAncestors(
