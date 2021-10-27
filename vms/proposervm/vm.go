@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
@@ -48,7 +48,7 @@ type VM struct {
 	proposer.Windower
 	tree.Tree
 	scheduler.Scheduler
-	timer.Clock
+	mockable.Clock
 
 	ctx         *snow.Context
 	db          *versiondb.Database

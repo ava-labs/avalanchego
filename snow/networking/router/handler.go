@@ -4,29 +4,33 @@
 package router
 
 import (
+	"errors"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/uptime"
 )
+
+var errDuplicatedContainerID = errors.New("inbound message contains duplicated container ID")
 
 // Handler passes incoming messages from the network to the consensus engine.
 // (Actually, it receives the incoming messages from a ChainRouter, but same difference.)
 type Handler struct {
 	ctx *snow.Context
 	// Useful for faking time in tests
-	clock   timer.Clock
+	clock   mockable.Clock
+	mc      message.Creator
 	metrics handlerMetrics
 	// The validator set that validates this chain
 	validators validators.Set
@@ -51,6 +55,7 @@ type Handler struct {
 // Initialize this consensus handler
 // [engine] must be initialized before initializing this handler
 func (h *Handler) Initialize(
+	mc message.Creator,
 	engine common.Engine,
 	validators validators.Set,
 	msgFromVMChan <-chan common.Message,
@@ -61,6 +66,7 @@ func (h *Handler) Initialize(
 	if err := h.metrics.Initialize(metricsNamespace, metricsRegisterer); err != nil {
 		return fmt.Errorf("initializing handler metrics errored with: %s", err)
 	}
+	h.mc = mc
 	h.closed = make(chan struct{})
 	h.msgFromVMChan = msgFromVMChan
 	h.engine = engine
@@ -81,6 +87,21 @@ func (h *Handler) Engine() common.Engine { return h.engine }
 
 // SetEngine sets the engine for this handler to dispatch to
 func (h *Handler) SetEngine(engine common.Engine) { h.engine = engine }
+
+// Push the message onto the handler's queue
+func (h *Handler) Push(msg message.InboundMessage) {
+	nodeID := msg.NodeID()
+	if nodeID == ids.ShortEmpty {
+		// This should never happen
+		h.ctx.Log.Warn("message does not have node ID of sender. Message: %s", msg)
+	}
+
+	h.unprocessedMsgsCond.L.Lock()
+	defer h.unprocessedMsgsCond.L.Unlock()
+
+	h.unprocessedMsgs.Push(msg)
+	h.unprocessedMsgsCond.Signal()
+}
 
 // Dispatch waits for incoming messages from the router
 // and, when they arrive, sends them to the consensus engine
@@ -112,28 +133,46 @@ func (h *Handler) Dispatch() {
 		h.unprocessedMsgsCond.L.Unlock()
 
 		// If this message's deadline has passed, don't process it.
-		if !msg.deadline.IsZero() && h.clock.Time().After(msg.deadline) {
-			h.ctx.Log.Verbo("Dropping message from %s%s due to timeout. msg: %s", constants.NodeIDPrefix, msg.nodeID, msg)
+		if expirationTime := msg.ExpirationTime(); !expirationTime.IsZero() && h.clock.Time().After(expirationTime) {
+			nodeID := msg.NodeID()
+			h.ctx.Log.Verbo("Dropping message from %s%s due to timeout. msg: %s",
+				constants.NodeIDPrefix, nodeID, msg)
 			h.metrics.expired.Inc()
-			msg.doneHandling()
+			msg.OnFinishedHandling()
 			continue
 		}
 
 		// Process the message.
 		// If there was an error, shut down this chain
 		if err := h.handleMsg(msg); err != nil {
-			h.ctx.Log.Fatal("chain shutting down due to error %q while processing message: %s", err, msg)
+			h.ctx.Log.Fatal("chain shutting down due to error %q while processing message: %s",
+				err, msg)
 			h.StartShutdown()
 			return
 		}
 	}
 }
 
+// IsPeriodic returns true if this message is of a type that is sent on a
+// periodic basis.
+func isPeriodic(inMsg message.InboundMessage) bool {
+	op := inMsg.Op()
+	if op == message.AppGossip || op == message.GossipRequest {
+		return true
+	}
+	if op != message.Put {
+		return false
+	}
+
+	reqID := inMsg.Get(message.RequestID).(uint32)
+	return reqID == constants.GossipMsgRequestID
+}
+
 // Dispatch a message to the consensus engine.
-func (h *Handler) handleMsg(msg message) error {
+func (h *Handler) handleMsg(msg message.InboundMessage) error {
 	startTime := h.clock.Time()
 
-	isPeriodic := msg.IsPeriodic()
+	isPeriodic := isPeriodic(msg)
 	if isPeriodic {
 		h.ctx.Log.Verbo("Forwarding message to consensus: %s", msg)
 	} else {
@@ -143,401 +182,219 @@ func (h *Handler) handleMsg(msg message) error {
 	h.ctx.Lock.Lock()
 	defer h.ctx.Lock.Unlock()
 
-	var err error
-	switch msg.messageType {
-	case constants.NotifyMsg:
-		err = h.engine.Notify(msg.notification)
-		h.metrics.notify.Observe(float64(h.clock.Time().Sub(startTime)))
-	case constants.GossipMsg:
+	var (
+		err error
+		op  = msg.Op()
+	)
+	switch op {
+	case message.Notify:
+		vmMsg := msg.Get(message.VMMessage).(uint32)
+		err = h.engine.Notify(common.Message(vmMsg))
+	case message.GossipRequest:
 		err = h.engine.Gossip()
-		h.metrics.gossip.Observe(float64(h.clock.Time().Sub(startTime)))
-	case constants.TimeoutMsg:
+	case message.Timeout:
 		err = h.engine.Timeout()
-		h.metrics.timeout.Observe(float64(h.clock.Time().Sub(startTime)))
 	default:
 		err = h.handleConsensusMsg(msg)
-		endTime := h.clock.Time()
-		handleDuration := endTime.Sub(startTime)
-		histogram := h.metrics.getMSGHistogram(msg.messageType)
-		histogram.Observe(float64(handleDuration))
-		h.cpuTracker.UtilizeTime(msg.nodeID, startTime, endTime)
 	}
 
-	msg.doneHandling()
+	endTime := h.clock.Time()
+	// If the message was caused by another node, track their CPU time.
+	if op != message.Notify && op != message.GossipRequest && op != message.Timeout {
+		nodeID := msg.NodeID()
+		h.cpuTracker.UtilizeTime(nodeID, startTime, endTime)
+	}
+
+	// Track how long the operation took.
+	histogram := h.metrics.messages[op]
+	histogram.Observe(float64(endTime.Sub(startTime)))
+
+	msg.OnFinishedHandling()
 
 	if isPeriodic {
-		h.ctx.Log.Verbo("Finished handling message: %s", msg.messageType)
+		h.ctx.Log.Verbo("Finished handling message: %s", op)
 	} else {
-		h.ctx.Log.Debug("Finished handling message: %s", msg.messageType)
+		h.ctx.Log.Debug("Finished handling message: %s", op)
 	}
 	return err
 }
 
 // Assumes [h.ctx.Lock] is locked
-func (h *Handler) handleConsensusMsg(msg message) error {
-	var err error
-	switch msg.messageType {
-	case constants.GetAcceptedFrontierMsg:
-		err = h.engine.GetAcceptedFrontier(msg.nodeID, msg.requestID)
-	case constants.AcceptedFrontierMsg:
-		err = h.engine.AcceptedFrontier(msg.nodeID, msg.requestID, msg.containerIDs)
-	case constants.GetAcceptedFrontierFailedMsg:
-		err = h.engine.GetAcceptedFrontierFailed(msg.nodeID, msg.requestID)
-	case constants.GetAcceptedMsg:
-		err = h.engine.GetAccepted(msg.nodeID, msg.requestID, msg.containerIDs)
-	case constants.AcceptedMsg:
-		err = h.engine.Accepted(msg.nodeID, msg.requestID, msg.containerIDs)
-	case constants.GetAcceptedFailedMsg:
-		err = h.engine.GetAcceptedFailed(msg.nodeID, msg.requestID)
-	case constants.GetAncestorsMsg:
-		err = h.engine.GetAncestors(msg.nodeID, msg.requestID, msg.containerID)
-	case constants.GetAncestorsFailedMsg:
-		err = h.engine.GetAncestorsFailed(msg.nodeID, msg.requestID)
-	case constants.MultiPutMsg:
-		err = h.engine.MultiPut(msg.nodeID, msg.requestID, msg.containers)
-	case constants.GetMsg:
-		err = h.engine.Get(msg.nodeID, msg.requestID, msg.containerID)
-	case constants.GetFailedMsg:
-		err = h.engine.GetFailed(msg.nodeID, msg.requestID)
-	case constants.PutMsg:
-		err = h.engine.Put(msg.nodeID, msg.requestID, msg.containerID, msg.container)
-	case constants.PushQueryMsg:
-		err = h.engine.PushQuery(msg.nodeID, msg.requestID, msg.containerID, msg.container)
-	case constants.PullQueryMsg:
-		err = h.engine.PullQuery(msg.nodeID, msg.requestID, msg.containerID)
-	case constants.QueryFailedMsg:
-		err = h.engine.QueryFailed(msg.nodeID, msg.requestID)
-	case constants.ChitsMsg:
-		err = h.engine.Chits(msg.nodeID, msg.requestID, msg.containerIDs)
-	case constants.ConnectedMsg:
-		err = h.engine.Connected(msg.nodeID)
-	case constants.DisconnectedMsg:
-		err = h.engine.Disconnected(msg.nodeID)
-	case constants.AppGossipMsg:
-		err = h.engine.AppGossip(msg.nodeID, msg.appMsgBytes)
-	case constants.AppRequestMsg:
-		err = h.engine.AppRequest(msg.nodeID, msg.requestID, msg.deadline, msg.appMsgBytes)
-	case constants.AppResponseMsg:
-		err = h.engine.AppResponse(msg.nodeID, msg.requestID, msg.appMsgBytes)
+// Relevant fields in msgs must be validated before being dispatched to the engine.
+// An invalid msg is logged and dropped silently since err would cause a chain shutdown.
+func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
+	nodeID := msg.NodeID()
+	switch msg.Op() {
+	case message.GetAcceptedFrontier:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return h.engine.GetAcceptedFrontier(nodeID, reqID)
+
+	case message.AcceptedFrontier:
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerIDs, err := getContainerIDs(msg)
+		if err != nil {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
+			return nil
+		}
+		return h.engine.AcceptedFrontier(nodeID, reqID, containerIDs)
+
+	case message.GetAcceptedFrontierFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return h.engine.GetAcceptedFrontierFailed(nodeID, reqID)
+
+	case message.GetAccepted:
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerIDs, err := getContainerIDs(msg)
+		if err != nil {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
+			return nil
+		}
+		return h.engine.GetAccepted(nodeID, reqID, containerIDs)
+
+	case message.Accepted:
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerIDs, err := getContainerIDs(msg)
+		if err != nil {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
+			return nil
+		}
+		return h.engine.Accepted(nodeID, reqID, containerIDs)
+
+	case message.GetAcceptedFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return h.engine.GetAcceptedFailed(nodeID, reqID)
+
+	case message.GetAncestors:
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
+		if err != nil {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
+			return nil
+		}
+		return h.engine.GetAncestors(nodeID, reqID, containerID)
+
+	case message.GetAncestorsFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return h.engine.GetAncestorsFailed(nodeID, reqID)
+
+	case message.MultiPut:
+		reqID := msg.Get(message.RequestID).(uint32)
+		containers, ok := msg.Get(message.MultiContainerBytes).([][]byte)
+		if !ok {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse MultiContainerBytes",
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
+			return nil
+		}
+		return h.engine.MultiPut(nodeID, reqID, containers)
+
+	case message.Get:
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
+		h.ctx.Log.AssertNoError(err)
+		return h.engine.Get(nodeID, reqID, containerID)
+
+	case message.GetFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return h.engine.GetFailed(nodeID, reqID)
+
+	case message.Put:
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
+		h.ctx.Log.AssertNoError(err)
+		container, ok := msg.Get(message.ContainerBytes).([]byte)
+		if !ok {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse ContainerBytes",
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
+			return nil
+		}
+		return h.engine.Put(nodeID, reqID, containerID, container)
+
+	case message.PushQuery:
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
+		h.ctx.Log.AssertNoError(err)
+		container, ok := msg.Get(message.ContainerBytes).([]byte)
+		if !ok {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse ContainerBytes",
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
+			return nil
+		}
+		return h.engine.PushQuery(nodeID, reqID, containerID, container)
+
+	case message.PullQuery:
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
+		h.ctx.Log.AssertNoError(err)
+		return h.engine.PullQuery(nodeID, reqID, containerID)
+
+	case message.QueryFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return h.engine.QueryFailed(nodeID, reqID)
+
+	case message.Chits:
+		reqID := msg.Get(message.RequestID).(uint32)
+		votes, err := getContainerIDs(msg)
+		if err != nil {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
+			return nil
+		}
+		return h.engine.Chits(nodeID, reqID, votes)
+
+	case message.Connected:
+		return h.engine.Connected(nodeID)
+
+	case message.Disconnected:
+		return h.engine.Disconnected(nodeID)
+
+	case message.AppRequest:
+		reqID := msg.Get(message.RequestID).(uint32)
+		appBytes, ok := msg.Get(message.AppBytes).([]byte)
+		if !ok {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppBytes",
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
+			return nil
+		}
+		return h.engine.AppRequest(nodeID, reqID, msg.ExpirationTime(), appBytes)
+
+	case message.AppRequestFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return h.engine.AppRequestFailed(nodeID, reqID)
+
+	case message.AppResponse:
+		reqID := msg.Get(message.RequestID).(uint32)
+		appBytes, ok := msg.Get(message.AppBytes).([]byte)
+		if !ok {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppBytes",
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
+			return nil
+		}
+		return h.engine.AppResponse(nodeID, reqID, appBytes)
+
+	case message.AppGossip:
+		appBytes, ok := msg.Get(message.AppBytes).([]byte)
+		if !ok {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppBytes",
+				msg.Op(), nodeID, h.engine.Context().ChainID, constants.GossipMsgRequestID)
+			return nil
+		}
+		return h.engine.AppGossip(nodeID, appBytes)
+
+	default:
+		h.ctx.Log.Warn("Attempt to submit to engine unhandled consensus msg %s from from (%s, %s). Dropping it",
+			msg.Op(), nodeID, h.engine.Context().ChainID)
+		return nil
 	}
-	return err
-}
-
-// GetAcceptedFrontier passes a GetAcceptedFrontier message received from the
-// network to the consensus engine.
-func (h *Handler) GetAcceptedFrontier(
-	nodeID ids.ShortID,
-	requestID uint32,
-	deadline time.Time,
-	onDoneHandling func(),
-) {
-	h.push(message{
-		messageType:    constants.GetAcceptedFrontierMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		deadline:       deadline,
-		received:       h.clock.Time(),
-		onDoneHandling: onDoneHandling,
-	})
-}
-
-// AcceptedFrontier passes a AcceptedFrontier message received from the network
-// to the consensus engine.
-func (h *Handler) AcceptedFrontier(
-	nodeID ids.ShortID,
-	requestID uint32,
-	containerIDs []ids.ID,
-	onDoneHandling func(),
-) {
-	h.push(message{
-		messageType:    constants.AcceptedFrontierMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		containerIDs:   containerIDs,
-		received:       h.clock.Time(),
-		onDoneHandling: onDoneHandling,
-	})
-}
-
-// GetAcceptedFrontierFailed passes a GetAcceptedFrontierFailed message received
-// from the network to the consensus engine.
-func (h *Handler) GetAcceptedFrontierFailed(nodeID ids.ShortID, requestID uint32) {
-	h.push(message{
-		messageType: constants.GetAcceptedFrontierFailedMsg,
-		nodeID:      nodeID,
-		requestID:   requestID,
-	})
-}
-
-// GetAccepted passes a GetAccepted message received from the
-// network to the consensus engine.
-func (h *Handler) GetAccepted(
-	nodeID ids.ShortID,
-	requestID uint32,
-	deadline time.Time,
-	containerIDs []ids.ID,
-	onDoneHandling func(),
-) {
-	h.push(message{
-		messageType:    constants.GetAcceptedMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		deadline:       deadline,
-		containerIDs:   containerIDs,
-		received:       h.clock.Time(),
-		onDoneHandling: onDoneHandling,
-	})
-}
-
-// Accepted passes a Accepted message received from the network to the consensus
-// engine.
-func (h *Handler) Accepted(
-	nodeID ids.ShortID,
-	requestID uint32,
-	containerIDs []ids.ID,
-	onDoneHandling func(),
-) {
-	h.push(message{
-		messageType:    constants.AcceptedMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		containerIDs:   containerIDs,
-		received:       h.clock.Time(),
-		onDoneHandling: onDoneHandling,
-	})
-}
-
-// GetAcceptedFailed passes a GetAcceptedFailed message received from the
-// network to the consensus engine.
-func (h *Handler) GetAcceptedFailed(nodeID ids.ShortID, requestID uint32) {
-	h.push(message{
-		messageType: constants.GetAcceptedFailedMsg,
-		nodeID:      nodeID,
-		requestID:   requestID,
-	})
-}
-
-// GetAncestors passes a GetAncestors message received from the network to the consensus engine.
-func (h *Handler) GetAncestors(
-	nodeID ids.ShortID,
-	requestID uint32,
-	deadline time.Time,
-	containerID ids.ID,
-	onDoneHandling func(),
-) {
-	h.push(message{
-		messageType:    constants.GetAncestorsMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		deadline:       deadline,
-		containerID:    containerID,
-		received:       h.clock.Time(),
-		onDoneHandling: onDoneHandling,
-	})
-}
-
-// MultiPut passes a MultiPut message received from the network to the consensus engine.
-func (h *Handler) MultiPut(
-	nodeID ids.ShortID,
-	requestID uint32,
-	containers [][]byte,
-	onDoneHandling func(),
-) {
-	h.push(message{
-		messageType:    constants.MultiPutMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		containers:     containers,
-		received:       h.clock.Time(),
-		onDoneHandling: onDoneHandling,
-	})
-}
-
-// GetAncestorsFailed passes a GetAncestorsFailed message to the consensus engine.
-func (h *Handler) GetAncestorsFailed(nodeID ids.ShortID, requestID uint32) {
-	h.push(message{
-		messageType: constants.GetAncestorsFailedMsg,
-		nodeID:      nodeID,
-		requestID:   requestID,
-	})
 }
 
 // Timeout passes a new timeout notification to the consensus engine
 func (h *Handler) Timeout() {
-	h.push(message{
-		messageType: constants.TimeoutMsg,
-		nodeID:      h.ctx.NodeID,
-	})
-}
-
-// Get passes a Get message received from the network to the consensus engine.
-func (h *Handler) Get(
-	nodeID ids.ShortID,
-	requestID uint32,
-	deadline time.Time,
-	containerID ids.ID,
-	onDoneHandling func(),
-) {
-	h.push(message{
-		messageType:    constants.GetMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		deadline:       deadline,
-		containerID:    containerID,
-		received:       h.clock.Time(),
-		onDoneHandling: onDoneHandling,
-	})
-}
-
-// Put passes a Put message received from the network to the consensus engine.
-func (h *Handler) Put(
-	nodeID ids.ShortID,
-	requestID uint32,
-	containerID ids.ID,
-	container []byte,
-	onDoneHandling func(),
-) {
-	h.push(message{
-		messageType:    constants.PutMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		containerID:    containerID,
-		container:      container,
-		received:       h.clock.Time(),
-		onDoneHandling: onDoneHandling,
-	})
-}
-
-// GetFailed passes a GetFailed message to the consensus engine.
-func (h *Handler) GetFailed(nodeID ids.ShortID, requestID uint32) {
-	h.push(message{
-		messageType: constants.GetFailedMsg,
-		nodeID:      nodeID,
-		requestID:   requestID,
-	})
-}
-
-// PushQuery passes a PushQuery message received from the network to the consensus engine.
-func (h *Handler) PushQuery(
-	nodeID ids.ShortID,
-	requestID uint32,
-	deadline time.Time,
-	containerID ids.ID,
-	container []byte,
-	onDoneHandling func(),
-) {
-	h.push(message{
-		messageType:    constants.PushQueryMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		deadline:       deadline,
-		containerID:    containerID,
-		container:      container,
-		received:       h.clock.Time(),
-		onDoneHandling: onDoneHandling,
-	})
-}
-
-// PullQuery passes a PullQuery message received from the network to the consensus engine.
-func (h *Handler) PullQuery(
-	nodeID ids.ShortID,
-	requestID uint32,
-	deadline time.Time,
-	containerID ids.ID,
-	onDoneHandling func(),
-) {
-	h.push(message{
-		messageType:    constants.PullQueryMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		deadline:       deadline,
-		containerID:    containerID,
-		received:       h.clock.Time(),
-		onDoneHandling: onDoneHandling,
-	})
-}
-
-// Chits passes a Chits message received from the network to the consensus engine.
-func (h *Handler) Chits(nodeID ids.ShortID, requestID uint32, votes []ids.ID, onDoneHandling func()) {
-	h.push(message{
-		messageType:    constants.ChitsMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		containerIDs:   votes,
-		received:       h.clock.Time(),
-		onDoneHandling: onDoneHandling,
-	})
-}
-
-// QueryFailed passes a QueryFailed message received from the network to the consensus engine.
-func (h *Handler) QueryFailed(nodeID ids.ShortID, requestID uint32) {
-	h.push(message{
-		messageType: constants.QueryFailedMsg,
-		nodeID:      nodeID,
-		requestID:   requestID,
-	})
-}
-
-// AppRequest passes an application-level request from the given node to the consensus engine.
-func (h *Handler) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, appRequestBytes []byte, onFinishedHandling func()) {
-	h.push(message{
-		messageType:    constants.AppRequestMsg,
-		nodeID:         nodeID,
-		deadline:       deadline,
-		requestID:      requestID,
-		appMsgBytes:    appRequestBytes,
-		received:       h.clock.Time(),
-		onDoneHandling: onFinishedHandling,
-	})
-}
-
-// AppResponse passes an application-level response from the given node to the consensus engine.
-func (h *Handler) AppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte, onFinishedHandling func()) {
-	h.push(message{
-		messageType:    constants.AppResponseMsg,
-		nodeID:         nodeID,
-		requestID:      requestID,
-		appMsgBytes:    appResponseBytes,
-		received:       h.clock.Time(),
-		onDoneHandling: onFinishedHandling,
-	})
-}
-
-// AppRequestFailed notifies the consensus engine that an application-level request failed
-// and it won't receive a response to the request.
-func (h *Handler) AppRequestFailed(nodeID ids.ShortID, requestID uint32) {
-	h.push(message{
-		messageType: constants.AppRequestFailedMsg,
-		nodeID:      nodeID,
-		requestID:   requestID,
-	})
-}
-
-// AppGossip passes an application-level gossip message from the given node to the consensus engine.
-func (h *Handler) AppGossip(nodeID ids.ShortID, appGossipBytes []byte, onFinishedHandling func()) {
-	h.push(message{
-		messageType:    constants.AppGossipMsg,
-		nodeID:         nodeID,
-		appMsgBytes:    appGossipBytes,
-		received:       h.clock.Time(),
-		onDoneHandling: onFinishedHandling,
-	})
-}
-
-// Connected passes a new connection notification to the consensus engine
-func (h *Handler) Connected(nodeID ids.ShortID) {
-	h.push(message{
-		messageType: constants.ConnectedMsg,
-		nodeID:      nodeID,
-	})
-}
-
-// Disconnected passes a new connection notification to the consensus engine
-func (h *Handler) Disconnected(nodeID ids.ShortID) {
-	h.push(message{
-		messageType: constants.DisconnectedMsg,
-		nodeID:      nodeID,
-	})
+	msg := h.mc.InternalTimeout(h.ctx.NodeID)
+	h.Push(msg)
 }
 
 // Gossip passes a gossip request to the consensus engine
@@ -546,10 +403,9 @@ func (h *Handler) Gossip() {
 		// Shouldn't send gossiping messages while the chain is bootstrapping
 		return
 	}
-	h.push(message{
-		messageType: constants.GossipMsg,
-		nodeID:      h.ctx.NodeID,
-	})
+
+	inMsg := h.mc.InternalGossipRequest(h.ctx.NodeID)
+	h.Push(inMsg)
 }
 
 // StartShutdown starts the shutdown process for this handler/engine.
@@ -593,24 +449,6 @@ func (h *Handler) shutdown() {
 	close(h.closed)
 }
 
-// Assumes [h.unprocessedMsgsCond.L] is not held
-func (h *Handler) push(msg message) {
-	if msg.nodeID == ids.ShortEmpty {
-		// This should never happen
-		h.ctx.Log.Warn("message does not have node ID of sender. Message: %s", msg)
-	}
-	if msg.messageType == constants.NullMsg {
-		// This should never happen
-		h.ctx.Log.Warn("message has message type %s", constants.NullMsg)
-	}
-
-	h.unprocessedMsgsCond.L.Lock()
-	defer h.unprocessedMsgsCond.L.Unlock()
-
-	h.unprocessedMsgs.Push(msg)
-	h.unprocessedMsgsCond.Signal()
-}
-
 func (h *Handler) dispatchInternal() {
 	for {
 		select {
@@ -621,11 +459,8 @@ func (h *Handler) dispatchInternal() {
 				return
 			}
 			// handle a message from the VM
-			h.push(message{
-				messageType:  constants.NotifyMsg,
-				notification: msg,
-				nodeID:       h.ctx.NodeID,
-			})
+			inMsg := h.mc.InternalVMMessage(h.ctx.NodeID, uint32(msg))
+			h.Push(inMsg)
 		}
 	}
 }
@@ -638,4 +473,22 @@ func (h *Handler) endInterval() {
 // if subnet is validator only and this is not a validator or self, returns false.
 func (h *Handler) isValidator(nodeID ids.ShortID) bool {
 	return !h.ctx.IsValidatorOnly() || nodeID == h.ctx.NodeID || h.validators.Contains(nodeID)
+}
+
+func getContainerIDs(msg message.InboundMessage) ([]ids.ID, error) {
+	containerIDsBytes := msg.Get(message.ContainerIDs).([][]byte)
+	res := make([]ids.ID, len(containerIDsBytes))
+	idSet := ids.NewSet(len(containerIDsBytes))
+	for i, containerIDBytes := range containerIDsBytes {
+		containerID, err := ids.ToID(containerIDBytes)
+		if err != nil {
+			return nil, err
+		}
+		if idSet.Contains(containerID) {
+			return nil, errDuplicatedContainerID
+		}
+		res[i] = containerID
+		idSet.Add(containerID)
+	}
+	return res, nil
 }

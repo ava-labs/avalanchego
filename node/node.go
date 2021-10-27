@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/indexer"
 	"github.com/ava-labs/avalanchego/ipcs"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -102,6 +103,9 @@ type Node struct {
 	// Monitors node health and runs health checks
 	healthService health.Service
 
+	// Build and parse messages, for both network layer and chain manager
+	msgCreator message.Creator
+
 	// Manages creation of blockchains and routing messages to them
 	chainManager chains.Manager
 
@@ -118,7 +122,8 @@ type Node struct {
 	IPCs *ipcs.ChainIPCs
 
 	// Net runs the networking stack
-	Net network.Network
+	networkNamespace string
+	Net              network.Network
 
 	// this node's initial connections to the network
 	beacons validators.Set
@@ -191,6 +196,7 @@ func (n *Node) initNetworking() error {
 	// Configure benchlist
 	n.Config.BenchlistConfig.Validators = n.vdrs
 	n.Config.BenchlistConfig.Benchable = n.Config.ConsensusRouter
+	n.Config.BenchlistConfig.StakingEnabled = n.Config.EnableStaking
 	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
 
 	consensusRouter := n.Config.ConsensusRouter
@@ -231,10 +237,8 @@ func (n *Node) initNetworking() error {
 		}
 	}
 
-	networkNamespace := fmt.Sprintf("%s_network", constants.PlatformName)
-
 	// add node configs to network config
-	n.Config.NetworkConfig.Namespace = networkNamespace
+	n.Config.NetworkConfig.Namespace = n.networkNamespace
 	n.Config.NetworkConfig.MyNodeID = n.ID
 	n.Config.NetworkConfig.MyIP = n.Config.IP
 	n.Config.NetworkConfig.NetworkID = n.Config.NetworkID
@@ -246,6 +250,7 @@ func (n *Node) initNetworking() error {
 
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
+		n.msgCreator,
 		n.MetricsRegisterer,
 		n.Log,
 		listener,
@@ -585,6 +590,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	err = n.Config.ConsensusRouter.Initialize(
 		n.ID,
 		n.Log,
+		n.msgCreator,
 		timeoutManager,
 		n.Config.ConsensusGossipFrequency,
 		n.Config.ConsensusShutdownTimeout,
@@ -614,6 +620,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		DecisionEvents:                         n.DecisionDispatcher,
 		ConsensusEvents:                        n.ConsensusDispatcher,
 		DBManager:                              n.DBManager,
+		MsgCreator:                             n.msgCreator,
 		Router:                                 n.Config.ConsensusRouter,
 		Net:                                    n.Net,
 		ConsensusParams:                        n.Config.ConsensusParams,
@@ -637,6 +644,9 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		MeterVMEnabled:                         n.Config.MeterVMEnabled,
 		SubnetConfigs:                          n.Config.SubnetConfigs,
 		ChainConfigs:                           n.Config.ChainConfigs,
+		AppGossipValidatorSize:                 int(n.Config.NetworkConfig.AppGossipValidatorSize),
+		AppGossipNonValidatorSize:              int(n.Config.NetworkConfig.AppGossipNonValidatorSize),
+		GossipAcceptedFrontierSize:             int(n.Config.NetworkConfig.GossipAcceptedFrontierSize),
 		BootstrapMaxTimeGetAncestors:           n.Config.BootstrapMaxTimeGetAncestors,
 		BootstrapMultiputMaxContainersSent:     n.Config.BootstrapMultiputMaxContainersSent,
 		BootstrapMultiputMaxContainersReceived: n.Config.BootstrapMultiputMaxContainersReceived,
@@ -1051,6 +1061,17 @@ func (n *Node) Initialize(
 
 	if err := n.initSharedMemory(); err != nil { // Initialize shared memory
 		return fmt.Errorf("problem initializing shared memory: %w", err)
+	}
+
+	// message.Creator is shared between networking, chainManager and the engine.
+	// It must be initiated before networking (initNetworking), chain manager (initChainManager)
+	// and the engine (initChains) but after the metrics (initMetricsAPI)
+	// message.Creator currently record metrics under network namespace
+	n.networkNamespace = fmt.Sprintf("%s_network", constants.PlatformName)
+	if n.msgCreator, err = message.NewCreator(n.MetricsRegisterer,
+		n.Config.NetworkConfig.CompressionEnabled,
+		n.networkNamespace); err != nil {
+		return fmt.Errorf("problem TheOneCreator: %w", err)
 	}
 
 	if err = n.initNetworking(); err != nil { // Set up all networking

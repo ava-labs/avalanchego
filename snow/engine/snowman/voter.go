@@ -89,11 +89,12 @@ func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
 votesLoop:
 	for _, vote := range votes.List() {
 		count := votes.Count(vote)
-		blk, err := v.t.GetBlock(vote)
+		// use rootID in case of this is a non-verified block ID
+		rootID := v.t.nonVerifieds.GetRoot(vote)
+		blk, err := v.t.GetBlock(rootID)
 		// If we cannot retrieve the block, drop [vote]
 		if err != nil {
-			v.t.Ctx.Log.Debug("Dropping %d vote(s) for %s because the block couldn't be fetched",
-				count, vote)
+			v.t.Ctx.Log.Debug("Dropping %d vote(s) for %s because %s couldn't be fetched", count, vote, rootID)
 			continue
 		}
 

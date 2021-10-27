@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
@@ -2076,21 +2077,32 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	go timeoutManager.Dispatch()
 
 	chainRouter := &router.ChainRouter{}
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &timeoutManager, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	metrics := prometheus.NewRegistry()
+	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	assert.NoError(t, err)
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &timeoutManager, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
-	externalSender := &sender.ExternalSenderTest{T: t}
+	externalSender := &sender.ExternalSenderTest{TB: t}
 	externalSender.Default(true)
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-	err = sender.Initialize(ctx, externalSender, chainRouter, &timeoutManager, "", prometheus.NewRegistry())
+	err = sender.Initialize(ctx, mc, externalSender, chainRouter, &timeoutManager, "", metrics, 1, 1, 1)
 	assert.NoError(t, err)
 
-	reqID := new(uint32)
-	externalSender.SendGetAcceptedFrontierF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration) []ids.ShortID {
-		*reqID = requestID
-		return ids.List()
+	var reqID uint32
+	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) ids.ShortSet {
+		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+		assert.NoError(t, err)
+		assert.Equal(t, message.GetAcceptedFrontier, inMsg.Op())
+
+		res := ids.NewShortSet(len(nodeIDs))
+		requestID, ok := inMsg.Get(message.RequestID).(uint32)
+		assert.True(t, ok)
+
+		reqID = requestID
+		return res
 	}
 
 	isBootstrapped := false
@@ -2139,6 +2151,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}
 	err = handler.Initialize(
+		mc,
 		&engine,
 		vdrs,
 		msgChan,
@@ -2155,39 +2168,53 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	externalSender.SendGetAcceptedFrontierF = nil
-	externalSender.SendGetAcceptedF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration, _ []ids.ID) []ids.ShortID {
-		*reqID = requestID
-		return ids.List()
+	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) ids.ShortSet {
+		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+		assert.NoError(t, err)
+		assert.Equal(t, message.GetAccepted, inMsg.Op())
+
+		res := ids.NewShortSet(len(nodeIDs))
+		requestID, ok := inMsg.Get(message.RequestID).(uint32)
+		assert.True(t, ok)
+
+		reqID = requestID
+		return res
 	}
 
 	frontier := []ids.ID{advanceTimeBlkID}
-	if err := engine.AcceptedFrontier(peerID, *reqID, frontier); err != nil {
+	if err := engine.AcceptedFrontier(peerID, reqID, frontier); err != nil {
 		t.Fatal(err)
 	}
 
-	externalSender.SendGetAcceptedF = nil
-	externalSender.SendGetAncestorsF = func(_ ids.ShortID, _ ids.ID, requestID uint32, _ time.Duration, containerID ids.ID) bool {
-		*reqID = requestID
+	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) ids.ShortSet {
+		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+		assert.NoError(t, err)
+		assert.Equal(t, message.GetAncestors, inMsg.Op())
+
+		res := ids.NewShortSet(len(nodeIDs))
+		requestID, ok := inMsg.Get(message.RequestID).(uint32)
+		assert.True(t, ok)
+		reqID = requestID
+
+		containerID, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte))
+		assert.NoError(t, err)
 		if containerID != advanceTimeBlkID {
 			t.Fatalf("wrong block requested")
 		}
-		return true
+
+		return res
 	}
 
-	if err := engine.Accepted(peerID, *reqID, frontier); err != nil {
+	if err := engine.Accepted(peerID, reqID, frontier); err != nil {
 		t.Fatal(err)
 	}
 
-	externalSender.SendGetF = nil
-	externalSender.CantSendPushQuery = false
-	externalSender.CantSendPullQuery = false
+	externalSender.SendF = nil
+	externalSender.CantSend = false
 
-	if err := engine.MultiPut(peerID, *reqID, [][]byte{advanceTimeBlkBytes}); err != nil {
+	if err := engine.MultiPut(peerID, reqID, [][]byte{advanceTimeBlkBytes}); err != nil {
 		t.Fatal(err)
 	}
-
-	externalSender.CantSendPushQuery = true
 
 	preferred, err = vm.Preferred()
 	if err != nil {
