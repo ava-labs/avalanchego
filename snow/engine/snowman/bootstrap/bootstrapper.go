@@ -231,7 +231,8 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 		return b.fetch(wantedBlkID)
 	}
 
-	if actualID := blocks[0].ID(); actualID != wantedBlkID {
+	requestedBlock := blocks[0]
+	if actualID := requestedBlock.ID(); actualID != wantedBlkID {
 		b.Ctx.Log.Debug("expected the first block to be the requested block, %s, but is %s",
 			wantedBlkID, actualID)
 		return b.fetch(wantedBlkID)
@@ -241,7 +242,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 	for _, block := range blocks[1:] {
 		blockSet[block.ID()] = block
 	}
-	return b.process(blocks[0], blockSet)
+	return b.process(requestedBlock, blockSet)
 }
 
 // GetAncestorsFailed is called when a GetAncestors message we sent fails
