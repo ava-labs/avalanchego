@@ -17,13 +17,12 @@ const (
 	defaultWeb3ApiEnabled              = true
 	defaultPruningEnabled              = true
 	defaultSnapshotAsync               = true
-	defaultRpcGasCap                   = 2500000000 // 25000000 X 100
-	defaultRpcTxFeeCap                 = 100        // 100 AVAX
-	defaultApiMaxDuration              = 0          // Default to no maximum API Call duration
-	defaultMaxBlocksPerRequest         = 0          // Default to no maximum on the number of blocks per getLogs request
+	defaultRpcGasCap                   = 2500000000      // 25000000 X 100
+	defaultRpcTxFeeCap                 = 100             // 100 AVAX
+	defaultApiMaxDuration              = 5 * time.Second // Default to no maximum API Call duration
+	defaultMaxBlocksPerRequest         = 0               // Default to no maximum on the number of blocks per getLogs request
 	defaultContinuousProfilerFrequency = 15 * time.Minute
 	defaultContinuousProfilerMaxFiles  = 5
-	defaultRPCEVMTimeout               = 5 * time.Second
 )
 
 type Duration struct {
@@ -43,9 +42,8 @@ type Config struct {
 	ContinuousProfilerMaxFiles  int      `json:"continuous-profiler-max-files"` // Maximum number of files to maintain
 
 	// Coreth API Gas/Price Caps
-	RPCGasCap     uint64   `json:"rpc-gas-cap"`
-	RPCEVMTimeout Duration `json:"rpc-evm-timeout"`
-	RPCTxFeeCap   float64  `json:"rpc-tx-fee-cap"`
+	RPCGasCap   uint64  `json:"rpc-gas-cap"`
+	RPCTxFeeCap float64 `json:"rpc-tx-fee-cap"`
 
 	// Eth APIs
 	EthAPIEnabled      bool `json:"eth-api-enabled"`
@@ -104,7 +102,6 @@ func (c *Config) SetDefaults() {
 	c.NetAPIEnabled = defaultNetApiEnabled
 	c.Web3APIEnabled = defaultWeb3ApiEnabled
 	c.RPCGasCap = defaultRpcGasCap
-	c.RPCEVMTimeout.Duration = defaultRPCEVMTimeout
 	c.RPCTxFeeCap = defaultRpcTxFeeCap
 	c.APIMaxDuration.Duration = defaultApiMaxDuration
 	c.MaxBlocksPerRequest = defaultMaxBlocksPerRequest
