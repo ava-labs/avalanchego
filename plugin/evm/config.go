@@ -17,10 +17,10 @@ const (
 	defaultWeb3ApiEnabled              = true
 	defaultPruningEnabled              = true
 	defaultSnapshotAsync               = true
-	defaultRpcGasCap                   = 2500000000      // 25000000 X 100
-	defaultRpcTxFeeCap                 = 100             // 100 AVAX
-	defaultApiMaxDuration              = 5 * time.Second // Default to no maximum API Call duration
-	defaultMaxBlocksPerRequest         = 0               // Default to no maximum on the number of blocks per getLogs request
+	defaultRpcGasCap                   = 2500000000 // 25000000 X 100
+	defaultRpcTxFeeCap                 = 100        // 100 AVAX
+	defaultApiMaxDuration              = 0          // Default to no maximum API Call duration
+	defaultMaxBlocksPerRequest         = 0          // Default to no maximum on the number of blocks per getLogs request
 	defaultContinuousProfilerFrequency = 15 * time.Minute
 	defaultContinuousProfilerMaxFiles  = 5
 )
