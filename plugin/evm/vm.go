@@ -210,6 +210,11 @@ func (vm *VM) Clock() *timer.Clock { return &vm.clock }
 // Logger implements the secp256k1fx interface
 func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
 
+// SetLogLevel sets the log level with the original [os.StdErr] interface
+func (vm *VM) setLogLevel(logLevel log.Lvl) {
+	log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.StreamHandler(originalStderr, log.TerminalFormat(false))))
+}
+
 /*
  ******************************************************************************
  ********************************* Snowman API ********************************
@@ -296,7 +301,7 @@ func (vm *VM) Initialize(
 		logLevel = configLogLevel
 	}
 
-	log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.StreamHandler(originalStderr, log.TerminalFormat(false))))
+	vm.setLogLevel(logLevel)
 
 	// Set minimum price for mining and default gas price oracle value to the min
 	// gas price to prevent so transactions and blocks all use the correct fees
@@ -661,18 +666,31 @@ func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 	enabledAPIs := vm.config.EthAPIs()
 	vm.chain.AttachEthService(handler, enabledAPIs)
 
+	primaryAlias, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get primary alias for chain due to %w", err)
+	}
+	apis := make(map[string]*commonEng.HTTPHandler)
+	avaxAPI, err := newHandler("avax", &AvaxAPI{vm})
+	if err != nil {
+		return nil, fmt.Errorf("failed to register service for AVAX API due to %w", err)
+	}
+	enabledAPIs = append(enabledAPIs, "avax")
+	apis["/avax"] = avaxAPI
+
+	if vm.config.CorethAdminAPIEnabled {
+		adminAPI, err := newHandler("admin", NewAdminService(vm, fmt.Sprintf("coreth_performance_%s", primaryAlias)))
+		if err != nil {
+			return nil, fmt.Errorf("failed to register service for admin API due to %w", err)
+		}
+		apis["/admin"] = adminAPI
+		enabledAPIs = append(enabledAPIs, "coreth-admin")
+	}
+
 	errs := wrappers.Errs{}
 	if vm.config.SnowmanAPIEnabled {
 		errs.Add(handler.RegisterName("snowman", &SnowmanAPI{vm}))
 		enabledAPIs = append(enabledAPIs, "snowman")
-	}
-	if vm.config.CorethAdminAPIEnabled {
-		primaryAlias, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get primary alias for chain due to %w", err)
-		}
-		errs.Add(handler.RegisterName("performance", NewPerformanceService(fmt.Sprintf("coreth_performance_%s", primaryAlias))))
-		enabledAPIs = append(enabledAPIs, "coreth-admin")
 	}
 	if vm.config.NetAPIEnabled {
 		errs.Add(handler.RegisterName("net", &NetAPI{vm}))
@@ -686,18 +704,11 @@ func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 		return nil, errs.Err
 	}
 
-	avaxAPI, err := newHandler("avax", &AvaxAPI{vm})
-	if err != nil {
-		return nil, fmt.Errorf("failed to register service for AVAX API due to %w", err)
-	}
-
 	log.Info(fmt.Sprintf("Enabled APIs: %s", strings.Join(enabledAPIs, ", ")))
+	apis["/rpc"] = &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler}
+	apis["/ws"] = &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandlerWithDuration([]string{"*"}, vm.config.APIMaxDuration.Duration)}
 
-	return map[string]*commonEng.HTTPHandler{
-		"/rpc":  {LockOptions: commonEng.NoLock, Handler: handler},
-		"/avax": avaxAPI,
-		"/ws":   {LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandlerWithDuration([]string{"*"}, vm.config.APIMaxDuration.Duration)},
-	}, nil
+	return apis, nil
 }
 
 // CreateStaticHandlers makes new http handlers that can handle API calls
