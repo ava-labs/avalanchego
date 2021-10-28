@@ -180,11 +180,7 @@ func (b *blockBuilder) handleGenerateBlock() {
 // needToBuild returns true if there are outstanding transactions to be issued
 // into a block.
 func (b *blockBuilder) needToBuild() bool {
-	size, err := b.chain.PendingSize()
-	if err != nil {
-		log.Error("Failed to get chain pending size", "error", err)
-		return false
-	}
+	size := b.chain.PendingSize()
 	return size > 0 || b.mempool.Len() > 0
 }
 
@@ -193,11 +189,7 @@ func (b *blockBuilder) needToBuild() bool {
 //
 // NOTE: Only used prior to AP4.
 func (b *blockBuilder) buildEarly() bool {
-	size, err := b.chain.PendingSize()
-	if err != nil {
-		log.Error("Failed to get chain pending size", "error", err)
-		return false
-	}
+	size := b.chain.PendingSize()
 	return size > batchSize || b.mempool.Len() > 1
 }
 

@@ -68,13 +68,13 @@ func (self *ETHChain) APIBackend() *eth.EthAPIBackend {
 	return self.backend.APIBackend
 }
 
-func (self *ETHChain) PendingSize() (int, error) {
-	pending, err := self.backend.TxPool().Pending(true)
+func (self *ETHChain) PendingSize() int {
+	pending := self.backend.TxPool().Pending(true)
 	count := 0
 	for _, txs := range pending {
 		count += len(txs)
 	}
-	return count, err
+	return count
 }
 
 func (self *ETHChain) AddRemoteTxs(txs []*types.Transaction) []error {
