@@ -11,7 +11,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
@@ -359,24 +358,6 @@ func (vm *VMServer) ParseBlock(_ context.Context, req *vmproto.ParseBlockRequest
 	}, err
 }
 
-func (vm *VMServer) Connected(_ context.Context, req *vmproto.ConnectedRequest) (*empty.Empty, error) {
-	vdrID, err := ids.ToShortID(req.ValidatorID)
-	if err != nil {
-		return nil, err
-	}
-
-	return &emptypb.Empty{}, vm.vm.Connected(vdrID)
-}
-
-func (vm *VMServer) Disconnected(_ context.Context, req *vmproto.DisconnectedRequest) (*empty.Empty, error) {
-	vdrID, err := ids.ToShortID(req.ValidatorID)
-	if err != nil {
-		return nil, err
-	}
-
-	return &emptypb.Empty{}, vm.vm.Disconnected(vdrID)
-}
-
 func (vm *VMServer) GetBlock(_ context.Context, req *vmproto.GetBlockRequest) (*vmproto.GetBlockResponse, error) {
 	id, err := ids.ToID(req.Id)
 	if err != nil {
@@ -437,6 +418,22 @@ func (vm *VMServer) Version(context.Context, *emptypb.Empty) (*vmproto.VersionRe
 	return &vmproto.VersionResponse{
 		Version: version,
 	}, err
+}
+
+func (vm *VMServer) Connected(_ context.Context, req *vmproto.ConnectedRequest) (*emptypb.Empty, error) {
+	vdrID, err := ids.ToShortID(req.ValidatorID)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, vm.vm.Connected(vdrID)
+}
+
+func (vm *VMServer) Disconnected(_ context.Context, req *vmproto.DisconnectedRequest) (*emptypb.Empty, error) {
+	vdrID, err := ids.ToShortID(req.ValidatorID)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, vm.vm.Disconnected(vdrID)
 }
 
 func (vm *VMServer) AppRequest(_ context.Context, req *vmproto.AppRequestMsg) (*emptypb.Empty, error) {

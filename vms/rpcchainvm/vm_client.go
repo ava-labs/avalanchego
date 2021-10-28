@@ -223,8 +223,6 @@ func (vm *VMClient) Initialize(
 			GetBlock:            vm.getBlock,
 			UnmarshalBlock:      vm.parseBlock,
 			BuildBlock:          vm.buildBlock,
-			Connected:           vm.connected,
-			Disconnected:        vm.disconnected,
 		},
 	)
 	if err != nil {
@@ -527,6 +525,20 @@ func (vm *VMClient) Version() (string, error) {
 	return resp.Version, nil
 }
 
+func (vm *VMClient) Connected(vdrID ids.ShortID) error {
+	_, err := vm.client.Connected(context.Background(), &vmproto.ConnectedRequest{
+		ValidatorID: vdrID[:],
+	})
+	return err
+}
+
+func (vm *VMClient) Disconnected(vdrID ids.ShortID) error {
+	_, err := vm.client.Disconnected(context.Background(), &vmproto.DisconnectedRequest{
+		ValidatorID: vdrID[:],
+	})
+	return err
+}
+
 // BlockClient is an implementation of Block that talks over RPC.
 type BlockClient struct {
 	vm *VMClient
@@ -576,19 +588,3 @@ func (b *BlockClient) Verify() error {
 func (b *BlockClient) Bytes() []byte        { return b.bytes }
 func (b *BlockClient) Height() uint64       { return b.height }
 func (b *BlockClient) Timestamp() time.Time { return b.time }
-
-func (vm *VMClient) connected(vdrID ids.ShortID) error {
-	_, err := vm.client.Connected(context.Background(), &vmproto.ConnectedRequest{
-		ValidatorID: vdrID[:],
-	})
-
-	return err
-}
-
-func (vm *VMClient) disconnected(vdrID ids.ShortID) error {
-	_, err := vm.client.Disconnected(context.Background(), &vmproto.DisconnectedRequest{
-		ValidatorID: vdrID[:],
-	})
-
-	return err
-}
