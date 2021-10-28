@@ -150,6 +150,12 @@ func newPeer(net *network, conn net.Conn, ip utils.IPDesc) *peer {
 
 // assume the [stateLock] is held
 func (p *peer) Start() {
+	// Register this node with the inbound message throttler.
+	// Note: we must call [p.net.inboundMsgThrottler.RemoveNode(p.nodeID)]
+	// after we stop reading messages from [p.nodeID].
+	// This happens in [p.Close].
+	// Failure to call RemoveNode will cause a memory leak.
+	p.net.inboundMsgThrottler.AddNode(p.nodeID)
 	go func() {
 		// Make sure that the version is the first message sent
 		p.sendVersion()
@@ -460,6 +466,9 @@ func (p *peer) Close() { p.once.Do(p.close) }
 // assumes only [peer.Close] calls this.
 // By the time this message returns, [p] has been removed from [p.net.peers]
 func (p *peer) close() {
+	// Remove this node from the throttler.
+	p.net.inboundMsgThrottler.RemoveNode(p.nodeID)
+
 	// If the connection is closing, we can immediately cancel the ticker
 	// goroutines.
 	close(p.tickerCloser)
