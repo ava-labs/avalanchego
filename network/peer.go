@@ -150,14 +150,13 @@ func newPeer(net *network, conn net.Conn, ip utils.IPDesc) *peer {
 
 // assume the [stateLock] is held
 func (p *peer) Start() {
+	// Register this node with the inbound message throttler.
+	// Note: we must call [p.net.inboundMsgThrottler.RemoveNode(p.nodeID)]
+	// after we stop reading messages from [p.nodeID].
+	// This happens in [p.Close].
+	// Failure to call RemoveNode will cause a memory leak.
+	p.net.inboundMsgThrottler.AddNode(p.nodeID)
 	go func() {
-		// Register this node with the inbound message throttler.
-		// Note: we must call [p.net.inboundMsgThrottler.RemoveNode(p.nodeID)]
-		// after we stop reading messages from [p.nodeID].
-		// This happens in [p.Close].
-		// Failure to call RemoveNode will cause a memory leak.
-		p.net.inboundMsgThrottler.AddNode(p.nodeID)
-
 		// Make sure that the version is the first message sent
 		p.sendVersion()
 
