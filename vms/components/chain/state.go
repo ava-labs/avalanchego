@@ -5,7 +5,6 @@ package chain
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
@@ -32,12 +31,6 @@ type State struct {
 
 	// getStatus returns the status of the block
 	getStatus func(snowman.Block) (choices.Status, error)
-
-	getAncestors func(blkID ids.ID,
-		maxBlocksNum int, maxBlocksSize int, maxBlocksRetrivalTime time.Duration,
-	) [][]byte
-
-	batchedParseBlock func(blksBytes [][]byte) ([]snowman.Block, error)
 
 	// verifiedBlocks is a map of blocks that have been verified and are
 	// therefore currently in consensus.
@@ -67,10 +60,6 @@ type Config struct {
 	UnmarshalBlock     func([]byte) (snowman.Block, error)
 	BuildBlock         func() (snowman.Block, error)
 	GetBlockIDAtHeight func(uint64) (ids.ID, error)
-	GetAncestors       func(blkID ids.ID,
-		maxBlocksNum int, maxBlocksSize int, maxBlocksRetrivalTime time.Duration,
-	) [][]byte
-	BatchedParseBlock func([][]byte) ([]snowman.Block, error)
 }
 
 // Block is an interface wrapping the normal snowman.Block interface to be used in
@@ -116,8 +105,6 @@ func (s *State) initialize(config *Config) {
 	s.verifiedBlocks = make(map[ids.ID]*BlockWrapper)
 	s.getBlock = config.GetBlock
 	s.buildBlock = config.BuildBlock
-	s.getAncestors = config.GetAncestors
-	s.batchedParseBlock = config.BatchedParseBlock
 	s.unmarshalBlock = config.UnmarshalBlock
 	if config.GetBlockIDAtHeight == nil {
 		s.getStatus = func(blk snowman.Block) (choices.Status, error) { return blk.Status(), nil }

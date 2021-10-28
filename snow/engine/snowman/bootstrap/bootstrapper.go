@@ -18,9 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/vms/metervm"
-	"github.com/ava-labs/avalanchego/vms/proposervm"
 )
 
 // Parameters for delaying bootstrapping to avoid potential CPU burns
@@ -223,59 +220,33 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 		return nil
 	}
 
-	wantedBlk, err := b.VM.ParseBlock(blks[0]) // the block we requested
-	if err != nil {
-		b.Ctx.Log.Debug("Failed to parse requested block %s: %s", wantedBlkID, err)
+	blocks, err := block.BatchedParseBlock(b.VM, blks)
+	if err != nil { // the provided blocks couldn't be parsed
+		b.Ctx.Log.Debug("failed to parse blocks in MultiPut from %s with ID %d", vdr, requestID)
 		return b.fetch(wantedBlkID)
-	} else if actualID := wantedBlk.ID(); actualID != wantedBlkID {
+	}
+
+	if len(blocks) == 0 {
+		b.Ctx.Log.Debug("parsing blocks returned an empty set of blocks from %s with ID %d", vdr, requestID)
+		return b.fetch(wantedBlkID)
+	}
+
+	if len(blocks) == 0 {
+		b.Ctx.Log.Debug("parsing blocks returned an empty set of blocks from %s with ID %d", vdr, requestID)
+		return b.fetch(wantedBlkID)
+	}
+
+	if actualID := blocks[0].ID(); actualID != wantedBlkID {
 		b.Ctx.Log.Debug("expected the first block to be the requested block, %s, but is %s",
-			wantedBlk, actualID)
+			wantedBlkID, actualID)
 		return b.fetch(wantedBlkID)
 	}
 
-	processingBlocks := make(map[ids.ID]snowman.Block, lenBlks)
-	processingBlocks[wantedBlkID] = wantedBlk
-
-	// Peel off till a RemoteVM, to try and batch ParseBlock requests (it reduces network overhead)
-	if mVM, ok := b.VM.(*metervm.BlockVM); ok {
-		if pVM, ok := mVM.ChainVM.(*proposervm.VM); ok {
-			parsedBlks, err := pVM.BatchedParseBlock(blks[1:])
-			if err == nil {
-				if !b.Restarted {
-					b.Ctx.Log.Info("Parsed a batch of %d blocks", len(blks[1:]))
-				} else {
-					b.Ctx.Log.Debug("Parsed a batch of %d blocks", len(blks[1:]))
-				}
-
-				for _, parsedBlk := range parsedBlks {
-					processingBlocks[parsedBlk.ID()] = parsedBlk
-				}
-
-				return b.process(wantedBlk, processingBlocks)
-			}
-
-			if err != block.ErrRemoteVMNotImplemented {
-				b.Ctx.Log.Debug("Failed parsing block via RemoteVM: %s", err)
-				return err
-			}
-
-			// while ProposerVM implements RemoteVM, its core VM does not.
-			b.Ctx.Log.Debug("MultiPut: fallback to non-batched processing")
-		}
+	blockSet := make(map[ids.ID]snowman.Block, len(blocks))
+	for _, block := range blocks[1:] {
+		blockSet[block.ID()] = block
 	}
-
-	// RemoteVM did not work, try local logic
-	for _, blkBytes := range blks[1:] {
-		blk, err := b.VM.ParseBlock(blkBytes)
-		if err != nil {
-			b.Ctx.Log.Debug("Failed to parse block: %s", err)
-			b.Ctx.Log.Verbo("block: %s", formatting.DumpBytes{Bytes: blkBytes})
-		} else {
-			processingBlocks[blk.ID()] = blk
-		}
-	}
-
-	return b.process(wantedBlk, processingBlocks)
+	return b.process(blocks[0], blockSet)
 }
 
 // GetAncestorsFailed is called when a GetAncestors message we sent fails

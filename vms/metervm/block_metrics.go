@@ -19,6 +19,8 @@ type blockMetrics struct {
 	getBlockErr,
 	setPreference,
 	lastAccepted,
+	getAncestors,
+	batchedParseBlock,
 	verify,
 	verifyErr,
 	accept,
@@ -26,6 +28,7 @@ type blockMetrics struct {
 }
 
 func (m *blockMetrics) Initialize(
+	supportsBatchedFetching bool,
 	namespace string,
 	reg prometheus.Registerer,
 ) error {
@@ -38,6 +41,8 @@ func (m *blockMetrics) Initialize(
 	m.getBlockErr = newAverager(namespace, "get_block_err", reg, &errs)
 	m.setPreference = newAverager(namespace, "set_preference", reg, &errs)
 	m.lastAccepted = newAverager(namespace, "last_accepted", reg, &errs)
+	m.getAncestors = newAverager(namespace, "get_ancestors", reg, &errs)
+	m.batchedParseBlock = newAverager(namespace, "batched_parse_block", reg, &errs)
 	m.verify = newAverager(namespace, "verify", reg, &errs)
 	m.verifyErr = newAverager(namespace, "verify_err", reg, &errs)
 	m.accept = newAverager(namespace, "accept", reg, &errs)

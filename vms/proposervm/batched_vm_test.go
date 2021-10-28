@@ -1,3 +1,6 @@
+// (c) 2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package proposervm
 
 import (
@@ -813,7 +816,7 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 }
 
 type TestRemoteProposerVM struct {
-	*block.TestRemoteVM
+	*block.TestBatchedVM
 	*block.TestVM
 }
 
@@ -837,11 +840,11 @@ func initTestRemoteProposerVM(
 
 	initialState := []byte("genesis state")
 	coreVM := TestRemoteProposerVM{
-		TestVM:       &block.TestVM{},
-		TestRemoteVM: &block.TestRemoteVM{},
+		TestVM:        &block.TestVM{},
+		TestBatchedVM: &block.TestBatchedVM{},
 	}
 	coreVM.TestVM.T = t
-	coreVM.TestRemoteVM.T = t
+	coreVM.TestBatchedVM.T = t
 
 	coreVM.InitializeF = func(*snow.Context, manager.Manager,
 		[]byte, []byte, []byte, chan<- common.Message,

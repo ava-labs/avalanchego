@@ -5,12 +5,13 @@ package block
 
 import (
 	"errors"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
+
+var ErrRemoteVMNotImplemented = errors.New("vm does not implement RemoteVM interface")
 
 // ChainVM defines the required functionality of a Snowman VM.
 //
@@ -29,18 +30,13 @@ import (
 type ChainVM interface {
 	common.VM
 	Getter
+	Parser
 
 	// Attempt to create a new block from data contained in the VM.
 	//
 	// If the VM doesn't want to issue a new block, an error should be
 	// returned.
 	BuildBlock() (snowman.Block, error)
-
-	// Attempt to create a block from a stream of bytes.
-	//
-	// The block should be represented by the full byte array, without extra
-	// bytes.
-	ParseBlock([]byte) (snowman.Block, error)
 
 	// Notify the VM of the currently preferred block.
 	//
@@ -66,18 +62,11 @@ type Getter interface {
 	GetBlock(ids.ID) (snowman.Block, error)
 }
 
-// RemoteVM extends the minimal functionalities exposed by ChainVM for VMs communicating
-// over network (gRPC in our case). This allows more efficient operations since
-// calls over network can be duly batched
-type RemoteVM interface {
-	GetAncestors(
-		blkID ids.ID, // first requested block
-		maxBlocksNum int, // max number of blocks to be retrieved
-		maxBlocksSize int, // max cumulated byte size of retrieved blocks
-		maxBlocksRetrivalTime time.Duration, // max duration of retrival operation
-	) ([][]byte, error)
-
-	BatchedParseBlock(blks [][]byte) ([]snowman.Block, error)
+// Parser defines the functionality for fetching a block by its bytes.
+type Parser interface {
+	// Attempt to create a block from a stream of bytes.
+	//
+	// The block should be represented by the full byte array, without extra
+	// bytes.
+	ParseBlock([]byte) (snowman.Block, error)
 }
-
-var ErrRemoteVMNotImplemented = errors.New("vm does not implement RemoteVM interface")

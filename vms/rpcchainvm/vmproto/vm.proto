@@ -159,12 +159,8 @@ message GetAncestorsRequest {
     int64 maxBlocksRetrivalTime = 4;
 }
 
-message BlkBytes {
-    bytes blkBytes = 1;
-}
-
 message GetAncestorsResponse {
-    repeated BlkBytes blksBytes = 1;
+    repeated bytes blksBytes = 1;
 }
 
 message BatchedParseBlockRequest {

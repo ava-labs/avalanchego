@@ -13,13 +13,14 @@ import (
 )
 
 var (
-	_                    RemoteVM = &TestRemoteVM{}
-	errGetAncestor                = errors.New("unexpectedly called GetAncestor")
-	errBatchedParseBlock          = errors.New("unexpectedly called BatchedParseBlock")
+	errGetAncestor       = errors.New("unexpectedly called GetAncestor")
+	errBatchedParseBlock = errors.New("unexpectedly called BatchedParseBlock")
+
+	_ BatchedChainVM = &TestBatchedVM{}
 )
 
-// TestRemoteVM is a RemoteVM that is useful for testing.
-type TestRemoteVM struct {
+// TestBatchedVM is a BatchedVM that is useful for testing.
+type TestBatchedVM struct {
 	T *testing.T
 
 	CantGetAncestors    bool
@@ -35,12 +36,12 @@ type TestRemoteVM struct {
 	BatchedParseBlockF func(blks [][]byte) ([]snowman.Block, error)
 }
 
-func (vm *TestRemoteVM) Default(cant bool) {
+func (vm *TestBatchedVM) Default(cant bool) {
 	vm.CantGetAncestors = cant
 	vm.CantBatchParseBlock = cant
 }
 
-func (vm *TestRemoteVM) GetAncestors(
+func (vm *TestBatchedVM) GetAncestors(
 	blkID ids.ID,
 	maxBlocksNum int,
 	maxBlocksSize int,
@@ -55,7 +56,7 @@ func (vm *TestRemoteVM) GetAncestors(
 	return nil, errGetAncestor
 }
 
-func (vm *TestRemoteVM) BatchedParseBlock(blks [][]byte) ([]snowman.Block, error) {
+func (vm *TestBatchedVM) BatchedParseBlock(blks [][]byte) ([]snowman.Block, error) {
 	if vm.BatchedParseBlockF != nil {
 		return vm.BatchedParseBlockF(blks)
 	}

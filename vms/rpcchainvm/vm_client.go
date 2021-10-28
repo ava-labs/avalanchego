@@ -46,7 +46,8 @@ import (
 var (
 	errUnsupportedFXs = errors.New("unsupported feature extensions")
 
-	_ block.ChainVM = &VMClient{}
+	_ block.ChainVM        = &VMClient{}
+	_ block.BatchedChainVM = &VMClient{}
 )
 
 const (
@@ -223,8 +224,6 @@ func (vm *VMClient) Initialize(
 			GetBlock:            vm.getBlock,
 			UnmarshalBlock:      vm.parseBlock,
 			BuildBlock:          vm.buildBlock,
-			GetAncestors:        vm.getAncestors,
-			BatchedParseBlock:   vm.batchedParseBlock,
 		},
 	)
 	if err != nil {
@@ -516,13 +515,12 @@ func (vm *VMClient) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	return err
 }
 
-func (vm *VMClient) getAncestors(
+func (vm *VMClient) GetAncestors(
 	blkID ids.ID,
 	maxBlocksNum int,
 	maxBlocksSize int,
 	maxBlocksRetrivalTime time.Duration,
-) [][]byte {
-	res := make([][]byte, 0)
+) ([][]byte, error) {
 	resp, err := vm.client.GetAncestors(context.Background(), &vmproto.GetAncestorsRequest{
 		BlkID:                 blkID[:],
 		MaxBlocksNum:          int32(maxBlocksNum),
@@ -530,18 +528,12 @@ func (vm *VMClient) getAncestors(
 		MaxBlocksRetrivalTime: int64(maxBlocksRetrivalTime),
 	})
 	if err != nil {
-		return res
+		return nil, err
 	}
-
-	for _, blkBytes := range resp.BlksBytes {
-		res = append(res, blkBytes.BlkBytes)
-	}
-	return res
+	return resp.BlksBytes, nil
 }
 
-func (vm *VMClient) batchedParseBlock(
-	blksBytes [][]byte,
-) ([]snowman.Block, error) {
+func (vm *VMClient) BatchedParseBlock(blksBytes [][]byte) ([]snowman.Block, error) {
 	resp, err := vm.client.BatchedParseBlock(context.Background(), &vmproto.BatchedParseBlockRequest{
 		Request: blksBytes,
 	})

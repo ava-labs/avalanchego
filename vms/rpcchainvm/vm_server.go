@@ -358,17 +358,7 @@ func (vm *VMServer) ParseBlock(_ context.Context, req *vmproto.ParseBlockRequest
 	}, err
 }
 
-func (vm *VMServer) GetAncestors(_ context.Context,
-	req *vmproto.GetAncestorsRequest) (*vmproto.GetAncestorsResponse, error) {
-	res := &vmproto.GetAncestorsResponse{
-		BlksBytes: make([]*vmproto.BlkBytes, 0),
-	}
-	rVM, ok := vm.vm.(block.RemoteVM)
-	if !ok {
-		// should not happen
-		return nil, block.ErrRemoteVMNotImplemented
-	}
-
+func (vm *VMServer) GetAncestors(_ context.Context, req *vmproto.GetAncestorsRequest) (*vmproto.GetAncestorsResponse, error) {
 	blkID, err := ids.ToID(req.BlkID)
 	if err != nil {
 		return nil, err
@@ -377,50 +367,34 @@ func (vm *VMServer) GetAncestors(_ context.Context,
 	maxBlksSize := int(req.MaxBlocksSize)
 	maxBlocksRetrivalTime := time.Duration(req.MaxBlocksRetrivalTime)
 
-	blksBytes, err := rVM.GetAncestors(blkID, maxBlksNum, maxBlksSize, maxBlocksRetrivalTime)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, blkBytes := range blksBytes {
-		blkRes := vmproto.BlkBytes{BlkBytes: blkBytes}
-		res.BlksBytes = append(res.BlksBytes, &blkRes)
-	}
-
-	return res, nil
+	blocks, err := block.GetAncestors(
+		vm.vm,
+		blkID,
+		maxBlksNum,
+		maxBlksSize,
+		maxBlocksRetrivalTime,
+	)
+	return &vmproto.GetAncestorsResponse{
+		BlksBytes: blocks,
+	}, err
 }
 
-func (vm *VMServer) BatchedParseBlock(_ context.Context,
+func (vm *VMServer) BatchedParseBlock(
+	ctx context.Context,
 	req *vmproto.BatchedParseBlockRequest,
 ) (*vmproto.BatchedParseBlockResponse, error) {
-	rVM, ok := vm.vm.(block.RemoteVM)
-	if !ok {
-		// should not happen
-		return nil, block.ErrRemoteVMNotImplemented
-	}
-	blks, err := rVM.BatchedParseBlock(req.Request)
-	if err != nil {
-		return nil, err
-	}
-
-	res := make([]*vmproto.ParseBlockResponse, 0, len(blks))
-	for _, blk := range blks {
-		blkID := blk.ID()
-		parentID := blk.Parent()
-		timeBytes, err := blk.Timestamp().MarshalBinary()
+	blocks := make([]*vmproto.ParseBlockResponse, 0, len(req.Request))
+	for i, blockBytes := range req.Request {
+		block, err := vm.ParseBlock(ctx, &vmproto.ParseBlockRequest{
+			Bytes: blockBytes,
+		})
 		if err != nil {
 			return nil, err
 		}
-		res = append(res, &vmproto.ParseBlockResponse{
-			Id:        blkID[:],
-			ParentID:  parentID[:],
-			Status:    uint32(blk.Status()),
-			Height:    blk.Height(),
-			Timestamp: timeBytes,
-		})
+		blocks[i] = block
 	}
 	return &vmproto.BatchedParseBlockResponse{
-		Response: res,
+		Response: blocks,
 	}, nil
 }
 
