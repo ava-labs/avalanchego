@@ -151,7 +151,6 @@ message AppGossipMsg {
     bytes msg = 2;
 }
 
-// validator.Connector related messages
 message ConnectedRequest {
    bytes validatorID = 1; 
 }
@@ -159,8 +158,6 @@ message ConnectedRequest {
 message DisconnectedRequest {
    bytes validatorID = 1; 
 }
-
-// end of validator.Connector related messages
 
 service VM {
     rpc Initialize(InitializeRequest) returns (InitializeResponse);
