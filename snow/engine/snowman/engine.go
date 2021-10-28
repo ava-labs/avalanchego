@@ -4,6 +4,8 @@
 package snowman
 
 import (
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
@@ -21,5 +23,19 @@ type Engine interface {
 	block.Getter
 
 	// Initialize this engine.
-	Initialize(Config) error
+	Initialize(config Config,
+		getAcceptedF func(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error,
+		acceptedF func(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error,
+		getAcceptedFailedF func(validatorID ids.ShortID, requestID uint32) error,
+		getAcceptedFrontierF func(validatorID ids.ShortID, requestID uint32) error,
+		acceptedFrontierF func(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error,
+		getAcceptedFrontierFailedF func(validatorID ids.ShortID, requestID uint32) error,
+		multiPutF func(validatorID ids.ShortID, requestID uint32, containers [][]byte) error,
+		getAncestorsFailedF func(validatorID ids.ShortID, requestID uint32) error,
+		contextF func() *snow.Context,
+		timeoutF func() error,
+		haltF func(),
+		connectedF func(validatorID ids.ShortID) error,
+		disconnectedF func(validatorID ids.ShortID) error,
+	) (func() error, error)
 }

@@ -6,6 +6,7 @@ package snowman
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -14,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -71,8 +73,34 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 		}
 	}
 
+	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
+	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
 	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	bootstrapper := bootstrap.Bootstrapper{}
+
+	if _ /*onEngineStart*/, err := te.Initialize(config,
+		bootstrapper.GetAccepted,
+		bootstrapper.Accepted,
+		bootstrapper.GetAcceptedFailed,
+		bootstrapper.GetAcceptedFrontier,
+		bootstrapper.AcceptedFrontier,
+		bootstrapper.GetAcceptedFrontierFailed,
+		bootstrapper.MultiPut,
+		bootstrapper.GetAncestorsFailed,
+		bootstrapper.Context,
+		bootstrapper.Timeout,
+		bootstrapper.Halt,
+		bootstrapper.Connected,
+		bootstrapper.Disconnected); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bootstrapper.Initialize(
+		config.Config,
+		te.FinishBootstrapping,
+		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		prometheus.NewRegistry(),
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -102,7 +130,7 @@ func TestEngineShutdown(t *testing.T) {
 func TestEngineAdd(t *testing.T) {
 	vdr, _, sender, vm, te, gBlk := setup(t)
 
-	if te.Ctx.ChainID != ids.Empty {
+	if te.EngineCtx.ChainID != ids.Empty {
 		t.Fatalf("Wrong chain ID")
 	}
 
@@ -443,8 +471,34 @@ func TestEngineMultipleQuery(t *testing.T) {
 		return gBlk, nil
 	}
 
+	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
+	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
 	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	bootstrapper := bootstrap.Bootstrapper{}
+
+	if _ /*onEngineStart*/, err := te.Initialize(config,
+		bootstrapper.GetAccepted,
+		bootstrapper.Accepted,
+		bootstrapper.GetAcceptedFailed,
+		bootstrapper.GetAcceptedFrontier,
+		bootstrapper.AcceptedFrontier,
+		bootstrapper.GetAcceptedFrontierFailed,
+		bootstrapper.MultiPut,
+		bootstrapper.GetAncestorsFailed,
+		bootstrapper.Context,
+		bootstrapper.Timeout,
+		bootstrapper.Halt,
+		bootstrapper.Connected,
+		bootstrapper.Disconnected); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bootstrapper.Initialize(
+		config.Config,
+		te.FinishBootstrapping,
+		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		prometheus.NewRegistry(),
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -934,8 +988,34 @@ func TestVoteCanceling(t *testing.T) {
 	vm.CantBootstrapping = false
 	vm.CantBootstrapped = false
 
+	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
+	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
 	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	bootstrapper := bootstrap.Bootstrapper{}
+
+	if _ /*onEngineStart*/, err := te.Initialize(config,
+		bootstrapper.GetAccepted,
+		bootstrapper.Accepted,
+		bootstrapper.GetAcceptedFailed,
+		bootstrapper.GetAcceptedFrontier,
+		bootstrapper.AcceptedFrontier,
+		bootstrapper.GetAcceptedFrontierFailed,
+		bootstrapper.MultiPut,
+		bootstrapper.GetAncestorsFailed,
+		bootstrapper.Context,
+		bootstrapper.Timeout,
+		bootstrapper.Halt,
+		bootstrapper.Connected,
+		bootstrapper.Disconnected); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bootstrapper.Initialize(
+		config.Config,
+		te.FinishBootstrapping,
+		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		prometheus.NewRegistry(),
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1029,8 +1109,35 @@ func TestEngineNoQuery(t *testing.T) {
 	}
 
 	config.VM = vm
+
+	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
+	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
 	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	bootstrapper := bootstrap.Bootstrapper{}
+
+	if _ /*onEngineStart*/, err := te.Initialize(config,
+		bootstrapper.GetAccepted,
+		bootstrapper.Accepted,
+		bootstrapper.GetAcceptedFailed,
+		bootstrapper.GetAcceptedFrontier,
+		bootstrapper.AcceptedFrontier,
+		bootstrapper.GetAcceptedFrontierFailed,
+		bootstrapper.MultiPut,
+		bootstrapper.GetAncestorsFailed,
+		bootstrapper.Context,
+		bootstrapper.Timeout,
+		bootstrapper.Halt,
+		bootstrapper.Connected,
+		bootstrapper.Disconnected); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bootstrapper.Initialize(
+		config.Config,
+		te.FinishBootstrapping,
+		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		prometheus.NewRegistry(),
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1076,8 +1183,35 @@ func TestEngineNoRepollQuery(t *testing.T) {
 	}
 
 	config.VM = vm
+
+	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
+	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
 	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	bootstrapper := bootstrap.Bootstrapper{}
+
+	if _ /*onEngineStart*/, err := te.Initialize(config,
+		bootstrapper.GetAccepted,
+		bootstrapper.Accepted,
+		bootstrapper.GetAcceptedFailed,
+		bootstrapper.GetAcceptedFrontier,
+		bootstrapper.AcceptedFrontier,
+		bootstrapper.GetAcceptedFrontierFailed,
+		bootstrapper.MultiPut,
+		bootstrapper.GetAncestorsFailed,
+		bootstrapper.Context,
+		bootstrapper.Timeout,
+		bootstrapper.Halt,
+		bootstrapper.Connected,
+		bootstrapper.Disconnected); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bootstrapper.Initialize(
+		config.Config,
+		te.FinishBootstrapping,
+		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		prometheus.NewRegistry(),
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1756,8 +1890,34 @@ func TestEngineAggressivePolling(t *testing.T) {
 		return gBlk, nil
 	}
 
+	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
+	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
 	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	bootstrapper := bootstrap.Bootstrapper{}
+
+	if _ /*onEngineStart*/, err := te.Initialize(config,
+		bootstrapper.GetAccepted,
+		bootstrapper.Accepted,
+		bootstrapper.GetAcceptedFailed,
+		bootstrapper.GetAcceptedFrontier,
+		bootstrapper.AcceptedFrontier,
+		bootstrapper.GetAcceptedFrontierFailed,
+		bootstrapper.MultiPut,
+		bootstrapper.GetAncestorsFailed,
+		bootstrapper.Context,
+		bootstrapper.Timeout,
+		bootstrapper.Halt,
+		bootstrapper.Connected,
+		bootstrapper.Disconnected); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bootstrapper.Initialize(
+		config.Config,
+		te.FinishBootstrapping,
+		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		prometheus.NewRegistry(),
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1882,8 +2042,34 @@ func TestEngineDoubleChit(t *testing.T) {
 	vm.CantBootstrapping = false
 	vm.CantBootstrapped = false
 
+	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
+	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
 	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	bootstrapper := bootstrap.Bootstrapper{}
+
+	if _ /*onEngineStart*/, err := te.Initialize(config,
+		bootstrapper.GetAccepted,
+		bootstrapper.Accepted,
+		bootstrapper.GetAcceptedFailed,
+		bootstrapper.GetAcceptedFrontier,
+		bootstrapper.AcceptedFrontier,
+		bootstrapper.GetAcceptedFrontierFailed,
+		bootstrapper.MultiPut,
+		bootstrapper.GetAncestorsFailed,
+		bootstrapper.Context,
+		bootstrapper.Timeout,
+		bootstrapper.Halt,
+		bootstrapper.Connected,
+		bootstrapper.Disconnected); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bootstrapper.Initialize(
+		config.Config,
+		te.FinishBootstrapping,
+		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		prometheus.NewRegistry(),
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2012,8 +2198,34 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		return gBlk, nil
 	}
 
+	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
+	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
 	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	bootstrapper := bootstrap.Bootstrapper{}
+
+	if _ /*onEngineStart*/, err := te.Initialize(config,
+		bootstrapper.GetAccepted,
+		bootstrapper.Accepted,
+		bootstrapper.GetAcceptedFailed,
+		bootstrapper.GetAcceptedFrontier,
+		bootstrapper.AcceptedFrontier,
+		bootstrapper.GetAcceptedFrontierFailed,
+		bootstrapper.MultiPut,
+		bootstrapper.GetAncestorsFailed,
+		bootstrapper.Context,
+		bootstrapper.Timeout,
+		bootstrapper.Halt,
+		bootstrapper.Connected,
+		bootstrapper.Disconnected); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bootstrapper.Initialize(
+		config.Config,
+		te.FinishBootstrapping,
+		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		prometheus.NewRegistry(),
+	); err != nil {
 		t.Fatal(err)
 	}
 

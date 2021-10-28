@@ -733,33 +733,63 @@ func (m *manager) createSnowmanChain(
 	}
 
 	// The engine handles consensus
-	engine := &smeng.Transitive{}
-	if err := engine.Initialize(smeng.Config{
-		Config: smbootstrap.Config{
-			Config: common.Config{
-				Ctx:                           ctx,
-				Validators:                    vdrs,
-				Beacons:                       beacons,
-				SampleK:                       sampleK,
-				StartupAlpha:                  (3*bootstrapWeight + 3) / 4,
-				Alpha:                         bootstrapWeight/2 + 1, // must be > 50%
-				Sender:                        &sender,
-				Subnet:                        sb,
-				Timer:                         timer,
-				RetryBootstrap:                m.RetryBootstrap,
-				RetryBootstrapWarnFrequency:   m.RetryBootstrapWarnFrequency,
-				MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
-				MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
-				MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
-			},
-			Blocked:      blocked,
-			VM:           vm,
-			Bootstrapped: m.unblockChains,
+	bootstrapCfg := smbootstrap.Config{
+		Config: common.Config{
+			Ctx:                           ctx,
+			Validators:                    vdrs,
+			Beacons:                       beacons,
+			SampleK:                       sampleK,
+			StartupAlpha:                  (3*bootstrapWeight + 3) / 4,
+			Alpha:                         bootstrapWeight/2 + 1, // must be > 50%
+			Sender:                        &sender,
+			Subnet:                        sb,
+			Timer:                         timer,
+			RetryBootstrap:                m.RetryBootstrap,
+			RetryBootstrapWarnFrequency:   m.RetryBootstrapWarnFrequency,
+			MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
+			MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
+			MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
 		},
+		Blocked:      blocked,
+		VM:           vm,
+		Bootstrapped: m.unblockChains,
+	}
+
+	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
+	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
+	bootstrapper := smbootstrap.Bootstrapper{}
+	engine := &smeng.Transitive{}
+
+	onDoneBootstrapping, err := engine.Initialize(smeng.Config{
+		Config:    bootstrapCfg,
 		Params:    consensusParams,
 		Consensus: &smcon.Topological{},
-	}); err != nil {
+	},
+		bootstrapper.GetAccepted,
+		bootstrapper.Accepted,
+		bootstrapper.GetAcceptedFailed,
+		bootstrapper.GetAcceptedFrontier,
+		bootstrapper.AcceptedFrontier,
+		bootstrapper.GetAcceptedFrontierFailed,
+		bootstrapper.MultiPut,
+		bootstrapper.GetAncestorsFailed,
+		bootstrapper.Context,
+		bootstrapper.Timeout,
+		bootstrapper.Halt,
+		bootstrapper.Connected,
+		bootstrapper.Disconnected,
+	)
+	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
+	}
+
+	if err := bootstrapper.Initialize(
+		bootstrapCfg,
+		onDoneBootstrapping,
+		fmt.Sprintf("%s_bs", consensusParams.Namespace),
+		consensusParams.Metrics,
+	); err != nil {
+		return nil, fmt.Errorf("error initializing snowman bootstrapper: %w", err)
 	}
 
 	err = handler.Initialize(

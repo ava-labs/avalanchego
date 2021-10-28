@@ -2097,7 +2097,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, message.GetAcceptedFrontier, inMsg.Op())
 
-		res := ids.NewShortSet(len(nodeIDs))
+		res := nodeIDs
 		requestID, ok := inMsg.Get(message.RequestID).(uint32)
 		assert.True(t, ok)
 
@@ -2113,8 +2113,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	// The engine handles consensus
-	engine := smeng.Transitive{}
-	err = engine.Initialize(smeng.Config{
+	config := smeng.Config{
 		Config: bootstrap.Config{
 			Config: common.Config{
 				Ctx:                           ctx,
@@ -2143,7 +2142,33 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			MaxItemProcessingTime: 1,
 		},
 		Consensus: &smcon.Topological{},
-	})
+	}
+
+	engine := smeng.Transitive{}
+	bootstrapper := bootstrap.Bootstrapper{}
+	if err := bootstrapper.Initialize(
+		config.Config,
+		engine.FinishBootstrapping,
+		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		prometheus.NewRegistry(),
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	_ /*onEngineStart*/, err = engine.Initialize(config,
+		bootstrapper.GetAccepted,
+		bootstrapper.Accepted,
+		bootstrapper.GetAcceptedFailed,
+		bootstrapper.GetAcceptedFrontier,
+		bootstrapper.AcceptedFrontier,
+		bootstrapper.GetAcceptedFrontierFailed,
+		bootstrapper.MultiPut,
+		bootstrapper.GetAncestorsFailed,
+		bootstrapper.Context,
+		bootstrapper.Timeout,
+		bootstrapper.Halt,
+		bootstrapper.Connected,
+		bootstrapper.Disconnected)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2173,7 +2198,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, message.GetAccepted, inMsg.Op())
 
-		res := ids.NewShortSet(len(nodeIDs))
+		res := nodeIDs
 		requestID, ok := inMsg.Get(message.RequestID).(uint32)
 		assert.True(t, ok)
 
@@ -2191,7 +2216,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, message.GetAncestors, inMsg.Op())
 
-		res := ids.NewShortSet(len(nodeIDs))
+		res := nodeIDs
 		requestID, ok := inMsg.Get(message.RequestID).(uint32)
 		assert.True(t, ok)
 		reqID = requestID
