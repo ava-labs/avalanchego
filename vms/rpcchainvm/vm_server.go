@@ -383,7 +383,7 @@ func (vm *VMServer) BatchedParseBlock(
 	ctx context.Context,
 	req *vmproto.BatchedParseBlockRequest,
 ) (*vmproto.BatchedParseBlockResponse, error) {
-	blocks := make([]*vmproto.ParseBlockResponse, 0, len(req.Request))
+	blocks := make([]*vmproto.ParseBlockResponse, len(req.Request))
 	for i, blockBytes := range req.Request {
 		block, err := vm.ParseBlock(ctx, &vmproto.ParseBlockRequest{
 			Bytes: blockBytes,
