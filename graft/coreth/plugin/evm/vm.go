@@ -306,7 +306,7 @@ func (vm *VM) Initialize(
 	// Set minimum price for mining and default gas price oracle value to the min
 	// gas price to prevent so transactions and blocks all use the correct fees
 	ethConfig.RPCGasCap = vm.config.RPCGasCap
-	ethConfig.RPCEVMTimeout = vm.config.RPCEVMTimeout.Duration
+	ethConfig.RPCEVMTimeout = vm.config.APIMaxDuration.Duration
 	ethConfig.RPCTxFeeCap = vm.config.RPCTxFeeCap
 	ethConfig.TxPool.NoLocals = !vm.config.LocalTxsEnabled
 	ethConfig.AllowUnfinalizedQueries = vm.config.AllowUnfinalizedQueries
