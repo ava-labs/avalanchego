@@ -528,21 +528,3 @@ func (service *AvaxAPI) GetAtomicTx(r *http.Request, args *api.GetTxArgs, reply 
 	}
 	return nil
 }
-
-// AdminAPI offers APIs reserved for the administrators of the node.
-type AdminAPI struct{ vm *VM }
-
-type SetLogLevelArgs struct {
-	Level string `json:"level"`
-}
-
-func (service *AdminAPI) SetLogLevel(r *http.Request, args *SetLogLevelArgs, reply *api.SuccessResponse) error {
-	log.Info("EVM: SetLogLevel called", "logLevel", args.Level)
-	logLevel, err := log.LvlFromString(args.Level)
-	if err != nil {
-		return fmt.Errorf("failed to parse log level: %w ", err)
-	}
-	service.vm.setLogLevel(logLevel)
-	reply.Success = true
-	return nil
-}
