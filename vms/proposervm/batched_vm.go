@@ -27,59 +27,47 @@ func (vm *VM) GetAncestors(
 		return nil, block.ErrRemoteVMNotImplemented
 	}
 
-	_, errBlk := vm.getPostForkBlock(blkID)
-	if errBlk != nil {
-		// assume it is a preForkBlock
-		return rVM.GetAncestors(blkID, maxBlocksNum, maxBlocksSize, maxBlocksRetrivalTime)
-	}
-
-	// hereinafter loop over proposerVM cache and DB, possibly till snowman++ fork is hit
 	res := make([][]byte, 0, maxBlocksNum)
 	currentByteLength := 0
-	var currentDuration time.Duration
 	startTime := time.Now()
 
-	for cnt := 0; ; cnt++ {
-		currentDuration = time.Since(startTime)
-		if cnt >= maxBlocksNum || currentDuration >= maxBlocksRetrivalTime {
-			return res, nil // return what we have
+	// hereinafter loop over proposerVM cache and DB, possibly till snowman++
+	// fork is hit
+	for {
+		blk, err := vm.getStatelessBlk(blkID)
+		if err != nil {
+			// maybe we have hit the proposerVM fork here?
+			break
 		}
 
-		var blkBytes []byte
-		if currentBlk, exists := vm.verifiedBlocks[blkID]; !exists {
-			statelessBlock, _, err := vm.State.GetBlock(blkID)
-			if err != nil {
-				// maybe we have hit the proposerVM fork here?
-				break
-			}
-			blkBytes = statelessBlock.Bytes()
-			blkID = statelessBlock.ParentID() // set next blkID to look for
-		} else {
-			blkBytes = currentBlk.Bytes()
-			blkID = currentBlk.Parent() // set next blkID to look for
+		blkBytes := blk.Bytes()
+
+		// Ensure response size isn't too large. Include wrappers.IntLen because
+		// the size of the message is included with each container, and the size
+		// is repr. by an int.
+		currentByteLength += wrappers.IntLen + len(blkBytes)
+		if len(res) > 0 && (currentByteLength >= maxBlocksSize || maxBlocksRetrivalTime <= time.Since(startTime)) {
+			return res, nil // reached maximum size or ran out of time
 		}
 
-		// Ensure response size isn't too large. Include wrappers.IntLen because the size of the message
-		// is included with each container, and the size is repr. by an int.
-		if newLen := currentByteLength + wrappers.IntLen + len(blkBytes); newLen < maxBlocksSize {
-			res = append(res, blkBytes)
-			currentByteLength = newLen
-			continue
-		}
+		res = append(res, blkBytes)
+		blkID = blk.ParentID()
+		maxBlocksNum--
 
-		return res, nil // reached maximum size
+		if maxBlocksNum <= 0 {
+			return res, nil
+		}
 	}
 
-	if _, err := vm.getPreForkBlock(blkID); err != nil {
-		return res, nil // return what we have
-	}
-
-	// snowman++ fork hit.
+	// snowman++ fork may have been hit.
 	preMaxBlocksNum := maxBlocksNum - len(res)
 	preMaxBlocksSize := maxBlocksSize - currentByteLength
-	preMaxBlocksRetrivalTime := maxBlocksRetrivalTime - currentDuration
+	preMaxBlocksRetrivalTime := maxBlocksRetrivalTime - time.Since(startTime)
 	innerBytes, err := rVM.GetAncestors(blkID, preMaxBlocksNum, preMaxBlocksSize, preMaxBlocksRetrivalTime)
 	if err != nil {
+		if len(res) == 0 {
+			return nil, err
+		}
 		return res, nil // return what we have
 	}
 	res = append(res, innerBytes...)
@@ -109,8 +97,7 @@ func (vm *VM) BatchedParseBlock(blks [][]byte) ([]snowman.Block, error) {
 				innerBytes = append(innerBytes, statelessBlock.Block())
 				continue
 			}
-
-			return res, err
+			return nil, err
 		}
 
 		// assume it is a preForkBlock and defer parsing to VM
@@ -158,4 +145,12 @@ func (vm *VM) BatchedParseBlock(blks [][]byte) ([]snowman.Block, error) {
 	}
 
 	return res, nil
+}
+
+func (vm *VM) getStatelessBlk(blkID ids.ID) (statelessblock.Block, error) {
+	if currentBlk, exists := vm.verifiedBlocks[blkID]; exists {
+		return currentBlk.getStatelessBlk(), nil
+	}
+	statelessBlock, _, err := vm.State.GetBlock(blkID)
+	return statelessBlock, err
 }
