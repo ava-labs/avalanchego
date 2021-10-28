@@ -91,6 +91,14 @@ const (
 	unverifiedCacheSize = 50
 )
 
+// Define the API endpoints for the VM
+const (
+	avaxEndpoint   = "/avax"
+	adminEndpoint  = "/admin"
+	ethRPCEndpoint = "/rpc"
+	ethWSEndpoint  = "/ws"
+)
+
 var (
 	// Set last accepted key to be longer than the keys used to store accepted block IDs.
 	lastAcceptedKey        = []byte("last_accepted_key")
@@ -676,14 +684,14 @@ func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 		return nil, fmt.Errorf("failed to register service for AVAX API due to %w", err)
 	}
 	enabledAPIs = append(enabledAPIs, "avax")
-	apis["/avax"] = avaxAPI
+	apis[avaxEndpoint] = avaxAPI
 
 	if vm.config.CorethAdminAPIEnabled {
 		adminAPI, err := newHandler("admin", NewAdminService(vm, fmt.Sprintf("coreth_performance_%s", primaryAlias)))
 		if err != nil {
 			return nil, fmt.Errorf("failed to register service for admin API due to %w", err)
 		}
-		apis["/admin"] = adminAPI
+		apis[adminEndpoint] = adminAPI
 		enabledAPIs = append(enabledAPIs, "coreth-admin")
 	}
 
@@ -705,8 +713,8 @@ func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 	}
 
 	log.Info(fmt.Sprintf("Enabled APIs: %s", strings.Join(enabledAPIs, ", ")))
-	apis["/rpc"] = &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler}
-	apis["/ws"] = &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandlerWithDuration([]string{"*"}, vm.config.APIMaxDuration.Duration)}
+	apis[ethRPCEndpoint] = &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler}
+	apis[ethWSEndpoint] = &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandlerWithDuration([]string{"*"}, vm.config.APIMaxDuration.Duration)}
 
 	return apis, nil
 }
