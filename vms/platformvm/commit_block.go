@@ -74,7 +74,8 @@ func (c *CommitBlock) Verify() error {
 }
 
 // newCommitBlock returns a new *Commit block where the block's parent, a
-// proposal block, has ID [parentID].
+// proposal block, has ID [parentID]. Additionally the block will track if it
+// was originally preferred or not for metrics.
 func (vm *VM) newCommitBlock(parentID ids.ID, height uint64, wasPreferred bool) (*CommitBlock, error) {
 	commit := &CommitBlock{
 		DoubleDecisionBlock: DoubleDecisionBlock{
