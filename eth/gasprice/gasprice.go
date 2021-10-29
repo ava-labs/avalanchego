@@ -32,7 +32,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
@@ -90,7 +90,7 @@ type Oracle struct {
 	fetchLock  sync.Mutex
 
 	// clock to decide what set of rules to use when recommending a gas price
-	clock timer.Clock
+	clock mockable.Clock
 
 	checkBlocks, percentile           int
 	maxHeaderHistory, maxBlockHistory int
