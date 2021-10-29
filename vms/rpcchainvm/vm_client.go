@@ -195,7 +195,9 @@ func (vm *VMClient) Initialize(
 	}
 
 	status := choices.Status(resp.Status)
-	vm.ctx.Log.AssertDeferredNoError(status.Valid)
+	if err := status.Valid(); err != nil {
+		return err
+	}
 
 	timestamp := time.Time{}
 	if err := timestamp.UnmarshalBinary(resp.Timestamp); err != nil {
@@ -367,10 +369,14 @@ func (vm *VMClient) buildBlock() (snowman.Block, error) {
 	}
 
 	id, err := ids.ToID(resp.Id)
-	vm.ctx.Log.AssertNoError(err)
+	if err != nil {
+		return nil, err
+	}
 
 	parentID, err := ids.ToID(resp.ParentID)
-	vm.ctx.Log.AssertNoError(err)
+	if err != nil {
+		return nil, err
+	}
 
 	timestamp := time.Time{}
 	if err := timestamp.UnmarshalBinary(resp.Timestamp); err != nil {
@@ -397,13 +403,19 @@ func (vm *VMClient) parseBlock(bytes []byte) (snowman.Block, error) {
 	}
 
 	id, err := ids.ToID(resp.Id)
-	vm.ctx.Log.AssertNoError(err)
+	if err != nil {
+		return nil, err
+	}
 
 	parentID, err := ids.ToID(resp.ParentID)
-	vm.ctx.Log.AssertNoError(err)
+	if err != nil {
+		return nil, err
+	}
 
 	status := choices.Status(resp.Status)
-	vm.ctx.Log.AssertDeferredNoError(status.Valid)
+	if err := status.Valid(); err != nil {
+		return nil, err
+	}
 
 	timestamp := time.Time{}
 	if err := timestamp.UnmarshalBinary(resp.Timestamp); err != nil {
@@ -432,10 +444,14 @@ func (vm *VMClient) getBlock(id ids.ID) (snowman.Block, error) {
 	}
 
 	parentID, err := ids.ToID(resp.ParentID)
-	vm.ctx.Log.AssertNoError(err)
+	if err != nil {
+		return nil, err
+	}
 
 	status := choices.Status(resp.Status)
-	vm.ctx.Log.AssertDeferredNoError(status.Valid)
+	if err := status.Valid(); err != nil {
+		return nil, err
+	}
 
 	timestamp := time.Time{}
 	if err := timestamp.UnmarshalBinary(resp.Timestamp); err != nil {
@@ -547,13 +563,19 @@ func (vm *VMClient) BatchedParseBlock(blksBytes [][]byte) ([]snowman.Block, erro
 	res := make([]snowman.Block, 0, len(blksBytes))
 	for idx, blkResp := range resp.Response {
 		id, err := ids.ToID(blkResp.Id)
-		vm.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return nil, err
+		}
 
 		parentID, err := ids.ToID(blkResp.ParentID)
-		vm.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return nil, err
+		}
 
 		status := choices.Status(blkResp.Status)
-		vm.ctx.Log.AssertDeferredNoError(status.Valid)
+		if err := status.Valid(); err != nil {
+			return nil, err
+		}
 
 		timestamp := time.Time{}
 		if err := timestamp.UnmarshalBinary(blkResp.Timestamp); err != nil {
