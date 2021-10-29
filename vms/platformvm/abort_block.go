@@ -74,7 +74,8 @@ func (a *AbortBlock) Verify() error {
 }
 
 // newAbortBlock returns a new *Abort block where the block's parent, a proposal
-// block, has ID [parentID].
+// block, has ID [parentID]. Additionally the block will track if it was
+// originally preferred or not for metrics.
 func (vm *VM) newAbortBlock(parentID ids.ID, height uint64, wasPreferred bool) (*AbortBlock, error) {
 	abort := &AbortBlock{
 		DoubleDecisionBlock: DoubleDecisionBlock{

@@ -6,6 +6,7 @@ package common
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 
@@ -48,7 +49,8 @@ type TestVM struct {
 	ConnectedF                               func(ids.ShortID) error
 	DisconnectedF                            func(ids.ShortID) error
 	HealthCheckF                             func() (interface{}, error)
-	AppRequestF, AppResponseF                func(nodeID ids.ShortID, requestID uint32, msg []byte) error
+	AppRequestF                              func(nodeID ids.ShortID, requestID uint32, deadline time.Time, msg []byte) error
+	AppResponseF                             func(nodeID ids.ShortID, requestID uint32, msg []byte) error
 	AppGossipF                               func(nodeID ids.ShortID, msg []byte) error
 	AppRequestFailedF                        func(nodeID ids.ShortID, requestID uint32) error
 	VersionF                                 func() (string, error)
@@ -163,9 +165,9 @@ func (vm *TestVM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 	return errAppRequest
 }
 
-func (vm *TestVM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+func (vm *TestVM) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
 	if vm.AppRequestF != nil {
-		return vm.AppRequestF(nodeID, requestID, request)
+		return vm.AppRequestF(nodeID, requestID, deadline, request)
 	}
 	if !vm.CantAppRequest {
 		return nil

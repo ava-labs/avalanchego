@@ -110,7 +110,7 @@ func (t *bandwidthThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 	t.lock.RUnlock()
 	if !ok {
 		// This should never happen. If it is, the caller is misusing this struct.
-		t.log.Warn("tried to acquire %d bytes for %s but that node isn't registered", msgSize, nodeID.PrefixedString(constants.NodeIDPrefix))
+		t.log.Debug("tried to acquire %d bytes for %s but that node isn't registered", msgSize, nodeID.PrefixedString(constants.NodeIDPrefix))
 		return
 	}
 	// TODO Allow cancellation using context?

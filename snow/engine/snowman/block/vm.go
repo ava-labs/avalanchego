@@ -4,10 +4,14 @@
 package block
 
 import (
+	"errors"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
+
+var ErrRemoteVMNotImplemented = errors.New("vm does not implement RemoteVM interface")
 
 // ChainVM defines the required functionality of a Snowman VM.
 //
@@ -26,18 +30,13 @@ import (
 type ChainVM interface {
 	common.VM
 	Getter
+	Parser
 
 	// Attempt to create a new block from data contained in the VM.
 	//
 	// If the VM doesn't want to issue a new block, an error should be
 	// returned.
 	BuildBlock() (snowman.Block, error)
-
-	// Attempt to create a block from a stream of bytes.
-	//
-	// The block should be represented by the full byte array, without extra
-	// bytes.
-	ParseBlock([]byte) (snowman.Block, error)
 
 	// Notify the VM of the currently preferred block.
 	//
@@ -61,4 +60,13 @@ type Getter interface {
 	// TODO: Update the invariant to report database.ErrNotFound if the
 	//       operation is missing.
 	GetBlock(ids.ID) (snowman.Block, error)
+}
+
+// Parser defines the functionality for fetching a block by its bytes.
+type Parser interface {
+	// Attempt to create a block from a stream of bytes.
+	//
+	// The block should be represented by the full byte array, without extra
+	// bytes.
+	ParseBlock([]byte) (snowman.Block, error)
 }

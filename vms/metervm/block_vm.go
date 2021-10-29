@@ -5,6 +5,7 @@ package metervm
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
@@ -16,9 +17,10 @@ import (
 )
 
 var (
-	_ block.ChainVM       = &blockVM{}
-	_ snowman.Block       = &meterBlock{}
-	_ snowman.OracleBlock = &meterBlock{}
+	_ block.ChainVM        = &blockVM{}
+	_ block.BatchedChainVM = &blockVM{}
+	_ snowman.Block        = &meterBlock{}
+	_ snowman.OracleBlock  = &meterBlock{}
 )
 
 func NewBlockVM(vm block.ChainVM) block.ChainVM {
@@ -43,7 +45,8 @@ func (vm *blockVM) Initialize(
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
-	if err := vm.blockMetrics.Initialize(fmt.Sprintf("%s_metervm", ctx.Namespace), ctx.Metrics); err != nil {
+	_, supportsBatchedFetching := vm.ChainVM.(block.BatchedChainVM)
+	if err := vm.blockMetrics.Initialize(supportsBatchedFetching, fmt.Sprintf("%s_metervm", ctx.Namespace), ctx.Metrics); err != nil {
 		return err
 	}
 
@@ -112,6 +115,50 @@ func (vm *blockVM) LastAccepted() (ids.ID, error) {
 	end := vm.clock.Time()
 	vm.blockMetrics.lastAccepted.Observe(float64(end.Sub(start)))
 	return lastAcceptedID, err
+}
+
+func (vm *blockVM) GetAncestors(
+	blkID ids.ID,
+	maxBlocksNum int,
+	maxBlocksSize int,
+	maxBlocksRetrivalTime time.Duration,
+) ([][]byte, error) {
+	rVM, ok := vm.ChainVM.(block.BatchedChainVM)
+	if !ok {
+		return nil, block.ErrRemoteVMNotImplemented
+	}
+
+	start := vm.clock.Time()
+	ancestors, err := rVM.GetAncestors(
+		blkID,
+		maxBlocksNum,
+		maxBlocksSize,
+		maxBlocksRetrivalTime,
+	)
+	end := vm.clock.Time()
+	vm.blockMetrics.getAncestors.Observe(float64(end.Sub(start)))
+	return ancestors, err
+}
+
+func (vm *blockVM) BatchedParseBlock(blks [][]byte) ([]snowman.Block, error) {
+	rVM, ok := vm.ChainVM.(block.BatchedChainVM)
+	if !ok {
+		return nil, block.ErrRemoteVMNotImplemented
+	}
+
+	start := vm.clock.Time()
+	blocks, err := rVM.BatchedParseBlock(blks)
+	end := vm.clock.Time()
+	vm.blockMetrics.batchedParseBlock.Observe(float64(end.Sub(start)))
+
+	wrappedBlocks := make([]snowman.Block, len(blocks))
+	for i, block := range blocks {
+		wrappedBlocks[i] = &meterBlock{
+			Block: block,
+			vm:    vm,
+		}
+	}
+	return wrappedBlocks, err
 }
 
 type meterBlock struct {

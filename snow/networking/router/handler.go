@@ -359,7 +359,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
-		return h.engine.AppRequest(nodeID, reqID, appBytes)
+		return h.engine.AppRequest(nodeID, reqID, msg.ExpirationTime(), appBytes)
 
 	case message.AppRequestFailed:
 		reqID := msg.Get(message.RequestID).(uint32)

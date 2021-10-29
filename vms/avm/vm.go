@@ -1158,7 +1158,7 @@ func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
 }
 
 // This VM doesn't (currently) have any app-specific messages
-func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
 	return nil
 }
 
