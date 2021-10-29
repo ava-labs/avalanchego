@@ -198,11 +198,11 @@ type VM struct {
 	profiler profiler.ContinuousProfiler
 }
 
-func (vm *VM) connected(id ids.ShortID) error {
+func (vm *VM) Connected(nodeID ids.ShortID) error {
 	return nil // noop
 }
 
-func (vm *VM) disconnected(id ids.ShortID) error {
+func (vm *VM) Disconnected(nodeID ids.ShortID) error {
 	return nil // noop
 }
 
@@ -394,8 +394,6 @@ func (vm *VM) Initialize(
 		GetBlock:           vm.getBlock,
 		UnmarshalBlock:     vm.parseBlock,
 		BuildBlock:         vm.buildBlock,
-		Connected:          vm.connected,
-		Disconnected:       vm.disconnected,
 	})
 
 	vm.builder.awaitSubmittedTxs()

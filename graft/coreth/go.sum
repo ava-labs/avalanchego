@@ -62,6 +62,8 @@ github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da/go.mod h1:Q73ZrmV
 github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310/go.mod h1:ufUuZ+zHj4x4TnLV4JWEpy2hxWSpsRywHrMgIH9cCH8=
 github.com/ava-labs/avalanchego v1.6.2-rc.2 h1:pg4uZy2+sBjBHMjHFpTIJizX//wVf22E4HdxqjVhKRc=
 github.com/ava-labs/avalanchego v1.6.2-rc.2/go.mod h1:Dir4TnnbmIzrl5/Gnqxv+89qGmwIPjqKjLBWXw2lu9M=
+github.com/ava-labs/avalanchego v1.6.4-rc.1 h1:Vf45yHzeILFjP3dr40gFTwAyWC6P2J+7y4TjHC44X0c=
+github.com/ava-labs/avalanchego v1.6.4-rc.1/go.mod h1:Dir4TnnbmIzrl5/Gnqxv+89qGmwIPjqKjLBWXw2lu9M=
 github.com/aws/aws-sdk-go-v2 v1.2.0/go.mod h1:zEQs02YRBw1DjK0PoJv3ygDYOFTre1ejlJWl8FwAuQo=
 github.com/aws/aws-sdk-go-v2/config v1.1.1/go.mod h1:0XsVy9lBI/BCXm+2Tuvt39YmdHwS5unDQmxZOYe8F5Y=
 github.com/aws/aws-sdk-go-v2/credentials v1.1.1/go.mod h1:mM2iIjwl7LULWtS6JCACyInboHirisUUdkBPoTHMOUo=
