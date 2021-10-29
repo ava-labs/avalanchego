@@ -466,9 +466,6 @@ func (p *peer) Close() { p.once.Do(p.close) }
 // assumes only [peer.Close] calls this.
 // By the time this message returns, [p] has been removed from [p.net.peers]
 func (p *peer) close() {
-	// Remove this node from the throttler.
-	p.net.inboundMsgThrottler.RemoveNode(p.nodeID)
-
 	// If the connection is closing, we can immediately cancel the ticker
 	// goroutines.
 	close(p.tickerCloser)
@@ -478,6 +475,9 @@ func (p *peer) close() {
 	if err := p.conn.Close(); err != nil {
 		p.net.log.Debug("closing connection to %s%s at %s resulted in an error: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
 	}
+
+	// Remove this node from the throttler.
+	p.net.inboundMsgThrottler.RemoveNode(p.nodeID)
 
 	p.sendQueueCond.L.Lock()
 	// Release the bytes of the unsent messages to the outbound message throttler
