@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -22,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestCoreVMNotRemote(t *testing.T) {
@@ -144,23 +145,23 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 
 	// ... and check returned values are as expected
 	assert.NoError(err, "Error calling GetAncestors: %v", err)
-	assert.True(len(res) == 3, "GetAncestor returned %v entries instead of %v", len(res), 3)
-	assert.True(bytes.Equal(res[0], builtBlk3.Bytes()))
-	assert.True(bytes.Equal(res[1], builtBlk2.Bytes()))
-	assert.True(bytes.Equal(res[2], builtBlk1.Bytes()))
+	assert.Len(res, 3, "GetAncestor returned %v entries instead of %v", len(res), 3)
+	assert.EqualValues(res[0], builtBlk3.Bytes())
+	assert.EqualValues(res[1], builtBlk2.Bytes())
+	assert.EqualValues(res[2], builtBlk1.Bytes())
 
 	// another good call
 	reqBlkID = builtBlk1.ID()
 	res, err = proRemoteVM.GetAncestors(reqBlkID, maxBlocksNum, maxBlocksSize, maxBlocksRetrivalTime)
 	assert.NoError(err, "Error calling GetAncestors: %v", err)
-	assert.True(len(res) == 1, "GetAncestor returned %v entries instead of %v", len(res), 1)
-	assert.True(bytes.Equal(res[0], builtBlk1.Bytes()))
+	assert.Len(res, 1, "GetAncestor returned %v entries instead of %v", len(res), 1)
+	assert.EqualValues(res[0], builtBlk1.Bytes())
 
 	// a faulty call
 	reqBlkID = ids.Empty
 	res, err = proRemoteVM.GetAncestors(reqBlkID, maxBlocksNum, maxBlocksSize, maxBlocksRetrivalTime)
 	assert.NoError(err, "Error calling GetAncestors: %v", err)
-	assert.True(len(res) == 0, "GetAncestor returned %v entries instead of %v", len(res), 0)
+	assert.Empty(res, "GetAncestor returned %v entries instead of %v", len(res), 0)
 }
 
 func TestGetAncestorsPostForkOnly(t *testing.T) {
@@ -268,23 +269,23 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 
 	// ... and check returned values are as expected
 	assert.NoError(err, "Error calling GetAncestors: %v", err)
-	assert.True(len(res) == 3, "GetAncestor returned %v entries instead of %v", len(res), 3)
-	assert.True(bytes.Equal(res[0], builtBlk3.Bytes()))
-	assert.True(bytes.Equal(res[1], builtBlk2.Bytes()))
-	assert.True(bytes.Equal(res[2], builtBlk1.Bytes()))
+	assert.Len(res, 3, "GetAncestor returned %v entries instead of %v", len(res), 3)
+	assert.EqualValues(res[0], builtBlk3.Bytes())
+	assert.EqualValues(res[1], builtBlk2.Bytes())
+	assert.EqualValues(res[2], builtBlk1.Bytes())
 
 	// another good call
 	reqBlkID = builtBlk1.ID()
 	res, err = proRemoteVM.GetAncestors(reqBlkID, maxBlocksNum, maxBlocksSize, maxBlocksRetrivalTime)
 	assert.NoError(err, "Error calling GetAncestors: %v", err)
-	assert.True(len(res) == 1, "GetAncestor returned %v entries instead of %v", len(res), 1)
-	assert.True(bytes.Equal(res[0], builtBlk1.Bytes()))
+	assert.Len(res, 1, "GetAncestor returned %v entries instead of %v", len(res), 1)
+	assert.EqualValues(res[0], builtBlk1.Bytes())
 
 	// a faulty call
 	reqBlkID = ids.Empty
 	res, err = proRemoteVM.GetAncestors(reqBlkID, maxBlocksNum, maxBlocksSize, maxBlocksRetrivalTime)
 	assert.NoError(err, "Error calling GetAncestors: %v", err)
-	assert.True(len(res) == 0, "GetAncestor returned %v entries instead of %v", len(res), 0)
+	assert.Empty(res, "GetAncestor returned %v entries instead of %v", len(res), 0)
 }
 
 func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
@@ -431,24 +432,24 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 
 	// ... and check returned values are as expected
 	assert.NoError(err, "Error calling GetAncestors: %v", err)
-	assert.True(len(res) == 4, "GetAncestor returned %v entries instead of %v", len(res), 4)
-	assert.True(bytes.Equal(res[0], builtBlk4.Bytes()))
-	assert.True(bytes.Equal(res[1], builtBlk3.Bytes()))
-	assert.True(bytes.Equal(res[2], builtBlk2.Bytes()))
-	assert.True(bytes.Equal(res[3], builtBlk1.Bytes()))
+	assert.Len(res, 4, "GetAncestor returned %v entries instead of %v", len(res), 4)
+	assert.EqualValues(res[0], builtBlk4.Bytes())
+	assert.EqualValues(res[1], builtBlk3.Bytes())
+	assert.EqualValues(res[2], builtBlk2.Bytes())
+	assert.EqualValues(res[3], builtBlk1.Bytes())
 
 	// another good call
 	reqBlkID = builtBlk1.ID()
 	res, err = proRemoteVM.GetAncestors(reqBlkID, maxBlocksNum, maxBlocksSize, maxBlocksRetrivalTime)
 	assert.NoError(err, "Error calling GetAncestors: %v", err)
-	assert.True(len(res) == 1, "GetAncestor returned %v entries instead of %v", len(res), 1)
-	assert.True(bytes.Equal(res[0], builtBlk1.Bytes()))
+	assert.Len(res, 1, "GetAncestor returned %v entries instead of %v", len(res), 1)
+	assert.EqualValues(res[0], builtBlk1.Bytes())
 
 	// a faulty call
 	reqBlkID = ids.Empty
 	res, err = proRemoteVM.GetAncestors(reqBlkID, maxBlocksNum, maxBlocksSize, maxBlocksRetrivalTime)
 	assert.NoError(err, "Error calling GetAncestors: %v", err)
-	assert.True(len(res) == 0, "GetAncestor returned %v entries instead of %v", len(res), 0)
+	assert.Len(res, 0, "GetAncestor returned %v entries instead of %v", len(res), 0)
 }
 
 func TestBatchedParseBlockPreForkOnly(t *testing.T) {
@@ -550,16 +551,17 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 		return res, nil
 	}
 
-	bytesToParse := make([][]byte, 0, 3)
-	bytesToParse = append(bytesToParse, builtBlk1.Bytes())
-	bytesToParse = append(bytesToParse, builtBlk2.Bytes())
-	bytesToParse = append(bytesToParse, builtBlk3.Bytes())
+	bytesToParse := [][]byte{
+		builtBlk1.Bytes(),
+		builtBlk2.Bytes(),
+		builtBlk3.Bytes(),
+	}
 	res, err := proRemoteVM.BatchedParseBlock(bytesToParse)
 	assert.NoError(err, "Error calling BatchedParseBlock: %v", err)
-	assert.True(len(res) == 3, "BatchedParseBlock returned %v entries instead of %v", len(res), 3)
-	assert.True(res[0].ID() == builtBlk1.ID())
-	assert.True(res[1].ID() == builtBlk2.ID())
-	assert.True(res[2].ID() == builtBlk3.ID())
+	assert.Len(res, 3, "BatchedParseBlock returned %v entries instead of %v", len(res), 3)
+	assert.Equal(res[0].ID(), builtBlk1.ID())
+	assert.Equal(res[1].ID(), builtBlk2.ID())
+	assert.Equal(res[2].ID(), builtBlk3.ID())
 }
 
 func TestBatchedParseBlockPostForkOnly(t *testing.T) {
@@ -649,16 +651,17 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 		return res, nil
 	}
 
-	bytesToParse := make([][]byte, 0, 3)
-	bytesToParse = append(bytesToParse, builtBlk1.Bytes())
-	bytesToParse = append(bytesToParse, builtBlk2.Bytes())
-	bytesToParse = append(bytesToParse, builtBlk3.Bytes())
+	bytesToParse := [][]byte{
+		builtBlk1.Bytes(),
+		builtBlk2.Bytes(),
+		builtBlk3.Bytes(),
+	}
 	res, err := proRemoteVM.BatchedParseBlock(bytesToParse)
 	assert.NoError(err, "Error calling BatchedParseBlock: %v", err)
-	assert.True(len(res) == 3, "BatchedParseBlock returned %v entries instead of %v", len(res), 3)
-	assert.True(res[0].ID() == builtBlk1.ID())
-	assert.True(res[1].ID() == builtBlk2.ID())
-	assert.True(res[2].ID() == builtBlk3.ID())
+	assert.Len(res, 3, "BatchedParseBlock returned %v entries instead of %v", len(res), 3)
+	assert.Equal(res[0].ID(), builtBlk1.ID())
+	assert.Equal(res[1].ID(), builtBlk2.ID())
+	assert.Equal(res[2].ID(), builtBlk3.ID())
 }
 
 func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
@@ -800,20 +803,20 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 		return res, nil
 	}
 
-	// show that post and preFork blocks can be asked in any order
-	bytesToParse := make([][]byte, 0, 3)
-	bytesToParse = append(bytesToParse, builtBlk2.Bytes())
-	bytesToParse = append(bytesToParse, builtBlk4.Bytes())
-	bytesToParse = append(bytesToParse, builtBlk3.Bytes())
-	bytesToParse = append(bytesToParse, builtBlk1.Bytes())
+	bytesToParse := [][]byte{
+		builtBlk4.Bytes(),
+		builtBlk3.Bytes(),
+		builtBlk2.Bytes(),
+		builtBlk1.Bytes(),
+	}
 
 	res, err := proRemoteVM.BatchedParseBlock(bytesToParse)
 	assert.NoError(err, "Error calling BatchedParseBlock: %v", err)
-	assert.True(len(res) == 4, "BatchedParseBlock returned %v entries instead of %v", len(res), 4)
-	assert.True(res[0].ID() == builtBlk2.ID())
-	assert.True(res[1].ID() == builtBlk4.ID())
-	assert.True(res[2].ID() == builtBlk3.ID())
-	assert.True(res[3].ID() == builtBlk1.ID())
+	assert.Len(res, 4, "BatchedParseBlock returned %v entries instead of %v", len(res), 4)
+	assert.Equal(res[0].ID(), builtBlk4.ID())
+	assert.Equal(res[1].ID(), builtBlk3.ID())
+	assert.Equal(res[2].ID(), builtBlk2.ID())
+	assert.Equal(res[3].ID(), builtBlk1.ID())
 }
 
 type TestRemoteProposerVM struct {

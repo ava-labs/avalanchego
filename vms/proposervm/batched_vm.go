@@ -80,86 +80,84 @@ func (vm *VM) BatchedParseBlock(blks [][]byte) ([]snowman.Block, error) {
 		return nil, block.ErrRemoteVMNotImplemented
 	}
 
-	res := make([]snowman.Block, len(blks))
 	type partialData struct {
-		statelessblock.Block
-		innerBytes []byte
+		index int
+		block statelessblock.Block
 	}
-	blksToBeCompleted := make(map[int]partialData)
-	for idx, blkBytes := range blks {
-		if statelessBlock, err := statelessblock.Parse(blkBytes); err == nil {
-			blkID := statelessBlock.ID()
-			if blk, err := vm.getPostForkBlock(blkID); err == nil {
-				// blk already known, move on.
-				res[idx] = blk
-				continue
-			}
-			if err != database.ErrNotFound {
-				// blk not known. Batch-parse innerBytes and then batch-build
-				blksToBeCompleted[idx] = partialData{
-					Block:      statelessBlock,
-					innerBytes: statelessBlock.Block(),
-				}
-				continue
-			}
+	var (
+		blocksIndex int
+		blocks      = make([]snowman.Block, len(blks))
+
+		innerBlocksIndex    int
+		statelessBlockDescs = make([]partialData, 0, len(blks))
+		innerBlockBytes     = make([][]byte, 0, len(blks))
+	)
+	for ; blocksIndex < len(blks); blocksIndex++ {
+		blkBytes := blks[blocksIndex]
+		statelessBlock, err := statelessblock.Parse(blkBytes)
+		if err != nil {
+			break
+		}
+
+		blkID := statelessBlock.ID()
+		block, exists := vm.verifiedBlocks[blkID]
+		if exists {
+			blocks[blocksIndex] = block
+			continue
+		}
+
+		statelessBlockDescs = append(statelessBlockDescs, partialData{
+			index: blocksIndex,
+			block: statelessBlock,
+		})
+		innerBlockBytes = append(innerBlockBytes, statelessBlock.Block())
+	}
+	innerBlockBytes = append(innerBlockBytes, blks[blocksIndex:]...)
+
+	// parse all inner blocks at once
+	innerBlks, err := rVM.BatchedParseBlock(innerBlockBytes)
+	if err != nil {
+		return nil, err
+	}
+	for ; innerBlocksIndex < len(statelessBlockDescs); innerBlocksIndex++ {
+		statelessBlockDesc := statelessBlockDescs[innerBlocksIndex]
+		statelessBlk := statelessBlockDesc.block
+		blkID := statelessBlk.ID()
+
+		_, status, err := vm.State.GetBlock(blkID)
+		if err == database.ErrNotFound {
+			status = choices.Processing
+		} else if err != nil {
 			return nil, err
 		}
 
-		// assume it is a preForkBlock and defer parsing to VM
-		blksToBeCompleted[idx] = partialData{
-			innerBytes: blkBytes,
-		}
-	}
-
-	missingIdxs := make([]int, 0, len(blksToBeCompleted))
-	innerBlksBytes := make([][]byte, 0, len(blksToBeCompleted))
-
-	for idx, data := range blksToBeCompleted {
-		missingIdxs = append(missingIdxs, idx)
-		innerBlksBytes = append(innerBlksBytes, data.innerBytes)
-	}
-
-	// parse all inner blocks at once
-	innerBlks, err := rVM.BatchedParseBlock(innerBlksBytes)
-	if err != nil {
-		return res, err
-	}
-
-	// duly rebuild ProposerVM blocks given all the innerBlks
-	for idx, innerBlk := range innerBlks {
-		var blk snowman.Block
-		missingIdx := missingIdxs[idx]
-		if statelessBlock := blksToBeCompleted[idx].Block; statelessBlock != nil {
-			// build postForkBlock given statelessBlk and innerBlk
-			if statelessSignedBlock, ok := statelessBlock.(statelessblock.SignedBlock); ok {
-				blk = &postForkBlock{
-					SignedBlock: statelessSignedBlock,
-					postForkCommonComponents: postForkCommonComponents{
-						vm:       vm,
-						innerBlk: innerBlk,
-						status:   choices.Processing,
-					},
-				}
-			} else {
-				blk = &postForkOption{
-					Block: statelessBlock,
-					postForkCommonComponents: postForkCommonComponents{
-						vm:       vm,
-						innerBlk: innerBlk,
-						status:   choices.Processing,
-					},
-				}
+		if statelessSignedBlock, ok := statelessBlk.(statelessblock.SignedBlock); ok {
+			blocks[statelessBlockDesc.index] = &postForkBlock{
+				SignedBlock: statelessSignedBlock,
+				postForkCommonComponents: postForkCommonComponents{
+					vm:       vm,
+					innerBlk: innerBlks[innerBlocksIndex],
+					status:   status,
+				},
 			}
 		} else {
-			blk = &preForkBlock{
-				Block: innerBlk,
-				vm:    vm,
+			blocks[statelessBlockDesc.index] = &postForkOption{
+				Block: statelessBlk,
+				postForkCommonComponents: postForkCommonComponents{
+					vm:       vm,
+					innerBlk: innerBlks[innerBlocksIndex],
+					status:   status,
+				},
 			}
 		}
-		res[missingIdx] = blk
 	}
-
-	return res, nil
+	for ; blocksIndex < len(blocks); blocksIndex, innerBlocksIndex = blocksIndex+1, innerBlocksIndex+1 {
+		blocks[blocksIndex] = &preForkBlock{
+			Block: innerBlks[innerBlocksIndex],
+			vm:    vm,
+		}
+	}
+	return blocks, nil
 }
 
 func (vm *VM) getStatelessBlk(blkID ids.ID) (statelessblock.Block, error) {
