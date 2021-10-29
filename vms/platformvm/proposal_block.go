@@ -207,17 +207,27 @@ func (pb *ProposalBlock) Verify() error {
 
 // Options returns the possible children of this block in preferential order.
 func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
+	tx, ok := pb.Tx.UnsignedTx.(UnsignedProposalTx)
+	if !ok {
+		return [2]snowman.Block{}, fmt.Errorf(
+			"%w, expected UnsignedProposalTx but got %T",
+			errWrongTxType,
+			pb.Tx.UnsignedTx,
+		)
+	}
+
 	blkID := pb.ID()
 	nextHeight := pb.Height() + 1
+	prefersCommit := tx.InitiallyPrefersCommit(pb.vm)
 
-	commit, err := pb.vm.newCommitBlock(blkID, nextHeight)
+	commit, err := pb.vm.newCommitBlock(blkID, nextHeight, prefersCommit)
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
 			"failed to create commit block: %w",
 			err,
 		)
 	}
-	abort, err := pb.vm.newAbortBlock(blkID, nextHeight)
+	abort, err := pb.vm.newAbortBlock(blkID, nextHeight, !prefersCommit)
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
 			"failed to create abort block: %w",
@@ -225,12 +235,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 		)
 	}
 
-	tx, ok := pb.Tx.UnsignedTx.(UnsignedProposalTx)
-	if !ok {
-		return [2]snowman.Block{}, errWrongTxType
-	}
-
-	if tx.InitiallyPrefersCommit(pb.vm) {
+	if prefersCommit {
 		return [2]snowman.Block{commit, abort}, nil
 	}
 	return [2]snowman.Block{abort, commit}, nil
