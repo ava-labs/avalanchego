@@ -209,7 +209,11 @@ func (pb *ProposalBlock) Verify() error {
 func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 	tx, ok := pb.Tx.UnsignedTx.(UnsignedProposalTx)
 	if !ok {
-		return [2]snowman.Block{}, errWrongTxType
+		return [2]snowman.Block{}, fmt.Errorf(
+			"%w, expected UnsignedProposalTx but got %T",
+			errWrongTxType,
+			pb.Tx.UnsignedTx,
+		)
 	}
 
 	blkID := pb.ID()
