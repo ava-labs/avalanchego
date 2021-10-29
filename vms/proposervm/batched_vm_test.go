@@ -800,18 +800,19 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 		return res, nil
 	}
 
+	// show that post and preFork blocks can be asked in any order
 	bytesToParse := make([][]byte, 0, 3)
+	bytesToParse = append(bytesToParse, builtBlk2.Bytes())
 	bytesToParse = append(bytesToParse, builtBlk4.Bytes())
 	bytesToParse = append(bytesToParse, builtBlk3.Bytes())
-	bytesToParse = append(bytesToParse, builtBlk2.Bytes())
 	bytesToParse = append(bytesToParse, builtBlk1.Bytes())
 
 	res, err := proRemoteVM.BatchedParseBlock(bytesToParse)
 	assert.NoError(err, "Error calling BatchedParseBlock: %v", err)
 	assert.True(len(res) == 4, "BatchedParseBlock returned %v entries instead of %v", len(res), 4)
-	assert.True(res[0].ID() == builtBlk4.ID())
-	assert.True(res[1].ID() == builtBlk3.ID())
-	assert.True(res[2].ID() == builtBlk2.ID())
+	assert.True(res[0].ID() == builtBlk2.ID())
+	assert.True(res[1].ID() == builtBlk4.ID())
+	assert.True(res[2].ID() == builtBlk3.ID())
 	assert.True(res[3].ID() == builtBlk1.ID())
 }
 

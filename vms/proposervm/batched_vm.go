@@ -80,32 +80,47 @@ func (vm *VM) BatchedParseBlock(blks [][]byte) ([]snowman.Block, error) {
 		return nil, block.ErrRemoteVMNotImplemented
 	}
 
-	res := make([]snowman.Block, 0, len(blks))
-	blksToBeCompleted := make([]statelessblock.Block, 0, len(blks))
-	innerBytes := make([][]byte, 0, len(blks))
-	for _, blkBytes := range blks {
+	res := make([]snowman.Block, len(blks))
+	type partialData struct {
+		statelessblock.Block
+		innerBytes []byte
+	}
+	blksToBeCompleted := make(map[int]partialData)
+	for idx, blkBytes := range blks {
 		if statelessBlock, err := statelessblock.Parse(blkBytes); err == nil {
 			blkID := statelessBlock.ID()
 			if blk, err := vm.getPostForkBlock(blkID); err == nil {
 				// blk already known, move on.
-				res = append(res, blk)
+				res[idx] = blk
 				continue
 			}
 			if err != database.ErrNotFound {
 				// blk not known. Batch-parse innerBytes and then batch-build
-				blksToBeCompleted = append(blksToBeCompleted, statelessBlock)
-				innerBytes = append(innerBytes, statelessBlock.Block())
+				blksToBeCompleted[idx] = partialData{
+					Block:      statelessBlock,
+					innerBytes: statelessBlock.Block(),
+				}
 				continue
 			}
 			return nil, err
 		}
 
 		// assume it is a preForkBlock and defer parsing to VM
-		innerBytes = append(innerBytes, blkBytes)
+		blksToBeCompleted[idx] = partialData{
+			innerBytes: blkBytes,
+		}
+	}
+
+	missingIdxs := make([]int, 0, len(blksToBeCompleted))
+	innerBlksBytes := make([][]byte, 0, len(blksToBeCompleted))
+
+	for idx, data := range blksToBeCompleted {
+		missingIdxs = append(missingIdxs, idx)
+		innerBlksBytes = append(innerBlksBytes, data.innerBytes)
 	}
 
 	// parse all inner blocks at once
-	innerBlks, err := rVM.BatchedParseBlock(innerBytes)
+	innerBlks, err := rVM.BatchedParseBlock(innerBlksBytes)
 	if err != nil {
 		return res, err
 	}
@@ -113,9 +128,9 @@ func (vm *VM) BatchedParseBlock(blks [][]byte) ([]snowman.Block, error) {
 	// duly rebuild ProposerVM blocks given all the innerBlks
 	for idx, innerBlk := range innerBlks {
 		var blk snowman.Block
-		if idx < len(blksToBeCompleted) {
+		missingIdx := missingIdxs[idx]
+		if statelessBlock := blksToBeCompleted[idx].Block; statelessBlock != nil {
 			// build postForkBlock given statelessBlk and innerBlk
-			statelessBlock := blksToBeCompleted[idx]
 			if statelessSignedBlock, ok := statelessBlock.(statelessblock.SignedBlock); ok {
 				blk = &postForkBlock{
 					SignedBlock: statelessSignedBlock,
@@ -141,7 +156,7 @@ func (vm *VM) BatchedParseBlock(blks [][]byte) ([]snowman.Block, error) {
 				vm:    vm,
 			}
 		}
-		res = append(res, blk)
+		res[missingIdx] = blk
 	}
 
 	return res, nil
