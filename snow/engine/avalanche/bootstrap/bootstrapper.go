@@ -496,19 +496,19 @@ func (b *Bootstrapper) finish() error {
 }
 
 // Connected implements the Engine interface.
-func (b *Bootstrapper) Connected(validatorID ids.ShortID) error {
-	err := b.VM.Connected(validatorID)
+func (b *Bootstrapper) Connected(nodeID ids.ShortID) error {
+	err := b.VM.Connected(nodeID)
 	if err != nil {
 		return err
 	}
-	return b.Bootstrapper.Connected(validatorID)
+	return b.Bootstrapper.Connected(nodeID)
 }
 
 // Disconnected implements the Engine interface.
-func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
-	err := b.VM.Disconnected(validatorID)
+func (b *Bootstrapper) Disconnected(nodeID ids.ShortID) error {
+	err := b.VM.Disconnected(nodeID)
 	if err != nil {
 		return err
 	}
-	return b.Bootstrapper.Disconnected(validatorID)
+	return b.Bootstrapper.Disconnected(nodeID)
 }

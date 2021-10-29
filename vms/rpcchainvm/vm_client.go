@@ -614,6 +614,20 @@ func (vm *VMClient) Version() (string, error) {
 	return resp.Version, nil
 }
 
+func (vm *VMClient) Connected(nodeID ids.ShortID) error {
+	_, err := vm.client.Connected(context.Background(), &vmproto.ConnectedRequest{
+		NodeID: nodeID[:],
+	})
+	return err
+}
+
+func (vm *VMClient) Disconnected(nodeID ids.ShortID) error {
+	_, err := vm.client.Disconnected(context.Background(), &vmproto.DisconnectedRequest{
+		NodeID: nodeID[:],
+	})
+	return err
+}
+
 // BlockClient is an implementation of Block that talks over RPC.
 type BlockClient struct {
 	vm *VMClient
@@ -663,13 +677,3 @@ func (b *BlockClient) Verify() error {
 func (b *BlockClient) Bytes() []byte        { return b.bytes }
 func (b *BlockClient) Height() uint64       { return b.height }
 func (b *BlockClient) Timestamp() time.Time { return b.time }
-
-// AV-590, quantify overhead of passing these over RPC
-
-func (vm *VMClient) Connected(id ids.ShortID) error {
-	return nil // noop
-}
-
-func (vm *VMClient) Disconnected(id ids.ShortID) error {
-	return nil // noop
-}

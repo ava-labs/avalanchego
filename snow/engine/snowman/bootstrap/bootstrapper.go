@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 // Parameters for delaying bootstrapping to avoid potential CPU burns
@@ -420,21 +419,19 @@ func (b *Bootstrapper) finish() error {
 }
 
 // Connected implements the Engine interface.
-func (b *Bootstrapper) Connected(validatorID ids.ShortID) error {
-	if connector, ok := b.VM.(validators.Connector); ok {
-		if err := connector.Connected(validatorID); err != nil {
-			return err
-		}
+func (b *Bootstrapper) Connected(nodeID ids.ShortID) error {
+	if err := b.VM.Connected(nodeID); err != nil {
+		return err
 	}
-	return b.Bootstrapper.Connected(validatorID)
+
+	return b.Bootstrapper.Connected(nodeID)
 }
 
 // Disconnected implements the Engine interface.
-func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
-	if connector, ok := b.VM.(validators.Connector); ok {
-		if err := connector.Disconnected(validatorID); err != nil {
-			return err
-		}
+func (b *Bootstrapper) Disconnected(nodeID ids.ShortID) error {
+	if err := b.VM.Disconnected(nodeID); err != nil {
+		return err
 	}
-	return b.Bootstrapper.Disconnected(validatorID)
+
+	return b.Bootstrapper.Disconnected(nodeID)
 }

@@ -153,7 +153,14 @@ message AppGossipMsg {
     bytes msg = 2;
 }
 
-// RemoteVM section
+message ConnectedRequest {
+    bytes nodeID = 1; 
+}
+ 
+message DisconnectedRequest {
+    bytes nodeID = 1; 
+}
+
 message GetAncestorsRequest {
     bytes blkID = 1;
     int32 maxBlocksNum = 2;
@@ -172,7 +179,7 @@ message BatchedParseBlockRequest {
 message BatchedParseBlockResponse {
     repeated ParseBlockResponse response = 1;
 }
-// end of RemoteVM section
+
 
 service VM {
     rpc Initialize(InitializeRequest) returns (InitializeResponse);
@@ -181,6 +188,8 @@ service VM {
     rpc Shutdown(google.protobuf.Empty) returns (google.protobuf.Empty);
     rpc CreateHandlers(google.protobuf.Empty) returns (CreateHandlersResponse);
     rpc CreateStaticHandlers(google.protobuf.Empty) returns (CreateStaticHandlersResponse);
+    rpc Connected(ConnectedRequest) returns (google.protobuf.Empty);
+    rpc Disconnected(DisconnectedRequest) returns (google.protobuf.Empty);
     rpc BuildBlock(google.protobuf.Empty) returns (BuildBlockResponse);
     rpc ParseBlock(ParseBlockRequest) returns (ParseBlockResponse);
     rpc GetBlock(GetBlockRequest) returns (GetBlockResponse);
