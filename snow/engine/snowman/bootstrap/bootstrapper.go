@@ -420,19 +420,19 @@ func (b *Bootstrapper) finish() error {
 }
 
 // Connected implements the Engine interface.
-func (b *Bootstrapper) Connected(validatorID ids.ShortID) error {
-	if err := b.VM.Connected(validatorID); err != nil {
+func (b *Bootstrapper) Connected(nodeID ids.ShortID) error {
+	if err := b.VM.Connected(nodeID); err != nil {
 		return err
 	}
 
-	return b.Bootstrapper.Connected(validatorID)
+	return b.Bootstrapper.Connected(nodeID)
 }
 
 // Disconnected implements the Engine interface.
-func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
-	if err := b.VM.Disconnected(validatorID); err != nil {
+func (b *Bootstrapper) Disconnected(nodeID ids.ShortID) error {
+	if err := b.VM.Disconnected(nodeID); err != nil {
 		return err
 	}
 
-	return b.Bootstrapper.Disconnected(validatorID)
+	return b.Bootstrapper.Disconnected(nodeID)
 }

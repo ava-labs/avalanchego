@@ -152,11 +152,11 @@ message AppGossipMsg {
 }
 
 message ConnectedRequest {
-   bytes validatorID = 1; 
+   bytes nodeID = 1; 
 }
 
 message DisconnectedRequest {
-   bytes validatorID = 1; 
+   bytes nodeID = 1; 
 }
 
 service VM {

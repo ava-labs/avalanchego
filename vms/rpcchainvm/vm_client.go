@@ -525,16 +525,16 @@ func (vm *VMClient) Version() (string, error) {
 	return resp.Version, nil
 }
 
-func (vm *VMClient) Connected(vdrID ids.ShortID) error {
+func (vm *VMClient) Connected(nodeID ids.ShortID) error {
 	_, err := vm.client.Connected(context.Background(), &vmproto.ConnectedRequest{
-		ValidatorID: vdrID[:],
+		NodeID: nodeID[:],
 	})
 	return err
 }
 
-func (vm *VMClient) Disconnected(vdrID ids.ShortID) error {
+func (vm *VMClient) Disconnected(nodeID ids.ShortID) error {
 	_, err := vm.client.Disconnected(context.Background(), &vmproto.DisconnectedRequest{
-		ValidatorID: vdrID[:],
+		NodeID: nodeID[:],
 	})
 	return err
 }

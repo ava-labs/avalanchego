@@ -421,19 +421,19 @@ func (vm *VMServer) Version(context.Context, *emptypb.Empty) (*vmproto.VersionRe
 }
 
 func (vm *VMServer) Connected(_ context.Context, req *vmproto.ConnectedRequest) (*emptypb.Empty, error) {
-	vdrID, err := ids.ToShortID(req.ValidatorID)
+	nodeID, err := ids.ToShortID(req.NodeID)
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.Connected(vdrID)
+	return &emptypb.Empty{}, vm.vm.Connected(nodeID)
 }
 
 func (vm *VMServer) Disconnected(_ context.Context, req *vmproto.DisconnectedRequest) (*emptypb.Empty, error) {
-	vdrID, err := ids.ToShortID(req.ValidatorID)
+	nodeID, err := ids.ToShortID(req.NodeID)
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.Disconnected(vdrID)
+	return &emptypb.Empty{}, vm.vm.Disconnected(nodeID)
 }
 
 func (vm *VMServer) AppRequest(_ context.Context, req *vmproto.AppRequestMsg) (*emptypb.Empty, error) {
