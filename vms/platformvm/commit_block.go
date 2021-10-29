@@ -19,6 +19,19 @@ var (
 // be a proposal block) being enacted.
 type CommitBlock struct {
 	DoubleDecisionBlock `serialize:"true"`
+
+	wasPreferred bool
+}
+
+func (c *CommitBlock) Accept() error {
+	if c.vm.bootstrapped {
+		if c.wasPreferred {
+			c.vm.metrics.numVotesWon.Inc()
+		} else {
+			c.vm.metrics.numVotesLost.Inc()
+		}
+	}
+	return c.DoubleDecisionBlock.Accept()
 }
 
 // Verify this block performs a valid state transition.
@@ -62,7 +75,7 @@ func (c *CommitBlock) Verify() error {
 
 // newCommitBlock returns a new *Commit block where the block's parent, a
 // proposal block, has ID [parentID].
-func (vm *VM) newCommitBlock(parentID ids.ID, height uint64) (*CommitBlock, error) {
+func (vm *VM) newCommitBlock(parentID ids.ID, height uint64, wasPreferred bool) (*CommitBlock, error) {
 	commit := &CommitBlock{
 		DoubleDecisionBlock: DoubleDecisionBlock{
 			CommonDecisionBlock: CommonDecisionBlock{
@@ -72,6 +85,7 @@ func (vm *VM) newCommitBlock(parentID ids.ID, height uint64) (*CommitBlock, erro
 				},
 			},
 		},
+		wasPreferred: wasPreferred,
 	}
 
 	// We serialize this block as a Block so that it can be deserialized into a

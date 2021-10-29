@@ -1566,7 +1566,7 @@ func (st *internalStateImpl) init(genesisBytes []byte) error {
 	// do genesisBlock.Accept() because then it'd look for genesisBlock's
 	// non-existent parent)
 	genesisID := hashing.ComputeHash256Array(genesisBytes)
-	genesisBlock, err := st.vm.newCommitBlock(genesisID, 0)
+	genesisBlock, err := st.vm.newCommitBlock(genesisID, 0, true)
 	if err != nil {
 		return err
 	}

@@ -27,6 +27,8 @@ type metrics struct {
 	numProposalBlocks,
 	numStandardBlocks prometheus.Counter
 
+	numVotesWon, numVotesLost prometheus.Counter
+
 	numAddDelegatorTxs,
 	numAddSubnetValidatorTxs,
 	numAddValidatorTxs,
@@ -88,6 +90,17 @@ func (m *metrics) Initialize(
 	m.numProposalBlocks = newBlockMetrics(namespace, "proposal")
 	m.numStandardBlocks = newBlockMetrics(namespace, "standard")
 
+	m.numVotesWon = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "votes_won",
+		Help:      "Total number of votes this node has won",
+	})
+	m.numVotesLost = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "votes_lost",
+		Help:      "Total number of votes this node has lost",
+	})
+
 	m.numAddDelegatorTxs = newTxMetrics(namespace, "add_delegator")
 	m.numAddSubnetValidatorTxs = newTxMetrics(namespace, "add_subnet_validator")
 	m.numAddValidatorTxs = newTxMetrics(namespace, "add_validator")
@@ -134,6 +147,9 @@ func (m *metrics) Initialize(
 		registerer.Register(m.numCommitBlocks),
 		registerer.Register(m.numProposalBlocks),
 		registerer.Register(m.numStandardBlocks),
+
+		registerer.Register(m.numVotesWon),
+		registerer.Register(m.numVotesLost),
 
 		registerer.Register(m.numAddDelegatorTxs),
 		registerer.Register(m.numAddSubnetValidatorTxs),

@@ -23,6 +23,8 @@ This version is backwards compatible to [v1.6.0](https://github.com/ava-labs/ava
 - Added `avalanche_{ChainID}_app_response_{count,sum}`.
 - Added `avalanche_network_bandwidth_throttler_inbound_acquire_latency_{count,sum}`
 - Added `avalanche_network_bandwidth_throttler_inbound_awaiting_acquire`
+- Added `avalanche_P_vm_votes_won`
+- Added `avalanche_P_vm_votes_lost`
 
 ### Indexer
 
