@@ -465,7 +465,11 @@ func (vm *VMServer) AppRequest(_ context.Context, req *vmproto.AppRequestMsg) (*
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.AppRequest(nodeID, req.RequestID, req.Request)
+	var deadline time.Time
+	if err := deadline.UnmarshalBinary(req.Deadline); err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, vm.vm.AppRequest(nodeID, req.RequestID, deadline, req.Request)
 }
 
 func (vm *VMServer) AppRequestFailed(_ context.Context, req *vmproto.AppRequestFailedMsg) (*emptypb.Empty, error) {

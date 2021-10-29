@@ -4,6 +4,8 @@
 package common
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -131,14 +133,14 @@ type AcceptedHandler interface {
 type AppHandler interface {
 	// Notify this engine of a request for data from [nodeID].
 	// This node should send an AppResponse to [nodeID] in response to
-	// this message using the same request ID.
+	// this message using the same request ID and before the deadline.
 	// The VM may choose to not send a response to this request.
 	// The meaning of [request], and what should be sent in response to it,
 	// is application (VM) defined.
 	// It is not guaranteed that [request] is well-formed/valid.
 	// The VM must do this validation.
 	// A non-nil return value causes this engine to shutdown.
-	AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error
+	AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error
 
 	// Notify this engine that an AppRequest message it sent to
 	// [nodeID] with request ID [requestID] failed.
