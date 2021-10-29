@@ -46,7 +46,8 @@ import (
 var (
 	errUnsupportedFXs = errors.New("unsupported feature extensions")
 
-	_ block.ChainVM = &VMClient{}
+	_ block.ChainVM        = &VMClient{}
+	_ block.BatchedChainVM = &VMClient{}
 )
 
 const (
@@ -194,7 +195,9 @@ func (vm *VMClient) Initialize(
 	}
 
 	status := choices.Status(resp.Status)
-	vm.ctx.Log.AssertDeferredNoError(status.Valid)
+	if err := status.Valid(); err != nil {
+		return err
+	}
 
 	timestamp := time.Time{}
 	if err := timestamp.UnmarshalBinary(resp.Timestamp); err != nil {
@@ -366,10 +369,14 @@ func (vm *VMClient) buildBlock() (snowman.Block, error) {
 	}
 
 	id, err := ids.ToID(resp.Id)
-	vm.ctx.Log.AssertNoError(err)
+	if err != nil {
+		return nil, err
+	}
 
 	parentID, err := ids.ToID(resp.ParentID)
-	vm.ctx.Log.AssertNoError(err)
+	if err != nil {
+		return nil, err
+	}
 
 	timestamp := time.Time{}
 	if err := timestamp.UnmarshalBinary(resp.Timestamp); err != nil {
@@ -396,13 +403,19 @@ func (vm *VMClient) parseBlock(bytes []byte) (snowman.Block, error) {
 	}
 
 	id, err := ids.ToID(resp.Id)
-	vm.ctx.Log.AssertNoError(err)
+	if err != nil {
+		return nil, err
+	}
 
 	parentID, err := ids.ToID(resp.ParentID)
-	vm.ctx.Log.AssertNoError(err)
+	if err != nil {
+		return nil, err
+	}
 
 	status := choices.Status(resp.Status)
-	vm.ctx.Log.AssertDeferredNoError(status.Valid)
+	if err := status.Valid(); err != nil {
+		return nil, err
+	}
 
 	timestamp := time.Time{}
 	if err := timestamp.UnmarshalBinary(resp.Timestamp); err != nil {
@@ -431,10 +444,14 @@ func (vm *VMClient) getBlock(id ids.ID) (snowman.Block, error) {
 	}
 
 	parentID, err := ids.ToID(resp.ParentID)
-	vm.ctx.Log.AssertNoError(err)
+	if err != nil {
+		return nil, err
+	}
 
 	status := choices.Status(resp.Status)
-	vm.ctx.Log.AssertDeferredNoError(status.Valid)
+	if err := status.Valid(); err != nil {
+		return nil, err
+	}
 
 	timestamp := time.Time{}
 	if err := timestamp.UnmarshalBinary(resp.Timestamp); err != nil {
@@ -512,6 +529,73 @@ func (vm *VMClient) AppGossip(nodeID ids.ShortID, msg []byte) error {
 		},
 	)
 	return err
+}
+
+func (vm *VMClient) GetAncestors(
+	blkID ids.ID,
+	maxBlocksNum int,
+	maxBlocksSize int,
+	maxBlocksRetrivalTime time.Duration,
+) ([][]byte, error) {
+	resp, err := vm.client.GetAncestors(context.Background(), &vmproto.GetAncestorsRequest{
+		BlkID:                 blkID[:],
+		MaxBlocksNum:          int32(maxBlocksNum),
+		MaxBlocksSize:         int32(maxBlocksSize),
+		MaxBlocksRetrivalTime: int64(maxBlocksRetrivalTime),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return resp.BlksBytes, nil
+}
+
+func (vm *VMClient) BatchedParseBlock(blksBytes [][]byte) ([]snowman.Block, error) {
+	resp, err := vm.client.BatchedParseBlock(context.Background(), &vmproto.BatchedParseBlockRequest{
+		Request: blksBytes,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(blksBytes) != len(resp.Response) {
+		return nil, fmt.Errorf("BatchedParse block returned different number of blocks than expected")
+	}
+
+	res := make([]snowman.Block, 0, len(blksBytes))
+	for idx, blkResp := range resp.Response {
+		id, err := ids.ToID(blkResp.Id)
+		if err != nil {
+			return nil, err
+		}
+
+		parentID, err := ids.ToID(blkResp.ParentID)
+		if err != nil {
+			return nil, err
+		}
+
+		status := choices.Status(blkResp.Status)
+		if err := status.Valid(); err != nil {
+			return nil, err
+		}
+
+		timestamp := time.Time{}
+		if err := timestamp.UnmarshalBinary(blkResp.Timestamp); err != nil {
+			return nil, err
+		}
+
+		blk := &BlockClient{
+			vm:       vm,
+			id:       id,
+			parentID: parentID,
+			status:   status,
+			bytes:    blksBytes[idx],
+			height:   blkResp.Height,
+			time:     timestamp,
+		}
+
+		res = append(res, blk)
+	}
+
+	return res, nil
 }
 
 func (vm *VMClient) Version() (string, error) {

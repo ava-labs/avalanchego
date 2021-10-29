@@ -5,7 +5,6 @@ package snowman
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -13,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/poll"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
 	"github.com/ava-labs/avalanchego/snow/events"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -171,34 +171,19 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, blkID ids.ID) error 
 
 // GetAncestors implements the Engine interface
 func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
-	startTime := time.Now()
-	blk, err := t.GetBlock(blkID)
-	if err != nil { // Don't have the block. Drop this request.
-		t.Ctx.Log.Verbo("couldn't get block %s. dropping GetAncestors(%s, %d, %s)", blkID, vdr, requestID, blkID)
+	ancestorsBytes, err := block.GetAncestors(
+		t.VM,
+		blkID,
+		t.Config.MultiputMaxContainersSent,
+		constants.MaxContainersLen,
+		t.Config.MaxTimeGetAncestors,
+	)
+	if err != nil {
+		t.Ctx.Log.Verbo("couldn't get ancestors with %s. Dropping GetAncestors(%s, %d, %s)",
+			err, vdr, requestID, blkID)
 		return nil
 	}
 
-	// First elt is byte repr. of [blk], then its parent, then grandparent, etc.
-	ancestorsBytes := make([][]byte, 1, t.Config.MultiputMaxContainersSent)
-	ancestorsBytes[0] = blk.Bytes()
-	ancestorsBytesLen := len(blk.Bytes()) + wrappers.IntLen // length, in bytes, of all elements of ancestors
-
-	for numFetched := 1; numFetched < t.Config.MultiputMaxContainersSent && time.Since(startTime) < t.Config.MaxTimeGetAncestors; numFetched++ {
-		if blk, err = t.GetBlock(blk.Parent()); err != nil {
-			break
-		}
-		blkBytes := blk.Bytes()
-		// Ensure response size isn't too large. Include wrappers.IntLen because the size of the message
-		// is included with each container, and the size is repr. by an int.
-		if newLen := wrappers.IntLen + ancestorsBytesLen + len(blkBytes); newLen < constants.MaxContainersLen {
-			ancestorsBytes = append(ancestorsBytes, blkBytes)
-			ancestorsBytesLen = newLen
-		} else { // reached maximum response size
-			break
-		}
-	}
-
-	t.metrics.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
 	t.Sender.SendMultiPut(vdr, requestID, ancestorsBytes)
 	return nil
 }

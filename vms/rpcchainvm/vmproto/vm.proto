@@ -151,6 +151,27 @@ message AppGossipMsg {
     bytes msg = 2;
 }
 
+// RemoteVM section
+message GetAncestorsRequest {
+    bytes blkID = 1;
+    int32 maxBlocksNum = 2;
+    int32 maxBlocksSize = 3;
+    int64 maxBlocksRetrivalTime = 4;
+}
+
+message GetAncestorsResponse {
+    repeated bytes blksBytes = 1;
+}
+
+message BatchedParseBlockRequest {
+    repeated bytes request = 1;
+}
+
+message BatchedParseBlockResponse {
+    repeated ParseBlockResponse response = 1;
+}
+// end of RemoteVM section
+
 service VM {
     rpc Initialize(InitializeRequest) returns (InitializeResponse);
     rpc Bootstrapping(google.protobuf.Empty) returns (google.protobuf.Empty);
@@ -172,4 +193,7 @@ service VM {
     rpc BlockVerify(BlockVerifyRequest) returns (BlockVerifyResponse);
     rpc BlockAccept(BlockAcceptRequest) returns (google.protobuf.Empty);
     rpc BlockReject(BlockRejectRequest) returns (google.protobuf.Empty);
+
+    rpc GetAncestors(GetAncestorsRequest) returns (GetAncestorsResponse);
+    rpc BatchedParseBlock(BatchedParseBlockRequest) returns (BatchedParseBlockResponse);
 }

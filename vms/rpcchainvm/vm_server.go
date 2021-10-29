@@ -358,6 +358,46 @@ func (vm *VMServer) ParseBlock(_ context.Context, req *vmproto.ParseBlockRequest
 	}, err
 }
 
+func (vm *VMServer) GetAncestors(_ context.Context, req *vmproto.GetAncestorsRequest) (*vmproto.GetAncestorsResponse, error) {
+	blkID, err := ids.ToID(req.BlkID)
+	if err != nil {
+		return nil, err
+	}
+	maxBlksNum := int(req.MaxBlocksNum)
+	maxBlksSize := int(req.MaxBlocksSize)
+	maxBlocksRetrivalTime := time.Duration(req.MaxBlocksRetrivalTime)
+
+	blocks, err := block.GetAncestors(
+		vm.vm,
+		blkID,
+		maxBlksNum,
+		maxBlksSize,
+		maxBlocksRetrivalTime,
+	)
+	return &vmproto.GetAncestorsResponse{
+		BlksBytes: blocks,
+	}, err
+}
+
+func (vm *VMServer) BatchedParseBlock(
+	ctx context.Context,
+	req *vmproto.BatchedParseBlockRequest,
+) (*vmproto.BatchedParseBlockResponse, error) {
+	blocks := make([]*vmproto.ParseBlockResponse, len(req.Request))
+	for i, blockBytes := range req.Request {
+		block, err := vm.ParseBlock(ctx, &vmproto.ParseBlockRequest{
+			Bytes: blockBytes,
+		})
+		if err != nil {
+			return nil, err
+		}
+		blocks[i] = block
+	}
+	return &vmproto.BatchedParseBlockResponse{
+		Response: blocks,
+	}, nil
+}
+
 func (vm *VMServer) GetBlock(_ context.Context, req *vmproto.GetBlockRequest) (*vmproto.GetBlockResponse, error) {
 	id, err := ids.ToID(req.Id)
 	if err != nil {
