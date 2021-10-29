@@ -11,9 +11,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-// BatchedChainVM extends the minimal functionalities exposed by ChainVM for VMs communicating
-// over network (gRPC in our case). This allows more efficient operations since
-// calls over network can be duly batched
+// BatchedChainVM extends the minimal functionalities exposed by ChainVM for VMs
+// communicating over network (gRPC in our case). This allows more efficient
+// operations since calls over network can be duly batched
 type BatchedChainVM interface {
 	GetAncestors(
 		blkID ids.ID, // first requested block
@@ -65,9 +65,10 @@ func GetAncestors(
 			break
 		}
 		blkBytes := blk.Bytes()
-		// Ensure response size isn't too large. Include wrappers.IntLen because the size of the message
-		// is included with each container, and the size is repr. by an int.
-		if newLen := ancestorsBytesLen + len(blkBytes) + wrappers.IntLen; newLen < maxBlocksSize {
+		// Ensure response size isn't too large. Include wrappers.IntLen because
+		// the size of the message is included with each container, and the size
+		// is repr. by an int.
+		if newLen := ancestorsBytesLen + len(blkBytes) + wrappers.IntLen; newLen <= maxBlocksSize {
 			ancestorsBytes = append(ancestorsBytes, blkBytes)
 			ancestorsBytesLen = newLen
 		} else { // reached maximum response size
