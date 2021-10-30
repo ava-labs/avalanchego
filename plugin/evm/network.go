@@ -38,7 +38,7 @@ const (
 type Network interface {
 	// Message handling
 	AppRequestFailed(nodeID ids.ShortID, requestID uint32) error
-	AppRequest(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error
+	AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, msgBytes []byte) error
 	AppResponse(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error
 	AppGossip(nodeID ids.ShortID, msgBytes []byte) error
 
@@ -47,8 +47,8 @@ type Network interface {
 	GossipEthTxs(txs []*types.Transaction) error
 }
 
-func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
-	return vm.network.AppRequest(nodeID, requestID, request)
+func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
+	return vm.network.AppRequest(nodeID, requestID, deadline, request)
 }
 
 func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
@@ -172,7 +172,7 @@ func (n *pushNetwork) AppRequestFailed(nodeID ids.ShortID, requestID uint32) err
 	return nil
 }
 
-func (n *pushNetwork) AppRequest(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error {
+func (n *pushNetwork) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, msgBytes []byte) error {
 	return nil
 }
 
@@ -470,7 +470,7 @@ type noopNetwork struct{}
 func (n *noopNetwork) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 	return nil
 }
-func (n *noopNetwork) AppRequest(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error {
+func (n *noopNetwork) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, msgBytes []byte) error {
 	return nil
 }
 func (n *noopNetwork) AppResponse(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error {
