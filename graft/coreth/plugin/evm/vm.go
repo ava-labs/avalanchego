@@ -50,7 +50,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/profiler"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
@@ -185,7 +185,7 @@ type VM struct {
 
 	baseCodec codec.Registry
 	codec     codec.Manager
-	clock     timer.Clock
+	clock     mockable.Clock
 	mempool   *Mempool
 
 	shutdownChan chan struct{}
@@ -198,11 +198,11 @@ type VM struct {
 	profiler profiler.ContinuousProfiler
 }
 
-func (vm *VM) Connected(id ids.ShortID) error {
+func (vm *VM) Connected(nodeID ids.ShortID) error {
 	return nil // noop
 }
 
-func (vm *VM) Disconnected(id ids.ShortID) error {
+func (vm *VM) Disconnected(nodeID ids.ShortID) error {
 	return nil // noop
 }
 
@@ -213,7 +213,7 @@ func (vm *VM) Codec() codec.Manager { return vm.codec }
 func (vm *VM) CodecRegistry() codec.Registry { return vm.baseCodec }
 
 // Clock implements the secp256k1fx interface
-func (vm *VM) Clock() *timer.Clock { return &vm.clock }
+func (vm *VM) Clock() *mockable.Clock { return &vm.clock }
 
 // Logger implements the secp256k1fx interface
 func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
