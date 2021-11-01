@@ -16,6 +16,7 @@ const (
 	GetPeerList
 	_
 	Ping
+	// TODO: NetworkUpgrade/delete this in favor of UptimePong
 	Pong
 	// Bootstrapping:
 	GetAcceptedFrontier
@@ -51,6 +52,8 @@ const (
 	Disconnected
 	Notify
 	GossipRequest
+	// TODO: NetworkUpgrade/Rename this to Pong
+	UptimePong
 )
 
 var (
@@ -61,6 +64,7 @@ var (
 		PeerList,
 		Ping,
 		Pong,
+		UptimePong,
 	}
 
 	// List of all consensus request message types
@@ -152,6 +156,7 @@ var (
 		PeerList:    {SignedPeers},
 		Ping:        {},
 		Pong:        {},
+		UptimePong:  {Uptime},
 		// Bootstrapping:
 		GetAcceptedFrontier: {ChainID, RequestID, Deadline},
 		AcceptedFrontier:    {ChainID, RequestID, ContainerIDs},
@@ -195,6 +200,8 @@ func (op Op) String() string {
 		return "ping"
 	case Pong:
 		return "pong"
+	case UptimePong:
+		return "uptime_pong"
 	case GetAcceptedFrontier:
 		return "get_accepted_frontier"
 	case AcceptedFrontier:

@@ -569,6 +569,14 @@ func (p *peer) sendPong() {
 }
 
 // assumes the [stateLock] is not held
+func (p *peer) sendUptimePong() {
+	msg, err := p.net.mc.UptimePong()
+	p.net.log.AssertNoError(err)
+
+	p.net.send(msg, false, []*peer{p})
+}
+
+// assumes the [stateLock] is not held
 func (p *peer) handleGetVersion(_ message.InboundMessage) {
 	if !p.versionSent.GetValue() {
 		p.sendVersion()

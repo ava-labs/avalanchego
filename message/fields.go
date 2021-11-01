@@ -31,6 +31,7 @@ const (
 	TrackedSubnets                   // Used in handshake / peer gossiping
 	AppBytes                         // Used at application level
 	VMMessage                        // Used internally
+	Uptime                           // Used for Pong
 )
 
 // Packer returns the packer function that can be used to pack this field.
@@ -72,6 +73,8 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPackIPCertList
 	case TrackedSubnets:
 		return wrappers.TryPackHashes
+	case Uptime:
+		return wrappers.TryPackByte
 	default:
 		return nil
 	}
@@ -116,6 +119,8 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackIPCertList
 	case TrackedSubnets:
 		return wrappers.TryUnpackHashes
+	case Uptime:
+		return wrappers.TryUnpackByte
 	default:
 		return nil
 	}
@@ -161,6 +166,8 @@ func (f Field) String() string {
 		return "TrackedSubnets"
 	case VMMessage:
 		return "VMMessage"
+	case Uptime:
+		return "Uptime"
 	default:
 		return "Unknown Field"
 	}
