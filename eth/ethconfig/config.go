@@ -145,4 +145,7 @@ type Config struct {
 
 	// AllowUnfinalizedQueries allow unfinalized queries
 	AllowUnfinalizedQueries bool
+
+	// AllowUnprotectedTxs allow unprotected transactions to be locally issued
+	AllowUnprotectedTxs bool
 }

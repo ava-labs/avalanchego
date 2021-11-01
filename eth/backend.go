@@ -195,11 +195,12 @@ func New(stack *node.Node, config *Config,
 
 	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine)
 
-	// FIXME use node config to pass in config param on whether or not to allow unprotected
-	// currently defaults to false.
-	allowUnprotectedTxs := false
-	eth.APIBackend = &EthAPIBackend{stack.Config().ExtRPCEnabled(), false, eth, nil}
-	if allowUnprotectedTxs {
+	eth.APIBackend = &EthAPIBackend{
+		extRPCEnabled:       stack.Config().ExtRPCEnabled(),
+		allowUnprotectedTxs: config.AllowUnprotectedTxs,
+		eth:                 eth,
+	}
+	if config.AllowUnprotectedTxs {
 		log.Info("Unprotected transactions allowed")
 	}
 	gpoParams := config.GPO

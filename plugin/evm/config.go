@@ -63,6 +63,7 @@ type Config struct {
 	APIMaxDuration            Duration `json:"api-max-duration"`
 	MaxBlocksPerRequest       int64    `json:"api-max-blocks-per-request"`
 	AllowUnfinalizedQueries   bool     `json:"allow-unfinalized-queries"`
+	AllowUnprotectedTxs       bool     `json:"allow-unprotected-txs"`
 
 	// Keystore Settings
 	KeystoreDirectory             string `json:"keystore-directory"` // both absolute and relative supported
