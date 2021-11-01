@@ -318,6 +318,7 @@ func (vm *VM) Initialize(
 	ethConfig.RPCTxFeeCap = vm.config.RPCTxFeeCap
 	ethConfig.TxPool.NoLocals = !vm.config.LocalTxsEnabled
 	ethConfig.AllowUnfinalizedQueries = vm.config.AllowUnfinalizedQueries
+	ethConfig.AllowUnprotectedTxs = vm.config.AllowUnprotectedTxs
 	ethConfig.Preimages = vm.config.Preimages
 	ethConfig.Pruning = vm.config.Pruning
 	ethConfig.SnapshotAsync = vm.config.SnapshotAsync
