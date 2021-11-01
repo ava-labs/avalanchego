@@ -145,4 +145,9 @@ type Config struct {
 
 	// AllowUnfinalizedQueries allow unfinalized queries
 	AllowUnfinalizedQueries bool
+
+	// AllowUnprotectedTxs allow unprotected transactions to be locally issued.
+	// Unprotected transactions are transactions that are signed without EIP-155
+	// replay protection.
+	AllowUnprotectedTxs bool
 }
