@@ -79,12 +79,7 @@ type Bootstrapper struct {
 // Initialize implements the Engine interface.
 func (b *Bootstrapper) Initialize(config Config) error {
 	b.Config = config
-	b.Ctx.Log.Info("Starting bootstrap...")
-
-	if b.Config.StartupAlpha > 0 {
-		return nil
-	}
-	return b.startup()
+	return nil
 }
 
 // GetAcceptedFrontier implements the Engine interface.
@@ -294,7 +289,7 @@ func (b *Bootstrapper) Connected(nodeID ids.ShortID) error {
 	if b.weight < b.StartupAlpha {
 		return nil
 	}
-	return b.startup()
+	return b.Startup()
 }
 
 // Disconnected implements the Engine interface.
@@ -326,10 +321,10 @@ func (b *Bootstrapper) RestartBootstrap(reset bool) error {
 			b.bootstrapAttempts)
 	}
 
-	return b.startup()
+	return b.Startup()
 }
 
-func (b *Bootstrapper) startup() error {
+func (b *Bootstrapper) Startup() error {
 	b.started = true
 
 	beacons, err := b.Beacons.Sample(b.Config.SampleK)

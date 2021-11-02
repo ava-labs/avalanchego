@@ -52,7 +52,7 @@ func (v *voter) Update() {
 	for _, result := range results {
 		result := result
 
-		v.t.EngineCtx.Log.Debug("Finishing poll with:\n%s", &result)
+		v.t.TheOneCommonBootstrapper.Ctx.Log.Debug("Finishing poll with:\n%s", &result)
 		if err := v.t.Consensus.RecordPoll(result); err != nil {
 			v.t.errs.Add(err)
 		}
@@ -68,11 +68,11 @@ func (v *voter) Update() {
 	}
 
 	if v.t.Consensus.Finalized() {
-		v.t.EngineCtx.Log.Debug("Snowman engine can quiesce")
+		v.t.TheOneCommonBootstrapper.Ctx.Log.Debug("Snowman engine can quiesce")
 		return
 	}
 
-	v.t.EngineCtx.Log.Debug("Snowman engine can't quiesce")
+	v.t.TheOneCommonBootstrapper.Ctx.Log.Debug("Snowman engine can't quiesce")
 	v.t.repoll()
 }
 
@@ -94,7 +94,7 @@ votesLoop:
 		blk, err := v.t.GetBlock(rootID)
 		// If we cannot retrieve the block, drop [vote]
 		if err != nil {
-			v.t.EngineCtx.Log.Debug("Dropping %d vote(s) for %s because %s couldn't be fetched", count, vote, rootID)
+			v.t.TheOneCommonBootstrapper.Ctx.Log.Debug("Dropping %d vote(s) for %s because %s couldn't be fetched", count, vote, rootID)
 			continue
 		}
 
@@ -116,7 +116,7 @@ votesLoop:
 			blk, err = v.t.GetBlock(blkID)
 			// If we cannot retrieve the block, drop [vote]
 			if err != nil {
-				v.t.EngineCtx.Log.Debug("Dropping %d vote(s) for %s because %s couldn't be fetched",
+				v.t.TheOneCommonBootstrapper.Ctx.Log.Debug("Dropping %d vote(s) for %s because %s couldn't be fetched",
 					count, vote, blkID)
 				continue votesLoop
 			}

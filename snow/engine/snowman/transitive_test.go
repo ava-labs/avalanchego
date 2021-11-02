@@ -29,6 +29,12 @@ var (
 	Genesis         = ids.GenerateTestID()
 )
 
+type dummyHandler struct {
+	startEngineF func() error
+}
+
+func (dh *dummyHandler) onDoneBootstrapping() error { return dh.startEngineF() }
+
 func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
 	config := DefaultConfig()
 
@@ -75,19 +81,24 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 
 	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
 	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
-	te := &Transitive{}
-	bootstrapper := bootstrap.Bootstrapper{}
+	dh := &dummyHandler{}
 
-	if _ /*onEngineStart*/, err := te.Initialize(config,
-		bootstrapper.GetAccepted,
-		bootstrapper.Accepted,
-		bootstrapper.GetAcceptedFailed,
-		bootstrapper.GetAcceptedFrontier,
-		bootstrapper.AcceptedFrontier,
-		bootstrapper.GetAcceptedFrontierFailed,
+	bootstrapper := bootstrap.Bootstrapper{}
+	if err := bootstrapper.Initialize(
+		config.Config,
+		dh.onDoneBootstrapping,
+		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		prometheus.NewRegistry(),
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	var err error
+	te := &Transitive{}
+	if dh.startEngineF, err = te.Initialize(config,
+		&bootstrapper.Bootstrapper,
 		bootstrapper.MultiPut,
 		bootstrapper.GetAncestorsFailed,
-		bootstrapper.Context,
 		bootstrapper.Timeout,
 		bootstrapper.Halt,
 		bootstrapper.Connected,
@@ -95,12 +106,7 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 		t.Fatal(err)
 	}
 
-	if err := bootstrapper.Initialize(
-		config.Config,
-		te.FinishBootstrapping,
-		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
-		prometheus.NewRegistry(),
-	); err != nil {
+	if err := bootstrapper.Startup(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -130,7 +136,7 @@ func TestEngineShutdown(t *testing.T) {
 func TestEngineAdd(t *testing.T) {
 	vdr, _, sender, vm, te, gBlk := setup(t)
 
-	if te.EngineCtx.ChainID != ids.Empty {
+	if te.TheOneCommonBootstrapper.Ctx.ChainID != ids.Empty {
 		t.Fatalf("Wrong chain ID")
 	}
 
@@ -473,19 +479,23 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
 	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
-	te := &Transitive{}
+	dh := &dummyHandler{}
 	bootstrapper := bootstrap.Bootstrapper{}
+	if err := bootstrapper.Initialize(
+		config.Config,
+		dh.onDoneBootstrapping,
+		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		prometheus.NewRegistry(),
+	); err != nil {
+		t.Fatal(err)
+	}
 
-	if _ /*onEngineStart*/, err := te.Initialize(config,
-		bootstrapper.GetAccepted,
-		bootstrapper.Accepted,
-		bootstrapper.GetAcceptedFailed,
-		bootstrapper.GetAcceptedFrontier,
-		bootstrapper.AcceptedFrontier,
-		bootstrapper.GetAcceptedFrontierFailed,
+	var err error
+	te := &Transitive{}
+	if dh.startEngineF, err = te.Initialize(config,
+		&bootstrapper.Bootstrapper,
 		bootstrapper.MultiPut,
 		bootstrapper.GetAncestorsFailed,
-		bootstrapper.Context,
 		bootstrapper.Timeout,
 		bootstrapper.Halt,
 		bootstrapper.Connected,
@@ -493,12 +503,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := bootstrapper.Initialize(
-		config.Config,
-		te.FinishBootstrapping,
-		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
-		prometheus.NewRegistry(),
-	); err != nil {
+	if err := bootstrapper.Startup(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -990,19 +995,23 @@ func TestVoteCanceling(t *testing.T) {
 
 	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
 	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
-	te := &Transitive{}
+	dh := &dummyHandler{}
 	bootstrapper := bootstrap.Bootstrapper{}
+	if err := bootstrapper.Initialize(
+		config.Config,
+		dh.onDoneBootstrapping,
+		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		prometheus.NewRegistry(),
+	); err != nil {
+		t.Fatal(err)
+	}
 
-	if _ /*onEngineStart*/, err := te.Initialize(config,
-		bootstrapper.GetAccepted,
-		bootstrapper.Accepted,
-		bootstrapper.GetAcceptedFailed,
-		bootstrapper.GetAcceptedFrontier,
-		bootstrapper.AcceptedFrontier,
-		bootstrapper.GetAcceptedFrontierFailed,
+	var err error
+	te := &Transitive{}
+	if dh.startEngineF, err = te.Initialize(config,
+		&bootstrapper.Bootstrapper,
 		bootstrapper.MultiPut,
 		bootstrapper.GetAncestorsFailed,
-		bootstrapper.Context,
 		bootstrapper.Timeout,
 		bootstrapper.Halt,
 		bootstrapper.Connected,
@@ -1010,12 +1019,7 @@ func TestVoteCanceling(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := bootstrapper.Initialize(
-		config.Config,
-		te.FinishBootstrapping,
-		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
-		prometheus.NewRegistry(),
-	); err != nil {
+	if err := bootstrapper.Startup(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1112,19 +1116,24 @@ func TestEngineNoQuery(t *testing.T) {
 
 	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
 	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
-	te := &Transitive{}
-	bootstrapper := bootstrap.Bootstrapper{}
+	dh := &dummyHandler{}
 
-	if _ /*onEngineStart*/, err := te.Initialize(config,
-		bootstrapper.GetAccepted,
-		bootstrapper.Accepted,
-		bootstrapper.GetAcceptedFailed,
-		bootstrapper.GetAcceptedFrontier,
-		bootstrapper.AcceptedFrontier,
-		bootstrapper.GetAcceptedFrontierFailed,
+	bootstrapper := bootstrap.Bootstrapper{}
+	if err := bootstrapper.Initialize(
+		config.Config,
+		dh.onDoneBootstrapping,
+		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		prometheus.NewRegistry(),
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	var err error
+	te := &Transitive{}
+	if dh.startEngineF, err = te.Initialize(config,
+		&bootstrapper.Bootstrapper,
 		bootstrapper.MultiPut,
 		bootstrapper.GetAncestorsFailed,
-		bootstrapper.Context,
 		bootstrapper.Timeout,
 		bootstrapper.Halt,
 		bootstrapper.Connected,
@@ -1132,12 +1141,7 @@ func TestEngineNoQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := bootstrapper.Initialize(
-		config.Config,
-		te.FinishBootstrapping,
-		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
-		prometheus.NewRegistry(),
-	); err != nil {
+	if err := bootstrapper.Startup(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1186,19 +1190,24 @@ func TestEngineNoRepollQuery(t *testing.T) {
 
 	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
 	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
-	te := &Transitive{}
-	bootstrapper := bootstrap.Bootstrapper{}
+	dh := &dummyHandler{}
 
-	if _ /*onEngineStart*/, err := te.Initialize(config,
-		bootstrapper.GetAccepted,
-		bootstrapper.Accepted,
-		bootstrapper.GetAcceptedFailed,
-		bootstrapper.GetAcceptedFrontier,
-		bootstrapper.AcceptedFrontier,
-		bootstrapper.GetAcceptedFrontierFailed,
+	bootstrapper := bootstrap.Bootstrapper{}
+	if err := bootstrapper.Initialize(
+		config.Config,
+		dh.onDoneBootstrapping,
+		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		prometheus.NewRegistry(),
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	var err error
+	te := &Transitive{}
+	if dh.startEngineF, err = te.Initialize(config,
+		&bootstrapper.Bootstrapper,
 		bootstrapper.MultiPut,
 		bootstrapper.GetAncestorsFailed,
-		bootstrapper.Context,
 		bootstrapper.Timeout,
 		bootstrapper.Halt,
 		bootstrapper.Connected,
@@ -1206,12 +1215,7 @@ func TestEngineNoRepollQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := bootstrapper.Initialize(
-		config.Config,
-		te.FinishBootstrapping,
-		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
-		prometheus.NewRegistry(),
-	); err != nil {
+	if err := bootstrapper.Startup(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1892,19 +1896,23 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
 	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
-	te := &Transitive{}
+	dh := &dummyHandler{}
 	bootstrapper := bootstrap.Bootstrapper{}
+	if err := bootstrapper.Initialize(
+		config.Config,
+		dh.onDoneBootstrapping,
+		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		prometheus.NewRegistry(),
+	); err != nil {
+		t.Fatal(err)
+	}
 
-	if _ /*onEngineStart*/, err := te.Initialize(config,
-		bootstrapper.GetAccepted,
-		bootstrapper.Accepted,
-		bootstrapper.GetAcceptedFailed,
-		bootstrapper.GetAcceptedFrontier,
-		bootstrapper.AcceptedFrontier,
-		bootstrapper.GetAcceptedFrontierFailed,
+	var err error
+	te := &Transitive{}
+	if dh.startEngineF, err = te.Initialize(config,
+		&bootstrapper.Bootstrapper,
 		bootstrapper.MultiPut,
 		bootstrapper.GetAncestorsFailed,
-		bootstrapper.Context,
 		bootstrapper.Timeout,
 		bootstrapper.Halt,
 		bootstrapper.Connected,
@@ -1912,12 +1920,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := bootstrapper.Initialize(
-		config.Config,
-		te.FinishBootstrapping,
-		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
-		prometheus.NewRegistry(),
-	); err != nil {
+	if err := bootstrapper.Startup(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2044,19 +2047,23 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
 	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
-	te := &Transitive{}
+	dh := &dummyHandler{}
 	bootstrapper := bootstrap.Bootstrapper{}
+	if err := bootstrapper.Initialize(
+		config.Config,
+		dh.onDoneBootstrapping,
+		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		prometheus.NewRegistry(),
+	); err != nil {
+		t.Fatal(err)
+	}
 
-	if _ /*onEngineStart*/, err := te.Initialize(config,
-		bootstrapper.GetAccepted,
-		bootstrapper.Accepted,
-		bootstrapper.GetAcceptedFailed,
-		bootstrapper.GetAcceptedFrontier,
-		bootstrapper.AcceptedFrontier,
-		bootstrapper.GetAcceptedFrontierFailed,
+	var err error
+	te := &Transitive{}
+	if dh.startEngineF, err = te.Initialize(config,
+		&bootstrapper.Bootstrapper,
 		bootstrapper.MultiPut,
 		bootstrapper.GetAncestorsFailed,
-		bootstrapper.Context,
 		bootstrapper.Timeout,
 		bootstrapper.Halt,
 		bootstrapper.Connected,
@@ -2064,12 +2071,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := bootstrapper.Initialize(
-		config.Config,
-		te.FinishBootstrapping,
-		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
-		prometheus.NewRegistry(),
-	); err != nil {
+	if err := bootstrapper.Startup(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2200,19 +2202,23 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 
 	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
 	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
-	te := &Transitive{}
+	dh := &dummyHandler{}
 	bootstrapper := bootstrap.Bootstrapper{}
+	if err := bootstrapper.Initialize(
+		config.Config,
+		dh.onDoneBootstrapping,
+		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		prometheus.NewRegistry(),
+	); err != nil {
+		t.Fatal(err)
+	}
 
-	if _ /*onEngineStart*/, err := te.Initialize(config,
-		bootstrapper.GetAccepted,
-		bootstrapper.Accepted,
-		bootstrapper.GetAcceptedFailed,
-		bootstrapper.GetAcceptedFrontier,
-		bootstrapper.AcceptedFrontier,
-		bootstrapper.GetAcceptedFrontierFailed,
+	var err error
+	te := &Transitive{}
+	if dh.startEngineF, err = te.Initialize(config,
+		&bootstrapper.Bootstrapper,
 		bootstrapper.MultiPut,
 		bootstrapper.GetAncestorsFailed,
-		bootstrapper.Context,
 		bootstrapper.Timeout,
 		bootstrapper.Halt,
 		bootstrapper.Connected,
@@ -2220,12 +2226,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := bootstrapper.Initialize(
-		config.Config,
-		te.FinishBootstrapping,
-		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
-		prometheus.NewRegistry(),
-	); err != nil {
+	if err := bootstrapper.Startup(); err != nil {
 		t.Fatal(err)
 	}
 

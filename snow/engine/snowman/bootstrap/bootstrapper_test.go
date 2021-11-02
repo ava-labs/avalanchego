@@ -112,13 +112,16 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 
 	finished := new(bool)
 	bs := Bootstrapper{}
-	err := bs.Initialize(
+	if err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
 		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	)
-	if err != nil {
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bs.Startup(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -149,7 +152,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	vm.CantBootstrapping = false
 	vm.CantBootstrapped = false
 
-	err = bs.ForceAccepted(acceptedIDs)
+	err := bs.ForceAccepted(acceptedIDs)
 	switch {
 	case err != nil: // should finish
 		t.Fatal(err)
@@ -211,13 +214,16 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 
 	finished := new(bool)
 	bs := Bootstrapper{}
-	err := bs.Initialize(
+	if err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
 		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	)
-	if err != nil {
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bs.Startup(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -294,7 +300,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 
 	vm.CantBootstrapped = false
 
-	err = bs.MultiPut(peerID, *requestID, [][]byte{blkBytes1})
+	err := bs.MultiPut(peerID, *requestID, [][]byte{blkBytes1})
 	switch {
 	case err != nil: // respond with right block
 		t.Fatal(err)
@@ -368,13 +374,16 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 
 	finished := new(bool)
 	bs := Bootstrapper{}
-	err := bs.Initialize(
+	if err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
 		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	)
-	if err != nil {
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bs.Startup(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -528,13 +537,16 @@ func TestBootstrapperMultiPut(t *testing.T) {
 	}
 	finished := new(bool)
 	bs := Bootstrapper{}
-	err := bs.Initialize(
+	if err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
 		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	)
-	if err != nil {
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bs.Startup(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -641,13 +653,16 @@ func TestBootstrapperAcceptedFrontier(t *testing.T) {
 		return dummyBlk, nil
 	}
 	bs := Bootstrapper{}
-	err := bs.Initialize(
+	if err := bs.Initialize(
 		config,
 		nil,
 		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	)
-	if err != nil {
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bs.Startup(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -688,13 +703,16 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 	}
 
 	bs := Bootstrapper{}
-	err := bs.Initialize(
+	if err := bs.Initialize(
 		config,
 		nil,
 		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	)
-	if err != nil {
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bs.Startup(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -777,13 +795,16 @@ func TestBootstrapperFinalized(t *testing.T) {
 		assert.Equal(t, blk0.ID(), blkID)
 		return blk0, nil
 	}
-	err := bs.Initialize(
+	if err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
 		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	)
-	if err != nil {
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bs.Startup(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -984,13 +1005,16 @@ func TestRestartBootstrapping(t *testing.T) {
 
 	finished := new(bool)
 	bs := Bootstrapper{}
-	err := bs.Initialize(
+	if err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
 		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	)
-	if err != nil {
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bs.Startup(); err != nil {
 		t.Fatal(err)
 	}
 

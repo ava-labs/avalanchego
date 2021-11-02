@@ -114,6 +114,12 @@ func init() {
 	testSubnet1ControlKeys = keys[0:3]
 }
 
+type dummyHandler struct {
+	startEngineF func() error
+}
+
+func (dh *dummyHandler) onDoneBootstrapping() error { return dh.startEngineF() }
+
 func defaultContext() *snow.Context {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = testNetworkID
@@ -2144,32 +2150,30 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		Consensus: &smcon.Topological{},
 	}
 
-	engine := smeng.Transitive{}
+	dh := &dummyHandler{}
 	bootstrapper := bootstrap.Bootstrapper{}
 	if err := bootstrapper.Initialize(
 		config.Config,
-		engine.FinishBootstrapping,
+		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
 		prometheus.NewRegistry(),
 	); err != nil {
 		t.Fatal(err)
 	}
 
-	_ /*onEngineStart*/, err = engine.Initialize(config,
-		bootstrapper.GetAccepted,
-		bootstrapper.Accepted,
-		bootstrapper.GetAcceptedFailed,
-		bootstrapper.GetAcceptedFrontier,
-		bootstrapper.AcceptedFrontier,
-		bootstrapper.GetAcceptedFrontierFailed,
+	engine := smeng.Transitive{}
+	if dh.startEngineF, err = engine.Initialize(config,
+		&bootstrapper.Bootstrapper,
 		bootstrapper.MultiPut,
 		bootstrapper.GetAncestorsFailed,
-		bootstrapper.Context,
 		bootstrapper.Timeout,
 		bootstrapper.Halt,
 		bootstrapper.Connected,
-		bootstrapper.Disconnected)
-	if err != nil {
+		bootstrapper.Disconnected); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bootstrapper.Startup(); err != nil {
 		t.Fatal(err)
 	}
 

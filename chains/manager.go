@@ -758,49 +758,45 @@ func (m *manager) createSnowmanChain(
 	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
 	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
 	bootstrapper := smbootstrap.Bootstrapper{}
-	engine := &smeng.Transitive{}
-
-	onDoneBootstrapping, err := engine.Initialize(smeng.Config{
-		Config:    bootstrapCfg,
-		Params:    consensusParams,
-		Consensus: &smcon.Topological{},
-	},
-		bootstrapper.GetAccepted,
-		bootstrapper.Accepted,
-		bootstrapper.GetAcceptedFailed,
-		bootstrapper.GetAcceptedFrontier,
-		bootstrapper.AcceptedFrontier,
-		bootstrapper.GetAcceptedFrontierFailed,
-		bootstrapper.MultiPut,
-		bootstrapper.GetAncestorsFailed,
-		bootstrapper.Context,
-		bootstrapper.Timeout,
-		bootstrapper.Halt,
-		bootstrapper.Connected,
-		bootstrapper.Disconnected,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
-	}
-
 	if err := bootstrapper.Initialize(
 		bootstrapCfg,
-		onDoneBootstrapping,
+		handler.OnDoneBootstrapping,
 		fmt.Sprintf("%s_bs", consensusParams.Namespace),
 		consensusParams.Metrics,
 	); err != nil {
 		return nil, fmt.Errorf("error initializing snowman bootstrapper: %w", err)
 	}
 
-	err = handler.Initialize(
+	engine := &smeng.Transitive{}
+	if handler.StartEngineF, err = engine.Initialize(smeng.Config{
+		Config:    bootstrapCfg,
+		Params:    consensusParams,
+		Consensus: &smcon.Topological{},
+	},
+		&bootstrapper.Bootstrapper,
+		bootstrapper.MultiPut,
+		bootstrapper.GetAncestorsFailed,
+
+		bootstrapper.Timeout,
+		bootstrapper.Halt,
+		bootstrapper.Connected,
+		bootstrapper.Disconnected,
+	); err != nil {
+		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
+	}
+
+	if err := bootstrapper.Startup(); err != nil {
+		return nil, fmt.Errorf("error starting snowman bootstrapper: %w", err)
+	}
+
+	if err = handler.Initialize(
 		m.MsgCreator,
 		engine,
 		vdrs,
 		msgChan,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
-	)
-	if err != nil {
+	); err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %s", err)
 	}
 

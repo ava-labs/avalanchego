@@ -128,13 +128,15 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 
 	bs := Bootstrapper{}
 	finished := new(bool)
-	err := bs.Initialize(
+	if err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
 		fmt.Sprintf("%s_%s_bs", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	)
-	if err != nil {
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := bs.Startup(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -229,13 +231,16 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 
 	bs := Bootstrapper{}
 	finished := new(bool)
-	err := bs.Initialize(
+	if err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
 		fmt.Sprintf("%s_%s_bs", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	)
-	if err != nil {
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bs.Startup(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -291,7 +296,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	}
 
 	oldReqID := *requestID
-	err = bs.MultiPut(peerID, *requestID, [][]byte{vtxBytes2})
+	err := bs.MultiPut(peerID, *requestID, [][]byte{vtxBytes2})
 	switch {
 	case err != nil: // send unexpected vertex
 		t.Fatal(err)
@@ -405,13 +410,16 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 
 	bs := Bootstrapper{}
 	finished := new(bool)
-	err := bs.Initialize(
+	if err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
 		fmt.Sprintf("%s_%s_bs", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	)
-	if err != nil {
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bs.Startup(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -548,13 +556,16 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 
 	bs := Bootstrapper{}
 	finished := new(bool)
-	err := bs.Initialize(
+	if err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
 		fmt.Sprintf("%s_%s_bs", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	)
-	if err != nil {
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bs.Startup(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -635,13 +646,16 @@ func TestBootstrapperAcceptedFrontier(t *testing.T) {
 	vtxID2 := ids.GenerateTestID()
 
 	bs := Bootstrapper{}
-	err := bs.Initialize(
+	if err := bs.Initialize(
 		config,
 		nil,
 		fmt.Sprintf("%s_%s_bs", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	)
-	if err != nil {
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bs.Startup(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -690,13 +704,16 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 
 	bs := Bootstrapper{}
 	finished := new(bool)
-	err := bs.Initialize(
+	if err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
 		fmt.Sprintf("%s_%s_bs", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	)
-	if err != nil {
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bs.Startup(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -773,13 +790,15 @@ func TestBootstrapperIncompleteMultiPut(t *testing.T) {
 
 	bs := Bootstrapper{}
 	finished := new(bool)
-	err := bs.Initialize(
+	if err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
 		fmt.Sprintf("%s_%s_bs", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	)
-	if err != nil {
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := bs.Startup(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -836,7 +855,7 @@ func TestBootstrapperIncompleteMultiPut(t *testing.T) {
 		t.Fatal("requested wrong vtx")
 	}
 
-	err = bs.MultiPut(peerID, *reqIDPtr, [][]byte{vtxBytes1})
+	err := bs.MultiPut(peerID, *reqIDPtr, [][]byte{vtxBytes1})
 	switch {
 	case err != nil: // Provide vtx1; should request vtx0
 		t.Fatal(err)
@@ -892,13 +911,16 @@ func TestBootstrapperFinalized(t *testing.T) {
 
 	bs := Bootstrapper{}
 	finished := new(bool)
-	err := bs.Initialize(
+	if err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
 		fmt.Sprintf("%s_%s_bs", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	)
-	if err != nil {
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bs.Startup(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -968,7 +990,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		t.Fatalf("should have requested vtx0")
 	}
 
-	err = bs.GetAncestorsFailed(peerID, reqID)
+	err := bs.GetAncestorsFailed(peerID, reqID)
 	switch {
 	case err != nil:
 		t.Fatal(err)
@@ -1022,13 +1044,16 @@ func TestBootstrapperAcceptsMultiPutParents(t *testing.T) {
 
 	bs := Bootstrapper{}
 	finished := new(bool)
-	err := bs.Initialize(
+	if err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
 		fmt.Sprintf("%s_%s_bs", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	)
-	if err != nil {
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bs.Startup(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1188,13 +1213,16 @@ func TestRestartBootstrapping(t *testing.T) {
 
 	bs := Bootstrapper{}
 	finished := new(bool)
-	err := bs.Initialize(
+	if err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
 		fmt.Sprintf("%s_%s_bs", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	)
-	if err != nil {
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bs.Startup(); err != nil {
 		t.Fatal(err)
 	}
 

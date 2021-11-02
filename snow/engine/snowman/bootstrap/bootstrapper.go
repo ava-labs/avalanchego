@@ -107,6 +107,16 @@ func (b *Bootstrapper) Initialize(
 	return b.Bootstrapper.Initialize(config.Config)
 }
 
+func (b *Bootstrapper) Startup() error {
+	b.Ctx.Log.Info("Starting bootstrap...")
+
+	if b.Config.StartupAlpha > 0 {
+		return nil
+	}
+
+	return b.Bootstrapper.Startup()
+}
+
 // CurrentAcceptedFrontier returns the last accepted block
 func (b *Bootstrapper) CurrentAcceptedFrontier() ([]ids.ID, error) {
 	lastAccepted, err := b.VM.LastAccepted()

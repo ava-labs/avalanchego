@@ -79,12 +79,16 @@ func (t *Transitive) Initialize(config Config) error {
 		return err
 	}
 
-	return t.Bootstrapper.Initialize(
+	if err := t.Bootstrapper.Initialize(
 		config.Config,
 		t.finishBootstrapping,
 		fmt.Sprintf("%s_bs", config.Params.Namespace),
 		config.Params.Metrics,
-	)
+	); err != nil {
+		return err
+	}
+
+	return t.Bootstrapper.Startup()
 }
 
 func (t *Transitive) finishBootstrapping() error {
