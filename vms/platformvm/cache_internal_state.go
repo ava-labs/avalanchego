@@ -18,11 +18,11 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/uptimes"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/uptime"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -71,7 +71,7 @@ const (
 
 type InternalState interface {
 	MutableState
-	uptime.State
+	uptimes.UptimeState
 
 	SetHeight(height uint64)
 

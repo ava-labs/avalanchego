@@ -732,13 +732,13 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			weight := json.Uint64(staker.Validator.Weight())
 			potentialReward := json.Uint64(reward)
 			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(PercentDenominator))
-			rawUptime, err := service.vm.CalculateUptimePercent(nodeID, startTime)
+			rawUptime, err := service.vm.UptimesManager.CalculateUptimePercent(nodeID, startTime)
 			if err != nil {
 				return err
 			}
 			uptime := json.Float32(rawUptime)
 
-			connected := service.vm.IsConnected(nodeID)
+			connected := service.vm.UptimesManager.IsConnected(nodeID)
 
 			var rewardOwner *APIOwner
 			owner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
@@ -874,7 +874,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			weight := json.Uint64(staker.Validator.Weight())
 			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(PercentDenominator))
 
-			connected := service.vm.IsConnected(nodeID)
+			connected := service.vm.UptimesManager.IsConnected(nodeID)
 			reply.Validators = append(reply.Validators, APIPrimaryValidator{
 				APIStaker: APIStaker{
 					TxID:        tx.ID(),
