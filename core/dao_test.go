@@ -46,22 +46,18 @@ func TestDAOForkRangeExtradata(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 	gspec := &Genesis{
 		BaseFee: big.NewInt(params.ApricotPhase3InitialBaseFee),
-		Config:  params.TestChainConfig,
+		Config:  params.TestApricotPhase2Config,
 	}
-	gspec.Config.ApricotPhase3BlockTimestamp = nil
-	gspec.Config.ApricotPhase4BlockTimestamp = nil
 	genesis := gspec.MustCommit(db)
-	prefix, _, _ := GenerateChain(params.TestChainConfig, genesis, dummy.NewFaker(), db, int(forkBlock.Int64()-1), 10, func(i int, gen *BlockGen) {})
+	prefix, _, _ := GenerateChain(params.TestApricotPhase2Config, genesis, dummy.NewFaker(), db, int(forkBlock.Int64()-1), 10, func(i int, gen *BlockGen) {})
 
 	// Create the concurrent, conflicting two nodes
 	proDb := rawdb.NewMemoryDatabase()
 	gspec.MustCommit(proDb)
 
-	proConf := *params.TestChainConfig
+	proConf := *params.TestApricotPhase2Config
 	proConf.DAOForkBlock = forkBlock
 	proConf.DAOForkSupport = true
-	proConf.ApricotPhase3BlockTimestamp = nil
-	proConf.ApricotPhase4BlockTimestamp = nil
 
 	proBc, _ := NewBlockChain(proDb, DefaultCacheConfig, &proConf, dummy.NewFaker(), vm.Config{}, common.Hash{})
 	defer proBc.Stop()
@@ -69,11 +65,9 @@ func TestDAOForkRangeExtradata(t *testing.T) {
 	conDb := rawdb.NewMemoryDatabase()
 	gspec.MustCommit(conDb)
 
-	conConf := *params.TestChainConfig
+	conConf := *params.TestApricotPhase2Config
 	conConf.DAOForkBlock = forkBlock
 	conConf.DAOForkSupport = false
-	conConf.ApricotPhase3BlockTimestamp = nil
-	conConf.ApricotPhase4BlockTimestamp = nil
 
 	conBc, _ := NewBlockChain(conDb, DefaultCacheConfig, &conConf, dummy.NewFaker(), vm.Config{}, common.Hash{})
 	defer conBc.Stop()
@@ -176,5 +170,28 @@ func TestDAOForkRangeExtradata(t *testing.T) {
 	blocks, _, _ = GenerateChain(&conConf, proBc.CurrentBlock(), dummy.NewFaker(), db, 1, 10, func(i int, gen *BlockGen) {})
 	if _, err := proBc.InsertChain(blocks); err != nil {
 		t.Fatalf("pro-fork chain didn't accept contra-fork block post-fork: %v", err)
+	}
+}
+
+func TestDAOApricot3Apricot4Enabled(t *testing.T) {
+	forkBlock := big.NewInt(0)
+
+	conf := *params.TestChainConfig
+	conf.DAOForkSupport = true
+	conf.DAOForkBlock = forkBlock
+
+	db := rawdb.NewMemoryDatabase()
+	gspec := &Genesis{
+		BaseFee: big.NewInt(params.ApricotPhase3InitialBaseFee),
+		Config:  &conf,
+	}
+	genesis := gspec.MustCommit(db)
+	bc, _ := NewBlockChain(db, DefaultCacheConfig, &conf, dummy.NewFaker(), vm.Config{}, common.Hash{})
+	defer bc.Stop()
+
+	blocks, _, _ := GenerateChain(&conf, genesis, dummy.NewFaker(), db, 32, 10, func(i int, gen *BlockGen) {})
+
+	if _, err := bc.InsertChain(blocks); err != nil {
+		t.Fatalf("failed to import blocks: %v", err)
 	}
 }
