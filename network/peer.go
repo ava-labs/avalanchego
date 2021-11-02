@@ -580,7 +580,7 @@ func (p *peer) sendUptimePong() {
 	if err != nil {
 		uptimeDuration = 0
 	}
-	msg, err := p.net.mc.UptimePong(uint64(uptimeDuration.Seconds()))
+	msg, err := p.net.mc.UptimePong(uptimeDuration)
 	p.net.log.AssertNoError(err)
 
 	p.net.send(msg, false, []*peer{p})
@@ -851,9 +851,9 @@ func (p *peer) pongHandle(msg message.InboundMessage, isUptime bool) {
 		p.discardIP()
 	}
 	if isUptime {
-		uptimeDuration := msg.Get(message.Uptime)
+		uptimeDuration := msg.Get(message.Uptime).(uint64)
 		// TODO: do uptime calculation here
-		fmt.Printf("uptimeDuration: %s", uptimeDuration)
+		fmt.Printf("nodeID: %s, uptimeDuration: %s", p.nodeID, time.Duration(uptimeDuration))
 	}
 }
 
