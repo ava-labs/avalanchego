@@ -512,7 +512,11 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 	}
 
 	for _, tx := range txs {
-		for _, dep := range tx.Dependencies() {
+		deps, err := tx.Dependencies()
+		if err != nil {
+			return err
+		}
+		for _, dep := range deps {
 			depID := dep.ID()
 			if !txIDs.Contains(depID) && !t.Consensus.TxIssued(dep) {
 				// This transaction hasn't been issued yet. Add it as a dependency.

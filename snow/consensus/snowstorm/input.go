@@ -179,8 +179,7 @@ func (ig *Input) Add(tx Tx) error {
 
 	// If a tx that this tx depends on is rejected, this tx should also be
 	// rejected.
-	ig.registerRejector(ig, tx)
-	return nil
+	return ig.registerRejector(ig, tx)
 }
 
 // Issued implements the ConflictGraph interface
@@ -301,7 +300,9 @@ func (ig *Input) RecordPoll(votes ids.Bag) (bool, error) {
 			// registered once.
 			txNode.pendingAccept = true
 
-			ig.registerAcceptor(ig, txNode.tx)
+			if err := ig.registerAcceptor(ig, txNode.tx); err != nil {
+				return false, err
+			}
 			if ig.errs.Errored() {
 				return changed, ig.errs.Err
 			}
