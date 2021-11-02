@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"crypto/x509"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"math"
 	"net"
@@ -433,6 +434,10 @@ func (p *peer) handle(msg message.InboundMessage, msgLen float64) {
 		p.handlePong(msg)
 		msg.OnFinishedHandling()
 		return
+	case message.UptimePong:
+		p.handleUptimePong(msg)
+		msg.OnFinishedHandling()
+		return
 	case message.GetPeerList:
 		p.handleGetPeerList(msg)
 		msg.OnFinishedHandling()
@@ -570,7 +575,12 @@ func (p *peer) sendPong() {
 
 // assumes the [stateLock] is not held
 func (p *peer) sendUptimePong() {
-	msg, err := p.net.mc.UptimePong()
+	// ASK: also send current localtime?
+	uptimeDuration, _, err := p.net.config.Uptimes.CalculateUptime(p.nodeID)
+	if err != nil {
+		uptimeDuration = 0
+	}
+	msg, err := p.net.mc.UptimePong(uint64(uptimeDuration.Seconds()))
 	p.net.log.AssertNoError(err)
 
 	p.net.send(msg, false, []*peer{p})
@@ -809,10 +819,21 @@ func (p *peer) handlePeerList(msg message.InboundMessage) {
 // assumes the [stateLock] is not held
 func (p *peer) handlePing(_ message.InboundMessage) {
 	p.sendPong()
+	p.sendUptimePong()
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handlePong(_ message.InboundMessage) {
+func (p *peer) handlePong(msg message.InboundMessage) {
+	p.pongHandle(msg, false)
+}
+
+// assumes the [stateLock] is not held
+func (p *peer) handleUptimePong(msg message.InboundMessage) {
+	p.pongHandle(msg, true)
+}
+
+// assumes the [stateLock] is not held
+func (p *peer) pongHandle(msg message.InboundMessage, isUptime bool) {
 	if !p.net.shouldHoldConnection(p.nodeID) {
 		p.net.log.Debug("disconnecting from peer %s%s at %s because the peer is not a validator", constants.NodeIDPrefix, p.nodeID, p.getIP())
 		p.discardIP()
@@ -828,6 +849,11 @@ func (p *peer) handlePong(_ message.InboundMessage) {
 	if err := p.net.versionCompatibility.Compatible(peerVersion); err != nil {
 		p.net.log.Debug("disconnecting from peer %s%s at %s version (%s) not compatible: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), peerVersion, err)
 		p.discardIP()
+	}
+	if isUptime {
+		uptimeDuration := msg.Get(message.Uptime)
+		// TODO: do uptime calculation here
+		fmt.Printf("uptimeDuration: %s", uptimeDuration)
 	}
 }
 

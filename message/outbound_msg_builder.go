@@ -37,7 +37,7 @@ type OutboundMsgBuilder interface {
 
 	Pong() (OutboundMessage, error)
 
-	UptimePong() (OutboundMessage, error)
+	UptimePong(uptime uint64) (OutboundMessage, error)
 
 	GetAcceptedFrontier(
 		chainID ids.ID,
@@ -216,10 +216,12 @@ func (b *outMsgBuilder) Pong() (OutboundMessage, error) {
 	)
 }
 
-func (b *outMsgBuilder) UptimePong() (OutboundMessage, error) {
+func (b *outMsgBuilder) UptimePong(uptime uint64) (OutboundMessage, error) {
 	return b.c.Pack(
 		UptimePong,
-		nil,
+		map[Field]interface{}{
+			Uptime: uptime,
+		},
 		UptimePong.Compressable(), // UptimePong messages can't be compressed
 	)
 }

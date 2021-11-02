@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/snow/uptimes"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
@@ -3125,6 +3126,9 @@ func newDefaultNetwork(
 	log := logging.NoLog{}
 	networkID := uint32(0)
 	benchlistManager := benchlist.NewManager(&benchlist.Config{})
+	s := uptimes.NewTestState()
+
+	uptimesManager := uptimes.NewUptimeManager(s)
 
 	netConfig := newDefaultConfig()
 	netConfig.Namespace = ""
@@ -3143,6 +3147,7 @@ func newDefaultNetwork(
 	netConfig.GossipOnAcceptSize = defaultGossipOnAcceptSize
 	netConfig.CompressionEnabled = true
 	netConfig.WhitelistedSubnets = subnetSet
+	netConfig.Uptimes = uptimesManager
 
 	n, err := NewNetwork(&netConfig, msgCreator, metrics, log, listener, router, benchlistManager)
 	if err != nil {

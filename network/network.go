@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/triggers"
+	"github.com/ava-labs/avalanchego/snow/uptimes"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -240,6 +241,7 @@ type Config struct {
 	Beacons            validators.Set `json:"beacons"`
 	// Current validators in the Avalanche network
 	Validators validators.Manager `json:"validators"`
+	Uptimes    uptimes.Manager    `json:"-"`
 
 	// Require that all connections must have at least one validator between the
 	// 2 peers. This can be useful to enable if the node wants to connect to the

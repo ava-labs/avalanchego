@@ -74,7 +74,7 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 	case TrackedSubnets:
 		return wrappers.TryPackHashes
 	case Uptime:
-		return wrappers.TryPackByte
+		return wrappers.TryPackLong
 	default:
 		return nil
 	}
@@ -120,7 +120,7 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 	case TrackedSubnets:
 		return wrappers.TryUnpackHashes
 	case Uptime:
-		return wrappers.TryUnpackByte
+		return wrappers.TryUnpackLong
 	default:
 		return nil
 	}
