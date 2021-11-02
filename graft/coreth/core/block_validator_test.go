@@ -28,49 +28,7 @@ package core
 
 import (
 	"testing"
-
-	"github.com/ava-labs/coreth/consensus/dummy"
-	"github.com/ava-labs/coreth/core/rawdb"
-	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/core/vm"
-	"github.com/ava-labs/coreth/params"
-	"github.com/ethereum/go-ethereum/common"
 )
-
-// Tests that simple header verification works, for both good and bad blocks.
-func TestHeaderVerification(t *testing.T) {
-	// Create a simple chain to verify
-	var (
-		testdb       = rawdb.NewMemoryDatabase()
-		gspec        = &Genesis{Config: params.TestChainConfig}
-		genesis      = gspec.MustCommit(testdb)
-		blocks, _, _ = GenerateChain(params.TestChainConfig, genesis, dummy.NewFaker(), testdb, 8, 10, nil)
-	)
-	headers := make([]*types.Header, len(blocks))
-	for i, block := range blocks {
-		headers[i] = block.Header()
-	}
-	// Run the header checker for blocks one-by-one, checking for both valid and invalid nonces
-	chain, _ := NewBlockChain(testdb, DefaultCacheConfig, params.TestChainConfig, dummy.NewFaker(), vm.Config{}, common.Hash{})
-	defer chain.Stop()
-
-	for i := 0; i < len(blocks); i++ {
-		for j, valid := range []bool{true, false} {
-			var err error
-			if valid {
-				engine := dummy.NewFaker()
-				err = engine.VerifyHeader(chain, headers[i])
-			} else {
-				engine := dummy.NewFakeFailer(headers[i].Number.Uint64())
-				err = engine.VerifyHeader(chain, headers[i])
-			}
-			if (err == nil) != valid {
-				t.Errorf("test %d.%d: validity mismatch: have %v, want %v", i, j, err, valid)
-			}
-		}
-		chain.InsertChain(blocks[i : i+1])
-	}
-}
 
 func TestCalcGasLimit(t *testing.T) {
 	for i, tc := range []struct {

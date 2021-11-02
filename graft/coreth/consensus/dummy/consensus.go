@@ -36,7 +36,6 @@ type Mode uint
 
 const (
 	ModeFake Mode = iota
-	ModeFakeFail
 	ModeFullFake
 	ModeEthFake
 )
@@ -55,7 +54,6 @@ type (
 	DummyEngine struct {
 		cb            *ConsensusCallbacks
 		consensusMode Mode
-		fakeFail      uint64
 	}
 )
 
@@ -81,14 +79,6 @@ func NewComplexETHFaker(cb *ConsensusCallbacks) *DummyEngine {
 
 func NewFaker() *DummyEngine {
 	return NewDummyEngine(new(ConsensusCallbacks))
-}
-
-func NewFakeFailer(fail uint64) *DummyEngine {
-	return &DummyEngine{
-		cb:            new(ConsensusCallbacks),
-		fakeFail:      fail,
-		consensusMode: ModeFakeFail,
-	}
 }
 
 func NewFullFaker() *DummyEngine {
@@ -229,8 +219,7 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header 
 	if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {
 		return consensus.ErrInvalidNumber
 	}
-	// Verify the engine specific seal securing the block
-	return self.VerifySeal(chain, header)
+	return nil
 }
 
 func (self *DummyEngine) Author(header *types.Header) (common.Address, error) {
@@ -258,13 +247,6 @@ func (self *DummyEngine) VerifyHeader(chain consensus.ChainHeaderReader, header 
 func (self *DummyEngine) VerifyUncles(chain consensus.ChainReader, block *types.Block) error {
 	if len(block.Uncles()) > 0 {
 		return errUnclesUnsupported
-	}
-	return nil
-}
-
-func (self *DummyEngine) VerifySeal(chain consensus.ChainHeaderReader, header *types.Header) error {
-	if self.consensusMode == ModeFakeFail && self.fakeFail == header.Number.Uint64() {
-		return errFakeFail
 	}
 	return nil
 }
