@@ -73,7 +73,7 @@ type Engine interface {
 	Author(header *types.Header) (common.Address, error)
 
 	// VerifyHeader checks whether a header conforms to the consensus rules of a
-	// given engine. 
+	// given engine.
 	//
 	// NOTE: VerifyHeader does not validate the correctness of fields that rely
 	// on the contents of the block (as opposed to the current and/or parent
