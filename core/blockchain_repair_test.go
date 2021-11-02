@@ -591,7 +591,6 @@ func testRepair(t *testing.T, tt *rewindTest, snapshots bool) {
 		t.Fatalf("Failed to import canonical chain start: %v", err)
 	}
 	if tt.commitBlock > 0 {
-		chain.stateCache.TrieDB().Commit(canonblocks[tt.commitBlock-1].Root(), true, nil)
 		if snapshots {
 			for i := uint64(0); i < tt.commitBlock; i++ {
 				if err := chain.Accept(canonblocks[i]); err != nil {
