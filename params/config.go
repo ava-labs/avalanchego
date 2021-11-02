@@ -397,7 +397,6 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, head *big.Int) *Confi
 	if isForkIncompatible(c.MuirGlacierBlock, newcfg.MuirGlacierBlock, head) {
 		return newCompatError("Muir Glacier fork block", c.MuirGlacierBlock, newcfg.MuirGlacierBlock)
 	}
-	// TODO(aaronbuchwald) ensure that Avalanche Blocktimestamps are not modified
 	if !configNumEqual(c.ApricotPhase1BlockTimestamp, newcfg.ApricotPhase1BlockTimestamp) {
 		return newCompatError("ApricotPhase1 fork block", c.ApricotPhase1BlockTimestamp, newcfg.ApricotPhase1BlockTimestamp)
 	}
