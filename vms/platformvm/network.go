@@ -50,7 +50,7 @@ func (n *network) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 	return nil
 }
 
-func (n *network) AppRequest(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error {
+func (n *network) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, msgBytes []byte) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil

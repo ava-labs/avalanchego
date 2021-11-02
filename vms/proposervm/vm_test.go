@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 
@@ -634,7 +634,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 
 // Pre Fork tests section
 func TestPreFork_Initialize(t *testing.T) {
-	_, _, proVM, coreGenBlk, _ := initTestProposerVM(t, timer.MaxTime, 0) // disable ProBlks
+	_, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
 
 	// checks
 	blkID, err := proVM.LastAccepted()
@@ -657,7 +657,7 @@ func TestPreFork_Initialize(t *testing.T) {
 
 func TestPreFork_BuildBlock(t *testing.T) {
 	// setup
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, timer.MaxTime, 0) // disable ProBlks
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -699,7 +699,7 @@ func TestPreFork_BuildBlock(t *testing.T) {
 
 func TestPreFork_ParseBlock(t *testing.T) {
 	// setup
-	coreVM, _, proVM, _, _ := initTestProposerVM(t, timer.MaxTime, 0) // disable ProBlks
+	coreVM, _, proVM, _, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -745,7 +745,7 @@ func TestPreFork_ParseBlock(t *testing.T) {
 }
 
 func TestPreFork_SetPreference(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, timer.MaxTime, 0) // disable ProBlks
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
 
 	coreBlk0 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{

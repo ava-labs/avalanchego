@@ -7,7 +7,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 var (
@@ -49,7 +49,7 @@ type compatibility struct {
 	minUnmaskableTime time.Time
 	prevMinUnmaskable Application
 
-	clock timer.Clock
+	clock mockable.Clock
 }
 
 // NewCompatibility returns a compatibility checker with the provided options

@@ -22,8 +22,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/health"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/dialer"
-	"github.com/ava-labs/avalanchego/network/message"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
@@ -37,7 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -45,9 +45,9 @@ var (
 	errNetworkClosed       = errors.New("network closed")
 	errPeerIsMyself        = errors.New("peer is myself")
 	errNoPrimaryValidators = errors.New("no default subnet validators")
-)
 
-var _ Network = &network{}
+	_ Network = &network{}
+)
 
 func init() { rand.Seed(time.Now().UnixNano()) }
 
@@ -116,9 +116,8 @@ type network struct {
 	// disabled. So, cryptographically secure random number generation isn't
 	// used here.
 	dummyNodeID uint32
-	clock       timer.Clock
-	c           message.Codec
-	b           message.Builder
+	clock       mockable.Clock
+	mc          message.Creator
 
 	stateLock sync.RWMutex
 	closed    utils.AtomicBool
@@ -170,10 +169,6 @@ type network struct {
 	// A node is present in this map if and only if we are actively
 	// trying to dial the node.
 	connAttempts sync.Map
-
-	// Contains []byte. Used as an optimization.
-	// Can be accessed by multiple goroutines concurrently.
-	byteSlicePool sync.Pool
 
 	// Rate-limits incoming messages
 	inboundMsgThrottler         throttling.InboundMsgThrottler
@@ -265,6 +260,7 @@ type peerElement struct {
 // NewNetwork returns a new Network implementation with the provided parameters.
 func NewNetwork(
 	config *Config,
+	msgCreator message.Creator,
 	metricsRegisterer prometheus.Registerer,
 	log logging.Logger,
 	listener net.Listener,
@@ -287,13 +283,9 @@ func NewNetwork(
 		inboundConnUpgradeThrottler: throttling.NewInboundConnUpgradeThrottler(log, config.ThrottlerConfig.InboundConnUpgradeThrottlerConfig),
 		benchlistManager:            benchlistManager,
 		latestPeerIP:                make(map[ids.ShortID]signedPeerIP),
-		byteSlicePool: sync.Pool{
-			New: func() interface{} {
-				return make([]byte, 0, constants.DefaultByteSliceCap)
-			},
-		},
-		versionCompatibility: version.GetCompatibility(config.NetworkID),
-		config:               config,
+		versionCompatibility:        version.GetCompatibility(config.NetworkID),
+		config:                      config,
+		mc:                          msgCreator,
 	}
 
 	netw.serverUpgrader = NewTLSServerUpgrader(config.TLSConfig)
@@ -329,19 +321,6 @@ func NewNetwork(
 	}
 	netw.outboundMsgThrottler = outboundMsgThrottler
 
-	codec, err := message.NewCodecWithAllocator(
-		fmt.Sprintf("%s_codec", config.Namespace),
-		metricsRegisterer,
-		func() []byte {
-			return netw.byteSlicePool.Get().([]byte)
-		},
-		int64(constants.DefaultMaxMessageSize),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("initializing codec failed with: %s", err)
-	}
-	netw.c = codec
-	netw.b = message.NewBuilder(codec)
 	netw.peers.initialize()
 	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, config.MaxSendFailRateHalflife, netw.clock.Time()))
 	if err := netw.metrics.initialize(config.Namespace, metricsRegisterer); err != nil {
@@ -350,521 +329,32 @@ func NewNetwork(
 	return netw, nil
 }
 
-// GetAcceptedFrontier implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration) []ids.ShortID {
-	msg, err := n.b.GetAcceptedFrontier(chainID, requestID, uint64(deadline))
-	n.log.AssertNoError(err)
-	msgLen := len(msg.Bytes())
-
-	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
-	now := n.clock.Time()
-	for _, peerElement := range n.getPeerElements(nodeIDs) {
-		peer := peerElement.peer
-		nodeID := peerElement.id
-		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
-			n.log.Debug("failed to send GetAcceptedFrontier(%s, %s, %d)",
-				nodeID,
-				chainID,
-				requestID)
-			n.metrics.getAcceptedFrontier.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, now)
-		} else {
-			sentTo = append(sentTo, nodeID)
-			n.metrics.getAcceptedFrontier.numSent.Inc()
-			n.sendFailRateCalculator.Observe(0, now)
-			n.metrics.getAcceptedFrontier.sentBytes.Add(float64(msgLen))
-			// assume that if [saved] == 0, [msg] wasn't compressed
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.getAcceptedFrontier.savedSentBytes.Observe(float64(saved))
-			}
-		}
-	}
-	return sentTo
+func (n *network) Send(msg message.OutboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) ids.ShortSet {
+	// retrieve target peers
+	peers := n.getPeers(nodeIDs, subnetID, validatorOnly)
+	return n.send(msg, true, peers)
 }
 
-// AcceptedFrontier implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) SendAcceptedFrontier(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
-	now := n.clock.Time()
-
-	peer := n.getPeer(nodeID)
-	msg, err := n.b.AcceptedFrontier(chainID, requestID, containerIDs)
+func (n *network) Gossip(
+	msg message.OutboundMessage,
+	subnetID ids.ID,
+	validatorOnly bool,
+	numValidatorsToSend int,
+	numNonValidatorsToSend int,
+) ids.ShortSet {
+	peers, err := n.selectPeersForGossip(subnetID, validatorOnly, numValidatorsToSend, numNonValidatorsToSend)
 	if err != nil {
-		n.log.Error("failed to build AcceptedFrontier(%s, %d, %s): %s",
-			chainID,
-			requestID,
-			containerIDs,
-			err)
-		n.sendFailRateCalculator.Observe(1, now)
-		return // Packing message failed
-	}
+		n.log.Error("failed to sample peers: %s", err)
 
-	msgLen := len(msg.Bytes())
-	if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
-		n.log.Debug("failed to send AcceptedFrontier(%s, %s, %d, %s)",
-			nodeID,
-			chainID,
-			requestID,
-			containerIDs)
-		n.metrics.acceptedFrontier.numFailed.Inc()
-		n.sendFailRateCalculator.Observe(1, now)
-	} else {
-		n.metrics.acceptedFrontier.numSent.Inc()
-		n.sendFailRateCalculator.Observe(0, now)
-		n.metrics.acceptedFrontier.sentBytes.Add(float64(msgLen))
-		// assume that if [saved] == 0, [msg] wasn't compressed
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			n.metrics.acceptedFrontier.savedSentBytes.Observe(float64(saved))
-		}
-	}
-}
-
-// GetAccepted implements the Sender interface.
-// Assumes [n.stateLock] is not held.
-func (n *network) SendGetAccepted(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) []ids.ShortID {
-	now := n.clock.Time()
-
-	msg, err := n.b.GetAccepted(chainID, requestID, uint64(deadline), containerIDs)
-	if err != nil {
-		n.log.Error("failed to build GetAccepted(%s, %d, %s): %s",
-			chainID,
-			requestID,
-			containerIDs,
-			err)
-		n.sendFailRateCalculator.Observe(1, now)
+		// Because we failed to sample the peers, the message will never be
+		// sent. This means that we should return the bytes allocated for the
+		// message.
+		msg.DecRef()
 		return nil
 	}
-	msgLen := len(msg.Bytes())
-
-	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
-	for _, peerElement := range n.getPeerElements(nodeIDs) {
-		peer := peerElement.peer
-		vID := peerElement.id
-		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
-			n.log.Debug("failed to send GetAccepted(%s, %s, %d, %s)",
-				vID,
-				chainID,
-				requestID,
-				containerIDs)
-			n.metrics.getAccepted.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, now)
-		} else {
-			n.metrics.getAccepted.numSent.Inc()
-			n.sendFailRateCalculator.Observe(0, now)
-			n.metrics.getAccepted.sentBytes.Add(float64(msgLen))
-			// assume that if [saved] == 0, [msg] wasn't compressed
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.getAccepted.savedSentBytes.Observe(float64(saved))
-			}
-			sentTo = append(sentTo, vID)
-		}
-	}
-	return sentTo
-}
-
-// Accepted implements the Sender interface.
-// Assumes [n.stateLock] is not held.
-func (n *network) SendAccepted(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
-	now := n.clock.Time()
-
-	msg, err := n.b.Accepted(chainID, requestID, containerIDs)
-	if err != nil {
-		n.log.Error("failed to build Accepted(%s, %d, %s): %s",
-			chainID,
-			requestID,
-			containerIDs,
-			err)
-		n.sendFailRateCalculator.Observe(1, now)
-		return // Packing message failed
-	}
-	msgLen := len(msg.Bytes())
-
-	peer := n.getPeer(nodeID)
-	if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
-		n.log.Debug("failed to send Accepted(%s, %s, %d, %s)",
-			nodeID,
-			chainID,
-			requestID,
-			containerIDs)
-		n.metrics.accepted.numFailed.Inc()
-		n.sendFailRateCalculator.Observe(1, now)
-	} else {
-		n.sendFailRateCalculator.Observe(0, now)
-		n.metrics.accepted.numSent.Inc()
-		n.metrics.accepted.sentBytes.Add(float64(msgLen))
-		// assume that if [saved] == 0, [msg] wasn't compressed
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			n.metrics.accepted.savedSentBytes.Observe(float64(saved))
-		}
-	}
-}
-
-// GetAncestors implements the Sender interface.
-// Assumes [n.stateLock] is not held.
-func (n *network) SendGetAncestors(nodeID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool {
-	now := n.clock.Time()
-
-	peer := n.getPeer(nodeID)
-
-	msg, err := n.b.GetAncestors(chainID, requestID, uint64(deadline), containerID)
-	if err != nil {
-		n.log.Error("failed to build GetAncestors message: %s", err)
-		n.sendFailRateCalculator.Observe(1, now)
-		return false
-	}
-
-	msgLen := len(msg.Bytes())
-	if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
-		n.log.Debug("failed to send GetAncestors(%s, %s, %d, %s)",
-			nodeID,
-			chainID,
-			requestID,
-			containerID)
-		n.metrics.getAncestors.numFailed.Inc()
-		n.sendFailRateCalculator.Observe(1, now)
-		return false
-	}
-	n.metrics.getAncestors.numSent.Inc()
-	n.sendFailRateCalculator.Observe(0, now)
-	n.metrics.getAncestors.sentBytes.Add(float64(msgLen))
-	// assume that if [saved] == 0, [msg] wasn't compressed
-	if saved := msg.BytesSavedCompression(); saved != 0 {
-		n.metrics.getAncestors.savedSentBytes.Observe(float64(saved))
-	}
-	return true
-}
-
-// MultiPut implements the Sender interface.
-// Assumes [n.stateLock] is not held.
-func (n *network) SendMultiPut(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte) {
-	now := n.clock.Time()
-
-	// Compress this message only if the peer can handle compressed
-	// messages and we have compression enabled
-	msg, err := n.b.MultiPut(chainID, requestID, containers, n.config.CompressionEnabled)
-	if err != nil {
-		n.log.Error("failed to build MultiPut message because of container of size %d", len(containers))
-		n.sendFailRateCalculator.Observe(1, now)
-		return
-	}
-
-	msgLen := len(msg.Bytes())
-	if peer := n.getPeer(nodeID); peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
-		n.log.Debug("failed to send MultiPut(%s, %s, %d, %d)",
-			nodeID,
-			chainID,
-			requestID,
-			len(containers))
-		n.metrics.multiPut.numFailed.Inc()
-		n.sendFailRateCalculator.Observe(1, now)
-	} else {
-		n.metrics.multiPut.numSent.Inc()
-		n.sendFailRateCalculator.Observe(0, now)
-		n.metrics.multiPut.sentBytes.Add(float64(msgLen))
-		// assume that if [saved] == 0, [msg] wasn't compressed
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			n.metrics.multiPut.savedSentBytes.Observe(float64(saved))
-		}
-	}
-}
-
-// Get implements the Sender interface.
-// Assumes [n.stateLock] is not held.
-func (n *network) SendGet(nodeID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool {
-	now := n.clock.Time()
-
-	msg, err := n.b.Get(chainID, requestID, uint64(deadline), containerID)
-	n.log.AssertNoError(err)
-
-	msgLen := len(msg.Bytes())
-	peer := n.getPeer(nodeID)
-	if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
-		n.log.Debug("failed to send Get(%s, %s, %d, %s)",
-			nodeID,
-			chainID,
-			requestID,
-			containerID)
-		n.metrics.get.numFailed.Inc()
-		n.sendFailRateCalculator.Observe(1, now)
-		return false
-	}
-	n.metrics.get.numSent.Inc()
-	n.sendFailRateCalculator.Observe(0, now)
-	n.metrics.get.sentBytes.Add(float64(msgLen))
-	// assume that if [saved] == 0, [msg] wasn't compressed
-	if saved := msg.BytesSavedCompression(); saved != 0 {
-		n.metrics.get.savedSentBytes.Observe(float64(saved))
-	}
-	return true
-}
-
-// Put implements the Sender interface.
-// Assumes [n.stateLock] is not held.
-func (n *network) SendPut(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
-	now := n.clock.Time()
-
-	// Compress this message only if the peer can handle compressed
-	// messages and we have compression enabled
-	msg, err := n.b.Put(chainID, requestID, containerID, container, n.config.CompressionEnabled)
-	if err != nil {
-		n.log.Error("failed to build Put(%s, %d, %s): %s. len(container) : %d",
-			chainID,
-			requestID,
-			containerID,
-			err,
-			len(container))
-		n.sendFailRateCalculator.Observe(1, now)
-		return
-	}
-	msgLen := len(msg.Bytes())
-
-	if peer := n.getPeer(nodeID); peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
-		n.log.Debug("failed to send Put(%s, %s, %d, %s)",
-			nodeID,
-			chainID,
-			requestID,
-			containerID)
-		n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
-		n.metrics.put.numFailed.Inc()
-		n.sendFailRateCalculator.Observe(1, now)
-	} else {
-		n.metrics.put.numSent.Inc()
-		n.sendFailRateCalculator.Observe(0, now)
-		n.metrics.put.sentBytes.Add(float64(msgLen))
-		// assume that if [saved] == 0, [msg] wasn't compressed
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			n.metrics.put.savedSentBytes.Observe(float64(saved))
-		}
-	}
-}
-
-// PushQuery implements the Sender interface.
-// Assumes [n.stateLock] is not held.
-func (n *network) SendPushQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID, container []byte) []ids.ShortID {
-	now := n.clock.Time()
-
-	msg, err := n.b.PushQuery(chainID, requestID, uint64(deadline), containerID, container, n.config.CompressionEnabled)
-	if err != nil {
-		n.log.Error("failed to build PushQuery(%s, %d, %s): %s. len(container): %d",
-			chainID,
-			requestID,
-			containerID,
-			err,
-			len(container))
-		n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
-		n.sendFailRateCalculator.Observe(1, now)
-		return nil // Packing message failed
-	}
-
-	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
-	for _, peerElement := range n.getPeerElements(nodeIDs) {
-		peer := peerElement.peer
-		vID := peerElement.id
-		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
-			n.log.Debug("failed to send PushQuery(%s, %s, %d, %s)",
-				vID,
-				chainID,
-				requestID,
-				containerID)
-			n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
-			n.metrics.pushQuery.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, now)
-		} else {
-			sentTo = append(sentTo, vID)
-			n.metrics.pushQuery.numSent.Inc()
-			n.sendFailRateCalculator.Observe(0, now)
-			n.metrics.pushQuery.sentBytes.Add(float64(len(msg.Bytes())))
-			// assume that if [saved] == 0, [msg] wasn't compressed
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.pushQuery.savedSentBytes.Observe(float64(saved))
-			}
-		}
-	}
-	return sentTo
-}
-
-// PullQuery implements the Sender interface.
-// Assumes [n.stateLock] is not held.
-func (n *network) SendPullQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) []ids.ShortID {
-	now := n.clock.Time()
-
-	msg, err := n.b.PullQuery(chainID, requestID, uint64(deadline), containerID)
-	n.log.AssertNoError(err)
-	msgLen := len(msg.Bytes())
-
-	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
-	for _, peerElement := range n.getPeerElements(nodeIDs) {
-		peer := peerElement.peer
-		vID := peerElement.id
-		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
-			n.log.Debug("failed to send PullQuery(%s, %s, %d, %s)",
-				vID,
-				chainID,
-				requestID,
-				containerID)
-			n.metrics.pullQuery.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, now)
-		} else {
-			sentTo = append(sentTo, vID)
-			n.metrics.pullQuery.numSent.Inc()
-			n.sendFailRateCalculator.Observe(0, now)
-			n.metrics.pullQuery.sentBytes.Add(float64(msgLen))
-			// assume that if [saved] == 0, [msg] wasn't compressed
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.pullQuery.savedSentBytes.Observe(float64(saved))
-			}
-		}
-	}
-	return sentTo
-}
-
-// Chits implements the Sender interface.
-// Assumes [n.stateLock] is not held.
-func (n *network) SendChits(nodeID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID) {
-	now := n.clock.Time()
-
-	peer := n.getPeer(nodeID)
-	msg, err := n.b.Chits(chainID, requestID, votes)
-	if err != nil {
-		n.log.Error("failed to build Chits(%s, %d, %s): %s",
-			chainID,
-			requestID,
-			votes,
-			err)
-		n.sendFailRateCalculator.Observe(1, now)
-		return
-	}
-	msgLen := len(msg.Bytes())
-
-	if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
-		n.log.Debug("failed to send Chits(%s, %s, %d, %s)",
-			nodeID,
-			chainID,
-			requestID,
-			votes)
-		n.metrics.chits.numFailed.Inc()
-		n.sendFailRateCalculator.Observe(1, now)
-	} else {
-		n.sendFailRateCalculator.Observe(0, now)
-		n.metrics.chits.numSent.Inc()
-		n.metrics.chits.sentBytes.Add(float64(msgLen))
-		// assume that if [saved] == 0, [msg] wasn't compressed
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			n.metrics.chits.savedSentBytes.Observe(float64(saved))
-		}
-	}
-}
-
-// AppRequest implements the Sender interface.
-// assumes the stateLock is not held.
-func (n *network) SendAppRequest(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, appRequestBytes []byte) []ids.ShortID {
-	now := n.clock.Time()
-
-	msg, err := n.b.AppRequest(chainID, requestID, uint64(deadline), appRequestBytes, n.config.CompressionEnabled)
-	if err != nil {
-		n.log.Error("failed to build AppRequest(%s, %d): %s", chainID, requestID, err)
-		n.log.Verbo("message: %s", formatting.DumpBytes{Bytes: appRequestBytes})
-		n.sendFailRateCalculator.Observe(1, now)
-		return nil
-	}
-
-	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
-	for _, peerElement := range n.getPeerElements(nodeIDs) {
-		peer := peerElement.peer
-		nodeID := peerElement.id
-		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
-			n.log.Debug("failed to send AppRequest(%s, %s, %d)", nodeID, chainID, requestID)
-			n.log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appRequestBytes})
-			n.metrics.appRequest.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, now)
-		} else {
-			sentTo = append(sentTo, nodeID)
-			n.metrics.appRequest.numSent.Inc()
-			n.sendFailRateCalculator.Observe(0, now)
-			n.metrics.appRequest.sentBytes.Add(float64(len(msg.Bytes())))
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.appRequest.savedSentBytes.Observe(float64(saved))
-			}
-		}
-	}
-	return sentTo
-}
-
-// AppResponse implements the Sender interface.
-// assumes the stateLock is not held.
-func (n *network) SendAppResponse(nodeID ids.ShortID, chainID ids.ID, requestID uint32, appResponse []byte) {
-	now := n.clock.Time()
-
-	msg, err := n.b.AppResponse(chainID, requestID, appResponse, n.config.CompressionEnabled)
-	if err != nil {
-		n.log.Error("failed to build AppResponse(%s, %d): %s", chainID, requestID, err)
-		n.log.Verbo("message: %s", formatting.DumpBytes{Bytes: appResponse})
-		n.sendFailRateCalculator.Observe(1, now)
-		return
-	}
-
-	peer := n.getPeer(nodeID)
-	if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
-		n.log.Debug("failed to send AppResponse(%s, %s, %d)", nodeID, chainID, requestID)
-		n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: appResponse})
-		n.metrics.appResponse.numFailed.Inc()
-		n.sendFailRateCalculator.Observe(1, now)
-	} else {
-		n.metrics.appResponse.numSent.Inc()
-		n.sendFailRateCalculator.Observe(0, now)
-		n.metrics.appResponse.sentBytes.Add(float64(len(msg.Bytes())))
-		if saved := msg.BytesSavedCompression(); saved != 0 {
-			n.metrics.appResponse.savedSentBytes.Observe(float64(saved))
-		}
-	}
-}
-
-// AppGossip implements the Sender interface.
-// assumes the stateLock is not held.
-func (n *network) SendAppGossip(subnetID, chainID ids.ID, appGossipBytes []byte, validatorOnly bool) {
-	n.stateLock.RLock()
-	// Gossip the message to [n.config.AppGossipNonValidatorSize] random nodes
-	// in the network. If this is a validator only subnet, selects only validators.
-	peersAll, err := n.peers.sample(subnetID, validatorOnly, int(n.config.AppGossipNonValidatorSize))
-	if err != nil {
-		n.log.Debug("failed to sample %d peers for AppGossip: %s", n.config.AppGossipNonValidatorSize, err)
-		n.stateLock.RUnlock()
-		return
-	}
-
-	// Gossip the message to [n.config.AppGossipValidatorSize] random validators
-	// in the network. This does not gossip by stake - but uniformly to the
-	// validator set.
-	peersValidators, err := n.peers.sample(subnetID, true, int(n.config.AppGossipValidatorSize))
-	n.stateLock.RUnlock()
-	if err != nil {
-		n.log.Debug("failed to sample %d validators for AppGossip: %s", n.config.AppGossipValidatorSize, err)
-		return
-	}
-	peersAll = append(peersAll, peersValidators...)
-	if err := n.appGossipPeers(peersAll, chainID, appGossipBytes); err != nil {
-		n.log.Debug("failed to SendAppGossip(%s, %s): %s", chainID, err)
-		n.log.Verbo("message:\n%s", formatting.DumpBytes{Bytes: appGossipBytes})
-	}
-}
-
-// SendAppGossipSpecific attempts to gossip the container to specific peers.
-func (n *network) SendAppGossipSpecific(nodeIDs ids.ShortSet, subnetID, chainID ids.ID, appGossipBytes []byte, validatorOnly bool) {
-	peers := n.getSubnetPeers(nodeIDs, subnetID, validatorOnly)
-	if err := n.appGossipPeers(peers, chainID, appGossipBytes); err != nil {
-		n.log.Debug("failed to SendAppGossipSpecific(%s, %s): %s", chainID, err)
-		n.log.Verbo("message:\n%s", formatting.DumpBytes{Bytes: appGossipBytes})
-	}
-}
-
-// SendGossip attempts to gossip the container to the network
-// Assumes [n.stateLock] is not held.
-func (n *network) SendGossip(subnetID, chainID, containerID ids.ID, container []byte, validatorOnly bool) {
-	if err := n.gossipContainer(subnetID, chainID, containerID, container, n.config.GossipAcceptedFrontierSize, validatorOnly); err != nil {
-		n.log.Debug("failed to Gossip(%s, %s): %s", chainID, containerID, err)
-		n.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
-	}
+	return n.send(msg, true, peers)
 }
 
 // Accept is called after every consensus decision
@@ -874,12 +364,108 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 		// don't gossip during bootstrapping
 		return nil
 	}
-	return n.gossipContainer(ctx.SubnetID, ctx.ChainID, containerID, container, n.config.GossipOnAcceptSize, ctx.IsValidatorOnly())
+
+	now := n.clock.Time()
+	msg, err := n.mc.Put(ctx.ChainID, constants.GossipMsgRequestID, containerID, container)
+	if err != nil {
+		n.log.Debug("failed to build Put message for gossip (%s, %s): %s", ctx.ChainID, containerID, err)
+		n.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
+		n.sendFailRateCalculator.Observe(1, now)
+		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
+	}
+
+	n.Gossip(msg, ctx.SubnetID, ctx.IsValidatorOnly(), 0, int(n.config.GossipOnAcceptSize))
+	return nil
 }
 
-// shouldUpgradeIncoming returns whether we should
-// upgrade an incoming connection from a peer
-// at the IP whose string repr. is [ipStr].
+// Select peers to gossip to.
+func (n *network) selectPeersForGossip(subnetID ids.ID, validatorOnly bool, numValidatorsToSample, numNonValidatorsToSample int) ([]*peer, error) {
+	n.stateLock.RLock()
+	// Gossip the message to numNonValidatorsToSample random nodes in the
+	// network. If this is a validator only subnet, selects only validators.
+	peersAll, err := n.peers.sample(subnetID, validatorOnly, numNonValidatorsToSample)
+	if err != nil {
+		n.log.Debug("failed to sample %d peers: %s", numNonValidatorsToSample, err)
+		n.stateLock.RUnlock()
+		return nil, err
+	}
+
+	// Gossip the message to numValidatorsToSample random validators in the
+	// network. This does not gossip by stake - but uniformly to the validator
+	// set.
+	peersValidators, err := n.peers.sample(subnetID, true, numValidatorsToSample)
+	n.stateLock.RUnlock()
+	if err != nil {
+		n.log.Debug("failed to sample %d validators: %s", numValidatorsToSample, err)
+		return nil, err
+	}
+	peersAll = append(peersAll, peersValidators...)
+	return peersAll, nil
+}
+
+// Send the message to the provided peers.
+//
+// Send takes ownership of the provided message reference. So, the provided
+// message should only be inspected if the reference has been externally
+// increased.
+//
+// Assumes stateLock is not held.
+func (n *network) send(msg message.OutboundMessage, connectedOnly bool, peers []*peer) ids.ShortSet {
+	var (
+		now    = n.clock.Time()
+		msgLen = len(msg.Bytes())
+		sentTo = ids.NewShortSet(len(peers))
+		op     = msg.Op()
+	)
+
+	msgMetrics := n.metrics.messageMetrics[op]
+	if msgMetrics == nil {
+		n.log.Error("unregistered metric for message with op %s. Dropping it", op)
+
+		// The message wasn't passed to any peers, so we can remove the
+		// reference that was added.
+		msg.DecRef()
+		return sentTo
+	}
+
+	// send to peer and update metrics
+	// note: peer may be nil
+	for _, peer := range peers {
+		// Add a reference to the message so that if it is sent, it won't be
+		// collected until it is done being processed.
+		msg.AddRef()
+		if peer != nil &&
+			(!connectedOnly || peer.finishedHandshake.GetValue()) &&
+			!sentTo.Contains(peer.nodeID) &&
+			peer.Send(msg) {
+			sentTo.Add(peer.nodeID)
+
+			// record metrics for success
+			n.sendFailRateCalculator.Observe(0, now)
+			msgMetrics.numSent.Inc()
+			msgMetrics.sentBytes.Add(float64(msgLen))
+			if saved := msg.BytesSavedCompression(); saved != 0 {
+				msgMetrics.savedSentBytes.Observe(float64(saved))
+			}
+		} else {
+			// record metrics for failure
+			n.sendFailRateCalculator.Observe(1, now)
+			msgMetrics.numFailed.Inc()
+
+			// The message wasn't passed to the peer, so we should remove the
+			// reference that was added.
+			msg.DecRef()
+		}
+	}
+
+	// The message has been passed to all peers that it will be sent to, so we
+	// can decrease the sender reference now.
+	msg.DecRef()
+	return sentTo
+}
+
+// shouldUpgradeIncoming returns whether we should upgrade an incoming
+// connection from a peer at the IP whose string repr. is [ipStr].
 // Assumes stateLock is not held.
 func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 	n.stateLock.RLock()
@@ -911,8 +497,9 @@ func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 }
 
 // shouldHoldConnection returns true if this node should have a connection to
-// the provided peerID. If the node is attempting to connect to the minimum number of peers, then it should only connect
-// if this node is a validator, or the peer is a validator/beacon.
+// the provided peerID. If the node is attempting to connect to the minimum
+// number of peers, then it should only connect if this node is a validator, or
+// the peer is a validator/beacon.
 func (n *network) shouldHoldConnection(peerID ids.ShortID) bool {
 	return !n.config.RequireValidatorToConnect ||
 		n.config.Validators.Contains(constants.PrimaryNetworkID, n.config.MyNodeID) ||
@@ -1098,77 +685,6 @@ func (n *network) IP() utils.IPDesc {
 	return n.currentIP.IP()
 }
 
-// Assumes [n.stateLock] is not held.
-func (n *network) gossipContainer(subnetID, chainID, containerID ids.ID, container []byte, numToGossip uint, validatorOnly bool) error {
-	now := n.clock.Time()
-
-	// Sent to peers that handle compressed messages (and messages with the isCompress flag)
-	msg, err := n.b.Put(chainID, constants.GossipMsgRequestID, containerID, container, n.config.CompressionEnabled)
-	if err != nil {
-		n.sendFailRateCalculator.Observe(1, now)
-		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
-	}
-
-	n.stateLock.RLock()
-	peers, err := n.peers.sample(subnetID, validatorOnly, int(numToGossip))
-	n.stateLock.RUnlock()
-	if err != nil {
-		return err
-	}
-
-	for _, peer := range peers {
-		sent := peer.Send(msg, false)
-		if sent {
-			n.metrics.put.numSent.Inc()
-			n.metrics.put.sentBytes.Add(float64(len(msg.Bytes())))
-			// assume that if [saved] == 0, [msg] wasn't compressed
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.put.savedSentBytes.Observe(float64(saved))
-			}
-			n.sendFailRateCalculator.Observe(0, now)
-		} else {
-			n.sendFailRateCalculator.Observe(1, now)
-			n.metrics.put.numFailed.Inc()
-		}
-	}
-	return nil
-}
-
-// helper method for SendAppGossip/SendAppGossipSpecific
-func (n *network) appGossipPeers(peers []*peer, chainID ids.ID, appGossipBytes []byte) error {
-	now := n.clock.Time()
-
-	msg, err := n.b.AppGossip(chainID, appGossipBytes, n.config.CompressionEnabled)
-	if err != nil {
-		n.sendFailRateCalculator.Observe(1, now)
-		return fmt.Errorf("failed to build AppGossip(%s): %w", chainID, err)
-	}
-
-	sentPeers := ids.NewShortSet(len(peers))
-	for _, peer := range peers {
-		// should never be nil but just in case
-		if peer == nil || sentPeers.Contains(peer.nodeID) {
-			continue
-		}
-		sentPeers.Add(peer.nodeID)
-		sent := peer.Send(msg, false)
-		if !sent {
-			n.log.Debug("failed to send AppGossip(%s, %s)", peer.nodeID, chainID)
-			n.log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
-			n.metrics.appGossip.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, now)
-		} else {
-			n.metrics.appGossip.numSent.Inc()
-			n.metrics.appGossip.sentBytes.Add(float64(len(msg.Bytes())))
-			n.sendFailRateCalculator.Observe(0, now)
-			if saved := msg.BytesSavedCompression(); saved != 0 {
-				n.metrics.appGossip.savedSentBytes.Observe(float64(saved))
-			}
-		}
-	}
-	return nil
-}
-
 // assumes the stateLock is held.
 // Try to connect to [nodeID] at [ip].
 func (n *network) track(ip utils.IPDesc, nodeID ids.ShortID) {
@@ -1211,59 +727,6 @@ func (n *network) gossipPeerList() {
 			return
 		}
 
-		allPeers := n.getAllPeers()
-		if len(allPeers) == 0 {
-			continue
-		}
-
-		stakers := make([]*peer, 0, len(allPeers))
-		nonStakers := make([]*peer, 0, len(allPeers))
-		for _, peer := range allPeers {
-			if n.config.Validators.Contains(constants.PrimaryNetworkID, peer.nodeID) {
-				stakers = append(stakers, peer)
-			} else {
-				nonStakers = append(nonStakers, peer)
-			}
-		}
-
-		numStakersToSend := int((n.config.PeerListGossipSize + n.config.PeerListStakerGossipFraction - 1) / n.config.PeerListStakerGossipFraction)
-		if len(stakers) < numStakersToSend {
-			numStakersToSend = len(stakers)
-		}
-		numNonStakersToSend := int(n.config.PeerListGossipSize) - numStakersToSend
-		if len(nonStakers) < numNonStakersToSend {
-			numNonStakersToSend = len(nonStakers)
-		}
-
-		s := sampler.NewUniform()
-		if err := s.Initialize(uint64(len(stakers))); err != nil {
-			n.log.Error("failed to select stakers to sample: %s. len(stakers): %d",
-				err,
-				len(stakers))
-			continue
-		}
-		stakerIndices, err := s.Sample(numStakersToSend)
-		if err != nil {
-			n.log.Error("failed to select stakers to sample: %s. len(stakers): %d",
-				err,
-				len(stakers))
-			continue
-		}
-
-		if err := s.Initialize(uint64(len(nonStakers))); err != nil {
-			n.log.Error("failed to select non-stakers to sample: %s. len(nonStakers): %d",
-				err,
-				len(nonStakers))
-			continue
-		}
-		nonStakerIndices, err := s.Sample(numNonStakersToSend)
-		if err != nil {
-			n.log.Error("failed to select non-stakers to sample: %s. len(nonStakers): %d",
-				err,
-				len(nonStakers))
-			continue
-		}
-
 		ipCerts, err := n.validatorIPs()
 		if err != nil {
 			n.log.Error("failed to fetch validator IPs: %s", err)
@@ -1275,8 +738,7 @@ func (n *network) gossipPeerList() {
 			continue
 		}
 
-		// Sent to peers that handle compressed messages (and messages with the isCompress flag)
-		msg, err := n.b.PeerList(ipCerts, n.config.CompressionEnabled)
+		msg, err := n.mc.PeerList(ipCerts)
 		if err != nil {
 			n.log.Error("failed to build signed peerlist to gossip: %s. len(ips): %d",
 				err,
@@ -1284,14 +746,10 @@ func (n *network) gossipPeerList() {
 			continue
 		}
 
-		for _, index := range stakerIndices {
-			peer := stakers[int(index)]
-			peer.Send(msg, false)
-		}
-		for _, index := range nonStakerIndices {
-			peer := nonStakers[int(index)]
-			peer.Send(msg, false)
-		}
+		numStakersToSend := int((n.config.PeerListGossipSize + n.config.PeerListStakerGossipFraction - 1) / n.config.PeerListStakerGossipFraction)
+		numNonStakersToSend := int(n.config.PeerListGossipSize) - numStakersToSend
+
+		n.Gossip(msg, constants.PrimaryNetworkID, false, numStakersToSend, numNonStakersToSend)
 	}
 }
 
@@ -1688,7 +1146,7 @@ func (n *network) getPeerElements(nodeIDs ids.ShortSet) []*peerElement {
 
 // Safe copy the peers
 // Assumes [n.stateLock] is not held.
-func (n *network) getSubnetPeers(nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) []*peer {
+func (n *network) getPeers(nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) []*peer {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
@@ -1696,48 +1154,21 @@ func (n *network) getSubnetPeers(nodeIDs ids.ShortSet, subnetID ids.ID, validato
 		return nil
 	}
 
-	peers := make([]*peer, 0, nodeIDs.Len())
+	var (
+		peers = make([]*peer, nodeIDs.Len())
+		index int
+	)
 	for nodeID := range nodeIDs {
 		peer, ok := n.peers.getByID(nodeID)
-		if ok && peer.finishedHandshake.GetValue() && peer.trackedSubnets.Contains(subnetID) && (!validatorOnly || n.config.Validators.Contains(subnetID, nodeID)) {
-			peers = append(peers, peer)
+		if ok &&
+			peer.finishedHandshake.GetValue() &&
+			(subnetID == constants.PrimaryNetworkID || peer.trackedSubnets.Contains(subnetID)) &&
+			(!validatorOnly || n.config.Validators.Contains(subnetID, nodeID)) {
+			peers[index] = peer
 		}
+		index++
 	}
 	return peers
-}
-
-// Returns a copy of the peer set.
-// Only includes peers that have finished the handshake.
-// Assumes [n.stateLock] is not held.
-func (n *network) getAllPeers() []*peer {
-	n.stateLock.RLock()
-	defer n.stateLock.RUnlock()
-
-	if n.closed.GetValue() {
-		return nil
-	}
-
-	peers := make([]*peer, 0, n.peers.size())
-	for _, peer := range n.peers.peersList {
-		if peer.finishedHandshake.GetValue() {
-			peers = append(peers, peer)
-		}
-	}
-	return peers
-}
-
-// Safe find a single peer
-// Assumes [n.stateLock] is not held.
-func (n *network) getPeer(nodeID ids.ShortID) *peer {
-	n.stateLock.RLock()
-	defer n.stateLock.RUnlock()
-
-	if n.closed.GetValue() {
-		return nil
-	}
-
-	res, _ := n.peers.getByID(nodeID) // note: peer may be nil
-	return res
 }
 
 // HealthCheck returns information about several network layer health checks.

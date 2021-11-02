@@ -178,7 +178,7 @@ func (tx *UniqueTx) Accept() error {
 		return fmt.Errorf("ExecuteWithSideEffects errored while processing tx %s: %w", txID, err)
 	}
 
-	tx.vm.pubsub.Publish(txID, NewPubSubFilterer(tx.Tx))
+	tx.vm.pubsub.Publish(NewPubSubFilterer(tx.Tx))
 	tx.vm.walletService.decided(txID)
 
 	tx.deps = nil // Needed to prevent a memory leak

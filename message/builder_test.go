@@ -19,26 +19,29 @@ import (
 )
 
 var (
-	TestBuilder Builder
-	TestCodec   Codec
+	UncompressingBuilder OutboundMsgBuilder
+	TestCodec            Codec
+
+	dummyNodeID             = ids.ShortEmpty
+	dummyOnFinishedHandling = func() {}
 )
 
 func init() {
-	codec, err := NewCodec("", prometheus.NewRegistry(), 2*units.MiB)
+	codec, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB)
 	if err != nil {
 		panic(err)
 	}
 	TestCodec = codec
-	TestBuilder = NewBuilder(codec)
+	UncompressingBuilder = NewOutboundBuilder(codec, false /*compress*/)
 }
 
 func TestBuildGetVersion(t *testing.T) {
-	msg, err := TestBuilder.GetVersion()
+	msg, err := UncompressingBuilder.GetVersion()
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, GetVersion, msg.Op())
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes())
+	parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, GetVersion, parsedMsg.Op())
@@ -51,12 +54,13 @@ func TestBuildVersion(t *testing.T) {
 	ip := utils.IPDesc{
 		IP: net.IPv4(1, 2, 3, 4),
 	}
+
 	myVersion := version.NewDefaultVersion(1, 2, 3).String()
 	myVersionTime := uint64(time.Now().Unix())
 	sig := make([]byte, 65)
 	subnetID := ids.Empty.Prefix(1)
 	subnetIDs := [][]byte{subnetID[:]}
-	msg, err := TestBuilder.Version(
+	msg, err := UncompressingBuilder.Version(
 		networkID,
 		nodeID,
 		myTime,
@@ -70,7 +74,7 @@ func TestBuildVersion(t *testing.T) {
 	assert.NotNil(t, msg)
 	assert.Equal(t, Version, msg.Op())
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes())
+	parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
@@ -86,12 +90,12 @@ func TestBuildVersion(t *testing.T) {
 }
 
 func TestBuildGetPeerList(t *testing.T) {
-	msg, err := TestBuilder.GetPeerList()
+	msg, err := UncompressingBuilder.GetPeerList()
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, GetPeerList, msg.Op())
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes())
+	parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, GetPeerList, parsedMsg.Op())
@@ -102,12 +106,12 @@ func TestBuildGetAcceptedFrontier(t *testing.T) {
 	requestID := uint32(5)
 	deadline := uint64(15)
 
-	msg, err := TestBuilder.GetAcceptedFrontier(chainID, requestID, deadline)
+	msg, err := UncompressingBuilder.GetAcceptedFrontier(chainID, requestID, time.Duration(deadline))
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, GetAcceptedFrontier, msg.Op())
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes())
+	parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, GetAcceptedFrontier, parsedMsg.Op())
@@ -122,12 +126,12 @@ func TestBuildAcceptedFrontier(t *testing.T) {
 	containerID := ids.Empty.Prefix(1)
 	containerIDs := [][]byte{containerID[:]}
 
-	msg, err := TestBuilder.AcceptedFrontier(chainID, requestID, []ids.ID{containerID})
+	msg, err := UncompressingBuilder.AcceptedFrontier(chainID, requestID, []ids.ID{containerID})
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, AcceptedFrontier, msg.Op())
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes())
+	parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, AcceptedFrontier, parsedMsg.Op())
@@ -143,12 +147,12 @@ func TestBuildGetAccepted(t *testing.T) {
 	containerID := ids.Empty.Prefix(1)
 	containerIDs := [][]byte{containerID[:]}
 
-	msg, err := TestBuilder.GetAccepted(chainID, requestID, deadline, []ids.ID{containerID})
+	msg, err := UncompressingBuilder.GetAccepted(chainID, requestID, time.Duration(deadline), []ids.ID{containerID})
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, GetAccepted, msg.Op())
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes())
+	parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, GetAccepted, parsedMsg.Op())
@@ -164,12 +168,12 @@ func TestBuildAccepted(t *testing.T) {
 	containerID := ids.Empty.Prefix(1)
 	containerIDs := [][]byte{containerID[:]}
 
-	msg, err := TestBuilder.Accepted(chainID, requestID, []ids.ID{containerID})
+	msg, err := UncompressingBuilder.Accepted(chainID, requestID, []ids.ID{containerID})
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, Accepted, msg.Op())
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes())
+	parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, Accepted, parsedMsg.Op())
@@ -184,12 +188,12 @@ func TestBuildGet(t *testing.T) {
 	deadline := uint64(15)
 	containerID := ids.Empty.Prefix(1)
 
-	msg, err := TestBuilder.Get(chainID, requestID, deadline, containerID)
+	msg, err := UncompressingBuilder.Get(chainID, requestID, time.Duration(deadline), containerID)
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, Get, msg.Op())
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes())
+	parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, Get, parsedMsg.Op())
@@ -206,12 +210,13 @@ func TestBuildPut(t *testing.T) {
 	container := []byte{2}
 
 	for _, compress := range []bool{false, true} {
-		msg, err := TestBuilder.Put(chainID, requestID, containerID, container, compress)
+		builder := NewOutboundBuilder(TestCodec, compress)
+		msg, err := builder.Put(chainID, requestID, containerID, container)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, Put, msg.Op())
 
-		parsedMsg, err := TestCodec.Parse(msg.Bytes())
+		parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 		assert.NoError(t, err)
 		assert.NotNil(t, parsedMsg)
 		assert.Equal(t, Put, parsedMsg.Op())
@@ -230,12 +235,13 @@ func TestBuildPushQuery(t *testing.T) {
 	container := []byte{2}
 
 	for _, compress := range []bool{false, true} {
-		msg, err := TestBuilder.PushQuery(chainID, requestID, deadline, containerID, container, compress)
+		builder := NewOutboundBuilder(TestCodec, compress)
+		msg, err := builder.PushQuery(chainID, requestID, time.Duration(deadline), containerID, container)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, PushQuery, msg.Op())
 
-		parsedMsg, err := TestCodec.Parse(msg.Bytes())
+		parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 		assert.NoError(t, err)
 		assert.NotNil(t, parsedMsg)
 		assert.Equal(t, PushQuery, parsedMsg.Op())
@@ -253,12 +259,12 @@ func TestBuildPullQuery(t *testing.T) {
 	deadline := uint64(15)
 	containerID := ids.Empty.Prefix(1)
 
-	msg, err := TestBuilder.PullQuery(chainID, requestID, deadline, containerID)
+	msg, err := UncompressingBuilder.PullQuery(chainID, requestID, time.Duration(deadline), containerID)
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, PullQuery, msg.Op())
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes())
+	parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, PullQuery, parsedMsg.Op())
@@ -274,12 +280,12 @@ func TestBuildChits(t *testing.T) {
 	containerID := ids.Empty.Prefix(1)
 	containerIDs := [][]byte{containerID[:]}
 
-	msg, err := TestBuilder.Chits(chainID, requestID, []ids.ID{containerID})
+	msg, err := UncompressingBuilder.Chits(chainID, requestID, []ids.ID{containerID})
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, Chits, msg.Op())
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes())
+	parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, Chits, parsedMsg.Op())
@@ -296,12 +302,13 @@ func TestBuildMultiPut(t *testing.T) {
 	containers := [][]byte{container[:], container2[:]}
 
 	for _, compress := range []bool{false, true} {
-		msg, err := TestBuilder.MultiPut(chainID, requestID, containers, compress)
+		builder := NewOutboundBuilder(TestCodec, compress)
+		msg, err := builder.MultiPut(chainID, requestID, containers)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, MultiPut, msg.Op())
 
-		parsedMsg, err := TestCodec.Parse(msg.Bytes())
+		parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 		assert.NoError(t, err)
 		assert.NotNil(t, parsedMsg)
 		assert.Equal(t, MultiPut, parsedMsg.Op())
@@ -319,12 +326,13 @@ func TestBuildAppRequestMsg(t *testing.T) {
 	deadline := uint64(time.Now().Unix())
 
 	for _, compress := range []bool{false, true} {
-		msg, err := TestBuilder.AppRequest(chainID, 1, deadline, appRequestBytes, compress)
+		builder := NewOutboundBuilder(TestCodec, compress)
+		msg, err := builder.AppRequest(chainID, 1, time.Duration(deadline), appRequestBytes)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, AppRequest, msg.Op())
 
-		parsedMsg, err := TestCodec.Parse(msg.Bytes())
+		parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 		assert.NoError(t, err)
 		assert.NotNil(t, parsedMsg)
 		assert.Equal(t, AppRequest, parsedMsg.Op())
@@ -338,17 +346,18 @@ func TestBuildAppResponseMsg(t *testing.T) {
 	appResponseBytes[len(appResponseBytes)-1] = 1
 
 	for _, compress := range []bool{false, true} {
-		msg, err := TestBuilder.AppResponse(chainID, 1, appResponseBytes, compress)
+		builder := NewOutboundBuilder(TestCodec, compress)
+		msg, err := builder.AppResponse(chainID, 1, appResponseBytes)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, AppResponse, msg.Op())
 
-		parsedMsg, err := TestCodec.Parse(msg.Bytes())
+		parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, AppResponse, msg.Op())
 		assert.EqualValues(t, 1, parsedMsg.Get(RequestID))
-		assert.Equal(t, appResponseBytes, parsedMsg.Get(AppResponseBytes))
+		assert.Equal(t, appResponseBytes, parsedMsg.Get(AppBytes))
 		assert.Equal(t, chainID[:], parsedMsg.Get(ChainID))
 	}
 }
@@ -360,16 +369,17 @@ func TestBuildAppGossipMsg(t *testing.T) {
 	appGossipBytes[len(appGossipBytes)-1] = 1
 
 	for _, compress := range []bool{false, true} {
-		msg, err := TestBuilder.AppGossip(chainID, appGossipBytes, compress)
+		testBuilder := NewOutboundBuilder(TestCodec, compress)
+		msg, err := testBuilder.AppGossip(chainID, appGossipBytes)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, AppGossip, msg.Op())
 
-		parsedMsg, err := TestCodec.Parse(msg.Bytes())
+		parsedMsg, err := TestCodec.Parse(msg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, AppGossip, msg.Op())
-		assert.Equal(t, appGossipBytes, parsedMsg.Get(AppGossipBytes))
+		assert.Equal(t, appGossipBytes, parsedMsg.Get(AppBytes))
 		assert.Equal(t, chainID[:], parsedMsg.Get(ChainID))
 	}
 }

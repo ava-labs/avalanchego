@@ -278,11 +278,11 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 }
 
 // Connected implements the Engine interface.
-func (b *Bootstrapper) Connected(validatorID ids.ShortID) error {
+func (b *Bootstrapper) Connected(nodeID ids.ShortID) error {
 	if b.started {
 		return nil
 	}
-	weight, ok := b.Beacons.GetWeight(validatorID)
+	weight, ok := b.Beacons.GetWeight(nodeID)
 	if !ok {
 		return nil
 	}
@@ -298,8 +298,8 @@ func (b *Bootstrapper) Connected(validatorID ids.ShortID) error {
 }
 
 // Disconnected implements the Engine interface.
-func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
-	if weight, ok := b.Beacons.GetWeight(validatorID); ok {
+func (b *Bootstrapper) Disconnected(nodeID ids.ShortID) error {
+	if weight, ok := b.Beacons.GetWeight(nodeID); ok {
 		// TODO: Account for weight changes in a more robust manner.
 
 		// Sub64 should rarely error since only validators that have added their

@@ -87,7 +87,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.addConnection(conn)
 }
 
-func (s *Server) Publish(msg interface{}, parser Filterer) {
+func (s *Server) Publish(parser Filterer) {
 	conns := s.subscribedConnections.Conns()
 	toNotify, msg := parser.Filter(conns)
 	for i, shouldNotify := range toNotify {

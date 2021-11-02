@@ -20,7 +20,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
@@ -91,7 +91,7 @@ type Auth interface {
 
 type auth struct {
 	// Used to mock time.
-	clock timer.Clock
+	clock mockable.Clock
 
 	log      logging.Logger
 	endpoint string

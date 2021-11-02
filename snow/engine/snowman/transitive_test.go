@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
@@ -2442,7 +2443,7 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 		t.Fatalf("Should have finalized the consensus instance")
 	}
 
-	if te.pending.Len() != 0 {
+	if len(te.pending) != 0 {
 		t.Fatalf("Shouldn't have any pending blocks")
 	}
 }
@@ -2551,7 +2552,7 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 		t.Fatalf("Should have finalized the consensus instance")
 	}
 
-	if te.pending.Len() != 0 {
+	if len(te.pending) != 0 {
 		t.Fatalf("Shouldn't have any pending blocks")
 	}
 }
@@ -2617,5 +2618,224 @@ func TestEngineNonPreferredAmplification(t *testing.T) {
 
 	if err := te.Put(vdr, 0, nonPreferredBlk.ID(), nonPreferredBlk.Bytes()); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// Test that in the following scenario, if block B fails verification, votes will still be
+// bubbled through to the valid block A. This is a regression test to ensure that the consensus
+// engine correctly handles the case that votes can be bubbled correctly through a block that
+// cannot pass verification until one of its ancestors has been marked as accepted.
+//  G
+//  |
+//  A
+//  |
+//  B
+func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
+	vdr, _, sender, vm, te, gBlk := setup(t)
+
+	// [blk1] is a child of [gBlk] and currently passes verification
+	blk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: gBlk.ID(),
+		HeightV: 1,
+		BytesV:  []byte{1},
+	}
+	// [blk2] is a child of [blk1] and cannot pass verification until [blk1]
+	// has been marked as accepted.
+	blk2 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: blk1.ID(),
+		HeightV: 2,
+		BytesV:  []byte{2},
+		VerifyV: errors.New("blk2 does not pass verification until after blk1 is accepted"),
+	}
+
+	// The VM should be able to parse [blk1] and [blk2]
+	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, blk1.Bytes()):
+			return blk1, nil
+		case bytes.Equal(b, blk2.Bytes()):
+			return blk2, nil
+		default:
+			t.Fatalf("Unknown block bytes")
+			return nil, nil
+		}
+	}
+
+	// The VM should only be able to retrieve [gBlk] from storage
+	// TODO GetBlockF should be updated after blocks are verified/accepted
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case gBlk.ID():
+			return gBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	asked := new(bool)
+	reqID := new(uint32)
+	sender.SendGetF = func(inVdr ids.ShortID, requestID uint32, blkID ids.ID) {
+		*reqID = requestID
+		if *asked {
+			t.Fatalf("Asked multiple times")
+		}
+		if blkID != blk1.ID() {
+			t.Fatalf("Expected engine to request blk1")
+		}
+		if inVdr != vdr {
+			t.Fatalf("Expected engine to request blk2 from vdr")
+		}
+		*asked = true
+	}
+	// Receive Gossip message for [blk2] first and expect the sender to issue a Get request for
+	// its ancestor: [blk1].
+	if err := te.Put(vdr, constants.GossipMsgRequestID, blk2.ID(), blk2.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+
+	if !*asked {
+		t.Fatalf("Didn't ask for missing blk1")
+	}
+
+	// Prepare to PushQuery [blk1] after our Get request is fulfilled. We should not PushQuery
+	// [blk2] since it currently fails verification.
+	queried := new(bool)
+	queryRequestID := new(uint32)
+	sender.SendPushQueryF = func(inVdrs ids.ShortSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
+		if *queried {
+			t.Fatalf("Asked multiple times")
+		}
+		*queried = true
+		*queryRequestID = requestID
+		vdrSet := ids.ShortSet{}
+		vdrSet.Add(vdr)
+		if !inVdrs.Equals(vdrSet) {
+			t.Fatalf("Asking wrong validator for preference")
+		}
+		if blk1.ID() != blkID {
+			t.Fatalf("Asking for wrong block")
+		}
+	}
+
+	// Answer the request, this should allow [blk1] to be issued and cause [blk2] to
+	// fail verification.
+	if err := te.Put(vdr, *reqID, blk1.ID(), blk1.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+
+	// now blk1 is verified, vm can return it
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case gBlk.ID():
+			return gBlk, nil
+		case blk1.ID():
+			return blk1, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	if !*queried {
+		t.Fatalf("Didn't ask for preferences regarding blk1")
+	}
+
+	sendReqID := new(uint32)
+	reqVdr := new(ids.ShortID)
+	// Update GetF to produce a more detailed error message in the case that receiving a Chits
+	// message causes us to send another Get request.
+	sender.SendGetF = func(inVdr ids.ShortID, requestID uint32, blkID ids.ID) {
+		switch blkID {
+		case blk1.ID():
+			t.Fatal("Unexpectedly sent a Get request for blk1")
+		case blk2.ID():
+			*sendReqID = requestID
+			*reqVdr = inVdr
+			return
+		default:
+			t.Fatal("Unexpectedly sent a Get request for unknown block")
+		}
+	}
+
+	sender.SendPullQueryF = func(_ ids.ShortSet, _ uint32, blkID ids.ID) {
+		switch blkID {
+		case blk1.ID():
+			t.Fatal("Unexpectedly sent a Get request for blk1")
+		case blk2.ID():
+			t.Fatal("Unexpectedly sent a Get request for blk1")
+		default:
+			t.Fatal("Unexpectedly sent a Get request for unknown block")
+		}
+	}
+
+	// Now we are expecting a Chits message, and we receive it for blk2 instead of blk1
+	// The votes should be bubbled through blk2 despite the fact that it is failing verification.
+	if err := te.Chits(vdr, *queryRequestID, []ids.ID{blk2.ID()}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := te.Put(*reqVdr, *sendReqID, blk2.ID(), blk2.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+
+	// The vote should be bubbled through [blk2], such that [blk1] gets marked as Accepted.
+	if blk1.Status() != choices.Accepted {
+		t.Fatalf("Expected blk1 to be Accepted, but found status: %s", blk1.Status())
+	}
+
+	// Now that [blk1] has been marked as Accepted, [blk2] can pass verification.
+	blk2.VerifyV = nil
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case gBlk.ID():
+			return gBlk, nil
+		case blk1.ID():
+			return blk1, nil
+		case blk2.ID():
+			return blk2, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	*queried = false
+	// Prepare to PushQuery [blk2] after receiving a Gossip message with [blk2].
+	sender.SendPushQueryF = func(inVdrs ids.ShortSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
+		if *queried {
+			t.Fatalf("Asked multiple times")
+		}
+		*queried = true
+		*queryRequestID = requestID
+		vdrSet := ids.ShortSet{}
+		vdrSet.Add(vdr)
+		if !inVdrs.Equals(vdrSet) {
+			t.Fatalf("Asking wrong validator for preference")
+		}
+		if blk2.ID() != blkID {
+			t.Fatalf("Asking for wrong block")
+		}
+	}
+	// Expect that the Engine will send a PushQuery after receiving this Gossip message for [blk2].
+	if err := te.Put(vdr, constants.GossipMsgRequestID, blk2.ID(), blk2.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+
+	if !*queried {
+		t.Fatalf("Didn't ask for preferences regarding blk2")
+	}
+
+	// After a single vote for [blk2], it should be marked as accepted.
+	if err := te.Chits(vdr, *queryRequestID, []ids.ID{blk2.ID()}); err != nil {
+		t.Fatal(err)
+	}
+
+	if blk2.Status() != choices.Accepted {
+		t.Fatalf("Expected blk2 to be Accepted, but found status: %s", blk2.Status())
 	}
 }

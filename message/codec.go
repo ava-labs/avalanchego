@@ -7,12 +7,16 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/compression"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/metric"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -23,47 +27,52 @@ var (
 	_ Codec = &codec{}
 )
 
-type Codec interface {
+type Packer interface {
 	Pack(
 		op Op,
 		fieldValues map[Field]interface{},
 		compress bool,
 	) (OutboundMessage, error)
+}
 
-	Parse(bytes []byte) (InboundMessage, error)
+type Parser interface {
+	SetTime(t time.Time) // useful in UTs
+	Parse(bytes []byte, nodeID ids.ShortID, onFinishedHandling func()) (InboundMessage, error)
+}
+
+type Codec interface {
+	Packer
+	Parser
 }
 
 // codec defines the serialization and deserialization of network messages.
 // It's safe for multiple goroutines to call Pack and Parse concurrently.
 type codec struct {
-	// [getBytes] may return nil.
-	// [getBytes] must be safe for concurrent access by multiple goroutines.
-	getBytes func() []byte
+	// Contains []byte. Used as an optimization.
+	// Can be accessed by multiple goroutines concurrently.
+	byteSlicePool sync.Pool
+
+	clock mockable.Clock
 
 	compressTimeMetrics   map[Op]metric.Averager
 	decompressTimeMetrics map[Op]metric.Averager
 	compressor            compression.Compressor
 }
 
-func NewCodec(namespace string, metrics prometheus.Registerer, maxMessageSize int64) (Codec, error) {
-	return NewCodecWithAllocator(
-		namespace,
-		metrics,
-		func() []byte { return nil },
-		maxMessageSize,
-	)
-}
-
-func NewCodecWithAllocator(namespace string, metrics prometheus.Registerer, getBytes func() []byte, maxMessageSize int64) (Codec, error) {
+func NewCodecWithMemoryPool(namespace string, metrics prometheus.Registerer, maxMessageSize int64) (Codec, error) {
 	c := &codec{
-		getBytes:              getBytes,
-		compressTimeMetrics:   make(map[Op]metric.Averager, len(ops)),
-		decompressTimeMetrics: make(map[Op]metric.Averager, len(ops)),
+		byteSlicePool: sync.Pool{
+			New: func() interface{} {
+				return make([]byte, 0, constants.DefaultByteSliceCap)
+			},
+		},
+		compressTimeMetrics:   make(map[Op]metric.Averager, len(ExternalOps)),
+		decompressTimeMetrics: make(map[Op]metric.Averager, len(ExternalOps)),
 		compressor:            compression.NewGzipCompressor(maxMessageSize),
 	}
 
 	errs := wrappers.Errs{}
-	for _, op := range ops {
+	for _, op := range ExternalOps {
 		if !op.Compressable() {
 			continue
 		}
@@ -86,6 +95,10 @@ func NewCodecWithAllocator(namespace string, metrics prometheus.Registerer, getB
 	return c, errs.Err
 }
 
+func (c *codec) SetTime(t time.Time) {
+	c.clock.Set(t)
+}
+
 // Pack attempts to pack a map of fields into a message.
 // The first byte of the message is the opcode of the message.
 // Uses [buffer] to hold the message's byte repr.
@@ -102,7 +115,7 @@ func (c *codec) Pack(
 		return nil, errBadOp
 	}
 
-	buffer := c.getBytes()
+	buffer := c.byteSlicePool.Get().([]byte)
 	p := wrappers.Packer{
 		MaxSize: math.MaxInt32,
 		Bytes:   buffer[:0],
@@ -129,6 +142,8 @@ func (c *codec) Pack(
 	msg := &outboundMessage{
 		op:    op,
 		bytes: p.Bytes,
+		refs:  1,
+		c:     c,
 	}
 	if !compress {
 		return msg, nil
@@ -154,7 +169,7 @@ func (c *codec) Pack(
 
 // Parse attempts to convert bytes into a message.
 // The first byte of the message is the opcode of the message.
-func (c *codec) Parse(bytes []byte) (InboundMessage, error) {
+func (c *codec) Parse(bytes []byte, nodeID ids.ShortID, onFinishedHandling func()) (InboundMessage, error) {
 	p := wrappers.Packer{Bytes: bytes}
 
 	// Unpack the op code (message type)
@@ -207,9 +222,17 @@ func (c *codec) Parse(bytes []byte) (InboundMessage, error) {
 		return nil, fmt.Errorf("expected length %d but got %d", len(p.Bytes), p.Offset)
 	}
 
+	var expirationTime time.Time
+	if deadline, hasDeadline := fieldValues[Deadline]; hasDeadline {
+		expirationTime = c.clock.Time().Add(time.Duration(deadline.(uint64)))
+	}
+
 	return &inboundMessage{
 		op:                    op,
 		fields:                fieldValues,
 		bytesSavedCompression: bytesSaved,
+		nodeID:                nodeID,
+		expirationTime:        expirationTime,
+		onFinishedHandling:    onFinishedHandling,
 	}, p.Err
 }

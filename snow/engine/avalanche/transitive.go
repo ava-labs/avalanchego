@@ -338,13 +338,13 @@ func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
 }
 
 // AppRequest implements the Engine interface
-func (t *Transitive) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+func (t *Transitive) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
 	if !t.Ctx.IsBootstrapped() {
 		t.Ctx.Log.Debug("dropping AppRequest(%s, %d) due to bootstrapping", nodeID, requestID)
 		return nil
 	}
 	// Notify the VM of this request
-	return t.VM.AppRequest(nodeID, requestID, request)
+	return t.VM.AppRequest(nodeID, requestID, deadline, request)
 }
 
 // AppResponse implements the Engine interface
@@ -541,7 +541,7 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 	// Track performance statistics
 	t.metrics.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len()))
 	t.metrics.numMissingTxs.Set(float64(t.missingTxs.Len()))
-	t.metrics.numPendingVts.Set(float64(t.pending.Len()))
+	t.metrics.numPendingVts.Set(float64(len(t.pending)))
 	t.metrics.blockerVtxs.Set(float64(t.vtxBlocked.Len()))
 	t.metrics.blockerTxs.Set(float64(t.txBlocked.Len()))
 	return t.errs.Err

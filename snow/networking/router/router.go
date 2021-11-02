@@ -8,9 +8,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/health"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -24,6 +24,7 @@ type Router interface {
 	Initialize(
 		nodeID ids.ShortID,
 		log logging.Logger,
+		msgCreator message.Creator,
 		timeouts *timeout.Manager,
 		gossipFrequency,
 		shutdownTimeout time.Duration,
@@ -41,135 +42,19 @@ type Router interface {
 // ExternalRouter routes messages from the network to the
 // Handler of the consensus engine that the message is intended for
 type ExternalRouter interface {
-	AppRouter
+	HandleInbound(msg message.InboundMessage)
+
 	RegisterRequest(
 		nodeID ids.ShortID,
 		chainID ids.ID,
 		requestID uint32,
-		msgType constants.MsgType,
-	)
-	GetAcceptedFrontier(
-		nodeID ids.ShortID,
-		chainID ids.ID,
-		requestID uint32,
-		deadline time.Time,
-		onFinishedHandling func(),
-	)
-	AcceptedFrontier(
-		nodeID ids.ShortID,
-		chainID ids.ID,
-		requestID uint32,
-		containerIDs []ids.ID,
-		onFinishedHandling func(),
-	)
-	GetAccepted(
-		nodeID ids.ShortID,
-		chainID ids.ID,
-		requestID uint32,
-		deadline time.Time,
-		containerIDs []ids.ID,
-		onFinishedHandling func(),
-	)
-	Accepted(
-		nodeID ids.ShortID,
-		chainID ids.ID,
-		requestID uint32,
-		containerIDs []ids.ID,
-		onFinishedHandling func(),
-	)
-	GetAncestors(
-		nodeID ids.ShortID,
-		chainID ids.ID,
-		requestID uint32,
-		deadline time.Time,
-		containerID ids.ID,
-		onFinishedHandling func(),
-	)
-	MultiPut(
-		nodeID ids.ShortID,
-		chainID ids.ID,
-		requestID uint32,
-		containers [][]byte,
-		onFinishedHandling func(),
-	)
-	Get(
-		nodeID ids.ShortID,
-		chainID ids.ID,
-		requestID uint32,
-		deadline time.Time,
-		containerID ids.ID,
-		onFinishedHandling func(),
-	)
-	Put(
-		nodeID ids.ShortID,
-		chainID ids.ID,
-		requestID uint32,
-		containerID ids.ID,
-		container []byte,
-		onFinishedHandling func(),
-	)
-	PushQuery(
-		nodeID ids.ShortID,
-		chainID ids.ID,
-		requestID uint32,
-		deadline time.Time,
-		containerID ids.ID,
-		container []byte,
-		onFinishedHandling func(),
-	)
-	PullQuery(
-		nodeID ids.ShortID,
-		chainID ids.ID,
-		requestID uint32,
-		deadline time.Time,
-		containerID ids.ID,
-		onFinishedHandling func(),
-	)
-	Chits(
-		nodeID ids.ShortID,
-		chainID ids.ID,
-		requestID uint32,
-		votes []ids.ID,
-		onFinishedHandling func(),
-	)
-}
-
-// AppRouter routes app-level messages
-type AppRouter interface {
-	AppRequest(
-		nodeID ids.ShortID,
-		chainID ids.ID,
-		requestID uint32,
-		deadline time.Time,
-		appRequestBytes []byte,
-		onFinishedHandling func(),
-	)
-	AppResponse(
-		nodeID ids.ShortID,
-		chainID ids.ID,
-		requestID uint32,
-		appResponseBytes []byte,
-		onFinishedHandling func(),
-	)
-	AppGossip(
-		nodeID ids.ShortID,
-		chainID ids.ID,
-		appGossipBytes []byte,
-		onFinishedHandling func(),
+		op message.Op,
 	)
 }
 
 // InternalRouter deals with messages internal to this node
 type InternalRouter interface {
 	benchlist.Benchable
-
-	GetAcceptedFrontierFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
-	GetAcceptedFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
-	GetFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
-	GetAncestorsFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
-	QueryFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
-
-	AppRequestFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
 
 	Connected(nodeID ids.ShortID)
 	Disconnected(nodeID ids.ShortID)

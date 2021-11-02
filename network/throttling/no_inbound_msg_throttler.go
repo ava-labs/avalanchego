@@ -19,3 +19,7 @@ type noInboundMsgThrottler struct{}
 func (*noInboundMsgThrottler) Acquire(uint64, ids.ShortID) {}
 
 func (*noInboundMsgThrottler) Release(uint64, ids.ShortID) {}
+
+func (*noInboundMsgThrottler) AddNode(ids.ShortID) {}
+
+func (*noInboundMsgThrottler) RemoveNode(ids.ShortID) {}

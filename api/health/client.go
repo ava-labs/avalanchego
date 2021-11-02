@@ -17,12 +17,16 @@ type Client struct {
 	requester rpc.EndpointRequester
 }
 
+type ErrorMsg struct {
+	Message string `json:"message"`
+}
+
 // Result represents the output of a health check execution.
 type Result struct {
 	// the details of task Result - may be nil
 	Details interface{} `json:"message,omitempty"`
 	// the error returned from a failed health check - an empty string when successful
-	Error string `json:"error,omitempty"`
+	Error ErrorMsg `json:"error,omitempty"`
 	// the time of the last health check
 	Timestamp time.Time `json:"timestamp"`
 	// the execution duration of the last check

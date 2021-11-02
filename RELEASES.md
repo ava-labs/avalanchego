@@ -1,5 +1,49 @@
 # Release Notes
 
+## v1.6.4
+
+This version is backwards compatible to [v1.6.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.6.0). It is optional, but encouraged.
+
+### Config
+
+- Added flag `throttler-inbound-bandwidth-refill-rate`, which specifies the max average inbound bandwidth usage of a peer.
+- Added flag `throttler-inbound-bandwidth-max-burst-size`, which specifies the max inbound bandwidth usage of a peer.
+
+### Networking
+
+- Updated peerlist gossiping to use the same mechanism as other gossip calls.
+- Added inbound message throttling based on recent bandwidth usage.
+
+### Metrics
+
+- Updated `avalanche_{ChainID}_handler_gossip_{count,sum}` to `avalanche_{ChainID}_handler_gossip_request_{count,sum}`.
+- Updated `avalanche_{ChainID}_lat_get_accepted_{count,sum}` to `avalanche_{ChainID}_lat_accepted_{count,sum}`.
+- Updated `avalanche_{ChainID}_lat_get_accepted_frontier_{count,sum}` to `avalanche_{ChainID}_lat_accepted_frontier_{count,sum}`.
+- Updated `avalanche_{ChainID}_lat_get_ancestors_{count,sum}` to `avalanche_{ChainID}_lat_multi_put_{count,sum}`.
+- Combined `avalanche_{ChainID}_lat_pull_query_{count,sum}` and `avalanche_{ChainID}_lat_push_query_{count,sum}` to `avalanche_{ChainID}_lat_chits_{count,sum}`.
+- Added `avalanche_{ChainID}_app_response_{count,sum}`.
+- Added `avalanche_network_bandwidth_throttler_inbound_acquire_latency_{count,sum}`
+- Added `avalanche_network_bandwidth_throttler_inbound_awaiting_acquire`
+- Added `avalanche_P_vm_votes_won`
+- Added `avalanche_P_vm_votes_lost`
+
+### Indexer
+
+- Added method `GetContainerByID` to client implementation.
+- Client methods now return `[]byte` rather than `string` representations of a container.
+
+### C-Chain
+
+- Updated Geth dependency to 1.10.11.
+- Added a new admin API for updating the log level and measuring performance.
+- Added a new `--allow-unprotected-txs` flag to allow issuance of transactions without EIP-155 replay protection.
+
+### Subnet & Custom VMs
+
+- Ensured that all possible chains are run in `--staking-enabled=false` networks.
+
+---
+
 ## v1.6.3
 
 This version is backwards compatible to [v1.6.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.6.0). It is optional, but encouraged.

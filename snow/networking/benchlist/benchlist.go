@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -92,7 +93,7 @@ type benchlist struct {
 	timer *timer.Timer
 
 	// Tells the time. Can be faked for testing.
-	clock timer.Clock
+	clock mockable.Clock
 
 	// notified when a node is benched or unbenched
 	benchable Benchable
