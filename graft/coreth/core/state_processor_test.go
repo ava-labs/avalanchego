@@ -323,17 +323,10 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 		UncleHash: types.EmptyUncleHash,
 	}
 	if config.IsApricotPhase3(new(big.Int).SetUint64(header.Time)) {
-		header.Extra = make([]byte, params.ApricotPhase3ExtraDataSize)
-	} else {
-		header.Extra = make([]byte, params.MaximumExtraDataSize)
+		header.Extra, header.BaseFee, _ = dummy.CalcBaseFee(config, parent.Header(), header.Time)
 	}
-	if config.IsApricotPhase3(new(big.Int).SetUint64(header.Time)) {
-		_, header.BaseFee, _ = dummy.CalcBaseFee(config, parent.Header(), header.Time)
-	}
-	if config.IsApricotPhase3(new(big.Int).SetUint64(header.Time)) {
+	if config.IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
 		header.BlockGasCost = big.NewInt(0)
-	}
-	if config.IsApricotPhase3(new(big.Int).SetUint64(header.Time)) {
 		header.ExtDataGasUsed = big.NewInt(0)
 	}
 	var receipts []*types.Receipt
