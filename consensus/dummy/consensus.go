@@ -29,7 +29,6 @@ var (
 	errBaseFeeNil             = errors.New("base fee is nil")
 	errExtDataGasUsedNil      = errors.New("extDataGasUsed is nil")
 	errExtDataGasUsedTooLarge = errors.New("extDataGasUsed is not uint64")
-	errFakeFail               = errors.New("fake fail occurred")
 )
 
 type Mode uint

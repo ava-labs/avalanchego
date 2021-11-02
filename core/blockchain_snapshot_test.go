@@ -52,7 +52,6 @@ import (
 type snapshotTestBasic struct {
 	chainBlocks   int    // Number of blocks to generate for the canonical chain
 	snapshotBlock uint64 // Block number of the relevant snapshot disk layer
-	commitBlock   uint64 // Block number for which to commit the state to disk
 
 	expCanonicalBlocks int    // Number of canonical blocks expected to remain in the database (excl. genesis)
 	expHeadHeader      uint64 // Block number of the expected head header
@@ -102,11 +101,7 @@ func (basic *snapshotTestBasic) prepare(t *testing.T) (*BlockChain, []*types.Blo
 
 	// Insert the blocks with configured settings.
 	var breakpoints []uint64
-	if basic.commitBlock > basic.snapshotBlock {
-		breakpoints = append(breakpoints, basic.snapshotBlock, basic.commitBlock)
-	} else {
-		breakpoints = append(breakpoints, basic.commitBlock, basic.snapshotBlock)
-	}
+	breakpoints = append(breakpoints, basic.snapshotBlock)
 	var startPoint uint64
 	for _, point := range breakpoints {
 		if _, err := chain.InsertChain(blocks[startPoint:point]); err != nil {
@@ -114,9 +109,6 @@ func (basic *snapshotTestBasic) prepare(t *testing.T) (*BlockChain, []*types.Blo
 		}
 		startPoint = point
 
-		if basic.commitBlock > 0 && basic.commitBlock == point {
-			chain.stateCache.TrieDB().Commit(blocks[point-1].Root(), true, nil)
-		}
 		if basic.snapshotBlock > 0 && basic.snapshotBlock == point {
 
 			// Flushing from 0 to snapshotBlock into the disk
@@ -181,12 +173,6 @@ func (basic *snapshotTestBasic) dump() string {
 		fmt.Fprintf(buffer, "->C%d", i+1)
 	}
 	fmt.Fprint(buffer, " (HEAD)\n\n")
-
-	fmt.Fprintf(buffer, "Commit:   G")
-	if basic.commitBlock > 0 {
-		fmt.Fprintf(buffer, ", C%d", basic.commitBlock)
-	}
-	fmt.Fprint(buffer, "\n")
 
 	fmt.Fprintf(buffer, "Snapshot: G")
 	if basic.snapshotBlock > 0 {
@@ -446,7 +432,6 @@ func TestRestartWithNewSnapshot(t *testing.T) {
 	// Chain:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8 (HEAD)
 	//
-	// Commit:   G
 	// Snapshot: G
 	//
 	// ------------------------------
@@ -461,7 +446,6 @@ func TestRestartWithNewSnapshot(t *testing.T) {
 		snapshotTestBasic{
 			chainBlocks:        8,
 			snapshotBlock:      4,
-			commitBlock:        0,
 			expCanonicalBlocks: 8,
 			expHeadHeader:      8,
 			expHeadBlock:       4,
@@ -481,7 +465,6 @@ func TestNoCommitCrashWithNewSnapshot(t *testing.T) {
 	// Chain:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8 (HEAD)
 	//
-	// Commit:   G
 	// Snapshot: G, C4
 	//
 	// CRASH
@@ -498,7 +481,6 @@ func TestNoCommitCrashWithNewSnapshot(t *testing.T) {
 		snapshotTestBasic{
 			chainBlocks:        8,
 			snapshotBlock:      4,
-			commitBlock:        0,
 			expCanonicalBlocks: 8,
 			expHeadHeader:      8,
 			expHeadBlock:       4,
@@ -518,7 +500,6 @@ func TestLowCommitCrashWithNewSnapshot(t *testing.T) {
 	// Chain:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8 (HEAD)
 	//
-	// Commit:   G, C2
 	// Snapshot: G, C4
 	//
 	// CRASH
@@ -535,7 +516,6 @@ func TestLowCommitCrashWithNewSnapshot(t *testing.T) {
 		snapshotTestBasic{
 			chainBlocks:        8,
 			snapshotBlock:      4,
-			commitBlock:        2,
 			expCanonicalBlocks: 8,
 			expHeadHeader:      8,
 			expHeadBlock:       4,
@@ -555,7 +535,6 @@ func TestHighCommitCrashWithNewSnapshot(t *testing.T) {
 	// Chain:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8 (HEAD)
 	//
-	// Commit:   G, C6
 	// Snapshot: G, C4
 	//
 	// CRASH
@@ -572,7 +551,6 @@ func TestHighCommitCrashWithNewSnapshot(t *testing.T) {
 		snapshotTestBasic{
 			chainBlocks:        8,
 			snapshotBlock:      4,
-			commitBlock:        6,
 			expCanonicalBlocks: 8,
 			expHeadHeader:      8,
 			expHeadBlock:       4,
@@ -590,7 +568,6 @@ func TestGappedNewSnapshot(t *testing.T) {
 	// Chain:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8 (HEAD)
 	//
-	// Commit:   G
 	// Snapshot: G
 	//
 	// ------------------------------
@@ -605,7 +582,6 @@ func TestGappedNewSnapshot(t *testing.T) {
 		snapshotTestBasic: snapshotTestBasic{
 			chainBlocks:        8,
 			snapshotBlock:      0,
-			commitBlock:        0,
 			expCanonicalBlocks: 10,
 			expHeadHeader:      8,
 			expHeadBlock:       0,
@@ -624,7 +600,6 @@ func TestRecoverSnapshotFromWipingCrash(t *testing.T) {
 	// Chain:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8 (HEAD)
 	//
-	// Commit:   G
 	// Snapshot: G
 	//
 	// ------------------------------
@@ -639,7 +614,6 @@ func TestRecoverSnapshotFromWipingCrash(t *testing.T) {
 		snapshotTestBasic: snapshotTestBasic{
 			chainBlocks:        8,
 			snapshotBlock:      4,
-			commitBlock:        0,
 			expCanonicalBlocks: 10,
 			expHeadHeader:      8,
 			expHeadBlock:       4,
