@@ -11,7 +11,7 @@ import (
 )
 
 func TestInterface(t *testing.T) {
-	pw := "lol totally a secure password"
+	pw := "lol totally a secure password" // #nosec G101
 	for _, test := range database.Tests {
 		unencryptedDB := memdb.New()
 		db, err := New([]byte(pw), unencryptedDB)
@@ -24,7 +24,7 @@ func TestInterface(t *testing.T) {
 }
 
 func BenchmarkInterface(b *testing.B) {
-	pw := "lol totally a secure password"
+	pw := "lol totally a secure password" // #nosec G101
 	for _, size := range database.BenchmarkSizes {
 		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
 		for _, bench := range database.Benchmarks {
