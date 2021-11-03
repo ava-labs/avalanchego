@@ -27,7 +27,6 @@ type Engine interface {
 		multiPutF func(validatorID ids.ShortID, requestID uint32, containers [][]byte) error,
 		getAncestorsFailedF func(validatorID ids.ShortID, requestID uint32) error,
 		timeoutF func() error,
-		haltF func(),
 		connectedF func(validatorID ids.ShortID) error,
 		disconnectedF func(validatorID ids.ShortID) error,
 	) (func() error, error)

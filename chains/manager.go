@@ -776,9 +776,7 @@ func (m *manager) createSnowmanChain(
 		&bootstrapper.Bootstrapper,
 		bootstrapper.MultiPut,
 		bootstrapper.GetAncestorsFailed,
-
 		bootstrapper.Timeout,
-		bootstrapper.Halt,
 		bootstrapper.Connected,
 		bootstrapper.Disconnected,
 	); err != nil {

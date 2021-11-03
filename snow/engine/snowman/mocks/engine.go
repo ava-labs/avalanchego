@@ -357,13 +357,13 @@ func (_m *Engine) HealthCheck() (interface{}, error) {
 	return r0, r1
 }
 
-// Initialize provides a mock function with given fields: config, theOneCommonBootstrapper, multiPutF, getAncestorsFailedF, timeoutF, haltF, connectedF, disconnectedF
-func (_m *Engine) Initialize(config snowman.Config, theOneCommonBootstrapper *common.Bootstrapper, multiPutF func(ids.ShortID, uint32, [][]byte) error, getAncestorsFailedF func(ids.ShortID, uint32) error, timeoutF func() error, haltF func(), connectedF func(ids.ShortID) error, disconnectedF func(ids.ShortID) error) (func() error, error) {
-	ret := _m.Called(config, theOneCommonBootstrapper, multiPutF, getAncestorsFailedF, timeoutF, haltF, connectedF, disconnectedF)
+// Initialize provides a mock function with given fields: config, theOneCommonBootstrapper, multiPutF, getAncestorsFailedF, timeoutF, connectedF, disconnectedF
+func (_m *Engine) Initialize(config snowman.Config, theOneCommonBootstrapper *common.Bootstrapper, multiPutF func(ids.ShortID, uint32, [][]byte) error, getAncestorsFailedF func(ids.ShortID, uint32) error, timeoutF func() error, connectedF func(ids.ShortID) error, disconnectedF func(ids.ShortID) error) (func() error, error) {
+	ret := _m.Called(config, theOneCommonBootstrapper, multiPutF, getAncestorsFailedF, timeoutF, connectedF, disconnectedF)
 
 	var r0 func() error
-	if rf, ok := ret.Get(0).(func(snowman.Config, *common.Bootstrapper, func(ids.ShortID, uint32, [][]byte) error, func(ids.ShortID, uint32) error, func() error, func(), func(ids.ShortID) error, func(ids.ShortID) error) func() error); ok {
-		r0 = rf(config, theOneCommonBootstrapper, multiPutF, getAncestorsFailedF, timeoutF, haltF, connectedF, disconnectedF)
+	if rf, ok := ret.Get(0).(func(snowman.Config, *common.Bootstrapper, func(ids.ShortID, uint32, [][]byte) error, func(ids.ShortID, uint32) error, func() error, func(ids.ShortID) error, func(ids.ShortID) error) func() error); ok {
+		r0 = rf(config, theOneCommonBootstrapper, multiPutF, getAncestorsFailedF, timeoutF, connectedF, disconnectedF)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(func() error)
@@ -371,8 +371,8 @@ func (_m *Engine) Initialize(config snowman.Config, theOneCommonBootstrapper *co
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(snowman.Config, *common.Bootstrapper, func(ids.ShortID, uint32, [][]byte) error, func(ids.ShortID, uint32) error, func() error, func(), func(ids.ShortID) error, func(ids.ShortID) error) error); ok {
-		r1 = rf(config, theOneCommonBootstrapper, multiPutF, getAncestorsFailedF, timeoutF, haltF, connectedF, disconnectedF)
+	if rf, ok := ret.Get(1).(func(snowman.Config, *common.Bootstrapper, func(ids.ShortID, uint32, [][]byte) error, func(ids.ShortID, uint32) error, func() error, func(ids.ShortID) error, func(ids.ShortID) error) error); ok {
+		r1 = rf(config, theOneCommonBootstrapper, multiPutF, getAncestorsFailedF, timeoutF, connectedF, disconnectedF)
 	} else {
 		r1 = ret.Error(1)
 	}

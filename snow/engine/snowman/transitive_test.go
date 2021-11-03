@@ -100,7 +100,6 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 		bootstrapper.MultiPut,
 		bootstrapper.GetAncestorsFailed,
 		bootstrapper.Timeout,
-		bootstrapper.Halt,
 		bootstrapper.Connected,
 		bootstrapper.Disconnected); err != nil {
 		t.Fatal(err)
@@ -497,7 +496,6 @@ func TestEngineMultipleQuery(t *testing.T) {
 		bootstrapper.MultiPut,
 		bootstrapper.GetAncestorsFailed,
 		bootstrapper.Timeout,
-		bootstrapper.Halt,
 		bootstrapper.Connected,
 		bootstrapper.Disconnected); err != nil {
 		t.Fatal(err)
@@ -1013,7 +1011,6 @@ func TestVoteCanceling(t *testing.T) {
 		bootstrapper.MultiPut,
 		bootstrapper.GetAncestorsFailed,
 		bootstrapper.Timeout,
-		bootstrapper.Halt,
 		bootstrapper.Connected,
 		bootstrapper.Disconnected); err != nil {
 		t.Fatal(err)
@@ -1135,7 +1132,6 @@ func TestEngineNoQuery(t *testing.T) {
 		bootstrapper.MultiPut,
 		bootstrapper.GetAncestorsFailed,
 		bootstrapper.Timeout,
-		bootstrapper.Halt,
 		bootstrapper.Connected,
 		bootstrapper.Disconnected); err != nil {
 		t.Fatal(err)
@@ -1209,7 +1205,6 @@ func TestEngineNoRepollQuery(t *testing.T) {
 		bootstrapper.MultiPut,
 		bootstrapper.GetAncestorsFailed,
 		bootstrapper.Timeout,
-		bootstrapper.Halt,
 		bootstrapper.Connected,
 		bootstrapper.Disconnected); err != nil {
 		t.Fatal(err)
@@ -1914,7 +1909,6 @@ func TestEngineAggressivePolling(t *testing.T) {
 		bootstrapper.MultiPut,
 		bootstrapper.GetAncestorsFailed,
 		bootstrapper.Timeout,
-		bootstrapper.Halt,
 		bootstrapper.Connected,
 		bootstrapper.Disconnected); err != nil {
 		t.Fatal(err)
@@ -2065,7 +2059,6 @@ func TestEngineDoubleChit(t *testing.T) {
 		bootstrapper.MultiPut,
 		bootstrapper.GetAncestorsFailed,
 		bootstrapper.Timeout,
-		bootstrapper.Halt,
 		bootstrapper.Connected,
 		bootstrapper.Disconnected); err != nil {
 		t.Fatal(err)
@@ -2220,7 +2213,6 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		bootstrapper.MultiPut,
 		bootstrapper.GetAncestorsFailed,
 		bootstrapper.Timeout,
-		bootstrapper.Halt,
 		bootstrapper.Connected,
 		bootstrapper.Disconnected); err != nil {
 		t.Fatal(err)

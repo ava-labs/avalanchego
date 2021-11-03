@@ -35,7 +35,6 @@ type Transitive struct {
 
 	// InternalHandler interface
 	timeoutF      func() error
-	haltF         func()
 	connectedF    func(validatorID ids.ShortID) error
 	disconnectedF func(validatorID ids.ShortID) error
 	// END OF PULL OUT ENGINE NEEDED STUFF FROM BOOSTRAPPER
@@ -76,7 +75,6 @@ func (t *Transitive) Initialize(config Config,
 	multiPutF func(validatorID ids.ShortID, requestID uint32, containers [][]byte) error,
 	getAncestorsFailedF func(validatorID ids.ShortID, requestID uint32) error,
 	timeoutF func() error,
-	haltF func(),
 	connectedF func(validatorID ids.ShortID) error,
 	disconnectedF func(validatorID ids.ShortID) error,
 ) (func() error, error) {
@@ -104,7 +102,6 @@ func (t *Transitive) Initialize(config Config,
 	t.getAncestorsFailedF = getAncestorsFailedF
 
 	t.timeoutF = timeoutF
-	t.haltF = haltF
 	t.connectedF = connectedF
 	t.disconnectedF = disconnectedF
 
@@ -152,7 +149,7 @@ func (t *Transitive) Timeout() error {
 }
 
 func (t *Transitive) Halt() {
-	t.haltF()
+	t.TheOneCommonBootstrapper.Halt()
 }
 
 func (t *Transitive) Connected(validatorID ids.ShortID) error {

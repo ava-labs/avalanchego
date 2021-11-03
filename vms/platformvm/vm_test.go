@@ -2167,7 +2167,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		bootstrapper.MultiPut,
 		bootstrapper.GetAncestorsFailed,
 		bootstrapper.Timeout,
-		bootstrapper.Halt,
 		bootstrapper.Connected,
 		bootstrapper.Disconnected); err != nil {
 		t.Fatal(err)
