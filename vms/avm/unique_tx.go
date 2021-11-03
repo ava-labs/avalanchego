@@ -217,10 +217,10 @@ func (tx *UniqueTx) Status() choices.Status {
 }
 
 // Dependencies returns the set of transactions this transaction builds on
-func (tx *UniqueTx) Dependencies() []snowstorm.Tx {
+func (tx *UniqueTx) Dependencies() ([]snowstorm.Tx, error) {
 	tx.refresh()
 	if tx.Tx == nil || len(tx.deps) != 0 {
-		return tx.deps
+		return tx.deps, nil
 	}
 
 	txIDs := ids.Set{}
@@ -249,7 +249,7 @@ func (tx *UniqueTx) Dependencies() []snowstorm.Tx {
 			txID: assetID,
 		})
 	}
-	return tx.deps
+	return tx.deps, nil
 }
 
 // InputIDs returns the set of utxoIDs this transaction consumes
