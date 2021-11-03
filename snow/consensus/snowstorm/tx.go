@@ -18,7 +18,7 @@ type Tx interface {
 	//
 	// Similarly, each element of Dependencies must be accepted before this
 	// transaction is accepted.
-	Dependencies() []Tx
+	Dependencies() ([]Tx, error)
 
 	// InputIDs is a set where each element is the ID of a piece of state that
 	// will be consumed if this transaction is accepted.

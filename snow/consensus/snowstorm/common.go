@@ -210,7 +210,7 @@ func (c *common) rejectTx(tx Tx) error {
 // registerAcceptor attempts to accept this tx once all its dependencies are
 // accepted. If all the dependencies are already accepted, this function will
 // immediately accept the tx.
-func (c *common) registerAcceptor(con Consensus, tx Tx) {
+func (c *common) registerAcceptor(con Consensus, tx Tx) error {
 	txID := tx.ID()
 
 	toAccept := &acceptor{
@@ -219,7 +219,11 @@ func (c *common) registerAcceptor(con Consensus, tx Tx) {
 		txID: txID,
 	}
 
-	for _, dependency := range tx.Dependencies() {
+	deps, err := tx.Dependencies()
+	if err != nil {
+		return err
+	}
+	for _, dependency := range deps {
 		if dependency.Status() != choices.Accepted {
 			// If the dependency isn't accepted, then it must be processing.
 			// This tx should be accepted after this tx is accepted. Note that
@@ -234,10 +238,11 @@ func (c *common) registerAcceptor(con Consensus, tx Tx) {
 	// node to treat the rogue tx as virtuous.
 	c.virtuousVoting.Remove(txID)
 	c.pendingAccept.Register(toAccept)
+	return nil
 }
 
 // registerRejector rejects this tx if any of its dependencies are rejected.
-func (c *common) registerRejector(con Consensus, tx Tx) {
+func (c *common) registerRejector(con Consensus, tx Tx) error {
 	// If a tx that this tx depends on is rejected, this tx should also be
 	// rejected.
 	toReject := &rejector{
@@ -247,7 +252,11 @@ func (c *common) registerRejector(con Consensus, tx Tx) {
 	}
 
 	// Register all of this txs dependencies as possibilities to reject this tx.
-	for _, dependency := range tx.Dependencies() {
+	deps, err := tx.Dependencies()
+	if err != nil {
+		return err
+	}
+	for _, dependency := range deps {
 		if dependency.Status() != choices.Accepted {
 			// If the dependency isn't accepted, then it must be processing. So,
 			// this tx should be rejected if any of these processing txs are
@@ -259,6 +268,7 @@ func (c *common) registerRejector(con Consensus, tx Tx) {
 
 	// Register these dependencies
 	c.pendingReject.Register(toReject)
+	return nil
 }
 
 // acceptor implements Blockable

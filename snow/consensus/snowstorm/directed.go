@@ -172,8 +172,7 @@ func (dg *Directed) Add(tx Tx) error {
 
 	// If a tx that this tx depends on is rejected, this tx should also be
 	// rejected.
-	dg.registerRejector(dg, tx)
-	return nil
+	return dg.registerRejector(dg, tx)
 }
 
 // Issued implements the Consensus interface
@@ -226,7 +225,9 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 			// registered once.
 			txNode.pendingAccept = true
 
-			dg.registerAcceptor(dg, txNode.tx)
+			if err := dg.registerAcceptor(dg, txNode.tx); err != nil {
+				return false, err
+			}
 			if dg.errs.Errored() {
 				return changed, dg.errs.Err
 			}

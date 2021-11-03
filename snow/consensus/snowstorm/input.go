@@ -13,11 +13,13 @@ import (
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
-// InputFactory implements Factory by returning an input struct
-type InputFactory struct{}
+// inputFactory implements Factory by returning an input struct
+// for testing purposes in parity with "DirectedFactory"
+// focus on more frequent conflicts
+type inputFactory struct{}
 
 // New implements Factory
-func (InputFactory) New() Consensus { return &Input{} }
+func (inputFactory) New() Consensus { return &Input{} }
 
 // Input is an implementation of a multi-color, non-transitive, snowball
 // instance
@@ -179,8 +181,7 @@ func (ig *Input) Add(tx Tx) error {
 
 	// If a tx that this tx depends on is rejected, this tx should also be
 	// rejected.
-	ig.registerRejector(ig, tx)
-	return nil
+	return ig.registerRejector(ig, tx)
 }
 
 // Issued implements the ConflictGraph interface
@@ -301,7 +302,9 @@ func (ig *Input) RecordPoll(votes ids.Bag) (bool, error) {
 			// registered once.
 			txNode.pendingAccept = true
 
-			ig.registerAcceptor(ig, txNode.tx)
+			if err := ig.registerAcceptor(ig, txNode.tx); err != nil {
+				return false, err
+			}
 			if ig.errs.Errored() {
 				return changed, ig.errs.Err
 			}

@@ -7,4 +7,4 @@ import (
 	"testing"
 )
 
-func TestInputConsensus(t *testing.T) { ConsensusTest(t, InputFactory{}, "IG") }
+func TestInputConsensus(t *testing.T) { ConsensusTest(t, inputFactory{}, "IG") }
