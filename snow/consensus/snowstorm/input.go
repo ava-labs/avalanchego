@@ -13,11 +13,13 @@ import (
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
-// InputFactory implements Factory by returning an input struct
-type InputFactory struct{}
+// inputFactory implements Factory by returning an input struct
+// for testing purposes in parity with "DirectedFactory"
+// focus on more frequent conflicts
+type inputFactory struct{}
 
 // New implements Factory
-func (InputFactory) New() Consensus { return &Input{} }
+func (inputFactory) New() Consensus { return &Input{} }
 
 // Input is an implementation of a multi-color, non-transitive, snowball
 // instance

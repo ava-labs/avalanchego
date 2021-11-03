@@ -92,7 +92,7 @@ func BenchmarkVirtuousInput(b *testing.B) {
 				ConcurrentRepolls: 1,
 			},
 			/*seed=*/ 0,
-			/*fact=*/ InputFactory{},
+			/*fact=*/ inputFactory{},
 		)
 		if err != nil {
 			b.Fatal(err)
@@ -146,7 +146,7 @@ func BenchmarkRogueInput(b *testing.B) {
 				ConcurrentRepolls: 1,
 			},
 			/*seed=*/ 0,
-			/*fact=*/ InputFactory{},
+			/*fact=*/ inputFactory{},
 		)
 		if err != nil {
 			b.Fatal(err)
@@ -200,7 +200,7 @@ func BenchmarkMultiInput(b *testing.B) {
 				ConcurrentRepolls: 1,
 			},
 			/*seed=*/ 0,
-			/*fact=*/ InputFactory{},
+			/*fact=*/ inputFactory{},
 		)
 		if err != nil {
 			b.Fatal(err)
@@ -254,7 +254,7 @@ func BenchmarkMultiRogueInput(b *testing.B) {
 				ConcurrentRepolls: 1,
 			},
 			/*seed=*/ 0,
-			/*fact=*/ InputFactory{},
+			/*fact=*/ inputFactory{},
 		)
 		if err != nil {
 			b.Fatal(err)
