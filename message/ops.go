@@ -14,7 +14,8 @@ const (
 	GetVersion Op = iota
 	_
 	GetPeerList
-	_
+	// TODO: NetworkUpgrade/Rename this to Pong
+	UptimePong
 	Ping
 	// TODO: NetworkUpgrade/delete this in favor of UptimePong
 	Pong
@@ -39,8 +40,7 @@ const (
 	AppRequest
 	AppResponse
 	AppGossip
-	// TODO: NetworkUpgrade/Rename this to Pong
-	UptimePong
+
 	// Internal messages (External messages should be added above these):
 	GetAcceptedFrontierFailed
 	GetAcceptedFailed
