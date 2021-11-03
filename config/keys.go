@@ -3,6 +3,7 @@
 
 package config
 
+// #nosec G101
 const (
 	ConfigFileKey                               = "config-file"
 	VersionKey                                  = "version"
@@ -40,7 +41,7 @@ const (
 	HTTPSCertFileKey                            = "http-tls-cert-file"
 	HTTPAllowedOrigins                          = "http-allowed-origins"
 	APIAuthRequiredKey                          = "api-auth-required"
-	APIAuthPasswordFileKey                      = "api-auth-password-file" // #nosec G101
+	APIAuthPasswordFileKey                      = "api-auth-password-file"
 	BootstrapIPsKey                             = "bootstrap-ips"
 	BootstrapIDsKey                             = "bootstrap-ids"
 	StakingPortKey                              = "staking-port"
