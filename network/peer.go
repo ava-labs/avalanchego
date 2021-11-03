@@ -575,12 +575,15 @@ func (p *peer) sendPong() {
 
 // assumes the [stateLock] is not held
 func (p *peer) sendUptimePong() {
-	// ASK: also send current localtime?
-	uptimeDuration, _, err := p.net.config.Uptimes.CalculateUptime(p.nodeID)
+	uptimePercent, err := p.net.config.Uptimes.CalculateCurrentUptimePercent(p.nodeID)
 	if err != nil {
-		uptimeDuration = 0
+		uptimePercent = 0
 	}
-	msg, err := p.net.mc.UptimePong(uptimeDuration)
+	// let's round down and send percentage (0-100) instead of float
+	// with this way we can pack it into a single byte
+	flooredPercentage := math.Floor(uptimePercent * 100)
+	percentage := uint8(flooredPercentage)
+	msg, err := p.net.mc.UptimePong(percentage)
 	p.net.log.AssertNoError(err)
 
 	p.net.send(msg, false, []*peer{p})
@@ -851,9 +854,9 @@ func (p *peer) pongHandle(msg message.InboundMessage, isUptime bool) {
 		p.discardIP()
 	}
 	if isUptime {
-		uptimeDuration := msg.Get(message.Uptime).(uint64)
+		uptimePercentage := msg.Get(message.Uptime).(uint8)
 		// TODO: do uptime calculation here
-		fmt.Printf("nodeID: %s, uptimeDuration: %s", p.nodeID, time.Duration(uptimeDuration))
+		fmt.Printf("nodeID: %s, uptimeDuration: %d", p.nodeID, uptimePercentage)
 	}
 }
 

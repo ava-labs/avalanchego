@@ -19,9 +19,13 @@ func UnreadyState() UptimeState {
 }
 
 func (u *stateless) GetUptime(nodeID ids.ShortID) (upDuration time.Duration, lastUpdated time.Time, err error) {
-	return 0, time.Unix(0, 0), errNotReady
+	return 0, time.Time{}, errNotReady
 }
 
 func (u *stateless) SetUptime(nodeID ids.ShortID, upDuration time.Duration, lastUpdated time.Time) error {
 	return errNotReady
+}
+
+func (u *stateless) GetStartTime(nodeID ids.ShortID) (time.Time, error) {
+	return time.Time{}, errNotReady
 }

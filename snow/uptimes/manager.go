@@ -24,6 +24,7 @@ type Manager interface {
 
 	CalculateUptime(nodeID ids.ShortID) (time.Duration, time.Time, error)
 	CalculateUptimePercent(nodeID ids.ShortID, startTime time.Time) (float64, error)
+	CalculateCurrentUptimePercent(nodeID ids.ShortID) (float64, error)
 
 	SetState(state UptimeState) error
 }
@@ -33,6 +34,7 @@ var _ TestUptimeManager = &uptimeManager{}
 type UptimeState interface {
 	GetUptime(nodeID ids.ShortID) (upDuration time.Duration, lastUpdated time.Time, err error)
 	SetUptime(nodeID ids.ShortID, upDuration time.Duration, lastUpdated time.Time) error
+	GetStartTime(nodeID ids.ShortID) (startTime time.Time, err error)
 }
 
 type TestUptimeManager interface {
@@ -189,6 +191,14 @@ func (u *uptimeManager) CalculateUptimePercent(nodeID ids.ShortID, startTime tim
 	}
 	uptime := float64(upDuration) / float64(bestPossibleUpDuration)
 	return uptime, nil
+}
+
+func (u *uptimeManager) CalculateCurrentUptimePercent(nodeID ids.ShortID) (float64, error) {
+	startTime, err := u.state.GetStartTime(nodeID)
+	if err != nil {
+		return 0, err
+	}
+	return u.CalculateUptimePercent(nodeID, startTime)
 }
 
 func (u *uptimeManager) SetTime(newTime time.Time) {

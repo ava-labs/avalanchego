@@ -39,7 +39,8 @@ const (
 	AppRequest
 	AppResponse
 	AppGossip
-
+	// TODO: NetworkUpgrade/Rename this to Pong
+	UptimePong
 	// Internal messages (External messages should be added above these):
 	GetAcceptedFrontierFailed
 	GetAcceptedFailed
@@ -52,8 +53,6 @@ const (
 	Disconnected
 	Notify
 	GossipRequest
-	// TODO: NetworkUpgrade/Rename this to Pong
-	UptimePong
 )
 
 var (

@@ -13,6 +13,7 @@ import (
 type uptime struct {
 	upDuration  time.Duration
 	lastUpdated time.Time
+	startTime   time.Time
 }
 
 type TestState struct {
@@ -30,6 +31,7 @@ func NewTestState() *TestState {
 func (s *TestState) addNode(nodeID ids.ShortID, startTime time.Time) {
 	s.nodes[nodeID] = &uptime{
 		lastUpdated: startTime,
+		startTime:   startTime,
 	}
 }
 
@@ -49,4 +51,12 @@ func (s *TestState) SetUptime(nodeID ids.ShortID, upDuration time.Duration, last
 	up.upDuration = upDuration
 	up.lastUpdated = lastUpdated
 	return s.dbWriteError
+}
+
+func (s *TestState) GetStartTime(nodeID ids.ShortID) (time.Time, error) {
+	up, exists := s.nodes[nodeID]
+	if !exists {
+		return time.Time{}, database.ErrNotFound
+	}
+	return up.startTime, s.dbReadError
 }

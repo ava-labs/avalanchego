@@ -712,6 +712,14 @@ func (st *internalStateImpl) SetUptime(nodeID ids.ShortID, upDuration time.Durat
 	return nil
 }
 
+func (st *internalStateImpl) GetStartTime(nodeID ids.ShortID) (time.Time, error) {
+	currentValidator, err := st.CurrentStakerChainState().GetValidator(nodeID)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return currentValidator.AddValidatorTx().StartTime(), nil
+}
+
 func (st *internalStateImpl) SetHeight(height uint64) {
 	st.currentHeight = height
 }
