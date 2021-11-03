@@ -114,7 +114,7 @@ func TestCodecPackParseGzip(t *testing.T) {
 		{
 			op: UptimePong,
 			fields: map[Field]interface{}{
-				Uptime: 80,
+				Uptime: uint8(80),
 			},
 		},
 		{
