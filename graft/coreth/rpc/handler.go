@@ -232,14 +232,16 @@ func (h *handler) cancelServerSubscriptions(err error) {
 func (h *handler) startCallProc(fn func(*callProc)) {
 	h.callWG.Add(1)
 	go func() {
-		ctx, cancel := context.WithCancel(h.rootCtx)
-		defer h.callWG.Done()
+		var (
+			ctx    context.Context
+			cancel context.CancelFunc
+		)
 		if h.deadlineContext > 0 {
-			ctx = contextWithDeadline{
-				Context:  ctx,
-				deadline: time.Now().Add(h.deadlineContext),
-			}
+			ctx, cancel = context.WithTimeout(h.rootCtx, h.deadlineContext)
+		} else {
+			ctx, cancel = context.WithCancel(h.rootCtx)
 		}
+		defer h.callWG.Done()
 		defer cancel()
 		fn(&callProc{ctx: ctx})
 	}()
