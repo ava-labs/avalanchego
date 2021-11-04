@@ -249,6 +249,9 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 	switch msg.Op() {
 	case message.GetAcceptedFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
+		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+			return h.bootstrapper.GetAcceptedFrontier(nodeID, reqID)
+		}
 		return h.engine.GetAcceptedFrontier(nodeID, reqID)
 
 	case message.AcceptedFrontier:
@@ -259,10 +262,18 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
 			return nil
 		}
+
+		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+			return h.bootstrapper.AcceptedFrontier(nodeID, reqID, containerIDs)
+		}
 		return h.engine.AcceptedFrontier(nodeID, reqID, containerIDs)
 
 	case message.GetAcceptedFrontierFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
+
+		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+			return h.bootstrapper.GetAcceptedFrontierFailed(nodeID, reqID)
+		}
 		return h.engine.GetAcceptedFrontierFailed(nodeID, reqID)
 
 	case message.GetAccepted:
@@ -272,6 +283,9 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
 			return nil
+		}
+		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+			return h.bootstrapper.GetAccepted(nodeID, reqID, containerIDs)
 		}
 		return h.engine.GetAccepted(nodeID, reqID, containerIDs)
 
@@ -283,10 +297,17 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
 			return nil
 		}
+
+		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+			return h.bootstrapper.Accepted(nodeID, reqID, containerIDs)
+		}
 		return h.engine.Accepted(nodeID, reqID, containerIDs)
 
 	case message.GetAcceptedFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
+		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+			return h.bootstrapper.GetAcceptedFailed(nodeID, reqID)
+		}
 		return h.engine.GetAcceptedFailed(nodeID, reqID)
 
 	case message.GetAncestors:
@@ -296,6 +317,10 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
 			return nil
+		}
+
+		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+			return h.bootstrapper.GetAncestors(nodeID, reqID, containerID)
 		}
 		return h.engine.GetAncestors(nodeID, reqID, containerID)
 
@@ -499,7 +524,12 @@ func (h *Handler) StartShutdown() {
 	// we wouldn't be able to grab [h.ctx.Lock] until the engine
 	// finished executing state transitions, which may take a long time.
 	// As a result, the router would time out on shutting down this chain.
-	h.engine.Halt()
+
+	if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+		h.bootstrapper.Halt()
+	} else {
+		h.engine.Halt()
+	}
 }
 
 // Calls [h.engine.Shutdown] and [h.onCloseF]; closes [h.closed].

@@ -2162,7 +2162,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	engine := smeng.Transitive{}
-	if dh.startEngineF, err = engine.Initialize(config, &bootstrapper.Bootstrapper); err != nil {
+	if dh.startEngineF, err = engine.Initialize(
+		config,
+		config.Ctx,
+		config.Sender,
+		&bootstrapper.RequestID,
+		bootstrapper.Validators,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2205,7 +2211,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	frontier := []ids.ID{advanceTimeBlkID}
-	if err := engine.AcceptedFrontier(peerID, reqID, frontier); err != nil {
+	if err := bootstrapper.AcceptedFrontier(peerID, reqID, frontier); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2228,7 +2234,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return res
 	}
 
-	if err := engine.Accepted(peerID, reqID, frontier); err != nil {
+	if err := bootstrapper.Accepted(peerID, reqID, frontier); err != nil {
 		t.Fatal(err)
 	}
 

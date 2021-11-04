@@ -18,6 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/metric"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 // Parameters for delaying bootstrapping to avoid potential CPU burns
@@ -49,6 +51,7 @@ type Bootstrapper struct {
 	common.Bootstrapper
 	common.Fetcher
 	metrics
+	getAncestorsBlks metric.Averager
 
 	// Greatest height of the blocks passed in ForceAccepted
 	tipHeight uint64
@@ -99,6 +102,15 @@ func (b *Bootstrapper) Initialize(
 	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return err
 	}
+
+	errs := wrappers.Errs{}
+	b.getAncestorsBlks = metric.NewAveragerWithErrs(
+		namespace,
+		"get_ancestors_blks",
+		"blocks fetched in a call to GetAncestors",
+		registerer,
+		&errs,
+	)
 
 	b.parser = &parser{
 		log:         config.Ctx.Log,
@@ -213,6 +225,26 @@ func (b *Bootstrapper) fetch(blkID ids.ID) error {
 
 	b.OutstandingRequests.Add(validatorID, b.RequestID, blkID)
 	b.Sender.SendGetAncestors(validatorID, b.RequestID, blkID) // request block and ancestors
+	return nil
+}
+
+// GetAncestors implements the Engine interface
+func (b *Bootstrapper) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
+	ancestorsBytes, err := block.GetAncestors(
+		b.VM,
+		blkID,
+		b.MultiputMaxContainersSent,
+		constants.MaxContainersLen,
+		b.MaxTimeGetAncestors,
+	)
+	if err != nil {
+		b.Ctx.Log.Verbo("couldn't get ancestors with %s. Dropping GetAncestors(%s, %d, %s)",
+			err, vdr, requestID, blkID)
+		return nil
+	}
+
+	b.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
+	b.Sender.SendMultiPut(vdr, requestID, ancestorsBytes)
 	return nil
 }
 
@@ -490,11 +522,6 @@ func (b *Bootstrapper) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkB
 	} else {
 		b.Ctx.Log.Debug("dropping Put(%s, %d, %s) due to bootstrapping", vdr, requestID, blkID)
 	}
-	return nil
-}
-
-func (b *Bootstrapper) GetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error {
-	b.Ctx.Log.Debug("Received GetAncestors message from (%s) during bootstrap. Dropping it", validatorID)
 	return nil
 }
 

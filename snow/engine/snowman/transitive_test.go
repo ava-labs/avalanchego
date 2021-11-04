@@ -95,7 +95,13 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(config, &bootstrapper.Bootstrapper); err != nil {
+	if dh.startEngineF, err = te.Initialize(
+		config,
+		config.Ctx,
+		config.Sender,
+		&bootstrapper.RequestID,
+		bootstrapper.Validators,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -129,7 +135,7 @@ func TestEngineShutdown(t *testing.T) {
 func TestEngineAdd(t *testing.T) {
 	vdr, _, sender, vm, te, gBlk := setup(t)
 
-	if te.TheOneCommonBootstrapper.Ctx.ChainID != ids.Empty {
+	if te.Ctx.ChainID != ids.Empty {
 		t.Fatalf("Wrong chain ID")
 	}
 
@@ -485,7 +491,13 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(config, &bootstrapper.Bootstrapper); err != nil {
+	if dh.startEngineF, err = te.Initialize(
+		config,
+		config.Ctx,
+		config.Sender,
+		&bootstrapper.RequestID,
+		bootstrapper.Validators,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -994,7 +1006,13 @@ func TestVoteCanceling(t *testing.T) {
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(config, &bootstrapper.Bootstrapper); err != nil {
+	if dh.startEngineF, err = te.Initialize(
+		config,
+		config.Ctx,
+		config.Sender,
+		&bootstrapper.RequestID,
+		bootstrapper.Validators,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1109,7 +1127,13 @@ func TestEngineNoQuery(t *testing.T) {
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(config, &bootstrapper.Bootstrapper); err != nil {
+	if dh.startEngineF, err = te.Initialize(
+		config,
+		config.Ctx,
+		config.Sender,
+		&bootstrapper.RequestID,
+		bootstrapper.Validators,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1176,7 +1200,12 @@ func TestEngineNoRepollQuery(t *testing.T) {
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(config, &bootstrapper.Bootstrapper); err != nil {
+	if dh.startEngineF, err = te.Initialize(
+		config,
+		config.Ctx,
+		config.Sender,
+		&bootstrapper.RequestID,
+		bootstrapper.Validators); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1874,7 +1903,13 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(config, &bootstrapper.Bootstrapper); err != nil {
+	if dh.startEngineF, err = te.Initialize(
+		config,
+		config.Ctx,
+		config.Sender,
+		&bootstrapper.RequestID,
+		bootstrapper.Validators,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2018,7 +2053,13 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(config, &bootstrapper.Bootstrapper); err != nil {
+	if dh.startEngineF, err = te.Initialize(
+		config,
+		config.Ctx,
+		config.Sender,
+		&bootstrapper.RequestID,
+		bootstrapper.Validators,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2166,7 +2207,13 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(config, &bootstrapper.Bootstrapper); err != nil {
+	if dh.startEngineF, err = te.Initialize(
+		config,
+		config.Ctx,
+		config.Sender,
+		&bootstrapper.RequestID,
+		bootstrapper.Validators,
+	); err != nil {
 		t.Fatal(err)
 	}
 

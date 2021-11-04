@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/events"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -26,10 +26,12 @@ var _ Engine = &Transitive{}
 // Transitive implements the Engine interface by attempting to fetch all
 // transitive dependencies.
 type Transitive struct {
-	// PULL OUT ENGINE NEEDED STUFF FROM BOOSTRAPPER
-	TheOneCommonBootstrapper *common.Bootstrapper
-	EngineVM                 block.ChainVM
-	// END OF PULL OUT ENGINE NEEDED STUFF FROM BOOSTRAPPER
+	Ctx    *snow.Context
+	Sender common.Sender
+	VM     block.ChainVM
+
+	RequestID  *uint32
+	Validators validators.Set
 
 	metrics
 
@@ -63,11 +65,17 @@ type Transitive struct {
 
 // Initialize implements the Engine interface
 func (t *Transitive) Initialize(config Config,
-	theOneCommonBootstrapper *common.Bootstrapper,
+	ctx *snow.Context,
+	sender common.Sender,
+	requestID *uint32,
+	validators validators.Set,
 ) (func() error, error) {
-	t.TheOneCommonBootstrapper = theOneCommonBootstrapper
-	t.EngineVM = config.VM
-	t.TheOneCommonBootstrapper.Ctx.Log.Info("initializing consensus engine")
+	t.Ctx = ctx
+	t.Sender = sender
+	t.VM = config.VM
+	t.RequestID = requestID
+	t.Validators = validators
+	t.Ctx.Log.Info("initializing consensus engine")
 
 	t.Params = config.Params
 	t.Consensus = config.Consensus
@@ -76,7 +84,7 @@ func (t *Transitive) Initialize(config Config,
 
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t.polls = poll.NewSet(factory,
-		config.Ctx.Log,
+		t.Ctx.Log,
 		config.Params.Namespace,
 		config.Params.Metrics,
 	)
@@ -89,27 +97,27 @@ func (t *Transitive) Initialize(config Config,
 }
 
 func (t *Transitive) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	return t.TheOneCommonBootstrapper.GetAccepted(validatorID, requestID, containerIDs)
+	return fmt.Errorf("GetAccepted message should not be handled by engine. Dropping it")
 }
 
 func (t *Transitive) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	return t.TheOneCommonBootstrapper.Accepted(validatorID, requestID, containerIDs)
+	return fmt.Errorf("Accepted message should not be handled by engine. Dropping it")
 }
 
 func (t *Transitive) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
-	return t.TheOneCommonBootstrapper.GetAcceptedFailed(validatorID, requestID)
+	return fmt.Errorf("GetAcceptedFailed message should not be handled by engine. Dropping it")
 }
 
 func (t *Transitive) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
-	return t.TheOneCommonBootstrapper.GetAcceptedFrontier(validatorID, requestID)
+	return fmt.Errorf("GetAcceptedFrontier message should not be handled by engine. Dropping it")
 }
 
 func (t *Transitive) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	return t.TheOneCommonBootstrapper.AcceptedFrontier(validatorID, requestID, containerIDs)
+	return fmt.Errorf("AcceptedFrontier message should not be handled by engine. Dropping it")
 }
 
 func (t *Transitive) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
-	return t.TheOneCommonBootstrapper.GetAcceptedFrontierFailed(validatorID, requestID)
+	return fmt.Errorf("GetAcceptedFrontierFailed message should not be handled by engine. Dropping it")
 }
 
 func (t *Transitive) MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) error {
@@ -121,11 +129,11 @@ func (t *Transitive) GetAncestorsFailed(validatorID ids.ShortID, requestID uint3
 }
 
 func (t *Transitive) Context() *snow.Context {
-	return t.TheOneCommonBootstrapper.Ctx
+	return t.Ctx
 }
 
 func (t *Transitive) Halt() {
-	t.TheOneCommonBootstrapper.Halt()
+	t.Ctx.Log.Warn("Halt command should not be handled by engine. Dropping it")
 }
 
 func (t *Transitive) Timeout() error {
@@ -143,18 +151,18 @@ func (t *Transitive) Disconnected(validatorID ids.ShortID) error {
 // When bootstrapping is finished, this will be called.
 // This initializes the consensus engine with the last accepted block.
 func (t *Transitive) FinishBootstrapping() error {
-	lastAcceptedID, err := t.EngineVM.LastAccepted()
+	lastAcceptedID, err := t.VM.LastAccepted()
 	if err != nil {
 		return err
 	}
 	lastAccepted, err := t.GetBlock(lastAcceptedID)
 	if err != nil {
-		t.TheOneCommonBootstrapper.Ctx.Log.Error("failed to get last accepted block due to: %s", err)
+		t.Ctx.Log.Error("failed to get last accepted block due to: %s", err)
 		return err
 	}
 
 	// initialize consensus to the last accepted blockID
-	if err := t.Consensus.Initialize(t.TheOneCommonBootstrapper.Ctx, t.Params, lastAcceptedID, lastAccepted.Height()); err != nil {
+	if err := t.Consensus.Initialize(t.Ctx, t.Params, lastAcceptedID, lastAccepted.Height()); err != nil {
 		return err
 	}
 
@@ -166,7 +174,7 @@ func (t *Transitive) FinishBootstrapping() error {
 		case err == snowman.ErrNotOracle:
 			// if there aren't blocks we need to deliver on startup, we need to set
 			// the preference to the last accepted block
-			if err := t.EngineVM.SetPreference(lastAcceptedID); err != nil {
+			if err := t.VM.SetPreference(lastAcceptedID); err != nil {
 				return err
 			}
 		case err != nil:
@@ -179,34 +187,34 @@ func (t *Transitive) FinishBootstrapping() error {
 				}
 			}
 		}
-	} else if err := t.EngineVM.SetPreference(lastAcceptedID); err != nil {
+	} else if err := t.VM.SetPreference(lastAcceptedID); err != nil {
 		return err
 	}
 
-	t.TheOneCommonBootstrapper.Ctx.Log.Info("bootstrapping finished with %s as the last accepted block", lastAcceptedID)
+	t.Ctx.Log.Info("bootstrapping finished with %s as the last accepted block", lastAcceptedID)
 	return nil
 }
 
 // Gossip implements the Engine interface
 func (t *Transitive) Gossip() error {
-	blkID, err := t.EngineVM.LastAccepted()
+	blkID, err := t.VM.LastAccepted()
 	if err != nil {
 		return err
 	}
 	blk, err := t.GetBlock(blkID)
 	if err != nil {
-		t.TheOneCommonBootstrapper.Ctx.Log.Warn("dropping gossip request as %s couldn't be loaded due to %s", blkID, err)
+		t.Ctx.Log.Warn("dropping gossip request as %s couldn't be loaded due to %s", blkID, err)
 		return nil
 	}
-	t.TheOneCommonBootstrapper.Ctx.Log.Verbo("gossiping %s as accepted to the network", blkID)
-	t.TheOneCommonBootstrapper.Sender.SendGossip(blkID, blk.Bytes())
+	t.Ctx.Log.Verbo("gossiping %s as accepted to the network", blkID)
+	t.Sender.SendGossip(blkID, blk.Bytes())
 	return nil
 }
 
 // Shutdown implements the Engine interface
 func (t *Transitive) Shutdown() error {
-	t.TheOneCommonBootstrapper.Ctx.Log.Info("shutting down consensus engine")
-	return t.EngineVM.Shutdown()
+	t.Ctx.Log.Info("shutting down consensus engine")
+	return t.VM.Shutdown()
 }
 
 // Get implements the Engine interface
@@ -216,43 +224,28 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, blkID ids.ID) error 
 		// If we failed to get the block, that means either an unexpected error
 		// has occurred, [vdr] is not following the protocol, or the
 		// block has been pruned.
-		t.TheOneCommonBootstrapper.Ctx.Log.Debug("Get(%s, %d, %s) failed with: %s", vdr, requestID, blkID, err)
+		t.Ctx.Log.Debug("Get(%s, %d, %s) failed with: %s", vdr, requestID, blkID, err)
 		return nil
 	}
 
 	// Respond to the validator with the fetched block and the same requestID.
-	t.TheOneCommonBootstrapper.Sender.SendPut(vdr, requestID, blkID, blk.Bytes())
+	t.Sender.SendPut(vdr, requestID, blkID, blk.Bytes())
 	return nil
 }
 
 // GetAncestors implements the Engine interface
 func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
-	ancestorsBytes, err := block.GetAncestors(
-		t.EngineVM,
-		blkID,
-		t.TheOneCommonBootstrapper.MultiputMaxContainersSent,
-		constants.MaxContainersLen,
-		t.TheOneCommonBootstrapper.MaxTimeGetAncestors,
-	)
-	if err != nil {
-		t.TheOneCommonBootstrapper.Ctx.Log.Verbo("couldn't get ancestors with %s. Dropping GetAncestors(%s, %d, %s)",
-			err, vdr, requestID, blkID)
-		return nil
-	}
-
-	t.metrics.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
-	t.TheOneCommonBootstrapper.Sender.SendMultiPut(vdr, requestID, ancestorsBytes)
-	return nil
+	return fmt.Errorf("getAncestors message should not be handled by engine. Dropping it")
 }
 
 // Put implements the Engine interface
 func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
-	t.TheOneCommonBootstrapper.Ctx.Log.AssertTrue(t.IsBootstrapped(), "Put received by Engine during Bootstrap")
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "Put received by Engine during Bootstrap")
 
-	blk, err := t.EngineVM.ParseBlock(blkBytes)
+	blk, err := t.VM.ParseBlock(blkBytes)
 	if err != nil {
-		t.TheOneCommonBootstrapper.Ctx.Log.Debug("failed to parse block %s: %s", blkID, err)
-		t.TheOneCommonBootstrapper.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes{Bytes: blkBytes})
+		t.Ctx.Log.Debug("failed to parse block %s: %s", blkID, err)
+		t.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes{Bytes: blkBytes})
 		// because GetFailed doesn't utilize the assumption that we actually
 		// sent a Get message, we can safely call GetFailed here to potentially
 		// abandon the request.
@@ -272,13 +265,13 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkByt
 
 // GetFailed implements the Engine interface
 func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
-	t.TheOneCommonBootstrapper.Ctx.Log.AssertTrue(t.IsBootstrapped(), "GetFailed received by Engine during Bootstrap")
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "GetFailed received by Engine during Bootstrap")
 
 	// We don't assume that this function is called after a failed Get message.
 	// Check to see if we have an outstanding request and also get what the request was for if it exists.
 	blkID, ok := t.blkReqs.Remove(vdr, requestID)
 	if !ok {
-		t.TheOneCommonBootstrapper.Ctx.Log.Debug("getFailed(%s, %d) called without having sent corresponding Get", vdr, requestID)
+		t.Ctx.Log.Debug("getFailed(%s, %d) called without having sent corresponding Get", vdr, requestID)
 		return nil
 	}
 
@@ -291,12 +284,12 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 // PullQuery implements the Engine interface
 func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
 	// If the engine hasn't been bootstrapped, we aren't ready to respond to queries
-	t.TheOneCommonBootstrapper.Ctx.Log.AssertTrue(t.IsBootstrapped(), "PullQuery received by Engine during Bootstrap")
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "PullQuery received by Engine during Bootstrap")
 
 	// Will send chits once we've issued block [blkID] into consensus
 	c := &convincer{
 		consensus: t.Consensus,
-		sender:    t.TheOneCommonBootstrapper.Sender,
+		sender:    t.Sender,
 		vdr:       vdr,
 		requestID: requestID,
 		errs:      &t.errs,
@@ -322,13 +315,13 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) 
 // PushQuery implements the Engine interface
 func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
 	// if the engine hasn't been bootstrapped, we aren't ready to respond to queries
-	t.TheOneCommonBootstrapper.Ctx.Log.AssertTrue(t.IsBootstrapped(), "PushQuery received by Engine during Bootstrap")
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "PushQuery received by Engine during Bootstrap")
 
-	blk, err := t.EngineVM.ParseBlock(blkBytes)
+	blk, err := t.VM.ParseBlock(blkBytes)
 	// If parsing fails, we just drop the request, as we didn't ask for it
 	if err != nil {
-		t.TheOneCommonBootstrapper.Ctx.Log.Debug("failed to parse block %s: %s", blkID, err)
-		t.TheOneCommonBootstrapper.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes{Bytes: blkBytes})
+		t.Ctx.Log.Debug("failed to parse block %s: %s", blkID, err)
+		t.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes{Bytes: blkBytes})
 		return nil
 	}
 
@@ -348,11 +341,11 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, 
 // Chits implements the Engine interface
 func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) error {
 	// if the engine hasn't been bootstrapped, we shouldn't be receiving chits
-	t.TheOneCommonBootstrapper.Ctx.Log.AssertTrue(t.IsBootstrapped(), "Chits received by Engine during Bootstrap")
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "Chits received by Engine during Bootstrap")
 
 	// Since this is a linear chain, there should only be one ID in the vote set
 	if len(votes) != 1 {
-		t.TheOneCommonBootstrapper.Ctx.Log.Debug("Chits(%s, %d) was called with %d votes (expected 1)", vdr, requestID, len(votes))
+		t.Ctx.Log.Debug("Chits(%s, %d) was called with %d votes (expected 1)", vdr, requestID, len(votes))
 		// because QueryFailed doesn't utilize the assumption that we actually
 		// sent a Query message, we can safely call QueryFailed here to
 		// potentially abandon the request.
@@ -360,7 +353,7 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) er
 	}
 	blkID := votes[0]
 
-	t.TheOneCommonBootstrapper.Ctx.Log.Verbo("Chits(%s, %d) contains vote for %s", vdr, requestID, blkID)
+	t.Ctx.Log.Verbo("Chits(%s, %d) contains vote for %s", vdr, requestID, blkID)
 
 	// Will record chits once [blkID] has been issued into consensus
 	v := &voter{
@@ -387,7 +380,7 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) er
 // QueryFailed implements the Engine interface
 func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
 	// If the engine hasn't been bootstrapped, we didn't issue a query
-	t.TheOneCommonBootstrapper.Ctx.Log.AssertTrue(t.IsBootstrapped(), "QueryFailed received by Engine during Bootstrap")
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "QueryFailed received by Engine during Bootstrap")
 
 	t.blocked.Register(&voter{
 		t:         t,
@@ -400,48 +393,48 @@ func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
 
 // AppRequest implements the Engine interface
 func (t *Transitive) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
-	t.TheOneCommonBootstrapper.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppRequest received by Engine during Bootstrap")
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppRequest received by Engine during Bootstrap")
 
 	// Notify the VM of this request
-	return t.EngineVM.AppRequest(nodeID, requestID, deadline, request)
+	return t.VM.AppRequest(nodeID, requestID, deadline, request)
 }
 
 // AppResponse implements the Engine interface
 func (t *Transitive) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
-	t.TheOneCommonBootstrapper.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppResponse received by Engine during Bootstrap")
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppResponse received by Engine during Bootstrap")
 
 	// Notify the VM of a response to its request
-	return t.EngineVM.AppResponse(nodeID, requestID, response)
+	return t.VM.AppResponse(nodeID, requestID, response)
 }
 
 // AppRequestFailed implements the Engine interface
 func (t *Transitive) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
-	t.TheOneCommonBootstrapper.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppRequestFailed received by Engine during Bootstrap")
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppRequestFailed received by Engine during Bootstrap")
 
 	// Notify the VM that a request it made failed
-	return t.EngineVM.AppRequestFailed(nodeID, requestID)
+	return t.VM.AppRequestFailed(nodeID, requestID)
 }
 
 // AppGossip implements the Engine interface
 func (t *Transitive) AppGossip(nodeID ids.ShortID, msg []byte) error {
-	t.TheOneCommonBootstrapper.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppGossip received by Engine during Bootstrap")
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppGossip received by Engine during Bootstrap")
 
 	// Notify the VM of this message which has been gossiped to it
-	return t.EngineVM.AppGossip(nodeID, msg)
+	return t.VM.AppGossip(nodeID, msg)
 }
 
 // Notify implements the Engine interface
 func (t *Transitive) Notify(msg common.Message) error {
 	// if the engine hasn't been bootstrapped, we shouldn't build/issue blocks from the VM
-	t.TheOneCommonBootstrapper.Ctx.Log.AssertTrue(t.IsBootstrapped(), "Notify received by Engine during Bootstrap")
-	t.TheOneCommonBootstrapper.Ctx.Log.Verbo("snowman engine notified of %s from the vm", msg)
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "Notify received by Engine during Bootstrap")
+	t.Ctx.Log.Verbo("snowman engine notified of %s from the vm", msg)
 	switch msg {
 	case common.PendingTxs:
 		// the pending txs message means we should attempt to build a block.
 		t.pendingBuildBlocks++
 		return t.buildBlocks()
 	default:
-		t.TheOneCommonBootstrapper.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
+		t.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
 	}
 	return nil
 }
@@ -455,9 +448,9 @@ func (t *Transitive) buildBlocks() error {
 	for t.pendingBuildBlocks > 0 && t.Consensus.NumProcessing() < t.Params.OptimalProcessing {
 		t.pendingBuildBlocks--
 
-		blk, err := t.EngineVM.BuildBlock()
+		blk, err := t.VM.BuildBlock()
 		if err != nil {
-			t.TheOneCommonBootstrapper.Ctx.Log.Debug("VM.BuildBlock errored with: %s", err)
+			t.Ctx.Log.Debug("VM.BuildBlock errored with: %s", err)
 			t.numBuildsFailed.Inc()
 			return nil
 		}
@@ -466,14 +459,14 @@ func (t *Transitive) buildBlocks() error {
 		// a newly created block is expected to be processing. If this check
 		// fails, there is potentially an error in the VM this engine is running
 		if status := blk.Status(); status != choices.Processing {
-			t.TheOneCommonBootstrapper.Ctx.Log.Warn("attempting to issue a block with status: %s, expected Processing", status)
+			t.Ctx.Log.Warn("attempting to issue a block with status: %s, expected Processing", status)
 		}
 
 		// The newly created block should be built on top of the preferred block.
 		// Otherwise, the new block doesn't have the best chance of being confirmed.
 		parentID := blk.Parent()
 		if pref := t.Consensus.Preference(); parentID != pref {
-			t.TheOneCommonBootstrapper.Ctx.Log.Warn("built block with parent: %s, expected %s", parentID, pref)
+			t.Ctx.Log.Warn("built block with parent: %s, expected %s", parentID, pref)
 		}
 
 		added, err := t.issueWithAncestors(blk)
@@ -483,9 +476,9 @@ func (t *Transitive) buildBlocks() error {
 
 		// issuing the block shouldn't have any missing dependencies
 		if added {
-			t.TheOneCommonBootstrapper.Ctx.Log.Verbo("successfully issued new block from the VM")
+			t.Ctx.Log.Verbo("successfully issued new block from the VM")
 		} else {
-			t.TheOneCommonBootstrapper.Ctx.Log.Warn("VM.BuildBlock returned a block with unissued ancestors")
+			t.Ctx.Log.Warn("VM.BuildBlock returned a block with unissued ancestors")
 		}
 	}
 	return nil
@@ -614,7 +607,7 @@ func (t *Transitive) issue(blk snowman.Block) error {
 	// block on the parent if needed
 	parentID := blk.Parent()
 	if parent, err := t.GetBlock(parentID); err != nil || !t.Consensus.DecidedOrProcessing(parent) {
-		t.TheOneCommonBootstrapper.Ctx.Log.Verbo("block %s waiting for parent %s to be issued", blkID, parentID)
+		t.Ctx.Log.Verbo("block %s waiting for parent %s to be issued", blkID, parentID)
 		i.deps.Add(parentID)
 	}
 
@@ -634,10 +627,10 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, blkID ids.ID) {
 		return
 	}
 
-	t.TheOneCommonBootstrapper.RequestID++
-	t.blkReqs.Add(vdr, t.TheOneCommonBootstrapper.RequestID, blkID)
-	t.TheOneCommonBootstrapper.Ctx.Log.Verbo("sending Get(%s, %d, %s)", vdr, t.TheOneCommonBootstrapper.RequestID, blkID)
-	t.TheOneCommonBootstrapper.Sender.SendGet(vdr, t.TheOneCommonBootstrapper.RequestID, blkID)
+	(*t.RequestID)++
+	t.blkReqs.Add(vdr, (*t.RequestID), blkID)
+	t.Ctx.Log.Verbo("sending Get(%s, %d, %s)", vdr, (*t.RequestID), blkID)
+	t.Sender.SendGet(vdr, (*t.RequestID), blkID)
 
 	// Tracks performance statistics
 	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
@@ -645,43 +638,43 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, blkID ids.ID) {
 
 // send a pull query for this block ID
 func (t *Transitive) pullQuery(blkID ids.ID) {
-	t.TheOneCommonBootstrapper.Ctx.Log.Verbo("about to sample from: %s", t.TheOneCommonBootstrapper.Validators)
+	t.Ctx.Log.Verbo("about to sample from: %s", t.Validators)
 	// The validators we will query
-	vdrs, err := t.TheOneCommonBootstrapper.Validators.Sample(t.Params.K)
+	vdrs, err := t.Validators.Sample(t.Params.K)
 	vdrBag := ids.ShortBag{}
 	for _, vdr := range vdrs {
 		vdrBag.Add(vdr.ID())
 	}
 
-	t.TheOneCommonBootstrapper.RequestID++
-	if err == nil && t.polls.Add(t.TheOneCommonBootstrapper.RequestID, vdrBag) {
+	(*t.RequestID)++
+	if err == nil && t.polls.Add((*t.RequestID), vdrBag) {
 		vdrList := vdrBag.List()
 		vdrSet := ids.NewShortSet(len(vdrList))
 		vdrSet.Add(vdrList...)
-		t.TheOneCommonBootstrapper.Sender.SendPullQuery(vdrSet, t.TheOneCommonBootstrapper.RequestID, blkID)
+		t.Sender.SendPullQuery(vdrSet, (*t.RequestID), blkID)
 	} else if err != nil {
-		t.TheOneCommonBootstrapper.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", blkID)
+		t.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", blkID)
 	}
 }
 
 // send a push query for this block
 func (t *Transitive) pushQuery(blk snowman.Block) {
-	t.TheOneCommonBootstrapper.Ctx.Log.Verbo("about to sample from: %s", t.TheOneCommonBootstrapper.Validators)
-	vdrs, err := t.TheOneCommonBootstrapper.Validators.Sample(t.Params.K)
+	t.Ctx.Log.Verbo("about to sample from: %s", t.Validators)
+	vdrs, err := t.Validators.Sample(t.Params.K)
 	vdrBag := ids.ShortBag{}
 	for _, vdr := range vdrs {
 		vdrBag.Add(vdr.ID())
 	}
 
-	t.TheOneCommonBootstrapper.RequestID++
-	if err == nil && t.polls.Add(t.TheOneCommonBootstrapper.RequestID, vdrBag) {
+	(*t.RequestID)++
+	if err == nil && t.polls.Add((*t.RequestID), vdrBag) {
 		vdrList := vdrBag.List()
 		vdrSet := ids.NewShortSet(len(vdrList))
 		vdrSet.Add(vdrList...)
 
-		t.TheOneCommonBootstrapper.Sender.SendPushQuery(vdrSet, t.TheOneCommonBootstrapper.RequestID, blk.ID(), blk.Bytes())
+		t.Sender.SendPushQuery(vdrSet, (*t.RequestID), blk.ID(), blk.Bytes())
 	} else if err != nil {
-		t.TheOneCommonBootstrapper.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", blk.ID())
+		t.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", blk.ID())
 	}
 }
 
@@ -715,7 +708,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 
 	// make sure this block is valid
 	if err := blk.Verify(); err != nil {
-		t.TheOneCommonBootstrapper.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
+		t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
 
 		// if verify fails, then all descendants are also invalid
 		t.addToNonVerifieds(blk)
@@ -726,7 +719,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	}
 	t.nonVerifieds.Remove(blkID)
 	t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
-	t.TheOneCommonBootstrapper.Ctx.Log.Verbo("adding block to consensus: %s", blkID)
+	t.Ctx.Log.Verbo("adding block to consensus: %s", blkID)
 	wrappedBlk := &memoryBlock{
 		Block:   blk,
 		metrics: &t.metrics,
@@ -750,7 +743,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 
 			for _, blk := range options {
 				if err := blk.Verify(); err != nil {
-					t.TheOneCommonBootstrapper.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
+					t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
 					dropped = append(dropped, blk)
 					// block fails verification, hold this in memory for bubbling
 					t.addToNonVerifieds(blk)
@@ -773,7 +766,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		}
 	}
 
-	if err := t.EngineVM.SetPreference(t.Consensus.Preference()); err != nil {
+	if err := t.VM.SetPreference(t.Consensus.Preference()); err != nil {
 		return err
 	}
 
@@ -813,15 +806,15 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 
 // IsBootstrapped returns true iff this chain is done bootstrapping
 func (t *Transitive) IsBootstrapped() bool {
-	return t.TheOneCommonBootstrapper.Ctx.IsBootstrapped()
+	return t.Ctx.IsBootstrapped()
 }
 
 // HealthCheck implements the common.Engine interface
 func (t *Transitive) HealthCheck() (interface{}, error) {
-	t.TheOneCommonBootstrapper.Ctx.Log.AssertTrue(t.IsBootstrapped(), "HealthCheck received by Engine during Bootstrap")
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "HealthCheck received by Engine during Bootstrap")
 
 	consensusIntf, consensusErr := t.Consensus.HealthCheck()
-	vmIntf, vmErr := t.EngineVM.HealthCheck()
+	vmIntf, vmErr := t.VM.HealthCheck()
 	intf := map[string]interface{}{
 		"consensus": consensusIntf,
 		"vm":        vmIntf,
@@ -840,12 +833,12 @@ func (t *Transitive) GetBlock(blkID ids.ID) (snowman.Block, error) {
 	if blk, ok := t.pending[blkID]; ok {
 		return blk, nil
 	}
-	return t.EngineVM.GetBlock(blkID)
+	return t.VM.GetBlock(blkID)
 }
 
 // GetVM implements the snowman.Engine interface
 func (t *Transitive) GetVM() common.VM {
-	return t.EngineVM
+	return t.VM
 }
 
 // Returns true if the block whose ID is [blkID] is waiting to be issued to consensus

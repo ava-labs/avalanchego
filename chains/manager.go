@@ -774,7 +774,10 @@ func (m *manager) createSnowmanChain(
 		Params:    consensusParams,
 		Consensus: &smcon.Topological{},
 	},
-		&bootstrapper.Bootstrapper,
+		bootstrapCfg.Ctx,
+		bootstrapCfg.Sender,
+		&bootstrapper.RequestID,
+		bootstrapper.Validators,
 	); err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
