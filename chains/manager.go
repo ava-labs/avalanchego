@@ -607,6 +607,7 @@ func (m *manager) createAvalancheChain(
 
 	err = handler.Initialize(
 		m.MsgCreator,
+		nil,
 		engine,
 		vdrs,
 		msgChan,
@@ -757,7 +758,7 @@ func (m *manager) createSnowmanChain(
 
 	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
 	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
-	bootstrapper := smbootstrap.Bootstrapper{}
+	bootstrapper := &smbootstrap.Bootstrapper{}
 	if err := bootstrapper.Initialize(
 		bootstrapCfg,
 		handler.OnDoneBootstrapping,
@@ -774,11 +775,6 @@ func (m *manager) createSnowmanChain(
 		Consensus: &smcon.Topological{},
 	},
 		&bootstrapper.Bootstrapper,
-		bootstrapper.MultiPut,
-		bootstrapper.GetAncestorsFailed,
-		bootstrapper.Timeout,
-		bootstrapper.Connected,
-		bootstrapper.Disconnected,
 	); err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
@@ -789,6 +785,7 @@ func (m *manager) createSnowmanChain(
 
 	if err = handler.Initialize(
 		m.MsgCreator,
+		bootstrapper,
 		engine,
 		vdrs,
 		msgChan,
@@ -807,7 +804,10 @@ func (m *manager) createSnowmanChain(
 	checkFn := func() (interface{}, error) {
 		ctx.Lock.Lock()
 		defer ctx.Lock.Unlock()
-		return engine.HealthCheck()
+		if bootstrapCfg.Ctx.IsBootstrapped() {
+			return engine.HealthCheck()
+		}
+		return bootstrapper.HealthCheck()
 	}
 	if err := m.HealthService.RegisterCheck(chainAlias, checkFn); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)

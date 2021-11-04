@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 // Parameters for delaying bootstrapping to avoid potential CPU burns
@@ -25,6 +26,12 @@ const bootstrappingDelay = 10 * time.Second
 var (
 	errUnexpectedTimeout                      = errors.New("unexpected timeout fired")
 	_                    common.Bootstrapable = &Bootstrapper{}
+
+	// TODO ABENEGIA: conflate in a single interface
+	// Something like FullMessageHandler since this is a way to ensure
+	// at compile time that all messages in interface are handled
+	_ common.Engine = &Bootstrapper{}
+	_ block.Getter  = &Bootstrapper{}
 )
 
 type Config struct {
@@ -444,4 +451,110 @@ func (b *Bootstrapper) Disconnected(nodeID ids.ShortID) error {
 	}
 
 	return b.Bootstrapper.Disconnected(nodeID)
+}
+
+// AppHandler interface
+func (b *Bootstrapper) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
+	b.Ctx.Log.Debug("dropping AppRequest(%s, %d) due to bootstrapping", nodeID, requestID)
+	return nil
+}
+
+func (b *Bootstrapper) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	b.Ctx.Log.Debug("dropping AppResponse(%s, %d) due to bootstrapping", nodeID, requestID)
+	return nil
+}
+
+func (b *Bootstrapper) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	b.Ctx.Log.Debug("dropping AppRequestFailed(%s, %d) due to bootstrapping", nodeID, requestID)
+	return nil
+}
+
+func (b *Bootstrapper) AppGossip(nodeID ids.ShortID, msg []byte) error {
+	b.Ctx.Log.Debug("dropping AppGossip(%s) due to bootstrapping", nodeID)
+	return nil
+}
+
+// End of AppHandler interface
+
+func (b *Bootstrapper) Get(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error {
+	b.Ctx.Log.Debug("Received Get message from (%s) during bootstrap. Dropping it", validatorID)
+	return nil
+}
+
+func (b *Bootstrapper) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
+	// bootstrapping isn't done --> we didn't send any gets --> this put is invalid
+	// TODO ABENEGIA: this comes from engine where IsBootStrapped is checked.
+	// Here assumed IsBootstrapped is checked in handler
+	if requestID == constants.GossipMsgRequestID {
+		b.Ctx.Log.Verbo("dropping gossip Put(%s, %d, %s) due to bootstrapping", vdr, requestID, blkID)
+	} else {
+		b.Ctx.Log.Debug("dropping Put(%s, %d, %s) due to bootstrapping", vdr, requestID, blkID)
+	}
+	return nil
+}
+
+func (b *Bootstrapper) GetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error {
+	b.Ctx.Log.Debug("Received GetAncestors message from (%s) during bootstrap. Dropping it", validatorID)
+	return nil
+}
+
+func (b *Bootstrapper) GetFailed(validatorID ids.ShortID, requestID uint32) error {
+	// not done bootstrapping --> didn't send a get --> this message is invalid
+	b.Ctx.Log.Debug("dropping GetFailed(%s, %d) due to bootstrapping", validatorID, requestID)
+	return nil
+}
+
+func (b *Bootstrapper) GetVM() common.VM {
+	return b.VM
+}
+
+func (b *Bootstrapper) Gossip() error {
+	b.Ctx.Log.Debug("No Gossip during bootstrap. Dropping it")
+	return nil
+}
+
+func (b *Bootstrapper) Notify(common.Message) error {
+	b.Ctx.Log.Debug("dropping Notify due to bootstrapping")
+	return nil
+}
+
+func (b *Bootstrapper) Shutdown() error {
+	b.Ctx.Log.Debug("Called Shutdown during bootstrap. Doing nothing for now")
+	return nil
+}
+
+func (b *Bootstrapper) HealthCheck() (interface{}, error) {
+	vmIntf, vmErr := b.VM.HealthCheck()
+	intf := map[string]interface{}{
+		"consensus": struct{}{},
+		"vm":        vmIntf,
+	}
+	return intf, vmErr
+}
+
+// QueryHandler interface
+func (b *Bootstrapper) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
+	b.Ctx.Log.Debug("dropping PullQuery(%s, %d, %s) due to bootstrapping", vdr, requestID, blkID)
+	return nil
+}
+
+func (b *Bootstrapper) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
+	b.Ctx.Log.Debug("dropping PushQuery(%s, %d, %s) due to bootstrapping", vdr, requestID, blkID)
+	return nil
+}
+
+func (b *Bootstrapper) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) error {
+	b.Ctx.Log.Debug("dropping Chits(%s, %d) due to bootstrapping", vdr, requestID)
+	return nil
+}
+
+func (b *Bootstrapper) QueryFailed(vdr ids.ShortID, requestID uint32) error {
+	b.Ctx.Log.Debug("dropping QueryFailed(%s, %d) due to bootstrapping", vdr, requestID)
+	return nil
+}
+
+// End of QueryHandler interface
+
+func (b *Bootstrapper) GetBlock(blkID ids.ID) (snowman.Block, error) {
+	return b.VM.GetBlock(blkID)
 }

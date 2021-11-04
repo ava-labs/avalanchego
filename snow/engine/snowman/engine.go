@@ -4,7 +4,6 @@
 package snowman
 
 import (
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
@@ -24,10 +23,5 @@ type Engine interface {
 	// Initialize this engine.
 	Initialize(config Config,
 		theOneCommonBootstrapper *common.Bootstrapper,
-		multiPutF func(validatorID ids.ShortID, requestID uint32, containers [][]byte) error,
-		getAncestorsFailedF func(validatorID ids.ShortID, requestID uint32) error,
-		timeoutF func() error,
-		connectedF func(validatorID ids.ShortID) error,
-		disconnectedF func(validatorID ids.ShortID) error,
 	) (func() error, error)
 }

@@ -108,6 +108,7 @@ func TestTimeout(t *testing.T) {
 	handler := router.Handler{}
 	err = handler.Initialize(
 		mc,
+		nil, // TODO ABENEGIA: clean avalanche engine and duly init
 		&engine,
 		vdrs,
 		nil,
@@ -193,6 +194,7 @@ func TestReliableMessages(t *testing.T) {
 	handler := router.Handler{}
 	err = handler.Initialize(
 		mc,
+		nil, // TODO ABENEGIA: clean avalanche engine and duly init
 		&engine,
 		vdrs,
 		nil,
@@ -286,6 +288,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	handler := router.Handler{}
 	err = handler.Initialize(
 		mc,
+		nil, // TODO ABENEGIA: clean avalanche engine and duly init
 		&engine,
 		vdrs,
 		nil,

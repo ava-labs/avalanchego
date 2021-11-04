@@ -2151,7 +2151,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := bootstrap.Bootstrapper{}
+	bootstrapper := &bootstrap.Bootstrapper{}
 	if err := bootstrapper.Initialize(
 		config.Config,
 		dh.onDoneBootstrapping,
@@ -2162,13 +2162,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	engine := smeng.Transitive{}
-	if dh.startEngineF, err = engine.Initialize(config,
-		&bootstrapper.Bootstrapper,
-		bootstrapper.MultiPut,
-		bootstrapper.GetAncestorsFailed,
-		bootstrapper.Timeout,
-		bootstrapper.Connected,
-		bootstrapper.Disconnected); err != nil {
+	if dh.startEngineF, err = engine.Initialize(config, &bootstrapper.Bootstrapper); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2180,6 +2174,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	handler := &router.Handler{}
 	err = handler.Initialize(
 		mc,
+		bootstrapper,
 		&engine,
 		vdrs,
 		msgChan,
@@ -2192,7 +2187,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	chainRouter.AddChain(handler)
 	go ctx.Log.RecoverAndPanic(handler.Dispatch)
 
-	if err := engine.Connected(peerID); err != nil {
+	if err := bootstrapper.Connected(peerID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2240,7 +2235,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	externalSender.SendF = nil
 	externalSender.CantSend = false
 
-	if err := engine.MultiPut(peerID, reqID, [][]byte{advanceTimeBlkBytes}); err != nil {
+	if err := bootstrapper.MultiPut(peerID, reqID, [][]byte{advanceTimeBlkBytes}); err != nil {
 		t.Fatal(err)
 	}
 

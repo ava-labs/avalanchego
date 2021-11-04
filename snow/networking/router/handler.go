@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
+	smbootstrap "github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
+
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -34,8 +36,10 @@ type Handler struct {
 	metrics handlerMetrics
 	// The validator set that validates this chain
 	validators validators.Set
-	// The consensus engine
-	engine common.Engine
+
+	bootstrapper *smbootstrap.Bootstrapper
+	engine       common.Engine
+
 	// Closed when this handler and [engine] are done shutting down
 	closed chan struct{}
 	// Receives messages from the VM
@@ -59,6 +63,7 @@ type Handler struct {
 // [engine] must be initialized before initializing this handler
 func (h *Handler) Initialize(
 	mc message.Creator,
+	smbootstrap *smbootstrap.Bootstrapper,
 	engine common.Engine,
 	validators validators.Set,
 	msgFromVMChan <-chan common.Message,
@@ -72,6 +77,7 @@ func (h *Handler) Initialize(
 	h.mc = mc
 	h.closed = make(chan struct{})
 	h.msgFromVMChan = msgFromVMChan
+	h.bootstrapper = smbootstrap
 	h.engine = engine
 	h.validators = validators
 	var lock sync.Mutex
@@ -194,11 +200,22 @@ func (h *Handler) handleMsg(msg message.InboundMessage) error {
 	switch op {
 	case message.Notify:
 		vmMsg := msg.Get(message.VMMessage).(uint32)
-		err = h.engine.Notify(common.Message(vmMsg))
+		if h.ctx.IsBootstrapped() || h.bootstrapper == nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+			err = h.engine.Notify(common.Message(vmMsg))
+		} else {
+			err = h.bootstrapper.Notify(common.Message(vmMsg))
+		}
+
 	case message.GossipRequest:
 		err = h.engine.Gossip()
+
 	case message.Timeout:
-		err = h.engine.Timeout()
+		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+			err = h.bootstrapper.Timeout()
+		} else {
+			err = h.engine.Timeout()
+		}
+
 	default:
 		err = h.handleConsensusMsg(msg)
 	}
@@ -284,6 +301,9 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 
 	case message.GetAncestorsFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
+		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+			return h.bootstrapper.GetAncestorsFailed(nodeID, reqID)
+		}
 		return h.engine.GetAncestorsFailed(nodeID, reqID)
 
 	case message.MultiPut:
@@ -293,6 +313,10 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse MultiContainerBytes",
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
+		}
+
+		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+			return h.bootstrapper.MultiPut(nodeID, reqID, containers)
 		}
 		return h.engine.MultiPut(nodeID, reqID, containers)
 
@@ -304,7 +328,10 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 
 	case message.GetFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return h.engine.GetFailed(nodeID, reqID)
+		if h.ctx.IsBootstrapped() || h.bootstrapper == nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+			return h.engine.GetFailed(nodeID, reqID)
+		}
+		return h.bootstrapper.GetFailed(nodeID, reqID)
 
 	case message.Put:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -316,7 +343,11 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
-		return h.engine.Put(nodeID, reqID, containerID, container)
+
+		if h.ctx.IsBootstrapped() || h.bootstrapper == nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+			return h.engine.Put(nodeID, reqID, containerID, container)
+		}
+		return h.bootstrapper.Put(nodeID, reqID, containerID, container)
 
 	case message.PushQuery:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -328,17 +359,21 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
-		return h.engine.PushQuery(nodeID, reqID, containerID, container)
+
+		if h.ctx.IsBootstrapped() || h.bootstrapper == nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+			return h.engine.PushQuery(nodeID, reqID, containerID, container)
+		}
+		return h.bootstrapper.PushQuery(nodeID, reqID, containerID, container)
 
 	case message.PullQuery:
 		reqID := msg.Get(message.RequestID).(uint32)
 		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
 		h.ctx.Log.AssertNoError(err)
-		return h.engine.PullQuery(nodeID, reqID, containerID)
 
-	case message.QueryFailed:
-		reqID := msg.Get(message.RequestID).(uint32)
-		return h.engine.QueryFailed(nodeID, reqID)
+		if h.ctx.IsBootstrapped() || h.bootstrapper == nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+			return h.engine.PullQuery(nodeID, reqID, containerID)
+		}
+		return h.bootstrapper.PullQuery(nodeID, reqID, containerID)
 
 	case message.Chits:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -348,12 +383,29 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
 			return nil
 		}
-		return h.engine.Chits(nodeID, reqID, votes)
+
+		if h.ctx.IsBootstrapped() || h.bootstrapper == nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+			return h.engine.Chits(nodeID, reqID, votes)
+		}
+		return h.bootstrapper.Chits(nodeID, reqID, votes)
+
+	case message.QueryFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		if h.ctx.IsBootstrapped() || h.bootstrapper == nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+			return h.engine.QueryFailed(nodeID, reqID)
+		}
+		return h.bootstrapper.QueryFailed(nodeID, reqID)
 
 	case message.Connected:
+		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+			return h.bootstrapper.Connected(nodeID)
+		}
 		return h.engine.Connected(nodeID)
 
 	case message.Disconnected:
+		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+			return h.bootstrapper.Disconnected(nodeID)
+		}
 		return h.engine.Disconnected(nodeID)
 
 	case message.AppRequest:
@@ -364,11 +416,10 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
-		return h.engine.AppRequest(nodeID, reqID, msg.ExpirationTime(), appBytes)
-
-	case message.AppRequestFailed:
-		reqID := msg.Get(message.RequestID).(uint32)
-		return h.engine.AppRequestFailed(nodeID, reqID)
+		if h.ctx.IsBootstrapped() || h.bootstrapper == nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+			return h.engine.AppRequest(nodeID, reqID, msg.ExpirationTime(), appBytes)
+		}
+		return h.bootstrapper.AppRequest(nodeID, reqID, msg.ExpirationTime(), appBytes)
 
 	case message.AppResponse:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -378,7 +429,17 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
-		return h.engine.AppResponse(nodeID, reqID, appBytes)
+		if h.ctx.IsBootstrapped() || h.bootstrapper == nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+			return h.engine.AppResponse(nodeID, reqID, appBytes)
+		}
+		return h.bootstrapper.AppResponse(nodeID, reqID, appBytes)
+
+	case message.AppRequestFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		if h.ctx.IsBootstrapped() || h.bootstrapper == nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+			return h.engine.AppRequestFailed(nodeID, reqID)
+		}
+		return h.bootstrapper.AppRequestFailed(nodeID, reqID)
 
 	case message.AppGossip:
 		appBytes, ok := msg.Get(message.AppBytes).([]byte)
@@ -387,7 +448,11 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 				msg.Op(), nodeID, h.engine.Context().ChainID, constants.GossipMsgRequestID)
 			return nil
 		}
-		return h.engine.AppGossip(nodeID, appBytes)
+
+		if h.ctx.IsBootstrapped() || h.bootstrapper == nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+			return h.engine.AppGossip(nodeID, appBytes)
+		}
+		return h.bootstrapper.AppGossip(nodeID, appBytes)
 
 	default:
 		h.ctx.Log.Warn("Attempt to submit to engine unhandled consensus msg %s from from (%s, %s). Dropping it",

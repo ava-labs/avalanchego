@@ -95,13 +95,7 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(config,
-		&bootstrapper.Bootstrapper,
-		bootstrapper.MultiPut,
-		bootstrapper.GetAncestorsFailed,
-		bootstrapper.Timeout,
-		bootstrapper.Connected,
-		bootstrapper.Disconnected); err != nil {
+	if dh.startEngineF, err = te.Initialize(config, &bootstrapper.Bootstrapper); err != nil {
 		t.Fatal(err)
 	}
 
@@ -491,13 +485,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(config,
-		&bootstrapper.Bootstrapper,
-		bootstrapper.MultiPut,
-		bootstrapper.GetAncestorsFailed,
-		bootstrapper.Timeout,
-		bootstrapper.Connected,
-		bootstrapper.Disconnected); err != nil {
+	if dh.startEngineF, err = te.Initialize(config, &bootstrapper.Bootstrapper); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1006,13 +994,7 @@ func TestVoteCanceling(t *testing.T) {
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(config,
-		&bootstrapper.Bootstrapper,
-		bootstrapper.MultiPut,
-		bootstrapper.GetAncestorsFailed,
-		bootstrapper.Timeout,
-		bootstrapper.Connected,
-		bootstrapper.Disconnected); err != nil {
+	if dh.startEngineF, err = te.Initialize(config, &bootstrapper.Bootstrapper); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1127,13 +1109,7 @@ func TestEngineNoQuery(t *testing.T) {
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(config,
-		&bootstrapper.Bootstrapper,
-		bootstrapper.MultiPut,
-		bootstrapper.GetAncestorsFailed,
-		bootstrapper.Timeout,
-		bootstrapper.Connected,
-		bootstrapper.Disconnected); err != nil {
+	if dh.startEngineF, err = te.Initialize(config, &bootstrapper.Bootstrapper); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1200,13 +1176,7 @@ func TestEngineNoRepollQuery(t *testing.T) {
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(config,
-		&bootstrapper.Bootstrapper,
-		bootstrapper.MultiPut,
-		bootstrapper.GetAncestorsFailed,
-		bootstrapper.Timeout,
-		bootstrapper.Connected,
-		bootstrapper.Disconnected); err != nil {
+	if dh.startEngineF, err = te.Initialize(config, &bootstrapper.Bootstrapper); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1904,13 +1874,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(config,
-		&bootstrapper.Bootstrapper,
-		bootstrapper.MultiPut,
-		bootstrapper.GetAncestorsFailed,
-		bootstrapper.Timeout,
-		bootstrapper.Connected,
-		bootstrapper.Disconnected); err != nil {
+	if dh.startEngineF, err = te.Initialize(config, &bootstrapper.Bootstrapper); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2054,13 +2018,7 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(config,
-		&bootstrapper.Bootstrapper,
-		bootstrapper.MultiPut,
-		bootstrapper.GetAncestorsFailed,
-		bootstrapper.Timeout,
-		bootstrapper.Connected,
-		bootstrapper.Disconnected); err != nil {
+	if dh.startEngineF, err = te.Initialize(config, &bootstrapper.Bootstrapper); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2208,13 +2166,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(config,
-		&bootstrapper.Bootstrapper,
-		bootstrapper.MultiPut,
-		bootstrapper.GetAncestorsFailed,
-		bootstrapper.Timeout,
-		bootstrapper.Connected,
-		bootstrapper.Disconnected); err != nil {
+	if dh.startEngineF, err = te.Initialize(config, &bootstrapper.Bootstrapper); err != nil {
 		t.Fatal(err)
 	}
 

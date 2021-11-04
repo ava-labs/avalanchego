@@ -64,6 +64,7 @@ func TestShutdown(t *testing.T) {
 	handler := &Handler{}
 	err = handler.Initialize(
 		mc,
+		nil, // TODO ABENEGIA: clean avalanche engine and duly init
 		&engine,
 		vdrs,
 		nil,
@@ -157,6 +158,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	handler := &Handler{}
 	err = handler.Initialize(
 		mc,
+		nil, // TODO ABENEGIA: clean avalanche engine and duly init
 		&engine,
 		vdrs,
 		nil,
@@ -266,6 +268,7 @@ func TestRouterTimeout(t *testing.T) {
 	assert.NoError(t, err)
 	err = handler.Initialize(
 		mc,
+		nil, // TODO ABENEGIA: clean avalanche engine and duly init
 		&engine,
 		vdrs,
 		nil,
@@ -342,6 +345,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 	handler := &Handler{}
 	err = handler.Initialize(
 		mc,
+		nil, // TODO ABENEGIA: clean avalanche engine and duly init
 		&engine,
 		vdrs,
 		nil,
@@ -451,6 +455,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	assert.NoError(t, err)
 	err = handler.Initialize(
 		mc,
+		nil, // TODO ABENEGIA: clean avalanche engine and duly init
 		&engine,
 		vdrs,
 		nil,

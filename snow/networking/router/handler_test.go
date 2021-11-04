@@ -44,6 +44,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	assert.NoError(t, err)
 	err = handler.Initialize(
 		mc,
+		nil, // TODO ABENEGIA: clean avalanche engine and duly init
 		&engine,
 		vdrs,
 		nil,
@@ -102,6 +103,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	handler := &Handler{}
 	err = handler.Initialize(
 		mc,
+		nil, // TODO ABENEGIA: clean avalanche engine and duly init
 		&engine,
 		vdrs,
 		nil,
@@ -154,6 +156,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	handler := &Handler{}
 	err = handler.Initialize(
 		mc,
+		nil, // TODO ABENEGIA: clean avalanche engine and duly init
 		&engine,
 		vdrs,
 		nil,
@@ -203,6 +206,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	assert.NoError(t, err)
 	err = handler.Initialize(
 		mc,
+		nil, // TODO ABENEGIA: clean avalanche engine and duly init
 		&engine,
 		vdrs,
 		msgFromVMChan,
