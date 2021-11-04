@@ -36,10 +36,11 @@ type dummyHandler struct {
 func (dh *dummyHandler) onDoneBootstrapping() error { return dh.startEngineF() }
 
 func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
-	config := DefaultConfig()
+	bootCfg, engCfg := DefaultConfigs()
 
 	vals := validators.NewSet()
-	config.Validators = vals
+	bootCfg.Validators = vals
+	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -48,13 +49,15 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	bootCfg.VM = vm
+	engCfg.VM = vm
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -85,9 +88,9 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 
 	bootstrapper := bootstrap.Bootstrapper{}
 	if err := bootstrapper.Initialize(
-		config.Config,
+		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
 		prometheus.NewRegistry(),
 	); err != nil {
 		t.Fatal(err)
@@ -95,13 +98,7 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(
-		config,
-		config.Ctx,
-		config.Sender,
-		&bootstrapper.RequestID,
-		bootstrapper.Validators,
-	); err != nil {
+	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
 		t.Fatal(err)
 	}
 
@@ -415,9 +412,9 @@ func TestEngineQuery(t *testing.T) {
 }
 
 func TestEngineMultipleQuery(t *testing.T) {
-	config := DefaultConfig()
+	bootCfg, engCfg := DefaultConfigs()
 
-	config.Params = snowball.Parameters{
+	engCfg.Params = snowball.Parameters{
 		Metrics:               prometheus.NewRegistry(),
 		K:                     3,
 		Alpha:                 2,
@@ -430,7 +427,8 @@ func TestEngineMultipleQuery(t *testing.T) {
 	}
 
 	vals := validators.NewSet()
-	config.Validators = vals
+	bootCfg.Validators = vals
+	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestShortID()
 	vdr1 := ids.GenerateTestShortID()
@@ -448,13 +446,15 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	bootCfg.VM = vm
+	engCfg.VM = vm
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -481,9 +481,9 @@ func TestEngineMultipleQuery(t *testing.T) {
 	dh := &dummyHandler{}
 	bootstrapper := bootstrap.Bootstrapper{}
 	if err := bootstrapper.Initialize(
-		config.Config,
+		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
 		prometheus.NewRegistry(),
 	); err != nil {
 		t.Fatal(err)
@@ -491,13 +491,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(
-		config,
-		config.Ctx,
-		config.Sender,
-		&bootstrapper.RequestID,
-		bootstrapper.Validators,
-	); err != nil {
+	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
 		t.Fatal(err)
 	}
 
@@ -927,9 +921,9 @@ func TestEngineRepoll(t *testing.T) {
 }
 
 func TestVoteCanceling(t *testing.T) {
-	config := DefaultConfig()
+	bootCfg, engCfg := DefaultConfigs()
 
-	config.Params = snowball.Parameters{
+	engCfg.Params = snowball.Parameters{
 		Metrics:               prometheus.NewRegistry(),
 		K:                     3,
 		Alpha:                 2,
@@ -942,7 +936,8 @@ func TestVoteCanceling(t *testing.T) {
 	}
 
 	vals := validators.NewSet()
-	config.Validators = vals
+	bootCfg.Validators = vals
+	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestShortID()
 	vdr1 := ids.GenerateTestShortID()
@@ -960,13 +955,15 @@ func TestVoteCanceling(t *testing.T) {
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	bootCfg.VM = vm
+	engCfg.VM = vm
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -996,9 +993,9 @@ func TestVoteCanceling(t *testing.T) {
 	dh := &dummyHandler{}
 	bootstrapper := bootstrap.Bootstrapper{}
 	if err := bootstrapper.Initialize(
-		config.Config,
+		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
 		prometheus.NewRegistry(),
 	); err != nil {
 		t.Fatal(err)
@@ -1006,13 +1003,7 @@ func TestVoteCanceling(t *testing.T) {
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(
-		config,
-		config.Ctx,
-		config.Sender,
-		&bootstrapper.RequestID,
-		bootstrapper.Validators,
-	); err != nil {
+	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1084,11 +1075,12 @@ func TestVoteCanceling(t *testing.T) {
 }
 
 func TestEngineNoQuery(t *testing.T) {
-	config := DefaultConfig()
+	bootCfg, engCfg := DefaultConfigs()
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
@@ -1109,7 +1101,8 @@ func TestEngineNoQuery(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	config.VM = vm
+	bootCfg.VM = vm
+	engCfg.VM = vm
 
 	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
 	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
@@ -1117,9 +1110,9 @@ func TestEngineNoQuery(t *testing.T) {
 
 	bootstrapper := bootstrap.Bootstrapper{}
 	if err := bootstrapper.Initialize(
-		config.Config,
+		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
 		prometheus.NewRegistry(),
 	); err != nil {
 		t.Fatal(err)
@@ -1127,13 +1120,7 @@ func TestEngineNoQuery(t *testing.T) {
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(
-		config,
-		config.Ctx,
-		config.Sender,
-		&bootstrapper.RequestID,
-		bootstrapper.Validators,
-	); err != nil {
+	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1157,11 +1144,12 @@ func TestEngineNoQuery(t *testing.T) {
 }
 
 func TestEngineNoRepollQuery(t *testing.T) {
-	config := DefaultConfig()
+	bootCfg, engCfg := DefaultConfigs()
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
@@ -1182,7 +1170,8 @@ func TestEngineNoRepollQuery(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	config.VM = vm
+	bootCfg.VM = vm
+	engCfg.VM = vm
 
 	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
 	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
@@ -1190,9 +1179,9 @@ func TestEngineNoRepollQuery(t *testing.T) {
 
 	bootstrapper := bootstrap.Bootstrapper{}
 	if err := bootstrapper.Initialize(
-		config.Config,
+		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
 		prometheus.NewRegistry(),
 	); err != nil {
 		t.Fatal(err)
@@ -1200,12 +1189,7 @@ func TestEngineNoRepollQuery(t *testing.T) {
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(
-		config,
-		config.Ctx,
-		config.Sender,
-		&bootstrapper.RequestID,
-		bootstrapper.Validators); err != nil {
+	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1845,12 +1829,13 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 }
 
 func TestEngineAggressivePolling(t *testing.T) {
-	config := DefaultConfig()
+	bootCfg, engCfg := DefaultConfigs()
 
-	config.Params.ConcurrentRepolls = 2
+	engCfg.Params.ConcurrentRepolls = 2
 
 	vals := validators.NewSet()
-	config.Validators = vals
+	bootCfg.Validators = vals
+	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1859,13 +1844,15 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	bootCfg.VM = vm
+	engCfg.VM = vm
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -1893,9 +1880,9 @@ func TestEngineAggressivePolling(t *testing.T) {
 	dh := &dummyHandler{}
 	bootstrapper := bootstrap.Bootstrapper{}
 	if err := bootstrapper.Initialize(
-		config.Config,
+		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
 		prometheus.NewRegistry(),
 	); err != nil {
 		t.Fatal(err)
@@ -1903,13 +1890,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(
-		config,
-		config.Ctx,
-		config.Sender,
-		&bootstrapper.RequestID,
-		bootstrapper.Validators,
-	); err != nil {
+	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1979,9 +1960,9 @@ func TestEngineAggressivePolling(t *testing.T) {
 }
 
 func TestEngineDoubleChit(t *testing.T) {
-	config := DefaultConfig()
+	bootCfg, engCfg := DefaultConfigs()
 
-	config.Params = snowball.Parameters{
+	engCfg.Params = snowball.Parameters{
 		Metrics:               prometheus.NewRegistry(),
 		K:                     2,
 		Alpha:                 2,
@@ -1994,7 +1975,8 @@ func TestEngineDoubleChit(t *testing.T) {
 	}
 
 	vals := validators.NewSet()
-	config.Validators = vals
+	bootCfg.Validators = vals
+	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestShortID()
 	vdr1 := ids.GenerateTestShortID()
@@ -2008,13 +1990,15 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	bootCfg.VM = vm
+	engCfg.VM = vm
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -2043,9 +2027,9 @@ func TestEngineDoubleChit(t *testing.T) {
 	dh := &dummyHandler{}
 	bootstrapper := bootstrap.Bootstrapper{}
 	if err := bootstrapper.Initialize(
-		config.Config,
+		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
 		prometheus.NewRegistry(),
 	); err != nil {
 		t.Fatal(err)
@@ -2053,13 +2037,7 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(
-		config,
-		config.Ctx,
-		config.Sender,
-		&bootstrapper.RequestID,
-		bootstrapper.Validators,
-	); err != nil {
+	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2148,13 +2126,15 @@ func TestEngineDoubleChit(t *testing.T) {
 }
 
 func TestEngineBuildBlockLimit(t *testing.T) {
-	config := DefaultConfig()
-	config.Params.K = 1
-	config.Params.Alpha = 1
-	config.Params.OptimalProcessing = 1
+	bootCfg, engCfg := DefaultConfigs()
+
+	engCfg.Params.K = 1
+	engCfg.Params.Alpha = 1
+	engCfg.Params.OptimalProcessing = 1
 
 	vals := validators.NewSet()
-	config.Validators = vals
+	bootCfg.Validators = vals
+	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -2163,13 +2143,15 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	bootCfg.VM = vm
+	engCfg.VM = vm
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -2197,9 +2179,9 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	dh := &dummyHandler{}
 	bootstrapper := bootstrap.Bootstrapper{}
 	if err := bootstrapper.Initialize(
-		config.Config,
+		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
+		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
 		prometheus.NewRegistry(),
 	); err != nil {
 		t.Fatal(err)
@@ -2207,13 +2189,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 
 	var err error
 	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(
-		config,
-		config.Ctx,
-		config.Sender,
-		&bootstrapper.RequestID,
-		bootstrapper.Validators,
-	); err != nil {
+	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
 		t.Fatal(err)
 	}
 

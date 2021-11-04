@@ -2119,23 +2119,42 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	// The engine handles consensus
-	config := smeng.Config{
-		Config: bootstrap.Config{
-			Config: common.Config{
-				Ctx:                           ctx,
-				Validators:                    vdrs,
-				Beacons:                       beacons,
-				SampleK:                       beacons.Len(),
-				StartupAlpha:                  (beacons.Weight() + 1) / 2,
-				Alpha:                         (beacons.Weight() + 1) / 2,
-				Sender:                        &sender,
-				Subnet:                        subnet,
-				MultiputMaxContainersSent:     2000,
-				MultiputMaxContainersReceived: 2000,
-			},
-			Blocked: blocked,
-			VM:      vm,
+	consensus := &smcon.Topological{}
+
+	bootstrapConfig := bootstrap.Config{
+		Config: common.Config{
+			Ctx:                           ctx,
+			Validators:                    vdrs,
+			Beacons:                       beacons,
+			SampleK:                       beacons.Len(),
+			StartupAlpha:                  (beacons.Weight() + 1) / 2,
+			Alpha:                         (beacons.Weight() + 1) / 2,
+			Sender:                        &sender,
+			Subnet:                        subnet,
+			MultiputMaxContainersSent:     2000,
+			MultiputMaxContainersReceived: 2000,
 		},
+		Blocked: blocked,
+		VM:      vm,
+	}
+
+	dh := &dummyHandler{}
+	bootstrapper := &bootstrap.Bootstrapper{}
+	if err := bootstrapper.Initialize(
+		bootstrapConfig,
+		dh.onDoneBootstrapping,
+		fmt.Sprintf("%s_bs", consensus.Parameters().Namespace),
+		prometheus.NewRegistry(),
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	engineConfig := smeng.Config{
+		Ctx:        bootstrapConfig.Ctx,
+		VM:         bootstrapConfig.VM,
+		Sender:     bootstrapConfig.Sender,
+		RequestID:  &bootstrapper.RequestID,
+		Validators: bootstrapper.Validators,
 		Params: snowball.Parameters{
 			Metrics:               prometheus.NewRegistry(),
 			K:                     1,
@@ -2147,28 +2166,10 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			MaxOutstandingItems:   1,
 			MaxItemProcessingTime: 1,
 		},
-		Consensus: &smcon.Topological{},
+		Consensus: consensus,
 	}
-
-	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
-		config.Config,
-		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", config.Consensus.Parameters().Namespace),
-		prometheus.NewRegistry(),
-	); err != nil {
-		t.Fatal(err)
-	}
-
 	engine := smeng.Transitive{}
-	if dh.startEngineF, err = engine.Initialize(
-		config,
-		config.Ctx,
-		config.Sender,
-		&bootstrapper.RequestID,
-		bootstrapper.Validators,
-	); err != nil {
+	if dh.startEngineF, err = engine.Initialize(engineConfig); err != nil {
 		t.Fatal(err)
 	}
 

@@ -4,10 +4,8 @@
 package snowman
 
 import (
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 // Engine describes the events that can occur to a Snowman instance.
@@ -23,11 +21,5 @@ type Engine interface {
 	block.Getter
 
 	// Initialize this engine.
-	Initialize(
-		config Config,
-		ctx *snow.Context,
-		sender common.Sender,
-		requestID *uint32,
-		validators validators.Set,
-	) (func() error, error)
+	Initialize(config Config) (func() error, error)
 }

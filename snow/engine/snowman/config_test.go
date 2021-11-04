@@ -15,14 +15,21 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
 )
 
-func DefaultConfig() Config {
+func DefaultConfigs() (bootstrap.Config, Config) {
 	blocked, _ := queue.NewWithMissing(memdb.New(), "", prometheus.NewRegistry())
-	return Config{
-		Config: bootstrap.Config{
-			Config:  common.DefaultConfigTest(),
-			Blocked: blocked,
-			VM:      &block.TestVM{},
-		},
+
+	bootstrapConfig := bootstrap.Config{
+		Config:  common.DefaultConfigTest(),
+		Blocked: blocked,
+		VM:      &block.TestVM{},
+	}
+
+	engineConfig := Config{
+		Ctx:        bootstrapConfig.Ctx,
+		VM:         bootstrapConfig.VM,
+		Sender:     bootstrapConfig.Sender,
+		RequestID:  new(uint32), // TODO ABENEGIA: FIX IT UP, SHOULD BE PART OF Config NOT Bootstrapper
+		Validators: bootstrapConfig.Validators,
 		Params: snowball.Parameters{
 			Metrics:               prometheus.NewRegistry(),
 			K:                     1,
@@ -36,4 +43,6 @@ func DefaultConfig() Config {
 		},
 		Consensus: &snowman.Topological{},
 	}
+
+	return bootstrapConfig, engineConfig
 }

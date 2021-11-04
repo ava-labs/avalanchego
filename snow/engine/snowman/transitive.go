@@ -64,17 +64,12 @@ type Transitive struct {
 }
 
 // Initialize implements the Engine interface
-func (t *Transitive) Initialize(config Config,
-	ctx *snow.Context,
-	sender common.Sender,
-	requestID *uint32,
-	validators validators.Set,
-) (func() error, error) {
-	t.Ctx = ctx
-	t.Sender = sender
+func (t *Transitive) Initialize(config Config) (func() error, error) {
+	t.Ctx = config.Ctx
+	t.Sender = config.Sender
 	t.VM = config.VM
-	t.RequestID = requestID
-	t.Validators = validators
+	t.RequestID = config.RequestID
+	t.Validators = config.Validators
 	t.Ctx.Log.Info("initializing consensus engine")
 
 	t.Params = config.Params

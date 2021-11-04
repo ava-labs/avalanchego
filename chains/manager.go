@@ -768,17 +768,18 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("error initializing snowman bootstrapper: %w", err)
 	}
 
+	engineConfig := smeng.Config{
+		Ctx:        bootstrapCfg.Ctx,
+		VM:         bootstrapCfg.VM,
+		Sender:     bootstrapCfg.Sender,
+		RequestID:  &bootstrapper.RequestID,
+		Validators: bootstrapper.Validators,
+		Params:     consensusParams,
+		Consensus:  &smcon.Topological{},
+	}
+
 	engine := &smeng.Transitive{}
-	if handler.StartEngineF, err = engine.Initialize(smeng.Config{
-		Config:    bootstrapCfg,
-		Params:    consensusParams,
-		Consensus: &smcon.Topological{},
-	},
-		bootstrapCfg.Ctx,
-		bootstrapCfg.Sender,
-		&bootstrapper.RequestID,
-		bootstrapper.Validators,
-	); err != nil {
+	if handler.StartEngineF, err = engine.Initialize(engineConfig); err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
 
