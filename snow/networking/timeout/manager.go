@@ -90,8 +90,7 @@ func (m *Manager) RegisterResponse(
 	m.tm.Remove(uniqueRequestID)
 }
 
-// RegisterResponse registers that we received a response from [validatorID]
-// regarding the given request ID and chain.
+// RemoveRequest clears the request with the provided ID.
 func (m *Manager) RemoveRequest(uniqueRequestID ids.ID) {
 	m.tm.Remove(uniqueRequestID)
 }
