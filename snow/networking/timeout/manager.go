@@ -90,6 +90,12 @@ func (m *Manager) RegisterResponse(
 	m.tm.Remove(uniqueRequestID)
 }
 
+// RegisterResponse registers that we received a response from [validatorID]
+// regarding the given request ID and chain.
+func (m *Manager) RemoveRequest(uniqueRequestID ids.ID) {
+	m.tm.Remove(uniqueRequestID)
+}
+
 // RegisterRequestToUnreachableValidator registers that we would have sent
 // a query to a validator but they are unreachable because they are bench
 // or because of network conditions (e.g. we're not connected), so we didn't
