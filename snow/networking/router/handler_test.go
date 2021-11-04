@@ -19,20 +19,22 @@ import (
 )
 
 func TestHandlerDropsTimedOutMessages(t *testing.T) {
-	engine := common.EngineTest{T: t}
-	engine.Default(true)
-	engine.ContextF = snow.DefaultContextTest
 	called := make(chan struct{})
-
-	engine.GetAcceptedFrontierF = func(nodeID ids.ShortID, requestID uint32) error {
+	bootstrapper := &common.EngineTest{T: t}
+	bootstrapper.Default(false)
+	bootstrapper.ContextF = snow.DefaultContextTest
+	bootstrapper.GetAcceptedFrontierF = func(nodeID ids.ShortID, requestID uint32) error {
 		t.Fatalf("GetAcceptedFrontier message should have timed out")
 		return nil
 	}
-
-	engine.GetAcceptedF = func(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+	bootstrapper.GetAcceptedF = func(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 		called <- struct{}{}
 		return nil
 	}
+
+	engine := &common.EngineTest{T: t}
+	engine.Default(true)
+	engine.ContextF = snow.DefaultContextTest
 
 	handler := &Handler{}
 	vdrs := validators.NewSet()
@@ -44,8 +46,8 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	assert.NoError(t, err)
 	err = handler.Initialize(
 		mc,
-		nil, // TODO ABENEGIA: clean avalanche engine and duly init
-		&engine,
+		bootstrapper,
+		engine,
 		vdrs,
 		nil,
 		"",
@@ -84,15 +86,17 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 }
 
 func TestHandlerClosesOnError(t *testing.T) {
-	engine := common.EngineTest{T: t}
-	engine.Default(false)
-
 	closed := make(chan struct{}, 1)
-
-	engine.ContextF = snow.DefaultContextTest
-	engine.GetAcceptedFrontierF = func(nodeID ids.ShortID, requestID uint32) error {
+	bootstrapper := &common.EngineTest{T: t}
+	bootstrapper.Default(false)
+	bootstrapper.ContextF = snow.DefaultContextTest
+	bootstrapper.GetAcceptedFrontierF = func(nodeID ids.ShortID, requestID uint32) error {
 		return errors.New("Engine error should cause handler to close")
 	}
+
+	engine := &common.EngineTest{T: t}
+	engine.Default(false)
+	engine.ContextF = snow.DefaultContextTest
 
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
@@ -103,8 +107,8 @@ func TestHandlerClosesOnError(t *testing.T) {
 	handler := &Handler{}
 	err = handler.Initialize(
 		mc,
-		nil, // TODO ABENEGIA: clean avalanche engine and duly init
-		&engine,
+		bootstrapper,
+		engine,
 		vdrs,
 		nil,
 		"",
@@ -134,18 +138,19 @@ func TestHandlerClosesOnError(t *testing.T) {
 }
 
 func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
-	engine := common.EngineTest{T: t}
-	engine.Default(false)
-
-	engine.CantGossip = true
-
 	closed := make(chan struct{}, 1)
-
-	engine.ContextF = snow.DefaultContextTest
-	engine.GetFailedF = func(nodeID ids.ShortID, requestID uint32) error {
+	bootstrapper := &common.EngineTest{T: t}
+	bootstrapper.Default(false)
+	bootstrapper.ContextF = snow.DefaultContextTest
+	bootstrapper.GetFailedF = func(nodeID ids.ShortID, requestID uint32) error {
 		closed <- struct{}{}
 		return nil
 	}
+
+	engine := &common.EngineTest{T: t}
+	engine.Default(false)
+	engine.CantGossip = true
+	engine.ContextF = snow.DefaultContextTest
 
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
@@ -156,8 +161,8 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	handler := &Handler{}
 	err = handler.Initialize(
 		mc,
-		nil, // TODO ABENEGIA: clean avalanche engine and duly init
-		&engine,
+		bootstrapper,
+		engine,
 		vdrs,
 		nil,
 		"",
@@ -187,14 +192,18 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 
 // Test that messages from the VM are handled
 func TestHandlerDispatchInternal(t *testing.T) {
-	engine := common.EngineTest{T: t}
-	engine.Default(false)
-	engine.ContextF = snow.DefaultContextTest
 	calledNotify := make(chan struct{}, 1)
-	engine.NotifyF = func(common.Message) error {
+	bootstrapper := &common.EngineTest{T: t}
+	bootstrapper.Default(false)
+	bootstrapper.ContextF = snow.DefaultContextTest
+	bootstrapper.NotifyF = func(common.Message) error {
 		calledNotify <- struct{}{}
 		return nil
 	}
+
+	engine := &common.EngineTest{T: t}
+	engine.Default(false)
+	engine.ContextF = snow.DefaultContextTest
 
 	handler := &Handler{}
 	msgFromVMChan := make(chan common.Message)
@@ -206,8 +215,8 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	assert.NoError(t, err)
 	err = handler.Initialize(
 		mc,
-		nil, // TODO ABENEGIA: clean avalanche engine and duly init
-		&engine,
+		bootstrapper,
+		engine,
 		vdrs,
 		msgFromVMChan,
 		"",

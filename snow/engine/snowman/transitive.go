@@ -30,7 +30,7 @@ type Transitive struct {
 	Sender common.Sender
 	VM     block.ChainVM
 
-	RequestID  *uint32
+	ReqID      *uint32
 	Validators validators.Set
 
 	metrics
@@ -65,12 +65,12 @@ type Transitive struct {
 
 // Initialize implements the Engine interface
 func (t *Transitive) Initialize(config Config) (func() error, error) {
+	config.Ctx.Log.Info("initializing consensus engine")
 	t.Ctx = config.Ctx
 	t.Sender = config.Sender
 	t.VM = config.VM
-	t.RequestID = config.RequestID
+	t.ReqID = config.RequestID
 	t.Validators = config.Validators
-	t.Ctx.Log.Info("initializing consensus engine")
 
 	t.Params = config.Params
 	t.Consensus = config.Consensus
@@ -622,10 +622,10 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, blkID ids.ID) {
 		return
 	}
 
-	(*t.RequestID)++
-	t.blkReqs.Add(vdr, (*t.RequestID), blkID)
-	t.Ctx.Log.Verbo("sending Get(%s, %d, %s)", vdr, (*t.RequestID), blkID)
-	t.Sender.SendGet(vdr, (*t.RequestID), blkID)
+	(*t.ReqID)++
+	t.blkReqs.Add(vdr, (*t.ReqID), blkID)
+	t.Ctx.Log.Verbo("sending Get(%s, %d, %s)", vdr, (*t.ReqID), blkID)
+	t.Sender.SendGet(vdr, (*t.ReqID), blkID)
 
 	// Tracks performance statistics
 	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
@@ -641,12 +641,12 @@ func (t *Transitive) pullQuery(blkID ids.ID) {
 		vdrBag.Add(vdr.ID())
 	}
 
-	(*t.RequestID)++
-	if err == nil && t.polls.Add((*t.RequestID), vdrBag) {
+	(*t.ReqID)++
+	if err == nil && t.polls.Add((*t.ReqID), vdrBag) {
 		vdrList := vdrBag.List()
 		vdrSet := ids.NewShortSet(len(vdrList))
 		vdrSet.Add(vdrList...)
-		t.Sender.SendPullQuery(vdrSet, (*t.RequestID), blkID)
+		t.Sender.SendPullQuery(vdrSet, (*t.ReqID), blkID)
 	} else if err != nil {
 		t.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", blkID)
 	}
@@ -661,13 +661,13 @@ func (t *Transitive) pushQuery(blk snowman.Block) {
 		vdrBag.Add(vdr.ID())
 	}
 
-	(*t.RequestID)++
-	if err == nil && t.polls.Add((*t.RequestID), vdrBag) {
+	(*t.ReqID)++
+	if err == nil && t.polls.Add((*t.ReqID), vdrBag) {
 		vdrList := vdrBag.List()
 		vdrSet := ids.NewShortSet(len(vdrList))
 		vdrSet.Add(vdrList...)
 
-		t.Sender.SendPushQuery(vdrSet, (*t.RequestID), blk.ID(), blk.Bytes())
+		t.Sender.SendPushQuery(vdrSet, (*t.ReqID), blk.ID(), blk.Bytes())
 	} else if err != nil {
 		t.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", blk.ID())
 	}

@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
-	smbootstrap "github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
 
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
@@ -37,7 +36,7 @@ type Handler struct {
 	// The validator set that validates this chain
 	validators validators.Set
 
-	bootstrapper *smbootstrap.Bootstrapper
+	bootstrapper common.Engine
 	engine       common.Engine
 
 	// Closed when this handler and [engine] are done shutting down
@@ -63,7 +62,7 @@ type Handler struct {
 // [engine] must be initialized before initializing this handler
 func (h *Handler) Initialize(
 	mc message.Creator,
-	smbootstrap *smbootstrap.Bootstrapper,
+	smbootstrap common.Engine,
 	engine common.Engine,
 	validators validators.Set,
 	msgFromVMChan <-chan common.Message,
@@ -200,7 +199,7 @@ func (h *Handler) handleMsg(msg message.InboundMessage) error {
 	switch op {
 	case message.Notify:
 		vmMsg := msg.Get(message.VMMessage).(uint32)
-		if h.ctx.IsBootstrapped() || h.bootstrapper == nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+		if h.ctx.IsBootstrapped() {
 			err = h.engine.Notify(common.Message(vmMsg))
 		} else {
 			err = h.bootstrapper.Notify(common.Message(vmMsg))
@@ -210,11 +209,7 @@ func (h *Handler) handleMsg(msg message.InboundMessage) error {
 		err = h.engine.Gossip()
 
 	case message.Timeout:
-		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
-			err = h.bootstrapper.Timeout()
-		} else {
-			err = h.engine.Timeout()
-		}
+		err = h.bootstrapper.Timeout()
 
 	default:
 		err = h.handleConsensusMsg(msg)
@@ -249,10 +244,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 	switch msg.Op() {
 	case message.GetAcceptedFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
-		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
-			return h.bootstrapper.GetAcceptedFrontier(nodeID, reqID)
-		}
-		return h.engine.GetAcceptedFrontier(nodeID, reqID)
+		return h.bootstrapper.GetAcceptedFrontier(nodeID, reqID)
 
 	case message.AcceptedFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -263,18 +255,11 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 			return nil
 		}
 
-		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
-			return h.bootstrapper.AcceptedFrontier(nodeID, reqID, containerIDs)
-		}
-		return h.engine.AcceptedFrontier(nodeID, reqID, containerIDs)
+		return h.bootstrapper.AcceptedFrontier(nodeID, reqID, containerIDs)
 
 	case message.GetAcceptedFrontierFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-
-		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
-			return h.bootstrapper.GetAcceptedFrontierFailed(nodeID, reqID)
-		}
-		return h.engine.GetAcceptedFrontierFailed(nodeID, reqID)
+		return h.bootstrapper.GetAcceptedFrontierFailed(nodeID, reqID)
 
 	case message.GetAccepted:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -284,10 +269,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
 			return nil
 		}
-		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
-			return h.bootstrapper.GetAccepted(nodeID, reqID, containerIDs)
-		}
-		return h.engine.GetAccepted(nodeID, reqID, containerIDs)
+		return h.bootstrapper.GetAccepted(nodeID, reqID, containerIDs)
 
 	case message.Accepted:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -298,17 +280,11 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 			return nil
 		}
 
-		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
-			return h.bootstrapper.Accepted(nodeID, reqID, containerIDs)
-		}
-		return h.engine.Accepted(nodeID, reqID, containerIDs)
+		return h.bootstrapper.Accepted(nodeID, reqID, containerIDs)
 
 	case message.GetAcceptedFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
-			return h.bootstrapper.GetAcceptedFailed(nodeID, reqID)
-		}
-		return h.engine.GetAcceptedFailed(nodeID, reqID)
+		return h.bootstrapper.GetAcceptedFailed(nodeID, reqID)
 
 	case message.GetAncestors:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -319,17 +295,11 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 			return nil
 		}
 
-		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
-			return h.bootstrapper.GetAncestors(nodeID, reqID, containerID)
-		}
-		return h.engine.GetAncestors(nodeID, reqID, containerID)
+		return h.bootstrapper.GetAncestors(nodeID, reqID, containerID)
 
 	case message.GetAncestorsFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
-			return h.bootstrapper.GetAncestorsFailed(nodeID, reqID)
-		}
-		return h.engine.GetAncestorsFailed(nodeID, reqID)
+		return h.bootstrapper.GetAncestorsFailed(nodeID, reqID)
 
 	case message.MultiPut:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -340,10 +310,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 			return nil
 		}
 
-		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
-			return h.bootstrapper.MultiPut(nodeID, reqID, containers)
-		}
-		return h.engine.MultiPut(nodeID, reqID, containers)
+		return h.bootstrapper.MultiPut(nodeID, reqID, containers)
 
 	case message.Get:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -353,7 +320,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 
 	case message.GetFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		if h.ctx.IsBootstrapped() || h.bootstrapper == nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+		if h.ctx.IsBootstrapped() {
 			return h.engine.GetFailed(nodeID, reqID)
 		}
 		return h.bootstrapper.GetFailed(nodeID, reqID)
@@ -369,7 +336,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 			return nil
 		}
 
-		if h.ctx.IsBootstrapped() || h.bootstrapper == nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+		if h.ctx.IsBootstrapped() {
 			return h.engine.Put(nodeID, reqID, containerID, container)
 		}
 		return h.bootstrapper.Put(nodeID, reqID, containerID, container)
@@ -385,7 +352,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 			return nil
 		}
 
-		if h.ctx.IsBootstrapped() || h.bootstrapper == nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+		if h.ctx.IsBootstrapped() {
 			return h.engine.PushQuery(nodeID, reqID, containerID, container)
 		}
 		return h.bootstrapper.PushQuery(nodeID, reqID, containerID, container)
@@ -395,7 +362,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
 		h.ctx.Log.AssertNoError(err)
 
-		if h.ctx.IsBootstrapped() || h.bootstrapper == nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+		if h.ctx.IsBootstrapped() {
 			return h.engine.PullQuery(nodeID, reqID, containerID)
 		}
 		return h.bootstrapper.PullQuery(nodeID, reqID, containerID)
@@ -409,29 +376,23 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 			return nil
 		}
 
-		if h.ctx.IsBootstrapped() || h.bootstrapper == nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+		if h.ctx.IsBootstrapped() {
 			return h.engine.Chits(nodeID, reqID, votes)
 		}
 		return h.bootstrapper.Chits(nodeID, reqID, votes)
 
 	case message.QueryFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		if h.ctx.IsBootstrapped() || h.bootstrapper == nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+		if h.ctx.IsBootstrapped() {
 			return h.engine.QueryFailed(nodeID, reqID)
 		}
 		return h.bootstrapper.QueryFailed(nodeID, reqID)
 
 	case message.Connected:
-		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
-			return h.bootstrapper.Connected(nodeID)
-		}
-		return h.engine.Connected(nodeID)
+		return h.bootstrapper.Connected(nodeID)
 
 	case message.Disconnected:
-		if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
-			return h.bootstrapper.Disconnected(nodeID)
-		}
-		return h.engine.Disconnected(nodeID)
+		return h.bootstrapper.Disconnected(nodeID)
 
 	case message.AppRequest:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -441,7 +402,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
-		if h.ctx.IsBootstrapped() || h.bootstrapper == nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+		if h.ctx.IsBootstrapped() {
 			return h.engine.AppRequest(nodeID, reqID, msg.ExpirationTime(), appBytes)
 		}
 		return h.bootstrapper.AppRequest(nodeID, reqID, msg.ExpirationTime(), appBytes)
@@ -454,14 +415,14 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
-		if h.ctx.IsBootstrapped() || h.bootstrapper == nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+		if h.ctx.IsBootstrapped() {
 			return h.engine.AppResponse(nodeID, reqID, appBytes)
 		}
 		return h.bootstrapper.AppResponse(nodeID, reqID, appBytes)
 
 	case message.AppRequestFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		if h.ctx.IsBootstrapped() || h.bootstrapper == nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+		if h.ctx.IsBootstrapped() {
 			return h.engine.AppRequestFailed(nodeID, reqID)
 		}
 		return h.bootstrapper.AppRequestFailed(nodeID, reqID)
@@ -474,7 +435,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 			return nil
 		}
 
-		if h.ctx.IsBootstrapped() || h.bootstrapper == nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
+		if h.ctx.IsBootstrapped() {
 			return h.engine.AppGossip(nodeID, appBytes)
 		}
 		return h.bootstrapper.AppGossip(nodeID, appBytes)

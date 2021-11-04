@@ -89,27 +89,29 @@ func TestTimeout(t *testing.T) {
 	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, "", metrics, 2, 2, 2)
 	assert.NoError(t, err)
 
-	engine := common.EngineTest{T: t}
-	engine.Default(true)
-	engine.CantConnected = false
-
-	engine.ContextF = snow.DefaultContextTest
-
 	wg := sync.WaitGroup{}
 	wg.Add(2)
-
 	failedVDRs := ids.ShortSet{}
-	engine.QueryFailedF = func(nodeID ids.ShortID, _ uint32) error {
+	bootstrapper := &common.EngineTest{T: t}
+	bootstrapper.Default(true)
+	bootstrapper.ContextF = snow.DefaultContextTest
+	bootstrapper.ConnectedF = func(nodeID ids.ShortID) error { return nil }
+	bootstrapper.QueryFailedF = func(nodeID ids.ShortID, _ uint32) error {
 		failedVDRs.Add(nodeID)
 		wg.Done()
 		return nil
 	}
 
+	engine := &common.EngineTest{T: t}
+	engine.Default(true)
+	engine.CantConnected = false
+	engine.ContextF = snow.DefaultContextTest
+
 	handler := router.Handler{}
 	err = handler.Initialize(
 		mc,
-		nil, // TODO ABENEGIA: clean avalanche engine and duly init
-		&engine,
+		bootstrapper,
+		engine,
 		vdrs,
 		nil,
 		"",
@@ -173,29 +175,32 @@ func TestReliableMessages(t *testing.T) {
 	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, "", metrics, 2, 2, 2)
 	assert.NoError(t, err)
 
-	engine := common.EngineTest{T: t}
-	engine.Default(true)
-	engine.CantConnected = false
-
-	engine.ContextF = snow.DefaultContextTest
-	engine.GossipF = func() error { return nil }
-
+	bootstrapper := &common.EngineTest{T: t}
+	bootstrapper.Default(true)
+	bootstrapper.ContextF = snow.DefaultContextTest
+	bootstrapper.ConnectedF = func(nodeID ids.ShortID) error { return nil }
 	queriesToSend := 1000
 	awaiting := make([]chan struct{}, queriesToSend)
 	for i := 0; i < queriesToSend; i++ {
 		awaiting[i] = make(chan struct{}, 1)
 	}
 
-	engine.QueryFailedF = func(nodeID ids.ShortID, reqID uint32) error {
+	bootstrapper.QueryFailedF = func(nodeID ids.ShortID, reqID uint32) error {
 		close(awaiting[int(reqID)])
 		return nil
 	}
 
+	engine := &common.EngineTest{T: t}
+	engine.Default(true)
+	engine.CantConnected = false
+	engine.ContextF = snow.DefaultContextTest
+	engine.GossipF = func() error { return nil }
+
 	handler := router.Handler{}
 	err = handler.Initialize(
 		mc,
-		nil, // TODO ABENEGIA: clean avalanche engine and duly init
-		&engine,
+		bootstrapper,
+		engine,
 		vdrs,
 		nil,
 		"",
@@ -267,29 +272,32 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, "", metrics, 2, 2, 2)
 	assert.NoError(t, err)
 
-	engine := common.EngineTest{T: t}
-	engine.Default(false)
-
-	engine.ContextF = snow.DefaultContextTest
-	engine.GossipF = func() error { return nil }
-	engine.CantPullQuery = false
-
+	bootstrapper := &common.EngineTest{T: t}
+	bootstrapper.Default(true)
+	bootstrapper.ContextF = snow.DefaultContextTest
+	bootstrapper.ConnectedF = func(nodeID ids.ShortID) error { return nil }
 	queriesToSend := 2
 	awaiting := make([]chan struct{}, queriesToSend)
 	for i := 0; i < queriesToSend; i++ {
 		awaiting[i] = make(chan struct{}, 1)
 	}
-
-	engine.QueryFailedF = func(nodeID ids.ShortID, reqID uint32) error {
+	bootstrapper.QueryFailedF = func(nodeID ids.ShortID, reqID uint32) error {
 		close(awaiting[int(reqID)])
 		return nil
 	}
 
+	engine := &common.EngineTest{T: t}
+	engine.Default(false)
+	engine.ContextF = snow.DefaultContextTest
+
+	engine.GossipF = func() error { return nil }
+	engine.CantPullQuery = false
+
 	handler := router.Handler{}
 	err = handler.Initialize(
 		mc,
-		nil, // TODO ABENEGIA: clean avalanche engine and duly init
-		&engine,
+		bootstrapper,
+		engine,
 		vdrs,
 		nil,
 		"",

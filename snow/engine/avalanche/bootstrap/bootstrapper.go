@@ -18,7 +18,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/metric"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
@@ -36,6 +39,11 @@ const (
 var (
 	errUnexpectedTimeout                      = errors.New("unexpected timeout fired")
 	_                    common.Bootstrapable = &Bootstrapper{}
+
+	// TODO ABENEGIA: conflate in a single interface
+	// Something like FullMessageHandler since this is a way to ensure
+	// at compile time that all messages in interface are handled
+	_ common.Engine = &Bootstrapper{}
 )
 
 type Config struct {
@@ -54,6 +62,7 @@ type Bootstrapper struct {
 	common.Bootstrapper
 	common.Fetcher
 	metrics
+	getAncestorsVtxs metric.Averager
 
 	// VtxBlocked tracks operations that are blocked on vertices
 	VtxBlocked *queue.JobsWithMissing
@@ -93,6 +102,15 @@ func (b *Bootstrapper) Initialize(
 	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return err
 	}
+
+	errs := wrappers.Errs{}
+	b.getAncestorsVtxs = metric.NewAveragerWithErrs(
+		namespace,
+		"get_ancestors_vtxs",
+		"vertices fetched in a call to GetAncestors",
+		registerer,
+		&errs,
+	)
 
 	if err := b.VtxBlocked.SetParser(&vtxParser{
 		log:         config.Ctx.Log,
@@ -507,18 +525,164 @@ func (b *Bootstrapper) finish() error {
 
 // Connected implements the Engine interface.
 func (b *Bootstrapper) Connected(nodeID ids.ShortID) error {
-	err := b.VM.Connected(nodeID)
-	if err != nil {
+	if err := b.VM.Connected(nodeID); err != nil {
 		return err
 	}
+
 	return b.Bootstrapper.Connected(nodeID)
 }
 
 // Disconnected implements the Engine interface.
 func (b *Bootstrapper) Disconnected(nodeID ids.ShortID) error {
-	err := b.VM.Disconnected(nodeID)
-	if err != nil {
+	if err := b.VM.Disconnected(nodeID); err != nil {
 		return err
 	}
+
 	return b.Bootstrapper.Disconnected(nodeID)
+}
+
+// AppHandler interface
+func (b *Bootstrapper) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
+	b.Ctx.Log.Debug("dropping AppRequest(%s, %d) due to bootstrapping", nodeID, requestID)
+	return nil
+}
+
+func (b *Bootstrapper) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	b.Ctx.Log.Debug("dropping AppResponse(%s, %d) due to bootstrapping", nodeID, requestID)
+	return nil
+}
+
+func (b *Bootstrapper) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	b.Ctx.Log.Debug("dropping AppRequestFailed(%s, %d) due to bootstrapping", nodeID, requestID)
+	return nil
+}
+
+func (b *Bootstrapper) AppGossip(nodeID ids.ShortID, msg []byte) error {
+	b.Ctx.Log.Debug("dropping AppGossip(%s) due to bootstrapping", nodeID)
+	return nil
+}
+
+// End of AppHandler interface
+
+func (b *Bootstrapper) Get(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error {
+	b.Ctx.Log.Debug("Received Get message from (%s) during bootstrap. Dropping it", validatorID)
+	return nil
+}
+
+func (b *Bootstrapper) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) error {
+	// bootstrapping isn't done --> we didn't send any gets --> this put is invalid
+	// TODO ABENEGIA: this comes from engine where IsBootStrapped is checked.
+	// Here assumed IsBootstrapped is checked in handler
+	if requestID == constants.GossipMsgRequestID {
+		b.Ctx.Log.Verbo("dropping gossip Put(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
+	} else {
+		b.Ctx.Log.Debug("dropping Put(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
+	}
+	return nil
+}
+
+func (b *Bootstrapper) GetFailed(validatorID ids.ShortID, requestID uint32) error {
+	// Bootstrapping unfinished --> didn't call Get --> this message is invalid
+	b.Ctx.Log.Debug("dropping GetFailed(%s, %d) due to bootstrapping", validatorID, requestID)
+
+	return nil
+}
+
+func (b *Bootstrapper) GetVM() common.VM {
+	return b.VM
+}
+
+func (b *Bootstrapper) Gossip() error {
+	b.Ctx.Log.Debug("No Gossip during bootstrap. Dropping it")
+	return nil
+}
+
+func (b *Bootstrapper) Notify(common.Message) error {
+	b.Ctx.Log.Debug("dropping Notify due to bootstrapping")
+	return nil
+}
+
+func (b *Bootstrapper) Shutdown() error {
+	b.Ctx.Log.Debug("Called Shutdown during bootstrap. Doing nothing for now")
+	return nil
+}
+
+func (b *Bootstrapper) HealthCheck() (interface{}, error) {
+	vmIntf, vmErr := b.VM.HealthCheck()
+	intf := map[string]interface{}{
+		"consensus": struct{}{},
+		"vm":        vmIntf,
+	}
+	return intf, vmErr
+}
+
+// QueryHandler interface
+func (b *Bootstrapper) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
+	b.Ctx.Log.Debug("dropping PullQuery(%s, %d, %s) due to bootstrapping", vdr, requestID, blkID)
+	return nil
+}
+
+func (b *Bootstrapper) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
+	b.Ctx.Log.Debug("dropping PushQuery(%s, %d, %s) due to bootstrapping", vdr, requestID, blkID)
+	return nil
+}
+
+func (b *Bootstrapper) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) error {
+	b.Ctx.Log.Debug("dropping Chits(%s, %d) due to bootstrapping", vdr, requestID)
+	return nil
+}
+
+func (b *Bootstrapper) QueryFailed(vdr ids.ShortID, requestID uint32) error {
+	b.Ctx.Log.Debug("dropping QueryFailed(%s, %d) due to bootstrapping", vdr, requestID)
+	return nil
+}
+
+// End of QueryHandler interface
+
+func (b *Bootstrapper) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error {
+	startTime := time.Now()
+	b.Ctx.Log.Verbo("GetAncestors(%s, %d, %s) called", vdr, requestID, vtxID)
+	vertex, err := b.Manager.GetVtx(vtxID)
+	if err != nil || vertex.Status() == choices.Unknown {
+		b.Ctx.Log.Verbo("dropping getAncestors")
+		return nil // Don't have the requested vertex. Drop message.
+	}
+
+	queue := make([]avalanche.Vertex, 1, b.Config.MultiputMaxContainersSent) // for BFS
+	queue[0] = vertex
+	ancestorsBytesLen := 0                                                  // length, in bytes, of vertex and its ancestors
+	ancestorsBytes := make([][]byte, 0, b.Config.MultiputMaxContainersSent) // vertex and its ancestors in BFS order
+	visited := ids.Set{}                                                    // IDs of vertices that have been in queue before
+	visited.Add(vertex.ID())
+
+	for len(ancestorsBytes) < b.Config.MultiputMaxContainersSent && len(queue) > 0 && time.Since(startTime) < b.Config.MaxTimeGetAncestors {
+		var vtx avalanche.Vertex
+		vtx, queue = queue[0], queue[1:] // pop
+		vtxBytes := vtx.Bytes()
+		// Ensure response size isn't too large. Include wrappers.IntLen because the size of the message
+		// is included with each container, and the size is repr. by an int.
+		if newLen := wrappers.IntLen + ancestorsBytesLen + len(vtxBytes); newLen < constants.MaxContainersLen {
+			ancestorsBytes = append(ancestorsBytes, vtxBytes)
+			ancestorsBytesLen = newLen
+		} else { // reached maximum response size
+			break
+		}
+		parents, err := vtx.Parents()
+		if err != nil {
+			return err
+		}
+		for _, parent := range parents {
+			if parent.Status() == choices.Unknown { // Don't have this vertex;ignore
+				continue
+			}
+			if parentID := parent.ID(); !visited.Contains(parentID) { // If already visited, ignore
+				queue = append(queue, parent)
+				visited.Add(parentID)
+			}
+		}
+	}
+
+	b.getAncestorsVtxs.Observe(float64(len(ancestorsBytes)))
+	b.Sender.SendMultiPut(vdr, requestID, ancestorsBytes)
+	return nil
 }

@@ -15,17 +15,25 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 )
 
-func DefaultConfig() Config {
+func DefaultConfig() (bootstrap.Config, Config) {
 	vtxBlocked, _ := queue.NewWithMissing(memdb.New(), "", prometheus.NewRegistry())
 	txBlocked, _ := queue.New(memdb.New(), "", prometheus.NewRegistry())
-	return Config{
-		Config: bootstrap.Config{
-			Config:     common.DefaultConfigTest(),
-			VtxBlocked: vtxBlocked,
-			TxBlocked:  txBlocked,
-			Manager:    &vertex.TestManager{},
-			VM:         &vertex.TestVM{},
-		},
+
+	bootstrapConfig := bootstrap.Config{
+		Config:     common.DefaultConfigTest(),
+		VtxBlocked: vtxBlocked,
+		TxBlocked:  txBlocked,
+		Manager:    &vertex.TestManager{},
+		VM:         &vertex.TestVM{},
+	}
+
+	engineConfig := Config{
+		Ctx:        bootstrapConfig.Ctx,
+		VM:         bootstrapConfig.VM,
+		Manager:    bootstrapConfig.Manager,
+		Sender:     bootstrapConfig.Sender,
+		RequestID:  new(uint32), // TODO ABENEGIA: FIX IT UP, SHOULD BE PART OF Config NOT Bootstrapper
+		Validators: bootstrapConfig.Validators,
 		Params: avalanche.Parameters{
 			Parameters: snowball.Parameters{
 				Metrics:               prometheus.NewRegistry(),
@@ -43,4 +51,6 @@ func DefaultConfig() Config {
 		},
 		Consensus: &avalanche.Topological{},
 	}
+
+	return bootstrapConfig, engineConfig
 }

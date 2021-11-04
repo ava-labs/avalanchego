@@ -6,7 +6,6 @@ package avalanche
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -14,7 +13,6 @@ type metrics struct {
 	numVtxRequests, numPendingVts,
 	numMissingTxs, pendingTxs,
 	blockerVtxs, blockerTxs prometheus.Gauge
-	getAncestorsVtxs metric.Averager
 }
 
 // Initialize implements the Engine interface
@@ -50,14 +48,6 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		Name:      "blocker_txs",
 		Help:      "Number of transactions that are blocking other transactions from being issued because they haven't been issued",
 	})
-
-	m.getAncestorsVtxs = metric.NewAveragerWithErrs(
-		namespace,
-		"get_ancestors_vtxs",
-		"vertices fetched in a call to GetAncestors",
-		reg,
-		&errs,
-	)
 
 	errs.Add(
 		reg.Register(m.numVtxRequests),

@@ -14,7 +14,7 @@ type Engine interface {
 	common.Engine
 
 	// Initialize this engine.
-	Initialize(Config) error
+	Initialize(Config) (func() error, error)
 
 	// GetVtx returns a vertex by its ID.
 	// Returns an error if unknown.

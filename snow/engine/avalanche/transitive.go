@@ -8,15 +8,14 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche/poll"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
-	"github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/events"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -27,7 +26,13 @@ var _ Engine = &Transitive{}
 // Transitive implements the Engine interface by attempting to fetch all
 // transitive dependencies.
 type Transitive struct {
-	bootstrap.Bootstrapper
+	Ctx        *snow.Context
+	Sender     common.Sender
+	Manager    vertex.Manager
+	VM         vertex.DAGVM
+	Validators validators.Set
+	ReqID      *uint32
+
 	metrics
 
 	Params    avalanche.Parameters
@@ -61,8 +66,14 @@ type Transitive struct {
 }
 
 // Initialize implements the Engine interface
-func (t *Transitive) Initialize(config Config) error {
+func (t *Transitive) Initialize(config Config) (func() error, error) {
 	config.Ctx.Log.Info("initializing consensus engine")
+	t.Ctx = config.Ctx
+	t.Sender = config.Sender
+	t.VM = config.VM
+	t.Manager = config.Manager
+	t.ReqID = config.RequestID
+	t.Validators = config.Validators
 
 	t.Params = config.Params
 	t.Consensus = config.Consensus
@@ -76,19 +87,66 @@ func (t *Transitive) Initialize(config Config) error {
 	t.uniformSampler = sampler.NewUniform()
 
 	if err := t.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
-		return err
+		return t.finishBootstrapping, err
 	}
 
-	if err := t.Bootstrapper.Initialize(
-		config.Config,
-		t.finishBootstrapping,
-		fmt.Sprintf("%s_bs", config.Params.Namespace),
-		config.Params.Metrics,
-	); err != nil {
-		return err
-	}
+	return t.finishBootstrapping, nil
+}
 
-	return t.Bootstrapper.Startup()
+func (t *Transitive) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+	return fmt.Errorf("GetAccepted message should not be handled by engine. Dropping it")
+}
+
+func (t *Transitive) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+	return fmt.Errorf("Accepted message should not be handled by engine. Dropping it")
+}
+
+func (t *Transitive) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
+	return fmt.Errorf("GetAcceptedFailed message should not be handled by engine. Dropping it")
+}
+
+func (t *Transitive) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
+	return fmt.Errorf("GetAcceptedFrontier message should not be handled by engine. Dropping it")
+}
+
+func (t *Transitive) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+	return fmt.Errorf("AcceptedFrontier message should not be handled by engine. Dropping it")
+}
+
+func (t *Transitive) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
+	return fmt.Errorf("GetAcceptedFrontierFailed message should not be handled by engine. Dropping it")
+}
+
+func (t *Transitive) MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) error {
+	return fmt.Errorf("multiPut message should not be handled by engine. Dropping it")
+}
+
+func (t *Transitive) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) error {
+	return fmt.Errorf("getAncestorsFailed message should not be handled by engine. Dropping it")
+}
+
+func (t *Transitive) Context() *snow.Context {
+	return t.Ctx
+}
+
+func (t *Transitive) Halt() {
+	t.Ctx.Log.Warn("Halt command should not be handled by engine. Dropping it")
+}
+
+func (t *Transitive) Timeout() error {
+	return fmt.Errorf("timeout message should not be handled by engine. Dropping it")
+}
+
+func (t *Transitive) Connected(validatorID ids.ShortID) error {
+	return fmt.Errorf("connected message should not be handled by engine. Dropping it")
+}
+
+func (t *Transitive) Disconnected(validatorID ids.ShortID) error {
+	return fmt.Errorf("disconnected message should not be handled by engine. Dropping it")
+}
+
+func (t *Transitive) IsBootstrapped() bool {
+	return t.Ctx.IsBootstrapped()
 }
 
 func (t *Transitive) finishBootstrapping() error {
@@ -151,65 +209,13 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error 
 
 // GetAncestors implements the Engine interface
 func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error {
-	startTime := time.Now()
-	t.Ctx.Log.Verbo("GetAncestors(%s, %d, %s) called", vdr, requestID, vtxID)
-	vertex, err := t.Manager.GetVtx(vtxID)
-	if err != nil || vertex.Status() == choices.Unknown {
-		t.Ctx.Log.Verbo("dropping getAncestors")
-		return nil // Don't have the requested vertex. Drop message.
-	}
-
-	queue := make([]avalanche.Vertex, 1, t.Config.MultiputMaxContainersSent) // for BFS
-	queue[0] = vertex
-	ancestorsBytesLen := 0                                                  // length, in bytes, of vertex and its ancestors
-	ancestorsBytes := make([][]byte, 0, t.Config.MultiputMaxContainersSent) // vertex and its ancestors in BFS order
-	visited := ids.Set{}                                                    // IDs of vertices that have been in queue before
-	visited.Add(vertex.ID())
-
-	for len(ancestorsBytes) < t.Config.MultiputMaxContainersSent && len(queue) > 0 && time.Since(startTime) < t.Config.MaxTimeGetAncestors {
-		var vtx avalanche.Vertex
-		vtx, queue = queue[0], queue[1:] // pop
-		vtxBytes := vtx.Bytes()
-		// Ensure response size isn't too large. Include wrappers.IntLen because the size of the message
-		// is included with each container, and the size is repr. by an int.
-		if newLen := wrappers.IntLen + ancestorsBytesLen + len(vtxBytes); newLen < constants.MaxContainersLen {
-			ancestorsBytes = append(ancestorsBytes, vtxBytes)
-			ancestorsBytesLen = newLen
-		} else { // reached maximum response size
-			break
-		}
-		parents, err := vtx.Parents()
-		if err != nil {
-			return err
-		}
-		for _, parent := range parents {
-			if parent.Status() == choices.Unknown { // Don't have this vertex;ignore
-				continue
-			}
-			if parentID := parent.ID(); !visited.Contains(parentID) { // If already visited, ignore
-				queue = append(queue, parent)
-				visited.Add(parentID)
-			}
-		}
-	}
-
-	t.metrics.getAncestorsVtxs.Observe(float64(len(ancestorsBytes)))
-	t.Sender.SendMultiPut(vdr, requestID, ancestorsBytes)
-	return nil
+	return fmt.Errorf("getAncestors message should not be handled by engine. Dropping it")
 }
 
 // Put implements the Engine interface
 func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) error {
 	t.Ctx.Log.Verbo("Put(%s, %d, %s) called", vdr, requestID, vtxID)
-
-	if !t.Ctx.IsBootstrapped() { // Bootstrapping unfinished --> didn't call Get --> this message is invalid
-		if requestID == constants.GossipMsgRequestID {
-			t.Ctx.Log.Verbo("dropping gossip Put(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
-		} else {
-			t.Ctx.Log.Debug("dropping Put(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
-		}
-		return nil
-	}
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "Put received by Engine during Bootstrap")
 
 	vtx, err := t.Manager.ParseVtx(vtxBytes)
 	if err != nil {
@@ -225,10 +231,7 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxByt
 
 // GetFailed implements the Engine interface
 func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
-	if !t.Ctx.IsBootstrapped() { // Bootstrapping unfinished --> didn't call Get --> this message is invalid
-		t.Ctx.Log.Debug("dropping GetFailed(%s, %d) due to bootstrapping", vdr, requestID)
-		return nil
-	}
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "GetFailed received by Engine during Bootstrap")
 
 	vtxID, ok := t.outstandingVtxReqs.Remove(vdr, requestID)
 	if !ok {
@@ -255,11 +258,8 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 
 // PullQuery implements the Engine interface
 func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error {
-	if !t.Ctx.IsBootstrapped() {
-		t.Ctx.Log.Debug("dropping PullQuery(%s, %d, %s) due to bootstrapping",
-			vdr, requestID, vtxID)
-		return nil
-	}
+	// If the engine hasn't been bootstrapped, we aren't ready to respond to queries
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "PullQuery received by Engine during Bootstrap")
 
 	// Will send chits to [vdr] once we have [vtxID] and its dependencies
 	c := &convincer{
@@ -290,11 +290,8 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID) 
 
 // PushQuery implements the Engine interface
 func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) error {
-	if !t.Ctx.IsBootstrapped() {
-		// We're bootstrapping, so ignore this query.
-		t.Ctx.Log.Debug("dropping PushQuery(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
-		return nil
-	}
+	// We're bootstrapping, so ignore this query.
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "PushQuery received by Engine during Bootstrap")
 
 	vtx, err := t.Manager.ParseVtx(vtxBytes)
 	if err != nil {
@@ -312,10 +309,7 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID, 
 
 // Chits implements the Engine interface
 func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) error {
-	if !t.Ctx.IsBootstrapped() {
-		t.Ctx.Log.Debug("dropping Chits(%s, %d) due to bootstrapping", vdr, requestID)
-		return nil
-	}
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "Chits received by Engine during Bootstrap")
 
 	v := &voter{
 		t:         t,
@@ -338,52 +332,47 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) er
 
 // QueryFailed implements the Engine interface
 func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
+	// If the engine hasn't been bootstrapped, we didn't issue a query
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "QueryFailed received by Engine during Bootstrap")
+
 	return t.Chits(vdr, requestID, nil)
 }
 
 // AppRequest implements the Engine interface
 func (t *Transitive) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
-	if !t.Ctx.IsBootstrapped() {
-		t.Ctx.Log.Debug("dropping AppRequest(%s, %d) due to bootstrapping", nodeID, requestID)
-		return nil
-	}
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppRequest received by Engine during Bootstrap")
+
 	// Notify the VM of this request
 	return t.VM.AppRequest(nodeID, requestID, deadline, request)
 }
 
 // AppResponse implements the Engine interface
 func (t *Transitive) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
-	if !t.Ctx.IsBootstrapped() {
-		t.Ctx.Log.Debug("dropping AppResponse(%s, %d) due to bootstrapping", nodeID, requestID)
-		return nil
-	}
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppResponse received by Engine during Bootstrap")
+
 	// Notify the VM of a response to its request
 	return t.VM.AppResponse(nodeID, requestID, response)
 }
 
 // AppRequestFailed implements the Engine interface
 func (t *Transitive) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
-	if !t.Ctx.IsBootstrapped() {
-		t.Ctx.Log.Debug("dropping AppRequestFailed(%s, %d) due to bootstrapping", nodeID, requestID)
-		return nil
-	}
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppRequestFailed received by Engine during Bootstrap")
+
 	// Notify the VM that a request it made failed
 	return t.VM.AppRequestFailed(nodeID, requestID)
 }
 
 // AppGossip implements the Engine interface
 func (t *Transitive) AppGossip(nodeID ids.ShortID, msg []byte) error {
-	if !t.Ctx.IsBootstrapped() {
-		t.Ctx.Log.Debug("dropping AppGossip(%s) due to bootstrapping", nodeID)
-		return nil
-	}
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppGossip received by Engine during Bootstrap")
+
 	// Notify the VM of this message which has been gossiped to it
 	return t.VM.AppGossip(nodeID, msg)
 }
 
 // Notify implements the Engine interface
 func (t *Transitive) Notify(msg common.Message) error {
-	if !t.Ctx.IsBootstrapped() {
+	if !t.IsBootstrapped() {
 		t.Ctx.Log.Debug("dropping Notify due to bootstrapping")
 		return nil
 	}
@@ -631,9 +620,9 @@ func (t *Transitive) issueRepoll() {
 	vdrSet.Add(vdrList...)
 
 	// Poll the network
-	t.RequestID++
-	if err == nil && t.polls.Add(t.RequestID, vdrBag) {
-		t.Sender.SendPullQuery(vdrSet, t.RequestID, vtxID)
+	(*t.ReqID)++
+	if err == nil && t.polls.Add((*t.ReqID), vdrBag) {
+		t.Sender.SendPullQuery(vdrSet, (*t.ReqID), vtxID)
 	} else if err != nil {
 		t.Ctx.Log.Error("re-query for %s was dropped due to an insufficient number of validators", vtxID)
 	}
@@ -675,9 +664,9 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 		t.Ctx.Log.Debug("not sending request for vertex %s because there is already an outstanding request for it", vtxID)
 		return
 	}
-	t.RequestID++
-	t.outstandingVtxReqs.Add(vdr, t.RequestID, vtxID) // Mark that there is an outstanding request for this vertex
-	t.Sender.SendGet(vdr, t.RequestID, vtxID)
+	(*t.ReqID)++
+	t.outstandingVtxReqs.Add(vdr, (*t.ReqID), vtxID) // Mark that there is an outstanding request for this vertex
+	t.Sender.SendGet(vdr, (*t.ReqID), vtxID)
 	t.metrics.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len())) // Tracks performance statistics
 }
 

@@ -53,19 +53,27 @@ func TestShutdown(t *testing.T) {
 	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Hour, time.Second, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
-	engine := common.EngineTest{T: t}
-	engine.Default(false)
-
 	shutdownCalled := make(chan struct{}, 1)
 
+	bootstrapper := &common.EngineTest{T: t}
+	bootstrapper.Default(true)
+	bootstrapper.ContextF = snow.DefaultContextTest
+	bootstrapper.ShutdownF = func() error { shutdownCalled <- struct{}{}; return nil }
+	bootstrapper.ConnectedF = func(nodeID ids.ShortID) error { return nil }
+	bootstrapper.HaltF = func() {}
+
+	engine := &common.EngineTest{T: t}
+	engine.Default(true)
 	engine.ContextF = snow.DefaultContextTest
 	engine.ShutdownF = func() error { shutdownCalled <- struct{}{}; return nil }
+	engine.ConnectedF = func(nodeID ids.ShortID) error { return nil }
+	engine.HaltF = func() {}
 
 	handler := &Handler{}
 	err = handler.Initialize(
 		mc,
-		nil, // TODO ABENEGIA: clean avalanche engine and duly init
-		&engine,
+		bootstrapper,
+		engine,
 		vdrs,
 		nil,
 		"",
@@ -138,17 +146,21 @@ func TestShutdownTimesOut(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	engine := common.EngineTest{T: t}
-	engine.Default(false)
-
-	engineFinished := make(chan struct{}, 1)
-
-	// MultiPut blocks for two seconds
-	engine.MultiPutF = func(nodeID ids.ShortID, requestID uint32, containers [][]byte) error {
+	bootstrapFinished := make(chan struct{}, 1)
+	bootstrapper := &common.EngineTest{T: t}
+	bootstrapper.Default(true)
+	bootstrapper.ContextF = snow.DefaultContextTest
+	bootstrapper.ConnectedF = func(nodeID ids.ShortID) error { return nil }
+	bootstrapper.HaltF = func() {}
+	bootstrapper.MultiPutF = func(nodeID ids.ShortID, requestID uint32, containers [][]byte) error {
+		// MultiPut blocks for two seconds
 		time.Sleep(2 * time.Second)
-		engineFinished <- struct{}{}
+		bootstrapFinished <- struct{}{}
 		return nil
 	}
+
+	engine := &common.EngineTest{T: t}
+	engine.Default(false)
 
 	closed := new(int)
 
@@ -158,8 +170,8 @@ func TestShutdownTimesOut(t *testing.T) {
 	handler := &Handler{}
 	err = handler.Initialize(
 		mc,
-		nil, // TODO ABENEGIA: clean avalanche engine and duly init
-		&engine,
+		bootstrapper,
+		engine,
 		vdrs,
 		nil,
 		"",
@@ -185,7 +197,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	}()
 
 	select {
-	case <-engineFinished:
+	case <-bootstrapFinished:
 		t.Fatalf("Shutdown should have finished in one millisecond before timing out instead of waiting for engine to finish shutting down.")
 	case <-shutdownFinished:
 	}
@@ -222,10 +234,7 @@ func TestRouterTimeout(t *testing.T) {
 	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Hour, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
-	// Create an engine and handler
-	engine := common.EngineTest{T: t}
-	engine.Default(false)
-
+	// Create bootstrapper, engine and handler
 	var (
 		calledGetFailed, calledGetAncestorsFailed,
 		calledQueryFailed, calledQueryFailed2,
@@ -234,13 +243,18 @@ func TestRouterTimeout(t *testing.T) {
 		wg = sync.WaitGroup{}
 	)
 
-	engine.GetFailedF = func(nodeID ids.ShortID, requestID uint32) error { wg.Done(); calledGetFailed = true; return nil }
-	engine.GetAncestorsFailedF = func(nodeID ids.ShortID, requestID uint32) error {
+	bootstrapper := &common.EngineTest{T: t}
+	bootstrapper.Default(true)
+	bootstrapper.ContextF = snow.DefaultContextTest
+	bootstrapper.ConnectedF = func(nodeID ids.ShortID) error { return nil }
+	bootstrapper.HaltF = func() {}
+	bootstrapper.GetFailedF = func(nodeID ids.ShortID, requestID uint32) error { wg.Done(); calledGetFailed = true; return nil }
+	bootstrapper.GetAncestorsFailedF = func(nodeID ids.ShortID, requestID uint32) error {
 		defer wg.Done()
 		calledGetAncestorsFailed = true
 		return nil
 	}
-	engine.QueryFailedF = func(nodeID ids.ShortID, requestID uint32) error {
+	bootstrapper.QueryFailedF = func(nodeID ids.ShortID, requestID uint32) error {
 		defer wg.Done()
 		if !calledQueryFailed {
 			calledQueryFailed = true
@@ -249,17 +263,19 @@ func TestRouterTimeout(t *testing.T) {
 		calledQueryFailed2 = true
 		return nil
 	}
-	engine.GetAcceptedFailedF = func(nodeID ids.ShortID, requestID uint32) error {
+	bootstrapper.GetAcceptedFailedF = func(nodeID ids.ShortID, requestID uint32) error {
 		defer wg.Done()
 		calledGetAcceptedFailed = true
 		return nil
 	}
-	engine.GetAcceptedFrontierFailedF = func(nodeID ids.ShortID, requestID uint32) error {
+	bootstrapper.GetAcceptedFrontierFailedF = func(nodeID ids.ShortID, requestID uint32) error {
 		defer wg.Done()
 		calledGetAcceptedFrontierFailed = true
 		return nil
 	}
 
+	engine := &common.EngineTest{T: t}
+	engine.Default(false)
 	engine.ContextF = snow.DefaultContextTest
 
 	handler := &Handler{}
@@ -268,8 +284,8 @@ func TestRouterTimeout(t *testing.T) {
 	assert.NoError(t, err)
 	err = handler.Initialize(
 		mc,
-		nil, // TODO ABENEGIA: clean avalanche engine and duly init
-		&engine,
+		bootstrapper,
+		engine,
 		vdrs,
 		nil,
 		"",
@@ -333,10 +349,13 @@ func TestRouterClearTimeouts(t *testing.T) {
 	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Hour, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
-	// Create an engine and handler
-	engine := common.EngineTest{T: t}
-	engine.Default(false)
+	// Create bootstrapper, engine and handler
+	bootstrapper := &common.EngineTest{T: t}
+	bootstrapper.Default(false)
+	bootstrapper.ContextF = snow.DefaultContextTest
 
+	engine := &common.EngineTest{T: t}
+	engine.Default(false)
 	engine.ContextF = snow.DefaultContextTest
 
 	vdrs := validators.NewSet()
@@ -345,8 +364,8 @@ func TestRouterClearTimeouts(t *testing.T) {
 	handler := &Handler{}
 	err = handler.Initialize(
 		mc,
-		nil, // TODO ABENEGIA: clean avalanche engine and duly init
-		&engine,
+		bootstrapper,
+		engine,
 		vdrs,
 		nil,
 		"",
@@ -428,19 +447,21 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Hour, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
-	// Create an engine and handler
-	engine := common.EngineTest{T: t}
-	engine.Default(false)
-
+	// Create bootstrapper, engine and handler
 	calledF := new(bool)
-
 	wg := sync.WaitGroup{}
 
-	engine.PullQueryF = func(nodeID ids.ShortID, requestID uint32, containerID ids.ID) error {
+	bootstrapper := &common.EngineTest{T: t}
+	bootstrapper.Default(false)
+	bootstrapper.ContextF = snow.DefaultContextTest
+	bootstrapper.PullQueryF = func(nodeID ids.ShortID, requestID uint32, containerID ids.ID) error {
 		defer wg.Done()
 		*calledF = true
 		return nil
 	}
+
+	engine := &common.EngineTest{T: t}
+	engine.Default(false)
 
 	engine.ContextF = func() *snow.Context {
 		ctx := snow.DefaultContextTest()
@@ -455,8 +476,8 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	assert.NoError(t, err)
 	err = handler.Initialize(
 		mc,
-		nil, // TODO ABENEGIA: clean avalanche engine and duly init
-		&engine,
+		bootstrapper,
+		engine,
 		vdrs,
 		nil,
 		"",

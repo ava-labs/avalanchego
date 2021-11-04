@@ -558,36 +558,56 @@ func (m *manager) createAvalancheChain(
 		Preempt: sb.afterBootstrapped(),
 	}
 
-	// The engine handles consensus
-	engine := &aveng.Transitive{}
-	if err := engine.Initialize(aveng.Config{
-		Config: avbootstrap.Config{
-			Config: common.Config{
-				Ctx:                           ctx,
-				Validators:                    vdrs,
-				Beacons:                       beacons,
-				SampleK:                       sampleK,
-				StartupAlpha:                  (3*bootstrapWeight + 3) / 4,
-				Alpha:                         bootstrapWeight/2 + 1, // must be > 50%
-				Sender:                        &sender,
-				Subnet:                        sb,
-				Timer:                         timer,
-				RetryBootstrap:                m.RetryBootstrap,
-				RetryBootstrapWarnFrequency:   m.RetryBootstrapWarnFrequency,
-				MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
-				MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
-				MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
-			},
-			VtxBlocked: vtxBlocker,
-			TxBlocked:  txBlocker,
-			Manager:    vtxManager,
-
-			VM: vm,
+	bootstrapperConfig := avbootstrap.Config{
+		Config: common.Config{
+			Ctx:                           ctx,
+			Validators:                    vdrs,
+			Beacons:                       beacons,
+			SampleK:                       sampleK,
+			StartupAlpha:                  (3*bootstrapWeight + 3) / 4,
+			Alpha:                         bootstrapWeight/2 + 1, // must be > 50%
+			Sender:                        &sender,
+			Subnet:                        sb,
+			Timer:                         timer,
+			RetryBootstrap:                m.RetryBootstrap,
+			RetryBootstrapWarnFrequency:   m.RetryBootstrapWarnFrequency,
+			MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
+			MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
+			MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
 		},
-		Params:    consensusParams,
-		Consensus: &avcon.Topological{},
-	}); err != nil {
+		VtxBlocked: vtxBlocker,
+		TxBlocked:  txBlocker,
+		Manager:    vtxManager,
+
+		VM: vm,
+	}
+	bootstrapper := &avbootstrap.Bootstrapper{}
+	if err := bootstrapper.Initialize(
+		bootstrapperConfig,
+		handler.OnDoneBootstrapping,
+		fmt.Sprintf("%s_bs", consensusParams.Namespace),
+		consensusParams.Metrics,
+	); err != nil {
+		return nil, fmt.Errorf("error initializing avalanche bootstrapper: %w", err)
+	}
+
+	engineConfig := aveng.Config{
+		Ctx:        bootstrapperConfig.Ctx,
+		VM:         bootstrapperConfig.VM,
+		Sender:     bootstrapperConfig.Sender,
+		RequestID:  &bootstrapper.RequestID,
+		Validators: bootstrapper.Validators,
+		Params:     consensusParams,
+		Consensus:  &avcon.Topological{},
+	}
+
+	engine := &aveng.Transitive{}
+	if handler.StartEngineF, err = engine.Initialize(engineConfig); err != nil {
 		return nil, fmt.Errorf("error initializing avalanche engine: %w", err)
+	}
+
+	if err := bootstrapper.Startup(); err != nil {
+		return nil, fmt.Errorf("error starting up avalanche bootstrapper: %w", err)
 	}
 
 	// Register health check for this chain
@@ -607,7 +627,7 @@ func (m *manager) createAvalancheChain(
 
 	err = handler.Initialize(
 		m.MsgCreator,
-		nil,
+		bootstrapper,
 		engine,
 		vdrs,
 		msgChan,
