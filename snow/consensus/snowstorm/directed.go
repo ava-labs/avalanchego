@@ -151,6 +151,8 @@ func (dg *Directed) Add(tx Tx) error {
 		// Add this tx to list of txs consuming the current UTXO
 		spenders.Add(txID)
 
+		// spenders may be nil initially, so we should re-map the set.
+		dg.utxos[inputID] = spenders
 	}
 
 	// Mark this transaction as rogue if had any conflicts registered above
