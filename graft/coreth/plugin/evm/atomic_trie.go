@@ -26,9 +26,8 @@ const commitHeightInterval = uint64(4096)
 const errEntryNotFound = "not found"
 
 var (
-	indexHeightKey           = []byte("IndexHeight")
-	lastCommittedKey         = []byte("LastCommittedBlock")
-	errIndexerNotInitialized = errors.New("indexedAtomicTrie must be initialized before Index can be called")
+	indexHeightKey   = []byte("IndexHeight")
+	lastCommittedKey = []byte("LastCommittedBlock")
 )
 
 // indexedAtomicTrie implements the types.AtomicTrie interface
