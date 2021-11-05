@@ -7,11 +7,12 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/avalanchego/database"
+
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/params"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -205,8 +206,7 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	return nil
 }
 
-// Accept this transaction.
-func (tx *UnsignedExportTx) Accept(ctx *snow.Context, batch database.Batch) error {
+func (tx *UnsignedExportTx) AtomicOps() (map[ids.ID]*atomic.Requests, error) {
 	txID := tx.ID()
 
 	elems := make([]*atomic.Element, len(tx.ExportedOutputs))
@@ -222,7 +222,7 @@ func (tx *UnsignedExportTx) Accept(ctx *snow.Context, batch database.Batch) erro
 
 		utxoBytes, err := Codec.Marshal(codecVersion, utxo)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		utxoID := utxo.InputID()
 		elem := &atomic.Element{
@@ -235,8 +235,16 @@ func (tx *UnsignedExportTx) Accept(ctx *snow.Context, batch database.Batch) erro
 
 		elems[i] = elem
 	}
+	return map[ids.ID]*atomic.Requests{tx.DestinationChain: {PutRequests: elems}}, nil
+}
 
-	return ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{tx.DestinationChain: {PutRequests: elems}}, batch)
+// Accept this transaction.
+func (tx *UnsignedExportTx) Accept(ctx *snow.Context, batch database.Batch) error {
+	ops, err := tx.AtomicOps()
+	if err != nil {
+		return err
+	}
+	return ctx.SharedMemory.Apply(ops, batch)
 }
 
 // newExportTx returns a new ExportTx
