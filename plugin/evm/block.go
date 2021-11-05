@@ -123,6 +123,9 @@ func (b *Block) Accept() error {
 		return err
 	}
 	if tx == nil {
+		if _, err = b.vm.atomicTrie.Index(b.Height(), nil); err != nil {
+			return err
+		}
 		return vm.db.Commit()
 	}
 
@@ -139,12 +142,27 @@ func (b *Block) Accept() error {
 		return vm.db.Commit()
 	}
 
+	ops, err := tx.UnsignedAtomicTx.AtomicOps()
+	if err != nil {
+		return err
+	}
+
+	hash, err := b.vm.atomicTrie.Index(b.Height(), ops)
+	if err != nil {
+		return err
+	}
+
 	batch, err := vm.db.CommitBatch()
 	if err != nil {
 		return fmt.Errorf("failed to create commit batch due to: %w", err)
 	}
+	err = tx.UnsignedAtomicTx.Accept(vm.ctx, batch)
+	if err != nil {
+		return err
+	}
 
-	return tx.UnsignedAtomicTx.Accept(vm.ctx, batch)
+	fmt.Println("committed atomic trie", "hash", hash)
+	return nil
 }
 
 // Reject implements the snowman.Block interface
