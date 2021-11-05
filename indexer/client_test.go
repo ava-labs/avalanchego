@@ -5,7 +5,6 @@ package indexer
 
 import (
 	"testing"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -25,7 +24,7 @@ func (mc *mockClient) SendRequest(method string, _ interface{}, reply interface{
 
 func TestIndexClient(t *testing.T) {
 	assert := assert.New(t)
-	client := NewClient("http://localhost:9650", "/ext/index/C/block", time.Minute)
+	client := client{}
 	{
 		// Test GetIndex
 		client.EndpointRequester = &mockClient{

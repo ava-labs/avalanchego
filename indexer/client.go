@@ -11,20 +11,34 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-type Client struct {
+// Interface compliance
+var _ Client = (*client)(nil)
+
+// Client interface for Avalanche Indexer API Endpoint
+type Client interface {
+	GetContainerRange(*GetContainerRangeArgs) ([]Container, error)
+	GetContainerByIndex(*GetContainer) (Container, error)
+	GetLastAccepted(*GetLastAcceptedArgs) (Container, error)
+	GetIndex(*GetIndexArgs) (uint64, error)
+	IsAccepted(*GetIndexArgs) (bool, error)
+	GetContainerByID(*GetIndexArgs) (Container, error)
+}
+
+// Client implementation for Avalanche Indexer API Endpoint
+type client struct {
 	rpc.EndpointRequester
 }
 
 // NewClient creates a client that can interact with an index via HTTP API calls.
 // [host] is the host to make API calls to (e.g. http://1.2.3.4:9650).
 // [endpoint] is the path to the index endpoint (e.g. /ext/index/C/block or /ext/index/X/tx).
-func NewClient(host, endpoint string, requestTimeout time.Duration) *Client {
-	return &Client{
+func NewClient(host, endpoint string, requestTimeout time.Duration) Client {
+	return &client{
 		EndpointRequester: rpc.NewEndpointRequester(host, endpoint, "index", requestTimeout),
 	}
 }
 
-func (c *Client) GetContainerRange(args *GetContainerRangeArgs) ([]Container, error) {
+func (c *client) GetContainerRange(args *GetContainerRangeArgs) ([]Container, error) {
 	var fcs GetContainerRangeResponse
 	if err := c.SendRequest("getContainerRange", args, &fcs); err != nil {
 		return nil, err
@@ -44,7 +58,7 @@ func (c *Client) GetContainerRange(args *GetContainerRangeArgs) ([]Container, er
 	return response, nil
 }
 
-func (c *Client) GetContainerByIndex(args *GetContainer) (Container, error) {
+func (c *client) GetContainerByIndex(args *GetContainer) (Container, error) {
 	var fc FormattedContainer
 	if err := c.SendRequest("getContainerByIndex", args, &fc); err != nil {
 		return Container{}, err
@@ -60,7 +74,7 @@ func (c *Client) GetContainerByIndex(args *GetContainer) (Container, error) {
 	}, nil
 }
 
-func (c *Client) GetLastAccepted(args *GetLastAcceptedArgs) (Container, error) {
+func (c *client) GetLastAccepted(args *GetLastAcceptedArgs) (Container, error) {
 	var fc FormattedContainer
 	if err := c.SendRequest("getLastAccepted", args, &fc); err != nil {
 		return Container{}, nil
@@ -76,19 +90,19 @@ func (c *Client) GetLastAccepted(args *GetLastAcceptedArgs) (Container, error) {
 	}, nil
 }
 
-func (c *Client) GetIndex(args *GetIndexArgs) (uint64, error) {
+func (c *client) GetIndex(args *GetIndexArgs) (uint64, error) {
 	var index GetIndexResponse
 	err := c.SendRequest("getIndex", args, &index)
 	return uint64(index.Index), err
 }
 
-func (c *Client) IsAccepted(args *GetIndexArgs) (bool, error) {
+func (c *client) IsAccepted(args *GetIndexArgs) (bool, error) {
 	var isAccepted bool
 	err := c.SendRequest("isAccepted", args, &isAccepted)
 	return isAccepted, err
 }
 
-func (c *Client) GetContainerByID(args *GetIndexArgs) (Container, error) {
+func (c *client) GetContainerByID(args *GetIndexArgs) (Container, error) {
 	var fc FormattedContainer
 	if err := c.SendRequest("getContainerByID", args, &fc); err != nil {
 		return Container{}, err
