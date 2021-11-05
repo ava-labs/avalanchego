@@ -1,6 +1,10 @@
 package fastsyncer
 
-import "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+import (
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+)
 
 var _ FastSyncer = &fastSyncer{}
 
@@ -9,6 +13,8 @@ type Config struct {
 }
 
 type FastSyncer interface {
+	common.FastSyncHandler
+
 	Start() error
 }
 
@@ -40,5 +46,25 @@ func (fs *fastSyncer) Start() error {
 	}
 
 	// TODO: to implement
+	return nil
+}
+
+func (fs *fastSyncer) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error {
+	// TODO: implement
+	return nil
+}
+
+func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summary []byte) error {
+	// TODO: implement
+	return nil
+}
+
+func (fs *fastSyncer) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error {
+	// TODO: implement
+	return nil
+}
+
+func (fs *fastSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error {
+	// TODO: implement
 	return nil
 }

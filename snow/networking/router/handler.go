@@ -446,7 +446,38 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		return h.bootstrapper.AppGossip(nodeID, appBytes)
 
 	case message.GetStateSummaryFrontier:
-		h.FastSyncer.GetStateSummaryFrontier(nodeID)
+		reqID := msg.Get(message.RequestID).(uint32)
+		return h.FastSyncer.GetStateSummaryFrontier(nodeID, reqID)
+
+	case message.StateSummaryFrontier:
+		reqID := msg.Get(message.RequestID).(uint32)
+		summary, ok := msg.Get(message.ContainerBytes).([]byte)
+		if !ok {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse ContainerBytes",
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
+			return nil
+		}
+		return h.FastSyncer.StateSummaryFrontier(nodeID, reqID, summary)
+
+	case message.GetAcceptedStateSummary:
+		reqID := msg.Get(message.RequestID).(uint32)
+		summaries, ok := msg.Get(message.MultiContainerBytes).([][]byte)
+		if !ok {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse MultiContainerBytes",
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
+			return nil
+		}
+		return h.FastSyncer.GetAcceptedStateSummary(nodeID, reqID, summaries)
+
+	case message.AcceptedStateSummary:
+		reqID := msg.Get(message.RequestID).(uint32)
+		summaries, ok := msg.Get(message.MultiContainerBytes).([][]byte)
+		if !ok {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse MultiContainerBytes",
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
+			return nil
+		}
+		return h.FastSyncer.AcceptedStateSummary(nodeID, reqID, summaries)
 
 	default:
 		h.ctx.Log.Warn("Attempt to submit to engine unhandled consensus msg %s from from (%s, %s). Dropping it",

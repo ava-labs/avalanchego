@@ -42,6 +42,15 @@ type ExternalHandler interface {
 	AcceptedHandler
 	FetchHandler
 	QueryHandler
+	// FastSyncHandler
+}
+
+// TODO: duly comment and include in ExternalHandler Interface
+type FastSyncHandler interface {
+	GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error
+	StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summary []byte) error
+	GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error
+	AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error
 }
 
 // FrontierHandler defines how a consensus engine reacts to frontier messages

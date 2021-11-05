@@ -200,7 +200,8 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 		return
 	}
 
-	if _, notRequested := message.UnrequestedOps[op]; notRequested || (op == message.Put && requestID == constants.GossipMsgRequestID) {
+	if _, notRequested := message.UnrequestedOps[op]; notRequested ||
+		(op == message.Put && requestID == constants.GossipMsgRequestID) {
 		chain.Push(msg)
 		return
 	}
