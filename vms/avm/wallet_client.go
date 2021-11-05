@@ -15,19 +15,30 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-type WalletClient struct {
+// Interface compliance
+var _ Client = (*client)(nil)
+
+// interface of an AVM wallet client for interacting with avm managed wallet on [chain]
+type WalletClient interface {
+	IssueTx([]byte) (ids.ID, error)
+	Send(api.UserPass, []string, string, uint64, string, string, string) (ids.ID, error)
+	SendMultiple(api.UserPass, []string, string, []SendOutput, string) (ids.ID, error)
+}
+
+// implementation of an AVM wallet client for interacting with avm managed wallet on [chain]
+type walletClient struct {
 	requester rpc.EndpointRequester
 }
 
 // NewWalletClient returns an AVM wallet client for interacting with avm managed wallet on [chain]
-func NewWalletClient(uri, chain string, requestTimeout time.Duration) *WalletClient {
-	return &WalletClient{
+func NewWalletClient(uri, chain string, requestTimeout time.Duration) WalletClient {
+	return &walletClient{
 		requester: rpc.NewEndpointRequester(uri, fmt.Sprintf("/ext/%s/wallet", constants.ChainAliasPrefix+chain), "wallet", requestTimeout),
 	}
 }
 
 // IssueTx issues a transaction to a node and returns the TxID
-func (c *WalletClient) IssueTx(txBytes []byte) (ids.ID, error) {
+func (c *walletClient) IssueTx(txBytes []byte) (ids.ID, error) {
 	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, txBytes)
 	if err != nil {
 		return ids.ID{}, err
@@ -41,7 +52,7 @@ func (c *WalletClient) IssueTx(txBytes []byte) (ids.ID, error) {
 }
 
 // Send [amount] of [assetID] to address [to]
-func (c *WalletClient) Send(
+func (c *walletClient) Send(
 	user api.UserPass,
 	from []string,
 	changeAddr string,
@@ -68,7 +79,7 @@ func (c *WalletClient) Send(
 }
 
 // SendMultiple sends a transaction from [user] funding all [outputs]
-func (c *WalletClient) SendMultiple(
+func (c *walletClient) SendMultiple(
 	user api.UserPass,
 	from []string,
 	changeAddr string,

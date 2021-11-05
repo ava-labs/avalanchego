@@ -17,19 +17,51 @@ import (
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
 
-type Client struct {
+// Interface compliance
+var _ Client = (*client)(nil)
+
+// interface for an AVM client for interacting with avm [chain]
+type Client interface {
+	IssueTx([]byte) (ids.ID, error)
+	GetTxStatus(ids.ID) (choices.Status, error)
+	ConfirmTx(ids.ID, int, time.Duration) (choices.Status, error)
+	GetTx(ids.ID) ([]byte, error)
+	GetUTXOs([]string, uint32, string, string) ([][]byte, api.Index, error)
+	GetAtomicUTXOs([]string, string, uint32, string, string) ([][]byte, api.Index, error)
+	GetAssetDescription(string) (*GetAssetDescriptionReply, error)
+	GetBalance(string, string, bool) (*GetBalanceReply, error)
+	GetAllBalances(string, bool) (*GetAllBalancesReply, error)
+	CreateAsset(api.UserPass, []string, string, string, string, byte, []*Holder, []Owners) (ids.ID, error)
+	CreateFixedCapAsset(api.UserPass, []string, string, string, string, byte, []*Holder) (ids.ID, error)
+	CreateVariableCapAsset(api.UserPass, []string, string, string, string, byte, []Owners) (ids.ID, error)
+	CreateNFTAsset(api.UserPass, []string, string, string, string, []Owners) (ids.ID, error)
+	CreateAddress(api.UserPass) (string, error)
+	ListAddresses(api.UserPass) ([]string, error)
+	ExportKey(api.UserPass, string) (string, error)
+	ImportKey(api.UserPass, string) (string, error)
+	Send(api.UserPass, []string, string, uint64, string, string, string) (ids.ID, error)
+	SendMultiple(api.UserPass, []string, string, []SendOutput, string) (ids.ID, error)
+	Mint(api.UserPass, []string, string, uint64, string, string) (ids.ID, error)
+	SendNFT(api.UserPass, []string, string, string, uint32, string) (ids.ID, error)
+	MintNFT(api.UserPass, []string, string, string, []byte, string) (ids.ID, error)
+	Import(api.UserPass, string, string) (ids.ID, error)
+	Export(api.UserPass, []string, string, uint64, string, string) (ids.ID, error)
+}
+
+// implementation for an AVM client for interacting with avm [chain]
+type client struct {
 	requester rpc.EndpointRequester
 }
 
 // NewClient returns an AVM client for interacting with avm [chain]
-func NewClient(uri, chain string, requestTimeout time.Duration) *Client {
-	return &Client{
+func NewClient(uri, chain string, requestTimeout time.Duration) Client {
+	return &client{
 		requester: rpc.NewEndpointRequester(uri, fmt.Sprintf("/ext/%s", constants.ChainAliasPrefix+chain), "avm", requestTimeout),
 	}
 }
 
 // IssueTx issues a transaction to a node and returns the TxID
-func (c *Client) IssueTx(txBytes []byte) (ids.ID, error) {
+func (c *client) IssueTx(txBytes []byte) (ids.ID, error) {
 	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, txBytes)
 	if err != nil {
 		return ids.ID{}, err
@@ -43,7 +75,7 @@ func (c *Client) IssueTx(txBytes []byte) (ids.ID, error) {
 }
 
 // GetTxStatus returns the status of [txID]
-func (c *Client) GetTxStatus(txID ids.ID) (choices.Status, error) {
+func (c *client) GetTxStatus(txID ids.ID) (choices.Status, error) {
 	res := &GetTxStatusReply{}
 	err := c.requester.SendRequest("getTxStatus", &api.JSONTxID{
 		TxID: txID,
@@ -56,7 +88,7 @@ func (c *Client) GetTxStatus(txID ids.ID) (choices.Status, error) {
 // by the final attempt, it returns the status of the last attempt.
 // Note: ConfirmTx will block until either the last attempt finishes or the client
 // returns a decided status.
-func (c *Client) ConfirmTx(txID ids.ID, attempts int, delay time.Duration) (choices.Status, error) {
+func (c *client) ConfirmTx(txID ids.ID, attempts int, delay time.Duration) (choices.Status, error) {
 	for i := 0; i < attempts-1; i++ {
 		status, err := c.GetTxStatus(txID)
 		if err != nil {
@@ -73,7 +105,7 @@ func (c *Client) ConfirmTx(txID ids.ID, attempts int, delay time.Duration) (choi
 }
 
 // GetTx returns the byte representation of [txID]
-func (c *Client) GetTx(txID ids.ID) ([]byte, error) {
+func (c *client) GetTx(txID ids.ID) ([]byte, error) {
 	res := &api.FormattedTx{}
 	err := c.requester.SendRequest("getTx", &api.GetTxArgs{
 		TxID:     txID,
@@ -91,13 +123,13 @@ func (c *Client) GetTx(txID ids.ID) ([]byte, error) {
 }
 
 // GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
-func (c *Client) GetUTXOs(addrs []string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error) {
+func (c *client) GetUTXOs(addrs []string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error) {
 	return c.GetAtomicUTXOs(addrs, "", limit, startAddress, startUTXOID)
 }
 
 // GetAtomicUTXOs returns the byte representation of the atomic UTXOs controlled by [addresses]
 // from [sourceChain]
-func (c *Client) GetAtomicUTXOs(addrs []string, sourceChain string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error) {
+func (c *client) GetAtomicUTXOs(addrs []string, sourceChain string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error) {
 	res := &api.GetUTXOsReply{}
 	err := c.requester.SendRequest("getUTXOs", &api.GetUTXOsArgs{
 		Addresses:   addrs,
@@ -125,7 +157,7 @@ func (c *Client) GetAtomicUTXOs(addrs []string, sourceChain string, limit uint32
 }
 
 // GetAssetDescription returns a description of [assetID]
-func (c *Client) GetAssetDescription(assetID string) (*GetAssetDescriptionReply, error) {
+func (c *client) GetAssetDescription(assetID string) (*GetAssetDescriptionReply, error) {
 	res := &GetAssetDescriptionReply{}
 	err := c.requester.SendRequest("getAssetDescription", &GetAssetDescriptionArgs{
 		AssetID: assetID,
@@ -135,7 +167,7 @@ func (c *Client) GetAssetDescription(assetID string) (*GetAssetDescriptionReply,
 
 // GetBalance returns the balance of [assetID] held by [addr].
 // If [includePartial], balance includes partial owned (i.e. in a multisig) funds.
-func (c *Client) GetBalance(addr string, assetID string, includePartial bool) (*GetBalanceReply, error) {
+func (c *client) GetBalance(addr string, assetID string, includePartial bool) (*GetBalanceReply, error) {
 	res := &GetBalanceReply{}
 	err := c.requester.SendRequest("getBalance", &GetBalanceArgs{
 		Address:        addr,
@@ -146,7 +178,7 @@ func (c *Client) GetBalance(addr string, assetID string, includePartial bool) (*
 }
 
 // GetAllBalances returns all asset balances for [addr]
-func (c *Client) GetAllBalances(addr string, includePartial bool) (*GetAllBalancesReply, error) {
+func (c *client) GetAllBalances(addr string, includePartial bool) (*GetAllBalancesReply, error) {
 	res := &GetAllBalancesReply{}
 	err := c.requester.SendRequest("getAllBalances", &GetAllBalancesArgs{
 		JSONAddress:    api.JSONAddress{Address: addr},
@@ -156,7 +188,7 @@ func (c *Client) GetAllBalances(addr string, includePartial bool) (*GetAllBalanc
 }
 
 // CreateAsset creates a new asset and returns its assetID
-func (c *Client) CreateAsset(
+func (c *client) CreateAsset(
 	user api.UserPass,
 	from []string,
 	changeAddr,
@@ -183,7 +215,7 @@ func (c *Client) CreateAsset(
 }
 
 // CreateFixedCapAsset creates a new fixed cap asset and returns its assetID
-func (c *Client) CreateFixedCapAsset(
+func (c *client) CreateFixedCapAsset(
 	user api.UserPass,
 	from []string,
 	changeAddr,
@@ -208,7 +240,7 @@ func (c *Client) CreateFixedCapAsset(
 }
 
 // CreateVariableCapAsset creates a new variable cap asset and returns its assetID
-func (c *Client) CreateVariableCapAsset(
+func (c *client) CreateVariableCapAsset(
 	user api.UserPass,
 	from []string,
 	changeAddr,
@@ -233,7 +265,7 @@ func (c *Client) CreateVariableCapAsset(
 }
 
 // CreateNFTAsset creates a new NFT asset and returns its assetID
-func (c *Client) CreateNFTAsset(
+func (c *client) CreateNFTAsset(
 	user api.UserPass,
 	from []string,
 	changeAddr,
@@ -256,21 +288,21 @@ func (c *Client) CreateNFTAsset(
 }
 
 // CreateAddress creates a new address controlled by [user]
-func (c *Client) CreateAddress(user api.UserPass) (string, error) {
+func (c *client) CreateAddress(user api.UserPass) (string, error) {
 	res := &api.JSONAddress{}
 	err := c.requester.SendRequest("createAddress", &user, res)
 	return res.Address, err
 }
 
 // ListAddresses returns all addresses on this chain controlled by [user]
-func (c *Client) ListAddresses(user api.UserPass) ([]string, error) {
+func (c *client) ListAddresses(user api.UserPass) ([]string, error) {
 	res := &api.JSONAddresses{}
 	err := c.requester.SendRequest("listAddresses", &user, res)
 	return res.Addresses, err
 }
 
 // ExportKey returns the private key corresponding to [addr] controlled by [user]
-func (c *Client) ExportKey(user api.UserPass, addr string) (string, error) {
+func (c *client) ExportKey(user api.UserPass, addr string) (string, error) {
 	res := &ExportKeyReply{}
 	err := c.requester.SendRequest("exportKey", &ExportKeyArgs{
 		UserPass: user,
@@ -280,7 +312,7 @@ func (c *Client) ExportKey(user api.UserPass, addr string) (string, error) {
 }
 
 // ImportKey imports [privateKey] to [user]
-func (c *Client) ImportKey(user api.UserPass, privateKey string) (string, error) {
+func (c *client) ImportKey(user api.UserPass, privateKey string) (string, error) {
 	res := &api.JSONAddress{}
 	err := c.requester.SendRequest("importKey", &ImportKeyArgs{
 		UserPass:   user,
@@ -290,7 +322,7 @@ func (c *Client) ImportKey(user api.UserPass, privateKey string) (string, error)
 }
 
 // Send [amount] of [assetID] to address [to]
-func (c *Client) Send(
+func (c *client) Send(
 	user api.UserPass,
 	from []string,
 	changeAddr string,
@@ -317,7 +349,7 @@ func (c *Client) Send(
 }
 
 // SendMultiple sends a transaction from [user] funding all [outputs]
-func (c *Client) SendMultiple(
+func (c *client) SendMultiple(
 	user api.UserPass,
 	from []string,
 	changeAddr string,
@@ -338,7 +370,7 @@ func (c *Client) SendMultiple(
 }
 
 // Mint [amount] of [assetID] to be owned by [to]
-func (c *Client) Mint(
+func (c *client) Mint(
 	user api.UserPass,
 	from []string,
 	changeAddr string,
@@ -361,7 +393,7 @@ func (c *Client) Mint(
 }
 
 // SendNFT sends an NFT and returns the ID of the newly created transaction
-func (c *Client) SendNFT(
+func (c *client) SendNFT(
 	user api.UserPass,
 	from []string,
 	changeAddr string,
@@ -384,7 +416,7 @@ func (c *Client) SendNFT(
 }
 
 // MintNFT issues a MintNFT transaction and returns the ID of the newly created transaction
-func (c *Client) MintNFT(
+func (c *client) MintNFT(
 	user api.UserPass,
 	from []string,
 	changeAddr string,
@@ -413,7 +445,7 @@ func (c *Client) MintNFT(
 
 // Import sends an import transaction to import funds from [sourceChain] and
 // returns the ID of the newly created transaction
-func (c *Client) Import(user api.UserPass, to, sourceChain string) (ids.ID, error) {
+func (c *client) Import(user api.UserPass, to, sourceChain string) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest("import", &ImportArgs{
 		UserPass:    user,
@@ -426,7 +458,7 @@ func (c *Client) Import(user api.UserPass, to, sourceChain string) (ids.ID, erro
 // Export sends an asset from this chain to the P/C-Chain.
 // After this tx is accepted, the AVAX must be imported to the P/C-chain with an importTx.
 // Returns the ID of the newly created atomic transaction
-func (c *Client) Export(
+func (c *client) Export(
 	user api.UserPass,
 	from []string,
 	changeAddr string,
