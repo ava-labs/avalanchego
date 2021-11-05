@@ -16,6 +16,12 @@ import (
 	"sync"
 	"time"
 
+	types2 "github.com/ava-labs/coreth/fastsync/types"
+
+	"github.com/ava-labs/avalanchego/chains/atomic"
+
+	"github.com/ava-labs/coreth/fastsync/facades"
+
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	coreth "github.com/ava-labs/coreth/chain"
 	"github.com/ava-labs/coreth/consensus/dummy"
@@ -105,6 +111,7 @@ var (
 	acceptedPrefix         = []byte("snowman_accepted")
 	ethDBPrefix            = []byte("ethdb")
 	atomicTxPrefix         = []byte("atomicTxDB")
+	atomicIndexDBPrefix    = []byte("atomicIndexDB")
 	pruneRejectedBlocksKey = []byte("pruned_rejected_blocks")
 )
 
@@ -196,6 +203,8 @@ type VM struct {
 
 	// Continuous Profiler
 	profiler profiler.ContinuousProfiler
+
+	atomicTrie types2.AtomicTrie
 }
 
 func (vm *VM) Connected(nodeID ids.ShortID) error {
@@ -361,6 +370,28 @@ func (vm *VM) Initialize(
 	}
 	vm.chain = ethChain
 	lastAccepted := vm.chain.LastAcceptedBlock()
+
+	atomicIndexDB := Database{prefixdb.New(atomicIndexDBPrefix, vm.db)}
+	vm.atomicTrie, err = NewIndexedAtomicTrie(atomicIndexDB)
+	if err != nil {
+		return err
+	}
+
+	// Initialize is blocking at the moment
+	if err = vm.atomicTrie.Initialize(facades.NewEthChainFacade(ethChain), vm.db.Commit, func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error) {
+		tx, err := vm.extractAtomicTx(blk.(*types.Block))
+		if err != nil {
+			return nil, err
+		}
+
+		if tx == nil {
+			return nil, nil
+		}
+
+		return tx.AtomicOps()
+	}); err != nil {
+		return err
+	}
 
 	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
 	vm.handleGasPriceUpdates()
