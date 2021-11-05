@@ -102,6 +102,21 @@ type InboundMsgBuilder interface {
 		container []byte,
 		nodeID ids.ShortID,
 	) InboundMessage // used in UTs only
+
+	InboundGetStateSummaryFrontier(
+		chainID ids.ID,
+		requestID uint32,
+		deadline time.Duration,
+		nodeID ids.ShortID,
+	) InboundMessage
+
+	InboundStateSummaryFrontier(
+		chainID ids.ID,
+		requestID uint32,
+		containers [][]byte,
+		deadline time.Duration,
+		nodeID ids.ShortID,
+	) InboundMessage
 }
 
 type inMsgBuilder struct {
@@ -353,6 +368,42 @@ func (b *inMsgBuilder) InboundMultiPut(
 			ChainID:             chainID[:],
 			RequestID:           requestID,
 			MultiContainerBytes: containers,
+		},
+		nodeID: nodeID,
+	}
+}
+
+func (b *inMsgBuilder) InboundGetStateSummaryFrontier(
+	chainID ids.ID,
+	requestID uint32,
+	deadline time.Duration,
+	nodeID ids.ShortID,
+) InboundMessage {
+	received := b.clock.Time()
+	return &inboundMessage{
+		op: GetStateSummaryFrontier,
+		fields: map[Field]interface{}{
+			ChainID:   chainID[:],
+			RequestID: requestID,
+			Deadline:  uint64(deadline),
+		},
+		nodeID:         nodeID,
+		expirationTime: received.Add(deadline),
+	}
+}
+
+func (b *inMsgBuilder) InboundStateSummaryFrontier(
+	chainID ids.ID,
+	requestID uint32,
+	container []byte,
+	nodeID ids.ShortID,
+) InboundMessage {
+	return &inboundMessage{
+		op: AcceptedFrontier,
+		fields: map[Field]interface{}{
+			ChainID:        chainID[:],
+			RequestID:      requestID,
+			ContainerBytes: container,
 		},
 		nodeID: nodeID,
 	}

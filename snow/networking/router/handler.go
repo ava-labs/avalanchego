@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	fastsyncer "github.com/ava-labs/avalanchego/snow/engine/snowman/fast_syncer"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -36,6 +37,7 @@ type Handler struct {
 	// The validator set that validates this chain
 	validators validators.Set
 
+	FastSyncer   fastsyncer.FastSyncer
 	bootstrapper common.Engine
 	engine       common.Engine
 
@@ -54,8 +56,10 @@ type Handler struct {
 	unprocessedMsgs unprocessedMsgs
 	closing         utils.AtomicBool
 
-	// the function to call and start the engine once bootstrap is done
+	// the function to start the engine once bootstrap is done
 	StartEngineF func() error
+	// the function to start the bootstrap once fasty sync is done
+	StartBootstrapF func() error
 }
 
 // Initialize this consensus handler
@@ -87,6 +91,7 @@ func (h *Handler) Initialize(
 	return err
 }
 
+func (h *Handler) OnDoneFastSyncing() error   { return h.StartBootstrapF() }
 func (h *Handler) OnDoneBootstrapping() error { return h.StartEngineF() }
 
 // Context of this Handler
@@ -439,6 +444,9 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 			return h.engine.AppGossip(nodeID, appBytes)
 		}
 		return h.bootstrapper.AppGossip(nodeID, appBytes)
+
+	case message.GetStateSummaryFrontier:
+		h.FastSyncer.GetStateSummaryFrontier(nodeID)
 
 	default:
 		h.ctx.Log.Warn("Attempt to submit to engine unhandled consensus msg %s from from (%s, %s). Dropping it",

@@ -51,6 +51,14 @@ const (
 	Disconnected
 	Notify
 	GossipRequest
+
+	// Fast sync
+	GetStateSummaryFrontier
+	StateSummaryFrontier
+	GetStateSummaryFrontierFailed
+	GetAcceptedStateSummary
+	AcceptedStateSummary
+	GetAcceptedStateSummaryFailed
 )
 
 var (
@@ -105,16 +113,34 @@ var (
 	}
 	ConsensusOps = append(ConsensusExternalOps, ConsensusInternalOps...)
 
-	ExternalOps = append(ConsensusExternalOps, HandshakeOps...)
+	FastSyncRequestOps = []Op{
+		GetStateSummaryFrontier,
+		GetAcceptedStateSummary,
+	}
+	FastSyncResponseOps = []Op{
+		StateSummaryFrontier,
+		AcceptedStateSummary,
+	}
+	FastSyncExternalOps = append(FastSyncRequestOps, FastSyncResponseOps...)
+	FastSyncInternalOps = []Op{
+		GetStateSummaryFrontierFailed,
+		GetAcceptedStateSummaryFailed,
+	}
+	FastSyncOps = append(FastSyncRequestOps, FastSyncResponseOps...)
+
+	ExternalOps_TOFINDBETTERNAME = append(ConsensusExternalOps, HandshakeOps...)
+	ExternalOps                  = append(ExternalOps_TOFINDBETTERNAME, FastSyncExternalOps...)
 
 	RequestToResponseOps = map[Op]Op{
-		GetAcceptedFrontier: AcceptedFrontier,
-		GetAccepted:         Accepted,
-		GetAncestors:        MultiPut,
-		Get:                 Put,
-		PushQuery:           Chits,
-		PullQuery:           Chits,
-		AppRequest:          AppResponse,
+		GetAcceptedFrontier:     AcceptedFrontier,
+		GetAccepted:             Accepted,
+		GetAncestors:            MultiPut,
+		Get:                     Put,
+		PushQuery:               Chits,
+		PullQuery:               Chits,
+		AppRequest:              AppResponse,
+		GetStateSummaryFrontier: StateSummaryFrontier,
+		GetAcceptedStateSummary: AcceptedStateSummary,
 	}
 	ResponseToFailedOps = map[Op]Op{
 		AcceptedFrontier: GetAcceptedFrontierFailed,
@@ -123,6 +149,10 @@ var (
 		Put:              GetFailed,
 		Chits:            QueryFailed,
 		AppResponse:      AppRequestFailed,
+
+		// TODO: Understand what is this for
+		StateSummaryFrontier: GetStateSummaryFrontierFailed,
+		AcceptedStateSummary: GetAcceptedStateSummaryFailed,
 	}
 	FailedToResponseOps = map[Op]Op{
 		GetAcceptedFrontierFailed: AcceptedFrontier,
@@ -131,6 +161,10 @@ var (
 		GetFailed:                 Put,
 		QueryFailed:               Chits,
 		AppRequestFailed:          AppResponse,
+
+		// TODO: Understand what is this for
+		GetStateSummaryFrontierFailed: StateSummaryFrontier,
+		GetAcceptedStateSummaryFailed: AcceptedStateSummary,
 	}
 	UnrequestedOps = map[Op]struct{}{
 		GetAcceptedFrontier: {},
@@ -169,6 +203,11 @@ var (
 		AppRequest:  {ChainID, RequestID, Deadline, AppBytes},
 		AppResponse: {ChainID, RequestID, AppBytes},
 		AppGossip:   {ChainID, AppBytes},
+		// Fast Sync
+		GetStateSummaryFrontier: {ChainID, RequestID, Deadline},
+		StateSummaryFrontier:    {ChainID, RequestID, ContainerBytes},
+		GetAcceptedStateSummary: {ChainID, RequestID, Deadline, MultiContainerBytes},
+		AcceptedStateSummary:    {ChainID, RequestID, MultiContainerBytes},
 	}
 )
 

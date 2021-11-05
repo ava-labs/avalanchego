@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	fastsyncer "github.com/ava-labs/avalanchego/snow/engine/snowman/fast_syncer"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
@@ -754,7 +755,18 @@ func (m *manager) createSnowmanChain(
 		Preempt: sb.afterBootstrapped(),
 	}
 
-	// The engine handles consensus
+	fastSyncCfg := fastsyncer.Config{
+		VM: vm,
+	}
+	fastSync := fastsyncer.NewFastSyncer(
+		fastSyncCfg,
+		handler.OnDoneFastSyncing,
+	)
+	handler.FastSyncer = fastSync
+	if err := fastSync.Start(); err != nil {
+		return nil, fmt.Errorf("error starting fast sync operations: %w", err)
+	}
+
 	bootstrapCfg := smbootstrap.Config{
 		Config: common.Config{
 			Ctx:                           ctx,
