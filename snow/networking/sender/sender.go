@@ -86,27 +86,29 @@ func (s *Sender) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, requestID uint32)
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
 
+	// Tell the router to expect a response message or a message notifying
+	// that we won't get a response from each of these nodes.
+	// We register timeouts for all nodes, regardless of whether we fail
+	// to send them a message, to avoid busy looping when disconnected from
+	// the internet.
+	for nodeID := range nodeIDs {
+		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.AcceptedFrontier)
+	}
+
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
-
-		// Tell the router to expect a reply message from this node
-		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.AcceptedFrontier)
-
 		inMsg := s.msgCreator.InboundGetAcceptedFrontier(s.ctx.ChainID, requestID, deadline, s.ctx.NodeID)
 		go s.router.HandleInbound(inMsg)
 	}
 
-	// Try to send the messages over the network.
+	// Create the outbound message.
 	outMsg, err := s.msgCreator.GetAcceptedFrontier(s.ctx.ChainID, requestID, deadline)
 	s.ctx.Log.AssertNoError(err)
-	sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
 
-	// Tell the router to expect a reply message from these validators.
-	// We register timeouts for all validators, regardless of if the message
-	// failed to be sent, to avoid busy looping when disconnected from the
-	// internet
+	// Send the message over the network.
+	sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
 	for nodeID := range nodeIDs {
 		if !sentTo.Contains(nodeID) {
 			s.ctx.Log.Debug(
@@ -116,17 +118,18 @@ func (s *Sender) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, requestID uint32)
 				requestID,
 			)
 		}
-		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.AcceptedFrontier)
 	}
 }
 
 func (s *Sender) SendAcceptedFrontier(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
+	// Sending this message to myself.
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundAcceptedFrontier(s.ctx.ChainID, requestID, containerIDs, nodeID)
 		go s.router.HandleInbound(inMsg)
 		return
 	}
 
+	// Create the outbound message.
 	outMsg, err := s.msgCreator.AcceptedFrontier(s.ctx.ChainID, requestID, containerIDs)
 	if err != nil {
 		s.ctx.Log.Error(
@@ -139,6 +142,7 @@ func (s *Sender) SendAcceptedFrontier(nodeID ids.ShortID, requestID uint32, cont
 		return
 	}
 
+	// Send the message over the network.
 	nodeIDs := ids.NewShortSet(1)
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
@@ -157,20 +161,27 @@ func (s *Sender) SendGetAccepted(nodeIDs ids.ShortSet, requestID uint32, contain
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
 
+	// Tell the router to expect a response message or a message notifying
+	// that we won't get a response from each of these nodes.
+	// We register timeouts for all nodes, regardless of whether we fail
+	// to send them a message, to avoid busy looping when disconnected from
+	// the internet.
+	for nodeID := range nodeIDs {
+		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Accepted)
+	}
+
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
-
-		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.Accepted)
-
 		inMsg := s.msgCreator.InboundGetAccepted(s.ctx.ChainID, requestID, deadline, containerIDs, s.ctx.NodeID)
 		go s.router.HandleInbound(inMsg)
 	}
 
-	// Try to send the messages over the network.
+	// Create the outbound message.
 	outMsg, err := s.msgCreator.GetAccepted(s.ctx.ChainID, requestID, deadline, containerIDs)
 
+	// Send the message over the network.
 	var sentTo ids.ShortSet
 	if err == nil {
 		sentTo = s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
@@ -184,10 +195,6 @@ func (s *Sender) SendGetAccepted(nodeIDs ids.ShortSet, requestID uint32, contain
 		)
 	}
 
-	// Tell the router to expect a reply message from these validators
-	// We register timeouts for all validators, regardless of if the message
-	// failed to be sent, to avoid busy looping when disconnected from the
-	// internet
 	for nodeID := range nodeIDs {
 		if !sentTo.Contains(nodeID) {
 			s.ctx.Log.Debug(
@@ -198,7 +205,6 @@ func (s *Sender) SendGetAccepted(nodeIDs ids.ShortSet, requestID uint32, contain
 				containerIDs,
 			)
 		}
-		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Accepted)
 	}
 }
 
@@ -209,6 +215,7 @@ func (s *Sender) SendAccepted(nodeID ids.ShortID, requestID uint32, containerIDs
 		return
 	}
 
+	// Create the outbound message.
 	outMsg, err := s.msgCreator.Accepted(s.ctx.ChainID, requestID, containerIDs)
 	if err != nil {
 		s.ctx.Log.Error(
@@ -221,6 +228,7 @@ func (s *Sender) SendAccepted(nodeID ids.ShortID, requestID uint32, containerIDs
 		return
 	}
 
+	// Send the message over the network.
 	nodeIDs := ids.NewShortSet(1)
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
@@ -241,10 +249,11 @@ func (s *Sender) SendGetAncestors(nodeID ids.ShortID, requestID uint32, containe
 		containerID,
 	)
 
-	// Tell the router to expect a reply message from this node
+	// Tell the router to expect a response message or a message notifying
+	// that we won't get a response from this node.
 	s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.MultiPut)
 
-	// Sending a GetAncestors to myself will always fail
+	// Sending a GetAncestors to myself always fails.
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, s.ctx.ChainID, requestID)
 		go s.router.HandleInbound(inMsg)
@@ -264,6 +273,7 @@ func (s *Sender) SendGetAncestors(nodeID ids.ShortID, requestID uint32, containe
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
+	// Create the outbound message.
 	outMsg, err := s.msgCreator.GetAncestors(s.ctx.ChainID, requestID, deadline, containerID)
 	if err != nil {
 		s.ctx.Log.Error("failed to build GetAncestors message: %s", err)
@@ -272,6 +282,7 @@ func (s *Sender) SendGetAncestors(nodeID ids.ShortID, requestID uint32, containe
 		return
 	}
 
+	// Send the message over the network.
 	nodeIDs := ids.NewShortSet(1)
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
@@ -294,6 +305,7 @@ func (s *Sender) SendGetAncestors(nodeID ids.ShortID, requestID uint32, containe
 func (s *Sender) SendMultiPut(nodeID ids.ShortID, requestID uint32, containers [][]byte) {
 	s.ctx.Log.Verbo("Sending MultiPut to node %s. RequestID: %d. NumContainers: %d", nodeID, requestID, len(containers))
 
+	// Create the outbound message.
 	outMsg, err := s.msgCreator.MultiPut(s.ctx.ChainID, requestID, containers)
 	if err != nil {
 		s.ctx.Log.Error(
@@ -303,6 +315,7 @@ func (s *Sender) SendMultiPut(nodeID ids.ShortID, requestID uint32, containers [
 		return
 	}
 
+	// Send the message over the network.
 	nodeIDs := ids.NewShortSet(1)
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
@@ -328,10 +341,11 @@ func (s *Sender) SendGet(nodeID ids.ShortID, requestID uint32, containerID ids.I
 		containerID,
 	)
 
-	// Tell the router to expect a reply message from this node
+	// Tell the router to expect a response message or a message notifying
+	// that we won't get a response from this node.
 	s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Put)
 
-	// Sending a Get to myself will always fail
+	// Sending a Get to myself always fails.
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InternalFailedRequest(message.GetFailed, nodeID, s.ctx.ChainID, requestID)
 		go s.router.HandleInbound(inMsg)
@@ -351,9 +365,11 @@ func (s *Sender) SendGet(nodeID ids.ShortID, requestID uint32, containerID ids.I
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
+	// Create the outbound message.
 	outMsg, err := s.msgCreator.Get(s.ctx.ChainID, requestID, deadline, containerID)
 	s.ctx.Log.AssertNoError(err)
 
+	// Send the message over the network.
 	nodeIDs := ids.NewShortSet(1)
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
@@ -383,6 +399,7 @@ func (s *Sender) SendPut(nodeID ids.ShortID, requestID uint32, containerID ids.I
 		containerID,
 	)
 
+	// Create the outbound message.
 	outMsg, err := s.msgCreator.Put(s.ctx.ChainID, requestID, containerID, container)
 	if err != nil {
 		s.ctx.Log.Error(
@@ -396,6 +413,7 @@ func (s *Sender) SendPut(nodeID ids.ShortID, requestID uint32, containerID ids.I
 		return
 	}
 
+	// Send the message over the network.
 	nodeIDs := ids.NewShortSet(1)
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
@@ -422,6 +440,15 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 		containerID,
 	)
 
+	// Tell the router to expect a response message or a message notifying
+	// that we won't get a response from each of these nodes.
+	// We register timeouts for all nodes, regardless of whether we fail
+	// to send them a message, to avoid busy looping when disconnected from
+	// the internet.
+	for nodeID := range nodeIDs {
+		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Chits)
+	}
+
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -430,9 +457,6 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 	// Just put it right into the router. Do so asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
-
-		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.Chits)
-
 		inMsg := s.msgCreator.InboundPushQuery(s.ctx.ChainID, requestID, deadline, containerID, container, s.ctx.NodeID)
 		go s.router.HandleInbound(inMsg)
 	}
@@ -440,8 +464,6 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 	// Some of [nodeIDs] may be benched. That is, they've been unresponsive
 	// so we don't even bother sending messages to them. We just have them immediately fail.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Chits)
-
 		if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
 			s.failedDueToBench[message.PushQuery].Inc() // update metric
 			nodeIDs.Remove(nodeID)
@@ -453,10 +475,11 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 		}
 	}
 
-	// Try to send the messages over the network.
+	// Create the outbound message.
 	// [sentTo] are the IDs of validators who may receive the message.
 	outMsg, err := s.msgCreator.PushQuery(s.ctx.ChainID, requestID, deadline, containerID, container)
 
+	// Send the message over the network.
 	var sentTo ids.ShortSet
 	if err == nil {
 		sentTo = s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
@@ -472,8 +495,6 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 	}
 
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Chits)
-
 		if !sentTo.Contains(nodeID) {
 			s.ctx.Log.Debug(
 				"failed to send PushQuery(%s, %s, %d, %s)",
@@ -503,6 +524,15 @@ func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, container
 		containerID,
 	)
 
+	// Tell the router to expect a response message or a message notifying
+	// that we won't get a response from each of these nodes.
+	// We register timeouts for all nodes, regardless of whether we fail
+	// to send them a message, to avoid busy looping when disconnected from
+	// the internet.
+	for nodeID := range nodeIDs {
+		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Chits)
+	}
+
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -511,10 +541,6 @@ func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, container
 	// Just put it right into the router. Do so asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
-
-		// Register a timeout in case I don't respond to myself
-		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.Chits)
-
 		inMsg := s.msgCreator.InboundPullQuery(s.ctx.ChainID, requestID, deadline, containerID, s.ctx.NodeID)
 		go s.router.HandleInbound(inMsg)
 	}
@@ -522,8 +548,6 @@ func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, container
 	// Some of the nodes in [nodeIDs] may be benched. That is, they've been unresponsive
 	// so we don't even bother sending messages to them. We just have them immediately fail.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Chits)
-
 		if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
 			s.failedDueToBench[message.PullQuery].Inc() // update metric
 			nodeIDs.Remove(nodeID)
@@ -534,9 +558,11 @@ func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, container
 		}
 	}
 
-	// Try to send the messages over the network.
+	// Create the outbound message.
 	outMsg, err := s.msgCreator.PullQuery(s.ctx.ChainID, requestID, deadline, containerID)
 	s.ctx.Log.AssertNoError(err)
+
+	// Send the message over the network.
 	sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
 
 	for nodeID := range nodeIDs {
@@ -574,6 +600,7 @@ func (s *Sender) SendChits(nodeID ids.ShortID, requestID uint32, votes []ids.ID)
 		return
 	}
 
+	// Create the outbound message.
 	outMsg, err := s.msgCreator.Chits(s.ctx.ChainID, requestID, votes)
 	if err != nil {
 		s.ctx.Log.Error(
@@ -586,6 +613,7 @@ func (s *Sender) SendChits(nodeID ids.ShortID, requestID uint32, votes []ids.ID)
 		return
 	}
 
+	// Send the message over the network.
 	nodeIDs := ids.NewShortSet(1)
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
@@ -608,6 +636,15 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 		formatting.DumpBytes{Bytes: appRequestBytes},
 	)
 
+	// Tell the router to expect a response message or a message notifying
+	// that we won't get a response from each of these nodes.
+	// We register timeouts for all nodes, regardless of whether we fail
+	// to send them a message, to avoid busy looping when disconnected from
+	// the internet.
+	for nodeID := range nodeIDs {
+		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.AppResponse)
+	}
+
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -616,10 +653,6 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 	// Just put it right into the router. Do so asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
-
-		// Register a timeout in case I don't respond to myself
-		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, message.AppResponse)
-
 		inMsg := s.msgCreator.InboundAppRequest(s.ctx.ChainID, requestID, deadline, appRequestBytes, s.ctx.NodeID)
 		go s.router.HandleInbound(inMsg)
 	}
@@ -627,8 +660,6 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 	// Some of the nodes in [nodeIDs] may be benched. That is, they've been unresponsive
 	// so we don't even bother sending messages to them. We just have them immediately fail.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.AppResponse)
-
 		if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
 			s.failedDueToBench[message.AppRequest].Inc() // update metric
 			nodeIDs.Remove(nodeID)
@@ -640,10 +671,11 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 		}
 	}
 
-	// Try to send the messages over the network.
+	// Create the outbound message.
 	// [sentTo] are the IDs of nodes who may receive the message.
 	outMsg, err := s.msgCreator.AppRequest(s.ctx.ChainID, requestID, deadline, appRequestBytes)
 
+	// Send the message over the network.
 	var sentTo ids.ShortSet
 	if err == nil {
 		sentTo = s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
@@ -684,6 +716,7 @@ func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appRespon
 		return nil
 	}
 
+	// Create the outbound message.
 	outMsg, err := s.msgCreator.AppResponse(s.ctx.ChainID, requestID, appResponseBytes)
 	if err != nil {
 		s.ctx.Log.Error(
@@ -696,6 +729,7 @@ func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appRespon
 		return nil
 	}
 
+	// Send the message over the network.
 	nodeIDs := ids.NewShortSet(1)
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
@@ -712,6 +746,7 @@ func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appRespon
 }
 
 func (s *Sender) SendAppGossipSpecific(nodeIDs ids.ShortSet, appGossipBytes []byte) error {
+	// Create the outbound message.
 	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
 	if err != nil {
 		s.ctx.Log.Error(
@@ -722,6 +757,7 @@ func (s *Sender) SendAppGossipSpecific(nodeIDs ids.ShortSet, appGossipBytes []by
 		s.ctx.Log.Verbo("message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
 	}
 
+	// Send the message over the network.
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to gossip SpecificGossip(%s)", s.ctx.ChainID)
 		s.ctx.Log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
@@ -731,6 +767,7 @@ func (s *Sender) SendAppGossipSpecific(nodeIDs ids.ShortSet, appGossipBytes []by
 
 // SendAppGossip sends an application-level gossip message.
 func (s *Sender) SendAppGossip(appGossipBytes []byte) error {
+	// Create the outbound message.
 	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
 	if err != nil {
 		s.ctx.Log.Error("failed to build AppGossip(%s): %s", s.ctx.ChainID, err)
@@ -748,6 +785,7 @@ func (s *Sender) SendAppGossip(appGossipBytes []byte) error {
 // SendGossip gossips the provided container
 func (s *Sender) SendGossip(containerID ids.ID, container []byte) {
 	s.ctx.Log.Verbo("Gossiping %s", containerID)
+	// Create the outbound message.
 	outMsg, err := s.msgCreator.Put(s.ctx.ChainID, constants.GossipMsgRequestID, containerID, container)
 	if err != nil {
 		s.ctx.Log.Error(
