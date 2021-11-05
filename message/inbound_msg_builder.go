@@ -113,8 +113,22 @@ type InboundMsgBuilder interface {
 	InboundStateSummaryFrontier(
 		chainID ids.ID,
 		requestID uint32,
+		container []byte,
+		nodeID ids.ShortID,
+	) InboundMessage
+
+	InboundGetAcceptedStateSummary(
+		chainID ids.ID,
+		requestID uint32,
 		containers [][]byte,
 		deadline time.Duration,
+		nodeID ids.ShortID,
+	) InboundMessage
+
+	InboundAcceptedStateSummary(
+		chainID ids.ID,
+		requestID uint32,
+		containers [][]byte,
 		nodeID ids.ShortID,
 	) InboundMessage
 }
@@ -399,11 +413,49 @@ func (b *inMsgBuilder) InboundStateSummaryFrontier(
 	nodeID ids.ShortID,
 ) InboundMessage {
 	return &inboundMessage{
-		op: AcceptedFrontier,
+		op: StateSummaryFrontier,
 		fields: map[Field]interface{}{
 			ChainID:        chainID[:],
 			RequestID:      requestID,
 			ContainerBytes: container,
+		},
+		nodeID: nodeID,
+	}
+}
+
+func (b *inMsgBuilder) InboundGetAcceptedStateSummary(
+	chainID ids.ID,
+	requestID uint32,
+	containers [][]byte,
+	deadline time.Duration,
+	nodeID ids.ShortID,
+) InboundMessage {
+	received := b.clock.Time()
+	return &inboundMessage{
+		op: GetAcceptedStateSummary,
+		fields: map[Field]interface{}{
+			ChainID:             chainID[:],
+			RequestID:           requestID,
+			Deadline:            uint64(deadline),
+			MultiContainerBytes: containers,
+		},
+		nodeID:         nodeID,
+		expirationTime: received.Add(deadline),
+	}
+}
+
+func (b *inMsgBuilder) InboundAcceptedStateSummary(
+	chainID ids.ID,
+	requestID uint32,
+	containers [][]byte,
+	nodeID ids.ShortID,
+) InboundMessage {
+	return &inboundMessage{
+		op: AcceptedStateSummary,
+		fields: map[Field]interface{}{
+			ChainID:             chainID[:],
+			RequestID:           requestID,
+			MultiContainerBytes: containers,
 		},
 		nodeID: nodeID,
 	}

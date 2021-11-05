@@ -128,8 +128,8 @@ var (
 	}
 	FastSyncOps = append(FastSyncRequestOps, FastSyncResponseOps...)
 
-	ExternalOps_TOFINDBETTERNAME = append(ConsensusExternalOps, HandshakeOps...)
-	ExternalOps                  = append(ExternalOps_TOFINDBETTERNAME, FastSyncExternalOps...)
+	ConsensusAndNetworkOps = append(ConsensusExternalOps, HandshakeOps...)
+	ExternalOps            = append(ConsensusAndNetworkOps, FastSyncExternalOps...)
 
 	RequestToResponseOps = map[Op]Op{
 		GetAcceptedFrontier:     AcceptedFrontier,
@@ -143,38 +143,36 @@ var (
 		GetAcceptedStateSummary: AcceptedStateSummary,
 	}
 	ResponseToFailedOps = map[Op]Op{
-		AcceptedFrontier: GetAcceptedFrontierFailed,
-		Accepted:         GetAcceptedFailed,
-		MultiPut:         GetAncestorsFailed,
-		Put:              GetFailed,
-		Chits:            QueryFailed,
-		AppResponse:      AppRequestFailed,
-
-		// TODO: Understand what is this for
+		AcceptedFrontier:     GetAcceptedFrontierFailed,
+		Accepted:             GetAcceptedFailed,
+		MultiPut:             GetAncestorsFailed,
+		Put:                  GetFailed,
+		Chits:                QueryFailed,
+		AppResponse:          AppRequestFailed,
 		StateSummaryFrontier: GetStateSummaryFrontierFailed,
 		AcceptedStateSummary: GetAcceptedStateSummaryFailed,
 	}
 	FailedToResponseOps = map[Op]Op{
-		GetAcceptedFrontierFailed: AcceptedFrontier,
-		GetAcceptedFailed:         Accepted,
-		GetAncestorsFailed:        MultiPut,
-		GetFailed:                 Put,
-		QueryFailed:               Chits,
-		AppRequestFailed:          AppResponse,
-
-		// TODO: Understand what is this for
+		GetAcceptedFrontierFailed:     AcceptedFrontier,
+		GetAcceptedFailed:             Accepted,
+		GetAncestorsFailed:            MultiPut,
+		GetFailed:                     Put,
+		QueryFailed:                   Chits,
+		AppRequestFailed:              AppResponse,
 		GetStateSummaryFrontierFailed: StateSummaryFrontier,
 		GetAcceptedStateSummaryFailed: AcceptedStateSummary,
 	}
 	UnrequestedOps = map[Op]struct{}{
-		GetAcceptedFrontier: {},
-		GetAccepted:         {},
-		GetAncestors:        {},
-		Get:                 {},
-		PushQuery:           {},
-		PullQuery:           {},
-		AppRequest:          {},
-		AppGossip:           {},
+		GetAcceptedFrontier:     {},
+		GetAccepted:             {},
+		GetAncestors:            {},
+		Get:                     {},
+		PushQuery:               {},
+		PullQuery:               {},
+		AppRequest:              {},
+		AppGossip:               {},
+		GetStateSummaryFrontier: {},
+		GetAcceptedStateSummary: {},
 	}
 
 	// Defines the messages that can be sent/received with this network
@@ -262,6 +260,14 @@ func (op Op) String() string {
 		return "app_response"
 	case AppGossip:
 		return "app_gossip"
+	case GetStateSummaryFrontier:
+		return "get_state_summary_frontier"
+	case StateSummaryFrontier:
+		return "state_summary_frontier"
+	case GetAcceptedStateSummary:
+		return "get_accepted_state_summary"
+	case AcceptedStateSummary:
+		return "accepted_state_summary"
 
 	case GetAcceptedFrontierFailed:
 		return "get_accepted_frontier_failed"
@@ -275,6 +281,10 @@ func (op Op) String() string {
 		return "get_ancestors_failed"
 	case AppRequestFailed:
 		return "app_request_failed"
+	case GetStateSummaryFrontierFailed:
+		return "get_state_summary_frontier_failed"
+	case GetAcceptedStateSummaryFailed:
+		return "get_accepted_state_summary_failed"
 	case Timeout:
 		return "timeout"
 	case Connected:
