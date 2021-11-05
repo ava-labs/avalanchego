@@ -11,7 +11,7 @@ import (
 )
 
 // Interface compliance
-var _ Client = (*clientImpl)(nil)
+var _ Client = (*client)(nil)
 
 // Client interface for the Avalanche Platform Info API Endpoint
 type Client interface {
@@ -26,42 +26,42 @@ type Client interface {
 }
 
 // Client implementation for the Avalanche Platform Info API Endpoint
-type clientImpl struct {
+type client struct {
 	requester rpc.EndpointRequester
 }
 
 // NewClient returns a new Info API Client
 func NewClient(uri string, requestTimeout time.Duration) Client {
-	return &clientImpl{
+	return &client{
 		requester: rpc.NewEndpointRequester(uri, "/ext/admin", "admin", requestTimeout),
 	}
 }
 
-func (c *clientImpl) StartCPUProfiler() (bool, error) {
+func (c *client) StartCPUProfiler() (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.requester.SendRequest("startCPUProfiler", struct{}{}, res)
 	return res.Success, err
 }
 
-func (c *clientImpl) StopCPUProfiler() (bool, error) {
+func (c *client) StopCPUProfiler() (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.requester.SendRequest("stopCPUProfiler", struct{}{}, res)
 	return res.Success, err
 }
 
-func (c *clientImpl) MemoryProfile() (bool, error) {
+func (c *client) MemoryProfile() (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.requester.SendRequest("memoryProfile", struct{}{}, res)
 	return res.Success, err
 }
 
-func (c *clientImpl) LockProfile() (bool, error) {
+func (c *client) LockProfile() (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.requester.SendRequest("lockProfile", struct{}{}, res)
 	return res.Success, err
 }
 
-func (c *clientImpl) Alias(endpoint, alias string) (bool, error) {
+func (c *client) Alias(endpoint, alias string) (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.requester.SendRequest("alias", &AliasArgs{
 		Endpoint: endpoint,
@@ -70,7 +70,7 @@ func (c *clientImpl) Alias(endpoint, alias string) (bool, error) {
 	return res.Success, err
 }
 
-func (c *clientImpl) AliasChain(chain, alias string) (bool, error) {
+func (c *client) AliasChain(chain, alias string) (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.requester.SendRequest("aliasChain", &AliasChainArgs{
 		Chain: chain,
@@ -79,7 +79,7 @@ func (c *clientImpl) AliasChain(chain, alias string) (bool, error) {
 	return res.Success, err
 }
 
-func (c *clientImpl) GetChainAliases(chain string) ([]string, error) {
+func (c *client) GetChainAliases(chain string) ([]string, error) {
 	res := &GetChainAliasesReply{}
 	err := c.requester.SendRequest("getChainAliases", &GetChainAliasesArgs{
 		Chain: chain,
@@ -87,7 +87,7 @@ func (c *clientImpl) GetChainAliases(chain string) ([]string, error) {
 	return res.Aliases, err
 }
 
-func (c *clientImpl) Stacktrace() (bool, error) {
+func (c *client) Stacktrace() (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.requester.SendRequest("stacktrace", struct{}{}, res)
 	return res.Success, err

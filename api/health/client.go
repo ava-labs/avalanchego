@@ -13,7 +13,7 @@ import (
 var errInvalidNumberOfChecks = errors.New("expected at least 1 check attempt")
 
 // Interface compliance
-var _ Client = (*clientImpl)(nil)
+var _ Client = (*client)(nil)
 
 // Client interface for Avalanche Health API Endpoint
 type Client interface {
@@ -22,7 +22,7 @@ type Client interface {
 }
 
 // Client implementation for Avalanche Health API Endpoint
-type clientImpl struct {
+type client struct {
 	requester rpc.EndpointRequester
 }
 
@@ -53,13 +53,13 @@ type APIHealthClientReply struct {
 
 // NewClient returns a client to interact with Health API endpoint
 func NewClient(uri string, requestTimeout time.Duration) Client {
-	return &clientImpl{
+	return &client{
 		requester: rpc.NewEndpointRequester(uri, "/ext/health", "health", requestTimeout),
 	}
 }
 
 // Health returns a health check on the Avalanche node
-func (c *clientImpl) Health() (*APIHealthClientReply, error) {
+func (c *client) Health() (*APIHealthClientReply, error) {
 	res := &APIHealthClientReply{}
 	err := c.requester.SendRequest("health", struct{}{}, res)
 	return res, err
@@ -67,7 +67,7 @@ func (c *clientImpl) Health() (*APIHealthClientReply, error) {
 
 // AwaitHealthy queries the Health endpoint [checks] times, with a pause of
 // [interval] in between checks and returns early if Health returns healthy
-func (c *clientImpl) AwaitHealthy(checks int, interval time.Duration) (bool, error) {
+func (c *client) AwaitHealthy(checks int, interval time.Duration) (bool, error) {
 	if checks < 1 {
 		return false, errInvalidNumberOfChecks
 	}
