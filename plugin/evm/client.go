@@ -15,27 +15,49 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-// Client ...
-type Client struct {
+// Interface compliance
+var _ Client = (*client)(nil)
+
+// Client interface for interacting with EVM [chain]
+type Client interface {
+	IssueTx([]byte) (ids.ID, error)
+	GetAtomicTxStatus(ids.ID) (Status, error)
+	GetAtomicTx(ids.ID) ([]byte, error)
+	GetAtomicUTXOs([]string, string, uint32, string, string) ([][]byte, api.Index, error)
+	ListAddresses(api.UserPass) ([]string, error)
+	ExportKey(api.UserPass, string) (string, string, error)
+	ImportKey(api.UserPass, string) (string, error)
+	Import(api.UserPass, string, string) (ids.ID, error)
+	ExportAVAX(api.UserPass, uint64, string) (ids.ID, error)
+	Export(api.UserPass, uint64, string, string) (ids.ID, error)
+	StartCPUProfiler() (bool, error)
+	StopCPUProfiler() (bool, error)
+	MemoryProfile() (bool, error)
+	LockProfile() (bool, error)
+	SetLogLevel(level log.Lvl) (bool, error)
+}
+
+// Client implementation for interacting with EVM [chain]
+type client struct {
 	requester      rpc.EndpointRequester
 	adminRequester rpc.EndpointRequester
 }
 
 // NewClient returns a Client for interacting with EVM [chain]
-func NewClient(uri, chain string, requestTimeout time.Duration) *Client {
-	return &Client{
+func NewClient(uri, chain string, requestTimeout time.Duration) Client {
+	return &client{
 		requester:      rpc.NewEndpointRequester(uri, fmt.Sprintf("/ext/bc/%s/avax", chain), "avax", requestTimeout),
 		adminRequester: rpc.NewEndpointRequester(uri, fmt.Sprintf("/ext/bc/%s/admin", chain), "admin", requestTimeout),
 	}
 }
 
 // NewCChainClient returns a Client for interacting with the C Chain
-func NewCChainClient(uri string, requestTimeout time.Duration) *Client {
+func NewCChainClient(uri string, requestTimeout time.Duration) Client {
 	return NewClient(uri, "C", requestTimeout)
 }
 
 // IssueTx issues a transaction to a node and returns the TxID
-func (c *Client) IssueTx(txBytes []byte) (ids.ID, error) {
+func (c *client) IssueTx(txBytes []byte) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, txBytes)
 	if err != nil {
@@ -49,7 +71,7 @@ func (c *Client) IssueTx(txBytes []byte) (ids.ID, error) {
 }
 
 // GetAtomicTxStatus returns the status of [txID]
-func (c *Client) GetAtomicTxStatus(txID ids.ID) (Status, error) {
+func (c *client) GetAtomicTxStatus(txID ids.ID) (Status, error) {
 	res := &GetAtomicTxStatusReply{}
 	err := c.requester.SendRequest("getAtomicTxStatus", &api.JSONTxID{
 		TxID: txID,
@@ -58,7 +80,7 @@ func (c *Client) GetAtomicTxStatus(txID ids.ID) (Status, error) {
 }
 
 // GetAtomicTx returns the byte representation of [txID]
-func (c *Client) GetAtomicTx(txID ids.ID) ([]byte, error) {
+func (c *client) GetAtomicTx(txID ids.ID) ([]byte, error) {
 	res := &api.FormattedTx{}
 	err := c.requester.SendRequest("getAtomicTx", &api.GetTxArgs{
 		TxID:     txID,
@@ -73,7 +95,7 @@ func (c *Client) GetAtomicTx(txID ids.ID) ([]byte, error) {
 
 // GetAtomicUTXOs returns the byte representation of the atomic UTXOs controlled by [addresses]
 // from [sourceChain]
-func (c *Client) GetAtomicUTXOs(addrs []string, sourceChain string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error) {
+func (c *client) GetAtomicUTXOs(addrs []string, sourceChain string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error) {
 	res := &api.GetUTXOsReply{}
 	err := c.requester.SendRequest("getUTXOs", &api.GetUTXOsArgs{
 		Addresses:   addrs,
@@ -101,7 +123,7 @@ func (c *Client) GetAtomicUTXOs(addrs []string, sourceChain string, limit uint32
 }
 
 // ListAddresses returns all addresses on this chain controlled by [user]
-func (c *Client) ListAddresses(user api.UserPass) ([]string, error) {
+func (c *client) ListAddresses(user api.UserPass) ([]string, error) {
 	res := &api.JSONAddresses{}
 	err := c.requester.SendRequest("listAddresses", &user, res)
 	return res.Addresses, err
@@ -109,7 +131,7 @@ func (c *Client) ListAddresses(user api.UserPass) ([]string, error) {
 
 // ExportKey returns the private key corresponding to [addr] controlled by [user]
 // in both Avalanche standard format and hex format
-func (c *Client) ExportKey(user api.UserPass, addr string) (string, string, error) {
+func (c *client) ExportKey(user api.UserPass, addr string) (string, string, error) {
 	res := &ExportKeyReply{}
 	err := c.requester.SendRequest("exportKey", &ExportKeyArgs{
 		UserPass: user,
@@ -119,7 +141,7 @@ func (c *Client) ExportKey(user api.UserPass, addr string) (string, string, erro
 }
 
 // ImportKey imports [privateKey] to [user]
-func (c *Client) ImportKey(user api.UserPass, privateKey string) (string, error) {
+func (c *client) ImportKey(user api.UserPass, privateKey string) (string, error) {
 	res := &api.JSONAddress{}
 	err := c.requester.SendRequest("importKey", &ImportKeyArgs{
 		UserPass:   user,
@@ -130,7 +152,7 @@ func (c *Client) ImportKey(user api.UserPass, privateKey string) (string, error)
 
 // Import sends an import transaction to import funds from [sourceChain] and
 // returns the ID of the newly created transaction
-func (c *Client) Import(user api.UserPass, to, sourceChain string) (ids.ID, error) {
+func (c *client) Import(user api.UserPass, to, sourceChain string) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest("import", &ImportArgs{
 		UserPass:    user,
@@ -142,7 +164,7 @@ func (c *Client) Import(user api.UserPass, to, sourceChain string) (ids.ID, erro
 
 // ExportAVAX sends AVAX from this chain to the address specified by [to].
 // Returns the ID of the newly created atomic transaction
-func (c *Client) ExportAVAX(
+func (c *client) ExportAVAX(
 	user api.UserPass,
 	amount uint64,
 	to string,
@@ -153,7 +175,7 @@ func (c *Client) ExportAVAX(
 // Export sends an asset from this chain to the P/C-Chain.
 // After this tx is accepted, the AVAX must be imported to the P/C-chain with an importTx.
 // Returns the ID of the newly created atomic transaction
-func (c *Client) Export(
+func (c *client) Export(
 	user api.UserPass,
 	amount uint64,
 	to string,
@@ -171,32 +193,32 @@ func (c *Client) Export(
 	return res.TxID, err
 }
 
-func (c *Client) StartCPUProfiler() (bool, error) {
+func (c *client) StartCPUProfiler() (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.adminRequester.SendRequest("startCPUProfiler", struct{}{}, res)
 	return res.Success, err
 }
 
-func (c *Client) StopCPUProfiler() (bool, error) {
+func (c *client) StopCPUProfiler() (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.adminRequester.SendRequest("stopCPUProfiler", struct{}{}, res)
 	return res.Success, err
 }
 
-func (c *Client) MemoryProfile() (bool, error) {
+func (c *client) MemoryProfile() (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.adminRequester.SendRequest("memoryProfile", struct{}{}, res)
 	return res.Success, err
 }
 
-func (c *Client) LockProfile() (bool, error) {
+func (c *client) LockProfile() (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.adminRequester.SendRequest("lockProfile", struct{}{}, res)
 	return res.Success, err
 }
 
 // SetLogLevel dynamically sets the log level for the C Chain
-func (c *Client) SetLogLevel(level log.Lvl) (bool, error) {
+func (c *client) SetLogLevel(level log.Lvl) (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.adminRequester.SendRequest("setLogLevel", &SetLogLevelArgs{
 		Level: level.String(),
