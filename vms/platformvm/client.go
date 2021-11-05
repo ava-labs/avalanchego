@@ -14,26 +14,69 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-type Client struct {
+// Interface compliance
+var _ Client = (*client)(nil)
+
+// Client interface for interacting with the P Chain endpoint
+type Client interface {
+	GetHeight() (uint64, error)
+	ExportKey(api.UserPass, string) (string, error)
+	ImportKey(api.UserPass, string) (string, error)
+	GetBalance(string) (*GetBalanceResponse, error)
+	CreateAddress(api.UserPass) (string, error)
+	ListAddresses(api.UserPass) ([]string, error)
+	GetUTXOs([]string, uint32, string, string) ([][]byte, api.Index, error)
+	GetAtomicUTXOs([]string, string, uint32, string, string) ([][]byte, api.Index, error)
+	GetSubnets([]ids.ID) ([]APISubnet, error)
+	GetStakingAssetID(ids.ID) (ids.ID, error)
+	GetCurrentValidators(ids.ID, []ids.ShortID) ([]interface{}, error)
+	GetPendingValidators(ids.ID, []ids.ShortID) ([]interface{}, []interface{}, error)
+	GetCurrentSupply() (uint64, error)
+	SampleValidators(ids.ID, uint16) ([]string, error)
+	AddValidator(api.UserPass, []string, string, string, string, uint64, uint64, uint64, float32) (ids.ID, error)
+	AddDelegator(api.UserPass, []string, string, string, string, uint64, uint64, uint64) (ids.ID, error)
+	AddSubnetValidator(api.UserPass, []string, string, string, string, uint64, uint64, uint64) (ids.ID, error)
+	CreateSubnet(api.UserPass, []string, string, []string, uint32) (ids.ID, error)
+	ExportAVAX(api.UserPass, []string, string, string, uint64) (ids.ID, error)
+	ImportAVAX(api.UserPass, []string, string, string, string) (ids.ID, error)
+	CreateBlockchain(api.UserPass, []string, string, ids.ID, string, []string, string, []byte) (ids.ID, error)
+	GetBlockchainStatus(string) (BlockchainStatus, error)
+	ValidatedBy(ids.ID) (ids.ID, error)
+	Validates(ids.ID) ([]ids.ID, error)
+	GetBlockchains() ([]APIBlockchain, error)
+	IssueTx([]byte) (ids.ID, error)
+	GetTx(ids.ID) ([]byte, error)
+	GetTxStatus(ids.ID, bool) (*GetTxStatusResponse, error)
+	GetStake([]string) (*GetStakeReply, error)
+	GetMinStake() (uint64, uint64, error)
+	GetTotalStake() (uint64, error)
+	GetMaxStakeAmount(ids.ID, string, uint64, uint64) (uint64, error)
+	GetRewardUTXOs(*api.GetTxArgs) ([][]byte, error)
+	GetTimestamp() (time.Time, error)
+	GetValidatorsAt(ids.ID, uint64) (map[string]uint64, error)
+}
+
+// Client implementation for interacting with the P Chain endpoint
+type client struct {
 	requester rpc.EndpointRequester
 }
 
 // NewClient returns a Client for interacting with the P Chain endpoint
-func NewClient(uri string, requestTimeout time.Duration) *Client {
-	return &Client{
+func NewClient(uri string, requestTimeout time.Duration) Client {
+	return &client{
 		requester: rpc.NewEndpointRequester(uri, "/ext/P", "platform", requestTimeout),
 	}
 }
 
 // GetHeight returns the current block height of the P Chain
-func (c *Client) GetHeight() (uint64, error) {
+func (c *client) GetHeight() (uint64, error) {
 	res := &GetHeightResponse{}
 	err := c.requester.SendRequest("getHeight", struct{}{}, res)
 	return uint64(res.Height), err
 }
 
 // ExportKey returns the private key corresponding to [address] from [user]'s account
-func (c *Client) ExportKey(user api.UserPass, address string) (string, error) {
+func (c *client) ExportKey(user api.UserPass, address string) (string, error) {
 	res := &ExportKeyReply{}
 	err := c.requester.SendRequest("exportKey", &ExportKeyArgs{
 		UserPass: user,
@@ -43,7 +86,7 @@ func (c *Client) ExportKey(user api.UserPass, address string) (string, error) {
 }
 
 // ImportKey imports the specified [privateKey] to [user]'s keystore
-func (c *Client) ImportKey(user api.UserPass, privateKey string) (string, error) {
+func (c *client) ImportKey(user api.UserPass, privateKey string) (string, error) {
 	res := &api.JSONAddress{}
 	err := c.requester.SendRequest("importKey", &ImportKeyArgs{
 		UserPass:   user,
@@ -53,7 +96,7 @@ func (c *Client) ImportKey(user api.UserPass, privateKey string) (string, error)
 }
 
 // GetBalance returns the balance of [address] on the P Chain
-func (c *Client) GetBalance(address string) (*GetBalanceResponse, error) {
+func (c *client) GetBalance(address string) (*GetBalanceResponse, error) {
 	res := &GetBalanceResponse{}
 	err := c.requester.SendRequest("getBalance", &api.JSONAddress{
 		Address: address,
@@ -62,27 +105,27 @@ func (c *Client) GetBalance(address string) (*GetBalanceResponse, error) {
 }
 
 // CreateAddress creates a new address for [user]
-func (c *Client) CreateAddress(user api.UserPass) (string, error) {
+func (c *client) CreateAddress(user api.UserPass) (string, error) {
 	res := &api.JSONAddress{}
 	err := c.requester.SendRequest("createAddress", &user, res)
 	return res.Address, err
 }
 
 // ListAddresses returns an array of platform addresses controlled by [user]
-func (c *Client) ListAddresses(user api.UserPass) ([]string, error) {
+func (c *client) ListAddresses(user api.UserPass) ([]string, error) {
 	res := &api.JSONAddresses{}
 	err := c.requester.SendRequest("listAddresses", &user, res)
 	return res.Addresses, err
 }
 
 // GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
-func (c *Client) GetUTXOs(addrs []string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error) {
+func (c *client) GetUTXOs(addrs []string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error) {
 	return c.GetAtomicUTXOs(addrs, "", limit, startAddress, startUTXOID)
 }
 
 // GetAtomicUTXOs returns the byte representation of the atomic UTXOs controlled by [addresses]
 // from [sourceChain]
-func (c *Client) GetAtomicUTXOs(addrs []string, sourceChain string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error) {
+func (c *client) GetAtomicUTXOs(addrs []string, sourceChain string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error) {
 	res := &api.GetUTXOsReply{}
 	err := c.requester.SendRequest("getUTXOs", &api.GetUTXOsArgs{
 		Addresses:   addrs,
@@ -110,7 +153,7 @@ func (c *Client) GetAtomicUTXOs(addrs []string, sourceChain string, limit uint32
 }
 
 // GetSubnets returns information about the specified subnets
-func (c *Client) GetSubnets(ids []ids.ID) ([]APISubnet, error) {
+func (c *client) GetSubnets(ids []ids.ID) ([]APISubnet, error) {
 	res := &GetSubnetsResponse{}
 	err := c.requester.SendRequest("getSubnets", &GetSubnetsArgs{
 		IDs: ids,
@@ -120,7 +163,7 @@ func (c *Client) GetSubnets(ids []ids.ID) ([]APISubnet, error) {
 
 // GetStakingAssetID returns the assetID of the asset used for staking on
 // subnet corresponding to [subnetID]
-func (c *Client) GetStakingAssetID(subnetID ids.ID) (ids.ID, error) {
+func (c *client) GetStakingAssetID(subnetID ids.ID) (ids.ID, error) {
 	res := &GetStakingAssetIDResponse{}
 	err := c.requester.SendRequest("getStakingAssetID", &GetStakingAssetIDArgs{
 		SubnetID: subnetID,
@@ -129,7 +172,7 @@ func (c *Client) GetStakingAssetID(subnetID ids.ID) (ids.ID, error) {
 }
 
 // GetCurrentValidators returns the list of current validators for subnet with ID [subnetID]
-func (c *Client) GetCurrentValidators(subnetID ids.ID, nodeIDs []ids.ShortID) ([]interface{}, error) {
+func (c *client) GetCurrentValidators(subnetID ids.ID, nodeIDs []ids.ShortID) ([]interface{}, error) {
 	nodeIDsStr := []string{}
 	for _, nodeID := range nodeIDs {
 		nodeIDsStr = append(nodeIDsStr, nodeID.PrefixedString(constants.NodeIDPrefix))
@@ -143,7 +186,7 @@ func (c *Client) GetCurrentValidators(subnetID ids.ID, nodeIDs []ids.ShortID) ([
 }
 
 // GetPendingValidators returns the list of pending validators for subnet with ID [subnetID]
-func (c *Client) GetPendingValidators(subnetID ids.ID, nodeIDs []ids.ShortID) ([]interface{}, []interface{}, error) {
+func (c *client) GetPendingValidators(subnetID ids.ID, nodeIDs []ids.ShortID) ([]interface{}, []interface{}, error) {
 	nodeIDsStr := []string{}
 	for _, nodeID := range nodeIDs {
 		nodeIDsStr = append(nodeIDsStr, nodeID.PrefixedString(constants.NodeIDPrefix))
@@ -157,14 +200,14 @@ func (c *Client) GetPendingValidators(subnetID ids.ID, nodeIDs []ids.ShortID) ([
 }
 
 // GetCurrentSupply returns an upper bound on the supply of AVAX in the system
-func (c *Client) GetCurrentSupply() (uint64, error) {
+func (c *client) GetCurrentSupply() (uint64, error) {
 	res := &GetCurrentSupplyReply{}
 	err := c.requester.SendRequest("getCurrentSupply", struct{}{}, res)
 	return uint64(res.Supply), err
 }
 
 // SampleValidators returns the nodeIDs of a sample of [sampleSize] validators from the current validator set for subnet with ID [subnetID]
-func (c *Client) SampleValidators(subnetID ids.ID, sampleSize uint16) ([]string, error) {
+func (c *client) SampleValidators(subnetID ids.ID, sampleSize uint16) ([]string, error) {
 	res := &SampleValidatorsReply{}
 	err := c.requester.SendRequest("sampleValidators", &SampleValidatorsArgs{
 		SubnetID: subnetID,
@@ -175,7 +218,7 @@ func (c *Client) SampleValidators(subnetID ids.ID, sampleSize uint16) ([]string,
 
 // AddValidator issues a transaction to add a validator to the primary network
 // and returns the txID
-func (c *Client) AddValidator(
+func (c *client) AddValidator(
 	user api.UserPass,
 	from []string,
 	changeAddr string,
@@ -207,7 +250,7 @@ func (c *Client) AddValidator(
 
 // AddDelegator issues a transaction to add a delegator to the primary network
 // and returns the txID
-func (c *Client) AddDelegator(
+func (c *client) AddDelegator(
 	user api.UserPass,
 	from []string,
 	changeAddr string,
@@ -237,7 +280,7 @@ func (c *Client) AddDelegator(
 
 // AddSubnetValidator issues a transaction to add validator [nodeID] to subnet
 // with ID [subnetID] and returns the txID
-func (c *Client) AddSubnetValidator(
+func (c *client) AddSubnetValidator(
 	user api.UserPass,
 	from []string,
 	changeAddr string,
@@ -267,7 +310,7 @@ func (c *Client) AddSubnetValidator(
 }
 
 // CreateSubnet issues a transaction to create [subnet] and returns the txID
-func (c *Client) CreateSubnet(
+func (c *client) CreateSubnet(
 	user api.UserPass,
 	from []string,
 	changeAddr string,
@@ -290,7 +333,7 @@ func (c *Client) CreateSubnet(
 }
 
 // ExportAVAX issues an ExportTx transaction and returns the txID
-func (c *Client) ExportAVAX(
+func (c *client) ExportAVAX(
 	user api.UserPass,
 	from []string,
 	changeAddr string,
@@ -311,7 +354,7 @@ func (c *Client) ExportAVAX(
 }
 
 // ImportAVAX issues an ImportTx transaction and returns the txID
-func (c *Client) ImportAVAX(
+func (c *client) ImportAVAX(
 	user api.UserPass,
 	from []string,
 	changeAddr,
@@ -332,7 +375,7 @@ func (c *Client) ImportAVAX(
 }
 
 // CreateBlockchain issues a CreateBlockchain transaction and returns the txID
-func (c *Client) CreateBlockchain(
+func (c *client) CreateBlockchain(
 	user api.UserPass,
 	from []string,
 	changeAddr string,
@@ -365,7 +408,7 @@ func (c *Client) CreateBlockchain(
 }
 
 // GetBlockchainStatus returns the current status of blockchain with ID: [blockchainID]
-func (c *Client) GetBlockchainStatus(blockchainID string) (BlockchainStatus, error) {
+func (c *client) GetBlockchainStatus(blockchainID string) (BlockchainStatus, error) {
 	res := &GetBlockchainStatusReply{}
 	err := c.requester.SendRequest("getBlockchainStatus", &GetBlockchainStatusArgs{
 		BlockchainID: blockchainID,
@@ -374,7 +417,7 @@ func (c *Client) GetBlockchainStatus(blockchainID string) (BlockchainStatus, err
 }
 
 // ValidatedBy returns the ID of the Subnet that validates [blockchainID]
-func (c *Client) ValidatedBy(blockchainID ids.ID) (ids.ID, error) {
+func (c *client) ValidatedBy(blockchainID ids.ID) (ids.ID, error) {
 	res := &ValidatedByResponse{}
 	err := c.requester.SendRequest("validatedBy", &ValidatedByArgs{
 		BlockchainID: blockchainID,
@@ -383,7 +426,7 @@ func (c *Client) ValidatedBy(blockchainID ids.ID) (ids.ID, error) {
 }
 
 // Validates returns the list of blockchains that are validated by the subnet with ID [subnetID]
-func (c *Client) Validates(subnetID ids.ID) ([]ids.ID, error) {
+func (c *client) Validates(subnetID ids.ID) ([]ids.ID, error) {
 	res := &ValidatesResponse{}
 	err := c.requester.SendRequest("validates", &ValidatesArgs{
 		SubnetID: subnetID,
@@ -392,14 +435,14 @@ func (c *Client) Validates(subnetID ids.ID) ([]ids.ID, error) {
 }
 
 // GetBlockchains returns the list of blockchains on the platform
-func (c *Client) GetBlockchains() ([]APIBlockchain, error) {
+func (c *client) GetBlockchains() ([]APIBlockchain, error) {
 	res := &GetBlockchainsResponse{}
 	err := c.requester.SendRequest("getBlockchains", struct{}{}, res)
 	return res.Blockchains, err
 }
 
 // IssueTx issues the transaction and returns its txID
-func (c *Client) IssueTx(txBytes []byte) (ids.ID, error) {
+func (c *client) IssueTx(txBytes []byte) (ids.ID, error) {
 	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, txBytes)
 	if err != nil {
 		return ids.ID{}, err
@@ -415,7 +458,7 @@ func (c *Client) IssueTx(txBytes []byte) (ids.ID, error) {
 
 // GetTx returns the byte representation of the transaction corresponding to
 // [txID]
-func (c *Client) GetTx(txID ids.ID) ([]byte, error) {
+func (c *client) GetTx(txID ids.ID) ([]byte, error) {
 	res := &api.FormattedTx{}
 	err := c.requester.SendRequest("getTx", &api.GetTxArgs{
 		TxID:     txID,
@@ -428,7 +471,7 @@ func (c *Client) GetTx(txID ids.ID) ([]byte, error) {
 }
 
 // GetTxStatus returns the status of the transaction corresponding to [txID]
-func (c *Client) GetTxStatus(txID ids.ID, includeReason bool) (*GetTxStatusResponse, error) {
+func (c *client) GetTxStatus(txID ids.ID, includeReason bool) (*GetTxStatusResponse, error) {
 	res := new(GetTxStatusResponse)
 	err := c.requester.SendRequest("getTxStatus", &GetTxStatusArgs{
 		TxID:          txID,
@@ -439,7 +482,7 @@ func (c *Client) GetTxStatus(txID ids.ID, includeReason bool) (*GetTxStatusRespo
 
 // GetStake returns the amount of nAVAX that [addresses] have cumulatively
 // staked on the Primary Network.
-func (c *Client) GetStake(addrs []string) (*GetStakeReply, error) {
+func (c *client) GetStake(addrs []string) (*GetStakeReply, error) {
 	res := new(GetStakeReply)
 	err := c.requester.SendRequest("getStake", &api.JSONAddresses{
 		Addresses: addrs,
@@ -449,14 +492,14 @@ func (c *Client) GetStake(addrs []string) (*GetStakeReply, error) {
 
 // GetMinStake returns the minimum staking amount in nAVAX for validators
 // and delegators respectively
-func (c *Client) GetMinStake() (uint64, uint64, error) {
+func (c *client) GetMinStake() (uint64, uint64, error) {
 	res := new(GetMinStakeReply)
 	err := c.requester.SendRequest("getMinStake", struct{}{}, res)
 	return uint64(res.MinValidatorStake), uint64(res.MinDelegatorStake), err
 }
 
 // GetTotalStake returns the total amount (in nAVAX) staked on the network
-func (c *Client) GetTotalStake() (uint64, error) {
+func (c *client) GetTotalStake() (uint64, error) {
 	res := new(GetTotalStakeReply)
 	err := c.requester.SendRequest("getTotalStake", struct{}{}, res)
 	return uint64(res.Stake), err
@@ -464,7 +507,7 @@ func (c *Client) GetTotalStake() (uint64, error) {
 
 // GetMaxStakeAmount returns the maximum amount of nAVAX staking to the named
 // node during the time period.
-func (c *Client) GetMaxStakeAmount(subnetID ids.ID, nodeID string, startTime, endTime uint64) (uint64, error) {
+func (c *client) GetMaxStakeAmount(subnetID ids.ID, nodeID string, startTime, endTime uint64) (uint64, error) {
 	res := new(GetMaxStakeAmountReply)
 	err := c.requester.SendRequest("getMaxStakeAmount", &GetMaxStakeAmountArgs{
 		SubnetID:  subnetID,
@@ -476,7 +519,7 @@ func (c *Client) GetMaxStakeAmount(subnetID ids.ID, nodeID string, startTime, en
 }
 
 // GetRewardUTXOs returns the reward UTXOs for a transaction
-func (c *Client) GetRewardUTXOs(args *api.GetTxArgs) ([][]byte, error) {
+func (c *client) GetRewardUTXOs(args *api.GetTxArgs) ([][]byte, error) {
 	res := &GetRewardUTXOsReply{}
 	err := c.requester.SendRequest("getRewardUTXOs", args, res)
 	if err != nil {
@@ -494,7 +537,7 @@ func (c *Client) GetRewardUTXOs(args *api.GetTxArgs) ([][]byte, error) {
 }
 
 // GetTimestamp returns the current chain timestamp
-func (c *Client) GetTimestamp() (time.Time, error) {
+func (c *client) GetTimestamp() (time.Time, error) {
 	res := &GetTimestampReply{}
 	err := c.requester.SendRequest("getTimestamp", struct{}{}, res)
 	return res.Timestamp, err
@@ -502,7 +545,7 @@ func (c *Client) GetTimestamp() (time.Time, error) {
 
 // GetValidatorsAt returns the weights of the validator set of a provided subnet
 // at the specified height.
-func (c *Client) GetValidatorsAt(subnetID ids.ID, height uint64) (map[string]uint64, error) {
+func (c *client) GetValidatorsAt(subnetID ids.ID, height uint64) (map[string]uint64, error) {
 	res := &GetValidatorsAtReply{}
 	err := c.requester.SendRequest("getValidatorsAt", &GetValidatorsAtArgs{
 		SubnetID: subnetID,
