@@ -28,12 +28,7 @@ const bootstrappingDelay = 10 * time.Second
 var (
 	errUnexpectedTimeout                      = errors.New("unexpected timeout fired")
 	_                    common.Bootstrapable = &Bootstrapper{}
-
-	// TODO ABENEGIA: conflate in a single interface
-	// Something like FullMessageHandler since this is a way to ensure
-	// at compile time that all messages in interface are handled
-	_ common.Engine = &Bootstrapper{}
-	_ block.Getter  = &Bootstrapper{}
+	_                    common.Engine        = &Bootstrapper{}
 )
 
 type Config struct {
@@ -515,8 +510,6 @@ func (b *Bootstrapper) Get(validatorID ids.ShortID, requestID uint32, containerI
 
 func (b *Bootstrapper) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
 	// bootstrapping isn't done --> we didn't send any gets --> this put is invalid
-	// TODO ABENEGIA: this comes from engine where IsBootStrapped is checked.
-	// Here assumed IsBootstrapped is checked in handler
 	if requestID == constants.GossipMsgRequestID {
 		b.Ctx.Log.Verbo("dropping gossip Put(%s, %d, %s) due to bootstrapping", vdr, requestID, blkID)
 	} else {
@@ -581,7 +574,3 @@ func (b *Bootstrapper) QueryFailed(vdr ids.ShortID, requestID uint32) error {
 }
 
 // End of QueryHandler interface
-
-func (b *Bootstrapper) GetBlock(blkID ids.ID) (snowman.Block, error) {
-	return b.VM.GetBlock(blkID)
-}

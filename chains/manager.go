@@ -594,6 +594,7 @@ func (m *manager) createAvalancheChain(
 	engineConfig := aveng.Config{
 		Ctx:        bootstrapperConfig.Ctx,
 		VM:         bootstrapperConfig.VM,
+		Manager:    bootstrapper.Manager,
 		Sender:     bootstrapperConfig.Sender,
 		RequestID:  &bootstrapper.RequestID,
 		Validators: bootstrapper.Validators,
@@ -776,8 +777,6 @@ func (m *manager) createSnowmanChain(
 		Bootstrapped: m.unblockChains,
 	}
 
-	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
-	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
 	bootstrapper := &smbootstrap.Bootstrapper{}
 	if err := bootstrapper.Initialize(
 		bootstrapCfg,

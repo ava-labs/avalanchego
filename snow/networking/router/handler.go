@@ -485,12 +485,7 @@ func (h *Handler) StartShutdown() {
 	// we wouldn't be able to grab [h.ctx.Lock] until the engine
 	// finished executing state transitions, which may take a long time.
 	// As a result, the router would time out on shutting down this chain.
-
-	if h.bootstrapper != nil /*TODO ABENEGIA: clean avalanche engine and remove*/ {
-		h.bootstrapper.Halt()
-	} else {
-		h.engine.Halt()
-	}
+	h.bootstrapper.Halt()
 }
 
 // Calls [h.engine.Shutdown] and [h.onCloseF]; closes [h.closed].

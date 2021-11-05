@@ -39,11 +39,7 @@ const (
 var (
 	errUnexpectedTimeout                      = errors.New("unexpected timeout fired")
 	_                    common.Bootstrapable = &Bootstrapper{}
-
-	// TODO ABENEGIA: conflate in a single interface
-	// Something like FullMessageHandler since this is a way to ensure
-	// at compile time that all messages in interface are handled
-	_ common.Engine = &Bootstrapper{}
+	_                    common.Engine        = &Bootstrapper{}
 )
 
 type Config struct {
@@ -571,8 +567,6 @@ func (b *Bootstrapper) Get(validatorID ids.ShortID, requestID uint32, containerI
 
 func (b *Bootstrapper) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) error {
 	// bootstrapping isn't done --> we didn't send any gets --> this put is invalid
-	// TODO ABENEGIA: this comes from engine where IsBootStrapped is checked.
-	// Here assumed IsBootstrapped is checked in handler
 	if requestID == constants.GossipMsgRequestID {
 		b.Ctx.Log.Verbo("dropping gossip Put(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
 	} else {

@@ -82,10 +82,7 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 		}
 	}
 
-	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
-	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
 	dh := &dummyHandler{}
-
 	bootstrapper := bootstrap.Bootstrapper{}
 	if err := bootstrapper.Initialize(
 		bootCfg,
@@ -476,8 +473,6 @@ func TestEngineMultipleQuery(t *testing.T) {
 		return gBlk, nil
 	}
 
-	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
-	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
 	dh := &dummyHandler{}
 	bootstrapper := bootstrap.Bootstrapper{}
 	if err := bootstrapper.Initialize(
@@ -988,8 +983,6 @@ func TestVoteCanceling(t *testing.T) {
 	vm.CantBootstrapping = false
 	vm.CantBootstrapped = false
 
-	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
-	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
 	dh := &dummyHandler{}
 	bootstrapper := bootstrap.Bootstrapper{}
 	if err := bootstrapper.Initialize(
@@ -1104,10 +1097,7 @@ func TestEngineNoQuery(t *testing.T) {
 	bootCfg.VM = vm
 	engCfg.VM = vm
 
-	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
-	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
 	dh := &dummyHandler{}
-
 	bootstrapper := bootstrap.Bootstrapper{}
 	if err := bootstrapper.Initialize(
 		bootCfg,
@@ -1173,10 +1163,7 @@ func TestEngineNoRepollQuery(t *testing.T) {
 	bootCfg.VM = vm
 	engCfg.VM = vm
 
-	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
-	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
 	dh := &dummyHandler{}
-
 	bootstrapper := bootstrap.Bootstrapper{}
 	if err := bootstrapper.Initialize(
 		bootCfg,
@@ -1875,8 +1862,6 @@ func TestEngineAggressivePolling(t *testing.T) {
 		return gBlk, nil
 	}
 
-	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
-	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
 	dh := &dummyHandler{}
 	bootstrapper := bootstrap.Bootstrapper{}
 	if err := bootstrapper.Initialize(
@@ -2022,8 +2007,6 @@ func TestEngineDoubleChit(t *testing.T) {
 	vm.CantBootstrapping = false
 	vm.CantBootstrapped = false
 
-	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
-	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
 	dh := &dummyHandler{}
 	bootstrapper := bootstrap.Bootstrapper{}
 	if err := bootstrapper.Initialize(
@@ -2174,8 +2157,6 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		return gBlk, nil
 	}
 
-	// TODO ABENEGIA: Currently engine MUST be initialized before bootstrapper
-	// FIX THIS SO THAT THEY CAN BE INSTANTIATED AS WE LIKE
 	dh := &dummyHandler{}
 	bootstrapper := bootstrap.Bootstrapper{}
 	if err := bootstrapper.Initialize(
