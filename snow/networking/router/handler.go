@@ -58,7 +58,7 @@ type Handler struct {
 
 	// the function to start the engine once bootstrap is done
 	StartEngineF func() error
-	// the function to start the bootstrap once fasty sync is done
+	// the function to start the bootstrap once fast sync is done
 	StartBootstrapF func() error
 }
 

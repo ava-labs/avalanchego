@@ -3,35 +3,20 @@
 
 package block
 
-import "github.com/ava-labs/avalanchego/ids"
-
 type StateSyncableVM interface {
 	// Enabled indicates whether the state sync is enabled for this VM
 	Enabled() bool
-	// ParseStateSummary returns a StateSummary from a given byte slice
-	ParseStateSummary([]byte) StateSummary
 	// StateSummary returns latest StateSummary with an optional error
-	StateSummary() (StateSummary, error)
-}
+	StateSummary() ([]byte, error)
+	// IsAccepted returns true if input []bytes represent a valid state summary
+	// for fast sync.
+	IsAccepted([]byte) (bool, error)
 
-// StateSummary indicates summary of VM state at a specified position
-// in the blockchain
-type StateSummary interface {
-	// Height returns block height in this state summary
-	Height() uint64
-	// Height returns block height in this state summary
-	BlockID() ids.ID
-	// StateRoot returns a byte slice representing the state root hash
-	// that can be synced to
-	StateRoot() []byte
-	// AtomicStateRoot returns a byte slice representing the atomic state root
-	// hash that can be synced to
-	AtomicStateRoot() []byte
-	// StartSync triggers a sync of this state summary to the VM
-	StartSync(vm ChainVM) error
-	// IsCompleted returns whether the state has been synced with an optional error
-	// Returned error indicates an irrecoverable error encountered during sync
-	IsCompleted() (bool, error)
-	// Bytes returns the byte slice representation of this StateSummary object
-	Bytes() []byte
+	// Sync state is with a list of valid state summaries to sync from.
+	// These summaries were collected from peers and validated with validators.
+	// VM will use information inside the summary to choose one and sync
+	// its state to that summary. Normal bootstrapping resumes after this
+	// function returns.
+	// Will be called with [nil] if no valid state summaries could be found.
+	SyncState([][]byte) error
 }

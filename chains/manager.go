@@ -756,12 +756,20 @@ func (m *manager) createSnowmanChain(
 	}
 
 	fastSyncCfg := fastsyncer.Config{
-		VM: vm,
+		VM:      vm,
+		Ctx:     ctx,
+		Sender:  &sender,
+		Beacons: beacons,
+		SampleK: sampleK,
+		Alpha:   bootstrapWeight/2 + 1, // must be > 50%
 	}
-	fastSync := fastsyncer.NewFastSyncer(
+	fastSync, err := fastsyncer.NewFastSyncer(
 		fastSyncCfg,
 		handler.OnDoneFastSyncing,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating fastsyncer: %w", err)
+	}
 	handler.FastSyncer = fastSync
 	if err := fastSync.Start(); err != nil {
 		return nil, fmt.Errorf("error starting fast sync operations: %w", err)
