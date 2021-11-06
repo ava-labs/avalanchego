@@ -102,7 +102,7 @@ type fastSyncer struct {
 
 	// current weight
 	started bool
-	weight  uint64
+	// weight  uint64
 
 	// number of times the bootstrap has been attempted
 	bootstrapAttempts int
@@ -281,7 +281,7 @@ func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID ui
 func (fs *fastSyncer) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error {
 	acceptedSummaries := make([][]byte, 0, len(summaries))
 	for _, summary := range summaries {
-		if accepted, err := fs.VM.IsAccepted(summary); accepted == true && err == nil {
+		if accepted, err := fs.VM.IsAccepted(summary); accepted && err == nil {
 			acceptedSummaries = append(acceptedSummaries, summary)
 		} else if err != nil {
 			return err

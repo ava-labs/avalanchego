@@ -280,6 +280,7 @@ func (s *Sender) SendGetStateSummaryFrontier(nodeIDs ids.ShortSet, requestID uin
 		}
 	}
 }
+
 func (s *Sender) SendStateSummaryFrontier(nodeID ids.ShortID, requestID uint32, summary []byte) {
 	// Sending this message to myself.
 	if nodeID == s.ctx.NodeID {
