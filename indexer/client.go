@@ -26,7 +26,7 @@ type Client interface {
 
 // Client implementation for Avalanche Indexer API Endpoint
 type client struct {
-	rpc.EndpointRequester
+	requester rpc.EndpointRequester
 }
 
 // NewClient creates a client that can interact with an index via HTTP API calls.
@@ -34,13 +34,13 @@ type client struct {
 // [endpoint] is the path to the index endpoint (e.g. /ext/index/C/block or /ext/index/X/tx).
 func NewClient(host, endpoint string, requestTimeout time.Duration) Client {
 	return &client{
-		EndpointRequester: rpc.NewEndpointRequester(host, endpoint, "index", requestTimeout),
+		requester: rpc.NewEndpointRequester(host, endpoint, "index", requestTimeout),
 	}
 }
 
 func (c *client) GetContainerRange(args *GetContainerRangeArgs) ([]Container, error) {
 	var fcs GetContainerRangeResponse
-	if err := c.SendRequest("getContainerRange", args, &fcs); err != nil {
+	if err := c.requester.SendRequest("getContainerRange", args, &fcs); err != nil {
 		return nil, err
 	}
 	response := make([]Container, len(fcs.Containers))
@@ -60,7 +60,7 @@ func (c *client) GetContainerRange(args *GetContainerRangeArgs) ([]Container, er
 
 func (c *client) GetContainerByIndex(args *GetContainer) (Container, error) {
 	var fc FormattedContainer
-	if err := c.SendRequest("getContainerByIndex", args, &fc); err != nil {
+	if err := c.requester.SendRequest("getContainerByIndex", args, &fc); err != nil {
 		return Container{}, err
 	}
 	containerBytes, err := formatting.Decode(fc.Encoding, fc.Bytes)
@@ -76,7 +76,7 @@ func (c *client) GetContainerByIndex(args *GetContainer) (Container, error) {
 
 func (c *client) GetLastAccepted(args *GetLastAcceptedArgs) (Container, error) {
 	var fc FormattedContainer
-	if err := c.SendRequest("getLastAccepted", args, &fc); err != nil {
+	if err := c.requester.SendRequest("getLastAccepted", args, &fc); err != nil {
 		return Container{}, nil
 	}
 	containerBytes, err := formatting.Decode(fc.Encoding, fc.Bytes)
@@ -92,19 +92,19 @@ func (c *client) GetLastAccepted(args *GetLastAcceptedArgs) (Container, error) {
 
 func (c *client) GetIndex(args *GetIndexArgs) (uint64, error) {
 	var index GetIndexResponse
-	err := c.SendRequest("getIndex", args, &index)
+	err := c.requester.SendRequest("getIndex", args, &index)
 	return uint64(index.Index), err
 }
 
 func (c *client) IsAccepted(args *GetIndexArgs) (bool, error) {
 	var isAccepted bool
-	err := c.SendRequest("isAccepted", args, &isAccepted)
+	err := c.requester.SendRequest("isAccepted", args, &isAccepted)
 	return isAccepted, err
 }
 
 func (c *client) GetContainerByID(args *GetIndexArgs) (Container, error) {
 	var fc FormattedContainer
-	if err := c.SendRequest("getContainerByID", args, &fc); err != nil {
+	if err := c.requester.SendRequest("getContainerByID", args, &fc); err != nil {
 		return Container{}, err
 	}
 	containerBytes, err := formatting.Decode(fc.Encoding, fc.Bytes)
