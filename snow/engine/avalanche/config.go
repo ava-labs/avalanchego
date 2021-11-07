@@ -17,7 +17,6 @@ type Config struct {
 	VM         vertex.DAGVM
 	Manager    vertex.Manager
 	Sender     common.Sender
-	RequestID  *uint32
 	Validators validators.Set
 
 	Params    avalanche.Parameters

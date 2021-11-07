@@ -23,14 +23,18 @@ import (
 
 var _ Engine = &Transitive{}
 
+func New(config Config) (Engine, error) {
+	return newTransitive(config)
+}
+
 // Transitive implements the Engine interface by attempting to fetch all
-// transitive dependencies.
+// Transitive dependencies.
 type Transitive struct {
 	Ctx    *snow.Context
 	Sender common.Sender
 	VM     block.ChainVM
 
-	ReqID      *uint32
+	RequestID  uint32
 	Validators validators.Set
 
 	metrics
@@ -63,32 +67,31 @@ type Transitive struct {
 	errs wrappers.Errs
 }
 
-// Initialize implements the Engine interface
-func (t *Transitive) Initialize(config Config) (func() error, error) {
+func newTransitive(config Config) (*Transitive, error) {
+	res := &Transitive{}
 	config.Ctx.Log.Info("initializing consensus engine")
-	t.Ctx = config.Ctx
-	t.Sender = config.Sender
-	t.VM = config.VM
-	t.ReqID = config.RequestID
-	t.Validators = config.Validators
+	res.Ctx = config.Ctx
+	res.Sender = config.Sender
+	res.VM = config.VM
+	res.Validators = config.Validators
 
-	t.Params = config.Params
-	t.Consensus = config.Consensus
-	t.pending = make(map[ids.ID]snowman.Block)
-	t.nonVerifieds = NewAncestorTree()
+	res.Params = config.Params
+	res.Consensus = config.Consensus
+	res.pending = make(map[ids.ID]snowman.Block)
+	res.nonVerifieds = NewAncestorTree()
 
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
-	t.polls = poll.NewSet(factory,
-		t.Ctx.Log,
+	res.polls = poll.NewSet(factory,
+		res.Ctx.Log,
 		config.Params.Namespace,
 		config.Params.Metrics,
 	)
 
-	if err := t.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
+	if err := res.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
 		return nil, err
 	}
 
-	return t.FinishBootstrapping, nil
+	return res, nil
 }
 
 func (t *Transitive) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
@@ -145,7 +148,8 @@ func (t *Transitive) Disconnected(validatorID ids.ShortID) error {
 
 // When bootstrapping is finished, this will be called.
 // This initializes the consensus engine with the last accepted block.
-func (t *Transitive) FinishBootstrapping() error {
+func (t *Transitive) Start(startRequestID uint32) error {
+	t.RequestID = startRequestID
 	lastAcceptedID, err := t.VM.LastAccepted()
 	if err != nil {
 		return err
@@ -622,10 +626,10 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, blkID ids.ID) {
 		return
 	}
 
-	(*t.ReqID)++
-	t.blkReqs.Add(vdr, (*t.ReqID), blkID)
-	t.Ctx.Log.Verbo("sending Get(%s, %d, %s)", vdr, (*t.ReqID), blkID)
-	t.Sender.SendGet(vdr, (*t.ReqID), blkID)
+	t.RequestID++
+	t.blkReqs.Add(vdr, t.RequestID, blkID)
+	t.Ctx.Log.Verbo("sending Get(%s, %d, %s)", vdr, t.RequestID, blkID)
+	t.Sender.SendGet(vdr, t.RequestID, blkID)
 
 	// Tracks performance statistics
 	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
@@ -641,12 +645,12 @@ func (t *Transitive) pullQuery(blkID ids.ID) {
 		vdrBag.Add(vdr.ID())
 	}
 
-	(*t.ReqID)++
-	if err == nil && t.polls.Add((*t.ReqID), vdrBag) {
+	t.RequestID++
+	if err == nil && t.polls.Add(t.RequestID, vdrBag) {
 		vdrList := vdrBag.List()
 		vdrSet := ids.NewShortSet(len(vdrList))
 		vdrSet.Add(vdrList...)
-		t.Sender.SendPullQuery(vdrSet, (*t.ReqID), blkID)
+		t.Sender.SendPullQuery(vdrSet, t.RequestID, blkID)
 	} else if err != nil {
 		t.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", blkID)
 	}
@@ -661,13 +665,13 @@ func (t *Transitive) pushQuery(blk snowman.Block) {
 		vdrBag.Add(vdr.ID())
 	}
 
-	(*t.ReqID)++
-	if err == nil && t.polls.Add((*t.ReqID), vdrBag) {
+	t.RequestID++
+	if err == nil && t.polls.Add(t.RequestID, vdrBag) {
 		vdrList := vdrBag.List()
 		vdrSet := ids.NewShortSet(len(vdrList))
 		vdrSet.Add(vdrList...)
 
-		t.Sender.SendPushQuery(vdrSet, (*t.ReqID), blk.ID(), blk.Bytes())
+		t.Sender.SendPushQuery(vdrSet, t.RequestID, blk.ID(), blk.Bytes())
 	} else if err != nil {
 		t.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", blk.ID())
 	}

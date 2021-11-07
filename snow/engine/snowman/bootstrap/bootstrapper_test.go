@@ -111,17 +111,18 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	}
 
 	finished := new(bool)
-	bs := Bootstrapper{}
-	if err := bs.Initialize(
+	bs, err := newBootstrapper(
 		config,
-		func() error { *finished = true; return nil },
+		func(lastReqID uint32) error { *finished = true; return nil },
 		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := bs.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bs.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -152,7 +153,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	vm.CantBootstrapping = false
 	vm.CantBootstrapped = false
 
-	err := bs.ForceAccepted(acceptedIDs)
+	err = bs.ForceAccepted(acceptedIDs)
 	switch {
 	case err != nil: // should finish
 		t.Fatal(err)
@@ -213,17 +214,18 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	}
 
 	finished := new(bool)
-	bs := Bootstrapper{}
-	if err := bs.Initialize(
+	bs, err := newBootstrapper(
 		config,
-		func() error { *finished = true; return nil },
+		func(lastReqID uint32) error { *finished = true; return nil },
 		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := bs.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bs.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -300,7 +302,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 
 	vm.CantBootstrapped = false
 
-	err := bs.MultiPut(peerID, *requestID, [][]byte{blkBytes1})
+	err = bs.MultiPut(peerID, *requestID, [][]byte{blkBytes1})
 	switch {
 	case err != nil: // respond with right block
 		t.Fatal(err)
@@ -373,17 +375,18 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	}
 
 	finished := new(bool)
-	bs := Bootstrapper{}
-	if err := bs.Initialize(
+	bs, err := newBootstrapper(
 		config,
-		func() error { *finished = true; return nil },
+		func(lastReqID uint32) error { *finished = true; return nil },
 		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := bs.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bs.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -536,17 +539,18 @@ func TestBootstrapperMultiPut(t *testing.T) {
 		return blk0, nil
 	}
 	finished := new(bool)
-	bs := Bootstrapper{}
-	if err := bs.Initialize(
+	bs, err := newBootstrapper(
 		config,
-		func() error { *finished = true; return nil },
+		func(lastReqID uint32) error { *finished = true; return nil },
 		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := bs.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bs.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -652,17 +656,18 @@ func TestBootstrapperAcceptedFrontier(t *testing.T) {
 		assert.Equal(t, blkID, bID)
 		return dummyBlk, nil
 	}
-	bs := Bootstrapper{}
-	if err := bs.Initialize(
+	bs, err := newBootstrapper(
 		config,
 		nil,
 		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := bs.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bs.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -702,17 +707,18 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 		return blk1, nil
 	}
 
-	bs := Bootstrapper{}
-	if err := bs.Initialize(
+	bs, err := newBootstrapper(
 		config,
 		nil,
 		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := bs.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bs.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -788,23 +794,24 @@ func TestBootstrapperFinalized(t *testing.T) {
 	}
 
 	finished := new(bool)
-	bs := Bootstrapper{}
 	vm.CantLastAccepted = false
 	vm.LastAcceptedF = func() (ids.ID, error) { return blk0.ID(), nil }
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		assert.Equal(t, blk0.ID(), blkID)
 		return blk0, nil
 	}
-	if err := bs.Initialize(
+	bs, err := newBootstrapper(
 		config,
-		func() error { *finished = true; return nil },
+		func(lastReqID uint32) error { *finished = true; return nil },
 		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := bs.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bs.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1004,17 +1011,18 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	finished := new(bool)
-	bs := Bootstrapper{}
-	if err := bs.Initialize(
+	bs, err := newBootstrapper(
 		config,
-		func() error { *finished = true; return nil },
+		func(lastReqID uint32) error { *finished = true; return nil },
 		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := bs.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bs.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 

@@ -30,10 +30,13 @@ var (
 )
 
 type dummyHandler struct {
-	startEngineF func() error
+	startEngineF func(startReqID uint32) error
 }
 
-func (dh *dummyHandler) onDoneBootstrapping() error { return dh.startEngineF() }
+func (dh *dummyHandler) onDoneBootstrapping(lastReqID uint32) error {
+	lastReqID++
+	return dh.startEngineF(lastReqID)
+}
 
 func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
 	bootCfg, engCfg := DefaultConfigs()
@@ -83,23 +86,24 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
 		prometheus.NewRegistry(),
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -474,23 +478,24 @@ func TestEngineMultipleQuery(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
 		prometheus.NewRegistry(),
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -984,23 +989,24 @@ func TestVoteCanceling(t *testing.T) {
 	vm.CantBootstrapped = false
 
 	dh := &dummyHandler{}
-	bootstrapper := bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
 		prometheus.NewRegistry(),
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1098,23 +1104,24 @@ func TestEngineNoQuery(t *testing.T) {
 	engCfg.VM = vm
 
 	dh := &dummyHandler{}
-	bootstrapper := bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
 		prometheus.NewRegistry(),
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1164,23 +1171,24 @@ func TestEngineNoRepollQuery(t *testing.T) {
 	engCfg.VM = vm
 
 	dh := &dummyHandler{}
-	bootstrapper := bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
 		prometheus.NewRegistry(),
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1863,23 +1871,24 @@ func TestEngineAggressivePolling(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
 		prometheus.NewRegistry(),
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2008,23 +2017,24 @@ func TestEngineDoubleChit(t *testing.T) {
 	vm.CantBootstrapped = false
 
 	dh := &dummyHandler{}
-	bootstrapper := bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
 		prometheus.NewRegistry(),
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2158,23 +2168,24 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
 		prometheus.NewRegistry(),
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 

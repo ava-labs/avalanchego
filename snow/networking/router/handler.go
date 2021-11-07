@@ -55,7 +55,7 @@ type Handler struct {
 	closing         utils.AtomicBool
 
 	// the function to call and start the engine once bootstrap is done
-	StartEngineF func() error
+	StartEngineF func(startReqID uint32) error
 }
 
 // Initialize this consensus handler
@@ -87,7 +87,10 @@ func (h *Handler) Initialize(
 	return err
 }
 
-func (h *Handler) OnDoneBootstrapping() error { return h.StartEngineF() }
+func (h *Handler) OnDoneBootstrapping(lastReqID uint32) error {
+	lastReqID++
+	return h.StartEngineF(lastReqID)
+}
 
 // Context of this Handler
 func (h *Handler) Context() *snow.Context { return h.engine.Context() }

@@ -11,5 +11,5 @@ type Fetcher struct {
 	OutstandingRequests Requests
 
 	// Called when bootstrapping is done on a specific chain
-	OnFinished func() error
+	OnFinished func(lastReqID uint32) error
 }

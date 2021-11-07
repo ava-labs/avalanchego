@@ -32,7 +32,6 @@ func DefaultConfig() (bootstrap.Config, Config) {
 		VM:         bootstrapConfig.VM,
 		Manager:    bootstrapConfig.Manager,
 		Sender:     bootstrapConfig.Sender,
-		RequestID:  new(uint32), // TODO ABENEGIA: FIX IT UP, SHOULD BE PART OF Config NOT Bootstrapper
 		Validators: bootstrapConfig.Validators,
 		Params: avalanche.Parameters{
 			Parameters: snowball.Parameters{

@@ -17,7 +17,6 @@ type Config struct {
 	Ctx        *snow.Context
 	VM         block.ChainVM
 	Sender     common.Sender
-	RequestID  *uint32
 	Validators validators.Set
 	Params     snowball.Parameters
 	Consensus  snowman.Consensus

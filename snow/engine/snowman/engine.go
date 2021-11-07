@@ -20,6 +20,5 @@ type Engine interface {
 	common.Engine
 	block.Getter
 
-	// Initialize this engine.
-	Initialize(config Config) (func() error, error)
+	Start(startReqID uint32) error
 }
