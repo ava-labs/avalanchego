@@ -756,13 +756,26 @@ func (m *manager) createSnowmanChain(
 		Preempt: sb.afterBootstrapped(),
 	}
 
+	commonCfg := common.Config{
+		Ctx:                           ctx,
+		Validators:                    vdrs,
+		Beacons:                       beacons,
+		SampleK:                       sampleK,
+		StartupAlpha:                  (3*bootstrapWeight + 3) / 4,
+		Alpha:                         bootstrapWeight/2 + 1, // must be > 50%
+		Sender:                        &sender,
+		Subnet:                        sb,
+		Timer:                         timer,
+		RetryBootstrap:                m.RetryBootstrap,
+		RetryBootstrapWarnFrequency:   m.RetryBootstrapWarnFrequency,
+		MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
+		MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
+		MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
+	}
+
 	fastSyncCfg := fastsyncer.Config{
-		VM:      vm,
-		Ctx:     ctx,
-		Sender:  &sender,
-		Beacons: beacons,
-		SampleK: sampleK,
-		Alpha:   bootstrapWeight/2 + 1, // must be > 50%
+		Config: commonCfg,
+		VM:     vm,
 	}
 	fastSync := fastsyncer.NewFastSyncer(
 		fastSyncCfg,
@@ -771,22 +784,7 @@ func (m *manager) createSnowmanChain(
 	handler.FastSyncer = fastSync
 
 	bootstrapCfg := smbootstrap.Config{
-		Config: common.Config{
-			Ctx:                           ctx,
-			Validators:                    vdrs,
-			Beacons:                       beacons,
-			SampleK:                       sampleK,
-			StartupAlpha:                  (3*bootstrapWeight + 3) / 4,
-			Alpha:                         bootstrapWeight/2 + 1, // must be > 50%
-			Sender:                        &sender,
-			Subnet:                        sb,
-			Timer:                         timer,
-			RetryBootstrap:                m.RetryBootstrap,
-			RetryBootstrapWarnFrequency:   m.RetryBootstrapWarnFrequency,
-			MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
-			MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
-			MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
-		},
+		Config:       commonCfg,
 		Blocked:      blocked,
 		VM:           vm,
 		Bootstrapped: m.unblockChains,

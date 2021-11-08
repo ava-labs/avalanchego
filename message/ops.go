@@ -126,7 +126,7 @@ var (
 		GetStateSummaryFrontierFailed,
 		GetAcceptedStateSummaryFailed,
 	}
-	FastSyncOps = append(FastSyncRequestOps, FastSyncResponseOps...)
+	FastSyncOps = append(FastSyncExternalOps, FastSyncInternalOps...)
 
 	ConsensusAndNetworkOps = append(ConsensusExternalOps, HandshakeOps...)
 	ExternalOps            = append(ConsensusAndNetworkOps, FastSyncExternalOps...)

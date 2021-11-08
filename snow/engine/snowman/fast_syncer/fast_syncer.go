@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -26,22 +25,6 @@ const (
 
 var _ FastSyncer = &fastSyncer{}
 
-type Config struct {
-	Ctx    *snow.Context
-	Sender common.Sender
-
-	// Should Bootstrap be retried
-	RetryBootstrap bool
-	// Max number of times to retry bootstrap before warning the node operator
-	RetryBootstrapWarnFrequency int
-
-	VM block.ChainVM
-
-	Beacons validators.Set
-	SampleK int
-	Alpha   uint64
-}
-
 type FastSyncer interface {
 	common.FastSyncHandler
 
@@ -55,7 +38,6 @@ func NewFastSyncer(
 	return &fastSyncer{
 		onDoneFastSyncing: onDoneFastSyncing,
 		Config:            cfg,
-		Beacons:           cfg.Beacons,
 	}
 }
 
@@ -103,7 +85,6 @@ type fastSyncer struct {
 
 	// Fast Sync specific fields
 	VM                block.StateSyncableVM
-	Beacons           validators.Set
 	onDoneFastSyncing func(lastReqID uint32) error
 }
 

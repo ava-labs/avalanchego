@@ -238,7 +238,7 @@ func (h *Handler) handleMsg(msg message.InboundMessage) error {
 	histogram := h.metrics.messages[op]
 	// TODO: should not be needed
 	if histogram == nil {
-		h.ctx.Log.Warn("could not find metric map for message type", "op", op)
+		h.ctx.Log.Warn("could not find metric map for message type %s", op.String())
 	} else {
 		histogram.Observe(float64(endTime.Sub(startTime)))
 	}
