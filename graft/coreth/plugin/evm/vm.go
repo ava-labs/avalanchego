@@ -378,7 +378,7 @@ func (vm *VM) Initialize(
 	}
 
 	// Initialize is blocking at the moment
-	if err = vm.atomicTrie.Initialize(facades.NewEthChainFacade(ethChain), vm.db.Commit, func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error) {
+	doneChan := vm.atomicTrie.Initialize(facades.NewEthChainFacade(ethChain), vm.db.Commit, func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error) {
 		tx, err := vm.extractAtomicTx(blk.(*types.Block))
 		if err != nil {
 			return nil, err
@@ -389,9 +389,13 @@ func (vm *VM) Initialize(
 		}
 
 		return tx.AtomicOps()
-	}); err != nil {
-		return err
-	}
+	})
+
+	go func(done chan struct{}) {
+		startTime := time.Now()
+		<-done
+		log.Info("Atomic trie initialization complete", "time", time.Since(startTime))
+	}(doneChan)
 
 	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
 	vm.handleGasPriceUpdates()
