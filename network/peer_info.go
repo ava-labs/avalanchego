@@ -7,16 +7,17 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/json"
 )
 
 type PeerInfo struct {
-	IP             string    `json:"ip"`
-	PublicIP       string    `json:"publicIP,omitempty"`
-	ID             string    `json:"nodeID"`
-	Version        string    `json:"version"`
-	LastSent       time.Time `json:"lastSent"`
-	LastReceived   time.Time `json:"lastReceived"`
-	Benched        []ids.ID  `json:"benched"`
-	ObservedUptime uint8     `json:"observedUptime"`
-	Weight         uint64    `json:"weight"`
+	IP             string      `json:"ip"`
+	PublicIP       string      `json:"publicIP,omitempty"`
+	ID             string      `json:"nodeID"`
+	Version        string      `json:"version"`
+	LastSent       time.Time   `json:"lastSent"`
+	LastReceived   time.Time   `json:"lastReceived"`
+	Benched        []ids.ID    `json:"benched"`
+	ObservedUptime json.Uint8  `json:"observedUptime"`
+	Weight         json.Uint64 `json:"weight"`
 }

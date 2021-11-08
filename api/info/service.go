@@ -179,7 +179,6 @@ type PeersReply struct {
 // Peers returns the list of current validators
 func (service *Info) Peers(_ *http.Request, args *PeersArgs, reply *PeersReply) error {
 	service.log.Debug("Info: Peers called")
-
 	nodeIDs := make([]ids.ShortID, 0, len(args.NodeIDs))
 	for _, nodeID := range args.NodeIDs {
 		nID, err := ids.ShortFromPrefixedString(nodeID, constants.NodeIDPrefix)
@@ -240,8 +239,8 @@ func (service *Info) Uptime(_ *http.Request, _ *struct{}, reply *UptimeResponse)
 	totalWeight := uint64(0)
 	rewardingStake := uint64(0)
 	for _, peerInfo := range service.networking.Peers([]ids.ShortID{}) {
-		percent := peerInfo.ObservedUptime
-		weight := peerInfo.Weight
+		percent := uint8(peerInfo.ObservedUptime)
+		weight := uint64(peerInfo.Weight)
 		// this is not a validaotor skip it.
 		if weight == 0 {
 			continue

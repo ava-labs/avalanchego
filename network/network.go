@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
@@ -634,8 +635,8 @@ func (n *network) NewPeerInfo(peer *peer) PeerInfo {
 		LastSent:       time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
 		LastReceived:   time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
 		Benched:        n.benchlistManager.GetBenched(peer.nodeID),
-		ObservedUptime: peer.observedUptime,
-		Weight:         weight,
+		ObservedUptime: json.Uint8(peer.observedUptime),
+		Weight:         json.Uint64(weight),
 	}
 }
 
