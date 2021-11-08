@@ -4,8 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	atomic2 "go.uber.org/atomic"
-
 	"github.com/ava-labs/coreth/fastsync/types"
 
 	"github.com/ava-labs/coreth/fastsync/facades"
@@ -36,7 +34,6 @@ type indexedAtomicTrie struct {
 	db                   ethdb.KeyValueStore // Underlying database
 	trieDB               *trie.Database      // Trie database
 	trie                 *trie.Trie          // Atomic trie.Trie mapping key (height+blockchainID) and value (RLP encoded atomic.Requests)
-	initialized          *atomic2.Bool       // whether the index has been initialized
 }
 
 func NewIndexedAtomicTrie(db ethdb.KeyValueStore) (types.AtomicTrie, error) {
@@ -66,7 +63,6 @@ func NewIndexedAtomicTrie(db ethdb.KeyValueStore) (types.AtomicTrie, error) {
 		db:                   db,
 		trieDB:               triedb,
 		trie:                 t,
-		initialized:          atomic2.NewBool(false),
 	}, nil
 }
 
@@ -139,7 +135,6 @@ func (i *indexedAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn fun
 			return err
 		}
 	}
-	i.initialized.Store(true)
 	return nil
 }
 
