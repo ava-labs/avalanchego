@@ -2,7 +2,6 @@ package evm
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 
 	atomic2 "go.uber.org/atomic"
@@ -144,24 +143,18 @@ func (i *indexedAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn fun
 	return nil
 }
 
-func (i *indexedAtomicTrie) getCurrentHeight() ([]byte, uint64, bool, error) {
-	currentHeightBytes, err := i.db.Get(indexHeightKey)
+// Height returns the current index height, whether the index is initialized and an optional error
+func (i *indexedAtomicTrie) Height() (uint64, bool, error) {
+	heightBytes, err := i.db.Get(indexHeightKey)
 	if err != nil && err.Error() == errEntryNotFound {
-		return make([]byte, wrappers.LongLen), 0, false, nil
+		// trie has not been committed yet
+		return 0, false, nil
 	} else if err != nil {
-		// some other error
-		return nil, 0, false, err
+		return 0, true, err
 	}
 
-	// the key exists so we must have the bytes
-	if len(currentHeightBytes) == 0 {
-		// no bytes from DB? unlikely but could happen in a universe
-		return nil, 0, false, errors.New("invalid index height data from DB")
-	}
-
-	// ok we got the bytes, read them as uint64
-	currentHeight := binary.BigEndian.Uint64(currentHeightBytes)
-	return currentHeightBytes, currentHeight, true, nil
+	height := binary.BigEndian.Uint64(heightBytes)
+	return height, true, err
 }
 
 // Index updates the trie with entries in atomicOps
@@ -189,20 +182,27 @@ func (i *indexedAtomicTrie) Index(height uint64, atomicOps map[ids.ID]*atomic.Re
 	currentHeightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(currentHeightBytes, currentHeight)
 
-	if !exists && height != 0 {
-		// when the indexer is being indexed for the first time, the first
-		// height is expected to be of the genesis block, which is expected
-		// to be zero. This doesn't really affect the indexer but is a safety
-		// measure to catch if something unexpected is going on.
-		return gethCommon.Hash{}, fmt.Errorf("invalid starting height for a new index, must be exactly 0, is %d", height)
+	if err != nil {
+		// some error other than bytes not being present in the DB
+		return gethCommon.Hash{}, err
+	}
+
+	if !exists {
+		// this can happen when the indexer is running for the first time
+		if height != 0 {
+			// when the indexer is being indexed for the first time, the first
+			// height is expected to be of the genesis block, which is expected
+			// to be zero. This doesn't really affect the indexer but is a safety
+			// measure to catch if something unexpected is going on.
+			return gethCommon.Hash{}, fmt.Errorf("invalid starting height for a new index, must be exactly 0, is %d", height)
+		}
 	} else {
-		// increment the currentHeight because we index the next block
 		currentHeight++
 
 		// make sure currentHeight + 1 = height that we're about to index because we don't want gaps
 		if currentHeight != height {
 			// index is inconsistent, we cannot have missing entries so reject it
-			return gethCommon.Hash{}, fmt.Errorf("inconsistent atomic trie index, currentHeight=%d, indexHeight=%d", currentHeight, height)
+			return gethCommon.Hash{}, fmt.Errorf("inconsistent atomic trie index, currentHeight=%d, height=%d", currentHeight, height)
 		}
 
 		// all good here, update the currentHeightBytes
@@ -274,20 +274,6 @@ func (i *indexedAtomicTrie) LastCommitted() (gethCommon.Hash, uint64, error) {
 	height := binary.BigEndian.Uint64(heightBytes)
 	hash, err := i.db.Get(heightBytes)
 	return gethCommon.BytesToHash(hash), height, err
-}
-
-// Height returns the current index height, whether the index is initialized and an optional error
-func (i *indexedAtomicTrie) Height() (uint64, bool, error) {
-	heightBytes, err := i.db.Get(indexHeightKey)
-	if err != nil && err.Error() == errEntryNotFound {
-		// trie has not been committed yet
-		return 0, false, nil
-	} else if err != nil {
-		return 0, true, err
-	}
-
-	height := binary.BigEndian.Uint64(heightBytes)
-	return height, true, err
 }
 
 // Iterator returns a types.AtomicIterator that iterates the trie from the given
