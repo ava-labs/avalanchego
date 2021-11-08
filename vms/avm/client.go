@@ -20,7 +20,7 @@ import (
 // Interface compliance
 var _ Client = (*client)(nil)
 
-// interface for an AVM client for interacting with avm [chain]
+// Client for interacting with an AVM (X-Chain) instance
 type Client interface {
 	IssueTx([]byte) (ids.ID, error)
 	GetTxStatus(ids.ID) (choices.Status, error)
