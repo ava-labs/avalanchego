@@ -115,10 +115,13 @@ func init() {
 }
 
 type dummyHandler struct {
-	startEngineF func() error
+	startEngineF func(startReqID uint32) error
 }
 
-func (dh *dummyHandler) onDoneBootstrapping() error { return dh.startEngineF() }
+func (dh *dummyHandler) onDoneBootstrapping(lastReqID uint32) error {
+	lastReqID++
+	return dh.startEngineF(lastReqID)
+}
 
 func defaultContext() *snow.Context {
 	ctx := snow.DefaultContextTest()
@@ -2139,13 +2142,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootstrapConfig,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", consensus.Parameters().Namespace),
 		prometheus.NewRegistry(),
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -2153,8 +2156,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		Ctx:        bootstrapConfig.Ctx,
 		VM:         bootstrapConfig.VM,
 		Sender:     bootstrapConfig.Sender,
-		RequestID:  &bootstrapper.RequestID,
-		Validators: bootstrapper.Validators,
+		Validators: vdrs,
 		Params: snowball.Parameters{
 			Metrics:               prometheus.NewRegistry(),
 			K:                     1,
@@ -2168,12 +2170,14 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		},
 		Consensus: consensus,
 	}
-	engine := smeng.Transitive{}
-	if dh.startEngineF, err = engine.Initialize(engineConfig); err != nil {
+	engine, err := smeng.New(engineConfig)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = engine.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2182,7 +2186,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	err = handler.Initialize(
 		mc,
 		bootstrapper,
-		&engine,
+		engine,
 		vdrs,
 		msgChan,
 		"",

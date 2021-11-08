@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -104,7 +105,7 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 
 	// If the node is currently bootstrapping - we don't assume that the P-chain
 	// has been synced up to this point yet.
-	if p.vm.ctx.IsBootstrapped() {
+	if p.vm.ctx.GetState() == snow.NormalOp {
 		childID := child.ID()
 		currentPChainHeight, err := p.vm.ctx.ValidatorState.GetCurrentHeight()
 		if err != nil {

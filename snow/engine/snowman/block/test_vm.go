@@ -100,12 +100,15 @@ func (vm *TestVM) LastAccepted() (ids.ID, error) {
 func (vm *TestVM) StateSyncEnabled() (bool, error) {
 	return true, nil
 }
+
 func (vm *TestVM) StateSyncGetLastSummary() ([]byte, error) {
 	return []byte("some bytes"), nil
 }
+
 func (vm *TestVM) StateSyncIsSummaryAccepted(summary []byte) (bool, error) {
 	return string(summary) == "some bytes", nil
 }
+
 func (vm *TestVM) StateSync([][]byte) error {
 	return nil
 }

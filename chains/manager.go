@@ -582,33 +582,34 @@ func (m *manager) createAvalancheChain(
 
 		VM: vm,
 	}
-	bootstrapper := &avbootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := avbootstrap.New(
 		bootstrapperConfig,
 		handler.OnDoneBootstrapping,
 		fmt.Sprintf("%s_bs", consensusParams.Namespace),
 		consensusParams.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		return nil, fmt.Errorf("error initializing avalanche bootstrapper: %w", err)
 	}
 
 	engineConfig := aveng.Config{
 		Ctx:        bootstrapperConfig.Ctx,
 		VM:         bootstrapperConfig.VM,
-		Manager:    bootstrapper.Manager,
+		Manager:    vtxManager,
 		Sender:     bootstrapperConfig.Sender,
-		RequestID:  &bootstrapper.RequestID,
-		Validators: bootstrapper.Validators,
+		Validators: vdrs,
 		Params:     consensusParams,
 		Consensus:  &avcon.Topological{},
 	}
 
-	engine := &aveng.Transitive{}
-	if handler.StartEngineF, err = engine.Initialize(engineConfig); err != nil {
+	engine, err := aveng.New(engineConfig)
+	if err != nil {
 		return nil, fmt.Errorf("error initializing avalanche engine: %w", err)
 	}
+	handler.StartEngineF = engine.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		return nil, fmt.Errorf("error starting up avalanche bootstrapper: %w", err)
 	}
 
@@ -790,37 +791,31 @@ func (m *manager) createSnowmanChain(
 		VM:           vm,
 		Bootstrapped: m.unblockChains,
 	}
-
-	bootstrapper := &smbootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := smbootstrap.New(
 		bootstrapCfg,
 		handler.OnDoneBootstrapping,
 		fmt.Sprintf("%s_bs", consensusParams.Namespace),
 		consensusParams.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman bootstrapper: %w", err)
 	}
+	handler.StartBootstrapF = bootstrapper.Start
 
 	engineConfig := smeng.Config{
 		Ctx:        bootstrapCfg.Ctx,
 		VM:         bootstrapCfg.VM,
 		Sender:     bootstrapCfg.Sender,
-		RequestID:  &bootstrapper.RequestID,
-		Validators: bootstrapper.Validators,
+		Validators: vdrs,
 		Params:     consensusParams,
 		Consensus:  &smcon.Topological{},
 	}
-
-	engine := &smeng.Transitive{}
-	handler.StartBootstrapF = func() error {
-		if err := bootstrapper.Startup(); err != nil {
-			return fmt.Errorf("error starting snowman bootstrapper: %w", err)
-		}
-		return nil
-	}
-	if handler.StartEngineF, err = engine.Initialize(engineConfig); err != nil {
+	engine, err := smeng.New(engineConfig)
+	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
+	handler.StartEngineF = engine.Start
+
 	if err = handler.Initialize(
 		m.MsgCreator,
 		bootstrapper,
@@ -833,7 +828,8 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("couldn't initialize message handler: %s", err)
 	}
 
-	if err := fastSync.Start(); err != nil {
+	startReqID := uint32(0)
+	if err := fastSync.Start(startReqID); err != nil {
 		return nil, fmt.Errorf("error starting fast sync operations: %w", err)
 	}
 
@@ -846,7 +842,7 @@ func (m *manager) createSnowmanChain(
 	checkFn := func() (interface{}, error) {
 		ctx.Lock.Lock()
 		defer ctx.Lock.Unlock()
-		if bootstrapCfg.Ctx.IsBootstrapped() {
+		if bootstrapCfg.Ctx.GetState() == snow.NormalOp {
 			return engine.HealthCheck()
 		}
 		return bootstrapper.HealthCheck()

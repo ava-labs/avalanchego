@@ -14,15 +14,13 @@ import (
 )
 
 func TestVotingFinishesWithAbandonedDep(t *testing.T) {
-	transitive := &Transitive{}
-
 	bootCfg, engCfg := DefaultConfig()
 	mngr := vertex.NewTestManager(t)
 	bootCfg.Manager = mngr
 	engCfg.Manager = mngr
-	startEngineF, err := transitive.Initialize(engCfg)
+	transitive, err := newTransitive(engCfg)
 	assert.NoError(t, err)
-	assert.NoError(t, startEngineF())
+	assert.NoError(t, transitive.Start( /*startReqID*/ 0))
 
 	// prepare 3 validators
 	vdr1 := ids.ShortID{1}
@@ -108,15 +106,13 @@ func TestVotingFinishesWithAbandonedDep(t *testing.T) {
 }
 
 func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
-	transitive := &Transitive{}
-
 	bootCfg, engCfg := DefaultConfig()
 	mngr := vertex.NewTestManager(t)
 	bootCfg.Manager = mngr
 	engCfg.Manager = mngr
-	startEngineF, err := transitive.Initialize(engCfg)
+	transitive, err := newTransitive(engCfg)
 	assert.NoError(t, err)
-	assert.NoError(t, startEngineF())
+	assert.NoError(t, transitive.Start( /*startReqID*/ 0))
 
 	// prepare 3 validators
 	vdr1 := ids.ShortID{1}
@@ -245,15 +241,13 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 }
 
 func TestSharedDependency(t *testing.T) {
-	transitive := &Transitive{}
-
 	bootCfg, engCfg := DefaultConfig()
 	mngr := vertex.NewTestManager(t)
 	bootCfg.Manager = mngr
 	engCfg.Manager = mngr
-	startEngineF, err := transitive.Initialize(engCfg)
+	transitive, err := newTransitive(engCfg)
 	assert.NoError(t, err)
-	assert.NoError(t, startEngineF())
+	assert.NoError(t, transitive.Start( /*startReqID*/ 0))
 
 	// prepare 3 validators
 	vdr1 := ids.ShortID{1}

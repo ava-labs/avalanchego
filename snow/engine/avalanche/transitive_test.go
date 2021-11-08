@@ -33,10 +33,13 @@ var (
 )
 
 type dummyHandler struct {
-	startEngineF func() error
+	startEngineF func(startReqID uint32) error
 }
 
-func (dh *dummyHandler) onDoneBootstrapping() error { return dh.startEngineF() }
+func (dh *dummyHandler) onDoneBootstrapping(lastReqID uint32) error {
+	lastReqID++
+	return dh.startEngineF(lastReqID)
+}
 
 func TestEngineShutdown(t *testing.T) {
 	_, engCfg := DefaultConfig()
@@ -47,9 +50,8 @@ func TestEngineShutdown(t *testing.T) {
 	vm.ShutdownF = func() error { vmShutdownCalled = true; return nil }
 	engCfg.VM = vm
 
-	transitive := &Transitive{}
-
-	if _, err := transitive.Initialize(engCfg); err != nil {
+	transitive, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if err := transitive.Shutdown(); err != nil {
@@ -89,23 +91,24 @@ func TestEngineAdd(t *testing.T) {
 	manager.CantEdge = false
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -247,23 +250,24 @@ func TestEngineQuery(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -547,23 +551,24 @@ func TestEngineMultipleQuery(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -719,23 +724,24 @@ func TestEngineBlockedIssue(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -806,23 +812,24 @@ func TestEngineAbandonResponse(t *testing.T) {
 	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) { return nil, errUnknownVertex }
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -899,23 +906,24 @@ func TestEngineScheduleRepoll(t *testing.T) {
 	sender.CantSendGetAcceptedFrontier = false
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1039,23 +1047,24 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 	vm.CantBootstrapped = false
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1150,23 +1159,24 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 	vm.CantBootstrapped = false
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1245,23 +1255,24 @@ func TestEngineIssueRepoll(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1395,23 +1406,24 @@ func TestEngineReissue(t *testing.T) {
 	vm.CantBootstrapped = false
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1566,23 +1578,24 @@ func TestEngineLargeIssue(t *testing.T) {
 	vm.CantBootstrapped = false
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1654,23 +1667,24 @@ func TestEngineGetVertex(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1740,23 +1754,24 @@ func TestEngineInsufficientValidators(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1833,23 +1848,24 @@ func TestEnginePushGossip(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1936,23 +1952,24 @@ func TestEngineSingleQuery(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2041,23 +2058,24 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2161,23 +2179,24 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2298,25 +2317,27 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dh.startEngineF = te.Start
+
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := bootstrapper.Startup(); err != nil {
-		t.Fatal(err)
-	}
 	if err := te.issue(blockingVtx); err != nil {
 		t.Fatal(err)
 	}
@@ -2445,23 +2466,24 @@ func TestEngineMissingTx(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2566,23 +2588,24 @@ func TestEngineIssueBlockingTx(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2663,23 +2686,24 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2840,23 +2864,24 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3102,23 +3127,24 @@ func TestEngineReBootstrapFails(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3155,17 +3181,17 @@ func TestEngineReBootstrapFails(t *testing.T) {
 	engCfg.Params.Namespace = "AcceptedFrontier"
 	engCfg.Params.Metrics = prometheus.NewRegistry()
 
-	bootstrapper2 := &bootstrap.Bootstrapper{}
-	if err := bootstrapper2.Initialize(
+	bootstrapper2, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := bootstrapper2.Startup(); err != nil {
+	if err := bootstrapper2.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3286,23 +3312,24 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3526,23 +3553,24 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3636,23 +3664,24 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3703,23 +3732,24 @@ func TestEngineGossip(t *testing.T) {
 	}}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3822,23 +3852,24 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3983,23 +4014,24 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	randomVtxID := ids.GenerateTestID()
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -4144,23 +4176,24 @@ func TestEngineAggressivePolling(t *testing.T) {
 	vm.CantBootstrapped = false
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -4279,23 +4312,24 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 	vm.CantBootstrapped = false
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -4411,23 +4445,24 @@ func TestEngineDoubleChit(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -4588,22 +4623,24 @@ func TestEngineBubbleVotes(t *testing.T) {
 	}
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -4726,23 +4763,24 @@ func TestEngineIssue(t *testing.T) {
 	vm.CantBootstrapped = false
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -4846,23 +4884,24 @@ func TestAbandonTx(t *testing.T) {
 	engCfg.VM = vm
 
 	dh := &dummyHandler{}
-	bootstrapper := &bootstrap.Bootstrapper{}
-	if err := bootstrapper.Initialize(
+	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
 		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
 		engCfg.Params.Metrics,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	var err error
-	te := &Transitive{}
-	if dh.startEngineF, err = te.Initialize(engCfg); err != nil {
+	te, err := newTransitive(engCfg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	dh.startEngineF = te.Start
 
-	if err := bootstrapper.Startup(); err != nil {
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 

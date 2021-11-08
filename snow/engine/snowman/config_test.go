@@ -28,7 +28,6 @@ func DefaultConfigs() (bootstrap.Config, Config) {
 		Ctx:        bootstrapConfig.Ctx,
 		VM:         bootstrapConfig.VM,
 		Sender:     bootstrapConfig.Sender,
-		RequestID:  new(uint32), // TODO ABENEGIA: FIX IT UP, SHOULD BE PART OF Config NOT Bootstrapper
 		Validators: bootstrapConfig.Validators,
 		Params: snowball.Parameters{
 			Metrics:               prometheus.NewRegistry(),

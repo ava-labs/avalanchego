@@ -893,7 +893,7 @@ func initTestRemoteProposerVM(
 	ctx.StakingCertLeaf = pTestCert.Leaf
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
-	ctx.Bootstrapped()
+	ctx.SetState(snow.NormalOp)
 
 	dummyDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	// make sure that DBs are compressed correctly

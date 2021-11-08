@@ -45,12 +45,12 @@ type Config struct {
 type FastSyncer interface {
 	common.FastSyncHandler
 
-	Start() error
+	Start(startReqID uint32) error
 }
 
 func NewFastSyncer(
 	cfg Config,
-	onDoneFastSyncing func() error,
+	onDoneFastSyncing func(lastReqID uint32) error,
 ) FastSyncer {
 	return &fastSyncer{
 		onDoneFastSyncing: onDoneFastSyncing,
@@ -104,11 +104,12 @@ type fastSyncer struct {
 	// Fast Sync specific fields
 	VM                block.StateSyncableVM
 	Beacons           validators.Set
-	onDoneFastSyncing func() error
+	onDoneFastSyncing func(lastReqID uint32) error
 }
 
-func (fs *fastSyncer) Start() error {
+func (fs *fastSyncer) Start(startReqID uint32) error {
 	fs.VM = fs.Config.VM
+	fs.RequestID = startReqID
 
 	enabled, err := fs.VM.StateSyncEnabled()
 	if err != nil {
@@ -116,7 +117,7 @@ func (fs *fastSyncer) Start() error {
 	}
 	if !enabled {
 		// nothing to do, fast sync is implemented but not enabled
-		return fs.onDoneFastSyncing()
+		return fs.onDoneFastSyncing(fs.RequestID)
 	}
 	fs.Config.Ctx.Log.Info("starting fast sync")
 
@@ -418,5 +419,5 @@ func (fs *fastSyncer) RestartBootstrap(reset bool) error {
 			fs.bootstrapAttempts)
 	}
 
-	return fs.Start()
+	return fs.Start(fs.RequestID)
 }

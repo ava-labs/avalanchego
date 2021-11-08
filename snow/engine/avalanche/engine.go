@@ -13,8 +13,7 @@ import (
 type Engine interface {
 	common.Engine
 
-	// Initialize this engine.
-	Initialize(Config) (func() error, error)
+	Start(startReqID uint32) error
 
 	// GetVtx returns a vertex by its ID.
 	// Returns an error if unknown.

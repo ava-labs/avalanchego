@@ -23,6 +23,10 @@ import (
 
 var _ Engine = &Transitive{}
 
+func New(config Config) (Engine, error) {
+	return newTransitive(config)
+}
+
 // Transitive implements the Engine interface by attempting to fetch all
 // transitive dependencies.
 type Transitive struct {
@@ -31,7 +35,8 @@ type Transitive struct {
 	Manager    vertex.Manager
 	VM         vertex.DAGVM
 	Validators validators.Set
-	ReqID      *uint32
+	RequestID  uint32
+	common.EngineNoOps
 
 	metrics
 
@@ -66,90 +71,44 @@ type Transitive struct {
 }
 
 // Initialize implements the Engine interface
-func (t *Transitive) Initialize(config Config) (func() error, error) {
+func newTransitive(config Config) (*Transitive, error) {
+	res := &Transitive{}
 	config.Ctx.Log.Info("initializing consensus engine")
-	t.Ctx = config.Ctx
-	t.Sender = config.Sender
-	t.VM = config.VM
-	t.Manager = config.Manager
-	t.ReqID = config.RequestID
-	t.Validators = config.Validators
+	res.Ctx = config.Ctx
+	res.EngineNoOps.Ctx = res.Ctx
+	res.Sender = config.Sender
+	res.VM = config.VM
+	res.Manager = config.Manager
+	res.Validators = config.Validators
 
-	t.Params = config.Params
-	t.Consensus = config.Consensus
+	res.Params = config.Params
+	res.Consensus = config.Consensus
 
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
-	t.polls = poll.NewSet(factory,
+	res.polls = poll.NewSet(factory,
 		config.Ctx.Log,
 		config.Params.Namespace,
 		config.Params.Metrics,
 	)
-	t.uniformSampler = sampler.NewUniform()
+	res.uniformSampler = sampler.NewUniform()
 
-	if err := t.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
-		return t.finishBootstrapping, err
+	if err := res.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
+		return nil, err
 	}
 
-	return t.finishBootstrapping, nil
-}
-
-func (t *Transitive) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	return fmt.Errorf("GetAccepted message should not be handled by engine. Dropping it")
-}
-
-func (t *Transitive) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	return fmt.Errorf("Accepted message should not be handled by engine. Dropping it")
-}
-
-func (t *Transitive) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
-	return fmt.Errorf("GetAcceptedFailed message should not be handled by engine. Dropping it")
-}
-
-func (t *Transitive) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
-	return fmt.Errorf("GetAcceptedFrontier message should not be handled by engine. Dropping it")
-}
-
-func (t *Transitive) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	return fmt.Errorf("AcceptedFrontier message should not be handled by engine. Dropping it")
-}
-
-func (t *Transitive) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
-	return fmt.Errorf("GetAcceptedFrontierFailed message should not be handled by engine. Dropping it")
-}
-
-func (t *Transitive) MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) error {
-	return fmt.Errorf("multiPut message should not be handled by engine. Dropping it")
-}
-
-func (t *Transitive) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) error {
-	return fmt.Errorf("getAncestorsFailed message should not be handled by engine. Dropping it")
+	return res, nil
 }
 
 func (t *Transitive) Context() *snow.Context {
 	return t.Ctx
 }
 
-func (t *Transitive) Halt() {
-	t.Ctx.Log.Warn("Halt command should not be handled by engine. Dropping it")
-}
-
-func (t *Transitive) Timeout() error {
-	return fmt.Errorf("timeout message should not be handled by engine. Dropping it")
-}
-
-func (t *Transitive) Connected(validatorID ids.ShortID) error {
-	return fmt.Errorf("connected message should not be handled by engine. Dropping it")
-}
-
-func (t *Transitive) Disconnected(validatorID ids.ShortID) error {
-	return fmt.Errorf("disconnected message should not be handled by engine. Dropping it")
-}
-
 func (t *Transitive) IsBootstrapped() bool {
-	return t.Ctx.IsBootstrapped()
+	return t.Ctx.GetState() == snow.NormalOp
 }
 
-func (t *Transitive) finishBootstrapping() error {
+func (t *Transitive) Start(startReqID uint32) error {
+	t.RequestID = startReqID
 	// Load the vertices that were last saved as the accepted frontier
 	edge := t.Manager.Edge()
 	frontier := make([]avalanche.Vertex, 0, len(edge))
@@ -620,9 +579,9 @@ func (t *Transitive) issueRepoll() {
 	vdrSet.Add(vdrList...)
 
 	// Poll the network
-	(*t.ReqID)++
-	if err == nil && t.polls.Add((*t.ReqID), vdrBag) {
-		t.Sender.SendPullQuery(vdrSet, (*t.ReqID), vtxID)
+	t.RequestID++
+	if err == nil && t.polls.Add(t.RequestID, vdrBag) {
+		t.Sender.SendPullQuery(vdrSet, t.RequestID, vtxID)
 	} else if err != nil {
 		t.Ctx.Log.Error("re-query for %s was dropped due to an insufficient number of validators", vtxID)
 	}
@@ -664,9 +623,9 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 		t.Ctx.Log.Debug("not sending request for vertex %s because there is already an outstanding request for it", vtxID)
 		return
 	}
-	(*t.ReqID)++
-	t.outstandingVtxReqs.Add(vdr, (*t.ReqID), vtxID) // Mark that there is an outstanding request for this vertex
-	t.Sender.SendGet(vdr, (*t.ReqID), vtxID)
+	t.RequestID++
+	t.outstandingVtxReqs.Add(vdr, t.RequestID, vtxID) // Mark that there is an outstanding request for this vertex
+	t.Sender.SendGet(vdr, t.RequestID, vtxID)
 	t.metrics.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len())) // Tracks performance statistics
 }
 
@@ -676,7 +635,7 @@ func (t *Transitive) HealthCheck() (interface{}, error) {
 		consensusIntf interface{} = struct{}{}
 		consensusErr  error
 	)
-	if t.Ctx.IsBootstrapped() {
+	if t.Ctx.GetState() == snow.NormalOp {
 		consensusIntf, consensusErr = t.Consensus.HealthCheck()
 	}
 	vmIntf, vmErr := t.VM.HealthCheck()

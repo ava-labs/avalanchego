@@ -282,7 +282,7 @@ func (vm *VMServer) Bootstrapping(context.Context, *emptypb.Empty) (*emptypb.Emp
 }
 
 func (vm *VMServer) Bootstrapped(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
-	vm.ctx.Bootstrapped()
+	vm.ctx.SetState(snow.NormalOp)
 	return &emptypb.Empty{}, vm.vm.Bootstrapped()
 }
 

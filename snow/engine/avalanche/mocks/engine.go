@@ -3,10 +3,8 @@
 package mocks
 
 import (
-	avalanche "github.com/ava-labs/avalanchego/snow/engine/avalanche"
-	common "github.com/ava-labs/avalanchego/snow/engine/common"
-
 	consensusavalanche "github.com/ava-labs/avalanchego/snow/consensus/avalanche"
+	common "github.com/ava-labs/avalanchego/snow/engine/common"
 
 	ids "github.com/ava-labs/avalanchego/ids"
 
@@ -357,29 +355,6 @@ func (_m *Engine) HealthCheck() (interface{}, error) {
 	return r0, r1
 }
 
-// Initialize provides a mock function with given fields: _a0
-func (_m *Engine) Initialize(_a0 avalanche.Config) (func() error, error) {
-	ret := _m.Called(_a0)
-
-	var r0 func() error
-	if rf, ok := ret.Get(0).(func(avalanche.Config) func() error); ok {
-		r0 = rf(_a0)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(func() error)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(avalanche.Config) error); ok {
-		r1 = rf(_a0)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // IsBootstrapped provides a mock function with given fields:
 func (_m *Engine) IsBootstrapped() bool {
 	ret := _m.Called()
@@ -485,6 +460,20 @@ func (_m *Engine) Shutdown() error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func() error); ok {
 		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Start provides a mock function with given fields: startReqID
+func (_m *Engine) Start(startReqID uint32) error {
+	ret := _m.Called(startReqID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(uint32) error); ok {
+		r0 = rf(startReqID)
 	} else {
 		r0 = ret.Error(0)
 	}

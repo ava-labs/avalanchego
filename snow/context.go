@@ -70,7 +70,7 @@ type Context struct {
 	Clock                mockable.Clock
 
 	// Non-zero iff this chain bootstrapped.
-	bootstrapped utils.AtomicBool
+	state utils.AtomicInterface
 
 	// Indicates this chain is available to only validators.
 	validatorOnly utils.AtomicBool
@@ -81,14 +81,16 @@ type Context struct {
 	StakingCertLeaf   *x509.Certificate // block certificate
 }
 
-// IsBootstrapped returns true iff this chain is done bootstrapping
-func (ctx *Context) IsBootstrapped() bool {
-	return ctx.bootstrapped.GetValue()
+func (ctx *Context) SetState(newState State) {
+	ctx.state.SetValue(newState)
 }
 
-// Bootstrapped marks this chain as done bootstrapping
-func (ctx *Context) Bootstrapped() {
-	ctx.bootstrapped.SetValue(true)
+func (ctx *Context) GetState() State {
+	stateInf := ctx.state.GetValue()
+	if stateInf == nil {
+		return Unknown
+	}
+	return stateInf.(State)
 }
 
 // IsValidatorOnly returns true iff this chain is available only to validators
