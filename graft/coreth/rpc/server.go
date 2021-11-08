@@ -60,22 +60,6 @@ type Server struct {
 	maximumDuration time.Duration
 }
 
-type contextWithDeadline struct {
-	context.Context
-	deadline time.Time
-}
-
-func (ctx contextWithDeadline) Deadline() (time.Time, bool) {
-	deadline, exists := ctx.Context.Deadline()
-	if !exists {
-		return ctx.deadline, true
-	}
-	if ctx.deadline.Before(deadline) {
-		return ctx.deadline, true
-	}
-	return deadline, true
-}
-
 // NewServer creates a new server instance with no registered handlers.
 //
 // If [maximumDuration] > 0, the deadline of incoming requests is
