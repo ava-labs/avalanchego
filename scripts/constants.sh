@@ -35,3 +35,17 @@ then
     which $CC > /dev/null || ( echo $CC must be available for static compilation && exit 1 )
     static_ld_flags=' -extldflags "-static" -linkmode external '
 fi
+
+# Joins each element in the array with a comma and space
+print_tags() {
+    local ary=("$@")
+    printf -v out "%s, " "${ary[@]}"
+    echo ${out%, }
+}
+
+# Generates docker build tag flags from an array of tags
+build_tag_flags() {
+    local ary=("$@")
+    printf -v out " \055\164 %s" "${ary[@]}"
+    echo "$out"
+}
