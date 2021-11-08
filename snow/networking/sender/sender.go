@@ -347,7 +347,7 @@ func (s *Sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uin
 		sentTo = s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
 	} else {
 		s.ctx.Log.Error(
-			"failed to build GetAccepted(%s, %d, %s): %s",
+			"failed to build GetAcceptedStateSummary(%s, %d, %s): %s",
 			s.ctx.ChainID,
 			requestID,
 			summaries,
@@ -358,7 +358,7 @@ func (s *Sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uin
 	for nodeID := range nodeIDs {
 		if !sentTo.Contains(nodeID) {
 			s.ctx.Log.Debug(
-				"failed to send GetAccepted(%s, %s, %d, %s)",
+				"failed to send GetAcceptedStateSummary(%s, %s, %d, %s)",
 				nodeID,
 				s.ctx.ChainID,
 				requestID,
@@ -379,7 +379,7 @@ func (s *Sender) SendAcceptedStateSummary(nodeID ids.ShortID, requestID uint32, 
 	outMsg, err := s.msgCreator.AcceptedStateSummary(s.ctx.ChainID, requestID, summaries)
 	if err != nil {
 		s.ctx.Log.Error(
-			"failed to build Accepted(%s, %d, %s): %s",
+			"failed to build AcceptedStateSummary(%s, %d, %s): %s",
 			s.ctx.ChainID,
 			requestID,
 			summaries,
@@ -392,7 +392,7 @@ func (s *Sender) SendAcceptedStateSummary(nodeID ids.ShortID, requestID uint32, 
 	nodeIDs := ids.NewShortSet(1)
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
-		s.ctx.Log.Debug("failed to send Accepted(%s, %s, %d, %s)",
+		s.ctx.Log.Debug("failed to send AcceptedStateSummary(%s, %s, %d, %s)",
 			nodeID,
 			s.ctx.ChainID,
 			requestID,

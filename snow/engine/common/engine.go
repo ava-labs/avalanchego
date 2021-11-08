@@ -51,6 +51,9 @@ type FastSyncHandler interface {
 	StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summary []byte) error
 	GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error
 	AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error
+
+	GetAcceptedStateSummaryFailed(validatorID ids.ShortID, requestID uint32) error
+	GetStateSummaryFrontierFailed(validatorID ids.ShortID, requestID uint32) error
 }
 
 // FrontierHandler defines how a consensus engine reacts to frontier messages

@@ -91,7 +91,9 @@ func (h *Handler) Initialize(
 	return err
 }
 
-func (h *Handler) OnDoneFastSyncing() error   { return h.StartBootstrapF() }
+func (h *Handler) OnDoneFastSyncing() error {
+	return h.StartBootstrapF()
+}
 func (h *Handler) OnDoneBootstrapping() error { return h.StartEngineF() }
 
 // Context of this Handler
@@ -229,7 +231,12 @@ func (h *Handler) handleMsg(msg message.InboundMessage) error {
 
 	// Track how long the operation took.
 	histogram := h.metrics.messages[op]
-	histogram.Observe(float64(endTime.Sub(startTime)))
+	// TODO: should not be needed
+	if histogram == nil {
+		h.ctx.Log.Warn("could not find metric map for message type", "op", op)
+	} else {
+		histogram.Observe(float64(endTime.Sub(startTime)))
+	}
 
 	msg.OnFinishedHandling()
 
@@ -459,6 +466,10 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		}
 		return h.FastSyncer.StateSummaryFrontier(nodeID, reqID, summary)
 
+	case message.GetStateSummaryFrontierFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return h.FastSyncer.GetStateSummaryFrontierFailed(nodeID, reqID)
+
 	case message.GetAcceptedStateSummary:
 		reqID := msg.Get(message.RequestID).(uint32)
 		summaries, ok := msg.Get(message.MultiContainerBytes).([][]byte)
@@ -478,6 +489,10 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 			return nil
 		}
 		return h.FastSyncer.AcceptedStateSummary(nodeID, reqID, summaries)
+
+	case message.GetAcceptedStateSummaryFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return h.FastSyncer.GetAcceptedStateSummaryFailed(nodeID, reqID)
 
 	default:
 		h.ctx.Log.Warn("Attempt to submit to engine unhandled consensus msg %s from from (%s, %s). Dropping it",
