@@ -150,7 +150,7 @@ func (t *Transitive) Disconnected(validatorID ids.ShortID) error {
 }
 
 func (t *Transitive) IsBootstrapped() bool {
-	return t.Ctx.IsBootstrapped()
+	return t.Ctx.GetState() == snow.NormalOp
 }
 
 func (t *Transitive) Start(startReqID uint32) error {
@@ -681,7 +681,7 @@ func (t *Transitive) HealthCheck() (interface{}, error) {
 		consensusIntf interface{} = struct{}{}
 		consensusErr  error
 	)
-	if t.Ctx.IsBootstrapped() {
+	if t.Ctx.GetState() == snow.NormalOp {
 		consensusIntf, consensusErr = t.Consensus.HealthCheck()
 	}
 	vmIntf, vmErr := t.VM.HealthCheck()

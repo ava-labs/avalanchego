@@ -202,7 +202,7 @@ func (h *Handler) handleMsg(msg message.InboundMessage) error {
 	switch op {
 	case message.Notify:
 		vmMsg := msg.Get(message.VMMessage).(uint32)
-		if h.ctx.IsBootstrapped() {
+		if h.ctx.GetState() == snow.NormalOp {
 			err = h.engine.Notify(common.Message(vmMsg))
 		} else {
 			err = h.bootstrapper.Notify(common.Message(vmMsg))
@@ -323,7 +323,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 
 	case message.GetFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		if h.ctx.IsBootstrapped() {
+		if h.ctx.GetState() == snow.NormalOp {
 			return h.engine.GetFailed(nodeID, reqID)
 		}
 		return h.bootstrapper.GetFailed(nodeID, reqID)
@@ -339,7 +339,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 			return nil
 		}
 
-		if h.ctx.IsBootstrapped() {
+		if h.ctx.GetState() == snow.NormalOp {
 			return h.engine.Put(nodeID, reqID, containerID, container)
 		}
 		return h.bootstrapper.Put(nodeID, reqID, containerID, container)
@@ -355,7 +355,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 			return nil
 		}
 
-		if h.ctx.IsBootstrapped() {
+		if h.ctx.GetState() == snow.NormalOp {
 			return h.engine.PushQuery(nodeID, reqID, containerID, container)
 		}
 		return h.bootstrapper.PushQuery(nodeID, reqID, containerID, container)
@@ -365,7 +365,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
 		h.ctx.Log.AssertNoError(err)
 
-		if h.ctx.IsBootstrapped() {
+		if h.ctx.GetState() == snow.NormalOp {
 			return h.engine.PullQuery(nodeID, reqID, containerID)
 		}
 		return h.bootstrapper.PullQuery(nodeID, reqID, containerID)
@@ -379,14 +379,14 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 			return nil
 		}
 
-		if h.ctx.IsBootstrapped() {
+		if h.ctx.GetState() == snow.NormalOp {
 			return h.engine.Chits(nodeID, reqID, votes)
 		}
 		return h.bootstrapper.Chits(nodeID, reqID, votes)
 
 	case message.QueryFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		if h.ctx.IsBootstrapped() {
+		if h.ctx.GetState() == snow.NormalOp {
 			return h.engine.QueryFailed(nodeID, reqID)
 		}
 		return h.bootstrapper.QueryFailed(nodeID, reqID)
@@ -405,7 +405,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
-		if h.ctx.IsBootstrapped() {
+		if h.ctx.GetState() == snow.NormalOp {
 			return h.engine.AppRequest(nodeID, reqID, msg.ExpirationTime(), appBytes)
 		}
 		return h.bootstrapper.AppRequest(nodeID, reqID, msg.ExpirationTime(), appBytes)
@@ -418,14 +418,14 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
-		if h.ctx.IsBootstrapped() {
+		if h.ctx.GetState() == snow.NormalOp {
 			return h.engine.AppResponse(nodeID, reqID, appBytes)
 		}
 		return h.bootstrapper.AppResponse(nodeID, reqID, appBytes)
 
 	case message.AppRequestFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		if h.ctx.IsBootstrapped() {
+		if h.ctx.GetState() == snow.NormalOp {
 			return h.engine.AppRequestFailed(nodeID, reqID)
 		}
 		return h.bootstrapper.AppRequestFailed(nodeID, reqID)
@@ -438,7 +438,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 			return nil
 		}
 
-		if h.ctx.IsBootstrapped() {
+		if h.ctx.GetState() == snow.NormalOp {
 			return h.engine.AppGossip(nodeID, appBytes)
 		}
 		return h.bootstrapper.AppGossip(nodeID, appBytes)
@@ -458,7 +458,7 @@ func (h *Handler) Timeout() {
 
 // Gossip passes a gossip request to the consensus engine
 func (h *Handler) Gossip() {
-	if !h.ctx.IsBootstrapped() {
+	if h.ctx.GetState() != snow.NormalOp {
 		// Shouldn't send gossiping messages while the chain is bootstrapping
 		return
 	}

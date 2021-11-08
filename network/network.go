@@ -360,7 +360,7 @@ func (n *network) Gossip(
 // Accept is called after every consensus decision
 // Assumes [n.stateLock] is not held.
 func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte) error {
-	if !ctx.IsBootstrapped() {
+	if ctx.GetState() != snow.NormalOp {
 		// don't gossip during bootstrapping
 		return nil
 	}

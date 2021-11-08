@@ -868,7 +868,7 @@ func TestBootstrapperIncompleteMultiPut(t *testing.T) {
 	switch {
 	case err != nil: // Provide vtx1; should request vtx0
 		t.Fatal(err)
-	case bs.Ctx.IsBootstrapped():
+	case bs.Ctx.GetState() == snow.NormalOp:
 		t.Fatalf("should not have finished")
 	case requested != vtxID0:
 		t.Fatal("should hae requested vtx0")
@@ -880,7 +880,7 @@ func TestBootstrapperIncompleteMultiPut(t *testing.T) {
 	switch {
 	case err != nil: // Provide vtx0; can finish now
 		t.Fatal(err)
-	case !bs.Ctx.IsBootstrapped():
+	case bs.Ctx.GetState() != snow.NormalOp:
 		t.Fatal("should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatal("should be accepted")

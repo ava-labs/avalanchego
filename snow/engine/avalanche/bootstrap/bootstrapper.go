@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
@@ -471,7 +472,7 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 func (b *bootstrapper) checkFinish() error {
 	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
 	pendingJobs := b.VtxBlocked.MissingIDs()
-	if b.Ctx.IsBootstrapped() || len(pendingJobs) > 0 || b.awaitingTimeout {
+	if b.Ctx.GetState() == snow.NormalOp || len(pendingJobs) > 0 || b.awaitingTimeout {
 		return nil
 	}
 
@@ -540,7 +541,7 @@ func (b *bootstrapper) finish() error {
 	if err := b.OnFinished(b.RequestID); err != nil {
 		return err
 	}
-	b.Ctx.Bootstrapped()
+	b.Ctx.SetState(snow.NormalOp)
 
 	return nil
 }
