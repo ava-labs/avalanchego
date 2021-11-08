@@ -763,17 +763,11 @@ func (m *manager) createSnowmanChain(
 		SampleK: sampleK,
 		Alpha:   bootstrapWeight/2 + 1, // must be > 50%
 	}
-	fastSync, err := fastsyncer.NewFastSyncer(
+	fastSync := fastsyncer.NewFastSyncer(
 		fastSyncCfg,
 		handler.OnDoneFastSyncing,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("error creating fastsyncer: %w", err)
-	}
 	handler.FastSyncer = fastSync
-	if err := fastSync.Start(); err != nil {
-		return nil, fmt.Errorf("error starting fast sync operations: %w", err)
-	}
 
 	bootstrapCfg := smbootstrap.Config{
 		Config: common.Config{
@@ -818,14 +812,15 @@ func (m *manager) createSnowmanChain(
 	}
 
 	engine := &smeng.Transitive{}
+	handler.StartBootstrapF = func() error {
+		if err := bootstrapper.Startup(); err != nil {
+			return fmt.Errorf("error starting snowman bootstrapper: %w", err)
+		}
+		return nil
+	}
 	if handler.StartEngineF, err = engine.Initialize(engineConfig); err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
-
-	if err := bootstrapper.Startup(); err != nil {
-		return nil, fmt.Errorf("error starting snowman bootstrapper: %w", err)
-	}
-
 	if err = handler.Initialize(
 		m.MsgCreator,
 		bootstrapper,
@@ -836,6 +831,10 @@ func (m *manager) createSnowmanChain(
 		consensusParams.Metrics,
 	); err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %s", err)
+	}
+
+	if err := fastSync.Start(); err != nil {
+		return nil, fmt.Errorf("error starting fast sync operations: %w", err)
 	}
 
 	// Register health checks

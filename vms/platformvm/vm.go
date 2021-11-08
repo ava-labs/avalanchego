@@ -666,3 +666,19 @@ func (vm *VM) getPercentConnected() (float64, error) {
 	}
 	return float64(connectedStake) / float64(vdrSet.Weight()), nil
 }
+
+func (vm *VM) StateSyncEnabled() (bool, error) {
+	return false, nil
+}
+
+func (vm *VM) StateSyncGetLastSummary() ([]byte, error) {
+	return nil, nil
+}
+
+func (vm *VM) StateSyncIsSummaryAccepted([]byte) (bool, error) {
+	return false, nil
+}
+
+func (vm *VM) StateSync([][]byte) error {
+	return nil
+}

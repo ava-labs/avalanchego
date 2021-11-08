@@ -249,6 +249,34 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	}, err
 }
 
+func (vm *VMServer) StateSyncEnabled(context.Context, *emptypb.Empty) (*vmproto.StateSyncEnabledResponse, error) {
+	response, err := vm.vm.StateSyncEnabled()
+	if err != nil {
+		return nil, err
+	}
+	return &vmproto.StateSyncEnabledResponse{Enabled: response}, nil
+}
+
+func (vm *VMServer) StateSyncGetLastSummary(ctx context.Context, empty *emptypb.Empty) (*vmproto.StateSyncGetLastSummaryResponse, error) {
+	summary, err := vm.vm.StateSyncGetLastSummary()
+	if err != nil {
+		return nil, err
+	}
+	return &vmproto.StateSyncGetLastSummaryResponse{Summary: summary}, nil
+}
+
+func (vm *VMServer) StateSyncIsSummaryAccepted(ctx context.Context, req *vmproto.StateSyncIsSummaryAcceptedRequest) (*vmproto.StateSyncIsSummaryAcceptedResponse, error) {
+	accepted, err := vm.vm.StateSyncIsSummaryAccepted(req.Summary)
+	if err != nil {
+		return nil, err
+	}
+	return &vmproto.StateSyncIsSummaryAcceptedResponse{Accepted: accepted}, nil
+}
+
+func (vm *VMServer) StateSync(ctx context.Context, req *vmproto.StateSyncRequest) (*emptypb.Empty, error) {
+	return &emptypb.Empty{}, vm.vm.StateSync(req.Summaries)
+}
+
 func (vm *VMServer) Bootstrapping(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return &emptypb.Empty{}, vm.vm.Bootstrapping()
 }

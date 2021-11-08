@@ -78,6 +78,9 @@ type VMClient struct {
 	ctx *snow.Context
 }
 
+var _ block.StateSyncableVM = &VMClient{}
+var _ block.ChainVM = &VMClient{}
+
 // NewClient returns a VM connected to a remote VM
 func NewClient(client vmproto.VMClient, broker *plugin.GRPCBroker) *VMClient {
 	return &VMClient{
@@ -531,6 +534,51 @@ func (vm *VMClient) AppGossip(nodeID ids.ShortID, msg []byte) error {
 		&vmproto.AppGossipMsg{
 			NodeID: nodeID[:],
 			Msg:    msg,
+		},
+	)
+	return err
+}
+
+func (vm *VMClient) StateSyncEnabled() (bool, error) {
+	resp, err := vm.client.StateSyncEnabled(
+		context.Background(),
+		&emptypb.Empty{},
+	)
+	if err != nil {
+		return false, err
+	}
+	return resp.Enabled, nil
+}
+
+func (vm *VMClient) StateSyncGetLastSummary() ([]byte, error) {
+	resp, err := vm.client.StateSyncGetLastSummary(
+		context.Background(),
+		&emptypb.Empty{},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Summary, nil
+}
+
+func (vm *VMClient) StateSyncIsSummaryAccepted(summary []byte) (bool, error) {
+	resp, err := vm.client.StateSyncIsSummaryAccepted(
+		context.Background(),
+		&vmproto.StateSyncIsSummaryAcceptedRequest{
+			Summary: summary,
+		},
+	)
+	if err != nil {
+		return false, err
+	}
+	return resp.Accepted, nil
+}
+
+func (vm *VMClient) StateSync(summaries [][]byte) error {
+	_, err := vm.client.StateSync(
+		context.Background(),
+		&vmproto.StateSyncRequest{
+			Summaries: summaries,
 		},
 	)
 	return err

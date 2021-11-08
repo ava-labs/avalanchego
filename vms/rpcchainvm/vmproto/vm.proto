@@ -180,6 +180,25 @@ message BatchedParseBlockResponse {
     repeated ParseBlockResponse response = 1;
 }
 
+message StateSyncEnabledResponse {
+    bool enabled = 1;
+}
+
+message StateSyncGetLastSummaryResponse {
+    bytes summary = 1;
+}
+
+message StateSyncIsSummaryAcceptedRequest {
+    bytes summary = 1;
+}
+
+message StateSyncIsSummaryAcceptedResponse {
+    bool accepted = 1;
+}
+
+message StateSyncRequest {
+    repeated bytes summaries = 1;
+}
 
 service VM {
     rpc Initialize(InitializeRequest) returns (InitializeResponse);
@@ -207,4 +226,10 @@ service VM {
 
     rpc GetAncestors(GetAncestorsRequest) returns (GetAncestorsResponse);
     rpc BatchedParseBlock(BatchedParseBlockRequest) returns (BatchedParseBlockResponse);
+
+    // State sync
+    rpc StateSyncEnabled(google.protobuf.Empty) returns (StateSyncEnabledResponse);
+    rpc StateSyncGetLastSummary(google.protobuf.Empty) returns (StateSyncGetLastSummaryResponse);
+    rpc StateSyncIsSummaryAccepted(StateSyncIsSummaryAcceptedRequest) returns (StateSyncIsSummaryAcceptedResponse);
+    rpc StateSync(StateSyncRequest) returns (google.protobuf.Empty);
 }

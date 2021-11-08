@@ -51,18 +51,12 @@ type FastSyncer interface {
 func NewFastSyncer(
 	cfg Config,
 	onDoneFastSyncing func() error,
-) (FastSyncer, error) {
-	syncVM, ok := cfg.VM.(block.StateSyncableVM)
-	if !ok {
-		// nothing to do, vm does not implement fast sync
-		return nil, onDoneFastSyncing()
-	}
-
+) FastSyncer {
 	return &fastSyncer{
-		VM:                syncVM,
 		onDoneFastSyncing: onDoneFastSyncing,
 		Config:            cfg,
-	}, nil
+		Beacons:           cfg.Beacons,
+	}
 }
 
 type fastSyncer struct {
@@ -114,10 +108,17 @@ type fastSyncer struct {
 }
 
 func (fs *fastSyncer) Start() error {
-	if !fs.VM.Enabled() {
+	fs.VM = fs.Config.VM
+
+	enabled, err := fs.VM.StateSyncEnabled()
+	if err != nil {
+		return err
+	}
+	if !enabled {
 		// nothing to do, fast sync is implemented but not enabled
 		return fs.onDoneFastSyncing()
 	}
+	fs.Config.Ctx.Log.Info("starting fast sync")
 
 	fs.started = true
 
@@ -155,7 +156,7 @@ func (fs *fastSyncer) Start() error {
 	fs.bootstrapAttempts++
 	if fs.pendingSendAcceptedFrontier.Len() == 0 {
 		fs.Ctx.Log.Info("Bootstrapping skipped due to no provided bootstraps")
-		return fs.VM.SyncState(nil)
+		return fs.VM.StateSync(nil)
 	}
 
 	fs.RequestID++
@@ -202,7 +203,7 @@ func (fs *fastSyncer) sendGetAccepted() {
 }
 
 func (fs *fastSyncer) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error {
-	stateSummaryFrontier, err := fs.VM.StateSummary()
+	stateSummaryFrontier, err := fs.VM.StateSyncGetLastSummary()
 	if err != nil {
 		return err
 	}
@@ -281,7 +282,7 @@ func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID ui
 func (fs *fastSyncer) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error {
 	acceptedSummaries := make([][]byte, 0, len(summaries))
 	for _, summary := range summaries {
-		if accepted, err := fs.VM.IsAccepted(summary); accepted && err == nil {
+		if accepted, err := fs.VM.StateSyncIsSummaryAccepted(summary); accepted && err == nil {
 			acceptedSummaries = append(acceptedSummaries, summary)
 		} else if err != nil {
 			return err
@@ -363,7 +364,7 @@ func (fs *fastSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID ui
 		fs.Ctx.Log.Debug("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
 	}
 
-	return fs.VM.SyncState(accepted)
+	return fs.VM.StateSync(accepted)
 }
 
 ///

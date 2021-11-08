@@ -29,6 +29,8 @@ var ErrRemoteVMNotImplemented = errors.New("vm does not implement RemoteVM inter
 // Consensus will ensure the network agrees on the number at every block height.
 type ChainVM interface {
 	common.VM
+	StateSyncableVM
+
 	Getter
 	Parser
 
