@@ -36,6 +36,7 @@ type Transitive struct {
 	VM         vertex.DAGVM
 	Validators validators.Set
 	RequestID  uint32
+	common.EngineNoOps
 
 	metrics
 
@@ -74,6 +75,7 @@ func newTransitive(config Config) (*Transitive, error) {
 	res := &Transitive{}
 	config.Ctx.Log.Info("initializing consensus engine")
 	res.Ctx = config.Ctx
+	res.EngineNoOps.Ctx = res.Ctx
 	res.Sender = config.Sender
 	res.VM = config.VM
 	res.Manager = config.Manager
@@ -97,56 +99,8 @@ func newTransitive(config Config) (*Transitive, error) {
 	return res, nil
 }
 
-func (t *Transitive) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	return fmt.Errorf("GetAccepted message should not be handled by engine. Dropping it")
-}
-
-func (t *Transitive) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	return fmt.Errorf("Accepted message should not be handled by engine. Dropping it")
-}
-
-func (t *Transitive) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
-	return fmt.Errorf("GetAcceptedFailed message should not be handled by engine. Dropping it")
-}
-
-func (t *Transitive) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
-	return fmt.Errorf("GetAcceptedFrontier message should not be handled by engine. Dropping it")
-}
-
-func (t *Transitive) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	return fmt.Errorf("AcceptedFrontier message should not be handled by engine. Dropping it")
-}
-
-func (t *Transitive) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
-	return fmt.Errorf("GetAcceptedFrontierFailed message should not be handled by engine. Dropping it")
-}
-
-func (t *Transitive) MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) error {
-	return fmt.Errorf("multiPut message should not be handled by engine. Dropping it")
-}
-
-func (t *Transitive) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) error {
-	return fmt.Errorf("getAncestorsFailed message should not be handled by engine. Dropping it")
-}
-
 func (t *Transitive) Context() *snow.Context {
 	return t.Ctx
-}
-
-func (t *Transitive) Halt() {
-	t.Ctx.Log.Warn("Halt command should not be handled by engine. Dropping it")
-}
-
-func (t *Transitive) Timeout() error {
-	return fmt.Errorf("timeout message should not be handled by engine. Dropping it")
-}
-
-func (t *Transitive) Connected(validatorID ids.ShortID) error {
-	return fmt.Errorf("connected message should not be handled by engine. Dropping it")
-}
-
-func (t *Transitive) Disconnected(validatorID ids.ShortID) error {
-	return fmt.Errorf("disconnected message should not be handled by engine. Dropping it")
 }
 
 func (t *Transitive) IsBootstrapped() bool {

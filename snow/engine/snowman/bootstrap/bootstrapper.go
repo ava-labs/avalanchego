@@ -67,6 +67,7 @@ func New(
 type bootstrapper struct {
 	common.Bootstrapper
 	common.Fetcher
+	common.BootstrapNoOps
 	metrics
 	getAncestorsBlks metric.Averager
 
@@ -100,6 +101,7 @@ func newBootstrapper(
 	registerer prometheus.Registerer,
 ) (*bootstrapper, error) {
 	res := &bootstrapper{}
+	res.BootstrapNoOps.Ctx = config.Ctx
 	res.Blocked = config.Blocked
 	res.VM = config.VM
 	res.Bootstrapped = config.Bootstrapped
@@ -508,67 +510,8 @@ func (b *bootstrapper) Disconnected(nodeID ids.ShortID) error {
 	return b.Bootstrapper.Disconnected(nodeID)
 }
 
-// AppHandler interface
-func (b *bootstrapper) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
-	b.Ctx.Log.Debug("dropping AppRequest(%s, %d) due to bootstrapping", nodeID, requestID)
-	return nil
-}
-
-func (b *bootstrapper) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
-	b.Ctx.Log.Debug("dropping AppResponse(%s, %d) due to bootstrapping", nodeID, requestID)
-	return nil
-}
-
-func (b *bootstrapper) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
-	b.Ctx.Log.Debug("dropping AppRequestFailed(%s, %d) due to bootstrapping", nodeID, requestID)
-	return nil
-}
-
-func (b *bootstrapper) AppGossip(nodeID ids.ShortID, msg []byte) error {
-	b.Ctx.Log.Debug("dropping AppGossip(%s) due to bootstrapping", nodeID)
-	return nil
-}
-
-// End of AppHandler interface
-
-func (b *bootstrapper) Get(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error {
-	b.Ctx.Log.Debug("Received Get message from (%s) during bootstrap. Dropping it", validatorID)
-	return nil
-}
-
-func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
-	// bootstrapping isn't done --> we didn't send any gets --> this put is invalid
-	if requestID == constants.GossipMsgRequestID {
-		b.Ctx.Log.Verbo("dropping gossip Put(%s, %d, %s) due to bootstrapping", vdr, requestID, blkID)
-	} else {
-		b.Ctx.Log.Debug("dropping Put(%s, %d, %s) due to bootstrapping", vdr, requestID, blkID)
-	}
-	return nil
-}
-
-func (b *bootstrapper) GetFailed(validatorID ids.ShortID, requestID uint32) error {
-	// not done bootstrapping --> didn't send a get --> this message is invalid
-	b.Ctx.Log.Debug("dropping GetFailed(%s, %d) due to bootstrapping", validatorID, requestID)
-	return nil
-}
-
 func (b *bootstrapper) GetVM() common.VM {
 	return b.VM
-}
-
-func (b *bootstrapper) Gossip() error {
-	b.Ctx.Log.Debug("No Gossip during bootstrap. Dropping it")
-	return nil
-}
-
-func (b *bootstrapper) Notify(common.Message) error {
-	b.Ctx.Log.Debug("dropping Notify due to bootstrapping")
-	return nil
-}
-
-func (b *bootstrapper) Shutdown() error {
-	b.Ctx.Log.Debug("Called Shutdown during bootstrap. Doing nothing for now")
-	return nil
 }
 
 func (b *bootstrapper) HealthCheck() (interface{}, error) {
@@ -579,26 +522,3 @@ func (b *bootstrapper) HealthCheck() (interface{}, error) {
 	}
 	return intf, vmErr
 }
-
-// QueryHandler interface
-func (b *bootstrapper) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
-	b.Ctx.Log.Debug("dropping PullQuery(%s, %d, %s) due to bootstrapping", vdr, requestID, blkID)
-	return nil
-}
-
-func (b *bootstrapper) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
-	b.Ctx.Log.Debug("dropping PushQuery(%s, %d, %s) due to bootstrapping", vdr, requestID, blkID)
-	return nil
-}
-
-func (b *bootstrapper) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) error {
-	b.Ctx.Log.Debug("dropping Chits(%s, %d) due to bootstrapping", vdr, requestID)
-	return nil
-}
-
-func (b *bootstrapper) QueryFailed(vdr ids.ShortID, requestID uint32) error {
-	b.Ctx.Log.Debug("dropping QueryFailed(%s, %d) due to bootstrapping", vdr, requestID)
-	return nil
-}
-
-// End of QueryHandler interface
