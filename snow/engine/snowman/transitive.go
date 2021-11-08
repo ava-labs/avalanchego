@@ -129,6 +129,7 @@ func (t *Transitive) finishBootstrapping() error {
 	}
 
 	t.Ctx.Log.Info("bootstrapping finished with %s as the last accepted block", lastAcceptedID)
+	t.metrics.bootstrapFinished.Set(1)
 	return nil
 }
 
