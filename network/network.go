@@ -78,7 +78,7 @@ type Network interface {
 	// Returns the description of the specified [nodeIDs] this network is currently
 	// connected to externally or all nodes this network is connected to if [nodeIDs]
 	// is empty. Thread safety must be managed internally to the network.
-	Peers(nodeIDs []ids.ShortID) []PeerID
+	Peers(nodeIDs []ids.ShortID) []PeerInfo
 
 	// Close this network and all existing connections it has. Thread safety
 	// must be managed internally to the network. Calling close multiple times
@@ -593,43 +593,49 @@ func (n *network) Dispatch() error {
 // the handshake. Otherwise, returns info about the peers in [nodeIDs]
 // that have finished the handshake.
 // Assumes [n.stateLock] is not held.
-func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
+func (n *network) Peers(nodeIDs []ids.ShortID) []PeerInfo {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
 	if len(nodeIDs) == 0 { // Return info about all peers
-		peers := make([]PeerID, 0, n.peers.size())
+		peers := make([]PeerInfo, 0, n.peers.size())
 		for _, peer := range n.peers.peersList {
 			if peer.finishedHandshake.GetValue() {
-				peers = append(peers, n.NewPeerID(peer))
+				peers = append(peers, n.NewPeerInfo(peer))
 			}
 		}
 		return peers
 	}
 
-	peers := make([]PeerID, 0, len(nodeIDs))
+	peers := make([]PeerInfo, 0, len(nodeIDs))
 	for _, nodeID := range nodeIDs { // Return info about given peers
 		if peer, ok := n.peers.getByID(nodeID); ok && peer.finishedHandshake.GetValue() {
-			peers = append(peers, n.NewPeerID(peer))
+			peers = append(peers, n.NewPeerInfo(peer))
 		}
 	}
 	return peers
 }
 
-func (n *network) NewPeerID(peer *peer) PeerID {
+func (n *network) NewPeerInfo(peer *peer) PeerInfo {
 	publicIPStr := ""
 	if !peer.ip.IsZero() {
 		publicIPStr = peer.getIP().String()
 	}
-
-	return PeerID{
-		IP:           peer.conn.RemoteAddr().String(),
-		PublicIP:     publicIPStr,
-		ID:           peer.nodeID.PrefixedString(constants.NodeIDPrefix),
-		Version:      peer.versionStr.GetValue().(string),
-		LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
-		LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
-		Benched:      n.benchlistManager.GetBenched(peer.nodeID),
+	primaryNetworkValidators, ok := n.config.Validators.GetValidators(constants.PrimaryNetworkID)
+	weight := uint64(0)
+	if ok {
+		weight = primaryNetworkValidators.Weight()
+	}
+	return PeerInfo{
+		IP:             peer.conn.RemoteAddr().String(),
+		PublicIP:       publicIPStr,
+		ID:             peer.nodeID.PrefixedString(constants.NodeIDPrefix),
+		Version:        peer.versionStr.GetValue().(string),
+		LastSent:       time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
+		LastReceived:   time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
+		Benched:        n.benchlistManager.GetBenched(peer.nodeID),
+		ObservedUptime: peer.observedUptime,
+		Weight:         weight,
 	}
 }
 

@@ -869,17 +869,20 @@ func (n *Node) initInfoAPI() error {
 	}
 	n.Log.Info("initializing info API")
 	service, err := info.NewService(
+		info.Parameters{
+			Version:               version.CurrentApp,
+			NodeID:                n.ID,
+			NetworkID:             n.Config.NetworkID,
+			TxFee:                 n.Config.TxFee,
+			CreateAssetTxFee:      n.Config.CreateAssetTxFee,
+			CreateSubnetTxFee:     n.Config.CreateSubnetTxFee,
+			CreateBlockchainTxFee: n.Config.CreateBlockchainTxFee,
+			UptimeRequirement:     n.Config.UptimeRequirement,
+		},
 		n.Log,
-		version.CurrentApp,
-		n.ID,
-		n.Config.NetworkID,
 		n.chainManager,
 		n.vmManager,
 		n.Net,
-		n.Config.TxFee,
-		n.Config.CreateAssetTxFee,
-		n.Config.CreateSubnetTxFee,
-		n.Config.CreateBlockchainTxFee,
 	)
 	if err != nil {
 		return err

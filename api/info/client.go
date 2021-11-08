@@ -61,7 +61,7 @@ func (c *Client) GetBlockchainID(alias string) (ids.ID, error) {
 	return res.BlockchainID, err
 }
 
-func (c *Client) Peers() ([]network.PeerID, error) {
+func (c *Client) Peers() ([]network.PeerInfo, error) {
 	res := &PeersReply{}
 	err := c.requester.SendRequest("peers", struct{}{}, res)
 	return res.Peers, err
@@ -78,5 +78,11 @@ func (c *Client) IsBootstrapped(chain string) (bool, error) {
 func (c *Client) GetTxFee() (*GetTxFeeResponse, error) {
 	res := &GetTxFeeResponse{}
 	err := c.requester.SendRequest("getTxFee", struct{}{}, res)
+	return res, err
+}
+
+func (c *Client) Uptime() (*UptimeResponse, error) {
+	res := &UptimeResponse{}
+	err := c.requester.SendRequest("uptime", struct{}{}, res)
 	return res, err
 }

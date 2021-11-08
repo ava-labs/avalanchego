@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"crypto/x509"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"math"
 	"net"
@@ -133,6 +132,9 @@ type peer struct {
 
 	// trackedSubnets hold subnetIDs that this peer is interested in.
 	trackedSubnets ids.Set
+
+	// observedUptime is the uptime of this node in peer's point of view
+	observedUptime uint8
 }
 
 // newPeer returns a properly initialized *peer.
@@ -854,9 +856,11 @@ func (p *peer) pongHandle(msg message.InboundMessage, isUptime bool) {
 		p.discardIP()
 	}
 	if isUptime {
-		uptimePercentage := msg.Get(message.Uptime).(uint8)
-		// TODO: do uptime calculation here
-		fmt.Printf("nodeID: %s, uptimeDuration: %d", p.nodeID, uptimePercentage)
+		uptime := msg.Get(message.Uptime).(uint8)
+		if uptime > 0 && uptime <= 100 {
+			// (0-100) percentage
+			p.observedUptime = uptime
+		}
 	}
 }
 

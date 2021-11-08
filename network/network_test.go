@@ -1054,7 +1054,7 @@ func TestTrackConnectedRace(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func assertEqualPeers(t *testing.T, expected map[string]ids.ShortID, actual []PeerID) {
+func assertEqualPeers(t *testing.T, expected map[string]ids.ShortID, actual []PeerInfo) {
 	assert.Len(t, actual, len(expected))
 	for _, p := range actual {
 		match, ok := expected[p.IP]
