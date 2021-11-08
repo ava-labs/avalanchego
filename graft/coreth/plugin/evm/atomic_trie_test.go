@@ -217,13 +217,13 @@ func Test_IndexerInitializeFromGenesis(t *testing.T) {
 	})
 
 	var dbCommitCount atomic2.Uint32
-	err = indexer.Initialize(chainFacade, func() error {
+	doneChan := indexer.Initialize(chainFacade, func() error {
 		dbCommitCount.Inc()
 		return nil
 	}, func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error) {
 		return blockAtomicOpsMap[blk.NumberU64()], nil
 	})
-	assert.NoError(t, err)
+	<-doneChan
 	assert.EqualValues(t, 3, dbCommitCount.Load())
 
 	height, initialized, err := indexer.Height()
@@ -339,13 +339,13 @@ func Test_IndexerInitializeFromState(t *testing.T) {
 	})
 
 	var dbCommitCount atomic2.Uint32
-	err = indexer.Initialize(chainFacade, func() error {
+	doneChan := indexer.Initialize(chainFacade, func() error {
 		dbCommitCount.Inc()
 		return nil
 	}, func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error) {
 		return blockAtomicOpsMap[blk.NumberU64()], nil
 	})
-	assert.NoError(t, err)
+	<-doneChan
 	assert.EqualValues(t, 2, dbCommitCount.Load())
 
 	height, initialized, err = indexer.Height()

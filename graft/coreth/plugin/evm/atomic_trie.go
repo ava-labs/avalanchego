@@ -66,9 +66,21 @@ func NewIndexedAtomicTrie(db ethdb.KeyValueStore) (types.AtomicTrie, error) {
 	}, nil
 }
 
+func (i *indexedAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn func() error, getAtomicTxFn func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error)) chan struct{} {
+	doneChan := make(chan struct{})
+	go func() {
+		defer close(doneChan)
+		if err := i.initialize(chain, dbCommitFn, getAtomicTxFn); err != nil {
+			log.Crit("error encountered when initializing index", "err", err)
+			return
+		}
+	}()
+	return doneChan
+}
+
 // Initialize initialises the atomic trie index for a specified [chain]
 // Uses the getAtomicTxFn to get the atomic Tx to index
-func (i *indexedAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn func() error, getAtomicTxFn func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error)) error {
+func (i *indexedAtomicTrie) initialize(chain facades.ChainFacade, dbCommitFn func() error, getAtomicTxFn func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error)) error {
 	// get the current indexer height, whether we've initialized and error if any in accessing the database
 	lastIndexedHeight, initialized, err := i.Height()
 	if err != nil {
