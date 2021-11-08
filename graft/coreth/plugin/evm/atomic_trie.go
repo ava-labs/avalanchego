@@ -196,8 +196,9 @@ func (i *indexedAtomicTrie) Index(height uint64, atomicOps map[ids.ID]*atomic.Re
 
 		// make sure currentHeight + 1 = height that we're about to index because we don't want gaps
 		if currentHeight != height {
-			// index is inconsistent, we cannot have missing entries so reject it
-			return gethCommon.Hash{}, fmt.Errorf("inconsistent atomic trie index, currentHeight=%d, height=%d", currentHeight, height)
+			// index is inconsistent, we cannot have missing entries so skip it, Initialize() will get to it
+			log.Debug("skipped Index(...) call for higher block height because index is not yet complete", "currentHeight", currentHeight, "height", height)
+			return gethCommon.Hash{}, nil
 		}
 
 		// all good here, update the currentHeightBytes
