@@ -428,7 +428,7 @@ func (b *EthAPIBackend) GetMaxBlocksPerRequest() int64 {
 }
 
 func (b *EthAPIBackend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, checkLive bool, preferDisk bool) (*state.StateDB, error) {
-	return b.eth.stateAtBlock(block, reexec, base, checkLive)
+	return b.eth.stateAtBlock(block, reexec, base, checkLive, preferDisk)
 }
 
 func (b *EthAPIBackend) StateAtTransaction(ctx context.Context, block *types.Block, txIndex int, reexec uint64) (core.Message, vm.BlockContext, *state.StateDB, error) {
