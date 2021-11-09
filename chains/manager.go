@@ -827,7 +827,7 @@ func (m *manager) createSnowmanChain(
 	checkFn := func() (interface{}, error) {
 		ctx.Lock.Lock()
 		defer ctx.Lock.Unlock()
-		if ctx.GetState() == snow.NormalOp {
+		if ctx.IsBootstrapped() {
 			return engine.HealthCheck()
 		}
 		return bootstrapper.HealthCheck()

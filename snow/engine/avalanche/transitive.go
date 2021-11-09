@@ -104,7 +104,7 @@ func (t *Transitive) Context() *snow.Context {
 }
 
 func (t *Transitive) IsBootstrapped() bool {
-	return t.Ctx.GetState() == snow.NormalOp
+	return t.Ctx.IsBootstrapped()
 }
 
 func (t *Transitive) Start(startReqID uint32) error {
@@ -635,7 +635,7 @@ func (t *Transitive) HealthCheck() (interface{}, error) {
 		consensusIntf interface{} = struct{}{}
 		consensusErr  error
 	)
-	if t.Ctx.GetState() == snow.NormalOp {
+	if t.Ctx.IsBootstrapped() {
 		consensusIntf, consensusErr = t.Consensus.HealthCheck()
 	}
 	vmIntf, vmErr := t.VM.HealthCheck()

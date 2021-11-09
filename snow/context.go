@@ -93,6 +93,10 @@ func (ctx *Context) GetState() State {
 	return stateInf.(State)
 }
 
+func (ctx *Context) IsBootstrapped() bool {
+	return ctx.GetState() == NormalOp
+}
+
 // IsValidatorOnly returns true iff this chain is available only to validators
 func (ctx *Context) IsValidatorOnly() bool {
 	return ctx.validatorOnly.GetValue()
