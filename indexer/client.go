@@ -16,11 +16,20 @@ var _ Client = &client{}
 
 // Client interface for Avalanche Indexer API Endpoint
 type Client interface {
+	// GetContainerRange returns the transactions at index [startIndex], [startIndex+1], ... , [startIndex+n-1]
+	// If [n] == 0, returns an empty response (i.e. null).
+	// If [startIndex] > the last accepted index, returns an error (unless the above apply.)
+	// If we run out of transactions, returns the ones fetched before running out.
 	GetContainerRange(*GetContainerRangeArgs) ([]Container, error)
+	// Get a container by its index
 	GetContainerByIndex(*GetContainer) (Container, error)
+	// Get the most recently accepted container
 	GetLastAccepted(*GetLastAcceptedArgs) (Container, error)
+	// Returns 1 less than the number of containers accepted on this chain
 	GetIndex(*GetIndexArgs) (uint64, error)
+	// Returns true if the given container is accepted
 	IsAccepted(*GetIndexArgs) (bool, error)
+	// Get a container by its index
 	GetContainerByID(*GetIndexArgs) (Container, error)
 }
 

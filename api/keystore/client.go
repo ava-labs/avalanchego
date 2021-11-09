@@ -17,9 +17,13 @@ var _ Client = &client{}
 // Client interface for Avalanche Keystore API Endpoint
 type Client interface {
 	CreateUser(api.UserPass) (bool, error)
+	// Returns the usernames of all keystore users
 	ListUsers() ([]string, error)
+	// Returns the byte representation of the given user
 	ExportUser(api.UserPass) ([]byte, error)
-	ImportUser(api.UserPass, []byte) (bool, error)
+	// Import [exportedUser] to [importTo]
+	ImportUser(importTo api.UserPass, exportedUser []byte) (bool, error)
+	// Delete the given user
 	DeleteUser(api.UserPass) (bool, error)
 }
 
@@ -40,14 +44,12 @@ func (c *client) CreateUser(user api.UserPass) (bool, error) {
 	return res.Success, err
 }
 
-// ListUsers lists the usernames of all keystore users on the node
 func (c *client) ListUsers() ([]string, error) {
 	res := &ListUsersReply{}
 	err := c.requester.SendRequest("listUsers", struct{}{}, res)
 	return res.Users, err
 }
 
-// ExportUser returns the byte representation of the requested [user]
 func (c *client) ExportUser(user api.UserPass) ([]byte, error) {
 	res := &ExportUserReply{
 		Encoding: formatting.Hex,
@@ -59,7 +61,6 @@ func (c *client) ExportUser(user api.UserPass) ([]byte, error) {
 	return formatting.Decode(res.Encoding, res.User)
 }
 
-// ImportUser imports the keystore user in [account] under [user]
 func (c *client) ImportUser(user api.UserPass, account []byte) (bool, error) {
 	accountStr, err := formatting.EncodeWithChecksum(formatting.Hex, account)
 	if err != nil {

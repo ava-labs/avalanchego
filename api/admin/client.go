@@ -19,9 +19,9 @@ type Client interface {
 	StopCPUProfiler() (bool, error)
 	MemoryProfile() (bool, error)
 	LockProfile() (bool, error)
-	Alias(string, string) (bool, error)
-	AliasChain(string, string) (bool, error)
-	GetChainAliases(string) ([]string, error)
+	Alias(endpoint string, alias string) (bool, error)
+	AliasChain(chainID string, alias string) (bool, error)
+	GetChainAliases(chainID string) ([]string, error)
 	Stacktrace() (bool, error)
 }
 

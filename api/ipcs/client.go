@@ -16,8 +16,10 @@ var _ Client = &client{}
 
 // Client interface for interacting with the IPCS endpoint
 type Client interface {
-	PublishBlockchain(string) (*PublishBlockchainReply, error)
-	UnpublishBlockchain(string) (bool, error)
+	// PublishBlockchain requests the node to begin publishing consensus and decision events
+	PublishBlockchain(chainID string) (*PublishBlockchainReply, error)
+	// UnpublishBlockchain requests the node to stop publishing consensus and decision events
+	UnpublishBlockchain(chainID string) (bool, error)
 	GetPublishedBlockchains() ([]ids.ID, error)
 }
 
@@ -33,7 +35,6 @@ func NewClient(uri string, requestTimeout time.Duration) Client {
 	}
 }
 
-// PublishBlockchain requests the node to begin publishing consensus and decision events
 func (c *client) PublishBlockchain(blockchainID string) (*PublishBlockchainReply, error) {
 	res := &PublishBlockchainReply{}
 	err := c.requester.SendRequest("publishBlockchain", &PublishBlockchainArgs{
@@ -42,7 +43,6 @@ func (c *client) PublishBlockchain(blockchainID string) (*PublishBlockchainReply
 	return res, err
 }
 
-// UnpublishBlockchain requests the node to stop publishing consensus and decision events
 func (c *client) UnpublishBlockchain(blockchainID string) (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.requester.SendRequest("unpublishBlockchain", &UnpublishBlockchainArgs{
