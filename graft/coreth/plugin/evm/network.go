@@ -33,6 +33,13 @@ const (
 	// [ethTxsGossipInterval] is how often we attempt to gossip newly seen
 	// transactions to other nodes.
 	ethTxsGossipInterval = 1 * time.Second
+
+	// [ethTxsRegossipInterval] is how often we attempt to reissue gossip of
+	// local transactions to other nodes.
+	ethTxsRegossipInterval = 3 * time.Minute
+
+	// TODO: parameterize regossip interval and regossip amount
+	ethRegossipCount = 15
 )
 
 type Network interface {
@@ -139,11 +146,65 @@ func (n *pushNetwork) awaitEthTxGossip() {
 	go n.ctx.Log.RecoverAndPanic(func() {
 		defer n.shutdownWg.Done()
 
-		ticker := time.NewTicker(ethTxsGossipInterval)
+		var (
+			txPool         = n.chain.GetTxPool()
+			gossipTicker   = time.NewTicker(ethTxsGossipInterval)
+			regossipTicker = time.NewTicker(ethTxsRegossipInterval)
+		)
+
 		for {
 			select {
-			case <-ticker.C:
-				if attempted, err := n.gossipEthTxs(); err != nil {
+			case <-gossipTicker.C:
+				if attempted, err := n.gossipEthTxs(false); err != nil {
+					log.Warn(
+						"failed to send eth transactions",
+						"len(txs)", attempted,
+						"err", err,
+					)
+				}
+			case <-regossipTicker.C:
+				// TODO: extract into function
+				// Fetch all pending transactions
+				pending := txPool.Pending(true)
+
+				// Split the pending transactions into locals and remotes
+				localTxs := make(map[common.Address]types.Transactions)
+				remoteTxs := pending
+				for _, account := range txPool.Locals() {
+					if txs := remoteTxs[account]; len(txs) > 0 {
+						delete(remoteTxs, account)
+						localTxs[account] = txs
+					}
+				}
+
+				// Sample X valid, older, non-executed txs (bypass cache)
+				itemsAdded := 0
+				for _, txs := range localTxs {
+					if itemsAdded > ethRegossipCount {
+						break
+					}
+					if len(txs) == 0 {
+						continue
+					}
+					// Only get 1 tx per account
+					tx := txs[0]
+					n.ethTxsToGossip[tx.Hash()] = tx
+					itemsAdded++
+				}
+				for _, txs := range remoteTxs {
+					if itemsAdded > ethRegossipCount {
+						break
+					}
+					if len(txs) == 0 {
+						continue
+					}
+					// Only get 1 tx per account
+					tx := txs[0]
+					n.ethTxsToGossip[tx.Hash()] = tx
+					itemsAdded++
+				}
+
+				if attempted, err := n.gossipEthTxs(true); err != nil {
 					log.Warn(
 						"failed to send eth transactions",
 						"len(txs)", attempted,
@@ -154,7 +215,7 @@ func (n *pushNetwork) awaitEthTxGossip() {
 				for _, tx := range txs {
 					n.ethTxsToGossip[tx.Hash()] = tx
 				}
-				if attempted, err := n.gossipEthTxs(); err != nil {
+				if attempted, err := n.gossipEthTxs(false); err != nil {
 					log.Warn(
 						"failed to send eth transactions",
 						"len(txs)", attempted,
@@ -259,7 +320,7 @@ func (n *pushNetwork) sendEthTxs(txs []*types.Transaction) error {
 	return n.appSender.SendAppGossip(msgBytes)
 }
 
-func (n *pushNetwork) gossipEthTxs() (int, error) {
+func (n *pushNetwork) gossipEthTxs(bypassCache bool) (int, error) {
 	if time.Since(n.lastGossiped) < ethTxsGossipInterval || len(n.ethTxsToGossip) == 0 {
 		return 0, nil
 	}
@@ -283,7 +344,7 @@ func (n *pushNetwork) gossipEthTxs() (int, error) {
 			continue
 		}
 
-		if _, has := n.recentEthTxs.Get(txHash); has {
+		if _, has := n.recentEthTxs.Get(txHash); has && !bypassCache {
 			continue
 		}
 		n.recentEthTxs.Put(txHash, nil)
