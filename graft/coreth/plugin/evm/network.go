@@ -135,7 +135,8 @@ func (vm *VM) newPushNetwork(
 	return net
 }
 
-// queueExecutableTxs attempts to add up to [maxTxs] to [ethTxsToGossip].
+// queueExecutableTxs attempts to select up to [maxTxs] from the tx pool for
+// regossiping.
 func (n *pushNetwork) queueExecutableTxs(state *state.StateDB, baseFee *big.Int, txs map[common.Address]types.Transactions, maxTxs int) types.Transactions {
 	// Setup heap for transactions
 	heads := make(types.TxByPriceAndTime, 0, len(txs))
