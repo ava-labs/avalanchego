@@ -5,7 +5,6 @@ package evm
 
 import (
 	"container/heap"
-	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -189,13 +188,11 @@ func (n *pushNetwork) queueRegossipTxs() types.Transactions {
 	// Add best transactions to be gossiped (preferring local txs)
 	baseFee := txPool.BaseFee()
 	localQueued := n.queueBestTxs(baseFee, localTxs, n.config.TxRegossipMaxSize)
-	fmt.Println(localQueued)
 	localCount := len(localQueued)
 	if localCount >= n.config.TxRegossipMaxSize {
 		return localQueued
 	}
 	remoteQueued := n.queueBestTxs(baseFee, remoteTxs, n.config.TxRegossipMaxSize-localCount)
-	fmt.Println(remoteQueued)
 	return append(localQueued, remoteQueued...)
 }
 
