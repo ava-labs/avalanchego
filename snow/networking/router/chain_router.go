@@ -203,6 +203,7 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	if _, notRequested := message.UnrequestedOps[op]; notRequested || (op == message.Put && requestID == constants.GossipMsgRequestID) {
 		if chain.ctx.IsExecuting() {
 			cr.log.Debug("dropping %s and skipping queue since the chain is currently executing", op)
+			cr.metrics.droppedRequests.Inc()
 			return
 		}
 		chain.Push(msg)
@@ -229,6 +230,7 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 
 	if chain.ctx.IsExecuting() {
 		cr.log.Debug("dropping %s and skipping queue since the chain is currently executing", op)
+		cr.metrics.droppedRequests.Inc()
 		return
 	}
 
