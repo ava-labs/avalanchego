@@ -31,6 +31,7 @@ func Test_IndexerWriteAndRead(t *testing.T) {
 		atomicTrieIndexer, ok := indexer.(*indexedAtomicTrie)
 		assert.True(t, ok)
 		atomicTrieIndexer.commitHeightInterval = testCommitInterval
+		atomicTrieIndexer.initialised.Store(true)
 	}
 
 	// ensure invalid height commits are not possible
@@ -243,6 +244,7 @@ func Test_IndexerInitializeFromState(t *testing.T) {
 		atomicTrieIndexer, ok := indexer.(*indexedAtomicTrie)
 		assert.True(t, ok)
 		atomicTrieIndexer.commitHeightInterval = testCommitInterval
+		atomicTrieIndexer.initialised.Store(true)
 	}
 
 	// ensure invalid height commits are not possible
