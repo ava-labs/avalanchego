@@ -52,12 +52,12 @@ func fundAddressByGenesis(addrs []common.Address) (string, error) {
 	return string(bytes), err
 }
 
-func getValidEthTxs(key *ecdsa.PrivateKey, count int, gasprice *big.Int) []*types.Transaction {
+func getValidEthTxs(key *ecdsa.PrivateKey, count int, gasPrice *big.Int) []*types.Transaction {
 	res := make([]*types.Transaction, count)
 
 	to := common.Address{}
 	amount := big.NewInt(10000)
-	gaslimit := uint64(100000)
+	gasLimit := uint64(100000)
 
 	for i := 0; i < count; i++ {
 		tx, _ := types.SignTx(
@@ -65,8 +65,8 @@ func getValidEthTxs(key *ecdsa.PrivateKey, count int, gasprice *big.Int) []*type
 				uint64(i),
 				to,
 				amount,
-				gaslimit,
-				gasprice,
+				gasLimit,
+				gasPrice,
 				[]byte(strings.Repeat("aaaaaaaaaa", 100))),
 			types.HomesteadSigner{}, key)
 		res[i] = tx
