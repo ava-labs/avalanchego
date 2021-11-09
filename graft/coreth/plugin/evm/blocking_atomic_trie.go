@@ -1,6 +1,9 @@
 package evm
 
 import (
+	"encoding/binary"
+	"time"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
@@ -34,6 +37,9 @@ func NewBlockingAtomicTrie(db ethdb.KeyValueStore, acceptedAtomicTxDB database.D
 func (b *blockingAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn func() error, getAtomicTxFn func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error)) chan struct{} {
 	lastAccepted := chain.LastAcceptedBlock()
 	iter := b.acceptedAtomicTxDB.NewIterator()
+	transactionsIndexed := uint64(0)
+	startTime := time.Now()
+	lastUpdate := time.Now()
 	for iter.Next() && iter.Error() == nil {
 		indexedTxBytes := iter.Value()
 		packer := wrappers.Packer{Bytes: indexedTxBytes}
@@ -59,22 +65,49 @@ func (b *blockingAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn fu
 			log.Crit("problem getting atomic ops", "err", err)
 			return nil
 		}
-		hash, err := b.index(height, ops)
+		heightBytes := make([]byte, wrappers.LongLen)
+		binary.BigEndian.PutUint64(heightBytes, height)
+		err = b.updateTrie(ops, heightBytes)
 		if err != nil {
 			log.Crit("problem indexing atomic ops", "err", err)
 			return nil
 		}
-		if hash != (common.Hash{}) {
-			log.Info("committed trie", "height", height, "hash", hash)
-			if err := dbCommitFn(); err != nil {
-				log.Crit("error committing DB", "err", err)
-				return nil
-			}
+		transactionsIndexed++
+		if time.Since(lastUpdate) > 30*time.Second {
+			log.Info("atomic trie init progress", "indexedTransactions", transactionsIndexed)
+			lastUpdate = time.Now()
 		}
 	}
+
+	log.Info("done updating trie, setting index height", "height", lastAccepted.NumberU64(), "duration", time.Since(startTime))
+	if err := b.setIndexHeight(lastAccepted.NumberU64()); err != nil {
+		log.Crit("error setting index height", "height", lastAccepted.NumberU64())
+		return nil
+	}
+
+	log.Info("committing trie")
+	hash, err := b.commitTrie()
+	if err != nil {
+		log.Crit("error committing trie post init")
+		return nil
+	}
+
+	log.Info("trie committed", "hash", hash, "height", lastAccepted.NumberU64(), "time", time.Since(startTime))
+
+	if dbCommitFn != nil {
+		log.Info("committing DB")
+		if err := dbCommitFn(); err != nil {
+			log.Crit("unable to commit DB")
+			return nil
+		}
+	}
+
+	defer log.Info("atomic trie initialisation complete", "time", time.Since(startTime))
+
 	doneChan := make(chan struct{}, 1)
-	b.indexedAtomicTrie.initialised.Store(true)
 	defer close(doneChan)
+
+	b.indexedAtomicTrie.initialised.Store(true)
 	return doneChan
 }
 
