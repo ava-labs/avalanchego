@@ -20,9 +20,31 @@ import (
 
 func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	called := make(chan struct{})
+
+	metrics := prometheus.NewRegistry()
+	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	assert.NoError(t, err)
+
+	ctx := snow.DefaultContextTest()
+
+	vdrs := validators.NewSet()
+	vdr0 := ids.GenerateTestShortID()
+	err = vdrs.AddWeight(vdr0, 1)
+	assert.NoError(t, err)
+
+	handler, err := NewHandler(
+		mc,
+		ctx,
+		vdrs,
+		nil,
+		"",
+		metrics,
+	)
+	assert.NoError(t, err)
+
 	bootstrapper := &common.EngineTest{T: t}
 	bootstrapper.Default(false)
-	bootstrapper.ContextF = snow.DefaultContextTest
+	bootstrapper.ContextF = func() *snow.Context { return ctx }
 	bootstrapper.GetAcceptedFrontierF = func(nodeID ids.ShortID, requestID uint32) error {
 		t.Fatalf("GetAcceptedFrontier message should have timed out")
 		return nil
@@ -31,29 +53,12 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		called <- struct{}{}
 		return nil
 	}
+	handler.RegisterBootstrap(bootstrapper)
 
 	engine := &common.EngineTest{T: t}
 	engine.Default(true)
-	engine.ContextF = snow.DefaultContextTest
-
-	handler := &Handler{}
-	vdrs := validators.NewSet()
-	vdr0 := ids.GenerateTestShortID()
-	err := vdrs.AddWeight(vdr0, 1)
-	assert.NoError(t, err)
-	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
-	assert.NoError(t, err)
-	err = handler.Initialize(
-		mc,
-		bootstrapper,
-		engine,
-		vdrs,
-		nil,
-		"",
-		metrics,
-	)
-	assert.NoError(t, err)
+	handler.RegisterEngine(engine)
+	engine.ContextF = func() *snow.Context { return ctx }
 
 	pastTime := time.Now()
 	mc.SetTime(pastTime)
@@ -87,16 +92,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 
 func TestHandlerClosesOnError(t *testing.T) {
 	closed := make(chan struct{}, 1)
-	bootstrapper := &common.EngineTest{T: t}
-	bootstrapper.Default(false)
-	bootstrapper.ContextF = snow.DefaultContextTest
-	bootstrapper.GetAcceptedFrontierF = func(nodeID ids.ShortID, requestID uint32) error {
-		return errors.New("Engine error should cause handler to close")
-	}
-
-	engine := &common.EngineTest{T: t}
-	engine.Default(false)
-	engine.ContextF = snow.DefaultContextTest
+	ctx := snow.DefaultContextTest()
 
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
@@ -104,11 +100,10 @@ func TestHandlerClosesOnError(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
 	assert.NoError(t, err)
-	handler := &Handler{}
-	err = handler.Initialize(
+
+	handler, err := NewHandler(
 		mc,
-		bootstrapper,
-		engine,
+		ctx,
 		vdrs,
 		nil,
 		"",
@@ -117,10 +112,23 @@ func TestHandlerClosesOnError(t *testing.T) {
 	assert.NoError(t, err)
 
 	handler.clock.Set(time.Now())
-
 	handler.onCloseF = func() {
 		closed <- struct{}{}
 	}
+
+	bootstrapper := &common.EngineTest{T: t}
+	bootstrapper.Default(false)
+	bootstrapper.ContextF = func() *snow.Context { return ctx }
+	bootstrapper.GetAcceptedFrontierF = func(nodeID ids.ShortID, requestID uint32) error {
+		return errors.New("Engine error should cause handler to close")
+	}
+	handler.RegisterBootstrap(bootstrapper)
+
+	engine := &common.EngineTest{T: t}
+	engine.Default(false)
+	engine.ContextF = func() *snow.Context { return ctx }
+	handler.RegisterEngine(engine)
+
 	go handler.Dispatch()
 
 	nodeID := ids.ShortEmpty
@@ -139,30 +147,17 @@ func TestHandlerClosesOnError(t *testing.T) {
 
 func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	closed := make(chan struct{}, 1)
-	bootstrapper := &common.EngineTest{T: t}
-	bootstrapper.Default(false)
-	bootstrapper.ContextF = snow.DefaultContextTest
-	bootstrapper.GetFailedF = func(nodeID ids.ShortID, requestID uint32) error {
-		closed <- struct{}{}
-		return nil
-	}
-
-	engine := &common.EngineTest{T: t}
-	engine.Default(false)
-	engine.CantGossip = true
-	engine.ContextF = snow.DefaultContextTest
-
+	ctx := snow.DefaultContextTest()
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
 	assert.NoError(t, err)
-	handler := &Handler{}
-	err = handler.Initialize(
+
+	handler, err := NewHandler(
 		mc,
-		bootstrapper,
-		engine,
+		ctx,
 		vdrs,
 		nil,
 		"",
@@ -171,6 +166,21 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	assert.NoError(t, err)
 
 	handler.clock.Set(time.Now())
+
+	bootstrapper := &common.EngineTest{T: t}
+	bootstrapper.Default(false)
+	bootstrapper.ContextF = func() *snow.Context { return ctx }
+	bootstrapper.GetFailedF = func(nodeID ids.ShortID, requestID uint32) error {
+		closed <- struct{}{}
+		return nil
+	}
+	handler.RegisterBootstrap(bootstrapper)
+
+	engine := &common.EngineTest{T: t}
+	engine.Default(false)
+	engine.ContextF = func() *snow.Context { return ctx }
+	engine.CantGossip = true
+	handler.RegisterEngine(engine)
 
 	go handler.Dispatch()
 
@@ -193,19 +203,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 // Test that messages from the VM are handled
 func TestHandlerDispatchInternal(t *testing.T) {
 	calledNotify := make(chan struct{}, 1)
-	bootstrapper := &common.EngineTest{T: t}
-	bootstrapper.Default(false)
-	bootstrapper.ContextF = snow.DefaultContextTest
-	bootstrapper.NotifyF = func(common.Message) error {
-		calledNotify <- struct{}{}
-		return nil
-	}
-
-	engine := &common.EngineTest{T: t}
-	engine.Default(false)
-	engine.ContextF = snow.DefaultContextTest
-
-	handler := &Handler{}
+	ctx := snow.DefaultContextTest()
 	msgFromVMChan := make(chan common.Message)
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
@@ -213,16 +211,30 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
 	assert.NoError(t, err)
-	err = handler.Initialize(
+
+	handler, err := NewHandler(
 		mc,
-		bootstrapper,
-		engine,
+		ctx,
 		vdrs,
 		msgFromVMChan,
 		"",
 		prometheus.NewRegistry(),
 	)
 	assert.NoError(t, err)
+
+	bootstrapper := &common.EngineTest{T: t}
+	bootstrapper.Default(false)
+	bootstrapper.ContextF = func() *snow.Context { return ctx }
+	bootstrapper.NotifyF = func(common.Message) error {
+		calledNotify <- struct{}{}
+		return nil
+	}
+	handler.RegisterBootstrap(bootstrapper)
+
+	engine := &common.EngineTest{T: t}
+	engine.Default(false)
+	engine.ContextF = func() *snow.Context { return ctx }
+	handler.RegisterEngine(engine)
 
 	go handler.Dispatch()
 	msgFromVMChan <- 0

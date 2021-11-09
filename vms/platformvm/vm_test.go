@@ -114,15 +114,6 @@ func init() {
 	testSubnet1ControlKeys = keys[0:3]
 }
 
-type dummyHandler struct {
-	startEngineF func(startReqID uint32) error
-}
-
-func (dh *dummyHandler) onDoneBootstrapping(lastReqID uint32) error {
-	lastReqID++
-	return dh.startEngineF(lastReqID)
-}
-
 func defaultContext() *snow.Context {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = testNetworkID
@@ -2141,16 +2132,27 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		VM:      vm,
 	}
 
-	dh := &dummyHandler{}
+	// Asynchronously passes messages from the network to the consensus engine
+	handler, err := router.NewHandler(
+		mc,
+		bootstrapConfig.Ctx,
+		vdrs,
+		msgChan,
+		"",
+		prometheus.NewRegistry(),
+	)
+	assert.NoError(t, err)
+
 	bootstrapper, err := bootstrap.New(
 		bootstrapConfig,
-		dh.onDoneBootstrapping,
+		handler.OnDoneBootstrapping,
 		fmt.Sprintf("%s_bs", consensus.Parameters().Namespace),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
+	handler.RegisterBootstrap(bootstrapper)
 
 	engineConfig := smeng.Config{
 		Ctx:        bootstrapConfig.Ctx,
@@ -2174,25 +2176,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dh.startEngineF = engine.Start
+	handler.RegisterEngine(engine)
 
 	startReqID := uint32(0)
 	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
-
-	// Asynchronously passes messages from the network to the consensus engine
-	handler := &router.Handler{}
-	err = handler.Initialize(
-		mc,
-		bootstrapper,
-		engine,
-		vdrs,
-		msgChan,
-		"",
-		prometheus.NewRegistry(),
-	)
-	assert.NoError(t, err)
 
 	// Allow incoming messages to be routed to the new chain
 	chainRouter.AddChain(handler)

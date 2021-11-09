@@ -551,7 +551,17 @@ func (m *manager) createAvalancheChain(
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
-	handler := &router.Handler{}
+	handler, err := router.NewHandler(
+		m.MsgCreator,
+		ctx,
+		vdrs,
+		msgChan,
+		fmt.Sprintf("%s_handler", consensusParams.Namespace),
+		consensusParams.Metrics,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing network handler: %w", err)
+	}
 
 	timer := &router.Timer{
 		Handler: handler,
@@ -590,6 +600,7 @@ func (m *manager) createAvalancheChain(
 	if err != nil {
 		return nil, fmt.Errorf("error initializing avalanche bootstrapper: %w", err)
 	}
+	handler.RegisterBootstrap(bootstrapper)
 
 	engineConfig := aveng.Config{
 		Ctx:        bootstrapperConfig.Ctx,
@@ -600,11 +611,11 @@ func (m *manager) createAvalancheChain(
 		Params:     consensusParams,
 		Consensus:  &avcon.Topological{},
 	}
-
 	engine, err := aveng.New(engineConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing avalanche engine: %w", err)
 	}
+	handler.RegisterEngine(engine)
 
 	startReqID := uint32(0)
 	if err := bootstrapper.Start(startReqID); err != nil {
@@ -625,16 +636,6 @@ func (m *manager) createAvalancheChain(
 	if err := m.HealthService.RegisterCheck(chainAlias, checkFn); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
-
-	err = handler.Initialize(
-		m.MsgCreator,
-		bootstrapper,
-		engine,
-		vdrs,
-		msgChan,
-		fmt.Sprintf("%s_handler", consensusParams.Namespace),
-		consensusParams.Metrics,
-	)
 
 	return &chain{
 		Name:    chainAlias,
@@ -747,7 +748,17 @@ func (m *manager) createSnowmanChain(
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
-	handler := &router.Handler{}
+	handler, err := router.NewHandler(
+		m.MsgCreator,
+		ctx,
+		vdrs,
+		msgChan,
+		fmt.Sprintf("%s_handler", consensusParams.Namespace),
+		consensusParams.Metrics,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize message handler: %s", err)
+	}
 
 	timer := &router.Timer{
 		Handler: handler,
@@ -786,6 +797,7 @@ func (m *manager) createSnowmanChain(
 	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman bootstrapper: %w", err)
 	}
+	handler.RegisterBootstrap(bootstrapper)
 
 	engineConfig := smeng.Config{
 		Ctx:        bootstrapCfg.Ctx,
@@ -800,22 +812,11 @@ func (m *manager) createSnowmanChain(
 	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
+	handler.RegisterEngine(engine)
 
 	startReqID := uint32(0)
 	if err := bootstrapper.Start(startReqID); err != nil {
 		return nil, fmt.Errorf("error starting snowman bootstrapper: %w", err)
-	}
-
-	if err = handler.Initialize(
-		m.MsgCreator,
-		bootstrapper,
-		engine,
-		vdrs,
-		msgChan,
-		fmt.Sprintf("%s_handler", consensusParams.Namespace),
-		consensusParams.Metrics,
-	); err != nil {
-		return nil, fmt.Errorf("couldn't initialize message handler: %s", err)
 	}
 
 	// Register health checks
