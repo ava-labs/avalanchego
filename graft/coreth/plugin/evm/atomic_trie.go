@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	atomic2 "go.uber.org/atomic"
+
 	"github.com/ava-labs/coreth/fastsync/types"
 
 	"github.com/ava-labs/coreth/fastsync/facades"
@@ -34,6 +36,7 @@ type indexedAtomicTrie struct {
 	db                   ethdb.KeyValueStore // Underlying database
 	trieDB               *trie.Database      // Trie database
 	trie                 *trie.Trie          // Atomic trie.Trie mapping key (height+blockchainID) and value (RLP encoded atomic.Requests)
+	initialised          *atomic2.Bool
 }
 
 func NewIndexedAtomicTrie(db ethdb.KeyValueStore) (types.AtomicTrie, error) {
@@ -63,6 +66,7 @@ func NewIndexedAtomicTrie(db ethdb.KeyValueStore) (types.AtomicTrie, error) {
 		db:                   db,
 		trieDB:               triedb,
 		trie:                 t,
+		initialised:          atomic2.NewBool(false),
 	}, nil
 }
 
@@ -74,6 +78,7 @@ func (i *indexedAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn fun
 			log.Crit("error encountered when initializing index", "err", err)
 			return
 		}
+		i.initialised.Store(true)
 	}()
 	return doneChan
 }
@@ -112,7 +117,7 @@ func (i *indexedAtomicTrie) initialize(chain facades.ChainFacade, dbCommitFn fun
 			// index atomicOperations (which may be nil) at the block height
 			// because the index needs to increment to track how many blocks have been
 			// indexed
-			hash, err := i.Index(blk.NumberU64(), atomicOperations)
+			hash, err := i.index(blk.NumberU64(), atomicOperations)
 			if err != nil {
 				return err
 			}
@@ -177,7 +182,17 @@ func (i *indexedAtomicTrie) Height() (uint64, bool, error) {
 //   initialise it with [height] as the starting height - this *must* be zero in
 //   that case
 func (i *indexedAtomicTrie) Index(height uint64, atomicOps map[ids.ID]*atomic.Requests) (gethCommon.Hash, error) {
-	l := log.New("func", "indexedAtomicTrie.Index", "height", height)
+	if !i.initialised.Load() {
+		// ignoring request because index has not yet been initialised
+		// the ongoing Initialize() will catch up to this height later
+		return gethCommon.Hash{}, nil
+	}
+
+	return i.index(height, atomicOps)
+}
+
+func (i *indexedAtomicTrie) index(height uint64, atomicOps map[ids.ID]*atomic.Requests) (gethCommon.Hash, error) {
+	l := log.New("func", "indexedAtomicTrie.index", "height", height)
 
 	// get the current index height from the index DB
 	currentHeight, exists, err := i.Height()
