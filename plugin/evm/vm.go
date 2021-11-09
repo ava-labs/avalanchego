@@ -714,8 +714,19 @@ func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 	}
 
 	log.Info(fmt.Sprintf("Enabled APIs: %s", strings.Join(enabledAPIs, ", ")))
-	apis[ethRPCEndpoint] = &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler}
-	apis[ethWSEndpoint] = &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandlerWithDuration([]string{"*"}, vm.config.APIMaxDuration.Duration)}
+	apis[ethRPCEndpoint] = &commonEng.HTTPHandler{
+		LockOptions: commonEng.NoLock,
+		Handler:     handler,
+	}
+	apis[ethWSEndpoint] = &commonEng.HTTPHandler{
+		LockOptions: commonEng.NoLock,
+		Handler: handler.WebsocketHandlerWithDuration(
+			[]string{"*"},
+			vm.config.APIMaxDuration.Duration,
+			vm.config.WSCPURefillRate.Duration,
+			vm.config.WSCPUMaxStored.Duration,
+		),
+	}
 
 	return apis, nil
 }
