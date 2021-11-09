@@ -298,6 +298,10 @@ func TestMempoolEthTxsRegossipSingleAccount(t *testing.T) {
 
 	// create eth txes
 	ethTxs := getValidEthTxs(key, 10, big.NewInt(226*params.GWei))
+	ethTxHashes := make([]common.Hash, len(ethTxs))
+	for i, tx := range ethTxs {
+		ethTxHashes[i] = tx.Hash()
+	}
 
 	// Notify VM about eth txs
 	errs := vm.chain.GetTxPool().AddRemotesSync(ethTxs)
@@ -309,7 +313,7 @@ func TestMempoolEthTxsRegossipSingleAccount(t *testing.T) {
 	pushNetwork := vm.network.(*pushNetwork)
 	queued := pushNetwork.queueRegossipTxs()
 	assert.Len(queued, 1, "unexpected length of queued txs")
-	assert.Equal(ethTxs[0].Hash(), queued[0].Hash())
+	assert.Contains(ethTxHashes, queued[0].Hash())
 }
 
 func TestMempoolEthTxsRegossip(t *testing.T) {
@@ -336,10 +340,13 @@ func TestMempoolEthTxsRegossip(t *testing.T) {
 	vm.chain.GetTxPool().SetMinFee(common.Big0)
 
 	// create eth txes
-	ethTxs := []*types.Transaction{}
+	ethTxs := make([]*types.Transaction, 20)
+	ethTxHashes := make([]common.Hash, 20)
 	for i := 0; i < 20; i++ {
 		txs := getValidEthTxs(keys[i], 1, big.NewInt(226*params.GWei))
-		ethTxs = append(ethTxs, txs[0])
+		tx := txs[0]
+		ethTxs[i] = tx
+		ethTxHashes[i] = tx.Hash()
 	}
 
 	// Notify VM about eth txs
@@ -359,13 +366,15 @@ func TestMempoolEthTxsRegossip(t *testing.T) {
 	queued := pushNetwork.queueRegossipTxs()
 	assert.Len(queued, 15, "unexpected length of queued txs")
 
-	// Confirm locals
-	for i, tx := range ethTxs[10:] {
-		assert.Equal(tx.Hash(), queued[i].Hash())
+	// Confirm queued transactions (should be ordered based on
+	// timestamp submitted, with local priorized over remote)
+	queuedTxHashes := make([]common.Hash, 15)
+	for i, tx := range queued {
+		queuedTxHashes[i] = tx.Hash()
 	}
+	assert.ElementsMatch(queuedTxHashes[:10], ethTxHashes[10:], "missing local transactions")
 
-	// Confirm remotes
-	for i, tx := range ethTxs[0:5] {
-		assert.Equal(tx.Hash(), queued[i+10].Hash())
-	}
+	// NOTE: We don't care which remote transactions are included in this test
+	// (due to the non-determinisitc way pending transactions are surfaced, this can be difficult
+	// to assert as well).
 }
