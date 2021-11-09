@@ -1,6 +1,22 @@
 # Release Notes
 
-## v1.6.4
+## [v1.6.5](https://github.com/ava-labs/avalanchego/releases/tag/v1.6.5)
+
+This version is backwards compatible to [v1.6.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.6.0). It is optional, but encouraged.
+
+## Bootstrapping
+
+- Drop inbound messages to a chain if that chain is in the execution phase of bootstrapping.
+
+## Metrics
+
+- Added `avalanche_{ChainID}_bootstrap_finished`, which is 1 if the chain is done bootstrapping, 0 otherwise.
+
+## Network
+
+- Refactored some send methods to avoid race condition.
+
+## [v1.6.4](https://github.com/ava-labs/avalanchego/releases/tag/v1.6.4)
 
 This version is backwards compatible to [v1.6.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.6.0). It is optional, but encouraged.
 
@@ -44,7 +60,7 @@ This version is backwards compatible to [v1.6.0](https://github.com/ava-labs/ava
 
 ---
 
-## v1.6.3
+## [v1.6.3](https://github.com/ava-labs/avalanchego/releases/tag/v1.6.3)
 
 This version is backwards compatible to [v1.6.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.6.0). It is optional, but encouraged.
 
