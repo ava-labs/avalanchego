@@ -13,8 +13,14 @@ This version is backwards compatible to [v1.6.0](https://github.com/ava-labs/ava
 
 - Added `avalanche_{ChainID}_bootstrap_finished`, which is 1 if the chain is done bootstrapping, 0 otherwise.
 
+## APIs
+
+- Added `info.uptime` API call that attempts to report the network's view of the local node.
+- Added `observedUptime` to each peer's result in `info.peers`.
+
 ## Network
 
+- Added reported uptime to pong messages to be able to better track a local node's uptime as viewed by the network.
 - Refactored request timeout registry to avoid a potential race condition.
 
 ## [v1.6.4](https://github.com/ava-labs/avalanchego/releases/tag/v1.6.4)
