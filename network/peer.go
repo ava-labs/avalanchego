@@ -577,7 +577,7 @@ func (p *peer) sendPong() {
 
 // assumes the [stateLock] is not held
 func (p *peer) sendUptimePong() {
-	uptimePercent, err := p.net.config.Uptimes.CalculateCurrentUptimePercent(p.nodeID)
+	uptimePercent, err := p.net.config.UptimeManager.CalculateUptimePercent(p.nodeID)
 	if err != nil {
 		uptimePercent = 0
 	}

@@ -191,7 +191,7 @@ func (vm *VM) Initialize(
 	vm.internalState = is
 
 	// Initialize the utility to track validator uptimes
-	if err := vm.UptimesManager.SetState(is); err != nil {
+	if err := vm.UptimeManager.SetState(is); err != nil {
 		return fmt.Errorf("failed to set state for the uptimes: %w", err)
 	}
 
@@ -318,7 +318,7 @@ func (vm *VM) Bootstrapped() error {
 		validatorIDs[i] = vdr.ID()
 	}
 
-	if err := vm.UptimesManager.StartTracking(validatorIDs); err != nil {
+	if err := vm.UptimeManager.StartTracking(validatorIDs); err != nil {
 		return err
 	}
 	return vm.internalState.Commit()
@@ -344,7 +344,7 @@ func (vm *VM) Shutdown() error {
 			validatorIDs[i] = vdr.ID()
 		}
 
-		if err := vm.UptimesManager.Shutdown(validatorIDs); err != nil {
+		if err := vm.UptimeManager.Shutdown(validatorIDs); err != nil {
 			return err
 		}
 		if err := vm.internalState.Commit(); err != nil {
@@ -468,12 +468,12 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 
 // Connected implements validators.Connector
 func (vm *VM) Connected(vdrID ids.ShortID) error {
-	return vm.UptimesManager.Connect(vdrID)
+	return vm.UptimeManager.Connect(vdrID)
 }
 
 // Disconnected implements validators.Connector
 func (vm *VM) Disconnected(vdrID ids.ShortID) error {
-	if err := vm.UptimesManager.Disconnect(vdrID); err != nil {
+	if err := vm.UptimeManager.Disconnect(vdrID); err != nil {
 		return err
 	}
 	return vm.internalState.Commit()
@@ -656,7 +656,7 @@ func (vm *VM) getPercentConnected() (float64, error) {
 		err            error
 	)
 	for _, vdr := range vdrs {
-		if !vm.UptimesManager.IsConnected(vdr.ID()) {
+		if !vm.UptimeManager.IsConnected(vdr.ID()) {
 			continue // not connected to us --> don't include
 		}
 		connectedStake, err = safemath.Add64(connectedStake, vdr.Weight())

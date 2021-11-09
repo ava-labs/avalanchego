@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/uptimes"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -384,7 +384,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		UptimePercentage:   .2,
 		StakeMintingPeriod: defaultMaxStakingDuration,
 		Validators:         validators.NewManager(),
-		UptimesManager:     uptimes.NewUptimeManager(uptimes.UnreadyState()),
+		UptimeManager:      uptime.NewManager(uptime.UnreadyState()),
 	}}
 
 	firstCtx := defaultContext()
@@ -396,7 +396,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	}
 
 	firstVM.clock.Set(defaultGenesisTime)
-	firstVM.UptimesManager.(uptimes.TestUptimeManager).SetTime(defaultGenesisTime)
+	firstVM.UptimeManager.(uptime.TestManager).SetTime(defaultGenesisTime)
 
 	if err := firstVM.Bootstrapping(); err != nil {
 		t.Fatal(err)
@@ -407,7 +407,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	}
 
 	// Fast forward clock to time for genesis validators to leave
-	firstVM.UptimesManager.(uptimes.TestUptimeManager).SetTime(defaultValidateEndTime)
+	firstVM.UptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
 
 	if err := firstVM.Shutdown(); err != nil {
 		t.Fatal(err)
@@ -419,7 +419,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		Chains:           chains.MockManager{},
 		UptimePercentage: .21,
 		Validators:       validators.NewManager(),
-		UptimesManager:   uptimes.NewUptimeManager(uptimes.UnreadyState()),
+		UptimeManager:    uptime.NewManager(uptime.UnreadyState()),
 	}}
 
 	secondCtx := defaultContext()
@@ -437,7 +437,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	}
 
 	secondVM.clock.Set(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
-	secondVM.UptimesManager.(uptimes.TestUptimeManager).SetTime(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
+	secondVM.UptimeManager.(uptime.TestManager).SetTime(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 
 	if err := secondVM.Bootstrapping(); err != nil {
 		t.Fatal(err)
@@ -448,7 +448,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	}
 
 	secondVM.clock.Set(defaultValidateEndTime)
-	secondVM.UptimesManager.(uptimes.TestUptimeManager).SetTime(defaultValidateEndTime)
+	secondVM.UptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
 
 	blk, err := secondVM.BuildBlock() // should contain proposal to advance time
 	if err != nil {
@@ -582,7 +582,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		UptimePercentage:   .2,
 		StakeMintingPeriod: defaultMaxStakingDuration,
 		Validators:         validators.NewManager(),
-		UptimesManager:     uptimes.NewUptimeManager(uptimes.UnreadyState()),
+		UptimeManager:      uptime.NewManager(uptime.UnreadyState()),
 	}}
 
 	ctx := defaultContext()
@@ -601,7 +601,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	}()
 
 	vm.clock.Set(defaultGenesisTime)
-	vm.UptimesManager.(uptimes.TestUptimeManager).SetTime(defaultGenesisTime)
+	vm.UptimeManager.(uptime.TestManager).SetTime(defaultGenesisTime)
 
 	if err := vm.Bootstrapping(); err != nil {
 		t.Fatal(err)
@@ -613,7 +613,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(defaultValidateEndTime)
-	vm.UptimesManager.(uptimes.TestUptimeManager).SetTime(defaultValidateEndTime)
+	vm.UptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
 
 	blk, err := vm.BuildBlock() // should contain proposal to advance time
 	if err != nil {

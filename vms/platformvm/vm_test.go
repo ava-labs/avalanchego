@@ -31,7 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
-	"github.com/ava-labs/avalanchego/snow/uptimes"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -286,7 +286,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 func defaultVM() (*VM, database.Database, *common.SenderTest) {
 	vm := &VM{Factory: Factory{
 		Chains:                chains.MockManager{},
-		UptimesManager:        uptimes.NewUptimeManager(uptimes.UnreadyState()),
+		UptimeManager:         uptime.NewManager(uptime.UnreadyState()),
 		Validators:            validators.NewManager(),
 		TxFee:                 defaultTxFee,
 		CreateSubnetTxFee:     100 * defaultTxFee,
@@ -365,7 +365,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 	vm := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
 		Validators:         validators.NewManager(),
-		UptimesManager:     uptimes.NewUptimeManager(uptimes.UnreadyState()),
+		UptimeManager:      uptime.NewManager(uptime.UnreadyState()),
 		TxFee:              defaultTxFee,
 		MinValidatorStake:  defaultMinValidatorStake,
 		MaxValidatorStake:  defaultMaxValidatorStake,
@@ -1774,7 +1774,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	firstVM := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
 		Validators:         validators.NewManager(),
-		UptimesManager:     uptimes.NewUptimeManager(uptimes.UnreadyState()),
+		UptimeManager:      uptime.NewManager(uptime.UnreadyState()),
 		MinStakeDuration:   defaultMinStakingDuration,
 		MaxStakeDuration:   defaultMaxStakingDuration,
 		StakeMintingPeriod: defaultMaxStakingDuration,
@@ -1856,7 +1856,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	secondVM := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
 		Validators:         validators.NewManager(),
-		UptimesManager:     uptimes.NewUptimeManager(uptimes.UnreadyState()),
+		UptimeManager:      uptime.NewManager(uptime.UnreadyState()),
 		MinStakeDuration:   defaultMinStakingDuration,
 		MaxStakeDuration:   defaultMaxStakingDuration,
 		StakeMintingPeriod: defaultMaxStakingDuration,
@@ -1896,7 +1896,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstVM := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
 		Validators:         validators.NewManager(),
-		UptimesManager:     uptimes.NewUptimeManager(uptimes.UnreadyState()),
+		UptimeManager:      uptime.NewManager(uptime.UnreadyState()),
 		MinStakeDuration:   defaultMinStakingDuration,
 		MaxStakeDuration:   defaultMaxStakingDuration,
 		StakeMintingPeriod: defaultMaxStakingDuration,
@@ -1973,7 +1973,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	secondVM := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
 		Validators:         validators.NewManager(),
-		UptimesManager:     uptimes.NewUptimeManager(uptimes.UnreadyState()),
+		UptimeManager:      uptime.NewManager(uptime.UnreadyState()),
 		MinStakeDuration:   defaultMinStakingDuration,
 		MaxStakeDuration:   defaultMaxStakingDuration,
 		StakeMintingPeriod: defaultMaxStakingDuration,
@@ -2019,7 +2019,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	vm := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
 		Validators:         validators.NewManager(),
-		UptimesManager:     uptimes.NewUptimeManager(uptimes.UnreadyState()),
+		UptimeManager:      uptime.NewManager(uptime.UnreadyState()),
 		MinStakeDuration:   defaultMinStakingDuration,
 		MaxStakeDuration:   defaultMaxStakingDuration,
 		StakeMintingPeriod: defaultMaxStakingDuration,
@@ -2248,7 +2248,7 @@ func TestUnverifiedParent(t *testing.T) {
 	vm := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
 		Validators:         validators.NewManager(),
-		UptimesManager:     uptimes.NewUptimeManager(uptimes.UnreadyState()),
+		UptimeManager:      uptime.NewManager(uptime.UnreadyState()),
 		MinStakeDuration:   defaultMinStakingDuration,
 		MaxStakeDuration:   defaultMaxStakingDuration,
 		StakeMintingPeriod: defaultMaxStakingDuration,
@@ -2402,7 +2402,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	vm := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
 		Validators:         validators.NewManager(),
-		UptimesManager:     uptimes.NewUptimeManager(uptimes.UnreadyState()),
+		UptimeManager:      uptime.NewManager(uptime.UnreadyState()),
 		MinStakeDuration:   defaultMinStakingDuration,
 		MaxStakeDuration:   defaultMaxStakingDuration,
 		StakeMintingPeriod: defaultMaxStakingDuration,

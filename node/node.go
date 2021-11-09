@@ -41,7 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/triggers"
-	"github.com/ava-labs/avalanchego/snow/uptimes"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -116,7 +116,7 @@ type Node struct {
 	// Manages validator benching
 	benchlistManager benchlist.Manager
 
-	uptimesManager uptimes.Manager
+	uptimeManager uptime.Manager
 
 	// dispatcher for events as they happen in consensus
 	DecisionDispatcher  *triggers.EventDispatcher
@@ -202,7 +202,7 @@ func (n *Node) initNetworking() error {
 	n.Config.BenchlistConfig.StakingEnabled = n.Config.EnableStaking
 	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
 
-	n.uptimesManager = uptimes.NewUptimeManager(uptimes.UnreadyState())
+	n.uptimeManager = uptime.NewManager(uptime.UnreadyState())
 
 	consensusRouter := n.Config.ConsensusRouter
 	if !n.Config.EnableStaking {
@@ -253,7 +253,7 @@ func (n *Node) initNetworking() error {
 	n.Config.NetworkConfig.TLSConfig = tlsConfig
 	n.Config.NetworkConfig.TLSKey = tlsKey
 	n.Config.NetworkConfig.WhitelistedSubnets = n.Config.WhitelistedSubnets
-	n.Config.NetworkConfig.Uptimes = n.uptimesManager
+	n.Config.NetworkConfig.UptimeManager = n.uptimeManager
 
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
@@ -676,7 +676,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		n.vmManager.RegisterFactory(platformvm.ID, &platformvm.Factory{
 			Chains:                n.chainManager,
 			Validators:            vdrs,
-			UptimesManager:        n.uptimesManager,
+			UptimeManager:         n.uptimeManager,
 			StakingEnabled:        n.Config.EnableStaking,
 			WhitelistedSubnets:    n.Config.WhitelistedSubnets,
 			TxFee:                 n.Config.TxFee,

@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package uptimes
+package uptime
 
 import (
 	"errors"
@@ -14,7 +14,7 @@ type stateless struct{}
 
 var errNotReady = errors.New("should not be called")
 
-func UnreadyState() UptimeState {
+func UnreadyState() State {
 	return &stateless{}
 }
 
