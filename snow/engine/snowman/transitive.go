@@ -102,8 +102,8 @@ func (t *Transitive) Context() *snow.Context {
 
 // When bootstrapping is finished, this will be called.
 // This initializes the consensus engine with the last accepted block.
-func (t *Transitive) Start(startRequestID uint32) error {
-	t.RequestID = startRequestID
+func (t *Transitive) Start(startReqID uint32) error {
+	t.RequestID = startReqID
 	lastAcceptedID, err := t.VM.LastAccepted()
 	if err != nil {
 		return err

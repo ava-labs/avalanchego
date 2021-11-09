@@ -46,8 +46,6 @@ type Config struct {
 type SnowBootstrapper interface {
 	common.Engine
 	common.Bootstrapable
-
-	Start(startReqID uint32) error
 }
 
 func New(

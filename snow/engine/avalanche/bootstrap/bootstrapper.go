@@ -58,8 +58,6 @@ type Config struct {
 type AvalancheBootstrapper interface {
 	common.Engine
 	common.Bootstrapable
-
-	Start(startReqID uint32) error
 }
 
 func New(

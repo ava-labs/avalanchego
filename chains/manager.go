@@ -605,7 +605,6 @@ func (m *manager) createAvalancheChain(
 	if err != nil {
 		return nil, fmt.Errorf("error initializing avalanche engine: %w", err)
 	}
-	handler.StartEngineF = engine.Start
 
 	startReqID := uint32(0)
 	if err := bootstrapper.Start(startReqID); err != nil {
@@ -801,7 +800,6 @@ func (m *manager) createSnowmanChain(
 	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
-	handler.StartEngineF = engine.Start
 
 	startReqID := uint32(0)
 	if err := bootstrapper.Start(startReqID); err != nil {
@@ -829,7 +827,7 @@ func (m *manager) createSnowmanChain(
 	checkFn := func() (interface{}, error) {
 		ctx.Lock.Lock()
 		defer ctx.Lock.Unlock()
-		if bootstrapCfg.Ctx.GetState() == snow.NormalOp {
+		if ctx.GetState() == snow.NormalOp {
 			return engine.HealthCheck()
 		}
 		return bootstrapper.HealthCheck()

@@ -53,9 +53,6 @@ type Handler struct {
 	// [unprocessedMsgsCond.L] must be held while accessing [unprocessedMsgs].
 	unprocessedMsgs unprocessedMsgs
 	closing         utils.AtomicBool
-
-	// the function to call and start the engine once bootstrap is done
-	StartEngineF func(startReqID uint32) error
 }
 
 // Initialize this consensus handler
@@ -89,7 +86,7 @@ func (h *Handler) Initialize(
 
 func (h *Handler) OnDoneBootstrapping(lastReqID uint32) error {
 	lastReqID++
-	return h.StartEngineF(lastReqID)
+	return h.engine.Start(lastReqID)
 }
 
 // Context of this Handler
