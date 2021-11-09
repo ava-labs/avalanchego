@@ -375,6 +375,6 @@ func TestMempoolEthTxsRegossip(t *testing.T) {
 	assert.ElementsMatch(queuedTxHashes[:10], ethTxHashes[10:], "missing local transactions")
 
 	// NOTE: We don't care which remote transactions are included in this test
-	// (due to the non-determinisitc way pending transactions are surfaced, this can be difficult
+	// (due to the non-deterministic way pending transactions are surfaced, this can be difficult
 	// to assert as well).
 }
