@@ -413,6 +413,11 @@ func (tx *Transaction) FirstSeen() time.Time {
 	return tx.time
 }
 
+// SetFirstSeen sets overwrites the time a transaction is first seen.
+func (tx *Transaction) SetFirstSeen(t time.Time) {
+	tx.time = t
+}
+
 // Transactions implements DerivableList for transactions.
 type Transactions []*Transaction
 
