@@ -12,8 +12,20 @@ import (
 
 var errInvalidNumberOfChecks = errors.New("expected at least 1 check attempt")
 
-// Client for Avalanche Health API Endpoint
-type Client struct {
+// Interface compliance
+var _ Client = &client{}
+
+// Client interface for Avalanche Health API Endpoint
+type Client interface {
+	// Health returns a health check on the Avalanche node
+	Health() (*APIHealthClientReply, error)
+	// AwaitHealthy queries the Health endpoint [checks] times, with a pause of
+	// [interval] in between checks and returns early if Health returns healthy
+	AwaitHealthy(numChecks int, freq time.Duration) (bool, error)
+}
+
+// Client implementation for Avalanche Health API Endpoint
+type client struct {
 	requester rpc.EndpointRequester
 }
 
@@ -43,23 +55,20 @@ type APIHealthClientReply struct {
 }
 
 // NewClient returns a client to interact with Health API endpoint
-func NewClient(uri string, requestTimeout time.Duration) *Client {
-	return &Client{
+func NewClient(uri string, requestTimeout time.Duration) Client {
+	return &client{
 		requester: rpc.NewEndpointRequester(uri, "/ext/health", "health", requestTimeout),
 	}
 }
 
-// Health returns a health check on the Avalanche node
-func (c *Client) Health() (*APIHealthClientReply, error) {
+func (c *client) Health() (*APIHealthClientReply, error) {
 	res := &APIHealthClientReply{}
 	err := c.requester.SendRequest("health", struct{}{}, res)
 	return res, err
 }
 
-// AwaitHealthy queries the Health endpoint [checks] times, with a pause of
-// [interval] in between checks and returns early if Health returns healthy
-func (c *Client) AwaitHealthy(checks int, interval time.Duration) (bool, error) {
-	if checks < 1 {
+func (c *client) AwaitHealthy(numChecks int, freq time.Duration) (bool, error) {
+	if numChecks < 1 {
 		return false, errInvalidNumberOfChecks
 	}
 
@@ -69,9 +78,8 @@ func (c *Client) AwaitHealthy(checks int, interval time.Duration) (bool, error) 
 		return true, nil
 	}
 
-	for i := 1; i < checks; i++ {
-		time.Sleep(interval)
-
+	for i := 1; i < numChecks; i++ {
+		time.Sleep(freq)
 		res, err = c.Health()
 		if err == nil && res.Healthy {
 			return true, nil
