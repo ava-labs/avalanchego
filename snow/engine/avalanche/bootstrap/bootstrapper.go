@@ -79,7 +79,6 @@ func New(
 type bootstrapper struct {
 	common.Bootstrapper
 	common.Fetcher
-	common.BootstrapNoOps
 	metrics
 	getAncestorsVtxs metric.Averager
 
@@ -110,7 +109,6 @@ func newBootstrapper(
 	registerer prometheus.Registerer,
 ) (*bootstrapper, error) {
 	res := &bootstrapper{}
-	res.BootstrapNoOps.Ctx = config.Ctx
 	res.VtxBlocked = config.VtxBlocked
 	res.TxBlocked = config.TxBlocked
 	res.Manager = config.Manager

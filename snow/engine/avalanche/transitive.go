@@ -36,7 +36,7 @@ type Transitive struct {
 	VM         vertex.DAGVM
 	Validators validators.Set
 	RequestID  uint32
-	common.EngineNoOps
+	common.MsgHandlerNoOps
 
 	metrics
 
@@ -72,25 +72,25 @@ type Transitive struct {
 
 // Initialize implements the Engine interface
 func newTransitive(config Config) (*Transitive, error) {
-	res := &Transitive{}
 	config.Ctx.Log.Info("initializing consensus engine")
-	res.Ctx = config.Ctx
-	res.EngineNoOps.Ctx = res.Ctx
-	res.Sender = config.Sender
-	res.VM = config.VM
-	res.Manager = config.Manager
-	res.Validators = config.Validators
-
-	res.Params = config.Params
-	res.Consensus = config.Consensus
 
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
-	res.polls = poll.NewSet(factory,
-		config.Ctx.Log,
-		config.Params.Namespace,
-		config.Params.Metrics,
-	)
-	res.uniformSampler = sampler.NewUniform()
+	res := &Transitive{
+		Ctx:             config.Ctx,
+		MsgHandlerNoOps: common.NewMsgHandlerNoOps(config.Ctx),
+		Sender:          config.Sender,
+		VM:              config.VM,
+		Manager:         config.Manager,
+		Validators:      config.Validators,
+		Params:          config.Params,
+		Consensus:       config.Consensus,
+		polls: poll.NewSet(factory,
+			config.Ctx.Log,
+			config.Params.Namespace,
+			config.Params.Metrics,
+		),
+		uniformSampler: sampler.NewUniform(),
+	}
 
 	if err := res.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
 		return nil, err

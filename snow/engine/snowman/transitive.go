@@ -33,7 +33,7 @@ type Transitive struct {
 	Ctx    *snow.Context
 	Sender common.Sender
 	VM     block.ChainVM
-	common.EngineNoOps
+	common.MsgHandlerNoOps
 
 	RequestID  uint32
 	Validators validators.Set
@@ -70,24 +70,24 @@ type Transitive struct {
 
 func newTransitive(config Config) (*Transitive, error) {
 	config.Ctx.Log.Info("initializing consensus engine")
-	res := &Transitive{}
-	res.Ctx = config.Ctx
-	res.EngineNoOps.Ctx = res.Ctx
-	res.Sender = config.Sender
-	res.VM = config.VM
-	res.Validators = config.Validators
-
-	res.Params = config.Params
-	res.Consensus = config.Consensus
-	res.pending = make(map[ids.ID]snowman.Block)
-	res.nonVerifieds = NewAncestorTree()
 
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
-	res.polls = poll.NewSet(factory,
-		res.Ctx.Log,
-		config.Params.Namespace,
-		config.Params.Metrics,
-	)
+	res := &Transitive{
+		Ctx:             config.Ctx,
+		MsgHandlerNoOps: common.NewMsgHandlerNoOps(config.Ctx),
+		Sender:          config.Sender,
+		VM:              config.VM,
+		Validators:      config.Validators,
+		Params:          config.Params,
+		Consensus:       config.Consensus,
+		pending:         make(map[ids.ID]snowman.Block),
+		nonVerifieds:    NewAncestorTree(),
+		polls: poll.NewSet(factory,
+			config.Ctx.Log,
+			config.Params.Namespace,
+			config.Params.Metrics,
+		),
+	}
 
 	if err := res.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
 		return nil, err
