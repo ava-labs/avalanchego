@@ -356,7 +356,9 @@ func TestMempoolEthTxsRegossip(t *testing.T) {
 		assert.NoError(err, "failed adding coreth tx to local mempool")
 	}
 
-	// Queued txs will be full because all from different addresses
+	// We expect 15 transactions (the default max number of transactions to
+	// regossip) comprised of 10 local txs and 5 remote txs (we prioritize local
+	// txs over remote).
 	pushNetwork := vm.network.(*pushNetwork)
 	queued := pushNetwork.queueRegossipTxs()
 	assert.Len(queued, 15, "unexpected length of queued txs")
