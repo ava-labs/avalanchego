@@ -124,7 +124,7 @@ type clientConn struct {
 	handler *handler
 }
 
-func (c *Client) newClientConn(conn ServerCodec, apiMaxDuration time.Duration) *clientConn {
+func (c *Client) newClientConn(conn ServerCodec, apiMaxDuration, refillRate, maxStored time.Duration) *clientConn {
 	ctx := context.WithValue(context.Background(), clientContextKey{}, c)
 	// Http connections have already set the scheme
 	if !c.isHTTP() && c.scheme != "" {
@@ -132,9 +132,10 @@ func (c *Client) newClientConn(conn ServerCodec, apiMaxDuration time.Duration) *
 	}
 	handler := newHandler(ctx, conn, c.idgen, c.services)
 
-	// When apiMaxDuration is 0 (as is the case for all client invocations of
-	// this function), deadlineContext is ignored.
+	// When [apiMaxDuration] or [refillRate]/[maxStored] is 0 (as is the case for
+	// all client invocations of this function), it is ignored.
 	handler.deadlineContext = apiMaxDuration
+	handler.addLimiter(refillRate, maxStored)
 	return &clientConn{conn, handler}
 }
 
@@ -220,12 +221,12 @@ func newClient(initctx context.Context, connect reconnectFunc) (*Client, error) 
 	if err != nil {
 		return nil, err
 	}
-	c := initClient(conn, randomIDGenerator(), new(serviceRegistry), 0)
+	c := initClient(conn, randomIDGenerator(), new(serviceRegistry), 0, 0, 0)
 	c.reconnectFunc = connect
 	return c, nil
 }
 
-func initClient(conn ServerCodec, idgen func() ID, services *serviceRegistry, apiMaxDuration time.Duration) *Client {
+func initClient(conn ServerCodec, idgen func() ID, services *serviceRegistry, apiMaxDuration, refillRate, maxStored time.Duration) *Client {
 	scheme := ""
 	switch conn.(type) {
 	case *httpConn:
@@ -251,7 +252,7 @@ func initClient(conn ServerCodec, idgen func() ID, services *serviceRegistry, ap
 		reqTimeout:  make(chan *requestOp),
 	}
 	if !c.isHTTP() {
-		go c.dispatch(conn, apiMaxDuration)
+		go c.dispatch(conn, apiMaxDuration, refillRate, maxStored)
 	}
 	return c
 }
@@ -567,11 +568,11 @@ func (c *Client) reconnect(ctx context.Context) error {
 // dispatch is the main loop of the client.
 // It sends read messages to waiting calls to Call and BatchCall
 // and subscription notifications to registered subscriptions.
-func (c *Client) dispatch(codec ServerCodec, apiMaxDuration time.Duration) {
+func (c *Client) dispatch(codec ServerCodec, apiMaxDuration, refillRate, maxStored time.Duration) {
 	var (
 		lastOp      *requestOp  // tracks last send operation
 		reqInitLock = c.reqInit // nil while the send lock is held
-		conn        = c.newClientConn(codec, apiMaxDuration)
+		conn        = c.newClientConn(codec, apiMaxDuration, refillRate, maxStored)
 		reading     = true
 	)
 	defer func() {
@@ -618,7 +619,7 @@ func (c *Client) dispatch(codec ServerCodec, apiMaxDuration time.Duration) {
 			}
 			go c.read(newcodec)
 			reading = true
-			conn = c.newClientConn(newcodec, apiMaxDuration)
+			conn = c.newClientConn(newcodec, apiMaxDuration, refillRate, maxStored)
 			// Re-register the in-flight request on the new handler
 			// because that's where it will be sent.
 			conn.handler.addRequestOp(lastOp)

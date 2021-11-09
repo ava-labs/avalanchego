@@ -19,7 +19,9 @@ const (
 	defaultSnapshotAsync               = true
 	defaultRpcGasCap                   = 2500000000 // 25000000 X 100
 	defaultRpcTxFeeCap                 = 100        // 100 AVAX
-	defaultApiMaxDuration              = 0          // Default to no maximum API Call duration
+	defaultApiMaxDuration              = 0          // Default to no maximum API call duration
+	defaultWsCpuRefillRate             = 0          // Default to no maximum WS CPU usage
+	defaultWsCpuMaxStored              = 0          // Default to no maximum WS CPU usage
 	defaultMaxBlocksPerRequest         = 0          // Default to no maximum on the number of blocks per getLogs request
 	defaultContinuousProfilerFrequency = 15 * time.Minute
 	defaultContinuousProfilerMaxFiles  = 5
@@ -61,6 +63,8 @@ type Config struct {
 	LocalTxsEnabled           bool     `json:"local-txs-enabled"`
 	RemoteTxGossipOnlyEnabled bool     `json:"remote-tx-gossip-only-enabled"`
 	APIMaxDuration            Duration `json:"api-max-duration"`
+	WSCPURefillRate           Duration `json:"ws-cpu-refill-rate"`
+	WSCPUMaxStored            Duration `json:"ws-cpu-max-stored"`
 	MaxBlocksPerRequest       int64    `json:"api-max-blocks-per-request"`
 	AllowUnfinalizedQueries   bool     `json:"allow-unfinalized-queries"`
 	AllowUnprotectedTxs       bool     `json:"allow-unprotected-txs"`
@@ -105,6 +109,8 @@ func (c *Config) SetDefaults() {
 	c.RPCGasCap = defaultRpcGasCap
 	c.RPCTxFeeCap = defaultRpcTxFeeCap
 	c.APIMaxDuration.Duration = defaultApiMaxDuration
+	c.WSCPURefillRate.Duration = defaultWsCpuRefillRate
+	c.WSCPUMaxStored.Duration = defaultWsCpuMaxStored
 	c.MaxBlocksPerRequest = defaultMaxBlocksPerRequest
 	c.ContinuousProfilerFrequency.Duration = defaultContinuousProfilerFrequency
 	c.ContinuousProfilerMaxFiles = defaultContinuousProfilerMaxFiles

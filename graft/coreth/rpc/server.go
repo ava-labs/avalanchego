@@ -92,7 +92,7 @@ func (s *Server) RegisterName(name string, receiver interface{}) error {
 // server is stopped. In either case the codec is closed.
 //
 // Note that codec options are no longer supported.
-func (s *Server) ServeCodec(codec ServerCodec, options CodecOption, apiMaxDuration time.Duration) {
+func (s *Server) ServeCodec(codec ServerCodec, options CodecOption, apiMaxDuration, refillRate, maxStored time.Duration) {
 	defer codec.close()
 
 	// Don't serve if server is stopped.
@@ -104,7 +104,7 @@ func (s *Server) ServeCodec(codec ServerCodec, options CodecOption, apiMaxDurati
 	s.codecs.Add(codec)
 	defer s.codecs.Remove(codec)
 
-	c := initClient(codec, s.idgen, &s.services, apiMaxDuration)
+	c := initClient(codec, s.idgen, &s.services, apiMaxDuration, refillRate, maxStored)
 	<-codec.closed()
 	c.Close()
 }
