@@ -22,8 +22,7 @@ var _ Client = &client{}
 
 // Client for interacting with an AVM (X-Chain) instance
 type Client interface {
-	// IssueTx issues a transaction to a node and returns the TxID
-	IssueTx(tx []byte) (ids.ID, error)
+	WalletClient
 	// GetTxStatus returns the status of [txID]
 	GetTxStatus(txID ids.ID) (choices.Status, error)
 	// ConfirmTx attempts to confirm [txID] by checking its status [numChecks] times
@@ -105,24 +104,6 @@ type Client interface {
 	ExportKey(user api.UserPass, addr string) (string, error)
 	// ImportKey imports [privateKey] to [user]
 	ImportKey(user api.UserPass, privateKey string) (string, error)
-	// Send [amount] of [assetID] to address [to]
-	Send(
-		user api.UserPass,
-		from []string,
-		changeAddr string,
-		amount uint64,
-		assetID,
-		to,
-		memo string,
-	) (ids.ID, error)
-	// SendMultiple sends a transaction from [user] funding all [outputs]
-	SendMultiple(
-		user api.UserPass,
-		from []string,
-		changeAddr string,
-		outputs []SendOutput,
-		memo string,
-	) (ids.ID, error)
 	// Mint [amount] of [assetID] to be owned by [to]
 	Mint(
 		user api.UserPass,
@@ -177,7 +158,6 @@ func NewClient(uri, chain string, requestTimeout time.Duration) Client {
 	}
 }
 
-// IssueTx issues a transaction to a node and returns the TxID
 func (c *client) IssueTx(txBytes []byte) (ids.ID, error) {
 	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, txBytes)
 	if err != nil {
@@ -462,7 +442,6 @@ func (c *client) SendMultiple(
 	return res.TxID, err
 }
 
-// Mint [amount] of [assetID] to be owned by [to]
 func (c *client) Mint(
 	user api.UserPass,
 	from []string,
@@ -485,7 +464,6 @@ func (c *client) Mint(
 	return res.TxID, err
 }
 
-// SendNFT sends an NFT and returns the ID of the newly created transaction
 func (c *client) SendNFT(
 	user api.UserPass,
 	from []string,
@@ -508,7 +486,6 @@ func (c *client) SendNFT(
 	return res.TxID, err
 }
 
-// MintNFT issues a MintNFT transaction and returns the ID of the newly created transaction
 func (c *client) MintNFT(
 	user api.UserPass,
 	from []string,

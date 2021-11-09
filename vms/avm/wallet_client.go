@@ -16,10 +16,7 @@ import (
 )
 
 // Interface compliance
-var (
-	_ Client       = &client{}
-	_ WalletClient = &client{}
-)
+var _ WalletClient = &client{}
 
 // interface of an AVM wallet client for interacting with avm managed wallet on [chain]
 type WalletClient interface {
