@@ -13,7 +13,7 @@ import (
 var errInvalidNumberOfChecks = errors.New("expected at least 1 check attempt")
 
 // Interface compliance
-var _ Client = (*client)(nil)
+var _ Client = &client{}
 
 // Client interface for Avalanche Health API Endpoint
 type Client interface {

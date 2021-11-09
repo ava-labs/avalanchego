@@ -15,7 +15,7 @@ import (
 )
 
 // Interface compliance
-var _ Client = (*client)(nil)
+var _ Client = &client{}
 
 // Client interface for interacting with the P Chain endpoint
 type Client interface {

@@ -12,7 +12,7 @@ import (
 )
 
 // Interface compliance
-var _ Client = (*client)(nil)
+var _ Client = &client{}
 
 // Client interface for Avalanche Keystore API Endpoint
 type Client interface {

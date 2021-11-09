@@ -18,7 +18,7 @@ import (
 )
 
 // Interface compliance
-var _ Client = (*client)(nil)
+var _ Client = &client{}
 
 // Client for interacting with an AVM (X-Chain) instance
 type Client interface {

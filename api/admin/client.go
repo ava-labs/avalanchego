@@ -11,7 +11,7 @@ import (
 )
 
 // Interface compliance
-var _ Client = (*client)(nil)
+var _ Client = &client{}
 
 // Client interface for the Avalanche Platform Info API Endpoint
 type Client interface {
