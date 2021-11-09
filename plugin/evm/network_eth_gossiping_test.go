@@ -300,16 +300,12 @@ func TestMempoolEthTxsRegossipSingleAccount(t *testing.T) {
 	ethTxs := getValidEthTxs(key, 10, big.NewInt(226*params.GWei))
 
 	// Notify VM about eth txs
-	errs := vm.chain.GetTxPool().AddRemotesSync(ethTxs[:5])
+	errs := vm.chain.GetTxPool().AddRemotesSync(ethTxs)
 	for _, err := range errs {
 		assert.NoError(err, "failed adding coreth tx to remote mempool")
 	}
-	errs = vm.chain.GetTxPool().AddLocals(ethTxs[5:])
-	for _, err := range errs {
-		assert.NoError(err, "failed adding coreth tx to local mempool")
-	}
 
-	// Only transaction for regossip will be first remote (considered local)
+	// Only 1 transaction will be regossiped for an address
 	pushNetwork := vm.network.(*pushNetwork)
 	queued := pushNetwork.queueRegossipTxs()
 	assert.Len(queued, 1, "unexpected length of queued txs")
