@@ -22,29 +22,62 @@ var _ Client = &client{}
 
 // Client for interacting with an AVM (X-Chain) instance
 type Client interface {
-	IssueTx([]byte) (ids.ID, error)
-	GetTxStatus(ids.ID) (choices.Status, error)
-	ConfirmTx(ids.ID, int, time.Duration) (choices.Status, error)
-	GetTx(ids.ID) ([]byte, error)
+	// IssueTx issues a transaction to a node and returns the TxID
+	IssueTx(tx []byte) (ids.ID, error)
+	// GetTxStatus returns the status of [txID]
+	GetTxStatus(txID ids.ID) (choices.Status, error)
+	// ConfirmTx attempts to confirm [txID] by checking its status [numChecks] times
+	// with [checkFreq] between each attempt. If the transaction has not been decided
+	// by the final attempt, it returns the status of the last attempt.
+	// Note: ConfirmTx will block until either the last attempt finishes or the client
+	// returns a decided status.
+	ConfirmTx(txID ids.ID, numChecks int, checkFreq time.Duration) (choices.Status, error)
+	// GetTx returns the byte representation of [txID]
+	GetTx(txID ids.ID) ([]byte, error)
+	// GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
 	GetUTXOs([]string, uint32, string, string) ([][]byte, api.Index, error)
+	// GetAtomicUTXOs returns the byte representation of the atomic UTXOs controlled by [addresses]
+	// from [sourceChain]
 	GetAtomicUTXOs([]string, string, uint32, string, string) ([][]byte, api.Index, error)
+	// GetAssetDescription returns a description of [assetID]
 	GetAssetDescription(string) (*GetAssetDescriptionReply, error)
+	// GetBalance returns the balance of [assetID] held by [addr].
+	// If [includePartial], balance includes partial owned (i.e. in a multisig) funds.
 	GetBalance(string, string, bool) (*GetBalanceReply, error)
+	// GetAllBalances returns all asset balances for [addr]
+	// CreateAsset creates a new asset and returns its assetID
 	GetAllBalances(string, bool) (*GetAllBalancesReply, error)
 	CreateAsset(api.UserPass, []string, string, string, string, byte, []*Holder, []Owners) (ids.ID, error)
+	// CreateFixedCapAsset creates a new fixed cap asset and returns its assetID
 	CreateFixedCapAsset(api.UserPass, []string, string, string, string, byte, []*Holder) (ids.ID, error)
+	// CreateVariableCapAsset creates a new variable cap asset and returns its assetID
 	CreateVariableCapAsset(api.UserPass, []string, string, string, string, byte, []Owners) (ids.ID, error)
+	// CreateNFTAsset creates a new NFT asset and returns its assetID
 	CreateNFTAsset(api.UserPass, []string, string, string, string, []Owners) (ids.ID, error)
+	// CreateAddress creates a new address controlled by [user]
 	CreateAddress(api.UserPass) (string, error)
+	// ListAddresses returns all addresses on this chain controlled by [user]
 	ListAddresses(api.UserPass) ([]string, error)
+	// ExportKey returns the private key corresponding to [addr] controlled by [user]
 	ExportKey(api.UserPass, string) (string, error)
+	// ImportKey imports [privateKey] to [user]
 	ImportKey(api.UserPass, string) (string, error)
+	// Send [amount] of [assetID] to address [to]
 	Send(api.UserPass, []string, string, uint64, string, string, string) (ids.ID, error)
+	// SendMultiple sends a transaction from [user] funding all [outputs]
 	SendMultiple(api.UserPass, []string, string, []SendOutput, string) (ids.ID, error)
+	// Mint [amount] of [assetID] to be owned by [to]
 	Mint(api.UserPass, []string, string, uint64, string, string) (ids.ID, error)
+	// SendNFT sends an NFT and returns the ID of the newly created transaction
 	SendNFT(api.UserPass, []string, string, string, uint32, string) (ids.ID, error)
+	// MintNFT issues a MintNFT transaction and returns the ID of the newly created transaction
 	MintNFT(api.UserPass, []string, string, string, []byte, string) (ids.ID, error)
+	// Import sends an import transaction to import funds from [sourceChain] and
+	// returns the ID of the newly created transaction
 	Import(api.UserPass, string, string) (ids.ID, error)
+	// Export sends an asset from this chain to the P/C-Chain.
+	// After this tx is accepted, the AVAX must be imported to the P/C-chain with an importTx.
+	// Returns the ID of the newly created atomic transaction
 	Export(api.UserPass, []string, string, uint64, string, string) (ids.ID, error)
 }
 
@@ -74,7 +107,6 @@ func (c *client) IssueTx(txBytes []byte) (ids.ID, error) {
 	return res.TxID, err
 }
 
-// GetTxStatus returns the status of [txID]
 func (c *client) GetTxStatus(txID ids.ID) (choices.Status, error) {
 	res := &GetTxStatusReply{}
 	err := c.requester.SendRequest("getTxStatus", &api.JSONTxID{
@@ -83,11 +115,6 @@ func (c *client) GetTxStatus(txID ids.ID) (choices.Status, error) {
 	return res.Status, err
 }
 
-// ConfirmTx attempts to confirm [txID] by checking its status [attempts] times
-// with a [delay] in between each attempt. If the transaction has not been decided
-// by the final attempt, it returns the status of the last attempt.
-// Note: ConfirmTx will block until either the last attempt finishes or the client
-// returns a decided status.
 func (c *client) ConfirmTx(txID ids.ID, attempts int, delay time.Duration) (choices.Status, error) {
 	for i := 0; i < attempts-1; i++ {
 		status, err := c.GetTxStatus(txID)
@@ -104,7 +131,6 @@ func (c *client) ConfirmTx(txID ids.ID, attempts int, delay time.Duration) (choi
 	return c.GetTxStatus(txID)
 }
 
-// GetTx returns the byte representation of [txID]
 func (c *client) GetTx(txID ids.ID) ([]byte, error) {
 	res := &api.FormattedTx{}
 	err := c.requester.SendRequest("getTx", &api.GetTxArgs{
@@ -122,13 +148,10 @@ func (c *client) GetTx(txID ids.ID) ([]byte, error) {
 	return txBytes, nil
 }
 
-// GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
 func (c *client) GetUTXOs(addrs []string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error) {
 	return c.GetAtomicUTXOs(addrs, "", limit, startAddress, startUTXOID)
 }
 
-// GetAtomicUTXOs returns the byte representation of the atomic UTXOs controlled by [addresses]
-// from [sourceChain]
 func (c *client) GetAtomicUTXOs(addrs []string, sourceChain string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error) {
 	res := &api.GetUTXOsReply{}
 	err := c.requester.SendRequest("getUTXOs", &api.GetUTXOsArgs{
@@ -156,7 +179,6 @@ func (c *client) GetAtomicUTXOs(addrs []string, sourceChain string, limit uint32
 	return utxos, res.EndIndex, nil
 }
 
-// GetAssetDescription returns a description of [assetID]
 func (c *client) GetAssetDescription(assetID string) (*GetAssetDescriptionReply, error) {
 	res := &GetAssetDescriptionReply{}
 	err := c.requester.SendRequest("getAssetDescription", &GetAssetDescriptionArgs{
@@ -165,8 +187,6 @@ func (c *client) GetAssetDescription(assetID string) (*GetAssetDescriptionReply,
 	return res, err
 }
 
-// GetBalance returns the balance of [assetID] held by [addr].
-// If [includePartial], balance includes partial owned (i.e. in a multisig) funds.
 func (c *client) GetBalance(addr string, assetID string, includePartial bool) (*GetBalanceReply, error) {
 	res := &GetBalanceReply{}
 	err := c.requester.SendRequest("getBalance", &GetBalanceArgs{
@@ -177,7 +197,6 @@ func (c *client) GetBalance(addr string, assetID string, includePartial bool) (*
 	return res, err
 }
 
-// GetAllBalances returns all asset balances for [addr]
 func (c *client) GetAllBalances(addr string, includePartial bool) (*GetAllBalancesReply, error) {
 	res := &GetAllBalancesReply{}
 	err := c.requester.SendRequest("getAllBalances", &GetAllBalancesArgs{
@@ -187,7 +206,6 @@ func (c *client) GetAllBalances(addr string, includePartial bool) (*GetAllBalanc
 	return res, err
 }
 
-// CreateAsset creates a new asset and returns its assetID
 func (c *client) CreateAsset(
 	user api.UserPass,
 	from []string,
@@ -214,7 +232,6 @@ func (c *client) CreateAsset(
 	return res.AssetID, err
 }
 
-// CreateFixedCapAsset creates a new fixed cap asset and returns its assetID
 func (c *client) CreateFixedCapAsset(
 	user api.UserPass,
 	from []string,
@@ -239,7 +256,6 @@ func (c *client) CreateFixedCapAsset(
 	return res.AssetID, err
 }
 
-// CreateVariableCapAsset creates a new variable cap asset and returns its assetID
 func (c *client) CreateVariableCapAsset(
 	user api.UserPass,
 	from []string,
@@ -264,7 +280,6 @@ func (c *client) CreateVariableCapAsset(
 	return res.AssetID, err
 }
 
-// CreateNFTAsset creates a new NFT asset and returns its assetID
 func (c *client) CreateNFTAsset(
 	user api.UserPass,
 	from []string,
@@ -287,21 +302,18 @@ func (c *client) CreateNFTAsset(
 	return res.AssetID, err
 }
 
-// CreateAddress creates a new address controlled by [user]
 func (c *client) CreateAddress(user api.UserPass) (string, error) {
 	res := &api.JSONAddress{}
 	err := c.requester.SendRequest("createAddress", &user, res)
 	return res.Address, err
 }
 
-// ListAddresses returns all addresses on this chain controlled by [user]
 func (c *client) ListAddresses(user api.UserPass) ([]string, error) {
 	res := &api.JSONAddresses{}
 	err := c.requester.SendRequest("listAddresses", &user, res)
 	return res.Addresses, err
 }
 
-// ExportKey returns the private key corresponding to [addr] controlled by [user]
 func (c *client) ExportKey(user api.UserPass, addr string) (string, error) {
 	res := &ExportKeyReply{}
 	err := c.requester.SendRequest("exportKey", &ExportKeyArgs{
@@ -311,7 +323,6 @@ func (c *client) ExportKey(user api.UserPass, addr string) (string, error) {
 	return res.PrivateKey, err
 }
 
-// ImportKey imports [privateKey] to [user]
 func (c *client) ImportKey(user api.UserPass, privateKey string) (string, error) {
 	res := &api.JSONAddress{}
 	err := c.requester.SendRequest("importKey", &ImportKeyArgs{
@@ -321,7 +332,6 @@ func (c *client) ImportKey(user api.UserPass, privateKey string) (string, error)
 	return res.Address, err
 }
 
-// Send [amount] of [assetID] to address [to]
 func (c *client) Send(
 	user api.UserPass,
 	from []string,
@@ -348,7 +358,6 @@ func (c *client) Send(
 	return res.TxID, err
 }
 
-// SendMultiple sends a transaction from [user] funding all [outputs]
 func (c *client) SendMultiple(
 	user api.UserPass,
 	from []string,
@@ -443,8 +452,6 @@ func (c *client) MintNFT(
 	return res.TxID, err
 }
 
-// Import sends an import transaction to import funds from [sourceChain] and
-// returns the ID of the newly created transaction
 func (c *client) Import(user api.UserPass, to, sourceChain string) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest("import", &ImportArgs{
@@ -455,9 +462,6 @@ func (c *client) Import(user api.UserPass, to, sourceChain string) (ids.ID, erro
 	return res.TxID, err
 }
 
-// Export sends an asset from this chain to the P/C-Chain.
-// After this tx is accepted, the AVAX must be imported to the P/C-chain with an importTx.
-// Returns the ID of the newly created atomic transaction
 func (c *client) Export(
 	user api.UserPass,
 	from []string,
