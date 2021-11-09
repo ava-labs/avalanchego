@@ -4,6 +4,8 @@
 package evm
 
 import (
+	"container/heap"
+	"math/big"
 	"sync"
 	"time"
 
@@ -132,6 +134,61 @@ func (vm *VM) newPushNetwork(
 	return net
 }
 
+func (n *pushNetwork) extractBestTxs(baseFee *big.Int, txs map[common.Address]types.Transactions, maxTxs int) (int, error) {
+	// Setup heap for transactions
+	heads := make(types.TxByPriceAndTime, 0, len(txs))
+	for _, accountTxs := range txs {
+		if len(accountTxs) == 0 {
+			continue
+		}
+		wrapped, err := types.NewTxWithMinerFee(accountTxs[0], baseFee)
+		if err != nil {
+			return -1, err
+		}
+		heads = append(heads, wrapped)
+	}
+	heap.Init(&heads)
+
+	// Add up to [maxTxs] transactions to be gossiped
+	txsAdded := 0
+	for len(heads) > 0 && txsAdded < maxTxs {
+		tx := heads[0].Tx
+		n.ethTxsToGossip[tx.Hash()] = tx
+		heap.Pop(&heads)
+	}
+
+	return txsAdded, nil
+}
+
+func (n *pushNetwork) queueRegossipTxs() error {
+	txPool := n.chain.GetTxPool()
+
+	// Fetch all pending transactions
+	pending := txPool.Pending(true)
+
+	// Split the pending transactions into locals and remotes
+	localTxs := make(map[common.Address]types.Transactions)
+	remoteTxs := pending
+	for _, account := range txPool.Locals() {
+		if txs := remoteTxs[account]; len(txs) > 0 {
+			delete(remoteTxs, account)
+			localTxs[account] = txs
+		}
+	}
+
+	// Add best transactions to be gossiped (preferring local txs)
+	baseFee := txPool.BaseFee()
+	selected, err := n.extractBestTxs(baseFee, localTxs, n.config.TxRegossipMaxSize)
+	if err != nil {
+		return err
+	}
+	if selected >= n.config.TxRegossipMaxSize {
+		return nil
+	}
+	_, err = n.extractBestTxs(baseFee, remoteTxs, n.config.TxRegossipMaxSize)
+	return err
+}
+
 // awaitEthTxGossip periodically gossips transactions that have been queued for
 // gossip at least once every [ethTxsGossipInterval].
 func (n *pushNetwork) awaitEthTxGossip() {
@@ -140,7 +197,6 @@ func (n *pushNetwork) awaitEthTxGossip() {
 		defer n.shutdownWg.Done()
 
 		var (
-			txPool         = n.chain.GetTxPool()
 			gossipTicker   = time.NewTicker(ethTxsGossipInterval)
 			regossipTicker = time.NewTicker(n.config.TxRegossipFrequency.Duration)
 		)
@@ -156,47 +212,12 @@ func (n *pushNetwork) awaitEthTxGossip() {
 					)
 				}
 			case <-regossipTicker.C:
-				// TODO: extract into function
-				// Fetch all pending transactions
-				pending := txPool.Pending(true)
-
-				// Split the pending transactions into locals and remotes
-				localTxs := make(map[common.Address]types.Transactions)
-				remoteTxs := pending
-				for _, account := range txPool.Locals() {
-					if txs := remoteTxs[account]; len(txs) > 0 {
-						delete(remoteTxs, account)
-						localTxs[account] = txs
-					}
+				if err := n.queueRegossipTxs(); err != nil {
+					log.Warn(
+						"failed to find eth transactions to regossip",
+						"err", err,
+					)
 				}
-
-				// Sample X valid, older, non-executed txs (bypass cache)
-				itemsAdded := 0
-				for _, txs := range localTxs {
-					if itemsAdded > n.config.TxRegossipMaxSize {
-						break
-					}
-					if len(txs) == 0 {
-						continue
-					}
-					// Only get 1 tx per account
-					tx := txs[0]
-					n.ethTxsToGossip[tx.Hash()] = tx
-					itemsAdded++
-				}
-				for _, txs := range remoteTxs {
-					if itemsAdded > n.config.TxRegossipMaxSize {
-						break
-					}
-					if len(txs) == 0 {
-						continue
-					}
-					// Only get 1 tx per account
-					tx := txs[0]
-					n.ethTxsToGossip[tx.Hash()] = tx
-					itemsAdded++
-				}
-
 				if attempted, err := n.gossipEthTxs(true); err != nil {
 					log.Warn(
 						"failed to send eth transactions",
