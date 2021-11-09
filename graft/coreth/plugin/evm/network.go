@@ -5,6 +5,7 @@ package evm
 
 import (
 	"container/heap"
+	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -135,35 +136,41 @@ func (vm *VM) newPushNetwork(
 }
 
 // queueBestTxs attempts to add up to [maxTxs] to [ethTxsToGossip].
-func (n *pushNetwork) queueBestTxs(baseFee *big.Int, txs map[common.Address]types.Transactions, maxTxs int) (int, error) {
+func (n *pushNetwork) queueBestTxs(baseFee *big.Int, txs map[common.Address]types.Transactions, maxTxs int) types.Transactions {
 	// Setup heap for transactions
 	heads := make(types.TxByPriceAndTime, 0, len(txs))
 	for _, accountTxs := range txs {
 		if len(accountTxs) == 0 {
 			continue
 		}
-		wrapped, err := types.NewTxWithMinerFee(accountTxs[0], baseFee)
+		tx := accountTxs[0]
+		wrapped, err := types.NewTxWithMinerFee(tx, baseFee)
 		if err != nil {
-			return -1, err
+			log.Debug(
+				"not regossiping tx because of error parsing fee",
+				"tx", tx.Hash(),
+				"err", err,
+			)
+			continue
 		}
 		heads = append(heads, wrapped)
 	}
 	heap.Init(&heads)
 
 	// Add up to [maxTxs] transactions to be gossiped
-	txsAdded := 0
-	for len(heads) > 0 && txsAdded < maxTxs {
+	queued := make([]*types.Transaction, 0, maxTxs)
+	for len(heads) > 0 && len(queued) < maxTxs {
 		tx := heads[0].Tx
-		n.ethTxsToGossip[tx.Hash()] = tx
+		queued = append(queued, tx)
 		heap.Pop(&heads)
 	}
 
-	return txsAdded, nil
+	return queued
 }
 
 // queueRegossipTxs finds the best transactions in the mempool and adds up to
 // [TxRegossipMaxSize] of them to [ethTxsToGossip].
-func (n *pushNetwork) queueRegossipTxs() error {
+func (n *pushNetwork) queueRegossipTxs() types.Transactions {
 	txPool := n.chain.GetTxPool()
 
 	// Fetch all pending transactions
@@ -181,15 +188,15 @@ func (n *pushNetwork) queueRegossipTxs() error {
 
 	// Add best transactions to be gossiped (preferring local txs)
 	baseFee := txPool.BaseFee()
-	queued, err := n.queueBestTxs(baseFee, localTxs, n.config.TxRegossipMaxSize)
-	if err != nil {
-		return err
+	localQueued := n.queueBestTxs(baseFee, localTxs, n.config.TxRegossipMaxSize)
+	fmt.Println(localQueued)
+	localCount := len(localQueued)
+	if localCount >= n.config.TxRegossipMaxSize {
+		return localQueued
 	}
-	if queued >= n.config.TxRegossipMaxSize {
-		return nil
-	}
-	_, err = n.queueBestTxs(baseFee, remoteTxs, n.config.TxRegossipMaxSize-queued)
-	return err
+	remoteQueued := n.queueBestTxs(baseFee, remoteTxs, n.config.TxRegossipMaxSize-localCount)
+	fmt.Println(remoteQueued)
+	return append(localQueued, remoteQueued...)
 }
 
 // awaitEthTxGossip periodically gossips transactions that have been queued for
@@ -215,11 +222,8 @@ func (n *pushNetwork) awaitEthTxGossip() {
 					)
 				}
 			case <-regossipTicker.C:
-				if err := n.queueRegossipTxs(); err != nil {
-					log.Warn(
-						"failed to find eth transactions to regossip",
-						"err", err,
-					)
+				for _, tx := range n.queueRegossipTxs() {
+					n.ethTxsToGossip[tx.Hash()] = tx
 				}
 				if attempted, err := n.gossipEthTxs(true); err != nil {
 					log.Warn(
