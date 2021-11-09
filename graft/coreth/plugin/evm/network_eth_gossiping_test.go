@@ -311,7 +311,6 @@ func TestMempoolEthTxsRegossipSingleAccount(t *testing.T) {
 
 	// Only transaction for regossip will be first remote (considered local)
 	pushNetwork := vm.network.(*pushNetwork)
-	pushNetwork.ethTxsToGossip = map[common.Hash]*types.Transaction{}
 	queued := pushNetwork.queueRegossipTxs()
 	assert.Len(queued, 1, "unexpected length of queued txs")
 	assert.Equal(ethTxs[0].Hash(), queued[0].Hash())
@@ -357,8 +356,8 @@ func TestMempoolEthTxsRegossip(t *testing.T) {
 		assert.NoError(err, "failed adding coreth tx to local mempool")
 	}
 
+	// Queued txs will be full because all from different addresses
 	pushNetwork := vm.network.(*pushNetwork)
-	pushNetwork.ethTxsToGossip = map[common.Hash]*types.Transaction{}
 	queued := pushNetwork.queueRegossipTxs()
 	assert.Len(queued, 15, "unexpected length of queued txs")
 
