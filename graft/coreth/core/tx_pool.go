@@ -606,15 +606,6 @@ func (pool *TxPool) Pending(enforceTips bool) map[common.Address]types.Transacti
 	return pending
 }
 
-// BaseFee returns the most recently updated [baseFee]. This is useful when
-// determining which transactions to regossip.
-func (pool *TxPool) BaseFee() *big.Int {
-	pool.mu.RLock()
-	defer pool.mu.RUnlock()
-
-	return new(big.Int).Set(pool.priced.urgent.baseFee)
-}
-
 // Locals retrieves the accounts currently considered local by the pool.
 func (pool *TxPool) Locals() []common.Address {
 	pool.mu.Lock()

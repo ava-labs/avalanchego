@@ -21,6 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 
@@ -135,14 +136,20 @@ func (vm *VM) newPushNetwork(
 }
 
 // queueExecutableTxs attempts to add up to [maxTxs] to [ethTxsToGossip].
-func (n *pushNetwork) queueExecutableTxs(baseFee *big.Int, txs map[common.Address]types.Transactions, maxTxs int) types.Transactions {
+func (n *pushNetwork) queueExecutableTxs(state *state.StateDB, baseFee *big.Int, txs map[common.Address]types.Transactions, maxTxs int) types.Transactions {
 	// Setup heap for transactions
 	heads := make(types.TxByPriceAndTime, 0, len(txs))
-	for _, accountTxs := range txs {
+	for addr, accountTxs := range txs {
 		if len(accountTxs) == 0 {
 			continue
 		}
 		tx := accountTxs[0]
+
+		// Ensure any transactions regossiped are immediately executable
+		if tx.Nonce() != state.GetNonce(addr) {
+			continue
+		}
+
 		wrapped, err := types.NewTxWithMinerFee(tx, baseFee)
 		if err != nil {
 			log.Debug(
@@ -186,13 +193,22 @@ func (n *pushNetwork) queueRegossipTxs() types.Transactions {
 	}
 
 	// Add best transactions to be gossiped (preferring local txs)
-	baseFee := txPool.BaseFee()
-	localQueued := n.queueExecutableTxs(baseFee, localTxs, n.config.TxRegossipMaxSize)
+	tip := n.chain.BlockChain().CurrentBlock()
+	state, err := n.chain.BlockChain().StateAt(tip.Root())
+	if err != nil || state == nil {
+		log.Debug(
+			"could not get state at tip",
+			"tip", tip.Hash(),
+			"err", err,
+		)
+		return nil
+	}
+	localQueued := n.queueExecutableTxs(state, tip.BaseFee(), localTxs, n.config.TxRegossipMaxSize)
 	localCount := len(localQueued)
 	if localCount >= n.config.TxRegossipMaxSize {
 		return localQueued
 	}
-	remoteQueued := n.queueExecutableTxs(baseFee, remoteTxs, n.config.TxRegossipMaxSize-localCount)
+	remoteQueued := n.queueExecutableTxs(state, tip.BaseFee(), remoteTxs, n.config.TxRegossipMaxSize-localCount)
 	return append(localQueued, remoteQueued...)
 }
 
