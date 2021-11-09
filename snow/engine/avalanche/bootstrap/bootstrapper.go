@@ -108,21 +108,22 @@ func newBootstrapper(
 	namespace string,
 	registerer prometheus.Registerer,
 ) (*bootstrapper, error) {
-	res := &bootstrapper{}
-	res.VtxBlocked = config.VtxBlocked
-	res.TxBlocked = config.TxBlocked
-	res.Manager = config.Manager
-	res.VM = config.VM
-	res.processedCache = &cache.LRU{Size: cacheSize}
-	res.OnFinished = onFinished
-	res.executedStateTransitions = math.MaxInt32
+	b := &bootstrapper{
+		VtxBlocked:               config.VtxBlocked,
+		TxBlocked:                config.TxBlocked,
+		Manager:                  config.Manager,
+		VM:                       config.VM,
+		processedCache:           &cache.LRU{Size: cacheSize},
+		Fetcher:                  common.Fetcher{OnFinished: onFinished},
+		executedStateTransitions: math.MaxInt32,
+	}
 
-	if err := res.metrics.Initialize(namespace, registerer); err != nil {
+	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return nil, err
 	}
 
 	errs := wrappers.Errs{}
-	res.getAncestorsVtxs = metric.NewAveragerWithErrs(
+	b.getAncestorsVtxs = metric.NewAveragerWithErrs(
 		namespace,
 		"get_ancestors_vtxs",
 		"vertices fetched in a call to GetAncestors",
@@ -130,30 +131,30 @@ func newBootstrapper(
 		&errs,
 	)
 
-	if err := res.VtxBlocked.SetParser(&vtxParser{
+	if err := b.VtxBlocked.SetParser(&vtxParser{
 		log:         config.Ctx.Log,
-		numAccepted: res.numAcceptedVts,
-		numDropped:  res.numDroppedVts,
-		manager:     res.Manager,
+		numAccepted: b.numAcceptedVts,
+		numDropped:  b.numDroppedVts,
+		manager:     b.Manager,
 	}); err != nil {
 		return nil, err
 	}
 
-	if err := res.TxBlocked.SetParser(&txParser{
+	if err := b.TxBlocked.SetParser(&txParser{
 		log:         config.Ctx.Log,
-		numAccepted: res.numAcceptedTxs,
-		numDropped:  res.numDroppedTxs,
-		vm:          res.VM,
+		numAccepted: b.numAcceptedTxs,
+		numDropped:  b.numDroppedTxs,
+		vm:          b.VM,
 	}); err != nil {
 		return nil, err
 	}
 
-	config.Bootstrapable = res
-	if err := res.Bootstrapper.Initialize(config.Config); err != nil {
+	config.Bootstrapable = b
+	if err := b.Bootstrapper.Initialize(config.Config); err != nil {
 		return nil, err
 	}
 
-	return res, nil
+	return b, nil
 }
 
 func (b *bootstrapper) Start(startReqID uint32) error {

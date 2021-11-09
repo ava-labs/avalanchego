@@ -99,30 +99,33 @@ func newBootstrapper(
 	namespace string,
 	registerer prometheus.Registerer,
 ) (*bootstrapper, error) {
-	res := &bootstrapper{}
-	res.Blocked = config.Blocked
-	res.VM = config.VM
-	res.Bootstrapped = config.Bootstrapped
-	res.OnFinished = onFinished
-	res.executedStateTransitions = math.MaxInt32
-	res.startingAcceptedFrontier = ids.Set{}
+	b := &bootstrapper{
+		Blocked:      config.Blocked,
+		VM:           config.VM,
+		Bootstrapped: config.Bootstrapped,
+		Fetcher: common.Fetcher{
+			OnFinished: onFinished,
+		},
+		executedStateTransitions: math.MaxInt32,
+		startingAcceptedFrontier: ids.Set{},
+	}
 
-	lastAcceptedID, err := res.VM.LastAccepted()
+	lastAcceptedID, err := b.VM.LastAccepted()
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get last accepted ID: %s", err)
 	}
-	lastAccepted, err := res.VM.GetBlock(lastAcceptedID)
+	lastAccepted, err := b.VM.GetBlock(lastAcceptedID)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get last accepted block: %s", err)
 	}
-	res.startingHeight = lastAccepted.Height()
+	b.startingHeight = lastAccepted.Height()
 
-	if err := res.metrics.Initialize(namespace, registerer); err != nil {
+	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return nil, err
 	}
 
 	errs := wrappers.Errs{}
-	res.getAncestorsBlks = metric.NewAveragerWithErrs(
+	b.getAncestorsBlks = metric.NewAveragerWithErrs(
 		namespace,
 		"get_ancestors_blks",
 		"blocks fetched in a call to GetAncestors",
@@ -130,22 +133,22 @@ func newBootstrapper(
 		&errs,
 	)
 
-	res.parser = &parser{
+	b.parser = &parser{
 		log:         config.Ctx.Log,
-		numAccepted: res.numAccepted,
-		numDropped:  res.numDropped,
-		vm:          res.VM,
+		numAccepted: b.numAccepted,
+		numDropped:  b.numDropped,
+		vm:          b.VM,
 	}
-	if err := res.Blocked.SetParser(res.parser); err != nil {
+	if err := b.Blocked.SetParser(b.parser); err != nil {
 		return nil, err
 	}
 
-	config.Bootstrapable = res
-	if err := res.Bootstrapper.Initialize(config.Config); err != nil {
+	config.Bootstrapable = b
+	if err := b.Bootstrapper.Initialize(config.Config); err != nil {
 		return nil, err
 	}
 
-	return res, nil
+	return b, nil
 }
 
 func (b *bootstrapper) Start(startReqID uint32) error {
