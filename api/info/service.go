@@ -238,10 +238,10 @@ func (service *Info) Uptime(_ *http.Request, _ *struct{}, reply *UptimeResponse)
 	totalWeightedPercent := uint64(0)
 	totalWeight := uint64(0)
 	rewardingStake := uint64(0)
-	for _, peerInfo := range service.networking.Peers([]ids.ShortID{}) {
+	for _, peerInfo := range service.networking.Peers(nil) {
 		percent := uint8(peerInfo.ObservedUptime)
 		weight := uint64(peerInfo.Weight)
-		// this is not a validaotor skip it.
+		// this is not a validator skip it.
 		if weight == 0 {
 			continue
 		}

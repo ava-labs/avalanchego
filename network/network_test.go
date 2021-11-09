@@ -1371,12 +1371,12 @@ func TestPeerAliasesTicker(t *testing.T) {
 	wg0.Wait()
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip1.String(): id1,
-	}, net0.Peers([]ids.ShortID{}))
+	}, net0.Peers(nil))
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip0.String(): id0,
-	}, net1.Peers([]ids.ShortID{}))
-	assert.Len(t, net2.Peers([]ids.ShortID{}), 0)
-	assert.Len(t, net3.Peers([]ids.ShortID{}), 0)
+	}, net1.Peers(nil))
+	assert.Len(t, net2.Peers(nil), 0)
+	assert.Len(t, net3.Peers(nil), 0)
 
 	// Attempt to connect to ip2 (same id as ip1)
 	net0.Track(ip2.IP(), id2)
@@ -1386,12 +1386,12 @@ func TestPeerAliasesTicker(t *testing.T) {
 	wg1Done = true
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip1.String(): id1,
-	}, net0.Peers([]ids.ShortID{}))
+	}, net0.Peers(nil))
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip0.String(): id0,
-	}, net1.Peers([]ids.ShortID{}))
-	assert.Len(t, net2.Peers([]ids.ShortID{}), 0)
-	assert.Len(t, net3.Peers([]ids.ShortID{}), 0)
+	}, net1.Peers(nil))
+	assert.Len(t, net2.Peers(nil), 0)
+	assert.Len(t, net3.Peers(nil), 0)
 
 	// Subsequent track call returns immediately with no connection attempts
 	// (would cause fatal error from unauthorized connection if allowed)
@@ -1410,14 +1410,14 @@ func TestPeerAliasesTicker(t *testing.T) {
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip1.String(): id1,
 		ip2.String(): id2,
-	}, net0.Peers([]ids.ShortID{}))
+	}, net0.Peers(nil))
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip0.String(): id0,
-	}, net1.Peers([]ids.ShortID{}))
-	assert.Len(t, net2.Peers([]ids.ShortID{}), 0)
+	}, net1.Peers(nil))
+	assert.Len(t, net2.Peers(nil), 0)
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip0.String(): id0,
-	}, net3.Peers([]ids.ShortID{}))
+	}, net3.Peers(nil))
 
 	// Cleanup
 	cleanup = true
@@ -1777,12 +1777,12 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	wg0.Wait()
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip1.String(): id1,
-	}, net0.Peers([]ids.ShortID{}))
+	}, net0.Peers(nil))
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip0.String(): id0,
-	}, net1.Peers([]ids.ShortID{}))
-	assert.Len(t, net2.Peers([]ids.ShortID{}), 0)
-	assert.Len(t, net3.Peers([]ids.ShortID{}), 0)
+	}, net1.Peers(nil))
+	assert.Len(t, net2.Peers(nil), 0)
+	assert.Len(t, net3.Peers(nil), 0)
 
 	// Attempt to connect to ip2 (same id as ip1)
 	net0.Track(ip2.IP(), id2)
@@ -1792,12 +1792,12 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	wg1Done = true
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip1.String(): id1,
-	}, net0.Peers([]ids.ShortID{}))
+	}, net0.Peers(nil))
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip0.String(): id0,
-	}, net1.Peers([]ids.ShortID{}))
-	assert.Len(t, net2.Peers([]ids.ShortID{}), 0)
-	assert.Len(t, net3.Peers([]ids.ShortID{}), 0)
+	}, net1.Peers(nil))
+	assert.Len(t, net2.Peers(nil), 0)
+	assert.Len(t, net3.Peers(nil), 0)
 
 	// Disconnect original peer
 	_ = caller0.clients[ip1.String()].Close()
@@ -1805,12 +1805,12 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	// Track ip2 on net3
 	wg2.Wait()
 	wg2Done = true
-	assertEqualPeers(t, map[string]ids.ShortID{}, net0.Peers([]ids.ShortID{}))
+	assertEqualPeers(t, map[string]ids.ShortID{}, net0.Peers(nil))
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip0.String(): id0,
-	}, net1.Peers([]ids.ShortID{}))
-	assert.Len(t, net2.Peers([]ids.ShortID{}), 0)
-	assert.Len(t, net3.Peers([]ids.ShortID{}), 0)
+	}, net1.Peers(nil))
+	assert.Len(t, net2.Peers(nil), 0)
+	assert.Len(t, net3.Peers(nil), 0)
 	upgrader.Update(ip2, id2)
 	caller0.Update(ip2, listener3)
 	net0.Track(ip2.IP(), id2)
@@ -1819,14 +1819,14 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	wg3.Wait()
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip2.String(): id2,
-	}, net0.Peers([]ids.ShortID{}))
+	}, net0.Peers(nil))
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip0.String(): id0,
-	}, net1.Peers([]ids.ShortID{}))
-	assert.Len(t, net2.Peers([]ids.ShortID{}), 0)
+	}, net1.Peers(nil))
+	assert.Len(t, net2.Peers(nil), 0)
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip0.String(): id0,
-	}, net3.Peers([]ids.ShortID{}))
+	}, net3.Peers(nil))
 
 	// Cleanup
 	cleanup = true
