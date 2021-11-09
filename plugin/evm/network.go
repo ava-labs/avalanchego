@@ -134,8 +134,8 @@ func (vm *VM) newPushNetwork(
 	return net
 }
 
-// queueBestTxs attempts to add up to [maxTxs] to [ethTxsToGossip].
-func (n *pushNetwork) queueBestTxs(baseFee *big.Int, txs map[common.Address]types.Transactions, maxTxs int) types.Transactions {
+// queueExecutableTxs attempts to add up to [maxTxs] to [ethTxsToGossip].
+func (n *pushNetwork) queueExecutableTxs(baseFee *big.Int, txs map[common.Address]types.Transactions, maxTxs int) types.Transactions {
 	// Setup heap for transactions
 	heads := make(types.TxByPriceAndTime, 0, len(txs))
 	for _, accountTxs := range txs {
@@ -146,7 +146,7 @@ func (n *pushNetwork) queueBestTxs(baseFee *big.Int, txs map[common.Address]type
 		wrapped, err := types.NewTxWithMinerFee(tx, baseFee)
 		if err != nil {
 			log.Debug(
-				"not regossiping tx because of error parsing fee",
+				"not queuing tx for regossip",
 				"tx", tx.Hash(),
 				"err", err,
 			)
@@ -187,12 +187,12 @@ func (n *pushNetwork) queueRegossipTxs() types.Transactions {
 
 	// Add best transactions to be gossiped (preferring local txs)
 	baseFee := txPool.BaseFee()
-	localQueued := n.queueBestTxs(baseFee, localTxs, n.config.TxRegossipMaxSize)
+	localQueued := n.queueExecutableTxs(baseFee, localTxs, n.config.TxRegossipMaxSize)
 	localCount := len(localQueued)
 	if localCount >= n.config.TxRegossipMaxSize {
 		return localQueued
 	}
-	remoteQueued := n.queueBestTxs(baseFee, remoteTxs, n.config.TxRegossipMaxSize-localCount)
+	remoteQueued := n.queueExecutableTxs(baseFee, remoteTxs, n.config.TxRegossipMaxSize-localCount)
 	return append(localQueued, remoteQueued...)
 }
 
