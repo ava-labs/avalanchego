@@ -408,6 +408,11 @@ func (tx *Transaction) WithSignature(signer Signer, sig []byte) (*Transaction, e
 	return &Transaction{inner: cpy, time: tx.time}, nil
 }
 
+// FirstSeen is the time a transaction is first seen.
+func (tx *Transaction) FirstSeen() time.Time {
+	return tx.time
+}
+
 // Transactions implements DerivableList for transactions.
 type Transactions []*Transaction
 

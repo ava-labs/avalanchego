@@ -146,11 +146,12 @@ func (n *pushNetwork) queueExecutableTxs(state *state.StateDB, baseFee *big.Int,
 		}
 		tx := accountTxs[0]
 
-		// Ensure any transactions regossiped are immediately executable
-		if tx.Nonce() != state.GetNonce(addr) {
+		// Don't try to regossip a transaction too frequently
+		if time.Since(tx.FirstSeen()) < n.config.TxRegossipFrequency.Duration {
 			continue
 		}
 
+		// Ensure the fee the transaction pays is valid at tip
 		wrapped, err := types.NewTxWithMinerFee(tx, baseFee)
 		if err != nil {
 			log.Debug(
@@ -160,6 +161,12 @@ func (n *pushNetwork) queueExecutableTxs(state *state.StateDB, baseFee *big.Int,
 			)
 			continue
 		}
+
+		// Ensure any transactions regossiped are immediately executable
+		if tx.Nonce() != state.GetNonce(addr) {
+			continue
+		}
+
 		heads = append(heads, wrapped)
 	}
 	heap.Init(&heads)
@@ -355,8 +362,8 @@ func (n *pushNetwork) sendEthTxs(txs []*types.Transaction) error {
 	return n.appSender.SendAppGossip(msgBytes)
 }
 
-func (n *pushNetwork) gossipEthTxs(bypassCache bool) (int, error) {
-	if time.Since(n.lastGossiped) < ethTxsGossipInterval || len(n.ethTxsToGossip) == 0 {
+func (n *pushNetwork) gossipEthTxs(force bool) (int, error) {
+	if (!force && time.Since(n.lastGossiped) < ethTxsGossipInterval) || len(n.ethTxsToGossip) == 0 {
 		return 0, nil
 	}
 	n.lastGossiped = time.Now()
@@ -379,9 +386,9 @@ func (n *pushNetwork) gossipEthTxs(bypassCache bool) (int, error) {
 			continue
 		}
 
-		// We check bypassCache outside of the if statement to avoid an unnecessary
-		// cache lookup.
-		if !bypassCache {
+		// We check [force] outside of the if statement to avoid an unnecessary
+		// cache wlookup.
+		if !force {
 			if _, has := n.recentEthTxs.Get(txHash); has {
 				continue
 			}
