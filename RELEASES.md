@@ -7,6 +7,7 @@ This version is backwards compatible to [v1.6.0](https://github.com/ava-labs/ava
 ## Bootstrapping
 
 - Drop inbound messages to a chain if that chain is in the execution phase of bootstrapping.
+- Print beacon nodes upon failure to connect to them.
 
 ## Metrics
 
