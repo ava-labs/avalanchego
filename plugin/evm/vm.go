@@ -82,7 +82,7 @@ const (
 	// and fail verification
 	maxFutureBlockTime   = 10 * time.Second
 	maxUTXOsToFetch      = 1024
-	defaultMempoolSize   = 1024
+	defaultMempoolSize   = 4096
 	codecVersion         = uint16(0)
 	secpFactoryCacheSize = 1024
 
