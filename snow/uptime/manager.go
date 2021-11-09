@@ -14,6 +14,9 @@ import (
 var _ TestManager = &manager{}
 
 type Manager interface {
+	// TODO: Remove SetState as it is a jank workaround.
+	SetState(state State)
+
 	// Should only be called once
 	StartTracking(nodeIDs []ids.ShortID) error
 
@@ -27,19 +30,11 @@ type Manager interface {
 	CalculateUptime(nodeID ids.ShortID) (time.Duration, time.Time, error)
 	CalculateUptimePercent(nodeID ids.ShortID) (float64, error)
 	CalculateUptimePercentFrom(nodeID ids.ShortID, startTime time.Time) (float64, error)
-
-	SetState(state State) error
 }
 
 type TestManager interface {
 	Manager
 	SetTime(time.Time)
-}
-
-type State interface {
-	GetUptime(nodeID ids.ShortID) (upDuration time.Duration, lastUpdated time.Time, err error)
-	SetUptime(nodeID ids.ShortID, upDuration time.Duration, lastUpdated time.Time) error
-	GetStartTime(nodeID ids.ShortID) (startTime time.Time, err error)
 }
 
 type manager struct {
@@ -58,9 +53,8 @@ func NewManager(state State) Manager {
 	}
 }
 
-func (m *manager) SetState(state State) error {
+func (m *manager) SetState(state State) {
 	m.state = state
-	return nil
 }
 
 func (m *manager) StartTracking(nodeIDs []ids.ShortID) error {

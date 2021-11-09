@@ -857,9 +857,8 @@ func (p *peer) pongHandle(msg message.InboundMessage, isUptime bool) {
 	}
 	if isUptime {
 		uptime := msg.Get(message.Uptime).(uint8)
-		if uptime > 0 && uptime <= 100 {
-			// (0-100) percentage
-			p.observedUptime = uptime
+		if uptime <= 100 {
+			p.observedUptime = uptime // [0, 100] percentage
 		}
 	}
 }

@@ -10,6 +10,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+var _ State = &TestState{}
+
 type uptime struct {
 	upDuration  time.Duration
 	lastUpdated time.Time
@@ -28,14 +30,14 @@ func NewTestState() *TestState {
 	}
 }
 
-func (s *TestState) addNode(nodeID ids.ShortID, startTime time.Time) {
+func (s *TestState) AddNode(nodeID ids.ShortID, startTime time.Time) {
 	s.nodes[nodeID] = &uptime{
 		lastUpdated: startTime,
 		startTime:   startTime,
 	}
 }
 
-func (s *TestState) GetUptime(nodeID ids.ShortID) (upDuration time.Duration, lastUpdated time.Time, err error) {
+func (s *TestState) GetUptime(nodeID ids.ShortID) (time.Duration, time.Time, error) {
 	up, exists := s.nodes[nodeID]
 	if !exists {
 		return 0, time.Time{}, database.ErrNotFound

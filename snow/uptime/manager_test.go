@@ -19,7 +19,7 @@ func TestStartTracking(t *testing.T) {
 	startTime := time.Now()
 
 	s := NewTestState()
-	s.addNode(nodeID0, startTime)
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 
@@ -43,7 +43,7 @@ func TestStartTrackingDBError(t *testing.T) {
 
 	s := NewTestState()
 	s.dbWriteError = errors.New("err")
-	s.addNode(nodeID0, startTime)
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 
@@ -72,7 +72,7 @@ func TestStartTrackingInThePast(t *testing.T) {
 	startTime := time.Now()
 
 	s := NewTestState()
-	s.addNode(nodeID0, startTime)
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 
@@ -96,7 +96,7 @@ func TestShutdownDecreasesUptime(t *testing.T) {
 	startTime := currentTime
 
 	s := NewTestState()
-	s.addNode(nodeID0, startTime)
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
@@ -130,7 +130,7 @@ func TestShutdownIncreasesUptime(t *testing.T) {
 	startTime := currentTime
 
 	s := NewTestState()
-	s.addNode(nodeID0, startTime)
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
@@ -181,7 +181,7 @@ func TestShutdownConnectedDBError(t *testing.T) {
 	startTime := time.Now()
 
 	s := NewTestState()
-	s.addNode(nodeID0, startTime)
+	s.AddNode(nodeID0, startTime)
 	up := NewManager(s).(*manager)
 
 	err := up.StartTracking(nil)
@@ -203,7 +203,7 @@ func TestShutdownNonConnectedPast(t *testing.T) {
 	startTime := currentTime
 
 	s := NewTestState()
-	s.addNode(nodeID0, startTime)
+	s.AddNode(nodeID0, startTime)
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
 
@@ -230,7 +230,7 @@ func TestShutdownNonConnectedDBError(t *testing.T) {
 	startTime := currentTime
 
 	s := NewTestState()
-	s.addNode(nodeID0, startTime)
+	s.AddNode(nodeID0, startTime)
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
 
@@ -253,7 +253,7 @@ func TestConnectAndDisconnect(t *testing.T) {
 	startTime := currentTime
 
 	s := NewTestState()
-	s.addNode(nodeID0, startTime)
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
@@ -309,7 +309,7 @@ func TestConnectAndDisconnectBeforeTracking(t *testing.T) {
 	startTime := currentTime
 
 	s := NewTestState()
-	s.addNode(nodeID0, startTime)
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 	currentTime = currentTime.Add(time.Second)
@@ -342,7 +342,7 @@ func TestUnrelatedNodeDisconnect(t *testing.T) {
 	startTime := currentTime
 
 	s := NewTestState()
-	s.addNode(nodeID0, startTime)
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
@@ -388,7 +388,7 @@ func TestCalculateUptimeWhenNeverConnected(t *testing.T) {
 	startTime := time.Now()
 
 	s := NewTestState()
-	s.addNode(nodeID0, startTime)
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 
@@ -413,7 +413,7 @@ func TestCalculateUptimeWhenConnectedBeforeTracking(t *testing.T) {
 	startTime := currentTime
 
 	s := NewTestState()
-	s.addNode(nodeID0, startTime)
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
@@ -444,7 +444,7 @@ func TestCalculateUptimeWhenConnectedInFuture(t *testing.T) {
 	startTime := currentTime
 
 	s := NewTestState()
-	s.addNode(nodeID0, startTime)
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
@@ -489,7 +489,7 @@ func TestCalculateUptimePercentageDivBy0(t *testing.T) {
 	startTime := currentTime
 
 	s := NewTestState()
-	s.addNode(nodeID0, startTime)
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
@@ -507,7 +507,7 @@ func TestCalculateUptimePercentage(t *testing.T) {
 	startTime := currentTime
 
 	s := NewTestState()
-	s.addNode(nodeID0, startTime)
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 
