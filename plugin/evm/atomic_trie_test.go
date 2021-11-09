@@ -3,6 +3,7 @@ package evm
 import (
 	"math/rand"
 	"testing"
+	"time"
 
 	atomic2 "go.uber.org/atomic"
 
@@ -335,6 +336,8 @@ func Test_IndexerInitializeFromState(t *testing.T) {
 
 	lastAcceptedBlock := newAtomicBlockFacade(100, common.Hash{}, nil)
 	chainFacade := newTestChainFacade(lastAcceptedBlock, func(blockNum uint64) facades.BlockFacade {
+		// slow it down a bit
+		time.Sleep(50 * time.Millisecond)
 		_, exists := blockAtomicOpsMap[blockNum]
 		assert.True(t, exists, "block %d must exist", blockNum)
 		return newAtomicBlockFacade(blockNum, common.Hash{}, nil)
@@ -347,6 +350,17 @@ func Test_IndexerInitializeFromState(t *testing.T) {
 	}, func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error) {
 		return blockAtomicOpsMap[blk.NumberU64()], nil
 	})
+
+	// ensure calls to Index are ignored without error
+	// this is important because while atomic trie indexing is running in the background
+	// and as new blocks are being accepted indexer.Index will be called so it has to
+	// skip this call without returning error
+	time.Sleep(500 * time.Millisecond)
+	hash, err = indexer.Index(lastAcceptedBlock.NumberU64()+1, nil)
+	assert.NoError(t, err)
+	assert.Equal(t, common.Hash{}, hash)
+
+	// wait for index.Initialize to finish
 	<-doneChan
 	assert.EqualValues(t, 2, dbCommitCount.Load())
 
