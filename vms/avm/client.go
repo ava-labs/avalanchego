@@ -35,50 +35,134 @@ type Client interface {
 	// GetTx returns the byte representation of [txID]
 	GetTx(txID ids.ID) ([]byte, error)
 	// GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
-	GetUTXOs([]string, uint32, string, string) ([][]byte, api.Index, error)
+	GetUTXOs(
+		addrs []string,
+		limit uint32,
+		startAddress,
+		startUTXOID string,
+	) ([][]byte, api.Index, error)
 	// GetAtomicUTXOs returns the byte representation of the atomic UTXOs controlled by [addresses]
 	// from [sourceChain]
-	GetAtomicUTXOs([]string, string, uint32, string, string) ([][]byte, api.Index, error)
+	GetAtomicUTXOs(
+		addrs []string,
+		sourceChain string,
+		limit uint32,
+		startAddress,
+		startUTXOID string,
+	) ([][]byte, api.Index, error)
 	// GetAssetDescription returns a description of [assetID]
-	GetAssetDescription(string) (*GetAssetDescriptionReply, error)
+	GetAssetDescription(assetID string) (*GetAssetDescriptionReply, error)
 	// GetBalance returns the balance of [assetID] held by [addr].
 	// If [includePartial], balance includes partial owned (i.e. in a multisig) funds.
-	GetBalance(string, string, bool) (*GetBalanceReply, error)
+	GetBalance(addr string, assetID string, includePartial bool) (*GetBalanceReply, error)
 	// GetAllBalances returns all asset balances for [addr]
 	// CreateAsset creates a new asset and returns its assetID
 	GetAllBalances(string, bool) (*GetAllBalancesReply, error)
-	CreateAsset(api.UserPass, []string, string, string, string, byte, []*Holder, []Owners) (ids.ID, error)
+	CreateAsset(
+		user api.UserPass,
+		from []string,
+		changeAddr,
+		name,
+		symbol string,
+		denomination byte,
+		holders []*Holder,
+		minters []Owners,
+	) (ids.ID, error)
 	// CreateFixedCapAsset creates a new fixed cap asset and returns its assetID
-	CreateFixedCapAsset(api.UserPass, []string, string, string, string, byte, []*Holder) (ids.ID, error)
+	CreateFixedCapAsset(
+		user api.UserPass,
+		from []string,
+		changeAddr,
+		name,
+		symbol string,
+		denomination byte,
+		holders []*Holder,
+	) (ids.ID, error)
 	// CreateVariableCapAsset creates a new variable cap asset and returns its assetID
-	CreateVariableCapAsset(api.UserPass, []string, string, string, string, byte, []Owners) (ids.ID, error)
+	CreateVariableCapAsset(
+		user api.UserPass,
+		from []string,
+		changeAddr,
+		name,
+		symbol string,
+		denomination byte,
+		minters []Owners,
+	) (ids.ID, error)
 	// CreateNFTAsset creates a new NFT asset and returns its assetID
-	CreateNFTAsset(api.UserPass, []string, string, string, string, []Owners) (ids.ID, error)
+	CreateNFTAsset(
+		user api.UserPass,
+		from []string,
+		changeAddr,
+		name,
+		symbol string,
+		minters []Owners,
+	) (ids.ID, error)
 	// CreateAddress creates a new address controlled by [user]
-	CreateAddress(api.UserPass) (string, error)
+	CreateAddress(user api.UserPass) (string, error)
 	// ListAddresses returns all addresses on this chain controlled by [user]
-	ListAddresses(api.UserPass) ([]string, error)
+	ListAddresses(user api.UserPass) ([]string, error)
 	// ExportKey returns the private key corresponding to [addr] controlled by [user]
-	ExportKey(api.UserPass, string) (string, error)
+	ExportKey(user api.UserPass, addr string) (string, error)
 	// ImportKey imports [privateKey] to [user]
-	ImportKey(api.UserPass, string) (string, error)
+	ImportKey(user api.UserPass, privateKey string) (string, error)
 	// Send [amount] of [assetID] to address [to]
-	Send(api.UserPass, []string, string, uint64, string, string, string) (ids.ID, error)
+	Send(
+		user api.UserPass,
+		from []string,
+		changeAddr string,
+		amount uint64,
+		assetID,
+		to,
+		memo string,
+	) (ids.ID, error)
 	// SendMultiple sends a transaction from [user] funding all [outputs]
-	SendMultiple(api.UserPass, []string, string, []SendOutput, string) (ids.ID, error)
+	SendMultiple(
+		user api.UserPass,
+		from []string,
+		changeAddr string,
+		outputs []SendOutput,
+		memo string,
+	) (ids.ID, error)
 	// Mint [amount] of [assetID] to be owned by [to]
-	Mint(api.UserPass, []string, string, uint64, string, string) (ids.ID, error)
+	Mint(
+		user api.UserPass,
+		from []string,
+		changeAddr string,
+		amount uint64,
+		assetID,
+		to string,
+	) (ids.ID, error)
 	// SendNFT sends an NFT and returns the ID of the newly created transaction
-	SendNFT(api.UserPass, []string, string, string, uint32, string) (ids.ID, error)
+	SendNFT(
+		user api.UserPass,
+		from []string,
+		changeAddr string,
+		assetID string,
+		groupID uint32,
+		to string,
+	) (ids.ID, error)
 	// MintNFT issues a MintNFT transaction and returns the ID of the newly created transaction
-	MintNFT(api.UserPass, []string, string, string, []byte, string) (ids.ID, error)
+	MintNFT(
+		user api.UserPass,
+		from []string,
+		changeAddr string,
+		assetID string,
+		payload []byte,
+		to string,
+	) (ids.ID, error)
 	// Import sends an import transaction to import funds from [sourceChain] and
 	// returns the ID of the newly created transaction
-	Import(api.UserPass, string, string) (ids.ID, error)
-	// Export sends an asset from this chain to the P/C-Chain.
+	Import(user api.UserPass, to, sourceChain string) (ids.ID, error) // Export sends an asset from this chain to the P/C-Chain.
 	// After this tx is accepted, the AVAX must be imported to the P/C-chain with an importTx.
 	// Returns the ID of the newly created atomic transaction
-	Export(api.UserPass, []string, string, uint64, string, string) (ids.ID, error)
+	Export(
+		user api.UserPass,
+		from []string,
+		changeAddr string,
+		amount uint64,
+		to string,
+		assetID string,
+	) (ids.ID, error)
 }
 
 // implementation for an AVM client for interacting with avm [chain]
