@@ -372,12 +372,12 @@ func (vm *VM) Initialize(
 	lastAccepted := vm.chain.LastAcceptedBlock()
 
 	atomicIndexDB := Database{prefixdb.New(atomicIndexDBPrefix, vm.db)}
-	vm.atomicTrie, err = NewIndexedAtomicTrie(atomicIndexDB)
+	//vm.atomicTrie, err = NewIndexedAtomicTrie(atomicIndexDB)
+	vm.atomicTrie, err = NewBlockingAtomicTrie(atomicIndexDB, vm.acceptedAtomicTxDB, vm.codec)
 	if err != nil {
 		return err
 	}
 
-	// Initialize is blocking at the moment
 	doneChan := vm.atomicTrie.Initialize(facades.NewEthChainFacade(ethChain), vm.db.Commit, func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error) {
 		tx, err := vm.extractAtomicTx(blk.(*types.Block))
 		if err != nil {
