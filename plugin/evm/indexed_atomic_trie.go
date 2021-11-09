@@ -3,6 +3,8 @@ package evm
 import (
 	"encoding/binary"
 	"fmt"
+	"sync"
+	"time"
 
 	atomic2 "go.uber.org/atomic"
 
@@ -37,6 +39,7 @@ type indexedAtomicTrie struct {
 	trieDB               *trie.Database      // Trie database
 	trie                 *trie.Trie          // Atomic trie.Trie mapping key (height+blockchainID) and value (RLP encoded atomic.Requests)
 	initialised          *atomic2.Bool
+	initBlockRange       uint64
 }
 
 func NewIndexedAtomicTrie(db ethdb.KeyValueStore) (types.AtomicTrie, error) {
@@ -67,19 +70,137 @@ func NewIndexedAtomicTrie(db ethdb.KeyValueStore) (types.AtomicTrie, error) {
 		trieDB:               triedb,
 		trie:                 t,
 		initialised:          atomic2.NewBool(false),
+		initBlockRange:       10240,
 	}, nil
 }
 
+type indexRange struct {
+	start, end uint64 // starting and ending block number
+}
+
 func (i *indexedAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn func() error, getAtomicTxFn func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error)) chan struct{} {
-	doneChan := make(chan struct{})
-	go func() {
-		defer close(doneChan)
-		if err := i.initialize(chain, dbCommitFn, getAtomicTxFn); err != nil {
-			log.Crit("error encountered when initializing index", "err", err)
+	num := 16
+	blockRange := i.initBlockRange
+	workChan := make(chan indexRange)
+	managerWg := sync.WaitGroup{}
+	workerWg := sync.WaitGroup{}
+	// work orchestration goroutine
+	managerWg.Add(1)
+	go func(workChan chan<- indexRange, managerWg, workerWg *sync.WaitGroup) {
+		defer managerWg.Done()
+		time.Sleep(1 * time.Second)
+		startTime := time.Now()
+		start, initd, err := i.Height()
+		if err != nil {
+			log.Crit("error reading indexer height", "err", err)
+		}
+
+		if !initd {
+			start = 0
+		} else {
+			start++
+		}
+
+		end := start + blockRange
+
+		var lastAcceptedBlock facades.BlockFacade
+		for {
+			start = end + 1
+			end = start + blockRange
+
+			lastAcceptedBlock = chain.LastAcceptedBlock()
+
+			if end > lastAcceptedBlock.NumberU64() {
+				end = lastAcceptedBlock.NumberU64()
+			}
+
+			if start > end {
+				start = end
+			}
+
+			if start >= lastAcceptedBlock.NumberU64() {
+				log.Info("index has caught up with the last accepted block", "lastAccepted", lastAcceptedBlock.NumberU64(), "start", start, "end", end)
+				break
+			}
+
+			workChan <- indexRange{start, end}
+		}
+
+		close(workChan)
+
+		// wait for all workers to finish processing
+		workerWg.Wait()
+
+		// index is up-to-date, set the index height
+		if err := i.setIndexHeight(lastAcceptedBlock.NumberU64()); err != nil {
+			log.Crit("error setting index height", "block", lastAcceptedBlock.NumberU64(), "err", err)
 			return
 		}
+
+		// commit trie
+		hash, err := i.commitTrie()
+		if err != nil {
+			log.Crit("error committing trie", "block", lastAcceptedBlock.NumberU64(), "err", err)
+			return
+		}
+
+		log.Info("atomic trie committed", "hash", hash)
+
+		// commit DB
+		if dbCommitFn != nil {
+			log.Info("committing DB")
+			if err := dbCommitFn(); err != nil {
+				log.Crit("error committing DB", "err")
+			}
+		}
+
 		i.initialised.Store(true)
-	}()
+
+		log.Info("atomic trie initialisation complete", "time", time.Since(startTime))
+	}(workChan, &managerWg, &workerWg)
+
+	trieLock := &sync.Mutex{}
+
+	// spin up worker goroutines
+	for j := 0; j < num; j++ {
+		workerWg.Add(1)
+		go func(workChan <-chan indexRange, wg, workerWg *sync.WaitGroup) {
+			defer workerWg.Done()
+			for {
+				work, open := <-workChan
+				if !open {
+					log.Info("shutting down goroutine")
+					return
+				}
+
+				for blockNum := work.start; blockNum <= work.end; blockNum++ {
+					blk := chain.GetBlockByNumber(blockNum)
+					atomicOperations, err := getAtomicTxFn(blk)
+					if err != nil {
+						log.Crit("error reading atomic operations for block", "block", blockNum, "err", err)
+						return
+					}
+
+					blockNumBytes := make([]byte, wrappers.LongLen)
+					binary.BigEndian.PutUint64(blockNumBytes, blockNum)
+					trieLock.Lock()
+					if err := i.updateTrie(atomicOperations, blockNumBytes); err != nil {
+						log.Crit("error updating trie", "block", blockNum, "err", err)
+						trieLock.Unlock()
+						return
+					}
+					trieLock.Unlock()
+				}
+			}
+		}(workChan, &managerWg, &workerWg)
+	}
+
+	doneChan := make(chan struct{})
+	go func(managerWg, workerWg *sync.WaitGroup) {
+		workerWg.Wait()
+		managerWg.Wait()
+		close(doneChan)
+	}(&managerWg, &workerWg)
 	return doneChan
 }
 

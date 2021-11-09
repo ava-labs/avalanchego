@@ -226,7 +226,7 @@ func Test_IndexerInitializeFromGenesis(t *testing.T) {
 		return blockAtomicOpsMap[blk.NumberU64()], nil
 	})
 	<-doneChan
-	assert.EqualValues(t, 3, dbCommitCount.Load())
+	assert.EqualValues(t, 1, dbCommitCount.Load())
 
 	height, initialized, err := indexer.Height()
 	assert.NoError(t, err)
@@ -245,6 +245,7 @@ func Test_IndexerInitializeFromState(t *testing.T) {
 		atomicTrieIndexer, ok := indexer.(*indexedAtomicTrie)
 		assert.True(t, ok)
 		atomicTrieIndexer.commitHeightInterval = testCommitInterval
+		atomicTrieIndexer.initBlockRange = 5
 		atomicTrieIndexer.initialised.Store(true)
 	}
 
@@ -336,6 +337,9 @@ func Test_IndexerInitializeFromState(t *testing.T) {
 
 	lastAcceptedBlock := newAtomicBlockFacade(100, common.Hash{}, nil)
 	chainFacade := newTestChainFacade(lastAcceptedBlock, func(blockNum uint64) facades.BlockFacade {
+		if blockNum > lastAcceptedBlock.NumberU64() {
+			return nil
+		}
 		// slow it down a bit
 		time.Sleep(50 * time.Millisecond)
 		_, exists := blockAtomicOpsMap[blockNum]
@@ -362,10 +366,10 @@ func Test_IndexerInitializeFromState(t *testing.T) {
 
 	// wait for index.Initialize to finish
 	<-doneChan
-	assert.EqualValues(t, 2, dbCommitCount.Load())
+	assert.EqualValues(t, 1, dbCommitCount.Load())
 
 	height, initialized, err = indexer.Height()
 	assert.NoError(t, err)
 	assert.True(t, initialized)
-	assert.Equal(t, lastAcceptedBlock.NumberU64(), height)
+	assert.EqualValues(t, lastAcceptedBlock.NumberU64(), height)
 }
