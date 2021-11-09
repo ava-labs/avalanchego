@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	fastsyncer "github.com/ava-labs/avalanchego/snow/engine/snowman/fast_syncer"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -37,7 +36,7 @@ type Handler struct {
 	// The validator set that validates this chain
 	validators validators.Set
 
-	FastSyncer   fastsyncer.FastSyncer
+	fastSyncer   common.Engine
 	bootstrapper common.Engine
 	engine       common.Engine
 
@@ -66,6 +65,7 @@ type Handler struct {
 // [engine] must be initialized before initializing this handler
 func (h *Handler) Initialize(
 	mc message.Creator,
+	fastSyncer common.Engine,
 	smbootstrap common.Engine,
 	engine common.Engine,
 	validators validators.Set,
@@ -80,6 +80,7 @@ func (h *Handler) Initialize(
 	h.mc = mc
 	h.closed = make(chan struct{})
 	h.msgFromVMChan = msgFromVMChan
+	h.fastSyncer = fastSyncer
 	h.bootstrapper = smbootstrap
 	h.engine = engine
 	h.validators = validators
@@ -459,7 +460,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 
 	case message.GetStateSummaryFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return h.FastSyncer.GetStateSummaryFrontier(nodeID, reqID)
+		return h.fastSyncer.GetStateSummaryFrontier(nodeID, reqID)
 
 	case message.StateSummaryFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -469,11 +470,11 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
-		return h.FastSyncer.StateSummaryFrontier(nodeID, reqID, summary)
+		return h.fastSyncer.StateSummaryFrontier(nodeID, reqID, summary)
 
 	case message.GetStateSummaryFrontierFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return h.FastSyncer.GetStateSummaryFrontierFailed(nodeID, reqID)
+		return h.fastSyncer.GetStateSummaryFrontierFailed(nodeID, reqID)
 
 	case message.GetAcceptedStateSummary:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -483,7 +484,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
-		return h.FastSyncer.GetAcceptedStateSummary(nodeID, reqID, summaries)
+		return h.fastSyncer.GetAcceptedStateSummary(nodeID, reqID, summaries)
 
 	case message.AcceptedStateSummary:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -493,11 +494,11 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
-		return h.FastSyncer.AcceptedStateSummary(nodeID, reqID, summaries)
+		return h.fastSyncer.AcceptedStateSummary(nodeID, reqID, summaries)
 
 	case message.GetAcceptedStateSummaryFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return h.FastSyncer.GetAcceptedStateSummaryFailed(nodeID, reqID)
+		return h.fastSyncer.GetAcceptedStateSummaryFailed(nodeID, reqID)
 
 	default:
 		h.ctx.Log.Warn("Attempt to submit to engine unhandled consensus msg %s from from (%s, %s). Dropping it",

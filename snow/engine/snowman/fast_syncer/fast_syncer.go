@@ -2,31 +2,25 @@ package fastsyncer
 
 import (
 	stdmath "math"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
-	// MaxOutstandingBootstrapRequests is the maximum number of
+	// MaxOutstandingFastSyncRequests is the maximum number of
 	// GetAcceptedFrontier and GetAccepted messages sent but not responded
 	// to/failed
-	MaxOutstandingBootstrapRequests = 50
-
-	// MaxTimeFetchingAncestors is the maximum amount of time to spend fetching
-	// vertices during a call to GetAncestors
-	MaxTimeFetchingAncestors = 50 * time.Millisecond
+	MaxOutstandingFastSyncRequests = 50
 )
 
 var _ FastSyncer = &fastSyncer{}
 
 type FastSyncer interface {
-	common.FastSyncHandler
+	common.Engine
 
 	Start(startReqID uint32) error
 }
@@ -38,10 +32,15 @@ func NewFastSyncer(
 	return &fastSyncer{
 		onDoneFastSyncing: onDoneFastSyncing,
 		Config:            cfg,
+		FastSyncNoOps: FastSyncNoOps{
+			Ctx: cfg.Ctx,
+		},
 	}
 }
 
 type fastSyncer struct {
+	FastSyncNoOps
+
 	Config
 
 	// Tracks the last requestID that was used in a request
@@ -84,9 +83,11 @@ type fastSyncer struct {
 	bootstrapAttempts int
 
 	// Fast Sync specific fields
-	VM                block.StateSyncableVM
+	// VM                block.StateSyncableVM // this shadows Config VM
 	onDoneFastSyncing func(lastReqID uint32) error
 }
+
+func (fs *fastSyncer) GetVM() common.VM { return fs.VM }
 
 func (fs *fastSyncer) Start(startReqID uint32) error {
 	fs.VM = fs.Config.VM
@@ -150,7 +151,7 @@ func (fs *fastSyncer) Start(startReqID uint32) error {
 // their accepted frontier with the current accepted frontier
 func (fs *fastSyncer) sendGetStateSummaryFrontiers() {
 	vdrs := ids.NewShortSet(1)
-	for fs.pendingSendAcceptedFrontier.Len() > 0 && fs.pendingReceiveAcceptedFrontier.Len() < MaxOutstandingBootstrapRequests {
+	for fs.pendingSendAcceptedFrontier.Len() > 0 && fs.pendingReceiveAcceptedFrontier.Len() < MaxOutstandingFastSyncRequests {
 		vdr, _ := fs.pendingSendAcceptedFrontier.Pop()
 		// Add the validator to the set to send the messages to
 		vdrs.Add(vdr)
@@ -167,7 +168,7 @@ func (fs *fastSyncer) sendGetStateSummaryFrontiers() {
 // their filtered accepted frontier
 func (fs *fastSyncer) sendGetAccepted() {
 	vdrs := ids.NewShortSet(1)
-	for fs.pendingSendAccepted.Len() > 0 && fs.pendingReceiveAccepted.Len() < MaxOutstandingBootstrapRequests {
+	for fs.pendingSendAccepted.Len() > 0 && fs.pendingReceiveAccepted.Len() < MaxOutstandingFastSyncRequests {
 		vdr, _ := fs.pendingSendAccepted.Pop()
 		// Add the validator to the set to send the messages to
 		vdrs.Add(vdr)

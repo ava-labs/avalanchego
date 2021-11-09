@@ -75,3 +75,33 @@ func (nop *EngineNoOps) Disconnected(validatorID ids.ShortID) error {
 	nop.Ctx.Log.Debug("Disconnected(%s) unhandled by engine. Dropped.", validatorID)
 	return fmt.Errorf("message Disconnected should not be handled by engine. Dropping it")
 }
+
+func (nop *EngineNoOps) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error {
+	nop.Ctx.Log.Debug("GetStateSummaryFrontier(%s, %d) unhandled by engine. Dropped.", validatorID, requestID)
+	return fmt.Errorf("message GetStateSummaryFrontier should not be handled by engine. Dropping it")
+}
+
+func (nop *EngineNoOps) StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summary []byte) error {
+	nop.Ctx.Log.Debug("StateSummaryFrontier(%s, %d) unhandled by engine. Dropped.", validatorID, requestID)
+	return fmt.Errorf("message StateSummaryFrontier should not be handled by engine. Dropping it")
+}
+
+func (nop *EngineNoOps) GetStateSummaryFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
+	nop.Ctx.Log.Debug("GetStateSummaryFrontierFailed(%s, %d) unhandled by engine. Dropped.", validatorID, requestID)
+	return fmt.Errorf("message GetStateSummaryFrontierFailed should not be handled by engine. Dropping it")
+}
+
+func (nop *EngineNoOps) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error {
+	nop.Ctx.Log.Debug("GetAcceptedStateSummary(%s, %d) unhandled by engine. Dropped.", validatorID, requestID)
+	return fmt.Errorf("message GetAcceptedStateSummary should not be handled by engine. Dropping it")
+}
+
+func (nop *EngineNoOps) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error {
+	nop.Ctx.Log.Debug("AcceptedStateSummary(%s, %d) unhandled by engine. Dropped.", validatorID, requestID)
+	return fmt.Errorf("message AcceptedStateSummary should not be handled by engine. Dropping it")
+}
+
+func (nop *EngineNoOps) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, requestID uint32) error {
+	nop.Ctx.Log.Debug("GetAcceptedStateSummaryFailed(%s, %d) unhandled by engine. Dropped.", validatorID, requestID)
+	return fmt.Errorf("message GetAcceptedStateSummaryFailed should not be handled by engine. Dropping it")
+}

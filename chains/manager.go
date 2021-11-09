@@ -630,6 +630,7 @@ func (m *manager) createAvalancheChain(
 
 	err = handler.Initialize(
 		m.MsgCreator,
+		nil, // no fast sync for DAG
 		bootstrapper,
 		engine,
 		vdrs,
@@ -773,6 +774,7 @@ func (m *manager) createSnowmanChain(
 		MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
 	}
 
+	// create fast sync gear
 	fastSyncCfg := fastsyncer.Config{
 		Config: commonCfg,
 		VM:     vm,
@@ -781,8 +783,8 @@ func (m *manager) createSnowmanChain(
 		fastSyncCfg,
 		handler.OnDoneFastSyncing,
 	)
-	handler.FastSyncer = fastSync
 
+	// create bootstrap gear
 	bootstrapCfg := smbootstrap.Config{
 		Config:       commonCfg,
 		Blocked:      blocked,
@@ -800,6 +802,7 @@ func (m *manager) createSnowmanChain(
 	}
 	handler.StartBootstrapF = bootstrapper.Start
 
+	// create engine gear
 	engineConfig := smeng.Config{
 		Ctx:        bootstrapCfg.Ctx,
 		VM:         bootstrapCfg.VM,
@@ -814,8 +817,10 @@ func (m *manager) createSnowmanChain(
 	}
 	handler.StartEngineF = engine.Start
 
+	// register gears and start them
 	if err = handler.Initialize(
 		m.MsgCreator,
+		fastSync,
 		bootstrapper,
 		engine,
 		vdrs,

@@ -91,3 +91,33 @@ func (nop *BootstrapNoOps) QueryFailed(vdr ids.ShortID, requestID uint32) error 
 	nop.Ctx.Log.Debug("QueryFailed(%s, %d) unhandled by bootstrapper. Dropped.", vdr, requestID)
 	return nil
 }
+
+func (nop *BootstrapNoOps) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error {
+	nop.Ctx.Log.Debug("GetStateSummaryFrontier(%s, %d) unhandled by bootstrapper. Dropped.", validatorID, requestID)
+	return nil
+}
+
+func (nop *BootstrapNoOps) StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summary []byte) error {
+	nop.Ctx.Log.Debug("StateSummaryFrontier(%s, %d) unhandled by bootstrapper. Dropped.", validatorID, requestID)
+	return nil
+}
+
+func (nop *BootstrapNoOps) GetStateSummaryFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
+	nop.Ctx.Log.Debug("GetStateSummaryFrontierFailed(%s, %d) unhandled by bootstrapper. Dropped.", validatorID, requestID)
+	return nil
+}
+
+func (nop *BootstrapNoOps) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error {
+	nop.Ctx.Log.Debug("GetAcceptedStateSummary(%s, %d) unhandled by bootstrapper. Dropped.", validatorID, requestID)
+	return nil
+}
+
+func (nop *BootstrapNoOps) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error {
+	nop.Ctx.Log.Debug("AcceptedStateSummary(%s, %d) unhandled by bootstrapper. Dropped.", validatorID, requestID)
+	return nil
+}
+
+func (nop *BootstrapNoOps) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, requestID uint32) error {
+	nop.Ctx.Log.Debug("GetAcceptedStateSummaryFailed(%s, %d) unhandled by bootstrapper. Dropped.", validatorID, requestID)
+	return nil
+}

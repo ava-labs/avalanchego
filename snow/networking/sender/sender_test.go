@@ -110,6 +110,7 @@ func TestTimeout(t *testing.T) {
 	handler := router.Handler{}
 	err = handler.Initialize(
 		mc,
+		nil, // no fast sync for this test
 		bootstrapper,
 		engine,
 		vdrs,
@@ -199,6 +200,7 @@ func TestReliableMessages(t *testing.T) {
 	handler := router.Handler{}
 	err = handler.Initialize(
 		mc,
+		nil, // no fast sync for this test
 		bootstrapper,
 		engine,
 		vdrs,
@@ -296,6 +298,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	handler := router.Handler{}
 	err = handler.Initialize(
 		mc,
+		nil, // no fast sync for this test
 		bootstrapper,
 		engine,
 		vdrs,

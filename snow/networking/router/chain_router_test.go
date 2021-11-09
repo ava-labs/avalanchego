@@ -72,6 +72,7 @@ func TestShutdown(t *testing.T) {
 	handler := &Handler{}
 	err = handler.Initialize(
 		mc,
+		nil, // no fast sync for this test
 		bootstrapper,
 		engine,
 		vdrs,
@@ -170,6 +171,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	handler := &Handler{}
 	err = handler.Initialize(
 		mc,
+		nil, // no fast sync for this test
 		bootstrapper,
 		engine,
 		vdrs,
@@ -284,6 +286,7 @@ func TestRouterTimeout(t *testing.T) {
 	assert.NoError(t, err)
 	err = handler.Initialize(
 		mc,
+		nil, // no fast sync for this test
 		bootstrapper,
 		engine,
 		vdrs,
@@ -364,6 +367,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 	handler := &Handler{}
 	err = handler.Initialize(
 		mc,
+		nil, // no fast sync for this test
 		bootstrapper,
 		engine,
 		vdrs,
@@ -476,6 +480,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	assert.NoError(t, err)
 	err = handler.Initialize(
 		mc,
+		nil, // no fast sync for this test
 		bootstrapper,
 		engine,
 		vdrs,

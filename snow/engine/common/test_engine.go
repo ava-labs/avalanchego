@@ -33,6 +33,13 @@ var (
 	errQueryFailed               = errors.New("unexpectedly called QueryFailed")
 	errChits                     = errors.New("unexpectedly called Chits")
 
+	errGetStateSummaryFrontier       = errors.New("unexpectedly called GetStateSummaryFrontier")
+	errStateSummaryFrontier          = errors.New("unexpectedly called StateSummaryFrontier")
+	errGetStateSummaryFrontierFailed = errors.New("unexpectedly called GetStateSummaryFrontierFailed")
+	errGetAcceptedStateSummary       = errors.New("unexpectedly called GetAcceptedStateSummary")
+	errAcceptedStateSummary          = errors.New("unexpectedly called AcceptedStateSummary")
+	errGetAcceptedStateSummaryFailed = errors.New("unexpectedly called GetAcceptedStateSummaryFailed")
+
 	_ Engine = &EngineTest{}
 )
 
@@ -80,6 +87,13 @@ type EngineTest struct {
 	CantAppGossip,
 	CantAppRequestFailed,
 
+	CantGetStateSummaryFrontier,
+	CantStateSummaryFrontier,
+	CantGetStateSummaryFrontierFailed,
+	CantGetAcceptedStateSummary,
+	CantAcceptedStateSummary,
+	CantGetAcceptedStateSummaryFailed,
+
 	CantGetVM bool
 
 	IsBootstrappedF                                    func() bool
@@ -98,6 +112,13 @@ type EngineTest struct {
 	GetVMF                    func() VM
 	AppRequestF, AppResponseF func(nodeID ids.ShortID, requestID uint32, msg []byte) error
 	AppGossipF                func(nodeID ids.ShortID, msg []byte) error
+
+	GetStateSummaryFrontierF       func(validatorID ids.ShortID, requestID uint32) error
+	StateSummaryFrontierF          func(validatorID ids.ShortID, requestID uint32, summary []byte) error
+	GetStateSummaryFrontierFailedF func(validatorID ids.ShortID, requestID uint32) error
+	GetAcceptedStateSummaryF       func(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error
+	AcceptedStateSummaryF          func(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error
+	GetAcceptedStateSummaryFailedF func(validatorID ids.ShortID, requestID uint32) error
 }
 
 func (e *EngineTest) Default(cant bool) {
@@ -131,6 +152,12 @@ func (e *EngineTest) Default(cant bool) {
 	e.CantAppRequestFailed = cant
 	e.CantAppResponse = cant
 	e.CantAppGossip = cant
+	e.CantGetStateSummaryFrontier = cant
+	e.CantStateSummaryFrontier = cant
+	e.CantGetStateSummaryFrontierFailed = cant
+	e.CantGetAcceptedStateSummary = cant
+	e.CantAcceptedStateSummary = cant
+	e.CantGetAcceptedStateSummaryFailed = cant
 	e.CantGetVM = cant
 }
 
@@ -518,4 +545,64 @@ func (e *EngineTest) GetVM() VM {
 		e.T.Fatalf("Unexpectedly called GetVM")
 	}
 	return nil
+}
+
+func (e *EngineTest) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error {
+	if e.GetStateSummaryFrontierF != nil {
+		return e.GetStateSummaryFrontierF(validatorID, requestID)
+	}
+	if e.CantGetStateSummaryFrontier && e.T != nil {
+		e.T.Fatalf("Unexpectedly called GetStateSummaryFrontier")
+	}
+	return errGetStateSummaryFrontier
+}
+
+func (e *EngineTest) StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summary []byte) error {
+	if e.StateSummaryFrontierF != nil {
+		return e.StateSummaryFrontierF(validatorID, requestID, summary)
+	}
+	if e.CantGetStateSummaryFrontier && e.T != nil {
+		e.T.Fatalf("Unexpectedly called CantStateSummaryFrontier")
+	}
+	return errStateSummaryFrontier
+}
+
+func (e *EngineTest) GetStateSummaryFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
+	if e.GetStateSummaryFrontierFailedF != nil {
+		return e.GetStateSummaryFrontierFailedF(validatorID, requestID)
+	}
+	if e.CantGetStateSummaryFrontierFailed && e.T != nil {
+		e.T.Fatalf("Unexpectedly called GetStateSummaryFrontierFailed")
+	}
+	return errGetStateSummaryFrontierFailed
+}
+
+func (e *EngineTest) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error {
+	if e.GetAcceptedStateSummaryF != nil {
+		return e.GetAcceptedStateSummaryF(validatorID, requestID, summaries)
+	}
+	if e.CantGetAcceptedStateSummary && e.T != nil {
+		e.T.Fatalf("Unexpectedly called GetAcceptedStateSummary")
+	}
+	return errGetAcceptedStateSummary
+}
+
+func (e *EngineTest) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error {
+	if e.AcceptedStateSummaryF != nil {
+		return e.AcceptedStateSummary(validatorID, requestID, summaries)
+	}
+	if e.CantAcceptedStateSummary && e.T != nil {
+		e.T.Fatalf("Unexpectedly called AcceptedStateSummary")
+	}
+	return errAcceptedStateSummary
+}
+
+func (e *EngineTest) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, requestID uint32) error {
+	if e.GetAcceptedStateSummaryFailedF != nil {
+		return e.GetAcceptedStateSummaryFailedF(validatorID, requestID)
+	}
+	if e.CantGetAcceptedStateSummaryFailed && e.T != nil {
+		e.T.Fatalf("Unexpectedly called GetAcceptedStateSummaryFailed")
+	}
+	return errGetAcceptedStateSummaryFailed
 }

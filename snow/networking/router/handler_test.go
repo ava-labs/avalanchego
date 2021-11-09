@@ -46,6 +46,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	assert.NoError(t, err)
 	err = handler.Initialize(
 		mc,
+		nil, // no fast sync for this test
 		bootstrapper,
 		engine,
 		vdrs,
@@ -107,6 +108,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	handler := &Handler{}
 	err = handler.Initialize(
 		mc,
+		nil, // no fast sync for this test
 		bootstrapper,
 		engine,
 		vdrs,
@@ -161,6 +163,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	handler := &Handler{}
 	err = handler.Initialize(
 		mc,
+		nil, // no fast sync for this test
 		bootstrapper,
 		engine,
 		vdrs,
@@ -215,6 +218,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	assert.NoError(t, err)
 	err = handler.Initialize(
 		mc,
+		nil, // no fast sync for this test
 		bootstrapper,
 		engine,
 		vdrs,

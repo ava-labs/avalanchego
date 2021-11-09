@@ -42,10 +42,9 @@ type ExternalHandler interface {
 	AcceptedHandler
 	FetchHandler
 	QueryHandler
-	// FastSyncHandler
+	FastSyncHandler
 }
 
-// TODO: duly comment and include in ExternalHandler Interface
 type FastSyncHandler interface {
 	GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error
 	StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summary []byte) error
