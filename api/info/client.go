@@ -23,7 +23,7 @@ type Client interface {
 	GetNetworkName() (string, error)
 	GetBlockchainID(alias string) (ids.ID, error)
 	Peers() ([]network.PeerID, error)
-	IsBootstrapped(string) (bool, error)
+	IsBootstrapped(chainID string) (bool, error)
 	GetTxFee() (*GetTxFeeResponse, error)
 }
 
@@ -83,10 +83,10 @@ func (c *client) Peers() ([]network.PeerID, error) {
 	return res.Peers, err
 }
 
-func (c *client) IsBootstrapped(chain string) (bool, error) {
+func (c *client) IsBootstrapped(chainID string) (bool, error) {
 	res := &IsBootstrappedResponse{}
 	err := c.requester.SendRequest("isBootstrapped", &IsBootstrappedArgs{
-		Chain: chain,
+		Chain: chainID,
 	}, res)
 	return res.IsBootstrapped, err
 }

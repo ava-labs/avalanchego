@@ -20,6 +20,7 @@ type Client interface {
 	PublishBlockchain(chainID string) (*PublishBlockchainReply, error)
 	// UnpublishBlockchain requests the node to stop publishing consensus and decision events
 	UnpublishBlockchain(chainID string) (bool, error)
+	// GetPublishedBlockchains requests the node to get blockchains being published
 	GetPublishedBlockchains() ([]ids.ID, error)
 }
 
@@ -51,7 +52,6 @@ func (c *client) UnpublishBlockchain(blockchainID string) (bool, error) {
 	return res.Success, err
 }
 
-// GetPublishedBlockchains requests the node to get blockchains being published
 func (c *client) GetPublishedBlockchains() ([]ids.ID, error) {
 	res := &GetPublishedBlockchainsReply{}
 	err := c.requester.SendRequest("getPublishedBlockchains", nil, res)

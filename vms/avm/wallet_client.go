@@ -16,13 +16,33 @@ import (
 )
 
 // Interface compliance
-var _ Client = &client{}
+var (
+	_ Client       = &client{}
+	_ WalletClient = &client{}
+)
 
 // interface of an AVM wallet client for interacting with avm managed wallet on [chain]
 type WalletClient interface {
-	IssueTx([]byte) (ids.ID, error)
-	Send(api.UserPass, []string, string, uint64, string, string, string) (ids.ID, error)
-	SendMultiple(api.UserPass, []string, string, []SendOutput, string) (ids.ID, error)
+	// IssueTx issues a transaction to a node and returns the TxID
+	IssueTx(tx []byte) (ids.ID, error)
+	// Send [amount] of [assetID] to address [to]
+	Send(
+		user api.UserPass,
+		from []string,
+		changeAddr string,
+		amount uint64,
+		assetID,
+		to,
+		memo string,
+	) (ids.ID, error)
+	// SendMultiple sends a transaction from [user] funding all [outputs]
+	SendMultiple(
+		user api.UserPass,
+		from []string,
+		changeAddr string,
+		outputs []SendOutput,
+		memo string,
+	) (ids.ID, error)
 }
 
 // implementation of an AVM wallet client for interacting with avm managed wallet on [chain]
@@ -37,7 +57,6 @@ func NewWalletClient(uri, chain string, requestTimeout time.Duration) WalletClie
 	}
 }
 
-// IssueTx issues a transaction to a node and returns the TxID
 func (c *walletClient) IssueTx(txBytes []byte) (ids.ID, error) {
 	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, txBytes)
 	if err != nil {
@@ -51,7 +70,6 @@ func (c *walletClient) IssueTx(txBytes []byte) (ids.ID, error) {
 	return res.TxID, err
 }
 
-// Send [amount] of [assetID] to address [to]
 func (c *walletClient) Send(
 	user api.UserPass,
 	from []string,
@@ -78,7 +96,6 @@ func (c *walletClient) Send(
 	return res.TxID, err
 }
 
-// SendMultiple sends a transaction from [user] funding all [outputs]
 func (c *walletClient) SendMultiple(
 	user api.UserPass,
 	from []string,
