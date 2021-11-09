@@ -134,7 +134,8 @@ func (vm *VM) newPushNetwork(
 	return net
 }
 
-func (n *pushNetwork) extractBestTxs(baseFee *big.Int, txs map[common.Address]types.Transactions, maxTxs int) (int, error) {
+// queueBestTxs attempts to add up to [maxTxs] to [ethTxsToGossip].
+func (n *pushNetwork) queueBestTxs(baseFee *big.Int, txs map[common.Address]types.Transactions, maxTxs int) (int, error) {
 	// Setup heap for transactions
 	heads := make(types.TxByPriceAndTime, 0, len(txs))
 	for _, accountTxs := range txs {
@@ -160,6 +161,8 @@ func (n *pushNetwork) extractBestTxs(baseFee *big.Int, txs map[common.Address]ty
 	return txsAdded, nil
 }
 
+// queueRegossipTxs finds the best transactions in the mempool and adds up to
+// [TxRegossipMaxSize] of them to [ethTxsToGossip].
 func (n *pushNetwork) queueRegossipTxs() error {
 	txPool := n.chain.GetTxPool()
 
@@ -178,14 +181,14 @@ func (n *pushNetwork) queueRegossipTxs() error {
 
 	// Add best transactions to be gossiped (preferring local txs)
 	baseFee := txPool.BaseFee()
-	selected, err := n.extractBestTxs(baseFee, localTxs, n.config.TxRegossipMaxSize)
+	queued, err := n.queueBestTxs(baseFee, localTxs, n.config.TxRegossipMaxSize)
 	if err != nil {
 		return err
 	}
-	if selected >= n.config.TxRegossipMaxSize {
+	if queued >= n.config.TxRegossipMaxSize {
 		return nil
 	}
-	_, err = n.extractBestTxs(baseFee, remoteTxs, n.config.TxRegossipMaxSize)
+	_, err = n.queueBestTxs(baseFee, remoteTxs, n.config.TxRegossipMaxSize-queued)
 	return err
 }
 
