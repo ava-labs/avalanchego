@@ -713,7 +713,7 @@ func (st *internalStateImpl) SetUptime(nodeID ids.ShortID, upDuration time.Durat
 }
 
 func (st *internalStateImpl) GetStartTime(nodeID ids.ShortID) (time.Time, error) {
-	currentValidator, err := st.CurrentStakerChainState().GetValidator(nodeID)
+	currentValidator, err := st.currentStakerChainState.GetValidator(nodeID)
 	if err != nil {
 		return time.Time{}, err
 	}
