@@ -378,8 +378,12 @@ func (n *pushNetwork) gossipEthTxs(bypassCache bool) (int, error) {
 			continue
 		}
 
-		if _, has := n.recentEthTxs.Get(txHash); has && !bypassCache {
-			continue
+		// We check bypassCache outside of the if statement to avoid an unnecessary
+		// cache lookup.
+		if !bypassCache {
+			if _, has := n.recentEthTxs.Get(txHash); has {
+				continue
+			}
 		}
 		n.recentEthTxs.Put(txHash, nil)
 
