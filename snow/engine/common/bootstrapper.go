@@ -86,6 +86,17 @@ func (b *Bootstrapper) Initialize(config Config) error {
 	return nil
 }
 
+func (b *Bootstrapper) Start(startReqID uint32) error {
+	b.Ctx.Log.Info("Starting bootstrap...")
+	b.RequestID = startReqID
+
+	if b.Config.StartupAlpha > 0 {
+		return nil
+	}
+
+	return b.Startup()
+}
+
 // GetAcceptedFrontier implements the Engine interface.
 func (b *Bootstrapper) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
 	acceptedFrontier, err := b.Bootstrapable.CurrentAcceptedFrontier()
