@@ -622,11 +622,6 @@ func (n *network) NewPeerInfo(peer *peer) PeerInfo {
 	if !peer.ip.IsZero() {
 		publicIPStr = peer.getIP().String()
 	}
-	primaryNetworkValidators, ok := n.config.Validators.GetValidators(constants.PrimaryNetworkID)
-	weight := uint64(0)
-	if ok {
-		weight = primaryNetworkValidators.Weight()
-	}
 	return PeerInfo{
 		IP:             peer.conn.RemoteAddr().String(),
 		PublicIP:       publicIPStr,
@@ -636,7 +631,6 @@ func (n *network) NewPeerInfo(peer *peer) PeerInfo {
 		LastReceived:   time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
 		Benched:        n.benchlistManager.GetBenched(peer.nodeID),
 		ObservedUptime: json.Uint8(peer.observedUptime),
-		Weight:         json.Uint64(weight),
 	}
 }
 

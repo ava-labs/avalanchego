@@ -6,6 +6,7 @@ package info
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 
 	"github.com/gorilla/rpc/v2"
@@ -14,10 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 )
@@ -27,10 +28,12 @@ var errNoChainProvided = errors.New("argument 'chain' not given")
 // Info is the API service for unprivileged info on a node
 type Info struct {
 	Parameters
-	log          logging.Logger
-	networking   network.Network
-	chainManager chains.Manager
-	vmManager    vms.Manager
+	log           logging.Logger
+	networking    network.Network
+	chainManager  chains.Manager
+	vmManager     vms.Manager
+	versionParser version.ApplicationParser
+	validators    validators.Set
 }
 
 type Parameters struct {
@@ -51,17 +54,21 @@ func NewService(
 	chainManager chains.Manager,
 	vmManager vms.Manager,
 	network network.Network,
+	versionParser version.ApplicationParser,
+	validators validators.Set,
 ) (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := json.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	if err := newServer.RegisterService(&Info{
-		log:          log,
-		chainManager: chainManager,
-		vmManager:    vmManager,
-		networking:   network,
-		Parameters:   parameters,
+		Parameters:    parameters,
+		log:           log,
+		chainManager:  chainManager,
+		vmManager:     vmManager,
+		networking:    network,
+		versionParser: versionParser,
+		validators:    validators,
 	}, "info"); err != nil {
 		return nil, err
 	}
@@ -224,8 +231,10 @@ func (service *Info) IsBootstrapped(_ *http.Request, args *IsBootstrappedArgs, r
 
 // UptimeResponse are the results from calling Uptime
 type UptimeResponse struct {
-	// RewardingStakePercentage shows what percent of stake think we're above the requirement.
+	// RewardingStakePercentage shows what percent of network stake thinks we're
+	// above the requirement.
 	RewardingStakePercentage json.Float64 `json:"rewardingStakePercentage"`
+
 	// WeightedAveragePercentage is average of whole validator network observation, it is stake weighted.
 	// the difference between RewardingStakePercentage is WeightedAveragePercentage always takes uptime into account
 	// i.e if requirement is 80 and a peer reports 40 percent it will be counted (40*weight) in WeightedAveragePercentage
@@ -235,38 +244,49 @@ type UptimeResponse struct {
 
 func (service *Info) Uptime(_ *http.Request, _ *struct{}, reply *UptimeResponse) error {
 	service.log.Debug("Info: Uptime called")
-	totalWeightedPercent := uint64(0)
-	totalWeight := uint64(0)
-	rewardingStake := uint64(0)
+
+	myStake, _ := service.validators.GetWeight(service.NodeID)
+	var (
+		totalWeight          = float64(service.validators.Weight())
+		totalWeightedPercent = 100 * float64(myStake)
+		rewardingStake       = float64(myStake)
+	)
 	for _, peerInfo := range service.networking.Peers(nil) {
-		percent := uint8(peerInfo.ObservedUptime)
-		weight := uint64(peerInfo.Weight)
-		// this is not a validator skip it.
-		if weight == 0 {
+		peerID, err := ids.ShortFromPrefixedString(peerInfo.ID, constants.NodeIDPrefix)
+		if err != nil {
+			return err
+		}
+
+		weight, ok := service.validators.GetWeight(peerID)
+		if !ok {
+			// this is not a validator skip it.
 			continue
 		}
-		weightedPercent, err := safemath.Mul64(uint64(percent), weight)
+
+		peerVersion, err := service.versionParser.Parse(peerInfo.Version)
 		if err != nil {
 			return err
 		}
-		totalWeightedPercent, err = safemath.Add64(weightedPercent, totalWeightedPercent)
-		if err != nil {
-			return err
+
+		weightFloat := float64(weight)
+
+		if peerVersion.Before(version.MinUptimeVersion) {
+			// If the peer is running an earlier version, then ignore their
+			// stake
+			totalWeight -= weightFloat
+			continue
 		}
-		totalWeight, err = safemath.Add64(weight, totalWeight)
-		if err != nil {
-			return err
-		}
+
+		percent := float64(peerInfo.ObservedUptime)
+		totalWeightedPercent += percent * weightFloat
+
 		// if this peer thinks we're above requirement add the weight
-		if percent >= uint8(service.UptimeRequirement*100) {
-			rewardingStake, err = safemath.Add64(weight, rewardingStake)
-			if err != nil {
-				return err
-			}
+		if percent/100 >= service.UptimeRequirement {
+			rewardingStake += weightFloat
 		}
 	}
-	reply.WeightedAveragePercentage = json.Float64(float64(totalWeightedPercent) / float64(totalWeight))
-	reply.RewardingStakePercentage = json.Float64(float64(rewardingStake) * 100 / float64(totalWeight))
+	reply.WeightedAveragePercentage = json.Float64(math.Abs(totalWeightedPercent / totalWeight))
+	reply.RewardingStakePercentage = json.Float64(math.Abs(100 * rewardingStake / totalWeight))
 	return nil
 }
 

@@ -868,7 +868,10 @@ func (n *Node) initInfoAPI() error {
 		n.Log.Info("skipping info API initialization because it has been disabled")
 		return nil
 	}
+
 	n.Log.Info("initializing info API")
+
+	primaryValidators, _ := n.vdrs.GetValidators(constants.PrimaryNetworkID)
 	service, err := info.NewService(
 		info.Parameters{
 			Version:               version.CurrentApp,
@@ -884,6 +887,8 @@ func (n *Node) initInfoAPI() error {
 		n.chainManager,
 		n.vmManager,
 		n.Net,
+		version.NewDefaultApplicationParser(),
+		primaryValidators,
 	)
 	if err != nil {
 		return err
