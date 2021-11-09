@@ -372,8 +372,8 @@ func (vm *VM) Initialize(
 	lastAccepted := vm.chain.LastAcceptedBlock()
 
 	atomicIndexDB := Database{prefixdb.New(atomicIndexDBPrefix, vm.db)}
-	//vm.atomicTrie, err = NewIndexedAtomicTrie(atomicIndexDB)
-	vm.atomicTrie, err = NewBlockingAtomicTrie(atomicIndexDB, vm.acceptedAtomicTxDB, vm.codec)
+	vm.atomicTrie, err = NewIndexedAtomicTrie(atomicIndexDB)
+	//vm.atomicTrie, err = NewBlockingAtomicTrie(atomicIndexDB, vm.acceptedAtomicTxDB, vm.codec)
 	if err != nil {
 		return err
 	}
