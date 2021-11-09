@@ -33,13 +33,6 @@ const (
 	// [ethTxsGossipInterval] is how often we attempt to gossip newly seen
 	// transactions to other nodes.
 	ethTxsGossipInterval = 1 * time.Second
-
-	// [ethTxsRegossipInterval] is how often we attempt to reissue gossip of
-	// local transactions to other nodes.
-	ethTxsRegossipInterval = 3 * time.Minute
-
-	// TODO: parameterize regossip interval and regossip amount
-	ethRegossipCount = 15
 )
 
 type Network interface {
@@ -75,7 +68,7 @@ func (vm *VM) NewNetwork(appSender commonEng.AppSender) Network {
 	if vm.chainConfig.ApricotPhase4BlockTimestamp != nil {
 		return vm.newPushNetwork(
 			time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0),
-			vm.config.RemoteTxGossipOnlyEnabled,
+			vm.config,
 			appSender,
 			vm.chain,
 			vm.mempool,
@@ -88,7 +81,7 @@ func (vm *VM) NewNetwork(appSender commonEng.AppSender) Network {
 type pushNetwork struct {
 	ctx                  *snow.Context
 	gossipActivationTime time.Time
-	remoteTxGossipOnly   bool
+	config               Config
 
 	appSender commonEng.AppSender
 	chain     *coreth.ETHChain
@@ -112,7 +105,7 @@ type pushNetwork struct {
 
 func (vm *VM) newPushNetwork(
 	activationTime time.Time,
-	remoteTxGossipOnly bool,
+	config Config,
 	appSender commonEng.AppSender,
 	chain *coreth.ETHChain,
 	mempool *Mempool,
@@ -120,7 +113,7 @@ func (vm *VM) newPushNetwork(
 	net := &pushNetwork{
 		ctx:                  vm.ctx,
 		gossipActivationTime: activationTime,
-		remoteTxGossipOnly:   remoteTxGossipOnly,
+		config:               config,
 		appSender:            appSender,
 		chain:                chain,
 		mempool:              mempool,
@@ -149,7 +142,7 @@ func (n *pushNetwork) awaitEthTxGossip() {
 		var (
 			txPool         = n.chain.GetTxPool()
 			gossipTicker   = time.NewTicker(ethTxsGossipInterval)
-			regossipTicker = time.NewTicker(ethTxsRegossipInterval)
+			regossipTicker = time.NewTicker(n.config.TxRegossipFrequency.Duration)
 		)
 
 		for {
@@ -180,7 +173,7 @@ func (n *pushNetwork) awaitEthTxGossip() {
 				// Sample X valid, older, non-executed txs (bypass cache)
 				itemsAdded := 0
 				for _, txs := range localTxs {
-					if itemsAdded > ethRegossipCount {
+					if itemsAdded > n.config.TxRegossipMaxSize {
 						break
 					}
 					if len(txs) == 0 {
@@ -192,7 +185,7 @@ func (n *pushNetwork) awaitEthTxGossip() {
 					itemsAdded++
 				}
 				for _, txs := range remoteTxs {
-					if itemsAdded > ethRegossipCount {
+					if itemsAdded > n.config.TxRegossipMaxSize {
 						break
 					}
 					if len(txs) == 0 {
@@ -340,7 +333,7 @@ func (n *pushNetwork) gossipEthTxs(bypassCache bool) (int, error) {
 			continue
 		}
 
-		if n.remoteTxGossipOnly && pool.HasLocal(txHash) {
+		if n.config.RemoteTxGossipOnlyEnabled && pool.HasLocal(txHash) {
 			continue
 		}
 
