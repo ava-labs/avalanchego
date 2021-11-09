@@ -233,21 +233,9 @@ func (i *indexedAtomicTrie) index(height uint64, atomicOps map[ids.ID]*atomic.Re
 	}
 
 	// now flush the uncommitted to the atomic trie
-	for blockchainID, requests := range atomicOps {
-		// value is RLP encoded atomic.Requests struct
-		valueBytes, err := rlp.EncodeToBytes(*requests)
-		if err != nil {
-			// highly unlikely but possible if atomic.Element
-			// has a change that is unsupported by the RLP encoder
-			return gethCommon.Hash{}, err
-		}
-
-		// key is [currentHeightBytes]+[blockchainIDBytes]
-		keyBytes := make([]byte, 0, wrappers.LongLen+len(blockchainID[:]))
-		keyBytes = append(keyBytes, currentHeightBytes...)
-		keyBytes = append(keyBytes, blockchainID[:]...)
-
-		i.trie.Update(keyBytes, valueBytes)
+	err = i.updateTrie(atomicOps, currentHeightBytes)
+	if err != nil {
+		return gethCommon.Hash{}, err
 	}
 
 	// update the index height for next time
@@ -282,6 +270,37 @@ func (i *indexedAtomicTrie) index(height uint64, atomicOps map[ids.ID]*atomic.Re
 	}
 
 	return hash, nil
+}
+
+func (i *indexedAtomicTrie) updateTrie(atomicOps map[ids.ID]*atomic.Requests, currentHeightBytes []byte) error {
+	for blockchainID, requests := range atomicOps {
+		// value is RLP encoded atomic.Requests struct
+		valueBytes, err := rlp.EncodeToBytes(*requests)
+		if err != nil {
+			// highly unlikely but possible if atomic.Element
+			// has a change that is unsupported by the RLP encoder
+			return err
+		}
+
+		// key is [currentHeightBytes]+[blockchainIDBytes]
+		keyBytes := make([]byte, 0, wrappers.LongLen+len(blockchainID[:]))
+		keyBytes = append(keyBytes, currentHeightBytes...)
+		keyBytes = append(keyBytes, blockchainID[:]...)
+
+		i.trie.Update(keyBytes, valueBytes)
+	}
+	return nil
+}
+
+func (i *indexedAtomicTrie) setIndexHeight(height uint64) error {
+	heightBytes := make([]byte, wrappers.LongLen)
+	binary.BigEndian.PutUint64(heightBytes, height)
+	return i.db.Put(indexHeightKey, heightBytes)
+}
+
+func (i *indexedAtomicTrie) commitTrie() (gethCommon.Hash, error) {
+	hash, _, err := i.trie.Commit(nil)
+	return hash, err
 }
 
 // LastCommitted returns the last committed trie hash, block height and an optional error
