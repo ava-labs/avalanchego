@@ -191,9 +191,7 @@ func (vm *VM) Initialize(
 	vm.internalState = is
 
 	// Initialize the utility to track validator uptimes
-	if err := vm.UptimeManager.SetState(is); err != nil {
-		return fmt.Errorf("failed to set state for the uptimes: %w", err)
-	}
+	vm.UptimeManager.SetState(is)
 
 	if err := vm.updateValidators(true); err != nil {
 		return fmt.Errorf(
