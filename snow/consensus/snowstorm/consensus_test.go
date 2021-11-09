@@ -5,6 +5,10 @@ package snowstorm
 
 import (
 	"errors"
+	"path"
+	"reflect"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -19,8 +23,10 @@ import (
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
+type testFunc func(*testing.T, Factory)
+
 var (
-	Tests = []func(*testing.T, Factory){
+	testFuncs = []testFunc{
 		MetricsTest,
 		ParamsTest,
 		IssuedTest,
@@ -92,13 +98,19 @@ func Setup() {
 }
 
 // Execute all tests against a consensus implementation
-func ConsensusTest(t *testing.T, factory Factory, prefix string) {
-	for _, test := range Tests {
+func runConsensusTests(t *testing.T, factory Factory, prefix string) {
+	for _, test := range testFuncs {
 		Setup()
-		test(t, factory)
+		t.Run(getTestName(test), func(tt *testing.T) {
+			test(tt, factory)
+		})
 	}
 	Setup()
 	StringTest(t, factory, prefix)
+}
+
+func getTestName(i interface{}) string {
+	return strings.Split(path.Base(runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()), ".")[1]
 }
 
 func MetricsTest(t *testing.T, factory Factory) {

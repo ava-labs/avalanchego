@@ -11,6 +11,7 @@ import (
 )
 
 type metrics struct {
+	bootstrapFinished,
 	numVtxRequests, numPendingVts,
 	numMissingTxs, pendingTxs,
 	blockerVtxs, blockerTxs prometheus.Gauge
@@ -20,6 +21,11 @@ type metrics struct {
 // Initialize implements the Engine interface
 func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error {
 	errs := wrappers.Errs{}
+	m.bootstrapFinished = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "bootstrap_finished",
+		Help:      "Whether or not bootstrap process has completed. 1 is success, 0 is fail or ongoing.",
+	})
 	m.numVtxRequests = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "vtx_requests",
@@ -60,6 +66,7 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 	)
 
 	errs.Add(
+		reg.Register(m.bootstrapFinished),
 		reg.Register(m.numVtxRequests),
 		reg.Register(m.numPendingVts),
 		reg.Register(m.numMissingTxs),

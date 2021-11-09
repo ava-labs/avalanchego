@@ -5,6 +5,10 @@ package snowman
 
 import (
 	"errors"
+	"path"
+	"reflect"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,6 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
+type testFunc func(*testing.T, Factory)
+
 var (
 	GenesisID     = ids.Empty.Prefix(0)
 	GenesisHeight = uint64(0)
@@ -24,7 +30,7 @@ var (
 		StatusV: choices.Accepted,
 	}}
 
-	Tests = []func(*testing.T, Factory){
+	testFuncs = []testFunc{
 		InitializeTest,
 		NumProcessingTest,
 		AddToTailTest,
@@ -55,10 +61,16 @@ var (
 )
 
 // Execute all tests against a consensus implementation
-func ConsensusTest(t *testing.T, factory Factory) {
-	for _, test := range Tests {
-		test(t, factory)
+func runConsensusTests(t *testing.T, factory Factory) {
+	for _, test := range testFuncs {
+		t.Run(getTestName(test), func(tt *testing.T) {
+			test(tt, factory)
+		})
 	}
+}
+
+func getTestName(i interface{}) string {
+	return strings.Split(path.Base(runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()), ".")[1]
 }
 
 // Make sure that initialize sets the state correctly
