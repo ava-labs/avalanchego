@@ -26,15 +26,17 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/message"
 )
 
-func fundAddressByGenesis(addr common.Address) (string, error) {
+func fundAddressByGenesis(addrs []common.Address) (string, error) {
 	balance := big.NewInt(0xffffffffffffff)
 	genesis := &core.Genesis{
 		Difficulty: common.Big0,
 		GasLimit:   uint64(5000000),
 	}
 	funds := make(map[common.Address]core.GenesisAccount)
-	funds[addr] = core.GenesisAccount{
-		Balance: balance,
+	for _, addr := range addrs {
+		funds[addr] = core.GenesisAccount{
+			Balance: balance,
+		}
 	}
 	genesis.Alloc = funds
 
@@ -84,7 +86,7 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 
 	addr := crypto.PubkeyToAddress(key.PublicKey)
 
-	cfgJson, err := fundAddressByGenesis(addr)
+	cfgJson, err := fundAddressByGenesis([]common.Address{addr})
 	assert.NoError(err)
 
 	_, vm, _, _, sender := GenesisVM(t, true, cfgJson, "", "")
@@ -169,7 +171,7 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 
 	addr := crypto.PubkeyToAddress(key.PublicKey)
 
-	cfgJson, err := fundAddressByGenesis(addr)
+	cfgJson, err := fundAddressByGenesis([]common.Address{addr})
 	assert.NoError(err)
 
 	_, vm, _, _, sender := GenesisVM(t, true, cfgJson, "", "")
@@ -228,7 +230,7 @@ func TestMempoolEthTxsAppGossipHandling(t *testing.T) {
 
 	addr := crypto.PubkeyToAddress(key.PublicKey)
 
-	cfgJson, err := fundAddressByGenesis(addr)
+	cfgJson, err := fundAddressByGenesis([]common.Address{addr})
 	assert.NoError(err)
 
 	_, vm, _, _, sender := GenesisVM(t, true, cfgJson, "", "")
@@ -283,7 +285,7 @@ func TestMempoolEthTxsRegossipSingleAccount(t *testing.T) {
 
 	addr := crypto.PubkeyToAddress(key.PublicKey)
 
-	cfgJson, err := fundAddressByGenesis(addr)
+	cfgJson, err := fundAddressByGenesis([]common.Address{addr})
 	assert.NoError(err)
 
 	_, vm, _, _, _ := GenesisVM(t, true, cfgJson, `{"local-txs-enabled":true}`, "")
@@ -313,4 +315,60 @@ func TestMempoolEthTxsRegossipSingleAccount(t *testing.T) {
 	queued := pushNetwork.queueRegossipTxs()
 	assert.Len(queued, 1, "unexpected length of queued txs")
 	assert.Equal(ethTxs[0].Hash(), queued[0].Hash())
+}
+
+func TestMempoolEthTxsRegossip(t *testing.T) {
+	assert := assert.New(t)
+
+	keys := make([]*ecdsa.PrivateKey, 20)
+	addrs := make([]common.Address, 20)
+	for i := 0; i < 20; i++ {
+		key, err := crypto.GenerateKey()
+		assert.NoError(err)
+		keys[i] = key
+		addrs[i] = crypto.PubkeyToAddress(key.PublicKey)
+	}
+
+	cfgJson, err := fundAddressByGenesis(addrs)
+	assert.NoError(err)
+
+	_, vm, _, _, _ := GenesisVM(t, true, cfgJson, `{"local-txs-enabled":true}`, "")
+	defer func() {
+		err := vm.Shutdown()
+		assert.NoError(err)
+	}()
+	vm.chain.GetTxPool().SetGasPrice(common.Big1)
+	vm.chain.GetTxPool().SetMinFee(common.Big0)
+
+	// create eth txes
+	ethTxs := []*types.Transaction{}
+	for i := 0; i < 20; i++ {
+		txs := getValidEthTxs(keys[i], 1, big.NewInt(226*params.GWei))
+		ethTxs = append(ethTxs, txs[0])
+	}
+
+	// Notify VM about eth txs
+	errs := vm.chain.GetTxPool().AddRemotesSync(ethTxs[:10])
+	for _, err := range errs {
+		assert.NoError(err, "failed adding coreth tx to remote mempool")
+	}
+	errs = vm.chain.GetTxPool().AddLocals(ethTxs[10:])
+	for _, err := range errs {
+		assert.NoError(err, "failed adding coreth tx to local mempool")
+	}
+
+	pushNetwork := vm.network.(*pushNetwork)
+	pushNetwork.ethTxsToGossip = map[common.Hash]*types.Transaction{}
+	queued := pushNetwork.queueRegossipTxs()
+	assert.Len(queued, 15, "unexpected length of queued txs")
+
+	// Confirm locals
+	for i, tx := range ethTxs[10:] {
+		assert.Equal(tx.Hash(), queued[i].Hash())
+	}
+
+	// Confirm remotes
+	for i, tx := range ethTxs[0:5] {
+		assert.Equal(tx.Hash(), queued[i+10].Hash())
+	}
 }
