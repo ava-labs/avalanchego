@@ -50,13 +50,12 @@ func fundAddressByGenesis(addr common.Address) (string, error) {
 	return string(bytes), err
 }
 
-func getValidEthTxs(key *ecdsa.PrivateKey, count int) []*types.Transaction {
+func getValidEthTxs(key *ecdsa.PrivateKey, count int, gasprice *big.Int) []*types.Transaction {
 	res := make([]*types.Transaction, count)
 
 	to := common.Address{}
 	amount := big.NewInt(10000)
 	gaslimit := uint64(100000)
-	gasprice := big.NewInt(1)
 
 	for i := 0; i < count; i++ {
 		tx, _ := types.SignTx(
@@ -97,7 +96,7 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 	vm.chain.GetTxPool().SetMinFee(common.Big0)
 
 	// create eth txes
-	ethTxs := getValidEthTxs(key, 3)
+	ethTxs := getValidEthTxs(key, 3, common.Big1)
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -182,7 +181,7 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 	vm.chain.GetTxPool().SetMinFee(common.Big0)
 
 	// create eth txes
-	ethTxs := getValidEthTxs(key, 100)
+	ethTxs := getValidEthTxs(key, 100, common.Big1)
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -256,7 +255,7 @@ func TestMempoolEthTxsAppGossipHandling(t *testing.T) {
 	}
 
 	// prepare a tx
-	tx := getValidEthTxs(key, 1)[0]
+	tx := getValidEthTxs(key, 1, common.Big1)[0]
 
 	// show that unknown coreth hashes is requested
 	txBytes, err := rlp.EncodeToBytes([]*types.Transaction{tx})
@@ -274,4 +273,44 @@ func TestMempoolEthTxsAppGossipHandling(t *testing.T) {
 
 	// wait for transaction to be re-gossiped
 	attemptAwait(t, &wg, 5*time.Second)
+}
+
+func TestMempoolEthTxsRegossipSingleAccount(t *testing.T) {
+	assert := assert.New(t)
+
+	key, err := crypto.GenerateKey()
+	assert.NoError(err)
+
+	addr := crypto.PubkeyToAddress(key.PublicKey)
+
+	cfgJson, err := fundAddressByGenesis(addr)
+	assert.NoError(err)
+
+	_, vm, _, _, _ := GenesisVM(t, true, cfgJson, `{"local-txs-enabled":true}`, "")
+	defer func() {
+		err := vm.Shutdown()
+		assert.NoError(err)
+	}()
+	vm.chain.GetTxPool().SetGasPrice(common.Big1)
+	vm.chain.GetTxPool().SetMinFee(common.Big0)
+
+	// create eth txes
+	ethTxs := getValidEthTxs(key, 10, big.NewInt(226*params.GWei))
+
+	// Notify VM about eth txs
+	errs := vm.chain.GetTxPool().AddRemotesSync(ethTxs[:5])
+	for _, err := range errs {
+		assert.NoError(err, "failed adding coreth tx to remote mempool")
+	}
+	errs = vm.chain.GetTxPool().AddLocals(ethTxs[5:])
+	for _, err := range errs {
+		assert.NoError(err, "failed adding coreth tx to local mempool")
+	}
+
+	// Only transaction for regossip will be first remote (considered local)
+	pushNetwork := vm.network.(*pushNetwork)
+	pushNetwork.ethTxsToGossip = map[common.Hash]*types.Transaction{}
+	queued := pushNetwork.queueRegossipTxs()
+	assert.Len(queued, 1, "unexpected length of queued txs")
+	assert.Equal(ethTxs[0].Hash(), queued[0].Hash())
 }
