@@ -426,7 +426,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	doneChan := vm.atomicTrie.Initialize(facades.NewEthChainFacade(ethChain), vm.db.Commit, func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error) {
+	resultChan := vm.atomicTrie.Initialize(facades.NewEthChainFacade(ethChain), vm.db.Commit, func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error) {
 		tx, err := vm.extractAtomicTx(blk.(*types.Block))
 		if err != nil {
 			return nil, err
@@ -439,18 +439,17 @@ func (vm *VM) Initialize(
 		return tx.AtomicOps()
 	})
 
-	go func(done <-chan error) {
-		startTime := time.Now()
-		err, open := <-done
-		// loop until  errors are coming through and channel is open
-		for err != nil && open {
-			if err != nil {
-				log.Crit("error initializing atomic trie locally", "time", time.Since(startTime), "err", err)
-			}
-			err, open = <-done
+	startTime := time.Now()
+	err, open := <-resultChan
+
+	// loop until  errors are coming through and channel is open
+	for err != nil && open {
+		if err != nil {
+			log.Crit("error initializing atomic trie locally", "time", time.Since(startTime), "err", err)
 		}
-		log.Info("Atomic trie initialization complete", "time", time.Since(startTime))
-	}(doneChan)
+		err, open = <-resultChan
+	}
+	log.Info("Atomic trie initialization complete", "time", time.Since(startTime))
 
 	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
 	vm.handleGasPriceUpdates()
