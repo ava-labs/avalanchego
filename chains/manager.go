@@ -632,7 +632,10 @@ func (m *manager) createAvalancheChain(
 	checkFn := func() (interface{}, error) {
 		ctx.Lock.Lock()
 		defer ctx.Lock.Unlock()
-		return engine.HealthCheck()
+		if ctx.IsBootstrapped() {
+			return engine.HealthCheck()
+		}
+		return bootstrapper.HealthCheck()
 	}
 	if err := m.HealthService.RegisterCheck(chainAlias, checkFn); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
