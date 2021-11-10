@@ -131,7 +131,7 @@ func Test_BlockingAtomicTrie(t *testing.T) {
 	}
 
 	chainFacade := newTestChainFacade(newAtomicBlockFacade(0, common.Hash{}, nil), nil)
-	doneChan := atomicTrie.Initialize(chainFacade, dbCommitFn, memdb.New(), Codec)
+	doneChan := atomicTrie.Initialize(chainFacade, dbCommitFn, memdb.New().NewIterator(), Codec)
 	_, open := <-doneChan
 	assert.False(t, open)
 	assert.NotNil(t, doneChan)
