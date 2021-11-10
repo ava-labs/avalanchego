@@ -503,7 +503,7 @@ func TestIncompleteIndex(t *testing.T) {
 	config.DB = versiondb.New(baseDB)
 	idxrIntf, err = NewIndexer(config)
 	assert.NoError(err)
-	idxr, ok = idxrIntf.(*indexer)
+	_, ok = idxrIntf.(*indexer)
 	assert.True(ok)
 }
 
