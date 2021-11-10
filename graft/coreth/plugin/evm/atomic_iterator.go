@@ -13,9 +13,9 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-// atomicIterator is an implementation of types.AtomicIterator that serves
+// atomicTrieIterator is an implementation of types.AtomicTrieIterator that serves
 // parsed data with each iteration
-type atomicIterator struct {
+type atomicTrieIterator struct {
 	trieIterator *trie.Iterator   // underlying trie.Iterator
 	entries      *atomic.Requests // atomic operation entries at this iteration
 	blockchainID ids.ID           // blockchainID at this iteration
@@ -23,12 +23,12 @@ type atomicIterator struct {
 	errs         []error          // errors if any so far
 }
 
-func NewAtomicIterator(trieIterator *trie.Iterator) types.AtomicIterator {
-	return &atomicIterator{trieIterator: trieIterator}
+func NewAtomicTrieIterator(trieIterator *trie.Iterator) types.AtomicTrieIterator {
+	return &atomicTrieIterator{trieIterator: trieIterator}
 }
 
 // Errors returns a list of errors, if any encountered so far
-func (a *atomicIterator) Errors() []error {
+func (a *atomicTrieIterator) Errors() []error {
 	// check if the underlying trie has an error, or if we have errors
 	if a.trieIterator.Err != nil || len(a.errs) > 0 {
 		trieErrLen := 0
@@ -45,8 +45,8 @@ func (a *atomicIterator) Errors() []error {
 }
 
 // Next returns whether there is data to iterate over
-// this function sets blockNumber, blockchainID and entries fields of the atomicIterator
-func (a *atomicIterator) Next() bool {
+// this function sets blockNumber, blockchainID and entries fields of the atomicTrieIterator
+func (a *atomicTrieIterator) Next() bool {
 	hasNext := a.trieIterator.Next()
 	// if the underlying iterator has data to iterate over, parse and set the fields
 	if hasNext {
@@ -80,23 +80,23 @@ func (a *atomicIterator) Next() bool {
 	return hasNext
 }
 
-func (a *atomicIterator) resetFields() {
+func (a *atomicTrieIterator) resetFields() {
 	a.blockNumber = 0
 	a.blockchainID = ids.Empty
 	a.entries = nil
 }
 
 // BlockNumber returns the block number of this iteration
-func (a *atomicIterator) BlockNumber() uint64 {
+func (a *atomicTrieIterator) BlockNumber() uint64 {
 	return a.blockNumber
 }
 
 // BlockchainID returns the blockchainID of this iteration
-func (a *atomicIterator) BlockchainID() ids.ID {
+func (a *atomicTrieIterator) BlockchainID() ids.ID {
 	return a.blockchainID
 }
 
 // Entries returns the atomic operation entries of this iteration
-func (a *atomicIterator) Entries() *atomic.Requests {
+func (a *atomicTrieIterator) Entries() *atomic.Requests {
 	return a.entries
 }
