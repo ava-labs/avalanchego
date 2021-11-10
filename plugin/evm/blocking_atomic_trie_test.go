@@ -26,7 +26,7 @@ import (
 
 type TestAtomicTx struct {
 	avax.Metadata
-	BlockchainID  ids.ID
+	BlockchainID  ids.ID           `serialize:"true"`
 	AtomicRequest *atomic.Requests `serialize:"true"`
 }
 
