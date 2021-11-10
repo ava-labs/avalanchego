@@ -323,16 +323,16 @@ func (i *blockingAtomicTrie) LastCommitted() (common.Hash, uint64, error) {
 	return common.BytesToHash(hash), height, err
 }
 
-// Iterator returns a types.AtomicIterator that iterates the trie from the given
+// Iterator returns a types.AtomicTrieIterator that iterates the trie from the given
 // atomic root hash
-func (i *blockingAtomicTrie) Iterator(hash common.Hash) (types.AtomicIterator, error) {
+func (i *blockingAtomicTrie) Iterator(hash common.Hash) (types.AtomicTrieIterator, error) {
 	t, err := trie.New(hash, i.trieDB)
 	if err != nil {
 		return nil, err
 	}
 
 	iter := trie.NewIterator(t.NodeIterator(nil))
-	return NewAtomicIterator(iter), iter.Err
+	return NewAtomicTrieIterator(iter), iter.Err
 }
 
 // Height returns the current index height, whether the index is initialized and an optional error

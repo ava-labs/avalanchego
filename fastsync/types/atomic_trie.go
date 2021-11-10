@@ -20,10 +20,10 @@ type AtomicTrie interface {
 	// Returns an optional root hash and an optional error
 	Index(height uint64, atomicOps map[ids.ID]*atomic.Requests) (common.Hash, error)
 
-	// Iterator returns an AtomicIterator to iterate the trie at the given
+	// Iterator returns an AtomicTrieIterator to iterate the trie at the given
 	// root hash
 	// Optionally returns an error
-	Iterator(hash common.Hash) (AtomicIterator, error)
+	Iterator(hash common.Hash) (AtomicTrieIterator, error)
 
 	// Height returns the following:
 	// - current index height
@@ -38,9 +38,9 @@ type AtomicTrie interface {
 	LastCommitted() (common.Hash, uint64, error)
 }
 
-// AtomicIterator defines a stateful iterator that iterates
+// AtomicTrieIterator defines a stateful iterator that iterates
 // the AtomicTrie
-type AtomicIterator interface {
+type AtomicTrieIterator interface {
 	Next() bool
 	BlockNumber() uint64
 	BlockchainID() ids.ID
