@@ -55,7 +55,7 @@ func (a *atomicIterator) Next() bool {
 		blockchainID, err := ids.ToID(a.trieIterator.Key[wrappers.LongLen:])
 		if err != nil {
 			a.errs = append(a.errs, err)
-			log.Error("error converting to ID", err)
+			log.Error("error converting to ID", "err", err)
 			a.resetFields()
 			return hasNext
 		}
@@ -64,7 +64,7 @@ func (a *atomicIterator) Next() bool {
 		var requests atomic.Requests
 		if err = rlp.DecodeBytes(a.trieIterator.Value, &requests); err != nil {
 			a.errs = append(a.errs, err)
-			log.Error("error decoding", err)
+			log.Error("error decoding", "err", err)
 			a.resetFields()
 			return hasNext
 		}
