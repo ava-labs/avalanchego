@@ -72,6 +72,9 @@ type Context struct {
 	// Non-zero iff this chain bootstrapped.
 	state utils.AtomicInterface
 
+	// Non-zero iff this chain is executing transactions.
+	executing utils.AtomicBool
+
 	// Indicates this chain is available to only validators.
 	validatorOnly utils.AtomicBool
 
@@ -95,6 +98,17 @@ func (ctx *Context) GetState() State {
 
 func (ctx *Context) IsBootstrapped() bool {
 	return ctx.GetState() == NormalOp
+}
+
+// IsExecuting returns true iff this chain is still executing transactions.
+func (ctx *Context) IsExecuting() bool {
+	return ctx.executing.GetValue()
+}
+
+// Executing marks this chain as executing or not.
+// Set to "true" if there's an ongoing transaction.
+func (ctx *Context) Executing(b bool) {
+	ctx.executing.SetValue(b)
 }
 
 // IsValidatorOnly returns true iff this chain is available only to validators

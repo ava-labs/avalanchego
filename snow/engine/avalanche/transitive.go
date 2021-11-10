@@ -121,6 +121,7 @@ func (t *Transitive) Start(startReqID uint32) error {
 	}
 
 	t.Ctx.Log.Info("bootstrapping finished with %d vertices in the accepted frontier", len(frontier))
+	t.metrics.bootstrapFinished.Set(1)
 	return t.Consensus.Initialize(t.Ctx, t.Params, frontier)
 }
 

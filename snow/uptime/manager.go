@@ -13,12 +13,10 @@ import (
 
 var _ TestManager = &manager{}
 
-type State interface {
-	GetUptime(nodeID ids.ShortID) (upDuration time.Duration, lastUpdated time.Time, err error)
-	SetUptime(nodeID ids.ShortID, upDuration time.Duration, lastUpdated time.Time) error
-}
-
 type Manager interface {
+	// TODO: Remove SetState as it is a jank workaround.
+	SetState(state State)
+
 	// Should only be called once
 	StartTracking(nodeIDs []ids.ShortID) error
 
@@ -30,7 +28,8 @@ type Manager interface {
 	Disconnect(nodeID ids.ShortID) error
 
 	CalculateUptime(nodeID ids.ShortID) (time.Duration, time.Time, error)
-	CalculateUptimePercent(nodeID ids.ShortID, startTime time.Time) (float64, error)
+	CalculateUptimePercent(nodeID ids.ShortID) (float64, error)
+	CalculateUptimePercentFrom(nodeID ids.ShortID, startTime time.Time) (float64, error)
 }
 
 type TestManager interface {
@@ -52,6 +51,10 @@ func NewManager(state State) Manager {
 		state:       state,
 		connections: make(map[ids.ShortID]time.Time),
 	}
+}
+
+func (m *manager) SetState(state State) {
+	m.state = state
 }
 
 func (m *manager) StartTracking(nodeIDs []ids.ShortID) error {
@@ -171,7 +174,15 @@ func (m *manager) CalculateUptime(nodeID ids.ShortID) (time.Duration, time.Time,
 	return newUpDuration, currentLocalTime, nil
 }
 
-func (m *manager) CalculateUptimePercent(nodeID ids.ShortID, startTime time.Time) (float64, error) {
+func (m *manager) CalculateUptimePercent(nodeID ids.ShortID) (float64, error) {
+	startTime, err := m.state.GetStartTime(nodeID)
+	if err != nil {
+		return 0, err
+	}
+	return m.CalculateUptimePercentFrom(nodeID, startTime)
+}
+
+func (m *manager) CalculateUptimePercentFrom(nodeID ids.ShortID, startTime time.Time) (float64, error) {
 	upDuration, currentLocalTime, err := m.CalculateUptime(nodeID)
 	if err != nil {
 		return 0, err

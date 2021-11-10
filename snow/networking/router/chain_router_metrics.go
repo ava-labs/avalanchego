@@ -12,6 +12,7 @@ import (
 type routerMetrics struct {
 	outstandingRequests   prometheus.Gauge
 	longestRunningRequest prometheus.Gauge
+	droppedRequests       prometheus.Counter
 }
 
 func newRouterMetrics(namespace string, registerer prometheus.Registerer) (*routerMetrics, error) {
@@ -30,11 +31,19 @@ func newRouterMetrics(namespace string, registerer prometheus.Registerer) (*rout
 			Help:      "Time (in ns) the longest request took",
 		},
 	)
+	rMetrics.droppedRequests = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "dropped",
+			Help:      "Number of dropped requests (all types)",
+		},
+	)
 
 	errs := wrappers.Errs{}
 	errs.Add(
 		registerer.Register(rMetrics.outstandingRequests),
 		registerer.Register(rMetrics.longestRunningRequest),
+		registerer.Register(rMetrics.droppedRequests),
 	)
 	return rMetrics, errs.Err
 }

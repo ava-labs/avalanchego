@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/triggers"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -114,6 +115,8 @@ type Node struct {
 
 	// Manages validator benching
 	benchlistManager benchlist.Manager
+
+	uptimeManager uptime.Manager
 
 	// dispatcher for events as they happen in consensus
 	DecisionDispatcher  *triggers.EventDispatcher
@@ -199,6 +202,8 @@ func (n *Node) initNetworking() error {
 	n.Config.BenchlistConfig.StakingEnabled = n.Config.EnableStaking
 	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
 
+	n.uptimeManager = uptime.NewManager(uptime.UnreadyState())
+
 	consensusRouter := n.Config.ConsensusRouter
 	if !n.Config.EnableStaking {
 		if err := primaryNetworkValidators.AddWeight(n.ID, n.Config.DisabledStakingWeight); err != nil {
@@ -221,6 +226,7 @@ func (n *Node) initNetworking() error {
 		timer := timer.NewTimer(func() {
 			// If the timeout fires and we're already shutting down, nothing to do.
 			if !n.shuttingDown.GetValue() {
+				n.Log.Debug("node %s failed to connect to bootstrap nodes %s in time", n.ID.PrefixedString(constants.NodeIDPrefix), n.beacons)
 				n.Log.Fatal("Failed to connect to bootstrap nodes. Node shutting down...")
 				go n.Shutdown(1)
 			}
@@ -247,6 +253,7 @@ func (n *Node) initNetworking() error {
 	n.Config.NetworkConfig.TLSConfig = tlsConfig
 	n.Config.NetworkConfig.TLSKey = tlsKey
 	n.Config.NetworkConfig.WhitelistedSubnets = n.Config.WhitelistedSubnets
+	n.Config.NetworkConfig.UptimeManager = n.uptimeManager
 
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
@@ -669,6 +676,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		n.vmManager.RegisterFactory(platformvm.ID, &platformvm.Factory{
 			Chains:                n.chainManager,
 			Validators:            vdrs,
+			UptimeManager:         n.uptimeManager,
 			StakingEnabled:        n.Config.EnableStaking,
 			WhitelistedSubnets:    n.Config.WhitelistedSubnets,
 			TxFee:                 n.Config.TxFee,
@@ -860,19 +868,27 @@ func (n *Node) initInfoAPI() error {
 		n.Log.Info("skipping info API initialization because it has been disabled")
 		return nil
 	}
+
 	n.Log.Info("initializing info API")
+
+	primaryValidators, _ := n.vdrs.GetValidators(constants.PrimaryNetworkID)
 	service, err := info.NewService(
+		info.Parameters{
+			Version:               version.CurrentApp,
+			NodeID:                n.ID,
+			NetworkID:             n.Config.NetworkID,
+			TxFee:                 n.Config.TxFee,
+			CreateAssetTxFee:      n.Config.CreateAssetTxFee,
+			CreateSubnetTxFee:     n.Config.CreateSubnetTxFee,
+			CreateBlockchainTxFee: n.Config.CreateBlockchainTxFee,
+			UptimeRequirement:     n.Config.UptimeRequirement,
+		},
 		n.Log,
-		version.CurrentApp,
-		n.ID,
-		n.Config.NetworkID,
 		n.chainManager,
 		n.vmManager,
 		n.Net,
-		n.Config.TxFee,
-		n.Config.CreateAssetTxFee,
-		n.Config.CreateSubnetTxFee,
-		n.Config.CreateBlockchainTxFee,
+		version.NewDefaultApplicationParser(),
+		primaryValidators,
 	)
 	if err != nil {
 		return err

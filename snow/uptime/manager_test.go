@@ -8,51 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/stretchr/testify/assert"
 )
-
-type uptime struct {
-	upDuration  time.Duration
-	lastUpdated time.Time
-}
-
-type testState struct {
-	dbReadError  error
-	dbWriteError error
-	nodes        map[ids.ShortID]*uptime
-}
-
-func newTestState() *testState {
-	return &testState{
-		nodes: make(map[ids.ShortID]*uptime),
-	}
-}
-
-func (s *testState) addNode(nodeID ids.ShortID, startTime time.Time) {
-	s.nodes[nodeID] = &uptime{
-		lastUpdated: startTime,
-	}
-}
-
-func (s *testState) GetUptime(nodeID ids.ShortID) (upDuration time.Duration, lastUpdated time.Time, err error) {
-	up, exists := s.nodes[nodeID]
-	if !exists {
-		return 0, time.Time{}, database.ErrNotFound
-	}
-	return up.upDuration, up.lastUpdated, s.dbReadError
-}
-
-func (s *testState) SetUptime(nodeID ids.ShortID, upDuration time.Duration, lastUpdated time.Time) error {
-	up, exists := s.nodes[nodeID]
-	if !exists {
-		return database.ErrNotFound
-	}
-	up.upDuration = upDuration
-	up.lastUpdated = lastUpdated
-	return s.dbWriteError
-}
 
 func TestStartTracking(t *testing.T) {
 	assert := assert.New(t)
@@ -60,8 +18,8 @@ func TestStartTracking(t *testing.T) {
 	nodeID0 := ids.GenerateTestShortID()
 	startTime := time.Now()
 
-	s := newTestState()
-	s.addNode(nodeID0, startTime)
+	s := NewTestState()
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 
@@ -83,9 +41,9 @@ func TestStartTrackingDBError(t *testing.T) {
 	nodeID0 := ids.GenerateTestShortID()
 	startTime := time.Now()
 
-	s := newTestState()
+	s := NewTestState()
 	s.dbWriteError = errors.New("err")
-	s.addNode(nodeID0, startTime)
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 
@@ -99,7 +57,7 @@ func TestStartTrackingDBError(t *testing.T) {
 func TestStartTrackingNonValidator(t *testing.T) {
 	assert := assert.New(t)
 
-	s := newTestState()
+	s := NewTestState()
 	up := NewManager(s).(*manager)
 
 	nodeID0 := ids.GenerateTestShortID()
@@ -113,8 +71,8 @@ func TestStartTrackingInThePast(t *testing.T) {
 	nodeID0 := ids.GenerateTestShortID()
 	startTime := time.Now()
 
-	s := newTestState()
-	s.addNode(nodeID0, startTime)
+	s := NewTestState()
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 
@@ -137,8 +95,8 @@ func TestShutdownDecreasesUptime(t *testing.T) {
 	currentTime := time.Now()
 	startTime := currentTime
 
-	s := newTestState()
-	s.addNode(nodeID0, startTime)
+	s := NewTestState()
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
@@ -171,8 +129,8 @@ func TestShutdownIncreasesUptime(t *testing.T) {
 	currentTime := time.Now()
 	startTime := currentTime
 
-	s := newTestState()
-	s.addNode(nodeID0, startTime)
+	s := NewTestState()
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
@@ -206,7 +164,7 @@ func TestShutdownDisconnectedNonValidator(t *testing.T) {
 
 	nodeID0 := ids.GenerateTestShortID()
 
-	s := newTestState()
+	s := NewTestState()
 	up := NewManager(s).(*manager)
 
 	err := up.StartTracking(nil)
@@ -222,8 +180,8 @@ func TestShutdownConnectedDBError(t *testing.T) {
 	nodeID0 := ids.GenerateTestShortID()
 	startTime := time.Now()
 
-	s := newTestState()
-	s.addNode(nodeID0, startTime)
+	s := NewTestState()
+	s.AddNode(nodeID0, startTime)
 	up := NewManager(s).(*manager)
 
 	err := up.StartTracking(nil)
@@ -244,8 +202,8 @@ func TestShutdownNonConnectedPast(t *testing.T) {
 	currentTime := time.Now()
 	startTime := currentTime
 
-	s := newTestState()
-	s.addNode(nodeID0, startTime)
+	s := NewTestState()
+	s.AddNode(nodeID0, startTime)
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
 
@@ -271,8 +229,8 @@ func TestShutdownNonConnectedDBError(t *testing.T) {
 	currentTime := time.Now()
 	startTime := currentTime
 
-	s := newTestState()
-	s.addNode(nodeID0, startTime)
+	s := NewTestState()
+	s.AddNode(nodeID0, startTime)
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
 
@@ -294,8 +252,8 @@ func TestConnectAndDisconnect(t *testing.T) {
 	currentTime := time.Now()
 	startTime := currentTime
 
-	s := newTestState()
-	s.addNode(nodeID0, startTime)
+	s := NewTestState()
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
@@ -350,8 +308,8 @@ func TestConnectAndDisconnectBeforeTracking(t *testing.T) {
 	currentTime := time.Now()
 	startTime := currentTime
 
-	s := newTestState()
-	s.addNode(nodeID0, startTime)
+	s := NewTestState()
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 	currentTime = currentTime.Add(time.Second)
@@ -383,8 +341,8 @@ func TestUnrelatedNodeDisconnect(t *testing.T) {
 	currentTime := time.Now()
 	startTime := currentTime
 
-	s := newTestState()
-	s.addNode(nodeID0, startTime)
+	s := NewTestState()
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
@@ -429,8 +387,8 @@ func TestCalculateUptimeWhenNeverConnected(t *testing.T) {
 	nodeID0 := ids.GenerateTestShortID()
 	startTime := time.Now()
 
-	s := newTestState()
-	s.addNode(nodeID0, startTime)
+	s := NewTestState()
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 
@@ -442,7 +400,7 @@ func TestCalculateUptimeWhenNeverConnected(t *testing.T) {
 	assert.Equal(time.Duration(0), duration)
 	assert.Equal(currentTime, lastUpdated)
 
-	uptime, err := up.CalculateUptimePercent(nodeID0, startTime)
+	uptime, err := up.CalculateUptimePercentFrom(nodeID0, startTime)
 	assert.NoError(err)
 	assert.Equal(0., uptime)
 }
@@ -454,8 +412,8 @@ func TestCalculateUptimeWhenConnectedBeforeTracking(t *testing.T) {
 	currentTime := time.Now()
 	startTime := currentTime
 
-	s := newTestState()
-	s.addNode(nodeID0, startTime)
+	s := NewTestState()
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
@@ -485,8 +443,8 @@ func TestCalculateUptimeWhenConnectedInFuture(t *testing.T) {
 	currentTime := time.Now()
 	startTime := currentTime
 
-	s := newTestState()
-	s.addNode(nodeID0, startTime)
+	s := NewTestState()
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
@@ -515,11 +473,11 @@ func TestCalculateUptimeNonValidator(t *testing.T) {
 	nodeID0 := ids.GenerateTestShortID()
 	startTime := time.Now()
 
-	s := newTestState()
+	s := NewTestState()
 
 	up := NewManager(s).(*manager)
 
-	_, err := up.CalculateUptimePercent(nodeID0, startTime)
+	_, err := up.CalculateUptimePercentFrom(nodeID0, startTime)
 	assert.Error(err)
 }
 
@@ -530,13 +488,13 @@ func TestCalculateUptimePercentageDivBy0(t *testing.T) {
 	currentTime := time.Now()
 	startTime := currentTime
 
-	s := newTestState()
-	s.addNode(nodeID0, startTime)
+	s := NewTestState()
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
 
-	uptime, err := up.CalculateUptimePercent(nodeID0, startTime)
+	uptime, err := up.CalculateUptimePercentFrom(nodeID0, startTime)
 	assert.NoError(err)
 	assert.Equal(float64(1), uptime)
 }
@@ -548,15 +506,15 @@ func TestCalculateUptimePercentage(t *testing.T) {
 	currentTime := time.Now()
 	startTime := currentTime
 
-	s := newTestState()
-	s.addNode(nodeID0, startTime)
+	s := NewTestState()
+	s.AddNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
 
 	currentTime = currentTime.Add(time.Second)
 	up.clock.Set(currentTime)
 
-	uptime, err := up.CalculateUptimePercent(nodeID0, startTime)
+	uptime, err := up.CalculateUptimePercentFrom(nodeID0, startTime)
 	assert.NoError(err)
 	assert.Equal(float64(0), uptime)
 }

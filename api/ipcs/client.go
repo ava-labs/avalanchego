@@ -11,19 +11,32 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-type Client struct {
+// Interface compliance
+var _ Client = &client{}
+
+// Client interface for interacting with the IPCS endpoint
+type Client interface {
+	// PublishBlockchain requests the node to begin publishing consensus and decision events
+	PublishBlockchain(chainID string) (*PublishBlockchainReply, error)
+	// UnpublishBlockchain requests the node to stop publishing consensus and decision events
+	UnpublishBlockchain(chainID string) (bool, error)
+	// GetPublishedBlockchains requests the node to get blockchains being published
+	GetPublishedBlockchains() ([]ids.ID, error)
+}
+
+// Client implementation for interacting with the IPCS endpoint
+type client struct {
 	requester rpc.EndpointRequester
 }
 
 // NewClient returns a Client for interacting with the IPCS endpoint
-func NewClient(uri string, requestTimeout time.Duration) *Client {
-	return &Client{
+func NewClient(uri string, requestTimeout time.Duration) Client {
+	return &client{
 		requester: rpc.NewEndpointRequester(uri, "/ext/ipcs", "ipcs", requestTimeout),
 	}
 }
 
-// PublishBlockchain requests the node to begin publishing consensus and decision events
-func (c *Client) PublishBlockchain(blockchainID string) (*PublishBlockchainReply, error) {
+func (c *client) PublishBlockchain(blockchainID string) (*PublishBlockchainReply, error) {
 	res := &PublishBlockchainReply{}
 	err := c.requester.SendRequest("publishBlockchain", &PublishBlockchainArgs{
 		BlockchainID: blockchainID,
@@ -31,8 +44,7 @@ func (c *Client) PublishBlockchain(blockchainID string) (*PublishBlockchainReply
 	return res, err
 }
 
-// UnpublishBlockchain requests the node to stop publishing consensus and decision events
-func (c *Client) UnpublishBlockchain(blockchainID string) (bool, error) {
+func (c *client) UnpublishBlockchain(blockchainID string) (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.requester.SendRequest("unpublishBlockchain", &UnpublishBlockchainArgs{
 		BlockchainID: blockchainID,
@@ -40,8 +52,7 @@ func (c *Client) UnpublishBlockchain(blockchainID string) (bool, error) {
 	return res.Success, err
 }
 
-// GetPublishedBlockchains requests the node to get blockchains being published
-func (c *Client) GetPublishedBlockchains() ([]ids.ID, error) {
+func (c *client) GetPublishedBlockchains() ([]ids.ID, error) {
 	res := &GetPublishedBlockchainsReply{}
 	err := c.requester.SendRequest("getPublishedBlockchains", nil, res)
 	return res.Chains, err

@@ -11,31 +11,46 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-type Client struct {
+// Interface compliance
+var _ Client = &client{}
+
+// Client interface for Avalanche Keystore API Endpoint
+type Client interface {
+	CreateUser(api.UserPass) (bool, error)
+	// Returns the usernames of all keystore users
+	ListUsers() ([]string, error)
+	// Returns the byte representation of the given user
+	ExportUser(api.UserPass) ([]byte, error)
+	// Import [exportedUser] to [importTo]
+	ImportUser(importTo api.UserPass, exportedUser []byte) (bool, error)
+	// Delete the given user
+	DeleteUser(api.UserPass) (bool, error)
+}
+
+// Client implementation for Avalanche Keystore API Endpoint
+type client struct {
 	requester rpc.EndpointRequester
 }
 
-func NewClient(uri string, requestTimeout time.Duration) *Client {
-	return &Client{
+func NewClient(uri string, requestTimeout time.Duration) Client {
+	return &client{
 		requester: rpc.NewEndpointRequester(uri, "/ext/keystore", "keystore", requestTimeout),
 	}
 }
 
-func (c *Client) CreateUser(user api.UserPass) (bool, error) {
+func (c *client) CreateUser(user api.UserPass) (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.requester.SendRequest("createUser", &user, res)
 	return res.Success, err
 }
 
-// ListUsers lists the usernames of all keystore users on the node
-func (c *Client) ListUsers() ([]string, error) {
+func (c *client) ListUsers() ([]string, error) {
 	res := &ListUsersReply{}
 	err := c.requester.SendRequest("listUsers", struct{}{}, res)
 	return res.Users, err
 }
 
-// ExportUser returns the byte representation of the requested [user]
-func (c *Client) ExportUser(user api.UserPass) ([]byte, error) {
+func (c *client) ExportUser(user api.UserPass) ([]byte, error) {
 	res := &ExportUserReply{
 		Encoding: formatting.Hex,
 	}
@@ -46,8 +61,7 @@ func (c *Client) ExportUser(user api.UserPass) ([]byte, error) {
 	return formatting.Decode(res.Encoding, res.User)
 }
 
-// ImportUser imports the keystore user in [account] under [user]
-func (c *Client) ImportUser(user api.UserPass, account []byte) (bool, error) {
+func (c *client) ImportUser(user api.UserPass, account []byte) (bool, error) {
 	accountStr, err := formatting.EncodeWithChecksum(formatting.Hex, account)
 	if err != nil {
 		return false, err
@@ -63,7 +77,7 @@ func (c *Client) ImportUser(user api.UserPass, account []byte) (bool, error) {
 }
 
 // DeleteUser removes [user] from the node's keystore users
-func (c *Client) DeleteUser(user api.UserPass) (bool, error) {
+func (c *client) DeleteUser(user api.UserPass) (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.requester.SendRequest("deleteUser", &user, res)
 	return res.Success, err
