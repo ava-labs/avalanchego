@@ -78,7 +78,6 @@ func (t *TestAtomicTx) EVMStateTransfer(ctx *snow.Context, state *state.StateDB)
 
 // ignore
 func Test_BlockingAtomicTrie(t *testing.T) {
-	t.Skip()
 	db := memorydb.New()
 	acceptedAtomicTxDB := memdb.New()
 	Codec = codec.NewDefaultManager()
@@ -88,6 +87,7 @@ func Test_BlockingAtomicTrie(t *testing.T) {
 	errs.Add(
 		c.RegisterType(&UnsignedImportTx{}),
 		c.RegisterType(&UnsignedExportTx{}),
+		c.RegisterType(&atomic.Requests{}),
 	)
 	c.SkipRegistrations(3)
 	errs.Add(
@@ -128,6 +128,7 @@ func Test_BlockingAtomicTrie(t *testing.T) {
 	}
 	tx := &TestAtomicTx{AtomicRequests: atomicRequests}
 	b, err := Codec.Marshal(codecVersion, tx)
+
 	assert.NoError(t, err)
 
 	txBytes := make([]byte, wrappers.LongLen, wrappers.LongLen+len(b))
@@ -138,13 +139,15 @@ func Test_BlockingAtomicTrie(t *testing.T) {
 	err = acceptedAtomicTxDB.Put(txID[:], txBytes)
 	assert.NoError(t, err)
 
-	atomicTrie, err := NewBlockingAtomicTrie(db, acceptedAtomicTxDB, Codec)
+	atomicTrie, err := NewBlockingAtomicTrie(db)
 	assert.NoError(t, err)
 
 	dbCommitFn := func() error {
 		return nil
 	}
-	doneChan := atomicTrie.Initialize(testChainFacade{lastAcceptedBlock: newAtomicBlockFacade(0, common.Hash{}, nil)}, dbCommitFn, nil)
+
+	chainFacade := newTestChainFacade(newAtomicBlockFacade(0, common.Hash{}, nil), nil)
+	doneChan := atomicTrie.Initialize(chainFacade, dbCommitFn, memdb.New(), Codec)
 	_, open := <-doneChan
 	assert.False(t, open)
 	assert.NotNil(t, doneChan)

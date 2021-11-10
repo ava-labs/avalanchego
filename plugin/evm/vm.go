@@ -18,8 +18,6 @@ import (
 
 	types2 "github.com/ava-labs/coreth/fastsync/types"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
-
 	"github.com/ava-labs/coreth/fastsync/facades"
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -421,23 +419,12 @@ func (vm *VM) Initialize(
 
 	atomicIndexDB := Database{prefixdb.New(atomicIndexDBPrefix, vm.db)}
 
-	vm.atomicTrie, err = NewBlockingAtomicTrie(atomicIndexDB, vm.acceptedHeightAtomicTxDB, vm.codec)
+	vm.atomicTrie, err = NewBlockingAtomicTrie(atomicIndexDB)
 	if err != nil {
 		return err
 	}
 
-	resultChan := vm.atomicTrie.Initialize(facades.NewEthChainFacade(ethChain), vm.db.Commit, func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error) {
-		tx, err := vm.extractAtomicTx(blk.(*types.Block))
-		if err != nil {
-			return nil, err
-		}
-
-		if tx == nil {
-			return nil, nil
-		}
-
-		return tx.AtomicOps()
-	})
+	resultChan := vm.atomicTrie.Initialize(facades.NewEthChainFacade(ethChain), vm.db.Commit, vm.acceptedHeightAtomicTxDB, vm.codec)
 
 	startTime := time.Now()
 	err, open := <-resultChan
