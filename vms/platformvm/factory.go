@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
@@ -24,6 +25,8 @@ type Factory struct {
 
 	// Node's validator set maps subnetID -> validators of the subnet
 	Validators validators.Manager
+
+	UptimeManager uptime.Manager
 
 	// True if the node is being run with staking enabled
 	StakingEnabled bool

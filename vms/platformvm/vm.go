@@ -32,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/uptime"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -86,7 +85,6 @@ type VM struct {
 	metrics
 	avax.AddressManager
 	avax.AtomicUTXOManager
-	uptime.Manager
 	*network
 
 	// Used to get time. Useful for faking time during tests.
@@ -193,7 +191,7 @@ func (vm *VM) Initialize(
 	vm.internalState = is
 
 	// Initialize the utility to track validator uptimes
-	vm.Manager = uptime.NewManager(is)
+	vm.UptimeManager.SetState(is)
 
 	if err := vm.updateValidators(true); err != nil {
 		return fmt.Errorf(
@@ -318,7 +316,7 @@ func (vm *VM) Bootstrapped() error {
 		validatorIDs[i] = vdr.ID()
 	}
 
-	if err := vm.StartTracking(validatorIDs); err != nil {
+	if err := vm.UptimeManager.StartTracking(validatorIDs); err != nil {
 		return err
 	}
 	return vm.internalState.Commit()
@@ -344,7 +342,7 @@ func (vm *VM) Shutdown() error {
 			validatorIDs[i] = vdr.ID()
 		}
 
-		if err := vm.Manager.Shutdown(validatorIDs); err != nil {
+		if err := vm.UptimeManager.Shutdown(validatorIDs); err != nil {
 			return err
 		}
 		if err := vm.internalState.Commit(); err != nil {
@@ -468,12 +466,12 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 
 // Connected implements validators.Connector
 func (vm *VM) Connected(vdrID ids.ShortID) error {
-	return vm.Connect(vdrID)
+	return vm.UptimeManager.Connect(vdrID)
 }
 
 // Disconnected implements validators.Connector
 func (vm *VM) Disconnected(vdrID ids.ShortID) error {
-	if err := vm.Disconnect(vdrID); err != nil {
+	if err := vm.UptimeManager.Disconnect(vdrID); err != nil {
 		return err
 	}
 	return vm.internalState.Commit()
@@ -656,7 +654,7 @@ func (vm *VM) getPercentConnected() (float64, error) {
 		err            error
 	)
 	for _, vdr := range vdrs {
-		if !vm.IsConnected(vdr.ID()) {
+		if !vm.UptimeManager.IsConnected(vdr.ID()) {
 			continue // not connected to us --> don't include
 		}
 		connectedStake, err = safemath.Add64(connectedStake, vdr.Weight())

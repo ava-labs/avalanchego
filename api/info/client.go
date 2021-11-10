@@ -22,9 +22,10 @@ type Client interface {
 	GetNetworkID() (uint32, error)
 	GetNetworkName() (string, error)
 	GetBlockchainID(alias string) (ids.ID, error)
-	Peers() ([]network.PeerID, error)
+	Peers() ([]network.PeerInfo, error)
 	IsBootstrapped(chainID string) (bool, error)
 	GetTxFee() (*GetTxFeeResponse, error)
+	Uptime() (*UptimeResponse, error)
 }
 
 // Client implementation for an Info API Client
@@ -77,7 +78,7 @@ func (c *client) GetBlockchainID(alias string) (ids.ID, error) {
 	return res.BlockchainID, err
 }
 
-func (c *client) Peers() ([]network.PeerID, error) {
+func (c *client) Peers() ([]network.PeerInfo, error) {
 	res := &PeersReply{}
 	err := c.requester.SendRequest("peers", struct{}{}, res)
 	return res.Peers, err
@@ -94,5 +95,11 @@ func (c *client) IsBootstrapped(chainID string) (bool, error) {
 func (c *client) GetTxFee() (*GetTxFeeResponse, error) {
 	res := &GetTxFeeResponse{}
 	err := c.requester.SendRequest("getTxFee", struct{}{}, res)
+	return res, err
+}
+
+func (c *client) Uptime() (*UptimeResponse, error) {
+	res := &UptimeResponse{}
+	err := c.requester.SendRequest("uptime", struct{}{}, res)
 	return res, err
 }
