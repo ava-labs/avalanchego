@@ -1,0 +1,21 @@
+name: Full Lint
+on:
+  push:
+    tags-ignore:
+      - "*" # Ignores all tags
+    branches-ignore:
+      - master
+      - dev
+
+jobs:
+  run_lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v2
+        with:
+          version: v1.43.0
+          working-directory: .
+          args: --timeout 10m --config .golangci.yml

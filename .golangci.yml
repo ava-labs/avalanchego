@@ -19,7 +19,7 @@ linters:
     - gofmt
     - gofumpt
     - goimports
-    - revive 
+    - revive
     - gosec
     - gosimple
     - govet
@@ -35,12 +35,21 @@ linters:
     - varcheck
     - unconvert
     - whitespace
+    - staticcheck
     # - lll
     # - gomnd
     # - goprintffuncname
     # - interfacer
-    # - staticcheck
     # - structcheck
     # - typecheck
     # - goerr113
     # - noctx
+
+linters-settings:
+  staticcheck:
+    go: "1.17"
+    # https://staticcheck.io/docs/options#checks
+    checks:
+      - "all"
+      - "-SA6002" # argument should be pointer-like to avoid allocation, for sync.Pool
+      - "-SA1019" # deprecated packages e.g., golang.org/x/crypto/ripemd160
