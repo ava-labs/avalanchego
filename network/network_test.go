@@ -3147,7 +3147,7 @@ func newDefaultNetwork(
 	netConfig.GossipOnAcceptSize = defaultGossipOnAcceptSize
 	netConfig.CompressionEnabled = true
 	netConfig.WhitelistedSubnets = subnetSet
-	netConfig.UptimeManager = uptimeManager
+	netConfig.UptimeCalculator = uptimeManager
 
 	n, err := NewNetwork(&netConfig, msgCreator, metrics, log, listener, router, benchlistManager)
 	if err != nil {

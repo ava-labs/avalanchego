@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -94,6 +95,8 @@ type VM struct {
 	factory crypto.FactorySECP256K1R
 
 	blockBuilder blockBuilder
+
+	uptimeManger uptime.Manager
 
 	// The context of this vm
 	ctx       *snow.Context
@@ -191,7 +194,8 @@ func (vm *VM) Initialize(
 	vm.internalState = is
 
 	// Initialize the utility to track validator uptimes
-	vm.UptimeManager.SetState(is)
+	vm.uptimeManger = uptime.NewManager(is)
+	vm.UptimeLockedCalculator.SetCalculator(ctx, vm.uptimeManger)
 
 	if err := vm.updateValidators(true); err != nil {
 		return fmt.Errorf(
@@ -316,7 +320,7 @@ func (vm *VM) Bootstrapped() error {
 		validatorIDs[i] = vdr.ID()
 	}
 
-	if err := vm.UptimeManager.StartTracking(validatorIDs); err != nil {
+	if err := vm.uptimeManger.StartTracking(validatorIDs); err != nil {
 		return err
 	}
 	return vm.internalState.Commit()
@@ -342,7 +346,7 @@ func (vm *VM) Shutdown() error {
 			validatorIDs[i] = vdr.ID()
 		}
 
-		if err := vm.UptimeManager.Shutdown(validatorIDs); err != nil {
+		if err := vm.uptimeManger.Shutdown(validatorIDs); err != nil {
 			return err
 		}
 		if err := vm.internalState.Commit(); err != nil {
@@ -466,12 +470,12 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 
 // Connected implements validators.Connector
 func (vm *VM) Connected(vdrID ids.ShortID) error {
-	return vm.UptimeManager.Connect(vdrID)
+	return vm.uptimeManger.Connect(vdrID)
 }
 
 // Disconnected implements validators.Connector
 func (vm *VM) Disconnected(vdrID ids.ShortID) error {
-	if err := vm.UptimeManager.Disconnect(vdrID); err != nil {
+	if err := vm.uptimeManger.Disconnect(vdrID); err != nil {
 		return err
 	}
 	return vm.internalState.Commit()
@@ -654,7 +658,7 @@ func (vm *VM) getPercentConnected() (float64, error) {
 		err            error
 	)
 	for _, vdr := range vdrs {
-		if !vm.UptimeManager.IsConnected(vdr.ID()) {
+		if !vm.uptimeManger.IsConnected(vdr.ID()) {
 			continue // not connected to us --> don't include
 		}
 		connectedStake, err = safemath.Add64(connectedStake, vdr.Weight())
