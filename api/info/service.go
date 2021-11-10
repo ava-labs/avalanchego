@@ -232,13 +232,17 @@ func (service *Info) IsBootstrapped(_ *http.Request, args *IsBootstrappedArgs, r
 // UptimeResponse are the results from calling Uptime
 type UptimeResponse struct {
 	// RewardingStakePercentage shows what percent of network stake thinks we're
-	// above the requirement.
+	// above the uptime requirement.
 	RewardingStakePercentage json.Float64 `json:"rewardingStakePercentage"`
 
-	// WeightedAveragePercentage is average of whole validator network observation, it is stake weighted.
-	// the difference between RewardingStakePercentage is WeightedAveragePercentage always takes uptime into account
-	// i.e if requirement is 80 and a peer reports 40 percent it will be counted (40*weight) in WeightedAveragePercentage
-	// but not in RewardingStakePercentage since 40 < 80
+	// WeightedAveragePercentage is the average perceived uptime of this node,
+	// weighted by stake.
+	// Note that this is different from RewardingStakePercentage, which shows
+	// the percent of the network stake that thinks this node is above the
+	// uptime requirement. WeightedAveragePercentage is weighted by uptime.
+	// i.e If uptime requirement is 85 and a peer reports 40 percent it will be
+	// counted (40*weight) in WeightedAveragePercentage but not in
+	// RewardingStakePercentage since 40 < 85
 	WeightedAveragePercentage json.Float64 `json:"weightedAveragePercentage"`
 }
 
