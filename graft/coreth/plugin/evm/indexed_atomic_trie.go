@@ -78,7 +78,8 @@ type indexRange struct {
 	start, end uint64 // starting and ending block number
 }
 
-func (i *indexedAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn func() error, getAtomicTxFn func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error)) chan struct{} {
+func (i *indexedAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn func() error, getAtomicTxFn func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error)) chan error {
+
 	num := 16
 	blockRange := i.initBlockRange
 	workChan := make(chan indexRange)
@@ -195,10 +196,11 @@ func (i *indexedAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn fun
 		}(workChan, &managerWg, &workerWg)
 	}
 
-	doneChan := make(chan struct{})
+	doneChan := make(chan error)
 	go func(managerWg, workerWg *sync.WaitGroup) {
 		workerWg.Wait()
 		managerWg.Wait()
+		doneChan <- nil
 		close(doneChan)
 	}(&managerWg, &workerWg)
 	return doneChan
