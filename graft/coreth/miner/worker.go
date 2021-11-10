@@ -310,12 +310,12 @@ func (w *worker) handleResult(env *environment, block *types.Block, createdAt ti
 		receipt.BlockNumber = block.Number()
 		receipt.TransactionIndex = uint(i)
 
-		receipt.Logs = make([]*types.Log, len(unfinishedReceipt.Logs))
 		// Update the block hash in all logs since it is now available and not when the
 		// receipt/log of individual transactions were created.
-		for _, unfinishedLog := range unfinishedReceipt.Logs {
+		receipt.Logs = make([]*types.Log, len(unfinishedReceipt.Logs))
+		for j, unfinishedLog := range unfinishedReceipt.Logs {
 			log := new(types.Log)
-			receipt.Logs[i] = log
+			receipt.Logs[j] = log
 			*log = *unfinishedLog
 			log.BlockHash = hash
 		}
