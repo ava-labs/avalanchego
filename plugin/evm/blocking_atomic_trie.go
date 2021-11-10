@@ -1,6 +1,7 @@
 package evm
 
 import (
+	"bytes"
 	"encoding/binary"
 	"time"
 
@@ -18,38 +19,43 @@ import (
 
 type blockingAtomicTrie struct {
 	*indexedAtomicTrie
-	acceptedAtomicTxDB database.Database
-	codec              codec.Manager
+	acceptedHeightAtomicTxDB database.Database
+	codec                    codec.Manager
 }
 
-func NewBlockingAtomicTrie(db ethdb.KeyValueStore, acceptedAtomicTxDB database.Database, codec codec.Manager) (types.AtomicTrie, error) {
+func NewBlockingAtomicTrie(db ethdb.KeyValueStore, acceptedHeightAtomicTxDB database.Database, codec codec.Manager) (types.AtomicTrie, error) {
 	iTrie, err := NewIndexedAtomicTrie(db)
 	if err != nil {
 		return nil, err
 	}
 	return &blockingAtomicTrie{
-		indexedAtomicTrie:  iTrie.(*indexedAtomicTrie),
-		acceptedAtomicTxDB: acceptedAtomicTxDB,
-		codec:              codec,
+		indexedAtomicTrie:        iTrie.(*indexedAtomicTrie),
+		acceptedHeightAtomicTxDB: acceptedHeightAtomicTxDB,
+		codec:                    codec,
 	}, nil
 }
 
 func (b *blockingAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn func() error, getAtomicTxFn func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error)) chan struct{} {
 	lastAccepted := chain.LastAcceptedBlock()
-	iter := b.acceptedAtomicTxDB.NewIterator()
+	iter := b.acceptedHeightAtomicTxDB.NewIterator()
 	transactionsIndexed := uint64(0)
 	startTime := time.Now()
 	lastUpdate := time.Now()
 	for iter.Next() && iter.Error() == nil {
-		indexedTxBytes := iter.Value()
-		packer := wrappers.Packer{Bytes: indexedTxBytes}
-		height := packer.UnpackLong()
+		heightBytes := iter.Key()
+		if len(heightBytes) != wrappers.LongLen ||
+			bytes.Equal(heightBytes, heightAtomicTxDBInitializedKey) {
+			// this is metadata key, skip it
+			continue
+		}
+
+		height := binary.BigEndian.Uint64(heightBytes)
 		if height > lastAccepted.NumberU64() {
 			// skip tx if height is > last accepted
 			continue
 		}
 
-		txBytes := packer.UnpackBytes()
+		txBytes := iter.Value()
 
 		tx := &Tx{}
 		if _, err := b.codec.Unmarshal(txBytes, tx); err != nil {
@@ -65,13 +71,14 @@ func (b *blockingAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn fu
 			log.Crit("problem getting atomic ops", "err", err)
 			return nil
 		}
-		heightBytes := make([]byte, wrappers.LongLen)
+
 		binary.BigEndian.PutUint64(heightBytes, height)
 		err = b.updateTrie(ops, heightBytes)
 		if err != nil {
 			log.Crit("problem indexing atomic ops", "err", err)
 			return nil
 		}
+
 		transactionsIndexed++
 		if time.Since(lastUpdate) > 30*time.Second {
 			log.Info("atomic trie init progress", "indexedTransactions", transactionsIndexed)

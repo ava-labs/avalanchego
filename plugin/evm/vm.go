@@ -107,12 +107,14 @@ const (
 
 var (
 	// Set last accepted key to be longer than the keys used to store accepted block IDs.
-	lastAcceptedKey        = []byte("last_accepted_key")
-	acceptedPrefix         = []byte("snowman_accepted")
-	ethDBPrefix            = []byte("ethdb")
-	atomicTxPrefix         = []byte("atomicTxDB")
-	atomicIndexDBPrefix    = []byte("atomicIndexDB")
-	pruneRejectedBlocksKey = []byte("pruned_rejected_blocks")
+	lastAcceptedKey                = []byte("last_accepted_key")
+	acceptedPrefix                 = []byte("snowman_accepted")
+	ethDBPrefix                    = []byte("ethdb")
+	heightAtomicTxDBPrefix         = []byte("heightAtomicTxDB")
+	heightAtomicTxDBInitializedKey = []byte("initialized")
+	atomicTxIDDBPrefix             = []byte("atomicTxDB")
+	atomicIndexDBPrefix            = []byte("atomicIndexDB")
+	pruneRejectedBlocksKey         = []byte("pruned_rejected_blocks")
 )
 
 var (
@@ -185,6 +187,8 @@ type VM struct {
 	acceptedBlockDB database.Database
 	// [acceptedAtomicTxDB] maintains an index of accepted atomic txs.
 	acceptedAtomicTxDB database.Database
+	// [acceptedHeightAtomicTxDB] maintains an index of block height => [atomic tx].
+	acceptedHeightAtomicTxDB database.Database
 
 	builder *blockBuilder
 
@@ -280,7 +284,8 @@ func (vm *VM) Initialize(
 	vm.chaindb = Database{prefixdb.NewNested(ethDBPrefix, baseDB)}
 	vm.db = versiondb.New(baseDB)
 	vm.acceptedBlockDB = prefixdb.New(acceptedPrefix, vm.db)
-	vm.acceptedAtomicTxDB = prefixdb.New(atomicTxPrefix, vm.db)
+	vm.acceptedAtomicTxDB = prefixdb.New(atomicTxIDDBPrefix, vm.db)
+	vm.acceptedHeightAtomicTxDB = prefixdb.New(heightAtomicTxDBPrefix, vm.db)
 	g := new(core.Genesis)
 	if err := json.Unmarshal(genesisBytes, g); err != nil {
 		return err
@@ -371,9 +376,52 @@ func (vm *VM) Initialize(
 	vm.chain = ethChain
 	lastAccepted := vm.chain.LastAcceptedBlock()
 
+	// initialise the atomicHeightTxDB if not done already
+	heightTxDBInitialized, err := vm.acceptedHeightAtomicTxDB.Has([]byte("initialized"))
+	if err != nil {
+		return err
+	}
+
+	if !heightTxDBInitialized {
+		log.Info("initializing acceptedHeightAtomicTxDB")
+		startTime := time.Now()
+		iter := vm.acceptedAtomicTxDB.NewIterator()
+		batch := vm.acceptedHeightAtomicTxDB.NewBatch()
+		lastUpdate := time.Now()
+		entries := uint(0)
+		for iter.Next() {
+			packer := wrappers.Packer{Bytes: iter.Value()}
+			heightBytes := packer.UnpackFixedBytes(wrappers.LongLen)
+			txBytes := packer.UnpackBytes()
+
+			if err = batch.Put(heightBytes, txBytes); err != nil {
+				return fmt.Errorf("error saving tx bytes to acceptedHeightAtomicTxDB during init: %w", err)
+			}
+
+			entries++
+
+			if time.Since(lastUpdate) > 10*time.Second {
+				log.Info("entries copied to acceptedHeightAtomicTxDB", "entries", entries)
+				lastUpdate = time.Now()
+			}
+		}
+
+		if err = batch.Put(heightAtomicTxDBInitializedKey, nil); err != nil {
+			return err
+		}
+
+		if err = batch.Write(); err != nil {
+			return fmt.Errorf("error writing acceptedHeightAtomicTxDB batch: %w", err)
+		}
+
+		log.Info("finished initializing acceptedHeightAtomicTxDB", "time", time.Since(startTime))
+	} else {
+		log.Info("skipping acceptedHeightAtomicTxDB init")
+	}
+
 	atomicIndexDB := Database{prefixdb.New(atomicIndexDBPrefix, vm.db)}
-	vm.atomicTrie, err = NewIndexedAtomicTrie(atomicIndexDB)
-	//vm.atomicTrie, err = NewBlockingAtomicTrie(atomicIndexDB, vm.acceptedAtomicTxDB, vm.codec)
+	//vm.atomicTrie, err = NewIndexedAtomicTrie(atomicIndexDB)
+	vm.atomicTrie, err = NewBlockingAtomicTrie(atomicIndexDB, vm.acceptedHeightAtomicTxDB, vm.codec)
 	if err != nil {
 		return err
 	}
@@ -866,6 +914,26 @@ func (vm *VM) getAcceptedAtomicTx(txID ids.ID) (*Tx, uint64, error) {
 	return tx, height, nil
 }
 
+// getAcceptedAtomicTx attempts to get [txID] from the database.
+func (vm *VM) getAcceptedAtomicTxByHeight(height uint64) (*Tx, error) {
+	heightBytes := make([]byte, wrappers.LongLen)
+	binary.BigEndian.PutUint64(heightBytes, height)
+	indexedTxBytes, err := vm.acceptedHeightAtomicTxDB.Get(heightBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := &Tx{}
+	if _, err := vm.codec.Unmarshal(indexedTxBytes, tx); err != nil {
+		return nil, fmt.Errorf("problem parsing atomic transaction from db at height %d: %w", height, err)
+	}
+	if err := tx.Sign(vm.codec, nil); err != nil {
+		return nil, fmt.Errorf("problem initializing atomic transaction from db at height %d: %w", height, err)
+	}
+
+	return tx, nil
+}
+
 // getAtomicTx returns the requested transaction, status, and height.
 // If the status is Unknown, then the returned transaction will be nil.
 func (vm *VM) getAtomicTx(txID ids.ID) (*Tx, Status, uint64, error) {
@@ -888,16 +956,25 @@ func (vm *VM) getAtomicTx(txID ids.ID) (*Tx, Status, uint64, error) {
 
 // writeAtomicTx writes indexes [tx] in [blk]
 func (vm *VM) writeAtomicTx(blk *Block, tx *Tx) error {
+	// map txID => [height]+[tx bytes]
 	// 8 bytes
 	height := blk.ethBlock.NumberU64()
 	// 4 + len(txBytes)
 	txBytes := tx.Bytes()
-	packer := wrappers.Packer{Bytes: make([]byte, 12+len(txBytes))}
-	packer.PackLong(height)
-	packer.PackBytes(txBytes)
+	heightTxPacker := wrappers.Packer{Bytes: make([]byte, 12+len(txBytes))}
+	heightTxPacker.PackLong(height)
+	heightTxPacker.PackBytes(txBytes)
 	txID := tx.ID()
 
-	return vm.acceptedAtomicTxDB.Put(txID[:], packer.Bytes)
+	if err := vm.acceptedAtomicTxDB.Put(txID[:], heightTxPacker.Bytes); err != nil {
+		return err
+	}
+
+	// map height => tx bytes
+	heightBytes := make([]byte, wrappers.LongLen)
+	binary.BigEndian.PutUint64(heightBytes, height)
+
+	return vm.acceptedHeightAtomicTxDB.Put(heightBytes, txBytes)
 }
 
 // ParseAddress takes in an address and produces the ID of the chain it's for
