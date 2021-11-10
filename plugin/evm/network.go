@@ -4,6 +4,8 @@
 package evm
 
 import (
+	"container/heap"
+	"math/big"
 	"sync"
 	"time"
 
@@ -19,6 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 
@@ -68,7 +71,7 @@ func (vm *VM) NewNetwork(appSender commonEng.AppSender) Network {
 	if vm.chainConfig.ApricotPhase4BlockTimestamp != nil {
 		return vm.newPushNetwork(
 			time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0),
-			vm.config.RemoteTxGossipOnlyEnabled,
+			vm.config,
 			appSender,
 			vm.chain,
 			vm.mempool,
@@ -81,7 +84,7 @@ func (vm *VM) NewNetwork(appSender commonEng.AppSender) Network {
 type pushNetwork struct {
 	ctx                  *snow.Context
 	gossipActivationTime time.Time
-	remoteTxGossipOnly   bool
+	config               Config
 
 	appSender commonEng.AppSender
 	chain     *coreth.ETHChain
@@ -105,7 +108,7 @@ type pushNetwork struct {
 
 func (vm *VM) newPushNetwork(
 	activationTime time.Time,
-	remoteTxGossipOnly bool,
+	config Config,
 	appSender commonEng.AppSender,
 	chain *coreth.ETHChain,
 	mempool *Mempool,
@@ -113,7 +116,7 @@ func (vm *VM) newPushNetwork(
 	net := &pushNetwork{
 		ctx:                  vm.ctx,
 		gossipActivationTime: activationTime,
-		remoteTxGossipOnly:   remoteTxGossipOnly,
+		config:               config,
 		appSender:            appSender,
 		chain:                chain,
 		mempool:              mempool,
@@ -132,6 +135,91 @@ func (vm *VM) newPushNetwork(
 	return net
 }
 
+// queueExecutableTxs attempts to select up to [maxTxs] from the tx pool for
+// regossiping.
+func (n *pushNetwork) queueExecutableTxs(state *state.StateDB, baseFee *big.Int, txs map[common.Address]types.Transactions, maxTxs int) types.Transactions {
+	// Setup heap for transactions
+	heads := make(types.TxByPriceAndTime, 0, len(txs))
+	for addr, accountTxs := range txs {
+		if len(accountTxs) == 0 {
+			continue
+		}
+		tx := accountTxs[0]
+
+		// Don't try to regossip a transaction too frequently
+		if time.Since(tx.FirstSeen()) < n.config.TxRegossipFrequency.Duration {
+			continue
+		}
+
+		// Ensure the fee the transaction pays is valid at tip
+		wrapped, err := types.NewTxWithMinerFee(tx, baseFee)
+		if err != nil {
+			log.Debug(
+				"not queuing tx for regossip",
+				"tx", tx.Hash(),
+				"err", err,
+			)
+			continue
+		}
+
+		// Ensure any transactions regossiped are immediately executable
+		if tx.Nonce() != state.GetNonce(addr) {
+			continue
+		}
+
+		heads = append(heads, wrapped)
+	}
+	heap.Init(&heads)
+
+	// Add up to [maxTxs] transactions to be gossiped
+	queued := make([]*types.Transaction, 0, maxTxs)
+	for len(heads) > 0 && len(queued) < maxTxs {
+		tx := heads[0].Tx
+		queued = append(queued, tx)
+		heap.Pop(&heads)
+	}
+
+	return queued
+}
+
+// queueRegossipTxs finds the best transactions in the mempool and adds up to
+// [TxRegossipMaxSize] of them to [ethTxsToGossip].
+func (n *pushNetwork) queueRegossipTxs() types.Transactions {
+	txPool := n.chain.GetTxPool()
+
+	// Fetch all pending transactions
+	pending := txPool.Pending(true)
+
+	// Split the pending transactions into locals and remotes
+	localTxs := make(map[common.Address]types.Transactions)
+	remoteTxs := pending
+	for _, account := range txPool.Locals() {
+		if txs := remoteTxs[account]; len(txs) > 0 {
+			delete(remoteTxs, account)
+			localTxs[account] = txs
+		}
+	}
+
+	// Add best transactions to be gossiped (preferring local txs)
+	tip := n.chain.BlockChain().CurrentBlock()
+	state, err := n.chain.BlockChain().StateAt(tip.Root())
+	if err != nil || state == nil {
+		log.Debug(
+			"could not get state at tip",
+			"tip", tip.Hash(),
+			"err", err,
+		)
+		return nil
+	}
+	localQueued := n.queueExecutableTxs(state, tip.BaseFee(), localTxs, n.config.TxRegossipMaxSize)
+	localCount := len(localQueued)
+	if localCount >= n.config.TxRegossipMaxSize {
+		return localQueued
+	}
+	remoteQueued := n.queueExecutableTxs(state, tip.BaseFee(), remoteTxs, n.config.TxRegossipMaxSize-localCount)
+	return append(localQueued, remoteQueued...)
+}
+
 // awaitEthTxGossip periodically gossips transactions that have been queued for
 // gossip at least once every [ethTxsGossipInterval].
 func (n *pushNetwork) awaitEthTxGossip() {
@@ -139,11 +227,26 @@ func (n *pushNetwork) awaitEthTxGossip() {
 	go n.ctx.Log.RecoverAndPanic(func() {
 		defer n.shutdownWg.Done()
 
-		ticker := time.NewTicker(ethTxsGossipInterval)
+		var (
+			gossipTicker   = time.NewTicker(ethTxsGossipInterval)
+			regossipTicker = time.NewTicker(n.config.TxRegossipFrequency.Duration)
+		)
+
 		for {
 			select {
-			case <-ticker.C:
-				if attempted, err := n.gossipEthTxs(); err != nil {
+			case <-gossipTicker.C:
+				if attempted, err := n.gossipEthTxs(false); err != nil {
+					log.Warn(
+						"failed to send eth transactions",
+						"len(txs)", attempted,
+						"err", err,
+					)
+				}
+			case <-regossipTicker.C:
+				for _, tx := range n.queueRegossipTxs() {
+					n.ethTxsToGossip[tx.Hash()] = tx
+				}
+				if attempted, err := n.gossipEthTxs(true); err != nil {
 					log.Warn(
 						"failed to send eth transactions",
 						"len(txs)", attempted,
@@ -154,7 +257,7 @@ func (n *pushNetwork) awaitEthTxGossip() {
 				for _, tx := range txs {
 					n.ethTxsToGossip[tx.Hash()] = tx
 				}
-				if attempted, err := n.gossipEthTxs(); err != nil {
+				if attempted, err := n.gossipEthTxs(false); err != nil {
 					log.Warn(
 						"failed to send eth transactions",
 						"len(txs)", attempted,
@@ -259,8 +362,8 @@ func (n *pushNetwork) sendEthTxs(txs []*types.Transaction) error {
 	return n.appSender.SendAppGossip(msgBytes)
 }
 
-func (n *pushNetwork) gossipEthTxs() (int, error) {
-	if time.Since(n.lastGossiped) < ethTxsGossipInterval || len(n.ethTxsToGossip) == 0 {
+func (n *pushNetwork) gossipEthTxs(force bool) (int, error) {
+	if (!force && time.Since(n.lastGossiped) < ethTxsGossipInterval) || len(n.ethTxsToGossip) == 0 {
 		return 0, nil
 	}
 	n.lastGossiped = time.Now()
@@ -279,12 +382,16 @@ func (n *pushNetwork) gossipEthTxs() (int, error) {
 			continue
 		}
 
-		if n.remoteTxGossipOnly && pool.HasLocal(txHash) {
+		if n.config.RemoteTxGossipOnlyEnabled && pool.HasLocal(txHash) {
 			continue
 		}
 
-		if _, has := n.recentEthTxs.Get(txHash); has {
-			continue
+		// We check [force] outside of the if statement to avoid an unnecessary
+		// cache lookup.
+		if !force {
+			if _, has := n.recentEthTxs.Get(txHash); has {
+				continue
+			}
 		}
 		n.recentEthTxs.Put(txHash, nil)
 

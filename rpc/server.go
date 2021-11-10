@@ -60,22 +60,6 @@ type Server struct {
 	maximumDuration time.Duration
 }
 
-type contextWithDeadline struct {
-	context.Context
-	deadline time.Time
-}
-
-func (ctx contextWithDeadline) Deadline() (time.Time, bool) {
-	deadline, exists := ctx.Context.Deadline()
-	if !exists {
-		return ctx.deadline, true
-	}
-	if ctx.deadline.Before(deadline) {
-		return ctx.deadline, true
-	}
-	return deadline, true
-}
-
 // NewServer creates a new server instance with no registered handlers.
 //
 // If [maximumDuration] > 0, the deadline of incoming requests is
@@ -108,7 +92,7 @@ func (s *Server) RegisterName(name string, receiver interface{}) error {
 // server is stopped. In either case the codec is closed.
 //
 // Note that codec options are no longer supported.
-func (s *Server) ServeCodec(codec ServerCodec, options CodecOption, apiMaxDuration time.Duration) {
+func (s *Server) ServeCodec(codec ServerCodec, options CodecOption, apiMaxDuration, refillRate, maxStored time.Duration) {
 	defer codec.close()
 
 	// Don't serve if server is stopped.
@@ -120,7 +104,7 @@ func (s *Server) ServeCodec(codec ServerCodec, options CodecOption, apiMaxDurati
 	s.codecs.Add(codec)
 	defer s.codecs.Remove(codec)
 
-	c := initClient(codec, s.idgen, &s.services, apiMaxDuration)
+	c := initClient(codec, s.idgen, &s.services, apiMaxDuration, refillRate, maxStored)
 	<-codec.closed()
 	c.Close()
 }
