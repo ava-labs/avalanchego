@@ -35,7 +35,7 @@ func NewBlockingAtomicTrie(db ethdb.KeyValueStore, acceptedHeightAtomicTxDB data
 	}, nil
 }
 
-func (b *blockingAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn func() error, getAtomicTxFn func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error)) chan struct{} {
+func (b *blockingAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn func() error, getAtomicTxFn func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error)) <-chan error {
 	lastAccepted := chain.LastAcceptedBlock()
 	iter := b.acceptedHeightAtomicTxDB.NewIterator()
 	transactionsIndexed := uint64(0)
@@ -111,7 +111,7 @@ func (b *blockingAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn fu
 
 	defer log.Info("atomic trie initialisation complete", "time", time.Since(startTime))
 
-	doneChan := make(chan struct{}, 1)
+	doneChan := make(chan error, 1)
 	defer close(doneChan)
 
 	b.indexedAtomicTrie.initialised.Store(true)

@@ -439,9 +439,16 @@ func (vm *VM) Initialize(
 		return tx.AtomicOps()
 	})
 
-	go func(done chan struct{}) {
+	go func(done <-chan error) {
 		startTime := time.Now()
-		<-done
+		err, open := <-done
+		// loop until  errors are coming through and channel is open
+		for err != nil && open {
+			if err != nil {
+				log.Crit("error initializing atomic trie locally", "time", time.Since(startTime), "err", err)
+			}
+			err, open = <-done
+		}
 		log.Info("Atomic trie initialization complete", "time", time.Since(startTime))
 	}(doneChan)
 
