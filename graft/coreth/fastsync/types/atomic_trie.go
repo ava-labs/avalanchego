@@ -12,7 +12,7 @@ import (
 type AtomicTrie interface {
 	// Initialize initializes the AtomicTrie from the last indexed
 	// block to the last accepted block in the chain
-	Initialize(chain facades.ChainFacade, dbCommitFn func() error, getAtomicTxFn func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error)) chan error
+	Initialize(chain facades.ChainFacade, dbCommitFn func() error, getAtomicTxFn func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error)) <-chan error
 
 	// Index indexes the given atomicOps at the specified block height
 	// Returns an optional root hash and an optional error

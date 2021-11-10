@@ -19,10 +19,14 @@ const (
 	defaultSnapshotAsync               = true
 	defaultRpcGasCap                   = 2500000000 // 25000000 X 100
 	defaultRpcTxFeeCap                 = 100        // 100 AVAX
-	defaultApiMaxDuration              = 0          // Default to no maximum API Call duration
+	defaultApiMaxDuration              = 0          // Default to no maximum API call duration
+	defaultWsCpuRefillRate             = 0          // Default to no maximum WS CPU usage
+	defaultWsCpuMaxStored              = 0          // Default to no maximum WS CPU usage
 	defaultMaxBlocksPerRequest         = 0          // Default to no maximum on the number of blocks per getLogs request
 	defaultContinuousProfilerFrequency = 15 * time.Minute
 	defaultContinuousProfilerMaxFiles  = 5
+	defaultTxRegossipFrequency         = 1 * time.Minute
+	defaultTxRegossipMaxSize           = 15
 )
 
 type Duration struct {
@@ -58,17 +62,24 @@ type Config struct {
 	SnapshotAsync  bool `json:"snapshot-async"`
 	SnapshotVerify bool `json:"snapshot-verification-enabled"`
 
-	LocalTxsEnabled           bool     `json:"local-txs-enabled"`
-	RemoteTxGossipOnlyEnabled bool     `json:"remote-tx-gossip-only-enabled"`
-	APIMaxDuration            Duration `json:"api-max-duration"`
-	MaxBlocksPerRequest       int64    `json:"api-max-blocks-per-request"`
-	AllowUnfinalizedQueries   bool     `json:"allow-unfinalized-queries"`
-	AllowUnprotectedTxs       bool     `json:"allow-unprotected-txs"`
+	// API Settings
+	LocalTxsEnabled         bool     `json:"local-txs-enabled"`
+	APIMaxDuration          Duration `json:"api-max-duration"`
+	WSCPURefillRate         Duration `json:"ws-cpu-refill-rate"`
+	WSCPUMaxStored          Duration `json:"ws-cpu-max-stored"`
+	MaxBlocksPerRequest     int64    `json:"api-max-blocks-per-request"`
+	AllowUnfinalizedQueries bool     `json:"allow-unfinalized-queries"`
+	AllowUnprotectedTxs     bool     `json:"allow-unprotected-txs"`
 
 	// Keystore Settings
 	KeystoreDirectory             string `json:"keystore-directory"` // both absolute and relative supported
 	KeystoreExternalSigner        string `json:"keystore-external-signer"`
 	KeystoreInsecureUnlockAllowed bool   `json:"keystore-insecure-unlock-allowed"`
+
+	// Gossip Settings
+	RemoteTxGossipOnlyEnabled bool     `json:"remote-tx-gossip-only-enabled"`
+	TxRegossipFrequency       Duration `json:"tx-regossip-frequency"`
+	TxRegossipMaxSize         int      `json:"tx-regossip-max-size"`
 
 	// Log level
 	LogLevel string `json:"log-level"`
@@ -105,11 +116,15 @@ func (c *Config) SetDefaults() {
 	c.RPCGasCap = defaultRpcGasCap
 	c.RPCTxFeeCap = defaultRpcTxFeeCap
 	c.APIMaxDuration.Duration = defaultApiMaxDuration
+	c.WSCPURefillRate.Duration = defaultWsCpuRefillRate
+	c.WSCPUMaxStored.Duration = defaultWsCpuMaxStored
 	c.MaxBlocksPerRequest = defaultMaxBlocksPerRequest
 	c.ContinuousProfilerFrequency.Duration = defaultContinuousProfilerFrequency
 	c.ContinuousProfilerMaxFiles = defaultContinuousProfilerMaxFiles
 	c.Pruning = defaultPruningEnabled
 	c.SnapshotAsync = defaultSnapshotAsync
+	c.TxRegossipFrequency.Duration = defaultTxRegossipFrequency
+	c.TxRegossipMaxSize = defaultTxRegossipMaxSize
 }
 
 func (d *Duration) UnmarshalJSON(data []byte) (err error) {

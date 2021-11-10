@@ -78,22 +78,23 @@ type indexRange struct {
 	start, end uint64 // starting and ending block number
 }
 
-func (i *indexedAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn func() error, getAtomicTxFn func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error)) chan error {
-
+func (i *indexedAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn func() error, getAtomicTxFn func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error)) <-chan error {
 	num := 16
 	blockRange := i.initBlockRange
 	workChan := make(chan indexRange)
 	managerWg := sync.WaitGroup{}
 	workerWg := sync.WaitGroup{}
+	resultChan := make(chan error)
 	// work orchestration goroutine
 	managerWg.Add(1)
-	go func(workChan chan<- indexRange, managerWg, workerWg *sync.WaitGroup) {
+	go func(workChan chan<- indexRange, resultChan chan<- error, managerWg, workerWg *sync.WaitGroup) {
 		defer managerWg.Done()
 		time.Sleep(1 * time.Second)
 		startTime := time.Now()
 		start, initd, err := i.Height()
 		if err != nil {
-			log.Crit("error reading indexer height", "err", err)
+			log.Error("error reading indexer height", "err", err)
+			resultChan <- err
 		}
 
 		if !initd {
@@ -134,14 +135,16 @@ func (i *indexedAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn fun
 
 		// index is up-to-date, set the index height
 		if err := i.setIndexHeight(lastAcceptedBlock.NumberU64()); err != nil {
-			log.Crit("error setting index height", "block", lastAcceptedBlock.NumberU64(), "err", err)
+			log.Error("error setting index height", "block", lastAcceptedBlock.NumberU64(), "err", err)
+			resultChan <- err
 			return
 		}
 
 		// commit trie
 		hash, err := i.commitTrie()
 		if err != nil {
-			log.Crit("error committing trie", "block", lastAcceptedBlock.NumberU64(), "err", err)
+			log.Error("error committing trie", "block", lastAcceptedBlock.NumberU64(), "err", err)
+			resultChan <- err
 			return
 		}
 
@@ -151,21 +154,23 @@ func (i *indexedAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn fun
 		if dbCommitFn != nil {
 			log.Info("committing DB")
 			if err := dbCommitFn(); err != nil {
-				log.Crit("error committing DB", "err")
+				log.Error("error committing DB", "err")
+				resultChan <- err
 			}
 		}
 
 		i.initialised.Store(true)
 
 		log.Info("atomic trie initialisation complete", "time", time.Since(startTime))
-	}(workChan, &managerWg, &workerWg)
+	}(workChan, resultChan, &managerWg, &workerWg)
 
+	// trie operations are not thread-safe
 	trieLock := &sync.Mutex{}
 
 	// spin up worker goroutines
 	for j := 0; j < num; j++ {
 		workerWg.Add(1)
-		go func(workChan <-chan indexRange, wg, workerWg *sync.WaitGroup) {
+		go func(workChan <-chan indexRange, resultChan chan<- error, wg, workerWg *sync.WaitGroup) {
 			defer workerWg.Done()
 			for {
 				work, open := <-workChan
@@ -178,7 +183,8 @@ func (i *indexedAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn fun
 					blk := chain.GetBlockByNumber(blockNum)
 					atomicOperations, err := getAtomicTxFn(blk)
 					if err != nil {
-						log.Crit("error reading atomic operations for block", "block", blockNum, "err", err)
+						log.Error("error reading atomic operations for block", "block", blockNum, "err", err)
+						resultChan <- err
 						return
 					}
 
@@ -186,24 +192,23 @@ func (i *indexedAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn fun
 					binary.BigEndian.PutUint64(blockNumBytes, blockNum)
 					trieLock.Lock()
 					if err := i.updateTrie(atomicOperations, blockNumBytes); err != nil {
-						log.Crit("error updating trie", "block", blockNum, "err", err)
+						log.Error("error updating trie", "block", blockNum, "err", err)
+						resultChan <- err
 						trieLock.Unlock()
 						return
 					}
 					trieLock.Unlock()
 				}
 			}
-		}(workChan, &managerWg, &workerWg)
+		}(workChan, resultChan, &managerWg, &workerWg)
 	}
 
-	doneChan := make(chan error)
-	go func(managerWg, workerWg *sync.WaitGroup) {
+	go func(resultChan chan<- error, managerWg, workerWg *sync.WaitGroup) {
 		workerWg.Wait()
 		managerWg.Wait()
-		doneChan <- nil
-		close(doneChan)
-	}(&managerWg, &workerWg)
-	return doneChan
+		close(resultChan)
+	}(resultChan, &managerWg, &workerWg)
+	return resultChan
 }
 
 // Initialize initialises the atomic trie index for a specified [chain]

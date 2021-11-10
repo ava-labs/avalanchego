@@ -1125,7 +1125,7 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	// because performing a reorg would mean removing an accepted block from the
 	// canonical chain.
 	if commonBlock.NumberU64() < bc.lastAccepted.NumberU64() {
-		return errors.New("cannot orphan finalized block")
+		return fmt.Errorf("cannot orphan finalized block at height: %d to common block at height: %d", bc.lastAccepted.NumberU64(), commonBlock.NumberU64())
 	}
 
 	// Ensure the user sees large reorgs

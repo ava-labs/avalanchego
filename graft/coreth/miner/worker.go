@@ -294,25 +294,29 @@ func (w *worker) handleResult(env *environment, block *types.Block, createdAt ti
 	if w.chain.HasBlock(block.Hash(), block.NumberU64()) {
 		return nil, fmt.Errorf("produced duplicate block (Hash: %s, Number %d)", block.Hash(), block.NumberU64())
 	}
-	var (
-		hash = block.Hash()
-	)
 	// Different block could share same sealhash, deep copy here to prevent write-write conflict.
 	var (
+		hash     = block.Hash()
 		receipts = make([]*types.Receipt, len(unfinishedReceipts))
 		logs     []*types.Log
 	)
-	for i, receipt := range unfinishedReceipts {
+	for i, unfinishedReceipt := range unfinishedReceipts {
+		receipt := new(types.Receipt)
+		receipts[i] = receipt
+		*receipt = *unfinishedReceipt
+
 		// add block location fields
 		receipt.BlockHash = hash
 		receipt.BlockNumber = block.Number()
 		receipt.TransactionIndex = uint(i)
 
-		receipts[i] = new(types.Receipt)
-		*receipts[i] = *receipt
 		// Update the block hash in all logs since it is now available and not when the
 		// receipt/log of individual transactions were created.
-		for _, log := range receipt.Logs {
+		receipt.Logs = make([]*types.Log, len(unfinishedReceipt.Logs))
+		for j, unfinishedLog := range unfinishedReceipt.Logs {
+			log := new(types.Log)
+			receipt.Logs[j] = log
+			*log = *unfinishedLog
 			log.BlockHash = hash
 		}
 		logs = append(logs, receipt.Logs...)
