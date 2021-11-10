@@ -885,11 +885,14 @@ func (vm *VM) conflicts(inputs ids.Set, ancestor *Block) error {
 	return nil
 }
 
-// parseAcceptedAtomicTxBytes converts bytes read from the database to
-// [Tx] object + block height [Tx] was processed for, and can
-// optionally return error.
-func (vm *VM) parseAcceptedAtomicTxBytes(bytes []byte) (*Tx, uint64, error) {
-	packer := wrappers.Packer{Bytes: bytes}
+// getAcceptedAtomicTx attempts to get [txID] from the database.
+func (vm *VM) getAcceptedAtomicTx(txID ids.ID) (*Tx, uint64, error) {
+	indexedTxBytes, err := vm.acceptedAtomicTxDB.Get(txID[:])
+	if err != nil {
+		return nil, 0, err
+	}
+
+	packer := wrappers.Packer{Bytes: indexedTxBytes}
 	height := packer.UnpackLong()
 	txBytes := packer.UnpackBytes()
 
@@ -950,102 +953,6 @@ func (vm *VM) writeAtomicTx(blk *Block, tx *Tx) error {
 	// 8 bytes
 	height := blk.ethBlock.NumberU64()
 	// 4 + len(txBytes)
-	txID := tx.ID()
-	txBytes := vm.getAtomicTxBytes(height, tx)
-
-	err := vm.acceptedAtomicTxDB.Put(txID[:], txBytes)
-	if err != nil {
-		return err
-	}
-
-	// 8 bytes [height] + len(txID)
-	heightIdxKey := wrappers.Packer{Bytes: make([]byte, 8+len(txID))}
-	heightIdxKey.PackLong(height)
-	heightIdxKey.PackFixedBytes(txID[:])
-	return vm.acceptedAtomicTxDB.Put(heightIdxKey.Bytes, txBytes)
-}
-
-// buildAtomicTxHeightIdx builds the index on [acceptedAtomicTxDB],
-// ensuring the mapping [height]+[txID] => [txBytes] exists for all
-// [txID] => [txBytes] mappings in [acceptedAtomicTxDB].
-// returns maximum height observed in the [acceptedAtomicTxDB] while
-// indexing.
-func (vm *VM) buildAtomicTxHeightIdx() (uint64, error) {
-	maxHeight := uint64(0)
-	it := vm.acceptedAtomicTxDB.NewIterator()
-	txIdLength := len(ids.ID{})
-
-	atomicTxProcessed := 0
-	for it.Next() {
-		if err := it.Error(); err != nil {
-			return 0, err
-		}
-		key := it.Key()
-		if len(key) != txIdLength {
-			continue
-		}
-		tx, height, err := vm.parseAcceptedAtomicTxBytes(it.Value())
-		if err != nil {
-			return 0, err
-		}
-		keyID, err := ids.ToID(it.Key())
-		if err != nil {
-			return 0, err
-		}
-		txID := tx.ID()
-		if keyID != txID {
-			return 0, fmt.Errorf("unexpected mismatch of acceptedAtomicTx key (%v) with txID in parsed value (%v)", keyID, txID)
-		}
-
-		// len(atomicTxHieghtIdxPrefix) + 8 bytes [height] + len(txID)
-		heightIdxKey := wrappers.Packer{Bytes: make([]byte, len(atomicTxHieghtIdxPrefix)+8+len(txID))}
-		heightIdxKey.PackFixedBytes(atomicTxHieghtIdxPrefix)
-		heightIdxKey.PackLong(height)
-		heightIdxKey.PackFixedBytes(txID[:])
-		err = vm.acceptedAtomicTxDB.Put(heightIdxKey.Bytes, it.Value())
-		if err != nil {
-			return 0, err
-		}
-		if height > maxHeight {
-			maxHeight = height
-		}
-		atomicTxProcessed += 1
-		if atomicTxProcessed%10000 == 0 {
-			log.Info("creating atomic tx height index", "atomicTxProcessed", atomicTxProcessed)
-		}
-	}
-	return maxHeight, nil
-}
-
-// isAtomicHeightIdxBuilt returns true when the [height]+[txID] => [txBytes]
-// index is already built.
-func (vm *VM) isAtomicTxHeightIdxBuilt() (bool, error) {
-	val, err := vm.acceptedAtomicTxDB.Get(atomicTxLastIndexedHeightKey)
-	switch {
-	case err == database.ErrNotFound:
-		return false, nil
-	case err != nil:
-		return false, err
-	case len(val) != wrappers.LongLen:
-		return false, fmt.Errorf("unexpected length for value stored at atomicTxLastIndexedHeightKey (%d)", len(val))
-	}
-	log.Info("acceptedAtomicTx was indexed by bulk operation on a previous run", "maxHeight", binary.BigEndian.Uint64(val))
-	return true, nil
-}
-
-// called after [buildAtomicTxHeightIdx] completes. value of [height] will be
-// written to database to signal the completion of this operation.
-// the [height] does not need to be updated further as incremental updates to
-// the index occur during block accept, through [writeAtomicTx]
-func (vm *VM) atomicTxHeightIdxBuilt(height uint64) error {
-	bytes := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(bytes, height)
-	return vm.acceptedAtomicTxDB.Put(atomicTxLastIndexedHeightKey, bytes)
-}
-
-// getAtomicTxBytes converts the block [height] and atomic transaction [tx]
-// which it processed on to a byte array representation for storage in the database.
-func (vm *VM) getAtomicTxBytes(height uint64, tx *Tx) []byte {
 	txBytes := tx.Bytes()
 	heightTxPacker := wrappers.Packer{Bytes: make([]byte, 12+len(txBytes))}
 	heightTxPacker.PackLong(height)
