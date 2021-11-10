@@ -133,7 +133,7 @@ func (b *blockingAtomicTrie) initialize(chain facades.ChainFacade, dbCommitFn fu
 		}
 	}
 
-	defer log.Info("atomic trie initialisation complete", "time", time.Since(startTime))
+	log.Info("atomic trie initialisation complete", "time", time.Since(startTime))
 
 	b.indexedAtomicTrie.initialised.Store(true)
 }
