@@ -19,8 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/metric"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 // Parameters for delaying bootstrapping to avoid potential CPU burns
@@ -66,7 +64,6 @@ type bootstrapper struct {
 	common.Bootstrapper
 	common.Fetcher
 	metrics
-	getAncestorsBlks metric.Averager
 
 	// Greatest height of the blocks passed in ForceAccepted
 	tipHeight uint64
@@ -121,15 +118,6 @@ func newBootstrapper(
 	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return nil, err
 	}
-
-	errs := wrappers.Errs{}
-	b.getAncestorsBlks = metric.NewAveragerWithErrs(
-		namespace,
-		"get_ancestors_blks",
-		"blocks fetched in a call to GetAncestors",
-		registerer,
-		&errs,
-	)
 
 	b.parser = &parser{
 		log:         config.Ctx.Log,
