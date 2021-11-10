@@ -396,7 +396,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	}
 
 	firstVM.clock.Set(defaultGenesisTime)
-	firstVM.uptimeManger.(uptime.TestManager).SetTime(defaultGenesisTime)
+	firstVM.uptimeManager.(uptime.TestManager).SetTime(defaultGenesisTime)
 
 	if err := firstVM.Bootstrapping(); err != nil {
 		t.Fatal(err)
@@ -407,7 +407,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	}
 
 	// Fast forward clock to time for genesis validators to leave
-	firstVM.uptimeManger.(uptime.TestManager).SetTime(defaultValidateEndTime)
+	firstVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
 
 	if err := firstVM.Shutdown(); err != nil {
 		t.Fatal(err)
@@ -437,7 +437,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	}
 
 	secondVM.clock.Set(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
-	secondVM.uptimeManger.(uptime.TestManager).SetTime(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
+	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 
 	if err := secondVM.Bootstrapping(); err != nil {
 		t.Fatal(err)
@@ -448,7 +448,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	}
 
 	secondVM.clock.Set(defaultValidateEndTime)
-	secondVM.uptimeManger.(uptime.TestManager).SetTime(defaultValidateEndTime)
+	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
 
 	blk, err := secondVM.BuildBlock() // should contain proposal to advance time
 	if err != nil {
@@ -601,7 +601,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	}()
 
 	vm.clock.Set(defaultGenesisTime)
-	vm.uptimeManger.(uptime.TestManager).SetTime(defaultGenesisTime)
+	vm.uptimeManager.(uptime.TestManager).SetTime(defaultGenesisTime)
 
 	if err := vm.Bootstrapping(); err != nil {
 		t.Fatal(err)
@@ -613,7 +613,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(defaultValidateEndTime)
-	vm.uptimeManger.(uptime.TestManager).SetTime(defaultValidateEndTime)
+	vm.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
 
 	blk, err := vm.BuildBlock() // should contain proposal to advance time
 	if err != nil {

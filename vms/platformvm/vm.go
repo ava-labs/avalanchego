@@ -96,7 +96,7 @@ type VM struct {
 
 	blockBuilder blockBuilder
 
-	uptimeManger uptime.Manager
+	uptimeManager uptime.Manager
 
 	// The context of this vm
 	ctx       *snow.Context
@@ -194,8 +194,8 @@ func (vm *VM) Initialize(
 	vm.internalState = is
 
 	// Initialize the utility to track validator uptimes
-	vm.uptimeManger = uptime.NewManager(is)
-	vm.UptimeLockedCalculator.SetCalculator(ctx, vm.uptimeManger)
+	vm.uptimeManager = uptime.NewManager(is)
+	vm.UptimeLockedCalculator.SetCalculator(ctx, vm.uptimeManager)
 
 	if err := vm.updateValidators(true); err != nil {
 		return fmt.Errorf(
@@ -320,7 +320,7 @@ func (vm *VM) Bootstrapped() error {
 		validatorIDs[i] = vdr.ID()
 	}
 
-	if err := vm.uptimeManger.StartTracking(validatorIDs); err != nil {
+	if err := vm.uptimeManager.StartTracking(validatorIDs); err != nil {
 		return err
 	}
 	return vm.internalState.Commit()
@@ -346,7 +346,7 @@ func (vm *VM) Shutdown() error {
 			validatorIDs[i] = vdr.ID()
 		}
 
-		if err := vm.uptimeManger.Shutdown(validatorIDs); err != nil {
+		if err := vm.uptimeManager.Shutdown(validatorIDs); err != nil {
 			return err
 		}
 		if err := vm.internalState.Commit(); err != nil {
@@ -470,12 +470,12 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 
 // Connected implements validators.Connector
 func (vm *VM) Connected(vdrID ids.ShortID) error {
-	return vm.uptimeManger.Connect(vdrID)
+	return vm.uptimeManager.Connect(vdrID)
 }
 
 // Disconnected implements validators.Connector
 func (vm *VM) Disconnected(vdrID ids.ShortID) error {
-	if err := vm.uptimeManger.Disconnect(vdrID); err != nil {
+	if err := vm.uptimeManager.Disconnect(vdrID); err != nil {
 		return err
 	}
 	return vm.internalState.Commit()
@@ -658,7 +658,7 @@ func (vm *VM) getPercentConnected() (float64, error) {
 		err            error
 	)
 	for _, vdr := range vdrs {
-		if !vm.uptimeManger.IsConnected(vdr.ID()) {
+		if !vm.uptimeManager.IsConnected(vdr.ID()) {
 			continue // not connected to us --> don't include
 		}
 		connectedStake, err = safemath.Add64(connectedStake, vdr.Weight())

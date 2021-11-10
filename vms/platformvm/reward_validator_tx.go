@@ -288,7 +288,7 @@ func (tx *UnsignedRewardValidatorTx) Execute(
 		return nil, nil, nil, nil, permError{errShouldBeDSValidator}
 	}
 
-	uptime, err := vm.uptimeManger.CalculateUptimePercentFrom(nodeID, startTime)
+	uptime, err := vm.uptimeManager.CalculateUptimePercentFrom(nodeID, startTime)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{
 			fmt.Errorf("failed to calculate uptime: %w", err),
