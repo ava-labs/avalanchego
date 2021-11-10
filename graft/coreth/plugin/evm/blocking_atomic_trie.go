@@ -36,86 +36,103 @@ func NewBlockingAtomicTrie(db ethdb.KeyValueStore, acceptedHeightAtomicTxDB data
 }
 
 func (b *blockingAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn func() error, getAtomicTxFn func(blk facades.BlockFacade) (map[ids.ID]*atomic.Requests, error)) <-chan error {
-	lastAccepted := chain.LastAcceptedBlock()
-	iter := b.acceptedHeightAtomicTxDB.NewIterator()
-	transactionsIndexed := uint64(0)
-	startTime := time.Now()
-	lastUpdate := time.Now()
-	for iter.Next() && iter.Error() == nil {
-		heightBytes := iter.Key()
-		if len(heightBytes) != wrappers.LongLen ||
-			bytes.Equal(heightBytes, heightAtomicTxDBInitializedKey) {
-			// this is metadata key, skip it
-			continue
+	resultChan := make(chan error, 1)
+
+	go func(chain facades.ChainFacade, dbCommitFn func() error, resultChan chan<- error) {
+		defer close(resultChan)
+		lastAccepted := chain.LastAcceptedBlock()
+		iter := b.acceptedHeightAtomicTxDB.NewIterator()
+		transactionsIndexed := uint64(0)
+		startTime := time.Now()
+		lastUpdate := time.Now()
+		for iter.Next() && iter.Error() == nil {
+			heightBytes := iter.Key()
+			if len(heightBytes) != wrappers.LongLen ||
+				bytes.Equal(heightBytes, heightAtomicTxDBInitializedKey) {
+				// this is metadata key, skip it
+				continue
+			}
+
+			height := binary.BigEndian.Uint64(heightBytes)
+			if height > lastAccepted.NumberU64() {
+				// skip tx if height is > last accepted
+				continue
+			}
+
+			txBytes := iter.Value()
+
+			tx := &Tx{}
+			if _, err := b.codec.Unmarshal(txBytes, tx); err != nil {
+				log.Error("problem parsing atomic transaction from db", "err", err)
+				resultChan <- err
+				return
+			}
+			if err := tx.Sign(b.codec, nil); err != nil {
+				log.Error("problem initializing atomic transaction from DB", "err", err)
+				resultChan <- err
+				return
+			}
+			ops, err := tx.AtomicOps()
+			if err != nil {
+				log.Error("problem getting atomic ops", "err", err)
+				resultChan <- err
+				return
+			}
+
+			binary.BigEndian.PutUint64(heightBytes, height)
+			err = b.updateTrie(ops, heightBytes)
+			if err != nil {
+				log.Error("problem indexing atomic ops", "err", err)
+				resultChan <- err
+				return
+			}
+
+			transactionsIndexed++
+			if time.Since(lastUpdate) > 30*time.Second {
+				log.Info("atomic trie init progress", "indexedTransactions", transactionsIndexed)
+				lastUpdate = time.Now()
+			}
 		}
 
-		height := binary.BigEndian.Uint64(heightBytes)
-		if height > lastAccepted.NumberU64() {
-			// skip tx if height is > last accepted
-			continue
+		if iter.Error() != nil {
+			log.Error("error iterating data", "err", iter.Error())
+			resultChan <- iter.Error()
+			return
 		}
 
-		txBytes := iter.Value()
+		log.Info("done updating trie, setting index height", "height", lastAccepted.NumberU64(), "duration", time.Since(startTime))
+		if err := b.setIndexHeight(lastAccepted.NumberU64()); err != nil {
+			log.Error("error setting index height", "height", lastAccepted.NumberU64())
+			resultChan <- err
+			return
+		}
 
-		tx := &Tx{}
-		if _, err := b.codec.Unmarshal(txBytes, tx); err != nil {
-			log.Crit("problem parsing atomic transaction from db", "err", err)
-			return nil
-		}
-		if err := tx.Sign(b.codec, nil); err != nil {
-			log.Crit("problem initializing atomic transaction from DB", "err", err)
-			return nil
-		}
-		ops, err := tx.AtomicOps()
+		log.Info("committing trie")
+		hash, err := b.commitTrie()
 		if err != nil {
-			log.Crit("problem getting atomic ops", "err", err)
-			return nil
+			log.Error("error committing trie post init")
+			resultChan <- err
+			return
 		}
 
-		binary.BigEndian.PutUint64(heightBytes, height)
-		err = b.updateTrie(ops, heightBytes)
-		if err != nil {
-			log.Crit("problem indexing atomic ops", "err", err)
-			return nil
+		log.Info("trie committed", "hash", hash, "height", lastAccepted.NumberU64(), "time", time.Since(startTime))
+
+		if dbCommitFn != nil {
+			log.Info("committing DB")
+			if err := dbCommitFn(); err != nil {
+				log.Error("unable to commit DB")
+				resultChan <- err
+				return
+			}
 		}
 
-		transactionsIndexed++
-		if time.Since(lastUpdate) > 30*time.Second {
-			log.Info("atomic trie init progress", "indexedTransactions", transactionsIndexed)
-			lastUpdate = time.Now()
-		}
-	}
+		defer log.Info("atomic trie initialisation complete", "time", time.Since(startTime))
 
-	log.Info("done updating trie, setting index height", "height", lastAccepted.NumberU64(), "duration", time.Since(startTime))
-	if err := b.setIndexHeight(lastAccepted.NumberU64()); err != nil {
-		log.Crit("error setting index height", "height", lastAccepted.NumberU64())
-		return nil
-	}
+		b.indexedAtomicTrie.initialised.Store(true)
+	}(chain, dbCommitFn, resultChan)
 
-	log.Info("committing trie")
-	hash, err := b.commitTrie()
-	if err != nil {
-		log.Crit("error committing trie post init")
-		return nil
-	}
+	return resultChan
 
-	log.Info("trie committed", "hash", hash, "height", lastAccepted.NumberU64(), "time", time.Since(startTime))
-
-	if dbCommitFn != nil {
-		log.Info("committing DB")
-		if err := dbCommitFn(); err != nil {
-			log.Crit("unable to commit DB")
-			return nil
-		}
-	}
-
-	defer log.Info("atomic trie initialisation complete", "time", time.Since(startTime))
-
-	doneChan := make(chan error, 1)
-	defer close(doneChan)
-
-	b.indexedAtomicTrie.initialised.Store(true)
-	return doneChan
 }
 
 func (b *blockingAtomicTrie) Index(height uint64, atomicOps map[ids.ID]*atomic.Requests) (common.Hash, error) {
