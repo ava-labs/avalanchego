@@ -7,7 +7,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -25,15 +25,9 @@ import (
 )
 
 type TestAtomicTx struct {
-	AtomicRequests map[ids.ID]*atomic.Requests `serialize:"true"`
-}
-
-func (t *TestAtomicTx) Initialize(unsignedBytes, signedBytes []byte) {
-	// no op
-}
-
-func (t *TestAtomicTx) ID() ids.ID {
-	panic("implement me")
+	avax.Metadata
+	BlockchainID  ids.ID
+	AtomicRequest *atomic.Requests `serialize:"true"`
 }
 
 func (t *TestAtomicTx) GasUsed() (uint64, error) {
@@ -41,14 +35,6 @@ func (t *TestAtomicTx) GasUsed() (uint64, error) {
 }
 
 func (t *TestAtomicTx) Burned(assetID ids.ID) (uint64, error) {
-	panic("implement me")
-}
-
-func (t *TestAtomicTx) UnsignedBytes() []byte {
-	panic("implement me")
-}
-
-func (t *TestAtomicTx) Bytes() []byte {
 	panic("implement me")
 }
 
@@ -65,7 +51,7 @@ func (t *TestAtomicTx) SemanticVerify(vm *VM, stx *Tx, parent *Block, baseFee *b
 }
 
 func (t *TestAtomicTx) AtomicOps() (map[ids.ID]*atomic.Requests, error) {
-	return t.AtomicRequests, nil
+	return map[ids.ID]*atomic.Requests{t.BlockchainID: t.AtomicRequest}, nil
 }
 
 func (t *TestAtomicTx) Accept(ctx *snow.Context, batch database.Batch) error {
@@ -76,39 +62,11 @@ func (t *TestAtomicTx) EVMStateTransfer(ctx *snow.Context, state *state.StateDB)
 	panic("implement me")
 }
 
-// ignore
-func Test_BlockingAtomicTrie(t *testing.T) {
-	db := memorydb.New()
-	acceptedAtomicTxDB := memdb.New()
-	Codec = codec.NewDefaultManager()
-	c := linearcodec.NewDefault()
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		c.RegisterType(&UnsignedImportTx{}),
-		c.RegisterType(&UnsignedExportTx{}),
-		c.RegisterType(&atomic.Requests{}),
-	)
-	c.SkipRegistrations(3)
-	errs.Add(
-		c.RegisterType(&secp256k1fx.TransferInput{}),
-		c.RegisterType(&secp256k1fx.MintOutput{}),
-		c.RegisterType(&secp256k1fx.TransferOutput{}),
-		c.RegisterType(&secp256k1fx.MintOperation{}),
-		c.RegisterType(&secp256k1fx.Credential{}),
-		c.RegisterType(&secp256k1fx.Input{}),
-		c.RegisterType(&secp256k1fx.OutputOwners{}),
-		Codec.RegisterCodec(codecVersion, c),
-	)
-
-	if errs.Errored() {
-		panic(errs.Err)
-	}
-
-	atomicRequests := make(map[ids.ID]*atomic.Requests)
-	for j := 0; j < 3; j++ {
-		blockchainID := ids.GenerateTestID()
-		req := atomic.Requests{
+func testDataImportTx() *TestAtomicTx {
+	blockchainID := ids.GenerateTestID()
+	return &TestAtomicTx{
+		BlockchainID: blockchainID,
+		AtomicRequest: &atomic.Requests{
 			PutRequests: []*atomic.Element{
 				{
 					Key:   utils.RandomBytes(16),
@@ -119,16 +77,42 @@ func Test_BlockingAtomicTrie(t *testing.T) {
 					},
 				},
 			},
+		},
+	}
+}
+
+func testDataExportTx() *TestAtomicTx {
+	blockchainID := ids.GenerateTestID()
+	return &TestAtomicTx{
+		BlockchainID: blockchainID,
+		AtomicRequest: &atomic.Requests{
 			RemoveRequests: [][]byte{
 				utils.RandomBytes(32),
 				utils.RandomBytes(32),
 			},
-		}
-		atomicRequests[blockchainID] = &req
+		},
 	}
-	tx := &TestAtomicTx{AtomicRequests: atomicRequests}
-	b, err := Codec.Marshal(codecVersion, tx)
+}
 
+func Test_BlockingAtomicTrie(t *testing.T) {
+	db := memorydb.New()
+	acceptedAtomicTxDB := memdb.New()
+
+	codec := codec.NewDefaultManager()
+	codecVersion := uint16(0)
+
+	c := linearcodec.NewDefault()
+	errs := wrappers.Errs{}
+	errs.Add(
+		c.RegisterType(&TestAtomicTx{}),
+		codec.RegisterCodec(codecVersion, c),
+	)
+	if errs.Errored() {
+		panic(errs.Err)
+	}
+
+	tx := testDataImportTx()
+	b, err := codec.Marshal(codecVersion, tx)
 	assert.NoError(t, err)
 
 	txBytes := make([]byte, wrappers.LongLen, wrappers.LongLen+len(b))
