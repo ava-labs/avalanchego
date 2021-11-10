@@ -141,10 +141,33 @@ func (n *pushNetwork) queueExecutableTxs(state *state.StateDB, baseFee *big.Int,
 	// Setup heap for transactions
 	heads := make(types.TxByPriceAndTime, 0, len(txs))
 	for addr, accountTxs := range txs {
+		// Short-circuit here to avoid needing to perform an unnecessary state lookup
 		if len(accountTxs) == 0 {
 			continue
 		}
-		tx := accountTxs[0]
+
+		// Ensure any transactions regossiped are immediately executable
+		var (
+			currentNonce = state.GetNonce(addr)
+			tx           *types.Transaction
+		)
+		for _, accountTx := range accountTxs {
+			// The tx pool may be out of sync with current state, so we iterate
+			// through the account transactions until we get to one that is
+			// executable.
+			if accountTx.Nonce() == currentNonce {
+				tx = accountTx
+				break
+			}
+			// There may be gaps in the tx pool and we could jump past the nonce we'd
+			// like to execute.
+			if accountTx.Nonce() > currentNonce {
+				break
+			}
+		}
+		if tx == nil {
+			continue
+		}
 
 		// Don't try to regossip a transaction too frequently
 		if time.Since(tx.FirstSeen()) < n.config.TxRegossipFrequency.Duration {
@@ -159,11 +182,6 @@ func (n *pushNetwork) queueExecutableTxs(state *state.StateDB, baseFee *big.Int,
 				"tx", tx.Hash(),
 				"err", err,
 			)
-			continue
-		}
-
-		// Ensure any transactions regossiped are immediately executable
-		if tx.Nonce() != state.GetNonce(addr) {
 			continue
 		}
 
