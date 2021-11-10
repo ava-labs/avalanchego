@@ -420,7 +420,7 @@ func (vm *VM) Initialize(
 	}
 
 	atomicIndexDB := Database{prefixdb.New(atomicIndexDBPrefix, vm.db)}
-	//vm.atomicTrie, err = NewIndexedAtomicTrie(atomicIndexDB)
+
 	vm.atomicTrie, err = NewBlockingAtomicTrie(atomicIndexDB, vm.acceptedHeightAtomicTxDB, vm.codec)
 	if err != nil {
 		return err
