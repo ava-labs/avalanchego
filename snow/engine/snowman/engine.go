@@ -19,6 +19,4 @@ import (
 type Engine interface {
 	common.Engine
 	block.Getter
-
-	Start(startReqID uint32) error
 }

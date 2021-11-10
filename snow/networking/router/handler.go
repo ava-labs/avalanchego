@@ -54,56 +54,60 @@ type Handler struct {
 	// [unprocessedMsgsCond.L] must be held while accessing [unprocessedMsgs].
 	unprocessedMsgs unprocessedMsgs
 	closing         utils.AtomicBool
-
-	// the function to start the bootstrap once fast sync is done
-	StartBootstrapF func(startReqID uint32) error
-	// the function to start the engine once bootstrap is done
-	StartEngineF func(startReqID uint32) error
 }
 
 // Initialize this consensus handler
 // [engine] must be initialized before initializing this handler
-func (h *Handler) Initialize(
+func NewHandler(
 	mc message.Creator,
-	fastSyncer common.Engine,
-	smbootstrap common.Engine,
-	engine common.Engine,
+	ctx *snow.Context,
 	validators validators.Set,
 	msgFromVMChan <-chan common.Message,
 	metricsNamespace string,
 	metricsRegisterer prometheus.Registerer,
-) error {
-	h.ctx = engine.Context()
-	if err := h.metrics.Initialize(metricsNamespace, metricsRegisterer); err != nil {
-		return fmt.Errorf("initializing handler metrics errored with: %s", err)
+) (*Handler, error) {
+	h := &Handler{
+		ctx:                 ctx,
+		mc:                  mc,
+		closed:              make(chan struct{}),
+		msgFromVMChan:       msgFromVMChan,
+		validators:          validators,
+		unprocessedMsgsCond: sync.NewCond(&sync.Mutex{}),
+		cpuTracker:          tracker.NewCPUTracker(uptime.IntervalFactory{}, defaultCPUInterval),
 	}
-	h.mc = mc
-	h.closed = make(chan struct{})
-	h.msgFromVMChan = msgFromVMChan
-	h.fastSyncer = fastSyncer
-	h.bootstrapper = smbootstrap
-	h.engine = engine
-	h.validators = validators
-	var lock sync.Mutex
-	h.unprocessedMsgsCond = sync.NewCond(&lock)
-	h.cpuTracker = tracker.NewCPUTracker(uptime.IntervalFactory{}, defaultCPUInterval)
+
+	if err := h.metrics.Initialize(metricsNamespace, metricsRegisterer); err != nil {
+		return nil, fmt.Errorf("initializing handler metrics errored with: %s", err)
+	}
 	var err error
 	h.unprocessedMsgs, err = newUnprocessedMsgs(h.ctx.Log, h.validators, h.cpuTracker, metricsNamespace, metricsRegisterer)
-	return err
+	return h, err
+}
+
+func (h *Handler) RegisterFastSyncer(fastSyncer common.Engine) {
+	h.fastSyncer = fastSyncer
+}
+
+func (h *Handler) RegisterBootstrap(smbootstrap common.Engine) {
+	h.bootstrapper = smbootstrap
+}
+
+func (h *Handler) RegisterEngine(engine common.Engine) {
+	h.engine = engine
 }
 
 func (h *Handler) OnDoneFastSyncing(lastReqID uint32) error {
 	lastReqID++
-	return h.StartBootstrapF(lastReqID)
+	return h.bootstrapper.Start(lastReqID)
 }
 
 func (h *Handler) OnDoneBootstrapping(lastReqID uint32) error {
 	lastReqID++
-	return h.StartEngineF(lastReqID)
+	return h.engine.Start(lastReqID)
 }
 
 // Context of this Handler
-func (h *Handler) Context() *snow.Context { return h.engine.Context() }
+func (h *Handler) Context() *snow.Context { return h.ctx }
 
 // Engine returns the engine this handler dispatches to
 func (h *Handler) Engine() common.Engine { return h.engine }
@@ -212,7 +216,7 @@ func (h *Handler) handleMsg(msg message.InboundMessage) error {
 	switch op {
 	case message.Notify:
 		vmMsg := msg.Get(message.VMMessage).(uint32)
-		if h.ctx.GetState() == snow.NormalOp {
+		if h.ctx.IsBootstrapped() {
 			err = h.engine.Notify(common.Message(vmMsg))
 		} else {
 			err = h.bootstrapper.Notify(common.Message(vmMsg))
@@ -269,7 +273,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		containerIDs, err := getContainerIDs(msg)
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
-				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
+				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
 			return nil
 		}
 
@@ -284,7 +288,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		containerIDs, err := getContainerIDs(msg)
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
-				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
+				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
 			return nil
 		}
 		return h.bootstrapper.GetAccepted(nodeID, reqID, containerIDs)
@@ -294,7 +298,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		containerIDs, err := getContainerIDs(msg)
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
-				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
+				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
 			return nil
 		}
 
@@ -309,7 +313,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
-				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
+				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
 			return nil
 		}
 
@@ -324,7 +328,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		containers, ok := msg.Get(message.MultiContainerBytes).([][]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse MultiContainerBytes",
-				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
+				msg.Op(), nodeID, h.ctx.ChainID, reqID)
 			return nil
 		}
 
@@ -338,7 +342,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 
 	case message.GetFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		if h.ctx.GetState() == snow.NormalOp {
+		if h.ctx.IsBootstrapped() {
 			return h.engine.GetFailed(nodeID, reqID)
 		}
 		return h.bootstrapper.GetFailed(nodeID, reqID)
@@ -350,11 +354,11 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		container, ok := msg.Get(message.ContainerBytes).([]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse ContainerBytes",
-				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
+				msg.Op(), nodeID, h.ctx.ChainID, reqID)
 			return nil
 		}
 
-		if h.ctx.GetState() == snow.NormalOp {
+		if h.ctx.IsBootstrapped() {
 			return h.engine.Put(nodeID, reqID, containerID, container)
 		}
 		return h.bootstrapper.Put(nodeID, reqID, containerID, container)
@@ -366,11 +370,11 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		container, ok := msg.Get(message.ContainerBytes).([]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse ContainerBytes",
-				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
+				msg.Op(), nodeID, h.ctx.ChainID, reqID)
 			return nil
 		}
 
-		if h.ctx.GetState() == snow.NormalOp {
+		if h.ctx.IsBootstrapped() {
 			return h.engine.PushQuery(nodeID, reqID, containerID, container)
 		}
 		return h.bootstrapper.PushQuery(nodeID, reqID, containerID, container)
@@ -380,7 +384,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
 		h.ctx.Log.AssertNoError(err)
 
-		if h.ctx.GetState() == snow.NormalOp {
+		if h.ctx.IsBootstrapped() {
 			return h.engine.PullQuery(nodeID, reqID, containerID)
 		}
 		return h.bootstrapper.PullQuery(nodeID, reqID, containerID)
@@ -390,18 +394,18 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		votes, err := getContainerIDs(msg)
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
-				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
+				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
 			return nil
 		}
 
-		if h.ctx.GetState() == snow.NormalOp {
+		if h.ctx.IsBootstrapped() {
 			return h.engine.Chits(nodeID, reqID, votes)
 		}
 		return h.bootstrapper.Chits(nodeID, reqID, votes)
 
 	case message.QueryFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		if h.ctx.GetState() == snow.NormalOp {
+		if h.ctx.IsBootstrapped() {
 			return h.engine.QueryFailed(nodeID, reqID)
 		}
 		return h.bootstrapper.QueryFailed(nodeID, reqID)
@@ -417,10 +421,10 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		appBytes, ok := msg.Get(message.AppBytes).([]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppBytes",
-				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
+				msg.Op(), nodeID, h.ctx.ChainID, reqID)
 			return nil
 		}
-		if h.ctx.GetState() == snow.NormalOp {
+		if h.ctx.IsBootstrapped() {
 			return h.engine.AppRequest(nodeID, reqID, msg.ExpirationTime(), appBytes)
 		}
 		return h.bootstrapper.AppRequest(nodeID, reqID, msg.ExpirationTime(), appBytes)
@@ -430,17 +434,17 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		appBytes, ok := msg.Get(message.AppBytes).([]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppBytes",
-				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
+				msg.Op(), nodeID, h.ctx.ChainID, reqID)
 			return nil
 		}
-		if h.ctx.GetState() == snow.NormalOp {
+		if h.ctx.IsBootstrapped() {
 			return h.engine.AppResponse(nodeID, reqID, appBytes)
 		}
 		return h.bootstrapper.AppResponse(nodeID, reqID, appBytes)
 
 	case message.AppRequestFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		if h.ctx.GetState() == snow.NormalOp {
+		if h.ctx.IsBootstrapped() {
 			return h.engine.AppRequestFailed(nodeID, reqID)
 		}
 		return h.bootstrapper.AppRequestFailed(nodeID, reqID)
@@ -449,11 +453,11 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		appBytes, ok := msg.Get(message.AppBytes).([]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppBytes",
-				msg.Op(), nodeID, h.engine.Context().ChainID, constants.GossipMsgRequestID)
+				msg.Op(), nodeID, h.ctx.ChainID, constants.GossipMsgRequestID)
 			return nil
 		}
 
-		if h.ctx.GetState() == snow.NormalOp {
+		if h.ctx.IsBootstrapped() {
 			return h.engine.AppGossip(nodeID, appBytes)
 		}
 		return h.bootstrapper.AppGossip(nodeID, appBytes)
@@ -502,7 +506,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 
 	default:
 		h.ctx.Log.Warn("Attempt to submit to engine unhandled consensus msg %s from from (%s, %s). Dropping it",
-			msg.Op(), nodeID, h.engine.Context().ChainID)
+			msg.Op(), nodeID, h.ctx.ChainID)
 		return nil
 	}
 }
@@ -515,7 +519,7 @@ func (h *Handler) Timeout() {
 
 // Gossip passes a gossip request to the consensus engine
 func (h *Handler) Gossip() {
-	if h.ctx.GetState() != snow.NormalOp {
+	if !h.ctx.IsBootstrapped() {
 		// Shouldn't send gossiping messages while the chain is bootstrapping
 		return
 	}

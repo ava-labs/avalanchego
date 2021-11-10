@@ -13,8 +13,6 @@ import (
 type Engine interface {
 	common.Engine
 
-	Start(startReqID uint32) error
-
 	// GetVtx returns a vertex by its ID.
 	// Returns an error if unknown.
 	GetVtx(vtxID ids.ID) (avalanche.Vertex, error)

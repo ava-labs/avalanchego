@@ -55,32 +55,32 @@ func TestShutdown(t *testing.T) {
 
 	shutdownCalled := make(chan struct{}, 1)
 
-	bootstrapper := &common.EngineTest{T: t}
-	bootstrapper.Default(true)
-	bootstrapper.ContextF = snow.DefaultContextTest
-	bootstrapper.ShutdownF = func() error { shutdownCalled <- struct{}{}; return nil }
-	bootstrapper.ConnectedF = func(nodeID ids.ShortID) error { return nil }
-	bootstrapper.HaltF = func() {}
-
-	engine := &common.EngineTest{T: t}
-	engine.Default(true)
-	engine.ContextF = snow.DefaultContextTest
-	engine.ShutdownF = func() error { shutdownCalled <- struct{}{}; return nil }
-	engine.ConnectedF = func(nodeID ids.ShortID) error { return nil }
-	engine.HaltF = func() {}
-
-	handler := &Handler{}
-	err = handler.Initialize(
+	ctx := snow.DefaultContextTest()
+	handler, err := NewHandler(
 		mc,
-		nil, // no fast sync for this test
-		bootstrapper,
-		engine,
+		ctx,
 		vdrs,
 		nil,
 		"",
 		prometheus.NewRegistry(),
 	)
 	assert.NoError(t, err)
+
+	bootstrapper := &common.EngineTest{T: t}
+	bootstrapper.Default(true)
+	bootstrapper.ContextF = func() *snow.Context { return ctx }
+	bootstrapper.ShutdownF = func() error { shutdownCalled <- struct{}{}; return nil }
+	bootstrapper.ConnectedF = func(nodeID ids.ShortID) error { return nil }
+	bootstrapper.HaltF = func() {}
+	handler.RegisterBootstrap(bootstrapper)
+
+	engine := &common.EngineTest{T: t}
+	engine.Default(true)
+	engine.ContextF = func() *snow.Context { return ctx }
+	engine.ShutdownF = func() error { shutdownCalled <- struct{}{}; return nil }
+	engine.ConnectedF = func(nodeID ids.ShortID) error { return nil }
+	engine.HaltF = func() {}
+	handler.RegisterEngine(engine)
 
 	go handler.Dispatch()
 
@@ -147,10 +147,21 @@ func TestShutdownTimesOut(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
+	ctx := snow.DefaultContextTest()
+	handler, err := NewHandler(
+		mc,
+		ctx,
+		vdrs,
+		nil,
+		"",
+		metrics,
+	)
+	assert.NoError(t, err)
+
 	bootstrapFinished := make(chan struct{}, 1)
 	bootstrapper := &common.EngineTest{T: t}
 	bootstrapper.Default(true)
-	bootstrapper.ContextF = snow.DefaultContextTest
+	bootstrapper.ContextF = func() *snow.Context { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.ShortID) error { return nil }
 	bootstrapper.HaltF = func() {}
 	bootstrapper.MultiPutF = func(nodeID ids.ShortID, requestID uint32, containers [][]byte) error {
@@ -159,27 +170,14 @@ func TestShutdownTimesOut(t *testing.T) {
 		bootstrapFinished <- struct{}{}
 		return nil
 	}
+	handler.RegisterBootstrap(bootstrapper)
 
 	engine := &common.EngineTest{T: t}
 	engine.Default(false)
-
+	engine.ContextF = func() *snow.Context { return ctx }
 	closed := new(int)
-
-	engine.ContextF = snow.DefaultContextTest
 	engine.ShutdownF = func() error { *closed++; return nil }
-
-	handler := &Handler{}
-	err = handler.Initialize(
-		mc,
-		nil, // no fast sync for this test
-		bootstrapper,
-		engine,
-		vdrs,
-		nil,
-		"",
-		metrics,
-	)
-	assert.NoError(t, err)
+	handler.RegisterEngine(engine)
 
 	chainRouter.AddChain(handler)
 
@@ -245,9 +243,24 @@ func TestRouterTimeout(t *testing.T) {
 		wg = sync.WaitGroup{}
 	)
 
+	ctx := snow.DefaultContextTest()
+	vdrs := validators.NewSet()
+	err = vdrs.AddWeight(ids.GenerateTestShortID(), 1)
+	assert.NoError(t, err)
+
+	handler, err := NewHandler(
+		mc,
+		ctx,
+		vdrs,
+		nil,
+		"",
+		prometheus.NewRegistry(),
+	)
+	assert.NoError(t, err)
+
 	bootstrapper := &common.EngineTest{T: t}
 	bootstrapper.Default(true)
-	bootstrapper.ContextF = snow.DefaultContextTest
+	bootstrapper.ContextF = func() *snow.Context { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.ShortID) error { return nil }
 	bootstrapper.HaltF = func() {}
 	bootstrapper.GetFailedF = func(nodeID ids.ShortID, requestID uint32) error { wg.Done(); calledGetFailed = true; return nil }
@@ -275,26 +288,12 @@ func TestRouterTimeout(t *testing.T) {
 		calledGetAcceptedFrontierFailed = true
 		return nil
 	}
+	handler.RegisterBootstrap(bootstrapper)
 
 	engine := &common.EngineTest{T: t}
 	engine.Default(false)
-	engine.ContextF = snow.DefaultContextTest
-
-	handler := &Handler{}
-	vdrs := validators.NewSet()
-	err = vdrs.AddWeight(ids.GenerateTestShortID(), 1)
-	assert.NoError(t, err)
-	err = handler.Initialize(
-		mc,
-		nil, // no fast sync for this test
-		bootstrapper,
-		engine,
-		vdrs,
-		nil,
-		"",
-		prometheus.NewRegistry(),
-	)
-	assert.NoError(t, err)
+	engine.ContextF = func() *snow.Context { return ctx }
+	handler.RegisterEngine(engine)
 
 	chainRouter.AddChain(handler)
 	go handler.Dispatch()
@@ -353,29 +352,30 @@ func TestRouterClearTimeouts(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Create bootstrapper, engine and handler
-	bootstrapper := &common.EngineTest{T: t}
-	bootstrapper.Default(false)
-	bootstrapper.ContextF = snow.DefaultContextTest
-
-	engine := &common.EngineTest{T: t}
-	engine.Default(false)
-	engine.ContextF = snow.DefaultContextTest
-
+	ctx := snow.DefaultContextTest()
 	vdrs := validators.NewSet()
 	err = vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
-	handler := &Handler{}
-	err = handler.Initialize(
+
+	handler, err := NewHandler(
 		mc,
-		nil, // no fast sync for this test
-		bootstrapper,
-		engine,
+		ctx,
 		vdrs,
 		nil,
 		"",
 		metrics,
 	)
 	assert.NoError(t, err)
+
+	bootstrapper := &common.EngineTest{T: t}
+	bootstrapper.Default(false)
+	bootstrapper.ContextF = func() *snow.Context { return ctx }
+	handler.RegisterBootstrap(bootstrapper)
+
+	engine := &common.EngineTest{T: t}
+	engine.Default(false)
+	engine.ContextF = func() *snow.Context { return ctx }
+	handler.RegisterEngine(engine)
 
 	chainRouter.AddChain(handler)
 	go handler.Dispatch()
@@ -452,37 +452,19 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Create bootstrapper, engine and handler
-	calledF := new(bool)
+	calledF := false
 	wg := sync.WaitGroup{}
 
-	bootstrapper := &common.EngineTest{T: t}
-	bootstrapper.Default(false)
-	bootstrapper.ContextF = snow.DefaultContextTest
-	bootstrapper.PullQueryF = func(nodeID ids.ShortID, requestID uint32, containerID ids.ID) error {
-		defer wg.Done()
-		*calledF = true
-		return nil
-	}
-
-	engine := &common.EngineTest{T: t}
-	engine.Default(false)
-
-	engine.ContextF = func() *snow.Context {
-		ctx := snow.DefaultContextTest()
-		ctx.SetValidatorOnly()
-		return ctx
-	}
-
-	handler := &Handler{}
+	ctx := snow.DefaultContextTest()
+	ctx.SetValidatorOnly()
 	vdrs := validators.NewSet()
 	vID := ids.GenerateTestShortID()
 	err = vdrs.AddWeight(vID, 1)
 	assert.NoError(t, err)
-	err = handler.Initialize(
+
+	handler, err := NewHandler(
 		mc,
-		nil, // no fast sync for this test
-		bootstrapper,
-		engine,
+		ctx,
 		vdrs,
 		nil,
 		"",
@@ -490,40 +472,54 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
+	bootstrapper := &common.EngineTest{T: t}
+	bootstrapper.Default(false)
+	bootstrapper.ContextF = func() *snow.Context { return ctx }
+	bootstrapper.PullQueryF = func(nodeID ids.ShortID, requestID uint32, containerID ids.ID) error {
+		defer wg.Done()
+		calledF = true
+		return nil
+	}
+	handler.RegisterBootstrap(bootstrapper)
+
+	engine := &common.EngineTest{T: t}
+	engine.ContextF = func() *snow.Context { return ctx }
+	engine.Default(false)
+
+	handler.RegisterEngine(engine)
+
 	chainRouter.AddChain(handler)
 	go handler.Dispatch()
 
-	// generate a non-validator ID
+	var inMsg message.InboundMessage
+	dummyContainerID := ids.GenerateTestID()
+	reqID := uint32(0)
+
+	// Non-validator case
 	nID := ids.GenerateTestShortID()
 
-	*calledF = false
-	var inMsg message.InboundMessage
-
-	inMsg = mc.InboundPullQuery(handler.ctx.ChainID, uint32(1),
-		time.Hour,
-		ids.GenerateTestID(),
+	calledF = false
+	inMsg = mc.InboundPullQuery(handler.ctx.ChainID, reqID, time.Hour, dummyContainerID,
 		nID,
 	)
 	chainRouter.HandleInbound(inMsg)
-	assert.False(t, *calledF) // should not be called
 
-	// validator case
-	*calledF = false
-	wg.Add(1)
-	inMsg = mc.InboundPullQuery(handler.ctx.ChainID,
-		uint32(2),
-		time.Hour,
-		ids.GenerateTestID(),
+	assert.False(t, calledF) // should not be called
+
+	// Validator case
+	calledF = false
+	reqID++
+	inMsg = mc.InboundPullQuery(handler.ctx.ChainID, reqID, time.Hour, dummyContainerID,
 		vID,
 	)
+	wg.Add(1)
 	chainRouter.HandleInbound(inMsg)
 
 	wg.Wait()
-	// should be called since this is a validator request
-	assert.True(t, *calledF)
+	assert.True(t, calledF) // should be called since this is a validator request
 
 	// register a validator request
-	reqID := uint32(3)
+	reqID++
 	chainRouter.RegisterRequest(vID, handler.ctx.ChainID, reqID, message.Get)
 	assert.Equal(t, 1, chainRouter.timedRequests.Len())
 

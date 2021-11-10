@@ -32,8 +32,11 @@ const (
 	MaxTimeFetchingAncestors = 50 * time.Millisecond
 )
 
+var _ Handler = &Bootstrapper{}
+
 // Bootstrapper implements the Engine interface.
 type Bootstrapper struct {
+	MsgHandlerNoOps
 	Config
 	Halter
 
@@ -79,7 +82,19 @@ type Bootstrapper struct {
 // Initialize implements the Engine interface.
 func (b *Bootstrapper) Initialize(config Config) error {
 	b.Config = config
+	b.MsgHandlerNoOps = NewMsgHandlerNoOps(config.Ctx)
 	return nil
+}
+
+func (b *Bootstrapper) Start(startReqID uint32) error {
+	b.Ctx.Log.Info("Starting bootstrap...")
+	b.RequestID = startReqID
+
+	if b.Config.StartupAlpha > 0 {
+		return nil
+	}
+
+	return b.Startup()
 }
 
 // GetAcceptedFrontier implements the Engine interface.
@@ -405,4 +420,14 @@ func (b *Bootstrapper) sendGetAccepted() {
 		)
 		b.Sender.SendGetAccepted(vdrs, b.RequestID, b.acceptedFrontier)
 	}
+}
+
+// Needed to disambiguate with MsgHandlerNoOps
+func (b *Bootstrapper) Halt() {
+	b.Halter.Halt()
+}
+
+// Needed to disambiguate with MsgHandlerNoOps
+func (b *Bootstrapper) Halted() bool {
+	return b.Halter.Halted()
 }

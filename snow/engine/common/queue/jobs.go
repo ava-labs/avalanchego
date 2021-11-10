@@ -89,6 +89,9 @@ func (j *Jobs) Push(job Job) (bool, error) {
 }
 
 func (j *Jobs) ExecuteAll(ctx *snow.Context, halter common.Haltable, restarted bool, events ...snow.EventDispatcher) (int, error) {
+	ctx.Executing(true)
+	defer ctx.Executing(false)
+
 	numExecuted := 0
 
 	// Disable and clear state caches to prevent us from attempting to execute

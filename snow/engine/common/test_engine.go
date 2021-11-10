@@ -32,6 +32,7 @@ var (
 	errPullQuery                 = errors.New("unexpectedly called PullQuery")
 	errQueryFailed               = errors.New("unexpectedly called QueryFailed")
 	errChits                     = errors.New("unexpectedly called Chits")
+	errStart                     = errors.New("unexpectedly called Start")
 
 	errGetStateSummaryFrontier       = errors.New("unexpectedly called GetStateSummaryFrontier")
 	errStateSummaryFrontier          = errors.New("unexpectedly called StateSummaryFrontier")
@@ -46,6 +47,8 @@ var (
 // EngineTest is a test engine
 type EngineTest struct {
 	T *testing.T
+
+	CantStart,
 
 	CantIsBootstrapped,
 	CantTimeout,
@@ -96,6 +99,7 @@ type EngineTest struct {
 
 	CantGetVM bool
 
+	StartF                                             func(startReqID uint32) error
 	IsBootstrappedF                                    func() bool
 	ContextF                                           func() *snow.Context
 	HaltF                                              func()
@@ -122,6 +126,7 @@ type EngineTest struct {
 }
 
 func (e *EngineTest) Default(cant bool) {
+	e.CantStart = cant
 	e.CantIsBootstrapped = cant
 	e.CantTimeout = cant
 	e.CantGossip = cant
@@ -159,6 +164,16 @@ func (e *EngineTest) Default(cant bool) {
 	e.CantAcceptedStateSummary = cant
 	e.CantGetAcceptedStateSummaryFailed = cant
 	e.CantGetVM = cant
+}
+
+func (e *EngineTest) Start(startReqID uint32) error {
+	if e.StartF != nil {
+		return e.StartF(startReqID)
+	}
+	if e.CantStart && e.T != nil {
+		e.T.Fatalf("Unexpectedly called Start")
+	}
+	return errStart
 }
 
 func (e *EngineTest) Context() *snow.Context {

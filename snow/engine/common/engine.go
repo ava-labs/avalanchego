@@ -21,6 +21,9 @@ type Engine interface {
 	// Returns true iff the chain is done bootstrapping
 	IsBootstrapped() bool
 
+	// Start engine operations from given request ID
+	Start(startReqID uint32) error
+
 	// Returns nil if the engine is healthy.
 	// Periodically called and reported through the health API
 	health.Checkable

@@ -58,8 +58,6 @@ type Config struct {
 type AvalancheBootstrapper interface {
 	common.Engine
 	common.Bootstrapable
-
-	Start(startReqID uint32) error
 }
 
 func New(
@@ -79,7 +77,6 @@ func New(
 type bootstrapper struct {
 	common.Bootstrapper
 	common.Fetcher
-	common.BootstrapNoOps
 	metrics
 	getAncestorsVtxs metric.Averager
 
@@ -109,22 +106,22 @@ func newBootstrapper(
 	namespace string,
 	registerer prometheus.Registerer,
 ) (*bootstrapper, error) {
-	res := &bootstrapper{}
-	res.BootstrapNoOps.Ctx = config.Ctx
-	res.VtxBlocked = config.VtxBlocked
-	res.TxBlocked = config.TxBlocked
-	res.Manager = config.Manager
-	res.VM = config.VM
-	res.processedCache = &cache.LRU{Size: cacheSize}
-	res.OnFinished = onFinished
-	res.executedStateTransitions = math.MaxInt32
+	b := &bootstrapper{
+		VtxBlocked:               config.VtxBlocked,
+		TxBlocked:                config.TxBlocked,
+		Manager:                  config.Manager,
+		VM:                       config.VM,
+		processedCache:           &cache.LRU{Size: cacheSize},
+		Fetcher:                  common.Fetcher{OnFinished: onFinished},
+		executedStateTransitions: math.MaxInt32,
+	}
 
-	if err := res.metrics.Initialize(namespace, registerer); err != nil {
+	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return nil, err
 	}
 
 	errs := wrappers.Errs{}
-	res.getAncestorsVtxs = metric.NewAveragerWithErrs(
+	b.getAncestorsVtxs = metric.NewAveragerWithErrs(
 		namespace,
 		"get_ancestors_vtxs",
 		"vertices fetched in a call to GetAncestors",
@@ -132,41 +129,30 @@ func newBootstrapper(
 		&errs,
 	)
 
-	if err := res.VtxBlocked.SetParser(&vtxParser{
+	if err := b.VtxBlocked.SetParser(&vtxParser{
 		log:         config.Ctx.Log,
-		numAccepted: res.numAcceptedVts,
-		numDropped:  res.numDroppedVts,
-		manager:     res.Manager,
+		numAccepted: b.numAcceptedVts,
+		numDropped:  b.numDroppedVts,
+		manager:     b.Manager,
 	}); err != nil {
 		return nil, err
 	}
 
-	if err := res.TxBlocked.SetParser(&txParser{
+	if err := b.TxBlocked.SetParser(&txParser{
 		log:         config.Ctx.Log,
-		numAccepted: res.numAcceptedTxs,
-		numDropped:  res.numDroppedTxs,
-		vm:          res.VM,
+		numAccepted: b.numAcceptedTxs,
+		numDropped:  b.numDroppedTxs,
+		vm:          b.VM,
 	}); err != nil {
 		return nil, err
 	}
 
-	config.Bootstrapable = res
-	if err := res.Bootstrapper.Initialize(config.Config); err != nil {
+	config.Bootstrapable = b
+	if err := b.Bootstrapper.Initialize(config.Config); err != nil {
 		return nil, err
 	}
 
-	return res, nil
-}
-
-func (b *bootstrapper) Start(startReqID uint32) error {
-	b.Ctx.Log.Info("Starting bootstrap...")
-	b.RequestID = startReqID
-
-	if b.Config.StartupAlpha > 0 {
-		return nil
-	}
-
-	return b.Bootstrapper.Startup()
+	return b, nil
 }
 
 // CurrentAcceptedFrontier returns the set of vertices that this node has accepted
@@ -474,7 +460,7 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 func (b *bootstrapper) checkFinish() error {
 	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
 	pendingJobs := b.VtxBlocked.MissingIDs()
-	if b.Ctx.GetState() == snow.NormalOp || len(pendingJobs) > 0 || b.awaitingTimeout {
+	if b.Ctx.IsBootstrapped() || len(pendingJobs) > 0 || b.awaitingTimeout {
 		return nil
 	}
 

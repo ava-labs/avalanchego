@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -112,15 +113,6 @@ func init() {
 		keys = append(keys, pk.(*crypto.PrivateKeySECP256K1R))
 	}
 	testSubnet1ControlKeys = keys[0:3]
-}
-
-type dummyHandler struct {
-	startEngineF func(startReqID uint32) error
-}
-
-func (dh *dummyHandler) onDoneBootstrapping(lastReqID uint32) error {
-	lastReqID++
-	return dh.startEngineF(lastReqID)
 }
 
 func defaultContext() *snow.Context {
@@ -294,6 +286,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 func defaultVM() (*VM, database.Database, *common.SenderTest) {
 	vm := &VM{Factory: Factory{
 		Chains:                chains.MockManager{},
+		UptimeManager:         uptime.NewManager(uptime.UnreadyState()),
 		Validators:            validators.NewManager(),
 		TxFee:                 defaultTxFee,
 		CreateSubnetTxFee:     100 * defaultTxFee,
@@ -372,6 +365,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 	vm := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
 		Validators:         validators.NewManager(),
+		UptimeManager:      uptime.NewManager(uptime.UnreadyState()),
 		TxFee:              defaultTxFee,
 		MinValidatorStake:  defaultMinValidatorStake,
 		MaxValidatorStake:  defaultMaxValidatorStake,
@@ -1780,6 +1774,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	firstVM := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
 		Validators:         validators.NewManager(),
+		UptimeManager:      uptime.NewManager(uptime.UnreadyState()),
 		MinStakeDuration:   defaultMinStakingDuration,
 		MaxStakeDuration:   defaultMaxStakingDuration,
 		StakeMintingPeriod: defaultMaxStakingDuration,
@@ -1861,6 +1856,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	secondVM := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
 		Validators:         validators.NewManager(),
+		UptimeManager:      uptime.NewManager(uptime.UnreadyState()),
 		MinStakeDuration:   defaultMinStakingDuration,
 		MaxStakeDuration:   defaultMaxStakingDuration,
 		StakeMintingPeriod: defaultMaxStakingDuration,
@@ -1900,6 +1896,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstVM := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
 		Validators:         validators.NewManager(),
+		UptimeManager:      uptime.NewManager(uptime.UnreadyState()),
 		MinStakeDuration:   defaultMinStakingDuration,
 		MaxStakeDuration:   defaultMaxStakingDuration,
 		StakeMintingPeriod: defaultMaxStakingDuration,
@@ -1976,6 +1973,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	secondVM := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
 		Validators:         validators.NewManager(),
+		UptimeManager:      uptime.NewManager(uptime.UnreadyState()),
 		MinStakeDuration:   defaultMinStakingDuration,
 		MaxStakeDuration:   defaultMaxStakingDuration,
 		StakeMintingPeriod: defaultMaxStakingDuration,
@@ -2021,6 +2019,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	vm := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
 		Validators:         validators.NewManager(),
+		UptimeManager:      uptime.NewManager(uptime.UnreadyState()),
 		MinStakeDuration:   defaultMinStakingDuration,
 		MaxStakeDuration:   defaultMaxStakingDuration,
 		StakeMintingPeriod: defaultMaxStakingDuration,
@@ -2141,16 +2140,27 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		VM:      vm,
 	}
 
-	dh := &dummyHandler{}
+	// Asynchronously passes messages from the network to the consensus engine
+	handler, err := router.NewHandler(
+		mc,
+		bootstrapConfig.Ctx,
+		vdrs,
+		msgChan,
+		"",
+		prometheus.NewRegistry(),
+	)
+	assert.NoError(t, err)
+
 	bootstrapper, err := bootstrap.New(
 		bootstrapConfig,
-		dh.onDoneBootstrapping,
+		handler.OnDoneBootstrapping,
 		fmt.Sprintf("%s_bs", consensus.Parameters().Namespace),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
+	handler.RegisterBootstrap(bootstrapper)
 
 	engineConfig := smeng.Config{
 		Ctx:        bootstrapConfig.Ctx,
@@ -2174,26 +2184,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dh.startEngineF = engine.Start
+	handler.RegisterEngine(engine)
 
 	startReqID := uint32(0)
 	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
-
-	// Asynchronously passes messages from the network to the consensus engine
-	handler := &router.Handler{}
-	err = handler.Initialize(
-		mc,
-		nil, // no fast sync for this test
-		bootstrapper,
-		engine,
-		vdrs,
-		msgChan,
-		"",
-		prometheus.NewRegistry(),
-	)
-	assert.NoError(t, err)
 
 	// Allow incoming messages to be routed to the new chain
 	chainRouter.AddChain(handler)
@@ -2275,6 +2271,7 @@ func TestUnverifiedParent(t *testing.T) {
 	vm := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
 		Validators:         validators.NewManager(),
+		UptimeManager:      uptime.NewManager(uptime.UnreadyState()),
 		MinStakeDuration:   defaultMinStakingDuration,
 		MaxStakeDuration:   defaultMaxStakingDuration,
 		StakeMintingPeriod: defaultMaxStakingDuration,
@@ -2428,6 +2425,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	vm := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
 		Validators:         validators.NewManager(),
+		UptimeManager:      uptime.NewManager(uptime.UnreadyState()),
 		MinStakeDuration:   defaultMinStakingDuration,
 		MaxStakeDuration:   defaultMaxStakingDuration,
 		StakeMintingPeriod: defaultMaxStakingDuration,
