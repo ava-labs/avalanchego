@@ -387,7 +387,7 @@ func (n *pushNetwork) gossipEthTxs(force bool) (int, error) {
 		}
 
 		// We check [force] outside of the if statement to avoid an unnecessary
-		// cache wlookup.
+		// cache lookup.
 		if !force {
 			if _, has := n.recentEthTxs.Get(txHash); has {
 				continue
