@@ -141,6 +141,7 @@ func (a *atomicTxRepository) Write(height uint64, tx *Tx) error {
 	txBytes := tx.Bytes()
 
 	// map txID => [height]+[tx bytes]
+	// Height is 8 bytes. txBytes len is 4 bytes and then the txBytes itself is len(txBytes)
 	heightTxPacker := wrappers.Packer{Bytes: make([]byte, 12+len(txBytes))}
 	heightTxPacker.PackLong(height)
 	heightTxPacker.PackBytes(txBytes)
