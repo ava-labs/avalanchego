@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -78,7 +77,6 @@ type bootstrapper struct {
 	common.Bootstrapper
 	common.Fetcher
 	metrics
-	getAncestorsVtxs metric.Averager
 
 	// VtxBlocked tracks operations that are blocked on vertices
 	VtxBlocked *queue.JobsWithMissing
@@ -119,15 +117,6 @@ func newBootstrapper(
 	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return nil, err
 	}
-
-	errs := wrappers.Errs{}
-	b.getAncestorsVtxs = metric.NewAveragerWithErrs(
-		namespace,
-		"get_ancestors_vtxs",
-		"vertices fetched in a call to GetAncestors",
-		registerer,
-		&errs,
-	)
 
 	if err := b.VtxBlocked.SetParser(&vtxParser{
 		log:         config.Ctx.Log,

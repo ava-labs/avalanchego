@@ -75,7 +75,7 @@ func newTransitive(config Config) (*Transitive, error) {
 	config.Ctx.Log.Info("initializing consensus engine")
 
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
-	res := &Transitive{
+	t := &Transitive{
 		Ctx:             config.Ctx,
 		MsgHandlerNoOps: common.NewMsgHandlerNoOps(config.Ctx),
 		Sender:          config.Sender,
@@ -92,11 +92,11 @@ func newTransitive(config Config) (*Transitive, error) {
 		uniformSampler: sampler.NewUniform(),
 	}
 
-	if err := res.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
+	if err := t.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
 		return nil, err
 	}
 
-	return res, nil
+	return t, nil
 }
 
 func (t *Transitive) Context() *snow.Context {
@@ -632,13 +632,7 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 
 // HealthCheck implements the common.Engine interface
 func (t *Transitive) HealthCheck() (interface{}, error) {
-	var (
-		consensusIntf interface{} = struct{}{}
-		consensusErr  error
-	)
-	if t.Ctx.IsBootstrapped() {
-		consensusIntf, consensusErr = t.Consensus.HealthCheck()
-	}
+	consensusIntf, consensusErr := t.Consensus.HealthCheck()
 	vmIntf, vmErr := t.VM.HealthCheck()
 	intf := map[string]interface{}{
 		"consensus": consensusIntf,
