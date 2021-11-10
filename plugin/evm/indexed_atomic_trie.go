@@ -37,7 +37,7 @@ type indexedAtomicTrie struct {
 	commitHeightInterval uint64              // commit interval, same as commitHeightInterval by default
 	db                   ethdb.KeyValueStore // Underlying database
 	trieDB               *trie.Database      // Trie database
-	trie                 *trie.SecureTrie    // Atomic trie.Trie mapping key (height+blockchainID) and value (RLP encoded atomic.Requests)
+	trie                 *trie.Trie          // Atomic trie.Trie mapping key (height+blockchainID) and value (RLP encoded atomic.Requests)
 	initialised          *atomic2.Bool
 	initBlockRange       uint64
 }
@@ -60,7 +60,7 @@ func NewIndexedAtomicTrie(db ethdb.KeyValueStore) (types.AtomicTrie, error) {
 	}
 
 	triedb := trie.NewDatabase(db)
-	t, err := trie.NewSecure(root, triedb)
+	t, err := trie.New(root, triedb)
 	if err != nil {
 		return nil, err
 	}
