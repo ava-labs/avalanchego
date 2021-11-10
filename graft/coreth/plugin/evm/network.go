@@ -141,7 +141,7 @@ func (n *pushNetwork) queueExecutableTxs(state *state.StateDB, baseFee *big.Int,
 	// Setup heap for transactions
 	heads := make(types.TxByPriceAndTime, 0, len(txs))
 	for addr, accountTxs := range txs {
-		// Short-circuit here to avoid needing to perform an unnecessary state lookup
+		// Short-circuit here to avoid performing an unnecessary state lookup
 		if len(accountTxs) == 0 {
 			continue
 		}
