@@ -72,9 +72,9 @@ func NewBlockingAtomicTrie(db ethdb.KeyValueStore) (types.AtomicTrie, error) {
 	}, nil
 }
 
-func (i *blockingAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn func() error, acceptedHeightAtomicTxDB database.Database, codec codec.Manager) <-chan error {
+func (i *blockingAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn func() error, atomicTxByHeightIterator database.Iterator, codec codec.Manager) <-chan error {
 	resultChan := make(chan error, 1)
-	go i.initialize(chain, dbCommitFn, acceptedHeightAtomicTxDB, codec, resultChan)
+	go i.initialize(chain, dbCommitFn, atomicTxByHeightIterator, codec, resultChan)
 	return resultChan
 
 }
@@ -82,15 +82,14 @@ func (i *blockingAtomicTrie) Initialize(chain facades.ChainFacade, dbCommitFn fu
 // initialize blockingly initializes the blockingAtomicTrie using the acceptedHeightAtomicTxDB
 // and lastAccepted from the chain
 // Publishes any errors to the resultChan
-func (i *blockingAtomicTrie) initialize(chain facades.ChainFacade, dbCommitFn func() error, acceptedHeightAtomicTxDB database.Database, codec codec.Manager, resultChan chan<- error) {
+func (i *blockingAtomicTrie) initialize(chain facades.ChainFacade, dbCommitFn func() error, atomicTxByHeightIterator database.Iterator, codec codec.Manager, resultChan chan<- error) {
 	defer close(resultChan)
 	lastAccepted := chain.LastAcceptedBlock()
-	iter := acceptedHeightAtomicTxDB.NewIterator()
 	transactionsIndexed := uint64(0)
 	startTime := time.Now()
 	lastUpdate := time.Now()
-	for iter.Next() && iter.Error() == nil {
-		heightBytes := iter.Key()
+	for atomicTxByHeightIterator.Next() && atomicTxByHeightIterator.Error() == nil {
+		heightBytes := atomicTxByHeightIterator.Key()
 		if len(heightBytes) != wrappers.LongLen ||
 			bytes.Equal(heightBytes, heightAtomicTxDBInitializedKey) {
 			// this is metadata key, skip it
@@ -103,7 +102,7 @@ func (i *blockingAtomicTrie) initialize(chain facades.ChainFacade, dbCommitFn fu
 			continue
 		}
 
-		txBytes := iter.Value()
+		txBytes := atomicTxByHeightIterator.Value()
 
 		tx := &Tx{}
 		if _, err := codec.Unmarshal(txBytes, tx); err != nil {
@@ -138,9 +137,9 @@ func (i *blockingAtomicTrie) initialize(chain facades.ChainFacade, dbCommitFn fu
 		}
 	}
 
-	if iter.Error() != nil {
-		log.Error("error iterating data", "err", iter.Error())
-		resultChan <- iter.Error()
+	if atomicTxByHeightIterator.Error() != nil {
+		log.Error("error iterating data", "err", atomicTxByHeightIterator.Error())
+		resultChan <- atomicTxByHeightIterator.Error()
 		return
 	}
 
