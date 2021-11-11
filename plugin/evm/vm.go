@@ -370,8 +370,12 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	atomicIndexDB := Database{prefixdb.New(atomicIndexDBPrefix, vm.db)}
+	err = vm.db.Commit()
+	if err != nil {
+		return err
+	}
 
+	atomicIndexDB := Database{prefixdb.New(atomicIndexDBPrefix, vm.db)}
 	vm.atomicTrie, err = NewBlockingAtomicTrie(atomicIndexDB, vm.atomicTxRepository)
 	if err != nil {
 		return err
@@ -388,6 +392,10 @@ func (vm *VM) Initialize(
 			log.Crit("error initializing atomic trie locally", "time", time.Since(startTime), "err", err)
 		}
 		err, open = <-resultChan
+	}
+	err = vm.db.Commit()
+	if err != nil {
+		return err
 	}
 	log.Info("Atomic trie initialization complete", "time", time.Since(startTime))
 
