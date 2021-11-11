@@ -2869,7 +2869,7 @@ func TestReissueAtomicTx(t *testing.T) {
 	}
 
 	// Check that [importTx] has been indexed correctly after [blkB] is accepted.
-	_, height, err := vm.getAcceptedAtomicTx(importTx.ID())
+	_, height, err := vm.atomicTxRepository.GetByTxID(importTx.ID())
 	if err != nil {
 		t.Fatal(err)
 	} else if height != blkB.Height() {
