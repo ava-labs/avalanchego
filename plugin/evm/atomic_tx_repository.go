@@ -15,6 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
+const txIDLen = 32
+
 var (
 	heightAtomicTxDBPrefix         = []byte("heightAtomicTxDB")
 	heightAtomicTxDBInitializedKey = []byte("initialized")
@@ -53,39 +55,43 @@ func newAtomicTxRepository(db database.Database, codec codec.Manager) AtomicTxRe
 // Initialize initializes the atomicTxRepository by re-mapping entries from
 // txID => [height][txBytes] to height => [txBytes]
 func (a *atomicTxRepository) Initialize() error {
+	startTime := time.Now()
+
 	// initialise atomicHeightTxDB if not done already
 	heightTxDBInitialized, err := a.acceptedHeightAtomicTxDB.Has(heightAtomicTxDBInitializedKey)
 	if err != nil {
 		return err
 	}
+
 	if heightTxDBInitialized {
-		log.Info("skipping acceptedHeightAtomicTxDB init")
+		log.Info("skipping atomic tx by height index init")
 		return nil
 	}
 
-	startTime := time.Now()
-	log.Info("initializing acceptedHeightAtomicTxDB", "startTime", startTime)
+	log.Info("initializing atomic tx by height index", "startTime", startTime)
+
 	iter := a.acceptedAtomicTxDB.NewIterator()
+	defer iter.Release()
 	batch := a.acceptedHeightAtomicTxDB.NewBatch()
 
 	logger := NewProgressLogger(10 * time.Second)
-	entries := uint(0)
+	entries := uint32(0)
 	for iter.Next() {
+		// if there was an error during iteration, return now
 		if err := iter.Error(); err != nil {
 			return err
 		}
-		lenTxID := len(ids.ID{})
-		if len(iter.Key()) != lenTxID || bytes.Equal(iter.Key(), heightAtomicTxDBInitializedKey) {
+
+		if len(iter.Key()) != txIDLen || bytes.Equal(iter.Key(), heightAtomicTxDBInitializedKey) {
 			continue
 		}
 
-		// TODO: check height is == to expected & txID matches key
 		tx, height, err := a.ParseTxBytes(iter.Value())
 		if err != nil {
 			return err
 		}
 
-		// map [height] => tx bytes
+		// map [height] => [tx count] + ( [tx bytes] ... )
 		// NOTE: this assumes there is only one atomic tx / height.
 		// This code should be modified if we need to rebuild the height
 		// index and there may be multiple atomic tx per block height.
@@ -94,17 +100,23 @@ func (a *atomicTxRepository) Initialize() error {
 
 		packer := wrappers.Packer{Bytes: make([]byte, wrappers.ShortLen), MaxSize: 1024 * 1024}
 		packer.PackShort(1)
-		packer.PackBytes(tx.Bytes())
+
+		txBytes, err := a.codec.Marshal(codecVersion, tx)
+		if err != nil {
+			return err
+		}
+
+		packer.PackBytes(txBytes)
 		if packer.Errored() {
 			return packer.Err
 		}
 
 		if err = batch.Put(heightBytes, packer.Bytes); err != nil {
-			return fmt.Errorf("error saving tx bytes to acceptedHeightAtomicTxDB during init: %w", err)
+			return fmt.Errorf("error saving tx bytes to atomic tx by height index during init: %w", err)
 		}
 
 		entries++
-		logger.Info("entries indexed to acceptedHeightAtomicTxDB", "entries", entries)
+		logger.Info("entries indexed to atomic tx by height index", "entries", entries)
 	}
 
 	if err = batch.Put(heightAtomicTxDBInitializedKey, nil); err != nil {
@@ -112,10 +124,10 @@ func (a *atomicTxRepository) Initialize() error {
 	}
 
 	if err = batch.Write(); err != nil {
-		return fmt.Errorf("error writing acceptedHeightAtomicTxDB batch: %w", err)
+		return fmt.Errorf("error writing atomic tx by height index batch: %w", err)
 	}
 
-	log.Info("finished initializing acceptedHeightAtomicTxDB", "time", time.Since(startTime))
+	log.Info("finished initializing atomic tx by height index", "time", time.Since(startTime))
 	return nil
 }
 
@@ -164,7 +176,6 @@ func (a *atomicTxRepository) ParseTxsBytes(bytes []byte) ([]*Tx, error) {
 		return nil, nil
 	}
 
-	fmt.Println(count)
 	for i := uint16(0); i < count; i++ {
 		txBytes := packer.UnpackBytes()
 		tx := &Tx{}
@@ -187,7 +198,7 @@ func (a *atomicTxRepository) GetByHeight(height uint64) ([]*Tx, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("height", height)
+
 	return a.ParseTxsBytes(txsBytes)
 }
 
@@ -202,7 +213,7 @@ func (a *atomicTxRepository) Write(height uint64, txs []*Tx) error {
 		// 4 bytes for number of tx byte length + the number of bytes for tx bytes itself
 		totalPackerLen += wrappers.IntLen + len(tx.Bytes())
 	}
-	fmt.Println("height", height, "packerlen", totalPackerLen)
+
 	packer := wrappers.Packer{Bytes: make([]byte, totalPackerLen), MaxSize: 1024 * 1024}
 	packer.PackShort(uint16(len(txs)))
 
