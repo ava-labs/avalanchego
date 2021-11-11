@@ -197,7 +197,7 @@ func (b *Block) Parent() ids.ID {
 
 // Height implements the snowman.Block interface
 func (b *Block) Height() uint64 {
-	return b.ethBlock.Number().Uint64()
+	return b.ethBlock.NumberU64()
 }
 
 // Timestamp implements the snowman.Block interface
