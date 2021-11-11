@@ -26,6 +26,13 @@ import (
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
 
+	// Force-load tracer engine to trigger registration
+	//
+	// We must import this package (not referenced elsewhere) so that the native "callTracer"
+	// is added to a map of client-accessible tracers. In geth, this is done
+	// inside of cmd/geth.
+	_ "github.com/ava-labs/coreth/eth/tracers/native"
+
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
