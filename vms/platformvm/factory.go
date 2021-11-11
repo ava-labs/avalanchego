@@ -26,7 +26,8 @@ type Factory struct {
 	// Node's validator set maps subnetID -> validators of the subnet
 	Validators validators.Manager
 
-	UptimeManager uptime.Manager
+	// Provides access to the uptime manager as a thread safe data structure
+	UptimeLockedCalculator uptime.LockedCalculator
 
 	// True if the node is being run with staking enabled
 	StakingEnabled bool

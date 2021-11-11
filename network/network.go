@@ -241,8 +241,8 @@ type Config struct {
 	WhitelistedSubnets ids.Set        `json:"whitelistedSubnets"`
 	Beacons            validators.Set `json:"beacons"`
 	// Current validators in the Avalanche network
-	Validators    validators.Manager `json:"validators"`
-	UptimeManager uptime.Manager     `json:"-"`
+	Validators       validators.Manager `json:"validators"`
+	UptimeCalculator uptime.Calculator  `json:"-"`
 
 	// Require that all connections must have at least one validator between the
 	// 2 peers. This can be useful to enable if the node wants to connect to the
