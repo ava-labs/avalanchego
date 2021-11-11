@@ -25,7 +25,8 @@ type AtomicTxRepository interface {
 	GetByTxID(txID ids.ID) (*Tx, uint64, error)
 	GetByHeight(height uint64) ([]*Tx, error)
 	ParseTxBytes(bytes []byte) (*Tx, uint64, error)
-	Write(height uint64, txs *Tx) error
+	ParseTxsBytes(bytes []byte) ([]*Tx, error)
+	Write(height uint64, txs []*Tx) error
 	IterateByHeight(startHeight uint64) database.Iterator
 }
 
@@ -78,12 +79,18 @@ func (a *atomicTxRepository) Initialize() error {
 		}
 		txID := tx.ID()
 
-		// map [height] + [txID] => tx bytes
+		// map [height] => tx bytes
+		// NOTE: this assumes there is only one atomic tx / height.
+		// This code should be modified if we need to rebuild the height
+		// index and there may be multiple atomic tx per block height.
 		keyPacker := wrappers.Packer{Bytes: make([]byte, wrappers.LongLen+len(txID))}
 		keyPacker.PackLong(height)
-		keyPacker.PackFixedBytes(txID[:])
-
-		if err = batch.Put(keyPacker.Bytes, iter.Value()); err != nil {
+		txs := []*Tx{tx}
+		txsBytes, err := a.codec.Marshal(codecVersion, txs)
+		if err != nil {
+			return err
+		}
+		if err = batch.Put(keyPacker.Bytes, txsBytes); err != nil {
 			return fmt.Errorf("error saving tx bytes to acceptedHeightAtomicTxDB during init: %w", err)
 		}
 
@@ -125,7 +132,14 @@ func (a *atomicTxRepository) ParseTxBytes(bytes []byte) (*Tx, uint64, error) {
 	}
 
 	return tx, height, nil
+}
 
+func (a *atomicTxRepository) ParseTxsBytes(bytes []byte) ([]*Tx, error) {
+	txs := []*Tx{}
+	if _, err := a.codec.Unmarshal(bytes, txs); err != nil {
+		return nil, fmt.Errorf("problem parsing atomic transaction from db: %w", err)
+	}
+	return txs, nil
 }
 
 func (a *atomicTxRepository) GetByHeight(height uint64) ([]*Tx, error) {
@@ -133,44 +147,39 @@ func (a *atomicTxRepository) GetByHeight(height uint64) ([]*Tx, error) {
 	binary.BigEndian.PutUint64(heightBytes, height)
 
 	txs := make([]*Tx, 0)
-	it := a.acceptedHeightAtomicTxDB.NewIteratorWithPrefix(heightBytes)
-	for it.Next() {
-		if err := it.Error(); err != nil {
-			return nil, err
-		}
-		tx := &Tx{}
-		if _, err := a.codec.Unmarshal(it.Value(), tx); err != nil {
-			return nil, fmt.Errorf("problem parsing atomic transaction from db at height %d: %w", height, err)
-		}
-		for _, tx := range txs {
-			if err := tx.Sign(a.codec, nil); err != nil {
-				return nil, fmt.Errorf("problem initializing atomic transaction (txId %v) from db at height %d: %w", tx.ID(), height, err)
-			}
-		}
-		txs = append(txs, tx)
+	txsBytes, err := a.acceptedHeightAtomicTxDB.Get(heightBytes)
+	if err != nil {
+		return nil, err
 	}
+	a.codec.Unmarshal(txsBytes, txs)
 	return txs, nil
 }
 
-func (a *atomicTxRepository) Write(height uint64, tx *Tx) error {
-	txBytes := tx.Bytes()
+func (a *atomicTxRepository) Write(height uint64, txs []*Tx) error {
+	for _, tx := range txs {
+		txBytes := tx.Bytes()
 
-	// map txID => [height]+[tx bytes]
-	heightTxPacker := wrappers.Packer{Bytes: make([]byte, 12+len(txBytes))}
-	heightTxPacker.PackLong(height)
-	heightTxPacker.PackBytes(txBytes)
-	txID := tx.ID()
+		// map txID => [height]+[tx bytes]
+		heightTxPacker := wrappers.Packer{Bytes: make([]byte, 12+len(txBytes))}
+		heightTxPacker.PackLong(height)
+		heightTxPacker.PackBytes(txBytes)
+		txID := tx.ID()
 
-	txIdBatch := a.acceptedAtomicTxDB.NewBatch()
-	if err := txIdBatch.Put(txID[:], heightTxPacker.Bytes); err != nil {
-		return err
+		if err := a.acceptedAtomicTxDB.Put(txID[:], heightTxPacker.Bytes); err != nil {
+			return err
+		}
 	}
 
-	// map [height] + [txID] => tx bytes
-	keyPacker := wrappers.Packer{Bytes: make([]byte, wrappers.LongLen+len(txID))}
-	keyPacker.PackLong(height)
-	keyPacker.PackFixedBytes(txID[:])
-	return a.acceptedHeightAtomicTxDB.Put(keyPacker.Bytes, txBytes)
+	// map height => txs bytes
+	heightBytes := make([]byte, wrappers.LongLen)
+	binary.BigEndian.PutUint64(heightBytes, height)
+
+	txsBytes, err := a.codec.Marshal(codecVersion, txs)
+	if err != nil {
+		return nil
+	}
+	a.acceptedHeightAtomicTxDB.Put(heightBytes, txsBytes)
+	return nil
 }
 
 func (a *atomicTxRepository) IterateByHeight(startHeight uint64) database.Iterator {

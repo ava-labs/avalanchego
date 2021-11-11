@@ -1,8 +1,8 @@
 package evm
 
 import (
+	"bytes"
 	"encoding/binary"
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/coreth/trie"
@@ -116,36 +116,35 @@ func (i *blockingAtomicTrie) initialize(lastAcceptedBlockNumber uint64, dbCommit
 			return err
 		}
 		// TODO: add error if unexpected key found
-		if len(it.Key()) != wrappers.LongLen+lenTxID {
+		heightBytes := it.Key()
+		if len(heightBytes) != wrappers.LongLen ||
+			bytes.Equal(heightBytes, heightAtomicTxDBInitializedKey) {
+			// this is metadata key, skip it
 			continue
 		}
-		packer := wrappers.Packer{Bytes: it.Key()}
-		height := packer.UnpackLong()
-		// TODO: check txID in key matches txID in it.Value
-		//txIDBytes := packer.UnpackFixedBytes(lenTxID)
+		height := binary.BigEndian.Uint64(heightBytes)
 
 		// catch up trie index to height observed in iterator
 		for ; nextHeight < height; nextHeight++ {
 			indexAtomicOpsOrNil(nextHeight)
 		}
 		// height == nextHeight
-		tx, txHeight, err := i.repo.ParseTxBytes(it.Value())
+		txs, err := i.repo.ParseTxsBytes(it.Value())
 		if err != nil {
 			return err
 		}
-		if txHeight != height {
-			return fmt.Errorf("tx height in db value (%v) does not match tx height stored in key (%v)", txHeight, height)
-		}
-		transactionsIndexed++
-		ops, err := tx.AtomicOps()
-		if err != nil {
-			return err
+		for _, tx := range txs {
+			transactionsIndexed++
+			ops, err := tx.AtomicOps()
+			if err != nil {
+				return err
+			}
+			appendAtomicOps(ops)
 		}
 		// remember the atomic ops for this tx in [pendingAtomicOps]
 		// we will call [index] on them when either:
 		// - a greater height is observed from iterating
 		// - iteration is complete
-		appendAtomicOps(ops)
 		logger.Info("atomic trie init progress", "transactionsIndexed", transactionsIndexed)
 	}
 	// make sure [index] is called up to [lastAcceptedBlockNumber]
