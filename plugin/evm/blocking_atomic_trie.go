@@ -80,7 +80,6 @@ func (i *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommit
 // from current position up to [lastAcceptedBlockNumber]. Optionally returns error.
 func (i *blockingAtomicTrie) initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error, codec codec.Manager) error {
 	transactionsIndexed := uint64(0)
-	lenTxID := len(ids.ID{})
 	startTime := time.Now()
 
 	_, nextHeight, err := i.LastCommitted()
