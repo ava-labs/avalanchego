@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	txIDLen = 32
-	atomicTxsMaxLenBytes = 1024*1024
+	txIDLen              = 32
+	atomicTxsMaxLenBytes = 1024 * 1024
 )
 
 var (
@@ -170,7 +170,7 @@ func (a *atomicTxRepository) GetByHeight(height uint64) ([]*Tx, error) {
 // ParseTxBytes parses [bytes] to a [*Tx] object using the codec provided to the
 // atomicTxRepository.
 func (a *atomicTxRepository) ParseTxBytes(bytes []byte) (*Tx, error) {
-	if  len(bytes) < wrappers.LongLen {
+	if len(bytes) < wrappers.LongLen {
 		return nil, fmt.Errorf("bytes too short to parse atomic tx: %d", len(bytes))
 	}
 
