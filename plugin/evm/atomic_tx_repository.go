@@ -15,7 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-const txIDLen = 32
+const (
+	txIDLen = 32
+	atomicTxsMaxLenBytes = 1024*1024
+)
 
 var (
 	heightAtomicTxDBPrefix         = []byte("heightAtomicTxDB")
@@ -27,8 +30,7 @@ type AtomicTxRepository interface {
 	Initialize() error
 	GetByTxID(txID ids.ID) (*Tx, uint64, error)
 	GetByHeight(height uint64) ([]*Tx, error)
-	ParseTxBytes(bytes []byte) (*Tx, uint64, error)
-	ParseTxsBytes(bytes []byte) ([]*Tx, error)
+	ParseTxBytes(bytes []byte) (*Tx, error)
 	Write(height uint64, txs []*Tx) error
 	IterateByHeight(startHeight uint64) database.Iterator
 }
@@ -53,7 +55,7 @@ func newAtomicTxRepository(db database.Database, codec codec.Manager) AtomicTxRe
 }
 
 // Initialize initializes the atomicTxRepository by re-mapping entries from
-// txID => [height][txBytes] to height => [txBytes]
+// txID => [height][txBytes] to height => [txCount][txBytes0][txBytes1]...
 func (a *atomicTxRepository) Initialize() error {
 	startTime := time.Now()
 
@@ -64,11 +66,10 @@ func (a *atomicTxRepository) Initialize() error {
 	}
 
 	if heightTxDBInitialized {
-		log.Info("skipping atomic tx by height index init")
+		log.Info("acceptedHeightAtomicTxDB already initialized")
 		return nil
 	}
-
-	log.Info("initializing atomic tx by height index", "startTime", startTime)
+	log.Info("initializing acceptedHeightAtomicTxDB", "startTime", startTime)
 
 	iter := a.acceptedAtomicTxDB.NewIterator()
 	defer iter.Release()
@@ -81,103 +82,69 @@ func (a *atomicTxRepository) Initialize() error {
 		if err := iter.Error(); err != nil {
 			return err
 		}
-
 		if len(iter.Key()) != txIDLen || bytes.Equal(iter.Key(), heightAtomicTxDBInitializedKey) {
 			continue
 		}
 
-		// map [height] => [tx count] + ( [tx bytes] ... )
-		// NOTE: this assumes there is only one atomic tx / height.
+		// read heightBytes and txBytes from iter.Value()
+		unpacker := wrappers.Packer{Bytes: iter.Value()}
+		// heightBytes will be directly used as key in [acceptedHeightAtomicTxDB] index
+		heightBytes := unpacker.UnpackFixedBytes(wrappers.LongLen)
+		txBytes := unpacker.UnpackBytes()
+
+		// write [heightBytes] => [tx count] + ([tx bytes] ...),
+		// NOTE: code here assumes only one atomic tx / height
 		// This code should be modified if we need to rebuild the height
 		// index and there may be multiple atomic tx per block height.
-		txBytes := iter.Value()
-		txBytesLen := len(txBytes) - wrappers.LongLen
+		packer := wrappers.Packer{Bytes: make([]byte, wrappers.ShortLen+wrappers.LongLen+len(txBytes))}
+		packer.PackShort(1)
+		packer.PackBytes(txBytes)
 
-		heightBytes := txBytes[:wrappers.LongLen]
-
-		valBytes := make([]byte, wrappers.ShortLen, wrappers.ShortLen+txBytesLen)
-		binary.BigEndian.PutUint16(valBytes, uint16(1))
-		valBytes = append(valBytes, txBytes[wrappers.LongLen:]...)
-
-		if err = batch.Put(heightBytes, valBytes); err != nil {
-			return fmt.Errorf("error saving tx bytes to atomic tx by height index during init: %w", err)
+		if err := batch.Put(heightBytes, packer.Bytes); err != nil {
+			return fmt.Errorf("error saving tx bytes to  during init: %w", err)
 		}
 
 		entries++
-		logger.Info("entries indexed to atomic tx by height index", "entries", entries)
+		logger.Info("entries indexed to acceptedHeightAtomicTxDB", "entries", entries)
 	}
 
-	if err = batch.Put(heightAtomicTxDBInitializedKey, nil); err != nil {
+	if err := batch.Put(heightAtomicTxDBInitializedKey, nil); err != nil {
 		return err
 	}
-
-	if err = batch.Write(); err != nil {
-		return fmt.Errorf("error writing atomic tx by height index batch: %w", err)
+	if err := batch.Write(); err != nil {
+		return fmt.Errorf("error writing acceptedHeightAtomicTxDB batch: %w", err)
 	}
 
-	log.Info("finished initializing atomic tx by height index", "time", time.Since(startTime))
+	log.Info("finished initializing acceptedHeightAtomicTxDB", "time", time.Since(startTime))
 	return nil
 }
 
+// GetByTxID queries [acceptedAtomicTxDB] for the [txID], parses a [*Tx] object
+// if an entry is found, and returns it with the block height the atomic tx it
+// represents was accepted on, along with an optional error.
 func (a *atomicTxRepository) GetByTxID(txID ids.ID) (*Tx, uint64, error) {
 	indexedTxBytes, err := a.acceptedAtomicTxDB.Get(txID[:])
 	if err != nil {
 		return nil, 0, err
 	}
-	return a.ParseTxBytes(indexedTxBytes)
-}
-
-func (a *atomicTxRepository) ParseTxBytes(bytes []byte) (*Tx, uint64, error) {
-	if len(bytes) == 0 || len(bytes) < wrappers.LongLen {
-		return nil, 0, nil
+	if len(indexedTxBytes) < wrappers.LongLen {
+		return nil, 0, fmt.Errorf("acceptedAtomicTxDB entry too short: %d", len(indexedTxBytes))
 	}
 
-	packer := wrappers.Packer{Bytes: bytes}
+	packer := wrappers.Packer{Bytes: indexedTxBytes}
 	height := packer.UnpackLong()
 	txBytes := packer.UnpackBytes()
-
-	if len(txBytes) == 0 {
-		return nil, 0, nil
-	}
-
-	tx := &Tx{}
-	if _, err := a.codec.Unmarshal(txBytes, tx); err != nil {
-		return nil, 0, fmt.Errorf("problem parsing atomic tx from db: %w", err)
-	}
-	if err := tx.Sign(a.codec, nil); err != nil {
-		return nil, 0, fmt.Errorf("problem initializing atomic tx from db: %w", err)
+	tx, err := a.ParseTxBytes(txBytes)
+	if err != nil {
+		return nil, 0, err
 	}
 
 	return tx, height, nil
 }
 
-func (a *atomicTxRepository) ParseTxsBytes(bytes []byte) ([]*Tx, error) {
-	if len(bytes) == 0 || len(bytes) < wrappers.ShortLen {
-		return nil, nil
-	}
-
-	packer := wrappers.Packer{Bytes: bytes}
-	count := packer.UnpackShort()
-	txs := make([]*Tx, count)
-
-	if count == 0 {
-		return nil, nil
-	}
-
-	for i := uint16(0); i < count; i++ {
-		txBytes := packer.UnpackBytes()
-		tx := &Tx{}
-		if _, err := a.codec.Unmarshal(txBytes, tx); err != nil {
-			return nil, fmt.Errorf("problem parsing atomic txs from db, txBytesLen=%d, err=%w", len(txBytes), err)
-		}
-		if err := tx.Sign(a.codec, nil); err != nil {
-			return nil, fmt.Errorf("problem initializing atomic txs from db, txBytesLen=%d, err=%w", len(txBytes), err)
-		}
-		txs[i] = tx
-	}
-	return txs, nil
-}
-
+// GetByHeight queries [acceptedHeightAtomicTxDB] for atomic txs that were accepted
+// on the block specified by [height] and parses them into [*Tx] objects, returning
+// them along with an optional error.
 func (a *atomicTxRepository) GetByHeight(height uint64) ([]*Tx, error) {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
@@ -187,16 +154,45 @@ func (a *atomicTxRepository) GetByHeight(height uint64) ([]*Tx, error) {
 		return nil, err
 	}
 
-	return a.ParseTxsBytes(txsBytes)
+	unpacker := wrappers.Packer{Bytes: txsBytes}
+	txCount := unpacker.UnpackShort()
+	txs := make([]*Tx, txCount)
+	for i := 0; i < int(txCount); i++ {
+		tx, err := a.ParseTxBytes(unpacker.UnpackBytes())
+		if err != nil {
+			return nil, err
+		}
+		txs[i] = tx
+	}
+	return txs, nil
 }
 
+// ParseTxBytes parses [bytes] to a [*Tx] object using the codec provided to the
+// atomicTxRepository.
+func (a *atomicTxRepository) ParseTxBytes(bytes []byte) (*Tx, error) {
+	if  len(bytes) < wrappers.LongLen {
+		return nil, fmt.Errorf("bytes too short to parse atomic tx: %d", len(bytes))
+	}
+
+	tx := &Tx{}
+	if _, err := a.codec.Unmarshal(bytes, tx); err != nil {
+		return nil, fmt.Errorf("problem parsing atomic tx from db: %w", err)
+	}
+	if err := tx.Sign(a.codec, nil); err != nil {
+		return nil, fmt.Errorf("problem initializing atomic tx from db: %w", err)
+	}
+
+	return tx, nil
+}
+
+// Write updates [txID] => [height][txBytes] and [height] => [txCount][txBytes0][txBytes1]...
+// records for all atomic txs specified in [txs], and returns an optional error.
 func (a *atomicTxRepository) Write(height uint64, txs []*Tx) error {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 
 	// 4 bytes for num representing number of transactions
-	totalPackerLen := wrappers.ShortLen
-	packer := wrappers.Packer{Bytes: make([]byte, totalPackerLen), MaxSize: 1024 * 1024}
+	packer := wrappers.Packer{Bytes: make([]byte, wrappers.ShortLen), MaxSize: atomicTxsMaxLenBytes}
 	packer.PackShort(uint16(len(txs)))
 
 	for _, tx := range txs {
@@ -220,6 +216,9 @@ func (a *atomicTxRepository) Write(height uint64, txs []*Tx) error {
 	return a.acceptedHeightAtomicTxDB.Put(heightBytes, packer.Bytes)
 }
 
+// IterateByHeight returns a new iterator on acceptedHeightAtomicTxDB starting at
+// [startHeight]. This iterator can be used to fetch all atomic transactions accepted on
+// blocks >= [startHeight].
 func (a *atomicTxRepository) IterateByHeight(startHeight uint64) database.Iterator {
 	startHeightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(startHeightBytes, startHeight)
