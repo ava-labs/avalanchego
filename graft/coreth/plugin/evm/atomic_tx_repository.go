@@ -77,13 +77,12 @@ func (a *atomicTxRepository) Initialize() error {
 		if err != nil {
 			return err
 		}
-		txID := tx.ID()
 
 		// map [height] => tx bytes
 		// NOTE: this assumes there is only one atomic tx / height.
 		// This code should be modified if we need to rebuild the height
 		// index and there may be multiple atomic tx per block height.
-		keyPacker := wrappers.Packer{Bytes: make([]byte, wrappers.LongLen+len(txID))}
+		keyPacker := wrappers.Packer{Bytes: make([]byte, wrappers.LongLen)}
 		keyPacker.PackLong(height)
 		txs := []*Tx{tx}
 		txsBytes, err := a.codec.Marshal(codecVersion, txs)
