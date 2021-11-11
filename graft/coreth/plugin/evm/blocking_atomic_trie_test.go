@@ -11,7 +11,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
@@ -19,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/coreth/core/state"
-	"github.com/ava-labs/coreth/ethdb/memorydb"
 	"github.com/ava-labs/coreth/params"
 	"github.com/stretchr/testify/assert"
 )
@@ -95,7 +93,7 @@ func testDataExportTx() *TestAtomicTx {
 }
 
 func Test_BlockingAtomicTrie(t *testing.T) {
-	db := memorydb.New()
+	db := memdb.New()
 	acceptedAtomicTxDB := memdb.New()
 
 	codec := codec.NewDefaultManager()
@@ -123,15 +121,17 @@ func Test_BlockingAtomicTrie(t *testing.T) {
 	err = acceptedAtomicTxDB.Put(txID[:], txBytes)
 	assert.NoError(t, err)
 
-	atomicTrie, err := NewBlockingAtomicTrie(db)
+	repo := newAtomicTxRepository(db, Codec)
+	atomicTrie, err := NewBlockingAtomicTrie(Database{db}, repo)
 	assert.NoError(t, err)
 
 	dbCommitFn := func() error {
 		return nil
 	}
 
-	chainFacade := newTestChainFacade(newAtomicBlockFacade(0, common.Hash{}, nil), nil)
-	doneChan := atomicTrie.Initialize(chainFacade, dbCommitFn, memdb.New().NewIterator(), Codec)
+	doneChan := atomicTrie.Initialize( /*lastAcceptedBlockNumber*/ 0, dbCommitFn, Codec)
+	err = <-doneChan
+	assert.NoError(t, err)
 	_, open := <-doneChan
 	assert.False(t, open)
 	assert.NotNil(t, doneChan)
