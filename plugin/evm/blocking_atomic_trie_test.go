@@ -1,11 +1,13 @@
 package evm
 
 import (
-	"encoding/binary"
 	"math/big"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/codec"
+
+	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 
@@ -26,6 +28,14 @@ type TestAtomicTx struct {
 	avax.Metadata
 	BlockchainID  ids.ID           `serialize:"true"`
 	AtomicRequest *atomic.Requests `serialize:"true"`
+}
+
+func (t *TestAtomicTx) Bytes() []byte {
+	b, err := rlp.EncodeToBytes(t)
+	if err != nil {
+		panic(err)
+	}
+	return b
 }
 
 func (t *TestAtomicTx) GasUsed() (uint64, error) {
@@ -60,9 +70,9 @@ func (t *TestAtomicTx) EVMStateTransfer(ctx *snow.Context, state *state.StateDB)
 	panic("implement me")
 }
 
-func testDataImportTx() *TestAtomicTx {
+func testDataImportTx() *Tx {
 	blockchainID := ids.GenerateTestID()
-	return &TestAtomicTx{
+	return &Tx{UnsignedAtomicTx: &TestAtomicTx{
 		BlockchainID: blockchainID,
 		AtomicRequest: &atomic.Requests{
 			PutRequests: []*atomic.Element{
@@ -76,52 +86,45 @@ func testDataImportTx() *TestAtomicTx {
 				},
 			},
 		},
-	}
+	}}
 }
 
-func testDataExportTx() *TestAtomicTx {
+func testDataExportTx() *Tx {
 	blockchainID := ids.GenerateTestID()
-	return &TestAtomicTx{
+	return &Tx{UnsignedAtomicTx: &TestAtomicTx{
 		BlockchainID: blockchainID,
 		AtomicRequest: &atomic.Requests{
 			RemoveRequests: [][]byte{
 				utils.RandomBytes(32),
 				utils.RandomBytes(32),
 			},
-		},
+		}},
 	}
 }
 
 func Test_BlockingAtomicTrie(t *testing.T) {
 	db := memdb.New()
-	acceptedAtomicTxDB := memdb.New()
 
-	codec := codec.NewDefaultManager()
-	codecVersion := uint16(0)
+	Codec := codec.NewDefaultManager()
 
 	c := linearcodec.NewDefault()
 	errs := wrappers.Errs{}
 	errs.Add(
 		c.RegisterType(&TestAtomicTx{}),
-		codec.RegisterCodec(codecVersion, c),
+		Codec.RegisterCodec(codecVersion, c),
 	)
 	if errs.Errored() {
 		panic(errs.Err)
 	}
-
-	tx := testDataImportTx()
-	b, err := codec.Marshal(codecVersion, tx)
-	assert.NoError(t, err)
-
-	txBytes := make([]byte, wrappers.LongLen, wrappers.LongLen+len(b))
-	binary.BigEndian.PutUint64(txBytes, 0)
-	txBytes = append(txBytes, b...)
-
-	txID := ids.GenerateTestID()
-	err = acceptedAtomicTxDB.Put(txID[:], txBytes)
-	assert.NoError(t, err)
-
 	repo := newAtomicTxRepository(db, Codec)
+	txs := []*Tx{testDataExportTx(), testDataImportTx()}
+
+	for height, tx := range txs {
+		assert.NotNil(t, tx.Bytes())
+		err := repo.Write(uint64(height), []*Tx{tx})
+		assert.NoError(t, err)
+	}
+
 	atomicTrie, err := NewBlockingAtomicTrie(Database{db}, repo)
 	assert.NoError(t, err)
 
@@ -129,7 +132,7 @@ func Test_BlockingAtomicTrie(t *testing.T) {
 		return nil
 	}
 
-	doneChan := atomicTrie.Initialize( /*lastAcceptedBlockNumber*/ 0, dbCommitFn, Codec)
+	doneChan := atomicTrie.Initialize(dbCommitFn)
 	err = <-doneChan
 	assert.NoError(t, err)
 	_, open := <-doneChan

@@ -381,7 +381,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	resultChan := vm.atomicTrie.Initialize(lastAccepted.NumberU64(), vm.db.Commit, vm.codec)
+	resultChan := vm.atomicTrie.Initialize(vm.db.Commit)
 
 	startTime := time.Now()
 	err, open := <-resultChan
