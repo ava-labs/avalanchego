@@ -128,9 +128,17 @@ func (a *atomicTxRepository) GetByTxID(txID ids.ID) (*Tx, uint64, error) {
 }
 
 func (a *atomicTxRepository) ParseTxBytes(bytes []byte) (*Tx, uint64, error) {
+	if len(bytes) == 0 || len(bytes) < wrappers.LongLen {
+		return nil, 0, nil
+	}
+
 	packer := wrappers.Packer{Bytes: bytes}
 	height := packer.UnpackLong()
 	txBytes := packer.UnpackBytes()
+
+	if len(txBytes) == 0 {
+		return nil, 0, nil
+	}
 
 	tx := &Tx{}
 	if _, err := a.codec.Unmarshal(txBytes, tx); err != nil {
@@ -144,17 +152,27 @@ func (a *atomicTxRepository) ParseTxBytes(bytes []byte) (*Tx, uint64, error) {
 }
 
 func (a *atomicTxRepository) ParseTxsBytes(bytes []byte) ([]*Tx, error) {
+	if len(bytes) == 0 || len(bytes) < wrappers.ShortLen {
+		return nil, nil
+	}
+
 	packer := wrappers.Packer{Bytes: bytes}
 	count := packer.UnpackShort()
 	txs := make([]*Tx, count)
+
+	if count == 0 {
+		return nil, nil
+	}
+
+	fmt.Println(count)
 	for i := uint16(0); i < count; i++ {
 		txBytes := packer.UnpackBytes()
 		tx := &Tx{}
 		if _, err := a.codec.Unmarshal(txBytes, tx); err != nil {
-			return nil, fmt.Errorf("problem parsing atomic txs from db: %w", err)
+			return nil, fmt.Errorf("problem parsing atomic txs from db, txBytesLen=%d, err=%w", len(txBytes), err)
 		}
 		if err := tx.Sign(a.codec, nil); err != nil {
-			return nil, fmt.Errorf("problem initializing atomic txs from db: %w", err)
+			return nil, fmt.Errorf("problem initializing atomic txs from db, txBytesLen=%d, err=%w", len(txBytes), err)
 		}
 		txs[i] = tx
 	}
@@ -169,17 +187,30 @@ func (a *atomicTxRepository) GetByHeight(height uint64) ([]*Tx, error) {
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("height", height)
 	return a.ParseTxsBytes(txsBytes)
 }
 
 func (a *atomicTxRepository) Write(height uint64, txs []*Tx) error {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
-	packer := wrappers.Packer{Bytes: make([]byte, wrappers.ShortLen)}
+
+	// 4 bytes for num representing number of transactions
+	totalPackerLen := wrappers.ShortLen
+	for _, tx := range txs {
+		// for each tx
+		// 4 bytes for number of tx byte length + the number of bytes for tx bytes itself
+		totalPackerLen += wrappers.IntLen + len(tx.Bytes())
+	}
+	fmt.Println("height", height, "packerlen", totalPackerLen)
+	packer := wrappers.Packer{Bytes: make([]byte, totalPackerLen), MaxSize: 1024 * 1024}
 	packer.PackShort(uint16(len(txs)))
 
 	for _, tx := range txs {
-		txBytes := tx.Bytes()
+		txBytes, err := a.codec.Marshal(codecVersion, tx)
+		if err != nil {
+			return err
+		}
 
 		// map txID => [height]+[tx bytes]
 		heightTxPacker := wrappers.Packer{Bytes: make([]byte, 12+len(txBytes))}

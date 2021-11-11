@@ -2,7 +2,6 @@ package types
 
 import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -12,7 +11,7 @@ import (
 type AtomicTrie interface {
 	// Initialize initializes the AtomicTrie from the last indexed
 	// block to the last accepted block in the chain
-	Initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error, codec codec.Manager) <-chan error
+	Initialize(dbCommitFn func() error) <-chan error
 
 	// Index indexes the given atomicOps at the specified block height
 	// Returns an optional root hash and an optional error
