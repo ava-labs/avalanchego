@@ -104,7 +104,6 @@ var (
 	lastAcceptedKey        = []byte("last_accepted_key")
 	acceptedPrefix         = []byte("snowman_accepted")
 	ethDBPrefix            = []byte("ethdb")
-	atomicTxPrefix         = []byte("atomicTxDB")
 	pruneRejectedBlocksKey = []byte("pruned_rejected_blocks")
 )
 
@@ -176,8 +175,8 @@ type VM struct {
 	// [acceptedBlockDB] is the database to store the last accepted
 	// block.
 	acceptedBlockDB database.Database
-	// [acceptedAtomicTxDB] maintains an index of accepted atomic txs.
-	acceptedAtomicTxDB database.Database
+
+	atomicTxRepository AtomicTxRepository
 
 	builder *blockBuilder
 
@@ -271,7 +270,6 @@ func (vm *VM) Initialize(
 	vm.chaindb = Database{prefixdb.NewNested(ethDBPrefix, baseDB)}
 	vm.db = versiondb.New(baseDB)
 	vm.acceptedBlockDB = prefixdb.New(acceptedPrefix, vm.db)
-	vm.acceptedAtomicTxDB = prefixdb.New(atomicTxPrefix, vm.db)
 	g := new(core.Genesis)
 	if err := json.Unmarshal(genesisBytes, g); err != nil {
 		return err
@@ -361,6 +359,16 @@ func (vm *VM) Initialize(
 	}
 	vm.chain = ethChain
 	lastAccepted := vm.chain.LastAcceptedBlock()
+
+	vm.atomicTxRepository = newAtomicTxRepository(vm.db, vm.codec)
+	if err = vm.atomicTxRepository.Initialize(); err != nil {
+		return err
+	}
+
+	err = vm.db.Commit()
+	if err != nil {
+		return err
+	}
 
 	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
 	vm.handleGasPriceUpdates()
@@ -809,32 +817,10 @@ func (vm *VM) conflicts(inputs ids.Set, ancestor *Block) error {
 	return nil
 }
 
-// getAcceptedAtomicTx attempts to get [txID] from the database.
-func (vm *VM) getAcceptedAtomicTx(txID ids.ID) (*Tx, uint64, error) {
-	indexedTxBytes, err := vm.acceptedAtomicTxDB.Get(txID[:])
-	if err != nil {
-		return nil, 0, err
-	}
-
-	packer := wrappers.Packer{Bytes: indexedTxBytes}
-	height := packer.UnpackLong()
-	txBytes := packer.UnpackBytes()
-
-	tx := &Tx{}
-	if _, err := vm.codec.Unmarshal(txBytes, tx); err != nil {
-		return nil, 0, fmt.Errorf("problem parsing atomic transaction from db: %w", err)
-	}
-	if err := tx.Sign(vm.codec, nil); err != nil {
-		return nil, 0, fmt.Errorf("problem initializing atomic transaction from db: %w", err)
-	}
-
-	return tx, height, nil
-}
-
 // getAtomicTx returns the requested transaction, status, and height.
 // If the status is Unknown, then the returned transaction will be nil.
 func (vm *VM) getAtomicTx(txID ids.ID) (*Tx, Status, uint64, error) {
-	if tx, height, err := vm.getAcceptedAtomicTx(txID); err == nil {
+	if tx, height, err := vm.atomicTxRepository.GetByTxID(txID); err == nil {
 		return tx, Accepted, height, nil
 	} else if err != database.ErrNotFound {
 		return nil, Unknown, 0, err
@@ -849,20 +835,6 @@ func (vm *VM) getAtomicTx(txID ids.ID) (*Tx, Status, uint64, error) {
 	default:
 		return nil, Unknown, 0, nil
 	}
-}
-
-// writeAtomicTx writes indexes [tx] in [blk]
-func (vm *VM) writeAtomicTx(blk *Block, tx *Tx) error {
-	// 8 bytes
-	height := blk.ethBlock.NumberU64()
-	// 4 + len(txBytes)
-	txBytes := tx.Bytes()
-	packer := wrappers.Packer{Bytes: make([]byte, 12+len(txBytes))}
-	packer.PackLong(height)
-	packer.PackBytes(txBytes)
-	txID := tx.ID()
-
-	return vm.acceptedAtomicTxDB.Put(txID[:], packer.Bytes)
 }
 
 // ParseAddress takes in an address and produces the ID of the chain it's for

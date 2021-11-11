@@ -130,7 +130,9 @@ func (b *Block) Accept() error {
 	vm.mempool.RemoveTx(tx.ID())
 
 	// Save the accepted atomic transaction
-	if err := vm.writeAtomicTx(b, tx); err != nil {
+	txs := make([]*Tx, 0, 1)
+	txs = append(txs, tx)
+	if err := vm.atomicTxRepository.Write(b.Height(), txs); err != nil {
 		return err
 	}
 
@@ -179,7 +181,7 @@ func (b *Block) Parent() ids.ID {
 
 // Height implements the snowman.Block interface
 func (b *Block) Height() uint64 {
-	return b.ethBlock.Number().Uint64()
+	return b.ethBlock.NumberU64()
 }
 
 // Timestamp implements the snowman.Block interface
