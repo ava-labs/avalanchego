@@ -116,7 +116,7 @@ type Node struct {
 	// Manages validator benching
 	benchlistManager benchlist.Manager
 
-	uptimeManager uptime.Manager
+	uptimeCalculator uptime.LockedCalculator
 
 	// dispatcher for events as they happen in consensus
 	DecisionDispatcher  *triggers.EventDispatcher
@@ -202,7 +202,7 @@ func (n *Node) initNetworking() error {
 	n.Config.BenchlistConfig.StakingEnabled = n.Config.EnableStaking
 	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
 
-	n.uptimeManager = uptime.NewManager(uptime.UnreadyState())
+	n.uptimeCalculator = uptime.NewLockedCalculator()
 
 	consensusRouter := n.Config.ConsensusRouter
 	if !n.Config.EnableStaking {
@@ -253,7 +253,7 @@ func (n *Node) initNetworking() error {
 	n.Config.NetworkConfig.TLSConfig = tlsConfig
 	n.Config.NetworkConfig.TLSKey = tlsKey
 	n.Config.NetworkConfig.WhitelistedSubnets = n.Config.WhitelistedSubnets
-	n.Config.NetworkConfig.UptimeManager = n.uptimeManager
+	n.Config.NetworkConfig.UptimeCalculator = n.uptimeCalculator
 
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
@@ -674,25 +674,25 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		n.vmManager.RegisterFactory(platformvm.ID, &platformvm.Factory{
-			Chains:                n.chainManager,
-			Validators:            vdrs,
-			UptimeManager:         n.uptimeManager,
-			StakingEnabled:        n.Config.EnableStaking,
-			WhitelistedSubnets:    n.Config.WhitelistedSubnets,
-			TxFee:                 n.Config.TxFee,
-			CreateAssetTxFee:      n.Config.CreateAssetTxFee,
-			CreateSubnetTxFee:     n.Config.CreateSubnetTxFee,
-			CreateBlockchainTxFee: n.Config.CreateBlockchainTxFee,
-			UptimePercentage:      n.Config.UptimeRequirement,
-			MinValidatorStake:     n.Config.MinValidatorStake,
-			MaxValidatorStake:     n.Config.MaxValidatorStake,
-			MinDelegatorStake:     n.Config.MinDelegatorStake,
-			MinDelegationFee:      n.Config.MinDelegationFee,
-			MinStakeDuration:      n.Config.MinStakeDuration,
-			MaxStakeDuration:      n.Config.MaxStakeDuration,
-			StakeMintingPeriod:    n.Config.StakeMintingPeriod,
-			ApricotPhase3Time:     version.GetApricotPhase3Time(n.Config.NetworkID),
-			ApricotPhase4Time:     version.GetApricotPhase4Time(n.Config.NetworkID),
+			Chains:                 n.chainManager,
+			Validators:             vdrs,
+			UptimeLockedCalculator: n.uptimeCalculator,
+			StakingEnabled:         n.Config.EnableStaking,
+			WhitelistedSubnets:     n.Config.WhitelistedSubnets,
+			TxFee:                  n.Config.TxFee,
+			CreateAssetTxFee:       n.Config.CreateAssetTxFee,
+			CreateSubnetTxFee:      n.Config.CreateSubnetTxFee,
+			CreateBlockchainTxFee:  n.Config.CreateBlockchainTxFee,
+			UptimePercentage:       n.Config.UptimeRequirement,
+			MinValidatorStake:      n.Config.MinValidatorStake,
+			MaxValidatorStake:      n.Config.MaxValidatorStake,
+			MinDelegatorStake:      n.Config.MinDelegatorStake,
+			MinDelegationFee:       n.Config.MinDelegationFee,
+			MinStakeDuration:       n.Config.MinStakeDuration,
+			MaxStakeDuration:       n.Config.MaxStakeDuration,
+			StakeMintingPeriod:     n.Config.StakeMintingPeriod,
+			ApricotPhase3Time:      version.GetApricotPhase3Time(n.Config.NetworkID),
+			ApricotPhase4Time:      version.GetApricotPhase4Time(n.Config.NetworkID),
 		}),
 		n.vmManager.RegisterFactory(avm.ID, &avm.Factory{
 			TxFee:            n.Config.TxFee,

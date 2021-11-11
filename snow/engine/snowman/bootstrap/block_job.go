@@ -88,7 +88,7 @@ func (b *blockJob) Execute() error {
 		}
 
 		b.numAccepted.Inc()
-		b.log.Trace("accepting block %s in bootstrapping", blkID)
+		b.log.Trace("accepting block (%s, %d) in bootstrapping", blkID, b.blk.Height())
 		if err := b.blk.Accept(); err != nil {
 			b.log.Debug("block %s failed to accept during bootstrapping due to %s", blkID, err)
 			return fmt.Errorf("failed to accept block in bootstrapping: %w", err)

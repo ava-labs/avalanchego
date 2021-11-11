@@ -76,7 +76,6 @@ func (c *client) ImportUser(user api.UserPass, account []byte) (bool, error) {
 	return res.Success, err
 }
 
-// DeleteUser removes [user] from the node's keystore users
 func (c *client) DeleteUser(user api.UserPass) (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.requester.SendRequest("deleteUser", &user, res)
