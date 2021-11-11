@@ -130,6 +130,7 @@ func (i *blockingAtomicTrie) initialize(lastAcceptedBlockNumber uint64, dbCommit
 		// height == nextHeight
 		txs, err := i.repo.ParseTxsBytes(it.Value())
 		if err != nil {
+			log.Error("bad txs bytes", "err", err)
 			return err
 		}
 		for _, tx := range txs {
@@ -198,9 +199,9 @@ func (i *blockingAtomicTrie) index(height uint64, atomicOps map[ids.ID]*atomic.R
 	}
 	// early return if block height is not divisible by [commitHeightInterval]
 	if height%i.commitHeightInterval != 0 {
-		return i.commit(height)
+		return common.Hash{}, nil
 	}
-	return common.Hash{}, nil
+	return i.commit(height)
 }
 
 func (i *blockingAtomicTrie) commit(height uint64) (common.Hash, error) {
