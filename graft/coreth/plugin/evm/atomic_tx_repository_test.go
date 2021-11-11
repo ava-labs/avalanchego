@@ -6,8 +6,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -74,10 +72,24 @@ func (t TestTx) EVMStateTransfer(ctx *snow.Context, state *state.StateDB) error 
 	panic("implement me")
 }
 
+func prepareCodecForTest() codec.Manager {
+	codec := codec.NewDefaultManager()
+	c := linearcodec.NewDefault()
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		c.RegisterType(&TestTx{}),
+		codec.RegisterCodec(codecVersion, c),
+	)
+	if errs.Errored() {
+		panic(errs.Err)
+	}
+	return codec
+}
+
 func Test_AtomicTxRepository_Initialize(t *testing.T) {
 	db := memdb.New()
-
-	prepareCodecForTest()
+	codec := prepareCodecForTest()
 
 	// write in the old database in legacy style
 	txDB := prefixdb.New(atomicTxIDDBPrefix, db) // tx DB indexed by txID => height+txbytes
@@ -90,7 +102,7 @@ func Test_AtomicTxRepository_Initialize(t *testing.T) {
 			},
 		}
 
-		txBytes, err := Codec.Marshal(codecVersion, tx)
+		txBytes, err := codec.Marshal(codecVersion, tx)
 		assert.NoError(t, err)
 		assert.NotNil(t, txBytes)
 
@@ -104,49 +116,22 @@ func Test_AtomicTxRepository_Initialize(t *testing.T) {
 		txIDs[i] = id
 	}
 
-	repo := newAtomicTxRepository(db, Codec)
+	repo := newAtomicTxRepository(db, codec)
 	err := repo.Initialize()
 	assert.NoError(t, err)
 
 	for i := 0; i < 100; i++ {
-		tx, err := repo.GetByHeight(uint64(i))
+		txs, err := repo.GetByHeight(uint64(i))
 		assert.NoError(t, err)
-
-		assert.Equal(t, txIDs[i], tx[0].ID())
-	}
-}
-
-func prepareCodecForTest() {
-	Codec = codec.NewDefaultManager()
-	c := linearcodec.NewDefault()
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		c.RegisterType(&UnsignedImportTx{}),
-		c.RegisterType(&UnsignedExportTx{}),
-	)
-	c.SkipRegistrations(3)
-	errs.Add(
-		c.RegisterType(&secp256k1fx.TransferInput{}),
-		c.RegisterType(&secp256k1fx.MintOutput{}),
-		c.RegisterType(&secp256k1fx.TransferOutput{}),
-		c.RegisterType(&secp256k1fx.MintOperation{}),
-		c.RegisterType(&secp256k1fx.Credential{}),
-		c.RegisterType(&secp256k1fx.Input{}),
-		c.RegisterType(&secp256k1fx.OutputOwners{}),
-		c.RegisterType(&TestTx{}),
-		Codec.RegisterCodec(codecVersion, c),
-	)
-
-	if errs.Errored() {
-		panic(errs.Err)
+		assert.Len(t, txs, 1)
+		assert.Equal(t, txIDs[i], txs[0].ID())
 	}
 }
 
 func Test_AtomicRepository_Read_Write(t *testing.T) {
 	db := memdb.New()
-	prepareCodecForTest()
-	repo := newAtomicTxRepository(db, Codec)
+	codec := prepareCodecForTest()
+	repo := newAtomicTxRepository(db, codec)
 
 	txIDs := make([]ids.ID, 100)
 	for i := 0; i < 100; i++ {
@@ -165,9 +150,9 @@ func Test_AtomicRepository_Read_Write(t *testing.T) {
 
 	// check we can get them all by height
 	for i := 0; i < 100; i++ {
-		tx, err := repo.GetByHeight(uint64(i))
+		txs, err := repo.GetByHeight(uint64(i))
 		assert.NoError(t, err)
-		assert.Equal(t, tx[0].ID(), txIDs[i])
+		assert.Equal(t, txs[0].ID(), txIDs[i])
 	}
 
 	// check we can get them all by ID
