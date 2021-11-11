@@ -146,6 +146,10 @@ func (b *Block) Accept() error {
 		}
 	}
 
+	if err := vm.atomicTxRepository.Write(b.Height(), b.atomicTxs); err != nil {
+		return err
+	}
+
 	// If [b] is a bonus block, then we commit the database without applying the requests from
 	// the atmoic transactions to shared memory.
 	if bonusBlocks.Contains(b.id) {
@@ -190,7 +194,7 @@ func (b *Block) Parent() ids.ID {
 
 // Height implements the snowman.Block interface
 func (b *Block) Height() uint64 {
-	return b.ethBlock.Number().Uint64()
+	return b.ethBlock.NumberU64()
 }
 
 // Timestamp implements the snowman.Block interface
