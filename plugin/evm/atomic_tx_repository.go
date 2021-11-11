@@ -38,7 +38,7 @@ type AtomicTxRepository interface {
 type atomicTxRepository struct {
 	// [acceptedAtomicTxDB] maintains an index of [txID] => [atomic tx] for all accepted atomic txs.
 	acceptedAtomicTxDB database.Database
-	// [acceptedHeightAtomicTxDB] maintains an index of block height => [atomic tx].
+	// [acceptedHeightAtomicTxDB] maintains an index of block height => [atomic tx count][atomic tx0][atomic tx1]...
 	acceptedHeightAtomicTxDB database.Database
 	codec                    codec.Manager
 }
