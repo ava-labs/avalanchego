@@ -5,7 +5,6 @@ package indexer
 
 import (
 	"testing"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -25,10 +24,10 @@ func (mc *mockClient) SendRequest(method string, _ interface{}, reply interface{
 
 func TestIndexClient(t *testing.T) {
 	assert := assert.New(t)
-	client := NewClient("http://localhost:9650", "/ext/index/C/block", time.Minute)
+	client := client{}
 	{
 		// Test GetIndex
-		client.EndpointRequester = &mockClient{
+		client.requester = &mockClient{
 			assert:         assert,
 			expectedMethod: "getIndex",
 			onSendRequestF: func(reply interface{}) error {
@@ -43,7 +42,7 @@ func TestIndexClient(t *testing.T) {
 	{
 		// Test GetLastAccepted
 		id := ids.GenerateTestID()
-		client.EndpointRequester = &mockClient{
+		client.requester = &mockClient{
 			assert:         assert,
 			expectedMethod: "getLastAccepted",
 			onSendRequestF: func(reply interface{}) error {
@@ -58,7 +57,7 @@ func TestIndexClient(t *testing.T) {
 	{
 		// Test GetContainerRange
 		id := ids.GenerateTestID()
-		client.EndpointRequester = &mockClient{
+		client.requester = &mockClient{
 			assert:         assert,
 			expectedMethod: "getContainerRange",
 			onSendRequestF: func(reply interface{}) error {
@@ -73,7 +72,7 @@ func TestIndexClient(t *testing.T) {
 	}
 	{
 		// Test IsAccepted
-		client.EndpointRequester = &mockClient{
+		client.requester = &mockClient{
 			assert:         assert,
 			expectedMethod: "isAccepted",
 			onSendRequestF: func(reply interface{}) error {
@@ -88,7 +87,7 @@ func TestIndexClient(t *testing.T) {
 	{
 		// Test GetContainerByID
 		id := ids.GenerateTestID()
-		client.EndpointRequester = &mockClient{
+		client.requester = &mockClient{
 			assert:         assert,
 			expectedMethod: "getContainerByID",
 			onSendRequestF: func(reply interface{}) error {

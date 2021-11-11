@@ -7,6 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"path"
+	"reflect"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -19,7 +23,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-var Tests = []func(*testing.T, Factory){
+type testFunc func(*testing.T, Factory)
+
+var testFuncs = []testFunc{
 	MetricsTest,
 	ParamsTest,
 	NumProcessingTest,
@@ -44,10 +50,16 @@ var Tests = []func(*testing.T, Factory){
 	ErrorOnTransitiveVtxRejectTest,
 }
 
-func ConsensusTest(t *testing.T, factory Factory) {
-	for _, test := range Tests {
-		test(t, factory)
+func runConsensusTests(t *testing.T, factory Factory) {
+	for _, test := range testFuncs {
+		t.Run(getTestName(test), func(tt *testing.T) {
+			test(tt, factory)
+		})
 	}
+}
+
+func getTestName(i interface{}) string {
+	return strings.Split(path.Base(runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()), ".")[1]
 }
 
 func MetricsTest(t *testing.T, factory Factory) {

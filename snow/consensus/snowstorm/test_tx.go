@@ -19,7 +19,7 @@ type TestTx struct {
 }
 
 // Dependencies implements the Tx interface
-func (t *TestTx) Dependencies() []Tx { return t.DependenciesV }
+func (t *TestTx) Dependencies() ([]Tx, error) { return t.DependenciesV, nil }
 
 // InputIDs implements the Tx interface
 func (t *TestTx) InputIDs() []ids.ID { return t.InputIDsV }

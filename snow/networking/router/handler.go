@@ -283,12 +283,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 
 	case message.MultiPut:
 		reqID := msg.Get(message.RequestID).(uint32)
-		containers, ok := msg.Get(message.MultiContainerBytes).([][]byte)
-		if !ok {
-			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse MultiContainerBytes",
-				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
-			return nil
-		}
+		containers := msg.Get(message.MultiContainerBytes).([][]byte)
 		return h.engine.MultiPut(nodeID, reqID, containers)
 
 	case message.Get:

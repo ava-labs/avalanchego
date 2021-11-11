@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -284,18 +285,19 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 
 func defaultVM() (*VM, database.Database, *common.SenderTest) {
 	vm := &VM{Factory: Factory{
-		Chains:                chains.MockManager{},
-		Validators:            validators.NewManager(),
-		TxFee:                 defaultTxFee,
-		CreateSubnetTxFee:     100 * defaultTxFee,
-		CreateBlockchainTxFee: 100 * defaultTxFee,
-		MinValidatorStake:     defaultMinValidatorStake,
-		MaxValidatorStake:     defaultMaxValidatorStake,
-		MinDelegatorStake:     defaultMinDelegatorStake,
-		MinStakeDuration:      defaultMinStakingDuration,
-		MaxStakeDuration:      defaultMaxStakingDuration,
-		StakeMintingPeriod:    defaultMaxStakingDuration,
-		ApricotPhase3Time:     defaultValidateEndTime,
+		Chains:                 chains.MockManager{},
+		UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		Validators:             validators.NewManager(),
+		TxFee:                  defaultTxFee,
+		CreateSubnetTxFee:      100 * defaultTxFee,
+		CreateBlockchainTxFee:  100 * defaultTxFee,
+		MinValidatorStake:      defaultMinValidatorStake,
+		MaxValidatorStake:      defaultMaxValidatorStake,
+		MinDelegatorStake:      defaultMinDelegatorStake,
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
+		StakeMintingPeriod:     defaultMaxStakingDuration,
+		ApricotPhase3Time:      defaultValidateEndTime,
 	}}
 
 	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
@@ -361,15 +363,16 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 	}
 
 	vm := &VM{Factory: Factory{
-		Chains:             chains.MockManager{},
-		Validators:         validators.NewManager(),
-		TxFee:              defaultTxFee,
-		MinValidatorStake:  defaultMinValidatorStake,
-		MaxValidatorStake:  defaultMaxValidatorStake,
-		MinDelegatorStake:  defaultMinDelegatorStake,
-		MinStakeDuration:   defaultMinStakingDuration,
-		MaxStakeDuration:   defaultMaxStakingDuration,
-		StakeMintingPeriod: defaultMaxStakingDuration,
+		Chains:                 chains.MockManager{},
+		Validators:             validators.NewManager(),
+		UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		TxFee:                  defaultTxFee,
+		MinValidatorStake:      defaultMinValidatorStake,
+		MaxValidatorStake:      defaultMaxValidatorStake,
+		MinDelegatorStake:      defaultMinDelegatorStake,
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
+		StakeMintingPeriod:     defaultMaxStakingDuration,
 	}}
 
 	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
@@ -1769,11 +1772,12 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 
 	firstDB := db.NewPrefixDBManager([]byte{})
 	firstVM := &VM{Factory: Factory{
-		Chains:             chains.MockManager{},
-		Validators:         validators.NewManager(),
-		MinStakeDuration:   defaultMinStakingDuration,
-		MaxStakeDuration:   defaultMaxStakingDuration,
-		StakeMintingPeriod: defaultMaxStakingDuration,
+		Chains:                 chains.MockManager{},
+		Validators:             validators.NewManager(),
+		UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
+		StakeMintingPeriod:     defaultMaxStakingDuration,
 	}}
 	firstVM.clock.Set(defaultGenesisTime)
 	firstCtx := defaultContext()
@@ -1850,11 +1854,12 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	firstCtx.Lock.Unlock()
 
 	secondVM := &VM{Factory: Factory{
-		Chains:             chains.MockManager{},
-		Validators:         validators.NewManager(),
-		MinStakeDuration:   defaultMinStakingDuration,
-		MaxStakeDuration:   defaultMaxStakingDuration,
-		StakeMintingPeriod: defaultMaxStakingDuration,
+		Chains:                 chains.MockManager{},
+		Validators:             validators.NewManager(),
+		UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
+		StakeMintingPeriod:     defaultMaxStakingDuration,
 	}}
 
 	secondVM.clock.Set(defaultGenesisTime)
@@ -1889,11 +1894,12 @@ func TestRestartFullyAccepted(t *testing.T) {
 	db := manager.NewMemDB(version.DefaultVersion1_0_0)
 	firstDB := db.NewPrefixDBManager([]byte{})
 	firstVM := &VM{Factory: Factory{
-		Chains:             chains.MockManager{},
-		Validators:         validators.NewManager(),
-		MinStakeDuration:   defaultMinStakingDuration,
-		MaxStakeDuration:   defaultMaxStakingDuration,
-		StakeMintingPeriod: defaultMaxStakingDuration,
+		Chains:                 chains.MockManager{},
+		Validators:             validators.NewManager(),
+		UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
+		StakeMintingPeriod:     defaultMaxStakingDuration,
 	}}
 
 	firstVM.clock.Set(defaultGenesisTime)
@@ -1965,11 +1971,12 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstCtx.Lock.Unlock()
 
 	secondVM := &VM{Factory: Factory{
-		Chains:             chains.MockManager{},
-		Validators:         validators.NewManager(),
-		MinStakeDuration:   defaultMinStakingDuration,
-		MaxStakeDuration:   defaultMaxStakingDuration,
-		StakeMintingPeriod: defaultMaxStakingDuration,
+		Chains:                 chains.MockManager{},
+		Validators:             validators.NewManager(),
+		UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
+		StakeMintingPeriod:     defaultMaxStakingDuration,
 	}}
 
 	secondVM.clock.Set(defaultGenesisTime)
@@ -2010,11 +2017,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	vm := &VM{Factory: Factory{
-		Chains:             chains.MockManager{},
-		Validators:         validators.NewManager(),
-		MinStakeDuration:   defaultMinStakingDuration,
-		MaxStakeDuration:   defaultMaxStakingDuration,
-		StakeMintingPeriod: defaultMaxStakingDuration,
+		Chains:                 chains.MockManager{},
+		Validators:             validators.NewManager(),
+		UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
+		StakeMintingPeriod:     defaultMaxStakingDuration,
 	}}
 
 	vm.clock.Set(defaultGenesisTime)
@@ -2238,11 +2246,12 @@ func TestUnverifiedParent(t *testing.T) {
 	dbManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 
 	vm := &VM{Factory: Factory{
-		Chains:             chains.MockManager{},
-		Validators:         validators.NewManager(),
-		MinStakeDuration:   defaultMinStakingDuration,
-		MaxStakeDuration:   defaultMaxStakingDuration,
-		StakeMintingPeriod: defaultMaxStakingDuration,
+		Chains:                 chains.MockManager{},
+		Validators:             validators.NewManager(),
+		UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
+		StakeMintingPeriod:     defaultMaxStakingDuration,
 	}}
 
 	vm.clock.Set(defaultGenesisTime)
@@ -2391,11 +2400,12 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 
 	vm := &VM{Factory: Factory{
-		Chains:             chains.MockManager{},
-		Validators:         validators.NewManager(),
-		MinStakeDuration:   defaultMinStakingDuration,
-		MaxStakeDuration:   defaultMaxStakingDuration,
-		StakeMintingPeriod: defaultMaxStakingDuration,
+		Chains:                 chains.MockManager{},
+		Validators:             validators.NewManager(),
+		UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
+		StakeMintingPeriod:     defaultMaxStakingDuration,
 	}}
 
 	vm.clock.Set(defaultGenesisTime)

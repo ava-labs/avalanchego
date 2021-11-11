@@ -112,6 +112,12 @@ func TestCodecPackParseGzip(t *testing.T) {
 			fields: map[Field]interface{}{},
 		},
 		{
+			op: UptimePong,
+			fields: map[Field]interface{}{
+				Uptime: uint8(80),
+			},
+		},
+		{
 			op: GetAcceptedFrontier,
 			fields: map[Field]interface{}{
 				ChainID:   id[:],

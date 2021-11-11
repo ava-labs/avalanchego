@@ -201,6 +201,13 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	}
 
 	if _, notRequested := message.UnrequestedOps[op]; notRequested || (op == message.Put && requestID == constants.GossipMsgRequestID) {
+		if chain.ctx.IsExecuting() {
+			cr.log.Debug("dropping %s and skipping queue since the chain is currently executing", op)
+			cr.metrics.droppedRequests.Inc()
+
+			msg.OnFinishedHandling()
+			return
+		}
 		chain.Push(msg)
 		return
 	}
@@ -208,15 +215,26 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	if expectedResponse, isFailed := message.FailedToResponseOps[op]; isFailed {
 		// Create the request ID of the request we sent that this message is in
 		// response to.
-		_, req := cr.clearRequest(expectedResponse, nodeID, chainID, requestID)
+		uniqueRequestID, req := cr.clearRequest(expectedResponse, nodeID, chainID, requestID)
 		if req == nil {
 			// This was a duplicated response.
 			msg.OnFinishedHandling()
 			return
 		}
 
+		// Tell the timeout manager we are no longer expecting a response
+		cr.timeoutManager.RemoveRequest(uniqueRequestID)
+
 		// Pass the failure to the chain
 		chain.Push(msg)
+		return
+	}
+
+	if chain.ctx.IsExecuting() {
+		cr.log.Debug("dropping %s and skipping queue since the chain is currently executing", op)
+		cr.metrics.droppedRequests.Inc()
+
+		msg.OnFinishedHandling()
 		return
 	}
 

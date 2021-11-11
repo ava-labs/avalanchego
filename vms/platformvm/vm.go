@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -32,7 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/uptime"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -86,7 +86,6 @@ type VM struct {
 	metrics
 	avax.AddressManager
 	avax.AtomicUTXOManager
-	uptime.Manager
 	*network
 
 	// Used to get time. Useful for faking time during tests.
@@ -96,6 +95,8 @@ type VM struct {
 	factory crypto.FactorySECP256K1R
 
 	blockBuilder blockBuilder
+
+	uptimeManager uptime.Manager
 
 	// The context of this vm
 	ctx       *snow.Context
@@ -193,7 +194,8 @@ func (vm *VM) Initialize(
 	vm.internalState = is
 
 	// Initialize the utility to track validator uptimes
-	vm.Manager = uptime.NewManager(is)
+	vm.uptimeManager = uptime.NewManager(is)
+	vm.UptimeLockedCalculator.SetCalculator(ctx, vm.uptimeManager)
 
 	if err := vm.updateValidators(true); err != nil {
 		return fmt.Errorf(
@@ -318,7 +320,7 @@ func (vm *VM) Bootstrapped() error {
 		validatorIDs[i] = vdr.ID()
 	}
 
-	if err := vm.StartTracking(validatorIDs); err != nil {
+	if err := vm.uptimeManager.StartTracking(validatorIDs); err != nil {
 		return err
 	}
 	return vm.internalState.Commit()
@@ -344,7 +346,7 @@ func (vm *VM) Shutdown() error {
 			validatorIDs[i] = vdr.ID()
 		}
 
-		if err := vm.Manager.Shutdown(validatorIDs); err != nil {
+		if err := vm.uptimeManager.Shutdown(validatorIDs); err != nil {
 			return err
 		}
 		if err := vm.internalState.Commit(); err != nil {
@@ -468,12 +470,12 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 
 // Connected implements validators.Connector
 func (vm *VM) Connected(vdrID ids.ShortID) error {
-	return vm.Connect(vdrID)
+	return vm.uptimeManager.Connect(vdrID)
 }
 
 // Disconnected implements validators.Connector
 func (vm *VM) Disconnected(vdrID ids.ShortID) error {
-	if err := vm.Disconnect(vdrID); err != nil {
+	if err := vm.uptimeManager.Disconnect(vdrID); err != nil {
 		return err
 	}
 	return vm.internalState.Commit()
@@ -656,7 +658,7 @@ func (vm *VM) getPercentConnected() (float64, error) {
 		err            error
 	)
 	for _, vdr := range vdrs {
-		if !vm.IsConnected(vdr.ID()) {
+		if !vm.uptimeManager.IsConnected(vdr.ID()) {
 			continue // not connected to us --> don't include
 		}
 		connectedStake, err = safemath.Add64(connectedStake, vdr.Weight())
