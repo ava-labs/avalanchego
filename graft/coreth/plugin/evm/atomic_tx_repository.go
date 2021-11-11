@@ -86,32 +86,20 @@ func (a *atomicTxRepository) Initialize() error {
 			continue
 		}
 
-		tx, height, err := a.ParseTxBytes(iter.Value())
-		if err != nil {
-			return err
-		}
-
 		// map [height] => [tx count] + ( [tx bytes] ... )
 		// NOTE: this assumes there is only one atomic tx / height.
 		// This code should be modified if we need to rebuild the height
 		// index and there may be multiple atomic tx per block height.
-		heightBytes := make([]byte, wrappers.LongLen)
-		binary.BigEndian.PutUint64(heightBytes, height)
+		txBytes := iter.Value()
+		txBytesLen := len(txBytes) - wrappers.LongLen
 
-		packer := wrappers.Packer{Bytes: make([]byte, wrappers.ShortLen), MaxSize: 1024 * 1024}
-		packer.PackShort(1)
+		heightBytes := txBytes[:wrappers.LongLen]
 
-		txBytes, err := a.codec.Marshal(codecVersion, tx)
-		if err != nil {
-			return err
-		}
+		valBytes := make([]byte, wrappers.ShortLen, wrappers.ShortLen+txBytesLen)
+		binary.BigEndian.PutUint16(valBytes, uint16(1))
+		valBytes = append(valBytes, txBytes[wrappers.LongLen:]...)
 
-		packer.PackBytes(txBytes)
-		if packer.Errored() {
-			return packer.Err
-		}
-
-		if err = batch.Put(heightBytes, packer.Bytes); err != nil {
+		if err = batch.Put(heightBytes, valBytes); err != nil {
 			return fmt.Errorf("error saving tx bytes to atomic tx by height index during init: %w", err)
 		}
 
@@ -208,12 +196,6 @@ func (a *atomicTxRepository) Write(height uint64, txs []*Tx) error {
 
 	// 4 bytes for num representing number of transactions
 	totalPackerLen := wrappers.ShortLen
-	for _, tx := range txs {
-		// for each tx
-		// 4 bytes for number of tx byte length + the number of bytes for tx bytes itself
-		totalPackerLen += wrappers.IntLen + len(tx.Bytes())
-	}
-
 	packer := wrappers.Packer{Bytes: make([]byte, totalPackerLen), MaxSize: 1024 * 1024}
 	packer.PackShort(uint16(len(txs)))
 
