@@ -26,6 +26,8 @@ var (
 	atomicTxIDDBPrefix             = []byte("atomicTxDB")
 )
 
+// AtomicTxRepository defines an entity that manages storage and indexing of
+// atomic transactions
 type AtomicTxRepository interface {
 	Initialize() error
 	GetByTxID(txID ids.ID) (*Tx, uint64, error)
@@ -35,10 +37,11 @@ type AtomicTxRepository interface {
 	IterateByHeight(startHeight uint64) database.Iterator
 }
 
+// atomicTxRepository is a prefixdb implementation of the AtomicTxRepository interface
 type atomicTxRepository struct {
-	// [acceptedAtomicTxDB] maintains an index of [txID] => [atomic tx] for all accepted atomic txs.
+	// [acceptedAtomicTxDB] maintains an index of [txID] => [height]+[atomic tx] for all accepted atomic txs.
 	acceptedAtomicTxDB database.Database
-	// [acceptedHeightAtomicTxDB] maintains an index of block height => [atomic tx count][atomic tx0][atomic tx1]...
+	// [acceptedHeightAtomicTxDB] maintains an index of [height] => [atomic tx count]([atomic tx0][atomic tx1]...)
 	acceptedHeightAtomicTxDB database.Database
 	codec                    codec.Manager
 }
@@ -56,10 +59,12 @@ func newAtomicTxRepository(db database.Database, codec codec.Manager) AtomicTxRe
 
 // Initialize initializes the atomicTxRepository by re-mapping entries from
 // txID => [height][txBytes] to height => [txCount][txBytes0][txBytes1]...
+// if they have not been re-mapped already
+// Does not delete anything
 func (a *atomicTxRepository) Initialize() error {
 	startTime := time.Now()
 
-	// initialise atomicHeightTxDB if not done already
+	// check if we've already re-mapped the entries previously
 	heightTxDBInitialized, err := a.acceptedHeightAtomicTxDB.Has(heightAtomicTxDBInitializedKey)
 	if err != nil {
 		return err
@@ -69,10 +74,15 @@ func (a *atomicTxRepository) Initialize() error {
 		log.Info("acceptedHeightAtomicTxDB already initialized")
 		return nil
 	}
+
 	log.Info("initializing acceptedHeightAtomicTxDB", "startTime", startTime)
 
+	// iterate over the acceptedAtomicTxDB, iterating by [txID]=>[height]+[txBytes]
+	// and re-mapping into the acceptedHeightAtomicTxDB as [height]=[txCount]+([tx0][tx1]...)
 	iter := a.acceptedAtomicTxDB.NewIterator()
 	defer iter.Release()
+
+	// we do this re-mapping as a single batch operation
 	batch := a.acceptedHeightAtomicTxDB.NewBatch()
 
 	logger := NewProgressLogger(10 * time.Second)
@@ -82,12 +92,15 @@ func (a *atomicTxRepository) Initialize() error {
 		if err := iter.Error(); err != nil {
 			return err
 		}
+
+		// if this is one of the metadata keys, skip it
 		if len(iter.Key()) != txIDLen || bytes.Equal(iter.Key(), heightAtomicTxDBInitializedKey) {
 			continue
 		}
 
 		// read heightBytes and txBytes from iter.Value()
 		unpacker := wrappers.Packer{Bytes: iter.Value()}
+
 		// heightBytes will be directly used as key in [acceptedHeightAtomicTxDB] index
 		heightBytes := unpacker.UnpackFixedBytes(wrappers.LongLen)
 		txBytes := unpacker.UnpackBytes()
@@ -111,6 +124,7 @@ func (a *atomicTxRepository) Initialize() error {
 	if err := batch.Put(heightAtomicTxDBInitializedKey, nil); err != nil {
 		return err
 	}
+
 	if err := batch.Write(); err != nil {
 		return fmt.Errorf("error writing acceptedHeightAtomicTxDB batch: %w", err)
 	}
@@ -127,6 +141,7 @@ func (a *atomicTxRepository) GetByTxID(txID ids.ID) (*Tx, uint64, error) {
 	if err != nil {
 		return nil, 0, err
 	}
+
 	if len(indexedTxBytes) < wrappers.LongLen {
 		return nil, 0, fmt.Errorf("acceptedAtomicTxDB entry too short: %d", len(indexedTxBytes))
 	}
