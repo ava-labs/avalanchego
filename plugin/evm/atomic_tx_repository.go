@@ -129,7 +129,7 @@ func (a *atomicTxRepository) Initialize() error {
 		return fmt.Errorf("error writing acceptedHeightAtomicTxDB batch: %w", err)
 	}
 
-	log.Info("finished initializing acceptedHeightAtomicTxDB", "time", time.Since(startTime))
+	log.Info("finished initializing acceptedHeightAtomicTxDB", "time", time.Since(startTime), "entries", entries)
 	return nil
 }
 
