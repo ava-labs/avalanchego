@@ -3,7 +3,6 @@ package evm
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/coreth/trie"
@@ -101,11 +100,17 @@ func (i *blockingAtomicTrie) initialize(dbCommitFn func() error) error {
 			continue
 		}
 		height := binary.BigEndian.Uint64(heightBytes)
-		fmt.Println("height iter", height)
-		txs, err := i.repo.ParseTxsBytes(it.Value())
-		if err != nil {
-			log.Error("bad txs bytes", "err", err)
-			return err
+		unpacker := wrappers.Packer{Bytes: it.Value()}
+		txCount := unpacker.UnpackShort()
+		txs := make([]*Tx, txCount)
+		for idx := uint16(0); idx < txCount; idx++ {
+			txsBytes := unpacker.UnpackBytes()
+			tx, err := i.repo.ParseTxBytes(txsBytes)
+			if err != nil {
+				log.Error("bad txs bytes", "err", err)
+				return err
+			}
+			txs[idx] = tx
 		}
 
 		// now merge all atomic requests across all transactions at this height

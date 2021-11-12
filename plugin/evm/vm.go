@@ -106,6 +106,7 @@ var (
 	lastAcceptedKey        = []byte("last_accepted_key")
 	acceptedPrefix         = []byte("snowman_accepted")
 	ethDBPrefix            = []byte("ethdb")
+	atomicIndexDBPrefix    = []byte("atomicIndexDB")
 	pruneRejectedBlocksKey = []byte("pruned_rejected_blocks")
 )
 
@@ -373,6 +374,30 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return err
 	}
+
+	atomicIndexDB := Database{prefixdb.New(atomicIndexDBPrefix, vm.db)}
+	vm.atomicTrie, err = NewBlockingAtomicTrie(atomicIndexDB, vm.atomicTxRepository)
+	if err != nil {
+		return err
+	}
+
+	resultChan := vm.atomicTrie.Initialize(vm.db.Commit)
+
+	startTime := time.Now()
+	err, open := <-resultChan
+
+	// loop until  errors are coming through and channel is open
+	for err != nil && open {
+		if err != nil {
+			log.Crit("error initializing atomic trie locally", "time", time.Since(startTime), "err", err)
+		}
+		err, open = <-resultChan
+	}
+	err = vm.db.Commit()
+	if err != nil {
+		return err
+	}
+	log.Info("Atomic trie initialization complete", "time", time.Since(startTime))
 
 	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
 	vm.handleGasPriceUpdates()
