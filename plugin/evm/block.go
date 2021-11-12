@@ -133,8 +133,7 @@ func (b *Block) Accept() error {
 	vm.mempool.RemoveTx(tx.ID())
 
 	// Save the accepted atomic transaction
-	txs := make([]*Tx, 0, 1)
-	txs = append(txs, tx)
+	txs := []*Tx{tx}
 	if err := vm.atomicTxRepository.Write(b.Height(), txs); err != nil {
 		return err
 	}
