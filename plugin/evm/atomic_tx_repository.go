@@ -109,7 +109,7 @@ func (a *atomicTxRepository) Initialize() error {
 		// NOTE: code here assumes only one atomic tx / height
 		// This code should be modified if we need to rebuild the height
 		// index and there may be multiple atomic tx per block height.
-		packer := wrappers.Packer{Bytes: make([]byte, wrappers.ShortLen+wrappers.LongLen+len(txBytes))}
+		packer := wrappers.Packer{Bytes: make([]byte, wrappers.ShortLen+wrappers.IntLen+len(txBytes))}
 		packer.PackShort(1)
 		packer.PackBytes(txBytes)
 
