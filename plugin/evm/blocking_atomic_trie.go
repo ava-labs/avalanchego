@@ -25,6 +25,8 @@ var (
 	lastCommittedKey = []byte("LastCommittedBlock")
 )
 
+type AtomicReqs map[ids.ID]*atomic.Requests
+
 // blockingAtomicTrie implements the types.AtomicTrie interface
 // using the eth trie.Trie implementation
 type blockingAtomicTrie struct {
@@ -33,6 +35,8 @@ type blockingAtomicTrie struct {
 	trieDB               *trie.Database      // Trie database
 	trie                 *trie.Trie          // Atomic trie.Trie mapping key (height+blockchainID) and value (RLP encoded atomic.Requests)
 	repo                 AtomicTxRepository
+	pendingWrites        map[uint64]AtomicReqs
+	initialisedChan      chan error
 }
 
 func NewBlockingAtomicTrie(db ethdb.KeyValueStore, repo AtomicTxRepository) (types.AtomicTrie, error) {
@@ -52,6 +56,7 @@ func NewBlockingAtomicTrie(db ethdb.KeyValueStore, repo AtomicTxRepository) (typ
 
 	triedb := trie.NewDatabase(db)
 	t, err := trie.New(root, triedb)
+
 	if err != nil {
 		return nil, err
 	}
@@ -62,16 +67,17 @@ func NewBlockingAtomicTrie(db ethdb.KeyValueStore, repo AtomicTxRepository) (typ
 		trieDB:               triedb,
 		trie:                 t,
 		repo:                 repo,
+		pendingWrites:        make(map[uint64]AtomicReqs),
+		initialisedChan:      make(chan error),
 	}, nil
 }
 
 func (i *blockingAtomicTrie) Initialize(dbCommitFn func() error) <-chan error {
-	resultChan := make(chan error)
 	go func() {
-		resultChan <- i.initialize(dbCommitFn)
-		close(resultChan)
+		i.initialisedChan <- i.initialize(dbCommitFn)
+		close(i.initialisedChan)
 	}()
-	return resultChan
+	return i.initialisedChan
 }
 
 // initialize populates blockingAtomicTrie, doing a prefix scan on [acceptedHeightAtomicTxDB]
@@ -167,19 +173,24 @@ func (i *blockingAtomicTrie) initialize(dbCommitFn func() error) error {
 //   initialise it with [height] as the starting height - this *must* be zero in
 //   that case
 func (i *blockingAtomicTrie) Index(height uint64, atomicOps map[ids.ID]*atomic.Requests) (common.Hash, error) {
-	/*
-		TODO: not sure if we really need to support loading this async anymore.
-		if we do, the assumption is that index will be called on each height exactly once, so we must be careful
-		to not break that assumption.
-		We can't really rely on Initialize because the iterator behavior does not guarantee including keys
-		that are added after instantiating the iterator.
-		if !i.initialised.Load() {
-			// ignoring request because index has not yet been initialised
-			// the ongoing Initialize() will catch up to this height later
-			return common.Hash{}, nil
-		}*/
+	select {
+	case <-i.initialisedChan:
+	// initialization is complete, proceed normally
+	default:
+		i.pendingWrites[height] = atomicOps
+		return common.Hash{}, nil
+	}
 
+	// first time called after initialization is complete will flush pendingWrites
+	// TODO: probably needs to be sorted by key
+	for height, atomicOps := range i.pendingWrites {
+		if _, err := i.index(height, atomicOps); err != nil {
+			return common.Hash{}, err
+		}
+	}
+	i.pendingWrites = nil
 	return i.index(height, atomicOps)
+
 }
 
 // TODO: is the return value useful? most of the time we return common.Hash{}
