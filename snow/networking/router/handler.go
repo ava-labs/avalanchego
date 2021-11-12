@@ -27,7 +27,7 @@ var errDuplicatedContainerID = errors.New("inbound message contains duplicated c
 // Handler passes incoming messages from the network to the consensus engine.
 // (Actually, it receives the incoming messages from a ChainRouter, but same difference.)
 type Handler struct {
-	ctx *snow.Context
+	ctx *snow.ConsensusContext
 	// Useful for faking time in tests
 	clock   mockable.Clock
 	mc      message.Creator
@@ -80,7 +80,7 @@ func (h *Handler) Initialize(
 }
 
 // Context of this Handler
-func (h *Handler) Context() *snow.Context { return h.engine.Context() }
+func (h *Handler) Context() *snow.ConsensusContext { return h.engine.Context() }
 
 // Engine returns the engine this handler dispatches to
 func (h *Handler) Engine() common.Engine { return h.engine }

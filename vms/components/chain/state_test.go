@@ -635,8 +635,6 @@ func TestBuildBlockError(t *testing.T) {
 
 func TestMeteredCache(t *testing.T) {
 	registry := prometheus.NewRegistry()
-	namespace1 := "Joe"
-	namespace2 := "Namath"
 
 	testBlks := NewTestBlocks(1)
 	genesisBlock := testBlks[0]
@@ -654,17 +652,13 @@ func TestMeteredCache(t *testing.T) {
 		BuildBlock:          cantBuildBlock,
 		GetBlockIDAtHeight:  getCanonicalBlockID,
 	}
-	_, err := NewMeteredState(registry, namespace1, config)
+	_, err := NewMeteredState(registry, config)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = NewMeteredState(registry, namespace1, config)
+	_, err = NewMeteredState(registry, config)
 	if err == nil {
-		t.Fatal("Expected creating a second NewMeteredState with the same namespace to error due to a registry conflict")
-	}
-	_, err = NewMeteredState(registry, namespace2, config)
-	if err != nil {
-		t.Fatal(err)
+		t.Fatal("Expected creating a second NewMeteredState to error due to a registry conflict")
 	}
 }
 

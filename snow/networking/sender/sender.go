@@ -22,7 +22,7 @@ import (
 // Sender registers outbound requests with [router] so that [router]
 // fires a timeout if we don't get a response to the request.
 type Sender struct {
-	ctx        *snow.Context
+	ctx        *snow.ConsensusContext
 	msgCreator message.Creator
 	sender     ExternalSender // Actually does the sending over the network
 	router     router.Router
@@ -39,7 +39,7 @@ type Sender struct {
 
 // Initialize this sender
 func (s *Sender) Initialize(
-	ctx *snow.Context,
+	ctx *snow.ConsensusContext,
 	msgCreator message.Creator,
 	sender ExternalSender,
 	router router.Router,
@@ -79,7 +79,7 @@ func (s *Sender) Initialize(
 }
 
 // Context of this sender
-func (s *Sender) Context() *snow.Context { return s.ctx }
+func (s *Sender) Context() *snow.ConsensusContext { return s.ctx }
 
 func (s *Sender) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, requestID uint32) {
 	// Note that this timeout duration won't exactly match the one that gets

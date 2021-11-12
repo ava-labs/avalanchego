@@ -24,7 +24,7 @@ type CommitBlock struct {
 }
 
 func (c *CommitBlock) Accept() error {
-	if c.vm.bootstrapped {
+	if c.vm.bootstrapped.GetValue() {
 		if c.wasPreferred {
 			c.vm.metrics.numVotesWon.Inc()
 		} else {

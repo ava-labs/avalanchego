@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -44,13 +45,13 @@ type blockBuilder struct {
 }
 
 // Initialize this builder.
-func (m *blockBuilder) Initialize(vm *VM) error {
+func (m *blockBuilder) Initialize(vm *VM, registerer prometheus.Registerer) error {
 	m.vm = vm
 
 	m.vm.ctx.Log.Verbo("initializing platformVM mempool")
 	mempool, err := NewMempool(
-		fmt.Sprintf("%s_mempool", vm.ctx.Namespace),
-		vm.ctx.Metrics,
+		"mempool",
+		registerer,
 	)
 	if err != nil {
 		return err

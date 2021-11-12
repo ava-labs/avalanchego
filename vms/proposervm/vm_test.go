@@ -119,7 +119,6 @@ func initTestProposerVM(
 	ctx.StakingCertLeaf = pTestCert.Leaf
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
-	ctx.Bootstrapped()
 
 	dummyDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	// make sure that DBs are compressed correctly
@@ -130,6 +129,10 @@ func initTestProposerVM(
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
+
+	if err := proVM.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := proVM.SetPreference(coreGenBlk.IDV); err != nil {
 		t.Fatal(err)
@@ -856,7 +859,6 @@ func TestExpiredBuildBlock(t *testing.T) {
 	ctx.StakingCertLeaf = pTestCert.Leaf
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
-	ctx.Bootstrapped()
 
 	dbManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	toEngine := make(chan common.Message, 1)
@@ -883,6 +885,10 @@ func TestExpiredBuildBlock(t *testing.T) {
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
+
+	if err := proVM.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := proVM.SetPreference(coreGenBlk.IDV); err != nil {
 		t.Fatal(err)
@@ -1149,7 +1155,6 @@ func TestInnerVMRollback(t *testing.T) {
 	ctx.StakingCertLeaf = pTestCert.Leaf
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
-	ctx.Bootstrapped()
 
 	coreVM.InitializeF = func(
 		*snow.Context,
@@ -1170,6 +1175,10 @@ func TestInnerVMRollback(t *testing.T) {
 
 	if err := proVM.Initialize(ctx, dbManager, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+
+	if err := proVM.Bootstrapped(); err != nil {
+		t.Fatal(err)
 	}
 
 	if err := proVM.SetPreference(coreGenBlk.IDV); err != nil {

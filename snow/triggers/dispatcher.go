@@ -41,7 +41,7 @@ func (ed *EventDispatcher) Initialize(log logging.Logger) {
 // Accept is called when a transaction or block is accepted.
 // If the returned error is non-nil, the chain associated with [ctx] should shut
 // down and not commit [container] or any other container to its database as accepted.
-func (ed *EventDispatcher) Accept(ctx *snow.Context, containerID ids.ID, container []byte) error {
+func (ed *EventDispatcher) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error {
 	ed.lock.Lock()
 	defer ed.lock.Unlock()
 
@@ -77,7 +77,7 @@ func (ed *EventDispatcher) Accept(ctx *snow.Context, containerID ids.ID, contain
 }
 
 // Reject is called when a transaction or block is rejected
-func (ed *EventDispatcher) Reject(ctx *snow.Context, containerID ids.ID, container []byte) error {
+func (ed *EventDispatcher) Reject(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error {
 	ed.lock.Lock()
 	defer ed.lock.Unlock()
 
@@ -110,7 +110,7 @@ func (ed *EventDispatcher) Reject(ctx *snow.Context, containerID ids.ID, contain
 }
 
 // Issue is called when a transaction or block is issued
-func (ed *EventDispatcher) Issue(ctx *snow.Context, containerID ids.ID, container []byte) error {
+func (ed *EventDispatcher) Issue(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error {
 	ed.lock.Lock()
 	defer ed.lock.Unlock()
 

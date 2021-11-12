@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/rpc/v2"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/chains"
@@ -24,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -117,7 +119,7 @@ type VM struct {
 	codecRegistry codec.Registry
 
 	// Bootstrapped remembers if this chain has finished bootstrapping or not
-	bootstrapped bool
+	bootstrapped utils.AtomicBool
 
 	// Contains the IDs of transactions recently dropped because they failed
 	// verification. These txs may be re-issued and put into accepted blocks, so
@@ -153,8 +155,13 @@ func (vm *VM) Initialize(
 ) error {
 	ctx.Log.Verbo("initializing platform chain")
 
+	registerer := prometheus.NewRegistry()
+	if err := ctx.Metrics.Register(registerer); err != nil {
+		return err
+	}
+
 	// Initialize metrics as soon as possible
-	if err := vm.metrics.Initialize(ctx.Namespace, ctx.Metrics); err != nil {
+	if err := vm.metrics.Initialize("", registerer); err != nil {
 		return err
 	}
 
@@ -179,7 +186,7 @@ func (vm *VM) Initialize(
 	vm.validatorSetCaches = make(map[ids.ID]cache.Cacher)
 	vm.currentBlocks = make(map[ids.ID]Block)
 
-	if err := vm.blockBuilder.Initialize(vm); err != nil {
+	if err := vm.blockBuilder.Initialize(vm, registerer); err != nil {
 		return fmt.Errorf(
 			"failed to initialize the block builder: %w",
 			err,
@@ -187,7 +194,7 @@ func (vm *VM) Initialize(
 	}
 	vm.network = newNetwork(vm.ApricotPhase4Time, appSender, vm)
 
-	is, err := NewMeteredInternalState(vm, vm.dbManager.Current().Database, genesisBytes, ctx.Namespace, ctx.Metrics)
+	is, err := NewMeteredInternalState(vm, vm.dbManager.Current().Database, genesisBytes, registerer)
 	if err != nil {
 		return err
 	}
@@ -195,7 +202,7 @@ func (vm *VM) Initialize(
 
 	// Initialize the utility to track validator uptimes
 	vm.uptimeManager = uptime.NewManager(is)
-	vm.UptimeLockedCalculator.SetCalculator(ctx, vm.uptimeManager)
+	vm.UptimeLockedCalculator.SetCalculator(&vm.bootstrapped, &ctx.Lock, vm.uptimeManager)
 
 	if err := vm.updateValidators(true); err != nil {
 		return fmt.Errorf(
@@ -289,16 +296,16 @@ func (vm *VM) createChain(tx *Tx) error {
 
 // Bootstrapping marks this VM as bootstrapping
 func (vm *VM) Bootstrapping() error {
-	vm.bootstrapped = false
+	vm.bootstrapped.SetValue(false)
 	return vm.fx.Bootstrapping()
 }
 
 // Bootstrapped marks this VM as bootstrapped
 func (vm *VM) Bootstrapped() error {
-	if vm.bootstrapped {
+	if vm.bootstrapped.GetValue() {
 		return nil
 	}
-	vm.bootstrapped = true
+	vm.bootstrapped.SetValue(true)
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -334,7 +341,7 @@ func (vm *VM) Shutdown() error {
 
 	vm.blockBuilder.Shutdown()
 
-	if vm.bootstrapped {
+	if vm.bootstrapped.GetValue() {
 		primaryValidatorSet, exist := vm.Validators.GetValidators(constants.PrimaryNetworkID)
 		if !exist {
 			return errNoPrimaryValidators
@@ -575,7 +582,7 @@ func (vm *VM) GetCurrentHeight() (uint64, error) {
 
 func (vm *VM) updateValidators(force bool) error {
 	now := vm.clock.Time()
-	if !force && !vm.bootstrapped && now.Sub(vm.lastVdrUpdate) < 5*time.Second {
+	if !force && !vm.bootstrapped.GetValue() && now.Sub(vm.lastVdrUpdate) < 5*time.Second {
 		return nil
 	}
 	vm.lastVdrUpdate = now

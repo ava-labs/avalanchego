@@ -31,7 +31,7 @@ type Topological struct {
 	pollNumber uint64
 
 	// ctx is the context this snowman instance is executing in
-	ctx *snow.Context
+	ctx *snow.ConsensusContext
 
 	// params are the parameters that should be used to initialize snowball
 	// instances
@@ -83,7 +83,7 @@ type votes struct {
 }
 
 // Initialize implements the Snowman interface
-func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters, rootID ids.ID, rootHeight uint64) error {
+func (ts *Topological) Initialize(ctx *snow.ConsensusContext, params snowball.Parameters, rootID ids.ID, rootHeight uint64) error {
 	if err := params.Verify(); err != nil {
 		return err
 	}

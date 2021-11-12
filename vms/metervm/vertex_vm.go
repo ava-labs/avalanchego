@@ -4,8 +4,7 @@
 package metervm
 
 import (
-	"fmt"
-
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -13,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -42,9 +42,23 @@ func (vm *vertexVM) Initialize(
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
-	if err := vm.vertexMetrics.Initialize(fmt.Sprintf("%s_metervm", ctx.Namespace), ctx.Metrics); err != nil {
+	registerer := prometheus.NewRegistry()
+	if err := vm.vertexMetrics.Initialize("", registerer); err != nil {
 		return err
 	}
+
+	optionalGatherer := metrics.NewOptionalGatherer()
+	multiGatherer := metrics.NewMultiGatherer()
+	if err := multiGatherer.Register("metervm", registerer); err != nil {
+		return err
+	}
+	if err := multiGatherer.Register("", optionalGatherer); err != nil {
+		return err
+	}
+	if err := ctx.Metrics.Register(multiGatherer); err != nil {
+		return err
+	}
+	ctx.Metrics = optionalGatherer
 
 	return vm.DAGVM.Initialize(ctx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender)
 }

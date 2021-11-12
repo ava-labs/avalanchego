@@ -52,7 +52,7 @@ type directedTx struct {
 
 // Initialize implements the Consensus interface
 func (dg *Directed) Initialize(
-	ctx *snow.Context,
+	ctx *snow.ConsensusContext,
 	params sbcon.Parameters,
 ) error {
 	dg.txs = make(map[ids.ID]*directedTx)

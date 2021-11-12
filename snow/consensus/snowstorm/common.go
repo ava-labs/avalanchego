@@ -26,7 +26,7 @@ type common struct {
 	metrics.Polls
 
 	// context that this consensus instance is executing in
-	ctx *snow.Context
+	ctx *snow.ConsensusContext
 
 	// params describes how this instance was parameterized
 	params sbcon.Parameters
@@ -54,7 +54,7 @@ type common struct {
 }
 
 // Initialize implements the ConflictGraph interface
-func (c *common) Initialize(ctx *snow.Context, params sbcon.Parameters) error {
+func (c *common) Initialize(ctx *snow.ConsensusContext, params sbcon.Parameters) error {
 	c.ctx = ctx
 	c.params = params
 
