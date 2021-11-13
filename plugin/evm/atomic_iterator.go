@@ -16,11 +16,12 @@ import (
 // atomicTrieIterator is an implementation of types.AtomicTrieIterator that serves
 // parsed data with each iteration
 type atomicTrieIterator struct {
-	trieIterator *trie.Iterator   // underlying trie.Iterator
-	entries      *atomic.Requests // atomic operation entries at this iteration
-	blockchainID ids.ID           // blockchainID at this iteration
-	blockNumber  uint64           // block number at this iteration
-	errs         []error          // errors if any so far
+	trieIterator *trie.Iterator              // underlying trie.Iterator
+	entries      *atomic.Requests            // atomic operation entries at this iteration
+	atomicOps    map[ids.ID]*atomic.Requests // atomic operation entries at this iteration
+	blockchainID ids.ID                      // blockchainID at this iteration
+	blockNumber  uint64                      // block number at this iteration
+	errs         []error                     // errors if any so far
 }
 
 func NewAtomicTrieIterator(trieIterator *trie.Iterator) types.AtomicTrieIterator {
@@ -47,6 +48,10 @@ func (a *atomicTrieIterator) Errors() []error {
 // Next returns whether there is data to iterate over
 // this function sets blockNumber, blockchainID and entries fields of the atomicTrieIterator
 func (a *atomicTrieIterator) Next() bool {
+	// TODO: this function needs updates for supporting multiple atomic tx / height
+	// we will need to iterate until we see next height to make sure all atomic tx for
+	// this height are processed
+
 	hasNext := a.trieIterator.Next()
 	// if the underlying iterator has data to iterate over, parse and set the fields
 	if hasNext {
@@ -71,6 +76,7 @@ func (a *atomicTrieIterator) Next() bool {
 
 		// update the struct fields
 		a.blockNumber = blockNumber
+		a.atomicOps = map[ids.ID]*atomic.Requests{blockchainID: &requests} // TODO: above TODO impacts this line
 		a.blockchainID = blockchainID
 		a.entries = &requests
 	} else {
@@ -82,6 +88,7 @@ func (a *atomicTrieIterator) Next() bool {
 
 func (a *atomicTrieIterator) resetFields() {
 	a.blockNumber = 0
+	a.atomicOps = nil
 	a.blockchainID = ids.Empty
 	a.entries = nil
 }
@@ -89,6 +96,10 @@ func (a *atomicTrieIterator) resetFields() {
 // BlockNumber returns the block number of this iteration
 func (a *atomicTrieIterator) BlockNumber() uint64 {
 	return a.blockNumber
+}
+
+func (a *atomicTrieIterator) AtomicOps() map[ids.ID]*atomic.Requests {
+	return a.atomicOps
 }
 
 // BlockchainID returns the blockchainID of this iteration

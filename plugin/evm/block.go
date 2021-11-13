@@ -111,6 +111,7 @@ func (b *Block) Accept() error {
 
 	b.status = choices.Accepted
 	log.Debug(fmt.Sprintf("Accepting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
+
 	if err := vm.chain.Accept(b.ethBlock); err != nil {
 		return fmt.Errorf("chain could not accept %s: %w", b.ID(), err)
 	}
@@ -143,6 +144,8 @@ func (b *Block) Accept() error {
 		return vm.db.Commit()
 	}
 
+	// TODO: do the early returns here need [vm.db.Commit] since vm.mempool.RemoveTx(tx.ID())
+	// has been called?
 	ops, err := tx.UnsignedAtomicTx.AtomicOps()
 	if err != nil {
 		return err
@@ -150,6 +153,20 @@ func (b *Block) Accept() error {
 
 	hash, err := b.vm.atomicTrie.Index(b.Height(), ops)
 	if err != nil {
+		return err
+	}
+	lastAcceptedAtomicTxHeight, err := b.vm.LastAcceptedAtomicTxHeight()
+	if err != nil {
+		return fmt.Errorf("failed to get LastAcceptedAtomicTxHeight: #{err}")
+	}
+	log.Info("block accept: read lastAcceptedAtomicTxHeight", "lastAcceptedAtomicTxHeight", lastAcceptedAtomicTxHeight, "height", b.Height())
+
+	if lastAcceptedAtomicTxHeight >= b.Height() {
+		log.Warn("skipping accepting atomic txs on block acceptance", "height", b.Height(), "ops", len(ops))
+		return vm.db.Commit()
+	}
+	if err := vm.SetLastAcceptedAtomicTxHeight(b.Height()); err != nil {
+		log.Error("error calling SetLastAcceptedAtomicTxHeight", "err", err)
 		return err
 	}
 
@@ -162,7 +179,7 @@ func (b *Block) Accept() error {
 		return err
 	}
 
-	fmt.Println("committed atomic trie", "hash", hash)
+	log.Info("indexed atomic trie", "hash", hash, "height", b.Height())
 	return nil
 }
 

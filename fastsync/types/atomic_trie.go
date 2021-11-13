@@ -3,6 +3,7 @@ package types
 import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -11,7 +12,7 @@ import (
 type AtomicTrie interface {
 	// Initialize initializes the AtomicTrie from the last indexed
 	// block to the last accepted block in the chain
-	Initialize(dbCommitFn func() error) <-chan error
+	Initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error) <-chan error
 
 	// Index indexes the given atomicOps at the specified block height
 	// Returns an optional root hash and an optional error
@@ -27,6 +28,11 @@ type AtomicTrie interface {
 	// - next block height that can be indexed (committed height + 1)
 	// - optional error
 	LastCommitted() (common.Hash, uint64, error)
+
+	// TrieDB returns the underlying trie database
+	TrieDB() *trie.Database
+
+	Root(height uint64) (common.Hash, error)
 }
 
 // AtomicTrieIterator defines a stateful iterator that iterates
@@ -34,7 +40,10 @@ type AtomicTrie interface {
 type AtomicTrieIterator interface {
 	Next() bool
 	BlockNumber() uint64
+	// TODO: these are to be removed
 	BlockchainID() ids.ID
 	Entries() *atomic.Requests
+
+	AtomicOps() map[ids.ID]*atomic.Requests
 	Errors() []error
 }
