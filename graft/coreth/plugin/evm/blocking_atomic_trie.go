@@ -1,8 +1,8 @@
 package evm
 
 import (
-	"bytes"
 	"encoding/binary"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/coreth/trie"
@@ -17,15 +17,21 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-const commitHeightInterval = uint64(4096)
-const errEntryNotFound = "not found"
+const (
+	commitHeightInterval = uint64(4096)
+	historicalTrieRoots  = 8
+	errEntryNotFound     = "not found"
+)
 
 var (
-	indexHeightKey   = []byte("IndexHeight")
 	lastCommittedKey = []byte("LastCommittedBlock")
 )
 
 type AtomicReqs map[ids.ID]*atomic.Requests
+type AtomicIndexReq struct {
+	height uint64
+	ops    AtomicReqs
+}
 
 // blockingAtomicTrie implements the types.AtomicTrie interface
 // using the eth trie.Trie implementation
@@ -35,8 +41,8 @@ type blockingAtomicTrie struct {
 	trieDB               *trie.Database      // Trie database
 	trie                 *trie.Trie          // Atomic trie.Trie mapping key (height+blockchainID) and value (RLP encoded atomic.Requests)
 	repo                 AtomicTxRepository
-	pendingWrites        map[uint64]AtomicReqs
-	initialisedChan      chan error
+	pendingWrites        []*AtomicIndexReq
+	initialisedChan      chan struct{}
 }
 
 func NewBlockingAtomicTrie(db ethdb.KeyValueStore, repo AtomicTxRepository) (types.AtomicTrie, error) {
@@ -67,86 +73,116 @@ func NewBlockingAtomicTrie(db ethdb.KeyValueStore, repo AtomicTxRepository) (typ
 		trieDB:               triedb,
 		trie:                 t,
 		repo:                 repo,
-		pendingWrites:        make(map[uint64]AtomicReqs),
-		initialisedChan:      make(chan error),
+		pendingWrites:        make([]*AtomicIndexReq, 0),
+		initialisedChan:      make(chan struct{}),
 	}, nil
 }
 
-func (i *blockingAtomicTrie) Initialize(dbCommitFn func() error) <-chan error {
+func (i *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error) <-chan error {
+	resultChan := make(chan error)
 	go func() {
-		i.initialisedChan <- i.initialize(dbCommitFn)
-		close(i.initialisedChan)
+		resultChan <- i.initialize(lastAcceptedBlockNumber, dbCommitFn)
+		close(resultChan)
 	}()
-	return i.initialisedChan
+	return resultChan
 }
 
 // initialize populates blockingAtomicTrie, doing a prefix scan on [acceptedHeightAtomicTxDB]
 // from current position up to [lastAcceptedBlockNumber]. Optionally returns error.
-func (i *blockingAtomicTrie) initialize(dbCommitFn func() error) error {
+func (i *blockingAtomicTrie) initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error) error {
 	transactionsIndexed := uint64(0)
+	transactionsIndexedDirect := uint64(0)
 	startTime := time.Now()
 
-	_, nextHeight, err := i.LastCommitted()
+	lastCommittedHash, nextHeight, err := i.LastCommitted()
 	if err != nil {
 		return err
 	}
+	if (lastCommittedHash != common.Hash{}) && nextHeight > 0 {
+		// index has been initialized.
+		if lastAcceptedBlockNumber > nextHeight && lastAcceptedBlockNumber-nextHeight > i.commitHeightInterval {
+			log.Error("index lagging by unexpected amount", "lastAcceptedBlockNumber", lastAcceptedBlockNumber, "nextHeight", nextHeight)
+			return fmt.Errorf("index lagging by unexpected amount")
+		}
+		log.Info("atomic trie already initialized", "lastAcceptedBlockNumber", lastAcceptedBlockNumber, "nextHeight", nextHeight)
+		return nil
+	}
 
-	// start iteration at [nextHeight], all previous heights are already indexed
-	it := i.repo.IterateByHeight(nextHeight)
+	// When [initialize] returns, [historicalTrieRoot] trie roots will have been created.
+	// Each root is the hash of the trie containing all atomic operations requested by
+	// atomic txs accepted on blocks [0..height] (inclusive).
+	// Roots will be created starting at [lastCommitHeight], at [i.commitHeightInterval]
+	// intervals.
+	// Atomic operations for txs accepted on blocks <= [directToTrieHeight] can be indexed
+	// directly, and others will be buffered into
+	lastCommitHeight := lastAcceptedBlockNumber - lastAcceptedBlockNumber%i.commitHeightInterval
+	rootCount := uint64(historicalTrieRoots)
+	if lastAcceptedBlockNumber < historicalTrieRoots*i.commitHeightInterval {
+		rootCount = lastAcceptedBlockNumber / i.commitHeightInterval
+	}
+	directToTrieHeight := lastCommitHeight - (rootCount-1)*i.commitHeightInterval
+	buckets := make([]map[uint64]AtomicReqs, rootCount)
+
+	it := i.repo.Iterate()
 	logger := NewProgressLogger(10 * time.Second)
+
 	for it.Next() {
 		if err := it.Error(); err != nil {
 			return err
 		}
-
-		heightBytes := it.Key()
-		if len(heightBytes) != wrappers.LongLen ||
-			bytes.Equal(heightBytes, heightAtomicTxDBInitializedKey) {
-			// this is metadata key, skip it
-			continue
-		}
-		height := binary.BigEndian.Uint64(heightBytes)
-		unpacker := wrappers.Packer{Bytes: it.Value()}
-		txCount := unpacker.UnpackShort()
-		txs := make([]*Tx, txCount)
-		for idx := uint16(0); idx < txCount; idx++ {
-			txsBytes := unpacker.UnpackBytes()
-			tx, err := i.repo.ParseTxBytes(txsBytes)
-			if err != nil {
-				log.Error("bad txs bytes", "err", err)
-				return err
-			}
-			txs[idx] = tx
-		}
-
-		// now merge all atomic requests across all transactions at this height
-		pendingAtomicOps := make(map[ids.ID]*atomic.Requests)
-		for _, tx := range txs {
-			transactionsIndexed++
-			ops, err := tx.AtomicOps()
-			if err != nil {
-				return err
-			}
-			for blockchainID, reqs := range ops {
-				if currentReqs, exists := pendingAtomicOps[blockchainID]; exists {
-					currentReqs.PutRequests = append(currentReqs.PutRequests, reqs.PutRequests...)
-					currentReqs.RemoveRequests = append(currentReqs.RemoveRequests, reqs.RemoveRequests...)
-				} else {
-					pendingAtomicOps[blockchainID] = reqs
-				}
-			}
-		}
-
-		// index the merged atomic requests against the height
-		if _, err := i.index(height, pendingAtomicOps); err != nil {
+		packer := wrappers.Packer{Bytes: it.Value()}
+		height := packer.UnpackLong()
+		txBytes := packer.UnpackBytes()
+		tx, err := i.repo.ParseTxBytes(txBytes)
+		if err != nil {
 			return err
 		}
 
-		// remember the atomic ops for this tx in [pendingAtomicOps]
-		// we will call [index] on them when either:
-		// - a greater height is observed from iterating
-		// - iteration is complete
+		// NOTE: this logic only works assuming a single atomic tx accepted per block height
+		transactionsIndexed++
+		ops, err := tx.AtomicOps()
+		if err != nil {
+			return err
+		}
+		if height <= directToTrieHeight {
+			// index the merged atomic requests against the height
+			if err := i.index(height, ops); err != nil {
+				return err
+			}
+			transactionsIndexedDirect++
+		} else {
+			bucketIdx := (height - directToTrieHeight - 1) / i.commitHeightInterval
+			if buckets[bucketIdx] == nil {
+				buckets[bucketIdx] = make(map[uint64]AtomicReqs)
+			}
+			buckets[bucketIdx][height] = ops
+		}
 		logger.Info("atomic trie init progress", "transactionsIndexed", transactionsIndexed)
+	}
+
+	// all known txs have processed.
+	hash, err := i.commit(directToTrieHeight)
+	if err != nil {
+		return err
+	}
+	log.Info("committed directToTrieHeight", "hash", hash, "directToTrieHeight", directToTrieHeight, "transactionsIndexedDirect", transactionsIndexedDirect)
+
+	for idx, bucket := range buckets {
+		log.Info("processing bucket", "idx", idx, "len", len(bucket))
+		for height, ops := range bucket {
+			if err := i.index(height, ops); err != nil {
+				return err
+			}
+		}
+		if idx == len(buckets)-1 {
+			// atomic ops from txs in last bucket will be committed at next commitHeightInterval, skip commit here
+			continue
+		}
+		hash, err := i.commit(directToTrieHeight + uint64(idx+1)*i.commitHeightInterval)
+		if err != nil {
+			return err
+		}
+		log.Info("committed bucket", "idx", idx, "len", len(bucket), "hash", hash)
 	}
 
 	if dbCommitFn != nil {
@@ -157,6 +193,7 @@ func (i *blockingAtomicTrie) initialize(dbCommitFn func() error) error {
 		}
 	}
 	log.Info("atomic trie initialisation complete", "time", time.Since(startTime))
+	close(i.initialisedChan)
 	return nil
 }
 
@@ -177,44 +214,43 @@ func (i *blockingAtomicTrie) Index(height uint64, atomicOps map[ids.ID]*atomic.R
 	case <-i.initialisedChan:
 	// initialization is complete, proceed normally
 	default:
-		i.pendingWrites[height] = atomicOps
+		i.pendingWrites = append(i.pendingWrites, &AtomicIndexReq{height: height, ops: atomicOps})
 		return common.Hash{}, nil
 	}
 
 	// first time called after initialization is complete will flush pendingWrites
-	// TODO: probably needs to be sorted by key
-	for height, atomicOps := range i.pendingWrites {
-		if _, err := i.index(height, atomicOps); err != nil {
+	for _, req := range i.pendingWrites {
+		if err := i.index(req.height, req.ops); err != nil {
 			return common.Hash{}, err
 		}
 	}
 	i.pendingWrites = nil
-	return i.index(height, atomicOps)
 
-}
-
-// TODO: is the return value useful? most of the time we return common.Hash{}
-func (i *blockingAtomicTrie) index(height uint64, atomicOps map[ids.ID]*atomic.Requests) (common.Hash, error) {
-	err := i.updateTrie(atomicOps, height)
-	if err != nil {
+	// normal, ongoing behavior: index and commit if at [commitHeightInterval]
+	if err := i.index(height, atomicOps); err != nil {
 		return common.Hash{}, err
 	}
-	// early return if block height is not divisible by [commitHeightInterval]
-	if height%i.commitHeightInterval != 0 {
-		return common.Hash{}, nil
+	if height%i.commitHeightInterval == 0 {
+		return i.commit(height)
 	}
-	return i.commit(height)
+	return common.Hash{}, nil
+}
+
+func (i *blockingAtomicTrie) index(height uint64, atomicOps map[ids.ID]*atomic.Requests) error {
+	return i.updateTrie(atomicOps, height)
 }
 
 func (i *blockingAtomicTrie) commit(height uint64) (common.Hash, error) {
 	l := log.New("func", "indexedAtomicTrie.index", "height", height)
-	// TODO: check the assumption height%i.commitHeightInterval == 0
+	if height%i.commitHeightInterval != 0 {
+		return common.Hash{}, fmt.Errorf("atomic tx trie commit height must be divisable by 4096 (got %v)", height)
+	}
 
 	hash, err := i.commitTrie()
 	if err != nil {
 		return common.Hash{}, err
 	}
-	l.Info("committed atomic trie", "hash", hash)
+	l.Info("committed atomic trie", "hash", hash, "height", height)
 	if err = i.trieDB.Commit(hash, false, nil); err != nil {
 		return common.Hash{}, err
 	}
@@ -252,12 +288,6 @@ func (i *blockingAtomicTrie) updateTrie(atomicOps map[ids.ID]*atomic.Requests, h
 	return nil
 }
 
-func (i *blockingAtomicTrie) setIndexHeight(height uint64) error {
-	heightBytes := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(heightBytes, height)
-	return i.db.Put(indexHeightKey, heightBytes)
-}
-
 func (i *blockingAtomicTrie) commitTrie() (common.Hash, error) {
 	hash, _, err := i.trie.Commit(nil)
 	return hash, err
@@ -288,4 +318,18 @@ func (i *blockingAtomicTrie) Iterator(hash common.Hash) (types.AtomicTrieIterato
 
 	iter := trie.NewIterator(t.NodeIterator(nil))
 	return NewAtomicTrieIterator(iter), iter.Err
+}
+
+func (i *blockingAtomicTrie) TrieDB() *trie.Database {
+	return i.trieDB
+}
+
+func (i *blockingAtomicTrie) Root(height uint64) (common.Hash, error) {
+	heightBytes := make([]byte, wrappers.LongLen)
+	binary.BigEndian.PutUint64(heightBytes, height)
+	hash, err := i.db.Get(heightBytes)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	return common.BytesToHash(hash), err
 }

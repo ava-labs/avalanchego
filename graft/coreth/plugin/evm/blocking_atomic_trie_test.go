@@ -1,6 +1,8 @@
 package evm
 
 import (
+	"encoding/binary"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -17,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/coreth/core/state"
@@ -102,9 +105,16 @@ func testDataExportTx() *Tx {
 	}
 }
 
+func (t *Tx) mustAtomicOps() map[ids.ID]*atomic.Requests {
+	ops, err := t.AtomicOps()
+	if err != nil {
+		panic(err)
+	}
+	return ops
+}
+
 func Test_BlockingAtomicTrie(t *testing.T) {
 	db := memdb.New()
-
 	Codec := codec.NewDefaultManager()
 
 	c := linearcodec.NewDefault()
@@ -132,10 +142,41 @@ func Test_BlockingAtomicTrie(t *testing.T) {
 		return nil
 	}
 
-	doneChan := atomicTrie.Initialize(dbCommitFn)
+	doneChan := atomicTrie.Initialize(100, dbCommitFn)
 	err = <-doneChan
 	assert.NoError(t, err)
 	_, open := <-doneChan
 	assert.False(t, open)
 	assert.NotNil(t, doneChan)
+}
+
+func Test_BlockingAtomicTrie_XYZ(t *testing.T) {
+	db := memdb.New()
+	vdb := versiondb.New(db)
+	repo := newAtomicTxRepository(db, Codec)
+	atomicTrie, err := NewBlockingAtomicTrie(Database{vdb}, repo)
+	assert.NoError(t, err)
+	dbCommitFn := func() error {
+		return nil
+	}
+
+	doneChan := atomicTrie.Initialize(100, dbCommitFn)
+	err = <-doneChan
+	assert.NoError(t, err)
+
+	tx0 := testDataExportTx()
+	_, err = atomicTrie.Index(0, tx0.mustAtomicOps())
+	assert.NoError(t, err)
+
+	tx1 := testDataImportTx()
+	_, err = atomicTrie.Index(1, tx1.mustAtomicOps())
+	assert.NoError(t, err)
+
+	vdb.Commit()
+
+	key := make([]byte, 8)
+	binary.BigEndian.PutUint64(key, 0)
+	val, err := vdb.Get(key)
+	assert.NoError(t, err)
+	fmt.Println("val", len(val))
 }
