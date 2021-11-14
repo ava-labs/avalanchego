@@ -122,8 +122,8 @@ func TestUTXOSerialize(t *testing.T) {
 	}
 	if !bytes.Equal(utxoBytes, expected) {
 		t.Fatalf("Expected:\n%s\nResult:\n%s",
-			formatting.DumpBytes{Bytes: expected},
-			formatting.DumpBytes{Bytes: utxoBytes},
+			formatting.DumpBytes(expected),
+			formatting.DumpBytes(utxoBytes),
 		)
 	}
 }
