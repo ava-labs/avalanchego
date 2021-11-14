@@ -5,9 +5,12 @@ package formatting
 
 import (
 	"encoding/hex"
+	"fmt"
 	"strings"
 )
 
-type DumpBytes struct{ Bytes []byte }
+var _ fmt.Stringer = DumpBytes{}
 
-func (db DumpBytes) String() string { return strings.TrimSpace(hex.Dump(db.Bytes)) }
+type DumpBytes []byte
+
+func (db DumpBytes) String() string { return strings.TrimSpace(hex.Dump(db)) }

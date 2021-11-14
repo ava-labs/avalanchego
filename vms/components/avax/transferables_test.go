@@ -166,8 +166,8 @@ func TestTransferableOutputSerialization(t *testing.T) {
 	}
 	if !bytes.Equal(outBytes, expected) {
 		t.Fatalf("Expected:\n%s\nResult:\n%s",
-			formatting.DumpBytes{Bytes: expected},
-			formatting.DumpBytes{Bytes: outBytes},
+			formatting.DumpBytes(expected),
+			formatting.DumpBytes(outBytes),
 		)
 	}
 }
@@ -330,8 +330,8 @@ func TestTransferableInputSerialization(t *testing.T) {
 	}
 	if !bytes.Equal(inBytes, expected) {
 		t.Fatalf("Expected:\n%s\nResult:\n%s",
-			formatting.DumpBytes{Bytes: expected},
-			formatting.DumpBytes{Bytes: inBytes},
+			formatting.DumpBytes(expected),
+			formatting.DumpBytes(inBytes),
 		)
 	}
 }
