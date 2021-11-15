@@ -19,6 +19,19 @@ var (
 // be a proposal block) being rejected.
 type AbortBlock struct {
 	DoubleDecisionBlock `serialize:"true"`
+
+	wasPreferred bool
+}
+
+func (a *AbortBlock) Accept() error {
+	if a.vm.bootstrapped {
+		if a.wasPreferred {
+			a.vm.metrics.numVotesWon.Inc()
+		} else {
+			a.vm.metrics.numVotesLost.Inc()
+		}
+	}
+	return a.DoubleDecisionBlock.Accept()
 }
 
 // Verify this block performs a valid state transition.
@@ -61,8 +74,9 @@ func (a *AbortBlock) Verify() error {
 }
 
 // newAbortBlock returns a new *Abort block where the block's parent, a proposal
-// block, has ID [parentID].
-func (vm *VM) newAbortBlock(parentID ids.ID, height uint64) (*AbortBlock, error) {
+// block, has ID [parentID]. Additionally the block will track if it was
+// originally preferred or not for metrics.
+func (vm *VM) newAbortBlock(parentID ids.ID, height uint64, wasPreferred bool) (*AbortBlock, error) {
 	abort := &AbortBlock{
 		DoubleDecisionBlock: DoubleDecisionBlock{
 			CommonDecisionBlock: CommonDecisionBlock{
@@ -72,6 +86,7 @@ func (vm *VM) newAbortBlock(parentID ids.ID, height uint64) (*AbortBlock, error)
 				},
 			},
 		},
+		wasPreferred: wasPreferred,
 	}
 
 	// We serialize this block as a Block so that it can be deserialized into a

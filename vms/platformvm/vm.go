@@ -22,17 +22,17 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/uptime"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -86,16 +86,17 @@ type VM struct {
 	metrics
 	avax.AddressManager
 	avax.AtomicUTXOManager
-	uptime.Manager
 	*network
 
 	// Used to get time. Useful for faking time during tests.
-	clock timer.Clock
+	clock mockable.Clock
 
 	// Used to create and use keys.
 	factory crypto.FactorySECP256K1R
 
 	blockBuilder blockBuilder
+
+	uptimeManager uptime.Manager
 
 	// The context of this vm
 	ctx       *snow.Context
@@ -193,7 +194,8 @@ func (vm *VM) Initialize(
 	vm.internalState = is
 
 	// Initialize the utility to track validator uptimes
-	vm.Manager = uptime.NewManager(is)
+	vm.uptimeManager = uptime.NewManager(is)
+	vm.UptimeLockedCalculator.SetCalculator(ctx, vm.uptimeManager)
 
 	if err := vm.updateValidators(true); err != nil {
 		return fmt.Errorf(
@@ -220,25 +222,39 @@ func (vm *VM) Initialize(
 
 // Create all chains that exist that this node validates.
 func (vm *VM) initBlockchains() error {
-	chains, err := vm.internalState.GetChains(constants.PrimaryNetworkID)
+	if err := vm.createSubnet(constants.PrimaryNetworkID); err != nil {
+		return err
+	}
+
+	if vm.StakingEnabled {
+		for subnetID := range vm.WhitelistedSubnets {
+			if err := vm.createSubnet(subnetID); err != nil {
+				return err
+			}
+		}
+	} else {
+		subnets, err := vm.internalState.GetSubnets()
+		if err != nil {
+			return err
+		}
+		for _, subnet := range subnets {
+			if err := vm.createSubnet(subnet.ID()); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// Create the subnet with ID [subnetID]
+func (vm *VM) createSubnet(subnetID ids.ID) error {
+	chains, err := vm.internalState.GetChains(subnetID)
 	if err != nil {
 		return err
 	}
 	for _, chain := range chains {
 		if err := vm.createChain(chain); err != nil {
 			return err
-		}
-	}
-
-	for subnetID := range vm.WhitelistedSubnets {
-		chains, err := vm.internalState.GetChains(subnetID)
-		if err != nil {
-			return err
-		}
-		for _, chain := range chains {
-			if err := vm.createChain(chain); err != nil {
-				return err
-			}
 		}
 	}
 	return nil
@@ -304,7 +320,7 @@ func (vm *VM) Bootstrapped() error {
 		validatorIDs[i] = vdr.ID()
 	}
 
-	if err := vm.StartTracking(validatorIDs); err != nil {
+	if err := vm.uptimeManager.StartTracking(validatorIDs); err != nil {
 		return err
 	}
 	return vm.internalState.Commit()
@@ -330,7 +346,7 @@ func (vm *VM) Shutdown() error {
 			validatorIDs[i] = vdr.ID()
 		}
 
-		if err := vm.Manager.Shutdown(validatorIDs); err != nil {
+		if err := vm.uptimeManager.Shutdown(validatorIDs); err != nil {
 			return err
 		}
 		if err := vm.internalState.Commit(); err != nil {
@@ -359,14 +375,13 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 		return nil, err
 	}
 
+	// TODO: remove this to make ParseBlock stateless
 	if block, err := vm.GetBlock(blk.ID()); err == nil {
 		// If we have seen this block before, return it with the most up-to-date
 		// info
 		return block, nil
 	}
-
-	vm.internalState.AddBlock(blk)
-	return blk, vm.internalState.Commit()
+	return blk, nil
 }
 
 // GetBlock implements the snowman.ChainVM interface
@@ -455,12 +470,12 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 
 // Connected implements validators.Connector
 func (vm *VM) Connected(vdrID ids.ShortID) error {
-	return vm.Connect(vdrID)
+	return vm.uptimeManager.Connect(vdrID)
 }
 
 // Disconnected implements validators.Connector
 func (vm *VM) Disconnected(vdrID ids.ShortID) error {
-	if err := vm.Disconnect(vdrID); err != nil {
+	if err := vm.uptimeManager.Disconnect(vdrID); err != nil {
 		return err
 	}
 	return vm.internalState.Commit()
@@ -596,7 +611,7 @@ func (vm *VM) nextStakerChangeTime(vs ValidatorState) (time.Time, error) {
 	currentStakers := vs.CurrentStakerChainState()
 	pendingStakers := vs.PendingStakerChainState()
 
-	earliest := timer.MaxTime
+	earliest := mockable.MaxTime
 	if currentStakers := currentStakers.Stakers(); len(currentStakers) > 0 {
 		nextStakerToRemove := currentStakers[0]
 		staker, ok := nextStakerToRemove.UnsignedTx.(TimedTx)
@@ -624,7 +639,7 @@ func (vm *VM) nextStakerChangeTime(vs ValidatorState) (time.Time, error) {
 
 func (vm *VM) CodecRegistry() codec.Registry { return vm.codecRegistry }
 
-func (vm *VM) Clock() *timer.Clock { return &vm.clock }
+func (vm *VM) Clock() *mockable.Clock { return &vm.clock }
 
 func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
 
@@ -643,7 +658,7 @@ func (vm *VM) getPercentConnected() (float64, error) {
 		err            error
 	)
 	for _, vdr := range vdrs {
-		if !vm.IsConnected(vdr.ID()) {
+		if !vm.uptimeManager.IsConnected(vdr.ID()) {
 			continue // not connected to us --> don't include
 		}
 		connectedStake, err = safemath.Add64(connectedStake, vdr.Weight())

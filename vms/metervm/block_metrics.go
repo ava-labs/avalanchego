@@ -22,10 +22,13 @@ type blockMetrics struct {
 	verify,
 	verifyErr,
 	accept,
-	reject metric.Averager
+	reject,
+	getAncestors,
+	batchedParseBlock metric.Averager
 }
 
 func (m *blockMetrics) Initialize(
+	supportsBatchedFetching bool,
 	namespace string,
 	reg prometheus.Registerer,
 ) error {
@@ -43,5 +46,9 @@ func (m *blockMetrics) Initialize(
 	m.accept = newAverager(namespace, "accept", reg, &errs)
 	m.reject = newAverager(namespace, "reject", reg, &errs)
 
+	if supportsBatchedFetching {
+		m.getAncestors = newAverager(namespace, "get_ancestors", reg, &errs)
+		m.batchedParseBlock = newAverager(namespace, "batched_parse_block", reg, &errs)
+	}
 	return errs.Err
 }

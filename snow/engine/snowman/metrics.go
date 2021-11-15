@@ -11,14 +11,19 @@ import (
 )
 
 type metrics struct {
-	numRequests, numBlocked, numBlockers prometheus.Gauge
-	numBuilt, numBuildsFailed            prometheus.Counter
-	getAncestorsBlks                     metric.Averager
+	bootstrapFinished, numRequests, numBlocked, numBlockers, numNonVerifieds prometheus.Gauge
+	numBuilt, numBuildsFailed                                                prometheus.Counter
+	getAncestorsBlks                                                         metric.Averager
 }
 
 // Initialize the metrics
 func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error {
 	errs := wrappers.Errs{}
+	m.bootstrapFinished = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "bootstrap_finished",
+		Help:      "Whether or not bootstrap process has completed. 1 is success, 0 is fail or ongoing.",
+	})
 	m.numRequests = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "requests",
@@ -51,13 +56,20 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		reg,
 		&errs,
 	)
+	m.numNonVerifieds = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "non_verified_blks",
+		Help:      "Number of non-verified blocks in the memory",
+	})
 
 	errs.Add(
+		reg.Register(m.bootstrapFinished),
 		reg.Register(m.numRequests),
 		reg.Register(m.numBlocked),
 		reg.Register(m.numBlockers),
 		reg.Register(m.numBuilt),
 		reg.Register(m.numBuildsFailed),
+		reg.Register(m.numNonVerifieds),
 	)
 	return errs.Err
 }

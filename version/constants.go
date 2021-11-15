@@ -11,13 +11,15 @@ import (
 
 // These are globals that describe network upgrades and node versions
 var (
-	Current                      = NewDefaultVersion(1, 6, 3)
+	Current                      = NewDefaultVersion(1, 6, 5)
 	CurrentApp                   = NewDefaultApplication(constants.PlatformName, Current.Major(), Current.Minor(), Current.Patch())
 	MinimumCompatibleVersion     = NewDefaultApplication(constants.PlatformName, 1, 6, 0)
 	PrevMinimumCompatibleVersion = NewDefaultApplication(constants.PlatformName, 1, 5, 0)
 	MinimumUnmaskedVersion       = NewDefaultApplication(constants.PlatformName, 1, 1, 0)
 	PrevMinimumUnmaskedVersion   = NewDefaultApplication(constants.PlatformName, 1, 0, 0)
 	VersionParser                = NewDefaultApplicationParser()
+
+	MinUptimeVersion = NewDefaultApplication(constants.PlatformName, 1, 6, 5)
 
 	CurrentDatabase = DatabaseVersion1_4_5
 	PrevDatabase    = DatabaseVersion1_0_0

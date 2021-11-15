@@ -29,6 +29,7 @@ const (
 // Set of validators that can be sampled
 type Set interface {
 	fmt.Stringer
+	PrefixedString(string) string
 
 	// Set removes all the current validators and adds all the provided
 	// validators to the set.
@@ -408,13 +409,17 @@ func (s *set) Weight() uint64 {
 }
 
 func (s *set) String() string {
+	return s.PrefixedString("")
+}
+
+func (s *set) PrefixedString(prefix string) string {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	return s.string()
+	return s.prefixedString(prefix)
 }
 
-func (s *set) string() string {
+func (s *set) prefixedString(prefix string) string {
 	sb := strings.Builder{}
 
 	totalWeight := uint64(0)
@@ -427,7 +432,7 @@ func (s *set) string() string {
 		s.totalWeight,
 		totalWeight,
 	))
-	format := fmt.Sprintf("\n    Validator[%s]: %%33s, %%d/%%d", formatting.IntFormat(len(s.vdrSlice)-1))
+	format := fmt.Sprintf("\n%s    Validator[%s]: %%33s, %%d/%%d", prefix, formatting.IntFormat(len(s.vdrSlice)-1))
 	for i, vdr := range s.vdrSlice {
 		sb.WriteString(fmt.Sprintf(format,
 			i,

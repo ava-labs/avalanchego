@@ -100,6 +100,7 @@ func (t *Transitive) finishBootstrapping() error {
 	}
 
 	t.Ctx.Log.Info("bootstrapping finished with %d vertices in the accepted frontier", len(frontier))
+	t.metrics.bootstrapFinished.Set(1)
 	return t.Consensus.Initialize(t.Ctx, t.Params, frontier)
 }
 
@@ -338,13 +339,13 @@ func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
 }
 
 // AppRequest implements the Engine interface
-func (t *Transitive) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+func (t *Transitive) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
 	if !t.Ctx.IsBootstrapped() {
 		t.Ctx.Log.Debug("dropping AppRequest(%s, %d) due to bootstrapping", nodeID, requestID)
 		return nil
 	}
 	// Notify the VM of this request
-	return t.VM.AppRequest(nodeID, requestID, request)
+	return t.VM.AppRequest(nodeID, requestID, deadline, request)
 }
 
 // AppResponse implements the Engine interface
@@ -512,7 +513,11 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 	}
 
 	for _, tx := range txs {
-		for _, dep := range tx.Dependencies() {
+		deps, err := tx.Dependencies()
+		if err != nil {
+			return err
+		}
+		for _, dep := range deps {
 			depID := dep.ID()
 			if !txIDs.Contains(depID) && !t.Consensus.TxIssued(dep) {
 				// This transaction hasn't been issued yet. Add it as a dependency.
@@ -541,7 +546,7 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 	// Track performance statistics
 	t.metrics.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len()))
 	t.metrics.numMissingTxs.Set(float64(t.missingTxs.Len()))
-	t.metrics.numPendingVts.Set(float64(t.pending.Len()))
+	t.metrics.numPendingVts.Set(float64(len(t.pending)))
 	t.metrics.blockerVtxs.Set(float64(t.vtxBlocked.Len()))
 	t.metrics.blockerTxs.Set(float64(t.txBlocked.Len()))
 	return t.errs.Err

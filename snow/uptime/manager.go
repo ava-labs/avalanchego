@@ -8,17 +8,17 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 var _ TestManager = &manager{}
 
-type State interface {
-	GetUptime(nodeID ids.ShortID) (upDuration time.Duration, lastUpdated time.Time, err error)
-	SetUptime(nodeID ids.ShortID, upDuration time.Duration, lastUpdated time.Time) error
+type Manager interface {
+	Tracker
+	Calculator
 }
 
-type Manager interface {
+type Tracker interface {
 	// Should only be called once
 	StartTracking(nodeIDs []ids.ShortID) error
 
@@ -28,9 +28,12 @@ type Manager interface {
 	Connect(nodeID ids.ShortID) error
 	IsConnected(nodeID ids.ShortID) bool
 	Disconnect(nodeID ids.ShortID) error
+}
 
+type Calculator interface {
 	CalculateUptime(nodeID ids.ShortID) (time.Duration, time.Time, error)
-	CalculateUptimePercent(nodeID ids.ShortID, startTime time.Time) (float64, error)
+	CalculateUptimePercent(nodeID ids.ShortID) (float64, error)
+	CalculateUptimePercentFrom(nodeID ids.ShortID, startTime time.Time) (float64, error)
 }
 
 type TestManager interface {
@@ -40,7 +43,7 @@ type TestManager interface {
 
 type manager struct {
 	// Used to get time. Useful for faking time during tests.
-	clock timer.Clock
+	clock mockable.Clock
 
 	state           State
 	connections     map[ids.ShortID]time.Time
@@ -171,7 +174,15 @@ func (m *manager) CalculateUptime(nodeID ids.ShortID) (time.Duration, time.Time,
 	return newUpDuration, currentLocalTime, nil
 }
 
-func (m *manager) CalculateUptimePercent(nodeID ids.ShortID, startTime time.Time) (float64, error) {
+func (m *manager) CalculateUptimePercent(nodeID ids.ShortID) (float64, error) {
+	startTime, err := m.state.GetStartTime(nodeID)
+	if err != nil {
+		return 0, err
+	}
+	return m.CalculateUptimePercentFrom(nodeID, startTime)
+}
+
+func (m *manager) CalculateUptimePercentFrom(nodeID ids.ShortID, startTime time.Time) (float64, error) {
 	upDuration, currentLocalTime, err := m.CalculateUptime(nodeID)
 	if err != nil {
 		return 0, err

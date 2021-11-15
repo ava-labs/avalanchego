@@ -20,10 +20,12 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
@@ -246,30 +248,31 @@ func (h *testHandler) Disconnected(id ids.ShortID) {
 	}
 }
 
-func (h *testHandler) Put(
-	validatorID ids.ShortID,
-	chainID ids.ID,
-	requestID uint32,
-	containerID ids.ID,
-	container []byte,
-	onFinishedHandling func(),
-) {
-	if h.PutF != nil {
-		h.PutF(validatorID,
-			chainID,
-			requestID,
-			containerID,
-			container,
-			onFinishedHandling)
-	}
-}
+func (h *testHandler) HandleInbound(msg message.InboundMessage) {
+	switch msg.Op() {
+	case message.Put:
+		chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
+		requestID, _ := msg.Get(message.RequestID).(uint32)
+		containerID, _ := ids.ToID(msg.Get(message.ContainerID).([]byte))
+		container, _ := msg.Get(message.ContainerBytes).([]byte)
 
-func (h *testHandler) AppGossip(nodeID ids.ShortID,
-	chainID ids.ID,
-	appGossipBytes []byte,
-	onFinishedHandling func()) {
-	if h.AppGossipF != nil {
-		h.AppGossipF(nodeID, chainID, appGossipBytes, onFinishedHandling)
+		if h.PutF != nil {
+			h.PutF(msg.NodeID(),
+				chainID,
+				requestID,
+				containerID,
+				container,
+				msg.OnFinishedHandling)
+		}
+	case message.AppGossip:
+		chainID, _ := ids.ToID(msg.Get(message.ChainID).([]byte))
+		appBytes := msg.Get(message.AppBytes).([]byte)
+
+		if h.AppGossipF != nil {
+			h.AppGossipF(msg.NodeID(), chainID, appBytes, msg.OnFinishedHandling)
+		}
+	default:
+		return
 	}
 }
 
@@ -351,6 +354,9 @@ func TestNewDefaultNetwork(t *testing.T) {
 
 	vdrs := getDefaultManager()
 	beacons := validators.NewSet()
+	metrics := prometheus.NewRegistry()
+	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler := &testHandler{}
 	net, err := newDefaultNetwork(
 		id,
@@ -361,6 +367,8 @@ func TestNewDefaultNetwork(t *testing.T) {
 		ids.Set{},
 		tlsConfig0,
 		listener,
+		metrics,
+		msgCreator,
 		handler,
 	)
 	assert.NoError(t, err)
@@ -433,6 +441,9 @@ func TestEstablishConnection(t *testing.T) {
 	wg0.Add(1)
 	wg1.Add(1)
 
+	metrics0 := prometheus.NewRegistry()
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler0 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			if id != id0 {
@@ -441,6 +452,9 @@ func TestEstablishConnection(t *testing.T) {
 		},
 	}
 
+	metrics1 := prometheus.NewRegistry()
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler1 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			if id != id1 {
@@ -460,6 +474,8 @@ func TestEstablishConnection(t *testing.T) {
 		tlsConfig0,
 		listener0,
 		caller0,
+		metrics0,
+		msgCreator0,
 		handler0,
 	)
 	assert.NoError(t, err)
@@ -476,6 +492,8 @@ func TestEstablishConnection(t *testing.T) {
 		tlsConfig1,
 		listener1,
 		caller1,
+		metrics1,
+		msgCreator1,
 		handler1,
 	)
 	assert.NoError(t, err)
@@ -560,6 +578,9 @@ func TestDoubleTrack(t *testing.T) {
 	wg0.Add(1)
 	wg1.Add(1)
 
+	metrics0 := prometheus.NewRegistry()
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler0 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			if id != id0 {
@@ -568,6 +589,9 @@ func TestDoubleTrack(t *testing.T) {
 		},
 	}
 
+	metrics1 := prometheus.NewRegistry()
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler1 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			if id != id1 {
@@ -587,6 +611,8 @@ func TestDoubleTrack(t *testing.T) {
 		tlsConfig0,
 		listener0,
 		caller0,
+		metrics0,
+		msgCreator0,
 		handler0,
 	)
 	assert.NoError(t, err)
@@ -603,6 +629,8 @@ func TestDoubleTrack(t *testing.T) {
 		tlsConfig1,
 		listener1,
 		caller1,
+		metrics1,
+		msgCreator1,
 		handler1,
 	)
 	assert.NoError(t, err)
@@ -688,6 +716,9 @@ func TestDoubleClose(t *testing.T) {
 	wg0.Add(1)
 	wg1.Add(1)
 
+	metrics0 := prometheus.NewRegistry()
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler0 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			if id != id0 {
@@ -696,6 +727,9 @@ func TestDoubleClose(t *testing.T) {
 		},
 	}
 
+	metrics1 := prometheus.NewRegistry()
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler1 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			if id != id1 {
@@ -715,6 +749,8 @@ func TestDoubleClose(t *testing.T) {
 		tlsConfig0,
 		listener0,
 		caller0,
+		metrics0,
+		msgCreator0,
 		handler0,
 	)
 	assert.NoError(t, err)
@@ -731,6 +767,8 @@ func TestDoubleClose(t *testing.T) {
 		tlsConfig1,
 		listener1,
 		caller1,
+		metrics1,
+		msgCreator1,
 		handler1,
 	)
 	assert.NoError(t, err)
@@ -821,6 +859,9 @@ func TestTrackConnected(t *testing.T) {
 	wg0.Add(1)
 	wg1.Add(1)
 
+	metrics0 := prometheus.NewRegistry()
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler0 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			if id != id0 {
@@ -829,6 +870,9 @@ func TestTrackConnected(t *testing.T) {
 		},
 	}
 
+	metrics1 := prometheus.NewRegistry()
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler1 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			if id != id1 {
@@ -848,6 +892,8 @@ func TestTrackConnected(t *testing.T) {
 		tlsConfig0,
 		listener0,
 		caller0,
+		metrics0,
+		msgCreator0,
 		handler0,
 	)
 	assert.NoError(t, err)
@@ -864,6 +910,8 @@ func TestTrackConnected(t *testing.T) {
 		tlsConfig1,
 		listener1,
 		caller1,
+		metrics1,
+		msgCreator1,
 		handler1,
 	)
 	assert.NoError(t, err)
@@ -942,6 +990,13 @@ func TestTrackConnectedRace(t *testing.T) {
 
 	vdrs := getDefaultManager()
 	beacons := validators.NewSet()
+	metrics0 := prometheus.NewRegistry()
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
+
+	metrics1 := prometheus.NewRegistry()
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 
 	handler := &testHandler{}
 
@@ -956,6 +1011,8 @@ func TestTrackConnectedRace(t *testing.T) {
 		tlsConfig0,
 		listener0,
 		caller0,
+		metrics0,
+		msgCreator0,
 		handler,
 	)
 	assert.NoError(t, err)
@@ -972,6 +1029,8 @@ func TestTrackConnectedRace(t *testing.T) {
 		tlsConfig1,
 		listener1,
 		caller1,
+		metrics1,
+		msgCreator1,
 		handler,
 	)
 	assert.NoError(t, err)
@@ -995,7 +1054,7 @@ func TestTrackConnectedRace(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func assertEqualPeers(t *testing.T, expected map[string]ids.ShortID, actual []PeerID) {
+func assertEqualPeers(t *testing.T, expected map[string]ids.ShortID, actual []PeerInfo) {
 	assert.Len(t, actual, len(expected))
 	for _, p := range actual {
 		match, ok := expected[p.IP]
@@ -1118,6 +1177,9 @@ func TestPeerAliasesTicker(t *testing.T) {
 	wg1.Add(1)
 	wg2.Add(2)
 
+	metrics0 := prometheus.NewRegistry()
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler0 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			if id == id1 {
@@ -1136,6 +1198,9 @@ func TestPeerAliasesTicker(t *testing.T) {
 		},
 	}
 
+	metrics1 := prometheus.NewRegistry()
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler1 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			if id == id0 {
@@ -1150,6 +1215,9 @@ func TestPeerAliasesTicker(t *testing.T) {
 		},
 	}
 
+	metrics2 := prometheus.NewRegistry()
+	msgCreator2, err := message.NewCreator(metrics2, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler2 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			if cleanup {
@@ -1160,6 +1228,9 @@ func TestPeerAliasesTicker(t *testing.T) {
 		},
 	}
 
+	metrics3 := prometheus.NewRegistry()
+	msgCreator3, err := message.NewCreator(metrics3, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler3 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			if id == id0 {
@@ -1197,6 +1268,8 @@ func TestPeerAliasesTicker(t *testing.T) {
 		tlsConfig0,
 		listener0,
 		caller0,
+		metrics0,
+		msgCreator0,
 		handler0,
 	)
 	assert.NoError(t, err)
@@ -1217,6 +1290,8 @@ func TestPeerAliasesTicker(t *testing.T) {
 		tlsConfig1,
 		listener1,
 		caller1,
+		metrics1,
+		msgCreator1,
 		handler1,
 	)
 	assert.NoError(t, err)
@@ -1237,6 +1312,8 @@ func TestPeerAliasesTicker(t *testing.T) {
 		tlsConfig2,
 		listener2,
 		caller2,
+		metrics2,
+		msgCreator2,
 		handler2,
 	)
 	assert.NoError(t, err)
@@ -1258,6 +1335,8 @@ func TestPeerAliasesTicker(t *testing.T) {
 		tlsConfig2,
 		listener3,
 		caller3,
+		metrics3,
+		msgCreator3,
 		handler3,
 	)
 	assert.NoError(t, err)
@@ -1292,12 +1371,12 @@ func TestPeerAliasesTicker(t *testing.T) {
 	wg0.Wait()
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip1.String(): id1,
-	}, net0.Peers([]ids.ShortID{}))
+	}, net0.Peers(nil))
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip0.String(): id0,
-	}, net1.Peers([]ids.ShortID{}))
-	assert.Len(t, net2.Peers([]ids.ShortID{}), 0)
-	assert.Len(t, net3.Peers([]ids.ShortID{}), 0)
+	}, net1.Peers(nil))
+	assert.Len(t, net2.Peers(nil), 0)
+	assert.Len(t, net3.Peers(nil), 0)
 
 	// Attempt to connect to ip2 (same id as ip1)
 	net0.Track(ip2.IP(), id2)
@@ -1307,12 +1386,12 @@ func TestPeerAliasesTicker(t *testing.T) {
 	wg1Done = true
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip1.String(): id1,
-	}, net0.Peers([]ids.ShortID{}))
+	}, net0.Peers(nil))
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip0.String(): id0,
-	}, net1.Peers([]ids.ShortID{}))
-	assert.Len(t, net2.Peers([]ids.ShortID{}), 0)
-	assert.Len(t, net3.Peers([]ids.ShortID{}), 0)
+	}, net1.Peers(nil))
+	assert.Len(t, net2.Peers(nil), 0)
+	assert.Len(t, net3.Peers(nil), 0)
 
 	// Subsequent track call returns immediately with no connection attempts
 	// (would cause fatal error from unauthorized connection if allowed)
@@ -1331,14 +1410,14 @@ func TestPeerAliasesTicker(t *testing.T) {
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip1.String(): id1,
 		ip2.String(): id2,
-	}, net0.Peers([]ids.ShortID{}))
+	}, net0.Peers(nil))
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip0.String(): id0,
-	}, net1.Peers([]ids.ShortID{}))
-	assert.Len(t, net2.Peers([]ids.ShortID{}), 0)
+	}, net1.Peers(nil))
+	assert.Len(t, net2.Peers(nil), 0)
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip0.String(): id0,
-	}, net3.Peers([]ids.ShortID{}))
+	}, net3.Peers(nil))
 
 	// Cleanup
 	cleanup = true
@@ -1487,6 +1566,9 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	wg2.Add(3)
 	wg3.Add(2)
 
+	metrics0 := prometheus.NewRegistry()
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler0 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			if id == id1 {
@@ -1516,6 +1598,9 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		},
 	}
 
+	metrics1 := prometheus.NewRegistry()
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler1 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			if id == id0 {
@@ -1530,6 +1615,9 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		},
 	}
 
+	metrics2 := prometheus.NewRegistry()
+	msgCreator2, err := message.NewCreator(metrics2, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler2 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			if cleanup {
@@ -1540,6 +1628,9 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		},
 	}
 
+	metrics3 := prometheus.NewRegistry()
+	msgCreator3, err := message.NewCreator(metrics3, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler3 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			if id == id0 {
@@ -1585,6 +1676,8 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		tlsConfig0,
 		listener0,
 		caller0,
+		metrics0,
+		msgCreator0,
 		handler0,
 	)
 	assert.NoError(t, err)
@@ -1605,6 +1698,8 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		tlsConfig1,
 		listener1,
 		caller1,
+		metrics1,
+		msgCreator1,
 		handler1,
 	)
 	assert.NoError(t, err)
@@ -1625,6 +1720,8 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		tlsConfig2,
 		listener2,
 		caller2,
+		metrics2,
+		msgCreator2,
 		handler2,
 	)
 	assert.NoError(t, err)
@@ -1645,6 +1742,8 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		tlsConfig2,
 		listener3,
 		caller3,
+		metrics3,
+		msgCreator3,
 		handler3,
 	)
 	assert.NoError(t, err)
@@ -1678,12 +1777,12 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	wg0.Wait()
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip1.String(): id1,
-	}, net0.Peers([]ids.ShortID{}))
+	}, net0.Peers(nil))
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip0.String(): id0,
-	}, net1.Peers([]ids.ShortID{}))
-	assert.Len(t, net2.Peers([]ids.ShortID{}), 0)
-	assert.Len(t, net3.Peers([]ids.ShortID{}), 0)
+	}, net1.Peers(nil))
+	assert.Len(t, net2.Peers(nil), 0)
+	assert.Len(t, net3.Peers(nil), 0)
 
 	// Attempt to connect to ip2 (same id as ip1)
 	net0.Track(ip2.IP(), id2)
@@ -1693,12 +1792,12 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	wg1Done = true
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip1.String(): id1,
-	}, net0.Peers([]ids.ShortID{}))
+	}, net0.Peers(nil))
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip0.String(): id0,
-	}, net1.Peers([]ids.ShortID{}))
-	assert.Len(t, net2.Peers([]ids.ShortID{}), 0)
-	assert.Len(t, net3.Peers([]ids.ShortID{}), 0)
+	}, net1.Peers(nil))
+	assert.Len(t, net2.Peers(nil), 0)
+	assert.Len(t, net3.Peers(nil), 0)
 
 	// Disconnect original peer
 	_ = caller0.clients[ip1.String()].Close()
@@ -1706,12 +1805,12 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	// Track ip2 on net3
 	wg2.Wait()
 	wg2Done = true
-	assertEqualPeers(t, map[string]ids.ShortID{}, net0.Peers([]ids.ShortID{}))
+	assertEqualPeers(t, map[string]ids.ShortID{}, net0.Peers(nil))
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip0.String(): id0,
-	}, net1.Peers([]ids.ShortID{}))
-	assert.Len(t, net2.Peers([]ids.ShortID{}), 0)
-	assert.Len(t, net3.Peers([]ids.ShortID{}), 0)
+	}, net1.Peers(nil))
+	assert.Len(t, net2.Peers(nil), 0)
+	assert.Len(t, net3.Peers(nil), 0)
 	upgrader.Update(ip2, id2)
 	caller0.Update(ip2, listener3)
 	net0.Track(ip2.IP(), id2)
@@ -1720,14 +1819,14 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	wg3.Wait()
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip2.String(): id2,
-	}, net0.Peers([]ids.ShortID{}))
+	}, net0.Peers(nil))
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip0.String(): id0,
-	}, net1.Peers([]ids.ShortID{}))
-	assert.Len(t, net2.Peers([]ids.ShortID{}), 0)
+	}, net1.Peers(nil))
+	assert.Len(t, net2.Peers(nil), 0)
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip0.String(): id0,
-	}, net3.Peers([]ids.ShortID{}))
+	}, net3.Peers(nil))
 
 	// Cleanup
 	cleanup = true
@@ -1836,6 +1935,9 @@ func TestPeerSignature(t *testing.T) {
 	handledLock := sync.RWMutex{}
 	handled := make(map[string]struct{})
 
+	metrics0 := prometheus.NewRegistry()
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler0 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			if id != id0 {
@@ -1847,6 +1949,9 @@ func TestPeerSignature(t *testing.T) {
 		},
 	}
 
+	metrics1 := prometheus.NewRegistry()
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler1 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			if id != id1 {
@@ -1858,6 +1963,9 @@ func TestPeerSignature(t *testing.T) {
 		},
 	}
 
+	metrics2 := prometheus.NewRegistry()
+	msgCreator2, err := message.NewCreator(metrics2, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler2 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			if id != id2 {
@@ -1880,6 +1988,8 @@ func TestPeerSignature(t *testing.T) {
 		tlsConfig0,
 		listener0,
 		caller0,
+		metrics0,
+		msgCreator0,
 		handler0,
 	)
 	assert.NoError(t, err)
@@ -1896,6 +2006,8 @@ func TestPeerSignature(t *testing.T) {
 		tlsConfig1,
 		listener1,
 		caller1,
+		metrics1,
+		msgCreator1,
 		handler1,
 	)
 	assert.NoError(t, err)
@@ -1912,6 +2024,8 @@ func TestPeerSignature(t *testing.T) {
 		tlsConfig2,
 		listener2,
 		caller2,
+		metrics2,
+		msgCreator2,
 		handler2,
 	)
 	assert.NoError(t, err)
@@ -2235,6 +2349,9 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 	assert.NoError(t, vdrs.AddWeight(constants.PrimaryNetworkID, id1, 1))
 	assert.NoError(t, vdrs.AddWeight(constants.PrimaryNetworkID, id0, 1))
 
+	metrics0 := prometheus.NewRegistry()
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	net0Compatibility := version.NewCompatibility(
 		net0Version,
 		net0MinCompatibleVersion,
@@ -2244,6 +2361,10 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 		time.Now(),
 		net0MinCompatibleVersion,
 	)
+
+	metrics1 := prometheus.NewRegistry()
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	net1Compatibility := version.NewCompatibility(
 		net1Version,
 		net1MinCompatibleVersion,
@@ -2265,6 +2386,8 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 		tlsConfig0,
 		listener0,
 		caller0,
+		metrics0,
+		msgCreator0,
 		&testHandler{},
 	)
 	assert.NoError(t, err)
@@ -2281,6 +2404,8 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 		tlsConfig1,
 		listener1,
 		caller1,
+		metrics1,
+		msgCreator1,
 		&testHandler{},
 	)
 	assert.NoError(t, err)
@@ -2371,6 +2496,9 @@ func TestPeerTrackedSubnets(t *testing.T) {
 	wg0.Add(1)
 	wg1.Add(1)
 
+	metrics0 := prometheus.NewRegistry()
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler0 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			assert.NotEqual(t, id0, id)
@@ -2378,6 +2506,9 @@ func TestPeerTrackedSubnets(t *testing.T) {
 		},
 	}
 
+	metrics1 := prometheus.NewRegistry()
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler1 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			assert.NotEqual(t, id1, id)
@@ -2398,6 +2529,8 @@ func TestPeerTrackedSubnets(t *testing.T) {
 		tlsConfig0,
 		listener0,
 		caller0,
+		metrics0,
+		msgCreator0,
 		handler0,
 	)
 	assert.NoError(t, err)
@@ -2414,6 +2547,8 @@ func TestPeerTrackedSubnets(t *testing.T) {
 		tlsConfig1,
 		listener1,
 		caller1,
+		metrics1,
+		msgCreator1,
 		handler1,
 	)
 	assert.NoError(t, err)
@@ -2549,6 +2684,10 @@ func TestPeerGossip(t *testing.T) {
 	testSubnetContainerID := ids.GenerateTestID()
 	testPrimaryContainerID := ids.GenerateTestID()
 	allContainerIDs := []ids.ID{testSubnetContainerID, testPrimaryContainerID}
+
+	metrics0 := prometheus.NewRegistry()
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler0 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			assert.NotEqual(t, id0, id)
@@ -2559,6 +2698,9 @@ func TestPeerGossip(t *testing.T) {
 		},
 	}
 
+	metrics1 := prometheus.NewRegistry()
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler1 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			assert.NotEqual(t, id1, id)
@@ -2570,6 +2712,9 @@ func TestPeerGossip(t *testing.T) {
 		},
 	}
 
+	metrics2 := prometheus.NewRegistry()
+	msgCreator2, err := message.NewCreator(metrics2, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler2 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			assert.NotEqual(t, id2, id)
@@ -2596,6 +2741,8 @@ func TestPeerGossip(t *testing.T) {
 		tlsConfig0,
 		listener0,
 		caller0,
+		metrics0,
+		msgCreator0,
 		handler0,
 	)
 	assert.NoError(t, err)
@@ -2612,6 +2759,8 @@ func TestPeerGossip(t *testing.T) {
 		tlsConfig1,
 		listener1,
 		caller1,
+		metrics1,
+		msgCreator1,
 		handler1,
 	)
 	assert.NoError(t, err)
@@ -2628,6 +2777,8 @@ func TestPeerGossip(t *testing.T) {
 		tlsConfig2,
 		listener2,
 		caller2,
+		metrics2,
+		msgCreator2,
 		handler2,
 	)
 	assert.NoError(t, err)
@@ -2654,8 +2805,13 @@ func TestPeerGossip(t *testing.T) {
 	wg1.Wait()
 	wg2.Wait()
 
-	net0.SendGossip(testSubnetID, ids.GenerateTestID(), testSubnetContainerID, []byte("test"), false)
-	net0.SendGossip(constants.PrimaryNetworkID, ids.GenerateTestID(), testPrimaryContainerID, []byte("test2"), false)
+	gossipMsg0, err := msgCreator0.Put(ids.GenerateTestID(), constants.GossipMsgRequestID, testSubnetContainerID, []byte("test0"))
+	assert.NoError(t, err)
+	net0.Gossip(gossipMsg0, testSubnetID, false, 0, int(net0.(*network).config.GossipAcceptedFrontierSize))
+
+	gossipMsg1, err := msgCreator0.Put(ids.GenerateTestID(), constants.GossipMsgRequestID, testPrimaryContainerID, []byte("test1"))
+	assert.NoError(t, err)
+	net0.Gossip(gossipMsg1, constants.PrimaryNetworkID, false, 0, int(net0.(*network).config.GossipAcceptedFrontierSize))
 
 	wg1P.Wait()
 	wg2P.Wait()
@@ -2767,6 +2923,9 @@ func TestAppGossip(t *testing.T) {
 
 	testAppGossipBytes := []byte("appgossip")
 	testAppGossipSpecificBytes := []byte("appgossipspecific")
+	metrics0 := prometheus.NewRegistry()
+	msgCreator0, err := message.NewCreator(metrics0, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler0 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			assert.NotEqual(t, id0, id)
@@ -2780,6 +2939,9 @@ func TestAppGossip(t *testing.T) {
 		},
 	}
 
+	metrics1 := prometheus.NewRegistry()
+	msgCreator1, err := message.NewCreator(metrics1, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler1 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			assert.NotEqual(t, id1, id)
@@ -2794,6 +2956,9 @@ func TestAppGossip(t *testing.T) {
 		},
 	}
 
+	metrics2 := prometheus.NewRegistry()
+	msgCreator2, err := message.NewCreator(metrics2, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	assert.NoError(t, err)
 	handler2 := &testHandler{
 		ConnectedF: func(id ids.ShortID) {
 			assert.NotEqual(t, id2, id)
@@ -2819,6 +2984,8 @@ func TestAppGossip(t *testing.T) {
 		tlsConfig0,
 		listener0,
 		caller0,
+		metrics0,
+		msgCreator0,
 		handler0,
 	)
 	assert.NoError(t, err)
@@ -2835,6 +3002,8 @@ func TestAppGossip(t *testing.T) {
 		tlsConfig1,
 		listener1,
 		caller1,
+		metrics1,
+		msgCreator1,
 		handler1,
 	)
 	assert.NoError(t, err)
@@ -2851,6 +3020,8 @@ func TestAppGossip(t *testing.T) {
 		tlsConfig2,
 		listener2,
 		caller2,
+		metrics2,
+		msgCreator2,
 		handler2,
 	)
 	assert.NoError(t, err)
@@ -2878,10 +3049,15 @@ func TestAppGossip(t *testing.T) {
 	wg2.Wait()
 
 	chainID := ids.GenerateTestID()
-	net0.SendAppGossip(constants.PrimaryNetworkID, chainID, testAppGossipBytes, false)
+	msg1, err := msgCreator0.AppGossip(chainID, testAppGossipBytes)
+	assert.NoError(t, err)
+	net0.Gossip(msg1, constants.PrimaryNetworkID, false, int(net0.(*network).config.AppGossipValidatorSize), int(net0.(*network).config.AppGossipNonValidatorSize))
+
 	specificNodeSet := ids.NewShortSet(1)
 	specificNodeSet.Add(id2)
-	net0.SendAppGossipSpecific(specificNodeSet, constants.PrimaryNetworkID, chainID, testAppGossipSpecificBytes, false)
+	msg2, err := msgCreator0.AppGossip(chainID, testAppGossipSpecificBytes)
+	assert.NoError(t, err)
+	net0.Send(msg2, specificNodeSet, constants.PrimaryNetworkID, false)
 
 	wg1P.Wait()
 	wg2P.Wait()
@@ -2943,11 +3119,16 @@ func newDefaultNetwork(
 	subnetSet ids.Set,
 	tlsConfig *tls.Config,
 	listener net.Listener,
+	metrics *prometheus.Registry,
+	msgCreator message.Creator,
 	router router.Router,
 ) (Network, error) {
 	log := logging.NoLog{}
 	networkID := uint32(0)
 	benchlistManager := benchlist.NewManager(&benchlist.Config{})
+	s := uptime.NewTestState()
+
+	uptimeManager := uptime.NewManager(s)
 
 	netConfig := newDefaultConfig()
 	netConfig.Namespace = ""
@@ -2966,8 +3147,9 @@ func newDefaultNetwork(
 	netConfig.GossipOnAcceptSize = defaultGossipOnAcceptSize
 	netConfig.CompressionEnabled = true
 	netConfig.WhitelistedSubnets = subnetSet
+	netConfig.UptimeCalculator = uptimeManager
 
-	n, err := NewNetwork(&netConfig, prometheus.NewRegistry(), log, listener, router, benchlistManager)
+	n, err := NewNetwork(&netConfig, msgCreator, metrics, log, listener, router, benchlistManager)
 	if err != nil {
 		return nil, err
 	}
@@ -2985,8 +3167,10 @@ func newTestNetwork(id ids.ShortID,
 	tlsConfig *tls.Config,
 	listener net.Listener,
 	dialer dialer.Dialer,
+	metrics *prometheus.Registry,
+	msgCreator message.Creator,
 	router router.Router) (Network, error) {
-	n, err := newDefaultNetwork(id, ip, vdrs, beacons, tlsKey, subnetSet, tlsConfig, listener, router)
+	n, err := newDefaultNetwork(id, ip, vdrs, beacons, tlsKey, subnetSet, tlsConfig, listener, metrics, msgCreator, router)
 	if err != nil {
 		return nil, err
 	}

@@ -17,8 +17,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var _ InboundMsgThrottler = &inboundMsgByteThrottler{}
-
 // See inbound_msg_throttler.go
 
 func newInboundMsgByteThrottler(

@@ -25,6 +25,8 @@ type VMClient interface {
 	Shutdown(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	CreateHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateHandlersResponse, error)
 	CreateStaticHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateStaticHandlersResponse, error)
+	Connected(ctx context.Context, in *ConnectedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	Disconnected(ctx context.Context, in *DisconnectedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	BuildBlock(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*BuildBlockResponse, error)
 	ParseBlock(ctx context.Context, in *ParseBlockRequest, opts ...grpc.CallOption) (*ParseBlockResponse, error)
 	GetBlock(ctx context.Context, in *GetBlockRequest, opts ...grpc.CallOption) (*GetBlockResponse, error)
@@ -38,6 +40,8 @@ type VMClient interface {
 	BlockVerify(ctx context.Context, in *BlockVerifyRequest, opts ...grpc.CallOption) (*BlockVerifyResponse, error)
 	BlockAccept(ctx context.Context, in *BlockAcceptRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	BlockReject(ctx context.Context, in *BlockRejectRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	GetAncestors(ctx context.Context, in *GetAncestorsRequest, opts ...grpc.CallOption) (*GetAncestorsResponse, error)
+	BatchedParseBlock(ctx context.Context, in *BatchedParseBlockRequest, opts ...grpc.CallOption) (*BatchedParseBlockResponse, error)
 }
 
 type vMClient struct {
@@ -96,6 +100,24 @@ func (c *vMClient) CreateHandlers(ctx context.Context, in *emptypb.Empty, opts .
 func (c *vMClient) CreateStaticHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateStaticHandlersResponse, error) {
 	out := new(CreateStaticHandlersResponse)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/CreateStaticHandlers", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) Connected(ctx context.Context, in *ConnectedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/Connected", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) Disconnected(ctx context.Context, in *DisconnectedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/Disconnected", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -219,6 +241,24 @@ func (c *vMClient) BlockReject(ctx context.Context, in *BlockRejectRequest, opts
 	return out, nil
 }
 
+func (c *vMClient) GetAncestors(ctx context.Context, in *GetAncestorsRequest, opts ...grpc.CallOption) (*GetAncestorsResponse, error) {
+	out := new(GetAncestorsResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/GetAncestors", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) BatchedParseBlock(ctx context.Context, in *BatchedParseBlockRequest, opts ...grpc.CallOption) (*BatchedParseBlockResponse, error) {
+	out := new(BatchedParseBlockResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/BatchedParseBlock", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // VMServer is the server API for VM service.
 // All implementations must embed UnimplementedVMServer
 // for forward compatibility
@@ -229,6 +269,8 @@ type VMServer interface {
 	Shutdown(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	CreateHandlers(context.Context, *emptypb.Empty) (*CreateHandlersResponse, error)
 	CreateStaticHandlers(context.Context, *emptypb.Empty) (*CreateStaticHandlersResponse, error)
+	Connected(context.Context, *ConnectedRequest) (*emptypb.Empty, error)
+	Disconnected(context.Context, *DisconnectedRequest) (*emptypb.Empty, error)
 	BuildBlock(context.Context, *emptypb.Empty) (*BuildBlockResponse, error)
 	ParseBlock(context.Context, *ParseBlockRequest) (*ParseBlockResponse, error)
 	GetBlock(context.Context, *GetBlockRequest) (*GetBlockResponse, error)
@@ -242,6 +284,8 @@ type VMServer interface {
 	BlockVerify(context.Context, *BlockVerifyRequest) (*BlockVerifyResponse, error)
 	BlockAccept(context.Context, *BlockAcceptRequest) (*emptypb.Empty, error)
 	BlockReject(context.Context, *BlockRejectRequest) (*emptypb.Empty, error)
+	GetAncestors(context.Context, *GetAncestorsRequest) (*GetAncestorsResponse, error)
+	BatchedParseBlock(context.Context, *BatchedParseBlockRequest) (*BatchedParseBlockResponse, error)
 	mustEmbedUnimplementedVMServer()
 }
 
@@ -266,6 +310,12 @@ func (UnimplementedVMServer) CreateHandlers(context.Context, *emptypb.Empty) (*C
 }
 func (UnimplementedVMServer) CreateStaticHandlers(context.Context, *emptypb.Empty) (*CreateStaticHandlersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateStaticHandlers not implemented")
+}
+func (UnimplementedVMServer) Connected(context.Context, *ConnectedRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Connected not implemented")
+}
+func (UnimplementedVMServer) Disconnected(context.Context, *DisconnectedRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Disconnected not implemented")
 }
 func (UnimplementedVMServer) BuildBlock(context.Context, *emptypb.Empty) (*BuildBlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BuildBlock not implemented")
@@ -305,6 +355,12 @@ func (UnimplementedVMServer) BlockAccept(context.Context, *BlockAcceptRequest) (
 }
 func (UnimplementedVMServer) BlockReject(context.Context, *BlockRejectRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BlockReject not implemented")
+}
+func (UnimplementedVMServer) GetAncestors(context.Context, *GetAncestorsRequest) (*GetAncestorsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAncestors not implemented")
+}
+func (UnimplementedVMServer) BatchedParseBlock(context.Context, *BatchedParseBlockRequest) (*BatchedParseBlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BatchedParseBlock not implemented")
 }
 func (UnimplementedVMServer) mustEmbedUnimplementedVMServer() {}
 
@@ -423,6 +479,42 @@ func _VM_CreateStaticHandlers_Handler(srv interface{}, ctx context.Context, dec 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(VMServer).CreateStaticHandlers(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_Connected_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ConnectedRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).Connected(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/Connected",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).Connected(ctx, req.(*ConnectedRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_Disconnected_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DisconnectedRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).Disconnected(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/Disconnected",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).Disconnected(ctx, req.(*DisconnectedRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -661,6 +753,42 @@ func _VM_BlockReject_Handler(srv interface{}, ctx context.Context, dec func(inte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VM_GetAncestors_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAncestorsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).GetAncestors(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/GetAncestors",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).GetAncestors(ctx, req.(*GetAncestorsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_BatchedParseBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BatchedParseBlockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).BatchedParseBlock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/BatchedParseBlock",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).BatchedParseBlock(ctx, req.(*BatchedParseBlockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // VM_ServiceDesc is the grpc.ServiceDesc for VM service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -691,6 +819,14 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateStaticHandlers",
 			Handler:    _VM_CreateStaticHandlers_Handler,
+		},
+		{
+			MethodName: "Connected",
+			Handler:    _VM_Connected_Handler,
+		},
+		{
+			MethodName: "Disconnected",
+			Handler:    _VM_Disconnected_Handler,
 		},
 		{
 			MethodName: "BuildBlock",
@@ -743,6 +879,14 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "BlockReject",
 			Handler:    _VM_BlockReject_Handler,
+		},
+		{
+			MethodName: "GetAncestors",
+			Handler:    _VM_GetAncestors_Handler,
+		},
+		{
+			MethodName: "BatchedParseBlock",
+			Handler:    _VM_BatchedParseBlock_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -11,49 +11,66 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-// Client is an Info API Client
-type Client struct {
+// Interface compliance
+var _ Client = &client{}
+
+// Client interface for an Info API Client
+type Client interface {
+	GetNodeVersion() (*GetNodeVersionReply, error)
+	GetNodeID() (string, error)
+	GetNodeIP() (string, error)
+	GetNetworkID() (uint32, error)
+	GetNetworkName() (string, error)
+	GetBlockchainID(alias string) (ids.ID, error)
+	Peers() ([]network.PeerInfo, error)
+	IsBootstrapped(chainID string) (bool, error)
+	GetTxFee() (*GetTxFeeResponse, error)
+	Uptime() (*UptimeResponse, error)
+}
+
+// Client implementation for an Info API Client
+type client struct {
 	requester rpc.EndpointRequester
 }
 
 // NewClient returns a new Info API Client
-func NewClient(uri string, requestTimeout time.Duration) *Client {
-	return &Client{
+func NewClient(uri string, requestTimeout time.Duration) Client {
+	return &client{
 		requester: rpc.NewEndpointRequester(uri, "/ext/info", "info", requestTimeout),
 	}
 }
 
-func (c *Client) GetNodeVersion() (*GetNodeVersionReply, error) {
+func (c *client) GetNodeVersion() (*GetNodeVersionReply, error) {
 	res := &GetNodeVersionReply{}
 	err := c.requester.SendRequest("getNodeVersion", struct{}{}, res)
 	return res, err
 }
 
-func (c *Client) GetNodeID() (string, error) {
+func (c *client) GetNodeID() (string, error) {
 	res := &GetNodeIDReply{}
 	err := c.requester.SendRequest("getNodeID", struct{}{}, res)
 	return res.NodeID, err
 }
 
-func (c *Client) GetNodeIP() (string, error) {
+func (c *client) GetNodeIP() (string, error) {
 	res := &GetNodeIPReply{}
 	err := c.requester.SendRequest("getNodeIP", struct{}{}, res)
 	return res.IP, err
 }
 
-func (c *Client) GetNetworkID() (uint32, error) {
+func (c *client) GetNetworkID() (uint32, error) {
 	res := &GetNetworkIDReply{}
 	err := c.requester.SendRequest("getNetworkID", struct{}{}, res)
 	return uint32(res.NetworkID), err
 }
 
-func (c *Client) GetNetworkName() (string, error) {
+func (c *client) GetNetworkName() (string, error) {
 	res := &GetNetworkNameReply{}
 	err := c.requester.SendRequest("getNetworkName", struct{}{}, res)
 	return res.NetworkName, err
 }
 
-func (c *Client) GetBlockchainID(alias string) (ids.ID, error) {
+func (c *client) GetBlockchainID(alias string) (ids.ID, error) {
 	res := &GetBlockchainIDReply{}
 	err := c.requester.SendRequest("getBlockchainID", &GetBlockchainIDArgs{
 		Alias: alias,
@@ -61,22 +78,28 @@ func (c *Client) GetBlockchainID(alias string) (ids.ID, error) {
 	return res.BlockchainID, err
 }
 
-func (c *Client) Peers() ([]network.PeerID, error) {
+func (c *client) Peers() ([]network.PeerInfo, error) {
 	res := &PeersReply{}
 	err := c.requester.SendRequest("peers", struct{}{}, res)
 	return res.Peers, err
 }
 
-func (c *Client) IsBootstrapped(chain string) (bool, error) {
+func (c *client) IsBootstrapped(chainID string) (bool, error) {
 	res := &IsBootstrappedResponse{}
 	err := c.requester.SendRequest("isBootstrapped", &IsBootstrappedArgs{
-		Chain: chain,
+		Chain: chainID,
 	}, res)
 	return res.IsBootstrapped, err
 }
 
-func (c *Client) GetTxFee() (*GetTxFeeResponse, error) {
+func (c *client) GetTxFee() (*GetTxFeeResponse, error) {
 	res := &GetTxFeeResponse{}
 	err := c.requester.SendRequest("getTxFee", struct{}{}, res)
+	return res, err
+}
+
+func (c *client) Uptime() (*UptimeResponse, error) {
+	res := &UptimeResponse{}
+	err := c.requester.SendRequest("uptime", struct{}{}, res)
 	return res, err
 }

@@ -358,6 +358,46 @@ func (vm *VMServer) ParseBlock(_ context.Context, req *vmproto.ParseBlockRequest
 	}, err
 }
 
+func (vm *VMServer) GetAncestors(_ context.Context, req *vmproto.GetAncestorsRequest) (*vmproto.GetAncestorsResponse, error) {
+	blkID, err := ids.ToID(req.BlkID)
+	if err != nil {
+		return nil, err
+	}
+	maxBlksNum := int(req.MaxBlocksNum)
+	maxBlksSize := int(req.MaxBlocksSize)
+	maxBlocksRetrivalTime := time.Duration(req.MaxBlocksRetrivalTime)
+
+	blocks, err := block.GetAncestors(
+		vm.vm,
+		blkID,
+		maxBlksNum,
+		maxBlksSize,
+		maxBlocksRetrivalTime,
+	)
+	return &vmproto.GetAncestorsResponse{
+		BlksBytes: blocks,
+	}, err
+}
+
+func (vm *VMServer) BatchedParseBlock(
+	ctx context.Context,
+	req *vmproto.BatchedParseBlockRequest,
+) (*vmproto.BatchedParseBlockResponse, error) {
+	blocks := make([]*vmproto.ParseBlockResponse, len(req.Request))
+	for i, blockBytes := range req.Request {
+		block, err := vm.ParseBlock(ctx, &vmproto.ParseBlockRequest{
+			Bytes: blockBytes,
+		})
+		if err != nil {
+			return nil, err
+		}
+		blocks[i] = block
+	}
+	return &vmproto.BatchedParseBlockResponse{
+		Response: blocks,
+	}, nil
+}
+
 func (vm *VMServer) GetBlock(_ context.Context, req *vmproto.GetBlockRequest) (*vmproto.GetBlockResponse, error) {
 	id, err := ids.ToID(req.Id)
 	if err != nil {
@@ -420,12 +460,32 @@ func (vm *VMServer) Version(context.Context, *emptypb.Empty) (*vmproto.VersionRe
 	}, err
 }
 
+func (vm *VMServer) Connected(_ context.Context, req *vmproto.ConnectedRequest) (*emptypb.Empty, error) {
+	nodeID, err := ids.ToShortID(req.NodeID)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, vm.vm.Connected(nodeID)
+}
+
+func (vm *VMServer) Disconnected(_ context.Context, req *vmproto.DisconnectedRequest) (*emptypb.Empty, error) {
+	nodeID, err := ids.ToShortID(req.NodeID)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, vm.vm.Disconnected(nodeID)
+}
+
 func (vm *VMServer) AppRequest(_ context.Context, req *vmproto.AppRequestMsg) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToShortID(req.NodeID)
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.AppRequest(nodeID, req.RequestID, req.Request)
+	var deadline time.Time
+	if err := deadline.UnmarshalBinary(req.Deadline); err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, vm.vm.AppRequest(nodeID, req.RequestID, deadline, req.Request)
 }
 
 func (vm *VMServer) AppRequestFailed(_ context.Context, req *vmproto.AppRequestFailedMsg) (*emptypb.Empty, error) {

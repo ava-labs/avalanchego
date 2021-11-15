@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/indexer"
 	"github.com/ava-labs/avalanchego/ipcs"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -40,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/triggers"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -102,6 +104,9 @@ type Node struct {
 	// Monitors node health and runs health checks
 	healthService health.Service
 
+	// Build and parse messages, for both network layer and chain manager
+	msgCreator message.Creator
+
 	// Manages creation of blockchains and routing messages to them
 	chainManager chains.Manager
 
@@ -111,6 +116,8 @@ type Node struct {
 	// Manages validator benching
 	benchlistManager benchlist.Manager
 
+	uptimeCalculator uptime.LockedCalculator
+
 	// dispatcher for events as they happen in consensus
 	DecisionDispatcher  *triggers.EventDispatcher
 	ConsensusDispatcher *triggers.EventDispatcher
@@ -118,7 +125,8 @@ type Node struct {
 	IPCs *ipcs.ChainIPCs
 
 	// Net runs the networking stack
-	Net network.Network
+	networkNamespace string
+	Net              network.Network
 
 	// this node's initial connections to the network
 	beacons validators.Set
@@ -191,7 +199,10 @@ func (n *Node) initNetworking() error {
 	// Configure benchlist
 	n.Config.BenchlistConfig.Validators = n.vdrs
 	n.Config.BenchlistConfig.Benchable = n.Config.ConsensusRouter
+	n.Config.BenchlistConfig.StakingEnabled = n.Config.EnableStaking
 	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
+
+	n.uptimeCalculator = uptime.NewLockedCalculator()
 
 	consensusRouter := n.Config.ConsensusRouter
 	if !n.Config.EnableStaking {
@@ -215,6 +226,7 @@ func (n *Node) initNetworking() error {
 		timer := timer.NewTimer(func() {
 			// If the timeout fires and we're already shutting down, nothing to do.
 			if !n.shuttingDown.GetValue() {
+				n.Log.Debug("node %s failed to connect to bootstrap nodes %s in time", n.ID.PrefixedString(constants.NodeIDPrefix), n.beacons)
 				n.Log.Fatal("Failed to connect to bootstrap nodes. Node shutting down...")
 				go n.Shutdown(1)
 			}
@@ -231,10 +243,8 @@ func (n *Node) initNetworking() error {
 		}
 	}
 
-	networkNamespace := fmt.Sprintf("%s_network", constants.PlatformName)
-
 	// add node configs to network config
-	n.Config.NetworkConfig.Namespace = networkNamespace
+	n.Config.NetworkConfig.Namespace = n.networkNamespace
 	n.Config.NetworkConfig.MyNodeID = n.ID
 	n.Config.NetworkConfig.MyIP = n.Config.IP
 	n.Config.NetworkConfig.NetworkID = n.Config.NetworkID
@@ -243,9 +253,11 @@ func (n *Node) initNetworking() error {
 	n.Config.NetworkConfig.TLSConfig = tlsConfig
 	n.Config.NetworkConfig.TLSKey = tlsKey
 	n.Config.NetworkConfig.WhitelistedSubnets = n.Config.WhitelistedSubnets
+	n.Config.NetworkConfig.UptimeCalculator = n.uptimeCalculator
 
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
+		n.msgCreator,
 		n.MetricsRegisterer,
 		n.Log,
 		listener,
@@ -585,6 +597,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	err = n.Config.ConsensusRouter.Initialize(
 		n.ID,
 		n.Log,
+		n.msgCreator,
 		timeoutManager,
 		n.Config.ConsensusGossipFrequency,
 		n.Config.ConsensusShutdownTimeout,
@@ -614,6 +627,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		DecisionEvents:                         n.DecisionDispatcher,
 		ConsensusEvents:                        n.ConsensusDispatcher,
 		DBManager:                              n.DBManager,
+		MsgCreator:                             n.msgCreator,
 		Router:                                 n.Config.ConsensusRouter,
 		Net:                                    n.Net,
 		ConsensusParams:                        n.Config.ConsensusParams,
@@ -637,6 +651,9 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		MeterVMEnabled:                         n.Config.MeterVMEnabled,
 		SubnetConfigs:                          n.Config.SubnetConfigs,
 		ChainConfigs:                           n.Config.ChainConfigs,
+		AppGossipValidatorSize:                 int(n.Config.NetworkConfig.AppGossipValidatorSize),
+		AppGossipNonValidatorSize:              int(n.Config.NetworkConfig.AppGossipNonValidatorSize),
+		GossipAcceptedFrontierSize:             int(n.Config.NetworkConfig.GossipAcceptedFrontierSize),
 		BootstrapMaxTimeGetAncestors:           n.Config.BootstrapMaxTimeGetAncestors,
 		BootstrapMultiputMaxContainersSent:     n.Config.BootstrapMultiputMaxContainersSent,
 		BootstrapMultiputMaxContainersReceived: n.Config.BootstrapMultiputMaxContainersReceived,
@@ -657,24 +674,25 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		n.vmManager.RegisterFactory(platformvm.ID, &platformvm.Factory{
-			Chains:                n.chainManager,
-			Validators:            vdrs,
-			StakingEnabled:        n.Config.EnableStaking,
-			WhitelistedSubnets:    n.Config.WhitelistedSubnets,
-			TxFee:                 n.Config.TxFee,
-			CreateAssetTxFee:      n.Config.CreateAssetTxFee,
-			CreateSubnetTxFee:     n.Config.CreateSubnetTxFee,
-			CreateBlockchainTxFee: n.Config.CreateBlockchainTxFee,
-			UptimePercentage:      n.Config.UptimeRequirement,
-			MinValidatorStake:     n.Config.MinValidatorStake,
-			MaxValidatorStake:     n.Config.MaxValidatorStake,
-			MinDelegatorStake:     n.Config.MinDelegatorStake,
-			MinDelegationFee:      n.Config.MinDelegationFee,
-			MinStakeDuration:      n.Config.MinStakeDuration,
-			MaxStakeDuration:      n.Config.MaxStakeDuration,
-			StakeMintingPeriod:    n.Config.StakeMintingPeriod,
-			ApricotPhase3Time:     version.GetApricotPhase3Time(n.Config.NetworkID),
-			ApricotPhase4Time:     version.GetApricotPhase4Time(n.Config.NetworkID),
+			Chains:                 n.chainManager,
+			Validators:             vdrs,
+			UptimeLockedCalculator: n.uptimeCalculator,
+			StakingEnabled:         n.Config.EnableStaking,
+			WhitelistedSubnets:     n.Config.WhitelistedSubnets,
+			TxFee:                  n.Config.TxFee,
+			CreateAssetTxFee:       n.Config.CreateAssetTxFee,
+			CreateSubnetTxFee:      n.Config.CreateSubnetTxFee,
+			CreateBlockchainTxFee:  n.Config.CreateBlockchainTxFee,
+			UptimePercentage:       n.Config.UptimeRequirement,
+			MinValidatorStake:      n.Config.MinValidatorStake,
+			MaxValidatorStake:      n.Config.MaxValidatorStake,
+			MinDelegatorStake:      n.Config.MinDelegatorStake,
+			MinDelegationFee:       n.Config.MinDelegationFee,
+			MinStakeDuration:       n.Config.MinStakeDuration,
+			MaxStakeDuration:       n.Config.MaxStakeDuration,
+			StakeMintingPeriod:     n.Config.StakeMintingPeriod,
+			ApricotPhase3Time:      version.GetApricotPhase3Time(n.Config.NetworkID),
+			ApricotPhase4Time:      version.GetApricotPhase4Time(n.Config.NetworkID),
 		}),
 		n.vmManager.RegisterFactory(avm.ID, &avm.Factory{
 			TxFee:            n.Config.TxFee,
@@ -850,19 +868,27 @@ func (n *Node) initInfoAPI() error {
 		n.Log.Info("skipping info API initialization because it has been disabled")
 		return nil
 	}
+
 	n.Log.Info("initializing info API")
+
+	primaryValidators, _ := n.vdrs.GetValidators(constants.PrimaryNetworkID)
 	service, err := info.NewService(
+		info.Parameters{
+			Version:               version.CurrentApp,
+			NodeID:                n.ID,
+			NetworkID:             n.Config.NetworkID,
+			TxFee:                 n.Config.TxFee,
+			CreateAssetTxFee:      n.Config.CreateAssetTxFee,
+			CreateSubnetTxFee:     n.Config.CreateSubnetTxFee,
+			CreateBlockchainTxFee: n.Config.CreateBlockchainTxFee,
+			UptimeRequirement:     n.Config.UptimeRequirement,
+		},
 		n.Log,
-		version.CurrentApp,
-		n.ID,
-		n.Config.NetworkID,
 		n.chainManager,
 		n.vmManager,
 		n.Net,
-		n.Config.TxFee,
-		n.Config.CreateAssetTxFee,
-		n.Config.CreateSubnetTxFee,
-		n.Config.CreateBlockchainTxFee,
+		version.NewDefaultApplicationParser(),
+		primaryValidators,
 	)
 	if err != nil {
 		return err
@@ -1051,6 +1077,17 @@ func (n *Node) Initialize(
 
 	if err := n.initSharedMemory(); err != nil { // Initialize shared memory
 		return fmt.Errorf("problem initializing shared memory: %w", err)
+	}
+
+	// message.Creator is shared between networking, chainManager and the engine.
+	// It must be initiated before networking (initNetworking), chain manager (initChainManager)
+	// and the engine (initChains) but after the metrics (initMetricsAPI)
+	// message.Creator currently record metrics under network namespace
+	n.networkNamespace = fmt.Sprintf("%s_network", constants.PlatformName)
+	if n.msgCreator, err = message.NewCreator(n.MetricsRegisterer,
+		n.Config.NetworkConfig.CompressionEnabled,
+		n.networkNamespace); err != nil {
+		return fmt.Errorf("problem TheOneCreator: %w", err)
 	}
 
 	if err = n.initNetworking(); err != nil { // Set up all networking

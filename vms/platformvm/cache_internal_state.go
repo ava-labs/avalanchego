@@ -18,11 +18,11 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/uptime"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -710,6 +710,14 @@ func (st *internalStateImpl) SetUptime(nodeID ids.ShortID, upDuration time.Durat
 	uptime.lastUpdated = lastUpdated
 	st.updatedUptimes[nodeID] = struct{}{}
 	return nil
+}
+
+func (st *internalStateImpl) GetStartTime(nodeID ids.ShortID) (time.Time, error) {
+	currentValidator, err := st.currentStakerChainState.GetValidator(nodeID)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return currentValidator.AddValidatorTx().StartTime(), nil
 }
 
 func (st *internalStateImpl) SetHeight(height uint64) {
@@ -1566,7 +1574,7 @@ func (st *internalStateImpl) init(genesisBytes []byte) error {
 	// do genesisBlock.Accept() because then it'd look for genesisBlock's
 	// non-existent parent)
 	genesisID := hashing.ComputeHash256Array(genesisBytes)
-	genesisBlock, err := st.vm.newCommitBlock(genesisID, 0)
+	genesisBlock, err := st.vm.newCommitBlock(genesisID, 0, true)
 	if err != nil {
 		return err
 	}

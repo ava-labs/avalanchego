@@ -8,7 +8,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 var errNoValidUniformSamplers = errors.New("no valid uniform samplers found")
@@ -25,7 +25,7 @@ type uniformBest struct {
 	samplers            []Uniform
 	maxSampleSize       int
 	benchmarkIterations int
-	clock               timer.Clock
+	clock               mockable.Clock
 }
 
 // NewBestUniform returns a new sampler

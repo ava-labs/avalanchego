@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
@@ -131,6 +132,7 @@ type ManagerConfig struct {
 	DecisionEvents              *triggers.EventDispatcher
 	ConsensusEvents             *triggers.EventDispatcher
 	DBManager                   dbManager.Manager
+	MsgCreator                  message.Creator  // message creator, shared with network
 	Router                      router.Router    // Routes incoming messages to the appropriate chain
 	Net                         network.Network  // Sends consensus messages to other validators
 	ConsensusParams             avcon.Parameters // The consensus parameters (alpha, beta, etc.) for new chains
@@ -155,6 +157,10 @@ type ManagerConfig struct {
 	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
 	ShutdownNodeFunc func(exitCode int)
 	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
+
+	AppGossipValidatorSize     int
+	AppGossipNonValidatorSize  int
+	GossipAcceptedFrontierSize int
 
 	// Max Time to spend fetching a container and its
 	// ancestors when responding to a GetAncestors
@@ -219,7 +225,7 @@ func (m *manager) CreateChain(chain ChainParameters) {
 // Create a chain, this is only called from the P-chain thread, except for
 // creating the P-chain.
 func (m *manager) ForceCreateChain(chainParams ChainParameters) {
-	if chainParams.SubnetID != constants.PrimaryNetworkID && !m.WhitelistedSubnets.Contains(chainParams.SubnetID) {
+	if m.StakingEnabled && chainParams.SubnetID != constants.PrimaryNetworkID && !m.WhitelistedSubnets.Contains(chainParams.SubnetID) {
 		m.Log.Debug("Skipped creating non-whitelisted chain:\n"+
 			"    ID: %s\n"+
 			"    VMID:%s",
@@ -500,11 +506,15 @@ func (m *manager) createAvalancheChain(
 	sender := sender.Sender{}
 	if err := sender.Initialize(
 		ctx,
+		m.MsgCreator,
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
 		consensusParams.Namespace,
 		consensusParams.Metrics,
+		m.AppGossipValidatorSize,
+		m.AppGossipNonValidatorSize,
+		m.GossipAcceptedFrontierSize,
 	); err != nil {
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
 	}
@@ -596,6 +606,7 @@ func (m *manager) createAvalancheChain(
 	}
 
 	err = handler.Initialize(
+		m.MsgCreator,
 		engine,
 		vdrs,
 		msgChan,
@@ -649,11 +660,15 @@ func (m *manager) createSnowmanChain(
 	sender := sender.Sender{}
 	if err := sender.Initialize(
 		ctx,
+		m.MsgCreator,
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
 		consensusParams.Namespace,
 		consensusParams.Metrics,
+		m.AppGossipValidatorSize,
+		m.AppGossipNonValidatorSize,
+		m.GossipAcceptedFrontierSize,
 	); err != nil {
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
 	}
@@ -748,6 +763,7 @@ func (m *manager) createSnowmanChain(
 	}
 
 	err = handler.Initialize(
+		m.MsgCreator,
 		engine,
 		vdrs,
 		msgChan,

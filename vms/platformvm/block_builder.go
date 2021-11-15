@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 const (
@@ -185,7 +186,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 
 	// The chain time if the preferred block were to be committed
 	currentChainTimestamp := preferredState.GetTimestamp()
-	if !currentChainTimestamp.Before(timer.MaxTime) {
+	if !currentChainTimestamp.Before(mockable.MaxTime) {
 		return nil, errEndOfTime
 	}
 
@@ -335,7 +336,7 @@ func (m *blockBuilder) ResetTimer() {
 
 	// The chain time if the preferred block were to be accepted
 	timestamp := preferredState.GetTimestamp()
-	if timestamp.Equal(timer.MaxTime) {
+	if timestamp.Equal(mockable.MaxTime) {
 		m.vm.ctx.Log.Error("program time is suspiciously far in the future. Either this codebase was way more successful than expected, or a critical error has occurred")
 		return
 	}

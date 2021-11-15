@@ -6,6 +6,7 @@ package info
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 
 	"github.com/gorilla/rpc/v2"
@@ -14,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -25,49 +27,48 @@ var errNoChainProvided = errors.New("argument 'chain' not given")
 
 // Info is the API service for unprivileged info on a node
 type Info struct {
-	version               version.Application
-	nodeID                ids.ShortID
-	networkID             uint32
-	log                   logging.Logger
-	networking            network.Network
-	chainManager          chains.Manager
-	vmManager             vms.Manager
-	txFee                 uint64
-	createAssetTxFee      uint64
-	createSubnetTxFee     uint64
-	createBlockchainTxFee uint64
+	Parameters
+	log           logging.Logger
+	networking    network.Network
+	chainManager  chains.Manager
+	vmManager     vms.Manager
+	versionParser version.ApplicationParser
+	validators    validators.Set
+}
+
+type Parameters struct {
+	Version               version.Application
+	NodeID                ids.ShortID
+	NetworkID             uint32
+	TxFee                 uint64
+	CreateAssetTxFee      uint64
+	CreateSubnetTxFee     uint64
+	CreateBlockchainTxFee uint64
+	UptimeRequirement     float64
 }
 
 // NewService returns a new admin API service
 func NewService(
+	parameters Parameters,
 	log logging.Logger,
-	version version.Application,
-	nodeID ids.ShortID,
-	networkID uint32,
 	chainManager chains.Manager,
 	vmManager vms.Manager,
-	peers network.Network,
-	txFee uint64,
-	createAssetTxFee uint64,
-	createSubnetTxFee uint64,
-	createBlockchainTxFee uint64,
+	network network.Network,
+	versionParser version.ApplicationParser,
+	validators validators.Set,
 ) (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := json.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	if err := newServer.RegisterService(&Info{
-		version:               version,
-		nodeID:                nodeID,
-		networkID:             networkID,
-		log:                   log,
-		chainManager:          chainManager,
-		vmManager:             vmManager,
-		networking:            peers,
-		txFee:                 txFee,
-		createAssetTxFee:      createAssetTxFee,
-		createSubnetTxFee:     createSubnetTxFee,
-		createBlockchainTxFee: createBlockchainTxFee,
+		Parameters:    parameters,
+		log:           log,
+		chainManager:  chainManager,
+		vmManager:     vmManager,
+		networking:    network,
+		versionParser: versionParser,
+		validators:    validators,
 	}, "info"); err != nil {
 		return nil, err
 	}
@@ -91,7 +92,7 @@ func (service *Info) GetNodeVersion(_ *http.Request, _ *struct{}, reply *GetNode
 		return err
 	}
 
-	reply.Version = service.version.String()
+	reply.Version = service.Version.String()
 	reply.DatabaseVersion = version.CurrentDatabase.String()
 	reply.GitCommit = version.GitCommit
 	reply.VMVersions = vmVersions
@@ -107,7 +108,7 @@ type GetNodeIDReply struct {
 func (service *Info) GetNodeID(_ *http.Request, _ *struct{}, reply *GetNodeIDReply) error {
 	service.log.Debug("Info: GetNodeID called")
 
-	reply.NodeID = service.nodeID.PrefixedString(constants.NodeIDPrefix)
+	reply.NodeID = service.NodeID.PrefixedString(constants.NodeIDPrefix)
 	return nil
 }
 
@@ -133,7 +134,7 @@ func (service *Info) GetNodeIP(_ *http.Request, _ *struct{}, reply *GetNodeIPRep
 func (service *Info) GetNetworkID(_ *http.Request, _ *struct{}, reply *GetNetworkIDReply) error {
 	service.log.Debug("Info: GetNetworkID called")
 
-	reply.NetworkID = json.Uint32(service.networkID)
+	reply.NetworkID = json.Uint32(service.NetworkID)
 	return nil
 }
 
@@ -146,7 +147,7 @@ type GetNetworkNameReply struct {
 func (service *Info) GetNetworkName(_ *http.Request, _ *struct{}, reply *GetNetworkNameReply) error {
 	service.log.Debug("Info: GetNetworkName called")
 
-	reply.NetworkName = constants.NetworkName(service.networkID)
+	reply.NetworkName = constants.NetworkName(service.NetworkID)
 	return nil
 }
 
@@ -179,13 +180,12 @@ type PeersReply struct {
 	// Number of elements in [Peers]
 	NumPeers json.Uint64 `json:"numPeers"`
 	// Each element is a peer
-	Peers []network.PeerID `json:"peers"`
+	Peers []network.PeerInfo `json:"peers"`
 }
 
 // Peers returns the list of current validators
 func (service *Info) Peers(_ *http.Request, args *PeersArgs, reply *PeersReply) error {
 	service.log.Debug("Info: Peers called")
-
 	nodeIDs := make([]ids.ShortID, 0, len(args.NodeIDs))
 	for _, nodeID := range args.NodeIDs {
 		nID, err := ids.ShortFromPrefixedString(nodeID, constants.NodeIDPrefix)
@@ -229,6 +229,71 @@ func (service *Info) IsBootstrapped(_ *http.Request, args *IsBootstrappedArgs, r
 	return nil
 }
 
+// UptimeResponse are the results from calling Uptime
+type UptimeResponse struct {
+	// RewardingStakePercentage shows what percent of network stake thinks we're
+	// above the uptime requirement.
+	RewardingStakePercentage json.Float64 `json:"rewardingStakePercentage"`
+
+	// WeightedAveragePercentage is the average perceived uptime of this node,
+	// weighted by stake.
+	// Note that this is different from RewardingStakePercentage, which shows
+	// the percent of the network stake that thinks this node is above the
+	// uptime requirement. WeightedAveragePercentage is weighted by uptime.
+	// i.e If uptime requirement is 85 and a peer reports 40 percent it will be
+	// counted (40*weight) in WeightedAveragePercentage but not in
+	// RewardingStakePercentage since 40 < 85
+	WeightedAveragePercentage json.Float64 `json:"weightedAveragePercentage"`
+}
+
+func (service *Info) Uptime(_ *http.Request, _ *struct{}, reply *UptimeResponse) error {
+	service.log.Debug("Info: Uptime called")
+
+	myStake, _ := service.validators.GetWeight(service.NodeID)
+	var (
+		totalWeight          = float64(service.validators.Weight())
+		totalWeightedPercent = 100 * float64(myStake)
+		rewardingStake       = float64(myStake)
+	)
+	for _, peerInfo := range service.networking.Peers(nil) {
+		peerID, err := ids.ShortFromPrefixedString(peerInfo.ID, constants.NodeIDPrefix)
+		if err != nil {
+			return err
+		}
+
+		weight, ok := service.validators.GetWeight(peerID)
+		if !ok {
+			// this is not a validator skip it.
+			continue
+		}
+
+		peerVersion, err := service.versionParser.Parse(peerInfo.Version)
+		if err != nil {
+			return err
+		}
+
+		weightFloat := float64(weight)
+
+		if peerVersion.Before(version.MinUptimeVersion) {
+			// If the peer is running an earlier version, then ignore their
+			// stake
+			totalWeight -= weightFloat
+			continue
+		}
+
+		percent := float64(peerInfo.ObservedUptime)
+		totalWeightedPercent += percent * weightFloat
+
+		// if this peer thinks we're above requirement add the weight
+		if percent/100 >= service.UptimeRequirement {
+			rewardingStake += weightFloat
+		}
+	}
+	reply.WeightedAveragePercentage = json.Float64(math.Abs(totalWeightedPercent / totalWeight))
+	reply.RewardingStakePercentage = json.Float64(math.Abs(100 * rewardingStake / totalWeight))
+	return nil
+}
+
 type GetTxFeeResponse struct {
 	TxFee json.Uint64 `json:"txFee"`
 	// TODO: remove [CreationTxFee] after enough time for dependencies to update
@@ -240,10 +305,10 @@ type GetTxFeeResponse struct {
 
 // GetTxFee returns the transaction fee in nAVAX.
 func (service *Info) GetTxFee(_ *http.Request, args *struct{}, reply *GetTxFeeResponse) error {
-	reply.TxFee = json.Uint64(service.txFee)
-	reply.CreationTxFee = json.Uint64(service.createAssetTxFee)
-	reply.CreateAssetTxFee = json.Uint64(service.createAssetTxFee)
-	reply.CreateSubnetTxFee = json.Uint64(service.createSubnetTxFee)
-	reply.CreateBlockchainTxFee = json.Uint64(service.createBlockchainTxFee)
+	reply.TxFee = json.Uint64(service.TxFee)
+	reply.CreationTxFee = json.Uint64(service.CreateAssetTxFee)
+	reply.CreateAssetTxFee = json.Uint64(service.CreateAssetTxFee)
+	reply.CreateSubnetTxFee = json.Uint64(service.CreateSubnetTxFee)
+	reply.CreateBlockchainTxFee = json.Uint64(service.CreateBlockchainTxFee)
 	return nil
 }

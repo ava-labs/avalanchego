@@ -3,6 +3,7 @@
 
 package config
 
+// #nosec G101
 const (
 	ConfigFileKey                               = "config-file"
 	VersionKey                                  = "version"
@@ -40,7 +41,7 @@ const (
 	HTTPSCertFileKey                            = "http-tls-cert-file"
 	HTTPAllowedOrigins                          = "http-allowed-origins"
 	APIAuthRequiredKey                          = "api-auth-required"
-	APIAuthPasswordFileKey                      = "api-auth-password-file" // #nosec G101
+	APIAuthPasswordFileKey                      = "api-auth-password-file"
 	BootstrapIPsKey                             = "bootstrap-ips"
 	BootstrapIDsKey                             = "bootstrap-ids"
 	StakingPortKey                              = "staking-port"
@@ -136,6 +137,8 @@ const (
 	InboundThrottlerVdrAllocSizeKey             = "throttler-inbound-validator-alloc-size"
 	InboundThrottlerNodeMaxAtLargeBytesKey      = "throttler-inbound-node-max-at-large-bytes"
 	InboundThrottlerMaxProcessingMsgsPerNodeKey = "throttler-inbound-node-max-processing-msgs"
+	InboundThrottlerBandwidthRefillRateKey      = "throttler-inbound-bandwidth-refill-rate"
+	InboundThrottlerBandwidthMaxBurstSizeKey    = "throttler-inbound-bandwidth-max-burst-size"
 	OutboundThrottlerAtLargeAllocSizeKey        = "throttler-outbound-at-large-alloc-size"
 	OutboundThrottlerVdrAllocSizeKey            = "throttler-outbound-validator-alloc-size"
 	OutboundThrottlerNodeMaxAtLargeBytesKey     = "throttler-outbound-node-max-at-large-bytes"
