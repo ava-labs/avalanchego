@@ -105,7 +105,8 @@ func (vm *VMClient) Initialize(
 		return errUnsupportedFXs
 	}
 
-	epochFirstTransitionBytes, err := ctx.EpochFirstTransition.MarshalBinary()
+	// TODO: remove this at the next protocol version bump
+	epochFirstTransitionBytes, err := time.Time{}.MarshalBinary()
 	if err != nil {
 		return err
 	}
@@ -162,24 +163,26 @@ func (vm *VMClient) Initialize(
 	go vm.broker.AcceptAndServe(appSenderBrokerID, vm.startAppSenderServer)
 
 	resp, err := vm.client.Initialize(context.Background(), &vmproto.InitializeRequest{
-		NetworkID:            ctx.NetworkID,
-		SubnetID:             ctx.SubnetID[:],
-		ChainID:              ctx.ChainID[:],
-		NodeID:               ctx.NodeID.Bytes(),
-		XChainID:             ctx.XChainID[:],
-		AvaxAssetID:          ctx.AVAXAssetID[:],
-		GenesisBytes:         genesisBytes,
-		UpgradeBytes:         upgradeBytes,
-		ConfigBytes:          configBytes,
-		DbServers:            versionedDBServers,
-		EngineServer:         messengerBrokerID,
-		KeystoreServer:       keystoreBrokerID,
-		SharedMemoryServer:   sharedMemoryBrokerID,
-		BcLookupServer:       bcLookupBrokerID,
-		SnLookupServer:       snLookupBrokerID,
-		AppSenderServer:      appSenderBrokerID,
+		NetworkID:          ctx.NetworkID,
+		SubnetID:           ctx.SubnetID[:],
+		ChainID:            ctx.ChainID[:],
+		NodeID:             ctx.NodeID.Bytes(),
+		XChainID:           ctx.XChainID[:],
+		AvaxAssetID:        ctx.AVAXAssetID[:],
+		GenesisBytes:       genesisBytes,
+		UpgradeBytes:       upgradeBytes,
+		ConfigBytes:        configBytes,
+		DbServers:          versionedDBServers,
+		EngineServer:       messengerBrokerID,
+		KeystoreServer:     keystoreBrokerID,
+		SharedMemoryServer: sharedMemoryBrokerID,
+		BcLookupServer:     bcLookupBrokerID,
+		SnLookupServer:     snLookupBrokerID,
+		AppSenderServer:    appSenderBrokerID,
+
+		// TODO: remove these at the next protocol version bump
 		EpochFirstTransition: epochFirstTransitionBytes,
-		EpochDuration:        uint64(ctx.EpochDuration),
+		EpochDuration:        0,
 	})
 	if err != nil {
 		return err
