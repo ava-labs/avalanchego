@@ -180,7 +180,7 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxByt
 	vtx, err := t.Manager.ParseVtx(vtxBytes)
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse vertex %s due to: %s", vtxID, err)
-		t.Ctx.Log.Verbo("vertex:\n%s", formatting.DumpBytes{Bytes: vtxBytes})
+		t.Ctx.Log.Verbo("vertex:\n%s", formatting.DumpBytes(vtxBytes))
 		return t.GetFailed(vdr, requestID)
 	}
 	if _, err := t.issueFrom(vdr, vtx); err != nil {
@@ -256,7 +256,7 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID, 
 	vtx, err := t.Manager.ParseVtx(vtxBytes)
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse vertex %s due to: %s", vtxID, err)
-		t.Ctx.Log.Verbo("vertex:\n%s", formatting.DumpBytes{Bytes: vtxBytes})
+		t.Ctx.Log.Verbo("vertex:\n%s", formatting.DumpBytes(vtxBytes))
 		return nil
 	}
 
@@ -609,7 +609,7 @@ func (t *Transitive) issueBatch(txs []snowstorm.Tx) error {
 		parentIDs[i] = virtuousIDs[int(index)]
 	}
 
-	vtx, err := t.Manager.BuildVtx(0, parentIDs, txs, nil)
+	vtx, err := t.Manager.BuildVtx(parentIDs, txs)
 	if err != nil {
 		t.Ctx.Log.Warn("error building new vertex with %d parents and %d transactions",
 			len(parentIDs), len(txs))

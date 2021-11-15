@@ -291,12 +291,12 @@ func (p *peer) ReadMessages() {
 			return
 		}
 
-		p.net.log.Verbo("parsing message from %s%s at %s:\n%s", constants.NodeIDPrefix, p.nodeID, p.getIP(), formatting.DumpBytes{Bytes: msgBytes})
+		p.net.log.Verbo("parsing message from %s%s at %s:\n%s", constants.NodeIDPrefix, p.nodeID, p.getIP(), formatting.DumpBytes(msgBytes))
 
 		// Parse the message
 		msg, err := p.net.mc.Parse(msgBytes, p.nodeID, onFinishedHandling)
 		if err != nil {
-			p.net.log.Verbo("failed to parse message from %s%s at %s:\n%s\n%s", constants.NodeIDPrefix, p.nodeID, p.getIP(), formatting.DumpBytes{Bytes: msgBytes}, err)
+			p.net.log.Verbo("failed to parse message from %s%s at %s:\n%s\n%s", constants.NodeIDPrefix, p.nodeID, p.getIP(), formatting.DumpBytes(msgBytes), err)
 			// Couldn't parse the message. Read the next one.
 			onFinishedHandling()
 			p.net.metrics.failedToParse.Inc()
@@ -336,7 +336,7 @@ func (p *peer) WriteMessages() {
 
 		msgLen := uint32(len(msg.Bytes()))
 		p.net.outboundMsgThrottler.Release(uint64(msgLen), p.nodeID)
-		p.net.log.Verbo("sending message to %s%s at %s:\n%s", constants.NodeIDPrefix, p.nodeID, p.getIP(), formatting.DumpBytes{Bytes: msg.Bytes()})
+		p.net.log.Verbo("sending message to %s%s at %s:\n%s", constants.NodeIDPrefix, p.nodeID, p.getIP(), formatting.DumpBytes(msg.Bytes()))
 		msgb := [wrappers.IntLen]byte{}
 		binary.BigEndian.PutUint32(msgb[:], msgLen)
 		for _, byteSlice := range [2][]byte{msgb[:], msg.Bytes()} {

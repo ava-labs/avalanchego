@@ -7,7 +7,6 @@ import (
 	"crypto"
 	"crypto/x509"
 	"sync"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -17,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 type EventDispatcher interface {
@@ -63,11 +61,6 @@ type Context struct {
 	SNLookup            SubnetLookup
 	Namespace           string
 	Metrics             prometheus.Registerer
-
-	// Epoch management
-	EpochFirstTransition time.Time
-	EpochDuration        time.Duration
-	Clock                mockable.Clock
 
 	// Non-zero iff this chain bootstrapped.
 	state utils.AtomicInterface
@@ -121,18 +114,6 @@ func (ctx *Context) SetValidatorOnly() {
 	ctx.validatorOnly.SetValue(true)
 }
 
-// Epoch this context thinks it's in based on the wall clock time.
-func (ctx *Context) Epoch() uint32 {
-	now := ctx.Clock.Time()
-	timeSinceFirstEpochTransition := now.Sub(ctx.EpochFirstTransition)
-	epochsSinceFirstTransition := timeSinceFirstEpochTransition / ctx.EpochDuration
-	currentEpoch := epochsSinceFirstTransition + 1
-	if currentEpoch < 0 {
-		return 0
-	}
-	return uint32(currentEpoch)
-}
-
 func DefaultContextTest() *Context {
 	return &Context{
 		NetworkID:           0,
@@ -140,16 +121,80 @@ func DefaultContextTest() *Context {
 		ChainID:             ids.Empty,
 		NodeID:              ids.ShortEmpty,
 		Log:                 logging.NoLog{},
-		DecisionDispatcher:  emptyEventDispatcher{},
-		ConsensusDispatcher: emptyEventDispatcher{},
+		DecisionDispatcher:  noOpEventDispatcher{},
+		ConsensusDispatcher: noOpEventDispatcher{},
 		BCLookup:            ids.NewAliaser(),
 		Namespace:           "",
 		Metrics:             prometheus.NewRegistry(),
 	}
 }
 
-type emptyEventDispatcher struct{}
+type noOpEventDispatcher struct{}
 
-func (emptyEventDispatcher) Issue(*Context, ids.ID, []byte) error  { return nil }
-func (emptyEventDispatcher) Accept(*Context, ids.ID, []byte) error { return nil }
-func (emptyEventDispatcher) Reject(*Context, ids.ID, []byte) error { return nil }
+func (noOpEventDispatcher) Issue(*Context, ids.ID, []byte) error  { return nil }
+func (noOpEventDispatcher) Accept(*Context, ids.ID, []byte) error { return nil }
+func (noOpEventDispatcher) Reject(*Context, ids.ID, []byte) error { return nil }
+
+var _ EventDispatcher = &EventDispatcherTracker{}
+
+func NewEventDispatcherTracker() *EventDispatcherTracker {
+	return &EventDispatcherTracker{
+		issued:   make(map[ids.ID]int),
+		accepted: make(map[ids.ID]int),
+		rejected: make(map[ids.ID]int),
+	}
+}
+
+// EventDispatcherTracker tracks the dispatched events by its ID and counts.
+// Useful for testing.
+type EventDispatcherTracker struct {
+	mu sync.RWMutex
+	// maps "issued" ID to its count
+	issued map[ids.ID]int
+	// maps "accepted" ID to its count
+	accepted map[ids.ID]int
+	// maps "rejected" ID to its count
+	rejected map[ids.ID]int
+}
+
+func (evd *EventDispatcherTracker) IsIssued(containerID ids.ID) (int, bool) {
+	evd.mu.RLock()
+	cnt, ok := evd.issued[containerID]
+	evd.mu.RUnlock()
+	return cnt, ok
+}
+
+func (evd *EventDispatcherTracker) Issue(ctx *Context, containerID ids.ID, container []byte) error {
+	evd.mu.Lock()
+	evd.issued[containerID]++
+	evd.mu.Unlock()
+	return nil
+}
+
+func (evd *EventDispatcherTracker) Accept(ctx *Context, containerID ids.ID, container []byte) error {
+	evd.mu.Lock()
+	evd.accepted[containerID]++
+	evd.mu.Unlock()
+	return nil
+}
+
+func (evd *EventDispatcherTracker) IsAccepted(containerID ids.ID) (int, bool) {
+	evd.mu.RLock()
+	cnt, ok := evd.accepted[containerID]
+	evd.mu.RUnlock()
+	return cnt, ok
+}
+
+func (evd *EventDispatcherTracker) Reject(ctx *Context, containerID ids.ID, container []byte) error {
+	evd.mu.Lock()
+	evd.rejected[containerID]++
+	evd.mu.Unlock()
+	return nil
+}
+
+func (evd *EventDispatcherTracker) IsRejected(containerID ids.ID) (int, bool) {
+	evd.mu.RLock()
+	cnt, ok := evd.rejected[containerID]
+	evd.mu.RUnlock()
+	return cnt, ok
+}

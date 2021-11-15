@@ -87,11 +87,6 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 		return nil, err
 	}
 
-	epochFirstTransition := time.Time{}
-	if err := epochFirstTransition.UnmarshalBinary(req.EpochFirstTransition); err != nil {
-		return nil, err
-	}
-
 	// Dial each database in the request and construct the database manager
 	versionedDBs := make([]*manager.VersionedDatabase, len(req.DbServers))
 	versionParser := version.NewDefaultParser()
@@ -196,21 +191,19 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	}()
 
 	vm.ctx = &snow.Context{
-		NetworkID:            req.NetworkID,
-		SubnetID:             subnetID,
-		ChainID:              chainID,
-		NodeID:               nodeID,
-		XChainID:             xChainID,
-		AVAXAssetID:          avaxAssetID,
-		Log:                  logging.NoLog{},
-		DecisionDispatcher:   nil,
-		ConsensusDispatcher:  nil,
-		Keystore:             keystoreClient,
-		SharedMemory:         sharedMemoryClient,
-		BCLookup:             bcLookupClient,
-		SNLookup:             snLookupClient,
-		EpochFirstTransition: epochFirstTransition,
-		EpochDuration:        time.Duration(req.EpochDuration),
+		NetworkID:           req.NetworkID,
+		SubnetID:            subnetID,
+		ChainID:             chainID,
+		NodeID:              nodeID,
+		XChainID:            xChainID,
+		AVAXAssetID:         avaxAssetID,
+		Log:                 logging.NoLog{},
+		DecisionDispatcher:  nil,
+		ConsensusDispatcher: nil,
+		Keystore:            keystoreClient,
+		SharedMemory:        sharedMemoryClient,
+		BCLookup:            bcLookupClient,
+		SNLookup:            snLookupClient,
 	}
 
 	if err := vm.vm.Initialize(vm.ctx, dbManager, req.GenesisBytes, req.UpgradeBytes, req.ConfigBytes, toEngine, nil, appSenderClient); err != nil {
