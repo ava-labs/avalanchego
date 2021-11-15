@@ -7,7 +7,6 @@ import (
 	"crypto"
 	"crypto/x509"
 	"sync"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -17,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 type EventDispatcher interface {
@@ -64,11 +62,6 @@ type Context struct {
 	Namespace           string
 	Metrics             prometheus.Registerer
 
-	// Epoch management
-	EpochFirstTransition time.Time
-	EpochDuration        time.Duration
-	Clock                mockable.Clock
-
 	// Non-zero iff this chain bootstrapped.
 	bootstrapped utils.AtomicBool
 
@@ -113,18 +106,6 @@ func (ctx *Context) IsValidatorOnly() bool {
 // SetValidatorOnly  marks this chain as available only to validators
 func (ctx *Context) SetValidatorOnly() {
 	ctx.validatorOnly.SetValue(true)
-}
-
-// Epoch this context thinks it's in based on the wall clock time.
-func (ctx *Context) Epoch() uint32 {
-	now := ctx.Clock.Time()
-	timeSinceFirstEpochTransition := now.Sub(ctx.EpochFirstTransition)
-	epochsSinceFirstTransition := timeSinceFirstEpochTransition / ctx.EpochDuration
-	currentEpoch := epochsSinceFirstTransition + 1
-	if currentEpoch < 0 {
-		return 0
-	}
-	return uint32(currentEpoch)
 }
 
 func DefaultContextTest() *Context {

@@ -657,7 +657,7 @@ func (t *Transitive) issueBatch(txs []snowstorm.Tx) error {
 		parentIDs[i] = virtuousIDs[int(index)]
 	}
 
-	vtx, err := t.Manager.BuildVtx(0, parentIDs, txs, nil)
+	vtx, err := t.Manager.BuildVtx(parentIDs, txs)
 	if err != nil {
 		t.Ctx.Log.Warn("error building new vertex with %d parents and %d transactions",
 			len(parentIDs), len(txs))

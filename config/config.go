@@ -589,20 +589,6 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 	return genesis.GetTxFeeConfig(networkID)
 }
 
-func getEpochConfig(v *viper.Viper, networkID uint32) (genesis.EpochConfig, error) {
-	if networkID != constants.MainnetID && networkID != constants.FujiID {
-		config := genesis.EpochConfig{
-			EpochFirstTransition: time.Unix(v.GetInt64(SnowEpochFirstTransitionKey), 0),
-			EpochDuration:        v.GetDuration(SnowEpochDurationKey),
-		}
-		if config.EpochDuration <= 0 {
-			return genesis.EpochConfig{}, fmt.Errorf("%s must be > 0", SnowEpochDurationKey)
-		}
-		return config, nil
-	}
-	return genesis.GetEpochConfig(networkID), nil
-}
-
 func getWhitelistedSubnets(v *viper.Viper) (ids.Set, error) {
 	whitelistedSubnetIDs := ids.Set{}
 	for _, subnet := range strings.Split(v.GetString(WhitelistedSubnetsKey), ",") {
@@ -914,12 +900,6 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 
 	// Tx Fee
 	nodeConfig.TxFeeConfig = getTxFeeConfig(v, nodeConfig.NetworkID)
-
-	// Epoch
-	nodeConfig.EpochConfig, err = getEpochConfig(v, nodeConfig.NetworkID)
-	if err != nil {
-		return node.Config{}, fmt.Errorf("couldn't load epoch config: %w", err)
-	}
 
 	// Genesis Data
 	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = genesis.Genesis(

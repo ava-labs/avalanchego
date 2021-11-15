@@ -66,10 +66,8 @@ func (s *Serializer) ParseVtx(b []byte) (avalanche.Vertex, error) {
 
 // BuildVtx implements the avalanche.State interface
 func (s *Serializer) BuildVtx(
-	epoch uint32,
 	parentIDs []ids.ID,
 	txs []snowstorm.Tx,
-	restrictions []ids.ID,
 ) (avalanche.Vertex, error) {
 	height := uint64(0)
 	for _, parentID := range parentIDs {
@@ -93,10 +91,8 @@ func (s *Serializer) BuildVtx(
 	vtx, err := vertex.Build(
 		s.ctx.ChainID,
 		height,
-		epoch,
 		parentIDs,
 		txBytes,
-		restrictions,
 	)
 	if err != nil {
 		return nil, err
