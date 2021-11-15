@@ -17,9 +17,7 @@ import (
 // parsed data with each iteration
 type atomicTrieIterator struct {
 	trieIterator *trie.Iterator              // underlying trie.Iterator
-	entries      *atomic.Requests            // atomic operation entries at this iteration
 	atomicOps    map[ids.ID]*atomic.Requests // atomic operation entries at this iteration
-	blockchainID ids.ID                      // blockchainID at this iteration
 	blockNumber  uint64                      // block number at this iteration
 	errs         []error                     // errors if any so far
 }
@@ -77,8 +75,6 @@ func (a *atomicTrieIterator) Next() bool {
 		// update the struct fields
 		a.blockNumber = blockNumber
 		a.atomicOps = map[ids.ID]*atomic.Requests{blockchainID: &requests} // TODO: above TODO impacts this line
-		a.blockchainID = blockchainID
-		a.entries = &requests
 	} else {
 		// else reset the fields
 		a.resetFields()
@@ -89,8 +85,6 @@ func (a *atomicTrieIterator) Next() bool {
 func (a *atomicTrieIterator) resetFields() {
 	a.blockNumber = 0
 	a.atomicOps = nil
-	a.blockchainID = ids.Empty
-	a.entries = nil
 }
 
 // BlockNumber returns the block number of this iteration
@@ -100,14 +94,4 @@ func (a *atomicTrieIterator) BlockNumber() uint64 {
 
 func (a *atomicTrieIterator) AtomicOps() map[ids.ID]*atomic.Requests {
 	return a.atomicOps
-}
-
-// BlockchainID returns the blockchainID of this iteration
-func (a *atomicTrieIterator) BlockchainID() ids.ID {
-	return a.blockchainID
-}
-
-// Entries returns the atomic operation entries of this iteration
-func (a *atomicTrieIterator) Entries() *atomic.Requests {
-	return a.entries
 }
