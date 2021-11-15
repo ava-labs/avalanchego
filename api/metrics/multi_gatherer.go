@@ -66,6 +66,8 @@ func (g *multiGatherer) Gather() ([]*dto.MetricFamily, error) {
 			results = append(results, metric)
 		}
 	}
+	// Because we overwrite every metric's name, we are guaranteed that there
+	// are no metrics with nil names.
 	sortMetrics(results)
 	return results, nil
 }
