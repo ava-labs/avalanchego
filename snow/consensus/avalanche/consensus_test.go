@@ -807,6 +807,8 @@ func VirtuousSkippedUpdateTest(t *testing.T, factory Factory) {
 	}
 }
 
+// Creates two conflicting transactions in different vertices
+// and make sure only one is accepted
 func VotingTest(t *testing.T, factory Factory) {
 	avl := factory.New()
 
@@ -841,12 +843,23 @@ func VotingTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Processing,
-	}}
-	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
+	// create two different transactions with the same input UTXO (double-spend)
+	tx0 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: []ids.ID{utxos[0]},
+	}
+	tx1 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: []ids.ID{utxos[0]},
+	}
 
+	// put them in different vertices
 	vtx0 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
@@ -856,13 +869,6 @@ func VotingTest(t *testing.T, factory Factory) {
 		HeightV:  1,
 		TxsV:     []snowstorm.Tx{tx0},
 	}
-
-	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Processing,
-	}}
-	tx1.InputIDsV = append(tx1.InputIDsV, utxos[0])
-
 	vtx1 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
@@ -873,16 +879,20 @@ func VotingTest(t *testing.T, factory Factory) {
 		TxsV:     []snowstorm.Tx{tx1},
 	}
 
+	// issue two vertices with conflicting transaction to the consensus instance
 	if err := avl.Add(vtx0); err != nil {
 		t.Fatal(err)
-	} else if err := avl.Add(vtx1); err != nil {
+	}
+	if err := avl.Add(vtx1); err != nil {
 		t.Fatal(err)
 	}
 
+	// create poll results, all vote for vtx1, not for vtx0
 	sm := ids.UniqueBag{}
 	sm.Add(0, vtx1.IDV)
 	sm.Add(1, vtx1.IDV)
 
+	// "BetaRogue" is 2, thus consensus should not be finalized yet
 	err = avl.RecordPoll(sm)
 	switch {
 	case err != nil:
@@ -891,8 +901,14 @@ func VotingTest(t *testing.T, factory Factory) {
 		t.Fatalf("An avalanche instance finalized too early")
 	case !ids.UnsortedEquals([]ids.ID{vtx1.IDV}, avl.Preferences().List()):
 		t.Fatalf("Initial frontier failed to be set")
+	case tx0.Status() != choices.Processing:
+		t.Fatalf("Tx should have been Processing")
+	case tx1.Status() != choices.Processing:
+		t.Fatalf("Tx should have been Processing")
 	}
 
+	// second poll should reach consensus,
+	// and the other vertex of conflict transaction should be rejected
 	err = avl.RecordPoll(sm)
 	switch {
 	case err != nil:
