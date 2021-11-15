@@ -40,10 +40,6 @@ type AtomicTrie interface {
 type AtomicTrieIterator interface {
 	Next() bool
 	BlockNumber() uint64
-	// TODO: these are to be removed
-	BlockchainID() ids.ID
-	Entries() *atomic.Requests
-
 	AtomicOps() map[ids.ID]*atomic.Requests
 	Errors() []error
 }
