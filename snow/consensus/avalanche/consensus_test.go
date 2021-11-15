@@ -67,7 +67,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 		avl := factory.New()
 		params := Parameters{
 			Parameters: snowball.Parameters{
-				Namespace:         ctx.ChainID.String(),
+				Namespace:         "chain_" + ctx.ChainID.String(),
 				Metrics:           prometheus.NewRegistry(),
 				K:                 2,
 				Alpha:             2,
@@ -94,7 +94,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 		avl := factory.New()
 		params := Parameters{
 			Parameters: snowball.Parameters{
-				Namespace:         ctx.ChainID.String(),
+				Namespace:         "chain_" + ctx.ChainID.String(),
 				Metrics:           prometheus.NewRegistry(),
 				K:                 2,
 				Alpha:             2,
@@ -121,7 +121,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 		avl := factory.New()
 		params := Parameters{
 			Parameters: snowball.Parameters{
-				Namespace:         ctx.ChainID.String(),
+				Namespace:         "chain_" + ctx.ChainID.String(),
 				Metrics:           prometheus.NewRegistry(),
 				K:                 2,
 				Alpha:             2,
@@ -152,7 +152,7 @@ func ParamsTest(t *testing.T, factory Factory) {
 	ctx := snow.DefaultConsensusContextTest()
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Namespace:             ctx.ChainID.String(),
+			Namespace:             "chain_" + ctx.ChainID.String(),
 			Metrics:               prometheus.NewRegistry(),
 			K:                     2,
 			Alpha:                 2,
@@ -317,98 +317,128 @@ func AddTest(t *testing.T, factory Factory) {
 		Parents:   2,
 		BatchSize: 1,
 	}
-	vts := []Vertex{
-		&TestVertex{TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Accepted,
-		}},
-		&TestVertex{TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Accepted,
-		}},
-	}
-	utxos := []ids.ID{ids.GenerateTestID()}
 
-	if err := avl.Initialize(snow.DefaultConsensusContextTest(), params, vts); err != nil {
+	seedVertices := []Vertex{
+		&TestVertex{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Accepted,
+			},
+		},
+		&TestVertex{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Accepted,
+			},
+		},
+	}
+
+	ctx := snow.DefaultConsensusContextTest()
+	// track consensus events to ensure idempotency in case of redundant vertex adds
+	consensusEvents := snow.NewEventDispatcherTracker()
+	ctx.ConsensusDispatcher = consensusEvents
+
+	if err := avl.Initialize(ctx, params, seedVertices); err != nil {
 		t.Fatal(err)
 	}
 
 	if !avl.Finalized() {
-		t.Fatalf("An empty avalanche instance is not finalized")
-	} else if !ids.UnsortedEquals([]ids.ID{vts[0].ID(), vts[1].ID()}, avl.Preferences().List()) {
-		t.Fatalf("Initial frontier failed to be set")
+		t.Fatal("An empty avalanche instance is not finalized")
+	}
+	if !ids.UnsortedEquals([]ids.ID{seedVertices[0].ID(), seedVertices[1].ID()}, avl.Preferences().List()) {
+		t.Fatal("Initial frontier failed to be set")
 	}
 
-	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Processing,
-	}}
-	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
-
+	utxos := []ids.ID{ids.GenerateTestID()}
 	vtx0 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		ParentsV: vts,
+		ParentsV: seedVertices,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx0},
+		TxsV: []snowstorm.Tx{
+			&snowstorm.TestTx{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.GenerateTestID(),
+					StatusV: choices.Processing,
+				},
+				InputIDsV: utxos,
+			},
+		},
 	}
-
-	err := avl.Add(vtx0)
-	switch {
-	case err != nil:
-		t.Fatal(err)
-	case avl.Finalized():
-		t.Fatalf("A non-empty avalanche instance is finalized")
-	case !ids.UnsortedEquals([]ids.ID{vtx0.IDV}, avl.Preferences().List()):
-		t.Fatalf("Initial frontier failed to be set")
-	}
-
-	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Processing,
-	}}
-	tx1.InputIDsV = append(tx1.InputIDsV, utxos[0])
-
 	vtx1 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		ParentsV: vts,
+		ParentsV: seedVertices,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx1},
+		TxsV: []snowstorm.Tx{
+			&snowstorm.TestTx{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.GenerateTestID(),
+					StatusV: choices.Processing,
+				},
+				InputIDsV: utxos,
+			},
+		},
 	}
 
-	err = avl.Add(vtx1)
-	switch {
-	case err != nil:
-		t.Fatal(err)
-	case avl.Finalized():
-		t.Fatalf("A non-empty avalanche instance is finalized")
-	case !ids.UnsortedEquals([]ids.ID{vtx0.IDV}, avl.Preferences().List()):
-		t.Fatalf("Initial frontier failed to be set")
+	tt := []struct {
+		toAdd         Vertex
+		err           error
+		finalized     bool
+		preferenceSet []ids.ID
+		issued        int
+		accepted      int
+	}{
+		{
+			toAdd:         vtx0,
+			err:           nil,
+			finalized:     false,
+			preferenceSet: []ids.ID{vtx0.IDV},
+			issued:        1, // on "add", it should be issued
+			accepted:      0,
+		},
+		{
+			toAdd:         vtx1,
+			err:           nil,
+			finalized:     false,
+			preferenceSet: []ids.ID{vtx0.IDV},
+			issued:        1, // on "add", it should be issued
+			accepted:      0,
+		},
+		{
+			toAdd:         seedVertices[0],
+			err:           nil,
+			finalized:     false,
+			preferenceSet: []ids.ID{vtx0.IDV},
+			issued:        0, // initialized vertex should not belong to in-processing nodes
+			accepted:      0,
+		},
 	}
-
-	err = avl.Add(vtx1)
-	switch {
-	case err != nil:
-		t.Fatal(err)
-	case avl.Finalized():
-		t.Fatalf("A non-empty avalanche instance is finalized")
-	case !ids.UnsortedEquals([]ids.ID{vtx0.IDV}, avl.Preferences().List()):
-		t.Fatalf("Initial frontier failed to be set")
-	}
-
-	err = avl.Add(vts[0])
-	switch {
-	case err != nil:
-		t.Fatal(err)
-	case avl.Finalized():
-		t.Fatalf("A non-empty avalanche instance is finalized")
-	case !ids.UnsortedEquals([]ids.ID{vtx0.IDV}, avl.Preferences().List()):
-		t.Fatalf("Initial frontier failed to be set")
+	for i, tv := range tt {
+		for _, j := range []int{1, 2} { // duplicate vertex add should be skipped
+			err := avl.Add(tv.toAdd)
+			if err != tv.err {
+				t.Fatalf("#%d-%d: expected error %v, got %v", i, j, tv.err, err)
+			}
+			finalized := avl.Finalized()
+			if finalized != tv.finalized {
+				t.Fatalf("#%d-%d: expected finalized %v, got %v", i, j, finalized, tv.finalized)
+			}
+			preferenceSet := avl.Preferences().List()
+			if !ids.UnsortedEquals(tv.preferenceSet, preferenceSet) {
+				t.Fatalf("#%d-%d: expected preferenceSet %v, got %v", i, j, preferenceSet, tv.preferenceSet)
+			}
+			if issued, _ := consensusEvents.IsIssued(tv.toAdd.ID()); issued != tv.issued {
+				t.Fatalf("#%d-%d: expected issued %d, got %d", i, j, tv.issued, issued)
+			}
+			if accepted, _ := consensusEvents.IsAccepted(tv.toAdd.ID()); accepted != tv.accepted {
+				t.Fatalf("#%d-%d: expected accepted %d, got %d", i, j, tv.accepted, accepted)
+			}
+		}
 	}
 }
 

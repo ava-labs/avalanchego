@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -18,14 +20,14 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/mocks"
-	avvtxmocks "github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex/mocks"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	smblockmocks "github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
-	smengmocks "github.com/ava-labs/avalanchego/snow/engine/snowman/mocks"
 	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/stretchr/testify/assert"
+
+	avvtxmocks "github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex/mocks"
+	smblockmocks "github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
+	smengmocks "github.com/ava-labs/avalanchego/snow/engine/snowman/mocks"
 )
 
 type apiServerMock struct {

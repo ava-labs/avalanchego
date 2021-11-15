@@ -372,7 +372,7 @@ func (n *network) Accept(ctx *snow.ConsensusContext, containerID ids.ID, contain
 	msg, err := n.mc.Put(ctx.ChainID, constants.GossipMsgRequestID, containerID, container)
 	if err != nil {
 		n.log.Debug("failed to build Put message for gossip (%s, %s): %s", ctx.ChainID, containerID, err)
-		n.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
+		n.log.Verbo("container:\n%s", formatting.DumpBytes(container))
 		n.sendFailRateCalculator.Observe(1, now)
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 	}

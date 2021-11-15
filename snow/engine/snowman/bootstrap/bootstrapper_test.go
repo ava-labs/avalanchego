@@ -113,7 +113,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		config.Ctx.ChainID.String(),
+		"chain_"+config.Ctx.ChainID.String(),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -212,7 +212,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		config.Ctx.ChainID.String(),
+		"chain_"+config.Ctx.ChainID.String(),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -369,7 +369,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		config.Ctx.ChainID.String(),
+		"chain_"+config.Ctx.ChainID.String(),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -529,7 +529,7 @@ func TestBootstrapperMultiPut(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		config.Ctx.ChainID.String(),
+		"chain_"+config.Ctx.ChainID.String(),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -642,7 +642,7 @@ func TestBootstrapperAcceptedFrontier(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		nil,
-		config.Ctx.ChainID.String(),
+		"chain_"+config.Ctx.ChainID.String(),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -689,7 +689,7 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		nil,
-		config.Ctx.ChainID.String(),
+		"chain_"+config.Ctx.ChainID.String(),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -778,7 +778,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		config.Ctx.ChainID.String(),
+		"chain_"+config.Ctx.ChainID.String(),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -985,7 +985,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		config.Ctx.ChainID.String(),
+		"chain_"+config.Ctx.ChainID.String(),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {

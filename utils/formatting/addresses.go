@@ -70,9 +70,5 @@ func FormatBech32(hrp string, payload []byte) (string, error) {
 	if err != nil {
 		return "", errBits8To5
 	}
-	addr, err := bech32.Encode(hrp, fiveBits)
-	if err != nil {
-		return "", err
-	}
-	return addr, nil
+	return bech32.Encode(hrp, fiveBits)
 }

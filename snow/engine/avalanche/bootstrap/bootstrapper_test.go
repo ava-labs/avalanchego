@@ -130,7 +130,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("%s_bs", config.Ctx.ChainID),
+		fmt.Sprintf("chain_%s_bs", config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -231,7 +231,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("%s_bs", config.Ctx.ChainID),
+		fmt.Sprintf("chain_%s_bs", config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -407,7 +407,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("%s_bs", config.Ctx.ChainID),
+		fmt.Sprintf("chain_%s_bs", config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -550,7 +550,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("%s_bs", config.Ctx.ChainID),
+		fmt.Sprintf("chain_%s_bs", config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -637,7 +637,7 @@ func TestBootstrapperAcceptedFrontier(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		nil,
-		fmt.Sprintf("%s_bs", config.Ctx.ChainID),
+		fmt.Sprintf("chain_%s_bs", config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -692,7 +692,7 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("%s_bs", config.Ctx.ChainID),
+		fmt.Sprintf("chain_%s_bs", config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -775,7 +775,7 @@ func TestBootstrapperIncompleteMultiPut(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("%s_bs", config.Ctx.ChainID),
+		fmt.Sprintf("chain_%s_bs", config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -894,7 +894,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("%s_bs", config.Ctx.ChainID),
+		fmt.Sprintf("chain_%s_bs", config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -1024,7 +1024,7 @@ func TestBootstrapperAcceptsMultiPutParents(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("%s_bs", config.Ctx.ChainID),
+		fmt.Sprintf("chain_%s_bs", config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -1190,7 +1190,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("%s_bs", config.Ctx.ChainID),
+		fmt.Sprintf("chain_%s_bs", config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {

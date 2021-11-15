@@ -51,6 +51,7 @@ import (
 
 const (
 	defaultChannelSize = 1
+	defaultChainPrefix = "chain_"
 )
 
 var (
@@ -302,8 +303,10 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	primaryAlias, err := m.PrimaryAlias(chainParams.ID)
+	metricsNamespace := primaryAlias
 	if err != nil {
 		primaryAlias = chainParams.ID.String()
+		metricsNamespace = defaultChainPrefix + primaryAlias
 	}
 
 	// Create the log and context of the chain
@@ -394,7 +397,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		// TODO: move metrics to another place so this can be tidier
 		consensusParams.Metrics = m.ConsensusParams.Metrics
 	}
-	consensusParams.Namespace = primaryAlias
+	consensusParams.Namespace = metricsNamespace
 
 	// The validators of this blockchain
 	var vdrs validators.Set // Validators validating this blockchain
