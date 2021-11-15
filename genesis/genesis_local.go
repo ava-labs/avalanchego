@@ -109,9 +109,5 @@ var (
 			MaxStakeDuration:   365 * 24 * time.Hour,
 			StakeMintingPeriod: 365 * 24 * time.Hour,
 		},
-		EpochConfig: EpochConfig{
-			EpochFirstTransition: time.Unix(1607626800, 0),
-			EpochDuration:        6 * time.Hour,
-		},
 	}
 )

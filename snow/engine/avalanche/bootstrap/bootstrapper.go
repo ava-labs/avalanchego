@@ -332,7 +332,7 @@ func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 			return nil
 		}
 		b.Ctx.Log.Debug("failed to parse requested vertex %s: %s", requestedVtxID, err)
-		b.Ctx.Log.Verbo("vertex: %s", formatting.DumpBytes{Bytes: vtxs[0]})
+		b.Ctx.Log.Verbo("vertex: %s", formatting.DumpBytes(vtxs[0]))
 		return b.fetch(requestedVtxID)
 	}
 
@@ -368,7 +368,7 @@ func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 		vtx, err := b.Manager.ParseVtx(vtxBytes) // Persists the vtx
 		if err != nil {
 			b.Ctx.Log.Debug("failed to parse vertex: %s", err)
-			b.Ctx.Log.Verbo("vertex: %s", formatting.DumpBytes{Bytes: vtxBytes})
+			b.Ctx.Log.Verbo("vertex: %s", formatting.DumpBytes(vtxBytes))
 			break
 		}
 		vtxID := vtx.ID()

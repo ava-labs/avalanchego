@@ -173,8 +173,8 @@ func TestInitialStateVerifySerialization(t *testing.T) {
 	}
 	if !bytes.Equal(isBytes, expected) {
 		t.Fatalf("Expected:\n%s\nResult:\n%s",
-			formatting.DumpBytes{Bytes: expected},
-			formatting.DumpBytes{Bytes: isBytes},
+			formatting.DumpBytes(expected),
+			formatting.DumpBytes(isBytes),
 		)
 	}
 }

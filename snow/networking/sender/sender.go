@@ -584,7 +584,7 @@ func (s *Sender) SendPut(nodeID ids.ShortID, requestID uint32, containerID ids.I
 			requestID,
 			containerID,
 		)
-		s.ctx.Log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
+		s.ctx.Log.Verbo("container: %s", formatting.DumpBytes(container))
 	}
 }
 
@@ -663,7 +663,7 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 				requestID,
 				containerID,
 			)
-			s.ctx.Log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
+			s.ctx.Log.Verbo("container: %s", formatting.DumpBytes(container))
 
 			// Register failures for nodes we didn't send a request to.
 			s.timeouts.RegisterRequestToUnreachableValidator()
@@ -793,7 +793,7 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 	s.ctx.Log.Verbo(
 		"Sending AppRequest. RequestID: %d. Message: %s",
 		requestID,
-		formatting.DumpBytes{Bytes: appRequestBytes},
+		formatting.DumpBytes(appRequestBytes),
 	)
 
 	// Tell the router to expect a response message or a message notifying
@@ -856,7 +856,7 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 				s.ctx.ChainID,
 				requestID,
 			)
-			s.ctx.Log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appRequestBytes})
+			s.ctx.Log.Verbo("failed message: %s", formatting.DumpBytes(appRequestBytes))
 
 			// Register failures for nodes we didn't send a request to.
 			s.timeouts.RegisterRequestToUnreachableValidator()
@@ -885,7 +885,7 @@ func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appRespon
 			requestID,
 			err,
 		)
-		s.ctx.Log.Verbo("message: %s", formatting.DumpBytes{Bytes: appResponseBytes})
+		s.ctx.Log.Verbo("message: %s", formatting.DumpBytes(appResponseBytes))
 		return nil
 	}
 
@@ -899,7 +899,7 @@ func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appRespon
 			s.ctx.ChainID,
 			requestID,
 		)
-		s.ctx.Log.Verbo("container: %s", formatting.DumpBytes{Bytes: appResponseBytes})
+		s.ctx.Log.Verbo("container: %s", formatting.DumpBytes(appResponseBytes))
 	}
 
 	return nil
@@ -914,13 +914,13 @@ func (s *Sender) SendAppGossipSpecific(nodeIDs ids.ShortSet, appGossipBytes []by
 			s.ctx.ChainID,
 			err,
 		)
-		s.ctx.Log.Verbo("message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
+		s.ctx.Log.Verbo("message: %s", formatting.DumpBytes(appGossipBytes))
 	}
 
 	// Send the message over the network.
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to gossip SpecificGossip(%s)", s.ctx.ChainID)
-		s.ctx.Log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
+		s.ctx.Log.Verbo("failed message: %s", formatting.DumpBytes(appGossipBytes))
 	}
 	return nil
 }
@@ -931,13 +931,13 @@ func (s *Sender) SendAppGossip(appGossipBytes []byte) error {
 	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
 	if err != nil {
 		s.ctx.Log.Error("failed to build AppGossip(%s): %s", s.ctx.ChainID, err)
-		s.ctx.Log.Verbo("message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
+		s.ctx.Log.Verbo("message: %s", formatting.DumpBytes(appGossipBytes))
 	}
 
 	sentTo := s.sender.Gossip(outMsg, s.ctx.SubnetID, s.ctx.IsValidatorOnly(), s.appGossipValidatorSize, s.appGossipNonValidatorSize)
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to gossip AppGossip(%s)", s.ctx.ChainID)
-		s.ctx.Log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
+		s.ctx.Log.Verbo("failed message: %s", formatting.DumpBytes(appGossipBytes))
 	}
 	return nil
 }

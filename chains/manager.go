@@ -133,12 +133,10 @@ type ManagerConfig struct {
 	DecisionEvents              *triggers.EventDispatcher
 	ConsensusEvents             *triggers.EventDispatcher
 	DBManager                   dbManager.Manager
-	MsgCreator                  message.Creator  // message creator, shared with network
-	Router                      router.Router    // Routes incoming messages to the appropriate chain
-	Net                         network.Network  // Sends consensus messages to other validators
-	ConsensusParams             avcon.Parameters // The consensus parameters (alpha, beta, etc.) for new chains
-	EpochFirstTransition        time.Time
-	EpochDuration               time.Duration
+	MsgCreator                  message.Creator    // message creator, shared with network
+	Router                      router.Router      // Routes incoming messages to the appropriate chain
+	Net                         network.Network    // Sends consensus messages to other validators
+	ConsensusParams             avcon.Parameters   // The consensus parameters (alpha, beta, etc.) for new chains
 	Validators                  validators.Manager // Validators validating on this chain
 	NodeID                      ids.ShortID        // The ID of this node
 	NetworkID                   uint32             // ID of the network this node is connected to
@@ -314,26 +312,24 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	ctx := &snow.Context{
-		NetworkID:            m.NetworkID,
-		SubnetID:             chainParams.SubnetID,
-		ChainID:              chainParams.ID,
-		NodeID:               m.NodeID,
-		XChainID:             m.XChainID,
-		AVAXAssetID:          m.AVAXAssetID,
-		Log:                  chainLog,
-		DecisionDispatcher:   m.DecisionEvents,
-		ConsensusDispatcher:  m.ConsensusEvents,
-		Keystore:             m.Keystore.NewBlockchainKeyStore(chainParams.ID),
-		SharedMemory:         m.AtomicMemory.NewSharedMemory(chainParams.ID),
-		BCLookup:             m,
-		SNLookup:             m,
-		Namespace:            fmt.Sprintf("%s_%s_vm", constants.PlatformName, primaryAlias),
-		Metrics:              m.ConsensusParams.Metrics,
-		EpochFirstTransition: m.EpochFirstTransition,
-		EpochDuration:        m.EpochDuration,
-		ValidatorState:       m.validatorState,
-		StakingCertLeaf:      m.StakingCert.Leaf,
-		StakingLeafSigner:    m.StakingCert.PrivateKey.(crypto.Signer),
+		NetworkID:           m.NetworkID,
+		SubnetID:            chainParams.SubnetID,
+		ChainID:             chainParams.ID,
+		NodeID:              m.NodeID,
+		XChainID:            m.XChainID,
+		AVAXAssetID:         m.AVAXAssetID,
+		Log:                 chainLog,
+		DecisionDispatcher:  m.DecisionEvents,
+		ConsensusDispatcher: m.ConsensusEvents,
+		Keystore:            m.Keystore.NewBlockchainKeyStore(chainParams.ID),
+		SharedMemory:        m.AtomicMemory.NewSharedMemory(chainParams.ID),
+		BCLookup:            m,
+		SNLookup:            m,
+		Namespace:           fmt.Sprintf("%s_%s_vm", constants.PlatformName, primaryAlias),
+		Metrics:             m.ConsensusParams.Metrics,
+		ValidatorState:      m.validatorState,
+		StakingCertLeaf:     m.StakingCert.Leaf,
+		StakingLeafSigner:   m.StakingCert.PrivateKey.(crypto.Signer),
 	}
 
 	if sbConfigs, ok := m.SubnetConfigs[chainParams.SubnetID]; ok {
