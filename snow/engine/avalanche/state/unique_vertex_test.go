@@ -79,10 +79,8 @@ func TestUniqueVertexCacheHit(t *testing.T) {
 	vtx, err := vertex.Build(
 		chainID,
 		height,
-		0,
 		parentIDs,
 		[][]byte{{0}},
-		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -159,10 +157,8 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 	innerVertex, err := vertex.Build(
 		chainID,
 		height,
-		0,
 		parentIDs,
 		[][]byte{txBytes},
-		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -272,10 +268,8 @@ func TestParseVertexWithInvalidTxs(t *testing.T) {
 	statelessVertex, err := vertex.Build(
 		ctx.ChainID,
 		0,
-		0,
 		nil,
 		[][]byte{{1}},
-		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -309,10 +303,8 @@ func TestParseVertexWithInvalidTxs(t *testing.T) {
 	childStatelessVertex, err := vertex.Build(
 		ctx.ChainID,
 		1,
-		0,
 		[]ids.ID{vtxID},
 		[][]byte{{2}},
-		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
