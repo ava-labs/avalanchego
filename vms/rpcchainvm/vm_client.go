@@ -9,11 +9,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/go-plugin"
+
+	"github.com/prometheus/client_golang/prometheus"
+
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
-
-	"github.com/hashicorp/go-plugin"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore/gkeystoreproto"

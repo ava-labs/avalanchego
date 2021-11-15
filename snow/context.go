@@ -8,6 +8,8 @@ import (
 	"crypto/x509"
 	"sync"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -15,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 type EventDispatcher interface {
