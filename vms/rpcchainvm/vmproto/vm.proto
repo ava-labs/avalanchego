@@ -177,6 +177,10 @@ message BatchedParseBlockResponse {
     repeated ParseBlockResponse response = 1;
 }
 
+// The metrics message defintions are copied from:
+// https://github.com/prometheus/client_model/blob/master/io/prometheus/client/metrics.proto
+// TODO: directly import this dependency
+
 message LabelPair {
   optional string name  = 1;
   optional string value = 2;

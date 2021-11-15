@@ -20,10 +20,14 @@ var (
 	_ MultiGatherer = &multiGatherer{}
 )
 
+// MultiGatherer extends the Gatherer interface by allowing additional gatherers
+// to be registered.
 type MultiGatherer interface {
 	prometheus.Gatherer
 
-	Register(prefix string, gatherer prometheus.Gatherer) error
+	// Register adds the outputs of [gatherer] to the results of future calls to
+	// Gather with the provided [namespace] added to the metrics.
+	Register(namespace string, gatherer prometheus.Gatherer) error
 }
 
 type multiGatherer struct {
@@ -42,7 +46,7 @@ func (g *multiGatherer) Gather() ([]*dto.MetricFamily, error) {
 	defer g.lock.RUnlock()
 
 	var results []*dto.MetricFamily
-	for prefix, gatherer := range g.gatherers {
+	for namespace, gatherer := range g.gatherers {
 		metrics, err := gatherer.Gather()
 		if err != nil {
 			return nil, err
@@ -50,13 +54,13 @@ func (g *multiGatherer) Gather() ([]*dto.MetricFamily, error) {
 		for _, metric := range metrics {
 			var name string
 			if metric.Name != nil {
-				if len(prefix) > 0 {
-					name = fmt.Sprintf("%s_%s", prefix, *metric.Name)
+				if len(namespace) > 0 {
+					name = fmt.Sprintf("%s_%s", namespace, *metric.Name)
 				} else {
 					name = *metric.Name
 				}
 			} else {
-				name = prefix
+				name = namespace
 			}
 			metric.Name = &name
 			results = append(results, metric)
@@ -66,35 +70,22 @@ func (g *multiGatherer) Gather() ([]*dto.MetricFamily, error) {
 	return results, nil
 }
 
-func (g *multiGatherer) Register(prefix string, gatherer prometheus.Gatherer) error {
+func (g *multiGatherer) Register(namespace string, gatherer prometheus.Gatherer) error {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
-	if _, exists := g.gatherers[prefix]; exists {
+	if _, exists := g.gatherers[namespace]; exists {
 		return errDuplicatedPrefix
 	}
 
-	g.gatherers[prefix] = gatherer
+	g.gatherers[namespace] = gatherer
 	return nil
 }
 
 type sortMetricsData []*dto.MetricFamily
 
-func (m sortMetricsData) Less(i, j int) bool {
-	iName := m[i].Name
-	jName := m[j].Name
-	if iName == jName {
-		return false
-	}
-	if iName == nil {
-		return true
-	}
-	if jName == nil {
-		return false
-	}
-	return *iName < *jName
-}
-func (m sortMetricsData) Len() int      { return len(m) }
-func (m sortMetricsData) Swap(i, j int) { m[j], m[i] = m[i], m[j] }
+func (m sortMetricsData) Less(i, j int) bool { return *m[i].Name < *m[j].Name }
+func (m sortMetricsData) Len() int           { return len(m) }
+func (m sortMetricsData) Swap(i, j int)      { m[j], m[i] = m[i], m[j] }
 
 func sortMetrics(m []*dto.MetricFamily) { sort.Sort(sortMetricsData(m)) }

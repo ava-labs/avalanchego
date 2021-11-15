@@ -18,9 +18,15 @@ var (
 	_ OptionalGatherer = &optionalGatherer{}
 )
 
+// OptionalGatherer extends the Gatherer interface by allowing the optional
+// registration of a single gatherer. If no gatherer is registered, Gather will
+// return no metrics and no error. If a gatherer is registered, Gather will
+// return the results of calling Gather on the provided gatherer.
 type OptionalGatherer interface {
 	prometheus.Gatherer
 
+	// Register the provided gatherer. If a gatherer was previously registered,
+	// an error will be returned.
 	Register(gatherer prometheus.Gatherer) error
 }
 
