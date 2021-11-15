@@ -1,5 +1,17 @@
 # Release Notes
 
+## [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0)
+
+This upgrade adds [TODO: populate].
+
+The changes in the upgrade go into effect at **[TODO: populate]**. One should upgrade their node before the changes go into effect, otherwise they may experience loss of uptime.
+
+More info can be found [here]([TODO: populate]).
+
+## Configs
+
+- Removed `--snow-epoch-first-transition` and `snow-epoch-duration` as command line arguments.
+
 ## [v1.6.5](https://github.com/ava-labs/avalanchego/releases/tag/v1.6.5)
 
 This version is backwards compatible to [v1.6.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.6.0). It is optional, but encouraged.
