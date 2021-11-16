@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -87,47 +86,6 @@ func prepareCodecForTest() codec.Manager {
 	return codec
 }
 
-func Test_AtomicTxRepository_Initialize(t *testing.T) {
-	db := memdb.New()
-	codec := prepareCodecForTest()
-
-	// write in the old database in legacy style
-	txDB := prefixdb.New(atomicTxIDDBPrefix, db) // tx DB indexed by txID => height+txbytes
-	txIDs := make([]ids.ID, 100)
-	for i := 0; i < 100; i++ {
-		id := ids.GenerateTestID()
-		tx := &Tx{
-			UnsignedAtomicTx: &TestTx{
-				Id: id,
-			},
-		}
-
-		txBytes, err := codec.Marshal(codecVersion, tx)
-		assert.NoError(t, err)
-		assert.NotNil(t, txBytes)
-
-		heightTxPacker := wrappers.Packer{Bytes: make([]byte, 12+len(txBytes))}
-		heightTxPacker.PackLong(uint64(i))
-		heightTxPacker.PackBytes(txBytes)
-
-		err = txDB.Put(id[:], heightTxPacker.Bytes)
-		assert.NoError(t, err)
-
-		txIDs[i] = id
-	}
-
-	repo := newAtomicTxRepository(db, codec)
-	err := repo.Initialize()
-	assert.NoError(t, err)
-
-	for i := 0; i < 100; i++ {
-		txs, err := repo.GetByHeight(uint64(i))
-		assert.NoError(t, err)
-		assert.Len(t, txs, 1)
-		assert.Equal(t, txIDs[i], txs[0].ID())
-	}
-}
-
 func Test_AtomicRepository_Read_Write(t *testing.T) {
 	db := memdb.New()
 	codec := prepareCodecForTest()
@@ -146,13 +104,6 @@ func Test_AtomicRepository_Read_Write(t *testing.T) {
 		assert.NoError(t, err)
 
 		txIDs[i] = id
-	}
-
-	// check we can get them all by height
-	for i := 0; i < 100; i++ {
-		txs, err := repo.GetByHeight(uint64(i))
-		assert.NoError(t, err)
-		assert.Equal(t, txs[0].ID(), txIDs[i])
 	}
 
 	// check we can get them all by ID

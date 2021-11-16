@@ -376,9 +376,6 @@ func (vm *VM) Initialize(
 	lastAccepted := vm.chain.LastAcceptedBlock()
 
 	vm.atomicTxRepository = newAtomicTxRepository(vm.db, vm.codec)
-	if err = vm.atomicTxRepository.Initialize(); err != nil {
-		return err
-	}
 
 	err = vm.db.Commit()
 	if err != nil {
