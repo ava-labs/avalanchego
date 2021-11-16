@@ -144,9 +144,28 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 	preferredID := preferred.ID()
 	nextHeight := preferred.Height() + 1
 
+	// The state if the preferred block were to be accepted
+	preferredState := preferredDecision.onAccept()
+	currentChainTimestamp := preferredState.GetTimestamp()
+	if !currentChainTimestamp.Before(mockable.MaxTime) {
+		return nil, errEndOfTime
+	}
+
+	// TODO: remove after AP5.
+	enabledAP5 := !currentChainTimestamp.Before(m.vm.ApricotPhase5Time)
+
 	// If there are pending decision txs, build a block with a batch of them
-	if m.HasDecisionTxs() {
-		txs := m.PopDecisionTxs(BatchSize)
+	if m.HasDecisionTxs() || (enabledAP5 && m.HasAtomicTx()) {
+		txs := make([]*Tx, 0, BatchSize)
+		if m.HasDecisionTxs() {
+			decisionTxs := m.PopDecisionTxs(BatchSize)
+			txs = append(txs, decisionTxs...)
+		}
+		if enabledAP5 && m.HasAtomicTx() {
+			atomicTxs := m.PopAtomicTxs(BatchSize - len(txs))
+			txs = append(txs, atomicTxs...)
+		}
+
 		blk, err := m.vm.newStandardBlock(preferredID, nextHeight, txs)
 		if err != nil {
 			m.ResetTimer()
@@ -164,7 +183,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 	}
 
 	// If there is a pending atomic tx, build a block with it
-	if m.HasAtomicTx() {
+	if !enabledAP5 && m.HasAtomicTx() {
 		tx := m.PopAtomicTx()
 
 		blk, err := m.vm.newAtomicBlock(preferredID, nextHeight, *tx)
@@ -181,15 +200,6 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 
 		m.vm.internalState.AddBlock(blk)
 		return blk, m.vm.internalState.Commit()
-	}
-
-	// The state if the preferred block were to be accepted
-	preferredState := preferredDecision.onAccept()
-
-	// The chain time if the preferred block were to be committed
-	currentChainTimestamp := preferredState.GetTimestamp()
-	if !currentChainTimestamp.Before(mockable.MaxTime) {
-		return nil, errEndOfTime
 	}
 
 	currentStakers := preferredState.CurrentStakerChainState()

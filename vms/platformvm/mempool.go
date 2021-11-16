@@ -48,10 +48,12 @@ type Mempool interface {
 
 	RemoveDecisionTxs(txs []*Tx)
 	RemoveAtomicTx(tx *Tx)
+	RemoveAtomicTxs(tx []*Tx)
 	RemoveProposalTx(tx *Tx)
 
 	PopDecisionTxs(numTxs int) []*Tx
 	PopAtomicTx() *Tx
+	PopAtomicTxs(numTxs int) []*Tx
 	PopProposalTx() *Tx
 
 	MarkDropped(txID ids.ID)
@@ -151,10 +153,10 @@ func (m *mempool) Add(tx *Tx) error {
 	switch tx.UnsignedTx.(type) {
 	case TimedTx:
 		m.AddProposalTx(tx)
-	case UnsignedDecisionTx:
-		m.AddDecisionTx(tx)
 	case UnsignedAtomicTx:
 		m.AddAtomicTx(tx)
+	case UnsignedDecisionTx:
+		m.AddDecisionTx(tx)
 	default:
 		m.unknownTxs.Inc()
 		return errUnknownTxType
@@ -212,6 +214,15 @@ func (m *mempool) RemoveDecisionTxs(txs []*Tx) {
 	}
 }
 
+func (m *mempool) RemoveAtomicTxs(txs []*Tx) {
+	for _, tx := range txs {
+		txID := tx.ID()
+		if m.unissuedAtomicTxs.Remove(txID) != nil {
+			m.deregister(tx)
+		}
+	}
+}
+
 func (m *mempool) RemoveAtomicTx(tx *Tx) {
 	txID := tx.ID()
 	if m.unissuedAtomicTxs.Remove(txID) != nil {
@@ -244,6 +255,21 @@ func (m *mempool) PopAtomicTx() *Tx {
 	tx := m.unissuedAtomicTxs.RemoveTop()
 	m.deregister(tx)
 	return tx
+}
+
+// Pops a batch of atomic txs
+func (m *mempool) PopAtomicTxs(numTxs int) []*Tx {
+	if maxLen := m.unissuedAtomicTxs.Len(); numTxs > maxLen {
+		numTxs = maxLen
+	}
+
+	txs := make([]*Tx, numTxs)
+	for i := range txs {
+		tx := m.unissuedAtomicTxs.RemoveTop()
+		m.deregister(tx)
+		txs[i] = tx
+	}
+	return txs
 }
 
 func (m *mempool) PopProposalTx() *Tx {

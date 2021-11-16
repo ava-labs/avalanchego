@@ -298,6 +298,8 @@ func defaultVM() (*VM, database.Database, *common.SenderTest) {
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		StakeMintingPeriod:     defaultMaxStakingDuration,
 		ApricotPhase3Time:      defaultValidateEndTime,
+		ApricotPhase4Time:      defaultValidateEndTime,
+		ApricotPhase5Time:      defaultValidateEndTime,
 	}}
 
 	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
@@ -2400,6 +2402,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
 
 	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
 
 	vm := &VM{Factory: Factory{
 		Chains:                 chains.MockManager{},
@@ -2424,6 +2427,12 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	if err := vm.Initialize(ctx, baseDBManager, genesisBytes, nil, nil, msgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
+	m := &atomic.Memory{}
+	err := m.Initialize(logging.NoLog{}, atomicDB)
+	if err != nil {
+		panic(err)
+	}
+	vm.ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	key0 := keys[0]
 	key1 := keys[1]

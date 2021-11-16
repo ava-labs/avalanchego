@@ -693,6 +693,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			StakeMintingPeriod:     n.Config.StakeMintingPeriod,
 			ApricotPhase3Time:      version.GetApricotPhase3Time(n.Config.NetworkID),
 			ApricotPhase4Time:      version.GetApricotPhase4Time(n.Config.NetworkID),
+			ApricotPhase5Time:      version.GetApricotPhase5Time(n.Config.NetworkID),
 		}),
 		n.vmManager.RegisterFactory(avm.ID, &avm.Factory{
 			TxFee:            n.Config.TxFee,

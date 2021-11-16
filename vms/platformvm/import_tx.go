@@ -96,23 +96,23 @@ func (tx *UnsignedImportTx) SyntacticVerify(ctx *snow.Context) error {
 
 // Attempts to verify this transaction with the provided state.
 func (tx *UnsignedImportTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
-	_, err := tx.Execute(vm, parentState, stx)
+	_, err := tx.AtomicExecute(vm, parentState, stx)
 	return err
 }
 
 // Execute this transaction.
 func (tx *UnsignedImportTx) Execute(
 	vm *VM,
-	parentState MutableState,
+	vs VersionedState,
 	stx *Tx,
-) (VersionedState, TxError) {
+) (func() error, TxError) {
 	if err := tx.SyntacticVerify(vm.ctx); err != nil {
 		return nil, permError{err}
 	}
 
 	utxos := make([]*avax.UTXO, len(tx.Ins)+len(tx.ImportedInputs))
 	for index, input := range tx.Ins {
-		utxo, err := parentState.GetUTXO(input.InputID())
+		utxo, err := vs.GetUTXO(input.InputID())
 		if err != nil {
 			return nil, tempError{
 				fmt.Errorf("failed to get UTXO %s: %w", &input.UTXOID, err),
@@ -153,18 +153,38 @@ func (tx *UnsignedImportTx) Execute(
 		}
 	}
 
+	// Consume the UTXOS
+	consumeInputs(vs, tx.Ins)
+	// Produce the UTXOS
+	txID := tx.ID()
+	produceOutputs(vs, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	return nil, nil
+}
+
+// AtomicOperations returns the shared memory requests
+func (tx *UnsignedImportTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
+	utxoIDs := make([][]byte, len(tx.ImportedInputs))
+	for i, in := range tx.ImportedInputs {
+		utxoID := in.InputID()
+		utxoIDs[i] = utxoID[:]
+	}
+	return tx.SourceChain, &atomic.Requests{RemoveRequests: utxoIDs}, nil
+}
+
+// [AtomicExecute] to maintain consistency for the standard block.
+func (tx *UnsignedImportTx) AtomicExecute(
+	vm *VM,
+	parentState MutableState,
+	stx *Tx,
+) (VersionedState, TxError) {
 	// Set up the state if this tx is committed
 	newState := newVersionedState(
 		parentState,
 		parentState.CurrentStakerChainState(),
 		parentState.PendingStakerChainState(),
 	)
-	// Consume the UTXOS
-	consumeInputs(newState, tx.Ins)
-	// Produce the UTXOS
-	txID := tx.ID()
-	produceOutputs(newState, txID, vm.ctx.AVAXAssetID, tx.Outs)
-	return newState, nil
+	_, err := tx.Execute(vm, newState, stx)
+	return newState, err
 }
 
 // Accept this transaction and spend imported inputs
@@ -172,13 +192,12 @@ func (tx *UnsignedImportTx) Execute(
 // we don't want to remove an imported UTXO in semanticVerify
 // only to have the transaction not be Accepted. This would be inconsistent.
 // Recall that imported UTXOs are not kept in a versionDB.
-func (tx *UnsignedImportTx) Accept(ctx *snow.Context, batch database.Batch) error {
-	utxoIDs := make([][]byte, len(tx.ImportedInputs))
-	for i, in := range tx.ImportedInputs {
-		utxoID := in.InputID()
-		utxoIDs[i] = utxoID[:]
+func (tx *UnsignedImportTx) AtomicAccept(ctx *snow.Context, batch database.Batch) error {
+	chainID, requests, err := tx.AtomicOperations()
+	if err != nil {
+		return err
 	}
-	return ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{tx.SourceChain: {RemoveRequests: utxoIDs}}, batch)
+	return ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{chainID: requests}, batch)
 }
 
 // Create a new transaction

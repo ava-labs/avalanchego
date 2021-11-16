@@ -277,38 +277,6 @@ func (cdb *CommonDecisionBlock) Reject() error {
 	return cdb.vm.internalState.Commit()
 }
 
-// SingleDecisionBlock contains the accept for standalone decision blocks
-type SingleDecisionBlock struct {
-	CommonDecisionBlock `serialize:"true"`
-}
-
-// Accept implements the snowman.Block interface
-func (sdb *SingleDecisionBlock) Accept() error {
-	sdb.vm.ctx.Log.Verbo("accepting block with ID %s", sdb.ID())
-
-	if err := sdb.CommonDecisionBlock.Accept(); err != nil {
-		return fmt.Errorf("failed to accept CommonBlock: %w", err)
-	}
-
-	// Update the state of the chain in the database
-	sdb.onAcceptState.Apply(sdb.vm.internalState)
-	if err := sdb.vm.internalState.Commit(); err != nil {
-		return fmt.Errorf("failed to commit vm's state: %w", err)
-	}
-
-	for _, child := range sdb.children {
-		child.setBaseState()
-	}
-	if sdb.onAcceptFunc != nil {
-		if err := sdb.onAcceptFunc(); err != nil {
-			return fmt.Errorf("failed to execute onAcceptFunc: %w", err)
-		}
-	}
-
-	sdb.free()
-	return nil
-}
-
 // DoubleDecisionBlock contains the accept for a pair of blocks
 type DoubleDecisionBlock struct {
 	CommonDecisionBlock `serialize:"true"`
