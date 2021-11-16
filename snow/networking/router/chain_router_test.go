@@ -79,6 +79,7 @@ func TestShutdown(t *testing.T) {
 	engine.ConnectedF = func(nodeID ids.ShortID) error { return nil }
 	engine.HaltF = func() {}
 	handler.RegisterEngine(engine)
+	ctx.SetState(snow.NormalOp) // assumed bootstrap is done
 
 	go handler.Dispatch()
 
@@ -174,6 +175,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	closed := new(int)
 	engine.ShutdownF = func() error { *closed++; return nil }
 	handler.RegisterEngine(engine)
+	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
 
 	chainRouter.AddChain(handler)
 
@@ -283,11 +285,7 @@ func TestRouterTimeout(t *testing.T) {
 		return nil
 	}
 	handler.RegisterBootstrap(bootstrapper)
-
-	engine := &common.EngineTest{T: t}
-	engine.Default(false)
-	engine.ContextF = func() *snow.ConsensusContext { return ctx }
-	handler.RegisterEngine(engine)
+	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
 	chainRouter.AddChain(handler)
 	go handler.Dispatch()
@@ -368,6 +366,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 	engine.Default(false)
 	engine.ContextF = func() *snow.ConsensusContext { return ctx }
 	handler.RegisterEngine(engine)
+	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
 
 	chainRouter.AddChain(handler)
 	go handler.Dispatch()
@@ -471,11 +470,11 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		return nil
 	}
 	handler.RegisterBootstrap(bootstrapper)
+	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
 	engine := &common.EngineTest{T: t}
 	engine.ContextF = func() *snow.ConsensusContext { return ctx }
 	engine.Default(false)
-
 	handler.RegisterEngine(engine)
 
 	chainRouter.AddChain(handler)

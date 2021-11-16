@@ -258,200 +258,20 @@ func (h *Handler) handleMsg(msg message.InboundMessage) error {
 // Relevant fields in msgs must be validated before being dispatched to the engine.
 // An invalid msg is logged and dropped silently since err would cause a chain shutdown.
 func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
+	var targetGear common.Engine
+	switch h.ctx.GetState() {
+	case snow.FastSyncing:
+		targetGear = h.fastSyncer
+	case snow.Bootstrapping:
+		targetGear = h.bootstrapper
+	case snow.NormalOp:
+		targetGear = h.engine
+	default:
+		return fmt.Errorf("unknown handler for state %v", h.ctx.GetState())
+	}
+
 	nodeID := msg.NodeID()
 	switch msg.Op() {
-	case message.GetAcceptedFrontier:
-		reqID := msg.Get(message.RequestID).(uint32)
-		return h.bootstrapper.GetAcceptedFrontier(nodeID, reqID)
-
-	case message.AcceptedFrontier:
-		reqID := msg.Get(message.RequestID).(uint32)
-		containerIDs, err := getContainerIDs(msg)
-		if err != nil {
-			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
-				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
-			return nil
-		}
-
-		return h.bootstrapper.AcceptedFrontier(nodeID, reqID, containerIDs)
-
-	case message.GetAcceptedFrontierFailed:
-		reqID := msg.Get(message.RequestID).(uint32)
-		return h.bootstrapper.GetAcceptedFrontierFailed(nodeID, reqID)
-
-	case message.GetAccepted:
-		reqID := msg.Get(message.RequestID).(uint32)
-		containerIDs, err := getContainerIDs(msg)
-		if err != nil {
-			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
-				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
-			return nil
-		}
-		return h.bootstrapper.GetAccepted(nodeID, reqID, containerIDs)
-
-	case message.Accepted:
-		reqID := msg.Get(message.RequestID).(uint32)
-		containerIDs, err := getContainerIDs(msg)
-		if err != nil {
-			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
-				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
-			return nil
-		}
-
-		return h.bootstrapper.Accepted(nodeID, reqID, containerIDs)
-
-	case message.GetAcceptedFailed:
-		reqID := msg.Get(message.RequestID).(uint32)
-		return h.bootstrapper.GetAcceptedFailed(nodeID, reqID)
-
-	case message.GetAncestors:
-		reqID := msg.Get(message.RequestID).(uint32)
-		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
-		if err != nil {
-			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
-				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
-			return nil
-		}
-
-		return h.bootstrapper.GetAncestors(nodeID, reqID, containerID)
-
-	case message.GetAncestorsFailed:
-		reqID := msg.Get(message.RequestID).(uint32)
-		return h.bootstrapper.GetAncestorsFailed(nodeID, reqID)
-
-	case message.MultiPut:
-		reqID := msg.Get(message.RequestID).(uint32)
-		containers := msg.Get(message.MultiContainerBytes).([][]byte)
-		return h.bootstrapper.MultiPut(nodeID, reqID, containers)
-
-	case message.Get:
-		reqID := msg.Get(message.RequestID).(uint32)
-		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
-		h.ctx.Log.AssertNoError(err)
-		return h.engine.Get(nodeID, reqID, containerID)
-
-	case message.GetFailed:
-		reqID := msg.Get(message.RequestID).(uint32)
-		if h.ctx.IsBootstrapped() {
-			return h.engine.GetFailed(nodeID, reqID)
-		}
-		return h.bootstrapper.GetFailed(nodeID, reqID)
-
-	case message.Put:
-		reqID := msg.Get(message.RequestID).(uint32)
-		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
-		h.ctx.Log.AssertNoError(err)
-		container, ok := msg.Get(message.ContainerBytes).([]byte)
-		if !ok {
-			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse ContainerBytes",
-				msg.Op(), nodeID, h.ctx.ChainID, reqID)
-			return nil
-		}
-
-		if h.ctx.IsBootstrapped() {
-			return h.engine.Put(nodeID, reqID, containerID, container)
-		}
-		return h.bootstrapper.Put(nodeID, reqID, containerID, container)
-
-	case message.PushQuery:
-		reqID := msg.Get(message.RequestID).(uint32)
-		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
-		h.ctx.Log.AssertNoError(err)
-		container, ok := msg.Get(message.ContainerBytes).([]byte)
-		if !ok {
-			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse ContainerBytes",
-				msg.Op(), nodeID, h.ctx.ChainID, reqID)
-			return nil
-		}
-
-		if h.ctx.IsBootstrapped() {
-			return h.engine.PushQuery(nodeID, reqID, containerID, container)
-		}
-		return h.bootstrapper.PushQuery(nodeID, reqID, containerID, container)
-
-	case message.PullQuery:
-		reqID := msg.Get(message.RequestID).(uint32)
-		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
-		h.ctx.Log.AssertNoError(err)
-
-		if h.ctx.IsBootstrapped() {
-			return h.engine.PullQuery(nodeID, reqID, containerID)
-		}
-		return h.bootstrapper.PullQuery(nodeID, reqID, containerID)
-
-	case message.Chits:
-		reqID := msg.Get(message.RequestID).(uint32)
-		votes, err := getContainerIDs(msg)
-		if err != nil {
-			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
-				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
-			return nil
-		}
-
-		if h.ctx.IsBootstrapped() {
-			return h.engine.Chits(nodeID, reqID, votes)
-		}
-		return h.bootstrapper.Chits(nodeID, reqID, votes)
-
-	case message.QueryFailed:
-		reqID := msg.Get(message.RequestID).(uint32)
-		if h.ctx.IsBootstrapped() {
-			return h.engine.QueryFailed(nodeID, reqID)
-		}
-		return h.bootstrapper.QueryFailed(nodeID, reqID)
-
-	case message.Connected:
-		return h.bootstrapper.Connected(nodeID)
-
-	case message.Disconnected:
-		return h.bootstrapper.Disconnected(nodeID)
-
-	case message.AppRequest:
-		reqID := msg.Get(message.RequestID).(uint32)
-		appBytes, ok := msg.Get(message.AppBytes).([]byte)
-		if !ok {
-			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppBytes",
-				msg.Op(), nodeID, h.ctx.ChainID, reqID)
-			return nil
-		}
-		if h.ctx.IsBootstrapped() {
-			return h.engine.AppRequest(nodeID, reqID, msg.ExpirationTime(), appBytes)
-		}
-		return h.bootstrapper.AppRequest(nodeID, reqID, msg.ExpirationTime(), appBytes)
-
-	case message.AppResponse:
-		reqID := msg.Get(message.RequestID).(uint32)
-		appBytes, ok := msg.Get(message.AppBytes).([]byte)
-		if !ok {
-			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppBytes",
-				msg.Op(), nodeID, h.ctx.ChainID, reqID)
-			return nil
-		}
-		if h.ctx.IsBootstrapped() {
-			return h.engine.AppResponse(nodeID, reqID, appBytes)
-		}
-		return h.bootstrapper.AppResponse(nodeID, reqID, appBytes)
-
-	case message.AppRequestFailed:
-		reqID := msg.Get(message.RequestID).(uint32)
-		if h.ctx.IsBootstrapped() {
-			return h.engine.AppRequestFailed(nodeID, reqID)
-		}
-		return h.bootstrapper.AppRequestFailed(nodeID, reqID)
-
-	case message.AppGossip:
-		appBytes, ok := msg.Get(message.AppBytes).([]byte)
-		if !ok {
-			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppBytes",
-				msg.Op(), nodeID, h.ctx.ChainID, constants.GossipMsgRequestID)
-			return nil
-		}
-
-		if h.ctx.IsBootstrapped() {
-			return h.engine.AppGossip(nodeID, appBytes)
-		}
-		return h.bootstrapper.AppGossip(nodeID, appBytes)
-
 	case message.GetStateSummaryFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
 		return h.fastSyncer.GetStateSummaryFrontier(nodeID, reqID)
@@ -493,6 +313,160 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 	case message.GetAcceptedStateSummaryFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
 		return h.fastSyncer.GetAcceptedStateSummaryFailed(nodeID, reqID)
+
+	case message.GetAcceptedFrontier:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return h.bootstrapper.GetAcceptedFrontier(nodeID, reqID)
+
+	case message.AcceptedFrontier:
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerIDs, err := getContainerIDs(msg)
+		if err != nil {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
+				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
+			return nil
+		}
+		return h.bootstrapper.AcceptedFrontier(nodeID, reqID, containerIDs)
+
+	case message.GetAcceptedFrontierFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return h.bootstrapper.GetAcceptedFrontierFailed(nodeID, reqID)
+
+	case message.GetAccepted:
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerIDs, err := getContainerIDs(msg)
+		if err != nil {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
+				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
+			return nil
+		}
+		return h.bootstrapper.GetAccepted(nodeID, reqID, containerIDs)
+
+	case message.Accepted:
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerIDs, err := getContainerIDs(msg)
+		if err != nil {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
+				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
+			return nil
+		}
+		return h.bootstrapper.Accepted(nodeID, reqID, containerIDs)
+
+	case message.GetAcceptedFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return h.bootstrapper.GetAcceptedFailed(nodeID, reqID)
+
+	case message.GetAncestors:
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
+		if err != nil {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
+				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
+			return nil
+		}
+		return h.bootstrapper.GetAncestors(nodeID, reqID, containerID)
+
+	case message.GetAncestorsFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return h.bootstrapper.GetAncestorsFailed(nodeID, reqID)
+
+	case message.MultiPut:
+		reqID := msg.Get(message.RequestID).(uint32)
+		containers := msg.Get(message.MultiContainerBytes).([][]byte)
+		return h.bootstrapper.MultiPut(nodeID, reqID, containers)
+
+	case message.Get:
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
+		h.ctx.Log.AssertNoError(err)
+		return h.engine.Get(nodeID, reqID, containerID)
+
+	case message.GetFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return targetGear.GetFailed(nodeID, reqID)
+
+	case message.Put:
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
+		h.ctx.Log.AssertNoError(err)
+		container, ok := msg.Get(message.ContainerBytes).([]byte)
+		if !ok {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse ContainerBytes",
+				msg.Op(), nodeID, h.ctx.ChainID, reqID)
+			return nil
+		}
+		return targetGear.Put(nodeID, reqID, containerID, container)
+
+	case message.PushQuery:
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
+		h.ctx.Log.AssertNoError(err)
+		container, ok := msg.Get(message.ContainerBytes).([]byte)
+		if !ok {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse ContainerBytes",
+				msg.Op(), nodeID, h.ctx.ChainID, reqID)
+			return nil
+		}
+		return targetGear.PushQuery(nodeID, reqID, containerID, container)
+
+	case message.PullQuery:
+		reqID := msg.Get(message.RequestID).(uint32)
+		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
+		h.ctx.Log.AssertNoError(err)
+		return targetGear.PullQuery(nodeID, reqID, containerID)
+
+	case message.Chits:
+		reqID := msg.Get(message.RequestID).(uint32)
+		votes, err := getContainerIDs(msg)
+		if err != nil {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
+				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
+			return nil
+		}
+		return targetGear.Chits(nodeID, reqID, votes)
+
+	case message.QueryFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return targetGear.QueryFailed(nodeID, reqID)
+
+	case message.Connected:
+		return h.bootstrapper.Connected(nodeID)
+
+	case message.Disconnected:
+		return h.bootstrapper.Disconnected(nodeID)
+
+	case message.AppRequest:
+		reqID := msg.Get(message.RequestID).(uint32)
+		appBytes, ok := msg.Get(message.AppBytes).([]byte)
+		if !ok {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppBytes",
+				msg.Op(), nodeID, h.ctx.ChainID, reqID)
+			return nil
+		}
+		return targetGear.AppRequest(nodeID, reqID, msg.ExpirationTime(), appBytes)
+
+	case message.AppResponse:
+		reqID := msg.Get(message.RequestID).(uint32)
+		appBytes, ok := msg.Get(message.AppBytes).([]byte)
+		if !ok {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppBytes",
+				msg.Op(), nodeID, h.ctx.ChainID, reqID)
+			return nil
+		}
+		return targetGear.AppResponse(nodeID, reqID, appBytes)
+
+	case message.AppRequestFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return targetGear.AppRequestFailed(nodeID, reqID)
+
+	case message.AppGossip:
+		appBytes, ok := msg.Get(message.AppBytes).([]byte)
+		if !ok {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppBytes",
+				msg.Op(), nodeID, h.ctx.ChainID, constants.GossipMsgRequestID)
+			return nil
+		}
+		return targetGear.AppGossip(nodeID, appBytes)
 
 	default:
 		h.ctx.Log.Warn("Attempt to submit to engine unhandled consensus msg %s from from (%s, %s). Dropping it",

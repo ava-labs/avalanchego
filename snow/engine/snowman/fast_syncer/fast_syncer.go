@@ -2,8 +2,10 @@ package fastsyncer
 
 import (
 	stdmath "math"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -92,6 +94,7 @@ func (fs *fastSyncer) GetVM() common.VM { return fs.VM }
 func (fs *fastSyncer) Start(startReqID uint32) error {
 	fs.VM = fs.Config.VM
 	fs.RequestID = startReqID
+	fs.Ctx.SetState(snow.FastSyncing)
 
 	enabled, err := fs.VM.StateSyncEnabled()
 	if err != nil {
@@ -385,7 +388,19 @@ func (fs *fastSyncer) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, req
 	return fs.AcceptedStateSummary(validatorID, requestID, [][]byte{})
 }
 
-///
+func (fs *fastSyncer) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
+	return fs.VM.AppRequest(nodeID, requestID, deadline, request)
+}
+
+func (fs *fastSyncer) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	return fs.VM.AppResponse(nodeID, requestID, response)
+}
+
+// AppRequestFailed implements the Engine interface
+func (fs *fastSyncer) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	return fs.VM.AppRequestFailed(nodeID, requestID)
+}
+
 func (fs *fastSyncer) RestartBootstrap(reset bool) error {
 	// resets the attempts when we're pulling blocks/vertices we don't want to
 	// fail the bootstrap at that stage

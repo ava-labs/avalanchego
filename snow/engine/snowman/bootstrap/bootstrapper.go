@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -456,7 +455,6 @@ func (b *bootstrapper) finish() error {
 	if err := b.OnFinished(b.RequestID); err != nil {
 		return err
 	}
-	b.Ctx.SetState(snow.NormalOp)
 	return nil
 }
 

@@ -122,10 +122,9 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		BytesV:  vtxBytes2,
 	}
 
-	finished := new(bool)
 	bs, err := newBootstrapper(
 		config,
-		func(lastReqID uint32) error { *finished = true; return nil },
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -173,7 +172,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	}
 
 	switch {
-	case !*finished:
+	case config.Ctx.GetState() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
@@ -225,10 +224,9 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		BytesV:  vtxBytes2,
 	}
 
-	finished := new(bool)
 	bs, err := newBootstrapper(
 		config,
-		func(lastReqID uint32) error { *finished = true; return nil },
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -323,7 +321,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	switch {
 	case *requestID != oldReqID:
 		t.Fatal("should not have issued new request")
-	case !*finished:
+	case config.Ctx.GetState() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
@@ -403,10 +401,9 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		BytesV:   vtxBytes1,
 	}
 
-	finished := new(bool)
 	bs, err := newBootstrapper(
 		config,
-		func(lastReqID uint32) error { *finished = true; return nil },
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -479,7 +476,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !*finished {
+	if config.Ctx.GetState() != snow.NormalOp {
 		t.Fatalf("Should have finished bootstrapping")
 	}
 	if tx0.Status() != choices.Accepted {
@@ -548,10 +545,9 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 		BytesV:   vtxBytes1,
 	}
 
-	finished := new(bool)
 	bs, err := newBootstrapper(
 		config,
-		func(lastReqID uint32) error { *finished = true; return nil },
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -613,7 +609,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !*finished {
+	if config.Ctx.GetState() != snow.NormalOp {
 		t.Fatalf("Bootstrapping should have finished")
 	}
 	if tx0.Status() != choices.Unknown { // never saw this tx
@@ -694,10 +690,9 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	finished := new(bool)
 	bs, err := newBootstrapper(
 		config,
-		func(lastReqID uint32) error { *finished = true; return nil },
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -779,10 +774,9 @@ func TestBootstrapperIncompleteMultiPut(t *testing.T) {
 		BytesV:   vtxBytes2,
 	}
 
-	finished := new(bool)
 	bs, err := newBootstrapper(
 		config,
-		func(lastReqID uint32) error { *finished = true; return nil },
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -900,10 +894,9 @@ func TestBootstrapperFinalized(t *testing.T) {
 		BytesV:   vtxBytes1,
 	}
 
-	finished := new(bool)
 	bs, err := newBootstrapper(
 		config,
-		func(lastReqID uint32) error { *finished = true; return nil },
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -984,7 +977,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	switch {
 	case err != nil:
 		t.Fatal(err)
-	case !*finished:
+	case config.Ctx.GetState() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
@@ -1032,10 +1025,9 @@ func TestBootstrapperAcceptsMultiPutParents(t *testing.T) {
 		BytesV:   vtxBytes2,
 	}
 
-	finished := new(bool)
 	bs, err := newBootstrapper(
 		config,
-		func(lastReqID uint32) error { *finished = true; return nil },
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1118,7 +1110,7 @@ func TestBootstrapperAcceptsMultiPutParents(t *testing.T) {
 	}
 
 	switch {
-	case !*finished:
+	case config.Ctx.GetState() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
@@ -1200,10 +1192,9 @@ func TestRestartBootstrapping(t *testing.T) {
 		BytesV:   vtxBytes5,
 	}
 
-	finished := new(bool)
 	bs, err := newBootstrapper(
 		config,
-		func(lastReqID uint32) error { *finished = true; return nil },
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1363,7 +1354,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	switch {
-	case !*finished:
+	case config.Ctx.GetState() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
