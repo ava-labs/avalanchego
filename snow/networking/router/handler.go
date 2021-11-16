@@ -267,7 +267,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 	case snow.NormalOp:
 		targetGear = h.engine
 	default:
-		return fmt.Errorf("unknown handler for state %v", h.ctx.GetState())
+		return fmt.Errorf("unknown handler for state %v", h.ctx.GetState().String())
 	}
 
 	nodeID := msg.NodeID()
