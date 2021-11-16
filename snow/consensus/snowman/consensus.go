@@ -14,7 +14,7 @@ import (
 type Consensus interface {
 	// Takes in the context, snowball parameters, and the last accepted block.
 	Initialize(
-		ctx *snow.Context,
+		ctx *snow.ConsensusContext,
 		params snowball.Parameters,
 		lastAcceptedID ids.ID,
 		lastAcceptedHeight uint64,

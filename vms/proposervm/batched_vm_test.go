@@ -893,7 +893,6 @@ func initTestRemoteProposerVM(
 	ctx.StakingCertLeaf = pTestCert.Leaf
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
-	ctx.Bootstrapped()
 
 	dummyDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	// make sure that DBs are compressed correctly
@@ -904,6 +903,10 @@ func initTestRemoteProposerVM(
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
+
+	if err := proVM.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := proVM.SetPreference(coreGenBlk.IDV); err != nil {
 		t.Fatal(err)

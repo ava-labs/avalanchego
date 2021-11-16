@@ -27,7 +27,7 @@ type metrics struct {
 	chainToMetrics map[ids.ID]*chainMetrics
 }
 
-func (m *metrics) RegisterChain(ctx *snow.Context, namespace string) error {
+func (m *metrics) RegisterChain(ctx *snow.ConsensusContext, namespace string) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -60,7 +60,7 @@ func (m *metrics) Observe(chainID ids.ID, op message.Op, latency time.Duration) 
 
 // chainMetrics contains message response time metrics for a chain
 type chainMetrics struct {
-	ctx *snow.Context
+	ctx *snow.ConsensusContext
 
 	messageLatencies map[message.Op]metric.Averager
 
@@ -68,7 +68,7 @@ type chainMetrics struct {
 	messageSummaries map[message.Op]*prometheus.SummaryVec
 }
 
-func newChainMetrics(ctx *snow.Context, namespace string, summaryEnabled bool) (*chainMetrics, error) {
+func newChainMetrics(ctx *snow.ConsensusContext, namespace string, summaryEnabled bool) (*chainMetrics, error) {
 	cm := &chainMetrics{
 		ctx: ctx,
 
@@ -85,7 +85,7 @@ func newChainMetrics(ctx *snow.Context, namespace string, summaryEnabled bool) (
 			queryLatencyNamespace,
 			op.String(),
 			defaultRequestHelpMsg,
-			ctx.Metrics,
+			ctx.Registerer,
 			&errs,
 		)
 
@@ -104,7 +104,7 @@ func newChainMetrics(ctx *snow.Context, namespace string, summaryEnabled bool) (
 		)
 		cm.messageSummaries[op] = summary
 
-		if err := ctx.Metrics.Register(summary); err != nil {
+		if err := ctx.Registerer.Register(summary); err != nil {
 			errs.Add(fmt.Errorf("failed to register %s statistics: %w", summaryName, err))
 		}
 	}

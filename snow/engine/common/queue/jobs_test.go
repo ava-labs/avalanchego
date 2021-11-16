@@ -96,7 +96,7 @@ func TestPushAndExecute(t *testing.T) {
 		return job, nil
 	}
 
-	count, err := jobs.ExecuteAll(snow.DefaultContextTest(), &common.Halter{}, false)
+	count, err := jobs.ExecuteAll(snow.DefaultConsensusContextTest(), &common.Halter{}, false)
 	assert.NoError(err)
 	assert.Equal(1, count)
 
@@ -189,7 +189,7 @@ func TestRemoveDependency(t *testing.T) {
 		}
 	}
 
-	count, err := jobs.ExecuteAll(snow.DefaultContextTest(), &common.Halter{}, false)
+	count, err := jobs.ExecuteAll(snow.DefaultConsensusContextTest(), &common.Halter{}, false)
 	assert.NoError(err)
 	assert.Equal(2, count)
 	assert.True(executed0)
@@ -415,7 +415,7 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 		}
 	}
 
-	_, err = jobs.ExecuteAll(snow.DefaultContextTest(), &common.Halter{}, false)
+	_, err = jobs.ExecuteAll(snow.DefaultConsensusContextTest(), &common.Halter{}, false)
 	// Assert that the database closed error on job1 causes ExecuteAll
 	// to fail in the middle of execution.
 	assert.Error(err)
@@ -448,7 +448,7 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	assert.NoError(err)
 	assert.True(hasNext)
 
-	count, err := jobs.ExecuteAll(snow.DefaultContextTest(), &common.Halter{}, false)
+	count, err := jobs.ExecuteAll(snow.DefaultConsensusContextTest(), &common.Halter{}, false)
 	assert.NoError(err)
 	assert.Equal(2, count)
 	assert.True(executed1)

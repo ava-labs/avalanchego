@@ -5,7 +5,6 @@ package avalanche
 
 import (
 	"errors"
-	"fmt"
 	"math"
 	"path"
 	"reflect"
@@ -20,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
-	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 type testFunc func(*testing.T, Factory)
@@ -63,13 +61,13 @@ func getTestName(i interface{}) string {
 }
 
 func MetricsTest(t *testing.T, factory Factory) {
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 
 	{
 		avl := factory.New()
 		params := Parameters{
 			Parameters: snowball.Parameters{
-				Namespace:         fmt.Sprintf("%s_%s", constants.PlatformName, ctx.ChainID),
+				Namespace:         "chain_" + ctx.ChainID.String(),
 				Metrics:           prometheus.NewRegistry(),
 				K:                 2,
 				Alpha:             2,
@@ -96,7 +94,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 		avl := factory.New()
 		params := Parameters{
 			Parameters: snowball.Parameters{
-				Namespace:         fmt.Sprintf("%s_%s", constants.PlatformName, ctx.ChainID),
+				Namespace:         "chain_" + ctx.ChainID.String(),
 				Metrics:           prometheus.NewRegistry(),
 				K:                 2,
 				Alpha:             2,
@@ -123,7 +121,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 		avl := factory.New()
 		params := Parameters{
 			Parameters: snowball.Parameters{
-				Namespace:         fmt.Sprintf("%s_%s", constants.PlatformName, ctx.ChainID),
+				Namespace:         "chain_" + ctx.ChainID.String(),
 				Metrics:           prometheus.NewRegistry(),
 				K:                 2,
 				Alpha:             2,
@@ -151,10 +149,10 @@ func MetricsTest(t *testing.T, factory Factory) {
 func ParamsTest(t *testing.T, factory Factory) {
 	avl := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Namespace:             fmt.Sprintf("%s_%s", constants.PlatformName, ctx.ChainID),
+			Namespace:             "chain_" + ctx.ChainID.String(),
 			Metrics:               prometheus.NewRegistry(),
 			K:                     2,
 			Alpha:                 2,
@@ -218,7 +216,7 @@ func NumProcessingTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	if err := avl.Initialize(snow.DefaultContextTest(), params, vts); err != nil {
+	if err := avl.Initialize(snow.DefaultConsensusContextTest(), params, vts); err != nil {
 		t.Fatal(err)
 	}
 
@@ -335,7 +333,7 @@ func AddTest(t *testing.T, factory Factory) {
 		},
 	}
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	// track consensus events to ensure idempotency in case of redundant vertex adds
 	consensusEvents := snow.NewEventDispatcherTracker()
 	ctx.ConsensusDispatcher = consensusEvents
@@ -474,7 +472,7 @@ func VertexIssuedTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	if err := avl.Initialize(snow.DefaultContextTest(), params, vts); err != nil {
+	if err := avl.Initialize(snow.DefaultConsensusContextTest(), params, vts); err != nil {
 		t.Fatal(err)
 	}
 
@@ -545,7 +543,7 @@ func TxIssuedTest(t *testing.T, factory Factory) {
 	}}
 	tx1.InputIDsV = append(tx1.InputIDsV, utxos[0])
 
-	if err := avl.Initialize(snow.DefaultContextTest(), params, vts); err != nil {
+	if err := avl.Initialize(snow.DefaultConsensusContextTest(), params, vts); err != nil {
 		t.Fatal(err)
 	}
 
@@ -601,7 +599,7 @@ func VirtuousTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultConsensusContextTest(), params, vts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -758,7 +756,7 @@ func VirtuousSkippedUpdateTest(t *testing.T, factory Factory) {
 		ids.GenerateTestID(),
 	}
 
-	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultConsensusContextTest(), params, vts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -856,7 +854,7 @@ func VotingTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultConsensusContextTest(), params, vts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -959,7 +957,7 @@ func IgnoreInvalidVotingTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	if err := avl.Initialize(snow.DefaultContextTest(), params, vts); err != nil {
+	if err := avl.Initialize(snow.DefaultConsensusContextTest(), params, vts); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1046,7 +1044,7 @@ func TransitiveVotingTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultConsensusContextTest(), params, vts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1166,7 +1164,7 @@ func SplitVotingTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultConsensusContextTest(), params, vts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1250,7 +1248,7 @@ func TransitiveRejectionTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultConsensusContextTest(), params, vts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1388,7 +1386,7 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultConsensusContextTest(), params, vts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1492,7 +1490,7 @@ func QuiesceTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultConsensusContextTest(), params, vts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1598,7 +1596,7 @@ func OrphansTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultConsensusContextTest(), params, vts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1699,7 +1697,7 @@ func ErrorOnVacuousAcceptTest(t *testing.T, factory Factory) {
 		StatusV: choices.Accepted,
 	}}}
 
-	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultConsensusContextTest(), params, vts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1749,7 +1747,7 @@ func ErrorOnTxAcceptTest(t *testing.T, factory Factory) {
 	}}}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultConsensusContextTest(), params, vts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1806,7 +1804,7 @@ func ErrorOnVtxAcceptTest(t *testing.T, factory Factory) {
 	}}}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultConsensusContextTest(), params, vts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1863,7 +1861,7 @@ func ErrorOnVtxRejectTest(t *testing.T, factory Factory) {
 	}}}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultConsensusContextTest(), params, vts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1938,7 +1936,7 @@ func ErrorOnParentVtxRejectTest(t *testing.T, factory Factory) {
 	}}}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultConsensusContextTest(), params, vts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2025,7 +2023,7 @@ func ErrorOnTransitiveVtxRejectTest(t *testing.T, factory Factory) {
 	}}}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultConsensusContextTest(), params, vts)
 	if err != nil {
 		t.Fatal(err)
 	}

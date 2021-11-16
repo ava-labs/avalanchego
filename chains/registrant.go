@@ -13,5 +13,5 @@ type Registrant interface {
 	// Called when the chain described by [ctx] and [engine] is created
 	// This function is called before the chain starts processing messages
 	// [engine] should be an avalanche.Engine or snowman.Engine
-	RegisterChain(name string, ctx *snow.Context, engine common.Engine)
+	RegisterChain(name string, ctx *snow.ConsensusContext, engine common.Engine)
 }

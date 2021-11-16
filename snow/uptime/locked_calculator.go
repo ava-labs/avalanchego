@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 var (
@@ -21,13 +21,14 @@ var (
 type LockedCalculator interface {
 	Calculator
 
-	SetCalculator(ctx *snow.Context, newC Calculator)
+	SetCalculator(isBootstrapped *utils.AtomicBool, lock sync.Locker, newC Calculator)
 }
 
 type lockedCalculator struct {
-	lock sync.RWMutex
-	ctx  *snow.Context
-	c    Calculator
+	lock           sync.RWMutex
+	isBootstrapped *utils.AtomicBool
+	calculatorLock sync.Locker
+	c              Calculator
 }
 
 func NewLockedCalculator() LockedCalculator {
@@ -38,12 +39,12 @@ func (c *lockedCalculator) CalculateUptime(nodeID ids.ShortID) (time.Duration, t
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	if c.ctx == nil || !c.ctx.IsBootstrapped() {
+	if c.isBootstrapped == nil || !c.isBootstrapped.GetValue() {
 		return 0, time.Time{}, errNotReady
 	}
 
-	c.ctx.Lock.Lock()
-	defer c.ctx.Lock.Unlock()
+	c.calculatorLock.Lock()
+	defer c.calculatorLock.Unlock()
 
 	return c.c.CalculateUptime(nodeID)
 }
@@ -52,12 +53,12 @@ func (c *lockedCalculator) CalculateUptimePercent(nodeID ids.ShortID) (float64, 
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	if c.ctx == nil || !c.ctx.IsBootstrapped() {
+	if c.isBootstrapped == nil || !c.isBootstrapped.GetValue() {
 		return 0, errNotReady
 	}
 
-	c.ctx.Lock.Lock()
-	defer c.ctx.Lock.Unlock()
+	c.calculatorLock.Lock()
+	defer c.calculatorLock.Unlock()
 
 	return c.c.CalculateUptimePercent(nodeID)
 }
@@ -66,20 +67,21 @@ func (c *lockedCalculator) CalculateUptimePercentFrom(nodeID ids.ShortID, startT
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	if c.ctx == nil || !c.ctx.IsBootstrapped() {
+	if c.isBootstrapped == nil || !c.isBootstrapped.GetValue() {
 		return 0, errNotReady
 	}
 
-	c.ctx.Lock.Lock()
-	defer c.ctx.Lock.Unlock()
+	c.calculatorLock.Lock()
+	defer c.calculatorLock.Unlock()
 
 	return c.c.CalculateUptimePercentFrom(nodeID, startTime)
 }
 
-func (c *lockedCalculator) SetCalculator(ctx *snow.Context, newC Calculator) {
+func (c *lockedCalculator) SetCalculator(isBootstrapped *utils.AtomicBool, lock sync.Locker, newC Calculator) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	c.ctx = ctx
+	c.isBootstrapped = isBootstrapped
+	c.calculatorLock = lock
 	c.c = newC
 }

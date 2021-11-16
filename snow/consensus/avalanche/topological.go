@@ -45,7 +45,7 @@ type Topological struct {
 	pollNumber uint64
 
 	// Context used for logging
-	ctx *snow.Context
+	ctx *snow.ConsensusContext
 	// Threshold for confidence increases
 	params Parameters
 
@@ -89,7 +89,7 @@ type kahnNode struct {
 
 // Initialize implements the Avalanche interface
 func (ta *Topological) Initialize(
-	ctx *snow.Context,
+	ctx *snow.ConsensusContext,
 	params Parameters,
 	frontier []Vertex,
 ) error {

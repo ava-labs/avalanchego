@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/keystore"
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -50,6 +51,7 @@ import (
 
 const (
 	defaultChannelSize = 1
+	defaultChainPrefix = "chain_"
 )
 
 var (
@@ -111,7 +113,7 @@ type chain struct {
 	Name    string
 	Engine  common.Engine
 	Handler *router.Handler
-	Ctx     *snow.Context
+	Ctx     *snow.ConsensusContext
 	Beacons validators.Set
 }
 
@@ -155,6 +157,7 @@ type ManagerConfig struct {
 	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
 	ShutdownNodeFunc func(exitCode int)
 	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
+	Metrics          metrics.MultiGatherer
 
 	AppGossipValidatorSize     int
 	AppGossipNonValidatorSize  int
@@ -300,8 +303,10 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	primaryAlias, err := m.PrimaryAlias(chainParams.ID)
+	metricsNamespace := primaryAlias
 	if err != nil {
 		primaryAlias = chainParams.ID.String()
+		metricsNamespace = defaultChainPrefix + primaryAlias
 	}
 
 	// Create the log and context of the chain
@@ -310,25 +315,36 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		return nil, fmt.Errorf("error while creating chain's log %w", err)
 	}
 
-	ctx := &snow.Context{
-		NetworkID:           m.NetworkID,
-		SubnetID:            chainParams.SubnetID,
-		ChainID:             chainParams.ID,
-		NodeID:              m.NodeID,
-		XChainID:            m.XChainID,
-		AVAXAssetID:         m.AVAXAssetID,
-		Log:                 chainLog,
+	namespace := fmt.Sprintf("%s_%s_vm", constants.PlatformName, primaryAlias)
+	optionalMetrics := metrics.NewOptionalGatherer()
+	if err := m.Metrics.Register(namespace, optionalMetrics); err != nil {
+		return nil, fmt.Errorf("error while creating chain's metrics %w", err)
+	}
+
+	ctx := &snow.ConsensusContext{
+		Context: &snow.Context{
+			NetworkID: m.NetworkID,
+			SubnetID:  chainParams.SubnetID,
+			ChainID:   chainParams.ID,
+			NodeID:    m.NodeID,
+
+			XChainID:    m.XChainID,
+			AVAXAssetID: m.AVAXAssetID,
+
+			Log:          chainLog,
+			Keystore:     m.Keystore.NewBlockchainKeyStore(chainParams.ID),
+			SharedMemory: m.AtomicMemory.NewSharedMemory(chainParams.ID),
+			BCLookup:     m,
+			SNLookup:     m,
+			Metrics:      optionalMetrics,
+
+			ValidatorState:    m.validatorState,
+			StakingCertLeaf:   m.StakingCert.Leaf,
+			StakingLeafSigner: m.StakingCert.PrivateKey.(crypto.Signer),
+		},
 		DecisionDispatcher:  m.DecisionEvents,
 		ConsensusDispatcher: m.ConsensusEvents,
-		Keystore:            m.Keystore.NewBlockchainKeyStore(chainParams.ID),
-		SharedMemory:        m.AtomicMemory.NewSharedMemory(chainParams.ID),
-		BCLookup:            m,
-		SNLookup:            m,
-		Namespace:           fmt.Sprintf("%s_%s_vm", constants.PlatformName, primaryAlias),
-		Metrics:             m.ConsensusParams.Metrics,
-		ValidatorState:      m.validatorState,
-		StakingCertLeaf:     m.StakingCert.Leaf,
-		StakingLeafSigner:   m.StakingCert.PrivateKey.(crypto.Signer),
+		Registerer:          m.ConsensusParams.Metrics,
 	}
 
 	if sbConfigs, ok := m.SubnetConfigs[chainParams.SubnetID]; ok {
@@ -344,7 +360,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	// Create the chain
-	vm, err := vmFactory.New(ctx)
+	vm, err := vmFactory.New(ctx.Context)
 	if err != nil {
 		return nil, fmt.Errorf("error while creating vm: %w", err)
 	}
@@ -363,7 +379,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			return nil, fmt.Errorf("error while getting fxFactory: %w", err)
 		}
 
-		fx, err := fxFactory.New(ctx)
+		fx, err := fxFactory.New(ctx.Context)
 		if err != nil {
 			return nil, fmt.Errorf("error while creating fx: %w", err)
 		}
@@ -381,7 +397,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		// TODO: move metrics to another place so this can be tidier
 		consensusParams.Metrics = m.ConsensusParams.Metrics
 	}
-	consensusParams.Namespace = fmt.Sprintf("%s_%s", constants.PlatformName, primaryAlias)
+	consensusParams.Namespace = metricsNamespace
 
 	// The validators of this blockchain
 	var vdrs validators.Set // Validators validating this blockchain
@@ -460,7 +476,7 @@ func (m *manager) unblockChains() {
 
 // Create a DAG-based blockchain that uses Avalanche
 func (m *manager) createAvalancheChain(
-	ctx *snow.Context,
+	ctx *snow.ConsensusContext,
 	genesisData []byte,
 	vdrs,
 	beacons validators.Set,
@@ -473,7 +489,7 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
+	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Registerer)
 	if err != nil {
 		return nil, err
 	}
@@ -485,11 +501,11 @@ func (m *manager) createAvalancheChain(
 	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bs"), db.Database)
 	txBootstrappingDB := prefixdb.New([]byte("tx_bs"), db.Database)
 
-	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, consensusParams.Namespace+"_vtx", ctx.Metrics)
+	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, consensusParams.Namespace+"_vtx", ctx.Registerer)
 	if err != nil {
 		return nil, err
 	}
-	txBlocker, err := queue.New(txBootstrappingDB, consensusParams.Namespace+"_tx", ctx.Metrics)
+	txBlocker, err := queue.New(txBootstrappingDB, consensusParams.Namespace+"_tx", ctx.Registerer)
 	if err != nil {
 		return nil, err
 	}
@@ -524,7 +540,7 @@ func (m *manager) createAvalancheChain(
 		vm = metervm.NewVertexVM(vm)
 	}
 	if err := vm.Initialize(
-		ctx,
+		ctx.Context,
 		vmDBManager,
 		genesisData,
 		chainConfig.Upgrade,
@@ -539,7 +555,7 @@ func (m *manager) createAvalancheChain(
 	// Handles serialization/deserialization of vertices and also the
 	// persistence of vertices
 	vtxManager := &state.Serializer{}
-	vtxManager.Initialize(ctx, vm, vertexDB)
+	vtxManager.Initialize(ctx.Context, vm, vertexDB)
 
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
@@ -620,7 +636,7 @@ func (m *manager) createAvalancheChain(
 
 // Create a linear chain using the Snowman consensus engine
 func (m *manager) createSnowmanChain(
-	ctx *snow.Context,
+	ctx *snow.ConsensusContext,
 	genesisData []byte,
 	vdrs,
 	beacons validators.Set,
@@ -633,7 +649,7 @@ func (m *manager) createSnowmanChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
+	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Registerer)
 	if err != nil {
 		return nil, err
 	}
@@ -643,7 +659,7 @@ func (m *manager) createSnowmanChain(
 	db := prefixDBManager.Current()
 	bootstrappingDB := prefixdb.New([]byte("bs"), db.Database)
 
-	blocked, err := queue.NewWithMissing(bootstrappingDB, consensusParams.Namespace+"_block", ctx.Metrics)
+	blocked, err := queue.NewWithMissing(bootstrappingDB, consensusParams.Namespace+"_block", ctx.Registerer)
 	if err != nil {
 		return nil, err
 	}
@@ -703,7 +719,7 @@ func (m *manager) createSnowmanChain(
 		vm = metervm.NewBlockVM(vm)
 	}
 	if err := vm.Initialize(
-		ctx,
+		ctx.Context,
 		vmDBManager,
 		genesisData,
 		chainConfig.Upgrade,
@@ -826,7 +842,7 @@ func (m *manager) LookupVM(alias string) (ids.ID, error) { return m.VMManager.Lo
 
 // Notify registrants [those who want to know about the creation of chains]
 // that the specified chain has been created
-func (m *manager) notifyRegistrants(name string, ctx *snow.Context, engine common.Engine) {
+func (m *manager) notifyRegistrants(name string, ctx *snow.ConsensusContext, engine common.Engine) {
 	for _, registrant := range m.registrants {
 		registrant.RegisterChain(name, ctx, engine)
 	}

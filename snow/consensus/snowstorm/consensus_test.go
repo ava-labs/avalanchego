@@ -130,7 +130,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 			t.Fatal(err)
 		}
 		graph := factory.New()
-		if err := graph.Initialize(snow.DefaultContextTest(), params); err == nil {
+		if err := graph.Initialize(snow.DefaultConsensusContextTest(), params); err == nil {
 			t.Fatalf("should have errored due to a duplicated metric")
 		}
 	}
@@ -150,7 +150,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 			t.Fatal(err)
 		}
 		graph := factory.New()
-		if err := graph.Initialize(snow.DefaultContextTest(), params); err == nil {
+		if err := graph.Initialize(snow.DefaultConsensusContextTest(), params); err == nil {
 			t.Fatalf("should have errored due to a duplicated metric")
 		}
 	}
@@ -170,7 +170,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 			t.Fatal(err)
 		}
 		graph := factory.New()
-		if err := graph.Initialize(snow.DefaultContextTest(), params); err == nil {
+		if err := graph.Initialize(snow.DefaultConsensusContextTest(), params); err == nil {
 			t.Fatalf("should have errored due to a duplicated metric")
 		}
 	}
@@ -190,7 +190,7 @@ func ParamsTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +220,7 @@ func IssuedTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,7 +254,7 @@ func LeftoverInputTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +311,7 @@ func LowerConfidenceTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -370,7 +370,7 @@ func MiddleConfidenceTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -434,7 +434,7 @@ func IndependentTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -499,7 +499,7 @@ func VirtuousTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -545,7 +545,7 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	if err := graph.Initialize(snow.DefaultContextTest(), params); err != nil {
+	if err := graph.Initialize(snow.DefaultConsensusContextTest(), params); err != nil {
 		t.Fatal(err)
 	}
 
@@ -601,7 +601,7 @@ func QuiesceTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -642,7 +642,7 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	if err := graph.Initialize(snow.DefaultContextTest(), params); err != nil {
+	if err := graph.Initialize(snow.DefaultConsensusContextTest(), params); err != nil {
 		t.Fatal(err)
 	}
 
@@ -784,7 +784,7 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -931,7 +931,7 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1033,7 +1033,7 @@ func VacuouslyAcceptedTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1061,7 +1061,7 @@ func ConflictsTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1113,7 +1113,7 @@ func VirtuousDependsOnRogueTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1188,7 +1188,7 @@ func ErrorOnVacuouslyAcceptedTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1219,7 +1219,7 @@ func ErrorOnAcceptedTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1264,7 +1264,7 @@ func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) 
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1311,7 +1311,7 @@ func ErrorOnRejectingHigherConfidenceConflictTest(t *testing.T, factory Factory)
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1343,7 +1343,7 @@ func UTXOCleanupTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
 	assert.NoError(t, err)
 
 	err = graph.Add(Red)
@@ -1391,7 +1391,7 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
 	if err != nil {
 		t.Fatal(err)
 	}

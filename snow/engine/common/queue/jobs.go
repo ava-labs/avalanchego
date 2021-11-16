@@ -88,7 +88,7 @@ func (j *Jobs) Push(job Job) (bool, error) {
 	return true, nil
 }
 
-func (j *Jobs) ExecuteAll(ctx *snow.Context, halter common.Haltable, restarted bool, events ...snow.EventDispatcher) (int, error) {
+func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, restarted bool, events ...snow.EventDispatcher) (int, error) {
 	ctx.Executing(true)
 	defer ctx.Executing(false)
 
