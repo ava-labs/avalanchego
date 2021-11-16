@@ -313,9 +313,9 @@ func (st *internalStateImpl) initCaches() {
 	st.chainDBCache = &cache.LRU{Size: chainDBCacheSize}
 }
 
-func (st *internalStateImpl) initMeteredCaches(namespace string, metrics prometheus.Registerer) error {
+func (st *internalStateImpl) initMeteredCaches(metrics prometheus.Registerer) error {
 	validatorDiffsCache, err := metercacher.New(
-		fmt.Sprintf("%s_validator_diffs_cache", namespace),
+		"validator_diffs_cache",
 		metrics,
 		&cache.LRU{Size: validatorDiffsCacheSize},
 	)
@@ -324,7 +324,7 @@ func (st *internalStateImpl) initMeteredCaches(namespace string, metrics prometh
 	}
 
 	blockCache, err := metercacher.New(
-		fmt.Sprintf("%s_block_cache", namespace),
+		"block_cache",
 		metrics,
 		&cache.LRU{Size: blockCacheSize},
 	)
@@ -333,7 +333,7 @@ func (st *internalStateImpl) initMeteredCaches(namespace string, metrics prometh
 	}
 
 	txCache, err := metercacher.New(
-		fmt.Sprintf("%s_tx_cache", namespace),
+		"tx_cache",
 		metrics,
 		&cache.LRU{Size: txCacheSize},
 	)
@@ -342,7 +342,7 @@ func (st *internalStateImpl) initMeteredCaches(namespace string, metrics prometh
 	}
 
 	rewardUTXOsCache, err := metercacher.New(
-		fmt.Sprintf("%s_reward_utxos_cache", namespace),
+		"reward_utxos_cache",
 		metrics,
 		&cache.LRU{Size: rewardUTXOsCacheSize},
 	)
@@ -350,13 +350,13 @@ func (st *internalStateImpl) initMeteredCaches(namespace string, metrics prometh
 		return err
 	}
 
-	utxoState, err := avax.NewMeteredUTXOState(st.utxoDB, GenesisCodec, namespace, metrics)
+	utxoState, err := avax.NewMeteredUTXOState(st.utxoDB, GenesisCodec, metrics)
 	if err != nil {
 		return err
 	}
 
 	chainCache, err := metercacher.New(
-		fmt.Sprintf("%s_chain_cache", namespace),
+		"chain_cache",
 		metrics,
 		&cache.LRU{Size: chainCacheSize},
 	)
@@ -365,7 +365,7 @@ func (st *internalStateImpl) initMeteredCaches(namespace string, metrics prometh
 	}
 
 	chainDBCache, err := metercacher.New(
-		fmt.Sprintf("%s_chain_db_cache", namespace),
+		"chain_db_cache",
 		metrics,
 		&cache.LRU{Size: chainDBCacheSize},
 	)
@@ -421,9 +421,9 @@ func NewInternalState(vm *VM, db database.Database, genesis []byte) (InternalSta
 	return is, nil
 }
 
-func NewMeteredInternalState(vm *VM, db database.Database, genesis []byte, namespace string, metrics prometheus.Registerer) (InternalState, error) {
+func NewMeteredInternalState(vm *VM, db database.Database, genesis []byte, metrics prometheus.Registerer) (InternalState, error) {
 	is := newInternalStateDatabases(vm, db)
-	if err := is.initMeteredCaches(namespace, metrics); err != nil {
+	if err := is.initMeteredCaches(metrics); err != nil {
 		// Drop any errors on close to return the first error
 		_ = is.Close()
 

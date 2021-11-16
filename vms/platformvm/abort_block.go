@@ -24,7 +24,7 @@ type AbortBlock struct {
 }
 
 func (a *AbortBlock) Accept() error {
-	if a.vm.bootstrapped {
+	if a.vm.bootstrapped.GetValue() {
 		if a.wasPreferred {
 			a.vm.metrics.numVotesWon.Inc()
 		} else {

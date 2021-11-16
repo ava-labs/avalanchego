@@ -121,7 +121,7 @@ func (tx *UnsignedImportTx) Execute(
 		utxos[index] = utxo
 	}
 
-	if vm.bootstrapped {
+	if vm.bootstrapped.GetValue() {
 		utxoIDs := make([][]byte, len(tx.ImportedInputs))
 		for i, in := range tx.ImportedInputs {
 			utxoID := in.UTXOID.InputID()

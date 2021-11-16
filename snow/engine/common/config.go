@@ -13,7 +13,7 @@ import (
 // Config wraps the common configurations that are needed by a Snow consensus
 // engine
 type Config struct {
-	Ctx        *snow.Context
+	Ctx        *snow.ConsensusContext
 	Validators validators.Set
 	Beacons    validators.Set
 
@@ -44,7 +44,7 @@ type Config struct {
 }
 
 // Context implements the Engine interface
-func (c *Config) Context() *snow.Context { return c.Ctx }
+func (c *Config) Context() *snow.ConsensusContext { return c.Ctx }
 
 // IsBootstrapped returns true iff this chain is done bootstrapping
 func (c *Config) IsBootstrapped() bool { return c.Ctx.IsBootstrapped() }

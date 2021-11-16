@@ -15,7 +15,9 @@ import (
 	"sync"
 
 	"github.com/hashicorp/go-plugin"
+
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/api/auth"
@@ -155,6 +157,7 @@ type Node struct {
 
 	// Metrics Registerer
 	MetricsRegisterer *prometheus.Registry
+	MetricsGatherer   metrics.MultiGatherer
 }
 
 /*
@@ -579,14 +582,12 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		cChainID,
 	)
 
-	requestsNamespace := fmt.Sprintf("%s_requests", constants.PlatformName)
-
 	// Manages network timeouts
 	timeoutManager := &timeout.Manager{}
 	if err := timeoutManager.Initialize(
 		&n.Config.AdaptiveTimeoutConfig,
 		n.benchlistManager,
-		requestsNamespace,
+		"requests",
 		n.MetricsRegisterer,
 	); err != nil {
 		return err
@@ -604,7 +605,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		criticalChains,
 		n.Shutdown,
 		n.Config.RouterHealthConfig,
-		requestsNamespace,
+		"requests",
 		n.MetricsRegisterer,
 	)
 	if err != nil {
@@ -647,6 +648,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		RetryBootstrapWarnFrequency:            n.Config.RetryBootstrapWarnFrequency,
 		ShutdownNodeFunc:                       n.Shutdown,
 		MeterVMEnabled:                         n.Config.MeterVMEnabled,
+		Metrics:                                n.MetricsGatherer,
 		SubnetConfigs:                          n.Config.SubnetConfigs,
 		ChainConfigs:                           n.Config.ChainConfigs,
 		AppGossipValidatorSize:                 int(n.Config.NetworkConfig.AppGossipValidatorSize),
@@ -784,10 +786,8 @@ func (n *Node) initKeystoreAPI() error {
 // initMetricsAPI initializes the Metrics API
 // Assumes n.APIServer is already set
 func (n *Node) initMetricsAPI() error {
-	registry, handler := metrics.NewService()
-	// It is assumed by components of the system that the Metrics interface is
-	// non-nil. So, it is set regardless of if the metrics API is available or not.
-	n.MetricsRegisterer = registry
+	n.MetricsRegisterer = prometheus.NewRegistry()
+	n.MetricsGatherer = metrics.NewMultiGatherer()
 
 	// TODO: remove metrics field from consensus params.
 	n.Config.ConsensusParams.Metrics = n.MetricsRegisterer
@@ -797,16 +797,31 @@ func (n *Node) initMetricsAPI() error {
 		return nil
 	}
 
+	if err := n.MetricsGatherer.Register(constants.PlatformName, n.MetricsRegisterer); err != nil {
+		return err
+	}
+
 	n.Log.Info("initializing metrics API")
 
-	dbNamespace := fmt.Sprintf("%s_db", constants.PlatformName)
-	meterDBManager, err := n.DBManager.NewMeterDBManager(dbNamespace, registry)
+	meterDBManager, err := n.DBManager.NewMeterDBManager("db", n.MetricsRegisterer)
 	if err != nil {
 		return err
 	}
 	n.DBManager = meterDBManager
 
-	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "metrics", "", n.HTTPLog)
+	return n.APIServer.AddRoute(
+		&common.HTTPHandler{
+			LockOptions: common.NoLock,
+			Handler: promhttp.HandlerFor(
+				n.MetricsGatherer,
+				promhttp.HandlerOpts{},
+			),
+		},
+		&sync.RWMutex{},
+		"metrics",
+		"",
+		n.HTTPLog,
+	)
 }
 
 // initAdminAPI initializes the Admin API service
@@ -907,7 +922,7 @@ func (n *Node) initHealthAPI() error {
 	healthService, err := health.NewService(
 		n.Config.HealthCheckFreq,
 		n.Log,
-		fmt.Sprintf("%s_health", constants.PlatformName),
+		"health",
 		n.MetricsRegisterer,
 	)
 	if err != nil {
@@ -1081,7 +1096,7 @@ func (n *Node) Initialize(
 	// It must be initiated before networking (initNetworking), chain manager (initChainManager)
 	// and the engine (initChains) but after the metrics (initMetricsAPI)
 	// message.Creator currently record metrics under network namespace
-	n.networkNamespace = fmt.Sprintf("%s_network", constants.PlatformName)
+	n.networkNamespace = "network"
 	if n.msgCreator, err = message.NewCreator(n.MetricsRegisterer,
 		n.Config.NetworkConfig.CompressionEnabled,
 		n.networkNamespace); err != nil {

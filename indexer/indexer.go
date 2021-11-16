@@ -145,7 +145,7 @@ type indexer struct {
 }
 
 // Assumes [engine]'s context lock is not held
-func (i *indexer) RegisterChain(name string, ctx *snow.Context, engine common.Engine) {
+func (i *indexer) RegisterChain(name string, ctx *snow.ConsensusContext, engine common.Engine) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 

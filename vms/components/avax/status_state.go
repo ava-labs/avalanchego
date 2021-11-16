@@ -4,8 +4,6 @@
 package avax
 
 import (
-	"fmt"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -46,9 +44,9 @@ func NewStatusState(db database.Database) StatusState {
 	}
 }
 
-func NewMeteredStatusState(db database.Database, namespace string, metrics prometheus.Registerer) (StatusState, error) {
+func NewMeteredStatusState(db database.Database, metrics prometheus.Registerer) (StatusState, error) {
 	cache, err := metercacher.New(
-		fmt.Sprintf("%s_status_cache", namespace),
+		"status_cache",
 		metrics,
 		&cache.LRU{Size: statusCacheSize},
 	)

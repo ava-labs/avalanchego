@@ -18,7 +18,7 @@ func DefaultConfigTest() Config {
 	}
 
 	return Config{
-		Ctx:                           snow.DefaultContextTest(),
+		Ctx:                           snow.DefaultConsensusContextTest(),
 		Validators:                    validators.NewSet(),
 		Beacons:                       validators.NewSet(),
 		Sender:                        &SenderTest{},

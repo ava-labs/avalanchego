@@ -83,7 +83,7 @@ type EngineTest struct {
 	CantGetVM bool
 
 	IsBootstrappedF                                    func() bool
-	ContextF                                           func() *snow.Context
+	ContextF                                           func() *snow.ConsensusContext
 	HaltF                                              func()
 	TimeoutF, GossipF, ShutdownF                       func() error
 	NotifyF                                            func(Message) error
@@ -134,7 +134,7 @@ func (e *EngineTest) Default(cant bool) {
 	e.CantGetVM = cant
 }
 
-func (e *EngineTest) Context() *snow.Context {
+func (e *EngineTest) Context() *snow.ConsensusContext {
 	if e.ContextF != nil {
 		return e.ContextF()
 	}

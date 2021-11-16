@@ -2027,6 +2027,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	vm.clock.Set(defaultGenesisTime)
 	ctx := defaultContext()
+	consensusCtx := snow.DefaultConsensusContextTest()
+	consensusCtx.Context = ctx
 	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)
@@ -2096,7 +2098,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-	err = sender.Initialize(ctx, mc, externalSender, chainRouter, &timeoutManager, "", metrics, 1, 1, 1)
+	err = sender.Initialize(consensusCtx, mc, externalSender, chainRouter, &timeoutManager, "", metrics, 1, 1, 1)
 	assert.NoError(t, err)
 
 	var reqID uint32
@@ -2125,7 +2127,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	err = engine.Initialize(smeng.Config{
 		Config: bootstrap.Config{
 			Config: common.Config{
-				Ctx:                           ctx,
+				Ctx:                           consensusCtx,
 				Validators:                    vdrs,
 				Beacons:                       beacons,
 				SampleK:                       beacons.Len(),

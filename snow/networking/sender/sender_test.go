@@ -27,7 +27,7 @@ import (
 )
 
 func TestSenderContext(t *testing.T) {
-	context := snow.DefaultContextTest()
+	context := snow.DefaultConsensusContextTest()
 	metrics := prometheus.NewRegistry()
 	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
@@ -82,7 +82,7 @@ func TestTimeout(t *testing.T) {
 	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
-	context := snow.DefaultContextTest()
+	context := snow.DefaultConsensusContextTest()
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 	sender := Sender{}
@@ -93,7 +93,7 @@ func TestTimeout(t *testing.T) {
 	engine.Default(true)
 	engine.CantConnected = false
 
-	engine.ContextF = snow.DefaultContextTest
+	engine.ContextF = snow.DefaultConsensusContextTest
 
 	wg := sync.WaitGroup{}
 	wg.Add(2)
@@ -164,7 +164,7 @@ func TestReliableMessages(t *testing.T) {
 		ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
-	context := snow.DefaultContextTest()
+	context := snow.DefaultConsensusContextTest()
 
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
@@ -176,7 +176,7 @@ func TestReliableMessages(t *testing.T) {
 	engine.Default(true)
 	engine.CantConnected = false
 
-	engine.ContextF = snow.DefaultContextTest
+	engine.ContextF = snow.DefaultConsensusContextTest
 	engine.GossipF = func() error { return nil }
 
 	queriesToSend := 1000
@@ -257,7 +257,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
-	context := snow.DefaultContextTest()
+	context := snow.DefaultConsensusContextTest()
 
 	sender := Sender{}
 	externalSender := &ExternalSenderTest{TB: t}
@@ -268,7 +268,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	engine := common.EngineTest{T: t}
 	engine.Default(false)
 
-	engine.ContextF = snow.DefaultContextTest
+	engine.ContextF = snow.DefaultConsensusContextTest
 	engine.GossipF = func() error { return nil }
 	engine.CantPullQuery = false
 
