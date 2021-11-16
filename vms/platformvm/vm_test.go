@@ -2100,7 +2100,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-	err = sender.Initialize(consensusCtx, mc, externalSender, chainRouter, &timeoutManager, "", metrics, 1, 1, 1)
+	err = sender.Initialize(consensusCtx, mc, externalSender, chainRouter, &timeoutManager, 1, 1, 1)
 	assert.NoError(t, err)
 
 	var reqID uint32
@@ -2144,7 +2144,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			VM:      vm,
 		},
 		Params: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     1,
 			Alpha:                 1,
 			BetaVirtuous:          20,
@@ -2167,8 +2166,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		&engine,
 		vdrs,
 		msgChan,
-		"",
-		prometheus.NewRegistry(),
 	)
 	assert.NoError(t, err)
 

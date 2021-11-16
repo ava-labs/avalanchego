@@ -27,7 +27,7 @@ type metrics struct {
 	chainToMetrics map[ids.ID]*chainMetrics
 }
 
-func (m *metrics) RegisterChain(ctx *snow.ConsensusContext, namespace string) error {
+func (m *metrics) RegisterChain(ctx *snow.ConsensusContext) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -37,7 +37,7 @@ func (m *metrics) RegisterChain(ctx *snow.ConsensusContext, namespace string) er
 	if _, exists := m.chainToMetrics[ctx.ChainID]; exists {
 		return fmt.Errorf("chain %s has already been registered", ctx.ChainID)
 	}
-	cm, err := newChainMetrics(ctx, namespace, false)
+	cm, err := newChainMetrics(ctx, false)
 	if err != nil {
 		return fmt.Errorf("couldn't create metrics for chain %s: %w", ctx.ChainID, err)
 	}
@@ -68,7 +68,7 @@ type chainMetrics struct {
 	messageSummaries map[message.Op]*prometheus.SummaryVec
 }
 
-func newChainMetrics(ctx *snow.ConsensusContext, namespace string, summaryEnabled bool) (*chainMetrics, error) {
+func newChainMetrics(ctx *snow.ConsensusContext, summaryEnabled bool) (*chainMetrics, error) {
 	cm := &chainMetrics{
 		ctx: ctx,
 
@@ -78,11 +78,10 @@ func newChainMetrics(ctx *snow.ConsensusContext, namespace string, summaryEnable
 		messageSummaries: make(map[message.Op]*prometheus.SummaryVec, len(message.ConsensusResponseOps)),
 	}
 
-	queryLatencyNamespace := fmt.Sprintf("%s_lat", namespace)
 	errs := wrappers.Errs{}
 	for _, op := range message.ConsensusResponseOps {
 		cm.messageLatencies[op] = metric.NewAveragerWithErrs(
-			queryLatencyNamespace,
+			"lat",
 			op.String(),
 			defaultRequestHelpMsg,
 			ctx.Registerer,
@@ -96,7 +95,7 @@ func newChainMetrics(ctx *snow.ConsensusContext, namespace string, summaryEnable
 		summaryName := fmt.Sprintf("%s_peer", op)
 		summary := prometheus.NewSummaryVec(
 			prometheus.SummaryOpts{
-				Namespace: queryLatencyNamespace,
+				Namespace: "lat",
 				Name:      summaryName,
 				Help:      defaultRequestHelpMsg,
 			},

@@ -47,8 +47,6 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		"",
-		metrics,
 	)
 	assert.NoError(t, err)
 
@@ -105,8 +103,6 @@ func TestHandlerClosesOnError(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		"",
-		metrics,
 	)
 	assert.NoError(t, err)
 
@@ -157,8 +153,6 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		"",
-		metrics,
 	)
 	assert.NoError(t, err)
 
@@ -206,8 +200,6 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		&engine,
 		vdrs,
 		msgFromVMChan,
-		"",
-		prometheus.NewRegistry(),
 	)
 	assert.NoError(t, err)
 

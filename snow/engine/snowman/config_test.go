@@ -24,7 +24,7 @@ func DefaultConfig() Config {
 			VM:      &block.TestVM{},
 		},
 		Params: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
+
 			K:                     1,
 			Alpha:                 1,
 			BetaVirtuous:          1,

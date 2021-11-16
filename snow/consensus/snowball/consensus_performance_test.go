@@ -7,15 +7,13 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/utils/sampler"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 func TestSnowballOptimized(t *testing.T) {
 	numColors := 10
 	numNodes := 100
 	params := Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       20, Alpha: 15, BetaVirtuous: 20, BetaRogue: 30,
+		K: 20, Alpha: 15, BetaVirtuous: 20, BetaRogue: 30,
 	}
 	seed := int64(0)
 

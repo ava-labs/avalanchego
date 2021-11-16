@@ -14,11 +14,9 @@ type metrics struct {
 }
 
 // Initialize implements the Engine interface
-func (m *metrics) Initialize(registerer prometheus.Registerer, namespace string) error {
-	benchNamespace := fmt.Sprintf("%s_benchlist", namespace)
-
+func (m *metrics) Initialize(registerer prometheus.Registerer) error {
 	m.numBenched = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: benchNamespace,
+		Namespace: "benchlist",
 		Name:      "benched_num",
 		Help:      "Number of currently benched validators",
 	})
@@ -27,7 +25,7 @@ func (m *metrics) Initialize(registerer prometheus.Registerer, namespace string)
 	}
 
 	m.weightBenched = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: benchNamespace,
+		Namespace: "benchlist",
 		Name:      "benched_weight",
 		Help:      "Weight of currently benched validators",
 	})

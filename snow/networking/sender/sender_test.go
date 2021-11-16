@@ -40,8 +40,6 @@ func TestSenderContext(t *testing.T) {
 		externalSender,
 		&router.ChainRouter{},
 		&timeout.Manager{},
-		"",
-		metrics,
 		2,
 		2,
 		2,
@@ -86,7 +84,7 @@ func TestTimeout(t *testing.T) {
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 	sender := Sender{}
-	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, "", metrics, 2, 2, 2)
+	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, 2, 2, 2)
 	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}
@@ -111,8 +109,6 @@ func TestTimeout(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		"",
-		prometheus.NewRegistry(),
 	)
 	assert.NoError(t, err)
 
@@ -169,7 +165,7 @@ func TestReliableMessages(t *testing.T) {
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 	sender := Sender{}
-	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, "", metrics, 2, 2, 2)
+	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, 2, 2, 2)
 	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}
@@ -196,8 +192,6 @@ func TestReliableMessages(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		"",
-		prometheus.NewRegistry(),
 	)
 	assert.NoError(t, err)
 
@@ -262,7 +256,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	sender := Sender{}
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
-	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, "", metrics, 2, 2, 2)
+	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, 2, 2, 2)
 	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}
@@ -289,8 +283,6 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		"",
-		prometheus.NewRegistry(),
 	)
 	assert.NoError(t, err)
 

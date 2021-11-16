@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -385,7 +384,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 	config := DefaultConfig()
 
 	config.Params = snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
+
 		K:                     3,
 		Alpha:                 2,
 		BetaVirtuous:          1,
@@ -873,7 +872,7 @@ func TestVoteCanceling(t *testing.T) {
 	config := DefaultConfig()
 
 	config.Params = snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
+
 		K:                     3,
 		Alpha:                 2,
 		BetaVirtuous:          1,
@@ -1826,7 +1825,7 @@ func TestEngineDoubleChit(t *testing.T) {
 	config := DefaultConfig()
 
 	config.Params = snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
+
 		K:                     2,
 		Alpha:                 2,
 		BetaVirtuous:          1,

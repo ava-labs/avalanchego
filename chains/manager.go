@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
@@ -49,10 +51,7 @@ import (
 	smbootstrap "github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
 )
 
-const (
-	defaultChannelSize = 1
-	defaultChainPrefix = "chain_"
-)
+const defaultChannelSize = 1
 
 var (
 	errUnknownChainID = errors.New("unknown chain ID")
@@ -303,10 +302,8 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	primaryAlias, err := m.PrimaryAlias(chainParams.ID)
-	metricsNamespace := primaryAlias
 	if err != nil {
 		primaryAlias = chainParams.ID.String()
-		metricsNamespace = defaultChainPrefix + primaryAlias
 	}
 
 	// Create the log and context of the chain
@@ -315,10 +312,16 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		return nil, fmt.Errorf("error while creating chain's log %w", err)
 	}
 
-	namespace := fmt.Sprintf("%s_%s_vm", constants.PlatformName, primaryAlias)
-	optionalMetrics := metrics.NewOptionalGatherer()
-	if err := m.Metrics.Register(namespace, optionalMetrics); err != nil {
-		return nil, fmt.Errorf("error while creating chain's metrics %w", err)
+	consensusMetrics := prometheus.NewRegistry()
+	chainNamespace := fmt.Sprintf("%s_%s", constants.PlatformName, primaryAlias)
+	if err := m.Metrics.Register(chainNamespace, consensusMetrics); err != nil {
+		return nil, fmt.Errorf("error while registering chain's metrics %w", err)
+	}
+
+	vmMetrics := metrics.NewOptionalGatherer()
+	vmNamespace := fmt.Sprintf("%s_vm", chainNamespace)
+	if err := m.Metrics.Register(vmNamespace, vmMetrics); err != nil {
+		return nil, fmt.Errorf("error while registering vm's metrics %w", err)
 	}
 
 	ctx := &snow.ConsensusContext{
@@ -336,7 +339,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			SharedMemory: m.AtomicMemory.NewSharedMemory(chainParams.ID),
 			BCLookup:     m,
 			SNLookup:     m,
-			Metrics:      optionalMetrics,
+			Metrics:      vmMetrics,
 
 			ValidatorState:    m.validatorState,
 			StakingCertLeaf:   m.StakingCert.Leaf,
@@ -344,7 +347,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		},
 		DecisionDispatcher:  m.DecisionEvents,
 		ConsensusDispatcher: m.ConsensusEvents,
-		Registerer:          m.ConsensusParams.Metrics,
+		Registerer:          consensusMetrics,
 	}
 
 	if sbConfigs, ok := m.SubnetConfigs[chainParams.SubnetID]; ok {
@@ -394,10 +397,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	consensusParams := m.ConsensusParams
 	if sbConfigs, ok := m.SubnetConfigs[chainParams.SubnetID]; ok && chainParams.SubnetID != constants.PrimaryNetworkID {
 		consensusParams = sbConfigs.ConsensusParameters
-		// TODO: move metrics to another place so this can be tidier
-		consensusParams.Metrics = m.ConsensusParams.Metrics
 	}
-	consensusParams.Namespace = metricsNamespace
 
 	// The validators of this blockchain
 	var vdrs validators.Set // Validators validating this blockchain
@@ -455,7 +455,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	// Register the chain with the timeout manager
-	if err := m.TimeoutManager.RegisterChain(ctx, consensusParams.Namespace); err != nil {
+	if err := m.TimeoutManager.RegisterChain(ctx); err != nil {
 		return nil, err
 	}
 
@@ -489,7 +489,7 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Registerer)
+	meterDBManager, err := m.DBManager.NewMeterDBManager("db", ctx.Registerer)
 	if err != nil {
 		return nil, err
 	}
@@ -501,11 +501,11 @@ func (m *manager) createAvalancheChain(
 	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bs"), db.Database)
 	txBootstrappingDB := prefixdb.New([]byte("tx_bs"), db.Database)
 
-	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, consensusParams.Namespace+"_vtx", ctx.Registerer)
+	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, "vtx", ctx.Registerer)
 	if err != nil {
 		return nil, err
 	}
-	txBlocker, err := queue.New(txBootstrappingDB, consensusParams.Namespace+"_tx", ctx.Registerer)
+	txBlocker, err := queue.New(txBootstrappingDB, "tx", ctx.Registerer)
 	if err != nil {
 		return nil, err
 	}
@@ -522,8 +522,6 @@ func (m *manager) createAvalancheChain(
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
-		consensusParams.Namespace,
-		consensusParams.Metrics,
 		m.AppGossipValidatorSize,
 		m.AppGossipNonValidatorSize,
 		m.GossipAcceptedFrontierSize,
@@ -622,8 +620,6 @@ func (m *manager) createAvalancheChain(
 		engine,
 		vdrs,
 		msgChan,
-		fmt.Sprintf("%s_handler", consensusParams.Namespace),
-		consensusParams.Metrics,
 	)
 
 	return &chain{
@@ -649,7 +645,7 @@ func (m *manager) createSnowmanChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Registerer)
+	meterDBManager, err := m.DBManager.NewMeterDBManager("db", ctx.Registerer)
 	if err != nil {
 		return nil, err
 	}
@@ -659,7 +655,7 @@ func (m *manager) createSnowmanChain(
 	db := prefixDBManager.Current()
 	bootstrappingDB := prefixdb.New([]byte("bs"), db.Database)
 
-	blocked, err := queue.NewWithMissing(bootstrappingDB, consensusParams.Namespace+"_block", ctx.Registerer)
+	blocked, err := queue.NewWithMissing(bootstrappingDB, "block", ctx.Registerer)
 	if err != nil {
 		return nil, err
 	}
@@ -676,8 +672,6 @@ func (m *manager) createSnowmanChain(
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
-		consensusParams.Namespace,
-		consensusParams.Metrics,
 		m.AppGossipValidatorSize,
 		m.AppGossipNonValidatorSize,
 		m.GossipAcceptedFrontierSize,
@@ -779,8 +773,6 @@ func (m *manager) createSnowmanChain(
 		engine,
 		vdrs,
 		msgChan,
-		fmt.Sprintf("%s_handler", consensusParams.Namespace),
-		consensusParams.Metrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %s", err)

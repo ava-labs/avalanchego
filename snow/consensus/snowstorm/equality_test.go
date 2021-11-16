@@ -6,8 +6,6 @@ package snowstorm
 import (
 	"testing"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/avalanchego/utils/sampler"
 
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
@@ -21,7 +19,6 @@ func TestConflictGraphEquality(t *testing.T) {
 	maxInputConflicts := 2
 	numNodes := 100
 	params := sbcon.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     20,
 		Alpha:                 11,
 		BetaVirtuous:          20,
