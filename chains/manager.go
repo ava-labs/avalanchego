@@ -11,8 +11,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/keystore"
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -49,9 +52,7 @@ import (
 	smbootstrap "github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
 )
 
-const (
-	defaultChannelSize = 1
-)
+const defaultChannelSize = 1
 
 var (
 	errUnknownChainID = errors.New("unknown chain ID")
@@ -112,7 +113,7 @@ type chain struct {
 	Name    string
 	Engine  common.Engine
 	Handler *router.Handler
-	Ctx     *snow.Context
+	Ctx     *snow.ConsensusContext
 	Beacons validators.Set
 }
 
@@ -156,6 +157,7 @@ type ManagerConfig struct {
 	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
 	ShutdownNodeFunc func(exitCode int)
 	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
+	Metrics          metrics.MultiGatherer
 
 	AppGossipValidatorSize     int
 	AppGossipNonValidatorSize  int
@@ -311,25 +313,42 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		return nil, fmt.Errorf("error while creating chain's log %w", err)
 	}
 
-	ctx := &snow.Context{
-		NetworkID:           m.NetworkID,
-		SubnetID:            chainParams.SubnetID,
-		ChainID:             chainParams.ID,
-		NodeID:              m.NodeID,
-		XChainID:            m.XChainID,
-		AVAXAssetID:         m.AVAXAssetID,
-		Log:                 chainLog,
+	consensusMetrics := prometheus.NewRegistry()
+	chainNamespace := fmt.Sprintf("%s_%s", constants.PlatformName, primaryAlias)
+	if err := m.Metrics.Register(chainNamespace, consensusMetrics); err != nil {
+		return nil, fmt.Errorf("error while registering chain's metrics %w", err)
+	}
+
+	vmMetrics := metrics.NewOptionalGatherer()
+	vmNamespace := fmt.Sprintf("%s_vm", chainNamespace)
+	if err := m.Metrics.Register(vmNamespace, vmMetrics); err != nil {
+		return nil, fmt.Errorf("error while registering vm's metrics %w", err)
+	}
+
+	ctx := &snow.ConsensusContext{
+		Context: &snow.Context{
+			NetworkID: m.NetworkID,
+			SubnetID:  chainParams.SubnetID,
+			ChainID:   chainParams.ID,
+			NodeID:    m.NodeID,
+
+			XChainID:    m.XChainID,
+			AVAXAssetID: m.AVAXAssetID,
+
+			Log:          chainLog,
+			Keystore:     m.Keystore.NewBlockchainKeyStore(chainParams.ID),
+			SharedMemory: m.AtomicMemory.NewSharedMemory(chainParams.ID),
+			BCLookup:     m,
+			SNLookup:     m,
+			Metrics:      vmMetrics,
+
+			ValidatorState:    m.validatorState,
+			StakingCertLeaf:   m.StakingCert.Leaf,
+			StakingLeafSigner: m.StakingCert.PrivateKey.(crypto.Signer),
+		},
 		DecisionDispatcher:  m.DecisionEvents,
 		ConsensusDispatcher: m.ConsensusEvents,
-		Keystore:            m.Keystore.NewBlockchainKeyStore(chainParams.ID),
-		SharedMemory:        m.AtomicMemory.NewSharedMemory(chainParams.ID),
-		BCLookup:            m,
-		SNLookup:            m,
-		Namespace:           fmt.Sprintf("%s_%s_vm", constants.PlatformName, primaryAlias),
-		Metrics:             m.ConsensusParams.Metrics,
-		ValidatorState:      m.validatorState,
-		StakingCertLeaf:     m.StakingCert.Leaf,
-		StakingLeafSigner:   m.StakingCert.PrivateKey.(crypto.Signer),
+		Registerer:          consensusMetrics,
 	}
 
 	if sbConfigs, ok := m.SubnetConfigs[chainParams.SubnetID]; ok {
@@ -345,7 +364,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	// Create the chain
-	vm, err := vmFactory.New(ctx)
+	vm, err := vmFactory.New(ctx.Context)
 	if err != nil {
 		return nil, fmt.Errorf("error while creating vm: %w", err)
 	}
@@ -364,7 +383,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			return nil, fmt.Errorf("error while getting fxFactory: %w", err)
 		}
 
-		fx, err := fxFactory.New(ctx)
+		fx, err := fxFactory.New(ctx.Context)
 		if err != nil {
 			return nil, fmt.Errorf("error while creating fx: %w", err)
 		}
@@ -379,10 +398,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	consensusParams := m.ConsensusParams
 	if sbConfigs, ok := m.SubnetConfigs[chainParams.SubnetID]; ok && chainParams.SubnetID != constants.PrimaryNetworkID {
 		consensusParams = sbConfigs.ConsensusParameters
-		// TODO: move metrics to another place so this can be tidier
-		consensusParams.Metrics = m.ConsensusParams.Metrics
 	}
-	consensusParams.Namespace = fmt.Sprintf("%s_%s", constants.PlatformName, primaryAlias)
 
 	// The validators of this blockchain
 	var vdrs validators.Set // Validators validating this blockchain
@@ -440,7 +456,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	// Register the chain with the timeout manager
-	if err := m.TimeoutManager.RegisterChain(ctx, consensusParams.Namespace); err != nil {
+	if err := m.TimeoutManager.RegisterChain(ctx); err != nil {
 		return nil, err
 	}
 
@@ -461,7 +477,7 @@ func (m *manager) unblockChains() {
 
 // Create a DAG-based blockchain that uses Avalanche
 func (m *manager) createAvalancheChain(
-	ctx *snow.Context,
+	ctx *snow.ConsensusContext,
 	genesisData []byte,
 	vdrs,
 	beacons validators.Set,
@@ -474,7 +490,7 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
+	meterDBManager, err := m.DBManager.NewMeterDBManager("db", ctx.Registerer)
 	if err != nil {
 		return nil, err
 	}
@@ -486,11 +502,11 @@ func (m *manager) createAvalancheChain(
 	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bs"), db.Database)
 	txBootstrappingDB := prefixdb.New([]byte("tx_bs"), db.Database)
 
-	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, consensusParams.Namespace+"_vtx", ctx.Metrics)
+	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, "vtx", ctx.Registerer)
 	if err != nil {
 		return nil, err
 	}
-	txBlocker, err := queue.New(txBootstrappingDB, consensusParams.Namespace+"_tx", ctx.Metrics)
+	txBlocker, err := queue.New(txBootstrappingDB, "tx", ctx.Registerer)
 	if err != nil {
 		return nil, err
 	}
@@ -507,8 +523,6 @@ func (m *manager) createAvalancheChain(
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
-		consensusParams.Namespace,
-		consensusParams.Metrics,
 		m.AppGossipValidatorSize,
 		m.AppGossipNonValidatorSize,
 		m.GossipAcceptedFrontierSize,
@@ -525,7 +539,7 @@ func (m *manager) createAvalancheChain(
 		vm = metervm.NewVertexVM(vm)
 	}
 	if err := vm.Initialize(
-		ctx,
+		ctx.Context,
 		vmDBManager,
 		genesisData,
 		chainConfig.Upgrade,
@@ -540,7 +554,7 @@ func (m *manager) createAvalancheChain(
 	// Handles serialization/deserialization of vertices and also the
 	// persistence of vertices
 	vtxManager := &state.Serializer{}
-	vtxManager.Initialize(ctx, vm, vertexDB)
+	vtxManager.Initialize(ctx.Context, vm, vertexDB)
 
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
@@ -553,8 +567,6 @@ func (m *manager) createAvalancheChain(
 		ctx,
 		vdrs,
 		msgChan,
-		fmt.Sprintf("%s_handler", consensusParams.Namespace),
-		consensusParams.Metrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing network handler: %w", err)
@@ -591,8 +603,6 @@ func (m *manager) createAvalancheChain(
 	bootstrapper, err := avbootstrap.New(
 		bootstrapperConfig,
 		handler.OnDoneBootstrapping,
-		fmt.Sprintf("%s_bs", consensusParams.Namespace),
-		consensusParams.Metrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing avalanche bootstrapper: %w", err)
@@ -647,7 +657,7 @@ func (m *manager) createAvalancheChain(
 
 // Create a linear chain using the Snowman consensus engine
 func (m *manager) createSnowmanChain(
-	ctx *snow.Context,
+	ctx *snow.ConsensusContext,
 	genesisData []byte,
 	vdrs,
 	beacons validators.Set,
@@ -660,7 +670,7 @@ func (m *manager) createSnowmanChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
+	meterDBManager, err := m.DBManager.NewMeterDBManager("db", ctx.Registerer)
 	if err != nil {
 		return nil, err
 	}
@@ -670,7 +680,7 @@ func (m *manager) createSnowmanChain(
 	db := prefixDBManager.Current()
 	bootstrappingDB := prefixdb.New([]byte("bs"), db.Database)
 
-	blocked, err := queue.NewWithMissing(bootstrappingDB, consensusParams.Namespace+"_block", ctx.Metrics)
+	blocked, err := queue.NewWithMissing(bootstrappingDB, "block", ctx.Registerer)
 	if err != nil {
 		return nil, err
 	}
@@ -687,8 +697,6 @@ func (m *manager) createSnowmanChain(
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
-		consensusParams.Namespace,
-		consensusParams.Metrics,
 		m.AppGossipValidatorSize,
 		m.AppGossipNonValidatorSize,
 		m.GossipAcceptedFrontierSize,
@@ -730,7 +738,7 @@ func (m *manager) createSnowmanChain(
 		vm = metervm.NewBlockVM(vm)
 	}
 	if err := vm.Initialize(
-		ctx,
+		ctx.Context,
 		vmDBManager,
 		genesisData,
 		chainConfig.Upgrade,
@@ -753,8 +761,6 @@ func (m *manager) createSnowmanChain(
 		ctx,
 		vdrs,
 		msgChan,
-		fmt.Sprintf("%s_handler", consensusParams.Namespace),
-		consensusParams.Metrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %s", err)
@@ -803,8 +809,6 @@ func (m *manager) createSnowmanChain(
 	bootstrapper, err := smbootstrap.New(
 		bootstrapCfg,
 		handler.OnDoneBootstrapping,
-		fmt.Sprintf("%s_bs", consensusParams.Namespace),
-		consensusParams.Metrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman bootstrapper: %w", err)
@@ -890,7 +894,7 @@ func (m *manager) LookupVM(alias string) (ids.ID, error) { return m.VMManager.Lo
 
 // Notify registrants [those who want to know about the creation of chains]
 // that the specified chain has been created
-func (m *manager) notifyRegistrants(name string, ctx *snow.Context, engine common.Engine) {
+func (m *manager) notifyRegistrants(name string, ctx *snow.ConsensusContext, engine common.Engine) {
 	for _, registrant := range m.registrants {
 		registrant.RegisterChain(name, ctx, engine)
 	}

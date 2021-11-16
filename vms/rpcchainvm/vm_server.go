@@ -15,6 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore/gkeystoreproto"
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory"
 	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory/gsharedmemoryproto"
 	"github.com/ava-labs/avalanchego/database/manager"
@@ -191,19 +192,22 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	}()
 
 	vm.ctx = &snow.Context{
-		NetworkID:           req.NetworkID,
-		SubnetID:            subnetID,
-		ChainID:             chainID,
-		NodeID:              nodeID,
-		XChainID:            xChainID,
-		AVAXAssetID:         avaxAssetID,
-		Log:                 logging.NoLog{},
-		DecisionDispatcher:  nil,
-		ConsensusDispatcher: nil,
-		Keystore:            keystoreClient,
-		SharedMemory:        sharedMemoryClient,
-		BCLookup:            bcLookupClient,
-		SNLookup:            snLookupClient,
+		NetworkID: req.NetworkID,
+		SubnetID:  subnetID,
+		ChainID:   chainID,
+		NodeID:    nodeID,
+
+		XChainID:    xChainID,
+		AVAXAssetID: avaxAssetID,
+
+		Log:          logging.NoLog{},
+		Keystore:     keystoreClient,
+		SharedMemory: sharedMemoryClient,
+		BCLookup:     bcLookupClient,
+		SNLookup:     snLookupClient,
+		Metrics:      metrics.NewOptionalGatherer(),
+
+		// TODO: support snowman++ fields
 	}
 
 	if err := vm.vm.Initialize(vm.ctx, dbManager, req.GenesisBytes, req.UpgradeBytes, req.ConfigBytes, toEngine, nil, appSenderClient); err != nil {
@@ -275,7 +279,6 @@ func (vm *VMServer) Bootstrapping(context.Context, *emptypb.Empty) (*emptypb.Emp
 }
 
 func (vm *VMServer) Bootstrapped(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
-	vm.ctx.SetState(snow.NormalOp)
 	return &emptypb.Empty{}, vm.vm.Bootstrapped()
 }
 

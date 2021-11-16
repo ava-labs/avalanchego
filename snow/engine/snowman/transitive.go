@@ -30,7 +30,7 @@ func New(config Config) (Engine, error) {
 // Transitive implements the Engine interface by attempting to fetch all
 // Transitive dependencies.
 type Transitive struct {
-	Ctx    *snow.Context
+	Ctx    *snow.ConsensusContext
 	Sender common.Sender
 	VM     block.ChainVM
 	common.MsgHandlerNoOps
@@ -72,7 +72,7 @@ func newTransitive(config Config) (*Transitive, error) {
 	config.Ctx.Log.Info("initializing consensus engine")
 
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
-	res := &Transitive{
+	t := &Transitive{
 		Ctx:             config.Ctx,
 		MsgHandlerNoOps: common.NewMsgHandlerNoOps(config.Ctx),
 		Sender:          config.Sender,
@@ -84,19 +84,19 @@ func newTransitive(config Config) (*Transitive, error) {
 		nonVerifieds:    NewAncestorTree(),
 		polls: poll.NewSet(factory,
 			config.Ctx.Log,
-			config.Params.Namespace,
-			config.Params.Metrics,
+			"",
+			config.Ctx.Registerer,
 		),
 	}
 
-	if err := res.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
+	if err := t.metrics.Initialize("", config.Ctx.Registerer); err != nil {
 		return nil, err
 	}
 
-	return res, nil
+	return t, nil
 }
 
-func (t *Transitive) Context() *snow.Context {
+func (t *Transitive) Context() *snow.ConsensusContext {
 	return t.Ctx
 }
 

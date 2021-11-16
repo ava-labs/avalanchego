@@ -147,15 +147,15 @@ func (_m *Engine) Connected(validatorID ids.ShortID) error {
 }
 
 // Context provides a mock function with given fields:
-func (_m *Engine) Context() *snow.Context {
+func (_m *Engine) Context() *snow.ConsensusContext {
 	ret := _m.Called()
 
-	var r0 *snow.Context
-	if rf, ok := ret.Get(0).(func() *snow.Context); ok {
+	var r0 *snow.ConsensusContext
+	if rf, ok := ret.Get(0).(func() *snow.ConsensusContext); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*snow.Context)
+			r0 = ret.Get(0).(*snow.ConsensusContext)
 		}
 	}
 

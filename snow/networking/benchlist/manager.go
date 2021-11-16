@@ -28,7 +28,7 @@ type Manager interface {
 	// [chainID] timed out
 	RegisterFailure(chainID ids.ID, validatorID ids.ShortID)
 	// RegisterChain registers a new chain with metrics under [namespace]
-	RegisterChain(ctx *snow.Context, namespace string) error
+	RegisterChain(ctx *snow.ConsensusContext) error
 	// IsBenched returns true if messages to [validatorID] regarding chain [chainID]
 	// should not be sent over the network and should immediately fail.
 	// Returns false if such messages should be sent, or if the chain is unknown.
@@ -104,7 +104,7 @@ func (m *manager) GetBenched(validatorID ids.ShortID) []ids.ID {
 	return benched
 }
 
-func (m *manager) RegisterChain(ctx *snow.Context, namespace string) error {
+func (m *manager) RegisterChain(ctx *snow.ConsensusContext) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -135,8 +135,7 @@ func (m *manager) RegisterChain(ctx *snow.Context, namespace string) error {
 		m.config.MinimumFailingDuration,
 		m.config.Duration,
 		m.config.MaxPortion,
-		namespace,
-		ctx.Metrics,
+		ctx.Registerer,
 	)
 	if err != nil {
 		return err
@@ -175,8 +174,8 @@ type noBenchlist struct{}
 // NewNoBenchlist returns an empty benchlist that will never stop any queries
 func NewNoBenchlist() Manager { return &noBenchlist{} }
 
-func (noBenchlist) RegisterChain(*snow.Context, string) error { return nil }
-func (noBenchlist) RegisterResponse(ids.ID, ids.ShortID)      {}
-func (noBenchlist) RegisterFailure(ids.ID, ids.ShortID)       {}
-func (noBenchlist) IsBenched(ids.ShortID, ids.ID) bool        { return false }
-func (noBenchlist) GetBenched(ids.ShortID) []ids.ID           { return []ids.ID{} }
+func (noBenchlist) RegisterChain(*snow.ConsensusContext) error { return nil }
+func (noBenchlist) RegisterResponse(ids.ID, ids.ShortID)       {}
+func (noBenchlist) RegisterFailure(ids.ID, ids.ShortID)        {}
+func (noBenchlist) IsBenched(ids.ShortID, ids.ID) bool         { return false }
+func (noBenchlist) GetBenched(ids.ShortID) []ids.ID            { return []ids.ID{} }

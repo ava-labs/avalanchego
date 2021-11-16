@@ -6,12 +6,11 @@ package avalanche
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -94,8 +93,6 @@ func TestEngineAdd(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -253,8 +250,6 @@ func TestEngineQuery(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -465,7 +460,6 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	engCfg.Params = avalanche.Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     3,
 			Alpha:                 2,
 			BetaVirtuous:          1,
@@ -554,8 +548,6 @@ func TestEngineMultipleQuery(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -727,8 +719,6 @@ func TestEngineBlockedIssue(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -815,8 +805,6 @@ func TestEngineAbandonResponse(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -909,8 +897,6 @@ func TestEngineScheduleRepoll(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1050,8 +1036,6 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1162,8 +1146,6 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1258,8 +1240,6 @@ func TestEngineIssueRepoll(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1409,8 +1389,6 @@ func TestEngineReissue(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1581,8 +1559,6 @@ func TestEngineLargeIssue(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1670,8 +1646,6 @@ func TestEngineGetVertex(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1757,8 +1731,6 @@ func TestEngineInsufficientValidators(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1851,8 +1823,6 @@ func TestEnginePushGossip(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1955,8 +1925,6 @@ func TestEngineSingleQuery(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -2061,8 +2029,6 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -2182,8 +2148,6 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -2320,8 +2284,6 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -2469,8 +2431,6 @@ func TestEngineMissingTx(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -2591,8 +2551,6 @@ func TestEngineIssueBlockingTx(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -2689,8 +2647,6 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -2867,8 +2823,6 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -3130,8 +3084,6 @@ func TestEngineReBootstrapFails(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -3177,15 +3129,12 @@ func TestEngineReBootstrapFails(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// re-register the Transitive
-	engCfg.Params.Namespace = "AcceptedFrontier"
-	engCfg.Params.Metrics = prometheus.NewRegistry()
+	bootCfg.Ctx.Registerer = prometheus.NewRegistry()
 
+	// re-register the Transitive
 	bootstrapper2, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -3315,8 +3264,6 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -3556,8 +3503,6 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -3667,8 +3612,6 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -3735,8 +3678,6 @@ func TestEngineGossip(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -3855,8 +3796,6 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -4017,8 +3956,6 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -4179,8 +4116,6 @@ func TestEngineAggressivePolling(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -4315,8 +4250,6 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -4448,8 +4381,6 @@ func TestEngineDoubleChit(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -4626,8 +4557,6 @@ func TestEngineBubbleVotes(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -4766,8 +4695,6 @@ func TestEngineIssue(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -4887,8 +4814,6 @@ func TestAbandonTx(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Params.Namespace),
-		engCfg.Params.Metrics,
 	)
 	if err != nil {
 		t.Fatal(err)

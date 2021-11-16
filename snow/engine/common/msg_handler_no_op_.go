@@ -13,14 +13,14 @@ import (
 
 var _ Handler = &MsgHandlerNoOps{}
 
-func NewMsgHandlerNoOps(ctx *snow.Context) MsgHandlerNoOps {
+func NewMsgHandlerNoOps(ctx *snow.ConsensusContext) MsgHandlerNoOps {
 	return MsgHandlerNoOps{
 		ctx: ctx,
 	}
 }
 
 type MsgHandlerNoOps struct {
-	ctx *snow.Context
+	ctx *snow.ConsensusContext
 }
 
 // FrontierHandler interface

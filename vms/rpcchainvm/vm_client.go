@@ -9,13 +9,16 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/go-plugin"
+
+	"github.com/prometheus/client_golang/prometheus"
+
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/hashicorp/go-plugin"
-
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore/gkeystoreproto"
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory"
 	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory/gsharedmemoryproto"
 	"github.com/ava-labs/avalanchego/database/manager"
@@ -110,12 +113,6 @@ func (vm *VMClient) Initialize(
 		return errUnsupportedFXs
 	}
 
-	// TODO: remove this at the next protocol version bump
-	epochFirstTransitionBytes, err := time.Time{}.MarshalBinary()
-	if err != nil {
-		return err
-	}
-
 	vm.ctx = ctx
 
 	// Initialize and serve each database and construct the db manager
@@ -184,10 +181,6 @@ func (vm *VMClient) Initialize(
 		BcLookupServer:     bcLookupBrokerID,
 		SnLookupServer:     snLookupBrokerID,
 		AppSenderServer:    appSenderBrokerID,
-
-		// TODO: remove these at the next protocol version bump
-		EpochFirstTransition: epochFirstTransitionBytes,
-		EpochDuration:        0,
 	})
 	if err != nil {
 		return err
@@ -222,9 +215,17 @@ func (vm *VMClient) Initialize(
 		time:     timestamp,
 	}
 
+	registerer := prometheus.NewRegistry()
+	multiGatherer := metrics.NewMultiGatherer()
+	if err := multiGatherer.Register("rpcchainvm", registerer); err != nil {
+		return err
+	}
+	if err := multiGatherer.Register("", vm); err != nil {
+		return err
+	}
+
 	chainState, err := chain.NewMeteredState(
-		ctx.Metrics,
-		fmt.Sprintf("%s_rpcchainvm", ctx.Namespace),
+		registerer,
 		&chain.Config{
 			DecidedCacheSize:    decidedCacheSize,
 			MissingCacheSize:    missingCacheSize,
@@ -241,7 +242,7 @@ func (vm *VMClient) Initialize(
 	}
 	vm.State = chainState
 
-	return nil
+	return vm.ctx.Metrics.Register(multiGatherer)
 }
 
 func (vm *VMClient) startDBServer(opts []grpc.ServerOption) *grpc.Server {

@@ -26,7 +26,7 @@ type common struct {
 	metrics.Polls
 
 	// context that this consensus instance is executing in
-	ctx *snow.Context
+	ctx *snow.ConsensusContext
 
 	// params describes how this instance was parameterized
 	params sbcon.Parameters
@@ -54,14 +54,14 @@ type common struct {
 }
 
 // Initialize implements the ConflictGraph interface
-func (c *common) Initialize(ctx *snow.Context, params sbcon.Parameters) error {
+func (c *common) Initialize(ctx *snow.ConsensusContext, params sbcon.Parameters) error {
 	c.ctx = ctx
 	c.params = params
 
-	if err := c.Latency.Initialize("txs", "transaction(s)", ctx.Log, params.Namespace, params.Metrics); err != nil {
+	if err := c.Latency.Initialize("txs", "transaction(s)", ctx.Log, "", ctx.Registerer); err != nil {
 		return fmt.Errorf("failed to initialize latency metrics: %w", err)
 	}
-	if err := c.Polls.Initialize(params.Namespace, params.Metrics); err != nil {
+	if err := c.Polls.Initialize("", ctx.Registerer); err != nil {
 		return fmt.Errorf("failed to initialize poll metrics: %w", err)
 	}
 	return params.Verify()

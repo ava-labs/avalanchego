@@ -55,20 +55,18 @@ func TestShutdown(t *testing.T) {
 
 	shutdownCalled := make(chan struct{}, 1)
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	handler, err := NewHandler(
 		mc,
 		ctx,
 		vdrs,
 		nil,
-		"",
-		prometheus.NewRegistry(),
 	)
 	assert.NoError(t, err)
 
 	bootstrapper := &common.EngineTest{T: t}
 	bootstrapper.Default(true)
-	bootstrapper.ContextF = func() *snow.Context { return ctx }
+	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ShutdownF = func() error { shutdownCalled <- struct{}{}; return nil }
 	bootstrapper.ConnectedF = func(nodeID ids.ShortID) error { return nil }
 	bootstrapper.HaltF = func() {}
@@ -76,7 +74,7 @@ func TestShutdown(t *testing.T) {
 
 	engine := &common.EngineTest{T: t}
 	engine.Default(true)
-	engine.ContextF = func() *snow.Context { return ctx }
+	engine.ContextF = func() *snow.ConsensusContext { return ctx }
 	engine.ShutdownF = func() error { shutdownCalled <- struct{}{}; return nil }
 	engine.ConnectedF = func(nodeID ids.ShortID) error { return nil }
 	engine.HaltF = func() {}
@@ -147,21 +145,19 @@ func TestShutdownTimesOut(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	handler, err := NewHandler(
 		mc,
 		ctx,
 		vdrs,
 		nil,
-		"",
-		metrics,
 	)
 	assert.NoError(t, err)
 
 	bootstrapFinished := make(chan struct{}, 1)
 	bootstrapper := &common.EngineTest{T: t}
 	bootstrapper.Default(true)
-	bootstrapper.ContextF = func() *snow.Context { return ctx }
+	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.ShortID) error { return nil }
 	bootstrapper.HaltF = func() {}
 	bootstrapper.MultiPutF = func(nodeID ids.ShortID, requestID uint32, containers [][]byte) error {
@@ -174,7 +170,7 @@ func TestShutdownTimesOut(t *testing.T) {
 
 	engine := &common.EngineTest{T: t}
 	engine.Default(false)
-	engine.ContextF = func() *snow.Context { return ctx }
+	engine.ContextF = func() *snow.ConsensusContext { return ctx }
 	closed := new(int)
 	engine.ShutdownF = func() error { *closed++; return nil }
 	handler.RegisterEngine(engine)
@@ -243,7 +239,7 @@ func TestRouterTimeout(t *testing.T) {
 		wg = sync.WaitGroup{}
 	)
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	vdrs := validators.NewSet()
 	err = vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
@@ -253,14 +249,12 @@ func TestRouterTimeout(t *testing.T) {
 		ctx,
 		vdrs,
 		nil,
-		"",
-		prometheus.NewRegistry(),
 	)
 	assert.NoError(t, err)
 
 	bootstrapper := &common.EngineTest{T: t}
 	bootstrapper.Default(true)
-	bootstrapper.ContextF = func() *snow.Context { return ctx }
+	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.ShortID) error { return nil }
 	bootstrapper.HaltF = func() {}
 	bootstrapper.GetFailedF = func(nodeID ids.ShortID, requestID uint32) error { wg.Done(); calledGetFailed = true; return nil }
@@ -292,7 +286,7 @@ func TestRouterTimeout(t *testing.T) {
 
 	engine := &common.EngineTest{T: t}
 	engine.Default(false)
-	engine.ContextF = func() *snow.Context { return ctx }
+	engine.ContextF = func() *snow.ConsensusContext { return ctx }
 	handler.RegisterEngine(engine)
 
 	chainRouter.AddChain(handler)
@@ -352,7 +346,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Create bootstrapper, engine and handler
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	vdrs := validators.NewSet()
 	err = vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
@@ -362,19 +356,17 @@ func TestRouterClearTimeouts(t *testing.T) {
 		ctx,
 		vdrs,
 		nil,
-		"",
-		metrics,
 	)
 	assert.NoError(t, err)
 
 	bootstrapper := &common.EngineTest{T: t}
 	bootstrapper.Default(false)
-	bootstrapper.ContextF = func() *snow.Context { return ctx }
+	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	handler.RegisterBootstrap(bootstrapper)
 
 	engine := &common.EngineTest{T: t}
 	engine.Default(false)
-	engine.ContextF = func() *snow.Context { return ctx }
+	engine.ContextF = func() *snow.ConsensusContext { return ctx }
 	handler.RegisterEngine(engine)
 
 	chainRouter.AddChain(handler)
@@ -455,7 +447,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	calledF := false
 	wg := sync.WaitGroup{}
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	ctx.SetValidatorOnly()
 	vdrs := validators.NewSet()
 	vID := ids.GenerateTestShortID()
@@ -467,14 +459,12 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		ctx,
 		vdrs,
 		nil,
-		"",
-		metrics,
 	)
 	assert.NoError(t, err)
 
 	bootstrapper := &common.EngineTest{T: t}
 	bootstrapper.Default(false)
-	bootstrapper.ContextF = func() *snow.Context { return ctx }
+	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.PullQueryF = func(nodeID ids.ShortID, requestID uint32, containerID ids.ID) error {
 		defer wg.Done()
 		calledF = true
@@ -483,7 +473,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	handler.RegisterBootstrap(bootstrapper)
 
 	engine := &common.EngineTest{T: t}
-	engine.ContextF = func() *snow.Context { return ctx }
+	engine.ContextF = func() *snow.ConsensusContext { return ctx }
 	engine.Default(false)
 
 	handler.RegisterEngine(engine)

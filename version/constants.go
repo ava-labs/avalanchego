@@ -61,6 +61,12 @@ var (
 		constants.FujiID:    47437,
 	}
 	ApricotPhase4DefaultMinPChainHeight uint64
+
+	ApricotPhase5Times = map[uint32]time.Time{
+		constants.MainnetID: time.Date(2022, time.December, 29, 0, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(2022, time.December, 27, 0, 0, 0, 0, time.UTC),
+	}
+	ApricotPhase5DefaultTime = time.Date(2022, time.December, 5, 5, 0, 0, 0, time.UTC)
 )
 
 func GetApricotPhase0Time(networkID uint32) time.Time {
@@ -96,6 +102,13 @@ func GetApricotPhase4Time(networkID uint32) time.Time {
 		return upgradeTime
 	}
 	return ApricotPhase4DefaultTime
+}
+
+func GetApricotPhase5Time(networkID uint32) time.Time {
+	if upgradeTime, exists := ApricotPhase5Times[networkID]; exists {
+		return upgradeTime
+	}
+	return ApricotPhase5DefaultTime
 }
 
 func GetApricotPhase4MinPChainHeight(networkID uint32) uint64 {

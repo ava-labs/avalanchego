@@ -16,7 +16,7 @@ import (
 // Whenever we drop a message, we do that raising an error (unlike BootstrapNoOps)
 
 type FastSyncNoOps struct {
-	Ctx *snow.Context
+	Ctx *snow.ConsensusContext
 }
 
 func (nop *FastSyncNoOps) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {

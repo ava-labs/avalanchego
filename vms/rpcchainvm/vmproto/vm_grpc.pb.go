@@ -4,7 +4,6 @@ package vmproto
 
 import (
 	context "context"
-
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -38,6 +37,7 @@ type VMClient interface {
 	AppRequestFailed(ctx context.Context, in *AppRequestFailedMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	AppResponse(ctx context.Context, in *AppResponseMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	AppGossip(ctx context.Context, in *AppGossipMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	Gather(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GatherResponse, error)
 	BlockVerify(ctx context.Context, in *BlockVerifyRequest, opts ...grpc.CallOption) (*BlockVerifyResponse, error)
 	BlockAccept(ctx context.Context, in *BlockAcceptRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	BlockReject(ctx context.Context, in *BlockRejectRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -220,6 +220,15 @@ func (c *vMClient) AppGossip(ctx context.Context, in *AppGossipMsg, opts ...grpc
 	return out, nil
 }
 
+func (c *vMClient) Gather(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GatherResponse, error) {
+	out := new(GatherResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/Gather", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *vMClient) BlockVerify(ctx context.Context, in *BlockVerifyRequest, opts ...grpc.CallOption) (*BlockVerifyResponse, error) {
 	out := new(BlockVerifyResponse)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/BlockVerify", in, out, opts...)
@@ -323,6 +332,7 @@ type VMServer interface {
 	AppRequestFailed(context.Context, *AppRequestFailedMsg) (*emptypb.Empty, error)
 	AppResponse(context.Context, *AppResponseMsg) (*emptypb.Empty, error)
 	AppGossip(context.Context, *AppGossipMsg) (*emptypb.Empty, error)
+	Gather(context.Context, *emptypb.Empty) (*GatherResponse, error)
 	BlockVerify(context.Context, *BlockVerifyRequest) (*BlockVerifyResponse, error)
 	BlockAccept(context.Context, *BlockAcceptRequest) (*emptypb.Empty, error)
 	BlockReject(context.Context, *BlockRejectRequest) (*emptypb.Empty, error)
@@ -393,6 +403,9 @@ func (UnimplementedVMServer) AppResponse(context.Context, *AppResponseMsg) (*emp
 }
 func (UnimplementedVMServer) AppGossip(context.Context, *AppGossipMsg) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AppGossip not implemented")
+}
+func (UnimplementedVMServer) Gather(context.Context, *emptypb.Empty) (*GatherResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Gather not implemented")
 }
 func (UnimplementedVMServer) BlockVerify(context.Context, *BlockVerifyRequest) (*BlockVerifyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BlockVerify not implemented")
@@ -758,6 +771,24 @@ func _VM_AppGossip_Handler(srv interface{}, ctx context.Context, dec func(interf
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VM_Gather_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).Gather(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/Gather",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).Gather(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _VM_BlockVerify_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(BlockVerifyRequest)
 	if err := dec(in); err != nil {
@@ -998,6 +1029,10 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AppGossip",
 			Handler:    _VM_AppGossip_Handler,
+		},
+		{
+			MethodName: "Gather",
+			Handler:    _VM_Gather_Handler,
 		},
 		{
 			MethodName: "BlockVerify",

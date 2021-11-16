@@ -111,7 +111,7 @@ func (tx *UnsignedAddSubnetValidatorTx) Execute(
 	currentStakers := parentState.CurrentStakerChainState()
 	pendingStakers := parentState.PendingStakerChainState()
 
-	if vm.bootstrapped {
+	if vm.bootstrapped.GetValue() {
 		currentTimestamp := parentState.GetTimestamp()
 		// Ensure the proposed validator starts after the current timestamp
 		validatorStartTime := tx.StartTime()

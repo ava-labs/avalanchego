@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
@@ -28,7 +26,7 @@ var errDuplicatedContainerID = errors.New("inbound message contains duplicated c
 // Handler passes incoming messages from the network to the consensus engine.
 // (Actually, it receives the incoming messages from a ChainRouter, but same difference.)
 type Handler struct {
-	ctx *snow.Context
+	ctx *snow.ConsensusContext
 	// Useful for faking time in tests
 	clock   mockable.Clock
 	mc      message.Creator
@@ -60,11 +58,9 @@ type Handler struct {
 // [engine] must be initialized before initializing this handler
 func NewHandler(
 	mc message.Creator,
-	ctx *snow.Context,
+	ctx *snow.ConsensusContext,
 	validators validators.Set,
 	msgFromVMChan <-chan common.Message,
-	metricsNamespace string,
-	metricsRegisterer prometheus.Registerer,
 ) (*Handler, error) {
 	h := &Handler{
 		ctx:                 ctx,
@@ -76,11 +72,11 @@ func NewHandler(
 		cpuTracker:          tracker.NewCPUTracker(uptime.IntervalFactory{}, defaultCPUInterval),
 	}
 
-	if err := h.metrics.Initialize(metricsNamespace, metricsRegisterer); err != nil {
+	if err := h.metrics.Initialize("handler", h.ctx.Registerer); err != nil {
 		return nil, fmt.Errorf("initializing handler metrics errored with: %s", err)
 	}
 	var err error
-	h.unprocessedMsgs, err = newUnprocessedMsgs(h.ctx.Log, h.validators, h.cpuTracker, metricsNamespace, metricsRegisterer)
+	h.unprocessedMsgs, err = newUnprocessedMsgs(h.ctx.Log, h.validators, h.cpuTracker, "handler", h.ctx.Registerer)
 	return h, err
 }
 
@@ -107,7 +103,7 @@ func (h *Handler) OnDoneBootstrapping(lastReqID uint32) error {
 }
 
 // Context of this Handler
-func (h *Handler) Context() *snow.Context { return h.ctx }
+func (h *Handler) Context() *snow.ConsensusContext { return h.ctx }
 
 // Engine returns the engine this handler dispatches to
 func (h *Handler) Engine() common.Engine { return h.engine }

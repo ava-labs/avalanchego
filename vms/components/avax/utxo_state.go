@@ -4,8 +4,6 @@
 package avax
 
 import (
-	"fmt"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -69,9 +67,9 @@ func NewUTXOState(db database.Database, codec codec.Manager) UTXOState {
 	}
 }
 
-func NewMeteredUTXOState(db database.Database, codec codec.Manager, namespace string, metrics prometheus.Registerer) (UTXOState, error) {
+func NewMeteredUTXOState(db database.Database, codec codec.Manager, metrics prometheus.Registerer) (UTXOState, error) {
 	utxoCache, err := metercacher.New(
-		fmt.Sprintf("%s_utxo_cache", namespace),
+		"utxo_cache",
 		metrics,
 		&cache.LRU{Size: utxoCacheSize},
 	)
@@ -80,7 +78,7 @@ func NewMeteredUTXOState(db database.Database, codec codec.Manager, namespace st
 	}
 
 	indexCache, err := metercacher.New(
-		fmt.Sprintf("%s_index_cache", namespace),
+		"index_cache",
 		metrics,
 		&cache.LRU{
 			Size: indexCacheSize,

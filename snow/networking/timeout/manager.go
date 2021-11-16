@@ -48,11 +48,11 @@ func (m *Manager) IsBenched(validatorID ids.ShortID, chainID ids.ID) bool {
 	return m.benchlistMgr.IsBenched(validatorID, chainID)
 }
 
-func (m *Manager) RegisterChain(ctx *snow.Context, namespace string) error {
-	if err := m.metrics.RegisterChain(ctx, namespace); err != nil {
+func (m *Manager) RegisterChain(ctx *snow.ConsensusContext) error {
+	if err := m.metrics.RegisterChain(ctx); err != nil {
 		return fmt.Errorf("couldn't register timeout metrics for chain %s: %w", ctx.ChainID, err)
 	}
-	if err := m.benchlistMgr.RegisterChain(ctx, namespace); err != nil {
+	if err := m.benchlistMgr.RegisterChain(ctx); err != nil {
 		return fmt.Errorf("couldn't register chain %s with benchlist manager: %w", ctx.ChainID, err)
 	}
 	return nil

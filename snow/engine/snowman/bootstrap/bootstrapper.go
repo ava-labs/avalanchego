@@ -9,8 +9,6 @@ import (
 	"math"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -49,14 +47,10 @@ type SnowBootstrapper interface {
 func New(
 	config Config,
 	onFinished func(lastReqID uint32) error,
-	namespace string,
-	registerer prometheus.Registerer,
 ) (SnowBootstrapper, error) {
 	return newBootstrapper(
 		config,
 		onFinished,
-		namespace,
-		registerer,
 	)
 }
 
@@ -91,8 +85,6 @@ type bootstrapper struct {
 func newBootstrapper(
 	config Config,
 	onFinished func(lastReqID uint32) error,
-	namespace string,
-	registerer prometheus.Registerer,
 ) (*bootstrapper, error) {
 	b := &bootstrapper{
 		Blocked:      config.Blocked,
@@ -115,7 +107,7 @@ func newBootstrapper(
 	}
 	b.startingHeight = lastAccepted.Height()
 
-	if err := b.metrics.Initialize(namespace, registerer); err != nil {
+	if err := b.metrics.Initialize("bs", config.Ctx.Registerer); err != nil {
 		return nil, err
 	}
 

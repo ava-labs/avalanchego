@@ -70,7 +70,7 @@ type inputUTXO struct {
 }
 
 // Initialize implements the ConflictGraph interface
-func (ig *Input) Initialize(ctx *snow.Context, params sbcon.Parameters) error {
+func (ig *Input) Initialize(ctx *snow.ConsensusContext, params sbcon.Parameters) error {
 	ig.txs = make(map[ids.ID]*inputTx)
 	ig.utxos = make(map[ids.ID]inputUTXO)
 
