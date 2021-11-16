@@ -108,11 +108,12 @@ const (
 
 var (
 	// Set last accepted key to be longer than the keys used to store accepted block IDs.
-	lastAcceptedKey        = []byte("last_accepted_key")
-	acceptedPrefix         = []byte("snowman_accepted")
-	ethDBPrefix            = []byte("ethdb")
-	atomicIndexDBPrefix    = []byte("atomicIndexDB")
-	pruneRejectedBlocksKey = []byte("pruned_rejected_blocks")
+	lastAcceptedKey               = []byte("last_accepted_key")
+	acceptedPrefix                = []byte("snowman_accepted")
+	ethDBPrefix                   = []byte("ethdb")
+	atomicIndexDBPrefix           = []byte("atomicIndexDB")
+	pruneRejectedBlocksKey        = []byte("pruned_rejected_blocks")
+	lastAcceptedAtomicTxHeightKey = []byte("last_accepted_atomic_tx_height")
 )
 
 var (
@@ -243,8 +244,43 @@ func (vm *VM) GetActivationTime() time.Time {
 	return time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0)
 }
 
-// Initialize implements the snowman.ChainVM interface
+// Atomic TX helper funcs
+func isNotFound(err error) bool {
+	return err != nil && err.Error() == "not found"
+}
+func (vm *VM) LastAcceptedAtomicTxHeight() (uint64, error) {
+	lastAcceptedBytes, err := vm.acceptedBlockDB.Get(lastAcceptedAtomicTxHeightKey)
+	if err != nil {
+		return 0, err
+	}
+	if len(lastAcceptedBytes) != wrappers.LongLen {
+		return 0, fmt.Errorf("bad length for lastAcceptedAtomicTxHeightKey %d expecting 8", len(lastAcceptedBytes))
+	}
+	return binary.BigEndian.Uint64(lastAcceptedBytes), nil
+}
+func (vm *VM) SetLastAcceptedAtomicTxHeight(newHeight uint64) error {
+	lastAcceptedBytes := make([]byte, wrappers.LongLen)
+	binary.BigEndian.PutUint64(lastAcceptedBytes, newHeight)
+	return vm.acceptedBlockDB.Put(lastAcceptedAtomicTxHeightKey, lastAcceptedBytes)
+}
+func (vm *VM) initLastAcceptedAtomicTxHeightIfNotSet() error {
+	lastAcceptedAtomicTxHeight, err := vm.LastAcceptedAtomicTxHeight()
 
+	if err != nil {
+		log.Info("lastAcceptedAtomicTxHeight found from db", "lastAcceptedAtomicTxHeight", lastAcceptedAtomicTxHeight)
+	} else if !isNotFound(err) {
+		return err
+	}
+	// if lastAcceptedAtomicTxHeight was not found, initialize from lastAcceptedBlock
+	lastAcceptedBlockHeight := vm.chain.LastAcceptedBlock().NumberU64()
+	log.Info("using lastAcceptedBlockHeight to initialize LastAcceptedAtomicTxHeight", "lastAcceptedBlockHeight", lastAcceptedBlockHeight)
+	if err := vm.SetLastAcceptedAtomicTxHeight(lastAcceptedBlockHeight); err != nil {
+		return err
+	}
+	return vm.db.Commit()
+}
+
+// Initialize implements the snowman.ChainVM interface
 func (vm *VM) Initialize(
 	ctx *snow.Context,
 	dbManager manager.Manager,
@@ -354,7 +390,7 @@ func (vm *VM) Initialize(
 	var lastAcceptedHash common.Hash
 	switch {
 	case lastAcceptedErr == database.ErrNotFound:
-		// // Set [lastAcceptedHash] to the genesis block hash.
+		// Set [lastAcceptedHash] to the genesis block hash.
 		lastAcceptedHash = ethConfig.Genesis.ToBlock(nil).Hash()
 	case lastAcceptedErr != nil:
 		return fmt.Errorf("failed to get last accepted block ID due to: %w", lastAcceptedErr)
@@ -371,22 +407,16 @@ func (vm *VM) Initialize(
 	lastAccepted := vm.chain.LastAcceptedBlock()
 
 	vm.atomicTxRepository = newAtomicTxRepository(vm.db, vm.codec)
-	if err = vm.atomicTxRepository.Initialize(); err != nil {
-		return err
-	}
-
-	err = vm.db.Commit()
-	if err != nil {
-		return err
-	}
-
 	atomicIndexDB := Database{prefixdb.New(atomicIndexDBPrefix, vm.db)}
 	vm.atomicTrie, err = NewBlockingAtomicTrie(atomicIndexDB, vm.atomicTxRepository)
 	if err != nil {
 		return err
 	}
 
-	resultChan := vm.atomicTrie.Initialize(vm.db.Commit)
+	if err := vm.initLastAcceptedAtomicTxHeightIfNotSet(); err != nil {
+		return err
+	}
+	resultChan := vm.atomicTrie.Initialize(lastAccepted.NumberU64(), vm.db.Commit)
 
 	startTime := time.Now()
 	err, open := <-resultChan
