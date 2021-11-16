@@ -274,6 +274,9 @@ func (vm *VM) Initialize(
 		return errUnsupportedFXs
 	}
 
+	metrics.Enabled = vm.config.MetricsEnabled
+	metrics.EnabledExpensive = vm.config.MetricsEnabledExpensive
+
 	vm.shutdownChan = make(chan struct{}, 1)
 	vm.ctx = ctx
 	baseDB := dbManager.Current().Database
@@ -425,9 +428,12 @@ func (vm *VM) Initialize(
 	// 	return err
 	// }
 
-	gatherer := prometheus.Gatherer(metrics.DefaultRegistry)
-	if err := ctx.Metrics.Register(gatherer); err != nil {
-		return err
+	// Only provide metrics if they are being populated.
+	if metrics.Enabled {
+		gatherer := prometheus.Gatherer(metrics.DefaultRegistry)
+		if err := ctx.Metrics.Register(gatherer); err != nil {
+			return err
+		}
 	}
 
 	return vm.fx.Initialize(vm)

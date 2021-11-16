@@ -19,10 +19,12 @@ const (
 	defaultSnapshotAsync               = true
 	defaultRpcGasCap                   = 2500000000 // 25000000 X 100
 	defaultRpcTxFeeCap                 = 100        // 100 AVAX
-	defaultApiMaxDuration              = 0          // Default to no maximum API call duration
-	defaultWsCpuRefillRate             = 0          // Default to no maximum WS CPU usage
-	defaultWsCpuMaxStored              = 0          // Default to no maximum WS CPU usage
-	defaultMaxBlocksPerRequest         = 0          // Default to no maximum on the number of blocks per getLogs request
+	defaultMetricsEnabled              = true
+	defaultMetricsEnabledExpensive     = false
+	defaultApiMaxDuration              = 0 // Default to no maximum API call duration
+	defaultWsCpuRefillRate             = 0 // Default to no maximum WS CPU usage
+	defaultWsCpuMaxStored              = 0 // Default to no maximum WS CPU usage
+	defaultMaxBlocksPerRequest         = 0 // Default to no maximum on the number of blocks per getLogs request
 	defaultContinuousProfilerFrequency = 15 * time.Minute
 	defaultContinuousProfilerMaxFiles  = 5
 	defaultTxRegossipFrequency         = 1 * time.Minute
@@ -61,6 +63,10 @@ type Config struct {
 	Pruning        bool `json:"pruning-enabled"`
 	SnapshotAsync  bool `json:"snapshot-async"`
 	SnapshotVerify bool `json:"snapshot-verification-enabled"`
+
+	// Metric Settings
+	MetricsEnabled          bool `json:"metrics-enabled"`
+	MetricsEnabledExpensive bool `json:"metrics-enabled-expensive"`
 
 	// API Settings
 	LocalTxsEnabled         bool     `json:"local-txs-enabled"`
@@ -115,6 +121,8 @@ func (c *Config) SetDefaults() {
 	c.Web3APIEnabled = defaultWeb3ApiEnabled
 	c.RPCGasCap = defaultRpcGasCap
 	c.RPCTxFeeCap = defaultRpcTxFeeCap
+	c.MetricsEnabled = defaultMetricsEnabled
+	c.MetricsEnabledExpensive = defaultMetricsEnabledExpensive
 	c.APIMaxDuration.Duration = defaultApiMaxDuration
 	c.WSCPURefillRate.Duration = defaultWsCpuRefillRate
 	c.WSCPUMaxStored.Duration = defaultWsCpuMaxStored
