@@ -59,6 +59,7 @@ type VM struct {
 	// hasn't yet been accepted/rejected
 	verifiedBlocks map[ids.ID]PostForkBlock
 	preferred      ids.ID
+	bootstrapped   bool
 
 	// lastAcceptedOptionTime is set to the last accepted PostForkBlock's
 	// timestamp if the last accepted block has been a PostForkOption block
@@ -121,6 +122,16 @@ func (vm *VM) Initialize(
 	}
 
 	return vm.setLastAcceptedOptionTime()
+}
+
+func (vm *VM) Bootstrapping() error {
+	vm.bootstrapped = false
+	return vm.ChainVM.Bootstrapping()
+}
+
+func (vm *VM) Bootstrapped() error {
+	vm.bootstrapped = true
+	return vm.ChainVM.Bootstrapped()
 }
 
 func (vm *VM) BuildBlock() (snowman.Block, error) {

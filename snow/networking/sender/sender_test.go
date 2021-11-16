@@ -27,7 +27,7 @@ import (
 )
 
 func TestSenderContext(t *testing.T) {
-	context := snow.DefaultContextTest()
+	context := snow.DefaultConsensusContextTest()
 	metrics := prometheus.NewRegistry()
 	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
@@ -40,8 +40,6 @@ func TestSenderContext(t *testing.T) {
 		externalSender,
 		&router.ChainRouter{},
 		&timeout.Manager{},
-		"",
-		metrics,
 		2,
 		2,
 		2,
@@ -82,30 +80,28 @@ func TestTimeout(t *testing.T) {
 	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
-	context := snow.DefaultContextTest()
+	context := snow.DefaultConsensusContextTest()
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 	sender := Sender{}
-	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, "", metrics, 2, 2, 2)
+	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, 2, 2, 2)
 	assert.NoError(t, err)
 
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 	failedVDRs := ids.ShortSet{}
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	handler, err := router.NewHandler(
 		mc,
 		ctx,
 		vdrs,
 		nil,
-		"",
-		prometheus.NewRegistry(),
 	)
 	assert.NoError(t, err)
 
 	bootstrapper := &common.EngineTest{T: t}
 	bootstrapper.Default(true)
-	bootstrapper.ContextF = func() *snow.Context { return ctx }
+	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.ShortID) error { return nil }
 	bootstrapper.QueryFailedF = func(nodeID ids.ShortID, _ uint32) error {
 		failedVDRs.Add(nodeID)
@@ -117,7 +113,7 @@ func TestTimeout(t *testing.T) {
 	engine := &common.EngineTest{T: t}
 	engine.Default(true)
 	engine.CantConnected = false
-	engine.ContextF = func() *snow.Context { return ctx }
+	engine.ContextF = func() *snow.ConsensusContext { return ctx }
 	handler.RegisterEngine(engine)
 
 	go handler.Dispatch()
@@ -168,29 +164,27 @@ func TestReliableMessages(t *testing.T) {
 		ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
-	context := snow.DefaultContextTest()
+	context := snow.DefaultConsensusContextTest()
 
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 	sender := Sender{}
-	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, "", metrics, 2, 2, 2)
+	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, 2, 2, 2)
 	assert.NoError(t, err)
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 
 	handler, err := router.NewHandler(
 		mc,
 		ctx,
 		vdrs,
 		nil,
-		"",
-		prometheus.NewRegistry(),
 	)
 	assert.NoError(t, err)
 
 	bootstrapper := &common.EngineTest{T: t}
 	bootstrapper.Default(true)
-	bootstrapper.ContextF = func() *snow.Context { return ctx }
+	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.ShortID) error { return nil }
 	queriesToSend := 1000
 	awaiting := make([]chan struct{}, queriesToSend)
@@ -206,7 +200,7 @@ func TestReliableMessages(t *testing.T) {
 	engine := &common.EngineTest{T: t}
 	engine.Default(true)
 	engine.CantConnected = false
-	engine.ContextF = func() *snow.Context { return ctx }
+	engine.ContextF = func() *snow.ConsensusContext { return ctx }
 	engine.GossipF = func() error { return nil }
 	handler.RegisterEngine(engine)
 
@@ -266,28 +260,26 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
-	context := snow.DefaultContextTest()
+	context := snow.DefaultConsensusContextTest()
 
 	sender := Sender{}
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
-	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, "", metrics, 2, 2, 2)
+	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, 2, 2, 2)
 	assert.NoError(t, err)
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	handler, err := router.NewHandler(
 		mc,
 		ctx,
 		vdrs,
 		nil,
-		"",
-		prometheus.NewRegistry(),
 	)
 	assert.NoError(t, err)
 
 	bootstrapper := &common.EngineTest{T: t}
 	bootstrapper.Default(true)
-	bootstrapper.ContextF = func() *snow.Context { return ctx }
+	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.ShortID) error { return nil }
 	queriesToSend := 2
 	awaiting := make([]chan struct{}, queriesToSend)
@@ -302,7 +294,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 
 	engine := &common.EngineTest{T: t}
 	engine.Default(false)
-	engine.ContextF = func() *snow.Context { return ctx }
+	engine.ContextF = func() *snow.ConsensusContext { return ctx }
 	engine.GossipF = func() error { return nil }
 	engine.CantPullQuery = false
 	handler.RegisterEngine(engine)

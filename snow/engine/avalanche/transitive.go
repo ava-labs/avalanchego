@@ -30,7 +30,7 @@ func New(config Config) (Engine, error) {
 // Transitive implements the Engine interface by attempting to fetch all
 // transitive dependencies.
 type Transitive struct {
-	Ctx        *snow.Context
+	Ctx        *snow.ConsensusContext
 	Sender     common.Sender
 	Manager    vertex.Manager
 	VM         vertex.DAGVM
@@ -86,20 +86,20 @@ func newTransitive(config Config) (*Transitive, error) {
 		Consensus:       config.Consensus,
 		polls: poll.NewSet(factory,
 			config.Ctx.Log,
-			config.Params.Namespace,
-			config.Params.Metrics,
+			"",
+			config.Ctx.Registerer,
 		),
 		uniformSampler: sampler.NewUniform(),
 	}
 
-	if err := t.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
+	if err := t.metrics.Initialize("", config.Ctx.Registerer); err != nil {
 		return nil, err
 	}
 
 	return t, nil
 }
 
-func (t *Transitive) Context() *snow.Context {
+func (t *Transitive) Context() *snow.ConsensusContext {
 	return t.Ctx
 }
 

@@ -298,6 +298,8 @@ func defaultVM() (*VM, database.Database, *common.SenderTest) {
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		StakeMintingPeriod:     defaultMaxStakingDuration,
 		ApricotPhase3Time:      defaultValidateEndTime,
+		ApricotPhase4Time:      defaultValidateEndTime,
+		ApricotPhase5Time:      defaultValidateEndTime,
 	}}
 
 	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
@@ -2027,6 +2029,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	vm.clock.Set(defaultGenesisTime)
 	ctx := defaultContext()
+	consensusCtx := snow.DefaultConsensusContextTest()
+	consensusCtx.Context = ctx
 	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)
@@ -2096,7 +2100,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-	err = sender.Initialize(ctx, mc, externalSender, chainRouter, &timeoutManager, "", metrics, 1, 1, 1)
+	err = sender.Initialize(consensusCtx, mc, externalSender, chainRouter, &timeoutManager, 1, 1, 1)
 	assert.NoError(t, err)
 
 	var reqID uint32
@@ -2125,7 +2129,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	bootstrapConfig := bootstrap.Config{
 		Config: common.Config{
-			Ctx:                           ctx,
+			Ctx:                           consensusCtx,
 			Validators:                    vdrs,
 			Beacons:                       beacons,
 			SampleK:                       beacons.Len(),
@@ -2146,16 +2150,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		bootstrapConfig.Ctx,
 		vdrs,
 		msgChan,
-		"",
-		prometheus.NewRegistry(),
 	)
 	assert.NoError(t, err)
 
 	bootstrapper, err := bootstrap.New(
 		bootstrapConfig,
 		handler.OnDoneBootstrapping,
-		fmt.Sprintf("%s_bs", consensus.Parameters().Namespace),
-		prometheus.NewRegistry(),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -2168,7 +2168,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		Sender:     bootstrapConfig.Sender,
 		Validators: vdrs,
 		Params: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     1,
 			Alpha:                 1,
 			BetaVirtuous:          20,
@@ -2421,6 +2420,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
 
 	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
 
 	vm := &VM{Factory: Factory{
 		Chains:                 chains.MockManager{},
@@ -2445,6 +2445,12 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	if err := vm.Initialize(ctx, baseDBManager, genesisBytes, nil, nil, msgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
+	m := &atomic.Memory{}
+	err := m.Initialize(logging.NoLog{}, atomicDB)
+	if err != nil {
+		panic(err)
+	}
+	vm.ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	key0 := keys[0]
 	key1 := keys[1]

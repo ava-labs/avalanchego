@@ -6,8 +6,6 @@ package snowball
 import (
 	"testing"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -15,8 +13,7 @@ func TestFlatParams(t *testing.T) { ParamsTest(t, FlatFactory{}) }
 
 func TestFlat(t *testing.T) {
 	params := Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       2, Alpha: 2, BetaVirtuous: 1, BetaRogue: 2,
+		K: 2, Alpha: 2, BetaVirtuous: 1, BetaRogue: 2,
 	}
 	f := Flat{}
 	f.Initialize(params, Red)

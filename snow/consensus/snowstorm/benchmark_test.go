@@ -6,8 +6,6 @@ package snowstorm
 import (
 	"testing"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/avalanchego/utils/sampler"
 
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
@@ -60,7 +58,6 @@ func BenchmarkVirtuousDirected(b *testing.B) {
 			/*maxInputConflicts=*/ 1,
 			/*numNodes=*/ 50,
 			/*params=*/ sbcon.Parameters{
-				Metrics:           prometheus.NewRegistry(),
 				K:                 20,
 				Alpha:             11,
 				BetaVirtuous:      20,
@@ -84,7 +81,7 @@ func BenchmarkVirtuousInput(b *testing.B) {
 			/*maxInputConflicts=*/ 1,
 			/*numNodes=*/ 50,
 			/*params=*/ sbcon.Parameters{
-				Metrics:           prometheus.NewRegistry(),
+
 				K:                 20,
 				Alpha:             11,
 				BetaVirtuous:      20,
@@ -114,7 +111,6 @@ func BenchmarkRogueDirected(b *testing.B) {
 			/*maxInputConflicts=*/ 3,
 			/*numNodes=*/ 50,
 			/*params=*/ sbcon.Parameters{
-				Metrics:           prometheus.NewRegistry(),
 				K:                 20,
 				Alpha:             11,
 				BetaVirtuous:      20,
@@ -138,7 +134,6 @@ func BenchmarkRogueInput(b *testing.B) {
 			/*maxInputConflicts=*/ 3,
 			/*numNodes=*/ 50,
 			/*params=*/ sbcon.Parameters{
-				Metrics:           prometheus.NewRegistry(),
 				K:                 20,
 				Alpha:             11,
 				BetaVirtuous:      20,
@@ -168,7 +163,6 @@ func BenchmarkMultiDirected(b *testing.B) {
 			/*maxInputConflicts=*/ 1,
 			/*numNodes=*/ 50,
 			/*params=*/ sbcon.Parameters{
-				Metrics:           prometheus.NewRegistry(),
 				K:                 20,
 				Alpha:             11,
 				BetaVirtuous:      20,
@@ -192,7 +186,6 @@ func BenchmarkMultiInput(b *testing.B) {
 			/*maxInputConflicts=*/ 1,
 			/*numNodes=*/ 50,
 			/*params=*/ sbcon.Parameters{
-				Metrics:           prometheus.NewRegistry(),
 				K:                 20,
 				Alpha:             11,
 				BetaVirtuous:      20,
@@ -222,7 +215,6 @@ func BenchmarkMultiRogueDirected(b *testing.B) {
 			/*maxInputConflicts=*/ 3,
 			/*numNodes=*/ 50,
 			/*params=*/ sbcon.Parameters{
-				Metrics:           prometheus.NewRegistry(),
 				K:                 20,
 				Alpha:             11,
 				BetaVirtuous:      20,
@@ -246,7 +238,6 @@ func BenchmarkMultiRogueInput(b *testing.B) {
 			/*maxInputConflicts=*/ 3,
 			/*numNodes=*/ 50,
 			/*params=*/ sbcon.Parameters{
-				Metrics:           prometheus.NewRegistry(),
 				K:                 20,
 				Alpha:             11,
 				BetaVirtuous:      20,

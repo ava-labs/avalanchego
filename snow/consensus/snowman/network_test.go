@@ -6,8 +6,6 @@ package snowman
 import (
 	"math/rand"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -60,8 +58,7 @@ func (n *Network) Initialize(params snowball.Parameters, numColors int) {
 }
 
 func (n *Network) AddNode(sm Consensus) error {
-	n.params.Metrics = prometheus.NewRegistry()
-	if err := sm.Initialize(snow.DefaultContextTest(), n.params, Genesis.ID(), Genesis.Height()); err != nil {
+	if err := sm.Initialize(snow.DefaultConsensusContextTest(), n.params, Genesis.ID(), Genesis.Height()); err != nil {
 		return err
 	}
 

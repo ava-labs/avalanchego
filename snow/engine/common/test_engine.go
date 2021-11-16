@@ -87,7 +87,7 @@ type EngineTest struct {
 
 	StartF                                             func(startReqID uint32) error
 	IsBootstrappedF                                    func() bool
-	ContextF                                           func() *snow.Context
+	ContextF                                           func() *snow.ConsensusContext
 	HaltF                                              func()
 	TimeoutF, GossipF, ShutdownF                       func() error
 	NotifyF                                            func(Message) error
@@ -149,7 +149,7 @@ func (e *EngineTest) Start(startReqID uint32) error {
 	return errStart
 }
 
-func (e *EngineTest) Context() *snow.Context {
+func (e *EngineTest) Context() *snow.ConsensusContext {
 	if e.ContextF != nil {
 		return e.ContextF()
 	}

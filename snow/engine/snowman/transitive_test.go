@@ -6,7 +6,6 @@ package snowman
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -19,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -89,8 +87,6 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
-		prometheus.NewRegistry(),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -416,7 +412,6 @@ func TestEngineMultipleQuery(t *testing.T) {
 	bootCfg, engCfg := DefaultConfigs()
 
 	engCfg.Params = snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     3,
 		Alpha:                 2,
 		BetaVirtuous:          1,
@@ -481,8 +476,6 @@ func TestEngineMultipleQuery(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
-		prometheus.NewRegistry(),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -924,7 +917,6 @@ func TestVoteCanceling(t *testing.T) {
 	bootCfg, engCfg := DefaultConfigs()
 
 	engCfg.Params = snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     3,
 		Alpha:                 2,
 		BetaVirtuous:          1,
@@ -992,8 +984,6 @@ func TestVoteCanceling(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
-		prometheus.NewRegistry(),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1107,8 +1097,6 @@ func TestEngineNoQuery(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
-		prometheus.NewRegistry(),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1174,8 +1162,6 @@ func TestEngineNoRepollQuery(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
-		prometheus.NewRegistry(),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1874,8 +1860,6 @@ func TestEngineAggressivePolling(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
-		prometheus.NewRegistry(),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1957,7 +1941,6 @@ func TestEngineDoubleChit(t *testing.T) {
 	bootCfg, engCfg := DefaultConfigs()
 
 	engCfg.Params = snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     2,
 		Alpha:                 2,
 		BetaVirtuous:          1,
@@ -2020,8 +2003,6 @@ func TestEngineDoubleChit(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
-		prometheus.NewRegistry(),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -2171,8 +2152,6 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
 		dh.onDoneBootstrapping,
-		fmt.Sprintf("%s_bs", engCfg.Consensus.Parameters().Namespace),
-		prometheus.NewRegistry(),
 	)
 	if err != nil {
 		t.Fatal(err)

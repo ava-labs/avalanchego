@@ -30,7 +30,7 @@ func DefaultConfigs() (bootstrap.Config, Config) {
 		Sender:     bootstrapConfig.Sender,
 		Validators: bootstrapConfig.Validators,
 		Params: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
+
 			K:                     1,
 			Alpha:                 1,
 			BetaVirtuous:          1,

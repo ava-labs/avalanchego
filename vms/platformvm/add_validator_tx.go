@@ -170,7 +170,7 @@ func (tx *UnsignedAddValidatorTx) Execute(
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.Stake)
 
-	if vm.bootstrapped {
+	if vm.bootstrapped.GetValue() {
 		currentTimestamp := parentState.GetTimestamp()
 		// Ensure the proposed validator starts after the current time
 		startTime := tx.StartTime()

@@ -35,7 +35,6 @@ func DefaultConfig() (bootstrap.Config, Config) {
 		Validators: bootstrapConfig.Validators,
 		Params: avalanche.Parameters{
 			Parameters: snowball.Parameters{
-				Metrics:               prometheus.NewRegistry(),
 				K:                     1,
 				Alpha:                 1,
 				BetaVirtuous:          1,

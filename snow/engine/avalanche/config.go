@@ -13,7 +13,7 @@ import (
 
 // Config wraps all the parameters needed for an avalanche engine
 type Config struct {
-	Ctx        *snow.Context
+	Ctx        *snow.ConsensusContext
 	VM         vertex.DAGVM
 	Manager    vertex.Manager
 	Sender     common.Sender

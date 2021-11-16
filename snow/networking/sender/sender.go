@@ -22,7 +22,7 @@ import (
 // Sender registers outbound requests with [router] so that [router]
 // fires a timeout if we don't get a response to the request.
 type Sender struct {
-	ctx        *snow.Context
+	ctx        *snow.ConsensusContext
 	msgCreator message.Creator
 	sender     ExternalSender // Actually does the sending over the network
 	router     router.Router
@@ -39,13 +39,11 @@ type Sender struct {
 
 // Initialize this sender
 func (s *Sender) Initialize(
-	ctx *snow.Context,
+	ctx *snow.ConsensusContext,
 	msgCreator message.Creator,
 	sender ExternalSender,
 	router router.Router,
 	timeouts *timeout.Manager,
-	metricsNamespace string,
-	metricsRegisterer prometheus.Registerer,
 	appGossipValidatorSize int,
 	appGossipNonValidatorSize int,
 	gossipAcceptedFrontierSize int,
@@ -65,12 +63,11 @@ func (s *Sender) Initialize(
 	for _, op := range message.ConsensusRequestOps {
 		counter := prometheus.NewCounter(
 			prometheus.CounterOpts{
-				Namespace: metricsNamespace,
-				Name:      fmt.Sprintf("%s_failed_benched", op),
-				Help:      fmt.Sprintf("# of times a %s request was not sent because the node was benched", op),
+				Name: fmt.Sprintf("%s_failed_benched", op),
+				Help: fmt.Sprintf("# of times a %s request was not sent because the node was benched", op),
 			},
 		)
-		if err := metricsRegisterer.Register(counter); err != nil {
+		if err := ctx.Registerer.Register(counter); err != nil {
 			return fmt.Errorf("couldn't register metric for %s: %w", op, err)
 		}
 		s.failedDueToBench[op] = counter
@@ -79,7 +76,7 @@ func (s *Sender) Initialize(
 }
 
 // Context of this sender
-func (s *Sender) Context() *snow.Context { return s.ctx }
+func (s *Sender) Context() *snow.ConsensusContext { return s.ctx }
 
 func (s *Sender) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, requestID uint32) {
 	// Note that this timeout duration won't exactly match the one that gets

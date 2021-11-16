@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/api/keystore"
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -19,12 +20,12 @@ import (
 )
 
 type EventDispatcher interface {
-	Issue(ctx *Context, containerID ids.ID, container []byte) error
+	Issue(ctx *ConsensusContext, containerID ids.ID, container []byte) error
 	// If the returned error is non-nil, the chain associated with [ctx] should shut
 	// down and not commit [container] or any other container to its database as accepted.
 	// Accept must be called before [containerID] is committed to the VM as accepted.
-	Accept(ctx *Context, containerID ids.ID, container []byte) error
-	Reject(ctx *Context, containerID ids.ID, container []byte) error
+	Accept(ctx *ConsensusContext, containerID ids.ID, container []byte) error
+	Reject(ctx *ConsensusContext, containerID ids.ID, container []byte) error
 }
 
 type SubnetLookup interface {
@@ -51,16 +52,27 @@ type Context struct {
 	XChainID    ids.ID
 	AVAXAssetID ids.ID
 
-	Log                 logging.Logger
+	Log          logging.Logger
+	Lock         sync.RWMutex
+	Keystore     keystore.BlockchainKeystore
+	SharedMemory atomic.SharedMemory
+	BCLookup     ids.AliaserReader
+	SNLookup     SubnetLookup
+	Metrics      metrics.OptionalGatherer
+
+	// snowman++ attributes
+	ValidatorState    validators.State  // interface for P-Chain validators
+	StakingLeafSigner crypto.Signer     // block signer
+	StakingCertLeaf   *x509.Certificate // block certificate
+}
+
+type ConsensusContext struct {
+	*Context
+
+	Registerer prometheus.Registerer
+
 	DecisionDispatcher  EventDispatcher
 	ConsensusDispatcher EventDispatcher
-	Lock                sync.RWMutex
-	Keystore            keystore.BlockchainKeystore
-	SharedMemory        atomic.SharedMemory
-	BCLookup            ids.AliaserReader
-	SNLookup            SubnetLookup
-	Namespace           string
-	Metrics             prometheus.Registerer
 
 	// Non-zero iff this chain bootstrapped.
 	state utils.AtomicInterface
@@ -70,18 +82,13 @@ type Context struct {
 
 	// Indicates this chain is available to only validators.
 	validatorOnly utils.AtomicBool
-
-	// snowman++ attributes
-	ValidatorState    validators.State  // interface for P-Chain validators
-	StakingLeafSigner crypto.Signer     // block signer
-	StakingCertLeaf   *x509.Certificate // block certificate
 }
 
-func (ctx *Context) SetState(newState State) {
+func (ctx *ConsensusContext) SetState(newState State) {
 	ctx.state.SetValue(newState)
 }
 
-func (ctx *Context) GetState() State {
+func (ctx *ConsensusContext) GetState() State {
 	stateInf := ctx.state.GetValue()
 	if stateInf == nil {
 		return Unknown
@@ -89,51 +96,57 @@ func (ctx *Context) GetState() State {
 	return stateInf.(State)
 }
 
-func (ctx *Context) IsBootstrapped() bool {
+func (ctx *ConsensusContext) IsBootstrapped() bool {
 	return ctx.GetState() == NormalOp
 }
 
 // IsExecuting returns true iff this chain is still executing transactions.
-func (ctx *Context) IsExecuting() bool {
+func (ctx *ConsensusContext) IsExecuting() bool {
 	return ctx.executing.GetValue()
 }
 
 // Executing marks this chain as executing or not.
 // Set to "true" if there's an ongoing transaction.
-func (ctx *Context) Executing(b bool) {
+func (ctx *ConsensusContext) Executing(b bool) {
 	ctx.executing.SetValue(b)
 }
 
 // IsValidatorOnly returns true iff this chain is available only to validators
-func (ctx *Context) IsValidatorOnly() bool {
+func (ctx *ConsensusContext) IsValidatorOnly() bool {
 	return ctx.validatorOnly.GetValue()
 }
 
 // SetValidatorOnly  marks this chain as available only to validators
-func (ctx *Context) SetValidatorOnly() {
+func (ctx *ConsensusContext) SetValidatorOnly() {
 	ctx.validatorOnly.SetValue(true)
 }
 
 func DefaultContextTest() *Context {
 	return &Context{
-		NetworkID:           0,
-		SubnetID:            ids.Empty,
-		ChainID:             ids.Empty,
-		NodeID:              ids.ShortEmpty,
-		Log:                 logging.NoLog{},
+		NetworkID: 0,
+		SubnetID:  ids.Empty,
+		ChainID:   ids.Empty,
+		NodeID:    ids.ShortEmpty,
+		Log:       logging.NoLog{},
+		BCLookup:  ids.NewAliaser(),
+		Metrics:   metrics.NewOptionalGatherer(),
+	}
+}
+
+func DefaultConsensusContextTest() *ConsensusContext {
+	return &ConsensusContext{
+		Context:             DefaultContextTest(),
+		Registerer:          prometheus.NewRegistry(),
 		DecisionDispatcher:  noOpEventDispatcher{},
 		ConsensusDispatcher: noOpEventDispatcher{},
-		BCLookup:            ids.NewAliaser(),
-		Namespace:           "",
-		Metrics:             prometheus.NewRegistry(),
 	}
 }
 
 type noOpEventDispatcher struct{}
 
-func (noOpEventDispatcher) Issue(*Context, ids.ID, []byte) error  { return nil }
-func (noOpEventDispatcher) Accept(*Context, ids.ID, []byte) error { return nil }
-func (noOpEventDispatcher) Reject(*Context, ids.ID, []byte) error { return nil }
+func (noOpEventDispatcher) Issue(*ConsensusContext, ids.ID, []byte) error  { return nil }
+func (noOpEventDispatcher) Accept(*ConsensusContext, ids.ID, []byte) error { return nil }
+func (noOpEventDispatcher) Reject(*ConsensusContext, ids.ID, []byte) error { return nil }
 
 var _ EventDispatcher = &EventDispatcherTracker{}
 
@@ -164,14 +177,14 @@ func (evd *EventDispatcherTracker) IsIssued(containerID ids.ID) (int, bool) {
 	return cnt, ok
 }
 
-func (evd *EventDispatcherTracker) Issue(ctx *Context, containerID ids.ID, container []byte) error {
+func (evd *EventDispatcherTracker) Issue(ctx *ConsensusContext, containerID ids.ID, container []byte) error {
 	evd.mu.Lock()
 	evd.issued[containerID]++
 	evd.mu.Unlock()
 	return nil
 }
 
-func (evd *EventDispatcherTracker) Accept(ctx *Context, containerID ids.ID, container []byte) error {
+func (evd *EventDispatcherTracker) Accept(ctx *ConsensusContext, containerID ids.ID, container []byte) error {
 	evd.mu.Lock()
 	evd.accepted[containerID]++
 	evd.mu.Unlock()
@@ -185,7 +198,7 @@ func (evd *EventDispatcherTracker) IsAccepted(containerID ids.ID) (int, bool) {
 	return cnt, ok
 }
 
-func (evd *EventDispatcherTracker) Reject(ctx *Context, containerID ids.ID, container []byte) error {
+func (evd *EventDispatcherTracker) Reject(ctx *ConsensusContext, containerID ids.ID, container []byte) error {
 	evd.mu.Lock()
 	evd.rejected[containerID]++
 	evd.mu.Unlock()

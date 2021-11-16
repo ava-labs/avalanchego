@@ -4,9 +4,11 @@
 package metervm
 
 import (
-	"fmt"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -45,10 +47,24 @@ func (vm *blockVM) Initialize(
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
+	registerer := prometheus.NewRegistry()
 	_, supportsBatchedFetching := vm.ChainVM.(block.BatchedChainVM)
-	if err := vm.blockMetrics.Initialize(supportsBatchedFetching, fmt.Sprintf("%s_metervm", ctx.Namespace), ctx.Metrics); err != nil {
+	if err := vm.blockMetrics.Initialize(supportsBatchedFetching, "", registerer); err != nil {
 		return err
 	}
+
+	optionalGatherer := metrics.NewOptionalGatherer()
+	multiGatherer := metrics.NewMultiGatherer()
+	if err := multiGatherer.Register("metervm", registerer); err != nil {
+		return err
+	}
+	if err := multiGatherer.Register("", optionalGatherer); err != nil {
+		return err
+	}
+	if err := ctx.Metrics.Register(multiGatherer); err != nil {
+		return err
+	}
+	ctx.Metrics = optionalGatherer
 
 	return vm.ChainVM.Initialize(ctx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender)
 }

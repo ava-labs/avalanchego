@@ -85,6 +85,6 @@ func TestMeteredTxState(t *testing.T) {
 	codec, err := staticCodec()
 	assert.NoError(err)
 
-	_, err = NewMeteredTxState(db, codec, "", prometheus.NewRegistry())
+	_, err = NewMeteredTxState(db, codec, prometheus.NewRegistry())
 	assert.NoError(err)
 }

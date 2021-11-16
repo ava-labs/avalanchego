@@ -888,7 +888,7 @@ func initTestRemoteProposerVM(
 		return res, nil
 	}
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	ctx.NodeID = hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw))
 	ctx.StakingCertLeaf = pTestCert.Leaf
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
@@ -898,12 +898,16 @@ func initTestRemoteProposerVM(
 	dummyDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	// make sure that DBs are compressed correctly
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
-	if err := proVM.Initialize(ctx, dummyDBManager, initialState, nil, nil, nil, nil, nil); err != nil {
+	if err := proVM.Initialize(ctx.Context, dummyDBManager, initialState, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("failed to initialize proposerVM with %s", err)
 	}
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
+
+	if err := proVM.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := proVM.SetPreference(coreGenBlk.IDV); err != nil {
 		t.Fatal(err)
