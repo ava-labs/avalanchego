@@ -770,7 +770,7 @@ func (m *manager) createSnowmanChain(
 		Preempt: sb.afterBootstrapped(),
 	}
 
-	// The engine handles consensus
+	// create bootstrap gear
 	bootstrapCfg := smbootstrap.Config{
 		Config: common.Config{
 			Ctx:                           ctx,
@@ -792,7 +792,6 @@ func (m *manager) createSnowmanChain(
 		VM:           vm,
 		Bootstrapped: m.unblockChains,
 	}
-
 	bootstrapper, err := smbootstrap.New(
 		bootstrapCfg,
 		handler.OnDoneBootstrapping,
@@ -802,6 +801,7 @@ func (m *manager) createSnowmanChain(
 	}
 	handler.RegisterBootstrap(bootstrapper)
 
+	// create engine gear
 	engineConfig := smeng.Config{
 		Ctx:        bootstrapCfg.Ctx,
 		VM:         bootstrapCfg.VM,
@@ -810,7 +810,6 @@ func (m *manager) createSnowmanChain(
 		Params:     consensusParams,
 		Consensus:  &smcon.Topological{},
 	}
-
 	engine, err := smeng.New(engineConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)

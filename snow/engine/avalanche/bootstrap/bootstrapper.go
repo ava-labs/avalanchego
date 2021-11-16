@@ -11,7 +11,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
@@ -510,8 +509,6 @@ func (b *bootstrapper) finish() error {
 	if err := b.OnFinished(b.RequestID); err != nil {
 		return err
 	}
-	b.Ctx.SetState(snow.NormalOp)
-
 	return nil
 }
 

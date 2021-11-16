@@ -146,6 +146,7 @@ func (t *Transitive) Start(startReqID uint32) error {
 
 	t.Ctx.Log.Info("bootstrapping finished with %s as the last accepted block", lastAcceptedID)
 	t.metrics.bootstrapFinished.Set(1)
+	t.Ctx.SetState(snow.NormalOp)
 	return nil
 }
 

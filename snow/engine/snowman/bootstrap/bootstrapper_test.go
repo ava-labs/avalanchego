@@ -108,10 +108,9 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		return blk0, nil
 	}
 
-	finished := new(bool)
 	bs, err := newBootstrapper(
 		config,
-		func(lastReqID uint32) error { *finished = true; return nil },
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -153,7 +152,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	switch {
 	case err != nil: // should finish
 		t.Fatal(err)
-	case !*finished:
+	case config.Ctx.GetState() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case blk1.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -209,10 +208,9 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 		return blk0, nil
 	}
 
-	finished := new(bool)
 	bs, err := newBootstrapper(
 		config,
-		func(lastReqID uint32) error { *finished = true; return nil },
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -300,7 +298,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	switch {
 	case err != nil: // respond with right block
 		t.Fatal(err)
-	case !*finished:
+	case config.Ctx.GetState() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -368,10 +366,9 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		return blk0, nil
 	}
 
-	finished := new(bool)
 	bs, err := newBootstrapper(
 		config,
-		func(lastReqID uint32) error { *finished = true; return nil },
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -462,7 +459,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	}
 
 	switch {
-	case !*finished:
+	case config.Ctx.GetState() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -530,10 +527,10 @@ func TestBootstrapperMultiPut(t *testing.T) {
 		assert.Equal(t, blk0.ID(), blkID)
 		return blk0, nil
 	}
-	finished := new(bool)
+
 	bs, err := newBootstrapper(
 		config,
-		func(lastReqID uint32) error { *finished = true; return nil },
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -616,7 +613,7 @@ func TestBootstrapperMultiPut(t *testing.T) {
 	}
 
 	switch {
-	case !*finished:
+	case config.Ctx.GetState() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -779,7 +776,6 @@ func TestBootstrapperFinalized(t *testing.T) {
 		BytesV:  blkBytes2,
 	}
 
-	finished := new(bool)
 	vm.CantLastAccepted = false
 	vm.LastAcceptedF = func() (ids.ID, error) { return blk0.ID(), nil }
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
@@ -788,7 +784,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	}
 	bs, err := newBootstrapper(
 		config,
-		func(lastReqID uint32) error { *finished = true; return nil },
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -863,7 +859,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	}
 
 	switch {
-	case !*finished:
+	case config.Ctx.GetState() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -994,10 +990,9 @@ func TestRestartBootstrapping(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	finished := new(bool)
 	bs, err := newBootstrapper(
 		config,
-		func(lastReqID uint32) error { *finished = true; return nil },
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1061,7 +1056,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if *finished {
+	if config.Ctx.GetState() == snow.NormalOp {
 		t.Fatal("Bootstrapping should not have finished with outstanding request for blk4")
 	}
 
@@ -1070,7 +1065,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	switch {
-	case !*finished:
+	case config.Ctx.GetState() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")

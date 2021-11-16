@@ -9,6 +9,7 @@ import (
 	stdmath "math"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/math"
 )
@@ -88,6 +89,7 @@ func (b *Bootstrapper) Initialize(config Config) error {
 
 func (b *Bootstrapper) Start(startReqID uint32) error {
 	b.Ctx.Log.Info("Starting bootstrap...")
+	b.Ctx.SetState(snow.Bootstrapping)
 	b.RequestID = startReqID
 
 	if b.Config.StartupAlpha > 0 {

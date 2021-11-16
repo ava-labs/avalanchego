@@ -52,11 +52,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		return nil
 	}
 	handler.RegisterBootstrap(bootstrapper)
-
-	engine := &common.EngineTest{T: t}
-	engine.Default(true)
-	handler.RegisterEngine(engine)
-	engine.ContextF = func() *snow.ConsensusContext { return ctx }
+	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
 	pastTime := time.Now()
 	mc.SetTime(pastTime)
@@ -124,6 +120,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	engine.Default(false)
 	engine.ContextF = func() *snow.ConsensusContext { return ctx }
 	handler.RegisterEngine(engine)
+	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
 
 	go handler.Dispatch()
 
@@ -169,12 +166,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		return nil
 	}
 	handler.RegisterBootstrap(bootstrapper)
-
-	engine := &common.EngineTest{T: t}
-	engine.Default(false)
-	engine.ContextF = func() *snow.ConsensusContext { return ctx }
-	engine.CantGossip = true
-	handler.RegisterEngine(engine)
+	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
 	go handler.Dispatch()
 
@@ -214,19 +206,15 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	bootstrapper := &common.EngineTest{T: t}
-	bootstrapper.Default(false)
-	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
-	bootstrapper.NotifyF = func(common.Message) error {
-		calledNotify <- struct{}{}
-		return nil
-	}
-	handler.RegisterBootstrap(bootstrapper)
-
 	engine := &common.EngineTest{T: t}
 	engine.Default(false)
 	engine.ContextF = func() *snow.ConsensusContext { return ctx }
+	engine.NotifyF = func(common.Message) error {
+		calledNotify <- struct{}{}
+		return nil
+	}
 	handler.RegisterEngine(engine)
+	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
 
 	go handler.Dispatch()
 	msgFromVMChan <- 0

@@ -109,12 +109,7 @@ func TestTimeout(t *testing.T) {
 		return nil
 	}
 	handler.RegisterBootstrap(bootstrapper)
-
-	engine := &common.EngineTest{T: t}
-	engine.Default(true)
-	engine.CantConnected = false
-	engine.ContextF = func() *snow.ConsensusContext { return ctx }
-	handler.RegisterEngine(engine)
+	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
 	go handler.Dispatch()
 
@@ -196,13 +191,7 @@ func TestReliableMessages(t *testing.T) {
 		return nil
 	}
 	handler.RegisterBootstrap(bootstrapper)
-
-	engine := &common.EngineTest{T: t}
-	engine.Default(true)
-	engine.CantConnected = false
-	engine.ContextF = func() *snow.ConsensusContext { return ctx }
-	engine.GossipF = func() error { return nil }
-	handler.RegisterEngine(engine)
+	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
 	go handler.Dispatch()
 
@@ -291,13 +280,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		return nil
 	}
 	handler.RegisterBootstrap(bootstrapper)
-
-	engine := &common.EngineTest{T: t}
-	engine.Default(false)
-	engine.ContextF = func() *snow.ConsensusContext { return ctx }
-	engine.GossipF = func() error { return nil }
-	engine.CantPullQuery = false
-	handler.RegisterEngine(engine)
+	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
 	go handler.Dispatch()
 
