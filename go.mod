@@ -4,7 +4,7 @@ go 1.16
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.6.0
-	github.com/ava-labs/avalanchego v1.6.5
+	github.com/ava-labs/avalanchego v1.6.6-rc.0
 	github.com/btcsuite/btcd v0.21.0-beta // indirect
 	github.com/cespare/cp v0.1.0
 	github.com/davecgh/go-spew v1.1.1
@@ -23,6 +23,8 @@ require (
 	github.com/mattn/go-colorable v0.1.8
 	github.com/mattn/go-isatty v0.0.12
 	github.com/olekukonko/tablewriter v0.0.5
+	github.com/prometheus/client_golang v1.7.1
+	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/tsdb v0.10.0 // indirect
 	github.com/rjeczalik/notify v0.9.2
 	github.com/spf13/cast v1.3.1

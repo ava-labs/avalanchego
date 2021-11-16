@@ -183,7 +183,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 		return fmt.Errorf("import tx contained mismatched number of inputs/credentials (%d vs. %d)", len(tx.ImportedInputs), len(stx.Creds))
 	}
 
-	if !vm.ctx.IsBootstrapped() {
+	if !vm.bootstrapped {
 		// Allow for force committing during bootstrapping
 		return nil
 	}
