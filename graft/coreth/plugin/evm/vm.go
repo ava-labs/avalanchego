@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth/ethconfig"
+	"github.com/ava-labs/coreth/metrics/prometheus"
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
@@ -35,6 +36,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	avalancheRPC "github.com/gorilla/rpc/v2"
@@ -205,7 +207,7 @@ type VM struct {
 	// Continuous Profiler
 	profiler profiler.ContinuousProfiler
 
-	atomicTrie types2.AtomicTrie
+	bootstrapped bool
 }
 
 func (vm *VM) Connected(nodeID ids.ShortID) error {
@@ -486,6 +488,11 @@ func (vm *VM) Initialize(
 	// 	return err
 	// }
 
+	gatherer := prometheus.Gatherer(metrics.DefaultRegistry)
+	if err := ctx.Metrics.Register(gatherer); err != nil {
+		return err
+	}
+
 	return vm.fx.Initialize(vm)
 }
 
@@ -591,12 +598,15 @@ func (vm *VM) pruneChain() error {
 
 // Bootstrapping notifies this VM that the consensus engine is performing
 // bootstrapping
-func (vm *VM) Bootstrapping() error { return vm.fx.Bootstrapping() }
+func (vm *VM) Bootstrapping() error {
+	vm.bootstrapped = false
+	return vm.fx.Bootstrapping()
+}
 
 // Bootstrapped notifies this VM that the consensus engine has finished
 // bootstrapping
 func (vm *VM) Bootstrapped() error {
-	vm.ctx.Bootstrapped()
+	vm.bootstrapped = true
 	return vm.fx.Bootstrapped()
 }
 
