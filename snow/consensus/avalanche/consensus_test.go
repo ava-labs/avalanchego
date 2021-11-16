@@ -67,8 +67,6 @@ func MetricsTest(t *testing.T, factory Factory) {
 		avl := factory.New()
 		params := Parameters{
 			Parameters: snowball.Parameters{
-				Namespace:         "chain_" + ctx.ChainID.String(),
-				Metrics:           prometheus.NewRegistry(),
 				K:                 2,
 				Alpha:             2,
 				BetaVirtuous:      1,
@@ -79,9 +77,8 @@ func MetricsTest(t *testing.T, factory Factory) {
 			Parents:   2,
 			BatchSize: 1,
 		}
-		err := params.Metrics.Register(prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: params.Namespace,
-			Name:      "vtx_processing",
+		err := ctx.Registerer.Register(prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "vtx_processing",
 		}))
 		if err != nil {
 			t.Fatal(err)
@@ -94,8 +91,6 @@ func MetricsTest(t *testing.T, factory Factory) {
 		avl := factory.New()
 		params := Parameters{
 			Parameters: snowball.Parameters{
-				Namespace:         "chain_" + ctx.ChainID.String(),
-				Metrics:           prometheus.NewRegistry(),
 				K:                 2,
 				Alpha:             2,
 				BetaVirtuous:      1,
@@ -106,9 +101,8 @@ func MetricsTest(t *testing.T, factory Factory) {
 			Parents:   2,
 			BatchSize: 1,
 		}
-		err := params.Metrics.Register(prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: params.Namespace,
-			Name:      "vtx_accepted",
+		err := ctx.Registerer.Register(prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "vtx_accepted",
 		}))
 		if err != nil {
 			t.Fatal(err)
@@ -121,8 +115,6 @@ func MetricsTest(t *testing.T, factory Factory) {
 		avl := factory.New()
 		params := Parameters{
 			Parameters: snowball.Parameters{
-				Namespace:         "chain_" + ctx.ChainID.String(),
-				Metrics:           prometheus.NewRegistry(),
 				K:                 2,
 				Alpha:             2,
 				BetaVirtuous:      1,
@@ -133,9 +125,8 @@ func MetricsTest(t *testing.T, factory Factory) {
 			Parents:   2,
 			BatchSize: 1,
 		}
-		err := params.Metrics.Register(prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: params.Namespace,
-			Name:      "vtx_rejected",
+		err := ctx.Registerer.Register(prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "vtx_rejected",
 		}))
 		if err != nil {
 			t.Fatal(err)
@@ -152,8 +143,6 @@ func ParamsTest(t *testing.T, factory Factory) {
 	ctx := snow.DefaultConsensusContextTest()
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Namespace:             "chain_" + ctx.ChainID.String(),
-			Metrics:               prometheus.NewRegistry(),
 			K:                     2,
 			Alpha:                 2,
 			BetaVirtuous:          1,
@@ -191,7 +180,6 @@ func NumProcessingTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     1,
 			Alpha:                 1,
 			BetaVirtuous:          1,
@@ -304,7 +292,6 @@ func AddTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     2,
 			Alpha:                 2,
 			BetaVirtuous:          1,
@@ -447,7 +434,6 @@ func VertexIssuedTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     2,
 			Alpha:                 2,
 			BetaVirtuous:          1,
@@ -510,7 +496,6 @@ func TxIssuedTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     2,
 			Alpha:                 2,
 			BetaVirtuous:          1,
@@ -574,7 +559,6 @@ func VirtuousTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     2,
 			Alpha:                 2,
 			BetaVirtuous:          10,
@@ -728,7 +712,6 @@ func VirtuousSkippedUpdateTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     2,
 			Alpha:                 2,
 			BetaVirtuous:          10,
@@ -829,7 +812,6 @@ func VotingTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     2,
 			Alpha:                 2,
 			BetaVirtuous:          1,
@@ -931,7 +913,6 @@ func IgnoreInvalidVotingTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     3,
 			Alpha:                 2,
 			BetaVirtuous:          1,
@@ -1019,7 +1000,6 @@ func TransitiveVotingTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     2,
 			Alpha:                 2,
 			BetaVirtuous:          1,
@@ -1139,7 +1119,6 @@ func SplitVotingTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     2,
 			Alpha:                 2,
 			BetaVirtuous:          1,
@@ -1223,7 +1202,6 @@ func TransitiveRejectionTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     2,
 			Alpha:                 2,
 			BetaVirtuous:          1,
@@ -1361,7 +1339,6 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     2,
 			Alpha:                 2,
 			BetaVirtuous:          1,
@@ -1465,7 +1442,6 @@ func QuiesceTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     1,
 			Alpha:                 1,
 			BetaVirtuous:          1,
@@ -1571,7 +1547,6 @@ func OrphansTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     1,
 			Alpha:                 1,
 			BetaVirtuous:          math.MaxInt32,
@@ -1679,7 +1654,6 @@ func ErrorOnVacuousAcceptTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     1,
 			Alpha:                 1,
 			BetaVirtuous:          math.MaxInt32,
@@ -1728,7 +1702,6 @@ func ErrorOnTxAcceptTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     1,
 			Alpha:                 1,
 			BetaVirtuous:          1,
@@ -1785,7 +1758,6 @@ func ErrorOnVtxAcceptTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     1,
 			Alpha:                 1,
 			BetaVirtuous:          1,
@@ -1842,7 +1814,6 @@ func ErrorOnVtxRejectTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     1,
 			Alpha:                 1,
 			BetaVirtuous:          1,
@@ -1917,7 +1888,6 @@ func ErrorOnParentVtxRejectTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     1,
 			Alpha:                 1,
 			BetaVirtuous:          1,
@@ -2004,7 +1974,6 @@ func ErrorOnTransitiveVtxRejectTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     1,
 			Alpha:                 1,
 			BetaVirtuous:          1,

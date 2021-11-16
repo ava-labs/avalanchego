@@ -790,9 +790,6 @@ func (n *Node) initMetricsAPI() error {
 	n.MetricsRegisterer = prometheus.NewRegistry()
 	n.MetricsGatherer = metrics.NewMultiGatherer()
 
-	// TODO: remove metrics field from consensus params.
-	n.Config.ConsensusParams.Metrics = n.MetricsRegisterer
-
 	if !n.Config.MetricsAPIEnabled {
 		n.Log.Info("skipping metrics API initialization because it has been disabled")
 		return nil

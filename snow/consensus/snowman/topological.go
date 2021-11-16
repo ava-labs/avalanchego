@@ -87,10 +87,10 @@ func (ts *Topological) Initialize(ctx *snow.ConsensusContext, params snowball.Pa
 	if err := params.Verify(); err != nil {
 		return err
 	}
-	if err := ts.Latency.Initialize("blks", "block(s)", ctx.Log, params.Namespace, params.Metrics); err != nil {
+	if err := ts.Latency.Initialize("blks", "block(s)", ctx.Log, "", ctx.Registerer); err != nil {
 		return err
 	}
-	if err := ts.Polls.Initialize(params.Namespace, params.Metrics); err != nil {
+	if err := ts.Polls.Initialize("", ctx.Registerer); err != nil {
 		return err
 	}
 	ts.leaves = ids.Set{}

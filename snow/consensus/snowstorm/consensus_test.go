@@ -115,62 +115,62 @@ func getTestName(i interface{}) string {
 
 func MetricsTest(t *testing.T, factory Factory) {
 	{
+		ctx := snow.DefaultConsensusContextTest()
 		params := sbcon.Parameters{
-			Metrics:           prometheus.NewRegistry(),
 			K:                 2,
 			Alpha:             2,
 			BetaVirtuous:      1,
 			BetaRogue:         2,
 			ConcurrentRepolls: 1,
 		}
-		err := params.Metrics.Register(prometheus.NewCounter(prometheus.CounterOpts{
+		err := ctx.Registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "tx_processing",
 		}))
 		if err != nil {
 			t.Fatal(err)
 		}
 		graph := factory.New()
-		if err := graph.Initialize(snow.DefaultConsensusContextTest(), params); err == nil {
+		if err := graph.Initialize(ctx, params); err == nil {
 			t.Fatalf("should have errored due to a duplicated metric")
 		}
 	}
 	{
+		ctx := snow.DefaultConsensusContextTest()
 		params := sbcon.Parameters{
-			Metrics:           prometheus.NewRegistry(),
 			K:                 2,
 			Alpha:             2,
 			BetaVirtuous:      1,
 			BetaRogue:         2,
 			ConcurrentRepolls: 1,
 		}
-		err := params.Metrics.Register(prometheus.NewCounter(prometheus.CounterOpts{
+		err := ctx.Registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "tx_accepted",
 		}))
 		if err != nil {
 			t.Fatal(err)
 		}
 		graph := factory.New()
-		if err := graph.Initialize(snow.DefaultConsensusContextTest(), params); err == nil {
+		if err := graph.Initialize(ctx, params); err == nil {
 			t.Fatalf("should have errored due to a duplicated metric")
 		}
 	}
 	{
+		ctx := snow.DefaultConsensusContextTest()
 		params := sbcon.Parameters{
-			Metrics:           prometheus.NewRegistry(),
 			K:                 2,
 			Alpha:             2,
 			BetaVirtuous:      1,
 			BetaRogue:         2,
 			ConcurrentRepolls: 1,
 		}
-		err := params.Metrics.Register(prometheus.NewCounter(prometheus.CounterOpts{
+		err := ctx.Registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "tx_rejected",
 		}))
 		if err != nil {
 			t.Fatal(err)
 		}
 		graph := factory.New()
-		if err := graph.Initialize(snow.DefaultConsensusContextTest(), params); err == nil {
+		if err := graph.Initialize(ctx, params); err == nil {
 			t.Fatalf("should have errored due to a duplicated metric")
 		}
 	}
@@ -180,7 +180,6 @@ func ParamsTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     2,
 		Alpha:                 2,
 		BetaVirtuous:          1,
@@ -210,7 +209,6 @@ func IssuedTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     2,
 		Alpha:                 2,
 		BetaVirtuous:          1,
@@ -244,7 +242,6 @@ func LeftoverInputTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     2,
 		Alpha:                 2,
 		BetaVirtuous:          1,
@@ -301,7 +298,6 @@ func LowerConfidenceTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     2,
 		Alpha:                 2,
 		BetaVirtuous:          1,
@@ -360,7 +356,6 @@ func MiddleConfidenceTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     2,
 		Alpha:                 2,
 		BetaVirtuous:          1,
@@ -424,7 +419,6 @@ func IndependentTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     2,
 		Alpha:                 2,
 		BetaVirtuous:          2,
@@ -489,7 +483,6 @@ func VirtuousTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     2,
 		Alpha:                 2,
 		BetaVirtuous:          1,
@@ -535,7 +528,6 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     2,
 		Alpha:                 2,
 		BetaVirtuous:          1,
@@ -591,7 +583,6 @@ func QuiesceTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     2,
 		Alpha:                 2,
 		BetaVirtuous:          1,
@@ -632,7 +623,6 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 	purple.InputIDsV = append(purple.InputIDsV, ids.Empty.Prefix(8))
 
 	params := sbcon.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          1,
@@ -774,7 +764,6 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 	}
 
 	params := sbcon.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          1,
@@ -921,7 +910,6 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 	purple.InputIDsV = append(purple.InputIDsV, ids.Empty.Prefix(8))
 
 	params := sbcon.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          1,
@@ -1023,7 +1011,6 @@ func VacuouslyAcceptedTest(t *testing.T, factory Factory) {
 	}}
 
 	params := sbcon.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          1,
@@ -1051,7 +1038,6 @@ func ConflictsTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          1,
@@ -1103,7 +1089,6 @@ func VirtuousDependsOnRogueTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          1,
@@ -1178,7 +1163,6 @@ func ErrorOnVacuouslyAcceptedTest(t *testing.T, factory Factory) {
 	}}
 
 	params := sbcon.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          1,
@@ -1209,7 +1193,6 @@ func ErrorOnAcceptedTest(t *testing.T, factory Factory) {
 	purple.InputIDsV = append(purple.InputIDsV, ids.Empty.Prefix(4))
 
 	params := sbcon.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          1,
@@ -1254,7 +1237,6 @@ func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) 
 	pink.InputIDsV = append(pink.InputIDsV, X)
 
 	params := sbcon.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          1,
@@ -1301,7 +1283,6 @@ func ErrorOnRejectingHigherConfidenceConflictTest(t *testing.T, factory Factory)
 	pink.InputIDsV = append(pink.InputIDsV, X)
 
 	params := sbcon.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          1,
@@ -1333,7 +1314,6 @@ func UTXOCleanupTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          1,
@@ -1381,7 +1361,6 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     2,
 		Alpha:                 2,
 		BetaVirtuous:          1,

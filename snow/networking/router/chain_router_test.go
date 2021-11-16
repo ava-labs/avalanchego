@@ -67,8 +67,6 @@ func TestShutdown(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		"",
-		prometheus.NewRegistry(),
 	)
 	assert.NoError(t, err)
 
@@ -160,8 +158,6 @@ func TestShutdownTimesOut(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		"",
-		metrics,
 	)
 	assert.NoError(t, err)
 
@@ -269,8 +265,6 @@ func TestRouterTimeout(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		"",
-		prometheus.NewRegistry(),
 	)
 	assert.NoError(t, err)
 
@@ -345,8 +339,6 @@ func TestRouterClearTimeouts(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		"",
-		metrics,
 	)
 	assert.NoError(t, err)
 
@@ -454,8 +446,6 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		"",
-		metrics,
 	)
 	assert.NoError(t, err)
 

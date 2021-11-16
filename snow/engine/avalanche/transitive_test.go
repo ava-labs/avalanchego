@@ -8,9 +8,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -413,7 +413,6 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	config.Params = avalanche.Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     3,
 			Alpha:                 2,
 			BetaVirtuous:          1,
@@ -2763,11 +2762,10 @@ func TestEngineReBootstrapFails(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	config.Ctx.Registerer = prometheus.NewRegistry()
+
 	// re-register the Transitive
 	te2 := &Transitive{}
-	config.Params.Namespace = "AcceptedFrontier"
-	config.Params.Metrics = prometheus.NewRegistry()
-
 	if err := te2.Initialize(config); err != nil {
 		t.Fatal(err)
 	}

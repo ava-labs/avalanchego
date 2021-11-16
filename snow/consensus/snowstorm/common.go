@@ -58,10 +58,10 @@ func (c *common) Initialize(ctx *snow.ConsensusContext, params sbcon.Parameters)
 	c.ctx = ctx
 	c.params = params
 
-	if err := c.Latency.Initialize("txs", "transaction(s)", ctx.Log, params.Namespace, params.Metrics); err != nil {
+	if err := c.Latency.Initialize("txs", "transaction(s)", ctx.Log, "", ctx.Registerer); err != nil {
 		return fmt.Errorf("failed to initialize latency metrics: %w", err)
 	}
-	if err := c.Polls.Initialize(params.Namespace, params.Metrics); err != nil {
+	if err := c.Polls.Initialize("", ctx.Registerer); err != nil {
 		return fmt.Errorf("failed to initialize poll metrics: %w", err)
 	}
 	return params.Verify()

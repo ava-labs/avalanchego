@@ -70,20 +70,20 @@ func (t *Transitive) Initialize(config Config) error {
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t.polls = poll.NewSet(factory,
 		config.Ctx.Log,
-		config.Params.Namespace,
-		config.Params.Metrics,
+		"",
+		config.Ctx.Registerer,
 	)
 	t.uniformSampler = sampler.NewUniform()
 
-	if err := t.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
+	if err := t.metrics.Initialize("", config.Ctx.Registerer); err != nil {
 		return err
 	}
 
 	return t.Bootstrapper.Initialize(
 		config.Config,
 		t.finishBootstrapping,
-		fmt.Sprintf("%s_bs", config.Params.Namespace),
-		config.Params.Metrics,
+		"bs",
+		config.Ctx.Registerer,
 	)
 }
 
