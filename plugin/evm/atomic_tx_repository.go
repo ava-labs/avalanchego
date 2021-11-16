@@ -14,11 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-const (
-	txIDLen              = 32
-	atomicTxsMaxLenBytes = 1024 * 1024
-)
-
 var (
 	atomicTxIDDBPrefix = []byte("atomicTxDB")
 )
