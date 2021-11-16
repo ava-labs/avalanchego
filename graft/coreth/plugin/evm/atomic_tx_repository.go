@@ -3,9 +3,6 @@ package evm
 import (
 	"encoding/binary"
 	"fmt"
-	"time"
-
-	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
@@ -112,23 +109,4 @@ func (a *atomicTxRepository) Write(height uint64, txs []*Tx) error {
 
 func (a *atomicTxRepository) Iterate() database.Iterator {
 	return a.acceptedAtomicTxDB.NewIterator()
-}
-
-type progressLogger struct {
-	lastUpdate     time.Time
-	updateInterval time.Duration
-}
-
-func NewProgressLogger(updateInterval time.Duration) *progressLogger {
-	return &progressLogger{
-		lastUpdate:     time.Now(),
-		updateInterval: updateInterval,
-	}
-}
-
-func (pl *progressLogger) Info(msg string, vals ...interface{}) {
-	if time.Since(pl.lastUpdate) >= pl.updateInterval {
-		log.Info(msg, vals...)
-		pl.lastUpdate = time.Now()
-	}
 }
