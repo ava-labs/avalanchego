@@ -142,7 +142,55 @@ func Test_BlockingAtomicTrie(t *testing.T) {
 		return nil
 	}
 
-	doneChan := atomicTrie.Initialize(100, dbCommitFn)
+	doneChan := atomicTrie.Initialize(1, dbCommitFn)
+	err = <-doneChan
+	assert.NoError(t, err)
+	_, open := <-doneChan
+	assert.False(t, open)
+	assert.NotNil(t, doneChan)
+}
+
+func Test_BlockingAtomicTrie_Initialize_Roots(t *testing.T) {
+	db := memdb.New()
+	Codec := codec.NewDefaultManager()
+
+	c := linearcodec.NewDefault()
+	errs := wrappers.Errs{}
+	errs.Add(
+		c.RegisterType(&TestAtomicTx{}),
+		Codec.RegisterCodec(codecVersion, c),
+	)
+	if errs.Errored() {
+		panic(errs.Err)
+	}
+	repo := newAtomicTxRepository(db, Codec)
+
+	const lastAcceptedHeight = 1000
+	allTxs := make([][]*Tx, lastAcceptedHeight+1)
+	for i := 0; i <= lastAcceptedHeight; i++ {
+		txs := []*Tx{testDataImportTx()}
+		if i%3 == 0 {
+			txs = append(txs, testDataExportTx())
+		}
+
+		err := repo.Write(uint64(i), txs)
+		assert.NoError(t, err)
+
+		allTxs[i] = txs
+	}
+
+	atomicTrie, err := NewBlockingAtomicTrie(Database{db}, repo)
+	assert.NoError(t, err)
+	{
+		blockingTrie := atomicTrie.(*blockingAtomicTrie)
+		blockingTrie.commitHeightInterval = 10 // commit every 10 blocks for test
+	}
+
+	dbCommitFn := func() error {
+		return nil
+	}
+
+	doneChan := atomicTrie.Initialize(lastAcceptedHeight, dbCommitFn)
 	err = <-doneChan
 	assert.NoError(t, err)
 	_, open := <-doneChan
