@@ -91,6 +91,21 @@ type fastSyncer struct {
 
 func (fs *fastSyncer) GetVM() common.VM { return fs.VM }
 
+func (fs *fastSyncer) Notify(msg common.Message) error {
+	// if fast sync + bootstrap is done, we shouldn't receive FastSyncDone from the VM
+	fs.Ctx.Log.AssertTrue(!fs.IsBootstrapped(), "Notify received by FastSync after Bootstrap is done")
+	fs.Ctx.Log.Verbo("snowman engine notified of %s from the vm", msg)
+	switch msg {
+	case common.PendingTxs:
+		fs.Ctx.Log.Warn("Message %s received in fast sync. Dropped.", msg.String())
+	case common.FastSyncDone:
+		return fs.onDoneFastSyncing(fs.RequestID)
+	default:
+		fs.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
+	}
+	return nil
+}
+
 func (fs *fastSyncer) Start(startReqID uint32) error {
 	fs.VM = fs.Config.VM
 	fs.RequestID = startReqID

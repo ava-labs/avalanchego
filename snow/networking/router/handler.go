@@ -212,11 +212,18 @@ func (h *Handler) handleMsg(msg message.InboundMessage) error {
 	switch op {
 	case message.Notify:
 		vmMsg := msg.Get(message.VMMessage).(uint32)
-		if h.ctx.IsBootstrapped() {
-			err = h.engine.Notify(common.Message(vmMsg))
-		} else {
-			err = h.bootstrapper.Notify(common.Message(vmMsg))
+		var targetGear common.Engine
+		switch h.ctx.GetState() {
+		case snow.FastSyncing:
+			targetGear = h.fastSyncer
+		case snow.Bootstrapping:
+			targetGear = h.bootstrapper
+		case snow.NormalOp:
+			targetGear = h.engine
+		default:
+			return fmt.Errorf("unknown handler for state %v", h.ctx.GetState().String())
 		}
+		err = targetGear.Notify(common.Message(vmMsg))
 
 	case message.GossipRequest:
 		err = h.engine.Gossip()

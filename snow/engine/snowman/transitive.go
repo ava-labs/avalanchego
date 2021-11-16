@@ -388,6 +388,8 @@ func (t *Transitive) Notify(msg common.Message) error {
 		// the pending txs message means we should attempt to build a block.
 		t.pendingBuildBlocks++
 		return t.buildBlocks()
+	case common.FastSyncDone:
+		t.Ctx.Log.Warn("unexpected message %s received in snowman engine. Dropped", msg.String())
 	default:
 		t.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
 	}

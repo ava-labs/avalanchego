@@ -17,12 +17,15 @@ const (
 	// its VM has pending transactions
 	// (i.e. it would like to add a new block/vertex to consensus)
 	PendingTxs Message = iota
+	FastSyncDone
 )
 
 func (msg Message) String() string {
 	switch msg {
 	case PendingTxs:
 		return "Pending Transactions"
+	case FastSyncDone:
+		return "FastSyncDone"
 	default:
 		return fmt.Sprintf("Unknown Message: %d", msg)
 	}
