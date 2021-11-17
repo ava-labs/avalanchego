@@ -26,12 +26,17 @@ type Keychain struct {
 	Keys  []*crypto.PrivateKeySECP256K1R
 }
 
-// NewKeychain returns a new, empty, keychain
-func NewKeychain() *Keychain {
-	return &Keychain{
+// NewKeychain returns a new keychain containing [keys]
+func NewKeychain(keys ...*crypto.PrivateKeySECP256K1R) *Keychain {
+	kc := &Keychain{
 		factory:        &crypto.FactorySECP256K1R{},
 		addrToKeyIndex: make(map[ids.ShortID]int),
 	}
+	for _, key := range keys {
+		kc.Add(key)
+	}
+
+	return kc
 }
 
 // Add a new key to the key chain
