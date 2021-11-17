@@ -16,10 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
-
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -184,29 +180,7 @@ func GenesisVM(t *testing.T,
 	appSender := &engCommon.SenderTest{}
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func([]byte) error { return nil }
-	Codec = codec.NewDefaultManager()
 
-	c := linearcodec.NewDefault()
-	errs := wrappers.Errs{}
-	errs.Add(
-		c.RegisterType(&UnsignedImportTx{}),
-		c.RegisterType(&UnsignedExportTx{}),
-	)
-	c.SkipRegistrations(3)
-	errs.Add(
-		c.RegisterType(&secp256k1fx.TransferInput{}),
-		c.RegisterType(&secp256k1fx.MintOutput{}),
-		c.RegisterType(&secp256k1fx.TransferOutput{}),
-		c.RegisterType(&secp256k1fx.MintOperation{}),
-		c.RegisterType(&secp256k1fx.Credential{}),
-		c.RegisterType(&secp256k1fx.Input{}),
-		c.RegisterType(&secp256k1fx.OutputOwners{}),
-		c.RegisterType(&TestAtomicTx{}),
-		Codec.RegisterCodec(codecVersion, c),
-	)
-	if errs.Errored() {
-		panic(errs.Err)
-	}
 	if err := vm.Initialize(
 		ctx,
 		dbManager,
