@@ -10,14 +10,7 @@ func (vm *blockVM) StateSyncEnabled() (bool, error) {
 		return false, block.ErrStateSyncableVMNotImplemented
 	}
 
-	/*start :=*/
-	_ = vm.clock.Time()
-	enabled, err := fsVM.StateSyncEnabled()
-	/*end :=*/ _ = vm.clock.Time()
-
-	// TODO ABENEGIA: introduce Summary metrics
-
-	return enabled, err
+	return fsVM.StateSyncEnabled()
 }
 
 func (vm *blockVM) StateSyncGetLastSummary() ([]byte, error) {
@@ -26,12 +19,10 @@ func (vm *blockVM) StateSyncGetLastSummary() ([]byte, error) {
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
 
-	/*start :=*/
-	_ = vm.clock.Time()
+	start := vm.clock.Time()
 	stateSummaryFrontier, err := fsVM.StateSyncGetLastSummary()
-	/*end :=*/ _ = vm.clock.Time()
-
-	// TODO ABENEGIA: introduce Summary metrics
+	end := vm.clock.Time()
+	vm.stateSummaryMetrics.lastSummary.Observe(float64(end.Sub(start)))
 
 	return stateSummaryFrontier, err
 }
@@ -42,12 +33,10 @@ func (vm *blockVM) StateSyncIsSummaryAccepted(summary []byte) (bool, error) {
 		return false, block.ErrStateSyncableVMNotImplemented
 	}
 
-	/*start :=*/
-	_ = vm.clock.Time()
+	start := vm.clock.Time()
 	accepted, err := fsVM.StateSyncIsSummaryAccepted(summary)
-	/*end :=*/ _ = vm.clock.Time()
-
-	// TODO ABENEGIA: introduce Summary metrics
+	end := vm.clock.Time()
+	vm.stateSummaryMetrics.isSummaryAccepted.Observe(float64(end.Sub(start)))
 
 	return accepted, err
 }
@@ -58,12 +47,10 @@ func (vm *blockVM) StateSync(accepted [][]byte) error {
 		return block.ErrStateSyncableVMNotImplemented
 	}
 
-	/*start :=*/
-	_ = vm.clock.Time()
+	start := vm.clock.Time()
 	err := fsVM.StateSync(accepted)
-	/*end :=*/ _ = vm.clock.Time()
-
-	// TODO ABENEGIA: introduce Summary metrics
+	end := vm.clock.Time()
+	vm.stateSummaryMetrics.syncState.Observe(float64(end.Sub(start)))
 
 	return err
 }

@@ -32,6 +32,7 @@ func NewBlockVM(vm block.ChainVM) block.ChainVM {
 type blockVM struct {
 	block.ChainVM
 	blockMetrics
+	stateSummaryMetrics
 	clock mockable.Clock
 }
 
@@ -48,6 +49,9 @@ func (vm *blockVM) Initialize(
 	registerer := prometheus.NewRegistry()
 	_, supportsBatchedFetching := vm.ChainVM.(block.BatchedChainVM)
 	if err := vm.blockMetrics.Initialize(supportsBatchedFetching, "", registerer); err != nil {
+		return err
+	}
+	if err := vm.stateSummaryMetrics.Initialize("", registerer); err != nil {
 		return err
 	}
 

@@ -26,8 +26,6 @@ var _ FastSyncer = &fastSyncer{}
 
 type FastSyncer interface {
 	common.Engine
-
-	Start(startReqID uint32) error
 }
 
 func NewFastSyncer(
