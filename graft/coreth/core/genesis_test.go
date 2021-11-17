@@ -81,11 +81,11 @@ func TestToBlock(t *testing.T) {
 	}
 	block = fakeRinkebyGenesisBlock().ToBlock(nil)
 	if block.Hash() != fakeRinkebyGenesisHash {
-		t.Errorf("wrong ropsten genesis hash, got %v, want %v", block.Hash(), fakeRinkebyGenesisHash)
+		t.Errorf("wrong rinkeby genesis hash, got %v, want %v", block.Hash(), fakeRinkebyGenesisHash)
 	}
 	block = fakeGoerliGenesisBlock().ToBlock(nil)
 	if block.Hash() != fakeGoerliGenesisHash {
-		t.Errorf("wrong ropsten genesis hash, got %v, want %v", block.Hash(), fakeGoerliGenesisHash)
+		t.Errorf("wrong goerli genesis hash, got %v, want %v", block.Hash(), fakeGoerliGenesisHash)
 	}
 }
 
@@ -257,10 +257,10 @@ func decodePrealloc(data string) GenesisAlloc {
 	return ga
 }
 
-var fakeMainnetGenesisHash = common.HexToHash("0x41442cdabaf3cdcf0109ab0acd96ab2b8f06c4888952ee53a8e166d4c7a04bd5")
-var fakeRopstenGenesisHash = common.HexToHash("0xea76bad279d6e0be97a6c2b7adb75fbfc5566e59cb23869e0c91a7c1fff96ae0")
-var fakeGoerliGenesisHash = common.HexToHash("0xff59f9571fa557f03d46cbfcfb508fe16f665fb70b80fdfcc8311cffc706934c")
-var fakeRinkebyGenesisHash = common.HexToHash("0xa6f4addcecb90a03354cdf993f8c3c99d208c796735000aaa8954fb0540b4fe3")
+var fakeMainnetGenesisHash = common.HexToHash("0x4c2016cf79d02e524b52d99fc5632a3c82938f00d7df1184dc73200369f33fa1")
+var fakeRopstenGenesisHash = common.HexToHash("0xffb37ef9bf631aed154333ea8a9da0115d3dd850b95b68a0ca4ab8ee9e2dd547")
+var fakeGoerliGenesisHash = common.HexToHash("0xc08f95ed5171e83fefc60bf1778803d289dc71d1b857390d283b8940d6d37cb6")
+var fakeRinkebyGenesisHash = common.HexToHash("0x661e25c2f8122a4c9eccff6b45bd1086e075dc069e90b7d5dcaf0b34bf86acf7")
 
 func loadGenesisTestAllocData() *genesisTestAllocData {
 	m := genesisTestAllocData{}
