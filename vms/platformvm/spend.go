@@ -1,4 +1,4 @@
-// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -57,10 +57,7 @@ func (vm *VM) stake(
 		return nil, nil, nil, nil, fmt.Errorf("couldn't get UTXOs: %w", err)
 	}
 
-	kc := secp256k1fx.NewKeychain() // Keychain consumes UTXOs and creates new ones
-	for _, key := range keys {
-		kc.Add(key)
-	}
+	kc := secp256k1fx.NewKeychain(keys...) // Keychain consumes UTXOs and creates new ones
 
 	// Minimum time this transaction will be issued at
 	now := uint64(vm.clock.Time().Unix())
@@ -308,10 +305,7 @@ func (vm *VM) authorize(
 	}
 
 	// Add the keys to a keychain
-	kc := secp256k1fx.NewKeychain()
-	for _, key := range keys {
-		kc.Add(key)
-	}
+	kc := secp256k1fx.NewKeychain(keys...)
 
 	// Make sure that the operation is valid after a minimum time
 	now := uint64(vm.clock.Time().Unix())
