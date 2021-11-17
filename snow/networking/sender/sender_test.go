@@ -99,7 +99,14 @@ func TestTimeout(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	bootstrapper := &common.EngineTest{T: t}
+	bootstrapper := &common.BootstrapperTest{
+		BootstrapableTest: common.BootstrapableTest{
+			T: t,
+		},
+		EngineTest: common.EngineTest{
+			T: t,
+		},
+	}
 	bootstrapper.Default(true)
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.ShortID) error { return nil }
@@ -177,7 +184,14 @@ func TestReliableMessages(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	bootstrapper := &common.EngineTest{T: t}
+	bootstrapper := &common.BootstrapperTest{
+		BootstrapableTest: common.BootstrapableTest{
+			T: t,
+		},
+		EngineTest: common.EngineTest{
+			T: t,
+		},
+	}
 	bootstrapper.Default(true)
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.ShortID) error { return nil }
@@ -266,7 +280,14 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	bootstrapper := &common.EngineTest{T: t}
+	bootstrapper := &common.BootstrapperTest{
+		BootstrapableTest: common.BootstrapableTest{
+			T: t,
+		},
+		EngineTest: common.EngineTest{
+			T: t,
+		},
+	}
 	bootstrapper.Default(true)
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.ShortID) error { return nil }

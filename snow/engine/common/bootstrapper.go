@@ -33,10 +33,16 @@ const (
 	MaxTimeFetchingAncestors = 50 * time.Millisecond
 )
 
-var _ Handler = &Bootstrapper{}
+var _ Handler = &BootstrapperGear{}
 
-// Bootstrapper implements the Engine interface.
-type Bootstrapper struct {
+type Bootstrapper interface {
+	Engine
+	Bootstrapable
+}
+
+// BootstrapperGear implements the Handler interface.
+// It collects mechanisms common to both snowman and avalanche bootstrappers
+type BootstrapperGear struct {
 	MsgHandlerNoOps
 	Config
 	Halter
@@ -80,14 +86,14 @@ type Bootstrapper struct {
 	bootstrapAttempts int
 }
 
-// Initialize implements the Engine interface.
-func (b *Bootstrapper) Initialize(config Config) error {
+// Initialize implements the Handler interface.
+func (b *BootstrapperGear) Initialize(config Config) error {
 	b.Config = config
 	b.MsgHandlerNoOps = NewMsgHandlerNoOps(config.Ctx)
 	return nil
 }
 
-func (b *Bootstrapper) Start(startReqID uint32) error {
+func (b *BootstrapperGear) Start(startReqID uint32) error {
 	b.Ctx.Log.Info("Starting bootstrap...")
 	b.Ctx.SetState(snow.Bootstrapping)
 	b.RequestID = startReqID
@@ -99,8 +105,8 @@ func (b *Bootstrapper) Start(startReqID uint32) error {
 	return b.Startup()
 }
 
-// GetAcceptedFrontier implements the Engine interface.
-func (b *Bootstrapper) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
+// GetAcceptedFrontier implements the Handler interface.
+func (b *BootstrapperGear) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
 	acceptedFrontier, err := b.Bootstrapable.CurrentAcceptedFrontier()
 	if err != nil {
 		return err
@@ -109,8 +115,8 @@ func (b *Bootstrapper) GetAcceptedFrontier(validatorID ids.ShortID, requestID ui
 	return nil
 }
 
-// GetAcceptedFrontierFailed implements the Engine interface.
-func (b *Bootstrapper) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
+// GetAcceptedFrontierFailed implements the Handler interface.
+func (b *BootstrapperGear) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
 	// ignores any late responses
 	if requestID != b.RequestID {
 		b.Ctx.Log.Debug("Received an Out-of-Sync GetAcceptedFrontierFailed - validator: %v - expectedRequestID: %v, requestID: %v",
@@ -126,8 +132,8 @@ func (b *Bootstrapper) GetAcceptedFrontierFailed(validatorID ids.ShortID, reques
 	return b.AcceptedFrontier(validatorID, requestID, nil)
 }
 
-// AcceptedFrontier implements the Engine interface.
-func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+// AcceptedFrontier implements the Handler interface.
+func (b *BootstrapperGear) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	// ignores any late responses
 	if requestID != b.RequestID {
 		b.Ctx.Log.Debug("Received an Out-of-Sync AcceptedFrontier - validator: %v - expectedRequestID: %v, requestID: %v",
@@ -191,14 +197,14 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 	return nil
 }
 
-// GetAccepted implements the Engine interface.
-func (b *Bootstrapper) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+// GetAccepted implements the Handler interface.
+func (b *BootstrapperGear) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	b.Sender.SendAccepted(validatorID, requestID, b.Bootstrapable.FilterAccepted(containerIDs))
 	return nil
 }
 
-// GetAcceptedFailed implements the Engine interface.
-func (b *Bootstrapper) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
+// GetAcceptedFailed implements the Handler interface.
+func (b *BootstrapperGear) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
 	// ignores any late responses
 	if requestID != b.RequestID {
 		b.Ctx.Log.Debug("Received an Out-of-Sync GetAcceptedFailed - validator: %v - expectedRequestID: %v, requestID: %v",
@@ -214,8 +220,8 @@ func (b *Bootstrapper) GetAcceptedFailed(validatorID ids.ShortID, requestID uint
 	return b.Accepted(validatorID, requestID, nil)
 }
 
-// Accepted implements the Engine interface.
-func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+// Accepted implements the Handler interface.
+func (b *BootstrapperGear) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	// ignores any late responses
 	if requestID != b.RequestID {
 		b.Ctx.Log.Debug("Received an Out-of-Sync Accepted - validator: %v - expectedRequestID: %v, requestID: %v",
@@ -289,8 +295,8 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 	return b.Bootstrapable.ForceAccepted(accepted)
 }
 
-// Connected implements the Engine interface.
-func (b *Bootstrapper) Connected(nodeID ids.ShortID) error {
+// Connected implements the Handler interface.
+func (b *BootstrapperGear) Connected(nodeID ids.ShortID) error {
 	if b.started {
 		return nil
 	}
@@ -309,8 +315,8 @@ func (b *Bootstrapper) Connected(nodeID ids.ShortID) error {
 	return b.Startup()
 }
 
-// Disconnected implements the Engine interface.
-func (b *Bootstrapper) Disconnected(nodeID ids.ShortID) error {
+// Disconnected implements the Handler interface.
+func (b *BootstrapperGear) Disconnected(nodeID ids.ShortID) error {
 	if weight, ok := b.Beacons.GetWeight(nodeID); ok {
 		// TODO: Account for weight changes in a more robust manner.
 
@@ -323,7 +329,7 @@ func (b *Bootstrapper) Disconnected(nodeID ids.ShortID) error {
 	return nil
 }
 
-func (b *Bootstrapper) RestartBootstrap(reset bool) error {
+func (b *BootstrapperGear) RestartBootstrap(reset bool) error {
 	// resets the attempts when we're pulling blocks/vertices we don't want to
 	// fail the bootstrap at that stage
 	if reset {
@@ -341,7 +347,7 @@ func (b *Bootstrapper) RestartBootstrap(reset bool) error {
 	return b.Startup()
 }
 
-func (b *Bootstrapper) Startup() error {
+func (b *BootstrapperGear) Startup() error {
 	b.started = true
 
 	beacons, err := b.Beacons.Sample(b.Config.SampleK)
@@ -388,7 +394,7 @@ func (b *Bootstrapper) Startup() error {
 
 // Ask up to [MaxOutstandingBootstrapRequests] bootstrap validators to send
 // their accepted frontier with the current accepted frontier
-func (b *Bootstrapper) sendGetAcceptedFrontiers() {
+func (b *BootstrapperGear) sendGetAcceptedFrontiers() {
 	vdrs := ids.NewShortSet(1)
 	for b.pendingSendAcceptedFrontier.Len() > 0 && b.pendingReceiveAcceptedFrontier.Len() < MaxOutstandingBootstrapRequests {
 		vdr, _ := b.pendingSendAcceptedFrontier.Pop()
@@ -405,7 +411,7 @@ func (b *Bootstrapper) sendGetAcceptedFrontiers() {
 
 // Ask up to [MaxOutstandingBootstrapRequests] bootstrap validators to send
 // their filtered accepted frontier
-func (b *Bootstrapper) sendGetAccepted() {
+func (b *BootstrapperGear) sendGetAccepted() {
 	vdrs := ids.NewShortSet(1)
 	for b.pendingSendAccepted.Len() > 0 && b.pendingReceiveAccepted.Len() < MaxOutstandingBootstrapRequests {
 		vdr, _ := b.pendingSendAccepted.Pop()
@@ -425,11 +431,11 @@ func (b *Bootstrapper) sendGetAccepted() {
 }
 
 // Needed to disambiguate with MsgHandlerNoOps
-func (b *Bootstrapper) Halt() {
+func (b *BootstrapperGear) Halt() {
 	b.Halter.Halt()
 }
 
 // Needed to disambiguate with MsgHandlerNoOps
-func (b *Bootstrapper) Halted() bool {
+func (b *BootstrapperGear) Halted() bool {
 	return b.Halter.Halted()
 }

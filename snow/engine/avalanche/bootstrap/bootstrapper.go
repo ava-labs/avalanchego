@@ -34,9 +34,9 @@ const (
 )
 
 var (
-	errUnexpectedTimeout                      = errors.New("unexpected timeout fired")
-	_                    common.Bootstrapable = &bootstrapper{}
-	_                    common.Engine        = &bootstrapper{}
+	_ common.Bootstrapper = &bootstrapper{}
+
+	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
 
 type Config struct {
@@ -51,15 +51,10 @@ type Config struct {
 	VM      vertex.DAGVM
 }
 
-type AvalancheBootstrapper interface {
-	common.Engine
-	common.Bootstrapable
-}
-
 func New(
 	config Config,
 	onFinished func(lastReqID uint32) error,
-) (AvalancheBootstrapper, error) {
+) (common.Bootstrapper, error) {
 	return newBootstrapper(
 		config,
 		onFinished,
@@ -67,7 +62,7 @@ func New(
 }
 
 type bootstrapper struct {
-	common.Bootstrapper
+	common.BootstrapperGear
 	common.Fetcher
 	metrics
 
@@ -128,7 +123,7 @@ func newBootstrapper(
 	}
 
 	config.Bootstrapable = b
-	if err := b.Bootstrapper.Initialize(config.Config); err != nil {
+	if err := b.BootstrapperGear.Initialize(config.Config); err != nil {
 		return nil, err
 	}
 
@@ -518,7 +513,7 @@ func (b *bootstrapper) Connected(nodeID ids.ShortID) error {
 		return err
 	}
 
-	return b.Bootstrapper.Connected(nodeID)
+	return b.BootstrapperGear.Connected(nodeID)
 }
 
 // Disconnected implements the Engine interface.
@@ -527,7 +522,7 @@ func (b *bootstrapper) Disconnected(nodeID ids.ShortID) error {
 		return err
 	}
 
-	return b.Bootstrapper.Disconnected(nodeID)
+	return b.BootstrapperGear.Disconnected(nodeID)
 }
 
 func (b *bootstrapper) GetVM() common.VM {
