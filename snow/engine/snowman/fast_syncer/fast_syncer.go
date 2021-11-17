@@ -88,7 +88,7 @@ type fastSyncer struct {
 	// weight  uint64
 
 	// number of times the bootstrap has been attempted
-	bootstrapAttempts int
+	fastSyncAttempts int
 
 	// Fast Sync specific fields
 	fastSyncVM        block.StateSyncableVM
@@ -98,7 +98,7 @@ type fastSyncer struct {
 func (fs *fastSyncer) GetVM() common.VM { return fs.VM }
 
 func (fs *fastSyncer) Notify(msg common.Message) error {
-	// if fast sync + bootstrap is done, we shouldn't receive FastSyncDone from the VM
+	// if fast sync and bootstrap is done, we shouldn't receive FastSyncDone from the VM
 	fs.Ctx.Log.AssertTrue(!fs.IsBootstrapped(), "Notify received by FastSync after Bootstrap is done")
 	fs.Ctx.Log.Verbo("snowman engine notified of %s from the vm", msg)
 	switch msg {
@@ -129,8 +129,12 @@ func (fs *fastSyncer) Start(startReqID uint32) error {
 		// nothing to do, fast sync is implemented but not enabled
 		return fs.onDoneFastSyncing(fs.RequestID)
 	}
-	fs.Config.Ctx.Log.Info("starting fast sync")
 
+	return fs.startup()
+}
+
+func (fs *fastSyncer) startup() error {
+	fs.Config.Ctx.Log.Info("starting fast sync")
 	fs.started = true
 
 	beacons, err := fs.Beacons.Sample(fs.Config.SampleK)
@@ -164,7 +168,7 @@ func (fs *fastSyncer) Start(startReqID uint32) error {
 	fs.failedAccepted.Clear()
 	fs.acceptedVotes = make(map[hashing.Hash256]uint64)
 
-	fs.bootstrapAttempts++
+	fs.fastSyncAttempts++
 	if fs.pendingSendAcceptedFrontier.Len() == 0 {
 		fs.Ctx.Log.Info("Fast syncing skipped due to no provided bootstraps")
 		return fs.fastSyncVM.StateSync(nil)
@@ -271,12 +275,12 @@ func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID ui
 	if float64(fs.sampledBeacons.Weight())-newAlpha < float64(failedBeaconWeight) {
 		if fs.Config.RetryBootstrap {
 			fs.Ctx.Log.Debug("Not enough frontiers received, restarting bootstrap... - Beacons: %d - Failed Bootstrappers: %d "+
-				"- bootstrap attempt: %d", fs.Beacons.Len(), fs.failedAcceptedFrontier.Len(), fs.bootstrapAttempts)
+				"- fast sync attempt: %d", fs.Beacons.Len(), fs.failedAcceptedFrontier.Len(), fs.fastSyncAttempts)
 			return fs.RestartBootstrap(false)
 		}
 
 		fs.Ctx.Log.Info("Didn't receive enough frontiers - failed validators: %d, "+
-			"bootstrap attempt: %d", fs.failedAcceptedFrontier.Len(), fs.bootstrapAttempts)
+			"fast sync attempt: %d", fs.failedAcceptedFrontier.Len(), fs.fastSyncAttempts)
 	}
 
 	fs.RequestID++
@@ -364,7 +368,7 @@ func (fs *fastSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID ui
 		// in a zero network there will be no accepted votes but the voting weight will be greater than the failed weight
 		if fs.Config.RetryBootstrap && fs.Beacons.Weight()-fs.Alpha < failedBeaconWeight {
 			fs.Ctx.Log.Debug("Not enough votes received, restarting bootstrap... - Beacons: %d - Failed Bootstrappers: %d "+
-				"- fast sync attempt: %d", fs.Beacons.Len(), fs.failedAccepted.Len(), fs.bootstrapAttempts)
+				"- fast sync attempt: %d", fs.Beacons.Len(), fs.failedAccepted.Len(), fs.fastSyncAttempts)
 			return fs.RestartBootstrap(false)
 		}
 	}
@@ -433,13 +437,13 @@ func (fs *fastSyncer) RestartBootstrap(reset bool) error {
 		fs.Ctx.Log.Debug("Checking for new fast sync frontiers")
 
 		fs.Restarted = true
-		fs.bootstrapAttempts = 0
+		fs.fastSyncAttempts = 0
 	}
 
-	if fs.bootstrapAttempts > 0 && fs.bootstrapAttempts%fs.RetryBootstrapWarnFrequency == 0 {
+	if fs.fastSyncAttempts > 0 && fs.fastSyncAttempts%fs.RetryBootstrapWarnFrequency == 0 {
 		fs.Ctx.Log.Debug("continuing to attempt to fast sync after %d failed attempts. Is this node connected to the internet?",
-			fs.bootstrapAttempts)
+			fs.fastSyncAttempts)
 	}
 
-	return fs.Start(fs.RequestID)
+	return fs.startup()
 }
