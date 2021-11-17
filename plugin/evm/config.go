@@ -19,8 +19,8 @@ const (
 	defaultSnapshotAsync               = true
 	defaultRpcGasCap                   = 2500000000 // 25000000 X 100
 	defaultRpcTxFeeCap                 = 100        // 100 AVAX
-	defaultMetricsEnabled              = true
-	defaultMetricsEnabledExpensive     = false
+	defaultMetricsEnabled              = false
+	defaultMetricsExpensiveEnabled     = false
 	defaultApiMaxDuration              = 0 // Default to no maximum API call duration
 	defaultWsCpuRefillRate             = 0 // Default to no maximum WS CPU usage
 	defaultWsCpuMaxStored              = 0 // Default to no maximum WS CPU usage
@@ -66,7 +66,7 @@ type Config struct {
 
 	// Metric Settings
 	MetricsEnabled          bool `json:"metrics-enabled"`
-	MetricsEnabledExpensive bool `json:"metrics-enabled-expensive"`
+	MetricsExpensiveEnabled bool `json:"metrics-expensive-enabled"`
 
 	// API Settings
 	LocalTxsEnabled         bool     `json:"local-txs-enabled"`
@@ -122,7 +122,7 @@ func (c *Config) SetDefaults() {
 	c.RPCGasCap = defaultRpcGasCap
 	c.RPCTxFeeCap = defaultRpcTxFeeCap
 	c.MetricsEnabled = defaultMetricsEnabled
-	c.MetricsEnabledExpensive = defaultMetricsEnabledExpensive
+	c.MetricsExpensiveEnabled = defaultMetricsExpensiveEnabled
 	c.APIMaxDuration.Duration = defaultApiMaxDuration
 	c.WSCPURefillRate.Duration = defaultWsCpuRefillRate
 	c.WSCPUMaxStored.Duration = defaultWsCpuMaxStored

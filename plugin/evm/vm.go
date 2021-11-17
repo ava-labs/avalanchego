@@ -275,7 +275,7 @@ func (vm *VM) Initialize(
 	}
 
 	metrics.Enabled = vm.config.MetricsEnabled
-	metrics.EnabledExpensive = vm.config.MetricsEnabledExpensive
+	metrics.EnabledExpensive = vm.config.MetricsExpensiveEnabled
 
 	vm.shutdownChan = make(chan struct{}, 1)
 	vm.ctx = ctx
