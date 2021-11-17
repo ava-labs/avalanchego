@@ -3,6 +3,10 @@
 
 package block
 
+import "errors"
+
+var ErrStateSyncableVMNotImplemented = errors.New("vm does not implement StateSyncableVM interface")
+
 type StateSyncableVM interface {
 	// Enabled indicates whether the state sync is enabled for this VM
 	StateSyncEnabled() (bool, error)

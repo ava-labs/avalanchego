@@ -4,14 +4,10 @@
 package block
 
 import (
-	"errors"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
-
-var ErrRemoteVMNotImplemented = errors.New("vm does not implement RemoteVM interface")
 
 // ChainVM defines the required functionality of a Snowman VM.
 //
@@ -29,7 +25,6 @@ var ErrRemoteVMNotImplemented = errors.New("vm does not implement RemoteVM inter
 // Consensus will ensure the network agrees on the number at every block height.
 type ChainVM interface {
 	common.VM
-	StateSyncableVM
 
 	Getter
 	Parser

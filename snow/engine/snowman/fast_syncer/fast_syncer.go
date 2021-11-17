@@ -1,3 +1,5 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
 package fastsyncer
 
 import (
@@ -7,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -31,13 +34,18 @@ func NewFastSyncer(
 	cfg Config,
 	onDoneFastSyncing func(lastReqID uint32) error,
 ) FastSyncer {
-	return &fastSyncer{
+	fsVM, _ := cfg.VM.(block.StateSyncableVM)
+
+	fs := &fastSyncer{
 		onDoneFastSyncing: onDoneFastSyncing,
 		Config:            cfg,
 		FastSyncNoOps: FastSyncNoOps{
 			Ctx: cfg.Ctx,
 		},
+		fastSyncVM: fsVM,
 	}
+
+	return fs
 }
 
 type fastSyncer struct {
@@ -85,7 +93,7 @@ type fastSyncer struct {
 	bootstrapAttempts int
 
 	// Fast Sync specific fields
-	// VM                block.StateSyncableVM // this shadows Config VM
+	fastSyncVM        block.StateSyncableVM
 	onDoneFastSyncing func(lastReqID uint32) error
 }
 
@@ -107,11 +115,15 @@ func (fs *fastSyncer) Notify(msg common.Message) error {
 }
 
 func (fs *fastSyncer) Start(startReqID uint32) error {
-	fs.VM = fs.Config.VM
 	fs.RequestID = startReqID
 	fs.Ctx.SetState(snow.FastSyncing)
 
-	enabled, err := fs.VM.StateSyncEnabled()
+	if fs.fastSyncVM == nil {
+		// nothing to do, fast sync is not implemented
+		return fs.onDoneFastSyncing(fs.RequestID)
+	}
+
+	enabled, err := fs.fastSyncVM.StateSyncEnabled()
 	if err != nil {
 		return err
 	}
@@ -157,7 +169,7 @@ func (fs *fastSyncer) Start(startReqID uint32) error {
 	fs.bootstrapAttempts++
 	if fs.pendingSendAcceptedFrontier.Len() == 0 {
 		fs.Ctx.Log.Info("Fast syncing skipped due to no provided bootstraps")
-		return fs.VM.StateSync(nil)
+		return fs.fastSyncVM.StateSync(nil)
 	}
 
 	fs.RequestID++
@@ -204,7 +216,7 @@ func (fs *fastSyncer) sendGetAccepted() {
 }
 
 func (fs *fastSyncer) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error {
-	stateSummaryFrontier, err := fs.VM.StateSyncGetLastSummary()
+	stateSummaryFrontier, err := fs.fastSyncVM.StateSyncGetLastSummary()
 	if err != nil {
 		return err
 	}
@@ -283,7 +295,7 @@ func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID ui
 func (fs *fastSyncer) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error {
 	acceptedSummaries := make([][]byte, 0, len(summaries))
 	for _, summary := range summaries {
-		if accepted, err := fs.VM.StateSyncIsSummaryAccepted(summary); accepted && err == nil {
+		if accepted, err := fs.fastSyncVM.StateSyncIsSummaryAccepted(summary); accepted && err == nil {
 			acceptedSummaries = append(acceptedSummaries, summary)
 		} else if err != nil {
 			return err
@@ -365,7 +377,7 @@ func (fs *fastSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID ui
 		fs.Ctx.Log.Debug("Fast sync started syncing with %d vertices in the accepted frontier", size)
 	}
 
-	return fs.VM.StateSync(accepted)
+	return fs.fastSyncVM.StateSync(accepted)
 }
 
 // Failed messages

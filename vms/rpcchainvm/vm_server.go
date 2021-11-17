@@ -247,7 +247,12 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 }
 
 func (vm *VMServer) StateSyncEnabled(context.Context, *emptypb.Empty) (*vmproto.StateSyncEnabledResponse, error) {
-	response, err := vm.vm.StateSyncEnabled()
+	fsVM, ok := vm.vm.(block.StateSyncableVM)
+	if !ok {
+		return nil, block.ErrStateSyncableVMNotImplemented
+	}
+
+	response, err := fsVM.StateSyncEnabled()
 	if err != nil {
 		return nil, err
 	}
@@ -255,7 +260,12 @@ func (vm *VMServer) StateSyncEnabled(context.Context, *emptypb.Empty) (*vmproto.
 }
 
 func (vm *VMServer) StateSyncGetLastSummary(ctx context.Context, empty *emptypb.Empty) (*vmproto.StateSyncGetLastSummaryResponse, error) {
-	summary, err := vm.vm.StateSyncGetLastSummary()
+	fsVM, ok := vm.vm.(block.StateSyncableVM)
+	if !ok {
+		return nil, block.ErrStateSyncableVMNotImplemented
+	}
+
+	summary, err := fsVM.StateSyncGetLastSummary()
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +273,12 @@ func (vm *VMServer) StateSyncGetLastSummary(ctx context.Context, empty *emptypb.
 }
 
 func (vm *VMServer) StateSyncIsSummaryAccepted(ctx context.Context, req *vmproto.StateSyncIsSummaryAcceptedRequest) (*vmproto.StateSyncIsSummaryAcceptedResponse, error) {
-	accepted, err := vm.vm.StateSyncIsSummaryAccepted(req.Summary)
+	fsVM, ok := vm.vm.(block.StateSyncableVM)
+	if !ok {
+		return nil, block.ErrStateSyncableVMNotImplemented
+	}
+
+	accepted, err := fsVM.StateSyncIsSummaryAccepted(req.Summary)
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +286,12 @@ func (vm *VMServer) StateSyncIsSummaryAccepted(ctx context.Context, req *vmproto
 }
 
 func (vm *VMServer) StateSync(ctx context.Context, req *vmproto.StateSyncRequest) (*emptypb.Empty, error) {
-	return &emptypb.Empty{}, vm.vm.StateSync(req.Summaries)
+	fsVM, ok := vm.vm.(block.StateSyncableVM)
+	if !ok {
+		return nil, block.ErrStateSyncableVMNotImplemented
+	}
+
+	return &emptypb.Empty{}, fsVM.StateSync(req.Summaries)
 }
 
 func (vm *VMServer) Bootstrapping(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {

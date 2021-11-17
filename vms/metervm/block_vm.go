@@ -4,8 +4,6 @@
 package metervm
 
 import (
-	"time"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
@@ -131,50 +129,6 @@ func (vm *blockVM) LastAccepted() (ids.ID, error) {
 	end := vm.clock.Time()
 	vm.blockMetrics.lastAccepted.Observe(float64(end.Sub(start)))
 	return lastAcceptedID, err
-}
-
-func (vm *blockVM) GetAncestors(
-	blkID ids.ID,
-	maxBlocksNum int,
-	maxBlocksSize int,
-	maxBlocksRetrivalTime time.Duration,
-) ([][]byte, error) {
-	rVM, ok := vm.ChainVM.(block.BatchedChainVM)
-	if !ok {
-		return nil, block.ErrRemoteVMNotImplemented
-	}
-
-	start := vm.clock.Time()
-	ancestors, err := rVM.GetAncestors(
-		blkID,
-		maxBlocksNum,
-		maxBlocksSize,
-		maxBlocksRetrivalTime,
-	)
-	end := vm.clock.Time()
-	vm.blockMetrics.getAncestors.Observe(float64(end.Sub(start)))
-	return ancestors, err
-}
-
-func (vm *blockVM) BatchedParseBlock(blks [][]byte) ([]snowman.Block, error) {
-	rVM, ok := vm.ChainVM.(block.BatchedChainVM)
-	if !ok {
-		return nil, block.ErrRemoteVMNotImplemented
-	}
-
-	start := vm.clock.Time()
-	blocks, err := rVM.BatchedParseBlock(blks)
-	end := vm.clock.Time()
-	vm.blockMetrics.batchedParseBlock.Observe(float64(end.Sub(start)))
-
-	wrappedBlocks := make([]snowman.Block, len(blocks))
-	for i, block := range blocks {
-		wrappedBlocks[i] = &meterBlock{
-			Block: block,
-			vm:    vm,
-		}
-	}
-	return wrappedBlocks, err
 }
 
 type meterBlock struct {
