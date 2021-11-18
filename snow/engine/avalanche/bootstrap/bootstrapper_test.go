@@ -82,6 +82,7 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 		TxBlocked:  txBlocker,
 		Manager:    manager,
 		VM:         vm,
+		Starter:    common.NewGearStarter(commonConfig.Beacons, commonConfig.StartupAlpha),
 	}, peer, sender, manager, vm
 }
 
@@ -844,7 +845,7 @@ func TestBootstrapperIncompleteMultiPut(t *testing.T) {
 	switch {
 	case err != nil: // Provide vtx1; should request vtx0
 		t.Fatal(err)
-	case bs.Ctx.IsBootstrapped():
+	case bs.IsBootstrapped():
 		t.Fatalf("should not have finished")
 	case requested != vtxID0:
 		t.Fatal("should hae requested vtx0")
@@ -856,7 +857,7 @@ func TestBootstrapperIncompleteMultiPut(t *testing.T) {
 	switch {
 	case err != nil: // Provide vtx0; can finish now
 		t.Fatal(err)
-	case !bs.Ctx.IsBootstrapped():
+	case !bs.IsBootstrapped():
 		t.Fatal("should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatal("should be accepted")

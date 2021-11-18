@@ -78,10 +78,6 @@ type BootstrapperGear struct {
 	acceptedVotes    map[ids.ID]uint64
 	acceptedFrontier []ids.ID
 
-	// current weight
-	started bool
-	weight  uint64
-
 	// number of times the bootstrap has been attempted
 	bootstrapAttempts int
 }
@@ -295,40 +291,6 @@ func (b *BootstrapperGear) Accepted(validatorID ids.ShortID, requestID uint32, c
 	return b.Bootstrapable.ForceAccepted(accepted)
 }
 
-// Connected implements the Handler interface.
-func (b *BootstrapperGear) Connected(nodeID ids.ShortID) error {
-	if b.started {
-		return nil
-	}
-	weight, ok := b.Beacons.GetWeight(nodeID)
-	if !ok {
-		return nil
-	}
-	weight, err := math.Add64(weight, b.weight)
-	if err != nil {
-		return err
-	}
-	b.weight = weight
-	if b.weight < b.StartupAlpha {
-		return nil
-	}
-	return b.Startup()
-}
-
-// Disconnected implements the Handler interface.
-func (b *BootstrapperGear) Disconnected(nodeID ids.ShortID) error {
-	if weight, ok := b.Beacons.GetWeight(nodeID); ok {
-		// TODO: Account for weight changes in a more robust manner.
-
-		// Sub64 should rarely error since only validators that have added their
-		// weight can become disconnected. Because it is possible that there are
-		// changes to the validators set, we utilize that Sub64 returns 0 on
-		// error.
-		b.weight, _ = math.Sub64(b.weight, weight)
-	}
-	return nil
-}
-
 func (b *BootstrapperGear) RestartBootstrap(reset bool) error {
 	// resets the attempts when we're pulling blocks/vertices we don't want to
 	// fail the bootstrap at that stage
@@ -348,8 +310,6 @@ func (b *BootstrapperGear) RestartBootstrap(reset bool) error {
 }
 
 func (b *BootstrapperGear) Startup() error {
-	b.started = true
-
 	beacons, err := b.Beacons.Sample(b.Config.SampleK)
 	if err != nil {
 		return err

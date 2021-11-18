@@ -7,3 +7,16 @@ const (
 	Bootstrapping
 	NormalOp
 )
+
+func (st State) String() string {
+	switch st {
+	case Unknown:
+		return "Unknown state"
+	case Bootstrapping:
+		return "Bootstrapping state"
+	case NormalOp:
+		return "Normal operations state"
+	default:
+		return "Unknown state"
+	}
+}

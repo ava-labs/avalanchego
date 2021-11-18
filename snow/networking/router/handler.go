@@ -74,7 +74,6 @@ func NewHandler(
 	if err := h.metrics.Initialize("handler", h.ctx.Registerer); err != nil {
 		return nil, fmt.Errorf("initializing handler metrics errored with: %s", err)
 	}
-
 	var err error
 	h.unprocessedMsgs, err = newUnprocessedMsgs(h.ctx.Log, h.validators, h.cpuTracker, "handler", h.ctx.Registerer)
 	return h, err
@@ -203,11 +202,16 @@ func (h *Handler) handleMsg(msg message.InboundMessage) error {
 	switch op {
 	case message.Notify:
 		vmMsg := msg.Get(message.VMMessage).(uint32)
-		if h.ctx.IsBootstrapped() {
-			err = h.engine.Notify(common.Message(vmMsg))
-		} else {
-			err = h.bootstrapper.Notify(common.Message(vmMsg))
+		var targetGear common.Engine
+		switch h.ctx.GetState() {
+		case snow.Bootstrapping:
+			targetGear = h.bootstrapper
+		case snow.NormalOp:
+			targetGear = h.engine
+		default:
+			return fmt.Errorf("unknown handler for state %v", h.ctx.GetState().String())
 		}
+		err = targetGear.Notify(common.Message(vmMsg))
 
 	case message.GossipRequest:
 		err = h.engine.Gossip()
@@ -256,7 +260,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 	case snow.NormalOp:
 		targetGear = h.engine
 	default:
-		return fmt.Errorf("unknown handler for state %v", h.ctx.GetState())
+		return fmt.Errorf("unknown handler for state %v", h.ctx.GetState().String())
 	}
 
 	nodeID := msg.NodeID()
@@ -377,10 +381,10 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		return targetGear.QueryFailed(nodeID, reqID)
 
 	case message.Connected:
-		return h.bootstrapper.Connected(nodeID)
+		return targetGear.Connected(nodeID)
 
 	case message.Disconnected:
-		return h.bootstrapper.Disconnected(nodeID)
+		return targetGear.Disconnected(nodeID)
 
 	case message.AppRequest:
 		reqID := msg.Get(message.RequestID).(uint32)

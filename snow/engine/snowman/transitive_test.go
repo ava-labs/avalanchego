@@ -40,8 +40,11 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 	bootCfg, engCfg := DefaultConfigs()
 
 	vals := validators.NewSet()
+	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
+	bootCfg.Starter = gs
 	engCfg.Validators = vals
+	engCfg.Starter = gs
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -423,8 +426,11 @@ func TestEngineMultipleQuery(t *testing.T) {
 	}
 
 	vals := validators.NewSet()
+	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
+	bootCfg.Starter = gs
 	engCfg.Validators = vals
+	engCfg.Starter = gs
 
 	vdr0 := ids.GenerateTestShortID()
 	vdr1 := ids.GenerateTestShortID()
@@ -928,8 +934,11 @@ func TestVoteCanceling(t *testing.T) {
 	}
 
 	vals := validators.NewSet()
+	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
+	bootCfg.Starter = gs
 	engCfg.Validators = vals
+	engCfg.Starter = gs
 
 	vdr0 := ids.GenerateTestShortID()
 	vdr1 := ids.GenerateTestShortID()
@@ -1066,6 +1075,11 @@ func TestVoteCanceling(t *testing.T) {
 func TestEngineNoQuery(t *testing.T) {
 	bootCfg, engCfg := DefaultConfigs()
 
+	vals := validators.NewSet()
+	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	bootCfg.Starter = gs
+	engCfg.Starter = gs
+
 	sender := &common.SenderTest{}
 	sender.T = t
 	bootCfg.Sender = sender
@@ -1130,6 +1144,11 @@ func TestEngineNoQuery(t *testing.T) {
 
 func TestEngineNoRepollQuery(t *testing.T) {
 	bootCfg, engCfg := DefaultConfigs()
+
+	vals := validators.NewSet()
+	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	bootCfg.Starter = gs
+	engCfg.Starter = gs
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -1815,8 +1834,11 @@ func TestEngineAggressivePolling(t *testing.T) {
 	engCfg.Params.ConcurrentRepolls = 2
 
 	vals := validators.NewSet()
+	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
+	bootCfg.Starter = gs
 	engCfg.Validators = vals
+	engCfg.Starter = gs
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1952,8 +1974,11 @@ func TestEngineDoubleChit(t *testing.T) {
 	}
 
 	vals := validators.NewSet()
+	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
+	bootCfg.Starter = gs
 	engCfg.Validators = vals
+	engCfg.Starter = gs
 
 	vdr0 := ids.GenerateTestShortID()
 	vdr1 := ids.GenerateTestShortID()
@@ -2107,8 +2132,11 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	engCfg.Params.OptimalProcessing = 1
 
 	vals := validators.NewSet()
+	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
+	bootCfg.Starter = gs
 	engCfg.Validators = vals
+	engCfg.Starter = gs
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {

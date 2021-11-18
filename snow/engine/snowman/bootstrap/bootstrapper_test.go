@@ -70,6 +70,7 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 		Config:  commonConfig,
 		Blocked: blocker,
 		VM:      vm,
+		Starter: common.NewGearStarter(commonConfig.Beacons, commonConfig.StartupAlpha),
 	}, peer, sender, vm
 }
 

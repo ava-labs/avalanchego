@@ -10,13 +10,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/poll"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/events"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -30,18 +27,13 @@ func New(config Config) (Engine, error) {
 // Transitive implements the Engine interface by attempting to fetch all
 // Transitive dependencies.
 type Transitive struct {
-	Ctx    *snow.ConsensusContext
-	Sender common.Sender
-	VM     block.ChainVM
+	Config
+
 	common.MsgHandlerNoOps
 
-	RequestID  uint32
-	Validators validators.Set
+	RequestID uint32
 
 	metrics
-
-	Params    snowball.Parameters
-	Consensus snowman.Consensus
 
 	// track outstanding preference requests
 	polls poll.Set
@@ -73,13 +65,8 @@ func newTransitive(config Config) (*Transitive, error) {
 
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t := &Transitive{
-		Ctx:             config.Ctx,
+		Config:          config,
 		MsgHandlerNoOps: common.NewMsgHandlerNoOps(config.Ctx),
-		Sender:          config.Sender,
-		VM:              config.VM,
-		Validators:      config.Validators,
-		Params:          config.Params,
-		Consensus:       config.Consensus,
 		pending:         make(map[ids.ID]snowman.Block),
 		nonVerifieds:    NewAncestorTree(),
 		polls: poll.NewSet(factory,
@@ -164,6 +151,24 @@ func (t *Transitive) Gossip() error {
 	t.Ctx.Log.Verbo("gossiping %s as accepted to the network", blkID)
 	t.Sender.SendGossip(blkID, blk.Bytes())
 	return nil
+}
+
+// Connected implements the Engine interface.
+func (t *Transitive) Connected(nodeID ids.ShortID) error {
+	if err := t.VM.Connected(nodeID); err != nil {
+		return err
+	}
+
+	return t.Starter.AddWeightForNode(nodeID)
+}
+
+// Disconnected implements the Engine interface.
+func (t *Transitive) Disconnected(nodeID ids.ShortID) error {
+	if err := t.VM.Disconnected(nodeID); err != nil {
+		return err
+	}
+
+	return t.Starter.RemoveWeightForNode(nodeID)
 }
 
 // Shutdown implements the Engine interface
