@@ -379,6 +379,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
+	log.Info("initializing atomic trie", "lastAccepted", lastAccepted.NumberU64())
 	startTime := time.Now()
 	if err = vm.atomicTrie.Initialize(lastAccepted.NumberU64(), vm.db.Commit); err != nil {
 		log.Error("error initializing atomic trie locally", "time", time.Since(startTime), "err", err)

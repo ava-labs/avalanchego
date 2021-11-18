@@ -134,7 +134,7 @@ func (i *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommit
 			preCommitTxIndexed++
 		}
 		if time.Since(lastUpdate) > 30*time.Second {
-			log.Info("imported entries into atomic trie pre-commit", "preCommitEntriesIndexed", preCommitTxIndexed)
+			log.Info("imported entries into atomic trie pre-commit", "entriesIndexed", preCommitTxIndexed)
 			lastUpdate = time.Now()
 		}
 	}
@@ -170,7 +170,7 @@ func (i *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommit
 		}
 		postCommitTxIndexed++
 		if time.Since(lastUpdate) > 30*time.Second {
-			log.Info("imported entries into atomic trie post-commit", "postCommitEntriesIndexed", postCommitTxIndexed)
+			log.Info("imported entries into atomic trie post-commit", "entriesIndexed", postCommitTxIndexed)
 			lastUpdate = time.Now()
 		}
 	}
