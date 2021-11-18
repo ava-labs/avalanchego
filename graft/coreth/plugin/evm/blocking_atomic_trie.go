@@ -3,7 +3,6 @@ package evm
 import (
 	"encoding/binary"
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -19,7 +18,6 @@ import (
 
 const (
 	commitHeightInterval = uint64(4096)
-	historicalTrieRoots  = 8
 	errEntryNotFound     = "not found"
 )
 
@@ -75,57 +73,25 @@ func NewBlockingAtomicTrie(db ethdb.KeyValueStore, repo AtomicTxRepository) (typ
 }
 
 func (i *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error) error {
-	return i.initialize(lastAcceptedBlockNumber, dbCommitFn)
-}
-
-// initialize populates blockingAtomicTrie, doing a prefix scan on [acceptedHeightAtomicTxDB]
-// from current position up to [lastAcceptedBlockNumber]. Optionally returns error.
-func (i *blockingAtomicTrie) initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error) error {
-	transactionsIndexed := uint64(0)
-	transactionsIndexedDirect := uint64(0)
-	startTime := time.Now()
-
-	lastCommittedHash, lastCommittedHeight, err := i.LastCommitted()
-	nextHeight := lastCommittedHeight + 1
-	if lastCommittedHeight == 0 {
-		nextHeight = 0
-	}
-	if err != nil {
-		return err
-	}
-	if (lastCommittedHash != common.Hash{}) && nextHeight > 0 {
-		// index has been initialized.
-		if lastAcceptedBlockNumber > nextHeight && lastAcceptedBlockNumber-nextHeight > i.commitHeightInterval {
-			log.Error("index lagging by unexpected amount", "lastAcceptedBlockNumber", lastAcceptedBlockNumber, "nextHeight", nextHeight)
-			return fmt.Errorf("index lagging by unexpected amount")
-		}
-		log.Info("atomic trie already initialized", "lastAcceptedBlockNumber", lastAcceptedBlockNumber, "nextHeight", nextHeight)
-		return nil
+	var commitHeight uint64
+	if lastAcceptedBlockNumber == 0 {
+		commitHeight = 0
+	} else {
+		commitHeight = (lastAcceptedBlockNumber - (lastAcceptedBlockNumber % i.commitHeightInterval)) - i.commitHeightInterval
 	}
 
-	// When [initialize] returns, [historicalTrieRoot] trie roots will have been created.
-	// Each root is the hash of the trie containing all atomic operations requested by
-	// atomic txs accepted on blocks [0..height] (inclusive).
-	// Roots will be created starting at [lastCommitHeight], at [i.commitHeightInterval]
-	// intervals.
-	// Atomic operations for txs accepted on blocks <= [directToTrieHeight] can be indexed
-	// directly, and others will be buffered into
-	lastCommitHeight := lastAcceptedBlockNumber - lastAcceptedBlockNumber%i.commitHeightInterval
-	rootCount := uint64(historicalTrieRoots)
-	if lastAcceptedBlockNumber < historicalTrieRoots*i.commitHeightInterval {
-		rootCount = lastAcceptedBlockNumber / i.commitHeightInterval
-	}
-	directToTrieHeight := lastCommitHeight - (rootCount-1)*i.commitHeightInterval
-	buckets := make([]map[uint64]AtomicReqs, rootCount)
+	uncommittedOpsMap := make(map[uint64]map[ids.ID]*atomic.Requests, lastAcceptedBlockNumber-commitHeight)
 
-	it := i.repo.Iterate()
-	logger := NewProgressLogger(10 * time.Second)
+	iter := i.repo.Iterate()
+	defer iter.Release()
 
-	for it.Next() {
-		if err := it.Error(); err != nil {
+	preCommitTxIndexed := 0
+	postCommitTxIndexed := 0
+	for iter.Next() {
+		if err := iter.Error(); err != nil {
 			return err
 		}
-		packer := wrappers.Packer{Bytes: it.Value()}
+		packer := wrappers.Packer{Bytes: iter.Value()}
 		height := packer.UnpackLong()
 		txBytes := packer.UnpackBytes()
 		tx, err := i.repo.ParseTxBytes(txBytes)
@@ -133,61 +99,85 @@ func (i *blockingAtomicTrie) initialize(lastAcceptedBlockNumber uint64, dbCommit
 			return err
 		}
 
-		// NOTE: this logic only works assuming a single atomic tx accepted per block height
-		transactionsIndexed++
 		ops, err := tx.AtomicOps()
 		if err != nil {
 			return err
 		}
-		if height <= directToTrieHeight {
-			// index the merged atomic requests against the height
-			if err := i.index(height, ops); err != nil {
+
+		if height > commitHeight {
+			// add it to the map to index later
+			// make sure we merge transactions at same height
+			if opsMap, exists := uncommittedOpsMap[height]; !exists {
+				// create a new entry if it does not exist
+				uncommittedOpsMap[height] = ops
+			} else {
+				// for existing entry at same height, we merge the atomic ops
+				for blockchainID, atomicRequests := range ops {
+					if requests, exists := opsMap[blockchainID]; !exists {
+						opsMap[blockchainID] = atomicRequests
+					} else {
+						requests.PutRequests = append(requests.PutRequests, atomicRequests.PutRequests...)
+						requests.RemoveRequests = append(requests.RemoveRequests, atomicRequests.RemoveRequests...)
+					}
+				}
+			}
+		} else {
+			if err = i.index(height, ops); err != nil {
 				return err
 			}
-			transactionsIndexedDirect++
-		} else {
-			bucketIdx := (height - directToTrieHeight - 1) / i.commitHeightInterval
-			if buckets[bucketIdx] == nil {
-				buckets[bucketIdx] = make(map[uint64]AtomicReqs)
-			}
-			buckets[bucketIdx][height] = ops
+			preCommitTxIndexed++
 		}
-		logger.Info("atomic trie init progress", "transactionsIndexed", transactionsIndexed)
 	}
 
-	// all known txs have processed.
-	hash, err := i.commit(directToTrieHeight)
+	// skip commit in case of early height
+	if lastAcceptedBlockNumber < i.commitHeightInterval {
+		if dbCommitFn != nil {
+			if err := dbCommitFn(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	// now that all heights < commitHeight have been processed
+	// commit the trie
+	hash, err := i.commit(commitHeight)
 	if err != nil {
 		return err
 	}
-	log.Info("committed directToTrieHeight", "hash", hash, "directToTrieHeight", directToTrieHeight, "transactionsIndexedDirect", transactionsIndexedDirect)
 
-	for idx, bucket := range buckets {
-		log.Info("processing bucket", "idx", idx, "len", len(bucket))
-		for height, ops := range bucket {
-			if err := i.index(height, ops); err != nil {
-				return err
-			}
+	if dbCommitFn != nil {
+		if err = dbCommitFn(); err != nil {
+			return err
 		}
-		if idx == len(buckets)-1 {
-			// atomic ops from txs in last bucket will be committed at next commitHeightInterval, skip commit here
-			continue
+	}
+
+	log.Info("committed trie", "hash", hash, "height", commitHeight)
+
+	// process uncommitted ops
+	for height, ops := range uncommittedOpsMap {
+		if err = i.index(height, ops); err != nil {
+			return err
 		}
-		hash, err := i.commit(directToTrieHeight + uint64(idx+1)*i.commitHeightInterval)
+		postCommitTxIndexed++
+	}
+
+	// check if its eligible to commit the trie
+	if lastAcceptedBlockNumber%i.commitHeightInterval == 0 {
+		hash, err := i.commit(lastAcceptedBlockNumber)
 		if err != nil {
 			return err
 		}
-		log.Info("committed bucket", "idx", idx, "len", len(bucket), "hash", hash)
+		log.Info("committed trie", "hash", hash, "height", lastAcceptedBlockNumber)
 	}
 
 	if dbCommitFn != nil {
-		log.Info("committing DB")
-		if err := dbCommitFn(); err != nil {
-			log.Error("unable to commit DB", "err", err)
+		if err = dbCommitFn(); err != nil {
 			return err
 		}
 	}
-	log.Info("atomic trie initialisation complete", "time", time.Since(startTime))
+
+	log.Info("index initialised", "preCommitEntriesIndexed", preCommitTxIndexed, "postCommitEntriesIndexed", postCommitTxIndexed)
+
 	return nil
 }
 
@@ -234,7 +224,7 @@ func (i *blockingAtomicTrie) index(height uint64, atomicOps map[ids.ID]*atomic.R
 func (i *blockingAtomicTrie) commit(height uint64) (common.Hash, error) {
 	l := log.New("func", "indexedAtomicTrie.index", "height", height)
 	if height%i.commitHeightInterval != 0 {
-		return common.Hash{}, fmt.Errorf("atomic tx trie commit height must be divisable by 4096 (got %v)", height)
+		return common.Hash{}, fmt.Errorf("atomic tx trie commit height must be divisable by %d (got %d)", i.commitHeightInterval, height)
 	}
 
 	hash, err := i.commitTrie()

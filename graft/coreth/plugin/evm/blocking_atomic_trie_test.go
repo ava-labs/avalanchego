@@ -162,9 +162,8 @@ func Test_BlockingAtomicTrie_InitializeGenesis(t *testing.T) {
 	err = atomicTrie.Initialize(0, dbCommitFn)
 	assert.NoError(t, err)
 
-	hash, num, err := atomicTrie.LastCommitted()
+	_, num, err := atomicTrie.LastCommitted()
 	assert.NoError(t, err)
-	assert.NotEqual(t, common.Hash{}, hash)
 	assert.EqualValues(t, 0, num)
 }
 
@@ -186,9 +185,8 @@ func Test_BlockingAtomicTrie_InitializeGenesisPlusOne(t *testing.T) {
 	err = atomicTrie.Initialize(1, dbCommitFn)
 	assert.NoError(t, err)
 
-	hash, num, err := atomicTrie.LastCommitted()
+	_, num, err := atomicTrie.LastCommitted()
 	assert.NoError(t, err)
-	assert.NotEqual(t, common.Hash{}, hash)
 	assert.EqualValues(t, 0, num, "expected %d was %d", 0, num)
 }
 
