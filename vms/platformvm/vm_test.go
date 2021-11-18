@@ -2126,23 +2126,25 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	// The engine handles consensus
 	consensus := &smcon.Topological{}
+	commonCfg := common.Config{
+		Ctx:                           consensusCtx,
+		Validators:                    vdrs,
+		Beacons:                       beacons,
+		SampleK:                       beacons.Len(),
+		StartupAlpha:                  (beacons.Weight() + 1) / 2,
+		Alpha:                         (beacons.Weight() + 1) / 2,
+		Sender:                        &sender,
+		Subnet:                        subnet,
+		MultiputMaxContainersSent:     2000,
+		MultiputMaxContainersReceived: 2000,
+	}
 
+	gs := common.NewGearStarter(commonCfg.Beacons, commonCfg.StartupAlpha)
 	bootstrapConfig := bootstrap.Config{
-		Config: common.Config{
-			Ctx:                           consensusCtx,
-			Validators:                    vdrs,
-			Beacons:                       beacons,
-			SampleK:                       beacons.Len(),
-			StartupAlpha:                  (beacons.Weight() + 1) / 2,
-			Alpha:                         (beacons.Weight() + 1) / 2,
-			Sender:                        &sender,
-			Subnet:                        subnet,
-			MultiputMaxContainersSent:     2000,
-			MultiputMaxContainersReceived: 2000,
-		},
+		Config:  commonCfg,
 		Blocked: blocked,
 		VM:      vm,
-		Starter: common.NewGearStarter(beacons /*StartupAlpha*/, (beacons.Weight()+1)/2),
+		Starter: gs,
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
@@ -2166,6 +2168,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	engineConfig := smeng.Config{
 		Ctx:        bootstrapConfig.Ctx,
 		VM:         bootstrapConfig.VM,
+		Starter:    gs,
 		Sender:     bootstrapConfig.Sender,
 		Validators: vdrs,
 		Params: snowball.Parameters{

@@ -16,6 +16,7 @@ import (
 type Config struct {
 	Ctx        *snow.ConsensusContext
 	VM         block.ChainVM
+	Starter    common.GearStarter
 	Sender     common.Sender
 	Validators validators.Set
 	Params     snowball.Parameters

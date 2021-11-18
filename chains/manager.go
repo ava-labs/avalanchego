@@ -618,6 +618,7 @@ func (m *manager) createAvalancheChain(
 	engineConfig := aveng.Config{
 		Ctx:        bootstrapperConfig.Ctx,
 		VM:         bootstrapperConfig.VM,
+		Starter:    gearStarter,
 		Manager:    vtxManager,
 		Sender:     bootstrapperConfig.Sender,
 		Validators: vdrs,
@@ -829,6 +830,7 @@ func (m *manager) createSnowmanChain(
 	engineConfig := smeng.Config{
 		Ctx:        bootstrapCfg.Ctx,
 		VM:         bootstrapCfg.VM,
+		Starter:    gearStarter,
 		Sender:     bootstrapCfg.Sender,
 		Validators: vdrs,
 		Params:     consensusParams,

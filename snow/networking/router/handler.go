@@ -438,16 +438,10 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		return targetGear.QueryFailed(nodeID, reqID)
 
 	case message.Connected:
-		if h.ctx.GetState() == snow.FastSyncing {
-			return h.fastSyncer.Connected(nodeID)
-		}
-		return h.bootstrapper.Connected(nodeID)
+		return targetGear.Connected(nodeID)
 
 	case message.Disconnected:
-		if h.ctx.GetState() == snow.FastSyncing {
-			return h.fastSyncer.Disconnected(nodeID)
-		}
-		return h.bootstrapper.Disconnected(nodeID)
+		return targetGear.Disconnected(nodeID)
 
 	case message.AppRequest:
 		reqID := msg.Get(message.RequestID).(uint32)

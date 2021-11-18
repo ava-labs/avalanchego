@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/events"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -30,18 +29,12 @@ func New(config Config) (Engine, error) {
 // Transitive implements the Engine interface by attempting to fetch all
 // transitive dependencies.
 type Transitive struct {
-	Ctx        *snow.ConsensusContext
-	Sender     common.Sender
-	Manager    vertex.Manager
-	VM         vertex.DAGVM
-	Validators validators.Set
-	RequestID  uint32
+	Config
+
+	RequestID uint32
 	common.MsgHandlerNoOps
 
 	metrics
-
-	Params    avalanche.Parameters
-	Consensus avalanche.Consensus
 
 	polls poll.Set // track people I have asked for their preference
 
@@ -76,14 +69,8 @@ func newTransitive(config Config) (*Transitive, error) {
 
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t := &Transitive{
-		Ctx:             config.Ctx,
+		Config:          config,
 		MsgHandlerNoOps: common.NewMsgHandlerNoOps(config.Ctx),
-		Sender:          config.Sender,
-		VM:              config.VM,
-		Manager:         config.Manager,
-		Validators:      config.Validators,
-		Params:          config.Params,
-		Consensus:       config.Consensus,
 		polls: poll.NewSet(factory,
 			config.Ctx.Log,
 			"",
@@ -105,6 +92,24 @@ func (t *Transitive) Context() *snow.ConsensusContext {
 
 func (t *Transitive) IsBootstrapped() bool {
 	return t.Ctx.IsBootstrapped()
+}
+
+// Connected implements the Engine interface.
+func (t *Transitive) Connected(nodeID ids.ShortID) error {
+	if err := t.VM.Connected(nodeID); err != nil {
+		return err
+	}
+
+	return t.Starter.AddWeightForNode(nodeID)
+}
+
+// Disconnected implements the Engine interface.
+func (t *Transitive) Disconnected(nodeID ids.ShortID) error {
+	if err := t.VM.Disconnected(nodeID); err != nil {
+		return err
+	}
+
+	return t.Starter.RemoveWeightForNode(nodeID)
 }
 
 func (t *Transitive) Start(startReqID uint32) error {
