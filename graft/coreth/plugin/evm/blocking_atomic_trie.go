@@ -41,8 +41,6 @@ type blockingAtomicTrie struct {
 	trieDB               *trie.Database      // Trie database
 	trie                 *trie.Trie          // Atomic trie.Trie mapping key (height+blockchainID) and value (RLP encoded atomic.Requests)
 	repo                 AtomicTxRepository
-	pendingWrites        []*AtomicIndexReq
-	initialisedChan      chan struct{}
 }
 
 func NewBlockingAtomicTrie(db ethdb.KeyValueStore, repo AtomicTxRepository) (types.AtomicTrie, error) {
@@ -73,8 +71,6 @@ func NewBlockingAtomicTrie(db ethdb.KeyValueStore, repo AtomicTxRepository) (typ
 		trieDB:               triedb,
 		trie:                 t,
 		repo:                 repo,
-		pendingWrites:        make([]*AtomicIndexReq, 0),
-		initialisedChan:      make(chan struct{}),
 	}, nil
 }
 
@@ -89,7 +85,11 @@ func (i *blockingAtomicTrie) initialize(lastAcceptedBlockNumber uint64, dbCommit
 	transactionsIndexedDirect := uint64(0)
 	startTime := time.Now()
 
-	lastCommittedHash, nextHeight, err := i.LastCommitted()
+	lastCommittedHash, lastCommittedHeight, err := i.LastCommitted()
+	nextHeight := lastCommittedHeight + 1
+	if lastCommittedHeight == 0 {
+		nextHeight = 0
+	}
 	if err != nil {
 		return err
 	}
@@ -188,7 +188,6 @@ func (i *blockingAtomicTrie) initialize(lastAcceptedBlockNumber uint64, dbCommit
 		}
 	}
 	log.Info("atomic trie initialisation complete", "time", time.Since(startTime))
-	close(i.initialisedChan)
 	return nil
 }
 
@@ -205,24 +204,21 @@ func (i *blockingAtomicTrie) initialize(lastAcceptedBlockNumber uint64, dbCommit
 //   initialise it with [height] as the starting height - this *must* be zero in
 //   that case
 func (i *blockingAtomicTrie) Index(height uint64, atomicOps map[ids.ID]*atomic.Requests) (common.Hash, error) {
-	select {
-	case <-i.initialisedChan:
-	// initialization is complete, proceed normally
-	default:
-		i.pendingWrites = append(i.pendingWrites, &AtomicIndexReq{height: height, ops: atomicOps})
-		return common.Hash{}, nil
+	_, lastCommittedHeight, err := i.LastCommitted()
+	if err != nil {
+		return common.Hash{}, err
 	}
 
-	// first time called after initialization is complete will flush pendingWrites
-	for _, req := range i.pendingWrites {
-		if err := i.index(req.height, req.ops); err != nil {
-			return common.Hash{}, err
-		}
+	if height < lastCommittedHeight {
+		return common.Hash{}, fmt.Errorf("height %d must be after last committed height %d", height, lastCommittedHeight)
 	}
-	i.pendingWrites = nil
 
-	// normal, ongoing behavior: index and commit if at [commitHeightInterval]
-	if err := i.index(height, atomicOps); err != nil {
+	nextCommitHeight := lastCommittedHeight + i.commitHeightInterval
+	if height > nextCommitHeight {
+		return common.Hash{}, fmt.Errorf("height %d not within the next commit height %d", height, nextCommitHeight)
+	}
+
+	if err = i.index(height, atomicOps); err != nil {
 		return common.Hash{}, err
 	}
 	if height%i.commitHeightInterval == 0 {
@@ -245,7 +241,7 @@ func (i *blockingAtomicTrie) commit(height uint64) (common.Hash, error) {
 	if err != nil {
 		return common.Hash{}, err
 	}
-	l.Info("committed atomic trie", "hash", hash, "height", height)
+	l.Info("committed atomic trie", "hash", hash.String(), "height", height)
 	if err = i.trieDB.Commit(hash, false, nil); err != nil {
 		return common.Hash{}, err
 	}
@@ -288,7 +284,7 @@ func (i *blockingAtomicTrie) commitTrie() (common.Hash, error) {
 	return hash, err
 }
 
-// LastCommitted returns the last committed trie hash, next indexable block height, and an optional error
+// LastCommitted returns the last committed trie hash, block height, and an optional error
 func (i *blockingAtomicTrie) LastCommitted() (common.Hash, uint64, error) {
 	heightBytes, err := i.db.Get(lastCommittedKey)
 	if err != nil && err.Error() == errEntryNotFound {
@@ -300,7 +296,7 @@ func (i *blockingAtomicTrie) LastCommitted() (common.Hash, uint64, error) {
 
 	height := binary.BigEndian.Uint64(heightBytes)
 	hash, err := i.db.Get(heightBytes)
-	return common.BytesToHash(hash), height + 1, err
+	return common.BytesToHash(hash), height, err
 }
 
 // Iterator returns a types.AtomicTrieIterator that iterates the trie from the given

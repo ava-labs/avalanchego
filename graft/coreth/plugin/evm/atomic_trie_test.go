@@ -27,7 +27,6 @@ func newTestAtomicTrieIndexer(t *testing.T) types.AtomicTrie {
 		atomicTrieIndexer, ok := indexer.(*blockingAtomicTrie)
 		assert.True(t, ok)
 		atomicTrieIndexer.commitHeightInterval = testCommitInterval
-		close(atomicTrieIndexer.initialisedChan)
 	}
 
 	return indexer
@@ -38,55 +37,46 @@ func Test_IndexerWriteAndRead(t *testing.T) {
 
 	blockRootMap := make(map[uint64]common.Hash)
 	lastCommittedBlockHeight := uint64(0)
-	// process blocks and insert them into the indexer
-	for height := uint64(0); height <= testCommitInterval*2+1; height++ {
+	var lastCommittedBlockHash common.Hash
+
+	// process 205 blocks so that we get three commits (0, 100, 200)
+	for height := uint64(0); height <= testCommitInterval*2+5; /*=205*/ height++ {
 		atomicRequests := testDataImportTx().mustAtomicOps()
 		_, err := indexer.Index(height, atomicRequests)
 		assert.NoError(t, err)
 		if height%testCommitInterval == 0 {
-			lastCommittedBlockHash, lastCommittedBlockHeight, err := indexer.LastCommitted()
+			lastCommittedBlockHash, lastCommittedBlockHeight, err = indexer.LastCommitted()
 			assert.NoError(t, err)
 			assert.NotEqual(t, common.Hash{}, lastCommittedBlockHash)
-			blockRootMap[lastCommittedBlockHeight-1] = lastCommittedBlockHash
+			blockRootMap[lastCommittedBlockHeight] = lastCommittedBlockHash
 		}
 	}
 
-	assert.NotEqual(t, 0, lastCommittedBlockHeight)
+	// ensure we have 3 roots
 	assert.Len(t, blockRootMap, 3)
 
-	for height := range blockRootMap {
-		root, err := indexer.Root(height)
-		assert.NoError(t, err)
-		assert.NotNil(t, root)
-		//TODO: fix this test
-		//requestsMap, err := indexer.ReadAll(root)
-		//assert.NoError(t, err, "err at height %d", height)
-		//assert.Equal(t, height+1, uint64(len(requestsMap)))
-	}
-}
-
-func Test_IndexerInitializeFromGenesis(t *testing.T) {
-	indexer := newTestAtomicTrieIndexer(t)
-
-	// ensure last is uninitialised
 	hash, height, err := indexer.LastCommitted()
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(0), height)
-	assert.Equal(t, common.Hash{}, hash)
+	assert.EqualValues(t, lastCommittedBlockHeight, height, "expected %d was %d", 200, lastCommittedBlockHeight)
+	assert.Equal(t, lastCommittedBlockHash, hash)
 
-	blockAtomicOpsMap := make(map[uint64]map[ids.ID]*atomic.Requests)
-	// process blocks and insert them into the indexer
-	for height := uint64(0); height < testCommitInterval+1; height++ {
-		atomicRequests := testDataExportTx().mustAtomicOps()
-		blockAtomicOpsMap[height] = atomicRequests
-		_, err := indexer.Index(height, atomicRequests)
+	// verify all roots are there
+	for height, hash := range blockRootMap {
+		root, err := indexer.Root(height)
 		assert.NoError(t, err)
+		assert.Equal(t, hash, root)
 	}
 
-	hash, height, err = indexer.LastCommitted()
-	assert.NoError(t, err)
-	assert.Equal(t, uint64(testCommitInterval)+1, height)
-	assert.NotEqual(t, common.Hash{}, hash)
+	// ensure Index does not accept blocks older than last committed height
+	_, err = indexer.Index(10, testDataExportTx().mustAtomicOps())
+	assert.Error(t, err)
+	assert.Equal(t, "height 10 must be after last committed height 200", err.Error())
+
+	// ensure Index does not accept blocks beyond next committed height
+	nextCommitHeight := lastCommittedBlockHeight + testCommitInterval + 1 // =301
+	_, err = indexer.Index(nextCommitHeight, testDataExportTx().mustAtomicOps())
+	assert.Error(t, err)
+	assert.Equal(t, "height 301 not within the next commit height 300", err.Error())
 }
 
 func Test_IndexerInitializeFromState(t *testing.T) {
@@ -115,7 +105,7 @@ func Test_IndexerInitializeFromState(t *testing.T) {
 
 	hash, height, err = indexer.LastCommitted()
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(testCommitInterval), height-1)
+	assert.Equal(t, uint64(testCommitInterval), height)
 	assert.NotEqual(t, common.Hash{}, hash)
 
 	blockAtomicOpsMap := make(map[uint64]map[ids.ID]*atomic.Requests)
@@ -129,6 +119,6 @@ func Test_IndexerInitializeFromState(t *testing.T) {
 
 	hash, height, err = indexer.LastCommitted()
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(testCommitInterval)*2+1, height)
+	assert.Equal(t, uint64(testCommitInterval)*2, height)
 	assert.NotEqual(t, common.Hash{}, hash)
 }

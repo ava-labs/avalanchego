@@ -28,28 +28,28 @@ func NewAtomicTrieIterator(trieIterator *trie.Iterator) types.AtomicTrieIterator
 
 // Errors returns a list of errors, if any encountered so far
 func (a *atomicTrieIterator) Errors() []error {
-	// check if the underlying trie has an error, or if we have errors
-	if a.trieIterator.Err != nil || len(a.errs) > 0 {
-		trieErrLen := 0
-		if a.trieIterator.Err != nil {
-			trieErrLen = 1
-		}
-		// create a slice to copy errors into (protection against modification)
-		errsCopy := make([]error, len(a.errs), len(a.errs)+trieErrLen)
-		copy(errsCopy, a.errs)
-		errsCopy = append(errsCopy, a.trieIterator.Err)
-		return errsCopy
+	if a.trieIterator.Err == nil && len(a.errs) == 0 {
+		return nil
 	}
-	return nil
+
+	// check if there's an error in the trie iterator
+	// if there is one, we include this in the []error len
+	trieErrLen := 0
+	if a.trieIterator.Err != nil {
+		trieErrLen = 1
+	}
+
+	// create a slice to copy errors into and return the copy
+	errsCopy := make([]error, len(a.errs), len(a.errs)+trieErrLen)
+	copy(errsCopy, a.errs)
+	errsCopy = append(errsCopy, a.trieIterator.Err)
+	return errsCopy
 }
 
 // Next returns whether there is data to iterate over
 // this function sets blockNumber, blockchainID and entries fields of the atomicTrieIterator
+// resets all fields and sets err in case of an error during current iteration
 func (a *atomicTrieIterator) Next() bool {
-	// TODO: this function needs updates for supporting multiple atomic tx / height
-	// we will need to iterate until we see next height to make sure all atomic tx for
-	// this height are processed
-
 	hasNext := a.trieIterator.Next()
 	// if the underlying iterator has data to iterate over, parse and set the fields
 	if hasNext {
@@ -74,7 +74,7 @@ func (a *atomicTrieIterator) Next() bool {
 
 		// update the struct fields
 		a.blockNumber = blockNumber
-		a.atomicOps = map[ids.ID]*atomic.Requests{blockchainID: &requests} // TODO: above TODO impacts this line
+		a.atomicOps = map[ids.ID]*atomic.Requests{blockchainID: &requests}
 	} else {
 		// else reset the fields
 		a.resetFields()

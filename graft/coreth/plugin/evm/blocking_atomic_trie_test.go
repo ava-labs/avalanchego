@@ -1,10 +1,12 @@
 package evm
 
 import (
-	"encoding/binary"
-	"fmt"
 	"math/big"
 	"testing"
+
+	"github.com/ava-labs/coreth/ethdb/memorydb"
+
+	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ava-labs/avalanchego/codec"
 
@@ -19,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/coreth/core/state"
@@ -29,8 +30,13 @@ import (
 
 type TestAtomicTx struct {
 	avax.Metadata
+	TxID          ids.ID           `serialize:"true"`
 	BlockchainID  ids.ID           `serialize:"true"`
 	AtomicRequest *atomic.Requests `serialize:"true"`
+}
+
+func (t *TestAtomicTx) ID() ids.ID {
+	return t.TxID
 }
 
 func (t *TestAtomicTx) Bytes() []byte {
@@ -96,7 +102,18 @@ func testDataExportTx() *Tx {
 	blockchainID := ids.GenerateTestID()
 	return &Tx{UnsignedAtomicTx: &TestAtomicTx{
 		BlockchainID: blockchainID,
+		TxID:         ids.GenerateTestID(),
 		AtomicRequest: &atomic.Requests{
+			PutRequests: []*atomic.Element{
+				{
+					Key:   utils.RandomBytes(16),
+					Value: utils.RandomBytes(24),
+					Traits: [][]byte{
+						utils.RandomBytes(32),
+						utils.RandomBytes(32),
+					},
+				},
+			},
 			RemoveRequests: [][]byte{
 				utils.RandomBytes(32),
 				utils.RandomBytes(32),
@@ -113,8 +130,7 @@ func (t *Tx) mustAtomicOps() map[ids.ID]*atomic.Requests {
 	return ops
 }
 
-func Test_BlockingAtomicTrie(t *testing.T) {
-	db := memdb.New()
+func testCodec() codec.Manager {
 	Codec := codec.NewDefaultManager()
 
 	c := linearcodec.NewDefault()
@@ -126,96 +142,92 @@ func Test_BlockingAtomicTrie(t *testing.T) {
 	if errs.Errored() {
 		panic(errs.Err)
 	}
-	repo := newAtomicTxRepository(db, Codec)
-	txs := []*Tx{testDataExportTx(), testDataImportTx()}
+	return Codec
+}
 
-	for height, tx := range txs {
-		assert.NotNil(t, tx.Bytes())
-		err := repo.Write(uint64(height), []*Tx{tx})
-		assert.NoError(t, err)
-	}
-
-	atomicTrie, err := NewBlockingAtomicTrie(Database{db}, repo)
+func Test_BlockingAtomicTrie_InitializeGenesis(t *testing.T) {
+	db := memdb.New()
+	repo := newAtomicTxRepository(db, testCodec())
+	tx := testDataImportTx()
+	err := repo.Write(0, []*Tx{tx})
 	assert.NoError(t, err)
 
+	atomicTrieDB := memorydb.New()
+	atomicTrie, err := NewBlockingAtomicTrie(atomicTrieDB, repo)
+	assert.NoError(t, err)
+	atomicTrie.(*blockingAtomicTrie).commitHeightInterval = 10
 	dbCommitFn := func() error {
 		return nil
 	}
-
-	err = atomicTrie.Initialize(1, dbCommitFn)
+	err = atomicTrie.Initialize(0, dbCommitFn)
 	assert.NoError(t, err)
+
+	hash, num, err := atomicTrie.LastCommitted()
+	assert.NoError(t, err)
+	assert.NotEqual(t, common.Hash{}, hash)
+	assert.EqualValues(t, 0, num)
 }
 
-func Test_BlockingAtomicTrie_Initialize_Roots(t *testing.T) {
+func Test_BlockingAtomicTrie_InitializeGenesisPlusOne(t *testing.T) {
 	db := memdb.New()
-	Codec := codec.NewDefaultManager()
-
-	c := linearcodec.NewDefault()
-	errs := wrappers.Errs{}
-	errs.Add(
-		c.RegisterType(&TestAtomicTx{}),
-		Codec.RegisterCodec(codecVersion, c),
-	)
-	if errs.Errored() {
-		panic(errs.Err)
-	}
-	repo := newAtomicTxRepository(db, Codec)
-
-	const lastAcceptedHeight = 1000
-	allTxs := make([][]*Tx, lastAcceptedHeight+1)
-	for i := 0; i <= lastAcceptedHeight; i++ {
-		txs := []*Tx{testDataImportTx()}
-		if i%3 == 0 {
-			txs = append(txs, testDataExportTx())
-		}
-
-		err := repo.Write(uint64(i), txs)
-		assert.NoError(t, err)
-
-		allTxs[i] = txs
-	}
-
-	atomicTrie, err := NewBlockingAtomicTrie(Database{db}, repo)
+	repo := newAtomicTxRepository(db, testCodec())
+	err := repo.Write(0, []*Tx{testDataImportTx()})
 	assert.NoError(t, err)
-	{
-		blockingTrie := atomicTrie.(*blockingAtomicTrie)
-		blockingTrie.commitHeightInterval = 10 // commit every 10 blocks for test
+	err = repo.Write(1, []*Tx{testDataImportTx()})
+	assert.NoError(t, err)
+
+	atomicTrieDB := memorydb.New()
+	atomicTrie, err := NewBlockingAtomicTrie(atomicTrieDB, repo)
+	assert.NoError(t, err)
+	atomicTrie.(*blockingAtomicTrie).commitHeightInterval = 10
+	dbCommitFn := func() error {
+		return nil
+	}
+	err = atomicTrie.Initialize(1, dbCommitFn)
+	assert.NoError(t, err)
+
+	hash, num, err := atomicTrie.LastCommitted()
+	assert.NoError(t, err)
+	assert.NotEqual(t, common.Hash{}, hash)
+	assert.EqualValues(t, 0, num, "expected %d was %d", 0, num)
+}
+
+func Test_BlockingAtomicTrie_Initialize(t *testing.T) {
+	db := memdb.New()
+	repo := newAtomicTxRepository(db, testCodec())
+	// create state
+	lastAcceptedHeight := uint64(1000)
+	for i := uint64(0); i <= lastAcceptedHeight; i++ {
+		err := repo.Write(i, []*Tx{testDataExportTx()})
+		assert.NoError(t, err)
 	}
 
+	atomicTrieDB := memorydb.New()
+	atomicTrie, err := NewBlockingAtomicTrie(atomicTrieDB, repo)
+	atomicTrie.(*blockingAtomicTrie).commitHeightInterval = 10
+	assert.NoError(t, err)
 	dbCommitFn := func() error {
 		return nil
 	}
 
 	err = atomicTrie.Initialize(lastAcceptedHeight, dbCommitFn)
 	assert.NoError(t, err)
-}
 
-func Test_BlockingAtomicTrie_XYZ(t *testing.T) {
-	db := memdb.New()
-	vdb := versiondb.New(db)
-	repo := newAtomicTxRepository(db, Codec)
-	atomicTrie, err := NewBlockingAtomicTrie(Database{vdb}, repo)
+	lastCommittedHash, lastCommittedHeight, err := atomicTrie.LastCommitted()
 	assert.NoError(t, err)
-	dbCommitFn := func() error {
-		return nil
+	assert.NotEqual(t, common.Hash{}, lastCommittedHash)
+	assert.EqualValues(t, 1000, lastCommittedHeight, "expected %d but was %d", 1000, lastCommittedHeight)
+
+	atomicTrie, err = NewBlockingAtomicTrie(atomicTrieDB, repo)
+	assert.NoError(t, err)
+	iterator, err := atomicTrie.Iterator(lastCommittedHash)
+	assert.NoError(t, err)
+	entriesIterated := uint64(0)
+	for iterator.Next() {
+		assert.Greater(t, len(iterator.AtomicOps()), 0)
+		assert.Len(t, iterator.Errors(), 0)
+		entriesIterated++
 	}
-
-	err = atomicTrie.Initialize(100, dbCommitFn)
-	assert.NoError(t, err)
-
-	tx0 := testDataExportTx()
-	_, err = atomicTrie.Index(0, tx0.mustAtomicOps())
-	assert.NoError(t, err)
-
-	tx1 := testDataImportTx()
-	_, err = atomicTrie.Index(1, tx1.mustAtomicOps())
-	assert.NoError(t, err)
-
-	vdb.Commit()
-
-	key := make([]byte, 8)
-	binary.BigEndian.PutUint64(key, 0)
-	val, err := vdb.Get(key)
-	assert.NoError(t, err)
-	fmt.Println("val", len(val))
+	assert.Len(t, iterator.Errors(), 0)
+	assert.EqualValues(t, 1001, entriesIterated, "expected %d was %d", 1001, entriesIterated)
 }

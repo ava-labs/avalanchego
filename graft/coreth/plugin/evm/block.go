@@ -151,6 +151,7 @@ func (b *Block) Accept() error {
 		return err
 	}
 
+	// TODO Merge all atomic operations across all txs into single and save index it in the trie
 	hash, err := b.vm.atomicTrie.Index(b.Height(), ops)
 	if err != nil {
 		return err
