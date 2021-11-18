@@ -66,6 +66,7 @@ func TestEngineAdd(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -172,6 +173,7 @@ func TestEngineQuery(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -437,7 +439,11 @@ func TestEngineQuery(t *testing.T) {
 
 func TestEngineMultipleQuery(t *testing.T) {
 	bootCfg, engCfg := DefaultConfig()
+	vals := validators.NewSet()
+	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 
+	engCfg.Validators = vals
 	engCfg.Params = avalanche.Parameters{
 		Parameters: snowball.Parameters{
 			K:                     3,
@@ -452,10 +458,6 @@ func TestEngineMultipleQuery(t *testing.T) {
 		Parents:   2,
 		BatchSize: 1,
 	}
-
-	vals := validators.NewSet()
-	bootCfg.Validators = vals
-	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestShortID()
 	vdr1 := ids.GenerateTestShortID()
@@ -714,6 +716,7 @@ func TestEngineAbandonResponse(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -794,6 +797,7 @@ func TestEngineScheduleRepoll(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -895,6 +899,7 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -1006,6 +1011,7 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -1123,6 +1129,7 @@ func TestEngineIssueRepoll(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -1198,6 +1205,7 @@ func TestEngineReissue(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -1389,6 +1397,7 @@ func TestEngineLargeIssue(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -1561,6 +1570,7 @@ func TestEngineInsufficientValidators(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	sender := &common.SenderTest{T: t}
@@ -1636,6 +1646,7 @@ func TestEnginePushGossip(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -1728,6 +1739,7 @@ func TestEngineSingleQuery(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -1804,6 +1816,7 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -1913,6 +1926,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -2039,6 +2053,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -2176,6 +2191,7 @@ func TestEngineMissingTx(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -2313,6 +2329,7 @@ func TestEngineIssueBlockingTx(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -2381,6 +2398,7 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -2515,6 +2533,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	vals := validators.NewSet()
 	bootCfg.Beacons = vals
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -2786,10 +2805,12 @@ func TestEngineReBootstrapFails(t *testing.T) {
 	bootCfg.Alpha = 1
 	bootCfg.RetryBootstrap = true
 	bootCfg.RetryBootstrapWarnFrequency = 4
+	bootCfg.Starter = common.NewGearStarter(validators.NewSet(), bootCfg.StartupAlpha)
 
 	vals := validators.NewSet()
 	bootCfg.Beacons = vals
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -2955,6 +2976,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 
 	bootCfg.Beacons = vals
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	bootCfg.SampleK = vals.Len()
@@ -3230,6 +3252,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -3338,6 +3361,7 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -3482,6 +3506,7 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -3634,6 +3659,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -3790,6 +3816,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -3913,6 +3940,7 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -4027,6 +4055,7 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestShortID()
@@ -4159,6 +4188,7 @@ func TestEngineBubbleVotes(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -4320,6 +4350,7 @@ func TestEngineIssue(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()

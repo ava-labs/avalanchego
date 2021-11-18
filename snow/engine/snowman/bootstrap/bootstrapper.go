@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -33,7 +34,8 @@ type Config struct {
 	// Blocked tracks operations that are blocked on blocks
 	Blocked *queue.JobsWithMissing
 
-	VM block.ChainVM
+	VM      block.ChainVM
+	Starter common.GearStarter
 
 	Bootstrapped func()
 }
@@ -49,6 +51,7 @@ func New(
 }
 
 type bootstrapper struct {
+	Config
 	common.BootstrapperGear
 	common.Fetcher
 	metrics
@@ -59,13 +62,6 @@ type bootstrapper struct {
 	startingHeight uint64
 	// Blocks passed into ForceAccepted
 	startingAcceptedFrontier ids.Set
-
-	// Blocked tracks operations that are blocked on blocks
-	Blocked *queue.JobsWithMissing
-
-	VM block.ChainVM
-
-	Bootstrapped func()
 
 	// number of state transitions executed
 	executedStateTransitions int
@@ -81,9 +77,7 @@ func newBootstrapper(
 	onFinished func(lastReqID uint32) error,
 ) (*bootstrapper, error) {
 	b := &bootstrapper{
-		Blocked:      config.Blocked,
-		VM:           config.VM,
-		Bootstrapped: config.Bootstrapped,
+		Config: config,
 		Fetcher: common.Fetcher{
 			OnFinished: onFinished,
 		},
@@ -154,7 +148,7 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	// we iterate over every container that must be traversed.
 	pendingContainerIDs = append(pendingContainerIDs, acceptedContainerIDs...)
 	toProcess := make([]snowman.Block, 0, len(acceptedContainerIDs))
-	b.Ctx.Log.Debug("Starting bootstrapping with %d pending blocks and %d from the accepted frontier",
+	b.Config.Ctx.Log.Debug("Starting bootstrapping with %d pending blocks and %d from the accepted frontier",
 		len(pendingContainerIDs), len(acceptedContainerIDs))
 	for _, blkID := range pendingContainerIDs {
 		b.startingAcceptedFrontier.Add(blkID)
@@ -203,7 +197,7 @@ func (b *bootstrapper) fetch(blkID ids.ID) error {
 		return nil
 	}
 
-	validators, err := b.Beacons.Sample(1) // validator to send request to
+	validators, err := b.Config.Beacons.Sample(1) // validator to send request to
 	if err != nil {
 		return fmt.Errorf("dropping request for %s as there are no validators", blkID)
 	}
@@ -211,7 +205,7 @@ func (b *bootstrapper) fetch(blkID ids.ID) error {
 	b.RequestID++
 
 	b.OutstandingRequests.Add(validatorID, b.RequestID, blkID)
-	b.Sender.SendGetAncestors(validatorID, b.RequestID, blkID) // request block and ancestors
+	b.Config.Sender.SendGetAncestors(validatorID, b.RequestID, blkID) // request block and ancestors
 	return nil
 }
 
@@ -220,18 +214,18 @@ func (b *bootstrapper) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids
 	ancestorsBytes, err := block.GetAncestors(
 		b.VM,
 		blkID,
-		b.MultiputMaxContainersSent,
+		b.Config.MultiputMaxContainersSent,
 		constants.MaxContainersLen,
-		b.MaxTimeGetAncestors,
+		b.Config.MaxTimeGetAncestors,
 	)
 	if err != nil {
-		b.Ctx.Log.Verbo("couldn't get ancestors with %s. Dropping GetAncestors(%s, %d, %s)",
+		b.Config.Ctx.Log.Verbo("couldn't get ancestors with %s. Dropping GetAncestors(%s, %d, %s)",
 			err, vdr, requestID, blkID)
 		return nil
 	}
 
 	b.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
-	b.Sender.SendMultiPut(vdr, requestID, ancestorsBytes)
+	b.Config.Sender.SendMultiPut(vdr, requestID, ancestorsBytes)
 	return nil
 }
 
@@ -240,35 +234,36 @@ func (b *bootstrapper) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids
 func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte) error {
 	lenBlks := len(blks)
 	if lenBlks == 0 {
-		b.Ctx.Log.Debug("MultiPut(%s, %d) contains no blocks", vdr, requestID)
+		b.Config.Ctx.Log.Debug("MultiPut(%s, %d) contains no blocks", vdr, requestID)
 		return b.GetAncestorsFailed(vdr, requestID)
 	}
-	if lenBlks > b.MultiputMaxContainersReceived {
-		blks = blks[:b.MultiputMaxContainersReceived]
-		b.Ctx.Log.Debug("ignoring %d containers in multiput(%s, %d)", lenBlks-b.MultiputMaxContainersReceived, vdr, requestID)
+	if lenBlks > b.Config.MultiputMaxContainersReceived {
+		blks = blks[:b.Config.MultiputMaxContainersReceived]
+		b.Config.Ctx.Log.Debug("ignoring %d containers in multiput(%s, %d)",
+			lenBlks-b.Config.MultiputMaxContainersReceived, vdr, requestID)
 	}
 
 	// Make sure this is in response to a request we made
 	wantedBlkID, ok := b.OutstandingRequests.Remove(vdr, requestID)
 	if !ok { // this message isn't in response to a request we made
-		b.Ctx.Log.Debug("received unexpected MultiPut from %s with ID %d", vdr, requestID)
+		b.Config.Ctx.Log.Debug("received unexpected MultiPut from %s with ID %d", vdr, requestID)
 		return nil
 	}
 
 	blocks, err := block.BatchedParseBlock(b.VM, blks)
 	if err != nil { // the provided blocks couldn't be parsed
-		b.Ctx.Log.Debug("failed to parse blocks in MultiPut from %s with ID %d", vdr, requestID)
+		b.Config.Ctx.Log.Debug("failed to parse blocks in MultiPut from %s with ID %d", vdr, requestID)
 		return b.fetch(wantedBlkID)
 	}
 
 	if len(blocks) == 0 {
-		b.Ctx.Log.Debug("parsing blocks returned an empty set of blocks from %s with ID %d", vdr, requestID)
+		b.Config.Ctx.Log.Debug("parsing blocks returned an empty set of blocks from %s with ID %d", vdr, requestID)
 		return b.fetch(wantedBlkID)
 	}
 
 	requestedBlock := blocks[0]
 	if actualID := requestedBlock.ID(); actualID != wantedBlkID {
-		b.Ctx.Log.Debug("expected the first block to be the requested block, %s, but is %s",
+		b.Config.Ctx.Log.Debug("expected the first block to be the requested block, %s, but is %s",
 			wantedBlkID, actualID)
 		return b.fetch(wantedBlkID)
 	}
@@ -284,7 +279,7 @@ func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 func (b *bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) error {
 	blkID, ok := b.OutstandingRequests.Remove(vdr, requestID)
 	if !ok {
-		b.Ctx.Log.Debug("GetAncestorsFailed(%s, %d) called but there was no outstanding request to this validator with this ID",
+		b.Config.Ctx.Log.Debug("GetAncestorsFailed(%s, %d) called but there was no outstanding request to this validator with this ID",
 			vdr, requestID)
 		return nil
 	}
@@ -298,7 +293,7 @@ func (b *bootstrapper) Timeout() error {
 	}
 	b.awaitingTimeout = false
 
-	if !b.Subnet.IsBootstrapped() {
+	if !b.Config.Subnet.IsBootstrapped() {
 		return b.RestartBootstrap(true)
 	}
 	return b.finish()
@@ -358,9 +353,9 @@ func (b *bootstrapper) process(blk snowman.Block, processingBlocks map[ids.ID]sn
 		b.NumFetched++                                      // Progress tracker
 		if b.NumFetched%common.StatusUpdateFrequency == 0 { // Periodically print progress
 			if !b.Restarted {
-				b.Ctx.Log.Info("fetched %d of %d blocks", b.NumFetched, b.tipHeight-b.startingHeight)
+				b.Config.Ctx.Log.Info("fetched %d of %d blocks", b.NumFetched, b.tipHeight-b.startingHeight)
 			} else {
-				b.Ctx.Log.Debug("fetched %d of %d blocks", b.NumFetched, b.tipHeight-b.startingHeight)
+				b.Config.Ctx.Log.Debug("fetched %d of %d blocks", b.NumFetched, b.tipHeight-b.startingHeight)
 			}
 		}
 	}
@@ -393,12 +388,12 @@ func (b *bootstrapper) checkFinish() error {
 	}
 
 	if !b.Restarted {
-		b.Ctx.Log.Info("bootstrapping fetched %d blocks. Executing state transitions...", b.NumFetched)
+		b.Config.Ctx.Log.Info("bootstrapping fetched %d blocks. Executing state transitions...", b.NumFetched)
 	} else {
-		b.Ctx.Log.Debug("bootstrapping fetched %d blocks. Executing state transitions...", b.NumFetched)
+		b.Config.Ctx.Log.Debug("bootstrapping fetched %d blocks. Executing state transitions...", b.NumFetched)
 	}
 
-	executedBlocks, err := b.Blocked.ExecuteAll(b.Ctx, b, b.Restarted, b.Ctx.ConsensusDispatcher, b.Ctx.DecisionDispatcher)
+	executedBlocks, err := b.Blocked.ExecuteAll(b.Config.Ctx, b, b.Restarted, b.Config.Ctx.ConsensusDispatcher, b.Config.Ctx.DecisionDispatcher)
 	if err != nil || b.Halted() {
 		return err
 	}
@@ -409,7 +404,7 @@ func (b *bootstrapper) checkFinish() error {
 	// Note that executedBlocks < c*previouslyExecuted ( 0 <= c < 1 ) is enforced
 	// so that the bootstrapping process will terminate even as new blocks are
 	// being issued.
-	if b.RetryBootstrap && executedBlocks > 0 && executedBlocks < previouslyExecuted/2 {
+	if b.Config.RetryBootstrap && executedBlocks > 0 && executedBlocks < previouslyExecuted/2 {
 		return b.RestartBootstrap(true)
 	}
 
@@ -420,19 +415,19 @@ func (b *bootstrapper) checkFinish() error {
 	}
 
 	// Notify the subnet that this chain is synced
-	b.Subnet.Bootstrapped(b.Ctx.ChainID)
+	b.Config.Subnet.Bootstrapped(b.Config.Ctx.ChainID)
 
 	// If the subnet hasn't finished bootstrapping, this chain should remain
 	// syncing.
-	if !b.Subnet.IsBootstrapped() {
+	if !b.Config.Subnet.IsBootstrapped() {
 		if !b.Restarted {
-			b.Ctx.Log.Info("waiting for the remaining chains in this subnet to finish syncing")
+			b.Config.Ctx.Log.Info("waiting for the remaining chains in this subnet to finish syncing")
 		} else {
-			b.Ctx.Log.Debug("waiting for the remaining chains in this subnet to finish syncing")
+			b.Config.Ctx.Log.Debug("waiting for the remaining chains in this subnet to finish syncing")
 		}
 		// Restart bootstrapping after [bootstrappingDelay] to keep up to date
 		// on the latest tip.
-		b.Timer.RegisterTimeout(bootstrappingDelay)
+		b.Config.Timer.RegisterTimeout(bootstrappingDelay)
 		b.awaitingTimeout = true
 		return nil
 	}
@@ -459,7 +454,16 @@ func (b *bootstrapper) Connected(nodeID ids.ShortID) error {
 		return err
 	}
 
-	return b.BootstrapperGear.Connected(nodeID)
+	if err := b.Starter.AddWeightForNode(nodeID); err != nil {
+		return err
+	}
+
+	if b.Starter.CanStart() {
+		b.Starter.MarkStart()
+		return b.Startup()
+	}
+
+	return nil
 }
 
 // Disconnected implements the Engine interface.
@@ -468,12 +472,12 @@ func (b *bootstrapper) Disconnected(nodeID ids.ShortID) error {
 		return err
 	}
 
-	return b.BootstrapperGear.Disconnected(nodeID)
+	return b.Starter.RemoveWeightForNode(nodeID)
 }
 
-func (b *bootstrapper) GetVM() common.VM {
-	return b.VM
-}
+func (b *bootstrapper) GetVM() common.VM                { return b.VM }
+func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
+func (b *bootstrapper) IsBootstrapped() bool            { return b.Config.Ctx.IsBootstrapped() }
 
 func (b *bootstrapper) HealthCheck() (interface{}, error) {
 	vmIntf, vmErr := b.VM.HealthCheck()

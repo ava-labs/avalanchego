@@ -83,10 +83,6 @@ type fastSyncer struct {
 	acceptedVotes    map[hashing.Hash256]uint64
 	acceptedFrontier [][]byte
 
-	// current weight
-	started bool
-	// weight  uint64
-
 	// number of times the bootstrap has been attempted
 	fastSyncAttempts int
 
@@ -112,6 +108,33 @@ func (fs *fastSyncer) Notify(msg common.Message) error {
 	return nil
 }
 
+// Connected implements the Engine interface.
+func (fs *fastSyncer) Connected(nodeID ids.ShortID) error {
+	if err := fs.VM.Connected(nodeID); err != nil {
+		return err
+	}
+
+	if err := fs.Starter.AddWeightForNode(nodeID); err != nil {
+		return err
+	}
+
+	if fs.Starter.CanStart() {
+		fs.Starter.MarkStart()
+		return fs.startup()
+	}
+
+	return nil
+}
+
+// Disconnected implements the Engine interface.
+func (fs *fastSyncer) Disconnected(nodeID ids.ShortID) error {
+	if err := fs.VM.Disconnected(nodeID); err != nil {
+		return err
+	}
+
+	return fs.Starter.RemoveWeightForNode(nodeID)
+}
+
 func (fs *fastSyncer) Start(startReqID uint32) error {
 	fs.RequestID = startReqID
 	fs.Ctx.SetState(snow.FastSyncing)
@@ -135,7 +158,7 @@ func (fs *fastSyncer) Start(startReqID uint32) error {
 
 func (fs *fastSyncer) startup() error {
 	fs.Config.Ctx.Log.Info("starting fast sync")
-	fs.started = true
+	fs.Starter.MarkStart()
 
 	beacons, err := fs.Beacons.Sample(fs.Config.SampleK)
 	if err != nil {

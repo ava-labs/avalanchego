@@ -2142,6 +2142,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		},
 		Blocked: blocked,
 		VM:      vm,
+		Starter: common.NewGearStarter(beacons /*StartupAlpha*/, (beacons.Weight()+1)/2),
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine

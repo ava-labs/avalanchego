@@ -577,28 +577,33 @@ func (m *manager) createAvalancheChain(
 		Preempt: sb.afterBootstrapped(),
 	}
 
+	commonCfg := common.Config{
+		Ctx:                           ctx,
+		Validators:                    vdrs,
+		Beacons:                       beacons,
+		SampleK:                       sampleK,
+		StartupAlpha:                  (3*bootstrapWeight + 3) / 4,
+		Alpha:                         bootstrapWeight/2 + 1, // must be > 50%
+		Sender:                        &sender,
+		Subnet:                        sb,
+		Timer:                         timer,
+		RetryBootstrap:                m.RetryBootstrap,
+		RetryBootstrapWarnFrequency:   m.RetryBootstrapWarnFrequency,
+		MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
+		MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
+		MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
+	}
+
+	gearStarter := common.NewGearStarter(beacons, commonCfg.StartupAlpha)
+
+	// create bootstrap gear
 	bootstrapperConfig := avbootstrap.Config{
-		Config: common.Config{
-			Ctx:                           ctx,
-			Validators:                    vdrs,
-			Beacons:                       beacons,
-			SampleK:                       sampleK,
-			StartupAlpha:                  (3*bootstrapWeight + 3) / 4,
-			Alpha:                         bootstrapWeight/2 + 1, // must be > 50%
-			Sender:                        &sender,
-			Subnet:                        sb,
-			Timer:                         timer,
-			RetryBootstrap:                m.RetryBootstrap,
-			RetryBootstrapWarnFrequency:   m.RetryBootstrapWarnFrequency,
-			MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
-			MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
-			MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
-		},
+		Config:     commonCfg,
 		VtxBlocked: vtxBlocker,
 		TxBlocked:  txBlocker,
 		Manager:    vtxManager,
-
-		VM: vm,
+		VM:         vm,
+		Starter:    gearStarter,
 	}
 	bootstrapper, err := avbootstrap.New(
 		bootstrapperConfig,
@@ -609,6 +614,7 @@ func (m *manager) createAvalancheChain(
 	}
 	handler.RegisterBootstrap(bootstrapper)
 
+	// create engine gear
 	engineConfig := aveng.Config{
 		Ctx:        bootstrapperConfig.Ctx,
 		VM:         bootstrapperConfig.VM,
@@ -788,10 +794,13 @@ func (m *manager) createSnowmanChain(
 		MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
 	}
 
+	gearStarter := common.NewGearStarter(beacons, commonCfg.StartupAlpha)
+
 	// create fast sync gear
 	fastSyncCfg := fastsyncer.Config{
-		Config: commonCfg,
-		VM:     vm,
+		Config:  commonCfg,
+		VM:      vm,
+		Starter: gearStarter,
 	}
 	fastSync := fastsyncer.NewFastSyncer(
 		fastSyncCfg,
@@ -804,6 +813,7 @@ func (m *manager) createSnowmanChain(
 		Config:       commonCfg,
 		Blocked:      blocked,
 		VM:           vm,
+		Starter:      gearStarter,
 		Bootstrapped: m.unblockChains,
 	}
 	bootstrapper, err := smbootstrap.New(

@@ -10,5 +10,6 @@ import (
 type Config struct {
 	common.Config
 
-	VM block.ChainVM
+	VM      block.ChainVM
+	Starter common.GearStarter
 }

@@ -41,6 +41,7 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -424,6 +425,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestShortID()
@@ -929,6 +931,7 @@ func TestVoteCanceling(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestShortID()
@@ -1065,6 +1068,7 @@ func TestVoteCanceling(t *testing.T) {
 
 func TestEngineNoQuery(t *testing.T) {
 	bootCfg, engCfg := DefaultConfigs()
+	bootCfg.Starter = common.NewGearStarter(validators.NewSet(), bootCfg.StartupAlpha)
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -1130,6 +1134,7 @@ func TestEngineNoQuery(t *testing.T) {
 
 func TestEngineNoRepollQuery(t *testing.T) {
 	bootCfg, engCfg := DefaultConfigs()
+	bootCfg.Starter = common.NewGearStarter(validators.NewSet(), bootCfg.StartupAlpha)
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -1816,6 +1821,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -1953,6 +1959,7 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestShortID()
@@ -2108,6 +2115,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 
 	vals := validators.NewSet()
 	bootCfg.Validators = vals
+	bootCfg.Starter = common.NewGearStarter(vals, bootCfg.StartupAlpha)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
