@@ -372,24 +372,19 @@ func (vm *VM) Initialize(
 	lastAccepted := vm.chain.LastAcceptedBlock()
 
 	vm.atomicTxRepository = newAtomicTxRepository(vm.db, vm.codec)
+
 	atomicIndexDB := Database{prefixdb.New(atomicIndexDBPrefix, vm.db)}
 	vm.atomicTrie, err = NewBlockingAtomicTrie(atomicIndexDB, vm.atomicTxRepository)
 	if err != nil {
 		return err
 	}
 
-	resultChan := vm.atomicTrie.Initialize(lastAccepted.NumberU64(), vm.db.Commit)
-
 	startTime := time.Now()
-	err, open := <-resultChan
-
-	// loop until  errors are coming through and channel is open
-	for err != nil && open {
-		if err != nil {
-			log.Crit("error initializing atomic trie locally", "time", time.Since(startTime), "err", err)
-		}
-		err, open = <-resultChan
+	if err = vm.atomicTrie.Initialize(lastAccepted.NumberU64(), vm.db.Commit); err != nil {
+		log.Error("error initializing atomic trie locally", "time", time.Since(startTime), "err", err)
+		return err
 	}
+
 	err = vm.db.Commit()
 	if err != nil {
 		return err

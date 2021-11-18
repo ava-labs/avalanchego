@@ -78,13 +78,8 @@ func NewBlockingAtomicTrie(db ethdb.KeyValueStore, repo AtomicTxRepository) (typ
 	}, nil
 }
 
-func (i *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error) <-chan error {
-	resultChan := make(chan error)
-	go func() {
-		resultChan <- i.initialize(lastAcceptedBlockNumber, dbCommitFn)
-		close(resultChan)
-	}()
-	return resultChan
+func (i *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error) error {
+	return i.initialize(lastAcceptedBlockNumber, dbCommitFn)
 }
 
 // initialize populates blockingAtomicTrie, doing a prefix scan on [acceptedHeightAtomicTxDB]
