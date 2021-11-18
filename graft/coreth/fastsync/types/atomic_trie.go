@@ -12,7 +12,7 @@ import (
 type AtomicTrie interface {
 	// Initialize initializes the AtomicTrie from the last indexed
 	// block to the last accepted block in the chain
-	Initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error) <-chan error
+	Initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error) error
 
 	// Index indexes the given atomicOps at the specified block height
 	// Returns an optional root hash and an optional error

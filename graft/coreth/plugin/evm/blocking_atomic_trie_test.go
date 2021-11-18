@@ -142,12 +142,8 @@ func Test_BlockingAtomicTrie(t *testing.T) {
 		return nil
 	}
 
-	doneChan := atomicTrie.Initialize(1, dbCommitFn)
-	err = <-doneChan
+	err = atomicTrie.Initialize(1, dbCommitFn)
 	assert.NoError(t, err)
-	_, open := <-doneChan
-	assert.False(t, open)
-	assert.NotNil(t, doneChan)
 }
 
 func Test_BlockingAtomicTrie_Initialize_Roots(t *testing.T) {
@@ -190,12 +186,8 @@ func Test_BlockingAtomicTrie_Initialize_Roots(t *testing.T) {
 		return nil
 	}
 
-	doneChan := atomicTrie.Initialize(lastAcceptedHeight, dbCommitFn)
-	err = <-doneChan
+	err = atomicTrie.Initialize(lastAcceptedHeight, dbCommitFn)
 	assert.NoError(t, err)
-	_, open := <-doneChan
-	assert.False(t, open)
-	assert.NotNil(t, doneChan)
 }
 
 func Test_BlockingAtomicTrie_XYZ(t *testing.T) {
@@ -208,8 +200,7 @@ func Test_BlockingAtomicTrie_XYZ(t *testing.T) {
 		return nil
 	}
 
-	doneChan := atomicTrie.Initialize(100, dbCommitFn)
-	err = <-doneChan
+	err = atomicTrie.Initialize(100, dbCommitFn)
 	assert.NoError(t, err)
 
 	tx0 := testDataExportTx()
