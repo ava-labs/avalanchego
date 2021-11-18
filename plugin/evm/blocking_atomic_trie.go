@@ -73,14 +73,18 @@ func NewBlockingAtomicTrie(db ethdb.KeyValueStore, repo AtomicTxRepository) (typ
 	}, nil
 }
 
-func (i *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error) error {
-	var commitHeight uint64
-	if lastAcceptedBlockNumber == 0 {
-		commitHeight = 0
-	} else {
-		commitHeight = (lastAcceptedBlockNumber - (lastAcceptedBlockNumber % i.commitHeightInterval)) - i.commitHeightInterval
+// nearestCommitHeight given a block number calculates the nearest commit height such that the
+// commit height is always less than blockNumber, commitHeight+commitInterval is greater
+// than the blockNumber and commit height is completely divisible by commit interval
+func nearestCommitHeight(blockNumber uint64, commitInterval uint64) uint64 {
+	if blockNumber == 0 {
+		return 0
 	}
+	return blockNumber - (blockNumber % commitInterval)
+}
 
+func (i *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error) error {
+	commitHeight := nearestCommitHeight(lastAcceptedBlockNumber, i.commitHeightInterval)
 	uncommittedOpsMap := make(map[uint64]map[ids.ID]*atomic.Requests, lastAcceptedBlockNumber-commitHeight)
 
 	iter := i.repo.Iterate()
