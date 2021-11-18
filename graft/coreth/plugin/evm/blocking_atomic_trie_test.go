@@ -1,6 +1,7 @@
 package evm
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -147,6 +148,13 @@ func testCodec() codec.Manager {
 		panic(errs.Err)
 	}
 	return Codec
+}
+
+func Test_nearestCommitHeight(t *testing.T) {
+	blockNumber := uint64(7029687)
+	height := nearestCommitHeight(blockNumber, 4096)
+	assert.Less(t, blockNumber, height+4096)
+	fmt.Println(height)
 }
 
 func Test_BlockingAtomicTrie_InitializeGenesis(t *testing.T) {
