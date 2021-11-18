@@ -25,21 +25,30 @@ type AtomicTrie interface {
 
 	// LastCommitted returns the following:
 	// - last committed hash
-	// - next block height that can be indexed (committed height + 1)
+	// - last committed block height
 	// - optional error
 	LastCommitted() (common.Hash, uint64, error)
 
 	// TrieDB returns the underlying trie database
 	TrieDB() *trie.Database
 
+	// Root returns the trie root if it exists at specified height with
+	// an optional error
 	Root(height uint64) (common.Hash, error)
 }
 
 // AtomicTrieIterator defines a stateful iterator that iterates
 // the AtomicTrie
 type AtomicTrieIterator interface {
+	// Next returns the next node in the atomic trie that is being iterated
 	Next() bool
+
+	// BlockNumber returns the current block number
 	BlockNumber() uint64
+
+	// AtomicOps returns the current atomic requests mapped to the chain ID
 	AtomicOps() map[ids.ID]*atomic.Requests
+
+	// Errors returns list of errors, if any
 	Errors() []error
 }
