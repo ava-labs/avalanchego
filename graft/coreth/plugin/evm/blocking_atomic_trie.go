@@ -3,6 +3,7 @@ package evm
 import (
 	"encoding/binary"
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -87,6 +88,7 @@ func (i *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommit
 
 	preCommitTxIndexed := 0
 	postCommitTxIndexed := 0
+	lastUpdate := time.Now()
 	for iter.Next() {
 		if err := iter.Error(); err != nil {
 			return err
@@ -127,6 +129,10 @@ func (i *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommit
 			}
 			preCommitTxIndexed++
 		}
+		if time.Since(lastUpdate) > 30*time.Second {
+			log.Info("imported entries into atomic trie pre-commit", "preCommitEntriesIndexed", preCommitTxIndexed)
+			lastUpdate = time.Now()
+		}
 	}
 
 	// skip commit in case of early height
@@ -159,6 +165,10 @@ func (i *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommit
 			return err
 		}
 		postCommitTxIndexed++
+		if time.Since(lastUpdate) > 30*time.Second {
+			log.Info("imported entries into atomic trie post-commit", "postCommitEntriesIndexed", postCommitTxIndexed)
+			lastUpdate = time.Now()
+		}
 	}
 
 	// check if its eligible to commit the trie
