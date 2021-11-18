@@ -111,7 +111,6 @@ func (b *Block) Accept() error {
 
 	b.status = choices.Accepted
 	log.Debug(fmt.Sprintf("Accepting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
-
 	if err := vm.chain.Accept(b.ethBlock); err != nil {
 		return fmt.Errorf("chain could not accept %s: %w", b.ID(), err)
 	}
@@ -155,32 +154,15 @@ func (b *Block) Accept() error {
 	if err != nil {
 		return err
 	}
-	lastAcceptedAtomicTxHeight, err := b.vm.LastAcceptedAtomicTxHeight()
-	if err != nil {
-		return fmt.Errorf("failed to get LastAcceptedAtomicTxHeight: #{err}")
+	if hash != (common.Hash{}) {
+		log.Info("atomic trie was committed", "hash", hash, "height", b.Height())
 	}
-	log.Info("block accept: read lastAcceptedAtomicTxHeight", "lastAcceptedAtomicTxHeight", lastAcceptedAtomicTxHeight, "height", b.Height())
-
-	if lastAcceptedAtomicTxHeight >= b.Height() {
-		log.Warn("skipping accepting atomic txs on block acceptance", "height", b.Height(), "ops", len(ops))
-		return vm.db.Commit()
-	}
-	if err := vm.SetLastAcceptedAtomicTxHeight(b.Height()); err != nil {
-		log.Error("error calling SetLastAcceptedAtomicTxHeight", "err", err)
-		return err
-	}
-
 	batch, err := vm.db.CommitBatch()
 	if err != nil {
 		return fmt.Errorf("failed to create commit batch due to: %w", err)
 	}
-	err = tx.UnsignedAtomicTx.Accept(vm.ctx, batch)
-	if err != nil {
-		return err
-	}
 
-	log.Info("indexed atomic trie", "hash", hash, "height", b.Height())
-	return nil
+	return tx.UnsignedAtomicTx.Accept(vm.ctx, batch)
 }
 
 // Reject implements the snowman.Block interface
