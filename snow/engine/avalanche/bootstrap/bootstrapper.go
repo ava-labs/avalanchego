@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -39,19 +38,6 @@ var (
 
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
-
-type Config struct {
-	common.Config
-
-	// VtxBlocked tracks operations that are blocked on vertices
-	VtxBlocked *queue.JobsWithMissing
-	// TxBlocked tracks operations that are blocked on transactions
-	TxBlocked *queue.Jobs
-
-	Manager vertex.Manager
-	VM      vertex.DAGVM
-	Starter common.GearStarter
-}
 
 func New(
 	config Config,

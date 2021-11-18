@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
@@ -27,18 +26,6 @@ var (
 
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
-
-type Config struct {
-	common.Config
-
-	// Blocked tracks operations that are blocked on blocks
-	Blocked *queue.JobsWithMissing
-
-	VM      block.ChainVM
-	Starter common.GearStarter
-
-	Bootstrapped func()
-}
 
 func New(
 	config Config,
