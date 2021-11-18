@@ -145,10 +145,13 @@ func (fs *fastSyncer) Start(startReqID uint32) error {
 	}
 
 	enabled, err := fs.fastSyncVM.StateSyncEnabled()
-	if err != nil {
+	switch {
+	case err == block.ErrStateSyncableVMNotImplemented:
+		// nothing to do, fast sync is not implemented
+		return fs.onDoneFastSyncing(fs.RequestID)
+	case err != nil:
 		return err
-	}
-	if !enabled {
+	case !enabled:
 		// nothing to do, fast sync is implemented but not enabled
 		return fs.onDoneFastSyncing(fs.RequestID)
 	}
@@ -202,7 +205,7 @@ func (fs *fastSyncer) startup() error {
 	return nil
 }
 
-// Ask up to [MaxOutstandingBootstrapRequests] bootstrap validators to send
+// Ask up to [MaxOutstandingFastSyncRequests] bootstrap validators to send
 // their accepted frontier with the current accepted frontier
 func (fs *fastSyncer) sendGetStateSummaryFrontiers() {
 	vdrs := ids.NewShortSet(1)
@@ -219,7 +222,7 @@ func (fs *fastSyncer) sendGetStateSummaryFrontiers() {
 	}
 }
 
-// Ask up to [MaxOutstandingBootstrapRequests] bootstrap validators to send
+// Ask up to [MaxOutstandingFastSyncRequests] bootstrap validators to send
 // their filtered accepted frontier
 func (fs *fastSyncer) sendGetAccepted() {
 	vdrs := ids.NewShortSet(1)
