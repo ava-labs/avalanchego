@@ -55,14 +55,13 @@ func (tx *UnsignedExportTx) InputUTXOs() ids.Set {
 
 // Verify this transaction is well-formed
 func (tx *UnsignedExportTx) Verify(
-	xChainID ids.ID,
 	ctx *snow.Context,
 	rules params.Rules,
 ) error {
 	switch {
 	case tx == nil:
 		return errNilTx
-	case tx.DestinationChain != xChainID:
+	case tx.DestinationChain != ctx.XChainID:
 		return errWrongChainID
 	case len(tx.ExportedOutputs) == 0:
 		return errNoExportOutputs
@@ -138,7 +137,7 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	baseFee *big.Int,
 	rules params.Rules,
 ) error {
-	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, rules); err != nil {
+	if err := tx.Verify(vm.ctx, rules); err != nil {
 		return err
 	}
 
@@ -332,7 +331,7 @@ func (vm *VM) newExportTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.currentRules())
+	return tx, utx.Verify(vm.ctx, vm.currentRules())
 }
 
 // EVMStateTransfer executes the state update from the atomic export transaction
