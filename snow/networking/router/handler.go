@@ -207,30 +207,40 @@ func (h *Handler) handleMsg(msg message.InboundMessage) error {
 	defer h.ctx.Lock.Unlock()
 
 	var (
-		err error
-		op  = msg.Op()
+		err        error
+		op         = msg.Op()
+		targetGear common.Engine
 	)
+
+	switch h.ctx.GetState() {
+	case snow.FastSyncing:
+		targetGear = h.fastSyncer
+	case snow.Bootstrapping:
+		targetGear = h.bootstrapper
+	case snow.NormalOp:
+		targetGear = h.engine
+	default:
+		return fmt.Errorf("unknown handler for state %v", h.ctx.GetState().String())
+	}
+
 	switch op {
 	case message.Notify:
 		vmMsg := msg.Get(message.VMMessage).(uint32)
-		var targetGear common.Engine
-		switch h.ctx.GetState() {
-		case snow.FastSyncing:
-			targetGear = h.fastSyncer
-		case snow.Bootstrapping:
-			targetGear = h.bootstrapper
-		case snow.NormalOp:
-			targetGear = h.engine
-		default:
-			return fmt.Errorf("unknown handler for state %v", h.ctx.GetState().String())
-		}
 		err = targetGear.Notify(common.Message(vmMsg))
 
 	case message.GossipRequest:
-		err = h.engine.Gossip()
+		err = targetGear.Gossip()
 
 	case message.Timeout:
-		err = h.bootstrapper.Timeout()
+		err = targetGear.Timeout()
+
+	case message.Connected:
+		nodeID := msg.NodeID()
+		err = targetGear.Connected(nodeID)
+
+	case message.Disconnected:
+		nodeID := msg.NodeID()
+		err = targetGear.Disconnected(nodeID)
 
 	default:
 		err = h.handleConsensusMsg(msg)
@@ -436,12 +446,6 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 	case message.QueryFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
 		return targetGear.QueryFailed(nodeID, reqID)
-
-	case message.Connected:
-		return targetGear.Connected(nodeID)
-
-	case message.Disconnected:
-		return targetGear.Disconnected(nodeID)
 
 	case message.AppRequest:
 		reqID := msg.Get(message.RequestID).(uint32)

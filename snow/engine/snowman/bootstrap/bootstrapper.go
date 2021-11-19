@@ -163,10 +163,7 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 		}
 	}
 
-	if numPending := b.Blocked.NumMissingIDs(); numPending == 0 {
-		return b.checkFinish()
-	}
-	return nil
+	return b.checkFinish()
 }
 
 // Get block [blkID] and its ancestors from a validator
@@ -178,10 +175,7 @@ func (b *bootstrapper) fetch(blkID ids.ID) error {
 
 	// Make sure we don't already have this block
 	if _, err := b.VM.GetBlock(blkID); err == nil {
-		if numPending := b.Blocked.NumMissingIDs(); numPending == 0 {
-			return b.checkFinish()
-		}
-		return nil
+		return b.checkFinish()
 	}
 
 	validators, err := b.Config.Beacons.Sample(1) // validator to send request to
@@ -361,15 +355,16 @@ func (b *bootstrapper) process(blk snowman.Block, processingBlocks map[ids.ID]sn
 		return err
 	}
 
-	if numPending := b.Blocked.NumMissingIDs(); numPending == 0 {
-		return b.checkFinish()
-	}
-	return nil
+	return b.checkFinish()
 }
 
 // checkFinish repeatedly executes pending transactions and requests new frontier vertices until there aren't any new ones
 // after which it finishes the bootstrap process
 func (b *bootstrapper) checkFinish() error {
+	if numPending := b.Blocked.NumMissingIDs(); numPending != 0 {
+		return nil
+	}
+
 	if b.IsBootstrapped() || b.awaitingTimeout {
 		return nil
 	}
@@ -380,7 +375,13 @@ func (b *bootstrapper) checkFinish() error {
 		b.Config.Ctx.Log.Debug("bootstrapping fetched %d blocks. Executing state transitions...", b.NumFetched)
 	}
 
-	executedBlocks, err := b.Blocked.ExecuteAll(b.Config.Ctx, b, b.Restarted, b.Config.Ctx.ConsensusDispatcher, b.Config.Ctx.DecisionDispatcher)
+	executedBlocks, err := b.Blocked.ExecuteAll(
+		b.Config.Ctx,
+		b,
+		b.Restarted,
+		b.Config.Ctx.ConsensusDispatcher,
+		b.Config.Ctx.DecisionDispatcher,
+	)
 	if err != nil || b.Halted() {
 		return err
 	}
