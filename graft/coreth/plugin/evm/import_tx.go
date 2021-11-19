@@ -48,14 +48,13 @@ func (tx *UnsignedImportTx) InputUTXOs() ids.Set {
 
 // Verify this transaction is well-formed
 func (tx *UnsignedImportTx) Verify(
-	xChainID ids.ID,
 	ctx *snow.Context,
 	rules params.Rules,
 ) error {
 	switch {
 	case tx == nil:
 		return errNilTx
-	case tx.SourceChain != xChainID:
+	case tx.SourceChain != ctx.XChainID:
 		return errWrongChainID
 	case len(tx.ImportedInputs) == 0:
 		return errNoImportInputs
@@ -145,7 +144,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	baseFee *big.Int,
 	rules params.Rules,
 ) error {
-	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, rules); err != nil {
+	if err := tx.Verify(vm.ctx, rules); err != nil {
 		return err
 	}
 
@@ -379,7 +378,7 @@ func (vm *VM) newImportTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.currentRules())
+	return tx, utx.Verify(vm.ctx, vm.currentRules())
 }
 
 // EVMStateTransfer performs the state transfer to increase the balances of
