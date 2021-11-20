@@ -6,6 +6,9 @@ package platformvm
 import (
 	"math/rand"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -28,23 +31,26 @@ func TestNewImportTx(t *testing.T) {
 
 	type test struct {
 		description   string
+		sourceChainID ids.ID
 		sharedMemory  atomic.SharedMemory
-		recipientKeys []*crypto.PrivateKeySECP256K1R
+		sourceKeys    []*crypto.PrivateKeySECP256K1R
+		timestamp     time.Time
 		shouldErr     bool
+		shouldVerify  bool
 	}
 
 	factory := crypto.FactorySECP256K1R{}
-	recipientKeyIntf, err := factory.NewPrivateKey()
+	sourceKeyIntf, err := factory.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-	recipientKey := recipientKeyIntf.(*crypto.PrivateKeySECP256K1R)
+	sourceKey := sourceKeyIntf.(*crypto.PrivateKeySECP256K1R)
 
 	cnt := new(byte)
 
 	// Returns a shared memory where GetDatabase returns a database
 	// where [recipientKey] has a balance of [amt]
-	fundedSharedMemory := func(amt uint64) atomic.SharedMemory {
+	fundedSharedMemory := func(peerChain ids.ID, amt uint64) atomic.SharedMemory {
 		*cnt++
 		m := &atomic.Memory{}
 		err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{*cnt}, baseDB))
@@ -53,7 +59,7 @@ func TestNewImportTx(t *testing.T) {
 		}
 
 		sm := m.NewSharedMemory(vm.ctx.ChainID)
-		peerSharedMemory := m.NewSharedMemory(avmID)
+		peerSharedMemory := m.NewSharedMemory(peerChain)
 
 		// #nosec G404
 		utxo := &avax.UTXO{
@@ -66,7 +72,7 @@ func TestNewImportTx(t *testing.T) {
 				Amt: amt,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
-					Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
+					Addrs:     []ids.ShortID{sourceKey.PublicKey().Address()},
 					Threshold: 1,
 				},
 			},
@@ -80,7 +86,7 @@ func TestNewImportTx(t *testing.T) {
 			Key:   inputID[:],
 			Value: utxoBytes,
 			Traits: [][]byte{
-				recipientKey.PublicKey().Address().Bytes(),
+				sourceKey.PublicKey().Address().Bytes(),
 			},
 		}}}}); err != nil {
 			t.Fatal(err)
@@ -91,51 +97,96 @@ func TestNewImportTx(t *testing.T) {
 
 	tests := []test{
 		{
-			description:   "recipient key can't pay fee;",
-			sharedMemory:  fundedSharedMemory(vm.TxFee - 1),
-			recipientKeys: []*crypto.PrivateKeySECP256K1R{recipientKey},
+			description:   "can't pay fee",
+			sourceChainID: xChainID,
+			sharedMemory:  fundedSharedMemory(xChainID, vm.TxFee-1),
+			sourceKeys:    []*crypto.PrivateKeySECP256K1R{sourceKey},
 			shouldErr:     true,
 		},
 		{
 
-			description:   "recipient key pays fee",
-			sharedMemory:  fundedSharedMemory(vm.TxFee),
-			recipientKeys: []*crypto.PrivateKeySECP256K1R{recipientKey},
+			description:   "can barely pay fee",
+			sourceChainID: xChainID,
+			sharedMemory:  fundedSharedMemory(xChainID, vm.TxFee),
+			sourceKeys:    []*crypto.PrivateKeySECP256K1R{sourceKey},
 			shouldErr:     false,
+			shouldVerify:  true,
+		},
+		{
+
+			description:   "attempting to import from C-chain before AP5",
+			sourceChainID: cChainID,
+			sharedMemory:  fundedSharedMemory(cChainID, vm.TxFee),
+			sourceKeys:    []*crypto.PrivateKeySECP256K1R{sourceKey},
+			timestamp:     defaultValidateStartTime,
+			shouldErr:     false,
+			shouldVerify:  false,
+		},
+		{
+
+			description:   "attempting to import from C-chain after AP5",
+			sourceChainID: cChainID,
+			sharedMemory:  fundedSharedMemory(cChainID, vm.TxFee),
+			sourceKeys:    []*crypto.PrivateKeySECP256K1R{sourceKey},
+			timestamp:     vm.ApricotPhase5Time,
+			shouldErr:     false,
+			shouldVerify:  true,
 		},
 	}
 
 	to := ids.GenerateTestShortID()
 	for _, tt := range tests {
-		vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(tt.sharedMemory, Codec)
-		tx, err := vm.newImportTx(avmID, to, tt.recipientKeys, ids.ShortEmpty)
-		if err != nil {
-			if !tt.shouldErr {
-				t.Fatalf("test '%s' unexpectedly errored with: %s", tt.description, err)
+		t.Run(tt.description, func(t *testing.T) {
+			assert := assert.New(t)
+
+			vm.ctx.SharedMemory = tt.sharedMemory
+			vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(tt.sharedMemory, Codec)
+			tx, err := vm.newImportTx(tt.sourceChainID, to, tt.sourceKeys, ids.ShortEmpty)
+			if tt.shouldErr {
+				assert.Error(err)
+				return
 			}
-			continue
-		} else if tt.shouldErr {
-			t.Fatalf("test '%s' didn't error but it should have", tt.description)
-		}
-		unsignedTx := tx.UnsignedTx.(*UnsignedImportTx)
-		if len(unsignedTx.ImportedInputs) == 0 {
-			t.Fatalf("in test '%s', tx has no imported inputs", tt.description)
-		} else if len(tx.Creds) != len(unsignedTx.Ins)+len(unsignedTx.ImportedInputs) {
-			t.Fatalf("in test '%s', should have same number of credentials as inputs", tt.description)
-		}
-		totalIn := uint64(0)
-		for _, in := range unsignedTx.Ins {
-			totalIn += in.Input().Amount()
-		}
-		for _, in := range unsignedTx.ImportedInputs {
-			totalIn += in.Input().Amount()
-		}
-		totalOut := uint64(0)
-		for _, out := range unsignedTx.Outs {
-			totalOut += out.Out.Amount()
-		}
-		if totalIn-totalOut != vm.TxFee {
-			t.Fatalf("in test '%s'. inputs (%d) != outputs (%d) + txFee (%d)", tt.description, totalIn, totalOut, vm.TxFee)
-		}
+			assert.NoError(err)
+
+			unsignedTx := tx.UnsignedTx.(*UnsignedImportTx)
+			assert.NotEmpty(unsignedTx.ImportedInputs)
+			assert.Equal(len(tx.Creds), len(unsignedTx.Ins)+len(unsignedTx.ImportedInputs), "should have the same number of credentials as inputs")
+
+			totalIn := uint64(0)
+			for _, in := range unsignedTx.Ins {
+				totalIn += in.Input().Amount()
+			}
+			for _, in := range unsignedTx.ImportedInputs {
+				totalIn += in.Input().Amount()
+			}
+			totalOut := uint64(0)
+			for _, out := range unsignedTx.Outs {
+				totalOut += out.Out.Amount()
+			}
+
+			assert.Equal(vm.TxFee, totalIn-totalOut, "burned too much")
+
+			// Get the preferred block (which we want to build off)
+			preferred, err := vm.Preferred()
+			assert.NoError(err)
+
+			preferredDecision, ok := preferred.(decision)
+			assert.True(ok)
+
+			preferredState := preferredDecision.onAccept()
+			fakedState := newVersionedState(
+				preferredState,
+				preferredState.CurrentStakerChainState(),
+				preferredState.PendingStakerChainState(),
+			)
+			fakedState.SetTimestamp(tt.timestamp)
+
+			err = tx.UnsignedTx.SemanticVerify(vm, fakedState, tx)
+			if tt.shouldVerify {
+				assert.NoError(err)
+			} else {
+				assert.Error(err)
+			}
+		})
 	}
 }
