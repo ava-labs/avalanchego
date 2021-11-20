@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -675,4 +676,18 @@ func (vm *VM) getPercentConnected() (float64, error) {
 		}
 	}
 	return float64(connectedStake) / float64(vdrSet.Weight()), nil
+}
+
+// TODO: remove after AP5
+func (vm *VM) isValidCrossChainID(vs VersionedState, peerChainID ids.ID) TxError {
+	currentTimestamp := vs.GetTimestamp()
+	enabledAP5 := !currentTimestamp.Before(vm.ApricotPhase5Time)
+	if enabledAP5 {
+		if err := verify.SameSubnet(vm.ctx, peerChainID); err != nil {
+			return tempError{err}
+		}
+	} else if peerChainID != vm.ctx.XChainID {
+		return permError{errWrongChainID}
+	}
+	return nil
 }
