@@ -80,12 +80,8 @@ func (t *ExportTx) SyntacticVerify(
 // SemanticVerify that this transaction is valid to be spent.
 func (t *ExportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable) error {
 	if vm.bootstrapped {
-		subnetID, err := vm.ctx.SNLookup.SubnetID(t.DestinationChain)
-		if err != nil {
+		if err := verify.SameSubnet(vm.ctx, t.DestinationChain); err != nil {
 			return err
-		}
-		if vm.ctx.SubnetID != subnetID || t.DestinationChain == vm.ctx.ChainID {
-			return errWrongBlockchainID
 		}
 	}
 

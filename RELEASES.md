@@ -2,11 +2,16 @@
 
 ## [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0)
 
-This upgrade adds [TODO: populate].
+This upgrade adds support for issuing multiple atomic transactions into a single block and for directly transferring assets between the P-chain and the X-chain.
 
 The changes in the upgrade go into effect at **[TODO: populate]**. One should upgrade their node before the changes go into effect, otherwise they may experience loss of uptime.
 
 More info can be found [here]([TODO: populate]).
+
+## PlatformVM
+
+- Enabled `AtomicTx`s to be issued into `StandardBlock`s and deprecated `AtomicBlock`s.
+- Added the ability to export/import AVAX to/from the C-chain.
 
 ## Configs
 

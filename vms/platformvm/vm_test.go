@@ -83,7 +83,8 @@ var (
 	testSubnet1            *UnsignedCreateSubnetTx
 	testSubnet1ControlKeys []*crypto.PrivateKeySECP256K1R
 
-	avmID = ids.Empty.Prefix(0)
+	xChainID = ids.Empty.Prefix(0)
+	cChainID = ids.Empty.Prefix(1)
 )
 
 var (
@@ -115,10 +116,22 @@ func init() {
 	testSubnet1ControlKeys = keys[0:3]
 }
 
+type snLookup struct {
+	chainsToSubnet map[ids.ID]ids.ID
+}
+
+func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
+	subnetID, ok := sn.chainsToSubnet[chainID]
+	if !ok {
+		return ids.ID{}, errors.New("")
+	}
+	return subnetID, nil
+}
+
 func defaultContext() *snow.Context {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = testNetworkID
-	ctx.XChainID = avmID
+	ctx.XChainID = xChainID
 	ctx.AVAXAssetID = avaxAssetID
 	aliaser := ids.NewAliaser()
 
@@ -126,13 +139,23 @@ func defaultContext() *snow.Context {
 	errs.Add(
 		aliaser.Alias(constants.PlatformChainID, "P"),
 		aliaser.Alias(constants.PlatformChainID, constants.PlatformChainID.String()),
-		aliaser.Alias(avmID, "X"),
-		aliaser.Alias(avmID, avmID.String()),
+		aliaser.Alias(xChainID, "X"),
+		aliaser.Alias(xChainID, xChainID.String()),
+		aliaser.Alias(cChainID, "C"),
+		aliaser.Alias(cChainID, cChainID.String()),
 	)
 	if errs.Errored() {
 		panic(errs.Err)
 	}
 	ctx.BCLookup = aliaser
+
+	ctx.SNLookup = &snLookup{
+		chainsToSubnet: map[ids.ID]ids.ID{
+			constants.PlatformChainID: constants.PrimaryNetworkID,
+			xChainID:                  constants.PrimaryNetworkID,
+			cChainID:                  constants.PrimaryNetworkID,
+		},
+	}
 	return ctx
 }
 
