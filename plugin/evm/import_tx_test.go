@@ -317,7 +317,7 @@ func TestNewImportTx(t *testing.T) {
 	// and checks that it has the correct fee for the base fee that has been used
 	createNewImportAVAXTx := func(t *testing.T, vm *VM, sharedMemory *atomic.Memory) *Tx {
 		txID := ids.GenerateTestID()
-		_, err := addUTXO(sharedMemory, vm.ctx, txID, vm.ctx.AVAXAssetID, importAmount, testShortIDAddrs[0])
+		_, err := addUTXO(sharedMemory, vm.ctx, txID, 0, vm.ctx.AVAXAssetID, importAmount, testShortIDAddrs[0])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -335,7 +335,7 @@ func TestNewImportTx(t *testing.T) {
 		rules := vm.currentRules()
 		switch {
 		case rules.IsApricotPhase3:
-			actualCost, err := importTx.GasUsed()
+			actualCost, err := importTx.GasUsed(rules.IsApricotPhase5)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -356,17 +356,17 @@ func TestNewImportTx(t *testing.T) {
 		return tx
 	}
 	checkState := func(t *testing.T, vm *VM) {
-		tx, err := vm.extractAtomicTx(vm.LastAcceptedBlockInternal().(*Block).ethBlock)
-		if err != nil {
-			t.Fatal(err)
+		txs := vm.LastAcceptedBlockInternal().(*Block).atomicTxs
+		if len(txs) != 1 {
+			t.Fatalf("Expected one import tx to be in the last accepted block, but found %d", len(txs))
 		}
-		if tx == nil {
-			t.Fatal("Expected import tx to be in the last accepted block, but found nil")
-		}
+
+		tx := txs[0]
 		actualAVAXBurned, err := tx.UnsignedAtomicTx.Burned(vm.ctx.AVAXAssetID)
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		// Ensure that the UTXO has been removed from shared memory within Accept
 		addrSet := ids.ShortSet{}
 		addrSet.Add(testShortIDAddrs[0])
@@ -389,6 +389,7 @@ func TestNewImportTx(t *testing.T) {
 		if actualBalance := sdb.GetBalance(addr); actualBalance.Cmp(expectedRemainingBalance) != 0 {
 			t.Fatalf("address remaining balance %s equal %s not %s", addr.String(), actualBalance, expectedRemainingBalance)
 		}
+
 	}
 	tests2 := map[string]atomicTxTest{
 		"apricot phase 0": {
@@ -437,6 +438,7 @@ func TestImportTxGasCost(t *testing.T) {
 		ExpectedGasUsed uint64
 		ExpectedFee     uint64
 		BaseFee         *big.Int
+		FixedFee        bool
 	}{
 		"simple import": {
 			UnsignedImportTx: &UnsignedImportTx{
@@ -485,6 +487,31 @@ func TestImportTxGasCost(t *testing.T) {
 			ExpectedGasUsed: 1230,
 			ExpectedFee:     1,
 			BaseFee:         big.NewInt(1),
+		},
+		"simple import 1wei + fixed fee": {
+			UnsignedImportTx: &UnsignedImportTx{
+				NetworkID:    networkID,
+				BlockchainID: chainID,
+				SourceChain:  xChainID,
+				ImportedInputs: []*avax.TransferableInput{{
+					UTXOID: avax.UTXOID{TxID: ids.GenerateTestID()},
+					Asset:  avax.Asset{ID: avaxAssetID},
+					In: &secp256k1fx.TransferInput{
+						Amt:   importAmount,
+						Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+					},
+				}},
+				Outs: []EVMOutput{{
+					Address: testEthAddrs[0],
+					Amount:  importAmount,
+					AssetID: avaxAssetID,
+				}},
+			},
+			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
+			ExpectedGasUsed: 11230,
+			ExpectedFee:     1,
+			BaseFee:         big.NewInt(1),
+			FixedFee:        true,
 		},
 		"simple ANT import": {
 			UnsignedImportTx: &UnsignedImportTx{
@@ -709,7 +736,7 @@ func TestImportTxGasCost(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			gasUsed, err := tx.GasUsed()
+			gasUsed, err := tx.GasUsed(test.FixedFee)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -832,7 +859,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 			setup: func(t *testing.T, vm *VM, sharedMemory *atomic.Memory) *Tx {
 				txID := ids.GenerateTestID()
 				expectedAssetID := ids.GenerateTestID()
-				utxo, err := addUTXO(sharedMemory, vm.ctx, txID, expectedAssetID, 1, testShortIDAddrs[0])
+				utxo, err := addUTXO(sharedMemory, vm.ctx, txID, 0, expectedAssetID, 1, testShortIDAddrs[0])
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -865,7 +892,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 		"insufficient AVAX funds": {
 			setup: func(t *testing.T, vm *VM, sharedMemory *atomic.Memory) *Tx {
 				txID := ids.GenerateTestID()
-				utxo, err := addUTXO(sharedMemory, vm.ctx, txID, vm.ctx.AVAXAssetID, 1, testShortIDAddrs[0])
+				utxo, err := addUTXO(sharedMemory, vm.ctx, txID, 0, vm.ctx.AVAXAssetID, 1, testShortIDAddrs[0])
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -899,7 +926,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 			setup: func(t *testing.T, vm *VM, sharedMemory *atomic.Memory) *Tx {
 				txID := ids.GenerateTestID()
 				assetID := ids.GenerateTestID()
-				utxo, err := addUTXO(sharedMemory, vm.ctx, txID, assetID, 1, testShortIDAddrs[0])
+				utxo, err := addUTXO(sharedMemory, vm.ctx, txID, 0, assetID, 1, testShortIDAddrs[0])
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -932,7 +959,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 		"no signatures": {
 			setup: func(t *testing.T, vm *VM, sharedMemory *atomic.Memory) *Tx {
 				txID := ids.GenerateTestID()
-				utxo, err := addUTXO(sharedMemory, vm.ctx, txID, vm.ctx.AVAXAssetID, 1, testShortIDAddrs[0])
+				utxo, err := addUTXO(sharedMemory, vm.ctx, txID, 0, vm.ctx.AVAXAssetID, 1, testShortIDAddrs[0])
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -965,7 +992,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 		"incorrect signature": {
 			setup: func(t *testing.T, vm *VM, sharedMemory *atomic.Memory) *Tx {
 				txID := ids.GenerateTestID()
-				utxo, err := addUTXO(sharedMemory, vm.ctx, txID, vm.ctx.AVAXAssetID, 1, testShortIDAddrs[0])
+				utxo, err := addUTXO(sharedMemory, vm.ctx, txID, 0, vm.ctx.AVAXAssetID, 1, testShortIDAddrs[0])
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -999,7 +1026,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 		"non-unique EVM Outputs": {
 			setup: func(t *testing.T, vm *VM, sharedMemory *atomic.Memory) *Tx {
 				txID := ids.GenerateTestID()
-				utxo, err := addUTXO(sharedMemory, vm.ctx, txID, vm.ctx.AVAXAssetID, 2, testShortIDAddrs[0])
+				utxo, err := addUTXO(sharedMemory, vm.ctx, txID, 0, vm.ctx.AVAXAssetID, 2, testShortIDAddrs[0])
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -1052,7 +1079,7 @@ func TestImportTxEVMStateTransfer(t *testing.T) {
 		"AVAX UTXO": {
 			setup: func(t *testing.T, vm *VM, sharedMemory *atomic.Memory) *Tx {
 				txID := ids.GenerateTestID()
-				utxo, err := addUTXO(sharedMemory, vm.ctx, txID, vm.ctx.AVAXAssetID, 1, testShortIDAddrs[0])
+				utxo, err := addUTXO(sharedMemory, vm.ctx, txID, 0, vm.ctx.AVAXAssetID, 1, testShortIDAddrs[0])
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -1097,7 +1124,7 @@ func TestImportTxEVMStateTransfer(t *testing.T) {
 		"non-AVAX UTXO": {
 			setup: func(t *testing.T, vm *VM, sharedMemory *atomic.Memory) *Tx {
 				txID := ids.GenerateTestID()
-				utxo, err := addUTXO(sharedMemory, vm.ctx, txID, assetID, 1, testShortIDAddrs[0])
+				utxo, err := addUTXO(sharedMemory, vm.ctx, txID, 0, assetID, 1, testShortIDAddrs[0])
 				if err != nil {
 					t.Fatal(err)
 				}

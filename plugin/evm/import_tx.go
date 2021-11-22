@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/coreth/params"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -94,14 +93,23 @@ func (tx *UnsignedImportTx) Verify(
 	return nil
 }
 
-func (tx *UnsignedImportTx) GasUsed() (uint64, error) {
-	cost := calcBytesCost(len(tx.UnsignedBytes()))
+func (tx *UnsignedImportTx) GasUsed(fixedFee bool) (uint64, error) {
+	var (
+		cost = calcBytesCost(len(tx.UnsignedBytes()))
+		err  error
+	)
 	for _, in := range tx.ImportedInputs {
 		inCost, err := in.In.Cost()
 		if err != nil {
 			return 0, err
 		}
 		cost, err = math.Add64(cost, inCost)
+		if err != nil {
+			return 0, err
+		}
+	}
+	if fixedFee {
+		cost, err = math.Add64(cost, params.AtomicTxBaseCost)
 		if err != nil {
 			return 0, err
 		}
@@ -153,7 +161,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	switch {
 	// Apply dynamic fees to import transactions as of Apricot Phase 3
 	case rules.IsApricotPhase3:
-		gasUsed, err := stx.GasUsed()
+		gasUsed, err := stx.GasUsed(rules.IsApricotPhase5)
 		if err != nil {
 			return err
 		}
@@ -227,13 +235,13 @@ func (tx *UnsignedImportTx) SemanticVerify(
 // we don't want to remove an imported UTXO in semanticVerify
 // only to have the transaction not be Accepted. This would be inconsistent.
 // Recall that imported UTXOs are not kept in a versionDB.
-func (tx *UnsignedImportTx) Accept(ctx *snow.Context, batch database.Batch) error {
+func (tx *UnsignedImportTx) Accept() (ids.ID, *atomic.Requests, error) {
 	utxoIDs := make([][]byte, len(tx.ImportedInputs))
 	for i, in := range tx.ImportedInputs {
 		inputID := in.InputID()
 		utxoIDs[i] = inputID[:]
 	}
-	return ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{tx.SourceChain: {RemoveRequests: utxoIDs}}, batch)
+	return tx.SourceChain, &atomic.Requests{RemoveRequests: utxoIDs}, nil
 }
 
 // newImportTx returns a new ImportTx
@@ -243,10 +251,6 @@ func (vm *VM) newImportTx(
 	baseFee *big.Int, // fee to use post-AP3
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to import the funds
 ) (*Tx, error) {
-	if vm.ctx.XChainID != chainID {
-		return nil, errWrongChainID
-	}
-
 	kc := secp256k1fx.NewKeychain()
 	for _, key := range keys {
 		kc.Add(key)
@@ -255,6 +259,21 @@ func (vm *VM) newImportTx(
 	atomicUTXOs, _, _, err := vm.GetAtomicUTXOs(chainID, kc.Addresses(), ids.ShortEmpty, ids.Empty, -1)
 	if err != nil {
 		return nil, fmt.Errorf("problem retrieving atomic UTXOs: %w", err)
+	}
+
+	return vm.newImportTxWithUTXOs(chainID, to, baseFee, kc, atomicUTXOs)
+}
+
+// newImportTx returns a new ImportTx
+func (vm *VM) newImportTxWithUTXOs(
+	chainID ids.ID, // chain to import from
+	to common.Address, // Address of recipient
+	baseFee *big.Int, // fee to use post-AP3
+	kc *secp256k1fx.Keychain, // Keychain to use for signing the atomic UTXOs
+	atomicUTXOs []*avax.UTXO, // UTXOs to spend
+) (*Tx, error) {
+	if vm.ctx.XChainID != chainID {
+		return nil, errWrongChainID
 	}
 
 	importedInputs := []*avax.TransferableInput{}
@@ -325,7 +344,7 @@ func (vm *VM) newImportTx(
 			return nil, err
 		}
 
-		gasUsedWithoutChange, err := tx.GasUsed()
+		gasUsedWithoutChange, err := tx.GasUsed(rules.IsApricotPhase5)
 		if err != nil {
 			return nil, err
 		}

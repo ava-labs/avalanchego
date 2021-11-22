@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/coreth/params"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -92,14 +91,25 @@ func (tx *UnsignedExportTx) Verify(
 	return nil
 }
 
-func (tx *UnsignedExportTx) GasUsed() (uint64, error) {
+func (tx *UnsignedExportTx) GasUsed(fixedFee bool) (uint64, error) {
 	byteCost := calcBytesCost(len(tx.UnsignedBytes()))
 	numSigs := uint64(len(tx.Ins))
 	sigCost, err := math.Mul64(numSigs, secp256k1fx.CostPerSignature)
 	if err != nil {
 		return 0, err
 	}
-	return math.Add64(byteCost, sigCost)
+	cost, err := math.Add64(byteCost, sigCost)
+	if err != nil {
+		return 0, err
+	}
+	if fixedFee {
+		cost, err = math.Add64(cost, params.AtomicTxBaseCost)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	return cost, nil
 }
 
 // Amount of [assetID] burned by this transaction
@@ -146,7 +156,7 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	switch {
 	// Apply dynamic fees to export transactions as of Apricot Phase 3
 	case rules.IsApricotPhase3:
-		gasUsed, err := stx.GasUsed()
+		gasUsed, err := stx.GasUsed(rules.IsApricotPhase5)
 		if err != nil {
 			return err
 		}
@@ -155,7 +165,6 @@ func (tx *UnsignedExportTx) SemanticVerify(
 			return err
 		}
 		fc.Produce(vm.ctx.AVAXAssetID, txFee)
-
 	// Apply fees to export transactions before Apricot Phase 3
 	default:
 		fc.Produce(vm.ctx.AVAXAssetID, params.AvalancheAtomicTxFee)
@@ -205,7 +214,7 @@ func (tx *UnsignedExportTx) SemanticVerify(
 }
 
 // Accept this transaction.
-func (tx *UnsignedExportTx) Accept(ctx *snow.Context, batch database.Batch) error {
+func (tx *UnsignedExportTx) Accept() (ids.ID, *atomic.Requests, error) {
 	txID := tx.ID()
 
 	elems := make([]*atomic.Element, len(tx.ExportedOutputs))
@@ -221,7 +230,7 @@ func (tx *UnsignedExportTx) Accept(ctx *snow.Context, batch database.Batch) erro
 
 		utxoBytes, err := Codec.Marshal(codecVersion, utxo)
 		if err != nil {
-			return err
+			return ids.ID{}, nil, err
 		}
 		utxoID := utxo.InputID()
 		elem := &atomic.Element{
@@ -235,7 +244,7 @@ func (tx *UnsignedExportTx) Accept(ctx *snow.Context, batch database.Batch) erro
 		elems[i] = elem
 	}
 
-	return ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{tx.DestinationChain: {PutRequests: elems}}, batch)
+	return tx.DestinationChain, &atomic.Requests{PutRequests: elems}, nil
 }
 
 // newExportTx returns a new ExportTx
@@ -296,7 +305,7 @@ func (vm *VM) newExportTx(
 		}
 
 		var cost uint64
-		cost, err = tx.GasUsed()
+		cost, err = tx.GasUsed(rules.IsApricotPhase5)
 		if err != nil {
 			return nil, err
 		}
