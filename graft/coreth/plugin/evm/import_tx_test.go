@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -153,6 +154,25 @@ func TestImportTxVerify(t *testing.T) {
 			rules:       apricotRulesPhase0,
 			expectedErr: errWrongBlockchainID.Error(),
 		},
+		"P-chain source before AP5": {
+			generate: func(t *testing.T) UnsignedAtomicTx {
+				tx := *importTx
+				tx.SourceChain = constants.PlatformChainID
+				return &tx
+			},
+			ctx:         ctx,
+			rules:       apricotRulesPhase0,
+			expectedErr: errWrongChainID.Error(),
+		},
+		"P-chain source after AP5": {
+			generate: func(t *testing.T) UnsignedAtomicTx {
+				tx := *importTx
+				tx.SourceChain = constants.PlatformChainID
+				return &tx
+			},
+			ctx:   ctx,
+			rules: apricotRulesPhase5,
+		},
 		"invalid source chain ID": {
 			generate: func(t *testing.T) UnsignedAtomicTx {
 				tx := *importTx
@@ -160,7 +180,7 @@ func TestImportTxVerify(t *testing.T) {
 				return &tx
 			},
 			ctx:         ctx,
-			rules:       apricotRulesPhase0,
+			rules:       apricotRulesPhase5,
 			expectedErr: errWrongChainID.Error(),
 		},
 		"no inputs": {

@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -132,8 +133,26 @@ func NewContext() *snow.Context {
 	_ = aliaser.Alias(testCChainID, testCChainID.String())
 	_ = aliaser.Alias(testXChainID, "X")
 	_ = aliaser.Alias(testXChainID, testXChainID.String())
-
+	ctx.SNLookup = &snLookup{
+		chainsToSubnet: map[ids.ID]ids.ID{
+			constants.PlatformChainID: constants.PrimaryNetworkID,
+			testXChainID:              constants.PrimaryNetworkID,
+			testCChainID:              constants.PrimaryNetworkID,
+		},
+	}
 	return ctx
+}
+
+type snLookup struct {
+	chainsToSubnet map[ids.ID]ids.ID
+}
+
+func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
+	subnetID, ok := sn.chainsToSubnet[chainID]
+	if !ok {
+		return ids.ID{}, errors.New("unknown chain")
+	}
+	return subnetID, nil
 }
 
 func setupGenesis(t *testing.T,

@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -60,14 +61,25 @@ func (tx *UnsignedExportTx) Verify(
 	switch {
 	case tx == nil:
 		return errNilTx
-	case tx.DestinationChain != ctx.XChainID:
-		return errWrongChainID
 	case len(tx.ExportedOutputs) == 0:
 		return errNoExportOutputs
 	case tx.NetworkID != ctx.NetworkID:
 		return errWrongNetworkID
 	case ctx.ChainID != tx.BlockchainID:
 		return errWrongBlockchainID
+	}
+
+	// Make sure that the tx has a valid peer chain ID
+	if rules.IsApricotPhase5 {
+		// Note that SameSubnet verifies that [tx.DestinationChain] isn't this
+		// chain's ID
+		if err := verify.SameSubnet(ctx, tx.DestinationChain); err != nil {
+			return errWrongChainID
+		}
+	} else {
+		if tx.DestinationChain != ctx.XChainID {
+			return errWrongChainID
+		}
 	}
 
 	for _, in := range tx.Ins {
@@ -256,10 +268,6 @@ func (vm *VM) newExportTx(
 	baseFee *big.Int, // fee to use post-AP3
 	keys []*crypto.PrivateKeySECP256K1R, // Pay the fee and provide the tokens
 ) (*Tx, error) {
-	if vm.ctx.XChainID != chainID {
-		return nil, errWrongChainID
-	}
-
 	outs := []*avax.TransferableOutput{{ // Exported to X-Chain
 		Asset: avax.Asset{ID: assetID},
 		Out: &secp256k1fx.TransferOutput{
@@ -348,7 +356,7 @@ func (tx *UnsignedExportTx) EVMStateTransfer(ctx *snow.Context, state *state.Sta
 	addrs := map[[20]byte]uint64{}
 	for _, from := range tx.Ins {
 		if from.AssetID == ctx.AVAXAssetID {
-			log.Debug("crosschain C->X", "addr", from.Address, "amount", from.Amount, "assetID", "AVAX")
+			log.Debug("crosschain", "dest", tx.DestinationChain, "addr", from.Address, "amount", from.Amount, "assetID", "AVAX")
 			// We multiply the input amount by x2cRate to convert AVAX back to the appropriate
 			// denomination before export.
 			amount := new(big.Int).Mul(
@@ -358,7 +366,7 @@ func (tx *UnsignedExportTx) EVMStateTransfer(ctx *snow.Context, state *state.Sta
 			}
 			state.SubBalance(from.Address, amount)
 		} else {
-			log.Debug("crosschain C->X", "addr", from.Address, "amount", from.Amount, "assetID", from.AssetID)
+			log.Debug("crosschain", "dest", tx.DestinationChain, "addr", from.Address, "amount", from.Amount, "assetID", from.AssetID)
 			amount := new(big.Int).SetUint64(from.Amount)
 			if state.GetBalanceMultiCoin(from.Address, common.Hash(from.AssetID)).Cmp(amount) < 0 {
 				return errInsufficientFunds

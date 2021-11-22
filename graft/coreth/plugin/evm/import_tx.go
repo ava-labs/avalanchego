@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -53,8 +54,6 @@ func (tx *UnsignedImportTx) Verify(
 	switch {
 	case tx == nil:
 		return errNilTx
-	case tx.SourceChain != ctx.XChainID:
-		return errWrongChainID
 	case len(tx.ImportedInputs) == 0:
 		return errNoImportInputs
 	case tx.NetworkID != ctx.NetworkID:
@@ -63,6 +62,19 @@ func (tx *UnsignedImportTx) Verify(
 		return errWrongBlockchainID
 	case rules.IsApricotPhase3 && len(tx.Outs) == 0:
 		return errNoEVMOutputs
+	}
+
+	// Make sure that the tx has a valid peer chain ID
+	if rules.IsApricotPhase5 {
+		// Note that SameSubnet verifies that [tx.SourceChain] isn't this
+		// chain's ID
+		if err := verify.SameSubnet(ctx, tx.SourceChain); err != nil {
+			return errWrongChainID
+		}
+	} else {
+		if tx.SourceChain != ctx.XChainID {
+			return errWrongChainID
+		}
 	}
 
 	for _, out := range tx.Outs {
@@ -272,10 +284,6 @@ func (vm *VM) newImportTxWithUTXOs(
 	kc *secp256k1fx.Keychain, // Keychain to use for signing the atomic UTXOs
 	atomicUTXOs []*avax.UTXO, // UTXOs to spend
 ) (*Tx, error) {
-	if vm.ctx.XChainID != chainID {
-		return nil, errWrongChainID
-	}
-
 	importedInputs := []*avax.TransferableInput{}
 	signers := [][]*crypto.PrivateKeySECP256K1R{}
 
@@ -405,14 +413,14 @@ func (vm *VM) newImportTxWithUTXOs(
 func (tx *UnsignedImportTx) EVMStateTransfer(ctx *snow.Context, state *state.StateDB) error {
 	for _, to := range tx.Outs {
 		if to.AssetID == ctx.AVAXAssetID {
-			log.Debug("crosschain X->C", "addr", to.Address, "amount", to.Amount, "assetID", "AVAX")
+			log.Debug("crosschain", "src", tx.SourceChain, "addr", to.Address, "amount", to.Amount, "assetID", "AVAX")
 			// If the asset is AVAX, convert the input amount in nAVAX to gWei by
 			// multiplying by the x2c rate.
 			amount := new(big.Int).Mul(
 				new(big.Int).SetUint64(to.Amount), x2cRate)
 			state.AddBalance(to.Address, amount)
 		} else {
-			log.Debug("crosschain X->C", "addr", to.Address, "amount", to.Amount, "assetID", to.AssetID)
+			log.Debug("crosschain", "src", tx.SourceChain, "addr", to.Address, "amount", to.Amount, "assetID", to.AssetID)
 			amount := new(big.Int).SetUint64(to.Amount)
 			state.AddBalanceMultiCoin(to.Address, common.Hash(to.AssetID), amount)
 		}
