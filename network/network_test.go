@@ -3203,5 +3203,6 @@ func newDefaultConfig() Config {
 		MaxClockDifference: time.Minute,
 		AllowPrivateIPs:    true,
 		PingFrequency:      constants.DefaultPingFrequency,
+		UptimeMetricFreq:   30 * time.Second,
 	}
 }

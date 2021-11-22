@@ -351,8 +351,8 @@ func (p *peer) WriteMessages() {
 				msg.DecRef()
 				return
 			}
-			p.tickerOnce.Do(p.StartTicker)
 		}
+		p.tickerOnce.Do(p.StartTicker)
 		// Make sure the peer got the entire message
 		if err := writer.Flush(); err != nil {
 			p.net.log.Verbo("couldn't flush writer to %s%s at %s: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
@@ -855,7 +855,10 @@ func (p *peer) pongHandle(msg message.InboundMessage, isUptime bool) {
 		p.net.log.Debug("disconnecting from peer %s%s at %s version (%s) not compatible: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), peerVersion, err)
 		p.discardIP()
 	}
-	if isUptime {
+	if isUptime &&
+		// if the peer or this node is not a validator, we don't need their uptime.
+		p.net.config.Validators.Contains(constants.PrimaryNetworkID, p.nodeID) &&
+		p.net.config.Validators.Contains(constants.PrimaryNetworkID, p.net.config.MyNodeID) {
 		uptime := msg.Get(message.Uptime).(uint8)
 		if uptime <= 100 {
 			p.observedUptime = uptime // [0, 100] percentage

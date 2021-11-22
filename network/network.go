@@ -17,6 +17,7 @@ import (
 	"time"
 
 	cryptorand "crypto/rand"
+	gomath "math"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -89,8 +90,15 @@ type Network interface {
 	// Return the IP of the node
 	IP() utils.IPDesc
 
+	NodeUptime() (UptimeResult, bool)
+
 	// Has a health check
 	health.Checkable
+}
+
+type UptimeResult struct {
+	WeightedAveragePercentage float64
+	RewardingStakePercentage  float64
 }
 
 type network struct {
@@ -241,8 +249,10 @@ type Config struct {
 	WhitelistedSubnets ids.Set        `json:"whitelistedSubnets"`
 	Beacons            validators.Set `json:"beacons"`
 	// Current validators in the Avalanche network
-	Validators       validators.Manager `json:"validators"`
-	UptimeCalculator uptime.Calculator  `json:"-"`
+	Validators        validators.Manager `json:"validators"`
+	UptimeCalculator  uptime.Calculator  `json:"-"`
+	UptimeMetricFreq  time.Duration      `json:"uptimeMetricFreq"`
+	UptimeRequirement float64            `json:"uptimeRequirement"`
 
 	// Require that all connections must have at least one validator between the
 	// 2 peers. This can be useful to enable if the node wants to connect to the
@@ -514,7 +524,8 @@ func (n *network) shouldHoldConnection(peerID ids.ShortID) bool {
 // to this node.
 // Assumes [n.stateLock] is not held.
 func (n *network) Dispatch() error {
-	go n.gossipPeerList() // Periodically gossip peers
+	go n.gossipPeerList()      // Periodically gossip peers
+	go n.updateUptimeMetrics() // Periodically update uptime metrics
 	go n.inboundConnUpgradeThrottler.Dispatch()
 	defer n.inboundConnUpgradeThrottler.Stop()
 	go func() {
@@ -688,6 +699,60 @@ func (n *network) IP() utils.IPDesc {
 	return n.currentIP.IP()
 }
 
+func (n *network) NodeUptime() (UptimeResult, bool) {
+	n.stateLock.RLock()
+	defer n.stateLock.RUnlock()
+	primaryValidators, ok := n.config.Validators.GetValidators(constants.PrimaryNetworkID)
+	if !ok {
+		return UptimeResult{}, false
+	}
+
+	myStake, isValidator := primaryValidators.GetWeight(n.config.MyNodeID)
+	if !isValidator {
+		return UptimeResult{}, false
+	}
+
+	var (
+		totalWeight          = float64(primaryValidators.Weight())
+		totalWeightedPercent = 100 * float64(myStake)
+		rewardingStake       = float64(myStake)
+	)
+	for _, peer := range n.peers.peersList {
+		weight, ok := primaryValidators.GetWeight(peer.nodeID)
+		if !ok {
+			// this is not a validator skip it.
+			continue
+		}
+
+		if !peer.finishedHandshake.GetValue() {
+			continue
+		}
+
+		weightFloat := float64(weight)
+
+		peerVersion := peer.versionStruct.GetValue().(version.Application)
+		if peerVersion.Before(version.MinUptimeVersion) {
+			// If the peer is running an earlier version, then ignore their
+			// stake
+			totalWeight -= weightFloat
+			continue
+		}
+
+		percent := float64(peer.observedUptime)
+		totalWeightedPercent += percent * weightFloat
+
+		// if this peer thinks we're above requirement add the weight
+		if percent/100 >= n.config.UptimeRequirement {
+			rewardingStake += weightFloat
+		}
+	}
+
+	return UptimeResult{
+		WeightedAveragePercentage: gomath.Abs(totalWeightedPercent / totalWeight),
+		RewardingStakePercentage:  gomath.Abs(100 * rewardingStake / totalWeight),
+	}, true
+}
+
 // assumes the stateLock is held.
 // Try to connect to [nodeID] at [ip].
 func (n *network) track(ip utils.IPDesc, nodeID ids.ShortID) {
@@ -753,6 +818,21 @@ func (n *network) gossipPeerList() {
 		numNonStakersToSend := int(n.config.PeerListGossipSize) - numStakersToSend
 
 		n.Gossip(msg, constants.PrimaryNetworkID, false, numStakersToSend, numNonStakersToSend)
+	}
+}
+
+// Assumes [n.stateLock] is not held. Only returns after the network is closed.
+func (n *network) updateUptimeMetrics() {
+	t := time.NewTicker(n.config.UptimeMetricFreq)
+	defer t.Stop()
+
+	for range t.C {
+		if n.closed.GetValue() {
+			return
+		}
+		result, _ := n.NodeUptime()
+		n.metrics.nodeUptimeWeightedAverage.Set(result.WeightedAveragePercentage)
+		n.metrics.nodeUptimeRewardingStake.Set(result.RewardingStakePercentage)
 	}
 }
 
