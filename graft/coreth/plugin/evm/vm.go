@@ -385,11 +385,6 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	err = vm.db.Commit()
-	if err != nil {
-		return err
-	}
-
 	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
 	vm.handleGasPriceUpdates()
 
