@@ -136,7 +136,7 @@ type network struct {
 	peers peersData
 
 	// disconnectedIPs, connectedIPs, peerAliasIPs, and myIPs
-	// are maps with ip.String() keys that are used to determine if
+	// are maps with utils.IPDesc.String() keys that are used to determine if
 	// we should attempt to dial an IP. [stateLock] should be held
 	// whenever accessing one of these maps.
 	disconnectedIPs map[string]struct{} // set of IPs we are attempting to connect to
@@ -145,7 +145,7 @@ type network struct {
 	// TODO: bound the size of [myIPs] to avoid DoS. LRU caching would be ideal
 	myIPs map[string]struct{} // set of IPs that resulted in my ID.
 
-	// retryDelay is a map with ip.String() keys that is used to track
+	// retryDelay is a map with utils.IPDesc.String() keys that is used to track
 	// the backoff delay we should wait before attempting to dial an IP address
 	// again.
 	retryDelay map[string]time.Duration
@@ -480,10 +480,11 @@ func (n *network) send(msg message.OutboundMessage, connectedOnly bool, peers []
 // shouldUpgradeIncoming returns whether we should upgrade an incoming
 // connection from a peer at the IP whose string repr. is [ipStr].
 // Assumes stateLock is not held.
-func (n *network) shouldUpgradeIncoming(ipStr string) bool {
+func (n *network) shouldUpgradeIncoming(ip utils.IPDesc) bool {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
+	ipStr := ip.String()
 	if _, ok := n.connectedIPs[ipStr]; ok {
 		n.log.Debug("not upgrading connection to %s because it's connected", ipStr)
 		return false
@@ -496,7 +497,7 @@ func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 		n.log.Debug("not upgrading connection to %s because it's an alias", ipStr)
 		return false
 	}
-	if !n.inboundConnUpgradeThrottler.ShouldUpgrade(ipStr) {
+	if !n.inboundConnUpgradeThrottler.ShouldUpgrade(ip) {
 		n.log.Debug("not upgrading connection to %s due to rate-limiting", ipStr)
 		n.metrics.inboundConnRateLimited.Inc()
 		return false
@@ -576,8 +577,7 @@ func (n *network) Dispatch() error {
 		if err != nil {
 			return fmt.Errorf("unable to convert remote address %s to IPDesc: %w", remoteAddr, err)
 		}
-		ipStr := ip.IP.String()
-		upgrade := n.shouldUpgradeIncoming(ipStr)
+		upgrade := n.shouldUpgradeIncoming(ip)
 		if !upgrade {
 			_ = conn.Close()
 			continue
