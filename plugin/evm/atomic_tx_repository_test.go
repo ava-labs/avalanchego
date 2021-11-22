@@ -4,6 +4,8 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/database/prefixdb"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -111,5 +113,87 @@ func Test_AtomicRepository_Read_Write(t *testing.T) {
 		assert.NoError(t, err)
 		assert.EqualValues(t, height, i)
 		assert.Equal(t, tx.ID(), txIDs[i])
+
+		txs, err := repo.GetByHeight(height)
+		assert.NoError(t, err)
+		assert.Len(t, txs, 1)
+		assert.Equal(t, txIDs[i], txs[0].ID())
+	}
+}
+
+func Test_AtomicRepository_Initialize(t *testing.T) {
+	db := memdb.New()
+	codec := prepareCodecForTest()
+
+	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
+	txIDs := make([]ids.ID, 150)
+	for i := 0; i < 100; i++ {
+		id := ids.GenerateTestID()
+		tx := &Tx{
+			UnsignedAtomicTx: &TestTx{
+				Id: id,
+			},
+		}
+
+		txBytes, err := codec.Marshal(codecVersion, tx)
+		assert.NoError(t, err)
+		packer := wrappers.Packer{Bytes: make([]byte, 1), MaxSize: 1024 * 1024}
+		packer.PackLong(uint64(i))
+		packer.PackBytes(txBytes)
+		err = acceptedAtomicTxDB.Put(id[:], packer.Bytes)
+		assert.NoError(t, err)
+		txIDs[i] = id
+	}
+
+	repo := newAtomicTxRepository(db, codec)
+	err := repo.Initialize()
+	assert.NoError(t, err)
+
+	// check we can get them all by ID
+	for i := 0; i < 100; i++ {
+		tx, height, err := repo.GetByTxID(txIDs[i])
+		assert.NoError(t, err)
+		assert.EqualValues(t, height, i)
+		assert.Equal(t, tx.ID(), txIDs[i])
+
+		txs, err := repo.GetByHeight(height)
+		assert.NoError(t, err)
+		assert.Len(t, txs, 1)
+		assert.Equal(t, txIDs[i], txs[0].ID())
+	}
+
+	for i := 100; i < 150; i++ {
+		id := ids.GenerateTestID()
+		tx := &Tx{
+			UnsignedAtomicTx: &TestTx{
+				Id: id,
+			},
+		}
+
+		txBytes, err := codec.Marshal(codecVersion, tx)
+		assert.NoError(t, err)
+		packer := wrappers.Packer{Bytes: make([]byte, 1), MaxSize: 1024 * 1024}
+		packer.PackLong(uint64(i))
+		packer.PackBytes(txBytes)
+		err = acceptedAtomicTxDB.Put(id[:], packer.Bytes)
+		assert.NoError(t, err)
+		txIDs[i] = id
+	}
+
+	repo = newAtomicTxRepository(db, codec)
+	err = repo.Initialize()
+	assert.NoError(t, err)
+
+	// check we can get them all by ID
+	for i := 0; i < 150; i++ {
+		tx, height, err := repo.GetByTxID(txIDs[i])
+		assert.NoError(t, err)
+		assert.EqualValues(t, height, i)
+		assert.Equal(t, tx.ID(), txIDs[i])
+
+		txs, err := repo.GetByHeight(height)
+		assert.NoError(t, err, "error '%v' for height %d", err, height)
+		assert.Len(t, txs, 1)
+		assert.Equal(t, txIDs[i], txs[0].ID())
 	}
 }
