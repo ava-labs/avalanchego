@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	engCommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -513,7 +514,39 @@ func TestExportTxSemanticVerify(t *testing.T) {
 			shouldErr: false,
 		},
 		{
-			name: "wrong destination",
+			name: "P-chain before AP5",
+			tx: func() *Tx {
+				validExportTx := *validExportTx
+				validExportTx.DestinationChain = constants.PlatformChainID
+				return &Tx{UnsignedAtomicTx: &validExportTx}
+			}(),
+			signers: [][]*crypto.PrivateKeySECP256K1R{
+				{key},
+				{key},
+				{key},
+			},
+			baseFee:   initialBaseFee,
+			rules:     apricotRulesPhase3,
+			shouldErr: true,
+		},
+		{
+			name: "P-chain after AP5",
+			tx: func() *Tx {
+				validExportTx := *validExportTx
+				validExportTx.DestinationChain = constants.PlatformChainID
+				return &Tx{UnsignedAtomicTx: &validExportTx}
+			}(),
+			signers: [][]*crypto.PrivateKeySECP256K1R{
+				{key},
+				{key},
+				{key},
+			},
+			baseFee:   initialBaseFee,
+			rules:     apricotRulesPhase5,
+			shouldErr: false,
+		},
+		{
+			name: "random chain after AP5",
 			tx: func() *Tx {
 				validExportTx := *validExportTx
 				validExportTx.DestinationChain = ids.GenerateTestID()
@@ -525,7 +558,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 				{key},
 			},
 			baseFee:   initialBaseFee,
-			rules:     apricotRulesPhase3,
+			rules:     apricotRulesPhase5,
 			shouldErr: true,
 		},
 		{
