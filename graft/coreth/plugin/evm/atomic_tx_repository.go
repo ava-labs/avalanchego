@@ -185,10 +185,6 @@ func (a *atomicTxRepository) GetByHeight(height uint64) ([]*Tx, error) {
 // ParseTxBytes parses [bytes] to a [*Tx] object using the codec provided to the
 // atomicTxRepository.
 func (a *atomicTxRepository) ParseTxBytes(bytes []byte) (*Tx, error) {
-	if len(bytes) < wrappers.LongLen {
-		return nil, fmt.Errorf("bytes too short to parse atomic tx: %d", len(bytes))
-	}
-
 	tx := &Tx{}
 	if _, err := a.codec.Unmarshal(bytes, tx); err != nil {
 		return nil, fmt.Errorf("problem parsing atomic tx from db: %w", err)
