@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
@@ -32,8 +33,9 @@ type InboundConnUpgradeThrottler interface {
 	Stop()
 	// Returns whether we should upgrade an inbound connection from [ipStr].
 	// Must only be called after [Dispatch] has been called.
+	// If [ip] is a local IP, this method always returns true.
 	// Must not be called after [Stop] has been called.
-	ShouldUpgrade(ipStr string) bool
+	ShouldUpgrade(ip utils.IPDesc) bool
 }
 
 type InboundConnUpgradeThrottlerConfig struct {
@@ -67,9 +69,9 @@ func NewInboundConnUpgradeThrottler(log logging.Logger, config InboundConnUpgrad
 // noInboundConnUpgradeThrottler upgrades all inbound connections
 type noInboundConnUpgradeThrottler struct{}
 
-func (*noInboundConnUpgradeThrottler) Dispatch()                 {}
-func (*noInboundConnUpgradeThrottler) Stop()                     {}
-func (*noInboundConnUpgradeThrottler) ShouldUpgrade(string) bool { return true }
+func (*noInboundConnUpgradeThrottler) Dispatch()                       {}
+func (*noInboundConnUpgradeThrottler) Stop()                           {}
+func (*noInboundConnUpgradeThrottler) ShouldUpgrade(utils.IPDesc) bool { return true }
 
 type ipAndTime struct {
 	ip                string
@@ -96,7 +98,14 @@ type inboundConnUpgradeThrottler struct {
 }
 
 // Returns whether we should upgrade an inbound connection from [ipStr].
-func (n *inboundConnUpgradeThrottler) ShouldUpgrade(ipStr string) bool {
+func (n *inboundConnUpgradeThrottler) ShouldUpgrade(ip utils.IPDesc) bool {
+	if ip.IsPrivate() {
+		// Don't rate-limit private (local) IPs
+		return true
+	}
+	// Only use IP (not port). This mitigates DoS
+	// attacks from many nodes on one host.
+	ipStr := ip.IP.String()
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
