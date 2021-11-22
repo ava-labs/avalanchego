@@ -87,7 +87,7 @@ func prepareCodecForTest() codec.Manager {
 	return codec
 }
 
-func Test_AtomicRepository_Read_Write(t *testing.T) {
+func TestAtomicRepositoryReadWrite(t *testing.T) {
 	db := memdb.New()
 	codec := prepareCodecForTest()
 	repo := newAtomicTxRepository(db, codec)
@@ -121,7 +121,7 @@ func Test_AtomicRepository_Read_Write(t *testing.T) {
 	}
 }
 
-func Test_AtomicRepository_Initialize(t *testing.T) {
+func TestAtomicRepositoryInitialize(t *testing.T) {
 	db := memdb.New()
 	codec := prepareCodecForTest()
 
