@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/params"
@@ -23,16 +22,24 @@ type TestTx struct {
 	Id ids.ID `serialize:"true" json:"id"`
 }
 
+func (t TestTx) GasUsed(fixedFee bool) (uint64, error) {
+	panic("implement me")
+}
+
+func (t TestTx) Verify(ctx *snow.Context, rules params.Rules) error {
+	panic("implement me")
+}
+
+func (t TestTx) Accept() (ids.ID, *atomic.Requests, error) {
+	panic("implement me")
+}
+
 func (t TestTx) Initialize(unsignedBytes, signedBytes []byte) {
 	// no op
 }
 
 func (t TestTx) ID() ids.ID {
 	return t.Id
-}
-
-func (t TestTx) GasUsed() (uint64, error) {
-	panic("implement me")
 }
 
 func (t TestTx) Burned(assetID ids.ID) (uint64, error) {
@@ -51,19 +58,11 @@ func (t TestTx) InputUTXOs() ids.Set {
 	panic("implement me")
 }
 
-func (t TestTx) Verify(xChainID ids.ID, ctx *snow.Context, rules params.Rules) error {
-	panic("implement me")
-}
-
 func (t TestTx) SemanticVerify(vm *VM, stx *Tx, parent *Block, baseFee *big.Int, rules params.Rules) error {
 	panic("implement me")
 }
 
 func (t TestTx) AtomicOps() (map[ids.ID]*atomic.Requests, error) {
-	panic("implement me")
-}
-
-func (t TestTx) Accept(ctx *snow.Context, batch database.Batch) error {
 	panic("implement me")
 }
 

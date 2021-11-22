@@ -126,13 +126,14 @@ func (b *Block) Accept() error {
 
 	batchChainsAndInputs := make(map[ids.ID]*atomic.Requests)
 
+	if err := vm.atomicTxRepository.Write(b.Height(), b.atomicTxs); err != nil {
+		return err
+	}
+
 	for _, tx := range b.atomicTxs {
 		// Remove the accepted transaction from the mempool
 		vm.mempool.RemoveTx(tx.ID())
-		// Save the accepted atomic transaction
-		if err := vm.writeAtomicTx(b, tx); err != nil {
-			return err
-		}
+		// Accept atomic transaction
 		chainID, txRequest, err := tx.UnsignedAtomicTx.Accept()
 		if err != nil {
 			return err
@@ -144,10 +145,6 @@ func (b *Block) Accept() error {
 		} else {
 			batchChainsAndInputs[chainID] = txRequest
 		}
-	}
-
-	if err := vm.atomicTxRepository.Write(b.Height(), b.atomicTxs); err != nil {
-		return err
 	}
 
 	// If [b] is a bonus block, then we commit the database without applying the requests from
