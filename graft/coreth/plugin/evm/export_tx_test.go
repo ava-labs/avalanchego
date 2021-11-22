@@ -898,10 +898,14 @@ func TestExportTxAccept(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create commit batch for VM due to %s", err)
 	}
-	if err := tx.Accept(vm.ctx, commitBatch); err != nil {
+	chainID, atomicRequests, err := tx.Accept()
+	if err != nil {
 		t.Fatalf("Failed to accept export transaction due to: %s", err)
 	}
 
+	if err := vm.ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{chainID: {PutRequests: atomicRequests.PutRequests}}, commitBatch); err != nil {
+		t.Fatal(err)
+	}
 	indexedValues, _, _, err := xChainSharedMemory.Indexed(vm.ctx.ChainID, [][]byte{addr.Bytes()}, nil, nil, 3)
 	if err != nil {
 		t.Fatal(err)
@@ -1025,14 +1029,11 @@ func TestExportTxVerify(t *testing.T) {
 	SortEVMInputsAndSigners(exportTx.Ins, emptySigners)
 
 	ctx := NewContext()
-
 	// Test Valid Export Tx
 	if err := exportTx.Verify(ctx, apricotRulesPhase1); err != nil {
 		t.Fatalf("Failed to verify valid ExportTx: %s", err)
 	}
-
 	exportTx.NetworkID = testNetworkID + 1
-
 	// Test Incorrect Network ID Errors
 	if err := exportTx.Verify(ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ExportTx should have failed verification due to incorrect network ID")
@@ -1123,6 +1124,7 @@ func TestExportTxGasCost(t *testing.T) {
 		BaseFee         *big.Int
 		ExpectedGasUsed uint64
 		ExpectedFee     uint64
+		FixedFee        bool
 	}{
 		"simple export 1wei BaseFee": {
 			UnsignedExportTx: &UnsignedExportTx{
@@ -1155,6 +1157,39 @@ func TestExportTxGasCost(t *testing.T) {
 			ExpectedGasUsed: 1230,
 			ExpectedFee:     1,
 			BaseFee:         big.NewInt(1),
+		},
+		"simple export 1wei BaseFee + fixed fee": {
+			UnsignedExportTx: &UnsignedExportTx{
+				NetworkID:        networkID,
+				BlockchainID:     chainID,
+				DestinationChain: xChainID,
+				Ins: []EVMInput{
+					{
+						Address: testEthAddrs[0],
+						Amount:  exportAmount,
+						AssetID: avaxAssetID,
+						Nonce:   0,
+					},
+				},
+				ExportedOutputs: []*avax.TransferableOutput{
+					{
+						Asset: avax.Asset{ID: avaxAssetID},
+						Out: &secp256k1fx.TransferOutput{
+							Amt: exportAmount,
+							OutputOwners: secp256k1fx.OutputOwners{
+								Locktime:  0,
+								Threshold: 1,
+								Addrs:     []ids.ShortID{testShortIDAddrs[0]},
+							},
+						},
+					},
+				},
+			},
+			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
+			ExpectedGasUsed: 11230,
+			ExpectedFee:     1,
+			BaseFee:         big.NewInt(1),
+			FixedFee:        true,
 		},
 		"simple export 25Gwei BaseFee": {
 			UnsignedExportTx: &UnsignedExportTx{
@@ -1319,7 +1354,7 @@ func TestExportTxGasCost(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			gasUsed, err := tx.GasUsed()
+			gasUsed, err := tx.GasUsed(test.FixedFee)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1380,6 +1415,13 @@ func TestNewExportTx(t *testing.T) {
 			rules:              apricotRulesPhase4,
 			bal:                44446500,
 			expectedBurnedAVAX: 276750,
+		},
+		{
+			name:               "apricot phase 5",
+			genesis:            genesisJSONApricotPhase5,
+			rules:              apricotRulesPhase5,
+			bal:                39946500,
+			expectedBurnedAVAX: 2526750,
 		},
 	}
 	for _, test := range tests {
@@ -1478,8 +1520,14 @@ func TestNewExportTx(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create commit batch for VM due to %s", err)
 			}
-			if err := exportTx.Accept(vm.ctx, commitBatch); err != nil {
+			chainID, atomicRequests, err := exportTx.Accept()
+
+			if err != nil {
 				t.Fatalf("Failed to accept export transaction due to: %s", err)
+			}
+
+			if err := vm.ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{chainID: {PutRequests: atomicRequests.PutRequests}}, commitBatch); err != nil {
+				t.Fatal(err)
 			}
 
 			sdb, err := vm.chain.CurrentState()
@@ -1660,8 +1708,14 @@ func TestNewExportTxMulticoin(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create commit batch for VM due to %s", err)
 			}
-			if err := exportTx.Accept(vm.ctx, commitBatch); err != nil {
+			chainID, atomicRequests, err := exportTx.Accept()
+
+			if err != nil {
 				t.Fatalf("Failed to accept export transaction due to: %s", err)
+			}
+
+			if err := vm.ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{chainID: {PutRequests: atomicRequests.PutRequests}}, commitBatch); err != nil {
+				t.Fatal(err)
 			}
 
 			stdb, err := vm.chain.CurrentState()

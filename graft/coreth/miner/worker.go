@@ -36,6 +36,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/consensus/misc"
@@ -81,9 +82,10 @@ type worker struct {
 	mux      *event.TypeMux // TODO replace
 	mu       sync.RWMutex   // The lock used to protect the coinbase and extra fields
 	coinbase common.Address
+	clock    *mockable.Clock // Allows us mock the clock for testing
 }
 
-func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux) *worker {
+func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, clock *mockable.Clock) *worker {
 	worker := &worker{
 		config:      config,
 		chainConfig: chainConfig,
@@ -91,6 +93,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		eth:         eth,
 		mux:         mux,
 		chain:       eth.BlockChain(),
+		clock:       clock,
 	}
 
 	return worker
@@ -108,7 +111,7 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
-	tstart := time.Now()
+	tstart := w.clock.Time()
 	timestamp := tstart.Unix()
 	parent := w.chain.CurrentBlock()
 	// Note: in order to support asynchronous block production, blocks are allowed to have

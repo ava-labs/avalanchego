@@ -33,6 +33,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/coreth/accounts"
 	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/consensus/dummy"
@@ -107,6 +108,7 @@ func New(stack *node.Node, config *Config,
 	chainDb ethdb.Database,
 	settings Settings,
 	lastAcceptedHash common.Hash,
+	clock *mockable.Clock,
 ) (*Ethereum, error) {
 	if chainDb == nil {
 		return nil, errors.New("chainDb cannot be nil")
@@ -193,7 +195,7 @@ func New(stack *node.Node, config *Config,
 	config.TxPool.Journal = ""
 	eth.txPool = core.NewTxPool(config.TxPool, chainConfig, eth.blockchain)
 
-	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine)
+	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine, clock)
 
 	eth.APIBackend = &EthAPIBackend{
 		extRPCEnabled:       stack.Config().ExtRPCEnabled(),
