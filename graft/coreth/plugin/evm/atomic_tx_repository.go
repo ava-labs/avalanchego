@@ -206,7 +206,9 @@ func (a *atomicTxRepository) Write(height uint64, txs []*Tx) error {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 
-	txsPacker := wrappers.Packer{Bytes: make([]byte, 0), MaxSize: 1024 * 1024}
+	// packer format [tx count] [[tx1ByteLen][tx1Bytes]] [[tx2ByteLen][tx2Bytes]] ...
+	packerLen := wrappers.ShortLen + len(txs) + (len(txs) * wrappers.IntLen)
+	txsPacker := wrappers.Packer{Bytes: make([]byte, packerLen), MaxSize: 1024 * 1024}
 	txsPacker.PackShort(uint16(len(txs)))
 
 	for _, tx := range txs {
