@@ -257,6 +257,7 @@ func (n *Node) initNetworking() error {
 	n.Config.NetworkConfig.TLSKey = tlsKey
 	n.Config.NetworkConfig.WhitelistedSubnets = n.Config.WhitelistedSubnets
 	n.Config.NetworkConfig.UptimeCalculator = n.uptimeCalculator
+	n.Config.NetworkConfig.UptimeRequirement = n.Config.UptimeRequirement
 
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
@@ -892,7 +893,6 @@ func (n *Node) initInfoAPI() error {
 			CreateAssetTxFee:      n.Config.CreateAssetTxFee,
 			CreateSubnetTxFee:     n.Config.CreateSubnetTxFee,
 			CreateBlockchainTxFee: n.Config.CreateBlockchainTxFee,
-			UptimeRequirement:     n.Config.UptimeRequirement,
 		},
 		n.Log,
 		n.chainManager,

@@ -140,5 +140,6 @@ const (
 	OutboundThrottlerAtLargeAllocSizeKey        = "throttler-outbound-at-large-alloc-size"
 	OutboundThrottlerVdrAllocSizeKey            = "throttler-outbound-validator-alloc-size"
 	OutboundThrottlerNodeMaxAtLargeBytesKey     = "throttler-outbound-node-max-at-large-bytes"
+	UptimeMetricFreqKey                         = "uptime-metric-freq"
 	VMAliasesFileKey                            = "vm-aliases-file"
 )
