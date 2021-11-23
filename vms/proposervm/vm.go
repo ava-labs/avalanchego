@@ -307,6 +307,14 @@ func (vm *VM) parsePostForkBlock(b []byte) (PostForkBlock, error) {
 	}
 
 	if statelessSignedBlock, ok := statelessBlock.(statelessblock.SignedBlock); ok {
+		// Make sure that a block with an invalid signature doesn't parse. This
+		// prevents the case that we return a block with an [ID] that may
+		// describe a valid block that reports invalid.
+		claimedProposer := statelessSignedBlock.Proposer()
+		hasClaimedProposer := claimedProposer != ids.ShortEmpty
+		if err := statelessSignedBlock.Verify(hasClaimedProposer, vm.ctx.ChainID); err != nil {
+			return nil, err
+		}
 		blk = &postForkBlock{
 			SignedBlock: statelessSignedBlock,
 			postForkCommonComponents: postForkCommonComponents{
