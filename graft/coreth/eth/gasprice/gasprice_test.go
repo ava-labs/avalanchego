@@ -259,7 +259,7 @@ func TestSuggestTipCapEmptyExtDataGasUsage(t *testing.T) {
 				b.AddTx(tx)
 			}
 		},
-		expectedTip: big.NewInt(11_511_261_261),
+		expectedTip: big.NewInt(11_427_927_927),
 	})
 }
 
@@ -292,7 +292,7 @@ func TestSuggestTipCapSimple(t *testing.T) {
 				b.AddTx(tx)
 			}
 		},
-		expectedTip: big.NewInt(11_511_261_261),
+		expectedTip: big.NewInt(11_427_927_927),
 	})
 }
 
@@ -373,7 +373,7 @@ func TestSuggestTipCapSmallTips(t *testing.T) {
 			}
 		},
 		// NOTE: small tips do not bias estimate
-		expectedTip: big.NewInt(11_511_261_261),
+		expectedTip: big.NewInt(11_427_927_927),
 	})
 }
 
@@ -406,7 +406,7 @@ func TestSuggestTipCapExtDataUsage(t *testing.T) {
 				b.AddTx(tx)
 			}
 		},
-		expectedTip: big.NewInt(11_496_786_632),
+		expectedTip: big.NewInt(11_413_453_299),
 	})
 }
 

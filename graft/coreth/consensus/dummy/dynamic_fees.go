@@ -16,8 +16,6 @@ import (
 )
 
 var (
-	TargetGas uint64 = 10_000_000
-
 	ApricotPhase3MinBaseFee = big.NewInt(params.ApricotPhase3MinBaseFee)
 	ApricotPhase3MaxBaseFee = big.NewInt(params.ApricotPhase3MaxBaseFee)
 	ApricotPhase4MinBaseFee = big.NewInt(params.ApricotPhase4MinBaseFee)
@@ -69,17 +67,18 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 		return nil, nil, err
 	}
 
+	// If AP5, use a less responsive [BaseFeeChangeDenominator] and a higher gas
+	// block limit
 	var (
-		parentGasTarget    = TargetGas
-		parentGasTargetBig = new(big.Int).SetUint64(parentGasTarget)
-		baseFee            = new(big.Int).Set(parent.BaseFee)
+		baseFee                  = new(big.Int).Set(parent.BaseFee)
+		baseFeeChangeDenominator = ApricotPhase4BaseFeeChangeDenominator
+		parentGasTarget          = params.ApricotPhase3TargetGas
 	)
-
-	// If AP5, use a less responsive change denominator
-	baseFeeChangeDenominator := ApricotPhase4BaseFeeChangeDenominator
 	if isApricotPhase5 {
 		baseFeeChangeDenominator = ApricotPhase5BaseFeeChangeDenominator
+		parentGasTarget = params.ApricotPhase5TargetGas
 	}
+	parentGasTargetBig := new(big.Int).SetUint64(parentGasTarget)
 
 	// Add in the gas used by the parent block in the correct place
 	// If the parent consumed gas within the rollup window, add the consumed
