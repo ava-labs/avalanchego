@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/storage"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
+	"github.com/ava-labs/avalanchego/vms"
 )
 
 const (
@@ -655,6 +656,23 @@ func getVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
 	return vmAliasMap, nil
 }
 
+func getVMManager(v *viper.Viper) (vms.Manager, error) {
+	vmAliases, err := getVMAliases(v)
+	if err != nil {
+		return nil, err
+	}
+
+	manager := vms.NewManager()
+	for vmID, aliases := range vmAliases {
+		for _, alias := range aliases {
+			if err := manager.Alias(vmID, alias); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return manager, nil
+}
+
 // getPathFromDirKey reads flag value from viper instance and then checks the folder existence
 func getPathFromDirKey(v *viper.Viper, configKey string) (string, error) {
 	configDir := os.ExpandEnv(v.GetString(configKey))
@@ -943,7 +961,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	}
 
 	// VM Aliases
-	nodeConfig.VMAliases, err = getVMAliases(v)
+	nodeConfig.VMManager, err = getVMManager(v)
 	if err != nil {
 		return node.Config{}, err
 	}
