@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"path/filepath"
 	"strings"
@@ -54,7 +53,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/evm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -111,9 +109,6 @@ type Node struct {
 
 	// Manages creation of blockchains and routing messages to them
 	chainManager chains.Manager
-
-	// Manages Virtual Machines
-	vmManager vms.Manager
 
 	// Manages validator benching
 	benchlistManager benchlist.Manager
@@ -533,25 +528,14 @@ func (n *Node) initAPIServer() error {
 	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "auth", "", n.Log)
 }
 
-// Create the vmManager and register any aliases.
-func (n *Node) initVMManager() error {
-	n.vmManager = vms.NewManager(&n.APIServer, n.HTTPLog)
-
-	n.Log.Info("initializing VM aliases")
+// Add the default VM aliases
+func (n *Node) addDefaultVMAliases() error {
+	n.Log.Info("adding the default VM aliases")
 	vmAliases := genesis.GetVMAliases()
 
 	for vmID, aliases := range vmAliases {
 		for _, alias := range aliases {
-			if err := n.vmManager.Alias(vmID, alias); err != nil {
-				return err
-			}
-		}
-	}
-
-	// use aliases in given config
-	for vmID, aliases := range n.Config.VMAliases {
-		for _, alias := range aliases {
-			if err := n.vmManager.Alias(vmID, alias); err != nil {
+			if err := n.Config.VMManager.Alias(vmID, alias); err != nil {
 				return err
 			}
 		}
@@ -559,7 +543,7 @@ func (n *Node) initVMManager() error {
 	return nil
 }
 
-// Create the vmManager, chainManager and register the following VMs:
+// Create the chainManager and register the following VMs:
 // AVM, Simple Payments DAG, Simple Payments Chain, and Platform VM
 // Assumes n.DBManager, n.vdrs all initialized (non-nil)
 func (n *Node) initChainManager(avaxAssetID ids.ID) error {
@@ -625,7 +609,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		StakingCert:                            n.Config.StakingTLSCert,
 		Log:                                    n.Log,
 		LogFactory:                             n.LogFactory,
-		VMManager:                              n.vmManager,
+		VMManager:                              n.Config.VMManager,
 		DecisionEvents:                         n.DecisionDispatcher,
 		ConsensusEvents:                        n.ConsensusDispatcher,
 		DBManager:                              n.DBManager,
@@ -674,7 +658,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	// Register the VMs that Avalanche supports
 	errs := wrappers.Errs{}
 	errs.Add(
-		n.vmManager.RegisterFactory(platformvm.ID, &platformvm.Factory{
+		n.Config.VMManager.RegisterFactory(platformvm.ID, &platformvm.Factory{
 			Chains:                 n.chainManager,
 			Validators:             vdrs,
 			UptimeLockedCalculator: n.uptimeCalculator,
@@ -696,63 +680,88 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			ApricotPhase4Time:      version.GetApricotPhase4Time(n.Config.NetworkID),
 			ApricotPhase5Time:      version.GetApricotPhase5Time(n.Config.NetworkID),
 		}),
-		n.vmManager.RegisterFactory(avm.ID, &avm.Factory{
+		n.Config.VMManager.RegisterFactory(avm.ID, &avm.Factory{
 			TxFee:            n.Config.TxFee,
 			CreateAssetTxFee: n.Config.CreateAssetTxFee,
 		}),
-		n.vmManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
-		n.vmManager.RegisterFactory(nftfx.ID, &nftfx.Factory{}),
-		n.vmManager.RegisterFactory(propertyfx.ID, &propertyfx.Factory{}),
+		n.Config.VMManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
+		n.Config.VMManager.RegisterFactory(nftfx.ID, &nftfx.Factory{}),
+		n.Config.VMManager.RegisterFactory(propertyfx.ID, &propertyfx.Factory{}),
+		rpcchainvm.RegisterPlugins(n.Config.PluginDir, n.Config.VMManager),
 	)
 	if errs.Errored() {
 		return errs.Err
 	}
 
-	if err := n.registerRPCVMs(); err != nil {
-		return err
-	}
-
-	// Notify the API server when new chains are created
-	n.chainManager.AddRegistrant(&n.APIServer)
-	return nil
-}
-
-// registerRPCVMs iterates in plugin dir and registers rpc chain VMs.
-func (n *Node) registerRPCVMs() error {
-	files, err := ioutil.ReadDir(n.Config.PluginDir)
+	vmIDs, err := n.Config.VMManager.ListFactories()
 	if err != nil {
 		return err
 	}
 
-	for _, file := range files {
-		if file.IsDir() {
-			continue
+	for _, vmID := range vmIDs {
+		factory, err := n.Config.VMManager.GetFactory(vmID)
+		if err != nil {
+			return err
 		}
-		name := file.Name()
-		// Strip any extension from the file. This is to support windows .exe
-		// files.
-		name = name[:len(name)-len(filepath.Ext(name))]
-		// Skip hidden files.
-		if len(name) == 0 {
+
+		vm, err := factory.New(nil)
+		if err != nil {
+			return err
+		}
+
+		commonVM, ok := vm.(common.VM)
+		if !ok {
 			continue
 		}
 
-		vmID, err := n.vmManager.Lookup(name)
+		handlers, err := commonVM.CreateStaticHandlers()
 		if err != nil {
-			// there is no alias with plugin name, try to use full vmID.
-			vmID, err = ids.FromString(name)
-			if err != nil {
-				return fmt.Errorf("invalid vmID %s", name)
+			n.Log.Error("creating static API endpoints for %q errored with: %s", vmID, err)
+
+			if err := commonVM.Shutdown(); err != nil {
+				return fmt.Errorf("shutting down VM errored with: %s", err)
+			}
+			continue
+		}
+
+		// all static endpoints go to the vm endpoint, defaulting to the vm id
+		defaultEndpoint := constants.VMAliasPrefix + vmID.String()
+
+		// use a single lock for this entire vm
+		lock := new(sync.RWMutex)
+		// register the static endpoints
+		for extension, service := range handlers {
+			n.Log.Verbo("adding static API endpoint: %s%s", defaultEndpoint, extension)
+			if err := n.APIServer.AddRoute(service, lock, defaultEndpoint, extension, n.Log); err != nil {
+				return fmt.Errorf(
+					"failed to add static API endpoint %s%s: %s",
+					defaultEndpoint,
+					extension,
+					err,
+				)
 			}
 		}
 
-		if err = n.vmManager.RegisterFactory(vmID, &rpcchainvm.Factory{
-			Path: filepath.Join(n.Config.PluginDir, file.Name()),
-		}); err != nil {
+		aliases, err := n.Config.VMManager.Aliases(vmID)
+		if err != nil {
+			return err
+		}
+
+		urlAliases := []string{}
+		for _, alias := range aliases {
+			urlAlias := constants.VMAliasPrefix + alias
+			if urlAlias != defaultEndpoint {
+				urlAliases = append(urlAliases, urlAlias)
+			}
+		}
+
+		if err := n.APIServer.AddAliases(defaultEndpoint, urlAliases...); err != nil {
 			return err
 		}
 	}
 
+	// Notify the API server when new chains are created
+	n.chainManager.AddRegistrant(&n.APIServer)
 	return nil
 }
 
@@ -896,7 +905,7 @@ func (n *Node) initInfoAPI() error {
 		},
 		n.Log,
 		n.chainManager,
-		n.vmManager,
+		n.Config.VMManager,
 		n.Net,
 		version.NewDefaultApplicationParser(),
 		primaryValidators,
@@ -1027,18 +1036,6 @@ func (n *Node) initAPIAliases(genesisBytes []byte) error {
 			return err
 		}
 	}
-
-	for vmID, aliases := range n.Config.VMAliases {
-		urlAliases := []string{}
-		for _, alias := range aliases {
-			urlAliases = append(urlAliases, constants.VMAliasPrefix+alias)
-		}
-
-		url := constants.VMAliasPrefix + vmID.String()
-		if err := n.APIServer.AddAliases(url, urlAliases...); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -1114,7 +1111,7 @@ func (n *Node) Initialize(
 	if err := n.initHealthAPI(); err != nil {
 		return fmt.Errorf("couldn't initialize health API: %w", err)
 	}
-	if err := n.initVMManager(); err != nil {
+	if err := n.addDefaultVMAliases(); err != nil {
 		return fmt.Errorf("couldn't initialize API aliases: %w", err)
 	}
 	if err := n.initChainManager(n.Config.AvaxAssetID); err != nil { // Set up the chain manager
