@@ -712,7 +712,7 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 	invalidBlk, err := proVM.ParseBlock(invalidBlkBytes)
 	if err != nil {
 		// Not being able to parse an invalid block is fine.
-		return
+		t.Skip(err)
 	}
 
 	if err := invalidBlk.Verify(); err == nil {
@@ -734,7 +734,7 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 	// representation of [blkID]
 	fetchedBlk, err := proVM.GetBlock(blkID)
 	if err != nil {
-		return
+		t.Skip(err)
 	}
 
 	// GetBlock returned, so it must have somehow gotten a valid representation
