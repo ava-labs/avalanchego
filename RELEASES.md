@@ -2,16 +2,30 @@
 
 ## [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0)
 
-This upgrade adds support for issuing multiple atomic transactions into a single block and for directly transferring assets between the P-chain and the X-chain.
+This upgrade adds support for issuing multiple atomic transactions into a single block and directly transferring assets between the P-chain and the C-chain.
 
-The changes in the upgrade go into effect at **[TODO: populate]**. One should upgrade their node before the changes go into effect, otherwise they may experience loss of uptime.
+The changes in the upgrade go into effect at 10 AM EST, November 24th 2021 on the Fuji testnet. After Fuji is updated and verified, a mainnet compatible release will be published.
 
-More info can be found [here]([TODO: populate]).
+**All Fuji nodes should upgrade before 10 AM EST, November 24th 2021.**
+
+## Networking
+
+- Added peer uptime reports as metrics.
+- Removed IP rate limiting over local networks.
 
 ## PlatformVM
 
 - Enabled `AtomicTx`s to be issued into `StandardBlock`s and deprecated `AtomicBlock`s.
 - Added the ability to export/import AVAX to/from the C-chain.
+
+## Coreth
+
+- Enabled multiple `AtomicTx`s to be issued per block.
+- Added the ability to export/import AVAX to/from the P-chain.
+
+## RPCChainVM
+
+- Added support for metrics to be reported by plugin VMs.
 
 ## Configs
 
