@@ -16,16 +16,22 @@ import (
 )
 
 var (
-	ApricotPhase3MinBaseFee              = big.NewInt(params.ApricotPhase3MinBaseFee)
-	ApricotPhase3MaxBaseFee              = big.NewInt(params.ApricotPhase3MaxBaseFee)
-	ApricotPhase4MinBaseFee              = big.NewInt(params.ApricotPhase4MinBaseFee)
-	ApricotPhase4MaxBaseFee              = big.NewInt(params.ApricotPhase4MaxBaseFee)
-	TargetGas                     uint64 = 10_000_000
+	TargetGas uint64 = 10_000_000
+
+	ApricotPhase3MinBaseFee = big.NewInt(params.ApricotPhase3MinBaseFee)
+	ApricotPhase3MaxBaseFee = big.NewInt(params.ApricotPhase3MaxBaseFee)
+	ApricotPhase4MinBaseFee = big.NewInt(params.ApricotPhase4MinBaseFee)
+	ApricotPhase4MaxBaseFee = big.NewInt(params.ApricotPhase4MaxBaseFee)
+
+	ApricotPhase4BaseFeeChangeDenominator = new(big.Int).SetUint64(params.ApricotPhase4BaseFeeChangeDenominator)
+	ApricotPhase5BaseFeeChangeDenominator = new(big.Int).SetUint64(params.ApricotPhase5BaseFeeChangeDenominator)
+
 	ApricotPhase3BlockGasFee      uint64 = 1_000_000
 	ApricotPhase4MinBlockGasCost         = new(big.Int).Set(common.Big0)
 	ApricotPhase4MaxBlockGasCost         = big.NewInt(1_000_000)
 	ApricotPhase4BlockGasCostStep        = big.NewInt(50_000)
 	ApricotPhase4TargetBlockRate  uint64 = 2 // in seconds
+	ApricotPhase5BlockGasCostStep        = big.NewInt(200_000)
 	rollupWindow                  uint64 = 10
 )
 
@@ -64,11 +70,16 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 	}
 
 	var (
-		parentGasTarget          = TargetGas
-		parentGasTargetBig       = new(big.Int).SetUint64(parentGasTarget)
-		baseFeeChangeDenominator = new(big.Int).SetUint64(params.BaseFeeChangeDenominator)
-		baseFee                  = new(big.Int).Set(parent.BaseFee)
+		parentGasTarget    = TargetGas
+		parentGasTargetBig = new(big.Int).SetUint64(parentGasTarget)
+		baseFee            = new(big.Int).Set(parent.BaseFee)
 	)
+
+	// If AP5, use a less responsive change denominator
+	baseFeeChangeDenominator := ApricotPhase4BaseFeeChangeDenominator
+	if isApricotPhase5 {
+		baseFeeChangeDenominator = ApricotPhase5BaseFeeChangeDenominator
+	}
 
 	// Add in the gas used by the parent block in the correct place
 	// If the parent consumed gas within the rollup window, add the consumed
@@ -76,7 +87,21 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 	if roll < rollupWindow {
 		var blockGasCost, parentExtraStateGasUsed uint64
 		switch {
-		// If ApricotPhase4 is enabled, use the updated block fee calculation.
+		case isApricotPhase5:
+			blockGasCost = calcBlockGasCost(
+				ApricotPhase4TargetBlockRate,
+				ApricotPhase4MinBlockGasCost,
+				ApricotPhase4MaxBlockGasCost,
+				ApricotPhase5BlockGasCostStep,
+				parent.BlockGasCost,
+				parent.Time, timestamp,
+			).Uint64()
+
+			// At the start of a new network, the parent
+			// may not have a populated [ExtDataGasUsed].
+			if parent.ExtDataGasUsed != nil {
+				parentExtraStateGasUsed = parent.ExtDataGasUsed.Uint64()
+			}
 		case isApricotPhase4:
 			// The [blockGasCost] is paid by the effective tips in the block using
 			// the block's value of [baseFee].
@@ -89,12 +114,11 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 				parent.Time, timestamp,
 			).Uint64()
 
-			// On the boundary of AP3 and AP4, the parent may not have a populated
-			// [ExtDataGasUsed].
+			// On the boundary of AP3 and AP4 or at the start of a new network, the parent
+			// may not have a populated [ExtDataGasUsed].
 			if parent.ExtDataGasUsed != nil {
 				parentExtraStateGasUsed = parent.ExtDataGasUsed.Uint64()
 			}
-		// Otherwise, we must be in ApricotPhase3 and use the constant [ApricotPhase3BlockGasFee].
 		default:
 			blockGasCost = ApricotPhase3BlockGasFee
 		}
@@ -104,10 +128,15 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 		if overflow {
 			addedGas = math.MaxUint64
 		}
-		addedGas, overflow = math.SafeAdd(addedGas, blockGasCost)
-		if overflow {
-			addedGas = math.MaxUint64
+
+		// Only add the [blockGasCost] to the gas used if it isn't AP5
+		if !isApricotPhase5 {
+			addedGas, overflow = math.SafeAdd(addedGas, blockGasCost)
+			if overflow {
+				addedGas = math.MaxUint64
+			}
 		}
+
 		slot := rollupWindow - 1 - roll
 		start := slot * wrappers.LongLen
 		updateLongWindow(newRollupWindow, start, addedGas)
