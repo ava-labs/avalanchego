@@ -74,7 +74,7 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 	}, peer, sender, vm
 }
 
-// Single node in the accepted frontier; no need to fecth parent
+// Single node in the accepted frontier; no need to fetch parent
 func TestBootstrapperSingleFrontier(t *testing.T) {
 	config, _, _, vm := newConfig(t)
 
@@ -1036,7 +1036,7 @@ func TestRestartBootstrapping(t *testing.T) {
 
 	// Remove request, so we can restart bootstrapping via ForceAccepted
 	if removed := bs.OutstandingRequests.RemoveAny(blkID1); !removed {
-		t.Fatal("Expeted to find an outstanding request for blk1")
+		t.Fatal("Expected to find an outstanding request for blk1")
 	}
 	requestIDs = map[ids.ID]uint32{}
 

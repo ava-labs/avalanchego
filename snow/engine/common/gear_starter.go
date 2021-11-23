@@ -9,6 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 )
 
+// GearStarter presides over the start of fastSyncer, Bootstrapper and Engine
+
 var _ GearStarter = &gearStarter{}
 
 type GearStarter interface {
