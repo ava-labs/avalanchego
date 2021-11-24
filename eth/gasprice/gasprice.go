@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
+	"github.com/ava-labs/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -178,9 +179,7 @@ func (oracle *Oracle) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
 		return baseFee, nil
 	}
 
-	if nextBaseFee.Cmp(baseFee) == -1 {
-		return nextBaseFee, nil
-	}
+	baseFee = math.BigMin(baseFee, nextBaseFee)
 	return baseFee, nil
 }
 
@@ -222,9 +221,7 @@ func (oracle *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 	// to prevent returning an incorrectly high fee when the network is quiescent.
 	nextBaseFee, err := oracle.estimateNextBaseFee(ctx)
 	if err == nil {
-		if nextBaseFee.Cmp(baseFee) == -1 {
-			baseFee = nextBaseFee
-		}
+		baseFee = math.BigMin(baseFee, nextBaseFee)
 	} else {
 		log.Warn("failed to estimate next base fee", "err", err)
 	}
