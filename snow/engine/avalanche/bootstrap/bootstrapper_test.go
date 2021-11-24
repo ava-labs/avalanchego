@@ -74,6 +74,7 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 		Timer:                         &common.TimerTest{},
 		MultiputMaxContainersSent:     2000,
 		MultiputMaxContainersReceived: 2000,
+		SharedCfg:                     &common.SharedConfig{},
 	}
 
 	return Config{

@@ -33,25 +33,22 @@ const (
 	MaxTimeFetchingAncestors = 50 * time.Millisecond
 )
 
-var _ Handler = &BootstrapperGear{}
+var _ Bootstrapper = &bootstrapper{}
 
 type Bootstrapper interface {
-	Engine
-	Bootstrapable
+	Handler
+	Haltable
+	Start(startReqID uint32) error
+	Startup() error
+	RestartBootstrap(reset bool) error
 }
 
-// BootstrapperGear implements the Handler interface.
+// bootstrapper implements the Handler interface.
 // It collects mechanisms common to both snowman and avalanche bootstrappers
-type BootstrapperGear struct {
+type bootstrapper struct {
 	MsgHandlerNoOps
 	Config
 	Halter
-
-	// Tracks the last requestID that was used in a request
-	RequestID uint32
-
-	// True if RestartBootstrap has been called at least once
-	Restarted bool
 
 	// Holds the beacons that were sampled for the accepted frontier
 	sampledBeacons validators.Set
@@ -82,17 +79,17 @@ type BootstrapperGear struct {
 	bootstrapAttempts int
 }
 
-// Initialize implements the Handler interface.
-func (b *BootstrapperGear) Initialize(config Config) error {
-	b.Config = config
-	b.MsgHandlerNoOps = NewMsgHandlerNoOps(config.Ctx)
-	return nil
+func NewCommonBootstrapper(config Config) Bootstrapper {
+	return &bootstrapper{
+		Config:          config,
+		MsgHandlerNoOps: NewMsgHandlerNoOps(config.Ctx),
+	}
 }
 
-func (b *BootstrapperGear) Start(startReqID uint32) error {
+func (b *bootstrapper) Start(startReqID uint32) error {
 	b.Ctx.Log.Info("Starting bootstrap...")
 	b.Ctx.SetState(snow.Bootstrapping)
-	b.RequestID = startReqID
+	b.Config.SharedCfg.RequestID = startReqID
 
 	if b.Config.StartupAlpha > 0 {
 		return nil
@@ -102,7 +99,7 @@ func (b *BootstrapperGear) Start(startReqID uint32) error {
 }
 
 // GetAcceptedFrontier implements the Handler interface.
-func (b *BootstrapperGear) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
+func (b *bootstrapper) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
 	acceptedFrontier, err := b.Bootstrapable.CurrentAcceptedFrontier()
 	if err != nil {
 		return err
@@ -112,12 +109,12 @@ func (b *BootstrapperGear) GetAcceptedFrontier(validatorID ids.ShortID, requestI
 }
 
 // GetAcceptedFrontierFailed implements the Handler interface.
-func (b *BootstrapperGear) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
+func (b *bootstrapper) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
 	// ignores any late responses
-	if requestID != b.RequestID {
+	if requestID != b.Config.SharedCfg.RequestID {
 		b.Ctx.Log.Debug("Received an Out-of-Sync GetAcceptedFrontierFailed - validator: %v - expectedRequestID: %v, requestID: %v",
 			validatorID,
-			b.RequestID,
+			b.Config.SharedCfg.RequestID,
 			requestID)
 		return nil
 	}
@@ -129,12 +126,12 @@ func (b *BootstrapperGear) GetAcceptedFrontierFailed(validatorID ids.ShortID, re
 }
 
 // AcceptedFrontier implements the Handler interface.
-func (b *BootstrapperGear) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+func (b *bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	// ignores any late responses
-	if requestID != b.RequestID {
+	if requestID != b.Config.SharedCfg.RequestID {
 		b.Ctx.Log.Debug("Received an Out-of-Sync AcceptedFrontier - validator: %v - expectedRequestID: %v, requestID: %v",
 			validatorID,
-			b.RequestID,
+			b.Config.SharedCfg.RequestID,
 			requestID)
 		return nil
 	}
@@ -186,7 +183,7 @@ func (b *BootstrapperGear) AcceptedFrontier(validatorID ids.ShortID, requestID u
 			"bootstrap attempt: %d", b.failedAcceptedFrontier.Len(), b.bootstrapAttempts)
 	}
 
-	b.RequestID++
+	b.Config.SharedCfg.RequestID++
 	b.acceptedFrontier = b.acceptedFrontierSet.List()
 
 	b.sendGetAccepted()
@@ -194,18 +191,18 @@ func (b *BootstrapperGear) AcceptedFrontier(validatorID ids.ShortID, requestID u
 }
 
 // GetAccepted implements the Handler interface.
-func (b *BootstrapperGear) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+func (b *bootstrapper) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	b.Sender.SendAccepted(validatorID, requestID, b.Bootstrapable.FilterAccepted(containerIDs))
 	return nil
 }
 
 // GetAcceptedFailed implements the Handler interface.
-func (b *BootstrapperGear) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
+func (b *bootstrapper) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
 	// ignores any late responses
-	if requestID != b.RequestID {
+	if requestID != b.Config.SharedCfg.RequestID {
 		b.Ctx.Log.Debug("Received an Out-of-Sync GetAcceptedFailed - validator: %v - expectedRequestID: %v, requestID: %v",
 			validatorID,
-			b.RequestID,
+			b.Config.SharedCfg.RequestID,
 			requestID)
 		return nil
 	}
@@ -217,12 +214,12 @@ func (b *BootstrapperGear) GetAcceptedFailed(validatorID ids.ShortID, requestID 
 }
 
 // Accepted implements the Handler interface.
-func (b *BootstrapperGear) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+func (b *bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	// ignores any late responses
-	if requestID != b.RequestID {
+	if requestID != b.Config.SharedCfg.RequestID {
 		b.Ctx.Log.Debug("Received an Out-of-Sync Accepted - validator: %v - expectedRequestID: %v, requestID: %v",
 			validatorID,
-			b.RequestID,
+			b.Config.SharedCfg.RequestID,
 			requestID)
 		return nil
 	}
@@ -282,7 +279,7 @@ func (b *BootstrapperGear) Accepted(validatorID ids.ShortID, requestID uint32, c
 		}
 	}
 
-	if !b.Restarted {
+	if !b.Config.SharedCfg.Restarted {
 		b.Ctx.Log.Info("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
 	} else {
 		b.Ctx.Log.Debug("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
@@ -291,13 +288,13 @@ func (b *BootstrapperGear) Accepted(validatorID ids.ShortID, requestID uint32, c
 	return b.Bootstrapable.ForceAccepted(accepted)
 }
 
-func (b *BootstrapperGear) RestartBootstrap(reset bool) error {
+func (b *bootstrapper) RestartBootstrap(reset bool) error {
 	// resets the attempts when we're pulling blocks/vertices we don't want to
 	// fail the bootstrap at that stage
 	if reset {
 		b.Ctx.Log.Debug("Checking for new frontiers")
 
-		b.Restarted = true
+		b.Config.SharedCfg.Restarted = true
 		b.bootstrapAttempts = 0
 	}
 
@@ -309,7 +306,7 @@ func (b *BootstrapperGear) RestartBootstrap(reset bool) error {
 	return b.Startup()
 }
 
-func (b *BootstrapperGear) Startup() error {
+func (b *bootstrapper) Startup() error {
 	beacons, err := b.Beacons.Sample(b.Config.SampleK)
 	if err != nil {
 		return err
@@ -347,14 +344,14 @@ func (b *BootstrapperGear) Startup() error {
 		return b.Bootstrapable.ForceAccepted(nil)
 	}
 
-	b.RequestID++
+	b.Config.SharedCfg.RequestID++
 	b.sendGetAcceptedFrontiers()
 	return nil
 }
 
 // Ask up to [MaxOutstandingBootstrapRequests] bootstrap validators to send
 // their accepted frontier with the current accepted frontier
-func (b *BootstrapperGear) sendGetAcceptedFrontiers() {
+func (b *bootstrapper) sendGetAcceptedFrontiers() {
 	vdrs := ids.NewShortSet(1)
 	for b.pendingSendAcceptedFrontier.Len() > 0 && b.pendingReceiveAcceptedFrontier.Len() < MaxOutstandingBootstrapRequests {
 		vdr, _ := b.pendingSendAcceptedFrontier.Pop()
@@ -365,13 +362,13 @@ func (b *BootstrapperGear) sendGetAcceptedFrontiers() {
 	}
 
 	if vdrs.Len() > 0 {
-		b.Sender.SendGetAcceptedFrontier(vdrs, b.RequestID)
+		b.Sender.SendGetAcceptedFrontier(vdrs, b.Config.SharedCfg.RequestID)
 	}
 }
 
 // Ask up to [MaxOutstandingBootstrapRequests] bootstrap validators to send
 // their filtered accepted frontier
-func (b *BootstrapperGear) sendGetAccepted() {
+func (b *bootstrapper) sendGetAccepted() {
 	vdrs := ids.NewShortSet(1)
 	for b.pendingSendAccepted.Len() > 0 && b.pendingReceiveAccepted.Len() < MaxOutstandingBootstrapRequests {
 		vdr, _ := b.pendingSendAccepted.Pop()
@@ -386,16 +383,16 @@ func (b *BootstrapperGear) sendGetAccepted() {
 			vdrs.Len(),
 			b.pendingSendAccepted.Len(),
 		)
-		b.Sender.SendGetAccepted(vdrs, b.RequestID, b.acceptedFrontier)
+		b.Sender.SendGetAccepted(vdrs, b.Config.SharedCfg.RequestID, b.acceptedFrontier)
 	}
 }
 
 // Needed to disambiguate with MsgHandlerNoOps
-func (b *BootstrapperGear) Halt() {
+func (b *bootstrapper) Halt() {
 	b.Halter.Halt()
 }
 
 // Needed to disambiguate with MsgHandlerNoOps
-func (b *BootstrapperGear) Halted() bool {
+func (b *bootstrapper) Halted() bool {
 	return b.Halter.Halted()
 }

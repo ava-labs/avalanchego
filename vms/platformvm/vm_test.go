@@ -2160,6 +2160,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		Subnet:                        subnet,
 		MultiputMaxContainersSent:     2000,
 		MultiputMaxContainersReceived: 2000,
+		SharedCfg:                     &common.SharedConfig{},
 	}
 
 	gs := common.NewGearStarter(commonCfg.Beacons, commonCfg.StartupAlpha)

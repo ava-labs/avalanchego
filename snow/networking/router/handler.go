@@ -34,7 +34,7 @@ type Handler struct {
 	// The validator set that validates this chain
 	validators validators.Set
 
-	bootstrapper common.Bootstrapper
+	bootstrapper common.Engine
 	engine       common.Engine
 
 	// Closed when this handler and [engine] are done shutting down
@@ -79,7 +79,7 @@ func NewHandler(
 	return h, err
 }
 
-func (h *Handler) RegisterBootstrap(bootstrapper common.Bootstrapper) {
+func (h *Handler) RegisterBootstrap(bootstrapper common.Engine) {
 	h.bootstrapper = bootstrapper
 }
 

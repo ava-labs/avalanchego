@@ -27,5 +27,6 @@ func DefaultConfigTest() Config {
 		Timer:                         &TimerTest{},
 		MultiputMaxContainersSent:     2000,
 		MultiputMaxContainersReceived: 2000,
+		SharedCfg:                     &SharedConfig{},
 	}
 }

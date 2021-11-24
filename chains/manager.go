@@ -591,6 +591,7 @@ func (m *manager) createAvalancheChain(
 		MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
 		MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
 		MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
+		SharedCfg:                     &common.SharedConfig{},
 	}
 
 	gearStarter := common.NewGearStarter(beacons, commonCfg.StartupAlpha)
@@ -792,6 +793,7 @@ func (m *manager) createSnowmanChain(
 		MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
 		MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
 		MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
+		SharedCfg:                     &common.SharedConfig{},
 	}
 
 	gearStarter := common.NewGearStarter(beacons, commonCfg.StartupAlpha)

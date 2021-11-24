@@ -3,7 +3,10 @@
 
 package common
 
-var _ Bootstrapper = &BootstrapperTest{}
+var (
+	_ Engine        = &BootstrapperTest{}
+	_ Bootstrapable = &BootstrapperTest{}
+)
 
 // EngineTest is a test engine
 type BootstrapperTest struct {
