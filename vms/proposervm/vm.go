@@ -325,7 +325,7 @@ func (vm *VM) parsePostForkBlock(b []byte) (PostForkBlock, error) {
 			},
 		}
 	}
-	return blk, vm.storePostForkBlock(blk)
+	return blk, nil
 }
 
 func (vm *VM) parsePreForkBlock(b []byte) (*preForkBlock, error) {
