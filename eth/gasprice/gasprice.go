@@ -33,7 +33,6 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
@@ -47,6 +46,7 @@ import (
 var (
 	DefaultMaxPrice   = big.NewInt(150 * params.GWei)
 	DefaultMinPrice   = big.NewInt(0 * params.GWei)
+	DefaultMinBaseFee = big.NewInt(params.ApricotPhase3InitialBaseFee)
 	DefaultMinGasUsed = big.NewInt(6_000_000) // block gas limit is 8,000,000
 )
 
@@ -74,9 +74,10 @@ type OracleBackend interface {
 // Oracle recommends gas prices based on the content of recent
 // blocks. Suitable for both light and full clients.
 type Oracle struct {
-	backend   OracleBackend
-	lastHead  common.Hash
-	lastPrice *big.Int
+	backend     OracleBackend
+	lastHead    common.Hash
+	lastPrice   *big.Int
+	lastBaseFee *big.Int
 	// [minPrice] ensures we don't get into a positive feedback loop where tips
 	// sink to 0 during a period of slow block production, such that nobody's
 	// transactions will be included until the full block fee duration has
@@ -146,6 +147,7 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 	return &Oracle{
 		backend:          backend,
 		lastPrice:        minPrice,
+		lastBaseFee:      DefaultMinBaseFee,
 		minPrice:         minPrice,
 		maxPrice:         maxPrice,
 		minGasUsed:       minGasUsed,
@@ -161,47 +163,23 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 // produced at the current time. If ApricotPhase3 has not been activated, it may
 // return a nil value and a nil error.
 func (oracle *Oracle) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
-	// Fetch the most recent block by number
-	block, err := oracle.backend.BlockByNumber(ctx, rpc.LatestBlockNumber)
-	if err != nil {
-		return nil, err
-	}
-	// If the fetched block does not have a base fee, return nil as the base fee
-	if block.BaseFee() == nil {
-		return nil, nil
-	}
-
-	// If the current time is prior to the parent timestamp, then we use the parent
-	// timestamp instead.
-	header := block.Header()
-	timestamp := oracle.clock.Unix()
-	if timestamp < header.Time {
-		timestamp = header.Time
-	}
-	// If the block does have a baseFee, calculate the next base fee
-	// based on the current time and add it to the tip to estimate the
-	// total gas price estimate.
-	_, nextBaseFee, err := dummy.CalcBaseFee(oracle.backend.ChainConfig(), header, timestamp)
-	return nextBaseFee, err
+	_, baseFee, err := oracle.suggestDynamicFees(ctx)
+	return baseFee, err
 }
 
 // SuggestPrice returns an estimated price for legacy transactions.
 func (oracle *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 	// Estimate the effective tip based on recent blocks.
-	tip, err := oracle.suggestTipCap(ctx)
-	if err != nil {
-		return nil, err
-	}
-	nextBaseFee, err := oracle.EstimateBaseFee(ctx)
+	tip, baseFee, err := oracle.suggestDynamicFees(ctx)
 	if err != nil {
 		return nil, err
 	}
 	// If [nextBaseFee] is nil, return [tip] without modification.
-	if nextBaseFee == nil {
+	if baseFee == nil {
 		return tip, nil
 	}
 
-	return new(big.Int).Add(tip, nextBaseFee), nil
+	return new(big.Int).Add(tip, baseFee), nil
 }
 
 // SuggestTipCap returns a tip cap so that newly created transaction can have a
@@ -211,54 +189,39 @@ func (oracle *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 // necessary to add the basefee to the returned number to fall back to the legacy
 // behavior.
 func (oracle *Oracle) SuggestTipCap(ctx context.Context) (*big.Int, error) {
-	return oracle.suggestTipCap(ctx)
+	tip, _, err := oracle.suggestDynamicFees(ctx)
+	return tip, err
 }
 
-// sugggestTipCap checks the clock to estimate what network rules will be applied to
-// new transactions and then suggests a gas tip cap based on the response.
-func (oracle *Oracle) suggestTipCap(ctx context.Context) (*big.Int, error) {
-	bigTimestamp := big.NewInt(oracle.clock.Time().Unix())
-
-	switch {
-	case oracle.backend.ChainConfig().IsApricotPhase4(bigTimestamp):
-		return oracle.suggestDynamicTipCap(ctx)
-	case oracle.backend.ChainConfig().IsApricotPhase3(bigTimestamp):
-		return new(big.Int).Set(common.Big0), nil
-	case oracle.backend.ChainConfig().IsApricotPhase1(bigTimestamp):
-		return big.NewInt(params.ApricotPhase1MinGasPrice), nil
-	default:
-		return big.NewInt(params.LaunchMinGasPrice), nil
-	}
-}
-
-// suggestDynamicTipCap estimates the gas tip based on a simple sampling method
-func (oracle *Oracle) suggestDynamicTipCap(ctx context.Context) (*big.Int, error) {
+// suggestDynamicFees estimates the gas tip and base fee based on a simple sampling method
+func (oracle *Oracle) suggestDynamicFees(ctx context.Context) (*big.Int, *big.Int, error) {
 	head, _ := oracle.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
 	headHash := head.Hash()
 
 	// If the latest gasprice is still available, return it.
 	oracle.cacheLock.RLock()
-	lastHead, lastPrice := oracle.lastHead, oracle.lastPrice
+	lastHead, lastPrice, lastBaseFee := oracle.lastHead, oracle.lastPrice, oracle.lastBaseFee
 	oracle.cacheLock.RUnlock()
 	if headHash == lastHead {
-		return new(big.Int).Set(lastPrice), nil
+		return new(big.Int).Set(lastPrice), new(big.Int).Set(lastBaseFee), nil
 	}
 	oracle.fetchLock.Lock()
 	defer oracle.fetchLock.Unlock()
 
 	// Try checking the cache again, maybe the last fetch fetched what we need
 	oracle.cacheLock.RLock()
-	lastHead, lastPrice = oracle.lastHead, oracle.lastPrice
+	lastHead, lastPrice, lastBaseFee = oracle.lastHead, oracle.lastPrice, oracle.lastBaseFee
 	oracle.cacheLock.RUnlock()
 	if headHash == lastHead {
-		return new(big.Int).Set(lastPrice), nil
+		return new(big.Int).Set(lastPrice), new(big.Int).Set(lastBaseFee), nil
 	}
 	var (
-		sent, exp int
-		number    = head.Number.Uint64()
-		result    = make(chan results, oracle.checkBlocks)
-		quit      = make(chan struct{})
-		results   []*big.Int
+		sent, exp      int
+		number         = head.Number.Uint64()
+		result         = make(chan results, oracle.checkBlocks)
+		quit           = make(chan struct{})
+		tipResults     []*big.Int
+		baseFeeResults []*big.Int
 	)
 	for sent < oracle.checkBlocks && number > 0 {
 		go oracle.getBlockTips(ctx, number, result, quit)
@@ -270,19 +233,31 @@ func (oracle *Oracle) suggestDynamicTipCap(ctx context.Context) (*big.Int, error
 		res := <-result
 		if res.err != nil {
 			close(quit)
-			return new(big.Int).Set(lastPrice), res.err
+			return new(big.Int).Set(lastPrice), new(big.Int).Set(lastBaseFee), res.err
 		}
 		exp--
-		if res.value != nil {
-			results = append(results, res.value)
+		if res.tip != nil {
+			tipResults = append(tipResults, res.tip)
 		} else {
-			results = append(results, new(big.Int).Set(common.Big0))
+			tipResults = append(tipResults, new(big.Int).Set(common.Big0))
+		}
+
+		if res.baseFee != nil {
+			baseFeeResults = append(baseFeeResults, res.baseFee)
+		} else {
+			baseFeeResults = append(baseFeeResults, new(big.Int).Set(common.Big0))
 		}
 	}
 	price := lastPrice
-	if len(results) > 0 {
-		sort.Sort(bigIntArray(results))
-		price = results[(len(results)-1)*oracle.percentile/100]
+	baseFee := lastBaseFee
+	if len(tipResults) > 0 {
+		sort.Sort(bigIntArray(tipResults))
+		price = tipResults[(len(tipResults)-1)*oracle.percentile/100]
+	}
+
+	if len(baseFeeResults) > 0 {
+		sort.Sort(bigIntArray(baseFeeResults))
+		baseFee = baseFeeResults[(len(baseFeeResults)-1)*oracle.percentile/100]
 	}
 	if price.Cmp(oracle.maxPrice) > 0 {
 		price = new(big.Int).Set(oracle.maxPrice)
@@ -293,14 +268,16 @@ func (oracle *Oracle) suggestDynamicTipCap(ctx context.Context) (*big.Int, error
 	oracle.cacheLock.Lock()
 	oracle.lastHead = headHash
 	oracle.lastPrice = price
+	oracle.lastBaseFee = baseFee
 	oracle.cacheLock.Unlock()
 
-	return new(big.Int).Set(price), nil
+	return new(big.Int).Set(price), new(big.Int).Set(baseFee), nil
 }
 
 type results struct {
-	value *big.Int
-	err   error
+	tip     *big.Int
+	baseFee *big.Int
+	err     error
 }
 
 // getBlockTips calculates the minimum required tip to be included in a given
@@ -309,7 +286,7 @@ func (oracle *Oracle) getBlockTips(ctx context.Context, blockNum uint64, result 
 	header, err := oracle.backend.HeaderByNumber(ctx, rpc.BlockNumber(blockNum))
 	if header == nil {
 		select {
-		case result <- results{nil, err}:
+		case result <- results{nil, nil, err}:
 		case <-quit:
 		}
 		return
@@ -319,7 +296,7 @@ func (oracle *Oracle) getBlockTips(ctx context.Context, blockNum uint64, result 
 	// expedite block production.
 	if header.GasUsed < oracle.minGasUsed.Uint64() {
 		select {
-		case result <- results{nil, nil}:
+		case result <- results{nil, header.BaseFee, nil}:
 		case <-quit:
 		}
 		return
@@ -335,7 +312,7 @@ func (oracle *Oracle) getBlockTips(ctx context.Context, blockNum uint64, result 
 	// delay in transaction inclusion.
 	minTip, err := oracle.backend.MinRequiredTip(ctx, header)
 	select {
-	case result <- results{minTip, err}:
+	case result <- results{minTip, header.BaseFee, err}:
 	case <-quit:
 	}
 }
