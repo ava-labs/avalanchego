@@ -186,6 +186,9 @@ type VM struct {
 	// block.
 	acceptedBlockDB database.Database
 
+	// [atomicTxRepository] maintains two indexes on accepted atomic txs.
+	// - txID to accepted atomic tx
+	// - block height to list of atomic txs accepted on block at that height
 	atomicTxRepository AtomicTxRepository
 
 	builder *blockBuilder
@@ -375,13 +378,13 @@ func (vm *VM) Initialize(
 	vm.chain = ethChain
 	lastAccepted := vm.chain.LastAcceptedBlock()
 
-	vm.atomicTxRepository = newAtomicTxRepository(vm.db, vm.codec)
-	if err = vm.atomicTxRepository.Initialize(); err != nil {
+	vm.atomicTxRepository = NewAtomicTxRepository(vm.db, vm.codec)
+	if err := vm.atomicTxRepository.Initialize(); err != nil {
 		log.Error("failed to initialise atomic tx repository", "err", err)
 		return err
 	}
 
-	if err = vm.db.Commit(); err != nil {
+	if err := vm.db.Commit(); err != nil {
 		return err
 	}
 
