@@ -33,6 +33,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
@@ -164,7 +165,48 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 // return a nil value and a nil error.
 func (oracle *Oracle) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
 	_, baseFee, err := oracle.suggestDynamicFees(ctx)
-	return baseFee, err
+	if err != nil {
+		return nil, err
+	}
+
+	// We calculate the [nextBaseFee] if a block were to be produced immediately.
+	// If [nextBaseFee] is lower than the estimate from sampling, then we return it
+	// to prevent returning an incorrectly high fee when the network is quiescent.
+	nextBaseFee, err := oracle.estimateNextBaseFee(ctx)
+	if err != nil {
+		log.Warn("failed to estimate next base fee", "err", err)
+		return baseFee, nil
+	}
+
+	if nextBaseFee.Cmp(baseFee) == -1 {
+		return nextBaseFee, nil
+	}
+	return baseFee, nil
+}
+
+func (oracle *Oracle) estimateNextBaseFee(ctx context.Context) (*big.Int, error) {
+	// Fetch the most recent block by number
+	block, err := oracle.backend.BlockByNumber(ctx, rpc.LatestBlockNumber)
+	if err != nil {
+		return nil, err
+	}
+	// If the fetched block does not have a base fee, return nil as the base fee
+	if block.BaseFee() == nil {
+		return nil, nil
+	}
+
+	// If the current time is prior to the parent timestamp, then we use the parent
+	// timestamp instead.
+	header := block.Header()
+	timestamp := oracle.clock.Unix()
+	if timestamp < header.Time {
+		timestamp = header.Time
+	}
+	// If the block does have a baseFee, calculate the next base fee
+	// based on the current time and add it to the tip to estimate the
+	// total gas price estimate.
+	_, nextBaseFee, err := dummy.CalcBaseFee(oracle.backend.ChainConfig(), header, timestamp)
+	return nextBaseFee, err
 }
 
 // SuggestPrice returns an estimated price for legacy transactions.
