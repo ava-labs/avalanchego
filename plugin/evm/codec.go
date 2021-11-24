@@ -41,7 +41,7 @@ func init() {
 	}
 }
 
-// extractAtomicTxs returns the atomic transactions in [block] if
+// extractAtomicTxs returns the atomic transactions in [atomicTxBytes] if
 // they exist.
 func ExtractAtomicTxs(atomicTxBytes []byte, isApricotPhase5 bool) ([]*Tx, error) {
 	if len(atomicTxBytes) == 0 {
