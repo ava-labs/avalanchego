@@ -10,7 +10,7 @@ avalanchego_byzantine_repo="avaplatform/avalanche-byzantine"
 
 # Define avalanche-testing and avalanche-byzantine versions to use
 avalanche_testing_image="avaplatform/avalanche-testing:master"
-avalanchego_byzantine_image="avaplatform/avalanche-byzantine:master"
+avalanchego_byzantine_image="avaplatform/avalanche-byzantine:update-avalanchego-v1.7.0"
 
 # Fetch the images
 # If Docker Credentials are not available fail

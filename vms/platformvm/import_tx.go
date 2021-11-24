@@ -70,9 +70,6 @@ func (tx *UnsignedImportTx) SyntacticVerify(ctx *snow.Context) error {
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.SourceChain != ctx.XChainID:
-		// TODO: remove this check if we allow for P->C swaps
-		return errWrongChainID
 	case len(tx.ImportedInputs) == 0:
 		return errNoImportInputs
 	}
@@ -122,6 +119,10 @@ func (tx *UnsignedImportTx) Execute(
 	}
 
 	if vm.bootstrapped.GetValue() {
+		if err := vm.isValidCrossChainID(vs, tx.SourceChain); err != nil {
+			return nil, err
+		}
+
 		utxoIDs := make([][]byte, len(tx.ImportedInputs))
 		for i, in := range tx.ImportedInputs {
 			utxoID := in.UTXOID.InputID()
@@ -207,10 +208,6 @@ func (vm *VM) newImportTx(
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to import the funds
 	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	if vm.ctx.XChainID != chainID {
-		return nil, errWrongChainID
-	}
-
 	kc := secp256k1fx.NewKeychain(keys...)
 
 	atomicUTXOs, _, _, err := vm.GetAtomicUTXOs(chainID, kc.Addresses(), ids.ShortEmpty, ids.Empty, -1)

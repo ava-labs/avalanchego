@@ -103,6 +103,13 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 		t.Fatal("could not build post fork oracle block")
 	}
 
+	if err := parentBlk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if err := proVM.SetPreference(parentBlk.ID()); err != nil {
+		t.Fatal(err)
+	}
+
 	// retrieve options ...
 	postForkOracleBlk, ok := parentBlk.(*postForkBlock)
 	if !ok {
@@ -227,6 +234,13 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	parentBlk, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("could not build post fork oracle block")
+	}
+
+	if err := parentBlk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if err := proVM.SetPreference(parentBlk.ID()); err != nil {
+		t.Fatal(err)
 	}
 
 	// retrieve options ...

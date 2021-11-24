@@ -1,6 +1,6 @@
 FROM ubuntu:20.04
 
-RUN apt-get update && apt -y install bash curl unzip
+RUN apt-get update && apt -y install bash curl unzip git
 WORKDIR /opt
 RUN \
   curl -L https://golang.org/dl/go1.16.6.linux-amd64.tar.gz > golang.tar.gz && \

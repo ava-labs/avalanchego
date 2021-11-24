@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gorilla/rpc/v2"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -52,7 +53,6 @@ var (
 	errIncompatibleFx            = errors.New("incompatible feature extension")
 	errUnknownFx                 = errors.New("unknown feature extension")
 	errGenesisAssetMustHaveState = errors.New("genesis asset must have non-empty state")
-	errWrongBlockchainID         = errors.New("wrong blockchain ID")
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 	errInsufficientFunds         = errors.New("insufficient funds")
 

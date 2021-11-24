@@ -36,7 +36,7 @@ type Handler struct {
 	validators validators.Set
 
 	fastSyncer   snowsyncer.FastSyncer
-	bootstrapper common.Bootstrapper
+	bootstrapper common.Engine
 	engine       common.Engine
 
 	// Closed when this handler and [engine] are done shutting down
@@ -85,7 +85,7 @@ func (h *Handler) RegisterFastSyncer(fastSyncer snowsyncer.FastSyncer) {
 	h.fastSyncer = fastSyncer
 }
 
-func (h *Handler) RegisterBootstrap(bootstrapper common.Bootstrapper) {
+func (h *Handler) RegisterBootstrap(bootstrapper common.Engine) {
 	h.bootstrapper = bootstrapper
 }
 

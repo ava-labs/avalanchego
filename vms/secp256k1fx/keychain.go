@@ -35,7 +35,6 @@ func NewKeychain(keys ...*crypto.PrivateKeySECP256K1R) *Keychain {
 	for _, key := range keys {
 		kc.Add(key)
 	}
-
 	return kc
 }
 

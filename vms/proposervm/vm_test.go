@@ -278,6 +278,10 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 		t.Fatal("proBlk1 and proBlk2 should be different for this test")
 	}
 
+	if err := proBlk2.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
 	// ...and set one as preferred
 	var prefcoreBlk *snowman.TestBlock
 	coreVM.SetPreferenceF = func(prefID ids.ID) error {
@@ -370,6 +374,10 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 	}
 	if proBlk1.ID() == proBlk2.ID() {
 		t.Fatal("proBlk1 and proBlk2 should be different for this test")
+	}
+
+	if err := proBlk2.Verify(); err != nil {
+		t.Fatal(err)
 	}
 
 	// ...and set one as preferred
@@ -544,22 +552,6 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 	}
 	if parsedBlk2.ID() != proBlk2.ID() {
 		t.Fatal("error in parsing block")
-	}
-
-	rtrvdProBlk1, err := proVM.GetBlock(proBlk1.ID())
-	if err != nil {
-		t.Fatal("Could not retrieve proBlk1")
-	}
-	if rtrvdProBlk1.ID() != proBlk1.ID() {
-		t.Fatal("blocks do not match following cache whiping")
-	}
-
-	rtrvdProBlk2, err := proVM.GetBlock(proBlk2.ID())
-	if err != nil {
-		t.Fatal("Could not retrieve proBlk1")
-	}
-	if rtrvdProBlk2.ID() != proBlk2.ID() {
-		t.Fatal("blocks do not match following cache whiping")
 	}
 }
 

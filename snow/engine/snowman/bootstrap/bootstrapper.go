@@ -22,7 +22,7 @@ import (
 const bootstrappingDelay = 10 * time.Second
 
 var (
-	_ common.Bootstrapper = &bootstrapper{}
+	_ common.Engine = &bootstrapper{}
 
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
@@ -30,7 +30,7 @@ var (
 func New(
 	config Config,
 	onFinished func(lastReqID uint32) error,
-) (common.Bootstrapper, error) {
+) (common.Engine, error) {
 	return newBootstrapper(
 		config,
 		onFinished,
@@ -39,7 +39,7 @@ func New(
 
 type bootstrapper struct {
 	Config
-	common.BootstrapperGear
+	common.Bootstrapper
 	common.Fetcher
 	metrics
 
@@ -97,10 +97,7 @@ func newBootstrapper(
 	}
 
 	config.Bootstrapable = b
-	if err := b.BootstrapperGear.Initialize(config.Config); err != nil {
-		return nil, err
-	}
-
+	b.Bootstrapper = common.NewCommonBootstrapper(config.Config)
 	return b, nil
 }
 
@@ -183,10 +180,10 @@ func (b *bootstrapper) fetch(blkID ids.ID) error {
 		return fmt.Errorf("dropping request for %s as there are no validators", blkID)
 	}
 	validatorID := validators[0].ID()
-	b.RequestID++
+	b.Config.SharedCfg.RequestID++
 
-	b.OutstandingRequests.Add(validatorID, b.RequestID, blkID)
-	b.Config.Sender.SendGetAncestors(validatorID, b.RequestID, blkID) // request block and ancestors
+	b.OutstandingRequests.Add(validatorID, b.Config.SharedCfg.RequestID, blkID)
+	b.Config.Sender.SendGetAncestors(validatorID, b.Config.SharedCfg.RequestID, blkID) // request block and ancestors
 	return nil
 }
 
@@ -333,7 +330,7 @@ func (b *bootstrapper) process(blk snowman.Block, processingBlocks map[ids.ID]sn
 		b.numFetched.Inc()
 		b.NumFetched++                                      // Progress tracker
 		if b.NumFetched%common.StatusUpdateFrequency == 0 { // Periodically print progress
-			if !b.Restarted {
+			if !b.Config.SharedCfg.Restarted {
 				b.Config.Ctx.Log.Info("fetched %d of %d blocks", b.NumFetched, b.tipHeight-b.startingHeight)
 			} else {
 				b.Config.Ctx.Log.Debug("fetched %d of %d blocks", b.NumFetched, b.tipHeight-b.startingHeight)
@@ -369,7 +366,7 @@ func (b *bootstrapper) checkFinish() error {
 		return nil
 	}
 
-	if !b.Restarted {
+	if !b.Config.SharedCfg.Restarted {
 		b.Config.Ctx.Log.Info("bootstrapping fetched %d blocks. Executing state transitions...", b.NumFetched)
 	} else {
 		b.Config.Ctx.Log.Debug("bootstrapping fetched %d blocks. Executing state transitions...", b.NumFetched)
@@ -378,7 +375,7 @@ func (b *bootstrapper) checkFinish() error {
 	executedBlocks, err := b.Blocked.ExecuteAll(
 		b.Config.Ctx,
 		b,
-		b.Restarted,
+		b.Config.SharedCfg.Restarted,
 		b.Config.Ctx.ConsensusDispatcher,
 		b.Config.Ctx.DecisionDispatcher,
 	)
@@ -408,7 +405,7 @@ func (b *bootstrapper) checkFinish() error {
 	// If the subnet hasn't finished bootstrapping, this chain should remain
 	// syncing.
 	if !b.Config.Subnet.IsBootstrapped() {
-		if !b.Restarted {
+		if !b.Config.SharedCfg.Restarted {
 			b.Config.Ctx.Log.Info("waiting for the remaining chains in this subnet to finish syncing")
 		} else {
 			b.Config.Ctx.Log.Debug("waiting for the remaining chains in this subnet to finish syncing")
@@ -430,7 +427,7 @@ func (b *bootstrapper) finish() error {
 	}
 
 	// Start consensus
-	if err := b.OnFinished(b.RequestID); err != nil {
+	if err := b.OnFinished(b.Config.SharedCfg.RequestID); err != nil {
 		return err
 	}
 	return nil
@@ -466,7 +463,6 @@ func (b *bootstrapper) Disconnected(nodeID ids.ShortID) error {
 func (b *bootstrapper) GetVM() common.VM                { return b.VM }
 func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
 func (b *bootstrapper) IsBootstrapped() bool            { return b.Config.Ctx.IsBootstrapped() }
-
 func (b *bootstrapper) HealthCheck() (interface{}, error) {
 	vmIntf, vmErr := b.VM.HealthCheck()
 	intf := map[string]interface{}{

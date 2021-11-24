@@ -9,13 +9,16 @@ import (
 
 	stdjson "encoding/json"
 
+	health "github.com/AppsFlyer/go-sundheit"
+
+	"github.com/gorilla/rpc/v2"
+
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/gorilla/rpc/v2"
-	"github.com/prometheus/client_golang/prometheus"
 
-	health "github.com/AppsFlyer/go-sundheit"
 	healthlib "github.com/ava-labs/avalanchego/health"
 )
 

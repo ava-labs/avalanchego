@@ -221,6 +221,9 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 	builtBlk3, err := proRemoteVM.BuildBlock()
 	assert.NoError(err, "Could not build proposer block")
 
+	assert.NoError(builtBlk3.Verify())
+	assert.NoError(proRemoteVM.SetPreference(builtBlk3.ID()))
+
 	// ...Call GetAncestors on them ...
 	// Note: we assumed that if blkID is not known, that's NOT an error.
 	// Simply return an empty result

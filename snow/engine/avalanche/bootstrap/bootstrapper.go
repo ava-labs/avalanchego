@@ -34,7 +34,7 @@ const (
 )
 
 var (
-	_ common.Bootstrapper = &bootstrapper{}
+	_ common.Engine = &bootstrapper{}
 
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
@@ -42,7 +42,7 @@ var (
 func New(
 	config Config,
 	onFinished func(lastReqID uint32) error,
-) (common.Bootstrapper, error) {
+) (common.Engine, error) {
 	return newBootstrapper(
 		config,
 		onFinished,
@@ -51,7 +51,7 @@ func New(
 
 type bootstrapper struct {
 	Config
-	common.BootstrapperGear
+	common.Bootstrapper
 	common.Fetcher
 	metrics
 
@@ -101,10 +101,7 @@ func newBootstrapper(
 	}
 
 	config.Bootstrapable = b
-	if err := b.BootstrapperGear.Initialize(config.Config); err != nil {
-		return nil, err
-	}
-
+	b.Bootstrapper = common.NewCommonBootstrapper(config.Config)
 	return b, nil
 }
 
@@ -149,10 +146,10 @@ func (b *bootstrapper) fetch(vtxIDs ...ids.ID) error {
 			return fmt.Errorf("dropping request for %s as there are no validators", vtxID)
 		}
 		validatorID := validators[0].ID()
-		b.RequestID++
+		b.Config.SharedCfg.RequestID++
 
-		b.OutstandingRequests.Add(validatorID, b.RequestID, vtxID)
-		b.Config.Sender.SendGetAncestors(validatorID, b.RequestID, vtxID) // request vertex and ancestors
+		b.OutstandingRequests.Add(validatorID, b.Config.SharedCfg.RequestID, vtxID)
+		b.Config.Sender.SendGetAncestors(validatorID, b.Config.SharedCfg.RequestID, vtxID) // request vertex and ancestors
 	}
 	return b.checkFinish()
 }
@@ -228,7 +225,7 @@ func (b *bootstrapper) process(vtxs ...avalanche.Vertex) error {
 			b.numFetchedVts.Inc()
 			b.NumFetched++ // Progress tracker
 			if b.NumFetched%common.StatusUpdateFrequency == 0 {
-				if !b.Restarted {
+				if !b.Config.SharedCfg.Restarted {
 					b.Config.Ctx.Log.Info("fetched %d vertices", b.NumFetched)
 				} else {
 					b.Config.Ctx.Log.Debug("fetched %d vertices", b.NumFetched)
@@ -418,23 +415,23 @@ func (b *bootstrapper) checkFinish() error {
 		return nil
 	}
 
-	if !b.Restarted {
+	if !b.Config.SharedCfg.Restarted {
 		b.Config.Ctx.Log.Info("bootstrapping fetched %d vertices. Executing transaction state transitions...", b.NumFetched)
 	} else {
 		b.Config.Ctx.Log.Debug("bootstrapping fetched %d vertices. Executing transaction state transitions...", b.NumFetched)
 	}
 
-	_, err := b.TxBlocked.ExecuteAll(b.Config.Ctx, b, b.Restarted, b.Config.Ctx.DecisionDispatcher)
+	_, err := b.TxBlocked.ExecuteAll(b.Config.Ctx, b, b.Config.SharedCfg.Restarted, b.Config.Ctx.DecisionDispatcher)
 	if err != nil || b.Halted() {
 		return err
 	}
 
-	if !b.Restarted {
+	if !b.Config.SharedCfg.Restarted {
 		b.Config.Ctx.Log.Info("executing vertex state transitions...")
 	} else {
 		b.Config.Ctx.Log.Debug("executing vertex state transitions...")
 	}
-	executedVts, err := b.VtxBlocked.ExecuteAll(b.Config.Ctx, b, b.Restarted, b.Config.Ctx.ConsensusDispatcher)
+	executedVts, err := b.VtxBlocked.ExecuteAll(b.Config.Ctx, b, b.Config.SharedCfg.Restarted, b.Config.Ctx.ConsensusDispatcher)
 	if err != nil || b.Halted() {
 		return err
 	}
@@ -457,7 +454,7 @@ func (b *bootstrapper) checkFinish() error {
 	// If the subnet hasn't finished bootstrapping, this chain should remain
 	// syncing.
 	if !b.Config.Subnet.IsBootstrapped() {
-		if !b.Restarted {
+		if !b.Config.SharedCfg.Restarted {
 			b.Config.Ctx.Log.Info("waiting for the remaining chains in this subnet to finish syncing")
 		} else {
 			b.Config.Ctx.Log.Debug("waiting for the remaining chains in this subnet to finish syncing")
@@ -480,7 +477,7 @@ func (b *bootstrapper) finish() error {
 	}
 
 	// Start consensus
-	if err := b.OnFinished(b.RequestID); err != nil {
+	if err := b.OnFinished(b.Config.SharedCfg.RequestID); err != nil {
 		return err
 	}
 	return nil

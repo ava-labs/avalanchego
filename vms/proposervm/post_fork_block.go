@@ -95,7 +95,7 @@ func (b *postForkBlock) Options() ([2]snowman.Block, error) {
 			return [2]snowman.Block{}, err
 		}
 
-		outerOption := &postForkOption{
+		outerOptions[i] = &postForkOption{
 			Block: statelessOuterOption,
 			postForkCommonComponents: postForkCommonComponents{
 				vm:       b.vm,
@@ -103,12 +103,6 @@ func (b *postForkBlock) Options() ([2]snowman.Block, error) {
 				status:   innerOption.Status(),
 			},
 		}
-		// Persist the wrapped child options
-		if err := b.vm.storePostForkBlock(outerOption); err != nil {
-			return [2]snowman.Block{}, err
-		}
-
-		outerOptions[i] = outerOption
 	}
 	return outerOptions, nil
 }

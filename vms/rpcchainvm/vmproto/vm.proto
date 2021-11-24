@@ -2,10 +2,19 @@ syntax = "proto3";
 package vmproto;
 option go_package = "github.com/ava-labs/avalanchego/vms/rpcchainvm/vmproto";
 import "google/protobuf/empty.proto";
-import "google/protobuf/timestamp.proto";
 
+// import from https://github.com/prometheus/client_model/blob/master/io/prometheus/client/metrics.proto
+// requires "github.com/prometheus/client_model" for reuse in Go code
+// requires "io/prometheus/client/metrics.proto" file in "protoc --proto_path" commands
+//
+// if vended after https://github.com/prometheus/client_model/commit/147c58e9608a4f9628b53b6cc863325ca746f63a
+// import "io/prometheus/client/metrics.proto";
+
+// for older vendored prometheus
+import "metrics.proto";
 
 // To compile: protoc --go_out=plugins=grpc:. vm.proto
+// Or run "scripts/protobuf_codegen.sh"
 
 message InitializeRequest {
     uint32 networkID = 1;
@@ -273,7 +282,7 @@ message MetricFamily {
 }
 
 message GatherResponse {
-    repeated MetricFamily metricFamilies = 1;
+    repeated io.prometheus.client.MetricFamily metricFamilies = 1;
 }
 
 service VM {
