@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/vms"
 )
 
 type IPCConfig struct {
@@ -184,6 +185,6 @@ type Config struct {
 	// ChainConfigs
 	ChainConfigs map[string]chains.ChainConfig `json:"-"`
 
-	// VM Aliases
-	VMAliases map[ids.ID][]string `json:"vmAliases"`
+	// VM management
+	VMManager vms.Manager `json:"-"`
 }

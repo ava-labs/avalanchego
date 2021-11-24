@@ -19,24 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 )
 
-func TestAliases(t *testing.T) {
-	assert := assert.New(t)
-
-	genesisBytes, _, err := Genesis(constants.LocalID, "")
-	assert.NoError(err)
-
-	generalAliases, _, err := Aliases(genesisBytes)
-	assert.NoError(err)
-
-	if _, exists := generalAliases["vm/"+platformvm.ID.String()]; !exists {
-		assert.Fail("Should have a custom alias from the vm")
-	} else if _, exists := generalAliases["vm/"+avm.ID.String()]; !exists {
-		assert.Fail("Should have a custom alias from the vm")
-	} else if _, exists := generalAliases["vm/"+evm.ID.String()]; !exists {
-		assert.Fail("Should have a custom alias from the vm")
-	}
-}
-
 func TestValidateConfig(t *testing.T) {
 	tests := map[string]struct {
 		networkID uint32
