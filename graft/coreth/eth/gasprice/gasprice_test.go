@@ -217,6 +217,10 @@ func TestSuggestTipCapNetworkUpgrades(t *testing.T) {
 			chainConfig: params.TestApricotPhase4Config,
 			expectedTip: DefaultMinPrice,
 		},
+		"apricot phase 5": {
+			chainConfig: params.TestApricotPhase5Config,
+			expectedTip: DefaultMinPrice,
+		},
 	}
 
 	for name, test := range tests {
@@ -255,7 +259,7 @@ func TestSuggestTipCapEmptyExtDataGasUsage(t *testing.T) {
 				b.AddTx(tx)
 			}
 		},
-		expectedTip: big.NewInt(2_844_353_281),
+		expectedTip: big.NewInt(11_427_927_927),
 	})
 }
 
@@ -288,7 +292,7 @@ func TestSuggestTipCapSimple(t *testing.T) {
 				b.AddTx(tx)
 			}
 		},
-		expectedTip: big.NewInt(2_844_353_281),
+		expectedTip: big.NewInt(11_427_927_927),
 	})
 }
 
@@ -369,7 +373,7 @@ func TestSuggestTipCapSmallTips(t *testing.T) {
 			}
 		},
 		// NOTE: small tips do not bias estimate
-		expectedTip: big.NewInt(2_844_353_281),
+		expectedTip: big.NewInt(11_427_927_927),
 	})
 }
 
@@ -402,12 +406,12 @@ func TestSuggestTipCapExtDataUsage(t *testing.T) {
 				b.AddTx(tx)
 			}
 		},
-		expectedTip: big.NewInt(2_840_938_303),
+		expectedTip: big.NewInt(11_413_453_299),
 	})
 }
 
 func TestSuggestTipCapMinGas(t *testing.T) {
-	txTip := big.NewInt(55 * params.GWei)
+	txTip := big.NewInt(500 * params.GWei)
 	applyGasPriceTest(t, suggestTipCapTest{
 		chainConfig:     params.TestChainConfig,
 		numBlocks:       3,
