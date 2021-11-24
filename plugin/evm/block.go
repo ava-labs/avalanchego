@@ -124,12 +124,12 @@ func (b *Block) Accept() error {
 		return vm.db.Commit()
 	}
 
-	batchChainsAndInputs := make(map[ids.ID]*atomic.Requests)
-
+	// Update indexes the vm maintains on accepted atomic txs.
 	if err := vm.atomicTxRepository.Write(b.Height(), b.atomicTxs); err != nil {
 		return err
 	}
 
+	batchChainsAndInputs := make(map[ids.ID]*atomic.Requests)
 	for _, tx := range b.atomicTxs {
 		// Remove the accepted transaction from the mempool
 		vm.mempool.RemoveTx(tx.ID())
