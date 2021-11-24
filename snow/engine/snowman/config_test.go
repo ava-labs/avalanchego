@@ -24,7 +24,6 @@ func DefaultConfig() Config {
 			VM:      &block.TestVM{},
 		},
 		Params: snowball.Parameters{
-
 			K:                     1,
 			Alpha:                 1,
 			BetaVirtuous:          1,

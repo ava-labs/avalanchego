@@ -81,7 +81,6 @@ func BenchmarkVirtuousInput(b *testing.B) {
 			/*maxInputConflicts=*/ 1,
 			/*numNodes=*/ 50,
 			/*params=*/ sbcon.Parameters{
-
 				K:                 20,
 				Alpha:             11,
 				BetaVirtuous:      20,
