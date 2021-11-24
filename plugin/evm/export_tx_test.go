@@ -493,6 +493,32 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		},
 	}
 
+	validAVAXExportTx := &UnsignedExportTx{
+		NetworkID:        vm.ctx.NetworkID,
+		BlockchainID:     vm.ctx.ChainID,
+		DestinationChain: vm.ctx.XChainID,
+		Ins: []EVMInput{
+			{
+				Address: ethAddr,
+				Amount:  avaxBalance,
+				AssetID: vm.ctx.AVAXAssetID,
+				Nonce:   0,
+			},
+		},
+		ExportedOutputs: []*avax.TransferableOutput{
+			{
+				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: avaxBalance / 2,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{addr},
+					},
+				},
+			},
+		},
+	}
+
 	tests := []struct {
 		name      string
 		tx        *Tx
@@ -516,6 +542,48 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		{
 			name: "P-chain before AP5",
 			tx: func() *Tx {
+				validExportTx := *validAVAXExportTx
+				validExportTx.DestinationChain = constants.PlatformChainID
+				return &Tx{UnsignedAtomicTx: &validExportTx}
+			}(),
+			signers: [][]*crypto.PrivateKeySECP256K1R{
+				{key},
+			},
+			baseFee:   initialBaseFee,
+			rules:     apricotRulesPhase3,
+			shouldErr: true,
+		},
+		{
+			name: "P-chain after AP5",
+			tx: func() *Tx {
+				validExportTx := *validAVAXExportTx
+				validExportTx.DestinationChain = constants.PlatformChainID
+				return &Tx{UnsignedAtomicTx: &validExportTx}
+			}(),
+			signers: [][]*crypto.PrivateKeySECP256K1R{
+				{key},
+			},
+			baseFee:   initialBaseFee,
+			rules:     apricotRulesPhase5,
+			shouldErr: false,
+		},
+		{
+			name: "random chain after AP5",
+			tx: func() *Tx {
+				validExportTx := *validAVAXExportTx
+				validExportTx.DestinationChain = ids.GenerateTestID()
+				return &Tx{UnsignedAtomicTx: &validExportTx}
+			}(),
+			signers: [][]*crypto.PrivateKeySECP256K1R{
+				{key},
+			},
+			baseFee:   initialBaseFee,
+			rules:     apricotRulesPhase5,
+			shouldErr: true,
+		},
+		{
+			name: "P-chain multi-coin before AP5",
+			tx: func() *Tx {
 				validExportTx := *validExportTx
 				validExportTx.DestinationChain = constants.PlatformChainID
 				return &Tx{UnsignedAtomicTx: &validExportTx}
@@ -530,7 +598,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 			shouldErr: true,
 		},
 		{
-			name: "P-chain after AP5",
+			name: "P-chain multi-coin after AP5",
 			tx: func() *Tx {
 				validExportTx := *validExportTx
 				validExportTx.DestinationChain = constants.PlatformChainID
@@ -543,10 +611,10 @@ func TestExportTxSemanticVerify(t *testing.T) {
 			},
 			baseFee:   initialBaseFee,
 			rules:     apricotRulesPhase5,
-			shouldErr: false,
+			shouldErr: true,
 		},
 		{
-			name: "random chain after AP5",
+			name: "random chain multi-coin  after AP5",
 			tx: func() *Tx {
 				validExportTx := *validExportTx
 				validExportTx.DestinationChain = ids.GenerateTestID()

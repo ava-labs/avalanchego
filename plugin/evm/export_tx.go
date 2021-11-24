@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -91,6 +92,10 @@ func (tx *UnsignedExportTx) Verify(
 	for _, out := range tx.ExportedOutputs {
 		if err := out.Verify(); err != nil {
 			return err
+		}
+		assetID := out.AssetID()
+		if assetID != ctx.AVAXAssetID && tx.DestinationChain == constants.PlatformChainID {
+			return errWrongChainID
 		}
 	}
 	if !avax.IsSortedTransferableOutputs(tx.ExportedOutputs, Codec) {
