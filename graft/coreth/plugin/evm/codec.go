@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/coreth/core/types"
 )
 
 // Codec does serialization and deserialization
@@ -44,8 +43,7 @@ func init() {
 
 // extractAtomicTxs returns the atomic transactions in [block] if
 // they exist.
-func ExtractAtomicTxs(block *types.Block, isApricotPhase5 bool) ([]*Tx, error) {
-	atomicTxBytes := block.ExtData()
+func ExtractAtomicTxs(atomicTxBytes []byte, isApricotPhase5 bool) ([]*Tx, error) {
 	if len(atomicTxBytes) == 0 {
 		return nil, nil
 	}
