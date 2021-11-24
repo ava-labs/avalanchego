@@ -228,7 +228,6 @@ func (p *postForkCommonComponents) buildChild(
 
 	p.vm.ctx.Log.Info("built block %s - parent timestamp %v, block timestamp %v",
 		child.ID(), parentTimestamp, newTimestamp)
-	// Persist the child
 	return child, nil
 }
 
