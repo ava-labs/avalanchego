@@ -384,7 +384,6 @@ func TestEngineMultipleQuery(t *testing.T) {
 	config := DefaultConfig()
 
 	config.Params = snowball.Parameters{
-
 		K:                     3,
 		Alpha:                 2,
 		BetaVirtuous:          1,
@@ -872,7 +871,6 @@ func TestVoteCanceling(t *testing.T) {
 	config := DefaultConfig()
 
 	config.Params = snowball.Parameters{
-
 		K:                     3,
 		Alpha:                 2,
 		BetaVirtuous:          1,
@@ -1825,7 +1823,6 @@ func TestEngineDoubleChit(t *testing.T) {
 	config := DefaultConfig()
 
 	config.Params = snowball.Parameters{
-
 		K:                     2,
 		Alpha:                 2,
 		BetaVirtuous:          1,

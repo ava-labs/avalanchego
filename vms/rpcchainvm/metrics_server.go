@@ -6,8 +6,9 @@ package rpcchainvm
 import (
 	"context"
 
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/vmproto"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/vmproto"
 )
 
 func (vm *VMServer) Gather(context.Context, *emptypb.Empty) (*vmproto.GatherResponse, error) {

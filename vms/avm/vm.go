@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gorilla/rpc/v2"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
