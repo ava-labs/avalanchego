@@ -22,6 +22,11 @@ The changes in the upgrade go into effect at 10 AM EST, November 24th 2021 on th
 
 - Enabled multiple `AtomicTx`s to be issued per block.
 - Added the ability to export/import AVAX to/from the P-chain.
+- Updated dynamic fee calculations.
+
+## ProposerVM
+
+- Removed storage of undecided blocks.
 
 ## RPCChainVM
 

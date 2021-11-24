@@ -30,7 +30,6 @@ func DefaultConfigs() (bootstrap.Config, Config) {
 		Sender:     bootstrapConfig.Sender,
 		Validators: bootstrapConfig.Validators,
 		Params: snowball.Parameters{
-
 			K:                     1,
 			Alpha:                 1,
 			BetaVirtuous:          1,

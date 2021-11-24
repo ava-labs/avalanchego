@@ -10,12 +10,13 @@ import (
 	"log"
 	"path/filepath"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-plugin"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/subprocess"
 	"github.com/ava-labs/avalanchego/vms"
-	"github.com/hashicorp/go-hclog"
-	"github.com/hashicorp/go-plugin"
 )
 
 var errWrongVM = errors.New("wrong vm type")
@@ -25,9 +26,6 @@ type Factory struct {
 }
 
 func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
-	// Ignore warning from launching an executable with a variable command
-	// because the command is a controlled and required input
-
 	config := &plugin.ClientConfig{
 		HandshakeConfig: Handshake,
 		Plugins:         PluginMap,

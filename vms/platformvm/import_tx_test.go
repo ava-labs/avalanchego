@@ -104,7 +104,6 @@ func TestNewImportTx(t *testing.T) {
 			shouldErr:     true,
 		},
 		{
-
 			description:   "can barely pay fee",
 			sourceChainID: xChainID,
 			sharedMemory:  fundedSharedMemory(xChainID, vm.TxFee),
@@ -113,7 +112,6 @@ func TestNewImportTx(t *testing.T) {
 			shouldVerify:  true,
 		},
 		{
-
 			description:   "attempting to import from C-chain before AP5",
 			sourceChainID: cChainID,
 			sharedMemory:  fundedSharedMemory(cChainID, vm.TxFee),
@@ -123,7 +121,6 @@ func TestNewImportTx(t *testing.T) {
 			shouldVerify:  false,
 		},
 		{
-
 			description:   "attempting to import from C-chain after AP5",
 			sourceChainID: cChainID,
 			sharedMemory:  fundedSharedMemory(cChainID, vm.TxFee),
