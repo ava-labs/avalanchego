@@ -4,24 +4,36 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/database/prefixdb"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/params"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
 type TestTx struct {
 	Id ids.ID `serialize:"true" json:"id"`
+}
+
+func (t TestTx) GasUsed(fixedFee bool) (uint64, error) {
+	panic("implement me")
+}
+
+func (t TestTx) Verify(ctx *snow.Context, rules params.Rules) error {
+	panic("implement me")
+}
+
+func (t TestTx) Accept() (ids.ID, *atomic.Requests, error) {
+	panic("implement me")
 }
 
 func (t TestTx) Initialize(unsignedBytes, signedBytes []byte) {
@@ -30,10 +42,6 @@ func (t TestTx) Initialize(unsignedBytes, signedBytes []byte) {
 
 func (t TestTx) ID() ids.ID {
 	return t.Id
-}
-
-func (t TestTx) GasUsed() (uint64, error) {
-	panic("implement me")
 }
 
 func (t TestTx) Burned(assetID ids.ID) (uint64, error) {
@@ -52,19 +60,11 @@ func (t TestTx) InputUTXOs() ids.Set {
 	panic("implement me")
 }
 
-func (t TestTx) Verify(xChainID ids.ID, ctx *snow.Context, rules params.Rules) error {
-	panic("implement me")
-}
-
 func (t TestTx) SemanticVerify(vm *VM, stx *Tx, parent *Block, baseFee *big.Int, rules params.Rules) error {
 	panic("implement me")
 }
 
 func (t TestTx) AtomicOps() (map[ids.ID]*atomic.Requests, error) {
-	panic("implement me")
-}
-
-func (t TestTx) Accept(ctx *snow.Context, batch database.Batch) error {
 	panic("implement me")
 }
 
@@ -87,48 +87,7 @@ func prepareCodecForTest() codec.Manager {
 	return codec
 }
 
-func Test_AtomicTxRepository_Initialize(t *testing.T) {
-	db := memdb.New()
-	codec := prepareCodecForTest()
-
-	// write in the old database in legacy style
-	txDB := prefixdb.New(atomicTxIDDBPrefix, db) // tx DB indexed by txID => height+txbytes
-	txIDs := make([]ids.ID, 100)
-	for i := 0; i < 100; i++ {
-		id := ids.GenerateTestID()
-		tx := &Tx{
-			UnsignedAtomicTx: &TestTx{
-				Id: id,
-			},
-		}
-
-		txBytes, err := codec.Marshal(codecVersion, tx)
-		assert.NoError(t, err)
-		assert.NotNil(t, txBytes)
-
-		heightTxPacker := wrappers.Packer{Bytes: make([]byte, 12+len(txBytes))}
-		heightTxPacker.PackLong(uint64(i))
-		heightTxPacker.PackBytes(txBytes)
-
-		err = txDB.Put(id[:], heightTxPacker.Bytes)
-		assert.NoError(t, err)
-
-		txIDs[i] = id
-	}
-
-	repo := newAtomicTxRepository(db, codec)
-	err := repo.Initialize()
-	assert.NoError(t, err)
-
-	for i := 0; i < 100; i++ {
-		txs, err := repo.GetByHeight(uint64(i))
-		assert.NoError(t, err)
-		assert.Len(t, txs, 1)
-		assert.Equal(t, txIDs[i], txs[0].ID())
-	}
-}
-
-func Test_AtomicRepository_Read_Write(t *testing.T) {
+func TestAtomicRepositoryReadWrite(t *testing.T) {
 	db := memdb.New()
 	codec := prepareCodecForTest()
 	repo := newAtomicTxRepository(db, codec)
@@ -148,12 +107,47 @@ func Test_AtomicRepository_Read_Write(t *testing.T) {
 		txIDs[i] = id
 	}
 
-	// check we can get them all by height
+	// check we can get them all by ID
 	for i := 0; i < 100; i++ {
-		txs, err := repo.GetByHeight(uint64(i))
+		tx, height, err := repo.GetByTxID(txIDs[i])
 		assert.NoError(t, err)
-		assert.Equal(t, txs[0].ID(), txIDs[i])
+		assert.EqualValues(t, height, i)
+		assert.Equal(t, tx.ID(), txIDs[i])
+
+		txs, err := repo.GetByHeight(height)
+		assert.NoError(t, err)
+		assert.Len(t, txs, 1)
+		assert.Equal(t, txIDs[i], txs[0].ID())
 	}
+}
+
+func TestAtomicRepositoryInitialize(t *testing.T) {
+	db := memdb.New()
+	codec := prepareCodecForTest()
+
+	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
+	txIDs := make([]ids.ID, 150)
+	for i := 0; i < 100; i++ {
+		id := ids.GenerateTestID()
+		tx := &Tx{
+			UnsignedAtomicTx: &TestTx{
+				Id: id,
+			},
+		}
+
+		txBytes, err := codec.Marshal(codecVersion, tx)
+		assert.NoError(t, err)
+		packer := wrappers.Packer{Bytes: make([]byte, 1), MaxSize: 1024 * 1024}
+		packer.PackLong(uint64(i))
+		packer.PackBytes(txBytes)
+		err = acceptedAtomicTxDB.Put(id[:], packer.Bytes)
+		assert.NoError(t, err)
+		txIDs[i] = id
+	}
+
+	repo := newAtomicTxRepository(db, codec)
+	err := repo.Initialize()
+	assert.NoError(t, err)
 
 	// check we can get them all by ID
 	for i := 0; i < 100; i++ {
@@ -161,5 +155,45 @@ func Test_AtomicRepository_Read_Write(t *testing.T) {
 		assert.NoError(t, err)
 		assert.EqualValues(t, height, i)
 		assert.Equal(t, tx.ID(), txIDs[i])
+
+		txs, err := repo.GetByHeight(height)
+		assert.NoError(t, err)
+		assert.Len(t, txs, 1)
+		assert.Equal(t, txIDs[i], txs[0].ID())
+	}
+
+	for i := 100; i < 150; i++ {
+		id := ids.GenerateTestID()
+		tx := &Tx{
+			UnsignedAtomicTx: &TestTx{
+				Id: id,
+			},
+		}
+
+		txBytes, err := codec.Marshal(codecVersion, tx)
+		assert.NoError(t, err)
+		packer := wrappers.Packer{Bytes: make([]byte, 1), MaxSize: 1024 * 1024}
+		packer.PackLong(uint64(i))
+		packer.PackBytes(txBytes)
+		err = acceptedAtomicTxDB.Put(id[:], packer.Bytes)
+		assert.NoError(t, err)
+		txIDs[i] = id
+	}
+
+	repo = newAtomicTxRepository(db, codec)
+	err = repo.Initialize()
+	assert.NoError(t, err)
+
+	// check we can get them all by ID
+	for i := 0; i < 150; i++ {
+		tx, height, err := repo.GetByTxID(txIDs[i])
+		assert.NoError(t, err)
+		assert.EqualValues(t, height, i)
+		assert.Equal(t, tx.ID(), txIDs[i])
+
+		txs, err := repo.GetByHeight(height)
+		assert.NoError(t, err, "error '%v' for height %d", err, height)
+		assert.Len(t, txs, 1)
+		assert.Equal(t, txIDs[i], txs[0].ID())
 	}
 }

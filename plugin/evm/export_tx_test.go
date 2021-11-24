@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	engCommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -513,7 +514,39 @@ func TestExportTxSemanticVerify(t *testing.T) {
 			shouldErr: false,
 		},
 		{
-			name: "wrong destination",
+			name: "P-chain before AP5",
+			tx: func() *Tx {
+				validExportTx := *validExportTx
+				validExportTx.DestinationChain = constants.PlatformChainID
+				return &Tx{UnsignedAtomicTx: &validExportTx}
+			}(),
+			signers: [][]*crypto.PrivateKeySECP256K1R{
+				{key},
+				{key},
+				{key},
+			},
+			baseFee:   initialBaseFee,
+			rules:     apricotRulesPhase3,
+			shouldErr: true,
+		},
+		{
+			name: "P-chain after AP5",
+			tx: func() *Tx {
+				validExportTx := *validExportTx
+				validExportTx.DestinationChain = constants.PlatformChainID
+				return &Tx{UnsignedAtomicTx: &validExportTx}
+			}(),
+			signers: [][]*crypto.PrivateKeySECP256K1R{
+				{key},
+				{key},
+				{key},
+			},
+			baseFee:   initialBaseFee,
+			rules:     apricotRulesPhase5,
+			shouldErr: false,
+		},
+		{
+			name: "random chain after AP5",
 			tx: func() *Tx {
 				validExportTx := *validExportTx
 				validExportTx.DestinationChain = ids.GenerateTestID()
@@ -525,7 +558,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 				{key},
 			},
 			baseFee:   initialBaseFee,
-			rules:     apricotRulesPhase3,
+			rules:     apricotRulesPhase5,
 			shouldErr: true,
 		},
 		{
@@ -898,10 +931,14 @@ func TestExportTxAccept(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create commit batch for VM due to %s", err)
 	}
-	if err := tx.Accept(vm.ctx, commitBatch); err != nil {
+	chainID, atomicRequests, err := tx.Accept()
+	if err != nil {
 		t.Fatalf("Failed to accept export transaction due to: %s", err)
 	}
 
+	if err := vm.ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{chainID: {PutRequests: atomicRequests.PutRequests}}, commitBatch); err != nil {
+		t.Fatal(err)
+	}
 	indexedValues, _, _, err := xChainSharedMemory.Indexed(vm.ctx.ChainID, [][]byte{addr.Bytes()}, nil, nil, 3)
 	if err != nil {
 		t.Fatal(err)
@@ -966,7 +1003,7 @@ func TestExportTxAccept(t *testing.T) {
 
 func TestExportTxVerifyNil(t *testing.T) {
 	var exportTx *UnsignedExportTx
-	if err := exportTx.Verify(testXChainID, NewContext(), apricotRulesPhase0); err == nil {
+	if err := exportTx.Verify(NewContext(), apricotRulesPhase0); err == nil {
 		t.Fatal("Verify should have failed due to nil transaction")
 	}
 }
@@ -1025,30 +1062,27 @@ func TestExportTxVerify(t *testing.T) {
 	SortEVMInputsAndSigners(exportTx.Ins, emptySigners)
 
 	ctx := NewContext()
-
 	// Test Valid Export Tx
-	if err := exportTx.Verify(testXChainID, ctx, apricotRulesPhase1); err != nil {
+	if err := exportTx.Verify(ctx, apricotRulesPhase1); err != nil {
 		t.Fatalf("Failed to verify valid ExportTx: %s", err)
 	}
-
 	exportTx.NetworkID = testNetworkID + 1
-
 	// Test Incorrect Network ID Errors
-	if err := exportTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
+	if err := exportTx.Verify(ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ExportTx should have failed verification due to incorrect network ID")
 	}
 
 	exportTx.NetworkID = testNetworkID
 	exportTx.BlockchainID = nonExistentID
 	// Test Incorrect Blockchain ID Errors
-	if err := exportTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
+	if err := exportTx.Verify(ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ExportTx should have failed verification due to incorrect blockchain ID")
 	}
 
 	exportTx.BlockchainID = testCChainID
 	exportTx.DestinationChain = nonExistentID
 	// Test Incorrect Destination Chain ID Errors
-	if err := exportTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
+	if err := exportTx.Verify(ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ExportTx should have failed verification due to incorrect destination chain")
 	}
 
@@ -1057,30 +1091,30 @@ func TestExportTxVerify(t *testing.T) {
 	exportTx.ExportedOutputs = nil
 	evmInputs := exportTx.Ins
 	// Test No Exported Outputs Errors
-	if err := exportTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
+	if err := exportTx.Verify(ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ExportTx should have failed verification due to no exported outputs")
 	}
 
 	exportTx.ExportedOutputs = []*avax.TransferableOutput{exportedOuts[1], exportedOuts[0]}
 	// Test Unsorted outputs Errors
-	if err := exportTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
+	if err := exportTx.Verify(ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ExportTx should have failed verification due to no unsorted exported outputs")
 	}
 
 	exportTx.ExportedOutputs = []*avax.TransferableOutput{exportedOuts[0], nil}
 	// Test invalid exported output
-	if err := exportTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
+	if err := exportTx.Verify(ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ExportTx should have failed verification due to invalid output")
 	}
 
 	exportTx.ExportedOutputs = []*avax.TransferableOutput{exportedOuts[0], exportedOuts[1]}
 	exportTx.Ins = []EVMInput{evmInputs[1], evmInputs[0]}
 	// Test unsorted EVM Inputs passes before AP1
-	if err := exportTx.Verify(testXChainID, ctx, apricotRulesPhase0); err != nil {
+	if err := exportTx.Verify(ctx, apricotRulesPhase0); err != nil {
 		t.Fatalf("ExportTx should have passed verification before AP1, but failed due to %s", err)
 	}
 	// Test unsorted EVM Inputs fails after AP1
-	if err := exportTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
+	if err := exportTx.Verify(ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ExportTx should have failed verification due to unsorted EVM Inputs")
 	}
 	exportTx.Ins = []EVMInput{
@@ -1092,17 +1126,17 @@ func TestExportTxVerify(t *testing.T) {
 		},
 	}
 	// Test ExportTx with invalid EVM Input amount 0 fails verification
-	if err := exportTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
+	if err := exportTx.Verify(ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ExportTx should have failed verification due to 0 value amount")
 	}
 	exportTx.Ins = []EVMInput{evmInputs[0], evmInputs[0]}
 	// Test non-unique EVM Inputs passes verification before AP1
-	if err := exportTx.Verify(testXChainID, ctx, apricotRulesPhase0); err != nil {
+	if err := exportTx.Verify(ctx, apricotRulesPhase0); err != nil {
 		t.Fatalf("ExportTx with non-unique EVM Inputs should have passed verification prior to AP1, but failed due to %s", err)
 	}
 	exportTx.Ins = []EVMInput{evmInputs[0], evmInputs[0]}
 	// Test non-unique EVM Inputs fails verification after AP1
-	if err := exportTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
+	if err := exportTx.Verify(ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ExportTx should have failed verification due to non-unique inputs")
 	}
 }
@@ -1123,6 +1157,7 @@ func TestExportTxGasCost(t *testing.T) {
 		BaseFee         *big.Int
 		ExpectedGasUsed uint64
 		ExpectedFee     uint64
+		FixedFee        bool
 	}{
 		"simple export 1wei BaseFee": {
 			UnsignedExportTx: &UnsignedExportTx{
@@ -1155,6 +1190,39 @@ func TestExportTxGasCost(t *testing.T) {
 			ExpectedGasUsed: 1230,
 			ExpectedFee:     1,
 			BaseFee:         big.NewInt(1),
+		},
+		"simple export 1wei BaseFee + fixed fee": {
+			UnsignedExportTx: &UnsignedExportTx{
+				NetworkID:        networkID,
+				BlockchainID:     chainID,
+				DestinationChain: xChainID,
+				Ins: []EVMInput{
+					{
+						Address: testEthAddrs[0],
+						Amount:  exportAmount,
+						AssetID: avaxAssetID,
+						Nonce:   0,
+					},
+				},
+				ExportedOutputs: []*avax.TransferableOutput{
+					{
+						Asset: avax.Asset{ID: avaxAssetID},
+						Out: &secp256k1fx.TransferOutput{
+							Amt: exportAmount,
+							OutputOwners: secp256k1fx.OutputOwners{
+								Locktime:  0,
+								Threshold: 1,
+								Addrs:     []ids.ShortID{testShortIDAddrs[0]},
+							},
+						},
+					},
+				},
+			},
+			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
+			ExpectedGasUsed: 11230,
+			ExpectedFee:     1,
+			BaseFee:         big.NewInt(1),
+			FixedFee:        true,
 		},
 		"simple export 25Gwei BaseFee": {
 			UnsignedExportTx: &UnsignedExportTx{
@@ -1319,7 +1387,7 @@ func TestExportTxGasCost(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			gasUsed, err := tx.GasUsed()
+			gasUsed, err := tx.GasUsed(test.FixedFee)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1380,6 +1448,13 @@ func TestNewExportTx(t *testing.T) {
 			rules:              apricotRulesPhase4,
 			bal:                44446500,
 			expectedBurnedAVAX: 276750,
+		},
+		{
+			name:               "apricot phase 5",
+			genesis:            genesisJSONApricotPhase5,
+			rules:              apricotRulesPhase5,
+			bal:                39946500,
+			expectedBurnedAVAX: 2526750,
 		},
 	}
 	for _, test := range tests {
@@ -1478,8 +1553,14 @@ func TestNewExportTx(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create commit batch for VM due to %s", err)
 			}
-			if err := exportTx.Accept(vm.ctx, commitBatch); err != nil {
+			chainID, atomicRequests, err := exportTx.Accept()
+
+			if err != nil {
 				t.Fatalf("Failed to accept export transaction due to: %s", err)
+			}
+
+			if err := vm.ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{chainID: {PutRequests: atomicRequests.PutRequests}}, commitBatch); err != nil {
+				t.Fatal(err)
 			}
 
 			sdb, err := vm.chain.CurrentState()
@@ -1660,8 +1741,14 @@ func TestNewExportTxMulticoin(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create commit batch for VM due to %s", err)
 			}
-			if err := exportTx.Accept(vm.ctx, commitBatch); err != nil {
+			chainID, atomicRequests, err := exportTx.Accept()
+
+			if err != nil {
 				t.Fatalf("Failed to accept export transaction due to: %s", err)
+			}
+
+			if err := vm.ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{chainID: {PutRequests: atomicRequests.PutRequests}}, commitBatch); err != nil {
+				t.Fatal(err)
 			}
 
 			stdb, err := vm.chain.CurrentState()
