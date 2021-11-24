@@ -221,12 +221,12 @@ func (oracle *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 	// If [nextBaseFee] is lower than the estimate from sampling, then we return it
 	// to prevent returning an incorrectly high fee when the network is quiescent.
 	nextBaseFee, err := oracle.estimateNextBaseFee(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if nextBaseFee.Cmp(baseFee) == -1 {
-		baseFee = nextBaseFee
+	if err == nil {
+		if nextBaseFee.Cmp(baseFee) == -1 {
+			baseFee = nextBaseFee
+		}
+	} else {
+		log.Warn("failed to estimate next base fee", "err", err)
 	}
 
 	return new(big.Int).Add(tip, baseFee), nil
