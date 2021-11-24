@@ -195,41 +195,6 @@ func applyGasPriceTest(t *testing.T, test suggestTipCapTest) {
 	}
 }
 
-func TestSuggestTipCapNetworkUpgrades(t *testing.T) {
-	tests := map[string]suggestTipCapTest{
-		"launch": {
-			chainConfig: params.TestLaunchConfig,
-			expectedTip: big.NewInt(params.LaunchMinGasPrice),
-		},
-		"apricot phase 1": {
-			chainConfig: params.TestApricotPhase1Config,
-			expectedTip: big.NewInt(params.ApricotPhase1MinGasPrice),
-		},
-		"apricot phase 2": {
-			chainConfig: params.TestApricotPhase2Config,
-			expectedTip: big.NewInt(params.ApricotPhase1MinGasPrice),
-		},
-		"apricot phase 3": {
-			chainConfig: params.TestApricotPhase3Config,
-			expectedTip: big.NewInt(0),
-		},
-		"apricot phase 4": {
-			chainConfig: params.TestApricotPhase4Config,
-			expectedTip: DefaultMinPrice,
-		},
-		"apricot phase 5": {
-			chainConfig: params.TestApricotPhase5Config,
-			expectedTip: DefaultMinPrice,
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			applyGasPriceTest(t, test)
-		})
-	}
-}
-
 func TestSuggestTipCapEmptyExtDataGasUsage(t *testing.T) {
 	txTip := big.NewInt(55 * params.GWei)
 	applyGasPriceTest(t, suggestTipCapTest{
