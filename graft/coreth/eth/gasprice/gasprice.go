@@ -216,9 +216,17 @@ func (oracle *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 	if err != nil {
 		return nil, err
 	}
-	// If [nextBaseFee] is nil, return [tip] without modification.
-	if baseFee == nil {
-		return tip, nil
+
+	// We calculate the [nextBaseFee] if a block were to be produced immediately.
+	// If [nextBaseFee] is lower than the estimate from sampling, then we return it
+	// to prevent returning an incorrectly high fee when the network is quiescent.
+	nextBaseFee, err := oracle.estimateNextBaseFee(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if nextBaseFee.Cmp(baseFee) == -1 {
+		baseFee = nextBaseFee
 	}
 
 	return new(big.Int).Add(tip, baseFee), nil
