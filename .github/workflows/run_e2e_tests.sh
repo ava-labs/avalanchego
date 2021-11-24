@@ -80,7 +80,7 @@ custom_params_json="{
 # >>>>>>>> avalanche-testing custom parameters <<<<<<<<<<<<<
 
 bash "$CORETH_PATH/.kurtosis/kurtosis.sh" \
-    --tests "C-Chain Bombard WorkFlow" \
+    --tests "C-Chain Bombard WorkFlow, Dynamic Fees, Snowman++ Correct Proposers and Timestamps" \
     --custom-params "${custom_params_json}" \
     "${avalanche_testing_image}" \
     $@
