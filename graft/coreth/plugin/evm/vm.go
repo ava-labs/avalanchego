@@ -396,7 +396,7 @@ func (vm *VM) Initialize(
 	vm.genesisHash = vm.chain.GetGenesisBlock().Hash()
 	log.Info(fmt.Sprintf("lastAccepted = %s", lastAccepted.Hash().Hex()))
 
-	atomicTxs, err := vm.extractAtomicTxs(lastAccepted)
+	atomicTxs, err := ExtractAtomicTxs(lastAccepted.ExtData(), vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(lastAccepted.Time())))
 	if err != nil {
 		return err
 	}
@@ -593,7 +593,15 @@ func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, 
 }
 
 func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big.Int, *big.Int, error) {
-	txs, err := vm.extractAtomicTxs(block)
+	var (
+		batchContribution *big.Int = big.NewInt(0)
+		batchGasUsed      *big.Int = big.NewInt(0)
+		timestamp                  = new(big.Int).SetUint64(block.Time())
+		isApricotPhase4            = vm.chainConfig.IsApricotPhase4(timestamp)
+		isApricotPhase5            = vm.chainConfig.IsApricotPhase5(timestamp)
+	)
+
+	txs, err := ExtractAtomicTxs(block.ExtData(), isApricotPhase5)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -603,14 +611,6 @@ func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big
 		return nil, nil, nil
 	}
 
-	// Allocate these variables only if there are atomic transactions to process.
-	var (
-		batchContribution *big.Int = big.NewInt(0)
-		batchGasUsed      *big.Int = big.NewInt(0)
-		timestamp                  = new(big.Int).SetUint64(block.Time())
-		isApricotPhase4            = vm.chainConfig.IsApricotPhase4(timestamp)
-		isApricotPhase5            = vm.chainConfig.IsApricotPhase5(timestamp)
-	)
 	for _, tx := range txs {
 		if err := tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state); err != nil {
 			return nil, nil, err
@@ -697,7 +697,7 @@ func (vm *VM) buildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 
-	atomicTxs, err := vm.extractAtomicTxs(block)
+	atomicTxs, err := ExtractAtomicTxs(block.ExtData(), vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(block.Time())))
 	if err != nil {
 		vm.mempool.DiscardCurrentTxs()
 		return nil, err
@@ -741,7 +741,7 @@ func (vm *VM) parseBlock(b []byte) (snowman.Block, error) {
 		return nil, err
 	}
 
-	atomicTxs, err := vm.extractAtomicTxs(ethBlock)
+	atomicTxs, err := ExtractAtomicTxs(ethBlock.ExtData(), vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(ethBlock.Time())))
 	if err != nil {
 		return nil, err
 	}
@@ -769,7 +769,7 @@ func (vm *VM) getBlock(id ids.ID) (snowman.Block, error) {
 	if ethBlock == nil {
 		return nil, database.ErrNotFound
 	}
-	atomicTxs, err := vm.extractAtomicTxs(ethBlock)
+	atomicTxs, err := ExtractAtomicTxs(ethBlock.ExtData(), vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(ethBlock.Time())))
 	if err != nil {
 		return nil, err
 	}
@@ -914,56 +914,6 @@ func (vm *VM) CreateStaticHandlers() (map[string]*commonEng.HTTPHandler, error) 
  *********************************** Helpers **********************************
  ******************************************************************************
  */
-// extractAtomicTxs returns the atomic transactions in [block] if
-// they exist.
-func (vm *VM) extractAtomicTxs(block *types.Block) ([]*Tx, error) {
-	atomicTxBytes := block.ExtData()
-	if len(atomicTxBytes) == 0 {
-		return nil, nil
-	}
-
-	if !vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(block.Time())) {
-		return vm.extractAtomicTxsPreApricotPhase5(atomicTxBytes)
-	}
-	return vm.extractAtomicTxsPostApricotPhase5(atomicTxBytes)
-}
-
-// [extractAtomicTxsPreApricotPhase5] extracts a singular atomic transaction from [atomicTxBytes]
-// and returns a slice of atomic transactions for compatibility with the type returned post
-// ApricotPhase5.
-// Note: this function assumes [atomicTxBytes] is non-empty.
-func (vm *VM) extractAtomicTxsPreApricotPhase5(atomicTxBytes []byte) ([]*Tx, error) {
-	atomicTx := new(Tx)
-	if _, err := vm.codec.Unmarshal(atomicTxBytes, atomicTx); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal atomic transaction (pre-AP3): %w", err)
-	}
-	if err := atomicTx.Sign(vm.codec, nil); err != nil {
-		return nil, fmt.Errorf("failed to initialize singleton atomic tx due to: %w", err)
-	}
-	return []*Tx{atomicTx}, nil
-}
-
-// [extractAtomicTxsPostApricotPhase5] extracts a slice of atomic transactions from [atomicTxBytes].
-// Note: this function assumes [atomicTxBytes] is non-empty.
-func (vm *VM) extractAtomicTxsPostApricotPhase5(atomicTxBytes []byte) ([]*Tx, error) {
-	var atomicTxs []*Tx
-	if _, err := vm.codec.Unmarshal(atomicTxBytes, &atomicTxs); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal atomic tx (AP5) due to %w", err)
-	}
-
-	// Do not allow non-empty extra data field to contain zero atomic transactions. This would allow
-	// people to construct a block that contains useless data.
-	if len(atomicTxs) == 0 {
-		return nil, errMissingAtomicTxs
-	}
-
-	for index, atx := range atomicTxs {
-		if err := atx.Sign(vm.codec, nil); err != nil {
-			return nil, fmt.Errorf("failed to initialize atomic tx at index %d: %w", index, err)
-		}
-	}
-	return atomicTxs, nil
-}
 
 // conflicts returns an error if [inputs] conflicts with any of the atomic inputs contained in [ancestor]
 // or any of its ancestor blocks going back to the last accepted block in its ancestry. If [ancestor] is
