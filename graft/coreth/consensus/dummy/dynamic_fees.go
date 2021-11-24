@@ -40,6 +40,7 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 	var (
 		isApricotPhase3 = config.IsApricotPhase3(bigTimestamp)
 		isApricotPhase4 = config.IsApricotPhase4(bigTimestamp)
+		isApricotPhase5 = config.IsApricotPhase5(bigTimestamp)
 	)
 	if !isApricotPhase3 || parent.Number.Cmp(common.Big0) == 0 {
 		initialSlice := make([]byte, params.ApricotPhase3ExtraDataSize)
@@ -153,6 +154,8 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 	}
 
 	switch {
+	case isApricotPhase5:
+		baseFee = selectBigWithinBounds(ApricotPhase4MinBaseFee, baseFee, nil)
 	case isApricotPhase4:
 		baseFee = selectBigWithinBounds(ApricotPhase4MinBaseFee, baseFee, ApricotPhase4MaxBaseFee)
 	default:
@@ -167,9 +170,9 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 // is outside of the defined boundaries.
 func selectBigWithinBounds(lowerBound, value, upperBound *big.Int) *big.Int {
 	switch {
-	case value.Cmp(lowerBound) < 0:
+	case lowerBound != nil && value.Cmp(lowerBound) < 0:
 		return new(big.Int).Set(lowerBound)
-	case value.Cmp(upperBound) > 0:
+	case upperBound != nil && value.Cmp(upperBound) > 0:
 		return new(big.Int).Set(upperBound)
 	default:
 		return value
