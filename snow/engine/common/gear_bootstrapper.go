@@ -48,20 +48,22 @@ type BootstrapperGear struct {
 	Config
 	Halter
 
+	gR GearRequester
+
 	// Tracks the last requestID that was used in a request
 	RequestID uint32
 
-	// True if RestartBootstrap has been called at least once
-	Restarted bool
-
-	gR GearRequester
-
 	// Holds the beacons that were sampled for the accepted frontier
 	sampledBeacons validators.Set
-
+	// IDs of all the returned accepted frontiers
 	acceptedFrontierSet ids.Set
-	acceptedVotes       map[ids.ID]uint64
-	acceptedFrontier    []ids.ID
+	// IDs of the returned accepted containers and the stake weight that has
+	// marked them as accepted
+	acceptedVotes    map[ids.ID]uint64
+	acceptedFrontier []ids.ID
+
+	// True if RestartBootstrap has been called at least once
+	Restarted bool
 
 	// number of times the bootstrap has been attempted
 	bootstrapAttempts int

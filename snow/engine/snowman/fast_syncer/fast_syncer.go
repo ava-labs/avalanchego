@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -33,14 +34,21 @@ func NewFastSyncer(
 	onDoneFastSyncing func(lastReqID uint32) error,
 ) FastSyncer {
 	fsVM, _ := cfg.VM.(block.StateSyncableVM)
+	gR := common.NewGearRequester(
+		cfg.Ctx.Log,
+		[]message.Op{
+			message.StateSummaryFrontier,
+			message.AcceptedStateSummary,
+		})
 
 	fs := &fastSyncer{
-		onDoneFastSyncing: onDoneFastSyncing,
-		Config:            cfg,
 		FastSyncNoOps: FastSyncNoOps{
 			Ctx: cfg.Ctx,
 		},
-		fastSyncVM: fsVM,
+		Config:            cfg,
+		gR:                gR,
+		fastSyncVM:        fsVM,
+		onDoneFastSyncing: onDoneFastSyncing,
 	}
 
 	return fs
@@ -48,40 +56,24 @@ func NewFastSyncer(
 
 type fastSyncer struct {
 	FastSyncNoOps
-
 	Config
+
+	gR common.GearRequester
 
 	// Tracks the last requestID that was used in a request
 	RequestID uint32
 
-	// True if RestartBootstrap has been called at least once
-	Restarted bool
-
 	// Holds the beacons that were sampled for the accepted frontier
 	sampledBeacons validators.Set
-	// IDs of validators we should request an accepted frontier from
-	pendingSendAcceptedFrontier ids.ShortSet
-	// IDs of validators we requested an accepted frontier from but haven't
-	// received a reply yet
-	pendingReceiveAcceptedFrontier ids.ShortSet
-	// IDs of validators that failed to respond with their accepted frontier
-	failedAcceptedFrontier ids.ShortSet
 	// IDs of all the returned accepted frontiers
 	acceptedFrontierSet map[hashing.Hash256][]byte
-
-	// IDs of validators we should request filtering the accepted frontier from
-	pendingSendAccepted ids.ShortSet
-	// IDs of validators we requested filtering the accepted frontier from but
-	// haven't received a reply yet
-	pendingReceiveAccepted ids.ShortSet
-	// IDs of validators that failed to respond with their filtered accepted
-	// frontier
-	failedAccepted ids.ShortSet
-
 	// IDs of the returned accepted containers and the stake weight that has
 	// marked them as accepted
 	acceptedVotes    map[hashing.Hash256]uint64
 	acceptedFrontier [][]byte
+
+	// True if RestartBootstrap has been called at least once
+	Restarted bool
 
 	// number of times the bootstrap has been attempted
 	fastSyncAttempts int
@@ -174,73 +166,77 @@ func (fs *fastSyncer) startup() error {
 		return err
 	}
 
-	fs.pendingSendAcceptedFrontier.Clear()
+	fs.gR.ClearToRequest(message.StateSummaryFrontier)
 	for _, vdr := range beacons {
 		vdrID := vdr.ID()
-		fs.pendingSendAcceptedFrontier.Add(vdrID)
+		if err := fs.gR.PushToRequest(message.StateSummaryFrontier, vdrID); err != nil {
+			return err
+		}
 	}
-
-	fs.pendingReceiveAcceptedFrontier.Clear()
-	fs.failedAcceptedFrontier.Clear()
+	fs.gR.ClearRequested(message.StateSummaryFrontier)
+	fs.gR.ClearFailed(message.StateSummaryFrontier)
 	fs.acceptedFrontierSet = make(map[hashing.Hash256][]byte)
 
-	fs.pendingSendAccepted.Clear()
+	fs.gR.ClearToRequest(message.AcceptedStateSummary)
 	for _, vdr := range fs.Beacons.List() {
 		vdrID := vdr.ID()
-		fs.pendingSendAccepted.Add(vdrID)
+		if err := fs.gR.PushToRequest(message.AcceptedStateSummary, vdrID); err != nil {
+			return err
+		}
 	}
 
-	fs.pendingReceiveAccepted.Clear()
-	fs.failedAccepted.Clear()
+	fs.gR.ClearRequested(message.AcceptedStateSummary)
+	fs.gR.ClearFailed(message.AcceptedStateSummary)
 	fs.acceptedVotes = make(map[hashing.Hash256]uint64)
 
 	fs.fastSyncAttempts++
-	if fs.pendingSendAcceptedFrontier.Len() == 0 {
+	if !fs.gR.HasToRequest(message.StateSummaryFrontier) {
 		fs.Ctx.Log.Info("Fast syncing skipped due to no provided bootstraps")
 		return fs.fastSyncVM.StateSync(nil)
 	}
 
 	fs.RequestID++
-	fs.sendGetStateSummaryFrontiers()
-	return nil
+	return fs.sendGetStateSummaryFrontiers()
 }
 
 // Ask up to [MaxOutstandingFastSyncRequests] bootstrap validators to send
 // their accepted frontier with the current accepted frontier
-func (fs *fastSyncer) sendGetStateSummaryFrontiers() {
-	vdrs := ids.NewShortSet(1)
-	for fs.pendingSendAcceptedFrontier.Len() > 0 && fs.pendingReceiveAcceptedFrontier.Len() < MaxOutstandingFastSyncRequests {
-		vdr, _ := fs.pendingSendAcceptedFrontier.Pop()
-		// Add the validator to the set to send the messages to
-		vdrs.Add(vdr)
-		// Add the validator to send pending receipt set
-		fs.pendingReceiveAcceptedFrontier.Add(vdr)
+func (fs *fastSyncer) sendGetStateSummaryFrontiers() error {
+	validators := ids.NewShortSet(1)
+
+	frontiersToRequest := MaxOutstandingFastSyncRequests - fs.gR.CountRequested(message.StateSummaryFrontier)
+	vdrsList := fs.gR.PopToRequest(message.StateSummaryFrontier, frontiersToRequest)
+	if err := fs.gR.RecordRequested(message.StateSummaryFrontier, vdrsList); err != nil {
+		return err
+	}
+	validators.Add(vdrsList...)
+
+	if validators.Len() > 0 {
+		fs.Sender.SendGetAcceptedFrontier(validators, fs.RequestID)
 	}
 
-	if vdrs.Len() > 0 {
-		fs.Sender.SendGetStateSummaryFrontier(vdrs, fs.RequestID)
-	}
+	return nil
 }
 
 // Ask up to [MaxOutstandingFastSyncRequests] bootstrap validators to send
 // their filtered accepted frontier
-func (fs *fastSyncer) sendGetAccepted() {
+func (fs *fastSyncer) sendGetAccepted() error {
 	vdrs := ids.NewShortSet(1)
-	for fs.pendingSendAccepted.Len() > 0 && fs.pendingReceiveAccepted.Len() < MaxOutstandingFastSyncRequests {
-		vdr, _ := fs.pendingSendAccepted.Pop()
-		// Add the validator to the set to send the messages to
-		vdrs.Add(vdr)
-		// Add the validator to send pending receipt set
-		fs.pendingReceiveAccepted.Add(vdr)
+
+	acceptedFrontiersToRequest := MaxOutstandingFastSyncRequests - fs.gR.CountRequested(message.AcceptedStateSummary)
+	vdrsList := fs.gR.PopToRequest(message.AcceptedStateSummary, acceptedFrontiersToRequest)
+	if err := fs.gR.RecordRequested(message.AcceptedStateSummary, vdrsList); err != nil {
+		return err
 	}
+	vdrs.Add(vdrsList...)
 
 	if vdrs.Len() > 0 {
 		fs.Ctx.Log.Debug("sent %d more GetAccepted messages with %d more to send",
-			vdrs.Len(),
-			fs.pendingSendAccepted.Len(),
-		)
+			vdrs.Len(), fs.gR.CountRequested(message.AcceptedStateSummary))
 		fs.Sender.SendGetAcceptedStateSummary(vdrs, fs.RequestID, fs.acceptedFrontier)
 	}
+
+	return nil
 }
 
 func (fs *fastSyncer) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error {
@@ -256,27 +252,21 @@ func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID ui
 	// ignores any late responses
 	if requestID != fs.RequestID {
 		fs.Ctx.Log.Debug("Received an Out-of-Sync AcceptedFrontier - validator: %v - expectedRequestID: %v, requestID: %v",
-			validatorID,
-			fs.RequestID,
-			requestID)
+			validatorID, fs.RequestID, requestID)
 		return nil
 	}
 
-	if !fs.pendingReceiveAcceptedFrontier.Contains(validatorID) {
-		fs.Ctx.Log.Debug("Received an AcceptedFrontier message from %s unexpectedly", validatorID)
+	if !fs.gR.ConsumeRequested(message.StateSummaryFrontier, validatorID) {
 		return nil
 	}
 
-	// Mark that we received a response from [validatorID]
-	fs.pendingReceiveAcceptedFrontier.Remove(validatorID)
-
-	// Union the reported accepted frontier from [validatorID] with the accepted frontier we got from others
 	fs.acceptedFrontierSet[hashing.ComputeHash256Array(summary)] = summary
-
-	fs.sendGetStateSummaryFrontiers()
+	if err := fs.sendGetStateSummaryFrontiers(); err != nil {
+		return err
+	}
 
 	// still waiting on requests
-	if fs.pendingReceiveAcceptedFrontier.Len() != 0 {
+	if fs.gR.CountRequested(message.StateSummaryFrontier) != 0 {
 		return nil
 	}
 
@@ -292,7 +282,8 @@ func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID ui
 
 	newAlpha := float64(fs.sampledBeacons.Weight()*fs.Alpha) / float64(fs.Beacons.Weight())
 
-	failedBeaconWeight, err := fs.Beacons.SubsetWeight(fs.failedAcceptedFrontier)
+	failedAcceptedFrontier := fs.gR.GetAllFailed(message.StateSummaryFrontier)
+	failedBeaconWeight, err := fs.Beacons.SubsetWeight(failedAcceptedFrontier)
 	if err != nil {
 		return err
 	}
@@ -301,12 +292,12 @@ func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID ui
 	if float64(fs.sampledBeacons.Weight())-newAlpha < float64(failedBeaconWeight) {
 		if fs.Config.RetryBootstrap {
 			fs.Ctx.Log.Debug("Not enough frontiers received, restarting bootstrap... - Beacons: %d - Failed Bootstrappers: %d "+
-				"- fast sync attempt: %d", fs.Beacons.Len(), fs.failedAcceptedFrontier.Len(), fs.fastSyncAttempts)
+				"- bootstrap attempt: %d", fs.Beacons.Len(), failedAcceptedFrontier.Len(), fs.fastSyncAttempts)
 			return fs.RestartBootstrap(false)
 		}
 
-		fs.Ctx.Log.Info("Didn't receive enough frontiers - failed validators: %d, "+
-			"fast sync attempt: %d", fs.failedAcceptedFrontier.Len(), fs.fastSyncAttempts)
+		fs.Ctx.Log.Debug("Didn't receive enough frontiers - failed validators: %d, "+
+			"bootstrap attempt: %d", failedAcceptedFrontier.Len(), fs.fastSyncAttempts)
 	}
 
 	fs.RequestID++
@@ -316,8 +307,7 @@ func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID ui
 	}
 	fs.acceptedFrontier = acceptedFrontierList
 
-	fs.sendGetAccepted()
-	return nil
+	return fs.sendGetAccepted()
 }
 
 func (fs *fastSyncer) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error {
@@ -337,18 +327,13 @@ func (fs *fastSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID ui
 	// ignores any late responses
 	if requestID != fs.RequestID {
 		fs.Ctx.Log.Debug("Received an Out-of-Sync Accepted - validator: %v - expectedRequestID: %v, requestID: %v",
-			validatorID,
-			fs.RequestID,
-			requestID)
+			validatorID, fs.RequestID, requestID)
 		return nil
 	}
 
-	if !fs.pendingReceiveAccepted.Contains(validatorID) {
-		fs.Ctx.Log.Debug("Received an Accepted message from %s unexpectedly", validatorID)
+	if !fs.gR.ConsumeRequested(message.AcceptedStateSummary, validatorID) {
 		return nil
 	}
-	// Mark that we received a response from [validatorID]
-	fs.pendingReceiveAccepted.Remove(validatorID)
 
 	weight := uint64(0)
 	if w, ok := fs.Beacons.GetWeight(validatorID); ok {
@@ -366,10 +351,12 @@ func (fs *fastSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID ui
 		fs.acceptedVotes[summaryHash] = newWeight
 	}
 
-	fs.sendGetAccepted()
+	if err := fs.sendGetAccepted(); err != nil {
+		return err
+	}
 
 	// wait on pending responses
-	if fs.pendingReceiveAccepted.Len() != 0 {
+	if fs.gR.CountRequested(message.AcceptedStateSummary) != 0 {
 		return nil
 	}
 
@@ -384,9 +371,10 @@ func (fs *fastSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID ui
 
 	// if we don't have enough weight for the bootstrap to be accepted then retry or fail the bootstrap
 	size := len(accepted)
+	failedAccepted := fs.gR.GetAllFailed(message.AcceptedStateSummary)
 	if size == 0 && fs.Beacons.Len() > 0 {
 		// retry the bootstrap if the weight is not enough to bootstrap
-		failedBeaconWeight, err := fs.Beacons.SubsetWeight(fs.failedAccepted)
+		failedBeaconWeight, err := fs.Beacons.SubsetWeight(failedAccepted)
 		if err != nil {
 			return err
 		}
@@ -394,7 +382,7 @@ func (fs *fastSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID ui
 		// in a zero network there will be no accepted votes but the voting weight will be greater than the failed weight
 		if fs.Config.RetryBootstrap && fs.Beacons.Weight()-fs.Alpha < failedBeaconWeight {
 			fs.Ctx.Log.Debug("Not enough votes received, restarting bootstrap... - Beacons: %d - Failed Bootstrappers: %d "+
-				"- fast sync attempt: %d", fs.Beacons.Len(), fs.failedAccepted.Len(), fs.fastSyncAttempts)
+				"- fast sync attempt: %d", fs.Beacons.Len(), failedAccepted.Len(), fs.fastSyncAttempts)
 			return fs.RestartBootstrap(false)
 		}
 	}
@@ -414,15 +402,14 @@ func (fs *fastSyncer) GetStateSummaryFrontierFailed(validatorID ids.ShortID, req
 	// ignores any late responses
 	if requestID != fs.RequestID {
 		fs.Ctx.Log.Debug("Received an Out-of-Sync GetStateSummaryFrontierFailed - validator: %v - expectedRequestID: %v, requestID: %v",
-			validatorID,
-			fs.RequestID,
-			requestID)
+			validatorID, fs.RequestID, requestID)
 		return nil
 	}
 
-	// If we can't get a response from [validatorID], act as though they said their accepted frontier is empty
-	// and we add the validator to the failed list
-	fs.failedAcceptedFrontier.Add(validatorID)
+	if err := fs.gR.AddFailed(message.StateSummaryFrontier, validatorID); err != nil {
+		return err
+	}
+
 	return fs.StateSummaryFrontier(validatorID, requestID, []byte{})
 }
 
@@ -431,15 +418,14 @@ func (fs *fastSyncer) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, req
 	// ignores any late responses
 	if requestID != fs.RequestID {
 		fs.Ctx.Log.Debug("Received an Out-of-Sync GetAcceptedStateSummaryFailed - validator: %v - expectedRequestID: %v, requestID: %v",
-			validatorID,
-			fs.RequestID,
-			requestID)
+			validatorID, fs.RequestID, requestID)
 		return nil
 	}
 
-	// If we can't get a response from [validatorID], act as though they said
-	// that they think none of the containers we sent them in GetAcceptedStateSummary are accepted
-	fs.failedAccepted.Add(validatorID)
+	if err := fs.gR.AddFailed(message.AcceptedStateSummary, validatorID); err != nil {
+		return err
+	}
+
 	return fs.AcceptedStateSummary(validatorID, requestID, [][]byte{})
 }
 
