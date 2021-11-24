@@ -199,9 +199,9 @@ func (tx *UnsignedImportTx) AtomicAccept(ctx *snow.Context, batch database.Batch
 	if err != nil {
 		return err
 	}
-	tx.vm.pubsub.Publish(tx.ID(), NewPubSubFilterer(&tx.BaseTx))
+	tx.vm.pubsub.Publish(NewPubSubFilterer(&tx.BaseTx))
 
-	return ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{chainID: requests}, batch)
+	return ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{tx.SourceChain: {RemoveRequests: utxoIDs}}, batch)
 }
 
 // Create a new transaction

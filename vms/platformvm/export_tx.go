@@ -182,7 +182,7 @@ func (tx *UnsignedExportTx) AtomicAccept(ctx *snow.Context, batch database.Batch
 	if err != nil {
 		return err
 	}
-	tx.vm.pubsub.Publish(tx.ID(), NewPubSubExportFilterer(tx))
+	tx.vm.pubsub.Publish(NewPubSubExportFilterer(tx))
 
 	return ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{chainID: requests}, batch)
 }
