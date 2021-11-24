@@ -396,7 +396,7 @@ func (vm *VM) Initialize(
 	vm.genesisHash = vm.chain.GetGenesisBlock().Hash()
 	log.Info(fmt.Sprintf("lastAccepted = %s", lastAccepted.Hash().Hex()))
 
-	atomicTxs, err := ExtractAtomicTxs(lastAccepted, vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(lastAccepted.Time())))
+	atomicTxs, err := ExtractAtomicTxs(lastAccepted.ExtData(), vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(lastAccepted.Time())))
 	if err != nil {
 		return err
 	}
@@ -601,7 +601,7 @@ func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big
 		isApricotPhase5            = vm.chainConfig.IsApricotPhase5(timestamp)
 	)
 
-	txs, err := ExtractAtomicTxs(block, isApricotPhase5)
+	txs, err := ExtractAtomicTxs(block.ExtData(), isApricotPhase5)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -697,7 +697,7 @@ func (vm *VM) buildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 
-	atomicTxs, err := ExtractAtomicTxs(block, vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(block.Time())))
+	atomicTxs, err := ExtractAtomicTxs(block.ExtData(), vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(block.Time())))
 	if err != nil {
 		vm.mempool.DiscardCurrentTxs()
 		return nil, err
@@ -741,7 +741,7 @@ func (vm *VM) parseBlock(b []byte) (snowman.Block, error) {
 		return nil, err
 	}
 
-	atomicTxs, err := ExtractAtomicTxs(ethBlock, vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(ethBlock.Time())))
+	atomicTxs, err := ExtractAtomicTxs(ethBlock.ExtData(), vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(ethBlock.Time())))
 	if err != nil {
 		return nil, err
 	}
@@ -769,7 +769,7 @@ func (vm *VM) getBlock(id ids.ID) (snowman.Block, error) {
 	if ethBlock == nil {
 		return nil, database.ErrNotFound
 	}
-	atomicTxs, err := ExtractAtomicTxs(ethBlock, vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(ethBlock.Time())))
+	atomicTxs, err := ExtractAtomicTxs(ethBlock.ExtData(), vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(ethBlock.Time())))
 	if err != nil {
 		return nil, err
 	}
