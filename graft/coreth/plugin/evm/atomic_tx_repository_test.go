@@ -96,6 +96,7 @@ func TestAtomicRepositoryReadWrite(t *testing.T) {
 	codec := prepareCodecForTest()
 	repo := NewAtomicTxRepository(db, codec)
 
+	// Generate and write atomic transactions to the repository
 	txIDs := make([]ids.ID, 100)
 	for i := 0; i < 100; i++ {
 		id := ids.GenerateTestID()
@@ -111,7 +112,8 @@ func TestAtomicRepositoryReadWrite(t *testing.T) {
 		txIDs[i] = id
 	}
 
-	// check we can get them all by ID
+	// Verify that we can fetch all of the indexed transactions
+	// by their txID and height.
 	for i := 0; i < 100; i++ {
 		tx, height, err := repo.GetByTxID(txIDs[i])
 		assert.NoError(t, err)
@@ -129,6 +131,9 @@ func TestAtomicRepositoryInitialize(t *testing.T) {
 	db := memdb.New()
 	codec := prepareCodecForTest()
 
+	// Write atomic transactions to the [acceptedAtomicTxDB]
+	// in the format handled prior to the migration to the atomic
+	// tx repository.
 	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
 	txIDs := make([]ids.ID, 150)
 	for i := 0; i < 100; i++ {
@@ -148,14 +153,14 @@ func TestAtomicRepositoryInitialize(t *testing.T) {
 		err = acceptedAtomicTxDB.Put(id[:], packer.Bytes)
 		assert.NoError(t, err)
 		txIDs[i] = id
-
 	}
 
 	repo := NewAtomicTxRepository(db, codec)
 	err := repo.Initialize()
 	assert.NoError(t, err)
 
-	// check we can get them all by ID
+	// Verify that we can fetch all of the indexed transactions
+	// by their txID and height.
 	for i := 0; i < 100; i++ {
 		tx, height, err := repo.GetByTxID(txIDs[i])
 		assert.NoError(t, err)
