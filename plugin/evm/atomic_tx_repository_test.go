@@ -2,7 +2,7 @@ package evm
 
 import (
 	"bytes"
-	"math/big"
+	"sync"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -11,71 +11,16 @@ import (
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/coreth/core/state"
-	"github.com/ava-labs/coreth/params"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-type TestTx struct {
-	Id ids.ID `serialize:"true" json:"id"`
-}
+var once sync.Once
+var originalCodec codec.Manager
 
-func (t TestTx) GasUsed(fixedFee bool) (uint64, error) {
-	panic("implement me")
-}
-
-func (t TestTx) Verify(ctx *snow.Context, rules params.Rules) error {
-	panic("implement me")
-}
-
-func (t TestTx) Accept() (ids.ID, *atomic.Requests, error) {
-	panic("implement me")
-}
-
-func (t TestTx) Initialize(unsignedBytes, signedBytes []byte) {
-	// no op
-}
-
-func (t TestTx) ID() ids.ID {
-	return t.Id
-}
-
-func (t TestTx) Burned(assetID ids.ID) (uint64, error) {
-	panic("implement me")
-}
-
-func (t TestTx) UnsignedBytes() []byte {
-	panic("implement me")
-}
-
-func (t TestTx) Bytes() []byte {
-	panic("implement me")
-}
-
-func (t TestTx) InputUTXOs() ids.Set {
-	panic("implement me")
-}
-
-func (t TestTx) SemanticVerify(vm *VM, stx *Tx, parent *Block, baseFee *big.Int, rules params.Rules) error {
-	panic("implement me")
-}
-
-func (t TestTx) AtomicOps() (map[ids.ID]*atomic.Requests, error) {
-	panic("implement me")
-}
-
-func (t TestTx) EVMStateTransfer(ctx *snow.Context, state *state.StateDB) error {
-	panic("implement me")
-}
-
-var _ UnsignedAtomicTx = &TestTx{}
-
-func prepareCodecForTest() codec.Manager {
+func prepareCodecForTest(t *testing.T) {
 	codec := codec.NewDefaultManager()
 	c := linearcodec.NewDefault()
 
@@ -88,23 +33,25 @@ func prepareCodecForTest() codec.Manager {
 	if errs.Errored() {
 		panic(errs.Err)
 	}
-	return codec
+	once.Do(func() { originalCodec = codec })
+	Codec = codec
+	t.Cleanup(func() { Codec = originalCodec })
+}
+
+func newTestTx() (ids.ID, *Tx) {
+	id := ids.GenerateTestID()
+	return id, &Tx{UnsignedAtomicTx: &TestTx{IDV: id}}
 }
 
 func TestAtomicRepositoryReadWrite(t *testing.T) {
 	db := memdb.New()
-	codec := prepareCodecForTest()
-	repo := NewAtomicTxRepository(db, codec)
+	prepareCodecForTest(t)
+	repo := NewAtomicTxRepository(db)
 
 	// Generate and write atomic transactions to the repository
 	txIDs := make([]ids.ID, 100)
 	for i := 0; i < 100; i++ {
-		id := ids.GenerateTestID()
-		tx := &Tx{
-			UnsignedAtomicTx: &TestTx{
-				Id: id,
-			},
-		}
+		id, tx := newTestTx()
 
 		err := repo.Write(uint64(i), []*Tx{tx})
 		assert.NoError(t, err)
@@ -129,7 +76,7 @@ func TestAtomicRepositoryReadWrite(t *testing.T) {
 
 func TestAtomicRepositoryInitialize(t *testing.T) {
 	db := memdb.New()
-	codec := prepareCodecForTest()
+	prepareCodecForTest(t)
 
 	// Write atomic transactions to the [acceptedAtomicTxDB]
 	// in the format handled prior to the migration to the atomic
@@ -137,14 +84,9 @@ func TestAtomicRepositoryInitialize(t *testing.T) {
 	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
 	txIDs := make([]ids.ID, 150)
 	for i := 0; i < 100; i++ {
-		id := ids.GenerateTestID()
-		tx := &Tx{
-			UnsignedAtomicTx: &TestTx{
-				Id: id,
-			},
-		}
+		id, tx := newTestTx()
 
-		txBytes, err := codec.Marshal(codecVersion, tx)
+		txBytes, err := Codec.Marshal(codecVersion, tx)
 		assert.NoError(t, err)
 
 		packer := wrappers.Packer{Bytes: make([]byte, 1), MaxSize: 1024 * 1024}
@@ -155,12 +97,11 @@ func TestAtomicRepositoryInitialize(t *testing.T) {
 		txIDs[i] = id
 	}
 
-	repo := NewAtomicTxRepository(db, codec)
+	repo := NewAtomicTxRepository(db)
 	err := repo.Initialize()
 	assert.NoError(t, err)
 
-	// Verify that we can fetch all of the indexed transactions
-	// by their txID and height.
+	// Verify that we can fetch all of the indexed transactions by their txID and height.
 	for i := 0; i < 100; i++ {
 		tx, height, err := repo.GetByTxID(txIDs[i])
 		assert.NoError(t, err)
@@ -174,14 +115,9 @@ func TestAtomicRepositoryInitialize(t *testing.T) {
 	}
 
 	for i := 100; i < 150; i++ {
-		id := ids.GenerateTestID()
-		tx := &Tx{
-			UnsignedAtomicTx: &TestTx{
-				Id: id,
-			},
-		}
+		id, tx := newTestTx()
 
-		txBytes, err := codec.Marshal(codecVersion, tx)
+		txBytes, err := Codec.Marshal(codecVersion, tx)
 		assert.NoError(t, err)
 		packer := wrappers.Packer{Bytes: make([]byte, 1), MaxSize: 1024 * 1024}
 		packer.PackLong(uint64(i))
@@ -191,11 +127,11 @@ func TestAtomicRepositoryInitialize(t *testing.T) {
 		txIDs[i] = id
 	}
 
-	repo = NewAtomicTxRepository(db, codec)
+	repo = NewAtomicTxRepository(db)
 	err = repo.Initialize()
 	assert.NoError(t, err)
 
-	// check we can get them all by ID
+	// Verify that we can fetch all of the indexed transactions by their txID and height.
 	for i := 0; i < 150; i++ {
 		tx, height, err := repo.GetByTxID(txIDs[i])
 		assert.NoError(t, err)
@@ -211,7 +147,7 @@ func TestAtomicRepositoryInitialize(t *testing.T) {
 
 func TestAtomicRepositoryInitializeMultipleHeights(t *testing.T) {
 	db := memdb.New()
-	codec := prepareCodecForTest()
+	prepareCodecForTest(t)
 
 	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
 	txIDs := make([]ids.ID, 150)
@@ -223,14 +159,9 @@ func TestAtomicRepositoryInitializeMultipleHeights(t *testing.T) {
 		return uint64(idx)
 	}
 	for i := 0; i < 100; i++ {
-		id := ids.GenerateTestID()
-		tx := &Tx{
-			UnsignedAtomicTx: &TestTx{
-				Id: id,
-			},
-		}
+		id, tx := newTestTx()
 
-		txBytes, err := codec.Marshal(codecVersion, tx)
+		txBytes, err := Codec.Marshal(codecVersion, tx)
 		assert.NoError(t, err)
 
 		packer := wrappers.Packer{Bytes: make([]byte, 1), MaxSize: 1024 * 1024}
@@ -242,11 +173,11 @@ func TestAtomicRepositoryInitializeMultipleHeights(t *testing.T) {
 
 	}
 
-	repo := NewAtomicTxRepository(db, codec)
+	repo := NewAtomicTxRepository(db)
 	err := repo.Initialize()
 	assert.NoError(t, err)
 
-	// check we can get them all by ID
+	// Verify that we can fetch all of the indexed transactions by their txID and height.
 	for i := 0; i < 100; i++ {
 		height := getHeight(i)
 		tx, txHeight, err := repo.GetByTxID(txIDs[i])
@@ -268,14 +199,9 @@ func TestAtomicRepositoryInitializeMultipleHeights(t *testing.T) {
 	}
 
 	for i := 100; i < 150; i++ {
-		id := ids.GenerateTestID()
-		tx := &Tx{
-			UnsignedAtomicTx: &TestTx{
-				Id: id,
-			},
-		}
+		id, tx := newTestTx()
 
-		txBytes, err := codec.Marshal(codecVersion, tx)
+		txBytes, err := Codec.Marshal(codecVersion, tx)
 		assert.NoError(t, err)
 		packer := wrappers.Packer{Bytes: make([]byte, 1), MaxSize: 1024 * 1024}
 		packer.PackLong(uint64(i))
@@ -285,11 +211,11 @@ func TestAtomicRepositoryInitializeMultipleHeights(t *testing.T) {
 		txIDs[i] = id
 	}
 
-	repo = NewAtomicTxRepository(db, codec)
+	repo = NewAtomicTxRepository(db)
 	err = repo.Initialize()
 	assert.NoError(t, err)
 
-	// check we can get them all by ID
+	// Verify that we can fetch all of the indexed transactions by their txID.
 	for i := 0; i < 150; i++ {
 		height := getHeight(i)
 		tx, txHeight, err := repo.GetByTxID(txIDs[i])
@@ -298,6 +224,7 @@ func TestAtomicRepositoryInitializeMultipleHeights(t *testing.T) {
 		assert.Equal(t, tx.ID(), txIDs[i])
 	}
 
+	// Verify that we can fetch all of the indexed transactions by their height.
 	for i := 100; i < 150; i++ {
 		height := getHeight(i)
 		txs, err := repo.GetByHeight(height)
