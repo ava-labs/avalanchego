@@ -378,7 +378,7 @@ func (vm *VM) Initialize(
 	vm.chain = ethChain
 	lastAccepted := vm.chain.LastAcceptedBlock()
 
-	vm.atomicTxRepository = NewAtomicTxRepository(vm.db, vm.codec)
+	vm.atomicTxRepository = NewAtomicTxRepository(vm.db)
 	if err := vm.atomicTxRepository.Initialize(); err != nil {
 		log.Error("failed to initialise atomic tx repository", "err", err)
 		return err
@@ -407,7 +407,8 @@ func (vm *VM) Initialize(
 	vm.genesisHash = vm.chain.GetGenesisBlock().Hash()
 	log.Info(fmt.Sprintf("lastAccepted = %s", lastAccepted.Hash().Hex()))
 
-	atomicTxs, err := ExtractAtomicTxs(lastAccepted.ExtData(), vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(lastAccepted.Time())))
+	isApricotPhase5 := vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(lastAccepted.Time()))
+	atomicTxs, err := ExtractAtomicTxs(lastAccepted.ExtData(), isApricotPhase5)
 	if err != nil {
 		return err
 	}
