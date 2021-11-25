@@ -2,7 +2,6 @@ package evm
 
 import (
 	"bytes"
-	"sync"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -17,10 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var once sync.Once
-var originalCodec codec.Manager
-
-func prepareCodecForTest(t *testing.T) {
+func prepareCodecForTest() codec.Manager {
 	codec := codec.NewDefaultManager()
 	c := linearcodec.NewDefault()
 
@@ -33,9 +29,7 @@ func prepareCodecForTest(t *testing.T) {
 	if errs.Errored() {
 		panic(errs.Err)
 	}
-	once.Do(func() { originalCodec = codec })
-	Codec = codec
-	t.Cleanup(func() { Codec = originalCodec })
+	return codec
 }
 
 func newTestTx() (ids.ID, *Tx) {
@@ -45,8 +39,8 @@ func newTestTx() (ids.ID, *Tx) {
 
 func TestAtomicRepositoryReadWrite(t *testing.T) {
 	db := memdb.New()
-	prepareCodecForTest(t)
-	repo := NewAtomicTxRepository(db)
+	codec := prepareCodecForTest()
+	repo := NewAtomicTxRepository(db, codec)
 
 	// Generate and write atomic transactions to the repository
 	txIDs := make([]ids.ID, 100)
@@ -76,7 +70,7 @@ func TestAtomicRepositoryReadWrite(t *testing.T) {
 
 func TestAtomicRepositoryInitialize(t *testing.T) {
 	db := memdb.New()
-	prepareCodecForTest(t)
+	codec := prepareCodecForTest()
 
 	// Write atomic transactions to the [acceptedAtomicTxDB]
 	// in the format handled prior to the migration to the atomic
@@ -86,7 +80,7 @@ func TestAtomicRepositoryInitialize(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		id, tx := newTestTx()
 
-		txBytes, err := Codec.Marshal(codecVersion, tx)
+		txBytes, err := codec.Marshal(codecVersion, tx)
 		assert.NoError(t, err)
 
 		packer := wrappers.Packer{Bytes: make([]byte, 1), MaxSize: 1024 * 1024}
@@ -97,7 +91,7 @@ func TestAtomicRepositoryInitialize(t *testing.T) {
 		txIDs[i] = id
 	}
 
-	repo := NewAtomicTxRepository(db)
+	repo := NewAtomicTxRepository(db, codec)
 	err := repo.Initialize()
 	assert.NoError(t, err)
 
@@ -117,7 +111,7 @@ func TestAtomicRepositoryInitialize(t *testing.T) {
 	for i := 100; i < 150; i++ {
 		id, tx := newTestTx()
 
-		txBytes, err := Codec.Marshal(codecVersion, tx)
+		txBytes, err := codec.Marshal(codecVersion, tx)
 		assert.NoError(t, err)
 		packer := wrappers.Packer{Bytes: make([]byte, 1), MaxSize: 1024 * 1024}
 		packer.PackLong(uint64(i))
@@ -127,7 +121,7 @@ func TestAtomicRepositoryInitialize(t *testing.T) {
 		txIDs[i] = id
 	}
 
-	repo = NewAtomicTxRepository(db)
+	repo = NewAtomicTxRepository(db, codec)
 	err = repo.Initialize()
 	assert.NoError(t, err)
 
@@ -147,7 +141,7 @@ func TestAtomicRepositoryInitialize(t *testing.T) {
 
 func TestAtomicRepositoryInitializeMultipleHeights(t *testing.T) {
 	db := memdb.New()
-	prepareCodecForTest(t)
+	codec := prepareCodecForTest()
 
 	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
 	txIDs := make([]ids.ID, 150)
@@ -173,7 +167,7 @@ func TestAtomicRepositoryInitializeMultipleHeights(t *testing.T) {
 
 	}
 
-	repo := NewAtomicTxRepository(db)
+	repo := NewAtomicTxRepository(db, codec)
 	err := repo.Initialize()
 	assert.NoError(t, err)
 
@@ -211,7 +205,7 @@ func TestAtomicRepositoryInitializeMultipleHeights(t *testing.T) {
 		txIDs[i] = id
 	}
 
-	repo = NewAtomicTxRepository(db)
+	repo = NewAtomicTxRepository(db, codec)
 	err = repo.Initialize()
 	assert.NoError(t, err)
 

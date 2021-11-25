@@ -43,27 +43,27 @@ func init() {
 
 // extractAtomicTxs returns the atomic transactions in [atomicTxBytes] if
 // they exist.
-func ExtractAtomicTxs(atomicTxBytes []byte, isApricotPhase5 bool) ([]*Tx, error) {
+func ExtractAtomicTxs(atomicTxBytes []byte, isApricotPhase5 bool, codec codec.Manager) ([]*Tx, error) {
 	if len(atomicTxBytes) == 0 {
 		return nil, nil
 	}
 
 	if !isApricotPhase5 {
-		return ExtractAtomicTxsPreApricotPhase5(atomicTxBytes)
+		return ExtractAtomicTxsPreApricotPhase5(atomicTxBytes, codec)
 	}
-	return ExtractAtomicTxsPostApricotPhase5(atomicTxBytes)
+	return ExtractAtomicTxsPostApricotPhase5(atomicTxBytes, codec)
 }
 
 // [ExtractAtomicTxsPreApricotPhase5] extracts a singular atomic transaction from [atomicTxBytes]
 // and returns a slice of atomic transactions for compatibility with the type returned post
 // ApricotPhase5.
 // Note: this function assumes [atomicTxBytes] is non-empty.
-func ExtractAtomicTxsPreApricotPhase5(atomicTxBytes []byte) ([]*Tx, error) {
+func ExtractAtomicTxsPreApricotPhase5(atomicTxBytes []byte, codec codec.Manager) ([]*Tx, error) {
 	atomicTx := new(Tx)
-	if _, err := Codec.Unmarshal(atomicTxBytes, atomicTx); err != nil {
+	if _, err := codec.Unmarshal(atomicTxBytes, atomicTx); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal atomic transaction (pre-AP5): %w", err)
 	}
-	if err := atomicTx.Sign(Codec, nil); err != nil {
+	if err := atomicTx.Sign(codec, nil); err != nil {
 		return nil, fmt.Errorf("failed to initialize singleton atomic tx due to: %w", err)
 	}
 	return []*Tx{atomicTx}, nil
@@ -71,9 +71,9 @@ func ExtractAtomicTxsPreApricotPhase5(atomicTxBytes []byte) ([]*Tx, error) {
 
 // [ExtractAtomicTxsPostApricotPhase5] extracts a slice of atomic transactions from [atomicTxBytes].
 // Note: this function assumes [atomicTxBytes] is non-empty.
-func ExtractAtomicTxsPostApricotPhase5(atomicTxBytes []byte) ([]*Tx, error) {
+func ExtractAtomicTxsPostApricotPhase5(atomicTxBytes []byte, codec codec.Manager) ([]*Tx, error) {
 	var atomicTxs []*Tx
-	if _, err := Codec.Unmarshal(atomicTxBytes, &atomicTxs); err != nil {
+	if _, err := codec.Unmarshal(atomicTxBytes, &atomicTxs); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal atomic tx (AP5) due to %w", err)
 	}
 
@@ -84,7 +84,7 @@ func ExtractAtomicTxsPostApricotPhase5(atomicTxBytes []byte) ([]*Tx, error) {
 	}
 
 	for index, atx := range atomicTxs {
-		if err := atx.Sign(Codec, nil); err != nil {
+		if err := atx.Sign(codec, nil); err != nil {
 			return nil, fmt.Errorf("failed to initialize atomic tx at index %d: %w", index, err)
 		}
 	}
