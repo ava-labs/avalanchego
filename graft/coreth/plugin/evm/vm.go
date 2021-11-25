@@ -379,7 +379,8 @@ func (vm *VM) Initialize(
 	lastAccepted := vm.chain.LastAcceptedBlock()
 
 	vm.atomicTxRepository = NewAtomicTxRepository(vm.db, vm.codec)
-	if err := vm.atomicTxRepository.Initialize(); err != nil {
+	// TODO find and fill apricotPhase5Block
+	if err := vm.atomicTxRepository.Initialize(0); err != nil {
 		log.Error("failed to initialise atomic tx repository", "err", err)
 		return err
 	}
