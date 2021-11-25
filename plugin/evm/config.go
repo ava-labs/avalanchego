@@ -38,9 +38,10 @@ type Duration struct {
 // Config ...
 type Config struct {
 	// Coreth APIs
-	SnowmanAPIEnabled     bool `json:"snowman-api-enabled"`
-	CorethAdminAPIEnabled bool `json:"coreth-admin-api-enabled"`
-	NetAPIEnabled         bool `json:"net-api-enabled"`
+	SnowmanAPIEnabled     bool   `json:"snowman-api-enabled"`
+	CorethAdminAPIEnabled bool   `json:"coreth-admin-api-enabled"`
+	CorethAdminAPIDir     string `json:"coreth-admin-api-dir"`
+	NetAPIEnabled         bool   `json:"net-api-enabled"`
 
 	// Continuous Profiler
 	ContinuousProfilerDir       string   `json:"continuous-profiler-dir"`       // If set to non-empty string creates a continuous profiler
