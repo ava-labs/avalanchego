@@ -1,7 +1,6 @@
 package evm
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -37,6 +36,7 @@ func newTestTx() (ids.ID, *Tx) {
 	return id, &Tx{UnsignedAtomicTx: &TestTx{IDV: id}}
 }
 
+// Tests simple writing and reading behaviour from atomic repository
 func TestAtomicRepositoryReadWrite(t *testing.T) {
 	db := memdb.New()
 	codec := prepareCodecForTest()
@@ -68,6 +68,9 @@ func TestAtomicRepositoryReadWrite(t *testing.T) {
 	}
 }
 
+// Tests simple Initialize behaviour from the atomic repository
+// based on a pre-populated txID=height+txbytes entries in the
+// acceptedAtomicTxDB database
 func TestAtomicRepositoryInitialize(t *testing.T) {
 	db := memdb.New()
 	codec := prepareCodecForTest()
@@ -139,91 +142,71 @@ func TestAtomicRepositoryInitialize(t *testing.T) {
 	}
 }
 
-func TestAtomicRepositoryInitializeMultipleHeights(t *testing.T) {
+// Test ensures Initialize can handle multiple atomic transactions past a
+// given block
+func TestAtomicRepositoryInitializeHandlesMultipleAtomicTxs(t *testing.T) {
 	db := memdb.New()
 	codec := prepareCodecForTest()
 
 	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
-	txIDs := make([]ids.ID, 150)
+	heightTxIDMap := make(map[uint64][]ids.ID, 175)
 
-	getHeight := func(idx int) uint64 {
-		if idx >= 50 && idx < 100 && idx%2 == 1 {
-			return uint64(idx) - 1
-		}
-		return uint64(idx)
-	}
-	for i := 0; i < 100; i++ {
+	for i := uint64(0); i < 150; i++ {
+		txs := make(map[ids.ID]*Tx)
 		id, tx := newTestTx()
+		txs[id] = tx
 
-		txBytes, err := codec.Marshal(codecVersion, tx)
-		assert.NoError(t, err)
+		// enable multiple txs for every other block past block 50
+		if i > 50 && i%2 == 0 {
+			id, tx := newTestTx()
+			txs[id] = tx
+		}
 
-		packer := wrappers.Packer{Bytes: make([]byte, 1), MaxSize: 1024 * 1024}
-		packer.PackLong(getHeight(i))
-		packer.PackBytes(txBytes)
-		err = acceptedAtomicTxDB.Put(id[:], packer.Bytes)
-		assert.NoError(t, err)
-		txIDs[i] = id
+		txList := make([]ids.ID, 0, len(txs))
+		for id, tx := range txs {
+			txBytes, err := codec.Marshal(codecVersion, tx)
+			assert.NoError(t, err)
 
+			packer := wrappers.Packer{Bytes: make([]byte, wrappers.LongLen+wrappers.IntLen+len(txBytes))}
+			packer.PackLong(i)
+			packer.PackBytes(txBytes)
+			err = acceptedAtomicTxDB.Put(id[:], packer.Bytes)
+			assert.NoError(t, err)
+
+			txList = append(txList, id)
+		}
+
+		heightTxIDMap[i] = txList
 	}
+
+	assert.Len(t, heightTxIDMap, 150)
 
 	repo := NewAtomicTxRepository(db, codec)
 	err := repo.Initialize()
 	assert.NoError(t, err)
 
-	// Verify that we can fetch all of the indexed transactions by their txID and height.
-	for i := 0; i < 100; i++ {
-		height := getHeight(i)
-		tx, txHeight, err := repo.GetByTxID(txIDs[i])
-		assert.NoError(t, err)
-		assert.EqualValues(t, height, txHeight)
-		assert.Equal(t, tx.ID(), txIDs[i])
-
+	for height, txIDs := range heightTxIDMap {
+		// first assert the height index
 		txs, err := repo.GetByHeight(height)
 		assert.NoError(t, err)
-		if i < 50 {
-			assert.Len(t, txs, 1)
-			assert.Equal(t, txIDs[i], txs[0].ID())
-		} else {
-			assert.Len(t, txs, 2)
-			resultIDs := []ids.ID{txs[0].ID(), txs[1].ID()}
-			assert.Contains(t, resultIDs, txIDs[i], "expecting txs to contain txIDs[i]")
-			assert.Negative(t, bytes.Compare(resultIDs[0][:], resultIDs[1][:]), "expecting txs to be sorted on txID")
+		assert.Len(t, txs, len(txIDs))
+
+		txIDSet := make(map[ids.ID]struct{}, len(txIDs))
+		for _, txID := range txIDs {
+			txIDSet[txID] = struct{}{}
 		}
-	}
 
-	for i := 100; i < 150; i++ {
-		id, tx := newTestTx()
+		for _, tx := range txs {
+			_, exists := txIDSet[tx.ID()]
+			assert.True(t, exists)
+		}
 
-		txBytes, err := codec.Marshal(codecVersion, tx)
-		assert.NoError(t, err)
-		packer := wrappers.Packer{Bytes: make([]byte, 1), MaxSize: 1024 * 1024}
-		packer.PackLong(uint64(i))
-		packer.PackBytes(txBytes)
-		err = acceptedAtomicTxDB.Put(id[:], packer.Bytes)
-		assert.NoError(t, err)
-		txIDs[i] = id
-	}
-
-	repo = NewAtomicTxRepository(db, codec)
-	err = repo.Initialize()
-	assert.NoError(t, err)
-
-	// Verify that we can fetch all of the indexed transactions by their txID.
-	for i := 0; i < 150; i++ {
-		height := getHeight(i)
-		tx, txHeight, err := repo.GetByTxID(txIDs[i])
-		assert.NoError(t, err)
-		assert.EqualValues(t, height, txHeight)
-		assert.Equal(t, tx.ID(), txIDs[i])
-	}
-
-	// Verify that we can fetch all of the indexed transactions by their height.
-	for i := 100; i < 150; i++ {
-		height := getHeight(i)
-		txs, err := repo.GetByHeight(height)
-		assert.NoError(t, err, "error '%v' for height %d", err, height)
-		assert.Len(t, txs, 1)
-		assert.Equal(t, txIDs[i], txs[0].ID())
+		// now assert the txID index
+		for _, txID := range txIDs {
+			tx, txHeight, err := repo.GetByTxID(txID)
+			assert.NoError(t, err)
+			assert.Equal(t, height, txHeight)
+			assert.Equal(t, txID, tx.ID())
+		}
 	}
 }
