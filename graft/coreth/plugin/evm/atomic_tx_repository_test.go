@@ -155,7 +155,7 @@ func TestAtomicRepositoryInitializeMultipleHeights(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		id, tx := newTestTx()
 
-		txBytes, err := Codec.Marshal(codecVersion, tx)
+		txBytes, err := codec.Marshal(codecVersion, tx)
 		assert.NoError(t, err)
 
 		packer := wrappers.Packer{Bytes: make([]byte, 1), MaxSize: 1024 * 1024}
@@ -195,7 +195,7 @@ func TestAtomicRepositoryInitializeMultipleHeights(t *testing.T) {
 	for i := 100; i < 150; i++ {
 		id, tx := newTestTx()
 
-		txBytes, err := Codec.Marshal(codecVersion, tx)
+		txBytes, err := codec.Marshal(codecVersion, tx)
 		assert.NoError(t, err)
 		packer := wrappers.Packer{Bytes: make([]byte, 1), MaxSize: 1024 * 1024}
 		packer.PackLong(uint64(i))
