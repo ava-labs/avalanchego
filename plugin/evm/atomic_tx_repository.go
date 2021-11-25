@@ -18,7 +18,7 @@ import (
 var (
 	atomicTxIDDBPrefix     = []byte("atomicTxDB")
 	atomicHeightTxDBPrefix = []byte("atomicHeightTxDB")
-	maxIndexedHeightKey    = []byte("maxIndexedHeight")
+	maxIndexedHeightKey    = []byte("maxIndexedAtomicTxHeight")
 )
 
 // AtomicTxRepository defines an entity that manages storage and indexing of
@@ -111,7 +111,7 @@ func (a *atomicTxRepository) Initialize() error {
 		}
 		seenHeights[height] = struct{}{}
 
-		txsBytes, err := Codec.Marshal(codecVersion, txs)
+		txsBytes, err := a.codec.Marshal(codecVersion, txs)
 		if err != nil {
 			return err
 		}
@@ -205,7 +205,7 @@ func (a *atomicTxRepository) Write(height uint64, txs []*Tx) error {
 	binary.BigEndian.PutUint64(heightBytes, height)
 
 	for _, tx := range txs {
-		txBytes, err := Codec.Marshal(codecVersion, tx)
+		txBytes, err := a.codec.Marshal(codecVersion, tx)
 		if err != nil {
 			return err
 		}
@@ -221,7 +221,7 @@ func (a *atomicTxRepository) Write(height uint64, txs []*Tx) error {
 		}
 	}
 
-	txsBytes, err := Codec.Marshal(codecVersion, txs)
+	txsBytes, err := a.codec.Marshal(codecVersion, txs)
 	if err != nil {
 		return err
 	}
