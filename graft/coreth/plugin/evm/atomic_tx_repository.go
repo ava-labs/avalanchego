@@ -7,7 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -28,7 +27,7 @@ type AtomicTxRepository interface {
 	GetByHeight(height uint64) ([]*Tx, error)
 	Write(height uint64, txs []*Tx) error
 	IterateByTxID() database.Iterator
-	IterateByHeight(heightBytes []byte) database.Iterator
+	IterateByHeight(height uint64) database.Iterator
 }
 
 // atomicTxRepository is a prefixdb implementation of the AtomicTxRepository interface
@@ -36,49 +35,26 @@ type atomicTxRepository struct {
 	// [acceptedAtomicTxDB] maintains an index of [txID] => [height]+[atomic tx] for all accepted atomic txs.
 	acceptedAtomicTxDB         database.Database
 	acceptedAtomicTxByHeightDB database.Database
-	codec                      codec.Manager
 }
 
-func NewAtomicTxRepository(db database.Database, codec codec.Manager) AtomicTxRepository {
+func NewAtomicTxRepository(db database.Database) AtomicTxRepository {
 	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
 	acceptedAtomicTxByHeightDB := prefixdb.New(atomicHeightTxDBPrefix, db)
 
 	return &atomicTxRepository{
 		acceptedAtomicTxDB:         acceptedAtomicTxDB,
 		acceptedAtomicTxByHeightDB: acceptedAtomicTxByHeightDB,
-		codec:                      codec,
 	}
 }
 
 func (a *atomicTxRepository) Initialize() error {
-	exists, err := a.acceptedAtomicTxByHeightDB.Has(maxIndexedHeightKey)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return a.createAtomicTxByHeightIndex()
-	}
-	return nil
-}
-
-func (a *atomicTxRepository) createAtomicTxByHeightIndex() error {
 	startTime := time.Now()
-
 	indexHeight := uint64(0)
-	var indexHeightBytes []byte
-	exists, err := a.acceptedAtomicTxByHeightDB.Has(maxIndexedHeightKey)
+	exists, indexHeight, err := a.getIndexHeight()
 	if err != nil {
-		return err
+		return nil
 	}
-
 	if exists {
-		indexHeightBytes, err = a.acceptedAtomicTxByHeightDB.Get(maxIndexedHeightKey)
-		if err != nil {
-			return err
-		}
-		if len(indexHeightBytes) == wrappers.LongLen {
-			indexHeight = binary.BigEndian.Uint64(indexHeightBytes)
-		}
 		log.Info("updating atomic tx repository height index", "lastHeight", indexHeight)
 	} else {
 		log.Info("initialising atomic tx repository height index for the first time")
@@ -91,96 +67,81 @@ func (a *atomicTxRepository) createAtomicTxByHeightIndex() error {
 	// Since leveldb orders keys and we're using BigEndian we should get the natural order at the DB level
 	// automatically when using the iterator later
 	newMaxHeight := indexHeight
-	newMaxHeightBytes := indexHeightBytes
 
-	// In the 1st pass, we optimistically assume there is a maximum of 1 atomic tx / height (since multiple
-	// atomic tx is new at this time and this index is initialized once). If a height occurs twice, remember
-	// it and write the remaining txs as a second pass.
+	// Remember which heights we processed so we can read existing txs if we encounter the same height twice.
 	seenHeights := make(map[uint64]struct{})
-	pendingWrites := make(map[uint64][]*Tx)
 
-	heightIndexBatch := a.acceptedAtomicTxByHeightDB.NewBatch()
-	logger := newProgressLogger(15 * time.Second)
+	progressLogger := newProgressLogger(15 * time.Second)
 	for iter.Next() {
-		logger.Info("updating tx repository height index", "indexed", txIndexed, "skipped", txSkipped)
+		progressLogger.Info("updating tx repository height index", "indexed", txIndexed, "skipped", txSkipped)
 
 		heightBytes := iter.Value()[:wrappers.LongLen]
 		height := binary.BigEndian.Uint64(heightBytes)
-		if exists && height < indexHeight {
+		if height < indexHeight {
 			txSkipped++
 			continue
 		}
 
 		// TODO: possibly replace with packer
 		txBytes := iter.Value()[wrappers.LongLen+wrappers.IntLen:]
-		tx, err := ParseTxBytes(txBytes, a.codec)
+		txs, err := ExtractAtomicTxs(txBytes, false)
 		if err != nil {
 			return err
 		}
 
+		// If this height is already processed, get existing txs for that height.
 		if _, exists := seenHeights[height]; exists {
-			pendingWrites[height] = append(pendingWrites[height], tx)
-			continue
+			existingTxs, err := a.GetByHeight(height)
+			if err != nil {
+				return err
+			}
+			txs = append(existingTxs, txs...)
 		}
 		seenHeights[height] = struct{}{}
 
-		txs := []*Tx{tx}
-		txsBytes, err := a.codec.Marshal(codecVersion, txs)
+		txsBytes, err := Codec.Marshal(codecVersion, txs)
 		if err != nil {
 			return err
 		}
-
-		if err := heightIndexBatch.Put(heightBytes, txsBytes); err != nil {
+		if err := a.acceptedAtomicTxByHeightDB.Put(heightBytes, txsBytes); err != nil {
 			return err
 		}
-
 		// update our height record
 		if height > newMaxHeight {
 			newMaxHeight = height
-			newMaxHeightBytes = heightBytes
 		}
 
 		txIndexed++
 	}
 
-	// Commit writes from 1st pass so they are visible during 2nd pass.
-	if err := heightIndexBatch.Write(); err != nil {
-		return err
-	}
-
-	// 2nd pass writes out pendingWrites to disk.
-	heightIndexBatch = a.acceptedAtomicTxByHeightDB.NewBatch()
-	for height, additionalTxs := range pendingWrites {
-		heightBytes := make([]byte, wrappers.LongLen)
-		binary.BigEndian.PutUint64(heightBytes, height)
-
-		txs, err := a.GetByHeight(height)
-		if err != nil {
-			return err
-		}
-		if len(txs) == 0 {
-			return fmt.Errorf("expected atomic txs to be found at height: %d", height)
-		}
-		txs = append(txs, additionalTxs...)
-		txsBytes, err := a.codec.Marshal(codecVersion, txs)
-		if err != nil {
-			return err
-		}
-		if err := heightIndexBatch.Put(heightBytes, txsBytes); err != nil {
-			return err
-		}
-		txIndexed++
-	}
-
-	if err := heightIndexBatch.Put(maxIndexedHeightKey, newMaxHeightBytes); err != nil {
-		return err
-	}
-	if err := heightIndexBatch.Write(); err != nil {
+	newMaxHeightBytes := make([]byte, wrappers.LongLen)
+	binary.BigEndian.PutUint64(newMaxHeightBytes, newMaxHeight)
+	if err := a.acceptedAtomicTxByHeightDB.Put(maxIndexedHeightKey, newMaxHeightBytes); err != nil {
 		return err
 	}
 
 	log.Info("initialized atomic tx repository", "indexHeight", indexHeight, "maxHeight", newMaxHeight, "duration", time.Since(startTime), "txIndexed", txIndexed, "txSkipped", txSkipped)
 	return nil
+}
+
+func (a *atomicTxRepository) getIndexHeight() (bool, uint64, error) {
+	exists, err := a.acceptedAtomicTxByHeightDB.Has(maxIndexedHeightKey)
+	if err != nil {
+		return false, 0, err
+	}
+	if !exists {
+		return exists, 0, nil
+	}
+
+	indexHeightBytes, err := a.acceptedAtomicTxByHeightDB.Get(maxIndexedHeightKey)
+	if err != nil {
+		return exists, 0, err
+	}
+	if len(indexHeightBytes) != wrappers.LongLen {
+		return exists, 0, fmt.Errorf("unexpected length for indexHeightBytes %d", len(indexHeightBytes))
+	}
+	indexHeight := binary.BigEndian.Uint64(indexHeightBytes)
+	return exists, indexHeight, nil
 }
 
 // GetByTxID queries [acceptedAtomicTxDB] for the [txID], parses a [*Tx] object
@@ -200,12 +161,15 @@ func (a *atomicTxRepository) GetByTxID(txID ids.ID) (*Tx, uint64, error) {
 	packer := wrappers.Packer{Bytes: indexedTxBytes}
 	height := packer.UnpackLong()
 	txBytes := packer.UnpackBytes()
-	tx, err := ParseTxBytes(txBytes, a.codec)
+	txs, err := ExtractAtomicTxs(txBytes, false)
 	if err != nil {
 		return nil, 0, err
 	}
+	if len(txs) != 1 {
+		return nil, 0, fmt.Errorf("unexpected len for ExtractAtomicTxs return value %d", len(txs))
+	}
 
-	return tx, height, nil
+	return txs[0], height, nil
 }
 
 // GetByHeight returns all atomic txs processed on block at [height].
@@ -217,33 +181,7 @@ func (a *atomicTxRepository) GetByHeight(height uint64) ([]*Tx, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ParseTxsBytes(txsBytes, a.codec)
-}
-
-// ParseTxBytes parses [bytes] to a [*Tx] object using [codec].
-func ParseTxBytes(bytes []byte, c codec.Manager) (*Tx, error) {
-	tx := &Tx{}
-	if _, err := c.Unmarshal(bytes, tx); err != nil {
-		return nil, fmt.Errorf("problem parsing atomic tx from db: %w", err)
-	}
-	if err := tx.Sign(c, nil); err != nil {
-		return nil, fmt.Errorf("problem initializing atomic tx from db: %w", err)
-	}
-	return tx, nil
-}
-
-// ParseTxsBytes parses [bytes] to a [[]*Tx] slice using [codec].
-func ParseTxsBytes(bytes []byte, c codec.Manager) ([]*Tx, error) {
-	txs := []*Tx{}
-	if _, err := c.Unmarshal(bytes, &txs); err != nil {
-		return nil, fmt.Errorf("problem parsing atomic txs from db: %w", err)
-	}
-	for _, tx := range txs {
-		if err := tx.Sign(c, nil); err != nil {
-			return nil, fmt.Errorf("problem initializing atomic tx from db: %w", err)
-		}
-	}
-	return txs, nil
+	return ExtractAtomicTxs(txsBytes, true)
 }
 
 // Write updates indexes maintained on atomic txs, so they can be queried
@@ -255,13 +193,13 @@ func (a *atomicTxRepository) Write(height uint64, txs []*Tx) error {
 	binary.BigEndian.PutUint64(heightBytes, height)
 
 	for _, tx := range txs {
-		txBytes, err := a.codec.Marshal(codecVersion, tx)
+		txBytes, err := Codec.Marshal(codecVersion, tx)
 		if err != nil {
 			return err
 		}
 
 		// map txID => [height]+[tx bytes]
-		heightTxPacker := wrappers.Packer{Bytes: make([]byte, 12+len(txBytes))}
+		heightTxPacker := wrappers.Packer{Bytes: make([]byte, wrappers.LongLen+wrappers.IntLen+len(txBytes))}
 		heightTxPacker.PackLong(height)
 		heightTxPacker.PackBytes(txBytes)
 		txID := tx.ID()
@@ -271,7 +209,7 @@ func (a *atomicTxRepository) Write(height uint64, txs []*Tx) error {
 		}
 	}
 
-	txsBytes, err := a.codec.Marshal(codecVersion, txs)
+	txsBytes, err := Codec.Marshal(codecVersion, txs)
 	if err != nil {
 		return err
 	}
@@ -286,7 +224,9 @@ func (a *atomicTxRepository) IterateByTxID() database.Iterator {
 	return a.acceptedAtomicTxDB.NewIterator()
 }
 
-func (a *atomicTxRepository) IterateByHeight(heightBytes []byte) database.Iterator {
+func (a *atomicTxRepository) IterateByHeight(height uint64) database.Iterator {
+	heightBytes := make([]byte, wrappers.LongLen)
+	binary.BigEndian.PutUint64(heightBytes, height)
 	return a.acceptedAtomicTxByHeightDB.NewIteratorWithStart(heightBytes)
 }
 
