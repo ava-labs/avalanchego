@@ -3,7 +3,11 @@
 
 package block
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/ava-labs/avalanchego/ids"
+)
 
 var ErrStateSyncableVMNotImplemented = errors.New("vm does not implement StateSyncableVM interface")
 
@@ -16,11 +20,16 @@ type StateSyncableVM interface {
 	// for fast sync.
 	StateSyncIsSummaryAccepted([]byte) (bool, error)
 
-	// Sync state is with a list of valid state summaries to sync from.
+	// SyncState is called with a list of valid state summaries to sync from.
 	// These summaries were collected from peers and validated with validators.
 	// VM will use information inside the summary to choose one and sync
 	// its state to that summary. Normal bootstrapping resumes after this
 	// function returns.
 	// Will be called with [nil] if no valid state summaries could be found.
 	StateSync([][]byte) error
+
+	// StateSyncLastAccepted returns the last accepted block, its height, and
+	// an optional error. This is called after the VM notifies the engine
+	// of the fast sync operation on the communication channel.
+	StateSyncLastAccepted() (ids.ID, uint64, error)
 }

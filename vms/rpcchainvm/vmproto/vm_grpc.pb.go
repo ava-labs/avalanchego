@@ -48,6 +48,7 @@ type VMClient interface {
 	StateSyncGetLastSummary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncGetLastSummaryResponse, error)
 	StateSyncIsSummaryAccepted(ctx context.Context, in *StateSyncIsSummaryAcceptedRequest, opts ...grpc.CallOption) (*StateSyncIsSummaryAcceptedResponse, error)
 	StateSync(ctx context.Context, in *StateSyncRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	StateSyncLastAccepted(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncLastAcceptedResponse, error)
 }
 
 type vMClient struct {
@@ -310,6 +311,15 @@ func (c *vMClient) StateSync(ctx context.Context, in *StateSyncRequest, opts ...
 	return out, nil
 }
 
+func (c *vMClient) StateSyncLastAccepted(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncLastAcceptedResponse, error) {
+	out := new(StateSyncLastAcceptedResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/StateSyncLastAccepted", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // VMServer is the server API for VM service.
 // All implementations must embed UnimplementedVMServer
 // for forward compatibility
@@ -343,6 +353,7 @@ type VMServer interface {
 	StateSyncGetLastSummary(context.Context, *emptypb.Empty) (*StateSyncGetLastSummaryResponse, error)
 	StateSyncIsSummaryAccepted(context.Context, *StateSyncIsSummaryAcceptedRequest) (*StateSyncIsSummaryAcceptedResponse, error)
 	StateSync(context.Context, *StateSyncRequest) (*emptypb.Empty, error)
+	StateSyncLastAccepted(context.Context, *emptypb.Empty) (*StateSyncLastAcceptedResponse, error)
 	mustEmbedUnimplementedVMServer()
 }
 
@@ -433,6 +444,9 @@ func (UnimplementedVMServer) StateSyncIsSummaryAccepted(context.Context, *StateS
 }
 func (UnimplementedVMServer) StateSync(context.Context, *StateSyncRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StateSync not implemented")
+}
+func (UnimplementedVMServer) StateSyncLastAccepted(context.Context, *emptypb.Empty) (*StateSyncLastAcceptedResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StateSyncLastAccepted not implemented")
 }
 func (UnimplementedVMServer) mustEmbedUnimplementedVMServer() {}
 
@@ -951,6 +965,24 @@ func _VM_StateSync_Handler(srv interface{}, ctx context.Context, dec func(interf
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VM_StateSyncLastAccepted_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).StateSyncLastAccepted(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/StateSyncLastAccepted",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).StateSyncLastAccepted(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // VM_ServiceDesc is the grpc.ServiceDesc for VM service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1069,6 +1101,10 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "StateSync",
 			Handler:    _VM_StateSync_Handler,
+		},
+		{
+			MethodName: "StateSyncLastAccepted",
+			Handler:    _VM_StateSyncLastAccepted_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

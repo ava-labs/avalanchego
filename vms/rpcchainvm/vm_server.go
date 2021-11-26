@@ -290,8 +290,26 @@ func (vm *VMServer) StateSync(ctx context.Context, req *vmproto.StateSyncRequest
 	if !ok {
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
+	err := fsVM.StateSync(req.Summaries)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
+}
 
-	return &emptypb.Empty{}, fsVM.StateSync(req.Summaries)
+func (vm *VMServer) StateSyncLastAccepted(context.Context, *emptypb.Empty) (*vmproto.StateSyncLastAcceptedResponse, error) {
+	fsVM, ok := vm.vm.(block.StateSyncableVM)
+	if !ok {
+		return nil, block.ErrStateSyncableVMNotImplemented
+	}
+	lastAcceptedID, lastAcceptedHeight, err := fsVM.StateSyncLastAccepted()
+	if err != nil {
+		return nil, err
+	}
+	return &vmproto.StateSyncLastAcceptedResponse{
+		LastAcceptedID:     lastAcceptedID[:],
+		LastAcceptedHeight: lastAcceptedHeight,
+	}, nil
 }
 
 func (vm *VMServer) Bootstrapping(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {

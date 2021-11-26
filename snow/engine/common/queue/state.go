@@ -69,7 +69,7 @@ func (s *state) AddRunnableJob(jobID ids.ID) error {
 	return s.runnableJobIDs.Put(jobID[:], nil)
 }
 
-// HasRunnableJob returns if there is a job that can be run on the queue
+// HasRunnableJob returns true if there is a job that can be run on the queue
 func (s *state) HasRunnableJob() (bool, error) {
 	isEmpty, err := s.runnableJobIDs.IsEmpty()
 	return !isEmpty, err
@@ -133,14 +133,14 @@ func (s *state) GetJob(id ids.ID) (Job, error) {
 	return job, err
 }
 
-// AddBlocking adds [dependent] as blocking on [dependency] being completed
+// AddDependency adds [dependent] as blocking on [dependency] being completed
 func (s *state) AddDependency(dependency, dependent ids.ID) error {
 	dependentsDB := s.getDependentsDB(dependency)
 	return dependentsDB.Put(dependent[:], nil)
 }
 
-// Blocking returns the set of IDs that are blocking on the completion of
-// [dependency] and removes them from the database.
+// RemoveDependencies removes the set of IDs that are blocking on the completion of
+// [dependency] from the database and returns them.
 func (s *state) RemoveDependencies(dependency ids.ID) ([]ids.ID, error) {
 	dependentsDB := s.getDependentsDB(dependency)
 	iterator := dependentsDB.NewIterator()

@@ -805,6 +805,7 @@ func (m *manager) createSnowmanChain(
 		VM:      vm,
 		Starter: gearStarter,
 	}
+
 	fastSync := fastsyncer.NewFastSyncer(
 		fastSyncCfg,
 		handler.OnDoneFastSyncing,
@@ -819,6 +820,7 @@ func (m *manager) createSnowmanChain(
 		Starter:      gearStarter,
 		Bootstrapped: m.unblockChains,
 	}
+
 	bootstrapper, err := smbootstrap.New(
 		bootstrapCfg,
 		handler.OnDoneBootstrapping,

@@ -590,6 +590,18 @@ func (vm *VMClient) StateSync(summaries [][]byte) error {
 	return err
 }
 
+func (vm *VMClient) StateSyncLastAccepted() (ids.ID, uint64, error) {
+	resp, err := vm.client.StateSyncLastAccepted(
+		context.Background(),
+		&emptypb.Empty{},
+	)
+	if err != nil {
+		return ids.Empty, 0, err
+	}
+	id, err := ids.ToID(resp.LastAcceptedID)
+	return id, resp.LastAcceptedHeight, err
+}
+
 func (vm *VMClient) GetAncestors(
 	blkID ids.ID,
 	maxBlocksNum int,

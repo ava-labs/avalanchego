@@ -2,7 +2,10 @@
 // See the file LICENSE for licensing terms.
 package metervm
 
-import "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+import (
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+)
 
 func (vm *blockVM) StateSyncEnabled() (bool, error) {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
@@ -53,4 +56,12 @@ func (vm *blockVM) StateSync(accepted [][]byte) error {
 	vm.stateSummaryMetrics.syncState.Observe(float64(end.Sub(start)))
 
 	return err
+}
+
+func (vm *blockVM) StateSyncLastAccepted() (ids.ID, uint64, error) {
+	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
+	if !ok {
+		return ids.Empty, 0, block.ErrStateSyncableVMNotImplemented
+	}
+	return fsVM.StateSyncLastAccepted()
 }

@@ -204,11 +204,16 @@ message StateSyncIsSummaryAcceptedResponse {
 
 message StateSyncRequest {
     repeated bytes summaries = 1;
+}
+
+message StateSyncLastAcceptedResponse {
+    bytes lastAcceptedID = 1;
+    uint64 lastAcceptedHeight = 2;
+}
+
 // The metrics message defintions are copied from:
 // https://github.com/prometheus/client_model/blob/master/io/prometheus/client/metrics.proto
 // TODO: directly import this dependency
-}
-
 message LabelPair {
   optional string name  = 1;
   optional string value = 2;
@@ -319,4 +324,5 @@ service VM {
     rpc StateSyncGetLastSummary(google.protobuf.Empty) returns (StateSyncGetLastSummaryResponse);
     rpc StateSyncIsSummaryAccepted(StateSyncIsSummaryAcceptedRequest) returns (StateSyncIsSummaryAcceptedResponse);
     rpc StateSync(StateSyncRequest) returns (google.protobuf.Empty);
+    rpc StateSyncLastAccepted(google.protobuf.Empty) returns (StateSyncLastAcceptedResponse);
 }
