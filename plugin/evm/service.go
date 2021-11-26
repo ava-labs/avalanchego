@@ -42,16 +42,16 @@ var (
 )
 
 // NetAPI offers network related API methods
-type NetAPI struct{ vm *VM }
+// type NetAPI struct{ vm *VM }
 
-// Listening returns an indication if the node is listening for network connections.
-func (s *NetAPI) Listening() bool { return true } // always listening
+// // Listening returns an indication if the node is listening for network connections.
+// func (s *NetAPI) Listening() bool { return true } // always listening
 
-// PeerCount returns the number of connected peers
-func (s *NetAPI) PeerCount() hexutil.Uint { return hexutil.Uint(0) }
+// // PeerCount returns the number of connected peers
+// func (s *NetAPI) PeerCount() hexutil.Uint { return hexutil.Uint(0) }
 
-// Version returns the current ethereum protocol version.
-func (s *NetAPI) Version() string { return fmt.Sprintf("%d", s.vm.networkID) }
+// // Version returns the current ethereum protocol version.
+// func (s *NetAPI) Version() string { return fmt.Sprintf("%d", s.vm.networkID) }
 
 // Web3API offers helper API methods
 type Web3API struct{}
