@@ -2907,6 +2907,8 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
+		case blk1.ID():
+			return blk1, nil
 		default:
 			return nil, errUnknownBlock
 		}
@@ -2936,31 +2938,6 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	if !*asked {
 		t.Fatalf("Didn't ask for missing blk2")
 	}
-	*asked = false
-
-	// Prepare to Get [blk1] after our Get request for [blk2] is fulfilled.
-	sender.SendGetF = func(inVdr ids.ShortID, requestID uint32, blkID ids.ID) {
-		*reqID = requestID
-		if *asked {
-			t.Fatalf("Asked multiple times")
-		}
-		if blkID != blk1.ID() {
-			t.Fatalf("Expected engine to request blk1")
-		}
-		if inVdr != vdr {
-			t.Fatalf("Expected engine to request blk1 from vdr")
-		}
-		*asked = true
-	}
-
-	// Answer the request, this should result in [blk1] being requested.
-	if err := te.Put(vdr, *reqID, blk2.ID(), blk2.Bytes()); err != nil {
-		t.Fatal(err)
-	}
-
-	if !*asked {
-		t.Fatalf("Didn't ask for missing blk1")
-	}
 
 	// Prepare to PushQuery [blk1] after our Get request is fulfilled. We should
 	// not PushQuery [blk2] since it currently fails verification. We should not
@@ -2983,22 +2960,9 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 		}
 	}
 
-	// Answer the request, this should allow [blk1] to be issued and cause
-	// [blk2] to fail verification.
-	if err := te.Put(vdr, *reqID, blk1.ID(), blk1.Bytes()); err != nil {
+	// Answer the request, this should result in [blk1] being issued as well.
+	if err := te.Put(vdr, *reqID, blk2.ID(), blk2.Bytes()); err != nil {
 		t.Fatal(err)
-	}
-
-	// now blk1 is verified, vm can return it
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case gBlk.ID():
-			return gBlk, nil
-		case blk1.ID():
-			return blk1, nil
-		default:
-			return nil, errUnknownBlock
-		}
 	}
 
 	if !*queried {
@@ -3014,12 +2978,12 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 		case blk1.ID():
 			t.Fatal("Unexpectedly sent a Get request for blk1")
 		case blk2.ID():
-			t.Logf("sending get for blk2")
+			t.Logf("sending get for blk2 with %d", requestID)
 			*sendReqID = requestID
 			*reqVdr = inVdr
 			return
 		case blk3.ID():
-			t.Logf("sending get for blk3")
+			t.Logf("sending get for blk3 with %d", requestID)
 			*sendReqID = requestID
 			*reqVdr = inVdr
 			return

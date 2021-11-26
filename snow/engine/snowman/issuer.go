@@ -29,6 +29,7 @@ func (i *issuer) Abandon(ids.ID) {
 	if !i.abandoned {
 		blkID := i.blk.ID()
 		i.t.removeFromPending(i.blk)
+		i.t.addToNonVerifieds(i.blk)
 		i.t.blocked.Abandon(blkID)
 
 		// Tracks performance statistics
