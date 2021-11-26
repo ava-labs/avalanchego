@@ -4,6 +4,10 @@
 
 This update is backwards compatible with [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). Please see the expected update times in the v1.7.0 release.
 
+### Coreth
+
+- Reduced fee estimate volatility.
+
 ### Consensus
 
 - Fixed vote bubbling for unverified block chits.
