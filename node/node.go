@@ -597,13 +597,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		return fmt.Errorf("couldn't initialize chain router: %w", err)
 	}
 
-	fetchOnlyFrom := validators.NewSet()
-	for _, peerID := range n.Config.BootstrapIDs {
-		if err := fetchOnlyFrom.AddWeight(peerID, 1); err != nil {
-			return fmt.Errorf("couldn't initialize fetch from set: %w", err)
-		}
-	}
-
 	n.chainManager = chains.New(&chains.ManagerConfig{
 		StakingEnabled:                         n.Config.EnableStaking,
 		StakingCert:                            n.Config.StakingTLSCert,
