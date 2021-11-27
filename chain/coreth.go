@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/state"
@@ -34,12 +35,12 @@ type ETHChain struct {
 }
 
 // NewETHChain creates an Ethereum blockchain with the given configs.
-func NewETHChain(config *eth.Config, nodecfg *node.Config, chainDB ethdb.Database, settings eth.Settings, consensusCallbacks *dummy.ConsensusCallbacks, lastAcceptedHash common.Hash) (*ETHChain, error) {
+func NewETHChain(config *eth.Config, nodecfg *node.Config, chainDB ethdb.Database, settings eth.Settings, consensusCallbacks *dummy.ConsensusCallbacks, lastAcceptedHash common.Hash, clock *mockable.Clock) (*ETHChain, error) {
 	node, err := node.New(nodecfg)
 	if err != nil {
 		return nil, err
 	}
-	backend, err := eth.New(node, config, consensusCallbacks, chainDB, settings, lastAcceptedHash)
+	backend, err := eth.New(node, config, consensusCallbacks, chainDB, settings, lastAcceptedHash, clock)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backend: %w", err)
 	}

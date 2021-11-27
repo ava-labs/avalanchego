@@ -71,9 +71,7 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 			evmBlk, ok := blk.(*chain.BlockWrapper).Block.(*Block)
 			assert.True(ok, "unknown block type")
 
-			retrievedTx, err := vm.extractAtomicTx(evmBlk.ethBlock)
-			assert.NoError(err, "could not extract atomic tx")
-			assert.Equal(txID, retrievedTx.ID(), "block does not include expected transaction")
+			assert.Equal(txID, evmBlk.atomicTxs[0].ID(), "block does not include expected transaction")
 
 			has = mempool.has(txID)
 			assert.True(has, "tx should stay in mempool until block is accepted")
