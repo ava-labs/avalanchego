@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/coreth/ethdb"
@@ -40,9 +41,10 @@ type blockingAtomicTrie struct {
 	trieDB               *trie.Database      // Trie database
 	trie                 *trie.Trie          // Atomic trie.Trie mapping key (height+blockchainID) and value (RLP encoded atomic.Requests)
 	repo                 AtomicTxRepository
+	codec                codec.Manager
 }
 
-func NewBlockingAtomicTrie(db ethdb.KeyValueStore, repo AtomicTxRepository) (types.AtomicTrie, error) {
+func NewBlockingAtomicTrie(db ethdb.KeyValueStore, repo AtomicTxRepository, codec codec.Manager) (types.AtomicTrie, error) {
 	var root common.Hash
 	// read the last committed entry if exists and automagically set root hash
 	lastCommittedHeightBytes, err := db.Get(lastCommittedKey)
@@ -70,6 +72,7 @@ func NewBlockingAtomicTrie(db ethdb.KeyValueStore, repo AtomicTxRepository) (typ
 		trieDB:               triedb,
 		trie:                 t,
 		repo:                 repo,
+		codec:                codec,
 	}, nil
 }
 
@@ -83,11 +86,13 @@ func nearestCommitHeight(blockNumber uint64, commitInterval uint64) uint64 {
 	return blockNumber - (blockNumber % commitInterval)
 }
 
+// TODO: rename "self" pointer from "i" to "b"
 func (i *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error) error {
 	commitHeight := nearestCommitHeight(lastAcceptedBlockNumber, i.commitHeightInterval)
 	uncommittedOpsMap := make(map[uint64]map[ids.ID]*atomic.Requests, lastAcceptedBlockNumber-commitHeight)
 
-	iter := i.repo.Iterate()
+	// TODO: pass height properly
+	iter := i.repo.IterateByHeight(nil)
 	defer iter.Release()
 
 	preCommitTxIndexed := 0
@@ -97,41 +102,26 @@ func (i *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommit
 		if err := iter.Error(); err != nil {
 			return err
 		}
-		packer := wrappers.Packer{Bytes: iter.Value()}
-		height := packer.UnpackLong()
-		txBytes := packer.UnpackBytes()
-		tx, err := i.repo.ParseTxBytes(txBytes)
+		height := binary.BigEndian.Uint64(iter.Key())
+		txs, err := ExtractAtomicTxs(iter.Value(), true, i.codec)
 		if err != nil {
 			return err
 		}
-
-		ops, err := tx.AtomicOps()
-		if err != nil {
-			return err
-		}
-
-		if height > commitHeight {
-			// add it to the map to index later
-			// make sure we merge transactions at same height
-			if opsMap, exists := uncommittedOpsMap[height]; !exists {
-				// create a new entry if it does not exist
-				uncommittedOpsMap[height] = ops
-			} else {
-				// for existing entry at same height, we merge the atomic ops
-				for blockchainID, atomicRequests := range ops {
-					if requests, exists := opsMap[blockchainID]; !exists {
-						opsMap[blockchainID] = atomicRequests
-					} else {
-						requests.PutRequests = append(requests.PutRequests, atomicRequests.PutRequests...)
-						requests.RemoveRequests = append(requests.RemoveRequests, atomicRequests.RemoveRequests...)
-					}
-				}
-			}
-		} else {
-			if err = i.index(height, ops); err != nil {
+		for _, tx := range txs {
+			id, reqs, err := tx.Accept()
+			ops := map[ids.ID]*atomic.Requests{id: reqs}
+			if err != nil {
 				return err
 			}
-			preCommitTxIndexed++
+
+			if height > commitHeight {
+				uncommittedOpsMap[height] = ops
+			} else {
+				if err = i.index(height, ops); err != nil {
+					return err
+				}
+				preCommitTxIndexed++
+			}
 		}
 		if time.Since(lastUpdate) > 30*time.Second {
 			log.Info("imported entries into atomic trie pre-commit", "entriesIndexed", preCommitTxIndexed)

@@ -384,6 +384,23 @@ func (vm *VM) Initialize(
 		log.Error("failed to initialise atomic tx repository", "err", err)
 		return err
 	}
+	atomicIndexDB := Database{prefixdb.New(atomicIndexDBPrefix, vm.db)}
+	vm.atomicTrie, err = NewBlockingAtomicTrie(atomicIndexDB, vm.atomicTxRepository, vm.codec)
+	if err != nil {
+		return err
+	}
+
+	log.Info("initializing atomic trie", "lastAccepted", lastAccepted.NumberU64())
+	startTime := time.Now()
+	if err = vm.atomicTrie.Initialize(lastAccepted.NumberU64(), vm.db.Commit); err != nil {
+		log.Error("error initializing atomic trie locally", "time", time.Since(startTime), "err", err)
+		return err
+	}
+
+	err = vm.db.Commit()
+	if err != nil {
+		return err
+	}
 	log.Info("Atomic trie initialization complete", "time", time.Since(startTime))
 
 	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
