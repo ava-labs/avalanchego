@@ -1,9 +1,35 @@
+// (c) 2020-2021, Ava Labs, Inc.
+//
+// This file is a derived work, based on the go-ethereum library whose original
+// notices appear below.
+//
+// It is distributed under a license compatible with the licensing terms of the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
+//
+// The go-ethereum library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The go-ethereum library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 package evm
 
 import (
-	"bytes"
+	"sort"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 
 	"github.com/ava-labs/avalanchego/codec"
@@ -37,106 +63,91 @@ func newTestTx() (ids.ID, *Tx) {
 	return id, &Tx{UnsignedAtomicTx: &TestTx{IDV: id}}
 }
 
+// addTxs writes [txPerHeight] txs for heights ranging in [fromHeight] to [toHeight] directly to [acceptedAtomicTxDB],
+// storing the results in [txMap] for verifying by verifyTxs
+func addTxs(t *testing.T, codec codec.Manager, acceptedAtomicTxDB database.Database, fromHeight uint64, toHeight uint64, txPerHeight int, txMap map[uint64][]*Tx) {
+	for height := fromHeight; height < toHeight; height++ {
+		for i := 0; i < txPerHeight; i++ {
+			id, tx := newTestTx()
+			txBytes, err := codec.Marshal(codecVersion, tx)
+			assert.NoError(t, err)
+
+			// Write atomic transactions to the [acceptedAtomicTxDB]
+			// in the format handled prior to the migration to the atomic
+			// tx repository.
+			packer := wrappers.Packer{Bytes: make([]byte, 1), MaxSize: 1024 * 1024}
+			packer.PackLong(height)
+			packer.PackBytes(txBytes)
+			err = acceptedAtomicTxDB.Put(id[:], packer.Bytes)
+			assert.NoError(t, err)
+
+			// save this to the map for verifying expected results in verifyTxs
+			txMap[height] = append(txMap[height], tx)
+		}
+	}
+}
+
+// writeTxs writes [txPerHeight] txs for heights ranging in [fromHeight] to [toHeight] through the Write call on [repo],
+// storing the results in [txMap] for verifying by verifyTxs
+func writeTxs(repo AtomicTxRepository, fromHeight uint64, toHeight uint64, txPerHeight int, txMap map[uint64][]*Tx) {
+	for height := fromHeight; height < toHeight; height++ {
+		txs := make([]*Tx, 0)
+		for i := 0; i < txPerHeight; i++ {
+			_, tx := newTestTx()
+			txs = append(txs, tx)
+		}
+		repo.Write(height, txs)
+		// save this to the map for verifying expected results in verifyTxs
+		txMap[height] = txs
+	}
+}
+
+// verifyTxs asserts [repo] can find all txs in [txMap] by height and txID
+func verifyTxs(t *testing.T, repo AtomicTxRepository, txMap map[uint64][]*Tx) {
+	// We should be able to fetch indexed txs by height:
+	for height, expectedTxs := range txMap {
+		txs, err := repo.GetByHeight(height)
+		assert.NoErrorf(t, err, "expected err=nil on GetByHeight at height=%d", height)
+		assert.Lenf(t, txs, len(expectedTxs), "wrong len of txs at height=%d", height)
+		// txs should be stored in order of txID
+		sort.Slice(expectedTxs, func(i, j int) bool {
+			return expectedTxs[i].ID().Hex() < expectedTxs[j].ID().Hex()
+		})
+		for i := 0; i < len(txs); i++ {
+			assert.Equalf(t, expectedTxs[i].ID().Hex(), txs[i].ID().Hex(), "wrong txID at height=%d idx=%d", height, i)
+		}
+	}
+}
+
 func TestAtomicRepositoryReadWrite(t *testing.T) {
 	db := memdb.New()
 	codec := prepareCodecForTest()
 	repo := NewAtomicTxRepository(db, codec)
+	txMap := make(map[uint64][]*Tx)
 
-	// Generate and write atomic transactions to the repository
-	txIDs := make([]ids.ID, 100)
-	for i := 0; i < 100; i++ {
-		id, tx := newTestTx()
-
-		err := repo.Write(uint64(i), []*Tx{tx})
-		assert.NoError(t, err)
-
-		txIDs[i] = id
-	}
-
-	// Verify that we can fetch all of the indexed transactions
-	// by their txID and height.
-	for i := 0; i < 100; i++ {
-		tx, height, err := repo.GetByTxID(txIDs[i])
-		assert.NoError(t, err)
-		assert.EqualValues(t, height, i)
-		assert.Equal(t, tx.ID(), txIDs[i])
-
-		txs, err := repo.GetByHeight(height)
-		assert.NoError(t, err)
-		assert.Len(t, txs, 1)
-		assert.Equal(t, txIDs[i], txs[0].ID())
-	}
+	writeTxs(repo, 0, 100, 1, txMap)
+	verifyTxs(t, repo, txMap)
 }
 
 func TestAtomicRepositoryInitialize(t *testing.T) {
 	db := memdb.New()
 	codec := prepareCodecForTest()
 
-	// Write atomic transactions to the [acceptedAtomicTxDB]
-	// in the format handled prior to the migration to the atomic
-	// tx repository.
 	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
-	txIDs := make([]ids.ID, 150)
-	for i := 0; i < 100; i++ {
-		id, tx := newTestTx()
-
-		txBytes, err := codec.Marshal(codecVersion, tx)
-		assert.NoError(t, err)
-
-		packer := wrappers.Packer{Bytes: make([]byte, 1), MaxSize: 1024 * 1024}
-		packer.PackLong(uint64(i))
-		packer.PackBytes(txBytes)
-		err = acceptedAtomicTxDB.Put(id[:], packer.Bytes)
-		assert.NoError(t, err)
-		txIDs[i] = id
-	}
+	txMap := make(map[uint64][]*Tx)
+	addTxs(t, codec, acceptedAtomicTxDB, 0, 100, 1, txMap)
 
 	repo := NewAtomicTxRepository(db, codec)
-	err := repo.Initialize()
+	err := repo.Initialize(nil)
 	assert.NoError(t, err)
+	verifyTxs(t, repo, txMap)
 
-	// Verify that we can fetch all of the indexed transactions by their txID and height.
-	for i := 0; i < 100; i++ {
-		tx, height, err := repo.GetByTxID(txIDs[i])
-		assert.NoError(t, err)
-		assert.EqualValues(t, height, i)
-		assert.Equal(t, tx.ID(), txIDs[i])
-
-		txs, err := repo.GetByHeight(height)
-		assert.NoError(t, err)
-		assert.Len(t, txs, 1)
-		assert.Equal(t, txIDs[i], txs[0].ID())
-	}
-
-	for i := 100; i < 150; i++ {
-		id, tx := newTestTx()
-
-		txBytes, err := codec.Marshal(codecVersion, tx)
-		assert.NoError(t, err)
-		packer := wrappers.Packer{Bytes: make([]byte, 1), MaxSize: 1024 * 1024}
-		packer.PackLong(uint64(i))
-		packer.PackBytes(txBytes)
-		err = acceptedAtomicTxDB.Put(id[:], packer.Bytes)
-		assert.NoError(t, err)
-		txIDs[i] = id
-	}
-
+	// add some more Txs
+	addTxs(t, codec, acceptedAtomicTxDB, 100, 150, 1, txMap)
 	repo = NewAtomicTxRepository(db, codec)
-	err = repo.Initialize()
+	err = repo.Initialize(nil)
 	assert.NoError(t, err)
-
-	// Verify that we can fetch all of the indexed transactions by their txID and height.
-	for i := 0; i < 150; i++ {
-		tx, height, err := repo.GetByTxID(txIDs[i])
-		assert.NoError(t, err)
-		assert.EqualValues(t, height, i)
-		assert.Equal(t, tx.ID(), txIDs[i])
-
-		txs, err := repo.GetByHeight(height)
-		assert.NoError(t, err, "error '%v' for height %d", err, height)
-		assert.Len(t, txs, 1)
-		assert.Equal(t, txIDs[i], txs[0].ID())
-	}
+	verifyTxs(t, repo, txMap)
 }
 
 func TestAtomicRepositoryInitializeMultipleHeights(t *testing.T) {
@@ -144,86 +155,21 @@ func TestAtomicRepositoryInitializeMultipleHeights(t *testing.T) {
 	codec := prepareCodecForTest()
 
 	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
-	txIDs := make([]ids.ID, 150)
+	txMap := make(map[uint64][]*Tx)
 
-	getHeight := func(idx int) uint64 {
-		if idx >= 50 && idx < 100 && idx%2 == 1 {
-			return uint64(idx) - 1
-		}
-		return uint64(idx)
-	}
-	for i := 0; i < 100; i++ {
-		id, tx := newTestTx()
-
-		txBytes, err := codec.Marshal(codecVersion, tx)
-		assert.NoError(t, err)
-
-		packer := wrappers.Packer{Bytes: make([]byte, 1), MaxSize: 1024 * 1024}
-		packer.PackLong(getHeight(i))
-		packer.PackBytes(txBytes)
-		err = acceptedAtomicTxDB.Put(id[:], packer.Bytes)
-		assert.NoError(t, err)
-		txIDs[i] = id
-
-	}
+	addTxs(t, codec, acceptedAtomicTxDB, 0, 50, 1, txMap)
+	addTxs(t, codec, acceptedAtomicTxDB, 50, 100, 2, txMap) // multiple txs per height
 
 	repo := NewAtomicTxRepository(db, codec)
-	err := repo.Initialize()
+	err := repo.Initialize(nil)
 	assert.NoError(t, err)
+	verifyTxs(t, repo, txMap)
 
-	// Verify that we can fetch all of the indexed transactions by their txID and height.
-	for i := 0; i < 100; i++ {
-		height := getHeight(i)
-		tx, txHeight, err := repo.GetByTxID(txIDs[i])
-		assert.NoError(t, err)
-		assert.EqualValues(t, height, txHeight)
-		assert.Equal(t, tx.ID(), txIDs[i])
-
-		txs, err := repo.GetByHeight(height)
-		assert.NoError(t, err)
-		if i < 50 {
-			assert.Len(t, txs, 1)
-			assert.Equal(t, txIDs[i], txs[0].ID())
-		} else {
-			assert.Len(t, txs, 2)
-			resultIDs := []ids.ID{txs[0].ID(), txs[1].ID()}
-			assert.Contains(t, resultIDs, txIDs[i], "expecting txs to contain txIDs[i]")
-			assert.Negative(t, bytes.Compare(resultIDs[0][:], resultIDs[1][:]), "expecting txs to be sorted on txID")
-		}
-	}
-
-	for i := 100; i < 150; i++ {
-		id, tx := newTestTx()
-
-		txBytes, err := codec.Marshal(codecVersion, tx)
-		assert.NoError(t, err)
-		packer := wrappers.Packer{Bytes: make([]byte, 1), MaxSize: 1024 * 1024}
-		packer.PackLong(uint64(i))
-		packer.PackBytes(txBytes)
-		err = acceptedAtomicTxDB.Put(id[:], packer.Bytes)
-		assert.NoError(t, err)
-		txIDs[i] = id
-	}
+	// add some more Tx
+	addTxs(t, codec, acceptedAtomicTxDB, 100, 150, 1, txMap)
 
 	repo = NewAtomicTxRepository(db, codec)
-	err = repo.Initialize()
+	err = repo.Initialize(nil)
 	assert.NoError(t, err)
-
-	// Verify that we can fetch all of the indexed transactions by their txID.
-	for i := 0; i < 150; i++ {
-		height := getHeight(i)
-		tx, txHeight, err := repo.GetByTxID(txIDs[i])
-		assert.NoError(t, err)
-		assert.EqualValues(t, height, txHeight)
-		assert.Equal(t, tx.ID(), txIDs[i])
-	}
-
-	// Verify that we can fetch all of the indexed transactions by their height.
-	for i := 100; i < 150; i++ {
-		height := getHeight(i)
-		txs, err := repo.GetByHeight(height)
-		assert.NoError(t, err, "error '%v' for height %d", err, height)
-		assert.Len(t, txs, 1)
-		assert.Equal(t, txIDs[i], txs[0].ID())
-	}
+	verifyTxs(t, repo, txMap)
 }

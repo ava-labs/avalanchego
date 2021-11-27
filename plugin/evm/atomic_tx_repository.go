@@ -1,3 +1,28 @@
+// (c) 2020-2021, Ava Labs, Inc.
+//
+// This file is a derived work, based on the go-ethereum library whose original
+// notices appear below.
+//
+// It is distributed under a license compatible with the licensing terms of the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
+//
+// The go-ethereum library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The go-ethereum library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 package evm
 
 import (
@@ -12,7 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/coreth/utils"
 )
 
 var (
@@ -24,12 +48,12 @@ var (
 // AtomicTxRepository defines an entity that manages storage and indexing of
 // atomic transactions
 type AtomicTxRepository interface {
-	Initialize() error
+	Initialize(commitFn func() error) error
 	GetByTxID(txID ids.ID) (*Tx, uint64, error)
 	GetByHeight(height uint64) ([]*Tx, error)
 	Write(height uint64, txs []*Tx) error
 	IterateByTxID() database.Iterator
-	IterateByHeight(height uint64) database.Iterator
+	IterateByHeight([]byte) database.Iterator
 }
 
 // atomicTxRepository is a prefixdb implementation of the AtomicTxRepository interface
@@ -59,7 +83,7 @@ func NewAtomicTxRepository(db database.Database, codec codec.Manager) AtomicTxRe
 	}
 }
 
-func (a *atomicTxRepository) Initialize() error {
+func (a *atomicTxRepository) Initialize(commitFn func() error) error {
 	startTime := time.Now()
 	indexHeight := uint64(0)
 	exists, indexHeight, err := a.getIndexHeight()
@@ -76,17 +100,26 @@ func (a *atomicTxRepository) Initialize() error {
 	iter := a.acceptedAtomicTxDB.NewIterator()
 	defer iter.Release()
 
-	// Since leveldb orders keys and we're using BigEndian we should get the natural order at the DB level
-	// automatically when using the iterator later
+	// Keep track of the max height we have seen
 	newMaxHeight := indexHeight
 
 	// Remember which heights we processed so we can read existing txs if we encounter the same height twice.
 	seenHeights := make(map[uint64]struct{})
+	lastLogTime := startTime
 
-	progressLogger := utils.NewProgressLogger(15 * time.Second)
+	// Keep track of the size of pending writes to be committed
+	approxCommitBytes := make(map[uint64]int)
+	totalApproxCommitBytes := 0
+	commitSizeCap := 10 * 1024 * 1024
+
 	for iter.Next() {
-		progressLogger.Info("updating tx repository height index", "indexed", txIndexed, "skipped", txSkipped)
+		// Periodically log progress
+		if time.Since(lastLogTime) > 15*time.Second {
+			log.Info("updating tx repository height index", "indexed", txIndexed, "skipped", txSkipped)
+			lastLogTime = time.Now()
+		}
 
+		// iter.Value() consists of [height packed as uint64] + [tx serialized as packed []byte]
 		heightBytes := iter.Value()[:wrappers.LongLen]
 		height := binary.BigEndian.Uint64(heightBytes)
 		if height < indexHeight {
@@ -94,7 +127,7 @@ func (a *atomicTxRepository) Initialize() error {
 			continue
 		}
 
-		// TODO: possibly replace with packer
+		// Get the tx iter is pointing to, len(txs) == 1 is expected here.
 		txBytes := iter.Value()[wrappers.LongLen+wrappers.IntLen:]
 		txs, err := ExtractAtomicTxs(txBytes, false, a.codec)
 		if err != nil {
@@ -108,6 +141,12 @@ func (a *atomicTxRepository) Initialize() error {
 				return err
 			}
 			txs = append(existingTxs, txs...)
+
+			// If this height already has uncommitted bytes, the running total
+			// should avoid double counting those bytes.
+			if alreadyCounted, exists := approxCommitBytes[height]; exists {
+				totalApproxCommitBytes -= alreadyCounted
+			}
 		}
 		seenHeights[height] = struct{}{}
 
@@ -118,11 +157,22 @@ func (a *atomicTxRepository) Initialize() error {
 		if err := a.acceptedAtomicTxByHeightDB.Put(heightBytes, txsBytes); err != nil {
 			return err
 		}
-		// update our height record
+		approxCommitBytes[height] = len(txBytes)
+		totalApproxCommitBytes += len(txBytes)
+
+		// call commitFn to write to underlying DB if needed
+		if commitFn != nil && totalApproxCommitBytes > commitSizeCap {
+			if err := commitFn(); err != nil {
+				return err
+			}
+			approxCommitBytes = make(map[uint64]int)
+			totalApproxCommitBytes = 0
+		}
+
+		// update max height if necessary
 		if height > newMaxHeight {
 			newMaxHeight = height
 		}
-
 		txIndexed++
 	}
 
@@ -130,6 +180,11 @@ func (a *atomicTxRepository) Initialize() error {
 	binary.BigEndian.PutUint64(newMaxHeightBytes, newMaxHeight)
 	if err := a.db.Put(maxIndexedHeightKey, newMaxHeightBytes); err != nil {
 		return err
+	}
+	if commitFn != nil {
+		if err := commitFn(); err != nil {
+			return err
+		}
 	}
 
 	log.Info("initialized atomic tx repository", "indexHeight", indexHeight, "maxHeight", newMaxHeight, "duration", time.Since(startTime), "txIndexed", txIndexed, "txSkipped", txSkipped)
@@ -236,8 +291,6 @@ func (a *atomicTxRepository) IterateByTxID() database.Iterator {
 	return a.acceptedAtomicTxDB.NewIterator()
 }
 
-func (a *atomicTxRepository) IterateByHeight(height uint64) database.Iterator {
-	heightBytes := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(heightBytes, height)
+func (a *atomicTxRepository) IterateByHeight(heightBytes []byte) database.Iterator {
 	return a.acceptedAtomicTxByHeightDB.NewIteratorWithStart(heightBytes)
 }
