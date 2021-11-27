@@ -26,7 +26,6 @@
 package evm
 
 import (
-	"sort"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -63,27 +62,21 @@ func newTestTx() (ids.ID, *Tx) {
 	return id, &Tx{UnsignedAtomicTx: &TestTx{IDV: id}}
 }
 
-// addTxs writes [txPerHeight] txs for heights ranging in [fromHeight] to [toHeight] directly to [acceptedAtomicTxDB],
-// storing the results in [txMap] for verifying by verifyTxs
-func addTxs(t *testing.T, codec codec.Manager, acceptedAtomicTxDB database.Database, fromHeight uint64, toHeight uint64, txPerHeight int, txMap map[uint64][]*Tx) {
-	for height := fromHeight; height < toHeight; height++ {
-		for i := 0; i < txPerHeight; i++ {
-			id, tx := newTestTx()
-			txBytes, err := codec.Marshal(codecVersion, tx)
-			assert.NoError(t, err)
+// Tests simple writing and reading behaviour from atomic repository
+func TestAtomicRepositoryReadWrite(t *testing.T) {
+	db := memdb.New()
+	codec := prepareCodecForTest()
+	repo := NewAtomicTxRepository(db, codec)
 
-			// Write atomic transactions to the [acceptedAtomicTxDB]
-			// in the format handled prior to the migration to the atomic
-			// tx repository.
-			packer := wrappers.Packer{Bytes: make([]byte, 1), MaxSize: 1024 * 1024}
-			packer.PackLong(height)
-			packer.PackBytes(txBytes)
-			err = acceptedAtomicTxDB.Put(id[:], packer.Bytes)
-			assert.NoError(t, err)
+	// Generate and write atomic transactions to the repository
+	txIDs := make([]ids.ID, 100)
+	for i := 0; i < 100; i++ {
+		id, tx := newTestTx()
 
-			// save this to the map for verifying expected results in verifyTxs
-			txMap[height] = append(txMap[height], tx)
-		}
+		err := repo.Write(uint64(i), []*Tx{tx})
+		assert.NoError(t, err)
+
+		txIDs[i] = id
 	}
 }
 
@@ -119,16 +112,9 @@ func verifyTxs(t *testing.T, repo AtomicTxRepository, txMap map[uint64][]*Tx) {
 	}
 }
 
-func TestAtomicRepositoryReadWrite(t *testing.T) {
-	db := memdb.New()
-	codec := prepareCodecForTest()
-	repo := NewAtomicTxRepository(db, codec)
-	txMap := make(map[uint64][]*Tx)
-
-	writeTxs(repo, 0, 100, 1, txMap)
-	verifyTxs(t, repo, txMap)
-}
-
+// Tests simple Initialize behaviour from the atomic repository
+// based on a pre-populated txID=height+txbytes entries in the
+// acceptedAtomicTxDB database
 func TestAtomicRepositoryInitialize(t *testing.T) {
 	db := memdb.New()
 	codec := prepareCodecForTest()
@@ -138,38 +124,157 @@ func TestAtomicRepositoryInitialize(t *testing.T) {
 	addTxs(t, codec, acceptedAtomicTxDB, 0, 100, 1, txMap)
 
 	repo := NewAtomicTxRepository(db, codec)
-	err := repo.Initialize(nil)
+	err := repo.Initialize(50)
 	assert.NoError(t, err)
 	verifyTxs(t, repo, txMap)
 
 	// add some more Txs
 	addTxs(t, codec, acceptedAtomicTxDB, 100, 150, 1, txMap)
 	repo = NewAtomicTxRepository(db, codec)
-	err = repo.Initialize(nil)
+	err = repo.Initialize(0)
 	assert.NoError(t, err)
 	verifyTxs(t, repo, txMap)
 }
 
-func TestAtomicRepositoryInitializeMultipleHeights(t *testing.T) {
+// Test ensures Initialize can handle multiple atomic transactions past a
+// given block
+func TestAtomicRepositoryInitializeHandlesMultipleAtomicTxs(t *testing.T) {
 	db := memdb.New()
 	codec := prepareCodecForTest()
 
 	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
-	txMap := make(map[uint64][]*Tx)
+	heightTxIDMap := make(map[uint64][]ids.ID, 175)
 
-	addTxs(t, codec, acceptedAtomicTxDB, 0, 50, 1, txMap)
-	addTxs(t, codec, acceptedAtomicTxDB, 50, 100, 2, txMap) // multiple txs per height
+	const apricotPhase5Height = uint64(50)
+
+	for i := uint64(0); i < 150; i++ {
+		txs := make(map[ids.ID]*Tx)
+		id, tx := newTestTx()
+		txs[id] = tx
+
+		// enable multiple txs for every other block past block 50
+		if i > apricotPhase5Height && i%2 == 0 {
+			id, tx := newTestTx()
+			txs[id] = tx
+		}
+
+		txList := make([]ids.ID, 0, len(txs))
+		for id, tx := range txs {
+			txBytes, err := codec.Marshal(codecVersion, tx)
+			assert.NoError(t, err)
+
+			packer := wrappers.Packer{Bytes: make([]byte, wrappers.LongLen+wrappers.IntLen+len(txBytes))}
+			packer.PackLong(i)
+			packer.PackBytes(txBytes)
+			err = acceptedAtomicTxDB.Put(id[:], packer.Bytes)
+			assert.NoError(t, err)
+
+			txList = append(txList, id)
+		}
+
+		heightTxIDMap[i] = txList
+	}
+
+	assert.Len(t, heightTxIDMap, 150)
 
 	repo := NewAtomicTxRepository(db, codec)
-	err := repo.Initialize(nil)
+	err := repo.Initialize(apricotPhase5Height)
 	assert.NoError(t, err)
 	verifyTxs(t, repo, txMap)
 
-	// add some more Tx
-	addTxs(t, codec, acceptedAtomicTxDB, 100, 150, 1, txMap)
+	for height, txIDs := range heightTxIDMap {
+		// first assert the height index
+		txs, err := repo.GetByHeight(height)
+		assert.NoError(t, err)
+		assert.Len(t, txs, len(txIDs))
 
-	repo = NewAtomicTxRepository(db, codec)
-	err = repo.Initialize(nil)
+		txIDSet := make(map[ids.ID]struct{}, len(txIDs))
+		for _, txID := range txIDs {
+			txIDSet[txID] = struct{}{}
+		}
+
+		for _, tx := range txs {
+			_, exists := txIDSet[tx.ID()]
+			assert.True(t, exists)
+		}
+
+		// now assert the txID index
+		for _, txID := range txIDs {
+			tx, txHeight, err := repo.GetByTxID(txID)
+			assert.NoError(t, err)
+			assert.Equal(t, height, txHeight)
+			assert.Equal(t, txID, tx.ID())
+		}
+	}
+}
+
+// Test ensures Initialize can handle multiple atomic transactions past a
+// given block
+func TestAtomicRepositoryInitializeHandlesMultipleAtomicTxs_Bench(t *testing.T) {
+	db := memdb.New()
+	codec := prepareCodecForTest()
+
+	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
+	heightTxIDMap := make(map[uint64][]ids.ID, 175)
+
+	const apricotPhase5Height = uint64(700000)
+
+	for i := uint64(0); i < 1000000; i++ {
+		txs := make(map[ids.ID]*Tx)
+		id, tx := newTestTx()
+		txs[id] = tx
+
+		// enable multiple txs for every other block past block 50
+		if i > apricotPhase5Height && i%2 == 0 {
+			id, tx := newTestTx()
+			txs[id] = tx
+		}
+
+		txList := make([]ids.ID, 0, len(txs))
+		for id, tx := range txs {
+			txBytes, err := codec.Marshal(codecVersion, tx)
+			assert.NoError(t, err)
+
+			packer := wrappers.Packer{Bytes: make([]byte, wrappers.LongLen+wrappers.IntLen+len(txBytes))}
+			packer.PackLong(i)
+			packer.PackBytes(txBytes)
+			err = acceptedAtomicTxDB.Put(id[:], packer.Bytes)
+			assert.NoError(t, err)
+
+			txList = append(txList, id)
+		}
+
+		heightTxIDMap[i] = txList
+	}
+
+	assert.Len(t, heightTxIDMap, 1000000)
+
+	repo := NewAtomicTxRepository(db, codec)
+	err := repo.Initialize(apricotPhase5Height)
 	assert.NoError(t, err)
-	verifyTxs(t, repo, txMap)
+
+	for height, txIDs := range heightTxIDMap {
+		// first assert the height index
+		txs, err := repo.GetByHeight(height)
+		assert.NoError(t, err)
+		assert.Len(t, txs, len(txIDs))
+
+		txIDSet := make(map[ids.ID]struct{}, len(txIDs))
+		for _, txID := range txIDs {
+			txIDSet[txID] = struct{}{}
+		}
+
+		for _, tx := range txs {
+			_, exists := txIDSet[tx.ID()]
+			assert.True(t, exists)
+		}
+
+		// now assert the txID index
+		for _, txID := range txIDs {
+			tx, txHeight, err := repo.GetByTxID(txID)
+			assert.NoError(t, err)
+			assert.Equal(t, height, txHeight)
+			assert.Equal(t, txID, tx.ID())
+		}
+	}
 }
