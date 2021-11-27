@@ -48,7 +48,7 @@ var (
 // AtomicTxRepository defines an entity that manages storage and indexing of
 // atomic transactions
 type AtomicTxRepository interface {
-	Initialize(commitFn func() error) error
+	Initialize(apricotPhase5Height uint64) error
 	GetByTxID(txID ids.ID) (*Tx, uint64, error)
 	GetByHeight(height uint64) ([]*Tx, error)
 	Write(height uint64, txs []*Tx) error
@@ -83,7 +83,7 @@ func NewAtomicTxRepository(db database.Database, codec codec.Manager) AtomicTxRe
 	}
 }
 
-func (a *atomicTxRepository) Initialize(commitFn func() error) error {
+func (a *atomicTxRepository) Initialize(apricotPhase5Height uint64) error {
 	startTime := time.Now()
 	indexHeight := uint64(0)
 	exists, indexHeight, err := a.getIndexHeight()
@@ -134,21 +134,20 @@ func (a *atomicTxRepository) Initialize(commitFn func() error) error {
 			return err
 		}
 
-		// If this height is already processed, get existing txs for that height.
-		if _, exists := seenHeights[height]; exists {
-			existingTxs, err := a.GetByHeight(height)
-			if err != nil {
-				return err
+		// Past apricotPhase5 we allow multiple txs per block
+		// This ensures that we keep the memory footprint low
+		// by not storing block heights for blocks prior
+		if height >= apricotPhase5Height {
+			// If this height is already processed, get existing txs for that height.
+			if _, exists := seenHeights[height]; exists {
+				existingTxs, err := a.GetByHeight(height)
+				if err != nil {
+					return err
+				}
+				txs = append(existingTxs, txs...)
 			}
-			txs = append(existingTxs, txs...)
-
-			// If this height already has uncommitted bytes, the running total
-			// should avoid double counting those bytes.
-			if alreadyCounted, exists := approxCommitBytes[height]; exists {
-				totalApproxCommitBytes -= alreadyCounted
-			}
+			seenHeights[height] = struct{}{}
 		}
-		seenHeights[height] = struct{}{}
 
 		txsBytes, err := a.codec.Marshal(codecVersion, txs)
 		if err != nil {
