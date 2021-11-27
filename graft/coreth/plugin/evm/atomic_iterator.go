@@ -1,9 +1,10 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package evm
 
 import (
 	"encoding/binary"
-
-	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
@@ -19,7 +20,7 @@ type atomicTrieIterator struct {
 	trieIterator *trie.Iterator              // underlying trie.Iterator
 	atomicOps    map[ids.ID]*atomic.Requests // atomic operation entries at this iteration
 	blockNumber  uint64                      // block number at this iteration
-	errs         []error                     // errors if any so far
+	err          error                       // error if any has occurred
 }
 
 func NewAtomicTrieIterator(trieIterator *trie.Iterator) types.AtomicTrieIterator {
@@ -27,23 +28,11 @@ func NewAtomicTrieIterator(trieIterator *trie.Iterator) types.AtomicTrieIterator
 }
 
 // Errors returns a list of errors, if any encountered so far
-func (a *atomicTrieIterator) Errors() []error {
-	if a.trieIterator.Err == nil && len(a.errs) == 0 {
-		return nil
+func (a *atomicTrieIterator) Error() error {
+	if err := a.trieIterator.Err; err != nil {
+		return err
 	}
-
-	// check if there's an error in the trie iterator
-	// if there is one, we include this in the []error len
-	trieErrLen := 0
-	if a.trieIterator.Err != nil {
-		trieErrLen = 1
-	}
-
-	// create a slice to copy errors into and return the copy
-	errsCopy := make([]error, len(a.errs), len(a.errs)+trieErrLen)
-	copy(errsCopy, a.errs)
-	errsCopy = append(errsCopy, a.trieIterator.Err)
-	return errsCopy
+	return a.err
 }
 
 // Next returns whether there is data to iterate over
@@ -57,26 +46,23 @@ func (a *atomicTrieIterator) Next() bool {
 		blockNumber := binary.BigEndian.Uint64(a.trieIterator.Key[:wrappers.LongLen])
 		blockchainID, err := ids.ToID(a.trieIterator.Key[wrappers.LongLen:])
 		if err != nil {
-			a.errs = append(a.errs, err)
-			log.Error("error converting to ID", "err", err)
+			a.err = err
 			a.resetFields()
-			return hasNext
+			return false
 		}
 
 		// value is RLP encoded atomic.Requests
 		var requests atomic.Requests
 		if err = rlp.DecodeBytes(a.trieIterator.Value, &requests); err != nil {
-			a.errs = append(a.errs, err)
-			log.Error("error decoding", "err", err)
+			a.err = err
 			a.resetFields()
-			return hasNext
+			return false
 		}
 
 		// update the struct fields
 		a.blockNumber = blockNumber
 		a.atomicOps = map[ids.ID]*atomic.Requests{blockchainID: &requests}
 	} else {
-		// else reset the fields
 		a.resetFields()
 	}
 	return hasNext

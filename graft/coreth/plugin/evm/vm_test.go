@@ -202,7 +202,6 @@ func GenesisVM(t *testing.T,
 	appSender := &engCommon.SenderTest{}
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func([]byte) error { return nil }
-
 	if err := vm.Initialize(
 		ctx,
 		dbManager,
