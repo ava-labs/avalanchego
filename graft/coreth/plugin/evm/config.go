@@ -19,10 +19,12 @@ const (
 	defaultSnapshotAsync               = true
 	defaultRpcGasCap                   = 2500000000 // 25000000 X 100
 	defaultRpcTxFeeCap                 = 100        // 100 AVAX
-	defaultApiMaxDuration              = 0          // Default to no maximum API call duration
-	defaultWsCpuRefillRate             = 0          // Default to no maximum WS CPU usage
-	defaultWsCpuMaxStored              = 0          // Default to no maximum WS CPU usage
-	defaultMaxBlocksPerRequest         = 0          // Default to no maximum on the number of blocks per getLogs request
+	defaultMetricsEnabled              = false
+	defaultMetricsExpensiveEnabled     = false
+	defaultApiMaxDuration              = 0 // Default to no maximum API call duration
+	defaultWsCpuRefillRate             = 0 // Default to no maximum WS CPU usage
+	defaultWsCpuMaxStored              = 0 // Default to no maximum WS CPU usage
+	defaultMaxBlocksPerRequest         = 0 // Default to no maximum on the number of blocks per getLogs request
 	defaultContinuousProfilerFrequency = 15 * time.Minute
 	defaultContinuousProfilerMaxFiles  = 5
 	defaultTxRegossipFrequency         = 1 * time.Minute
@@ -36,9 +38,10 @@ type Duration struct {
 // Config ...
 type Config struct {
 	// Coreth APIs
-	SnowmanAPIEnabled     bool `json:"snowman-api-enabled"`
-	CorethAdminAPIEnabled bool `json:"coreth-admin-api-enabled"`
-	NetAPIEnabled         bool `json:"net-api-enabled"`
+	SnowmanAPIEnabled     bool   `json:"snowman-api-enabled"`
+	CorethAdminAPIEnabled bool   `json:"coreth-admin-api-enabled"`
+	CorethAdminAPIDir     string `json:"coreth-admin-api-dir"`
+	NetAPIEnabled         bool   `json:"net-api-enabled"`
 
 	// Continuous Profiler
 	ContinuousProfilerDir       string   `json:"continuous-profiler-dir"`       // If set to non-empty string creates a continuous profiler
@@ -61,6 +64,10 @@ type Config struct {
 	Pruning        bool `json:"pruning-enabled"`
 	SnapshotAsync  bool `json:"snapshot-async"`
 	SnapshotVerify bool `json:"snapshot-verification-enabled"`
+
+	// Metric Settings
+	MetricsEnabled          bool `json:"metrics-enabled"`
+	MetricsExpensiveEnabled bool `json:"metrics-expensive-enabled"`
 
 	// API Settings
 	LocalTxsEnabled         bool     `json:"local-txs-enabled"`
@@ -115,6 +122,8 @@ func (c *Config) SetDefaults() {
 	c.Web3APIEnabled = defaultWeb3ApiEnabled
 	c.RPCGasCap = defaultRpcGasCap
 	c.RPCTxFeeCap = defaultRpcTxFeeCap
+	c.MetricsEnabled = defaultMetricsEnabled
+	c.MetricsExpensiveEnabled = defaultMetricsExpensiveEnabled
 	c.APIMaxDuration.Duration = defaultApiMaxDuration
 	c.WSCPURefillRate.Duration = defaultWsCpuRefillRate
 	c.WSCPUMaxStored.Duration = defaultWsCpuMaxStored

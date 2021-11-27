@@ -27,8 +27,8 @@ type Mempool struct {
 	AVAXAssetID ids.ID
 	// maxSize is the maximum number of transactions allowed to be kept in mempool
 	maxSize int
-	// currentTx is the transaction about to be added to a block.
-	currentTx *Tx
+	// currentTxs is the set of transactions about to be added to a block.
+	currentTxs map[ids.ID]*Tx
 	// issuedTxs is the set of transactions that have been issued into a new block
 	issuedTxs map[ids.ID]*Tx
 	// discardedTxs is an LRU Cache of transactions that have been discarded after failing
@@ -52,6 +52,7 @@ func NewMempool(AVAXAssetID ids.ID, maxSize int) *Mempool {
 		AVAXAssetID:  AVAXAssetID,
 		issuedTxs:    make(map[ids.ID]*Tx),
 		discardedTxs: &cache.LRU{Size: discardedTxsCacheSize},
+		currentTxs:   make(map[ids.ID]*Tx),
 		Pending:      make(chan struct{}, 1),
 		utxoSet:      ids.NewSet(maxSize),
 		txHeap:       newTxHeap(maxSize),
@@ -82,7 +83,7 @@ func (m *Mempool) has(txID ids.ID) bool {
 // atomicTxGasPrice is the [gasPrice] paid by a transaction to burn a given
 // amount of [AVAXAssetID] given the value of [gasUsed].
 func (m *Mempool) atomicTxGasPrice(tx *Tx) (uint64, error) {
-	gasUsed, err := tx.GasUsed()
+	gasUsed, err := tx.GasUsed(true)
 	if err != nil {
 		return 0, err
 	}
@@ -117,12 +118,12 @@ func (m *Mempool) ForceAddTx(tx *Tx) error {
 // If [force], skips conflict checks within the mempool.
 func (m *Mempool) addTx(tx *Tx, force bool) error {
 	txID := tx.ID()
-	// If [txID] has already been issued or is the currentTx
+	// If [txID] has already been issued or is in the currentTxs map
 	// there's no need to add it.
 	if _, exists := m.issuedTxs[txID]; exists {
 		return nil
 	}
-	if m.currentTx != nil && m.currentTx.ID() == txID {
+	if _, exists := m.currentTxs[txID]; exists {
 		return nil
 	}
 	if _, exists := m.txHeap.Get(txID); exists {
@@ -201,7 +202,7 @@ func (m *Mempool) NextTx() (*Tx, bool) {
 	// pay.
 	if m.txHeap.Len() > 0 {
 		tx := m.txHeap.PopMax()
-		m.currentTx = tx
+		m.currentTxs[tx.ID()] = tx
 		return tx, true
 	}
 
@@ -231,8 +232,8 @@ func (m *Mempool) GetTx(txID ids.ID) (*Tx, bool, bool) {
 	if tx, ok := m.issuedTxs[txID]; ok {
 		return tx, false, true
 	}
-	if m.currentTx != nil && m.currentTx.ID() == txID {
-		return m.currentTx, false, true
+	if tx, ok := m.currentTxs[txID]; ok {
+		return tx, false, true
 	}
 	if tx, exists := m.discardedTxs.Get(txID); exists {
 		return tx.(*Tx), true, true
@@ -242,13 +243,13 @@ func (m *Mempool) GetTx(txID ids.ID) (*Tx, bool, bool) {
 }
 
 // IssueCurrentTx marks [currentTx] as issued if there is one
-func (m *Mempool) IssueCurrentTx() {
+func (m *Mempool) IssueCurrentTxs() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	if m.currentTx != nil {
-		m.issuedTxs[m.currentTx.ID()] = m.currentTx
-		m.currentTx = nil
+	for txID := range m.currentTxs {
+		m.issuedTxs[txID] = m.currentTxs[txID]
+		delete(m.currentTxs, txID)
 	}
 
 	// If there are more transactions to be issued, add an item
@@ -258,30 +259,32 @@ func (m *Mempool) IssueCurrentTx() {
 	}
 }
 
-// CancelCurrentTx marks the attempt to issue [currentTx]
+// CancelCurrentTx marks the attempt to issue [txID]
+// as being aborted. This should be called after NextTx returns [txID]
+// and the transaction [txID] cannot be included in the block, but should
+// not be discarded. For example, CancelCurrentTx should be called if including
+// the transaction will put the block above the atomic tx gas limit.
+func (m *Mempool) CancelCurrentTx(txID ids.ID) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if tx, ok := m.currentTxs[txID]; ok {
+		m.cancelTx(tx)
+	}
+}
+
+// [CancelCurrentTxs] marks the attempt to issue [currentTxs]
 // as being aborted. If this is called after a buildBlock error
 // caused by the atomic transaction, then DiscardCurrentTx should have been called
 // such that this call will have no effect and should not re-issue the invalid tx.
-func (m *Mempool) CancelCurrentTx() {
+func (m *Mempool) CancelCurrentTxs() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	// If building a block failed, put the currentTx back in [txs]
 	// if it exists.
-	if m.currentTx != nil {
-		// Add tx to heap sorted by gasPrice
-		tx := m.currentTx
-		gasPrice, err := m.atomicTxGasPrice(tx)
-		if err == nil {
-			m.txHeap.Push(tx, gasPrice)
-		} else {
-			log.Error("failed to calculate atomic tx gas price while canceling current tx", "err", err)
-			m.utxoSet.Remove(tx.InputUTXOs().List()...)
-			m.discardedTxs.Put(tx.ID(), tx)
-		}
-		// If the err is not nil, we simply discard the transaction because it is
-		// invalid. This should never happen but we guard against the case it does.
-		m.currentTx = nil
+	for _, tx := range m.currentTxs {
+		m.cancelTx(tx)
 	}
 
 	// If there are more transactions to be issued, add an item
@@ -291,20 +294,52 @@ func (m *Mempool) CancelCurrentTx() {
 	}
 }
 
-// DiscardCurrentTx marks [currentTx] as invalid and aborts the attempt
+// cancelTx removes [tx] from current transactions and moves it back into the
+// tx heap.
+// assumes the lock is held.
+func (m *Mempool) cancelTx(tx *Tx) {
+	// Add tx to heap sorted by gasPrice
+	gasPrice, err := m.atomicTxGasPrice(tx)
+	if err == nil {
+		m.txHeap.Push(tx, gasPrice)
+	} else {
+		// If the err is not nil, we simply discard the transaction because it is
+		// invalid. This should never happen but we guard against the case it does.
+		log.Error("failed to calculate atomic tx gas price while canceling current tx", "err", err)
+		m.utxoSet.Remove(tx.InputUTXOs().List()...)
+		m.discardedTxs.Put(tx.ID(), tx)
+	}
+
+	delete(m.currentTxs, tx.ID())
+}
+
+// DiscardCurrentTx marks a [tx] in the [currentTxs] map as invalid and aborts the attempt
 // to issue it since it failed verification.
-// Adding to Pending should be handled by CancelCurrentTx in this case.
-func (m *Mempool) DiscardCurrentTx() {
+func (m *Mempool) DiscardCurrentTx(txID ids.ID) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	if m.currentTx == nil {
-		return
+	if tx, ok := m.currentTxs[txID]; ok {
+		m.discardCurrentTx(tx)
 	}
+}
 
-	m.utxoSet.Remove(m.currentTx.InputUTXOs().List()...)
-	m.discardedTxs.Put(m.currentTx.ID(), m.currentTx)
-	m.currentTx = nil
+// DiscardCurrentTxs marks all txs in [currentTxs] as discarded.
+func (m *Mempool) DiscardCurrentTxs() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	for _, tx := range m.currentTxs {
+		m.discardCurrentTx(tx)
+	}
+}
+
+// discardCurrentTx discards [tx] from the set of current transactions.
+// Assumes the lock is held.
+func (m *Mempool) discardCurrentTx(tx *Tx) {
+	m.utxoSet.Remove(tx.InputUTXOs().List()...)
+	m.discardedTxs.Put(tx.ID(), tx)
+	delete(m.currentTxs, tx.ID())
 }
 
 // RemoveTx removes [txID] from the mempool completely.
@@ -313,9 +348,9 @@ func (m *Mempool) RemoveTx(txID ids.ID) {
 	defer m.lock.Unlock()
 
 	var removedTx *Tx
-	if m.currentTx != nil && m.currentTx.ID() == txID {
-		removedTx = m.currentTx
-		m.currentTx = nil
+	if tx, ok := m.currentTxs[txID]; ok {
+		removedTx = tx
+		delete(m.currentTxs, txID)
 	}
 	if tx, ok := m.txHeap.Get(txID); ok {
 		removedTx = tx
