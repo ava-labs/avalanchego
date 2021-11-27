@@ -242,16 +242,6 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	return vm.conflicts(tx.InputUTXOs(), parent)
 }
 
-// Returns the atomic operations this TX represents
-func (tx *UnsignedImportTx) AtomicOps() (map[ids.ID]*atomic.Requests, error) {
-	utxoIDs := make([][]byte, len(tx.ImportedInputs))
-	for i, in := range tx.ImportedInputs {
-		inputID := in.InputID()
-		utxoIDs[i] = inputID[:]
-	}
-	return map[ids.ID]*atomic.Requests{tx.SourceChain: {RemoveRequests: utxoIDs}}, nil
-}
-
 // Accept this transaction and spend imported inputs
 // We spend imported UTXOs here rather than in semanticVerify because
 // we don't want to remove an imported UTXO in semanticVerify

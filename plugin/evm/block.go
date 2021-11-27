@@ -166,6 +166,7 @@ func (b *Block) Accept() error {
 	if err != nil {
 		return err
 	}
+	// hash will be empty on heights that are not divisible by atomicTrie.commitInterval
 	if hash != (common.Hash{}) {
 		log.Info("atomic trie was committed", "hash", hash, "height", b.Height())
 	}

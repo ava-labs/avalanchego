@@ -262,8 +262,6 @@ func (tx *UnsignedExportTx) Accept() (ids.ID, *atomic.Requests, error) {
 
 		elems[i] = elem
 	}
-	return map[ids.ID]*atomic.Requests{tx.DestinationChain: {PutRequests: elems}}, nil
-}
 
 	return tx.DestinationChain, &atomic.Requests{PutRequests: elems}, nil
 }

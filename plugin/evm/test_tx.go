@@ -6,15 +6,18 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/params"
 )
 
 type TestTx struct {
 	GasUsedV          uint64
-	AcceptRequestsV   *atomic.Requests
+	AcceptRequestsV   *atomic.Requests `serialize:"true"`
 	VerifyV           error
 	IDV               ids.ID `serialize:"true" json:"id"`
 	BurnedV           uint64
@@ -23,7 +26,6 @@ type TestTx struct {
 	InputUTXOsV       ids.Set
 	SemanticVerifyV   error
 	EVMStateTransferV error
-	AtomicOpsV        map[ids.ID]*atomic.Requests
 }
 
 var _ UnsignedAtomicTx = &TestTx{}
@@ -62,10 +64,23 @@ func (t *TestTx) SemanticVerify(vm *VM, stx *Tx, parent *Block, baseFee *big.Int
 	return t.SemanticVerifyV
 }
 
-// AtomicOps implements the UnsignedAtomicTx interface
-func (t *TestTx) AtomicOps() (map[ids.ID]*atomic.Requests, error) { return t.AtomicOpsV, nil }
-
 // EVMStateTransfer implements the UnsignedAtomicTx interface
 func (t *TestTx) EVMStateTransfer(ctx *snow.Context, state *state.StateDB) error {
 	return t.EVMStateTransferV
+}
+
+func testTxCodec() codec.Manager {
+	codec := codec.NewDefaultManager()
+	c := linearcodec.NewDefault()
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		c.RegisterType(&TestTx{}),
+		codec.RegisterCodec(codecVersion, c),
+	)
+
+	if errs.Errored() {
+		panic(errs.Err)
+	}
+	return codec
 }

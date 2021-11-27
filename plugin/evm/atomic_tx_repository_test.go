@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	"github.com/stretchr/testify/assert"
@@ -17,22 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 )
-
-func prepareCodecForTest() codec.Manager {
-	codec := codec.NewDefaultManager()
-	c := linearcodec.NewDefault()
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		c.RegisterType(&TestTx{}),
-		codec.RegisterCodec(codecVersion, c),
-	)
-
-	if errs.Errored() {
-		panic(errs.Err)
-	}
-	return codec
-}
 
 func newTestTx() (ids.ID, *Tx) {
 	id := ids.GenerateTestID()
@@ -89,12 +72,19 @@ func verifyTxs(t *testing.T, repo AtomicTxRepository, txMap map[uint64][]*Tx) {
 	}
 }
 
-// Tests simple Initialize behaviour from the atomic repository
-// based on a pre-populated txID=height+txbytes entries in the
-// acceptedAtomicTxDB database
+func TestAtomicRepositoryReadWrite(t *testing.T) {
+	db := memdb.New()
+	codec := testTxCodec()
+	repo := NewAtomicTxRepository(db, codec)
+	txMap := make(map[uint64][]*Tx)
+
+	writeTxs(repo, 0, 100, 1, txMap)
+	verifyTxs(t, repo, txMap)
+}
+
 func TestAtomicRepositoryInitialize(t *testing.T) {
 	db := memdb.New()
-	codec := prepareCodecForTest()
+	codec := testTxCodec()
 
 	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
 	txMap := make(map[uint64][]*Tx)
@@ -117,7 +107,7 @@ func TestAtomicRepositoryInitialize(t *testing.T) {
 // given block
 func TestAtomicRepositoryInitializeHandlesMultipleAtomicTxs(t *testing.T) {
 	db := memdb.New()
-	codec := prepareCodecForTest()
+	codec := testTxCodec()
 
 	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
 	heightTxIDMap := make(map[uint64][]ids.ID, 175)
@@ -189,7 +179,7 @@ func TestAtomicRepositoryInitializeHandlesMultipleAtomicTxs(t *testing.T) {
 // given block
 func TestAtomicRepositoryInitializeHandlesMultipleAtomicTxs_Bench(t *testing.T) {
 	db := memdb.New()
-	codec := prepareCodecForTest()
+	codec := testTxCodec()
 
 	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
 	heightTxIDMap := make(map[uint64][]ids.ID, 175)

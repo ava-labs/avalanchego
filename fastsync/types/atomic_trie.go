@@ -1,3 +1,5 @@
+// (c) 2020-2021, Ava Labs, Inc.
+// See the file LICENSE for licensing terms.
 package types
 
 import (
@@ -7,8 +9,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-// AtomicTrie defines an index containing the atomic operations
-// in a syncable trie format
+// TODO: replace [K] with actual, improve wording
+// AtomicTrie maintains a merkle forest with one trie root for each of the most recent
+// K commitInterval blocks. Each trie represents a commitment to atomic txs processed
+// from genesis up to and including the block at the height the root represents.
+// Leaf keys represent height (stored as big endian bytes) and leaf values represent
+// the atomic txs accepted on the block of the corresponding height.
+// This trie is used to transport and verify the correctness of atomic txs during
+// fast sync.
 type AtomicTrie interface {
 	// Initialize initializes the AtomicTrie from the last indexed
 	// block to the last accepted block in the chain
@@ -37,8 +45,7 @@ type AtomicTrie interface {
 	Root(height uint64) (common.Hash, error)
 }
 
-// AtomicTrieIterator defines a stateful iterator that iterates
-// the AtomicTrie
+// AtomicTrieIterator is a stateful iterator that iterates leafs of an AtomicTrie
 type AtomicTrieIterator interface {
 	// Next returns the next node in the atomic trie that is being iterated
 	Next() bool
@@ -50,5 +57,5 @@ type AtomicTrieIterator interface {
 	AtomicOps() map[ids.ID]*atomic.Requests
 
 	// Errors returns list of errors, if any
-	Errors() []error
+	Error() error
 }

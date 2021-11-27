@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth/ethconfig"
+	fastSyncTypes "github.com/ava-labs/coreth/fastsync/types"
 	"github.com/ava-labs/coreth/metrics/prometheus"
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
@@ -191,6 +192,9 @@ type VM struct {
 	// - txID to accepted atomic tx
 	// - block height to list of atomic txs accepted on block at that height
 	atomicTxRepository AtomicTxRepository
+	// [atomicTrie] maintains a merkle forest of [height]=>[atomic txs].
+	//  Used to state sync clients.
+	atomicTrie fastSyncTypes.AtomicTrie
 
 	builder *blockBuilder
 
@@ -378,30 +382,8 @@ func (vm *VM) Initialize(
 	vm.chain = ethChain
 	lastAccepted := vm.chain.LastAcceptedBlock()
 
-	vm.atomicTxRepository = NewAtomicTxRepository(vm.db, vm.codec)
-	// TODO find and fill apricotPhase5Block
-	if err := vm.atomicTxRepository.Initialize(0); err != nil {
-		log.Error("failed to initialise atomic tx repository", "err", err)
-		return err
-	}
-	atomicIndexDB := Database{prefixdb.New(atomicIndexDBPrefix, vm.db)}
-	vm.atomicTrie, err = NewBlockingAtomicTrie(atomicIndexDB, vm.atomicTxRepository, vm.codec)
-	if err != nil {
-		return err
-	}
-
-	log.Info("initializing atomic trie", "lastAccepted", lastAccepted.NumberU64())
-	startTime := time.Now()
-	if err = vm.atomicTrie.Initialize(lastAccepted.NumberU64(), vm.db.Commit); err != nil {
-		log.Error("error initializing atomic trie locally", "time", time.Since(startTime), "err", err)
-		return err
-	}
-
-	err = vm.db.Commit()
-	if err != nil {
-		return err
-	}
-	log.Info("Atomic trie initialization complete", "time", time.Since(startTime))
+	// initialize [atomicTxRepository] and [atomicTrie]
+	vm.initializeAtomicTxIndexes()
 
 	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
 	vm.handleGasPriceUpdates()
@@ -470,6 +452,36 @@ func (vm *VM) Initialize(
 	}
 
 	return vm.fx.Initialize(vm)
+}
+
+func (vm *VM) initializeAtomicTxIndexes() error {
+	var err error
+	vm.atomicTxRepository = NewAtomicTxRepository(vm.db, vm.codec)
+	if err := vm.atomicTxRepository.Initialize(vm.db.Commit); err != nil {
+		log.Error("failed to initialise atomic tx repository", "err", err)
+		return err
+	}
+	atomicIndexDB := Database{prefixdb.New(atomicIndexDBPrefix, vm.db)}
+	vm.atomicTrie, err = NewBlockingAtomicTrie(atomicIndexDB, vm.atomicTxRepository, vm.codec)
+	if err != nil {
+		return err
+	}
+
+	lastAccepted := vm.chain.LastAcceptedBlock()
+	log.Info("initializing atomic trie", "lastAccepted", lastAccepted.NumberU64())
+	startTime := time.Now()
+	if err = vm.atomicTrie.Initialize(lastAccepted.NumberU64(), vm.db.Commit); err != nil {
+		log.Error("error initializing atomic trie locally", "time", time.Since(startTime), "err", err)
+		return err
+	}
+
+	// TODO: is this necessary?
+	err = vm.db.Commit()
+	if err != nil {
+		return err
+	}
+	log.Info("atomic trie initialization complete", "time", time.Since(startTime))
+	return nil
 }
 
 func (vm *VM) createConsensusCallbacks() *dummy.ConsensusCallbacks {
