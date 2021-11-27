@@ -1,7 +1,6 @@
 package evm
 
 import (
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -22,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -52,7 +50,7 @@ func (t *TestAtomicTx) Bytes() []byte {
 	return b
 }
 
-func (t *TestAtomicTx) GasUsed() (uint64, error) {
+func (t *TestAtomicTx) GasUsed(fixedFee bool) (uint64, error) {
 	panic("implement me")
 }
 
@@ -64,7 +62,7 @@ func (t *TestAtomicTx) InputUTXOs() ids.Set {
 	panic("implement me")
 }
 
-func (t *TestAtomicTx) Verify(xChainID ids.ID, ctx *snow.Context, rules params.Rules) error {
+func (t *TestAtomicTx) Verify(ctx *snow.Context, rules params.Rules) error {
 	panic("implement me")
 }
 
@@ -72,12 +70,8 @@ func (t *TestAtomicTx) SemanticVerify(vm *VM, stx *Tx, parent *Block, baseFee *b
 	panic("implement me")
 }
 
-func (t *TestAtomicTx) AtomicOps() (map[ids.ID]*atomic.Requests, error) {
-	return map[ids.ID]*atomic.Requests{t.BlockchainID: t.AtomicRequest}, nil
-}
-
-func (t *TestAtomicTx) Accept(ctx *snow.Context, batch database.Batch) error {
-	panic("implement me")
+func (t *TestAtomicTx) Accept() (ids.ID, *atomic.Requests, error) {
+	return t.BlockchainID, t.AtomicRequest, nil
 }
 
 func (t *TestAtomicTx) EVMStateTransfer(ctx *snow.Context, state *state.StateDB) error {
@@ -128,11 +122,11 @@ func testDataExportTx() *Tx {
 }
 
 func (tx *Tx) mustAtomicOps() map[ids.ID]*atomic.Requests {
-	ops, err := tx.AtomicOps()
+	id, reqs, err := tx.Accept()
 	if err != nil {
 		panic(err)
 	}
-	return ops
+	return map[ids.ID]*atomic.Requests{id: reqs}
 }
 
 func testCodec() codec.Manager {
@@ -154,18 +148,17 @@ func Test_nearestCommitHeight(t *testing.T) {
 	blockNumber := uint64(7029687)
 	height := nearestCommitHeight(blockNumber, 4096)
 	assert.Less(t, blockNumber, height+4096)
-	fmt.Println(height)
 }
 
 func Test_BlockingAtomicTrie_InitializeGenesis(t *testing.T) {
 	db := memdb.New()
-	repo := newAtomicTxRepository(db, testCodec())
+	repo := NewAtomicTxRepository(db, testCodec())
 	tx := testDataImportTx()
 	err := repo.Write(0, []*Tx{tx})
 	assert.NoError(t, err)
 
 	atomicTrieDB := memorydb.New()
-	atomicTrie, err := NewBlockingAtomicTrie(atomicTrieDB, repo)
+	atomicTrie, err := NewBlockingAtomicTrie(atomicTrieDB, repo, testCodec())
 	assert.NoError(t, err)
 	atomicTrie.(*blockingAtomicTrie).commitHeightInterval = 10
 	dbCommitFn := func() error {
@@ -181,14 +174,14 @@ func Test_BlockingAtomicTrie_InitializeGenesis(t *testing.T) {
 
 func Test_BlockingAtomicTrie_InitializeGenesisPlusOne(t *testing.T) {
 	db := memdb.New()
-	repo := newAtomicTxRepository(db, testCodec())
+	repo := NewAtomicTxRepository(db, testCodec())
 	err := repo.Write(0, []*Tx{testDataImportTx()})
 	assert.NoError(t, err)
 	err = repo.Write(1, []*Tx{testDataImportTx()})
 	assert.NoError(t, err)
 
 	atomicTrieDB := memorydb.New()
-	atomicTrie, err := NewBlockingAtomicTrie(atomicTrieDB, repo)
+	atomicTrie, err := NewBlockingAtomicTrie(atomicTrieDB, repo, testCodec())
 	assert.NoError(t, err)
 	atomicTrie.(*blockingAtomicTrie).commitHeightInterval = 10
 	dbCommitFn := func() error {
@@ -204,7 +197,7 @@ func Test_BlockingAtomicTrie_InitializeGenesisPlusOne(t *testing.T) {
 
 func Test_BlockingAtomicTrie_Initialize(t *testing.T) {
 	db := memdb.New()
-	repo := newAtomicTxRepository(db, testCodec())
+	repo := NewAtomicTxRepository(db, testCodec())
 	// create state
 	lastAcceptedHeight := uint64(1000)
 	for i := uint64(0); i <= lastAcceptedHeight; i++ {
@@ -213,7 +206,7 @@ func Test_BlockingAtomicTrie_Initialize(t *testing.T) {
 	}
 
 	atomicTrieDB := memorydb.New()
-	atomicTrie, err := NewBlockingAtomicTrie(atomicTrieDB, repo)
+	atomicTrie, err := NewBlockingAtomicTrie(atomicTrieDB, repo, testCodec())
 	atomicTrie.(*blockingAtomicTrie).commitHeightInterval = 10
 	assert.NoError(t, err)
 	dbCommitFn := func() error {
@@ -228,7 +221,7 @@ func Test_BlockingAtomicTrie_Initialize(t *testing.T) {
 	assert.NotEqual(t, common.Hash{}, lastCommittedHash)
 	assert.EqualValues(t, 1000, lastCommittedHeight, "expected %d but was %d", 1000, lastCommittedHeight)
 
-	atomicTrie, err = NewBlockingAtomicTrie(atomicTrieDB, repo)
+	atomicTrie, err = NewBlockingAtomicTrie(atomicTrieDB, repo, testCodec())
 	assert.NoError(t, err)
 	iterator, err := atomicTrie.Iterator(lastCommittedHash)
 	assert.NoError(t, err)
@@ -244,8 +237,8 @@ func Test_BlockingAtomicTrie_Initialize(t *testing.T) {
 
 func newTestAtomicTrieIndexer(t *testing.T) types.AtomicTrie {
 	db := memdb.New()
-	repo := newAtomicTxRepository(db, Codec)
-	indexer, err := NewBlockingAtomicTrie(Database{db}, repo)
+	repo := NewAtomicTxRepository(db, Codec)
+	indexer, err := NewBlockingAtomicTrie(Database{db}, repo, testCodec())
 	assert.NoError(t, err)
 	assert.NotNil(t, indexer)
 
