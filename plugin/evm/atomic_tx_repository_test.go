@@ -5,6 +5,7 @@ package evm
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 
@@ -19,7 +20,7 @@ import (
 
 func newTestTx() (ids.ID, *Tx) {
 	id := ids.GenerateTestID()
-	return id, &Tx{UnsignedAtomicTx: &TestTx{IDV: id}}
+	return id, &Tx{UnsignedAtomicTx: &TestTx{IDV: id, AcceptRequestsV: &atomic.Requests{}}}
 }
 
 // Tests simple writing and reading behaviour from atomic repository
@@ -42,14 +43,15 @@ func TestAtomicRepositoryReadWrite(t *testing.T) {
 
 // writeTxs writes [txPerHeight] txs for heights ranging in [fromHeight] to [toHeight] through the Write call on [repo],
 // storing the results in [txMap] for verifying by verifyTxs
-func writeTxs(repo AtomicTxRepository, fromHeight uint64, toHeight uint64, txPerHeight int, txMap map[uint64][]*Tx) {
+func writeTxs(t *testing.T, repo AtomicTxRepository, fromHeight uint64, toHeight uint64, txPerHeight int, txMap map[uint64][]*Tx) {
 	for height := fromHeight; height < toHeight; height++ {
 		txs := make([]*Tx, 0)
 		for i := 0; i < txPerHeight; i++ {
 			_, tx := newTestTx()
 			txs = append(txs, tx)
 		}
-		repo.Write(height, txs)
+		err := repo.Write(height, txs)
+		assert.NoError(t, err)
 		// save this to the map for verifying expected results in verifyTxs
 		txMap[height] = txs
 	}
@@ -78,7 +80,7 @@ func TestAtomicRepositoryReadWrite(t *testing.T) {
 	repo := NewAtomicTxRepository(db, codec)
 	txMap := make(map[uint64][]*Tx)
 
-	writeTxs(repo, 0, 100, 1, txMap)
+	writeTxs(t, repo, 0, 100, 1, txMap)
 	verifyTxs(t, repo, txMap)
 }
 
