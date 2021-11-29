@@ -812,14 +812,13 @@ func (t *Transitive) removeFromPending(blk snowman.Block) {
 }
 
 func (t *Transitive) addToNonVerifieds(blk snowman.Block) {
-	// don't add this blk if it's decided or processing
-	// this should not be happening, but just in case.
+	// don't add this blk if it's decided or processing.
 	if t.Consensus.DecidedOrProcessing(blk) {
 		return
 	}
 	parentID := blk.Parent()
-	// we might still need that one, so we can bubble vote to parent through this block
-	// only add blocks with parent already in tree or processing.
+	// we might still need this block so we can bubble votes to the parent
+	// only add blocks with parent already in the tree or processing.
 	// decided parents should not be in this map.
 	if t.nonVerifieds.Has(parentID) || t.parentProcessing(blk) {
 		t.nonVerifieds.Add(blk.ID(), parentID)
