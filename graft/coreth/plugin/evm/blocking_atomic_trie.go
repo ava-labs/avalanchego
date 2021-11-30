@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/database"
+
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/rlp"
 
@@ -48,15 +50,15 @@ type blockingAtomicTrie struct {
 
 func NewBlockingAtomicTrie(db ethdb.KeyValueStore, repo AtomicTxRepository, codec codec.Manager) (types.AtomicTrie, error) {
 	var root common.Hash
-	exists, err := db.Has(lastCommittedKey)
-	if err != nil {
+	// read the last committed entry if exists and set root hash
+	lastCommittedHeightBytes, err := db.Get(lastCommittedKey)
+	if err != nil && err.Error() != database.ErrNotFound.Error() { // err type does not match database.ErrorNotFound so have to check `.Error()` instead
 		return nil, err
-	}
-	if exists {
-		// read the last committed entry if exists and set root hash
-		lastCommittedHeightBytes, err := db.Get(lastCommittedKey)
-		if err != nil {
-			return nil, err
+	} else if err == nil || err.Error() != database.ErrNotFound.Error() {
+		// entry is present, check length
+		lastCommittedHeightBytesLen := len(lastCommittedHeightBytes)
+		if lastCommittedHeightBytesLen != wrappers.LongLen {
+			return nil, fmt.Errorf("expected value of lastCommittedKey to be %d but was %d", wrappers.LongLen, lastCommittedHeightBytesLen)
 		}
 		hash, err := db.Get(lastCommittedHeightBytes)
 		if err != nil {
@@ -230,12 +232,11 @@ func (b *blockingAtomicTrie) index(height uint64, atomicOps map[ids.ID]*atomic.R
 	return b.updateTrie(atomicOps, height)
 }
 
+// commit commits the underlying trie generating a trie root hash
+// assumes that the caller is aware of the commit rules i.e. the height being within commitInterval
+// returns the trie root from the commit + optional error
 func (b *blockingAtomicTrie) commit(height uint64) (common.Hash, error) {
 	l := log.New("func", "indexedAtomicTrie.index", "height", height)
-	if height%b.commitHeightInterval != 0 {
-		return common.Hash{}, fmt.Errorf("atomic tx trie commit height must be divisable by %d (got %d)", b.commitHeightInterval, height)
-	}
-
 	hash, err := b.commitTrie()
 	if err != nil {
 		return common.Hash{}, err
