@@ -28,7 +28,8 @@ const (
 )
 
 var (
-	lastCommittedKey = []byte("LastCommittedBlock")
+	lastCommittedKey         = []byte("LastCommittedBlock")
+	atomicTrieInitializedKey = []byte("atomicTrieInitialized")
 )
 
 type AtomicReqs map[ids.ID]*atomic.Requests
@@ -116,6 +117,27 @@ func nearestCommitHeight(blockNumber uint64, commitInterval uint64) uint64 {
 }
 
 func (b *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error) error {
+	initialized := false
+	initializedBytes, err := b.db.Get(atomicTrieInitializedKey)
+	if err != nil && err.Error() != database.ErrNotFound.Error() {
+		return err
+	} else if err == nil || err.Error() != database.ErrNotFound.Error() {
+		initializedBytesLen := len(initializedBytes)
+		if initializedBytesLen != wrappers.BoolLen {
+			return fmt.Errorf("expected atomicTrieInitialized value to be %d bytes long but was %d", wrappers.BoolLen, initializedBytesLen)
+		}
+
+		// based on packer UnpackBool implementation
+		if initializedBytes[0] == 1 {
+			initialized = true
+		}
+	}
+
+	if initialized {
+		log.Info("atomic trie is already initialized")
+		return nil
+	}
+
 	commitHeight := nearestCommitHeight(lastAcceptedBlockNumber, b.commitHeightInterval)
 	uncommittedOpsMap := make(map[uint64]map[ids.ID]*atomic.Requests, lastAcceptedBlockNumber-commitHeight)
 
@@ -199,6 +221,11 @@ func (b *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommit
 			return err
 		}
 		log.Info("committed trie", "hash", hash, "height", lastAcceptedBlockNumber)
+	}
+
+	initializedBytes = []byte{1}
+	if err = b.db.Put(atomicTrieInitializedKey, initializedBytes); err != nil {
+		return err
 	}
 
 	if dbCommitFn != nil {
