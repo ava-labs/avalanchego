@@ -383,7 +383,9 @@ func (vm *VM) Initialize(
 	lastAccepted := vm.chain.LastAcceptedBlock()
 
 	// initialize [atomicTxRepository] and [atomicTrie]
-	vm.initializeAtomicTxIndexes()
+	if err = vm.initializeAtomicTxIndexes(); err != nil {
+		return err
+	}
 
 	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
 	vm.handleGasPriceUpdates()
@@ -475,11 +477,6 @@ func (vm *VM) initializeAtomicTxIndexes() error {
 		return err
 	}
 
-	// TODO: is this necessary?
-	err = vm.db.Commit()
-	if err != nil {
-		return err
-	}
 	log.Info("atomic trie initialization complete", "time", time.Since(startTime))
 	return nil
 }
