@@ -27,11 +27,8 @@ func NewAtomicTrieIterator(trieIterator *trie.Iterator) types.AtomicTrieIterator
 	return &atomicTrieIterator{trieIterator: trieIterator}
 }
 
-// Errors returns a list of errors, if any encountered so far
+// Error returns error, if any encountered during this iteration
 func (a *atomicTrieIterator) Error() error {
-	if err := a.trieIterator.Err; err != nil {
-		return err
-	}
 	return a.err
 }
 
@@ -41,7 +38,7 @@ func (a *atomicTrieIterator) Error() error {
 func (a *atomicTrieIterator) Next() bool {
 	hasNext := a.trieIterator.Next()
 	// if the underlying iterator has data to iterate over, parse and set the fields
-	if hasNext {
+	if err := a.trieIterator.Err; err == nil && hasNext {
 		// key is [blockNumberBytes]+[blockchainIDBytes]
 		blockNumber := binary.BigEndian.Uint64(a.trieIterator.Key[:wrappers.LongLen])
 		blockchainID, err := ids.ToID(a.trieIterator.Key[wrappers.LongLen:])
@@ -62,6 +59,9 @@ func (a *atomicTrieIterator) Next() bool {
 		// update the struct fields
 		a.blockNumber = blockNumber
 		a.atomicOps = map[ids.ID]*atomic.Requests{blockchainID: &requests}
+	} else if err != nil {
+		a.err = err
+		a.resetFields()
 	} else {
 		a.resetFields()
 	}
