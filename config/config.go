@@ -434,9 +434,43 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 		}
 		nodeID, err := ids.ShortFromPrefixedString(id, constants.NodeIDPrefix)
 		if err != nil {
-			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap peer id: %w", err)
+			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap peer id %s: %w", id, err)
 		}
 		config.BootstrapIDs = append(config.BootstrapIDs, nodeID)
+	}
+	return config, nil
+}
+
+func getStateSyncConfig(v *viper.Viper, networkID uint32) (node.StateSyncConfig, error) {
+	config := node.StateSyncConfig{}
+	var stateSyncIPs, stateSyncIDs []string
+
+	if v.IsSet(StateSyncIPsKey) {
+		stateSyncIPs = strings.Split(v.GetString(StateSyncIPsKey), ",")
+	}
+	for _, ip := range stateSyncIPs {
+		if ip == "" {
+			continue
+		}
+		addr, err := utils.ToIPDesc(ip)
+		if err != nil {
+			return node.StateSyncConfig{}, fmt.Errorf("couldn't parse state sync ip %s: %w", ip, err)
+		}
+		config.StateSyncIPs = append(config.StateSyncIPs, addr)
+	}
+
+	if v.IsSet(StateSyncIDsKey) {
+		stateSyncIDs = strings.Split(v.GetString(StateSyncIDsKey), ",")
+	}
+	for _, id := range stateSyncIDs {
+		if id == "" {
+			continue
+		}
+		nodeID, err := ids.ShortFromPrefixedString(id, constants.NodeIDPrefix)
+		if err != nil {
+			return node.StateSyncConfig{}, fmt.Errorf("couldn't parse state sync peer id %s: %w", id, err)
+		}
+		config.StateSyncIDs = append(config.StateSyncIDs, nodeID)
 	}
 	return config, nil
 }
@@ -937,6 +971,12 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 
 	// Bootstrap Configs
 	nodeConfig.BootstrapConfig, err = getBootstrapConfig(v, nodeConfig.NetworkID)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	// StateSync Configs
+	nodeConfig.StateSyncConfig, err = getStateSyncConfig(v, nodeConfig.NetworkID)
 	if err != nil {
 		return node.Config{}, err
 	}

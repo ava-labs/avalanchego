@@ -174,6 +174,9 @@ type ManagerConfig struct {
 
 	ApricotPhase4Time            time.Time
 	ApricotPhase4MinPChainHeight uint64
+
+	// State sync
+	StateSyncValidators validators.Set
 }
 
 type manager struct {
@@ -416,6 +419,10 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	if chainParams.CustomBeacons != nil {
 		beacons = chainParams.CustomBeacons
 	}
+	stateSyncValidators := vdrs
+	if m.StateSyncValidators != nil {
+		stateSyncValidators = m.StateSyncValidators
+	}
 
 	bootstrapWeight := beacons.Weight()
 
@@ -442,6 +449,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			chainParams.GenesisData,
 			vdrs,
 			beacons,
+			stateSyncValidators,
 			vm,
 			fxs,
 			consensusParams.Parameters,
@@ -668,7 +676,8 @@ func (m *manager) createSnowmanChain(
 	ctx *snow.ConsensusContext,
 	genesisData []byte,
 	vdrs,
-	beacons validators.Set,
+	beacons,
+	stateSyncValidators validators.Set,
 	vm block.ChainVM,
 	fxs []*common.Fx,
 	consensusParams snowball.Parameters,
@@ -797,13 +806,24 @@ func (m *manager) createSnowmanChain(
 		SharedCfg:                     &common.SharedConfig{},
 	}
 
+	// create a config for state sync
+	stateSyncWeight := stateSyncValidators.Weight()
+	stateSyncConfig := commonCfg // make a copy
+	stateSyncConfig.Beacons = stateSyncValidators
+	stateSyncConfig.Alpha = stateSyncWeight/2 + 1
+	stateSyncConfig.StartupAlpha = (3*stateSyncWeight + 3) / 4
+	if stateSyncConfig.SampleK > int(stateSyncWeight) {
+		stateSyncConfig.SampleK = int(stateSyncWeight)
+	}
+
+	stateSyncGearStarter := common.NewGearStarter(stateSyncValidators, stateSyncConfig.StartupAlpha)
 	gearStarter := common.NewGearStarter(beacons, commonCfg.StartupAlpha)
 
 	// create fast sync gear
 	fastSyncCfg := fastsyncer.Config{
-		Config:  commonCfg,
+		Config:  stateSyncConfig,
 		VM:      vm,
-		Starter: gearStarter,
+		Starter: stateSyncGearStarter,
 	}
 	fastSync := fastsyncer.NewFastSyncer(
 		fastSyncCfg,

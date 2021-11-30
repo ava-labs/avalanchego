@@ -110,6 +110,11 @@ type BootstrapConfig struct {
 	BootstrapIPs []utils.IPDesc `json:"bootstrapIPs"`
 }
 
+type StateSyncConfig struct {
+	StateSyncIDs []ids.ShortID  `json:"stateSyncIDs"`
+	StateSyncIPs []utils.IPDesc `json:"stateSyncIPs"`
+}
+
 type DatabaseConfig struct {
 	// Path to database
 	Path string `json:"path"`
@@ -128,6 +133,7 @@ type Config struct {
 	StakingConfig       `json:"stakingConfig"`
 	genesis.TxFeeConfig `json:"txFeeConfig"`
 	BootstrapConfig     `json:"bootstrapConfig"`
+	StateSyncConfig     `json:"stateSyncConfig"`
 	DatabaseConfig      `json:"databaseConfig"`
 
 	// Genesis information
