@@ -220,3 +220,50 @@ func Test_IndexerInitializeFromState(t *testing.T) {
 	assert.Equal(t, uint64(testCommitInterval)*2, height)
 	assert.NotEqual(t, common.Hash{}, hash)
 }
+
+func Test_IndexerInitializesOnlyOnce(t *testing.T) {
+	db := memdb.New()
+	repo := NewAtomicTxRepository(db, testTxCodec())
+	height := uint64(100)
+	for i := uint64(0); i < height; i++ {
+		err := repo.Write(i, []*Tx{testDataImportTx(), testDataExportTx()})
+		assert.NoError(t, err)
+	}
+
+	// initialize atomic repository
+	indexer, err := NewBlockingAtomicTrie(Database{db}, repo, testTxCodec())
+	assert.NoError(t, err)
+	{
+		indexer.(*blockingAtomicTrie).commitHeightInterval = testCommitInterval
+	}
+
+	err = indexer.Initialize(height, nil)
+	assert.NoError(t, err)
+
+	hash, height := indexer.LastCommitted()
+	assert.NoError(t, err)
+	assert.NotEqual(t, common.Hash{}, hash)
+	assert.Equal(t, uint64(100), height)
+
+	// the following scenario is not realistic but is there to test double initialize behaviour
+	err = repo.Write(101, []*Tx{testDataExportTx()})
+	assert.NoError(t, err)
+
+	// we wrote another tx at new height in the repo and we then re-initialise the atomic trie
+	// since initialize is not supposed to run again the height at the trie will still be the
+	// old height with the old commit hash without any changes
+
+	// initialize atomic repository again
+	indexer, err = NewBlockingAtomicTrie(Database{db}, repo, testTxCodec())
+	assert.NoError(t, err)
+	{
+		indexer.(*blockingAtomicTrie).commitHeightInterval = testCommitInterval
+	}
+	err = indexer.Initialize(101, nil)
+	assert.NoError(t, err)
+
+	newHash, height := indexer.LastCommitted()
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(100), height, "height should not have changed")
+	assert.Equal(t, hash, newHash, "hash should be the same")
+}
