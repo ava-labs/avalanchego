@@ -253,7 +253,7 @@ func Test_IndexerInitializesOnlyOnce(t *testing.T) {
 	// since initialize is not supposed to run again the height at the trie will still be the
 	// old height with the old commit hash without any changes
 
-	// initialize atomic repository again
+	// initialize atomic indexer again
 	indexer, err = NewBlockingAtomicTrie(Database{db}, repo, testTxCodec())
 	assert.NoError(t, err)
 	{
@@ -267,4 +267,57 @@ func Test_IndexerInitializesOnlyOnce(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(90), height, "height should not have changed")
 	assert.Equal(t, hash, newHash, "hash should be the same")
+}
+
+func Test_IndexerInitializeProducesSameHashEveryTime(t *testing.T) {
+	db := memdb.New()
+	repo := NewAtomicTxRepository(db, testTxCodec())
+	height := uint64(1000)
+	txsPerHeight := 30
+	for i := uint64(0); i < height; i++ {
+		txs := make([]*Tx, txsPerHeight)
+		for j := 0; j+1 < txsPerHeight; j += 2 {
+			txs[j] = testDataExportTx()
+			txs[j+1] = testDataImportTx()
+		}
+		err := repo.Write(i, txs)
+		assert.NoError(t, err)
+	}
+
+	// initialize atomic repository
+	indexer, err := NewBlockingAtomicTrie(Database{db}, repo, testTxCodec())
+	assert.NoError(t, err)
+	{
+		indexer.(*blockingAtomicTrie).commitHeightInterval = 90
+	}
+
+	err = indexer.Initialize(nil)
+	assert.NoError(t, err)
+
+	expectedCommitHeight := nearestCommitHeight(height, 90)
+	hash, indexerHeight := indexer.LastCommitted()
+	assert.NoError(t, err)
+	assert.NotEqual(t, common.Hash{}, hash)
+	assert.Equal(t, expectedCommitHeight, indexerHeight)
+
+	// we create another atomic trie, intializing it with the same dataset
+	initializeRuns := 50
+	for i := 0; i < initializeRuns; i++ {
+		// initialize atomic indexer again
+		indexer, err = NewBlockingAtomicTrie(Database{memdb.New()}, repo, testTxCodec())
+		assert.NoError(t, err)
+		{
+			indexer.(*blockingAtomicTrie).commitHeightInterval = 90
+		}
+
+		// run initialize
+		err = indexer.Initialize(nil)
+		assert.NoError(t, err)
+
+		// expects heights and hashes to be exactly the same
+		newHash, indexerHeight := indexer.LastCommitted()
+		assert.NoError(t, err)
+		assert.Equal(t, expectedCommitHeight, indexerHeight, "height should not have changed")
+		assert.Equal(t, hash, newHash, "hash should be the same")
+	}
 }
