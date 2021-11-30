@@ -205,6 +205,9 @@ func (b *blockingAtomicTrie) Initialize(dbCommitFn func() error) error {
 			}
 		}
 
+		// if height is greater than commit height, add it to the map so that we can write it later
+		// this is to ensure we have all the data before the commit height so that we can commit the
+		// trie
 		if height > commitHeight {
 			uncommittedOpsMap[height] = combinedOps
 		} else {
@@ -246,11 +249,12 @@ func (b *blockingAtomicTrie) Initialize(dbCommitFn func() error) error {
 
 	log.Info("committed trie", "hash", hash, "indexHeight", commitHeight)
 
-	// process uncommitted ops
+	// process uncommitted ops for heights > commitHeight
 	for height, ops := range uncommittedOpsMap {
 		if err = b.index(height, ops); err != nil {
 			return err
 		}
+
 		postCommitTxIndexed++
 		if time.Since(lastUpdate) > 30*time.Second {
 			log.Info("imported entries into atomic trie post-commit", "entriesIndexed", postCommitTxIndexed)
@@ -258,15 +262,17 @@ func (b *blockingAtomicTrie) Initialize(dbCommitFn func() error) error {
 		}
 	}
 
-	// check if its eligible to commit the trie
+	// check if its eligible to commit the trie now
 	if indexHeight%b.commitHeightInterval == 0 {
 		hash, err := b.commit(indexHeight)
 		if err != nil {
 			return err
 		}
+
 		log.Info("committed trie", "hash", hash, "indexHeight", indexHeight)
 	}
 
+	// set the initialized flag in the DB so that we can skip it next time
 	initializedBytes := []byte{1}
 	if err = b.db.Put(atomicTrieInitializedKey, initializedBytes); err != nil {
 		return err
@@ -279,7 +285,6 @@ func (b *blockingAtomicTrie) Initialize(dbCommitFn func() error) error {
 	}
 
 	log.Info("index initialised", "preCommitEntriesIndexed", preCommitBlockIndexed, "postCommitEntriesIndexed", postCommitTxIndexed)
-
 	return nil
 }
 
