@@ -164,6 +164,7 @@ func (b *blockingAtomicTrie) Initialize(dbCommitFn func() error) error {
 	commitHeight := nearestCommitHeight(indexHeight, b.commitHeightInterval)
 	uncommittedOpsMap := make(map[uint64]map[ids.ID]*atomic.Requests, indexHeight-commitHeight)
 
+	// we iterate by height, from 0 to the index height (highest indexed block containing atomic transaction)
 	iter := b.repo.IterateByHeight(nil)
 	defer iter.Release()
 
@@ -174,6 +175,11 @@ func (b *blockingAtomicTrie) Initialize(dbCommitFn func() error) error {
 		if err := iter.Error(); err != nil {
 			return err
 		}
+
+		// Get height for this iteration + transactions
+		// iterate over the transactions, indexing them if the height is < commit height
+		// otherwise we add the atomic operations from the transaction to the uncommittedOpsMap
+
 		height := binary.BigEndian.Uint64(iter.Key())
 		txs, err := ExtractAtomicTxs(iter.Value(), true, b.codec)
 		if err != nil {
