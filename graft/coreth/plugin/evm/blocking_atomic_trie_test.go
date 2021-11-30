@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 
@@ -18,52 +17,6 @@ import (
 )
 
 const testCommitInterval = 100
-
-func testDataImportTx() *Tx {
-	blockchainID := ids.GenerateTestID()
-	return &Tx{
-		UnsignedAtomicTx: &TestTx{
-			IDV: blockchainID,
-			AcceptRequestsV: &atomic.Requests{
-				PutRequests: []*atomic.Element{
-					{
-						Key:   utils.RandomBytes(16),
-						Value: utils.RandomBytes(24),
-						Traits: [][]byte{
-							utils.RandomBytes(32),
-							utils.RandomBytes(32),
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-func testDataExportTx() *Tx {
-	blockchainID := ids.GenerateTestID()
-	return &Tx{
-		UnsignedAtomicTx: &TestTx{
-			IDV: blockchainID,
-			AcceptRequestsV: &atomic.Requests{
-				PutRequests: []*atomic.Element{
-					{
-						Key:   utils.RandomBytes(16),
-						Value: utils.RandomBytes(24),
-						Traits: [][]byte{
-							utils.RandomBytes(32),
-							utils.RandomBytes(32),
-						},
-					},
-				},
-				RemoveRequests: [][]byte{
-					utils.RandomBytes(32),
-					utils.RandomBytes(32),
-				},
-			},
-		},
-	}
-}
 
 func (tx *Tx) mustAtomicOps() map[ids.ID]*atomic.Requests {
 	id, reqs, err := tx.Accept()
