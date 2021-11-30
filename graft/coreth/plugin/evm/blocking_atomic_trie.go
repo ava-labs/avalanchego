@@ -116,15 +116,15 @@ func nearestCommitHeight(blockNumber uint64, commitInterval uint64) uint64 {
 	return blockNumber - (blockNumber % commitInterval)
 }
 
-func (b *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error) error {
+func (b *blockingAtomicTrie) isInitialized() (bool, error) {
 	initialized := false
 	initializedBytes, err := b.db.Get(atomicTrieInitializedKey)
 	if err != nil && err.Error() != database.ErrNotFound.Error() {
-		return err
+		return false, err
 	} else if err == nil || err.Error() != database.ErrNotFound.Error() {
 		initializedBytesLen := len(initializedBytes)
 		if initializedBytesLen != wrappers.BoolLen {
-			return fmt.Errorf("expected atomicTrieInitialized value to be %d bytes long but was %d", wrappers.BoolLen, initializedBytesLen)
+			return false, fmt.Errorf("expected atomicTrieInitialized value to be %d bytes long but was %d", wrappers.BoolLen, initializedBytesLen)
 		}
 
 		// based on packer UnpackBool implementation
@@ -132,12 +132,24 @@ func (b *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommit
 			initialized = true
 		}
 	}
+	return initialized, nil
+}
 
-	if initialized {
+// Initialize initializes the atomic trie using the atomic repository height index iterating from the oldest to the
+// lastAcceptedBlockNumber making a single commit at the most recent height divisible by the commitInterval
+// Optionally returns an error
+// Initialize only ever runs once during a node's lifetime. Subsequent updates to this trie are made using the
+// Index call during evm.block.Accept().
+func (b *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error) error {
+	initialized, err := b.isInitialized()
+	if err != nil {
+		return err
+	} else if initialized {
 		log.Info("atomic trie is already initialized")
 		return nil
 	}
 
+	// commitHeight is the highest block that can be committed i.e. is divisible by b.commitHeightInterval
 	commitHeight := nearestCommitHeight(lastAcceptedBlockNumber, b.commitHeightInterval)
 	uncommittedOpsMap := make(map[uint64]map[ids.ID]*atomic.Requests, lastAcceptedBlockNumber-commitHeight)
 
@@ -223,7 +235,7 @@ func (b *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommit
 		log.Info("committed trie", "hash", hash, "height", lastAcceptedBlockNumber)
 	}
 
-	initializedBytes = []byte{1}
+	initializedBytes := []byte{1}
 	if err = b.db.Put(atomicTrieInitializedKey, initializedBytes); err != nil {
 		return err
 	}
