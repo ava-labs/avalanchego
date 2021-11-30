@@ -5,6 +5,7 @@ package evm
 
 import (
 	"encoding/binary"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
@@ -13,6 +14,9 @@ import (
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/rlp"
 )
+
+// this is there so that we don't have to hardcode the 32 length in case it changes
+var idLen = len(ids.ID{}) // should be 32
 
 // atomicTrieIterator is an implementation of types.AtomicTrieIterator that serves
 // parsed data with each iteration
@@ -39,7 +43,16 @@ func (a *atomicTrieIterator) Next() bool {
 	hasNext := a.trieIterator.Next()
 	// if the underlying iterator has data to iterate over, parse and set the fields
 	if err := a.trieIterator.Err; err == nil && hasNext {
-		// key is [blockNumberBytes]+[blockchainIDBytes]
+		// key is [blockNumberBytes]+[blockchainIDBytes] = 8+32=40 bytes
+		keyLen := len(a.trieIterator.Key)
+		if keyLen != wrappers.LongLen+idLen {
+			// unexpected key length
+			// set the error and stop the iteration as data is unreliable from this point
+			a.err = fmt.Errorf("expected atomic trie key length to be 40 but was %d", keyLen)
+			a.resetFields()
+			return false
+		}
+
 		blockNumber := binary.BigEndian.Uint64(a.trieIterator.Key[:wrappers.LongLen])
 		blockchainID, err := ids.ToID(a.trieIterator.Key[wrappers.LongLen:])
 		if err != nil {
