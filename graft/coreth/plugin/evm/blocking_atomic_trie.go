@@ -262,16 +262,6 @@ func (b *blockingAtomicTrie) Initialize(dbCommitFn func() error) error {
 		}
 	}
 
-	// check if its eligible to commit the trie now
-	if indexHeight%b.commitHeightInterval == 0 {
-		hash, err := b.commit(indexHeight)
-		if err != nil {
-			return err
-		}
-
-		log.Info("committed trie", "hash", hash, "indexHeight", indexHeight)
-	}
-
 	// set the initialized flag in the DB so that we can skip it next time
 	initializedBytes := []byte{1}
 	if err = b.db.Put(atomicTrieInitializedKey, initializedBytes); err != nil {
