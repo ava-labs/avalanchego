@@ -168,7 +168,7 @@ func (b *blockingAtomicTrie) Initialize(dbCommitFn func() error) error {
 	iter := b.repo.IterateByHeight(nil)
 	defer iter.Release()
 
-	preCommitTxIndexed := 0
+	preCommitBlockIndexed := 0
 	postCommitTxIndexed := 0
 	lastUpdate := time.Now()
 	for iter.Next() {
@@ -185,6 +185,9 @@ func (b *blockingAtomicTrie) Initialize(dbCommitFn func() error) error {
 		if err != nil {
 			return err
 		}
+
+		// combine all atomic operations across all transactions
+		combinedOps := make(map[ids.ID]*atomic.Requests)
 		for _, tx := range txs {
 			id, reqs, err := tx.Accept()
 			ops := map[ids.ID]*atomic.Requests{id: reqs}
@@ -192,17 +195,27 @@ func (b *blockingAtomicTrie) Initialize(dbCommitFn func() error) error {
 				return err
 			}
 
-			if height > commitHeight {
-				uncommittedOpsMap[height] = ops
-			} else {
-				if err = b.index(height, ops); err != nil {
-					return err
+			for chainID, ops := range ops {
+				if chainOps, exists := combinedOps[chainID]; exists {
+					chainOps.PutRequests = append(chainOps.PutRequests, ops.PutRequests...)
+					chainOps.RemoveRequests = append(chainOps.RemoveRequests, ops.RemoveRequests...)
+				} else {
+					combinedOps[id] = ops
 				}
-				preCommitTxIndexed++
 			}
 		}
+
+		if height > commitHeight {
+			uncommittedOpsMap[height] = combinedOps
+		} else {
+			if err = b.index(height, combinedOps); err != nil {
+				return err
+			}
+			preCommitBlockIndexed++
+		}
+
 		if time.Since(lastUpdate) > 30*time.Second {
-			log.Info("imported entries into atomic trie pre-commit", "entriesIndexed", preCommitTxIndexed)
+			log.Info("imported entries into atomic trie pre-commit", "heightsIndexed", preCommitBlockIndexed)
 			lastUpdate = time.Now()
 		}
 	}
@@ -265,7 +278,7 @@ func (b *blockingAtomicTrie) Initialize(dbCommitFn func() error) error {
 		}
 	}
 
-	log.Info("index initialised", "preCommitEntriesIndexed", preCommitTxIndexed, "postCommitEntriesIndexed", postCommitTxIndexed)
+	log.Info("index initialised", "preCommitEntriesIndexed", preCommitBlockIndexed, "postCommitEntriesIndexed", postCommitTxIndexed)
 
 	return nil
 }
