@@ -49,22 +49,9 @@ type blockingAtomicTrie struct {
 }
 
 func NewBlockingAtomicTrie(db ethdb.KeyValueStore, repo AtomicTxRepository, codec codec.Manager) (types.AtomicTrie, error) {
-	var root common.Hash
-	// read the last committed entry if exists and set root hash
-	lastCommittedHeightBytes, err := db.Get(lastCommittedKey)
-	if err != nil && err.Error() != database.ErrNotFound.Error() { // err type does not match database.ErrorNotFound so have to check `.Error()` instead
+	root, err := lastCommittedRootIfExists(db)
+	if err != nil {
 		return nil, err
-	} else if err == nil || err.Error() != database.ErrNotFound.Error() {
-		// entry is present, check length
-		lastCommittedHeightBytesLen := len(lastCommittedHeightBytes)
-		if lastCommittedHeightBytesLen != wrappers.LongLen {
-			return nil, fmt.Errorf("expected value of lastCommittedKey to be %d but was %d", wrappers.LongLen, lastCommittedHeightBytesLen)
-		}
-		hash, err := db.Get(lastCommittedHeightBytes)
-		if err != nil {
-			return nil, err
-		}
-		root = common.BytesToHash(hash)
 	}
 
 	triedb := trie.NewDatabase(db)
@@ -82,6 +69,31 @@ func NewBlockingAtomicTrie(db ethdb.KeyValueStore, repo AtomicTxRepository, code
 		repo:                 repo,
 		codec:                codec,
 	}, nil
+}
+
+// lastCommittedRootIfExists returns the last committed trie root if it exists
+// else returns empty common.Hash{}
+// returns optional error if there are issues with the underlying data store
+// or if values present in the database are not as expected
+func lastCommittedRootIfExists(db ethdb.KeyValueStore) (common.Hash, error) {
+	var root common.Hash
+	// read the last committed entry if exists and set root hash
+	lastCommittedHeightBytes, err := db.Get(lastCommittedKey)
+	if err != nil && err.Error() != database.ErrNotFound.Error() { // err type does not match database.ErrorNotFound so have to check `.Error()` instead
+		return common.Hash{}, err
+	} else if err == nil || err.Error() != database.ErrNotFound.Error() {
+		// entry is present, check length
+		lastCommittedHeightBytesLen := len(lastCommittedHeightBytes)
+		if lastCommittedHeightBytesLen != wrappers.LongLen {
+			return common.Hash{}, fmt.Errorf("expected value of lastCommittedKey to be %d but was %d", wrappers.LongLen, lastCommittedHeightBytesLen)
+		}
+		hash, err := db.Get(lastCommittedHeightBytes)
+		if err != nil {
+			return common.Hash{}, err
+		}
+		root = common.BytesToHash(hash)
+	}
+	return root, nil
 }
 
 // nearestCommitHeight given a block number calculates the nearest commit height such that the
