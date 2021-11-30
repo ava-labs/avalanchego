@@ -50,9 +50,9 @@ type ExternalHandler interface {
 
 type FastSyncHandler interface {
 	GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error
-	StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summary []byte) error
-	GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error
-	AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error
+	StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, key, summary []byte) error
+	GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error
+	AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error
 
 	GetAcceptedStateSummaryFailed(validatorID ids.ShortID, requestID uint32) error
 	GetStateSummaryFrontierFailed(validatorID ids.ShortID, requestID uint32) error

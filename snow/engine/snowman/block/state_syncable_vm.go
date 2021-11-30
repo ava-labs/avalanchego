@@ -11,11 +11,16 @@ import (
 
 var ErrStateSyncableVMNotImplemented = errors.New("vm does not implement StateSyncableVM interface")
 
+type Summary struct {
+	Key   []byte
+	State []byte
+}
+
 type StateSyncableVM interface {
 	// Enabled indicates whether the state sync is enabled for this VM
 	StateSyncEnabled() (bool, error)
-	// StateSummary returns latest StateSummary with an optional error
-	StateSyncGetLastSummary() ([]byte, error)
+	// StateSummary returns latest key and StateSummary with an optional error
+	StateSyncGetLastSummary() (Summary, error)
 	// IsAccepted returns true if input []bytes represent a valid state summary
 	// for fast sync.
 	StateSyncIsSummaryAccepted([]byte) (bool, error)
@@ -26,10 +31,10 @@ type StateSyncableVM interface {
 	// its state to that summary. Normal bootstrapping resumes after this
 	// function returns.
 	// Will be called with [nil] if no valid state summaries could be found.
-	StateSync([][]byte) error
+	StateSync([]Summary) error
 
 	// StateSyncLastAccepted returns the last accepted block, its height, and
 	// an optional error. This is called after the VM notifies the engine
 	// of the fast sync operation on the communication channel.
-	StateSyncLastAccepted() (ids.ID, uint64, error)
+	StateSyncLastAccepted() (ids.ID, uint64, error) // TODO ABENEGIA: remove and handle via notification
 }

@@ -16,35 +16,35 @@ func (vm *blockVM) StateSyncEnabled() (bool, error) {
 	return fsVM.StateSyncEnabled()
 }
 
-func (vm *blockVM) StateSyncGetLastSummary() ([]byte, error) {
+func (vm *blockVM) StateSyncGetLastSummary() (block.Summary, error) {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
-		return nil, block.ErrStateSyncableVMNotImplemented
+		return block.Summary{}, block.ErrStateSyncableVMNotImplemented
 	}
 
 	start := vm.clock.Time()
-	stateSummaryFrontier, err := fsVM.StateSyncGetLastSummary()
+	summary, err := fsVM.StateSyncGetLastSummary()
 	end := vm.clock.Time()
 	vm.stateSummaryMetrics.lastSummary.Observe(float64(end.Sub(start)))
 
-	return stateSummaryFrontier, err
+	return summary, err
 }
 
-func (vm *blockVM) StateSyncIsSummaryAccepted(summary []byte) (bool, error) {
+func (vm *blockVM) StateSyncIsSummaryAccepted(key []byte) (bool, error) {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
 		return false, block.ErrStateSyncableVMNotImplemented
 	}
 
 	start := vm.clock.Time()
-	accepted, err := fsVM.StateSyncIsSummaryAccepted(summary)
+	accepted, err := fsVM.StateSyncIsSummaryAccepted(key)
 	end := vm.clock.Time()
 	vm.stateSummaryMetrics.isSummaryAccepted.Observe(float64(end.Sub(start)))
 
 	return accepted, err
 }
 
-func (vm *blockVM) StateSync(accepted [][]byte) error {
+func (vm *blockVM) StateSync(accepted []block.Summary) error {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
 		return block.ErrStateSyncableVMNotImplemented

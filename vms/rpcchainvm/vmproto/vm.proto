@@ -2,6 +2,7 @@ syntax = "proto3";
 package vmproto;
 option go_package = "github.com/ava-labs/avalanchego/vms/rpcchainvm/vmproto";
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
 
 // import from https://github.com/prometheus/client_model/blob/master/io/prometheus/client/metrics.proto
 // requires "github.com/prometheus/client_model" for reuse in Go code
@@ -191,11 +192,12 @@ message StateSyncEnabledResponse {
 }
 
 message StateSyncGetLastSummaryResponse {
-    bytes summary = 1;
+    bytes key = 1;
+    bytes state = 2;
 }
 
 message StateSyncIsSummaryAcceptedRequest {
-    bytes summary = 1;
+    bytes key = 1;
 }
 
 message StateSyncIsSummaryAcceptedResponse {
@@ -203,7 +205,7 @@ message StateSyncIsSummaryAcceptedResponse {
 }
 
 message StateSyncRequest {
-    repeated bytes summaries = 1;
+    repeated StateSyncGetLastSummaryResponse summaries = 1;
 }
 
 message StateSyncLastAcceptedResponse {

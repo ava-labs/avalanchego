@@ -173,17 +173,17 @@ func (nop MsgHandlerNoOps) GetStateSummaryFrontier(validatorID ids.ShortID, requ
 	return nil
 }
 
-func (nop MsgHandlerNoOps) StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summary []byte) error {
+func (nop MsgHandlerNoOps) StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, key, summary []byte) error {
 	nop.ctx.Log.Debug("StateSummaryFrontier(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
 
-func (nop MsgHandlerNoOps) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error {
+func (nop MsgHandlerNoOps) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error {
 	nop.ctx.Log.Debug("GetAcceptedStateSummary(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
 
-func (nop MsgHandlerNoOps) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error {
+func (nop MsgHandlerNoOps) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error {
 	nop.ctx.Log.Debug("AcceptedStateSummary(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }

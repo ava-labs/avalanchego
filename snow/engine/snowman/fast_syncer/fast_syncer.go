@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
 )
 
@@ -66,11 +65,11 @@ type fastSyncer struct {
 	// Holds the beacons that were sampled for the accepted frontier
 	sampledBeacons validators.Set
 	// IDs of all the returned accepted frontiers
-	acceptedFrontierSet map[hashing.Hash256][]byte
+	acceptedFrontierSet map[string][]byte
 	// IDs of the returned accepted containers and the stake weight that has
 	// marked them as accepted
-	acceptedVotes    map[hashing.Hash256]uint64
-	acceptedFrontier [][]byte
+	acceptedVotes map[string]uint64
+	acceptedKeys  [][]byte
 
 	// True if RestartBootstrap has been called at least once
 	Restarted bool
@@ -184,7 +183,7 @@ func (fs *fastSyncer) startup() error {
 	}
 	fs.gR.ClearRequested(message.StateSummaryFrontier)
 	fs.gR.ClearFailed(message.StateSummaryFrontier)
-	fs.acceptedFrontierSet = make(map[hashing.Hash256][]byte)
+	fs.acceptedFrontierSet = make(map[string][]byte)
 
 	fs.gR.ClearToRequest(message.AcceptedStateSummary)
 	for _, vdr := range fs.Beacons.List() {
@@ -196,7 +195,7 @@ func (fs *fastSyncer) startup() error {
 
 	fs.gR.ClearRequested(message.AcceptedStateSummary)
 	fs.gR.ClearFailed(message.AcceptedStateSummary)
-	fs.acceptedVotes = make(map[hashing.Hash256]uint64)
+	fs.acceptedVotes = make(map[string]uint64)
 
 	fs.attempts++
 	if !fs.gR.HasToRequest(message.StateSummaryFrontier) {
@@ -242,22 +241,22 @@ func (fs *fastSyncer) sendGetAccepted() error {
 	if vdrs.Len() > 0 {
 		fs.Ctx.Log.Debug("sent %d more GetAccepted messages with %d more to send",
 			vdrs.Len(), fs.gR.CountRequested(message.AcceptedStateSummary))
-		fs.Sender.SendGetAcceptedStateSummary(vdrs, fs.RequestID, fs.acceptedFrontier)
+		fs.Sender.SendGetAcceptedStateSummary(vdrs, fs.RequestID, fs.acceptedKeys)
 	}
 
 	return nil
 }
 
 func (fs *fastSyncer) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error {
-	stateSummaryFrontier, err := fs.fastSyncVM.StateSyncGetLastSummary()
+	summary, err := fs.fastSyncVM.StateSyncGetLastSummary()
 	if err != nil {
 		return err
 	}
-	fs.Sender.SendStateSummaryFrontier(validatorID, requestID, stateSummaryFrontier)
+	fs.Sender.SendStateSummaryFrontier(validatorID, requestID, summary.Key, summary.State)
 	return nil
 }
 
-func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summary []byte) error {
+func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, key, summary []byte) error {
 	// ignores any late responses
 	if requestID != fs.RequestID {
 		fs.Ctx.Log.Debug("Received an Out-of-Sync AcceptedFrontier - validator: %v - expectedRequestID: %v, requestID: %v",
@@ -269,7 +268,7 @@ func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID ui
 		return nil
 	}
 
-	fs.acceptedFrontierSet[hashing.ComputeHash256Array(summary)] = summary
+	fs.acceptedFrontierSet[string(key)] = summary
 	if err := fs.sendGetStateSummaryFrontiers(); err != nil {
 		return err
 	}
@@ -314,25 +313,25 @@ func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID ui
 	for _, acceptedFrontier := range fs.acceptedFrontierSet {
 		acceptedFrontierList = append(acceptedFrontierList, acceptedFrontier)
 	}
-	fs.acceptedFrontier = acceptedFrontierList
+	fs.acceptedKeys = acceptedFrontierList
 
 	return fs.sendGetAccepted()
 }
 
-func (fs *fastSyncer) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error {
-	acceptedSummaries := make([][]byte, 0, len(summaries))
-	for _, summary := range summaries {
-		if accepted, err := fs.fastSyncVM.StateSyncIsSummaryAccepted(summary); accepted && err == nil {
-			acceptedSummaries = append(acceptedSummaries, summary)
+func (fs *fastSyncer) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error {
+	acceptedKeys := make([][]byte, 0, len(keys))
+	for _, key := range keys {
+		if accepted, err := fs.fastSyncVM.StateSyncIsSummaryAccepted(key); accepted && err == nil {
+			acceptedKeys = append(acceptedKeys, key)
 		} else if err != nil {
 			return err
 		}
 	}
-	fs.Sender.SendAcceptedStateSummary(validatorID, requestID, acceptedSummaries)
+	fs.Sender.SendAcceptedStateSummary(validatorID, requestID, acceptedKeys)
 	return nil
 }
 
-func (fs *fastSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaries [][]byte) error {
+func (fs *fastSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error {
 	// ignores any late responses
 	if requestID != fs.RequestID {
 		fs.Ctx.Log.Debug("Received an Out-of-Sync Accepted - validator: %v - expectedRequestID: %v, requestID: %v",
@@ -349,15 +348,14 @@ func (fs *fastSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID ui
 		weight = w
 	}
 
-	for _, summary := range summaries {
-		summaryHash := hashing.ComputeHash256Array(summary)
-		previousWeight := fs.acceptedVotes[summaryHash]
+	for _, key := range keys {
+		previousWeight := fs.acceptedVotes[string(key)]
 		newWeight, err := math.Add64(weight, previousWeight)
 		if err != nil {
 			fs.Ctx.Log.Error("Error calculating the Accepted votes - weight: %v, previousWeight: %v", weight, previousWeight)
 			newWeight = stdmath.MaxUint64
 		}
-		fs.acceptedVotes[summaryHash] = newWeight
+		fs.acceptedVotes[string(key)] = newWeight
 	}
 
 	if err := fs.sendGetAccepted(); err != nil {
@@ -371,10 +369,13 @@ func (fs *fastSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID ui
 
 	// We've received the filtered accepted frontier from every bootstrap validator
 	// Accept all containers that have a sufficient weight behind them
-	accepted := make([][]byte, 0, len(fs.acceptedVotes))
-	for summaryHash, weight := range fs.acceptedVotes {
+	accepted := make([]block.Summary, 0, len(fs.acceptedVotes))
+	for key, weight := range fs.acceptedVotes {
 		if weight >= fs.Alpha {
-			accepted = append(accepted, fs.acceptedFrontierSet[summaryHash])
+			accepted = append(accepted, block.Summary{
+				Key:   []byte(key),
+				State: fs.acceptedFrontierSet[key],
+			})
 		}
 	}
 
@@ -419,7 +420,7 @@ func (fs *fastSyncer) GetStateSummaryFrontierFailed(validatorID ids.ShortID, req
 		return err
 	}
 
-	return fs.StateSummaryFrontier(validatorID, requestID, []byte{})
+	return fs.StateSummaryFrontier(validatorID, requestID, []byte{}, []byte{}) // TODO ABENEGIA: Why empty key and summary?
 }
 
 // GetAcceptedStateSummaryFailed implements the Engine interface.
@@ -435,7 +436,7 @@ func (fs *fastSyncer) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, req
 		return err
 	}
 
-	return fs.AcceptedStateSummary(validatorID, requestID, [][]byte{})
+	return fs.AcceptedStateSummary(validatorID, requestID, [][]byte{}) // TODO ABENEGIA: just pick keys here and reask for them!
 }
 
 // AppRequest implements the Engine interface

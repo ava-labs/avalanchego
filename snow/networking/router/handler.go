@@ -296,13 +296,16 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 
 	case message.StateSummaryFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
-		summary, ok := msg.Get(message.ContainerBytes).([]byte)
-		if !ok {
-			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse ContainerBytes",
+		data, ok := msg.Get(message.MultiContainerBytes).([][]byte)
+		if !ok || len(data) != 2 {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse key and summary.",
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
-		return h.fastSyncer.StateSummaryFrontier(nodeID, reqID, summary)
+
+		key := data[0]
+		summary := data[1]
+		return h.fastSyncer.StateSummaryFrontier(nodeID, reqID, key, summary)
 
 	case message.GetStateSummaryFrontierFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -310,23 +313,23 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 
 	case message.GetAcceptedStateSummary:
 		reqID := msg.Get(message.RequestID).(uint32)
-		summaries, ok := msg.Get(message.MultiContainerBytes).([][]byte)
+		keys, ok := msg.Get(message.MultiContainerBytes).([][]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse MultiContainerBytes",
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
-		return h.fastSyncer.GetAcceptedStateSummary(nodeID, reqID, summaries)
+		return h.fastSyncer.GetAcceptedStateSummary(nodeID, reqID, keys)
 
 	case message.AcceptedStateSummary:
 		reqID := msg.Get(message.RequestID).(uint32)
-		summaries, ok := msg.Get(message.MultiContainerBytes).([][]byte)
+		keys, ok := msg.Get(message.MultiContainerBytes).([][]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse MultiContainerBytes",
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
-		return h.fastSyncer.AcceptedStateSummary(nodeID, reqID, summaries)
+		return h.fastSyncer.AcceptedStateSummary(nodeID, reqID, keys)
 
 	case message.GetAcceptedStateSummaryFailed:
 		reqID := msg.Get(message.RequestID).(uint32)

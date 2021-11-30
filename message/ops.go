@@ -207,7 +207,7 @@ var (
 		AppGossip:   {ChainID, AppBytes},
 		// Fast Sync
 		GetStateSummaryFrontier: {ChainID, RequestID, Deadline},
-		StateSummaryFrontier:    {ChainID, RequestID, ContainerBytes},
+		StateSummaryFrontier:    {ChainID, RequestID, MultiContainerBytes},
 		GetAcceptedStateSummary: {ChainID, RequestID, Deadline, MultiContainerBytes},
 		AcceptedStateSummary:    {ChainID, RequestID, MultiContainerBytes},
 	}

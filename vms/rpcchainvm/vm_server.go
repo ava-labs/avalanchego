@@ -269,7 +269,10 @@ func (vm *VMServer) StateSyncGetLastSummary(ctx context.Context, empty *emptypb.
 	if err != nil {
 		return nil, err
 	}
-	return &vmproto.StateSyncGetLastSummaryResponse{Summary: summary}, nil
+	return &vmproto.StateSyncGetLastSummaryResponse{
+		Key:   summary.Key,
+		State: summary.State,
+	}, nil
 }
 
 func (vm *VMServer) StateSyncIsSummaryAccepted(ctx context.Context, req *vmproto.StateSyncIsSummaryAcceptedRequest) (*vmproto.StateSyncIsSummaryAcceptedResponse, error) {
@@ -278,7 +281,7 @@ func (vm *VMServer) StateSyncIsSummaryAccepted(ctx context.Context, req *vmproto
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
 
-	accepted, err := fsVM.StateSyncIsSummaryAccepted(req.Summary)
+	accepted, err := fsVM.StateSyncIsSummaryAccepted(req.Key)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +293,13 @@ func (vm *VMServer) StateSync(ctx context.Context, req *vmproto.StateSyncRequest
 	if !ok {
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
-	err := fsVM.StateSync(req.Summaries)
+
+	summaries := make([]block.Summary, len(req.Summaries))
+	for k, v := range req.Summaries {
+		summaries[k].Key = v.Key
+		summaries[k].State = v.State
+	}
+	err := fsVM.StateSync(summaries)
 	if err != nil {
 		return nil, err
 	}

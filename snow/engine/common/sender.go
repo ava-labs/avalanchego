@@ -27,15 +27,15 @@ type FastSyncStateSummarySender interface {
 	SendGetStateSummaryFrontier(nodeIDs ids.ShortSet, requestID uint32)
 
 	// ...
-	SendStateSummaryFrontier(nodeID ids.ShortID, requestID uint32, summary []byte)
+	SendStateSummaryFrontier(nodeID ids.ShortID, requestID uint32, key, summary []byte)
 }
 
 type FastSyncAcceptedStateSummarySender interface {
 	// ...
-	SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uint32, summaries [][]byte)
+	SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uint32, keys [][]byte)
 
 	// ...
-	SendAcceptedStateSummary(nodeID ids.ShortID, requestID uint32, summaries [][]byte)
+	SendAcceptedStateSummary(nodeID ids.ShortID, requestID uint32, keys [][]byte)
 }
 
 // FrontierSender defines how a consensus engine sends frontier messages to

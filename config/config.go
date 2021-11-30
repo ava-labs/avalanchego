@@ -441,7 +441,7 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 	return config, nil
 }
 
-func getStateSyncConfig(v *viper.Viper, networkID uint32) (node.StateSyncConfig, error) {
+func getStateSyncConfig(v *viper.Viper) (node.StateSyncConfig, error) {
 	config := node.StateSyncConfig{}
 	var stateSyncIPs, stateSyncIDs []string
 
@@ -976,7 +976,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	}
 
 	// StateSync Configs
-	nodeConfig.StateSyncConfig, err = getStateSyncConfig(v, nodeConfig.NetworkID)
+	nodeConfig.StateSyncConfig, err = getStateSyncConfig(v)
 	if err != nil {
 		return node.Config{}, err
 	}

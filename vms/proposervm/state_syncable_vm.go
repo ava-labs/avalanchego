@@ -54,20 +54,22 @@ func (vm *VM) StateSyncGetLastSummary() ([]byte, error) {
 		return nil, err
 	}
 	blockBytes := block.Bytes()
-	packerLen := len(blockBytes) + wrappers.IntLen + len(vmSummary)
+	packerLen := len(blockBytes) + wrappers.IntLen + len(vmSummary.Key) +
+		wrappers.IntLen + len(vmSummary.State)
 	packer := wrappers.Packer{Bytes: make([]byte, packerLen)}
 	packer.PackBytes(blockBytes)
-	packer.PackFixedBytes(vmSummary)
+	packer.PackFixedBytes(vmSummary.Key)
+	packer.PackFixedBytes(vmSummary.State)
 	return packer.Bytes, nil
 }
 
-func (vm *VM) StateSyncIsSummaryAccepted(summary []byte) (bool, error) {
+func (vm *VM) StateSyncIsSummaryAccepted(key []byte) (bool, error) {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
 		return false, block.ErrStateSyncableVMNotImplemented
 	}
 
-	packer := wrappers.Packer{Bytes: summary}
+	packer := wrappers.Packer{Bytes: key}
 	blockBytes := packer.UnpackBytes()
 	_, err := vm.ParseBlock(blockBytes)
 	if err != nil {
@@ -75,11 +77,11 @@ func (vm *VM) StateSyncIsSummaryAccepted(summary []byte) (bool, error) {
 	}
 	// TODO: Validate the contents of the block here.
 
-	vmSummary := packer.UnpackFixedBytes(len(summary) - len(blockBytes) - wrappers.IntLen)
-	return fsVM.StateSyncIsSummaryAccepted(vmSummary)
+	vmKeys := packer.UnpackFixedBytes(len(key) - len(blockBytes) - wrappers.IntLen)
+	return fsVM.StateSyncIsSummaryAccepted(vmKeys)
 }
 
-func (vm *VM) StateSync(accepted [][]byte) error {
+func (vm *VM) StateSync(accepted []block.Summary) error {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
 		return block.ErrStateSyncableVMNotImplemented
@@ -92,10 +94,11 @@ func (vm *VM) StateSync(accepted [][]byte) error {
 	// then pass the vmSummary corresponding to the largest height
 	// to the fsVM.
 	maxHeight := uint64(0)
-	var maxHeightSummary []byte
+	var maxKey []byte
+	var maxHeightState []byte
 	var maxHeightBlock PostForkBlock
 	for _, summary := range accepted {
-		packer := wrappers.Packer{Bytes: summary}
+		packer := wrappers.Packer{Bytes: summary.State}
 		blockBytes := packer.UnpackBytes()
 		parsedBlock, err := vm.parsePostForkBlock(blockBytes)
 		if err != nil {
@@ -104,7 +107,8 @@ func (vm *VM) StateSync(accepted [][]byte) error {
 		height := parsedBlock.Height()
 		if maxHeight < height {
 			maxHeight = height
-			maxHeightSummary = packer.UnpackFixedBytes(len(summary) - len(blockBytes) - wrappers.IntLen)
+			maxKey = summary.Key
+			maxHeightState = packer.UnpackFixedBytes(len(summary.State) - len(blockBytes) - wrappers.IntLen)
 			maxHeightBlock = parsedBlock
 		}
 	}
@@ -120,7 +124,13 @@ func (vm *VM) StateSync(accepted [][]byte) error {
 		return err
 	}
 
-	return fsVM.StateSync([][]byte{maxHeightSummary})
+	summaryToPush := []block.Summary{
+		{
+			Key:   maxKey,
+			State: maxHeightState,
+		},
+	}
+	return fsVM.StateSync(summaryToPush)
 }
 
 func (vm *VM) StateSyncLastAccepted() (ids.ID, uint64, error) {

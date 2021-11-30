@@ -605,7 +605,9 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 
 	stateSyncValidators := validators.NewSet()
 	for _, id := range n.Config.StateSyncConfig.StateSyncIDs {
-		stateSyncValidators.AddWeight(id, 1)
+		if err := stateSyncValidators.AddWeight(id, 1); err != nil {
+			return err
+		}
 	}
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
