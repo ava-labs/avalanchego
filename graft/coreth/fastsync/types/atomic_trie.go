@@ -1,5 +1,6 @@
 // (c) 2020-2021, Ava Labs, Inc.
 // See the file LICENSE for licensing terms.
+
 package types
 
 import (
