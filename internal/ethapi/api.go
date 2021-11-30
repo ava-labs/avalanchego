@@ -900,7 +900,11 @@ func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash 
 	if blkNumber, isNum := blockNrOrHash.Number(); isNum && blkNumber == rpc.PendingBlockNumber {
 		// Override header with a copy to ensure the original header is not modified
 		header = types.CopyHeader(header)
+		// Grab the hash of the unmodified header, so that the modified header can point to the
+		// prior block as its parent.
+		parentHash := header.Hash()
 		header.Time = uint64(time.Now().Unix())
+		header.ParentHash = parentHash
 		header.Number = new(big.Int).Add(header.Number, big.NewInt(1))
 		estimatedBaseFee, err := b.EstimateBaseFee(ctx)
 		if err != nil {
