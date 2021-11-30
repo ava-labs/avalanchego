@@ -317,9 +317,9 @@ func (b *blockingAtomicTrie) LastCommitted() (common.Hash, uint64, error) {
 }
 
 // Iterator returns a types.AtomicTrieIterator that iterates the trie from the given
-// atomic root hash
-func (b *blockingAtomicTrie) Iterator(hash common.Hash) (types.AtomicTrieIterator, error) {
-	t, err := trie.New(hash, b.trieDB)
+// atomic trie root
+func (b *blockingAtomicTrie) Iterator(root common.Hash) (types.AtomicTrieIterator, error) {
+	t, err := trie.New(root, b.trieDB)
 	if err != nil {
 		return nil, err
 	}
