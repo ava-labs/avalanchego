@@ -81,8 +81,6 @@ type VMClient struct {
 	ctx *snow.Context
 }
 
-var _ block.ChainVM = &VMClient{}
-
 // NewClient returns a VM connected to a remote VM
 func NewClient(client vmproto.VMClient, broker *plugin.GRPCBroker) *VMClient {
 	return &VMClient{
