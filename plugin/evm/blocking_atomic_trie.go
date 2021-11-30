@@ -326,8 +326,8 @@ func (b *blockingAtomicTrie) commit(height uint64) (common.Hash, error) {
 		return common.Hash{}, err
 	}
 
-	b.lastCommittedHash = hash
 	l.Info("committed atomic trie", "hash", hash.String(), "height", height)
+
 	if err = b.trieDB.Commit(hash, false, nil); err != nil {
 		return common.Hash{}, err
 	}
@@ -346,6 +346,7 @@ func (b *blockingAtomicTrie) commit(height uint64) (common.Hash, error) {
 		return common.Hash{}, err
 	}
 
+	b.lastCommittedHash = hash
 	b.lastCommittedHeight = height
 	return hash, nil
 }
