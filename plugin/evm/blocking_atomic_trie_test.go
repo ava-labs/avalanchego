@@ -270,6 +270,7 @@ func Test_IndexerInitializesOnlyOnce(t *testing.T) {
 }
 
 func Test_IndexerInitializeProducesSameHashEveryTime(t *testing.T) {
+	t.Parallel()
 	db := memdb.New()
 	repo := NewAtomicTxRepository(db, testTxCodec())
 	height := uint64(1000)
