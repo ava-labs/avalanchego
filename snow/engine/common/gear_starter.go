@@ -32,6 +32,7 @@ type gearStarter struct {
 	startupAlpha uint64
 	weight       uint64
 	canStart     bool
+	started      bool
 }
 
 func (gs *gearStarter) AddWeightForNode(nodeID ids.ShortID) error {
@@ -71,5 +72,5 @@ func (gs *gearStarter) RemoveWeightForNode(nodeID ids.ShortID) error {
 	return nil
 }
 
-func (gs *gearStarter) CanStart() bool { return gs.canStart }
-func (gs *gearStarter) MarkStart()     { gs.canStart = true }
+func (gs *gearStarter) CanStart() bool { return gs.canStart && !gs.started }
+func (gs *gearStarter) MarkStart()     { gs.started = true }

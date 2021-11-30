@@ -104,7 +104,7 @@ func (vm *VM) StateSync(accepted [][]byte) error {
 		height := parsedBlock.Height()
 		if maxHeight < height {
 			maxHeight = height
-			maxHeightSummary = packer.UnpackFixedBytes(len(summary) - len(ids.ID{}) - wrappers.LongLen)
+			maxHeightSummary = packer.UnpackFixedBytes(len(summary) - len(blockBytes) - wrappers.IntLen)
 			maxHeightBlock = parsedBlock
 		}
 	}
@@ -121,4 +121,16 @@ func (vm *VM) StateSync(accepted [][]byte) error {
 	}
 
 	return fsVM.StateSync([][]byte{maxHeightSummary})
+}
+
+func (vm *VM) StateSyncLastAccepted() (ids.ID, uint64, error) {
+	lastAccepted, err := vm.State.GetLastAccepted()
+	if err != nil {
+		return ids.Empty, 0, err
+	}
+	block, err := vm.getBlock(lastAccepted)
+	if err != nil {
+		return ids.Empty, 0, err
+	}
+	return lastAccepted, block.Height(), nil
 }

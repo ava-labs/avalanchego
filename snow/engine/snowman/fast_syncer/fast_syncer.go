@@ -102,8 +102,13 @@ func (fs *fastSyncer) Notify(msg common.Message) error {
 
 // Connected implements the Engine interface.
 func (fs *fastSyncer) Connected(nodeID ids.ShortID) error {
-	if err := fs.VM.Connected(nodeID); err != nil {
-		return err
+	// prevent nodes outside of the specified state sync
+	// nodes from connecting to the vm. this is a temporary
+	// workaround while we add more handshake information.
+	if fs.Beacons.Contains(nodeID) {
+		if err := fs.VM.Connected(nodeID); err != nil {
+			return err
+		}
 	}
 
 	if err := fs.Starter.AddWeightForNode(nodeID); err != nil {
@@ -120,8 +125,12 @@ func (fs *fastSyncer) Connected(nodeID ids.ShortID) error {
 
 // Disconnected implements the Engine interface.
 func (fs *fastSyncer) Disconnected(nodeID ids.ShortID) error {
-	if err := fs.VM.Disconnected(nodeID); err != nil {
-		return err
+	// temporary workaround, avoid sending disconnect messages
+	// for nodes we did not send connect message.
+	if fs.Beacons.Contains(nodeID) {
+		if err := fs.VM.Disconnected(nodeID); err != nil {
+			return err
+		}
 	}
 
 	return fs.Starter.RemoveWeightForNode(nodeID)
@@ -199,8 +208,8 @@ func (fs *fastSyncer) startup() error {
 	return fs.sendGetStateSummaryFrontiers()
 }
 
-// Ask up to [MaxOutstandingFastSyncRequests] bootstrap validators to send
-// their accepted frontier with the current accepted frontier
+// Ask up to [MaxOutstandingFastSyncRequests] state sync validators to send
+// their accepted state summary
 func (fs *fastSyncer) sendGetStateSummaryFrontiers() error {
 	validators := ids.NewShortSet(1)
 
@@ -212,7 +221,7 @@ func (fs *fastSyncer) sendGetStateSummaryFrontiers() error {
 	validators.Add(vdrsList...)
 
 	if validators.Len() > 0 {
-		fs.Sender.SendGetAcceptedFrontier(validators, fs.RequestID)
+		fs.Sender.SendGetStateSummaryFrontier(validators, fs.RequestID)
 	}
 
 	return nil
