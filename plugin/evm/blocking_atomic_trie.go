@@ -45,11 +45,13 @@ type blockingAtomicTrie struct {
 	trieDB               *trie.Database      // Trie database
 	trie                 *trie.Trie          // Atomic trie.Trie mapping key (height+blockchainID) and value (RLP encoded atomic.Requests)
 	repo                 AtomicTxRepository
+	lastCommittedHash    common.Hash // trie root hash of the most recent commit
+	lastCommittedHeight  uint64      // index height of the most recent commit
 	codec                codec.Manager
 }
 
 func NewBlockingAtomicTrie(db ethdb.KeyValueStore, repo AtomicTxRepository, codec codec.Manager) (types.AtomicTrie, error) {
-	root, err := lastCommittedRootIfExists(db)
+	root, height, err := lastCommittedRootIfExists(db)
 	if err != nil {
 		return nil, err
 	}
@@ -68,32 +70,39 @@ func NewBlockingAtomicTrie(db ethdb.KeyValueStore, repo AtomicTxRepository, code
 		trie:                 t,
 		repo:                 repo,
 		codec:                codec,
+		lastCommittedHash:    root,
+		lastCommittedHeight:  height,
 	}, nil
 }
 
-// lastCommittedRootIfExists returns the last committed trie root if it exists
-// else returns empty common.Hash{}
+// lastCommittedRootIfExists returns the last committed trie root and height if it exists
+// else returns empty common.Hash{} and 0
 // returns optional error if there are issues with the underlying data store
 // or if values present in the database are not as expected
-func lastCommittedRootIfExists(db ethdb.KeyValueStore) (common.Hash, error) {
+func lastCommittedRootIfExists(db ethdb.KeyValueStore) (common.Hash, uint64, error) {
 	var root common.Hash
+	var height uint64
 	// read the last committed entry if exists and set root hash
 	lastCommittedHeightBytes, err := db.Get(lastCommittedKey)
 	if err != nil && err.Error() != database.ErrNotFound.Error() { // err type does not match database.ErrorNotFound so have to check `.Error()` instead
-		return common.Hash{}, err
+		return common.Hash{}, 0, err
 	} else if err == nil || err.Error() != database.ErrNotFound.Error() {
 		// entry is present, check length
 		lastCommittedHeightBytesLen := len(lastCommittedHeightBytes)
 		if lastCommittedHeightBytesLen != wrappers.LongLen {
-			return common.Hash{}, fmt.Errorf("expected value of lastCommittedKey to be %d but was %d", wrappers.LongLen, lastCommittedHeightBytesLen)
+			return common.Hash{}, 0, fmt.Errorf("expected value of lastCommittedKey to be %d but was %d", wrappers.LongLen, lastCommittedHeightBytesLen)
 		}
+
+		height = binary.BigEndian.Uint64(lastCommittedHeightBytes)
+
 		hash, err := db.Get(lastCommittedHeightBytes)
 		if err != nil {
-			return common.Hash{}, err
+			return common.Hash{}, 0, err
 		}
+
 		root = common.BytesToHash(hash)
 	}
-	return root, nil
+	return root, height, nil
 }
 
 // nearestCommitHeight given a block number calculates the nearest commit height such that the
@@ -217,10 +226,7 @@ func (b *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommit
 //   initialise it with [height] as the starting height - this *must* be zero in
 //   that case
 func (b *blockingAtomicTrie) Index(height uint64, atomicOps map[ids.ID]*atomic.Requests) (common.Hash, error) {
-	_, lastCommittedHeight, err := b.LastCommitted()
-	if err != nil {
-		return common.Hash{}, err
-	}
+	_, lastCommittedHeight := b.LastCommitted()
 
 	if height < lastCommittedHeight {
 		return common.Hash{}, fmt.Errorf("height %d must be after last committed height %d", height, lastCommittedHeight)
@@ -231,9 +237,10 @@ func (b *blockingAtomicTrie) Index(height uint64, atomicOps map[ids.ID]*atomic.R
 		return common.Hash{}, fmt.Errorf("height %d not within the next commit height %d", height, nextCommitHeight)
 	}
 
-	if err = b.index(height, atomicOps); err != nil {
+	if err := b.index(height, atomicOps); err != nil {
 		return common.Hash{}, err
 	}
+
 	if height%b.commitHeightInterval == 0 {
 		return b.commit(height)
 	}
@@ -253,11 +260,14 @@ func (b *blockingAtomicTrie) commit(height uint64) (common.Hash, error) {
 	if err != nil {
 		return common.Hash{}, err
 	}
+
+	b.lastCommittedHash = hash
 	l.Info("committed atomic trie", "hash", hash.String(), "height", height)
 	if err = b.trieDB.Commit(hash, false, nil); err != nil {
 		return common.Hash{}, err
 	}
-	// all good here, update the hightBytes
+
+	// all good here, update the heightBytes
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 
@@ -265,10 +275,13 @@ func (b *blockingAtomicTrie) commit(height uint64) (common.Hash, error) {
 	if err = b.db.Put(heightBytes, hash[:]); err != nil {
 		return common.Hash{}, err
 	}
+
 	// update lastCommittedKey with the current height
 	if err = b.db.Put(lastCommittedKey, heightBytes); err != nil {
 		return common.Hash{}, err
 	}
+
+	b.lastCommittedHeight = height
 	return hash, nil
 }
 
@@ -297,23 +310,8 @@ func (b *blockingAtomicTrie) commitTrie() (common.Hash, error) {
 }
 
 // LastCommitted returns the last committed trie hash, block height, and an optional error
-func (b *blockingAtomicTrie) LastCommitted() (common.Hash, uint64, error) {
-	exists, err := b.db.Has(lastCommittedKey)
-	if err != nil {
-		return common.Hash{}, 0, err
-	}
-	if !exists {
-		// trie has not been committed yet
-		return common.Hash{}, 0, nil
-	}
-	heightBytes, err := b.db.Get(lastCommittedKey)
-	if err != nil {
-		return common.Hash{}, 0, err
-	}
-
-	height := binary.BigEndian.Uint64(heightBytes)
-	hash, err := b.db.Get(heightBytes)
-	return common.BytesToHash(hash), height, err
+func (b *blockingAtomicTrie) LastCommitted() (common.Hash, uint64) {
+	return b.lastCommittedHash, b.lastCommittedHeight
 }
 
 // Iterator returns a types.AtomicTrieIterator that iterates the trie from the given

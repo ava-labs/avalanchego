@@ -34,7 +34,7 @@ type AtomicTrie interface {
 	// - last committed hash
 	// - last committed block height
 	// - optional error
-	LastCommitted() (common.Hash, uint64, error)
+	LastCommitted() (common.Hash, uint64)
 
 	// TrieDB returns the underlying trie database
 	TrieDB() *trie.Database
