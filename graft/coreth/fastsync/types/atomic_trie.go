@@ -17,7 +17,7 @@ import (
 type AtomicTrie interface {
 	// Initialize initializes the AtomicTrie from the atomic repository ignoring
 	// any atomic operations for any heights that have already been indexed
-	Initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error) error
+	Initialize(dbCommitFn func() error) error
 
 	// Index indexes the given atomicOps at the specified block height
 	// Returns an optional root hash and an optional error

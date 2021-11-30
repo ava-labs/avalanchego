@@ -46,7 +46,7 @@ func Test_BlockingAtomicTrie_InitializeGenesis(t *testing.T) {
 	dbCommitFn := func() error {
 		return nil
 	}
-	err = atomicTrie.Initialize(0, dbCommitFn)
+	err = atomicTrie.Initialize(dbCommitFn)
 	assert.NoError(t, err)
 
 	_, num := atomicTrie.LastCommitted()
@@ -69,7 +69,7 @@ func Test_BlockingAtomicTrie_InitializeGenesisPlusOne(t *testing.T) {
 	dbCommitFn := func() error {
 		return nil
 	}
-	err = atomicTrie.Initialize(1, dbCommitFn)
+	err = atomicTrie.Initialize(dbCommitFn)
 	assert.NoError(t, err)
 
 	_, num := atomicTrie.LastCommitted()
@@ -95,7 +95,7 @@ func Test_BlockingAtomicTrie_Initialize(t *testing.T) {
 		return nil
 	}
 
-	err = atomicTrie.Initialize(lastAcceptedHeight, dbCommitFn)
+	err = atomicTrie.Initialize(dbCommitFn)
 	assert.NoError(t, err)
 
 	lastCommittedHash, lastCommittedHeight := atomicTrie.LastCommitted()
@@ -234,16 +234,16 @@ func Test_IndexerInitializesOnlyOnce(t *testing.T) {
 	indexer, err := NewBlockingAtomicTrie(Database{db}, repo, testTxCodec())
 	assert.NoError(t, err)
 	{
-		indexer.(*blockingAtomicTrie).commitHeightInterval = testCommitInterval
+		indexer.(*blockingAtomicTrie).commitHeightInterval = 90
 	}
 
-	err = indexer.Initialize(height, nil)
+	err = indexer.Initialize(nil)
 	assert.NoError(t, err)
 
 	hash, height := indexer.LastCommitted()
 	assert.NoError(t, err)
 	assert.NotEqual(t, common.Hash{}, hash)
-	assert.Equal(t, uint64(100), height)
+	assert.Equal(t, uint64(90), height)
 
 	// the following scenario is not realistic but is there to test double initialize behaviour
 	err = repo.Write(101, []*Tx{testDataExportTx()})
@@ -257,13 +257,14 @@ func Test_IndexerInitializesOnlyOnce(t *testing.T) {
 	indexer, err = NewBlockingAtomicTrie(Database{db}, repo, testTxCodec())
 	assert.NoError(t, err)
 	{
-		indexer.(*blockingAtomicTrie).commitHeightInterval = testCommitInterval
+		indexer.(*blockingAtomicTrie).commitHeightInterval = 90
 	}
-	err = indexer.Initialize(101, nil)
+
+	err = indexer.Initialize(nil) // should be skipped
 	assert.NoError(t, err)
 
 	newHash, height := indexer.LastCommitted()
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(100), height, "height should not have changed")
+	assert.Equal(t, uint64(90), height, "height should not have changed")
 	assert.Equal(t, hash, newHash, "hash should be the same")
 }
