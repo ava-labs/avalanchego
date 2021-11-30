@@ -119,7 +119,6 @@ func (b *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommit
 	commitHeight := nearestCommitHeight(lastAcceptedBlockNumber, b.commitHeightInterval)
 	uncommittedOpsMap := make(map[uint64]map[ids.ID]*atomic.Requests, lastAcceptedBlockNumber-commitHeight)
 
-	// TODO: pass height properly
 	iter := b.repo.IterateByHeight(nil)
 	defer iter.Release()
 
