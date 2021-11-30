@@ -25,7 +25,8 @@ var (
 // AtomicTxRepository defines an entity that manages storage and indexing of
 // atomic transactions
 type AtomicTxRepository interface {
-	Initialize(apricotPhase5Height uint64) error
+	Initialize(commitFn func() error) error
+	GetIndexHeight() (bool, uint64, error)
 	GetByTxID(txID ids.ID) (*Tx, uint64, error)
 	GetByHeight(height uint64) ([]*Tx, error)
 	Write(height uint64, txs []*Tx) error
@@ -63,7 +64,7 @@ func NewAtomicTxRepository(db database.Database, codec codec.Manager) AtomicTxRe
 func (a *atomicTxRepository) Initialize(apricotPhase5Height uint64) error {
 	startTime := time.Now()
 	indexHeight := uint64(0)
-	exists, indexHeight, err := a.getIndexHeight()
+	exists, indexHeight, err := a.GetIndexHeight()
 	if err != nil {
 		return nil
 	}
@@ -167,11 +168,16 @@ func (a *atomicTxRepository) Initialize(apricotPhase5Height uint64) error {
 	return nil
 }
 
-func (a *atomicTxRepository) getIndexHeight() (bool, uint64, error) {
+// GetIndexHeight returns:
+// - whether the index has been initialized
+// - index height
+// - optional error
+func (a *atomicTxRepository) GetIndexHeight() (bool, uint64, error) {
 	exists, err := a.db.Has(maxIndexedHeightKey)
 	if err != nil {
 		return false, 0, err
 	}
+
 	if !exists {
 		return exists, 0, nil
 	}
