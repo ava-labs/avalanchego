@@ -5,6 +5,8 @@ package evm
 import (
 	"math/big"
 
+	"github.com/ava-labs/avalanchego/utils"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -83,4 +85,50 @@ func testTxCodec() codec.Manager {
 		panic(errs.Err)
 	}
 	return codec
+}
+
+func testDataImportTx() *Tx {
+	blockchainID := ids.GenerateTestID()
+	return &Tx{
+		UnsignedAtomicTx: &TestTx{
+			IDV: blockchainID,
+			AcceptRequestsV: &atomic.Requests{
+				PutRequests: []*atomic.Element{
+					{
+						Key:   utils.RandomBytes(16),
+						Value: utils.RandomBytes(24),
+						Traits: [][]byte{
+							utils.RandomBytes(32),
+							utils.RandomBytes(32),
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func testDataExportTx() *Tx {
+	blockchainID := ids.GenerateTestID()
+	return &Tx{
+		UnsignedAtomicTx: &TestTx{
+			IDV: blockchainID,
+			AcceptRequestsV: &atomic.Requests{
+				PutRequests: []*atomic.Element{
+					{
+						Key:   utils.RandomBytes(16),
+						Value: utils.RandomBytes(24),
+						Traits: [][]byte{
+							utils.RandomBytes(32),
+							utils.RandomBytes(32),
+						},
+					},
+				},
+				RemoveRequests: [][]byte{
+					utils.RandomBytes(32),
+					utils.RandomBytes(32),
+				},
+			},
+		},
+	}
 }
