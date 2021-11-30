@@ -9,21 +9,19 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-// TODO: replace [K] with actual, improve wording
-// AtomicTrie maintains a merkle forest with one trie root for each of the most recent
-// K commitInterval blocks. Each trie represents a commitment to atomic txs processed
-// from genesis up to and including the block at the height the root represents.
-// Leaf keys represent height (stored as big endian bytes) and leaf values represent
-// the atomic txs accepted on the block of the corresponding height.
-// This trie is used to transport and verify the correctness of atomic txs during
-// fast sync.
+// AtomicTrie maintains an index of atomic operations by chainID for every block height
+// containing atomic transactions. The backing data structure for this index is a Trie.
+// The keys of the trie represent the indexed keys (block heights), values (leaf nodes)
+// representing the atomic operations.
 type AtomicTrie interface {
-	// Initialize initializes the AtomicTrie from the last indexed
-	// block to the last accepted block in the chain
+	// Initialize initializes the AtomicTrie from the atomic repository ignoring
+	// any atomic operations for any heights that have already been indexed
 	Initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error) error
 
 	// Index indexes the given atomicOps at the specified block height
 	// Returns an optional root hash and an optional error
+	// A non-empty root hash is returned when the atomic trie has been committed
+	// Atomic trie is committed if the block height is within the commit interval
 	Index(height uint64, atomicOps map[ids.ID]*atomic.Requests) (common.Hash, error)
 
 	// Iterator returns an AtomicTrieIterator to iterate the trie at the given
@@ -56,6 +54,6 @@ type AtomicTrieIterator interface {
 	// AtomicOps returns the current atomic requests mapped to the chain ID
 	AtomicOps() map[ids.ID]*atomic.Requests
 
-	// Errors returns list of errors, if any
+	// Error returns an error, if any
 	Error() error
 }
