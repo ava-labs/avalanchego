@@ -5,6 +5,7 @@ package evm
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"time"
 
@@ -140,7 +141,8 @@ func (b *blockingAtomicTrie) isInitialized() (bool, error) {
 // Optionally returns an error
 // Initialize only ever runs once during a node's lifetime. Subsequent updates to this trie are made using the
 // Index call during evm.block.Accept().
-func (b *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error) error {
+// the lastAcceptedBlockNumber parameter is expected to be the height of the index
+func (b *blockingAtomicTrie) Initialize(dbCommitFn func() error) error {
 	initialized, err := b.isInitialized()
 	if err != nil {
 		return err
@@ -149,9 +151,18 @@ func (b *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommit
 		return nil
 	}
 
+	exists, indexHeight, err := b.repo.GetIndexHeight()
+	if err != nil {
+		return err
+	}
+
+	if !exists {
+		return errors.New("atomic repository not initialized")
+	}
+
 	// commitHeight is the highest block that can be committed i.e. is divisible by b.commitHeightInterval
-	commitHeight := nearestCommitHeight(lastAcceptedBlockNumber, b.commitHeightInterval)
-	uncommittedOpsMap := make(map[uint64]map[ids.ID]*atomic.Requests, lastAcceptedBlockNumber-commitHeight)
+	commitHeight := nearestCommitHeight(indexHeight, b.commitHeightInterval)
+	uncommittedOpsMap := make(map[uint64]map[ids.ID]*atomic.Requests, indexHeight-commitHeight)
 
 	iter := b.repo.IterateByHeight(nil)
 	defer iter.Release()
@@ -191,7 +202,8 @@ func (b *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommit
 	}
 
 	// skip commit in case of early height
-	if lastAcceptedBlockNumber < b.commitHeightInterval {
+	// should never happen in production since height is greater than 4096
+	if indexHeight < b.commitHeightInterval {
 		if dbCommitFn != nil {
 			if err := dbCommitFn(); err != nil {
 				return err
@@ -199,6 +211,7 @@ func (b *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommit
 		}
 		return nil
 	}
+
 	// now that all heights < commitHeight have been processed
 	// commit the trie
 	hash, err := b.commit(commitHeight)
@@ -212,7 +225,7 @@ func (b *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommit
 		}
 	}
 
-	log.Info("committed trie", "hash", hash, "height", commitHeight)
+	log.Info("committed trie", "hash", hash, "indexHeight", commitHeight)
 
 	// process uncommitted ops
 	for height, ops := range uncommittedOpsMap {
@@ -227,12 +240,12 @@ func (b *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommit
 	}
 
 	// check if its eligible to commit the trie
-	if lastAcceptedBlockNumber%b.commitHeightInterval == 0 {
-		hash, err := b.commit(lastAcceptedBlockNumber)
+	if indexHeight%b.commitHeightInterval == 0 {
+		hash, err := b.commit(indexHeight)
 		if err != nil {
 			return err
 		}
-		log.Info("committed trie", "hash", hash, "height", lastAcceptedBlockNumber)
+		log.Info("committed trie", "hash", hash, "indexHeight", indexHeight)
 	}
 
 	initializedBytes := []byte{1}
