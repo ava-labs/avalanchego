@@ -49,7 +49,7 @@ func Test_BlockingAtomicTrie_InitializeGenesis(t *testing.T) {
 	err = atomicTrie.Initialize(0, dbCommitFn)
 	assert.NoError(t, err)
 
-	_, num, err := atomicTrie.LastCommitted()
+	_, num := atomicTrie.LastCommitted()
 	assert.NoError(t, err)
 	assert.EqualValues(t, 0, num)
 }
@@ -72,7 +72,7 @@ func Test_BlockingAtomicTrie_InitializeGenesisPlusOne(t *testing.T) {
 	err = atomicTrie.Initialize(1, dbCommitFn)
 	assert.NoError(t, err)
 
-	_, num, err := atomicTrie.LastCommitted()
+	_, num := atomicTrie.LastCommitted()
 	assert.NoError(t, err)
 	assert.EqualValues(t, 0, num, "expected %d was %d", 0, num)
 }
@@ -98,7 +98,7 @@ func Test_BlockingAtomicTrie_Initialize(t *testing.T) {
 	err = atomicTrie.Initialize(lastAcceptedHeight, dbCommitFn)
 	assert.NoError(t, err)
 
-	lastCommittedHash, lastCommittedHeight, err := atomicTrie.LastCommitted()
+	lastCommittedHash, lastCommittedHeight := atomicTrie.LastCommitted()
 	assert.NoError(t, err)
 	assert.NotEqual(t, common.Hash{}, lastCommittedHash)
 	assert.EqualValues(t, 1000, lastCommittedHeight, "expected %d but was %d", 1000, lastCommittedHeight)
@@ -147,7 +147,7 @@ func Test_IndexerWriteAndRead(t *testing.T) {
 		_, err := indexer.Index(height, atomicRequests)
 		assert.NoError(t, err)
 		if height%testCommitInterval == 0 {
-			lastCommittedBlockHash, lastCommittedBlockHeight, err = indexer.LastCommitted()
+			lastCommittedBlockHash, lastCommittedBlockHeight = indexer.LastCommitted()
 			assert.NoError(t, err)
 			assert.NotEqual(t, common.Hash{}, lastCommittedBlockHash)
 			blockRootMap[lastCommittedBlockHeight] = lastCommittedBlockHash
@@ -157,8 +157,7 @@ func Test_IndexerWriteAndRead(t *testing.T) {
 	// ensure we have 3 roots
 	assert.Len(t, blockRootMap, 3)
 
-	hash, height, err := indexer.LastCommitted()
-	assert.NoError(t, err)
+	hash, height := indexer.LastCommitted()
 	assert.EqualValues(t, lastCommittedBlockHeight, height, "expected %d was %d", 200, lastCommittedBlockHeight)
 	assert.Equal(t, lastCommittedBlockHash, hash)
 
@@ -170,7 +169,7 @@ func Test_IndexerWriteAndRead(t *testing.T) {
 	}
 
 	// ensure Index does not accept blocks older than last committed height
-	_, err = indexer.Index(10, testDataExportTx().mustAtomicOps())
+	_, err := indexer.Index(10, testDataExportTx().mustAtomicOps())
 	assert.Error(t, err)
 	assert.Equal(t, "height 10 must be after last committed height 200", err.Error())
 
@@ -185,8 +184,7 @@ func Test_IndexerInitializeFromState(t *testing.T) {
 	indexer := newTestAtomicTrieIndexer(t)
 
 	// ensure last is uninitialised
-	hash, height, err := indexer.LastCommitted()
-	assert.NoError(t, err)
+	hash, height := indexer.LastCommitted()
 	assert.Equal(t, uint64(0), height)
 	assert.Equal(t, common.Hash{}, hash)
 
@@ -198,15 +196,14 @@ func Test_IndexerInitializeFromState(t *testing.T) {
 		assert.NoError(t, err)
 
 		if height%testCommitInterval == 0 {
-			lastCommittedBlockHash, lastCommittedBlockHeight, err := indexer.LastCommitted()
+			lastCommittedBlockHash, lastCommittedBlockHeight := indexer.LastCommitted()
 			assert.NoError(t, err)
 			assert.NotEqual(t, common.Hash{}, lastCommittedBlockHash)
 			blockRootMap[lastCommittedBlockHeight] = lastCommittedBlockHash
 		}
 	}
 
-	hash, height, err = indexer.LastCommitted()
-	assert.NoError(t, err)
+	hash, height = indexer.LastCommitted()
 	assert.Equal(t, uint64(testCommitInterval), height)
 	assert.NotEqual(t, common.Hash{}, hash)
 
@@ -219,8 +216,7 @@ func Test_IndexerInitializeFromState(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	hash, height, err = indexer.LastCommitted()
-	assert.NoError(t, err)
+	hash, height = indexer.LastCommitted()
 	assert.Equal(t, uint64(testCommitInterval)*2, height)
 	assert.NotEqual(t, common.Hash{}, hash)
 }
