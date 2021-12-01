@@ -17,8 +17,7 @@ import (
 
 const (
 	// MaxOutstandingFastSyncRequests is the maximum number of
-	// GetAcceptedFrontier and GetAccepted messages sent but not responded
-	// to/failed
+	// messages sent but not responded to/failed for each relevant message type
 	MaxOutstandingFastSyncRequests = 50
 )
 

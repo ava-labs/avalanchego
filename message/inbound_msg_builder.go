@@ -417,15 +417,13 @@ func (b *inMsgBuilder) InboundStateSummaryFrontier(
 	summary []byte,
 	nodeID ids.ShortID,
 ) InboundMessage {
-	multiContainer := make([][]byte, 2)
-	multiContainer[0] = key
-	multiContainer[1] = summary
 	return &inboundMessage{
 		op: StateSummaryFrontier,
 		fields: map[Field]interface{}{
-			ChainID:             chainID[:],
-			RequestID:           requestID,
-			MultiContainerBytes: multiContainer,
+			ChainID:        chainID[:],
+			RequestID:      requestID,
+			SummaryKey:     key,
+			ContainerBytes: summary,
 		},
 		nodeID: nodeID,
 	}
@@ -442,10 +440,10 @@ func (b *inMsgBuilder) InboundGetAcceptedStateSummary(
 	return &inboundMessage{
 		op: GetAcceptedStateSummary,
 		fields: map[Field]interface{}{
-			ChainID:             chainID[:],
-			RequestID:           requestID,
-			Deadline:            uint64(deadline),
-			MultiContainerBytes: keys,
+			ChainID:          chainID[:],
+			RequestID:        requestID,
+			Deadline:         uint64(deadline),
+			MultiSummaryKeys: keys,
 		},
 		nodeID:         nodeID,
 		expirationTime: received.Add(deadline),
@@ -455,15 +453,15 @@ func (b *inMsgBuilder) InboundGetAcceptedStateSummary(
 func (b *inMsgBuilder) InboundAcceptedStateSummary(
 	chainID ids.ID,
 	requestID uint32,
-	containers [][]byte,
+	keys [][]byte,
 	nodeID ids.ShortID,
 ) InboundMessage {
 	return &inboundMessage{
 		op: AcceptedStateSummary,
 		fields: map[Field]interface{}{
-			ChainID:             chainID[:],
-			RequestID:           requestID,
-			MultiContainerBytes: containers,
+			ChainID:          chainID[:],
+			RequestID:        requestID,
+			MultiSummaryKeys: keys,
 		},
 		nodeID: nodeID,
 	}

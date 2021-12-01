@@ -365,21 +365,21 @@ func (s *Sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uin
 	}
 }
 
-func (s *Sender) SendAcceptedStateSummary(nodeID ids.ShortID, requestID uint32, summaries [][]byte) {
+func (s *Sender) SendAcceptedStateSummary(nodeID ids.ShortID, requestID uint32, keys [][]byte) {
 	if nodeID == s.ctx.NodeID {
-		inMsg := s.msgCreator.InboundAcceptedStateSummary(s.ctx.ChainID, requestID, summaries, nodeID)
+		inMsg := s.msgCreator.InboundAcceptedStateSummary(s.ctx.ChainID, requestID, keys, nodeID)
 		go s.router.HandleInbound(inMsg)
 		return
 	}
 
 	// Create the outbound message.
-	outMsg, err := s.msgCreator.AcceptedStateSummary(s.ctx.ChainID, requestID, summaries)
+	outMsg, err := s.msgCreator.AcceptedStateSummary(s.ctx.ChainID, requestID, keys)
 	if err != nil {
 		s.ctx.Log.Error(
 			"failed to build AcceptedStateSummary(%s, %d, %s): %s",
 			s.ctx.ChainID,
 			requestID,
-			summaries,
+			keys,
 			err,
 		)
 		return
@@ -393,7 +393,7 @@ func (s *Sender) SendAcceptedStateSummary(nodeID ids.ShortID, requestID uint32, 
 			nodeID,
 			s.ctx.ChainID,
 			requestID,
-			summaries,
+			keys,
 		)
 	}
 }

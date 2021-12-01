@@ -296,15 +296,8 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 
 	case message.StateSummaryFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
-		data, ok := msg.Get(message.MultiContainerBytes).([][]byte)
-		if !ok || len(data) != 2 {
-			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse key and summary.",
-				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
-			return nil
-		}
-
-		key := data[0]
-		summary := data[1]
+		key := msg.Get(message.SummaryKey).([]byte)
+		summary := msg.Get(message.ContainerBytes).([]byte)
 		return h.fastSyncer.StateSummaryFrontier(nodeID, reqID, key, summary)
 
 	case message.GetStateSummaryFrontierFailed:
@@ -313,9 +306,9 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 
 	case message.GetAcceptedStateSummary:
 		reqID := msg.Get(message.RequestID).(uint32)
-		keys, ok := msg.Get(message.MultiContainerBytes).([][]byte)
+		keys, ok := msg.Get(message.MultiSummaryKeys).([][]byte)
 		if !ok {
-			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse MultiContainerBytes",
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse MultiSummaryKeys",
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
@@ -323,9 +316,9 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 
 	case message.AcceptedStateSummary:
 		reqID := msg.Get(message.RequestID).(uint32)
-		keys, ok := msg.Get(message.MultiContainerBytes).([][]byte)
+		keys, ok := msg.Get(message.MultiSummaryKeys).([][]byte)
 		if !ok {
-			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse MultiContainerBytes",
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse MultiSummaryKeys",
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}

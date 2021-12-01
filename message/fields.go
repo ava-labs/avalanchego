@@ -32,6 +32,8 @@ const (
 	AppBytes                         // Used at application level
 	VMMessage                        // Used internally
 	Uptime                           // Used for Pong
+	SummaryKey                       // Used for fast sync
+	MultiSummaryKeys                 // Used for fast sync
 )
 
 // Packer returns the packer function that can be used to pack this field.
@@ -75,6 +77,10 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPackHashes
 	case Uptime:
 		return wrappers.TryPackByte
+	case SummaryKey:
+		return wrappers.TryPackByte
+	case MultiSummaryKeys:
+		return wrappers.TryPack2DBytes
 	default:
 		return nil
 	}
@@ -121,6 +127,10 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackHashes
 	case Uptime:
 		return wrappers.TryUnpackByte
+	case SummaryKey:
+		return wrappers.TryUnpackByte
+	case MultiSummaryKeys:
+		return wrappers.TryUnpack2DBytes
 	default:
 		return nil
 	}
@@ -168,6 +178,10 @@ func (f Field) String() string {
 		return "VMMessage"
 	case Uptime:
 		return "Uptime"
+	case SummaryKey:
+		return "SummaryKey"
+	case MultiSummaryKeys:
+		return "MultiSummaryKeys"
 	default:
 		return "Unknown Field"
 	}
