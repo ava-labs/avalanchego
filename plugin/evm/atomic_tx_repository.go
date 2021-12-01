@@ -1,5 +1,6 @@
 // (c) 2020-2021, Ava Labs, Inc.
 // See the file LICENSE for licensing terms.
+
 package evm
 
 import (
@@ -12,8 +13,14 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+)
+
+const (
+	commitSizeCap = 10 * units.MiB
 )
 
 var (
@@ -25,8 +32,7 @@ var (
 // AtomicTxRepository defines an entity that manages storage and indexing of
 // atomic transactions
 type AtomicTxRepository interface {
-	Initialize(commitFn func() error) error
-	GetIndexHeight() (bool, uint64, error)
+	GetIndexHeight() (uint64, bool, error)
 	GetByTxID(txID ids.ID) (*Tx, uint64, error)
 	GetByHeight(height uint64) ([]*Tx, error)
 	Write(height uint64, txs []*Tx) error
@@ -42,31 +48,32 @@ type atomicTxRepository struct {
 	// [acceptedAtomicTxByHeightDB] maintains an index of [height] => [atomic txs] for all accepted block heights.
 	acceptedAtomicTxByHeightDB database.Database
 
-	// Only used to store [maxIndexedHeightKey]
-	db database.Database
+	// This db is used to store [maxIndexedHeightKey] to avoid interfering with the iterators over the atomic transaction DBs.
+	db *versiondb.Database
 
 	// Use this codec for serializing
 	codec codec.Manager
 }
 
-func NewAtomicTxRepository(db database.Database, codec codec.Manager) AtomicTxRepository {
+func NewAtomicTxRepository(db *versiondb.Database, codec codec.Manager) (AtomicTxRepository, error) {
 	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
 	acceptedAtomicTxByHeightDB := prefixdb.New(atomicHeightTxDBPrefix, db)
 
-	return &atomicTxRepository{
+	repo := &atomicTxRepository{
 		acceptedAtomicTxDB:         acceptedAtomicTxDB,
 		acceptedAtomicTxByHeightDB: acceptedAtomicTxByHeightDB,
 		codec:                      codec,
 		db:                         db,
 	}
+	return repo, repo.initialize()
 }
 
-func (a *atomicTxRepository) Initialize(apricotPhase5Height uint64) error {
+func (a *atomicTxRepository) initialize() error {
 	startTime := time.Now()
 	indexHeight := uint64(0)
-	exists, indexHeight, err := a.GetIndexHeight()
+	indexHeight, exists, err := a.GetIndexHeight()
 	if err != nil {
-		return nil
+		return err
 	}
 	if exists {
 		log.Info("updating atomic tx repository height index", "lastHeight", indexHeight)
@@ -82,15 +89,17 @@ func (a *atomicTxRepository) Initialize(apricotPhase5Height uint64) error {
 	newMaxHeight := indexHeight
 
 	// Remember which heights we processed so we can read existing txs if we encounter the same height twice.
+	// TODO usage of seenHeights is broken when there are restarts, so we need to decide how to fix this.
 	seenHeights := make(map[uint64]struct{})
 	lastLogTime := startTime
 
 	// Keep track of the size of pending writes to be committed
-	approxCommitBytes := make(map[uint64]int)
 	totalApproxCommitBytes := 0
-	commitSizeCap := 10 * 1024 * 1024
 
 	for iter.Next() {
+		if err := iter.Error(); err != nil {
+			return fmt.Errorf("atomic tx DB iterator errored while initializing atomic trie: %w", err)
+		}
 		// Periodically log progress
 		if time.Since(lastLogTime) > 15*time.Second {
 			log.Info("updating tx repository height index", "indexed", txIndexed, "skipped", txSkipped)
@@ -98,7 +107,8 @@ func (a *atomicTxRepository) Initialize(apricotPhase5Height uint64) error {
 		}
 
 		// iter.Value() consists of [height packed as uint64] + [tx serialized as packed []byte]
-		heightBytes := iter.Value()[:wrappers.LongLen]
+		iterValue := iter.Value()
+		heightBytes := iterValue[:wrappers.LongLen]
 		height := binary.BigEndian.Uint64(heightBytes)
 		if height < indexHeight {
 			txSkipped++
@@ -106,26 +116,22 @@ func (a *atomicTxRepository) Initialize(apricotPhase5Height uint64) error {
 		}
 
 		// Get the tx iter is pointing to, len(txs) == 1 is expected here.
-		txBytes := iter.Value()[wrappers.LongLen+wrappers.IntLen:]
-		txs, err := ExtractAtomicTxs(txBytes, false, a.codec)
+		txBytes := iterValue[wrappers.LongLen+wrappers.IntLen:]
+		txs, err := ExtractAtomicTx(txBytes, a.codec)
 		if err != nil {
 			return err
 		}
 
-		// Past apricotPhase5 we allow multiple txs per block
-		// This ensures that we keep the memory footprint low
-		// by not storing block heights for blocks prior
-		if height >= apricotPhase5Height {
-			// If this height is already processed, get existing txs for that height.
-			if _, exists := seenHeights[height]; exists {
-				existingTxs, err := a.GetByHeight(height)
-				if err != nil {
-					return err
-				}
-				txs = append(existingTxs, txs...)
+		// If this height is already processed, get the existing transactions
+		// at [height] so that they can be re-indexed.
+		if _, exists := seenHeights[height]; exists {
+			existingTxs, err := a.GetByHeight(height)
+			if err != nil {
+				return err
 			}
-			seenHeights[height] = struct{}{}
+			txs = append(existingTxs, txs...)
 		}
+		seenHeights[height] = struct{}{}
 
 		txsBytes, err := a.codec.Marshal(codecVersion, txs)
 		if err != nil {
@@ -134,15 +140,13 @@ func (a *atomicTxRepository) Initialize(apricotPhase5Height uint64) error {
 		if err := a.acceptedAtomicTxByHeightDB.Put(heightBytes, txsBytes); err != nil {
 			return err
 		}
-		approxCommitBytes[height] = len(txBytes)
 		totalApproxCommitBytes += len(txBytes)
 
 		// call commitFn to write to underlying DB if needed
-		if commitFn != nil && totalApproxCommitBytes > commitSizeCap {
-			if err := commitFn(); err != nil {
+		if totalApproxCommitBytes > commitSizeCap {
+			if err := a.db.Commit(); err != nil {
 				return err
 			}
-			approxCommitBytes = make(map[uint64]int)
 			totalApproxCommitBytes = 0
 		}
 
@@ -158,10 +162,9 @@ func (a *atomicTxRepository) Initialize(apricotPhase5Height uint64) error {
 	if err := a.db.Put(maxIndexedHeightKey, newMaxHeightBytes); err != nil {
 		return err
 	}
-	if commitFn != nil {
-		if err := commitFn(); err != nil {
-			return err
-		}
+
+	if err := a.db.Commit(); err != nil {
+		return err
 	}
 
 	log.Info("initialized atomic tx repository", "indexHeight", indexHeight, "maxHeight", newMaxHeight, "duration", time.Since(startTime), "txIndexed", txIndexed, "txSkipped", txSkipped)
@@ -169,28 +172,22 @@ func (a *atomicTxRepository) Initialize(apricotPhase5Height uint64) error {
 }
 
 // GetIndexHeight returns:
-// - whether the index has been initialized
 // - index height
+// - whether the index has been initialized
 // - optional error
-func (a *atomicTxRepository) GetIndexHeight() (bool, uint64, error) {
-	exists, err := a.db.Has(maxIndexedHeightKey)
-	if err != nil {
-		return false, 0, err
-	}
-
-	if !exists {
-		return exists, 0, nil
-	}
-
+func (a *atomicTxRepository) GetIndexHeight() (uint64, bool, error) {
 	indexHeightBytes, err := a.db.Get(maxIndexedHeightKey)
-	if err != nil {
-		return exists, 0, err
+	if err == database.ErrNotFound {
+		return 0, false, nil
+	} else if err != nil {
+		return 0, false, err
 	}
+
 	if len(indexHeightBytes) != wrappers.LongLen {
-		return exists, 0, fmt.Errorf("unexpected length for indexHeightBytes %d", len(indexHeightBytes))
+		return 0, false, fmt.Errorf("unexpected length for indexHeightBytes %d", len(indexHeightBytes))
 	}
 	indexHeight := binary.BigEndian.Uint64(indexHeightBytes)
-	return exists, indexHeight, nil
+	return indexHeight, true, nil
 }
 
 // GetByTxID queries [acceptedAtomicTxDB] for the [txID], parses a [*Tx] object
@@ -210,7 +207,7 @@ func (a *atomicTxRepository) GetByTxID(txID ids.ID) (*Tx, uint64, error) {
 	packer := wrappers.Packer{Bytes: indexedTxBytes}
 	height := packer.UnpackLong()
 	txBytes := packer.UnpackBytes()
-	txs, err := ExtractAtomicTxs(txBytes, false, a.codec)
+	txs, err := ExtractAtomicTx(txBytes, a.codec)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -230,7 +227,7 @@ func (a *atomicTxRepository) GetByHeight(height uint64) ([]*Tx, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ExtractAtomicTxs(txsBytes, true, a.codec)
+	return ExtractAtomicTxsBatch(txsBytes, a.codec)
 }
 
 // Write updates indexes maintained on atomic txs, so they can be queried
