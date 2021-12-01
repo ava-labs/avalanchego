@@ -162,6 +162,7 @@ func (fs *fastSyncer) startup() error {
 	fs.Config.Ctx.Log.Info("starting fast sync")
 	fs.Starter.MarkStart()
 
+	// set beacons
 	beacons, err := fs.Beacons.Sample(fs.Config.SampleK)
 	if err != nil {
 		return err
@@ -173,6 +174,7 @@ func (fs *fastSyncer) startup() error {
 		return err
 	}
 
+	// clear up messages tracker
 	fs.gR.ClearToRequest(message.StateSummaryFrontier)
 	for _, vdr := range beacons {
 		vdrID := vdr.ID()
@@ -191,11 +193,11 @@ func (fs *fastSyncer) startup() error {
 			return err
 		}
 	}
-
 	fs.gR.ClearRequested(message.AcceptedStateSummary)
 	fs.gR.ClearFailed(message.AcceptedStateSummary)
 	fs.acceptedVotes = make(map[string]uint64)
 
+	// initiate messages exchange
 	fs.attempts++
 	if !fs.gR.HasToRequest(message.StateSummaryFrontier) {
 		fs.Ctx.Log.Info("Fast syncing skipped due to no provided bootstraps")
@@ -206,46 +208,61 @@ func (fs *fastSyncer) startup() error {
 	return fs.sendGetStateSummaryFrontiers()
 }
 
+func (fs *fastSyncer) restartBootstrap(reset bool) error {
+	// resets the attempts when we're pulling blocks/vertices we don't want to
+	// fail the bootstrap at that stage
+	if reset {
+		fs.Ctx.Log.Debug("Checking for new fast sync frontiers")
+
+		fs.Restarted = true
+		fs.attempts = 0
+	}
+
+	if fs.attempts > 0 && fs.attempts%fs.RetryBootstrapWarnFrequency == 0 {
+		fs.Ctx.Log.Debug("continuing to attempt to fast sync after %d failed attempts. Is this node connected to the internet?",
+			fs.attempts)
+	}
+
+	return fs.startup()
+}
+
 // Ask up to [MaxOutstandingFastSyncRequests] state sync validators to send
 // their accepted state summary
 func (fs *fastSyncer) sendGetStateSummaryFrontiers() error {
-	validators := ids.NewShortSet(1)
-
 	frontiersToRequest := MaxOutstandingFastSyncRequests - fs.gR.CountRequested(message.StateSummaryFrontier)
 	vdrsList := fs.gR.PopToRequest(message.StateSummaryFrontier, frontiersToRequest)
 	if err := fs.gR.RecordRequested(message.StateSummaryFrontier, vdrsList); err != nil {
 		return err
 	}
-	validators.Add(vdrsList...)
 
-	if validators.Len() > 0 {
-		fs.Sender.SendGetStateSummaryFrontier(validators, fs.RequestID)
+	vdrs := ids.NewShortSet(1)
+	vdrs.Add(vdrsList...)
+	if vdrs.Len() > 0 {
+		fs.Sender.SendGetStateSummaryFrontier(vdrs, fs.RequestID)
 	}
-
 	return nil
 }
 
 // Ask up to [MaxOutstandingFastSyncRequests] bootstrap validators to send
 // their filtered accepted frontier
 func (fs *fastSyncer) sendGetAccepted() error {
-	vdrs := ids.NewShortSet(1)
-
 	acceptedFrontiersToRequest := MaxOutstandingFastSyncRequests - fs.gR.CountRequested(message.AcceptedStateSummary)
 	vdrsList := fs.gR.PopToRequest(message.AcceptedStateSummary, acceptedFrontiersToRequest)
 	if err := fs.gR.RecordRequested(message.AcceptedStateSummary, vdrsList); err != nil {
 		return err
 	}
-	vdrs.Add(vdrsList...)
 
+	vdrs := ids.NewShortSet(1)
+	vdrs.Add(vdrsList...)
 	if vdrs.Len() > 0 {
 		fs.Ctx.Log.Debug("sent %d more GetAccepted messages with %d more to send",
 			vdrs.Len(), fs.gR.CountRequested(message.AcceptedStateSummary))
 		fs.Sender.SendGetAcceptedStateSummary(vdrs, fs.RequestID, fs.acceptedKeys)
 	}
-
 	return nil
 }
 
+// FastSyncHandler interface implementation
 func (fs *fastSyncer) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error {
 	summary, err := fs.fastSyncVM.StateSyncGetLastSummary()
 	if err != nil {
@@ -255,6 +272,7 @@ func (fs *fastSyncer) GetStateSummaryFrontier(validatorID ids.ShortID, requestID
 	return nil
 }
 
+// FastSyncHandler interface implementation
 func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, key, summary []byte) error {
 	// ignores any late responses
 	if requestID != fs.RequestID {
@@ -300,7 +318,7 @@ func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID ui
 		if fs.Config.RetryBootstrap {
 			fs.Ctx.Log.Debug("Not enough frontiers received, restarting state sync... - Beacons: %d - Failed Bootstrappers: %d "+
 				"- state sync attempt: %d", fs.Beacons.Len(), failedAcceptedFrontier.Len(), fs.attempts)
-			return fs.RestartBootstrap(false)
+			return fs.restartBootstrap(false)
 		}
 
 		fs.Ctx.Log.Debug("Didn't receive enough frontiers - failed validators: %d, "+
@@ -317,6 +335,7 @@ func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID ui
 	return fs.sendGetAccepted()
 }
 
+// FastSyncHandler interface implementation
 func (fs *fastSyncer) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error {
 	acceptedKeys := make([][]byte, 0, len(keys))
 	for _, key := range keys {
@@ -330,6 +349,7 @@ func (fs *fastSyncer) GetAcceptedStateSummary(validatorID ids.ShortID, requestID
 	return nil
 }
 
+// FastSyncHandler interface implementation
 func (fs *fastSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error {
 	// ignores any late responses
 	if requestID != fs.RequestID {
@@ -392,7 +412,7 @@ func (fs *fastSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID ui
 		if fs.Config.RetryBootstrap && fs.Beacons.Weight()-fs.Alpha < failedBeaconWeight {
 			fs.Ctx.Log.Debug("Not enough votes received, restarting state sync... - Beacons: %d - Failed Bootstrappers: %d "+
 				"- fast sync attempt: %d", fs.Beacons.Len(), failedAccepted.Len(), fs.attempts)
-			return fs.RestartBootstrap(false)
+			return fs.restartBootstrap(false)
 		}
 	}
 
@@ -405,24 +425,7 @@ func (fs *fastSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID ui
 	return fs.fastSyncVM.StateSync(accepted)
 }
 
-// Failed messages
-// GetStateSummaryFrontierFailed implements the Engine interface.
-func (fs *fastSyncer) GetStateSummaryFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
-	// ignores any late responses
-	if requestID != fs.RequestID {
-		fs.Ctx.Log.Debug("Received an Out-of-Sync GetStateSummaryFrontierFailed - validator: %v - expectedRequestID: %v, requestID: %v",
-			validatorID, fs.RequestID, requestID)
-		return nil
-	}
-
-	if err := fs.gR.AddFailed(message.StateSummaryFrontier, validatorID); err != nil {
-		return err
-	}
-
-	return fs.StateSummaryFrontier(validatorID, requestID, []byte{}, []byte{}) // TODO ABENEGIA: Why empty key and summary?
-}
-
-// GetAcceptedStateSummaryFailed implements the Engine interface.
+// FastSyncHandler interface implementation
 func (fs *fastSyncer) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, requestID uint32) error {
 	// ignores any late responses
 	if requestID != fs.RequestID {
@@ -438,35 +441,33 @@ func (fs *fastSyncer) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, req
 	return fs.AcceptedStateSummary(validatorID, requestID, [][]byte{}) // TODO ABENEGIA: just pick keys here and reask for them!
 }
 
-// AppRequest implements the Engine interface
+// FastSyncHandler interface implementation
+func (fs *fastSyncer) GetStateSummaryFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
+	// ignores any late responses
+	if requestID != fs.RequestID {
+		fs.Ctx.Log.Debug("Received an Out-of-Sync GetStateSummaryFrontierFailed - validator: %v - expectedRequestID: %v, requestID: %v",
+			validatorID, fs.RequestID, requestID)
+		return nil
+	}
+
+	if err := fs.gR.AddFailed(message.StateSummaryFrontier, validatorID); err != nil {
+		return err
+	}
+
+	return fs.StateSummaryFrontier(validatorID, requestID, []byte{}, []byte{}) // TODO ABENEGIA: Why empty key and summary?
+}
+
+// AppHandler interface implementation
 func (fs *fastSyncer) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
 	return fs.VM.AppRequest(nodeID, requestID, deadline, request)
 }
 
-// AppResponse implements the Engine interface
+// AppHandler interface implementation
 func (fs *fastSyncer) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
 	return fs.VM.AppResponse(nodeID, requestID, response)
 }
 
-// AppRequestFailed implements the Engine interface
+// AppHandler interface implementation
 func (fs *fastSyncer) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 	return fs.VM.AppRequestFailed(nodeID, requestID)
-}
-
-func (fs *fastSyncer) RestartBootstrap(reset bool) error {
-	// resets the attempts when we're pulling blocks/vertices we don't want to
-	// fail the bootstrap at that stage
-	if reset {
-		fs.Ctx.Log.Debug("Checking for new fast sync frontiers")
-
-		fs.Restarted = true
-		fs.attempts = 0
-	}
-
-	if fs.attempts > 0 && fs.attempts%fs.RetryBootstrapWarnFrequency == 0 {
-		fs.Ctx.Log.Debug("continuing to attempt to fast sync after %d failed attempts. Is this node connected to the internet?",
-			fs.attempts)
-	}
-
-	return fs.startup()
 }
