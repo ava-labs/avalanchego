@@ -244,8 +244,8 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Uint(BootstrapMultiputMaxContainersReceivedKey, 2000, "This node reads at most this many containers from an incoming Multiput message")
 
 	// State syncing
-	fs.String(StateSyncIDsKey, "", "Comma separated list of state sync peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
-	fs.String(StateSyncIPsKey, "", "Comma separated list of state sync peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
+	fs.String(StateSyncTestingIDsKey, "", "Exclusive, comma separated list of state sync peer ips to connect to. Should be used to testing only. Example: 127.0.0.1:9630,127.0.0.1:9631")
+	fs.String(StateSyncTestingIPsKey, "", "Exclusive, Comma separated list of state sync peer ids to connect to. Should be used to testing only. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 
 	// Consensus
 	fs.Int(SnowSampleSizeKey, 20, "Number of nodes to query for each network poll")

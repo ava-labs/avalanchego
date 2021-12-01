@@ -176,7 +176,7 @@ type ManagerConfig struct {
 	ApricotPhase4MinPChainHeight uint64
 
 	// State sync
-	StateSyncValidators validators.Set
+	StateSyncTestingBeacons []ids.ShortID
 }
 
 type manager struct {
@@ -419,10 +419,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	if chainParams.CustomBeacons != nil {
 		beacons = chainParams.CustomBeacons
 	}
-	stateSyncValidators := vdrs
-	if m.StateSyncValidators != nil {
-		stateSyncValidators = m.StateSyncValidators
-	}
 
 	bootstrapWeight := beacons.Weight()
 
@@ -449,7 +445,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			chainParams.GenesisData,
 			vdrs,
 			beacons,
-			stateSyncValidators,
+			m.StateSyncTestingBeacons,
 			vm,
 			fxs,
 			consensusParams.Parameters,
@@ -676,8 +672,8 @@ func (m *manager) createSnowmanChain(
 	ctx *snow.ConsensusContext,
 	genesisData []byte,
 	vdrs,
-	beacons,
-	stateSyncValidators validators.Set,
+	beacons validators.Set,
+	stateSyncTestingBeacons []ids.ShortID,
 	vm block.ChainVM,
 	fxs []*common.Fx,
 	consensusParams snowball.Parameters,
@@ -807,23 +803,14 @@ func (m *manager) createSnowmanChain(
 	}
 
 	// create a config for state sync
-	stateSyncWeight := stateSyncValidators.Weight()
-	stateSyncConfig := commonCfg // make a copy
-	stateSyncConfig.Beacons = stateSyncValidators
-	stateSyncConfig.Alpha = stateSyncWeight/2 + 1
-	stateSyncConfig.StartupAlpha = (3*stateSyncWeight + 3) / 4
-	if stateSyncConfig.SampleK > int(stateSyncWeight) {
-		stateSyncConfig.SampleK = int(stateSyncWeight)
-	}
-
-	stateSyncGearStarter := common.NewGearStarter(stateSyncValidators, stateSyncConfig.StartupAlpha)
 	gearStarter := common.NewGearStarter(beacons, commonCfg.StartupAlpha)
 
 	// create fast sync gear
 	fastSyncCfg := fastsyncer.Config{
-		Config:  stateSyncConfig,
-		VM:      vm,
-		Starter: stateSyncGearStarter,
+		Config:                  commonCfg,
+		StateSyncTestingBeacons: stateSyncTestingBeacons,
+		VM:                      vm,
+		Starter:                 gearStarter,
 	}
 	fastSync := fastsyncer.NewFastSyncer(
 		fastSyncCfg,

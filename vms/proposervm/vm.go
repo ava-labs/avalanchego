@@ -37,7 +37,9 @@ const (
 var (
 	dbPrefix = []byte("proposervm")
 
-	_ block.ChainVM = &VM{}
+	_ block.ChainVM         = &VM{}
+	_ block.BatchedChainVM  = &VM{}
+	_ block.StateSyncableVM = &VM{}
 )
 
 type VM struct {

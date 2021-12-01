@@ -357,7 +357,7 @@ func (n *Node) Dispatch() error {
 		}
 	}
 	// Add state sync nodes to the peer network
-	for _, peerIP := range n.Config.StateSyncIPs {
+	for _, peerIP := range n.Config.StateSyncTestOnlyIPs {
 		if !peerIP.Equal(n.Config.IP.IP()) {
 			n.Net.TrackIP(peerIP)
 		}
@@ -603,13 +603,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		return fmt.Errorf("couldn't initialize chain router: %w", err)
 	}
 
-	stateSyncValidators := validators.NewSet()
-	for _, id := range n.Config.StateSyncConfig.StateSyncIDs {
-		if err := stateSyncValidators.AddWeight(id, 1); err != nil {
-			return err
-		}
-	}
-
 	n.chainManager = chains.New(&chains.ManagerConfig{
 		StakingEnabled:                         n.Config.EnableStaking,
 		StakingCert:                            n.Config.StakingTLSCert,
@@ -652,7 +645,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		ApricotPhase4MinPChainHeight:           version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
 
 		// State sync
-		StateSyncValidators: stateSyncValidators,
+		StateSyncTestingBeacons: n.Config.StateSyncTestOnlyIDs,
 	})
 
 	vdrs := n.vdrs

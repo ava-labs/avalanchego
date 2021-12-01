@@ -18,49 +18,50 @@ func (vm *VM) StateSyncEnabled() (bool, error) {
 	return fsVM.StateSyncEnabled()
 }
 
-func (vm *VM) StateSyncGetLastSummary() ([]byte, error) {
+func (vm *VM) StateSyncGetLastSummary() (block.Summary, error) {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
-		return nil, block.ErrStateSyncableVMNotImplemented
+		return block.Summary{}, block.ErrStateSyncableVMNotImplemented
 	}
-	// TODO: If this has a race condition with blocks being accepted
-	// between time the ChainVM gets the state summary, we can either
-	// (a) return (height uint64, summary []byte, error) from this method
-	// (b) encode the height or inner blk id in the summary bytes.
-	// (c) ? other solutions may be possible too
+	// // TODO: If this has a race condition with blocks being accepted
+	// // between time the ChainVM gets the state summary, we can either
+	// // (a) return (height uint64, summary []byte, error) from this method
+	// // (b) encode the height or inner blk id in the summary bytes.
+	// // (c) ? other solutions may be possible too
 
-	// find last syncable height
-	lastAcceptedID, err := vm.GetLastAccepted()
-	if err != nil {
-		return nil, err
-	}
+	// // find last syncable height
+	// lastAcceptedID, err := vm.GetLastAccepted()
+	// if err != nil {
+	// 	return block.Summary{}, err
+	// }
 
-	block, err := vm.GetBlock(lastAcceptedID)
-	if err != nil {
-		return nil, err
-	}
-	height := block.Height()
-	syncableHeight := height - height%4096
-	// TODO: we can cache the result here and also
-	// proactively set it on processing blocks.
-	for ; height > syncableHeight; height-- {
-		block, err = vm.GetBlock(block.Parent())
-		if err != nil {
-			return nil, err
-		}
-	}
+	// blk, err := vm.GetBlock(lastAcceptedID)
+	// if err != nil {
+	// 	return block.Summary{}, err
+	// }
+	// height := blk.Height()
+	// syncableHeight := height - height%4096
+	// // TODO: we can cache the result here and also
+	// // proactively set it on processing blocks.
+	// for ; height > syncableHeight; height-- {
+	// 	blk, err = vm.GetBlock(blk.Parent())
+	// 	if err != nil {
+	// 		return block.Summary{}, err
+	// 	}
+	// }
 	vmSummary, err := fsVM.StateSyncGetLastSummary()
-	if err != nil {
-		return nil, err
-	}
-	blockBytes := block.Bytes()
-	packerLen := len(blockBytes) + wrappers.IntLen + len(vmSummary.Key) +
-		wrappers.IntLen + len(vmSummary.State)
-	packer := wrappers.Packer{Bytes: make([]byte, packerLen)}
-	packer.PackBytes(blockBytes)
-	packer.PackFixedBytes(vmSummary.Key)
-	packer.PackFixedBytes(vmSummary.State)
-	return packer.Bytes, nil
+	// if err != nil {
+	// 	return block.Summary{}, err
+	// }
+	// blockBytes := blk.Bytes()
+	// packerLen := len(blockBytes) + wrappers.IntLen + len(vmSummary.Key) +
+	// 	wrappers.IntLen + len(vmSummary.State)
+	// packer := wrappers.Packer{Bytes: make([]byte, packerLen)}
+	// packer.PackBytes(blockBytes)
+	// packer.PackFixedBytes(vmSummary.Key)
+	// packer.PackFixedBytes(vmSummary.State)
+	// return packer.Bytes, nil
+	return vmSummary, err
 }
 
 func (vm *VM) StateSyncIsSummaryAccepted(key []byte) (bool, error) {

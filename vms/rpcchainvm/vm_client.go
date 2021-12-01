@@ -49,8 +49,9 @@ import (
 var (
 	errUnsupportedFXs = errors.New("unsupported feature extensions")
 
-	_ block.ChainVM        = &VMClient{}
-	_ block.BatchedChainVM = &VMClient{}
+	_ block.ChainVM         = &VMClient{}
+	_ block.BatchedChainVM  = &VMClient{}
+	_ block.StateSyncableVM = &VMClient{}
 )
 
 const (

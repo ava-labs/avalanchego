@@ -3,13 +3,14 @@
 package snowsyncer
 
 import (
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 type Config struct {
 	common.Config
-
-	VM      block.ChainVM
-	Starter common.GearStarter
+	StateSyncTestingBeacons []ids.ShortID // testing beacons from which nodes fast sync without network consensus
+	VM                      block.ChainVM
+	Starter                 common.GearStarter
 }

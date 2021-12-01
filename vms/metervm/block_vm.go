@@ -17,10 +17,11 @@ import (
 )
 
 var (
-	_ block.ChainVM        = &blockVM{}
-	_ block.BatchedChainVM = &blockVM{}
-	_ snowman.Block        = &meterBlock{}
-	_ snowman.OracleBlock  = &meterBlock{}
+	_ block.ChainVM         = &blockVM{}
+	_ block.BatchedChainVM  = &blockVM{}
+	_ block.StateSyncableVM = &blockVM{}
+	_ snowman.Block         = &meterBlock{}
+	_ snowman.OracleBlock   = &meterBlock{}
 )
 
 func NewBlockVM(vm block.ChainVM) block.ChainVM {

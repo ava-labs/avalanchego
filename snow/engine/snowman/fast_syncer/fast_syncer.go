@@ -3,6 +3,7 @@
 package snowsyncer
 
 import (
+	"fmt"
 	stdmath "math"
 	"time"
 
@@ -115,6 +116,11 @@ func (fs *fastSyncer) Connected(nodeID ids.ShortID) error {
 
 	if fs.Starter.CanStart() {
 		fs.Starter.MarkStart()
+		if len(fs.StateSyncTestingBeacons) != 0 {
+			// if StateSyncTestingBeacons are specified,
+			// they are the only validators involved in fast sync
+			return nil
+		}
 		return fs.startup()
 	}
 
@@ -158,50 +164,64 @@ func (fs *fastSyncer) Start(startReqID uint32) error {
 	return fs.startup()
 }
 
+// Note: ,
 func (fs *fastSyncer) startup() error {
 	fs.Config.Ctx.Log.Info("starting fast sync")
 	fs.Starter.MarkStart()
 
-	// set beacons
-	beacons, err := fs.Beacons.Sample(fs.Config.SampleK)
-	if err != nil {
-		return err
-	}
-
-	fs.sampledBeacons = validators.NewSet()
-	err = fs.sampledBeacons.Set(beacons)
-	if err != nil {
-		return err
-	}
-
 	// clear up messages tracker
 	fs.gR.ClearToRequest(message.StateSummaryFrontier)
-	for _, vdr := range beacons {
-		vdrID := vdr.ID()
-		if err := fs.gR.PushToRequest(message.StateSummaryFrontier, vdrID); err != nil {
-			return err
-		}
-	}
 	fs.gR.ClearRequested(message.StateSummaryFrontier)
 	fs.gR.ClearFailed(message.StateSummaryFrontier)
 	fs.acceptedFrontierSet = make(map[string][]byte)
 
 	fs.gR.ClearToRequest(message.AcceptedStateSummary)
-	for _, vdr := range fs.Beacons.List() {
-		vdrID := vdr.ID()
-		if err := fs.gR.PushToRequest(message.AcceptedStateSummary, vdrID); err != nil {
-			return err
-		}
-	}
 	fs.gR.ClearRequested(message.AcceptedStateSummary)
 	fs.gR.ClearFailed(message.AcceptedStateSummary)
 	fs.acceptedVotes = make(map[string]uint64)
 
-	// initiate messages exchange
-	fs.attempts++
-	if !fs.gR.HasToRequest(message.StateSummaryFrontier) {
-		fs.Ctx.Log.Info("Fast syncing skipped due to no provided bootstraps")
-		return fs.fastSyncVM.StateSync(nil)
+	// set beacons
+	if len(fs.StateSyncTestingBeacons) != 0 {
+		// if StateSyncTestingBeacons are specified, frontiers from these nodes only will be pulled
+		// and and pass them to VM. No voting rounds for these frontiers; just wait to have them all
+		// and pass them to VM
+		for _, vdrID := range fs.StateSyncTestingBeacons {
+			if err := fs.gR.PushToRequest(message.StateSummaryFrontier, vdrID); err != nil {
+				return err
+			}
+		}
+	} else {
+		beacons, err := fs.Beacons.Sample(fs.Config.SampleK)
+		if err != nil {
+			return err
+		}
+
+		fs.sampledBeacons = validators.NewSet()
+		err = fs.sampledBeacons.Set(beacons)
+		if err != nil {
+			return err
+		}
+
+		for _, vdr := range beacons {
+			vdrID := vdr.ID()
+			if err := fs.gR.PushToRequest(message.StateSummaryFrontier, vdrID); err != nil {
+				return err
+			}
+		}
+
+		for _, vdr := range fs.Beacons.List() {
+			vdrID := vdr.ID()
+			if err := fs.gR.PushToRequest(message.AcceptedStateSummary, vdrID); err != nil {
+				return err
+			}
+		}
+
+		// initiate messages exchange
+		fs.attempts++
+		if !fs.gR.HasToRequest(message.StateSummaryFrontier) {
+			fs.Ctx.Log.Info("Fast syncing skipped due to no provided bootstraps")
+			return fs.fastSyncVM.StateSync(nil)
+		}
 	}
 
 	fs.RequestID++
@@ -280,12 +300,29 @@ func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID ui
 			validatorID, fs.RequestID, requestID)
 		return nil
 	}
-
 	if !fs.gR.ConsumeRequested(message.StateSummaryFrontier, validatorID) {
 		return nil
 	}
-
 	fs.acceptedFrontierSet[string(key)] = summary
+
+	if len(fs.StateSyncTestingBeacons) != 0 {
+		// No voting rounds for these frontiers. Just download them from specified beacons
+		if len(fs.acceptedFrontierSet) < len(fs.StateSyncTestingBeacons) {
+			// still waiting on requests
+			return nil
+		}
+
+		// received what we needed. Just pass to VM
+		accepted := make([]block.Summary, len(fs.acceptedFrontierSet))
+		for k, v := range fs.acceptedFrontierSet {
+			accepted = append(accepted, block.Summary{
+				Key:   []byte(k),
+				State: v,
+			})
+		}
+		return fs.fastSyncVM.StateSync(accepted)
+	}
+
 	if err := fs.sendGetStateSummaryFrontiers(); err != nil {
 		return err
 	}
@@ -434,11 +471,16 @@ func (fs *fastSyncer) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, req
 		return nil
 	}
 
+	if len(fs.StateSyncTestingBeacons) != 0 {
+		// we are not able to obtain summaries from all StateSyncTestingBeacons; returning fatal error
+		return fmt.Errorf("failed downloading summaries from StateSyncTestingBeacons")
+	}
+
 	if err := fs.gR.AddFailed(message.AcceptedStateSummary, validatorID); err != nil {
 		return err
 	}
 
-	return fs.AcceptedStateSummary(validatorID, requestID, [][]byte{}) // TODO ABENEGIA: just pick keys here and reask for them!
+	return fs.AcceptedStateSummary(validatorID, requestID, [][]byte{})
 }
 
 // FastSyncHandler interface implementation
@@ -454,7 +496,7 @@ func (fs *fastSyncer) GetStateSummaryFrontierFailed(validatorID ids.ShortID, req
 		return err
 	}
 
-	return fs.StateSummaryFrontier(validatorID, requestID, []byte{}, []byte{}) // TODO ABENEGIA: Why empty key and summary?
+	return fs.StateSummaryFrontier(validatorID, requestID, []byte{}, []byte{})
 }
 
 // AppHandler interface implementation
