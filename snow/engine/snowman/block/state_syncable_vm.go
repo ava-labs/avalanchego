@@ -11,12 +11,22 @@ import (
 
 var ErrStateSyncableVMNotImplemented = errors.New("vm does not implement StateSyncableVM interface")
 
-// Notes: Key should uniquely identify Summary.
-// For Default Network VMs, Key is concatenation of ProposerBlockID + InnerVMBlockID + hash of State
-// Key is a string to be easily used as key map
+// Summary represents the information needed for state sync processing
 type Summary struct {
-	Key   []byte
-	State []byte
+	Key   []byte // Should uniquely identify Summary
+	State []byte // actual state summary content
+}
+
+// Default Network VMs have a specific structure for Summary.Key
+// However StateSyncableVM does not require usage of these default formats
+type ProposerSummaryKey struct {
+	ProBlkID ids.ID            `serialize:"true"`
+	InnerKey DefaultSummaryKey `serialize:"true"`
+}
+
+type DefaultSummaryKey struct {
+	InnerBlkID   ids.ID `serialize:"true"`
+	InnerVMBytes []byte `serialize:"true"`
 }
 
 type StateSyncableVM interface {
@@ -25,7 +35,7 @@ type StateSyncableVM interface {
 	// StateSummary returns latest Summary with an optional error
 	StateSyncGetLastSummary() (Summary, error)
 	// IsAccepted returns true if input []bytes represent a valid state summary
-	// for fast sync.
+	// for state sync.
 	StateSyncIsSummaryAccepted(key []byte) (bool, error)
 
 	// SyncState is called with a list of valid summaries to sync from.

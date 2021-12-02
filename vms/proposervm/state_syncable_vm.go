@@ -31,16 +31,6 @@ func init() {
 	}
 }
 
-type ProVMSummaryKey struct {
-	ProBlkID ids.ID            `serialize:"true"`
-	InnerKey InnerVMSummaryKey `serialize:"true"`
-}
-
-type InnerVMSummaryKey struct {
-	InnerBlkID   ids.ID `serialize:"true"`
-	InnerVMBytes []byte `serialize:"true"`
-}
-
 func (vm *VM) StateSyncEnabled() (bool, error) {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
@@ -62,7 +52,7 @@ func (vm *VM) StateSyncGetLastSummary() (block.Summary, error) {
 	}
 
 	// Extract innerBlkID from summary key
-	innerKey := InnerVMSummaryKey{}
+	innerKey := block.DefaultSummaryKey{}
 	parsedVersion, err := stateSyncCodec.Unmarshal(vmSummary.Key, &innerKey)
 	if err != nil {
 		return block.Summary{}, err
@@ -78,7 +68,7 @@ func (vm *VM) StateSyncGetLastSummary() (block.Summary, error) {
 	}
 
 	// recreate key
-	proKey := ProVMSummaryKey{
+	proKey := block.ProposerSummaryKey{
 		ProBlkID: proBlkID,
 		InnerKey: innerKey,
 	}
@@ -100,7 +90,7 @@ func (vm *VM) StateSyncIsSummaryAccepted(key []byte) (bool, error) {
 	}
 
 	// Extract innerKey from summary key
-	proKey := ProVMSummaryKey{}
+	proKey := block.ProposerSummaryKey{}
 	parsedVersion, err := stateSyncCodec.Unmarshal(key, &proKey)
 	if err != nil {
 		return false, err
@@ -127,7 +117,7 @@ func (vm *VM) StateSync(accepted []block.Summary) error {
 	// retrieve innerKey for each summary and propagate all to innerVM
 	innerSummaries := make([]block.Summary, 0, len(accepted))
 	for _, summ := range accepted {
-		proKey := ProVMSummaryKey{}
+		proKey := block.ProposerSummaryKey{}
 		parsedVersion, err := stateSyncCodec.Unmarshal(summ.Key, &proKey)
 		if err != nil {
 			return err
