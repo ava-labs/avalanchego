@@ -4,6 +4,7 @@
 package genesis
 
 import (
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -201,16 +202,27 @@ func GetConfig(networkID uint32) *Config {
 	}
 }
 
-// GetConfigFile loads a *Config from a provided
-// filepath.
+// GetConfigFile loads a *Config from a provided filepath.
 func GetConfigFile(fp string) (*Config, error) {
-	b, err := ioutil.ReadFile(filepath.Clean(fp))
+	bytes, err := ioutil.ReadFile(filepath.Clean(fp))
 	if err != nil {
 		return nil, fmt.Errorf("unable to load file %s: %w", fp, err)
 	}
+	return parseGenesisJSONBytesToConfig(bytes)
+}
 
+// GetConfigContent loads a *Config from a provided environment variable
+func GetConfigContent(genesisContent string) (*Config, error) {
+	bytes, err := base64.StdEncoding.DecodeString(genesisContent)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode base64 content: %w", err)
+	}
+	return parseGenesisJSONBytesToConfig(bytes)
+}
+
+func parseGenesisJSONBytesToConfig(bytes []byte) (*Config, error) {
 	var unparsedConfig UnparsedConfig
-	if err := json.Unmarshal(b, &unparsedConfig); err != nil {
+	if err := json.Unmarshal(bytes, &unparsedConfig); err != nil {
 		return nil, fmt.Errorf("could not unmarshal JSON: %w", err)
 	}
 
@@ -218,6 +230,5 @@ func GetConfigFile(fp string) (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse config: %w", err)
 	}
-
 	return &config, nil
 }

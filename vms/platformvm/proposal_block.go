@@ -32,10 +32,6 @@ type ProposalBlock struct {
 	onCommitState VersionedState
 	// The state that the chain will have if this block's proposal is aborted
 	onAbortState VersionedState
-	// The function to execute if this block's proposal is committed
-	onCommitFunc func() error
-	// The function to execute if this block's proposal is aborted
-	onAbortFunc func() error
 }
 
 func (pb *ProposalBlock) free() {
@@ -103,30 +99,6 @@ func (pb *ProposalBlock) setBaseState() {
 	pb.onAbortState.SetBase(pb.vm.internalState)
 }
 
-// onCommit should only be called after Verify is called.
-//
-// returns:
-//   1. The state of the chain assuming this proposal is enacted. (That is, if
-//      this block is accepted and followed by an accepted Commit block.)
-//   2. A function to be executed when this block's proposal is committed. This
-//      function should not write to state. This function should only be called
-//      after the state has been updated.
-func (pb *ProposalBlock) onCommit() (VersionedState, func() error) {
-	return pb.onCommitState, pb.onCommitFunc
-}
-
-// onAbort should only be called after Verify is called.
-//
-// returns:
-//   1. The state of the chain assuming this proposal is not enacted. (That is,
-//      if this block is accepted and followed by an accepted Abort block.)
-//   2. A function to be executed when this block's proposal is aborted. This
-//      function should not write to state. This function should only be called
-//      after the state has been updated.
-func (pb *ProposalBlock) onAbort() (VersionedState, func() error) {
-	return pb.onAbortState, pb.onAbortFunc
-}
-
 // Verify this block is valid.
 //
 // The parent block must either be a Commit or an Abort block.
@@ -175,7 +147,7 @@ func (pb *ProposalBlock) Verify() error {
 	parentState := parent.onAccept()
 
 	var err TxError
-	pb.onCommitState, pb.onAbortState, pb.onCommitFunc, pb.onAbortFunc, err = tx.Execute(pb.vm, parentState, &pb.Tx)
+	pb.onCommitState, pb.onAbortState, err = tx.Execute(pb.vm, parentState, &pb.Tx)
 	if err != nil {
 		txID := tx.ID()
 		pb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped

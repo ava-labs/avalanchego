@@ -5,6 +5,7 @@ package config
 
 import (
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -66,6 +67,8 @@ var (
 	errMinStakeDurationAboveMax      = errors.New("max stake duration can't be less than min stake duration")
 	errStakeMintingPeriodBelowMin    = errors.New("stake minting period can't be less than max stake duration")
 	errCannotWhitelistPrimaryNetwork = errors.New("cannot whitelist primary network")
+	errStakingKeyContentUnset        = fmt.Errorf("%s key not set but %s set", StakingKeyContentKey, StakingCertContentKey)
+	errStakingCertContentUnset       = fmt.Errorf("%s key set but %s not set", StakingKeyContentKey, StakingCertContentKey)
 )
 
 func GetRunnerConfig(v *viper.Viper) (runner.Config, error) {
@@ -160,12 +163,18 @@ func getAPIAuthConfig(v *viper.Viper) (node.APIAuthConfig, error) {
 	if !config.APIRequireAuthToken {
 		return config, nil
 	}
-	passwordFilePath := v.GetString(APIAuthPasswordFileKey)
-	pwBytes, err := ioutil.ReadFile(passwordFilePath)
-	if err != nil {
-		return node.APIAuthConfig{}, fmt.Errorf("API auth password file %q failed to be read: %w", passwordFilePath, err)
+
+	if v.IsSet(APIAuthPasswordKey) {
+		config.APIAuthPassword = v.GetString(APIAuthPasswordKey)
+	} else {
+		passwordFilePath := v.GetString(APIAuthPasswordFileKey) // picks flag value or default
+		passwordBytes, err := ioutil.ReadFile(passwordFilePath)
+		if err != nil {
+			return node.APIAuthConfig{}, fmt.Errorf("API auth password file %q failed to be read: %w", passwordFilePath, err)
+		}
+		config.APIAuthPassword = strings.TrimSpace(string(passwordBytes))
 	}
-	config.APIAuthPassword = strings.TrimSpace(string(pwBytes))
+
 	if !password.SufficientlyStrong(config.APIAuthPassword, password.OK) {
 		return node.APIAuthConfig{}, errAuthPasswordTooWeak
 	}
@@ -187,6 +196,39 @@ func getIPCConfig(v *viper.Viper) node.IPCConfig {
 }
 
 func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
+	var (
+		httpsKey  []byte
+		httpsCert []byte
+		err       error
+	)
+	switch {
+	case v.IsSet(HTTPSKeyContentKey):
+		rawContent := v.GetString(HTTPSKeyContentKey)
+		httpsKey, err = base64.StdEncoding.DecodeString(rawContent)
+		if err != nil {
+			return node.HTTPConfig{}, fmt.Errorf("unable to decode base64 content: %w", err)
+		}
+	case v.IsSet(HTTPSKeyFileKey):
+		httpsKeyFilepath := os.ExpandEnv(v.GetString(HTTPSKeyFileKey))
+		if httpsKey, err = ioutil.ReadFile(filepath.Clean(httpsKeyFilepath)); err != nil {
+			return node.HTTPConfig{}, err
+		}
+	}
+
+	switch {
+	case v.IsSet(HTTPSCertContentKey):
+		rawContent := v.GetString(HTTPSCertContentKey)
+		httpsCert, err = base64.StdEncoding.DecodeString(rawContent)
+		if err != nil {
+			return node.HTTPConfig{}, fmt.Errorf("unable to decode base64 content: %w", err)
+		}
+	case v.IsSet(HTTPSCertFileKey):
+		httpsKeyFilepath := os.ExpandEnv(v.GetString(HTTPSCertFileKey))
+		if httpsCert, err = ioutil.ReadFile(filepath.Clean(httpsKeyFilepath)); err != nil {
+			return node.HTTPConfig{}, err
+		}
+	}
+
 	config := node.HTTPConfig{
 		APIConfig: node.APIConfig{
 			APIIndexerConfig: node.APIIndexerConfig{
@@ -202,11 +244,11 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 		HTTPHost:          v.GetString(HTTPHostKey),
 		HTTPPort:          uint16(v.GetUint(HTTPPortKey)),
 		HTTPSEnabled:      v.GetBool(HTTPSEnabledKey),
-		HTTPSKeyFile:      os.ExpandEnv(v.GetString(HTTPSKeyFileKey)),
-		HTTPSCertFile:     os.ExpandEnv(v.GetString(HTTPSCertFileKey)),
+		HTTPSKey:          httpsKey,
+		HTTPSCert:         httpsCert,
 		APIAllowedOrigins: v.GetStringSlice(HTTPAllowedOrigins),
 	}
-	var err error
+
 	config.APIAuthConfig, err = getAPIAuthConfig(v)
 	if err != nil {
 		return node.HTTPConfig{}, err
@@ -532,16 +574,28 @@ func getProfilerConfig(v *viper.Viper) (profiler.Config, error) {
 	return config, nil
 }
 
-func getStakingTLSCert(v *viper.Viper) (tls.Certificate, error) {
-	if v.GetBool(StakingEphemeralCertEnabledKey) {
-		// Use an ephemeral staking key/cert
-		cert, err := staking.NewTLSCert()
-		if err != nil {
-			return tls.Certificate{}, fmt.Errorf("couldn't generate ephemeral staking key/cert: %w", err)
-		}
-		return *cert, nil
+func getStakingTLSCertFromFlag(v *viper.Viper) (tls.Certificate, error) {
+	stakingKeyRawContent := v.GetString(StakingKeyContentKey)
+	stakingKeyContent, err := base64.StdEncoding.DecodeString(stakingKeyRawContent)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("unable to decode base64 content: %w", err)
 	}
 
+	stakingCertRawContent := v.GetString(StakingCertContentKey)
+	stakingCertContent, err := base64.StdEncoding.DecodeString(stakingCertRawContent)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("unable to decode base64 content: %w", err)
+	}
+
+	cert, err := staking.LoadTLSCertFromBytes(stakingKeyContent, stakingCertContent)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("failed creating cert: %w", err)
+	}
+
+	return *cert, nil
+}
+
+func getStakingTLSCertFromFile(v *viper.Viper) (tls.Certificate, error) {
 	// Parse the staking key/cert paths and expand environment variables
 	stakingKeyPath := os.ExpandEnv(v.GetString(StakingKeyPathKey))
 	stakingCertPath := os.ExpandEnv(v.GetString(StakingCertPathKey))
@@ -561,11 +615,33 @@ func getStakingTLSCert(v *viper.Viper) (tls.Certificate, error) {
 	}
 
 	// Load and parse the staking key/cert
-	cert, err := staking.LoadTLSCert(stakingKeyPath, stakingCertPath)
+	cert, err := staking.LoadTLSCertFromFiles(stakingKeyPath, stakingCertPath)
 	if err != nil {
 		return tls.Certificate{}, fmt.Errorf("couldn't read staking certificate: %w", err)
 	}
 	return *cert, nil
+}
+
+func getStakingTLSCert(v *viper.Viper) (tls.Certificate, error) {
+	if v.GetBool(StakingEphemeralCertEnabledKey) {
+		// Use an ephemeral staking key/cert
+		cert, err := staking.NewTLSCert()
+		if err != nil {
+			return tls.Certificate{}, fmt.Errorf("couldn't generate ephemeral staking key/cert: %w", err)
+		}
+		return *cert, nil
+	}
+
+	switch {
+	case v.IsSet(StakingKeyContentKey) && !v.IsSet(StakingCertContentKey):
+		return tls.Certificate{}, errStakingCertContentUnset
+	case !v.IsSet(StakingKeyContentKey) && v.IsSet(StakingCertContentKey):
+		return tls.Certificate{}, errStakingKeyContentUnset
+	case v.IsSet(StakingKeyContentKey) && v.IsSet(StakingCertContentKey):
+		return getStakingTLSCertFromFlag(v)
+	default:
+		return getStakingTLSCertFromFile(v)
+	}
 }
 
 func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, error) {
@@ -625,6 +701,24 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 	return genesis.GetTxFeeConfig(networkID)
 }
 
+func getGenesisData(v *viper.Viper, networkID uint32) ([]byte, ids.ID, error) {
+	// try first loading genesis content directly from flag/env-var
+	if v.IsSet(GenesisConfigContentKey) {
+		genesisData := v.GetString(GenesisConfigContentKey)
+		return genesis.FromFlag(networkID, genesisData)
+	}
+
+	// if content is not specified go for the file
+	if v.IsSet(GenesisConfigFileKey) {
+		genesisFileName := os.ExpandEnv(v.GetString(GenesisConfigFileKey))
+		return genesis.FromFile(networkID, genesisFileName)
+	}
+
+	// finally if file is not specified/readable go for the predefined config
+	config := genesis.GetConfig(networkID)
+	return genesis.FromConfig(config)
+}
+
 func getWhitelistedSubnets(v *viper.Viper) (ids.Set, error) {
 	whitelistedSubnetIDs := ids.Set{}
 	for _, subnet := range strings.Split(v.GetString(WhitelistedSubnetsKey), ",") {
@@ -644,10 +738,18 @@ func getWhitelistedSubnets(v *viper.Viper) (ids.Set, error) {
 }
 
 func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, error) {
-	var configBytes []byte
-	if v.IsSet(DBConfigFileKey) {
+	var (
+		configBytes []byte
+		err         error
+	)
+	if v.IsSet(DBConfigContentKey) {
+		dbConfigContent := v.GetString(DBConfigContentKey)
+		configBytes, err = base64.StdEncoding.DecodeString(dbConfigContent)
+		if err != nil {
+			return node.DatabaseConfig{}, fmt.Errorf("unable to decode base64 content: %w", err)
+		}
+	} else if v.IsSet(DBConfigFileKey) {
 		path := os.ExpandEnv(v.GetString(DBConfigFileKey))
-		var err error
 		configBytes, err = ioutil.ReadFile(path)
 		if err != nil {
 			return node.DatabaseConfig{}, err
@@ -665,22 +767,32 @@ func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, e
 }
 
 func getVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
-	aliasFilePath := filepath.Clean(v.GetString(VMAliasesFileKey))
-	exists, err := storage.FileExists(aliasFilePath)
-	if err != nil {
-		return nil, err
-	}
-
-	if !exists {
-		if v.IsSet(VMAliasesFileKey) {
-			return nil, fmt.Errorf("vm alias file does not exist in %v", aliasFilePath)
+	var fileBytes []byte
+	if v.IsSet(VMAliasesContentKey) {
+		var err error
+		aliasFlagContent := v.GetString(VMAliasesContentKey)
+		fileBytes, err = base64.StdEncoding.DecodeString(aliasFlagContent)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode base64 content: %w", err)
 		}
-		return nil, nil
-	}
+	} else {
+		aliasFilePath := filepath.Clean(v.GetString(VMAliasesFileKey))
+		exists, err := storage.FileExists(aliasFilePath)
+		if err != nil {
+			return nil, err
+		}
 
-	fileBytes, err := ioutil.ReadFile(aliasFilePath)
-	if err != nil {
-		return nil, err
+		if !exists {
+			if v.IsSet(VMAliasesFileKey) {
+				return nil, fmt.Errorf("vm alias file does not exist in %v", aliasFilePath)
+			}
+			return nil, nil
+		}
+
+		fileBytes, err = ioutil.ReadFile(aliasFilePath)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	vmAliasMap := make(map[ids.ID][]string)
@@ -725,8 +837,21 @@ func getPathFromDirKey(v *viper.Viper, configKey string) (string, error) {
 	return "", nil
 }
 
-// getChainConfigs reads & puts chainConfigs to node config
-func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
+func getChainConfigsFromFlag(v *viper.Viper) (map[string]chains.ChainConfig, error) {
+	chainConfigContentB64 := v.GetString(ChainConfigContentKey)
+	chainConfigContent, err := base64.StdEncoding.DecodeString(chainConfigContentB64)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode base64 content: %w", err)
+	}
+
+	chainConfigs := make(map[string]chains.ChainConfig)
+	if err := json.Unmarshal(chainConfigContent, &chainConfigs); err != nil {
+		return nil, fmt.Errorf("could not unmarshal JSON: %w", err)
+	}
+	return chainConfigs, nil
+}
+
+func getChainConfigsFromDir(v *viper.Viper) (map[string]chains.ChainConfig, error) {
 	chainConfigPath, err := getPathFromDirKey(v, ChainConfigDirKey)
 	if err != nil {
 		return nil, err
@@ -741,6 +866,14 @@ func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
 		return nil, fmt.Errorf("couldn't read chain configs: %w", err)
 	}
 	return chainConfigs, nil
+}
+
+// getChainConfigs reads & puts chainConfigs to node config
+func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
+	if v.IsSet(ChainConfigContentKey) {
+		return getChainConfigsFromFlag(v)
+	}
+	return getChainConfigsFromDir(v)
 }
 
 // ReadsChainConfigs reads chain config files from static directories and returns map with contents,
@@ -781,8 +914,34 @@ func readChainConfigPath(chainConfigPath string) (map[string]chains.ChainConfig,
 	return chainConfigMap, nil
 }
 
+func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.SubnetConfig, error) {
+	subnetConfigContentB64 := v.GetString(SubnetConfigContentKey)
+	subnetConfigContent, err := base64.StdEncoding.DecodeString(subnetConfigContentB64)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode base64 content: %w", err)
+	}
+
+	// Note: no default values are loaded here. All Subnet parameters must be
+	// explicitly defined.
+	subnetConfigs := make(map[ids.ID]chains.SubnetConfig, len(subnetIDs))
+	if err := json.Unmarshal(subnetConfigContent, &subnetConfigs); err != nil {
+		return nil, fmt.Errorf("could not unmarshal JSON: %w", err)
+	}
+
+	res := make(map[ids.ID]chains.SubnetConfig)
+	for _, subnetID := range subnetIDs {
+		if subnetConfig, ok := subnetConfigs[subnetID]; ok {
+			if err := subnetConfig.ConsensusParameters.Valid(); err != nil {
+				return nil, err
+			}
+			res[subnetID] = subnetConfig
+		}
+	}
+	return res, nil
+}
+
 // getSubnetConfigs reads SubnetConfigs to node config map
-func getSubnetConfigs(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.SubnetConfig, error) {
+func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.SubnetConfig, error) {
 	subnetConfigPath, err := getPathFromDirKey(v, SubnetConfigDirKey)
 	if err != nil {
 		return nil, err
@@ -797,6 +956,13 @@ func getSubnetConfigs(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.Sub
 		return nil, fmt.Errorf("couldn't read subnet configs: %w", err)
 	}
 	return subnetConfigs, nil
+}
+
+func getSubnetConfigs(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.SubnetConfig, error) {
+	if v.IsSet(SubnetConfigContentKey) {
+		return getSubnetConfigsFromFlags(v, subnetIDs)
+	}
+	return getSubnetConfigsFromDir(v, subnetIDs)
 }
 
 // readSubnetConfigs reads subnet config files from a path and given subnetIDs and returns a map.
@@ -955,10 +1121,8 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.TxFeeConfig = getTxFeeConfig(v, nodeConfig.NetworkID)
 
 	// Genesis Data
-	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = genesis.Genesis(
-		nodeConfig.NetworkID,
-		os.ExpandEnv(v.GetString(GenesisConfigFileKey)),
-	)
+
+	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = getGenesisData(v, nodeConfig.NetworkID)
 	if err != nil {
 		return node.Config{}, fmt.Errorf("unable to load genesis file: %w", err)
 	}

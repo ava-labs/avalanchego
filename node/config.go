@@ -44,9 +44,9 @@ type HTTPConfig struct {
 	HTTPHost  string `json:"httpHost"`
 	HTTPPort  uint16 `json:"httpPort"`
 
-	HTTPSEnabled  bool   `json:"httpsEnabled"`
-	HTTPSKeyFile  string `json:"httpsKeyFile"`
-	HTTPSCertFile string `json:"httpsCertFile"`
+	HTTPSEnabled bool   `json:"httpsEnabled"`
+	HTTPSKey     []byte `json:"-"`
+	HTTPSCert    []byte `json:"-"`
 
 	APIAllowedOrigins []string `json:"apiAllowedOrigins"`
 }

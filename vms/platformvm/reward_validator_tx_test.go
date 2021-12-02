@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/version"
@@ -41,7 +42,7 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	// Case 1: Chain timestamp is wrong
 	if tx, err := vm.newRewardValidatorTx(toRemove.ID()); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := toRemove.Execute(vm, vm.internalState, tx); err == nil {
+	} else if _, _, err := toRemove.Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
 	}
 
@@ -51,7 +52,7 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	// Case 2: Wrong validator
 	if tx, err := vm.newRewardValidatorTx(ids.GenerateTestID()); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := toRemove.Execute(vm, vm.internalState, tx); err == nil {
+	} else if _, _, err := toRemove.Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatalf("should have failed because validator ID is wrong")
 	}
 
@@ -61,7 +62,7 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	onCommitState, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
+	onCommitState, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,10 +87,6 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 
 	onCommitState.Apply(vm.internalState)
 	if err := vm.internalState.Commit(); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := vm.updateValidators(false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -124,7 +121,7 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	// Case 1: Chain timestamp is wrong
 	if tx, err := vm.newRewardValidatorTx(toRemove.ID()); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := toRemove.Execute(vm, vm.internalState, tx); err == nil {
+	} else if _, _, err := toRemove.Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
 	}
 
@@ -134,7 +131,7 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	// Case 2: Wrong validator
 	if tx, err := vm.newRewardValidatorTx(ids.GenerateTestID()); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := toRemove.Execute(vm, vm.internalState, tx); err == nil {
+	} else if _, _, err := toRemove.Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatalf("should have failed because validator ID is wrong")
 	}
 
@@ -144,7 +141,7 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, onAbortState, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
+	_, onAbortState, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,10 +166,6 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 
 	onAbortState.Apply(vm.internalState)
 	if err := vm.internalState.Commit(); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := vm.updateValidators(false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -239,11 +232,17 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	assert.NoError(err)
 	err = vm.internalState.(*internalStateImpl).loadCurrentValidators()
 	assert.NoError(err)
+	// test validator stake
+	set, ok := vm.Validators.GetValidators(constants.PrimaryNetworkID)
+	assert.True(ok)
+	stake, ok := set.GetWeight(vdrNodeID)
+	assert.True(ok)
+	assert.Equal(vm.MinValidatorStake+vm.MinDelegatorStake, stake)
 
 	tx, err := vm.newRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 
-	onCommitState, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
+	onCommitState, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
 	assert.NoError(err)
 
 	vdrDestSet := ids.ShortSet{}
@@ -278,6 +277,10 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 
 	assert.Less(vdrReward, delReward, "the delegator's reward should be greater than the delegatee's because the delegatee's share is 25%")
 	assert.Equal(expectedReward, delReward+vdrReward, "expected total reward to be %d but is %d", expectedReward, delReward+vdrReward)
+
+	stake, ok = set.GetWeight(vdrNodeID)
+	assert.True(ok)
+	assert.Equal(vm.MinValidatorStake, stake)
 }
 
 func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
@@ -338,7 +341,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	tx, err := vm.newRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 
-	_, onAbortState, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
+	_, onAbortState, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
 	assert.NoError(err)
 
 	vdrDestSet := ids.ShortSet{}

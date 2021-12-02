@@ -1017,6 +1017,19 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 				delete(nodeUpdates, nodeID)
 				continue
 			}
+
+			if subnetID == constants.PrimaryNetworkID || st.vm.WhitelistedSubnets.Contains(subnetID) {
+				var err error
+				if nodeDiff.Decrease {
+					err = st.vm.Validators.RemoveWeight(subnetID, nodeID, nodeDiff.Amount)
+				} else {
+					err = st.vm.Validators.AddWeight(subnetID, nodeID, nodeDiff.Amount)
+				}
+				if err != nil {
+					return err
+				}
+			}
+
 			nodeDiffBytes, err := GenesisCodec.Marshal(CodecVersion, nodeDiff)
 			if err != nil {
 				return err
