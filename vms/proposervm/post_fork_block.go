@@ -38,6 +38,11 @@ func (b *postForkBlock) conditionalAccept(acceptInnerBlk bool) error {
 		return err
 	}
 
+	// confirm the mapping from inner to proposerVm block ID
+	if err := b.vm.State.SetBlocksIDMapping(b.innerBlk.ID(), blkID); err != nil {
+		return err
+	}
+
 	delete(b.vm.verifiedBlocks, blkID)
 	b.vm.lastAcceptedTime = b.Timestamp()
 
@@ -48,9 +53,7 @@ func (b *postForkBlock) conditionalAccept(acceptInnerBlk bool) error {
 			return err
 		}
 	}
-
-	// finally confirm the mapping from inner to proposerVm block ID
-	return b.vm.State.SetBlocksIDMapping(b.innerBlk.ID(), blkID)
+	return nil
 }
 
 func (b *postForkBlock) Reject() error {

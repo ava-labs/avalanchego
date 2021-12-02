@@ -119,8 +119,11 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	// TODO ABENEGIA: rebuild the innerBlockMapping inside repairAcceptedChain
 	if err := vm.repairAcceptedChain(); err != nil {
+		return err
+	}
+
+	if err := vm.repairInnerBlocksMapping(); err != nil {
 		return err
 	}
 
@@ -252,6 +255,48 @@ func (vm *VM) repairAcceptedChain() error {
 			return err
 		}
 		if err := vm.State.PutBlock(lastAccepted.getStatelessBlk(), choices.Processing); err != nil {
+			return err
+		}
+	}
+}
+
+func (vm *VM) repairInnerBlocksMapping() error {
+	lastAcceptedID, err := vm.GetLastAccepted()
+	switch err {
+	case database.ErrNotFound:
+		return nil // empty chain, nothing to do
+	case nil:
+	default:
+		return err
+	}
+
+	var lastAccepted Block
+	for {
+		lastAccepted, err = vm.getBlock(lastAcceptedID)
+		switch err {
+		case database.ErrNotFound:
+			// must have hit genesis'parent. Work done
+			return vm.db.Commit()
+		case nil:
+		default:
+			return err
+		}
+
+		proBlkID := lastAccepted.ID()
+		innerBlkID := lastAccepted.getInnerBlk().ID()
+		_, err = vm.State.GetBlockID(innerBlkID)
+		switch err {
+		case nil:
+			return vm.db.Commit()
+		case database.ErrNotFound:
+			// add the mapping
+			if err := vm.State.SetBlocksIDMapping(innerBlkID, proBlkID); err != nil {
+				return err
+			}
+
+			// keep checking the parent
+			lastAcceptedID = lastAccepted.Parent()
+		default:
 			return err
 		}
 	}
