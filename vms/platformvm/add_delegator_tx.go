@@ -110,7 +110,7 @@ func (tx *UnsignedAddDelegatorTx) SyntacticVerify(ctx *snow.Context) error {
 
 // Attempts to verify this transaction with the provided state.
 func (tx *UnsignedAddDelegatorTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
-	_, _, _, _, err := tx.Execute(vm, parentState, stx)
+	_, _, err := tx.Execute(vm, parentState, stx)
 	// We ignore [errFutureStakeTime] here because an advanceTimeTx will be
 	// issued before this transaction is issued.
 	if errors.Is(err, errFutureStakeTime) {
@@ -127,24 +127,22 @@ func (tx *UnsignedAddDelegatorTx) Execute(
 ) (
 	VersionedState,
 	VersionedState,
-	func() error,
-	func() error,
 	TxError,
 ) {
 	// Verify the tx is well-formed
 	if err := tx.SyntacticVerify(vm.ctx); err != nil {
-		return nil, nil, nil, nil, permError{err}
+		return nil, nil, permError{err}
 	}
 
 	duration := tx.Validator.Duration()
 	switch {
 	case duration < vm.MinStakeDuration: // Ensure staking length is not too short
-		return nil, nil, nil, nil, permError{errStakeTooShort}
+		return nil, nil, permError{errStakeTooShort}
 	case duration > vm.MaxStakeDuration: // Ensure staking length is not too long
-		return nil, nil, nil, nil, permError{errStakeTooLong}
+		return nil, nil, permError{errStakeTooLong}
 	case tx.Validator.Wght < vm.MinDelegatorStake:
 		// Ensure validator is staking at least the minimum amount
-		return nil, nil, nil, nil, permError{errWeightTooSmall}
+		return nil, nil, permError{errWeightTooSmall}
 	}
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))
@@ -159,7 +157,7 @@ func (tx *UnsignedAddDelegatorTx) Execute(
 		// Ensure the proposed validator starts after the current timestamp
 		validatorStartTime := tx.StartTime()
 		if !currentTimestamp.Before(validatorStartTime) {
-			return nil, nil, nil, nil, permError{
+			return nil, nil, permError{
 				fmt.Errorf(
 					"chain timestamp (%s) not before validator's start time (%s)",
 					currentTimestamp,
@@ -170,7 +168,7 @@ func (tx *UnsignedAddDelegatorTx) Execute(
 
 		currentValidator, err := currentStakers.GetValidator(tx.Validator.NodeID)
 		if err != nil && err != database.ErrNotFound {
-			return nil, nil, nil, nil, tempError{
+			return nil, nil, tempError{
 				fmt.Errorf(
 					"failed to find whether %s is a validator: %w",
 					tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
@@ -199,9 +197,9 @@ func (tx *UnsignedAddDelegatorTx) Execute(
 			vdrTx, err = pendingStakers.GetValidatorTx(tx.Validator.NodeID)
 			if err != nil {
 				if err == database.ErrNotFound {
-					return nil, nil, nil, nil, permError{errDelegatorSubset}
+					return nil, nil, permError{errDelegatorSubset}
 				}
-				return nil, nil, nil, nil, tempError{
+				return nil, nil, tempError{
 					fmt.Errorf(
 						"failed to find whether %s is a validator: %w",
 						tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
@@ -214,7 +212,7 @@ func (tx *UnsignedAddDelegatorTx) Execute(
 		// Ensure that the period this delegator delegates is a subset of the
 		// time the validator validates.
 		if !tx.Validator.BoundedBy(vdrTx.StartTime(), vdrTx.EndTime()) {
-			return nil, nil, nil, nil, permError{errDelegatorSubset}
+			return nil, nil, permError{errDelegatorSubset}
 		}
 
 		// Ensure that the period this delegator delegates wouldn't become over
@@ -222,12 +220,12 @@ func (tx *UnsignedAddDelegatorTx) Execute(
 		vdrWeight := vdrTx.Weight()
 		currentWeight, err := math.Add64(vdrWeight, currentDelegatorWeight)
 		if err != nil {
-			return nil, nil, nil, nil, permError{err}
+			return nil, nil, permError{err}
 		}
 
 		maximumWeight, err := math.Mul64(MaxValidatorWeightFactor, vdrWeight)
 		if err != nil {
-			return nil, nil, nil, nil, permError{errStakeOverflow}
+			return nil, nil, permError{errStakeOverflow}
 		}
 
 		if !currentTimestamp.Before(vm.ApricotPhase3Time) {
@@ -242,21 +240,21 @@ func (tx *UnsignedAddDelegatorTx) Execute(
 			maximumWeight,
 		)
 		if err != nil {
-			return nil, nil, nil, nil, permError{err}
+			return nil, nil, permError{err}
 		}
 		if !canDelegate {
-			return nil, nil, nil, nil, permError{errOverDelegated}
+			return nil, nil, permError{errOverDelegated}
 		}
 
 		// Verify the flowcheck
 		if err := vm.semanticVerifySpend(parentState, tx, tx.Ins, outs, stx.Creds, vm.AddStakerTxFee, vm.ctx.AVAXAssetID); err != nil {
 			switch err.(type) {
 			case permError:
-				return nil, nil, nil, nil, permError{
+				return nil, nil, permError{
 					fmt.Errorf("failed semanticVerifySpend: %w", err),
 				}
 			default:
-				return nil, nil, nil, nil, tempError{
+				return nil, nil, tempError{
 					fmt.Errorf("failed semanticVerifySpend: %w", err),
 				}
 			}
@@ -267,7 +265,7 @@ func (tx *UnsignedAddDelegatorTx) Execute(
 		// error.
 		maxStartTime := currentTimestamp.Add(maxFutureStartTime)
 		if validatorStartTime.After(maxStartTime) {
-			return nil, nil, nil, nil, permError{errFutureStakeTime}
+			return nil, nil, permError{errFutureStakeTime}
 		}
 	}
 
@@ -288,7 +286,7 @@ func (tx *UnsignedAddDelegatorTx) Execute(
 	// Produce the UTXOS
 	produceOutputs(onAbortState, txID, vm.ctx.AVAXAssetID, outs)
 
-	return onCommitState, onAbortState, nil, nil, nil
+	return onCommitState, onAbortState, nil
 }
 
 // InitiallyPrefersCommit returns true if the proposed validators start time is

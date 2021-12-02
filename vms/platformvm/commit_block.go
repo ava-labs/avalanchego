@@ -65,7 +65,7 @@ func (c *CommitBlock) Verify() error {
 		return errInvalidBlockType
 	}
 
-	c.onAcceptState, c.onAcceptFunc = parent.onCommit()
+	c.onAcceptState = parent.onCommitState
 	c.timestamp = c.onAcceptState.GetTimestamp()
 
 	c.vm.currentBlocks[blkID] = c
