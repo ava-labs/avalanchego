@@ -86,6 +86,12 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 	if roll < rollupWindow {
 		var blockGasCost, parentExtraStateGasUsed uint64
 		switch {
+		case isApricotPhase5:
+			// At the start of a new network, the parent
+			// may not have a populated [ExtDataGasUsed].
+			if parent.ExtDataGasUsed != nil {
+				parentExtraStateGasUsed = parent.ExtDataGasUsed.Uint64()
+			}
 		case isApricotPhase4:
 			// The [blockGasCost] is paid by the effective tips in the block using
 			// the block's value of [baseFee].
