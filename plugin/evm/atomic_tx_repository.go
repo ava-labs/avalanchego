@@ -126,7 +126,7 @@ func (a *atomicTxRepository) initialize(lastAcceptedHeight uint64) error {
 		// Check if there are already transactions at [height], to ensure that we
 		// add [txs] to the already indexed transactions at [height] instead of
 		// overwriting them.
-		if err := a.addTxToHeightIndex(heightBytes, tx); err != nil {
+		if err := a.appendTxToHeightIndex(heightBytes, tx); err != nil {
 			return err
 		}
 		txID := tx.ID()
@@ -269,7 +269,7 @@ func (a *atomicTxRepository) indexTxsAtHeight(heightBytes []byte, txs []*Tx) err
 	return nil
 }
 
-func (a *atomicTxRepository) addTxToHeightIndex(heightBytes []byte, tx *Tx) error {
+func (a *atomicTxRepository) appendTxToHeightIndex(heightBytes []byte, tx *Tx) error {
 	txs, err := a.getByHeightBytes(heightBytes)
 	if err != nil && err != database.ErrNotFound {
 		return err
