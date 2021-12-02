@@ -70,20 +70,26 @@ func InitNodeStakingKeyPair(keyPath, certPath string) error {
 	if err := os.Chmod(keyPath, perms.ReadOnly); err != nil { // Make key read-only
 		return fmt.Errorf("couldn't change permissions on key: %w", err)
 	}
-
 	return nil
 }
 
-func LoadTLSCert(keyPath, certPath string) (*tls.Certificate, error) {
+func LoadTLSCertFromBytes(keyBytes, certBytes []byte) (*tls.Certificate, error) {
+	cert, err := tls.X509KeyPair(certBytes, keyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating cert: %w", err)
+	}
+
+	cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
+	return &cert, err
+}
+
+func LoadTLSCertFromFiles(keyPath, certPath string) (*tls.Certificate, error) {
 	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
 	if err != nil {
 		return nil, err
 	}
 	cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
-	if err != nil {
-		return nil, err
-	}
-	return &cert, nil
+	return &cert, err
 }
 
 func NewTLSCert() (*tls.Certificate, error) {
@@ -96,10 +102,7 @@ func NewTLSCert() (*tls.Certificate, error) {
 		return nil, err
 	}
 	cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
-	if err != nil {
-		return nil, err
-	}
-	return &cert, nil
+	return &cert, err
 }
 
 // Creates a new staking private key / staking certificate pair.
@@ -137,6 +140,5 @@ func NewCertAndKeyBytes() ([]byte, []byte, error) {
 	if err := pem.Encode(&keyBuff, &pem.Block{Type: "PRIVATE KEY", Bytes: privBytes}); err != nil {
 		return nil, nil, fmt.Errorf("couldn't write private key: %w", err)
 	}
-
 	return certBuff.Bytes(), keyBuff.Bytes(), nil
 }

@@ -334,7 +334,7 @@ func (n *Node) Dispatch() error {
 		var err error
 		if n.Config.HTTPSEnabled {
 			n.Log.Debug("initializing API server with TLS")
-			err = n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
+			err = n.APIServer.DispatchTLS(n.Config.HTTPSCert, n.Config.HTTPSKey)
 		} else {
 			n.Log.Debug("initializing API server without TLS")
 			err = n.APIServer.Dispatch()

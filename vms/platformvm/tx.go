@@ -72,8 +72,6 @@ type UnsignedProposalTx interface {
 	Execute(vm *VM, state MutableState, stx *Tx) (
 		onCommitState VersionedState,
 		onAbortState VersionedState,
-		onCommitFunc func() error,
-		onAbortFunc func() error,
 		err TxError,
 	)
 	InitiallyPrefersCommit(vm *VM) bool

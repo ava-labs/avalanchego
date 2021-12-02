@@ -55,7 +55,7 @@ func (tx *UnsignedRewardValidatorTx) SyntacticVerify(*snow.Context) error {
 
 // Attempts to verify this transaction with the provided state.
 func (tx *UnsignedRewardValidatorTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
-	_, _, _, _, err := tx.Execute(vm, parentState, stx)
+	_, _, err := tx.Execute(vm, parentState, stx)
 	return err
 }
 
@@ -72,33 +72,31 @@ func (tx *UnsignedRewardValidatorTx) Execute(
 ) (
 	VersionedState,
 	VersionedState,
-	func() error,
-	func() error,
 	TxError,
 ) {
 	switch {
 	case tx == nil:
-		return nil, nil, nil, nil, tempError{errNilTx}
+		return nil, nil, tempError{errNilTx}
 	case tx.TxID == ids.Empty:
-		return nil, nil, nil, nil, tempError{errInvalidID}
+		return nil, nil, tempError{errInvalidID}
 	case len(stx.Creds) != 0:
-		return nil, nil, nil, nil, permError{errWrongNumberOfCredentials}
+		return nil, nil, permError{errWrongNumberOfCredentials}
 	}
 
 	currentStakers := parentState.CurrentStakerChainState()
 	stakerTx, stakerReward, err := currentStakers.GetNextStaker()
 	if err == database.ErrNotFound {
-		return nil, nil, nil, nil, permError{
+		return nil, nil, permError{
 			fmt.Errorf("failed to get next staker stop time: %w", err),
 		}
 	}
 	if err != nil {
-		return nil, nil, nil, nil, tempError{err}
+		return nil, nil, tempError{err}
 	}
 
 	stakerID := stakerTx.ID()
 	if stakerID != tx.TxID {
-		return nil, nil, nil, nil, permError{
+		return nil, nil, permError{
 			fmt.Errorf(
 				"attempting to remove TxID: %s. Should be removing %s",
 				tx.TxID,
@@ -111,10 +109,10 @@ func (tx *UnsignedRewardValidatorTx) Execute(
 	currentTime := parentState.GetTimestamp()
 	staker, ok := stakerTx.UnsignedTx.(TimedTx)
 	if !ok {
-		return nil, nil, nil, nil, permError{errWrongTxType}
+		return nil, nil, permError{errWrongTxType}
 	}
 	if endTime := staker.EndTime(); !endTime.Equal(currentTime) {
-		return nil, nil, nil, nil, permError{
+		return nil, nil, permError{
 			fmt.Errorf(
 				"attempting to remove TxID: %s before their end time %s",
 				tx.TxID,
@@ -125,7 +123,7 @@ func (tx *UnsignedRewardValidatorTx) Execute(
 
 	newlyCurrentStakers, err := currentStakers.DeleteNextStaker()
 	if err != nil {
-		return nil, nil, nil, nil, permError{err}
+		return nil, nil, permError{err}
 	}
 
 	pendingStakers := parentState.PendingStakerChainState()
@@ -136,7 +134,7 @@ func (tx *UnsignedRewardValidatorTx) Execute(
 	currentSupply := onAbortState.GetCurrentSupply()
 	newSupply, err := math.Sub64(currentSupply, stakerReward)
 	if err != nil {
-		return nil, nil, nil, nil, permError{err}
+		return nil, nil, permError{err}
 	}
 	onAbortState.SetCurrentSupply(newSupply)
 
@@ -164,13 +162,13 @@ func (tx *UnsignedRewardValidatorTx) Execute(
 		if stakerReward > 0 {
 			outIntf, err := vm.fx.CreateOutput(stakerReward, uStakerTx.RewardsOwner)
 			if err != nil {
-				return nil, nil, nil, nil, permError{
+				return nil, nil, permError{
 					fmt.Errorf("failed to create output: %w", err),
 				}
 			}
 			out, ok := outIntf.(verify.State)
 			if !ok {
-				return nil, nil, nil, nil, permError{errInvalidState}
+				return nil, nil, permError{errInvalidState}
 			}
 
 			utxo := &avax.UTXO{
@@ -208,7 +206,7 @@ func (tx *UnsignedRewardValidatorTx) Execute(
 		// are delgated to.
 		vdr, err := currentStakers.GetValidator(uStakerTx.Validator.NodeID)
 		if err != nil {
-			return nil, nil, nil, nil, tempError{
+			return nil, nil, tempError{
 				fmt.Errorf(
 					"failed to get whether %s is a validator: %w",
 					uStakerTx.Validator.NodeID,
@@ -234,13 +232,13 @@ func (tx *UnsignedRewardValidatorTx) Execute(
 		if delegatorReward > 0 {
 			outIntf, err := vm.fx.CreateOutput(delegatorReward, uStakerTx.RewardsOwner)
 			if err != nil {
-				return nil, nil, nil, nil, permError{
+				return nil, nil, permError{
 					fmt.Errorf("failed to create output: %w", err),
 				}
 			}
 			out, ok := outIntf.(verify.State)
 			if !ok {
-				return nil, nil, nil, nil, permError{errInvalidState}
+				return nil, nil, permError{errInvalidState}
 			}
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
@@ -261,13 +259,13 @@ func (tx *UnsignedRewardValidatorTx) Execute(
 		if delegateeReward > 0 {
 			outIntf, err := vm.fx.CreateOutput(delegateeReward, vdrTx.RewardsOwner)
 			if err != nil {
-				return nil, nil, nil, nil, permError{
+				return nil, nil, permError{
 					fmt.Errorf("failed to create output: %w", err),
 				}
 			}
 			out, ok := outIntf.(verify.State)
 			if !ok {
-				return nil, nil, nil, nil, permError{errInvalidState}
+				return nil, nil, permError{errInvalidState}
 			}
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
@@ -285,22 +283,18 @@ func (tx *UnsignedRewardValidatorTx) Execute(
 		nodeID = uStakerTx.Validator.ID()
 		startTime = vdrTx.StartTime()
 	default:
-		return nil, nil, nil, nil, permError{errShouldBeDSValidator}
+		return nil, nil, permError{errShouldBeDSValidator}
 	}
 
 	uptime, err := vm.uptimeManager.CalculateUptimePercentFrom(nodeID, startTime)
 	if err != nil {
-		return nil, nil, nil, nil, tempError{
+		return nil, nil, tempError{
 			fmt.Errorf("failed to calculate uptime: %w", err),
 		}
 	}
 	tx.shouldPreferCommit = uptime >= vm.UptimePercentage
 
-	// Regardless of whether this tx is committed or aborted, update the
-	// validator set to remove the staker. onAbortDB or onCommitDB should commit
-	// (flush to vm.DB) before this is called
-	updateValidators := func() error { return vm.updateValidators(false) }
-	return onCommitState, onAbortState, updateValidators, updateValidators, nil
+	return onCommitState, onAbortState, nil
 }
 
 // InitiallyPrefersCommit returns true if this node thinks the validator

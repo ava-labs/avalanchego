@@ -139,8 +139,6 @@ type VM struct {
 	// Key: block ID
 	// Value: the block
 	currentBlocks map[ids.ID]Block
-
-	lastVdrUpdate time.Time
 }
 
 // Initialize this blockchain.
@@ -206,7 +204,7 @@ func (vm *VM) Initialize(
 	vm.uptimeManager = uptime.NewManager(is)
 	vm.UptimeLockedCalculator.SetCalculator(&vm.bootstrapped, &ctx.Lock, vm.uptimeManager)
 
-	if err := vm.updateValidators(true); err != nil {
+	if err := vm.updateValidators(); err != nil {
 		return fmt.Errorf(
 			"failed to initialize validator sets: %w",
 			err,
@@ -309,13 +307,8 @@ func (vm *VM) Bootstrapped() error {
 	}
 	vm.bootstrapped.SetValue(true)
 
-	errs := wrappers.Errs{}
-	errs.Add(
-		vm.updateValidators(false),
-		vm.fx.Bootstrapped(),
-	)
-	if errs.Errored() {
-		return errs.Err
+	if err := vm.fx.Bootstrapped(); err != nil {
+		return err
 	}
 
 	primaryValidatorSet, exist := vm.Validators.GetValidators(constants.PrimaryNetworkID)
@@ -582,13 +575,7 @@ func (vm *VM) GetCurrentHeight() (uint64, error) {
 	return lastAccepted.Height(), nil
 }
 
-func (vm *VM) updateValidators(force bool) error {
-	now := vm.clock.Time()
-	if !force && !vm.bootstrapped.GetValue() && now.Sub(vm.lastVdrUpdate) < 5*time.Second {
-		return nil
-	}
-	vm.lastVdrUpdate = now
-
+func (vm *VM) updateValidators() error {
 	currentValidators := vm.internalState.CurrentStakerChainState()
 	primaryValidators, err := currentValidators.ValidatorSet(constants.PrimaryNetworkID)
 	if err != nil {

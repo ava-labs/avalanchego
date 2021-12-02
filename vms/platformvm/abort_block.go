@@ -65,7 +65,7 @@ func (a *AbortBlock) Verify() error {
 		return errInvalidBlockType
 	}
 
-	a.onAcceptState, a.onAcceptFunc = parent.onAbort()
+	a.onAcceptState = parent.onAbortState
 	a.timestamp = a.onAcceptState.GetTimestamp()
 
 	a.vm.currentBlocks[blkID] = a
