@@ -41,11 +41,11 @@ func newTestTx() (ids.ID, *Tx) {
 	return id, &Tx{UnsignedAtomicTx: &TestTx{IDV: id}}
 }
 
-// addTxs writes [txPerHeight] txs for heights ranging in [fromHeight] to [toHeight] directly to [acceptedAtomicTxDB],
+// addTxs writes [txsPerHeight] txs for heights ranging in [fromHeight, toHeight) directly to [acceptedAtomicTxDB],
 // storing the results in [txMap] for verifying by verifyTxs
-func addTxs(t testing.TB, codec codec.Manager, acceptedAtomicTxDB database.Database, fromHeight uint64, toHeight uint64, txPerHeight int, txMap map[uint64][]*Tx) {
+func addTxs(t testing.TB, codec codec.Manager, acceptedAtomicTxDB database.Database, fromHeight uint64, toHeight uint64, txsPerHeight int, txMap map[uint64][]*Tx) {
 	for height := fromHeight; height < toHeight; height++ {
-		for i := 0; i < txPerHeight; i++ {
+		for i := 0; i < txsPerHeight; i++ {
 			id, tx := newTestTx()
 			txBytes, err := codec.Marshal(codecVersion, tx)
 			assert.NoError(t, err)
@@ -62,12 +62,12 @@ func addTxs(t testing.TB, codec codec.Manager, acceptedAtomicTxDB database.Datab
 	}
 }
 
-// writeTxs writes [txPerHeight] txs for heights ranging in [fromHeight] to [toHeight] through the Write call on [repo],
+// writeTxs writes [txsPerHeight] txs for heights ranging in [fromHeight, toHeight) through the Write call on [repo],
 // storing the results in [txMap] for verifying by verifyTxs
-func writeTxs(t testing.TB, repo AtomicTxRepository, fromHeight uint64, toHeight uint64, txPerHeight int, txMap map[uint64][]*Tx) {
+func writeTxs(t testing.TB, repo AtomicTxRepository, fromHeight uint64, toHeight uint64, txsPerHeight int, txMap map[uint64][]*Tx) {
 	for height := fromHeight; height < toHeight; height++ {
 		txs := make([]*Tx, 0)
-		for i := 0; i < txPerHeight; i++ {
+		for i := 0; i < txsPerHeight; i++ {
 			_, tx := newTestTx()
 			txs = append(txs, tx)
 		}
@@ -88,9 +88,8 @@ func verifyTxs(t testing.TB, repo AtomicTxRepository, txMap map[uint64][]*Tx) {
 		}
 	}
 	for height, expectedTxs := range txMap {
-
 		txs, err := repo.GetByHeight(height)
-		assert.NoErrorf(t, err, "expected err=nil on GetByHeight at height=%d", height)
+		assert.NoErrorf(t, err, "unexpected error on GetByHeight at height=%d", height)
 		assert.Lenf(t, txs, len(expectedTxs), "wrong len of txs at height=%d", height)
 		// txs should be stored in order of txID
 		sort.Slice(expectedTxs, getComparator(expectedTxs))
@@ -108,7 +107,7 @@ func verifyTxs(t testing.TB, repo AtomicTxRepository, txMap map[uint64][]*Tx) {
 func TestAtomicRepositoryReadWriteSingleTx(t *testing.T) {
 	db := versiondb.New(memdb.New())
 	codec := prepareCodecForTest()
-	repo, err := NewAtomicTxRepository(db, codec)
+	repo, err := NewAtomicTxRepository(db, codec, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +120,7 @@ func TestAtomicRepositoryReadWriteSingleTx(t *testing.T) {
 func TestAtomicRepositoryReadWriteMultipleTxs(t *testing.T) {
 	db := versiondb.New(memdb.New())
 	codec := prepareCodecForTest()
-	repo, err := NewAtomicTxRepository(db, codec)
+	repo, err := NewAtomicTxRepository(db, codec, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +130,7 @@ func TestAtomicRepositoryReadWriteMultipleTxs(t *testing.T) {
 	verifyTxs(t, repo, txMap)
 }
 
-func TestAtomicRepositoryNormalMigration(t *testing.T) {
+func TestAtomicRepositoryPreAP5Migration(t *testing.T) {
 	db := versiondb.New(memdb.New())
 	codec := prepareCodecForTest()
 
@@ -144,106 +143,40 @@ func TestAtomicRepositoryNormalMigration(t *testing.T) {
 
 	// Ensure the atomic repository can correctly migrate the transactions
 	// from the old accepted atomic tx DB to add the height index.
-	repo, err := NewAtomicTxRepository(db, codec)
+	repo, err := NewAtomicTxRepository(db, codec, 100)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.NoError(t, err)
 	verifyTxs(t, repo, txMap)
 
-	// Add more transactions past the maximum indexed height and ensure
-	// that they are correctly indexed as well.
-	addTxs(t, codec, acceptedAtomicTxDB, 100, 150, 1, txMap)
-	if err := db.Commit(); err != nil {
-		t.Fatal(err)
-	}
-	repo, err = NewAtomicTxRepository(db, codec)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.NoError(t, err)
+	writeTxs(t, repo, 100, 150, 1, txMap)
+	writeTxs(t, repo, 150, 200, 10, txMap)
 	verifyTxs(t, repo, txMap)
 }
 
-func TestAtomicRepositoryNormalOperationPostMigration(t *testing.T) {
+func TestAtomicRepositoryPostAP5Migration(t *testing.T) {
 	db := versiondb.New(memdb.New())
 	codec := prepareCodecForTest()
 
 	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
 	txMap := make(map[uint64][]*Tx)
 	addTxs(t, codec, acceptedAtomicTxDB, 0, 100, 1, txMap)
+	addTxs(t, codec, acceptedAtomicTxDB, 100, 200, 10, txMap)
 	if err := db.Commit(); err != nil {
 		t.Fatal(err)
 	}
 
 	// Ensure the atomic repository can correctly migrate the transactions
 	// from the old accepted atomic tx DB to add the height index.
-	repo, err := NewAtomicTxRepository(db, codec)
+	repo, err := NewAtomicTxRepository(db, codec, 200)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.NoError(t, err)
 	verifyTxs(t, repo, txMap)
 
-	// Add more transactions past the maximum indexed height and ensure
-	// that they are correctly indexed as well.
-	addTxs(t, codec, acceptedAtomicTxDB, 100, 150, 1, txMap)
-	if err := db.Commit(); err != nil {
-		t.Fatal(err)
-	}
-	repo, err = NewAtomicTxRepository(db, codec)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.NoError(t, err)
-	verifyTxs(t, repo, txMap)
-
-	// Verify that adding transactions in normal operation after completing the migration
-	// works correctly.
-	writeTxs(t, repo, 150, 250, 10, txMap)
-	verifyTxs(t, repo, txMap)
-}
-
-// Test that the atomic repository can correctly handle the migration
-// when there are multiple atomic transactions at a given height.
-func TestAtomicRepositoryMultipleTxAtHeightMigration(t *testing.T) {
-	db := versiondb.New(memdb.New())
-	codec := prepareCodecForTest()
-
-	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
-	heightTxIDMap := make(map[uint64][]ids.ID, 175)
-
-	const apricotPhase5Height = uint64(700000)
-
-	for i := uint64(0); i < 1000000; i++ {
-		txs := make(map[ids.ID]*Tx)
-		id, tx := newTestTx()
-		txs[id] = tx
-
-	addTxs(t, codec, acceptedAtomicTxDB, 0, 50, 1, txMap)
-	addTxs(t, codec, acceptedAtomicTxDB, 50, 100, 10, txMap) // Batch of 10 txs at each height [50,100]
-	if err := db.Commit(); err != nil {
-		t.Fatal(err)
-	}
-
-	repo, err := NewAtomicTxRepository(db, codec)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.NoError(t, err)
-	verifyTxs(t, repo, txMap)
-
-	// Add more transactions and verify they are indexed correctly as well.
-	addTxs(t, codec, acceptedAtomicTxDB, 100, 125, 1, txMap)
-	addTxs(t, codec, acceptedAtomicTxDB, 125, 150, 10, txMap)
-	if err := db.Commit(); err != nil {
-		t.Fatal(err)
-	}
-	repo, err = NewAtomicTxRepository(db, codec)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.NoError(t, err)
+	writeTxs(t, repo, 200, 300, 10, txMap)
 	verifyTxs(t, repo, txMap)
 }
 
@@ -259,7 +192,7 @@ func benchAtomicRepositoryIndex10_000(b *testing.B, maxHeight uint64, txsPerHeig
 		b.Fatal(err)
 	}
 	b.ResetTimer()
-	repo, err := NewAtomicTxRepository(db, codec)
+	repo, err := NewAtomicTxRepository(db, codec, maxHeight)
 	if err != nil {
 		b.Fatal(err)
 	}
