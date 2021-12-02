@@ -5,6 +5,7 @@ package snowsyncer
 import (
 	"fmt"
 	stdmath "math"
+	"math/rand"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -80,6 +81,7 @@ type fastSyncer struct {
 	// Fast Sync specific fields
 	fastSyncVM        block.StateSyncableVM
 	onDoneFastSyncing func(lastReqID uint32) error
+	lastSummaryBlkID  ids.ID
 }
 
 // Engine interface implementation
@@ -467,12 +469,73 @@ func (fs *fastSyncer) Notify(msg common.Message) error {
 	switch msg {
 	case common.PendingTxs:
 		fs.Ctx.Log.Warn("Message %s received in fast sync. Dropped.", msg.String())
-	case common.FastSyncDone:
+
+	case common.StateSyncLastBlockMissing:
+		// retrieve the blkID to request
+		var err error
+		fs.lastSummaryBlkID, err = fs.fastSyncVM.GetLastSummaryBlockID()
+		if err != nil {
+			fs.Ctx.Log.Warn("Could not retrieve last summary block ID to complete fast sync. Err: %v", err)
+			return err
+		}
+		return fs.requestBlk(fs.lastSummaryBlkID)
+
+	case common.StateSyncDone:
 		return fs.onDoneFastSyncing(fs.RequestID)
+
 	default:
 		fs.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
 	}
 	return nil
+}
+
+func (fs *fastSyncer) requestBlk(blkID ids.ID) error {
+	// pick random beacon
+	var valID ids.ShortID
+	if len(fs.StateSyncTestingBeacons) > 0 {
+		rndIdx := rand.Intn(len(fs.StateSyncTestingBeacons) - 1) // #nosec G404
+		valID = fs.StateSyncTestingBeacons[rndIdx]
+	} else {
+		// sample from validators
+		valList, err := fs.Beacons.Sample(1)
+		if err != nil {
+			return err
+		}
+		valID = valList[0].ID()
+	}
+
+	// request the block
+	fs.Sender.SendGet(valID, fs.RequestID, blkID)
+	return nil
+}
+
+// FetchHandler interface implementation
+func (fs *fastSyncer) Put(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error {
+	// ignores any late responses
+	if requestID != fs.RequestID {
+		fs.Ctx.Log.Debug("Received an Out-of-Sync Put - validator: %v - expectedRequestID: %v, requestID: %v",
+			validatorID, fs.RequestID, requestID)
+		return nil
+	}
+
+	if err := fs.fastSyncVM.SetLastSummaryBlock(container); err != nil {
+		fs.Ctx.Log.Warn("Could not accept last summary block, err :%v. Retrying block download.", err)
+		return fs.requestBlk(fs.lastSummaryBlkID)
+	}
+
+	return nil
+}
+
+func (fs *fastSyncer) GetFailed(validatorID ids.ShortID, requestID uint32) error {
+	// ignores any late responses
+	if requestID != fs.RequestID {
+		fs.Ctx.Log.Debug("Received an Out-of-Sync GetFailed - validator: %v - expectedRequestID: %v, requestID: %v",
+			validatorID, fs.RequestID, requestID)
+		return nil
+	}
+
+	fs.Ctx.Log.Warn("Failed downloading Last Summary block. Retrying block download.")
+	return fs.requestBlk(fs.lastSummaryBlkID)
 }
 
 // InternalHandler interface implementation

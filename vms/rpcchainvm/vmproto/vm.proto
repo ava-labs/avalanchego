@@ -212,6 +212,10 @@ message StateSyncLastSummaryBlockIDResponse {
     bytes bytes = 1;
 }
 
+message StateSyncSetLastSummaryBlockRequest {
+    bytes bytes = 1;
+}
+
 // The metrics message defintions are copied from:
 // https://github.com/prometheus/client_model/blob/master/io/prometheus/client/metrics.proto
 // TODO: directly import this dependency
@@ -326,4 +330,5 @@ service VM {
     rpc StateSyncIsSummaryAccepted(StateSyncIsSummaryAcceptedRequest) returns (StateSyncIsSummaryAcceptedResponse);
     rpc StateSync(StateSyncRequest) returns (google.protobuf.Empty);
     rpc GetLastSummaryBlockID(google.protobuf.Empty) returns (StateSyncLastSummaryBlockIDResponse);
+    rpc SetLastSummaryBlock(StateSyncSetLastSummaryBlockRequest) returns (google.protobuf.Empty);
 }

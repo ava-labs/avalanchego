@@ -35,6 +35,7 @@ var (
 type Block interface {
 	snowman.Block
 
+	conditionalAccept(acceptInnerBlk bool) error
 	getInnerBlk() snowman.Block
 
 	verifyPreForkChild(child *preForkBlock) error

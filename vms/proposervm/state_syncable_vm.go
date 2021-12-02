@@ -19,6 +19,7 @@ var (
 	stateSyncCodec               codec.Manager
 	errWrongStateSyncVersion     = errors.New("wrong state sync key version")
 	errUnknownLastSummaryBlockID = errors.New("could not retrieve blockID associated with last summary")
+	errBadLastSummaryBlock       = errors.New("could not parse last summary block")
 )
 
 func init() {
@@ -148,7 +149,7 @@ func (vm *VM) GetLastSummaryBlockID() (ids.ID, error) {
 
 	innerBlkID, err := fsVM.GetLastSummaryBlockID()
 	if err != nil {
-		return ids.Empty, errUnknownLastSummaryBlockID
+		return ids.Empty, err
 	}
 
 	proBlkID, err := vm.GetBlockID(innerBlkID)
@@ -157,4 +158,33 @@ func (vm *VM) GetLastSummaryBlockID() (ids.ID, error) {
 	}
 
 	return proBlkID, nil
+}
+
+func (vm *VM) SetLastSummaryBlock(blkByte []byte) error {
+	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
+	if !ok {
+		return block.ErrStateSyncableVMNotImplemented
+	}
+
+	// retrieve inner block
+	var (
+		innerBlkBytes []byte
+		blk           Block
+		err           error
+	)
+	if blk, err = vm.parsePostForkBlock(blkByte); err == nil {
+		innerBlkBytes = blk.getInnerBlk().Bytes()
+	} else if blk, err = vm.parsePreForkBlock(blkByte); err == nil {
+		innerBlkBytes = blk.Bytes()
+	} else {
+		return errBadLastSummaryBlock
+	}
+
+	// TODO ABENEGIA: return error if innerBlk's ID does not match lastSummaryBlockID
+	// TODO ABENEGIA: make idempotent (to cope with SetLastSummaryBlock inner success and outer failure)
+	if err := fsVM.SetLastSummaryBlock(innerBlkBytes); err != nil {
+		return err
+	}
+
+	return blk.conditionalAccept(false /*acceptInnerBlk*/)
 }

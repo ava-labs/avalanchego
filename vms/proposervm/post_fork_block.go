@@ -23,6 +23,10 @@ type postForkBlock struct {
 // 2) Persists this block in storage
 // 3) Calls Reject() on siblings of this block and their descendants.
 func (b *postForkBlock) Accept() error {
+	return b.conditionalAccept(true /*acceptInnerBlk*/)
+}
+
+func (b *postForkBlock) conditionalAccept(acceptInnerBlk bool) error {
 	blkID := b.ID()
 	if err := b.vm.State.SetLastAccepted(blkID); err != nil {
 		return err
@@ -37,10 +41,12 @@ func (b *postForkBlock) Accept() error {
 	delete(b.vm.verifiedBlocks, blkID)
 	b.vm.lastAcceptedTime = b.Timestamp()
 
-	// mark the inner block as accepted and all conflicting inner blocks as
-	// rejected
-	if err := b.vm.Tree.Accept(b.innerBlk); err != nil {
-		return err
+	if acceptInnerBlk {
+		// mark the inner block as accepted and all conflicting inner blocks as
+		// rejected
+		if err := b.vm.Tree.Accept(b.innerBlk); err != nil {
+			return err
+		}
 	}
 
 	// finally confirm the mapping from inner to proposerVm block ID

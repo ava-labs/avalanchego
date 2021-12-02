@@ -349,7 +349,7 @@ func (t *Transitive) Notify(msg common.Message) error {
 		t.pendingTxs = append(t.pendingTxs, t.VM.PendingTxs()...)
 		t.metrics.pendingTxs.Set(float64(len(t.pendingTxs)))
 		return t.attemptToIssueTxs()
-	case common.FastSyncDone:
+	case common.StateSyncLastBlockMissing, common.StateSyncDone:
 		t.Ctx.Log.Warn("unexpected message %s received in avalanche engine. Dropped", msg.String())
 	default:
 		t.Ctx.Log.Warn("unexpected message from the VM: %s", msg)

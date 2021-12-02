@@ -50,4 +50,6 @@ type StateSyncableVM interface {
 	// up to a given height. However the block associated with that height may be not known
 	// to the VM yet. GetLastSummaryBlockID allows retrival of this block from network
 	GetLastSummaryBlockID() (ids.ID, error)
+
+	SetLastSummaryBlock([]byte) error
 }

@@ -22,8 +22,14 @@ type preForkBlock struct {
 }
 
 func (b *preForkBlock) Accept() error {
-	if err := b.Block.Accept(); err != nil {
-		return err
+	return b.conditionalAccept(true /*acceptInnerBlk*/)
+}
+
+func (b *preForkBlock) conditionalAccept(acceptInnerBlk bool) error {
+	if acceptInnerBlk {
+		if err := b.Block.Accept(); err != nil {
+			return err
+		}
 	}
 
 	// finally confirm the mapping from inner to proposerVm block ID

@@ -49,6 +49,7 @@ type VMClient interface {
 	StateSyncIsSummaryAccepted(ctx context.Context, in *StateSyncIsSummaryAcceptedRequest, opts ...grpc.CallOption) (*StateSyncIsSummaryAcceptedResponse, error)
 	StateSync(ctx context.Context, in *StateSyncRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetLastSummaryBlockID(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncLastSummaryBlockIDResponse, error)
+	SetLastSummaryBlock(ctx context.Context, in *StateSyncSetLastSummaryBlockRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type vMClient struct {
@@ -320,6 +321,15 @@ func (c *vMClient) GetLastSummaryBlockID(ctx context.Context, in *emptypb.Empty,
 	return out, nil
 }
 
+func (c *vMClient) SetLastSummaryBlock(ctx context.Context, in *StateSyncSetLastSummaryBlockRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/SetLastSummaryBlock", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // VMServer is the server API for VM service.
 // All implementations must embed UnimplementedVMServer
 // for forward compatibility
@@ -354,6 +364,7 @@ type VMServer interface {
 	StateSyncIsSummaryAccepted(context.Context, *StateSyncIsSummaryAcceptedRequest) (*StateSyncIsSummaryAcceptedResponse, error)
 	StateSync(context.Context, *StateSyncRequest) (*emptypb.Empty, error)
 	GetLastSummaryBlockID(context.Context, *emptypb.Empty) (*StateSyncLastSummaryBlockIDResponse, error)
+	SetLastSummaryBlock(context.Context, *StateSyncSetLastSummaryBlockRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedVMServer()
 }
 
@@ -447,6 +458,9 @@ func (UnimplementedVMServer) StateSync(context.Context, *StateSyncRequest) (*emp
 }
 func (UnimplementedVMServer) GetLastSummaryBlockID(context.Context, *emptypb.Empty) (*StateSyncLastSummaryBlockIDResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetLastSummaryBlockID not implemented")
+}
+func (UnimplementedVMServer) SetLastSummaryBlock(context.Context, *StateSyncSetLastSummaryBlockRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetLastSummaryBlock not implemented")
 }
 func (UnimplementedVMServer) mustEmbedUnimplementedVMServer() {}
 
@@ -983,6 +997,24 @@ func _VM_GetLastSummaryBlockID_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VM_SetLastSummaryBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StateSyncSetLastSummaryBlockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).SetLastSummaryBlock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/SetLastSummaryBlock",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).SetLastSummaryBlock(ctx, req.(*StateSyncSetLastSummaryBlockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // VM_ServiceDesc is the grpc.ServiceDesc for VM service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1105,6 +1137,10 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetLastSummaryBlockID",
 			Handler:    _VM_GetLastSummaryBlockID_Handler,
+		},
+		{
+			MethodName: "SetLastSummaryBlock",
+			Handler:    _VM_SetLastSummaryBlock_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

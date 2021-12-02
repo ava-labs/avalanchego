@@ -66,3 +66,12 @@ func (vm *blockVM) GetLastSummaryBlockID() (ids.ID, error) {
 
 	return fsVM.GetLastSummaryBlockID()
 }
+
+func (vm *blockVM) SetLastSummaryBlock(blkBytes []byte) error {
+	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
+	if !ok {
+		return block.ErrStateSyncableVMNotImplemented
+	}
+
+	return fsVM.SetLastSummaryBlock(blkBytes)
+}

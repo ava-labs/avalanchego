@@ -610,6 +610,15 @@ func (vm *VMClient) GetLastSummaryBlockID() (ids.ID, error) {
 	return ids.ID(ba), nil
 }
 
+func (vm *VMClient) SetLastSummaryBlock(blkByte []byte) error {
+	_, err := vm.client.SetLastSummaryBlock(context.Background(),
+		&vmproto.StateSyncSetLastSummaryBlockRequest{
+			Bytes: blkByte,
+		})
+
+	return err
+}
+
 func (vm *VMClient) GetAncestors(
 	blkID ids.ID,
 	maxBlocksNum int,

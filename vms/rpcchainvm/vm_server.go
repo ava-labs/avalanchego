@@ -319,6 +319,15 @@ func (vm *VMServer) GetLastSummaryBlockID(context.Context, *emptypb.Empty) (*vmp
 	return &vmproto.StateSyncLastSummaryBlockIDResponse{Bytes: blkID[:]}, nil
 }
 
+func (vm *VMServer) SetLastSummaryBlock(ctx context.Context, req *vmproto.StateSyncSetLastSummaryBlockRequest) (*emptypb.Empty, error) {
+	fsVM, ok := vm.vm.(block.StateSyncableVM)
+	if !ok {
+		return nil, block.ErrStateSyncableVMNotImplemented
+	}
+
+	return &emptypb.Empty{}, fsVM.SetLastSummaryBlock(req.Bytes)
+}
+
 func (vm *VMServer) Bootstrapping(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return &emptypb.Empty{}, vm.vm.Bootstrapping()
 }
