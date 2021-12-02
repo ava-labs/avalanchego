@@ -3,11 +3,42 @@
 package proposervm
 
 import (
+	"errors"
+	"math"
+
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
+
+const stateSyncVersion = 0
+
+var (
+	stateSyncCodec           codec.Manager
+	errWrongStateSyncVersion = errors.New("wrong state sync key version")
+)
+
+func init() {
+	lc := linearcodec.New(reflectcodec.DefaultTagName, math.MaxUint32)
+	stateSyncCodec = codec.NewManager(math.MaxInt32)
+
+	err := stateSyncCodec.RegisterCodec(stateSyncVersion, lc)
+	if err != nil {
+		panic(err)
+	}
+}
+
+type ProVMSummaryKey struct {
+	ProBlkID ids.ID            `serialize:"true"`
+	InnerKey InnerVMSummaryKey `serialize:"true"`
+}
+
+type InnerVMSummaryKey struct {
+	InnerBlkID   ids.ID `serialize:"true"`
+	InnerVMBytes []byte `serialize:"true"`
+}
 
 func (vm *VM) StateSyncEnabled() (bool, error) {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
@@ -25,12 +56,40 @@ func (vm *VM) StateSyncGetLastSummary() (block.Summary, error) {
 	}
 
 	vmSummary, err := fsVM.StateSyncGetLastSummary()
+	if err != nil {
+		return block.Summary{}, err
+	}
 
-	// TODO ABENEGIA:
-	// 1- Find proBlkID corresponding to vmSummary; note that vmSummary.Key == innerBlkID + hash
-	// 2- Return summary whose key is proBlkID + innerBlkID + hash
-	// Enabler: add mapping from innerBlkID to proBlkID. It should be just for accepted blocks, hence it's bijective map
-	return vmSummary, err
+	// Extract innerBlkID from summary key
+	innerKey := InnerVMSummaryKey{}
+	parsedVersion, err := stateSyncCodec.Unmarshal(vmSummary.Key, &innerKey)
+	if err != nil {
+		return block.Summary{}, err
+	}
+	if parsedVersion != stateSyncVersion {
+		return block.Summary{}, errWrongStateSyncVersion
+	}
+
+	// retrieve proposer Block wrapping innerBlock
+	proBlkID, err := vm.GetBlockID(innerKey.InnerBlkID)
+	if err != nil {
+		return block.Summary{}, err
+	}
+
+	// recreate key
+	proKey := ProVMSummaryKey{
+		ProBlkID: proBlkID,
+		InnerKey: innerKey,
+	}
+	proKeyBytes, err := stateSyncCodec.Marshal(stateSyncVersion, &proKey)
+	if err != nil {
+		return block.Summary{}, err
+	}
+
+	return block.Summary{
+		Key:   proKeyBytes,
+		State: vmSummary.State,
+	}, err
 }
 
 func (vm *VM) StateSyncIsSummaryAccepted(key []byte) (bool, error) {
@@ -39,16 +98,23 @@ func (vm *VM) StateSyncIsSummaryAccepted(key []byte) (bool, error) {
 		return false, block.ErrStateSyncableVMNotImplemented
 	}
 
-	packer := wrappers.Packer{Bytes: key}
-	blockBytes := packer.UnpackBytes()
-	_, err := vm.ParseBlock(blockBytes)
+	// Extract innerKey from summary key
+	proKey := ProVMSummaryKey{}
+	parsedVersion, err := stateSyncCodec.Unmarshal(key, &proKey)
 	if err != nil {
 		return false, err
 	}
-	// TODO: Validate the contents of the block here.
+	if parsedVersion != stateSyncVersion {
+		return false, errWrongStateSyncVersion
+	}
 
-	vmKeys := packer.UnpackFixedBytes(len(key) - len(blockBytes) - wrappers.IntLen)
-	return fsVM.StateSyncIsSummaryAccepted(vmKeys)
+	innerKey, err := stateSyncCodec.Marshal(stateSyncVersion, proKey.InnerKey)
+	if err != nil {
+		return false, err
+	}
+
+	// propagate request to innerVm
+	return fsVM.StateSyncIsSummaryAccepted(innerKey)
 }
 
 func (vm *VM) StateSync(accepted []block.Summary) error {
@@ -56,51 +122,31 @@ func (vm *VM) StateSync(accepted []block.Summary) error {
 	if !ok {
 		return block.ErrStateSyncableVMNotImplemented
 	}
-	if len(accepted) == 0 {
-		return fsVM.StateSync(accepted)
-	}
 
-	// unwrap the expected block id, height, and vmSummary data
-	// then pass the vmSummary corresponding to the largest height
-	// to the fsVM.
-	maxHeight := uint64(0)
-	var maxKey []byte
-	var maxHeightState []byte
-	var maxHeightBlock PostForkBlock
-	for _, summary := range accepted {
-		packer := wrappers.Packer{Bytes: summary.State}
-		blockBytes := packer.UnpackBytes()
-		parsedBlock, err := vm.parsePostForkBlock(blockBytes)
+	// retrieve innerKey for each summary and propagate all to innerVM
+	innerSummaries := make([]block.Summary, 0, len(accepted))
+	for _, summ := range accepted {
+		proKey := ProVMSummaryKey{}
+		parsedVersion, err := stateSyncCodec.Unmarshal(summ.Key, &proKey)
 		if err != nil {
 			return err
 		}
-		height := parsedBlock.Height()
-		if maxHeight < height {
-			maxHeight = height
-			maxKey = summary.Key
-			maxHeightState = packer.UnpackFixedBytes(len(summary.State) - len(blockBytes) - wrappers.IntLen)
-			maxHeightBlock = parsedBlock
+		if parsedVersion != stateSyncVersion {
+			return errWrongStateSyncVersion
 		}
+
+		innerKey, err := stateSyncCodec.Marshal(stateSyncVersion, proKey.InnerKey)
+		if err != nil {
+			return err
+		}
+
+		innerSummaries = append(innerSummaries, block.Summary{
+			Key:   innerKey,
+			State: summ.State,
+		})
 	}
 
-	// TODO: This should be done on complete instead.
-	// It may also be OK to do this first and once either
-	// vm.ChainVM or vm.State move on to a state sync block,
-	// operations can only be resumed by continuing a state sync.
-	if err := vm.State.PutBlock(maxHeightBlock.getStatelessBlk(), choices.Accepted); err != nil {
-		return err
-	}
-	if err := vm.State.SetLastAccepted(maxHeightBlock.ID()); err != nil {
-		return err
-	}
-
-	summaryToPush := []block.Summary{
-		{
-			Key:   maxKey,
-			State: maxHeightState,
-		},
-	}
-	return fsVM.StateSync(summaryToPush)
+	return fsVM.StateSync(innerSummaries)
 }
 
 func (vm *VM) StateSyncLastAccepted() (ids.ID, uint64, error) {
