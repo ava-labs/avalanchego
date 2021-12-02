@@ -44,7 +44,12 @@ func (b *postForkOption) Accept() error {
 
 	// mark the inner block as accepted and all conflicting inner blocks as
 	// rejected
-	return b.vm.Tree.Accept(b.innerBlk)
+	if err := b.vm.Tree.Accept(b.innerBlk); err != nil {
+		return err
+	}
+
+	// finally confirm the mapping from inner to proposerVm block ID
+	return b.vm.State.SetBlocksIDMapping(b.innerBlk.ID(), blkID)
 }
 
 func (b *postForkOption) Reject() error {

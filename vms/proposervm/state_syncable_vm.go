@@ -23,44 +23,13 @@ func (vm *VM) StateSyncGetLastSummary() (block.Summary, error) {
 	if !ok {
 		return block.Summary{}, block.ErrStateSyncableVMNotImplemented
 	}
-	// // TODO: If this has a race condition with blocks being accepted
-	// // between time the ChainVM gets the state summary, we can either
-	// // (a) return (height uint64, summary []byte, error) from this method
-	// // (b) encode the height or inner blk id in the summary bytes.
-	// // (c) ? other solutions may be possible too
 
-	// // find last syncable height
-	// lastAcceptedID, err := vm.GetLastAccepted()
-	// if err != nil {
-	// 	return block.Summary{}, err
-	// }
-
-	// blk, err := vm.GetBlock(lastAcceptedID)
-	// if err != nil {
-	// 	return block.Summary{}, err
-	// }
-	// height := blk.Height()
-	// syncableHeight := height - height%4096
-	// // TODO: we can cache the result here and also
-	// // proactively set it on processing blocks.
-	// for ; height > syncableHeight; height-- {
-	// 	blk, err = vm.GetBlock(blk.Parent())
-	// 	if err != nil {
-	// 		return block.Summary{}, err
-	// 	}
-	// }
 	vmSummary, err := fsVM.StateSyncGetLastSummary()
-	// if err != nil {
-	// 	return block.Summary{}, err
-	// }
-	// blockBytes := blk.Bytes()
-	// packerLen := len(blockBytes) + wrappers.IntLen + len(vmSummary.Key) +
-	// 	wrappers.IntLen + len(vmSummary.State)
-	// packer := wrappers.Packer{Bytes: make([]byte, packerLen)}
-	// packer.PackBytes(blockBytes)
-	// packer.PackFixedBytes(vmSummary.Key)
-	// packer.PackFixedBytes(vmSummary.State)
-	// return packer.Bytes, nil
+
+	// TODO ABENEGIA:
+	// 1- Find proBlkID corresponding to vmSummary; note that vmSummary.Key == innerBlkID + hash
+	// 2- Return summary whose key is proBlkID + innerBlkID + hash
+	// Enabler: add mapping from innerBlkID to proBlkID. It should be just for accepted blocks, hence it's bijective map
 	return vmSummary, err
 }
 

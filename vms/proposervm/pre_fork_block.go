@@ -21,6 +21,15 @@ type preForkBlock struct {
 	vm *VM
 }
 
+func (b *preForkBlock) Accept() error {
+	if err := b.Block.Accept(); err != nil {
+		return err
+	}
+
+	// finally confirm the mapping from inner to proposerVm block ID
+	return b.vm.State.SetBlocksIDMapping(b.Block.ID(), b.Block.ID())
+}
+
 func (b *preForkBlock) Parent() ids.ID {
 	return b.Block.Parent()
 }

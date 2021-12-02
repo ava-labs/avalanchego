@@ -4,7 +4,6 @@
 package proposervm
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -68,10 +67,6 @@ type VM struct {
 	// timestamp if the last accepted block has been a PostForkOption block
 	// since having initialized the VM.
 	lastAcceptedTime time.Time
-
-	// stateSyncBlock remembers the block the VM has state sync'ed to
-	stateSyncBlock     snowman.Block
-	stateSyncCompleted bool
 }
 
 func New(vm block.ChainVM, activationTime time.Time, minimumPChainHeight uint64) *VM {
@@ -124,6 +119,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
+	// TODO ABENEGIA: rebuild the innerBlockMapping inside repairAcceptedChain
 	if err := vm.repairAcceptedChain(); err != nil {
 		return err
 	}
@@ -158,23 +154,6 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 }
 
 func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
-	if vm.stateSyncCompleted && vm.stateSyncBlock != nil && vm.stateSyncBlock.ID() == id {
-		lastAcceptedID, err := vm.ChainVM.LastAccepted()
-		if err != nil {
-			return nil, err
-		}
-		lastAcceptedBlock, err := vm.ChainVM.GetBlock(lastAcceptedID)
-		if err != nil {
-			return nil, err
-		}
-
-		if vm.stateSyncBlock.Height() != lastAcceptedBlock.Height() {
-			return nil, fmt.Errorf("height mismatch between proposerVM (%d) and chainVM (%d) state sync last accepted blocks", vm.stateSyncBlock.Height(), lastAcceptedBlock.Height())
-		}
-		// TODO: see if we can parse the inner ID and check with last
-		// accepted ID here instead of the height.
-		return vm.stateSyncBlock, nil
-	}
 	return vm.getBlock(id)
 }
 
