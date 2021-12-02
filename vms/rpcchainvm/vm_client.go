@@ -599,16 +599,15 @@ func (vm *VMClient) StateSync(summaries []block.Summary) error {
 	return err
 }
 
-func (vm *VMClient) StateSyncLastAccepted() (ids.ID, uint64, error) {
-	resp, err := vm.client.StateSyncLastAccepted(
-		context.Background(),
-		&emptypb.Empty{},
-	)
+func (vm *VMClient) GetLastSummaryBlockID() (ids.ID, error) {
+	resp, err := vm.client.GetLastSummaryBlockID(context.Background(), &emptypb.Empty{})
 	if err != nil {
-		return ids.Empty, 0, err
+		return ids.Empty, err
 	}
-	id, err := ids.ToID(resp.LastAcceptedID)
-	return id, resp.LastAcceptedHeight, err
+
+	var ba [32]byte
+	copy(ba[:], resp.Bytes)
+	return ids.ID(ba), nil
 }
 
 func (vm *VMClient) GetAncestors(

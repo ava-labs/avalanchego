@@ -16,8 +16,9 @@ import (
 const stateSyncVersion = 0
 
 var (
-	stateSyncCodec           codec.Manager
-	errWrongStateSyncVersion = errors.New("wrong state sync key version")
+	stateSyncCodec               codec.Manager
+	errWrongStateSyncVersion     = errors.New("wrong state sync key version")
+	errUnknownLastSummaryBlockID = errors.New("could not retrieve blockID associated with last summary")
 )
 
 func init() {
@@ -149,14 +150,21 @@ func (vm *VM) StateSync(accepted []block.Summary) error {
 	return fsVM.StateSync(innerSummaries)
 }
 
-func (vm *VM) StateSyncLastAccepted() (ids.ID, uint64, error) {
-	lastAccepted, err := vm.State.GetLastAccepted()
-	if err != nil {
-		return ids.Empty, 0, err
+func (vm *VM) GetLastSummaryBlockID() (ids.ID, error) {
+	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
+	if !ok {
+		return ids.Empty, block.ErrStateSyncableVMNotImplemented
 	}
-	block, err := vm.getBlock(lastAccepted)
+
+	innerBlkID, err := fsVM.GetLastSummaryBlockID()
 	if err != nil {
-		return ids.Empty, 0, err
+		return ids.Empty, errUnknownLastSummaryBlockID
 	}
-	return lastAccepted, block.Height(), nil
+
+	proBlkID, err := vm.GetBlockID(innerBlkID)
+	if err != nil {
+		return ids.Empty, errUnknownLastSummaryBlockID
+	}
+
+	return proBlkID, nil
 }

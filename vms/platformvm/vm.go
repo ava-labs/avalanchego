@@ -665,26 +665,6 @@ func (vm *VM) getPercentConnected() (float64, error) {
 	return float64(connectedStake) / float64(vdrSet.Weight()), nil
 }
 
-func (vm *VM) StateSyncEnabled() (bool, error) {
-	return false, nil
-}
-
-func (vm *VM) StateSyncGetLastSummary() ([]byte, error) {
-	return nil, nil
-}
-
-func (vm *VM) StateSyncIsSummaryAccepted([]byte) (bool, error) {
-	return false, nil
-}
-
-func (vm *VM) StateSync([][]byte) error {
-	return nil
-}
-
-func (vm *VM) StateSyncLastAccepted() (ids.ID, uint64, error) {
-	return ids.Empty, 0, nil
-}
-
 // TODO: remove after AP5
 func (vm *VM) isValidCrossChainID(vs VersionedState, peerChainID ids.ID) TxError {
 	currentTimestamp := vs.GetTimestamp()

@@ -208,9 +208,8 @@ message StateSyncRequest {
     repeated StateSyncGetLastSummaryResponse summaries = 1;
 }
 
-message StateSyncLastAcceptedResponse {
-    bytes lastAcceptedID = 1;
-    uint64 lastAcceptedHeight = 2;
+message StateSyncLastSummaryBlockIDResponse {
+    bytes bytes = 1;
 }
 
 // The metrics message defintions are copied from:
@@ -326,5 +325,5 @@ service VM {
     rpc StateSyncGetLastSummary(google.protobuf.Empty) returns (StateSyncGetLastSummaryResponse);
     rpc StateSyncIsSummaryAccepted(StateSyncIsSummaryAcceptedRequest) returns (StateSyncIsSummaryAcceptedResponse);
     rpc StateSync(StateSyncRequest) returns (google.protobuf.Empty);
-    rpc StateSyncLastAccepted(google.protobuf.Empty) returns (StateSyncLastAcceptedResponse);
+    rpc GetLastSummaryBlockID(google.protobuf.Empty) returns (StateSyncLastSummaryBlockIDResponse);
 }

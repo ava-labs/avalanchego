@@ -58,10 +58,11 @@ func (vm *blockVM) StateSync(accepted []block.Summary) error {
 	return err
 }
 
-func (vm *blockVM) StateSyncLastAccepted() (ids.ID, uint64, error) {
+func (vm *blockVM) GetLastSummaryBlockID() (ids.ID, error) {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
-		return ids.Empty, 0, block.ErrStateSyncableVMNotImplemented
+		return ids.Empty, block.ErrStateSyncableVMNotImplemented
 	}
-	return fsVM.StateSyncLastAccepted()
+
+	return fsVM.GetLastSummaryBlockID()
 }

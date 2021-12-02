@@ -306,19 +306,17 @@ func (vm *VMServer) StateSync(ctx context.Context, req *vmproto.StateSyncRequest
 	return &emptypb.Empty{}, nil
 }
 
-func (vm *VMServer) StateSyncLastAccepted(context.Context, *emptypb.Empty) (*vmproto.StateSyncLastAcceptedResponse, error) {
+func (vm *VMServer) GetLastSummaryBlockID(context.Context, *emptypb.Empty) (*vmproto.StateSyncLastSummaryBlockIDResponse, error) {
 	fsVM, ok := vm.vm.(block.StateSyncableVM)
 	if !ok {
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
-	lastAcceptedID, lastAcceptedHeight, err := fsVM.StateSyncLastAccepted()
+
+	blkID, err := fsVM.GetLastSummaryBlockID()
 	if err != nil {
 		return nil, err
 	}
-	return &vmproto.StateSyncLastAcceptedResponse{
-		LastAcceptedID:     lastAcceptedID[:],
-		LastAcceptedHeight: lastAcceptedHeight,
-	}, nil
+	return &vmproto.StateSyncLastSummaryBlockIDResponse{Bytes: blkID[:]}, nil
 }
 
 func (vm *VMServer) Bootstrapping(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {

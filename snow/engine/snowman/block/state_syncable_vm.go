@@ -36,8 +36,8 @@ type StateSyncableVM interface {
 	// Will be called with [nil] if no valid state summaries could be found.
 	StateSync([]Summary) error
 
-	// StateSyncLastAccepted returns the last accepted block, its height, and
-	// an optional error. This is called after the VM notifies the engine
-	// of the fast sync operation on the communication channel.
-	StateSyncLastAccepted() (ids.ID, uint64, error) // TODO ABENEGIA: remove and handle via notification
+	// At the end of StateSync process, VM will have rebuilt the state of its blockchain
+	// up to a given height. However the block associated with that height may be not known
+	// to the VM yet. GetLastSummaryBlockID allows retrival of this block from network
+	GetLastSummaryBlockID() (ids.ID, error)
 }
