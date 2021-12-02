@@ -5,6 +5,7 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -119,9 +120,18 @@ func (s *Server) Dispatch() error {
 }
 
 // DispatchTLS starts the API server with the provided TLS certificate
-func (s *Server) DispatchTLS(certFile, keyFile string) error {
+func (s *Server) DispatchTLS(certBytes, keyBytes []byte) error {
 	listenAddress := fmt.Sprintf("%s:%d", s.listenHost, s.listenPort)
-	listener, err := net.Listen("tcp", listenAddress)
+	cert, err := tls.X509KeyPair(certBytes, keyBytes)
+	if err != nil {
+		return err
+	}
+	config := &tls.Config{
+		MinVersion:   tls.VersionTLS12,
+		Certificates: []tls.Certificate{cert},
+	}
+
+	listener, err := tls.Listen("tcp", listenAddress, config)
 	if err != nil {
 		return err
 	}
@@ -133,7 +143,8 @@ func (s *Server) DispatchTLS(certFile, keyFile string) error {
 		s.log.Info("HTTPS API server listening on \"%s:%d\"", s.listenHost, ipDesc.Port)
 	}
 
-	return http.ServeTLS(listener, s.handler, certFile, keyFile)
+	s.srv = &http.Server{Addr: listenAddress, Handler: s.handler}
+	return s.srv.Serve(listener)
 }
 
 // RegisterChain registers the API endpoints associated with this chain. That is,
