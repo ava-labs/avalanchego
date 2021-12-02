@@ -378,11 +378,9 @@ func (vm *VM) Initialize(
 	vm.chain = ethChain
 	lastAccepted := vm.chain.LastAcceptedBlock()
 
-	vm.atomicTxRepository = NewAtomicTxRepository(vm.db, vm.codec)
-	// TODO find and fill apricotPhase5Block
-	if err := vm.atomicTxRepository.Initialize(0); err != nil {
-		log.Error("failed to initialise atomic tx repository", "err", err)
-		return err
+	vm.atomicTxRepository, err = NewAtomicTxRepository(vm.db, vm.codec, lastAccepted.NumberU64())
+	if err != nil {
+		return fmt.Errorf("failed to create atomic repository: %w", err)
 	}
 
 	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
