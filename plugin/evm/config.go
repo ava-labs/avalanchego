@@ -108,6 +108,9 @@ func (c Config) EthAPIs() []string {
 	if c.DebugAPIEnabled {
 		ethAPIs = append(ethAPIs, "debug")
 	}
+	if c.NetAPIEnabled {
+		ethAPIs = append(ethAPIs, "net")
+	}
 
 	return ethAPIs
 }

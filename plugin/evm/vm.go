@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth/ethconfig"
-	ethAPI "github.com/ava-labs/coreth/internal/ethapi"
 	"github.com/ava-labs/coreth/metrics/prometheus"
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
@@ -866,10 +865,6 @@ func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 	if vm.config.SnowmanAPIEnabled {
 		errs.Add(handler.RegisterName("snowman", &SnowmanAPI{vm}))
 		enabledAPIs = append(enabledAPIs, "snowman")
-	}
-	if vm.config.NetAPIEnabled {
-		errs.Add(handler.RegisterName("net", ethAPI.NewPublicNetAPI(vm.chain.EthVersion())))
-		enabledAPIs = append(enabledAPIs, "net")
 	}
 	if vm.config.Web3APIEnabled {
 		errs.Add(handler.RegisterName("web3", &Web3API{}))
