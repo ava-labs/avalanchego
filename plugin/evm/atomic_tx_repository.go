@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ava-labs/avalanchego/codec"
@@ -32,7 +33,7 @@ var (
 // AtomicTxRepository defines an entity that manages storage and indexing of
 // atomic transactions
 type AtomicTxRepository interface {
-	GetIndexHeight() (uint64, bool, error)
+	// GetIndexHeight() (uint64, bool, error)
 	GetByTxID(txID ids.ID) (*Tx, uint64, error)
 	GetByHeight(height uint64) ([]*Tx, error)
 	Write(height uint64, txs []*Tx) error
@@ -55,7 +56,7 @@ type atomicTxRepository struct {
 	codec codec.Manager
 }
 
-func NewAtomicTxRepository(db *versiondb.Database, codec codec.Manager) (AtomicTxRepository, error) {
+func NewAtomicTxRepository(db *versiondb.Database, codec codec.Manager, lastAcceptedHeight uint64) (AtomicTxRepository, error) {
 	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
 	acceptedAtomicTxByHeightDB := prefixdb.New(atomicHeightTxDBPrefix, db)
 
@@ -65,129 +66,116 @@ func NewAtomicTxRepository(db *versiondb.Database, codec codec.Manager) (AtomicT
 		codec:                      codec,
 		db:                         db,
 	}
-	return repo, repo.initialize()
+	return repo, repo.initialize(lastAcceptedHeight)
 }
 
-func (a *atomicTxRepository) initialize() error {
+// initialize initializes the atomic repository and takes care of any required migration from the previous database
+// format which did not have a height -> txs index.
+func (a *atomicTxRepository) initialize(lastAcceptedHeight uint64) error {
 	startTime := time.Now()
-	indexHeight := uint64(0)
-	indexHeight, exists, err := a.GetIndexHeight()
-	if err != nil {
-		return err
-	}
-	if exists {
-		log.Info("updating atomic tx repository height index", "lastHeight", indexHeight)
-	} else {
-		log.Info("initialising atomic tx repository height index for the first time")
-	}
-
-	txIndexed, txSkipped := 0, 0
-	iter := a.acceptedAtomicTxDB.NewIterator()
-	defer iter.Release()
-
-	// Keep track of the max height we have seen
-	newMaxHeight := indexHeight
-
-	// Remember which heights we processed so we can read existing txs if we encounter the same height twice.
-	// TODO usage of seenHeights is broken when there are restarts, so we need to decide how to fix this.
-	seenHeights := make(map[uint64]struct{})
 	lastLogTime := startTime
 
-	// Keep track of the size of pending writes to be committed
-	totalApproxCommitBytes := 0
+	// [lastTxID] will be initialized to the last transaction that we indexed
+	// if we are part way through a migration.
+	var lastTxID []byte
+	indexHeightBytes, err := a.db.Get(maxIndexedHeightKey)
+	switch {
+	case err != nil && err != database.ErrNotFound: // unexpected error
+		return err
+	case err == database.ErrNotFound: // initializing from scratch
+		break
+	case len(indexHeightBytes) == wrappers.LongLen: // already initialized
+		return nil
+	case len(indexHeightBytes) == common.HashLength: // partially initialized
+		lastTxID = indexHeightBytes
+	default: // unexpected value in the database
+		return fmt.Errorf("found invalid value at max indexed height: %v", indexHeightBytes)
+	}
 
+	// Iterate from [lastTxID] to complete the re-index -> generating an index
+	// from height to a slice of transactions accepted at that height
+	iter := a.acceptedAtomicTxDB.NewIteratorWithStart(lastTxID)
+	defer iter.Release()
+
+	if len(lastTxID) == 0 {
+		log.Info("Initializing atomic transaction repository from scratch")
+	} else {
+		log.Info("Initializing atomic transaction repository from txID: %v", lastTxID)
+	}
+
+	indexedTxs := 0
+
+	// Keep track of the size of the currently pending writes
+	pendingBytesApproximation := 0
 	for iter.Next() {
 		if err := iter.Error(); err != nil {
 			return fmt.Errorf("atomic tx DB iterator errored while initializing atomic trie: %w", err)
-		}
-		// Periodically log progress
-		if time.Since(lastLogTime) > 15*time.Second {
-			log.Info("updating tx repository height index", "indexed", txIndexed, "skipped", txSkipped)
-			lastLogTime = time.Now()
 		}
 
 		// iter.Value() consists of [height packed as uint64] + [tx serialized as packed []byte]
 		iterValue := iter.Value()
 		heightBytes := iterValue[:wrappers.LongLen]
-		height := binary.BigEndian.Uint64(heightBytes)
-		if height < indexHeight {
-			txSkipped++
-			continue
-		}
 
 		// Get the tx iter is pointing to, len(txs) == 1 is expected here.
 		txBytes := iterValue[wrappers.LongLen+wrappers.IntLen:]
-		txs, err := ExtractAtomicTx(txBytes, a.codec)
+		tx, err := ExtractAtomicTx(txBytes, a.codec)
 		if err != nil {
 			return err
 		}
 
-		// If this height is already processed, get the existing transactions
-		// at [height] so that they can be re-indexed.
-		if _, exists := seenHeights[height]; exists {
-			existingTxs, err := a.GetByHeight(height)
-			if err != nil {
+		// Check if there are already transactions at [height], to ensure that we
+		// add [txs] to the already indexed transactions at [height] instead of
+		// overwriting them.
+		if err := a.addTxToHeightIndex(heightBytes, tx); err != nil {
+			return err
+		}
+		txID := tx.ID()
+		lastTxID = txID[:]
+		pendingBytesApproximation += len(txBytes)
+
+		// call commitFn to write to underlying DB if we have reached
+		// [commitSizeCap]
+		if pendingBytesApproximation > commitSizeCap {
+			if err := a.db.Put(maxIndexedHeightKey, lastTxID); err != nil {
 				return err
 			}
-			txs = append(existingTxs, txs...)
-		}
-		seenHeights[height] = struct{}{}
-
-		txsBytes, err := a.codec.Marshal(codecVersion, txs)
-		if err != nil {
-			return err
-		}
-		if err := a.acceptedAtomicTxByHeightDB.Put(heightBytes, txsBytes); err != nil {
-			return err
-		}
-		totalApproxCommitBytes += len(txBytes)
-
-		// call commitFn to write to underlying DB if needed
-		if totalApproxCommitBytes > commitSizeCap {
 			if err := a.db.Commit(); err != nil {
 				return err
 			}
-			totalApproxCommitBytes = 0
+			log.Info("Committing work initializing the atomic repository", "lastTxID", lastTxID)
+			pendingBytesApproximation = 0
 		}
-
-		// update max height if necessary
-		if height > newMaxHeight {
-			newMaxHeight = height
+		indexedTxs++
+		// Periodically log progress
+		if time.Since(lastLogTime) > 15*time.Second {
+			lastLogTime = time.Now()
+			log.Info("Atomic repository initialization", "indexedTxs", indexedTxs)
 		}
-		txIndexed++
 	}
 
-	newMaxHeightBytes := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(newMaxHeightBytes, newMaxHeight)
-	if err := a.db.Put(maxIndexedHeightKey, newMaxHeightBytes); err != nil {
+	// Updated the value stored [maxIndexedHeightKey] to be the lastAcceptedHeight
+	indexedHeight := make([]byte, wrappers.LongLen)
+	binary.BigEndian.PutUint64(indexedHeight, lastAcceptedHeight)
+	if err := a.db.Put(maxIndexedHeightKey, indexedHeight); err != nil {
 		return err
 	}
 
-	if err := a.db.Commit(); err != nil {
-		return err
-	}
-
-	log.Info("initialized atomic tx repository", "indexHeight", indexHeight, "maxHeight", newMaxHeight, "duration", time.Since(startTime), "txIndexed", txIndexed, "txSkipped", txSkipped)
-	return nil
+	log.Info("Completed atomic transaction repository migration", "lastAcceptedHeight", lastAcceptedHeight, "duration", time.Since(startTime))
+	return a.db.Commit()
 }
 
-// GetIndexHeight returns:
-// - index height
-// - whether the index has been initialized
-// - optional error
-func (a *atomicTxRepository) GetIndexHeight() (uint64, bool, error) {
+// GetIndexHeight returns the last height that was indexed by the atomic repository
+func (a *atomicTxRepository) GetIndexHeight() (uint64, error) {
 	indexHeightBytes, err := a.db.Get(maxIndexedHeightKey)
-	if err == database.ErrNotFound {
-		return 0, false, nil
-	} else if err != nil {
-		return 0, false, err
+	if err != nil {
+		return 0, err
 	}
 
 	if len(indexHeightBytes) != wrappers.LongLen {
-		return 0, false, fmt.Errorf("unexpected length for indexHeightBytes %d", len(indexHeightBytes))
+		return 0, fmt.Errorf("unexpected length for indexHeightBytes %d", len(indexHeightBytes))
 	}
 	indexHeight := binary.BigEndian.Uint64(indexHeightBytes)
-	return indexHeight, true, nil
+	return indexHeight, nil
 }
 
 // GetByTxID queries [acceptedAtomicTxDB] for the [txID], parses a [*Tx] object
@@ -207,15 +195,12 @@ func (a *atomicTxRepository) GetByTxID(txID ids.ID) (*Tx, uint64, error) {
 	packer := wrappers.Packer{Bytes: indexedTxBytes}
 	height := packer.UnpackLong()
 	txBytes := packer.UnpackBytes()
-	txs, err := ExtractAtomicTx(txBytes, a.codec)
+	tx, err := ExtractAtomicTx(txBytes, a.codec)
 	if err != nil {
 		return nil, 0, err
 	}
-	if len(txs) != 1 {
-		return nil, 0, fmt.Errorf("unexpected len for ExtractAtomicTxs return value %d", len(txs))
-	}
 
-	return txs[0], height, nil
+	return tx, height, nil
 }
 
 // GetByHeight returns all atomic txs processed on block at [height].
@@ -223,6 +208,10 @@ func (a *atomicTxRepository) GetByHeight(height uint64) ([]*Tx, error) {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 
+	return a.getByHeightBytes(heightBytes)
+}
+
+func (a *atomicTxRepository) getByHeightBytes(heightBytes []byte) ([]*Tx, error) {
 	txsBytes, err := a.acceptedAtomicTxByHeightDB.Get(heightBytes)
 	if err != nil {
 		return nil, err
@@ -239,22 +228,37 @@ func (a *atomicTxRepository) Write(height uint64, txs []*Tx) error {
 	binary.BigEndian.PutUint64(heightBytes, height)
 
 	for _, tx := range txs {
-		txBytes, err := a.codec.Marshal(codecVersion, tx)
-		if err != nil {
-			return err
-		}
-
-		// map txID => [height]+[tx bytes]
-		heightTxPacker := wrappers.Packer{Bytes: make([]byte, wrappers.LongLen+wrappers.IntLen+len(txBytes))}
-		heightTxPacker.PackLong(height)
-		heightTxPacker.PackBytes(txBytes)
-		txID := tx.ID()
-
-		if err := a.acceptedAtomicTxDB.Put(txID[:], heightTxPacker.Bytes); err != nil {
+		if err := a.indexTxByID(heightBytes, tx); err != nil {
 			return err
 		}
 	}
+	if err := a.indexTxsAtHeight(heightBytes, txs); err != nil {
+		return err
+	}
 
+	return a.db.Put(maxIndexedHeightKey, heightBytes)
+}
+
+func (a *atomicTxRepository) indexTxByID(heightBytes []byte, tx *Tx) error {
+	txBytes, err := a.codec.Marshal(codecVersion, tx)
+	if err != nil {
+		return err
+	}
+
+	// map txID => [height]+[tx bytes]
+	heightTxPacker := wrappers.Packer{Bytes: make([]byte, wrappers.LongLen+wrappers.IntLen+len(txBytes))}
+	heightTxPacker.PackFixedBytes(heightBytes)
+	heightTxPacker.PackBytes(txBytes)
+	txID := tx.ID()
+
+	if err := a.acceptedAtomicTxDB.Put(txID[:], heightTxPacker.Bytes); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (a *atomicTxRepository) indexTxsAtHeight(heightBytes []byte, txs []*Tx) error {
 	txsBytes, err := a.codec.Marshal(codecVersion, txs)
 	if err != nil {
 		return err
@@ -262,8 +266,25 @@ func (a *atomicTxRepository) Write(height uint64, txs []*Tx) error {
 	if err := a.acceptedAtomicTxByHeightDB.Put(heightBytes, txsBytes); err != nil {
 		return err
 	}
+	return nil
+}
 
-	return a.db.Put(maxIndexedHeightKey, heightBytes)
+func (a *atomicTxRepository) addTxToHeightIndex(heightBytes []byte, tx *Tx) error {
+	txs, err := a.getByHeightBytes(heightBytes)
+	if err != nil && err != database.ErrNotFound {
+		return err
+	}
+
+	// Iterate over the existing transactions to ensure we do not add a
+	// duplicate to the index
+	for _, existingTx := range txs {
+		if existingTx.ID() == tx.ID() {
+			// return nil
+		}
+	}
+
+	txs = append(txs, tx)
+	return a.indexTxsAtHeight(heightBytes, txs)
 }
 
 func (a *atomicTxRepository) IterateByTxID() database.Iterator {

@@ -52,7 +52,11 @@ func ExtractAtomicTxs(atomicTxBytes []byte, batch bool, codec codec.Manager) ([]
 	}
 
 	if !batch {
-		return ExtractAtomicTx(atomicTxBytes, codec)
+		tx, err := ExtractAtomicTx(atomicTxBytes, codec)
+		if err != nil {
+			return nil, err
+		}
+		return []*Tx{tx}, err
 	}
 	return ExtractAtomicTxsBatch(atomicTxBytes, codec)
 }
@@ -61,7 +65,7 @@ func ExtractAtomicTxs(atomicTxBytes []byte, batch bool, codec codec.Manager) ([]
 // and returns a slice of atomic transactions for compatibility with the type returned post
 // ApricotPhase5.
 // Note: this function assumes [atomicTxBytes] is non-empty.
-func ExtractAtomicTx(atomicTxBytes []byte, codec codec.Manager) ([]*Tx, error) {
+func ExtractAtomicTx(atomicTxBytes []byte, codec codec.Manager) (*Tx, error) {
 	atomicTx := new(Tx)
 	if _, err := codec.Unmarshal(atomicTxBytes, atomicTx); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal atomic transaction (pre-AP5): %w", err)
@@ -69,7 +73,7 @@ func ExtractAtomicTx(atomicTxBytes []byte, codec codec.Manager) ([]*Tx, error) {
 	if err := atomicTx.Sign(codec, nil); err != nil {
 		return nil, fmt.Errorf("failed to initialize singleton atomic tx due to: %w", err)
 	}
-	return []*Tx{atomicTx}, nil
+	return atomicTx, nil
 }
 
 // [ExtractAtomicTxsBatch] extracts a slice of atomic transactions from [atomicTxBytes].
