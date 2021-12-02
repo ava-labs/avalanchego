@@ -342,7 +342,7 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) er
 	if err != nil {
 		return err
 	}
-	// Wait until [blkID] has been issued to consensus before for applying this chit.
+	// Wait until [blkID] has been issued to consensus before applying this chit.
 	if !added {
 		v.deps.Add(blkID)
 	}
