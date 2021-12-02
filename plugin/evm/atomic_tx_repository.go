@@ -276,10 +276,10 @@ func (a *atomicTxRepository) addTxToHeightIndex(heightBytes []byte, tx *Tx) erro
 	}
 
 	// Iterate over the existing transactions to ensure we do not add a
-	// duplicate to the index
+	// duplicate to the index.
 	for _, existingTx := range txs {
 		if existingTx.ID() == tx.ID() {
-			// return nil
+			return nil
 		}
 	}
 
