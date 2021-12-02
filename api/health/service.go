@@ -1,4 +1,4 @@
-// (c) 2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package health
@@ -9,13 +9,16 @@ import (
 
 	stdjson "encoding/json"
 
+	health "github.com/AppsFlyer/go-sundheit"
+
+	"github.com/gorilla/rpc/v2"
+
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/gorilla/rpc/v2"
-	"github.com/prometheus/client_golang/prometheus"
 
-	health "github.com/AppsFlyer/go-sundheit"
 	healthlib "github.com/ava-labs/avalanchego/health"
 )
 

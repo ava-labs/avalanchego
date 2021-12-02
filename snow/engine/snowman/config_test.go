@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -24,7 +24,6 @@ func DefaultConfig() Config {
 			VM:      &block.TestVM{},
 		},
 		Params: snowball.Parameters{
-			Metrics:               prometheus.NewRegistry(),
 			K:                     1,
 			Alpha:                 1,
 			BetaVirtuous:          1,

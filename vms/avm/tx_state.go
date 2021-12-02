@@ -1,11 +1,9 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
 
 import (
-	"fmt"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -54,9 +52,9 @@ func NewTxState(db database.Database, codec codec.Manager) TxState {
 	}
 }
 
-func NewMeteredTxState(db database.Database, codec codec.Manager, namespace string, metrics prometheus.Registerer) (TxState, error) {
+func NewMeteredTxState(db database.Database, codec codec.Manager, metrics prometheus.Registerer) (TxState, error) {
 	cache, err := metercacher.New(
-		fmt.Sprintf("%s_tx_cache", namespace),
+		"tx_cache",
 		metrics,
 		&cache.LRU{Size: txCacheSize},
 	)

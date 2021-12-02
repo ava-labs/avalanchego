@@ -1,4 +1,4 @@
-// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package indexer
@@ -145,7 +145,7 @@ type indexer struct {
 }
 
 // Assumes [engine]'s context lock is not held
-func (i *indexer) RegisterChain(name string, ctx *snow.Context, engine common.Engine) {
+func (i *indexer) RegisterChain(name string, ctx *snow.ConsensusContext, engine common.Engine) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 

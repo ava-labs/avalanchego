@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpcchainvm
@@ -9,13 +9,16 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/go-plugin"
+
+	"github.com/prometheus/client_golang/prometheus"
+
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/hashicorp/go-plugin"
-
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore/gkeystoreproto"
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory"
 	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory/gsharedmemoryproto"
 	"github.com/ava-labs/avalanchego/database/manager"
@@ -105,11 +108,6 @@ func (vm *VMClient) Initialize(
 		return errUnsupportedFXs
 	}
 
-	epochFirstTransitionBytes, err := ctx.EpochFirstTransition.MarshalBinary()
-	if err != nil {
-		return err
-	}
-
 	vm.ctx = ctx
 
 	// Initialize and serve each database and construct the db manager
@@ -162,24 +160,22 @@ func (vm *VMClient) Initialize(
 	go vm.broker.AcceptAndServe(appSenderBrokerID, vm.startAppSenderServer)
 
 	resp, err := vm.client.Initialize(context.Background(), &vmproto.InitializeRequest{
-		NetworkID:            ctx.NetworkID,
-		SubnetID:             ctx.SubnetID[:],
-		ChainID:              ctx.ChainID[:],
-		NodeID:               ctx.NodeID.Bytes(),
-		XChainID:             ctx.XChainID[:],
-		AvaxAssetID:          ctx.AVAXAssetID[:],
-		GenesisBytes:         genesisBytes,
-		UpgradeBytes:         upgradeBytes,
-		ConfigBytes:          configBytes,
-		DbServers:            versionedDBServers,
-		EngineServer:         messengerBrokerID,
-		KeystoreServer:       keystoreBrokerID,
-		SharedMemoryServer:   sharedMemoryBrokerID,
-		BcLookupServer:       bcLookupBrokerID,
-		SnLookupServer:       snLookupBrokerID,
-		AppSenderServer:      appSenderBrokerID,
-		EpochFirstTransition: epochFirstTransitionBytes,
-		EpochDuration:        uint64(ctx.EpochDuration),
+		NetworkID:          ctx.NetworkID,
+		SubnetID:           ctx.SubnetID[:],
+		ChainID:            ctx.ChainID[:],
+		NodeID:             ctx.NodeID.Bytes(),
+		XChainID:           ctx.XChainID[:],
+		AvaxAssetID:        ctx.AVAXAssetID[:],
+		GenesisBytes:       genesisBytes,
+		UpgradeBytes:       upgradeBytes,
+		ConfigBytes:        configBytes,
+		DbServers:          versionedDBServers,
+		EngineServer:       messengerBrokerID,
+		KeystoreServer:     keystoreBrokerID,
+		SharedMemoryServer: sharedMemoryBrokerID,
+		BcLookupServer:     bcLookupBrokerID,
+		SnLookupServer:     snLookupBrokerID,
+		AppSenderServer:    appSenderBrokerID,
 	})
 	if err != nil {
 		return err
@@ -214,9 +210,17 @@ func (vm *VMClient) Initialize(
 		time:     timestamp,
 	}
 
+	registerer := prometheus.NewRegistry()
+	multiGatherer := metrics.NewMultiGatherer()
+	if err := multiGatherer.Register("rpcchainvm", registerer); err != nil {
+		return err
+	}
+	if err := multiGatherer.Register("", vm); err != nil {
+		return err
+	}
+
 	chainState, err := chain.NewMeteredState(
-		ctx.Metrics,
-		fmt.Sprintf("%s_rpcchainvm", ctx.Namespace),
+		registerer,
 		&chain.Config{
 			DecidedCacheSize:    decidedCacheSize,
 			MissingCacheSize:    missingCacheSize,
@@ -233,7 +237,7 @@ func (vm *VMClient) Initialize(
 	}
 	vm.State = chainState
 
-	return nil
+	return vm.ctx.Metrics.Register(multiGatherer)
 }
 
 func (vm *VMClient) startDBServer(opts []grpc.ServerOption) *grpc.Server {

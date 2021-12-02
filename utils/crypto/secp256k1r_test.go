@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package crypto
@@ -54,7 +54,7 @@ func TestExtensive(t *testing.T) {
 		if key, err := f.NewPrivateKey(); err != nil {
 			t.Fatalf("Generated bad private key")
 		} else if _, err := key.SignHash(hash); err != nil {
-			t.Fatalf("Failed signing with:\n%s", formatting.DumpBytes{Bytes: key.Bytes()})
+			t.Fatalf("Failed signing with:\n%s", formatting.DumpBytes(key.Bytes()))
 		}
 	}
 }

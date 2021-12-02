@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package vertex
@@ -22,23 +22,19 @@ type TestBuilder struct {
 	T            *testing.T
 	CantBuildVtx bool
 	BuildVtxF    func(
-		epoch uint32,
 		parentIDs []ids.ID,
 		txs []snowstorm.Tx,
-		restrictions []ids.ID,
 	) (avalanche.Vertex, error)
 }
 
 func (b *TestBuilder) Default(cant bool) { b.CantBuildVtx = cant }
 
 func (b *TestBuilder) BuildVtx(
-	epoch uint32,
 	parentIDs []ids.ID,
 	txs []snowstorm.Tx,
-	restrictions []ids.ID,
 ) (avalanche.Vertex, error) {
 	if b.BuildVtxF != nil {
-		return b.BuildVtxF(epoch, parentIDs, txs, restrictions)
+		return b.BuildVtxF(parentIDs, txs)
 	}
 	if b.CantBuildVtx && b.T != nil {
 		b.T.Fatal(errBuild)

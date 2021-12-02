@@ -1,13 +1,17 @@
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package uptime
 
 import (
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/uptime/mocks"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -26,11 +30,11 @@ func TestLockedCalculator(t *testing.T) {
 	_, err = lc.CalculateUptimePercentFrom(nodeID, time.Now())
 	assert.EqualValues(errNotReady, err)
 
-	ctx := &snow.Context{}
+	var isBootstrapped utils.AtomicBool
 	mockCalc := &mocks.Calculator{}
 
 	// Should still error because ctx is not bootstrapped
-	lc.SetCalculator(ctx, mockCalc)
+	lc.SetCalculator(&isBootstrapped, &sync.Mutex{}, mockCalc)
 	_, _, err = lc.CalculateUptime(nodeID)
 	assert.EqualValues(errNotReady, err)
 	_, err = lc.CalculateUptimePercent(nodeID)
@@ -38,7 +42,7 @@ func TestLockedCalculator(t *testing.T) {
 	_, err = lc.CalculateUptimePercentFrom(nodeID, time.Now())
 	assert.EqualValues(errNotReady, err)
 
-	ctx.Bootstrapped()
+	isBootstrapped.SetValue(true)
 
 	// Should return the value from the mocked inner calculator
 	mockErr := errors.New("mock error")

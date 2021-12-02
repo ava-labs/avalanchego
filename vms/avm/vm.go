@@ -1,4 +1,4 @@
-// (c) 2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/gorilla/rpc/v2"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
@@ -51,7 +53,6 @@ var (
 	errIncompatibleFx            = errors.New("incompatible feature extension")
 	errUnknownFx                 = errors.New("unknown feature extension")
 	errGenesisAssetMustHaveState = errors.New("genesis asset must have non-empty state")
-	errWrongBlockchainID         = errors.New("wrong blockchain ID")
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 	errInsufficientFunds         = errors.New("insufficient funds")
 
@@ -144,7 +145,12 @@ func (vm *VM) Initialize(
 		ctx.Log.Info("VM config initialized %+v", avmConfig)
 	}
 
-	err := vm.metrics.Initialize(ctx.Namespace, ctx.Metrics)
+	registerer := prometheus.NewRegistry()
+	if err := ctx.Metrics.Register(registerer); err != nil {
+		return err
+	}
+
+	err := vm.metrics.Initialize("", registerer)
 	if err != nil {
 		return err
 	}
@@ -190,7 +196,7 @@ func (vm *VM) Initialize(
 
 	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, vm.codec)
 
-	state, err := NewMeteredState(vm.db, vm.genesisCodec, vm.codec, ctx.Namespace, ctx.Metrics)
+	state, err := NewMeteredState(vm.db, vm.genesisCodec, vm.codec, registerer)
 	if err != nil {
 		return err
 	}
@@ -216,7 +222,7 @@ func (vm *VM) Initialize(
 	// use no op impl when disabled in config
 	if avmConfig.IndexTransactions {
 		vm.ctx.Log.Info("address transaction indexing is enabled")
-		vm.addressTxsIndexer, err = index.NewIndexer(vm.db, vm.ctx.Log, ctx.Namespace, ctx.Metrics, avmConfig.IndexAllowIncomplete)
+		vm.addressTxsIndexer, err = index.NewIndexer(vm.db, vm.ctx.Log, "", registerer, avmConfig.IndexAllowIncomplete)
 		if err != nil {
 			return fmt.Errorf("failed to initialize address transaction indexer: %w", err)
 		}

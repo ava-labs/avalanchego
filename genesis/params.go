@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package genesis
@@ -43,31 +43,9 @@ type TxFeeConfig struct {
 	CreateBlockchainTxFee uint64 `json:"createBlockchainTxFee"`
 }
 
-type EpochConfig struct {
-	// EpochFirstTransition is the time that the transition from epoch 0 to 1
-	// should occur.
-	EpochFirstTransition time.Time `json:"epochFirstTransition"`
-	// EpochDuration is the amount of time that an epoch runs for.
-	EpochDuration time.Duration `json:"epochDuration"`
-}
-
 type Params struct {
 	StakingConfig
 	TxFeeConfig
-	EpochConfig
-}
-
-func GetEpochConfig(networkID uint32) EpochConfig {
-	switch networkID {
-	case constants.MainnetID:
-		return MainnetParams.EpochConfig
-	case constants.FujiID:
-		return FujiParams.EpochConfig
-	case constants.LocalID:
-		return LocalParams.EpochConfig
-	default:
-		return LocalParams.EpochConfig
-	}
 }
 
 func GetTxFeeConfig(networkID uint32) TxFeeConfig {

@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package genesis
@@ -16,7 +16,14 @@ import (
 
 // Aliases returns the default aliases based on the network ID
 func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, error) {
-	apiAliases := getAPIAliases()
+	apiAliases := map[string][]string{
+		constants.ChainAliasPrefix + constants.PlatformChainID.String(): {
+			"P",
+			"platform",
+			constants.ChainAliasPrefix + "P",
+			constants.ChainAliasPrefix + "platform",
+		},
+	}
 	chainAliases := map[ids.ID][]string{
 		constants.PlatformChainID: {"P", "platform"},
 	}
@@ -48,15 +55,6 @@ func GetCChainAliases() []string {
 
 func GetXChainAliases() []string {
 	return []string{"X", "avm"}
-}
-
-func getAPIAliases() map[string][]string {
-	return map[string][]string{
-		constants.VMAliasPrefix + platformvm.ID.String():                {constants.VMAliasPrefix + "platform"},
-		constants.VMAliasPrefix + avm.ID.String():                       {constants.VMAliasPrefix + "avm"},
-		constants.VMAliasPrefix + evm.ID.String():                       {constants.VMAliasPrefix + "evm"},
-		constants.ChainAliasPrefix + constants.PlatformChainID.String(): {"P", "platform", constants.ChainAliasPrefix + "P", constants.ChainAliasPrefix + "platform"},
-	}
 }
 
 func GetVMAliases() map[ids.ID][]string {

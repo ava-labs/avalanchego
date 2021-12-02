@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/utils/sampler"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 func TestSnowballGovernance(t *testing.T) {
@@ -16,8 +15,7 @@ func TestSnowballGovernance(t *testing.T) {
 	numByzantine := 10
 	numRed := 55
 	params := Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       20, Alpha: 15, BetaVirtuous: 20, BetaRogue: 30,
+		K: 20, Alpha: 15, BetaVirtuous: 20, BetaRogue: 30,
 	}
 	seed := int64(0)
 

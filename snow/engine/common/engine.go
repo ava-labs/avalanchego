@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
@@ -16,7 +16,7 @@ type Engine interface {
 	Handler
 
 	// Return the context of the chain this engine is working on
-	Context() *snow.Context
+	Context() *snow.ConsensusContext
 
 	// Returns true iff the chain is done bootstrapping
 	IsBootstrapped() bool

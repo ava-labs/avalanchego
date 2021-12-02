@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avalanche
@@ -23,7 +23,7 @@ type Consensus interface {
 	// called, the status maps should be immediately updated accordingly.
 	// Assumes each element in the accepted frontier will return accepted from
 	// the join status map.
-	Initialize(*snow.Context, Parameters, []Vertex) error
+	Initialize(*snow.ConsensusContext, Parameters, []Vertex) error
 
 	// Returns the parameters that describe this avalanche instance
 	Parameters() Parameters

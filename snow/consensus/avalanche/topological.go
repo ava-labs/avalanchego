@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avalanche
@@ -45,7 +45,7 @@ type Topological struct {
 	pollNumber uint64
 
 	// Context used for logging
-	ctx *snow.Context
+	ctx *snow.ConsensusContext
 	// Threshold for confidence increases
 	params Parameters
 
@@ -89,7 +89,7 @@ type kahnNode struct {
 
 // Initialize implements the Avalanche interface
 func (ta *Topological) Initialize(
-	ctx *snow.Context,
+	ctx *snow.ConsensusContext,
 	params Parameters,
 	frontier []Vertex,
 ) error {
@@ -103,7 +103,7 @@ func (ta *Topological) Initialize(
 	ta.votes = ids.UniqueBag{}
 	ta.kahnNodes = make(map[ids.ID]kahnNode)
 
-	if err := ta.Latency.Initialize("vtx", "vertex/vertices", ctx.Log, params.Namespace, params.Metrics); err != nil {
+	if err := ta.Latency.Initialize("vtx", "vertex/vertices", ctx.Log, "", ctx.Registerer); err != nil {
 		return err
 	}
 

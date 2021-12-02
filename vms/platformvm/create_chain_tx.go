@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -50,6 +51,12 @@ type UnsignedCreateChainTx struct {
 	GenesisData []byte `serialize:"true" json:"genesisData"`
 	// Auth that will be allowing this validator into the network
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
+}
+
+func (tx *UnsignedCreateChainTx) InputUTXOs() ids.Set { return nil }
+
+func (tx *UnsignedCreateChainTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
+	return ids.ID{}, nil, nil
 }
 
 func (tx *UnsignedCreateChainTx) SyntacticVerify(ctx *snow.Context) error {

@@ -1,4 +1,4 @@
-// (c) 2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -101,6 +101,13 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 	parentBlk, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("could not build post fork oracle block")
+	}
+
+	if err := parentBlk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if err := proVM.SetPreference(parentBlk.ID()); err != nil {
+		t.Fatal(err)
 	}
 
 	// retrieve options ...
@@ -227,6 +234,13 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	parentBlk, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("could not build post fork oracle block")
+	}
+
+	if err := parentBlk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if err := proVM.SetPreference(parentBlk.ID()); err != nil {
+		t.Fatal(err)
 	}
 
 	// retrieve options ...

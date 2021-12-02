@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -79,6 +79,9 @@ type Factory struct {
 
 	// Time of the AP4 network upgrade
 	ApricotPhase4Time time.Time
+
+	// Time of the AP5 network upgrade
+	ApricotPhase5Time time.Time
 }
 
 // New returns a new instance of the Platform Chain

@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package formatting
@@ -70,9 +70,5 @@ func FormatBech32(hrp string, payload []byte) (string, error) {
 	if err != nil {
 		return "", errBits8To5
 	}
-	addr, err := bech32.Encode(hrp, fiveBits)
-	if err != nil {
-		return "", err
-	}
-	return addr, nil
+	return bech32.Encode(hrp, fiveBits)
 }

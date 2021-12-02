@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package node
@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/vms"
 )
 
 type IPCConfig struct {
@@ -126,7 +127,6 @@ type Config struct {
 	IPConfig            `json:"ipConfig"`
 	StakingConfig       `json:"stakingConfig"`
 	genesis.TxFeeConfig `json:"txFeeConfig"`
-	genesis.EpochConfig `json:"epochConfig"`
 	BootstrapConfig     `json:"bootstrapConfig"`
 	DatabaseConfig      `json:"databaseConfig"`
 
@@ -185,6 +185,6 @@ type Config struct {
 	// ChainConfigs
 	ChainConfigs map[string]chains.ChainConfig `json:"-"`
 
-	// VM Aliases
-	VMAliases map[ids.ID][]string `json:"vmAliases"`
+	// VM management
+	VMManager vms.Manager `json:"-"`
 }

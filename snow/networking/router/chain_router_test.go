@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package router
@@ -58,7 +58,7 @@ func TestShutdown(t *testing.T) {
 
 	shutdownCalled := make(chan struct{}, 1)
 
-	engine.ContextF = snow.DefaultContextTest
+	engine.ContextF = snow.DefaultConsensusContextTest
 	engine.ShutdownF = func() error { shutdownCalled <- struct{}{}; return nil }
 
 	handler := &Handler{}
@@ -67,8 +67,6 @@ func TestShutdown(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		"",
-		prometheus.NewRegistry(),
 	)
 	assert.NoError(t, err)
 
@@ -151,7 +149,7 @@ func TestShutdownTimesOut(t *testing.T) {
 
 	closed := new(int)
 
-	engine.ContextF = snow.DefaultContextTest
+	engine.ContextF = snow.DefaultConsensusContextTest
 	engine.ShutdownF = func() error { *closed++; return nil }
 
 	handler := &Handler{}
@@ -160,8 +158,6 @@ func TestShutdownTimesOut(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		"",
-		metrics,
 	)
 	assert.NoError(t, err)
 
@@ -258,7 +254,7 @@ func TestRouterTimeout(t *testing.T) {
 		return nil
 	}
 
-	engine.ContextF = snow.DefaultContextTest
+	engine.ContextF = snow.DefaultConsensusContextTest
 
 	handler := &Handler{}
 	vdrs := validators.NewSet()
@@ -269,8 +265,6 @@ func TestRouterTimeout(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		"",
-		prometheus.NewRegistry(),
 	)
 	assert.NoError(t, err)
 
@@ -334,7 +328,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 	engine := common.EngineTest{T: t}
 	engine.Default(false)
 
-	engine.ContextF = snow.DefaultContextTest
+	engine.ContextF = snow.DefaultConsensusContextTest
 
 	vdrs := validators.NewSet()
 	err = vdrs.AddWeight(ids.GenerateTestShortID(), 1)
@@ -345,8 +339,6 @@ func TestRouterClearTimeouts(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		"",
-		metrics,
 	)
 	assert.NoError(t, err)
 
@@ -438,8 +430,8 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		return nil
 	}
 
-	engine.ContextF = func() *snow.Context {
-		ctx := snow.DefaultContextTest()
+	engine.ContextF = func() *snow.ConsensusContext {
+		ctx := snow.DefaultConsensusContextTest()
 		ctx.SetValidatorOnly()
 		return ctx
 	}
@@ -454,8 +446,6 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		"",
-		metrics,
 	)
 	assert.NoError(t, err)
 

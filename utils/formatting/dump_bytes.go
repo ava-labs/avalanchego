@@ -1,13 +1,16 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package formatting
 
 import (
 	"encoding/hex"
+	"fmt"
 	"strings"
 )
 
-type DumpBytes struct{ Bytes []byte }
+var _ fmt.Stringer = DumpBytes{}
 
-func (db DumpBytes) String() string { return strings.TrimSpace(hex.Dump(db.Bytes)) }
+type DumpBytes []byte
+
+func (db DumpBytes) String() string { return strings.TrimSpace(hex.Dump(db)) }

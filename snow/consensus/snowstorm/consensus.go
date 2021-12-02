@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowstorm
@@ -19,7 +19,7 @@ type Consensus interface {
 	fmt.Stringer
 
 	// Takes in the context, alpha, betaVirtuous, and betaRogue
-	Initialize(*snow.Context, sbcon.Parameters) error
+	Initialize(*snow.ConsensusContext, sbcon.Parameters) error
 
 	// Returns the parameters that describe this snowstorm instance
 	Parameters() sbcon.Parameters

@@ -1,4 +1,4 @@
-// (c) 2021 Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/storage"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
+	"github.com/ava-labs/avalanchego/vms"
 )
 
 const (
@@ -337,6 +338,7 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 		CompressionEnabled: v.GetBool(NetworkCompressionEnabledKey),
 		PingFrequency:      v.GetDuration(NetworkPingFrequencyKey),
 		AllowPrivateIPs:    v.GetBool(NetworkAllowPrivateIPsKey),
+		UptimeMetricFreq:   v.GetDuration(UptimeMetricFreqKey),
 
 		RequireValidatorToConnect: v.GetBool(NetworkRequireValidatorToConnectKey),
 	}
@@ -589,20 +591,6 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 	return genesis.GetTxFeeConfig(networkID)
 }
 
-func getEpochConfig(v *viper.Viper, networkID uint32) (genesis.EpochConfig, error) {
-	if networkID != constants.MainnetID && networkID != constants.FujiID {
-		config := genesis.EpochConfig{
-			EpochFirstTransition: time.Unix(v.GetInt64(SnowEpochFirstTransitionKey), 0),
-			EpochDuration:        v.GetDuration(SnowEpochDurationKey),
-		}
-		if config.EpochDuration <= 0 {
-			return genesis.EpochConfig{}, fmt.Errorf("%s must be > 0", SnowEpochDurationKey)
-		}
-		return config, nil
-	}
-	return genesis.GetEpochConfig(networkID), nil
-}
-
 func getWhitelistedSubnets(v *viper.Viper) (ids.Set, error) {
 	whitelistedSubnetIDs := ids.Set{}
 	for _, subnet := range strings.Split(v.GetString(WhitelistedSubnetsKey), ",") {
@@ -666,6 +654,23 @@ func getVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
 		return nil, fmt.Errorf("problem unmarshaling vmAliases: %w", err)
 	}
 	return vmAliasMap, nil
+}
+
+func getVMManager(v *viper.Viper) (vms.Manager, error) {
+	vmAliases, err := getVMAliases(v)
+	if err != nil {
+		return nil, err
+	}
+
+	manager := vms.NewManager()
+	for vmID, aliases := range vmAliases {
+		for _, alias := range aliases {
+			if err := manager.Alias(vmID, alias); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return manager, nil
 }
 
 // getPathFromDirKey reads flag value from viper instance and then checks the folder existence
@@ -915,12 +920,6 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	// Tx Fee
 	nodeConfig.TxFeeConfig = getTxFeeConfig(v, nodeConfig.NetworkID)
 
-	// Epoch
-	nodeConfig.EpochConfig, err = getEpochConfig(v, nodeConfig.NetworkID)
-	if err != nil {
-		return node.Config{}, fmt.Errorf("couldn't load epoch config: %w", err)
-	}
-
 	// Genesis Data
 	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = genesis.Genesis(
 		nodeConfig.NetworkID,
@@ -962,7 +961,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	}
 
 	// VM Aliases
-	nodeConfig.VMAliases, err = getVMAliases(v)
+	nodeConfig.VMManager, err = getVMManager(v)
 	if err != nil {
 		return node.Config{}, err
 	}

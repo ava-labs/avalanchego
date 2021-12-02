@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package database
@@ -39,6 +39,8 @@ var Tests = []func(t *testing.T, db Database){
 	TestCompactNoPanic,
 	TestMemorySafetyDatabase,
 	TestMemorySafetyBatch,
+	TestClear,
+	TestClearPrefix,
 }
 
 // TestSimpleKeyValue tests to make sure that simple Put + Get + Delete + Has
@@ -1098,4 +1100,86 @@ func TestCompactNoPanic(t *testing.T, db Database) {
 	if err := db.Compact(nil, nil); err != ErrClosed {
 		t.Fatalf("Expected error %s on db.Close but got %s", ErrClosed, err)
 	}
+}
+
+// TestClear tests to make sure the deletion helper works as expected.
+func TestClear(t *testing.T, db Database) {
+	assert := assert.New(t)
+
+	key1 := []byte("hello1")
+	value1 := []byte("world1")
+
+	key2 := []byte("z")
+	value2 := []byte("world2")
+
+	key3 := []byte("hello3")
+	value3 := []byte("world3")
+
+	err := db.Put(key1, value1)
+	assert.NoError(err)
+
+	err = db.Put(key2, value2)
+	assert.NoError(err)
+
+	err = db.Put(key3, value3)
+	assert.NoError(err)
+
+	err = Clear(db, db)
+	assert.NoError(err)
+
+	has, err := db.Has(key1)
+	assert.NoError(err)
+	assert.False(has)
+
+	has, err = db.Has(key2)
+	assert.NoError(err)
+	assert.False(has)
+
+	has, err = db.Has(key3)
+	assert.NoError(err)
+	assert.False(has)
+
+	err = db.Close()
+	assert.NoError(err)
+}
+
+// TestClearPrefix tests to make sure prefix deletion works as expected.
+func TestClearPrefix(t *testing.T, db Database) {
+	assert := assert.New(t)
+
+	key1 := []byte("hello1")
+	value1 := []byte("world1")
+
+	key2 := []byte("z")
+	value2 := []byte("world2")
+
+	key3 := []byte("hello3")
+	value3 := []byte("world3")
+
+	err := db.Put(key1, value1)
+	assert.NoError(err)
+
+	err = db.Put(key2, value2)
+	assert.NoError(err)
+
+	err = db.Put(key3, value3)
+	assert.NoError(err)
+
+	err = ClearPrefix(db, db, []byte("hello"))
+	assert.NoError(err)
+
+	has, err := db.Has(key1)
+	assert.NoError(err)
+	assert.False(has)
+
+	has, err = db.Has(key2)
+	assert.NoError(err)
+	assert.True(has)
+
+	has, err = db.Has(key3)
+	assert.NoError(err)
+	assert.False(has)
+
+	err = db.Close()
+	assert.NoError(err)
 }

@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -49,7 +49,7 @@ func (tx *UnsignedExportTx) InitCtx(ctx *snow.Context) {
 }
 
 // InputUTXOs returns an empty set
-func (tx *UnsignedExportTx) InputUTXOs() ids.Set { return ids.Set{} }
+func (tx *UnsignedExportTx) InputUTXOs() ids.Set { return nil }
 
 // SyntacticVerify this transaction is well-formed
 func (tx *UnsignedExportTx) SyntacticVerify(ctx *snow.Context) error {
@@ -58,9 +58,6 @@ func (tx *UnsignedExportTx) SyntacticVerify(ctx *snow.Context) error {
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.DestinationChain != ctx.XChainID:
-		// TODO: remove this check if we allow for P->C swaps
-		return errWrongChainID
 	case len(tx.ExportedOutputs) == 0:
 		return errNoExportOutputs
 	}
@@ -87,16 +84,16 @@ func (tx *UnsignedExportTx) SyntacticVerify(ctx *snow.Context) error {
 
 // Attempts to verify this transaction with the provided state.
 func (tx *UnsignedExportTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
-	_, err := tx.Execute(vm, parentState, stx)
+	_, err := tx.AtomicExecute(vm, parentState, stx)
 	return err
 }
 
 // Execute this transaction.
 func (tx *UnsignedExportTx) Execute(
 	vm *VM,
-	parentState MutableState,
+	vs VersionedState,
 	stx *Tx,
-) (VersionedState, TxError) {
+) (func() error, TxError) {
 	if err := tx.SyntacticVerify(vm.ctx); err != nil {
 		return nil, permError{err}
 	}
@@ -105,8 +102,14 @@ func (tx *UnsignedExportTx) Execute(
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 
+	if vm.bootstrapped.GetValue() {
+		if err := vm.isValidCrossChainID(vs, tx.DestinationChain); err != nil {
+			return nil, err
+		}
+	}
+
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(parentState, tx, tx.Ins, outs, stx.Creds, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
+	if err := vm.semanticVerifySpend(vs, tx, tx.Ins, outs, stx.Creds, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
 		switch err.(type) {
 		case permError:
 			return nil, permError{
@@ -119,22 +122,16 @@ func (tx *UnsignedExportTx) Execute(
 		}
 	}
 
-	// Set up the state if this tx is committed
-	newState := newVersionedState(
-		parentState,
-		parentState.CurrentStakerChainState(),
-		parentState.PendingStakerChainState(),
-	)
 	// Consume the UTXOS
-	consumeInputs(newState, tx.Ins)
+	consumeInputs(vs, tx.Ins)
 	// Produce the UTXOS
 	txID := tx.ID()
-	produceOutputs(newState, txID, vm.ctx.AVAXAssetID, tx.Outs)
-	return newState, nil
+	produceOutputs(vs, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	return nil, nil
 }
 
-// Accept this transaction.
-func (tx *UnsignedExportTx) Accept(ctx *snow.Context, batch database.Batch) error {
+// AtomicOperations returns the shared memory requests
+func (tx *UnsignedExportTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
 	txID := tx.ID()
 
 	elems := make([]*atomic.Element, len(tx.ExportedOutputs))
@@ -150,7 +147,7 @@ func (tx *UnsignedExportTx) Accept(ctx *snow.Context, batch database.Batch) erro
 
 		utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
 		if err != nil {
-			return fmt.Errorf("failed to marshal UTXO: %w", err)
+			return ids.ID{}, nil, fmt.Errorf("failed to marshal UTXO: %w", err)
 		}
 		utxoID := utxo.InputID()
 		elem := &atomic.Element{
@@ -163,8 +160,32 @@ func (tx *UnsignedExportTx) Accept(ctx *snow.Context, batch database.Batch) erro
 
 		elems[i] = elem
 	}
+	return tx.DestinationChain, &atomic.Requests{PutRequests: elems}, nil
+}
 
-	return ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{tx.DestinationChain: {PutRequests: elems}}, batch)
+// Execute this transaction and return the versioned state.
+func (tx *UnsignedExportTx) AtomicExecute(
+	vm *VM,
+	parentState MutableState,
+	stx *Tx,
+) (VersionedState, TxError) {
+	// Set up the state if this tx is committed
+	newState := newVersionedState(
+		parentState,
+		parentState.CurrentStakerChainState(),
+		parentState.PendingStakerChainState(),
+	)
+	_, err := tx.Execute(vm, newState, stx)
+	return newState, err
+}
+
+// Accept this transaction.
+func (tx *UnsignedExportTx) AtomicAccept(ctx *snow.Context, batch database.Batch) error {
+	chainID, requests, err := tx.AtomicOperations()
+	if err != nil {
+		return err
+	}
+	return ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{chainID: requests}, batch)
 }
 
 // Create a new transaction
@@ -175,10 +196,6 @@ func (vm *VM) newExportTx(
 	keys []*crypto.PrivateKeySECP256K1R, // Pay the fee and provide the tokens
 	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	if vm.ctx.XChainID != chainID {
-		return nil, errWrongChainID
-	}
-
 	toBurn, err := math.Add64(amount, vm.TxFee)
 	if err != nil {
 		return nil, errOverflowExport

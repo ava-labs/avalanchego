@@ -1,4 +1,4 @@
-// (c) 2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -104,7 +104,7 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 
 	// If the node is currently bootstrapping - we don't assume that the P-chain
 	// has been synced up to this point yet.
-	if p.vm.ctx.IsBootstrapped() {
+	if p.vm.bootstrapped {
 		childID := child.ID()
 		currentPChainHeight, err := p.vm.ctx.ValidatorState.GetCurrentHeight()
 		if err != nil {
@@ -228,8 +228,7 @@ func (p *postForkCommonComponents) buildChild(
 
 	p.vm.ctx.Log.Info("built block %s - parent timestamp %v, block timestamp %v",
 		child.ID(), parentTimestamp, newTimestamp)
-	// Persist the child
-	return child, p.vm.storePostForkBlock(child)
+	return child, nil
 }
 
 func (p *postForkCommonComponents) getInnerBlk() snowman.Block {

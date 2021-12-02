@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package version
@@ -11,10 +11,10 @@ import (
 
 // These are globals that describe network upgrades and node versions
 var (
-	Current                      = NewDefaultVersion(1, 6, 5)
+	Current                      = NewDefaultVersion(1, 7, 1)
 	CurrentApp                   = NewDefaultApplication(constants.PlatformName, Current.Major(), Current.Minor(), Current.Patch())
-	MinimumCompatibleVersion     = NewDefaultApplication(constants.PlatformName, 1, 6, 0)
-	PrevMinimumCompatibleVersion = NewDefaultApplication(constants.PlatformName, 1, 5, 0)
+	MinimumCompatibleVersion     = NewDefaultApplication(constants.PlatformName, 1, 7, 0)
+	PrevMinimumCompatibleVersion = NewDefaultApplication(constants.PlatformName, 1, 6, 0)
 	MinimumUnmaskedVersion       = NewDefaultApplication(constants.PlatformName, 1, 1, 0)
 	PrevMinimumUnmaskedVersion   = NewDefaultApplication(constants.PlatformName, 1, 0, 0)
 	VersionParser                = NewDefaultApplicationParser()
@@ -61,6 +61,12 @@ var (
 		constants.FujiID:    47437,
 	}
 	ApricotPhase4DefaultMinPChainHeight uint64
+
+	ApricotPhase5Times = map[uint32]time.Time{
+		constants.MainnetID: time.Date(2021, time.December, 2, 18, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(2021, time.November, 24, 15, 0, 0, 0, time.UTC),
+	}
+	ApricotPhase5DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 )
 
 func GetApricotPhase0Time(networkID uint32) time.Time {
@@ -105,11 +111,18 @@ func GetApricotPhase4MinPChainHeight(networkID uint32) uint64 {
 	return ApricotPhase4DefaultMinPChainHeight
 }
 
+func GetApricotPhase5Time(networkID uint32) time.Time {
+	if upgradeTime, exists := ApricotPhase5Times[networkID]; exists {
+		return upgradeTime
+	}
+	return ApricotPhase5DefaultTime
+}
+
 func GetCompatibility(networkID uint32) Compatibility {
 	return NewCompatibility(
 		CurrentApp,
 		MinimumCompatibleVersion,
-		GetApricotPhase4Time(networkID),
+		GetApricotPhase5Time(networkID),
 		PrevMinimumCompatibleVersion,
 		MinimumUnmaskedVersion,
 		GetApricotPhase0Time(networkID),

@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -129,16 +129,16 @@ func GetCreateTxFromGenesisTest(tb testing.TB, genesisBytes []byte, assetName st
 	}
 	if assetTx == nil {
 		tb.Fatal("there is no create tx")
+		return nil
 	}
 
-	tx := Tx{
+	tx := &Tx{
 		UnsignedTx: &assetTx.CreateAssetTx,
 	}
 	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		tb.Fatal(err)
 	}
-
-	return &tx
+	return tx
 }
 
 func GetAVAXTxFromGenesisTest(genesisBytes []byte, tb testing.TB) *Tx {

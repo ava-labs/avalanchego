@@ -1,4 +1,4 @@
-// (c) 2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -129,6 +129,13 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 		t.Fatal("Could not build proposer block")
 	}
 
+	if err := prntProBlk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if err := proVM.SetPreference(prntProBlk.ID()); err != nil {
+		t.Fatal(err)
+	}
+
 	// .. create child block ...
 	childCoreBlk := &snowman.TestBlock{
 		ParentV:    prntCoreBlk.ID(),
@@ -224,6 +231,14 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	if err != nil {
 		t.Fatal("Could not build proposer block")
 	}
+
+	if err := prntProBlk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if err := proVM.SetPreference(prntProBlk.ID()); err != nil {
+		t.Fatal(err)
+	}
+
 	prntTimestamp := prntProBlk.Timestamp()
 
 	childCoreBlk := &snowman.TestBlock{
@@ -410,6 +425,14 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	if err != nil {
 		t.Fatal("Could not build proposer block")
 	}
+
+	if err := prntProBlk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if err := proVM.SetPreference(prntProBlk.ID()); err != nil {
+		t.Fatal(err)
+	}
+
 	prntBlkPChainHeight := pChainHeight
 
 	childCoreBlk := &snowman.TestBlock{
@@ -584,13 +607,20 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		}
 	}
 
-	OracleBlk, err := proVM.BuildBlock()
+	oracleBlk, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("could not build post fork oracle block")
 	}
 
+	if err := oracleBlk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if err := proVM.SetPreference(oracleBlk.ID()); err != nil {
+		t.Fatal(err)
+	}
+
 	// retrieve one option and verify block built on it
-	postForkOracleBlk, ok := OracleBlk.(*postForkBlock)
+	postForkOracleBlk, ok := oracleBlk.(*postForkBlock)
 	if !ok {
 		t.Fatal("expected post fork block")
 	}
@@ -599,6 +629,14 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		t.Fatal("could not retrieve options from post fork oracle block")
 	}
 	parentBlk := opts[0]
+
+	if err := parentBlk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if err := proVM.SetPreference(parentBlk.ID()); err != nil {
+		t.Fatal(err)
+	}
+
 	prntBlkPChainHeight := pChainHeight
 
 	childCoreBlk := &snowman.TestBlock{
@@ -980,6 +1018,13 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 	parentBlk, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("could not build post fork oracle block")
+	}
+
+	if err := parentBlk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if err := proVM.SetPreference(parentBlk.ID()); err != nil {
+		t.Fatal(err)
 	}
 
 	// retrieve options ...

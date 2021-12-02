@@ -1,4 +1,4 @@
-// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -55,6 +56,12 @@ type UnsignedDecisionTx interface {
 		onAcceptFunc func() error,
 		err TxError,
 	)
+
+	// To maintain consistency with the Atomic txs
+	InputUTXOs() ids.Set
+
+	// AtomicOperations provides the requests to be written to shared memory.
+	AtomicOperations() (ids.ID, *atomic.Requests, error)
 }
 
 // UnsignedProposalTx is an unsigned operation that can be proposed
@@ -74,16 +81,13 @@ type UnsignedProposalTx interface {
 
 // UnsignedAtomicTx is an unsigned operation that can be atomically accepted
 type UnsignedAtomicTx interface {
-	UnsignedTx
-
-	// UTXOs this tx consumes
-	InputUTXOs() ids.Set
+	UnsignedDecisionTx
 
 	// Execute this transaction with the provided state.
-	Execute(vm *VM, parentState MutableState, stx *Tx) (VersionedState, TxError)
+	AtomicExecute(vm *VM, parentState MutableState, stx *Tx) (VersionedState, TxError)
 
 	// Accept this transaction with the additionally provided state transitions.
-	Accept(ctx *snow.Context, batch database.Batch) error
+	AtomicAccept(ctx *snow.Context, batch database.Batch) error
 }
 
 // Tx is a signed transaction

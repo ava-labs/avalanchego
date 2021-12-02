@@ -1,4 +1,4 @@
-// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package benchlist
@@ -55,7 +55,6 @@ func TestBenchlistAdd(t *testing.T) {
 		minimumFailingDuration,
 		duration,
 		maxPortion,
-		"",
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -199,7 +198,6 @@ func TestBenchlistMaxStake(t *testing.T) {
 		minimumFailingDuration,
 		duration,
 		maxPortion,
-		"",
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -340,7 +338,6 @@ func TestBenchlistRemove(t *testing.T) {
 		minimumFailingDuration,
 		duration,
 		maxPortion,
-		"",
 		prometheus.NewRegistry(),
 	)
 	if err != nil {

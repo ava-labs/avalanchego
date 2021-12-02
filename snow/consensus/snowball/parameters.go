@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
@@ -6,8 +6,6 @@ package snowball
 import (
 	"fmt"
 	"time"
-
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -30,15 +28,12 @@ const (
 
 // Parameters required for snowball consensus
 type Parameters struct {
-	Namespace string `json:"-"`
-	// TODO: move metrics to a more suitable place
-	Metrics           prometheus.Registerer `json:"-"`
-	K                 int                   `json:"k"`
-	Alpha             int                   `json:"alpha"`
-	BetaVirtuous      int                   `json:"betaVirtuous"`
-	BetaRogue         int                   `json:"betaRogue"`
-	ConcurrentRepolls int                   `json:"concurrentRepolls"`
-	OptimalProcessing int                   `json:"optimalProcessing"`
+	K                 int `json:"k"`
+	Alpha             int `json:"alpha"`
+	BetaVirtuous      int `json:"betaVirtuous"`
+	BetaRogue         int `json:"betaRogue"`
+	ConcurrentRepolls int `json:"concurrentRepolls"`
+	OptimalProcessing int `json:"optimalProcessing"`
 
 	// Reports unhealthy if more than this number of items are outstanding.
 	MaxOutstandingItems int `json:"maxOutstandingItems"`

@@ -1,4 +1,4 @@
-// (c) 2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -220,6 +220,9 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk3, nil }
 	builtBlk3, err := proRemoteVM.BuildBlock()
 	assert.NoError(err, "Could not build proposer block")
+
+	assert.NoError(builtBlk3.Verify())
+	assert.NoError(proRemoteVM.SetPreference(builtBlk3.ID()))
 
 	// ...Call GetAncestors on them ...
 	// Note: we assumed that if blkID is not known, that's NOT an error.
@@ -893,7 +896,6 @@ func initTestRemoteProposerVM(
 	ctx.StakingCertLeaf = pTestCert.Leaf
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
-	ctx.Bootstrapped()
 
 	dummyDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	// make sure that DBs are compressed correctly
@@ -904,6 +906,10 @@ func initTestRemoteProposerVM(
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
+
+	if err := proVM.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := proVM.SetPreference(coreGenBlk.IDV); err != nil {
 		t.Fatal(err)

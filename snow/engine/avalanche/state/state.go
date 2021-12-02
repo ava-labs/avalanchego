@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -35,7 +35,7 @@ func (s *state) Vertex(id ids.ID) vertex.StatelessVertex {
 		}
 		s.serializer.ctx.Log.Error("Parsing failed on saved vertex.\nPrefixed key = %s\nBytes = %s",
 			id,
-			formatting.DumpBytes{Bytes: b})
+			formatting.DumpBytes(b))
 	}
 
 	s.dbCache.Put(id, nil) // Cache the miss
@@ -104,7 +104,7 @@ func (s *state) Edge(id ids.ID) []ids.ID {
 		}
 		s.serializer.ctx.Log.Error("Parsing failed on saved ids.\nPrefixed key = %s\nBytes = %s",
 			id,
-			formatting.DumpBytes{Bytes: b})
+			formatting.DumpBytes(b))
 	}
 
 	s.dbCache.Put(id, nil) // Cache the miss

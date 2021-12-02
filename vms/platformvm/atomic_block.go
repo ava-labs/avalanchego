@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -110,7 +110,19 @@ func (ab *AtomicBlock) Verify() error {
 	}
 
 	parentState := parent.onAccept()
-	onAccept, err := tx.Execute(ab.vm, parentState, &ab.Tx)
+
+	currentTimestamp := parentState.GetTimestamp()
+	enabledAP5 := !currentTimestamp.Before(ab.vm.ApricotPhase5Time)
+
+	if enabledAP5 {
+		return fmt.Errorf(
+			"the chain timestamp (%d) is after the apricot phase 5 time (%d), hence atomic transactions should go through the standard block",
+			currentTimestamp.Unix(),
+			ab.vm.ApricotPhase5Time.Unix(),
+		)
+	}
+
+	onAccept, err := tx.AtomicExecute(ab.vm, parentState, &ab.Tx)
 	if err != nil {
 		txID := tx.ID()
 		ab.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
@@ -157,7 +169,8 @@ func (ab *AtomicBlock) Accept() error {
 			err,
 		)
 	}
-	if err := tx.Accept(ab.vm.ctx, batch); err != nil {
+
+	if err := tx.AtomicAccept(ab.vm.ctx, batch); err != nil {
 		return fmt.Errorf(
 			"failed to atomically accept tx %s in block %s: %w",
 			tx.ID(),

@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package database
@@ -140,4 +140,21 @@ func Size(db Iteratee) (int, error) {
 		size += len(iterator.Key()) + len(iterator.Value()) + kvPairOverhead
 	}
 	return size, iterator.Error()
+}
+
+func Clear(readerDB Iteratee, writerDB KeyValueWriter) error {
+	return ClearPrefix(readerDB, writerDB, nil)
+}
+
+func ClearPrefix(readerDB Iteratee, writerDB KeyValueWriter, prefix []byte) error {
+	iterator := readerDB.NewIteratorWithPrefix(prefix)
+	defer iterator.Release()
+
+	for iterator.Next() {
+		key := iterator.Key()
+		if err := writerDB.Delete(key); err != nil {
+			return err
+		}
+	}
+	return iterator.Error()
 }

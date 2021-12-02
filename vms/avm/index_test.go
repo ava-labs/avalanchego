@@ -1,4 +1,4 @@
-// (c) 2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -304,7 +304,6 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 
 	addressTxMap := map[ids.ShortID]*UniqueTx{}
 	txAssetID := avax.Asset{ID: avaxID}
-	txIDs := make([]ids.ID, len(keys))
 
 	ctx.Lock.Lock()
 	for _, key := range keys {
@@ -368,7 +367,6 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 		// index the transaction, NOT calling Accept(ids.ID) method
 		err := vm.addressTxsIndexer.Accept(uniqueParsedTX.ID(), inputUTXOs, uniqueParsedTX.UTXOs())
 		assert.NoError(t, err)
-		txIDs = append(txIDs, uniqueParsedTX.ID())
 	}
 
 	// ensure length is same as keys length

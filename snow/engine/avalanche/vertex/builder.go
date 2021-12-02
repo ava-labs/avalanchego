@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package vertex
@@ -14,10 +14,8 @@ import (
 type Builder interface {
 	// Build a new vertex from the contents of a vertex
 	BuildVtx(
-		epoch uint32,
 		parentIDs []ids.ID,
 		txs []snowstorm.Tx,
-		restrictions []ids.ID,
 	) (avalanche.Vertex, error)
 }
 
@@ -25,23 +23,19 @@ type Builder interface {
 func Build(
 	chainID ids.ID,
 	height uint64,
-	epoch uint32,
 	parentIDs []ids.ID,
 	txs [][]byte,
-	restrictions []ids.ID,
 ) (StatelessVertex, error) {
 	ids.SortIDs(parentIDs)
 	SortHashOf(txs)
-	ids.SortIDs(restrictions)
 
 	innerVtx := innerStatelessVertex{
-		Version:      noEpochTransitionsCodecVersion,
-		ChainID:      chainID,
-		Height:       height,
-		Epoch:        epoch,
-		ParentIDs:    parentIDs,
-		Txs:          txs,
-		Restrictions: restrictions,
+		Version:   codecVersion,
+		ChainID:   chainID,
+		Height:    height,
+		Epoch:     0,
+		ParentIDs: parentIDs,
+		Txs:       txs,
 	}
 	if err := innerVtx.Verify(); err != nil {
 		return nil, err

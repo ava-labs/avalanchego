@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -24,7 +24,7 @@ type AbortBlock struct {
 }
 
 func (a *AbortBlock) Accept() error {
-	if a.vm.bootstrapped {
+	if a.vm.bootstrapped.GetValue() {
 		if a.wasPreferred {
 			a.vm.metrics.numVotesWon.Inc()
 		} else {

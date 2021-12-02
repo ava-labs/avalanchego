@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -77,16 +77,18 @@ func newMessageMetrics(op message.Op, namespace string, metrics prometheus.Regis
 }
 
 type metrics struct {
-	numPeers                 prometheus.Gauge
-	timeSinceLastMsgSent     prometheus.Gauge
-	timeSinceLastMsgReceived prometheus.Gauge
-	sendQueuePortionFull     prometheus.Gauge
-	sendFailRate             prometheus.Gauge
-	failedToParse            prometheus.Counter
-	connected                prometheus.Counter
-	disconnected             prometheus.Counter
-	inboundConnRateLimited   prometheus.Counter
-	inboundConnAllowed       prometheus.Counter
+	numPeers                  prometheus.Gauge
+	timeSinceLastMsgSent      prometheus.Gauge
+	timeSinceLastMsgReceived  prometheus.Gauge
+	sendQueuePortionFull      prometheus.Gauge
+	sendFailRate              prometheus.Gauge
+	failedToParse             prometheus.Counter
+	connected                 prometheus.Counter
+	disconnected              prometheus.Counter
+	inboundConnRateLimited    prometheus.Counter
+	inboundConnAllowed        prometheus.Counter
+	nodeUptimeWeightedAverage prometheus.Gauge
+	nodeUptimeRewardingStake  prometheus.Gauge
 
 	messageMetrics map[message.Op]*messageMetrics
 }
@@ -140,7 +142,17 @@ func (m *metrics) initialize(namespace string, registerer prometheus.Registerer)
 	m.inboundConnRateLimited = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      "inbound_conn_throttler_rate_limited",
-		Help:      "Times this node rejected an inbound connection due to rate-limiting.",
+		Help:      "Times this node rejected an inbound connection due to rate-limiting",
+	})
+	m.nodeUptimeWeightedAverage = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "node_uptime_weighted_average",
+		Help:      "This node's uptime average weighted by observing peer stakes",
+	})
+	m.nodeUptimeRewardingStake = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "node_uptime_rewarding_stake",
+		Help:      "The percentage of total stake which thinks this node is eligible for rewards",
 	})
 
 	errs := wrappers.Errs{}
@@ -155,6 +167,8 @@ func (m *metrics) initialize(namespace string, registerer prometheus.Registerer)
 		registerer.Register(m.disconnected),
 		registerer.Register(m.inboundConnAllowed),
 		registerer.Register(m.inboundConnRateLimited),
+		registerer.Register(m.nodeUptimeWeightedAverage),
+		registerer.Register(m.nodeUptimeRewardingStake),
 	)
 
 	m.messageMetrics = make(map[message.Op]*messageMetrics, len(message.ExternalOps))

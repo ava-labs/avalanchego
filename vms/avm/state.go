@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -63,23 +63,23 @@ func NewState(db database.Database, genesisCodec, codec codec.Manager) State {
 	}
 }
 
-func NewMeteredState(db database.Database, genesisCodec, codec codec.Manager, namespace string, metrics prometheus.Registerer) (State, error) {
+func NewMeteredState(db database.Database, genesisCodec, codec codec.Manager, metrics prometheus.Registerer) (State, error) {
 	utxoDB := prefixdb.New(utxoStatePrefix, db)
 	statusDB := prefixdb.New(statusStatePrefix, db)
 	singletonDB := prefixdb.New(singletonStatePrefix, db)
 	txDB := prefixdb.New(txStatePrefix, db)
 
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, codec, namespace, metrics)
+	utxoState, err := avax.NewMeteredUTXOState(utxoDB, codec, metrics)
 	if err != nil {
 		return nil, err
 	}
 
-	statusState, err := avax.NewMeteredStatusState(statusDB, namespace, metrics)
+	statusState, err := avax.NewMeteredStatusState(statusDB, metrics)
 	if err != nil {
 		return nil, err
 	}
 
-	txState, err := NewMeteredTxState(txDB, genesisCodec, namespace, metrics)
+	txState, err := NewMeteredTxState(txDB, genesisCodec, metrics)
 	return &state{
 		UTXOState:      utxoState,
 		StatusState:    statusState,

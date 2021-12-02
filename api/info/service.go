@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package info
@@ -6,7 +6,6 @@ package info
 import (
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 
 	"github.com/gorilla/rpc/v2"
@@ -23,7 +22,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms"
 )
 
-var errNoChainProvided = errors.New("argument 'chain' not given")
+var (
+	errNoChainProvided = errors.New("argument 'chain' not given")
+	errNotValidator    = errors.New("this is not a validator node")
+)
 
 // Info is the API service for unprivileged info on a node
 type Info struct {
@@ -44,7 +46,6 @@ type Parameters struct {
 	CreateAssetTxFee      uint64
 	CreateSubnetTxFee     uint64
 	CreateBlockchainTxFee uint64
-	UptimeRequirement     float64
 }
 
 // NewService returns a new admin API service
@@ -248,49 +249,12 @@ type UptimeResponse struct {
 
 func (service *Info) Uptime(_ *http.Request, _ *struct{}, reply *UptimeResponse) error {
 	service.log.Debug("Info: Uptime called")
-
-	myStake, _ := service.validators.GetWeight(service.NodeID)
-	var (
-		totalWeight          = float64(service.validators.Weight())
-		totalWeightedPercent = 100 * float64(myStake)
-		rewardingStake       = float64(myStake)
-	)
-	for _, peerInfo := range service.networking.Peers(nil) {
-		peerID, err := ids.ShortFromPrefixedString(peerInfo.ID, constants.NodeIDPrefix)
-		if err != nil {
-			return err
-		}
-
-		weight, ok := service.validators.GetWeight(peerID)
-		if !ok {
-			// this is not a validator skip it.
-			continue
-		}
-
-		peerVersion, err := service.versionParser.Parse(peerInfo.Version)
-		if err != nil {
-			return err
-		}
-
-		weightFloat := float64(weight)
-
-		if peerVersion.Before(version.MinUptimeVersion) {
-			// If the peer is running an earlier version, then ignore their
-			// stake
-			totalWeight -= weightFloat
-			continue
-		}
-
-		percent := float64(peerInfo.ObservedUptime)
-		totalWeightedPercent += percent * weightFloat
-
-		// if this peer thinks we're above requirement add the weight
-		if percent/100 >= service.UptimeRequirement {
-			rewardingStake += weightFloat
-		}
+	result, isValidator := service.networking.NodeUptime()
+	if !isValidator {
+		return errNotValidator
 	}
-	reply.WeightedAveragePercentage = json.Float64(math.Abs(totalWeightedPercent / totalWeight))
-	reply.RewardingStakePercentage = json.Float64(math.Abs(100 * rewardingStake / totalWeight))
+	reply.WeightedAveragePercentage = json.Float64(result.WeightedAveragePercentage)
+	reply.RewardingStakePercentage = json.Float64(result.RewardingStakePercentage)
 	return nil
 }
 

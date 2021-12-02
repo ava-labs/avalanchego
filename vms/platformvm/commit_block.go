@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -24,7 +24,7 @@ type CommitBlock struct {
 }
 
 func (c *CommitBlock) Accept() error {
-	if c.vm.bootstrapped {
+	if c.vm.bootstrapped.GetValue() {
 		if c.wasPreferred {
 			c.vm.metrics.numVotesWon.Inc()
 		} else {

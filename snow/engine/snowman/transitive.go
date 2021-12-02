@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -69,19 +69,19 @@ func (t *Transitive) Initialize(config Config) error {
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t.polls = poll.NewSet(factory,
 		config.Ctx.Log,
-		config.Params.Namespace,
-		config.Params.Metrics,
+		"",
+		config.Ctx.Registerer,
 	)
 
-	if err := t.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
+	if err := t.metrics.Initialize("", config.Ctx.Registerer); err != nil {
 		return err
 	}
 
 	return t.Bootstrapper.Initialize(
 		config.Config,
 		t.finishBootstrapping,
-		fmt.Sprintf("%s_bs", config.Params.Namespace),
-		config.Params.Metrics,
+		"bs",
+		config.Ctx.Registerer,
 	)
 }
 
@@ -207,7 +207,7 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkByt
 	blk, err := t.VM.ParseBlock(blkBytes)
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse block %s: %s", blkID, err)
-		t.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes{Bytes: blkBytes})
+		t.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes(blkBytes))
 		// because GetFailed doesn't utilize the assumption that we actually
 		// sent a Get message, we can safely call GetFailed here to potentially
 		// abandon the request.
@@ -293,7 +293,7 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, 
 	// If parsing fails, we just drop the request, as we didn't ask for it
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse block %s: %s", blkID, err)
-		t.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes{Bytes: blkBytes})
+		t.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes(blkBytes))
 		return nil
 	}
 
@@ -846,14 +846,13 @@ func (t *Transitive) removeFromPending(blk snowman.Block) {
 }
 
 func (t *Transitive) addToNonVerifieds(blk snowman.Block) {
-	// don't add this blk if it's decided or processing
-	// this should not be happening, but just in case.
+	// don't add this blk if it's decided or processing.
 	if t.Consensus.DecidedOrProcessing(blk) {
 		return
 	}
 	parentID := blk.Parent()
-	// we might still need that one, so we can bubble vote to parent through this block
-	// only add blocks with parent already in tree or processing.
+	// we might still need this block so we can bubble votes to the parent
+	// only add blocks with parent already in the tree or processing.
 	// decided parents should not be in this map.
 	if t.nonVerifieds.Has(parentID) || t.parentProcessing(blk) {
 		t.nonVerifieds.Add(blk.ID(), parentID)

@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -173,8 +173,8 @@ func TestInitialStateVerifySerialization(t *testing.T) {
 	}
 	if !bytes.Equal(isBytes, expected) {
 		t.Fatalf("Expected:\n%s\nResult:\n%s",
-			formatting.DumpBytes{Bytes: expected},
-			formatting.DumpBytes{Bytes: isBytes},
+			formatting.DumpBytes(expected),
+			formatting.DumpBytes(isBytes),
 		)
 	}
 }

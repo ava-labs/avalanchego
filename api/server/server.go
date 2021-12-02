@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package server
@@ -143,11 +143,11 @@ func (s *Server) DispatchTLS(certFile, keyFile string) error {
 // creating a new chain and holds the P-Chain's lock when this function is held,
 // and at the same time the server's lock is held due to an API call and is trying
 // to grab the P-Chain's lock.
-func (s *Server) RegisterChain(chainName string, ctx *snow.Context, engine common.Engine) {
+func (s *Server) RegisterChain(chainName string, ctx *snow.ConsensusContext, engine common.Engine) {
 	go s.registerChain(chainName, ctx, engine)
 }
 
-func (s *Server) registerChain(chainName string, ctx *snow.Context, engine common.Engine) {
+func (s *Server) registerChain(chainName string, ctx *snow.ConsensusContext, engine common.Engine) {
 	var (
 		handlers map[string]*common.HTTPHandler
 		err      error
@@ -187,7 +187,7 @@ func (s *Server) registerChain(chainName string, ctx *snow.Context, engine commo
 }
 
 // AddChainRoute registers a route to a chain's handler
-func (s *Server) AddChainRoute(handler *common.HTTPHandler, ctx *snow.Context, base, endpoint string, loggingWriter io.Writer) error {
+func (s *Server) AddChainRoute(handler *common.HTTPHandler, ctx *snow.ConsensusContext, base, endpoint string, loggingWriter io.Writer) error {
 	url := fmt.Sprintf("%s/%s", baseURL, base)
 	s.log.Info("adding route %s%s", url, endpoint)
 	// Apply logging middleware
@@ -240,7 +240,7 @@ func lockMiddleware(handler http.Handler, lockOption common.LockOption, lock *sy
 
 // Reject middleware wraps a handler. If the chain that the context describes is
 // not done bootstrapping, writes back an error.
-func rejectMiddleware(handler http.Handler, ctx *snow.Context) http.Handler {
+func rejectMiddleware(handler http.Handler, ctx *snow.ConsensusContext) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { // If chain isn't done bootstrapping, ignore API calls
 		if !ctx.IsBootstrapped() {
 			w.WriteHeader(http.StatusServiceUnavailable)

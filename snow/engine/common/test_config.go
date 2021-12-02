@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
@@ -18,7 +18,7 @@ func DefaultConfigTest() Config {
 	}
 
 	return Config{
-		Ctx:                           snow.DefaultContextTest(),
+		Ctx:                           snow.DefaultConsensusContextTest(),
 		Validators:                    validators.NewSet(),
 		Beacons:                       validators.NewSet(),
 		Sender:                        &SenderTest{},

@@ -1,4 +1,4 @@
-// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package indexer
@@ -27,7 +27,7 @@ func TestIndex(t *testing.T) {
 	assert.NoError(err)
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 
 	indexIntf, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
 	assert.NoError(err)
@@ -117,7 +117,7 @@ func TestIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 	err := codec.RegisterCodec(codecVersion, linearcodec.NewDefault())
 	assert.NoError(err)
 	db := memdb.New()
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	indexIntf, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
 	assert.NoError(err)
 	idx := indexIntf.(*index)
@@ -159,7 +159,7 @@ func TestDontIndexSameContainerTwice(t *testing.T) {
 	err := codec.RegisterCodec(codecVersion, linearcodec.NewDefault())
 	assert.NoError(err)
 	db := memdb.New()
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	idx, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
 	assert.NoError(err)
 

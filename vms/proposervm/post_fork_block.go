@@ -1,4 +1,4 @@
-// (c) 2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -95,7 +95,7 @@ func (b *postForkBlock) Options() ([2]snowman.Block, error) {
 			return [2]snowman.Block{}, err
 		}
 
-		outerOption := &postForkOption{
+		outerOptions[i] = &postForkOption{
 			Block: statelessOuterOption,
 			postForkCommonComponents: postForkCommonComponents{
 				vm:       b.vm,
@@ -103,12 +103,6 @@ func (b *postForkBlock) Options() ([2]snowman.Block, error) {
 				status:   innerOption.Status(),
 			},
 		}
-		// Persist the wrapped child options
-		if err := b.vm.storePostForkBlock(outerOption); err != nil {
-			return [2]snowman.Block{}, err
-		}
-
-		outerOptions[i] = outerOption
 	}
 	return outerOptions, nil
 }

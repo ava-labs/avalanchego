@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -14,7 +14,7 @@ import (
 type Consensus interface {
 	// Takes in the context, snowball parameters, and the last accepted block.
 	Initialize(
-		ctx *snow.Context,
+		ctx *snow.ConsensusContext,
 		params snowball.Parameters,
 		lastAcceptedID ids.ID,
 		lastAcceptedHeight uint64,

@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package router
@@ -21,7 +21,7 @@ import (
 func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	engine := common.EngineTest{T: t}
 	engine.Default(true)
-	engine.ContextF = snow.DefaultContextTest
+	engine.ContextF = snow.DefaultConsensusContextTest
 	called := make(chan struct{})
 
 	engine.GetAcceptedFrontierF = func(nodeID ids.ShortID, requestID uint32) error {
@@ -47,8 +47,6 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		"",
-		metrics,
 	)
 	assert.NoError(t, err)
 
@@ -88,7 +86,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 
 	closed := make(chan struct{}, 1)
 
-	engine.ContextF = snow.DefaultContextTest
+	engine.ContextF = snow.DefaultConsensusContextTest
 	engine.GetAcceptedFrontierF = func(nodeID ids.ShortID, requestID uint32) error {
 		return errors.New("Engine error should cause handler to close")
 	}
@@ -105,8 +103,6 @@ func TestHandlerClosesOnError(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		"",
-		metrics,
 	)
 	assert.NoError(t, err)
 
@@ -139,7 +135,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 
 	closed := make(chan struct{}, 1)
 
-	engine.ContextF = snow.DefaultContextTest
+	engine.ContextF = snow.DefaultConsensusContextTest
 	engine.GetFailedF = func(nodeID ids.ShortID, requestID uint32) error {
 		closed <- struct{}{}
 		return nil
@@ -157,8 +153,6 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		"",
-		metrics,
 	)
 	assert.NoError(t, err)
 
@@ -186,7 +180,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 func TestHandlerDispatchInternal(t *testing.T) {
 	engine := common.EngineTest{T: t}
 	engine.Default(false)
-	engine.ContextF = snow.DefaultContextTest
+	engine.ContextF = snow.DefaultConsensusContextTest
 	calledNotify := make(chan struct{}, 1)
 	engine.NotifyF = func(common.Message) error {
 		calledNotify <- struct{}{}
@@ -206,8 +200,6 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		&engine,
 		vdrs,
 		msgFromVMChan,
-		"",
-		prometheus.NewRegistry(),
 	)
 	assert.NoError(t, err)
 

@@ -1,4 +1,4 @@
-// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package timeout
@@ -27,7 +27,7 @@ type metrics struct {
 	chainToMetrics map[ids.ID]*chainMetrics
 }
 
-func (m *metrics) RegisterChain(ctx *snow.Context, namespace string) error {
+func (m *metrics) RegisterChain(ctx *snow.ConsensusContext) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -37,7 +37,7 @@ func (m *metrics) RegisterChain(ctx *snow.Context, namespace string) error {
 	if _, exists := m.chainToMetrics[ctx.ChainID]; exists {
 		return fmt.Errorf("chain %s has already been registered", ctx.ChainID)
 	}
-	cm, err := newChainMetrics(ctx, namespace, false)
+	cm, err := newChainMetrics(ctx, false)
 	if err != nil {
 		return fmt.Errorf("couldn't create metrics for chain %s: %w", ctx.ChainID, err)
 	}
@@ -60,7 +60,7 @@ func (m *metrics) Observe(chainID ids.ID, op message.Op, latency time.Duration) 
 
 // chainMetrics contains message response time metrics for a chain
 type chainMetrics struct {
-	ctx *snow.Context
+	ctx *snow.ConsensusContext
 
 	messageLatencies map[message.Op]metric.Averager
 
@@ -68,7 +68,7 @@ type chainMetrics struct {
 	messageSummaries map[message.Op]*prometheus.SummaryVec
 }
 
-func newChainMetrics(ctx *snow.Context, namespace string, summaryEnabled bool) (*chainMetrics, error) {
+func newChainMetrics(ctx *snow.ConsensusContext, summaryEnabled bool) (*chainMetrics, error) {
 	cm := &chainMetrics{
 		ctx: ctx,
 
@@ -78,14 +78,13 @@ func newChainMetrics(ctx *snow.Context, namespace string, summaryEnabled bool) (
 		messageSummaries: make(map[message.Op]*prometheus.SummaryVec, len(message.ConsensusResponseOps)),
 	}
 
-	queryLatencyNamespace := fmt.Sprintf("%s_lat", namespace)
 	errs := wrappers.Errs{}
 	for _, op := range message.ConsensusResponseOps {
 		cm.messageLatencies[op] = metric.NewAveragerWithErrs(
-			queryLatencyNamespace,
+			"lat",
 			op.String(),
 			defaultRequestHelpMsg,
-			ctx.Metrics,
+			ctx.Registerer,
 			&errs,
 		)
 
@@ -96,7 +95,7 @@ func newChainMetrics(ctx *snow.Context, namespace string, summaryEnabled bool) (
 		summaryName := fmt.Sprintf("%s_peer", op)
 		summary := prometheus.NewSummaryVec(
 			prometheus.SummaryOpts{
-				Namespace: queryLatencyNamespace,
+				Namespace: "lat",
 				Name:      summaryName,
 				Help:      defaultRequestHelpMsg,
 			},
@@ -104,7 +103,7 @@ func newChainMetrics(ctx *snow.Context, namespace string, summaryEnabled bool) (
 		)
 		cm.messageSummaries[op] = summary
 
-		if err := ctx.Metrics.Register(summary); err != nil {
+		if err := ctx.Registerer.Register(summary); err != nil {
 			errs.Add(fmt.Errorf("failed to register %s statistics: %w", summaryName, err))
 		}
 	}

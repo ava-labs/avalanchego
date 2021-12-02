@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
@@ -6,8 +6,6 @@ package snowball
 import (
 	"strings"
 	"testing"
-
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/sampler"
@@ -21,8 +19,7 @@ func TestTreeParams(t *testing.T) { ParamsTest(t, TreeFactory{}) }
 
 func TestSnowballSingleton(t *testing.T) {
 	params := Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 2, BetaRogue: 5,
+		K: 1, Alpha: 1, BetaVirtuous: 2, BetaRogue: 5,
 	}
 	tree := Tree{}
 	tree.Initialize(params, Red)
@@ -75,8 +72,7 @@ func TestSnowballSingleton(t *testing.T) {
 
 func TestSnowballRecordUnsuccessfulPoll(t *testing.T) {
 	params := Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 3, BetaRogue: 5,
+		K: 1, Alpha: 1, BetaVirtuous: 3, BetaRogue: 5,
 	}
 	tree := Tree{}
 	tree.Initialize(params, Red)
@@ -114,8 +110,7 @@ func TestSnowballRecordUnsuccessfulPoll(t *testing.T) {
 
 func TestSnowballBinary(t *testing.T) {
 	params := Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
+		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
 	tree := Tree{}
 	tree.Initialize(params, Red)
@@ -174,8 +169,7 @@ func TestSnowballLastBinary(t *testing.T) {
 	}
 
 	params := Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 2, BetaRogue: 2,
+		K: 1, Alpha: 1, BetaVirtuous: 2, BetaRogue: 2,
 	}
 	tree := Tree{}
 	tree.Initialize(params, zero)
@@ -220,8 +214,7 @@ func TestSnowballAddPreviouslyRejected(t *testing.T) {
 	four := ids.ID{0b00000100}
 
 	params := Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
+		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
 	tree := Tree{}
 	tree.Initialize(params, zero)
@@ -286,8 +279,7 @@ func TestSnowballNewUnary(t *testing.T) {
 	one := ids.ID{0b00000001}
 
 	params := Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 2, BetaRogue: 3,
+		K: 1, Alpha: 1, BetaVirtuous: 2, BetaRogue: 3,
 	}
 	tree := Tree{}
 	tree.Initialize(params, zero)
@@ -345,8 +337,7 @@ func TestSnowballTransitiveReset(t *testing.T) {
 	eight := ids.ID{0b00001000}
 
 	params := Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 2, BetaRogue: 2,
+		K: 1, Alpha: 1, BetaVirtuous: 2, BetaRogue: 2,
 	}
 	tree := Tree{}
 	tree.Initialize(params, zero)
@@ -446,8 +437,7 @@ func TestSnowballTransitiveReset(t *testing.T) {
 
 func TestSnowballTrinary(t *testing.T) {
 	params := Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
+		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
 	tree := Tree{}
 	tree.Initialize(params, Green)
@@ -521,8 +511,7 @@ func TestSnowballCloseTrinary(t *testing.T) {
 	magenta := ids.ID{0x03}
 
 	params := Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
+		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
 	tree := Tree{}
 	tree.Initialize(params, yellow)
@@ -581,8 +570,7 @@ func TestSnowballAddRejected(t *testing.T) {
 	c0010 := ids.ID{0x04} // 0010
 
 	params := Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
+		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
 	tree := Tree{}
 	tree.Initialize(params, c0000)
@@ -637,8 +625,7 @@ func TestSnowballResetChild(t *testing.T) {
 	c1000 := ids.ID{0x01} // 1000
 
 	params := Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
+		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
 	tree := Tree{}
 	tree.Initialize(params, c0000)
@@ -711,8 +698,7 @@ func TestSnowballResetSibling(t *testing.T) {
 	c1000 := ids.ID{0x01} // 1000
 
 	params := Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
+		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
 	tree := Tree{}
 	tree.Initialize(params, c0000)
@@ -783,8 +769,7 @@ func TestSnowballResetSibling(t *testing.T) {
 func TestSnowball5Colors(t *testing.T) {
 	numColors := 5
 	params := Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       5, Alpha: 5, BetaVirtuous: 20, BetaRogue: 30,
+		K: 5, Alpha: 5, BetaVirtuous: 20, BetaRogue: 30,
 	}
 
 	colors := []ids.ID{}
@@ -823,8 +808,7 @@ func TestSnowballFineGrained(t *testing.T) {
 	c0010 := ids.ID{0x04}
 
 	params := Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
+		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
 	tree := Tree{}
 	tree.Initialize(params, c0000)
@@ -939,8 +923,7 @@ func TestSnowballFineGrained(t *testing.T) {
 
 func TestSnowballDoubleAdd(t *testing.T) {
 	params := Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 3, BetaRogue: 5,
+		K: 1, Alpha: 1, BetaVirtuous: 3, BetaRogue: 5,
 	}
 	tree := Tree{}
 	tree.Initialize(params, Red)
@@ -962,8 +945,7 @@ func TestSnowballConsistent(t *testing.T) {
 	numColors := 50
 	numNodes := 100
 	params := Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       20, Alpha: 15, BetaVirtuous: 20, BetaRogue: 30,
+		K: 20, Alpha: 15, BetaVirtuous: 20, BetaRogue: 30,
 	}
 	seed := int64(0)
 
@@ -992,8 +974,7 @@ func TestSnowballFilterBinaryChildren(t *testing.T) {
 	c0010 := ids.ID{0b00000100}
 
 	params := Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
+		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
 	tree := Tree{}
 	tree.Initialize(params, c0000)

@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -79,10 +79,8 @@ func TestUniqueVertexCacheHit(t *testing.T) {
 	vtx, err := vertex.Build(
 		chainID,
 		height,
-		0,
 		parentIDs,
 		[][]byte{{0}},
-		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -159,10 +157,8 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 	innerVertex, err := vertex.Build(
 		chainID,
 		height,
-		0,
 		parentIDs,
 		[][]byte{txBytes},
-		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -272,10 +268,8 @@ func TestParseVertexWithInvalidTxs(t *testing.T) {
 	statelessVertex, err := vertex.Build(
 		ctx.ChainID,
 		0,
-		0,
 		nil,
 		[][]byte{{1}},
-		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -309,10 +303,8 @@ func TestParseVertexWithInvalidTxs(t *testing.T) {
 	childStatelessVertex, err := vertex.Build(
 		ctx.ChainID,
 		1,
-		0,
 		[]ids.ID{vtxID},
 		[][]byte{{2}},
-		nil,
 	)
 	if err != nil {
 		t.Fatal(err)

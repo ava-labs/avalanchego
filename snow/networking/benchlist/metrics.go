@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package benchlist
@@ -14,11 +14,9 @@ type metrics struct {
 }
 
 // Initialize implements the Engine interface
-func (m *metrics) Initialize(registerer prometheus.Registerer, namespace string) error {
-	benchNamespace := fmt.Sprintf("%s_benchlist", namespace)
-
+func (m *metrics) Initialize(registerer prometheus.Registerer) error {
 	m.numBenched = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: benchNamespace,
+		Namespace: "benchlist",
 		Name:      "benched_num",
 		Help:      "Number of currently benched validators",
 	})
@@ -27,7 +25,7 @@ func (m *metrics) Initialize(registerer prometheus.Registerer, namespace string)
 	}
 
 	m.weightBenched = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: benchNamespace,
+		Namespace: "benchlist",
 		Name:      "benched_weight",
 		Help:      "Weight of currently benched validators",
 	})

@@ -1,24 +1,72 @@
 # Release Notes
 
+## [v1.7.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.1)
+
+This update is backwards compatible with [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). Please see the expected update times in the v1.7.0 release.
+
+### Coreth
+
+- Reduced fee estimate volatility.
+
+### Consensus
+
+- Fixed vote bubbling for unverified block chits.
+
+## [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0)
+
+This upgrade adds support for issuing multiple atomic transactions into a single block and directly transferring assets between the P-chain and the C-chain.
+
+The changes in the upgrade go into effect at 1 PM EST, December 2nd 2021 on Mainnet. One should upgrade their node before the changes go into effect, otherwise they may experience loss of uptime.
+
+**All nodes should upgrade before 1 PM EST, December 2nd 2021.**
+
+### Networking
+
+- Added peer uptime reports as metrics.
+- Removed IP rate limiting over local networks.
+
+### PlatformVM
+
+- Enabled `AtomicTx`s to be issued into `StandardBlock`s and deprecated `AtomicBlock`s.
+- Added the ability to export/import AVAX to/from the C-chain.
+
+### Coreth
+
+- Enabled multiple `AtomicTx`s to be issued per block.
+- Added the ability to export/import AVAX to/from the P-chain.
+- Updated dynamic fee calculations.
+
+### ProposerVM
+
+- Removed storage of undecided blocks.
+
+### RPCChainVM
+
+- Added support for metrics to be reported by plugin VMs.
+
+### Configs
+
+- Removed `--snow-epoch-first-transition` and `snow-epoch-duration` as command line arguments.
+
 ## [v1.6.5](https://github.com/ava-labs/avalanchego/releases/tag/v1.6.5)
 
 This version is backwards compatible to [v1.6.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.6.0). It is optional, but encouraged.
 
-## Bootstrapping
+### Bootstrapping
 
 - Drop inbound messages to a chain if that chain is in the execution phase of bootstrapping.
 - Print beacon nodeIDs upon failure to connect to them.
 
-## Metrics
+### Metrics
 
 - Added `avalanche_{ChainID}_bootstrap_finished`, which is 1 if the chain is done bootstrapping, 0 otherwise.
 
-## APIs
+### APIs
 
 - Added `info.uptime` API call that attempts to report the network's view of the local node.
 - Added `observedUptime` to each peer's result in `info.peers`.
 
-## Network
+### Network
 
 - Added reported uptime to pong messages to be able to better track a local node's uptime as viewed by the network.
 - Refactored request timeout registry to avoid a potential race condition.

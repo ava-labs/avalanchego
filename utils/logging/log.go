@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package logging
@@ -10,15 +10,27 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
-var filePrefix = fmt.Sprintf("%s/", constants.AppName)
+var (
+	fileSuffix = "utils/logging/log.go"
+	filePrefix string
+)
+
+func init() {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		panic("failed to get file")
+	}
+	if len(file) < len(fileSuffix) {
+		panic("unexpected file name returned")
+	}
+	filePrefix = file[:len(file)-len(fileSuffix)]
+}
 
 // Log implements the Logger interface
 type Log struct {
@@ -182,10 +194,8 @@ func (l *Log) log(level Level, format string, args ...interface{}) {
 func (l *Log) format(level Level, format string, args ...interface{}) string {
 	loc := "?"
 	if _, file, no, ok := runtime.Caller(3); ok {
-		loc = fmt.Sprintf("%s#%d", file, no)
-	}
-	if i := strings.Index(loc, filePrefix); i != -1 {
-		loc = loc[i+len(filePrefix):]
+		localFile := file[len(filePrefix):]
+		loc = fmt.Sprintf("%s#%d", localFile, no)
 	}
 	text := fmt.Sprintf("%s: %s", loc, fmt.Sprintf(format, args...))
 

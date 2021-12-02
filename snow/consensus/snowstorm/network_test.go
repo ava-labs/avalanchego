@@ -1,11 +1,9 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowstorm
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -94,8 +92,7 @@ func (n *Network) Initialize(
 }
 
 func (n *Network) AddNode(cg Consensus) error {
-	n.params.Metrics = prometheus.NewRegistry()
-	if err := cg.Initialize(snow.DefaultContextTest(), n.params); err != nil {
+	if err := cg.Initialize(snow.DefaultConsensusContextTest(), n.params); err != nil {
 		return err
 	}
 

@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -31,7 +31,7 @@ type Topological struct {
 	pollNumber uint64
 
 	// ctx is the context this snowman instance is executing in
-	ctx *snow.Context
+	ctx *snow.ConsensusContext
 
 	// params are the parameters that should be used to initialize snowball
 	// instances
@@ -83,14 +83,14 @@ type votes struct {
 }
 
 // Initialize implements the Snowman interface
-func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters, rootID ids.ID, rootHeight uint64) error {
+func (ts *Topological) Initialize(ctx *snow.ConsensusContext, params snowball.Parameters, rootID ids.ID, rootHeight uint64) error {
 	if err := params.Verify(); err != nil {
 		return err
 	}
-	if err := ts.Latency.Initialize("blks", "block(s)", ctx.Log, params.Namespace, params.Metrics); err != nil {
+	if err := ts.Latency.Initialize("blks", "block(s)", ctx.Log, "", ctx.Registerer); err != nil {
 		return err
 	}
-	if err := ts.Polls.Initialize(params.Namespace, params.Metrics); err != nil {
+	if err := ts.Polls.Initialize("", ctx.Registerer); err != nil {
 		return err
 	}
 	ts.leaves = ids.Set{}

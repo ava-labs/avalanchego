@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -77,9 +77,8 @@ func getTestName(i interface{}) string {
 func InitializeTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          3,
@@ -107,9 +106,8 @@ func InitializeTest(t *testing.T, factory Factory) {
 func NumProcessingTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          1,
@@ -159,9 +157,8 @@ func NumProcessingTest(t *testing.T, factory Factory) {
 func AddToTailTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          3,
@@ -197,9 +194,8 @@ func AddToTailTest(t *testing.T, factory Factory) {
 func AddToNonTailTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          3,
@@ -249,9 +245,8 @@ func AddToNonTailTest(t *testing.T, factory Factory) {
 func AddToUnknownTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          3,
@@ -292,9 +287,8 @@ func AddToUnknownTest(t *testing.T, factory Factory) {
 func StatusOrProcessingPreviouslyAcceptedTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          3,
@@ -322,9 +316,8 @@ func StatusOrProcessingPreviouslyAcceptedTest(t *testing.T, factory Factory) {
 func StatusOrProcessingPreviouslyRejectedTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          3,
@@ -360,9 +353,8 @@ func StatusOrProcessingPreviouslyRejectedTest(t *testing.T, factory Factory) {
 func StatusOrProcessingUnissuedTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          3,
@@ -399,9 +391,8 @@ func StatusOrProcessingUnissuedTest(t *testing.T, factory Factory) {
 func StatusOrProcessingIssuedTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          3,
@@ -440,9 +431,8 @@ func StatusOrProcessingIssuedTest(t *testing.T, factory Factory) {
 func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          2,
@@ -492,9 +482,8 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          1,
@@ -558,9 +547,8 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          1,
@@ -588,9 +576,8 @@ func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {
 func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          1,
@@ -668,9 +655,8 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          2,
@@ -783,9 +769,8 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          2,
@@ -834,9 +819,8 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     3,
 		Alpha:                 3,
 		BetaVirtuous:          1,
@@ -976,9 +960,8 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          1,
@@ -1059,9 +1042,8 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          10,
@@ -1193,9 +1175,8 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 func MetricsProcessingErrorTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          1,
@@ -1208,11 +1189,10 @@ func MetricsProcessingErrorTest(t *testing.T, factory Factory) {
 
 	numProcessing := prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Namespace: params.Namespace,
-			Name:      "blks_processing",
+			Name: "blks_processing",
 		})
 
-	if err := params.Metrics.Register(numProcessing); err != nil {
+	if err := ctx.Registerer.Register(numProcessing); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1224,9 +1204,8 @@ func MetricsProcessingErrorTest(t *testing.T, factory Factory) {
 func MetricsAcceptedErrorTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          1,
@@ -1239,11 +1218,10 @@ func MetricsAcceptedErrorTest(t *testing.T, factory Factory) {
 
 	numAccepted := prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Namespace: params.Namespace,
-			Name:      "blks_accepted_count",
+			Name: "blks_accepted_count",
 		})
 
-	if err := params.Metrics.Register(numAccepted); err != nil {
+	if err := ctx.Registerer.Register(numAccepted); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1255,9 +1233,8 @@ func MetricsAcceptedErrorTest(t *testing.T, factory Factory) {
 func MetricsRejectedErrorTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          1,
@@ -1270,11 +1247,10 @@ func MetricsRejectedErrorTest(t *testing.T, factory Factory) {
 
 	numRejected := prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Namespace: params.Namespace,
-			Name:      "blks_rejected_count",
+			Name: "blks_rejected_count",
 		})
 
-	if err := params.Metrics.Register(numRejected); err != nil {
+	if err := ctx.Registerer.Register(numRejected); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1286,9 +1262,8 @@ func MetricsRejectedErrorTest(t *testing.T, factory Factory) {
 func ErrorOnInitialRejectionTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          1,
@@ -1325,9 +1300,8 @@ func ErrorOnInitialRejectionTest(t *testing.T, factory Factory) {
 func ErrorOnAcceptTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          1,
@@ -1365,9 +1339,8 @@ func ErrorOnAcceptTest(t *testing.T, factory Factory) {
 func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          1,
@@ -1414,9 +1387,8 @@ func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     1,
 		Alpha:                 1,
 		BetaVirtuous:          1,
@@ -1473,7 +1445,6 @@ func RandomizedConsistencyTest(t *testing.T, factory Factory) {
 	numColors := 50
 	numNodes := 100
 	params := snowball.Parameters{
-		Metrics:               prometheus.NewRegistry(),
 		K:                     20,
 		Alpha:                 15,
 		BetaVirtuous:          20,

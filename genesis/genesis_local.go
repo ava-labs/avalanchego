@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package genesis
@@ -108,10 +108,6 @@ var (
 			MinStakeDuration:   24 * time.Hour,
 			MaxStakeDuration:   365 * 24 * time.Hour,
 			StakeMintingPeriod: 365 * 24 * time.Hour,
-		},
-		EpochConfig: EpochConfig{
-			EpochFirstTransition: time.Unix(1607626800, 0),
-			EpochDuration:        6 * time.Hour,
 		},
 	}
 )

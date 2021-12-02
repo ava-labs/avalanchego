@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sender
@@ -22,7 +22,7 @@ import (
 // Sender registers outbound requests with [router] so that [router]
 // fires a timeout if we don't get a response to the request.
 type Sender struct {
-	ctx        *snow.Context
+	ctx        *snow.ConsensusContext
 	msgCreator message.Creator
 	sender     ExternalSender // Actually does the sending over the network
 	router     router.Router
@@ -39,13 +39,11 @@ type Sender struct {
 
 // Initialize this sender
 func (s *Sender) Initialize(
-	ctx *snow.Context,
+	ctx *snow.ConsensusContext,
 	msgCreator message.Creator,
 	sender ExternalSender,
 	router router.Router,
 	timeouts *timeout.Manager,
-	metricsNamespace string,
-	metricsRegisterer prometheus.Registerer,
 	appGossipValidatorSize int,
 	appGossipNonValidatorSize int,
 	gossipAcceptedFrontierSize int,
@@ -65,12 +63,11 @@ func (s *Sender) Initialize(
 	for _, op := range message.ConsensusRequestOps {
 		counter := prometheus.NewCounter(
 			prometheus.CounterOpts{
-				Namespace: metricsNamespace,
-				Name:      fmt.Sprintf("%s_failed_benched", op),
-				Help:      fmt.Sprintf("# of times a %s request was not sent because the node was benched", op),
+				Name: fmt.Sprintf("%s_failed_benched", op),
+				Help: fmt.Sprintf("# of times a %s request was not sent because the node was benched", op),
 			},
 		)
-		if err := metricsRegisterer.Register(counter); err != nil {
+		if err := ctx.Registerer.Register(counter); err != nil {
 			return fmt.Errorf("couldn't register metric for %s: %w", op, err)
 		}
 		s.failedDueToBench[op] = counter
@@ -79,7 +76,7 @@ func (s *Sender) Initialize(
 }
 
 // Context of this sender
-func (s *Sender) Context() *snow.Context { return s.ctx }
+func (s *Sender) Context() *snow.ConsensusContext { return s.ctx }
 
 func (s *Sender) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, requestID uint32) {
 	// Note that this timeout duration won't exactly match the one that gets
@@ -424,7 +421,7 @@ func (s *Sender) SendPut(nodeID ids.ShortID, requestID uint32, containerID ids.I
 			requestID,
 			containerID,
 		)
-		s.ctx.Log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
+		s.ctx.Log.Verbo("container: %s", formatting.DumpBytes(container))
 	}
 }
 
@@ -503,7 +500,7 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 				requestID,
 				containerID,
 			)
-			s.ctx.Log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
+			s.ctx.Log.Verbo("container: %s", formatting.DumpBytes(container))
 
 			// Register failures for nodes we didn't send a request to.
 			s.timeouts.RegisterRequestToUnreachableValidator()
@@ -633,7 +630,7 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 	s.ctx.Log.Verbo(
 		"Sending AppRequest. RequestID: %d. Message: %s",
 		requestID,
-		formatting.DumpBytes{Bytes: appRequestBytes},
+		formatting.DumpBytes(appRequestBytes),
 	)
 
 	// Tell the router to expect a response message or a message notifying
@@ -696,7 +693,7 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 				s.ctx.ChainID,
 				requestID,
 			)
-			s.ctx.Log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appRequestBytes})
+			s.ctx.Log.Verbo("failed message: %s", formatting.DumpBytes(appRequestBytes))
 
 			// Register failures for nodes we didn't send a request to.
 			s.timeouts.RegisterRequestToUnreachableValidator()
@@ -725,7 +722,7 @@ func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appRespon
 			requestID,
 			err,
 		)
-		s.ctx.Log.Verbo("message: %s", formatting.DumpBytes{Bytes: appResponseBytes})
+		s.ctx.Log.Verbo("message: %s", formatting.DumpBytes(appResponseBytes))
 		return nil
 	}
 
@@ -739,7 +736,7 @@ func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appRespon
 			s.ctx.ChainID,
 			requestID,
 		)
-		s.ctx.Log.Verbo("container: %s", formatting.DumpBytes{Bytes: appResponseBytes})
+		s.ctx.Log.Verbo("container: %s", formatting.DumpBytes(appResponseBytes))
 	}
 
 	return nil
@@ -754,13 +751,13 @@ func (s *Sender) SendAppGossipSpecific(nodeIDs ids.ShortSet, appGossipBytes []by
 			s.ctx.ChainID,
 			err,
 		)
-		s.ctx.Log.Verbo("message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
+		s.ctx.Log.Verbo("message: %s", formatting.DumpBytes(appGossipBytes))
 	}
 
 	// Send the message over the network.
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to gossip SpecificGossip(%s)", s.ctx.ChainID)
-		s.ctx.Log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
+		s.ctx.Log.Verbo("failed message: %s", formatting.DumpBytes(appGossipBytes))
 	}
 	return nil
 }
@@ -771,13 +768,13 @@ func (s *Sender) SendAppGossip(appGossipBytes []byte) error {
 	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
 	if err != nil {
 		s.ctx.Log.Error("failed to build AppGossip(%s): %s", s.ctx.ChainID, err)
-		s.ctx.Log.Verbo("message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
+		s.ctx.Log.Verbo("message: %s", formatting.DumpBytes(appGossipBytes))
 	}
 
 	sentTo := s.sender.Gossip(outMsg, s.ctx.SubnetID, s.ctx.IsValidatorOnly(), s.appGossipValidatorSize, s.appGossipNonValidatorSize)
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to gossip AppGossip(%s)", s.ctx.ChainID)
-		s.ctx.Log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
+		s.ctx.Log.Verbo("failed message: %s", formatting.DumpBytes(appGossipBytes))
 	}
 	return nil
 }

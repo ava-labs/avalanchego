@@ -1,4 +1,4 @@
-// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package indexer
@@ -44,7 +44,7 @@ var (
 // Index assumes that Accept is called before the container is committed to the
 // database of the VM that the container exists in.
 type Index interface {
-	Accept(ctx *snow.Context, containerID ids.ID, container []byte) error
+	Accept(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error
 	GetContainerByIndex(index uint64) (Container, error)
 	GetContainerRange(startIndex uint64, numToFetch uint64) ([]Container, error)
 	GetLastAccepted() (Container, error)
@@ -123,7 +123,7 @@ func (i *index) Close() error {
 // Index that the given transaction is accepted
 // Returned error should be treated as fatal; the VM should not commit [containerID]
 // or any new containers as accepted.
-func (i *index) Accept(ctx *snow.Context, containerID ids.ID, containerBytes []byte) error {
+func (i *index) Accept(ctx *snow.ConsensusContext, containerID ids.ID, containerBytes []byte) error {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 

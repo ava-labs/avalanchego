@@ -1,4 +1,4 @@
-// (c) 2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -201,7 +201,7 @@ func (b *preForkBlock) buildChild() (Block, error) {
 
 	b.vm.ctx.Log.Info("built block %s - parent timestamp %v, block timestamp %v",
 		blk.ID(), parentTimestamp, newTimestamp)
-	return blk, b.vm.storePostForkBlock(blk)
+	return blk, nil
 }
 
 func (b *preForkBlock) pChainHeight() (uint64, error) {

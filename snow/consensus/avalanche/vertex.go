@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avalanche
@@ -18,9 +18,6 @@ type Vertex interface {
 	// Returns the height of this vertex. A vertex's height is defined by one
 	// greater than the maximum height of the parents.
 	Height() (uint64, error)
-
-	// Returns the epoch this vertex was issued in.
-	Epoch() (uint32, error)
 
 	// Returns a series of state transitions to be performed on acceptance
 	Txs() ([]snowstorm.Tx, error)

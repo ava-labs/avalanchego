@@ -1,4 +1,4 @@
-// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package indexer
@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -18,14 +20,14 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/mocks"
-	avvtxmocks "github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex/mocks"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	smblockmocks "github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
-	smengmocks "github.com/ava-labs/avalanchego/snow/engine/snowman/mocks"
 	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/stretchr/testify/assert"
+
+	avvtxmocks "github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex/mocks"
+	smblockmocks "github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
+	smengmocks "github.com/ava-labs/avalanchego/snow/engine/snowman/mocks"
 )
 
 type apiServerMock struct {
@@ -149,7 +151,7 @@ func TestIndexer(t *testing.T) {
 	idxr.clock.Set(now)
 
 	// Assert state is right
-	chain1Ctx := snow.DefaultContextTest()
+	chain1Ctx := snow.DefaultConsensusContextTest()
 	chain1Ctx.ChainID = ids.GenerateTestID()
 	isIncomplete, err := idxr.isIncomplete(chain1Ctx.ChainID)
 	assert.NoError(err)
@@ -266,7 +268,7 @@ func TestIndexer(t *testing.T) {
 	assert.Equal(blkID, container.ID)
 
 	// Register a DAG chain
-	chain2Ctx := snow.DefaultContextTest()
+	chain2Ctx := snow.DefaultConsensusContextTest()
 	chain2Ctx.ChainID = ids.GenerateTestID()
 	isIncomplete, err = idxr.isIncomplete(chain2Ctx.ChainID)
 	assert.NoError(err)
@@ -449,7 +451,7 @@ func TestIncompleteIndex(t *testing.T) {
 	assert.False(idxr.indexingEnabled)
 
 	// Register a chain
-	chain1Ctx := snow.DefaultContextTest()
+	chain1Ctx := snow.DefaultConsensusContextTest()
 	chain1Ctx.ChainID = ids.GenerateTestID()
 	isIncomplete, err := idxr.isIncomplete(chain1Ctx.ChainID)
 	assert.NoError(err)
@@ -503,7 +505,7 @@ func TestIncompleteIndex(t *testing.T) {
 	config.DB = versiondb.New(baseDB)
 	idxrIntf, err = NewIndexer(config)
 	assert.NoError(err)
-	idxr, ok = idxrIntf.(*indexer)
+	_, ok = idxrIntf.(*indexer)
 	assert.True(ok)
 }
 
@@ -534,7 +536,7 @@ func TestIgnoreNonDefaultChains(t *testing.T) {
 	assert.True(ok)
 
 	// Assert state is right
-	chain1Ctx := snow.DefaultContextTest()
+	chain1Ctx := snow.DefaultConsensusContextTest()
 	chain1Ctx.ChainID = ids.GenerateTestID()
 	chain1Ctx.SubnetID = ids.GenerateTestID()
 

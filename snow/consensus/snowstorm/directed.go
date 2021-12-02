@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowstorm
@@ -52,7 +52,7 @@ type directedTx struct {
 
 // Initialize implements the Consensus interface
 func (dg *Directed) Initialize(
-	ctx *snow.Context,
+	ctx *snow.ConsensusContext,
 	params sbcon.Parameters,
 ) error {
 	dg.txs = make(map[ids.ID]*directedTx)

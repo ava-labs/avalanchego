@@ -1,4 +1,4 @@
-// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package benchlist
@@ -137,7 +137,6 @@ func NewBenchlist(
 	minimumFailingDuration,
 	duration time.Duration,
 	maxPortion float64,
-	namespace string,
 	registerer prometheus.Registerer,
 ) (Benchlist, error) {
 	if maxPortion < 0 || maxPortion >= 1 {
@@ -157,7 +156,7 @@ func NewBenchlist(
 	}
 	benchlist.timer = timer.NewTimer(benchlist.update)
 	go benchlist.timer.Dispatch()
-	return benchlist, benchlist.metrics.Initialize(registerer, namespace)
+	return benchlist, benchlist.metrics.Initialize(registerer)
 }
 
 // Update removes benched validators whose time on the bench is over

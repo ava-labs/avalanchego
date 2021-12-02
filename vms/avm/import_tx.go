@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -116,12 +116,8 @@ func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 		return nil
 	}
 
-	subnetID, err := vm.ctx.SNLookup.SubnetID(t.SourceChain)
-	if err != nil {
+	if err := verify.SameSubnet(vm.ctx, t.SourceChain); err != nil {
 		return err
-	}
-	if vm.ctx.SubnetID != subnetID || t.SourceChain == vm.ctx.ChainID {
-		return errWrongBlockchainID
 	}
 
 	utxoIDs := make([][]byte, len(t.ImportedIns))

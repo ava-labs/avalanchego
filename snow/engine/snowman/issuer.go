@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -29,6 +29,7 @@ func (i *issuer) Abandon(ids.ID) {
 	if !i.abandoned {
 		blkID := i.blk.ID()
 		i.t.removeFromPending(i.blk)
+		i.t.addToNonVerifieds(i.blk)
 		i.t.blocked.Abandon(blkID)
 
 		// Tracks performance statistics
