@@ -82,64 +82,10 @@ type fastSyncer struct {
 	onDoneFastSyncing func(lastReqID uint32) error
 }
 
+// Engine interface implementation
 func (fs *fastSyncer) GetVM() common.VM { return fs.VM }
 
-func (fs *fastSyncer) Notify(msg common.Message) error {
-	// if fast sync and bootstrap is done, we shouldn't receive FastSyncDone from the VM
-	fs.Ctx.Log.AssertTrue(!fs.IsBootstrapped(), "Notify received by FastSync after Bootstrap is done")
-	fs.Ctx.Log.Verbo("snowman engine notified of %s from the vm", msg)
-	switch msg {
-	case common.PendingTxs:
-		fs.Ctx.Log.Warn("Message %s received in fast sync. Dropped.", msg.String())
-	case common.FastSyncDone:
-		return fs.onDoneFastSyncing(fs.RequestID)
-	default:
-		fs.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
-	}
-	return nil
-}
-
-// Connected implements the Engine interface.
-func (fs *fastSyncer) Connected(nodeID ids.ShortID) error {
-	// prevent nodes outside of the specified state sync
-	// nodes from connecting to the vm. this is a temporary
-	// workaround while we add more handshake information.
-	if fs.Beacons.Contains(nodeID) {
-		if err := fs.VM.Connected(nodeID); err != nil {
-			return err
-		}
-	}
-
-	if err := fs.Starter.AddWeightForNode(nodeID); err != nil {
-		return err
-	}
-
-	if fs.Starter.CanStart() {
-		fs.Starter.MarkStart()
-		if len(fs.StateSyncTestingBeacons) != 0 {
-			// if StateSyncTestingBeacons are specified,
-			// they are the only validators involved in fast sync
-			return nil
-		}
-		return fs.startup()
-	}
-
-	return nil
-}
-
-// Disconnected implements the Engine interface.
-func (fs *fastSyncer) Disconnected(nodeID ids.ShortID) error {
-	// temporary workaround, avoid sending disconnect messages
-	// for nodes we did not send connect message.
-	if fs.Beacons.Contains(nodeID) {
-		if err := fs.VM.Disconnected(nodeID); err != nil {
-			return err
-		}
-	}
-
-	return fs.Starter.RemoveWeightForNode(nodeID)
-}
-
+// Engine interface implementation
 func (fs *fastSyncer) Start(startReqID uint32) error {
 	fs.RequestID = startReqID
 	fs.Ctx.SetState(snow.FastSyncing)
@@ -164,7 +110,6 @@ func (fs *fastSyncer) Start(startReqID uint32) error {
 	return fs.startup()
 }
 
-// Note: ,
 func (fs *fastSyncer) startup() error {
 	fs.Config.Ctx.Log.Info("starting fast sync")
 	fs.Starter.MarkStart()
@@ -512,4 +457,61 @@ func (fs *fastSyncer) AppResponse(nodeID ids.ShortID, requestID uint32, response
 // AppHandler interface implementation
 func (fs *fastSyncer) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 	return fs.VM.AppRequestFailed(nodeID, requestID)
+}
+
+// InternalHandler interface implementation
+func (fs *fastSyncer) Notify(msg common.Message) error {
+	// if fast sync and bootstrap is done, we shouldn't receive FastSyncDone from the VM
+	fs.Ctx.Log.AssertTrue(!fs.IsBootstrapped(), "Notify received by FastSync after Bootstrap is done")
+	fs.Ctx.Log.Verbo("snowman engine notified of %s from the vm", msg)
+	switch msg {
+	case common.PendingTxs:
+		fs.Ctx.Log.Warn("Message %s received in fast sync. Dropped.", msg.String())
+	case common.FastSyncDone:
+		return fs.onDoneFastSyncing(fs.RequestID)
+	default:
+		fs.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
+	}
+	return nil
+}
+
+// InternalHandler interface implementation
+func (fs *fastSyncer) Connected(nodeID ids.ShortID) error {
+	// prevent nodes outside of the specified state sync
+	// nodes from connecting to the vm. this is a temporary
+	// workaround while we add more handshake information.
+	if fs.Beacons.Contains(nodeID) {
+		if err := fs.VM.Connected(nodeID); err != nil {
+			return err
+		}
+	}
+
+	if err := fs.Starter.AddWeightForNode(nodeID); err != nil {
+		return err
+	}
+
+	if fs.Starter.CanStart() {
+		fs.Starter.MarkStart()
+		if len(fs.StateSyncTestingBeacons) != 0 {
+			// if StateSyncTestingBeacons are specified,
+			// they are the only validators involved in fast sync
+			return nil
+		}
+		return fs.startup()
+	}
+
+	return nil
+}
+
+// InternalHandler interface implementation
+func (fs *fastSyncer) Disconnected(nodeID ids.ShortID) error {
+	// temporary workaround, avoid sending disconnect messages
+	// for nodes we did not send connect message.
+	if fs.Beacons.Contains(nodeID) {
+		if err := fs.VM.Disconnected(nodeID); err != nil {
+			return err
+		}
+	}
+
+	return fs.Starter.RemoveWeightForNode(nodeID)
 }
