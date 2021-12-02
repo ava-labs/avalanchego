@@ -204,6 +204,11 @@ func (a *atomicTxRepository) GetByTxID(txID ids.ID) (*Tx, uint64, error) {
 }
 
 // GetByHeight returns all atomic txs processed on block at [height].
+// Returns [database.ErrNotFound] if there are no atomic transactions indexed at [height].
+// Note: if [height] is below the last accepted height, then this means that there were
+// no atomic transactions in the block accepted at [height].
+// If [height] is greater than the last accepted height, then this will always return
+// [database.ErrNotFound]
 func (a *atomicTxRepository) GetByHeight(height uint64) ([]*Tx, error) {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
@@ -227,18 +232,25 @@ func (a *atomicTxRepository) Write(height uint64, txs []*Tx) error {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 
-	for _, tx := range txs {
-		if err := a.indexTxByID(heightBytes, tx); err != nil {
+	// Skip adding an entry to the height index if [txs] is empty.
+	if len(txs) > 0 {
+		for _, tx := range txs {
+			if err := a.indexTxByID(heightBytes, tx); err != nil {
+				return err
+			}
+		}
+		if err := a.indexTxsAtHeight(heightBytes, txs); err != nil {
 			return err
 		}
 	}
-	if err := a.indexTxsAtHeight(heightBytes, txs); err != nil {
-		return err
-	}
 
+	// Update the index height regardless of if any atomic transactions
+	// were present at [height].
 	return a.db.Put(maxIndexedHeightKey, heightBytes)
 }
 
+// indexTxByID writes [tx] into the [acceptedAtomicTxDB] stored as
+// [height] + [tx bytes]
 func (a *atomicTxRepository) indexTxByID(heightBytes []byte, tx *Tx) error {
 	txBytes, err := a.codec.Marshal(codecVersion, tx)
 	if err != nil {
@@ -258,6 +270,7 @@ func (a *atomicTxRepository) indexTxByID(heightBytes []byte, tx *Tx) error {
 	return nil
 }
 
+// indexTxsAtHeight adds [height] -> [txs] to the [acceptedAtomicTxByHeightDB]
 func (a *atomicTxRepository) indexTxsAtHeight(heightBytes []byte, txs []*Tx) error {
 	txsBytes, err := a.codec.Marshal(codecVersion, txs)
 	if err != nil {
@@ -269,6 +282,10 @@ func (a *atomicTxRepository) indexTxsAtHeight(heightBytes []byte, txs []*Tx) err
 	return nil
 }
 
+// appendTxToHeightIndex retrieves the transactions stored at [heightBytes] and appends
+// [tx] to the slice of transactions stored there.
+// This function is used while initializing the atomic repository to re-index the atomic transactions
+// by txID into the height -> txs index.
 func (a *atomicTxRepository) appendTxToHeightIndex(heightBytes []byte, tx *Tx) error {
 	txs, err := a.getByHeightBytes(heightBytes)
 	if err != nil && err != database.ErrNotFound {
@@ -287,6 +304,7 @@ func (a *atomicTxRepository) appendTxToHeightIndex(heightBytes []byte, tx *Tx) e
 	return a.indexTxsAtHeight(heightBytes, txs)
 }
 
+// TODO remove from interface if this is only necessary within the atomic repository
 func (a *atomicTxRepository) IterateByTxID() database.Iterator {
 	return a.acceptedAtomicTxDB.NewIterator()
 }
