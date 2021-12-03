@@ -93,7 +93,6 @@ func verifyTxs(t testing.TB, repo AtomicTxRepository, txMap map[uint64][]*Tx) {
 		assert.Lenf(t, txs, len(expectedTxs), "wrong len of txs at height=%d", height)
 		// txs should be stored in order of txID
 		sort.Slice(expectedTxs, getComparator(expectedTxs))
-		sort.Slice(txs, getComparator(txs))
 
 		txIDs := ids.Set{}
 		for i := 0; i < len(txs); i++ {
