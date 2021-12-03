@@ -33,6 +33,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/coreth/accounts"
 	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/consensus/dummy"
@@ -108,6 +109,7 @@ func New(stack *node.Node, config *Config,
 	chainDb ethdb.Database,
 	settings Settings,
 	lastAcceptedHash common.Hash,
+	clock *mockable.Clock,
 ) (*Ethereum, error) {
 	if chainDb == nil {
 		return nil, errors.New("chainDb cannot be nil")
@@ -132,7 +134,7 @@ func New(stack *node.Node, config *Config,
 	}
 	log.Info("Initialised chain configuration", "config", chainConfig)
 
-	if err := pruner.RecoverPruning(config.DataDirectory, chainDb); err != nil {
+	if err := pruner.RecoverPruning(config.OfflinePruningDataDirectory, chainDb); err != nil {
 		log.Error("Failed to recover state", "error", err)
 	}
 	eth := &Ethereum{
@@ -189,9 +191,9 @@ func New(stack *node.Node, config *Config,
 	// Perform offline pruning after NewBlockChain has been called to ensure that we have rolled back the chain
 	// to the last accepted block before pruning begins.
 	if config.OfflinePruning {
-		pruner, err := pruner.NewPruner(chainDb, config.DataDirectory, config.OfflinePruningBloomFilterSize)
+		pruner, err := pruner.NewPruner(chainDb, config.OfflinePruningDataDirectory, config.OfflinePruningBloomFilterSize)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create new pruner with data directory: %s, size: %d, due to: %w", config.DataDirectory, config.OfflinePruningBloomFilterSize, err)
+			return nil, fmt.Errorf("failed to create new pruner with data directory: %s, size: %d, due to: %w", config.OfflinePruningDataDirectory, config.OfflinePruningBloomFilterSize, err)
 
 		}
 		targetRoot := eth.blockchain.LastAcceptedBlock().Root()
@@ -207,13 +209,14 @@ func New(stack *node.Node, config *Config,
 	config.TxPool.Journal = ""
 	eth.txPool = core.NewTxPool(config.TxPool, chainConfig, eth.blockchain)
 
-	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine)
+	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine, clock)
 
-	// FIXME use node config to pass in config param on whether or not to allow unprotected
-	// currently defaults to false.
-	allowUnprotectedTxs := false
-	eth.APIBackend = &EthAPIBackend{stack.Config().ExtRPCEnabled(), false, eth, nil}
-	if allowUnprotectedTxs {
+	eth.APIBackend = &EthAPIBackend{
+		extRPCEnabled:       stack.Config().ExtRPCEnabled(),
+		allowUnprotectedTxs: config.AllowUnprotectedTxs,
+		eth:                 eth,
+	}
+	if config.AllowUnprotectedTxs {
 		log.Info("Unprotected transactions allowed")
 	}
 	gpoParams := config.GPO

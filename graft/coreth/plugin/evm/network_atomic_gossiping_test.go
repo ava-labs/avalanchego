@@ -179,7 +179,7 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 
 	mempool.AddTx(tx)
 	mempool.NextTx()
-	mempool.DiscardCurrentTx()
+	mempool.DiscardCurrentTx(txID)
 
 	// Check the mempool does not contain the discarded transaction
 	assert.False(mempool.has(txID))

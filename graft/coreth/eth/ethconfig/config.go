@@ -37,7 +37,7 @@ import (
 
 // DefaultFullGPOConfig contains default gasprice oracle settings for full node.
 var DefaultFullGPOConfig = gasprice.Config{
-	Blocks:           20,
+	Blocks:           40,
 	Percentile:       60,
 	MaxHeaderHistory: 1024,
 	MaxBlockHistory:  1024,
@@ -62,6 +62,7 @@ func NewDefaultConfig() Config {
 		Miner:              miner.Config{},
 		TxPool:             core.DefaultTxPoolConfig,
 		RPCGasCap:          25000000,
+		RPCEVMTimeout:      5 * time.Second,
 		GPO:                DefaultFullGPOConfig,
 		RPCTxFeeCap:        1, // 1 AVAX
 	}
@@ -131,6 +132,9 @@ type Config struct {
 	// RPCGasCap is the global gas cap for eth-call variants.
 	RPCGasCap uint64 `toml:",omitempty"`
 
+	// RPCEVMTimeout is the global timeout for eth-call.
+	RPCEVMTimeout time.Duration
+
 	// RPCTxFeeCap is the global transaction fee(price * gaslimit) cap for
 	// send-transction variants. The unit is ether.
 	RPCTxFeeCap float64 `toml:",omitempty"`
@@ -138,11 +142,14 @@ type Config struct {
 	// AllowUnfinalizedQueries allow unfinalized queries
 	AllowUnfinalizedQueries bool
 
-	// Path to a directory belonging to the chain
-	DataDirectory string
+	// AllowUnprotectedTxs allow unprotected transactions to be locally issued.
+	// Unprotected transactions are transactions that are signed without EIP-155
+	// replay protection.
+	AllowUnprotectedTxs bool
 
 	// OfflinePruning enables offline pruning on startup of the ndoe. If a node is started
 	// with this configuration option, it must finish pruning before resuming normal operation.
 	OfflinePruning                bool
 	OfflinePruningBloomFilterSize uint64
+	OfflinePruningDataDirectory   string
 }
