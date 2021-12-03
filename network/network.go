@@ -728,17 +728,8 @@ func (n *network) NodeUptime() (UptimeResult, bool) {
 			continue
 		}
 
-		weightFloat := float64(weight)
-
-		peerVersion := peer.versionStruct.GetValue().(version.Application)
-		if peerVersion.Before(version.MinUptimeVersion) {
-			// If the peer is running an earlier version, then ignore their
-			// stake
-			totalWeight -= weightFloat
-			continue
-		}
-
 		percent := float64(peer.observedUptime)
+		weightFloat := float64(weight)
 		totalWeightedPercent += percent * weightFloat
 
 		// if this peer thinks we're above requirement add the weight

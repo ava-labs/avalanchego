@@ -19,8 +19,6 @@ var (
 	PrevMinimumUnmaskedVersion   = NewDefaultApplication(constants.PlatformName, 1, 0, 0)
 	VersionParser                = NewDefaultApplicationParser()
 
-	MinUptimeVersion = NewDefaultApplication(constants.PlatformName, 1, 6, 5)
-
 	CurrentDatabase = DatabaseVersion1_4_5
 	PrevDatabase    = DatabaseVersion1_0_0
 

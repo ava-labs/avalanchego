@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -119,8 +120,8 @@ func (tx *UnsignedImportTx) Execute(
 	}
 
 	if vm.bootstrapped.GetValue() {
-		if err := vm.isValidCrossChainID(vs, tx.SourceChain); err != nil {
-			return nil, err
+		if err := verify.SameSubnet(vm.ctx, tx.SourceChain); err != nil {
+			return nil, tempError{err}
 		}
 
 		utxoIDs := make([][]byte, len(tx.ImportedInputs))
