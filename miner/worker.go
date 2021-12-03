@@ -36,6 +36,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/consensus/misc"
@@ -81,9 +82,10 @@ type worker struct {
 	mux      *event.TypeMux // TODO replace
 	mu       sync.RWMutex   // The lock used to protect the coinbase and extra fields
 	coinbase common.Address
+	clock    *mockable.Clock // Allows us mock the clock for testing
 }
 
-func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux) *worker {
+func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, clock *mockable.Clock) *worker {
 	worker := &worker{
 		config:      config,
 		chainConfig: chainConfig,
@@ -91,6 +93,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		eth:         eth,
 		mux:         mux,
 		chain:       eth.BlockChain(),
+		clock:       clock,
 	}
 
 	return worker
@@ -108,7 +111,7 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
-	tstart := time.Now()
+	tstart := w.clock.Time()
 	timestamp := tstart.Unix()
 	parent := w.chain.CurrentBlock()
 	// Note: in order to support asynchronous block production, blocks are allowed to have
@@ -160,10 +163,7 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	}
 
 	// Fill the block with all available pending transactions.
-	pending, err := w.eth.TxPool().Pending(true)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch pending transactions: %w", err)
-	}
+	pending := w.eth.TxPool().Pending(true)
 
 	// Split the pending transactions into locals and remotes
 	localTxs := make(map[common.Address]types.Transactions)
@@ -297,25 +297,29 @@ func (w *worker) handleResult(env *environment, block *types.Block, createdAt ti
 	if w.chain.HasBlock(block.Hash(), block.NumberU64()) {
 		return nil, fmt.Errorf("produced duplicate block (Hash: %s, Number %d)", block.Hash(), block.NumberU64())
 	}
-	var (
-		hash = block.Hash()
-	)
 	// Different block could share same sealhash, deep copy here to prevent write-write conflict.
 	var (
+		hash     = block.Hash()
 		receipts = make([]*types.Receipt, len(unfinishedReceipts))
 		logs     []*types.Log
 	)
-	for i, receipt := range unfinishedReceipts {
+	for i, unfinishedReceipt := range unfinishedReceipts {
+		receipt := new(types.Receipt)
+		receipts[i] = receipt
+		*receipt = *unfinishedReceipt
+
 		// add block location fields
 		receipt.BlockHash = hash
 		receipt.BlockNumber = block.Number()
 		receipt.TransactionIndex = uint(i)
 
-		receipts[i] = new(types.Receipt)
-		*receipts[i] = *receipt
 		// Update the block hash in all logs since it is now available and not when the
 		// receipt/log of individual transactions were created.
-		for _, log := range receipt.Logs {
+		receipt.Logs = make([]*types.Log, len(unfinishedReceipt.Logs))
+		for j, unfinishedLog := range unfinishedReceipt.Logs {
+			log := new(types.Log)
+			receipt.Logs[j] = log
+			*log = *unfinishedLog
 			log.BlockHash = hash
 		}
 		logs = append(logs, receipt.Logs...)
