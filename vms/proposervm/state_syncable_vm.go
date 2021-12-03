@@ -9,11 +9,10 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
-
-const stateSyncVersion = 0
 
 var (
 	stateSyncCodec               codec.Manager
@@ -26,9 +25,73 @@ func init() {
 	lc := linearcodec.New(reflectcodec.DefaultTagName, math.MaxUint32)
 	stateSyncCodec = codec.NewManager(math.MaxInt32)
 
-	err := stateSyncCodec.RegisterCodec(stateSyncVersion, lc)
+	err := stateSyncCodec.RegisterCodec(block.StateSyncDefaultKeysVersion, lc)
 	if err != nil {
 		panic(err)
+	}
+}
+
+// Upon initialization, repairInnerBlocksMapping ensure the innerBlkID -> proBlkID
+// mapping is well formed. This mapping is key for operations on summary key.
+func (vm *VM) repairInnerBlocksMapping() error {
+	latestProBlkID, err := vm.GetLastAccepted()
+	switch err {
+	case nil:
+	case database.ErrNotFound:
+		return nil // empty chain, nothing to do
+	default:
+		return err
+	}
+
+	latestInnerBlkID := ids.Empty
+	for {
+		lastAcceptedBlk, err := vm.getPostForkBlock(latestProBlkID)
+		switch err {
+		case nil:
+		case database.ErrNotFound:
+			// visited all proposerVM blocks.
+			goto checkFork
+		default:
+			return err
+		}
+
+		latestInnerBlkID = lastAcceptedBlk.getInnerBlk().ID()
+		_, err = vm.State.GetWrappingBlockID(latestInnerBlkID)
+		switch err {
+		case nil:
+			// mapping already there; It must be the same for all ancestors too. Work done
+			return vm.db.Commit()
+		case database.ErrNotFound:
+			// add the mapping
+			if err := vm.State.SetBlocksIDMapping(latestInnerBlkID, latestProBlkID); err != nil {
+				return err
+			}
+
+			// keep checking the parent
+			latestProBlkID = lastAcceptedBlk.Parent()
+		default:
+			return err
+		}
+	}
+
+checkFork: // handle possible snowman++ fork and commit all
+	lastInnerBlk, err := vm.ChainVM.GetBlock(latestInnerBlkID)
+	if err != nil {
+		// proposerVM and innerVM are incoherent
+		return err
+	}
+
+	lastInnerBlk, err = vm.ChainVM.GetBlock(lastInnerBlk.Parent())
+	switch err {
+	case nil:
+		// this is the fork. Note and commit.
+		vm.forkHeight = lastInnerBlk.Height()
+		return vm.db.Commit()
+	case database.ErrNotFound:
+		// we must have hit genesis in both proposerVM and innerVM. Work done
+		return vm.db.Commit()
+	default:
+		return err
 	}
 }
 
@@ -58,13 +121,27 @@ func (vm *VM) StateSyncGetLastSummary() (block.Summary, error) {
 	if err != nil {
 		return block.Summary{}, err
 	}
-	if parsedVersion != stateSyncVersion {
+	if parsedVersion != block.StateSyncDefaultKeysVersion {
 		return block.Summary{}, errWrongStateSyncVersion
 	}
 
 	// retrieve proposer Block wrapping innerBlock
-	proBlkID, err := vm.GetBlockID(innerKey.InnerBlkID)
-	if err != nil {
+	proBlkID, err := vm.GetWrappingBlockID(innerKey.InnerBlkID)
+	switch err {
+	case nil:
+	case database.ErrNotFound:
+		// we must have hit the snowman++ fork. Check it.
+		innerBlk, err := vm.ChainVM.GetBlock(innerKey.InnerBlkID)
+		if err != nil {
+			return block.Summary{}, err
+		}
+		if innerBlk.Height() > vm.forkHeight {
+			return block.Summary{}, err
+		}
+
+		// preFork blockID matched inner ones
+		proBlkID = innerKey.InnerBlkID
+	default:
 		return block.Summary{}, err
 	}
 
@@ -73,7 +150,7 @@ func (vm *VM) StateSyncGetLastSummary() (block.Summary, error) {
 		ProBlkID: proBlkID,
 		InnerKey: innerKey,
 	}
-	proKeyBytes, err := stateSyncCodec.Marshal(stateSyncVersion, &proKey)
+	proKeyBytes, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, &proKey)
 	if err != nil {
 		return block.Summary{}, err
 	}
@@ -96,11 +173,11 @@ func (vm *VM) StateSyncIsSummaryAccepted(key []byte) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if parsedVersion != stateSyncVersion {
+	if parsedVersion != block.StateSyncDefaultKeysVersion {
 		return false, errWrongStateSyncVersion
 	}
 
-	innerKey, err := stateSyncCodec.Marshal(stateSyncVersion, proKey.InnerKey)
+	innerKey, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, proKey.InnerKey)
 	if err != nil {
 		return false, err
 	}
@@ -123,11 +200,11 @@ func (vm *VM) StateSync(accepted []block.Summary) error {
 		if err != nil {
 			return err
 		}
-		if parsedVersion != stateSyncVersion {
+		if parsedVersion != block.StateSyncDefaultKeysVersion {
 			return errWrongStateSyncVersion
 		}
 
-		innerKey, err := stateSyncCodec.Marshal(stateSyncVersion, proKey.InnerKey)
+		innerKey, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, proKey.InnerKey)
 		if err != nil {
 			return err
 		}
@@ -152,7 +229,7 @@ func (vm *VM) GetLastSummaryBlockID() (ids.ID, error) {
 		return ids.Empty, err
 	}
 
-	proBlkID, err := vm.GetBlockID(innerBlkID)
+	proBlkID, err := vm.GetWrappingBlockID(innerBlkID)
 	if err != nil {
 		return ids.Empty, errUnknownLastSummaryBlockID
 	}

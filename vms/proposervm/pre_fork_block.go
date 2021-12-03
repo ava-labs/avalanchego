@@ -26,9 +26,8 @@ func (b *preForkBlock) Accept() error {
 }
 
 func (b *preForkBlock) conditionalAccept(acceptInnerBlk bool) error {
-	// confirm the mapping from inner to proposerVm block ID
-	if err := b.vm.State.SetBlocksIDMapping(b.Block.ID(), b.Block.ID()); err != nil {
-		return err
+	if b.Height() > b.vm.forkHeight {
+		b.vm.forkHeight = b.Height()
 	}
 
 	if acceptInnerBlk {

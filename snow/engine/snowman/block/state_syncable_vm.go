@@ -9,6 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+const StateSyncDefaultKeysVersion = 0
+
 var ErrStateSyncableVMNotImplemented = errors.New("vm does not implement StateSyncableVM interface")
 
 // Summary represents the information needed for state sync processing
@@ -19,6 +21,7 @@ type Summary struct {
 
 // Default Network VMs have a specific structure for Summary.Key
 // However StateSyncableVM does not require usage of these default formats
+
 type ProposerSummaryKey struct {
 	ProBlkID ids.ID            `serialize:"true"`
 	InnerKey DefaultSummaryKey `serialize:"true"`

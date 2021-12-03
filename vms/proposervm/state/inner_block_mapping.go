@@ -19,7 +19,7 @@ var _ InnerBlocksMapping = &innerBlocksMapping{}
 // Note that this should be done on accepted blocks only since a not-yet-accepted
 // core block can be wrapped into multiple proposer blocks.
 type InnerBlocksMapping interface {
-	GetBlockID(coreblkID ids.ID) (ids.ID, error)
+	GetWrappingBlockID(coreblkID ids.ID) (ids.ID, error)
 	SetBlocksIDMapping(coreblkID, blkID ids.ID) error
 	DeleteBlocksIDMapping(coreblkID ids.ID) error
 
@@ -41,7 +41,7 @@ func NewInnerBlocksMapping(db database.Database) InnerBlocksMapping {
 	}
 }
 
-func (ibm *innerBlocksMapping) GetBlockID(coreblkID ids.ID) (ids.ID, error) {
+func (ibm *innerBlocksMapping) GetWrappingBlockID(coreblkID ids.ID) (ids.ID, error) {
 	if blkIDIntf, found := ibm.cache.Get(coreblkID); found {
 		if blkIDIntf == nil {
 			return ids.Empty, database.ErrNotFound
