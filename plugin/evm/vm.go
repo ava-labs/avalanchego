@@ -1064,7 +1064,6 @@ func (vm *VM) issueTx(tx *Tx, local bool) error {
 		}
 		return err
 	}
-
 	// NOTE: Gossiping of the issued [Tx] is handled in [AddTx]
 	return nil
 }
