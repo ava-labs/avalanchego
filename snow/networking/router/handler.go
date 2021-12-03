@@ -69,7 +69,7 @@ func (h *Handler) Initialize(
 	h.validators = validators
 	var lock sync.Mutex
 	h.unprocessedMsgsCond = sync.NewCond(&lock)
-	h.cpuTracker = tracker.NewCPUTracker(uptime.IntervalFactory{}, defaultCPUInterval)
+	h.cpuTracker = tracker.NewCPUTracker(uptime.ContinuousFactory{}, defaultCPUInterval)
 	var err error
 	h.unprocessedMsgs, err = newUnprocessedMsgs(h.ctx.Log, h.validators, h.cpuTracker, "handler", h.ctx.Registerer)
 	return err
