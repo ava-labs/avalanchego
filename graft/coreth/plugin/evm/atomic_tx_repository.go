@@ -6,6 +6,7 @@ package evm
 import (
 	"encoding/binary"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -229,6 +230,14 @@ func (a *atomicTxRepository) getByHeightBytes(heightBytes []byte) ([]*Tx, error)
 // and [txs] must include all atomic txs for the block accepted at the
 // corresponding height.
 func (a *atomicTxRepository) Write(height uint64, txs []*Tx) error {
+	if len(txs) > 1 {
+		// txs should be stored in order of txID to ensure consistency
+		// with txs initialized from the txID index.
+		copyTxs := make([]*Tx, len(txs))
+		copy(copyTxs, txs)
+		sort.Slice(copyTxs, func(i, j int) bool { return copyTxs[i].ID().Hex() < copyTxs[j].ID().Hex() })
+		txs = copyTxs
+	}
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 
