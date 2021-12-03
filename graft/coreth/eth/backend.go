@@ -229,9 +229,6 @@ func (s *Ethereum) APIs() []rpc.API {
 	// Append tracing APIs
 	apis = append(apis, tracers.APIs(s.APIBackend)...)
 
-	// Append any APIs exposed explicitly by the consensus engine
-	apis = append(apis, s.engine.APIs(s.BlockChain())...)
-
 	// Append all the local APIs and return
 	return append(apis, []rpc.API{
 		{
