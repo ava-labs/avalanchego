@@ -13,7 +13,7 @@ import (
 
 func TestCPUTracker(t *testing.T) {
 	halflife := time.Second
-	cpuTracker := NewCPUTracker(uptime.IntervalFactory{}, halflife)
+	cpuTracker := NewCPUTracker(uptime.ContinuousFactory{}, halflife)
 	vdr1 := ids.ShortID{1}
 	vdr2 := ids.ShortID{2}
 

@@ -114,17 +114,16 @@ func initTestProposerVM(
 		return res, nil
 	}
 
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultContextTest()
 	ctx.NodeID = hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw))
 	ctx.StakingCertLeaf = pTestCert.Leaf
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
-	ctx.SetState(snow.NormalOp)
 
 	dummyDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	// make sure that DBs are compressed correctly
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
-	if err := proVM.Initialize(ctx.Context, dummyDBManager, initialState, nil, nil, nil, nil, nil); err != nil {
+	if err := proVM.Initialize(ctx, dummyDBManager, initialState, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("failed to initialize proposerVM with %s", err)
 	}
 
@@ -847,12 +846,11 @@ func TestExpiredBuildBlock(t *testing.T) {
 		}, nil
 	}
 
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultContextTest()
 	ctx.NodeID = hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw))
 	ctx.StakingCertLeaf = pTestCert.Leaf
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
-	ctx.SetState(snow.NormalOp)
 
 	dbManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	toEngine := make(chan common.Message, 1)
@@ -873,7 +871,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	}
 
 	// make sure that DBs are compressed correctly
-	if err := proVM.Initialize(ctx.Context, dbManager, nil, nil, nil, toEngine, nil, nil); err != nil {
+	if err := proVM.Initialize(ctx, dbManager, nil, nil, nil, toEngine, nil, nil); err != nil {
 		t.Fatalf("failed to initialize proposerVM with %s", err)
 	}
 
@@ -1144,12 +1142,11 @@ func TestInnerVMRollback(t *testing.T) {
 		}
 	}
 
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultContextTest()
 	ctx.NodeID = hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw))
 	ctx.StakingCertLeaf = pTestCert.Leaf
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
-	ctx.SetState(snow.NormalOp)
 
 	coreVM.InitializeF = func(
 		*snow.Context,
@@ -1168,7 +1165,7 @@ func TestInnerVMRollback(t *testing.T) {
 
 	proVM := New(coreVM, time.Time{}, 0)
 
-	if err := proVM.Initialize(ctx.Context, dbManager, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := proVM.Initialize(ctx, dbManager, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("failed to initialize proposerVM with %s", err)
 	}
 
@@ -1250,7 +1247,7 @@ func TestInnerVMRollback(t *testing.T) {
 
 	proVM = New(coreVM, time.Time{}, 0)
 
-	if err := proVM.Initialize(ctx.Context, dbManager, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := proVM.Initialize(ctx, dbManager, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("failed to initialize proposerVM with %s", err)
 	}
 

@@ -70,7 +70,7 @@ func NewHandler(
 		msgFromVMChan:       msgFromVMChan,
 		validators:          validators,
 		unprocessedMsgsCond: sync.NewCond(&sync.Mutex{}),
-		cpuTracker:          tracker.NewCPUTracker(uptime.IntervalFactory{}, defaultCPUInterval),
+		cpuTracker:          tracker.NewCPUTracker(uptime.ContinuousFactory{}, defaultCPUInterval),
 	}
 
 	if err := h.metrics.Initialize("handler", h.ctx.Registerer); err != nil {
@@ -338,7 +338,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
 				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
-			return nil
+			return h.engine.GetAcceptedFrontierFailed(nodeID, reqID)
 		}
 		return h.bootstrapper.AcceptedFrontier(nodeID, reqID, containerIDs)
 
@@ -362,7 +362,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
 				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
-			return nil
+			return h.engine.GetAcceptedFailed(nodeID, reqID)
 		}
 		return h.bootstrapper.Accepted(nodeID, reqID, containerIDs)
 
@@ -435,7 +435,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
 				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
-			return nil
+			return h.engine.QueryFailed(nodeID, reqID)
 		}
 		return targetGear.Chits(nodeID, reqID, votes)
 
@@ -459,7 +459,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppBytes",
 				msg.Op(), nodeID, h.ctx.ChainID, reqID)
-			return nil
+			return h.engine.AppRequestFailed(nodeID, reqID)
 		}
 		return targetGear.AppResponse(nodeID, reqID, appBytes)
 

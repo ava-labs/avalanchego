@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -21,7 +22,6 @@ var (
 	errNoExportOutputs  = errors.New("no export outputs")
 	errOutputsNotSorted = errors.New("outputs not sorted")
 	errOverflowExport   = errors.New("overflow when computing export amount + txFee")
-	errWrongChainID     = errors.New("tx has wrong chain ID")
 
 	_ UnsignedAtomicTx = &UnsignedExportTx{}
 )
@@ -103,8 +103,8 @@ func (tx *UnsignedExportTx) Execute(
 	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 
 	if vm.bootstrapped.GetValue() {
-		if err := vm.isValidCrossChainID(vs, tx.DestinationChain); err != nil {
-			return nil, err
+		if err := verify.SameSubnet(vm.ctx, tx.DestinationChain); err != nil {
+			return nil, tempError{err}
 		}
 	}
 
