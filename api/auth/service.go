@@ -9,8 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 )
 
-// service that serves the Auth API functionality.
-type service struct {
+// Service that serves the Auth API functionality.
+type Service struct {
 	auth *auth
 }
 
@@ -32,7 +32,7 @@ type Token struct {
 	Token string `json:"token"` // The new token. Expires in [TokenLifespan].
 }
 
-func (s *service) NewToken(_ *http.Request, args *NewTokenArgs, reply *Token) error {
+func (s *Service) NewToken(_ *http.Request, args *NewTokenArgs, reply *Token) error {
 	s.auth.log.Debug("Auth: NewToken called")
 
 	var err error
@@ -45,7 +45,7 @@ type RevokeTokenArgs struct {
 	Token
 }
 
-func (s *service) RevokeToken(_ *http.Request, args *RevokeTokenArgs, reply *api.SuccessResponse) error {
+func (s *Service) RevokeToken(_ *http.Request, args *RevokeTokenArgs, reply *api.SuccessResponse) error {
 	s.auth.log.Debug("Auth: RevokeToken called")
 
 	reply.Success = true
@@ -57,7 +57,7 @@ type ChangePasswordArgs struct {
 	NewPassword string `json:"newPassword"` // New authorization password
 }
 
-func (s *service) ChangePassword(_ *http.Request, args *ChangePasswordArgs, reply *api.SuccessResponse) error {
+func (s *Service) ChangePassword(_ *http.Request, args *ChangePasswordArgs, reply *api.SuccessResponse) error {
 	s.auth.log.Debug("Auth: ChangePassword called")
 
 	reply.Success = true

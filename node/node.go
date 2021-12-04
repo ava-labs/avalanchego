@@ -102,7 +102,7 @@ type Node struct {
 	sharedMemory atomic.Memory
 
 	// Monitors node health and runs health checks
-	healthService health.Service
+	healthService health.Health
 
 	// Build and parse messages, for both network layer and chain manager
 	msgCreator message.Creator
@@ -913,13 +913,13 @@ func (n *Node) initInfoAPI() error {
 // Assumes n.Log, n.Net, n.APIServer, n.HTTPLog already initialized
 func (n *Node) initHealthAPI() error {
 	if !n.Config.HealthAPIEnabled {
-		n.healthService = health.NewNoOpService()
+		n.healthService = health.NewNoOp()
 		n.Log.Info("skipping health API initialization because it has been disabled")
 		return nil
 	}
 
 	n.Log.Info("initializing Health API")
-	healthService, err := health.NewService(
+	healthService, err := health.New(
 		n.Config.HealthCheckFreq,
 		n.Log,
 		"health",
