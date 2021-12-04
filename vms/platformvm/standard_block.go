@@ -108,9 +108,6 @@ func (sb *StandardBlock) Verify() error {
 	// clear inputs so that multiple [Verify] calls can be made
 	sb.inputs.Clear()
 
-	currentTimestamp := parentState.GetTimestamp()
-	enabledAP5 := !currentTimestamp.Before(sb.vm.ApricotPhase5Time)
-
 	funcs := make([]func() error, 0, len(sb.Txs))
 	for _, tx := range sb.Txs {
 		txID := tx.ID()
@@ -120,17 +117,8 @@ func (sb *StandardBlock) Verify() error {
 			return errWrongTxType
 		}
 
-		// TODO: remove after AP5.
-		if _, ok := tx.UnsignedTx.(UnsignedAtomicTx); ok && !enabledAP5 {
-			return fmt.Errorf(
-				"the chain timestamp (%d) is before the apricot phase 5 time (%d), hence atomic transactions should go through the atomic block",
-				currentTimestamp.Unix(),
-				sb.vm.ApricotPhase5Time.Unix(),
-			)
-		}
-
 		inputUTXOs := utx.InputUTXOs()
-		// ensure it doesnt overlap with current input batch
+		// ensure it doesn't overlap with current input batch
 		if sb.inputs.Overlaps(inputUTXOs) {
 			return errConflictingBatchTxs
 		}
@@ -183,7 +171,6 @@ func (sb *StandardBlock) Verify() error {
 	sb.timestamp = sb.onAcceptState.GetTimestamp()
 
 	sb.vm.blockBuilder.RemoveDecisionTxs(sb.Txs)
-	sb.vm.blockBuilder.RemoveAtomicTxs(sb.Txs)
 	sb.vm.currentBlocks[blkID] = sb
 	parentIntf.addChild(sb)
 	return nil

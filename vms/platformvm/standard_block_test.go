@@ -80,7 +80,7 @@ func TestAtomicTxImports(t *testing.T) {
 	}
 	vm.internalState.SetTimestamp(vm.ApricotPhase5Time.Add(100 * time.Second))
 
-	vm.mempool.AddAtomicTx(tx)
+	vm.mempool.AddDecisionTx(tx)
 	b, err := vm.BuildBlock()
 	assert.NoError(err)
 	// Test multiple verify calls work

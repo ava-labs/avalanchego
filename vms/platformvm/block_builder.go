@@ -151,47 +151,15 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 		return nil, errEndOfTime
 	}
 
-	// TODO: remove after AP5.
-	enabledAP5 := !currentChainTimestamp.Before(m.vm.ApricotPhase5Time)
-
 	// If there are pending decision txs, build a block with a batch of them
-	if m.HasDecisionTxs() || (enabledAP5 && m.HasAtomicTx()) {
-		txs := make([]*Tx, 0, BatchSize)
-		if m.HasDecisionTxs() {
-			decisionTxs := m.PopDecisionTxs(BatchSize)
-			txs = append(txs, decisionTxs...)
-		}
-		if enabledAP5 && m.HasAtomicTx() {
-			atomicTxs := m.PopAtomicTxs(BatchSize - len(txs))
-			txs = append(txs, atomicTxs...)
-		}
-
+	if m.HasDecisionTxs() {
+		txs := m.PopDecisionTxs(BatchSize)
 		blk, err := m.vm.newStandardBlock(preferredID, nextHeight, txs)
 		if err != nil {
 			m.ResetTimer()
 			return nil, err
 		}
 		m.vm.ctx.Log.Debug("Built Standard Block %s: %s", blk.ID(), jsonFormatter{obj: blk})
-
-		if err := blk.Verify(); err != nil {
-			m.ResetTimer()
-			return nil, err
-		}
-
-		m.vm.internalState.AddBlock(blk)
-		return blk, m.vm.internalState.Commit()
-	}
-
-	// If there is a pending atomic tx, build a block with it
-	if !enabledAP5 && m.HasAtomicTx() {
-		tx := m.PopAtomicTx()
-
-		blk, err := m.vm.newAtomicBlock(preferredID, nextHeight, *tx)
-		if err != nil {
-			m.ResetTimer()
-			return nil, err
-		}
-		m.vm.ctx.Log.Debug("Built Atomic Block %s: %s", blk.ID(), jsonFormatter{obj: blk})
 
 		if err := blk.Verify(); err != nil {
 			m.ResetTimer()
@@ -325,7 +293,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 func (m *blockBuilder) ResetTimer() {
 	// If there is a pending transaction trigger building of a block with that
 	// transaction
-	if m.HasDecisionTxs() || m.HasAtomicTx() {
+	if m.HasDecisionTxs() {
 		m.vm.NotifyBlockReady()
 		return
 	}

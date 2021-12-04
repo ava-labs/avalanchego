@@ -133,7 +133,7 @@ func (ab *AtomicBlock) Verify() error {
 	ab.onAcceptState = onAccept
 	ab.timestamp = onAccept.GetTimestamp()
 
-	ab.vm.blockBuilder.RemoveAtomicTx(&ab.Tx)
+	ab.vm.blockBuilder.RemoveDecisionTxs([]*Tx{&ab.Tx})
 	ab.vm.currentBlocks[blkID] = ab
 	parentIntf.addChild(ab)
 	return nil
