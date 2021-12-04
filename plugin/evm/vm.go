@@ -866,10 +866,6 @@ func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 		errs.Add(handler.RegisterName("snowman", &SnowmanAPI{vm}))
 		enabledAPIs = append(enabledAPIs, "snowman")
 	}
-	if vm.config.NetAPIEnabled {
-		errs.Add(handler.RegisterName("net", &NetAPI{vm}))
-		enabledAPIs = append(enabledAPIs, "net")
-	}
 	if vm.config.Web3APIEnabled {
 		errs.Add(handler.RegisterName("web3", &Web3API{}))
 		enabledAPIs = append(enabledAPIs, "web3")
@@ -1068,7 +1064,6 @@ func (vm *VM) issueTx(tx *Tx, local bool) error {
 		}
 		return err
 	}
-
 	// NOTE: Gossiping of the issued [Tx] is handled in [AddTx]
 	return nil
 }
