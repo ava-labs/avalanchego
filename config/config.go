@@ -247,6 +247,9 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 		HTTPSKey:          httpsKey,
 		HTTPSCert:         httpsCert,
 		APIAllowedOrigins: v.GetStringSlice(HTTPAllowedOrigins),
+
+		ShutdownTimeout: v.GetDuration(HTTPShutdownTimeoutKey),
+		ShutdownWait:    v.GetDuration(HTTPShutdownWaitKey),
 	}
 
 	config.APIAuthConfig, err = getAPIAuthConfig(v)

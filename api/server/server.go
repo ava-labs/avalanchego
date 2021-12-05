@@ -29,14 +29,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-const (
-	baseURL               = "/ext"
-	serverShutdownTimeout = 10 * time.Second
-)
+const baseURL = "/ext"
 
 var (
-	errUnknownLockOption            = errors.New("invalid lock options")
-	_                    RouteAdder = &Server{}
+	errUnknownLockOption = errors.New("invalid lock options")
+
+	_ RouteAdder = &Server{}
 )
 
 type RouteAdder interface {
@@ -45,21 +43,21 @@ type RouteAdder interface {
 
 // Server maintains the HTTP router
 type Server struct {
-	// This node's ID
-	nodeID ids.ShortID
 	// log this server writes to
 	log logging.Logger
 	// generates new logs for chains to write to
 	factory logging.Factory
-	// Maps endpoints to handlers
-	router *router
 	// points the the router handlers
 	handler http.Handler
 	// Listens for HTTP traffic on this address
 	listenHost string
 	listenPort uint16
 
-	// http server
+	shutdownTimeout time.Duration
+
+	// Maps endpoints to handlers
+	router *router
+
 	srv *http.Server
 }
 
@@ -70,6 +68,7 @@ func (s *Server) Initialize(
 	host string,
 	port uint16,
 	allowedOrigins []string,
+	shutdownTimeout time.Duration,
 	nodeID ids.ShortID,
 	wrappers ...Wrapper,
 ) {
@@ -77,8 +76,8 @@ func (s *Server) Initialize(
 	s.factory = factory
 	s.listenHost = host
 	s.listenPort = port
+	s.shutdownTimeout = shutdownTimeout
 	s.router = newRouter()
-	s.nodeID = nodeID
 
 	s.log.Info("API created with allowed origins: %v", allowedOrigins)
 
@@ -285,39 +284,17 @@ func (s *Server) AddAliasesWithReadLock(endpoint string, aliases ...string) erro
 	return s.AddAliases(endpoint, aliases...)
 }
 
-func (s *Server) Call(
-	writer http.ResponseWriter,
-	method,
-	base,
-	endpoint string,
-	body io.Reader,
-	headers map[string]string,
-) error {
-	url := fmt.Sprintf("%s/vm/%s", baseURL, base)
-
-	handler, err := s.router.GetHandler(url, endpoint)
-	if err != nil {
-		return err
-	}
-	req, err := http.NewRequest("POST", "*", body)
-	if err != nil {
-		return err
-	}
-	for key, value := range headers {
-		req.Header.Set(key, value)
-	}
-
-	handler.ServeHTTP(writer, req)
-
-	return nil
-}
-
 // Shutdown this server
 func (s *Server) Shutdown() error {
 	if s.srv == nil {
 		return nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), serverShutdownTimeout)
-	defer cancel()
-	return s.srv.Shutdown(ctx)
+
+	ctx, cancel := context.WithTimeout(context.Background(), s.shutdownTimeout)
+	err := s.srv.Shutdown(ctx)
+	cancel()
+
+	// If shutdown times out, make sure the server is still shutdown.
+	_ = s.srv.Close()
+	return err
 }
