@@ -282,6 +282,7 @@ func Test_IndexerInitializeProducesSameHashEveryTime(t *testing.T) {
 	lastAcceptedHeight := uint64(1000)
 	db := versiondb.New(memdb.New())
 	repo, err := NewAtomicTxRepository(db, testTxCodec(), lastAcceptedHeight)
+	assert.NoError(t, err)
 	txsPerHeight := 30
 	for i := uint64(0); i < lastAcceptedHeight; i++ {
 		txs := make([]*Tx, txsPerHeight)
