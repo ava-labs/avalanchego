@@ -19,13 +19,13 @@ var (
 type State interface {
 	ChainState
 	BlockState
-	InnerBlocksMapping
+	AcceptedPostForkBlockHeightIndex
 }
 
 type state struct {
 	ChainState
 	BlockState
-	InnerBlocksMapping
+	AcceptedPostForkBlockHeightIndex
 }
 
 func New(db database.Database) State {
@@ -33,9 +33,9 @@ func New(db database.Database) State {
 	blockDB := prefixdb.New(blockStatePrefix, db)
 	mappingDB := prefixdb.New(innerBlocksMappingPrefix, db)
 	return &state{
-		ChainState:         NewChainState(chainDB),
-		BlockState:         NewBlockState(blockDB),
-		InnerBlocksMapping: NewInnerBlocksMapping(mappingDB),
+		ChainState:                       NewChainState(chainDB),
+		BlockState:                       NewBlockState(blockDB),
+		AcceptedPostForkBlockHeightIndex: NewBlockHeightIndex(mappingDB),
 	}
 }
 
@@ -50,14 +50,14 @@ func NewMetered(db database.Database, namespace string, metrics prometheus.Regis
 	}
 
 	return &state{
-		ChainState:         NewChainState(chainDB),
-		BlockState:         blockState,
-		InnerBlocksMapping: NewInnerBlocksMapping(mappingDB),
+		ChainState:                       NewChainState(chainDB),
+		BlockState:                       blockState,
+		AcceptedPostForkBlockHeightIndex: NewBlockHeightIndex(mappingDB),
 	}, nil
 }
 
 func (s *state) clearCache() {
 	s.ChainState.clearCache()
 	s.BlockState.clearCache()
-	s.InnerBlocksMapping.clearCache()
+	s.AcceptedPostForkBlockHeightIndex.clearCache()
 }

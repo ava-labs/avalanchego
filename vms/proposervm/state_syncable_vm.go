@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
@@ -34,7 +35,14 @@ func init() {
 // Upon initialization, repairInnerBlocksMapping ensure the innerBlkID -> proBlkID
 // mapping is well formed. This mapping is key for operations on summary key.
 func (vm *VM) repairInnerBlocksMapping() error {
-	latestProBlkID, err := vm.GetLastAccepted()
+	var (
+		latestProBlkID   ids.ID
+		latestInnerBlkID ids.ID
+		lastInnerBlk     snowman.Block
+		err              error
+	)
+
+	latestProBlkID, err = vm.GetLastAccepted()
 	switch err {
 	case nil:
 	case database.ErrNotFound:
@@ -43,7 +51,6 @@ func (vm *VM) repairInnerBlocksMapping() error {
 		return err
 	}
 
-	latestInnerBlkID := ids.Empty
 	for {
 		lastAcceptedBlk, err := vm.getPostForkBlock(latestProBlkID)
 		switch err {
@@ -56,14 +63,20 @@ func (vm *VM) repairInnerBlocksMapping() error {
 		}
 
 		latestInnerBlkID = lastAcceptedBlk.getInnerBlk().ID()
-		_, err = vm.State.GetWrappingBlockID(latestInnerBlkID)
+		lastInnerBlk, err = vm.ChainVM.GetBlock(latestInnerBlkID)
+		if err != nil {
+			// innerVM internal error
+			return err
+		}
+
+		_, err = vm.State.GetBlockIDByHeight(lastInnerBlk.Height())
 		switch err {
 		case nil:
 			// mapping already there; It must be the same for all ancestors too. Work done
 			return vm.db.Commit()
 		case database.ErrNotFound:
 			// add the mapping
-			if err := vm.State.SetBlocksIDMapping(latestInnerBlkID, latestProBlkID); err != nil {
+			if err := vm.State.SetBlocksIDByHeight(lastInnerBlk.Height(), latestProBlkID); err != nil {
 				return err
 			}
 
@@ -75,12 +88,6 @@ func (vm *VM) repairInnerBlocksMapping() error {
 	}
 
 checkFork: // handle possible snowman++ fork and commit all
-	lastInnerBlk, err := vm.ChainVM.GetBlock(latestInnerBlkID)
-	if err != nil {
-		// proposerVM and innerVM are incoherent
-		return err
-	}
-
 	lastInnerBlk, err = vm.ChainVM.GetBlock(lastInnerBlk.Parent())
 	switch err {
 	case nil:
@@ -126,7 +133,13 @@ func (vm *VM) StateSyncGetLastSummary() (block.Summary, error) {
 	}
 
 	// retrieve proposer Block wrapping innerBlock
-	proBlkID, err := vm.GetWrappingBlockID(innerKey.InnerBlkID)
+	innerBlk, err := vm.ChainVM.GetBlock(innerKey.InnerBlkID)
+	if err != nil {
+		// innerVM internal error. Could retrieve innerBlk matching last summary
+		return block.Summary{}, errWrongStateSyncVersion
+	}
+
+	proBlkID, err := vm.GetBlockIDByHeight(innerBlk.Height())
 	switch err {
 	case nil:
 	case database.ErrNotFound:
@@ -228,8 +241,13 @@ func (vm *VM) GetLastSummaryBlockID() (ids.ID, error) {
 	if err != nil {
 		return ids.Empty, err
 	}
+	innerBlk, err := vm.ChainVM.GetBlock(innerBlkID)
+	if err != nil {
+		// innerVM internal error. Could retrieve innerBlk matching last summary
+		return ids.Empty, err
+	}
 
-	proBlkID, err := vm.GetWrappingBlockID(innerBlkID)
+	proBlkID, err := vm.GetBlockIDByHeight(innerBlk.Height())
 	if err != nil {
 		return ids.Empty, errUnknownLastSummaryBlockID
 	}

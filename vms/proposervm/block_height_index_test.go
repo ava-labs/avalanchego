@@ -21,7 +21,7 @@ func TestInnerBlockMappingPostFork(t *testing.T) {
 
 	// build a chain accepting a bunch of blocks
 	var (
-		blkNumber    = 10
+		blkNumber    = uint64(10)
 		prevInnerBlk = snowman.Block(innerGenBlk)
 		lastInnerBlk snowman.Block
 		innerBlks    = make(map[ids.ID]snowman.Block)
@@ -48,7 +48,7 @@ func TestInnerBlockMappingPostFork(t *testing.T) {
 	}
 	innerVM.LastAcceptedF = func() (ids.ID, error) { return prevInnerBlk.ID(), nil }
 
-	for blkCount := uint64(1); blkCount <= uint64(blkNumber); blkCount++ {
+	for blkCount := uint64(1); blkCount <= blkNumber; blkCount++ {
 		lastInnerBlk = &snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.GenerateTestID(),
@@ -74,33 +74,23 @@ func TestInnerBlockMappingPostFork(t *testing.T) {
 	}
 
 	// check that mapping is fully built
-	for innerBlkID := range innerBlks {
-		_, err := proVM.State.GetWrappingBlockID(innerBlkID)
-		if innerBlkID == innerGenBlk.ID() {
-			// genesis is preFork block hence not in mapping
-			assert.Error(err, database.ErrNotFound)
-		} else {
-			assert.NoError(err)
-		}
+	for height := uint64(1); height <= blkNumber; height++ {
+		_, err := proVM.State.GetBlockIDByHeight(height)
+		assert.NoError(err)
 	}
 
 	// Entirely delete the mapping to show it gets reconstructed
-	for innerBlkID := range innerBlks {
-		assert.NoError(proVM.State.DeleteBlocksIDMapping(innerBlkID))
+	for height := uint64(1); height <= blkNumber; height++ {
+		assert.NoError(proVM.State.DeleteBlockIDByHeight(height))
 	}
 
 	// show repairs rebuilds the mapping
 	assert.NoError(proVM.repairInnerBlocksMapping())
 
 	// check that mapping is fully built
-	for innerBlkID := range innerBlks {
-		_, err := proVM.State.GetWrappingBlockID(innerBlkID)
-		if innerBlkID == innerGenBlk.ID() {
-			// genesis is preFork block hence not in mapping
-			assert.Error(err, database.ErrNotFound)
-		} else {
-			assert.NoError(err)
-		}
+	for height := uint64(1); height <= blkNumber; height++ {
+		_, err := proVM.State.GetBlockIDByHeight(height)
+		assert.NoError(err)
 	}
 }
 
@@ -110,7 +100,7 @@ func TestInnerBlockMappingPreFork(t *testing.T) {
 
 	// build a chain accepting a bunch of blocks
 	var (
-		blkNumber    = 10
+		blkNumber    = uint64(10)
 		prevInnerBlk = snowman.Block(innerGenBlk)
 		lastInnerBlk snowman.Block
 		innerBlks    = make(map[ids.ID]snowman.Block)
@@ -137,7 +127,7 @@ func TestInnerBlockMappingPreFork(t *testing.T) {
 	}
 	innerVM.LastAcceptedF = func() (ids.ID, error) { return prevInnerBlk.ID(), nil }
 
-	for blkCount := uint64(1); blkCount <= uint64(blkNumber); blkCount++ {
+	for blkCount := uint64(1); blkCount <= blkNumber; blkCount++ {
 		lastInnerBlk = &snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.GenerateTestID(),
@@ -162,8 +152,8 @@ func TestInnerBlockMappingPreFork(t *testing.T) {
 	}
 
 	// mapping should be empty
-	for innerBlkID := range innerBlks {
-		_, err := proVM.State.GetWrappingBlockID(innerBlkID)
+	for height := uint64(1); height <= blkNumber; height++ {
+		_, err := proVM.State.GetBlockIDByHeight(height)
 		assert.Error(err, database.ErrNotFound)
 	}
 	// fork height should track highest accepted preFork block
@@ -173,8 +163,8 @@ func TestInnerBlockMappingPreFork(t *testing.T) {
 	assert.NoError(proVM.repairInnerBlocksMapping())
 
 	// mapping should be empty
-	for innerBlkID := range innerBlks {
-		_, err := proVM.State.GetWrappingBlockID(innerBlkID)
+	for height := uint64(1); height <= blkNumber; height++ {
+		_, err := proVM.State.GetBlockIDByHeight(height)
 		assert.Error(err, database.ErrNotFound)
 	}
 	// fork height should track highest accepted preFork block
@@ -295,9 +285,9 @@ func TestInnerBlockMappingAcrossFork(t *testing.T) {
 
 	// check that mapping is fully built
 	assert.True(proVM.forkHeight == forkHeight)
-	for innerBlkID, innerBlk := range innerBlks {
-		_, err := proVM.State.GetWrappingBlockID(innerBlkID)
-		if innerBlk.Height() <= forkHeight {
+	for height := uint64(1); height <= blkNumber; height++ {
+		_, err := proVM.State.GetBlockIDByHeight(height)
+		if height <= forkHeight {
 			// preFork blocks should not be in mapping
 			assert.Error(err, database.ErrNotFound)
 		} else {
@@ -307,8 +297,8 @@ func TestInnerBlockMappingAcrossFork(t *testing.T) {
 	}
 
 	// Entirely delete the mapping to show it gets reconstructed
-	for innerBlkID := range innerBlks {
-		assert.NoError(proVM.State.DeleteBlocksIDMapping(innerBlkID))
+	for height := uint64(1); height <= blkNumber; height++ {
+		assert.NoError(proVM.State.DeleteBlockIDByHeight(height))
 	}
 	proVM.forkHeight = 0
 
@@ -316,9 +306,9 @@ func TestInnerBlockMappingAcrossFork(t *testing.T) {
 	assert.NoError(proVM.repairInnerBlocksMapping())
 
 	assert.True(proVM.forkHeight == forkHeight)
-	for innerBlkID, innerBlk := range innerBlks {
-		_, err := proVM.State.GetWrappingBlockID(innerBlkID)
-		if innerBlk.Height() <= forkHeight {
+	for height := uint64(1); height <= blkNumber; height++ {
+		_, err := proVM.State.GetBlockIDByHeight(height)
+		if height <= forkHeight {
 			// preFork blocks should not be in mapping
 			assert.Error(err, database.ErrNotFound)
 		} else {
@@ -428,8 +418,8 @@ func TestInnerBlockMappingBackwardCompatiblity(t *testing.T) {
 
 	// mapping is currently empty
 	assert.True(proVM.forkHeight == 0)
-	for innerBlkID := range innerBlks {
-		_, err := proVM.State.GetWrappingBlockID(innerBlkID)
+	for height := uint64(1); height <= blkNumber; height++ {
+		_, err := proVM.State.GetBlockIDByHeight(height)
 		assert.Error(err, database.ErrNotFound)
 	}
 
@@ -437,9 +427,9 @@ func TestInnerBlockMappingBackwardCompatiblity(t *testing.T) {
 	assert.NoError(proVM.repairInnerBlocksMapping())
 
 	assert.True(proVM.forkHeight == forkHeight)
-	for innerBlkID, innerBlk := range innerBlks {
-		_, err := proVM.State.GetWrappingBlockID(innerBlkID)
-		if innerBlk.Height() <= forkHeight {
+	for height := uint64(1); height <= blkNumber; height++ {
+		_, err := proVM.State.GetBlockIDByHeight(height)
+		if height <= forkHeight {
 			// preFork blocks should not be in mapping
 			assert.Error(err, database.ErrNotFound)
 		} else {
