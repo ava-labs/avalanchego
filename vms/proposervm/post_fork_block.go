@@ -34,6 +34,11 @@ func (b *postForkBlock) Accept() error {
 		return err
 	}
 
+	// confirm the mapping from inner to proposerVm block ID
+	if err := b.vm.State.SetBlocksIDByHeight(b.Height(), blkID); err != nil {
+		return err
+	}
+
 	delete(b.vm.verifiedBlocks, blkID)
 	b.vm.lastAcceptedTime = b.Timestamp()
 

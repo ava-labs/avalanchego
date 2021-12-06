@@ -21,6 +21,18 @@ type preForkBlock struct {
 	vm *VM
 }
 
+func (b *preForkBlock) Accept() error {
+	if b.Height() > b.vm.forkHeight {
+		b.vm.forkHeight = b.Height()
+	}
+
+	if err := b.Block.Accept(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (b *preForkBlock) Parent() ids.ID {
 	return b.Block.Parent()
 }

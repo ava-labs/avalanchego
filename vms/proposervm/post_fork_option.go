@@ -40,6 +40,11 @@ func (b *postForkOption) Accept() error {
 		return err
 	}
 
+	// confirm the mapping from inner to proposerVm block ID
+	if err := b.vm.State.SetBlocksIDByHeight(b.Height(), blkID); err != nil {
+		return err
+	}
+
 	delete(b.vm.verifiedBlocks, blkID)
 
 	// mark the inner block as accepted and all conflicting inner blocks as

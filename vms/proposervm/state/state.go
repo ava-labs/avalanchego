@@ -11,44 +11,53 @@ import (
 )
 
 var (
-	chainStatePrefix = []byte("chain")
-	blockStatePrefix = []byte("block")
+	chainStatePrefix         = []byte("chain")
+	blockStatePrefix         = []byte("block")
+	innerBlocksMappingPrefix = []byte("mapping")
 )
 
 type State interface {
 	ChainState
 	BlockState
+	AcceptedPostForkBlockHeightIndex
 }
 
 type state struct {
 	ChainState
 	BlockState
+	AcceptedPostForkBlockHeightIndex
 }
 
 func New(db database.Database) State {
 	chainDB := prefixdb.New(chainStatePrefix, db)
 	blockDB := prefixdb.New(blockStatePrefix, db)
+	mappingDB := prefixdb.New(innerBlocksMappingPrefix, db)
 	return &state{
-		ChainState: NewChainState(chainDB),
-		BlockState: NewBlockState(blockDB),
+		ChainState:                       NewChainState(chainDB),
+		BlockState:                       NewBlockState(blockDB),
+		AcceptedPostForkBlockHeightIndex: NewBlockHeightIndex(mappingDB),
 	}
 }
 
 func NewMetered(db database.Database, namespace string, metrics prometheus.Registerer) (State, error) {
 	chainDB := prefixdb.New(chainStatePrefix, db)
 	blockDB := prefixdb.New(blockStatePrefix, db)
+	mappingDB := prefixdb.New(innerBlocksMappingPrefix, db)
+
 	blockState, err := NewMeteredBlockState(blockDB, namespace, metrics)
 	if err != nil {
 		return nil, err
 	}
 
 	return &state{
-		ChainState: NewChainState(chainDB),
-		BlockState: blockState,
+		ChainState:                       NewChainState(chainDB),
+		BlockState:                       blockState,
+		AcceptedPostForkBlockHeightIndex: NewBlockHeightIndex(mappingDB),
 	}, nil
 }
 
 func (s *state) clearCache() {
 	s.ChainState.clearCache()
 	s.BlockState.clearCache()
+	s.AcceptedPostForkBlockHeightIndex.clearCache()
 }
