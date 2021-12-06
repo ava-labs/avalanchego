@@ -4,22 +4,23 @@ package metervm
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 func (vm *blockVM) StateSyncEnabled() (bool, error) {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
-		return false, block.ErrStateSyncableVMNotImplemented
+		return false, common.ErrStateSyncableVMNotImplemented
 	}
 
 	return fsVM.StateSyncEnabled()
 }
 
-func (vm *blockVM) StateSyncGetLastSummary() (block.Summary, error) {
+func (vm *blockVM) StateSyncGetLastSummary() (common.Summary, error) {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
-		return block.Summary{}, block.ErrStateSyncableVMNotImplemented
+		return common.Summary{}, common.ErrStateSyncableVMNotImplemented
 	}
 
 	start := vm.clock.Time()
@@ -33,7 +34,7 @@ func (vm *blockVM) StateSyncGetLastSummary() (block.Summary, error) {
 func (vm *blockVM) StateSyncIsSummaryAccepted(key []byte) (bool, error) {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
-		return false, block.ErrStateSyncableVMNotImplemented
+		return false, common.ErrStateSyncableVMNotImplemented
 	}
 
 	start := vm.clock.Time()
@@ -44,10 +45,10 @@ func (vm *blockVM) StateSyncIsSummaryAccepted(key []byte) (bool, error) {
 	return accepted, err
 }
 
-func (vm *blockVM) StateSync(accepted []block.Summary) error {
+func (vm *blockVM) StateSync(accepted []common.Summary) error {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
-		return block.ErrStateSyncableVMNotImplemented
+		return common.ErrStateSyncableVMNotImplemented
 	}
 
 	start := vm.clock.Time()
@@ -61,7 +62,7 @@ func (vm *blockVM) StateSync(accepted []block.Summary) error {
 func (vm *blockVM) GetLastSummaryBlockID() (ids.ID, error) {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
-		return ids.Empty, block.ErrStateSyncableVMNotImplemented
+		return ids.Empty, common.ErrStateSyncableVMNotImplemented
 	}
 
 	return fsVM.GetLastSummaryBlockID()
@@ -70,7 +71,7 @@ func (vm *blockVM) GetLastSummaryBlockID() (ids.ID, error) {
 func (vm *blockVM) SetLastSummaryBlock(blkBytes []byte) error {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
-		return block.ErrStateSyncableVMNotImplemented
+		return common.ErrStateSyncableVMNotImplemented
 	}
 
 	return fsVM.SetLastSummaryBlock(blkBytes)

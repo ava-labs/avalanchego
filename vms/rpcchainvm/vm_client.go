@@ -552,15 +552,15 @@ func (vm *VMClient) StateSyncEnabled() (bool, error) {
 	return resp.Enabled, nil
 }
 
-func (vm *VMClient) StateSyncGetLastSummary() (block.Summary, error) {
+func (vm *VMClient) StateSyncGetLastSummary() (common.Summary, error) {
 	resp, err := vm.client.StateSyncGetLastSummary(
 		context.Background(),
 		&emptypb.Empty{},
 	)
 	if err != nil {
-		return block.Summary{}, err
+		return common.Summary{}, err
 	}
-	return block.Summary{
+	return common.Summary{
 		Key:   resp.Key,
 		State: resp.State,
 	}, nil
@@ -579,7 +579,7 @@ func (vm *VMClient) StateSyncIsSummaryAccepted(key []byte) (bool, error) {
 	return resp.Accepted, nil
 }
 
-func (vm *VMClient) StateSync(summaries []block.Summary) error {
+func (vm *VMClient) StateSync(summaries []common.Summary) error {
 	requestedSummaries := make([]*vmproto.StateSyncGetLastSummaryResponse, len(summaries))
 	for k, v := range summaries {
 		requestedSummaries[k].Key = v.Key

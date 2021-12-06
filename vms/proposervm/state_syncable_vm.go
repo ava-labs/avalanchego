@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
@@ -105,38 +106,38 @@ checkFork: // handle possible snowman++ fork and commit all
 func (vm *VM) StateSyncEnabled() (bool, error) {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
-		return false, block.ErrStateSyncableVMNotImplemented
+		return false, common.ErrStateSyncableVMNotImplemented
 	}
 
 	return fsVM.StateSyncEnabled()
 }
 
-func (vm *VM) StateSyncGetLastSummary() (block.Summary, error) {
+func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
-		return block.Summary{}, block.ErrStateSyncableVMNotImplemented
+		return common.Summary{}, common.ErrStateSyncableVMNotImplemented
 	}
 
 	vmSummary, err := fsVM.StateSyncGetLastSummary()
 	if err != nil {
-		return block.Summary{}, err
+		return common.Summary{}, err
 	}
 
 	// Extract innerBlkID from summary key
 	innerKey := block.DefaultSummaryKey{}
 	parsedVersion, err := stateSyncCodec.Unmarshal(vmSummary.Key, &innerKey)
 	if err != nil {
-		return block.Summary{}, err
+		return common.Summary{}, err
 	}
 	if parsedVersion != block.StateSyncDefaultKeysVersion {
-		return block.Summary{}, errWrongStateSyncVersion
+		return common.Summary{}, errWrongStateSyncVersion
 	}
 
 	// retrieve proposer Block wrapping innerBlock
 	innerBlk, err := vm.ChainVM.GetBlock(innerKey.InnerBlkID)
 	if err != nil {
 		// innerVM internal error. Could retrieve innerBlk matching last summary
-		return block.Summary{}, errWrongStateSyncVersion
+		return common.Summary{}, errWrongStateSyncVersion
 	}
 
 	proBlkID, err := vm.GetBlockIDByHeight(innerBlk.Height())
@@ -146,16 +147,16 @@ func (vm *VM) StateSyncGetLastSummary() (block.Summary, error) {
 		// we must have hit the snowman++ fork. Check it.
 		innerBlk, err := vm.ChainVM.GetBlock(innerKey.InnerBlkID)
 		if err != nil {
-			return block.Summary{}, err
+			return common.Summary{}, err
 		}
 		if innerBlk.Height() > vm.forkHeight {
-			return block.Summary{}, err
+			return common.Summary{}, err
 		}
 
 		// preFork blockID matched inner ones
 		proBlkID = innerKey.InnerBlkID
 	default:
-		return block.Summary{}, err
+		return common.Summary{}, err
 	}
 
 	// recreate key
@@ -165,10 +166,10 @@ func (vm *VM) StateSyncGetLastSummary() (block.Summary, error) {
 	}
 	proKeyBytes, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, &proKey)
 	if err != nil {
-		return block.Summary{}, err
+		return common.Summary{}, err
 	}
 
-	return block.Summary{
+	return common.Summary{
 		Key:   proKeyBytes,
 		State: vmSummary.State,
 	}, err
@@ -177,7 +178,7 @@ func (vm *VM) StateSyncGetLastSummary() (block.Summary, error) {
 func (vm *VM) StateSyncIsSummaryAccepted(key []byte) (bool, error) {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
-		return false, block.ErrStateSyncableVMNotImplemented
+		return false, common.ErrStateSyncableVMNotImplemented
 	}
 
 	// Extract innerKey from summary key
@@ -199,14 +200,14 @@ func (vm *VM) StateSyncIsSummaryAccepted(key []byte) (bool, error) {
 	return fsVM.StateSyncIsSummaryAccepted(innerKey)
 }
 
-func (vm *VM) StateSync(accepted []block.Summary) error {
+func (vm *VM) StateSync(accepted []common.Summary) error {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
-		return block.ErrStateSyncableVMNotImplemented
+		return common.ErrStateSyncableVMNotImplemented
 	}
 
 	// retrieve innerKey for each summary and propagate all to innerVM
-	innerSummaries := make([]block.Summary, 0, len(accepted))
+	innerSummaries := make([]common.Summary, 0, len(accepted))
 	for _, summ := range accepted {
 		proKey := block.ProposerSummaryKey{}
 		parsedVersion, err := stateSyncCodec.Unmarshal(summ.Key, &proKey)
@@ -222,7 +223,7 @@ func (vm *VM) StateSync(accepted []block.Summary) error {
 			return err
 		}
 
-		innerSummaries = append(innerSummaries, block.Summary{
+		innerSummaries = append(innerSummaries, common.Summary{
 			Key:   innerKey,
 			State: summ.State,
 		})
@@ -234,7 +235,7 @@ func (vm *VM) StateSync(accepted []block.Summary) error {
 func (vm *VM) GetLastSummaryBlockID() (ids.ID, error) {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
-		return ids.Empty, block.ErrStateSyncableVMNotImplemented
+		return ids.Empty, common.ErrStateSyncableVMNotImplemented
 	}
 
 	innerBlkID, err := fsVM.GetLastSummaryBlockID()
@@ -258,7 +259,7 @@ func (vm *VM) GetLastSummaryBlockID() (ids.ID, error) {
 func (vm *VM) SetLastSummaryBlock(blkByte []byte) error {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
-		return block.ErrStateSyncableVMNotImplemented
+		return common.ErrStateSyncableVMNotImplemented
 	}
 
 	// retrieve inner block

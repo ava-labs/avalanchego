@@ -101,7 +101,7 @@ func (fs *fastSyncer) Start(startReqID uint32) error {
 
 	enabled, err := fs.fastSyncVM.StateSyncEnabled()
 	switch {
-	case err == block.ErrStateSyncableVMNotImplemented:
+	case err == common.ErrStateSyncableVMNotImplemented:
 		// nothing to do, fast sync is not implemented
 		return fs.onDoneFastSyncing(fs.RequestID)
 	case err != nil:
@@ -262,9 +262,9 @@ func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID ui
 		}
 
 		// received what we needed. Just pass to VM
-		accepted := make([]block.Summary, len(fs.acceptedFrontierSet))
+		accepted := make([]common.Summary, len(fs.acceptedFrontierSet))
 		for k, v := range fs.acceptedFrontierSet {
-			accepted = append(accepted, block.Summary{
+			accepted = append(accepted, common.Summary{
 				Key:   []byte(k),
 				State: v,
 			})
@@ -374,10 +374,10 @@ func (fs *fastSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID ui
 
 	// We've received the filtered accepted frontier from every bootstrap validator
 	// Accept all containers that have a sufficient weight behind them
-	accepted := make([]block.Summary, 0, len(fs.acceptedVotes))
+	accepted := make([]common.Summary, 0, len(fs.acceptedVotes))
 	for key, weight := range fs.acceptedVotes {
 		if weight >= fs.Alpha {
-			accepted = append(accepted, block.Summary{
+			accepted = append(accepted, common.Summary{
 				Key:   []byte(key),
 				State: fs.acceptedFrontierSet[key],
 			})
