@@ -17,7 +17,7 @@ import (
 type AtomicTrie interface {
 	// Initialize initializes the AtomicTrie from the atomic repository ignoring
 	// any atomic operations for any heights that have already been indexed
-	Initialize(dbCommitFn func() error) error
+	Initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error) error
 
 	// Index indexes the given atomicOps at the specified block height
 	// Returns an optional root hash and an optional error
@@ -28,7 +28,7 @@ type AtomicTrie interface {
 	// Iterator returns an AtomicTrieIterator to iterate the trie at the given
 	// root hash
 	// Optionally returns an error
-	Iterator(hash common.Hash) (AtomicTrieIterator, error)
+	Iterator(hash common.Hash, startHeight uint64) (AtomicTrieIterator, error)
 
 	// LastCommitted returns the following:
 	// - last committed hash
