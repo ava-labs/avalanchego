@@ -5,7 +5,6 @@ package evm
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"time"
 
@@ -29,8 +28,7 @@ const (
 )
 
 var (
-	lastCommittedKey         = []byte("LastCommittedBlock")
-	atomicTrieInitializedKey = []byte("atomicTrieInitialized")
+	lastCommittedKey = []byte("atomicTrieLastCommittedBlock")
 )
 
 type AtomicReqs map[ids.ID]*atomic.Requests
@@ -117,55 +115,21 @@ func nearestCommitHeight(blockNumber uint64, commitInterval uint64) uint64 {
 	return blockNumber - (blockNumber % commitInterval)
 }
 
-func (b *blockingAtomicTrie) isInitialized() (bool, error) {
-	initialized := false
-	initializedBytes, err := b.db.Get(atomicTrieInitializedKey)
-	if err != nil && err.Error() != database.ErrNotFound.Error() {
-		return false, err
-	} else if err == nil || err.Error() != database.ErrNotFound.Error() {
-		initializedBytesLen := len(initializedBytes)
-		if initializedBytesLen != wrappers.BoolLen {
-			return false, fmt.Errorf("expected atomicTrieInitialized value to be %d bytes long but was %d", wrappers.BoolLen, initializedBytesLen)
-		}
-
-		// based on packer UnpackBool implementation
-		if initializedBytes[0] == 1 {
-			initialized = true
-		}
-	}
-	return initialized, nil
-}
-
 // Initialize initializes the atomic trie using the atomic repository height index iterating from the oldest to the
 // lastAcceptedBlockNumber making a single commit at the most recent height divisible by the commitInterval
 // Optionally returns an error
 // Initialize only ever runs once during a node's lifetime. Subsequent updates to this trie are made using the
 // Index call during evm.block.Accept().
 // the lastAcceptedBlockNumber parameter is expected to be the height of the index
-func (b *blockingAtomicTrie) Initialize(dbCommitFn func() error) error {
-	initialized, err := b.isInitialized()
-	if err != nil {
-		return err
-	} else if initialized {
-		log.Info("atomic trie is already initialized")
-		return nil
-	}
-
-	exists, indexHeight, err := b.repo.GetIndexHeight()
-	if err != nil {
-		return err
-	}
-
-	if !exists {
-		return errors.New("atomic repository not initialized")
-	}
-
+func (b *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error) error {
 	// commitHeight is the highest block that can be committed i.e. is divisible by b.commitHeightInterval
-	commitHeight := nearestCommitHeight(indexHeight, b.commitHeightInterval)
-	uncommittedOpsMap := make(map[uint64]map[ids.ID]*atomic.Requests, indexHeight-commitHeight)
+	commitHeight := nearestCommitHeight(lastAcceptedBlockNumber, b.commitHeightInterval)
+	uncommittedOpsMap := make(map[uint64]map[ids.ID]*atomic.Requests, lastAcceptedBlockNumber-commitHeight)
 
+	heightBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(heightBytes, b.lastCommittedHeight)
 	// we iterate by height, from 0 to the index height (highest indexed block containing atomic transaction)
-	iter := b.repo.IterateByHeight(nil)
+	iter := b.repo.IterateByHeight(heightBytes)
 	defer iter.Release()
 
 	preCommitBlockIndexed := 0
@@ -225,7 +189,7 @@ func (b *blockingAtomicTrie) Initialize(dbCommitFn func() error) error {
 
 	// skip commit in case of early height
 	// should never happen in production since height is greater than 4096
-	if indexHeight < b.commitHeightInterval {
+	if lastAcceptedBlockNumber < b.commitHeightInterval {
 		if dbCommitFn != nil {
 			if err := dbCommitFn(); err != nil {
 				return err
@@ -260,12 +224,6 @@ func (b *blockingAtomicTrie) Initialize(dbCommitFn func() error) error {
 			log.Info("imported entries into atomic trie post-commit", "entriesIndexed", postCommitTxIndexed)
 			lastUpdate = time.Now()
 		}
-	}
-
-	// set the initialized flag in the DB so that we can skip it next time
-	initializedBytes := []byte{1}
-	if err = b.db.Put(atomicTrieInitializedKey, initializedBytes); err != nil {
-		return err
 	}
 
 	if dbCommitFn != nil {
@@ -382,13 +340,19 @@ func (b *blockingAtomicTrie) LastCommitted() (common.Hash, uint64) {
 
 // Iterator returns a types.AtomicTrieIterator that iterates the trie from the given
 // atomic trie root
-func (b *blockingAtomicTrie) Iterator(root common.Hash) (types.AtomicTrieIterator, error) {
+func (b *blockingAtomicTrie) Iterator(root common.Hash, startHeight uint64) (types.AtomicTrieIterator, error) {
+	var startKey []byte
+	if startHeight > 0 {
+		startKey = make([]byte, wrappers.LongLen)
+		binary.BigEndian.PutUint64(startKey, startHeight)
+	}
+
 	t, err := trie.New(root, b.trieDB)
 	if err != nil {
 		return nil, err
 	}
 
-	iter := trie.NewIterator(t.NodeIterator(nil))
+	iter := trie.NewIterator(t.NodeIterator(startKey))
 	return NewAtomicTrieIterator(iter), iter.Err
 }
 

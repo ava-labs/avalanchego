@@ -471,8 +471,8 @@ func (vm *VM) initializeAtomicTxIndexes() error {
 
 	log.Info("initializing atomic trie")
 	startTime := time.Now()
-	if err = vm.atomicTrie.Initialize(vm.db.Commit); err != nil {
-		log.Error("error initializing atomic trie locally", "time", time.Since(startTime), "err", err)
+	if err = vm.atomicTrie.Initialize(lastAcceptedHeight, vm.db.Commit); err != nil {
+		log.Error("error initializing atomic tx trie locally", "time", time.Since(startTime), "err", err)
 		return err
 	}
 

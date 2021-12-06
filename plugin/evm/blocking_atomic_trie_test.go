@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
@@ -33,10 +34,12 @@ func Test_nearestCommitHeight(t *testing.T) {
 }
 
 func Test_BlockingAtomicTrie_InitializeGenesis(t *testing.T) {
-	db := memdb.New()
-	repo := NewAtomicTxRepository(db, testTxCodec())
+	lastAcceptedHeight := uint64(0)
+	db := versiondb.New(memdb.New())
+	repo, err := NewAtomicTxRepository(db, testTxCodec(), lastAcceptedHeight)
+	assert.NoError(t, err)
 	tx := testDataImportTx()
-	err := repo.Write(0, []*Tx{tx})
+	err = repo.Write(0, []*Tx{tx})
 	assert.NoError(t, err)
 
 	atomicTrieDB := memorydb.New()
@@ -46,7 +49,7 @@ func Test_BlockingAtomicTrie_InitializeGenesis(t *testing.T) {
 	dbCommitFn := func() error {
 		return nil
 	}
-	err = atomicTrie.Initialize(dbCommitFn)
+	err = atomicTrie.Initialize(lastAcceptedHeight, dbCommitFn)
 	assert.NoError(t, err)
 
 	_, num := atomicTrie.LastCommitted()
@@ -55,9 +58,11 @@ func Test_BlockingAtomicTrie_InitializeGenesis(t *testing.T) {
 }
 
 func Test_BlockingAtomicTrie_InitializeGenesisPlusOne(t *testing.T) {
-	db := memdb.New()
-	repo := NewAtomicTxRepository(db, testTxCodec())
-	err := repo.Write(0, []*Tx{testDataImportTx()})
+	lastAcceptedHeight := uint64(1)
+	db := versiondb.New(memdb.New())
+	repo, err := NewAtomicTxRepository(db, testTxCodec(), lastAcceptedHeight)
+	assert.NoError(t, err)
+	err = repo.Write(0, []*Tx{testDataImportTx()})
 	assert.NoError(t, err)
 	err = repo.Write(1, []*Tx{testDataImportTx()})
 	assert.NoError(t, err)
@@ -69,7 +74,7 @@ func Test_BlockingAtomicTrie_InitializeGenesisPlusOne(t *testing.T) {
 	dbCommitFn := func() error {
 		return nil
 	}
-	err = atomicTrie.Initialize(dbCommitFn)
+	err = atomicTrie.Initialize(lastAcceptedHeight, dbCommitFn)
 	assert.NoError(t, err)
 
 	_, num := atomicTrie.LastCommitted()
@@ -78,10 +83,11 @@ func Test_BlockingAtomicTrie_InitializeGenesisPlusOne(t *testing.T) {
 }
 
 func Test_BlockingAtomicTrie_Initialize(t *testing.T) {
-	db := memdb.New()
-	repo := NewAtomicTxRepository(db, testTxCodec())
-	// create state
 	lastAcceptedHeight := uint64(1000)
+	db := versiondb.New(memdb.New())
+	repo, err := NewAtomicTxRepository(db, testTxCodec(), lastAcceptedHeight)
+	assert.NoError(t, err)
+	// create state
 	for i := uint64(0); i <= lastAcceptedHeight; i++ {
 		err := repo.Write(i, []*Tx{testDataExportTx()})
 		assert.NoError(t, err)
@@ -95,7 +101,7 @@ func Test_BlockingAtomicTrie_Initialize(t *testing.T) {
 		return nil
 	}
 
-	err = atomicTrie.Initialize(dbCommitFn)
+	err = atomicTrie.Initialize(lastAcceptedHeight, dbCommitFn)
 	assert.NoError(t, err)
 
 	lastCommittedHash, lastCommittedHeight := atomicTrie.LastCommitted()
@@ -105,7 +111,7 @@ func Test_BlockingAtomicTrie_Initialize(t *testing.T) {
 
 	atomicTrie, err = NewBlockingAtomicTrie(atomicTrieDB, repo, testTxCodec())
 	assert.NoError(t, err)
-	iterator, err := atomicTrie.Iterator(lastCommittedHash)
+	iterator, err := atomicTrie.Iterator(lastCommittedHash, 0)
 	assert.NoError(t, err)
 	entriesIterated := uint64(0)
 	for iterator.Next() {
@@ -118,8 +124,9 @@ func Test_BlockingAtomicTrie_Initialize(t *testing.T) {
 }
 
 func newTestAtomicTrieIndexer(t *testing.T) types.AtomicTrie {
-	db := memdb.New()
-	repo := NewAtomicTxRepository(db, Codec)
+	db := versiondb.New(memdb.New())
+	repo, err := NewAtomicTxRepository(db, testTxCodec(), 0)
+	assert.NoError(t, err)
 	indexer, err := NewBlockingAtomicTrie(Database{db}, repo, testTxCodec())
 	assert.NoError(t, err)
 	assert.NotNil(t, indexer)
@@ -222,10 +229,11 @@ func Test_IndexerInitializeFromState(t *testing.T) {
 }
 
 func Test_IndexerInitializesOnlyOnce(t *testing.T) {
-	db := memdb.New()
-	repo := NewAtomicTxRepository(db, testTxCodec())
-	height := uint64(100)
-	for i := uint64(0); i < height; i++ {
+	lastAcceptedHeight := uint64(100)
+	db := versiondb.New(memdb.New())
+	repo, err := NewAtomicTxRepository(db, testTxCodec(), lastAcceptedHeight)
+	assert.NoError(t, err)
+	for i := uint64(0); i < lastAcceptedHeight; i++ {
 		err := repo.Write(i, []*Tx{testDataImportTx(), testDataExportTx()})
 		assert.NoError(t, err)
 	}
@@ -237,7 +245,7 @@ func Test_IndexerInitializesOnlyOnce(t *testing.T) {
 		indexer.(*blockingAtomicTrie).commitHeightInterval = 90
 	}
 
-	err = indexer.Initialize(nil)
+	err = indexer.Initialize(lastAcceptedHeight, nil)
 	assert.NoError(t, err)
 
 	hash, height := indexer.LastCommitted()
@@ -260,7 +268,7 @@ func Test_IndexerInitializesOnlyOnce(t *testing.T) {
 		indexer.(*blockingAtomicTrie).commitHeightInterval = 90
 	}
 
-	err = indexer.Initialize(nil) // should be skipped
+	err = indexer.Initialize(lastAcceptedHeight, nil) // should be skipped
 	assert.NoError(t, err)
 
 	newHash, height := indexer.LastCommitted()
@@ -271,11 +279,11 @@ func Test_IndexerInitializesOnlyOnce(t *testing.T) {
 
 func Test_IndexerInitializeProducesSameHashEveryTime(t *testing.T) {
 	t.Parallel()
-	db := memdb.New()
-	repo := NewAtomicTxRepository(db, testTxCodec())
-	height := uint64(1000)
+	lastAcceptedHeight := uint64(1000)
+	db := versiondb.New(memdb.New())
+	repo, err := NewAtomicTxRepository(db, testTxCodec(), lastAcceptedHeight)
 	txsPerHeight := 30
-	for i := uint64(0); i < height; i++ {
+	for i := uint64(0); i < lastAcceptedHeight; i++ {
 		txs := make([]*Tx, txsPerHeight)
 		for j := 0; j+1 < txsPerHeight; j += 2 {
 			txs[j] = testDataExportTx()
@@ -292,10 +300,10 @@ func Test_IndexerInitializeProducesSameHashEveryTime(t *testing.T) {
 		indexer.(*blockingAtomicTrie).commitHeightInterval = 90
 	}
 
-	err = indexer.Initialize(nil)
+	err = indexer.Initialize(lastAcceptedHeight, nil)
 	assert.NoError(t, err)
 
-	expectedCommitHeight := nearestCommitHeight(height, 90)
+	expectedCommitHeight := nearestCommitHeight(lastAcceptedHeight, 90)
 	hash, indexerHeight := indexer.LastCommitted()
 	assert.NoError(t, err)
 	assert.NotEqual(t, common.Hash{}, hash)
@@ -312,7 +320,7 @@ func Test_IndexerInitializeProducesSameHashEveryTime(t *testing.T) {
 		}
 
 		// run initialize
-		err = indexer.Initialize(nil)
+		err = indexer.Initialize(lastAcceptedHeight, nil)
 		assert.NoError(t, err)
 
 		// expects heights and hashes to be exactly the same
