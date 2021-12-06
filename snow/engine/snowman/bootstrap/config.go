@@ -15,8 +15,8 @@ type Config struct {
 	// Blocked tracks operations that are blocked on blocks
 	Blocked *queue.JobsWithMissing
 
-	VM      block.ChainVM
-	Starter common.GearStarter
+	VM            block.ChainVM
+	WeightTracker common.WeightTracker
 
 	Bootstrapped func()
 }

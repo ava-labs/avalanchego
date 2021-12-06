@@ -65,11 +65,11 @@ func TestEngineAdd(t *testing.T) {
 	bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -174,11 +174,11 @@ func TestEngineQuery(t *testing.T) {
 	bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -445,11 +445,11 @@ func TestEngineMultipleQuery(t *testing.T) {
 	bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	engCfg.Params = avalanche.Parameters{
 		Parameters: snowball.Parameters{
@@ -722,11 +722,11 @@ func TestEngineAbandonResponse(t *testing.T) {
 	bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -805,11 +805,11 @@ func TestEngineScheduleRepoll(t *testing.T) {
 	bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -909,11 +909,11 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 	sender.CantSendGetAcceptedFrontier = false
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1023,11 +1023,11 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 	sender.CantSendGetAcceptedFrontier = false
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1143,11 +1143,11 @@ func TestEngineIssueRepoll(t *testing.T) {
 	engCfg.Sender = sender
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1221,11 +1221,11 @@ func TestEngineReissue(t *testing.T) {
 	engCfg.Sender = sender
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1415,11 +1415,11 @@ func TestEngineLargeIssue(t *testing.T) {
 	engCfg.Sender = sender
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1590,11 +1590,11 @@ func TestEngineInsufficientValidators(t *testing.T) {
 	bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
@@ -1668,11 +1668,11 @@ func TestEnginePushGossip(t *testing.T) {
 	bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1763,11 +1763,11 @@ func TestEngineSingleQuery(t *testing.T) {
 	bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1842,11 +1842,11 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 	bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1954,11 +1954,11 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -2083,11 +2083,11 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -2223,11 +2223,11 @@ func TestEngineMissingTx(t *testing.T) {
 	bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -2363,11 +2363,11 @@ func TestEngineIssueBlockingTx(t *testing.T) {
 	bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -2434,11 +2434,11 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 	bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -2571,12 +2571,12 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Beacons = vals
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -2849,12 +2849,12 @@ func TestEngineReBootstrapFails(t *testing.T) {
 	bootCfg.RetryBootstrapWarnFrequency = 4
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Beacons = vals
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -3012,12 +3012,12 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 	bootCfg.RetryBootstrapWarnFrequency = 4
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Beacons = vals
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -3296,11 +3296,11 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 	bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -3407,11 +3407,11 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 	bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -3554,11 +3554,11 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 	bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	secondVdr := ids.GenerateTestShortID()
@@ -3709,11 +3709,11 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -3868,11 +3868,11 @@ func TestEngineAggressivePolling(t *testing.T) {
 	engCfg.Params.BetaRogue = 3
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -3994,11 +3994,11 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 	engCfg.Sender = sender
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -4111,11 +4111,11 @@ func TestEngineDoubleChit(t *testing.T) {
 	engCfg.Params.K = 2
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr0 := ids.GenerateTestShortID()
 	vdr1 := ids.GenerateTestShortID()
@@ -4246,11 +4246,11 @@ func TestEngineBubbleVotes(t *testing.T) {
 	bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	err := vals.AddWeight(vdr, 1)
@@ -4410,11 +4410,11 @@ func TestEngineIssue(t *testing.T) {
 	engCfg.Sender = sender
 
 	vals := validators.NewSet()
-	gs := common.NewGearStarter(vals, bootCfg.StartupAlpha)
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.Starter = gs
+	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.Starter = gs
+	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {

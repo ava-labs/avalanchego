@@ -2163,12 +2163,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		SharedCfg:                     &common.SharedConfig{},
 	}
 
-	gs := common.NewGearStarter(commonCfg.Beacons, commonCfg.StartupAlpha)
+	wt := common.NewWeightTracker(commonCfg.Beacons, commonCfg.StartupAlpha)
 	bootstrapConfig := bootstrap.Config{
-		Config:  commonCfg,
-		Blocked: blocked,
-		VM:      vm,
-		Starter: gs,
+		Config:        commonCfg,
+		Blocked:       blocked,
+		VM:            vm,
+		WeightTracker: wt,
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
@@ -2190,11 +2190,11 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	handler.RegisterBootstrap(bootstrapper)
 
 	engineConfig := smeng.Config{
-		Ctx:        bootstrapConfig.Ctx,
-		VM:         bootstrapConfig.VM,
-		Starter:    gs,
-		Sender:     bootstrapConfig.Sender,
-		Validators: vdrs,
+		Ctx:           bootstrapConfig.Ctx,
+		VM:            bootstrapConfig.VM,
+		WeightTracker: wt,
+		Sender:        bootstrapConfig.Sender,
+		Validators:    vdrs,
 		Params: snowball.Parameters{
 			K:                     1,
 			Alpha:                 1,
