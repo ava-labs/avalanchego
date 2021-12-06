@@ -8,6 +8,15 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
+func (vm *blockVM) RegisterFastSyncer(fastSyncers []ids.ShortID) error {
+	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
+	if !ok {
+		return common.ErrStateSyncableVMNotImplemented
+	}
+
+	return fsVM.RegisterFastSyncer(fastSyncers)
+}
+
 func (vm *blockVM) StateSyncEnabled() (bool, error) {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {

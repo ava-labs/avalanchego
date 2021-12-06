@@ -1,6 +1,10 @@
 package common
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/ava-labs/avalanchego/ids"
+)
 
 var ErrStateSyncableVMNotImplemented = errors.New("vm does not implement StateSyncableVM interface")
 
@@ -13,8 +17,10 @@ type Summary struct {
 // StateSyncableVM represents functionalities to allow VMs to sync to a given state,
 // rather then boostrapping from genesis.
 // common.StateSyncableVM can be detailed for Snowman or Avalanche-like VMs by extending the interface.
-
 type StateSyncableVM interface {
+	// Register nodes from which fast sync summaries can be downloaded
+	RegisterFastSyncer(fastSyncer []ids.ShortID) error
+
 	// Enabled indicates whether the state sync is enabled for this VM
 	StateSyncEnabled() (bool, error)
 	// StateSummary returns latest Summary with an optional error

@@ -99,6 +99,14 @@ func (fs *fastSyncer) Start(startReqID uint32) error {
 		return fs.onDoneFastSyncing(fs.RequestID)
 	}
 
+	// if StateSyncTestingBeacons are specified, VM should direct fast-sync related messages
+	// to StateSyncTestingBeacons only. So let's inform the VM
+	if len(fs.StateSyncTestingBeacons) != 0 {
+		if err := fs.fastSyncVM.RegisterFastSyncer(fs.StateSyncTestingBeacons); err != nil {
+			return err
+		}
+	}
+
 	enabled, err := fs.fastSyncVM.StateSyncEnabled()
 	switch {
 	case err == common.ErrStateSyncableVMNotImplemented:
@@ -542,13 +550,8 @@ func (fs *fastSyncer) GetFailed(validatorID ids.ShortID, requestID uint32) error
 
 // InternalHandler interface implementation
 func (fs *fastSyncer) Connected(nodeID ids.ShortID) error {
-	// prevent nodes outside of the specified state sync
-	// nodes from connecting to the vm. this is a temporary
-	// workaround while we add more handshake information.
-	if fs.Beacons.Contains(nodeID) {
-		if err := fs.VM.Connected(nodeID); err != nil {
-			return err
-		}
+	if err := fs.VM.Connected(nodeID); err != nil {
+		return err
 	}
 
 	if err := fs.WeightTracker.AddWeightForNode(nodeID); err != nil {
@@ -570,12 +573,8 @@ func (fs *fastSyncer) Connected(nodeID ids.ShortID) error {
 
 // InternalHandler interface implementation
 func (fs *fastSyncer) Disconnected(nodeID ids.ShortID) error {
-	// temporary workaround, avoid sending disconnect messages
-	// for nodes we did not send connect message.
-	if fs.Beacons.Contains(nodeID) {
-		if err := fs.VM.Disconnected(nodeID); err != nil {
-			return err
-		}
+	if err := fs.VM.Disconnected(nodeID); err != nil {
+		return err
 	}
 
 	return fs.WeightTracker.RemoveWeightForNode(nodeID)

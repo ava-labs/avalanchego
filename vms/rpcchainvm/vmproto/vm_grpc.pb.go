@@ -44,6 +44,7 @@ type VMClient interface {
 	GetAncestors(ctx context.Context, in *GetAncestorsRequest, opts ...grpc.CallOption) (*GetAncestorsResponse, error)
 	BatchedParseBlock(ctx context.Context, in *BatchedParseBlockRequest, opts ...grpc.CallOption) (*BatchedParseBlockResponse, error)
 	// State sync
+	RegisterFastSyncer(ctx context.Context, in *RegisterFastSyncerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	StateSyncEnabled(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncEnabledResponse, error)
 	StateSyncGetLastSummary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncGetLastSummaryResponse, error)
 	StateSyncIsSummaryAccepted(ctx context.Context, in *StateSyncIsSummaryAcceptedRequest, opts ...grpc.CallOption) (*StateSyncIsSummaryAcceptedResponse, error)
@@ -276,6 +277,15 @@ func (c *vMClient) BatchedParseBlock(ctx context.Context, in *BatchedParseBlockR
 	return out, nil
 }
 
+func (c *vMClient) RegisterFastSyncer(ctx context.Context, in *RegisterFastSyncerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/RegisterFastSyncer", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *vMClient) StateSyncEnabled(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncEnabledResponse, error) {
 	out := new(StateSyncEnabledResponse)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/StateSyncEnabled", in, out, opts...)
@@ -359,6 +369,7 @@ type VMServer interface {
 	GetAncestors(context.Context, *GetAncestorsRequest) (*GetAncestorsResponse, error)
 	BatchedParseBlock(context.Context, *BatchedParseBlockRequest) (*BatchedParseBlockResponse, error)
 	// State sync
+	RegisterFastSyncer(context.Context, *RegisterFastSyncerRequest) (*emptypb.Empty, error)
 	StateSyncEnabled(context.Context, *emptypb.Empty) (*StateSyncEnabledResponse, error)
 	StateSyncGetLastSummary(context.Context, *emptypb.Empty) (*StateSyncGetLastSummaryResponse, error)
 	StateSyncIsSummaryAccepted(context.Context, *StateSyncIsSummaryAcceptedRequest) (*StateSyncIsSummaryAcceptedResponse, error)
@@ -443,6 +454,9 @@ func (UnimplementedVMServer) GetAncestors(context.Context, *GetAncestorsRequest)
 }
 func (UnimplementedVMServer) BatchedParseBlock(context.Context, *BatchedParseBlockRequest) (*BatchedParseBlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BatchedParseBlock not implemented")
+}
+func (UnimplementedVMServer) RegisterFastSyncer(context.Context, *RegisterFastSyncerRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RegisterFastSyncer not implemented")
 }
 func (UnimplementedVMServer) StateSyncEnabled(context.Context, *emptypb.Empty) (*StateSyncEnabledResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StateSyncEnabled not implemented")
@@ -907,6 +921,24 @@ func _VM_BatchedParseBlock_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VM_RegisterFastSyncer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterFastSyncerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).RegisterFastSyncer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/RegisterFastSyncer",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).RegisterFastSyncer(ctx, req.(*RegisterFastSyncerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _VM_StateSyncEnabled_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
@@ -1117,6 +1149,10 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "BatchedParseBlock",
 			Handler:    _VM_BatchedParseBlock_Handler,
+		},
+		{
+			MethodName: "RegisterFastSyncer",
+			Handler:    _VM_RegisterFastSyncer_Handler,
 		},
 		{
 			MethodName: "StateSyncEnabled",

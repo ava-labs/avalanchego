@@ -246,6 +246,22 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	}, err
 }
 
+func (vm *VMServer) RegisterFastSyncer(ctx context.Context, req *vmproto.RegisterFastSyncerRequest) (*emptypb.Empty, error) {
+	fsVM, ok := vm.vm.(block.StateSyncableVM)
+	if !ok {
+		return nil, common.ErrStateSyncableVMNotImplemented
+	}
+
+	fastSyncers := make([]ids.ShortID, 0, len(req.NodeIDs))
+	for _, bytes := range req.NodeIDs {
+		var nodeID ids.ShortID
+		copy(nodeID[:], bytes)
+		fastSyncers = append(fastSyncers, nodeID)
+	}
+
+	return &emptypb.Empty{}, fsVM.RegisterFastSyncer(fastSyncers)
+}
+
 func (vm *VMServer) StateSyncEnabled(context.Context, *emptypb.Empty) (*vmproto.StateSyncEnabledResponse, error) {
 	fsVM, ok := vm.vm.(block.StateSyncableVM)
 	if !ok {

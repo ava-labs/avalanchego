@@ -103,6 +103,15 @@ checkFork: // handle possible snowman++ fork and commit all
 	}
 }
 
+func (vm *VM) RegisterFastSyncer(fastSyncers []ids.ShortID) error {
+	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
+	if !ok {
+		return common.ErrStateSyncableVMNotImplemented
+	}
+
+	return fsVM.RegisterFastSyncer(fastSyncers)
+}
+
 func (vm *VM) StateSyncEnabled() (bool, error) {
 	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {

@@ -187,6 +187,11 @@ message BatchedParseBlockResponse {
     repeated ParseBlockResponse response = 1;
 }
 
+// StateSyncableVM related messages
+message RegisterFastSyncerRequest {
+    repeated bytes nodeIDs = 1;
+}
+
 message StateSyncEnabledResponse {
     bool enabled = 1;
 }
@@ -215,6 +220,7 @@ message StateSyncLastSummaryBlockIDResponse {
 message StateSyncSetLastSummaryBlockRequest {
     bytes bytes = 1;
 }
+// end of StateSyncableVM related messages
 
 // The metrics message defintions are copied from:
 // https://github.com/prometheus/client_model/blob/master/io/prometheus/client/metrics.proto
@@ -325,6 +331,7 @@ service VM {
     rpc BatchedParseBlock(BatchedParseBlockRequest) returns (BatchedParseBlockResponse);
 
     // State sync
+    rpc RegisterFastSyncer(RegisterFastSyncerRequest) returns (google.protobuf.Empty);
     rpc StateSyncEnabled(google.protobuf.Empty) returns (StateSyncEnabledResponse);
     rpc StateSyncGetLastSummary(google.protobuf.Empty) returns (StateSyncGetLastSummaryResponse);
     rpc StateSyncIsSummaryAccepted(StateSyncIsSummaryAcceptedRequest) returns (StateSyncIsSummaryAcceptedResponse);

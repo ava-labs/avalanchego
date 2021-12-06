@@ -541,6 +541,22 @@ func (vm *VMClient) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	return err
 }
 
+func (vm *VMClient) RegisterFastSyncer(fastSyncer []ids.ShortID) error {
+	nodesID := make([][]byte, 0, len(fastSyncer))
+	for _, fs := range fastSyncer {
+		nodesID = append(nodesID, fs[:])
+	}
+
+	_, err := vm.client.RegisterFastSyncer(
+		context.Background(),
+		&vmproto.RegisterFastSyncerRequest{
+			NodeIDs: nodesID,
+		},
+	)
+
+	return err
+}
+
 func (vm *VMClient) StateSyncEnabled() (bool, error) {
 	resp, err := vm.client.StateSyncEnabled(
 		context.Background(),
