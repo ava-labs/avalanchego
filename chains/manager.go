@@ -149,7 +149,7 @@ type ManagerConfig struct {
 	CriticalChains              ids.Set          // Chains that can't exit gracefully
 	WhitelistedSubnets          ids.Set          // Subnets to validate
 	TimeoutManager              *timeout.Manager // Manages request timeouts when sending messages to other validators
-	HealthService               health.Service
+	HealthService               health.Health
 	RetryBootstrap              bool                    // Should Bootstrap be retried
 	RetryBootstrapWarnFrequency int                     // Max number of times to retry bootstrap before warning the node operator
 	SubnetConfigs               map[ids.ID]SubnetConfig // ID -> SubnetConfig
@@ -599,16 +599,16 @@ func (m *manager) createAvalancheChain(
 		SharedCfg:                     &common.SharedConfig{},
 	}
 
-	gearStarter := common.NewGearStarter(beacons, commonCfg.StartupAlpha)
+	wt := common.NewWeightTracker(beacons, commonCfg.StartupAlpha)
 
 	// create bootstrap gear
 	bootstrapperConfig := avbootstrap.Config{
-		Config:     commonCfg,
-		VtxBlocked: vtxBlocker,
-		TxBlocked:  txBlocker,
-		Manager:    vtxManager,
-		VM:         vm,
-		Starter:    gearStarter,
+		Config:        commonCfg,
+		VtxBlocked:    vtxBlocker,
+		TxBlocked:     txBlocker,
+		Manager:       vtxManager,
+		VM:            vm,
+		WeightTracker: wt,
 	}
 	bootstrapper, err := avbootstrap.New(
 		bootstrapperConfig,
@@ -621,14 +621,14 @@ func (m *manager) createAvalancheChain(
 
 	// create engine gear
 	engineConfig := aveng.Config{
-		Ctx:        bootstrapperConfig.Ctx,
-		VM:         bootstrapperConfig.VM,
-		Starter:    gearStarter,
-		Manager:    vtxManager,
-		Sender:     bootstrapperConfig.Sender,
-		Validators: vdrs,
-		Params:     consensusParams,
-		Consensus:  &avcon.Topological{},
+		Ctx:           bootstrapperConfig.Ctx,
+		VM:            bootstrapperConfig.VM,
+		WeightTracker: wt,
+		Manager:       vtxManager,
+		Sender:        bootstrapperConfig.Sender,
+		Validators:    vdrs,
+		Params:        consensusParams,
+		Consensus:     &avcon.Topological{},
 	}
 	engine, err := aveng.New(engineConfig)
 	if err != nil {
@@ -802,15 +802,14 @@ func (m *manager) createSnowmanChain(
 		SharedCfg:                     &common.SharedConfig{},
 	}
 
-	// create a config for state sync
-	gearStarter := common.NewGearStarter(beacons, commonCfg.StartupAlpha)
+	wt := common.NewWeightTracker(beacons, commonCfg.StartupAlpha)
 
 	// create fast sync gear
 	fastSyncCfg := fastsyncer.Config{
 		Config:                  commonCfg,
 		StateSyncTestingBeacons: stateSyncTestingBeacons,
 		VM:                      vm,
-		Starter:                 gearStarter,
+		WeightTracker:           wt,
 	}
 	fastSync := fastsyncer.NewFastSyncer(
 		fastSyncCfg,
@@ -820,11 +819,11 @@ func (m *manager) createSnowmanChain(
 
 	// create bootstrap gear
 	bootstrapCfg := smbootstrap.Config{
-		Config:       commonCfg,
-		Blocked:      blocked,
-		VM:           vm,
-		Starter:      gearStarter,
-		Bootstrapped: m.unblockChains,
+		Config:        commonCfg,
+		Blocked:       blocked,
+		VM:            vm,
+		WeightTracker: wt,
+		Bootstrapped:  m.unblockChains,
 	}
 	bootstrapper, err := smbootstrap.New(
 		bootstrapCfg,
@@ -837,13 +836,13 @@ func (m *manager) createSnowmanChain(
 
 	// create engine gear
 	engineConfig := smeng.Config{
-		Ctx:        bootstrapCfg.Ctx,
-		VM:         bootstrapCfg.VM,
-		Starter:    gearStarter,
-		Sender:     bootstrapCfg.Sender,
-		Validators: vdrs,
-		Params:     consensusParams,
-		Consensus:  &smcon.Topological{},
+		Ctx:           bootstrapCfg.Ctx,
+		VM:            bootstrapCfg.VM,
+		WeightTracker: wt,
+		Sender:        bootstrapCfg.Sender,
+		Validators:    vdrs,
+		Params:        consensusParams,
+		Consensus:     &smcon.Topological{},
 	}
 	engine, err := smeng.New(engineConfig)
 	if err != nil {

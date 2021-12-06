@@ -14,11 +14,11 @@ import (
 
 // Config wraps all the parameters needed for a snowman engine
 type Config struct {
-	Ctx        *snow.ConsensusContext
-	VM         block.ChainVM
-	Starter    common.GearStarter
-	Sender     common.Sender
-	Validators validators.Set
-	Params     snowball.Parameters
-	Consensus  snowman.Consensus
+	Ctx           *snow.ConsensusContext
+	VM            block.ChainVM
+	WeightTracker common.WeightTracker
+	Sender        common.Sender
+	Validators    validators.Set
+	Params        snowball.Parameters
+	Consensus     snowman.Consensus
 }

@@ -53,7 +53,7 @@ type service struct {
 	checkFreq time.Duration
 }
 
-// RegisterCheckFn adds a check that calls [checkFn] to evaluate health
+// RegisterCheck adds a check that calls [checkFn] to evaluate health
 func (s *service) RegisterCheck(name string, checkFn Check) error {
 	check := &check{
 		name:    name,

@@ -49,6 +49,9 @@ type HTTPConfig struct {
 	HTTPSCert    []byte `json:"-"`
 
 	APIAllowedOrigins []string `json:"apiAllowedOrigins"`
+
+	ShutdownTimeout time.Duration `json:"shutdownTimeout"`
+	ShutdownWait    time.Duration `json:"shutdownWait"`
 }
 
 type APIConfig struct {

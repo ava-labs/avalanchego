@@ -60,6 +60,8 @@ type fastSyncer struct {
 
 	gR common.GearRequester
 
+	started bool
+
 	// Tracks the last requestID that was used in a request
 	RequestID uint32
 
@@ -114,7 +116,7 @@ func (fs *fastSyncer) Start(startReqID uint32) error {
 
 func (fs *fastSyncer) startup() error {
 	fs.Config.Ctx.Log.Info("starting fast sync")
-	fs.Starter.MarkStart()
+	fs.started = true
 
 	// clear up messages tracker
 	fs.gR.ClearToRequest(message.StateSummaryFrontier)
@@ -549,12 +551,12 @@ func (fs *fastSyncer) Connected(nodeID ids.ShortID) error {
 		}
 	}
 
-	if err := fs.Starter.AddWeightForNode(nodeID); err != nil {
+	if err := fs.WeightTracker.AddWeightForNode(nodeID); err != nil {
 		return err
 	}
 
-	if fs.Starter.CanStart() {
-		fs.Starter.MarkStart()
+	if fs.WeightTracker.EnoughConnectedWeight() && !fs.started {
+		fs.started = true
 		if len(fs.StateSyncTestingBeacons) != 0 {
 			// if StateSyncTestingBeacons are specified,
 			// they are the only validators involved in fast sync
@@ -576,5 +578,5 @@ func (fs *fastSyncer) Disconnected(nodeID ids.ShortID) error {
 		}
 	}
 
-	return fs.Starter.RemoveWeightForNode(nodeID)
+	return fs.WeightTracker.RemoveWeightForNode(nodeID)
 }

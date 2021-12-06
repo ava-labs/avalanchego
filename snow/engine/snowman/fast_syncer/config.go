@@ -12,5 +12,5 @@ type Config struct {
 	common.Config
 	StateSyncTestingBeacons []ids.ShortID // testing beacons from which nodes fast sync without network consensus
 	VM                      block.ChainVM
-	Starter                 common.GearStarter
+	WeightTracker           common.WeightTracker
 }

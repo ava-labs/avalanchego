@@ -46,6 +46,8 @@ const (
 	HTTPSCertFileKey                            = "http-tls-cert-file"
 	HTTPSCertContentKey                         = "http-tls-cert-file-content"
 	HTTPAllowedOrigins                          = "http-allowed-origins"
+	HTTPShutdownTimeoutKey                      = "http-shutdown-timeout"
+	HTTPShutdownWaitKey                         = "http-shutdown-wait"
 	APIAuthRequiredKey                          = "api-auth-required"
 	APIAuthPasswordKey                          = "api-auth-password"
 	APIAuthPasswordFileKey                      = "api-auth-password-file"

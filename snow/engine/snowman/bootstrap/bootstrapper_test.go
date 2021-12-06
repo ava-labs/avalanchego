@@ -68,10 +68,10 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 		SharedCfg:                     &common.SharedConfig{},
 	}
 	return Config{
-		Config:  commonConfig,
-		Blocked: blocker,
-		VM:      vm,
-		Starter: common.NewGearStarter(commonConfig.Beacons, commonConfig.StartupAlpha),
+		Config:        commonConfig,
+		Blocked:       blocker,
+		VM:            vm,
+		WeightTracker: common.NewWeightTracker(commonConfig.Beacons, commonConfig.StartupAlpha),
 	}, peer, sender, vm
 }
 
