@@ -78,12 +78,12 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 	}
 
 	return Config{
-		Config:     commonConfig,
-		VtxBlocked: vtxBlocker,
-		TxBlocked:  txBlocker,
-		Manager:    manager,
-		VM:         vm,
-		Starter:    common.NewGearStarter(commonConfig.Beacons, commonConfig.StartupAlpha),
+		Config:        commonConfig,
+		VtxBlocked:    vtxBlocker,
+		TxBlocked:     txBlocker,
+		Manager:       manager,
+		VM:            vm,
+		WeightTracker: common.NewWeightTracker(commonConfig.Beacons, commonConfig.StartupAlpha),
 	}, peer, sender, manager, vm
 }
 

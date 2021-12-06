@@ -159,7 +159,7 @@ func (t *Transitive) Connected(nodeID ids.ShortID) error {
 		return err
 	}
 
-	return t.Starter.AddWeightForNode(nodeID)
+	return t.WeightTracker.AddWeightForNode(nodeID)
 }
 
 // Disconnected implements the Engine interface.
@@ -168,7 +168,7 @@ func (t *Transitive) Disconnected(nodeID ids.ShortID) error {
 		return err
 	}
 
-	return t.Starter.RemoveWeightForNode(nodeID)
+	return t.WeightTracker.RemoveWeightForNode(nodeID)
 }
 
 // Shutdown implements the Engine interface

@@ -55,6 +55,8 @@ type bootstrapper struct {
 	common.Fetcher
 	metrics
 
+	started bool
+
 	// IDs of vertices that we will send a GetAncestors request for once we are
 	// not at the max number of outstanding requests
 	needToFetch ids.Set
@@ -489,12 +491,12 @@ func (b *bootstrapper) Connected(nodeID ids.ShortID) error {
 		return err
 	}
 
-	if err := b.Starter.AddWeightForNode(nodeID); err != nil {
+	if err := b.WeightTracker.AddWeightForNode(nodeID); err != nil {
 		return err
 	}
 
-	if b.Starter.CanStart() {
-		b.Starter.MarkStart()
+	if b.WeightTracker.EnoughConnectedWeight() {
+		b.started = true
 		return b.Startup()
 	}
 
@@ -507,7 +509,7 @@ func (b *bootstrapper) Disconnected(nodeID ids.ShortID) error {
 		return err
 	}
 
-	return b.Starter.RemoveWeightForNode(nodeID)
+	return b.WeightTracker.RemoveWeightForNode(nodeID)
 }
 
 func (b *bootstrapper) GetVM() common.VM                { return b.VM }

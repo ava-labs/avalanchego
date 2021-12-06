@@ -17,7 +17,7 @@ type Config struct {
 	// TxBlocked tracks operations that are blocked on transactions
 	TxBlocked *queue.Jobs
 
-	Manager vertex.Manager
-	VM      vertex.DAGVM
-	Starter common.GearStarter
+	Manager       vertex.Manager
+	VM            vertex.DAGVM
+	WeightTracker common.WeightTracker
 }
