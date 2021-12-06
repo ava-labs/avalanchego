@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"net"
 	"path/filepath"
-	"strings"
 	"sync"
+	"time"
 
 	"github.com/hashicorp/go-plugin"
 
@@ -68,11 +68,12 @@ var (
 	genesisHashKey  = []byte("genesisID")
 	indexerDBPrefix = []byte{0x00}
 
-	errInvalidTLSKey               = errors.New("invalid TLS key")
-	errPNotCreated                 = errors.New("P-Chain not created")
-	errXNotCreated                 = errors.New("X-Chain not created")
-	errCNotCreated                 = errors.New("C-Chain not created")
-	errFailedToRegisterHealthCheck = errors.New("couldn't register network health check")
+	errInvalidTLSKey   = errors.New("invalid TLS key")
+	errPNotCreated     = errors.New("P-Chain not created")
+	errXNotCreated     = errors.New("X-Chain not created")
+	errCNotCreated     = errors.New("C-Chain not created")
+	errNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
+	errShuttingDown    = errors.New("server shutting down")
 )
 
 // Node is an instance of an Avalanche node.
@@ -102,7 +103,7 @@ type Node struct {
 	sharedMemory atomic.Memory
 
 	// Monitors node health and runs health checks
-	healthService health.Service
+	healthService health.Health
 
 	// Build and parse messages, for both network layer and chain manager
 	msgCreator message.Creator
@@ -495,6 +496,7 @@ func (n *Node) initAPIServer() error {
 			n.Config.HTTPHost,
 			n.Config.HTTPPort,
 			n.Config.APIAllowedOrigins,
+			n.Config.ShutdownTimeout,
 			n.ID,
 		)
 		return nil
@@ -511,6 +513,7 @@ func (n *Node) initAPIServer() error {
 		n.Config.HTTPHost,
 		n.Config.HTTPPort,
 		n.Config.APIAllowedOrigins,
+		n.Config.ShutdownTimeout,
 		n.ID,
 		a,
 	)
@@ -913,13 +916,13 @@ func (n *Node) initInfoAPI() error {
 // Assumes n.Log, n.Net, n.APIServer, n.HTTPLog already initialized
 func (n *Node) initHealthAPI() error {
 	if !n.Config.HealthAPIEnabled {
-		n.healthService = health.NewNoOpService()
+		n.healthService = health.NewNoOp()
 		n.Log.Info("skipping health API initialization because it has been disabled")
 		return nil
 	}
 
 	n.Log.Info("initializing Health API")
-	healthService, err := health.NewService(
+	healthService, err := health.New(
 		n.Config.HealthCheckFreq,
 		n.Log,
 		"health",
@@ -931,7 +934,7 @@ func (n *Node) initHealthAPI() error {
 	n.healthService = healthService
 
 	chainsNotBootstrapped := func(pChainID ids.ID, xChainID ids.ID, cChainID ids.ID) []string {
-		var chains []string
+		chains := make([]string, 0, 3)
 		if !n.chainManager.IsBootstrapped(pChainID) {
 			chains = append(chains, "'P'")
 		}
@@ -944,35 +947,43 @@ func (n *Node) initHealthAPI() error {
 		return chains
 	}
 
-	isBootstrappedFunc := func() (interface{}, error) {
-		if pChainID, err := n.chainManager.Lookup("P"); err != nil {
+	// Passes if the P, X and C chains are finished bootstrapping
+	isNotBootstrappedFunc := func() (interface{}, error) {
+		pChainID, err := n.chainManager.Lookup("P")
+		if err != nil {
 			return nil, errPNotCreated
-		} else if xChainID, err := n.chainManager.Lookup("X"); err != nil {
-			return nil, errXNotCreated
-		} else if cChainID, err := n.chainManager.Lookup("C"); err != nil {
-			return nil, errCNotCreated
-		} else if chains := chainsNotBootstrapped(pChainID, xChainID, cChainID); len(chains) != 0 {
-			return nil, fmt.Errorf("primary subnet has not finished bootstrapping %s", strings.Join(chains, ", "))
 		}
 
-		return nil, nil
-	}
-	// Passes if the P, X and C chains are finished bootstrapping
-	err = n.healthService.RegisterMonotonicCheck("isBootstrapped", isBootstrappedFunc)
-	if err != nil {
-		return fmt.Errorf("couldn't register isBootstrapped health check: %w", err)
+		xChainID, err := n.chainManager.Lookup("X")
+		if err != nil {
+			return nil, errXNotCreated
+		}
+
+		cChainID, err := n.chainManager.Lookup("C")
+		if err != nil {
+			return nil, errCNotCreated
+		}
+
+		chains := chainsNotBootstrapped(pChainID, xChainID, cChainID)
+		if len(chains) != 0 {
+			return chains, errNotBootstrapped
+		}
+		return chains, nil
 	}
 
-	// Register the network layer with the health service
+	err = n.healthService.RegisterMonotonicCheck("isNotBootstrapped", isNotBootstrappedFunc)
+	if err != nil {
+		return fmt.Errorf("couldn't register isNotBootstrapped health check: %w", err)
+	}
+
 	err = n.healthService.RegisterCheck("network", n.Net.HealthCheck)
 	if err != nil {
-		return errFailedToRegisterHealthCheck
+		return fmt.Errorf("couldn't register network health check: %w", err)
 	}
 
-	// Register the router with the health service
 	err = n.healthService.RegisterCheck("router", n.Config.ConsensusRouter.HealthCheck)
 	if err != nil {
-		return errFailedToRegisterHealthCheck
+		return fmt.Errorf("couldn't register router health check: %w", err)
 	}
 
 	handler, err := n.healthService.Handler()
@@ -1151,6 +1162,23 @@ func (n *Node) Shutdown(exitCode int) {
 
 func (n *Node) shutdown() {
 	n.Log.Info("shutting down node with exit code %d", n.ExitCode())
+
+	if n.healthService != nil {
+		// Passes if the node is not shutting down
+		shuttingDownCheckFunc := func() (interface{}, error) {
+			return map[string]interface{}{
+				"isShuttingDown": true,
+			}, errShuttingDown
+		}
+
+		err := n.healthService.RegisterCheck("shuttingDown", shuttingDownCheckFunc)
+		if err != nil {
+			n.Log.Debug("couldn't register shuttingDown health check: %s", err)
+		}
+
+		time.Sleep(n.Config.ShutdownWait)
+	}
+
 	if n.IPCs != nil {
 		if err := n.IPCs.Shutdown(); err != nil {
 			n.Log.Debug("error during IPC shutdown: %s", err)

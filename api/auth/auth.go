@@ -261,7 +261,7 @@ func (a *auth) CreateHandler() (http.Handler, error) {
 	server.RegisterCodec(codec, "application/json")
 	server.RegisterCodec(codec, "application/json;charset=UTF-8")
 	return server, server.RegisterService(
-		&service{auth: a},
+		&Service{auth: a},
 		"auth",
 	)
 }
