@@ -445,7 +445,7 @@ func (b *bootstrapper) Connected(nodeID ids.ShortID) error {
 		return err
 	}
 
-	if b.WeightTracker.EnoughConnectedWeight() {
+	if b.WeightTracker.EnoughConnectedWeight() && !b.started {
 		b.started = true
 		return b.Startup()
 	}
