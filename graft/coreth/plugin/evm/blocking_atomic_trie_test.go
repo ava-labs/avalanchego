@@ -26,13 +26,13 @@ func (tx *Tx) mustAtomicOps() map[ids.ID]*atomic.Requests {
 	return map[ids.ID]*atomic.Requests{id: reqs}
 }
 
-func Test_nearestCommitHeight(t *testing.T) {
+func TestNearestCommitHeight(t *testing.T) {
 	blockNumber := uint64(7029687)
 	height := nearestCommitHeight(blockNumber, 4096)
-	assert.Less(t, blockNumber, height+4096)
+	assert.Less(t, 7028736, height+4096)
 }
 
-func Test_BlockingAtomicTrie_InitializeGenesis(t *testing.T) {
+func TestBlockingAtomicTrieInitializeGenesis(t *testing.T) {
 	lastAcceptedHeight := uint64(0)
 	db := versiondb.New(memdb.New())
 	repo, err := NewAtomicTxRepository(db, testTxCodec(), lastAcceptedHeight)
@@ -49,7 +49,7 @@ func Test_BlockingAtomicTrie_InitializeGenesis(t *testing.T) {
 	assert.EqualValues(t, 0, num)
 }
 
-func Test_BlockingAtomicTrie_InitializeGenesisPlusOne(t *testing.T) {
+func TestBlockingAtomicTrieInitializeGenesisPlusOne(t *testing.T) {
 	lastAcceptedHeight := uint64(1)
 	db := versiondb.New(memdb.New())
 	repo, err := NewAtomicTxRepository(db, testTxCodec(), lastAcceptedHeight)
@@ -67,7 +67,7 @@ func Test_BlockingAtomicTrie_InitializeGenesisPlusOne(t *testing.T) {
 	assert.EqualValues(t, 0, num, "expected %d was %d", 0, num)
 }
 
-func Test_BlockingAtomicTrie_Initialize(t *testing.T) {
+func TestBlockingAtomicTrieInitialize(t *testing.T) {
 	lastAcceptedHeight := uint64(1000)
 	db := versiondb.New(memdb.New())
 	repo, err := NewAtomicTxRepository(db, testTxCodec(), lastAcceptedHeight)
@@ -110,7 +110,7 @@ func newTestAtomicTrieIndexer(t *testing.T) types.AtomicTrie {
 	return indexer
 }
 
-func Test_IndexerWriteAndRead(t *testing.T) {
+func TestIndexerWriteAndRead(t *testing.T) {
 	indexer := newTestAtomicTrieIndexer(t)
 
 	blockRootMap := make(map[uint64]common.Hash)
@@ -156,7 +156,7 @@ func Test_IndexerWriteAndRead(t *testing.T) {
 	assert.Equal(t, "height 301 not within the next commit height 300", err.Error())
 }
 
-func Test_IndexerInitializeFromState(t *testing.T) {
+func TestIndexerInitializeFromState(t *testing.T) {
 	indexer := newTestAtomicTrieIndexer(t)
 
 	// ensure last is uninitialised
@@ -197,7 +197,7 @@ func Test_IndexerInitializeFromState(t *testing.T) {
 	assert.NotEqual(t, common.Hash{}, hash)
 }
 
-func Test_IndexerInitializesOnlyOnce(t *testing.T) {
+func TestIndexerInitializesOnlyOnce(t *testing.T) {
 	lastAcceptedHeight := uint64(100)
 	db := versiondb.New(memdb.New())
 	repo, err := NewAtomicTxRepository(db, testTxCodec(), lastAcceptedHeight)
@@ -234,7 +234,7 @@ func Test_IndexerInitializesOnlyOnce(t *testing.T) {
 	assert.Equal(t, hash, newHash, "hash should be the same")
 }
 
-func Test_IndexerInitializeProducesSameHashEveryTime(t *testing.T) {
+func TestIndexerInitializeProducesSameHashEveryTime(t *testing.T) {
 	t.Parallel()
 	lastAcceptedHeight := uint64(1000)
 	db := versiondb.New(memdb.New())
