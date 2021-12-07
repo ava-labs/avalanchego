@@ -29,8 +29,9 @@ const (
 )
 
 var (
-	atomicIndexDBPrefix = []byte("atomicIndexDB")
-	lastCommittedKey    = []byte("atomicTrieLastCommittedBlock")
+	atomicIndexDBPrefix     = []byte("atomicIndexDB")
+	atomicIndexMetaDBPrefix = []byte("atomicIndexMetaDB")
+	lastCommittedKey        = []byte("atomicTrieLastCommittedBlock")
 )
 
 // blockingAtomicTrie implements the types.AtomicTrie interface
@@ -38,7 +39,8 @@ var (
 type blockingAtomicTrie struct {
 	commitHeightInterval uint64              // commit interval, same as commitHeightInterval by default
 	db                   *versiondb.Database // Underlying database
-	atomicTrieDB         database.Database   // Underlying database with any prefixes
+	metadataDB           database.Database   // Underlying database containing the atomic trie metadata
+	atomicTrieDB         database.Database   // Underlying database containing the atomic trie
 	trieDB               *trie.Database      // Trie database
 	trie                 *trie.Trie          // Atomic trie.Trie mapping key (height+blockchainID) and value (RLP encoded atomic.Requests)
 	repo                 AtomicTxRepository
@@ -59,7 +61,8 @@ func newBlockingAtomicTrie(
 	db *versiondb.Database, repo AtomicTxRepository, codec codec.Manager, lastAcceptedHeight uint64, commitHeightInterval uint64,
 ) (types.AtomicTrie, error) {
 	atomicTrieDB := prefixdb.New(atomicIndexDBPrefix, db)
-	root, height, err := lastCommittedRootIfExists(atomicTrieDB)
+	metadataDB := prefixdb.New(atomicIndexMetaDBPrefix, db)
+	root, height, err := lastCommittedRootIfExists(metadataDB)
 	if err != nil {
 		return nil, err
 	}
@@ -74,6 +77,7 @@ func newBlockingAtomicTrie(
 		commitHeightInterval: commitHeightInterval,
 		db:                   db,
 		atomicTrieDB:         atomicTrieDB,
+		metadataDB:           metadataDB,
 		trieDB:               triedb,
 		trie:                 t,
 		repo:                 repo,
@@ -284,12 +288,12 @@ func (b *blockingAtomicTrie) commit(height uint64) (common.Hash, error) {
 	binary.BigEndian.PutUint64(heightBytes, height)
 
 	// now save the trie hash against the height it was committed at
-	if err = b.atomicTrieDB.Put(heightBytes, hash[:]); err != nil {
+	if err = b.metadataDB.Put(heightBytes, hash[:]); err != nil {
 		return common.Hash{}, err
 	}
 
 	// update lastCommittedKey with the current height
-	if err = b.atomicTrieDB.Put(lastCommittedKey, heightBytes); err != nil {
+	if err = b.metadataDB.Put(lastCommittedKey, heightBytes); err != nil {
 		return common.Hash{}, err
 	}
 
@@ -351,7 +355,7 @@ func (b *blockingAtomicTrie) TrieDB() *trie.Database {
 func (b *blockingAtomicTrie) Root(height uint64) (common.Hash, error) {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
-	hash, err := b.atomicTrieDB.Get(heightBytes)
+	hash, err := b.metadataDB.Get(heightBytes)
 	if err != nil {
 		return common.Hash{}, err
 	}
