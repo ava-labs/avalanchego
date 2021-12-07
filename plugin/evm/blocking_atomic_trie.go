@@ -31,12 +31,6 @@ var (
 	lastCommittedKey = []byte("atomicTrieLastCommittedBlock")
 )
 
-type AtomicReqs map[ids.ID]*atomic.Requests
-type AtomicIndexReq struct {
-	height uint64
-	ops    AtomicReqs
-}
-
 // blockingAtomicTrie implements the types.AtomicTrie interface
 // using the eth trie.Trie implementation
 type blockingAtomicTrie struct {
@@ -105,30 +99,26 @@ func lastCommittedRootIfExists(db ethdb.KeyValueStore) (common.Hash, uint64, err
 	return root, height, nil
 }
 
-// nearestCommitHeight given a block number calculates the nearest commit height such that the
-// commit height is always less than blockNumber, commitHeight+commitInterval is greater
-// than the blockNumber and commit height is completely divisible by commit interval
+// nearestCommitHeight given blockNumber calculates and returns commitHeight such that
+// commitHeight is less than blockNumber, commitHeight+commitInterval is greater
+// than blockNumber and commitHeight is divisible by commitInterval
 func nearestCommitHeight(blockNumber uint64, commitInterval uint64) uint64 {
-	if blockNumber == 0 {
-		return 0
-	}
 	return blockNumber - (blockNumber % commitInterval)
 }
 
-// Initialize initializes the atomic trie using the atomic repository height index iterating from the oldest to the
-// lastAcceptedBlockNumber making a single commit at the most recent height divisible by the commitInterval
+// Initialize initializes the atomic trie using the atomic repository height index.
+// Iterating from the last indexed height to lastAcceptedBlockNumber, making a single commit at the
+// most recent height divisible by the commitInterval.
 // Optionally returns an error
-// Initialize only ever runs once during a node's lifetime. Subsequent updates to this trie are made using the
-// Index call during evm.block.Accept().
-// the lastAcceptedBlockNumber parameter is expected to be the height of the index
+// Subsequent updates to this trie are made using the Index call during evm.block.Accept().
 func (b *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error) error {
 	// commitHeight is the highest block that can be committed i.e. is divisible by b.commitHeightInterval
 	commitHeight := nearestCommitHeight(lastAcceptedBlockNumber, b.commitHeightInterval)
 	uncommittedOpsMap := make(map[uint64]map[ids.ID]*atomic.Requests, lastAcceptedBlockNumber-commitHeight)
 
-	heightBytes := make([]byte, 8)
+	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, b.lastCommittedHeight)
-	// we iterate by height, from 0 to the index height (highest indexed block containing atomic transaction)
+	// iterate by height, from lastCommittedHeight to the lastAcceptedBlockNumber
 	iter := b.repo.IterateByHeight(heightBytes)
 	defer iter.Release()
 
@@ -142,15 +132,14 @@ func (b *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommit
 
 		// Get height for this iteration + transactions
 		// iterate over the transactions, indexing them if the height is < commit height
-		// otherwise we add the atomic operations from the transaction to the uncommittedOpsMap
-
+		// otherwise, add the atomic operations from the transaction to the uncommittedOpsMap
 		height := binary.BigEndian.Uint64(iter.Key())
 		txs, err := ExtractAtomicTxs(iter.Value(), true, b.codec)
 		if err != nil {
 			return err
 		}
 
-		// combine all atomic operations across all transactions
+		// combine atomic operations from all transactions at this block height
 		combinedOps := make(map[ids.ID]*atomic.Requests)
 		for _, tx := range txs {
 			id, reqs, err := tx.Accept()
@@ -190,11 +179,6 @@ func (b *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommit
 	// skip commit in case of early height
 	// should never happen in production since height is greater than 4096
 	if lastAcceptedBlockNumber < b.commitHeightInterval {
-		if dbCommitFn != nil {
-			if err := dbCommitFn(); err != nil {
-				return err
-			}
-		}
 		return nil
 	}
 
@@ -232,29 +216,24 @@ func (b *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommit
 		}
 	}
 
-	log.Info("index initialised", "preCommitEntriesIndexed", preCommitBlockIndexed, "postCommitEntriesIndexed", postCommitTxIndexed)
+	log.Info("atomic trie initialised", "preCommitEntriesIndexed", preCommitBlockIndexed, "postCommitEntriesIndexed", postCommitTxIndexed)
 	return nil
 }
 
 // Index updates the trie with entries in atomicOps
-// Returns optional hash and optional error
-// atomicOps is a map of blockchainID -> atomic.Requests
-// A non-empty hash is returned when the height is within the commitInterval
-// and the trie is committed
+// A non-empty hash is returned if the trie was committed (the height is divisible by commitInterval)
 // This function updates the following:
-// - index height (indexHeightKey) => [height]
-// - heightBytes => trie root hash (if within commitInterval)
-// - lastCommittedBlock => height (if trie was committed this time)
-// If indexHeightKey is not set in the database, this function will
-//   initialise it with [height] as the starting height - this *must* be zero in
-//   that case
+// - heightBytes => trie root hash (if the trie was committed)
+// - lastCommittedBlock => height (if the trie was committed)
 func (b *blockingAtomicTrie) Index(height uint64, atomicOps map[ids.ID]*atomic.Requests) (common.Hash, error) {
 	_, lastCommittedHeight := b.LastCommitted()
 
+	// disallow going backwards
 	if height < lastCommittedHeight {
 		return common.Hash{}, fmt.Errorf("height %d must be after last committed height %d", height, lastCommittedHeight)
 	}
 
+	// disallow going ahead too far
 	nextCommitHeight := lastCommittedHeight + b.commitHeightInterval
 	if height > nextCommitHeight {
 		return common.Hash{}, fmt.Errorf("height %d not within the next commit height %d", height, nextCommitHeight)
@@ -274,7 +253,7 @@ func (b *blockingAtomicTrie) index(height uint64, atomicOps map[ids.ID]*atomic.R
 	return b.updateTrie(atomicOps, height)
 }
 
-// commit commits the underlying trie generating a trie root hash
+// commit commits the underlying trie, generating a trie root hash
 // assumes that the caller is aware of the commit rules i.e. the height being within commitInterval
 // returns the trie root from the commit + optional error
 func (b *blockingAtomicTrie) commit(height uint64) (common.Hash, error) {
@@ -285,8 +264,7 @@ func (b *blockingAtomicTrie) commit(height uint64) (common.Hash, error) {
 	}
 
 	l.Info("committed atomic trie", "hash", hash.String(), "height", height)
-
-	if err = b.trieDB.Commit(hash, false, nil); err != nil {
+	if err := b.trieDB.Commit(hash, false, nil); err != nil {
 		return common.Hash{}, err
 	}
 
@@ -311,8 +289,7 @@ func (b *blockingAtomicTrie) commit(height uint64) (common.Hash, error) {
 
 func (b *blockingAtomicTrie) updateTrie(atomicOps map[ids.ID]*atomic.Requests, height uint64) error {
 	for blockchainID, requests := range atomicOps {
-		// value is RLP encoded atomic.Requests struct
-		valueBytes, err := rlp.EncodeToBytes(*requests)
+		valueBytes, err := rlp.EncodeToBytes(requests)
 		if err != nil {
 			// highly unlikely but possible if atomic.Element
 			// has a change that is unsupported by the RLP encoder
@@ -320,7 +297,7 @@ func (b *blockingAtomicTrie) updateTrie(atomicOps map[ids.ID]*atomic.Requests, h
 		}
 
 		// key is [height]+[blockchainID]
-		keyPacker := wrappers.Packer{Bytes: make([]byte, wrappers.LongLen+len(blockchainID[:]))}
+		keyPacker := wrappers.Packer{Bytes: make([]byte, wrappers.LongLen+idLen)}
 		keyPacker.PackLong(height)
 		keyPacker.PackFixedBytes(blockchainID[:])
 		b.trie.Update(keyPacker.Bytes, valueBytes)
@@ -333,13 +310,13 @@ func (b *blockingAtomicTrie) commitTrie() (common.Hash, error) {
 	return hash, err
 }
 
-// LastCommitted returns the last committed trie hash, block height, and an optional error
+// LastCommitted returns the last committed trie hash and an optional error
 func (b *blockingAtomicTrie) LastCommitted() (common.Hash, uint64) {
 	return b.lastCommittedHash, b.lastCommittedHeight
 }
 
 // Iterator returns a types.AtomicTrieIterator that iterates the trie from the given
-// atomic trie root
+// atomic trie root, starting at the specified height
 func (b *blockingAtomicTrie) Iterator(root common.Hash, startHeight uint64) (types.AtomicTrieIterator, error) {
 	var startKey []byte
 	if startHeight > 0 {

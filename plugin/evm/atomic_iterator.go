@@ -16,7 +16,7 @@ import (
 )
 
 // this is there so that we don't have to hardcode the 32 length in case it changes
-var idLen = len(ids.ID{}) // should be 32
+const idLen = len(ids.ID{}) // should be 32
 
 // atomicTrieIterator is an implementation of types.AtomicTrieIterator that serves
 // parsed data with each iteration
@@ -36,19 +36,20 @@ func (a *atomicTrieIterator) Error() error {
 	return a.err
 }
 
-// Next returns whether there is data to iterate over
-// this function sets blockNumber, blockchainID and entries fields of the atomicTrieIterator
-// resets all fields and sets err in case of an error during current iteration
+// Next returns whether there are more nodes to iterate over
+// On success, this function sets the blockNumber and atomicOps fields
+// In case of an error during this iteration, it sets err and resets the above fields
 func (a *atomicTrieIterator) Next() bool {
 	hasNext := a.trieIterator.Next()
 	// if the underlying iterator has data to iterate over, parse and set the fields
 	if err := a.trieIterator.Err; err == nil && hasNext {
 		// key is [blockNumberBytes]+[blockchainIDBytes] = 8+32=40 bytes
 		keyLen := len(a.trieIterator.Key)
-		if keyLen != wrappers.LongLen+idLen {
+		expectedKeyLen := wrappers.LongLen + idLen
+		if keyLen != expectedKeyLen {
 			// unexpected key length
 			// set the error and stop the iteration as data is unreliable from this point
-			a.err = fmt.Errorf("expected atomic trie key length to be 40 but was %d", keyLen)
+			a.err = fmt.Errorf("expected atomic trie key length to be %d but was %d", expectedKeyLen, keyLen)
 			a.resetFields()
 			return false
 		}
@@ -63,13 +64,13 @@ func (a *atomicTrieIterator) Next() bool {
 
 		// value is RLP encoded atomic.Requests
 		var requests atomic.Requests
-		if err = rlp.DecodeBytes(a.trieIterator.Value, &requests); err != nil {
+		if err := rlp.DecodeBytes(a.trieIterator.Value, &requests); err != nil {
 			a.err = err
 			a.resetFields()
 			return false
 		}
 
-		// update the struct fields
+		// success, update the struct fields
 		a.blockNumber = blockNumber
 		a.atomicOps = map[ids.ID]*atomic.Requests{blockchainID: &requests}
 	} else if err != nil {
@@ -86,11 +87,13 @@ func (a *atomicTrieIterator) resetFields() {
 	a.atomicOps = nil
 }
 
-// BlockNumber returns the block number of this iteration
+// BlockNumber returns the current block number
 func (a *atomicTrieIterator) BlockNumber() uint64 {
 	return a.blockNumber
 }
 
+// AtomicOps returns a map of blockchainIDs to the set of atomic requests
+// for that blockchainID at the current block number
 func (a *atomicTrieIterator) AtomicOps() map[ids.ID]*atomic.Requests {
 	return a.atomicOps
 }
