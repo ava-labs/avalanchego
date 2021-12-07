@@ -19,10 +19,11 @@ import (
 // atomicTrieIterator is an implementation of types.AtomicTrieIterator that serves
 // parsed data with each iteration
 type atomicTrieIterator struct {
-	trieIterator *trie.Iterator              // underlying trie.Iterator
-	atomicOps    map[ids.ID]*atomic.Requests // atomic operation entries at this iteration
-	blockNumber  uint64                      // block number at this iteration
-	err          error                       // error if any has occurred
+	trieIterator *trie.Iterator   // underlying trie.Iterator
+	atomicOps    *atomic.Requests // atomic operation entries at this iteration
+	blockchainID ids.ID           // blockchain ID
+	blockNumber  uint64           // block number at this iteration
+	err          error            // error if any has occurred
 }
 
 func NewAtomicTrieIterator(trieIterator *trie.Iterator) types.AtomicTrieIterator {
@@ -39,6 +40,7 @@ func (a *atomicTrieIterator) Error() error {
 // In case of an error during this iteration, it sets err and resets the above fields
 func (a *atomicTrieIterator) Next() bool {
 	hasNext := a.trieIterator.Next()
+
 	err := a.trieIterator.Err
 	switch {
 	case err == nil && hasNext:
@@ -72,7 +74,8 @@ func (a *atomicTrieIterator) Next() bool {
 
 		// success, update the struct fields
 		a.blockNumber = blockNumber
-		a.atomicOps = map[ids.ID]*atomic.Requests{blockchainID: &requests}
+		a.blockchainID = blockchainID
+		a.atomicOps = &requests
 	case err != nil:
 		a.err = err
 		fallthrough
@@ -85,6 +88,7 @@ func (a *atomicTrieIterator) Next() bool {
 
 func (a *atomicTrieIterator) resetFields() {
 	a.blockNumber = 0
+	a.blockchainID = ids.ID{}
 	a.atomicOps = nil
 }
 
@@ -93,8 +97,13 @@ func (a *atomicTrieIterator) BlockNumber() uint64 {
 	return a.blockNumber
 }
 
+// BlockchainID returns the current blockchain ID
+func (a *atomicTrieIterator) BlockchainID() ids.ID {
+	return a.blockchainID
+}
+
 // AtomicOps returns a map of blockchainIDs to the set of atomic requests
 // for that blockchainID at the current block number
-func (a *atomicTrieIterator) AtomicOps() map[ids.ID]*atomic.Requests {
+func (a *atomicTrieIterator) AtomicOps() *atomic.Requests {
 	return a.atomicOps
 }
