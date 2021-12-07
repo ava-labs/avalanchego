@@ -22,11 +22,11 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth/ethconfig"
-	fastSyncTypes "github.com/ava-labs/coreth/fastsync/types"
 	"github.com/ava-labs/coreth/metrics/prometheus"
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
+	fastSyncTypes "github.com/ava-labs/coreth/statesync/types"
 
 	// Force-load tracer engine to trigger registration
 	//

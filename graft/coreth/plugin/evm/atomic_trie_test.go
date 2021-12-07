@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/coreth/fastsync/types"
+	"github.com/ava-labs/coreth/statesync/types"
 )
 
 const testCommitInterval = 100
