@@ -26,9 +26,10 @@ const (
 )
 
 var (
-	atomicTxIDDBPrefix     = []byte("atomicTxDB")
-	atomicHeightTxDBPrefix = []byte("atomicHeightTxDB")
-	maxIndexedHeightKey    = []byte("maxIndexedAtomicTxHeight")
+	atomicTxIDDBPrefix      = []byte("atomicTxDB")
+	atomicHeightTxDBPrefix  = []byte("atomicHeightTxDB")
+	maxIndexeHeightDBPrefix = []byte("atomicRepoMetadataDB")
+	maxIndexedHeightKey     = []byte("maxIndexedAtomicTxHeight")
 )
 
 // AtomicTxRepository defines an entity that manages storage and indexing of
@@ -49,6 +50,10 @@ type atomicTxRepository struct {
 	// [acceptedAtomicTxByHeightDB] maintains an index of [height] => [atomic txs] for all accepted block heights.
 	acceptedAtomicTxByHeightDB database.Database
 
+	// [atomicRepoMetadataDB] maintains a single key-value pair which tracks the height up to which the atomic repository
+	// has indexed.
+	atomicRepoMetadataDB database.Database
+
 	// This db is used to store [maxIndexedHeightKey] to avoid interfering with the iterators over the atomic transaction DBs.
 	db *versiondb.Database
 
@@ -57,12 +62,10 @@ type atomicTxRepository struct {
 }
 
 func NewAtomicTxRepository(db *versiondb.Database, codec codec.Manager, lastAcceptedHeight uint64) (AtomicTxRepository, error) {
-	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
-	acceptedAtomicTxByHeightDB := prefixdb.New(atomicHeightTxDBPrefix, db)
-
 	repo := &atomicTxRepository{
-		acceptedAtomicTxDB:         acceptedAtomicTxDB,
-		acceptedAtomicTxByHeightDB: acceptedAtomicTxByHeightDB,
+		acceptedAtomicTxDB:         prefixdb.New(atomicTxIDDBPrefix, db),
+		acceptedAtomicTxByHeightDB: prefixdb.New(atomicHeightTxDBPrefix, db),
+		atomicRepoMetadataDB:       prefixdb.New(maxIndexeHeightDBPrefix, db),
 		codec:                      codec,
 		db:                         db,
 	}
@@ -78,7 +81,7 @@ func (a *atomicTxRepository) initializeHeightIndex(lastAcceptedHeight uint64) er
 	// [lastTxID] will be initialized to the last transaction that we indexed
 	// if we are part way through a migration.
 	var lastTxID []byte
-	indexHeightBytes, err := a.db.Get(maxIndexedHeightKey)
+	indexHeightBytes, err := a.atomicRepoMetadataDB.Get(maxIndexedHeightKey)
 	switch err {
 	case nil:
 		break
@@ -116,6 +119,9 @@ func (a *atomicTxRepository) initializeHeightIndex(lastAcceptedHeight uint64) er
 
 		// iter.Value() consists of [height packed as uint64] + [tx serialized as packed []byte]
 		iterValue := iter.Value()
+		if len(iterValue) < wrappers.LongLen {
+			return fmt.Errorf("atomic tx DB iterator value had invalid length (%d) < (%d)", len(iterValue), wrappers.LongLen)
+		}
 		heightBytes := iterValue[:wrappers.LongLen]
 
 		// Get the tx iter is pointing to, len(txs) == 1 is expected here.
@@ -138,13 +144,13 @@ func (a *atomicTxRepository) initializeHeightIndex(lastAcceptedHeight uint64) er
 		// call commitFn to write to underlying DB if we have reached
 		// [commitSizeCap]
 		if pendingBytesApproximation > commitSizeCap {
-			if err := a.db.Put(maxIndexedHeightKey, lastTxID); err != nil {
+			if err := a.atomicRepoMetadataDB.Put(maxIndexedHeightKey, lastTxID); err != nil {
 				return err
 			}
 			if err := a.db.Commit(); err != nil {
 				return err
 			}
-			log.Info("Committing work initializing the atomic repository", "lastTxID", lastTxID)
+			log.Info("Committing work initializing the atomic repository", "lastTxID", lastTxID, "pendingBytesApprox", pendingBytesApproximation)
 			pendingBytesApproximation = 0
 		}
 		indexedTxs++
@@ -158,7 +164,7 @@ func (a *atomicTxRepository) initializeHeightIndex(lastAcceptedHeight uint64) er
 	// Updated the value stored [maxIndexedHeightKey] to be the lastAcceptedHeight
 	indexedHeight := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(indexedHeight, lastAcceptedHeight)
-	if err := a.db.Put(maxIndexedHeightKey, indexedHeight); err != nil {
+	if err := a.atomicRepoMetadataDB.Put(maxIndexedHeightKey, indexedHeight); err != nil {
 		return err
 	}
 
@@ -168,7 +174,7 @@ func (a *atomicTxRepository) initializeHeightIndex(lastAcceptedHeight uint64) er
 
 // GetIndexHeight returns the last height that was indexed by the atomic repository
 func (a *atomicTxRepository) GetIndexHeight() (uint64, error) {
-	indexHeightBytes, err := a.db.Get(maxIndexedHeightKey)
+	indexHeightBytes, err := a.atomicRepoMetadataDB.Get(maxIndexedHeightKey)
 	if err != nil {
 		return 0, err
 	}
@@ -256,7 +262,7 @@ func (a *atomicTxRepository) Write(height uint64, txs []*Tx) error {
 
 	// Update the index height regardless of if any atomic transactions
 	// were present at [height].
-	return a.db.Put(maxIndexedHeightKey, heightBytes)
+	return a.atomicRepoMetadataDB.Put(maxIndexedHeightKey, heightBytes)
 }
 
 // indexTxByID writes [tx] into the [acceptedAtomicTxDB] stored as

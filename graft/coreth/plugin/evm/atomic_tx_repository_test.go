@@ -137,3 +137,59 @@ func TestAtomicRepositoryPreAP5Migration(t *testing.T) {
 	writeTxs(t, repo, 150, 200, 10, txMap)
 	verifyTxs(t, repo, txMap)
 }
+
+func TestAtomicRepositoryPostAP5Migration(t *testing.T) {
+	db := versiondb.New(memdb.New())
+	codec := prepareCodecForTest()
+
+	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
+	txMap := make(map[uint64][]*Tx)
+	addTxs(t, codec, acceptedAtomicTxDB, 0, 100, 1, txMap)
+	addTxs(t, codec, acceptedAtomicTxDB, 100, 200, 10, txMap)
+	if err := db.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Ensure the atomic repository can correctly migrate the transactions
+	// from the old accepted atomic tx DB to add the height index.
+	repo, err := NewAtomicTxRepository(db, codec, 200)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.NoError(t, err)
+	verifyTxs(t, repo, txMap)
+
+	writeTxs(t, repo, 200, 300, 10, txMap)
+	verifyTxs(t, repo, txMap)
+}
+
+func benchAtomicRepositoryIndex10_000(b *testing.B, maxHeight uint64, txsPerHeight int) {
+	db := versiondb.New(memdb.New())
+	codec := prepareCodecForTest()
+
+	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
+	txMap := make(map[uint64][]*Tx)
+
+	addTxs(b, codec, acceptedAtomicTxDB, 0, maxHeight, txsPerHeight, txMap)
+	if err := db.Commit(); err != nil {
+		b.Fatal(err)
+	}
+	repo, err := NewAtomicTxRepository(db, codec, maxHeight)
+	if err != nil {
+		b.Fatal(err)
+	}
+	assert.NoError(b, err)
+	verifyTxs(b, repo, txMap)
+}
+
+func BenchmarkAtomicRepositoryIndex_10kBlocks_1Tx(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		benchAtomicRepositoryIndex10_000(b, 10_000, 1)
+	}
+}
+
+func BenchmarkAtomicRepositoryIndex_10kBlocks_10Tx(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		benchAtomicRepositoryIndex10_000(b, 10_000, 10)
+	}
+}
