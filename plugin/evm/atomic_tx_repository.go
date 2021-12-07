@@ -66,12 +66,12 @@ func NewAtomicTxRepository(db *versiondb.Database, codec codec.Manager, lastAcce
 		codec:                      codec,
 		db:                         db,
 	}
-	return repo, repo.initialize(lastAcceptedHeight)
+	return repo, repo.initializeHeightIndex(lastAcceptedHeight)
 }
 
-// initialize initializes the atomic repository and takes care of any required migration from the previous database
+// initializeHeightIndex initializes the atomic repository and takes care of any required migration from the previous database
 // format which did not have a height -> txs index.
-func (a *atomicTxRepository) initialize(lastAcceptedHeight uint64) error {
+func (a *atomicTxRepository) initializeHeightIndex(lastAcceptedHeight uint64) error {
 	startTime := time.Now()
 	lastLogTime := startTime
 
