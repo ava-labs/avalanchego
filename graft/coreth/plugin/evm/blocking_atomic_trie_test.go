@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/coreth/ethdb/memorydb"
 	"github.com/ava-labs/coreth/fastsync/types"
 )
 
@@ -42,14 +41,7 @@ func Test_BlockingAtomicTrie_InitializeGenesis(t *testing.T) {
 	err = repo.Write(0, []*Tx{tx})
 	assert.NoError(t, err)
 
-	atomicTrieDB := memorydb.New()
-	atomicTrie, err := NewBlockingAtomicTrie(atomicTrieDB, repo, testTxCodec())
-	assert.NoError(t, err)
-	atomicTrie.(*blockingAtomicTrie).commitHeightInterval = 10
-	dbCommitFn := func() error {
-		return nil
-	}
-	err = atomicTrie.Initialize(lastAcceptedHeight, dbCommitFn)
+	atomicTrie, err := newBlockingAtomicTrie(db, repo, testTxCodec(), lastAcceptedHeight, 10 /*commitHeightInterval*/)
 	assert.NoError(t, err)
 
 	_, num := atomicTrie.LastCommitted()
@@ -67,14 +59,7 @@ func Test_BlockingAtomicTrie_InitializeGenesisPlusOne(t *testing.T) {
 	err = repo.Write(1, []*Tx{testDataImportTx()})
 	assert.NoError(t, err)
 
-	atomicTrieDB := memorydb.New()
-	atomicTrie, err := NewBlockingAtomicTrie(atomicTrieDB, repo, testTxCodec())
-	assert.NoError(t, err)
-	atomicTrie.(*blockingAtomicTrie).commitHeightInterval = 10
-	dbCommitFn := func() error {
-		return nil
-	}
-	err = atomicTrie.Initialize(lastAcceptedHeight, dbCommitFn)
+	atomicTrie, err := newBlockingAtomicTrie(db, repo, testTxCodec(), lastAcceptedHeight, 10 /*commitHeightInterval*/)
 	assert.NoError(t, err)
 
 	_, num := atomicTrie.LastCommitted()
@@ -93,15 +78,7 @@ func Test_BlockingAtomicTrie_Initialize(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	atomicTrieDB := memorydb.New()
-	atomicTrie, err := NewBlockingAtomicTrie(atomicTrieDB, repo, testTxCodec())
-	atomicTrie.(*blockingAtomicTrie).commitHeightInterval = 10
-	assert.NoError(t, err)
-	dbCommitFn := func() error {
-		return nil
-	}
-
-	err = atomicTrie.Initialize(lastAcceptedHeight, dbCommitFn)
+	atomicTrie, err := newBlockingAtomicTrie(db, repo, testTxCodec(), lastAcceptedHeight, 10 /*commitHeightInterval*/)
 	assert.NoError(t, err)
 
 	lastCommittedHash, lastCommittedHeight := atomicTrie.LastCommitted()
@@ -109,7 +86,7 @@ func Test_BlockingAtomicTrie_Initialize(t *testing.T) {
 	assert.NotEqual(t, common.Hash{}, lastCommittedHash)
 	assert.EqualValues(t, 1000, lastCommittedHeight, "expected %d but was %d", 1000, lastCommittedHeight)
 
-	atomicTrie, err = NewBlockingAtomicTrie(atomicTrieDB, repo, testTxCodec())
+	atomicTrie, err = NewBlockingAtomicTrie(db, repo, testTxCodec(), lastAcceptedHeight)
 	assert.NoError(t, err)
 	iterator, err := atomicTrie.Iterator(lastCommittedHash, 0)
 	assert.NoError(t, err)
@@ -127,17 +104,9 @@ func newTestAtomicTrieIndexer(t *testing.T) types.AtomicTrie {
 	db := versiondb.New(memdb.New())
 	repo, err := NewAtomicTxRepository(db, testTxCodec(), 0)
 	assert.NoError(t, err)
-	indexer, err := NewBlockingAtomicTrie(Database{db}, repo, testTxCodec())
+	indexer, err := newBlockingAtomicTrie(db, repo, testTxCodec(), 0, testCommitInterval)
 	assert.NoError(t, err)
 	assert.NotNil(t, indexer)
-
-	{
-		// for test only to make it go faaaaaasst
-		atomicTrieIndexer, ok := indexer.(*blockingAtomicTrie)
-		assert.True(t, ok)
-		atomicTrieIndexer.commitHeightInterval = testCommitInterval
-	}
-
 	return indexer
 }
 
@@ -239,13 +208,7 @@ func Test_IndexerInitializesOnlyOnce(t *testing.T) {
 	}
 
 	// initialize atomic repository
-	indexer, err := NewBlockingAtomicTrie(Database{db}, repo, testTxCodec())
-	assert.NoError(t, err)
-	{
-		indexer.(*blockingAtomicTrie).commitHeightInterval = 90
-	}
-
-	err = indexer.Initialize(lastAcceptedHeight, nil)
+	indexer, err := newBlockingAtomicTrie(db, repo, testTxCodec(), lastAcceptedHeight, 90 /*commitHeightInterval*/)
 	assert.NoError(t, err)
 
 	hash, height := indexer.LastCommitted()
@@ -262,13 +225,7 @@ func Test_IndexerInitializesOnlyOnce(t *testing.T) {
 	// old height with the old commit hash without any changes
 
 	// initialize atomic indexer again
-	indexer, err = NewBlockingAtomicTrie(Database{db}, repo, testTxCodec())
-	assert.NoError(t, err)
-	{
-		indexer.(*blockingAtomicTrie).commitHeightInterval = 90
-	}
-
-	err = indexer.Initialize(lastAcceptedHeight, nil) // should be skipped
+	indexer, err = newBlockingAtomicTrie(db, repo, testTxCodec(), lastAcceptedHeight, 90 /*commitHeightInterval*/)
 	assert.NoError(t, err)
 
 	newHash, height := indexer.LastCommitted()
@@ -295,13 +252,7 @@ func Test_IndexerInitializeProducesSameHashEveryTime(t *testing.T) {
 	}
 
 	// initialize atomic repository
-	indexer, err := NewBlockingAtomicTrie(Database{db}, repo, testTxCodec())
-	assert.NoError(t, err)
-	{
-		indexer.(*blockingAtomicTrie).commitHeightInterval = 90
-	}
-
-	err = indexer.Initialize(lastAcceptedHeight, nil)
+	indexer, err := newBlockingAtomicTrie(db, repo, testTxCodec(), lastAcceptedHeight, 90 /*commitHeightInterval*/)
 	assert.NoError(t, err)
 
 	expectedCommitHeight := nearestCommitHeight(lastAcceptedHeight, 90)
@@ -314,16 +265,8 @@ func Test_IndexerInitializeProducesSameHashEveryTime(t *testing.T) {
 	initializeRuns := 50
 	for i := 0; i < initializeRuns; i++ {
 		// initialize atomic indexer again
-		indexer, err = NewBlockingAtomicTrie(Database{memdb.New()}, repo, testTxCodec())
+		indexer, err = newBlockingAtomicTrie(versiondb.New(memdb.New()), repo, testTxCodec(), lastAcceptedHeight, 90 /*commitHeightInterval*/)
 		assert.NoError(t, err)
-		{
-			indexer.(*blockingAtomicTrie).commitHeightInterval = 90
-		}
-
-		// run initialize
-		err = indexer.Initialize(lastAcceptedHeight, nil)
-		assert.NoError(t, err)
-
 		// expects heights and hashes to be exactly the same
 		newHash, indexerHeight := indexer.LastCommitted()
 		assert.NoError(t, err)

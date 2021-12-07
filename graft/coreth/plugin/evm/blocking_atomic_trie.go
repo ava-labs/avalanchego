@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/database/versiondb"
 
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -17,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/fastsync/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -28,14 +29,16 @@ const (
 )
 
 var (
-	lastCommittedKey = []byte("atomicTrieLastCommittedBlock")
+	atomicIndexDBPrefix = []byte("atomicIndexDB")
+	lastCommittedKey    = []byte("atomicTrieLastCommittedBlock")
 )
 
 // blockingAtomicTrie implements the types.AtomicTrie interface
 // using the eth trie.Trie implementation
 type blockingAtomicTrie struct {
 	commitHeightInterval uint64              // commit interval, same as commitHeightInterval by default
-	db                   ethdb.KeyValueStore // Underlying database
+	db                   *versiondb.Database // Underlying database
+	atomicTrieDB         database.Database   // Underlying database with any prefixes
 	trieDB               *trie.Database      // Trie database
 	trie                 *trie.Trie          // Atomic trie.Trie mapping key (height+blockchainID) and value (RLP encoded atomic.Requests)
 	repo                 AtomicTxRepository
@@ -44,59 +47,62 @@ type blockingAtomicTrie struct {
 	codec                codec.Manager
 }
 
-func NewBlockingAtomicTrie(db ethdb.KeyValueStore, repo AtomicTxRepository, codec codec.Manager) (types.AtomicTrie, error) {
-	root, height, err := lastCommittedRootIfExists(db)
+func NewBlockingAtomicTrie(db *versiondb.Database, repo AtomicTxRepository, codec codec.Manager, lastAcceptedHeight uint64) (types.AtomicTrie, error) {
+	return newBlockingAtomicTrie(db, repo, codec, lastAcceptedHeight, commitHeightInterval)
+}
+
+func newBlockingAtomicTrie(
+	db *versiondb.Database, repo AtomicTxRepository, codec codec.Manager, lastAcceptedHeight uint64, commitHeightInterval uint64,
+) (types.AtomicTrie, error) {
+	atomicTrieDB := prefixdb.New(atomicIndexDBPrefix, db)
+	root, height, err := lastCommittedRootIfExists(atomicTrieDB)
 	if err != nil {
 		return nil, err
 	}
 
-	triedb := trie.NewDatabase(db)
+	triedb := trie.NewDatabase(Database{atomicTrieDB})
 	t, err := trie.New(root, triedb)
-
 	if err != nil {
 		return nil, err
 	}
 
-	return &blockingAtomicTrie{
+	atomicTrie := &blockingAtomicTrie{
 		commitHeightInterval: commitHeightInterval,
 		db:                   db,
+		atomicTrieDB:         atomicTrieDB,
 		trieDB:               triedb,
 		trie:                 t,
 		repo:                 repo,
 		codec:                codec,
 		lastCommittedHash:    root,
 		lastCommittedHeight:  height,
-	}, nil
+	}
+	return atomicTrie, atomicTrie.initialize(lastAcceptedHeight)
 }
 
 // lastCommittedRootIfExists returns the last committed trie root and height if it exists
 // else returns empty common.Hash{} and 0
 // returns optional error if there are issues with the underlying data store
 // or if values present in the database are not as expected
-func lastCommittedRootIfExists(db ethdb.KeyValueStore) (common.Hash, uint64, error) {
-	var root common.Hash
-	var height uint64
+func lastCommittedRootIfExists(db database.Database) (common.Hash, uint64, error) {
 	// read the last committed entry if exists and set root hash
 	lastCommittedHeightBytes, err := db.Get(lastCommittedKey)
-	if err != nil && err.Error() != database.ErrNotFound.Error() { // err type does not match database.ErrorNotFound so have to check `.Error()` instead
+	switch {
+	// err type does not match database.ErrorNotFound, check `.Error()` instead
+	case err != nil && err.Error() == database.ErrNotFound.Error():
+		return common.Hash{}, 0, nil
+	case err != nil:
 		return common.Hash{}, 0, err
-	} else if err == nil || err.Error() != database.ErrNotFound.Error() {
-		// entry is present, check length
-		lastCommittedHeightBytesLen := len(lastCommittedHeightBytes)
-		if lastCommittedHeightBytesLen != wrappers.LongLen {
-			return common.Hash{}, 0, fmt.Errorf("expected value of lastCommittedKey to be %d but was %d", wrappers.LongLen, lastCommittedHeightBytesLen)
-		}
-
-		height = binary.BigEndian.Uint64(lastCommittedHeightBytes)
-
+	case len(lastCommittedHeightBytes) != wrappers.LongLen:
+		return common.Hash{}, 0, fmt.Errorf("expected value of lastCommittedKey to be %d but was %d", wrappers.LongLen, len(lastCommittedHeightBytes))
+	default:
+		height := binary.BigEndian.Uint64(lastCommittedHeightBytes)
 		hash, err := db.Get(lastCommittedHeightBytes)
 		if err != nil {
 			return common.Hash{}, 0, err
 		}
-
-		root = common.BytesToHash(hash)
+		return common.BytesToHash(hash), height, nil
 	}
-	return root, height, nil
 }
 
 // nearestCommitHeight given blockNumber calculates and returns commitHeight such that
@@ -106,12 +112,14 @@ func nearestCommitHeight(blockNumber uint64, commitInterval uint64) uint64 {
 	return blockNumber - (blockNumber % commitInterval)
 }
 
-// Initialize initializes the atomic trie using the atomic repository height index.
+// initializes the atomic trie using the atomic repository height index.
 // Iterating from the last indexed height to lastAcceptedBlockNumber, making a single commit at the
 // most recent height divisible by the commitInterval.
 // Optionally returns an error
 // Subsequent updates to this trie are made using the Index call during evm.block.Accept().
-func (b *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommitFn func() error) error {
+func (b *blockingAtomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
+	t0 := time.Now()
+	log.Info("initializing atomic trie", "lastAcceptedBlockNumber", lastAcceptedBlockNumber)
 	// commitHeight is the highest block that can be committed i.e. is divisible by b.commitHeightInterval
 	commitHeight := nearestCommitHeight(lastAcceptedBlockNumber, b.commitHeightInterval)
 	uncommittedOpsMap := make(map[uint64]map[ids.ID]*atomic.Requests, lastAcceptedBlockNumber-commitHeight)
@@ -189,12 +197,12 @@ func (b *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommit
 		return err
 	}
 
-	if dbCommitFn != nil {
-		if err = dbCommitFn(); err != nil {
-			return err
-		}
+	// commit to underlying versiondb
+	if err := b.db.Commit(); err != nil {
+		return err
 	}
-
+	b.lastCommittedHash = hash
+	b.lastCommittedHeight = commitHeight
 	log.Info("committed trie", "hash", hash, "indexHeight", commitHeight)
 
 	// process uncommitted ops for heights > commitHeight
@@ -210,13 +218,12 @@ func (b *blockingAtomicTrie) Initialize(lastAcceptedBlockNumber uint64, dbCommit
 		}
 	}
 
-	if dbCommitFn != nil {
-		if err = dbCommitFn(); err != nil {
-			return err
-		}
-	}
-
-	log.Info("atomic trie initialised", "preCommitEntriesIndexed", preCommitBlockIndexed, "postCommitEntriesIndexed", postCommitTxIndexed)
+	log.Info(
+		"done initializing atomic trie",
+		"lastAcceptedBlockNumber", lastAcceptedBlockNumber,
+		"preCommitEntriesIndexed", preCommitBlockIndexed, "postCommitEntriesIndexed", postCommitTxIndexed,
+		"time", time.Since(t0),
+	)
 	return nil
 }
 
@@ -273,12 +280,12 @@ func (b *blockingAtomicTrie) commit(height uint64) (common.Hash, error) {
 	binary.BigEndian.PutUint64(heightBytes, height)
 
 	// now save the trie hash against the height it was committed at
-	if err = b.db.Put(heightBytes, hash[:]); err != nil {
+	if err = b.atomicTrieDB.Put(heightBytes, hash[:]); err != nil {
 		return common.Hash{}, err
 	}
 
 	// update lastCommittedKey with the current height
-	if err = b.db.Put(lastCommittedKey, heightBytes); err != nil {
+	if err = b.atomicTrieDB.Put(lastCommittedKey, heightBytes); err != nil {
 		return common.Hash{}, err
 	}
 
@@ -340,7 +347,7 @@ func (b *blockingAtomicTrie) TrieDB() *trie.Database {
 func (b *blockingAtomicTrie) Root(height uint64) (common.Hash, error) {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
-	hash, err := b.db.Get(heightBytes)
+	hash, err := b.atomicTrieDB.Get(heightBytes)
 	if err != nil {
 		return common.Hash{}, err
 	}
