@@ -38,7 +38,6 @@ type AtomicTxRepository interface {
 	GetByTxID(txID ids.ID) (*Tx, uint64, error)
 	GetByHeight(height uint64) ([]*Tx, error)
 	Write(height uint64, txs []*Tx) error
-	IterateByTxID() database.Iterator
 	IterateByHeight([]byte) database.Iterator
 }
 
@@ -318,11 +317,6 @@ func (a *atomicTxRepository) appendTxToHeightIndex(heightBytes []byte, tx *Tx) e
 
 	txs = append(txs, tx)
 	return a.indexTxsAtHeight(heightBytes, txs)
-}
-
-// TODO remove from interface if this is only necessary within the atomic repository
-func (a *atomicTxRepository) IterateByTxID() database.Iterator {
-	return a.acceptedAtomicTxDB.NewIterator()
 }
 
 func (a *atomicTxRepository) IterateByHeight(heightBytes []byte) database.Iterator {
