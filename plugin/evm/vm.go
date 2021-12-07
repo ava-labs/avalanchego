@@ -114,7 +114,6 @@ var (
 	lastAcceptedKey        = []byte("last_accepted_key")
 	acceptedPrefix         = []byte("snowman_accepted")
 	ethDBPrefix            = []byte("ethdb")
-	atomicIndexDBPrefix    = []byte("atomicIndexDB")
 	pruneRejectedBlocksKey = []byte("pruned_rejected_blocks")
 )
 
@@ -463,20 +462,10 @@ func (vm *VM) initializeAtomicTxIndexes() error {
 		log.Error("failed to initialise atomic tx repository", "err", err)
 		return err
 	}
-	atomicIndexDB := Database{prefixdb.New(atomicIndexDBPrefix, vm.db)}
-	vm.atomicTrie, err = NewBlockingAtomicTrie(atomicIndexDB, vm.atomicTxRepository, vm.codec)
+	vm.atomicTrie, err = NewBlockingAtomicTrie(vm.db, vm.atomicTxRepository, vm.codec, lastAcceptedHeight)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create atomic trie: %w", err)
 	}
-
-	log.Info("initializing atomic ops trie")
-	startTime := time.Now()
-	if err = vm.atomicTrie.Initialize(lastAcceptedHeight, vm.db.Commit); err != nil {
-		log.Error("error initializing atomic ops trie locally", "time", time.Since(startTime), "err", err)
-		return err
-	}
-
-	log.Info("atomic ops trie initialization complete", "time", time.Since(startTime))
 	return nil
 }
 
