@@ -80,15 +80,22 @@ func (a *atomicTxRepository) initialize(lastAcceptedHeight uint64) error {
 	// if we are part way through a migration.
 	var lastTxID []byte
 	indexHeightBytes, err := a.db.Get(maxIndexedHeightKey)
-	switch {
-	case err != nil && err != database.ErrNotFound: // unexpected error
-		return err
-	case err == database.ErrNotFound: // initializing from scratch
+	switch err {
+	case nil:
 		break
-	case len(indexHeightBytes) == wrappers.LongLen: // already initialized
-		return nil
-	case len(indexHeightBytes) == common.HashLength: // partially initialized
+	case database.ErrNotFound:
+		break
+	default: // unexpected value in the database
+		return fmt.Errorf("found invalid value at max indexed height: %v", indexHeightBytes)
+	}
+
+	switch len(indexHeightBytes) {
+	case 0:
+		break
+	case common.HashLength: // partially initialized
 		lastTxID = indexHeightBytes
+	case wrappers.LongLen: // already initialized
+		return nil
 	default: // unexpected value in the database
 		return fmt.Errorf("found invalid value at max indexed height: %v", indexHeightBytes)
 	}
