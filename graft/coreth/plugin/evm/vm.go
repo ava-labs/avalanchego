@@ -386,6 +386,11 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to create atomic repository: %w", err)
 	}
 
+	vm.atomicTrie, err = NewBlockingAtomicTrie(vm.db, vm.atomicTxRepository, vm.codec, lastAccepted.NumberU64())
+	if err != nil {
+		return fmt.Errorf("failed to create atomic trie: %w", err)
+	}
+
 	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
 	vm.handleGasPriceUpdates()
 
@@ -453,20 +458,6 @@ func (vm *VM) Initialize(
 	}
 
 	return vm.fx.Initialize(vm)
-}
-
-func (vm *VM) initializeAtomicTxIndexes() error {
-	var err error
-	vm.atomicTxRepository = NewAtomicTxRepository(vm.db, vm.codec)
-	if err := vm.atomicTxRepository.Initialize(vm.db.Commit); err != nil {
-		log.Error("failed to initialise atomic tx repository", "err", err)
-		return err
-	}
-	vm.atomicTrie, err = NewBlockingAtomicTrie(vm.db, vm.atomicTxRepository, vm.codec, lastAcceptedHeight)
-	if err != nil {
-		return fmt.Errorf("failed to create atomic trie: %w", err)
-	}
-	return nil
 }
 
 func (vm *VM) createConsensusCallbacks() *dummy.ConsensusCallbacks {

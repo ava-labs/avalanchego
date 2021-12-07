@@ -92,7 +92,7 @@ func TestBlockingAtomicTrieInitialize(t *testing.T) {
 	assert.NoError(t, err)
 	entriesIterated := uint64(0)
 	for iterator.Next() {
-		assert.Greater(t, len(iterator.AtomicOps()), 0)
+		assert.NotNil(t, iterator.AtomicOps())
 		assert.NoError(t, iterator.Error())
 		entriesIterated++
 	}
