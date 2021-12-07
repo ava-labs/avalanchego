@@ -228,17 +228,13 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 
 	// now that all heights < commitHeight have been processed
 	// commit the trie
-	hash, err := a.commit(commitHeight, common.Hash{})
-	if err != nil {
+	if _, err := a.commit(commitHeight, common.Hash{}); err != nil {
 		return err
 	}
 	// commit to underlying versiondb
 	if err := a.db.Commit(); err != nil {
 		return err
 	}
-	a.lastCommittedHash = hash
-	a.lastCommittedHeight = commitHeight
-	a.log.Info("committed trie", "hash", hash, "indexHeight", commitHeight)
 
 	// process uncommitted ops for heights > commitHeight
 	for height, ops := range uncommittedOpsMap {
