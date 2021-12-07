@@ -7,6 +7,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -14,9 +16,6 @@ import (
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/rlp"
 )
-
-// this is there so that we don't have to hardcode the 32 length in case it changes
-const idLen = len(ids.ID{}) // should be 32
 
 // atomicTrieIterator is an implementation of types.AtomicTrieIterator that serves
 // parsed data with each iteration
@@ -45,7 +44,7 @@ func (a *atomicTrieIterator) Next() bool {
 	if err := a.trieIterator.Err; err == nil && hasNext {
 		// key is [blockNumberBytes]+[blockchainIDBytes] = 8+32=40 bytes
 		keyLen := len(a.trieIterator.Key)
-		expectedKeyLen := wrappers.LongLen + idLen
+		expectedKeyLen := wrappers.LongLen + common.HashLength
 		if keyLen != expectedKeyLen {
 			// unexpected key length
 			// set the error and stop the iteration as data is unreliable from this point
