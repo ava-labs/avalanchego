@@ -50,14 +50,14 @@ type atomicTrie struct {
 	log                  log.Logger // struct logger
 }
 
-// NewAtomicTrie returns a new instance of a atomicTrie configured with default commitHeightInterval.
-// The trie is initialized before it is returned.
+// NewAtomicTrie returns a new instance of a atomicTrie with the default commitHeightInterval.
+// Initializes the trie before returning it.
 func NewAtomicTrie(db *versiondb.Database, repo AtomicTxRepository, codec codec.Manager, lastAcceptedHeight uint64) (types.AtomicTrie, error) {
 	return newAtomicTrie(db, repo, codec, lastAcceptedHeight, commitHeightInterval)
 }
 
-// newAtomicTrie is to be used for testing, allows setting of custom commitHeightInterval.
-// Also initializes the trie before returning it.
+// newAtomicTrie returns a new instance of a atomicTrie with a configurable commitHeightInterval, used in testing.
+// Initializes the trie before returning it.
 func newAtomicTrie(
 	db *versiondb.Database, repo AtomicTxRepository, codec codec.Manager, lastAcceptedHeight uint64, commitHeightInterval uint64,
 ) (types.AtomicTrie, error) {
@@ -98,7 +98,6 @@ func lastCommittedRootIfExists(db database.Database) (common.Hash, uint64, error
 	// read the last committed entry if it exists and set the root hash
 	lastCommittedHeightBytes, err := db.Get(lastCommittedKey)
 	switch {
-	// err type does not match database.ErrorNotFound, check `.Error()` instead
 	case err == database.ErrNotFound:
 		return common.Hash{}, 0, nil
 	case err != nil:
@@ -115,9 +114,7 @@ func lastCommittedRootIfExists(db database.Database) (common.Hash, uint64, error
 	}
 }
 
-// nearestCommitHeight given blockNumber calculates and returns commitHeight such that
-// commitHeight is less than or equal to blockNumber, commitHeight+commitInterval is
-// greater than blockNumber and commitHeight is divisible by commitInterval
+// nearestCommitheight returns the nearest multiple of commitInterval less than or equal to blockNumber
 func nearestCommitHeight(blockNumber uint64, commitInterval uint64) uint64 {
 	return blockNumber - (blockNumber % commitInterval)
 }
@@ -127,7 +124,7 @@ func nearestCommitHeight(blockNumber uint64, commitInterval uint64) uint64 {
 // most recent height divisible by the commitInterval.
 // Subsequent updates to this trie are made using the Index call as blocks are accepted.
 func (b *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
-	startTime := time.Now()
+	start := time.Now()
 	b.log.Info("initializing atomic trie", "lastAcceptedBlockNumber", lastAcceptedBlockNumber)
 	// commitHeight is the highest block that can be committed i.e. is divisible by b.commitHeightInterval
 	commitHeight := nearestCommitHeight(lastAcceptedBlockNumber, b.commitHeightInterval)
@@ -231,7 +228,7 @@ func (b *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 		"finished initializing atomic trie",
 		"lastAcceptedBlockNumber", lastAcceptedBlockNumber,
 		"preCommitEntriesIndexed", preCommitBlockIndexed, "postCommitEntriesIndexed", postCommitTxIndexed,
-		"time", time.Since(startTime),
+		"time", time.Since(start),
 	)
 	return nil
 }
