@@ -92,7 +92,7 @@ func newBlockingAtomicTrie(
 
 // lastCommittedRootIfExists returns the last committed trie root and height if it exists
 // else returns empty common.Hash{} and 0
-// returns optional error if there are issues with the underlying data store
+// returns error only if there are issues with the underlying data store
 // or if values present in the database are not as expected
 func lastCommittedRootIfExists(db database.Database) (common.Hash, uint64, error) {
 	// read the last committed entry if it exists and set the root hash
@@ -266,7 +266,7 @@ func (b *blockingAtomicTrie) Index(height uint64, atomicOps map[ids.ID]*atomic.R
 
 // commit the underlying trie, generating a trie root hash
 // assumes that the caller is aware of the commit rules i.e. the height being within commitInterval
-// returns the trie root from the commit + optional error
+// returns the trie root from the commit
 func (b *blockingAtomicTrie) commit(height uint64) (common.Hash, error) {
 	hash, _, err := b.trie.Commit(nil)
 	if err != nil {
