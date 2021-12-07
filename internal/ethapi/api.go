@@ -1274,7 +1274,9 @@ func RPCMarshalBlock(block *types.Block, inclTx bool, fullTx bool, config *param
 // a `PublicBlockchainAPI`.
 func (s *PublicBlockChainAPI) rpcMarshalHeader(ctx context.Context, header *types.Header) map[string]interface{} {
 	fields := RPCMarshalHeader(header)
-	fields["totalDifficulty"] = (*hexutil.Big)(s.b.GetTd(ctx, header.Hash()))
+	// Note: Coreth enforces that the difficulty of a block is always 1, such that the total difficulty of a block
+	// will be equivalent to its height.
+	fields["totalDifficulty"] = (*hexutil.Big)(header.Number)
 	return fields
 }
 
@@ -1286,7 +1288,9 @@ func (s *PublicBlockChainAPI) rpcMarshalBlock(ctx context.Context, b *types.Bloc
 		return nil, err
 	}
 	if inclTx {
-		fields["totalDifficulty"] = (*hexutil.Big)(s.b.GetTd(ctx, b.Hash()))
+		// Note: Coreth enforces that the difficulty of a block is always 1, such that the total difficulty of a block
+		// will be equivalent to its height.
+		fields["totalDifficulty"] = (*hexutil.Big)(b.Number())
 	}
 	return fields, err
 }
