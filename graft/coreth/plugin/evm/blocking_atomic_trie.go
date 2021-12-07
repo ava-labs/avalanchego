@@ -47,10 +47,14 @@ type blockingAtomicTrie struct {
 	codec                codec.Manager
 }
 
+// NewBlockingAtomicTrie returns a new instance of a blockingAtomicTrie configured with default commitHeightInterval.
+// The trie is initialized before it is returned.
 func NewBlockingAtomicTrie(db *versiondb.Database, repo AtomicTxRepository, codec codec.Manager, lastAcceptedHeight uint64) (types.AtomicTrie, error) {
 	return newBlockingAtomicTrie(db, repo, codec, lastAcceptedHeight, commitHeightInterval)
 }
 
+// newBlockingAtomicTrie is to be used for testing, allows setting of custom commitHeightInterval.
+// Also initializes the trie before returning it.
 func newBlockingAtomicTrie(
 	db *versiondb.Database, repo AtomicTxRepository, codec codec.Manager, lastAcceptedHeight uint64, commitHeightInterval uint64,
 ) (types.AtomicTrie, error) {
@@ -89,7 +93,7 @@ func lastCommittedRootIfExists(db database.Database) (common.Hash, uint64, error
 	lastCommittedHeightBytes, err := db.Get(lastCommittedKey)
 	switch {
 	// err type does not match database.ErrorNotFound, check `.Error()` instead
-	case err != nil && err.Error() == database.ErrNotFound.Error():
+	case err == database.ErrNotFound:
 		return common.Hash{}, 0, nil
 	case err != nil:
 		return common.Hash{}, 0, err
@@ -304,7 +308,7 @@ func (b *blockingAtomicTrie) updateTrie(atomicOps map[ids.ID]*atomic.Requests, h
 		}
 
 		// key is [height]+[blockchainID]
-		keyPacker := wrappers.Packer{Bytes: make([]byte, wrappers.LongLen+idLen)}
+		keyPacker := wrappers.Packer{Bytes: make([]byte, wrappers.LongLen+common.HashLength)}
 		keyPacker.PackLong(height)
 		keyPacker.PackFixedBytes(blockchainID[:])
 		b.trie.Update(keyPacker.Bytes, valueBytes)
