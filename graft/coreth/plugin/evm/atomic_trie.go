@@ -69,7 +69,10 @@ func newAtomicTrie(
 		return nil, err
 	}
 
-	triedb := trie.NewDatabase(Database{atomicTrieDB})
+	triedb := trie.NewDatabaseWithConfig(
+		Database{atomicTrieDB},
+		&trie.Config{Preimages: false}, // keys are not hashed, no need for preimages
+	)
 	t, err := trie.New(root, triedb)
 	if err != nil {
 		return nil, err
@@ -140,6 +143,11 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 	preCommitBlockIndexed := 0
 	postCommitTxIndexed := 0
 	lastUpdate := time.Now()
+
+	// keep track of the latest generated trie's root. This is used to avoid
+	// writing more intermediary trie nodes than needed to disk, while keeping
+	// the commit size under commitSizeCap (approximately).
+	lastHash := common.Hash{}
 	for iter.Next() {
 		if err := iter.Error(); err != nil {
 			return err
@@ -189,6 +197,27 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 			a.log.Info("imported entries into atomic trie pre-commit", "heightsIndexed", preCommitBlockIndexed)
 			lastUpdate = time.Now()
 		}
+
+		// keep track of progress and keep commit size under commitSizeCap
+		if height%a.commitHeightInterval == 0 {
+			hash, _, err := a.trie.Commit(nil)
+			if err != nil {
+				return err
+			}
+			if (lastHash != common.Hash{}) {
+				a.trieDB.Dereference(lastHash)
+			}
+			storage, _ := a.trieDB.Size()
+			if storage > commitSizeCap {
+				a.log.Info("committing atomic trie progress", "storage", storage)
+				a.commit(height, hash)
+				// commit to underlying versiondb
+				if err := a.db.Commit(); err != nil {
+					return err
+				}
+			}
+			lastHash = hash
+		}
 	}
 
 	// skip commit in case of early height
@@ -199,11 +228,10 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 
 	// now that all heights < commitHeight have been processed
 	// commit the trie
-	hash, err := a.commit(commitHeight)
+	hash, err := a.commit(commitHeight, common.Hash{})
 	if err != nil {
 		return err
 	}
-
 	// commit to underlying versiondb
 	if err := a.db.Commit(); err != nil {
 		return err
@@ -257,22 +285,26 @@ func (a *atomicTrie) Index(height uint64, atomicOps map[ids.ID]*atomic.Requests)
 	}
 
 	if height%a.commitHeightInterval == 0 {
-		return a.commit(height)
+		return a.commit(height, common.Hash{})
 	}
 	return common.Hash{}, nil
 }
 
-// commit the underlying trie, generating a trie root hash
+// commit the underlying trieDB and update metadata pointers to the given root hash.
+// if the root is empty, the trie will be committed to generate one.
 // assumes that the caller is aware of the commit rules i.e. the height being within commitInterval
 // returns the trie root from the commit
-func (a *atomicTrie) commit(height uint64) (common.Hash, error) {
-	hash, _, err := a.trie.Commit(nil)
-	if err != nil {
-		return common.Hash{}, err
+func (a *atomicTrie) commit(height uint64, root common.Hash) (common.Hash, error) {
+	if (root == common.Hash{}) {
+		hash, _, err := a.trie.Commit(nil)
+		if err != nil {
+			return common.Hash{}, err
+		}
+		root = hash
 	}
 
-	a.log.Debug("committed atomic trie", "hash", hash.String(), "height", height)
-	if err := a.trieDB.Commit(hash, false, nil); err != nil {
+	a.log.Debug("committed atomic trie", "hash", root.String(), "height", height)
+	if err := a.trieDB.Commit(root, false, nil); err != nil {
 		return common.Hash{}, err
 	}
 
@@ -281,18 +313,18 @@ func (a *atomicTrie) commit(height uint64) (common.Hash, error) {
 	binary.BigEndian.PutUint64(heightBytes, height)
 
 	// now save the trie hash against the height it was committed at
-	if err = a.metadataDB.Put(heightBytes, hash[:]); err != nil {
+	if err := a.metadataDB.Put(heightBytes, root[:]); err != nil {
 		return common.Hash{}, err
 	}
 
 	// update lastCommittedKey with the current height
-	if err = a.metadataDB.Put(lastCommittedKey, heightBytes); err != nil {
+	if err := a.metadataDB.Put(lastCommittedKey, heightBytes); err != nil {
 		return common.Hash{}, err
 	}
 
-	a.lastCommittedHash = hash
+	a.lastCommittedHash = root
 	a.lastCommittedHeight = height
-	return hash, nil
+	return root, nil
 }
 
 func (a *atomicTrie) updateTrie(height uint64, atomicOps map[ids.ID]*atomic.Requests) error {
