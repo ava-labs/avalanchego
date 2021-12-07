@@ -7,13 +7,12 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/coreth/fastsync/types"
 	"github.com/ava-labs/coreth/trie"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -40,8 +39,10 @@ func (a *atomicTrieIterator) Error() error {
 // In case of an error during this iteration, it sets err and resets the above fields
 func (a *atomicTrieIterator) Next() bool {
 	hasNext := a.trieIterator.Next()
-	// if the underlying iterator has data to iterate over, parse and set the fields
-	if err := a.trieIterator.Err; err == nil && hasNext {
+	err := a.trieIterator.Err
+	switch {
+	case err == nil && hasNext:
+		// if the underlying iterator has data to iterate over, parse and set the fields
 		// key is [blockNumberBytes]+[blockchainIDBytes] = 8+32=40 bytes
 		keyLen := len(a.trieIterator.Key)
 		expectedKeyLen := wrappers.LongLen + common.HashLength
@@ -72,12 +73,13 @@ func (a *atomicTrieIterator) Next() bool {
 		// success, update the struct fields
 		a.blockNumber = blockNumber
 		a.atomicOps = map[ids.ID]*atomic.Requests{blockchainID: &requests}
-	} else if err != nil {
+	case err != nil:
 		a.err = err
-		a.resetFields()
-	} else {
+		fallthrough
+	default:
 		a.resetFields()
 	}
+
 	return hasNext
 }
 
