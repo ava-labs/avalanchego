@@ -121,6 +121,14 @@ func (b *Block) Accept() error {
 	}
 
 	if len(b.atomicTxs) == 0 {
+		hash, err := b.vm.atomicTrie.Index(b.Height(), nil)
+		if err != nil {
+			return err
+		}
+		// hash will be empty on heights that are not divisible by atomicTrie.commitInterval
+		if hash != (common.Hash{}) {
+			log.Info("atomic trie was committed", "hash", hash, "height", b.Height())
+		}
 		return vm.db.Commit()
 	}
 

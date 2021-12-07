@@ -10,10 +10,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-// AtomicTrie maintains an index of atomic operations by chainID for every block height
-// containing atomic transactions. The backing data structure for this index is a Trie.
-// The keys of the trie represent the indexed keys (block heights), values (leaf nodes)
-// representing the atomic operations.
+// AtomicTrie maintains an index of atomic operations by blockchainIDs for every block
+// height containing atomic transactions. The backing data structure for this index is
+// a Trie. The keys of the trie are block heights and the values (leaf nodes)
+// are the atomic operations applied to shared memory while processing the block accepted
+// at the corresponding height.
 type AtomicTrie interface {
 	// Initialize initializes the AtomicTrie from the atomic repository ignoring
 	// any atomic operations for any heights that have already been indexed
@@ -30,10 +31,7 @@ type AtomicTrie interface {
 	// Optionally returns an error
 	Iterator(hash common.Hash, startHeight uint64) (AtomicTrieIterator, error)
 
-	// LastCommitted returns the following:
-	// - last committed hash
-	// - last committed block height
-	// - optional error
+	// LastCommitted returns the last committed hash and corresponding block height
 	LastCommitted() (common.Hash, uint64)
 
 	// TrieDB returns the underlying trie database
@@ -44,17 +42,19 @@ type AtomicTrie interface {
 	Root(height uint64) (common.Hash, error)
 }
 
-// AtomicTrieIterator is a stateful iterator that iterates leafs of an AtomicTrie
+// AtomicTrieIterator is a stateful iterator that iterates the leafs of an AtomicTrie
 type AtomicTrieIterator interface {
-	// Next returns the next node in the atomic trie that is being iterated
+	// Next advances the iterator to the next node in the atomic trie and
+	// returns true if there are more nodes to iterate
 	Next() bool
 
 	// BlockNumber returns the current block number
 	BlockNumber() uint64
 
-	// AtomicOps returns the current atomic requests mapped to the chain ID
+	// AtomicOps returns a map of blockchainIDs to the set of atomic requests
+	// for that blockchainID at the current block number
 	AtomicOps() map[ids.ID]*atomic.Requests
 
-	// Error returns an error, if any
+	// Error returns error, if any encountered during this iteration
 	Error() error
 }
