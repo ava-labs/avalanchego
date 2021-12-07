@@ -90,9 +90,10 @@ func (a *atomicTxRepository) initialize(lastAcceptedHeight uint64) error {
 
 	switch len(indexHeightBytes) {
 	case 0:
-		break
+		log.Info("Initializing atomic transaction repository from scratch")
 	case common.HashLength: // partially initialized
 		lastTxID = indexHeightBytes
+		log.Info("Initializing atomic transaction repository from txID: %v", lastTxID)
 	case wrappers.LongLen: // already initialized
 		return nil
 	default: // unexpected value in the database
@@ -103,12 +104,6 @@ func (a *atomicTxRepository) initialize(lastAcceptedHeight uint64) error {
 	// from height to a slice of transactions accepted at that height
 	iter := a.acceptedAtomicTxDB.NewIteratorWithStart(lastTxID)
 	defer iter.Release()
-
-	if len(lastTxID) == 0 {
-		log.Info("Initializing atomic transaction repository from scratch")
-	} else {
-		log.Info("Initializing atomic transaction repository from txID: %v", lastTxID)
-	}
 
 	indexedTxs := 0
 
