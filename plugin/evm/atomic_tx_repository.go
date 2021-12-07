@@ -38,7 +38,6 @@ type AtomicTxRepository interface {
 	GetByTxID(txID ids.ID) (*Tx, uint64, error)
 	GetByHeight(height uint64) ([]*Tx, error)
 	Write(height uint64, txs []*Tx) error
-	IterateByTxID() database.Iterator
 	IterateByHeight([]byte) database.Iterator
 }
 
@@ -67,12 +66,12 @@ func NewAtomicTxRepository(db *versiondb.Database, codec codec.Manager, lastAcce
 		codec:                      codec,
 		db:                         db,
 	}
-	return repo, repo.initialize(lastAcceptedHeight)
+	return repo, repo.initializeHeightIndex(lastAcceptedHeight)
 }
 
-// initialize initializes the atomic repository and takes care of any required migration from the previous database
+// initializeHeightIndex initializes the atomic repository and takes care of any required migration from the previous database
 // format which did not have a height -> txs index.
-func (a *atomicTxRepository) initialize(lastAcceptedHeight uint64) error {
+func (a *atomicTxRepository) initializeHeightIndex(lastAcceptedHeight uint64) error {
 	startTime := time.Now()
 	lastLogTime := startTime
 
@@ -80,15 +79,23 @@ func (a *atomicTxRepository) initialize(lastAcceptedHeight uint64) error {
 	// if we are part way through a migration.
 	var lastTxID []byte
 	indexHeightBytes, err := a.db.Get(maxIndexedHeightKey)
-	switch {
-	case err != nil && err != database.ErrNotFound: // unexpected error
-		return err
-	case err == database.ErrNotFound: // initializing from scratch
+	switch err {
+	case nil:
 		break
-	case len(indexHeightBytes) == wrappers.LongLen: // already initialized
-		return nil
-	case len(indexHeightBytes) == common.HashLength: // partially initialized
+	case database.ErrNotFound:
+		break
+	default: // unexpected value in the database
+		return fmt.Errorf("found invalid value at max indexed height: %v", indexHeightBytes)
+	}
+
+	switch len(indexHeightBytes) {
+	case 0:
+		log.Info("Initializing atomic transaction repository from scratch")
+	case common.HashLength: // partially initialized
 		lastTxID = indexHeightBytes
+		log.Info("Initializing atomic transaction repository from txID: %v", lastTxID)
+	case wrappers.LongLen: // already initialized
+		return nil
 	default: // unexpected value in the database
 		return fmt.Errorf("found invalid value at max indexed height: %v", indexHeightBytes)
 	}
@@ -97,12 +104,6 @@ func (a *atomicTxRepository) initialize(lastAcceptedHeight uint64) error {
 	// from height to a slice of transactions accepted at that height
 	iter := a.acceptedAtomicTxDB.NewIteratorWithStart(lastTxID)
 	defer iter.Release()
-
-	if len(lastTxID) == 0 {
-		log.Info("Initializing atomic transaction repository from scratch")
-	} else {
-		log.Info("Initializing atomic transaction repository from txID: %v", lastTxID)
-	}
 
 	indexedTxs := 0
 
@@ -311,11 +312,6 @@ func (a *atomicTxRepository) appendTxToHeightIndex(heightBytes []byte, tx *Tx) e
 
 	txs = append(txs, tx)
 	return a.indexTxsAtHeight(heightBytes, txs)
-}
-
-// TODO remove from interface if this is only necessary within the atomic repository
-func (a *atomicTxRepository) IterateByTxID() database.Iterator {
-	return a.acceptedAtomicTxDB.NewIterator()
 }
 
 func (a *atomicTxRepository) IterateByHeight(heightBytes []byte) database.Iterator {
