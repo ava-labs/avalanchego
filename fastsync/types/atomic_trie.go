@@ -47,7 +47,7 @@ type AtomicTrieIterator interface {
 	// BlockNumber returns the current block number
 	BlockNumber() uint64
 
-	// BlockchainID returns the current blockchain ID
+	// BlockchainID returns the current blockchain ID at the current block number
 	BlockchainID() ids.ID
 
 	// AtomicOps returns a map of blockchainIDs to the set of atomic requests
