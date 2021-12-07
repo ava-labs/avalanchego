@@ -26,7 +26,7 @@ import (
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
-	fastSyncTypes "github.com/ava-labs/coreth/statesync/types"
+	stateSyncTypes "github.com/ava-labs/coreth/statesync/types"
 
 	// Force-load tracer engine to trigger registration
 	//
@@ -193,7 +193,7 @@ type VM struct {
 	atomicTxRepository AtomicTxRepository
 	// [atomicTrie] maintains a merkle forest of [height]=>[atomic txs].
 	//  Used to state sync clients.
-	atomicTrie fastSyncTypes.AtomicTrie
+	atomicTrie stateSyncTypes.AtomicTrie
 
 	builder *blockBuilder
 
