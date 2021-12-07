@@ -17,14 +17,13 @@ import (
 // at the corresponding height.
 type AtomicTrie interface {
 	// Index indexes the given atomicOps at the specified block height
-	// Returns an optional root hash and an optional error
+	// Returns an optional root hash
 	// A non-empty root hash is returned when the atomic trie has been committed
 	// Atomic trie is committed if the block height is within the commit interval
 	Index(height uint64, atomicOps map[ids.ID]*atomic.Requests) (common.Hash, error)
 
 	// Iterator returns an AtomicTrieIterator to iterate the trie at the given
 	// root hash
-	// Optionally returns an error
 	Iterator(hash common.Hash, startHeight uint64) (AtomicTrieIterator, error)
 
 	// LastCommitted returns the last committed hash and corresponding block height
@@ -33,8 +32,9 @@ type AtomicTrie interface {
 	// TrieDB returns the underlying trie database
 	TrieDB() *trie.Database
 
-	// Root returns the trie root if it exists at specified height with
-	// an optional error
+	// Root returns hash if it exists at specified height
+	// if trie was not committed at provided height, it returns
+	// common.Hash{} instead
 	Root(height uint64) (common.Hash, error)
 }
 
