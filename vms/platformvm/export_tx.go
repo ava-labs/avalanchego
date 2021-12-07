@@ -93,9 +93,9 @@ func (tx *UnsignedExportTx) Execute(
 	vm *VM,
 	vs VersionedState,
 	stx *Tx,
-) (func() error, TxError) {
+) (func() error, error) {
 	if err := tx.SyntacticVerify(vm.ctx); err != nil {
-		return nil, permError{err}
+		return nil, err
 	}
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
@@ -104,22 +104,13 @@ func (tx *UnsignedExportTx) Execute(
 
 	if vm.bootstrapped.GetValue() {
 		if err := verify.SameSubnet(vm.ctx, tx.DestinationChain); err != nil {
-			return nil, tempError{err}
+			return nil, err
 		}
 	}
 
 	// Verify the flowcheck
 	if err := vm.semanticVerifySpend(vs, tx, tx.Ins, outs, stx.Creds, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
-		switch err.(type) {
-		case permError:
-			return nil, permError{
-				fmt.Errorf("failed semanticVerifySpend: %w", err),
-			}
-		default:
-			return nil, tempError{
-				fmt.Errorf("failed semanticVerifySpend: %w", err),
-			}
-		}
+		return nil, fmt.Errorf("failed semanticVerifySpend: %w", err)
 	}
 
 	// Consume the UTXOS
@@ -168,7 +159,7 @@ func (tx *UnsignedExportTx) AtomicExecute(
 	vm *VM,
 	parentState MutableState,
 	stx *Tx,
-) (VersionedState, TxError) {
+) (VersionedState, error) {
 	// Set up the state if this tx is committed
 	newState := newVersionedState(
 		parentState,

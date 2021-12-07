@@ -734,12 +734,9 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
-	lastAcceptedID, err := vm.LastAccepted()
-	if err != nil {
-		t.Fatal(err)
-	}
-	blk, err := vm.newProposalBlock(lastAcceptedID, preferredHeight+1, *tx)
+	blk, err := vm.newProposalBlock(preferredID, preferredHeight+1, *tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -753,19 +750,8 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	if err := parsedBlock.Verify(); err == nil {
 		t.Fatalf("Should have errored during verification")
 	}
-	if status := parsedBlock.Status(); status != choices.Rejected {
-		t.Fatalf("Should have marked the block as rejected")
-	}
 	if _, ok := vm.droppedTxCache.Get(blk.Tx.ID()); !ok {
 		t.Fatal("tx should be in dropped tx cache")
-	}
-
-	parsedBlk, err := vm.GetBlock(blk.ID())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if status := parsedBlk.Status(); status != choices.Rejected {
-		t.Fatalf("Should have marked the block as rejected")
 	}
 }
 

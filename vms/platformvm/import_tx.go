@@ -103,25 +103,23 @@ func (tx *UnsignedImportTx) Execute(
 	vm *VM,
 	vs VersionedState,
 	stx *Tx,
-) (func() error, TxError) {
+) (func() error, error) {
 	if err := tx.SyntacticVerify(vm.ctx); err != nil {
-		return nil, permError{err}
+		return nil, err
 	}
 
 	utxos := make([]*avax.UTXO, len(tx.Ins)+len(tx.ImportedInputs))
 	for index, input := range tx.Ins {
 		utxo, err := vs.GetUTXO(input.InputID())
 		if err != nil {
-			return nil, tempError{
-				fmt.Errorf("failed to get UTXO %s: %w", &input.UTXOID, err),
-			}
+			return nil, fmt.Errorf("failed to get UTXO %s: %w", &input.UTXOID, err)
 		}
 		utxos[index] = utxo
 	}
 
 	if vm.bootstrapped.GetValue() {
 		if err := verify.SameSubnet(vm.ctx, tx.SourceChain); err != nil {
-			return nil, tempError{err}
+			return nil, err
 		}
 
 		utxoIDs := make([][]byte, len(tx.ImportedInputs))
@@ -131,17 +129,13 @@ func (tx *UnsignedImportTx) Execute(
 		}
 		allUTXOBytes, err := vm.ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
 		if err != nil {
-			return nil, tempError{
-				fmt.Errorf("failed to get shared memory: %w", err),
-			}
+			return nil, fmt.Errorf("failed to get shared memory: %w", err)
 		}
 
 		for i, utxoBytes := range allUTXOBytes {
 			utxo := &avax.UTXO{}
 			if _, err := Codec.Unmarshal(utxoBytes, utxo); err != nil {
-				return nil, tempError{
-					fmt.Errorf("failed to unmarshal UTXO: %w", err),
-				}
+				return nil, fmt.Errorf("failed to unmarshal UTXO: %w", err)
 			}
 			utxos[i+len(tx.Ins)] = utxo
 		}
@@ -178,7 +172,7 @@ func (tx *UnsignedImportTx) AtomicExecute(
 	vm *VM,
 	parentState MutableState,
 	stx *Tx,
-) (VersionedState, TxError) {
+) (VersionedState, error) {
 	// Set up the state if this tx is committed
 	newState := newVersionedState(
 		parentState,

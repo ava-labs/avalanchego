@@ -125,6 +125,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 	m.dropIncoming = true
 	defer func() {
 		m.dropIncoming = false
+		m.ResetTimer()
 	}()
 
 	m.vm.ctx.Log.Debug("in BuildBlock")
@@ -154,20 +155,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 	// If there are pending decision txs, build a block with a batch of them
 	if m.HasDecisionTxs() {
 		txs := m.PopDecisionTxs(BatchSize)
-		blk, err := m.vm.newStandardBlock(preferredID, nextHeight, txs)
-		if err != nil {
-			m.ResetTimer()
-			return nil, err
-		}
-		m.vm.ctx.Log.Debug("Built Standard Block %s: %s", blk.ID(), jsonFormatter{obj: blk})
-
-		if err := blk.Verify(); err != nil {
-			m.ResetTimer()
-			return nil, err
-		}
-
-		m.vm.internalState.AddBlock(blk)
-		return blk, m.vm.internalState.Commit()
+		return m.vm.newStandardBlock(preferredID, nextHeight, txs)
 	}
 
 	currentStakers := preferredState.CurrentStakerChainState()
@@ -189,14 +177,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		blk, err := m.vm.newProposalBlock(preferredID, nextHeight, *rewardValidatorTx)
-		if err != nil {
-			return nil, err
-		}
-		m.vm.ctx.Log.Debug("Built Proposal Block %s: %s", blk.ID(), jsonFormatter{obj: blk})
-
-		m.vm.internalState.AddBlock(blk)
-		return blk, m.vm.internalState.Commit()
+		return m.vm.newProposalBlock(preferredID, nextHeight, *rewardValidatorTx)
 	}
 
 	// If local time is >= time of the next staker set change,
@@ -213,13 +194,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		blk, err := m.vm.newProposalBlock(preferredID, nextHeight, *advanceTimeTx)
-		if err != nil {
-			return nil, err
-		}
-
-		m.vm.internalState.AddBlock(blk)
-		return blk, m.vm.internalState.Commit()
+		return m.vm.newProposalBlock(preferredID, nextHeight, *advanceTimeTx)
 	}
 
 	// Propose adding a new validator but only if their start time is in the
@@ -259,29 +234,9 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 			if err != nil {
 				return nil, err
 			}
-			blk, err := m.vm.newProposalBlock(preferredID, nextHeight, *advanceTimeTx)
-			if err != nil {
-				return nil, err
-			}
-
-			m.vm.internalState.AddBlock(blk)
-			return blk, m.vm.internalState.Commit()
+			return m.vm.newProposalBlock(preferredID, nextHeight, *advanceTimeTx)
 		}
-
-		// Attempt to issue the transaction
-		blk, err := m.vm.newProposalBlock(preferredID, nextHeight, *tx)
-		if err != nil {
-			m.ResetTimer()
-			return nil, err
-		}
-
-		if err := blk.Verify(); err != nil {
-			m.ResetTimer()
-			return nil, err
-		}
-
-		m.vm.internalState.AddBlock(blk)
-		return blk, m.vm.internalState.Commit()
+		return m.vm.newProposalBlock(preferredID, nextHeight, *tx)
 	}
 
 	m.vm.ctx.Log.Debug("BuildBlock returning error (no blocks)")
