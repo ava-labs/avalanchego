@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	snowsyncer "github.com/ava-labs/avalanchego/snow/engine/snowman/fast_syncer"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -35,7 +34,7 @@ type Handler struct {
 	// The validator set that validates this chain
 	validators validators.Set
 
-	fastSyncer   snowsyncer.FastSyncer
+	fastSyncer   common.FastSyncer
 	bootstrapper common.Engine
 	engine       common.Engine
 
@@ -81,7 +80,7 @@ func NewHandler(
 	return h, err
 }
 
-func (h *Handler) RegisterFastSyncer(fastSyncer snowsyncer.FastSyncer) {
+func (h *Handler) RegisterFastSyncer(fastSyncer common.FastSyncer) {
 	h.fastSyncer = fastSyncer
 }
 

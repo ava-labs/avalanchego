@@ -23,16 +23,12 @@ const (
 	MaxOutstandingFastSyncRequests = 50
 )
 
-var _ FastSyncer = &fastSyncer{}
-
-type FastSyncer interface {
-	common.Engine
-}
+var _ common.FastSyncer = &fastSyncer{}
 
 func NewFastSyncer(
 	cfg Config,
 	onDoneFastSyncing func(lastReqID uint32) error,
-) FastSyncer {
+) common.FastSyncer {
 	fsVM, _ := cfg.VM.(block.StateSyncableVM)
 	gR := common.NewGearRequester(
 		cfg.Ctx.Log,
@@ -89,15 +85,28 @@ type fastSyncer struct {
 // Engine interface implementation
 func (fs *fastSyncer) GetVM() common.VM { return fs.VM }
 
+func (fs *fastSyncer) IsEnabled() bool {
+	if fs.fastSyncVM == nil {
+		// fast sync is not implemented
+		return false
+	}
+
+	enabled, err := fs.fastSyncVM.StateSyncEnabled()
+	switch {
+	case err == common.ErrStateSyncableVMNotImplemented:
+		// nothing to do, fast sync is not implemented
+		return false
+	case err != nil:
+		return false
+	default:
+		return enabled
+	}
+}
+
 // Engine interface implementation
 func (fs *fastSyncer) Start(startReqID uint32) error {
 	fs.RequestID = startReqID
 	fs.Ctx.SetState(snow.FastSyncing)
-
-	if fs.fastSyncVM == nil {
-		// nothing to do, fast sync is not implemented
-		return fs.onDoneFastSyncing(fs.RequestID)
-	}
 
 	// if StateSyncTestingBeacons are specified, VM should direct fast-sync related messages
 	// to StateSyncTestingBeacons only. So let's inform the VM
@@ -105,18 +114,6 @@ func (fs *fastSyncer) Start(startReqID uint32) error {
 		if err := fs.fastSyncVM.RegisterFastSyncer(fs.StateSyncTestingBeacons); err != nil {
 			return err
 		}
-	}
-
-	enabled, err := fs.fastSyncVM.StateSyncEnabled()
-	switch {
-	case err == common.ErrStateSyncableVMNotImplemented:
-		// nothing to do, fast sync is not implemented
-		return fs.onDoneFastSyncing(fs.RequestID)
-	case err != nil:
-		return err
-	case !enabled:
-		// nothing to do, fast sync is implemented but not enabled
-		return fs.onDoneFastSyncing(fs.RequestID)
 	}
 
 	return fs.startup()

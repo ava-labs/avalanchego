@@ -851,8 +851,14 @@ func (m *manager) createSnowmanChain(
 	handler.RegisterEngine(engine)
 
 	startReqID := uint32(0)
-	if err := fastSync.Start(startReqID); err != nil {
-		return nil, fmt.Errorf("error starting fast sync operations: %w", err)
+	if fastSync.IsEnabled() {
+		if err := fastSync.Start(startReqID); err != nil {
+			return nil, fmt.Errorf("error starting fast sync operations: %w", err)
+		}
+	} else {
+		if err := bootstrapper.Start(startReqID); err != nil {
+			return nil, fmt.Errorf("error starting bootstrap operations: %w", err)
+		}
 	}
 
 	// Register health checks
