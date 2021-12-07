@@ -242,7 +242,11 @@ func (oracle *Oracle) SuggestTipCap(ctx context.Context) (*big.Int, error) {
 
 // suggestDynamicFees estimates the gas tip and base fee based on a simple sampling method
 func (oracle *Oracle) suggestDynamicFees(ctx context.Context) (*big.Int, *big.Int, error) {
-	head, _ := oracle.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+	head, err := oracle.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	headHash := head.Hash()
 
 	// If the latest gasprice is still available, return it.
