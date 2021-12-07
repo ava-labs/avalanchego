@@ -97,13 +97,12 @@ func (a *atomicTrieIterator) BlockNumber() uint64 {
 	return a.blockNumber
 }
 
-// BlockchainID returns the current blockchain ID
+// BlockchainID returns the current blockchain ID at the current block number
 func (a *atomicTrieIterator) BlockchainID() ids.ID {
 	return a.blockchainID
 }
 
-// AtomicOps returns a map of blockchainIDs to the set of atomic requests
-// for that blockchainID at the current block number
+// AtomicOps returns atomic requests for the blockchainID at the current block number
 func (a *atomicTrieIterator) AtomicOps() *atomic.Requests {
 	return a.atomicOps
 }
