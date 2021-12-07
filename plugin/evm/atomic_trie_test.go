@@ -6,7 +6,6 @@ package evm
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
 
@@ -254,48 +253,6 @@ func BenchmarkEncodeDecode(b *testing.B) {
 			}
 		})
 	}
-}
-
-func TestAtomicRequestEncodeDecode(t *testing.T) {
-	tx := testDataImportTx()
-	_, requests, err := tx.AtomicOps()
-	assert.NoError(t, err)
-
-	// encode decode using RLP
-	start := time.Now()
-	rlpBytes, err := rlp.EncodeToBytes(*requests)
-	fmt.Println("rlp encode duration", time.Since(start))
-	assert.NoError(t, err)
-	assert.Greater(t, len(rlpBytes), 1)
-	fmt.Println("rlpLen", len(rlpBytes))
-
-	var rlpDecodedRequests atomic.Requests
-	start = time.Now()
-	err = rlp.DecodeBytes(rlpBytes, &rlpDecodedRequests)
-	fmt.Println("rlp decode duration", time.Since(start))
-	assert.NoError(t, err)
-	assert.Equal(t, requests.PutRequests, rlpDecodedRequests.PutRequests)
-	assert.Equal(t, requests.RemoveRequests, rlpDecodedRequests.RemoveRequests)
-
-	// encode decode using codec
-	//atomicReqs := newAtomicRequests(requests)
-	atomicReqs := requests
-	codec := testTxCodec()
-	start = time.Now()
-	codecBytes, err := codec.Marshal(codecVersion, atomicReqs)
-	fmt.Println("codec encode duration", time.Since(start))
-	assert.NoError(t, err)
-	assert.Greater(t, len(codecBytes), 1)
-
-	fmt.Println("codecLen", len(codecBytes))
-
-	var codecDecodedRequests atomic.Requests
-	start = time.Now()
-	_, err = codec.Unmarshal(codecBytes, &codecDecodedRequests)
-	fmt.Println("codec decode duration", time.Since(start))
-	assert.NoError(t, err)
-	assert.Equal(t, atomicReqs.PutRequests, codecDecodedRequests.PutRequests)
-	assert.Equal(t, atomicReqs.RemoveRequests, codecDecodedRequests.RemoveRequests)
 }
 
 func TestIndexerInitializesOnlyOnce(t *testing.T) {
