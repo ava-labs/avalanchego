@@ -1,5 +1,37 @@
 # Release Notes
 
+## [v1.7.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.2)
+
+This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.
+
+### Coreth
+
+- Fixed memory leak in the estimate gas API.
+- Reduced the default RPC gas limit to 50,000,000 gas.
+- Improved RPC logging.
+- Removed pre-AP5 legacy code.
+
+### PlatformVM
+
+- Optimized validator set change calculations.
+- Removed storage of non-decided blocks.
+- Simplified error handling.
+- Removed pre-AP5 legacy code.
+
+### Networking
+
+- Explicitly fail requests with responses that failed to be parsed.
+- Removed pre-AP5 legacy code.
+
+### Configs
+
+- Introduced the ability for a delayed graceful node shutdown.
+- Added the ability to take all configs as environment variables for containerized deployments.
+
+### Utils
+
+- Fixed panic bug in logging library when importing from external projects.
+
 ## [v1.7.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.1)
 
 This update is backwards compatible with [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). Please see the expected update times in the v1.7.0 release.
