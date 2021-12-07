@@ -29,7 +29,7 @@ func (tx *Tx) mustAtomicOps() map[ids.ID]*atomic.Requests {
 func TestNearestCommitHeight(t *testing.T) {
 	blockNumber := uint64(7029687)
 	height := nearestCommitHeight(blockNumber, 4096)
-	assert.Less(t, 7028736, height+4096)
+	assert.Less(t, uint64(7028736), height+4096)
 }
 
 func TestBlockingAtomicTrieInitializeGenesis(t *testing.T) {
