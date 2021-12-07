@@ -34,9 +34,9 @@ var (
 	lastCommittedKey        = []byte("atomicTrieLastCommittedBlock")
 )
 
-// blockingAtomicTrie implements the types.AtomicTrie interface
+// atomicTrie implements the types.AtomicTrie interface
 // using the eth trie.Trie implementation
-type blockingAtomicTrie struct {
+type atomicTrie struct {
 	commitHeightInterval uint64              // commit interval, same as commitHeightInterval by default
 	db                   *versiondb.Database // Underlying database
 	metadataDB           database.Database   // Underlying database containing the atomic trie metadata
@@ -50,15 +50,15 @@ type blockingAtomicTrie struct {
 	log                  log.Logger // struct logger
 }
 
-// NewBlockingAtomicTrie returns a new instance of a blockingAtomicTrie configured with default commitHeightInterval.
+// NewAtomicTrie returns a new instance of a atomicTrie configured with default commitHeightInterval.
 // The trie is initialized before it is returned.
-func NewBlockingAtomicTrie(db *versiondb.Database, repo AtomicTxRepository, codec codec.Manager, lastAcceptedHeight uint64) (types.AtomicTrie, error) {
-	return newBlockingAtomicTrie(db, repo, codec, lastAcceptedHeight, commitHeightInterval)
+func NewAtomicTrie(db *versiondb.Database, repo AtomicTxRepository, codec codec.Manager, lastAcceptedHeight uint64) (types.AtomicTrie, error) {
+	return newAtomicTrie(db, repo, codec, lastAcceptedHeight, commitHeightInterval)
 }
 
-// newBlockingAtomicTrie is to be used for testing, allows setting of custom commitHeightInterval.
+// newAtomicTrie is to be used for testing, allows setting of custom commitHeightInterval.
 // Also initializes the trie before returning it.
-func newBlockingAtomicTrie(
+func newAtomicTrie(
 	db *versiondb.Database, repo AtomicTxRepository, codec codec.Manager, lastAcceptedHeight uint64, commitHeightInterval uint64,
 ) (types.AtomicTrie, error) {
 	atomicTrieDB := prefixdb.New(atomicIndexDBPrefix, db)
@@ -74,7 +74,7 @@ func newBlockingAtomicTrie(
 		return nil, err
 	}
 
-	atomicTrie := &blockingAtomicTrie{
+	atomicTrie := &atomicTrie{
 		commitHeightInterval: commitHeightInterval,
 		db:                   db,
 		atomicTrieDB:         atomicTrieDB,
@@ -85,7 +85,7 @@ func newBlockingAtomicTrie(
 		codec:                codec,
 		lastCommittedHash:    root,
 		lastCommittedHeight:  height,
-		log:                  log.New("c", "blockingAtomicTrie"),
+		log:                  log.New("c", "atomicTrie"),
 	}
 	return atomicTrie, atomicTrie.initialize(lastAcceptedHeight)
 }
@@ -126,7 +126,7 @@ func nearestCommitHeight(blockNumber uint64, commitInterval uint64) uint64 {
 // Iterating from the last indexed height to lastAcceptedBlockNumber, making a single commit at the
 // most recent height divisible by the commitInterval.
 // Subsequent updates to this trie are made using the Index call as blocks are accepted.
-func (b *blockingAtomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
+func (b *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 	startTime := time.Now()
 	b.log.Info("initializing atomic trie", "lastAcceptedBlockNumber", lastAcceptedBlockNumber)
 	// commitHeight is the highest block that can be committed i.e. is divisible by b.commitHeightInterval
@@ -241,7 +241,7 @@ func (b *blockingAtomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 // This function updates the following:
 // - heightBytes => trie root hash (if the trie was committed)
 // - lastCommittedBlock => height (if the trie was committed)
-func (b *blockingAtomicTrie) Index(height uint64, atomicOps map[ids.ID]*atomic.Requests) (common.Hash, error) {
+func (b *atomicTrie) Index(height uint64, atomicOps map[ids.ID]*atomic.Requests) (common.Hash, error) {
 
 	// disallow going backwards
 	if height < b.lastCommittedHeight {
@@ -267,7 +267,7 @@ func (b *blockingAtomicTrie) Index(height uint64, atomicOps map[ids.ID]*atomic.R
 // commit the underlying trie, generating a trie root hash
 // assumes that the caller is aware of the commit rules i.e. the height being within commitInterval
 // returns the trie root from the commit
-func (b *blockingAtomicTrie) commit(height uint64) (common.Hash, error) {
+func (b *atomicTrie) commit(height uint64) (common.Hash, error) {
 	hash, _, err := b.trie.Commit(nil)
 	if err != nil {
 		return common.Hash{}, err
@@ -297,7 +297,7 @@ func (b *blockingAtomicTrie) commit(height uint64) (common.Hash, error) {
 	return hash, nil
 }
 
-func (b *blockingAtomicTrie) updateTrie(height uint64, atomicOps map[ids.ID]*atomic.Requests) error {
+func (b *atomicTrie) updateTrie(height uint64, atomicOps map[ids.ID]*atomic.Requests) error {
 	for blockchainID, requests := range atomicOps {
 		valueBytes, err := rlp.EncodeToBytes(requests)
 		if err != nil {
@@ -316,13 +316,13 @@ func (b *blockingAtomicTrie) updateTrie(height uint64, atomicOps map[ids.ID]*ato
 }
 
 // LastCommitted returns the last committed trie hash and last committed height
-func (b *blockingAtomicTrie) LastCommitted() (common.Hash, uint64) {
+func (b *atomicTrie) LastCommitted() (common.Hash, uint64) {
 	return b.lastCommittedHash, b.lastCommittedHeight
 }
 
 // Iterator returns a types.AtomicTrieIterator that iterates the trie from the given
 // atomic trie root, starting at the specified height
-func (b *blockingAtomicTrie) Iterator(root common.Hash, startHeight uint64) (types.AtomicTrieIterator, error) {
+func (b *atomicTrie) Iterator(root common.Hash, startHeight uint64) (types.AtomicTrieIterator, error) {
 	var startKey []byte
 	if startHeight > 0 {
 		startKey = make([]byte, wrappers.LongLen)
@@ -338,14 +338,14 @@ func (b *blockingAtomicTrie) Iterator(root common.Hash, startHeight uint64) (typ
 	return NewAtomicTrieIterator(iter), iter.Err
 }
 
-func (b *blockingAtomicTrie) TrieDB() *trie.Database {
+func (b *atomicTrie) TrieDB() *trie.Database {
 	return b.trieDB
 }
 
 // Root returns hash if it exists at specified height
 // if trie was not committed at provided height, it returns
 // common.Hash{} instead
-func (b *blockingAtomicTrie) Root(height uint64) (common.Hash, error) {
+func (b *atomicTrie) Root(height uint64) (common.Hash, error) {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 

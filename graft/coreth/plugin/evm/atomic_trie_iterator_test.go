@@ -25,7 +25,7 @@ func TestIteratorCanIterate(t *testing.T) {
 
 	// create atomic trie
 	// on create it will initialize all the transactions from the above atomic repository
-	atomicTrie, err := newBlockingAtomicTrie(db, repo, testTxCodec(), lastAcceptedHeight, 100)
+	atomicTrie, err := newAtomicTrie(db, repo, testTxCodec(), lastAcceptedHeight, 100)
 	assert.NoError(t, err)
 
 	lastCommittedHash, lastCommittedHeight := atomicTrie.LastCommitted()
@@ -33,9 +33,9 @@ func TestIteratorCanIterate(t *testing.T) {
 	assert.NotEqual(t, common.Hash{}, lastCommittedHash)
 	assert.EqualValues(t, 1000, lastCommittedHeight, "expected %d but was %d", 1000, lastCommittedHeight)
 
-	// we iterate on a new blocking atomic trie to make sure there is no resident state affecting the data and the
+	// we iterate on a new atomic trie to make sure there is no resident state affecting the data and the
 	// iterator
-	atomicTrie, err = NewBlockingAtomicTrie(db, repo, testTxCodec(), lastAcceptedHeight)
+	atomicTrie, err = NewAtomicTrie(db, repo, testTxCodec(), lastAcceptedHeight)
 	assert.NoError(t, err)
 
 	iterator, err := atomicTrie.Iterator(lastCommittedHash, 0)

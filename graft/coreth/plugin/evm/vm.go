@@ -386,7 +386,7 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to create atomic repository: %w", err)
 	}
 
-	vm.atomicTrie, err = NewBlockingAtomicTrie(vm.db, vm.atomicTxRepository, vm.codec, lastAccepted.NumberU64())
+	vm.atomicTrie, err = NewAtomicTrie(vm.db, vm.atomicTxRepository, vm.codec, lastAccepted.NumberU64())
 	if err != nil {
 		return fmt.Errorf("failed to create atomic trie: %w", err)
 	}
