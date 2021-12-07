@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory"
 	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory/gsharedmemoryproto"
+	"github.com/ava-labs/avalanchego/database/corruptabledb"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
 	"github.com/ava-labs/avalanchego/database/rpcdb/rpcdbproto"
@@ -106,9 +107,9 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 			return nil, err
 		}
 		vm.connCloser.Add(dbConn)
-
+		db := rpcdb.NewClient(rpcdbproto.NewDatabaseClient(dbConn))
 		versionedDBs[i] = &manager.VersionedDatabase{
-			Database: rpcdb.NewClient(rpcdbproto.NewDatabaseClient(dbConn)),
+			Database: corruptabledb.New(db),
 			Version:  version,
 		}
 	}

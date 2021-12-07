@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/corruptabledb"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/meterdb"
@@ -130,10 +131,12 @@ func new(
 		return nil, fmt.Errorf("couldn't create db at %s: %w", currentDBPath, err)
 	}
 
+	wrappedDB := corruptabledb.New(currentDB)
+
 	manager := &manager{
 		databases: []*VersionedDatabase{
 			{
-				Database: currentDB,
+				Database: wrappedDB,
 				Version:  currentVersion,
 			},
 		},
@@ -177,8 +180,10 @@ func new(
 			return fmt.Errorf("couldn't create db at %s: %w", path, err)
 		}
 
+		wrappedDB := corruptabledb.New(db)
+
 		manager.databases = append(manager.databases, &VersionedDatabase{
-			Database: db,
+			Database: wrappedDB,
 			Version:  version,
 		})
 
