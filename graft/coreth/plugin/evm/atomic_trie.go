@@ -12,14 +12,12 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 
-	"github.com/ava-labs/coreth/trie"
-	"github.com/ethereum/go-ethereum/rlp"
-
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/coreth/statesync/types"
+	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -166,19 +164,16 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 		// combine atomic operations from all transactions at this block height
 		combinedOps := make(map[ids.ID]*atomic.Requests)
 		for _, tx := range txs {
-			id, reqs, err := tx.Accept()
-			ops := map[ids.ID]*atomic.Requests{id: reqs}
+			chainID, requests, err := tx.Accept()
 			if err != nil {
 				return err
 			}
 
-			for chainID, ops := range ops {
-				if chainOps, exists := combinedOps[chainID]; exists {
-					chainOps.PutRequests = append(chainOps.PutRequests, ops.PutRequests...)
-					chainOps.RemoveRequests = append(chainOps.RemoveRequests, ops.RemoveRequests...)
-				} else {
-					combinedOps[id] = ops
-				}
+			if chainOps, exists := combinedOps[chainID]; exists {
+				chainOps.PutRequests = append(chainOps.PutRequests, requests.PutRequests...)
+				chainOps.RemoveRequests = append(chainOps.RemoveRequests, requests.RemoveRequests...)
+			} else {
+				combinedOps[chainID] = requests
 			}
 		}
 
@@ -326,7 +321,7 @@ func (a *atomicTrie) commit(height uint64, root common.Hash) (common.Hash, error
 
 func (a *atomicTrie) updateTrie(height uint64, atomicOps map[ids.ID]*atomic.Requests) error {
 	for blockchainID, requests := range atomicOps {
-		valueBytes, err := rlp.EncodeToBytes(requests)
+		valueBytes, err := a.codec.Marshal(codecVersion, *requests)
 		if err != nil {
 			// highly unlikely but possible if atomic.Element
 			// has a change that is unsupported by the RLP encoder
@@ -362,7 +357,7 @@ func (a *atomicTrie) Iterator(root common.Hash, startHeight uint64) (types.Atomi
 	}
 
 	iter := trie.NewIterator(t.NodeIterator(startKey))
-	return NewAtomicTrieIterator(iter), iter.Err
+	return NewAtomicTrieIterator(iter, a.codec), iter.Err
 }
 
 func (a *atomicTrie) TrieDB() *trie.Database {

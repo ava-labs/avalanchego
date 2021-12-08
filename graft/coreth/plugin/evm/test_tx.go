@@ -78,6 +78,8 @@ func testTxCodec() codec.Manager {
 	errs := wrappers.Errs{}
 	errs.Add(
 		c.RegisterType(&TestTx{}),
+		c.RegisterType(&atomic.Element{}),
+		c.RegisterType(&atomic.Requests{}),
 		codec.RegisterCodec(codecVersion, c),
 	)
 
@@ -102,6 +104,10 @@ func testDataImportTx() *Tx {
 							utils.RandomBytes(32),
 						},
 					},
+				},
+				RemoveRequests: [][]byte{
+					utils.RandomBytes(32),
+					utils.RandomBytes(32),
 				},
 			},
 		},
