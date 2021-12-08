@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -34,15 +35,18 @@ func addTxs(t testing.TB, codec codec.Manager, acceptedAtomicTxDB database.Datab
 			txBytes, err := codec.Marshal(codecVersion, tx)
 			assert.NoError(t, err)
 
-	// Generate and write atomic transactions to the repository
-	txIDs := make([]ids.ID, 100)
-	for i := 0; i < 100; i++ {
-		id, tx := newTestTx()
+			// Write atomic transactions to the [acceptedAtomicTxDB]
+			// in the format handled prior to the migration to the atomic
+			// tx repository.
+			packer := wrappers.Packer{Bytes: make([]byte, 1), MaxSize: 1024 * 1024}
+			packer.PackLong(height)
+			packer.PackBytes(txBytes)
+			err = acceptedAtomicTxDB.Put(id[:], packer.Bytes)
+			assert.NoError(t, err)
 
-		err := repo.Write(uint64(i), []*Tx{tx})
-		assert.NoError(t, err)
-
-		txIDs[i] = id
+			// save this to the map for verifying expected results in verifyTxs
+			txMap[height] = append(txMap[height], tx)
+		}
 	}
 }
 
@@ -89,7 +93,7 @@ func verifyTxs(t testing.TB, repo AtomicTxRepository, txMap map[uint64][]*Tx) {
 
 func TestAtomicRepositoryReadWriteSingleTx(t *testing.T) {
 	db := versiondb.New(memdb.New())
-	codec := prepareCodecForTest()
+	codec := testTxCodec()
 	repo, err := NewAtomicTxRepository(db, codec, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -102,7 +106,7 @@ func TestAtomicRepositoryReadWriteSingleTx(t *testing.T) {
 
 func TestAtomicRepositoryReadWriteMultipleTxs(t *testing.T) {
 	db := versiondb.New(memdb.New())
-	codec := prepareCodecForTest()
+	codec := testTxCodec()
 	repo, err := NewAtomicTxRepository(db, codec, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -115,7 +119,7 @@ func TestAtomicRepositoryReadWriteMultipleTxs(t *testing.T) {
 
 func TestAtomicRepositoryPreAP5Migration(t *testing.T) {
 	db := versiondb.New(memdb.New())
-	codec := prepareCodecForTest()
+	codec := testTxCodec()
 
 	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
 	txMap := make(map[uint64][]*Tx)
@@ -140,7 +144,7 @@ func TestAtomicRepositoryPreAP5Migration(t *testing.T) {
 
 func TestAtomicRepositoryPostAP5Migration(t *testing.T) {
 	db := versiondb.New(memdb.New())
-	codec := prepareCodecForTest()
+	codec := testTxCodec()
 
 	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
 	txMap := make(map[uint64][]*Tx)
@@ -165,7 +169,7 @@ func TestAtomicRepositoryPostAP5Migration(t *testing.T) {
 
 func benchAtomicRepositoryIndex10_000(b *testing.B, maxHeight uint64, txsPerHeight int) {
 	db := versiondb.New(memdb.New())
-	codec := prepareCodecForTest()
+	codec := testTxCodec()
 
 	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
 	txMap := make(map[uint64][]*Tx)
