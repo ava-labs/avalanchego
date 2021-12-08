@@ -166,7 +166,7 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 		// combine atomic operations from all transactions at this block height
 		combinedOps := make(map[ids.ID]*atomic.Requests)
 		for _, tx := range txs {
-			chainID, requests, err := tx.Accept()
+			chainID, requests, err := tx.AtomicOps()
 			if err != nil {
 				return err
 			}

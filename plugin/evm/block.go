@@ -142,7 +142,7 @@ func (b *Block) Accept() error {
 		// Remove the accepted transaction from the mempool
 		vm.mempool.RemoveTx(tx.ID())
 		// Accept atomic transaction
-		chainID, txRequest, err := tx.UnsignedAtomicTx.Accept()
+		chainID, txRequest, err := tx.UnsignedAtomicTx.AtomicOps()
 		if err != nil {
 			return err
 		}

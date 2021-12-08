@@ -25,7 +25,7 @@ import (
 const testCommitInterval = 100
 
 func (tx *Tx) mustAtomicOps() map[ids.ID]*atomic.Requests {
-	id, reqs, err := tx.Accept()
+	id, reqs, err := tx.AtomicOps()
 	if err != nil {
 		panic(err)
 	}
@@ -173,7 +173,7 @@ func TestIndexerInitializeFromState(t *testing.T) {
 		// 3 transactions per height
 		txs := []*Tx{testDataImportTx(), testDataExportTx(), testDataImportTx()}
 		for _, tx := range txs {
-			chainID, requests, err := tx.Accept()
+			chainID, requests, err := tx.AtomicOps()
 			assert.NoError(t, err)
 			if heightOps, exists := actualOpsMap[height]; !exists {
 				actualOpsMap[height] = map[ids.ID]*atomic.Requests{chainID: requests}
@@ -214,7 +214,7 @@ func TestIndexerInitializeFromState(t *testing.T) {
 func BenchmarkEncodeDecode(b *testing.B) {
 	codec := testTxCodec()
 	tx := testDataImportTx()
-	_, requests, err := tx.Accept()
+	_, requests, err := tx.AtomicOps()
 	assert.NoError(b, err)
 
 	rlpAtomicBytes, err := rlp.EncodeToBytes(requests)
@@ -268,7 +268,7 @@ func BenchmarkEncodeDecode(b *testing.B) {
 
 func TestAtomicRequestEncodeDecode(t *testing.T) {
 	tx := testDataImportTx()
-	_, requests, err := tx.Accept()
+	_, requests, err := tx.AtomicOps()
 	assert.NoError(t, err)
 
 	// encode decode using RLP

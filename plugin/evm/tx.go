@@ -108,10 +108,10 @@ type UnsignedAtomicTx interface {
 	Verify(ctx *snow.Context, rules params.Rules) error
 	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(vm *VM, stx *Tx, parent *Block, baseFee *big.Int, rules params.Rules) error
-	// Accept returns the blockchainID and set of atomic requests that
+	// AtomicOps returns the blockchainID and set of atomic requests that
 	// must be applied to shared memory for this transaction to be accepted.
 	// The set of atomic requests must be returned in a consistent order.
-	Accept() (ids.ID, *atomic.Requests, error)
+	AtomicOps() (ids.ID, *atomic.Requests, error)
 
 	EVMStateTransfer(ctx *snow.Context, state *state.StateDB) error
 }
