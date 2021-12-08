@@ -900,7 +900,11 @@ func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash 
 	if blkNumber, isNum := blockNrOrHash.Number(); isNum && blkNumber == rpc.PendingBlockNumber {
 		// Override header with a copy to ensure the original header is not modified
 		header = types.CopyHeader(header)
+		// Grab the hash of the unmodified header, so that the modified header can point to the
+		// prior block as its parent.
+		parentHash := header.Hash()
 		header.Time = uint64(time.Now().Unix())
+		header.ParentHash = parentHash
 		header.Number = new(big.Int).Add(header.Number, big.NewInt(1))
 		estimatedBaseFee, err := b.EstimateBaseFee(ctx)
 		if err != nil {
@@ -1270,7 +1274,9 @@ func RPCMarshalBlock(block *types.Block, inclTx bool, fullTx bool, config *param
 // a `PublicBlockchainAPI`.
 func (s *PublicBlockChainAPI) rpcMarshalHeader(ctx context.Context, header *types.Header) map[string]interface{} {
 	fields := RPCMarshalHeader(header)
-	fields["totalDifficulty"] = (*hexutil.Big)(s.b.GetTd(ctx, header.Hash()))
+	// Note: Coreth enforces that the difficulty of a block is always 1, such that the total difficulty of a block
+	// will be equivalent to its height.
+	fields["totalDifficulty"] = (*hexutil.Big)(header.Number)
 	return fields
 }
 
@@ -1282,7 +1288,9 @@ func (s *PublicBlockChainAPI) rpcMarshalBlock(ctx context.Context, b *types.Bloc
 		return nil, err
 	}
 	if inclTx {
-		fields["totalDifficulty"] = (*hexutil.Big)(s.b.GetTd(ctx, b.Hash()))
+		// Note: Coreth enforces that the difficulty of a block is always 1, such that the total difficulty of a block
+		// will be equivalent to its height.
+		fields["totalDifficulty"] = (*hexutil.Big)(b.Number())
 	}
 	return fields, err
 }
