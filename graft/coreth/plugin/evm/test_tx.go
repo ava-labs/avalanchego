@@ -38,12 +38,12 @@ func (t *TestTx) GasUsed(fixedFee bool) (uint64, error) { return t.GasUsedV, nil
 // Verify implements the UnsignedAtomicTx interface
 func (t *TestTx) Verify(ctx *snow.Context, rules params.Rules) error { return t.VerifyV }
 
-// Accept implements the UnsignedAtomicTx interface
-func (t *TestTx) Accept() (ids.ID, *atomic.Requests, error) {
+// AtomicOps implements the UnsignedAtomicTx interface
+func (t *TestTx) AtomicOps() (ids.ID, *atomic.Requests, error) {
 	return t.IDV, t.AcceptRequestsV, nil
 }
 
-// Accept implements the UnsignedAtomicTx interface
+// Initialize implements the UnsignedAtomicTx interface
 func (t *TestTx) Initialize(unsignedBytes, signedBytes []byte) {}
 
 // ID implements the UnsignedAtomicTx interface
@@ -58,7 +58,7 @@ func (t *TestTx) UnsignedBytes() []byte { return t.UnsignedBytesV }
 // Bytes implements the UnsignedAtomicTx interface
 func (t *TestTx) Bytes() []byte { return t.BytesV }
 
-// ByInputUTXOs implements the UnsignedAtomicTx interface
+// InputUTXOs implements the UnsignedAtomicTx interface
 func (t *TestTx) InputUTXOs() ids.Set { return t.InputUTXOsV }
 
 // SemanticVerify implements the UnsignedAtomicTx interface
