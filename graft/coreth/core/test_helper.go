@@ -34,6 +34,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/ethdb"
@@ -148,7 +149,7 @@ func verifyCutoff(t *testing.T, chain *BlockChain, canonical bool, inserted type
 // NewLevelDBDatabase creates a persistent key-value database without a freezer
 // moving immutable chain segments into cold storage.
 func NewLevelDBDatabase(file string, cache int, handles int, namespace string, readonly bool) (ethdb.Database, error) {
-	db, err := leveldb.New(file, nil)
+	db, err := leveldb.New(file, nil, logging.NoLog{})
 	if err != nil {
 		return nil, err
 	}
