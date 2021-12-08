@@ -96,7 +96,7 @@ func (a *atomicTxRepository) initializeHeightIndex(lastAcceptedHeight uint64) er
 		log.Info("Initializing atomic transaction repository from scratch")
 	case common.HashLength: // partially initialized
 		lastTxID = indexHeightBytes
-		log.Info("Initializing atomic transaction repository from txID: %v", lastTxID)
+		log.Info("Initializing atomic transaction repository from txID", "lastTxID", common.Bytes2Hex(lastTxID))
 	case wrappers.LongLen: // already initialized
 		return nil
 	default: // unexpected value in the database
@@ -150,7 +150,7 @@ func (a *atomicTxRepository) initializeHeightIndex(lastAcceptedHeight uint64) er
 			if err := a.db.Commit(); err != nil {
 				return err
 			}
-			log.Info("Committing work initializing the atomic repository", "lastTxID", lastTxID, "pendingBytesApprox", pendingBytesApproximation)
+			log.Info("Committing work initializing the atomic repository", "lastTxID", common.Bytes2Hex(lastTxID), "pendingBytesApprox", pendingBytesApproximation)
 			pendingBytesApproximation = 0
 		}
 		indexedTxs++
