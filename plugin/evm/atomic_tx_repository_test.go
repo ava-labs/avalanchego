@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -50,15 +51,18 @@ func addTxs(t testing.TB, codec codec.Manager, acceptedAtomicTxDB database.Datab
 			txBytes, err := codec.Marshal(codecVersion, tx)
 			assert.NoError(t, err)
 
-	// Generate and write atomic transactions to the repository
-	txIDs := make([]ids.ID, 100)
-	for i := 0; i < 100; i++ {
-		id, tx := newTestTx()
+			// Write atomic transactions to the [acceptedAtomicTxDB]
+			// in the format handled prior to the migration to the atomic
+			// tx repository.
+			packer := wrappers.Packer{Bytes: make([]byte, 1), MaxSize: 1024 * 1024}
+			packer.PackLong(height)
+			packer.PackBytes(txBytes)
+			err = acceptedAtomicTxDB.Put(id[:], packer.Bytes)
+			assert.NoError(t, err)
 
-		err := repo.Write(uint64(i), []*Tx{tx})
-		assert.NoError(t, err)
-
-		txIDs[i] = id
+			// save this to the map for verifying expected results in verifyTxs
+			txMap[height] = append(txMap[height], tx)
+		}
 	}
 }
 
