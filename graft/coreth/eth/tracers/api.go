@@ -31,7 +31,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"runtime"
 	"sync"
@@ -61,6 +60,13 @@ const (
 	// and reexecute to produce missing historical state necessary to run a specific
 	// trace.
 	defaultTraceReexec = uint64(128)
+
+	// defaultTracechainMemLimit is the size of the triedb, at which traceChain
+	// switches over and tries to use a disk-backed database instead of building
+	// on top of memory.
+	// For non-archive nodes, this limit _will_ be overblown, as disk-backed tries
+	// will only be found every ~15K blocks or so.
+	defaultTracechainMemLimit = common.StorageSize(500 * 1024 * 1024)
 )
 
 // Backend interface provides the common API services (that are provided by
@@ -70,12 +76,13 @@ type Backend interface {
 	HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error)
 	BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error)
 	BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error)
+	BadBlocks() []*types.Block
 	GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error)
 	RPCGasCap() uint64
 	ChainConfig() *params.ChainConfig
 	Engine() consensus.Engine
 	ChainDb() ethdb.Database
-	StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, checkLive bool) (*state.StateDB, error)
+	StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, checkLive bool, preferDisk bool) (*state.StateDB, error)
 	StateAtTransaction(ctx context.Context, block *types.Block, txIndex int, reexec uint64) (core.Message, vm.BlockContext, *state.StateDB, error)
 }
 
@@ -328,6 +335,7 @@ func (api *API) traceChain(ctx context.Context, start, end *types.Block, config 
 			}
 			close(results)
 		}()
+		var preferDisk bool
 		// Feed all the blocks both into the tracer, as well as fast process concurrently
 		for number = start.NumberU64(); number < end.NumberU64(); number++ {
 			// Stop tracing if interruption was requested
@@ -357,18 +365,24 @@ func (api *API) traceChain(ctx context.Context, start, end *types.Block, config 
 			}
 			// Prepare the statedb for tracing. Don't use the live database for
 			// tracing to avoid persisting state junks into the database.
-			statedb, err = api.backend.StateAtBlock(localctx, block, reexec, statedb, false)
+			statedb, err = api.backend.StateAtBlock(localctx, block, reexec, statedb, false, preferDisk)
 			if err != nil {
 				failed = err
 				break
 			}
-			if statedb.Database().TrieDB() != nil {
+			if trieDb := statedb.Database().TrieDB(); trieDb != nil {
 				// Hold the reference for tracer, will be released at the final stage
-				statedb.Database().TrieDB().Reference(block.Root(), common.Hash{})
+				trieDb.Reference(block.Root(), common.Hash{})
 
 				// Release the parent state because it's already held by the tracer
 				if parent != (common.Hash{}) {
-					statedb.Database().TrieDB().Dereference(parent)
+					trieDb.Dereference(parent)
+				}
+				// Prefer disk if the trie db memory grows too much
+				s1, s2 := trieDb.Size()
+				if !preferDisk && (s1+s2) > defaultTracechainMemLimit {
+					log.Info("Switching to prefer-disk mode for tracing", "size", s1+s2)
+					preferDisk = true
 				}
 			}
 			parent = block.Root()
@@ -450,50 +464,31 @@ func (api *API) TraceBlock(ctx context.Context, blob []byte, config *TraceConfig
 	return api.traceBlock(ctx, block, config)
 }
 
-// TraceBlockFromFile returns the structured logs created during the execution of
-// EVM and returns them as a JSON object.
-func (api *API) TraceBlockFromFile(ctx context.Context, file string, config *TraceConfig) ([]*txTraceResult, error) {
-	blob, err := ioutil.ReadFile(file)
-	if err != nil {
-		return nil, fmt.Errorf("could not read file: %v", err)
-	}
-	return api.TraceBlock(ctx, blob, config)
-}
-
 // TraceBadBlock returns the structured logs created during the execution of
 // EVM against a block pulled from the pool of bad ones and returns them as a JSON
 // object.
-/*
 func (api *API) TraceBadBlock(ctx context.Context, hash common.Hash, config *TraceConfig) ([]*txTraceResult, error) {
-	block := rawdb.ReadBadBlock(api.backend.ChainDb(), hash)
+	// Search for the bad block corresponding to [hash].
+	var (
+		badBlocks = api.backend.BadBlocks()
+		block     *types.Block
+	)
+	for _, badBlock := range badBlocks {
+		if hash == block.Hash() {
+			block = badBlock
+			break
+		}
+	}
 	if block == nil {
 		return nil, fmt.Errorf("bad block %#x not found", hash)
 	}
 	return api.traceBlock(ctx, block, config)
 }
-*/
-
-// StandardTraceBlockToFile dumps the structured logs created during the
-// execution of EVM to the local file system and returns a list of files
-// to the caller.
-/*
-func (api *API) StandardTraceBlockToFile(ctx context.Context, hash common.Hash, config *StdTraceConfig) ([]string, error) {
-	block, err := api.blockByHash(ctx, hash)
-	if err != nil {
-		return nil, err
-	}
-	return api.standardTraceBlockToFile(ctx, block, config)
-}
-*/
 
 // IntermediateRoots executes a block (bad- or canon- or side-), and returns a list
 // of intermediate roots: the stateroot after each transaction.
 func (api *API) IntermediateRoots(ctx context.Context, hash common.Hash, config *TraceConfig) ([]common.Hash, error) {
 	block, _ := api.blockByHash(ctx, hash)
-	if block == nil {
-		// Check in the bad blocks
-		// block = rawdb.ReadBadBlock(api.backend.ChainDb(), hash)
-	}
 	if block == nil {
 		return nil, fmt.Errorf("block %#x not found", hash)
 	}
@@ -508,13 +503,13 @@ func (api *API) IntermediateRoots(ctx context.Context, hash common.Hash, config 
 	if config != nil && config.Reexec != nil {
 		reexec = *config.Reexec
 	}
-	statedb, err := api.backend.StateAtBlock(ctx, parent, reexec, nil, true)
+	statedb, err := api.backend.StateAtBlock(ctx, parent, reexec, nil, true, false)
 	if err != nil {
 		return nil, err
 	}
 	var (
 		roots              []common.Hash
-		signer             = types.MakeSigner(api.backend.ChainConfig(), block.Number(), block.Number())
+		signer             = types.MakeSigner(api.backend.ChainConfig(), block.Number(), new(big.Int).SetUint64(block.Time()))
 		chainConfig        = api.backend.ChainConfig()
 		vmctx              = core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), nil)
 		deleteEmptyObjects = chainConfig.IsEIP158(block.Number())
@@ -543,19 +538,6 @@ func (api *API) IntermediateRoots(ctx context.Context, hash common.Hash, config 
 	return roots, nil
 }
 
-// StandardTraceBadBlockToFile dumps the structured logs created during the
-// execution of EVM against a block pulled from the pool of bad ones to the
-// local file system and returns a list of files to the caller.
-/*
-func (api *API) StandardTraceBadBlockToFile(ctx context.Context, hash common.Hash, config *StdTraceConfig) ([]string, error) {
-	block := rawdb.ReadBadBlock(api.backend.ChainDb(), hash)
-	if block == nil {
-		return nil, fmt.Errorf("bad block %#x not found", hash)
-	}
-	return api.standardTraceBlockToFile(ctx, block, config)
-}
-*/
-
 // traceBlock configures a new tracer according to the provided configuration, and
 // executes all the transactions contained within. The return value will be one item
 // per transaction, dependent on the requestd tracer.
@@ -571,7 +553,7 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 	if config != nil && config.Reexec != nil {
 		reexec = *config.Reexec
 	}
-	statedb, err := api.backend.StateAtBlock(ctx, parent, reexec, nil, true)
+	statedb, err := api.backend.StateAtBlock(ctx, parent, reexec, nil, true, false)
 	if err != nil {
 		return nil, err
 	}
@@ -639,139 +621,6 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 	return results, nil
 }
 
-// standardTraceBlockToFile configures a new tracer which uses standard JSON output,
-// and traces either a full block or an individual transaction. The return value will
-// be one filename per transaction traced.
-/*
-func (api *API) standardTraceBlockToFile(ctx context.Context, block *types.Block, config *StdTraceConfig) ([]string, error) {
-	// If we're tracing a single transaction, make sure it's present
-	if config != nil && config.TxHash != (common.Hash{}) {
-		if !containsTx(block, config.TxHash) {
-			return nil, fmt.Errorf("transaction %#x not found in block", config.TxHash)
-		}
-	}
-	if block.NumberU64() == 0 {
-		return nil, errors.New("genesis is not traceable")
-	}
-	parent, err := api.blockByNumberAndHash(ctx, rpc.BlockNumber(block.NumberU64()-1), block.ParentHash())
-	if err != nil {
-		return nil, err
-	}
-	reexec := defaultTraceReexec
-	if config != nil && config.Reexec != nil {
-		reexec = *config.Reexec
-	}
-	statedb, err := api.backend.StateAtBlock(ctx, parent, reexec, nil, true)
-	if err != nil {
-		return nil, err
-	}
-	// Retrieve the tracing configurations, or use default values
-	var (
-		logConfig vm.LogConfig
-		txHash    common.Hash
-	)
-	if config != nil {
-		logConfig = config.LogConfig
-		txHash = config.TxHash
-	}
-	logConfig.Debug = true
-
-	// Execute transaction, either tracing all or just the requested one
-	var (
-		dumps       []string
-		signer      = types.MakeSigner(api.backend.ChainConfig(), block.Number(), block.Number())
-		chainConfig = api.backend.ChainConfig()
-		vmctx       = core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), nil)
-		canon       = true
-	)
-	// Check if there are any overrides: the caller may wish to enable a future
-	// fork when executing this block. Note, such overrides are only applicable to the
-	// actual specified block, not any preceding blocks that we have to go through
-	// in order to obtain the state.
-	// Therefore, it's perfectly valid to specify `"futureForkBlock": 0`, to enable `futureFork`
-
-	if config != nil && config.Overrides != nil {
-		// Copy the config, to not screw up the main config
-		// Note: the Clique-part is _not_ deep copied
-		chainConfigCopy := new(params.ChainConfig)
-		*chainConfigCopy = *chainConfig
-		chainConfig = chainConfigCopy
-		if berlin := config.LogConfig.Overrides.BerlinBlock; berlin != nil {
-			chainConfig.BerlinBlock = berlin
-			canon = false
-		}
-	}
-	for i, tx := range block.Transactions() {
-		// Prepare the trasaction for un-traced execution
-		var (
-			msg, _    = tx.AsMessage(signer, block.BaseFee())
-			txContext = core.NewEVMTxContext(msg)
-			vmConf    vm.Config
-			dump      *os.File
-			writer    *bufio.Writer
-			err       error
-		)
-		// If the transaction needs tracing, swap out the configs
-		if tx.Hash() == txHash || txHash == (common.Hash{}) {
-			// Generate a unique temporary file to dump it into
-			prefix := fmt.Sprintf("block_%#x-%d-%#x-", block.Hash().Bytes()[:4], i, tx.Hash().Bytes()[:4])
-			if !canon {
-				prefix = fmt.Sprintf("%valt-", prefix)
-			}
-			dump, err = ioutil.TempFile(os.TempDir(), prefix)
-			if err != nil {
-				return nil, err
-			}
-			dumps = append(dumps, dump.Name())
-
-			// Swap out the noop logger to the standard tracer
-			writer = bufio.NewWriter(dump)
-			vmConf = vm.Config{
-				Debug:                   true,
-				Tracer:                  vm.NewJSONLogger(&logConfig, writer),
-				EnablePreimageRecording: true,
-			}
-		}
-		// Execute the transaction and flush any traces to disk
-		vmenv := vm.NewEVM(vmctx, txContext, statedb, chainConfig, vmConf)
-		statedb.Prepare(tx.Hash(), i)
-		_, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()))
-		if writer != nil {
-			writer.Flush()
-		}
-		if dump != nil {
-			dump.Close()
-			log.Info("Wrote standard trace", "file", dump.Name())
-		}
-		if err != nil {
-			return dumps, err
-		}
-		// Finalize the state so any modifications are written to the trie
-		// Only delete empty objects if EIP158/161 (a.k.a Spurious Dragon) is in effect
-		statedb.Finalise(vmenv.ChainConfig().IsEIP158(block.Number()))
-
-		// If we've traced the transaction we were looking for, abort
-		if tx.Hash() == txHash {
-			break
-		}
-	}
-	return dumps, nil
-}
-*/
-
-// containsTx reports whether the transaction with a certain hash
-// is contained within the specified block.
-/*
-func containsTx(block *types.Block, hash common.Hash) bool {
-	for _, tx := range block.Transactions() {
-		if tx.Hash() == hash {
-			return true
-		}
-	}
-	return false
-}
-*/
-
 // TraceTransaction returns the structured logs created during the execution of EVM
 // and returns them as a JSON object.
 func (api *API) TraceTransaction(ctx context.Context, hash common.Hash, config *TraceConfig) (interface{}, error) {
@@ -828,7 +677,7 @@ func (api *API) TraceCall(ctx context.Context, args ethapi.TransactionArgs, bloc
 	if config != nil && config.Reexec != nil {
 		reexec = *config.Reexec
 	}
-	statedb, err := api.backend.StateAtBlock(ctx, block, reexec, nil, true)
+	statedb, err := api.backend.StateAtBlock(ctx, block, reexec, nil, true, false)
 	if err != nil {
 		return nil, err
 	}
@@ -863,12 +712,14 @@ func (api *API) TraceCall(ctx context.Context, args ethapi.TransactionArgs, bloc
 func (api *API) traceTx(ctx context.Context, message core.Message, txctx *Context, vmctx vm.BlockContext, statedb *state.StateDB, config *TraceConfig) (interface{}, error) {
 	// Assemble the structured logger or the JavaScript tracer
 	var (
-		tracer    vm.Tracer
+		tracer    vm.EVMLogger
 		err       error
 		txContext = core.NewEVMTxContext(message)
 	)
 	switch {
-	case config != nil && config.Tracer != nil:
+	case config == nil:
+		tracer = vm.NewStructLogger(nil)
+	case config.Tracer != nil:
 		// Define a meaningful timeout of a single transaction trace
 		timeout := defaultTraceTimeout
 		if config.Timeout != nil {
@@ -876,22 +727,19 @@ func (api *API) traceTx(ctx context.Context, message core.Message, txctx *Contex
 				return nil, err
 			}
 		}
-		// Constuct the JavaScript tracer to execute with
-		if tracer, err = New(*config.Tracer, txctx); err != nil {
+		if t, err := New(*config.Tracer, txctx); err != nil {
 			return nil, err
+		} else {
+			deadlineCtx, cancel := context.WithTimeout(ctx, timeout)
+			go func() {
+				<-deadlineCtx.Done()
+				if errors.Is(deadlineCtx.Err(), context.DeadlineExceeded) {
+					t.Stop(errors.New("execution timeout"))
+				}
+			}()
+			defer cancel()
+			tracer = t
 		}
-		// Handle timeouts and RPC cancellations
-		deadlineCtx, cancel := context.WithTimeout(ctx, timeout)
-		go func() {
-			<-deadlineCtx.Done()
-			if deadlineCtx.Err() == context.DeadlineExceeded {
-				tracer.(*Tracer).Stop(errors.New("execution timeout"))
-			}
-		}()
-		defer cancel()
-
-	case config == nil:
-		tracer = vm.NewStructLogger(nil)
 
 	default:
 		tracer = vm.NewStructLogger(config.LogConfig)
@@ -922,7 +770,7 @@ func (api *API) traceTx(ctx context.Context, message core.Message, txctx *Contex
 			StructLogs:  ethapi.FormatLogs(tracer.StructLogs()),
 		}, nil
 
-	case *Tracer:
+	case Tracer:
 		return tracer.GetResult()
 
 	default:

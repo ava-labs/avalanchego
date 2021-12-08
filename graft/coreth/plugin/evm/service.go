@@ -41,24 +41,6 @@ var (
 	initialBaseFee = big.NewInt(params.ApricotPhase3InitialBaseFee)
 )
 
-// SnowmanAPI introduces snowman specific functionality to the evm
-type SnowmanAPI struct{ vm *VM }
-
-// AvaxAPI offers Avalanche network related API methods
-type AvaxAPI struct{ vm *VM }
-
-// NetAPI offers network related API methods
-type NetAPI struct{ vm *VM }
-
-// Listening returns an indication if the node is listening for network connections.
-func (s *NetAPI) Listening() bool { return true } // always listening
-
-// PeerCount returns the number of connected peers
-func (s *NetAPI) PeerCount() hexutil.Uint { return hexutil.Uint(0) }
-
-// Version returns the current ethereum protocol version.
-func (s *NetAPI) Version() string { return fmt.Sprintf("%d", s.vm.networkID) }
-
 // Web3API offers helper API methods
 type Web3API struct{}
 
@@ -67,6 +49,9 @@ func (s *Web3API) ClientVersion() string { return Version }
 
 // Sha3 returns the bytes returned by hashing [input] with Keccak256
 func (s *Web3API) Sha3(input hexutil.Bytes) hexutil.Bytes { return ethcrypto.Keccak256(input) }
+
+// SnowmanAPI introduces snowman specific functionality to the evm
+type SnowmanAPI struct{ vm *VM }
 
 // GetAcceptedFrontReply defines the reply that will be sent from the
 // GetAcceptedFront API call
@@ -91,6 +76,9 @@ func (api *SnowmanAPI) IssueBlock(ctx context.Context) error {
 	api.vm.builder.signalTxsReady()
 	return nil
 }
+
+// AvaxAPI offers Avalanche network related API methods
+type AvaxAPI struct{ vm *VM }
 
 // parseAssetID parses an assetID string into an ID
 func (service *AvaxAPI) parseAssetID(assetID string) (ids.ID, error) {

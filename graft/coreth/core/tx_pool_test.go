@@ -166,6 +166,8 @@ func setupTxPoolWithConfig(config *params.ChainConfig) (*TxPool, *ecdsa.PrivateK
 	key, _ := crypto.GenerateKey()
 	pool := NewTxPool(testTxPoolConfig, config, blockchain)
 
+	// wait for the pool to initialize
+	<-pool.initDoneCh
 	return pool, key
 }
 
@@ -295,10 +297,6 @@ func TestStateChangeDuringTransactionPoolReset(t *testing.T) {
 	trigger = true
 	<-pool.requestReset(nil, nil)
 
-	_, err := pool.Pending(false)
-	if err != nil {
-		t.Fatalf("Could not fetch pending transactions: %v", err)
-	}
 	nonce = pool.Nonce(address)
 	if nonce != 2 {
 		t.Fatalf("Invalid nonce, want 2, got %d", nonce)
@@ -1990,20 +1988,20 @@ func TestDualHeapEviction(t *testing.T) {
 	}
 
 	add := func(urgent bool) {
-		txs := make([]*types.Transaction, 20)
-		for i := range txs {
+		for i := 0; i < 20; i++ {
+			var tx *types.Transaction
 			// Create a test accounts and fund it
 			key, _ := crypto.GenerateKey()
 			testAddBalance(pool, crypto.PubkeyToAddress(key.PublicKey), big.NewInt(1000000000000))
 			if urgent {
-				txs[i] = dynamicFeeTx(0, 100000, big.NewInt(int64(baseFee+1+i)), big.NewInt(int64(1+i)), key)
-				highTip = txs[i]
+				tx = dynamicFeeTx(0, 100000, big.NewInt(int64(baseFee+1+i)), big.NewInt(int64(1+i)), key)
+				highTip = tx
 			} else {
-				txs[i] = dynamicFeeTx(0, 100000, big.NewInt(int64(baseFee+200+i)), big.NewInt(1), key)
-				highCap = txs[i]
+				tx = dynamicFeeTx(0, 100000, big.NewInt(int64(baseFee+200+i)), big.NewInt(1), key)
+				highCap = tx
 			}
+			pool.AddRemotesSync([]*types.Transaction{tx})
 		}
-		pool.AddRemotesSync(txs)
 		pending, queued := pool.Stats()
 		if pending+queued != 20 {
 			t.Fatalf("transaction count mismatch: have %d, want %d", pending+queued, 10)
@@ -2585,5 +2583,26 @@ func BenchmarkInsertRemoteWithAllLocals(b *testing.B) {
 			pool.AddRemotes([]*types.Transaction{remotes[i]})
 		}
 		pool.Stop()
+	}
+}
+
+// Benchmarks the speed of batch transaction insertion in case of multiple accounts.
+func BenchmarkPoolMultiAccountBatchInsert(b *testing.B) {
+	// Generate a batch of transactions to enqueue into the pool
+	pool, _ := setupTxPool()
+	defer pool.Stop()
+	b.ReportAllocs()
+	batches := make(types.Transactions, b.N)
+	for i := 0; i < b.N; i++ {
+		key, _ := crypto.GenerateKey()
+		account := crypto.PubkeyToAddress(key.PublicKey)
+		pool.currentState.AddBalance(account, big.NewInt(1000000))
+		tx := transaction(uint64(0), 100000, key)
+		batches[i] = tx
+	}
+	// Benchmark importing the transactions into the queue
+	b.ResetTimer()
+	for _, tx := range batches {
+		pool.AddRemotesSync([]*types.Transaction{tx})
 	}
 }

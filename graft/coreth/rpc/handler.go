@@ -36,6 +36,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+	"golang.org/x/time/rate"
 )
 
 // handler handles JSON-RPC messages. There is one handler per connection. Note that
@@ -76,11 +77,14 @@ type handler struct {
 	serverSubs map[ID]*Subscription
 
 	deadlineContext time.Duration // limits execution after some time.Duration
+	limiter         *rate.Limiter
 }
 
 type callProc struct {
 	ctx       context.Context
 	notifiers []*Notifier
+	callStart time.Time
+	procStart time.Time
 }
 
 func newHandler(connCtx context.Context, conn jsonWriter, idgen func() ID, reg *serviceRegistry) *handler {
@@ -102,6 +106,18 @@ func newHandler(connCtx context.Context, conn jsonWriter, idgen func() ID, reg *
 	}
 	h.unsubscribeCb = newCallback(reflect.Value{}, reflect.ValueOf(h.unsubscribe))
 	return h
+}
+
+// addLimiter adds a rate limiter to the handler that will allow at most
+// [refillRate] cpu to be used per second. At most [maxStored] cpu time will be
+// stored for this limiter.
+// If any values are provided that would make the rate limiting trivial, then no
+// limiter is added.
+func (h *handler) addLimiter(refillRate, maxStored time.Duration) {
+	if refillRate <= 0 || maxStored < h.deadlineContext || h.deadlineContext <= 0 {
+		return
+	}
+	h.limiter = rate.NewLimiter(rate.Limit(refillRate), int(maxStored))
 }
 
 // handleBatch executes all messages in a batch and returns the responses.
@@ -228,27 +244,80 @@ func (h *handler) cancelServerSubscriptions(err error) {
 	}
 }
 
+// awaitLimit blocks until the context is marked as done or the rate limiter is
+// full.
+func (h *handler) awaitLimit(ctx context.Context) {
+	if h.limiter == nil {
+		return
+	}
+
+	now := time.Now()
+	reservation := h.limiter.ReserveN(now, int(h.deadlineContext))
+	delay := reservation.Delay()
+	reservation.CancelAt(now)
+
+	timer := time.NewTimer(delay)
+	select {
+	case <-ctx.Done():
+	case <-timer.C:
+	}
+	timer.Stop()
+}
+
+// consumeLimit removes the time since [procStart] from the rate limiter. It is
+// assumed that the rate limiter is full.
+func (h *handler) consumeLimit(procStart time.Time) {
+	if h.limiter == nil {
+		return
+	}
+
+	stopTime := time.Now()
+	processingTime := stopTime.Sub(procStart)
+	if processingTime > h.deadlineContext {
+		processingTime = h.deadlineContext
+	}
+
+	h.limiter.ReserveN(stopTime, int(processingTime))
+}
+
 // startCallProc runs fn in a new goroutine and starts tracking it in the h.calls wait group.
 func (h *handler) startCallProc(fn func(*callProc)) {
 	h.callWG.Add(1)
-	go func() {
-		ctx, cancel := context.WithCancel(h.rootCtx)
-		defer h.callWG.Done()
+	callFn := func() {
+		var (
+			ctx    context.Context
+			cancel context.CancelFunc
+		)
 		if h.deadlineContext > 0 {
-			ctx = contextWithDeadline{
-				Context:  ctx,
-				deadline: time.Now().Add(h.deadlineContext),
-			}
+			ctx, cancel = context.WithTimeout(h.rootCtx, h.deadlineContext)
+		} else {
+			ctx, cancel = context.WithCancel(h.rootCtx)
 		}
+		defer h.callWG.Done()
+
+		// Capture the time before we await for processing
+		callStart := time.Now()
+		h.awaitLimit(ctx)
+
+		// If we are not limiting CPU, [procStart] will be identical to
+		// [callStart]
+		procStart := time.Now()
 		defer cancel()
-		fn(&callProc{ctx: ctx})
-	}()
+
+		fn(&callProc{ctx: ctx, callStart: callStart, procStart: procStart})
+		h.consumeLimit(procStart)
+	}
+	if h.limiter == nil {
+		go callFn()
+	} else {
+		callFn()
+	}
 }
 
 // handleImmediate executes non-call messages. It returns false if the message is a
 // call or requires a reply.
 func (h *handler) handleImmediate(msg *jsonrpcMessage) bool {
-	start := time.Now()
+	execStart := time.Now()
 	switch {
 	case msg.isNotification():
 		if strings.HasSuffix(msg.Method, notificationMethodSuffix) {
@@ -258,7 +327,7 @@ func (h *handler) handleImmediate(msg *jsonrpcMessage) bool {
 		return false
 	case msg.isResponse():
 		h.handleResponse(msg)
-		h.log.Trace("Handled RPC response", "reqid", idForLog{msg.ID}, "t", time.Since(start))
+		h.log.Trace("Handled RPC response", "reqid", idForLog{msg.ID}, "t", time.Since(execStart))
 		return true
 	default:
 		return false
@@ -306,16 +375,26 @@ func (h *handler) handleResponse(msg *jsonrpcMessage) {
 
 // handleCallMsg executes a call message and returns the answer.
 func (h *handler) handleCallMsg(ctx *callProc, msg *jsonrpcMessage) *jsonrpcMessage {
-	start := time.Now()
+	// [callStart] is the time the message was enqueued for handler processing
+	callStart := ctx.callStart
+	// [procStart] is the time the message cleared the [limiter] and began to be
+	// processed by the handler
+	procStart := ctx.procStart
+	// [execStart] is the time the message began to be executed by the handler
+	//
+	// Note: This can be different than the executionStart in [startCallProc] as
+	// the goroutine that handles execution may not be executed right away.
+	execStart := time.Now()
+
 	switch {
 	case msg.isNotification():
 		h.handleCall(ctx, msg)
-		h.log.Debug("Served "+msg.Method, "t", time.Since(start))
+		h.log.Debug("Served "+msg.Method, "execTime", time.Since(execStart), "procTime", time.Since(procStart), "totalTime", time.Since(callStart))
 		return nil
 	case msg.isCall():
 		resp := h.handleCall(ctx, msg)
 		var ctx []interface{}
-		ctx = append(ctx, "reqid", idForLog{msg.ID}, "t", time.Since(start))
+		ctx = append(ctx, "reqid", idForLog{msg.ID}, "execTime", time.Since(execStart), "procTime", time.Since(procStart), "totalTime", time.Since(callStart))
 		if resp.Error != nil {
 			ctx = append(ctx, "err", resp.Error.Message)
 			if resp.Error.Data != nil {

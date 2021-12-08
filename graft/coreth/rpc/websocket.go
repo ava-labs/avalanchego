@@ -58,10 +58,10 @@ var wsBufferPool = new(sync.Pool)
 // allowedOrigins should be a comma-separated list of allowed origin URLs.
 // To allow connections with any origin, pass "*".
 func (s *Server) WebsocketHandler(allowedOrigins []string) http.Handler {
-	return s.WebsocketHandlerWithDuration(allowedOrigins, 0)
+	return s.WebsocketHandlerWithDuration(allowedOrigins, 0, 0, 0)
 }
 
-func (s *Server) WebsocketHandlerWithDuration(allowedOrigins []string, apiMaxDuration time.Duration) http.Handler {
+func (s *Server) WebsocketHandlerWithDuration(allowedOrigins []string, apiMaxDuration, refillRate, maxStored time.Duration) http.Handler {
 	var upgrader = websocket.Upgrader{
 		ReadBufferSize:  wsReadBuffer,
 		WriteBufferSize: wsWriteBuffer,
@@ -75,7 +75,7 @@ func (s *Server) WebsocketHandlerWithDuration(allowedOrigins []string, apiMaxDur
 			return
 		}
 		codec := newWebsocketCodec(conn)
-		s.ServeCodec(codec, 0, apiMaxDuration)
+		s.ServeCodec(codec, 0, apiMaxDuration, refillRate, maxStored)
 	})
 }
 

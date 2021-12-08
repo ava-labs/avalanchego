@@ -31,6 +31,7 @@ import (
 	"math/big"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ethereum/go-ethereum/common"
@@ -648,4 +649,67 @@ func TestRebloomOnFlatten(t *testing.T) {
 	// Blooms C and D should now have only their own addrs
 	assertBlooms(snaps.Snapshot(diffRootC), false, false, true, false)
 	assertBlooms(snaps.Snapshot(diffRootD), false, false, false, true)
+}
+
+// TestReadStateDuringFlattening tests the scenario that, during the
+// bottom diff layers are merging which tags these as stale, the read
+// happens via a pre-created top snapshot layer which tries to access
+// the state in these stale layers. Ensure this read can retrieve the
+// right state back(block until the flattening is finished) instead of
+// an unexpected error(snapshot layer is stale).
+func TestReadStateDuringFlattening(t *testing.T) {
+	// setAccount is a helper to construct a random account entry and assign it to
+	// an account slot in a snapshot
+	setAccount := func(accKey string) map[common.Hash][]byte {
+		return map[common.Hash][]byte{
+			common.HexToHash(accKey): randomAccount(),
+		}
+	}
+
+	var (
+		baseRoot       = common.HexToHash("0xff01")
+		baseBlockHash  = common.HexToHash("0x01")
+		diffRootA      = common.HexToHash("0xff02")
+		diffBlockHashA = common.HexToHash("0x02")
+		diffRootB      = common.HexToHash("0xff03")
+		diffBlockHashB = common.HexToHash("0x03")
+		diffRootC      = common.HexToHash("0xff04")
+		diffBlockHashC = common.HexToHash("0x04")
+	)
+
+	snaps := NewTestTree(rawdb.NewMemoryDatabase(), baseBlockHash, baseRoot)
+
+	// 4 layers in total, 3 diff layers and 1 disk layers
+	snaps.Update(diffBlockHashA, diffRootA, baseBlockHash, nil, setAccount("0xa1"), nil)
+	snaps.Update(diffBlockHashB, diffRootB, diffBlockHashA, nil, setAccount("0xa2"), nil)
+	snaps.Update(diffBlockHashC, diffRootC, diffBlockHashB, nil, setAccount("0xa3"), nil)
+
+	// Obtain the topmost snapshot handler for state accessing
+	snap := snaps.Snapshot(diffRootC)
+
+	// Register the testing hook to access the state after flattening
+	var result = make(chan *Account)
+	snaps.onFlatten = func() {
+		// Spin up a thread to read the account from the pre-created
+		// snapshot handler. It's expected to be blocked.
+		go func() {
+			account, _ := snap.Account(common.HexToHash("0xa1"))
+			result <- account
+		}()
+		select {
+		case res := <-result:
+			t.Fatalf("Unexpected return %v", res)
+		case <-time.NewTimer(time.Millisecond * 300).C:
+		}
+	}
+	// Flatten the first diff block, which will mark the bottom-most layer as stale.
+	snaps.Flatten(diffBlockHashA)
+	select {
+	case account := <-result:
+		if account == nil {
+			t.Fatal("Failed to retrieve account")
+		}
+	case <-time.NewTimer(time.Millisecond * 300).C:
+		t.Fatal("Unexpected blocker")
+	}
 }

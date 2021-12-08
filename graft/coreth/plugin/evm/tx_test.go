@@ -60,7 +60,7 @@ type atomicTxVerifyTest struct {
 // executeTxVerifyTest tests
 func executeTxVerifyTest(t *testing.T, test atomicTxVerifyTest) {
 	atomicTx := test.generate(t)
-	err := atomicTx.Verify(test.ctx.XChainID, test.ctx, test.rules)
+	err := atomicTx.Verify(test.ctx, test.rules)
 	if len(test.expectedErr) == 0 {
 		if err != nil {
 			t.Fatalf("Atomic tx failed unexpectedly due to: %s", err)

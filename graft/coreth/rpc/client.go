@@ -27,7 +27,6 @@
 package rpc
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -125,7 +124,7 @@ type clientConn struct {
 	handler *handler
 }
 
-func (c *Client) newClientConn(conn ServerCodec, apiMaxDuration time.Duration) *clientConn {
+func (c *Client) newClientConn(conn ServerCodec, apiMaxDuration, refillRate, maxStored time.Duration) *clientConn {
 	ctx := context.WithValue(context.Background(), clientContextKey{}, c)
 	// Http connections have already set the scheme
 	if !c.isHTTP() && c.scheme != "" {
@@ -133,9 +132,10 @@ func (c *Client) newClientConn(conn ServerCodec, apiMaxDuration time.Duration) *
 	}
 	handler := newHandler(ctx, conn, c.idgen, c.services)
 
-	// When apiMaxDuration is 0 (as is the case for all client invocations of
-	// this function), deadlineContext is ignored.
+	// When [apiMaxDuration] or [refillRate]/[maxStored] is 0 (as is the case for
+	// all client invocations of this function), it is ignored.
 	handler.deadlineContext = apiMaxDuration
+	handler.addLimiter(refillRate, maxStored)
 	return &clientConn{conn, handler}
 }
 
@@ -221,12 +221,12 @@ func newClient(initctx context.Context, connect reconnectFunc) (*Client, error) 
 	if err != nil {
 		return nil, err
 	}
-	c := initClient(conn, randomIDGenerator(), new(serviceRegistry), 0)
+	c := initClient(conn, randomIDGenerator(), new(serviceRegistry), 0, 0, 0)
 	c.reconnectFunc = connect
 	return c, nil
 }
 
-func initClient(conn ServerCodec, idgen func() ID, services *serviceRegistry, apiMaxDuration time.Duration) *Client {
+func initClient(conn ServerCodec, idgen func() ID, services *serviceRegistry, apiMaxDuration, refillRate, maxStored time.Duration) *Client {
 	scheme := ""
 	switch conn.(type) {
 	case *httpConn:
@@ -252,7 +252,7 @@ func initClient(conn ServerCodec, idgen func() ID, services *serviceRegistry, ap
 		reqTimeout:  make(chan *requestOp),
 	}
 	if !c.isHTTP() {
-		go c.dispatch(conn, apiMaxDuration)
+		go c.dispatch(conn, apiMaxDuration, refillRate, maxStored)
 	}
 	return c
 }
@@ -374,7 +374,10 @@ func (c *Client) BatchCall(b []BatchElem) error {
 //
 // Note that batch calls may not be executed atomically on the server side.
 func (c *Client) BatchCallContext(ctx context.Context, b []BatchElem) error {
-	msgs := make([]*jsonrpcMessage, len(b))
+	var (
+		msgs = make([]*jsonrpcMessage, len(b))
+		byID = make(map[string]int, len(b))
+	)
 	op := &requestOp{
 		ids:  make([]json.RawMessage, len(b)),
 		resp: make(chan *jsonrpcMessage, len(b)),
@@ -386,6 +389,7 @@ func (c *Client) BatchCallContext(ctx context.Context, b []BatchElem) error {
 		}
 		msgs[i] = msg
 		op.ids[i] = msg.ID
+		byID[string(msg.ID)] = i
 	}
 
 	var err error
@@ -405,13 +409,7 @@ func (c *Client) BatchCallContext(ctx context.Context, b []BatchElem) error {
 		// Find the element corresponding to this response.
 		// The element is guaranteed to be present because dispatch
 		// only sends valid IDs to our channel.
-		var elem *BatchElem
-		for i := range msgs {
-			if bytes.Equal(msgs[i].ID, resp.ID) {
-				elem = &b[i]
-				break
-			}
-		}
+		elem := &b[byID[string(resp.ID)]]
 		if resp.Error != nil {
 			elem.Error = resp.Error
 			continue
@@ -440,12 +438,12 @@ func (c *Client) Notify(ctx context.Context, method string, args ...interface{})
 	return c.send(ctx, op, msg)
 }
 
-// EthSubscribe registers a subscripion under the "eth" namespace.
+// EthSubscribe registers a subscription under the "eth" namespace.
 func (c *Client) EthSubscribe(ctx context.Context, channel interface{}, args ...interface{}) (*ClientSubscription, error) {
 	return c.Subscribe(ctx, "eth", channel, args...)
 }
 
-// ShhSubscribe registers a subscripion under the "shh" namespace.
+// ShhSubscribe registers a subscription under the "shh" namespace.
 // Deprecated: use Subscribe(ctx, "shh", ...).
 func (c *Client) ShhSubscribe(ctx context.Context, channel interface{}, args ...interface{}) (*ClientSubscription, error) {
 	return c.Subscribe(ctx, "shh", channel, args...)
@@ -570,11 +568,11 @@ func (c *Client) reconnect(ctx context.Context) error {
 // dispatch is the main loop of the client.
 // It sends read messages to waiting calls to Call and BatchCall
 // and subscription notifications to registered subscriptions.
-func (c *Client) dispatch(codec ServerCodec, apiMaxDuration time.Duration) {
+func (c *Client) dispatch(codec ServerCodec, apiMaxDuration, refillRate, maxStored time.Duration) {
 	var (
 		lastOp      *requestOp  // tracks last send operation
 		reqInitLock = c.reqInit // nil while the send lock is held
-		conn        = c.newClientConn(codec, apiMaxDuration)
+		conn        = c.newClientConn(codec, apiMaxDuration, refillRate, maxStored)
 		reading     = true
 	)
 	defer func() {
@@ -621,7 +619,7 @@ func (c *Client) dispatch(codec ServerCodec, apiMaxDuration time.Duration) {
 			}
 			go c.read(newcodec)
 			reading = true
-			conn = c.newClientConn(newcodec, apiMaxDuration)
+			conn = c.newClientConn(newcodec, apiMaxDuration, refillRate, maxStored)
 			// Re-register the in-flight request on the new handler
 			// because that's where it will be sent.
 			conn.handler.addRequestOp(lastOp)
