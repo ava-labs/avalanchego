@@ -1043,6 +1043,15 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 		}
 		st.validatorDiffsCache.Put(string(prefixBytes), nodeUpdates)
 	}
+
+	// Attempt to update the stake metrics
+	primaryValidators, ok := st.vm.Validators.GetValidators(constants.PrimaryNetworkID)
+	if !ok {
+		return nil
+	}
+	weight, _ := primaryValidators.GetWeight(st.vm.ctx.NodeID)
+	st.vm.localStake.Set(float64(weight))
+	st.vm.totalStake.Set(float64(primaryValidators.Weight()))
 	return nil
 }
 
