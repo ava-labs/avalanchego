@@ -169,10 +169,6 @@ type Block struct {
 	// caches
 	hash atomic.Value
 	size atomic.Value
-
-	// Td is used by package core to store the total difficulty
-	// of the chain up to and including the block.
-	td *big.Int
 }
 
 // "external" block encoding. used for eth protocol, etc.
@@ -195,7 +191,7 @@ func NewBlock(
 	header *Header, txs []*Transaction, uncles []*Header, receipts []*Receipt,
 	hasher TrieHasher, extdata []byte, recalc bool,
 ) *Block {
-	b := &Block{header: CopyHeader(header), td: new(big.Int)}
+	b := &Block{header: CopyHeader(header)}
 
 	// TODO: panic if len(txs) != len(receipts)
 	if len(txs) == 0 {

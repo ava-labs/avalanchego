@@ -187,29 +187,6 @@ func TestPartialBlockStorage(t *testing.T) {
 	}
 }
 
-// Tests block total difficulty storage and retrieval operations.
-func TestTdStorage(t *testing.T) {
-	db := NewMemoryDatabase()
-
-	// Create a test TD to move around the database and make sure it's really new
-	hash, td := common.Hash{}, big.NewInt(314)
-	if entry := ReadTd(db, hash, 0); entry != nil {
-		t.Fatalf("Non existent TD returned: %v", entry)
-	}
-	// Write and verify the TD in the database
-	WriteTd(db, hash, 0, td)
-	if entry := ReadTd(db, hash, 0); entry == nil {
-		t.Fatalf("Stored TD not found")
-	} else if entry.Cmp(td) != 0 {
-		t.Fatalf("Retrieved TD mismatch: have %v, want %v", entry, td)
-	}
-	// Delete the TD and verify the execution
-	DeleteTd(db, hash, 0)
-	if entry := ReadTd(db, hash, 0); entry != nil {
-		t.Fatalf("Deleted TD returned: %v", entry)
-	}
-}
-
 // Tests that canonical numbers can be mapped to hashes and retrieved.
 func TestCanonicalMappingStorage(t *testing.T) {
 	db := NewMemoryDatabase()
@@ -393,7 +370,6 @@ func TestCanonicalHashIteration(t *testing.T) {
 	// Fill database with testing data.
 	for i := uint64(1); i <= 8; i++ {
 		WriteCanonicalHash(db, common.Hash{}, i)
-		WriteTd(db, common.Hash{}, i, big.NewInt(10)) // Write some interferential data
 	}
 	for i, c := range cases {
 		numbers, _ := ReadAllCanonicalHashes(db, c.from, c.to, c.limit)
@@ -443,61 +419,6 @@ func TestHashesInRange(t *testing.T) {
 		t.Fatalf("Wrong number of hashes read, want %d, got %d", want, have)
 	}
 }
-
-// makeTestBlocks creates fake blocks for the ancient write benchmark.
-/*
-func makeTestBlocks(nblock int, txsPerBlock int) []*types.Block {
-	key, _ := crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
-	signer := types.LatestSignerForChainID(big.NewInt(8))
-
-	// Create transactions.
-	txs := make([]*types.Transaction, txsPerBlock)
-	for i := 0; i < len(txs); i++ {
-		var err error
-		to := common.Address{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}
-		txs[i], err = types.SignNewTx(key, signer, &types.LegacyTx{
-			Nonce:    2,
-			GasPrice: big.NewInt(30000),
-			Gas:      0x45454545,
-			To:       &to,
-		})
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	// Create the blocks.
-	blocks := make([]*types.Block, nblock)
-	for i := 0; i < nblock; i++ {
-		header := &types.Header{
-			Number: big.NewInt(int64(i)),
-			Extra:  []byte("test block"),
-		}
-		blocks[i] = types.NewBlockWithHeader(header).WithBody(txs, nil, 0, nil)
-		blocks[i].Hash() // pre-cache the block hash
-	}
-	return blocks
-}
-*/
-
-// makeTestReceipts creates fake receipts for the ancient write benchmark.
-/*
-func makeTestReceipts(n int, nPerBlock int) []types.Receipts {
-	receipts := make([]*types.Receipt, nPerBlock)
-	for i := 0; i < len(receipts); i++ {
-		receipts[i] = &types.Receipt{
-			Status:            types.ReceiptStatusSuccessful,
-			CumulativeGasUsed: 0x888888888,
-			Logs:              make([]*types.Log, 5),
-		}
-	}
-	allReceipts := make([]types.Receipts, n)
-	for i := 0; i < n; i++ {
-		allReceipts[i] = receipts
-	}
-	return allReceipts
-}
-*/
 
 type fullLogRLP struct {
 	Address     common.Address

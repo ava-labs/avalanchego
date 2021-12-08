@@ -33,6 +33,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/coreth/accounts"
 	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/consensus/dummy"
@@ -52,7 +53,6 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -108,6 +108,7 @@ func New(stack *node.Node, config *Config,
 	chainDb ethdb.Database,
 	settings Settings,
 	lastAcceptedHash common.Hash,
+	clock *mockable.Clock,
 ) (*Ethereum, error) {
 	if chainDb == nil {
 		return nil, errors.New("chainDb cannot be nil")
@@ -194,13 +195,14 @@ func New(stack *node.Node, config *Config,
 	config.TxPool.Journal = ""
 	eth.txPool = core.NewTxPool(config.TxPool, chainConfig, eth.blockchain)
 
-	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine)
+	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine, clock)
 
-	// FIXME use node config to pass in config param on whether or not to allow unprotected
-	// currently defaults to false.
-	allowUnprotectedTxs := false
-	eth.APIBackend = &EthAPIBackend{stack.Config().ExtRPCEnabled(), false, eth, nil}
-	if allowUnprotectedTxs {
+	eth.APIBackend = &EthAPIBackend{
+		extRPCEnabled:       stack.Config().ExtRPCEnabled(),
+		allowUnprotectedTxs: config.AllowUnprotectedTxs,
+		eth:                 eth,
+	}
+	if config.AllowUnprotectedTxs {
 		log.Info("Unprotected transactions allowed")
 	}
 	gpoParams := config.GPO
@@ -226,9 +228,6 @@ func (s *Ethereum) APIs() []rpc.API {
 
 	// Append tracing APIs
 	apis = append(apis, tracers.APIs(s.APIBackend)...)
-
-	// Append any APIs exposed explicitly by the consensus engine
-	apis = append(apis, s.engine.APIs(s.BlockChain())...)
 
 	// Append all the local APIs and return
 	return append(apis, []rpc.API{
@@ -305,13 +304,9 @@ func (s *Ethereum) EventMux() *event.TypeMux          { return s.eventMux }
 func (s *Ethereum) Engine() consensus.Engine          { return s.engine }
 func (s *Ethereum) ChainDb() ethdb.Database           { return s.chainDb }
 
-// FIXME remove NetVersion, IsListening, Downloader, and Synced
-func (s *Ethereum) IsListening() bool                  { return true } // Always listening
-func (s *Ethereum) NetVersion() uint64                 { return s.networkID }
-func (s *Ethereum) Downloader() *downloader.Downloader { return nil }  // s.protocolManager.downloader }
-func (s *Ethereum) Synced() bool                       { return true } // atomic.LoadUint32(&s.protocolManager.acceptTxs) == 1 }
-func (s *Ethereum) ArchiveMode() bool                  { return !s.config.Pruning }
-func (s *Ethereum) BloomIndexer() *core.ChainIndexer   { return s.bloomIndexer }
+func (s *Ethereum) NetVersion() uint64               { return s.networkID }
+func (s *Ethereum) ArchiveMode() bool                { return !s.config.Pruning }
+func (s *Ethereum) BloomIndexer() *core.ChainIndexer { return s.bloomIndexer }
 
 // Start implements node.Lifecycle, starting all internal goroutines needed by the
 // Ethereum protocol implementation.

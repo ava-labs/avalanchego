@@ -105,22 +105,6 @@ type ChainStateReader interface {
 	NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error)
 }
 
-// SyncProgress gives progress indications when the node is synchronising with
-// the Ethereum network.
-type SyncProgress struct {
-	StartingBlock uint64 // Block number where sync began
-	CurrentBlock  uint64 // Current block number where sync is at
-	HighestBlock  uint64 // Highest alleged block number in the chain
-	PulledStates  uint64 // Number of state trie entries already downloaded
-	KnownStates   uint64 // Total number of state trie entries known about
-}
-
-// ChainSyncReader wraps access to the node's current sync status. If there's no
-// sync currently running, it returns nil.
-type ChainSyncReader interface {
-	SyncProgress(ctx context.Context) (*SyncProgress, error)
-}
-
 // CallMsg contains parameters for contract calls.
 type CallMsg struct {
 	From      common.Address  // the sender of the 'transaction'
@@ -181,7 +165,7 @@ type LogFilterer interface {
 //
 // The transaction must be signed and have a valid nonce to be included. Consumers of the
 // API can use package accounts to maintain local private keys and need can retrieve the
-// next available nonce using PendingNonceAt.
+// next available nonce using AcceptedNonceAt.
 type TransactionSender interface {
 	SendTransaction(ctx context.Context, tx *types.Transaction) error
 }
@@ -192,22 +176,16 @@ type GasPricer interface {
 	SuggestGasPrice(ctx context.Context) (*big.Int, error)
 }
 
-// A PendingStateReader provides access to the pending state, which is the result of all
-// known executable transactions which have not yet been included in the blockchain. It is
-// commonly used to display the result of ’unconfirmed’ actions (e.g. wallet value
-// transfers) initiated by the user. The PendingNonceAt operation is a good way to
-// retrieve the next available transaction nonce for a specific account.
-type PendingStateReader interface {
-	PendingBalanceAt(ctx context.Context, account common.Address) (*big.Int, error)
-	PendingStorageAt(ctx context.Context, account common.Address, key common.Hash) ([]byte, error)
-	PendingCodeAt(ctx context.Context, account common.Address) ([]byte, error)
-	PendingNonceAt(ctx context.Context, account common.Address) (uint64, error)
-	PendingTransactionCount(ctx context.Context) (uint, error)
+// An AcceptedStateReceiver provides access to the accepted state ie. the state of the
+// most recently accepted block.
+type AcceptedStateReader interface {
+	AcceptedCodeAt(ctx context.Context, account common.Address) ([]byte, error)
+	AcceptedNonceAt(ctx context.Context, account common.Address) (uint64, error)
 }
 
-// PendingContractCaller can be used to perform calls against the pending state.
-type PendingContractCaller interface {
-	PendingCallContract(ctx context.Context, call CallMsg) ([]byte, error)
+// AcceptedContractCaller can be used to perform calls against the accepted state.
+type AcceptedContractCaller interface {
+	AcceptedCallContract(ctx context.Context, call CallMsg) ([]byte, error)
 }
 
 // GasEstimator wraps EstimateGas, which tries to estimate the gas needed to execute a

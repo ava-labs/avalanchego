@@ -45,7 +45,6 @@ type (
 	OnExtraStateChangeType            = func(block *types.Block, statedb *state.StateDB) (blockFeeContribution *big.Int, extDataGasUsed *big.Int, err error)
 
 	ConsensusCallbacks struct {
-		OnAPIs                OnAPIsCallbackType
 		OnFinalizeAndAssemble OnFinalizeAndAssembleCallbackType
 		OnExtraStateChange    OnExtraStateChangeType
 	}
@@ -153,12 +152,16 @@ func (self *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, heade
 		return nil
 	}
 
-	// Enforce Apricot Phase 4 constraints
+	// Enforce BlockGasCost constraints
+	blockGasCostStep := ApricotPhase4BlockGasCostStep
+	if config.IsApricotPhase5(timestamp) {
+		blockGasCostStep = ApricotPhase5BlockGasCostStep
+	}
 	expectedBlockGasCost := calcBlockGasCost(
 		ApricotPhase4TargetBlockRate,
 		ApricotPhase4MinBlockGasCost,
 		ApricotPhase4MaxBlockGasCost,
-		ApricotPhase4BlockGasCostStep,
+		blockGasCostStep,
 		parent.BlockGasCost,
 		parent.Time, header.Time,
 	)
@@ -338,11 +341,15 @@ func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *type
 		if blockExtDataGasUsed := block.ExtDataGasUsed(); blockExtDataGasUsed == nil || !blockExtDataGasUsed.IsUint64() || blockExtDataGasUsed.Cmp(extDataGasUsed) != 0 {
 			return fmt.Errorf("invalid extDataGasUsed: have %d, want %d", blockExtDataGasUsed, extDataGasUsed)
 		}
+		blockGasCostStep := ApricotPhase4BlockGasCostStep
+		if chain.Config().IsApricotPhase5(new(big.Int).SetUint64(block.Time())) {
+			blockGasCostStep = ApricotPhase5BlockGasCostStep
+		}
 		blockGasCost := calcBlockGasCost(
 			ApricotPhase4TargetBlockRate,
 			ApricotPhase4MinBlockGasCost,
 			ApricotPhase4MaxBlockGasCost,
-			ApricotPhase4BlockGasCostStep,
+			blockGasCostStep,
 			parent.BlockGasCost,
 			parent.Time, block.Time(),
 		)
@@ -384,11 +391,15 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 		if header.ExtDataGasUsed == nil {
 			header.ExtDataGasUsed = new(big.Int).Set(common.Big0)
 		}
+		blockGasCostStep := ApricotPhase4BlockGasCostStep
+		if chain.Config().IsApricotPhase5(new(big.Int).SetUint64(header.Time)) {
+			blockGasCostStep = ApricotPhase5BlockGasCostStep
+		}
 		header.BlockGasCost = calcBlockGasCost(
 			ApricotPhase4TargetBlockRate,
 			ApricotPhase4MinBlockGasCost,
 			ApricotPhase4MaxBlockGasCost,
-			ApricotPhase4BlockGasCostStep,
+			blockGasCostStep,
 			parent.BlockGasCost,
 			parent.Time, header.Time,
 		)
@@ -414,14 +425,6 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 
 func (self *DummyEngine) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, parent *types.Header) *big.Int {
 	return big.NewInt(1)
-}
-
-func (self *DummyEngine) APIs(chain consensus.ChainHeaderReader) (res []rpc.API) {
-	res = nil
-	if self.cb.OnAPIs != nil {
-		res = self.cb.OnAPIs(chain)
-	}
-	return
 }
 
 func (self *DummyEngine) Close() error {

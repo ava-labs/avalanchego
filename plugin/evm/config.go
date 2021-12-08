@@ -17,12 +17,18 @@ const (
 	defaultWeb3ApiEnabled              = true
 	defaultPruningEnabled              = true
 	defaultSnapshotAsync               = true
-	defaultRpcGasCap                   = 2500000000 // 25000000 X 100
+	defaultRpcGasCap                   = 50_000_000 // Default to 50M Gas Limit
 	defaultRpcTxFeeCap                 = 100        // 100 AVAX
-	defaultApiMaxDuration              = 0          // Default to no maximum API Call duration
-	defaultMaxBlocksPerRequest         = 0          // Default to no maximum on the number of blocks per getLogs request
+	defaultMetricsEnabled              = false
+	defaultMetricsExpensiveEnabled     = false
+	defaultApiMaxDuration              = 0 // Default to no maximum API call duration
+	defaultWsCpuRefillRate             = 0 // Default to no maximum WS CPU usage
+	defaultWsCpuMaxStored              = 0 // Default to no maximum WS CPU usage
+	defaultMaxBlocksPerRequest         = 0 // Default to no maximum on the number of blocks per getLogs request
 	defaultContinuousProfilerFrequency = 15 * time.Minute
 	defaultContinuousProfilerMaxFiles  = 5
+	defaultTxRegossipFrequency         = 1 * time.Minute
+	defaultTxRegossipMaxSize           = 15
 )
 
 type Duration struct {
@@ -32,9 +38,10 @@ type Duration struct {
 // Config ...
 type Config struct {
 	// Coreth APIs
-	SnowmanAPIEnabled     bool `json:"snowman-api-enabled"`
-	CorethAdminAPIEnabled bool `json:"coreth-admin-api-enabled"`
-	NetAPIEnabled         bool `json:"net-api-enabled"`
+	SnowmanAPIEnabled     bool   `json:"snowman-api-enabled"`
+	CorethAdminAPIEnabled bool   `json:"coreth-admin-api-enabled"`
+	CorethAdminAPIDir     string `json:"coreth-admin-api-dir"`
+	NetAPIEnabled         bool   `json:"net-api-enabled"`
 
 	// Continuous Profiler
 	ContinuousProfilerDir       string   `json:"continuous-profiler-dir"`       // If set to non-empty string creates a continuous profiler
@@ -58,16 +65,28 @@ type Config struct {
 	SnapshotAsync  bool `json:"snapshot-async"`
 	SnapshotVerify bool `json:"snapshot-verification-enabled"`
 
-	LocalTxsEnabled           bool     `json:"local-txs-enabled"`
-	RemoteTxGossipOnlyEnabled bool     `json:"remote-tx-gossip-only-enabled"`
-	APIMaxDuration            Duration `json:"api-max-duration"`
-	MaxBlocksPerRequest       int64    `json:"api-max-blocks-per-request"`
-	AllowUnfinalizedQueries   bool     `json:"allow-unfinalized-queries"`
+	// Metric Settings
+	MetricsEnabled          bool `json:"metrics-enabled"`
+	MetricsExpensiveEnabled bool `json:"metrics-expensive-enabled"`
+
+	// API Settings
+	LocalTxsEnabled         bool     `json:"local-txs-enabled"`
+	APIMaxDuration          Duration `json:"api-max-duration"`
+	WSCPURefillRate         Duration `json:"ws-cpu-refill-rate"`
+	WSCPUMaxStored          Duration `json:"ws-cpu-max-stored"`
+	MaxBlocksPerRequest     int64    `json:"api-max-blocks-per-request"`
+	AllowUnfinalizedQueries bool     `json:"allow-unfinalized-queries"`
+	AllowUnprotectedTxs     bool     `json:"allow-unprotected-txs"`
 
 	// Keystore Settings
 	KeystoreDirectory             string `json:"keystore-directory"` // both absolute and relative supported
 	KeystoreExternalSigner        string `json:"keystore-external-signer"`
 	KeystoreInsecureUnlockAllowed bool   `json:"keystore-insecure-unlock-allowed"`
+
+	// Gossip Settings
+	RemoteTxGossipOnlyEnabled bool     `json:"remote-tx-gossip-only-enabled"`
+	TxRegossipFrequency       Duration `json:"tx-regossip-frequency"`
+	TxRegossipMaxSize         int      `json:"tx-regossip-max-size"`
 
 	// Log level
 	LogLevel string `json:"log-level"`
@@ -89,6 +108,9 @@ func (c Config) EthAPIs() []string {
 	if c.DebugAPIEnabled {
 		ethAPIs = append(ethAPIs, "debug")
 	}
+	if c.NetAPIEnabled {
+		ethAPIs = append(ethAPIs, "net")
+	}
 
 	return ethAPIs
 }
@@ -103,12 +125,18 @@ func (c *Config) SetDefaults() {
 	c.Web3APIEnabled = defaultWeb3ApiEnabled
 	c.RPCGasCap = defaultRpcGasCap
 	c.RPCTxFeeCap = defaultRpcTxFeeCap
+	c.MetricsEnabled = defaultMetricsEnabled
+	c.MetricsExpensiveEnabled = defaultMetricsExpensiveEnabled
 	c.APIMaxDuration.Duration = defaultApiMaxDuration
+	c.WSCPURefillRate.Duration = defaultWsCpuRefillRate
+	c.WSCPUMaxStored.Duration = defaultWsCpuMaxStored
 	c.MaxBlocksPerRequest = defaultMaxBlocksPerRequest
 	c.ContinuousProfilerFrequency.Duration = defaultContinuousProfilerFrequency
 	c.ContinuousProfilerMaxFiles = defaultContinuousProfilerMaxFiles
 	c.Pruning = defaultPruningEnabled
 	c.SnapshotAsync = defaultSnapshotAsync
+	c.TxRegossipFrequency.Duration = defaultTxRegossipFrequency
+	c.TxRegossipMaxSize = defaultTxRegossipMaxSize
 }
 
 func (d *Duration) UnmarshalJSON(data []byte) (err error) {
