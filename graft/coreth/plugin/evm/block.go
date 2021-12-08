@@ -162,15 +162,7 @@ func (b *Block) Accept() error {
 		return vm.db.Commit()
 	}
 
-	// TODO: do the early returns here need [vm.db.Commit] since vm.mempool.RemoveTx(tx.ID())
-	// has been called?
-	ops, err := tx.UnsignedAtomicTx.AtomicOps()
-	if err != nil {
-		return err
-	}
-
-	// TODO Merge all atomic operations across all txs into single and save index it in the trie
-	hash, err := b.vm.atomicTrie.Index(b.Height(), ops)
+	hash, err := b.vm.atomicTrie.Index(b.Height(), batchChainsAndInputs)
 	if err != nil {
 		return err
 	}
