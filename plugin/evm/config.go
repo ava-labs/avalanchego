@@ -17,7 +17,7 @@ const (
 	defaultWeb3ApiEnabled              = true
 	defaultPruningEnabled              = true
 	defaultSnapshotAsync               = true
-	defaultRpcGasCap                   = 2500000000 // 25000000 X 100
+	defaultRpcGasCap                   = 50_000_000 // Default to 50M Gas Limit
 	defaultRpcTxFeeCap                 = 100        // 100 AVAX
 	defaultMetricsEnabled              = false
 	defaultMetricsExpensiveEnabled     = false
@@ -107,6 +107,9 @@ func (c Config) EthAPIs() []string {
 	}
 	if c.DebugAPIEnabled {
 		ethAPIs = append(ethAPIs, "debug")
+	}
+	if c.NetAPIEnabled {
+		ethAPIs = append(ethAPIs, "net")
 	}
 
 	return ethAPIs

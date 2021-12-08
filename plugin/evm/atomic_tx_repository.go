@@ -26,10 +26,10 @@ const (
 )
 
 var (
-	atomicTxIDDBPrefix      = []byte("atomicTxDB")
-	atomicHeightTxDBPrefix  = []byte("atomicHeightTxDB")
-	maxIndexeHeightDBPrefix = []byte("atomicRepoMetadataDB")
-	maxIndexedHeightKey     = []byte("maxIndexedAtomicTxHeight")
+	atomicTxIDDBPrefix         = []byte("atomicTxDB")
+	atomicHeightTxDBPrefix     = []byte("atomicHeightTxDB")
+	atomicRepoMetadataDBPrefix = []byte("atomicRepoMetadataDB")
+	maxIndexedHeightKey        = []byte("maxIndexedAtomicTxHeight")
 )
 
 // AtomicTxRepository defines an entity that manages storage and indexing of
@@ -65,7 +65,7 @@ func NewAtomicTxRepository(db *versiondb.Database, codec codec.Manager, lastAcce
 	repo := &atomicTxRepository{
 		acceptedAtomicTxDB:         prefixdb.New(atomicTxIDDBPrefix, db),
 		acceptedAtomicTxByHeightDB: prefixdb.New(atomicHeightTxDBPrefix, db),
-		atomicRepoMetadataDB:       prefixdb.New(maxIndexeHeightDBPrefix, db),
+		atomicRepoMetadataDB:       prefixdb.New(atomicRepoMetadataDBPrefix, db),
 		codec:                      codec,
 		db:                         db,
 	}
