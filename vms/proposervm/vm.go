@@ -69,7 +69,7 @@ type VM struct {
 	lastAcceptedTime time.Time
 
 	// height of last preFork accepted block
-	forkHeight uint64
+	latestPreForkHeight uint64
 }
 
 func New(vm block.ChainVM, activationTime time.Time, minimumPChainHeight uint64) *VM {
@@ -214,21 +214,22 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 	return lastAccepted, err
 }
 
-// Upon initialization, repairInnerBlocksMapping ensures the height -> proBlkID
-// mapping is well formed.
+// Upon initialization, repairInnerBlocksMapping ensure the height -> proBlkID
+// mapping is well formed. Starting from last accepted proposerVM block,
+// it will go back to snowman++ activation fork or genesis.
 func (vm *VM) repairInnerBlocksMapping() error {
 	var (
 		latestProBlkID   ids.ID
-		latestInnerBlkID ids.ID
-		lastInnerBlk     snowman.Block
+		latestInnerBlkID = ids.Empty
 		err              error
 	)
 
-	latestProBlkID, err = vm.GetLastAccepted()
+	latestProBlkID, err = vm.State.GetLastAccepted() // this won't return preFork blks
 	switch err {
 	case nil:
 	case database.ErrNotFound:
-		return nil // empty chain, nothing to do
+		// no proposerVM blocks; maybe snowman++ not yet active
+		goto checkFork
 	default:
 		return err
 	}
@@ -245,20 +246,16 @@ func (vm *VM) repairInnerBlocksMapping() error {
 		}
 
 		latestInnerBlkID = lastAcceptedBlk.getInnerBlk().ID()
-		lastInnerBlk, err = vm.ChainVM.GetBlock(latestInnerBlkID)
-		if err != nil {
-			// innerVM internal error
-			return err
-		}
-
-		_, err = vm.State.GetBlockIDByHeight(lastInnerBlk.Height())
+		_, err = vm.State.GetBlockIDByHeight(lastAcceptedBlk.Height())
 		switch err {
 		case nil:
-			// mapping already there; It must be the same for all ancestors too. Work done
-			return vm.db.Commit()
+			// mapping already there; It must be the same for all ancestors too.
+			// just update latestPreForkHeight
+			vm.latestPreForkHeight, err = vm.State.GetLatestPreForkHeight()
+			return err
 		case database.ErrNotFound:
-			// add the mapping
-			if err := vm.State.SetBlockIDByHeight(lastInnerBlk.Height(), latestProBlkID); err != nil {
+			// mapping must have been introduced after snowman++ fork. Rebuild it.
+			if err := vm.State.SetBlockIDByHeight(lastAcceptedBlk.Height(), latestProBlkID); err != nil {
 				return err
 			}
 
@@ -269,19 +266,36 @@ func (vm *VM) repairInnerBlocksMapping() error {
 		}
 	}
 
-checkFork: // handle possible snowman++ fork and commit all
-	lastInnerBlk, err = vm.ChainVM.GetBlock(lastInnerBlk.Parent())
-	switch err {
-	case nil:
-		// this is the fork. Note and commit.
-		vm.forkHeight = lastInnerBlk.Height()
-		return vm.db.Commit()
-	case database.ErrNotFound:
-		// we must have hit genesis in both proposerVM and innerVM. Work done
-		return vm.db.Commit()
-	default:
-		return err
+checkFork:
+	var lastPreForkHeight uint64
+	if latestInnerBlkID == ids.Empty {
+		// not a single proposerVM block. Set fork height to current inner chain height
+		latestInnerBlkID, err = vm.ChainVM.LastAccepted()
+		if err != nil {
+			return err
+		}
+		lastInnerBlk, err := vm.ChainVM.GetBlock(latestInnerBlkID)
+		if err != nil {
+			return err
+		}
+		lastPreForkHeight = lastInnerBlk.Height()
+	} else {
+		firstWrappedInnerBlk, err := vm.ChainVM.GetBlock(latestInnerBlkID)
+		if err != nil {
+			return err
+		}
+		candidateForkBlk, err := vm.ChainVM.GetBlock(firstWrappedInnerBlk.Parent())
+		if err != nil {
+			return err
+		}
+		lastPreForkHeight = candidateForkBlk.Height()
 	}
+
+	vm.latestPreForkHeight = lastPreForkHeight
+	if err := vm.State.SetLatestPreForkHeight(vm.latestPreForkHeight); err != nil {
+		return nil
+	}
+	return vm.db.Commit()
 }
 
 func (vm *VM) repairAcceptedChain() error {

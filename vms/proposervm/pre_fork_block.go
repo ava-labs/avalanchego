@@ -26,8 +26,11 @@ func (b *preForkBlock) Accept() error {
 }
 
 func (b *preForkBlock) conditionalAccept(acceptInnerBlk bool) error {
-	if b.Height() > b.vm.forkHeight {
-		b.vm.forkHeight = b.Height()
+	if b.Height() > b.vm.latestPreForkHeight {
+		b.vm.latestPreForkHeight = b.Height()
+		if err := b.vm.State.SetLatestPreForkHeight(b.vm.latestPreForkHeight); err != nil {
+			return err
+		}
 	}
 
 	if acceptInnerBlk {
