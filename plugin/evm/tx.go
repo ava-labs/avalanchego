@@ -10,8 +10,6 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
-
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ava-labs/coreth/core/state"
