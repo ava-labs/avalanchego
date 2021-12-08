@@ -214,7 +214,7 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 	return lastAccepted, err
 }
 
-// Upon initialization, repairInnerBlocksMapping ensure the height -> proBlkID
+// Upon initialization, repairInnerBlocksMapping ensures the height -> proBlkID
 // mapping is well formed.
 func (vm *VM) repairInnerBlocksMapping() error {
 	var (
@@ -258,7 +258,7 @@ func (vm *VM) repairInnerBlocksMapping() error {
 			return vm.db.Commit()
 		case database.ErrNotFound:
 			// add the mapping
-			if err := vm.State.SetBlocksIDByHeight(lastInnerBlk.Height(), latestProBlkID); err != nil {
+			if err := vm.State.SetBlockIDByHeight(lastInnerBlk.Height(), latestProBlkID); err != nil {
 				return err
 			}
 

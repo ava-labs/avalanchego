@@ -38,8 +38,8 @@ func (b *postForkBlock) conditionalAccept(acceptInnerBlk bool) error {
 		return err
 	}
 
-	// confirm the mapping from inner to proposerVm block ID
-	if err := b.vm.State.SetBlocksIDByHeight(b.Height(), blkID); err != nil {
+	// write the mapping from inner to proposerVM block ID
+	if err := b.vm.State.SetBlockIDByHeight(b.Height(), blkID); err != nil {
 		return err
 	}
 
