@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
@@ -25,7 +26,7 @@ var (
 // AcceptedPostForkBlockHeightIndex contains mapping of blockHeights to accepted proposer block IDs.
 // Only accepted blocks are indexed; moreover only post-fork blocks are indexed.
 type AcceptedPostForkBlockHeightIndex interface {
-	SetBlocksIDByHeight(height uint64, blkID ids.ID) error
+	SetBlockIDByHeight(height uint64, blkID ids.ID) error
 	GetBlockIDByHeight(height uint64) (ids.ID, error)
 	DeleteBlockIDByHeight(height uint64) error
 
@@ -33,12 +34,12 @@ type AcceptedPostForkBlockHeightIndex interface {
 	GetLatestPreForkHeight() (uint64, error)
 	DeleteLatestPreForkHeight() error
 
-	clearCache() // useful for UTs
+	clearCache() // useful in testing
 }
 
 type innerBlocksMapping struct {
-	// Caches coreBlockID -> proposerVMBlockID. If the proposerVMBlockID is nil, that means the coreBlockID is not
-	// in storage.
+	// Caches block height -> proposerVMBlockID. If the proposerVMBlockID is nil,
+	// the height is not in storage.
 	cache cache.Cacher
 
 	db database.Database
@@ -51,8 +52,8 @@ func NewBlockHeightIndex(db database.Database) AcceptedPostForkBlockHeightIndex 
 	}
 }
 
-func (ibm *innerBlocksMapping) SetBlocksIDByHeight(height uint64, blkID ids.ID) error {
-	heightBytes := make([]byte, 8)
+func (ibm *innerBlocksMapping) SetBlockIDByHeight(height uint64, blkID ids.ID) error {
+	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 	key := make([]byte, len(heightPrefix)+len(heightBytes))
 	copy(key, heightPrefix)
@@ -63,7 +64,7 @@ func (ibm *innerBlocksMapping) SetBlocksIDByHeight(height uint64, blkID ids.ID) 
 }
 
 func (ibm *innerBlocksMapping) GetBlockIDByHeight(height uint64) (ids.ID, error) {
-	heightBytes := make([]byte, 8)
+	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 	key := make([]byte, len(heightPrefix)+len(heightBytes))
 	copy(key, heightPrefix)
@@ -95,7 +96,7 @@ func (ibm *innerBlocksMapping) GetBlockIDByHeight(height uint64) (ids.ID, error)
 }
 
 func (ibm *innerBlocksMapping) DeleteBlockIDByHeight(height uint64) error {
-	heightBytes := make([]byte, 8)
+	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 	key := make([]byte, len(heightPrefix)+len(heightBytes))
 	copy(key, heightPrefix)
@@ -106,7 +107,7 @@ func (ibm *innerBlocksMapping) DeleteBlockIDByHeight(height uint64) error {
 }
 
 func (ibm *innerBlocksMapping) SetLatestPreForkHeight(height uint64) error {
-	heightBytes := make([]byte, 8)
+	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 
 	ibm.cache.Put(string(preForkPrefix), heightBytes)

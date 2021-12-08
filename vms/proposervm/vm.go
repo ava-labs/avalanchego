@@ -125,7 +125,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	if err := vm.repairInnerBlocksMapping(); err != nil {
+	if err := vm.repairInnerBlockMapping(); err != nil {
 		return err
 	}
 
@@ -213,10 +213,10 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 	return lastAccepted, err
 }
 
-// Upon initialization, repairInnerBlocksMapping ensure the height -> proBlkID
+// Upon initialization, repairInnerBlocksMapping ensures the height -> proBlkID
 // mapping is well formed. Starting from last accepted proposerVM block,
 // it will go back to snowman++ activation fork or genesis.
-func (vm *VM) repairInnerBlocksMapping() error {
+func (vm *VM) repairInnerBlockMapping() error {
 	var (
 		latestProBlkID   ids.ID
 		latestInnerBlkID = ids.Empty
@@ -254,7 +254,7 @@ func (vm *VM) repairInnerBlocksMapping() error {
 			return err
 		case database.ErrNotFound:
 			// mapping must have been introduced after snowman++ fork. Rebuild it.
-			if err := vm.State.SetBlocksIDByHeight(lastAcceptedBlk.Height(), latestProBlkID); err != nil {
+			if err := vm.State.SetBlockIDByHeight(lastAcceptedBlk.Height(), latestProBlkID); err != nil {
 				return err
 			}
 

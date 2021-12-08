@@ -88,7 +88,7 @@ func TestInnerBlockMappingPostFork(t *testing.T) {
 	}
 
 	// show repairs rebuilds the mapping
-	assert.NoError(proVM.repairInnerBlocksMapping())
+	assert.NoError(proVM.repairInnerBlockMapping())
 
 	// check that mapping is fully built
 	for height := uint64(1); height <= blkNumber; height++ {
@@ -163,7 +163,7 @@ func TestInnerBlockMappingPreFork(t *testing.T) {
 	assert.True(proVM.latestPreForkHeight == lastProBlk.Height())
 
 	// show repairs rebuilds the mapping
-	assert.NoError(proVM.repairInnerBlocksMapping())
+	assert.NoError(proVM.repairInnerBlockMapping())
 
 	// mapping should be empty
 	for height := uint64(1); height <= blkNumber; height++ {
@@ -306,7 +306,7 @@ func TestInnerBlockMappingAcrossFork(t *testing.T) {
 	proVM.latestPreForkHeight = 0
 
 	// show repairs rebuilds the mapping
-	assert.NoError(proVM.repairInnerBlocksMapping())
+	assert.NoError(proVM.repairInnerBlockMapping())
 
 	assert.True(proVM.latestPreForkHeight == forkHeight)
 	for height := uint64(1); height <= blkNumber; height++ {
@@ -427,7 +427,7 @@ func TestInnerBlockMappingBackwardCompatiblity(t *testing.T) {
 	}
 
 	// show repairs builds the mapping
-	assert.NoError(proVM.repairInnerBlocksMapping())
+	assert.NoError(proVM.repairInnerBlockMapping())
 
 	assert.True(proVM.latestPreForkHeight == forkHeight)
 	for height := uint64(1); height <= blkNumber; height++ {
