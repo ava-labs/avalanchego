@@ -17,6 +17,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+const atomicTrieKeyLen = wrappers.LongLen + common.HashLength
+
 // atomicTrieIterator is an implementation of types.AtomicTrieIterator that serves
 // parsed data with each iteration
 type atomicTrieIterator struct {
@@ -49,11 +51,10 @@ func (a *atomicTrieIterator) Next() bool {
 		// if the underlying iterator has data to iterate over, parse and set the fields
 		// key is [blockNumberBytes]+[blockchainIDBytes] = 8+32=40 bytes
 		keyLen := len(a.trieIterator.Key)
-		expectedKeyLen := wrappers.LongLen + common.HashLength
-		if keyLen != expectedKeyLen {
+		if keyLen != atomicTrieKeyLen {
 			// unexpected key length
 			// set the error and stop the iteration as data is unreliable from this point
-			a.err = fmt.Errorf("expected atomic trie key length to be %d but was %d", expectedKeyLen, keyLen)
+			a.err = fmt.Errorf("expected atomic trie key length to be %d but was %d", atomicTrieKeyLen, keyLen)
 			a.resetFields()
 			return false
 		}
