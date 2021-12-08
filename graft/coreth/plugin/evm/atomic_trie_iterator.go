@@ -7,27 +7,29 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/codec"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/coreth/statesync/types"
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // atomicTrieIterator is an implementation of types.AtomicTrieIterator that serves
 // parsed data with each iteration
 type atomicTrieIterator struct {
-	trieIterator *trie.Iterator   // underlying trie.Iterator
+	trieIterator *trie.Iterator // underlying trie.Iterator
+	codec        codec.Manager
 	atomicOps    *atomic.Requests // atomic operation entries at this iteration
 	blockchainID ids.ID           // blockchain ID
 	blockNumber  uint64           // block number at this iteration
 	err          error            // error if any has occurred
 }
 
-func NewAtomicTrieIterator(trieIterator *trie.Iterator) types.AtomicTrieIterator {
-	return &atomicTrieIterator{trieIterator: trieIterator}
+func NewAtomicTrieIterator(trieIterator *trie.Iterator, codec codec.Manager) types.AtomicTrieIterator {
+	return &atomicTrieIterator{trieIterator: trieIterator, codec: codec}
 }
 
 // Error returns error, if any encountered during this iteration
@@ -66,7 +68,7 @@ func (a *atomicTrieIterator) Next() bool {
 
 		// value is RLP encoded atomic.Requests
 		var requests atomic.Requests
-		if err := rlp.DecodeBytes(a.trieIterator.Value, &requests); err != nil {
+		if _, err = a.codec.Unmarshal(a.trieIterator.Value, &requests); err != nil {
 			a.err = err
 			a.resetFields()
 			return false

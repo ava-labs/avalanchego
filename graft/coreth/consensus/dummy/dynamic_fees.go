@@ -87,14 +87,7 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 		var blockGasCost, parentExtraStateGasUsed uint64
 		switch {
 		case isApricotPhase5:
-			blockGasCost = calcBlockGasCost(
-				ApricotPhase4TargetBlockRate,
-				ApricotPhase4MinBlockGasCost,
-				ApricotPhase4MaxBlockGasCost,
-				ApricotPhase5BlockGasCostStep,
-				parent.BlockGasCost,
-				parent.Time, timestamp,
-			).Uint64()
+			// [blockGasCost] has been removed in AP5, so it is left as 0.
 
 			// At the start of a new network, the parent
 			// may not have a populated [ExtDataGasUsed].
