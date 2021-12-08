@@ -279,8 +279,8 @@ func TestGetTxStatus(t *testing.T) {
 		t.Fatal(err)
 	} else if block, err := service.vm.BuildBlock(); err != nil {
 		t.Fatal(err)
-	} else if blk, ok := block.(*AtomicBlock); !ok {
-		t.Fatalf("should be *AtomicBlock but is %T", block)
+	} else if blk, ok := block.(*StandardBlock); !ok {
+		t.Fatalf("should be *StandardBlock but is %T", block)
 	} else if err := blk.Verify(); err != nil {
 		t.Fatal(err)
 	} else if err := blk.Accept(); err != nil {

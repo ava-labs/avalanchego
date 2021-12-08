@@ -76,10 +76,14 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Uint64(FdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
 
 	// Config File
-	fs.String(ConfigFileKey, "", "Specifies a config file")
+	fs.String(ConfigFileKey, "", fmt.Sprintf("Specifies a config file. Ignored if %s is specified.", ConfigContentKey))
+	fs.String(ConfigContentKey, "", "Specifies base64 encoded config content")
+	fs.String(ConfigContentTypeKey, "", "Specifies the format of the base64 encoded config content")
 
-	// Genesis Config File
-	fs.String(GenesisConfigFileKey, "", "Specifies a genesis config file (ignored when running standard networks)")
+	// Genesis
+	fs.String(GenesisConfigFileKey, "", fmt.Sprintf("Specifies a genesis config file (ignored when running standard networks or if %s is specified).",
+		GenesisConfigContentKey))
+	fs.String(GenesisConfigContentKey, "", "Specifies base64 encoded genesis content")
 
 	// Network ID
 	fs.String(NetworkNameKey, defaultNetworkName, "Network ID this node will connect to")
@@ -93,7 +97,8 @@ func addNodeFlags(fs *flag.FlagSet) {
 	// Database
 	fs.String(DBTypeKey, leveldb.Name, fmt.Sprintf("Database type to use. Should be one of {%s, %s, %s}", leveldb.Name, rocksdb.Name, memdb.Name))
 	fs.String(DBPathKey, defaultDBDir, "Path to database directory")
-	fs.String(DBConfigFileKey, "", "Path to database config file")
+	fs.String(DBConfigFileKey, "", fmt.Sprintf("Path to database config file. Ignored if %s is specified.", DBConfigContentKey))
+	fs.String(DBConfigContentKey, "", "Specifies base64 encoded database config content")
 
 	// Logging
 	fs.String(LogsDirKey, "", "Logging directory for Avalanche")
@@ -147,8 +152,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Bool(NetworkAllowPrivateIPsKey, true, "Allows the node to connect peers with private IPs")
 	fs.Bool(NetworkRequireValidatorToConnectKey, false, "If true, this node will only maintain a connection with another node if this node is a validator, the other node is a validator, or the other node is a beacon")
 	// Peer alias configuration
-	fs.Duration(PeerAliasTimeoutKey, 10*time.Minute, "How often the node will attempt to connect "+
-		"to an IP address previously associated with a peer (i.e. a peer alias).")
+	fs.Duration(PeerAliasTimeoutKey, 10*time.Minute, "How often the node will attempt to connect to an IP address previously associated with a peer (i.e. a peer alias).")
 
 	// Benchlist
 	fs.Int(BenchlistFailThresholdKey, 10, "Number of consecutive failed queries before benchlisting a node.")
@@ -181,11 +185,19 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(HTTPHostKey, "127.0.0.1", "Address of the HTTP server")
 	fs.Uint(HTTPPortKey, 9650, "Port of the HTTP server")
 	fs.Bool(HTTPSEnabledKey, false, "Upgrade the HTTP server to HTTPs")
-	fs.String(HTTPSKeyFileKey, "", "TLS private key file for the HTTPs server")
-	fs.String(HTTPSCertFileKey, "", "TLS certificate file for the HTTPs server")
+	fs.String(HTTPSKeyFileKey, "", fmt.Sprintf("TLS private key file for the HTTPs server. Ignored if %s is specified.", HTTPSKeyContentKey))
+	fs.String(HTTPSKeyContentKey, "", "Specifies base64 encoded TLS private key for the HTTPs server.")
+	fs.String(HTTPSCertFileKey, "", fmt.Sprintf("TLS certificate file for the HTTPs server. Ignored if %s is specified.", HTTPSCertContentKey))
+	fs.String(HTTPSCertContentKey, "", "Specifies base64 encoded TLS certificate for the HTTPs server.")
 	fs.String(HTTPAllowedOrigins, "*", "Origins to allow on the HTTP port. Defaults to * which allows all origins. Example: https://*.avax.network https://*.avax-test.network")
+	fs.Duration(HTTPShutdownWaitKey, 0, "Duration to wait after receiving SIGTERM or SIGINT before initiating shutdown. The /health endpoint will return unhealthy during this duration.")
+	fs.Duration(HTTPShutdownTimeoutKey, 10*time.Second, "Maximum duration to wait for existing connections to complete during node shutdown.")
 	fs.Bool(APIAuthRequiredKey, false, "Require authorization token to call HTTP APIs")
-	fs.String(APIAuthPasswordFileKey, "", "Password file used to initially create/validate API authorization tokens. Leading and trailing whitespace is removed from the password. Can be changed via API call.")
+	fs.String(APIAuthPasswordFileKey, "",
+		fmt.Sprintf("Password file used to initially create/validate API authorization tokens. Ignored if %s is specified. Leading and trailing whitespace is removed from the password. Can be changed via API call.",
+			APIAuthPasswordKey))
+	fs.String(APIAuthPasswordKey, "", "Specifies password for API authorization tokens.")
+
 	// Enable/Disable APIs
 	fs.Bool(AdminAPIEnabledKey, false, "If true, this node exposes the Admin API")
 	fs.Bool(InfoAPIEnabledKey, true, "If true, this node exposes the Info API")
@@ -212,8 +224,10 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Uint(StakingPortKey, 9651, "Port of the consensus server")
 	fs.Bool(StakingEnabledKey, true, "Enable staking. If enabled, Network TLS is required.")
 	fs.Bool(StakingEphemeralCertEnabledKey, false, "If true, the node uses an ephemeral staking key and certificate, and has an ephemeral node ID.")
-	fs.String(StakingKeyPathKey, defaultStakingKeyPath, "Path to the TLS private key for staking")
-	fs.String(StakingCertPathKey, defaultStakingCertPath, "Path to the TLS certificate for staking")
+	fs.String(StakingKeyPathKey, defaultStakingKeyPath, fmt.Sprintf("Path to the TLS private key for staking. Ignored if %s is specified.", StakingKeyContentKey))
+	fs.String(StakingKeyContentKey, "", "Specifies base64 encoded TLS private key for staking.")
+	fs.String(StakingCertPathKey, defaultStakingCertPath, fmt.Sprintf("Path to the TLS certificate for staking. Ignored if %s is specified.", StakingCertContentKey))
+	fs.String(StakingCertContentKey, "", "Specifies base64 encoded TLS certificate for staking.")
 	fs.Uint64(StakingDisabledWeightKey, 100, "Weight to provide to each peer when staking is disabled")
 	// Uptime Requirement
 	fs.Float64(UptimeRequirementKey, genesis.LocalParams.UptimeRequirement, "Fraction of time a validator must be online to receive rewards")
@@ -268,15 +282,18 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Bool(IndexAllowIncompleteKey, false, "If true, allow running the node in such a way that could cause an index to miss transactions. Ignored if index is disabled.")
 
 	// Config Directories
-	fs.String(ChainConfigDirKey, defaultChainConfigDir, "Chain specific configurations parent directory. Defaults to $HOME/.avalanchego/configs/chains/")
-	fs.String(SubnetConfigDirKey, defaultSubnetConfigDir, "Subnet specific configurations parent directory. Defaults to $HOME/.avalanchego/configs/subnets/")
+	fs.String(ChainConfigDirKey, defaultChainConfigDir, fmt.Sprintf("Chain specific configurations parent directory. Ignored if %s is specified. Defaults to $HOME/.avalanchego/configs/chains/0", ChainConfigContentKey))
+	fs.String(ChainConfigContentKey, "", "Specifies base64 encoded chains configurations.")
+	fs.String(SubnetConfigDirKey, defaultSubnetConfigDir, fmt.Sprintf("Subnet specific configurations parent directory. Ignored if %s is specified. Defaults to $HOME/.avalanchego/configs/subnets/", SubnetConfigContentKey))
+	fs.String(SubnetConfigContentKey, "", "Specifies base64 encoded subnets configurations.")
 
 	// Profiles
 	fs.String(ProfileDirKey, defaultProfileDir, "Path to the profile directory")
 	fs.Bool(ProfileContinuousEnabledKey, false, "Whether the app should continuously produce performance profiles")
 	fs.Duration(ProfileContinuousFreqKey, 15*time.Minute, "How frequently to rotate performance profiles")
 	fs.Int(ProfileContinuousMaxFilesKey, 5, "Maximum number of historical profiles to keep")
-	fs.String(VMAliasesFileKey, defaultVMAliasFilePath, "Specifies a JSON file that maps vmIDs with custom aliases.")
+	fs.String(VMAliasesFileKey, defaultVMAliasFilePath, fmt.Sprintf("Specifies a JSON file that maps vmIDs with custom aliases. Ignored if %s is specified.", VMAliasesContentKey))
+	fs.String(VMAliasesContentKey, "", "Specifies base64 encoded maps vmIDs with custom aliases.")
 
 	// Delays
 	fs.Duration(NetworkInitialReconnectDelayKey, time.Second, "Initial delay duration must be waited before attempting to reconnect a peer.")

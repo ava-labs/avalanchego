@@ -4,6 +4,8 @@
 package config
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -18,9 +20,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
-func TestSetChainConfigs(t *testing.T) {
+func TestGetChainConfigsFromFiles(t *testing.T) {
 	tests := map[string]struct {
 		configs    map[string]string
 		upgrades   map[string]string
@@ -96,7 +100,7 @@ func TestSetChainConfigs(t *testing.T) {
 	}
 }
 
-func TestSetChainConfigsDirNotExist(t *testing.T) {
+func TestGetChainConfigsDirNotExist(t *testing.T) {
 	tests := map[string]struct {
 		structure  string
 		file       map[string]string
@@ -178,7 +182,84 @@ func TestSetChainConfigDefaultDir(t *testing.T) {
 	assert.Equal(expected, chainConfigs)
 }
 
-func TestGetVMAliases(t *testing.T) {
+func TestGetChainConfigsFromFlags(t *testing.T) {
+	tests := map[string]struct {
+		fullConfigs map[string]chains.ChainConfig
+		errMessage  string
+		expected    map[string]chains.ChainConfig
+	}{
+		"no chain configs": {
+			fullConfigs: map[string]chains.ChainConfig{},
+			expected:    map[string]chains.ChainConfig{},
+		},
+		"valid chain-id": {
+			fullConfigs: func() map[string]chains.ChainConfig {
+				m := map[string]chains.ChainConfig{}
+				id1, err := ids.FromString("yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp")
+				assert.NoError(t, err)
+				m[id1.String()] = chains.ChainConfig{Config: []byte("hello"), Upgrade: []byte("helloUpgrades")}
+
+				id2, err := ids.FromString("2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm")
+				assert.NoError(t, err)
+				m[id2.String()] = chains.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
+
+				return m
+			}(),
+			expected: func() map[string]chains.ChainConfig {
+				m := map[string]chains.ChainConfig{}
+				id1, err := ids.FromString("yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp")
+				assert.NoError(t, err)
+				m[id1.String()] = chains.ChainConfig{Config: []byte("hello"), Upgrade: []byte("helloUpgrades")}
+
+				id2, err := ids.FromString("2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm")
+				assert.NoError(t, err)
+				m[id2.String()] = chains.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
+
+				return m
+			}(),
+		},
+		"valid alias": {
+			fullConfigs: map[string]chains.ChainConfig{
+				"C": {Config: []byte("hello"), Upgrade: []byte("upgradess")},
+				"X": {Config: []byte("world"), Upgrade: []byte(nil)},
+			},
+			expected: func() map[string]chains.ChainConfig {
+				m := map[string]chains.ChainConfig{}
+				m["C"] = chains.ChainConfig{Config: []byte("hello"), Upgrade: []byte("upgradess")}
+				m["X"] = chains.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
+
+				return m
+			}(),
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert := assert.New(t)
+			jsonMaps, err := json.Marshal(test.fullConfigs)
+			assert.NoError(err)
+			encodedFileContent := base64.StdEncoding.EncodeToString(jsonMaps)
+
+			// build viper config
+			v := setupViperFlags()
+			v.Set(ChainConfigContentKey, encodedFileContent)
+
+			// Parse config
+			chainConfigs, err := getChainConfigs(v)
+			if len(test.errMessage) > 0 {
+				assert.Error(err)
+				if err != nil {
+					assert.Contains(err.Error(), test.errMessage)
+				}
+			} else {
+				assert.NoError(err)
+			}
+			assert.Equal(test.expected, chainConfigs)
+		})
+	}
+}
+
+func TestGetVMAliasesFromFile(t *testing.T) {
 	tests := map[string]struct {
 		givenJSON  string
 		expected   map[ids.ID][]string
@@ -213,6 +294,53 @@ func TestGetVMAliases(t *testing.T) {
 			configFilePath := setupConfigJSON(t, root, configJSON)
 			setupFile(t, root, "aliases.json", test.givenJSON)
 			v := setupViper(configFilePath)
+			vmAliases, err := getVMAliases(v)
+			if len(test.errMessage) > 0 {
+				assert.Error(err)
+				assert.Contains(err.Error(), test.errMessage)
+			} else {
+				assert.NoError(err)
+				assert.Equal(test.expected, vmAliases)
+			}
+		})
+	}
+}
+
+func TestGetVMAliasesFromFlag(t *testing.T) {
+	tests := map[string]struct {
+		givenJSON  string
+		expected   map[ids.ID][]string
+		errMessage string
+	}{
+		"wrong vm id": {
+			givenJSON:  `{"wrongVmId": ["vm1","vm2"]}`,
+			expected:   nil,
+			errMessage: "problem unmarshaling vmAliases",
+		},
+		"vm id": {
+			givenJSON: `{"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": ["vm1","vm2"],
+										"Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU": ["vm3", "vm4"] }`,
+			expected: func() map[ids.ID][]string {
+				m := map[ids.ID][]string{}
+				id1, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				id2, _ := ids.FromString("Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU")
+				m[id1] = []string{"vm1", "vm2"}
+				m[id2] = []string{"vm3", "vm4"}
+				return m
+			}(),
+			errMessage: "",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert := assert.New(t)
+			encodedFileContent := base64.StdEncoding.EncodeToString([]byte(test.givenJSON))
+
+			// build viper config
+			v := setupViperFlags()
+			v.Set(VMAliasesContentKey, encodedFileContent)
+
 			vmAliases, err := getVMAliases(v)
 			if len(test.errMessage) > 0 {
 				assert.Error(err)
@@ -267,7 +395,7 @@ func TestGetVMAliasesDirNotExists(t *testing.T) {
 	assert.NoError(err)
 }
 
-func TestGetSubnetConfigs(t *testing.T) {
+func TestGetSubnetConfigsFromFile(t *testing.T) {
 	tests := map[string]struct {
 		givenJSON  string
 		testF      func(*assert.Assertions, map[ids.ID]chains.SubnetConfig)
@@ -345,6 +473,136 @@ func TestGetSubnetConfigs(t *testing.T) {
 	}
 }
 
+func TestGetSubnetConfigsFromFlags(t *testing.T) {
+	tests := map[string]struct {
+		cfgsMap    map[ids.ID]chains.SubnetConfig
+		testF      func(*assert.Assertions, map[ids.ID]chains.SubnetConfig)
+		errMessage string
+	}{
+		"no configs": {
+			cfgsMap: func() map[ids.ID]chains.SubnetConfig {
+				res := make(map[ids.ID]chains.SubnetConfig)
+				return res
+			}(),
+			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
+				assert.Empty(given)
+			},
+			errMessage: "",
+		},
+		"entry with no config": {
+			cfgsMap: func() map[ids.ID]chains.SubnetConfig {
+				res := make(map[ids.ID]chains.SubnetConfig)
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				res[id] = chains.SubnetConfig{}
+				return res
+			}(),
+			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
+				assert.True(len(given) == 1)
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				_, ok := given[id]
+				assert.True(ok)
+			},
+			errMessage: "Fails the condition that: 1 < Parents",
+		},
+		"subnet is not whitelisted": {
+			cfgsMap: func() map[ids.ID]chains.SubnetConfig {
+				res := make(map[ids.ID]chains.SubnetConfig)
+				id, _ := ids.FromString("Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU")
+				res[id] = chains.SubnetConfig{ValidatorOnly: true}
+				return res
+			}(),
+			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
+				assert.Empty(given)
+			},
+		},
+		"invalid consensus parameters": {
+			cfgsMap: func() map[ids.ID]chains.SubnetConfig {
+				res := make(map[ids.ID]chains.SubnetConfig)
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				res[id] = chains.SubnetConfig{
+					ConsensusParameters: avalanche.Parameters{
+						Parents:   2,
+						BatchSize: 1,
+						Parameters: snowball.Parameters{
+							K:            111,
+							Alpha:        1234,
+							BetaVirtuous: 1,
+						},
+					},
+				}
+				return res
+			}(),
+			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
+				assert.Empty(given)
+			},
+			errMessage: "fails the condition that: alpha <= k",
+		},
+		"correct config": {
+			cfgsMap: func() map[ids.ID]chains.SubnetConfig {
+				res := make(map[ids.ID]chains.SubnetConfig)
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				res[id] = chains.SubnetConfig{
+					ValidatorOnly: true,
+					ConsensusParameters: avalanche.Parameters{
+						Parents:   111,
+						BatchSize: 1,
+						Parameters: snowball.Parameters{
+							Alpha:                 20,
+							K:                     30,
+							BetaVirtuous:          5,
+							BetaRogue:             6,
+							ConcurrentRepolls:     6,
+							OptimalProcessing:     2,
+							MaxOutstandingItems:   2,
+							MaxItemProcessingTime: 2,
+						},
+					},
+				}
+				return res
+			}(),
+			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				config, ok := given[id]
+				assert.True(ok)
+				assert.Equal(true, config.ValidatorOnly)
+				assert.Equal(111, config.ConsensusParameters.Parents)
+				assert.Equal(20, config.ConsensusParameters.Alpha)
+				// must still respect defaults
+				assert.Equal(30, config.ConsensusParameters.K)
+			},
+			errMessage: "",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert := assert.New(t)
+			subnetID, err := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+			assert.NoError(err)
+			cfgsMapBytes, err := json.Marshal(test.cfgsMap)
+			assert.NoError(err)
+			encodedFileContent := base64.StdEncoding.EncodeToString(cfgsMapBytes)
+
+			// build viper config
+			v := setupViperFlags()
+			v.Set(SubnetConfigContentKey, encodedFileContent)
+
+			// setup configs for default
+			v.Set(SnowAvalancheNumParentsKey, 1)
+			v.Set(SnowAvalancheBatchSizeKey, 1)
+
+			subnetConfigs, err := getSubnetConfigs(v, []ids.ID{subnetID})
+			if len(test.errMessage) > 0 {
+				assert.Error(err)
+				assert.Contains(err.Error(), test.errMessage)
+			} else {
+				assert.NoError(err)
+				test.testF(assert, subnetConfigs)
+			}
+		})
+	}
+}
+
 // setups config json file and writes content
 func setupConfigJSON(t *testing.T, rootPath string, value string) string {
 	configFilePath := filepath.Join(rootPath, "config.json")
@@ -359,7 +617,7 @@ func setupFile(t *testing.T, path string, fileName string, value string) {
 	assert.NoError(t, ioutil.WriteFile(filePath, []byte(value), 0o600))
 }
 
-func setupViper(configFilePath string) *viper.Viper {
+func setupViperFlags() *viper.Viper {
 	v := viper.New()
 	fs := BuildFlagSet()
 	pflag.CommandLine = pflag.NewFlagSet(os.Args[0], pflag.PanicOnError) // flags are now reset
@@ -368,6 +626,11 @@ func setupViper(configFilePath string) *viper.Viper {
 	if err := v.BindPFlags(pflag.CommandLine); err != nil {
 		log.Fatal(err)
 	}
+	return v
+}
+
+func setupViper(configFilePath string) *viper.Viper {
+	v := setupViperFlags()
 	// need to set it since in tests executable dir is somewhere /var/tmp/ (or wherever is designated by go)
 	// thus it searches buildDir in /var/tmp/
 	// but actual buildDir resides under project_root/build

@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -21,7 +22,6 @@ var (
 	errNoExportOutputs  = errors.New("no export outputs")
 	errOutputsNotSorted = errors.New("outputs not sorted")
 	errOverflowExport   = errors.New("overflow when computing export amount + txFee")
-	errWrongChainID     = errors.New("tx has wrong chain ID")
 
 	_ UnsignedAtomicTx = &UnsignedExportTx{}
 )
@@ -93,9 +93,9 @@ func (tx *UnsignedExportTx) Execute(
 	vm *VM,
 	vs VersionedState,
 	stx *Tx,
-) (func() error, TxError) {
+) (func() error, error) {
 	if err := tx.SyntacticVerify(vm.ctx); err != nil {
-		return nil, permError{err}
+		return nil, err
 	}
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
@@ -103,23 +103,14 @@ func (tx *UnsignedExportTx) Execute(
 	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 
 	if vm.bootstrapped.GetValue() {
-		if err := vm.isValidCrossChainID(vs, tx.DestinationChain); err != nil {
+		if err := verify.SameSubnet(vm.ctx, tx.DestinationChain); err != nil {
 			return nil, err
 		}
 	}
 
 	// Verify the flowcheck
 	if err := vm.semanticVerifySpend(vs, tx, tx.Ins, outs, stx.Creds, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
-		switch err.(type) {
-		case permError:
-			return nil, permError{
-				fmt.Errorf("failed semanticVerifySpend: %w", err),
-			}
-		default:
-			return nil, tempError{
-				fmt.Errorf("failed semanticVerifySpend: %w", err),
-			}
-		}
+		return nil, fmt.Errorf("failed semanticVerifySpend: %w", err)
 	}
 
 	// Consume the UTXOS
@@ -168,7 +159,7 @@ func (tx *UnsignedExportTx) AtomicExecute(
 	vm *VM,
 	parentState MutableState,
 	stx *Tx,
-) (VersionedState, TxError) {
+) (VersionedState, error) {
 	// Set up the state if this tx is committed
 	newState := newVersionedState(
 		parentState,

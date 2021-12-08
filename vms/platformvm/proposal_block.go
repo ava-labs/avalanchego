@@ -32,10 +32,6 @@ type ProposalBlock struct {
 	onCommitState VersionedState
 	// The state that the chain will have if this block's proposal is aborted
 	onAbortState VersionedState
-	// The function to execute if this block's proposal is committed
-	onCommitFunc func() error
-	// The function to execute if this block's proposal is aborted
-	onAbortFunc func() error
 }
 
 func (pb *ProposalBlock) free() {
@@ -103,30 +99,6 @@ func (pb *ProposalBlock) setBaseState() {
 	pb.onAbortState.SetBase(pb.vm.internalState)
 }
 
-// onCommit should only be called after Verify is called.
-//
-// returns:
-//   1. The state of the chain assuming this proposal is enacted. (That is, if
-//      this block is accepted and followed by an accepted Commit block.)
-//   2. A function to be executed when this block's proposal is committed. This
-//      function should not write to state. This function should only be called
-//      after the state has been updated.
-func (pb *ProposalBlock) onCommit() (VersionedState, func() error) {
-	return pb.onCommitState, pb.onCommitFunc
-}
-
-// onAbort should only be called after Verify is called.
-//
-// returns:
-//   1. The state of the chain assuming this proposal is not enacted. (That is,
-//      if this block is accepted and followed by an accepted Abort block.)
-//   2. A function to be executed when this block's proposal is aborted. This
-//      function should not write to state. This function should only be called
-//      after the state has been updated.
-func (pb *ProposalBlock) onAbort() (VersionedState, func() error) {
-	return pb.onAbortState, pb.onAbortFunc
-}
-
 // Verify this block is valid.
 //
 // The parent block must either be a Commit or an Abort block.
@@ -136,14 +108,6 @@ func (pb *ProposalBlock) Verify() error {
 	blkID := pb.ID()
 
 	if err := pb.CommonBlock.Verify(); err != nil {
-		pb.vm.ctx.Log.Trace("rejecting block %s due to a failed verification: %s", blkID, err)
-		if err := pb.Reject(); err != nil {
-			pb.vm.ctx.Log.Error(
-				"failed to reject proposal block %s due to %s",
-				blkID,
-				err,
-			)
-		}
 		return err
 	}
 
@@ -160,38 +124,17 @@ func (pb *ProposalBlock) Verify() error {
 	// The parent of a proposal block (ie this block) must be a decision block
 	parent, ok := parentIntf.(decision)
 	if !ok {
-		pb.vm.ctx.Log.Trace("rejecting block %s due to an incorrect parent type", blkID)
-		if err := pb.Reject(); err != nil {
-			pb.vm.ctx.Log.Error(
-				"failed to reject proposal block %s due to %s",
-				blkID,
-				err,
-			)
-		}
 		return errInvalidBlockType
 	}
 
 	// parentState is the state if this block's parent is accepted
 	parentState := parent.onAccept()
 
-	var err TxError
-	pb.onCommitState, pb.onAbortState, pb.onCommitFunc, pb.onAbortFunc, err = tx.Execute(pb.vm, parentState, &pb.Tx)
+	var err error
+	pb.onCommitState, pb.onAbortState, err = tx.Execute(pb.vm, parentState, &pb.Tx)
 	if err != nil {
 		txID := tx.ID()
 		pb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
-		// If this block's transaction proposes to advance the timestamp, the
-		// transaction may fail verification now but be valid in the future, so
-		// don't (permanently) mark the block as rejected.
-		if !err.Temporary() {
-			pb.vm.ctx.Log.Trace("rejecting block %s due to a permanent verification error: %s", blkID, err)
-			if err := pb.Reject(); err != nil {
-				pb.vm.ctx.Log.Error(
-					"failed to reject proposal block %s due to %s",
-					blkID,
-					err,
-				)
-			}
-		}
 		return err
 	}
 	pb.onCommitState.AddTx(&pb.Tx, Committed)

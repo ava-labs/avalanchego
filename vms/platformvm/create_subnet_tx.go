@@ -78,11 +78,11 @@ func (tx *UnsignedCreateSubnetTx) Execute(
 	stx *Tx,
 ) (
 	func() error,
-	TxError,
+	error,
 ) {
 	// Make sure this transaction is well formed.
 	if err := tx.SyntacticVerify(vm.ctx); err != nil {
-		return nil, permError{err}
+		return nil, err
 	}
 
 	// Verify the flowcheck

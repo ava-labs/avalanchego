@@ -125,6 +125,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 	m.dropIncoming = true
 	defer func() {
 		m.dropIncoming = false
+		m.ResetTimer()
 	}()
 
 	m.vm.ctx.Log.Debug("in BuildBlock")
@@ -151,55 +152,10 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 		return nil, errEndOfTime
 	}
 
-	// TODO: remove after AP5.
-	enabledAP5 := !currentChainTimestamp.Before(m.vm.ApricotPhase5Time)
-
 	// If there are pending decision txs, build a block with a batch of them
-	if m.HasDecisionTxs() || (enabledAP5 && m.HasAtomicTx()) {
-		txs := make([]*Tx, 0, BatchSize)
-		if m.HasDecisionTxs() {
-			decisionTxs := m.PopDecisionTxs(BatchSize)
-			txs = append(txs, decisionTxs...)
-		}
-		if enabledAP5 && m.HasAtomicTx() {
-			atomicTxs := m.PopAtomicTxs(BatchSize - len(txs))
-			txs = append(txs, atomicTxs...)
-		}
-
-		blk, err := m.vm.newStandardBlock(preferredID, nextHeight, txs)
-		if err != nil {
-			m.ResetTimer()
-			return nil, err
-		}
-		m.vm.ctx.Log.Debug("Built Standard Block %s: %s", blk.ID(), jsonFormatter{obj: blk})
-
-		if err := blk.Verify(); err != nil {
-			m.ResetTimer()
-			return nil, err
-		}
-
-		m.vm.internalState.AddBlock(blk)
-		return blk, m.vm.internalState.Commit()
-	}
-
-	// If there is a pending atomic tx, build a block with it
-	if !enabledAP5 && m.HasAtomicTx() {
-		tx := m.PopAtomicTx()
-
-		blk, err := m.vm.newAtomicBlock(preferredID, nextHeight, *tx)
-		if err != nil {
-			m.ResetTimer()
-			return nil, err
-		}
-		m.vm.ctx.Log.Debug("Built Atomic Block %s: %s", blk.ID(), jsonFormatter{obj: blk})
-
-		if err := blk.Verify(); err != nil {
-			m.ResetTimer()
-			return nil, err
-		}
-
-		m.vm.internalState.AddBlock(blk)
-		return blk, m.vm.internalState.Commit()
+	if m.HasDecisionTxs() {
+		txs := m.PopDecisionTxs(BatchSize)
+		return m.vm.newStandardBlock(preferredID, nextHeight, txs)
 	}
 
 	currentStakers := preferredState.CurrentStakerChainState()
@@ -221,14 +177,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		blk, err := m.vm.newProposalBlock(preferredID, nextHeight, *rewardValidatorTx)
-		if err != nil {
-			return nil, err
-		}
-		m.vm.ctx.Log.Debug("Built Proposal Block %s: %s", blk.ID(), jsonFormatter{obj: blk})
-
-		m.vm.internalState.AddBlock(blk)
-		return blk, m.vm.internalState.Commit()
+		return m.vm.newProposalBlock(preferredID, nextHeight, *rewardValidatorTx)
 	}
 
 	// If local time is >= time of the next staker set change,
@@ -245,13 +194,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		blk, err := m.vm.newProposalBlock(preferredID, nextHeight, *advanceTimeTx)
-		if err != nil {
-			return nil, err
-		}
-
-		m.vm.internalState.AddBlock(blk)
-		return blk, m.vm.internalState.Commit()
+		return m.vm.newProposalBlock(preferredID, nextHeight, *advanceTimeTx)
 	}
 
 	// Propose adding a new validator but only if their start time is in the
@@ -291,29 +234,9 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 			if err != nil {
 				return nil, err
 			}
-			blk, err := m.vm.newProposalBlock(preferredID, nextHeight, *advanceTimeTx)
-			if err != nil {
-				return nil, err
-			}
-
-			m.vm.internalState.AddBlock(blk)
-			return blk, m.vm.internalState.Commit()
+			return m.vm.newProposalBlock(preferredID, nextHeight, *advanceTimeTx)
 		}
-
-		// Attempt to issue the transaction
-		blk, err := m.vm.newProposalBlock(preferredID, nextHeight, *tx)
-		if err != nil {
-			m.ResetTimer()
-			return nil, err
-		}
-
-		if err := blk.Verify(); err != nil {
-			m.ResetTimer()
-			return nil, err
-		}
-
-		m.vm.internalState.AddBlock(blk)
-		return blk, m.vm.internalState.Commit()
+		return m.vm.newProposalBlock(preferredID, nextHeight, *tx)
 	}
 
 	m.vm.ctx.Log.Debug("BuildBlock returning error (no blocks)")
@@ -325,7 +248,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 func (m *blockBuilder) ResetTimer() {
 	// If there is a pending transaction trigger building of a block with that
 	// transaction
-	if m.HasDecisionTxs() || m.HasAtomicTx() {
+	if m.HasDecisionTxs() {
 		m.vm.NotifyBlockReady()
 		return
 	}
