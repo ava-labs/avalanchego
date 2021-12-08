@@ -51,6 +51,8 @@ type atomicTrie struct {
 	log                  log.Logger // struct logger
 }
 
+var _ types.AtomicTrie = &atomicTrie{}
+
 // NewAtomicTrie returns a new instance of a atomicTrie with the default commitHeightInterval.
 // Initializes the trie before returning it.
 func NewAtomicTrie(db *versiondb.Database, repo AtomicTxRepository, codec codec.Manager, lastAcceptedHeight uint64) (types.AtomicTrie, error) {
@@ -108,14 +110,13 @@ func lastCommittedRootIfExists(db database.Database) (common.Hash, uint64, error
 		return common.Hash{}, 0, err
 	case len(lastCommittedHeightBytes) != wrappers.LongLen:
 		return common.Hash{}, 0, fmt.Errorf("expected value of lastCommittedKey to be %d but was %d", wrappers.LongLen, len(lastCommittedHeightBytes))
-	default:
-		height := binary.BigEndian.Uint64(lastCommittedHeightBytes)
-		hash, err := db.Get(lastCommittedHeightBytes)
-		if err != nil {
-			return common.Hash{}, 0, err
-		}
-		return common.BytesToHash(hash), height, nil
 	}
+	height := binary.BigEndian.Uint64(lastCommittedHeightBytes)
+	hash, err := db.Get(lastCommittedHeightBytes)
+	if err != nil {
+		return common.Hash{}, 0, err
+	}
+	return common.BytesToHash(hash), height, nil
 }
 
 // nearestCommitheight returns the nearest multiple of commitInterval less than or equal to blockNumber
@@ -381,7 +382,6 @@ func (a *atomicTrie) Root(height uint64) (common.Hash, error) {
 		return common.Hash{}, nil
 	case err != nil:
 		return common.Hash{}, err
-	default:
-		return common.BytesToHash(hash), nil
 	}
+	return common.BytesToHash(hash), nil
 }
