@@ -6,6 +6,8 @@ package evm
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/database/prefixdb"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -273,4 +275,45 @@ func TestAtomicTrieInitializeProducesSameHashEveryTime(t *testing.T) {
 		assert.Equal(t, expectedCommitHeight, indexerHeight, "height should not have changed")
 		assert.Equal(t, hash, newHash, "hash should be the same")
 	}
+}
+
+func BenchmarkAtomicTrieInit(b *testing.B) {
+	db := versiondb.New(memdb.New())
+	codec := testTxCodec()
+
+	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
+	txMap := make(map[uint64][]*Tx)
+
+	lastAcceptedHeight := uint64(25000)
+	// add 25000 * 3 = 75000 transactions
+	addTxs(b, codec, acceptedAtomicTxDB, 0, lastAcceptedHeight, 3, txMap)
+	err := db.Commit()
+	assert.NoError(b, err)
+
+	repo, err := NewAtomicTxRepository(db, codec, lastAcceptedHeight)
+	assert.NoError(b, err)
+
+	var atomTrie types.AtomicTrie
+	var hash common.Hash
+	var height uint64
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		atomTrie, err = newAtomicTrie(versiondb.New(memdb.New()), repo, codec, lastAcceptedHeight, 5000)
+		assert.NoError(b, err)
+
+		hash, height = atomTrie.LastCommitted()
+		assert.Equal(b, lastAcceptedHeight, height)
+		assert.NotEqual(b, common.Hash{}, hash)
+	}
+	b.StopTimer()
+
+	// verify ops
+	iter, err := atomTrie.Iterator(hash, 0)
+	assert.NoError(b, err)
+	ops := 0
+	for iter.Next() {
+		ops++
+	}
+	assert.Equal(b, 75000, ops)
 }
