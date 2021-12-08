@@ -64,7 +64,7 @@ func (ibm *innerBlocksMapping) SetBlockIDByHeight(height uint64, blkID ids.ID) e
 }
 
 func (ibm *innerBlocksMapping) GetBlockIDByHeight(height uint64) (ids.ID, error) {
-	heightBytes := make([]byte, 8)
+	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 	key := make([]byte, len(heightPrefix)+len(heightBytes))
 	copy(key, heightPrefix)
@@ -107,7 +107,7 @@ func (ibm *innerBlocksMapping) DeleteBlockIDByHeight(height uint64) error {
 }
 
 func (ibm *innerBlocksMapping) SetLatestPreForkHeight(height uint64) error {
-	heightBytes := make([]byte, 8)
+	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 
 	ibm.cache.Put(string(preForkPrefix), heightBytes)
