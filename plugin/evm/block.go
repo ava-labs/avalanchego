@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
@@ -132,22 +131,13 @@ func (b *Block) Accept() error {
 		return err
 	}
 
-	batchChainsAndInputs := make(map[ids.ID]*atomic.Requests)
+	batchChainsAndInputs, err := mergeAtomicOps(b.atomicTxs)
+	if err != nil {
+		return err
+	}
 	for _, tx := range b.atomicTxs {
 		// Remove the accepted transaction from the mempool
 		vm.mempool.RemoveTx(tx.ID())
-		// Accept atomic transaction
-		chainID, txRequest, err := tx.UnsignedAtomicTx.AtomicOps()
-		if err != nil {
-			return err
-		}
-		// Add/merge in the atomic requests represented by [tx]
-		if request, exists := batchChainsAndInputs[chainID]; exists {
-			request.PutRequests = append(request.PutRequests, txRequest.PutRequests...)
-			request.RemoveRequests = append(request.RemoveRequests, txRequest.RemoveRequests...)
-		} else {
-			batchChainsAndInputs[chainID] = txRequest
-		}
 	}
 
 	// If [b] is a bonus block, then we commit the database without applying the requests from
