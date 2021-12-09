@@ -18,7 +18,7 @@ const (
 	// (i.e. it would like to add a new block/vertex to consensus)
 	PendingTxs Message = iota
 
-	// snowman-VM related messages
+	// snowman-VM related messages for state sync capable VMs
 	StateSyncLastBlockMissing
 	StateSyncDone
 )
