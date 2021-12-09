@@ -3,8 +3,10 @@ package evm
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 )
@@ -18,8 +20,12 @@ func TestIteratorCanIterate(t *testing.T) {
 	// create state with multiple transactions
 	// since each test transaction generates random ID for blockchainID we should get
 	// multiple blockchain IDs per block in the overall combined atomic operation map
+	expectedCombinedOps := make(map[uint64]map[ids.ID]*atomic.Requests)
 	for i := uint64(0); i <= lastAcceptedHeight; i++ {
-		err := repo.Write(i, []*Tx{testDataExportTx(), testDataImportTx(), testDataExportTx()})
+		txs := []*Tx{testDataExportTx(), testDataImportTx(), testDataExportTx()}
+		err := repo.Write(i, txs)
+		assert.NoError(t, err)
+		expectedCombinedOps[i], err = mergeAtomicOps(txs)
 		assert.NoError(t, err)
 	}
 
@@ -38,15 +44,17 @@ func TestIteratorCanIterate(t *testing.T) {
 	atomicTrie, err = NewAtomicTrie(db, repo, testTxCodec(), lastAcceptedHeight)
 	assert.NoError(t, err)
 
-	iterator, err := atomicTrie.Iterator(lastCommittedHash, 0)
+	it, err := atomicTrie.Iterator(lastCommittedHash, 0)
 	assert.NoError(t, err)
 	entriesIterated := uint64(0)
-	for iterator.Next() {
-		assert.NoError(t, iterator.Error())
-		assert.NotNil(t, iterator.AtomicOps())
+	for it.Next() {
+		assert.NoError(t, it.Error())
+		assert.NotNil(t, it.AtomicOps())
+		expected := expectedCombinedOps[it.BlockNumber()][it.BlockchainID()]
+		assert.Equal(t, expected, it.AtomicOps())
 		entriesIterated++
 	}
-	assert.NoError(t, iterator.Error())
+	assert.NoError(t, it.Error())
 
 	// we assert 3003 values because the iterator iterates by height+blockchainID
 	// so if for a given height there are atomic operations belonging to 3 blockchainIDs then the

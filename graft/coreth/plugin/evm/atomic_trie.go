@@ -162,19 +162,9 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 		}
 
 		// combine atomic operations from all transactions at this block height
-		combinedOps := make(map[ids.ID]*atomic.Requests)
-		for _, tx := range txs {
-			chainID, requests, err := tx.AtomicOps()
-			if err != nil {
-				return err
-			}
-
-			if chainOps, exists := combinedOps[chainID]; exists {
-				chainOps.PutRequests = append(chainOps.PutRequests, requests.PutRequests...)
-				chainOps.RemoveRequests = append(chainOps.RemoveRequests, requests.RemoveRequests...)
-			} else {
-				combinedOps[chainID] = requests
-			}
+		combinedOps, err := mergeAtomicOps(txs)
+		if err != nil {
+			return err
 		}
 
 		// if height is greater than commit height, add it to the map so that we can write it later
@@ -320,7 +310,7 @@ func (a *atomicTrie) commit(height uint64) (common.Hash, error) {
 
 func (a *atomicTrie) updateTrie(height uint64, atomicOps map[ids.ID]*atomic.Requests) error {
 	for blockchainID, requests := range atomicOps {
-		valueBytes, err := a.codec.Marshal(codecVersion, *requests)
+		valueBytes, err := a.codec.Marshal(codecVersion, requests)
 		if err != nil {
 			// highly unlikely but possible if atomic.Element
 			// has a change that is unsupported by the codec

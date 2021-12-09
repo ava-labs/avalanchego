@@ -279,3 +279,22 @@ func calculateDynamicFee(cost uint64, baseFee *big.Int) (uint64, error) {
 func calcBytesCost(len int) uint64 {
 	return uint64(len) * TxBytesGas
 }
+
+// mergeAtomicOps merges atomic requests represented by [txs]
+// to the [output] map, depending on whether [chainID] is present in the map.
+func mergeAtomicOps(txs []*Tx) (map[ids.ID]*atomic.Requests, error) {
+	output := make(map[ids.ID]*atomic.Requests)
+	for _, tx := range txs {
+		chainID, txRequest, err := tx.UnsignedAtomicTx.AtomicOps()
+		if err != nil {
+			return nil, err
+		}
+		if request, exists := output[chainID]; exists {
+			request.PutRequests = append(request.PutRequests, txRequest.PutRequests...)
+			request.RemoveRequests = append(request.RemoveRequests, txRequest.RemoveRequests...)
+		} else {
+			output[chainID] = txRequest
+		}
+	}
+	return output, nil
+}
