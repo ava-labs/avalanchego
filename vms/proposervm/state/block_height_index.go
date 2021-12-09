@@ -21,6 +21,7 @@ var (
 
 	heightPrefix  = []byte("heightkey")
 	preForkPrefix = []byte("preForkKey")
+	resumePrefix  = []byte("blockToResumeFrom")
 )
 
 // AcceptedPostForkBlockHeightIndex contains mapping of blockHeights to accepted proposer block IDs.
@@ -33,6 +34,10 @@ type AcceptedPostForkBlockHeightIndex interface {
 	SetLatestPreForkHeight(height uint64) error
 	GetLatestPreForkHeight() (uint64, error)
 	DeleteLatestPreForkHeight() error
+
+	SetBlockToResumeFrom(blkID ids.ID) error
+	GetBlockToResumeFrom() (ids.ID, error)
+	DeleteBlockToResumeFrom() error
 
 	clearCache() // useful in testing
 }
@@ -116,7 +121,6 @@ func (ibm *innerBlocksMapping) SetLatestPreForkHeight(height uint64) error {
 
 func (ibm *innerBlocksMapping) GetLatestPreForkHeight() (uint64, error) {
 	key := preForkPrefix
-
 	if blkIDIntf, found := ibm.cache.Get(string(key)); found {
 		if blkIDIntf == nil {
 			return 0, database.ErrNotFound
@@ -144,6 +148,45 @@ func (ibm *innerBlocksMapping) GetLatestPreForkHeight() (uint64, error) {
 
 func (ibm *innerBlocksMapping) DeleteLatestPreForkHeight() error {
 	key := preForkPrefix
+	ibm.cache.Put(string(key), nil)
+	return ibm.db.Delete(key)
+}
+
+func (ibm *innerBlocksMapping) SetBlockToResumeFrom(blkID ids.ID) error {
+	key := resumePrefix
+	ibm.cache.Put(string(key), blkID)
+	return ibm.db.Put(key, blkID[:])
+}
+
+func (ibm *innerBlocksMapping) GetBlockToResumeFrom() (ids.ID, error) {
+	key := resumePrefix
+	if blkIDIntf, found := ibm.cache.Get(string(key)); found {
+		if blkIDIntf == nil {
+			return ids.Empty, database.ErrNotFound
+		}
+
+		res, _ := blkIDIntf.(ids.ID)
+		return res, nil
+	}
+
+	bytes, err := ibm.db.Get(key)
+	switch err {
+	case nil:
+		var ba [32]byte
+		copy(ba[:], bytes)
+		return ids.ID(ba), nil
+
+	case database.ErrNotFound:
+		ibm.cache.Put(string(key), nil)
+		return ids.Empty, database.ErrNotFound
+
+	default:
+		return ids.Empty, err
+	}
+}
+
+func (ibm *innerBlocksMapping) DeleteBlockToResumeFrom() error {
+	key := resumePrefix
 	ibm.cache.Put(string(key), nil)
 	return ibm.db.Delete(key)
 }
