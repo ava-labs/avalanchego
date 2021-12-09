@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
@@ -30,76 +29,6 @@ func init() {
 	err := stateSyncCodec.RegisterCodec(block.StateSyncDefaultKeysVersion, lc)
 	if err != nil {
 		panic(err)
-	}
-}
-
-// Upon initialization, repairInnerBlocksMapping ensure the innerBlkID -> proBlkID
-// mapping is well formed. This mapping is key for operations on summary key.
-func (vm *VM) repairInnerBlocksMapping() error {
-	var (
-		latestProBlkID   ids.ID
-		latestInnerBlkID ids.ID
-		lastInnerBlk     snowman.Block
-		err              error
-	)
-
-	latestProBlkID, err = vm.GetLastAccepted()
-	switch err {
-	case nil:
-	case database.ErrNotFound:
-		return nil // empty chain, nothing to do
-	default:
-		return err
-	}
-
-	for {
-		lastAcceptedBlk, err := vm.getPostForkBlock(latestProBlkID)
-		switch err {
-		case nil:
-		case database.ErrNotFound:
-			// visited all proposerVM blocks.
-			goto checkFork
-		default:
-			return err
-		}
-
-		latestInnerBlkID = lastAcceptedBlk.getInnerBlk().ID()
-		lastInnerBlk, err = vm.ChainVM.GetBlock(latestInnerBlkID)
-		if err != nil {
-			// innerVM internal error
-			return err
-		}
-
-		_, err = vm.State.GetBlockIDByHeight(lastInnerBlk.Height())
-		switch err {
-		case nil:
-			// mapping already there; It must be the same for all ancestors too. Work done
-			return vm.db.Commit()
-		case database.ErrNotFound:
-			// add the mapping
-			if err := vm.State.SetBlocksIDByHeight(lastInnerBlk.Height(), latestProBlkID); err != nil {
-				return err
-			}
-
-			// keep checking the parent
-			latestProBlkID = lastAcceptedBlk.Parent()
-		default:
-			return err
-		}
-	}
-
-checkFork: // handle possible snowman++ fork and commit all
-	lastInnerBlk, err = vm.ChainVM.GetBlock(lastInnerBlk.Parent())
-	switch err {
-	case nil:
-		// this is the fork. Note and commit.
-		vm.forkHeight = lastInnerBlk.Height()
-		return vm.db.Commit()
-	case database.ErrNotFound:
-		// we must have hit genesis in both proposerVM and innerVM. Work done
-		return vm.db.Commit()
-	default:
-		return err
 	}
 }
 
@@ -158,7 +87,7 @@ func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 		if err != nil {
 			return common.Summary{}, err
 		}
-		if innerBlk.Height() > vm.forkHeight {
+		if innerBlk.Height() > vm.latestPreForkHeight {
 			return common.Summary{}, err
 		}
 
