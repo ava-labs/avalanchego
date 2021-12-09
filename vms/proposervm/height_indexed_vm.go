@@ -4,9 +4,16 @@
 package proposervm
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/units"
+)
+
+const (
+	commitSizeCap = 10 * units.MiB
 )
 
 var _ block.HeightIndexedChainVM = &VM{}
@@ -30,10 +37,20 @@ func (vm *VM) GetBlockIDByHeight(height uint64) (ids.ID, error) {
 // mapping is well formed. Starting from last accepted proposerVM block,
 // it will go back to snowman++ activation fork or genesis.
 func (vm *VM) repairInnerBlockMapping() error {
+	if _, ok := vm.ChainVM.(block.HeightIndexedChainVM); !ok {
+		// nothing to index if innerVM does not support height indexing
+		return nil
+	}
+
 	var (
 		latestProBlkID   ids.ID
 		latestInnerBlkID = ids.Empty
 		err              error
+
+		startTime                 = time.Now()
+		lastLogTime               = startTime
+		indexedBlks               = 0
+		pendingBytesApproximation = 0 // tracks of the size of uncommitted writes
 	)
 
 	latestProBlkID, err = vm.State.GetLastAccepted() // this won't return preFork blks
@@ -67,8 +84,27 @@ func (vm *VM) repairInnerBlockMapping() error {
 			return err
 		case database.ErrNotFound:
 			// mapping must have been introduced after snowman++ fork. Rebuild it.
-			if err := vm.State.SetBlkIDByHeight(lastAcceptedBlk.Height(), latestProBlkID); err != nil {
+			estimatedByteLen, err := vm.State.SetBlkIDByHeight(lastAcceptedBlk.Height(), latestProBlkID)
+			if err != nil {
 				return err
+			}
+
+			// enforce soft maximal commit size
+			pendingBytesApproximation += estimatedByteLen
+			if pendingBytesApproximation > commitSizeCap {
+				if err := vm.db.Commit(); err != nil {
+					return err
+				}
+				vm.ctx.Log.Info("Block indexing by height ongoing: committed %d bytes, latest committed height %d",
+					pendingBytesApproximation, lastAcceptedBlk.Height())
+				pendingBytesApproximation = 0
+			}
+
+			// Periodically log progress
+			indexedBlks++
+			if time.Since(lastLogTime) > 15*time.Second {
+				lastLogTime = time.Now()
+				vm.ctx.Log.Info("Block indexing by height ongoing: indexed %d blocks", indexedBlks)
 			}
 
 			// keep checking the parent
@@ -107,5 +143,32 @@ checkFork:
 	if err := vm.State.SetLatestPreForkHeight(vm.latestPreForkHeight); err != nil {
 		return nil
 	}
+
+	vm.ctx.Log.Info("Block indexing by height completed: indexed %d blocks, duration %v, latest pre fork block height %d",
+		indexedBlks, time.Since(startTime), vm.latestPreForkHeight)
 	return vm.db.Commit()
+}
+
+func (vm *VM) updateHeightIndex(height uint64, blkID ids.ID) error {
+	if _, ok := vm.ChainVM.(block.HeightIndexedChainVM); !ok {
+		// nothing to index if innerVM does not support height indexing
+		return nil
+	}
+
+	_, err := vm.State.SetBlkIDByHeight(height, blkID)
+	return err
+}
+
+func (vm *VM) updateLatestPreForkBlockHeight(height uint64) error {
+	if _, ok := vm.ChainVM.(block.HeightIndexedChainVM); !ok {
+		// nothing to index if innerVM does not support height indexing
+		return nil
+	}
+
+	if height <= vm.latestPreForkHeight {
+		return nil
+	}
+
+	vm.latestPreForkHeight = height
+	return vm.State.SetLatestPreForkHeight(height)
 }

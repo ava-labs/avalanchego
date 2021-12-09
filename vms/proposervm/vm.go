@@ -124,10 +124,8 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	if _, ok := vm.ChainVM.(block.HeightIndexedChainVM); ok {
-		if err := vm.repairInnerBlockMapping(); err != nil {
-			return err
-		}
+	if err := vm.repairInnerBlockMapping(); err != nil {
+		return err
 	}
 
 	return vm.setLastAcceptedOptionTime()

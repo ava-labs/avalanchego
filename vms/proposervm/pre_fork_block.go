@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	snowmanVMs "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
@@ -23,13 +22,8 @@ type preForkBlock struct {
 }
 
 func (b *preForkBlock) Accept() error {
-	if _, ok := b.vm.ChainVM.(snowmanVMs.HeightIndexedChainVM); ok {
-		if b.Height() > b.vm.latestPreForkHeight {
-			b.vm.latestPreForkHeight = b.Height()
-			if err := b.vm.State.SetLatestPreForkHeight(b.vm.latestPreForkHeight); err != nil {
-				return err
-			}
-		}
+	if err := b.vm.updateLatestPreForkBlockHeight(b.Height()); err != nil {
+		return err
 	}
 
 	if err := b.Block.Accept(); err != nil {
