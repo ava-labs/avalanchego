@@ -71,7 +71,7 @@ func newAtomicTrie(
 
 	triedb := trie.NewDatabaseWithConfig(
 		Database{atomicTrieDB},
-		&trie.Config{Preimages: false}, // keys are not hashed, no need for preimages
+		&trie.Config{}, // keys are not hashed, no need for preimages
 	)
 	t, err := trie.New(root, triedb)
 	if err != nil {
@@ -145,9 +145,7 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 	postCommitTxIndexed := 0
 	lastUpdate := time.Now()
 
-	// keep track of the latest generated trie's root. This is used to avoid
-	// writing more intermediary trie nodes than needed to disk, while keeping
-	// the commit size under commitSizeCap (approximately).
+	// keep track of the latest generated trie's root.
 	lastHash := common.Hash{}
 	for iter.Next() {
 		if err := iter.Error(); err != nil {
@@ -202,6 +200,9 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 			if err != nil {
 				return err
 			}
+			// Dereference lashHash to avoid writing more intermediary
+			// trie nodes than needed to disk, while keeping the commit
+			// size under commitSizeCap (approximately).
 			if (lastHash != common.Hash{}) {
 				a.trieDB.Dereference(lastHash)
 			}
@@ -293,7 +294,7 @@ func (a *atomicTrie) commit(height uint64) (common.Hash, error) {
 		return common.Hash{}, err
 	}
 
-	a.log.Debug("committed atomic trie", "hash", hash.String(), "height", height)
+	a.log.Info("committed atomic trie", "hash", hash.String(), "height", height)
 	if err := a.trieDB.Commit(hash, false, nil); err != nil {
 		return common.Hash{}, err
 	}

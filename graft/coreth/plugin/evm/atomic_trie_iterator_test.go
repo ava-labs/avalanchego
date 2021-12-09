@@ -23,7 +23,7 @@ func TestIteratorCanIterate(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	// create atomic trie
+	// create an atomic trie
 	// on create it will initialize all the transactions from the above atomic repository
 	atomicTrie, err := newAtomicTrie(db, repo, testTxCodec(), lastAcceptedHeight, 100)
 	assert.NoError(t, err)
@@ -33,7 +33,7 @@ func TestIteratorCanIterate(t *testing.T) {
 	assert.NotEqual(t, common.Hash{}, lastCommittedHash)
 	assert.EqualValues(t, 1000, lastCommittedHeight, "expected %d but was %d", 1000, lastCommittedHeight)
 
-	// we iterate on a new atomic trie to make sure there is no resident state affecting the data and the
+	// iterate on a new atomic trie to make sure there is no resident state affecting the data and the
 	// iterator
 	atomicTrie, err = NewAtomicTrie(db, repo, testTxCodec(), lastAcceptedHeight)
 	assert.NoError(t, err)
@@ -42,8 +42,8 @@ func TestIteratorCanIterate(t *testing.T) {
 	assert.NoError(t, err)
 	entriesIterated := uint64(0)
 	for iterator.Next() {
-		assert.NotNil(t, iterator.AtomicOps())
 		assert.NoError(t, iterator.Error())
+		assert.NotNil(t, iterator.AtomicOps())
 		entriesIterated++
 	}
 	assert.NoError(t, iterator.Error())

@@ -121,13 +121,8 @@ func (b *Block) Accept() error {
 	}
 
 	if len(b.atomicTxs) == 0 {
-		hash, err := b.vm.atomicTrie.Index(b.Height(), nil)
-		if err != nil {
+		if _, err := b.vm.atomicTrie.Index(b.Height(), nil); err != nil {
 			return err
-		}
-		// hash will be empty on heights that are not divisible by atomicTrie.commitInterval
-		if hash != (common.Hash{}) {
-			log.Info("atomic trie was committed", "hash", hash, "height", b.Height())
 		}
 		return vm.db.Commit()
 	}
@@ -162,13 +157,8 @@ func (b *Block) Accept() error {
 		return vm.db.Commit()
 	}
 
-	hash, err := b.vm.atomicTrie.Index(b.Height(), batchChainsAndInputs)
-	if err != nil {
+	if _, err := b.vm.atomicTrie.Index(b.Height(), batchChainsAndInputs); err != nil {
 		return err
-	}
-	// hash will be empty on heights that are not divisible by atomicTrie.commitInterval
-	if hash != (common.Hash{}) {
-		log.Info("atomic trie was committed", "hash", hash, "height", b.Height())
 	}
 	batch, err := vm.db.CommitBatch()
 	if err != nil {

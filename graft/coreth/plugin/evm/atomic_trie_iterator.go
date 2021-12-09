@@ -56,7 +56,7 @@ func (a *atomicTrieIterator) Next() bool {
 			// set the error and stop the iteration as data is unreliable from this point
 			a.err = fmt.Errorf("expected atomic trie key length to be %d but was %d", atomicTrieKeyLen, keyLen)
 			a.resetFields()
-			return false
+			return hasNext
 		}
 
 		blockNumber := binary.BigEndian.Uint64(a.trieIterator.Key[:wrappers.LongLen])
@@ -64,7 +64,7 @@ func (a *atomicTrieIterator) Next() bool {
 		if err != nil {
 			a.err = err
 			a.resetFields()
-			return false
+			return hasNext
 		}
 
 		// value is RLP encoded atomic.Requests
@@ -72,7 +72,7 @@ func (a *atomicTrieIterator) Next() bool {
 		if _, err = a.codec.Unmarshal(a.trieIterator.Value, &requests); err != nil {
 			a.err = err
 			a.resetFields()
-			return false
+			return hasNext
 		}
 
 		// success, update the struct fields
