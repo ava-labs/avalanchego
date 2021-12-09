@@ -131,8 +131,8 @@ func (nop MsgHandlerNoOps) Shutdown() error {
 	return nil
 }
 
-func (nop MsgHandlerNoOps) Notify(Message) error {
-	nop.ctx.Log.Debug("Notify unhandled by this gear. Dropped.")
+func (nop MsgHandlerNoOps) Notify(msg Message) error {
+	nop.ctx.Log.Debug("Notify message %s unhandled by this gear. Dropped", msg.String())
 	return nil
 }
 

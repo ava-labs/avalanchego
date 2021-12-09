@@ -77,7 +77,7 @@ waitloop:
 				default:
 					// If the channel to the engine is full, drop the message
 					// from the VM to avoid deadlock
-					s.log.Debug("dropping message from VM because channel to engine is full")
+					s.log.Debug("dropping message %s from VM because channel to engine is full", msg.String())
 				}
 			case buildBlockTime, ok := <-s.newBuildBlockTime:
 				// The time at which we should notify the engine that it should
