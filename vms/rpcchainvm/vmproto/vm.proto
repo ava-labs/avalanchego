@@ -187,6 +187,15 @@ message BatchedParseBlockResponse {
     repeated ParseBlockResponse response = 1;
 }
 
+// HeightIndexedVM related messages
+message GetBlockIDByHeightRequest {
+    uint64 height = 1;
+}
+
+message GetBlockIDByHeightResponse {
+    bytes blkID = 1;
+}
+
 // StateSyncableVM related messages
 message RegisterFastSyncerRequest {
     repeated bytes nodeIDs = 1;
@@ -329,6 +338,9 @@ service VM {
 
     rpc GetAncestors(GetAncestorsRequest) returns (GetAncestorsResponse);
     rpc BatchedParseBlock(BatchedParseBlockRequest) returns (BatchedParseBlockResponse);
+
+    // HeightIndexedVM
+    rpc GetBlockIDByHeight(GetBlockIDByHeightRequest) returns (GetBlockIDByHeightResponse);
 
     // State sync
     rpc RegisterFastSyncer(RegisterFastSyncerRequest) returns (google.protobuf.Empty);
