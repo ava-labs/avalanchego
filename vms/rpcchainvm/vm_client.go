@@ -540,6 +540,19 @@ func (vm *VMClient) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	return err
 }
 
+func (vm *VMClient) GetBlockIDByHeight(height uint64) (ids.ID, error) {
+	resp, err := vm.client.GetBlockIDByHeight(
+		context.Background(),
+		&vmproto.GetBlockIDByHeightRequest{Height: height},
+	)
+	if err != nil {
+		return ids.Empty, err
+	}
+	var ba [32]byte
+	copy(ba[:], resp.BlkID)
+	return ids.ID(ba), nil
+}
+
 func (vm *VMClient) GetAncestors(
 	blkID ids.ID,
 	maxBlocksNum int,

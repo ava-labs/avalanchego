@@ -186,6 +186,15 @@ message BatchedParseBlockResponse {
     repeated ParseBlockResponse response = 1;
 }
 
+// HeightIndexedVM related messages
+message GetBlockIDByHeightRequest {
+    uint64 height = 1;
+}
+
+message GetBlockIDByHeightResponse {
+    bytes blkID = 1;
+}
+
 message GatherResponse {
     repeated io.prometheus.client.MetricFamily metricFamilies = 1;
 }
@@ -218,4 +227,6 @@ service VM {
 
     rpc GetAncestors(GetAncestorsRequest) returns (GetAncestorsResponse);
     rpc BatchedParseBlock(BatchedParseBlockRequest) returns (BatchedParseBlockResponse);
+    
+    rpc GetBlockIDByHeight(GetBlockIDByHeightRequest) returns (GetBlockIDByHeightResponse);
 }

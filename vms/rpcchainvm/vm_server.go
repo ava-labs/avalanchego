@@ -247,6 +247,18 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	}, err
 }
 
+func (vm *VMServer) GetBlockIDByHeight(ctx context.Context, req *vmproto.GetBlockIDByHeightRequest) (*vmproto.GetBlockIDByHeightResponse, error) {
+	hVM, ok := vm.vm.(block.HeightIndexedChainVM)
+	if !ok {
+		return nil, block.ErrHeightIndexedVMNotImplemented
+	}
+	blkID, err := hVM.GetBlockIDByHeight(req.Height)
+	if err != nil {
+		return nil, err
+	}
+	return &vmproto.GetBlockIDByHeightResponse{BlkID: blkID[:]}, nil
+}
+
 func (vm *VMServer) Bootstrapping(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return &emptypb.Empty{}, vm.vm.Bootstrapping()
 }
