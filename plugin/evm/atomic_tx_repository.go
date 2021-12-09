@@ -99,7 +99,7 @@ func (a *atomicTxRepository) initializeHeightIndex(lastAcceptedHeight uint64) er
 		if err != nil {
 			return err
 		}
-		log.Info("Initializing atomic transaction repository from txID", "lastTxID", ids.ID(lastTxID))
+		log.Info("Initializing atomic transaction repository from txID", "lastTxID", lastTxID)
 	case wrappers.LongLen: // already initialized
 		return nil
 	default: // unexpected value in the database
