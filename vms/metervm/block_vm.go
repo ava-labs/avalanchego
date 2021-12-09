@@ -4,8 +4,6 @@
 package metervm
 
 import (
-	"time"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
@@ -18,12 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
-var (
-	_ block.ChainVM        = &blockVM{}
-	_ block.BatchedChainVM = &blockVM{}
-	_ snowman.Block        = &meterBlock{}
-	_ snowman.OracleBlock  = &meterBlock{}
-)
+var _ block.ChainVM = &blockVM{}
 
 func NewBlockVM(vm block.ChainVM) block.ChainVM {
 	return &blockVM{
@@ -131,107 +124,4 @@ func (vm *blockVM) LastAccepted() (ids.ID, error) {
 	end := vm.clock.Time()
 	vm.blockMetrics.lastAccepted.Observe(float64(end.Sub(start)))
 	return lastAcceptedID, err
-}
-
-func (vm *blockVM) GetAncestors(
-	blkID ids.ID,
-	maxBlocksNum int,
-	maxBlocksSize int,
-	maxBlocksRetrivalTime time.Duration,
-) ([][]byte, error) {
-	rVM, ok := vm.ChainVM.(block.BatchedChainVM)
-	if !ok {
-		return nil, block.ErrRemoteVMNotImplemented
-	}
-
-	start := vm.clock.Time()
-	ancestors, err := rVM.GetAncestors(
-		blkID,
-		maxBlocksNum,
-		maxBlocksSize,
-		maxBlocksRetrivalTime,
-	)
-	end := vm.clock.Time()
-	vm.blockMetrics.getAncestors.Observe(float64(end.Sub(start)))
-	return ancestors, err
-}
-
-func (vm *blockVM) BatchedParseBlock(blks [][]byte) ([]snowman.Block, error) {
-	rVM, ok := vm.ChainVM.(block.BatchedChainVM)
-	if !ok {
-		return nil, block.ErrRemoteVMNotImplemented
-	}
-
-	start := vm.clock.Time()
-	blocks, err := rVM.BatchedParseBlock(blks)
-	end := vm.clock.Time()
-	vm.blockMetrics.batchedParseBlock.Observe(float64(end.Sub(start)))
-
-	wrappedBlocks := make([]snowman.Block, len(blocks))
-	for i, block := range blocks {
-		wrappedBlocks[i] = &meterBlock{
-			Block: block,
-			vm:    vm,
-		}
-	}
-	return wrappedBlocks, err
-}
-
-type meterBlock struct {
-	snowman.Block
-
-	vm *blockVM
-}
-
-func (mb *meterBlock) Verify() error {
-	start := mb.vm.clock.Time()
-	err := mb.Block.Verify()
-	end := mb.vm.clock.Time()
-	duration := float64(end.Sub(start))
-	if err != nil {
-		mb.vm.blockMetrics.verifyErr.Observe(duration)
-	} else {
-		mb.vm.verify.Observe(duration)
-	}
-	return err
-}
-
-func (mb *meterBlock) Accept() error {
-	start := mb.vm.clock.Time()
-	err := mb.Block.Accept()
-	end := mb.vm.clock.Time()
-	duration := float64(end.Sub(start))
-	mb.vm.blockMetrics.accept.Observe(duration)
-	return err
-}
-
-func (mb *meterBlock) Reject() error {
-	start := mb.vm.clock.Time()
-	err := mb.Block.Reject()
-	end := mb.vm.clock.Time()
-	duration := float64(end.Sub(start))
-	mb.vm.blockMetrics.reject.Observe(duration)
-	return err
-}
-
-func (mb *meterBlock) Options() ([2]snowman.Block, error) {
-	oracleBlock, ok := mb.Block.(snowman.OracleBlock)
-	if !ok {
-		return [2]snowman.Block{}, snowman.ErrNotOracle
-	}
-
-	blks, err := oracleBlock.Options()
-	if err != nil {
-		return [2]snowman.Block{}, err
-	}
-	return [2]snowman.Block{
-		&meterBlock{
-			Block: blks[0],
-			vm:    mb.vm,
-		},
-		&meterBlock{
-			Block: blks[1],
-			vm:    mb.vm,
-		},
-	}, nil
 }

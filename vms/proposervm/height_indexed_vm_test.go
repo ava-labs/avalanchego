@@ -80,13 +80,13 @@ func TestInnerBlockMappingPostFork(t *testing.T) {
 
 	// check that mapping is fully built
 	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := proVM.State.GetBlockIDByHeight(height)
+		_, err := proVM.State.GetBlkIDByHeight(height)
 		assert.NoError(err)
 	}
 
 	// Entirely delete the mapping to show it gets reconstructed
 	for height := uint64(1); height <= blkNumber; height++ {
-		assert.NoError(proVM.State.DeleteBlockIDByHeight(height))
+		assert.NoError(proVM.State.DeleteBlkIDByHeight(height))
 	}
 
 	// show repairs rebuilds the mapping
@@ -94,7 +94,7 @@ func TestInnerBlockMappingPostFork(t *testing.T) {
 
 	// check that mapping is fully built
 	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := proVM.State.GetBlockIDByHeight(height)
+		_, err := proVM.State.GetBlkIDByHeight(height)
 		assert.NoError(err)
 	}
 
@@ -116,7 +116,7 @@ func TestInnerBlockMappingPostFork(t *testing.T) {
 
 	// check that mapping is fully built
 	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := proVM.State.GetBlockIDByHeight(height)
+		_, err := proVM.State.GetBlkIDByHeight(height)
 		assert.NoError(err)
 	}
 }
@@ -182,7 +182,7 @@ func TestInnerBlockMappingPreFork(t *testing.T) {
 
 	// mapping should be empty
 	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := proVM.State.GetBlockIDByHeight(height)
+		_, err := proVM.State.GetBlkIDByHeight(height)
 		assert.Error(err, database.ErrNotFound)
 	}
 	// fork height should track highest accepted preFork block
@@ -193,7 +193,7 @@ func TestInnerBlockMappingPreFork(t *testing.T) {
 
 	// mapping should be empty
 	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := proVM.State.GetBlockIDByHeight(height)
+		_, err := proVM.State.GetBlkIDByHeight(height)
 		assert.Error(err, database.ErrNotFound)
 	}
 	// fork height should track highest accepted preFork block
@@ -217,7 +217,7 @@ func TestInnerBlockMappingPreFork(t *testing.T) {
 
 	// Show the mapping is there after newProVM initialization
 	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := proVM.State.GetBlockIDByHeight(height)
+		_, err := proVM.State.GetBlkIDByHeight(height)
 		assert.Error(err, database.ErrNotFound)
 	}
 	// fork height should track highest accepted preFork block
@@ -340,7 +340,7 @@ func TestInnerBlockMappingAcrossFork(t *testing.T) {
 	// check that mapping is fully built
 	assert.True(proVM.latestPreForkHeight == forkHeight)
 	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := proVM.State.GetBlockIDByHeight(height)
+		_, err := proVM.State.GetBlkIDByHeight(height)
 		if height <= forkHeight {
 			// preFork blocks should not be in mapping
 			assert.Error(err, database.ErrNotFound)
@@ -352,7 +352,7 @@ func TestInnerBlockMappingAcrossFork(t *testing.T) {
 
 	// Entirely delete the mapping to show it gets reconstructed
 	for height := uint64(1); height <= blkNumber; height++ {
-		assert.NoError(proVM.State.DeleteBlockIDByHeight(height))
+		assert.NoError(proVM.State.DeleteBlkIDByHeight(height))
 	}
 	proVM.latestPreForkHeight = 0
 
@@ -361,7 +361,7 @@ func TestInnerBlockMappingAcrossFork(t *testing.T) {
 
 	assert.True(proVM.latestPreForkHeight == forkHeight)
 	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := proVM.State.GetBlockIDByHeight(height)
+		_, err := proVM.State.GetBlkIDByHeight(height)
 		if height <= forkHeight {
 			// preFork blocks should not be in mapping
 			assert.Error(err, database.ErrNotFound)
@@ -390,7 +390,7 @@ func TestInnerBlockMappingAcrossFork(t *testing.T) {
 	// Show the mapping is there after newProVM initialization
 	assert.True(newProVM.latestPreForkHeight == forkHeight)
 	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := newProVM.State.GetBlockIDByHeight(height)
+		_, err := newProVM.State.GetBlkIDByHeight(height)
 		if height <= forkHeight {
 			// preFork blocks should not be in mapping
 			assert.Error(err, database.ErrNotFound)
@@ -504,7 +504,7 @@ func TestInnerBlockMappingBackwardCompatiblity(t *testing.T) {
 	// mapping is currently empty
 	assert.True(proVM.latestPreForkHeight == 0)
 	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := proVM.State.GetBlockIDByHeight(height)
+		_, err := proVM.State.GetBlkIDByHeight(height)
 		assert.Error(err, database.ErrNotFound)
 	}
 
@@ -513,7 +513,7 @@ func TestInnerBlockMappingBackwardCompatiblity(t *testing.T) {
 
 	assert.True(proVM.latestPreForkHeight == forkHeight)
 	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := proVM.State.GetBlockIDByHeight(height)
+		_, err := proVM.State.GetBlkIDByHeight(height)
 		if height <= forkHeight {
 			// preFork blocks should not be in mapping
 			assert.Error(err, database.ErrNotFound)
@@ -542,7 +542,7 @@ func TestInnerBlockMappingBackwardCompatiblity(t *testing.T) {
 	// Show the mapping is there after newProVM initialization
 	assert.True(newProVM.latestPreForkHeight == forkHeight)
 	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := newProVM.State.GetBlockIDByHeight(height)
+		_, err := newProVM.State.GetBlkIDByHeight(height)
 		if height <= forkHeight {
 			// preFork blocks should not be in mapping
 			assert.Error(err, database.ErrNotFound)
