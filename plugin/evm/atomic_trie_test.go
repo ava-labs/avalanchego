@@ -94,15 +94,15 @@ func TestAtomicTrieInitialize(t *testing.T) {
 
 	atomicTrie, err = NewAtomicTrie(db, repo, testTxCodec(), lastAcceptedHeight)
 	assert.NoError(t, err)
-	iterator, err := atomicTrie.Iterator(lastCommittedHash, 0)
+	it, err := atomicTrie.Iterator(lastCommittedHash, 0)
 	assert.NoError(t, err)
 	entriesIterated := uint64(0)
-	for iterator.Next() {
-		assert.NotNil(t, iterator.AtomicOps())
-		assert.NoError(t, iterator.Error())
+	for it.Next() {
+		assert.NotNil(t, it.AtomicOps())
+		assert.NoError(t, it.Error())
 		entriesIterated++
 	}
-	assert.NoError(t, iterator.Error())
+	assert.NoError(t, it.Error())
 	assert.EqualValues(t, 1001, entriesIterated, "expected %d was %d", 1001, entriesIterated)
 }
 
@@ -172,18 +172,8 @@ func TestIndexerInitializeFromState(t *testing.T) {
 	for height := uint64(0); height < lastAcceptedHeight; height++ {
 		// 3 transactions per height
 		txs := []*Tx{testDataImportTx(), testDataExportTx(), testDataImportTx()}
-		for _, tx := range txs {
-			chainID, requests, err := tx.AtomicOps()
-			assert.NoError(t, err)
-			if heightOps, exists := actualOpsMap[height]; !exists {
-				actualOpsMap[height] = map[ids.ID]*atomic.Requests{chainID: requests}
-			} else if chainOps, exists := heightOps[chainID]; !exists {
-				heightOps[chainID] = requests
-			} else {
-				chainOps.PutRequests = append(chainOps.PutRequests, requests.PutRequests...)
-				chainOps.RemoveRequests = append(chainOps.RemoveRequests, requests.RemoveRequests...)
-			}
-		}
+		actualOpsMap[height], err = mergeAtomicOps(txs)
+		assert.NoError(t, err)
 		err = repo.Write(height, txs)
 		assert.NoError(t, err)
 	}
@@ -402,26 +392,26 @@ func BenchmarkAtomicTrieInit(b *testing.B) {
 	repo, err := NewAtomicTxRepository(db, codec, lastAcceptedHeight)
 	assert.NoError(b, err)
 
-	var atomTrie types.AtomicTrie
+	var atomicTrie types.AtomicTrie
 	var hash common.Hash
 	var height uint64
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		atomTrie, err = newAtomicTrie(versiondb.New(memdb.New()), repo, codec, lastAcceptedHeight, 5000)
+		atomicTrie, err = newAtomicTrie(versiondb.New(memdb.New()), repo, codec, lastAcceptedHeight, 5000)
 		assert.NoError(b, err)
 
-		hash, height = atomTrie.LastCommitted()
+		hash, height = atomicTrie.LastCommitted()
 		assert.Equal(b, lastAcceptedHeight, height)
 		assert.NotEqual(b, common.Hash{}, hash)
 	}
 	b.StopTimer()
 
 	// verify ops
-	iter, err := atomTrie.Iterator(hash, 0)
+	it, err := atomicTrie.Iterator(hash, 0)
 	assert.NoError(b, err)
 	ops := 0
-	for iter.Next() {
+	for it.Next() {
 		ops++
 	}
 	assert.Equal(b, 75000, ops)
