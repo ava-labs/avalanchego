@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	snowmanVMs "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
@@ -26,10 +27,12 @@ func (b *preForkBlock) Accept() error {
 }
 
 func (b *preForkBlock) conditionalAccept(acceptInnerBlk bool) error {
-	if b.Height() > b.vm.latestPreForkHeight {
-		b.vm.latestPreForkHeight = b.Height()
-		if err := b.vm.State.SetLatestPreForkHeight(b.vm.latestPreForkHeight); err != nil {
-			return err
+	if _, ok := b.vm.ChainVM.(snowmanVMs.HeightIndexedChainVM); ok {
+		if b.Height() > b.vm.latestPreForkHeight {
+			b.vm.latestPreForkHeight = b.Height()
+			if err := b.vm.State.SetLatestPreForkHeight(b.vm.latestPreForkHeight); err != nil {
+				return err
+			}
 		}
 	}
 

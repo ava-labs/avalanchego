@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	snowmanVMs "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
@@ -45,8 +46,10 @@ func (b *postForkOption) conditionalAccept(acceptInnerBlk bool) error {
 	}
 
 	// write the mapping from inner to proposerVM block ID
-	if err := b.vm.State.SetBlockIDByHeight(b.Height(), blkID); err != nil {
-		return err
+	if _, ok := b.vm.ChainVM.(snowmanVMs.HeightIndexedChainVM); ok {
+		if err := b.vm.State.SetBlkIDByHeight(b.Height(), blkID); err != nil {
+			return err
+		}
 	}
 
 	delete(b.vm.verifiedBlocks, blkID)

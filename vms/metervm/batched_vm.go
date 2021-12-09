@@ -1,5 +1,6 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
+
 package metervm
 
 import (
@@ -9,6 +10,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
+
+var _ block.BatchedChainVM = &blockVM{}
 
 func (vm *blockVM) GetAncestors(
 	blkID ids.ID,
