@@ -69,13 +69,6 @@ func (sb *StandardBlock) Verify() error {
 	blkID := sb.ID()
 
 	if err := sb.CommonDecisionBlock.Verify(); err != nil {
-		if err := sb.Reject(); err != nil {
-			sb.vm.ctx.Log.Error(
-				"failed to reject standard block %s due to %s",
-				blkID,
-				err,
-			)
-		}
 		return err
 	}
 
@@ -88,13 +81,6 @@ func (sb *StandardBlock) Verify() error {
 	// be a decision.
 	parent, ok := parentIntf.(decision)
 	if !ok {
-		if err := sb.Reject(); err != nil {
-			sb.vm.ctx.Log.Error(
-				"failed to reject standard block %s due to %s",
-				blkID,
-				err,
-			)
-		}
 		return errInvalidBlockType
 	}
 
@@ -128,13 +114,6 @@ func (sb *StandardBlock) Verify() error {
 		onAccept, err := utx.Execute(sb.vm, sb.onAcceptState, tx)
 		if err != nil {
 			sb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
-			if err := sb.Reject(); err != nil {
-				sb.vm.ctx.Log.Error(
-					"failed to reject standard block %s due to %s",
-					blkID,
-					err,
-				)
-			}
 			return err
 		}
 
