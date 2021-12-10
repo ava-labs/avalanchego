@@ -590,8 +590,8 @@ func (vm *VMClient) StateSyncGetLastSummary() (common.Summary, error) {
 		return common.Summary{}, err
 	}
 	return common.Summary{
-		Key:   resp.Key,
-		State: resp.State,
+		Key:     resp.Key,
+		Content: resp.State,
 	}, nil
 }
 
@@ -613,7 +613,7 @@ func (vm *VMClient) StateSync(summaries []common.Summary) error {
 	for k, v := range summaries {
 		requestedSummaries[k] = &vmproto.StateSyncGetLastSummaryResponse{}
 		requestedSummaries[k].Key = v.Key
-		requestedSummaries[k].State = v.State
+		requestedSummaries[k].State = v.Content
 	}
 	_, err := vm.client.StateSync(
 		context.Background(),

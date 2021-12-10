@@ -12,14 +12,21 @@ import (
 // However StateSyncableVM does not require usage of these default formats
 const StateSyncDefaultKeysVersion = 0
 
+// DefaultSummaryKey is used by platform and contract VM.
+// Key is composed concatenating:
+//     blkID of block associated with the Summary
+//     hash of Summary content, which allows validating content-key relationship.
+type DefaultSummaryKey struct {
+	BlkID       ids.ID `serialize:"true"`
+	ContentHash []byte `serialize:"true"`
+}
+
+// ProposerSummaryKey is used by ProposerVM.
+// Key is composed prepending innerVM key with ProposerVm BlkID
+// of the block wrapping DefaultSummaryKey.BlkID block.
 type ProposerSummaryKey struct {
 	ProBlkID ids.ID            `serialize:"true"`
 	InnerKey DefaultSummaryKey `serialize:"true"`
-}
-
-type DefaultSummaryKey struct {
-	InnerBlkID   ids.ID `serialize:"true"`
-	InnerVMBytes []byte `serialize:"true"`
 }
 
 type StateSyncableVM interface {

@@ -79,7 +79,7 @@ func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 	}
 
 	// retrieve proposer Block wrapping innerBlock
-	innerBlk, err := vm.ChainVM.GetBlock(innerKey.InnerBlkID)
+	innerBlk, err := vm.ChainVM.GetBlock(innerKey.BlkID)
 	if err != nil {
 		// innerVM internal error. Could retrieve innerBlk matching last summary
 		return common.Summary{}, errWrongStateSyncVersion
@@ -90,7 +90,7 @@ func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 	case nil:
 	case database.ErrNotFound:
 		// we must have hit the snowman++ fork. Check it.
-		innerBlk, err := vm.ChainVM.GetBlock(innerKey.InnerBlkID)
+		innerBlk, err := vm.ChainVM.GetBlock(innerKey.BlkID)
 		if err != nil {
 			return common.Summary{}, err
 		}
@@ -99,7 +99,7 @@ func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 		}
 
 		// preFork blockID matched inner ones
-		proBlkID = innerKey.InnerBlkID
+		proBlkID = innerKey.BlkID
 	default:
 		return common.Summary{}, err
 	}
@@ -115,8 +115,8 @@ func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 	}
 
 	return common.Summary{
-		Key:   proKeyBytes,
-		State: vmSummary.State,
+		Key:     proKeyBytes,
+		Content: vmSummary.Content,
 	}, err
 }
 
@@ -169,8 +169,8 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 		}
 
 		innerSummaries = append(innerSummaries, common.Summary{
-			Key:   innerKey,
-			State: summ.State,
+			Key:     innerKey,
+			Content: summ.Content,
 		})
 	}
 

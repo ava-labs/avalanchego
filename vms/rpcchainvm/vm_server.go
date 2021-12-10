@@ -300,7 +300,7 @@ func (vm *VMServer) StateSyncGetLastSummary(ctx context.Context, empty *emptypb.
 	}
 	return &vmproto.StateSyncGetLastSummaryResponse{
 		Key:   summary.Key,
-		State: summary.State,
+		State: summary.Content,
 	}, nil
 }
 
@@ -326,7 +326,7 @@ func (vm *VMServer) StateSync(ctx context.Context, req *vmproto.StateSyncRequest
 	summaries := make([]common.Summary, len(req.Summaries))
 	for k, v := range req.Summaries {
 		summaries[k].Key = v.Key
-		summaries[k].State = v.State
+		summaries[k].Content = v.State
 	}
 	err := fsVM.StateSync(summaries)
 	if err != nil {
