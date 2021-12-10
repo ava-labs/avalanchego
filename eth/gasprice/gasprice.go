@@ -178,6 +178,10 @@ func (oracle *Oracle) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
 		log.Warn("failed to estimate next base fee", "err", err)
 		return baseFee, nil
 	}
+	// If base fees have not been enabled, return a nil value.
+	if baseFee == nil {
+		return nil, nil
+	}
 
 	baseFee = math.BigMin(baseFee, nextBaseFee)
 	return baseFee, nil
@@ -220,10 +224,13 @@ func (oracle *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 	// If [nextBaseFee] is lower than the estimate from sampling, then we return it
 	// to prevent returning an incorrectly high fee when the network is quiescent.
 	nextBaseFee, err := oracle.estimateNextBaseFee(ctx)
-	if err == nil {
-		baseFee = math.BigMin(baseFee, nextBaseFee)
-	} else {
+	if err != nil {
 		log.Warn("failed to estimate next base fee", "err", err)
+	}
+	// Separately from checking the error value, check that [nextBaseFee] is non-nil
+	// before attempting to take the minimum.
+	if nextBaseFee != nil {
+		baseFee = math.BigMin(baseFee, nextBaseFee)
 	}
 
 	return new(big.Int).Add(tip, baseFee), nil
