@@ -4,6 +4,7 @@ package proposervm
 
 import (
 	"errors"
+	"fmt"
 	"math"
 
 	"github.com/ava-labs/avalanchego/codec"
@@ -13,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
@@ -26,8 +28,13 @@ func init() {
 	lc := linearcodec.New(reflectcodec.DefaultTagName, math.MaxUint32)
 	stateSyncCodec = codec.NewManager(math.MaxInt32)
 
-	err := stateSyncCodec.RegisterCodec(block.StateSyncDefaultKeysVersion, lc)
-	if err != nil {
+	errs := wrappers.Errs{}
+	errs.Add(
+		lc.RegisterType(&common.Summary{}),
+		lc.RegisterType(&block.DefaultSummaryKey{}),
+		stateSyncCodec.RegisterCodec(block.StateSyncDefaultKeysVersion, lc),
+	)
+	if err := errs.Err; err != nil {
 		panic(err)
 	}
 }
@@ -65,7 +72,7 @@ func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 	innerKey := block.DefaultSummaryKey{}
 	parsedVersion, err := stateSyncCodec.Unmarshal(vmSummary.Key, &innerKey)
 	if err != nil {
-		return common.Summary{}, err
+		return common.Summary{}, fmt.Errorf("cannot unmarshal vmSummary.Key due to: %w", err)
 	}
 	if parsedVersion != block.StateSyncDefaultKeysVersion {
 		return common.Summary{}, errWrongStateSyncVersion
@@ -104,7 +111,7 @@ func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 	}
 	proKeyBytes, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, &proKey)
 	if err != nil {
-		return common.Summary{}, err
+		return common.Summary{}, fmt.Errorf("cannot marshal proposerVMKey due to: %w", err)
 	}
 
 	return common.Summary{

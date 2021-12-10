@@ -290,9 +290,10 @@ func (s *Sender) SendStateSummaryFrontier(nodeID ids.ShortID, requestID uint32, 
 	outMsg, err := s.msgCreator.StateSummaryFrontier(s.ctx.ChainID, requestID, key, summary)
 	if err != nil {
 		s.ctx.Log.Error(
-			"failed to build StateSummaryFrontier(%s, %d, %s): %s",
+			"failed to build StateSummaryFrontier(%s, %d, %v, %v): %s",
 			s.ctx.ChainID,
 			requestID,
+			key,
 			summary,
 			err,
 		)

@@ -611,6 +611,7 @@ func (vm *VMClient) StateSyncIsSummaryAccepted(key []byte) (bool, error) {
 func (vm *VMClient) StateSync(summaries []common.Summary) error {
 	requestedSummaries := make([]*vmproto.StateSyncGetLastSummaryResponse, len(summaries))
 	for k, v := range summaries {
+		requestedSummaries[k] = &vmproto.StateSyncGetLastSummaryResponse{}
 		requestedSummaries[k].Key = v.Key
 		requestedSummaries[k].State = v.State
 	}

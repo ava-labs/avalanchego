@@ -267,7 +267,7 @@ func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID ui
 		}
 
 		// received what we needed. Just pass to VM
-		accepted := make([]common.Summary, len(fs.acceptedFrontierSet))
+		accepted := make([]common.Summary, 0, len(fs.acceptedFrontierSet))
 		for k, v := range fs.acceptedFrontierSet {
 			accepted = append(accepted, common.Summary{
 				Key:   []byte(k),

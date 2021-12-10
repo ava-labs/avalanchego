@@ -78,7 +78,7 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 	case Uptime:
 		return wrappers.TryPackByte
 	case SummaryKey:
-		return wrappers.TryPackByte
+		return wrappers.TryPackBytes
 	case MultiSummaryKeys:
 		return wrappers.TryPack2DBytes
 	default:
@@ -128,7 +128,7 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 	case Uptime:
 		return wrappers.TryUnpackByte
 	case SummaryKey:
-		return wrappers.TryUnpackByte
+		return wrappers.TryUnpackBytes
 	case MultiSummaryKeys:
 		return wrappers.TryUnpack2DBytes
 	default:
