@@ -187,6 +187,11 @@ func (oracle *Oracle) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
 	return baseFee, nil
 }
 
+// estimateNextBaseFee calculates what the base fee should be on the next block if it
+// were produced immediately. If the current time is less than the timestamp of the latest
+// block, this esimtate uses the timestamp of the latest block instead.
+// If the latest block has a nil base fee, this function will return nil as the base fee
+// of the next block.
 func (oracle *Oracle) estimateNextBaseFee(ctx context.Context) (*big.Int, error) {
 	// Fetch the most recent block by number
 	block, err := oracle.backend.BlockByNumber(ctx, rpc.LatestBlockNumber)
