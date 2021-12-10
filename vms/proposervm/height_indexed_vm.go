@@ -64,7 +64,7 @@ func (vm *VM) updateLatestPreForkBlockHeight(height uint64) error {
 // mapping is well formed. Starting from last accepted proposerVM block,
 // it will go back to snowman++ activation fork or genesis.
 // repairInnerBlocksMapping can take a non-trivial time to complete; hence we make sure
-// the process has limited memory footprint, is resumable (TODO ABENEGIA: and is asynchronous)
+// the process has limited memory footprint, is resumable and asynchronous.
 func (vm *VM) repairInnerBlockMapping() error {
 	if _, ok := vm.ChainVM.(block.HeightIndexedChainVM); !ok {
 		// nothing to index if innerVM does not support height indexing
