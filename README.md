@@ -15,7 +15,7 @@ Note that as network usage increases, hardware requirements may change.
 - CPU: Equivalent of 8 AWS vCPU
 - RAM: 16 GB
 - Storage: 200 GB
-- OS: Ubuntu 18.04/20.04 or MacOS >= Catalina
+- OS: Ubuntu 18.04/20.04 or macOS >= 10.15 (Catalina)
 - Network: Reliable IPv4 or IPv6 network connection, with an open public port.
 - Software Dependencies:
   - [Go](https://golang.org/doc/install) version >= 1.16.8 and set up [`$GOPATH`](https://github.com/golang/go/wiki/SettingGOPATH).

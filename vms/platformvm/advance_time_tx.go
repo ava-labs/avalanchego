@@ -58,53 +58,47 @@ func (tx *UnsignedAdvanceTimeTx) Execute(
 ) (
 	VersionedState,
 	VersionedState,
-	TxError,
+	error,
 ) {
 	switch {
 	case tx == nil:
-		return nil, nil, tempError{errNilTx}
+		return nil, nil, errNilTx
 	case len(stx.Creds) != 0:
-		return nil, nil, permError{errWrongNumberOfCredentials}
+		return nil, nil, errWrongNumberOfCredentials
 	}
 
 	txTimestamp := tx.Timestamp()
 	localTimestamp := vm.clock.Time()
 	localTimestampPlusSync := localTimestamp.Add(syncBound)
 	if localTimestampPlusSync.Before(txTimestamp) {
-		return nil, nil, tempError{
-			fmt.Errorf(
-				"proposed time (%s) is too far in the future relative to local time (%s)",
-				txTimestamp,
-				localTimestamp,
-			),
-		}
+		return nil, nil, fmt.Errorf(
+			"proposed time (%s) is too far in the future relative to local time (%s)",
+			txTimestamp,
+			localTimestamp,
+		)
 	}
 
 	if chainTimestamp := parentState.GetTimestamp(); !txTimestamp.After(chainTimestamp) {
-		return nil, nil, permError{
-			fmt.Errorf(
-				"proposed timestamp (%s), not after current timestamp (%s)",
-				txTimestamp,
-				chainTimestamp,
-			),
-		}
+		return nil, nil, fmt.Errorf(
+			"proposed timestamp (%s), not after current timestamp (%s)",
+			txTimestamp,
+			chainTimestamp,
+		)
 	}
 
 	// Only allow timestamp to move forward as far as the time of next staker
 	// set change time
 	nextStakerChangeTime, err := vm.nextStakerChangeTime(parentState)
 	if err != nil {
-		return nil, nil, tempError{err}
+		return nil, nil, err
 	}
 
 	if txTimestamp.After(nextStakerChangeTime) {
-		return nil, nil, permError{
-			fmt.Errorf(
-				"proposed timestamp (%s) later than next staker change time (%s)",
-				txTimestamp,
-				nextStakerChangeTime,
-			),
-		}
+		return nil, nil, fmt.Errorf(
+			"proposed timestamp (%s) later than next staker change time (%s)",
+			txTimestamp,
+			nextStakerChangeTime,
+		)
 	}
 
 	currentSupply := parentState.GetCurrentSupply()
@@ -134,7 +128,7 @@ pendingStakerLoop:
 			)
 			currentSupply, err = safemath.Add64(currentSupply, r)
 			if err != nil {
-				return nil, nil, permError{err}
+				return nil, nil, err
 			}
 
 			toAddDelegatorsWithRewardToCurrent = append(toAddDelegatorsWithRewardToCurrent, &validatorReward{
@@ -155,7 +149,7 @@ pendingStakerLoop:
 			)
 			currentSupply, err = safemath.Add64(currentSupply, r)
 			if err != nil {
-				return nil, nil, permError{err}
+				return nil, nil, err
 			}
 
 			toAddValidatorsWithRewardToCurrent = append(toAddValidatorsWithRewardToCurrent, &validatorReward{
@@ -175,9 +169,7 @@ pendingStakerLoop:
 			}
 			numToRemoveFromPending++
 		default:
-			return nil, nil, permError{
-				fmt.Errorf("expected validator but got %T", tx.UnsignedTx),
-			}
+			return nil, nil, fmt.Errorf("expected validator but got %T", tx.UnsignedTx)
 		}
 	}
 	newlyPendingStakers := pendingStakers.DeleteStakers(numToRemoveFromPending)
@@ -200,7 +192,7 @@ currentStakerLoop:
 			// We shouldn't be removing any primary network validators here
 			break currentStakerLoop
 		default:
-			return nil, nil, permError{errWrongTxType}
+			return nil, nil, errWrongTxType
 		}
 	}
 	newlyCurrentStakers, err := currentStakers.UpdateStakers(
@@ -210,7 +202,7 @@ currentStakerLoop:
 		numToRemoveFromCurrent,
 	)
 	if err != nil {
-		return nil, nil, tempError{err}
+		return nil, nil, err
 	}
 
 	onCommitState := newVersionedState(parentState, newlyCurrentStakers, newlyPendingStakers)

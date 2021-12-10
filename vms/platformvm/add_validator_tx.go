@@ -137,28 +137,28 @@ func (tx *UnsignedAddValidatorTx) Execute(
 ) (
 	VersionedState,
 	VersionedState,
-	TxError,
+	error,
 ) {
 	// Verify the tx is well-formed
 	if err := tx.SyntacticVerify(vm.ctx); err != nil {
-		return nil, nil, permError{err}
+		return nil, nil, err
 	}
 
 	switch {
 	case tx.Validator.Wght < vm.MinValidatorStake: // Ensure validator is staking at least the minimum amount
-		return nil, nil, permError{errWeightTooSmall}
+		return nil, nil, errWeightTooSmall
 	case tx.Validator.Wght > vm.MaxValidatorStake: // Ensure validator isn't staking too much
-		return nil, nil, permError{errWeightTooLarge}
+		return nil, nil, errWeightTooLarge
 	case tx.Shares < vm.MinDelegationFee:
-		return nil, nil, permError{errInsufficientDelegationFee}
+		return nil, nil, errInsufficientDelegationFee
 	}
 
 	duration := tx.Validator.Duration()
 	switch {
 	case duration < vm.MinStakeDuration: // Ensure staking length is not too short
-		return nil, nil, permError{errStakeTooShort}
+		return nil, nil, errStakeTooShort
 	case duration > vm.MaxStakeDuration: // Ensure staking length is not too long
-		return nil, nil, permError{errStakeTooLong}
+		return nil, nil, errStakeTooLong
 	}
 
 	currentStakers := parentState.CurrentStakerChainState()
@@ -173,67 +173,48 @@ func (tx *UnsignedAddValidatorTx) Execute(
 		// Ensure the proposed validator starts after the current time
 		startTime := tx.StartTime()
 		if !currentTimestamp.Before(startTime) {
-			return nil, nil, permError{
-				fmt.Errorf(
-					"validator's start time (%s) at or before current timestamp (%s)",
-					startTime,
-					currentTimestamp,
-				),
-			}
+			return nil, nil, fmt.Errorf(
+				"validator's start time (%s) at or before current timestamp (%s)",
+				startTime,
+				currentTimestamp,
+			)
 		}
 
 		// Ensure this validator isn't currently a validator.
 		_, err := currentStakers.GetValidator(tx.Validator.NodeID)
 		if err == nil {
-			return nil, nil, permError{
-				fmt.Errorf(
-					"%s is already a primary network validator",
-					tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
-				),
-			}
+			return nil, nil, fmt.Errorf(
+				"%s is already a primary network validator",
+				tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
+			)
 		}
 		if err != database.ErrNotFound {
-			return nil, nil, tempError{
-				fmt.Errorf(
-					"failed to find whether %s is a validator: %w",
-					tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
-					err,
-				),
-			}
+			return nil, nil, fmt.Errorf(
+				"failed to find whether %s is a validator: %w",
+				tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
+				err,
+			)
 		}
 
 		// Ensure this validator isn't about to become a validator.
 		_, err = pendingStakers.GetValidatorTx(tx.Validator.NodeID)
 		if err == nil {
-			return nil, nil, permError{
-				fmt.Errorf(
-					"%s is about to become a primary network validator",
-					tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
-				),
-			}
+			return nil, nil, fmt.Errorf(
+				"%s is about to become a primary network validator",
+				tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
+			)
 		}
 		if err != database.ErrNotFound {
-			return nil, nil, tempError{
-				fmt.Errorf(
-					"failed to find whether %s is about to become a validator: %w",
-					tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
-					err,
-				),
-			}
+			return nil, nil, fmt.Errorf(
+				"failed to find whether %s is about to become a validator: %w",
+				tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
+				err,
+			)
 		}
 
 		// Verify the flowcheck
 		if err := vm.semanticVerifySpend(parentState, tx, tx.Ins, outs, stx.Creds, vm.AddStakerTxFee, vm.ctx.AVAXAssetID); err != nil {
-			switch err.(type) {
-			case permError:
-				return nil, nil, permError{
-					fmt.Errorf("failed semanticVerifySpend: %w", err),
-				}
-			default:
-				return nil, nil, tempError{
-					fmt.Errorf("failed semanticVerifySpend: %w", err),
-				}
-			}
+			return nil, nil, fmt.Errorf("failed semanticVerifySpend: %w", err)
 		}
 
 		// Make sure the tx doesn't start too far in the future. This is done
@@ -241,7 +222,7 @@ func (tx *UnsignedAddValidatorTx) Execute(
 		// error.
 		maxStartTime := currentTimestamp.Add(maxFutureStartTime)
 		if startTime.After(maxStartTime) {
-			return nil, nil, permError{errFutureStakeTime}
+			return nil, nil, errFutureStakeTime
 		}
 	}
 

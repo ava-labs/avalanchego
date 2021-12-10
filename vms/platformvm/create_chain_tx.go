@@ -112,15 +112,15 @@ func (tx *UnsignedCreateChainTx) Execute(
 	stx *Tx,
 ) (
 	func() error,
-	TxError,
+	error,
 ) {
 	// Make sure this transaction is well formed.
 	if len(stx.Creds) == 0 {
-		return nil, permError{errWrongNumberOfCredentials}
+		return nil, errWrongNumberOfCredentials
 	}
 
 	if err := tx.SyntacticVerify(vm.ctx); err != nil {
-		return nil, permError{err}
+		return nil, err
 	}
 
 	// Select the credentials for each purpose
@@ -137,24 +137,20 @@ func (tx *UnsignedCreateChainTx) Execute(
 
 	subnetIntf, _, err := vs.GetTx(tx.SubnetID)
 	if err == database.ErrNotFound {
-		return nil, permError{
-			fmt.Errorf("%s isn't a known subnet", tx.SubnetID),
-		}
+		return nil, fmt.Errorf("%s isn't a known subnet", tx.SubnetID)
 	}
 	if err != nil {
-		return nil, tempError{err}
+		return nil, err
 	}
 
 	subnet, ok := subnetIntf.UnsignedTx.(*UnsignedCreateSubnetTx)
 	if !ok {
-		return nil, permError{
-			fmt.Errorf("%s isn't a subnet", tx.SubnetID),
-		}
+		return nil, fmt.Errorf("%s isn't a subnet", tx.SubnetID)
 	}
 
 	// Verify that this chain is authorized by the subnet
 	if err := vm.fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
-		return nil, permError{err}
+		return nil, err
 	}
 
 	// Consume the UTXOS
