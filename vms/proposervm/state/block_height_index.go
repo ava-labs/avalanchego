@@ -87,9 +87,7 @@ func (ibm *innerBlocksMapping) GetBlkIDByHeight(height uint64) (ids.ID, error) {
 	bytes, err := ibm.db.Get(key)
 	switch err {
 	case nil:
-		var res ids.ID
-		copy(res[:], bytes)
-		return res, nil
+		return ids.FromBytes(bytes), nil
 
 	case database.ErrNotFound:
 		ibm.cache.Put(string(key), nil)
@@ -172,9 +170,7 @@ func (ibm *innerBlocksMapping) GetBlockToResumeFrom() (ids.ID, error) {
 	bytes, err := ibm.db.Get(key)
 	switch err {
 	case nil:
-		var res ids.ID
-		copy(res[:], bytes)
-		return res, nil
+		return ids.FromBytes(bytes), nil
 
 	case database.ErrNotFound:
 		ibm.cache.Put(string(key), nil)

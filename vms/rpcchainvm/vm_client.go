@@ -548,9 +548,7 @@ func (vm *VMClient) GetBlockIDByHeight(height uint64) (ids.ID, error) {
 	if err != nil {
 		return ids.Empty, err
 	}
-	var ba [32]byte
-	copy(ba[:], resp.BlkID)
-	return ids.ID(ba), nil
+	return ids.FromBytes(resp.BlkID), nil
 }
 
 func (vm *VMClient) GetAncestors(
