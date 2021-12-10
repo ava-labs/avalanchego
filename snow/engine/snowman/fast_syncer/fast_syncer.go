@@ -242,7 +242,7 @@ func (fs *fastSyncer) GetStateSummaryFrontier(validatorID ids.ShortID, requestID
 	if err != nil {
 		return err
 	}
-	fs.Sender.SendStateSummaryFrontier(validatorID, requestID, summary.Key, summary.State)
+	fs.Sender.SendStateSummaryFrontier(validatorID, requestID, summary.Key, summary.Content)
 	return nil
 }
 
@@ -270,8 +270,8 @@ func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID ui
 		accepted := make([]common.Summary, 0, len(fs.acceptedFrontierSet))
 		for k, v := range fs.acceptedFrontierSet {
 			accepted = append(accepted, common.Summary{
-				Key:   []byte(k),
-				State: v,
+				Key:     []byte(k),
+				Content: v,
 			})
 		}
 		return fs.fastSyncVM.StateSync(accepted)
@@ -383,8 +383,8 @@ func (fs *fastSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID ui
 	for key, weight := range fs.acceptedVotes {
 		if weight >= fs.Alpha {
 			accepted = append(accepted, common.Summary{
-				Key:   []byte(key),
-				State: fs.acceptedFrontierSet[key],
+				Key:     []byte(key),
+				Content: fs.acceptedFrontierSet[key],
 			})
 		}
 	}
