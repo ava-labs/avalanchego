@@ -76,6 +76,8 @@ func (c *common) Virtuous() ids.Set { return c.virtuous }
 // Preferences implements the ConflictGraph interface
 func (c *common) Preferences() ids.Set { return c.preferences }
 
+func (c *common) VirtuousVoting() ids.Set { return c.virtuousVoting }
+
 // Quiesce implements the ConflictGraph interface
 func (c *common) Quiesce() bool {
 	numVirtuous := c.virtuousVoting.Len()
@@ -118,9 +120,12 @@ func (c *common) shouldVote(con Consensus, tx Tx) (bool, error) {
 	txID := tx.ID()
 	bytes := tx.Bytes()
 
-	// Notify the IPC socket that this tx has been issued.
-	if err := c.ctx.DecisionDispatcher.Issue(c.ctx, txID, bytes); err != nil {
-		return false, err
+	// Notify the IPC socket that this tx has been issued if the transaction has
+	// a binary format.
+	if len(bytes) > 0 {
+		if err := c.ctx.DecisionDispatcher.Issue(c.ctx, txID, bytes); err != nil {
+			return false, err
+		}
 	}
 
 	// Notify the metrics that this transaction is being issued.
@@ -135,11 +140,14 @@ func (c *common) shouldVote(con Consensus, tx Tx) (bool, error) {
 	// any conflicting transactions. Therefore, this transaction is treated as
 	// vacuously accepted and doesn't need to be voted on.
 
-	// Notify those listening for accepted txs
-	// Note that DecisionDispatcher.Accept must be called before
-	// tx.Accept to honor EventDispatcher.Accept's invariant.
-	if err := c.ctx.DecisionDispatcher.Accept(c.ctx, txID, bytes); err != nil {
-		return false, err
+	// Notify those listening for accepted txs if the transaction has
+	// a binary format.
+	if len(bytes) > 0 {
+		// Note that DecisionDispatcher.Accept must be called before
+		// tx.Accept to honor EventDispatcher.Accept's invariant.
+		if err := c.ctx.DecisionDispatcher.Accept(c.ctx, txID, bytes); err != nil {
+			return false, err
+		}
 	}
 
 	if err := tx.Accept(); err != nil {
@@ -156,11 +164,14 @@ func (c *common) acceptTx(tx Tx) error {
 	txID := tx.ID()
 	c.ctx.Log.Trace("accepting transaction %s", txID)
 
-	// Notify those listening that this tx has been accepted.
-	// Note that DecisionDispatcher.Accept must be called before
-	// tx.Accept to honor EventDispatcher.Accept's invariant.
-	if err := c.ctx.DecisionDispatcher.Accept(c.ctx, txID, tx.Bytes()); err != nil {
-		return err
+	// Notify those listening that this tx has been accepted if the transaction
+	// has a binary format.
+	if bytes := tx.Bytes(); len(bytes) > 0 {
+		// Note that DecisionDispatcher.Accept must be called before
+		// tx.Accept to honor EventDispatcher.Accept's invariant.
+		if err := c.ctx.DecisionDispatcher.Accept(c.ctx, txID, bytes); err != nil {
+			return err
+		}
 	}
 
 	if err := tx.Accept(); err != nil {
@@ -190,9 +201,12 @@ func (c *common) rejectTx(tx Tx) error {
 		return err
 	}
 
-	// Notify the IPC that the tx was rejected
-	if err := c.ctx.DecisionDispatcher.Reject(c.ctx, txID, tx.Bytes()); err != nil {
-		return err
+	// Notify the IPC that the tx was rejected if the transaction has a binary
+	// format.
+	if bytes := tx.Bytes(); len(bytes) > 0 {
+		if err := c.ctx.DecisionDispatcher.Reject(c.ctx, txID, bytes); err != nil {
+			return err
+		}
 	}
 
 	// Update the metrics to account for this transaction's rejection

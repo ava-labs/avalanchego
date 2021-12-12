@@ -49,15 +49,27 @@ type Topological struct {
 	// Threshold for confidence increases
 	params Parameters
 
-	// Maps vtxID -> vtx
-	nodes map[ids.ID]Vertex
+	// Maps vtxID -> transactionVertex wrapping the provided vertex as a
+	// transaction
+	nodes map[ids.ID]*transactionVertex
+
 	// Tracks the conflict relations
 	cg snowstorm.Consensus
 
 	// preferred is the frontier of vtxIDs that are strongly preferred
+	preferred ids.Set
+
 	// virtuous is the frontier of vtxIDs that are strongly virtuous
+	virtuous ids.Set
+
 	// orphans are the txIDs that are virtuous, but not preferred
-	preferred, virtuous, orphans ids.Set
+	orphans ids.Set
+
+	// virtuousVoting are the txIDs that are virtuous and still awaiting
+	// additional votes before acceptance. transactionVertices whose vertices
+	// are not considered virtuous are removed from this set.
+	virtuousVoting ids.Set
+
 	// frontier is the set of vts that have no descendents
 	frontier map[ids.ID]Vertex
 	// preferenceCache is the cache for strongly preferred checks
@@ -107,7 +119,7 @@ func (ta *Topological) Initialize(
 		return err
 	}
 
-	ta.nodes = make(map[ids.ID]Vertex, minMapSize)
+	ta.nodes = make(map[ids.ID]*transactionVertex, minMapSize)
 
 	ta.cg = &snowstorm.Directed{}
 	if err := ta.cg.Initialize(ctx, params.Parameters); err != nil {
@@ -155,13 +167,42 @@ func (ta *Topological) Add(vtx Vertex) error {
 			if err := ta.cg.Add(tx); err != nil {
 				return err
 			}
+
+			// If the added transaction is virtuous, add it to the set of
+			// virtuous transactions that are still being voted on.
+			if vs := ta.cg.VirtuousVoting(); vs.Contains(tx.ID()) {
+				ta.virtuousVoting.Add(tx.ID())
+			}
 		}
 	}
 
-	ta.nodes[vtxID] = vtx // Add this vertex to the set of nodes
+	txv := newTransactionVertex(vtx, ta.nodes)
+
+	// Add the transaction vertex to the set of processing nodes.
+	ta.nodes[vtxID] = txv
+
+	// Also add the transaction vertex to the conflict graph to track conflicts.
+	if err := ta.cg.Add(txv); err != nil {
+		return err
+	}
+
+	// If the added transaction vertex is virtuous, add it to the set of
+	// virtuous transactions that are still being voted on. If the vertex isn't
+	// virtuous, then the ID will be removed on the subsequent call to update.
+	if vs := ta.cg.VirtuousVoting(); vs.Contains(vtxID) {
+		ta.virtuousVoting.Add(vtxID)
+	}
+
 	ta.Latency.Issued(vtxID, ta.pollNumber)
 
-	return ta.update(vtx) // Update the vertex and it's ancestry
+	// Because we don't call [updateFrontiers], previous vertices that were
+	// marked as virtuous will not be updated to no longer being virtuous. Even
+	// if this newly added vertex conflicts with them. This is an optimization
+	// to avoid a retraversal of the DAG in the issuance path. Their virtuous
+	// status will be updated during a future poll. This is safe because the
+	// virtuous frontier is only used optimistically to control when it is valid
+	// to quiesce.
+	return ta.update(vtx) // Update the vertices preference and virtuous status
 }
 
 // VertexIssued implements the Avalanche interface
@@ -202,7 +243,8 @@ func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
 		}
 	}
 	if partialVotes.Len() < ta.params.Alpha {
-		// Skip the traversals.
+		// Because there were less than alpha total returned votes, we can skip
+		// the traversals and fail the poll.
 		_, err := ta.cg.RecordPoll(ids.Bag{})
 		return err
 	}
@@ -211,23 +253,26 @@ func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
 	if err := ta.calculateInDegree(responses); err != nil {
 		return err
 	}
+
 	// Collect the votes for each transaction: O(|Live Set|)
 	votes, err := ta.pushVotes()
 	if err != nil {
 		return err
 	}
+
 	// Update the conflict graph: O(|Transactions|)
 	if updated, err := ta.cg.RecordPoll(votes); !updated || err != nil {
 		// If the transaction statuses weren't changed, there is no need to
 		// perform a traversal.
 		return err
 	}
+
 	// Update the dag: O(|Live Set|)
 	return ta.updateFrontiers()
 }
 
 // Quiesce implements the Avalanche interface
-func (ta *Topological) Quiesce() bool { return ta.cg.Quiesce() }
+func (ta *Topological) Quiesce() bool { return ta.virtuousVoting.Len() == 0 }
 
 // Finalized implements the Avalanche interface
 func (ta *Topological) Finalized() bool { return ta.cg.Finalized() }
@@ -272,7 +317,9 @@ func (ta *Topological) calculateInDegree(responses ids.UniqueBag) error {
 	for vote := range responses {
 		// If it is not found, then the vote is either for something decided,
 		// or something we haven't heard of yet.
-		if vtx := ta.nodes[vote]; vtx != nil {
+		if tv := ta.nodes[vote]; tv != nil {
+			vtx := tv.vtx
+
 			kahn, previouslySeen := ta.kahnNodes[vote]
 			// Add this new vote to the current bag of votes
 			kahn.votes.Union(responses.GetSet(vote))
@@ -344,23 +391,28 @@ func (ta *Topological) markAncestorInDegrees(
 	return kahns, nil
 }
 
-// count the number of votes for each operation
+// Count the number of votes for each operation by pushing votes upwards through
+// vertex ancestors.
 func (ta *Topological) pushVotes() (ids.Bag, error) {
 	ta.votes.Clear()
 	txConflicts := make(map[ids.ID]ids.Set, minMapSize)
 
+	// A leaf is a node with no inbound edges. This removes each leaf and pushes
+	// the votes upwards, potentially creating new leaves, until there are no
+	// more leaves.
 	for ta.leaves.Len() > 0 {
-		// Pop one element of [leaves]
+		// Pop one node from [leaves]
 		leaf, ok := ta.leaves.Pop()
 		if !ok {
-			// Should never happen because we just
-			// checked that [ta.leaves] is non-empty.
+			// Should never happen because we just checked that [ta.leaves] is
+			// not empty.
 			return ids.Bag{}, errNoLeaves
 		}
 
 		kahn := ta.kahnNodes[leaf]
 
-		if vtx := ta.nodes[leaf]; vtx != nil {
+		if tv := ta.nodes[leaf]; tv != nil {
+			vtx := tv.vtx
 			txs, err := vtx.Txs()
 			if err != nil {
 				return ids.Bag{}, err
@@ -374,6 +426,17 @@ func (ta *Topological) pushVotes() (ids.Bag, error) {
 				if _, exists := txConflicts[txID]; !exists {
 					txConflicts[txID] = ta.cg.Conflicts(tx)
 				}
+			}
+
+			// The leaf is the ID of the transaction vertex that was issued to
+			// the conflict graph for this vertex. Adding this vote is required
+			// to make progress toward accepting this transaction.
+			ta.votes.UnionSet(leaf, kahn.votes)
+
+			// Map the vertexID to the set of conflicts from the transaction
+			// vertex.
+			if _, exists := txConflicts[leaf]; !exists {
+				txConflicts[leaf] = ta.cg.Conflicts(tv)
 			}
 
 			parents, err := vtx.Parents()
@@ -424,6 +487,10 @@ func (ta *Topological) update(vtx Vertex) error {
 		return nil // This vertex has already been updated
 	}
 
+	// Drop all transaction vertices from the orphan set, as they can never be
+	// reissued.
+	ta.orphans.Remove(vtxID)
+
 	switch vtx.Status() {
 	case choices.Accepted:
 		ta.preferred.Add(vtxID) // I'm preferred
@@ -441,16 +508,32 @@ func (ta *Topological) update(vtx Vertex) error {
 		return nil
 	}
 
-	acceptable := true  // If the batch is accepted, this vertex is acceptable
-	rejectable := false // If I'm rejectable, I must be rejected
-	preferred := true
-	virtuous := true
 	txs, err := vtx.Txs()
 	if err != nil {
 		return err
 	}
 	preferences := ta.cg.Preferences()
 	virtuousTxs := ta.cg.Virtuous()
+
+	txv, ok := ta.nodes[vtxID]
+	if !ok {
+		return fmt.Errorf("transaction vertex %s not found in processing nodes set", vtxID)
+	}
+
+	initialTxVStatus := txv.Status()
+
+	// acceptable tracks if all transactions included in the vertex have been
+	// accepted and if all the parent vertices have been accepted. The
+	// transactions include the transaction vertex.
+	acceptable := initialTxVStatus == choices.Accepted
+
+	// rejectable tracks if any of the transactions included in the vertex have
+	// been rejected or if any of the parent vertices have been rejected. The
+	// transactions include the transaction vertex.
+	rejectable := initialTxVStatus == choices.Rejected
+
+	preferred := acceptable || preferences.Contains(vtxID)
+	virtuous := acceptable || virtuousTxs.Contains(vtxID)
 
 	for _, tx := range txs {
 		txID := tx.ID()
@@ -486,9 +569,16 @@ func (ta *Topological) update(vtx Vertex) error {
 
 	// Check my parent statuses
 	for _, dep := range deps {
-		if status := dep.Status(); status == choices.Rejected {
+		switch status := dep.Status(); status {
+		case choices.Rejected:
 			// My parent is rejected, so I should be rejected
 			ta.ctx.Log.Trace("rejecting vertex %s due to rejected parent %s", vtxID, dep.ID())
+			if !txv.Status().Decided() {
+				if err := ta.cg.Remove(vtxID); err != nil {
+					return fmt.Errorf("failed to remove transaction vertex %s from snowstorm before rejecting vertex itself", vtxID)
+				}
+				ta.virtuousVoting.Remove(vtxID)
+			}
 			if err := vtx.Reject(); err != nil {
 				return err
 			}
@@ -501,8 +591,11 @@ func (ta *Topological) update(vtx Vertex) error {
 			ta.preferenceCache[vtxID] = false
 			ta.virtuousCache[vtxID] = false
 			return nil
-		} else if status != choices.Accepted {
-			acceptable = false // My parent isn't accepted, so I can't be
+		case choices.Accepted:
+			// If the dependency is accepted, then the vertex's acceptability
+			// doesn't change.
+		default:
+			acceptable = false // A parent isn't accepted, so I can't be
 		}
 	}
 
@@ -528,9 +621,18 @@ func (ta *Topological) update(vtx Vertex) error {
 			ta.preferred.Remove(dep.ID()) // My parents aren't part of the frontier
 		}
 
-		for _, tx := range txs {
-			if tx.Status() != choices.Accepted {
-				ta.orphans.Remove(tx.ID())
+		// Transactions are marked as orphans if they are virtuous, but not
+		// contained in a preferred vertex. Since this vertex is preferred,
+		// remove all the internal transactions from the orphan set.
+		//
+		// As an optimization, we only iterate over the transactions if the set
+		// of orphans isn't empty. As if the set is empty, nothing will be able
+		// to be removed anyway.
+		if ta.orphans.Len() > 0 {
+			for _, tx := range txs {
+				if tx.Status() != choices.Accepted {
+					ta.orphans.Remove(tx.ID())
+				}
 			}
 		}
 	}
@@ -540,6 +642,10 @@ func (ta *Topological) update(vtx Vertex) error {
 		for _, dep := range deps {
 			ta.virtuous.Remove(dep.ID()) // My parents aren't part of the frontier
 		}
+	} else {
+		// If the vertex isn't virtuous, then we can remove the transaction
+		// vertex from the voting set to pessemistically quiesce early.
+		ta.virtuousVoting.Remove(vtxID)
 	}
 
 	switch {
@@ -551,7 +657,6 @@ func (ta *Topological) update(vtx Vertex) error {
 			return err
 		}
 
-		ta.ctx.Log.Trace("accepting vertex %s", vtxID)
 		if err := vtx.Accept(); err != nil {
 			return err
 		}
@@ -564,6 +669,12 @@ func (ta *Topological) update(vtx Vertex) error {
 		}
 
 		ta.ctx.Log.Trace("rejecting vertex %s due to a conflicting acceptance", vtxID)
+		if !txv.Status().Decided() {
+			if err := ta.cg.Remove(vtxID); err != nil {
+				return fmt.Errorf("failed to remove transaction vertex %s from snowstorm before rejecting vertex itself", vtxID)
+			}
+			ta.virtuousVoting.Remove(vtxID)
+		}
 		if err := vtx.Reject(); err != nil {
 			return err
 		}
@@ -579,11 +690,14 @@ func (ta *Topological) updateFrontiers() error {
 
 	ta.preferred.Clear()
 	ta.virtuous.Clear()
+	ta.virtuousVoting.Clear()
+
 	ta.orphans.Clear()
 	ta.frontier = make(map[ids.ID]Vertex, minMapSize)
 	ta.preferenceCache = make(map[ids.ID]bool, minMapSize)
 	ta.virtuousCache = make(map[ids.ID]bool, minMapSize)
 
+	ta.virtuousVoting.Union(ta.cg.VirtuousVoting())
 	ta.orphans.Union(ta.cg.Virtuous()) // Initially, nothing is preferred
 
 	for _, vtx := range vts {

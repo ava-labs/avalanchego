@@ -13,6 +13,8 @@ import (
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
+var _ Consensus = &Input{}
+
 // inputFactory implements Factory by returning an input struct
 // for testing purposes in parity with "DirectedFactory"
 // focus on more frequent conflicts
@@ -182,6 +184,13 @@ func (ig *Input) Add(tx Tx) error {
 	// If a tx that this tx depends on is rejected, this tx should also be
 	// rejected.
 	return ig.registerRejector(ig, tx)
+}
+
+func (ig *Input) Remove(txID ids.ID) error {
+	s := ids.Set{
+		txID: struct{}{},
+	}
+	return ig.reject(s)
 }
 
 // Issued implements the ConflictGraph interface
@@ -390,6 +399,8 @@ func (ig *Input) reject(conflictIDs ids.Set) error {
 		// While it's statistically unlikely that something being rejected is
 		// preferred, it is handled for completion.
 		delete(ig.preferences, conflictKey)
+		delete(ig.virtuous, conflictKey)
+		delete(ig.virtuousVoting, conflictKey)
 
 		// Remove this tx from all the conflict sets it's currently in
 		ig.removeConflict(conflictKey, conflict.tx.InputIDs())

@@ -61,9 +61,10 @@ type Consensus interface {
 	// occurred.
 	RecordPoll(ids.UniqueBag) error
 
-	// Quiesce returns true iff all vertices that have been added but not been accepted or rejected are rogue.
-	// Note, it is possible that after returning quiesce, a new decision may be added such
-	// that this instance should no longer quiesce.
+	// Quiesce is guaranteed to return true if the instance is finalized. It
+	// may, but doesn't need to, return true if all processing vertices are
+	// rogue. It must return false if there is a virtuous vertex that is still
+	// processing.
 	Quiesce() bool
 
 	// Finalized returns true if all transactions that have been added have been
