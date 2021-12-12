@@ -4,7 +4,6 @@
 package proposervm
 
 import (
-	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -15,11 +14,7 @@ import (
 
 const commitSizeCap = 1 * units.MiB
 
-var (
-	_ block.HeightIndexedChainVM = &VM{}
-
-	errRepairNoPostForkBlocks = errors.New("no post fork block to repair")
-)
+var _ block.HeightIndexedChainVM = &VM{}
 
 func (vm *VM) HeightIndexingEnabled() bool {
 	hVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
@@ -31,30 +26,14 @@ func (vm *VM) HeightIndexingEnabled() bool {
 		return false
 	}
 
-	// If height indexing is not complete, return we mark HeightIndexedChainVM as disabled.
+	// If height indexing is not complete, we mark HeightIndexedChainVM as disabled,
 	// even if vm.ChainVM is ready to serve blocks by height
-	_, err := vm.State.GetRepairCheckpoint()
-	switch err {
-	case nil:
-		return false
-	case database.ErrNotFound:
-		// Either indexing is complete or repairing it has not started yet.
-		break
-	default:
+	doRepair, _, err := vm.heightIndexNeedsRepairing()
+	if doRepair || err != nil {
 		return false
 	}
 
-	lastAcceptedBlkID, err := vm.LastAccepted()
-	if err != nil {
-		return false
-	}
-	lastAcceptedBlk, err := vm.GetBlock(lastAcceptedBlkID)
-	if err != nil {
-		return false
-	}
-
-	_, indexComplete := vm.State.GetBlkIDByHeight(lastAcceptedBlk.Height())
-	return indexComplete == nil
+	return true
 }
 
 func (vm *VM) GetBlockIDByHeight(height uint64) (ids.ID, error) {
@@ -96,22 +75,81 @@ func (vm *VM) updateLatestPreForkBlockHeight(height uint64) error {
 	return vm.State.SetLatestPreForkHeight(height)
 }
 
-// Upon initialization, repairInnerBlocksMapping ensures the height -> proBlkID
-// mapping is well formed. Starting from last accepted proposerVM block,
-// it will go back to snowman++ activation fork or genesis.
-// repairInnerBlocksMapping can take a non-trivial time to complete; hence we make sure
-// the process has limited memory footprint, can be resumed from periodic checkpoints
-// and asynchronously without stopping VM.
-func (vm *VM) repairInnerBlockMapping() error {
+// heightIndexNeedsRepairing checks if height index is complete;
+// if not, it returns highest un-indexed block ID from which repairing should start.
+// heightIndexNeedsRepairing should be called synchronously upon VM initialization.
+func (vm *VM) heightIndexNeedsRepairing() (bool, ids.ID, error) {
 	if _, ok := vm.ChainVM.(block.HeightIndexedChainVM); !ok {
-		// nothing to index if innerVM does not support height indexing
-		return nil
+		// no index, nothing to repair
+		return false, ids.Empty, nil
 	}
 
+	repairStartBlkID, err := vm.State.GetRepairCheckpoint()
+	switch err {
+	case nil:
+		// checkpoint found, repair must be resumed
+		return true, repairStartBlkID, nil
+	case database.ErrNotFound:
+		// no checkpoint. Either index is complete or repair was never attempted.
+		break
+	default:
+		return true, ids.Empty, err
+	}
+
+	// index is complete iff lastAcceptedBlock is indexed
+	latestProBlkID, err := vm.State.GetLastAccepted() // this won't return preFork blks
+	switch err {
+	case nil:
+		break
+	case database.ErrNotFound:
+		// snowman++ has not forked yet. Mapping is ok;
+		// just check latestPreForkHeight is duly set.
+		latestInnerBlkID, err := vm.ChainVM.LastAccepted()
+		if err != nil {
+			return true, ids.Empty, err
+		}
+		lastInnerBlk, err := vm.ChainVM.GetBlock(latestInnerBlkID)
+		if err != nil {
+			return true, ids.Empty, err
+		}
+		vm.latestPreForkHeight = lastInnerBlk.Height()
+		if err := vm.State.SetLatestPreForkHeight(vm.latestPreForkHeight); err != nil {
+			return true, ids.Empty, err
+		}
+		return false, ids.Empty, nil
+	default:
+		return true, ids.Empty, err
+	}
+	lastAcceptedBlk, err := vm.getPostForkBlock(latestProBlkID)
+	if err != nil {
+		// Could not retrieve block for LastAccepted Block.
+		// We got bigger problems than repairing the index
+		return true, ids.Empty, err
+	}
+
+	_, err = vm.State.GetBlkIDByHeight(lastAcceptedBlk.Height())
+	switch err {
+	case nil:
+		// index is complete already.
+		vm.latestPreForkHeight, err = vm.State.GetLatestPreForkHeight()
+		return false, ids.Empty, err
+	case database.ErrNotFound:
+		// index needs repairing (and it's the first time we do this)
+		return true, latestProBlkID, nil
+	default:
+		// Could not retrieve index from DB.
+		// We got bigger problems than repairing the index
+		return true, ids.Empty, err
+	}
+}
+
+// if height index needs repairing, doRepair would do that. It
+// iterates back via parents, checking and rebuilding height indexing
+// heightIndexNeedsRepairing should be called asynchronously upon VM initialization.
+func (vm *VM) doRepair(repairStartBlkID ids.ID) error {
 	var (
-		latestProBlkID   ids.ID
-		latestInnerBlkID = ids.Empty
-		err              error
+		currentProBlkID   = repairStartBlkID
+		currentInnerBlkID = ids.Empty
 
 		startTime                 = time.Now()
 		lastLogTime               = startTime
@@ -119,39 +157,31 @@ func (vm *VM) repairInnerBlockMapping() error {
 		pendingBytesApproximation = 0 // tracks of the size of uncommitted writes
 	)
 
-	// First the top proposerVM block to start with.
-	latestProBlkID, err = vm.pickStartBlkIDToRepair()
-	switch err {
-	case nil:
-
-	case errRepairNoPostForkBlocks:
-		// no proposerVM blocks; empty chain or snowman++ not yet active
-		if err := vm.repairForkHeight(latestInnerBlkID); err != nil {
-			return err
-		}
-		if err := vm.checkpointAndCommit(ids.Empty); err != nil {
-			return err
-		}
-		vm.ctx.Log.Info("Block indexing by height completed: indexed %d blocks, duration %v, latest pre fork block height %d",
-			indexedBlks, time.Since(startTime), vm.latestPreForkHeight)
-		return nil
-
-	default:
-		return err
-	}
-
-	// iterate back via parents, checking and rebuilding height indexing
 	for {
-		lastAcceptedBlk, err := vm.getPostForkBlock(latestProBlkID)
+		currentAcceptedBlk, err := vm.getPostForkBlock(currentProBlkID)
 		switch err {
 		case nil:
 
 		case database.ErrNotFound:
-			// visited all proposerVM blocks.
-			if err := vm.repairForkHeight(latestInnerBlkID); err != nil {
+			// visited all proposerVM blocks. Let's record forkHeight
+			firstWrappedInnerBlk, err := vm.ChainVM.GetBlock(currentInnerBlkID)
+			if err != nil {
 				return err
 			}
-			if err := vm.checkpointAndCommit(ids.Empty); err != nil {
+			innerForkBlk, err := vm.ChainVM.GetBlock(firstWrappedInnerBlk.Parent())
+			if err != nil {
+				return err
+			}
+			vm.latestPreForkHeight = innerForkBlk.Height()
+			if err := vm.State.SetLatestPreForkHeight(vm.latestPreForkHeight); err != nil {
+				return err
+			}
+
+			// Delete checkpoint and finally commit
+			if err := vm.State.DeleteRepairCheckpoint(); err != nil {
+				return err
+			}
+			if err := vm.db.Commit(); err != nil {
 				return err
 			}
 			vm.ctx.Log.Info("Block indexing by height completed: indexed %d blocks, duration %v, latest pre fork block height %d",
@@ -162,8 +192,8 @@ func (vm *VM) repairInnerBlockMapping() error {
 			return err
 		}
 
-		latestInnerBlkID = lastAcceptedBlk.getInnerBlk().ID()
-		_, err = vm.State.GetBlkIDByHeight(lastAcceptedBlk.Height())
+		currentInnerBlkID = currentAcceptedBlk.getInnerBlk().ID()
+		_, err = vm.State.GetBlkIDByHeight(currentAcceptedBlk.Height())
 		switch err {
 		case nil:
 			// mapping already there; It must be the same for all ancestors and fork height too.
@@ -177,17 +207,21 @@ func (vm *VM) repairInnerBlockMapping() error {
 			// Let's keep memory footprint under control by committing when a size threshold is reached
 			// We commit before storing lastAcceptedBlk mapping so to use lastAcceptedBlk as nextBlkIDToResumeFrom
 			if pendingBytesApproximation > commitSizeCap {
-				if err := vm.checkpointAndCommit(latestProBlkID); err != nil {
+				if err := vm.State.SetRepairCheckpoint(currentProBlkID); err != nil {
 					return err
 				}
+				if err := vm.db.Commit(); err != nil {
+					return err
+				}
+
 				vm.ctx.Log.Info("Block indexing by height ongoing: indexed %d blocks", indexedBlks)
 				vm.ctx.Log.Info("Block indexing by height ongoing: committed %d bytes, latest committed height %d",
-					pendingBytesApproximation, lastAcceptedBlk.Height()+1)
+					pendingBytesApproximation, currentAcceptedBlk.Height()+1)
 				pendingBytesApproximation = 0
 			}
 
 			// mapping must have been introduced after snowman++ fork. Rebuild it.
-			estimatedByteLen, err := vm.State.SetBlkIDByHeight(lastAcceptedBlk.Height(), latestProBlkID)
+			estimatedByteLen, err := vm.State.SetBlkIDByHeight(currentAcceptedBlk.Height(), currentProBlkID)
 			if err != nil {
 				return err
 			}
@@ -201,7 +235,7 @@ func (vm *VM) repairInnerBlockMapping() error {
 			}
 
 			// keep checking the parent
-			latestProBlkID = lastAcceptedBlk.Parent()
+			currentProBlkID = currentAcceptedBlk.Parent()
 
 		default:
 			return err
@@ -209,82 +243,21 @@ func (vm *VM) repairInnerBlockMapping() error {
 	}
 }
 
-func (vm *VM) pickStartBlkIDToRepair() (ids.ID, error) {
-	// It's either the last accepted block or an intermediate block,
-	// if the process was already started and interrupted.
-	var (
-		latestProBlkID ids.ID
-		err            error
-	)
-
-	latestProBlkID, err = vm.State.GetRepairCheckpoint()
-	switch err {
-	case nil:
-		vm.ctx.Log.Info("Block indexing by height starting: resuming from %v", latestProBlkID)
-		return latestProBlkID, nil
-	case database.ErrNotFound:
-		// process was not interrupted. Try picking latest accepted proposerVM block
-		break
-	default:
-		return ids.Empty, err
+// Upon initialization, repairInnerBlocksMapping ensures the height -> proBlkID
+// mapping is well formed. Starting from last accepted proposerVM block,
+// it will go back to snowman++ activation fork or genesis.
+// repairInnerBlocksMapping can take a non-trivial time to complete; hence we make sure
+// the process has limited memory footprint, can be resumed from periodic checkpoints
+// and asynchronously without stopping VM.
+func (vm *VM) repairHeightIndex() error {
+	doRepair, startBlkID, err := vm.heightIndexNeedsRepairing()
+	if !doRepair || err != nil {
+		return err
 	}
 
-	latestProBlkID, err = vm.State.GetLastAccepted() // this won't return preFork blks
-	switch err {
-	case nil:
-		vm.ctx.Log.Info("Block indexing by height starting: starting from last accepted block %v", latestProBlkID)
-		return latestProBlkID, nil
-	case database.ErrNotFound:
-		return ids.Empty, errRepairNoPostForkBlocks
-	default:
-		return ids.Empty, err
-	}
-}
+	go func() {
+		vm.ctx.Log.AssertNoError(vm.doRepair(startBlkID))
+	}()
 
-func (vm *VM) repairForkHeight(latestInnerBlkID ids.ID) error {
-	var (
-		lastPreForkHeight uint64
-		err               error
-	)
-
-	if latestInnerBlkID == ids.Empty {
-		// not a single proposerVM block. Set fork height to current inner chain height
-		latestInnerBlkID, err = vm.ChainVM.LastAccepted()
-		if err != nil {
-			return err
-		}
-		lastInnerBlk, err := vm.ChainVM.GetBlock(latestInnerBlkID)
-		if err != nil {
-			return err
-		}
-		lastPreForkHeight = lastInnerBlk.Height()
-	} else {
-		firstWrappedInnerBlk, err := vm.ChainVM.GetBlock(latestInnerBlkID)
-		if err != nil {
-			return err
-		}
-		candidateForkBlk, err := vm.ChainVM.GetBlock(firstWrappedInnerBlk.Parent())
-		if err != nil {
-			return err
-		}
-		lastPreForkHeight = candidateForkBlk.Height()
-	}
-
-	vm.latestPreForkHeight = lastPreForkHeight
-	return vm.State.SetLatestPreForkHeight(vm.latestPreForkHeight)
-}
-
-func (vm *VM) checkpointAndCommit(checkpointBlkID ids.ID) error {
-	// Empty nextBlkIDToResumeFrom signals rebuild process is done
-	if checkpointBlkID == ids.Empty {
-		if err := vm.State.DeleteRepairCheckpoint(); err != nil {
-			return err
-		}
-	} else {
-		if err := vm.State.SetRepairCheckpoint(checkpointBlkID); err != nil {
-			return err
-		}
-	}
-
-	return vm.db.Commit()
+	return nil
 }

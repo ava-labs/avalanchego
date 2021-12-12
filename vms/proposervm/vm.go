@@ -124,9 +124,9 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	go func() {
-		ctx.Log.AssertNoError(vm.repairInnerBlockMapping())
-	}()
+	if err := vm.repairHeightIndex(); err != nil {
+		return err
+	}
 
 	return vm.setLastAcceptedOptionTime()
 }

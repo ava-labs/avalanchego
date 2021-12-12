@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestInnerBlockMappingPostFork(t *testing.T) {
+func TestHeightBlockIndexPostFork(t *testing.T) {
 	assert := assert.New(t)
 	activationTime := time.Time{} // enable ProBlks
 	minPChainHeight := uint64(0)
@@ -91,7 +91,7 @@ func TestInnerBlockMappingPostFork(t *testing.T) {
 	}
 
 	// show repairs rebuilds the mapping
-	assert.NoError(proVM.repairInnerBlockMapping())
+	assert.NoError(proVM.repairHeightIndex())
 
 	// check that mapping is fully built
 	for height := uint64(1); height <= blkNumber; height++ {
@@ -122,7 +122,7 @@ func TestInnerBlockMappingPostFork(t *testing.T) {
 	}
 }
 
-func TestInnerBlockMappingPreFork(t *testing.T) {
+func TestHeightBlockIndexPreFork(t *testing.T) {
 	assert := assert.New(t)
 	activationTime := mockable.MaxTime // disable ProBlks
 	minPChainHeight := uint64(0)
@@ -190,7 +190,7 @@ func TestInnerBlockMappingPreFork(t *testing.T) {
 	assert.True(proVM.latestPreForkHeight == lastProBlk.Height())
 
 	// show repairs rebuilds the mapping
-	assert.NoError(proVM.repairInnerBlockMapping())
+	assert.NoError(proVM.repairHeightIndex())
 
 	// mapping should be empty
 	for height := uint64(1); height <= blkNumber; height++ {
@@ -225,7 +225,7 @@ func TestInnerBlockMappingPreFork(t *testing.T) {
 	assert.True(proVM.latestPreForkHeight == lastProBlk.Height())
 }
 
-func TestInnerBlockMappingAcrossFork(t *testing.T) {
+func TestHeightBlockIndexAcrossFork(t *testing.T) {
 	assert := assert.New(t)
 	activationTime := genesisTimestamp.Add(10 * time.Second)
 	minPChainHeight := uint64(0)
@@ -358,7 +358,7 @@ func TestInnerBlockMappingAcrossFork(t *testing.T) {
 	proVM.latestPreForkHeight = 0
 
 	// show repairs rebuilds the mapping
-	assert.NoError(proVM.repairInnerBlockMapping())
+	assert.NoError(proVM.repairHeightIndex())
 
 	assert.True(proVM.latestPreForkHeight == forkHeight)
 	for height := uint64(1); height <= blkNumber; height++ {
@@ -402,7 +402,7 @@ func TestInnerBlockMappingAcrossFork(t *testing.T) {
 	}
 }
 
-func TestInnerBlockMappingBackwardCompatiblity(t *testing.T) {
+func TestHeightBlockIndexBackwardCompatiblity(t *testing.T) {
 	// say the chain of preFork and postFork blocks is already accepted.
 	// Show that repairs can build mapping from scratch.
 
@@ -510,7 +510,7 @@ func TestInnerBlockMappingBackwardCompatiblity(t *testing.T) {
 	}
 
 	// show repairs builds the mapping
-	assert.NoError(proVM.repairInnerBlockMapping())
+	assert.NoError(proVM.repairHeightIndex())
 
 	assert.True(proVM.latestPreForkHeight == forkHeight)
 	for height := uint64(1); height <= blkNumber; height++ {
@@ -554,7 +554,7 @@ func TestInnerBlockMappingBackwardCompatiblity(t *testing.T) {
 	}
 }
 
-func TestInnerBlockMappingResumefromCheckPoint(t *testing.T) {
+func TestHeightBlockIndexResumefromCheckPoint(t *testing.T) {
 	// show that repair process is checkpointed and can be resumed
 
 	assert := assert.New(t)
@@ -652,7 +652,8 @@ func TestInnerBlockMappingResumefromCheckPoint(t *testing.T) {
 	}
 
 	// with no checkpoints repair starts from last accepted block
-	startBlkID, err := proVM.pickStartBlkIDToRepair()
+	doRepair, startBlkID, err := proVM.heightIndexNeedsRepairing()
+	assert.True(doRepair)
 	assert.NoError(err)
 	assert.True(startBlkID == lastProBlk.ID())
 
@@ -664,9 +665,10 @@ func TestInnerBlockMappingResumefromCheckPoint(t *testing.T) {
 		}
 
 		checkpointBlk := blk
-		assert.NoError(proVM.checkpointAndCommit(checkpointBlk.ID()))
+		assert.NoError(proVM.SetRepairCheckpoint(checkpointBlk.ID()))
 
-		startBlkID, err = proVM.pickStartBlkIDToRepair()
+		doRepair, startBlkID, err := proVM.heightIndexNeedsRepairing()
+		assert.True(doRepair)
 		assert.NoError(err)
 		assert.True(startBlkID == checkpointBlk.ID())
 	}
