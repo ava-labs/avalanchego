@@ -11,6 +11,8 @@ import (
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
+var _ Consensus = &Directed{}
+
 // DirectedFactory implements Factory by returning a directed struct
 type DirectedFactory struct{}
 
@@ -175,6 +177,13 @@ func (dg *Directed) Add(tx Tx) error {
 	return dg.registerRejector(dg, tx)
 }
 
+func (dg *Directed) Remove(txID ids.ID) error {
+	s := ids.Set{
+		txID: struct{}{},
+	}
+	return dg.reject(s)
+}
+
 // Issued implements the Consensus interface
 func (dg *Directed) Issued(tx Tx) bool {
 	// If the tx is either Accepted or Rejected, then it must have been issued
@@ -324,9 +333,12 @@ func (dg *Directed) reject(conflictIDs ids.Set) error {
 		// We are rejecting the tx, so we should remove it from the graph
 		delete(dg.txs, conflictKey)
 
-		// While it's statistically unlikely that something being rejected is
-		// preferred, it is handled for completion.
+		// It's statistically unlikely that something being rejected is
+		// preferred. However, it's possible. Additionally, any transaction may
+		// be removed at any time.
 		delete(dg.preferences, conflictKey)
+		delete(dg.virtuous, conflictKey)
+		delete(dg.virtuousVoting, conflictKey)
 
 		// remove the edge between this node and all its neighbors
 		dg.removeConflict(conflictKey, conflict.ins)
