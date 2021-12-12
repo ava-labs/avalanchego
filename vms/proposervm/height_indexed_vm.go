@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-const commitSizeCap = 10 * units.MiB
+const commitSizeCap = 1 * units.MiB
 
 var (
 	_ block.HeightIndexedChainVM = &VM{}
@@ -143,6 +143,7 @@ func (vm *VM) repairInnerBlockMapping() error {
 				if err := vm.commitPendingEntries(latestProBlkID); err != nil {
 					return err
 				}
+				vm.ctx.Log.Info("Block indexing by height ongoing: indexed %d blocks", indexedBlks)
 				vm.ctx.Log.Info("Block indexing by height ongoing: committed %d bytes, latest committed height %d",
 					pendingBytesApproximation, lastAcceptedBlk.Height()+1)
 				pendingBytesApproximation = 0
@@ -182,6 +183,7 @@ func (vm *VM) pickStartBlkIDToRepair() (ids.ID, error) {
 	latestProBlkID, err = vm.State.GetBlockToResumeFrom()
 	switch err {
 	case nil:
+		vm.ctx.Log.Info("Block indexing by height starting: resuming from %v", latestProBlkID)
 		return latestProBlkID, nil
 	case database.ErrNotFound:
 		// process was not interrupted. Try picking latest accepted proposerVM block
@@ -193,6 +195,7 @@ func (vm *VM) pickStartBlkIDToRepair() (ids.ID, error) {
 	latestProBlkID, err = vm.State.GetLastAccepted() // this won't return preFork blks
 	switch err {
 	case nil:
+		vm.ctx.Log.Info("Block indexing by height starting: starting from last accepted block %v", latestProBlkID)
 		return latestProBlkID, nil
 	case database.ErrNotFound:
 		return ids.Empty, errRepairNoPostForkBlocks

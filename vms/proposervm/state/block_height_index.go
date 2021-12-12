@@ -136,7 +136,6 @@ func (ibm *innerBlocksMapping) GetLatestPreForkHeight() (uint64, error) {
 		return res, nil
 
 	case database.ErrNotFound:
-		ibm.cache.Put(string(key), nil)
 		return 0, database.ErrNotFound
 
 	default:
@@ -146,7 +145,7 @@ func (ibm *innerBlocksMapping) GetLatestPreForkHeight() (uint64, error) {
 
 func (ibm *innerBlocksMapping) DeleteLatestPreForkHeight() error {
 	key := preForkPrefix
-	ibm.cache.Put(string(key), nil)
+	ibm.cache.Evict(string(key))
 	return ibm.db.Delete(key)
 }
 
@@ -173,7 +172,6 @@ func (ibm *innerBlocksMapping) GetBlockToResumeFrom() (ids.ID, error) {
 		return ids.FromBytes(bytes), nil
 
 	case database.ErrNotFound:
-		ibm.cache.Put(string(key), nil)
 		return ids.Empty, database.ErrNotFound
 
 	default:
@@ -183,7 +181,7 @@ func (ibm *innerBlocksMapping) GetBlockToResumeFrom() (ids.ID, error) {
 
 func (ibm *innerBlocksMapping) DeleteBlockToResumeFrom() error {
 	key := resumePrefix
-	ibm.cache.Put(string(key), nil)
+	ibm.cache.Evict(string(key))
 	return ibm.db.Delete(key)
 }
 
