@@ -2,6 +2,7 @@ package proposervm
 
 import (
 	"bytes"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -550,5 +551,123 @@ func TestInnerBlockMappingBackwardCompatiblity(t *testing.T) {
 			// postFork blocks should be in mapping
 			assert.NoError(err)
 		}
+	}
+}
+
+func TestInnerBlockMappingResumefromCheckPoint(t *testing.T) {
+	// show that repair process is checkpointed and can be resumed
+
+	assert := assert.New(t)
+	activationTime := mockable.MaxTime // disable ProBlks
+	minPChainHeight := uint64(0)
+	innerVM, _, proVM, innerGenBlk, _ := initTestProposerVM(t, activationTime, minPChainHeight)
+
+	var (
+		blkNumber    = uint64(10)
+		forkHeight   = blkNumber / 2
+		prevInnerBlk = snowman.Block(innerGenBlk)
+		lastInnerBlk snowman.Block
+		innerBlks    = make(map[ids.ID]snowman.Block)
+		lastProBlk   snowman.Block
+		proBlks      = make(map[ids.ID]snowman.Block)
+	)
+
+	innerBlks[innerGenBlk.ID()] = innerGenBlk
+	innerVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		blk, found := innerBlks[blkID]
+		if !found {
+			return nil, errUnknownBlock
+		}
+		return blk, nil
+	}
+	innerVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		for _, blk := range innerBlks {
+			if bytes.Equal(b, blk.Bytes()) {
+				return blk, nil
+			}
+		}
+		return nil, errUnknownBlock
+	}
+	innerVM.LastAcceptedF = func() (ids.ID, error) { return prevInnerBlk.ID(), nil }
+
+	// store preFork blocks first
+	for blkCount := uint64(1); blkCount <= forkHeight; blkCount++ {
+		lastInnerBlk = &snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Accepted, // set status to accepted already
+			},
+			BytesV:     []byte{uint8(blkCount)},
+			ParentV:    prevInnerBlk.ID(),
+			HeightV:    blkCount,
+			TimestampV: prevInnerBlk.Timestamp(),
+		}
+		innerBlks[lastInnerBlk.ID()] = lastInnerBlk
+
+		lastProBlk = &preForkBlock{
+			Block: lastInnerBlk,
+			vm:    proVM,
+		}
+
+		proBlks[lastProBlk.ID()] = lastProBlk
+		prevInnerBlk = lastInnerBlk
+	}
+
+	// store postFork blocks
+	for blkCount := forkHeight + 1; blkCount <= blkNumber; blkCount++ {
+		lastInnerBlk = &snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Accepted, // set status to accepted already
+			},
+			BytesV:     []byte{uint8(blkCount)},
+			ParentV:    prevInnerBlk.ID(),
+			HeightV:    blkCount,
+			TimestampV: prevInnerBlk.Timestamp(),
+		}
+		innerBlks[lastInnerBlk.ID()] = lastInnerBlk
+
+		statelessChild, err := block.BuildUnsigned(
+			lastProBlk.ID(),
+			time.Time{},
+			0, /*pChainHeight*/
+			lastInnerBlk.Bytes(),
+		)
+		assert.NoError(err)
+		postForkBlk := &postForkBlock{
+			SignedBlock: statelessChild,
+			postForkCommonComponents: postForkCommonComponents{
+				vm:       proVM,
+				innerBlk: lastInnerBlk,
+				status:   choices.Accepted, // set status to accepted already
+			},
+		}
+
+		assert.NoError(proVM.storePostForkBlock(postForkBlk))
+		assert.NoError(proVM.State.SetLastAccepted(postForkBlk.ID()))
+
+		lastProBlk = postForkBlk
+		proBlks[lastProBlk.ID()] = lastProBlk
+		prevInnerBlk = lastInnerBlk
+	}
+
+	// with no checkpoints repair starts from last accepted block
+	startBlkID, err := proVM.pickStartBlkIDToRepair()
+	assert.NoError(err)
+	assert.True(startBlkID == lastProBlk.ID())
+
+	// if an intermediate block is checkpointed, repair will start from it
+	rndPostForkHeight := rand.Intn(int(blkNumber-forkHeight)) + int(forkHeight) // #nosec G404
+	for _, blk := range proBlks {
+		if blk.Height() != uint64(rndPostForkHeight) {
+			continue // not the blk we are looking for
+		}
+
+		checkpointBlk := blk
+		assert.NoError(proVM.checkpointAndCommit(checkpointBlk.ID()))
+
+		startBlkID, err = proVM.pickStartBlkIDToRepair()
+		assert.NoError(err)
+		assert.True(startBlkID == checkpointBlk.ID())
 	}
 }

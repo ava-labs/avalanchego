@@ -19,9 +19,9 @@ const (
 var (
 	_ AcceptedPostForkBlockHeightIndex = &innerBlocksMapping{}
 
-	heightPrefix  = []byte("heightkey")
-	preForkPrefix = []byte("preForkKey")
-	resumePrefix  = []byte("blockToResumeFrom")
+	heightPrefix     = []byte("heightkey")
+	preForkPrefix    = []byte("preForkKey")
+	checkpointPrefix = []byte("checkpoint")
 )
 
 // AcceptedPostForkBlockHeightIndex contains mapping of blockHeights to accepted proposer block IDs.
@@ -35,9 +35,9 @@ type AcceptedPostForkBlockHeightIndex interface {
 	GetLatestPreForkHeight() (uint64, error)
 	DeleteLatestPreForkHeight() error
 
-	SetBlockToResumeFrom(blkID ids.ID) error
-	GetBlockToResumeFrom() (ids.ID, error)
-	DeleteBlockToResumeFrom() error
+	SetRepairCheckpoint(blkID ids.ID) error
+	GetRepairCheckpoint() (ids.ID, error)
+	DeleteRepairCheckpoint() error
 
 	clearCache() // useful in testing
 }
@@ -149,14 +149,14 @@ func (ibm *innerBlocksMapping) DeleteLatestPreForkHeight() error {
 	return ibm.db.Delete(key)
 }
 
-func (ibm *innerBlocksMapping) SetBlockToResumeFrom(blkID ids.ID) error {
-	key := resumePrefix
+func (ibm *innerBlocksMapping) SetRepairCheckpoint(blkID ids.ID) error {
+	key := checkpointPrefix
 	ibm.cache.Put(string(key), blkID)
 	return ibm.db.Put(key, blkID[:])
 }
 
-func (ibm *innerBlocksMapping) GetBlockToResumeFrom() (ids.ID, error) {
-	key := resumePrefix
+func (ibm *innerBlocksMapping) GetRepairCheckpoint() (ids.ID, error) {
+	key := checkpointPrefix
 	if blkIDIntf, found := ibm.cache.Get(string(key)); found {
 		if blkIDIntf == nil {
 			return ids.Empty, database.ErrNotFound
@@ -179,8 +179,8 @@ func (ibm *innerBlocksMapping) GetBlockToResumeFrom() (ids.ID, error) {
 	}
 }
 
-func (ibm *innerBlocksMapping) DeleteBlockToResumeFrom() error {
-	key := resumePrefix
+func (ibm *innerBlocksMapping) DeleteRepairCheckpoint() error {
+	key := checkpointPrefix
 	ibm.cache.Evict(string(key))
 	return ibm.db.Delete(key)
 }
