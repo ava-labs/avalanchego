@@ -21,6 +21,42 @@ var (
 	errRepairNoPostForkBlocks = errors.New("no post fork block to repair")
 )
 
+func (vm *VM) HeightIndexingEnabled() bool {
+	hVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
+	if !ok {
+		return false
+	}
+
+	if !hVM.HeightIndexingEnabled() {
+		return false
+	}
+
+	// If height indexing is not complete, return we mark HeightIndexedChainVM as disabled.
+	// even if vm.ChainVM is ready to serve blocks by height
+	_, err := vm.State.GetRepairCheckpoint()
+	switch err {
+	case nil:
+		return false
+	case database.ErrNotFound:
+		// Either indexing is complete or repairing it has not started yet.
+		break
+	default:
+		return false
+	}
+
+	lastAcceptedBlkID, err := vm.LastAccepted()
+	if err != nil {
+		return false
+	}
+	lastAcceptedBlk, err := vm.GetBlock(lastAcceptedBlkID)
+	if err != nil {
+		return false
+	}
+
+	_, indexComplete := vm.State.GetBlkIDByHeight(lastAcceptedBlk.Height())
+	return indexComplete == nil
+}
+
 func (vm *VM) GetBlockIDByHeight(height uint64) (ids.ID, error) {
 	hVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
 	if !ok {

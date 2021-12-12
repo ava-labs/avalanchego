@@ -124,7 +124,9 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	go ctx.Log.AssertNoError(vm.repairInnerBlockMapping())
+	go func() {
+		ctx.Log.AssertNoError(vm.repairInnerBlockMapping())
+	}()
 
 	return vm.setLastAcceptedOptionTime()
 }

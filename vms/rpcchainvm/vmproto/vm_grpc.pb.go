@@ -43,6 +43,7 @@ type VMClient interface {
 	BlockReject(ctx context.Context, in *BlockRejectRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetAncestors(ctx context.Context, in *GetAncestorsRequest, opts ...grpc.CallOption) (*GetAncestorsResponse, error)
 	BatchedParseBlock(ctx context.Context, in *BatchedParseBlockRequest, opts ...grpc.CallOption) (*BatchedParseBlockResponse, error)
+	HeightIndexedEnabled(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HeightIndexedEnabledResponse, error)
 	GetBlockIDByHeight(ctx context.Context, in *GetBlockIDByHeightRequest, opts ...grpc.CallOption) (*GetBlockIDByHeightResponse, error)
 }
 
@@ -270,6 +271,15 @@ func (c *vMClient) BatchedParseBlock(ctx context.Context, in *BatchedParseBlockR
 	return out, nil
 }
 
+func (c *vMClient) HeightIndexedEnabled(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HeightIndexedEnabledResponse, error) {
+	out := new(HeightIndexedEnabledResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/HeightIndexedEnabled", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *vMClient) GetBlockIDByHeight(ctx context.Context, in *GetBlockIDByHeightRequest, opts ...grpc.CallOption) (*GetBlockIDByHeightResponse, error) {
 	out := new(GetBlockIDByHeightResponse)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/GetBlockIDByHeight", in, out, opts...)
@@ -307,6 +317,7 @@ type VMServer interface {
 	BlockReject(context.Context, *BlockRejectRequest) (*emptypb.Empty, error)
 	GetAncestors(context.Context, *GetAncestorsRequest) (*GetAncestorsResponse, error)
 	BatchedParseBlock(context.Context, *BatchedParseBlockRequest) (*BatchedParseBlockResponse, error)
+	HeightIndexedEnabled(context.Context, *emptypb.Empty) (*HeightIndexedEnabledResponse, error)
 	GetBlockIDByHeight(context.Context, *GetBlockIDByHeightRequest) (*GetBlockIDByHeightResponse, error)
 	mustEmbedUnimplementedVMServer()
 }
@@ -386,6 +397,9 @@ func (UnimplementedVMServer) GetAncestors(context.Context, *GetAncestorsRequest)
 }
 func (UnimplementedVMServer) BatchedParseBlock(context.Context, *BatchedParseBlockRequest) (*BatchedParseBlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BatchedParseBlock not implemented")
+}
+func (UnimplementedVMServer) HeightIndexedEnabled(context.Context, *emptypb.Empty) (*HeightIndexedEnabledResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HeightIndexedEnabled not implemented")
 }
 func (UnimplementedVMServer) GetBlockIDByHeight(context.Context, *GetBlockIDByHeightRequest) (*GetBlockIDByHeightResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetBlockIDByHeight not implemented")
@@ -835,6 +849,24 @@ func _VM_BatchedParseBlock_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VM_HeightIndexedEnabled_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).HeightIndexedEnabled(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/HeightIndexedEnabled",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).HeightIndexedEnabled(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _VM_GetBlockIDByHeight_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetBlockIDByHeightRequest)
 	if err := dec(in); err != nil {
@@ -955,6 +987,10 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "BatchedParseBlock",
 			Handler:    _VM_BatchedParseBlock_Handler,
+		},
+		{
+			MethodName: "HeightIndexedEnabled",
+			Handler:    _VM_HeightIndexedEnabled_Handler,
 		},
 		{
 			MethodName: "GetBlockIDByHeight",

@@ -49,8 +49,9 @@ import (
 var (
 	errUnsupportedFXs = errors.New("unsupported feature extensions")
 
-	_ block.ChainVM        = &VMClient{}
-	_ block.BatchedChainVM = &VMClient{}
+	_ block.ChainVM              = &VMClient{}
+	_ block.BatchedChainVM       = &VMClient{}
+	_ block.HeightIndexedChainVM = &VMClient{}
 )
 
 const (
@@ -538,6 +539,17 @@ func (vm *VMClient) AppGossip(nodeID ids.ShortID, msg []byte) error {
 		},
 	)
 	return err
+}
+
+func (vm *VMClient) HeightIndexingEnabled() bool {
+	resp, err := vm.client.HeightIndexedEnabled(
+		context.Background(),
+		&emptypb.Empty{},
+	)
+	if err != nil {
+		return false
+	}
+	return resp.Enabled
 }
 
 func (vm *VMClient) GetBlockIDByHeight(height uint64) (ids.ID, error) {

@@ -18,3 +18,12 @@ func (vm *blockVM) GetBlockIDByHeight(height uint64) (ids.ID, error) {
 
 	return hVM.GetBlockIDByHeight(height)
 }
+
+func (vm *blockVM) HeightIndexingEnabled() bool {
+	hVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
+	if !ok {
+		return false
+	}
+
+	return hVM.HeightIndexingEnabled()
+}
