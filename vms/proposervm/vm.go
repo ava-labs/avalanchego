@@ -36,7 +36,8 @@ const (
 var (
 	dbPrefix = []byte("proposervm")
 
-	_ block.ChainVM = &VM{}
+	_ block.ChainVM              = &VM{}
+	_ block.HeightIndexedChainVM = &VM{}
 )
 
 type VM struct {
@@ -45,6 +46,7 @@ type VM struct {
 	minimumPChainHeight uint64
 
 	state.State
+	heightIndexer
 	proposer.Windower
 	tree.Tree
 	scheduler.Scheduler
@@ -65,9 +67,6 @@ type VM struct {
 	// timestamp if the last accepted block has been a PostForkOption block
 	// since having initialized the VM.
 	lastAcceptedTime time.Time
-
-	// height of last preFork accepted block
-	latestPreForkHeight uint64
 }
 
 func New(vm block.ChainVM, activationTime time.Time, minimumPChainHeight uint64) *VM {
@@ -95,6 +94,20 @@ func (vm *VM) Initialize(
 	vm.State = state.New(vm.db)
 	vm.Windower = proposer.New(ctx.ValidatorState, ctx.SubnetID, ctx.ChainID)
 	vm.Tree = tree.New()
+
+	innerHVM, _ := vm.ChainVM.(block.HeightIndexedChainVM)
+	vm.heightIndexer = heightIndexer{
+		latestPreForkHeight: 0,
+		innerHVM:            innerHVM,
+		log:                 vm.ctx.Log,
+		indexState:          vm.State,
+
+		lastAcceptedPostForkBlkIDF: vm.State.GetLastAccepted,
+		lastAcceptedInnerBlkIDF:    vm.ChainVM.LastAccepted,
+		getPostForkBlkF:            vm.getPostForkBlock,
+		getInnerBlkF:               vm.ChainVM.GetBlock,
+		dbCommitF:                  vm.db.Commit,
+	}
 
 	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine)
 	vm.Scheduler = scheduler

@@ -40,7 +40,7 @@ func (vm *TestHeightIndexedVM) GetBlockIDByHeight(height uint64) (ids.ID, error)
 
 func (vm *TestHeightIndexedVM) HeightIndexingEnabled() bool {
 	if vm.HeightIndexingEnabledF != nil {
-		return vm.HeightIndexingEnabled()
+		return vm.HeightIndexingEnabledF()
 	}
 	if vm.CantIsEnabled && vm.T != nil {
 		vm.T.Fatal(errHeightIndexingEnabled)

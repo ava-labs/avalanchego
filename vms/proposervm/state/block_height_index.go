@@ -17,16 +17,16 @@ const (
 )
 
 var (
-	_ AcceptedPostForkBlockHeightIndex = &innerBlocksMapping{}
+	_ HeightIndex = &innerHeightIndex{}
 
 	heightPrefix     = []byte("heightkey")
 	preForkPrefix    = []byte("preForkKey")
 	checkpointPrefix = []byte("checkpoint")
 )
 
-// AcceptedPostForkBlockHeightIndex contains mapping of blockHeights to accepted proposer block IDs.
+// HeightIndex contains mapping of blockHeights to accepted proposer block IDs.
 // Only accepted blocks are indexed; moreover only post-fork blocks are indexed.
-type AcceptedPostForkBlockHeightIndex interface {
+type HeightIndex interface {
 	SetBlkIDByHeight(height uint64, blkID ids.ID) (int, error)
 	GetBlkIDByHeight(height uint64) (ids.ID, error)
 	DeleteBlkIDByHeight(height uint64) error
@@ -42,7 +42,7 @@ type AcceptedPostForkBlockHeightIndex interface {
 	clearCache() // useful in testing
 }
 
-type innerBlocksMapping struct {
+type innerHeightIndex struct {
 	// Caches block height -> proposerVMBlockID. If the proposerVMBlockID is nil,
 	// the height is not in storage.
 	cache cache.Cacher
@@ -50,14 +50,14 @@ type innerBlocksMapping struct {
 	db database.Database
 }
 
-func NewBlockHeightIndex(db database.Database) AcceptedPostForkBlockHeightIndex {
-	return &innerBlocksMapping{
+func NewHeightIndex(db database.Database) HeightIndex {
+	return &innerHeightIndex{
 		cache: &cache.LRU{Size: cacheSize},
 		db:    db,
 	}
 }
 
-func (ibm *innerBlocksMapping) SetBlkIDByHeight(height uint64, blkID ids.ID) (int, error) {
+func (ibm *innerHeightIndex) SetBlkIDByHeight(height uint64, blkID ids.ID) (int, error) {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 	key := make([]byte, len(heightPrefix)+len(heightBytes))
@@ -68,7 +68,7 @@ func (ibm *innerBlocksMapping) SetBlkIDByHeight(height uint64, blkID ids.ID) (in
 	return len(key) + len(blkID), ibm.db.Put(key, blkID[:])
 }
 
-func (ibm *innerBlocksMapping) GetBlkIDByHeight(height uint64) (ids.ID, error) {
+func (ibm *innerHeightIndex) GetBlkIDByHeight(height uint64) (ids.ID, error) {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 	key := make([]byte, len(heightPrefix)+len(heightBytes))
@@ -98,7 +98,7 @@ func (ibm *innerBlocksMapping) GetBlkIDByHeight(height uint64) (ids.ID, error) {
 	}
 }
 
-func (ibm *innerBlocksMapping) DeleteBlkIDByHeight(height uint64) error {
+func (ibm *innerHeightIndex) DeleteBlkIDByHeight(height uint64) error {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 	key := make([]byte, len(heightPrefix)+len(heightBytes))
@@ -109,7 +109,7 @@ func (ibm *innerBlocksMapping) DeleteBlkIDByHeight(height uint64) error {
 	return ibm.db.Delete(key)
 }
 
-func (ibm *innerBlocksMapping) SetLatestPreForkHeight(height uint64) error {
+func (ibm *innerHeightIndex) SetLatestPreForkHeight(height uint64) error {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 
@@ -117,7 +117,7 @@ func (ibm *innerBlocksMapping) SetLatestPreForkHeight(height uint64) error {
 	return ibm.db.Put(preForkPrefix, heightBytes)
 }
 
-func (ibm *innerBlocksMapping) GetLatestPreForkHeight() (uint64, error) {
+func (ibm *innerHeightIndex) GetLatestPreForkHeight() (uint64, error) {
 	key := preForkPrefix
 	if blkIDIntf, found := ibm.cache.Get(string(key)); found {
 		if blkIDIntf == nil {
@@ -143,19 +143,19 @@ func (ibm *innerBlocksMapping) GetLatestPreForkHeight() (uint64, error) {
 	}
 }
 
-func (ibm *innerBlocksMapping) DeleteLatestPreForkHeight() error {
+func (ibm *innerHeightIndex) DeleteLatestPreForkHeight() error {
 	key := preForkPrefix
 	ibm.cache.Evict(string(key))
 	return ibm.db.Delete(key)
 }
 
-func (ibm *innerBlocksMapping) SetRepairCheckpoint(blkID ids.ID) error {
+func (ibm *innerHeightIndex) SetRepairCheckpoint(blkID ids.ID) error {
 	key := checkpointPrefix
 	ibm.cache.Put(string(key), blkID)
 	return ibm.db.Put(key, blkID[:])
 }
 
-func (ibm *innerBlocksMapping) GetRepairCheckpoint() (ids.ID, error) {
+func (ibm *innerHeightIndex) GetRepairCheckpoint() (ids.ID, error) {
 	key := checkpointPrefix
 	if blkIDIntf, found := ibm.cache.Get(string(key)); found {
 		if blkIDIntf == nil {
@@ -179,12 +179,12 @@ func (ibm *innerBlocksMapping) GetRepairCheckpoint() (ids.ID, error) {
 	}
 }
 
-func (ibm *innerBlocksMapping) DeleteRepairCheckpoint() error {
+func (ibm *innerHeightIndex) DeleteRepairCheckpoint() error {
 	key := checkpointPrefix
 	ibm.cache.Evict(string(key))
 	return ibm.db.Delete(key)
 }
 
-func (ibm *innerBlocksMapping) clearCache() {
+func (ibm *innerHeightIndex) clearCache() {
 	ibm.cache.Flush()
 }

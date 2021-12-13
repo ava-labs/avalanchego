@@ -1,658 +1,450 @@
 package proposervm
 
 import (
-	"bytes"
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	snowmanVMs "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
+	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestHeightBlockIndexPostFork(t *testing.T) {
 	assert := assert.New(t)
-	activationTime := time.Time{} // enable ProBlks
-	minPChainHeight := uint64(0)
-	innerVM, _, proVM, innerGenBlk, DBManager := initTestProposerVM(t, activationTime, minPChainHeight)
 
-	// build a chain accepting a bunch of blocks
+	// Build a chain of post fork blocks
+	innerGenBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		HeightV:    0,
+		TimestampV: genesisTimestamp,
+		BytesV:     []byte{0},
+	}
+
 	var (
-		blkNumber    = uint64(10)
+		blkNumber = uint64(10)
+
 		prevInnerBlk = snowman.Block(innerGenBlk)
-		lastInnerBlk snowman.Block
-		innerBlks    = make(map[ids.ID]snowman.Block)
-		lastProBlk   snowman.Block
-		proBlks      = make(map[ids.ID]snowman.Block)
-		err          error
+		lastProBlk   = snowman.Block(innerGenBlk)
+
+		innerBlks = make(map[ids.ID]snowman.Block)
+		proBlks   = make(map[ids.ID]PostForkBlock)
 	)
-
 	innerBlks[innerGenBlk.ID()] = innerGenBlk
-	innerVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		blk, found := innerBlks[blkID]
-		if !found {
-			return nil, errUnknownBlock
-		}
-		return blk, nil
-	}
-	innerVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
-		for _, blk := range innerBlks {
-			if bytes.Equal(b, blk.Bytes()) {
-				return blk, nil
-			}
-		}
-		return nil, errUnknownBlock
-	}
-	innerVM.LastAcceptedF = func() (ids.ID, error) { return prevInnerBlk.ID(), nil }
 
-	for blkCount := uint64(1); blkCount <= blkNumber; blkCount++ {
-		lastInnerBlk = &snowman.TestBlock{
+	for blkHeight := uint64(1); blkHeight <= blkNumber; blkHeight++ {
+		// build inner block
+		lastInnerBlk := &snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.GenerateTestID(),
-				StatusV: choices.Processing,
+				StatusV: choices.Accepted,
 			},
-			BytesV:     []byte{uint8(blkCount)},
+			BytesV:     []byte{uint8(blkHeight)},
 			ParentV:    prevInnerBlk.ID(),
-			HeightV:    blkCount,
+			HeightV:    blkHeight,
 			TimestampV: prevInnerBlk.Timestamp().Add(proposer.MaxDelay),
 		}
 		innerBlks[lastInnerBlk.ID()] = lastInnerBlk
 
-		innerVM.BuildBlockF = func() (snowman.Block, error) { return lastInnerBlk, nil }
-		proVM.Set(proVM.Time().Add(proposer.MaxDelay))
-		lastProBlk, err = proVM.BuildBlock()
-
+		// build wrapping post fork block
+		statelessChild, err := block.BuildUnsigned(
+			lastProBlk.ID(), // parentID
+			lastProBlk.Timestamp().Add(proposer.MaxDelay), // timestamp
+			uint64(0), // pChainHeight
+			lastInnerBlk.Bytes(),
+		)
 		assert.NoError(err)
-		assert.NoError(proVM.SetPreference(lastProBlk.ID()))
-		assert.NoError(lastProBlk.Accept())
+		postForkBlk := &postForkBlock{
+			SignedBlock: statelessChild,
+			postForkCommonComponents: postForkCommonComponents{
+				innerBlk: lastInnerBlk,
+				status:   choices.Accepted,
+			},
+		}
+		proBlks[postForkBlk.ID()] = postForkBlk
 
-		proBlks[lastProBlk.ID()] = lastProBlk
+		lastProBlk = postForkBlk
 		prevInnerBlk = lastInnerBlk
 	}
 
-	// check that mapping is fully built
+	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
+	hIndex := &heightIndexer{
+		innerHVM: &snowmanVMs.TestHeightIndexedVM{
+			HeightIndexingEnabledF: func() bool { return true },
+		},
+		log:        logging.NoLog{},
+		indexState: state.NewHeightIndex(dbMan.Current().Database),
+
+		lastAcceptedPostForkBlkIDF: func() (ids.ID, error) { return lastProBlk.ID(), nil },
+		lastAcceptedInnerBlkIDF:    func() (ids.ID, error) { return prevInnerBlk.ID(), nil },
+		getPostForkBlkF: func(blkID ids.ID) (PostForkBlock, error) {
+			blk, found := proBlks[blkID]
+			if !found {
+				return nil, database.ErrNotFound
+			}
+			return blk, nil
+		},
+		getInnerBlkF: func(blkID ids.ID) (snowman.Block, error) {
+			blk, found := innerBlks[blkID]
+			if !found {
+				return nil, database.ErrNotFound
+			}
+			return blk, nil
+		},
+		dbCommitF: func() error { return nil },
+	}
+
+	// height index is empty at start
+	assert.True(hIndex.latestPreForkHeight == 0)
 	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := proVM.State.GetBlkIDByHeight(height)
+		_, err := hIndex.indexState.GetBlkIDByHeight(height)
+		assert.Error(err, database.ErrNotFound)
+	}
+
+	// show that height index should be rebuild and it is
+	doRepair, startBlkID, err := hIndex.shouldRepair()
+	assert.NoError(err)
+	assert.True(doRepair)
+	assert.True(startBlkID == lastProBlk.ID())
+	assert.NoError(hIndex.doRepair(startBlkID))
+
+	// check that height index is fully built
+	assert.True(hIndex.latestPreForkHeight == 0)
+	for height := uint64(1); height <= blkNumber; height++ {
+		_, err := hIndex.indexState.GetBlkIDByHeight(height)
 		assert.NoError(err)
 	}
 
-	// Entirely delete the mapping to show it gets reconstructed
-	for height := uint64(1); height <= blkNumber; height++ {
-		assert.NoError(proVM.State.DeleteBlkIDByHeight(height))
-	}
-
-	// show repairs rebuilds the mapping
-	assert.NoError(proVM.repairHeightIndex())
-
-	// check that mapping is fully built
-	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := proVM.State.GetBlkIDByHeight(height)
-		assert.NoError(err)
-	}
-
-	// build a different VM on the same DB to simulated restart
-	innerVM.InitializeF = func(*snow.Context, manager.Manager,
-		[]byte, []byte, []byte, chan<- common.Message,
-		[]*common.Fx, common.AppSender) error {
-		return nil
-	}
-	newProVM := New(innerVM, activationTime, minPChainHeight)
-	if err := newProVM.Initialize(
-		snow.DefaultContextTest(),
-		DBManager, // same DB as previous proVM
-		[]byte("genesis state"),
-		nil, nil, nil, nil, nil,
-	); err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
-
-	// check that mapping is fully built
-	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := proVM.State.GetBlkIDByHeight(height)
-		assert.NoError(err)
-	}
+	// check that height index wont' be rebuild anymore
+	doRepair, _, err = hIndex.shouldRepair()
+	assert.NoError(err)
+	assert.False(doRepair)
 }
 
 func TestHeightBlockIndexPreFork(t *testing.T) {
 	assert := assert.New(t)
-	activationTime := mockable.MaxTime // disable ProBlks
-	minPChainHeight := uint64(0)
-	innerVM, _, proVM, innerGenBlk, DBManager := initTestProposerVM(t, activationTime, minPChainHeight)
 
-	// build a chain accepting a bunch of blocks
-	var (
-		blkNumber    = uint64(10)
-		prevInnerBlk = snowman.Block(innerGenBlk)
-		lastInnerBlk snowman.Block
-		innerBlks    = make(map[ids.ID]snowman.Block)
-		lastProBlk   snowman.Block
-		proBlks      = make(map[ids.ID]snowman.Block)
-		err          error
-	)
-
-	innerBlks[innerGenBlk.ID()] = innerGenBlk
-	innerVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		blk, found := innerBlks[blkID]
-		if !found {
-			return nil, errUnknownBlock
-		}
-		return blk, nil
-	}
-	innerVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
-		for _, blk := range innerBlks {
-			if bytes.Equal(b, blk.Bytes()) {
-				return blk, nil
-			}
-		}
-		return nil, errUnknownBlock
-	}
-	innerVM.LastAcceptedF = func() (ids.ID, error) { return prevInnerBlk.ID(), nil }
-
-	for blkCount := uint64(1); blkCount <= blkNumber; blkCount++ {
-		lastInnerBlk = &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     ids.GenerateTestID(),
-				StatusV: choices.Processing,
-			},
-			BytesV:     []byte{uint8(blkCount)},
-			ParentV:    prevInnerBlk.ID(),
-			HeightV:    blkCount,
-			TimestampV: prevInnerBlk.Timestamp(),
-		}
-		innerBlks[lastInnerBlk.ID()] = lastInnerBlk
-
-		innerVM.BuildBlockF = func() (snowman.Block, error) { return lastInnerBlk, nil }
-		lastProBlk, err = proVM.BuildBlock()
-
-		assert.NoError(err)
-		assert.NoError(proVM.SetPreference(lastProBlk.ID()))
-		assert.NoError(lastProBlk.Accept())
-
-		proBlks[lastProBlk.ID()] = lastProBlk
-		prevInnerBlk = lastInnerBlk
-	}
-
-	// mapping should be empty
-	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := proVM.State.GetBlkIDByHeight(height)
-		assert.Error(err, database.ErrNotFound)
-	}
-	// fork height should track highest accepted preFork block
-	assert.True(proVM.latestPreForkHeight == lastProBlk.Height())
-
-	// show repairs rebuilds the mapping
-	assert.NoError(proVM.repairHeightIndex())
-
-	// mapping should be empty
-	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := proVM.State.GetBlkIDByHeight(height)
-		assert.Error(err, database.ErrNotFound)
-	}
-	// fork height should track highest accepted preFork block
-	assert.True(proVM.latestPreForkHeight == lastProBlk.Height())
-
-	// build a different VM on the same DB to simulated restart
-	innerVM.InitializeF = func(*snow.Context, manager.Manager,
-		[]byte, []byte, []byte, chan<- common.Message,
-		[]*common.Fx, common.AppSender) error {
-		return nil
-	}
-	newProVM := New(innerVM, activationTime, minPChainHeight)
-	if err := newProVM.Initialize(
-		snow.DefaultContextTest(),
-		DBManager, // same DB as previous proVM
-		[]byte("genesis state"),
-		nil, nil, nil, nil, nil,
-	); err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
-
-	// Show the mapping is there after newProVM initialization
-	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := proVM.State.GetBlkIDByHeight(height)
-		assert.Error(err, database.ErrNotFound)
-	}
-	// fork height should track highest accepted preFork block
-	assert.True(proVM.latestPreForkHeight == lastProBlk.Height())
-}
-
-func TestHeightBlockIndexAcrossFork(t *testing.T) {
-	assert := assert.New(t)
-	activationTime := genesisTimestamp.Add(10 * time.Second)
-	minPChainHeight := uint64(0)
-	innerVM, _, proVM, innerGenBlk, DBManager := initTestProposerVM(t, activationTime, minPChainHeight)
-
-	// build a chain accepting a bunch of blocks
-	var (
-		blkNumber    = uint64(10)
-		forkHeight   = blkNumber / 2
-		prevInnerBlk = snowman.Block(innerGenBlk)
-		lastInnerBlk snowman.Block
-		innerBlks    = make(map[ids.ID]snowman.Block)
-		lastProBlk   snowman.Block
-		proBlks      = make(map[ids.ID]snowman.Block)
-		err          error
-	)
-
-	innerBlks[innerGenBlk.ID()] = innerGenBlk
-	innerVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		blk, found := innerBlks[blkID]
-		if !found {
-			return nil, errUnknownBlock
-		}
-		return blk, nil
-	}
-	innerVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
-		for _, blk := range innerBlks {
-			if bytes.Equal(b, blk.Bytes()) {
-				return blk, nil
-			}
-		}
-		return nil, errUnknownBlock
-	}
-	innerVM.LastAcceptedF = func() (ids.ID, error) { return prevInnerBlk.ID(), nil }
-
-	// build preFork blocks first
-	for blkCount := uint64(1); blkCount < forkHeight; blkCount++ {
-		lastInnerBlk = &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     ids.GenerateTestID(),
-				StatusV: choices.Processing,
-			},
-			BytesV:     []byte{uint8(blkCount)},
-			ParentV:    prevInnerBlk.ID(),
-			HeightV:    blkCount,
-			TimestampV: prevInnerBlk.Timestamp(),
-		}
-		innerBlks[lastInnerBlk.ID()] = lastInnerBlk
-
-		innerVM.BuildBlockF = func() (snowman.Block, error) { return lastInnerBlk, nil }
-		proVM.Set(genesisTimestamp)
-		lastProBlk, err = proVM.BuildBlock()
-
-		assert.NoError(err)
-		assert.NoError(proVM.SetPreference(lastProBlk.ID()))
-		assert.NoError(lastProBlk.Accept())
-
-		proBlks[lastProBlk.ID()] = lastProBlk
-		prevInnerBlk = lastInnerBlk
-	}
-
-	// build fork block
-	lastInnerBlk = &snowman.TestBlock{
+	// Build a chain of pre fork blocks
+	innerGenBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choices.Accepted,
 		},
-		BytesV:     []byte{uint8(forkHeight)},
-		ParentV:    prevInnerBlk.ID(),
-		HeightV:    forkHeight,
-		TimestampV: activationTime.Add(time.Second),
+		HeightV:    0,
+		TimestampV: genesisTimestamp,
+		BytesV:     []byte{0},
 	}
-	innerBlks[lastInnerBlk.ID()] = lastInnerBlk
 
-	innerVM.BuildBlockF = func() (snowman.Block, error) { return lastInnerBlk, nil }
-	proVM.Set(genesisTimestamp)
-	lastProBlk, err = proVM.BuildBlock()
+	var (
+		blkNumber    = uint64(10)
+		prevInnerBlk = snowman.Block(innerGenBlk)
+		innerBlks    = make(map[ids.ID]snowman.Block)
+	)
+	innerBlks[innerGenBlk.ID()] = innerGenBlk
 
-	assert.NoError(err)
-	assert.NoError(proVM.SetPreference(lastProBlk.ID()))
-	assert.NoError(lastProBlk.Accept())
-
-	proBlks[lastProBlk.ID()] = lastProBlk
-	prevInnerBlk = lastInnerBlk
-
-	// build postFork blocks then
-	proVM.Set(activationTime)
-	for blkCount := forkHeight + 1; blkCount <= blkNumber; blkCount++ {
-		lastInnerBlk = &snowman.TestBlock{
+	for blkHeight := uint64(1); blkHeight <= blkNumber; blkHeight++ {
+		// build inner block
+		lastInnerBlk := &snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.GenerateTestID(),
-				StatusV: choices.Processing,
+				StatusV: choices.Accepted,
 			},
-			BytesV:     []byte{uint8(blkCount)},
+			BytesV:     []byte{uint8(blkHeight)},
 			ParentV:    prevInnerBlk.ID(),
-			HeightV:    blkCount,
+			HeightV:    blkHeight,
 			TimestampV: prevInnerBlk.Timestamp().Add(proposer.MaxDelay),
 		}
 		innerBlks[lastInnerBlk.ID()] = lastInnerBlk
 
-		innerVM.BuildBlockF = func() (snowman.Block, error) { return lastInnerBlk, nil }
-		proVM.Set(lastInnerBlk.Timestamp().Add(proposer.MaxDelay))
-		lastProBlk, err = proVM.BuildBlock()
-
-		assert.NoError(err)
-		assert.NoError(proVM.SetPreference(lastProBlk.ID()))
-		assert.NoError(lastProBlk.Accept())
-
-		proBlks[lastProBlk.ID()] = lastProBlk
 		prevInnerBlk = lastInnerBlk
 	}
 
-	// check that mapping is fully built
-	assert.True(proVM.latestPreForkHeight == forkHeight)
-	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := proVM.State.GetBlkIDByHeight(height)
-		if height <= forkHeight {
-			// preFork blocks should not be in mapping
-			assert.Error(err, database.ErrNotFound)
-		} else {
-			// postFork blocks should be in mapping
-			assert.NoError(err)
-		}
-	}
+	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
+	hIndex := &heightIndexer{
+		innerHVM: &snowmanVMs.TestHeightIndexedVM{
+			HeightIndexingEnabledF: func() bool { return true },
+		},
+		log:        logging.NoLog{},
+		indexState: state.NewHeightIndex(dbMan.Current().Database),
 
-	// Entirely delete the mapping to show it gets reconstructed
-	for height := uint64(1); height <= blkNumber; height++ {
-		assert.NoError(proVM.State.DeleteBlkIDByHeight(height))
-	}
-	proVM.latestPreForkHeight = 0
-
-	// show repairs rebuilds the mapping
-	assert.NoError(proVM.repairHeightIndex())
-
-	assert.True(proVM.latestPreForkHeight == forkHeight)
-	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := proVM.State.GetBlkIDByHeight(height)
-		if height <= forkHeight {
-			// preFork blocks should not be in mapping
-			assert.Error(err, database.ErrNotFound)
-		} else {
-			// postFork blocks should be in mapping
-			assert.NoError(err)
-		}
-	}
-
-	// build a different VM on the same DB to simulated restart
-	innerVM.InitializeF = func(*snow.Context, manager.Manager,
-		[]byte, []byte, []byte, chan<- common.Message,
-		[]*common.Fx, common.AppSender) error {
-		return nil
-	}
-	newProVM := New(innerVM, activationTime, minPChainHeight)
-	if err := newProVM.Initialize(
-		snow.DefaultContextTest(),
-		DBManager, // same DB as previous proVM
-		[]byte("genesis state"),
-		nil, nil, nil, nil, nil,
-	); err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
-
-	// Show the mapping is there after newProVM initialization
-	assert.True(newProVM.latestPreForkHeight == forkHeight)
-	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := newProVM.State.GetBlkIDByHeight(height)
-		if height <= forkHeight {
-			// preFork blocks should not be in mapping
-			assert.Error(err, database.ErrNotFound)
-		} else {
-			// postFork blocks should be in mapping
-			assert.NoError(err)
-		}
-	}
-}
-
-func TestHeightBlockIndexBackwardCompatiblity(t *testing.T) {
-	// say the chain of preFork and postFork blocks is already accepted.
-	// Show that repairs can build mapping from scratch.
-
-	assert := assert.New(t)
-	activationTime := mockable.MaxTime // disable ProBlks
-	minPChainHeight := uint64(0)
-	innerVM, _, proVM, innerGenBlk, DBManager := initTestProposerVM(t, activationTime, minPChainHeight)
-
-	// store some preFork blocks
-	// build a chain accepting a bunch of blocks
-	var (
-		blkNumber    = uint64(10)
-		forkHeight   = blkNumber / 2
-		prevInnerBlk = snowman.Block(innerGenBlk)
-		lastInnerBlk snowman.Block
-		innerBlks    = make(map[ids.ID]snowman.Block)
-		lastProBlk   snowman.Block
-		proBlks      = make(map[ids.ID]snowman.Block)
-	)
-
-	innerBlks[innerGenBlk.ID()] = innerGenBlk
-	innerVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		blk, found := innerBlks[blkID]
-		if !found {
-			return nil, errUnknownBlock
-		}
-		return blk, nil
-	}
-	innerVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
-		for _, blk := range innerBlks {
-			if bytes.Equal(b, blk.Bytes()) {
-				return blk, nil
+		lastAcceptedPostForkBlkIDF: func() (ids.ID, error) { return ids.Empty, database.ErrNotFound },
+		lastAcceptedInnerBlkIDF:    func() (ids.ID, error) { return prevInnerBlk.ID(), nil },
+		getPostForkBlkF:            func(blkID ids.ID) (PostForkBlock, error) { return nil, database.ErrNotFound },
+		getInnerBlkF: func(blkID ids.ID) (snowman.Block, error) {
+			blk, found := innerBlks[blkID]
+			if !found {
+				return nil, database.ErrNotFound
 			}
-		}
-		return nil, errUnknownBlock
-	}
-	innerVM.LastAcceptedF = func() (ids.ID, error) { return prevInnerBlk.ID(), nil }
-
-	// store preFork blocks first
-	for blkCount := uint64(1); blkCount <= forkHeight; blkCount++ {
-		lastInnerBlk = &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     ids.GenerateTestID(),
-				StatusV: choices.Accepted, // set status to accepted already
-			},
-			BytesV:     []byte{uint8(blkCount)},
-			ParentV:    prevInnerBlk.ID(),
-			HeightV:    blkCount,
-			TimestampV: prevInnerBlk.Timestamp(),
-		}
-		innerBlks[lastInnerBlk.ID()] = lastInnerBlk
-
-		lastProBlk = &preForkBlock{
-			Block: lastInnerBlk,
-			vm:    proVM,
-		}
-
-		proBlks[lastProBlk.ID()] = lastProBlk
-		prevInnerBlk = lastInnerBlk
+			return blk, nil
+		},
+		dbCommitF: func() error { return nil },
 	}
 
-	// store postFork blocks
-	for blkCount := forkHeight + 1; blkCount <= blkNumber; blkCount++ {
-		lastInnerBlk = &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     ids.GenerateTestID(),
-				StatusV: choices.Accepted, // set status to accepted already
-			},
-			BytesV:     []byte{uint8(blkCount)},
-			ParentV:    prevInnerBlk.ID(),
-			HeightV:    blkCount,
-			TimestampV: prevInnerBlk.Timestamp(),
-		}
-		innerBlks[lastInnerBlk.ID()] = lastInnerBlk
-
-		statelessChild, err := block.BuildUnsigned(
-			lastProBlk.ID(),
-			time.Time{},
-			0, /*pChainHeight*/
-			lastInnerBlk.Bytes(),
-		)
-		assert.NoError(err)
-		postForkBlk := &postForkBlock{
-			SignedBlock: statelessChild,
-			postForkCommonComponents: postForkCommonComponents{
-				vm:       proVM,
-				innerBlk: lastInnerBlk,
-				status:   choices.Accepted, // set status to accepted already
-			},
-		}
-
-		assert.NoError(proVM.storePostForkBlock(postForkBlk))
-		assert.NoError(proVM.State.SetLastAccepted(postForkBlk.ID()))
-
-		lastProBlk = postForkBlk
-		proBlks[lastProBlk.ID()] = lastProBlk
-		prevInnerBlk = lastInnerBlk
-	}
-
-	// mapping is currently empty
-	assert.True(proVM.latestPreForkHeight == 0)
+	// height index is empty at start
+	assert.True(hIndex.latestPreForkHeight == 0)
 	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := proVM.State.GetBlkIDByHeight(height)
+		_, err := hIndex.indexState.GetBlkIDByHeight(height)
 		assert.Error(err, database.ErrNotFound)
 	}
 
-	// show repairs builds the mapping
-	assert.NoError(proVM.repairHeightIndex())
-
-	assert.True(proVM.latestPreForkHeight == forkHeight)
-	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := proVM.State.GetBlkIDByHeight(height)
-		if height <= forkHeight {
-			// preFork blocks should not be in mapping
-			assert.Error(err, database.ErrNotFound)
-		} else {
-			// postFork blocks should be in mapping
-			assert.NoError(err)
-		}
-	}
-
-	// build a different VM on the same DB to simulated restart
-	innerVM.InitializeF = func(*snow.Context, manager.Manager,
-		[]byte, []byte, []byte, chan<- common.Message,
-		[]*common.Fx, common.AppSender) error {
-		return nil
-	}
-	newProVM := New(innerVM, activationTime, minPChainHeight)
-	if err := newProVM.Initialize(
-		snow.DefaultContextTest(),
-		DBManager, // same DB as previous proVM
-		[]byte("genesis state"),
-		nil, nil, nil, nil, nil,
-	); err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
-
-	// Show the mapping is there after newProVM initialization
-	assert.True(newProVM.latestPreForkHeight == forkHeight)
-	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := newProVM.State.GetBlkIDByHeight(height)
-		if height <= forkHeight {
-			// preFork blocks should not be in mapping
-			assert.Error(err, database.ErrNotFound)
-		} else {
-			// postFork blocks should be in mapping
-			assert.NoError(err)
-		}
-	}
+	// with preFork only blocks there is nothing to rebuild
+	doRepair, _, err := hIndex.shouldRepair()
+	assert.NoError(err)
+	assert.False(doRepair)
 }
 
-func TestHeightBlockIndexResumefromCheckPoint(t *testing.T) {
-	// show that repair process is checkpointed and can be resumed
-
+func TestHeightBlockIndexAcrossFork(t *testing.T) {
 	assert := assert.New(t)
-	activationTime := mockable.MaxTime // disable ProBlks
-	minPChainHeight := uint64(0)
-	innerVM, _, proVM, innerGenBlk, _ := initTestProposerVM(t, activationTime, minPChainHeight)
+
+	// Build a chain of pre fork and post fork blocks
+	innerGenBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		HeightV:    0,
+		TimestampV: genesisTimestamp,
+		BytesV:     []byte{0},
+	}
 
 	var (
-		blkNumber    = uint64(10)
-		forkHeight   = blkNumber / 2
+		blkNumber  = uint64(10)
+		forkHeight = blkNumber / 2
+
 		prevInnerBlk = snowman.Block(innerGenBlk)
-		lastInnerBlk snowman.Block
-		innerBlks    = make(map[ids.ID]snowman.Block)
-		lastProBlk   snowman.Block
-		proBlks      = make(map[ids.ID]snowman.Block)
+		lastProBlk   = snowman.Block(innerGenBlk)
+
+		innerBlks = make(map[ids.ID]snowman.Block)
+		proBlks   = make(map[ids.ID]PostForkBlock)
 	)
-
 	innerBlks[innerGenBlk.ID()] = innerGenBlk
-	innerVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		blk, found := innerBlks[blkID]
-		if !found {
-			return nil, errUnknownBlock
-		}
-		return blk, nil
-	}
-	innerVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
-		for _, blk := range innerBlks {
-			if bytes.Equal(b, blk.Bytes()) {
-				return blk, nil
-			}
-		}
-		return nil, errUnknownBlock
-	}
-	innerVM.LastAcceptedF = func() (ids.ID, error) { return prevInnerBlk.ID(), nil }
 
-	// store preFork blocks first
-	for blkCount := uint64(1); blkCount <= forkHeight; blkCount++ {
-		lastInnerBlk = &snowman.TestBlock{
+	// build preFork blocks
+	for blkHeight := uint64(1); blkHeight <= forkHeight; blkHeight++ {
+		lastInnerBlk := &snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.GenerateTestID(),
-				StatusV: choices.Accepted, // set status to accepted already
+				StatusV: choices.Accepted,
 			},
-			BytesV:     []byte{uint8(blkCount)},
+			BytesV:     []byte{uint8(blkHeight)},
 			ParentV:    prevInnerBlk.ID(),
-			HeightV:    blkCount,
-			TimestampV: prevInnerBlk.Timestamp(),
+			HeightV:    blkHeight,
+			TimestampV: prevInnerBlk.Timestamp().Add(proposer.MaxDelay),
 		}
 		innerBlks[lastInnerBlk.ID()] = lastInnerBlk
 
-		lastProBlk = &preForkBlock{
-			Block: lastInnerBlk,
-			vm:    proVM,
-		}
-
-		proBlks[lastProBlk.ID()] = lastProBlk
 		prevInnerBlk = lastInnerBlk
 	}
 
-	// store postFork blocks
-	for blkCount := forkHeight + 1; blkCount <= blkNumber; blkCount++ {
-		lastInnerBlk = &snowman.TestBlock{
+	// build postFork blocks
+	for blkHeight := forkHeight + 1; blkHeight <= blkNumber; blkHeight++ {
+		lastInnerBlk := &snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.GenerateTestID(),
-				StatusV: choices.Accepted, // set status to accepted already
+				StatusV: choices.Accepted,
 			},
-			BytesV:     []byte{uint8(blkCount)},
+			BytesV:     []byte{uint8(blkHeight)},
 			ParentV:    prevInnerBlk.ID(),
-			HeightV:    blkCount,
-			TimestampV: prevInnerBlk.Timestamp(),
+			HeightV:    blkHeight,
+			TimestampV: prevInnerBlk.Timestamp().Add(proposer.MaxDelay),
 		}
 		innerBlks[lastInnerBlk.ID()] = lastInnerBlk
 
 		statelessChild, err := block.BuildUnsigned(
 			lastProBlk.ID(),
-			time.Time{},
-			0, /*pChainHeight*/
+			lastProBlk.Timestamp().Add(proposer.MaxDelay),
+			uint64(0),
 			lastInnerBlk.Bytes(),
 		)
 		assert.NoError(err)
 		postForkBlk := &postForkBlock{
 			SignedBlock: statelessChild,
 			postForkCommonComponents: postForkCommonComponents{
-				vm:       proVM,
 				innerBlk: lastInnerBlk,
-				status:   choices.Accepted, // set status to accepted already
+				status:   choices.Accepted,
 			},
 		}
-
-		assert.NoError(proVM.storePostForkBlock(postForkBlk))
-		assert.NoError(proVM.State.SetLastAccepted(postForkBlk.ID()))
+		proBlks[postForkBlk.ID()] = postForkBlk
 
 		lastProBlk = postForkBlk
-		proBlks[lastProBlk.ID()] = lastProBlk
 		prevInnerBlk = lastInnerBlk
 	}
 
+	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
+	hIndex := &heightIndexer{
+		innerHVM: &snowmanVMs.TestHeightIndexedVM{
+			HeightIndexingEnabledF: func() bool { return true },
+		},
+		log:        logging.NoLog{},
+		indexState: state.NewHeightIndex(dbMan.Current().Database),
+
+		lastAcceptedPostForkBlkIDF: func() (ids.ID, error) { return lastProBlk.ID(), nil },
+		lastAcceptedInnerBlkIDF:    func() (ids.ID, error) { return prevInnerBlk.ID(), nil },
+		getPostForkBlkF: func(blkID ids.ID) (PostForkBlock, error) {
+			blk, found := proBlks[blkID]
+			if !found {
+				return nil, database.ErrNotFound
+			}
+			return blk, nil
+		},
+		getInnerBlkF: func(blkID ids.ID) (snowman.Block, error) {
+			blk, found := innerBlks[blkID]
+			if !found {
+				return nil, database.ErrNotFound
+			}
+			return blk, nil
+		},
+		dbCommitF: func() error { return nil },
+	}
+
+	// height index is empty at start
+	assert.True(hIndex.latestPreForkHeight == 0)
+	for height := uint64(1); height <= blkNumber; height++ {
+		_, err := hIndex.indexState.GetBlkIDByHeight(height)
+		assert.Error(err, database.ErrNotFound)
+	}
+
+	// show that height index should be rebuild and it is
+	doRepair, startBlkID, err := hIndex.shouldRepair()
+	assert.NoError(err)
+	assert.True(doRepair)
+	assert.True(startBlkID == lastProBlk.ID())
+	assert.NoError(hIndex.doRepair(startBlkID))
+
+	// check that height index is fully built
+	assert.True(hIndex.latestPreForkHeight == forkHeight)
+	for height := uint64(0); height <= forkHeight; height++ {
+		_, err := hIndex.indexState.GetBlkIDByHeight(height)
+		assert.Error(err, database.ErrNotFound)
+	}
+	for height := forkHeight + 1; height <= blkNumber; height++ {
+		_, err := hIndex.indexState.GetBlkIDByHeight(height)
+		assert.NoError(err)
+	}
+
+	// check that height index wont' be rebuild anymore
+	doRepair, _, err = hIndex.shouldRepair()
+	assert.NoError(err)
+	assert.False(doRepair)
+}
+
+func TestHeightBlockIndexResumefromCheckPoint(t *testing.T) {
+	assert := assert.New(t)
+
+	// Build a chain of pre fork and post fork blocks
+	innerGenBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		HeightV:    0,
+		TimestampV: genesisTimestamp,
+		BytesV:     []byte{0},
+	}
+
+	var (
+		blkNumber  = uint64(10)
+		forkHeight = blkNumber / 2
+
+		prevInnerBlk = snowman.Block(innerGenBlk)
+		lastProBlk   = snowman.Block(innerGenBlk)
+
+		innerBlks = make(map[ids.ID]snowman.Block)
+		proBlks   = make(map[ids.ID]PostForkBlock)
+	)
+	innerBlks[innerGenBlk.ID()] = innerGenBlk
+
+	// build preFork blocks
+	for blkHeight := uint64(1); blkHeight <= forkHeight; blkHeight++ {
+		lastInnerBlk := &snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Accepted,
+			},
+			BytesV:     []byte{uint8(blkHeight)},
+			ParentV:    prevInnerBlk.ID(),
+			HeightV:    blkHeight,
+			TimestampV: prevInnerBlk.Timestamp().Add(proposer.MaxDelay),
+		}
+		innerBlks[lastInnerBlk.ID()] = lastInnerBlk
+
+		prevInnerBlk = lastInnerBlk
+	}
+
+	// build postFork blocks
+	for blkHeight := forkHeight + 1; blkHeight <= blkNumber; blkHeight++ {
+		lastInnerBlk := &snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Accepted,
+			},
+			BytesV:     []byte{uint8(blkHeight)},
+			ParentV:    prevInnerBlk.ID(),
+			HeightV:    blkHeight,
+			TimestampV: prevInnerBlk.Timestamp().Add(proposer.MaxDelay),
+		}
+		innerBlks[lastInnerBlk.ID()] = lastInnerBlk
+
+		statelessChild, err := block.BuildUnsigned(
+			lastProBlk.ID(),
+			lastProBlk.Timestamp().Add(proposer.MaxDelay),
+			uint64(0),
+			lastInnerBlk.Bytes(),
+		)
+		assert.NoError(err)
+		postForkBlk := &postForkBlock{
+			SignedBlock: statelessChild,
+			postForkCommonComponents: postForkCommonComponents{
+				innerBlk: lastInnerBlk,
+				status:   choices.Accepted,
+			},
+		}
+		proBlks[postForkBlk.ID()] = postForkBlk
+
+		lastProBlk = postForkBlk
+		prevInnerBlk = lastInnerBlk
+	}
+
+	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
+	hIndex := &heightIndexer{
+		innerHVM: &snowmanVMs.TestHeightIndexedVM{
+			HeightIndexingEnabledF: func() bool { return true },
+		},
+		log:        logging.NoLog{},
+		indexState: state.NewHeightIndex(dbMan.Current().Database),
+
+		lastAcceptedPostForkBlkIDF: func() (ids.ID, error) { return lastProBlk.ID(), nil },
+		lastAcceptedInnerBlkIDF:    func() (ids.ID, error) { return prevInnerBlk.ID(), nil },
+		getPostForkBlkF: func(blkID ids.ID) (PostForkBlock, error) {
+			blk, found := proBlks[blkID]
+			if !found {
+				return nil, database.ErrNotFound
+			}
+			return blk, nil
+		},
+		getInnerBlkF: func(blkID ids.ID) (snowman.Block, error) {
+			blk, found := innerBlks[blkID]
+			if !found {
+				return nil, database.ErrNotFound
+			}
+			return blk, nil
+		},
+		dbCommitF: func() error { return nil },
+	}
+
 	// with no checkpoints repair starts from last accepted block
-	doRepair, startBlkID, err := proVM.shouldRepair()
+	doRepair, startBlkID, err := hIndex.shouldRepair()
 	assert.True(doRepair)
 	assert.NoError(err)
 	assert.True(startBlkID == lastProBlk.ID())
@@ -665,9 +457,9 @@ func TestHeightBlockIndexResumefromCheckPoint(t *testing.T) {
 		}
 
 		checkpointBlk := blk
-		assert.NoError(proVM.SetRepairCheckpoint(checkpointBlk.ID()))
+		assert.NoError(hIndex.indexState.SetRepairCheckpoint(checkpointBlk.ID()))
 
-		doRepair, startBlkID, err := proVM.shouldRepair()
+		doRepair, startBlkID, err := hIndex.shouldRepair()
 		assert.True(doRepair)
 		assert.NoError(err)
 		assert.True(startBlkID == checkpointBlk.ID())
