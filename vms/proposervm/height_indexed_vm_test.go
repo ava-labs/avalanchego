@@ -652,7 +652,7 @@ func TestHeightBlockIndexResumefromCheckPoint(t *testing.T) {
 	}
 
 	// with no checkpoints repair starts from last accepted block
-	doRepair, startBlkID, err := proVM.heightIndexNeedsRepairing()
+	doRepair, startBlkID, err := proVM.shouldRepair()
 	assert.True(doRepair)
 	assert.NoError(err)
 	assert.True(startBlkID == lastProBlk.ID())
@@ -667,7 +667,7 @@ func TestHeightBlockIndexResumefromCheckPoint(t *testing.T) {
 		checkpointBlk := blk
 		assert.NoError(proVM.SetRepairCheckpoint(checkpointBlk.ID()))
 
-		doRepair, startBlkID, err := proVM.heightIndexNeedsRepairing()
+		doRepair, startBlkID, err := proVM.shouldRepair()
 		assert.True(doRepair)
 		assert.NoError(err)
 		assert.True(startBlkID == checkpointBlk.ID())

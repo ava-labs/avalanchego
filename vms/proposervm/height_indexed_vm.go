@@ -28,7 +28,7 @@ func (vm *VM) HeightIndexingEnabled() bool {
 
 	// If height indexing is not complete, we mark HeightIndexedChainVM as disabled,
 	// even if vm.ChainVM is ready to serve blocks by height
-	doRepair, _, err := vm.heightIndexNeedsRepairing()
+	doRepair, _, err := vm.shouldRepair()
 	if doRepair || err != nil {
 		return false
 	}
@@ -75,10 +75,10 @@ func (vm *VM) updateLatestPreForkBlockHeight(height uint64) error {
 	return vm.State.SetLatestPreForkHeight(height)
 }
 
-// heightIndexNeedsRepairing checks if height index is complete;
+// shouldRepair checks if height index is complete;
 // if not, it returns highest un-indexed block ID from which repairing should start.
-// heightIndexNeedsRepairing should be called synchronously upon VM initialization.
-func (vm *VM) heightIndexNeedsRepairing() (bool, ids.ID, error) {
+// shouldRepair should be called synchronously upon VM initialization.
+func (vm *VM) shouldRepair() (bool, ids.ID, error) {
 	if _, ok := vm.ChainVM.(block.HeightIndexedChainVM); !ok {
 		// no index, nothing to repair
 		return false, ids.Empty, nil
@@ -243,14 +243,14 @@ func (vm *VM) doRepair(repairStartBlkID ids.ID) error {
 	}
 }
 
-// Upon initialization, repairInnerBlocksMapping ensures the height -> proBlkID
+// Upon initialization, repairHeightIndex ensures the height -> proBlkID
 // mapping is well formed. Starting from last accepted proposerVM block,
 // it will go back to snowman++ activation fork or genesis.
-// repairInnerBlocksMapping can take a non-trivial time to complete; hence we make sure
+// repairHeightIndex can take a non-trivial time to complete; hence we make sure
 // the process has limited memory footprint, can be resumed from periodic checkpoints
 // and asynchronously without stopping VM.
 func (vm *VM) repairHeightIndex() error {
-	doRepair, startBlkID, err := vm.heightIndexNeedsRepairing()
+	doRepair, startBlkID, err := vm.shouldRepair()
 	if !doRepair || err != nil {
 		return err
 	}
