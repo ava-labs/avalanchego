@@ -103,10 +103,22 @@ func (vm *VM) Initialize(
 		indexState:          vm.State,
 
 		lastAcceptedPostForkBlkIDF: vm.State.GetLastAccepted,
-		lastAcceptedInnerBlkIDF:    vm.ChainVM.LastAccepted,
-		getPostForkBlkF:            vm.getPostForkBlock,
-		getInnerBlkF:               vm.ChainVM.GetBlock,
-		dbCommitF:                  vm.db.Commit,
+		lastAcceptedInnerBlkIDF: func() (ids.ID, error) {
+			vm.ctx.Lock.Lock()
+			defer vm.ctx.Lock.Unlock()
+			return vm.ChainVM.LastAccepted()
+		},
+		getPostForkBlkF: func(blkID ids.ID) (PostForkBlock, error) {
+			vm.ctx.Lock.Lock()
+			defer vm.ctx.Lock.Unlock()
+			return vm.getPostForkBlock(blkID)
+		},
+		getInnerBlkF: func(id ids.ID) (snowman.Block, error) {
+			vm.ctx.Lock.Lock()
+			defer vm.ctx.Lock.Unlock()
+			return vm.ChainVM.GetBlock(id)
+		},
+		dbCommitF: vm.db.Commit,
 	}
 
 	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine)
