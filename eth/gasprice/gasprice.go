@@ -179,7 +179,7 @@ func (oracle *Oracle) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
 		return baseFee, nil
 	}
 	// If base fees have not been enabled, return a nil value.
-	if baseFee == nil {
+	if nextBaseFee == nil {
 		return nil, nil
 	}
 
