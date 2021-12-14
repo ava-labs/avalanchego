@@ -274,6 +274,8 @@ func TestEngineQuery(t *testing.T) {
 		}
 	}
 
+	// After receiving the pull query for [vtx0] we will first request [vtx0]
+	// from the peer, because it is currently unknown to the engine.
 	if err := te.PullQuery(vdr, 0, vtx0.ID()); err != nil {
 		t.Fatal(err)
 	}
@@ -320,6 +322,9 @@ func TestEngineQuery(t *testing.T) {
 		}
 		return vtx0, nil
 	}
+
+	// Once the peer returns [vtx0], we will respond to its query and then issue
+	// our own push query for [vtx0].
 	if err := te.Put(vdr, 0, vtx0.ID(), vtx0.Bytes()); err != nil {
 		t.Fatal(err)
 	}
@@ -372,6 +377,8 @@ func TestEngineQuery(t *testing.T) {
 		}
 	}
 
+	// The peer returned [vtx1] from our query for [vtx0], which means we will
+	// need to request the missing [vtx1].
 	if err := te.Chits(vdr, *queryRequestID, []ids.ID{vtx1.ID()}); err != nil {
 		t.Fatal(err)
 	}
@@ -415,20 +422,36 @@ func TestEngineQuery(t *testing.T) {
 
 		return vtx1, nil
 	}
+
+	// Once the peer returns [vtx1], the poll that was issued for [vtx0] will be
+	// able to terminate. Additionally the node will issue a push query with
+	// [vtx1].
 	if err := te.Put(vdr, 0, vtx1.ID(), vtx1.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 	manager.ParseVtxF = nil
 
-	if vtx0.Status() != choices.Accepted {
-		t.Fatalf("Should have executed vertex")
+	// Because [vtx1] does not transitively reference [vtx0], the transaction
+	// vertex for [vtx0] was never voted for. This results in [vtx0] still being
+	// in processing.
+	if vtx0.Status() != choices.Processing {
+		t.Fatalf("Shouldn't have executed the vertex yet")
 	}
+	if vtx1.Status() != choices.Accepted {
+		t.Fatalf("Should have executed the vertex")
+	}
+	if tx0.Status() != choices.Accepted {
+		t.Fatalf("Should have executed the transaction")
+	}
+
+	// Make sure there is no memory leak for missing vertex tracking.
 	if len(te.vtxBlocked) != 0 {
 		t.Fatalf("Should have finished blocking")
 	}
 
-	_ = te.polls.String() // Shouldn't panic
+	sender.CantSendPullQuery = false
 
+	// Abandon the query for [vtx1]. This will result in a re-query for [vtx0].
 	if err := te.QueryFailed(vdr, *queryRequestID); err != nil {
 		t.Fatal(err)
 	}

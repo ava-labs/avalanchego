@@ -48,6 +48,7 @@ var (
 		ErrorOnRejectingLowerConfidenceConflictTest,
 		ErrorOnRejectingHigherConfidenceConflictTest,
 		UTXOCleanupTest,
+		RemoveVirtuousTest,
 	}
 
 	Red, Green, Blue, Alpha *TestTx
@@ -1355,6 +1356,35 @@ func UTXOCleanupTest(t *testing.T, factory Factory) {
 	assert.True(t, changed, "should have accepted the blue tx")
 
 	assert.Equal(t, choices.Accepted, Blue.Status())
+}
+
+func RemoveVirtuousTest(t *testing.T, factory Factory) {
+	graph := factory.New()
+
+	params := sbcon.Parameters{
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
+	}
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
+	assert.NoError(t, err)
+
+	err = graph.Add(Red)
+	assert.NoError(t, err)
+
+	virtuous := graph.Virtuous()
+	assert.NotEmpty(t, virtuous, "a virtuous transaction was added but not tracked")
+
+	err = graph.Remove(Red.ID())
+	assert.NoError(t, err)
+
+	virtuous = graph.Virtuous()
+	assert.Empty(t, virtuous, "removal of a virtuous transaction should have emptied the virtuous set")
 }
 
 func StringTest(t *testing.T, factory Factory, prefix string) {
