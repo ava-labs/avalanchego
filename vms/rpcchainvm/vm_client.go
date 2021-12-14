@@ -557,7 +557,7 @@ func (vm *VMClient) GetBlockIDByHeight(height uint64) (ids.ID, error) {
 func (vm *VMClient) RegisterFastSyncer(fastSyncer []ids.ShortID) error {
 	nodesID := make([][]byte, 0, len(fastSyncer))
 	for _, fs := range fastSyncer {
-		nodesID = append(nodesID, fs[:])
+		nodesID = append(nodesID, fs.Bytes())
 	}
 
 	_, err := vm.client.RegisterFastSyncer(

@@ -261,8 +261,7 @@ func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID ui
 
 	if len(fs.StateSyncTestingBeacons) != 0 {
 		// No voting rounds for these frontiers. Just download them from specified beacons
-		if len(fs.acceptedFrontierSet) < len(fs.StateSyncTestingBeacons) {
-			// still waiting on requests
+		if fs.gR.CountRequested(message.StateSummaryFrontier) != 0 {
 			return nil
 		}
 
