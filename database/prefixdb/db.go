@@ -299,7 +299,7 @@ func (b *batch) Reset() {
 // after those methods return.
 // Assumes it's not safe to modify the value argument to w.Put after calling that method.
 // Assumes [keyvalue.value] will not be modified because we assume that in batch.Put.
-func (b *batch) Replay(w database.KeyValueWriter) error {
+func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
 	for _, keyvalue := range b.writes {
 		keyWithoutPrefix := keyvalue.key[len(b.db.dbPrefix):]
 		if keyvalue.delete {
