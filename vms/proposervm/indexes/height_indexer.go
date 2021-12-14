@@ -1,14 +1,13 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package proposervm
+package indexes
 
 import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -17,29 +16,44 @@ import (
 
 const commitSizeCap = 1 * units.MiB
 
-var _ block.HeightIndexedChainVM = &heightIndexer{}
+var _ HeightIndexer = &heightIndexer{}
 
-type heightIndexer struct {
-	latestPreForkHeight uint64
+type HeightIndexer interface {
+	block.HeightIndexedChainVM
 
-	innerHVM   block.HeightIndexedChainVM // cast vm.ChainVM outside
-	log        logging.Logger
-	indexState state.HeightIndex
-
-	lastAcceptedPostForkBlkIDF func() (ids.ID, error)
-	lastAcceptedInnerBlkIDF    func() (ids.ID, error)
-	getPostForkBlkF            func(blkID ids.ID) (PostForkBlock, error)
-	getInnerBlkF               func(id ids.ID) (snowman.Block, error)
-	dbCommitF                  func() error
+	RepairHeightIndex() error
+	UpdateHeightIndex(height uint64, blkID ids.ID) error
+	UpdateLatestPreForkBlockHeight(height uint64) error
 }
 
-// Upon initialization, repairHeightIndex ensures the height -> proBlkID
+func NewHeightIndexer(srv BlockServer,
+	innerHVM block.HeightIndexedChainVM,
+	log logging.Logger,
+	indexState state.HeightIndex) HeightIndexer {
+	return &heightIndexer{
+		server:     srv,
+		innerHVM:   innerHVM,
+		log:        log,
+		indexState: indexState,
+	}
+}
+
+type heightIndexer struct {
+	server   BlockServer
+	innerHVM block.HeightIndexedChainVM
+	log      logging.Logger
+
+	latestPreForkHeight uint64
+	indexState          state.HeightIndex
+}
+
+// Upon initialization, RepairHeightIndex ensures the height -> proBlkID
 // height block index is well formed. Starting from last accepted proposerVM block,
 // it will go back to snowman++ activation fork or genesis.
-// repairHeightIndex can take a non-trivial time to complete; hence we make sure
+// RepairHeightIndex can take a non-trivial time to complete; hence we make sure
 // the process has limited memory footprint, can be resumed from periodic checkpoints
 // and asynchronously without stopping VM.
-func (hi *heightIndexer) repairHeightIndex() error {
+func (hi *heightIndexer) RepairHeightIndex() error {
 	doRepair, startBlkID, err := hi.shouldRepair()
 	if !doRepair || err != nil {
 		return err
@@ -85,7 +99,7 @@ func (hi *heightIndexer) GetBlockIDByHeight(height uint64) (ids.ID, error) {
 	return hi.indexState.GetBlkIDByHeight(height)
 }
 
-func (hi *heightIndexer) updateHeightIndex(height uint64, blkID ids.ID) error {
+func (hi *heightIndexer) UpdateHeightIndex(height uint64, blkID ids.ID) error {
 	if hi.innerHVM == nil || !hi.innerHVM.HeightIndexingEnabled() {
 		// nothing to index if innerVM does not support height indexing
 		return nil
@@ -95,7 +109,7 @@ func (hi *heightIndexer) updateHeightIndex(height uint64, blkID ids.ID) error {
 	return err
 }
 
-func (hi *heightIndexer) updateLatestPreForkBlockHeight(height uint64) error {
+func (hi *heightIndexer) UpdateLatestPreForkBlockHeight(height uint64) error {
 	if hi.innerHVM == nil || !hi.innerHVM.HeightIndexingEnabled() {
 		// nothing to index if innerVM does not support height indexing
 		return nil
@@ -131,18 +145,18 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 	}
 
 	// index is complete iff lastAcceptedBlock is indexed
-	latestProBlkID, err := hi.lastAcceptedPostForkBlkIDF()
+	latestProBlkID, err := hi.server.LastAcceptedWrappingBlkID()
 	switch err {
 	case nil:
 		break
 	case database.ErrNotFound:
 		// snowman++ has not forked yet. Height block index is ok;
 		// just check latestPreForkHeight is duly set.
-		latestInnerBlkID, err := hi.lastAcceptedInnerBlkIDF()
+		latestInnerBlkID, err := hi.server.LastAcceptedInnerBlkID()
 		if err != nil {
 			return true, ids.Empty, err
 		}
-		lastInnerBlk, err := hi.getInnerBlkF(latestInnerBlkID)
+		lastInnerBlk, err := hi.server.GetInnerBlk(latestInnerBlkID)
 		if err != nil {
 			return true, ids.Empty, err
 		}
@@ -154,7 +168,7 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 	default:
 		return true, ids.Empty, err
 	}
-	lastAcceptedBlk, err := hi.getPostForkBlkF(latestProBlkID)
+	lastAcceptedBlk, err := hi.server.GetWrappingBlk(latestProBlkID)
 	if err != nil {
 		// Could not retrieve block for LastAccepted Block.
 		// We got bigger problems than repairing the index
@@ -192,17 +206,17 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 	)
 
 	for {
-		currentAcceptedBlk, err := hi.getPostForkBlkF(currentProBlkID)
+		currentAcceptedBlk, err := hi.server.GetWrappingBlk(currentProBlkID)
 		switch err {
 		case nil:
 
 		case database.ErrNotFound:
 			// visited all proposerVM blocks. Let's record forkHeight
-			firstWrappedInnerBlk, err := hi.getInnerBlkF(currentInnerBlkID)
+			firstWrappedInnerBlk, err := hi.server.GetInnerBlk(currentInnerBlkID)
 			if err != nil {
 				return err
 			}
-			innerForkBlk, err := hi.getInnerBlkF(firstWrappedInnerBlk.Parent())
+			innerForkBlk, err := hi.server.GetInnerBlk(firstWrappedInnerBlk.Parent())
 			if err != nil {
 				return err
 			}
@@ -215,7 +229,7 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 			if err := hi.indexState.DeleteRepairCheckpoint(); err != nil {
 				return err
 			}
-			if err := hi.dbCommitF(); err != nil {
+			if err := hi.server.DBCommit(); err != nil {
 				return err
 			}
 			hi.log.Info("Block indexing by height completed: indexed %d blocks, duration %v, latest pre fork block height %d",
@@ -226,7 +240,7 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 			return err
 		}
 
-		currentInnerBlkID = currentAcceptedBlk.getInnerBlk().ID()
+		currentInnerBlkID = currentAcceptedBlk.GetInnerBlk().ID()
 		_, err = hi.indexState.GetBlkIDByHeight(currentAcceptedBlk.Height())
 		switch err {
 		case nil:
@@ -244,7 +258,7 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 				if err := hi.indexState.SetRepairCheckpoint(currentProBlkID); err != nil {
 					return err
 				}
-				if err := hi.dbCommitF(); err != nil {
+				if err := hi.server.DBCommit(); err != nil {
 					return err
 				}
 

@@ -8,9 +8,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
+	"github.com/ava-labs/avalanchego/vms/proposervm/indexes"
 )
 
-var _ Block = &postForkBlock{}
+var (
+	_ Block                 = &postForkBlock{}
+	_ indexes.WrappingBlock = &preForkBlock{}
+)
 
 // postForkBlock implements proposervm.Block
 type postForkBlock struct {
@@ -34,7 +38,7 @@ func (b *postForkBlock) Accept() error {
 		return err
 	}
 
-	if err := b.vm.updateHeightIndex(b.Height(), blkID); err != nil {
+	if err := b.vm.UpdateHeightIndex(b.Height(), blkID); err != nil {
 		return err
 	}
 

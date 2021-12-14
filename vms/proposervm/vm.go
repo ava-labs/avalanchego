@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/vms/proposervm/indexes"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
@@ -36,8 +37,8 @@ const (
 var (
 	dbPrefix = []byte("proposervm")
 
-	_ block.ChainVM              = &VM{}
-	_ block.HeightIndexedChainVM = &VM{}
+	_ block.ChainVM         = &VM{}
+	_ indexes.HeightIndexer = &VM{}
 )
 
 type VM struct {
@@ -46,7 +47,7 @@ type VM struct {
 	minimumPChainHeight uint64
 
 	state.State
-	heightIndexer
+	indexes.HeightIndexer
 	proposer.Windower
 	tree.Tree
 	scheduler.Scheduler
@@ -96,30 +97,7 @@ func (vm *VM) Initialize(
 	vm.Tree = tree.New()
 
 	innerHVM, _ := vm.ChainVM.(block.HeightIndexedChainVM)
-	vm.heightIndexer = heightIndexer{
-		latestPreForkHeight: 0,
-		innerHVM:            innerHVM,
-		log:                 vm.ctx.Log,
-		indexState:          vm.State,
-
-		lastAcceptedPostForkBlkIDF: vm.State.GetLastAccepted,
-		lastAcceptedInnerBlkIDF: func() (ids.ID, error) {
-			vm.ctx.Lock.Lock()
-			defer vm.ctx.Lock.Unlock()
-			return vm.ChainVM.LastAccepted()
-		},
-		getPostForkBlkF: func(blkID ids.ID) (PostForkBlock, error) {
-			vm.ctx.Lock.Lock()
-			defer vm.ctx.Lock.Unlock()
-			return vm.getPostForkBlock(blkID)
-		},
-		getInnerBlkF: func(id ids.ID) (snowman.Block, error) {
-			vm.ctx.Lock.Lock()
-			defer vm.ctx.Lock.Unlock()
-			return vm.ChainVM.GetBlock(id)
-		},
-		dbCommitF: vm.db.Commit,
-	}
+	vm.HeightIndexer = indexes.NewHeightIndexer(vm, innerHVM, vm.ctx.Log, vm.State)
 
 	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine)
 	vm.Scheduler = scheduler
@@ -149,7 +127,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	if err := vm.repairHeightIndex(); err != nil {
+	if err := vm.HeightIndexer.RepairHeightIndex(); err != nil {
 		return err
 	}
 
@@ -197,7 +175,7 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 		return vm.ChainVM.SetPreference(preferred)
 	}
 
-	if err := vm.ChainVM.SetPreference(blk.getInnerBlk().ID()); err != nil {
+	if err := vm.ChainVM.SetPreference(blk.GetInnerBlk().ID()); err != nil {
 		return err
 	}
 
@@ -265,7 +243,7 @@ func (vm *VM) repairAcceptedChain() error {
 			return err
 		}
 
-		shouldBeAccepted := lastAccepted.getInnerBlk()
+		shouldBeAccepted := lastAccepted.GetInnerBlk()
 
 		// If the inner block is accepted, then we don't need to revert any more
 		// blocks.
@@ -433,7 +411,7 @@ func (vm *VM) verifyAndRecordInnerBlk(postFork PostForkBlock) error {
 	// Note that if [innerBlk.Verify] returns nil, this method returns nil. This
 	// must always remain the case to maintain the inner block's invariant that
 	// if it's Verify() returns nil, it is eventually accepted or rejected.
-	currentInnerBlk := postFork.getInnerBlk()
+	currentInnerBlk := postFork.GetInnerBlk()
 	if originalInnerBlk, contains := vm.Tree.Get(currentInnerBlk); !contains {
 		if err := currentInnerBlk.Verify(); err != nil {
 			return err
