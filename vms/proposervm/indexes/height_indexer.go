@@ -103,6 +103,7 @@ func (hi *heightIndexer) UpdateHeightIndex(height uint64, blkID ids.ID) error {
 	}
 
 	_, err := hi.indexState.SetBlkIDByHeight(height, blkID)
+	hi.log.Debug("Block indexing by height: added post fork block at height %d", height)
 	return err
 }
 
@@ -117,6 +118,7 @@ func (hi *heightIndexer) UpdateLatestPreForkBlockHeight(height uint64) error {
 	}
 
 	hi.latestPreForkHeight = height
+	hi.log.Debug("Block indexing by height: added pre fork block at height %d", height)
 	return hi.indexState.SetLatestPreForkHeight(height)
 }
 

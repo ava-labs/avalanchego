@@ -60,7 +60,7 @@ func NewHeightIndex(db database.Database) HeightIndex {
 func (ibm *innerHeightIndex) SetBlkIDByHeight(height uint64, blkID ids.ID) (int, error) {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
-	key := make([]byte, len(heightPrefix)+len(heightBytes))
+	key := make([]byte, len(heightPrefix))
 	copy(key, heightPrefix)
 	key = append(key, heightBytes...)
 
@@ -71,7 +71,7 @@ func (ibm *innerHeightIndex) SetBlkIDByHeight(height uint64, blkID ids.ID) (int,
 func (ibm *innerHeightIndex) GetBlkIDByHeight(height uint64) (ids.ID, error) {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
-	key := make([]byte, len(heightPrefix)+len(heightBytes))
+	key := make([]byte, len(heightPrefix))
 	copy(key, heightPrefix)
 	key = append(key, heightBytes...)
 
@@ -101,7 +101,7 @@ func (ibm *innerHeightIndex) GetBlkIDByHeight(height uint64) (ids.ID, error) {
 func (ibm *innerHeightIndex) DeleteBlkIDByHeight(height uint64) error {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
-	key := make([]byte, len(heightPrefix)+len(heightBytes))
+	key := make([]byte, len(heightPrefix))
 	copy(key, heightPrefix)
 	key = append(key, heightBytes...)
 
