@@ -127,9 +127,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	if err := vm.HeightIndexer.RepairHeightIndex(); err != nil {
-		return err
-	}
+	go vm.HeightIndexer.RepairHeightIndex()
 
 	return vm.setLastAcceptedOptionTime()
 }

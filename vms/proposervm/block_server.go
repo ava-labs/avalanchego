@@ -10,7 +10,9 @@ var _ indexes.BlockServer = &VM{}
 
 // LastAcceptedWrappingBlkID implements BlockServer interface
 func (vm *VM) LastAcceptedWrappingBlkID() (ids.ID, error) {
-	return vm.LastAccepted()
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+	return vm.State.GetLastAccepted()
 }
 
 // LastAcceptedInnerBlkID implements BlockServer interface
@@ -36,5 +38,7 @@ func (vm *VM) GetInnerBlk(id ids.ID) (snowman.Block, error) {
 
 // DbCommit implements BlockServer interface
 func (vm *VM) DBCommit() error {
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
 	return vm.db.Commit()
 }

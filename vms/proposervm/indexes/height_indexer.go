@@ -21,7 +21,7 @@ var _ HeightIndexer = &heightIndexer{}
 type HeightIndexer interface {
 	block.HeightIndexedChainVM
 
-	RepairHeightIndex() error
+	RepairHeightIndex()
 	UpdateHeightIndex(height uint64, blkID ids.ID) error
 	UpdateLatestPreForkBlockHeight(height uint64) error
 }
@@ -53,17 +53,14 @@ type heightIndexer struct {
 // RepairHeightIndex can take a non-trivial time to complete; hence we make sure
 // the process has limited memory footprint, can be resumed from periodic checkpoints
 // and asynchronously without stopping VM.
-func (hi *heightIndexer) RepairHeightIndex() error {
+func (hi *heightIndexer) RepairHeightIndex() {
 	doRepair, startBlkID, err := hi.shouldRepair()
-	if !doRepair || err != nil {
-		return err
+	hi.log.AssertNoError(err)
+	if !doRepair {
+		return
 	}
 
-	go func() {
-		hi.log.AssertNoError(hi.doRepair(startBlkID))
-	}()
-
-	return nil
+	hi.log.AssertNoError(hi.doRepair(startBlkID))
 }
 
 // HeightIndexingEnabled implements HeightIndexedChainVM interface
