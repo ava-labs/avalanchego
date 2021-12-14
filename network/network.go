@@ -1157,7 +1157,7 @@ func (n *network) connected(p *peer) {
 		n.connectedIPs[str] = struct{}{}
 	}
 
-	n.router.Connected(p.nodeID)
+	n.router.Connected(p.nodeID, peerVersion)
 	n.metrics.connected.Inc()
 }
 
