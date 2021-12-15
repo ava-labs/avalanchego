@@ -181,7 +181,13 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 		hi.latestPreForkHeight, err = hi.indexState.GetLatestPreForkHeight()
 		return false, ids.Empty, err
 	case database.ErrNotFound:
-		// index needs repairing (and it's the first time we do this)
+		// index needs repairing and it's the first time we do this.
+		// Mark the checkpoint so that, in case new blocks are accepted while
+		// indexing is ongoing, and the process is terminated before first commit,
+		// we do not miss rebuilding the full index
+		if err := hi.indexState.SetRepairCheckpoint(latestProBlkID); err != nil {
+			return false, ids.Empty, err
+		}
 		return true, latestProBlkID, nil
 	default:
 		// Could not retrieve index from DB.
