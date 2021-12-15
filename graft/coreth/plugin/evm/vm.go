@@ -211,7 +211,7 @@ type VM struct {
 	bootstrapped bool
 }
 
-func (vm *VM) Connected(id ids.ShortID, nodeVersion version.Version) error {
+func (vm *VM) Connected(id ids.ShortID, nodeVersion version.Application) error {
 	return nil // noop
 }
 
