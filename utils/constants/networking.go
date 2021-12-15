@@ -14,7 +14,7 @@ import (
 const (
 	// Request ID used when sending a Put message to gossip an accepted container
 	// (ie not sent in response to a Get)
-	GossipMsgRequestID = math.MaxUint32
+	GossipMsgRequestID uint32 = math.MaxUint32
 
 	// The network must be "tcp", "tcp4", "tcp6", "unix" or "unixpacket".
 	NetworkType = "tcp"

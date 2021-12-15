@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -56,6 +57,6 @@ type ExternalRouter interface {
 type InternalRouter interface {
 	benchlist.Benchable
 
-	Connected(nodeID ids.ShortID)
+	Connected(nodeID ids.ShortID, nodeVersion version.Application)
 	Disconnected(nodeID ids.ShortID)
 }

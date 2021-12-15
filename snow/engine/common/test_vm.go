@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/version"
 
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/snow"
@@ -46,8 +47,8 @@ type TestVM struct {
 	BootstrappingF, BootstrappedF, ShutdownF func() error
 	CreateHandlersF                          func() (map[string]*HTTPHandler, error)
 	CreateStaticHandlersF                    func() (map[string]*HTTPHandler, error)
-	ConnectedF                               func(ids.ShortID) error
-	DisconnectedF                            func(ids.ShortID) error
+	ConnectedF                               func(nodeID ids.ShortID, nodeVersion version.Application) error
+	DisconnectedF                            func(nodeID ids.ShortID) error
 	HealthCheckF                             func() (interface{}, error)
 	AppRequestF                              func(nodeID ids.ShortID, requestID uint32, deadline time.Time, msg []byte) error
 	AppResponseF                             func(nodeID ids.ShortID, requestID uint32, msg []byte) error
@@ -204,9 +205,9 @@ func (vm *TestVM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	return errAppGossip
 }
 
-func (vm *TestVM) Connected(id ids.ShortID) error {
+func (vm *TestVM) Connected(id ids.ShortID, nodeVersion version.Application) error {
 	if vm.ConnectedF != nil {
-		return vm.ConnectedF(id)
+		return vm.ConnectedF(id, nodeVersion)
 	}
 	if vm.CantConnected && vm.T != nil {
 		vm.T.Fatal(errConnected)

@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 const (
@@ -61,7 +62,7 @@ type ChainRouter struct {
 	gossiper         *timer.Repeater
 	intervalNotifier *timer.Repeater
 	closeTimeout     time.Duration
-	peers            ids.ShortSet
+	peers            map[ids.ShortID]version.Application
 	// node ID --> chains that node is benched on
 	// invariant: if a node is benched on any chain, it is treated as disconnected on all chains
 	benched        map[ids.ShortID]ids.Set
@@ -109,7 +110,8 @@ func (cr *ChainRouter) Initialize(
 	cr.criticalChains = criticalChains
 	cr.onFatal = onFatal
 	cr.timedRequests = linkedhashmap.New()
-	cr.peers.Add(nodeID)
+	cr.peers = make(map[ids.ShortID]version.Application)
+	cr.peers[nodeID] = version.CurrentApp
 	cr.healthConfig = healthConfig
 	cr.requestIDBytes = make([]byte, hashing.AddrLen+hashing.HashLen+wrappers.IntLen+wrappers.ByteLen) // Validator ID, Chain ID, Request ID, Msg Type
 
@@ -296,27 +298,27 @@ func (cr *ChainRouter) AddChain(chain *Handler) {
 	chain.onCloseF = func() { cr.removeChain(chainID) }
 	cr.chains[chainID] = chain
 
-	for validatorID := range cr.peers {
+	for validatorID, version := range cr.peers {
 		// If this validator is benched on any chain, treat them as disconnected on all chains
 		if _, benched := cr.benched[validatorID]; !benched {
-			msg := cr.msgCreator.InternalConnected(validatorID)
+			msg := cr.msgCreator.InternalConnected(validatorID, version)
 			chain.Push(msg)
 		}
 	}
 }
 
 // Connected routes an incoming notification that a validator was just connected
-func (cr *ChainRouter) Connected(validatorID ids.ShortID) {
+func (cr *ChainRouter) Connected(validatorID ids.ShortID, nodeVersion version.Application) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	cr.peers.Add(validatorID)
+	cr.peers[validatorID] = nodeVersion
 	// If this validator is benched on any chain, treat them as disconnected on all chains
 	if _, benched := cr.benched[validatorID]; benched {
 		return
 	}
 
-	msg := cr.msgCreator.InternalConnected(validatorID)
+	msg := cr.msgCreator.InternalConnected(validatorID, nodeVersion)
 
 	// TODO: fire up an event when validator state changes i.e when they leave set, disconnect.
 	// we cannot put a subnet-only validator check here since Disconnected would not be handled properly.
@@ -330,7 +332,7 @@ func (cr *ChainRouter) Disconnected(validatorID ids.ShortID) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	cr.peers.Remove(validatorID)
+	delete(cr.peers, validatorID)
 	if _, benched := cr.benched[validatorID]; benched {
 		return
 	}
@@ -352,7 +354,8 @@ func (cr *ChainRouter) Benched(chainID ids.ID, validatorID ids.ShortID) {
 	benchedChains, exists := cr.benched[validatorID]
 	benchedChains.Add(chainID)
 	cr.benched[validatorID] = benchedChains
-	if exists || !cr.peers.Contains(validatorID) {
+	_, hasPeer := cr.peers[validatorID]
+	if exists || !hasPeer {
 		// If the set already existed, then the node was previously benched.
 		return
 	}
@@ -378,11 +381,12 @@ func (cr *ChainRouter) Unbenched(chainID ids.ID, validatorID ids.ShortID) {
 		return // This node is still benched
 	}
 
-	if !cr.peers.Contains(validatorID) {
+	version, found := cr.peers[validatorID]
+	if !found {
 		return
 	}
 
-	msg := cr.msgCreator.InternalConnected(validatorID)
+	msg := cr.msgCreator.InternalConnected(validatorID, version)
 
 	for _, chain := range cr.chains {
 		chain.Push(msg)

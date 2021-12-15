@@ -538,7 +538,7 @@ func VMGenesis(genesisBytes []byte, vmID ids.ID) (*platformvm.Tx, error) {
 
 func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
 	c := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
-	m := codec.NewManager(math.MaxUint32)
+	m := codec.NewManager(math.MaxInt32)
 	errs := wrappers.Errs{}
 	errs.Add(
 		c.RegisterType(&avm.BaseTx{}),

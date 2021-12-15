@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender/appsenderproto"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/ghttpproto"
@@ -641,9 +642,10 @@ func (vm *VMClient) Version() (string, error) {
 	return resp.Version, nil
 }
 
-func (vm *VMClient) Connected(nodeID ids.ShortID) error {
+func (vm *VMClient) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
 	_, err := vm.client.Connected(context.Background(), &vmproto.ConnectedRequest{
-		NodeID: nodeID[:],
+		NodeID:  nodeID[:],
+		Version: nodeVersion.String(),
 	})
 	return err
 }
