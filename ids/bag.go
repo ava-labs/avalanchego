@@ -144,13 +144,15 @@ func (b *Bag) Split(index uint) [2]Bag {
 	return splitVotes
 }
 
-func (b *Bag) String() string {
+func (b *Bag) PrefixedString(prefix string) string {
 	sb := strings.Builder{}
 
 	sb.WriteString(fmt.Sprintf("Bag: (Size = %d)", b.Len()))
 	for id, count := range b.counts {
-		sb.WriteString(fmt.Sprintf("\n    ID[%s]: Count = %d", id, count))
+		sb.WriteString(fmt.Sprintf("\n%s    ID[%s]: Count = %d", prefix, id, count))
 	}
 
 	return sb.String()
 }
+
+func (b *Bag) String() string { return b.PrefixedString("") }
