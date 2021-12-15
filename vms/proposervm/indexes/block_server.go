@@ -9,7 +9,7 @@ import (
 )
 
 // BlockServer represents all requests heightIndexer can issue
-// against ProposerVM
+// against ProposerVM. All methods must be thread-safe.
 type BlockServer interface {
 	LastAcceptedWrappingBlkID() (ids.ID, error)
 	LastAcceptedInnerBlkID() (ids.ID, error)

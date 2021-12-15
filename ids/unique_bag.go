@@ -81,16 +81,18 @@ func (b *UniqueBag) Bag(alpha int) Bag {
 	return bag
 }
 
-func (b *UniqueBag) String() string {
+func (b *UniqueBag) PrefixedString(prefix string) string {
 	sb := strings.Builder{}
 
 	sb.WriteString(fmt.Sprintf("UniqueBag: (Size = %d)", len(*b)))
 	for id, set := range *b {
-		sb.WriteString(fmt.Sprintf("\n    ID[%s]: Members = %s", id, set))
+		sb.WriteString(fmt.Sprintf("\n%s    ID[%s]: Members = %s", prefix, id, set))
 	}
 
 	return sb.String()
 }
+
+func (b *UniqueBag) String() string { return b.PrefixedString("") }
 
 func (b *UniqueBag) Clear() {
 	for id := range *b {

@@ -91,6 +91,8 @@ votesLoop:
 		count := votes.Count(vote)
 		// use rootID in case of this is a non-verified block ID
 		rootID := v.t.nonVerifieds.GetRoot(vote)
+		v.t.Ctx.Log.Verbo("Bubbling %d vote(s) for %s to %s through unverified blocks", count, vote, rootID)
+
 		blk, err := v.t.GetBlock(rootID)
 		// If we cannot retrieve the block, drop [vote]
 		if err != nil {
@@ -112,7 +114,10 @@ votesLoop:
 		// issued consensus. In this case, the votes will be bubbled further
 		// from [blk] to any of its ancestors that are also in consensus.
 		for status.Fetched() && !v.t.Consensus.DecidedOrProcessing(blk) {
-			blkID = blk.Parent()
+			parentID := blk.Parent()
+			v.t.Ctx.Log.Verbo("Pushing %d vote(s) from %s (%s) to %s", count, blkID, status, parentID)
+
+			blkID = parentID
 			blk, err = v.t.GetBlock(blkID)
 			// If we cannot retrieve the block, drop [vote]
 			if err != nil {
@@ -125,7 +130,10 @@ votesLoop:
 
 		// If [blkID] is currently in consensus, count the votes
 		if !status.Decided() && v.t.Consensus.DecidedOrProcessing(blk) {
+			v.t.Ctx.Log.Verbo("Applying %d vote(s) to %s (%s)", count, blkID, status)
 			bubbledVotes.AddCount(blkID, count)
+		} else {
+			v.t.Ctx.Log.Verbo("Dropping %d vote(s) to %s (%s)", count, blkID, status)
 		}
 	}
 	return bubbledVotes

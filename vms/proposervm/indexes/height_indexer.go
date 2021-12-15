@@ -115,19 +115,17 @@ func (hi *heightIndexer) UpdateHeightIndex(height uint64, blkID ids.ID) error {
 }
 
 // shouldRepair checks if height index is complete;
-// if not, it returns highest un-indexed block ID from which repairing should start.
-// shouldRepair should be called synchronously upon VM initialization.
+// if not, it returns the checkpoint from which repairing should start.
 func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 	if hi.innerHVM == nil || !hi.innerHVM.IsHeightIndexComplete() {
 		// no index, nothing to repair
 		return false, ids.Empty, nil
 	}
 
-	repairStartBlkID, err := hi.indexState.GetCheckpoint()
-	switch err {
+	switch checkpointID, err := hi.indexState.GetCheckpoint(); err {
 	case nil:
 		// checkpoint found, repair must be resumed
-		return true, repairStartBlkID, nil
+		return true, checkpointID, nil
 	case database.ErrNotFound:
 		// no checkpoint. Either index is complete or repair was never attempted.
 		break
@@ -147,6 +145,7 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 	default:
 		return true, ids.Empty, err
 	}
+
 	lastAcceptedBlk, err := hi.server.GetWrappingBlk(latestProBlkID)
 	if err != nil {
 		// Could not retrieve block for LastAccepted Block.
@@ -263,7 +262,8 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 			indexedBlks++
 			if time.Since(lastLogTime) > 15*time.Second {
 				lastLogTime = time.Now()
-				hi.log.Info("Block indexing by height ongoing: indexed %d blocks, latest indexed height %d", currentAcceptedBlk.Height()+1)
+				hi.log.Info("Block indexing by height ongoing: indexed %d blocks, latest indexed height %d",
+					indexedBlks, currentAcceptedBlk.Height()+1)
 			}
 
 			// keep checking the parent
