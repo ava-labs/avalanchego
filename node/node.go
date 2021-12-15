@@ -274,9 +274,9 @@ type insecureValidatorManager struct {
 	weight uint64
 }
 
-func (i *insecureValidatorManager) Connected(vdrID ids.ShortID) {
+func (i *insecureValidatorManager) Connected(vdrID ids.ShortID, nodeVersion version.Application) {
 	_ = i.vdrs.AddWeight(vdrID, i.weight)
-	i.Router.Connected(vdrID)
+	i.Router.Connected(vdrID, nodeVersion)
 }
 
 func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) {
@@ -294,24 +294,24 @@ type beaconManager struct {
 	totalWeight    uint64
 }
 
-func (b *beaconManager) Connected(vdrID ids.ShortID) {
+func (b *beaconManager) Connected(vdrID ids.ShortID, nodeVersion version.Application) {
 	// TODO: this is always 1, beacons can be reduced to ShortSet?
 	weight, ok := b.beacons.GetWeight(vdrID)
 	if !ok {
-		b.Router.Connected(vdrID)
+		b.Router.Connected(vdrID, nodeVersion)
 		return
 	}
 	weight, err := math.Add64(weight, b.totalWeight)
 	if err != nil {
 		b.timer.Cancel()
-		b.Router.Connected(vdrID)
+		b.Router.Connected(vdrID, nodeVersion)
 		return
 	}
 	b.totalWeight = weight
 	if b.totalWeight >= b.requiredWeight {
 		b.timer.Cancel()
 	}
-	b.Router.Connected(vdrID)
+	b.Router.Connected(vdrID, nodeVersion)
 }
 
 func (b *beaconManager) Disconnected(vdrID ids.ShortID) {

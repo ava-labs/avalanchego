@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 // Engine describes the standard interface of a consensus engine
@@ -354,6 +355,9 @@ type QueryHandler interface {
 // other components of this validator. Functions only return fatal errors if
 // they occur.
 type InternalHandler interface {
+	// Notify this engine of peer changes.
+	validators.Connector
+
 	// Notify this engine that a registered timeout has fired.
 	Timeout() error
 
@@ -374,10 +378,4 @@ type InternalHandler interface {
 
 	// Notify this engine of a message from the virtual machine.
 	Notify(Message) error
-
-	// Notify this engine of a new peer.
-	Connected(validatorID ids.ShortID) error
-
-	// Notify this engine of a removed peer.
-	Disconnected(validatorID ids.ShortID) error
 }

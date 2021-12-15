@@ -940,7 +940,7 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 
 	for _, tx := range st.deletedCurrentStakers {
 		var (
-			db       database.KeyValueWriter
+			db       database.KeyValueDeleter
 			subnetID ids.ID
 			nodeID   ids.ShortID
 			weight   uint64
@@ -1077,7 +1077,7 @@ func (st *internalStateImpl) writePendingStakers() error {
 	st.addedPendingStakers = nil
 
 	for _, tx := range st.deletedPendingStakers {
-		var db database.KeyValueWriter
+		var db database.KeyValueDeleter
 		switch tx.UnsignedTx.(type) {
 		case *UnsignedAddValidatorTx:
 			db = st.pendingValidatorList

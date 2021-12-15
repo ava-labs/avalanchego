@@ -44,7 +44,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/vmproto"
 )
 
-var _ vmproto.VMServer = &VMServer{}
+var (
+	versionParser = version.NewDefaultApplicationParser()
+
+	_ vmproto.VMServer = &VMServer{}
+)
 
 // VMServer is a VM that is managed over RPC.
 type VMServer struct {
@@ -572,7 +576,13 @@ func (vm *VMServer) Connected(_ context.Context, req *vmproto.ConnectedRequest) 
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.Connected(nodeID)
+
+	peerVersion, err := versionParser.Parse(req.Version)
+	if err != nil {
+		return nil, err
+	}
+
+	return &emptypb.Empty{}, vm.vm.Connected(nodeID, peerVersion)
 }
 
 func (vm *VMServer) Disconnected(_ context.Context, req *vmproto.DisconnectedRequest) (*emptypb.Empty, error) {

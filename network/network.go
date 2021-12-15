@@ -30,7 +30,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
-	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -62,7 +61,7 @@ type Network interface {
 
 	// The network must be able to broadcast accepted decisions to random peers.
 	// Thread safety must be managed internally in the network.
-	triggers.Acceptor
+	snow.Acceptor
 
 	// Should only be called once, will run until either a fatal error occurs,
 	// or the network is closed. Returns a non-nil error.
@@ -1158,7 +1157,7 @@ func (n *network) connected(p *peer) {
 		n.connectedIPs[str] = struct{}{}
 	}
 
-	n.router.Connected(p.nodeID)
+	n.router.Connected(p.nodeID, peerVersion)
 	n.metrics.connected.Inc()
 }
 

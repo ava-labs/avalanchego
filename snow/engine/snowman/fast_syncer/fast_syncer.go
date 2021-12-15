@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 const (
@@ -545,8 +546,8 @@ func (fs *fastSyncer) GetFailed(validatorID ids.ShortID, requestID uint32) error
 }
 
 // InternalHandler interface implementation
-func (fs *fastSyncer) Connected(nodeID ids.ShortID) error {
-	if err := fs.VM.Connected(nodeID); err != nil {
+func (fs *fastSyncer) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
+	if err := fs.VM.Connected(nodeID, nodeVersion); err != nil {
 		return err
 	}
 

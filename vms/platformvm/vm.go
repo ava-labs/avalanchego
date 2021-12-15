@@ -470,7 +470,7 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 }
 
 // Connected implements validators.Connector
-func (vm *VM) Connected(vdrID ids.ShortID) error {
+func (vm *VM) Connected(vdrID ids.ShortID, nodeVersion version.Application) error {
 	return vm.uptimeManager.Connect(vdrID)
 }
 

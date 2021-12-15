@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 func TestShutdown(t *testing.T) {
@@ -75,7 +76,7 @@ func TestShutdown(t *testing.T) {
 	bootstrapper.Default(true)
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ShutdownF = func() error { shutdownCalled <- struct{}{}; return nil }
-	bootstrapper.ConnectedF = func(nodeID ids.ShortID) error { return nil }
+	bootstrapper.ConnectedF = func(nodeID ids.ShortID, nodeVersion version.Application) error { return nil }
 	bootstrapper.HaltF = func() {}
 	handler.RegisterBootstrap(bootstrapper)
 
@@ -83,7 +84,7 @@ func TestShutdown(t *testing.T) {
 	engine.Default(true)
 	engine.ContextF = func() *snow.ConsensusContext { return ctx }
 	engine.ShutdownF = func() error { shutdownCalled <- struct{}{}; return nil }
-	engine.ConnectedF = func(nodeID ids.ShortID) error { return nil }
+	engine.ConnectedF = func(nodeID ids.ShortID, nodeVersion version.Application) error { return nil }
 	engine.HaltF = func() {}
 	handler.RegisterEngine(engine)
 	ctx.SetState(snow.NormalOp) // assumed bootstrap is done
@@ -173,7 +174,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	}
 	bootstrapper.Default(true)
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
-	bootstrapper.ConnectedF = func(nodeID ids.ShortID) error { return nil }
+	bootstrapper.ConnectedF = func(nodeID ids.ShortID, nodeVersion version.Application) error { return nil }
 	bootstrapper.HaltF = func() {}
 	bootstrapper.MultiPutF = func(nodeID ids.ShortID, requestID uint32, containers [][]byte) error {
 		// MultiPut blocks for two seconds
@@ -278,7 +279,7 @@ func TestRouterTimeout(t *testing.T) {
 	}
 	bootstrapper.Default(true)
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
-	bootstrapper.ConnectedF = func(nodeID ids.ShortID) error { return nil }
+	bootstrapper.ConnectedF = func(nodeID ids.ShortID, nodeVersion version.Application) error { return nil }
 	bootstrapper.HaltF = func() {}
 	bootstrapper.GetFailedF = func(nodeID ids.ShortID, requestID uint32) error { wg.Done(); calledGetFailed = true; return nil }
 	bootstrapper.GetAncestorsFailedF = func(nodeID ids.ShortID, requestID uint32) error {

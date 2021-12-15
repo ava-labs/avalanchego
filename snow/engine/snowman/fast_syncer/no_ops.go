@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 // EngineNoOps lists all messages that are dropped during nomal operation phase
@@ -73,7 +74,7 @@ func (nop *FastSyncNoOps) Timeout() error {
 	return nil
 }
 
-func (nop *FastSyncNoOps) Connected(validatorID ids.ShortID) error {
+func (nop *FastSyncNoOps) Connected(validatorID ids.ShortID, nodeVersion version.Application) error {
 	nop.Ctx.Log.Debug("Connected(%s) unhandled during fast sync. Dropped.", validatorID)
 	return nil
 }

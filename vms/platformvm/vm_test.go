@@ -2208,7 +2208,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	chainRouter.AddChain(handler)
 	go ctx.Log.RecoverAndPanic(handler.Dispatch)
 
-	if err := bootstrapper.Connected(peerID); err != nil {
+	if err := bootstrapper.Connected(peerID, version.CurrentApp); err != nil {
 		t.Fatal(err)
 	}
 

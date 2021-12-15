@@ -257,8 +257,8 @@ func (b *batch) Reset() {
 }
 
 // Replay the batch contents.
-func (b *batch) Replay(w database.KeyValueWriter) error {
-	replay := &replayer{writer: w}
+func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
+	replay := &replayer{writerDeleter: w}
 	if err := b.Batch.Replay(replay); err != nil {
 		// Never actually returns an error, because Replay just returns nil
 		return err
@@ -270,22 +270,22 @@ func (b *batch) Replay(w database.KeyValueWriter) error {
 func (b *batch) Inner() database.Batch { return b }
 
 type replayer struct {
-	writer database.KeyValueWriter
-	err    error
+	writerDeleter database.KeyValueWriterDeleter
+	err           error
 }
 
 func (r *replayer) Put(key, value []byte) {
 	if r.err != nil {
 		return
 	}
-	r.err = r.writer.Put(key, value)
+	r.err = r.writerDeleter.Put(key, value)
 }
 
 func (r *replayer) Delete(key []byte) {
 	if r.err != nil {
 		return
 	}
-	r.err = r.writer.Delete(key)
+	r.err = r.writerDeleter.Delete(key)
 }
 
 type iter struct{ iterator.Iterator }

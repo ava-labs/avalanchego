@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 var (
@@ -111,7 +112,8 @@ type EngineTest struct {
 	AcceptedFrontierF, GetAcceptedF, AcceptedF, ChitsF func(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) error
 	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
 	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF, AppRequestFailedF func(nodeID ids.ShortID, requestID uint32) error
-	ConnectedF, DisconnectedF func(nodeID ids.ShortID) error
+	ConnectedF                func(nodeID ids.ShortID, nodeVersion version.Application) error
+	DisconnectedF             func(nodeID ids.ShortID) error
 	HealthF                   func() (interface{}, error)
 	GetVMF                    func() VM
 	AppRequestF, AppResponseF func(nodeID ids.ShortID, requestID uint32, msg []byte) error
@@ -506,9 +508,9 @@ func (e *EngineTest) Chits(nodeID ids.ShortID, requestID uint32, containerIDs []
 	return errChits
 }
 
-func (e *EngineTest) Connected(nodeID ids.ShortID) error {
+func (e *EngineTest) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
 	if e.ConnectedF != nil {
-		return e.ConnectedF(nodeID)
+		return e.ConnectedF(nodeID, nodeVersion)
 	}
 	if !e.CantConnected {
 		return nil

@@ -33,6 +33,7 @@ var (
 	// The 10 is because there seems to be a floating point issue where the calculated
 	// max decode size (using this formula) is slightly smaller than the actual
 	maxCB58DecodeSize              = int(float64(maxCB58EncodeSize)*math.Log2(256)/math.Log2(58)) + 10
+	errEncodingOverFlow            = errors.New("encoding overflow")
 	errInvalidEncoding             = errors.New("invalid encoding")
 	errUnsupportedEncodingInMethod = errors.New("unsupported encoding in method")
 	errMissingChecksum             = errors.New("input string is smaller than the checksum size")
@@ -107,7 +108,11 @@ func EncodeWithChecksum(encoding Encoding, bytes []byte) (string, error) {
 		return "", err
 	}
 
-	checked := make([]byte, len(bytes)+checksumLen)
+	bytesLen := len(bytes)
+	if bytesLen > math.MaxInt32-checksumLen {
+		return "", errEncodingOverFlow
+	}
+	checked := make([]byte, bytesLen+checksumLen)
 	copy(checked, bytes)
 	copy(checked[len(bytes):], hashing.Checksum(bytes, checksumLen))
 	return encode(encoding, checked)

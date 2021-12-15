@@ -20,12 +20,12 @@ import (
 )
 
 type EventDispatcher interface {
-	Issue(ctx *ConsensusContext, containerID ids.ID, container []byte) error
+	Issuer
 	// If the returned error is non-nil, the chain associated with [ctx] should shut
 	// down and not commit [container] or any other container to its database as accepted.
 	// Accept must be called before [containerID] is committed to the VM as accepted.
-	Accept(ctx *ConsensusContext, containerID ids.ID, container []byte) error
-	Reject(ctx *ConsensusContext, containerID ids.ID, container []byte) error
+	Acceptor
+	Rejector
 }
 
 type SubnetLookup interface {

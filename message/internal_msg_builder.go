@@ -5,6 +5,7 @@ package message
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 var _ InternalMsgBuilder = internalMsgBuilder{}
@@ -18,7 +19,7 @@ type InternalMsgBuilder interface {
 	) InboundMessage
 
 	InternalTimeout(nodeID ids.ShortID) InboundMessage
-	InternalConnected(nodeID ids.ShortID) InboundMessage
+	InternalConnected(nodeID ids.ShortID, nodeVersion version.Application) InboundMessage
 	InternalDisconnected(nodeID ids.ShortID) InboundMessage
 	InternalVMMessage(nodeID ids.ShortID, notification uint32) InboundMessage
 	InternalGossipRequest(nodeID ids.ShortID) InboundMessage
@@ -53,9 +54,12 @@ func (internalMsgBuilder) InternalTimeout(nodeID ids.ShortID) InboundMessage {
 	}
 }
 
-func (internalMsgBuilder) InternalConnected(nodeID ids.ShortID) InboundMessage {
+func (internalMsgBuilder) InternalConnected(nodeID ids.ShortID, nodeVersion version.Application) InboundMessage {
 	return &inboundMessage{
-		op:     Connected,
+		op: Connected,
+		fields: map[Field]interface{}{
+			VersionStruct: nodeVersion,
+		},
 		nodeID: nodeID,
 	}
 }

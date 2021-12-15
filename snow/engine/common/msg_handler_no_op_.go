@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 var _ Handler = &MsgHandlerNoOps{}
@@ -136,7 +137,7 @@ func (nop MsgHandlerNoOps) Notify(msg Message) error {
 	return nil
 }
 
-func (nop MsgHandlerNoOps) Connected(validatorID ids.ShortID) error {
+func (nop MsgHandlerNoOps) Connected(validatorID ids.ShortID, nodeVersion version.Application) error {
 	nop.ctx.Log.Debug("Connected(%s) unhandled by this gear. Dropped.", validatorID)
 	return nil
 }

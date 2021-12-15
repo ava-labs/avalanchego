@@ -16,6 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
+var _ snow.Acceptor = &EventSockets{}
+
 // EventSockets is a set of named eventSockets
 type EventSockets struct {
 	consensusSocket *eventSocket
@@ -41,7 +43,7 @@ func newEventSockets(ctx context, chainID ids.ID, consensusEvents *triggers.Even
 }
 
 // Accept delivers a message to the underlying eventSockets
-func (ipcs *EventSockets) Accept(ctx *snow.Context, containerID ids.ID, container []byte) error {
+func (ipcs *EventSockets) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error {
 	if ipcs.consensusSocket != nil {
 		if err := ipcs.consensusSocket.Accept(ctx, containerID, container); err != nil {
 			return err
@@ -130,7 +132,7 @@ func newEventIPCSocket(ctx context, chainID ids.ID, name string, events *trigger
 }
 
 // Accept delivers a message to the eventSocket
-func (eis *eventSocket) Accept(_ *snow.Context, _ ids.ID, container []byte) error {
+func (eis *eventSocket) Accept(_ *snow.ConsensusContext, _ ids.ID, container []byte) error {
 	eis.socket.Send(container)
 	return nil
 }

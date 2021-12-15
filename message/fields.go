@@ -34,6 +34,7 @@ const (
 	Uptime                           // Used for Pong
 	SummaryKey                       // Used for fast sync
 	MultiSummaryKeys                 // Used for fast sync
+	VersionStruct                    // Used internally
 )
 
 // Packer returns the packer function that can be used to pack this field.
@@ -182,6 +183,8 @@ func (f Field) String() string {
 		return "SummaryKey"
 	case MultiSummaryKeys:
 		return "MultiSummaryKeys"
+	case VersionStruct:
+		return "VersionStruct"
 	default:
 		return "Unknown Field"
 	}
