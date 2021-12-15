@@ -24,13 +24,16 @@ var (
 // Database partitions a database into a sub-database by prefixing all keys with
 // a unique value.
 type Database struct {
-	lock sync.RWMutex
 	// All keys in this db begin with this byte slice
 	dbPrefix []byte
-	// The underlying storage
-	db database.Database
 	// Holds unused []byte
 	bufferPool sync.Pool
+
+	// lock needs to be held during Close to guarantee db will not be set to nil
+	// concurrently with another operation. All other operations can hold RLock.
+	lock sync.RWMutex
+	// The underlying storage
+	db database.Database
 }
 
 // New returns a new prefixed database
@@ -98,8 +101,8 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 // [key] can be modified after this method returns.
 // [value] should not be modified.
 func (db *Database) Put(key, value []byte) error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
+	db.lock.RLock()
+	defer db.lock.RUnlock()
 
 	if db.db == nil {
 		return database.ErrClosed
@@ -115,8 +118,8 @@ func (db *Database) Put(key, value []byte) error {
 // to be modified after db.db.Delete returns.
 // [key] may be modified after this method returns.
 func (db *Database) Delete(key []byte) error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
+	db.lock.RLock()
+	defer db.lock.RUnlock()
 
 	if db.db == nil {
 		return database.ErrClosed
@@ -184,8 +187,8 @@ func (db *Database) Stat(stat string) (string, error) {
 
 // Compact implements the Database interface
 func (db *Database) Compact(start, limit []byte) error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
+	db.lock.RLock()
+	defer db.lock.RUnlock()
 
 	if db.db == nil {
 		return database.ErrClosed
@@ -266,8 +269,8 @@ func (b *batch) Delete(key []byte) error {
 
 // Write flushes any accumulated data to the memory database.
 func (b *batch) Write() error {
-	b.db.lock.Lock()
-	defer b.db.lock.Unlock()
+	b.db.lock.RLock()
+	defer b.db.lock.RUnlock()
 
 	if b.db.db == nil {
 		return database.ErrClosed
@@ -279,7 +282,7 @@ func (b *batch) Write() error {
 func (b *batch) Reset() {
 	// Return the byte buffers underneath each key back to the pool.
 	// Don't return the byte buffers underneath each value back to the pool
-	// because we assume in batch.Repley that it's not safe to modify the
+	// because we assume in batch.Replay that it's not safe to modify the
 	// value argument to w.Put.
 	for _, kv := range b.writes {
 		b.db.bufferPool.Put(kv.key)
