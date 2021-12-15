@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 var (
@@ -2713,7 +2714,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := bootstrapper.Connected(vdr); err != nil {
+	if err := bootstrapper.Connected(vdr, version.CurrentApp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3154,7 +3155,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := bootstrapper.Connected(vdr); err != nil {
+	if err := bootstrapper.Connected(vdr, version.CurrentApp); err != nil {
 		t.Fatal(err)
 	}
 

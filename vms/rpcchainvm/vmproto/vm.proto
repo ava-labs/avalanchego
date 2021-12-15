@@ -161,6 +161,7 @@ message AppGossipMsg {
 
 message ConnectedRequest {
     bytes nodeID = 1; 
+    string version = 2;
 }
  
 message DisconnectedRequest {

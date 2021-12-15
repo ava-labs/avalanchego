@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 // Parameters for delaying bootstrapping to avoid potential CPU burns
@@ -436,8 +437,8 @@ func (b *bootstrapper) finish() error {
 }
 
 // Connected implements the Engine interface.
-func (b *bootstrapper) Connected(nodeID ids.ShortID) error {
-	if err := b.VM.Connected(nodeID); err != nil {
+func (b *bootstrapper) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
+	if err := b.VM.Connected(nodeID, nodeVersion); err != nil {
 		return err
 	}
 

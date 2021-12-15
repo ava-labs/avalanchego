@@ -192,7 +192,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 
 func staticCodec() (codec.Manager, error) {
 	c := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
-	manager := codec.NewManager(math.MaxUint32)
+	manager := codec.NewManager(math.MaxInt32)
 
 	errs := wrappers.Errs{}
 	errs.Add(

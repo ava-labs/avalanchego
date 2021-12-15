@@ -28,7 +28,7 @@ func init() {
 	c := linearcodec.NewDefault()
 	Codec = codec.NewDefaultManager()
 	gc := linearcodec.New(reflectcodec.DefaultTagName, math.MaxUint32)
-	GenesisCodec = codec.NewManager(math.MaxUint32)
+	GenesisCodec = codec.NewManager(math.MaxInt32)
 
 	errs := wrappers.Errs{}
 	for _, c := range []codec.Registry{c, gc} {

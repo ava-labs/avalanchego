@@ -5,11 +5,12 @@ package validators
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 // Connector represents a handler that is called when a connection is marked as
 // connected or disconnected
 type Connector interface {
-	Connected(id ids.ShortID) error
+	Connected(id ids.ShortID, nodeVersion version.Application) error
 	Disconnected(id ids.ShortID) error
 }

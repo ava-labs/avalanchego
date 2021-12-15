@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 var _ Engine = &Transitive{}
@@ -95,8 +96,8 @@ func (t *Transitive) IsBootstrapped() bool {
 }
 
 // Connected implements the Engine interface.
-func (t *Transitive) Connected(nodeID ids.ShortID) error {
-	if err := t.VM.Connected(nodeID); err != nil {
+func (t *Transitive) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
+	if err := t.VM.Connected(nodeID, nodeVersion); err != nil {
 		return err
 	}
 

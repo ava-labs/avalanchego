@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/uptime"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 var errDuplicatedContainerID = errors.New("inbound message contains duplicated container ID")
@@ -221,14 +222,6 @@ func (h *Handler) handleMsg(msg message.InboundMessage) error {
 	case message.Timeout:
 		err = targetGear.Timeout()
 
-	case message.Connected:
-		nodeID := msg.NodeID()
-		err = targetGear.Connected(nodeID)
-
-	case message.Disconnected:
-		nodeID := msg.NodeID()
-		err = targetGear.Disconnected(nodeID)
-
 	default:
 		err = h.handleConsensusMsg(msg)
 	}
@@ -389,6 +382,13 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 	case message.QueryFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
 		return targetGear.QueryFailed(nodeID, reqID)
+
+	case message.Connected:
+		peerVersion := msg.Get(message.VersionStruct).(version.Application)
+		return targetGear.Connected(nodeID, peerVersion)
+
+	case message.Disconnected:
+		return targetGear.Disconnected(nodeID)
 
 	case message.AppRequest:
 		reqID := msg.Get(message.RequestID).(uint32)
