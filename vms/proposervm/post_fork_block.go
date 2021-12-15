@@ -41,6 +41,7 @@ func (b *postForkBlock) Accept() error {
 	if err := b.vm.UpdateHeightIndex(b.Height(), blkID); err != nil {
 		return err
 	}
+	b.vm.ctx.Log.Debug("Block indexing by height: added post fork block at height %d", b.Height())
 
 	delete(b.vm.verifiedBlocks, blkID)
 	b.vm.lastAcceptedTime = b.Timestamp()

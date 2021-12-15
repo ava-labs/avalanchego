@@ -57,25 +57,25 @@ func NewHeightIndex(db database.Database) HeightIndex {
 	}
 }
 
-func (ibm *innerHeightIndex) SetBlkIDByHeight(height uint64, blkID ids.ID) (int, error) {
+func (ihi *innerHeightIndex) SetBlkIDByHeight(height uint64, blkID ids.ID) (int, error) {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 	key := make([]byte, len(heightPrefix))
 	copy(key, heightPrefix)
 	key = append(key, heightBytes...)
 
-	ibm.cache.Put(string(key), blkID)
-	return len(key) + len(blkID), ibm.db.Put(key, blkID[:])
+	ihi.cache.Put(string(key), blkID)
+	return len(key) + len(blkID), ihi.db.Put(key, blkID[:])
 }
 
-func (ibm *innerHeightIndex) GetBlkIDByHeight(height uint64) (ids.ID, error) {
+func (ihi *innerHeightIndex) GetBlkIDByHeight(height uint64) (ids.ID, error) {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 	key := make([]byte, len(heightPrefix))
 	copy(key, heightPrefix)
 	key = append(key, heightBytes...)
 
-	if blkIDIntf, found := ibm.cache.Get(string(key)); found {
+	if blkIDIntf, found := ihi.cache.Get(string(key)); found {
 		if blkIDIntf == nil {
 			return ids.Empty, database.ErrNotFound
 		}
@@ -84,13 +84,13 @@ func (ibm *innerHeightIndex) GetBlkIDByHeight(height uint64) (ids.ID, error) {
 		return res, nil
 	}
 
-	bytes, err := ibm.db.Get(key)
+	bytes, err := ihi.db.Get(key)
 	switch err {
 	case nil:
 		return ids.FromBytes(bytes), nil
 
 	case database.ErrNotFound:
-		ibm.cache.Put(string(key), nil)
+		ihi.cache.Put(string(key), nil)
 		return ids.Empty, database.ErrNotFound
 
 	default:
@@ -98,28 +98,28 @@ func (ibm *innerHeightIndex) GetBlkIDByHeight(height uint64) (ids.ID, error) {
 	}
 }
 
-func (ibm *innerHeightIndex) DeleteBlkIDByHeight(height uint64) error {
+func (ihi *innerHeightIndex) DeleteBlkIDByHeight(height uint64) error {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 	key := make([]byte, len(heightPrefix))
 	copy(key, heightPrefix)
 	key = append(key, heightBytes...)
 
-	ibm.cache.Put(string(key), nil)
-	return ibm.db.Delete(key)
+	ihi.cache.Put(string(key), nil)
+	return ihi.db.Delete(key)
 }
 
-func (ibm *innerHeightIndex) SetLatestPreForkHeight(height uint64) error {
+func (ihi *innerHeightIndex) SetLatestPreForkHeight(height uint64) error {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 
-	ibm.cache.Put(string(preForkPrefix), heightBytes)
-	return ibm.db.Put(preForkPrefix, heightBytes)
+	ihi.cache.Put(string(preForkPrefix), heightBytes)
+	return ihi.db.Put(preForkPrefix, heightBytes)
 }
 
-func (ibm *innerHeightIndex) GetLatestPreForkHeight() (uint64, error) {
+func (ihi *innerHeightIndex) GetLatestPreForkHeight() (uint64, error) {
 	key := preForkPrefix
-	if blkIDIntf, found := ibm.cache.Get(string(key)); found {
+	if blkIDIntf, found := ihi.cache.Get(string(key)); found {
 		if blkIDIntf == nil {
 			return 0, database.ErrNotFound
 		}
@@ -129,7 +129,7 @@ func (ibm *innerHeightIndex) GetLatestPreForkHeight() (uint64, error) {
 		return res, nil
 	}
 
-	bytes, err := ibm.db.Get(key)
+	bytes, err := ihi.db.Get(key)
 	switch err {
 	case nil:
 		res := binary.BigEndian.Uint64(bytes)
@@ -143,21 +143,21 @@ func (ibm *innerHeightIndex) GetLatestPreForkHeight() (uint64, error) {
 	}
 }
 
-func (ibm *innerHeightIndex) DeleteLatestPreForkHeight() error {
+func (ihi *innerHeightIndex) DeleteLatestPreForkHeight() error {
 	key := preForkPrefix
-	ibm.cache.Evict(string(key))
-	return ibm.db.Delete(key)
+	ihi.cache.Evict(string(key))
+	return ihi.db.Delete(key)
 }
 
-func (ibm *innerHeightIndex) SetRepairCheckpoint(blkID ids.ID) error {
+func (ihi *innerHeightIndex) SetRepairCheckpoint(blkID ids.ID) error {
 	key := checkpointPrefix
-	ibm.cache.Put(string(key), blkID)
-	return ibm.db.Put(key, blkID[:])
+	ihi.cache.Put(string(key), blkID)
+	return ihi.db.Put(key, blkID[:])
 }
 
-func (ibm *innerHeightIndex) GetRepairCheckpoint() (ids.ID, error) {
+func (ihi *innerHeightIndex) GetRepairCheckpoint() (ids.ID, error) {
 	key := checkpointPrefix
-	if blkIDIntf, found := ibm.cache.Get(string(key)); found {
+	if blkIDIntf, found := ihi.cache.Get(string(key)); found {
 		if blkIDIntf == nil {
 			return ids.Empty, database.ErrNotFound
 		}
@@ -166,7 +166,7 @@ func (ibm *innerHeightIndex) GetRepairCheckpoint() (ids.ID, error) {
 		return res, nil
 	}
 
-	bytes, err := ibm.db.Get(key)
+	bytes, err := ihi.db.Get(key)
 	switch err {
 	case nil:
 		return ids.FromBytes(bytes), nil
@@ -179,12 +179,12 @@ func (ibm *innerHeightIndex) GetRepairCheckpoint() (ids.ID, error) {
 	}
 }
 
-func (ibm *innerHeightIndex) DeleteRepairCheckpoint() error {
+func (ihi *innerHeightIndex) DeleteRepairCheckpoint() error {
 	key := checkpointPrefix
-	ibm.cache.Evict(string(key))
-	return ibm.db.Delete(key)
+	ihi.cache.Evict(string(key))
+	return ihi.db.Delete(key)
 }
 
-func (ibm *innerHeightIndex) clearCache() {
-	ibm.cache.Flush()
+func (ihi *innerHeightIndex) clearCache() {
+	ihi.cache.Flush()
 }

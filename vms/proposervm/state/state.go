@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	chainStatePrefix     = []byte("chain")
-	blockStatePrefix     = []byte("block")
-	heightBlkIndexPrefix = []byte("heightBlk")
+	chainStatePrefix  = []byte("chain")
+	blockStatePrefix  = []byte("block")
+	heightIndexPrefix = []byte("heightBlk")
 )
 
 type State interface {
@@ -31,7 +31,7 @@ type state struct {
 func New(db database.Database) State {
 	chainDB := prefixdb.New(chainStatePrefix, db)
 	blockDB := prefixdb.New(blockStatePrefix, db)
-	heightIndexDB := prefixdb.New(heightBlkIndexPrefix, db)
+	heightIndexDB := prefixdb.New(heightIndexPrefix, db)
 	return &state{
 		ChainState:  NewChainState(chainDB),
 		BlockState:  NewBlockState(blockDB),
@@ -42,7 +42,7 @@ func New(db database.Database) State {
 func NewMetered(db database.Database, namespace string, metrics prometheus.Registerer) (State, error) {
 	chainDB := prefixdb.New(chainStatePrefix, db)
 	blockDB := prefixdb.New(blockStatePrefix, db)
-	heightIndexDB := prefixdb.New(heightBlkIndexPrefix, db)
+	heightIndexDB := prefixdb.New(heightIndexPrefix, db)
 
 	blockState, err := NewMeteredBlockState(blockDB, namespace, metrics)
 	if err != nil {

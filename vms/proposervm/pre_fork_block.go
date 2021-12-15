@@ -29,6 +29,7 @@ func (b *preForkBlock) Accept() error {
 	if err := b.vm.UpdateLatestPreForkBlockHeight(b.Height()); err != nil {
 		return err
 	}
+	b.vm.ctx.Log.Debug("Block indexing by height: added pre fork block at height %d", b.Height())
 
 	if err := b.Block.Accept(); err != nil {
 		return err
