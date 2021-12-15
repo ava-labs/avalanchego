@@ -4,6 +4,7 @@
 package indexes
 
 import (
+	"math"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -23,7 +24,6 @@ type HeightIndexer interface {
 
 	RepairHeightIndex()
 	UpdateHeightIndex(height uint64, blkID ids.ID) error
-	UpdateLatestPreForkBlockHeight(height uint64) error
 }
 
 func NewHeightIndexer(srv BlockServer,
@@ -34,6 +34,7 @@ func NewHeightIndexer(srv BlockServer,
 		server:     srv,
 		innerHVM:   innerHVM,
 		log:        log,
+		forkHeight: math.MaxUint64,
 		indexState: indexState,
 	}
 }
@@ -43,8 +44,8 @@ type heightIndexer struct {
 	innerHVM block.HeightIndexedChainVM
 	log      logging.Logger
 
-	latestPreForkHeight uint64
-	indexState          state.HeightIndex
+	forkHeight uint64
+	indexState state.HeightIndex
 }
 
 // Upon initialization, RepairHeightIndex ensures the height -> proBlkID
@@ -88,7 +89,7 @@ func (hi *heightIndexer) GetBlockIDByHeight(height uint64) (ids.ID, error) {
 	}
 
 	// preFork blocks are indexed in innerVM only
-	if height <= hi.latestPreForkHeight {
+	if height <= hi.forkHeight {
 		return hi.innerHVM.GetBlockIDByHeight(height)
 	}
 
@@ -102,22 +103,15 @@ func (hi *heightIndexer) UpdateHeightIndex(height uint64, blkID ids.ID) error {
 		return nil
 	}
 
+	if hi.forkHeight > height {
+		hi.forkHeight = height - 1
+		if err := hi.indexState.SetForkHeight(height); err != nil {
+			return err
+		}
+	}
+
 	_, err := hi.indexState.SetBlockIDAtHeight(height, blkID)
 	return err
-}
-
-func (hi *heightIndexer) UpdateLatestPreForkBlockHeight(height uint64) error {
-	if hi.innerHVM == nil || !hi.innerHVM.IsHeightIndexComplete() {
-		// nothing to index if innerVM does not support height indexing
-		return nil
-	}
-
-	if height <= hi.latestPreForkHeight {
-		return nil
-	}
-
-	hi.latestPreForkHeight = height
-	return hi.indexState.SetLatestPreForkHeight(height)
 }
 
 // shouldRepair checks if height index is complete;
@@ -129,7 +123,7 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 		return false, ids.Empty, nil
 	}
 
-	repairStartBlkID, err := hi.indexState.GetRepairCheckpoint()
+	repairStartBlkID, err := hi.indexState.GetCheckpoint()
 	switch err {
 	case nil:
 		// checkpoint found, repair must be resumed
@@ -147,20 +141,8 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 	case nil:
 		break
 	case database.ErrNotFound:
-		// snowman++ has not forked yet. Height block index is ok;
-		// just check latestPreForkHeight is duly set.
-		latestInnerBlkID, err := hi.server.LastAcceptedInnerBlkID()
-		if err != nil {
-			return true, ids.Empty, err
-		}
-		lastInnerBlk, err := hi.server.GetInnerBlk(latestInnerBlkID)
-		if err != nil {
-			return true, ids.Empty, err
-		}
-		hi.latestPreForkHeight = lastInnerBlk.Height()
-		if err := hi.indexState.SetLatestPreForkHeight(hi.latestPreForkHeight); err != nil {
-			return true, ids.Empty, err
-		}
+		// snowman++ has not forked yet; height block index is ok.
+		// forkHeight set at math.MaxUint64, aka +infinity
 		return false, ids.Empty, nil
 	default:
 		return true, ids.Empty, err
@@ -176,14 +158,14 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 	switch err {
 	case nil:
 		// index is complete already.
-		hi.latestPreForkHeight, err = hi.indexState.GetLatestPreForkHeight()
+		hi.forkHeight, err = hi.indexState.GetForkHeight()
 		return false, ids.Empty, err
 	case database.ErrNotFound:
 		// index needs repairing and it's the first time we do this.
 		// Mark the checkpoint so that, in case new blocks are accepted while
 		// indexing is ongoing, and the process is terminated before first commit,
-		// we do not miss rebuilding the full index
-		if err := hi.indexState.SetRepairCheckpoint(latestProBlkID); err != nil {
+		// we do not miss rebuilding the full index.
+		if err := hi.indexState.SetCheckpoint(latestProBlkID); err != nil {
 			return false, ids.Empty, err
 		}
 		return true, latestProBlkID, nil
@@ -223,20 +205,20 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 			if err != nil {
 				return err
 			}
-			hi.latestPreForkHeight = innerForkBlk.Height()
-			if err := hi.indexState.SetLatestPreForkHeight(hi.latestPreForkHeight); err != nil {
+			hi.forkHeight = innerForkBlk.Height()
+			if err := hi.indexState.SetForkHeight(hi.forkHeight); err != nil {
 				return err
 			}
 
 			// Delete checkpoint and finally commit
-			if err := hi.indexState.DeleteRepairCheckpoint(); err != nil {
+			if err := hi.indexState.DeleteCheckpoint(); err != nil {
 				return err
 			}
 			if err := hi.server.DBCommit(); err != nil {
 				return err
 			}
-			hi.log.Info("Block indexing by height completed: indexed %d blocks, duration %v, latest pre fork block height %d",
-				indexedBlks, time.Since(start), hi.latestPreForkHeight)
+			hi.log.Info("Block indexing by height completed: indexed %d blocks, duration %v, fork height %d",
+				indexedBlks, time.Since(start), hi.forkHeight)
 			return nil
 
 		default:
@@ -249,16 +231,16 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 		case nil:
 			// height block index already there; It must be the same for all ancestors and fork height too.
 			// just load latestPreForkHeight
-			hi.latestPreForkHeight, err = hi.indexState.GetLatestPreForkHeight()
-			hi.log.Info("Block indexing by height completed: indexed %d blocks, duration %v, latest pre fork block height %d",
-				indexedBlks, time.Since(start), hi.latestPreForkHeight)
+			hi.forkHeight, err = hi.indexState.GetForkHeight()
+			hi.log.Info("Block indexing by height completed: indexed %d blocks, duration %v, fork block height %d",
+				indexedBlks, time.Since(start), hi.forkHeight)
 			return err
 
 		case database.ErrNotFound:
 			// Let's keep memory footprint under control by committing when a size threshold is reached
 			// We commit before storing lastAcceptedBlk height block index so to use lastAcceptedBlk as nextBlkIDToResumeFrom
 			if pendingBytesApproximation > commitSizeCap {
-				if err := hi.indexState.SetRepairCheckpoint(currentProBlkID); err != nil {
+				if err := hi.indexState.SetCheckpoint(currentProBlkID); err != nil {
 					return err
 				}
 				if err := hi.server.DBCommit(); err != nil {

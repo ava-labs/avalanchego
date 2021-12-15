@@ -31,13 +31,13 @@ type HeightIndex interface {
 	GetBlockIDAtHeight(height uint64) (ids.ID, error)
 	DeleteBlockIDAtHeight(height uint64) error
 
-	SetLatestPreForkHeight(height uint64) error
-	GetLatestPreForkHeight() (uint64, error)
-	DeleteLatestPreForkHeight() error
+	SetForkHeight(height uint64) error
+	GetForkHeight() (uint64, error)
+	DeleteForkHeight() error
 
-	SetRepairCheckpoint(blkID ids.ID) error
-	GetRepairCheckpoint() (ids.ID, error)
-	DeleteRepairCheckpoint() error
+	SetCheckpoint(blkID ids.ID) error
+	GetCheckpoint() (ids.ID, error)
+	DeleteCheckpoint() error
 
 	clearCache() // useful in testing
 }
@@ -109,7 +109,7 @@ func (ihi *innerHeightIndex) DeleteBlockIDAtHeight(height uint64) error {
 	return ihi.db.Delete(key)
 }
 
-func (ihi *innerHeightIndex) SetLatestPreForkHeight(height uint64) error {
+func (ihi *innerHeightIndex) SetForkHeight(height uint64) error {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 
@@ -117,7 +117,7 @@ func (ihi *innerHeightIndex) SetLatestPreForkHeight(height uint64) error {
 	return ihi.db.Put(preForkPrefix, heightBytes)
 }
 
-func (ihi *innerHeightIndex) GetLatestPreForkHeight() (uint64, error) {
+func (ihi *innerHeightIndex) GetForkHeight() (uint64, error) {
 	key := preForkPrefix
 	if blkIDIntf, found := ihi.cache.Get(string(key)); found {
 		if blkIDIntf == nil {
@@ -143,19 +143,19 @@ func (ihi *innerHeightIndex) GetLatestPreForkHeight() (uint64, error) {
 	}
 }
 
-func (ihi *innerHeightIndex) DeleteLatestPreForkHeight() error {
+func (ihi *innerHeightIndex) DeleteForkHeight() error {
 	key := preForkPrefix
 	ihi.cache.Evict(string(key))
 	return ihi.db.Delete(key)
 }
 
-func (ihi *innerHeightIndex) SetRepairCheckpoint(blkID ids.ID) error {
+func (ihi *innerHeightIndex) SetCheckpoint(blkID ids.ID) error {
 	key := checkpointPrefix
 	ihi.cache.Put(string(key), blkID)
 	return ihi.db.Put(key, blkID[:])
 }
 
-func (ihi *innerHeightIndex) GetRepairCheckpoint() (ids.ID, error) {
+func (ihi *innerHeightIndex) GetCheckpoint() (ids.ID, error) {
 	key := checkpointPrefix
 	if blkIDIntf, found := ihi.cache.Get(string(key)); found {
 		if blkIDIntf == nil {
@@ -179,7 +179,7 @@ func (ihi *innerHeightIndex) GetRepairCheckpoint() (ids.ID, error) {
 	}
 }
 
-func (ihi *innerHeightIndex) DeleteRepairCheckpoint() error {
+func (ihi *innerHeightIndex) DeleteCheckpoint() error {
 	key := checkpointPrefix
 	ihi.cache.Evict(string(key))
 	return ihi.db.Delete(key)

@@ -123,7 +123,7 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 	}
 
 	// height index is empty at start
-	assert.True(hIndex.latestPreForkHeight == 0)
+	assert.True(hIndex.forkHeight == 0)
 	for height := uint64(1); height <= blkNumber; height++ {
 		_, err := hIndex.indexState.GetBlockIDAtHeight(height)
 		assert.Error(err, database.ErrNotFound)
@@ -137,7 +137,7 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 	assert.NoError(hIndex.doRepair(startBlkID))
 
 	// check that height index is fully built
-	assert.True(hIndex.latestPreForkHeight == 0)
+	assert.True(hIndex.forkHeight == 0)
 	for height := uint64(1); height <= blkNumber; height++ {
 		_, err := hIndex.indexState.GetBlockIDAtHeight(height)
 		assert.NoError(err)
@@ -226,7 +226,7 @@ func TestHeightBlockIndexPreFork(t *testing.T) {
 	}
 
 	// height index is empty at start
-	assert.True(hIndex.latestPreForkHeight == 0)
+	assert.True(hIndex.forkHeight == 0)
 	for height := uint64(1); height <= blkNumber; height++ {
 		_, err := hIndex.indexState.GetBlockIDAtHeight(height)
 		assert.Error(err, database.ErrNotFound)
@@ -353,7 +353,7 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 	}
 
 	// height index is empty at start
-	assert.True(hIndex.latestPreForkHeight == 0)
+	assert.True(hIndex.forkHeight == 0)
 	for height := uint64(1); height <= blkNumber; height++ {
 		_, err := hIndex.indexState.GetBlockIDAtHeight(height)
 		assert.Error(err, database.ErrNotFound)
@@ -367,7 +367,7 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 	assert.NoError(hIndex.doRepair(startBlkID))
 
 	// check that height index is fully built
-	assert.True(hIndex.latestPreForkHeight == forkHeight)
+	assert.True(hIndex.forkHeight == forkHeight)
 	for height := uint64(0); height <= forkHeight; height++ {
 		_, err := hIndex.indexState.GetBlockIDAtHeight(height)
 		assert.Error(err, database.ErrNotFound)
@@ -511,7 +511,7 @@ func TestHeightBlockIndexResumefromCheckPoint(t *testing.T) {
 		}
 
 		checkpointBlk := blk
-		assert.NoError(hIndex.indexState.SetRepairCheckpoint(checkpointBlk.ID()))
+		assert.NoError(hIndex.indexState.SetCheckpoint(checkpointBlk.ID()))
 
 		doRepair, startBlkID, err := hIndex.shouldRepair()
 		assert.True(doRepair)
