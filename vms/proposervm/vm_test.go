@@ -30,11 +30,6 @@ import (
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-type expandedCoreVM struct {
-	*block.TestVM
-	*block.TestHeightIndexedVM
-}
-
 var (
 	pTestCert *tls.Certificate
 
@@ -61,7 +56,7 @@ func initTestProposerVM(
 	proBlkStartTime time.Time,
 	minPChainHeight uint64,
 ) (
-	expandedCoreVM,
+	*block.TestVM,
 	*validators.TestState,
 	*VM,
 	*snowman.TestBlock,
@@ -78,13 +73,8 @@ func initTestProposerVM(
 	}
 
 	initialState := []byte("genesis state")
-	coreVM := expandedCoreVM{
-		TestVM: &block.TestVM{
-			TestVM: common.TestVM{
-				T: t,
-			},
-		},
-		TestHeightIndexedVM: &block.TestHeightIndexedVM{
+	coreVM := &block.TestVM{
+		TestVM: common.TestVM{
 			T: t,
 		},
 	}
