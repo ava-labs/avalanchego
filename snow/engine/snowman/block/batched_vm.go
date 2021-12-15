@@ -4,12 +4,15 @@
 package block
 
 import (
+	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
+
+var ErrRemoteVMNotImplemented = errors.New("vm does not implement RemoteVM interface")
 
 // BatchedChainVM extends the minimal functionalities exposed by ChainVM for VMs
 // communicating over network (gRPC in our case). This allows more efficient
