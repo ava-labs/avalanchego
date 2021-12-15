@@ -1,0 +1,33 @@
+name: Lint + Unit Tests
+on: [push]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v2
+        with:
+          version: latest
+          working-directory: .
+          args: --timeout 3m
+  test:
+    name: Golang Unit Tests v${{ matrix.go }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        go: ["1.16"]
+        os: [ubuntu-20.04]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v1
+        with:
+          go-version: ${{ matrix.go }}
+      - run: go mod download
+        shell: bash
+      - run: ./scripts/build.sh evm
+        shell: bash
+      - run: ./scripts/build_test.sh
+        shell: bash
