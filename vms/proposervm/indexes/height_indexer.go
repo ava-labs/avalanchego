@@ -64,8 +64,8 @@ func (hi *heightIndexer) RepairHeightIndex() {
 }
 
 // HeightIndexingEnabled implements HeightIndexedChainVM interface
-func (hi *heightIndexer) HeightIndexingEnabled() bool {
-	if hi.innerHVM == nil || !hi.innerHVM.HeightIndexingEnabled() {
+func (hi *heightIndexer) IsHeightIndexComplete() bool {
+	if hi.innerHVM == nil || !hi.innerHVM.IsHeightIndexComplete() {
 		// innerVM does not support height index
 		return false
 	}
@@ -82,7 +82,7 @@ func (hi *heightIndexer) HeightIndexingEnabled() bool {
 
 // GetBlockIDByHeight implements HeightIndexedChainVM interface
 func (hi *heightIndexer) GetBlockIDByHeight(height uint64) (ids.ID, error) {
-	if hi.innerHVM == nil || !hi.innerHVM.HeightIndexingEnabled() {
+	if hi.innerHVM == nil || !hi.innerHVM.IsHeightIndexComplete() {
 		// innerVM does not support height index
 		return ids.Empty, block.ErrHeightIndexedVMNotImplemented
 	}
@@ -93,21 +93,21 @@ func (hi *heightIndexer) GetBlockIDByHeight(height uint64) (ids.ID, error) {
 	}
 
 	// postFork blocks are indexed in proposerVM
-	return hi.indexState.GetBlkIDByHeight(height)
+	return hi.indexState.GetBlockIDAtHeight(height)
 }
 
 func (hi *heightIndexer) UpdateHeightIndex(height uint64, blkID ids.ID) error {
-	if hi.innerHVM == nil || !hi.innerHVM.HeightIndexingEnabled() {
+	if hi.innerHVM == nil || !hi.innerHVM.IsHeightIndexComplete() {
 		// nothing to index if innerVM does not support height indexing
 		return nil
 	}
 
-	_, err := hi.indexState.SetBlkIDByHeight(height, blkID)
+	_, err := hi.indexState.SetBlockIDAtHeight(height, blkID)
 	return err
 }
 
 func (hi *heightIndexer) UpdateLatestPreForkBlockHeight(height uint64) error {
-	if hi.innerHVM == nil || !hi.innerHVM.HeightIndexingEnabled() {
+	if hi.innerHVM == nil || !hi.innerHVM.IsHeightIndexComplete() {
 		// nothing to index if innerVM does not support height indexing
 		return nil
 	}
@@ -124,7 +124,7 @@ func (hi *heightIndexer) UpdateLatestPreForkBlockHeight(height uint64) error {
 // if not, it returns highest un-indexed block ID from which repairing should start.
 // shouldRepair should be called synchronously upon VM initialization.
 func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
-	if hi.innerHVM == nil || !hi.innerHVM.HeightIndexingEnabled() {
+	if hi.innerHVM == nil || !hi.innerHVM.IsHeightIndexComplete() {
 		// no index, nothing to repair
 		return false, ids.Empty, nil
 	}
@@ -172,7 +172,7 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 		return true, ids.Empty, err
 	}
 
-	_, err = hi.indexState.GetBlkIDByHeight(lastAcceptedBlk.Height())
+	_, err = hi.indexState.GetBlockIDAtHeight(lastAcceptedBlk.Height())
 	switch err {
 	case nil:
 		// index is complete already.
@@ -244,7 +244,7 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 		}
 
 		currentInnerBlkID = currentAcceptedBlk.GetInnerBlk().ID()
-		_, err = hi.indexState.GetBlkIDByHeight(currentAcceptedBlk.Height())
+		_, err = hi.indexState.GetBlockIDAtHeight(currentAcceptedBlk.Height())
 		switch err {
 		case nil:
 			// height block index already there; It must be the same for all ancestors and fork height too.
@@ -271,7 +271,7 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 			}
 
 			// height block index must have been introduced after snowman++ fork. Rebuild it.
-			estimatedByteLen, err := hi.indexState.SetBlkIDByHeight(currentAcceptedBlk.Height(), currentProBlkID)
+			estimatedByteLen, err := hi.indexState.SetBlockIDAtHeight(currentAcceptedBlk.Height(), currentProBlkID)
 			if err != nil {
 				return err
 			}

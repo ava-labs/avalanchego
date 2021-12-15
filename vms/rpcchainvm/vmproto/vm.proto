@@ -188,8 +188,8 @@ message BatchedParseBlockResponse {
 }
 
 // HeightIndexedVM related messages
-message HeightIndexedEnabledResponse {
-    bool enabled = 1;
+message IsHeightIndexCompleteResponse {
+    bool completed = 1;
 }
 
 message GetBlockIDByHeightRequest {
@@ -233,6 +233,6 @@ service VM {
     rpc GetAncestors(GetAncestorsRequest) returns (GetAncestorsResponse);
     rpc BatchedParseBlock(BatchedParseBlockRequest) returns (BatchedParseBlockResponse);
     
-    rpc HeightIndexedEnabled(google.protobuf.Empty) returns (HeightIndexedEnabledResponse);
     rpc GetBlockIDByHeight(GetBlockIDByHeightRequest) returns (GetBlockIDByHeightResponse);
+    rpc IsHeightIndexComplete(google.protobuf.Empty) returns (IsHeightIndexCompleteResponse);
 }

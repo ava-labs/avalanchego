@@ -115,8 +115,8 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 	hIndex := &heightIndexer{
 		server: blkSrv,
 		innerHVM: &snowmanVMs.TestHeightIndexedVM{
-			CantIsEnabled:          true,
-			HeightIndexingEnabledF: func() bool { return true },
+			CantIsHeightIndexComplete: true,
+			IsHeightIndexCompleteF:    func() bool { return true },
 		},
 		log:        logging.NoLog{},
 		indexState: state.NewHeightIndex(dbMan.Current().Database),
@@ -125,7 +125,7 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 	// height index is empty at start
 	assert.True(hIndex.latestPreForkHeight == 0)
 	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := hIndex.indexState.GetBlkIDByHeight(height)
+		_, err := hIndex.indexState.GetBlockIDAtHeight(height)
 		assert.Error(err, database.ErrNotFound)
 	}
 
@@ -139,7 +139,7 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 	// check that height index is fully built
 	assert.True(hIndex.latestPreForkHeight == 0)
 	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := hIndex.indexState.GetBlkIDByHeight(height)
+		_, err := hIndex.indexState.GetBlockIDAtHeight(height)
 		assert.NoError(err)
 	}
 
@@ -218,8 +218,8 @@ func TestHeightBlockIndexPreFork(t *testing.T) {
 	hIndex := &heightIndexer{
 		server: blkSrv,
 		innerHVM: &snowmanVMs.TestHeightIndexedVM{
-			CantIsEnabled:          true,
-			HeightIndexingEnabledF: func() bool { return true },
+			CantIsHeightIndexComplete: true,
+			IsHeightIndexCompleteF:    func() bool { return true },
 		},
 		log:        logging.NoLog{},
 		indexState: state.NewHeightIndex(dbMan.Current().Database),
@@ -228,7 +228,7 @@ func TestHeightBlockIndexPreFork(t *testing.T) {
 	// height index is empty at start
 	assert.True(hIndex.latestPreForkHeight == 0)
 	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := hIndex.indexState.GetBlkIDByHeight(height)
+		_, err := hIndex.indexState.GetBlockIDAtHeight(height)
 		assert.Error(err, database.ErrNotFound)
 	}
 
@@ -345,8 +345,8 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 	hIndex := &heightIndexer{
 		server: blkSrv,
 		innerHVM: &snowmanVMs.TestHeightIndexedVM{
-			CantIsEnabled:          true,
-			HeightIndexingEnabledF: func() bool { return true },
+			CantIsHeightIndexComplete: true,
+			IsHeightIndexCompleteF:    func() bool { return true },
 		},
 		log:        logging.NoLog{},
 		indexState: state.NewHeightIndex(dbMan.Current().Database),
@@ -355,7 +355,7 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 	// height index is empty at start
 	assert.True(hIndex.latestPreForkHeight == 0)
 	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := hIndex.indexState.GetBlkIDByHeight(height)
+		_, err := hIndex.indexState.GetBlockIDAtHeight(height)
 		assert.Error(err, database.ErrNotFound)
 	}
 
@@ -369,11 +369,11 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 	// check that height index is fully built
 	assert.True(hIndex.latestPreForkHeight == forkHeight)
 	for height := uint64(0); height <= forkHeight; height++ {
-		_, err := hIndex.indexState.GetBlkIDByHeight(height)
+		_, err := hIndex.indexState.GetBlockIDAtHeight(height)
 		assert.Error(err, database.ErrNotFound)
 	}
 	for height := forkHeight + 1; height <= blkNumber; height++ {
-		_, err := hIndex.indexState.GetBlkIDByHeight(height)
+		_, err := hIndex.indexState.GetBlockIDAtHeight(height)
 		assert.NoError(err)
 	}
 
@@ -490,8 +490,8 @@ func TestHeightBlockIndexResumefromCheckPoint(t *testing.T) {
 	hIndex := &heightIndexer{
 		server: blkSrv,
 		innerHVM: &snowmanVMs.TestHeightIndexedVM{
-			CantIsEnabled:          true,
-			HeightIndexingEnabledF: func() bool { return true },
+			CantIsHeightIndexComplete: true,
+			IsHeightIndexCompleteF:    func() bool { return true },
 		},
 		log:        logging.NoLog{},
 		indexState: state.NewHeightIndex(dbMan.Current().Database),

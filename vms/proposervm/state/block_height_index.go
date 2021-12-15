@@ -27,9 +27,9 @@ var (
 // HeightIndex contains mapping of blockHeights to accepted proposer block IDs.
 // Only accepted blocks are indexed; moreover only post-fork blocks are indexed.
 type HeightIndex interface {
-	SetBlkIDByHeight(height uint64, blkID ids.ID) (int, error)
-	GetBlkIDByHeight(height uint64) (ids.ID, error)
-	DeleteBlkIDByHeight(height uint64) error
+	SetBlockIDAtHeight(height uint64, blkID ids.ID) (int, error)
+	GetBlockIDAtHeight(height uint64) (ids.ID, error)
+	DeleteBlockIDAtHeight(height uint64) error
 
 	SetLatestPreForkHeight(height uint64) error
 	GetLatestPreForkHeight() (uint64, error)
@@ -57,7 +57,7 @@ func NewHeightIndex(db database.Database) HeightIndex {
 	}
 }
 
-func (ihi *innerHeightIndex) SetBlkIDByHeight(height uint64, blkID ids.ID) (int, error) {
+func (ihi *innerHeightIndex) SetBlockIDAtHeight(height uint64, blkID ids.ID) (int, error) {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 	key := make([]byte, len(heightPrefix))
@@ -68,7 +68,7 @@ func (ihi *innerHeightIndex) SetBlkIDByHeight(height uint64, blkID ids.ID) (int,
 	return len(key) + len(blkID), ihi.db.Put(key, blkID[:])
 }
 
-func (ihi *innerHeightIndex) GetBlkIDByHeight(height uint64) (ids.ID, error) {
+func (ihi *innerHeightIndex) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 	key := make([]byte, len(heightPrefix))
@@ -98,7 +98,7 @@ func (ihi *innerHeightIndex) GetBlkIDByHeight(height uint64) (ids.ID, error) {
 	}
 }
 
-func (ihi *innerHeightIndex) DeleteBlkIDByHeight(height uint64) error {
+func (ihi *innerHeightIndex) DeleteBlockIDAtHeight(height uint64) error {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 	key := make([]byte, len(heightPrefix))

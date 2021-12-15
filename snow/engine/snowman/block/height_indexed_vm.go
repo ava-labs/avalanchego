@@ -13,6 +13,6 @@ var ErrHeightIndexedVMNotImplemented = errors.New("vm does not implement HeightI
 // HeightIndexedChainVM extends the minimal functionalities exposed by ChainVM to allow querying
 // block IDs by height.
 type HeightIndexedChainVM interface {
-	HeightIndexingEnabled() bool
+	IsHeightIndexComplete() bool
 	GetBlockIDByHeight(height uint64) (ids.ID, error)
 }
