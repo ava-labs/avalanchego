@@ -202,8 +202,8 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 		currentProBlkID   = repairStartBlkID
 		currentInnerBlkID = ids.Empty
 
-		startTime                 = time.Now()
-		lastLogTime               = startTime
+		start                     = time.Now()
+		lastLogTime               = start
 		indexedBlks               = 0
 		pendingBytesApproximation = 0 // tracks of the size of uncommitted writes
 	)
@@ -236,7 +236,7 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 				return err
 			}
 			hi.log.Info("Block indexing by height completed: indexed %d blocks, duration %v, latest pre fork block height %d",
-				indexedBlks, time.Since(startTime), hi.latestPreForkHeight)
+				indexedBlks, time.Since(start), hi.latestPreForkHeight)
 			return nil
 
 		default:
@@ -251,7 +251,7 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 			// just load latestPreForkHeight
 			hi.latestPreForkHeight, err = hi.indexState.GetLatestPreForkHeight()
 			hi.log.Info("Block indexing by height completed: indexed %d blocks, duration %v, latest pre fork block height %d",
-				indexedBlks, time.Since(startTime), hi.latestPreForkHeight)
+				indexedBlks, time.Since(start), hi.latestPreForkHeight)
 			return err
 
 		case database.ErrNotFound:
@@ -265,9 +265,8 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 					return err
 				}
 
-				hi.log.Info("Block indexing by height ongoing: indexed %d blocks", indexedBlks)
-				hi.log.Info("Block indexing by height ongoing: committed %d bytes, latest committed height %d",
-					pendingBytesApproximation, currentAcceptedBlk.Height()+1)
+				hi.log.Info("Block indexing by height ongoing: indexed %d blocks, committed %d bytes, latest committed height %d",
+					indexedBlks, pendingBytesApproximation, currentAcceptedBlk.Height()+1)
 				pendingBytesApproximation = 0
 			}
 
@@ -282,7 +281,7 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 			indexedBlks++
 			if time.Since(lastLogTime) > 15*time.Second {
 				lastLogTime = time.Now()
-				hi.log.Info("Block indexing by height ongoing: indexed %d blocks", indexedBlks)
+				hi.log.Info("Block indexing by height ongoing: indexed %d blocks, latest indexed height %d", currentAcceptedBlk.Height()+1)
 			}
 
 			// keep checking the parent
