@@ -17,7 +17,6 @@ on:
   pull_request:
     # The branches below must be a subset of the branches above
     branches: [ master ]
-  if: ${{ env.GITHUB_REPOSITORY == "ava-labs/coreth" }}
   schedule:
     - cron: '44 11 * * 4'
 
