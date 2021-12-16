@@ -5,6 +5,7 @@ package indexes
 
 import (
 	"math"
+	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -22,27 +23,33 @@ var _ HeightIndexer = &heightIndexer{}
 type HeightIndexer interface {
 	block.HeightIndexedChainVM
 
-	RepairHeightIndex()
+	RepairHeightIndex() error
 	UpdateHeightIndex(height uint64, blkID ids.ID) error
 }
 
 func NewHeightIndexer(srv BlockServer,
 	innerHVM block.HeightIndexedChainVM,
 	log logging.Logger,
-	indexState state.HeightIndex) HeightIndexer {
+	indexState state.HeightIndex,
+	shutdownChan chan struct{},
+	shutdownWg *sync.WaitGroup) HeightIndexer {
 	return &heightIndexer{
-		server:     srv,
-		innerHVM:   innerHVM,
-		log:        log,
-		forkHeight: math.MaxUint64,
-		indexState: indexState,
+		server:       srv,
+		innerHVM:     innerHVM,
+		log:          log,
+		shutdownChan: shutdownChan,
+		shutdownWg:   shutdownWg,
+		forkHeight:   math.MaxUint64,
+		indexState:   indexState,
 	}
 }
 
 type heightIndexer struct {
-	server   BlockServer
-	innerHVM block.HeightIndexedChainVM
-	log      logging.Logger
+	server       BlockServer
+	innerHVM     block.HeightIndexedChainVM
+	log          logging.Logger
+	shutdownChan chan struct{}
+	shutdownWg   *sync.WaitGroup
 
 	forkHeight uint64 // height of the first postFork block/option
 	indexState state.HeightIndex
@@ -54,18 +61,19 @@ type heightIndexer struct {
 // RepairHeightIndex can take a non-trivial time to complete; hence we make sure
 // the process has limited memory footprint, can be resumed from periodic checkpoints
 // and asynchronously without stopping VM.
-func (hi *heightIndexer) RepairHeightIndex() {
+func (hi *heightIndexer) RepairHeightIndex() error {
+	defer hi.shutdownWg.Done()
 	doRepair, startBlkID, err := hi.shouldRepair()
 	if err != nil {
 		hi.log.Info("Block indexing by height failed: could not determine if index is complete, error %v", err)
-		hi.log.AssertNoError(err)
+		return err
 	}
 
 	if !doRepair {
-		return
+		return nil
 	}
 
-	hi.log.AssertNoError(hi.doRepair(startBlkID))
+	return hi.doRepair(startBlkID)
 }
 
 // HeightIndexingEnabled implements HeightIndexedChainVM interface
@@ -200,6 +208,23 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 	)
 
 	for {
+		select {
+		case <-hi.shutdownChan:
+			hi.log.Info("Block indexing by height shutdown: started")
+			if err := hi.indexState.SetCheckpoint(currentProBlkID); err != nil {
+				hi.log.Info("Block indexing by height shutdown: failed setting checkpoint %v", err)
+				return err
+			}
+			if err := hi.server.DBCommit(); err != nil {
+				hi.log.Info("Block indexing by height shutdown: failed committing DB %v", err)
+				return err
+			}
+			hi.log.Info("Block indexing by height shutdown: done. Stored checkpoint at %v", currentProBlkID)
+			return nil
+		default:
+			// go ahead with index repairing
+		}
+
 		currentAcceptedBlk, err := hi.server.GetWrappingBlk(currentProBlkID)
 		switch err {
 		case nil:
@@ -252,8 +277,8 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 					return err
 				}
 
-				hi.log.Info("Block indexing by height ongoing: indexed %d blocks, committed %d bytes, latest committed height %d",
-					indexedBlks, pendingBytesApproximation, currentAcceptedBlk.Height()+1)
+				hi.log.Info("Block indexing by height ongoing: indexed %d blocks, committed %d bytes, latest committed height %d, checkpoint %v",
+					indexedBlks, pendingBytesApproximation, currentAcceptedBlk.Height()+1, currentProBlkID)
 				pendingBytesApproximation = 0
 			}
 

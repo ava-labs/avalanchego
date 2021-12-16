@@ -4,6 +4,7 @@
 package proposervm
 
 import (
+	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -48,6 +49,9 @@ type VM struct {
 
 	state.State
 	indexes.HeightIndexer
+	shutdownChan chan struct{}
+	shutdownWg   sync.WaitGroup
+
 	proposer.Windower
 	tree.Tree
 	scheduler.Scheduler
@@ -93,11 +97,13 @@ func (vm *VM) Initialize(
 	prefixDB := prefixdb.New(dbPrefix, rawDB)
 	vm.db = versiondb.New(prefixDB)
 	vm.State = state.New(vm.db)
+	vm.shutdownChan = make(chan struct{}, 1)
 	vm.Windower = proposer.New(ctx.ValidatorState, ctx.SubnetID, ctx.ChainID)
 	vm.Tree = tree.New()
 
 	innerHVM, _ := vm.ChainVM.(block.HeightIndexedChainVM)
-	vm.HeightIndexer = indexes.NewHeightIndexer(vm, innerHVM, vm.ctx.Log, vm.State)
+	vm.HeightIndexer = indexes.NewHeightIndexer(vm, innerHVM, vm.ctx.Log,
+		vm.State, vm.shutdownChan, &vm.shutdownWg)
 
 	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine)
 	vm.Scheduler = scheduler
@@ -127,9 +133,21 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	go vm.HeightIndexer.RepairHeightIndex()
+	vm.shutdownWg.Add(1)
+	go ctx.Log.RecoverAndPanic(func() {
+		if err := vm.HeightIndexer.RepairHeightIndex(); err != nil {
+			panic(err)
+		}
+	})
 
 	return vm.setLastAcceptedOptionTime()
+}
+
+// shutdown ops then propagate shutdown to innerVM
+func (vm *VM) Shutdown() error {
+	close(vm.shutdownChan)
+	vm.shutdownWg.Wait()
+	return vm.ChainVM.Shutdown()
 }
 
 func (vm *VM) Bootstrapping() error {
