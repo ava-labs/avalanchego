@@ -137,7 +137,7 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 	assert.NoError(hIndex.doRepair(startBlkID))
 
 	// check that height index is fully built
-	assert.True(hIndex.forkHeight == 0)
+	assert.True(hIndex.forkHeight == 1)
 	for height := uint64(1); height <= blkNumber; height++ {
 		_, err := hIndex.indexState.GetBlockIDAtHeight(height)
 		assert.NoError(err)
@@ -265,7 +265,7 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 	)
 	innerBlks[innerGenBlk.ID()] = innerGenBlk
 
-	for blkHeight := uint64(1); blkHeight <= forkHeight; blkHeight++ {
+	for blkHeight := uint64(1); blkHeight < forkHeight; blkHeight++ {
 		// build inner block
 		innerBlkID := ids.Empty.Prefix(blkHeight)
 		lastInnerBlk := &snowman.TestBlock{
@@ -281,7 +281,7 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 		prevInnerBlk = lastInnerBlk
 	}
 
-	for blkHeight := forkHeight + 1; blkHeight <= blkNumber; blkHeight++ {
+	for blkHeight := forkHeight; blkHeight <= blkNumber; blkHeight++ {
 		// build inner block
 		innerBlkID := ids.Empty.Prefix(blkHeight)
 		lastInnerBlk := &snowman.TestBlock{
@@ -368,11 +368,11 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 
 	// check that height index is fully built
 	assert.True(hIndex.forkHeight == forkHeight)
-	for height := uint64(0); height <= forkHeight; height++ {
+	for height := uint64(0); height < forkHeight; height++ {
 		_, err := hIndex.indexState.GetBlockIDAtHeight(height)
 		assert.Error(err, database.ErrNotFound)
 	}
-	for height := forkHeight + 1; height <= blkNumber; height++ {
+	for height := forkHeight; height <= blkNumber; height++ {
 		_, err := hIndex.indexState.GetBlockIDAtHeight(height)
 		assert.NoError(err)
 	}
@@ -410,7 +410,7 @@ func TestHeightBlockIndexResumefromCheckPoint(t *testing.T) {
 	)
 	innerBlks[innerGenBlk.ID()] = innerGenBlk
 
-	for blkHeight := uint64(1); blkHeight <= forkHeight; blkHeight++ {
+	for blkHeight := uint64(1); blkHeight < forkHeight; blkHeight++ {
 		// build inner block
 		innerBlkID := ids.Empty.Prefix(blkHeight)
 		lastInnerBlk := &snowman.TestBlock{
@@ -426,7 +426,7 @@ func TestHeightBlockIndexResumefromCheckPoint(t *testing.T) {
 		prevInnerBlk = lastInnerBlk
 	}
 
-	for blkHeight := forkHeight + 1; blkHeight <= blkNumber; blkHeight++ {
+	for blkHeight := forkHeight; blkHeight <= blkNumber; blkHeight++ {
 		// build inner block
 		innerBlkID := ids.Empty.Prefix(blkHeight)
 		lastInnerBlk := &snowman.TestBlock{

@@ -44,7 +44,7 @@ type heightIndexer struct {
 	innerHVM block.HeightIndexedChainVM
 	log      logging.Logger
 
-	forkHeight uint64
+	forkHeight uint64 // height of the first postFork block/option
 	indexState state.HeightIndex
 }
 
@@ -89,7 +89,7 @@ func (hi *heightIndexer) GetBlockIDByHeight(height uint64) (ids.ID, error) {
 	}
 
 	// preFork blocks are indexed in innerVM only
-	if height <= hi.forkHeight {
+	if height < hi.forkHeight {
 		return hi.innerHVM.GetBlockIDByHeight(height)
 	}
 
@@ -104,7 +104,7 @@ func (hi *heightIndexer) UpdateHeightIndex(height uint64, blkID ids.ID) error {
 	}
 
 	if hi.forkHeight > height {
-		hi.forkHeight = height - 1
+		hi.forkHeight = height
 		if err := hi.indexState.SetForkHeight(height); err != nil {
 			return err
 		}
@@ -200,11 +200,7 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 			if err != nil {
 				return err
 			}
-			innerForkBlk, err := hi.server.GetInnerBlk(firstWrappedInnerBlk.Parent())
-			if err != nil {
-				return err
-			}
-			hi.forkHeight = innerForkBlk.Height()
+			hi.forkHeight = firstWrappedInnerBlk.Height()
 			if err := hi.indexState.SetForkHeight(hi.forkHeight); err != nil {
 				return err
 			}
