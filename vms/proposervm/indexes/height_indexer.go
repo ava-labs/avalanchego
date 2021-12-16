@@ -56,7 +56,11 @@ type heightIndexer struct {
 // and asynchronously without stopping VM.
 func (hi *heightIndexer) RepairHeightIndex() {
 	doRepair, startBlkID, err := hi.shouldRepair()
-	hi.log.AssertNoError(err)
+	if err != nil {
+		hi.log.Info("Block indexing by height failed: could not determine if index is complete, error %v", err)
+		hi.log.AssertNoError(err)
+	}
+
 	if !doRepair {
 		return
 	}
@@ -130,7 +134,7 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 		// no checkpoint. Either index is complete or repair was never attempted.
 		break
 	default:
-		return false, ids.Empty, err
+		return true, ids.Empty, err
 	}
 
 	// index is complete iff lastAcceptedBlock is indexed
@@ -158,14 +162,20 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 	case nil:
 		// index is complete already.
 		hi.forkHeight, err = hi.indexState.GetForkHeight()
-		return false, ids.Empty, err
+		if err != nil {
+			return true, ids.Empty, err
+		}
+		return false, ids.Empty, nil
 	case database.ErrNotFound:
 		// index needs repairing and it's the first time we do this.
 		// Mark the checkpoint so that, in case new blocks are accepted while
 		// indexing is ongoing, and the process is terminated before first commit,
 		// we do not miss rebuilding the full index.
 		if err := hi.indexState.SetCheckpoint(latestProBlkID); err != nil {
-			return false, ids.Empty, err
+			return true, ids.Empty, err
+		}
+		if err := hi.server.DBCommit(); err != nil {
+			return true, ids.Empty, err
 		}
 		return true, latestProBlkID, nil
 	default:
