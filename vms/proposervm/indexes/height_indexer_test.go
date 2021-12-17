@@ -122,13 +122,6 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 		indexState: state.NewHeightIndex(dbMan.Current().Database),
 	}
 
-	// height index is empty at start
-	assert.True(hIndex.forkHeight == 0)
-	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := hIndex.indexState.GetBlockIDAtHeight(height)
-		assert.Error(err, database.ErrNotFound)
-	}
-
 	// show that height index should be rebuild and it is
 	doRepair, startBlkID, err := hIndex.shouldRepair()
 	assert.NoError(err)
@@ -137,7 +130,7 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 	assert.NoError(hIndex.doRepair(startBlkID))
 
 	// check that height index is fully built
-	assert.True(hIndex.forkHeight == 1)
+	assert.True(hIndex.forkHeight.GetValue().(uint64) == 1)
 	for height := uint64(1); height <= blkNumber; height++ {
 		_, err := hIndex.indexState.GetBlockIDAtHeight(height)
 		assert.NoError(err)
@@ -223,13 +216,6 @@ func TestHeightBlockIndexPreFork(t *testing.T) {
 		},
 		log:        logging.NoLog{},
 		indexState: state.NewHeightIndex(dbMan.Current().Database),
-	}
-
-	// height index is empty at start
-	assert.True(hIndex.forkHeight == 0)
-	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := hIndex.indexState.GetBlockIDAtHeight(height)
-		assert.Error(err, database.ErrNotFound)
 	}
 
 	// with preFork only blocks there is nothing to rebuild
@@ -352,13 +338,6 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 		indexState: state.NewHeightIndex(dbMan.Current().Database),
 	}
 
-	// height index is empty at start
-	assert.True(hIndex.forkHeight == 0)
-	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := hIndex.indexState.GetBlockIDAtHeight(height)
-		assert.Error(err, database.ErrNotFound)
-	}
-
 	// show that height index should be rebuild and it is
 	doRepair, startBlkID, err := hIndex.shouldRepair()
 	assert.NoError(err)
@@ -367,7 +346,7 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 	assert.NoError(hIndex.doRepair(startBlkID))
 
 	// check that height index is fully built
-	assert.True(hIndex.forkHeight == forkHeight)
+	assert.True(hIndex.forkHeight.GetValue().(uint64) == forkHeight)
 	for height := uint64(0); height < forkHeight; height++ {
 		_, err := hIndex.indexState.GetBlockIDAtHeight(height)
 		assert.Error(err, database.ErrNotFound)

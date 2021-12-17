@@ -5,6 +5,7 @@ package state
 
 import (
 	"encoding/binary"
+	"sync"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
@@ -43,17 +44,21 @@ type HeightIndex interface {
 }
 
 type heightIndex struct {
+	// heightIndex may be accessed by a long-running goroutine rebuilding the index
+	// as well as main goroutine querying blocks. Hence the lock
+	Lock sync.RWMutex
+
 	// Caches block height -> proposerVMBlockID. If the proposerVMBlockID is nil,
 	// the height is not in storage.
-	cache cache.Cacher
+	blkHeightsCache cache.Cacher
 
 	db database.Database
 }
 
 func NewHeightIndex(db database.Database) HeightIndex {
 	return &heightIndex{
-		cache: &cache.LRU{Size: cacheSize},
-		db:    db,
+		blkHeightsCache: &cache.LRU{Size: cacheSize},
+		db:              db,
 	}
 }
 
@@ -64,7 +69,7 @@ func (hi *heightIndex) SetBlockIDAtHeight(height uint64, blkID ids.ID) (int, err
 	copy(key, heightPrefix)
 	key = append(key, heightBytes...)
 
-	hi.cache.Put(string(key), blkID)
+	hi.blkHeightsCache.Put(string(key), blkID)
 	return len(key) + len(blkID), hi.db.Put(key, blkID[:])
 }
 
@@ -75,7 +80,7 @@ func (hi *heightIndex) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	copy(key, heightPrefix)
 	key = append(key, heightBytes...)
 
-	if blkIDIntf, found := hi.cache.Get(string(key)); found {
+	if blkIDIntf, found := hi.blkHeightsCache.Get(string(key)); found {
 		if blkIDIntf == nil {
 			return ids.Empty, database.ErrNotFound
 		}
@@ -90,7 +95,7 @@ func (hi *heightIndex) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 		return ids.FromBytes(bytes), nil
 
 	case database.ErrNotFound:
-		hi.cache.Put(string(key), nil)
+		hi.blkHeightsCache.Put(string(key), nil)
 		return ids.Empty, database.ErrNotFound
 
 	default:
@@ -105,31 +110,19 @@ func (hi *heightIndex) DeleteBlockIDAtHeight(height uint64) error {
 	copy(key, heightPrefix)
 	key = append(key, heightBytes...)
 
-	hi.cache.Put(string(key), nil)
+	hi.blkHeightsCache.Put(string(key), nil)
 	return hi.db.Delete(key)
 }
 
+// ForkHeight are only read at the start of indexing repairing. No need to cache
 func (hi *heightIndex) SetForkHeight(height uint64) error {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
-
-	hi.cache.Put(string(preForkPrefix), heightBytes)
 	return hi.db.Put(preForkPrefix, heightBytes)
 }
 
 func (hi *heightIndex) GetForkHeight() (uint64, error) {
-	if blkIDIntf, found := hi.cache.Get(string(preForkPrefix)); found {
-		if blkIDIntf == nil {
-			return 0, database.ErrNotFound
-		}
-
-		heightBytes, _ := blkIDIntf.([]byte)
-		res := binary.BigEndian.Uint64(heightBytes)
-		return res, nil
-	}
-
-	bytes, err := hi.db.Get(preForkPrefix)
-	switch err {
+	switch bytes, err := hi.db.Get(preForkPrefix); err {
 	case nil:
 		res := binary.BigEndian.Uint64(bytes)
 		return res, nil
@@ -143,43 +136,29 @@ func (hi *heightIndex) GetForkHeight() (uint64, error) {
 }
 
 func (hi *heightIndex) DeleteForkHeight() error {
-	hi.cache.Evict(string(preForkPrefix))
 	return hi.db.Delete(preForkPrefix)
 }
 
+// Checkpoints are only read at the start of indexing repairing. No need to cache
 func (hi *heightIndex) SetCheckpoint(blkID ids.ID) error {
-	hi.cache.Put(string(checkpointPrefix), blkID)
 	return hi.db.Put(checkpointPrefix, blkID[:])
 }
 
 func (hi *heightIndex) GetCheckpoint() (ids.ID, error) {
-	if blkIDIntf, found := hi.cache.Get(string(checkpointPrefix)); found {
-		if blkIDIntf == nil {
-			return ids.Empty, database.ErrNotFound
-		}
-
-		res, _ := blkIDIntf.(ids.ID)
-		return res, nil
-	}
-
-	bytes, err := hi.db.Get(checkpointPrefix)
-	switch err {
+	switch bytes, err := hi.db.Get(checkpointPrefix); err {
 	case nil:
 		return ids.FromBytes(bytes), nil
-
 	case database.ErrNotFound:
 		return ids.Empty, database.ErrNotFound
-
 	default:
 		return ids.Empty, err
 	}
 }
 
 func (hi *heightIndex) DeleteCheckpoint() error {
-	hi.cache.Evict(string(checkpointPrefix))
 	return hi.db.Delete(checkpointPrefix)
 }
 
 func (hi *heightIndex) clearCache() {
-	hi.cache.Flush()
+	hi.blkHeightsCache.Flush()
 }

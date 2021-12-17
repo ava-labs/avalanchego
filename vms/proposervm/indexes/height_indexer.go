@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
@@ -33,15 +34,18 @@ func NewHeightIndexer(srv BlockServer,
 	indexState state.HeightIndex,
 	shutdownChan chan struct{},
 	shutdownWg *sync.WaitGroup) HeightIndexer {
-	return &heightIndexer{
+	res := &heightIndexer{
 		server:       srv,
 		innerHVM:     innerHVM,
 		log:          log,
 		shutdownChan: shutdownChan,
 		shutdownWg:   shutdownWg,
-		forkHeight:   math.MaxUint64,
 		indexState:   indexState,
 	}
+
+	res.forkHeight.SetValue(uint64(math.MaxUint64))
+
+	return res
 }
 
 type heightIndexer struct {
@@ -51,7 +55,7 @@ type heightIndexer struct {
 	shutdownChan chan struct{}
 	shutdownWg   *sync.WaitGroup
 
-	forkHeight uint64 // height of the first postFork block/option
+	forkHeight utils.AtomicInterface // height of the first postFork block/option
 	indexState state.HeightIndex
 }
 
@@ -102,7 +106,7 @@ func (hi *heightIndexer) GetBlockIDByHeight(height uint64) (ids.ID, error) {
 	}
 
 	// preFork blocks are indexed in innerVM only
-	if height < hi.forkHeight {
+	if height < hi.forkHeight.GetValue().(uint64) {
 		return hi.innerHVM.GetBlockIDByHeight(height)
 	}
 
@@ -116,10 +120,10 @@ func (hi *heightIndexer) UpdateHeightIndex(height uint64, blkID ids.ID) error {
 		return nil
 	}
 
-	if hi.forkHeight > height {
+	if hi.forkHeight.GetValue().(uint64) > height {
 		hi.log.Info("Block indexing by height: new block. Moved fork height from %d to %d with block %v",
-			hi.forkHeight, height, blkID)
-		hi.forkHeight = height
+			hi.forkHeight.GetValue().(uint64), height, blkID)
+		hi.forkHeight.SetValue(height)
 		if err := hi.indexState.SetForkHeight(height); err != nil {
 			hi.log.Info("Block indexing by height: new block. Failed storing new fork height %v", err)
 			return err
@@ -173,10 +177,11 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 	switch err {
 	case nil:
 		// index is complete already.
-		hi.forkHeight, err = hi.indexState.GetForkHeight()
+		forkHeight, err := hi.indexState.GetForkHeight()
 		if err != nil {
 			return true, ids.Empty, err
 		}
+		hi.forkHeight.SetValue(forkHeight)
 		return false, ids.Empty, nil
 	case database.ErrNotFound:
 		// index needs repairing and it's the first time we do this.
@@ -228,8 +233,9 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 			if err != nil {
 				return err
 			}
-			hi.forkHeight = firstWrappedInnerBlk.Height()
-			if err := hi.indexState.SetForkHeight(hi.forkHeight); err != nil {
+			forkHeight := firstWrappedInnerBlk.Height()
+			hi.forkHeight.SetValue(forkHeight)
+			if err := hi.indexState.SetForkHeight(forkHeight); err != nil {
 				return err
 			}
 
@@ -241,7 +247,7 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 				return err
 			}
 			hi.log.Info("Block indexing by height: completed. Indexed %d blocks, duration %v, fork height %d",
-				indexedBlks, time.Since(start), hi.forkHeight)
+				indexedBlks, time.Since(start), hi.forkHeight.GetValue().(uint64))
 			return nil
 
 		default:
@@ -254,9 +260,10 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 		case nil:
 			// height block index already there; It must be the same for all ancestors and fork height too.
 			// just load latestPreForkHeight
-			hi.forkHeight, err = hi.indexState.GetForkHeight()
+			forkHeight, err := hi.indexState.GetForkHeight()
+			hi.forkHeight.SetValue(forkHeight)
 			hi.log.Info("Block indexing by height: completed. Indexed %d blocks, duration %v, fork height %d",
-				indexedBlks, time.Since(start), hi.forkHeight)
+				indexedBlks, time.Since(start), forkHeight)
 			return err
 
 		case database.ErrNotFound:
