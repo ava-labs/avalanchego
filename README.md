@@ -27,9 +27,11 @@ Note that as network usage increases, hardware requirements may change.
 Clone the AvalancheGo repository:
 
 ```sh
-go get -v -d github.com/ava-labs/avalanchego/...
-cd $GOPATH/src/github.com/ava-labs/avalanchego
+git clone git@github.com:ava-labs/avalanchego.git
+cd avalanchego
 ```
+
+This will clone and checkout to `master` branch.
 
 #### Building the Avalanche Executable
 
