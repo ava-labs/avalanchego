@@ -68,7 +68,6 @@ type VMClient struct {
 	broker *plugin.GRPCBroker
 	proc   *plugin.Client
 
-	db           *rpcdb.DatabaseServer
 	messenger    *messenger.Server
 	keystore     *gkeystore.Server
 	sharedMemory *gsharedmemory.Server
@@ -131,10 +130,6 @@ func (vm *VMClient) Initialize(
 	vm.bcLookup = galiasreader.NewServer(ctx.BCLookup)
 	vm.snLookup = gsubnetlookup.NewServer(ctx.SNLookup)
 	vm.appSender = appsender.NewServer(appSender)
-
-	// start the db server
-	dbBrokerID := vm.broker.NextId()
-	go vm.broker.AcceptAndServe(dbBrokerID, vm.startDBServer)
 
 	// start the messenger server
 	messengerBrokerID := vm.broker.NextId()
@@ -239,13 +234,6 @@ func (vm *VMClient) Initialize(
 	vm.State = chainState
 
 	return vm.ctx.Metrics.Register(multiGatherer)
-}
-
-func (vm *VMClient) startDBServer(opts []grpc.ServerOption) *grpc.Server {
-	server := grpc.NewServer(opts...)
-	vm.serverCloser.Add(server)
-	rpcdbproto.RegisterDatabaseServer(server, vm.db)
-	return server
 }
 
 func (vm *VMClient) startDBServerFunc(db rpcdbproto.DatabaseServer) func(opts []grpc.ServerOption) *grpc.Server { // #nolint

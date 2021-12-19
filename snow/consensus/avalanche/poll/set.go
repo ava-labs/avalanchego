@@ -164,8 +164,8 @@ func (s *set) String() string {
 	iter := s.polls.NewIterator()
 	for iter.Next() {
 		requestID := iter.Key()
-		p := iter.Value().(Poll)
-		sb.WriteString(fmt.Sprintf("\n    %d: %s", requestID, p.PrefixedString("    ")))
+		poll := iter.Value().(Poll)
+		sb.WriteString(fmt.Sprintf("\n    RequestID %d:\n        %s", requestID, poll.PrefixedString("        ")))
 	}
 	return sb.String()
 }
