@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
 // Set is a collection of polls
@@ -20,8 +21,7 @@ type Set interface {
 
 // Poll is an outstanding poll
 type Poll interface {
-	fmt.Stringer
-	PrefixedString(string) string
+	formatting.PrefixedStringer
 
 	Vote(vdr ids.ShortID, votes []ids.ID)
 	Finished() bool

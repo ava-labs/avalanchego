@@ -141,7 +141,7 @@ type BuildGenesisReply struct {
 // GenesisUTXO adds messages to UTXOs
 type GenesisUTXO struct {
 	avax.UTXO `serialize:"true"`
-	Message   []byte `serialize:"true"`
+	Message   []byte `serialize:"true" json:"message"`
 }
 
 // Genesis represents a genesis state of the platform chain

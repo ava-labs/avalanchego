@@ -120,7 +120,7 @@ func RegisterPlugins(pluginDir string, manager vms.Manager) error {
 		_, err = manager.GetFactory(vmID)
 		if err == nil {
 			// If we already have the VM registered, we shouldn't attempt to
-			// / register it again.
+			// register it again.
 			continue
 		}
 
