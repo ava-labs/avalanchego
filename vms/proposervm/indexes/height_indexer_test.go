@@ -5,6 +5,7 @@ package indexes
 
 import (
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -110,17 +111,22 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 		},
 		DBCommitF: func() error { return nil },
 	}
-	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
 
-	hIndex := &heightIndexer{
-		server: blkSrv,
-		innerHVM: &snowmanVMs.TestHeightIndexedVM{
+	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
+	storedState := state.NewHeightIndex(dbMan.Current().Database)
+	shutdownCh := make(chan struct{}, 1)
+	wGroup := sync.WaitGroup{}
+	wGroup.Add(1)
+	hIndex := newHeightIndexer(blkSrv,
+		&snowmanVMs.TestHeightIndexedVM{
 			CantIsHeightIndexComplete: true,
 			IsHeightIndexCompleteF:    func() bool { return true },
 		},
-		log:        logging.NoLog{},
-		indexState: state.NewHeightIndex(dbMan.Current().Database),
-	}
+		logging.NoLog{},
+		storedState,
+		shutdownCh,
+		&wGroup,
+	)
 
 	// show that height index should be rebuild and it is
 	doRepair, startBlkID, err := hIndex.shouldRepair()
@@ -132,14 +138,12 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 	// check that height index is fully built
 	assert.True(hIndex.forkHeight.GetValue().(uint64) == 1)
 	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := hIndex.indexState.GetBlockIDAtHeight(height)
+		_, err := hIndex.GetBlockIDByHeight(height)
 		assert.NoError(err)
 	}
 
 	// check that height index wont' be rebuild anymore
-	doRepair, _, err = hIndex.shouldRepair()
-	assert.NoError(err)
-	assert.False(doRepair)
+	assert.True(hIndex.IsHeightIndexComplete())
 }
 
 func TestHeightBlockIndexPreFork(t *testing.T) {
@@ -206,22 +210,29 @@ func TestHeightBlockIndexPreFork(t *testing.T) {
 		},
 		DBCommitF: func() error { return nil },
 	}
-	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
 
-	hIndex := &heightIndexer{
-		server: blkSrv,
-		innerHVM: &snowmanVMs.TestHeightIndexedVM{
+	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
+	storedState := state.NewHeightIndex(dbMan.Current().Database)
+	shutdownCh := make(chan struct{}, 1)
+	wGroup := sync.WaitGroup{}
+	wGroup.Add(1)
+	hIndex := newHeightIndexer(blkSrv,
+		&snowmanVMs.TestHeightIndexedVM{
 			CantIsHeightIndexComplete: true,
 			IsHeightIndexCompleteF:    func() bool { return true },
 		},
-		log:        logging.NoLog{},
-		indexState: state.NewHeightIndex(dbMan.Current().Database),
-	}
+		logging.NoLog{},
+		storedState,
+		shutdownCh,
+		&wGroup,
+	)
 
 	// with preFork only blocks there is nothing to rebuild
 	doRepair, _, err := hIndex.shouldRepair()
 	assert.NoError(err)
 	assert.False(doRepair)
+
+	assert.True(hIndex.IsHeightIndexComplete())
 }
 
 func TestHeightBlockIndexAcrossFork(t *testing.T) {
@@ -326,17 +337,22 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 		},
 		DBCommitF: func() error { return nil },
 	}
-	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
 
-	hIndex := &heightIndexer{
-		server: blkSrv,
-		innerHVM: &snowmanVMs.TestHeightIndexedVM{
+	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
+	storedState := state.NewHeightIndex(dbMan.Current().Database)
+	shutdownCh := make(chan struct{}, 1)
+	wGroup := sync.WaitGroup{}
+	wGroup.Add(1)
+	hIndex := newHeightIndexer(blkSrv,
+		&snowmanVMs.TestHeightIndexedVM{
 			CantIsHeightIndexComplete: true,
 			IsHeightIndexCompleteF:    func() bool { return true },
 		},
-		log:        logging.NoLog{},
-		indexState: state.NewHeightIndex(dbMan.Current().Database),
-	}
+		logging.NoLog{},
+		storedState,
+		shutdownCh,
+		&wGroup,
+	)
 
 	// show that height index should be rebuild and it is
 	doRepair, startBlkID, err := hIndex.shouldRepair()
@@ -348,21 +364,19 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 	// check that height index is fully built
 	assert.True(hIndex.forkHeight.GetValue().(uint64) == forkHeight)
 	for height := uint64(0); height < forkHeight; height++ {
-		_, err := hIndex.indexState.GetBlockIDAtHeight(height)
+		_, err := hIndex.GetBlockIDByHeight(height)
 		assert.Error(err, database.ErrNotFound)
 	}
 	for height := forkHeight; height <= blkNumber; height++ {
-		_, err := hIndex.indexState.GetBlockIDAtHeight(height)
+		_, err := hIndex.GetBlockIDByHeight(height)
 		assert.NoError(err)
 	}
 
 	// check that height index wont' be rebuild anymore
-	doRepair, _, err = hIndex.shouldRepair()
-	assert.NoError(err)
-	assert.False(doRepair)
+	assert.True(hIndex.IsHeightIndexComplete())
 }
 
-func TestHeightBlockIndexResumefromCheckPoint(t *testing.T) {
+func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 	assert := assert.New(t)
 
 	// Build a chain of non-wrapping and wrapping blocks, representing pre and post fork blocks
@@ -464,17 +478,22 @@ func TestHeightBlockIndexResumefromCheckPoint(t *testing.T) {
 		},
 		DBCommitF: func() error { return nil },
 	}
-	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
 
-	hIndex := &heightIndexer{
-		server: blkSrv,
-		innerHVM: &snowmanVMs.TestHeightIndexedVM{
+	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
+	storedState := state.NewHeightIndex(dbMan.Current().Database)
+	shutdownCh := make(chan struct{}, 1)
+	wGroup := sync.WaitGroup{}
+	wGroup.Add(1)
+	hIndex := newHeightIndexer(blkSrv,
+		&snowmanVMs.TestHeightIndexedVM{
 			CantIsHeightIndexComplete: true,
 			IsHeightIndexCompleteF:    func() bool { return true },
 		},
-		log:        logging.NoLog{},
-		indexState: state.NewHeightIndex(dbMan.Current().Database),
-	}
+		logging.NoLog{},
+		storedState,
+		shutdownCh,
+		&wGroup,
+	)
 
 	// with no checkpoints repair starts from last accepted block
 	doRepair, startBlkID, err := hIndex.shouldRepair()
@@ -497,4 +516,127 @@ func TestHeightBlockIndexResumefromCheckPoint(t *testing.T) {
 		assert.NoError(err)
 		assert.True(startBlkID == checkpointBlk.ID())
 	}
+}
+
+func TestHeightBlockIndexShutdown(t *testing.T) {
+	// show that upon shutdown a checkpoint is stored
+	assert := assert.New(t)
+
+	// Build a chain of wrapping blocks, representing post fork blocks
+	innerBlkID := ids.Empty.Prefix(0)
+	innerGenBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     innerBlkID,
+			StatusV: choices.Accepted,
+		},
+		HeightV:    0,
+		TimestampV: genesisTimestamp,
+		BytesV:     []byte{0},
+	}
+
+	var (
+		blkNumber = uint64(100)
+
+		prevInnerBlk = snowman.Block(innerGenBlk)
+		lastProBlk   = snowman.Block(innerGenBlk)
+
+		innerBlks = make(map[ids.ID]snowman.Block)
+		proBlks   = make(map[ids.ID]WrappingBlock)
+	)
+	innerBlks[innerGenBlk.ID()] = innerGenBlk
+
+	for blkHeight := uint64(1); blkHeight <= blkNumber; blkHeight++ {
+		// build inner block
+		innerBlkID := ids.Empty.Prefix(blkHeight)
+		lastInnerBlk := &snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     innerBlkID,
+				StatusV: choices.Accepted,
+			},
+			BytesV:  []byte{uint8(blkHeight)},
+			ParentV: prevInnerBlk.ID(),
+			HeightV: blkHeight,
+		}
+		innerBlks[lastInnerBlk.ID()] = lastInnerBlk
+
+		// build wrapping post fork block
+		wrappingID := ids.Empty.Prefix(blkHeight + blkNumber + 1)
+		postForkBlk := &TestWrappingBlock{
+			TestBlock: &snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     wrappingID,
+					StatusV: choices.Accepted,
+				},
+				BytesV:  wrappingID[:],
+				ParentV: lastProBlk.ID(),
+				HeightV: lastInnerBlk.Height(),
+			},
+			innerBlk: lastInnerBlk,
+		}
+		proBlks[postForkBlk.ID()] = postForkBlk
+
+		lastProBlk = postForkBlk
+		prevInnerBlk = lastInnerBlk
+	}
+
+	blkSrv := &TestBlockServer{
+		CantLastAcceptedWrappingBlkID: true,
+		CantLastAcceptedInnerBlkID:    true,
+		CantGetWrappingBlk:            true,
+		CantGetInnerBlk:               true,
+		CantDBCommit:                  true,
+
+		LastAcceptedWrappingBlkIDF: func() (ids.ID, error) { return lastProBlk.ID(), nil },
+		LastAcceptedInnerBlkIDF:    func() (ids.ID, error) { return prevInnerBlk.ID(), nil },
+		GetWrappingBlkF: func(blkID ids.ID) (WrappingBlock, error) {
+			blk, found := proBlks[blkID]
+			if !found {
+				return nil, database.ErrNotFound
+			}
+			return blk, nil
+		},
+		GetInnerBlkF: func(id ids.ID) (snowman.Block, error) {
+			blk, found := innerBlks[id]
+			if !found {
+				return nil, database.ErrNotFound
+			}
+			return blk, nil
+		},
+		DBCommitF: func() error { return nil },
+	}
+
+	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
+	storedState := state.NewHeightIndex(dbMan.Current().Database)
+	shutdownCh := make(chan struct{}, 1)
+	wGroup := sync.WaitGroup{}
+	wGroup.Add(1)
+	hIndex := newHeightIndexer(blkSrv,
+		&snowmanVMs.TestHeightIndexedVM{
+			CantIsHeightIndexComplete: true,
+			IsHeightIndexCompleteF:    func() bool { return true },
+		},
+		logging.NoLog{},
+		storedState,
+		shutdownCh,
+		&wGroup,
+	)
+
+	// repair index in ad-hoc goroutine and ...
+	go hIndex.log.RecoverAndPanic(func() {
+		if err := hIndex.RepairHeightIndex(); err != nil {
+			assert.NoError(err)
+		}
+	})
+
+	// shutdown and check that checkpoint is recorded
+	close(shutdownCh)
+	wGroup.Wait()
+	checkpoint, err := storedState.GetCheckpoint()
+	assert.NoError(err)
+
+	// checkpoint is one of the postFork blocks
+	_, ok := proBlks[checkpoint]
+	assert.True(ok)
+
+	assert.False(hIndex.IsHeightIndexComplete())
 }

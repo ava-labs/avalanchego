@@ -25,6 +25,9 @@ type HeightIndexer interface {
 	block.HeightIndexedChainVM
 
 	RepairHeightIndex() error
+
+	// called for postFork blocks only!
+	// TODO ABENEGIA: find a better name maybe
 	UpdateHeightIndex(height uint64, blkID ids.ID) error
 }
 
@@ -34,6 +37,15 @@ func NewHeightIndexer(srv BlockServer,
 	indexState state.HeightIndex,
 	shutdownChan chan struct{},
 	shutdownWg *sync.WaitGroup) HeightIndexer {
+	return newHeightIndexer(srv, innerHVM, log, indexState, shutdownChan, shutdownWg)
+}
+
+func newHeightIndexer(srv BlockServer,
+	innerHVM block.HeightIndexedChainVM,
+	log logging.Logger,
+	indexState state.HeightIndex,
+	shutdownChan chan struct{},
+	shutdownWg *sync.WaitGroup) *heightIndexer {
 	res := &heightIndexer{
 		server:       srv,
 		innerHVM:     innerHVM,
@@ -42,7 +54,6 @@ func NewHeightIndexer(srv BlockServer,
 		shutdownWg:   shutdownWg,
 		indexState:   indexState,
 	}
-
 	res.forkHeight.SetValue(uint64(math.MaxUint64))
 
 	return res
