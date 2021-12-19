@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	snowmanVMs "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
@@ -118,10 +117,6 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 	wGroup := sync.WaitGroup{}
 	wGroup.Add(1)
 	hIndex := newHeightIndexer(blkSrv,
-		&snowmanVMs.TestHeightIndexedVM{
-			CantIsHeightIndexComplete: true,
-			IsHeightIndexCompleteF:    func() bool { return true },
-		},
 		logging.NoLog{},
 		storedState,
 		shutdownCh,
@@ -136,14 +131,17 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 	assert.NoError(hIndex.doRepair(startBlkID))
 
 	// check that height index is fully built
-	assert.True(hIndex.forkHeight.GetValue().(uint64) == 1)
+	loadedForkHeight, err := storedState.GetForkHeight()
+	assert.NoError(err)
+	assert.True(loadedForkHeight == 1)
 	for height := uint64(1); height <= blkNumber; height++ {
-		_, err := hIndex.GetBlockIDByHeight(height)
+		_, err := storedState.GetBlockIDAtHeight(height)
 		assert.NoError(err)
 	}
 
 	// check that height index wont' be rebuild anymore
-	assert.True(hIndex.IsHeightIndexComplete())
+	assert.False(hIndex.shouldRepair())
+	assert.True(hIndex.IsRepaired())
 }
 
 func TestHeightBlockIndexPreFork(t *testing.T) {
@@ -217,10 +215,6 @@ func TestHeightBlockIndexPreFork(t *testing.T) {
 	wGroup := sync.WaitGroup{}
 	wGroup.Add(1)
 	hIndex := newHeightIndexer(blkSrv,
-		&snowmanVMs.TestHeightIndexedVM{
-			CantIsHeightIndexComplete: true,
-			IsHeightIndexCompleteF:    func() bool { return true },
-		},
 		logging.NoLog{},
 		storedState,
 		shutdownCh,
@@ -231,8 +225,7 @@ func TestHeightBlockIndexPreFork(t *testing.T) {
 	doRepair, _, err := hIndex.shouldRepair()
 	assert.NoError(err)
 	assert.False(doRepair)
-
-	assert.True(hIndex.IsHeightIndexComplete())
+	assert.True(hIndex.IsRepaired())
 }
 
 func TestHeightBlockIndexAcrossFork(t *testing.T) {
@@ -344,10 +337,6 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 	wGroup := sync.WaitGroup{}
 	wGroup.Add(1)
 	hIndex := newHeightIndexer(blkSrv,
-		&snowmanVMs.TestHeightIndexedVM{
-			CantIsHeightIndexComplete: true,
-			IsHeightIndexCompleteF:    func() bool { return true },
-		},
 		logging.NoLog{},
 		storedState,
 		shutdownCh,
@@ -362,18 +351,21 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 	assert.NoError(hIndex.doRepair(startBlkID))
 
 	// check that height index is fully built
-	assert.True(hIndex.forkHeight.GetValue().(uint64) == forkHeight)
+	loadedForkHeight, err := storedState.GetForkHeight()
+	assert.NoError(err)
+	assert.True(loadedForkHeight == forkHeight)
 	for height := uint64(0); height < forkHeight; height++ {
-		_, err := hIndex.GetBlockIDByHeight(height)
+		_, err := storedState.GetBlockIDAtHeight(height)
 		assert.Error(err, database.ErrNotFound)
 	}
 	for height := forkHeight; height <= blkNumber; height++ {
-		_, err := hIndex.GetBlockIDByHeight(height)
+		_, err := storedState.GetBlockIDAtHeight(height)
 		assert.NoError(err)
 	}
 
 	// check that height index wont' be rebuild anymore
-	assert.True(hIndex.IsHeightIndexComplete())
+	assert.False(hIndex.shouldRepair())
+	assert.True(hIndex.IsRepaired())
 }
 
 func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
@@ -485,10 +477,6 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 	wGroup := sync.WaitGroup{}
 	wGroup.Add(1)
 	hIndex := newHeightIndexer(blkSrv,
-		&snowmanVMs.TestHeightIndexedVM{
-			CantIsHeightIndexComplete: true,
-			IsHeightIndexCompleteF:    func() bool { return true },
-		},
 		logging.NoLog{},
 		storedState,
 		shutdownCh,
@@ -515,6 +503,7 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 		assert.True(doRepair)
 		assert.NoError(err)
 		assert.True(startBlkID == checkpointBlk.ID())
+		assert.False(hIndex.IsRepaired())
 	}
 }
 
@@ -611,10 +600,6 @@ func TestHeightBlockIndexShutdown(t *testing.T) {
 	wGroup := sync.WaitGroup{}
 	wGroup.Add(1)
 	hIndex := newHeightIndexer(blkSrv,
-		&snowmanVMs.TestHeightIndexedVM{
-			CantIsHeightIndexComplete: true,
-			IsHeightIndexCompleteF:    func() bool { return true },
-		},
 		logging.NoLog{},
 		storedState,
 		shutdownCh,
@@ -637,6 +622,6 @@ func TestHeightBlockIndexShutdown(t *testing.T) {
 	// checkpoint is one of the postFork blocks
 	_, ok := proBlks[checkpoint]
 	assert.True(ok)
-
-	assert.False(hIndex.IsHeightIndexComplete())
+	assert.True(hIndex.shouldRepair())
+	assert.False(hIndex.IsRepaired())
 }

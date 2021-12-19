@@ -100,9 +100,7 @@ func (vm *VM) Initialize(
 	vm.shutdownChan = make(chan struct{}, 1)
 	vm.Windower = proposer.New(ctx.ValidatorState, ctx.SubnetID, ctx.ChainID)
 	vm.Tree = tree.New()
-
-	innerHVM, _ := vm.ChainVM.(block.HeightIndexedChainVM)
-	vm.HeightIndexer = indexes.NewHeightIndexer(vm, innerHVM, vm.ctx.Log,
+	vm.HeightIndexer = indexes.NewHeightIndexer(vm, vm.ctx.Log,
 		vm.State, vm.shutdownChan, &vm.shutdownWg)
 
 	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine)
@@ -133,12 +131,18 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	vm.shutdownWg.Add(1)
-	go ctx.Log.RecoverAndPanic(func() {
-		if err := vm.HeightIndexer.RepairHeightIndex(); err != nil {
-			panic(err)
+	if innerHVM, ok := vm.ChainVM.(block.HeightIndexedChainVM); ok {
+		if !innerHVM.IsHeightIndexComplete() {
+			vm.ctx.Log.Info("Block indexing by height: repairing height index not started since innerVM index is incomplete.")
 		}
-	})
+
+		vm.shutdownWg.Add(1)
+		go ctx.Log.RecoverAndPanic(func() {
+			if err := vm.HeightIndexer.RepairHeightIndex(); err != nil {
+				panic(err)
+			}
+		})
+	}
 
 	return vm.setLastAcceptedOptionTime()
 }
