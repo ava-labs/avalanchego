@@ -70,6 +70,9 @@ type VM struct {
 
 	// height of last preFork accepted block
 	latestPreForkHeight uint64
+
+	// state sync map to see which summary was accepted by the innerVM
+	innerToProBlkID map[ids.ID]ids.ID
 }
 
 func New(vm block.ChainVM, activationTime time.Time, minimumPChainHeight uint64) *VM {

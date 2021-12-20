@@ -811,9 +811,20 @@ func (m *manager) createSnowmanChain(
 		VM:                      vm,
 		WeightTracker:           wt,
 	}
+	onDoneFastSyncing := func(lastReqID uint32) error {
+		// TODO: should this code go somewhere else?
+		// clear the list of pending jobs to download for bootstrapping
+		// note this does not remove any blocks already downloaded and
+		// not accepted, just the job to download their dependencies.
+		blocked.RemoveMissingID(blocked.MissingIDs()...)
+		if err := blocked.Commit(); err != nil {
+			return err
+		}
+		return handler.OnDoneFastSyncing(lastReqID)
+	}
 	fastSync := fastsyncer.NewFastSyncer(
 		fastSyncCfg,
-		handler.OnDoneFastSyncing,
+		onDoneFastSyncing,
 	)
 	handler.RegisterFastSyncer(fastSync)
 

@@ -153,6 +153,7 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 
 	// retrieve innerKey for each summary and propagate all to innerVM
 	innerSummaries := make([]common.Summary, 0, len(accepted))
+	vm.innerToProBlkID = make(map[ids.ID]ids.ID)
 	for _, summ := range accepted {
 		proKey := block.ProposerSummaryKey{}
 		parsedVersion, err := stateSyncCodec.Unmarshal(summ.Key, &proKey)
@@ -172,6 +173,12 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 			Key:     innerKey,
 			Content: summ.Content,
 		})
+
+		// remember the ProBlkID here so we can recall it later
+		// when the summary is accepted.
+		var innerID ids.ID
+		copy(innerID[:], innerKey)
+		vm.innerToProBlkID[innerID] = proKey.ProBlkID
 	}
 
 	return fsVM.StateSync(innerSummaries)
@@ -187,14 +194,10 @@ func (vm *VM) GetLastSummaryBlockID() (ids.ID, error) {
 	if err != nil {
 		return ids.Empty, err
 	}
-	innerBlk, err := vm.ChainVM.GetBlock(innerBlkID)
-	if err != nil {
-		// innerVM internal error. Could retrieve innerBlk matching last summary
-		return ids.Empty, err
-	}
 
-	proBlkID, err := vm.GetBlockIDByHeight(innerBlk.Height())
-	if err != nil {
+	proBlkID, found := vm.innerToProBlkID[innerBlkID]
+	vm.ctx.Log.Info("innerToProBlkID mapping found %v", proBlkID.String())
+	if !found {
 		return ids.Empty, errUnknownLastSummaryBlockID
 	}
 
