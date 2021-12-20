@@ -277,24 +277,24 @@ func GenesisVMWithUTXOs(t *testing.T, finishBootstrapping bool, genesisJSON stri
 
 func TestVMConfig(t *testing.T) {
 	txFeeCap := float64(11)
-	netApiEnabled := true
-	configJSON := fmt.Sprintf("{\"rpc-tx-fee-cap\": %g,\"net-api-enabled\": %t}", txFeeCap, netApiEnabled)
+	enabledEthAPIs := []string{"internal-private-debug"}
+	configJSON := fmt.Sprintf("{\"rpc-tx-fee-cap\": %g,\"eth-apis\": %s}", txFeeCap, fmt.Sprintf("[%q]", enabledEthAPIs[0]))
 	_, vm, _, _, _ := GenesisVM(t, false, genesisJSONApricotPhase0, configJSON, "")
 	assert.Equal(t, vm.config.RPCTxFeeCap, txFeeCap, "Tx Fee Cap should be set")
-	assert.Equal(t, vm.config.NetAPIEnabled, netApiEnabled, "Net API Enabled should be set")
+	assert.Equal(t, vm.config.EthAPIs(), enabledEthAPIs, "EnabledEthAPIs should be set")
 	assert.NoError(t, vm.Shutdown())
 }
 
 func TestVMConfigDefaults(t *testing.T) {
 	txFeeCap := float64(11)
-	netApiEnabled := true
-	configJSON := fmt.Sprintf("{\"rpc-tx-fee-cap\": %g,\"net-api-enabled\": %t}", txFeeCap, netApiEnabled)
+	enabledEthAPIs := []string{"internal-private-debug"}
+	configJSON := fmt.Sprintf("{\"rpc-tx-fee-cap\": %g,\"eth-apis\": %s}", txFeeCap, fmt.Sprintf("[%q]", enabledEthAPIs[0]))
 	_, vm, _, _, _ := GenesisVM(t, false, genesisJSONApricotPhase0, configJSON, "")
 
 	var vmConfig Config
 	vmConfig.SetDefaults()
 	vmConfig.RPCTxFeeCap = txFeeCap
-	vmConfig.NetAPIEnabled = netApiEnabled
+	vmConfig.EnabledEthAPIs = enabledEthAPIs
 	assert.Equal(t, vmConfig, vm.config, "VM Config should match default with overrides")
 	assert.NoError(t, vm.Shutdown())
 }
