@@ -407,3 +407,40 @@ func TestSuggestTipCapMinGas(t *testing.T) {
 		expectedTip: big.NewInt(0),
 	})
 }
+
+// Regression test to ensure that SuggestPrice does not panic prior to activation of ApricotPhase3
+// Note: support for gas estimation without activated hard forks has been deprecated, but we still
+// ensure that the call does not panic.
+func TestSuggestGasPricePreAP3(t *testing.T) {
+	config := Config{
+		Blocks:     20,
+		Percentile: 60,
+	}
+
+	backend := newTestBackend(t, params.TestApricotPhase2Config, 3, nil, func(i int, b *core.BlockGen) {
+		b.SetCoinbase(common.Address{1})
+
+		signer := types.LatestSigner(params.TestApricotPhase2Config)
+		gasPrice := big.NewInt(params.ApricotPhase1MinGasPrice)
+		for j := 0; j < 50; j++ {
+			tx := types.NewTx(&types.LegacyTx{
+				Nonce:    b.TxNonce(addr),
+				To:       &common.Address{},
+				Gas:      params.TxGas,
+				GasPrice: gasPrice,
+				Data:     []byte{},
+			})
+			tx, err := types.SignTx(tx, signer, key)
+			if err != nil {
+				t.Fatalf("failed to create tx: %s", err)
+			}
+			b.AddTx(tx)
+		}
+	})
+	oracle := NewOracle(backend, config)
+
+	_, err := oracle.SuggestPrice(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+}

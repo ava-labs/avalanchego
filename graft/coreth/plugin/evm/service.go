@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -40,15 +39,6 @@ var (
 
 	initialBaseFee = big.NewInt(params.ApricotPhase3InitialBaseFee)
 )
-
-// Web3API offers helper API methods
-type Web3API struct{}
-
-// ClientVersion returns the version of the vm running
-func (s *Web3API) ClientVersion() string { return Version }
-
-// Sha3 returns the bytes returned by hashing [input] with Keccak256
-func (s *Web3API) Sha3(input hexutil.Bytes) hexutil.Bytes { return ethcrypto.Keccak256(input) }
 
 // SnowmanAPI introduces snowman specific functionality to the evm
 type SnowmanAPI struct{ vm *VM }
