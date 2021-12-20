@@ -134,14 +134,14 @@ func (vm *VM) Initialize(
 	if innerHVM, ok := vm.ChainVM.(block.HeightIndexedChainVM); ok {
 		if !innerHVM.IsHeightIndexComplete() {
 			vm.ctx.Log.Info("Block indexing by height: repairing height index not started since innerVM index is incomplete.")
+		} else {
+			vm.shutdownWg.Add(1)
+			go ctx.Log.RecoverAndPanic(func() {
+				if err := vm.HeightIndexer.RepairHeightIndex(); err != nil {
+					panic(err)
+				}
+			})
 		}
-
-		vm.shutdownWg.Add(1)
-		go ctx.Log.RecoverAndPanic(func() {
-			if err := vm.HeightIndexer.RepairHeightIndex(); err != nil {
-				panic(err)
-			}
-		})
 	}
 
 	return vm.setLastAcceptedOptionTime()

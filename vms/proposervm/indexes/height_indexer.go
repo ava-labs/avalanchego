@@ -77,6 +77,11 @@ func (hi *heightIndexer) RepairHeightIndex() error {
 		return err
 	}
 	if !needRepair {
+		forkHeight, err := hi.indexState.GetForkHeight()
+		if err != nil {
+			return err
+		}
+		hi.log.Info("Block indexing by height: already complete. Fork height %d", forkHeight)
 		return nil
 	}
 
