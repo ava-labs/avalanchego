@@ -28,9 +28,7 @@ const (
 )
 
 var (
-	atomicIndexDBPrefix     = []byte("atomicIndexDB")
-	atomicIndexMetaDBPrefix = []byte("atomicIndexMetaDB")
-	lastCommittedKey        = []byte("atomicTrieLastCommittedBlock")
+	lastCommittedKey = []byte("atomicTrieLastCommittedBlock")
 )
 
 // atomicTrie implements the types.AtomicTrie interface
@@ -62,8 +60,8 @@ func NewAtomicTrie(db *versiondb.Database, repo AtomicTxRepository, codec codec.
 func newAtomicTrie(
 	db *versiondb.Database, repo AtomicTxRepository, codec codec.Manager, lastAcceptedHeight uint64, commitHeightInterval uint64,
 ) (types.AtomicTrie, error) {
-	atomicTrieDB := prefixdb.New(atomicIndexDBPrefix, db)
-	metadataDB := prefixdb.New(atomicIndexMetaDBPrefix, db)
+	atomicTrieDB := prefixdb.New(atomicTrieDBPrefix, db)
+	metadataDB := prefixdb.New(atomicTrieMetaDBPrefix, db)
 	root, height, err := lastCommittedRootIfExists(metadataDB)
 	if err != nil {
 		return nil, err
