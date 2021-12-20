@@ -110,9 +110,14 @@ const (
 
 var (
 	// Set last accepted key to be longer than the keys used to store accepted block IDs.
-	lastAcceptedKey        = []byte("last_accepted_key")
-	acceptedPrefix         = []byte("snowman_accepted")
-	ethDBPrefix            = []byte("ethdb")
+	lastAcceptedKey = []byte("last_accepted_key")
+	acceptedPrefix  = []byte("snowman_accepted")
+	ethDBPrefix     = []byte("ethdb")
+
+	// Prefixes for atomic trie
+	atomicTrieDBPrefix     = []byte("atomicTrieDB")
+	atomicTrieMetaDBPrefix = []byte("atomicTrieMetaDB")
+
 	pruneRejectedBlocksKey = []byte("pruned_rejected_blocks")
 )
 
