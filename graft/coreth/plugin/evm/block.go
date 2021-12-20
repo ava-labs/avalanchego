@@ -8,6 +8,8 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -120,15 +122,7 @@ func (b *Block) Accept() error {
 	}
 
 	if len(b.atomicTxs) == 0 {
-		if _, err := b.vm.atomicTrie.Index(b.Height(), nil); err != nil {
-			return err
-		}
 		return vm.db.Commit()
-	}
-
-	// Update indexes the vm maintains on accepted atomic txs.
-	if err := vm.atomicTxRepository.Write(b.Height(), b.atomicTxs); err != nil {
-		return err
 	}
 
 	batchChainsAndInputs, err := mergeAtomicOps(b.atomicTxs)
@@ -147,14 +141,30 @@ func (b *Block) Accept() error {
 		return vm.db.Commit()
 	}
 
-	if _, err := b.vm.atomicTrie.Index(b.Height(), batchChainsAndInputs); err != nil {
+	if err = b.indexAtomics(vm, b.Height(), b.atomicTxs, batchChainsAndInputs); err != nil {
 		return err
 	}
+
 	batch, err := vm.db.CommitBatch()
 	if err != nil {
 		return fmt.Errorf("failed to create commit batch due to: %w", err)
 	}
 	return vm.ctx.SharedMemory.Apply(batchChainsAndInputs, batch)
+}
+
+// indexAtomics writes given list of atomic transactions and atomic operations to atomic repository
+// and atomic trie respectively
+func (b *Block) indexAtomics(vm *VM, height uint64, atomicTxs []*Tx, batchChainsAndInputs map[ids.ID]*atomic.Requests) error {
+	// Update indexes the vm maintains on accepted atomic txs.
+	if err := vm.atomicTxRepository.Write(height, atomicTxs); err != nil {
+		return err
+	}
+
+	if _, err := b.vm.atomicTrie.Index(height, batchChainsAndInputs); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Reject implements the snowman.Block interface
