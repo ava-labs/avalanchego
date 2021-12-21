@@ -190,6 +190,8 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 				return hi.closeIndexer(currentAcceptedBlk)
 			default:
 				// go ahead with index repairing
+				hi.log.Info("Block indexing by height: ongoing. Processing %v, height %d",
+					currentAcceptedBlk.ID(), currentAcceptedBlk.Height())
 			}
 
 		case database.ErrNotFound:

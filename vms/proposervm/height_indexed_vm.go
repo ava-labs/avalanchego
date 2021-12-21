@@ -60,6 +60,7 @@ func (vm *VM) updateHeightIndex(height uint64, blkID ids.ID) error {
 
 	forkHeight, err := vm.State.GetForkHeight()
 	if err != nil {
+		vm.ctx.Log.Warn("Block indexing by height: new block. Could not load fork height %v", err)
 		return err
 	}
 
@@ -68,11 +69,14 @@ func (vm *VM) updateHeightIndex(height uint64, blkID ids.ID) error {
 			forkHeight, height, blkID)
 
 		if err := vm.State.SetForkHeight(height); err != nil {
-			vm.ctx.Log.Info("Block indexing by height: new block. Failed storing new fork height %v", err)
+			vm.ctx.Log.Warn("Block indexing by height: new block. Failed storing new fork height %v", err)
 			return err
 		}
 	}
 
-	_, err = vm.State.SetBlockIDAtHeight(height, blkID)
-	return err
+	if _, err = vm.State.SetBlockIDAtHeight(height, blkID); err != nil {
+		vm.ctx.Log.Warn("Block indexing by height: new block. Failed updating index %v", err)
+		return err
+	}
+	return nil
 }
