@@ -78,5 +78,7 @@ func (vm *VM) updateHeightIndex(height uint64, blkID ids.ID) error {
 		vm.ctx.Log.Warn("Block indexing by height: new block. Failed updating index %v", err)
 		return err
 	}
+
+	vm.ctx.Log.Debug("Block indexing by height: added block %s at height %d", blkID, height)
 	return nil
 }

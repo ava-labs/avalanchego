@@ -47,7 +47,6 @@ func (b *postForkOption) Accept() error {
 	if err := b.vm.updateHeightIndex(b.Height(), blkID); err != nil {
 		return err
 	}
-	b.vm.ctx.Log.Debug("Block indexing by height: added post fork option at height %d", b.Height())
 
 	delete(b.vm.verifiedBlocks, blkID)
 
