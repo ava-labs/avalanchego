@@ -1,9 +1,11 @@
-// (c) 2020-2021, Ava Labs, Inc.
+// (c) 2020-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
+
 package evm
 
 import (
 	"math/big"
+	"math/rand"
 
 	"github.com/ava-labs/avalanchego/utils"
 
@@ -18,16 +20,17 @@ import (
 )
 
 type TestTx struct {
-	GasUsedV          uint64
-	AcceptRequestsV   *atomic.Requests `serialize:"true"`
-	VerifyV           error
-	IDV               ids.ID `serialize:"true" json:"id"`
-	BurnedV           uint64
-	UnsignedBytesV    []byte
-	BytesV            []byte
-	InputUTXOsV       ids.Set
-	SemanticVerifyV   error
-	EVMStateTransferV error
+	GasUsedV                    uint64           `serialize:"true"`
+	AcceptRequestsBlockchainIDV ids.ID           `serialize:"true"`
+	AcceptRequestsV             *atomic.Requests `serialize:"true"`
+	VerifyV                     error
+	IDV                         ids.ID `serialize:"true" json:"id"`
+	BurnedV                     uint64 `serialize:"true"`
+	UnsignedBytesV              []byte
+	BytesV                      []byte
+	InputUTXOsV                 ids.Set
+	SemanticVerifyV             error
+	EVMStateTransferV           error
 }
 
 var _ UnsignedAtomicTx = &TestTx{}
@@ -40,7 +43,7 @@ func (t *TestTx) Verify(ctx *snow.Context, rules params.Rules) error { return t.
 
 // AtomicOps implements the UnsignedAtomicTx interface
 func (t *TestTx) AtomicOps() (ids.ID, *atomic.Requests, error) {
-	return t.IDV, t.AcceptRequestsV, nil
+	return t.AcceptRequestsBlockchainIDV, t.AcceptRequestsV, nil
 }
 
 // Initialize implements the UnsignedAtomicTx interface
@@ -90,21 +93,11 @@ func testTxCodec() codec.Manager {
 }
 
 func testDataImportTx() *Tx {
-	blockchainID := ids.GenerateTestID()
 	return &Tx{
 		UnsignedAtomicTx: &TestTx{
-			IDV: blockchainID,
+			IDV:                         ids.GenerateTestID(),
+			AcceptRequestsBlockchainIDV: ids.GenerateTestID(),
 			AcceptRequestsV: &atomic.Requests{
-				PutRequests: []*atomic.Element{
-					{
-						Key:   utils.RandomBytes(16),
-						Value: utils.RandomBytes(24),
-						Traits: [][]byte{
-							utils.RandomBytes(32),
-							utils.RandomBytes(32),
-						},
-					},
-				},
 				RemoveRequests: [][]byte{
 					utils.RandomBytes(32),
 					utils.RandomBytes(32),
@@ -115,10 +108,10 @@ func testDataImportTx() *Tx {
 }
 
 func testDataExportTx() *Tx {
-	blockchainID := ids.GenerateTestID()
 	return &Tx{
 		UnsignedAtomicTx: &TestTx{
-			IDV: blockchainID,
+			IDV:                         ids.GenerateTestID(),
+			AcceptRequestsBlockchainIDV: ids.GenerateTestID(),
 			AcceptRequestsV: &atomic.Requests{
 				PutRequests: []*atomic.Element{
 					{
@@ -130,11 +123,19 @@ func testDataExportTx() *Tx {
 						},
 					},
 				},
-				RemoveRequests: [][]byte{
-					utils.RandomBytes(32),
-					utils.RandomBytes(32),
-				},
 			},
 		},
+	}
+}
+
+func newTestTx() *Tx {
+	txType := rand.Intn(2)
+	switch txType {
+	case 0:
+		return testDataImportTx()
+	case 1:
+		return testDataExportTx()
+	default:
+		panic("rng generated unexpected value for tx type")
 	}
 }
