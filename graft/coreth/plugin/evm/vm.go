@@ -114,7 +114,6 @@ var (
 	lastAcceptedKey        = []byte("last_accepted_key")
 	acceptedPrefix         = []byte("snowman_accepted")
 	ethDBPrefix            = []byte("ethdb")
-	atomicTxPrefix         = []byte("atomicTxDB")
 	pruneRejectedBlocksKey = []byte("pruned_rejected_blocks")
 )
 
@@ -187,8 +186,11 @@ type VM struct {
 	// [acceptedBlockDB] is the database to store the last accepted
 	// block.
 	acceptedBlockDB database.Database
-	// [acceptedAtomicTxDB] maintains an index of accepted atomic txs.
-	acceptedAtomicTxDB database.Database
+
+	// [atomicTxRepository] maintains two indexes on accepted atomic txs.
+	// - txID to accepted atomic tx
+	// - block height to list of atomic txs accepted on block at that height
+	atomicTxRepository AtomicTxRepository
 
 	builder *blockBuilder
 
@@ -287,7 +289,6 @@ func (vm *VM) Initialize(
 	vm.chaindb = Database{prefixdb.NewNested(ethDBPrefix, baseDB)}
 	vm.db = versiondb.New(baseDB)
 	vm.acceptedBlockDB = prefixdb.New(acceptedPrefix, vm.db)
-	vm.acceptedAtomicTxDB = prefixdb.New(atomicTxPrefix, vm.db)
 	g := new(core.Genesis)
 	if err := json.Unmarshal(genesisBytes, g); err != nil {
 		return err
@@ -378,6 +379,11 @@ func (vm *VM) Initialize(
 	vm.chain = ethChain
 	lastAccepted := vm.chain.LastAcceptedBlock()
 
+	vm.atomicTxRepository, err = NewAtomicTxRepository(vm.db, vm.codec, lastAccepted.NumberU64())
+	if err != nil {
+		return fmt.Errorf("failed to create atomic repository: %w", err)
+	}
+
 	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
 	vm.handleGasPriceUpdates()
 
@@ -397,7 +403,8 @@ func (vm *VM) Initialize(
 	vm.genesisHash = vm.chain.GetGenesisBlock().Hash()
 	log.Info(fmt.Sprintf("lastAccepted = %s", lastAccepted.Hash().Hex()))
 
-	atomicTxs, err := ExtractAtomicTxs(lastAccepted.ExtData(), vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(lastAccepted.Time())))
+	isApricotPhase5 := vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(lastAccepted.Time()))
+	atomicTxs, err := ExtractAtomicTxs(lastAccepted.ExtData(), isApricotPhase5, vm.codec)
 	if err != nil {
 		return err
 	}
@@ -602,7 +609,7 @@ func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big
 		isApricotPhase5            = vm.chainConfig.IsApricotPhase5(timestamp)
 	)
 
-	txs, err := ExtractAtomicTxs(block.ExtData(), isApricotPhase5)
+	txs, err := ExtractAtomicTxs(block.ExtData(), isApricotPhase5, vm.codec)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -698,7 +705,8 @@ func (vm *VM) buildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 
-	atomicTxs, err := ExtractAtomicTxs(block.ExtData(), vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(block.Time())))
+	isApricotPhase5 := vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(block.Time()))
+	atomicTxs, err := ExtractAtomicTxs(block.ExtData(), isApricotPhase5, vm.codec)
 	if err != nil {
 		vm.mempool.DiscardCurrentTxs()
 		return nil, err
@@ -742,7 +750,8 @@ func (vm *VM) parseBlock(b []byte) (snowman.Block, error) {
 		return nil, err
 	}
 
-	atomicTxs, err := ExtractAtomicTxs(ethBlock.ExtData(), vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(ethBlock.Time())))
+	isApricotPhase5 := vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(ethBlock.Time()))
+	atomicTxs, err := ExtractAtomicTxs(ethBlock.ExtData(), isApricotPhase5, vm.codec)
 	if err != nil {
 		return nil, err
 	}
@@ -770,7 +779,8 @@ func (vm *VM) getBlock(id ids.ID) (snowman.Block, error) {
 	if ethBlock == nil {
 		return nil, database.ErrNotFound
 	}
-	atomicTxs, err := ExtractAtomicTxs(ethBlock.ExtData(), vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(ethBlock.Time())))
+	isApricotPhase5 := vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(ethBlock.Time()))
+	atomicTxs, err := ExtractAtomicTxs(ethBlock.ExtData(), isApricotPhase5, vm.codec)
 	if err != nil {
 		return nil, err
 	}
@@ -839,7 +849,9 @@ func newHandler(name string, service interface{}, lockOption ...commonEng.LockOp
 func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 	handler := vm.chain.NewRPCHandler(vm.config.APIMaxDuration.Duration)
 	enabledAPIs := vm.config.EthAPIs()
-	vm.chain.AttachEthService(handler, enabledAPIs)
+	if err := vm.chain.AttachEthService(handler, enabledAPIs); err != nil {
+		return nil, err
+	}
 
 	primaryAlias, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID)
 	if err != nil {
@@ -862,17 +874,11 @@ func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 		enabledAPIs = append(enabledAPIs, "coreth-admin")
 	}
 
-	errs := wrappers.Errs{}
 	if vm.config.SnowmanAPIEnabled {
-		errs.Add(handler.RegisterName("snowman", &SnowmanAPI{vm}))
+		if err := handler.RegisterName("snowman", &SnowmanAPI{vm}); err != nil {
+			return nil, err
+		}
 		enabledAPIs = append(enabledAPIs, "snowman")
-	}
-	if vm.config.Web3APIEnabled {
-		errs.Add(handler.RegisterName("web3", &Web3API{}))
-		enabledAPIs = append(enabledAPIs, "web3")
-	}
-	if errs.Errored() {
-		return nil, errs.Err
 	}
 
 	log.Info(fmt.Sprintf("Enabled APIs: %s", strings.Join(enabledAPIs, ", ")))
@@ -902,7 +908,6 @@ func (vm *VM) CreateStaticHandlers() (map[string]*commonEng.HTTPHandler, error) 
 
 	return map[string]*commonEng.HTTPHandler{
 		"/rpc": {LockOptions: commonEng.NoLock, Handler: handler},
-		"/ws":  {LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandler([]string{"*"})},
 	}, nil
 }
 
@@ -953,30 +958,10 @@ func (vm *VM) conflicts(inputs ids.Set, ancestor *Block) error {
 	return nil
 }
 
-// getAcceptedAtomicTx attempts to get [txID] from the database.
-func (vm *VM) getAcceptedAtomicTx(txID ids.ID) (*Tx, uint64, error) {
-	indexedTxBytes, err := vm.acceptedAtomicTxDB.Get(txID[:])
-	if err != nil {
-		return nil, 0, err
-	}
-	packer := wrappers.Packer{Bytes: indexedTxBytes}
-	height := packer.UnpackLong()
-	txBytes := packer.UnpackBytes()
-
-	tx := &Tx{}
-	if _, err := vm.codec.Unmarshal(txBytes, tx); err != nil {
-		return nil, 0, fmt.Errorf("problem parsing atomic transaction from db: %w", err)
-	}
-	if err := tx.Sign(vm.codec, nil); err != nil {
-		return nil, 0, fmt.Errorf("problem initializing atomic transaction from db: %w", err)
-	}
-	return tx, height, nil
-}
-
 // getAtomicTx returns the requested transaction, status, and height.
 // If the status is Unknown, then the returned transaction will be nil.
 func (vm *VM) getAtomicTx(txID ids.ID) (*Tx, Status, uint64, error) {
-	if tx, height, err := vm.getAcceptedAtomicTx(txID); err == nil {
+	if tx, height, err := vm.atomicTxRepository.GetByTxID(txID); err == nil {
 		return tx, Accepted, height, nil
 	} else if err != database.ErrNotFound {
 		return nil, Unknown, 0, err
@@ -990,20 +975,6 @@ func (vm *VM) getAtomicTx(txID ids.ID) (*Tx, Status, uint64, error) {
 	default:
 		return nil, Unknown, 0, nil
 	}
-}
-
-// writeAtomicTx writes indexes [tx] in [blk]
-func (vm *VM) writeAtomicTx(blk *Block, tx *Tx) error {
-	// 8 bytes
-	height := blk.ethBlock.NumberU64()
-	// 4 + len(txBytes)
-	txBytes := tx.Bytes()
-	packer := wrappers.Packer{Bytes: make([]byte, 12+len(txBytes))}
-	packer.PackLong(height)
-	packer.PackBytes(txBytes)
-	txID := tx.ID()
-
-	return vm.acceptedAtomicTxDB.Put(txID[:], packer.Bytes)
 }
 
 // ParseAddress takes in an address and produces the ID of the chain it's for

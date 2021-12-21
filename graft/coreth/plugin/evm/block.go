@@ -124,15 +124,16 @@ func (b *Block) Accept() error {
 		return vm.db.Commit()
 	}
 
-	batchChainsAndInputs := make(map[ids.ID]*atomic.Requests)
+	// Update indexes the vm maintains on accepted atomic txs.
+	if err := vm.atomicTxRepository.Write(b.Height(), b.atomicTxs); err != nil {
+		return err
+	}
 
+	batchChainsAndInputs := make(map[ids.ID]*atomic.Requests)
 	for _, tx := range b.atomicTxs {
 		// Remove the accepted transaction from the mempool
 		vm.mempool.RemoveTx(tx.ID())
-		// Save the accepted atomic transaction
-		if err := vm.writeAtomicTx(b, tx); err != nil {
-			return err
-		}
+		// Accept atomic transaction
 		chainID, txRequest, err := tx.UnsignedAtomicTx.Accept()
 		if err != nil {
 			return err
@@ -190,7 +191,7 @@ func (b *Block) Parent() ids.ID {
 
 // Height implements the snowman.Block interface
 func (b *Block) Height() uint64 {
-	return b.ethBlock.Number().Uint64()
+	return b.ethBlock.NumberU64()
 }
 
 // Timestamp implements the snowman.Block interface

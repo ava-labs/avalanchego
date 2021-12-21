@@ -178,11 +178,20 @@ func (oracle *Oracle) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
 		log.Warn("failed to estimate next base fee", "err", err)
 		return baseFee, nil
 	}
+	// If base fees have not been enabled, return a nil value.
+	if nextBaseFee == nil {
+		return nil, nil
+	}
 
 	baseFee = math.BigMin(baseFee, nextBaseFee)
 	return baseFee, nil
 }
 
+// estimateNextBaseFee calculates what the base fee should be on the next block if it
+// were produced immediately. If the current time is less than the timestamp of the latest
+// block, this esimtate uses the timestamp of the latest block instead.
+// If the latest block has a nil base fee, this function will return nil as the base fee
+// of the next block.
 func (oracle *Oracle) estimateNextBaseFee(ctx context.Context) (*big.Int, error) {
 	// Fetch the most recent block by number
 	block, err := oracle.backend.BlockByNumber(ctx, rpc.LatestBlockNumber)
@@ -220,10 +229,13 @@ func (oracle *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 	// If [nextBaseFee] is lower than the estimate from sampling, then we return it
 	// to prevent returning an incorrectly high fee when the network is quiescent.
 	nextBaseFee, err := oracle.estimateNextBaseFee(ctx)
-	if err == nil {
-		baseFee = math.BigMin(baseFee, nextBaseFee)
-	} else {
+	if err != nil {
 		log.Warn("failed to estimate next base fee", "err", err)
+	}
+	// Separately from checking the error value, check that [nextBaseFee] is non-nil
+	// before attempting to take the minimum.
+	if nextBaseFee != nil {
+		baseFee = math.BigMin(baseFee, nextBaseFee)
 	}
 
 	return new(big.Int).Add(tip, baseFee), nil
@@ -242,7 +254,11 @@ func (oracle *Oracle) SuggestTipCap(ctx context.Context) (*big.Int, error) {
 
 // suggestDynamicFees estimates the gas tip and base fee based on a simple sampling method
 func (oracle *Oracle) suggestDynamicFees(ctx context.Context) (*big.Int, *big.Int, error) {
-	head, _ := oracle.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+	head, err := oracle.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	headHash := head.Hash()
 
 	// If the latest gasprice is still available, return it.
