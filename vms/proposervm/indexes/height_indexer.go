@@ -240,17 +240,12 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 
 		case database.ErrNotFound:
 			// Let's keep memory footprint under control by committing when a size threshold is reached
-			// We commit before storing lastAcceptedBlk height block index so to use lastAcceptedBlk as nextBlkIDToResumeFrom
 			if pendingBytesApproximation > commitSizeCap {
-				if err := hi.indexState.SetCheckpoint(currentProBlkID); err != nil {
+				if err := hi.doCheckpoint(currentAcceptedBlk); err != nil {
 					return err
 				}
-				if err := hi.server.DBCommit(); err != nil {
-					return err
-				}
-
-				hi.log.Info("Block indexing by height: ongoing. Indexed %d blocks, latest committed height %d, committed %d bytes,  checkpoint %v",
-					indexedBlks, currentAcceptedBlk.Height()+1, pendingBytesApproximation, currentProBlkID)
+				hi.log.Info("Block indexing by height: ongoing. Indexed %d blocks, latest committed height %d, committed %d bytes",
+					indexedBlks, currentAcceptedBlk.Height()+1, pendingBytesApproximation)
 				pendingBytesApproximation = 0
 			}
 
@@ -278,17 +273,41 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 	}
 }
 
+func (hi *heightIndexer) doCheckpoint(currentProBlk WrappingBlock) error {
+	// checkpoint is current block's parent, it if exists
+	var checkpoint ids.ID
+	parentBlkID := currentProBlk.Parent()
+	checkpointBlk, err := hi.server.GetWrappingBlk(parentBlkID)
+	switch err {
+	case nil:
+		checkpoint = checkpointBlk.ID()
+		if err := hi.indexState.SetCheckpoint(checkpoint); err != nil {
+			return err
+		}
+		if err := hi.server.DBCommit(); err != nil {
+			return err
+		}
+		hi.log.Info("Block indexing by height. Stored checkpoint %v at height %d",
+			currentProBlk.ID(), currentProBlk.Height())
+		return nil
+
+	case database.ErrNotFound:
+		// parent must be a preFork block. We do not checkpoint here.
+		// Process will set forkHeight and terminate
+		return nil
+
+	default:
+		return err
+	}
+}
+
 func (hi *heightIndexer) closeIndexer(currentProBlk WrappingBlock) error {
 	hi.log.Info("Block indexing by height shutdown: Started.")
-	if err := hi.indexState.SetCheckpoint(currentProBlk.ID()); err != nil {
+	if err := hi.doCheckpoint(currentProBlk); err != nil {
 		hi.log.Info("Block indexing by height: shutdown. Failed setting checkpoint %v", err)
 		return err
 	}
-	if err := hi.server.DBCommit(); err != nil {
-		hi.log.Info("Block indexing by height shutdown: Failed committing DB %v", err)
-		return err
-	}
-	hi.log.Info("Block indexing by height shutdown: done. Stored checkpoint %v at height %d",
-		currentProBlk.ID(), currentProBlk.Height())
+
+	hi.log.Info("Block indexing by height shutdown: done.")
 	return nil
 }
