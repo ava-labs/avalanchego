@@ -60,6 +60,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -211,7 +212,7 @@ type VM struct {
 	bootstrapped bool
 }
 
-func (vm *VM) Connected(nodeID ids.ShortID) error {
+func (vm *VM) Connected(id ids.ShortID, nodeVersion version.Application) error {
 	return nil // noop
 }
 
