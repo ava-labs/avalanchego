@@ -46,7 +46,7 @@ func (ed *EventDispatcher) Accept(ctx *snow.ConsensusContext, containerID ids.ID
 	defer ed.lock.Unlock()
 
 	for id, handler := range ed.handlers {
-		handler, ok := handler.(Acceptor)
+		handler, ok := handler.(snow.Acceptor)
 		if !ok {
 			continue
 		}
@@ -61,7 +61,7 @@ func (ed *EventDispatcher) Accept(ctx *snow.ConsensusContext, containerID ids.ID
 		return nil
 	}
 	for id, handler := range events {
-		handlerFunc, ok := handler.handlerFunc.(Acceptor)
+		handlerFunc, ok := handler.handlerFunc.(snow.Acceptor)
 		if !ok {
 			continue
 		}
@@ -82,7 +82,7 @@ func (ed *EventDispatcher) Reject(ctx *snow.ConsensusContext, containerID ids.ID
 	defer ed.lock.Unlock()
 
 	for id, handler := range ed.handlers {
-		handler, ok := handler.(Rejector)
+		handler, ok := handler.(snow.Rejector)
 		if !ok {
 			continue
 		}
@@ -97,7 +97,7 @@ func (ed *EventDispatcher) Reject(ctx *snow.ConsensusContext, containerID ids.ID
 		return nil
 	}
 	for id, handler := range events {
-		handler, ok := handler.handlerFunc.(Rejector)
+		handler, ok := handler.handlerFunc.(snow.Rejector)
 		if !ok {
 			continue
 		}
@@ -115,7 +115,7 @@ func (ed *EventDispatcher) Issue(ctx *snow.ConsensusContext, containerID ids.ID,
 	defer ed.lock.Unlock()
 
 	for id, handler := range ed.handlers {
-		handler, ok := handler.(Issuer)
+		handler, ok := handler.(snow.Issuer)
 		if !ok {
 			continue
 		}
@@ -130,7 +130,7 @@ func (ed *EventDispatcher) Issue(ctx *snow.ConsensusContext, containerID ids.ID,
 		return nil
 	}
 	for id, handler := range events {
-		handler, ok := handler.handlerFunc.(Issuer)
+		handler, ok := handler.handlerFunc.(snow.Issuer)
 		if !ok {
 			continue
 		}

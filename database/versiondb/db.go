@@ -336,7 +336,7 @@ func (b *batch) Reset() {
 }
 
 // Replay implements the Database interface
-func (b *batch) Replay(w database.KeyValueWriter) error {
+func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
 	for _, kv := range b.writes {
 		if kv.delete {
 			if err := w.Delete(kv.key); err != nil {

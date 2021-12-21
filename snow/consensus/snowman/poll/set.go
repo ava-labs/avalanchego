@@ -191,7 +191,7 @@ func (s *set) String() string {
 	for iter.Next() {
 		requestID := iter.Key()
 		poll := iter.Value().(Poll)
-		sb.WriteString(fmt.Sprintf("\n    %d: %s", requestID, poll.PrefixedString("    ")))
+		sb.WriteString(fmt.Sprintf("\n    RequestID %d:\n        %s", requestID, poll.PrefixedString("        ")))
 	}
 	return sb.String()
 }

@@ -24,14 +24,31 @@ type KeyValueReader interface {
 type KeyValueWriter interface {
 	// Put inserts the given value into the key-value data store.
 	Put(key []byte, value []byte) error
+}
 
+// KeyValueDeleter wraps the Delete method of a backing data store.
+type KeyValueDeleter interface {
 	// Delete removes the key from the key-value data store.
 	Delete(key []byte) error
 }
 
+// KeyValueReaderWriter allows read/write acccess to a backing data store.
 type KeyValueReaderWriter interface {
 	KeyValueReader
 	KeyValueWriter
+}
+
+// KeyValueWriterDeleter allows write/delete acccess to a backing data store.
+type KeyValueWriterDeleter interface {
+	KeyValueWriter
+	KeyValueDeleter
+}
+
+// KeyValueReaderWriterDeleter allows read/write/delete access to a backing data store.
+type KeyValueReaderWriterDeleter interface {
+	KeyValueReader
+	KeyValueWriter
+	KeyValueDeleter
 }
 
 // Stater wraps the Stat method of a backing data store.
@@ -57,8 +74,7 @@ type Compacter interface {
 // Database contains all the methods required to allow handling different
 // key-value data stores backing the database.
 type Database interface {
-	KeyValueReader
-	KeyValueWriter
+	KeyValueReaderWriterDeleter
 	Batcher
 	Iteratee
 	Stater

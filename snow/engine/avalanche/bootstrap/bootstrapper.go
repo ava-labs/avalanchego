@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 const (
@@ -496,9 +497,8 @@ func (b *Bootstrapper) finish() error {
 }
 
 // Connected implements the Engine interface.
-func (b *Bootstrapper) Connected(nodeID ids.ShortID) error {
-	err := b.VM.Connected(nodeID)
-	if err != nil {
+func (b *Bootstrapper) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
+	if err := b.VM.Connected(nodeID, nodeVersion); err != nil {
 		return err
 	}
 	return b.Bootstrapper.Connected(nodeID)

@@ -107,12 +107,12 @@ type VM struct {
 	addressTxsIndexer index.AddressTxsIndexer
 }
 
-func (vm *VM) Connected(id ids.ShortID) error {
-	return nil // noop
+func (vm *VM) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
+	return nil
 }
 
-func (vm *VM) Disconnected(id ids.ShortID) error {
-	return nil // noop
+func (vm *VM) Disconnected(nodeID ids.ShortID) error {
+	return nil
 }
 
 /*

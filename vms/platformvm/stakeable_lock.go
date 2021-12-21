@@ -16,7 +16,7 @@ var (
 
 type StakeableLockOut struct {
 	Locktime             uint64 `serialize:"true" json:"locktime"`
-	avax.TransferableOut `serialize:"true"`
+	avax.TransferableOut `serialize:"true" json:"output"`
 }
 
 func (s *StakeableLockOut) Addresses() [][]byte {
@@ -38,7 +38,7 @@ func (s *StakeableLockOut) Verify() error {
 
 type StakeableLockIn struct {
 	Locktime            uint64 `serialize:"true" json:"locktime"`
-	avax.TransferableIn `serialize:"true"`
+	avax.TransferableIn `serialize:"true" json:"input"`
 }
 
 func (s *StakeableLockIn) Verify() error {

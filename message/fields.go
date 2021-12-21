@@ -32,6 +32,7 @@ const (
 	AppBytes                         // Used at application level
 	VMMessage                        // Used internally
 	Uptime                           // Used for Pong
+	VersionStruct                    // Used internally
 )
 
 // Packer returns the packer function that can be used to pack this field.
@@ -168,6 +169,8 @@ func (f Field) String() string {
 		return "VMMessage"
 	case Uptime:
 		return "Uptime"
+	case VersionStruct:
+		return "VersionStruct"
 	default:
 		return "Unknown Field"
 	}

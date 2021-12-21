@@ -27,9 +27,11 @@ Note that as network usage increases, hardware requirements may change.
 Clone the AvalancheGo repository:
 
 ```sh
-go get -v -d github.com/ava-labs/avalanchego/...
-cd $GOPATH/src/github.com/ava-labs/avalanchego
+git clone git@github.com:ava-labs/avalanchego.git
+cd avalanchego
 ```
+
+This will clone and checkout to `master` branch.
 
 #### Building the Avalanche Executable
 
@@ -178,6 +180,36 @@ For more information, refer to the [GRPC Golang Quick Start Guide](https://grpc.
 docker build -t avalanche:protobuf_codegen -f Dockerfile.protoc .
 docker run -t -i -v $(pwd):/opt/avalanche -w/opt/avalanche avalanche:protobuf_codegen bash -c "scripts/protobuf_codegen.sh"
 ```
+
+## Supported Platforms
+
+AvalancheGo can run on different platforms, with different support tiers:
+
+- **Tier 1**: Fully supported by the maintainers, guaranteed to pass all tests including e2e and stress tests.
+- **Tier 2**: Passes all unit and integration tests but not necessarily e2e tests.
+- **Tier 3**: Builds but lightly tested (or not), considered _experimental_.
+- **Not supported**: May not build and not tested, considered _unsafe_. To be supported in the future. 
+
+The following table lists currently supported platforms and their corresponding
+AvalancheGo support tiers:
+
+| Architecture | Operating system | Support tier  |
+|:------------:|:----------------:|:-------------:|
+| amd64        | Linux            | 1             |
+| arm64        | Linux            | 2             |
+| amd64        | Darwin           | 2             |
+| amd64        | Windows          | 3             |
+| arm          | Linux            | Not supported |
+| i386         | Linux            | Not supported |
+| arm64        | Darwin           | Not supported |
+
+To officially support a new platform, one must satisfy the following requirements:
+
+| AvalancheGo continuous integration    | Tier 1 | Tier 2 | Tier 3 |
+| ------------------------------------- |:------:|:------:|:------:|
+| Build passes                          | &check;| &check;| &check;|
+| Unit and integration tests pass       | &check;| &check;|        |
+| End-to-end and stress tests pass      | &check;|        |        |
 
 ## Security Bugs
 

@@ -31,7 +31,6 @@ func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
 		Plugins:         PluginMap,
 		Cmd:             subprocess.New(f.Path),
 		AllowedProtocols: []plugin.Protocol{
-			plugin.ProtocolNetRPC,
 			plugin.ProtocolGRPC,
 		},
 		// We kill this client by calling kill() when the chain running this VM
@@ -120,7 +119,7 @@ func RegisterPlugins(pluginDir string, manager vms.Manager) error {
 		_, err = manager.GetFactory(vmID)
 		if err == nil {
 			// If we already have the VM registered, we shouldn't attempt to
-			// / register it again.
+			// register it again.
 			continue
 		}
 

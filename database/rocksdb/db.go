@@ -335,7 +335,7 @@ func (b *batch) Reset() {
 }
 
 // Replay the batch contents.
-func (b *batch) Replay(w database.KeyValueWriter) error {
+func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
 	it := b.batch.NewIterator()
 	for it.Next() {
 		rec := it.Record()

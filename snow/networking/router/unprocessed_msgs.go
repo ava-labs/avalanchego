@@ -114,6 +114,11 @@ func (u *unprocessedMsgsImpl) Len() int {
 
 // canPop will return true for at least one message in [u.msgs]
 func (u *unprocessedMsgsImpl) canPop(msg message.InboundMessage) bool {
+	// Always pop connected and disconnected messages.
+	if op := msg.Op(); op == message.Connected || op == message.Disconnected {
+		return true
+	}
+
 	// If the deadline to handle [msg] has passed, always pop it.
 	// It will be dropped immediately.
 	if expirationTime := msg.ExpirationTime(); !expirationTime.IsZero() && u.clock.Time().After(expirationTime) {

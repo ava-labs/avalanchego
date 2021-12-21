@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/uptime"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 var errDuplicatedContainerID = errors.New("inbound message contains duplicated container ID")
@@ -186,10 +187,13 @@ func (h *Handler) handleMsg(msg message.InboundMessage) error {
 	case message.Notify:
 		vmMsg := msg.Get(message.VMMessage).(uint32)
 		err = h.engine.Notify(common.Message(vmMsg))
+
 	case message.GossipRequest:
 		err = h.engine.Gossip()
+
 	case message.Timeout:
 		err = h.engine.Timeout()
+
 	default:
 		err = h.handleConsensusMsg(msg)
 	}
@@ -337,7 +341,8 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		return h.engine.Chits(nodeID, reqID, votes)
 
 	case message.Connected:
-		return h.engine.Connected(nodeID)
+		peerVersion := msg.Get(message.VersionStruct).(version.Application)
+		return h.engine.Connected(nodeID, peerVersion)
 
 	case message.Disconnected:
 		return h.engine.Disconnected(nodeID)
