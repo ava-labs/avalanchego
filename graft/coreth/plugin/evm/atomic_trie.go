@@ -1,4 +1,4 @@
-// (c) 2020-2021, Ava Labs, Inc.
+// (c) 2020-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package evm
@@ -61,9 +61,9 @@ func NewAtomicTrie(db *versiondb.Database, repo AtomicTxRepository, codec codec.
 // Initializes the trie before returning it.
 func newAtomicTrie(
 	db *versiondb.Database, repo AtomicTxRepository, codec codec.Manager, lastAcceptedHeight uint64, commitHeightInterval uint64,
-) (types.AtomicTrie, error) {
-	atomicTrieDB := prefixdb.New(atomicIndexDBPrefix, db)
-	metadataDB := prefixdb.New(atomicIndexMetaDBPrefix, db)
+) (*atomicTrie, error) {
+	atomicTrieDB := prefixdb.New(atomicTrieDBPrefix, db)
+	metadataDB := prefixdb.New(atomicTrieMetaDBPrefix, db)
 	root, height, err := lastCommittedRootIfExists(metadataDB)
 	if err != nil {
 		return nil, err
@@ -217,7 +217,7 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 
 	// now that all heights < commitHeight have been processed
 	// commit the trie
-	if _, err := a.commit(commitHeight); err != nil {
+	if err := a.commit(commitHeight); err != nil {
 		return err
 	}
 	// commit to underlying versiondb
@@ -248,45 +248,56 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 }
 
 // Index updates the trie with entries in atomicOps
-// A non-empty hash is returned if the trie was committed (the height is divisible by commitInterval)
 // This function updates the following:
 // - heightBytes => trie root hash (if the trie was committed)
 // - lastCommittedBlock => height (if the trie was committed)
-func (a *atomicTrie) Index(height uint64, atomicOps map[ids.ID]*atomic.Requests) (common.Hash, error) {
-	// disallow going backwards
-	if height < a.lastCommittedHeight {
-		return common.Hash{}, fmt.Errorf("height %d must be after last committed height %d", height, a.lastCommittedHeight)
-	}
-
-	// disallow going ahead too far
-	nextCommitHeight := a.lastCommittedHeight + a.commitHeightInterval
-	if height > nextCommitHeight {
-		return common.Hash{}, fmt.Errorf("height %d not within the next commit height %d", height, nextCommitHeight)
+func (a *atomicTrie) Index(height uint64, atomicOps map[ids.ID]*atomic.Requests) error {
+	if err := a.validateIndexHeight(height); err != nil {
+		return err
 	}
 
 	if err := a.updateTrie(height, atomicOps); err != nil {
-		return common.Hash{}, err
+		return err
 	}
 
 	if height%a.commitHeightInterval == 0 {
-		return a.commit(height)
+		err := a.commit(height)
+		return err
 	}
-	return common.Hash{}, nil
+
+	return nil
+}
+
+// validateIndexHeight returns an error if [height] is not currently valid to be indexed.
+func (a *atomicTrie) validateIndexHeight(height uint64) error {
+	// Do not allow a height that we have already passed to be indexed
+	if height < a.lastCommittedHeight {
+		return fmt.Errorf("height %d must be after last committed height %d", height, a.lastCommittedHeight)
+	}
+
+	// Do not allow a height that is more than a commit interval ahead
+	// of the current index
+	nextCommitHeight := a.lastCommittedHeight + a.commitHeightInterval
+	if height > nextCommitHeight {
+		return fmt.Errorf("height %d not within the next commit height %d", height, nextCommitHeight)
+	}
+
+	return nil
 }
 
 // commit calls commit on the trie to generate a root, commits the underlying trieDB, and updates the
-// metadata pointers. assumes that the caller is aware of the commit rules i.e. the height being within
-// commitInterval.
+// metadata pointers.
+// assumes that the caller is aware of the commit rules i.e. the height being within commitInterval.
 // returns the trie root from the commit
-func (a *atomicTrie) commit(height uint64) (common.Hash, error) {
+func (a *atomicTrie) commit(height uint64) error {
 	hash, _, err := a.trie.Commit(nil)
 	if err != nil {
-		return common.Hash{}, err
+		return err
 	}
 
 	a.log.Info("committed atomic trie", "hash", hash.String(), "height", height)
 	if err := a.trieDB.Commit(hash, false, nil); err != nil {
-		return common.Hash{}, err
+		return err
 	}
 
 	// all good here, update the heightBytes
@@ -295,17 +306,17 @@ func (a *atomicTrie) commit(height uint64) (common.Hash, error) {
 
 	// now save the trie hash against the height it was committed at
 	if err := a.metadataDB.Put(heightBytes, hash[:]); err != nil {
-		return common.Hash{}, err
+		return err
 	}
 
 	// update lastCommittedKey with the current height
 	if err := a.metadataDB.Put(lastCommittedKey, heightBytes); err != nil {
-		return common.Hash{}, err
+		return err
 	}
 
 	a.lastCommittedHash = hash
 	a.lastCommittedHeight = height
-	return hash, nil
+	return nil
 }
 
 func (a *atomicTrie) updateTrie(height uint64, atomicOps map[ids.ID]*atomic.Requests) error {

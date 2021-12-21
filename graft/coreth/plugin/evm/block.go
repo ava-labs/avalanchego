@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
@@ -120,7 +121,7 @@ func (b *Block) Accept() error {
 	}
 
 	if len(b.atomicTxs) == 0 {
-		if _, err := b.vm.atomicTrie.Index(b.Height(), nil); err != nil {
+		if err := b.vm.atomicTrie.Index(b.Height(), nil); err != nil {
 			return err
 		}
 		return vm.db.Commit()
@@ -147,7 +148,7 @@ func (b *Block) Accept() error {
 		return vm.db.Commit()
 	}
 
-	if _, err := b.vm.atomicTrie.Index(b.Height(), batchChainsAndInputs); err != nil {
+	if err := b.vm.atomicTrie.Index(b.Height(), batchChainsAndInputs); err != nil {
 		return err
 	}
 	batch, err := vm.db.CommitBatch()
@@ -155,6 +156,21 @@ func (b *Block) Accept() error {
 		return fmt.Errorf("failed to create commit batch due to: %w", err)
 	}
 	return vm.ctx.SharedMemory.Apply(batchChainsAndInputs, batch)
+}
+
+// indexAtomics writes given list of atomic transactions and atomic operations to atomic repository
+// and atomic trie respectively
+func (b *Block) indexAtomics(vm *VM, height uint64, atomicTxs []*Tx, batchChainsAndInputs map[ids.ID]*atomic.Requests) error {
+	// Update indexes the vm maintains on accepted atomic txs.
+	if err := vm.atomicTxRepository.Write(height, atomicTxs); err != nil {
+		return err
+	}
+
+	if err := b.vm.atomicTrie.Index(height, batchChainsAndInputs); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Reject implements the snowman.Block interface

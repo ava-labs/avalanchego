@@ -1,16 +1,10 @@
-// (c) 2020-2021, Ava Labs, Inc.
+// (c) 2020-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package evm
 
 import (
-	"fmt"
 	"testing"
-	"time"
-
-	"github.com/ethereum/go-ethereum/rlp"
-
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -33,77 +27,143 @@ func (tx *Tx) mustAtomicOps() map[ids.ID]*atomic.Requests {
 }
 
 func TestNearestCommitHeight(t *testing.T) {
-	blockNumber := uint64(7029687)
-	height := nearestCommitHeight(blockNumber, 4096)
-	assert.Less(t, uint64(7028736), height+4096)
-}
+	type test struct {
+		height, commitInterval, expectedCommitHeight uint64
+	}
 
-func TestAtomicTrieInitializeGenesis(t *testing.T) {
-	lastAcceptedHeight := uint64(0)
-	db := versiondb.New(memdb.New())
-	repo, err := NewAtomicTxRepository(db, testTxCodec(), lastAcceptedHeight)
-	assert.NoError(t, err)
-	tx := testDataImportTx()
-	err = repo.Write(0, []*Tx{tx})
-	assert.NoError(t, err)
-
-	atomicTrie, err := newAtomicTrie(db, repo, testTxCodec(), lastAcceptedHeight, 10 /*commitHeightInterval*/)
-	assert.NoError(t, err)
-
-	_, num := atomicTrie.LastCommitted()
-	assert.NoError(t, err)
-	assert.EqualValues(t, 0, num)
-}
-
-func TestAtomicTrieInitializeGenesisPlusOne(t *testing.T) {
-	lastAcceptedHeight := uint64(1)
-	db := versiondb.New(memdb.New())
-	repo, err := NewAtomicTxRepository(db, testTxCodec(), lastAcceptedHeight)
-	assert.NoError(t, err)
-	err = repo.Write(0, []*Tx{testDataImportTx()})
-	assert.NoError(t, err)
-	err = repo.Write(1, []*Tx{testDataImportTx()})
-	assert.NoError(t, err)
-
-	atomicTrie, err := newAtomicTrie(db, repo, testTxCodec(), lastAcceptedHeight, 10 /*commitHeightInterval*/)
-	assert.NoError(t, err)
-
-	_, num := atomicTrie.LastCommitted()
-	assert.NoError(t, err)
-	assert.EqualValues(t, 0, num, "expected %d was %d", 0, num)
+	for _, test := range []test{
+		{
+			height:               4500,
+			commitInterval:       4096,
+			expectedCommitHeight: 4096,
+		},
+		{
+			height:               8500,
+			commitInterval:       4096,
+			expectedCommitHeight: 8192,
+		},
+		{
+			height:               950,
+			commitInterval:       100,
+			expectedCommitHeight: 900,
+		},
+	} {
+		commitHeight := nearestCommitHeight(test.height, test.commitInterval)
+		assert.Equal(t, commitHeight, test.expectedCommitHeight)
+	}
 }
 
 func TestAtomicTrieInitialize(t *testing.T) {
-	lastAcceptedHeight := uint64(1000)
+	type test struct {
+		commitInterval, lastAcceptedHeight, expectedCommitHeight uint64
+		numTxsPerBlock                                           int
+	}
+	for name, test := range map[string]test{
+		"genesis": {
+			commitInterval:       10,
+			lastAcceptedHeight:   0,
+			expectedCommitHeight: 0,
+			numTxsPerBlock:       0,
+		},
+		"before first commit": {
+			commitInterval:       10,
+			lastAcceptedHeight:   5,
+			expectedCommitHeight: 0,
+			numTxsPerBlock:       3,
+		},
+		"first commit": {
+			commitInterval:       10,
+			lastAcceptedHeight:   10,
+			expectedCommitHeight: 10,
+			numTxsPerBlock:       3,
+		},
+		"past first commit": {
+			commitInterval:       10,
+			lastAcceptedHeight:   15,
+			expectedCommitHeight: 10,
+			numTxsPerBlock:       3,
+		},
+		"many existing commits": {
+			commitInterval:       10,
+			lastAcceptedHeight:   1000,
+			expectedCommitHeight: 1000,
+			numTxsPerBlock:       3,
+		},
+		"many existing commits plus 1": {
+			commitInterval:       10,
+			lastAcceptedHeight:   1001,
+			expectedCommitHeight: 1000,
+			numTxsPerBlock:       3,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			db := versiondb.New(memdb.New())
+			codec := testTxCodec()
+			repo, err := NewAtomicTxRepository(db, codec, test.lastAcceptedHeight)
+			if err != nil {
+				t.Fatal(err)
+			}
+			operationsMap := make(map[uint64]map[ids.ID]*atomic.Requests)
+			writeTxs(t, repo, 0, test.lastAcceptedHeight, test.numTxsPerBlock, nil, operationsMap)
+
+			// Construct the atomic trie for the first time
+			atomicTrie1, err := newAtomicTrie(db, repo, codec, test.lastAcceptedHeight, test.commitInterval)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rootHash1, commitHeight1 := atomicTrie1.LastCommitted()
+			assert.EqualValues(t, test.expectedCommitHeight, commitHeight1)
+			if test.expectedCommitHeight != 0 {
+				assert.NotEqual(t, common.Hash{}, rootHash1)
+			}
+
+			// Verify the operations are as expected
+			verifyOperations(t, atomicTrie1, codec, rootHash1, operationsMap, int(test.expectedCommitHeight)*test.numTxsPerBlock)
+
+			freshDB := versiondb.New(memdb.New())
+			// Construct the atomic trie a second time and ensure that it produces the same hash
+			atomicTrie2, err := newAtomicTrie(freshDB, repo, codec, test.lastAcceptedHeight, test.commitInterval)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rootHash2, commitHeight2 := atomicTrie2.LastCommitted()
+			assert.EqualValues(t, commitHeight1, commitHeight2)
+			assert.EqualValues(t, rootHash1, rootHash2)
+		})
+	}
+}
+
+func TestIndexerInitializesOnlyOnce(t *testing.T) {
+	lastAcceptedHeight := uint64(25)
 	db := versiondb.New(memdb.New())
-	repo, err := NewAtomicTxRepository(db, testTxCodec(), lastAcceptedHeight)
+	codec := testTxCodec()
+	repo, err := NewAtomicTxRepository(db, codec, lastAcceptedHeight)
 	assert.NoError(t, err)
-	// create state
-	for i := uint64(0); i <= lastAcceptedHeight; i++ {
-		err := repo.Write(i, []*Tx{testDataExportTx()})
-		assert.NoError(t, err)
-	}
+	operationsMap := make(map[uint64]map[ids.ID]*atomic.Requests)
+	writeTxs(t, repo, 0, lastAcceptedHeight+1, 2, nil, operationsMap)
 
-	atomicTrie, err := newAtomicTrie(db, repo, testTxCodec(), lastAcceptedHeight, 10 /*commitHeightInterval*/)
+	// Initialize atomic repository
+	atomicTrie, err := newAtomicTrie(db, repo, codec, lastAcceptedHeight, 10 /*commitHeightInterval*/)
 	assert.NoError(t, err)
 
-	lastCommittedHash, lastCommittedHeight := atomicTrie.LastCommitted()
-	assert.NoError(t, err)
-	assert.NotEqual(t, common.Hash{}, lastCommittedHash)
-	assert.EqualValues(t, 1000, lastCommittedHeight, "expected %d but was %d", 1000, lastCommittedHeight)
+	hash, height := atomicTrie.LastCommitted()
+	assert.NotEqual(t, common.Hash{}, hash)
+	assert.Equal(t, uint64(20), height)
 
-	atomicTrie, err = NewAtomicTrie(db, repo, testTxCodec(), lastAcceptedHeight)
+	// We write another tx at a height below the last committed height in the repo and then
+	// re-initialize the atomic trie since initialize is not supposed to run again the height
+	// at the trie should still be the old height with the old commit hash without any changes.
+	// This scenario is not realistic, but is used to test potential double initialization behavior.
+	err = repo.Write(15, []*Tx{testDataExportTx()})
 	assert.NoError(t, err)
-	it, err := atomicTrie.Iterator(lastCommittedHash, 0)
+
+	// Re-initialize the atomic trie
+	atomicTrie, err = newAtomicTrie(db, repo, codec, lastAcceptedHeight, 10 /*commitHeightInterval*/)
 	assert.NoError(t, err)
-	entriesIterated := uint64(0)
-	for it.Next() {
-		assert.NotNil(t, it.AtomicOps())
-		assert.NoError(t, it.Error())
-		entriesIterated++
-	}
-	assert.NoError(t, it.Error())
-	assert.EqualValues(t, 1001, entriesIterated, "expected %d was %d", 1001, entriesIterated)
+
+	newHash, newHeight := atomicTrie.LastCommitted()
+	assert.Equal(t, height, newHeight, "height should not have changed")
+	assert.Equal(t, hash, newHash, "hash should be the same")
 }
 
 func newTestAtomicTrieIndexer(t *testing.T) types.AtomicTrie {
@@ -117,7 +177,7 @@ func newTestAtomicTrieIndexer(t *testing.T) types.AtomicTrie {
 }
 
 func TestIndexerWriteAndRead(t *testing.T) {
-	indexer := newTestAtomicTrieIndexer(t)
+	atomicTrie := newTestAtomicTrieIndexer(t)
 
 	blockRootMap := make(map[uint64]common.Hash)
 	lastCommittedBlockHeight := uint64(0)
@@ -126,10 +186,10 @@ func TestIndexerWriteAndRead(t *testing.T) {
 	// process 205 blocks so that we get three commits (0, 100, 200)
 	for height := uint64(0); height <= testCommitInterval*2+5; /*=205*/ height++ {
 		atomicRequests := testDataImportTx().mustAtomicOps()
-		_, err := indexer.Index(height, atomicRequests)
+		err := atomicTrie.Index(height, atomicRequests)
 		assert.NoError(t, err)
 		if height%testCommitInterval == 0 {
-			lastCommittedBlockHash, lastCommittedBlockHeight = indexer.LastCommitted()
+			lastCommittedBlockHash, lastCommittedBlockHeight = atomicTrie.LastCommitted()
 			assert.NoError(t, err)
 			assert.NotEqual(t, common.Hash{}, lastCommittedBlockHash)
 			blockRootMap[lastCommittedBlockHeight] = lastCommittedBlockHash
@@ -139,258 +199,40 @@ func TestIndexerWriteAndRead(t *testing.T) {
 	// ensure we have 3 roots
 	assert.Len(t, blockRootMap, 3)
 
-	hash, height := indexer.LastCommitted()
+	hash, height := atomicTrie.LastCommitted()
 	assert.EqualValues(t, lastCommittedBlockHeight, height, "expected %d was %d", 200, lastCommittedBlockHeight)
 	assert.Equal(t, lastCommittedBlockHash, hash)
 
-	// verify all roots are there
+	// Verify that [atomicTrie] can access each of the expected roots
 	for height, hash := range blockRootMap {
-		root, err := indexer.Root(height)
+		root, err := atomicTrie.Root(height)
 		assert.NoError(t, err)
 		assert.Equal(t, hash, root)
 	}
 
-	// ensure Index does not accept blocks older than last committed height
-	_, err := indexer.Index(10, testDataExportTx().mustAtomicOps())
+	// Ensure that Index refuses to accept blocks older than the last committed height
+	err := atomicTrie.Index(10, testDataExportTx().mustAtomicOps())
 	assert.Error(t, err)
 	assert.Equal(t, "height 10 must be after last committed height 200", err.Error())
 
-	// ensure Index does not accept blocks beyond next committed height
+	// Ensure Index does not accept blocks beyond the next commit interval
 	nextCommitHeight := lastCommittedBlockHeight + testCommitInterval + 1 // =301
-	_, err = indexer.Index(nextCommitHeight, testDataExportTx().mustAtomicOps())
+	err = atomicTrie.Index(nextCommitHeight, testDataExportTx().mustAtomicOps())
 	assert.Error(t, err)
 	assert.Equal(t, "height 301 not within the next commit height 300", err.Error())
-}
-
-func TestIndexerInitializeFromState(t *testing.T) {
-	db := versiondb.New(memdb.New())
-	repo, err := NewAtomicTxRepository(db, testTxCodec(), 0)
-	assert.NoError(t, err)
-
-	lastAcceptedHeight := uint64(1000)
-	actualOpsMap := make(map[uint64]map[ids.ID]*atomic.Requests)
-	for height := uint64(0); height < lastAcceptedHeight; height++ {
-		// 3 transactions per height
-		txs := []*Tx{testDataImportTx(), testDataExportTx(), testDataImportTx()}
-		actualOpsMap[height], err = mergeAtomicOps(txs)
-		assert.NoError(t, err)
-		err = repo.Write(height, txs)
-		assert.NoError(t, err)
-	}
-
-	indexer, err := newAtomicTrie(db, repo, testTxCodec(), lastAcceptedHeight, 100)
-	assert.NoError(t, err)
-	assert.NotNil(t, indexer)
-
-	hash, height := indexer.LastCommitted()
-	assert.Equal(t, lastAcceptedHeight, height)
-	assert.NotEqual(t, common.Hash{}, hash)
-
-	atomicIter, err := indexer.Iterator(hash, 0)
-	assert.NoError(t, err)
-	opsCount := 0
-	for atomicIter.Next() {
-		chainOps := actualOpsMap[atomicIter.BlockNumber()][atomicIter.BlockchainID()]
-		putRequests := atomicIter.AtomicOps().PutRequests
-		removeRequests := atomicIter.AtomicOps().RemoveRequests
-
-		assert.Equal(t, chainOps.PutRequests, putRequests)
-		assert.Equal(t, chainOps.RemoveRequests, removeRequests)
-		opsCount++
-	}
-	assert.Equal(t, 3000, opsCount)
-}
-
-func BenchmarkEncodeDecode(b *testing.B) {
-	codec := testTxCodec()
-	tx := testDataImportTx()
-	_, requests, err := tx.AtomicOps()
-	assert.NoError(b, err)
-
-	rlpAtomicBytes, err := rlp.EncodeToBytes(requests)
-	assert.NoError(b, err)
-	assert.Greater(b, len(rlpAtomicBytes), 1)
-
-	codecAtomicBytes, err := codec.Marshal(codecVersion, requests)
-	assert.NoError(b, err)
-	assert.Greater(b, len(codecAtomicBytes), 1)
-
-	fmt.Printf("rlpLen: %d, codecLen: %d\n", len(rlpAtomicBytes), len(codecAtomicBytes))
-
-	b.ReportAllocs()
-	b.ResetTimer()
-	benchmarks := []struct {
-		name string
-		fn   func()
-	}{
-		{
-			name: "RLP encode",
-			fn: func() {
-				_, _ = rlp.EncodeToBytes(requests)
-			},
-		}, {
-			name: "RLP decode",
-			fn: func() {
-				var decode atomic.Requests
-				_ = rlp.DecodeBytes(rlpAtomicBytes, &decode)
-			},
-		}, {
-			name: "codec encode",
-			fn: func() {
-				_, _ = codec.Marshal(codecVersion, requests)
-			},
-		}, {
-			name: "codec decode",
-			fn: func() {
-				var decode atomic.Requests
-				_, _ = codec.Unmarshal(codecAtomicBytes, &decode)
-			},
-		},
-	}
-	for _, bm := range benchmarks {
-		b.Run(bm.name, func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				bm.fn()
-			}
-		})
-	}
-}
-
-func TestAtomicRequestEncodeDecode(t *testing.T) {
-	tx := testDataImportTx()
-	_, requests, err := tx.AtomicOps()
-	assert.NoError(t, err)
-
-	// encode decode using RLP
-	start := time.Now()
-	rlpBytes, err := rlp.EncodeToBytes(*requests)
-	fmt.Println("rlp encode duration", time.Since(start))
-	assert.NoError(t, err)
-	assert.Greater(t, len(rlpBytes), 1)
-	fmt.Println("rlpLen", len(rlpBytes))
-
-	var rlpDecodedRequests atomic.Requests
-	start = time.Now()
-	err = rlp.DecodeBytes(rlpBytes, &rlpDecodedRequests)
-	fmt.Println("rlp decode duration", time.Since(start))
-	assert.NoError(t, err)
-	assert.Equal(t, requests.PutRequests, rlpDecodedRequests.PutRequests)
-	assert.Equal(t, requests.RemoveRequests, rlpDecodedRequests.RemoveRequests)
-
-	// encode decode using codec
-	//atomicReqs := newAtomicRequests(requests)
-	atomicReqs := requests
-	codec := testTxCodec()
-	start = time.Now()
-	codecBytes, err := codec.Marshal(codecVersion, atomicReqs)
-	fmt.Println("codec encode duration", time.Since(start))
-	assert.NoError(t, err)
-	assert.Greater(t, len(codecBytes), 1)
-
-	fmt.Println("codecLen", len(codecBytes))
-
-	var codecDecodedRequests atomic.Requests
-	start = time.Now()
-	_, err = codec.Unmarshal(codecBytes, &codecDecodedRequests)
-	fmt.Println("codec decode duration", time.Since(start))
-	assert.NoError(t, err)
-	assert.Equal(t, atomicReqs.PutRequests, codecDecodedRequests.PutRequests)
-	assert.Equal(t, atomicReqs.RemoveRequests, codecDecodedRequests.RemoveRequests)
-}
-
-func TestIndexerInitializesOnlyOnce(t *testing.T) {
-	lastAcceptedHeight := uint64(100)
-	db := versiondb.New(memdb.New())
-	repo, err := NewAtomicTxRepository(db, testTxCodec(), lastAcceptedHeight)
-	assert.NoError(t, err)
-	for i := uint64(0); i < lastAcceptedHeight; i++ {
-		err := repo.Write(i, []*Tx{testDataImportTx(), testDataExportTx()})
-		assert.NoError(t, err)
-	}
-
-	// initialize atomic repository
-	indexer, err := newAtomicTrie(db, repo, testTxCodec(), lastAcceptedHeight, 90 /*commitHeightInterval*/)
-	assert.NoError(t, err)
-
-	hash, height := indexer.LastCommitted()
-	assert.NoError(t, err)
-	assert.NotEqual(t, common.Hash{}, hash)
-	assert.Equal(t, uint64(90), height)
-
-	// the following scenario is not realistic but is there to test double initialize behaviour
-	err = repo.Write(101, []*Tx{testDataExportTx()})
-	assert.NoError(t, err)
-
-	// we wrote another tx at new height in the repo and we then re-initialise the atomic trie
-	// since initialize is not supposed to run again the height at the trie will still be the
-	// old height with the old commit hash without any changes
-
-	// initialize atomic indexer again
-	indexer, err = newAtomicTrie(db, repo, testTxCodec(), lastAcceptedHeight, 90 /*commitHeightInterval*/)
-	assert.NoError(t, err)
-
-	newHash, height := indexer.LastCommitted()
-	assert.NoError(t, err)
-	assert.Equal(t, uint64(90), height, "height should not have changed")
-	assert.Equal(t, hash, newHash, "hash should be the same")
-}
-
-func TestAtomicTrieInitializeProducesSameHashEveryTime(t *testing.T) {
-	t.Parallel()
-	lastAcceptedHeight := uint64(1000)
-	db := versiondb.New(memdb.New())
-	repo, err := NewAtomicTxRepository(db, testTxCodec(), lastAcceptedHeight)
-	assert.NoError(t, err)
-	txsPerHeight := 30
-	for i := uint64(0); i < lastAcceptedHeight; i++ {
-		txs := make([]*Tx, txsPerHeight)
-		for j := 0; j+1 < txsPerHeight; j += 2 {
-			txs[j] = testDataExportTx()
-			txs[j+1] = testDataImportTx()
-		}
-		err := repo.Write(i, txs)
-		assert.NoError(t, err)
-	}
-
-	// initialize atomic repository
-	indexer, err := newAtomicTrie(db, repo, testTxCodec(), lastAcceptedHeight, 90 /*commitHeightInterval*/)
-	assert.NoError(t, err)
-
-	expectedCommitHeight := nearestCommitHeight(lastAcceptedHeight, 90)
-	hash, indexerHeight := indexer.LastCommitted()
-	assert.NoError(t, err)
-	assert.NotEqual(t, common.Hash{}, hash)
-	assert.Equal(t, expectedCommitHeight, indexerHeight)
-
-	// we create another atomic trie, intializing it with the same dataset
-	initializeRuns := 50
-	for i := 0; i < initializeRuns; i++ {
-		// initialize atomic indexer again
-		indexer, err = newAtomicTrie(versiondb.New(memdb.New()), repo, testTxCodec(), lastAcceptedHeight, 90 /*commitHeightInterval*/)
-		assert.NoError(t, err)
-		// expects heights and hashes to be exactly the same
-		newHash, indexerHeight := indexer.LastCommitted()
-		assert.NoError(t, err)
-		assert.Equal(t, expectedCommitHeight, indexerHeight, "height should not have changed")
-		assert.Equal(t, hash, newHash, "hash should be the same")
-	}
 }
 
 func BenchmarkAtomicTrieInit(b *testing.B) {
 	db := versiondb.New(memdb.New())
 	codec := testTxCodec()
 
-	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
-	txMap := make(map[uint64][]*Tx)
+	operationsMap := make(map[uint64]map[ids.ID]*atomic.Requests)
 
 	lastAcceptedHeight := uint64(25000)
 	// add 25000 * 3 = 75000 transactions
-	addTxs(b, codec, acceptedAtomicTxDB, 0, lastAcceptedHeight, 3, txMap)
-	err := db.Commit()
-	assert.NoError(b, err)
-
 	repo, err := NewAtomicTxRepository(db, codec, lastAcceptedHeight)
 	assert.NoError(b, err)
+	writeTxs(b, repo, 0, 25000, 3, nil, operationsMap)
 
 	var atomicTrie types.AtomicTrie
 	var hash common.Hash
@@ -398,7 +240,7 @@ func BenchmarkAtomicTrieInit(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		atomicTrie, err = newAtomicTrie(versiondb.New(memdb.New()), repo, codec, lastAcceptedHeight, 5000)
+		atomicTrie, err = newAtomicTrie(db, repo, codec, lastAcceptedHeight, 5000)
 		assert.NoError(b, err)
 
 		hash, height = atomicTrie.LastCommitted()
@@ -407,12 +249,8 @@ func BenchmarkAtomicTrieInit(b *testing.B) {
 	}
 	b.StopTimer()
 
-	// verify ops
-	it, err := atomicTrie.Iterator(hash, 0)
-	assert.NoError(b, err)
-	ops := 0
-	for it.Next() {
-		ops++
-	}
-	assert.Equal(b, 75000, ops)
+	// Verify operations
+	verifyOperations(b, atomicTrie, codec, hash, operationsMap, 75000)
 }
+
+// TODO add bonus block test

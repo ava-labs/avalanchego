@@ -20,7 +20,7 @@ type AtomicTrie interface {
 	// Returns an optional root hash
 	// A non-empty root hash is returned when the atomic trie has been committed
 	// Atomic trie is committed if the block height is multiple of commit interval
-	Index(height uint64, atomicOps map[ids.ID]*atomic.Requests) (common.Hash, error)
+	Index(height uint64, atomicOps map[ids.ID]*atomic.Requests) error
 
 	// Iterator returns an AtomicTrieIterator to iterate the trie at the given
 	// root hash

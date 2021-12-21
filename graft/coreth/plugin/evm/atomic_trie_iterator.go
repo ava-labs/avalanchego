@@ -41,55 +41,56 @@ func (a *atomicTrieIterator) Error() error {
 
 // Next returns whether there are more nodes to iterate over
 // On success, this function sets the blockNumber and atomicOps fields
-// In case of an error during this iteration, it sets err and resets the above fields
+// In case of an error during this iteration, it sets the error value and resets the above fields.
+// It is the responsibility of the caller to check the result of Error() after an iterator reports
+// having no more elements to iterate.
 func (a *atomicTrieIterator) Next() bool {
 	hasNext := a.trieIterator.Next()
 
 	err := a.trieIterator.Err
-	switch {
-	case err == nil && hasNext:
-		// if the underlying iterator has data to iterate over, parse and set the fields
-		// key is [blockNumberBytes]+[blockchainIDBytes] = 8+32=40 bytes
-		keyLen := len(a.trieIterator.Key)
-		if keyLen != atomicTrieKeyLen {
-			// unexpected key length
-			// set the error and stop the iteration as data is unreliable from this point
-			a.err = fmt.Errorf("expected atomic trie key length to be %d but was %d", atomicTrieKeyLen, keyLen)
-			a.resetFields()
-			return hasNext
-		}
 
-		blockNumber := binary.BigEndian.Uint64(a.trieIterator.Key[:wrappers.LongLen])
-		blockchainID, err := ids.ToID(a.trieIterator.Key[wrappers.LongLen:])
-		if err != nil {
-			a.err = err
-			a.resetFields()
-			return hasNext
-		}
-
-		// value is RLP encoded atomic.Requests
-		var requests atomic.Requests
-		if _, err = a.codec.Unmarshal(a.trieIterator.Value, &requests); err != nil {
-			a.err = err
-			a.resetFields()
-			return hasNext
-		}
-
-		// success, update the struct fields
-		a.blockNumber = blockNumber
-		a.blockchainID = blockchainID
-		a.atomicOps = &requests
-	case err != nil:
-		a.err = err
-		fallthrough
-	default:
-		a.resetFields()
+	if err != nil {
+		a.resetFields(err)
+		return false
+	}
+	if !hasNext {
+		a.resetFields(nil)
+		return false
 	}
 
-	return hasNext
+	// if the underlying iterator has data to iterate over, parse and set the fields
+	// key is [blockNumberBytes]+[blockchainIDBytes] = 8+32=40 bytes
+	keyLen := len(a.trieIterator.Key)
+	// If the key has an unexpected length, set the error and stop the iteration since the data is
+	// no longer reliable.
+	if keyLen != atomicTrieKeyLen {
+		a.resetFields(fmt.Errorf("expected atomic trie key length to be %d but was %d", atomicTrieKeyLen, keyLen))
+		return false
+	}
+
+	blockNumber := binary.BigEndian.Uint64(a.trieIterator.Key[:wrappers.LongLen])
+	blockchainID, err := ids.ToID(a.trieIterator.Key[wrappers.LongLen:])
+	if err != nil {
+		a.resetFields(err)
+		return false
+	}
+
+	// The value in the iterator should be the atomic requests serialized the the codec.
+	requests := new(atomic.Requests)
+	if _, err = a.codec.Unmarshal(a.trieIterator.Value, requests); err != nil {
+		a.resetFields(err)
+		return false
+	}
+
+	// Success, update the struct fields
+	a.blockNumber = blockNumber
+	a.blockchainID = blockchainID
+	a.atomicOps = requests
+	return true
 }
 
-func (a *atomicTrieIterator) resetFields() {
+func (a *atomicTrieIterator) resetFields(err error) {
+	a.err = err
 	a.blockNumber = 0
 	a.blockchainID = ids.ID{}
 	a.atomicOps = nil
