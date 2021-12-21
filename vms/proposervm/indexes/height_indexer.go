@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 )
 
-const commitSizeCap = 1 * units.MiB
+const defaultCommitSizeCap = 1 * units.MiB
 
 var _ HeightIndexer = &heightIndexer{}
 
@@ -39,11 +39,12 @@ func newHeightIndexer(srv BlockServer,
 	shutdownChan chan struct{},
 	shutdownWg *sync.WaitGroup) *heightIndexer {
 	res := &heightIndexer{
-		server:       srv,
-		log:          log,
-		shutdownChan: shutdownChan,
-		shutdownWg:   shutdownWg,
-		indexState:   indexState,
+		server:        srv,
+		log:           log,
+		shutdownChan:  shutdownChan,
+		shutdownWg:    shutdownWg,
+		indexState:    indexState,
+		commitMaxSize: defaultCommitSizeCap,
 	}
 
 	return res
@@ -57,6 +58,8 @@ type heightIndexer struct {
 
 	jobDone    utils.AtomicBool
 	indexState state.HeightIndex
+
+	commitMaxSize int
 }
 
 func (hi *heightIndexer) IsRepaired() bool {
@@ -190,7 +193,7 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 				return hi.closeIndexer(currentAcceptedBlk)
 			default:
 				// go ahead with index repairing
-				hi.log.Info("Block indexing by height: ongoing. Processing %v, height %d",
+				hi.log.Debug("Block indexing by height: ongoing. Processing %v, height %d",
 					currentAcceptedBlk.ID(), currentAcceptedBlk.Height())
 			}
 
@@ -240,8 +243,8 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 
 		case database.ErrNotFound:
 			// Let's keep memory footprint under control by committing when a size threshold is reached
-			if pendingBytesApproximation > commitSizeCap {
-				if err := hi.doCheckpoint(currentAcceptedBlk); err != nil {
+			if pendingBytesApproximation > hi.commitMaxSize {
+				if err := hi.doCheckpointAndCommit(currentAcceptedBlk); err != nil {
 					return err
 				}
 				hi.log.Info("Block indexing by height: ongoing. Indexed %d blocks, latest committed height %d, committed %d bytes",
@@ -273,7 +276,7 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 	}
 }
 
-func (hi *heightIndexer) doCheckpoint(currentProBlk WrappingBlock) error {
+func (hi *heightIndexer) doCheckpointAndCommit(currentProBlk WrappingBlock) error {
 	// checkpoint is current block's parent, it if exists
 	var checkpoint ids.ID
 	parentBlkID := currentProBlk.Parent()
@@ -303,7 +306,7 @@ func (hi *heightIndexer) doCheckpoint(currentProBlk WrappingBlock) error {
 
 func (hi *heightIndexer) closeIndexer(currentProBlk WrappingBlock) error {
 	hi.log.Info("Block indexing by height shutdown: Started.")
-	if err := hi.doCheckpoint(currentProBlk); err != nil {
+	if err := hi.doCheckpointAndCommit(currentProBlk); err != nil {
 		hi.log.Info("Block indexing by height: shutdown. Failed setting checkpoint %v", err)
 		return err
 	}

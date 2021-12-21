@@ -122,6 +122,7 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 		shutdownCh,
 		&wGroup,
 	)
+	hIndex.commitMaxSize = 0 // commit each block
 
 	// show that height index should be rebuild and it is
 	doRepair, startBlkID, err := hIndex.shouldRepair()
@@ -220,6 +221,7 @@ func TestHeightBlockIndexPreFork(t *testing.T) {
 		shutdownCh,
 		&wGroup,
 	)
+	hIndex.commitMaxSize = 0 // commit each block
 
 	// with preFork only blocks there is nothing to rebuild
 	doRepair, _, err := hIndex.shouldRepair()
@@ -342,6 +344,7 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 		shutdownCh,
 		&wGroup,
 	)
+	hIndex.commitMaxSize = 0 // commit each block
 
 	// show that height index should be rebuild and it is
 	doRepair, startBlkID, err := hIndex.shouldRepair()
@@ -482,6 +485,7 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 		shutdownCh,
 		&wGroup,
 	)
+	hIndex.commitMaxSize = 0 // commit each block
 
 	// with no checkpoints repair starts from last accepted block
 	doRepair, startBlkID, err := hIndex.shouldRepair()
@@ -489,21 +493,36 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 	assert.NoError(err)
 	assert.True(startBlkID == lastProBlk.ID())
 
-	// if an intermediate block is checkpointed, repair will start from it
+	// pick a random block in the chain and checkpoint it;...
 	rndPostForkHeight := rand.Intn(int(blkNumber-forkHeight)) + int(forkHeight) // #nosec G404
+	var checkpointBlk WrappingBlock
 	for _, blk := range proBlks {
 		if blk.Height() != uint64(rndPostForkHeight) {
 			continue // not the blk we are looking for
 		}
 
-		checkpointBlk := blk
+		checkpointBlk = blk
 		assert.NoError(hIndex.indexState.SetCheckpoint(checkpointBlk.ID()))
+		break
+	}
 
-		doRepair, startBlkID, err := hIndex.shouldRepair()
-		assert.True(doRepair)
+	// ...show that repair starts from the checkpoint
+	doRepair, startBlkID, err = hIndex.shouldRepair()
+	assert.True(doRepair)
+	assert.NoError(err)
+	assert.True(startBlkID == checkpointBlk.ID())
+	assert.False(hIndex.IsRepaired())
+
+	// perform repair and show index is built
+	assert.NoError(hIndex.doRepair(startBlkID))
+
+	// check that height index is fully built
+	loadedForkHeight, err := storedState.GetForkHeight()
+	assert.NoError(err)
+	assert.True(loadedForkHeight == forkHeight)
+	for height := forkHeight; height <= checkpointBlk.Height(); height++ {
+		_, err := storedState.GetBlockIDAtHeight(height)
 		assert.NoError(err)
-		assert.True(startBlkID == checkpointBlk.ID())
-		assert.False(hIndex.IsRepaired())
 	}
 }
 
@@ -605,6 +624,7 @@ func TestHeightBlockIndexShutdown(t *testing.T) {
 		shutdownCh,
 		&wGroup,
 	)
+	hIndex.commitMaxSize = 0 // commit each block
 
 	// repair index in ad-hoc goroutine and ...
 	go hIndex.log.RecoverAndPanic(func() {
