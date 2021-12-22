@@ -90,7 +90,6 @@ func (hi *heightIndexer) RepairHeightIndex() error {
 		hi.log.Info("Block indexing by height: already complete. Fork height %d", forkHeight)
 		return nil
 	}
-	hi.log.Info("Block indexing by height starting: success. Retrieved checkpoint %v", startBlkID)
 	return hi.doRepair(startBlkID)
 }
 
@@ -100,11 +99,12 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 	switch checkpointID, err := hi.indexState.GetCheckpoint(); err {
 	case nil:
 		// checkpoint found, repair must be resumed
+		hi.log.Info("Block indexing by height starting: success. Retrieved checkpoint %v", checkpointID)
 		return true, checkpointID, nil
 
 	case database.ErrNotFound:
 		// no checkpoint. Either index is complete or repair was never attempted.
-		break
+		hi.log.Info("Block indexing by height starting: checkpoint not found. Verifying index is complete...")
 
 	default:
 		return true, ids.Empty, err
@@ -123,6 +123,7 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 			return true, ids.Empty, err
 		}
 		hi.jobDone.SetValue(true)
+		hi.log.Info("Block indexing by height starting: Snowman++ fork not reached yet. No need to rebuild index.")
 		return false, ids.Empty, nil
 
 	default:
@@ -144,6 +145,7 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 			return true, ids.Empty, err
 		}
 		hi.jobDone.SetValue(true)
+		hi.log.Info("Block indexing by height starting: Index already complete, nothing to do.")
 		return false, ids.Empty, nil
 
 	case database.ErrNotFound:
@@ -162,6 +164,7 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 		if err := hi.indexState.SetForkHeight(math.MaxUint64); err != nil {
 			return true, ids.Empty, err
 		}
+		hi.log.Info("Block indexing by height starting: index incomplete. Rebuilding from %v", latestProBlkID)
 		return true, latestProBlkID, nil
 
 	default:
