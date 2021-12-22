@@ -15,6 +15,7 @@ type WeightTracker interface {
 	AddWeightForNode(nodeID ids.ShortID) error
 	RemoveWeightForNode(nodeID ids.ShortID) error
 	EnoughConnectedWeight() bool
+	Weight() uint64
 }
 
 func NewWeightTracker(beacons validators.Set, startupAlpha uint64) WeightTracker {
@@ -62,10 +63,12 @@ func (wt *weightTracker) RemoveWeightForNode(nodeID ids.ShortID) error {
 
 		// TODO: shouldn't this be done?
 		if wt.weight < wt.startupAlpha {
-			wt.enoughConnectedWeight = false
+			// TODO: this blocks resuming bootstrapping after fast sync
+			// wt.enoughConnectedWeight = false
 		}
 	}
 	return nil
 }
 
 func (wt *weightTracker) EnoughConnectedWeight() bool { return wt.enoughConnectedWeight }
+func (wt *weightTracker) Weight() uint64              { return wt.weight }

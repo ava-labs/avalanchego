@@ -233,7 +233,7 @@ func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 
 	blocks, err := block.BatchedParseBlock(b.VM, blks)
 	if err != nil { // the provided blocks couldn't be parsed
-		b.Config.Ctx.Log.Debug("failed to parse blocks in MultiPut from %s with ID %d", vdr, requestID)
+		b.Config.Ctx.Log.Debug("failed to parse blocks in MultiPut from %s with ID %d, err: %s", vdr, requestID, err.Error())
 		return b.fetch(wantedBlkID)
 	}
 
@@ -438,17 +438,22 @@ func (b *bootstrapper) finish() error {
 
 // Connected implements the Engine interface.
 func (b *bootstrapper) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
-	if err := b.VM.Connected(nodeID, nodeVersion); err != nil {
-		return err
-	}
+	// TODO: remove this check and replace with a different flow for WeightTracker
+	if nodeID != ids.ShortEmpty {
+		if err := b.VM.Connected(nodeID, nodeVersion); err != nil {
+			return err
+		}
 
-	if err := b.WeightTracker.AddWeightForNode(nodeID); err != nil {
-		return err
+		if err := b.WeightTracker.AddWeightForNode(nodeID); err != nil {
+			return err
+		}
 	}
 
 	if b.WeightTracker.EnoughConnectedWeight() && !b.started {
 		b.started = true
 		return b.Startup()
+	} else {
+		b.Ctx.Log.Info("weight tracker not ready %v %v", b.WeightTracker.EnoughConnectedWeight(), b.started)
 	}
 
 	return nil
