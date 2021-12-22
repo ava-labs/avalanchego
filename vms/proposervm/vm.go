@@ -136,11 +136,12 @@ func (vm *VM) Initialize(
 			vm.ctx.Log.Info("Block indexing by height: repairing height index not started since innerVM index is incomplete.")
 		} else {
 			vm.shutdownWg.Add(1)
-			go ctx.Log.RecoverAndPanic(func() {
+			go func() {
 				if err := vm.HeightIndexer.RepairHeightIndex(); err != nil {
+					vm.ctx.Log.Info("Block indexing by height: failed with error %s", err)
 					panic(err)
 				}
-			})
+			}()
 		}
 	}
 
