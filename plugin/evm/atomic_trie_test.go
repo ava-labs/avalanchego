@@ -117,18 +117,52 @@ func TestAtomicTrieInitialize(t *testing.T) {
 				assert.NotEqual(t, common.Hash{}, rootHash1)
 			}
 
-			// Verify the operations are as expected
-			verifyOperations(t, atomicTrie1, codec, rootHash1, operationsMap, int(test.expectedCommitHeight+1)*test.numTxsPerBlock)
+			// Verify the operations up to the expected commit height
+			verifyOperations(t, atomicTrie1, codec, rootHash1, 0, test.expectedCommitHeight, operationsMap)
 
-			freshDB := versiondb.New(memdb.New())
 			// Construct the atomic trie a second time and ensure that it produces the same hash
-			atomicTrie2, err := newAtomicTrie(freshDB, make(map[uint64]ids.ID), repo, codec, test.lastAcceptedHeight, test.commitInterval)
+			atomicTrie2, err := newAtomicTrie(versiondb.New(memdb.New()), make(map[uint64]ids.ID), repo, codec, test.lastAcceptedHeight, test.commitInterval)
 			if err != nil {
 				t.Fatal(err)
 			}
 			rootHash2, commitHeight2 := atomicTrie2.LastCommitted()
 			assert.EqualValues(t, commitHeight1, commitHeight2)
 			assert.EqualValues(t, rootHash1, rootHash2)
+
+			// We now index additional operations up the next commit interval in order to confirm that nothing
+			// during the initialization phase will cause an invalid root when indexing continues.
+			nextCommitHeight := nearestCommitHeight(test.lastAcceptedHeight+test.commitInterval, test.commitInterval)
+			for i := test.lastAcceptedHeight + 1; i <= nextCommitHeight; i++ {
+				txs := newTestTxs(test.numTxsPerBlock)
+				if err := repo.Write(i, txs); err != nil {
+					t.Fatal(err)
+				}
+
+				atomicOps, err := mergeAtomicOps(txs)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := atomicTrie1.Index(i, atomicOps); err != nil {
+					t.Fatal(err)
+				}
+				operationsMap[i] = atomicOps
+			}
+
+			updatedRoot, updatedLastCommitHeight := atomicTrie1.LastCommitted()
+			assert.EqualValues(t, nextCommitHeight, updatedLastCommitHeight)
+			assert.NotEqual(t, common.Hash{}, updatedRoot)
+
+			// Verify the operations up to the new expected commit height
+			verifyOperations(t, atomicTrie1, codec, updatedRoot, 0, updatedLastCommitHeight, operationsMap)
+
+			// Generate a new atomic trie to compare the root against.
+			atomicTrie3, err := newAtomicTrie(versiondb.New(memdb.New()), make(map[uint64]ids.ID), repo, codec, nextCommitHeight, test.commitInterval)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rootHash3, commitHeight3 := atomicTrie3.LastCommitted()
+			assert.EqualValues(t, rootHash3, updatedRoot)
+			assert.EqualValues(t, updatedLastCommitHeight, commitHeight3)
 		})
 	}
 }
@@ -251,7 +285,7 @@ func TestAtomicTrieSkipsBonusBlocks(t *testing.T) {
 	lastAcceptedHeight := uint64(100)
 	numTxsPerBlock := 3
 	commitInterval := uint64(10)
-	expectedCommitHeight := 100
+	expectedCommitHeight := uint64(100)
 	db := versiondb.New(memdb.New())
 	codec := testTxCodec()
 	repo, err := NewAtomicTxRepository(db, codec, lastAcceptedHeight)
@@ -279,7 +313,7 @@ func TestAtomicTrieSkipsBonusBlocks(t *testing.T) {
 	for height := range bonusBlocks {
 		delete(operationsMap, height)
 	}
-	verifyOperations(t, atomicTrie, codec, rootHash, operationsMap, (expectedCommitHeight-len(bonusBlocks))*numTxsPerBlock)
+	verifyOperations(t, atomicTrie, codec, rootHash, 0, expectedCommitHeight, operationsMap)
 }
 
 func TestIndexingNilShouldNotImpactTrie(t *testing.T) {
@@ -354,8 +388,5 @@ func BenchmarkAtomicTrieInit(b *testing.B) {
 	b.StopTimer()
 
 	// Verify operations
-	verifyOperations(b, atomicTrie, codec, hash, operationsMap, 75000)
+	verifyOperations(b, atomicTrie, codec, hash, 0, lastAcceptedHeight, operationsMap)
 }
-
-// TODO test uncommitted operations are handled correctly
-// TODO test that we do not flush data unnecessarily to disk

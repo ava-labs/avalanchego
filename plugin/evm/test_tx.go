@@ -141,3 +141,12 @@ func newTestTx() *Tx {
 		panic("rng generated unexpected value for tx type")
 	}
 }
+
+func newTestTxs(numTxs int) []*Tx {
+	txs := make([]*Tx, 0, numTxs)
+	for i := 0; i < numTxs; i++ {
+		txs = append(txs, newTestTx())
+	}
+
+	return txs
+}
