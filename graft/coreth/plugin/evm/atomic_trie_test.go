@@ -247,37 +247,6 @@ func TestAtomicOpsAreNotTxOrderDependent(t *testing.T) {
 	assert.Equal(t, root1, root2)
 }
 
-func BenchmarkAtomicTrieInit(b *testing.B) {
-	db := versiondb.New(memdb.New())
-	codec := testTxCodec()
-
-	operationsMap := make(map[uint64]map[ids.ID]*atomic.Requests)
-
-	lastAcceptedHeight := uint64(25000)
-	// add 25000 * 3 = 75000 transactions
-	repo, err := NewAtomicTxRepository(db, codec, lastAcceptedHeight)
-	assert.NoError(b, err)
-	writeTxs(b, repo, 0, 25000, 3, nil, operationsMap)
-
-	var atomicTrie types.AtomicTrie
-	var hash common.Hash
-	var height uint64
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		atomicTrie, err = newAtomicTrie(db, make(map[uint64]ids.ID), repo, codec, lastAcceptedHeight, 5000)
-		assert.NoError(b, err)
-
-		hash, height = atomicTrie.LastCommitted()
-		assert.Equal(b, lastAcceptedHeight, height)
-		assert.NotEqual(b, common.Hash{}, hash)
-	}
-	b.StopTimer()
-
-	// Verify operations
-	verifyOperations(b, atomicTrie, codec, hash, operationsMap, 75000)
-}
-
 func TestAtomicTrieSkipsBonusBlocks(t *testing.T) {
 	lastAcceptedHeight := uint64(100)
 	numTxsPerBlock := 3
@@ -355,6 +324,37 @@ func TestIndexingNilShouldNotImpactTrie(t *testing.T) {
 
 	// key assertion of the test
 	assert.Equal(t, root1, root2)
+}
+
+func BenchmarkAtomicTrieInit(b *testing.B) {
+	db := versiondb.New(memdb.New())
+	codec := testTxCodec()
+
+	operationsMap := make(map[uint64]map[ids.ID]*atomic.Requests)
+
+	lastAcceptedHeight := uint64(25000)
+	// add 25000 * 3 = 75000 transactions
+	repo, err := NewAtomicTxRepository(db, codec, lastAcceptedHeight)
+	assert.NoError(b, err)
+	writeTxs(b, repo, 0, 25000, 3, nil, operationsMap)
+
+	var atomicTrie types.AtomicTrie
+	var hash common.Hash
+	var height uint64
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		atomicTrie, err = newAtomicTrie(db, make(map[uint64]ids.ID), repo, codec, lastAcceptedHeight, 5000)
+		assert.NoError(b, err)
+
+		hash, height = atomicTrie.LastCommitted()
+		assert.Equal(b, lastAcceptedHeight, height)
+		assert.NotEqual(b, common.Hash{}, hash)
+	}
+	b.StopTimer()
+
+	// Verify operations
+	verifyOperations(b, atomicTrie, codec, hash, operationsMap, 75000)
 }
 
 // TODO test uncommitted operations are handled correctly
