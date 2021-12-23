@@ -47,10 +47,8 @@ func (a *atomicTrieIterator) Error() error {
 func (a *atomicTrieIterator) Next() bool {
 	hasNext := a.trieIterator.Next()
 
-	err := a.trieIterator.Err
-
-	if err != nil {
-		a.resetFields(err)
+	if a.trieIterator.Err != nil {
+		a.resetFields(a.trieIterator.Err)
 		return false
 	}
 	if !hasNext {
@@ -89,6 +87,7 @@ func (a *atomicTrieIterator) Next() bool {
 	return true
 }
 
+// resetFields resets the value fields of the iterator to their nil values and sets the error value to [err].
 func (a *atomicTrieIterator) resetFields(err error) {
 	a.err = err
 	a.blockNumber = 0
