@@ -4,7 +4,8 @@
 package corruptabledb
 
 import (
-	"sync/atomic"
+	"fmt"
+	"sync"
 
 	"github.com/ava-labs/avalanchego/database"
 )
@@ -18,10 +19,12 @@ var (
 // it prevents any future calls in case of a corruption occurs
 type Database struct {
 	database.Database
-	// 1 if there was previously an error other than "not found" or "closed"
-	// while performing a db operation. If [errored] == 1, Has, Get, Put,
-	// Delete and batch writes fail with ErrAvoidCorruption.
-	errored uint64
+
+	// initialError stores the error other than "not found" or "closed" while
+	// performing a db operation. If not nil, Has, Get, Put, Delete and batch
+	// writes will fail with initialError.
+	errorLock    sync.RWMutex
+	initialError error
 }
 
 // New returns a new prefixed database
@@ -31,8 +34,8 @@ func New(db database.Database) *Database {
 
 // Has returns if the key is set in the database
 func (db *Database) Has(key []byte) (bool, error) {
-	if db.corrupted() {
-		return false, database.ErrAvoidCorruption
+	if err := db.corrupted(); err != nil {
+		return false, err
 	}
 	has, err := db.Database.Has(key)
 	return has, db.handleError(err)
@@ -40,8 +43,8 @@ func (db *Database) Has(key []byte) (bool, error) {
 
 // Get returns the value the key maps to in the database
 func (db *Database) Get(key []byte) ([]byte, error) {
-	if db.corrupted() {
-		return nil, database.ErrAvoidCorruption
+	if err := db.corrupted(); err != nil {
+		return nil, err
 	}
 	value, err := db.Database.Get(key)
 	return value, db.handleError(err)
@@ -49,16 +52,16 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 
 // Put sets the value of the provided key to the provided value
 func (db *Database) Put(key []byte, value []byte) error {
-	if db.corrupted() {
-		return database.ErrAvoidCorruption
+	if err := db.corrupted(); err != nil {
+		return err
 	}
 	return db.handleError(db.Database.Put(key, value))
 }
 
 // Delete removes the key from the database
 func (db *Database) Delete(key []byte) error {
-	if db.corrupted() {
-		return database.ErrAvoidCorruption
+	if err := db.corrupted(); err != nil {
+		return err
 	}
 	return db.handleError(db.Database.Delete(key))
 }
@@ -82,8 +85,11 @@ func (db *Database) NewBatch() database.Batch {
 	}
 }
 
-func (db *Database) corrupted() bool {
-	return atomic.LoadUint64(&db.errored) == 1
+func (db *Database) corrupted() error {
+	db.errorLock.RLock()
+	defer db.errorLock.RUnlock()
+
+	return db.initialError
 }
 
 func (db *Database) handleError(err error) error {
@@ -92,7 +98,14 @@ func (db *Database) handleError(err error) error {
 	// If we get an error other than "not found" or "closed", disallow future
 	// database operations to avoid possible corruption
 	default:
-		atomic.StoreUint64(&db.errored, 1)
+		db.errorLock.Lock()
+		defer db.errorLock.Unlock()
+
+		// Set the initial error to the first unexpected error. Don't call
+		// corrupted() here since it would deadlock.
+		if db.initialError == nil {
+			db.initialError = fmt.Errorf("closed to avoid possible corruption, init error: %w", err)
+		}
 	}
 	return err
 }
@@ -105,8 +118,8 @@ type batch struct {
 
 // Write flushes any accumulated data to disk.
 func (b *batch) Write() error {
-	if b.db.corrupted() {
-		return database.ErrAvoidCorruption
+	if err := b.db.corrupted(); err != nil {
+		return err
 	}
 	return b.db.handleError(b.Batch.Write())
 }

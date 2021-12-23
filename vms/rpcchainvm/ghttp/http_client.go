@@ -39,6 +39,9 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	closer := grpcutils.ServerCloser{}
 	defer closer.GracefulStop()
 
+	// Wrap [w] with a lock to ensure that it is accessed in a thread-safe manner.
+	w = gresponsewriter.NewLockedWriter(w)
+
 	readerID := c.broker.NextId()
 	go c.broker.AcceptAndServe(readerID, func(opts []grpc.ServerOption) *grpc.Server {
 		reader := grpc.NewServer(opts...)
@@ -154,6 +157,8 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// TODO: is there a better way to handle this error?
-	_, _ = c.client.Handle(r.Context(), req)
+	_, err := c.client.Handle(r.Context(), req)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 }
