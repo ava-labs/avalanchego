@@ -92,11 +92,13 @@ func testTxCodec() codec.Manager {
 	return codec
 }
 
+var blockChainID = ids.GenerateTestID()
+
 func testDataImportTx() *Tx {
 	return &Tx{
 		UnsignedAtomicTx: &TestTx{
 			IDV:                         ids.GenerateTestID(),
-			AcceptRequestsBlockchainIDV: ids.GenerateTestID(),
+			AcceptRequestsBlockchainIDV: blockChainID,
 			AcceptRequestsV: &atomic.Requests{
 				RemoveRequests: [][]byte{
 					utils.RandomBytes(32),
@@ -111,7 +113,7 @@ func testDataExportTx() *Tx {
 	return &Tx{
 		UnsignedAtomicTx: &TestTx{
 			IDV:                         ids.GenerateTestID(),
-			AcceptRequestsBlockchainIDV: ids.GenerateTestID(),
+			AcceptRequestsBlockchainIDV: blockChainID,
 			AcceptRequestsV: &atomic.Requests{
 				PutRequests: []*atomic.Element{
 					{
