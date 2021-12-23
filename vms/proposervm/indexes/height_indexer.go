@@ -186,17 +186,20 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 	)
 
 	for {
+		// handle graceful termination
+		select {
+		case <-hi.shutdownChan:
+			// ChainVM.Shutdown is called with ctx.Lock hold. Hence there
+			// is not much we can do here (certainly no calls to blockServer). Log and exit
+			hi.log.Info("Block indexing by height: shutdown called.")
+			return nil
+		default:
+			// go ahead with index repairing
+		}
+
 		currentAcceptedBlk, err := hi.server.GetWrappingBlk(currentProBlkID)
 		switch err {
 		case nil:
-			select { // handle graceful termination
-			case <-hi.shutdownChan:
-				return hi.closeIndexer(currentAcceptedBlk)
-			default:
-				// go ahead with index repairing
-				hi.log.Debug("Block indexing by height: ongoing. Processing %v, height %d",
-					currentAcceptedBlk.ID(), currentAcceptedBlk.Height())
-			}
 
 		case database.ErrNotFound:
 			// visited all proposerVM blocks. Let's record forkHeight ...
@@ -285,18 +288,4 @@ func (hi *heightIndexer) doCheckpoint(currentProBlk WrappingBlock) error {
 	default:
 		return err
 	}
-}
-
-func (hi *heightIndexer) closeIndexer(currentProBlk WrappingBlock) error {
-	hi.log.Info("Block indexing by height shutdown: Started.")
-	if err := hi.doCheckpoint(currentProBlk); err != nil {
-		hi.log.Info("Block indexing by height: shutdown. Failed setting checkpoint %v", err)
-		return err
-	}
-	if err := hi.server.DBCommit(); err != nil {
-		return err
-	}
-
-	hi.log.Info("Block indexing by height shutdown: done.")
-	return nil
 }

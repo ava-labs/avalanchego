@@ -152,6 +152,9 @@ func (vm *VM) Initialize(
 func (vm *VM) Shutdown() error {
 	close(vm.shutdownChan)
 	vm.shutdownWg.Wait()
+	if err := vm.db.Commit(); err != nil {
+		return err
+	}
 	return vm.ChainVM.Shutdown()
 }
 
