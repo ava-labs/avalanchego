@@ -41,7 +41,7 @@ func (jd *jobDropper) process(job Job) error {
 	return nil // just do nothing
 }
 
-// loop dequeue and process jobs
+// loop dequeues and processes jobs. returns the number of jobs executed.
 func (j *Jobs) loop(process func(Job) error, ctx *snow.ConsensusContext, halter common.Haltable, restarted bool) (int, error) {
 	ctx.Executing(true)
 	defer ctx.Executing(false)
@@ -66,8 +66,9 @@ func (j *Jobs) loop(process func(Job) error, ctx *snow.ConsensusContext, halter 
 		job, err := j.state.RemoveRunnableJob()
 		if err == database.ErrNotFound {
 			break
-		} else if err != nil {
-			return numExecuted, fmt.Errorf("failed to removing runnable job with %w", err)
+		}
+		if err != nil {
+			return numExecuted, fmt.Errorf("failed to remove runnable job due to %w", err)
 		}
 
 		// process runnable job
