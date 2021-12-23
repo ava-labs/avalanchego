@@ -23,7 +23,7 @@ type ChainState interface {
 	DeleteLastAccepted() error
 	GetLastAccepted() (ids.ID, error)
 
-	clearCache() // useful for UTs
+	clearCache() // used in testing
 }
 
 type chainState struct {

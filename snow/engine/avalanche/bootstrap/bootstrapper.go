@@ -35,19 +35,18 @@ const (
 )
 
 var (
-	_ common.Engine = &bootstrapper{}
+	_ AvalancheBootstrapper = &bootstrapper{}
 
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
 
-func New(
-	config Config,
-	onFinished func(lastReqID uint32) error,
-) (common.Engine, error) {
-	return newBootstrapper(
-		config,
-		onFinished,
-	)
+type AvalancheBootstrapper interface {
+	common.Engine
+	common.Bootstrapable
+}
+
+func New(config Config, onFinished func(lastReqID uint32) error) (AvalancheBootstrapper, error) {
+	return newBootstrapper(config, onFinished)
 }
 
 type bootstrapper struct {
@@ -108,12 +107,14 @@ func newBootstrapper(
 	return b, nil
 }
 
+// CurrentAcceptedFrontier implements common.Bootstrapable interface
 // CurrentAcceptedFrontier returns the set of vertices that this node has accepted
 // that have no accepted children
 func (b *bootstrapper) CurrentAcceptedFrontier() ([]ids.ID, error) {
 	return b.Manager.Edge(), nil
 }
 
+// FilterAccepted implements common.Bootstrapable interface
 // FilterAccepted returns the IDs of vertices in [containerIDs] that this node has accepted
 func (b *bootstrapper) FilterAccepted(containerIDs []ids.ID) []ids.ID {
 	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
@@ -379,6 +380,7 @@ func (b *bootstrapper) Timeout() error {
 	return b.finish()
 }
 
+// ForceAccepted implements common.Bootstrapable interface
 // ForceAccepted starts bootstrapping. Process the vertices in [accepterContainerIDs].
 func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	if err := b.VM.Bootstrapping(); err != nil {

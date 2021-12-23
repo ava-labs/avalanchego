@@ -77,9 +77,7 @@ func TestEngineAdd(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sender := &common.SenderTest{
-		T: t,
-	}
+	sender := &common.SenderTest{T: t}
 	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
@@ -186,9 +184,7 @@ func TestEngineQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sender := &common.SenderTest{
-		T: t,
-	}
+	sender := &common.SenderTest{T: t}
 	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
@@ -504,9 +500,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		t.Fatal(errs.Err)
 	}
 
-	sender := &common.SenderTest{
-		T: t,
-	}
+	sender := &common.SenderTest{T: t}
 	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
@@ -3387,8 +3381,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sender := &common.SenderTest{}
-	sender.T = t
+	sender := &common.SenderTest{T: t}
 	te.Sender = sender
 
 	reqID := new(uint32)
@@ -3503,8 +3496,7 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 		}, nil
 	}
 
-	sender := &common.SenderTest{}
-	sender.T = t
+	sender := &common.SenderTest{T: t}
 	te.Sender = sender
 
 	sender.SendPushQueryF = func(_ ids.ShortSet, _ uint32, vtxID ids.ID, _ []byte) {
