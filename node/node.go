@@ -27,58 +27,17 @@
 package node
 
 import (
-	"sync"
-
 	"github.com/ava-labs/coreth/accounts"
 	"github.com/ava-labs/coreth/rpc"
-	"github.com/ethereum/go-ethereum/event"
 )
 
 // Node is a container on which services can be registered.
 type Node struct {
-	eventmux *event.TypeMux
-	config   *Config
-	accman   *accounts.Manager
-	// log      log.Logger
-	// ephemKeystore string // if non-empty, the key directory that will be removed by Stop
-	// dirLock       fileutil.Releaser // prevents concurrent use of instance directory
-	// stop          chan struct{}     // Channel to wait for termination notifications
-	// server        *p2p.Server // Currently running P2P networking layer
-	// startStopLock sync.Mutex // Start/Stop are protected by an additional lock
-	// state int // Tracks state of node lifecycle
-
-	lock    sync.Mutex
-	rpcAPIs []rpc.API // List of APIs currently provided by the node
-	// inprocHandler *rpc.Server // In-process RPC request handler to process the API requests
-
-	// databases map[*closeTrackingDB]struct{} // All open databases
+	config *Config
+	accman *accounts.Manager
 
 	corethVersion string
 }
-
-// const (
-// 	initializingState = iota
-// 	closedState
-// )
-
-// func (n *Node) openDataDir() error {
-// 	if n.config.DataDir == "" {
-// 		return nil // ephemeral
-// 	}
-//
-// 	instdir := filepath.Join(n.config.DataDir, n.config.name())
-// 	if err := os.MkdirAll(instdir, 0700); err != nil {
-// 		return err
-// 	}
-// 	// Lock the instance directory to prevent concurrent use by another instance as well as
-// 	// accidental use of the instance directory as a database.
-// 	release, _, err := fileutil.Flock(filepath.Join(instdir, "LOCK"))
-// 	if err != nil {
-// 		return convertFileLockError(err)
-// 	}
-// 	n.dirLock = release
-// 	return nil
-// }
 
 // New creates a new P2P node, ready for protocol registration.
 func New(conf *Config) (*Node, error) {
@@ -87,13 +46,7 @@ func New(conf *Config) (*Node, error) {
 	confCopy := *conf
 	conf = &confCopy
 
-	node := &Node{
-		config:   conf,
-		eventmux: new(event.TypeMux),
-	}
-
-	// Register built-in APIs.
-	node.rpcAPIs = append(node.rpcAPIs, node.apis()...)
+	node := &Node{config: conf}
 
 	// Ensure that the AccountManager method works before the node has started. We rely on
 	// this in cmd/geth.
@@ -102,8 +55,6 @@ func New(conf *Config) (*Node, error) {
 		return nil, err
 	}
 	node.accman = am
-
-	// Configure RPC servers.
 
 	return node, nil
 }
@@ -118,16 +69,7 @@ func (n *Node) AccountManager() *accounts.Manager {
 	return n.accman
 }
 
-// EventMux retrieves the event multiplexer used by all the network services in
-// the current protocol stack.
-func (n *Node) EventMux() *event.TypeMux {
-	return n.eventmux
-}
-
 // RegisterAPIs registers the APIs a service provides on the node.
-func (n *Node) RegisterAPIs(apis []rpc.API) {
-	n.lock.Lock()
-	defer n.lock.Unlock()
-
-	n.rpcAPIs = append(n.rpcAPIs, apis...)
+func (n *Node) APIs() []rpc.API {
+	return n.apis()
 }

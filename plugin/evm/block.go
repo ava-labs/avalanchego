@@ -127,11 +127,6 @@ func (b *Block) Accept() error {
 		return vm.db.Commit()
 	}
 
-	// Update indexes the vm maintains on accepted atomic txs.
-	if err := vm.atomicTxRepository.Write(b.Height(), b.atomicTxs); err != nil {
-		return err
-	}
-
 	batchChainsAndInputs, err := mergeAtomicOps(b.atomicTxs)
 	if err != nil {
 		return err
@@ -148,9 +143,10 @@ func (b *Block) Accept() error {
 		return vm.db.Commit()
 	}
 
-	if err := b.vm.atomicTrie.Index(b.Height(), batchChainsAndInputs); err != nil {
+	if err := b.indexAtomics(vm, b.Height(), b.atomicTxs, batchChainsAndInputs); err != nil {
 		return err
 	}
+
 	batch, err := vm.db.CommitBatch()
 	if err != nil {
 		return fmt.Errorf("failed to create commit batch due to: %w", err)

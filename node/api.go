@@ -35,16 +35,20 @@ import (
 
 // apis returns the collection of built-in RPC APIs.
 func (n *Node) apis() []rpc.API {
-	return []rpc.API{{
-		Namespace: "debug",
-		Version:   "1.0",
-		Service:   debug.Handler,
-	}, {
-		Namespace: "web3",
-		Version:   "1.0",
-		Service:   &publicWeb3API{n},
-		Public:    true,
-	},
+	return []rpc.API{
+		{
+			Namespace: "debug",
+			Version:   "1.0",
+			Service:   debug.Handler,
+			Name:      "debug-handler",
+		},
+		{
+			Namespace: "web3",
+			Version:   "1.0",
+			Service:   &publicWeb3API{n},
+			Public:    true,
+			Name:      "web3",
+		},
 	}
 }
 
