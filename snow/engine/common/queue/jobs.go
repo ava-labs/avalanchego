@@ -93,13 +93,12 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 		ctx:    ctx,
 		events: events,
 	}
-
 	return j.loop(jExec.process, ctx, halter, restarted)
 }
 
 func (j *Jobs) ClearAll(ctx *snow.ConsensusContext, halter common.Haltable, restarted bool, events ...snow.EventDispatcher) (int, error) {
-	jExec := &jobDropper{}
-	return j.loop(jExec.process, ctx, halter, restarted)
+	jDrop := &jobDropper{}
+	return j.loop(jDrop.process, ctx, halter, restarted)
 }
 
 // Commit the versionDB to the underlying database.

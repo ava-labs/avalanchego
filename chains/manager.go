@@ -863,13 +863,14 @@ func (m *manager) createSnowmanChain(
 
 	startReqID := uint32(0)
 	if fastSync.IsEnabled() {
+		if err := bootstrapper.ClearJobs(); err != nil {
+			return nil, fmt.Errorf("could not clear bootstrap before starting fast sync operations: %w", err)
+		}
 		if err := fastSync.Start(startReqID); err != nil {
 			return nil, fmt.Errorf("error starting fast sync operations: %w", err)
 		}
-	} else {
-		if err := bootstrapper.Start(startReqID); err != nil {
-			return nil, fmt.Errorf("error starting bootstrap operations: %w", err)
-		}
+	} else if err := bootstrapper.Start(startReqID); err != nil {
+		return nil, fmt.Errorf("error starting bootstrap operations: %w", err)
 	}
 
 	// Register health checks

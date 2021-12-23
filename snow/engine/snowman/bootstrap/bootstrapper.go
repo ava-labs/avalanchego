@@ -23,19 +23,19 @@ import (
 const bootstrappingDelay = 10 * time.Second
 
 var (
-	_ common.Engine = &bootstrapper{}
+	_ SnowmanBootstrapper = &bootstrapper{}
 
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
 
-func New(
-	config Config,
-	onFinished func(lastReqID uint32) error,
-) (common.Engine, error) {
-	return newBootstrapper(
-		config,
-		onFinished,
-	)
+type SnowmanBootstrapper interface {
+	common.Engine
+	common.Bootstrapable
+	ClearJobs() error
+}
+
+func New(config Config, onFinished func(lastReqID uint32) error) (SnowmanBootstrapper, error) {
+	return newBootstrapper(config, onFinished)
 }
 
 type bootstrapper struct {
@@ -61,7 +61,6 @@ type bootstrapper struct {
 	awaitingTimeout bool
 }
 
-// new this engine.
 func newBootstrapper(
 	config Config,
 	onFinished func(lastReqID uint32) error,
@@ -104,12 +103,14 @@ func newBootstrapper(
 	return b, nil
 }
 
+// CurrentAcceptedFrontier implements common.Bootstrapable interface
 // CurrentAcceptedFrontier returns the last accepted block
 func (b *bootstrapper) CurrentAcceptedFrontier() ([]ids.ID, error) {
 	lastAccepted, err := b.VM.LastAccepted()
 	return []ids.ID{lastAccepted}, err
 }
 
+// FilterAccepted implements common.Bootstrapable interface
 // FilterAccepted returns the blocks in [containerIDs] that we have accepted
 func (b *bootstrapper) FilterAccepted(containerIDs []ids.ID) []ids.ID {
 	acceptedIDs := make([]ids.ID, 0, len(containerIDs))
@@ -121,6 +122,7 @@ func (b *bootstrapper) FilterAccepted(containerIDs []ids.ID) []ids.ID {
 	return acceptedIDs
 }
 
+// ForceAccepted implements common.Bootstrapable interface
 func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	if err := b.VM.Bootstrapping(); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
@@ -188,6 +190,11 @@ func (b *bootstrapper) fetch(blkID ids.ID) error {
 	b.OutstandingRequests.Add(validatorID, b.Config.SharedCfg.RequestID, blkID)
 	b.Config.Sender.SendGetAncestors(validatorID, b.Config.SharedCfg.RequestID, blkID) // request block and ancestors
 	return nil
+}
+
+func (b *bootstrapper) ClearJobs() error {
+	_, err := b.Config.Blocked.ClearAll(b.Config.Ctx, b, b.Config.SharedCfg.Restarted, nil)
+	return err
 }
 
 // GetAncestors implements the Engine interface
