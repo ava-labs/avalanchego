@@ -64,11 +64,7 @@ func addTxs(t testing.TB, codec codec.Manager, acceptedAtomicTxDB database.Datab
 // if non-nil.
 func writeTxs(t testing.TB, repo AtomicTxRepository, fromHeight uint64, toHeight uint64, txsPerHeight int, txMap map[uint64][]*Tx, operationsMap map[uint64]map[ids.ID]*atomic.Requests) {
 	for height := fromHeight; height < toHeight; height++ {
-		txs := make([]*Tx, 0)
-		for i := 0; i < txsPerHeight; i++ {
-			tx := newTestTx()
-			txs = append(txs, tx)
-		}
+		txs := newTestTxs(txsPerHeight)
 		if err := repo.Write(height, txs); err != nil {
 			t.Fatal(err)
 		}
@@ -110,35 +106,67 @@ func verifyTxs(t testing.TB, repo AtomicTxRepository, txMap map[uint64][]*Tx) {
 	}
 }
 
-func verifyOperations(t testing.TB, atomicTrie types.AtomicTrie, codec codec.Manager, rootHash common.Hash, operationsMap map[uint64]map[ids.ID]*atomic.Requests, expectedNumOps int) {
-	iter, err := atomicTrie.Iterator(rootHash, 0)
+// verifyOperations creates an iterator over the atomicTrie at [rootHash] and verifies that the all of the operations in the trie in the interval [from, to] are identical to
+// the atomic operations contained in [operationsMap] on the same interval.
+func verifyOperations(t testing.TB, atomicTrie types.AtomicTrie, codec codec.Manager, rootHash common.Hash, from, to uint64, operationsMap map[uint64]map[ids.ID]*atomic.Requests) {
+	// Start the iterator at [from]
+	iter, err := atomicTrie.Iterator(rootHash, from)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ops := 0
-	for iter.Next() {
-		chainOps := operationsMap[iter.BlockNumber()][iter.BlockchainID()]
-		// Marshal the atomic requests to avoid unequal errors caused by
-		// difference between a nil and empty list.
-		expectedBytes, err := codec.Marshal(0, chainOps)
-		if err != nil {
-			t.Fatal(err)
+	// Generate map of the marshalled atomic operations on the interval [from, to]
+	// based on [operationsMap].
+	marshalledOperationsMap := make(map[uint64]map[ids.ID][]byte)
+	for height, blockRequests := range operationsMap {
+		if height < from || height > to {
+			continue
 		}
-
-		actualBytes, err := codec.Marshal(0, iter.AtomicOps())
-		if err != nil {
-			t.Fatal(err)
+		for blockchainID, atomicRequests := range blockRequests {
+			b, err := codec.Marshal(0, atomicRequests)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if requestsMap, exists := marshalledOperationsMap[height]; exists {
+				requestsMap[blockchainID] = b
+			} else {
+				requestsMap = make(map[ids.ID][]byte)
+				requestsMap[blockchainID] = b
+				marshalledOperationsMap[height] = requestsMap
+			}
 		}
-
-		assert.Equal(t, expectedBytes, actualBytes)
-		ops++
 	}
 
+	// Generate map of marshalled atomic operations on the interval [from, to]
+	// based on the contents of the trie.
+	iteratorMarshalledOperationsMap := make(map[uint64]map[ids.ID][]byte)
+	for iter.Next() {
+		height := iter.BlockNumber()
+		if height < from {
+			t.Fatalf("Iterator starting at (%d) found value at block height (%d)", from, height)
+		}
+		if height > to {
+			continue
+		}
+
+		blockchainID := iter.BlockchainID()
+		b, err := codec.Marshal(0, iter.AtomicOps())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if requestsMap, exists := iteratorMarshalledOperationsMap[height]; exists {
+			requestsMap[blockchainID] = b
+		} else {
+			requestsMap = make(map[ids.ID][]byte)
+			requestsMap[blockchainID] = b
+			iteratorMarshalledOperationsMap[height] = requestsMap
+		}
+	}
 	if err := iter.Error(); err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, expectedNumOps, ops)
+
+	assert.Equal(t, marshalledOperationsMap, iteratorMarshalledOperationsMap)
 }
 
 func TestAtomicRepositoryReadWriteSingleTx(t *testing.T) {
