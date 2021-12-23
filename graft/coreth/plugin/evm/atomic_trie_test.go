@@ -222,6 +222,31 @@ func TestIndexerWriteAndRead(t *testing.T) {
 	assert.Equal(t, "height 301 not within the next commit height 300", err.Error())
 }
 
+func TestAtomicOpsAreNotTxOrderDependent(t *testing.T) {
+	atomicTrie1 := newTestAtomicTrieIndexer(t)
+	atomicTrie2 := newTestAtomicTrieIndexer(t)
+
+	for height := uint64(0); height <= testCommitInterval; /*=205*/ height++ {
+		tx1 := testDataImportTx()
+		tx2 := testDataImportTx()
+		atomicRequests1, err := mergeAtomicOps([]*Tx{tx1, tx2})
+		assert.NoError(t, err)
+		atomicRequests2, err := mergeAtomicOps([]*Tx{tx2, tx1})
+		assert.NoError(t, err)
+
+		err = atomicTrie1.Index(height, atomicRequests1)
+		assert.NoError(t, err)
+		err = atomicTrie2.Index(height, atomicRequests2)
+		assert.NoError(t, err)
+	}
+	root1, height1 := atomicTrie1.LastCommitted()
+	root2, height2 := atomicTrie2.LastCommitted()
+	assert.NotEqual(t, common.Hash{}, root1)
+	assert.Equal(t, uint64(testCommitInterval), height1)
+	assert.Equal(t, uint64(testCommitInterval), height2)
+	assert.Equal(t, root1, root2)
+}
+
 func BenchmarkAtomicTrieInit(b *testing.B) {
 	db := versiondb.New(memdb.New())
 	codec := testTxCodec()

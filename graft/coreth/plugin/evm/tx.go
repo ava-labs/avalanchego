@@ -283,6 +283,14 @@ func calcBytesCost(len int) uint64 {
 // mergeAtomicOps merges atomic requests represented by [txs]
 // to the [output] map, depending on whether [chainID] is present in the map.
 func mergeAtomicOps(txs []*Tx) (map[ids.ID]*atomic.Requests, error) {
+	if len(txs) > 1 {
+		// txs should be stored in order of txID to ensure consistency
+		// with txs initialized from the txID index.
+		copyTxs := make([]*Tx, len(txs))
+		copy(copyTxs, txs)
+		sort.Slice(copyTxs, func(i, j int) bool { return copyTxs[i].ID().Hex() < copyTxs[j].ID().Hex() })
+		txs = copyTxs
+	}
 	output := make(map[ids.ID]*atomic.Requests)
 	for _, tx := range txs {
 		chainID, txRequest, err := tx.UnsignedAtomicTx.AtomicOps()
