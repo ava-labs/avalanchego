@@ -28,9 +28,7 @@ const (
 )
 
 var (
-	atomicIndexDBPrefix     = []byte("atomicIndexDB")
-	atomicIndexMetaDBPrefix = []byte("atomicIndexMetaDB")
-	lastCommittedKey        = []byte("atomicTrieLastCommittedBlock")
+	lastCommittedKey = []byte("atomicTrieLastCommittedBlock")
 )
 
 // atomicTrie implements the types.AtomicTrie interface
@@ -112,7 +110,7 @@ func lastCommittedRootIfExists(db database.Database) (common.Hash, uint64, error
 	height := binary.BigEndian.Uint64(lastCommittedHeightBytes)
 	hash, err := db.Get(lastCommittedHeightBytes)
 	if err != nil {
-		return common.Hash{}, 0, err
+		return common.Hash{}, 0, fmt.Errorf("committed hash does not exist for committed height: %d: %w", height, err)
 	}
 	return common.BytesToHash(hash), height, nil
 }
