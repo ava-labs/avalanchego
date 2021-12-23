@@ -88,7 +88,8 @@ func (j *Jobs) Push(job Job) (bool, error) {
 	return true, nil
 }
 
-func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, restarted bool, events ...snow.EventDispatcher) (int, error) {
+func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable,
+	restarted bool, events ...snow.EventDispatcher) (int, error) {
 	jExec := &jobExecutor{
 		ctx:    ctx,
 		events: events,
@@ -96,7 +97,8 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 	return j.loop(jExec.process, ctx, halter, restarted)
 }
 
-func (j *Jobs) ClearAll(ctx *snow.ConsensusContext, halter common.Haltable, restarted bool, events ...snow.EventDispatcher) (int, error) {
+func (j *Jobs) ClearAll(ctx *snow.ConsensusContext, halter common.Haltable,
+	restarted bool, events ...snow.EventDispatcher) (int, error) {
 	jDrop := &jobDropper{}
 	return j.loop(jDrop.process, ctx, halter, restarted)
 }
@@ -138,6 +140,17 @@ func NewWithMissing(
 func (jm *JobsWithMissing) SetParser(parser Parser) error {
 	jm.state.parser = parser
 	return jm.cleanRunnableStack()
+}
+
+func (jm *JobsWithMissing) ClearAll(ctx *snow.ConsensusContext, halter common.Haltable,
+	restarted bool, events ...snow.EventDispatcher) (int, error) {
+	clearedJobs := jm.missingIDs.Len()
+	jm.missingIDs.Clear()
+	jm.addToMissingIDs.Clear()
+	jm.removeFromMissingIDs.Clear()
+
+	clearedInnerJobs, err := jm.Jobs.ClearAll(ctx, halter, restarted, events...)
+	return clearedJobs + clearedInnerJobs, err
 }
 
 func (jm *JobsWithMissing) Has(jobID ids.ID) (bool, error) {
