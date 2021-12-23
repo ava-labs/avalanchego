@@ -30,7 +30,7 @@ func TestIteratorCanIterate(t *testing.T) {
 
 	// create an atomic trie
 	// on create it will initialize all the transactions from the above atomic repository
-	atomicTrie1, err := newAtomicTrie(db, repo, codec, lastAcceptedHeight, 100)
+	atomicTrie1, err := newAtomicTrie(db, make(map[uint64]ids.ID), repo, codec, lastAcceptedHeight, 100)
 	assert.NoError(t, err)
 
 	lastCommittedHash1, lastCommittedHeight1 := atomicTrie1.LastCommitted()
@@ -42,7 +42,7 @@ func TestIteratorCanIterate(t *testing.T) {
 
 	// iterate on a new atomic trie to make sure there is no resident state affecting the data and the
 	// iterator
-	atomicTrie2, err := NewAtomicTrie(db, repo, codec, lastAcceptedHeight)
+	atomicTrie2, err := NewAtomicTrie(db, make(map[uint64]ids.ID), repo, codec, lastAcceptedHeight)
 	assert.NoError(t, err)
 	lastCommittedHash2, lastCommittedHeight2 := atomicTrie2.LastCommitted()
 	assert.NoError(t, err)
@@ -67,7 +67,7 @@ func TestIteratorHandlesInvalidData(t *testing.T) {
 
 	// create an atomic trie
 	// on create it will initialize all the transactions from the above atomic repository
-	atomicTrie, err := newAtomicTrie(db, repo, codec, lastAcceptedHeight, 100)
+	atomicTrie, err := newAtomicTrie(db, make(map[uint64]ids.ID), repo, codec, lastAcceptedHeight, 100)
 	assert.NoError(t, err)
 
 	lastCommittedHash, lastCommittedHeight := atomicTrie.LastCommitted()

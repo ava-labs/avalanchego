@@ -36,6 +36,7 @@ var (
 type atomicTrie struct {
 	commitHeightInterval uint64              // commit interval, same as commitHeightInterval by default
 	db                   *versiondb.Database // Underlying database
+	bonusBlocks          map[uint64]ids.ID   // Map of height to blockID for blocks to skip indexing
 	metadataDB           database.Database   // Underlying database containing the atomic trie metadata
 	atomicTrieDB         database.Database   // Underlying database containing the atomic trie
 	trieDB               *trie.Database      // Trie database
@@ -51,14 +52,14 @@ var _ types.AtomicTrie = &atomicTrie{}
 
 // NewAtomicTrie returns a new instance of a atomicTrie with the default commitHeightInterval.
 // Initializes the trie before returning it.
-func NewAtomicTrie(db *versiondb.Database, repo AtomicTxRepository, codec codec.Manager, lastAcceptedHeight uint64) (types.AtomicTrie, error) {
-	return newAtomicTrie(db, repo, codec, lastAcceptedHeight, commitHeightInterval)
+func NewAtomicTrie(db *versiondb.Database, bonusBlocks map[uint64]ids.ID, repo AtomicTxRepository, codec codec.Manager, lastAcceptedHeight uint64) (types.AtomicTrie, error) {
+	return newAtomicTrie(db, bonusBlocks, repo, codec, lastAcceptedHeight, commitHeightInterval)
 }
 
 // newAtomicTrie returns a new instance of a atomicTrie with a configurable commitHeightInterval, used in testing.
 // Initializes the trie before returning it.
 func newAtomicTrie(
-	db *versiondb.Database, repo AtomicTxRepository, codec codec.Manager, lastAcceptedHeight uint64, commitHeightInterval uint64,
+	db *versiondb.Database, bonusBlocks map[uint64]ids.ID, repo AtomicTxRepository, codec codec.Manager, lastAcceptedHeight uint64, commitHeightInterval uint64,
 ) (*atomicTrie, error) {
 	atomicTrieDB := prefixdb.New(atomicTrieDBPrefix, db)
 	metadataDB := prefixdb.New(atomicTrieMetaDBPrefix, db)
@@ -79,6 +80,7 @@ func newAtomicTrie(
 	atomicTrie := &atomicTrie{
 		commitHeightInterval: commitHeightInterval,
 		db:                   db,
+		bonusBlocks:          bonusBlocks,
 		atomicTrieDB:         atomicTrieDB,
 		metadataDB:           metadataDB,
 		trieDB:               triedb,
@@ -165,10 +167,12 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 			return err
 		}
 
-		// if height is greater than commit height, add it to the map so that we can write it later
-		// this is to ensure we have all the data before the commit height so that we can commit the
-		// trie
-		if height > commitHeight {
+		if _, skipBonusBlock := a.bonusBlocks[height]; skipBonusBlock {
+			// If [height] is a bonus block, do not index the atomic operations into the trie
+		} else if height > commitHeight {
+			// if height is greater than commit height, add it to the map so that we can write it later
+			// this is to ensure we have all the data before the commit height so that we can commit the
+			// trie
 			uncommittedOpsMap[height] = combinedOps
 		} else {
 			if err := a.updateTrie(height, combinedOps); err != nil {
@@ -198,7 +202,7 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 			if storage > commitSizeCap {
 				a.log.Info("committing atomic trie progress", "storage", storage)
 				a.commit(height)
-				// commit to underlying versiondb
+				// Flush any remaining changes that have not been committed yet in the versiondb.
 				if err := a.db.Commit(); err != nil {
 					return err
 				}
@@ -218,7 +222,7 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 	if err := a.commit(commitHeight); err != nil {
 		return err
 	}
-	// commit to underlying versiondb
+	// Flush any remaining changes that have not been committed yet in the versiondb.
 	if err := a.db.Commit(); err != nil {
 		return err
 	}
