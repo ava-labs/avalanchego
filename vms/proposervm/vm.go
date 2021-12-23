@@ -4,7 +4,6 @@
 package proposervm
 
 import (
-	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -49,8 +48,6 @@ type VM struct {
 
 	state.State
 	indexes.HeightIndexer
-	shutdownChan chan struct{}
-	shutdownWg   sync.WaitGroup
 
 	proposer.Windower
 	tree.Tree
@@ -97,11 +94,10 @@ func (vm *VM) Initialize(
 	prefixDB := prefixdb.New(dbPrefix, rawDB)
 	vm.db = versiondb.New(prefixDB)
 	vm.State = state.New(vm.db)
-	vm.shutdownChan = make(chan struct{}, 1)
 	vm.Windower = proposer.New(ctx.ValidatorState, ctx.SubnetID, ctx.ChainID)
 	vm.Tree = tree.New()
 	vm.HeightIndexer = indexes.NewHeightIndexer(vm, vm.ctx.Log,
-		vm.State, vm.shutdownChan, &vm.shutdownWg)
+		vm.State)
 
 	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine)
 	vm.Scheduler = scheduler
@@ -135,7 +131,6 @@ func (vm *VM) Initialize(
 		if !innerHVM.IsHeightIndexComplete() {
 			vm.ctx.Log.Info("Block indexing by height: repairing height index not started since innerVM index is incomplete.")
 		} else {
-			vm.shutdownWg.Add(1)
 			go func() {
 				if err := vm.HeightIndexer.RepairHeightIndex(); err != nil {
 					vm.ctx.Log.Info("Block indexing by height: failed with error %s", err)
@@ -150,8 +145,6 @@ func (vm *VM) Initialize(
 
 // shutdown ops then propagate shutdown to innerVM
 func (vm *VM) Shutdown() error {
-	close(vm.shutdownChan)
-	vm.shutdownWg.Wait()
 	if err := vm.db.Commit(); err != nil {
 		return err
 	}
