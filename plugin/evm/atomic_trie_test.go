@@ -311,15 +311,6 @@ func TestAtomicTrieSkipsBonusBlocks(t *testing.T) {
 		delete(operationsMap, height)
 	}
 	verifyOperations(t, atomicTrie, codec, rootHash, operationsMap, (expectedCommitHeight-len(bonusBlocks))*numTxsPerBlock)
-
-	// TODO: this seems to assume intermediary roots are created
-	/*
-		for i := uint64(10); i <= uint64(expectedCommitHeight); i += 10 {
-			rootHash, err := atomicTrie.Root(i)
-			assert.NoError(t, err, "failed to get atomic trie root at height %d", i)
-			assert.NotEqual(t, common.Hash{}, rootHash, "found empty hash for atomic trie root at height %d", i)
-		}
-	*/
 }
 
 func TestIndexingNilShouldNotImpactTrie(t *testing.T) {
