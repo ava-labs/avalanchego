@@ -297,5 +297,49 @@ func TestAtomicTrieSkipsBonusBlocks(t *testing.T) {
 	*/
 }
 
+func TestIndexingNilShouldNotImpactTrie(t *testing.T) {
+	// operations to index
+	ops := make([]map[ids.ID]*atomic.Requests, 0)
+	for i := 0; i <= testCommitInterval; i++ {
+		ops = append(ops, testDataImportTx().mustAtomicOps())
+	}
+
+	// without nils
+	a1 := newTestAtomicTrieIndexer(t)
+	for i := uint64(0); i <= testCommitInterval; i++ {
+		if i%2 == 0 {
+			if err := a1.Index(i, ops[i]); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			// do nothing
+		}
+	}
+
+	root1, height1 := a1.LastCommitted()
+	assert.NotEqual(t, common.Hash{}, root1)
+	assert.Equal(t, uint64(testCommitInterval), height1)
+
+	// with nils
+	a2 := newTestAtomicTrieIndexer(t)
+	for i := uint64(0); i <= testCommitInterval; i++ {
+		if i%2 == 0 {
+			if err := a2.Index(i, ops[i]); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			if err := a2.Index(i, nil); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	root2, height2 := a2.LastCommitted()
+	assert.NotEqual(t, common.Hash{}, root2)
+	assert.Equal(t, uint64(testCommitInterval), height2)
+
+	// key assertion of the test
+	assert.Equal(t, root1, root2)
+}
+
 // TODO test uncommitted operations are handled correctly
 // TODO test that we do not flush data unnecessarily to disk
