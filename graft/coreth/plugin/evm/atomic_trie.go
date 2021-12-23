@@ -211,12 +211,10 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 		}
 	}
 
-	// skip commit in case of early height
-	// should never happen in production since height is greater than 4096
-	if lastAcceptedBlockNumber < a.commitHeightInterval {
+	// TODO: clarify behavior for lastAcceptedBlockNumber < a.commitHeightInterval
+	if lastAcceptedBlockNumber == 0 {
 		return nil
 	}
-
 	// now that all heights < commitHeight have been processed
 	// commit the trie
 	if err := a.commit(commitHeight); err != nil {
