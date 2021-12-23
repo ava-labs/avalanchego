@@ -89,87 +89,17 @@ func (j *Jobs) Push(job Job) (bool, error) {
 }
 
 func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, restarted bool, events ...snow.EventDispatcher) (int, error) {
-	ctx.Executing(true)
-	defer ctx.Executing(false)
-
-	numExecuted := 0
-
-	// Disable and clear state caches to prevent us from attempting to execute
-	// a vertex that was previously parsed, but not saved to the VM. Some VMs
-	// may only persist containers when they are accepted. This is a stop-gap
-	// measure to ensure the job will be re-parsed before executing until the VM
-	// provides a more explicit interface for freeing parsed blocks.
-	// TODO remove DisableCaching when VM provides better interface for freeing
-	// blocks.
-	j.state.DisableCaching()
-	for {
-		if halter.Halted() {
-			ctx.Log.Info("Interrupted execution after executing %d operations", numExecuted)
-			return numExecuted, nil
-		}
-
-		job, err := j.state.RemoveRunnableJob()
-		if err == database.ErrNotFound {
-			break
-		}
-		if err != nil {
-			return 0, fmt.Errorf("failed to removing runnable job with %w", err)
-		}
-
-		jobID := job.ID()
-		ctx.Log.Debug("Executing: %s", jobID)
-		// Note that event.Accept must be called before executing [job]
-		// to honor EventDispatcher.Accept's invariant.
-		for _, event := range events {
-			if err := event.Accept(ctx, job.ID(), job.Bytes()); err != nil {
-				return numExecuted, err
-			}
-		}
-		if err := job.Execute(); err != nil {
-			return 0, fmt.Errorf("failed to execute job %s due to %w", jobID, err)
-		}
-
-		dependentIDs, err := j.state.RemoveDependencies(jobID)
-		if err != nil {
-			return 0, fmt.Errorf("failed to remove blocking jobs for %s due to %w", jobID, err)
-		}
-
-		for _, dependentID := range dependentIDs {
-			job, err := j.state.GetJob(dependentID)
-			if err != nil {
-				return 0, fmt.Errorf("failed to get job %s from blocking jobs due to %w", dependentID, err)
-			}
-			hasMissingDeps, err := job.HasMissingDependencies()
-			if err != nil {
-				return 0, fmt.Errorf("failed to get missing dependencies for %s due to %w", dependentID, err)
-			}
-			if hasMissingDeps {
-				continue
-			}
-			if err := j.state.AddRunnableJob(dependentID); err != nil {
-				return 0, fmt.Errorf("failed to add %s as a runnable job due to %w", dependentID, err)
-			}
-		}
-		if err := j.Commit(); err != nil {
-			return 0, err
-		}
-
-		numExecuted++
-		if numExecuted%StatusUpdateFrequency == 0 { // Periodically print progress
-			if !restarted {
-				ctx.Log.Info("executed %d operations", numExecuted)
-			} else {
-				ctx.Log.Debug("executed %d operations", numExecuted)
-			}
-		}
+	jExec := &jobExecutor{
+		ctx:    ctx,
+		events: events,
 	}
 
-	if !restarted {
-		ctx.Log.Info("executed %d operations", numExecuted)
-	} else {
-		ctx.Log.Debug("executed %d operations", numExecuted)
-	}
-	return numExecuted, nil
+	return j.loop(jExec.process, ctx, halter, restarted)
+}
+
+func (j *Jobs) ClearAll(ctx *snow.ConsensusContext, halter common.Haltable, restarted bool, events ...snow.EventDispatcher) (int, error) {
+	jExec := &jobDropper{}
+	return j.loop(jExec.process, ctx, halter, restarted)
 }
 
 // Commit the versionDB to the underlying database.
