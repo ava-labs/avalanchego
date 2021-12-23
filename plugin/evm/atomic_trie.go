@@ -263,8 +263,7 @@ func (a *atomicTrie) Index(height uint64, atomicOps map[ids.ID]*atomic.Requests)
 	}
 
 	if height%a.commitHeightInterval == 0 {
-		err := a.commit(height)
-		return err
+		return a.commit(height)
 	}
 
 	return nil
