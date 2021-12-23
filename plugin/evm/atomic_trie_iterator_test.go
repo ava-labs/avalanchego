@@ -77,6 +77,8 @@ func TestIteratorHandlesInvalidData(t *testing.T) {
 
 	verifyOperations(t, atomicTrie, codec, lastCommittedHash, 0, 1000, operationsMap)
 
+	// Add a random key-value pair to the atomic trie in order to test that the iterator correctly
+	// handles an error when it runs into an unexpected key-value pair in the trie.
 	assert.NoError(t, atomicTrie.trie.TryUpdate(utils.RandomBytes(50), utils.RandomBytes(50)))
 	assert.NoError(t, atomicTrie.commit(lastCommittedHeight+1))
 	corruptedHash, _ := atomicTrie.LastCommitted()
