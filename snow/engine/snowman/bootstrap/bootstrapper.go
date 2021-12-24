@@ -454,8 +454,6 @@ func (b *bootstrapper) Connected(nodeID ids.ShortID, nodeVersion version.Applica
 		b.started = true
 		return b.Startup()
 	}
-
-	b.Ctx.Log.Info("weight tracker not ready %v %v", b.WeightTracker.EnoughConnectedWeight(), b.started)
 	return nil
 }
 
