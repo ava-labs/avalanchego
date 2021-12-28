@@ -58,6 +58,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
@@ -342,6 +343,13 @@ func (vm *VM) Initialize(
 	ethConfig.OfflinePruning = vm.config.OfflinePruning
 	ethConfig.OfflinePruningBloomFilterSize = vm.config.OfflinePruningBloomFilterSize
 	ethConfig.OfflinePruningDataDirectory = vm.config.OfflinePruningDataDirectory
+
+	if len(ethConfig.OfflinePruningDataDirectory) != 0 {
+		if err := os.MkdirAll(ethConfig.OfflinePruningDataDirectory, perms.ReadWriteExecute); err != nil {
+			log.Error("failed to create offline pruning data directory")
+			return err
+		}
+	}
 
 	vm.chainConfig = g.Config
 	vm.networkID = ethConfig.NetworkId
