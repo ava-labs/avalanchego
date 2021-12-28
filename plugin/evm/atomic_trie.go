@@ -209,7 +209,7 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 				}
 			}
 			lastHash = hash
-			lastHeight = nearestCommitHeight(height, a.commitHeightInterval)
+			lastHeight = height
 		}
 	}
 	if err := iter.Error(); err != nil {
