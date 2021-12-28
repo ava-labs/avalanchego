@@ -422,6 +422,9 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, head *big.Int) *Confi
 	if !configNumEqual(c.ApricotPhase4BlockTimestamp, newcfg.ApricotPhase4BlockTimestamp) {
 		return newCompatError("ApricotPhase4 fork block", c.ApricotPhase4BlockTimestamp, newcfg.ApricotPhase4BlockTimestamp)
 	}
+	if !configNumEqual(c.ApricotPhase5BlockTimestamp, newcfg.ApricotPhase5BlockTimestamp) {
+		return newCompatError("ApricotPhase5 fork block", c.ApricotPhase5BlockTimestamp, newcfg.ApricotPhase5BlockTimestamp)
+	}
 
 	return nil
 }
