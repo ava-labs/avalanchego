@@ -12,9 +12,6 @@ import (
 )
 
 const (
-	defaultEthApiEnabled                        = true
-	defaultNetApiEnabled                        = true
-	defaultWeb3ApiEnabled                       = true
 	defaultPruningEnabled                       = true
 	defaultSnapshotAsync                        = true
 	defaultRpcGasCap                            = 50_000_000 // Default to 50M Gas Limit
@@ -32,6 +29,18 @@ const (
 	defaultOfflinePruningBloomFilterSize uint64 = 512 // Default size (MB) for the offline pruner to use
 )
 
+var (
+	defaultEnabledAPIs = []string{
+		"public-eth",
+		"public-eth-filter",
+		"net",
+		"web3",
+		"internal-public-eth",
+		"internal-public-blockchain",
+		"internal-public-transaction-pool",
+	}
+)
+
 type Duration struct {
 	time.Duration
 }
@@ -42,7 +51,10 @@ type Config struct {
 	SnowmanAPIEnabled     bool   `json:"snowman-api-enabled"`
 	CorethAdminAPIEnabled bool   `json:"coreth-admin-api-enabled"`
 	CorethAdminAPIDir     string `json:"coreth-admin-api-dir"`
-	NetAPIEnabled         bool   `json:"net-api-enabled"`
+
+	// EnabledEthAPIs is a list of Ethereum services that should be enabled
+	// If none is specified, then we use the default list [defaultEnabledAPIs]
+	EnabledEthAPIs []string `json:"eth-apis"`
 
 	// Continuous Profiler
 	ContinuousProfilerDir       string   `json:"continuous-profiler-dir"`       // If set to non-empty string creates a continuous profiler
@@ -52,13 +64,6 @@ type Config struct {
 	// Coreth API Gas/Price Caps
 	RPCGasCap   uint64  `json:"rpc-gas-cap"`
 	RPCTxFeeCap float64 `json:"rpc-tx-fee-cap"`
-
-	// Eth APIs
-	EthAPIEnabled      bool `json:"eth-api-enabled"`
-	PersonalAPIEnabled bool `json:"personal-api-enabled"`
-	TxPoolAPIEnabled   bool `json:"tx-pool-api-enabled"`
-	DebugAPIEnabled    bool `json:"debug-api-enabled"`
-	Web3APIEnabled     bool `json:"web3-api-enabled"`
 
 	// Eth Settings
 	Preimages      bool `json:"preimages-enabled"`
@@ -100,22 +105,7 @@ type Config struct {
 
 // EthAPIs returns an array of strings representing the Eth APIs that should be enabled
 func (c Config) EthAPIs() []string {
-	ethAPIs := make([]string, 0)
-
-	if c.EthAPIEnabled {
-		ethAPIs = append(ethAPIs, "eth")
-	}
-	if c.PersonalAPIEnabled {
-		ethAPIs = append(ethAPIs, "personal")
-	}
-	if c.TxPoolAPIEnabled {
-		ethAPIs = append(ethAPIs, "txpool")
-	}
-	if c.DebugAPIEnabled {
-		ethAPIs = append(ethAPIs, "debug")
-	}
-
-	return ethAPIs
+	return c.EnabledEthAPIs
 }
 
 func (c Config) EthBackendSettings() eth.Settings {
@@ -123,9 +113,7 @@ func (c Config) EthBackendSettings() eth.Settings {
 }
 
 func (c *Config) SetDefaults() {
-	c.EthAPIEnabled = defaultEthApiEnabled
-	c.NetAPIEnabled = defaultNetApiEnabled
-	c.Web3APIEnabled = defaultWeb3ApiEnabled
+	c.EnabledEthAPIs = defaultEnabledAPIs
 	c.RPCGasCap = defaultRpcGasCap
 	c.RPCTxFeeCap = defaultRpcTxFeeCap
 	c.MetricsEnabled = defaultMetricsEnabled
