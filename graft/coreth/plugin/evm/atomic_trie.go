@@ -148,8 +148,9 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 	postCommitTxIndexed := 0
 	lastUpdate := time.Now()
 
-	// keep track of the latest generated trie's root.
+	// keep track of the latest generated trie's root and height.
 	lastHash := common.Hash{}
+	lastHeight := a.lastCommittedHeight
 	for iter.Next() {
 		// Get the height and transactions for this iteration (from the key and value, respectively)
 		// iterate over the transactions, indexing them if the height is < commit height
@@ -185,8 +186,8 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 			lastUpdate = time.Now()
 		}
 
-		// keep track of progress and keep commit size under commitSizeCap
-		if height%a.commitHeightInterval == 0 {
+		for lastHeight < nearestCommitHeight(height, a.commitHeightInterval) {
+			// keep track of progress and keep commit size under commitSizeCap
 			hash, _, err := a.trie.Commit(nil)
 			if err != nil {
 				return err
@@ -207,6 +208,7 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 				}
 			}
 			lastHash = hash
+			lastHeight += a.commitHeightInterval
 		}
 	}
 	if err := iter.Error(); err != nil {
