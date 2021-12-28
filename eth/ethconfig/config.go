@@ -145,7 +145,7 @@ type Config struct {
 	// replay protection.
 	AllowUnprotectedTxs bool
 
-	// OfflinePruning enables offline pruning on startup of the ndoe. If a node is started
+	// OfflinePruning enables offline pruning on startup of the node. If a node is started
 	// with this configuration option, it must finish pruning before resuming normal operation.
 	OfflinePruning                bool
 	OfflinePruningBloomFilterSize uint64
