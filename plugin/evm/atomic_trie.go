@@ -186,8 +186,9 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 			lastUpdate = time.Now()
 		}
 
-		for lastHeight < nearestCommitHeight(height, a.commitHeightInterval) {
-			// keep track of progress and keep commit size under commitSizeCap
+		// if height has reached or skipped over the next commit interval,
+		// keep track of progress and keep commit size under commitSizeCap
+		if lastHeight < nearestCommitHeight(height, a.commitHeightInterval) {
 			hash, _, err := a.trie.Commit(nil)
 			if err != nil {
 				return err
@@ -208,7 +209,7 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 				}
 			}
 			lastHash = hash
-			lastHeight += a.commitHeightInterval
+			lastHeight = nearestCommitHeight(height, a.commitHeightInterval)
 		}
 	}
 	if err := iter.Error(); err != nil {
