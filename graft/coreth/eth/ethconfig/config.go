@@ -57,7 +57,6 @@ func NewDefaultConfig() Config {
 		DatabaseCache:      512,
 		TrieCleanCache:     75,
 		TrieDirtyCache:     256,
-		TrieTimeout:        60 * time.Minute,
 		SnapshotCache:      128,
 		Miner:              miner.Config{},
 		TxPool:             core.DefaultTxPoolConfig,
@@ -110,7 +109,6 @@ type Config struct {
 
 	TrieCleanCache int
 	TrieDirtyCache int
-	TrieTimeout    time.Duration
 	SnapshotCache  int
 	Preimages      bool
 
