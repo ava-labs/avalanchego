@@ -346,7 +346,7 @@ func (vm *VM) Initialize(
 
 	if len(ethConfig.OfflinePruningDataDirectory) != 0 {
 		if err := os.MkdirAll(ethConfig.OfflinePruningDataDirectory, perms.ReadWriteExecute); err != nil {
-			log.Error("failed to create offline pruning data directory")
+			log.Error("failed to create offline pruning data directory", "error", err)
 			return err
 		}
 	}
