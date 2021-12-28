@@ -138,6 +138,9 @@ func New(
 	}
 	log.Info("Initialised chain configuration", "config", chainConfig)
 
+	// Note: RecoverPruning must be called to handle the case that we are midway through offline pruning.
+	// If the data directory is changed in between runs preventing RecoverPruning from performing its job correctly,
+	// it may cause DB corruption.
 	if err := pruner.RecoverPruning(config.OfflinePruningDataDirectory, chainDb); err != nil {
 		log.Error("Failed to recover state", "error", err)
 	}

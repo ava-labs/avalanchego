@@ -100,7 +100,7 @@ type Config struct {
 	// Offline Pruning Settings
 	OfflinePruning                bool   `json:"offline-pruning-enabled"`
 	OfflinePruningBloomFilterSize uint64 `json:"offline-pruning-bloom-filter-size"`
-	DataDirectory                 string `json:"offline-pruning-data-directory"`
+	OfflinePruningDataDirectory   string `json:"offline-pruning-data-directory"`
 }
 
 // EthAPIs returns an array of strings representing the Eth APIs that should be enabled
