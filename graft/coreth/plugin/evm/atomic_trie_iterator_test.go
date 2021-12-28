@@ -38,18 +38,18 @@ func TestIteratorCanIterate(t *testing.T) {
 	assert.NotEqual(t, common.Hash{}, lastCommittedHash1)
 	assert.EqualValues(t, 1000, lastCommittedHeight1)
 
-	verifyOperations(t, atomicTrie1, codec, lastCommittedHash1, operationsMap, 3000)
+	verifyOperations(t, atomicTrie1, codec, lastCommittedHash1, 0, 1000, operationsMap)
 
 	// iterate on a new atomic trie to make sure there is no resident state affecting the data and the
 	// iterator
-	atomicTrie2, err := NewAtomicTrie(db, make(map[uint64]ids.ID), repo, codec, lastAcceptedHeight)
+	atomicTrie2, err := newAtomicTrie(db, make(map[uint64]ids.ID), repo, codec, lastAcceptedHeight, 100)
 	assert.NoError(t, err)
 	lastCommittedHash2, lastCommittedHeight2 := atomicTrie2.LastCommitted()
 	assert.NoError(t, err)
 	assert.NotEqual(t, common.Hash{}, lastCommittedHash2)
 	assert.EqualValues(t, 1000, lastCommittedHeight2)
 
-	verifyOperations(t, atomicTrie2, codec, lastCommittedHash1, operationsMap, 3000)
+	verifyOperations(t, atomicTrie2, codec, lastCommittedHash1, 0, 1000, operationsMap)
 }
 
 func TestIteratorHandlesInvalidData(t *testing.T) {
@@ -75,8 +75,10 @@ func TestIteratorHandlesInvalidData(t *testing.T) {
 	assert.NotEqual(t, common.Hash{}, lastCommittedHash)
 	assert.EqualValues(t, 1000, lastCommittedHeight)
 
-	verifyOperations(t, atomicTrie, codec, lastCommittedHash, operationsMap, 3000)
+	verifyOperations(t, atomicTrie, codec, lastCommittedHash, 0, 1000, operationsMap)
 
+	// Add a random key-value pair to the atomic trie in order to test that the iterator correctly
+	// handles an error when it runs into an unexpected key-value pair in the trie.
 	assert.NoError(t, atomicTrie.trie.TryUpdate(utils.RandomBytes(50), utils.RandomBytes(50)))
 	assert.NoError(t, atomicTrie.commit(lastCommittedHeight+1))
 	corruptedHash, _ := atomicTrie.LastCommitted()

@@ -70,7 +70,10 @@ func newAtomicTrie(
 
 	triedb := trie.NewDatabaseWithConfig(
 		Database{atomicTrieDB},
-		&trie.Config{}, // keys are not hashed, no need for preimages
+		&trie.Config{
+			Cache:     10,    // Allocate 10MB of memory for clean cache
+			Preimages: false, // Keys are not hashed, so there is no need for preimages
+		},
 	)
 	t, err := trie.New(root, triedb)
 	if err != nil {
@@ -148,10 +151,6 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 	// keep track of the latest generated trie's root.
 	lastHash := common.Hash{}
 	for iter.Next() {
-		if err := iter.Error(); err != nil {
-			return err
-		}
-
 		// Get the height and transactions for this iteration (from the key and value, respectively)
 		// iterate over the transactions, indexing them if the height is < commit height
 		// otherwise, add the atomic operations from the transaction to the uncommittedOpsMap
@@ -210,8 +209,11 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 			lastHash = hash
 		}
 	}
+	if err := iter.Error(); err != nil {
+		return err
+	}
 
-	// TODO: clarify behavior for lastAcceptedBlockNumber < a.commitHeightInterval
+	// Note: we should never create a commit at the genesis block (should not contain any atomic txs)
 	if lastAcceptedBlockNumber == 0 {
 		return nil
 	}
@@ -261,8 +263,7 @@ func (a *atomicTrie) Index(height uint64, atomicOps map[ids.ID]*atomic.Requests)
 	}
 
 	if height%a.commitHeightInterval == 0 {
-		err := a.commit(height)
-		return err
+		return a.commit(height)
 	}
 
 	return nil
@@ -332,8 +333,11 @@ func (a *atomicTrie) updateTrie(height uint64, atomicOps map[ids.ID]*atomic.Requ
 		keyPacker := wrappers.Packer{Bytes: make([]byte, wrappers.LongLen+common.HashLength)}
 		keyPacker.PackLong(height)
 		keyPacker.PackFixedBytes(blockchainID[:])
-		a.trie.Update(keyPacker.Bytes, valueBytes)
+		if err := a.trie.TryUpdate(keyPacker.Bytes, valueBytes); err != nil {
+			return err
+		}
 	}
+
 	return nil
 }
 
