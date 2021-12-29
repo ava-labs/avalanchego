@@ -138,7 +138,8 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 // considered a revert-and-consume-all-gas operation except for
 // ErrExecutionReverted which means revert-and-keep-gas-left.
 func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (ret []byte, err error) {
-	if contract.Address() == BuiltinAddr {
+	// Deprecate special handling of [BuiltInAddr] as of ApricotPhase1
+	if !in.evm.chainRules.IsApricotPhase2 && contract.Address() == BuiltinAddr {
 		self := AccountRef(contract.Caller())
 		if _, ok := contract.caller.(*Contract); ok {
 			contract = contract.AsDelegate()
