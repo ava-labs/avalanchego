@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc.
+// (c) 2020-2021, Ava Labs, Inc.
 //
 // This file is a derived work, based on the go-ethereum library whose original
 // notices appear below.
@@ -24,8 +24,16 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-//go:generate go-bindata -nometadata -o assets.go -pkg tracers -ignore tracers.go -ignore assets.go ./...
-//go:generate gofmt -s -w assets.go
+// noopTracer is just the barebone boilerplate code required from a JavaScript
+// object to be usable as a transaction tracer.
+{
+	// step is invoked for every opcode that the VM executes.
+	step: function(log, db) { },
 
-// Package tracers contains the actual JavaScript tracer assets.
-package tracers
+	// fault is invoked when the actual execution of an opcode fails.
+	fault: function(log, db) { },
+
+	// result is invoked when all the opcodes have been iterated over and returns
+	// the final result of the tracing.
+	result: function(ctx, db) { return {}; }
+}
