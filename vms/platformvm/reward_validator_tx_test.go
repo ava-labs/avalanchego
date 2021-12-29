@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -81,7 +82,7 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	stakeOwners := toRemove.Stake[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
 
 	// Get old balances
-	oldBalance, err := vm.getBalance(stakeOwners)
+	oldBalance, err := avax.GetBalance(vm.internalState, stakeOwners)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +92,7 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	onCommitBalance, err := vm.getBalance(stakeOwners)
+	onCommitBalance, err := avax.GetBalance(vm.internalState, stakeOwners)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +161,7 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	stakeOwners := toRemove.Stake[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
 
 	// Get old balances
-	oldBalance, err := vm.getBalance(stakeOwners)
+	oldBalance, err := avax.GetBalance(vm.internalState, stakeOwners)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +171,7 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	onAbortBalance, err := vm.getBalance(stakeOwners)
+	onAbortBalance, err := avax.GetBalance(vm.internalState, stakeOwners)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,9 +254,9 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 
 	expectedReward := uint64(1000000)
 
-	oldVdrBalance, err := vm.getBalance(vdrDestSet)
+	oldVdrBalance, err := avax.GetBalance(vm.internalState, vdrDestSet)
 	assert.NoError(err)
-	oldDelBalance, err := vm.getBalance(delDestSet)
+	oldDelBalance, err := avax.GetBalance(vm.internalState, delDestSet)
 	assert.NoError(err)
 
 	onCommitState.Apply(vm.internalState)
@@ -264,13 +265,13 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 
 	// If tx is committed, delegator and delegatee should get reward
 	// and the delegator's reward should be greater because the delegatee's share is 25%
-	commitVdrBalance, err := vm.getBalance(vdrDestSet)
+	commitVdrBalance, err := avax.GetBalance(vm.internalState, vdrDestSet)
 	assert.NoError(err)
 	vdrReward, err := math.Sub64(commitVdrBalance, oldVdrBalance)
 	assert.NoError(err)
 	assert.NotZero(vdrReward, "expected delegatee balance to increase because of reward")
 
-	commitDelBalance, err := vm.getBalance(delDestSet)
+	commitDelBalance, err := avax.GetBalance(vm.internalState, delDestSet)
 	assert.NoError(err)
 	delReward, err := math.Sub64(commitDelBalance, oldDelBalance)
 	assert.NoError(err)
@@ -352,9 +353,9 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 
 	expectedReward := uint64(1000000)
 
-	oldVdrBalance, err := vm.getBalance(vdrDestSet)
+	oldVdrBalance, err := avax.GetBalance(vm.internalState, vdrDestSet)
 	assert.NoError(err)
-	oldDelBalance, err := vm.getBalance(delDestSet)
+	oldDelBalance, err := avax.GetBalance(vm.internalState, delDestSet)
 	assert.NoError(err)
 
 	onAbortState.Apply(vm.internalState)
@@ -362,13 +363,13 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	assert.NoError(err)
 
 	// If tx is aborted, delegator and delegatee shouldn't get reward
-	newVdrBalance, err := vm.getBalance(vdrDestSet)
+	newVdrBalance, err := avax.GetBalance(vm.internalState, vdrDestSet)
 	assert.NoError(err)
 	vdrReward, err := math.Sub64(newVdrBalance, oldVdrBalance)
 	assert.NoError(err)
 	assert.Zero(vdrReward, "expected delegatee balance not to increase")
 
-	newDelBalance, err := vm.getBalance(delDestSet)
+	newDelBalance, err := avax.GetBalance(vm.internalState, delDestSet)
 	assert.NoError(err)
 	delReward, err := math.Sub64(newDelBalance, oldDelBalance)
 	assert.NoError(err)

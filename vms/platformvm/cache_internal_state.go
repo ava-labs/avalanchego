@@ -72,6 +72,7 @@ const (
 type InternalState interface {
 	MutableState
 	uptime.State
+	avax.UTXOReader
 
 	SetHeight(height uint64)
 
@@ -90,8 +91,6 @@ type InternalState interface {
 
 	GetBlock(blockID ids.ID) (Block, error)
 	AddBlock(block Block)
-
-	UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error)
 
 	Abort()
 	Commit() error

@@ -495,7 +495,7 @@ func TestGenesis(t *testing.T) {
 		}
 		addrs := ids.ShortSet{}
 		addrs.Add(addr)
-		utxos, err := vm.getAllUTXOs(addrs)
+		utxos, err := avax.GetAllUTXOs(vm.internalState, addrs)
 		if err != nil {
 			t.Fatal("couldn't find UTXO")
 		} else if len(utxos) != 1 {
@@ -542,88 +542,6 @@ func TestGenesis(t *testing.T) {
 	// Ensure the new subnet we created exists
 	if _, _, err := vm.internalState.GetTx(testSubnet1.ID()); err != nil {
 		t.Fatalf("expected subnet %s to exist", testSubnet1.ID())
-	}
-}
-
-func TestGenesisGetUTXOs(t *testing.T) {
-	addr0 := keys[0].PublicKey().Address()
-	addr1 := keys[1].PublicKey().Address()
-	addr2 := keys[2].PublicKey().Address()
-	hrp := constants.NetworkIDToHRP[testNetworkID]
-
-	addr0Str, _ := formatting.FormatBech32(hrp, addr0.Bytes())
-	addr1Str, _ := formatting.FormatBech32(hrp, addr1.Bytes())
-	addr2Str, _ := formatting.FormatBech32(hrp, addr2.Bytes())
-
-	// Create a starting point of 2000 UTXOs on different addresses
-	utxoCount := 2345
-	var genesisUTXOs []APIUTXO
-	for i := 0; i < utxoCount; i++ {
-		genesisUTXOs = append(genesisUTXOs,
-			APIUTXO{
-				Amount:  json.Uint64(defaultBalance),
-				Address: addr0Str,
-			},
-			APIUTXO{
-				Amount:  json.Uint64(defaultBalance),
-				Address: addr1Str,
-			},
-			APIUTXO{
-				Amount:  json.Uint64(defaultBalance),
-				Address: addr2Str,
-			})
-	}
-
-	// Inject them in the Genesis build
-	buildGenesisArgs := BuildGenesisArgs{
-		NetworkID:     json.Uint32(testNetworkID),
-		AvaxAssetID:   avaxAssetID,
-		UTXOs:         genesisUTXOs,
-		Validators:    []APIPrimaryValidator{},
-		Chains:        nil,
-		Time:          json.Uint64(defaultGenesisTime.Unix()),
-		InitialSupply: json.Uint64(360 * units.MegaAvax),
-		Encoding:      formatting.Hex,
-	}
-
-	_, _, vm, _ := GenesisVMWithArgs(t, &buildGenesisArgs)
-
-	addrsSet := ids.ShortSet{}
-	addrsSet.Add(addr0, addr1)
-
-	var (
-		fetchedUTXOs []*avax.UTXO
-		err          error
-	)
-
-	lastAddr := ids.ShortEmpty
-	lastIdx := ids.Empty
-
-	var totalUTXOs []*avax.UTXO
-	for i := 0; i <= 3; i++ {
-		fetchedUTXOs, lastAddr, lastIdx, err = vm.getPaginatedUTXOs(addrsSet, lastAddr, lastIdx, -1)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if len(fetchedUTXOs) == utxoCount {
-			t.Fatalf("Wrong number of utxos. Should be Paginated. Expected (%d) returned (%d)", maxUTXOsToFetch, len(fetchedUTXOs))
-		}
-		totalUTXOs = append(totalUTXOs, fetchedUTXOs...)
-	}
-
-	if len(totalUTXOs) != 4*maxUTXOsToFetch {
-		t.Fatalf("Wrong number of utxos. Should have paginated through all. Expected (%d) returned (%d)", 4*maxUTXOsToFetch, len(totalUTXOs))
-	}
-
-	// Fetch all UTXOs
-	notPaginatedUTXOs, err := vm.getAllUTXOs(addrsSet)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(notPaginatedUTXOs) != 2*utxoCount {
-		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", 2*utxoCount, len(notPaginatedUTXOs))
 	}
 }
 

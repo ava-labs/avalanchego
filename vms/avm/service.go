@@ -236,12 +236,17 @@ func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 		endUTXOID ids.ID
 		err       error
 	)
+	limit := int(args.Limit)
+	if limit <= 0 || int(maxPageSize) < limit {
+		limit = int(maxPageSize)
+	}
 	if sourceChain == service.vm.ctx.ChainID {
-		utxos, endAddr, endUTXOID, err = service.vm.getPaginatedUTXOs(
+		utxos, endAddr, endUTXOID, err = avax.GetPaginatedUTXOs(
+			service.vm.state,
 			addrSet,
 			startAddr,
 			startUTXO,
-			int(args.Limit),
+			limit,
 		)
 	} else {
 		utxos, endAddr, endUTXOID, err = service.vm.GetAtomicUTXOs(
@@ -249,7 +254,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 			addrSet,
 			startAddr,
 			startUTXO,
-			int(args.Limit),
+			limit,
 		)
 	}
 	if err != nil {
@@ -356,7 +361,7 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 	addrSet := ids.ShortSet{}
 	addrSet.Add(addr)
 
-	utxos, err := service.vm.getAllUTXOs(addrSet)
+	utxos, err := avax.GetAllUTXOs(service.vm.state, addrSet)
 	if err != nil {
 		return fmt.Errorf("problem retrieving UTXOs: %w", err)
 	}
@@ -418,7 +423,7 @@ func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs
 	addrSet := ids.ShortSet{}
 	addrSet.Add(address)
 
-	utxos, err := service.vm.getAllUTXOs(addrSet)
+	utxos, err := avax.GetAllUTXOs(service.vm.state, addrSet)
 	if err != nil {
 		return fmt.Errorf("couldn't get address's UTXOs: %w", err)
 	}
@@ -1522,7 +1527,7 @@ func (service *Service) Import(_ *http.Request, args *ImportArgs, reply *api.JSO
 		return err
 	}
 
-	atomicUTXOs, _, _, err := service.vm.GetAtomicUTXOs(chainID, kc.Addrs, ids.ShortEmpty, ids.Empty, -1)
+	atomicUTXOs, _, _, err := service.vm.GetAtomicUTXOs(chainID, kc.Addrs, ids.ShortEmpty, ids.Empty, int(maxPageSize))
 	if err != nil {
 		return fmt.Errorf("problem retrieving user's atomic UTXOs: %w", err)
 	}

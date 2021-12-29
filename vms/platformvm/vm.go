@@ -45,8 +45,6 @@ const (
 	droppedTxCacheSize     = 64
 	validatorSetsCacheSize = 64
 
-	maxUTXOsToFetch = 1024
-
 	// MaxValidatorWeightFactor is the maximum factor of the validator stake
 	// that is allowed to be placed on a validator.
 	MaxValidatorWeightFactor uint64 = 5

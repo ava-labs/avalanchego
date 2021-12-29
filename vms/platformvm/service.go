@@ -38,6 +38,9 @@ const (
 	// Minimum amount of delay to allow a transaction to be issued through the
 	// API
 	minAddStakerDelay = 2 * syncBound
+
+	// Max number of items allowed in a page
+	maxPageSize = 1024
 )
 
 var (
@@ -203,7 +206,7 @@ func (service *Service) GetBalance(_ *http.Request, args *api.JSONAddress, respo
 
 	addrs := ids.ShortSet{}
 	addrs.Add(addr)
-	utxos, err := service.vm.getAllUTXOs(addrs)
+	utxos, err := avax.GetAllUTXOs(service.vm.internalState, addrs)
 	if err != nil {
 		addr, err2 := service.vm.FormatLocalAddress(addr)
 		if err2 != nil {
@@ -435,12 +438,17 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 		endUTXOID ids.ID
 		err       error
 	)
+	limit := int(args.Limit)
+	if limit <= 0 || maxPageSize < limit {
+		limit = maxPageSize
+	}
 	if sourceChain == service.vm.ctx.ChainID {
-		utxos, endAddr, endUTXOID, err = service.vm.getPaginatedUTXOs(
+		utxos, endAddr, endUTXOID, err = avax.GetPaginatedUTXOs(
+			service.vm.internalState,
 			addrSet,
 			startAddr,
 			startUTXO,
-			int(args.Limit),
+			limit,
 		)
 	} else {
 		utxos, endAddr, endUTXOID, err = service.vm.GetAtomicUTXOs(
@@ -448,7 +456,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 			addrSet,
 			startAddr,
 			startUTXO,
-			int(args.Limit),
+			limit,
 		)
 	}
 	if err != nil {
