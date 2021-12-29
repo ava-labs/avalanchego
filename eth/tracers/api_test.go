@@ -487,29 +487,3 @@ func newAccounts(n int) (accounts Accounts) {
 	sort.Sort(accounts)
 	return accounts
 }
-
-func newRPCBalance(balance *big.Int) **hexutil.Big {
-	rpcBalance := (*hexutil.Big)(balance)
-	return &rpcBalance
-}
-
-func newRPCUint64(number uint64) *hexutil.Uint64 {
-	rpcUint64 := hexutil.Uint64(number)
-	return &rpcUint64
-}
-
-func newRPCBytes(bytes []byte) *hexutil.Bytes {
-	rpcBytes := hexutil.Bytes(bytes)
-	return &rpcBytes
-}
-
-func newStates(keys []common.Hash, vals []common.Hash) *map[common.Hash]common.Hash {
-	if len(keys) != len(vals) {
-		panic("invalid input")
-	}
-	m := make(map[common.Hash]common.Hash)
-	for i := 0; i < len(keys); i++ {
-		m[keys[i]] = vals[i]
-	}
-	return &m
-}
