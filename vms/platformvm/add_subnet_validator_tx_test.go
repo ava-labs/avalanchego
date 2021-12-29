@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -218,7 +219,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	}
 
 	vm.internalState.AddCurrentStaker(addDSTx, 0)
-	vm.internalState.AddTx(addDSTx, Committed)
+	vm.internalState.AddTx(addDSTx, status.Committed)
 	if err := vm.internalState.Commit(); err != nil {
 		t.Fatal(err)
 	}
@@ -316,7 +317,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	}
 
 	vm.internalState.AddCurrentStaker(subnetTx, 0)
-	vm.internalState.AddTx(subnetTx, Committed)
+	vm.internalState.AddTx(subnetTx, status.Committed)
 	if err := vm.internalState.Commit(); err != nil {
 		t.Fatal(err)
 	}
@@ -428,7 +429,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	}
 
 	vm.internalState.AddCurrentStaker(tx, 0)
-	vm.internalState.AddTx(tx, Committed)
+	vm.internalState.AddTx(tx, status.Committed)
 	if err := vm.internalState.Commit(); err != nil {
 		t.Fatal(err)
 	}

@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -226,9 +227,9 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	assert.NoError(err)
 
 	vm.internalState.AddCurrentStaker(vdrTx, 0)
-	vm.internalState.AddTx(vdrTx, Committed)
+	vm.internalState.AddTx(vdrTx, status.Committed)
 	vm.internalState.AddCurrentStaker(delTx, 1000000)
-	vm.internalState.AddTx(delTx, Committed)
+	vm.internalState.AddTx(delTx, status.Committed)
 	vm.internalState.SetTimestamp(time.Unix(int64(delEndTime), 0))
 	err = vm.internalState.Commit()
 	assert.NoError(err)
@@ -331,9 +332,9 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	assert.NoError(err)
 
 	vm.internalState.AddCurrentStaker(vdrTx, 0)
-	vm.internalState.AddTx(vdrTx, Committed)
+	vm.internalState.AddTx(vdrTx, status.Committed)
 	vm.internalState.AddCurrentStaker(delTx, 1000000)
-	vm.internalState.AddTx(delTx, Committed)
+	vm.internalState.AddTx(delTx, status.Committed)
 	vm.internalState.SetTimestamp(time.Unix(int64(delEndTime), 0))
 	err = vm.internalState.Commit()
 	assert.NoError(err)
@@ -490,24 +491,24 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	}
 
 	onAbortState := abort.onAccept()
-	_, status, err := onAbortState.GetTx(block.Tx.ID())
+	_, txStatus, err := onAbortState.GetTx(block.Tx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status != Aborted {
-		t.Fatalf("status should be Aborted but is %s", status)
+	if txStatus != status.Aborted {
+		t.Fatalf("status should be Aborted but is %s", txStatus)
 	}
 
 	if err := commit.Accept(); err != nil { // advance the timestamp
 		t.Fatal(err)
 	}
 
-	_, status, err = secondVM.internalState.GetTx(block.Tx.ID())
+	_, txStatus, err = secondVM.internalState.GetTx(block.Tx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status != Committed {
-		t.Fatalf("status should be Committed but is %s", status)
+	if txStatus != status.Committed {
+		t.Fatalf("status should be Committed but is %s", txStatus)
 	}
 
 	// Verify that chain's timestamp has advanced
@@ -548,12 +549,12 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	}
 
 	onCommitState := commit.onAccept()
-	_, status, err = onCommitState.GetTx(block.Tx.ID())
+	_, txStatus, err = onCommitState.GetTx(block.Tx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status != Committed {
-		t.Fatalf("status should be Committed but is %s", status)
+	if txStatus != status.Committed {
+		t.Fatalf("status should be Committed but is %s", txStatus)
 	}
 
 	if err := abort.Verify(); err != nil {
@@ -563,12 +564,12 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, status, err = secondVM.internalState.GetTx(block.Tx.ID())
+	_, txStatus, err = secondVM.internalState.GetTx(block.Tx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status != Aborted {
-		t.Fatalf("status should be Aborted but is %s", status)
+	if txStatus != status.Aborted {
+		t.Fatalf("status should be Aborted but is %s", txStatus)
 	}
 
 	currentStakers := secondVM.internalState.CurrentStakerChainState()

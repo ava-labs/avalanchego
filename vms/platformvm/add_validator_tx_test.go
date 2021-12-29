@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -243,7 +244,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 	}
 
 	vm.internalState.AddCurrentStaker(tx, 0)
-	vm.internalState.AddTx(tx, Committed)
+	vm.internalState.AddTx(tx, status.Committed)
 	if err := vm.internalState.Commit(); err != nil {
 		t.Fatal(err)
 	}

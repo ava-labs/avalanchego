@@ -8,11 +8,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/stretchr/testify/assert"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 )
 
 // Ensure semantic verification fails when proposed timestamp is at or before current timestamp
@@ -311,7 +313,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 				)
 				assert.NoError(err)
 				vm.internalState.AddPendingStaker(tx)
-				vm.internalState.AddTx(tx, Committed)
+				vm.internalState.AddTx(tx, status.Committed)
 			}
 			if err := vm.internalState.Commit(); err != nil {
 				t.Fatal(err)
@@ -396,7 +398,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	}
 
 	vm.internalState.AddCurrentStaker(tx, 0)
-	vm.internalState.AddTx(tx, Committed)
+	vm.internalState.AddTx(tx, status.Committed)
 	if err := vm.internalState.Commit(); err != nil {
 		t.Fatal(err)
 	}
@@ -422,7 +424,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	}
 
 	vm.internalState.AddPendingStaker(tx)
-	vm.internalState.AddTx(tx, Committed)
+	vm.internalState.AddTx(tx, status.Committed)
 	if err := vm.internalState.Commit(); err != nil {
 		t.Fatal(err)
 	}
@@ -495,7 +497,7 @@ func TestWhitelistedSubnet(t *testing.T) {
 			}
 
 			vm.internalState.AddPendingStaker(tx)
-			vm.internalState.AddTx(tx, Committed)
+			vm.internalState.AddTx(tx, status.Committed)
 			if err := vm.internalState.Commit(); err != nil {
 				t.Fatal(err)
 			}
@@ -567,7 +569,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	)
 	assert.NoError(t, err)
 	vm.internalState.AddPendingStaker(addDelegatorTx)
-	vm.internalState.AddTx(addDelegatorTx, Committed)
+	vm.internalState.AddTx(addDelegatorTx, status.Committed)
 	assert.NoError(t, vm.internalState.Commit())
 	assert.NoError(t, vm.internalState.(*internalStateImpl).loadPendingValidators())
 
@@ -630,7 +632,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	)
 	assert.NoError(t, err)
 	vm.internalState.AddPendingStaker(addDelegatorTx)
-	vm.internalState.AddTx(addDelegatorTx, Committed)
+	vm.internalState.AddTx(addDelegatorTx, status.Committed)
 	assert.NoError(t, vm.internalState.Commit())
 	assert.NoError(t, vm.internalState.(*internalStateImpl).loadPendingValidators())
 
@@ -722,7 +724,7 @@ func addPendingValidator(vm *VM, startTime time.Time, endTime time.Time, nodeID 
 	}
 
 	vm.internalState.AddPendingStaker(addPendingValidatorTx)
-	vm.internalState.AddTx(addPendingValidatorTx, Committed)
+	vm.internalState.AddTx(addPendingValidatorTx, status.Committed)
 	if err := vm.internalState.Commit(); err != nil {
 		return nil, err
 	}
