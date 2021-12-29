@@ -276,7 +276,7 @@ func generateTrieRoot(db ethdb.KeyValueWriter, it Iterator, account common.Hash,
 	// Create a semaphore to assign tasks and collect results through. We'll pre-
 	// fill it with nils, thus using the same channel for both limiting concurrent
 	// processing and gathering results.
-	threads := runtime.NumCPU() * 10
+	threads := runtime.NumCPU()
 	results := make(chan error, threads)
 	for i := 0; i < threads; i++ {
 		results <- nil // fill the semaphore
