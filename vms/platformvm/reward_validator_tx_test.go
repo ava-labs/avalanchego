@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -204,7 +205,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 		vdrEndTime,
 		vdrNodeID,        // node ID
 		vdrRewardAddress, // reward address
-		PercentDenominator/4,
+		reward.PercentDenominator/4,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // fee payer
 		ids.ShortEmpty,                          // change addr
 	)
@@ -309,7 +310,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		vdrEndTime,
 		vdrNodeID,        // node ID
 		vdrRewardAddress, // reward address
-		PercentDenominator/4,
+		reward.PercentDenominator/4,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // fee payer
 		ids.ShortEmpty,                          // change addr
 	)
@@ -385,7 +386,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstVM := &VM{Factory: Factory{
 		Chains:                 chains.MockManager{},
 		UptimePercentage:       .2,
-		StakeMintingPeriod:     defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 	}}
@@ -583,7 +584,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	vm := &VM{Factory: Factory{
 		Chains:                 chains.MockManager{},
 		UptimePercentage:       .2,
-		StakeMintingPeriod:     defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 	}}

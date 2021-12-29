@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -192,7 +193,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		uint64(DSEndTime.Unix()),                // end time
 		pendingDSValidatorID,                    // node ID
 		nodeID,                                  // reward address
-		PercentDenominator,                      // shares
+		reward.PercentDenominator,               // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 		ids.ShortEmpty,                          // change addr
 

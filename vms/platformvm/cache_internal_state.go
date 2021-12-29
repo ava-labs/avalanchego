@@ -1560,11 +1560,10 @@ func (st *internalStateImpl) init(genesisBytes []byte) error {
 		stakeDuration := tx.Validator.Duration()
 		currentSupply := st.GetCurrentSupply()
 
-		r := reward(
+		r := st.vm.rewards.Calculate(
 			stakeDuration,
 			stakeAmount,
 			currentSupply,
-			st.vm.StakeMintingPeriod,
 		)
 		newCurrentSupply, err := safemath.Add64(currentSupply, r)
 		if err != nil {

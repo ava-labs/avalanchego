@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -675,7 +676,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	currentValidators := service.vm.internalState.CurrentStakerChainState()
 
 	for _, tx := range currentValidators.Stakers() { // Iterates in order of increasing stop time
-		_, reward, err := currentValidators.GetStaker(tx.ID())
+		_, rewardAmount, err := currentValidators.GetStaker(tx.ID())
 		if err != nil {
 			return err
 		}
@@ -706,7 +707,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				}
 			}
 
-			potentialReward := json.Uint64(reward)
+			potentialReward := json.Uint64(rewardAmount)
 			delegator := APIPrimaryDelegator{
 				APIStaker: APIStaker{
 					TxID:        tx.ID(),
@@ -730,8 +731,8 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			nodeID := staker.Validator.ID()
 			startTime := staker.StartTime()
 			weight := json.Uint64(staker.Validator.Weight())
-			potentialReward := json.Uint64(reward)
-			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(PercentDenominator))
+			potentialReward := json.Uint64(rewardAmount)
+			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(reward.PercentDenominator))
 			rawUptime, err := service.vm.uptimeManager.CalculateUptimePercentFrom(nodeID, startTime)
 			if err != nil {
 				return err
@@ -872,7 +873,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 
 			nodeID := staker.Validator.ID()
 			weight := json.Uint64(staker.Validator.Weight())
-			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(PercentDenominator))
+			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(reward.PercentDenominator))
 
 			connected := service.vm.uptimeManager.IsConnected(nodeID)
 			reply.Validators = append(reply.Validators, APIPrimaryValidator{

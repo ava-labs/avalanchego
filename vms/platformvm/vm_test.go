@@ -43,6 +43,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -52,6 +53,13 @@ import (
 var (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
+
+	defaultRewardConfig = reward.Config{
+		MaxConsumptionRate: .12 * reward.PercentDenominator,
+		MinConsumptionRate: .10 * reward.PercentDenominator,
+		MintingPeriod:      365 * 24 * time.Hour,
+		SupplyCap:          720 * units.MegaAvax,
+	}
 
 	// AVAX asset ID in tests
 	avaxAssetID = ids.ID{'y', 'e', 'e', 't'}
@@ -198,7 +206,7 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 				Amount:  json.Uint64(defaultWeight),
 				Address: addr,
 			}},
-			DelegationFee: PercentDenominator,
+			DelegationFee: reward.PercentDenominator,
 		}
 	}
 
@@ -273,7 +281,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 				Amount:  json.Uint64(defaultWeight),
 				Address: addr,
 			}},
-			DelegationFee: PercentDenominator,
+			DelegationFee: reward.PercentDenominator,
 		}
 	}
 
@@ -319,7 +327,7 @@ func defaultVM() (*VM, database.Database, *common.SenderTest) {
 		MinDelegatorStake:      defaultMinDelegatorStake,
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
-		StakeMintingPeriod:     defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
 		ApricotPhase3Time:      defaultValidateEndTime,
 		ApricotPhase4Time:      defaultValidateEndTime,
 		ApricotPhase5Time:      defaultValidateEndTime,
@@ -397,7 +405,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 		MinDelegatorStake:      defaultMinDelegatorStake,
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
-		StakeMintingPeriod:     defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
 	}}
 
 	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
@@ -645,7 +653,7 @@ func TestAddValidatorCommit(t *testing.T) {
 		uint64(endTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	)
@@ -722,7 +730,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		uint64(endTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	)
@@ -778,7 +786,7 @@ func TestAddValidatorReject(t *testing.T) {
 		uint64(endTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	)
@@ -854,7 +862,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 		uint64(endTime.Unix()),
 		repeatNodeID,
 		repeatNodeID,
-		PercentDenominator,
+		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	)
@@ -1788,7 +1796,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
-		StakeMintingPeriod:     defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
 	}}
 	firstVM.clock.Set(defaultGenesisTime)
 	firstCtx := defaultContext()
@@ -1870,7 +1878,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
-		StakeMintingPeriod:     defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
 	}}
 
 	secondVM.clock.Set(defaultGenesisTime)
@@ -1910,7 +1918,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
-		StakeMintingPeriod:     defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
 	}}
 
 	firstVM.clock.Set(defaultGenesisTime)
@@ -1987,7 +1995,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
-		StakeMintingPeriod:     defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
 	}}
 
 	secondVM.clock.Set(defaultGenesisTime)
@@ -2033,7 +2041,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
-		StakeMintingPeriod:     defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
 	}}
 
 	vm.clock.Set(defaultGenesisTime)
@@ -2261,7 +2269,7 @@ func TestUnverifiedParent(t *testing.T) {
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
-		StakeMintingPeriod:     defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
 	}}
 
 	vm.clock.Set(defaultGenesisTime)
@@ -2416,7 +2424,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
-		StakeMintingPeriod:     defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
 	}}
 
 	vm.clock.Set(defaultGenesisTime)
@@ -2525,7 +2533,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		uint64(newValidatorEndTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty,
 	)
@@ -2738,7 +2746,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	vm.internalState.SetCurrentSupply(SupplyCap / 2)
+	vm.internalState.SetCurrentSupply(defaultRewardConfig.SupplyCap / 2)
 
 	newValidatorStartTime0 := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
 	newValidatorEndTime0 := newValidatorStartTime0.Add(defaultMaxStakingDuration)
@@ -2752,7 +2760,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		uint64(newValidatorEndTime0.Unix()),
 		nodeID0,
 		nodeID0,
-		PercentDenominator,
+		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty,
 	)
@@ -2939,7 +2947,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		uint64(newValidatorEndTime1.Unix()),
 		nodeID1,
 		nodeID1,
-		PercentDenominator,
+		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[1]},
 		ids.ShortEmpty,
 	)

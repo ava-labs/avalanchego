@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -712,7 +713,7 @@ func addPendingValidator(vm *VM, startTime time.Time, endTime time.Time, nodeID 
 		uint64(endTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		reward.PercentDenominator,
 		keys,
 		ids.ShortEmpty, // change addr
 	)
