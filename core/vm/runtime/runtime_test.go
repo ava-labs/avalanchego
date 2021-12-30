@@ -34,6 +34,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/coreth/accounts/abi"
 	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/rawdb"
@@ -43,7 +44,6 @@ import (
 	"github.com/ava-labs/coreth/eth/tracers"
 	"github.com/ava-labs/coreth/eth/tracers/logger"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/asm"
 
@@ -525,7 +525,7 @@ func BenchmarkSimpleLoop(b *testing.B) {
 // TestEip2929Cases contains various testcases that are used for
 // EIP-2929 about gas repricings
 func TestEip2929Cases(t *testing.T) {
-	t.Skip("Test only useful for generating documentation") // TODO ensure this still passes
+	t.Skip("Test only useful for generating documentation")
 	id := 1
 	prettyPrint := func(comment string, code []byte) {
 

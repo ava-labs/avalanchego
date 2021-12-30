@@ -1960,17 +1960,16 @@ var bindTests = []struct {
 		imports: `
 			"math/big"
 
-			"github.com/ethereum/go-ethereum/accounts/abi/bind"
-			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-			"github.com/ethereum/go-ethereum/core"
+			"github.com/ava-labs/coreth/accounts/abi/bind"
+			"github.com/ava-labs/coreth/accounts/abi/bind/backends"
+			"github.com/ava-labs/coreth/core"
 			"github.com/ethereum/go-ethereum/crypto"
-			"github.com/ethereum/go-ethereum/eth/ethconfig"
 		`,
 		tester: `
 			var (
 				key, _  = crypto.GenerateKey()
 				user, _ = bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-				sim     = backends.NewSimulatedBackend(core.GenesisAlloc{user.From: {Balance: big.NewInt(1000000000000000000)}}, ethconfig.Defaults.Miner.GasCeil)
+				sim     = backends.NewSimulatedBackend(core.GenesisAlloc{user.From: {Balance: big.NewInt(1000000000000000000)}}, 10000000)
 			)
 			defer sim.Close()
 
@@ -1978,7 +1977,7 @@ var bindTests = []struct {
 			if err != nil {
 				t.Fatalf("DeployConstructorWithStructParam() got err %v; want nil err", err)
 			}
-			sim.Commit()
+			sim.Commit(true)
 			
 			if _, err = bind.WaitDeployed(nil, sim, tx); err != nil {
 				t.Logf("Deployment tx: %+v", tx)

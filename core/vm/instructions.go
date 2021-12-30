@@ -735,7 +735,6 @@ func opCallExpert(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) 
 	// Get the arguments from the memory.
 	args := scope.Memory.GetPtr(int64(inOffset.Uint64()), int64(inSize.Uint64()))
 
-	// Note: we do not check value2 in the same way here because it was not checked in the original version
 	if interpreter.readOnly && !value.IsZero() {
 		return nil, ErrWriteProtection
 	}
