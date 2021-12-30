@@ -120,11 +120,10 @@ pendingStakerLoop:
 				break pendingStakerLoop
 			}
 
-			r := reward(
+			r := vm.rewards.Calculate(
 				staker.Validator.Duration(),
 				staker.Validator.Wght,
 				currentSupply,
-				vm.StakeMintingPeriod,
 			)
 			currentSupply, err = safemath.Add64(currentSupply, r)
 			if err != nil {
@@ -141,11 +140,10 @@ pendingStakerLoop:
 				break pendingStakerLoop
 			}
 
-			r := reward(
+			r := vm.rewards.Calculate(
 				staker.Validator.Duration(),
 				staker.Validator.Wght,
 				currentSupply,
-				vm.StakeMintingPeriod,
 			)
 			currentSupply, err = safemath.Add64(currentSupply, r)
 			if err != nil {

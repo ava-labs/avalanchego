@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package reward
 
 import (
 	"fmt"
@@ -11,19 +11,34 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-func TestRewardLongerDurationBonus(t *testing.T) {
+const (
+	defaultMinStakingDuration = 24 * time.Hour
+	defaultMaxStakingDuration = 365 * 24 * time.Hour
+
+	defaultMinValidatorStake = 5 * units.MilliAvax
+)
+
+var defaultConfig = Config{
+	MaxConsumptionRate: .12 * PercentDenominator,
+	MinConsumptionRate: .10 * PercentDenominator,
+	MintingPeriod:      365 * 24 * time.Hour,
+	SupplyCap:          720 * units.MegaAvax,
+}
+
+func TestLongerDurationBonus(t *testing.T) {
+	c := NewCalculator(defaultConfig)
 	shortDuration := 24 * time.Hour
 	totalDuration := 365 * 24 * time.Hour
 	shortBalance := units.KiloAvax
 	for i := 0; i < int(totalDuration/shortDuration); i++ {
-		r := reward(shortDuration, shortBalance, 359*units.MegaAvax+shortBalance, defaultMaxStakingDuration)
+		r := c.Calculate(shortDuration, shortBalance, 359*units.MegaAvax+shortBalance)
 		shortBalance += r
 	}
-	r := reward(totalDuration%shortDuration, shortBalance, 359*units.MegaAvax+shortBalance, defaultMaxStakingDuration)
+	r := c.Calculate(totalDuration%shortDuration, shortBalance, 359*units.MegaAvax+shortBalance)
 	shortBalance += r
 
 	longBalance := units.KiloAvax
-	longBalance += reward(totalDuration, longBalance, 359*units.MegaAvax+longBalance, defaultMaxStakingDuration)
+	longBalance += c.Calculate(totalDuration, longBalance, 359*units.MegaAvax+longBalance)
 
 	if shortBalance >= longBalance {
 		t.Fatalf("should promote stakers to stake longer")
@@ -31,6 +46,7 @@ func TestRewardLongerDurationBonus(t *testing.T) {
 }
 
 func TestRewards(t *testing.T) {
+	c := NewCalculator(defaultConfig)
 	tests := []struct {
 		duration       time.Duration
 		stakeAmount    uint64
@@ -59,7 +75,7 @@ func TestRewards(t *testing.T) {
 		{ // (720M - 720M) * (1M / 720M) * 12%
 			duration:       defaultMaxStakingDuration,
 			stakeAmount:    units.MegaAvax,
-			existingAmount: SupplyCap,
+			existingAmount: defaultConfig.SupplyCap,
 			expectedReward: 0,
 		},
 		// Min duration:
@@ -95,7 +111,7 @@ func TestRewards(t *testing.T) {
 		{
 			duration:       defaultMinStakingDuration,
 			stakeAmount:    units.MegaAvax,
-			existingAmount: SupplyCap,
+			existingAmount: defaultConfig.SupplyCap,
 			expectedReward: 0,
 		},
 	}
@@ -107,11 +123,10 @@ func TestRewards(t *testing.T) {
 			test.expectedReward,
 		)
 		t.Run(name, func(t *testing.T) {
-			r := reward(
+			r := c.Calculate(
 				test.duration,
 				test.stakeAmount,
 				test.existingAmount,
-				defaultMaxStakingDuration,
 			)
 			if r != test.expectedReward {
 				t.Fatalf("expected %d; got %d", test.expectedReward, r)
