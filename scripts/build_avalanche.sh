@@ -11,7 +11,7 @@ set -o pipefail
 # Dockerfile
 # README.md
 # go.mod
-go_version_minimum="1.16.8"
+go_version_minimum="1.17.0"
 
 go_version() {
     go version | sed -nE -e 's/[^0-9.]+([0-9.]+).+/\1/p'
