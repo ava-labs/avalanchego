@@ -135,6 +135,11 @@ func (vm *VM) Bootstrapped() error {
 	return vm.ChainVM.Bootstrapped()
 }
 
+func (vm *VM) SetState(state snow.State) error {
+	vm.bootstrapped = (state == snow.NormalOp)
+	return vm.ChainVM.SetState(state)
+}
+
 func (vm *VM) BuildBlock() (snowman.Block, error) {
 	preferredBlock, err := vm.getBlock(vm.preferred)
 	if err != nil {

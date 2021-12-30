@@ -257,6 +257,18 @@ func (vm *VM) Bootstrapped() error {
 	return nil
 }
 
+func (vm *VM) SetState(state snow.State) error {
+	switch state {
+	case snow.Bootstrapping:
+		return vm.Bootstrapping()
+	case snow.NormalOp:
+		return vm.Bootstrapped()
+	default:
+		// nothing to do here
+		return nil
+	}
+}
+
 // Shutdown implements the avalanche.DAGVM interface
 func (vm *VM) Shutdown() error {
 	if vm.timer == nil {

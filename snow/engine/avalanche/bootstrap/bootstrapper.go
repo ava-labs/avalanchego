@@ -383,7 +383,7 @@ func (b *bootstrapper) Timeout() error {
 // ForceAccepted implements common.Bootstrapable interface
 // ForceAccepted starts bootstrapping. Process the vertices in [accepterContainerIDs].
 func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
-	if err := b.VM.Bootstrapping(); err != nil {
+	if err := b.VM.SetState(snow.Bootstrapping); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
 			err)
 	}
@@ -476,7 +476,7 @@ func (b *bootstrapper) checkFinish() error {
 
 // Finish bootstrapping
 func (b *bootstrapper) finish() error {
-	if err := b.VM.Bootstrapped(); err != nil {
+	if err := b.VM.SetState(snow.NormalOp); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has finished: %w",
 			err)
 	}

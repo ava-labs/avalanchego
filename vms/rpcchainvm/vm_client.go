@@ -287,6 +287,23 @@ func (vm *VMClient) startAppSenderServer(opts []grpc.ServerOption) *grpc.Server 
 	return server
 }
 
+func (vm *VMClient) SetState(state snow.State) error {
+	var stateReq vmproto.StateRequest_State
+	switch state {
+	case snow.Bootstrapping:
+		stateReq = vmproto.StateRequest_Bootstrapping
+	case snow.NormalOp:
+		stateReq = vmproto.StateRequest_NormalOp
+	default:
+		stateReq = vmproto.StateRequest_Unknown
+	}
+	_, err := vm.client.SetState(context.Background(), &vmproto.StateRequest{
+		State: stateReq,
+	})
+
+	return err
+}
+
 func (vm *VMClient) Bootstrapping() error {
 	_, err := vm.client.Bootstrapping(context.Background(), &emptypb.Empty{})
 	return err

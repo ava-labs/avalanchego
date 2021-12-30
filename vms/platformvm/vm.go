@@ -313,6 +313,18 @@ func (vm *VM) Bootstrapped() error {
 	return vm.internalState.Commit()
 }
 
+func (vm *VM) SetState(state snow.State) error {
+	switch state {
+	case snow.Bootstrapping:
+		return vm.Bootstrapping()
+	case snow.NormalOp:
+		return vm.Bootstrapped()
+	default:
+		// nothing to do here
+		return nil
+	}
+}
+
 // Shutdown this blockchain
 func (vm *VM) Shutdown() error {
 	if vm.dbManager == nil {

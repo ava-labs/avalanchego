@@ -56,6 +56,9 @@ type VM interface {
 	// Bootstrapped is called when the node is done bootstrapping this chain.
 	Bootstrapped() error
 
+	// SetState communicates node state as they started
+	SetState(state snow.State) error
+
 	// Shutdown is called when the node is shutting down.
 	Shutdown() error
 
