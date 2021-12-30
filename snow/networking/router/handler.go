@@ -438,8 +438,8 @@ func (h *Handler) Timeout() {
 
 // Gossip passes a gossip request to the consensus engine
 func (h *Handler) Gossip() {
-	if !h.ctx.IsBootstrapped() {
-		// Shouldn't send gossiping messages while the chain is bootstrapping
+	if h.ctx.GetState() != snow.NormalOp {
+		// Shouldn't send gossiping messages while the chain is fast-syncing/bootstrapping
 		return
 	}
 

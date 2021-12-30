@@ -466,7 +466,7 @@ func (b *bootstrapper) Disconnected(nodeID ids.ShortID) error {
 
 func (b *bootstrapper) GetVM() common.VM                { return b.VM }
 func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
-func (b *bootstrapper) IsBootstrapped() bool            { return b.Config.Ctx.IsBootstrapped() }
+func (b *bootstrapper) IsBootstrapped() bool            { return b.Config.Ctx.GetState() == snow.NormalOp }
 func (b *bootstrapper) HealthCheck() (interface{}, error) {
 	vmIntf, vmErr := b.VM.HealthCheck()
 	intf := map[string]interface{}{

@@ -767,7 +767,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 
 // IsBootstrapped returns true iff this chain is done bootstrapping
 func (t *Transitive) IsBootstrapped() bool {
-	return t.Ctx.IsBootstrapped()
+	return t.Ctx.GetState() == snow.NormalOp
 }
 
 // HealthCheck implements the common.Engine interface

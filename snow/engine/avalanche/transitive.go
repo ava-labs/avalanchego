@@ -92,7 +92,7 @@ func (t *Transitive) Context() *snow.ConsensusContext {
 }
 
 func (t *Transitive) IsBootstrapped() bool {
-	return t.Ctx.IsBootstrapped()
+	return t.Ctx.GetState() == snow.NormalOp
 }
 
 // Connected implements the Engine interface.

@@ -416,7 +416,7 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 func (b *bootstrapper) checkFinish() error {
 	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
 	pendingJobs := b.VtxBlocked.MissingIDs()
-	if b.Config.Ctx.IsBootstrapped() || len(pendingJobs) > 0 || b.awaitingTimeout {
+	if b.Config.Ctx.GetState() == snow.NormalOp || len(pendingJobs) > 0 || b.awaitingTimeout {
 		return nil
 	}
 
@@ -517,7 +517,7 @@ func (b *bootstrapper) Disconnected(nodeID ids.ShortID) error {
 
 func (b *bootstrapper) GetVM() common.VM                { return b.VM }
 func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
-func (b *bootstrapper) IsBootstrapped() bool            { return b.Config.Ctx.IsBootstrapped() }
+func (b *bootstrapper) IsBootstrapped() bool            { return b.Config.Ctx.GetState() == snow.NormalOp }
 
 func (b *bootstrapper) HealthCheck() (interface{}, error) {
 	vmIntf, vmErr := b.VM.HealthCheck()
