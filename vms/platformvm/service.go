@@ -21,6 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -37,6 +39,9 @@ const (
 	// Minimum amount of delay to allow a transaction to be issued through the
 	// API
 	minAddStakerDelay = 2 * syncBound
+
+	// Max number of items allowed in a page
+	maxPageSize = 1024
 )
 
 var (
@@ -202,7 +207,7 @@ func (service *Service) GetBalance(_ *http.Request, args *api.JSONAddress, respo
 
 	addrs := ids.ShortSet{}
 	addrs.Add(addr)
-	utxos, err := service.vm.getAllUTXOs(addrs)
+	utxos, err := avax.GetAllUTXOs(service.vm.internalState, addrs)
 	if err != nil {
 		addr, err2 := service.vm.FormatLocalAddress(addr)
 		if err2 != nil {
@@ -434,12 +439,17 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 		endUTXOID ids.ID
 		err       error
 	)
+	limit := int(args.Limit)
+	if limit <= 0 || maxPageSize < limit {
+		limit = maxPageSize
+	}
 	if sourceChain == service.vm.ctx.ChainID {
-		utxos, endAddr, endUTXOID, err = service.vm.getPaginatedUTXOs(
+		utxos, endAddr, endUTXOID, err = avax.GetPaginatedUTXOs(
+			service.vm.internalState,
 			addrSet,
 			startAddr,
 			startUTXO,
-			int(args.Limit),
+			limit,
 		)
 	} else {
 		utxos, endAddr, endUTXOID, err = service.vm.GetAtomicUTXOs(
@@ -447,7 +457,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 			addrSet,
 			startAddr,
 			startUTXO,
-			int(args.Limit),
+			limit,
 		)
 	}
 	if err != nil {
@@ -675,7 +685,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	currentValidators := service.vm.internalState.CurrentStakerChainState()
 
 	for _, tx := range currentValidators.Stakers() { // Iterates in order of increasing stop time
-		_, reward, err := currentValidators.GetStaker(tx.ID())
+		_, rewardAmount, err := currentValidators.GetStaker(tx.ID())
 		if err != nil {
 			return err
 		}
@@ -706,7 +716,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				}
 			}
 
-			potentialReward := json.Uint64(reward)
+			potentialReward := json.Uint64(rewardAmount)
 			delegator := APIPrimaryDelegator{
 				APIStaker: APIStaker{
 					TxID:        tx.ID(),
@@ -730,8 +740,8 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			nodeID := staker.Validator.ID()
 			startTime := staker.StartTime()
 			weight := json.Uint64(staker.Validator.Weight())
-			potentialReward := json.Uint64(reward)
-			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(PercentDenominator))
+			potentialReward := json.Uint64(rewardAmount)
+			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(reward.PercentDenominator))
 			rawUptime, err := service.vm.uptimeManager.CalculateUptimePercentFrom(nodeID, startTime)
 			if err != nil {
 				return err
@@ -872,7 +882,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 
 			nodeID := staker.Validator.ID()
 			weight := json.Uint64(staker.Validator.Weight())
-			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(PercentDenominator))
+			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(reward.PercentDenominator))
 
 			connected := service.vm.uptimeManager.IsConnected(nodeID)
 			reply.Validators = append(reply.Validators, APIPrimaryValidator{
@@ -1783,7 +1793,7 @@ type GetBlockchainStatusArgs struct {
 // GetBlockchainStatusReply is the reply from calling GetBlockchainStatus
 // [Status] is the blockchain's status.
 type GetBlockchainStatusReply struct {
-	Status BlockchainStatus `json:"status"`
+	Status status.BlockchainStatus `json:"status"`
 }
 
 // GetBlockchainStatus gets the status of a blockchain with the ID [args.BlockchainID].
@@ -1797,11 +1807,11 @@ func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchain
 	// if its aliased then vm created this chain.
 	if aliasedID, err := service.vm.Chains.Lookup(args.BlockchainID); err == nil {
 		if service.nodeValidates(aliasedID) {
-			reply.Status = Validating
+			reply.Status = status.Validating
 			return nil
 		}
 
-		reply.Status = Syncing
+		reply.Status = status.Syncing
 		return nil
 	}
 
@@ -1820,7 +1830,7 @@ func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchain
 		return fmt.Errorf("problem looking up blockchain: %w", err)
 	}
 	if exists {
-		reply.Status = Created
+		reply.Status = status.Created
 		return nil
 	}
 
@@ -1829,7 +1839,7 @@ func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchain
 		return fmt.Errorf("problem looking up blockchain: %w", err)
 	}
 	if preferred {
-		reply.Status = Preferred
+		reply.Status = status.Preferred
 	}
 	return nil
 }
@@ -2093,7 +2103,7 @@ type GetTxStatusArgs struct {
 }
 
 type GetTxStatusResponse struct {
-	Status Status `json:"status"`
+	Status status.Status `json:"status"`
 	// Reason this tx was dropped.
 	// Only non-empty if Status is dropped
 	Reason string `json:"reason,omitempty"`
@@ -2103,9 +2113,9 @@ type GetTxStatusResponse struct {
 func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *GetTxStatusResponse) error {
 	service.vm.ctx.Log.Debug("Platform: GetTxStatus called with txID: %s", args.TxID)
 
-	_, status, err := service.vm.internalState.GetTx(args.TxID)
+	_, txStatus, err := service.vm.internalState.GetTx(args.TxID)
 	if err == nil { // Found the status. Report it.
-		response.Status = status
+		response.Status = txStatus
 		return nil
 	}
 	if err != database.ErrNotFound {
@@ -2128,7 +2138,7 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 	_, _, err = onAccept.GetTx(args.TxID)
 	if err == nil {
 		// Found the status in the preferred block's db. Report tx is processing.
-		response.Status = Processing
+		response.Status = status.Processing
 		return nil
 	}
 	if err != database.ErrNotFound {
@@ -2137,19 +2147,19 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 
 	if service.vm.blockBuilder.Has(args.TxID) {
 		// Found the tx in the mempool. Report tx is processing.
-		response.Status = Processing
+		response.Status = status.Processing
 		return nil
 	}
 
 	reason, ok := service.vm.droppedTxCache.Get(args.TxID)
 	if !ok {
 		// The tx isn't being tracked by the node.
-		response.Status = Unknown
+		response.Status = status.Unknown
 		return nil
 	}
 
 	// The tx was recently dropped because it was invalid.
-	response.Status = Dropped
+	response.Status = status.Dropped
 	if !args.IncludeReason {
 		return nil
 	}

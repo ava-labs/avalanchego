@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
 var (
@@ -208,11 +209,11 @@ func (tx *UnsignedRewardValidatorTx) Execute(
 
 		// Calculate split of reward between delegator/delegatee
 		// The delegator gives stake to the validatee
-		delegatorShares := PercentDenominator - uint64(vdrTx.Shares)             // parentTx.Shares <= PercentDenominator so no underflow
-		delegatorReward := delegatorShares * (stakerReward / PercentDenominator) // delegatorShares <= PercentDenominator so no overflow
+		delegatorShares := reward.PercentDenominator - uint64(vdrTx.Shares)             // parentTx.Shares <= reward.PercentDenominator so no underflow
+		delegatorReward := delegatorShares * (stakerReward / reward.PercentDenominator) // delegatorShares <= reward.PercentDenominator so no overflow
 		// Delay rounding as long as possible for small numbers
 		if optimisticReward, err := math.Mul64(delegatorShares, stakerReward); err == nil {
-			delegatorReward = optimisticReward / PercentDenominator
+			delegatorReward = optimisticReward / reward.PercentDenominator
 		}
 		delegateeReward := stakerReward - delegatorReward // delegatorReward <= reward so no underflow
 
