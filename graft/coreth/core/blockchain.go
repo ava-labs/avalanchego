@@ -1023,19 +1023,7 @@ func (bc *BlockChain) collectLogs(hash common.Hash, removed bool) []*types.Log {
 	if number == nil {
 		return nil
 	}
-	receipts := rawdb.ReadReceipts(bc.db, hash, *number, bc.chainConfig)
-
-	var logs []*types.Log
-	for _, receipt := range receipts {
-		for _, log := range receipt.Logs {
-			l := *log
-			if removed {
-				l.Removed = true
-			}
-			logs = append(logs, &l)
-		}
-	}
-	return logs
+	return bc.gatherBlockLogs(hash, *number, removed)
 }
 
 // mergeLogs returns a merged log slice with specified sort order.

@@ -86,9 +86,7 @@ type EVMInterpreter struct {
 
 // NewEVMInterpreter returns a new instance of the Interpreter.
 func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
-	// We use the STOP instruction whether to see
-	// the jump table was initialised. If it was not
-	// we'll set the default jump table.
+	// If jump table was not initialised we set the default one.
 	if cfg.JumpTable == nil {
 		switch {
 		case evm.chainRules.IsApricotPhase3:
