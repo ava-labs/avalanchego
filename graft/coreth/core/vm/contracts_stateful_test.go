@@ -64,7 +64,7 @@ func TestPackNativeAssetCallInput(t *testing.T) {
 	unpackedAddr, unpackedAssetID, unpackedAssetAmount, unpackedCallData, err := UnpackNativeAssetCallInput(input)
 	assert.NoError(t, err)
 	assert.Equal(t, addr, unpackedAddr, "address")
-	assert.Equal(t, &assetID, unpackedAssetID, "assetID")
+	assert.Equal(t, assetID, unpackedAssetID, "assetID")
 	assert.Equal(t, assetAmount, unpackedAssetAmount, "assetAmount")
 	assert.Equal(t, callData, unpackedCallData, "callData")
 }
