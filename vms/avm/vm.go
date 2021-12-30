@@ -234,9 +234,9 @@ func (vm *VM) Initialize(
 	return vm.db.Commit()
 }
 
-// Bootstrapping is called by the consensus engine when it starts bootstrapping
+// bootstrapping is called by the consensus engine when it starts bootstrapping
 // this chain
-func (vm *VM) Bootstrapping() error {
+func (vm *VM) bootstrapping() error {
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapping(); err != nil {
 			return err
@@ -245,9 +245,7 @@ func (vm *VM) Bootstrapping() error {
 	return nil
 }
 
-// Bootstrapped is called by the consensus engine when it is done bootstrapping
-// this chain
-func (vm *VM) Bootstrapped() error {
+func (vm *VM) normalOperationsStarted() error {
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapped(); err != nil {
 			return err
@@ -257,15 +255,17 @@ func (vm *VM) Bootstrapped() error {
 	return nil
 }
 
-func (vm *VM) SetState(state snow.State) error {
+func (vm *VM) OnStart(state snow.State) error {
 	switch state {
-	case snow.Bootstrapping:
-		return vm.Bootstrapping()
-	case snow.NormalOp:
-		return vm.Bootstrapped()
-	default:
+	case snow.Undefined:
 		// nothing to do here
 		return nil
+	case snow.Bootstrapping:
+		return vm.bootstrapping()
+	case snow.NormalOp:
+		return vm.normalOperationsStarted()
+	default:
+		return snow.ErrUnknownState
 	}
 }
 

@@ -1,17 +1,21 @@
 package snow
 
+import "errors"
+
 type State uint8
 
+var ErrUnknownState = errors.New("unknown node state")
+
 const (
-	Unknown State = iota
+	Undefined State = iota
 	Bootstrapping
 	NormalOp
 )
 
 func (st State) String() string {
 	switch st {
-	case Unknown:
-		return "Unknown state"
+	case Undefined:
+		return "Undefined state"
 	case Bootstrapping:
 		return "Bootstrapping state"
 	case NormalOp:

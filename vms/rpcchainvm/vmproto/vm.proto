@@ -38,7 +38,7 @@ message InitializeRequest {
 
 message StateRequest {
     enum State {
-        Unknown = 0;
+        Undefined = 0;
 	    Bootstrapping = 1;
 	    NormalOp = 2;
     }
@@ -202,12 +202,7 @@ message GatherResponse {
 
 service VM {
     rpc Initialize(InitializeRequest) returns (InitializeResponse);
-    rpc SetState(StateRequest) returns (google.protobuf.Empty);
-
-    // TODO: TO REMOVE AND REPLACE WITH SetState
-    rpc Bootstrapping(google.protobuf.Empty) returns (google.protobuf.Empty);
-    rpc Bootstrapped(google.protobuf.Empty) returns (google.protobuf.Empty);
-    
+    rpc OnStart(StateRequest) returns (google.protobuf.Empty);   
     rpc Shutdown(google.protobuf.Empty) returns (google.protobuf.Empty);
     rpc CreateHandlers(google.protobuf.Empty) returns (CreateHandlersResponse);
     rpc CreateStaticHandlers(google.protobuf.Empty) returns (CreateStaticHandlersResponse);

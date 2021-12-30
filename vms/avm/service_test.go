@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -824,12 +825,12 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	err = vm.Bootstrapping()
+	err = vm.OnStart(snow.Bootstrapping)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.Bootstrapped()
+	err = vm.OnStart(snow.NormalOp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -914,12 +915,12 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	err = vm.Bootstrapping()
+	err = vm.OnStart(snow.Bootstrapping)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.Bootstrapped()
+	err = vm.OnStart(snow.NormalOp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1019,12 +1020,12 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	err = vm.Bootstrapping()
+	err = vm.OnStart(snow.Bootstrapping)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.Bootstrapped()
+	err = vm.OnStart(snow.NormalOp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1126,12 +1127,12 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	err = vm.Bootstrapping()
+	err = vm.OnStart(snow.Bootstrapping)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.Bootstrapped()
+	err = vm.OnStart(snow.NormalOp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1233,12 +1234,12 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	err = vm.Bootstrapping()
+	err = vm.OnStart(snow.Bootstrapping)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.Bootstrapped()
+	err = vm.OnStart(snow.NormalOp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1341,12 +1342,12 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	err = vm.Bootstrapping()
+	err = vm.OnStart(snow.Bootstrapping)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.Bootstrapped()
+	err = vm.OnStart(snow.NormalOp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1446,12 +1447,12 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	}
 	vm.batchTimeout = 0
 
-	err = vm.Bootstrapping()
+	err = vm.OnStart(snow.Bootstrapping)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.Bootstrapped()
+	err = vm.OnStart(snow.NormalOp)
 	if err != nil {
 		t.Fatal(err)
 	}

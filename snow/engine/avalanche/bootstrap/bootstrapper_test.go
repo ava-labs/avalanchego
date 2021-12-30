@@ -166,9 +166,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		return nil, errParsedUnknownVertex
 	}
 
-	vm.CantBootstrapping = false
-	vm.CantBootstrapped = false
-
+	vm.CantOnStart = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil {
 		t.Fatal(err)
 	}
@@ -282,8 +280,8 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		t.Fatal(errParsedUnknownVertex)
 		return nil, errParsedUnknownVertex
 	}
-	vm.CantBootstrapping = false
 
+	vm.CantOnStart = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx0
 		t.Fatal(err)
 	} else if reqVtxID != vtxID0 {
@@ -313,8 +311,6 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 			panic(errUnknownVertex)
 		}
 	}
-
-	vm.CantBootstrapped = false
 
 	if err := bs.MultiPut(peerID, *requestID, [][]byte{vtxBytes0, vtxBytes2}); err != nil { // send expected vertex and vertex that should not be accepted
 		t.Fatal(err)
@@ -454,8 +450,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		*reqIDPtr = reqID
 	}
 
-	vm.CantBootstrapping = false
-
+	vm.CantOnStart = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx0
 		t.Fatal(err)
 	}
@@ -471,8 +466,6 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		t.Fatal(errParsedUnknownVertex)
 		return nil, errParsedUnknownVertex
 	}
-
-	vm.CantBootstrapped = false
 
 	if err := bs.MultiPut(peerID, *reqIDPtr, [][]byte{vtxBytes0}); err != nil {
 		t.Fatal(err)
@@ -599,13 +592,10 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 		*reqIDPtr = reqID
 	}
 
-	vm.CantBootstrapping = false
-
+	vm.CantOnStart = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx1
 		t.Fatal(err)
 	}
-
-	vm.CantBootstrapped = false
 
 	if err := bs.MultiPut(peerID, *reqIDPtr, [][]byte{vtxBytes0}); err != nil {
 		t.Fatal(err)
@@ -834,8 +824,7 @@ func TestBootstrapperIncompleteMultiPut(t *testing.T) {
 		requested = vtxID
 	}
 
-	vm.CantBootstrapping = false
-
+	vm.CantOnStart = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx1
 		t.Fatal(err)
 	} else if requested != vtxID1 {
@@ -851,8 +840,6 @@ func TestBootstrapperIncompleteMultiPut(t *testing.T) {
 	case requested != vtxID0:
 		t.Fatal("should hae requested vtx0")
 	}
-
-	vm.CantBootstrapped = false
 
 	err = bs.MultiPut(peerID, *reqIDPtr, [][]byte{vtxBytes0})
 	switch {
@@ -953,8 +940,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		requestIDs[vtxID] = reqID
 	}
 
-	vm.CantBootstrapping = false
-
+	vm.CantOnStart = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx0 and vtx1
 		t.Fatal(err)
 	}
@@ -963,8 +949,6 @@ func TestBootstrapperFinalized(t *testing.T) {
 	if !ok {
 		t.Fatalf("should have requested vtx1")
 	}
-
-	vm.CantBootstrapped = false
 
 	if err := bs.MultiPut(peerID, reqID, [][]byte{vtxBytes1, vtxBytes0}); err != nil {
 		t.Fatal(err)
@@ -1094,8 +1078,7 @@ func TestBootstrapperAcceptsMultiPutParents(t *testing.T) {
 		requestIDs[vtxID] = reqID
 	}
 
-	vm.CantBootstrapping = false
-
+	vm.CantOnStart = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx2
 		t.Fatal(err)
 	}
@@ -1104,8 +1087,6 @@ func TestBootstrapperAcceptsMultiPutParents(t *testing.T) {
 	if !ok {
 		t.Fatalf("should have requested vtx2")
 	}
-
-	vm.CantBootstrapped = false
 
 	if err := bs.MultiPut(peerID, reqID, [][]byte{vtxBytes2, vtxBytes1, vtxBytes0}); err != nil {
 		t.Fatal(err)
@@ -1286,8 +1267,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		requestIDs[vtxID] = reqID
 	}
 
-	vm.CantBootstrapping = false
-
+	vm.CantOnStart = false
 	if err := bs.ForceAccepted([]ids.ID{vtxID3, vtxID4}); err != nil { // should request vtx3 and vtx4
 		t.Fatal(err)
 	}
@@ -1348,8 +1328,6 @@ func TestRestartBootstrapping(t *testing.T) {
 	if !ok {
 		t.Fatal("should have requested vtx0 after multiput ended prior to it")
 	}
-
-	vm.CantBootstrapped = false
 
 	if err := bs.MultiPut(peerID, vtx1ReqID, [][]byte{vtxBytes1, vtxBytes0}); err != nil {
 		t.Fatal(err)

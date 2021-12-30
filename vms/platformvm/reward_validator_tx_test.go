@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -404,11 +405,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstVM.clock.Set(defaultGenesisTime)
 	firstVM.uptimeManager.(uptime.TestManager).SetTime(defaultGenesisTime)
 
-	if err := firstVM.Bootstrapping(); err != nil {
+	if err := firstVM.OnStart(snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := firstVM.Bootstrapped(); err != nil {
+	if err := firstVM.OnStart(snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -445,11 +446,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	secondVM.clock.Set(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 
-	if err := secondVM.Bootstrapping(); err != nil {
+	if err := secondVM.OnStart(snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := secondVM.Bootstrapped(); err != nil {
+	if err := secondVM.OnStart(snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -609,11 +610,11 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	vm.clock.Set(defaultGenesisTime)
 	vm.uptimeManager.(uptime.TestManager).SetTime(defaultGenesisTime)
 
-	if err := vm.Bootstrapping(); err != nil {
+	if err := vm.OnStart(snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm.Bootstrapped(); err != nil {
+	if err := vm.OnStart(snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}
 
