@@ -242,8 +242,11 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(MinStakeDurationKey, genesis.LocalParams.MinStakeDuration, "Minimum staking duration")
 	// Maximum Stake Duration
 	fs.Duration(MaxStakeDurationKey, genesis.LocalParams.MaxStakeDuration, "Maximum staking duration")
-	// Stake Minting Period
-	fs.Duration(StakeMintingPeriodKey, genesis.LocalParams.StakeMintingPeriod, "Consumption period of the staking function")
+	// Stake Reward Configs
+	fs.Uint64(StakeMaxConsumptionRateKey, genesis.LocalParams.RewardConfig.MaxConsumptionRate, "Maximum consumption rate of the remaining tokens to mint in the staking function")
+	fs.Uint64(StakeMinConsumptionRateKey, genesis.LocalParams.RewardConfig.MinConsumptionRate, "Minimum consumption rate of the remaining tokens to mint in the staking function")
+	fs.Duration(StakeMintingPeriodKey, genesis.LocalParams.RewardConfig.MintingPeriod, "Consumption period of the staking function")
+	fs.Uint64(StakeSupplyCapKey, genesis.LocalParams.RewardConfig.SupplyCap, "Supply cap of the staking function")
 	// Subnets
 	fs.String(WhitelistedSubnetsKey, "", "Whitelist of subnets to validate.")
 

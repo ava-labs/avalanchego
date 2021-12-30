@@ -130,13 +130,7 @@ To connect to the Fuji Testnet, run:
 
 ### Creating a Local Testnet
 
-To create a single node testnet, run:
-
-```sh
-./build/avalanchego --network-id=local --staking-enabled=false --snow-sample-size=1 --snow-quorum-size=1
-```
-
-This launches an Avalanche network with one node.
+See [this tutorial.](https://docs.avax.network/build/tutorials/platform/create-a-local-test-network/)
 
 ## Generating Code
 
