@@ -420,6 +420,8 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 // Note, this function assumes that the `mu` mutex is held!
 func (bc *BlockChain) writeHeadBlock(block *types.Block) {
 	// If the block is on a side chain or an unknown one, force other heads onto it too
+	// TODO: go-ethereum now assumes that the block passed in should always
+	// update heads. Should we do this?
 	updateHeads := rawdb.ReadCanonicalHash(bc.db, block.NumberU64()) != block.Hash()
 
 	// Add the block to the canonical chain number scheme and mark as the head
@@ -752,6 +754,8 @@ func (bc *BlockChain) newTip(block *types.Block) bool {
 // but it expects the chain mutex to be held.
 // writeBlockWithState expects to be the last verification step during InsertBlock
 // since it creates a reference that will only be cleaned up by Accept/Reject.
+// TODO: no longer return writeStatus in go-ethereum? Should we do this
+// (separate into writeBlockAndSetHead)?
 func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, state *state.StateDB) (WriteStatus, error) {
 	bc.wg.Add(1)
 	defer bc.wg.Done()
@@ -1245,6 +1249,9 @@ func (bc *BlockChain) RemoveRejectedBlocks(start, end uint64) error {
 // it reaches a block with a state committed to the database. reprocessState does not use
 // snapshots since the disk layer for snapshots will most likely be above the last committed
 // state that reprocessing will start from.
+// TODO: do you want to replace this with recoverAncestors (new official approach
+// at this)? Interestingly, geth just re-inserts chain instead of doing the
+// explicit approach we have here.
 func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64, report bool) error {
 	var (
 		origin = current.NumberU64()

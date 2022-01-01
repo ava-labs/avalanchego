@@ -33,6 +33,7 @@ import (
 	// is added to a map of client-accessible tracers. In geth, this is done
 	// inside of cmd/geth.
 	_ "github.com/ava-labs/coreth/eth/tracers/native"
+	// TODO: geth also includes: 	_ "github.com/ethereum/go-ethereum/eth/tracers/js"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -314,6 +315,7 @@ func (vm *VM) Initialize(
 
 	ethConfig := ethconfig.NewDefaultConfig()
 	ethConfig.Genesis = g
+	// TODO: removed .NetworkID = ChainID
 
 	// Set log level
 	logLevel := defaultLogLevel

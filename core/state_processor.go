@@ -44,6 +44,7 @@ import (
 // state from one point to another.
 //
 // StateProcessor implements Processor.
+// TODO: we should probably bring in the state processor tests?
 type StateProcessor struct {
 	config *params.ChainConfig // Chain configuration options
 	bc     *BlockChain         // Canonical block chain
