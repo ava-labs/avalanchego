@@ -125,7 +125,7 @@ func (vm *VM) Initialize(
 	return vm.setLastAcceptedOptionTime()
 }
 
-func (vm *VM) Starting(state snow.State) error {
+func (vm *VM) OnStart(state snow.State) error {
 	vm.bootstrapped = (state == snow.NormalOp)
 	return vm.ChainVM.OnStart(state)
 }

@@ -279,14 +279,14 @@ func (vm *VM) createChain(tx *Tx) error {
 	return nil
 }
 
-// Bootstrapping marks this VM as bootstrapping
-func (vm *VM) bootstrapping() error {
+// onBootstrapStarted marks this VM as bootstrapping
+func (vm *VM) onBootstrapStarted() error {
 	vm.bootstrapped.SetValue(false)
 	return vm.fx.Bootstrapping()
 }
 
-// normalOperationsStarted marks this VM as bootstrapped
-func (vm *VM) normalOperationsStarted() error {
+// onNormalOperationsStarted marks this VM as bootstrapped
+func (vm *VM) onNormalOperationsStarted() error {
 	if vm.bootstrapped.GetValue() {
 		return nil
 	}
@@ -319,9 +319,9 @@ func (vm *VM) OnStart(state snow.State) error {
 		// nothing to do here
 		return nil
 	case snow.Bootstrapping:
-		return vm.bootstrapping()
+		return vm.onBootstrapStarted()
 	case snow.NormalOp:
-		return vm.normalOperationsStarted()
+		return vm.onNormalOperationsStarted()
 	default:
 		return snow.ErrUnknownState
 	}
