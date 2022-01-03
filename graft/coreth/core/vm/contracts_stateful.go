@@ -106,13 +106,12 @@ func PackNativeAssetCallInput(address common.Address, assetID common.Hash, asset
 	return input
 }
 
-func UnpackNativeAssetCallInput(input []byte) (common.Address, *common.Hash, *big.Int, []byte, error) {
+func UnpackNativeAssetCallInput(input []byte) (common.Address, common.Hash, *big.Int, []byte, error) {
 	if len(input) < 84 {
-		return common.Address{}, nil, nil, nil, fmt.Errorf("native asset call input had unexpcted length %d", len(input))
+		return common.Address{}, common.Hash{}, nil, nil, fmt.Errorf("native asset call input had unexpcted length %d", len(input))
 	}
 	to := common.BytesToAddress(input[:20])
-	assetID := new(common.Hash)
-	assetID.SetBytes(input[20:52])
+	assetID := common.BytesToHash(input[20:52])
 	assetAmount := new(big.Int).SetBytes(input[52:84])
 	callData := input[84:]
 	return to, assetID, assetAmount, callData, nil
@@ -174,6 +173,6 @@ func (c *nativeAssetCall) Run(evm *EVM, caller ContractRef, addr common.Address,
 
 type deprecatedContract struct{}
 
-func (_ *deprecatedContract) Run(evm *EVM, caller ContractRef, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+func (*deprecatedContract) Run(evm *EVM, caller ContractRef, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	return nil, suppliedGas, ErrExecutionReverted
 }
