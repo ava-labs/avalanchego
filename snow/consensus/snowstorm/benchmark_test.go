@@ -73,29 +73,6 @@ func BenchmarkVirtuousDirected(b *testing.B) {
 	}
 }
 
-func BenchmarkVirtuousInput(b *testing.B) {
-	for n := 0; n < b.N; n++ {
-		err := Simulate(
-			/*numColors=*/ 25,
-			/*colorsPerConsumer=*/ 1,
-			/*maxInputConflicts=*/ 1,
-			/*numNodes=*/ 50,
-			/*params=*/ sbcon.Parameters{
-				K:                 20,
-				Alpha:             11,
-				BetaVirtuous:      20,
-				BetaRogue:         30,
-				ConcurrentRepolls: 1,
-			},
-			/*seed=*/ 0,
-			/*fact=*/ inputFactory{},
-		)
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
 /*
  ******************************************************************************
  *********************************** Rogue ************************************
@@ -118,29 +95,6 @@ func BenchmarkRogueDirected(b *testing.B) {
 			},
 			/*seed=*/ 0,
 			/*fact=*/ DirectedFactory{},
-		)
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
-func BenchmarkRogueInput(b *testing.B) {
-	for n := 0; n < b.N; n++ {
-		err := Simulate(
-			/*numColors=*/ 25,
-			/*colorsPerConsumer=*/ 1,
-			/*maxInputConflicts=*/ 3,
-			/*numNodes=*/ 50,
-			/*params=*/ sbcon.Parameters{
-				K:                 20,
-				Alpha:             11,
-				BetaVirtuous:      20,
-				BetaRogue:         30,
-				ConcurrentRepolls: 1,
-			},
-			/*seed=*/ 0,
-			/*fact=*/ inputFactory{},
 		)
 		if err != nil {
 			b.Fatal(err)
@@ -177,29 +131,6 @@ func BenchmarkMultiDirected(b *testing.B) {
 	}
 }
 
-func BenchmarkMultiInput(b *testing.B) {
-	for n := 0; n < b.N; n++ {
-		err := Simulate(
-			/*numColors=*/ 50,
-			/*colorsPerConsumer=*/ 10,
-			/*maxInputConflicts=*/ 1,
-			/*numNodes=*/ 50,
-			/*params=*/ sbcon.Parameters{
-				K:                 20,
-				Alpha:             11,
-				BetaVirtuous:      20,
-				BetaRogue:         30,
-				ConcurrentRepolls: 1,
-			},
-			/*seed=*/ 0,
-			/*fact=*/ inputFactory{},
-		)
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
 /*
  ******************************************************************************
  ***************************** Many Rogue Inputs ******************************
@@ -222,29 +153,6 @@ func BenchmarkMultiRogueDirected(b *testing.B) {
 			},
 			/*seed=*/ 0,
 			/*fact=*/ DirectedFactory{},
-		)
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
-func BenchmarkMultiRogueInput(b *testing.B) {
-	for n := 0; n < b.N; n++ {
-		err := Simulate(
-			/*numColors=*/ 50,
-			/*colorsPerConsumer=*/ 10,
-			/*maxInputConflicts=*/ 3,
-			/*numNodes=*/ 50,
-			/*params=*/ sbcon.Parameters{
-				K:                 20,
-				Alpha:             11,
-				BetaVirtuous:      20,
-				BetaRogue:         30,
-				ConcurrentRepolls: 1,
-			},
-			/*seed=*/ 0,
-			/*fact=*/ inputFactory{},
 		)
 		if err != nil {
 			b.Fatal(err)
