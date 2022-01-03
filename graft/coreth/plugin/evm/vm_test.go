@@ -216,8 +216,8 @@ func GenesisVM(t *testing.T,
 	}
 
 	if finishBootstrapping {
-		assert.NoError(t, vm.Bootstrapping())
-		assert.NoError(t, vm.Bootstrapped())
+		assert.NoError(t, vm.OnStart(snow.Bootstrapping))
+		assert.NoError(t, vm.OnStart(snow.NormalOp))
 	}
 
 	return issuer, vm, dbManager, m, appSender
