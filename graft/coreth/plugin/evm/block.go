@@ -167,11 +167,7 @@ func (b *Block) indexAtomics(vm *VM, height uint64, atomicTxs []*Tx, batchChains
 		return err
 	}
 
-	if err := b.vm.atomicTrie.Index(height, batchChainsAndInputs); err != nil {
-		return err
-	}
-
-	return nil
+	return b.vm.atomicTrie.Index(height, batchChainsAndInputs)
 }
 
 // Reject implements the snowman.Block interface
