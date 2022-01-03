@@ -24,7 +24,8 @@ fi
 TESTS=${TESTS:-"golangci_lint license_header"}
 
 function test_golangci_lint {
-  golangci-lint run --max-same-issues=0 --timeout=2m
+  go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.43.0
+  golangci-lint run --config .golangci.yml
 }
 
 # find_go_files [package]
