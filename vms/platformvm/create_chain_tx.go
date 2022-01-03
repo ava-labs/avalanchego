@@ -49,7 +49,7 @@ type UnsignedCreateChainTx struct {
 	FxIDs []ids.ID `serialize:"true" json:"fxIDs"`
 	// Byte representation of genesis state of the new chain
 	GenesisData []byte `serialize:"true" json:"genesisData"`
-	// Auth that will be allowing this validator into the network
+	// Authorizes this blockchain to be added to this subnet
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
 
