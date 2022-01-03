@@ -132,11 +132,11 @@ func nearestCommitHeight(blockNumber uint64, commitInterval uint64) uint64 {
 func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 	start := time.Now()
 	a.log.Info("initializing atomic trie", "lastAcceptedBlockNumber", lastAcceptedBlockNumber)
-	// commitHeight is the highest block that can be committed i.e. is divisible by b.commitHeightInterval
+	// finalCommitHeight is the highest block that can be committed i.e. is divisible by b.commitHeightInterval
 	// Txs from heights greater than commitHeight are to be included in the trie corresponding to the block at
-	// commitHeight+b.commitHeightInterval, which has not been accepted yet.
-	commitHeight := nearestCommitHeight(lastAcceptedBlockNumber, a.commitHeightInterval)
-	uncommittedOpsMap := make(map[uint64]map[ids.ID]*atomic.Requests, lastAcceptedBlockNumber-commitHeight)
+	// finalCommitHeight+b.commitHeightInterval, which has not been accepted yet.
+	finalCommitHeight := nearestCommitHeight(lastAcceptedBlockNumber, a.commitHeightInterval)
+	uncommittedOpsMap := make(map[uint64]map[ids.ID]*atomic.Requests, lastAcceptedBlockNumber-finalCommitHeight)
 
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, a.lastCommittedHeight)
@@ -148,8 +148,9 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 	postCommitTxIndexed := 0
 	lastUpdate := time.Now()
 
-	// keep track of the latest generated trie's root.
+	// keep track of the latest generated trie's root and height.
 	lastHash := common.Hash{}
+	lastHeight := a.lastCommittedHeight
 	for iter.Next() {
 		// Get the height and transactions for this iteration (from the key and value, respectively)
 		// iterate over the transactions, indexing them if the height is < commit height
@@ -168,7 +169,7 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 
 		if _, skipBonusBlock := a.bonusBlocks[height]; skipBonusBlock {
 			// If [height] is a bonus block, do not index the atomic operations into the trie
-		} else if height > commitHeight {
+		} else if height > finalCommitHeight {
 			// if height is greater than commit height, add it to the map so that we can write it later
 			// this is to ensure we have all the data before the commit height so that we can commit the
 			// trie
@@ -185,8 +186,10 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 			lastUpdate = time.Now()
 		}
 
+		// if height has reached or skipped over the next commit interval,
 		// keep track of progress and keep commit size under commitSizeCap
-		if height%a.commitHeightInterval == 0 {
+		commitHeight := nearestCommitHeight(height, a.commitHeightInterval)
+		if lastHeight < commitHeight {
 			hash, _, err := a.trie.Commit(nil)
 			if err != nil {
 				return err
@@ -200,13 +203,14 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 			storage, _ := a.trieDB.Size()
 			if storage > commitSizeCap {
 				a.log.Info("committing atomic trie progress", "storage", storage)
-				a.commit(height)
+				a.commit(commitHeight)
 				// Flush any remaining changes that have not been committed yet in the versiondb.
 				if err := a.db.Commit(); err != nil {
 					return err
 				}
 			}
 			lastHash = hash
+			lastHeight = commitHeight
 		}
 	}
 	if err := iter.Error(); err != nil {
@@ -217,9 +221,9 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 	if lastAcceptedBlockNumber == 0 {
 		return nil
 	}
-	// now that all heights < commitHeight have been processed
+	// now that all heights < finalCommitHeight have been processed
 	// commit the trie
-	if err := a.commit(commitHeight); err != nil {
+	if err := a.commit(finalCommitHeight); err != nil {
 		return err
 	}
 	// Flush any remaining changes that have not been committed yet in the versiondb.
@@ -227,7 +231,7 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 		return err
 	}
 
-	// process uncommitted ops for heights > commitHeight
+	// process uncommitted ops for heights > finalCommitHeight
 	for height, ops := range uncommittedOpsMap {
 		if err := a.updateTrie(height, ops); err != nil {
 			return err
