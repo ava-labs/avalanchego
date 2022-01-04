@@ -273,7 +273,7 @@ func (i *indexer) registerChainHelper(
 	copy(prefix, chainID[:])
 	prefix[hashing.HashLen] = prefixEnd
 	indexDB := prefixdb.New(prefix, i.db)
-	index, err := newIndex(indexDB, i.log, i.codec, i.clock)
+	index, err := newStandAloneIndex(indexDB, i.log, i.codec, i.clock)
 	if err != nil {
 		_ = indexDB.Close()
 		return nil, err
