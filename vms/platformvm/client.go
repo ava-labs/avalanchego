@@ -27,7 +27,7 @@ type Client interface {
 	// ImportKey imports the specified [privateKey] to [user]'s keystore
 	ImportKey(user api.UserPass, address string) (string, error)
 	// GetBalance returns the balance of [address] on the P Chain
-	GetBalance(addr string) (*GetBalanceResponse, error)
+	GetBalance(addrs []string) (*GetBalanceResponse, error)
 	// CreateAddress creates a new address for [user]
 	CreateAddress(user api.UserPass) (string, error)
 	// ListAddresses returns an array of platform addresses controlled by [user]
@@ -203,10 +203,10 @@ func (c *client) ImportKey(user api.UserPass, privateKey string) (string, error)
 	return res.Address, err
 }
 
-func (c *client) GetBalance(address string) (*GetBalanceResponse, error) {
+func (c *client) GetBalance(addrs []string) (*GetBalanceResponse, error) {
 	res := &GetBalanceResponse{}
-	err := c.requester.SendRequest("getBalance", &api.JSONAddress{
-		Address: address,
+	err := c.requester.SendRequest("getBalance", &GetBalanceRequest{
+		Addresses: addrs,
 	}, res)
 	return res, err
 }
