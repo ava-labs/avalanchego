@@ -131,8 +131,6 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 			err)
 	}
 
-	b.NumFetched = 0
-
 	pendingContainerIDs := b.Blocked.MissingIDs()
 
 	// Append the list of accepted container IDs to pendingContainerIDs to ensure
@@ -274,6 +272,8 @@ func (b *Bootstrapper) process(blk snowman.Block, processingBlocks map[ids.ID]sn
 	status := blk.Status()
 	blkID := blk.ID()
 	blkHeight := blk.Height()
+	totalBlocksToFetch := b.tipHeight - b.startingHeight
+
 	if blkHeight > b.tipHeight && b.startingAcceptedFrontier.Contains(blkID) {
 		b.tipHeight = blkHeight
 	}
@@ -320,12 +320,14 @@ func (b *Bootstrapper) process(blk snowman.Block, processingBlocks map[ids.ID]sn
 		}
 
 		b.numFetched.Inc()
-		b.NumFetched++                                      // Progress tracker
-		if b.NumFetched%common.StatusUpdateFrequency == 0 { // Periodically print progress
+
+		blocksFetchedSoFar := b.Blocked.Jobs.PendingJobs()
+
+		if blocksFetchedSoFar%common.StatusUpdateFrequency == 0 { // Periodically print progress
 			if !b.Restarted {
-				b.Ctx.Log.Info("fetched %d of %d blocks", b.NumFetched, b.tipHeight-b.startingHeight)
+				b.Ctx.Log.Info("fetched %d of %d blocks", blocksFetchedSoFar, totalBlocksToFetch)
 			} else {
-				b.Ctx.Log.Debug("fetched %d of %d blocks", b.NumFetched, b.tipHeight-b.startingHeight)
+				b.Ctx.Log.Debug("fetched %d of %d blocks", blocksFetchedSoFar, totalBlocksToFetch)
 			}
 		}
 	}
@@ -358,9 +360,9 @@ func (b *Bootstrapper) checkFinish() error {
 	}
 
 	if !b.Restarted {
-		b.Ctx.Log.Info("bootstrapping fetched %d blocks. Executing state transitions...", b.NumFetched)
+		b.Ctx.Log.Info("bootstrapping fetched %d blocks. Executing state transitions...", b.Blocked.PendingJobs())
 	} else {
-		b.Ctx.Log.Debug("bootstrapping fetched %d blocks. Executing state transitions...", b.NumFetched)
+		b.Ctx.Log.Debug("bootstrapping fetched %d blocks. Executing state transitions...", b.Blocked.PendingJobs())
 	}
 
 	executedBlocks, err := b.Blocked.ExecuteAll(b.Ctx, b, b.Restarted, b.Ctx.ConsensusDispatcher, b.Ctx.DecisionDispatcher)

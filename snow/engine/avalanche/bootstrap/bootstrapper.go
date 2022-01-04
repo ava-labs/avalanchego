@@ -235,12 +235,14 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 			}
 
 			b.numFetchedVts.Inc()
-			b.NumFetched++ // Progress tracker
-			if b.NumFetched%common.StatusUpdateFrequency == 0 {
+
+			verticesFetchedSoFar := b.VtxBlocked.Jobs.PendingJobs()
+
+			if verticesFetchedSoFar%common.StatusUpdateFrequency == 0 { // Periodically print progress
 				if !b.Restarted {
-					b.Ctx.Log.Info("fetched %d vertices", b.NumFetched)
+					b.Ctx.Log.Info("fetched %d vertices", verticesFetchedSoFar)
 				} else {
-					b.Ctx.Log.Debug("fetched %d vertices", b.NumFetched)
+					b.Ctx.Log.Debug("fetched %d vertices", verticesFetchedSoFar)
 				}
 			}
 
@@ -394,8 +396,6 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 			err)
 	}
 
-	b.NumFetched = 0
-
 	pendingContainerIDs := b.VtxBlocked.MissingIDs()
 	// Append the list of accepted container IDs to pendingContainerIDs to ensure
 	// we iterate over every container that must be traversed.
@@ -427,9 +427,9 @@ func (b *Bootstrapper) checkFinish() error {
 	}
 
 	if !b.Restarted {
-		b.Ctx.Log.Info("bootstrapping fetched %d vertices. Executing transaction state transitions...", b.NumFetched)
+		b.Ctx.Log.Info("bootstrapping fetched %d vertices. Executing transaction state transitions...", b.VtxBlocked.PendingJobs())
 	} else {
-		b.Ctx.Log.Debug("bootstrapping fetched %d vertices. Executing transaction state transitions...", b.NumFetched)
+		b.Ctx.Log.Debug("bootstrapping fetched %d vertices. Executing transaction state transitions...", b.VtxBlocked.PendingJobs())
 	}
 
 	_, err := b.TxBlocked.ExecuteAll(b.Ctx, b, b.Restarted, b.Ctx.DecisionDispatcher)
