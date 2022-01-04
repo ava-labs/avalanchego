@@ -11,7 +11,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -145,10 +144,11 @@ type indexer struct {
 }
 
 // Assumes [engine]'s context lock is not held
-func (i *indexer) RegisterChain(name string, ctx *snow.ConsensusContext, engine common.Engine) {
+func (i *indexer) RegisterChain(name string, engine common.Engine) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
+	ctx := engine.Context()
 	if i.closed {
 		i.log.Debug("not registering chain %s because indexer is closed", name)
 		return
