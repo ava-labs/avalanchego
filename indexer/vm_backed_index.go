@@ -7,9 +7,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/math"
 )
@@ -21,21 +21,18 @@ var (
 )
 
 type vmBackedBlockIndex struct {
-	codec codec.Manager
-
 	vm  block.ChainVM
 	hVM block.HeightIndexedChainVM
 }
 
-func newVmBackedBlockIndex(codec codec.Manager, vm block.ChainVM) (Index, error) {
+func newVMBackedBlockIndex(vm block.ChainVM) (Index, error) {
 	hVM, ok := vm.(block.HeightIndexedChainVM)
 	if !ok {
 		return nil, block.ErrHeightIndexedVMNotImplemented
 	}
 	return &vmBackedBlockIndex{
-		codec: codec,
-		vm:    vm,
-		hVM:   hVM,
+		vm:  vm,
+		hVM: hVM,
 	}, nil
 }
 
@@ -44,7 +41,7 @@ func (vmi *vmBackedBlockIndex) Accept(ctx *snow.ConsensusContext, containerID id
 	return nil
 }
 
-func (vmi *vmBackedBlockIndex) getContainerByIndex(index uint64) ([]byte, error) {
+func (vmi *vmBackedBlockIndex) getBlkByIndex(index uint64) (snowman.Block, error) {
 	if !vmi.hVM.IsHeightIndexComplete() {
 		return nil, errIndexNotReady
 	}
@@ -53,29 +50,19 @@ func (vmi *vmBackedBlockIndex) getContainerByIndex(index uint64) ([]byte, error)
 	if err != nil {
 		return nil, fmt.Errorf("no container at index %d", index)
 	}
-	blk, err := vmi.vm.GetBlock(blkID)
-	if err != nil {
-		return nil, fmt.Errorf("no container at index %d", index)
-	}
-
-	return blk.Bytes(), nil
-}
-
-func (vmi *vmBackedBlockIndex) bytesToContainer(bytes []byte) (Container, error) {
-	var container Container
-	if _, err := vmi.codec.Unmarshal(bytes, &container); err != nil {
-		return Container{}, fmt.Errorf("couldn't unmarshal container: %w", err)
-	}
-	return container, nil
+	return vmi.vm.GetBlock(blkID)
 }
 
 func (vmi *vmBackedBlockIndex) GetContainerByIndex(index uint64) (Container, error) {
-	containerBytes, err := vmi.getContainerByIndex(index)
+	blk, err := vmi.getBlkByIndex(index)
 	if err != nil {
 		return Container{}, err
 	}
 
-	return vmi.bytesToContainer(containerBytes)
+	return Container{
+		ID:    blk.ID(),
+		Bytes: blk.Bytes(),
+	}, nil
 }
 
 func (vmi *vmBackedBlockIndex) GetContainerRange(startIndex uint64, numToFetch uint64) ([]Container, error) {
@@ -104,19 +91,17 @@ func (vmi *vmBackedBlockIndex) GetContainerRange(startIndex uint64, numToFetch u
 	lastIndex := math.Min64(startIndex+numToFetch-1, lastAcceptedIndex)
 	// [lastIndex] is always >= [startIndex] so this is safe.
 	// [numToFetch] is limited to [MaxFetchedByRange] so [containers] is bounded in size.
-	containers := make([]Container, int(lastIndex)-int(startIndex)+1)
+	containers := make([]Container, 0, int(lastIndex)-int(startIndex)+1)
 
-	n := 0
 	for j := startIndex; j <= lastIndex; j++ {
-		containerBytes, err := vmi.getContainerByIndex(j)
+		blk, err := vmi.getBlkByIndex(j)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't get container at index %d: %w", j, err)
 		}
-		containers[n], err = vmi.bytesToContainer(containerBytes)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't get container at index %d: %w", j, err)
-		}
-		n++
+		containers = append(containers, Container{
+			ID:    blk.ID(),
+			Bytes: blk.Bytes(),
+		})
 	}
 	return containers, nil
 }
@@ -131,7 +116,10 @@ func (vmi *vmBackedBlockIndex) GetLastAccepted() (Container, error) {
 		return Container{}, fmt.Errorf("could not retrieve last accepted container")
 	}
 
-	return vmi.bytesToContainer(lastBlk.Bytes())
+	return Container{
+		ID:    lastBlk.ID(),
+		Bytes: lastBlk.Bytes(),
+	}, nil
 }
 
 func (vmi *vmBackedBlockIndex) GetIndex(containerID ids.ID) (uint64, error) {
@@ -149,7 +137,10 @@ func (vmi *vmBackedBlockIndex) GetContainerByID(containerID ids.ID) (Container, 
 		return Container{}, fmt.Errorf("could not retrieve container %s", containerID)
 	}
 
-	return vmi.bytesToContainer(blk.Bytes())
+	return Container{
+		ID:    blk.ID(),
+		Bytes: blk.Bytes(),
+	}, nil
 }
 
 func (vmi *vmBackedBlockIndex) Close() error {
