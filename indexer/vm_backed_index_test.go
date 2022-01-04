@@ -125,3 +125,77 @@ func TestVMBackedBlockIndex(t *testing.T) {
 		assert.EqualValues(blks[container.ID].ID(), container.ID)
 	}
 }
+
+func TestVMBackedBlockIndexGetContainerByRangeMaxPageSize(t *testing.T) {
+	// Setup
+	assert := assert.New(t)
+
+	vm := extendedVM{
+		TestVM:              &block.TestVM{},
+		TestHeightIndexedVM: &block.TestHeightIndexedVM{},
+	}
+	_, err := newVMBackedBlockIndex(&block.TestVM{})
+	assert.Error(err, "non HeightIndexedVM should not be used for the index")
+
+	vm.IsHeightIndexCompleteF = func() bool { return true }
+	vmBackedIndex, err := newVMBackedBlockIndex(vm)
+	assert.NoError(err)
+
+	// Insert [MaxFetchedByRange] + 1 containers
+	blksList := make([]*snowman.TestBlock, 0)
+	blks := make(map[ids.ID]*snowman.TestBlock)
+	for height := uint64(0); height < MaxFetchedByRange+1; height++ {
+		blk := &snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Accepted,
+			},
+			HeightV:    height,
+			TimestampV: time.Now(),
+			BytesV:     utils.RandomBytes(len(ids.Empty)),
+		}
+
+		blksList = append(blksList, blk)
+		blks[blk.ID()] = blk
+	}
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		blk, ok := blks[blkID]
+		if !ok {
+			return nil, database.ErrNotFound
+		}
+		return blk, nil
+	}
+	vm.GetBlockIDByHeightF = func(height uint64) (ids.ID, error) {
+		if height >= uint64(len(blksList)) {
+			return ids.Empty, database.ErrNotFound
+		}
+		return blksList[height].ID(), nil
+	}
+	vm.LastAcceptedF = func() (ids.ID, error) {
+		return blksList[len(blksList)-1].ID(), nil
+	}
+
+	// Page size too large
+	_, err = vmBackedIndex.GetContainerRange(0, MaxFetchedByRange+1)
+	assert.Error(err)
+
+	// Make sure data is right
+	containers, err := vmBackedIndex.GetContainerRange(0, MaxFetchedByRange)
+	assert.NoError(err)
+	assert.Len(containers, MaxFetchedByRange)
+
+	containers2, err := vmBackedIndex.GetContainerRange(1, MaxFetchedByRange)
+	assert.NoError(err)
+	assert.Len(containers2, MaxFetchedByRange)
+
+	assert.Equal(containers[1], containers2[0])
+	assert.Equal(containers[MaxFetchedByRange-1], containers2[MaxFetchedByRange-2])
+
+	// Should have last 2 elements
+	containers, err = vmBackedIndex.GetContainerRange(MaxFetchedByRange-1, MaxFetchedByRange)
+	assert.NoError(err)
+	assert.Len(containers, 2)
+	assert.EqualValues(containers[1], containers2[MaxFetchedByRange-1])
+	assert.EqualValues(containers[0], containers2[MaxFetchedByRange-2])
+}
