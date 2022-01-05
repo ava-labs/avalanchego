@@ -279,25 +279,6 @@ func (b *bootstrapper) HealthCheck() (interface{}, error) {
 // GetVM implements the common.Engine interface.
 func (b *bootstrapper) GetVM() common.VM { return b.VM }
 
-// CurrentAcceptedFrontier implements common.Bootstrapable interface
-// CurrentAcceptedFrontier returns the set of vertices that this node has accepted
-// that have no accepted children
-func (b *bootstrapper) CurrentAcceptedFrontier() ([]ids.ID, error) {
-	return b.Manager.Edge(), nil
-}
-
-// FilterAccepted implements common.Bootstrapable interface
-// FilterAccepted returns the IDs of vertices in [containerIDs] that this node has accepted
-func (b *bootstrapper) FilterAccepted(containerIDs []ids.ID) []ids.ID {
-	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
-	for _, vtxID := range containerIDs {
-		if vtx, err := b.Manager.GetVtx(vtxID); err == nil && vtx.Status() == choices.Accepted {
-			acceptedVtxIDs = append(acceptedVtxIDs, vtxID)
-		}
-	}
-	return acceptedVtxIDs
-}
-
 // Add the vertices in [vtxIDs] to the set of vertices that we need to fetch,
 // and then fetch vertices (and their ancestors) until either there are no more
 // to fetch or we are at the maximum number of outstanding requests.

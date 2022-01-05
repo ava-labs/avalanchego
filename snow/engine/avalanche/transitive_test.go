@@ -17,8 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
-	abh "github.com/ava-labs/avalanchego/snow/engine/avalanche/base_msg_handler"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap"
+	agh "github.com/ava-labs/avalanchego/snow/engine/avalanche/get_handler"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -1547,11 +1547,11 @@ func TestEngineGetVertex(t *testing.T) {
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
 	engCfg.Manager = manager
-	avaBaseMsgHandler, err := abh.New(manager, commonCfg)
+	avaGetHandler, err := agh.New(manager, commonCfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	engCfg.Handler = avaBaseMsgHandler
+	engCfg.Handler = avaGetHandler
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),

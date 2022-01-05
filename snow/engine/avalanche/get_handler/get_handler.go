@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package msghandler
+package gethandler
 
 import (
 	"time"
@@ -17,13 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-// Get requests are always served. Hence this object, common to bootstrapper and engine
-var (
-	_ common.GetAcceptedFrontierHandler = &Handler{}
-	_ common.GetAcceptedHandler         = &Handler{}
-	_ common.GetAncestorsHandler        = &Handler{}
-	_ common.GetHandler                 = &Handler{}
-)
+// Get requests are always served. Hence Handler, common to bootstrapper and engine
+var _ common.AllGetsServer = &Handler{}
 
 func New(manager vertex.Manager, commonCfg common.Config) (Handler, error) {
 	bh := Handler{
@@ -54,12 +49,17 @@ type Handler struct {
 	getAncestorsVtxs metric.Averager
 }
 
-// All Get.* Requests are served ...
-func (bh Handler) Get(validatorID ids.ShortID, requestID uint32, vtxID ids.ID) error {
-	// If this engine has access to the requested vertex, provide it
-	if vtx, err := bh.manager.GetVtx(vtxID); err == nil {
-		bh.sender.SendPut(validatorID, requestID, vtxID, vtx.Bytes())
+func (bh Handler) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
+	acceptedFrontier, err := bh.CurrentAcceptedFrontier()
+	if err != nil {
+		return err
 	}
+	bh.sender.SendAcceptedFrontier(validatorID, requestID, acceptedFrontier)
+	return nil
+}
+
+func (bh Handler) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+	bh.sender.SendAccepted(validatorID, requestID, bh.FilterAccepted(containerIDs))
 	return nil
 }
 
@@ -111,26 +111,28 @@ func (bh Handler) GetAncestors(validatorID ids.ShortID, requestID uint32, vtxID 
 	return nil
 }
 
-func (bh Handler) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
-	// TODO ABENEGIA: Broken common interface with Snowman. To Restore
-	// acceptedFrontier, err := b.Bootstrapable.CurrentAcceptedFrontier()
-
-	acceptedFrontier := bh.manager.Edge()
-	bh.sender.SendAcceptedFrontier(validatorID, requestID, acceptedFrontier)
+func (bh Handler) Get(validatorID ids.ShortID, requestID uint32, vtxID ids.ID) error {
+	// If this engine has access to the requested vertex, provide it
+	if vtx, err := bh.manager.GetVtx(vtxID); err == nil {
+		bh.sender.SendPut(validatorID, requestID, vtxID, vtx.Bytes())
+	}
 	return nil
 }
 
-func (bh Handler) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	// TODO ABENEGIA: Broken common interface with Snowman. To Restore
-	// bh.sender.SendAccepted(validatorID, requestID, b.Bootstrapable.FilterAccepted(containerIDs))
+// CurrentAcceptedFrontier returns the set of vertices that this node has accepted
+// that have no accepted children
+func (bh Handler) CurrentAcceptedFrontier() ([]ids.ID, error) {
+	return bh.manager.Edge(), nil
+}
 
+// FilterAccepted returns the subset of containerIDs that are accepted by this chain.
+// FilterAccepted returns the IDs of vertices in [containerIDs] that this node has accepted
+func (bh Handler) FilterAccepted(containerIDs []ids.ID) []ids.ID {
 	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, vtxID := range containerIDs {
 		if vtx, err := bh.manager.GetVtx(vtxID); err == nil && vtx.Status() == choices.Accepted {
 			acceptedVtxIDs = append(acceptedVtxIDs, vtxID)
 		}
 	}
-
-	bh.sender.SendAccepted(validatorID, requestID, acceptedVtxIDs)
-	return nil
+	return acceptedVtxIDs
 }

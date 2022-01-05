@@ -240,25 +240,6 @@ func (b *bootstrapper) HealthCheck() (interface{}, error) {
 // GetVM implements the common.Engine interface.
 func (b *bootstrapper) GetVM() common.VM { return b.VM }
 
-// CurrentAcceptedFrontier implements common.Bootstrapable interface
-// CurrentAcceptedFrontier returns the last accepted block
-func (b *bootstrapper) CurrentAcceptedFrontier() ([]ids.ID, error) {
-	lastAccepted, err := b.VM.LastAccepted()
-	return []ids.ID{lastAccepted}, err
-}
-
-// FilterAccepted implements common.Bootstrapable interface
-// FilterAccepted returns the blocks in [containerIDs] that we have accepted
-func (b *bootstrapper) FilterAccepted(containerIDs []ids.ID) []ids.ID {
-	acceptedIDs := make([]ids.ID, 0, len(containerIDs))
-	for _, blkID := range containerIDs {
-		if blk, err := b.VM.GetBlock(blkID); err == nil && blk.Status() == choices.Accepted {
-			acceptedIDs = append(acceptedIDs, blkID)
-		}
-	}
-	return acceptedIDs
-}
-
 // ForceAccepted implements common.Bootstrapable interface
 func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	if err := b.VM.Bootstrapping(); err != nil {

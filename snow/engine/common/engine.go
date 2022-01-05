@@ -34,19 +34,23 @@ type Engine interface {
 }
 
 type Handler interface {
-	GetAcceptedFrontierHandler
+	AllGetsServer
 	AcceptedFrontierHandler
-	GetAcceptedHandler
 	AcceptedHandler
-	GetAncestorsHandler
 	AncestorsHandler
-	GetHandler
 	PutHandler
 	QueryHandler
 	ChitsHandler
 	AppHandler
 
 	InternalHandler
+}
+
+type AllGetsServer interface {
+	GetAcceptedFrontierHandler
+	GetAcceptedHandler
+	GetAncestorsHandler
+	GetHandler
 }
 
 // GetAcceptedFrontierHandler defines how a consensus engine reacts to a get

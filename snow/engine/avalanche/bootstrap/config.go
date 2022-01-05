@@ -4,7 +4,7 @@
 package bootstrap
 
 import (
-	basemsghandler "github.com/ava-labs/avalanchego/snow/engine/avalanche/base_msg_handler"
+	gethandler "github.com/ava-labs/avalanchego/snow/engine/avalanche/get_handler"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
@@ -13,7 +13,7 @@ import (
 type Config struct {
 	common.Config
 
-	basemsghandler.Handler
+	gethandler.Handler
 
 	// VtxBlocked tracks operations that are blocked on vertices
 	VtxBlocked *queue.JobsWithMissing

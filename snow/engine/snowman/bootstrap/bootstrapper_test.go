@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	sgh "github.com/ava-labs/avalanchego/snow/engine/snowman/get_handler"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
@@ -67,8 +68,15 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 		MultiputMaxContainersReceived: 2000,
 		SharedCfg:                     &common.SharedConfig{},
 	}
+
+	snowGetHandler, err := sgh.New(vm, commonConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	return Config{
 		Config:        commonConfig,
+		Handler:       snowGetHandler,
 		Blocked:       blocker,
 		VM:            vm,
 		WeightTracker: common.NewWeightTracker(commonConfig.Beacons, commonConfig.StartupAlpha),
@@ -645,12 +653,16 @@ func TestBootstrapperAcceptedFrontier(t *testing.T) {
 		assert.Equal(t, blkID, bID)
 		return dummyBlk, nil
 	}
-	bs, err := New(
+	bsIntf, err := New(
 		config,
 		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
+	}
+	bs, ok := bsIntf.(*bootstrapper)
+	if !ok {
+		t.Fatal("unexpected bootstrapper type")
 	}
 
 	startReqID := uint32(0)
@@ -694,12 +706,16 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 		return blk1, nil
 	}
 
-	bs, err := New(
+	bsIntf, err := New(
 		config,
 		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
+	}
+	bs, ok := bsIntf.(*bootstrapper)
+	if !ok {
+		t.Fatal("unexpected bootstrapper type")
 	}
 
 	startReqID := uint32(0)

@@ -8,15 +8,15 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	basemsghandler "github.com/ava-labs/avalanchego/snow/engine/snowman/base_msg_handler"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	gethandler "github.com/ava-labs/avalanchego/snow/engine/snowman/get_handler"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 // Config wraps all the parameters needed for a snowman engine
 type Config struct {
 	Ctx *snow.ConsensusContext
-	basemsghandler.Handler
+	gethandler.Handler
 	VM         block.ChainVM
 	Sender     common.Sender
 	Validators validators.Set
