@@ -44,7 +44,6 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -430,7 +429,6 @@ func TestEngineMultipleQuery(t *testing.T) {
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr0 := ids.GenerateTestShortID()
 	vdr1 := ids.GenerateTestShortID()
@@ -938,7 +936,6 @@ func TestVoteCanceling(t *testing.T) {
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr0 := ids.GenerateTestShortID()
 	vdr1 := ids.GenerateTestShortID()
@@ -1078,7 +1075,6 @@ func TestEngineNoQuery(t *testing.T) {
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.WeightTracker = wt
-	engCfg.WeightTracker = wt
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -1148,7 +1144,6 @@ func TestEngineNoRepollQuery(t *testing.T) {
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.WeightTracker = wt
-	engCfg.WeightTracker = wt
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -1838,7 +1833,6 @@ func TestEngineAggressivePolling(t *testing.T) {
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1978,7 +1972,6 @@ func TestEngineDoubleChit(t *testing.T) {
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr0 := ids.GenerateTestShortID()
 	vdr1 := ids.GenerateTestShortID()
@@ -2136,7 +2129,6 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {

@@ -152,20 +152,12 @@ func (t *Transitive) Gossip() error {
 
 // Connected implements the Engine interface.
 func (t *Transitive) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
-	if err := t.VM.Connected(nodeID, nodeVersion); err != nil {
-		return err
-	}
-
-	return t.WeightTracker.AddWeightForNode(nodeID)
+	return t.VM.Connected(nodeID, nodeVersion)
 }
 
 // Disconnected implements the Engine interface.
 func (t *Transitive) Disconnected(nodeID ids.ShortID) error {
-	if err := t.VM.Disconnected(nodeID); err != nil {
-		return err
-	}
-
-	return t.WeightTracker.RemoveWeightForNode(nodeID)
+	return t.VM.Disconnected(nodeID)
 }
 
 // Shutdown implements the Engine interface

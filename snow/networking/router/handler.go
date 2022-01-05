@@ -273,7 +273,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 	switch msg.Op() {
 	case message.GetAcceptedFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return h.bootstrapper.GetAcceptedFrontier(nodeID, reqID)
+		return targetGear.GetAcceptedFrontier(nodeID, reqID)
 
 	case message.AcceptedFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -281,13 +281,13 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
 				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
-			return h.engine.GetAcceptedFrontierFailed(nodeID, reqID)
+			return targetGear.GetAcceptedFrontierFailed(nodeID, reqID)
 		}
-		return h.bootstrapper.AcceptedFrontier(nodeID, reqID, containerIDs)
+		return targetGear.AcceptedFrontier(nodeID, reqID, containerIDs)
 
 	case message.GetAcceptedFrontierFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return h.bootstrapper.GetAcceptedFrontierFailed(nodeID, reqID)
+		return targetGear.GetAcceptedFrontierFailed(nodeID, reqID)
 
 	case message.GetAccepted:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -297,7 +297,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
 			return nil
 		}
-		return h.bootstrapper.GetAccepted(nodeID, reqID, containerIDs)
+		return targetGear.GetAccepted(nodeID, reqID, containerIDs)
 
 	case message.Accepted:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -305,13 +305,13 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
 				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
-			return h.engine.GetAcceptedFailed(nodeID, reqID)
+			return targetGear.GetAcceptedFailed(nodeID, reqID)
 		}
-		return h.bootstrapper.Accepted(nodeID, reqID, containerIDs)
+		return targetGear.Accepted(nodeID, reqID, containerIDs)
 
 	case message.GetAcceptedFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return h.bootstrapper.GetAcceptedFailed(nodeID, reqID)
+		return targetGear.GetAcceptedFailed(nodeID, reqID)
 
 	case message.GetAncestors:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -321,22 +321,22 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
 			return nil
 		}
-		return h.bootstrapper.GetAncestors(nodeID, reqID, containerID)
+		return targetGear.GetAncestors(nodeID, reqID, containerID)
 
 	case message.GetAncestorsFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return h.bootstrapper.GetAncestorsFailed(nodeID, reqID)
+		return targetGear.GetAncestorsFailed(nodeID, reqID)
 
 	case message.MultiPut:
 		reqID := msg.Get(message.RequestID).(uint32)
 		containers := msg.Get(message.MultiContainerBytes).([][]byte)
-		return h.bootstrapper.MultiPut(nodeID, reqID, containers)
+		return targetGear.MultiPut(nodeID, reqID, containers)
 
 	case message.Get:
 		reqID := msg.Get(message.RequestID).(uint32)
 		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
 		h.ctx.Log.AssertNoError(err)
-		return h.engine.Get(nodeID, reqID, containerID)
+		return targetGear.Get(nodeID, reqID, containerID)
 
 	case message.GetFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -378,7 +378,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
 				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
-			return h.engine.QueryFailed(nodeID, reqID)
+			return targetGear.QueryFailed(nodeID, reqID)
 		}
 		return targetGear.Chits(nodeID, reqID, votes)
 
@@ -409,7 +409,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppBytes",
 				msg.Op(), nodeID, h.ctx.ChainID, reqID)
-			return h.engine.AppRequestFailed(nodeID, reqID)
+			return targetGear.AppRequestFailed(nodeID, reqID)
 		}
 		return targetGear.AppResponse(nodeID, reqID, appBytes)
 

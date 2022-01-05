@@ -594,8 +594,6 @@ func (m *manager) createAvalancheChain(
 		SharedCfg:                     &common.SharedConfig{},
 	}
 
-	wt := common.NewWeightTracker(beacons, commonCfg.StartupAlpha)
-
 	// create bootstrap gear
 	bootstrapperConfig := avbootstrap.Config{
 		Config:        commonCfg,
@@ -603,7 +601,7 @@ func (m *manager) createAvalancheChain(
 		TxBlocked:     txBlocker,
 		Manager:       vtxManager,
 		VM:            vm,
-		WeightTracker: wt,
+		WeightTracker: common.NewWeightTracker(beacons, commonCfg.StartupAlpha),
 	}
 	bootstrapper, err := avbootstrap.New(
 		bootstrapperConfig,
@@ -616,14 +614,13 @@ func (m *manager) createAvalancheChain(
 
 	// create engine gear
 	engineConfig := aveng.Config{
-		Ctx:           bootstrapperConfig.Ctx,
-		VM:            bootstrapperConfig.VM,
-		WeightTracker: wt,
-		Manager:       vtxManager,
-		Sender:        bootstrapperConfig.Sender,
-		Validators:    vdrs,
-		Params:        consensusParams,
-		Consensus:     &avcon.Topological{},
+		Ctx:        bootstrapperConfig.Ctx,
+		VM:         bootstrapperConfig.VM,
+		Manager:    vtxManager,
+		Sender:     bootstrapperConfig.Sender,
+		Validators: vdrs,
+		Params:     consensusParams,
+		Consensus:  &avcon.Topological{},
 	}
 	engine, err := aveng.New(engineConfig)
 	if err != nil {
@@ -795,14 +792,12 @@ func (m *manager) createSnowmanChain(
 		SharedCfg:                     &common.SharedConfig{},
 	}
 
-	wt := common.NewWeightTracker(beacons, commonCfg.StartupAlpha)
-
 	// create bootstrap gear
 	bootstrapCfg := smbootstrap.Config{
 		Config:        commonCfg,
 		Blocked:       blocked,
 		VM:            vm,
-		WeightTracker: wt,
+		WeightTracker: common.NewWeightTracker(beacons, commonCfg.StartupAlpha),
 		Bootstrapped:  m.unblockChains,
 	}
 	bootstrapper, err := smbootstrap.New(
@@ -816,13 +811,12 @@ func (m *manager) createSnowmanChain(
 
 	// create engine gear
 	engineConfig := smeng.Config{
-		Ctx:           bootstrapCfg.Ctx,
-		VM:            bootstrapCfg.VM,
-		WeightTracker: wt,
-		Sender:        bootstrapCfg.Sender,
-		Validators:    vdrs,
-		Params:        consensusParams,
-		Consensus:     &smcon.Topological{},
+		Ctx:        bootstrapCfg.Ctx,
+		VM:         bootstrapCfg.VM,
+		Sender:     bootstrapCfg.Sender,
+		Validators: vdrs,
+		Params:     consensusParams,
+		Consensus:  &smcon.Topological{},
 	}
 	engine, err := smeng.New(engineConfig)
 	if err != nil {
