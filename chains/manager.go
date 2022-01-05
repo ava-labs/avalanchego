@@ -147,7 +147,7 @@ type ManagerConfig struct {
 	CriticalChains              ids.Set          // Chains that can't exit gracefully
 	WhitelistedSubnets          ids.Set          // Subnets to validate
 	TimeoutManager              *timeout.Manager // Manages request timeouts when sending messages to other validators
-	HealthService               health.Health
+	Health                      health.Registerer
 	RetryBootstrap              bool                    // Should Bootstrap be retried
 	RetryBootstrapWarnFrequency int                     // Max number of times to retry bootstrap before warning the node operator
 	SubnetConfigs               map[ids.ID]SubnetConfig // ID -> SubnetConfig
@@ -606,12 +606,13 @@ func (m *manager) createAvalancheChain(
 		chainAlias = ctx.ChainID.String()
 	}
 	// Grab the context lock before calling the chain's health check
-	checkFn := func() (interface{}, error) {
+	check := health.CheckerFunc(func() (interface{}, error) {
 		ctx.Lock.Lock()
 		defer ctx.Lock.Unlock()
+
 		return engine.HealthCheck()
-	}
-	if err := m.HealthService.RegisterCheck(chainAlias, checkFn); err != nil {
+	})
+	if err := m.Health.RegisterHealthCheck(chainAlias, check); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
@@ -783,12 +784,13 @@ func (m *manager) createSnowmanChain(
 		chainAlias = ctx.ChainID.String()
 	}
 
-	checkFn := func() (interface{}, error) {
+	check := health.CheckerFunc(func() (interface{}, error) {
 		ctx.Lock.Lock()
 		defer ctx.Lock.Unlock()
+
 		return engine.HealthCheck()
-	}
-	if err := m.HealthService.RegisterCheck(chainAlias, checkFn); err != nil {
+	})
+	if err := m.Health.RegisterHealthCheck(chainAlias, check); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 

@@ -6,7 +6,7 @@ package common
 import (
 	"time"
 
-	"github.com/ava-labs/avalanchego/health"
+	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -24,7 +24,7 @@ type Engine interface {
 
 	// Returns nil if the engine is healthy.
 	// Periodically called and reported through the health API
-	health.Checkable
+	health.Checker
 
 	// GetVM returns this engine's VM
 	GetVM() VM
