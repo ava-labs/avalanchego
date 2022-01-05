@@ -1,4 +1,4 @@
-// (c) 2020-2021, Ava Labs, Inc.
+// (c) 2020-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package evm
@@ -80,7 +80,7 @@ func (a *atomicTxRepository) initializeHeightIndex(lastAcceptedHeight uint64) er
 
 	// [lastTxID] will be initialized to the last transaction that we indexed
 	// if we are part way through a migration.
-	var lastTxID []byte
+	var lastTxID ids.ID
 	indexHeightBytes, err := a.atomicRepoMetadataDB.Get(maxIndexedHeightKey)
 	switch err {
 	case nil:
@@ -95,8 +95,11 @@ func (a *atomicTxRepository) initializeHeightIndex(lastAcceptedHeight uint64) er
 	case 0:
 		log.Info("Initializing atomic transaction repository from scratch")
 	case common.HashLength: // partially initialized
-		lastTxID = indexHeightBytes
-		log.Info("Initializing atomic transaction repository from txID: %v", lastTxID)
+		lastTxID, err = ids.ToID(indexHeightBytes)
+		if err != nil {
+			return err
+		}
+		log.Info("Initializing atomic transaction repository from txID", "lastTxID", lastTxID)
 	case wrappers.LongLen: // already initialized
 		return nil
 	default: // unexpected value in the database
@@ -105,7 +108,7 @@ func (a *atomicTxRepository) initializeHeightIndex(lastAcceptedHeight uint64) er
 
 	// Iterate from [lastTxID] to complete the re-index -> generating an index
 	// from height to a slice of transactions accepted at that height
-	iter := a.acceptedAtomicTxDB.NewIteratorWithStart(lastTxID)
+	iter := a.acceptedAtomicTxDB.NewIteratorWithStart(lastTxID[:])
 	defer iter.Release()
 
 	indexedTxs := 0
@@ -137,14 +140,13 @@ func (a *atomicTxRepository) initializeHeightIndex(lastAcceptedHeight uint64) er
 		if err := a.appendTxToHeightIndex(heightBytes, tx); err != nil {
 			return err
 		}
-		txID := tx.ID()
-		lastTxID = txID[:]
+		lastTxID = tx.ID()
 		pendingBytesApproximation += len(txBytes)
 
 		// call commitFn to write to underlying DB if we have reached
 		// [commitSizeCap]
 		if pendingBytesApproximation > commitSizeCap {
-			if err := a.atomicRepoMetadataDB.Put(maxIndexedHeightKey, lastTxID); err != nil {
+			if err := a.atomicRepoMetadataDB.Put(maxIndexedHeightKey, lastTxID[:]); err != nil {
 				return err
 			}
 			if err := a.db.Commit(); err != nil {
