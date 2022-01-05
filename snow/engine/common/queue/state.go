@@ -25,6 +25,7 @@ var (
 	jobsKey           = []byte("jobs")
 	dependenciesKey   = []byte("dependencies")
 	missingJobIDsKey  = []byte("missing job IDs")
+	pendingJobsKey    = []byte("pendingJobs")
 )
 
 type state struct {
@@ -41,6 +42,10 @@ type state struct {
 	// made.
 	dependentsCache cache.Cacher
 	missingJobIDs   linkeddb.LinkedDB
+	// data store that tracks the last known checkpoint of how many jobs were pending in the queue.
+	pendingJobs database.KeyValueReaderWriter
+	// represents the number of pending jobs in the queue.
+	numPendingJobs uint64
 }
 
 func newState(
@@ -53,6 +58,12 @@ func newState(
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create metered cache: %s", err)
 	}
+
+	pendingJobs := prefixdb.New(pendingJobsKey, db)
+	numPendingJobs, err := getPendingJobs(pendingJobs)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize pending jobs: %s", err)
+	}
 	return &state{
 		runnableJobIDs:  linkeddb.NewDefault(prefixdb.New(runnableJobIDsKey, db)),
 		cachingEnabled:  true,
@@ -61,7 +72,34 @@ func newState(
 		dependencies:    prefixdb.New(dependenciesKey, db),
 		dependentsCache: &cache.LRU{Size: dependentsCacheSize},
 		missingJobIDs:   linkeddb.NewDefault(prefixdb.New(missingJobIDsKey, db)),
+		pendingJobs:     pendingJobs,
+		numPendingJobs:  numPendingJobs,
 	}, nil
+}
+
+// TODO remove this in a future release, since by then it's likely most customers will have a checkpoint set.
+// This is to avoid the edge-condition where a customer may have partially bootstrapped before this release,
+// and won't have a checkpoint on disk to go off of.
+func initializePendingJobs(d database.Database) (uint64, error) {
+	var pendingJobs uint64
+	iterator := d.NewIterator()
+	defer iterator.Release()
+
+	for iterator.Next() {
+		pendingJobs++
+	}
+
+	return pendingJobs, iterator.Error()
+}
+
+func getPendingJobs(d database.Database) (uint64, error) {
+	pendingJobs, err := database.GetUInt64(d, pendingJobsKey)
+
+	if err == database.ErrNotFound {
+		return initializePendingJobs(d) // If we don't have a checkpoint, we need to initialize it.
+	}
+
+	return pendingJobs, err
 }
 
 // AddRunnableJob adds [jobID] to the runnable queue
@@ -93,7 +131,18 @@ func (s *state) RemoveRunnableJob() (Job, error) {
 	if err != nil {
 		return nil, err
 	}
-	return job, s.jobs.Delete(jobIDBytes)
+
+	if err := s.jobs.Delete(jobIDBytes); err != nil {
+		return job, err
+	}
+
+	// Guard rail to make sure we don't underflow.
+	if s.numPendingJobs == 0 {
+		return job, nil
+	}
+	s.numPendingJobs--
+
+	return job, database.PutUInt64(s.pendingJobs, pendingJobsKey, s.numPendingJobs)
 }
 
 // PutJob adds the job to the queue
@@ -102,7 +151,13 @@ func (s *state) PutJob(job Job) error {
 	if s.cachingEnabled {
 		s.jobsCache.Put(id, job)
 	}
-	return s.jobs.Put(id[:], job.Bytes())
+
+	if err := s.jobs.Put(id[:], job.Bytes()); err != nil {
+		return err
+	}
+
+	s.numPendingJobs++
+	return database.PutUInt64(s.pendingJobs, pendingJobsKey, s.numPendingJobs)
 }
 
 // HasJob returns true if the job [id] is in the queue

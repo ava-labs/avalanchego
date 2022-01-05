@@ -26,10 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-const (
-	defaultCPUInterval = 15 * time.Second
-)
-
 var (
 	errUnknownChain = errors.New("received message for unknown chain")
 
@@ -59,10 +55,9 @@ type ChainRouter struct {
 	// a deadlock because the timeout manager will call Benched and Unbenched.
 	timeoutManager *timeout.Manager
 
-	gossiper         *timer.Repeater
-	intervalNotifier *timer.Repeater
-	closeTimeout     time.Duration
-	peers            map[ids.ShortID]version.Application
+	gossiper     *timer.Repeater
+	closeTimeout time.Duration
+	peers        map[ids.ShortID]version.Application
 	// node ID --> chains that node is benched on
 	// invariant: if a node is benched on any chain, it is treated as disconnected on all chains
 	benched        map[ids.ShortID]ids.Set
@@ -104,7 +99,6 @@ func (cr *ChainRouter) Initialize(
 	cr.chains = make(map[ids.ID]*Handler)
 	cr.timeoutManager = timeoutManager
 	cr.gossiper = timer.NewRepeater(cr.Gossip, gossipFrequency)
-	cr.intervalNotifier = timer.NewRepeater(cr.EndInterval, defaultCPUInterval)
 	cr.closeTimeout = closeTimeout
 	cr.benched = make(map[ids.ShortID]ids.Set)
 	cr.criticalChains = criticalChains
@@ -123,7 +117,6 @@ func (cr *ChainRouter) Initialize(
 	cr.metrics = rMetrics
 
 	go log.RecoverAndPanic(cr.gossiper.Dispatch)
-	go log.RecoverAndPanic(cr.intervalNotifier.Dispatch)
 	return nil
 }
 
@@ -266,7 +259,6 @@ func (cr *ChainRouter) Shutdown() {
 	cr.lock.Unlock()
 
 	cr.gossiper.Stop()
-	cr.intervalNotifier.Stop()
 
 	for _, chain := range prevChains {
 		chain.StartShutdown()
@@ -400,17 +392,6 @@ func (cr *ChainRouter) Gossip() {
 
 	for _, chain := range cr.chains {
 		chain.Gossip()
-	}
-}
-
-// EndInterval notifies the chains that the current CPU interval has ended
-// TODO remove?
-func (cr *ChainRouter) EndInterval() {
-	cr.lock.Lock()
-	defer cr.lock.Unlock()
-
-	for _, chain := range cr.chains {
-		chain.endInterval()
 	}
 }
 

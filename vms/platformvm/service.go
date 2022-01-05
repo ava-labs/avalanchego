@@ -186,6 +186,12 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
  ******************************************************
  */
 
+type GetBalanceRequest struct {
+	// TODO: remove Address
+	Address   *string  `json:"address,omitempty"`
+	Addresses []string `json:"addresses"`
+}
+
 type GetBalanceResponse struct {
 	// Balance, in nAVAX, of the address
 	Balance            json.Uint64    `json:"balance"`
@@ -196,24 +202,26 @@ type GetBalanceResponse struct {
 }
 
 // GetBalance gets the balance of an address
-func (service *Service) GetBalance(_ *http.Request, args *api.JSONAddress, response *GetBalanceResponse) error {
-	service.vm.ctx.Log.Debug("Platform: GetBalance called for address %s", args.Address)
-
-	// Parse to address
-	addr, err := service.vm.ParseLocalAddress(args.Address)
-	if err != nil {
-		return fmt.Errorf("couldn't parse argument 'address' to address: %w", err)
+func (service *Service) GetBalance(_ *http.Request, args *GetBalanceRequest, response *GetBalanceResponse) error {
+	if args.Address != nil {
+		args.Addresses = append(args.Addresses, *args.Address)
 	}
 
+	service.vm.ctx.Log.Debug("Platform: GetBalance called for addresses %v", args.Addresses)
+
 	addrs := ids.ShortSet{}
-	addrs.Add(addr)
+	for _, addrStr := range args.Addresses {
+		// Parse to address
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse argument %q to address: %w", addrStr, err)
+		}
+		addrs.Add(addr)
+	}
+
 	utxos, err := avax.GetAllUTXOs(service.vm.internalState, addrs)
 	if err != nil {
-		addr, err2 := service.vm.FormatLocalAddress(addr)
-		if err2 != nil {
-			return fmt.Errorf("problem formatting address: %w", err2)
-		}
-		return fmt.Errorf("couldn't get UTXO set of %s: %w", addr, err)
+		return fmt.Errorf("couldn't get UTXO set of %v: %w", args.Addresses, err)
 	}
 
 	currentTime := service.vm.clock.Unix()
