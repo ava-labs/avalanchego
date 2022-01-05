@@ -373,9 +373,9 @@ func (b *bootstrapper) checkFinish() error {
 	}
 
 	if !b.Config.SharedCfg.Restarted {
-		b.Ctx.Log.Info("bootstrapping fetched %d blocks. Executing state transitions...", b.Blocked.PendingJobs())
+		b.Config.Ctx.Log.Info("bootstrapping fetched %d blocks. Executing state transitions...", b.Blocked.PendingJobs())
 	} else {
-		b.Ctx.Log.Debug("bootstrapping fetched %d blocks. Executing state transitions...", b.Blocked.PendingJobs())
+		b.Config.Ctx.Log.Debug("bootstrapping fetched %d blocks. Executing state transitions...", b.Blocked.PendingJobs())
 	}
 
 	executedBlocks, err := b.Blocked.ExecuteAll(
