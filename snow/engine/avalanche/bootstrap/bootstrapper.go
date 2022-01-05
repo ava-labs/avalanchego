@@ -16,9 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -519,52 +517,4 @@ func (b *bootstrapper) HealthCheck() (interface{}, error) {
 		"vm":        vmIntf,
 	}
 	return intf, vmErr
-}
-
-func (b *bootstrapper) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error {
-	startTime := time.Now()
-	b.Ctx.Log.Verbo("GetAncestors(%s, %d, %s) called", vdr, requestID, vtxID)
-	vertex, err := b.Manager.GetVtx(vtxID)
-	if err != nil || vertex.Status() == choices.Unknown {
-		b.Ctx.Log.Verbo("dropping getAncestors")
-		return nil // Don't have the requested vertex. Drop message.
-	}
-
-	queue := make([]avalanche.Vertex, 1, b.Config.MultiputMaxContainersSent) // for BFS
-	queue[0] = vertex
-	ancestorsBytesLen := 0                                                  // length, in bytes, of vertex and its ancestors
-	ancestorsBytes := make([][]byte, 0, b.Config.MultiputMaxContainersSent) // vertex and its ancestors in BFS order
-	visited := ids.Set{}                                                    // IDs of vertices that have been in queue before
-	visited.Add(vertex.ID())
-
-	for len(ancestorsBytes) < b.Config.MultiputMaxContainersSent && len(queue) > 0 && time.Since(startTime) < b.Config.MaxTimeGetAncestors {
-		var vtx avalanche.Vertex
-		vtx, queue = queue[0], queue[1:] // pop
-		vtxBytes := vtx.Bytes()
-		// Ensure response size isn't too large. Include wrappers.IntLen because the size of the message
-		// is included with each container, and the size is repr. by an int.
-		if newLen := wrappers.IntLen + ancestorsBytesLen + len(vtxBytes); newLen < constants.MaxContainersLen {
-			ancestorsBytes = append(ancestorsBytes, vtxBytes)
-			ancestorsBytesLen = newLen
-		} else { // reached maximum response size
-			break
-		}
-		parents, err := vtx.Parents()
-		if err != nil {
-			return err
-		}
-		for _, parent := range parents {
-			if parent.Status() == choices.Unknown { // Don't have this vertex;ignore
-				continue
-			}
-			if parentID := parent.ID(); !visited.Contains(parentID) { // If already visited, ignore
-				queue = append(queue, parent)
-				visited.Add(parentID)
-			}
-		}
-	}
-
-	b.getAncestorsVtxs.Observe(float64(len(ancestorsBytes)))
-	b.Config.Sender.SendMultiPut(vdr, requestID, ancestorsBytes)
-	return nil
 }

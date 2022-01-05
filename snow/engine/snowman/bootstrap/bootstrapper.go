@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -179,26 +178,6 @@ func (b *bootstrapper) fetch(blkID ids.ID) error {
 
 	b.OutstandingRequests.Add(validatorID, b.Config.SharedCfg.RequestID, blkID)
 	b.Config.Sender.SendGetAncestors(validatorID, b.Config.SharedCfg.RequestID, blkID) // request block and ancestors
-	return nil
-}
-
-// GetAncestors implements the Engine interface
-func (b *bootstrapper) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
-	ancestorsBytes, err := block.GetAncestors(
-		b.VM,
-		blkID,
-		b.Config.MultiputMaxContainersSent,
-		constants.MaxContainersLen,
-		b.Config.MaxTimeGetAncestors,
-	)
-	if err != nil {
-		b.Ctx.Log.Verbo("couldn't get ancestors with %s. Dropping GetAncestors(%s, %d, %s)",
-			err, vdr, requestID, blkID)
-		return nil
-	}
-
-	b.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
-	b.Config.Sender.SendMultiPut(vdr, requestID, ancestorsBytes)
 	return nil
 }
 

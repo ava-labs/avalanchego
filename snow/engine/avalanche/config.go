@@ -6,6 +6,7 @@ package avalanche
 import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
+	basemsghandler "github.com/ava-labs/avalanchego/snow/engine/avalanche/base_msg_handler"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -13,7 +14,8 @@ import (
 
 // Config wraps all the parameters needed for an avalanche engine
 type Config struct {
-	Ctx        *snow.ConsensusContext
+	Ctx *snow.ConsensusContext
+	basemsghandler.Handler
 	VM         vertex.DAGVM
 	Manager    vertex.Manager
 	Sender     common.Sender

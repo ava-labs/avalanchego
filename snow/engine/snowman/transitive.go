@@ -30,8 +30,6 @@ func New(config Config) (Engine, error) {
 type Transitive struct {
 	Config
 
-	common.MsgHandlerNoOps
-
 	RequestID uint32
 
 	metrics
@@ -66,10 +64,9 @@ func newTransitive(config Config) (*Transitive, error) {
 
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t := &Transitive{
-		Config:          config,
-		MsgHandlerNoOps: common.NewMsgHandlerNoOps(config.Ctx),
-		pending:         make(map[ids.ID]snowman.Block),
-		nonVerifieds:    NewAncestorTree(),
+		Config:       config,
+		pending:      make(map[ids.ID]snowman.Block),
+		nonVerifieds: NewAncestorTree(),
 		polls: poll.NewSet(factory,
 			config.Ctx.Log,
 			"",
@@ -164,27 +161,6 @@ func (t *Transitive) Disconnected(nodeID ids.ShortID) error {
 func (t *Transitive) Shutdown() error {
 	t.Ctx.Log.Info("shutting down consensus engine")
 	return t.VM.Shutdown()
-}
-
-// Get implements the Engine interface
-func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
-	blk, err := t.GetBlock(blkID)
-	if err != nil {
-		// If we failed to get the block, that means either an unexpected error
-		// has occurred, [vdr] is not following the protocol, or the
-		// block has been pruned.
-		t.Ctx.Log.Debug("Get(%s, %d, %s) failed with: %s", vdr, requestID, blkID, err)
-		return nil
-	}
-
-	// Respond to the validator with the fetched block and the same requestID.
-	t.Sender.SendPut(vdr, requestID, blkID, blk.Bytes())
-	return nil
-}
-
-// GetAncestors implements the Engine interface
-func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
-	return fmt.Errorf("getAncestors message should not be handled by engine. Dropping it")
 }
 
 // Put implements the Engine interface

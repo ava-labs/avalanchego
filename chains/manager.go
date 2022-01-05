@@ -44,10 +44,12 @@ import (
 
 	avcon "github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	aveng "github.com/ava-labs/avalanchego/snow/engine/avalanche"
+	abh "github.com/ava-labs/avalanchego/snow/engine/avalanche/base_msg_handler"
 	avbootstrap "github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap"
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
+	sbh "github.com/ava-labs/avalanchego/snow/engine/snowman/base_msg_handler"
 	smbootstrap "github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
 )
 
@@ -594,9 +596,15 @@ func (m *manager) createAvalancheChain(
 		SharedCfg:                     &common.SharedConfig{},
 	}
 
+	avaBaseMsgHandler, err := abh.New(vtxManager, commonCfg)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize avalanche base message handler: %s", err)
+	}
+
 	// create bootstrap gear
 	bootstrapperConfig := avbootstrap.Config{
 		Config:        commonCfg,
+		Handler:       avaBaseMsgHandler,
 		VtxBlocked:    vtxBlocker,
 		TxBlocked:     txBlocker,
 		Manager:       vtxManager,
@@ -615,6 +623,7 @@ func (m *manager) createAvalancheChain(
 	// create engine gear
 	engineConfig := aveng.Config{
 		Ctx:        bootstrapperConfig.Ctx,
+		Handler:    avaBaseMsgHandler,
 		VM:         bootstrapperConfig.VM,
 		Manager:    vtxManager,
 		Sender:     bootstrapperConfig.Sender,
@@ -792,9 +801,15 @@ func (m *manager) createSnowmanChain(
 		SharedCfg:                     &common.SharedConfig{},
 	}
 
+	snowBaseMsgHandler, err := sbh.New(vm, commonCfg)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize snow base message handler: %s", err)
+	}
+
 	// create bootstrap gear
 	bootstrapCfg := smbootstrap.Config{
 		Config:        commonCfg,
+		Handler:       snowBaseMsgHandler,
 		Blocked:       blocked,
 		VM:            vm,
 		WeightTracker: common.NewWeightTracker(beacons, commonCfg.StartupAlpha),
@@ -812,6 +827,7 @@ func (m *manager) createSnowmanChain(
 	// create engine gear
 	engineConfig := smeng.Config{
 		Ctx:        bootstrapCfg.Ctx,
+		Handler:    snowBaseMsgHandler,
 		VM:         bootstrapCfg.VM,
 		Sender:     bootstrapCfg.Sender,
 		Validators: vdrs,

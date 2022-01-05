@@ -49,6 +49,7 @@ import (
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
+	sbh "github.com/ava-labs/avalanchego/snow/engine/snowman/base_msg_handler"
 )
 
 var (
@@ -2076,8 +2077,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		SharedCfg:                     &common.SharedConfig{},
 	}
 
+	snowBaseMsgHandler, err := sbh.New(vm, commonCfg)
+	assert.NoError(t, err)
+
 	bootstrapConfig := bootstrap.Config{
 		Config:        commonCfg,
+		Handler:       snowBaseMsgHandler,
 		Blocked:       blocked,
 		VM:            vm,
 		WeightTracker: common.NewWeightTracker(commonCfg.Beacons, commonCfg.StartupAlpha),
@@ -2103,6 +2108,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	engineConfig := smeng.Config{
 		Ctx:        bootstrapConfig.Ctx,
+		Handler:    snowBaseMsgHandler,
 		VM:         bootstrapConfig.VM,
 		Sender:     bootstrapConfig.Sender,
 		Validators: vdrs,

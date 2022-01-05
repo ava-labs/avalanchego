@@ -36,7 +36,6 @@ const (
 var _ Bootstrapper = &bootstrapper{}
 
 type Bootstrapper interface {
-	Handler
 	Haltable
 	Start(startReqID uint32) error
 	Startup() error
@@ -46,7 +45,6 @@ type Bootstrapper interface {
 // bootstrapper implements the Handler interface.
 // It collects mechanisms common to both snowman and avalanche bootstrappers
 type bootstrapper struct {
-	MsgHandlerNoOps
 	Config
 	Halter
 
@@ -81,8 +79,7 @@ type bootstrapper struct {
 
 func NewCommonBootstrapper(config Config) Bootstrapper {
 	return &bootstrapper{
-		Config:          config,
-		MsgHandlerNoOps: NewMsgHandlerNoOps(config.Ctx),
+		Config: config,
 	}
 }
 
@@ -96,16 +93,6 @@ func (b *bootstrapper) Start(startReqID uint32) error {
 	}
 
 	return b.Startup()
-}
-
-// GetAcceptedFrontier implements the Handler interface.
-func (b *bootstrapper) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
-	acceptedFrontier, err := b.Bootstrapable.CurrentAcceptedFrontier()
-	if err != nil {
-		return err
-	}
-	b.Sender.SendAcceptedFrontier(validatorID, requestID, acceptedFrontier)
-	return nil
 }
 
 // GetAcceptedFrontierFailed implements the Handler interface.
@@ -187,12 +174,6 @@ func (b *bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 	b.acceptedFrontier = b.acceptedFrontierSet.List()
 
 	b.sendGetAccepted()
-	return nil
-}
-
-// GetAccepted implements the Handler interface.
-func (b *bootstrapper) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	b.Sender.SendAccepted(validatorID, requestID, b.Bootstrapable.FilterAccepted(containerIDs))
 	return nil
 }
 

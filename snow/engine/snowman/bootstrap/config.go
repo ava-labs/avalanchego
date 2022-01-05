@@ -6,11 +6,14 @@ package bootstrap
 import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
+	basemsghandler "github.com/ava-labs/avalanchego/snow/engine/snowman/base_msg_handler"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 type Config struct {
 	common.Config
+
+	basemsghandler.Handler
 
 	// Blocked tracks operations that are blocked on blocks
 	Blocked *queue.JobsWithMissing

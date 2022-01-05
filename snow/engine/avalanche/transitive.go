@@ -33,7 +33,6 @@ type Transitive struct {
 	Config
 
 	RequestID uint32
-	common.MsgHandlerNoOps
 
 	metrics
 
@@ -70,8 +69,7 @@ func newTransitive(config Config) (*Transitive, error) {
 
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t := &Transitive{
-		Config:          config,
-		MsgHandlerNoOps: common.NewMsgHandlerNoOps(config.Ctx),
+		Config: config,
 		polls: poll.NewSet(factory,
 			config.Ctx.Log,
 			"",
@@ -152,20 +150,6 @@ func (t *Transitive) Gossip() error {
 func (t *Transitive) Shutdown() error {
 	t.Ctx.Log.Info("shutting down consensus engine")
 	return t.VM.Shutdown()
-}
-
-// Get implements the Engine interface
-func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error {
-	// If this engine has access to the requested vertex, provide it
-	if vtx, err := t.Manager.GetVtx(vtxID); err == nil {
-		t.Sender.SendPut(vdr, requestID, vtxID, vtx.Bytes())
-	}
-	return nil
-}
-
-// GetAncestors implements the Engine interface
-func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error {
-	return fmt.Errorf("getAncestors message should not be handled by engine. Dropping it")
 }
 
 // Put implements the Engine interface

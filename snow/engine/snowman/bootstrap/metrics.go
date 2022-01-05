@@ -6,13 +6,11 @@ package bootstrap
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 type metrics struct {
 	numFetched, numDropped, numAccepted prometheus.Counter
-	getAncestorsBlks                    metric.Averager
 }
 
 // Initialize implements the Engine interface
@@ -41,14 +39,6 @@ func (m *metrics) Initialize(
 		registerer.Register(m.numFetched),
 		registerer.Register(m.numDropped),
 		registerer.Register(m.numAccepted),
-	)
-
-	m.getAncestorsBlks = metric.NewAveragerWithErrs(
-		namespace,
-		"get_ancestors_blks",
-		"blocks fetched in a call to GetAncestors",
-		registerer,
-		&errs,
 	)
 
 	return errs.Err
