@@ -1,4 +1,4 @@
-name: Full Lint
+name: Static analysis
 on:
   push:
     tags-ignore:
@@ -8,14 +8,16 @@ on:
       - dev
 
 jobs:
-  run_lint:
-    name: lint
+  run_static_analysis:
+    name: Static analysis
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v2
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Set up Go
+        uses: actions/setup-go@v2
         with:
-          version: v1.43.0
-          working-directory: .
-          args: --timeout 10m --config .golangci.yml
+          go-version: 1.17
+      - name: Run static analysis tests
+        shell: bash
+        run: scripts/lint.sh

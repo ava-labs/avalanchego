@@ -19,3 +19,4 @@ cd $PKG_ROOT
 echo "Version: $VERSION"
 tar -czvf "avalanchego-linux-$ARCH-$VERSION.tar.gz" avalanchego-$VERSION
 aws s3 cp avalanchego-linux-$ARCH-$VERSION.tar.gz s3://$BUCKET/linux/binaries/ubuntu/$RELEASE/$ARCH/
+rm -rf $PKG_ROOT/avalanchego*

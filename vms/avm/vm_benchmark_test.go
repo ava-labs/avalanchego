@@ -127,7 +127,7 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 
 	for i := 0; i < b.N; i++ {
 		// Fetch all UTXOs older version
-		notPaginatedUTXOs, err = vm.getAllUTXOs(addrsSet)
+		notPaginatedUTXOs, err = avax.GetAllUTXOs(vm.state, addrsSet)
 		if err != nil {
 			b.Fatal(err)
 		}

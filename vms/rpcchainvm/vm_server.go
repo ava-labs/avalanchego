@@ -393,6 +393,7 @@ func (vm *VMServer) CreateStaticHandlers(context.Context, *emptypb.Empty) (*vmpr
 		// start the messenger server
 		serverID := vm.broker.NextId()
 		go vm.broker.AcceptAndServe(serverID, func(opts []grpc.ServerOption) *grpc.Server {
+			opts = append(opts, serverOptions...)
 			server := grpc.NewServer(opts...)
 			vm.serverCloser.Add(server)
 			ghttpproto.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler, vm.broker))
@@ -420,6 +421,7 @@ func (vm *VMServer) CreateHandlers(context.Context, *emptypb.Empty) (*vmproto.Cr
 		// start the messenger server
 		serverID := vm.broker.NextId()
 		go vm.broker.AcceptAndServe(serverID, func(opts []grpc.ServerOption) *grpc.Server {
+			opts = append(opts, serverOptions...)
 			server := grpc.NewServer(opts...)
 			vm.serverCloser.Add(server)
 			ghttpproto.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler, vm.broker))

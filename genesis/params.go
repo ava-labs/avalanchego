@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
 type StakingConfig struct {
@@ -28,8 +29,8 @@ type StakingConfig struct {
 	// MaxStakeDuration is the maximum amount of time a validator can validate
 	// for in a single period.
 	MaxStakeDuration time.Duration `json:"maxStakeDuration"`
-	// StakeMintingPeriod is the amount of time for a consumption period.
-	StakeMintingPeriod time.Duration `json:"stakeMintingPeriod"`
+	// RewardConfig is the config for the reward function.
+	RewardConfig reward.Config `json:"rewardConfig"`
 }
 
 type TxFeeConfig struct {

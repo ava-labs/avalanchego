@@ -69,10 +69,4 @@ type Consensus interface {
 
 	// HealthCheck returns information about the consensus health.
 	HealthCheck() (interface{}, error)
-
-	// Accept the provided tx remove it from the graph
-	accept(txID ids.ID) error
-
-	// Reject all the provided txs and remove them from the graph
-	reject(txIDs ids.Set) error
 }

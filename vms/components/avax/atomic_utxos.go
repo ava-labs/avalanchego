@@ -11,18 +11,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-const (
-	maxUTXOsToFetch = 1024
-)
-
 var _ AtomicUTXOManager = &atomicUTXOManager{}
 
 type AtomicUTXOManager interface {
 	// GetAtomicUTXOs returns exported UTXOs such that at least one of the
 	// addresses in [addrs] is referenced.
 	//
-	// Returns at most [limit] UTXOs. If [limit] <= 0 or
-	// [limit] > [maxUTXOsToFetch], [limit] is set to [maxUTXOsToFetch].
+	// Returns at most [limit] UTXOs.
 	//
 	// Returns:
 	// * The fetched UTXOs
@@ -57,10 +52,6 @@ func (a *atomicUTXOManager) GetAtomicUTXOs(
 	startUTXOID ids.ID,
 	limit int,
 ) ([]*UTXO, ids.ShortID, ids.ID, error) {
-	if limit <= 0 || limit > maxUTXOsToFetch {
-		limit = maxUTXOsToFetch
-	}
-
 	addrsList := make([][]byte, addrs.Len())
 	i := 0
 	for addr := range addrs {

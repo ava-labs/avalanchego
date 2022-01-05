@@ -16,6 +16,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Magic value that comes from the size in bytes of a serialized key-value bootstrap checkpoint in a database +
+// the overhead of the key-value storage.
+const bootstrapProgressCheckpointSize = 59
+
 // Test that creating a new queue can be created and that it is initially empty.
 func TestNew(t *testing.T) {
 	assert := assert.New(t)
@@ -110,7 +114,7 @@ func TestPushAndExecute(t *testing.T) {
 
 	dbSize, err := database.Size(db)
 	assert.NoError(err)
-	assert.Zero(dbSize)
+	assert.Equal(bootstrapProgressCheckpointSize, dbSize)
 }
 
 // Test that executing a job will cause a dependent job to be placed on to the
@@ -201,7 +205,7 @@ func TestRemoveDependency(t *testing.T) {
 
 	dbSize, err := database.Size(db)
 	assert.NoError(err)
-	assert.Zero(dbSize)
+	assert.Equal(bootstrapProgressCheckpointSize, dbSize)
 }
 
 // Test that a job that is ready to be executed can only be added once

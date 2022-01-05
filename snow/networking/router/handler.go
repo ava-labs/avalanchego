@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -21,6 +22,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/uptime"
 	"github.com/ava-labs/avalanchego/version"
 )
+
+const cpuHalflife = 15 * time.Second
 
 var errDuplicatedContainerID = errors.New("inbound message contains duplicated container ID")
 
@@ -70,7 +73,7 @@ func NewHandler(
 		msgFromVMChan:       msgFromVMChan,
 		validators:          validators,
 		unprocessedMsgsCond: sync.NewCond(&sync.Mutex{}),
-		cpuTracker:          tracker.NewCPUTracker(uptime.ContinuousFactory{}, defaultCPUInterval),
+		cpuTracker:          tracker.NewCPUTracker(uptime.ContinuousFactory{}, cpuHalflife),
 	}
 
 	if err := h.metrics.Initialize("handler", h.ctx.Registerer); err != nil {
@@ -558,11 +561,6 @@ func (h *Handler) dispatchInternal() {
 			h.Push(inMsg)
 		}
 	}
-}
-
-func (h *Handler) endInterval() {
-	now := h.clock.Time()
-	h.cpuTracker.EndInterval(now)
 }
 
 // if subnet is validator only and this is not a validator or self, returns false.
