@@ -1,5 +1,4 @@
 name: Branch Push CI
-
 on:
   push:
   workflow_dispatch:
@@ -13,6 +12,7 @@ on:
         required: true
         default: 'master'
 
+
 jobs:
   lint:
     name: Lint
@@ -20,72 +20,75 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: change avalanchego dep
-        if: ${{ github.event_name != 'workflow_dispatch' }}
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
+          git config --global url."https://${GITHUB_ACCESS_TOKEN}@github.com/ava-labs/avalanchego-internal".insteadOf "https://github.com/ava-labs/avalanchego-internal"
           git clone -b $AVALANCHEGO_BRANCH --single-branch --quiet ${AVALANCHEGO_REPO} avalanchego
           go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
         env:
-          AVALANCHEGO_REPO: https://github.com/ava-labs/avalanchego-internal
-          AVALANCHEGO_BRANCH: master
+          AVALANCHEGO_REPO: ${{ github.event.inputs.avalanchegoRepo }}
+          AVALANCHEGO_BRANCH: ${{ github.event.inputs.avalanchegoBranch }}
+          GITHUB_ACCESS_TOKEN: ${{ secrets.repo_access_token }}
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
         with:
           version: latest
           working-directory: .
           args: --timeout 3m
-            #  test:
-            #    name: Golang Unit Tests v${{ matrix.go }} (${{ matrix.os }})
-            #    runs-on: ${{ matrix.os }}
-            #    strategy:
-            #      matrix:
-            #        go: ['1.16']
-            #        os: [macos-11.0, ubuntu-18.04, ubuntu-20.04, windows-latest]
-            #    steps:
-            #    - uses: actions/checkout@v2
-            #    - uses: actions/setup-go@v1
-            #      with:
-            #        go-version: ${{ matrix.go }}
-            #    - run: go mod download
-            #      shell: bash
-            #    - run: ./scripts/build.sh evm
-            #      shell: bash
-            #    - run: ./scripts/build_test.sh
-            #      shell: bash
-            #  e2e:
-            #    name: Golang E2E Tests v${{ matrix.go }} (${{ matrix.os }})
-            #    runs-on: ${{ matrix.os }}
-            #    strategy:
-            #      matrix:
-            #        go: [ '1.16' ]
-            #        os: [ ubuntu-20.04 ]
-            #    steps:
-            #    - uses: actions/checkout@v2
-            #    - uses: actions/setup-go@v1
-            #      with:
-            #        go-version: ${{ matrix.go }}
-            #    - name: Configure accces to avalanchego-internal
-            #      env:
-            #        GITHUB_ACCESS_TOKEN: ${{ secrets.repo_access_token }}
-            #      run: git config --global url."https://${GITHUB_ACCESS_TOKEN}@github.com/ava-labs/avalanchego-internal".insteadOf "https://github.com/ava-labs/avalanchego-internal"
-            #    - name: Run tests (triggered by workflow dispatch)
-            #      if: ${{ github.event_name == 'workflow_dispatch' }} # Use provided arguments
-            #      run: .github/workflows/run_e2e_tests.sh --parallelism 1 --client-id $KURTOSIS_CLIENT_ID --client-secret $KURTOSIS_CLIENT_SECRET
-            #      shell: bash
-            #      env:
-            #        AVALANCHEGO_REPO: ${{ github.event.inputs.avalanchegoRepo }}
-            #        AVALANCHEGO_BRANCH: ${{ github.event.inputs.avalanchegoBranch }}
-            #        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-            #        DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
-            #        KURTOSIS_CLIENT_ID: ${{ secrets.KURTOSIS_CLIENT_ID }}
-            #        KURTOSIS_CLIENT_SECRET: ${{ secrets.KURTOSIS_CLIENT_SECRET }}
-            #    - name: Run tests (triggered by PR)
-            #      if: ${{ github.event_name != 'workflow_dispatch' }} # Use default arguments
-            #      run: .github/workflows/run_e2e_tests.sh --parallelism 1 --client-id $KURTOSIS_CLIENT_ID --client-secret $KURTOSIS_CLIENT_SECRET
-            #      shell: bash
-            #      env:
-            #        AVALANCHEGO_REPO: https://github.com/ava-labs/avalanchego
-            #        AVALANCHEGO_BRANCH: master
-            #        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-            #        DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
-            #        KURTOSIS_CLIENT_ID: ${{ secrets.KURTOSIS_CLIENT_ID }}
-            #        KURTOSIS_CLIENT_SECRET: ${{ secrets.KURTOSIS_CLIENT_SECRET }}
+  test:
+    name: Golang Unit Tests v${{ matrix.go }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        go: ['1.16']
+        os: [macos-11.0, ubuntu-18.04, ubuntu-20.04, windows-latest]
+    steps:
+    - uses: actions/checkout@v2
+    - name: change avalanchego dep
+      if: ${{ github.event_name == 'workflow_dispatch' }}
+      run: |
+        git config --global url."https://${GITHUB_ACCESS_TOKEN}@github.com/ava-labs/avalanchego-internal".insteadOf "https://github.com/ava-labs/avalanchego-internal"
+        git clone -b $AVALANCHEGO_BRANCH --single-branch --quiet ${AVALANCHEGO_REPO} avalanchego
+        go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
+      env:
+        AVALANCHEGO_REPO: ${{ github.event.inputs.avalanchegoRepo }}
+        AVALANCHEGO_BRANCH: ${{ github.event.inputs.avalanchegoBranch }}
+        GITHUB_ACCESS_TOKEN: ${{ secrets.repo_access_token }}
+    - uses: actions/setup-go@v1
+      with:
+        go-version: ${{ matrix.go }}
+    - run: go mod download
+      shell: bash
+    - run: ./scripts/build.sh evm
+      shell: bash
+    - run: ./scripts/build_test.sh
+      shell: bash
+  e2e:
+    name: Golang E2E Tests v${{ matrix.go }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        go: [ '1.16' ]
+        os: [ ubuntu-20.04 ]
+    steps:
+    - uses: actions/checkout@v2
+    - name: change avalanchego dep
+      if: ${{ github.event_name == 'workflow_dispatch' }}
+      run: |
+        git config --global url."https://${GITHUB_ACCESS_TOKEN}@github.com/ava-labs/avalanchego-internal".insteadOf "https://github.com/ava-labs/avalanchego-internal"
+        git clone -b $AVALANCHEGO_BRANCH --single-branch --quiet ${AVALANCHEGO_REPO} avalanchego
+        go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
+      env:
+        AVALANCHEGO_REPO: ${{ github.event.inputs.avalanchegoRepo }}
+        AVALANCHEGO_BRANCH: ${{ github.event.inputs.avalanchegoBranch }}
+        GITHUB_ACCESS_TOKEN: ${{ secrets.repo_access_token }}
+    - uses: actions/setup-go@v1
+      with:
+        go-version: ${{ matrix.go }}
+    - run: .github/workflows/run_e2e_tests.sh --parallelism 1 --client-id $KURTOSIS_CLIENT_ID --client-secret $KURTOSIS_CLIENT_SECRET
+      shell: bash
+      env:
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
+        KURTOSIS_CLIENT_ID: ${{ secrets.KURTOSIS_CLIENT_ID }}
+        KURTOSIS_CLIENT_SECRET: ${{ secrets.KURTOSIS_CLIENT_SECRET }}
