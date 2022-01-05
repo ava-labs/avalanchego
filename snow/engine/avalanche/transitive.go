@@ -156,14 +156,14 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.I
 		return nil // Don't have the requested vertex. Drop message.
 	}
 
-	queue := make([]avalanche.Vertex, 1, t.Config.MultiputMaxContainersSent) // for BFS
+	queue := make([]avalanche.Vertex, 1, t.Config.AncestorsMaxContainersSent) // for BFS
 	queue[0] = vertex
-	ancestorsBytesLen := 0                                                  // length, in bytes, of vertex and its ancestors
-	ancestorsBytes := make([][]byte, 0, t.Config.MultiputMaxContainersSent) // vertex and its ancestors in BFS order
-	visited := ids.Set{}                                                    // IDs of vertices that have been in queue before
+	ancestorsBytesLen := 0                                                   // length, in bytes, of vertex and its ancestors
+	ancestorsBytes := make([][]byte, 0, t.Config.AncestorsMaxContainersSent) // vertex and its ancestors in BFS order
+	visited := ids.Set{}                                                     // IDs of vertices that have been in queue before
 	visited.Add(vertex.ID())
 
-	for len(ancestorsBytes) < t.Config.MultiputMaxContainersSent && len(queue) > 0 && time.Since(startTime) < t.Config.MaxTimeGetAncestors {
+	for len(ancestorsBytes) < t.Config.AncestorsMaxContainersSent && len(queue) > 0 && time.Since(startTime) < t.Config.MaxTimeGetAncestors {
 		var vtx avalanche.Vertex
 		vtx, queue = queue[0], queue[1:] // pop
 		vtxBytes := vtx.Bytes()
@@ -191,26 +191,26 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.I
 	}
 
 	t.metrics.getAncestorsVtxs.Observe(float64(len(ancestorsBytes)))
-	t.Sender.SendMultiPut(vdr, requestID, ancestorsBytes)
+	t.Sender.SendAncestors(vdr, requestID, ancestorsBytes)
 	return nil
 }
 
 // Put implements the Engine interface
-func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) error {
-	t.Ctx.Log.Verbo("Put(%s, %d, %s) called", vdr, requestID, vtxID)
+func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxBytes []byte) error {
+	t.Ctx.Log.Verbo("Put(%s, %d) called", vdr, requestID)
 
 	if !t.Ctx.IsBootstrapped() { // Bootstrapping unfinished --> didn't call Get --> this message is invalid
 		if requestID == constants.GossipMsgRequestID {
-			t.Ctx.Log.Verbo("dropping gossip Put(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
+			t.Ctx.Log.Verbo("dropping gossip Put(%s, %d) due to bootstrapping", vdr, requestID)
 		} else {
-			t.Ctx.Log.Debug("dropping Put(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
+			t.Ctx.Log.Debug("dropping Put(%s, %d) due to bootstrapping", vdr, requestID)
 		}
 		return nil
 	}
 
 	vtx, err := t.Manager.ParseVtx(vtxBytes)
 	if err != nil {
-		t.Ctx.Log.Debug("failed to parse vertex %s due to: %s", vtxID, err)
+		t.Ctx.Log.Debug("failed to parse vertex due to: %s", err)
 		t.Ctx.Log.Verbo("vertex:\n%s", formatting.DumpBytes(vtxBytes))
 		return t.GetFailed(vdr, requestID)
 	}
@@ -286,16 +286,16 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID) 
 }
 
 // PushQuery implements the Engine interface
-func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) error {
+func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxBytes []byte) error {
 	if !t.Ctx.IsBootstrapped() {
 		// We're bootstrapping, so ignore this query.
-		t.Ctx.Log.Debug("dropping PushQuery(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
+		t.Ctx.Log.Debug("dropping PushQuery(%s, %d) due to bootstrapping", vdr, requestID)
 		return nil
 	}
 
 	vtx, err := t.Manager.ParseVtx(vtxBytes)
 	if err != nil {
-		t.Ctx.Log.Debug("failed to parse vertex %s due to: %s", vtxID, err)
+		t.Ctx.Log.Debug("failed to parse vertex due to: %s", err)
 		t.Ctx.Log.Verbo("vertex:\n%s", formatting.DumpBytes(vtxBytes))
 		return nil
 	}

@@ -284,10 +284,10 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		reqID := msg.Get(message.RequestID).(uint32)
 		return h.engine.GetAncestorsFailed(nodeID, reqID)
 
-	case message.MultiPut:
+	case message.Ancestors:
 		reqID := msg.Get(message.RequestID).(uint32)
 		containers := msg.Get(message.MultiContainerBytes).([][]byte)
-		return h.engine.MultiPut(nodeID, reqID, containers)
+		return h.engine.Ancestors(nodeID, reqID, containers)
 
 	case message.Get:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -301,27 +301,23 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 
 	case message.Put:
 		reqID := msg.Get(message.RequestID).(uint32)
-		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
-		h.ctx.Log.AssertNoError(err)
 		container, ok := msg.Get(message.ContainerBytes).([]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse ContainerBytes",
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
-		return h.engine.Put(nodeID, reqID, containerID, container)
+		return h.engine.Put(nodeID, reqID, container)
 
 	case message.PushQuery:
 		reqID := msg.Get(message.RequestID).(uint32)
-		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
-		h.ctx.Log.AssertNoError(err)
 		container, ok := msg.Get(message.ContainerBytes).([]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse ContainerBytes",
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
-		return h.engine.PushQuery(nodeID, reqID, containerID, container)
+		return h.engine.PushQuery(nodeID, reqID, container)
 
 	case message.PullQuery:
 		reqID := msg.Get(message.RequestID).(uint32)

@@ -2065,16 +2065,16 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	err = engine.Initialize(smeng.Config{
 		Config: bootstrap.Config{
 			Config: common.Config{
-				Ctx:                           consensusCtx,
-				Validators:                    vdrs,
-				Beacons:                       beacons,
-				SampleK:                       beacons.Len(),
-				StartupAlpha:                  (beacons.Weight() + 1) / 2,
-				Alpha:                         (beacons.Weight() + 1) / 2,
-				Sender:                        &sender,
-				Subnet:                        subnet,
-				MultiputMaxContainersSent:     2000,
-				MultiputMaxContainersReceived: 2000,
+				Ctx:                            consensusCtx,
+				Validators:                     vdrs,
+				Beacons:                        beacons,
+				SampleK:                        beacons.Len(),
+				StartupAlpha:                   (beacons.Weight() + 1) / 2,
+				Alpha:                          (beacons.Weight() + 1) / 2,
+				Sender:                         &sender,
+				Subnet:                         subnet,
+				AncestorsMaxContainersSent:     2000,
+				AncestorsMaxContainersReceived: 2000,
 			},
 			Blocked: blocked,
 			VM:      vm,
@@ -2157,7 +2157,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	externalSender.SendF = nil
 	externalSender.CantSend = false
 
-	if err := engine.MultiPut(peerID, reqID, [][]byte{advanceTimeBlkBytes}); err != nil {
+	if err := engine.Ancestors(peerID, reqID, [][]byte{advanceTimeBlkBytes}); err != nil {
 		t.Fatal(err)
 	}
 

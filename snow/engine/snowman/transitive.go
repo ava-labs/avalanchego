@@ -176,7 +176,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 	ancestorsBytes, err := block.GetAncestors(
 		t.VM,
 		blkID,
-		t.Config.MultiputMaxContainersSent,
+		t.Config.AncestorsMaxContainersSent,
 		constants.MaxContainersLen,
 		t.Config.MaxTimeGetAncestors,
 	)
@@ -187,26 +187,26 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 	}
 
 	t.metrics.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
-	t.Sender.SendMultiPut(vdr, requestID, ancestorsBytes)
+	t.Sender.SendAncestors(vdr, requestID, ancestorsBytes)
 	return nil
 }
 
 // Put implements the Engine interface
-func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
+func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkBytes []byte) error {
 	// bootstrapping isn't done --> we didn't send any gets --> this put is invalid
 	if !t.IsBootstrapped() {
 		if requestID == constants.GossipMsgRequestID {
-			t.Ctx.Log.Verbo("dropping gossip Put(%s, %d, %s) due to bootstrapping",
-				vdr, requestID, blkID)
+			t.Ctx.Log.Verbo("dropping gossip Put(%s, %d) due to bootstrapping",
+				vdr, requestID)
 		} else {
-			t.Ctx.Log.Debug("dropping Put(%s, %d, %s) due to bootstrapping", vdr, requestID, blkID)
+			t.Ctx.Log.Debug("dropping Put(%s, %d) due to bootstrapping", vdr, requestID)
 		}
 		return nil
 	}
 
 	blk, err := t.VM.ParseBlock(blkBytes)
 	if err != nil {
-		t.Ctx.Log.Debug("failed to parse block %s: %s", blkID, err)
+		t.Ctx.Log.Debug("failed to parse block: %s", err)
 		t.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes(blkBytes))
 		// because GetFailed doesn't utilize the assumption that we actually
 		// sent a Get message, we can safely call GetFailed here to potentially
@@ -282,17 +282,17 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) 
 }
 
 // PushQuery implements the Engine interface
-func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
+func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkBytes []byte) error {
 	// if the engine hasn't been bootstrapped, we aren't ready to respond to queries
 	if !t.Ctx.IsBootstrapped() {
-		t.Ctx.Log.Debug("dropping PushQuery(%s, %d, %s) due to bootstrapping", vdr, requestID, blkID)
+		t.Ctx.Log.Debug("dropping PushQuery(%s, %d) due to bootstrapping", vdr, requestID)
 		return nil
 	}
 
 	blk, err := t.VM.ParseBlock(blkBytes)
 	// If parsing fails, we just drop the request, as we didn't ask for it
 	if err != nil {
-		t.Ctx.Log.Debug("failed to parse block %s: %s", blkID, err)
+		t.Ctx.Log.Debug("failed to parse block: %s", err)
 		t.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes(blkBytes))
 		return nil
 	}
