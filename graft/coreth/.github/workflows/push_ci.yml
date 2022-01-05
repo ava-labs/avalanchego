@@ -26,6 +26,9 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
+      - run: |
+          pwd
+          ls
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
         with:
