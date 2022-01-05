@@ -1,4 +1,12 @@
 name: Branch Push CI
+  +# Clone avalanchego
++echo "Fetching AvalancheGo: ${AVALANCHEGO_REPO} ${AVALANCHEGO_BRANCH}..."
++git clone -b $AVALANCHEGO_BRANCH --single-branch --quiet ${AVALANCHEGO_REPO}
++
++# Replace avalanchego dep
++go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
++
+
 on:
   push:
   workflow_dispatch:
