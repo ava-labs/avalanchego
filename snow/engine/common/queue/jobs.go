@@ -52,6 +52,9 @@ func (j *Jobs) SetParser(parser Parser) error { j.state.parser = parser; return 
 
 func (j *Jobs) Has(jobID ids.ID) (bool, error) { return j.state.HasJob(jobID) }
 
+// Returns how many pending jobs are waiting in the queue.
+func (j *Jobs) PendingJobs() uint64 { return j.state.numPendingJobs }
+
 // Push adds a new job to the queue. Returns true if [job] was added to the queue and false
 // if [job] was already in the queue.
 func (j *Jobs) Push(job Job) (bool, error) {

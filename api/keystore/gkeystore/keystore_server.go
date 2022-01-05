@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
 	"github.com/ava-labs/avalanchego/database/rpcdb/rpcdbproto"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
 
@@ -49,6 +50,10 @@ func (s *Server) GetDatabase(
 	// start the db server
 	dbBrokerID := s.broker.NextId()
 	go s.broker.AcceptAndServe(dbBrokerID, func(opts []grpc.ServerOption) *grpc.Server {
+		opts = append(opts,
+			grpc.MaxRecvMsgSize(math.MaxInt),
+			grpc.MaxSendMsgSize(math.MaxInt),
+		)
 		server := grpc.NewServer(opts...)
 		closer.closer.Add(server)
 		db := rpcdb.NewServer(&closer)

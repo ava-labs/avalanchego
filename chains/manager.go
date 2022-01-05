@@ -113,7 +113,6 @@ type chain struct {
 	Name    string
 	Engine  common.Engine
 	Handler *router.Handler
-	Ctx     *snow.ConsensusContext
 	Beacons validators.Set
 }
 
@@ -282,15 +281,16 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	m.Log.AssertNoError(m.Alias(chainParams.ID, chainParams.ID.String()))
 
 	// Notify those that registered to be notified when a new chain is created
-	m.notifyRegistrants(chain.Name, chain.Ctx, chain.Engine)
+	m.notifyRegistrants(chain.Name, chain.Engine)
 
 	// Tell the chain to start processing messages.
 	// If the X or P Chain panics, do not attempt to recover
+	ctx := chain.Engine.Context()
 	if m.CriticalChains.Contains(chainParams.ID) {
-		go chain.Ctx.Log.RecoverAndPanic(chain.Handler.Dispatch)
+		go ctx.Log.RecoverAndPanic(chain.Handler.Dispatch)
 	} else {
-		go chain.Ctx.Log.RecoverAndExit(chain.Handler.Dispatch, func() {
-			chain.Ctx.Log.Error("Chain with ID: %s was shutdown due to a panic", chainParams.ID)
+		go ctx.Log.RecoverAndExit(chain.Handler.Dispatch, func() {
+			ctx.Log.Error("Chain with ID: %s was shutdown due to a panic", chainParams.ID)
 		})
 	}
 
@@ -663,7 +663,6 @@ func (m *manager) createAvalancheChain(
 		Name:    chainAlias,
 		Engine:  engine,
 		Handler: handler,
-		Ctx:     ctx,
 	}, err
 }
 
@@ -887,7 +886,6 @@ func (m *manager) createSnowmanChain(
 		Name:    chainAlias,
 		Engine:  engine,
 		Handler: handler,
-		Ctx:     ctx,
 	}, nil
 }
 
@@ -924,9 +922,9 @@ func (m *manager) LookupVM(alias string) (ids.ID, error) { return m.VMManager.Lo
 
 // Notify registrants [those who want to know about the creation of chains]
 // that the specified chain has been created
-func (m *manager) notifyRegistrants(name string, ctx *snow.ConsensusContext, engine common.Engine) {
+func (m *manager) notifyRegistrants(name string, engine common.Engine) {
 	for _, registrant := range m.registrants {
-		registrant.RegisterChain(name, ctx, engine)
+		registrant.RegisterChain(name, engine)
 	}
 }
 

@@ -420,8 +420,10 @@ func TestGetBalance(t *testing.T) {
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis()
 	for _, utxo := range genesis.UTXOs {
-		request := api.JSONAddress{
-			Address: fmt.Sprintf("P-%s", utxo.Address),
+		request := GetBalanceRequest{
+			Addresses: []string{
+				fmt.Sprintf("P-%s", utxo.Address),
+			},
 		}
 		reply := GetBalanceResponse{}
 		if err := service.GetBalance(nil, &request, &reply); err != nil {

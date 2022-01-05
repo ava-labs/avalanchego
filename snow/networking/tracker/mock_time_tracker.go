@@ -28,11 +28,6 @@ func (_m *MockTimeTracker) CumulativeUtilization(_a0 time.Time) float64 {
 	return r0
 }
 
-// EndInterval provides a mock function with given fields: _a0
-func (_m *MockTimeTracker) EndInterval(_a0 time.Time) {
-	_m.Called(_a0)
-}
-
 // Len provides a mock function with given fields:
 func (_m *MockTimeTracker) Len() int {
 	ret := _m.Called()

@@ -48,7 +48,7 @@ func TestCPUTracker(t *testing.T) {
 	// Set pruning time to 64 halflifes in the future, to guarantee that
 	// any counts should have gone to 0
 	pruningTime := endTime2.Add(halflife * 64)
-	cpuTracker.EndInterval(pruningTime)
+	cpuTracker.CumulativeUtilization(pruningTime)
 	len = cpuTracker.Len()
 	if len != 0 {
 		t.Fatalf("Expected length to be 0 after pruning, but found length: %d", len)
