@@ -6,7 +6,7 @@ on:
       avalanchegoRepo:
         description: 'avalanchego github repository'
         required: true
-        default: 'https://github.com/ava-labs/avalanchego'
+        default: 'ava-labs/avalanchego'
       avalanchegoBranch:
         description: 'avalanchego branch'
         required: true
