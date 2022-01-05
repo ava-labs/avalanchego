@@ -32,6 +32,11 @@ func New(config Config) (Engine, error) {
 type Transitive struct {
 	Config
 
+	// list of NoOpsHandler for messages dropped by engine
+	common.NoOpAcceptedHandler
+	common.NoOpAcceptedFrontierHandler
+	common.NoOpAncestorsHandler
+
 	RequestID uint32
 
 	metrics
@@ -636,3 +641,8 @@ func (t *Transitive) GetVtx(vtxID ids.ID) (avalanche.Vertex, error) {
 func (t *Transitive) GetVM() common.VM {
 	return t.VM
 }
+
+// TODO ABENEGIA: make sure these are correctly empty
+// TODO ABENEGIA: in comments, better specify interface implemented
+func (t *Transitive) Halt()          {}
+func (t *Transitive) Timeout() error { return nil }

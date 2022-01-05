@@ -30,6 +30,11 @@ func New(config Config) (Engine, error) {
 type Transitive struct {
 	Config
 
+	// list of NoOpsHandler for messages dropped by engine
+	common.NoOpAcceptedHandler
+	common.NoOpAcceptedFrontierHandler
+	common.NoOpAncestorsHandler
+
 	RequestID uint32
 
 	metrics
@@ -796,3 +801,8 @@ func (t *Transitive) parentProcessing(blk snowman.Block) bool {
 	parentBlk, err := t.GetBlock(parentID)
 	return err == nil && !parentBlk.Status().Decided() && t.Consensus.DecidedOrProcessing(parentBlk)
 }
+
+// TODO ABENEGIA: make sure these are correctly empty
+// TODO ABENEGIA: in comments, better specify interface implemented
+func (t *Transitive) Halt()          {}
+func (t *Transitive) Timeout() error { return nil }

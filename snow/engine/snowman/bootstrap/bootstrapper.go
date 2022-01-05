@@ -35,6 +35,18 @@ type SnowmanBootstrapper interface {
 func New(config Config, onFinished func(lastReqID uint32) error) (SnowmanBootstrapper, error) {
 	b := &bootstrapper{
 		Config: config,
+		NoOpAppHandler: common.NoOpAppHandler{
+			Log: config.Ctx.Log,
+		},
+		NoOpChitsHandler: common.NoOpChitsHandler{
+			Log: config.Ctx.Log,
+		},
+		NoOpPutHandler: common.NoOpPutHandler{
+			Log: config.Ctx.Log,
+		},
+		NoOpQueryHandler: common.NoOpQueryHandler{
+			Log: config.Ctx.Log,
+		},
 		Fetcher: common.Fetcher{
 			OnFinished: onFinished,
 		},
@@ -73,6 +85,13 @@ func New(config Config, onFinished func(lastReqID uint32) error) (SnowmanBootstr
 
 type bootstrapper struct {
 	Config
+
+	// list of NoOpsHandler for messages dropped by bootstrapper
+	common.NoOpAppHandler
+	common.NoOpChitsHandler
+	common.NoOpPutHandler
+	common.NoOpQueryHandler
+
 	common.Bootstrapper
 	common.Fetcher
 	metrics
@@ -449,3 +468,9 @@ func (b *bootstrapper) HealthCheck() (interface{}, error) {
 	}
 	return intf, vmErr
 }
+
+// TODO ABENEGIA: make sure these are correctly empty
+// TODO ABENEGIA: in comments, better specify interface implemented
+func (b *bootstrapper) Gossip() error               { return nil }
+func (b *bootstrapper) Notify(common.Message) error { return nil }
+func (b *bootstrapper) Shutdown() error             { return nil }

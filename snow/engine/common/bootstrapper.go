@@ -36,6 +36,8 @@ const (
 var _ Bootstrapper = &bootstrapper{}
 
 type Bootstrapper interface {
+	AcceptedHandler
+	AcceptedFrontierHandler
 	Haltable
 	Start(startReqID uint32) error
 	Startup() error
