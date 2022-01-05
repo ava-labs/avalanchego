@@ -1,9 +1,4 @@
 name: Branch Push CI
-#+git clone -b $AVALANCHEGO_BRANCH --single-branch --quiet ${AVALANCHEGO_REPO}
-#+
-#+# Replace avalanchego dep
-#+go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
-#+
 
 on:
   push:
@@ -28,13 +23,10 @@ jobs:
         if: ${{ github.event_name != 'workflow_dispatch' }}
         run: |
           git clone -b $AVALANCHEGO_BRANCH --single-branch --quiet ${AVALANCHEGO_REPO} avalanchego
+          go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
         env:
           AVALANCHEGO_REPO: https://github.com/ava-labs/avalanchego
           AVALANCHEGO_BRANCH: master
-      - run: |
-          pwd
-          ls
-          ls avalanchego
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
         with:
