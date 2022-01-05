@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/coreth/statesync/types"
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -30,7 +29,7 @@ type atomicTrieIterator struct {
 	err          error            // error if any has occurred
 }
 
-func NewAtomicTrieIterator(trieIterator *trie.Iterator, codec codec.Manager) types.AtomicTrieIterator {
+func NewAtomicTrieIterator(trieIterator *trie.Iterator, codec codec.Manager) AtomicTrieIterator {
 	return &atomicTrieIterator{trieIterator: trieIterator, codec: codec}
 }
 

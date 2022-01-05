@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/coreth/statesync/types"
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -31,7 +30,55 @@ var (
 	lastCommittedKey = []byte("atomicTrieLastCommittedBlock")
 )
 
-// atomicTrie implements the types.AtomicTrie interface
+// AtomicTrie maintains an index of atomic operations by blockchainIDs for every block
+// height containing atomic transactions. The backing data structure for this index is
+// a Trie. The keys of the trie are block heights and the values (leaf nodes)
+// are the atomic operations applied to shared memory while processing the block accepted
+// at the corresponding height.
+type AtomicTrie interface {
+	// Index indexes the given atomicOps at the specified block height
+	// Returns an optional root hash
+	// A non-empty root hash is returned when the atomic trie has been committed
+	// Atomic trie is committed if the block height is multiple of commit interval
+	Index(height uint64, atomicOps map[ids.ID]*atomic.Requests) error
+
+	// Iterator returns an AtomicTrieIterator to iterate the trie at the given
+	// root hash
+	Iterator(hash common.Hash, startHeight uint64) (AtomicTrieIterator, error)
+
+	// LastCommitted returns the last committed hash and corresponding block height
+	LastCommitted() (common.Hash, uint64)
+
+	// TrieDB returns the underlying trie database
+	TrieDB() *trie.Database
+
+	// Root returns hash if it exists at specified height
+	// if trie was not committed at provided height, it returns
+	// common.Hash{} instead
+	Root(height uint64) (common.Hash, error)
+}
+
+// AtomicTrieIterator is a stateful iterator that iterates the leafs of an AtomicTrie
+type AtomicTrieIterator interface {
+	// Next advances the iterator to the next node in the atomic trie and
+	// returns true if there are more nodes to iterate
+	Next() bool
+
+	// BlockNumber returns the current block number
+	BlockNumber() uint64
+
+	// BlockchainID returns the current blockchain ID at the current block number
+	BlockchainID() ids.ID
+
+	// AtomicOps returns a map of blockchainIDs to the set of atomic requests
+	// for that blockchainID at the current block number
+	AtomicOps() *atomic.Requests
+
+	// Error returns error, if any encountered during this iteration
+	Error() error
+}
+
+// atomicTrie implements the AtomicTrie interface
 // using the eth trie.Trie implementation
 type atomicTrie struct {
 	commitHeightInterval uint64              // commit interval, same as commitHeightInterval by default
@@ -48,11 +95,11 @@ type atomicTrie struct {
 	log                  log.Logger // struct logger
 }
 
-var _ types.AtomicTrie = &atomicTrie{}
+var _ AtomicTrie = &atomicTrie{}
 
 // NewAtomicTrie returns a new instance of a atomicTrie with the default commitHeightInterval.
 // Initializes the trie before returning it.
-func NewAtomicTrie(db *versiondb.Database, bonusBlocks map[uint64]ids.ID, repo AtomicTxRepository, codec codec.Manager, lastAcceptedHeight uint64) (types.AtomicTrie, error) {
+func NewAtomicTrie(db *versiondb.Database, bonusBlocks map[uint64]ids.ID, repo AtomicTxRepository, codec codec.Manager, lastAcceptedHeight uint64) (AtomicTrie, error) {
 	return newAtomicTrie(db, bonusBlocks, repo, codec, lastAcceptedHeight, commitHeightInterval)
 }
 
@@ -352,7 +399,7 @@ func (a *atomicTrie) LastCommitted() (common.Hash, uint64) {
 
 // Iterator returns a types.AtomicTrieIterator that iterates the trie from the given
 // atomic trie root, starting at the specified height
-func (a *atomicTrie) Iterator(root common.Hash, startHeight uint64) (types.AtomicTrieIterator, error) {
+func (a *atomicTrie) Iterator(root common.Hash, startHeight uint64) (AtomicTrieIterator, error) {
 	startKey := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(startKey, startHeight)
 
