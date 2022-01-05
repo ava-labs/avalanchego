@@ -34,7 +34,6 @@ import (
 	// inside of cmd/geth.
 	_ "github.com/ava-labs/coreth/eth/tracers/js"
 	_ "github.com/ava-labs/coreth/eth/tracers/native"
-	// TODO: geth also includes: 	_ "github.com/ethereum/go-ethereum/eth/tracers/js"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
