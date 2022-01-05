@@ -18,17 +18,6 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
-        #      - name: change avalanchego dep
-        #        if: ${{ github.event_name == 'workflow_dispatch' }}
-        #        run: |
-        #          git config --global url."https://${GITHUB_ACCESS_TOKEN}@github.com/ava-labs/avalanchego-internal".insteadOf "https://github.com/ava-labs/avalanchego-internal"
-        #          git clone -b $AVALANCHEGO_BRANCH --single-branch --quiet ${AVALANCHEGO_REPO} avalanchego
-        #          go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
-        #        env:
-        #          AVALANCHEGO_REPO: ${{ github.event.inputs.avalanchegoRepo }}
-        #          AVALANCHEGO_BRANCH: ${{ github.event.inputs.avalanchegoBranch }}
-        #          GITHUB_ACCESS_TOKEN: ${{ secrets.repo_access_token }}
-        #
       - name: Check out ${{ github.event.inputs.avalanchegoRepo }} ${{ github.event.inputs.avalanchegoBranch }}
         if: ${{ github.event_name != 'workflow_dispatch' }}
         uses: actions/checkout@v2
@@ -36,10 +25,13 @@ jobs:
           repository: ava-labs/avalanchego
           ref: master
           path: avalanchego
-          #token: ${{ secrets.SNOWBOT_PAT}}
-      - run: |
-          avalanchego_path=./avalanchego/*
-          echo $avalanchego_path
+          #token: ${{ secrets.SNOWBOT_PAT }}
+      - name: change avalanchego dep
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        run: go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
+          #env:
+          #AVALANCHEGO_REPO: ${{ github.event.inputs.avalanchegoRepo }}
+          #AVALANCHEGO_BRANCH: ${{ github.event.inputs.avalanchegoBranch }}
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
         with:
