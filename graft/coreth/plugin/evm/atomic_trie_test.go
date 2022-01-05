@@ -12,8 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/ava-labs/coreth/statesync/types"
 )
 
 const testCommitInterval = 100
@@ -200,7 +198,7 @@ func TestIndexerInitializesOnlyOnce(t *testing.T) {
 	assert.Equal(t, hash, newHash, "hash should be the same")
 }
 
-func newTestAtomicTrieIndexer(t *testing.T) types.AtomicTrie {
+func newTestAtomicTrieIndexer(t *testing.T) AtomicTrie {
 	db := versiondb.New(memdb.New())
 	repo, err := NewAtomicTxRepository(db, testTxCodec(), 0)
 	assert.NoError(t, err)
@@ -372,7 +370,7 @@ func BenchmarkAtomicTrieInit(b *testing.B) {
 	assert.NoError(b, err)
 	writeTxs(b, repo, 0, 25000, 3, nil, operationsMap)
 
-	var atomicTrie types.AtomicTrie
+	var atomicTrie AtomicTrie
 	var hash common.Hash
 	var height uint64
 	b.ReportAllocs()
