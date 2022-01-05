@@ -19,6 +19,13 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
+      - name: test download of avalanchego-internal
+        uses: actions/checkout@v2
+        with:
+          repository: ava-labs/avalanchego-internal
+          token: ${{ secrets.SNOWBOT_PAT}}
+          ref: master
+          path: avalanchego
       - name: change avalanchego dep
         if: ${{ github.event_name != 'workflow_dispatch' }}
         run: |
