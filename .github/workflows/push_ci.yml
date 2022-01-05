@@ -37,6 +37,9 @@ jobs:
           ref: master
           path: avalanchego
           #token: ${{ secrets.SNOWBOT_PAT}}
+      - run: |
+          avalanchego_path=./avalanchego/*
+          echo $avalanchego_path
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
         with:
