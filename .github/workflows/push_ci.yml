@@ -25,7 +25,7 @@ jobs:
           git clone -b $AVALANCHEGO_BRANCH --single-branch --quiet ${AVALANCHEGO_REPO} avalanchego
           go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
         env:
-          AVALANCHEGO_REPO: https://github.com/ava-labs/avalanchego
+          AVALANCHEGO_REPO: https://github.com/ava-labs/avalanchego-internal
           AVALANCHEGO_BRANCH: master
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
