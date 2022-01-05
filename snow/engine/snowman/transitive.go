@@ -77,11 +77,7 @@ func newTransitive(config Config) (*Transitive, error) {
 		),
 	}
 
-	if err := t.metrics.Initialize("", config.Ctx.Registerer); err != nil {
-		return nil, err
-	}
-
-	return t, nil
+	return t, t.metrics.Initialize("", config.Ctx.Registerer)
 }
 
 func (t *Transitive) Context() *snow.ConsensusContext {

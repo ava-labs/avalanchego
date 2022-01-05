@@ -124,7 +124,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		BytesV:  vtxBytes2,
 	}
 
-	bs, err := newBootstrapper(
+	bs, err := New(
 		config,
 		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
@@ -226,7 +226,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		BytesV:  vtxBytes2,
 	}
 
-	bs, err := newBootstrapper(
+	bs, err := New(
 		config,
 		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
@@ -403,7 +403,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		BytesV:   vtxBytes1,
 	}
 
-	bs, err := newBootstrapper(
+	bs, err := New(
 		config,
 		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
@@ -547,7 +547,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 		BytesV:   vtxBytes1,
 	}
 
-	bs, err := newBootstrapper(
+	bs, err := New(
 		config,
 		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
@@ -636,7 +636,7 @@ func TestBootstrapperAcceptedFrontier(t *testing.T) {
 	vtxID1 := ids.GenerateTestID()
 	vtxID2 := ids.GenerateTestID()
 
-	bs, err := newBootstrapper(
+	bs, err := New(
 		config,
 		nil,
 	)
@@ -692,7 +692,7 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	bs, err := newBootstrapper(
+	bs, err := New(
 		config,
 		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
@@ -776,7 +776,7 @@ func TestBootstrapperIncompleteMultiPut(t *testing.T) {
 		BytesV:   vtxBytes2,
 	}
 
-	bs, err := newBootstrapper(
+	bs, err := New(
 		config,
 		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
@@ -896,7 +896,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		BytesV:   vtxBytes1,
 	}
 
-	bs, err := newBootstrapper(
+	bs, err := New(
 		config,
 		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
@@ -1027,7 +1027,7 @@ func TestBootstrapperAcceptsMultiPutParents(t *testing.T) {
 		BytesV:   vtxBytes2,
 	}
 
-	bs, err := newBootstrapper(
+	bs, err := New(
 		config,
 		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
@@ -1194,12 +1194,16 @@ func TestRestartBootstrapping(t *testing.T) {
 		BytesV:   vtxBytes5,
 	}
 
-	bs, err := newBootstrapper(
+	bsIntf, err := New(
 		config,
 		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
 		t.Fatal(err)
+	}
+	bs, ok := bsIntf.(*bootstrapper)
+	if !ok {
+		t.Fatal("unexpected bootstrapper type")
 	}
 
 	startReqID := uint32(0)

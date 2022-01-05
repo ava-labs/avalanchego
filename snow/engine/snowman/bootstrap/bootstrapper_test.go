@@ -110,7 +110,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		return blk0, nil
 	}
 
-	bs, err := newBootstrapper(
+	bs, err := New(
 		config,
 		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
@@ -210,7 +210,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 		return blk0, nil
 	}
 
-	bs, err := newBootstrapper(
+	bs, err := New(
 		config,
 		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
@@ -368,7 +368,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		return blk0, nil
 	}
 
-	bs, err := newBootstrapper(
+	bs, err := New(
 		config,
 		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
@@ -530,7 +530,7 @@ func TestBootstrapperMultiPut(t *testing.T) {
 		return blk0, nil
 	}
 
-	bs, err := newBootstrapper(
+	bs, err := New(
 		config,
 		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
@@ -645,7 +645,7 @@ func TestBootstrapperAcceptedFrontier(t *testing.T) {
 		assert.Equal(t, blkID, bID)
 		return dummyBlk, nil
 	}
-	bs, err := newBootstrapper(
+	bs, err := New(
 		config,
 		nil,
 	)
@@ -694,7 +694,7 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 		return blk1, nil
 	}
 
-	bs, err := newBootstrapper(
+	bs, err := New(
 		config,
 		nil,
 	)
@@ -784,7 +784,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		assert.Equal(t, blk0.ID(), blkID)
 		return blk0, nil
 	}
-	bs, err := newBootstrapper(
+	bs, err := New(
 		config,
 		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
@@ -992,12 +992,16 @@ func TestRestartBootstrapping(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	bs, err := newBootstrapper(
+	bsIntf, err := New(
 		config,
 		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
 		t.Fatal(err)
+	}
+	bs, ok := bsIntf.(*bootstrapper)
+	if !ok {
+		t.Fatal("unexpected bootstrapper type")
 	}
 
 	startReqID := uint32(0)
