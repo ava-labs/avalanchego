@@ -36,7 +36,7 @@ jobs:
           repository: ava-labs/avalanchego
           ref: master
           path: avalanchego
-          token: ${{ secrets.SNOWBOT_PAT}}
+          #token: ${{ secrets.SNOWBOT_PAT}}
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
         with:
