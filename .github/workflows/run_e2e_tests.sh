@@ -60,6 +60,13 @@ docker pull $avalanche_testing_image
 # Setting the build ID
 git_commit_id=$( git rev-list -1 HEAD )
 
+# Clone avalanchego
+echo "Fetching AvalancheGo: ${AVALANCHEGO_REPO} ${AVALANCHEGO_BRANCH}..."
+git clone -b $AVALANCHEGO_BRANCH --single-branch --quiet ${AVALANCHEGO_REPO} 
+
+# Replace avalanchego dep
+go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego/
+
 # Build current avalanchego
 source "$CORETH_PATH"/scripts/build_image.sh
 
