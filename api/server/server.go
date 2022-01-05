@@ -153,16 +153,17 @@ func (s *Server) DispatchTLS(certBytes, keyBytes []byte) error {
 // creating a new chain and holds the P-Chain's lock when this function is held,
 // and at the same time the server's lock is held due to an API call and is trying
 // to grab the P-Chain's lock.
-func (s *Server) RegisterChain(chainName string, ctx *snow.ConsensusContext, engine common.Engine) {
-	go s.registerChain(chainName, ctx, engine)
+func (s *Server) RegisterChain(chainName string, engine common.Engine) {
+	go s.registerChain(chainName, engine)
 }
 
-func (s *Server) registerChain(chainName string, ctx *snow.ConsensusContext, engine common.Engine) {
+func (s *Server) registerChain(chainName string, engine common.Engine) {
 	var (
 		handlers map[string]*common.HTTPHandler
 		err      error
 	)
 
+	ctx := engine.Context()
 	ctx.Lock.Lock()
 	handlers, err = engine.GetVM().CreateHandlers()
 	ctx.Lock.Unlock()

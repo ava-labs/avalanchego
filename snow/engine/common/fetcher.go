@@ -4,9 +4,6 @@
 package common
 
 type Fetcher struct {
-	// number of containers fetched so far
-	NumFetched uint32
-
 	// tracks which validators were asked for which containers in which requests
 	OutstandingRequests Requests
 
