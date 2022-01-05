@@ -271,7 +271,7 @@ func (bc *BlockChain) SenderCacher() *TxSenderCacher {
 // empty returns an indicator whether the blockchain is empty.
 func (bc *BlockChain) empty() bool {
 	genesis := bc.genesisBlock.Hash()
-	for _, hash := range []common.Hash{rawdb.ReadHeadBlockHash(bc.db), rawdb.ReadHeadHeaderHash(bc.db), rawdb.ReadHeadFastBlockHash(bc.db)} {
+	for _, hash := range []common.Hash{rawdb.ReadHeadBlockHash(bc.db), rawdb.ReadHeadHeaderHash(bc.db)} {
 		if hash != genesis {
 			return false
 		}
@@ -424,28 +424,19 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 // Note, this function assumes that the `mu` mutex is held!
 func (bc *BlockChain) writeHeadBlock(block *types.Block) {
 	// If the block is on a side chain or an unknown one, force other heads onto it too
-	// TODO: go-ethereum now assumes that the block passed in should always
-	// update heads. Should we do this?
-	updateHeads := rawdb.ReadCanonicalHash(bc.db, block.NumberU64()) != block.Hash()
-
 	// Add the block to the canonical chain number scheme and mark as the head
 	batch := bc.db.NewBatch()
 	rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
 	rawdb.WriteHeadBlockHash(batch, block.Hash())
 
 	// If the block is better than our head or is on a different chain, force update heads
-	if updateHeads {
-		rawdb.WriteHeadHeaderHash(batch, block.Hash())
-		rawdb.WriteHeadFastBlockHash(batch, block.Hash())
-	}
+	rawdb.WriteHeadHeaderHash(batch, block.Hash())
 	// Flush the whole batch into the disk, exit the node if failed
 	if err := batch.Write(); err != nil {
 		log.Crit("Failed to update chain indexes and markers", "err", err)
 	}
 	// Update all in-memory chain markers in the last step
-	if updateHeads {
-		bc.hc.SetCurrentHeader(block.Header())
-	}
+	bc.hc.SetCurrentHeader(block.Header())
 	bc.currentBlock.Store(block)
 }
 
@@ -567,15 +558,6 @@ func (bc *BlockChain) Stop() {
 
 	log.Info("Blockchain stopped")
 }
-
-// WriteStatus status of write
-type WriteStatus byte
-
-const (
-	NonStatTy WriteStatus = iota
-	CanonStatTy
-	SideStatTy
-)
 
 // SetPreference attempts to update the head block to be the provided block and
 // emits a ChainHeadEvent if successful. This function will handle all reorg
@@ -765,7 +747,7 @@ func (bc *BlockChain) newTip(block *types.Block) bool {
 // since it creates a reference that will only be cleaned up by Accept/Reject.
 // TODO: no longer return writeStatus in go-ethereum? Should we do this
 // (separate into writeBlockAndSetHead)?
-func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, state *state.StateDB) (WriteStatus, error) {
+func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, state *state.StateDB) error {
 	bc.wg.Add(1)
 	defer bc.wg.Done()
 
@@ -790,7 +772,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 		_, err = state.CommitWithSnap(bc.chainConfig.IsEIP158(block.Number()), bc.snaps, block.Hash(), block.ParentHash())
 	}
 	if err != nil {
-		return NonStatTy, err
+		return err
 	}
 
 	// Note: if InsertTrie must be the last step in verification that can return an error.
@@ -805,18 +787,18 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 				log.Debug("failed to discard snapshot after being unable to insert block trie", "block", block.Hash(), "root", block.Root())
 			}
 		}
-		return NonStatTy, err
+		return err
 	}
 
 	// If [block] represents a new tip of the canonical chain, we optimistically add it before
 	// setPreference is called. Otherwise, we consider it a side chain block.
 	if bc.newTip(block) {
 		bc.writeCanonicalBlockWithLogs(block, logs)
-		return CanonStatTy, nil
+		return nil
 	}
 
 	bc.chainSideFeed.Send(ChainSideEvent{Block: block})
-	return SideStatTy, nil
+	return nil
 }
 
 // InsertChain attempts to insert the given batch of blocks in to the canonical
@@ -993,39 +975,17 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	// writeBlockWithState creates a reference that will be cleaned up in Accept/Reject
 	// so we need to ensure an error cannot occur later in verification, since that would
 	// cause the referenced root to never be dereferenced.
-	status, err := bc.writeBlockWithState(block, receipts, logs, statedb)
-	if err != nil {
+	if err := bc.writeBlockWithState(block, receipts, logs, statedb); err != nil {
 		return err
 	}
+	log.Debug("Inserted new block", "number", block.Number(), "hash", block.Hash(),
+		"parentHash", block.ParentHash(),
+		"uncles", len(block.Uncles()), "txs", len(block.Transactions()), "gas", block.GasUsed(),
+		"elapsed", common.PrettyDuration(time.Since(start)),
+		"root", block.Root(), "baseFeePerGas", block.BaseFee(), "blockGasCost", block.BlockGasCost(),
+	)
 
-	switch status {
-	case CanonStatTy:
-		log.Debug("Inserted new block", "number", block.Number(), "hash", block.Hash(),
-			"parentHash", block.ParentHash(),
-			"uncles", len(block.Uncles()), "txs", len(block.Transactions()), "gas", block.GasUsed(),
-			"elapsed", common.PrettyDuration(time.Since(start)),
-			"root", block.Root(), "baseFeePerGas", block.BaseFee(), "blockGasCost", block.BlockGasCost(),
-		)
-		// Only count canonical blocks for GC processing time
-	case SideStatTy:
-		log.Debug("Inserted forked block", "number", block.Number(), "hash", block.Hash(),
-			"parentHash", block.ParentHash(),
-			"diff", block.Difficulty(), "elapsed", common.PrettyDuration(time.Since(start)),
-			"txs", len(block.Transactions()), "gas", block.GasUsed(), "uncles", len(block.Uncles()),
-			"root", block.Root(), "baseFeePerGas", block.BaseFee(), "blockGasCost", block.BlockGasCost(),
-		)
-	default:
-		// This in theory is impossible, but lets be nice to our future selves and leave
-		// a log, instead of trying to track down blocks imports that don't emit logs.
-		log.Warn("Inserted block with unknown status", "number", block.Number(), "hash", block.Hash(),
-			"parentHash", block.ParentHash(),
-			"diff", block.Difficulty(), "elapsed", common.PrettyDuration(time.Since(start)),
-			"txs", len(block.Transactions()), "gas", block.GasUsed(), "uncles", len(block.Uncles()),
-			"root", block.Root(), "baseFeePerGas", block.BaseFee(), "blockGasCost", block.BlockGasCost(),
-		)
-	}
-
-	return err
+	return nil
 }
 
 // collectLogs collects the logs that were generated or removed during
