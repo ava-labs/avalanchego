@@ -23,9 +23,9 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: ava-labs/avalanchego-internal
-          token: ${{ secrets.SNOWBOT_PAT}}
           ref: master
           path: avalanchego
+            #token: ${{ secrets.SNOWBOT_PAT}}
       - name: change avalanchego dep
         if: ${{ github.event_name != 'workflow_dispatch' }}
         run: |
