@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	sbh "github.com/ava-labs/avalanchego/snow/engine/snowman/base_msg_handler"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -61,6 +62,12 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 	vm.T = t
 	bootCfg.VM = vm
 	engCfg.VM = vm
+
+	snowBaseMsgHandler, err := sbh.New(vm, bootCfg.Config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	engCfg.Handler = snowBaseMsgHandler
 
 	vm.Default(true)
 	vm.CantSetPreference = false

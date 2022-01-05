@@ -33,8 +33,8 @@ type Transitive struct {
 	Config
 
 	// list of NoOpsHandler for messages dropped by engine
-	common.NoOpAcceptedHandler
 	common.NoOpAcceptedFrontierHandler
+	common.NoOpAcceptedHandler
 	common.NoOpAncestorsHandler
 
 	RequestID uint32
@@ -68,13 +68,21 @@ type Transitive struct {
 	errs wrappers.Errs
 }
 
-// Initialize implements the Engine interface
 func newTransitive(config Config) (*Transitive, error) {
 	config.Ctx.Log.Info("initializing consensus engine")
 
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t := &Transitive{
 		Config: config,
+		NoOpAcceptedFrontierHandler: common.NoOpAcceptedFrontierHandler{
+			Log: config.Ctx.Log,
+		},
+		NoOpAcceptedHandler: common.NoOpAcceptedHandler{
+			Log: config.Ctx.Log,
+		},
+		NoOpAncestorsHandler: common.NoOpAncestorsHandler{
+			Log: config.Ctx.Log,
+		},
 		polls: poll.NewSet(factory,
 			config.Ctx.Log,
 			"",
@@ -86,78 +94,7 @@ func newTransitive(config Config) (*Transitive, error) {
 	return t, t.metrics.Initialize("", config.Ctx.Registerer)
 }
 
-func (t *Transitive) Context() *snow.ConsensusContext {
-	return t.Ctx
-}
-
-func (t *Transitive) IsBootstrapped() bool {
-	return t.Ctx.IsBootstrapped()
-}
-
-// Connected implements the Engine interface.
-func (t *Transitive) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
-	return t.VM.Connected(nodeID, nodeVersion)
-}
-
-// Disconnected implements the Engine interface.
-func (t *Transitive) Disconnected(nodeID ids.ShortID) error {
-	return t.VM.Disconnected(nodeID)
-}
-
-func (t *Transitive) Start(startReqID uint32) error {
-	t.RequestID = startReqID
-	// Load the vertices that were last saved as the accepted frontier
-	edge := t.Manager.Edge()
-	frontier := make([]avalanche.Vertex, 0, len(edge))
-	for _, vtxID := range edge {
-		if vtx, err := t.Manager.GetVtx(vtxID); err == nil {
-			frontier = append(frontier, vtx)
-		} else {
-			t.Ctx.Log.Error("vertex %s failed to be loaded from the frontier with %s", vtxID, err)
-		}
-	}
-
-	t.Ctx.Log.Info("bootstrapping finished with %d vertices in the accepted frontier", len(frontier))
-	t.metrics.bootstrapFinished.Set(1)
-
-	t.Ctx.SetState(snow.NormalOp)
-	return t.Consensus.Initialize(t.Ctx, t.Params, frontier)
-}
-
-// Gossip implements the Engine interface
-func (t *Transitive) Gossip() error {
-	edge := t.Manager.Edge()
-	if len(edge) == 0 {
-		t.Ctx.Log.Verbo("dropping gossip request as no vertices have been accepted")
-		return nil
-	}
-
-	if err := t.uniformSampler.Initialize(uint64(len(edge))); err != nil {
-		return err // Should never happen
-	}
-	indices, err := t.uniformSampler.Sample(1)
-	if err != nil {
-		return err // Also should never really happen because the edge has positive length
-	}
-	vtxID := edge[int(indices[0])]
-	vtx, err := t.Manager.GetVtx(vtxID)
-	if err != nil {
-		t.Ctx.Log.Warn("dropping gossip request as %s couldn't be loaded due to: %s", vtxID, err)
-		return nil
-	}
-
-	t.Ctx.Log.Verbo("gossiping %s as accepted to the network", vtxID)
-	t.Sender.SendGossip(vtxID, vtx.Bytes())
-	return nil
-}
-
-// Shutdown implements the Engine interface
-func (t *Transitive) Shutdown() error {
-	t.Ctx.Log.Info("shutting down consensus engine")
-	return t.VM.Shutdown()
-}
-
-// Put implements the Engine interface
+// Put implements the PutHandler interface
 func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) error {
 	t.Ctx.Log.Verbo("Put(%s, %d, %s) called", vdr, requestID, vtxID)
 	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "Put received by Engine during Bootstrap")
@@ -174,7 +111,7 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxByt
 	return t.attemptToIssueTxs()
 }
 
-// GetFailed implements the Engine interface
+// GetFailed implements the PutHandler interface
 func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "GetFailed received by Engine during Bootstrap")
 
@@ -201,7 +138,7 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 	return t.attemptToIssueTxs()
 }
 
-// PullQuery implements the Engine interface
+// PullQuery implements the QueryHandler interface
 func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error {
 	// If the engine hasn't been bootstrapped, we aren't ready to respond to queries
 	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "PullQuery received by Engine during Bootstrap")
@@ -233,7 +170,7 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID) 
 	return t.attemptToIssueTxs()
 }
 
-// PushQuery implements the Engine interface
+// PushQuery implements the QueryHandler interface
 func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) error {
 	// We're bootstrapping, so ignore this query.
 	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "PushQuery received by Engine during Bootstrap")
@@ -252,7 +189,7 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID, 
 	return t.PullQuery(vdr, requestID, vtx.ID())
 }
 
-// Chits implements the Engine interface
+// Chits implements the ChitsHandler interface
 func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) error {
 	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "Chits received by Engine during Bootstrap")
 
@@ -275,7 +212,7 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) er
 	return t.attemptToIssueTxs()
 }
 
-// QueryFailed implements the Engine interface
+// QueryFailed implements the ChitsHandler interface
 func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
 	// If the engine hasn't been bootstrapped, we didn't issue a query
 	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "QueryFailed received by Engine during Bootstrap")
@@ -283,7 +220,7 @@ func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
 	return t.Chits(vdr, requestID, nil)
 }
 
-// AppRequest implements the Engine interface
+// AppRequest implements the AppHandler interface
 func (t *Transitive) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
 	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppRequest received by Engine during Bootstrap")
 
@@ -291,15 +228,7 @@ func (t *Transitive) AppRequest(nodeID ids.ShortID, requestID uint32, deadline t
 	return t.VM.AppRequest(nodeID, requestID, deadline, request)
 }
 
-// AppResponse implements the Engine interface
-func (t *Transitive) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppResponse received by Engine during Bootstrap")
-
-	// Notify the VM of a response to its request
-	return t.VM.AppResponse(nodeID, requestID, response)
-}
-
-// AppRequestFailed implements the Engine interface
+// AppRequestFailed implements the AppHandler interface
 func (t *Transitive) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppRequestFailed received by Engine during Bootstrap")
 
@@ -307,7 +236,15 @@ func (t *Transitive) AppRequestFailed(nodeID ids.ShortID, requestID uint32) erro
 	return t.VM.AppRequestFailed(nodeID, requestID)
 }
 
-// AppGossip implements the Engine interface
+// AppResponse implements the AppHandler interface
+func (t *Transitive) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppResponse received by Engine during Bootstrap")
+
+	// Notify the VM of a response to its request
+	return t.VM.AppResponse(nodeID, requestID, response)
+}
+
+// AppGossip implements the AppHandler interface
 func (t *Transitive) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppGossip received by Engine during Bootstrap")
 
@@ -315,7 +252,56 @@ func (t *Transitive) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	return t.VM.AppGossip(nodeID, msg)
 }
 
-// Notify implements the Engine interface
+// Connected implements the InternalHandler interface.
+func (t *Transitive) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
+	return t.VM.Connected(nodeID, nodeVersion)
+}
+
+// Disconnected implements the InternalHandler interface.
+func (t *Transitive) Disconnected(nodeID ids.ShortID) error {
+	return t.VM.Disconnected(nodeID)
+}
+
+// Timeout implements the InternalHandler interface
+func (t *Transitive) Timeout() error { return nil }
+
+// Gossip implements the InternalHandler interface
+func (t *Transitive) Gossip() error {
+	edge := t.Manager.Edge()
+	if len(edge) == 0 {
+		t.Ctx.Log.Verbo("dropping gossip request as no vertices have been accepted")
+		return nil
+	}
+
+	if err := t.uniformSampler.Initialize(uint64(len(edge))); err != nil {
+		return err // Should never happen
+	}
+	indices, err := t.uniformSampler.Sample(1)
+	if err != nil {
+		return err // Also should never really happen because the edge has positive length
+	}
+	vtxID := edge[int(indices[0])]
+	vtx, err := t.Manager.GetVtx(vtxID)
+	if err != nil {
+		t.Ctx.Log.Warn("dropping gossip request as %s couldn't be loaded due to: %s", vtxID, err)
+		return nil
+	}
+
+	t.Ctx.Log.Verbo("gossiping %s as accepted to the network", vtxID)
+	t.Sender.SendGossip(vtxID, vtx.Bytes())
+	return nil
+}
+
+// Halt implements the InternalHandler interface
+func (t *Transitive) Halt() {}
+
+// Shutdown implements the InternalHandler interface
+func (t *Transitive) Shutdown() error {
+	t.Ctx.Log.Info("shutting down consensus engine")
+	return t.VM.Shutdown()
+}
+
+// Notify implements the InternalHandler interface
 func (t *Transitive) Notify(msg common.Message) error {
 	if !t.IsBootstrapped() {
 		t.Ctx.Log.Debug("dropping Notify due to bootstrapping")
@@ -331,6 +317,66 @@ func (t *Transitive) Notify(msg common.Message) error {
 		t.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
 	}
 	return nil
+}
+
+// Context implements the common.Engine interface.
+func (t *Transitive) Context() *snow.ConsensusContext {
+	return t.Ctx
+}
+
+// IsBootstrapped implements the common.Engine interface.
+func (t *Transitive) IsBootstrapped() bool {
+	return t.Ctx.IsBootstrapped()
+}
+
+// Start implements the common.Engine interface.
+func (t *Transitive) Start(startReqID uint32) error {
+	t.RequestID = startReqID
+	// Load the vertices that were last saved as the accepted frontier
+	edge := t.Manager.Edge()
+	frontier := make([]avalanche.Vertex, 0, len(edge))
+	for _, vtxID := range edge {
+		if vtx, err := t.Manager.GetVtx(vtxID); err == nil {
+			frontier = append(frontier, vtx)
+		} else {
+			t.Ctx.Log.Error("vertex %s failed to be loaded from the frontier with %s", vtxID, err)
+		}
+	}
+
+	t.Ctx.Log.Info("bootstrapping finished with %d vertices in the accepted frontier", len(frontier))
+	t.metrics.bootstrapFinished.Set(1)
+
+	t.Ctx.SetState(snow.NormalOp)
+	return t.Consensus.Initialize(t.Ctx, t.Params, frontier)
+}
+
+// HealthCheck implements the common.Engine interface.
+func (t *Transitive) HealthCheck() (interface{}, error) {
+	consensusIntf, consensusErr := t.Consensus.HealthCheck()
+	vmIntf, vmErr := t.VM.HealthCheck()
+	intf := map[string]interface{}{
+		"consensus": consensusIntf,
+		"vm":        vmIntf,
+	}
+	if consensusErr == nil {
+		return intf, vmErr
+	}
+	if vmErr == nil {
+		return intf, consensusErr
+	}
+	return intf, fmt.Errorf("vm: %s ; consensus: %s", vmErr, consensusErr)
+}
+
+// GetVM implements the common.Engine interface.
+func (t *Transitive) GetVM() common.VM {
+	return t.VM
+}
+
+// GetVtx implements the avalanche.Engine interface.
+func (t *Transitive) GetVtx(vtxID ids.ID) (avalanche.Vertex, error) {
+	// GetVtx returns a vertex by its ID.
+	// Returns database.ErrNotFound if unknown.
+	return t.Manager.GetVtx(vtxID)
 }
 
 func (t *Transitive) attemptToIssueTxs() error {
@@ -614,35 +660,3 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 	t.Sender.SendGet(vdr, t.RequestID, vtxID)
 	t.metrics.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len())) // Tracks performance statistics
 }
-
-// HealthCheck implements the common.Engine interface
-func (t *Transitive) HealthCheck() (interface{}, error) {
-	consensusIntf, consensusErr := t.Consensus.HealthCheck()
-	vmIntf, vmErr := t.VM.HealthCheck()
-	intf := map[string]interface{}{
-		"consensus": consensusIntf,
-		"vm":        vmIntf,
-	}
-	if consensusErr == nil {
-		return intf, vmErr
-	}
-	if vmErr == nil {
-		return intf, consensusErr
-	}
-	return intf, fmt.Errorf("vm: %s ; consensus: %s", vmErr, consensusErr)
-}
-
-// GetVtx returns a vertex by its ID.
-// Returns database.ErrNotFound if unknown.
-func (t *Transitive) GetVtx(vtxID ids.ID) (avalanche.Vertex, error) {
-	return t.Manager.GetVtx(vtxID)
-}
-
-func (t *Transitive) GetVM() common.VM {
-	return t.VM
-}
-
-// TODO ABENEGIA: make sure these are correctly empty
-// TODO ABENEGIA: in comments, better specify interface implemented
-func (t *Transitive) Halt()          {}
-func (t *Transitive) Timeout() error { return nil }

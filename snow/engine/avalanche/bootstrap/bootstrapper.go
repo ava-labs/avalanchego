@@ -46,18 +46,20 @@ type AvalancheBootstrapper interface {
 func New(config Config, onFinished func(lastReqID uint32) error) (AvalancheBootstrapper, error) {
 	b := &bootstrapper{
 		Config: config,
-		NoOpAppHandler: common.NoOpAppHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpChitsHandler: common.NoOpChitsHandler{
-			Log: config.Ctx.Log,
-		},
+
 		NoOpPutHandler: common.NoOpPutHandler{
 			Log: config.Ctx.Log,
 		},
 		NoOpQueryHandler: common.NoOpQueryHandler{
 			Log: config.Ctx.Log,
 		},
+		NoOpChitsHandler: common.NoOpChitsHandler{
+			Log: config.Ctx.Log,
+		},
+		NoOpAppHandler: common.NoOpAppHandler{
+			Log: config.Ctx.Log,
+		},
+
 		processedCache:           &cache.LRU{Size: cacheSize},
 		Fetcher:                  common.Fetcher{OnFinished: onFinished},
 		executedStateTransitions: math.MaxInt32,
@@ -94,10 +96,10 @@ type bootstrapper struct {
 	Config
 
 	// list of NoOpsHandler for messages dropped by bootstrapper
-	common.NoOpAppHandler
-	common.NoOpChitsHandler
 	common.NoOpPutHandler
 	common.NoOpQueryHandler
+	common.NoOpChitsHandler
+	common.NoOpAppHandler
 
 	common.Bootstrapper
 	common.Fetcher
@@ -116,6 +118,166 @@ type bootstrapper struct {
 
 	awaitingTimeout bool
 }
+
+// MultiPut implements the AncestorsHandler interface
+// Expects vtxs[0] to be the vertex requested in the corresponding GetAncestors.
+func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte) error {
+	lenVtxs := len(vtxs)
+	if lenVtxs == 0 {
+		b.Ctx.Log.Debug("MultiPut(%s, %d) contains no vertices", vdr, requestID)
+		return b.GetAncestorsFailed(vdr, requestID)
+	}
+	if lenVtxs > b.Config.MultiputMaxContainersReceived {
+		vtxs = vtxs[:b.Config.MultiputMaxContainersReceived]
+		b.Ctx.Log.Debug("ignoring %d containers in multiput(%s, %d)",
+			lenVtxs-b.Config.MultiputMaxContainersReceived, vdr, requestID)
+	}
+
+	requestedVtxID, requested := b.OutstandingRequests.Remove(vdr, requestID)
+	vtx, err := b.Manager.ParseVtx(vtxs[0]) // first vertex should be the one we requested in GetAncestors request
+	if err != nil {
+		if !requested {
+			b.Ctx.Log.Debug("failed to parse unrequested vertex from %s with requestID %d: %s", vdr, requestID, err)
+			return nil
+		}
+		b.Ctx.Log.Debug("failed to parse requested vertex %s: %s", requestedVtxID, err)
+		b.Ctx.Log.Verbo("vertex: %s", formatting.DumpBytes(vtxs[0]))
+		return b.fetch(requestedVtxID)
+	}
+
+	vtxID := vtx.ID()
+	// If the vertex is neither the requested vertex nor a needed vertex, return early and re-fetch if necessary
+	if requested && requestedVtxID != vtxID {
+		b.Ctx.Log.Debug("received incorrect vertex from %s with vertexID %s", vdr, vtxID)
+		return b.fetch(requestedVtxID)
+	}
+	if !requested && !b.OutstandingRequests.Contains(vtxID) && !b.needToFetch.Contains(vtxID) {
+		b.Ctx.Log.Debug("received un-needed vertex from %s with vertexID %s", vdr, vtxID)
+		return nil
+	}
+
+	// Do not remove from outstanding requests if this did not answer a specific outstanding request
+	// to ensure that real responses are not dropped in favor of potentially byzantine MultiPut messages that
+	// could force the node to bootstrap 1 vertex at a time.
+	b.needToFetch.Remove(vtxID)
+
+	// All vertices added to [processVertices] have received transitive votes from the accepted frontier
+	processVertices := make([]avalanche.Vertex, 1, len(vtxs)) // Process all of the valid vertices in this message
+	processVertices[0] = vtx
+	parents, err := vtx.Parents()
+	if err != nil {
+		return err
+	}
+	eligibleVertices := ids.NewSet(len(parents))
+	for _, parent := range parents {
+		eligibleVertices.Add(parent.ID())
+	}
+
+	for _, vtxBytes := range vtxs[1:] { // Parse/persist all the vertices
+		vtx, err := b.Manager.ParseVtx(vtxBytes) // Persists the vtx
+		if err != nil {
+			b.Ctx.Log.Debug("failed to parse vertex: %s", err)
+			b.Ctx.Log.Verbo("vertex: %s", formatting.DumpBytes(vtxBytes))
+			break
+		}
+		vtxID := vtx.ID()
+		if !eligibleVertices.Contains(vtxID) {
+			b.Ctx.Log.Debug("received vertex that should not have been included in MultiPut from %s with vertexID %s", vdr, vtxID)
+			break
+		}
+		eligibleVertices.Remove(vtxID)
+		parents, err := vtx.Parents()
+		if err != nil {
+			return err
+		}
+		for _, parent := range parents {
+			eligibleVertices.Add(parent.ID())
+		}
+		processVertices = append(processVertices, vtx)
+		b.needToFetch.Remove(vtxID) // No need to fetch this vertex since we have it now
+	}
+
+	return b.process(processVertices...)
+}
+
+// GetAncestorsFailed implements the AncestorsHandler interface
+func (b *bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) error {
+	vtxID, ok := b.OutstandingRequests.Remove(vdr, requestID)
+	if !ok {
+		b.Ctx.Log.Debug("GetAncestorsFailed(%s, %d) called but there was no outstanding request to this validator with this ID", vdr, requestID)
+		return nil
+	}
+	// Send another request for the vertex
+	return b.fetch(vtxID)
+}
+
+// Connected implements the InternalHandler interface.
+func (b *bootstrapper) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
+	if err := b.VM.Connected(nodeID, nodeVersion); err != nil {
+		return err
+	}
+
+	if err := b.WeightTracker.AddWeightForNode(nodeID); err != nil {
+		return err
+	}
+
+	if b.WeightTracker.EnoughConnectedWeight() && !b.started {
+		b.started = true
+		return b.Startup()
+	}
+
+	return nil
+}
+
+// Disconnected implements the InternalHandler interface.
+func (b *bootstrapper) Disconnected(nodeID ids.ShortID) error {
+	if err := b.VM.Disconnected(nodeID); err != nil {
+		return err
+	}
+
+	return b.WeightTracker.RemoveWeightForNode(nodeID)
+}
+
+// Timeout implements the InternalHandler interface.
+func (b *bootstrapper) Timeout() error {
+	if !b.awaitingTimeout {
+		return errUnexpectedTimeout
+	}
+	b.awaitingTimeout = false
+
+	if !b.Config.Subnet.IsBootstrapped() {
+		return b.RestartBootstrap(true)
+	}
+	return b.finish()
+}
+
+// Gossip implements the InternalHandler interface.
+func (b *bootstrapper) Gossip() error { return nil }
+
+// Shutdown implements the InternalHandler interface.
+func (b *bootstrapper) Shutdown() error { return nil }
+
+// Notify implements the InternalHandler interface.
+func (b *bootstrapper) Notify(common.Message) error { return nil }
+
+// Context implements the common.Engine interface.
+func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
+
+// IsBootstrapped implements the common.Engine interface.
+func (b *bootstrapper) IsBootstrapped() bool { return b.Ctx.IsBootstrapped() }
+
+// HealthCheck implements the common.Engine interface.
+func (b *bootstrapper) HealthCheck() (interface{}, error) {
+	vmIntf, vmErr := b.VM.HealthCheck()
+	intf := map[string]interface{}{
+		"consensus": struct{}{},
+		"vm":        vmIntf,
+	}
+	return intf, vmErr
+}
+
+// GetVM implements the common.Engine interface.
+func (b *bootstrapper) GetVM() common.VM { return b.VM }
 
 // CurrentAcceptedFrontier implements common.Bootstrapable interface
 // CurrentAcceptedFrontier returns the set of vertices that this node has accepted
@@ -288,110 +450,6 @@ func (b *bootstrapper) process(vtxs ...avalanche.Vertex) error {
 	return b.fetch()
 }
 
-// MultiPut handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
-// with request ID [requestID]. Expects vtxs[0] to be the vertex requested in the corresponding GetAncestors.
-func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte) error {
-	lenVtxs := len(vtxs)
-	if lenVtxs == 0 {
-		b.Ctx.Log.Debug("MultiPut(%s, %d) contains no vertices", vdr, requestID)
-		return b.GetAncestorsFailed(vdr, requestID)
-	}
-	if lenVtxs > b.Config.MultiputMaxContainersReceived {
-		vtxs = vtxs[:b.Config.MultiputMaxContainersReceived]
-		b.Ctx.Log.Debug("ignoring %d containers in multiput(%s, %d)",
-			lenVtxs-b.Config.MultiputMaxContainersReceived, vdr, requestID)
-	}
-
-	requestedVtxID, requested := b.OutstandingRequests.Remove(vdr, requestID)
-	vtx, err := b.Manager.ParseVtx(vtxs[0]) // first vertex should be the one we requested in GetAncestors request
-	if err != nil {
-		if !requested {
-			b.Ctx.Log.Debug("failed to parse unrequested vertex from %s with requestID %d: %s", vdr, requestID, err)
-			return nil
-		}
-		b.Ctx.Log.Debug("failed to parse requested vertex %s: %s", requestedVtxID, err)
-		b.Ctx.Log.Verbo("vertex: %s", formatting.DumpBytes(vtxs[0]))
-		return b.fetch(requestedVtxID)
-	}
-
-	vtxID := vtx.ID()
-	// If the vertex is neither the requested vertex nor a needed vertex, return early and re-fetch if necessary
-	if requested && requestedVtxID != vtxID {
-		b.Ctx.Log.Debug("received incorrect vertex from %s with vertexID %s", vdr, vtxID)
-		return b.fetch(requestedVtxID)
-	}
-	if !requested && !b.OutstandingRequests.Contains(vtxID) && !b.needToFetch.Contains(vtxID) {
-		b.Ctx.Log.Debug("received un-needed vertex from %s with vertexID %s", vdr, vtxID)
-		return nil
-	}
-
-	// Do not remove from outstanding requests if this did not answer a specific outstanding request
-	// to ensure that real responses are not dropped in favor of potentially byzantine MultiPut messages that
-	// could force the node to bootstrap 1 vertex at a time.
-	b.needToFetch.Remove(vtxID)
-
-	// All vertices added to [processVertices] have received transitive votes from the accepted frontier
-	processVertices := make([]avalanche.Vertex, 1, len(vtxs)) // Process all of the valid vertices in this message
-	processVertices[0] = vtx
-	parents, err := vtx.Parents()
-	if err != nil {
-		return err
-	}
-	eligibleVertices := ids.NewSet(len(parents))
-	for _, parent := range parents {
-		eligibleVertices.Add(parent.ID())
-	}
-
-	for _, vtxBytes := range vtxs[1:] { // Parse/persist all the vertices
-		vtx, err := b.Manager.ParseVtx(vtxBytes) // Persists the vtx
-		if err != nil {
-			b.Ctx.Log.Debug("failed to parse vertex: %s", err)
-			b.Ctx.Log.Verbo("vertex: %s", formatting.DumpBytes(vtxBytes))
-			break
-		}
-		vtxID := vtx.ID()
-		if !eligibleVertices.Contains(vtxID) {
-			b.Ctx.Log.Debug("received vertex that should not have been included in MultiPut from %s with vertexID %s", vdr, vtxID)
-			break
-		}
-		eligibleVertices.Remove(vtxID)
-		parents, err := vtx.Parents()
-		if err != nil {
-			return err
-		}
-		for _, parent := range parents {
-			eligibleVertices.Add(parent.ID())
-		}
-		processVertices = append(processVertices, vtx)
-		b.needToFetch.Remove(vtxID) // No need to fetch this vertex since we have it now
-	}
-
-	return b.process(processVertices...)
-}
-
-// GetAncestorsFailed is called when a GetAncestors message we sent fails
-func (b *bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) error {
-	vtxID, ok := b.OutstandingRequests.Remove(vdr, requestID)
-	if !ok {
-		b.Ctx.Log.Debug("GetAncestorsFailed(%s, %d) called but there was no outstanding request to this validator with this ID", vdr, requestID)
-		return nil
-	}
-	// Send another request for the vertex
-	return b.fetch(vtxID)
-}
-
-func (b *bootstrapper) Timeout() error {
-	if !b.awaitingTimeout {
-		return errUnexpectedTimeout
-	}
-	b.awaitingTimeout = false
-
-	if !b.Config.Subnet.IsBootstrapped() {
-		return b.RestartBootstrap(true)
-	}
-	return b.finish()
-}
-
 // ForceAccepted implements common.Bootstrapable interface
 // ForceAccepted starts bootstrapping. Process the vertices in [accepterContainerIDs].
 func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
@@ -497,49 +555,3 @@ func (b *bootstrapper) finish() error {
 	}
 	return nil
 }
-
-// Connected implements the Engine interface.
-func (b *bootstrapper) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
-	if err := b.VM.Connected(nodeID, nodeVersion); err != nil {
-		return err
-	}
-
-	if err := b.WeightTracker.AddWeightForNode(nodeID); err != nil {
-		return err
-	}
-
-	if b.WeightTracker.EnoughConnectedWeight() && !b.started {
-		b.started = true
-		return b.Startup()
-	}
-
-	return nil
-}
-
-// Disconnected implements the Engine interface.
-func (b *bootstrapper) Disconnected(nodeID ids.ShortID) error {
-	if err := b.VM.Disconnected(nodeID); err != nil {
-		return err
-	}
-
-	return b.WeightTracker.RemoveWeightForNode(nodeID)
-}
-
-func (b *bootstrapper) GetVM() common.VM                { return b.VM }
-func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
-func (b *bootstrapper) IsBootstrapped() bool            { return b.Ctx.IsBootstrapped() }
-
-func (b *bootstrapper) HealthCheck() (interface{}, error) {
-	vmIntf, vmErr := b.VM.HealthCheck()
-	intf := map[string]interface{}{
-		"consensus": struct{}{},
-		"vm":        vmIntf,
-	}
-	return intf, vmErr
-}
-
-// TODO ABENEGIA: make sure these are correctly empty
-// TODO ABENEGIA: in comments, better specify interface implemented
-func (b *bootstrapper) Gossip() error               { return nil }
-func (b *bootstrapper) Notify(common.Message) error { return nil }
-func (b *bootstrapper) Shutdown() error             { return nil }

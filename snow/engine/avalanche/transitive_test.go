@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	abh "github.com/ava-labs/avalanchego/snow/engine/avalanche/base_msg_handler"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -42,7 +43,7 @@ func (dh *dummyHandler) onDoneBootstrapping(lastReqID uint32) error {
 }
 
 func TestEngineShutdown(t *testing.T) {
-	_, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	vmShutdownCalled := false
 	vm := &vertex.TestVM{}
@@ -63,7 +64,7 @@ func TestEngineShutdown(t *testing.T) {
 }
 
 func TestEngineAdd(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
@@ -169,7 +170,7 @@ func TestEngineAdd(t *testing.T) {
 }
 
 func TestEngineQuery(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
@@ -460,7 +461,7 @@ func TestEngineQuery(t *testing.T) {
 }
 
 func TestEngineMultipleQuery(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
@@ -653,7 +654,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 }
 
 func TestEngineBlockedIssue(t *testing.T) {
-	_, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -734,7 +735,7 @@ func TestEngineBlockedIssue(t *testing.T) {
 }
 
 func TestEngineAbandonResponse(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
@@ -816,7 +817,7 @@ func TestEngineAbandonResponse(t *testing.T) {
 }
 
 func TestEngineScheduleRepoll(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
@@ -910,7 +911,7 @@ func TestEngineScheduleRepoll(t *testing.T) {
 }
 
 func TestEngineRejectDoubleSpendTx(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	engCfg.Params.BatchSize = 2
 
@@ -1024,7 +1025,7 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 }
 
 func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	engCfg.Params.BatchSize = 2
 
@@ -1143,7 +1144,7 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 }
 
 func TestEngineIssueRepoll(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	engCfg.Params.BatchSize = 2
 
@@ -1218,7 +1219,7 @@ func TestEngineIssueRepoll(t *testing.T) {
 }
 
 func TestEngineReissue(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	engCfg.Params.BatchSize = 2
 	engCfg.Params.BetaVirtuous = 5
@@ -1412,7 +1413,7 @@ func TestEngineReissue(t *testing.T) {
 }
 
 func TestEngineLargeIssue(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 	engCfg.Params.BatchSize = 1
 	engCfg.Params.BetaVirtuous = 5
 	engCfg.Params.BetaRogue = 5
@@ -1534,20 +1535,23 @@ func TestEngineLargeIssue(t *testing.T) {
 }
 
 func TestEngineGetVertex(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	commonCfg, _, engCfg := DefaultConfig()
 
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	vdr := validators.GenerateRandomValidator(1)
 
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
+	avaBaseMsgHandler, err := abh.New(manager, commonCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	engCfg.Handler = avaBaseMsgHandler
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -1595,7 +1599,7 @@ func TestEngineGetVertex(t *testing.T) {
 }
 
 func TestEngineInsufficientValidators(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
@@ -1672,7 +1676,7 @@ func TestEngineInsufficientValidators(t *testing.T) {
 }
 
 func TestEnginePushGossip(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
@@ -1766,7 +1770,7 @@ func TestEnginePushGossip(t *testing.T) {
 }
 
 func TestEngineSingleQuery(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
@@ -1844,7 +1848,7 @@ func TestEngineSingleQuery(t *testing.T) {
 }
 
 func TestEngineParentBlockingInsert(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
@@ -1955,7 +1959,7 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 }
 
 func TestEngineBlockingChitRequest(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
@@ -2083,7 +2087,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 }
 
 func TestEngineBlockingChitResponse(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
@@ -2222,7 +2226,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 }
 
 func TestEngineMissingTx(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
@@ -2361,7 +2365,7 @@ func TestEngineMissingTx(t *testing.T) {
 }
 
 func TestEngineIssueBlockingTx(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
@@ -2431,7 +2435,7 @@ func TestEngineIssueBlockingTx(t *testing.T) {
 }
 
 func TestEngineReissueAbortedVertex(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
@@ -2567,7 +2571,7 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 }
 
 func TestEngineBootstrappingIntoConsensus(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
@@ -2841,7 +2845,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 }
 
 func TestEngineReBootstrapFails(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 	bootCfg.Alpha = 1
 	bootCfg.RetryBootstrap = true
 	bootCfg.RetryBootstrapWarnFrequency = 4
@@ -3003,7 +3007,7 @@ func TestEngineReBootstrapFails(t *testing.T) {
 }
 
 func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 	bootCfg.Alpha = 1
 	bootCfg.RetryBootstrap = true
 	bootCfg.RetryBootstrapWarnFrequency = 4
@@ -3289,7 +3293,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 }
 
 func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
@@ -3398,7 +3402,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 }
 
 func TestEnginePartiallyValidVertex(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
@@ -3487,7 +3491,7 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 }
 
 func TestEngineGossip(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
@@ -3543,7 +3547,7 @@ func TestEngineGossip(t *testing.T) {
 }
 
 func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
@@ -3697,7 +3701,7 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 }
 
 func TestEnginePushQueryRequestIDConflict(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
@@ -3852,7 +3856,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 }
 
 func TestEngineAggressivePolling(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	engCfg.Params.ConcurrentRepolls = 3
 	engCfg.Params.BetaRogue = 3
@@ -3971,7 +3975,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 }
 
 func TestEngineDuplicatedIssuance(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 	engCfg.Params.BatchSize = 1
 	engCfg.Params.BetaVirtuous = 5
 	engCfg.Params.BetaRogue = 5
@@ -4093,7 +4097,7 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 }
 
 func TestEngineDoubleChit(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	engCfg.Params.Alpha = 2
 	engCfg.Params.K = 2
@@ -4230,7 +4234,7 @@ func TestEngineDoubleChit(t *testing.T) {
 }
 
 func TestEngineBubbleVotes(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
@@ -4383,7 +4387,7 @@ func TestEngineBubbleVotes(t *testing.T) {
 }
 
 func TestEngineIssue(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 	engCfg.Params.BatchSize = 1
 	engCfg.Params.BetaVirtuous = 1
 	engCfg.Params.BetaRogue = 1
@@ -4539,7 +4543,7 @@ func TestEngineIssue(t *testing.T) {
 // dependency fails verification.
 func TestAbandonTx(t *testing.T) {
 	assert := assert.New(t)
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 	engCfg.Params.BatchSize = 1
 	engCfg.Params.BetaVirtuous = 1
 	engCfg.Params.BetaRogue = 1
