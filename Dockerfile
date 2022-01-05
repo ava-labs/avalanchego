@@ -12,10 +12,11 @@ WORKDIR /build
 # Copy and download avalanche dependencies using go mod
 COPY go.mod .
 COPY go.sum .
+COPY . .
 RUN go mod download
 
 # Copy the code into the container
-COPY . .
+#COPY . .
 
 # Pass in CORETH_COMMIT as an arg to allow the build script to set this externally
 ARG CORETH_COMMIT
