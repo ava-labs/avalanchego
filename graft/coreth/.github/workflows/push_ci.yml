@@ -1,5 +1,16 @@
 name: Branch Push CI
-on: [push]
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      avalanchegoRepo:
+        description: 'avalanchego github repository'
+        required: true
+        default: 'https://github.com/ava-labs/avalanchego'
+      avalanchegoBranch:
+        description: 'avalanchego branch'
+        required: true
+        default: 'master'
 
 jobs:
   lint:
@@ -43,9 +54,28 @@ jobs:
     - uses: actions/setup-go@v1
       with:
         go-version: ${{ matrix.go }}
-    - run: .github/workflows/run_e2e_tests.sh --parallelism 1 --client-id $KURTOSIS_CLIENT_ID --client-secret $KURTOSIS_CLIENT_SECRET
+    - name: Configure accces to avalanchego-internal
+      env:
+        GITHUB_ACCESS_TOKEN: ${{ secrets.repo_access_token }}
+      run: git config --global url."https://${GITHUB_ACCESS_TOKEN}@github.com/ava-labs/avalanchego-internal".insteadOf "https://github.com/ava-labs/avalanchego-internal"
+    - name: Run tests (triggered by workflow dispatch)
+      if: ${{ github.event_name == 'workflow_dispatch' }} # Use provided arguments
+      run: .github/workflows/run_e2e_tests.sh --parallelism 1 --client-id $KURTOSIS_CLIENT_ID --client-secret $KURTOSIS_CLIENT_SECRET
       shell: bash
       env:
+        AVALANCHEGO_REPO: ${{ github.event.inputs.avalanchegoRepo }}
+        AVALANCHEGO_BRANCH: ${{ github.event.inputs.avalanchegoBranch }}
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
+        KURTOSIS_CLIENT_ID: ${{ secrets.KURTOSIS_CLIENT_ID }}
+        KURTOSIS_CLIENT_SECRET: ${{ secrets.KURTOSIS_CLIENT_SECRET }}
+    - name: Run tests (triggered by PR)
+      if: ${{ github.event_name != 'workflow_dispatch' }} # Use default arguments
+      run: .github/workflows/run_e2e_tests.sh --parallelism 1 --client-id $KURTOSIS_CLIENT_ID --client-secret $KURTOSIS_CLIENT_SECRET
+      shell: bash
+      env:
+        AVALANCHEGO_REPO: https://github.com/ava-labs/avalanchego
+        AVALANCHEGO_BRANCH: master
         DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
         DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
         KURTOSIS_CLIENT_ID: ${{ secrets.KURTOSIS_CLIENT_ID }}
