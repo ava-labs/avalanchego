@@ -242,12 +242,12 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	return vm.conflicts(tx.InputUTXOs(), parent)
 }
 
-// Accept this transaction and spend imported inputs
+// AtomicOps returns imported inputs spent on this transaction
 // We spend imported UTXOs here rather than in semanticVerify because
 // we don't want to remove an imported UTXO in semanticVerify
 // only to have the transaction not be Accepted. This would be inconsistent.
 // Recall that imported UTXOs are not kept in a versionDB.
-func (tx *UnsignedImportTx) Accept() (ids.ID, *atomic.Requests, error) {
+func (tx *UnsignedImportTx) AtomicOps() (ids.ID, *atomic.Requests, error) {
 	utxoIDs := make([][]byte, len(tx.ImportedInputs))
 	for i, in := range tx.ImportedInputs {
 		inputID := in.InputID()
