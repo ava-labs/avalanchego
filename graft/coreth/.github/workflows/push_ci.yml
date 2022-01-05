@@ -1,6 +1,4 @@
 name: Branch Push CI
-#  +# Clone avalanchego
-#+echo "Fetching AvalancheGo: ${AVALANCHEGO_REPO} ${AVALANCHEGO_BRANCH}..."
 #+git clone -b $AVALANCHEGO_BRANCH --single-branch --quiet ${AVALANCHEGO_REPO}
 #+
 #+# Replace avalanchego dep
@@ -26,14 +24,17 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/checkout@v2
-        with:
-          repository: 'ava-labs/avalanchego'
-          ref: 'master'
-          path: 'avalanchego'
+      - name: change avalanchego dep
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        run: |
+          git clone -b $AVALANCHEGO_BRANCH --single-branch --quiet ${AVALANCHEGO_REPO} avalanchego
+        env:
+          AVALANCHEGO_REPO: https://github.com/ava-labs/avalanchego
+          AVALANCHEGO_BRANCH: master
       - run: |
           pwd
           ls
+          ls avalanchego
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
         with:
