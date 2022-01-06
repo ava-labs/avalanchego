@@ -1262,6 +1262,9 @@ func (bc *BlockChain) recoverAncestors(target *types.Block) error {
 		}
 
 		b := bc.GetBlock(hashes[i], numbers[i])
+		if b == nil {
+			return fmt.Errorf("failed to fetch block (%s, %d) while recovering ancestors of target block (%s, %d)", hashes[i], numbers[i], target.Hash(), target.NumberU64())
+		}
 		if err := bc.insertBlock(b, true); err != nil {
 			return err
 		}
