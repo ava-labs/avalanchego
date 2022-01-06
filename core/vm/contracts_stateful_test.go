@@ -36,16 +36,9 @@ func CanTransfer(db StateDB, addr common.Address, amount *big.Int) bool {
 	return db.GetBalance(addr).Cmp(amount) >= 0
 }
 
-func CanTransferMC(db StateDB, addr common.Address, to common.Address, coinID *common.Hash, amount *big.Int) bool {
+func CanTransferMC(db StateDB, addr common.Address, to common.Address, coinID common.Hash, amount *big.Int) bool {
 	log.Info("CanTransferMC", "address", addr, "to", to, "coinID", coinID, "amount", amount)
-	if coinID == nil {
-		return true
-	}
-	if db.GetBalanceMultiCoin(addr, *coinID).Cmp(amount) >= 0 {
-		return true
-	}
-	// insufficient balance
-	return false
+	return db.GetBalanceMultiCoin(addr, coinID).Cmp(amount) >= 0
 }
 
 // Transfer subtracts amount from sender and adds amount to recipient using the given Db
@@ -55,12 +48,9 @@ func Transfer(db StateDB, sender, recipient common.Address, amount *big.Int) {
 }
 
 // Transfer subtracts amount from sender and adds amount to recipient using the given Db
-func TransferMultiCoin(db StateDB, sender, recipient common.Address, coinID *common.Hash, amount *big.Int) {
-	if coinID == nil {
-		return
-	}
-	db.SubBalanceMultiCoin(sender, *coinID, amount)
-	db.AddBalanceMultiCoin(recipient, *coinID, amount)
+func TransferMultiCoin(db StateDB, sender, recipient common.Address, coinID common.Hash, amount *big.Int) {
+	db.SubBalanceMultiCoin(sender, coinID, amount)
+	db.AddBalanceMultiCoin(recipient, coinID, amount)
 }
 
 func TestPackNativeAssetCallInput(t *testing.T) {
@@ -74,7 +64,7 @@ func TestPackNativeAssetCallInput(t *testing.T) {
 	unpackedAddr, unpackedAssetID, unpackedAssetAmount, unpackedCallData, err := UnpackNativeAssetCallInput(input)
 	assert.NoError(t, err)
 	assert.Equal(t, addr, unpackedAddr, "address")
-	assert.Equal(t, &assetID, unpackedAssetID, "assetID")
+	assert.Equal(t, assetID, unpackedAssetID, "assetID")
 	assert.Equal(t, assetAmount, unpackedAssetAmount, "assetAmount")
 	assert.Equal(t, callData, unpackedCallData, "callData")
 }

@@ -755,7 +755,7 @@ func opCallExpert(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) 
 		bigVal2 = value2.ToBig()
 	}
 
-	ret, returnGas, err := interpreter.evm.CallExpert(scope.Contract, toAddr, args, gas, bigVal, &coinID, bigVal2)
+	ret, returnGas, err := interpreter.evm.CallExpert(scope.Contract, toAddr, args, gas, bigVal, coinID, bigVal2)
 
 	if err != nil {
 		temp.Clear()
