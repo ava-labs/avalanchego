@@ -35,12 +35,12 @@ type Config struct {
 	// to a GetAncestors
 	MaxTimeGetAncestors time.Duration
 
-	// Max number of containers in a multiput message sent by this node.
-	MultiputMaxContainersSent int
+	// Max number of containers in an ancestors message sent by this node.
+	AncestorsMaxContainersSent int
 
-	// This node will only consider the first [MultiputMaxContainersReceived]
-	// containers in a multiput it receives.
-	MultiputMaxContainersReceived int
+	// This node will only consider the first [AncestorsMaxContainersReceived]
+	// containers in an ancestors message it receives.
+	AncestorsMaxContainersReceived int
 
 	SharedCfg *SharedConfig
 }

@@ -17,13 +17,12 @@ const (
 
 func (st State) String() string {
 	switch st {
-	case Undefined:
-		return "Undefined state"
 	case Bootstrapping:
 		return "Bootstrapping state"
 	case NormalOp:
 		return "Normal operations state"
 	default:
+		// State.Unknown treated as default
 		return "Unknown state"
 	}
 }

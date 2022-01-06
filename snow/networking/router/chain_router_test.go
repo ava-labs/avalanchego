@@ -117,7 +117,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
 	metrics := prometheus.NewRegistry()
-	// Ensure that the MultiPut request does not timeout
+	// Ensure that the Ancestors request does not timeout
 	err = tm.Initialize(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     time.Second,
@@ -176,8 +176,8 @@ func TestShutdownTimesOut(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.ShortID, nodeVersion version.Application) error { return nil }
 	bootstrapper.HaltF = func() {}
-	bootstrapper.MultiPutF = func(nodeID ids.ShortID, requestID uint32, containers [][]byte) error {
-		// MultiPut blocks for two seconds
+	bootstrapper.AncestorsF = func(nodeID ids.ShortID, requestID uint32, containers [][]byte) error {
+		// Ancestors blocks for two seconds
 		time.Sleep(2 * time.Second)
 		bootstrapFinished <- struct{}{}
 		return nil
@@ -200,7 +200,7 @@ func TestShutdownTimesOut(t *testing.T) {
 
 	go func() {
 		chainID := ids.ID{}
-		msg := mc.InboundMultiPut(chainID, 1, nil, nodeID)
+		msg := mc.InboundAncestors(chainID, 1, nil, nodeID)
 		handler.Push(msg)
 
 		time.Sleep(50 * time.Millisecond) // Pause to ensure message gets processed
@@ -315,7 +315,7 @@ func TestRouterTimeout(t *testing.T) {
 	// Register requests for each request type
 	msgs := []message.Op{
 		message.Put,
-		message.MultiPut,
+		message.Ancestors,
 		message.Chits,
 		message.Chits,
 		message.Accepted,
@@ -403,7 +403,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 	// Register requests for each request type
 	ops := []message.Op{
 		message.Put,
-		message.MultiPut,
+		message.Ancestors,
 		message.Chits,
 		message.Accepted,
 		message.AcceptedFrontier,
@@ -422,8 +422,8 @@ func TestRouterClearTimeouts(t *testing.T) {
 	inMsg = mc.InboundPut(handler.ctx.ChainID, 0, ids.GenerateTestID(), nil, vID)
 	chainRouter.HandleInbound(inMsg)
 
-	// MultiPut
-	inMsg = mc.InboundMultiPut(handler.ctx.ChainID, 1, nil, vID)
+	// Ancestors
+	inMsg = mc.InboundAncestors(handler.ctx.ChainID, 1, nil, vID)
 	chainRouter.HandleInbound(inMsg)
 
 	// Chits

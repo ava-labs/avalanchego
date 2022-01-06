@@ -30,7 +30,10 @@ func New(config Config) (Engine, error) {
 type Transitive struct {
 	Config
 
-	common.MsgHandlerNoOps
+	// list of NoOpsHandler for messages dropped by engine
+	common.NoOpAcceptedFrontierHandler
+	common.NoOpAcceptedHandler
+	common.NoOpAncestorsHandler
 
 	RequestID uint32
 
@@ -66,10 +69,18 @@ func newTransitive(config Config) (*Transitive, error) {
 
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t := &Transitive{
-		Config:          config,
-		MsgHandlerNoOps: common.NewMsgHandlerNoOps(config.Ctx),
-		pending:         make(map[ids.ID]snowman.Block),
-		nonVerifieds:    NewAncestorTree(),
+		Config: config,
+		NoOpAcceptedFrontierHandler: common.NoOpAcceptedFrontierHandler{
+			Log: config.Ctx.Log,
+		},
+		NoOpAcceptedHandler: common.NoOpAcceptedHandler{
+			Log: config.Ctx.Log,
+		},
+		NoOpAncestorsHandler: common.NoOpAncestorsHandler{
+			Log: config.Ctx.Log,
+		},
+		pending:      make(map[ids.ID]snowman.Block),
+		nonVerifieds: NewAncestorTree(),
 		polls: poll.NewSet(factory,
 			config.Ctx.Log,
 			"",
@@ -77,19 +88,260 @@ func newTransitive(config Config) (*Transitive, error) {
 		),
 	}
 
-	if err := t.metrics.Initialize("", config.Ctx.Registerer); err != nil {
-		return nil, err
-	}
-
-	return t, nil
+	return t, t.metrics.Initialize("", config.Ctx.Registerer)
 }
 
+// Put implements the PutHandler interface
+func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkBytes []byte) error {
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "Put received by Engine during Bootstrap")
+
+	blk, err := t.VM.ParseBlock(blkBytes)
+	if err != nil {
+		t.Ctx.Log.Debug("failed to parse block: %s", err)
+		t.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes(blkBytes))
+		// because GetFailed doesn't utilize the assumption that we actually
+		// sent a Get message, we can safely call GetFailed here to potentially
+		// abandon the request.
+		return t.GetFailed(vdr, requestID)
+	}
+
+	// issue the block into consensus. If the block has already been issued,
+	// this will be a noop. If this block has missing dependencies, vdr will
+	// receive requests to fill the ancestry. dependencies that have already
+	// been fetched, but with missing dependencies themselves won't be requested
+	// from the vdr.
+	if _, err := t.issueFrom(vdr, blk); err != nil {
+		return err
+	}
+	return t.buildBlocks()
+}
+
+// GetFailed implements the PutHandler interface
+func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "GetFailed received by Engine during Bootstrap")
+
+	// We don't assume that this function is called after a failed Get message.
+	// Check to see if we have an outstanding request and also get what the request was for if it exists.
+	blkID, ok := t.blkReqs.Remove(vdr, requestID)
+	if !ok {
+		t.Ctx.Log.Debug("getFailed(%s, %d) called without having sent corresponding Get", vdr, requestID)
+		return nil
+	}
+
+	// Because the get request was dropped, we no longer expect blkID to be issued.
+	t.blocked.Abandon(blkID)
+	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
+	return t.buildBlocks()
+}
+
+// PullQuery implements the QueryHandler interface
+func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
+	// If the engine hasn't been bootstrapped, we aren't ready to respond to queries
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "PullQuery received by Engine during Bootstrap")
+
+	// Will send chits once we've issued block [blkID] into consensus
+	c := &convincer{
+		consensus: t.Consensus,
+		sender:    t.Sender,
+		vdr:       vdr,
+		requestID: requestID,
+		errs:      &t.errs,
+	}
+
+	// Try to issue [blkID] to consensus.
+	// If we're missing an ancestor, request it from [vdr]
+	added, err := t.issueFromByID(vdr, blkID)
+	if err != nil {
+		return err
+	}
+
+	// Wait until we've issued block [blkID] before sending chits.
+	if !added {
+		c.deps.Add(blkID)
+	}
+
+	t.blocked.Register(c)
+	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
+	return t.buildBlocks()
+}
+
+// PushQuery implements the QueryHandler interface
+func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkBytes []byte) error {
+	// if the engine hasn't been bootstrapped, we aren't ready to respond to queries
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "PushQuery received by Engine during Bootstrap")
+
+	blk, err := t.VM.ParseBlock(blkBytes)
+	// If parsing fails, we just drop the request, as we didn't ask for it
+	if err != nil {
+		t.Ctx.Log.Debug("failed to parse block: %s", err)
+		t.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes(blkBytes))
+		return nil
+	}
+
+	// issue the block into consensus. If the block has already been issued,
+	// this will be a noop. If this block has missing dependencies, vdr will
+	// receive requests to fill the ancestry. dependencies that have already
+	// been fetched, but with missing dependencies themselves won't be requested
+	// from the vdr.
+	if _, err := t.issueFrom(vdr, blk); err != nil {
+		return err
+	}
+
+	// register the chit request
+	return t.PullQuery(vdr, requestID, blk.ID())
+}
+
+// Chits implements the ChitsHandler interface
+func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) error {
+	// if the engine hasn't been bootstrapped, we shouldn't be receiving chits
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "Chits received by Engine during Bootstrap")
+
+	// Since this is a linear chain, there should only be one ID in the vote set
+	if len(votes) != 1 {
+		t.Ctx.Log.Debug("Chits(%s, %d) was called with %d votes (expected 1)", vdr, requestID, len(votes))
+		// because QueryFailed doesn't utilize the assumption that we actually
+		// sent a Query message, we can safely call QueryFailed here to
+		// potentially abandon the request.
+		return t.QueryFailed(vdr, requestID)
+	}
+	blkID := votes[0]
+
+	t.Ctx.Log.Verbo("Chits(%s, %d) contains vote for %s", vdr, requestID, blkID)
+
+	// Will record chits once [blkID] has been issued into consensus
+	v := &voter{
+		t:         t,
+		vdr:       vdr,
+		requestID: requestID,
+		response:  blkID,
+	}
+
+	added, err := t.issueFromByID(vdr, blkID)
+	if err != nil {
+		return err
+	}
+	// Wait until [blkID] has been issued to consensus before applying this chit.
+	if !added {
+		v.deps.Add(blkID)
+	}
+
+	t.blocked.Register(v)
+	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
+	return t.buildBlocks()
+}
+
+// QueryFailed implements the ChitsHandler interface
+func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
+	// If the engine hasn't been bootstrapped, we didn't issue a query
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "QueryFailed received by Engine during Bootstrap")
+
+	t.blocked.Register(&voter{
+		t:         t,
+		vdr:       vdr,
+		requestID: requestID,
+	})
+	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
+	return t.buildBlocks()
+}
+
+// AppRequest implements the AppHandler interface
+func (t *Transitive) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppRequest received by Engine during Bootstrap")
+
+	// Notify the VM of this request
+	return t.VM.AppRequest(nodeID, requestID, deadline, request)
+}
+
+// AppRequestFailed implements the AppHandler interface
+func (t *Transitive) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppRequestFailed received by Engine during Bootstrap")
+
+	// Notify the VM that a request it made failed
+	return t.VM.AppRequestFailed(nodeID, requestID)
+}
+
+// AppResponse implements the AppHandler interface
+func (t *Transitive) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppResponse received by Engine during Bootstrap")
+
+	// Notify the VM of a response to its request
+	return t.VM.AppResponse(nodeID, requestID, response)
+}
+
+// AppGossip implements the AppHandler interface
+func (t *Transitive) AppGossip(nodeID ids.ShortID, msg []byte) error {
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppGossip received by Engine during Bootstrap")
+
+	// Notify the VM of this message which has been gossiped to it
+	return t.VM.AppGossip(nodeID, msg)
+}
+
+// Connected implements the InternalHandler interface.
+func (t *Transitive) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
+	return t.VM.Connected(nodeID, nodeVersion)
+}
+
+// Disconnected implements the InternalHandler interface.
+func (t *Transitive) Disconnected(nodeID ids.ShortID) error {
+	return t.VM.Disconnected(nodeID)
+}
+
+// Timeout implements the InternalHandler interface
+func (t *Transitive) Timeout() error { return nil }
+
+// Gossip implements the InternalHandler interface
+func (t *Transitive) Gossip() error {
+	blkID, err := t.VM.LastAccepted()
+	if err != nil {
+		return err
+	}
+	blk, err := t.GetBlock(blkID)
+	if err != nil {
+		t.Ctx.Log.Warn("dropping gossip request as %s couldn't be loaded due to %s", blkID, err)
+		return nil
+	}
+	t.Ctx.Log.Verbo("gossiping %s as accepted to the network", blkID)
+	t.Sender.SendGossip(blkID, blk.Bytes())
+	return nil
+}
+
+// Halt implements the InternalHandler interface
+func (t *Transitive) Halt() {}
+
+// Shutdown implements the InternalHandler interface
+func (t *Transitive) Shutdown() error {
+	t.Ctx.Log.Info("shutting down consensus engine")
+	return t.VM.Shutdown()
+}
+
+// Notify implements the InternalHandler interface
+func (t *Transitive) Notify(msg common.Message) error {
+	// if the engine hasn't been bootstrapped, we shouldn't build/issue blocks from the VM
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "Notify received by Engine during Bootstrap")
+	t.Ctx.Log.Verbo("snowman engine notified of %s from the vm", msg)
+	switch msg {
+	case common.PendingTxs:
+		// the pending txs message means we should attempt to build a block.
+		t.pendingBuildBlocks++
+		return t.buildBlocks()
+	default:
+		t.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
+	}
+	return nil
+}
+
+// Context implements the common.Engine interface.
 func (t *Transitive) Context() *snow.ConsensusContext {
 	return t.Ctx
 }
 
-// When bootstrapping is finished, this will be called.
-// This initializes the consensus engine with the last accepted block.
+// IsBootstrapped implements the common.Engine interface.
+func (t *Transitive) IsBootstrapped() bool {
+	// IsBootstrapped returns true iff this chain is done bootstrapping
+	return t.Ctx.GetState() == snow.NormalOp
+}
+
+// Start implements the common.Engine interface.
 func (t *Transitive) Start(startReqID uint32) error {
 	t.RequestID = startReqID
 	lastAcceptedID, err := t.VM.LastAccepted()
@@ -138,266 +390,36 @@ func (t *Transitive) Start(startReqID uint32) error {
 	return nil
 }
 
-// Gossip implements the Engine interface
-func (t *Transitive) Gossip() error {
-	blkID, err := t.VM.LastAccepted()
-	if err != nil {
-		return err
+// HealthCheck implements the common.Engine interface.
+func (t *Transitive) HealthCheck() (interface{}, error) {
+	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "HealthCheck received by Engine during Bootstrap")
+
+	consensusIntf, consensusErr := t.Consensus.HealthCheck()
+	vmIntf, vmErr := t.VM.HealthCheck()
+	intf := map[string]interface{}{
+		"consensus": consensusIntf,
+		"vm":        vmIntf,
 	}
-	blk, err := t.GetBlock(blkID)
-	if err != nil {
-		t.Ctx.Log.Warn("dropping gossip request as %s couldn't be loaded due to %s", blkID, err)
-		return nil
+	if consensusErr == nil {
+		return intf, vmErr
 	}
-	t.Ctx.Log.Verbo("gossiping %s as accepted to the network", blkID)
-	t.Sender.SendGossip(blkID, blk.Bytes())
-	return nil
+	if vmErr == nil {
+		return intf, consensusErr
+	}
+	return intf, fmt.Errorf("vm: %s ; consensus: %s", vmErr, consensusErr)
 }
 
-// Connected implements the Engine interface.
-func (t *Transitive) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
-	if err := t.VM.Connected(nodeID, nodeVersion); err != nil {
-		return err
-	}
-
-	return t.WeightTracker.AddWeightForNode(nodeID)
+// GetVM implements the common.Engine interface.
+func (t *Transitive) GetVM() common.VM {
+	return t.VM
 }
 
-// Disconnected implements the Engine interface.
-func (t *Transitive) Disconnected(nodeID ids.ShortID) error {
-	if err := t.VM.Disconnected(nodeID); err != nil {
-		return err
+// GetBlock implements the snowman.Getter interface.
+func (t *Transitive) GetBlock(blkID ids.ID) (snowman.Block, error) {
+	if blk, ok := t.pending[blkID]; ok {
+		return blk, nil
 	}
-
-	return t.WeightTracker.RemoveWeightForNode(nodeID)
-}
-
-// Shutdown implements the Engine interface
-func (t *Transitive) Shutdown() error {
-	t.Ctx.Log.Info("shutting down consensus engine")
-	return t.VM.Shutdown()
-}
-
-// Get implements the Engine interface
-func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
-	blk, err := t.GetBlock(blkID)
-	if err != nil {
-		// If we failed to get the block, that means either an unexpected error
-		// has occurred, [vdr] is not following the protocol, or the
-		// block has been pruned.
-		t.Ctx.Log.Debug("Get(%s, %d, %s) failed with: %s", vdr, requestID, blkID, err)
-		return nil
-	}
-
-	// Respond to the validator with the fetched block and the same requestID.
-	t.Sender.SendPut(vdr, requestID, blkID, blk.Bytes())
-	return nil
-}
-
-// GetAncestors implements the Engine interface
-func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
-	return fmt.Errorf("getAncestors message should not be handled by engine. Dropping it")
-}
-
-// Put implements the Engine interface
-func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "Put received by Engine during Bootstrap")
-
-	blk, err := t.VM.ParseBlock(blkBytes)
-	if err != nil {
-		t.Ctx.Log.Debug("failed to parse block %s: %s", blkID, err)
-		t.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes(blkBytes))
-		// because GetFailed doesn't utilize the assumption that we actually
-		// sent a Get message, we can safely call GetFailed here to potentially
-		// abandon the request.
-		return t.GetFailed(vdr, requestID)
-	}
-
-	// issue the block into consensus. If the block has already been issued,
-	// this will be a noop. If this block has missing dependencies, vdr will
-	// receive requests to fill the ancestry. dependencies that have already
-	// been fetched, but with missing dependencies themselves won't be requested
-	// from the vdr.
-	if _, err := t.issueFrom(vdr, blk); err != nil {
-		return err
-	}
-	return t.buildBlocks()
-}
-
-// GetFailed implements the Engine interface
-func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "GetFailed received by Engine during Bootstrap")
-
-	// We don't assume that this function is called after a failed Get message.
-	// Check to see if we have an outstanding request and also get what the request was for if it exists.
-	blkID, ok := t.blkReqs.Remove(vdr, requestID)
-	if !ok {
-		t.Ctx.Log.Debug("getFailed(%s, %d) called without having sent corresponding Get", vdr, requestID)
-		return nil
-	}
-
-	// Because the get request was dropped, we no longer expect blkID to be issued.
-	t.blocked.Abandon(blkID)
-	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
-	return t.buildBlocks()
-}
-
-// PullQuery implements the Engine interface
-func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
-	// If the engine hasn't been bootstrapped, we aren't ready to respond to queries
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "PullQuery received by Engine during Bootstrap")
-
-	// Will send chits once we've issued block [blkID] into consensus
-	c := &convincer{
-		consensus: t.Consensus,
-		sender:    t.Sender,
-		vdr:       vdr,
-		requestID: requestID,
-		errs:      &t.errs,
-	}
-
-	// Try to issue [blkID] to consensus.
-	// If we're missing an ancestor, request it from [vdr]
-	added, err := t.issueFromByID(vdr, blkID)
-	if err != nil {
-		return err
-	}
-
-	// Wait until we've issued block [blkID] before sending chits.
-	if !added {
-		c.deps.Add(blkID)
-	}
-
-	t.blocked.Register(c)
-	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
-	return t.buildBlocks()
-}
-
-// PushQuery implements the Engine interface
-func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
-	// if the engine hasn't been bootstrapped, we aren't ready to respond to queries
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "PushQuery received by Engine during Bootstrap")
-
-	blk, err := t.VM.ParseBlock(blkBytes)
-	// If parsing fails, we just drop the request, as we didn't ask for it
-	if err != nil {
-		t.Ctx.Log.Debug("failed to parse block %s: %s", blkID, err)
-		t.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes(blkBytes))
-		return nil
-	}
-
-	// issue the block into consensus. If the block has already been issued,
-	// this will be a noop. If this block has missing dependencies, vdr will
-	// receive requests to fill the ancestry. dependencies that have already
-	// been fetched, but with missing dependencies themselves won't be requested
-	// from the vdr.
-	if _, err := t.issueFrom(vdr, blk); err != nil {
-		return err
-	}
-
-	// register the chit request
-	return t.PullQuery(vdr, requestID, blk.ID())
-}
-
-// Chits implements the Engine interface
-func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) error {
-	// if the engine hasn't been bootstrapped, we shouldn't be receiving chits
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "Chits received by Engine during Bootstrap")
-
-	// Since this is a linear chain, there should only be one ID in the vote set
-	if len(votes) != 1 {
-		t.Ctx.Log.Debug("Chits(%s, %d) was called with %d votes (expected 1)", vdr, requestID, len(votes))
-		// because QueryFailed doesn't utilize the assumption that we actually
-		// sent a Query message, we can safely call QueryFailed here to
-		// potentially abandon the request.
-		return t.QueryFailed(vdr, requestID)
-	}
-	blkID := votes[0]
-
-	t.Ctx.Log.Verbo("Chits(%s, %d) contains vote for %s", vdr, requestID, blkID)
-
-	// Will record chits once [blkID] has been issued into consensus
-	v := &voter{
-		t:         t,
-		vdr:       vdr,
-		requestID: requestID,
-		response:  blkID,
-	}
-
-	added, err := t.issueFromByID(vdr, blkID)
-	if err != nil {
-		return err
-	}
-	// Wait until [blkID] has been issued to consensus before applying this chit.
-	if !added {
-		v.deps.Add(blkID)
-	}
-
-	t.blocked.Register(v)
-	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
-	return t.buildBlocks()
-}
-
-// QueryFailed implements the Engine interface
-func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
-	// If the engine hasn't been bootstrapped, we didn't issue a query
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "QueryFailed received by Engine during Bootstrap")
-
-	t.blocked.Register(&voter{
-		t:         t,
-		vdr:       vdr,
-		requestID: requestID,
-	})
-	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
-	return t.buildBlocks()
-}
-
-// AppRequest implements the Engine interface
-func (t *Transitive) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppRequest received by Engine during Bootstrap")
-
-	// Notify the VM of this request
-	return t.VM.AppRequest(nodeID, requestID, deadline, request)
-}
-
-// AppResponse implements the Engine interface
-func (t *Transitive) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppResponse received by Engine during Bootstrap")
-
-	// Notify the VM of a response to its request
-	return t.VM.AppResponse(nodeID, requestID, response)
-}
-
-// AppRequestFailed implements the Engine interface
-func (t *Transitive) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppRequestFailed received by Engine during Bootstrap")
-
-	// Notify the VM that a request it made failed
-	return t.VM.AppRequestFailed(nodeID, requestID)
-}
-
-// AppGossip implements the Engine interface
-func (t *Transitive) AppGossip(nodeID ids.ShortID, msg []byte) error {
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppGossip received by Engine during Bootstrap")
-
-	// Notify the VM of this message which has been gossiped to it
-	return t.VM.AppGossip(nodeID, msg)
-}
-
-// Notify implements the Engine interface
-func (t *Transitive) Notify(msg common.Message) error {
-	// if the engine hasn't been bootstrapped, we shouldn't build/issue blocks from the VM
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "Notify received by Engine during Bootstrap")
-	t.Ctx.Log.Verbo("snowman engine notified of %s from the vm", msg)
-	switch msg {
-	case common.PendingTxs:
-		// the pending txs message means we should attempt to build a block.
-		t.pendingBuildBlocks++
-		return t.buildBlocks()
-	default:
-		t.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
-	}
-	return nil
+	return t.VM.GetBlock(blkID)
 }
 
 // Build blocks if they have been requested and the number of processing blocks
@@ -763,43 +785,6 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	t.metrics.numBlocked.Set(float64(len(t.pending)))
 	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 	return t.errs.Err
-}
-
-// IsBootstrapped returns true iff this chain is done bootstrapping
-func (t *Transitive) IsBootstrapped() bool {
-	return t.Ctx.GetState() == snow.NormalOp
-}
-
-// HealthCheck implements the common.Engine interface
-func (t *Transitive) HealthCheck() (interface{}, error) {
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "HealthCheck received by Engine during Bootstrap")
-
-	consensusIntf, consensusErr := t.Consensus.HealthCheck()
-	vmIntf, vmErr := t.VM.HealthCheck()
-	intf := map[string]interface{}{
-		"consensus": consensusIntf,
-		"vm":        vmIntf,
-	}
-	if consensusErr == nil {
-		return intf, vmErr
-	}
-	if vmErr == nil {
-		return intf, consensusErr
-	}
-	return intf, fmt.Errorf("vm: %s ; consensus: %s", vmErr, consensusErr)
-}
-
-// GetBlock implements the snowman.Engine interface
-func (t *Transitive) GetBlock(blkID ids.ID) (snowman.Block, error) {
-	if blk, ok := t.pending[blkID]; ok {
-		return blk, nil
-	}
-	return t.VM.GetBlock(blkID)
-}
-
-// GetVM implements the snowman.Engine interface
-func (t *Transitive) GetVM() common.VM {
-	return t.VM
 }
 
 // Returns true if the block whose ID is [blkID] is waiting to be issued to consensus

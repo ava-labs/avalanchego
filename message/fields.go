@@ -24,7 +24,7 @@ const (
 	ContainerID                      // Used for querying
 	ContainerBytes                   // Used for gossiping
 	ContainerIDs                     // Used for querying
-	MultiContainerBytes              // Used in MultiPut
+	MultiContainerBytes              // Used in Ancestors
 	SigBytes                         // Used in handshake / peer gossiping
 	VersionTime                      // Used in handshake / peer gossiping
 	SignedPeers                      // Used in peer gossiping

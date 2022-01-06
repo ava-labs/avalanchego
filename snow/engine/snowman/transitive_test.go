@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
+	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -44,7 +45,6 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -62,6 +62,12 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 	vm.T = t
 	bootCfg.VM = vm
 	engCfg.VM = vm
+
+	snowGetHandler, err := snowgetter.New(vm, bootCfg.Config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	engCfg.AllGetsServer = snowGetHandler
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -180,7 +186,7 @@ func TestEngineAdd(t *testing.T) {
 		}
 	}
 
-	if err := te.Put(vdr, 0, blk.ID(), blk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, blk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -196,7 +202,7 @@ func TestEngineAdd(t *testing.T) {
 
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) { return nil, errUnknownBytes }
 
-	if err := te.Put(vdr, *reqID, blk.Parent(), nil); err != nil {
+	if err := te.Put(vdr, *reqID, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -299,7 +305,7 @@ func TestEngineQuery(t *testing.T) {
 		}
 		return blk, nil
 	}
-	if err := te.Put(vdr, *getRequestID, blk.ID(), blk.Bytes()); err != nil {
+	if err := te.Put(vdr, *getRequestID, blk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 	vm.ParseBlockF = nil
@@ -385,7 +391,7 @@ func TestEngineQuery(t *testing.T) {
 
 		return blk1, nil
 	}
-	if err := te.Put(vdr, *getRequestID, blk1.ID(), blk1.Bytes()); err != nil {
+	if err := te.Put(vdr, *getRequestID, blk1.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 	vm.ParseBlockF = nil
@@ -426,7 +432,6 @@ func TestEngineMultipleQuery(t *testing.T) {
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr0 := ids.GenerateTestShortID()
 	vdr1 := ids.GenerateTestShortID()
@@ -617,7 +622,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 			t.Fatalf("Asking for wrong block")
 		}
 	}
-	if err := te.Put(vdr0, *getRequestID, blk1.ID(), blk1.Bytes()); err != nil {
+	if err := te.Put(vdr0, *getRequestID, blk1.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -828,7 +833,7 @@ func TestEnginePushQuery(t *testing.T) {
 		}
 	}
 
-	if err := te.PushQuery(vdr, 20, blk.ID(), blk.Bytes()); err != nil {
+	if err := te.PushQuery(vdr, 20, blk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -931,7 +936,6 @@ func TestVoteCanceling(t *testing.T) {
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr0 := ids.GenerateTestShortID()
 	vdr1 := ids.GenerateTestShortID()
@@ -1067,7 +1071,6 @@ func TestEngineNoQuery(t *testing.T) {
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.WeightTracker = wt
-	engCfg.WeightTracker = wt
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -1137,7 +1140,6 @@ func TestEngineNoRepollQuery(t *testing.T) {
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.WeightTracker = wt
-	engCfg.WeightTracker = wt
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -1355,7 +1357,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := te.PushQuery(vdr, 0, blockingBlk.ID(), blockingBlk.Bytes()); err != nil {
+	if err := te.PushQuery(vdr, 0, blockingBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1668,11 +1670,11 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 		}
 	}
 
-	if err := te.PushQuery(vdr, 0, pendingBlk.ID(), pendingBlk.Bytes()); err != nil {
+	if err := te.PushQuery(vdr, 0, pendingBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := te.Put(secondVdr, *reqID, missingBlk.ID(), []byte{3}); err != nil {
+	if err := te.Put(secondVdr, *reqID, []byte{3}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1702,7 +1704,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 
 	missingBlk.StatusV = choices.Processing
 
-	if err := te.Put(vdr, *reqID, missingBlk.ID(), missingBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, *reqID, missingBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1735,8 +1737,6 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 		HeightV: 2,
 		BytesV:  []byte{2},
 	}
-
-	randomBlkID := ids.GenerateTestID()
 
 	parsed := new(bool)
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
@@ -1772,14 +1772,14 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 		}
 	}
 
-	if err := te.PushQuery(vdr, 0, pendingBlk.ID(), pendingBlk.Bytes()); err != nil {
+	if err := te.PushQuery(vdr, 0, pendingBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
 	sender.SendGetF = nil
 	sender.CantSendGet = false
 
-	if err := te.PushQuery(vdr, *reqID, randomBlkID, []byte{3}); err != nil {
+	if err := te.PushQuery(vdr, *reqID, []byte{3}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1807,7 +1807,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	sender.CantSendPushQuery = false
 	sender.CantSendChits = false
 
-	if err := te.Put(vdr, *reqID, missingBlk.ID(), missingBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, *reqID, missingBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1827,7 +1827,6 @@ func TestEngineAggressivePolling(t *testing.T) {
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1931,7 +1930,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	numPulled := new(int)
 	sender.SendPullQueryF = func(_ ids.ShortSet, _ uint32, _ ids.ID) { *numPulled++ }
 
-	if err := te.Put(vdr, 0, pendingBlk.ID(), pendingBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, pendingBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1963,7 +1962,6 @@ func TestEngineDoubleChit(t *testing.T) {
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr0 := ids.GenerateTestShortID()
 	vdr1 := ids.GenerateTestShortID()
@@ -2117,7 +2115,6 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -2339,7 +2336,7 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 		reqID = rID
 	}
 
-	if err := te.Put(vdr, 0, acceptedBlk.ID(), acceptedBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, acceptedBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2359,7 +2356,7 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 		reqID = rID
 	}
 
-	if err := te.Put(vdr, 0, pendingBlk.ID(), pendingBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, pendingBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2369,7 +2366,7 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 
 	rejectedBlk.StatusV = choices.Rejected
 
-	if err := te.Put(vdr, reqID, rejectedBlk.ID(), rejectedBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, reqID, rejectedBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2443,7 +2440,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 		reqID = rID
 	}
 
-	if err := te.Put(vdr, 0, acceptedBlk.ID(), acceptedBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, acceptedBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2484,7 +2481,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 		}
 	}
 
-	if err := te.Put(vdr, 0, pendingBlk.ID(), pendingBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, pendingBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2496,7 +2493,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 	}
 
 	rejectedBlk.StatusV = choices.Processing
-	if err := te.Put(vdr, reqID, rejectedBlk.ID(), rejectedBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, reqID, rejectedBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2575,7 +2572,7 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 		reqID = rID
 	}
 
-	if err := te.Put(vdr, 0, acceptedBlk.ID(), acceptedBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, acceptedBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2591,7 +2588,7 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 		t.Fatalf("Should have finalized the consensus instance")
 	}
 
-	if err := te.Put(vdr, 0, pendingBlk.ID(), pendingBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, pendingBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2671,7 +2668,7 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 		reqID = rID
 	}
 
-	if err := te.Put(vdr, 0, acceptedBlk.ID(), acceptedBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, acceptedBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2700,7 +2697,7 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 		t.Fatalf("Should have finalized the consensus instance")
 	}
 
-	if err := te.Put(vdr, 0, pendingBlk.ID(), pendingBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, pendingBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2768,11 +2765,11 @@ func TestEngineNonPreferredAmplification(t *testing.T) {
 		}
 	}
 
-	if err := te.Put(vdr, 0, preferredBlk.ID(), preferredBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, preferredBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := te.Put(vdr, 0, nonPreferredBlk.ID(), nonPreferredBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, nonPreferredBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -2854,7 +2851,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	}
 	// Receive Gossip message for [blk2] first and expect the sender to issue a Get request for
 	// its ancestor: [blk1].
-	if err := te.Put(vdr, constants.GossipMsgRequestID, blk2.ID(), blk2.Bytes()); err != nil {
+	if err := te.Put(vdr, constants.GossipMsgRequestID, blk2.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2884,7 +2881,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 
 	// Answer the request, this should allow [blk1] to be issued and cause [blk2] to
 	// fail verification.
-	if err := te.Put(vdr, *reqID, blk1.ID(), blk1.Bytes()); err != nil {
+	if err := te.Put(vdr, *reqID, blk1.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2938,7 +2935,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := te.Put(*reqVdr, *sendReqID, blk2.ID(), blk2.Bytes()); err != nil {
+	if err := te.Put(*reqVdr, *sendReqID, blk2.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2979,7 +2976,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		}
 	}
 	// Expect that the Engine will send a PushQuery after receiving this Gossip message for [blk2].
-	if err := te.Put(vdr, constants.GossipMsgRequestID, blk2.ID(), blk2.Bytes()); err != nil {
+	if err := te.Put(vdr, constants.GossipMsgRequestID, blk2.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3090,7 +3087,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	}
 	// Receive Gossip message for [blk3] first and expect the sender to issue a
 	// Get request for its ancestor: [blk2].
-	if err := te.Put(vdr, constants.GossipMsgRequestID, blk3.ID(), blk3.Bytes()); err != nil {
+	if err := te.Put(vdr, constants.GossipMsgRequestID, blk3.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3120,7 +3117,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	}
 
 	// Answer the request, this should result in [blk1] being issued as well.
-	if err := te.Put(vdr, *reqID, blk2.ID(), blk2.Bytes()); err != nil {
+	if err := te.Put(vdr, *reqID, blk2.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 

@@ -21,7 +21,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/health"
+	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/dialer"
@@ -92,7 +92,7 @@ type Network interface {
 	NodeUptime() (UptimeResult, bool)
 
 	// Has a health check
-	health.Checkable
+	health.Checker
 }
 
 type UptimeResult struct {
