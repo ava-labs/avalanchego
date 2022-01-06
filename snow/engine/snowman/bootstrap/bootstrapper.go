@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -34,38 +33,24 @@ type SnowmanBootstrapper interface {
 }
 
 func New(config Config, onFinished func(lastReqID uint32) error) (SnowmanBootstrapper, error) {
-	return newBootstrapper(config, onFinished)
-}
-
-type bootstrapper struct {
-	Config
-	common.Bootstrapper
-	common.Fetcher
-	metrics
-
-	started bool
-
-	// Greatest height of the blocks passed in ForceAccepted
-	tipHeight uint64
-	// Height of the last accepted block when bootstrapping starts
-	startingHeight uint64
-	// Blocks passed into ForceAccepted
-	startingAcceptedFrontier ids.Set
-
-	// number of state transitions executed
-	executedStateTransitions int
-
-	parser *parser
-
-	awaitingTimeout bool
-}
-
-func newBootstrapper(
-	config Config,
-	onFinished func(lastReqID uint32) error,
-) (*bootstrapper, error) {
 	b := &bootstrapper{
 		Config: config,
+		NoOpFastSyncHandler: common.NoOpFastSyncHandler{
+			Log: config.Ctx.Log,
+		},
+		NoOpPutHandler: common.NoOpPutHandler{
+			Log: config.Ctx.Log,
+		},
+		NoOpQueryHandler: common.NoOpQueryHandler{
+			Log: config.Ctx.Log,
+		},
+		NoOpChitsHandler: common.NoOpChitsHandler{
+			Log: config.Ctx.Log,
+		},
+		NoOpAppHandler: common.NoOpAppHandler{
+			Log: config.Ctx.Log,
+		},
+
 		Fetcher: common.Fetcher{
 			OnFinished: onFinished,
 		},
@@ -102,24 +87,162 @@ func newBootstrapper(
 	return b, nil
 }
 
-// CurrentAcceptedFrontier implements common.Bootstrapable interface
-// CurrentAcceptedFrontier returns the last accepted block
-func (b *bootstrapper) CurrentAcceptedFrontier() ([]ids.ID, error) {
-	lastAccepted, err := b.VM.LastAccepted()
-	return []ids.ID{lastAccepted}, err
+type bootstrapper struct {
+	Config
+
+	// list of NoOpsHandler for messages dropped by bootstrapper
+	common.NoOpFastSyncHandler
+	common.NoOpPutHandler
+	common.NoOpQueryHandler
+	common.NoOpChitsHandler
+	common.NoOpAppHandler
+
+	common.Bootstrapper
+	common.Fetcher
+	metrics
+
+	started bool
+
+	// Greatest height of the blocks passed in ForceAccepted
+	tipHeight uint64
+	// Height of the last accepted block when bootstrapping starts
+	startingHeight uint64
+	// Blocks passed into ForceAccepted
+	startingAcceptedFrontier ids.Set
+
+	// number of state transitions executed
+	executedStateTransitions int
+
+	parser *parser
+
+	awaitingTimeout bool
 }
 
-// FilterAccepted implements common.Bootstrapable interface
-// FilterAccepted returns the blocks in [containerIDs] that we have accepted
-func (b *bootstrapper) FilterAccepted(containerIDs []ids.ID) []ids.ID {
-	acceptedIDs := make([]ids.ID, 0, len(containerIDs))
-	for _, blkID := range containerIDs {
-		if blk, err := b.VM.GetBlock(blkID); err == nil && blk.Status() == choices.Accepted {
-			acceptedIDs = append(acceptedIDs, blkID)
-		}
+// Ancestors handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
+// with request ID [requestID]
+func (b *bootstrapper) Ancestors(vdr ids.ShortID, requestID uint32, blks [][]byte) error {
+	lenBlks := len(blks)
+	if lenBlks == 0 {
+		b.Ctx.Log.Debug("Ancestors(%s, %d) contains no blocks", vdr, requestID)
+		return b.GetAncestorsFailed(vdr, requestID)
 	}
-	return acceptedIDs
+	if lenBlks > b.Config.AncestorsMaxContainersReceived {
+		blks = blks[:b.Config.AncestorsMaxContainersReceived]
+		b.Ctx.Log.Debug("ignoring %d containers in Ancestors(%s, %d)",
+			lenBlks-b.Config.AncestorsMaxContainersReceived, vdr, requestID)
+	}
+
+	// Make sure this is in response to a request we made
+	wantedBlkID, ok := b.OutstandingRequests.Remove(vdr, requestID)
+	if !ok { // this message isn't in response to a request we made
+		b.Ctx.Log.Debug("received unexpected Ancestors from %s with ID %d", vdr, requestID)
+		return nil
+	}
+
+	blocks, err := block.BatchedParseBlock(b.VM, blks)
+	if err != nil { // the provided blocks couldn't be parsed
+		b.Ctx.Log.Debug("failed to parse blocks in Ancestors from %s with ID %d", vdr, requestID)
+		return b.fetch(wantedBlkID)
+	}
+
+	if len(blocks) == 0 {
+		b.Ctx.Log.Debug("parsing blocks returned an empty set of blocks from %s with ID %d", vdr, requestID)
+		return b.fetch(wantedBlkID)
+	}
+
+	requestedBlock := blocks[0]
+	if actualID := requestedBlock.ID(); actualID != wantedBlkID {
+		b.Ctx.Log.Debug("expected the first block to be the requested block, %s, but is %s",
+			wantedBlkID, actualID)
+		return b.fetch(wantedBlkID)
+	}
+
+	blockSet := make(map[ids.ID]snowman.Block, len(blocks))
+	for _, block := range blocks[1:] {
+		blockSet[block.ID()] = block
+	}
+	return b.process(requestedBlock, blockSet)
 }
+
+// GetAncestorsFailed implements the AncestorsHandler interface
+func (b *bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) error {
+	blkID, ok := b.OutstandingRequests.Remove(vdr, requestID)
+	if !ok {
+		b.Ctx.Log.Debug("GetAncestorsFailed(%s, %d) called but there was no outstanding request to this validator with this ID",
+			vdr, requestID)
+		return nil
+	}
+	// Send another request for this
+	return b.fetch(blkID)
+}
+
+// Connected implements the InternalHandler interface.
+func (b *bootstrapper) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
+	if err := b.VM.Connected(nodeID, nodeVersion); err != nil {
+		return err
+	}
+
+	if err := b.WeightTracker.AddWeightForNode(nodeID); err != nil {
+		return err
+	}
+
+	if b.WeightTracker.EnoughConnectedWeight() && !b.started {
+		b.started = true
+		return b.Startup()
+	}
+
+	return nil
+}
+
+// Disconnected implements the InternalHandler interface.
+func (b *bootstrapper) Disconnected(nodeID ids.ShortID) error {
+	if err := b.VM.Disconnected(nodeID); err != nil {
+		return err
+	}
+
+	return b.WeightTracker.RemoveWeightForNode(nodeID)
+}
+
+// Timeout implements the InternalHandler interface.
+func (b *bootstrapper) Timeout() error {
+	if !b.awaitingTimeout {
+		return errUnexpectedTimeout
+	}
+	b.awaitingTimeout = false
+
+	if !b.Config.Subnet.IsBootstrapped() {
+		return b.RestartBootstrap(true)
+	}
+	return b.finish()
+}
+
+// Gossip implements the InternalHandler interface.
+func (b *bootstrapper) Gossip() error { return nil }
+
+// Shutdown implements the InternalHandler interface.
+func (b *bootstrapper) Shutdown() error { return nil }
+
+// Notify implements the InternalHandler interface.
+func (b *bootstrapper) Notify(common.Message) error { return nil }
+
+// Context implements the common.Engine interface.
+func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
+
+// IsBootstrapped implements the common.Engine interface.
+func (b *bootstrapper) IsBootstrapped() bool { return b.Ctx.IsBootstrapped() }
+
+// HealthCheck implements the common.Engine interface.
+func (b *bootstrapper) HealthCheck() (interface{}, error) {
+	vmIntf, vmErr := b.VM.HealthCheck()
+	intf := map[string]interface{}{
+		"consensus": struct{}{},
+		"vm":        vmIntf,
+	}
+	return intf, vmErr
+}
+
+// GetVM implements the common.Engine interface.
+func (b *bootstrapper) GetVM() common.VM { return b.VM }
 
 // ForceAccepted implements common.Bootstrapable interface
 func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
@@ -128,15 +251,13 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 			err)
 	}
 
-	b.NumFetched = 0
-
 	pendingContainerIDs := b.Blocked.MissingIDs()
 
 	// Append the list of accepted container IDs to pendingContainerIDs to ensure
 	// we iterate over every container that must be traversed.
 	pendingContainerIDs = append(pendingContainerIDs, acceptedContainerIDs...)
 	toProcess := make([]snowman.Block, 0, len(acceptedContainerIDs))
-	b.Config.Ctx.Log.Debug("Starting bootstrapping with %d pending blocks and %d from the accepted frontier",
+	b.Ctx.Log.Debug("Starting bootstrapping with %d pending blocks and %d from the accepted frontier",
 		len(pendingContainerIDs), len(acceptedContainerIDs))
 	for _, blkID := range pendingContainerIDs {
 		b.startingAcceptedFrontier.Add(blkID)
@@ -191,101 +312,13 @@ func (b *bootstrapper) fetch(blkID ids.ID) error {
 	return nil
 }
 
-// GetAncestors implements the Engine interface
-func (b *bootstrapper) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
-	ancestorsBytes, err := block.GetAncestors(
-		b.VM,
-		blkID,
-		b.Config.MultiputMaxContainersSent,
-		constants.MaxContainersLen,
-		b.Config.MaxTimeGetAncestors,
-	)
-	if err != nil {
-		b.Config.Ctx.Log.Verbo("couldn't get ancestors with %s. Dropping GetAncestors(%s, %d, %s)",
-			err, vdr, requestID, blkID)
-		return nil
-	}
-
-	b.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
-	b.Config.Sender.SendMultiPut(vdr, requestID, ancestorsBytes)
-	return nil
-}
-
-// MultiPut handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
-// with request ID [requestID]
-func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte) error {
-	lenBlks := len(blks)
-	if lenBlks == 0 {
-		b.Config.Ctx.Log.Debug("MultiPut(%s, %d) contains no blocks", vdr, requestID)
-		return b.GetAncestorsFailed(vdr, requestID)
-	}
-	if lenBlks > b.Config.MultiputMaxContainersReceived {
-		blks = blks[:b.Config.MultiputMaxContainersReceived]
-		b.Config.Ctx.Log.Debug("ignoring %d containers in multiput(%s, %d)",
-			lenBlks-b.Config.MultiputMaxContainersReceived, vdr, requestID)
-	}
-
-	// Make sure this is in response to a request we made
-	wantedBlkID, ok := b.OutstandingRequests.Remove(vdr, requestID)
-	if !ok { // this message isn't in response to a request we made
-		b.Config.Ctx.Log.Debug("received unexpected MultiPut from %s with ID %d", vdr, requestID)
-		return nil
-	}
-
-	blocks, err := block.BatchedParseBlock(b.VM, blks)
-	if err != nil { // the provided blocks couldn't be parsed
-		b.Config.Ctx.Log.Debug("failed to parse blocks in MultiPut from %s with ID %d, err: %s", vdr, requestID, err.Error())
-		return b.fetch(wantedBlkID)
-	}
-
-	if len(blocks) == 0 {
-		b.Config.Ctx.Log.Debug("parsing blocks returned an empty set of blocks from %s with ID %d", vdr, requestID)
-		return b.fetch(wantedBlkID)
-	}
-
-	requestedBlock := blocks[0]
-	if actualID := requestedBlock.ID(); actualID != wantedBlkID {
-		b.Config.Ctx.Log.Debug("expected the first block to be the requested block, %s, but is %s",
-			wantedBlkID, actualID)
-		return b.fetch(wantedBlkID)
-	}
-
-	blockSet := make(map[ids.ID]snowman.Block, len(blocks))
-	for _, block := range blocks[1:] {
-		blockSet[block.ID()] = block
-	}
-	return b.process(requestedBlock, blockSet)
-}
-
-// GetAncestorsFailed is called when a GetAncestors message we sent fails
-func (b *bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) error {
-	blkID, ok := b.OutstandingRequests.Remove(vdr, requestID)
-	if !ok {
-		b.Config.Ctx.Log.Debug("GetAncestorsFailed(%s, %d) called but there was no outstanding request to this validator with this ID",
-			vdr, requestID)
-		return nil
-	}
-	// Send another request for this
-	return b.fetch(blkID)
-}
-
-func (b *bootstrapper) Timeout() error {
-	if !b.awaitingTimeout {
-		return errUnexpectedTimeout
-	}
-	b.awaitingTimeout = false
-
-	if !b.Config.Subnet.IsBootstrapped() {
-		return b.RestartBootstrap(true)
-	}
-	return b.finish()
-}
-
 // process a block
 func (b *bootstrapper) process(blk snowman.Block, processingBlocks map[ids.ID]snowman.Block) error {
 	status := blk.Status()
 	blkID := blk.ID()
 	blkHeight := blk.Height()
+	totalBlocksToFetch := b.tipHeight - b.startingHeight
+
 	if blkHeight > b.tipHeight && b.startingAcceptedFrontier.Contains(blkID) {
 		b.tipHeight = blkHeight
 	}
@@ -332,12 +365,14 @@ func (b *bootstrapper) process(blk snowman.Block, processingBlocks map[ids.ID]sn
 		}
 
 		b.numFetched.Inc()
-		b.NumFetched++                                      // Progress tracker
-		if b.NumFetched%common.StatusUpdateFrequency == 0 { // Periodically print progress
+
+		blocksFetchedSoFar := b.Blocked.Jobs.PendingJobs()
+
+		if blocksFetchedSoFar%common.StatusUpdateFrequency == 0 { // Periodically print progress
 			if !b.Config.SharedCfg.Restarted {
-				b.Config.Ctx.Log.Info("fetched %d of %d blocks", b.NumFetched, b.tipHeight-b.startingHeight)
+				b.Ctx.Log.Info("fetched %d of %d blocks", blocksFetchedSoFar, totalBlocksToFetch)
 			} else {
-				b.Config.Ctx.Log.Debug("fetched %d of %d blocks", b.NumFetched, b.tipHeight-b.startingHeight)
+				b.Ctx.Log.Debug("fetched %d of %d blocks", blocksFetchedSoFar, totalBlocksToFetch)
 			}
 		}
 	}
@@ -371,17 +406,17 @@ func (b *bootstrapper) checkFinish() error {
 	}
 
 	if !b.Config.SharedCfg.Restarted {
-		b.Config.Ctx.Log.Info("bootstrapping fetched %d blocks. Executing state transitions...", b.NumFetched)
+		b.Ctx.Log.Info("bootstrapping fetched %d blocks. Executing state transitions...", b.Blocked.PendingJobs())
 	} else {
-		b.Config.Ctx.Log.Debug("bootstrapping fetched %d blocks. Executing state transitions...", b.NumFetched)
+		b.Ctx.Log.Debug("bootstrapping fetched %d blocks. Executing state transitions...", b.Blocked.PendingJobs())
 	}
 
 	executedBlocks, err := b.Blocked.ExecuteAll(
 		b.Config.Ctx,
 		b,
 		b.Config.SharedCfg.Restarted,
-		b.Config.Ctx.ConsensusDispatcher,
-		b.Config.Ctx.DecisionDispatcher,
+		b.Ctx.ConsensusDispatcher,
+		b.Ctx.DecisionDispatcher,
 	)
 	if err != nil || b.Halted() {
 		return err
@@ -404,15 +439,15 @@ func (b *bootstrapper) checkFinish() error {
 	}
 
 	// Notify the subnet that this chain is synced
-	b.Config.Subnet.Bootstrapped(b.Config.Ctx.ChainID)
+	b.Config.Subnet.Bootstrapped(b.Ctx.ChainID)
 
 	// If the subnet hasn't finished bootstrapping, this chain should remain
 	// syncing.
 	if !b.Config.Subnet.IsBootstrapped() {
 		if !b.Config.SharedCfg.Restarted {
-			b.Config.Ctx.Log.Info("waiting for the remaining chains in this subnet to finish syncing")
+			b.Ctx.Log.Info("waiting for the remaining chains in this subnet to finish syncing")
 		} else {
-			b.Config.Ctx.Log.Debug("waiting for the remaining chains in this subnet to finish syncing")
+			b.Ctx.Log.Debug("waiting for the remaining chains in this subnet to finish syncing")
 		}
 		// Restart bootstrapping after [bootstrappingDelay] to keep up to date
 		// on the latest tip.
@@ -435,45 +470,4 @@ func (b *bootstrapper) finish() error {
 		return err
 	}
 	return nil
-}
-
-// Connected implements the Engine interface.
-func (b *bootstrapper) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
-	// TODO: remove this check and replace with a different flow for WeightTracker
-	if nodeID != ids.ShortEmpty {
-		if err := b.VM.Connected(nodeID, nodeVersion); err != nil {
-			return err
-		}
-
-		if err := b.WeightTracker.AddWeightForNode(nodeID); err != nil {
-			return err
-		}
-	}
-
-	if b.WeightTracker.EnoughConnectedWeight() && !b.started {
-		b.started = true
-		return b.Startup()
-	}
-	return nil
-}
-
-// Disconnected implements the Engine interface.
-func (b *bootstrapper) Disconnected(nodeID ids.ShortID) error {
-	if err := b.VM.Disconnected(nodeID); err != nil {
-		return err
-	}
-
-	return b.WeightTracker.RemoveWeightForNode(nodeID)
-}
-
-func (b *bootstrapper) GetVM() common.VM                { return b.VM }
-func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
-func (b *bootstrapper) IsBootstrapped() bool            { return b.Config.Ctx.IsBootstrapped() }
-func (b *bootstrapper) HealthCheck() (interface{}, error) {
-	vmIntf, vmErr := b.VM.HealthCheck()
-	intf := map[string]interface{}{
-		"consensus": struct{}{},
-		"vm":        vmIntf,
-	}
-	return intf, vmErr
 }

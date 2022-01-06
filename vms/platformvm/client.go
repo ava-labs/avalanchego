@@ -10,8 +10,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	cjson "github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 )
 
 // Interface compliance
@@ -26,7 +27,7 @@ type Client interface {
 	// ImportKey imports the specified [privateKey] to [user]'s keystore
 	ImportKey(user api.UserPass, address string) (string, error)
 	// GetBalance returns the balance of [address] on the P Chain
-	GetBalance(addr string) (*GetBalanceResponse, error)
+	GetBalance(addrs []string) (*GetBalanceResponse, error)
 	// CreateAddress creates a new address for [user]
 	CreateAddress(user api.UserPass) (string, error)
 	// ListAddresses returns an array of platform addresses controlled by [user]
@@ -133,7 +134,7 @@ type Client interface {
 		genesisData []byte,
 	) (ids.ID, error)
 	// GetBlockchainStatus returns the current status of blockchain with ID: [blockchainID]
-	GetBlockchainStatus(blockchainID string) (BlockchainStatus, error)
+	GetBlockchainStatus(blockchainID string) (status.BlockchainStatus, error)
 	// ValidatedBy returns the ID of the Subnet that validates [blockchainID]
 	ValidatedBy(blockchainID ids.ID) (ids.ID, error)
 	// Validates returns the list of blockchains that are validated by the subnet with ID [subnetID]
@@ -202,10 +203,10 @@ func (c *client) ImportKey(user api.UserPass, privateKey string) (string, error)
 	return res.Address, err
 }
 
-func (c *client) GetBalance(address string) (*GetBalanceResponse, error) {
+func (c *client) GetBalance(addrs []string) (*GetBalanceResponse, error) {
 	res := &GetBalanceResponse{}
-	err := c.requester.SendRequest("getBalance", &api.JSONAddress{
-		Address: address,
+	err := c.requester.SendRequest("getBalance", &GetBalanceRequest{
+		Addresses: addrs,
 	}, res)
 	return res, err
 }
@@ -231,7 +232,7 @@ func (c *client) GetAtomicUTXOs(addrs []string, sourceChain string, limit uint32
 	err := c.requester.SendRequest("getUTXOs", &api.GetUTXOsArgs{
 		Addresses:   addrs,
 		SourceChain: sourceChain,
-		Limit:       cjson.Uint32(limit),
+		Limit:       json.Uint32(limit),
 		StartIndex: api.Index{
 			Address: startAddress,
 			UTXO:    startUTXOID,
@@ -305,7 +306,7 @@ func (c *client) SampleValidators(subnetID ids.ID, sampleSize uint16) ([]string,
 	res := &SampleValidatorsReply{}
 	err := c.requester.SendRequest("sampleValidators", &SampleValidatorsArgs{
 		SubnetID: subnetID,
-		Size:     cjson.Uint16(sampleSize),
+		Size:     json.Uint16(sampleSize),
 	}, res)
 	return res.Validators, err
 }
@@ -322,7 +323,7 @@ func (c *client) AddValidator(
 	delegationFeeRate float32,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	jsonStakeAmount := cjson.Uint64(stakeAmount)
+	jsonStakeAmount := json.Uint64(stakeAmount)
 	err := c.requester.SendRequest("addValidator", &AddValidatorArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:      user,
@@ -331,11 +332,11 @@ func (c *client) AddValidator(
 		APIStaker: APIStaker{
 			NodeID:      nodeID,
 			StakeAmount: &jsonStakeAmount,
-			StartTime:   cjson.Uint64(startTime),
-			EndTime:     cjson.Uint64(endTime),
+			StartTime:   json.Uint64(startTime),
+			EndTime:     json.Uint64(endTime),
 		},
 		RewardAddress:     rewardAddress,
-		DelegationFeeRate: cjson.Float32(delegationFeeRate),
+		DelegationFeeRate: json.Float32(delegationFeeRate),
 	}, res)
 	return res.TxID, err
 }
@@ -351,7 +352,7 @@ func (c *client) AddDelegator(
 	endTime uint64,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	jsonStakeAmount := cjson.Uint64(stakeAmount)
+	jsonStakeAmount := json.Uint64(stakeAmount)
 	err := c.requester.SendRequest("addDelegator", &AddDelegatorArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
@@ -360,8 +361,8 @@ func (c *client) AddDelegator(
 		}, APIStaker: APIStaker{
 			NodeID:      nodeID,
 			StakeAmount: &jsonStakeAmount,
-			StartTime:   cjson.Uint64(startTime),
-			EndTime:     cjson.Uint64(endTime),
+			StartTime:   json.Uint64(startTime),
+			EndTime:     json.Uint64(endTime),
 		},
 		RewardAddress: rewardAddress,
 	}, res)
@@ -379,7 +380,7 @@ func (c *client) AddSubnetValidator(
 	endTime uint64,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	jsonStakeAmount := cjson.Uint64(stakeAmount)
+	jsonStakeAmount := json.Uint64(stakeAmount)
 	err := c.requester.SendRequest("addSubnetValidator", &AddSubnetValidatorArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
@@ -389,8 +390,8 @@ func (c *client) AddSubnetValidator(
 		APIStaker: APIStaker{
 			NodeID:      nodeID,
 			StakeAmount: &jsonStakeAmount,
-			StartTime:   cjson.Uint64(startTime),
-			EndTime:     cjson.Uint64(endTime),
+			StartTime:   json.Uint64(startTime),
+			EndTime:     json.Uint64(endTime),
 		},
 		SubnetID: subnetID,
 	}, res)
@@ -413,7 +414,7 @@ func (c *client) CreateSubnet(
 		},
 		APISubnet: APISubnet{
 			ControlKeys: controlKeys,
-			Threshold:   cjson.Uint32(threshold),
+			Threshold:   json.Uint32(threshold),
 		},
 	}, res)
 	return res.TxID, err
@@ -434,7 +435,7 @@ func (c *client) ExportAVAX(
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
 		},
 		To:     to,
-		Amount: cjson.Uint64(amount),
+		Amount: json.Uint64(amount),
 	}, res)
 	return res.TxID, err
 }
@@ -491,7 +492,7 @@ func (c *client) CreateBlockchain(
 	return res.TxID, err
 }
 
-func (c *client) GetBlockchainStatus(blockchainID string) (BlockchainStatus, error) {
+func (c *client) GetBlockchainStatus(blockchainID string) (status.BlockchainStatus, error) {
 	res := &GetBlockchainStatusReply{}
 	err := c.requester.SendRequest("getBlockchainStatus", &GetBlockchainStatusArgs{
 		BlockchainID: blockchainID,
@@ -581,8 +582,8 @@ func (c *client) GetMaxStakeAmount(subnetID ids.ID, nodeID string, startTime, en
 	err := c.requester.SendRequest("getMaxStakeAmount", &GetMaxStakeAmountArgs{
 		SubnetID:  subnetID,
 		NodeID:    nodeID,
-		StartTime: cjson.Uint64(startTime),
-		EndTime:   cjson.Uint64(endTime),
+		StartTime: json.Uint64(startTime),
+		EndTime:   json.Uint64(endTime),
 	}, res)
 	return uint64(res.Amount), err
 }
@@ -614,7 +615,7 @@ func (c *client) GetValidatorsAt(subnetID ids.ID, height uint64) (map[string]uin
 	res := &GetValidatorsAtReply{}
 	err := c.requester.SendRequest("getValidatorsAt", &GetValidatorsAtArgs{
 		SubnetID: subnetID,
-		Height:   cjson.Uint64(height),
+		Height:   json.Uint64(height),
 	}, res)
 	return res.Validators, err
 }

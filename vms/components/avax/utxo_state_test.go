@@ -19,6 +19,7 @@ import (
 
 func TestUTXOState(t *testing.T) {
 	assert := assert.New(t)
+
 	txID := ids.GenerateTestID()
 	assetID := ids.GenerateTestID()
 	addr := ids.GenerateTestShortID()

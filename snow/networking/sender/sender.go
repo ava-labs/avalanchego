@@ -409,7 +409,7 @@ func (s *Sender) SendGetAncestors(nodeID ids.ShortID, requestID uint32, containe
 
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from this node.
-	s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.MultiPut)
+	s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Ancestors)
 
 	// Sending a GetAncestors to myself always fails.
 	if nodeID == s.ctx.NodeID {
@@ -457,17 +457,17 @@ func (s *Sender) SendGetAncestors(nodeID ids.ShortID, requestID uint32, containe
 	}
 }
 
-// SendMultiPut sends a MultiPut message to the consensus engine running on the specified chain
+// SendAncestors sends an Ancestors message to the consensus engine running on the specified chain
 // on the specified node.
-// The MultiPut message gives the recipient the contents of several containers.
-func (s *Sender) SendMultiPut(nodeID ids.ShortID, requestID uint32, containers [][]byte) {
-	s.ctx.Log.Verbo("Sending MultiPut to node %s. RequestID: %d. NumContainers: %d", nodeID, requestID, len(containers))
+// The Ancestors message gives the recipient the contents of several containers.
+func (s *Sender) SendAncestors(nodeID ids.ShortID, requestID uint32, containers [][]byte) {
+	s.ctx.Log.Verbo("Sending Ancestors to node %s. RequestID: %d. NumContainers: %d", nodeID, requestID, len(containers))
 
 	// Create the outbound message.
-	outMsg, err := s.msgCreator.MultiPut(s.ctx.ChainID, requestID, containers)
+	outMsg, err := s.msgCreator.Ancestors(s.ctx.ChainID, requestID, containers)
 	if err != nil {
 		s.ctx.Log.Error(
-			"failed to build MultiPut message because of container of size %d",
+			"failed to build Ancestors message because of container of size %d",
 			len(containers),
 		)
 		return
@@ -478,7 +478,7 @@ func (s *Sender) SendMultiPut(nodeID ids.ShortID, requestID uint32, containers [
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug(
-			"failed to send MultiPut(%s, %s, %d, %d)",
+			"failed to send Ancestors(%s, %s, %d, %d)",
 			nodeID,
 			s.ctx.ChainID,
 			requestID,

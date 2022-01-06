@@ -10,6 +10,7 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/ghttpproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greadcloser"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greadcloser/greadcloserproto"
@@ -39,8 +40,15 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	closer := grpcutils.ServerCloser{}
 	defer closer.GracefulStop()
 
+	// Wrap [w] with a lock to ensure that it is accessed in a thread-safe manner.
+	w = gresponsewriter.NewLockedWriter(w)
+
 	readerID := c.broker.NextId()
 	go c.broker.AcceptAndServe(readerID, func(opts []grpc.ServerOption) *grpc.Server {
+		opts = append(opts,
+			grpc.MaxRecvMsgSize(math.MaxInt),
+			grpc.MaxSendMsgSize(math.MaxInt),
+		)
 		reader := grpc.NewServer(opts...)
 		closer.Add(reader)
 		greadcloserproto.RegisterReaderServer(reader, greadcloser.NewServer(r.Body))
@@ -49,6 +57,10 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 	writerID := c.broker.NextId()
 	go c.broker.AcceptAndServe(writerID, func(opts []grpc.ServerOption) *grpc.Server {
+		opts = append(opts,
+			grpc.MaxRecvMsgSize(math.MaxInt),
+			grpc.MaxSendMsgSize(math.MaxInt),
+		)
 		writer := grpc.NewServer(opts...)
 		closer.Add(writer)
 		gresponsewriterproto.RegisterWriterServer(writer, gresponsewriter.NewServer(w, c.broker))
@@ -154,6 +166,8 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// TODO: is there a better way to handle this error?
-	_, _ = c.client.Handle(r.Context(), req)
+	_, err := c.client.Handle(r.Context(), req)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 }

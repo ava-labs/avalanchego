@@ -61,11 +61,8 @@ func (wt *weightTracker) RemoveWeightForNode(nodeID ids.ShortID) error {
 		// error.
 		wt.weight, _ = math.Sub64(wt.weight, weight)
 
-		// TODO: shouldn't this be done?
-		if wt.weight < wt.startupAlpha {
-			// TODO: this blocks resuming bootstrapping after fast sync
-			// wt.enoughConnectedWeight = false
-		}
+		// Note: enoughConnectedWeight is currently not set to false
+		// if weight goes below startupAlpha upon node disconnection.
 	}
 	return nil
 }

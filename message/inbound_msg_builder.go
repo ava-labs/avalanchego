@@ -44,7 +44,7 @@ type InboundMsgBuilder interface {
 		nodeID ids.ShortID,
 	) InboundMessage
 
-	InboundMultiPut(
+	InboundAncestors(
 		chainID ids.ID,
 		requestID uint32,
 		containers [][]byte,
@@ -374,14 +374,14 @@ func (b *inMsgBuilder) InboundPut(
 	}
 }
 
-func (b *inMsgBuilder) InboundMultiPut(
+func (b *inMsgBuilder) InboundAncestors(
 	chainID ids.ID,
 	requestID uint32,
 	containers [][]byte,
 	nodeID ids.ShortID,
 ) InboundMessage { // used in UTs only
 	return &inboundMessage{
-		op: MultiPut,
+		op: Ancestors,
 		fields: map[Field]interface{}{
 			ChainID:             chainID[:],
 			RequestID:           requestID,

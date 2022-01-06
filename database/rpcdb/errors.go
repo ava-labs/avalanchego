@@ -11,18 +11,16 @@ var (
 	errCodeToError = map[uint32]error{
 		1: database.ErrClosed,
 		2: database.ErrNotFound,
-		3: database.ErrAvoidCorruption,
 	}
 	errorToErrCode = map[error]uint32{
-		database.ErrClosed:          1,
-		database.ErrNotFound:        2,
-		database.ErrAvoidCorruption: 3,
+		database.ErrClosed:   1,
+		database.ErrNotFound: 2,
 	}
 )
 
 func errorToRPCError(err error) error {
 	switch err {
-	case database.ErrClosed, database.ErrNotFound, database.ErrAvoidCorruption:
+	case database.ErrClosed, database.ErrNotFound:
 		return nil
 	default:
 		return err

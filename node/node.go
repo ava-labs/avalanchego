@@ -103,7 +103,7 @@ type Node struct {
 	sharedMemory atomic.Memory
 
 	// Monitors node health and runs health checks
-	healthService health.Health
+	health health.Health
 
 	// Build and parse messages, for both network layer and chain manager
 	msgCreator message.Creator
@@ -607,45 +607,45 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	}
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
-		StakingEnabled:                         n.Config.EnableStaking,
-		StakingCert:                            n.Config.StakingTLSCert,
-		Log:                                    n.Log,
-		LogFactory:                             n.LogFactory,
-		VMManager:                              n.Config.VMManager,
-		DecisionEvents:                         n.DecisionDispatcher,
-		ConsensusEvents:                        n.ConsensusDispatcher,
-		DBManager:                              n.DBManager,
-		MsgCreator:                             n.msgCreator,
-		Router:                                 n.Config.ConsensusRouter,
-		Net:                                    n.Net,
-		ConsensusParams:                        n.Config.ConsensusParams,
-		Validators:                             n.vdrs,
-		NodeID:                                 n.ID,
-		NetworkID:                              n.Config.NetworkID,
-		Server:                                 &n.APIServer,
-		Keystore:                               n.keystore,
-		AtomicMemory:                           &n.sharedMemory,
-		AVAXAssetID:                            avaxAssetID,
-		XChainID:                               xChainID,
-		CriticalChains:                         criticalChains,
-		TimeoutManager:                         timeoutManager,
-		HealthService:                          n.healthService,
-		WhitelistedSubnets:                     n.Config.WhitelistedSubnets,
-		RetryBootstrap:                         n.Config.RetryBootstrap,
-		RetryBootstrapWarnFrequency:            n.Config.RetryBootstrapWarnFrequency,
-		ShutdownNodeFunc:                       n.Shutdown,
-		MeterVMEnabled:                         n.Config.MeterVMEnabled,
-		Metrics:                                n.MetricsGatherer,
-		SubnetConfigs:                          n.Config.SubnetConfigs,
-		ChainConfigs:                           n.Config.ChainConfigs,
-		AppGossipValidatorSize:                 int(n.Config.NetworkConfig.AppGossipValidatorSize),
-		AppGossipNonValidatorSize:              int(n.Config.NetworkConfig.AppGossipNonValidatorSize),
-		GossipAcceptedFrontierSize:             int(n.Config.NetworkConfig.GossipAcceptedFrontierSize),
-		BootstrapMaxTimeGetAncestors:           n.Config.BootstrapMaxTimeGetAncestors,
-		BootstrapMultiputMaxContainersSent:     n.Config.BootstrapMultiputMaxContainersSent,
-		BootstrapMultiputMaxContainersReceived: n.Config.BootstrapMultiputMaxContainersReceived,
-		ApricotPhase4Time:                      version.GetApricotPhase4Time(n.Config.NetworkID),
-		ApricotPhase4MinPChainHeight:           version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
+		StakingEnabled:                          n.Config.EnableStaking,
+		StakingCert:                             n.Config.StakingTLSCert,
+		Log:                                     n.Log,
+		LogFactory:                              n.LogFactory,
+		VMManager:                               n.Config.VMManager,
+		DecisionEvents:                          n.DecisionDispatcher,
+		ConsensusEvents:                         n.ConsensusDispatcher,
+		DBManager:                               n.DBManager,
+		MsgCreator:                              n.msgCreator,
+		Router:                                  n.Config.ConsensusRouter,
+		Net:                                     n.Net,
+		ConsensusParams:                         n.Config.ConsensusParams,
+		Validators:                              n.vdrs,
+		NodeID:                                  n.ID,
+		NetworkID:                               n.Config.NetworkID,
+		Server:                                  &n.APIServer,
+		Keystore:                                n.keystore,
+		AtomicMemory:                            &n.sharedMemory,
+		AVAXAssetID:                             avaxAssetID,
+		XChainID:                                xChainID,
+		CriticalChains:                          criticalChains,
+		TimeoutManager:                          timeoutManager,
+		Health:                                  n.health,
+		WhitelistedSubnets:                      n.Config.WhitelistedSubnets,
+		RetryBootstrap:                          n.Config.RetryBootstrap,
+		RetryBootstrapWarnFrequency:             n.Config.RetryBootstrapWarnFrequency,
+		ShutdownNodeFunc:                        n.Shutdown,
+		MeterVMEnabled:                          n.Config.MeterVMEnabled,
+		Metrics:                                 n.MetricsGatherer,
+		SubnetConfigs:                           n.Config.SubnetConfigs,
+		ChainConfigs:                            n.Config.ChainConfigs,
+		AppGossipValidatorSize:                  int(n.Config.NetworkConfig.AppGossipValidatorSize),
+		AppGossipNonValidatorSize:               int(n.Config.NetworkConfig.AppGossipNonValidatorSize),
+		GossipAcceptedFrontierSize:              int(n.Config.NetworkConfig.GossipAcceptedFrontierSize),
+		BootstrapMaxTimeGetAncestors:            n.Config.BootstrapMaxTimeGetAncestors,
+		BootstrapAncestorsMaxContainersSent:     n.Config.BootstrapAncestorsMaxContainersSent,
+		BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
+		ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
+		ApricotPhase4MinPChainHeight:            version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
 
 		// State sync
 		StateSyncTestingBeacons: n.Config.StateSyncTestOnlyIDs,
@@ -680,7 +680,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			MinDelegationFee:       n.Config.MinDelegationFee,
 			MinStakeDuration:       n.Config.MinStakeDuration,
 			MaxStakeDuration:       n.Config.MaxStakeDuration,
-			StakeMintingPeriod:     n.Config.StakeMintingPeriod,
+			RewardConfig:           n.Config.RewardConfig,
 			ApricotPhase3Time:      version.GetApricotPhase3Time(n.Config.NetworkID),
 			ApricotPhase4Time:      version.GetApricotPhase4Time(n.Config.NetworkID),
 			ApricotPhase5Time:      version.GetApricotPhase5Time(n.Config.NetworkID),
@@ -924,24 +924,18 @@ func (n *Node) initInfoAPI() error {
 // initHealthAPI initializes the Health API service
 // Assumes n.Log, n.Net, n.APIServer, n.HTTPLog already initialized
 func (n *Node) initHealthAPI() error {
+	healthChecker, err := health.New(n.MetricsRegisterer)
+	if err != nil {
+		return err
+	}
+	n.health = healthChecker
+
 	if !n.Config.HealthAPIEnabled {
-		n.healthService = health.NewNoOp()
 		n.Log.Info("skipping health API initialization because it has been disabled")
 		return nil
 	}
 
 	n.Log.Info("initializing Health API")
-	healthService, err := health.New(
-		n.Config.HealthCheckFreq,
-		n.Log,
-		"health",
-		n.MetricsRegisterer,
-	)
-	if err != nil {
-		return err
-	}
-	n.healthService = healthService
-
 	chainsNotBootstrapped := func(pChainID ids.ID, xChainID ids.ID, cChainID ids.ID) []string {
 		chains := make([]string, 0, 3)
 		if !n.chainManager.IsBootstrapped(pChainID) {
@@ -957,7 +951,7 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	// Passes if the P, X and C chains are finished bootstrapping
-	isNotBootstrappedFunc := func() (interface{}, error) {
+	bootstrappedCheck := health.CheckerFunc(func() (interface{}, error) {
 		pChainID, err := n.chainManager.Lookup("P")
 		if err != nil {
 			return nil, errPNotCreated
@@ -978,29 +972,85 @@ func (n *Node) initHealthAPI() error {
 			return chains, errNotBootstrapped
 		}
 		return chains, nil
-	}
+	})
 
-	err = n.healthService.RegisterMonotonicCheck("isNotBootstrapped", isNotBootstrappedFunc)
+	err = healthChecker.RegisterReadinessCheck("bootstrapped", bootstrappedCheck)
 	if err != nil {
-		return fmt.Errorf("couldn't register isNotBootstrapped health check: %w", err)
+		return fmt.Errorf("couldn't register bootstrapped readiness check: %w", err)
 	}
 
-	err = n.healthService.RegisterCheck("network", n.Net.HealthCheck)
+	err = healthChecker.RegisterHealthCheck("bootstrapped", bootstrappedCheck)
+	if err != nil {
+		return fmt.Errorf("couldn't register bootstrapped health check: %w", err)
+	}
+
+	err = healthChecker.RegisterHealthCheck("network", n.Net)
 	if err != nil {
 		return fmt.Errorf("couldn't register network health check: %w", err)
 	}
 
-	err = n.healthService.RegisterCheck("router", n.Config.ConsensusRouter.HealthCheck)
+	err = healthChecker.RegisterHealthCheck("router", n.Config.ConsensusRouter)
 	if err != nil {
 		return fmt.Errorf("couldn't register router health check: %w", err)
 	}
 
-	handler, err := n.healthService.Handler()
+	handler, err := health.NewGetAndPostHandler(n.Log, healthChecker)
 	if err != nil {
 		return err
 	}
 
-	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "health", "", n.HTTPLog)
+	err = n.APIServer.AddRoute(
+		&common.HTTPHandler{
+			LockOptions: common.NoLock,
+			Handler:     handler,
+		},
+		&sync.RWMutex{},
+		"health",
+		"",
+		n.HTTPLog,
+	)
+	if err != nil {
+		return err
+	}
+
+	err = n.APIServer.AddRoute(
+		&common.HTTPHandler{
+			LockOptions: common.NoLock,
+			Handler:     health.NewGetHandler(healthChecker.Readiness),
+		},
+		&sync.RWMutex{},
+		"health",
+		"/readiness",
+		n.HTTPLog,
+	)
+	if err != nil {
+		return err
+	}
+
+	err = n.APIServer.AddRoute(
+		&common.HTTPHandler{
+			LockOptions: common.NoLock,
+			Handler:     health.NewGetHandler(healthChecker.Health),
+		},
+		&sync.RWMutex{},
+		"health",
+		"/health",
+		n.HTTPLog,
+	)
+	if err != nil {
+		return err
+	}
+
+	return n.APIServer.AddRoute(
+		&common.HTTPHandler{
+			LockOptions: common.NoLock,
+			Handler:     health.NewGetHandler(healthChecker.Liveness),
+		},
+		&sync.RWMutex{},
+		"health",
+		"/liveness",
+		n.HTTPLog,
+	)
 }
 
 // initIPCAPI initializes the IPC API service
@@ -1152,6 +1202,7 @@ func (n *Node) Initialize(
 		return fmt.Errorf("couldn't initialize indexer: %w", err)
 	}
 
+	n.health.Start(n.Config.HealthCheckFreq)
 	n.initProfiler()
 
 	// Start the Platform chain
@@ -1172,15 +1223,15 @@ func (n *Node) Shutdown(exitCode int) {
 func (n *Node) shutdown() {
 	n.Log.Info("shutting down node with exit code %d", n.ExitCode())
 
-	if n.healthService != nil {
+	if n.health != nil {
 		// Passes if the node is not shutting down
-		shuttingDownCheckFunc := func() (interface{}, error) {
+		shuttingDownCheck := health.CheckerFunc(func() (interface{}, error) {
 			return map[string]interface{}{
 				"isShuttingDown": true,
 			}, errShuttingDown
-		}
+		})
 
-		err := n.healthService.RegisterCheck("shuttingDown", shuttingDownCheckFunc)
+		err := n.health.RegisterHealthCheck("shuttingDown", shuttingDownCheck)
 		if err != nil {
 			n.Log.Debug("couldn't register shuttingDown health check: %s", err)
 		}

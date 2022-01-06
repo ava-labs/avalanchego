@@ -46,10 +46,12 @@ import (
 	avcon "github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	aveng "github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	avbootstrap "github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap"
+	avagetter "github.com/ava-labs/avalanchego/snow/engine/avalanche/getter"
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	smbootstrap "github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
+	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 )
 
 const defaultChannelSize = 1
@@ -113,7 +115,6 @@ type chain struct {
 	Name    string
 	Engine  common.Engine
 	Handler *router.Handler
-	Ctx     *snow.ConsensusContext
 	Beacons validators.Set
 }
 
@@ -149,7 +150,7 @@ type ManagerConfig struct {
 	CriticalChains              ids.Set          // Chains that can't exit gracefully
 	WhitelistedSubnets          ids.Set          // Subnets to validate
 	TimeoutManager              *timeout.Manager // Manages request timeouts when sending messages to other validators
-	HealthService               health.Health
+	Health                      health.Registerer
 	RetryBootstrap              bool                    // Should Bootstrap be retried
 	RetryBootstrapWarnFrequency int                     // Max number of times to retry bootstrap before warning the node operator
 	SubnetConfigs               map[ids.ID]SubnetConfig // ID -> SubnetConfig
@@ -166,11 +167,11 @@ type ManagerConfig struct {
 	// Max Time to spend fetching a container and its
 	// ancestors when responding to a GetAncestors
 	BootstrapMaxTimeGetAncestors time.Duration
-	// Max number of containers in a multiput message sent by this node.
-	BootstrapMultiputMaxContainersSent int
-	// This node will only consider the first [MultiputMaxContainersReceived]
-	// containers in a multiput it receives.
-	BootstrapMultiputMaxContainersReceived int
+	// Max number of containers in an ancestors message sent by this node.
+	BootstrapAncestorsMaxContainersSent int
+	// This node will only consider the first [AncestorsMaxContainersReceived]
+	// containers in an ancestors message it receives.
+	BootstrapAncestorsMaxContainersReceived int
 
 	ApricotPhase4Time            time.Time
 	ApricotPhase4MinPChainHeight uint64
@@ -282,15 +283,16 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	m.Log.AssertNoError(m.Alias(chainParams.ID, chainParams.ID.String()))
 
 	// Notify those that registered to be notified when a new chain is created
-	m.notifyRegistrants(chain.Name, chain.Ctx, chain.Engine)
+	m.notifyRegistrants(chain.Name, chain.Engine)
 
 	// Tell the chain to start processing messages.
 	// If the X or P Chain panics, do not attempt to recover
+	ctx := chain.Engine.Context()
 	if m.CriticalChains.Contains(chainParams.ID) {
-		go chain.Ctx.Log.RecoverAndPanic(chain.Handler.Dispatch)
+		go ctx.Log.RecoverAndPanic(chain.Handler.Dispatch)
 	} else {
-		go chain.Ctx.Log.RecoverAndExit(chain.Handler.Dispatch, func() {
-			chain.Ctx.Log.Error("Chain with ID: %s was shutdown due to a panic", chainParams.ID)
+		go ctx.Log.RecoverAndExit(chain.Handler.Dispatch, func() {
+			ctx.Log.Error("Chain with ID: %s was shutdown due to a panic", chainParams.ID)
 		})
 	}
 
@@ -582,33 +584,37 @@ func (m *manager) createAvalancheChain(
 	}
 
 	commonCfg := common.Config{
-		Ctx:                           ctx,
-		Validators:                    vdrs,
-		Beacons:                       beacons,
-		SampleK:                       sampleK,
-		StartupAlpha:                  (3*bootstrapWeight + 3) / 4,
-		Alpha:                         bootstrapWeight/2 + 1, // must be > 50%
-		Sender:                        &sender,
-		Subnet:                        sb,
-		Timer:                         timer,
-		RetryBootstrap:                m.RetryBootstrap,
-		RetryBootstrapWarnFrequency:   m.RetryBootstrapWarnFrequency,
-		MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
-		MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
-		MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
-		SharedCfg:                     &common.SharedConfig{},
+		Ctx:                            ctx,
+		Validators:                     vdrs,
+		Beacons:                        beacons,
+		SampleK:                        sampleK,
+		StartupAlpha:                   (3*bootstrapWeight + 3) / 4,
+		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
+		Sender:                         &sender,
+		Subnet:                         sb,
+		Timer:                          timer,
+		RetryBootstrap:                 m.RetryBootstrap,
+		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
+		MaxTimeGetAncestors:            m.BootstrapMaxTimeGetAncestors,
+		AncestorsMaxContainersSent:     m.BootstrapAncestorsMaxContainersSent,
+		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
+		SharedCfg:                      &common.SharedConfig{},
 	}
 
-	wt := common.NewWeightTracker(beacons, commonCfg.StartupAlpha)
+	avaGetHandler, err := avagetter.New(vtxManager, commonCfg)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize avalanche base message handler: %s", err)
+	}
 
 	// create bootstrap gear
 	bootstrapperConfig := avbootstrap.Config{
 		Config:        commonCfg,
+		AllGetsServer: avaGetHandler,
 		VtxBlocked:    vtxBlocker,
 		TxBlocked:     txBlocker,
 		Manager:       vtxManager,
 		VM:            vm,
-		WeightTracker: wt,
+		WeightTracker: common.NewWeightTracker(beacons, commonCfg.StartupAlpha),
 	}
 	bootstrapper, err := avbootstrap.New(
 		bootstrapperConfig,
@@ -622,8 +628,8 @@ func (m *manager) createAvalancheChain(
 	// create engine gear
 	engineConfig := aveng.Config{
 		Ctx:           bootstrapperConfig.Ctx,
+		AllGetsServer: avaGetHandler,
 		VM:            bootstrapperConfig.VM,
-		WeightTracker: wt,
 		Manager:       vtxManager,
 		Sender:        bootstrapperConfig.Sender,
 		Validators:    vdrs,
@@ -647,15 +653,15 @@ func (m *manager) createAvalancheChain(
 		chainAlias = ctx.ChainID.String()
 	}
 	// Grab the context lock before calling the chain's health check
-	checkFn := func() (interface{}, error) {
+	check := health.CheckerFunc(func() (interface{}, error) {
 		ctx.Lock.Lock()
 		defer ctx.Lock.Unlock()
 		if ctx.IsBootstrapped() {
 			return engine.HealthCheck()
 		}
 		return bootstrapper.HealthCheck()
-	}
-	if err := m.HealthService.RegisterCheck(chainAlias, checkFn); err != nil {
+	})
+	if err := m.Health.RegisterHealthCheck(chainAlias, check); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
@@ -663,7 +669,6 @@ func (m *manager) createAvalancheChain(
 		Name:    chainAlias,
 		Engine:  engine,
 		Handler: handler,
-		Ctx:     ctx,
 	}, err
 }
 
@@ -785,31 +790,35 @@ func (m *manager) createSnowmanChain(
 	}
 
 	commonCfg := common.Config{
-		Ctx:                           ctx,
-		Validators:                    vdrs,
-		Beacons:                       beacons,
-		SampleK:                       sampleK,
-		StartupAlpha:                  (3*bootstrapWeight + 3) / 4,
-		Alpha:                         bootstrapWeight/2 + 1, // must be > 50%
-		Sender:                        &sender,
-		Subnet:                        sb,
-		Timer:                         timer,
-		RetryBootstrap:                m.RetryBootstrap,
-		RetryBootstrapWarnFrequency:   m.RetryBootstrapWarnFrequency,
-		MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
-		MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
-		MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
-		SharedCfg:                     &common.SharedConfig{},
+		Ctx:                            ctx,
+		Validators:                     vdrs,
+		Beacons:                        beacons,
+		SampleK:                        sampleK,
+		StartupAlpha:                   (3*bootstrapWeight + 3) / 4,
+		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
+		Sender:                         &sender,
+		Subnet:                         sb,
+		Timer:                          timer,
+		RetryBootstrap:                 m.RetryBootstrap,
+		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
+		MaxTimeGetAncestors:            m.BootstrapMaxTimeGetAncestors,
+		AncestorsMaxContainersSent:     m.BootstrapAncestorsMaxContainersSent,
+		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
+		SharedCfg:                      &common.SharedConfig{},
 	}
 
-	wt := common.NewWeightTracker(beacons, commonCfg.StartupAlpha)
+	weightTracker := common.NewWeightTracker(beacons, commonCfg.StartupAlpha)
+	snowGetHandler, err := snowgetter.New(vm, commonCfg)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize snow base message handler: %s", err)
+	}
 
 	// create fast sync gear
 	fastSyncCfg := fastsyncer.Config{
 		Config:                  commonCfg,
 		StateSyncTestingBeacons: stateSyncTestingBeacons,
 		VM:                      vm,
-		WeightTracker:           wt,
+		WeightTracker:           weightTracker,
 	}
 	onDoneFastSyncing := func(lastReqID uint32) error {
 		// TODO: should this code go somewhere else?
@@ -831,9 +840,10 @@ func (m *manager) createSnowmanChain(
 	// create bootstrap gear
 	bootstrapCfg := smbootstrap.Config{
 		Config:        commonCfg,
+		AllGetsServer: snowGetHandler,
 		Blocked:       blocked,
 		VM:            vm,
-		WeightTracker: wt,
+		WeightTracker: weightTracker,
 		Bootstrapped:  m.unblockChains,
 	}
 	bootstrapper, err := smbootstrap.New(
@@ -848,8 +858,8 @@ func (m *manager) createSnowmanChain(
 	// create engine gear
 	engineConfig := smeng.Config{
 		Ctx:           bootstrapCfg.Ctx,
+		AllGetsServer: snowGetHandler,
 		VM:            bootstrapCfg.VM,
-		WeightTracker: wt,
 		Sender:        bootstrapCfg.Sender,
 		Validators:    vdrs,
 		Params:        consensusParams,
@@ -878,15 +888,15 @@ func (m *manager) createSnowmanChain(
 		chainAlias = ctx.ChainID.String()
 	}
 
-	checkFn := func() (interface{}, error) {
+	check := health.CheckerFunc(func() (interface{}, error) {
 		ctx.Lock.Lock()
 		defer ctx.Lock.Unlock()
 		if ctx.IsBootstrapped() {
 			return engine.HealthCheck()
 		}
 		return bootstrapper.HealthCheck()
-	}
-	if err := m.HealthService.RegisterCheck(chainAlias, checkFn); err != nil {
+	})
+	if err := m.Health.RegisterHealthCheck(chainAlias, check); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
@@ -894,7 +904,6 @@ func (m *manager) createSnowmanChain(
 		Name:    chainAlias,
 		Engine:  engine,
 		Handler: handler,
-		Ctx:     ctx,
 	}, nil
 }
 
@@ -931,9 +940,9 @@ func (m *manager) LookupVM(alias string) (ids.ID, error) { return m.VMManager.Lo
 
 // Notify registrants [those who want to know about the creation of chains]
 // that the specified chain has been created
-func (m *manager) notifyRegistrants(name string, ctx *snow.ConsensusContext, engine common.Engine) {
+func (m *manager) notifyRegistrants(name string, engine common.Engine) {
 	for _, registrant := range m.registrants {
-		registrant.RegisterChain(name, ctx, engine)
+		registrant.RegisterChain(name, engine)
 	}
 }
 

@@ -239,6 +239,7 @@ func (vm *VMClient) Initialize(
 
 func (vm *VMClient) startDBServerFunc(db rpcdbproto.DatabaseServer) func(opts []grpc.ServerOption) *grpc.Server { // #nolint
 	return func(opts []grpc.ServerOption) *grpc.Server {
+		opts = append(opts, serverOptions...)
 		server := grpc.NewServer(opts...)
 		vm.serverCloser.Add(server)
 		rpcdbproto.RegisterDatabaseServer(server, db)
@@ -247,6 +248,7 @@ func (vm *VMClient) startDBServerFunc(db rpcdbproto.DatabaseServer) func(opts []
 }
 
 func (vm *VMClient) startMessengerServer(opts []grpc.ServerOption) *grpc.Server {
+	opts = append(opts, serverOptions...)
 	server := grpc.NewServer(opts...)
 	vm.serverCloser.Add(server)
 	messengerproto.RegisterMessengerServer(server, vm.messenger)
@@ -254,6 +256,7 @@ func (vm *VMClient) startMessengerServer(opts []grpc.ServerOption) *grpc.Server 
 }
 
 func (vm *VMClient) startKeystoreServer(opts []grpc.ServerOption) *grpc.Server {
+	opts = append(opts, serverOptions...)
 	server := grpc.NewServer(opts...)
 	vm.serverCloser.Add(server)
 	gkeystoreproto.RegisterKeystoreServer(server, vm.keystore)
@@ -261,6 +264,7 @@ func (vm *VMClient) startKeystoreServer(opts []grpc.ServerOption) *grpc.Server {
 }
 
 func (vm *VMClient) startSharedMemoryServer(opts []grpc.ServerOption) *grpc.Server {
+	opts = append(opts, serverOptions...)
 	server := grpc.NewServer(opts...)
 	vm.serverCloser.Add(server)
 	gsharedmemoryproto.RegisterSharedMemoryServer(server, vm.sharedMemory)
@@ -268,6 +272,7 @@ func (vm *VMClient) startSharedMemoryServer(opts []grpc.ServerOption) *grpc.Serv
 }
 
 func (vm *VMClient) startBCLookupServer(opts []grpc.ServerOption) *grpc.Server {
+	opts = append(opts, serverOptions...)
 	server := grpc.NewServer(opts...)
 	vm.serverCloser.Add(server)
 	galiasreaderproto.RegisterAliasReaderServer(server, vm.bcLookup)
@@ -275,6 +280,7 @@ func (vm *VMClient) startBCLookupServer(opts []grpc.ServerOption) *grpc.Server {
 }
 
 func (vm *VMClient) startSNLookupServer(opts []grpc.ServerOption) *grpc.Server {
+	opts = append(opts, serverOptions...)
 	server := grpc.NewServer(opts...)
 	vm.serverCloser.Add(server)
 	gsubnetlookupproto.RegisterSubnetLookupServer(server, vm.snLookup)
@@ -282,6 +288,7 @@ func (vm *VMClient) startSNLookupServer(opts []grpc.ServerOption) *grpc.Server {
 }
 
 func (vm *VMClient) startAppSenderServer(opts []grpc.ServerOption) *grpc.Server {
+	opts = append(opts, serverOptions...)
 	server := grpc.NewServer(opts...)
 	vm.serverCloser.Add(server)
 	appsenderproto.RegisterAppSenderServer(server, vm.appSender)

@@ -10,16 +10,30 @@ import (
 	"log"
 	"path/filepath"
 
+	"google.golang.org/grpc"
+
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/subprocess"
 	"github.com/ava-labs/avalanchego/vms"
 )
 
-var errWrongVM = errors.New("wrong vm type")
+var (
+	errWrongVM = errors.New("wrong vm type")
+
+	serverOptions = []grpc.ServerOption{
+		grpc.MaxRecvMsgSize(math.MaxInt),
+		grpc.MaxSendMsgSize(math.MaxInt),
+	}
+	dialOptions = []grpc.DialOption{
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(math.MaxInt)),
+		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(math.MaxInt)),
+	}
+)
 
 type Factory struct {
 	Path string
@@ -31,7 +45,6 @@ func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
 		Plugins:         PluginMap,
 		Cmd:             subprocess.New(f.Path),
 		AllowedProtocols: []plugin.Protocol{
-			plugin.ProtocolNetRPC,
 			plugin.ProtocolGRPC,
 		},
 		// We kill this client by calling kill() when the chain running this VM
@@ -44,7 +57,8 @@ func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
 		//    unhandled.
 		// We set managed to true so that we can call plugin.CleanupClients on
 		// node shutdown to ensure every plugin subprocess is killed.
-		Managed: true,
+		Managed:         true,
+		GRPCDialOptions: dialOptions,
 	}
 	if ctx != nil {
 		log.SetOutput(ctx.Log)

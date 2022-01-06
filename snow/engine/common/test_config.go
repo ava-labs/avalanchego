@@ -18,15 +18,15 @@ func DefaultConfigTest() Config {
 	}
 
 	return Config{
-		Ctx:                           snow.DefaultConsensusContextTest(),
-		Validators:                    validators.NewSet(),
-		Beacons:                       validators.NewSet(),
-		Sender:                        &SenderTest{},
-		Bootstrapable:                 &BootstrapableTest{},
-		Subnet:                        subnet,
-		Timer:                         &TimerTest{},
-		MultiputMaxContainersSent:     2000,
-		MultiputMaxContainersReceived: 2000,
-		SharedCfg:                     &SharedConfig{},
+		Ctx:                            snow.DefaultConsensusContextTest(),
+		Validators:                     validators.NewSet(),
+		Beacons:                        validators.NewSet(),
+		Sender:                         &SenderTest{},
+		Bootstrapable:                  &BootstrapableTest{},
+		Subnet:                         subnet,
+		Timer:                          &TimerTest{},
+		AncestorsMaxContainersSent:     2000,
+		AncestorsMaxContainersReceived: 2000,
+		SharedCfg:                      &SharedConfig{},
 	}
 }

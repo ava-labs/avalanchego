@@ -47,6 +47,7 @@ type currentStakerChainState interface {
 
 	Apply(InternalState)
 
+	// Return the current validator set of [subnetID].
 	ValidatorSet(subnetID ids.ID) (validators.Set, error)
 }
 
