@@ -38,6 +38,7 @@ var (
 	dbPrefix = []byte("proposervm")
 
 	_ block.ChainVM         = &VM{}
+	_ block.BatchedChainVM  = &VM{}
 	_ indexes.HeightIndexer = &VM{}
 )
 

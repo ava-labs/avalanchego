@@ -13,10 +13,9 @@ import (
 // Builder builds a vertex given a set of parentIDs and transactions.
 type Builder interface {
 	// Build a new vertex from the contents of a vertex
-	BuildVtx(
-		parentIDs []ids.ID,
-		txs []snowstorm.Tx,
-	) (avalanche.Vertex, error)
+	BuildVtx(parentIDs []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error)
+	// Build a new stop vertex from the parents
+	BuildStopVtx(parentIDs []ids.ID) (avalanche.Vertex, error)
 }
 
 // Build a new stateless vertex from the contents of a vertex
@@ -26,18 +25,58 @@ func Build(
 	parentIDs []ids.ID,
 	txs [][]byte,
 ) (StatelessVertex, error) {
+	return buildVtx(
+		chainID,
+		height,
+		parentIDs,
+		txs,
+		func(vtx innerStatelessVertex) error {
+			return vtx.verify()
+		},
+		false,
+	)
+}
+
+// Build a new stateless vertex from the contents of a vertex
+func BuildStopVertex(chainID ids.ID, height uint64, parentIDs []ids.ID) (StatelessVertex, error) {
+	return buildVtx(
+		chainID,
+		height,
+		parentIDs,
+		nil,
+		func(vtx innerStatelessVertex) error {
+			return vtx.verifyStopVertex()
+		},
+		true,
+	)
+}
+
+func buildVtx(
+	chainID ids.ID,
+	height uint64,
+	parentIDs []ids.ID,
+	txs [][]byte,
+	verifyFunc func(innerStatelessVertex) error,
+	stopVertex bool,
+) (StatelessVertex, error) {
 	ids.SortIDs(parentIDs)
 	SortHashOf(txs)
 
+	codecVer := codecVersion
+	if stopVertex {
+		// use new codec version for the "StopVertex"
+		codecVer = codecVersionWithStopVtx
+	}
+
 	innerVtx := innerStatelessVertex{
-		Version:   codecVersion,
+		Version:   codecVer,
 		ChainID:   chainID,
 		Height:    height,
 		Epoch:     0,
 		ParentIDs: parentIDs,
 		Txs:       txs,
 	}
-	if err := innerVtx.Verify(); err != nil {
+	if err := verifyFunc(innerVtx); err != nil {
 		return nil, err
 	}
 

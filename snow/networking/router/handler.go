@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
+
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -36,8 +37,10 @@ type Handler struct {
 	metrics handlerMetrics
 	// The validator set that validates this chain
 	validators validators.Set
-	// The consensus engine
-	engine common.Engine
+
+	bootstrapper common.Engine
+	engine       common.Engine
+
 	// Closed when this handler and [engine] are done shutting down
 	closed chan struct{}
 	// Receives messages from the VM
@@ -56,31 +59,45 @@ type Handler struct {
 
 // Initialize this consensus handler
 // [engine] must be initialized before initializing this handler
-func (h *Handler) Initialize(
+func NewHandler(
 	mc message.Creator,
-	engine common.Engine,
+	ctx *snow.ConsensusContext,
 	validators validators.Set,
 	msgFromVMChan <-chan common.Message,
-) error {
-	h.ctx = engine.Context()
-	if err := h.metrics.Initialize("handler", h.ctx.Registerer); err != nil {
-		return fmt.Errorf("initializing handler metrics errored with: %s", err)
+) (*Handler, error) {
+	h := &Handler{
+		ctx:                 ctx,
+		mc:                  mc,
+		closed:              make(chan struct{}),
+		msgFromVMChan:       msgFromVMChan,
+		validators:          validators,
+		unprocessedMsgsCond: sync.NewCond(&sync.Mutex{}),
+		cpuTracker:          tracker.NewCPUTracker(uptime.ContinuousFactory{}, cpuHalflife),
 	}
-	h.mc = mc
-	h.closed = make(chan struct{})
-	h.msgFromVMChan = msgFromVMChan
-	h.engine = engine
-	h.validators = validators
-	var lock sync.Mutex
-	h.unprocessedMsgsCond = sync.NewCond(&lock)
-	h.cpuTracker = tracker.NewCPUTracker(uptime.ContinuousFactory{}, cpuHalflife)
+
+	if err := h.metrics.Initialize("handler", h.ctx.Registerer); err != nil {
+		return nil, fmt.Errorf("initializing handler metrics errored with: %s", err)
+	}
 	var err error
 	h.unprocessedMsgs, err = newUnprocessedMsgs(h.ctx.Log, h.validators, h.cpuTracker, "handler", h.ctx.Registerer)
-	return err
+	return h, err
+}
+
+func (h *Handler) RegisterBootstrap(bootstrapper common.Engine) {
+	h.bootstrapper = bootstrapper
+}
+
+func (h *Handler) RegisterEngine(engine common.Engine) {
+	h.engine = engine
+}
+
+func (h *Handler) OnDoneBootstrapping(lastReqID uint32) error {
+	lastReqID++
+	return h.engine.Start(lastReqID)
 }
 
 // Context of this Handler
-func (h *Handler) Context() *snow.ConsensusContext { return h.engine.Context() }
+func (h *Handler) Context() *snow.ConsensusContext { return h.ctx }
 
 // Engine returns the engine this handler dispatches to
 func (h *Handler) Engine() common.Engine { return h.engine }
@@ -183,19 +200,30 @@ func (h *Handler) handleMsg(msg message.InboundMessage) error {
 	defer h.ctx.Lock.Unlock()
 
 	var (
-		err error
-		op  = msg.Op()
+		err        error
+		op         = msg.Op()
+		targetGear common.Engine
 	)
+
+	switch h.ctx.GetState() {
+	case snow.Bootstrapping:
+		targetGear = h.bootstrapper
+	case snow.NormalOp:
+		targetGear = h.engine
+	default:
+		return fmt.Errorf("unknown handler for state %v", h.ctx.GetState().String())
+	}
+
 	switch op {
 	case message.Notify:
 		vmMsg := msg.Get(message.VMMessage).(uint32)
-		err = h.engine.Notify(common.Message(vmMsg))
+		err = targetGear.Notify(common.Message(vmMsg))
 
 	case message.GossipRequest:
-		err = h.engine.Gossip()
+		err = targetGear.Gossip()
 
 	case message.Timeout:
-		err = h.engine.Timeout()
+		err = targetGear.Timeout()
 
 	default:
 		err = h.handleConsensusMsg(msg)
@@ -210,7 +238,12 @@ func (h *Handler) handleMsg(msg message.InboundMessage) error {
 
 	// Track how long the operation took.
 	histogram := h.metrics.messages[op]
-	histogram.Observe(float64(endTime.Sub(startTime)))
+	// TODO: should not be needed
+	if histogram == nil {
+		h.ctx.Log.Warn("could not find metric map for message type %s", op.String())
+	} else {
+		histogram.Observe(float64(endTime.Sub(startTime)))
+	}
 
 	msg.OnFinishedHandling()
 
@@ -226,166 +259,172 @@ func (h *Handler) handleMsg(msg message.InboundMessage) error {
 // Relevant fields in msgs must be validated before being dispatched to the engine.
 // An invalid msg is logged and dropped silently since err would cause a chain shutdown.
 func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
+	var targetGear common.Engine
+	switch h.ctx.GetState() {
+	case snow.Bootstrapping:
+		targetGear = h.bootstrapper
+	case snow.NormalOp:
+		targetGear = h.engine
+	default:
+		return fmt.Errorf("unknown handler for state %v", h.ctx.GetState().String())
+	}
+
 	nodeID := msg.NodeID()
 	switch msg.Op() {
 	case message.GetAcceptedFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return h.engine.GetAcceptedFrontier(nodeID, reqID)
+		return targetGear.GetAcceptedFrontier(nodeID, reqID)
 
 	case message.AcceptedFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
 		containerIDs, err := getContainerIDs(msg)
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
-				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
-			return h.engine.GetAcceptedFrontierFailed(nodeID, reqID)
+				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
+			return targetGear.GetAcceptedFrontierFailed(nodeID, reqID)
 		}
-		return h.engine.AcceptedFrontier(nodeID, reqID, containerIDs)
+		return targetGear.AcceptedFrontier(nodeID, reqID, containerIDs)
 
 	case message.GetAcceptedFrontierFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return h.engine.GetAcceptedFrontierFailed(nodeID, reqID)
+		return targetGear.GetAcceptedFrontierFailed(nodeID, reqID)
 
 	case message.GetAccepted:
 		reqID := msg.Get(message.RequestID).(uint32)
 		containerIDs, err := getContainerIDs(msg)
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
-				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
+				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
 			return nil
 		}
-		return h.engine.GetAccepted(nodeID, reqID, containerIDs)
+		return targetGear.GetAccepted(nodeID, reqID, containerIDs)
 
 	case message.Accepted:
 		reqID := msg.Get(message.RequestID).(uint32)
 		containerIDs, err := getContainerIDs(msg)
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
-				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
-			return h.engine.GetAcceptedFailed(nodeID, reqID)
+				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
+			return targetGear.GetAcceptedFailed(nodeID, reqID)
 		}
-		return h.engine.Accepted(nodeID, reqID, containerIDs)
+		return targetGear.Accepted(nodeID, reqID, containerIDs)
 
 	case message.GetAcceptedFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return h.engine.GetAcceptedFailed(nodeID, reqID)
+		return targetGear.GetAcceptedFailed(nodeID, reqID)
 
 	case message.GetAncestors:
 		reqID := msg.Get(message.RequestID).(uint32)
 		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
-				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
+				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
 			return nil
 		}
-		return h.engine.GetAncestors(nodeID, reqID, containerID)
+		return targetGear.GetAncestors(nodeID, reqID, containerID)
 
 	case message.GetAncestorsFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return h.engine.GetAncestorsFailed(nodeID, reqID)
+		return targetGear.GetAncestorsFailed(nodeID, reqID)
 
-	case message.MultiPut:
+	case message.Ancestors:
 		reqID := msg.Get(message.RequestID).(uint32)
 		containers := msg.Get(message.MultiContainerBytes).([][]byte)
-		return h.engine.MultiPut(nodeID, reqID, containers)
+		return targetGear.Ancestors(nodeID, reqID, containers)
 
 	case message.Get:
 		reqID := msg.Get(message.RequestID).(uint32)
 		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
 		h.ctx.Log.AssertNoError(err)
-		return h.engine.Get(nodeID, reqID, containerID)
+		return targetGear.Get(nodeID, reqID, containerID)
 
 	case message.GetFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return h.engine.GetFailed(nodeID, reqID)
+		return targetGear.GetFailed(nodeID, reqID)
 
 	case message.Put:
 		reqID := msg.Get(message.RequestID).(uint32)
-		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
-		h.ctx.Log.AssertNoError(err)
 		container, ok := msg.Get(message.ContainerBytes).([]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse ContainerBytes",
-				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
+				msg.Op(), nodeID, h.ctx.ChainID, reqID)
 			return nil
 		}
-		return h.engine.Put(nodeID, reqID, containerID, container)
+		return targetGear.Put(nodeID, reqID, container)
 
 	case message.PushQuery:
 		reqID := msg.Get(message.RequestID).(uint32)
-		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
-		h.ctx.Log.AssertNoError(err)
 		container, ok := msg.Get(message.ContainerBytes).([]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse ContainerBytes",
-				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
+				msg.Op(), nodeID, h.ctx.ChainID, reqID)
 			return nil
 		}
-		return h.engine.PushQuery(nodeID, reqID, containerID, container)
+		return targetGear.PushQuery(nodeID, reqID, container)
 
 	case message.PullQuery:
 		reqID := msg.Get(message.RequestID).(uint32)
 		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
 		h.ctx.Log.AssertNoError(err)
-		return h.engine.PullQuery(nodeID, reqID, containerID)
-
-	case message.QueryFailed:
-		reqID := msg.Get(message.RequestID).(uint32)
-		return h.engine.QueryFailed(nodeID, reqID)
+		return targetGear.PullQuery(nodeID, reqID, containerID)
 
 	case message.Chits:
 		reqID := msg.Get(message.RequestID).(uint32)
 		votes, err := getContainerIDs(msg)
 		if err != nil {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: %s",
-				msg.Op(), nodeID, h.engine.Context().ChainID, reqID, err)
-			return h.engine.QueryFailed(nodeID, reqID)
+				msg.Op(), nodeID, h.ctx.ChainID, reqID, err)
+			return targetGear.QueryFailed(nodeID, reqID)
 		}
-		return h.engine.Chits(nodeID, reqID, votes)
+		return targetGear.Chits(nodeID, reqID, votes)
+
+	case message.QueryFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return targetGear.QueryFailed(nodeID, reqID)
 
 	case message.Connected:
 		peerVersion := msg.Get(message.VersionStruct).(version.Application)
-		return h.engine.Connected(nodeID, peerVersion)
+		return targetGear.Connected(nodeID, peerVersion)
 
 	case message.Disconnected:
-		return h.engine.Disconnected(nodeID)
+		return targetGear.Disconnected(nodeID)
 
 	case message.AppRequest:
 		reqID := msg.Get(message.RequestID).(uint32)
 		appBytes, ok := msg.Get(message.AppBytes).([]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppBytes",
-				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
+				msg.Op(), nodeID, h.ctx.ChainID, reqID)
 			return nil
 		}
-		return h.engine.AppRequest(nodeID, reqID, msg.ExpirationTime(), appBytes)
-
-	case message.AppRequestFailed:
-		reqID := msg.Get(message.RequestID).(uint32)
-		return h.engine.AppRequestFailed(nodeID, reqID)
+		return targetGear.AppRequest(nodeID, reqID, msg.ExpirationTime(), appBytes)
 
 	case message.AppResponse:
 		reqID := msg.Get(message.RequestID).(uint32)
 		appBytes, ok := msg.Get(message.AppBytes).([]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppBytes",
-				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
-			return h.engine.AppRequestFailed(nodeID, reqID)
+				msg.Op(), nodeID, h.ctx.ChainID, reqID)
+			return targetGear.AppRequestFailed(nodeID, reqID)
 		}
-		return h.engine.AppResponse(nodeID, reqID, appBytes)
+		return targetGear.AppResponse(nodeID, reqID, appBytes)
+
+	case message.AppRequestFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return targetGear.AppRequestFailed(nodeID, reqID)
 
 	case message.AppGossip:
 		appBytes, ok := msg.Get(message.AppBytes).([]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse AppBytes",
-				msg.Op(), nodeID, h.engine.Context().ChainID, constants.GossipMsgRequestID)
+				msg.Op(), nodeID, h.ctx.ChainID, constants.GossipMsgRequestID)
 			return nil
 		}
-		return h.engine.AppGossip(nodeID, appBytes)
+		return targetGear.AppGossip(nodeID, appBytes)
 
 	default:
 		h.ctx.Log.Warn("Attempt to submit to engine unhandled consensus msg %s from from (%s, %s). Dropping it",
-			msg.Op(), nodeID, h.engine.Context().ChainID)
+			msg.Op(), nodeID, h.ctx.ChainID)
 		return nil
 	}
 }
@@ -428,7 +467,7 @@ func (h *Handler) StartShutdown() {
 	// we wouldn't be able to grab [h.ctx.Lock] until the engine
 	// finished executing state transitions, which may take a long time.
 	// As a result, the router would time out on shutting down this chain.
-	h.engine.Halt()
+	h.bootstrapper.Halt()
 }
 
 // Calls [h.engine.Shutdown] and [h.onCloseF]; closes [h.closed].

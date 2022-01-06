@@ -49,6 +49,7 @@ import (
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
+	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 )
 
 var (
@@ -2045,7 +2046,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, message.GetAcceptedFrontier, inMsg.Op())
 
-		res := ids.NewShortSet(len(nodeIDs))
+		res := nodeIDs
 		requestID, ok := inMsg.Get(message.RequestID).(uint32)
 		assert.True(t, ok)
 
@@ -2061,24 +2062,56 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	// The engine handles consensus
-	engine := smeng.Transitive{}
-	err = engine.Initialize(smeng.Config{
-		Config: bootstrap.Config{
-			Config: common.Config{
-				Ctx:                           consensusCtx,
-				Validators:                    vdrs,
-				Beacons:                       beacons,
-				SampleK:                       beacons.Len(),
-				StartupAlpha:                  (beacons.Weight() + 1) / 2,
-				Alpha:                         (beacons.Weight() + 1) / 2,
-				Sender:                        &sender,
-				Subnet:                        subnet,
-				MultiputMaxContainersSent:     2000,
-				MultiputMaxContainersReceived: 2000,
-			},
-			Blocked: blocked,
-			VM:      vm,
-		},
+	consensus := &smcon.Topological{}
+	commonCfg := common.Config{
+		Ctx:                            consensusCtx,
+		Validators:                     vdrs,
+		Beacons:                        beacons,
+		SampleK:                        beacons.Len(),
+		StartupAlpha:                   (beacons.Weight() + 1) / 2,
+		Alpha:                          (beacons.Weight() + 1) / 2,
+		Sender:                         &sender,
+		Subnet:                         subnet,
+		AncestorsMaxContainersSent:     2000,
+		AncestorsMaxContainersReceived: 2000,
+		SharedCfg:                      &common.SharedConfig{},
+	}
+
+	snowGetHandler, err := snowgetter.New(vm, commonCfg)
+	assert.NoError(t, err)
+
+	bootstrapConfig := bootstrap.Config{
+		Config:        commonCfg,
+		AllGetsServer: snowGetHandler,
+		Blocked:       blocked,
+		VM:            vm,
+		WeightTracker: common.NewWeightTracker(commonCfg.Beacons, commonCfg.StartupAlpha),
+	}
+
+	// Asynchronously passes messages from the network to the consensus engine
+	handler, err := router.NewHandler(
+		mc,
+		bootstrapConfig.Ctx,
+		vdrs,
+		msgChan,
+	)
+	assert.NoError(t, err)
+
+	bootstrapper, err := bootstrap.New(
+		bootstrapConfig,
+		handler.OnDoneBootstrapping,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler.RegisterBootstrap(bootstrapper)
+
+	engineConfig := smeng.Config{
+		Ctx:           bootstrapConfig.Ctx,
+		AllGetsServer: snowGetHandler,
+		VM:            bootstrapConfig.VM,
+		Sender:        bootstrapConfig.Sender,
+		Validators:    vdrs,
 		Params: snowball.Parameters{
 			K:                     1,
 			Alpha:                 1,
@@ -2089,27 +2122,24 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			MaxOutstandingItems:   1,
 			MaxItemProcessingTime: 1,
 		},
-		Consensus: &smcon.Topological{},
-	})
+		Consensus: consensus,
+	}
+	engine, err := smeng.New(engineConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
+	handler.RegisterEngine(engine)
 
-	// Asynchronously passes messages from the network to the consensus engine
-	handler := &router.Handler{}
-	err = handler.Initialize(
-		mc,
-		&engine,
-		vdrs,
-		msgChan,
-	)
-	assert.NoError(t, err)
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
+		t.Fatal(err)
+	}
 
 	// Allow incoming messages to be routed to the new chain
 	chainRouter.AddChain(handler)
 	go ctx.Log.RecoverAndPanic(handler.Dispatch)
 
-	if err := engine.Connected(peerID, version.CurrentApp); err != nil {
+	if err := bootstrapper.Connected(peerID, version.CurrentApp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2118,7 +2148,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, message.GetAccepted, inMsg.Op())
 
-		res := ids.NewShortSet(len(nodeIDs))
+		res := nodeIDs
 		requestID, ok := inMsg.Get(message.RequestID).(uint32)
 		assert.True(t, ok)
 
@@ -2127,7 +2157,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	frontier := []ids.ID{advanceTimeBlkID}
-	if err := engine.AcceptedFrontier(peerID, reqID, frontier); err != nil {
+	if err := bootstrapper.AcceptedFrontier(peerID, reqID, frontier); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2136,7 +2166,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, message.GetAncestors, inMsg.Op())
 
-		res := ids.NewShortSet(len(nodeIDs))
+		res := nodeIDs
 		requestID, ok := inMsg.Get(message.RequestID).(uint32)
 		assert.True(t, ok)
 		reqID = requestID
@@ -2150,14 +2180,14 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return res
 	}
 
-	if err := engine.Accepted(peerID, reqID, frontier); err != nil {
+	if err := bootstrapper.Accepted(peerID, reqID, frontier); err != nil {
 		t.Fatal(err)
 	}
 
 	externalSender.SendF = nil
 	externalSender.CantSend = false
 
-	if err := engine.MultiPut(peerID, reqID, [][]byte{advanceTimeBlkBytes}); err != nil {
+	if err := bootstrapper.Ancestors(peerID, reqID, [][]byte{advanceTimeBlkBytes}); err != nil {
 		t.Fatal(err)
 	}
 

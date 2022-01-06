@@ -9,6 +9,7 @@ import (
 	stdmath "math"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/math"
 )
@@ -32,16 +33,22 @@ const (
 	MaxTimeFetchingAncestors = 50 * time.Millisecond
 )
 
-// Bootstrapper implements the Engine interface.
-type Bootstrapper struct {
+var _ Bootstrapper = &bootstrapper{}
+
+type Bootstrapper interface {
+	AcceptedFrontierHandler
+	AcceptedHandler
+	Haltable
+	Start(startReqID uint32) error
+	Startup() error
+	RestartBootstrap(reset bool) error
+}
+
+// bootstrapper implements the Handler interface.
+// It collects mechanisms common to both snowman and avalanche bootstrappers
+type bootstrapper struct {
 	Config
 	Halter
-
-	// Tracks the last requestID that was used in a request
-	RequestID uint32
-
-	// True if RestartBootstrap has been called at least once
-	Restarted bool
 
 	// Holds the beacons that were sampled for the accepted frontier
 	sampledBeacons validators.Set
@@ -68,59 +75,23 @@ type Bootstrapper struct {
 	acceptedVotes    map[ids.ID]uint64
 	acceptedFrontier []ids.ID
 
-	// current weight
-	started bool
-	weight  uint64
-
 	// number of times the bootstrap has been attempted
 	bootstrapAttempts int
 }
 
-// Initialize implements the Engine interface.
-func (b *Bootstrapper) Initialize(config Config) error {
-	b.Config = config
-	b.Ctx.Log.Info("Starting bootstrap...")
-
-	if b.Config.StartupAlpha > 0 {
-		return nil
+func NewCommonBootstrapper(config Config) Bootstrapper {
+	return &bootstrapper{
+		Config: config,
 	}
-	return b.startup()
 }
 
-// GetAcceptedFrontier implements the Engine interface.
-func (b *Bootstrapper) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
-	acceptedFrontier, err := b.Bootstrapable.CurrentAcceptedFrontier()
-	if err != nil {
-		return err
-	}
-	b.Sender.SendAcceptedFrontier(validatorID, requestID, acceptedFrontier)
-	return nil
-}
-
-// GetAcceptedFrontierFailed implements the Engine interface.
-func (b *Bootstrapper) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
+// AcceptedFrontier implements the AcceptedFrontierHandler interface.
+func (b *bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	// ignores any late responses
-	if requestID != b.RequestID {
-		b.Ctx.Log.Debug("Received an Out-of-Sync GetAcceptedFrontierFailed - validator: %v - expectedRequestID: %v, requestID: %v",
-			validatorID,
-			b.RequestID,
-			requestID)
-		return nil
-	}
-
-	// If we can't get a response from [validatorID], act as though they said their accepted frontier is empty
-	// and we add the validator to the failed list
-	b.failedAcceptedFrontier.Add(validatorID)
-	return b.AcceptedFrontier(validatorID, requestID, nil)
-}
-
-// AcceptedFrontier implements the Engine interface.
-func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	// ignores any late responses
-	if requestID != b.RequestID {
+	if requestID != b.Config.SharedCfg.RequestID {
 		b.Ctx.Log.Debug("Received an Out-of-Sync AcceptedFrontier - validator: %v - expectedRequestID: %v, requestID: %v",
 			validatorID,
-			b.RequestID,
+			b.Config.SharedCfg.RequestID,
 			requestID)
 		return nil
 	}
@@ -172,43 +143,37 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 			"bootstrap attempt: %d", b.failedAcceptedFrontier.Len(), b.bootstrapAttempts)
 	}
 
-	b.RequestID++
+	b.Config.SharedCfg.RequestID++
 	b.acceptedFrontier = b.acceptedFrontierSet.List()
 
 	b.sendGetAccepted()
 	return nil
 }
 
-// GetAccepted implements the Engine interface.
-func (b *Bootstrapper) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	b.Sender.SendAccepted(validatorID, requestID, b.Bootstrapable.FilterAccepted(containerIDs))
-	return nil
-}
-
-// GetAcceptedFailed implements the Engine interface.
-func (b *Bootstrapper) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
+// GetAcceptedFrontierFailed implements the AcceptedFrontierHandler interface.
+func (b *bootstrapper) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
 	// ignores any late responses
-	if requestID != b.RequestID {
-		b.Ctx.Log.Debug("Received an Out-of-Sync GetAcceptedFailed - validator: %v - expectedRequestID: %v, requestID: %v",
+	if requestID != b.Config.SharedCfg.RequestID {
+		b.Ctx.Log.Debug("Received an Out-of-Sync GetAcceptedFrontierFailed - validator: %v - expectedRequestID: %v, requestID: %v",
 			validatorID,
-			b.RequestID,
+			b.Config.SharedCfg.RequestID,
 			requestID)
 		return nil
 	}
 
-	// If we can't get a response from [validatorID], act as though they said
-	// that they think none of the containers we sent them in GetAccepted are accepted
-	b.failedAccepted.Add(validatorID)
-	return b.Accepted(validatorID, requestID, nil)
+	// If we can't get a response from [validatorID], act as though they said their accepted frontier is empty
+	// and we add the validator to the failed list
+	b.failedAcceptedFrontier.Add(validatorID)
+	return b.AcceptedFrontier(validatorID, requestID, nil)
 }
 
-// Accepted implements the Engine interface.
-func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+// Accepted implements the AcceptedHandler interface.
+func (b *bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	// ignores any late responses
-	if requestID != b.RequestID {
+	if requestID != b.Config.SharedCfg.RequestID {
 		b.Ctx.Log.Debug("Received an Out-of-Sync Accepted - validator: %v - expectedRequestID: %v, requestID: %v",
 			validatorID,
-			b.RequestID,
+			b.Config.SharedCfg.RequestID,
 			requestID)
 		return nil
 	}
@@ -268,7 +233,7 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 		}
 	}
 
-	if !b.Restarted {
+	if !b.Config.SharedCfg.Restarted {
 		b.Ctx.Log.Info("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
 	} else {
 		b.Ctx.Log.Debug("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
@@ -277,61 +242,36 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 	return b.Bootstrapable.ForceAccepted(accepted)
 }
 
-// Connected implements the Engine interface.
-func (b *Bootstrapper) Connected(nodeID ids.ShortID) error {
-	if b.started {
+// GetAcceptedFailed implements the AcceptedHandler interface.
+func (b *bootstrapper) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
+	// ignores any late responses
+	if requestID != b.Config.SharedCfg.RequestID {
+		b.Ctx.Log.Debug("Received an Out-of-Sync GetAcceptedFailed - validator: %v - expectedRequestID: %v, requestID: %v",
+			validatorID,
+			b.Config.SharedCfg.RequestID,
+			requestID)
 		return nil
 	}
-	weight, ok := b.Beacons.GetWeight(nodeID)
-	if !ok {
+
+	// If we can't get a response from [validatorID], act as though they said
+	// that they think none of the containers we sent them in GetAccepted are accepted
+	b.failedAccepted.Add(validatorID)
+	return b.Accepted(validatorID, requestID, nil)
+}
+
+func (b *bootstrapper) Start(startReqID uint32) error {
+	b.Ctx.Log.Info("Starting bootstrap...")
+	b.Ctx.SetState(snow.Bootstrapping)
+	b.Config.SharedCfg.RequestID = startReqID
+
+	if b.Config.StartupAlpha > 0 {
 		return nil
 	}
-	weight, err := math.Add64(weight, b.weight)
-	if err != nil {
-		return err
-	}
-	b.weight = weight
-	if b.weight < b.StartupAlpha {
-		return nil
-	}
-	return b.startup()
+
+	return b.Startup()
 }
 
-// Disconnected implements the Engine interface.
-func (b *Bootstrapper) Disconnected(nodeID ids.ShortID) error {
-	if weight, ok := b.Beacons.GetWeight(nodeID); ok {
-		// TODO: Account for weight changes in a more robust manner.
-
-		// Sub64 should rarely error since only validators that have added their
-		// weight can become disconnected. Because it is possible that there are
-		// changes to the validators set, we utilize that Sub64 returns 0 on
-		// error.
-		b.weight, _ = math.Sub64(b.weight, weight)
-	}
-	return nil
-}
-
-func (b *Bootstrapper) RestartBootstrap(reset bool) error {
-	// resets the attempts when we're pulling blocks/vertices we don't want to
-	// fail the bootstrap at that stage
-	if reset {
-		b.Ctx.Log.Debug("Checking for new frontiers")
-
-		b.Restarted = true
-		b.bootstrapAttempts = 0
-	}
-
-	if b.bootstrapAttempts > 0 && b.bootstrapAttempts%b.RetryBootstrapWarnFrequency == 0 {
-		b.Ctx.Log.Debug("continuing to attempt to bootstrap after %d failed attempts. Is this node connected to the internet?",
-			b.bootstrapAttempts)
-	}
-
-	return b.startup()
-}
-
-func (b *Bootstrapper) startup() error {
-	b.started = true
-
+func (b *bootstrapper) Startup() error {
 	beacons, err := b.Beacons.Sample(b.Config.SampleK)
 	if err != nil {
 		return err
@@ -369,14 +309,32 @@ func (b *Bootstrapper) startup() error {
 		return b.Bootstrapable.ForceAccepted(nil)
 	}
 
-	b.RequestID++
+	b.Config.SharedCfg.RequestID++
 	b.sendGetAcceptedFrontiers()
 	return nil
 }
 
+func (b *bootstrapper) RestartBootstrap(reset bool) error {
+	// resets the attempts when we're pulling blocks/vertices we don't want to
+	// fail the bootstrap at that stage
+	if reset {
+		b.Ctx.Log.Debug("Checking for new frontiers")
+
+		b.Config.SharedCfg.Restarted = true
+		b.bootstrapAttempts = 0
+	}
+
+	if b.bootstrapAttempts > 0 && b.bootstrapAttempts%b.RetryBootstrapWarnFrequency == 0 {
+		b.Ctx.Log.Debug("continuing to attempt to bootstrap after %d failed attempts. Is this node connected to the internet?",
+			b.bootstrapAttempts)
+	}
+
+	return b.Startup()
+}
+
 // Ask up to [MaxOutstandingBootstrapRequests] bootstrap validators to send
 // their accepted frontier with the current accepted frontier
-func (b *Bootstrapper) sendGetAcceptedFrontiers() {
+func (b *bootstrapper) sendGetAcceptedFrontiers() {
 	vdrs := ids.NewShortSet(1)
 	for b.pendingSendAcceptedFrontier.Len() > 0 && b.pendingReceiveAcceptedFrontier.Len() < MaxOutstandingBootstrapRequests {
 		vdr, _ := b.pendingSendAcceptedFrontier.Pop()
@@ -387,13 +345,13 @@ func (b *Bootstrapper) sendGetAcceptedFrontiers() {
 	}
 
 	if vdrs.Len() > 0 {
-		b.Sender.SendGetAcceptedFrontier(vdrs, b.RequestID)
+		b.Sender.SendGetAcceptedFrontier(vdrs, b.Config.SharedCfg.RequestID)
 	}
 }
 
 // Ask up to [MaxOutstandingBootstrapRequests] bootstrap validators to send
 // their filtered accepted frontier
-func (b *Bootstrapper) sendGetAccepted() {
+func (b *bootstrapper) sendGetAccepted() {
 	vdrs := ids.NewShortSet(1)
 	for b.pendingSendAccepted.Len() > 0 && b.pendingReceiveAccepted.Len() < MaxOutstandingBootstrapRequests {
 		vdr, _ := b.pendingSendAccepted.Pop()
@@ -408,6 +366,6 @@ func (b *Bootstrapper) sendGetAccepted() {
 			vdrs.Len(),
 			b.pendingSendAccepted.Len(),
 		)
-		b.Sender.SendGetAccepted(vdrs, b.RequestID, b.acceptedFrontier)
+		b.Sender.SendGetAccepted(vdrs, b.Config.SharedCfg.RequestID, b.acceptedFrontier)
 	}
 }

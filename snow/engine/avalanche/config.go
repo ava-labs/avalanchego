@@ -4,13 +4,21 @@
 package avalanche
 
 import (
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
-	"github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 // Config wraps all the parameters needed for an avalanche engine
 type Config struct {
-	bootstrap.Config
+	Ctx *snow.ConsensusContext
+	common.AllGetsServer
+	VM         vertex.DAGVM
+	Manager    vertex.Manager
+	Sender     common.Sender
+	Validators validators.Set
 
 	Params    avalanche.Parameters
 	Consensus avalanche.Consensus
