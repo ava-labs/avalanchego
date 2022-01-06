@@ -1249,9 +1249,6 @@ func (bc *BlockChain) recoverAncestors(target *types.Block) error {
 			log.Debug("Abort during blocks iteration")
 			return errInsertionInterrupted
 		}
-		if len(hashes)%500 == 0 {
-			log.Debug("recovering ancestors fetched %d block hashes to re-process", len(hashes))
-		}
 	}
 	if parent == nil {
 		return errors.New("missing parent")
