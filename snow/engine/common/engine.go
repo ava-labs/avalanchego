@@ -6,7 +6,7 @@ package common
 import (
 	"time"
 
-	"github.com/ava-labs/avalanchego/health"
+	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -27,7 +27,7 @@ type Engine interface {
 
 	// Returns nil if the engine is healthy.
 	// Periodically called and reported through the health API
-	health.Checkable
+	health.Checker
 
 	// GetVM returns this engine's VM
 	GetVM() VM
@@ -185,7 +185,7 @@ type AncestorsHandler interface {
 	// It is not safe to assume this message is in response to a GetAncestor
 	// message, that this message has a unique requestID or that any of the
 	// containers in [containers] are valid.
-	MultiPut(
+	Ancestors(
 		validatorID ids.ShortID,
 		requestID uint32,
 		containers [][]byte,
@@ -232,7 +232,6 @@ type PutHandler interface {
 	Put(
 		validatorID ids.ShortID,
 		requestID uint32,
-		containerID ids.ID,
 		container []byte,
 	) error
 
@@ -284,7 +283,6 @@ type QueryHandler interface {
 	PushQuery(
 		validatorID ids.ShortID,
 		requestID uint32,
-		containerID ids.ID,
 		container []byte,
 	) error
 }

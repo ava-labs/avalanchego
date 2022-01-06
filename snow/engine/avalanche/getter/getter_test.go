@@ -37,17 +37,17 @@ func testSetup(t *testing.T) (*vertex.TestManager, common.Config) {
 	}
 
 	commonConfig := common.Config{
-		Ctx:                           snow.DefaultConsensusContextTest(),
-		Validators:                    peers,
-		Beacons:                       peers,
-		SampleK:                       peers.Len(),
-		Alpha:                         peers.Weight()/2 + 1,
-		Sender:                        sender,
-		Subnet:                        subnet,
-		Timer:                         &common.TimerTest{},
-		MultiputMaxContainersSent:     2000,
-		MultiputMaxContainersReceived: 2000,
-		SharedCfg:                     &common.SharedConfig{},
+		Ctx:                            snow.DefaultConsensusContextTest(),
+		Validators:                     peers,
+		Beacons:                        peers,
+		SampleK:                        peers.Len(),
+		Alpha:                          peers.Weight()/2 + 1,
+		Sender:                         sender,
+		Subnet:                         subnet,
+		Timer:                          &common.TimerTest{},
+		AncestorsMaxContainersSent:     2000,
+		AncestorsMaxContainersReceived: 2000,
+		SharedCfg:                      &common.SharedConfig{},
 	}
 
 	manager := vertex.NewTestManager(t)

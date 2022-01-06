@@ -92,12 +92,12 @@ func newTransitive(config Config) (*Transitive, error) {
 }
 
 // Put implements the PutHandler interface
-func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
+func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkBytes []byte) error {
 	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "Put received by Engine during Bootstrap")
 
 	blk, err := t.VM.ParseBlock(blkBytes)
 	if err != nil {
-		t.Ctx.Log.Debug("failed to parse block %s: %s", blkID, err)
+		t.Ctx.Log.Debug("failed to parse block: %s", err)
 		t.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes(blkBytes))
 		// because GetFailed doesn't utilize the assumption that we actually
 		// sent a Get message, we can safely call GetFailed here to potentially
@@ -166,14 +166,14 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) 
 }
 
 // PushQuery implements the QueryHandler interface
-func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
+func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkBytes []byte) error {
 	// if the engine hasn't been bootstrapped, we aren't ready to respond to queries
 	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "PushQuery received by Engine during Bootstrap")
 
 	blk, err := t.VM.ParseBlock(blkBytes)
 	// If parsing fails, we just drop the request, as we didn't ask for it
 	if err != nil {
-		t.Ctx.Log.Debug("failed to parse block %s: %s", blkID, err)
+		t.Ctx.Log.Debug("failed to parse block: %s", err)
 		t.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes(blkBytes))
 		return nil
 	}

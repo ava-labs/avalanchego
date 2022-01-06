@@ -62,7 +62,7 @@ func (gh *getter) GetAncestors(validatorID ids.ShortID, requestID uint32, blkID 
 	ancestorsBytes, err := block.GetAncestors(
 		gh.vm,
 		blkID,
-		gh.cfg.MultiputMaxContainersSent,
+		gh.cfg.AncestorsMaxContainersSent,
 		constants.MaxContainersLen,
 		gh.cfg.MaxTimeGetAncestors,
 	)
@@ -73,7 +73,7 @@ func (gh *getter) GetAncestors(validatorID ids.ShortID, requestID uint32, blkID 
 	}
 
 	gh.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
-	gh.sender.SendMultiPut(validatorID, requestID, ancestorsBytes)
+	gh.sender.SendAncestors(validatorID, requestID, ancestorsBytes)
 	return nil
 }
 

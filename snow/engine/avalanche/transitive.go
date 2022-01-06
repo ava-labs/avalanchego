@@ -95,13 +95,13 @@ func newTransitive(config Config) (*Transitive, error) {
 }
 
 // Put implements the PutHandler interface
-func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) error {
-	t.Ctx.Log.Verbo("Put(%s, %d, %s) called", vdr, requestID, vtxID)
+func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxBytes []byte) error {
+	t.Ctx.Log.Verbo("Put(%s, %d) called", vdr, requestID)
 	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "Put received by Engine during Bootstrap")
 
 	vtx, err := t.Manager.ParseVtx(vtxBytes)
 	if err != nil {
-		t.Ctx.Log.Debug("failed to parse vertex %s due to: %s", vtxID, err)
+		t.Ctx.Log.Debug("failed to parse vertex due to: %s", err)
 		t.Ctx.Log.Verbo("vertex:\n%s", formatting.DumpBytes(vtxBytes))
 		return t.GetFailed(vdr, requestID)
 	}
@@ -171,13 +171,13 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID) 
 }
 
 // PushQuery implements the QueryHandler interface
-func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) error {
+func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxBytes []byte) error {
 	// We're bootstrapping, so ignore this query.
 	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "PushQuery received by Engine during Bootstrap")
 
 	vtx, err := t.Manager.ParseVtx(vtxBytes)
 	if err != nil {
-		t.Ctx.Log.Debug("failed to parse vertex %s due to: %s", vtxID, err)
+		t.Ctx.Log.Debug("failed to parse vertex due to: %s", err)
 		t.Ctx.Log.Verbo("vertex:\n%s", formatting.DumpBytes(vtxBytes))
 		return nil
 	}

@@ -142,7 +142,7 @@ func TestEngineAdd(t *testing.T) {
 		return vtx, nil
 	}
 
-	if err := te.Put(vdr, 0, vtx.ID(), vtx.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, vtx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -158,7 +158,7 @@ func TestEngineAdd(t *testing.T) {
 
 	manager.ParseVtxF = func(b []byte) (avalanche.Vertex, error) { return nil, errFailedParsing }
 
-	if err := te.Put(vdr, *reqID, vtx.ParentsV[0].ID(), nil); err != nil {
+	if err := te.Put(vdr, *reqID, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -325,7 +325,7 @@ func TestEngineQuery(t *testing.T) {
 
 	// Once the peer returns [vtx0], we will respond to its query and then issue
 	// our own push query for [vtx0].
-	if err := te.Put(vdr, 0, vtx0.ID(), vtx0.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, vtx0.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 	manager.ParseVtxF = nil
@@ -426,7 +426,7 @@ func TestEngineQuery(t *testing.T) {
 	// Once the peer returns [vtx1], the poll that was issued for [vtx0] will be
 	// able to terminate. Additionally the node will issue a push query with
 	// [vtx1].
-	if err := te.Put(vdr, 0, vtx1.ID(), vtx1.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, vtx1.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 	manager.ParseVtxF = nil
@@ -1390,7 +1390,7 @@ func TestEngineReissue(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := te.Put(vdr, 0, vtx.ID(), vtx.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, vtx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 	manager.ParseVtxF = nil
@@ -1760,7 +1760,7 @@ func TestEnginePushGossip(t *testing.T) {
 
 	sender.CantSendPushQuery = false
 	sender.CantSendChits = false
-	if err := te.PushQuery(vdr, 0, vtx.ID(), vtx.Bytes()); err != nil {
+	if err := te.PushQuery(vdr, 0, vtx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2065,7 +2065,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	if err := te.PushQuery(vdr, 0, blockingVtx.ID(), blockingVtx.Bytes()); err != nil {
+	if err := te.PushQuery(vdr, 0, blockingVtx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2535,7 +2535,7 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 		panic("Unknown bytes provided")
 	}
 
-	if err := te.PushQuery(vdr, 0, vtxID1, vtx1.Bytes()); err != nil {
+	if err := te.PushQuery(vdr, 0, vtx1.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2777,7 +2777,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		panic("Unknown bytes provided")
 	}
 
-	if err := bootstrapper.MultiPut(vdr, *requestID, [][]byte{vtxBytes0}); err != nil {
+	if err := bootstrapper.Ancestors(vdr, *requestID, [][]byte{vtxBytes0}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2834,7 +2834,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		panic("Unknown bytes provided")
 	}
 
-	if err := te.PushQuery(vdr, 0, vtxID1, vtxBytes1); err != nil {
+	if err := te.PushQuery(vdr, 0, vtxBytes1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3223,7 +3223,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 		panic("Unknown bytes provided")
 	}
 
-	if err := bootstrapper.MultiPut(vdr, *requestID, [][]byte{vtxBytes0}); err != nil {
+	if err := bootstrapper.Ancestors(vdr, *requestID, [][]byte{vtxBytes0}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3282,7 +3282,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 		panic("Unknown bytes provided")
 	}
 
-	if err := bootstrapper.PushQuery(vdr, 0, vtxID1, vtxBytes1); err != nil {
+	if err := bootstrapper.PushQuery(vdr, 0, vtxBytes1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3658,11 +3658,11 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 		}
 	}
 
-	if err := te.PushQuery(vdr, 0, vtx1.ID(), vtx1.Bytes()); err != nil {
+	if err := te.PushQuery(vdr, 0, vtx1.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := te.Put(secondVdr, *reqID, vtx0.ID(), []byte{3}); err != nil {
+	if err := te.Put(secondVdr, *reqID, []byte{3}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3690,7 +3690,7 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 
 	vtx0.StatusV = choices.Processing
 
-	if err := te.Put(vdr, *reqID, vtx0.ID(), vtx0.Bytes()); err != nil {
+	if err := te.Put(vdr, *reqID, vtx0.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3767,8 +3767,6 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 		BytesV:   []byte{2},
 	}
 
-	randomVtxID := ids.GenerateTestID()
-
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
@@ -3810,14 +3808,14 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 		}
 	}
 
-	if err := te.PushQuery(vdr, 0, vtx1.ID(), vtx1.Bytes()); err != nil {
+	if err := te.PushQuery(vdr, 0, vtx1.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
 	sender.SendGetF = nil
 	sender.CantSendGet = false
 
-	if err := te.PushQuery(vdr, *reqID, randomVtxID, []byte{3}); err != nil {
+	if err := te.PushQuery(vdr, *reqID, []byte{3}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3845,7 +3843,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 
 	vtx0.StatusV = choices.Processing
 
-	if err := te.Put(vdr, *reqID, vtx0.ID(), vtx0.Bytes()); err != nil {
+	if err := te.Put(vdr, *reqID, vtx0.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3962,7 +3960,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	vm.CantPendingTxs = false
 
-	if err := te.Put(vdr, 0, vtx.ID(), vtx.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, vtx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -4659,7 +4657,7 @@ func TestAbandonTx(t *testing.T) {
 		assert.FailNow("should have asked to parse vtx1")
 		return nil, errors.New("should have asked to parse vtx1")
 	}
-	err = te.Put(vdr, 0, vtx1.ID(), vtx1.Bytes())
+	err = te.Put(vdr, 0, vtx1.Bytes())
 	assert.NoError(err)
 
 	// Verify that vtx1 is waiting to be issued.
@@ -4676,7 +4674,7 @@ func TestAbandonTx(t *testing.T) {
 		return nil, errors.New("should have asked to parse vtx0")
 	}
 	sender.CantSendChits = false // Engine will respond to the PullQuerys since the vertices were abandoned
-	err = te.Put(vdr, 0, vtx0.ID(), vtx0.Bytes())
+	err = te.Put(vdr, 0, vtx0.Bytes())
 	assert.NoError(err)
 
 	// Despite the fact that there is still an outstanding vertex request,

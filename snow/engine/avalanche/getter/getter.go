@@ -68,14 +68,14 @@ func (gh *getter) GetAncestors(validatorID ids.ShortID, requestID uint32, vtxID 
 		return nil // Don't have the requested vertex. Drop message.
 	}
 
-	queue := make([]avalanche.Vertex, 1, gh.cfg.MultiputMaxContainersSent) // for BFS
+	queue := make([]avalanche.Vertex, 1, gh.cfg.AncestorsMaxContainersSent) // for BFS
 	queue[0] = vertex
-	ancestorsBytesLen := 0                                                // length, in bytes, of vertex and its ancestors
-	ancestorsBytes := make([][]byte, 0, gh.cfg.MultiputMaxContainersSent) // vertex and its ancestors in BFS order
-	visited := ids.Set{}                                                  // IDs of vertices that have been in queue before
+	ancestorsBytesLen := 0                                                 // length, in bytes, of vertex and its ancestors
+	ancestorsBytes := make([][]byte, 0, gh.cfg.AncestorsMaxContainersSent) // vertex and its ancestors in BFS order
+	visited := ids.Set{}                                                   // IDs of vertices that have been in queue before
 	visited.Add(vertex.ID())
 
-	for len(ancestorsBytes) < gh.cfg.MultiputMaxContainersSent && len(queue) > 0 && time.Since(startTime) < gh.cfg.MaxTimeGetAncestors {
+	for len(ancestorsBytes) < gh.cfg.AncestorsMaxContainersSent && len(queue) > 0 && time.Since(startTime) < gh.cfg.MaxTimeGetAncestors {
 		var vtx avalanche.Vertex
 		vtx, queue = queue[0], queue[1:] // pop
 		vtxBytes := vtx.Bytes()
@@ -103,7 +103,7 @@ func (gh *getter) GetAncestors(validatorID ids.ShortID, requestID uint32, vtxID 
 	}
 
 	gh.getAncestorsVtxs.Observe(float64(len(ancestorsBytes)))
-	gh.sender.SendMultiPut(validatorID, requestID, ancestorsBytes)
+	gh.sender.SendAncestors(validatorID, requestID, ancestorsBytes)
 	return nil
 }
 

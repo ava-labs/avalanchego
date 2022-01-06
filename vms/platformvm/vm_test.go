@@ -2064,17 +2064,17 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	// The engine handles consensus
 	consensus := &smcon.Topological{}
 	commonCfg := common.Config{
-		Ctx:                           consensusCtx,
-		Validators:                    vdrs,
-		Beacons:                       beacons,
-		SampleK:                       beacons.Len(),
-		StartupAlpha:                  (beacons.Weight() + 1) / 2,
-		Alpha:                         (beacons.Weight() + 1) / 2,
-		Sender:                        &sender,
-		Subnet:                        subnet,
-		MultiputMaxContainersSent:     2000,
-		MultiputMaxContainersReceived: 2000,
-		SharedCfg:                     &common.SharedConfig{},
+		Ctx:                            consensusCtx,
+		Validators:                     vdrs,
+		Beacons:                        beacons,
+		SampleK:                        beacons.Len(),
+		StartupAlpha:                   (beacons.Weight() + 1) / 2,
+		Alpha:                          (beacons.Weight() + 1) / 2,
+		Sender:                         &sender,
+		Subnet:                         subnet,
+		AncestorsMaxContainersSent:     2000,
+		AncestorsMaxContainersReceived: 2000,
+		SharedCfg:                      &common.SharedConfig{},
 	}
 
 	snowGetHandler, err := snowgetter.New(vm, commonCfg)
@@ -2187,7 +2187,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	externalSender.SendF = nil
 	externalSender.CantSend = false
 
-	if err := bootstrapper.MultiPut(peerID, reqID, [][]byte{advanceTimeBlkBytes}); err != nil {
+	if err := bootstrapper.Ancestors(peerID, reqID, [][]byte{advanceTimeBlkBytes}); err != nil {
 		t.Fatal(err)
 	}
 

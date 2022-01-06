@@ -53,8 +53,8 @@ type NoOpAncestorsHandler struct {
 	Log logging.Logger
 }
 
-func (nop *NoOpAncestorsHandler) MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) error {
-	nop.Log.Debug("MultiPut(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+func (nop *NoOpAncestorsHandler) Ancestors(validatorID ids.ShortID, requestID uint32, containers [][]byte) error {
+	nop.Log.Debug("Ancestors(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
 
@@ -67,11 +67,11 @@ type NoOpPutHandler struct {
 	Log logging.Logger
 }
 
-func (nop *NoOpPutHandler) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
+func (nop *NoOpPutHandler) Put(vdr ids.ShortID, requestID uint32, blkBytes []byte) error {
 	if requestID == constants.GossipMsgRequestID {
-		nop.Log.Verbo("Gossip Put(%s, %d, %s) unhandled by this gear. Dropped.", vdr, requestID, blkID)
+		nop.Log.Verbo("Gossip Put(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
 	} else {
-		nop.Log.Debug("Put(%s, %d, %s) unhandled by this gear. Dropped.", vdr, requestID, blkID)
+		nop.Log.Debug("Put(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
 	}
 	return nil
 }
@@ -90,8 +90,8 @@ func (nop *NoOpQueryHandler) PullQuery(vdr ids.ShortID, requestID uint32, blkID 
 	return nil
 }
 
-func (nop *NoOpQueryHandler) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
-	nop.Log.Debug("PushQuery(%s, %d, %s) unhandled by this gear. Dropped.", vdr, requestID, blkID)
+func (nop *NoOpQueryHandler) PushQuery(vdr ids.ShortID, requestID uint32, blkBytes []byte) error {
+	nop.Log.Debug("PushQuery(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
 	return nil
 }
 

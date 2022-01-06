@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/index"
+	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -666,17 +667,15 @@ func (vm *VM) LoadUser(
 	*secp256k1fx.Keychain,
 	error,
 ) {
-	db, err := vm.ctx.Keystore.GetDatabase(username, password)
+	user, err := keystore.NewUserFromKeystore(vm.ctx.Keystore, username, password)
 	if err != nil {
-		return nil, nil, fmt.Errorf("problem retrieving user: %w", err)
+		return nil, nil, err
 	}
 	// Drop any potential error closing the database to report the original
 	// error
-	defer db.Close()
+	defer user.Close()
 
-	user := userState{vm: vm}
-
-	kc, err := user.Keychain(db, addrsToUse)
+	kc, err := keystore.GetKeychain(user, addrsToUse)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -686,7 +685,7 @@ func (vm *VM) LoadUser(
 		return nil, nil, fmt.Errorf("problem retrieving user's UTXOs: %w", err)
 	}
 
-	return utxos, kc, db.Close()
+	return utxos, kc, user.Close()
 }
 
 func (vm *VM) Spend(
