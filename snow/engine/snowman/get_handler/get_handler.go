@@ -47,7 +47,7 @@ type Handler struct {
 }
 
 func (bh Handler) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
-	acceptedFrontier, err := bh.CurrentAcceptedFrontier()
+	acceptedFrontier, err := bh.currentAcceptedFrontier()
 	if err != nil {
 		return err
 	}
@@ -56,7 +56,7 @@ func (bh Handler) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32)
 }
 
 func (bh Handler) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	bh.sender.SendAccepted(validatorID, requestID, bh.FilterAccepted(containerIDs))
+	bh.sender.SendAccepted(validatorID, requestID, bh.filterAccepted(containerIDs))
 	return nil
 }
 
@@ -94,17 +94,17 @@ func (bh Handler) Get(validatorID ids.ShortID, requestID uint32, blkID ids.ID) e
 	return nil
 }
 
-// CurrentAcceptedFrontier returns the set of containerIDs that are accepted,
+// currentAcceptedFrontier returns the set of containerIDs that are accepted,
 // but have no accepted children.
-// CurrentAcceptedFrontier returns the last accepted block
-func (bh Handler) CurrentAcceptedFrontier() ([]ids.ID, error) {
+// currentAcceptedFrontier returns the last accepted block
+func (bh Handler) currentAcceptedFrontier() ([]ids.ID, error) {
 	lastAccepted, err := bh.vm.LastAccepted()
 	return []ids.ID{lastAccepted}, err
 }
 
-// FilterAccepted returns the subset of containerIDs that are accepted by this chain.
-// FilterAccepted returns the blocks in [containerIDs] that we have accepted
-func (bh Handler) FilterAccepted(containerIDs []ids.ID) []ids.ID {
+// filterAccepted returns the subset of containerIDs that are accepted by this chain.
+// filterAccepted returns the blocks in [containerIDs] that we have accepted
+func (bh Handler) filterAccepted(containerIDs []ids.ID) []ids.ID {
 	acceptedIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, blkID := range containerIDs {
 		if blk, err := bh.vm.GetBlock(blkID); err == nil && blk.Status() == choices.Accepted {

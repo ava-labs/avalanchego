@@ -50,16 +50,13 @@ type Handler struct {
 }
 
 func (bh Handler) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
-	acceptedFrontier, err := bh.CurrentAcceptedFrontier()
-	if err != nil {
-		return err
-	}
+	acceptedFrontier := bh.currentAcceptedFrontier()
 	bh.sender.SendAcceptedFrontier(validatorID, requestID, acceptedFrontier)
 	return nil
 }
 
 func (bh Handler) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	bh.sender.SendAccepted(validatorID, requestID, bh.FilterAccepted(containerIDs))
+	bh.sender.SendAccepted(validatorID, requestID, bh.filterAccepted(containerIDs))
 	return nil
 }
 
@@ -119,15 +116,15 @@ func (bh Handler) Get(validatorID ids.ShortID, requestID uint32, vtxID ids.ID) e
 	return nil
 }
 
-// CurrentAcceptedFrontier returns the set of vertices that this node has accepted
+// currentAcceptedFrontier returns the set of vertices that this node has accepted
 // that have no accepted children
-func (bh Handler) CurrentAcceptedFrontier() ([]ids.ID, error) {
-	return bh.manager.Edge(), nil
+func (bh Handler) currentAcceptedFrontier() []ids.ID {
+	return bh.manager.Edge()
 }
 
-// FilterAccepted returns the subset of containerIDs that are accepted by this chain.
-// FilterAccepted returns the IDs of vertices in [containerIDs] that this node has accepted
-func (bh Handler) FilterAccepted(containerIDs []ids.ID) []ids.ID {
+// filterAccepted returns the subset of containerIDs that are accepted by this chain.
+// filterAccepted returns the IDs of vertices in [containerIDs] that this node has accepted
+func (bh Handler) filterAccepted(containerIDs []ids.ID) []ids.ID {
 	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, vtxID := range containerIDs {
 		if vtx, err := bh.manager.GetVtx(vtxID); err == nil && vtx.Status() == choices.Accepted {
