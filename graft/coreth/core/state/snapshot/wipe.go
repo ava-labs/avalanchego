@@ -40,9 +40,6 @@ import (
 // and delete all the data associated with the snapshot (accounts, storage,
 // metadata). After all is done, the snapshot range of the database is compacted
 // to free up unused data blocks.
-// TODO: this is removed? Do we want to stop supporting this (assuming they
-// felt it was now stable enough, however, we had a snapshot rewrite occur on
-// one API node)?
 func wipeSnapshot(db ethdb.KeyValueStore, full bool) chan struct{} {
 	// Wipe the snapshot root marker synchronously
 	if full {
