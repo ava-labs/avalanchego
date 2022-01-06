@@ -49,6 +49,7 @@ import (
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
+	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 )
 
 var (
@@ -2076,8 +2077,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		SharedCfg:                     &common.SharedConfig{},
 	}
 
+	snowGetHandler, err := snowgetter.New(vm, commonCfg)
+	assert.NoError(t, err)
+
 	bootstrapConfig := bootstrap.Config{
 		Config:        commonCfg,
+		AllGetsServer: snowGetHandler,
 		Blocked:       blocked,
 		VM:            vm,
 		WeightTracker: common.NewWeightTracker(commonCfg.Beacons, commonCfg.StartupAlpha),
@@ -2102,10 +2107,11 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	handler.RegisterBootstrap(bootstrapper)
 
 	engineConfig := smeng.Config{
-		Ctx:        bootstrapConfig.Ctx,
-		VM:         bootstrapConfig.VM,
-		Sender:     bootstrapConfig.Sender,
-		Validators: vdrs,
+		Ctx:           bootstrapConfig.Ctx,
+		AllGetsServer: snowGetHandler,
+		VM:            bootstrapConfig.VM,
+		Sender:        bootstrapConfig.Sender,
+		Validators:    vdrs,
 		Params: snowball.Parameters{
 			K:                     1,
 			Alpha:                 1,

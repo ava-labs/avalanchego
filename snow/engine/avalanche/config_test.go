@@ -15,12 +15,14 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 )
 
-func DefaultConfig() (bootstrap.Config, Config) {
+func DefaultConfig() (common.Config, bootstrap.Config, Config) {
 	vtxBlocked, _ := queue.NewWithMissing(memdb.New(), "", prometheus.NewRegistry())
 	txBlocked, _ := queue.New(memdb.New(), "", prometheus.NewRegistry())
 
+	commonCfg := common.DefaultConfigTest()
+
 	bootstrapConfig := bootstrap.Config{
-		Config:     common.DefaultConfigTest(),
+		Config:     commonCfg,
 		VtxBlocked: vtxBlocked,
 		TxBlocked:  txBlocked,
 		Manager:    &vertex.TestManager{},
@@ -50,5 +52,5 @@ func DefaultConfig() (bootstrap.Config, Config) {
 		Consensus: &avalanche.Topological{},
 	}
 
-	return bootstrapConfig, engineConfig
+	return commonCfg, bootstrapConfig, engineConfig
 }

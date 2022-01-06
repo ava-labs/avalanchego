@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	avagetter "github.com/ava-labs/avalanchego/snow/engine/avalanche/getter"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
@@ -77,8 +78,14 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 		SharedCfg:                     &common.SharedConfig{},
 	}
 
+	avaGetHandler, err := avagetter.New(manager, commonConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	return Config{
 		Config:        commonConfig,
+		AllGetsServer: avaGetHandler,
 		VtxBlocked:    vtxBlocker,
 		TxBlocked:     txBlocker,
 		Manager:       manager,
@@ -626,114 +633,6 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 	}
 	if vtx1.Status() != choices.Processing { // can't accept because we don't have tx1 accepted
 		t.Fatalf("Vertex should be processing")
-	}
-}
-
-func TestBootstrapperAcceptedFrontier(t *testing.T) {
-	config, _, _, manager, _ := newConfig(t)
-
-	vtxID0 := ids.GenerateTestID()
-	vtxID1 := ids.GenerateTestID()
-	vtxID2 := ids.GenerateTestID()
-
-	bs, err := New(
-		config,
-		nil,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	startReqID := uint32(0)
-	if err := bs.Start(startReqID); err != nil {
-		t.Fatal(err)
-	}
-
-	manager.EdgeF = func() []ids.ID {
-		return []ids.ID{
-			vtxID0,
-			vtxID1,
-		}
-	}
-
-	accepted, err := bs.CurrentAcceptedFrontier()
-	if err != nil {
-		t.Fatal(err)
-	}
-	acceptedSet := ids.Set{}
-	acceptedSet.Add(accepted...)
-
-	manager.EdgeF = nil
-
-	if !acceptedSet.Contains(vtxID0) {
-		t.Fatalf("Vtx should be accepted")
-	}
-	if !acceptedSet.Contains(vtxID1) {
-		t.Fatalf("Vtx should be accepted")
-	}
-	if acceptedSet.Contains(vtxID2) {
-		t.Fatalf("Vtx shouldn't be accepted")
-	}
-}
-
-func TestBootstrapperFilterAccepted(t *testing.T) {
-	config, _, _, manager, _ := newConfig(t)
-
-	vtxID0 := ids.GenerateTestID()
-	vtxID1 := ids.GenerateTestID()
-	vtxID2 := ids.GenerateTestID()
-
-	vtx0 := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
-		IDV:     vtxID0,
-		StatusV: choices.Accepted,
-	}}
-	vtx1 := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
-		IDV:     vtxID1,
-		StatusV: choices.Accepted,
-	}}
-
-	bs, err := New(
-		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	startReqID := uint32(0)
-	if err := bs.Start(startReqID); err != nil {
-		t.Fatal(err)
-	}
-
-	vtxIDs := []ids.ID{vtxID0, vtxID1, vtxID2}
-
-	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
-		switch vtxID {
-		case vtxID0:
-			return vtx0, nil
-		case vtxID1:
-			return vtx1, nil
-		case vtxID2:
-			return nil, errUnknownVertex
-		}
-		t.Fatal(errUnknownVertex)
-		return nil, errUnknownVertex
-	}
-
-	accepted := bs.FilterAccepted(vtxIDs)
-	acceptedSet := ids.Set{}
-	acceptedSet.Add(accepted...)
-
-	manager.GetVtxF = nil
-
-	if !acceptedSet.Contains(vtxID0) {
-		t.Fatalf("Vtx should be accepted")
-	}
-	if !acceptedSet.Contains(vtxID1) {
-		t.Fatalf("Vtx should be accepted")
-	}
-	if acceptedSet.Contains(vtxID2) {
-		t.Fatalf("Vtx shouldn't be accepted")
 	}
 }
 

@@ -14,7 +14,8 @@ import (
 
 // Config wraps all the parameters needed for a snowman engine
 type Config struct {
-	Ctx        *snow.ConsensusContext
+	Ctx *snow.ConsensusContext
+	common.AllGetsServer
 	VM         block.ChainVM
 	Sender     common.Sender
 	Validators validators.Set

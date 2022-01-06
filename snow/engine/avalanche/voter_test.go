@@ -14,7 +14,7 @@ import (
 )
 
 func TestVotingFinishesWithAbandonedDep(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 	mngr := vertex.NewTestManager(t)
 	bootCfg.Manager = mngr
 	engCfg.Manager = mngr
@@ -106,7 +106,7 @@ func TestVotingFinishesWithAbandonedDep(t *testing.T) {
 }
 
 func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 	mngr := vertex.NewTestManager(t)
 	bootCfg.Manager = mngr
 	engCfg.Manager = mngr
@@ -241,7 +241,7 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 }
 
 func TestSharedDependency(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 	mngr := vertex.NewTestManager(t)
 	bootCfg.Manager = mngr
 	engCfg.Manager = mngr

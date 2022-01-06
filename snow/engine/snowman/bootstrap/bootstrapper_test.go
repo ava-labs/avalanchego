@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
@@ -67,8 +68,15 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 		MultiputMaxContainersReceived: 2000,
 		SharedCfg:                     &common.SharedConfig{},
 	}
+
+	snowGetHandler, err := snowgetter.New(vm, commonConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	return Config{
 		Config:        commonConfig,
+		AllGetsServer: snowGetHandler,
 		Blocked:       blocker,
 		VM:            vm,
 		WeightTracker: common.NewWeightTracker(commonConfig.Beacons, commonConfig.StartupAlpha),
@@ -623,120 +631,6 @@ func TestBootstrapperMultiPut(t *testing.T) {
 		t.Fatalf("Block should be accepted")
 	case blk2.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
-	}
-}
-
-func TestBootstrapperAcceptedFrontier(t *testing.T) {
-	config, _, _, vm := newConfig(t)
-
-	blkID := ids.GenerateTestID()
-
-	dummyBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID,
-			StatusV: choices.Accepted,
-		},
-		HeightV: 0,
-		BytesV:  []byte{1, 2, 3},
-	}
-	vm.CantLastAccepted = false
-	vm.LastAcceptedF = func() (ids.ID, error) { return blkID, nil }
-	vm.GetBlockF = func(bID ids.ID) (snowman.Block, error) {
-		assert.Equal(t, blkID, bID)
-		return dummyBlk, nil
-	}
-	bs, err := New(
-		config,
-		nil,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	startReqID := uint32(0)
-	if err := bs.Start(startReqID); err != nil {
-		t.Fatal(err)
-	}
-
-	accepted, err := bs.CurrentAcceptedFrontier()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(accepted) != 1 {
-		t.Fatalf("Only one block should be accepted")
-	}
-	if accepted[0] != blkID {
-		t.Fatalf("Blk should be accepted")
-	}
-}
-
-func TestBootstrapperFilterAccepted(t *testing.T) {
-	config, _, _, vm := newConfig(t)
-
-	blkID0 := ids.GenerateTestID()
-	blkID1 := ids.GenerateTestID()
-	blkID2 := ids.GenerateTestID()
-
-	blk0 := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
-		IDV:     blkID0,
-		StatusV: choices.Accepted,
-	}}
-	blk1 := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
-		IDV:     blkID1,
-		StatusV: choices.Accepted,
-	}}
-
-	vm.CantLastAccepted = false
-	vm.LastAcceptedF = func() (ids.ID, error) { return blk1.ID(), nil }
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		assert.Equal(t, blk1.ID(), blkID)
-		return blk1, nil
-	}
-
-	bs, err := New(
-		config,
-		nil,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	startReqID := uint32(0)
-	if err := bs.Start(startReqID); err != nil {
-		t.Fatal(err)
-	}
-
-	blkIDs := []ids.ID{blkID0, blkID1, blkID2}
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case blkID0:
-			return blk0, nil
-		case blkID1:
-			return blk1, nil
-		case blkID2:
-			return nil, errUnknownBlock
-		}
-		t.Fatal(errUnknownBlock)
-		return nil, errUnknownBlock
-	}
-	vm.CantBootstrapping = false
-
-	accepted := bs.FilterAccepted(blkIDs)
-	acceptedSet := ids.Set{}
-	acceptedSet.Add(accepted...)
-
-	if acceptedSet.Len() != 2 {
-		t.Fatalf("Two blocks should be accepted")
-	}
-	if !acceptedSet.Contains(blkID0) {
-		t.Fatalf("Blk should be accepted")
-	}
-	if !acceptedSet.Contains(blkID1) {
-		t.Fatalf("Blk should be accepted")
-	}
-	if acceptedSet.Contains(blkID2) {
-		t.Fatalf("Blk shouldn't be accepted")
 	}
 }
 

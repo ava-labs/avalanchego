@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
+	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -61,6 +62,12 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 	vm.T = t
 	bootCfg.VM = vm
 	engCfg.VM = vm
+
+	snowGetHandler, err := snowgetter.New(vm, bootCfg.Config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	engCfg.AllGetsServer = snowGetHandler
 
 	vm.Default(true)
 	vm.CantSetPreference = false
