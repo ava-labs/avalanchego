@@ -11,10 +11,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-// Get requests are always served. Hence Handler, common to bootstrapper and engine
+// Get requests are always served, regardless node state (bootstrapping or normal operations).
 var _ common.AllGetsServer = &getter{}
 
 func New(vm block.ChainVM, commonCfg common.Config) (common.AllGetsServer, error) {
@@ -25,16 +24,15 @@ func New(vm block.ChainVM, commonCfg common.Config) (common.AllGetsServer, error
 		log:    commonCfg.Ctx.Log,
 	}
 
-	errs := wrappers.Errs{}
-	gh.getAncestorsBlks = metric.NewAveragerWithErrs(
+	var err error
+	gh.getAncestorsBlks, err = metric.NewAverager(
 		"bs",
 		"get_ancestors_blks",
 		"blocks fetched in a call to GetAncestors",
 		commonCfg.Ctx.Registerer,
-		&errs,
 	)
 
-	return gh, errs.Err
+	return gh, err
 }
 
 type getter struct {

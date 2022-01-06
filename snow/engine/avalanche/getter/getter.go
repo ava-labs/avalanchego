@@ -28,16 +28,15 @@ func New(manager vertex.Manager, commonCfg common.Config) (common.AllGetsServer,
 		log:     commonCfg.Ctx.Log,
 	}
 
-	errs := wrappers.Errs{}
-	gh.getAncestorsVtxs = metric.NewAveragerWithErrs(
+	var err error
+	gh.getAncestorsVtxs, err = metric.NewAverager(
 		"bs",
 		"get_ancestors_vtxs",
 		"vertices fetched in a call to GetAncestors",
 		commonCfg.Ctx.Registerer,
-		&errs,
 	)
 
-	return gh, errs.Err
+	return gh, err
 }
 
 type getter struct {
