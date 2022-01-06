@@ -11,6 +11,7 @@ import (
 
 type Config struct {
 	common.Config
+	common.AllGetsServer
 
 	// Blocked tracks operations that are blocked on blocks
 	Blocked *queue.JobsWithMissing

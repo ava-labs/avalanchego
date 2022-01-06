@@ -40,10 +40,28 @@ func NewFastSyncer(
 		})
 
 	fs := &fastSyncer{
-		FastSyncNoOps: FastSyncNoOps{
-			Ctx: cfg.Ctx,
+		Config: cfg,
+		NoOpAcceptedFrontierHandler: common.NoOpAcceptedFrontierHandler{
+			Log: cfg.Ctx.Log,
 		},
-		Config:            cfg,
+		NoOpAcceptedHandler: common.NoOpAcceptedHandler{
+			Log: cfg.Ctx.Log,
+		},
+		NoOpAncestorsHandler: common.NoOpAncestorsHandler{
+			Log: cfg.Ctx.Log,
+		},
+		NoOpPutHandler: common.NoOpPutHandler{
+			Log: cfg.Ctx.Log,
+		},
+		NoOpQueryHandler: common.NoOpQueryHandler{
+			Log: cfg.Ctx.Log,
+		},
+		NoOpChitsHandler: common.NoOpChitsHandler{
+			Log: cfg.Ctx.Log,
+		},
+		NoOpAppHandler: common.NoOpAppHandler{
+			Log: cfg.Ctx.Log,
+		},
 		gR:                gR,
 		fastSyncVM:        fsVM,
 		onDoneFastSyncing: onDoneFastSyncing,
@@ -53,8 +71,16 @@ func NewFastSyncer(
 }
 
 type fastSyncer struct {
-	FastSyncNoOps
 	Config
+
+	// list of NoOpsHandler for messages dropped by fast syncer
+	common.NoOpAcceptedFrontierHandler
+	common.NoOpAcceptedHandler
+	common.NoOpAncestorsHandler
+	common.NoOpPutHandler
+	common.NoOpQueryHandler
+	common.NoOpChitsHandler
+	common.NoOpAppHandler
 
 	gR common.GearRequester
 
@@ -518,7 +544,7 @@ func (fs *fastSyncer) requestBlk(blkID ids.ID) error {
 }
 
 // FetchHandler interface implementation
-func (fs *fastSyncer) Put(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error {
+func (fs *fastSyncer) Put(validatorID ids.ShortID, requestID uint32, container []byte) error {
 	// ignores any late responses
 	if requestID != fs.RequestID {
 		fs.Ctx.Log.Debug("Received an Out-of-Sync Put - validator: %v - expectedRequestID: %v, requestID: %v",
@@ -576,4 +602,32 @@ func (fs *fastSyncer) Disconnected(nodeID ids.ShortID) error {
 	}
 
 	return fs.WeightTracker.RemoveWeightForNode(nodeID)
+}
+
+// Gossip implements the InternalHandler interface.
+func (fs *fastSyncer) Gossip() error { return nil }
+
+// Shutdown implements the InternalHandler interface.
+func (fs *fastSyncer) Shutdown() error { return nil }
+
+// Context implements the common.Engine interface.
+func (fs *fastSyncer) Context() *snow.ConsensusContext { return fs.Config.Ctx }
+
+// IsBootstrapped implements the common.Engine interface.
+func (fs *fastSyncer) IsBootstrapped() bool { return fs.Ctx.IsBootstrapped() }
+
+// Halt implements the InternalHandler interface
+func (fs *fastSyncer) Halt() {}
+
+// Timeout implements the InternalHandler interface
+func (fs *fastSyncer) Timeout() error { return nil }
+
+// HealthCheck implements the common.Engine interface.
+func (fs *fastSyncer) HealthCheck() (interface{}, error) {
+	vmIntf, vmErr := fs.VM.HealthCheck()
+	intf := map[string]interface{}{
+		"consensus": struct{}{},
+		"vm":        vmIntf,
+	}
+	return intf, vmErr
 }

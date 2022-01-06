@@ -11,6 +11,7 @@ import (
 
 type Config struct {
 	common.Config
+	common.AllGetsServer
 
 	// VtxBlocked tracks operations that are blocked on vertices
 	VtxBlocked *queue.JobsWithMissing

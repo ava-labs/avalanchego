@@ -11,6 +11,7 @@ import (
 
 type Config struct {
 	common.Config
+	common.AllGetsServer
 	StateSyncTestingBeacons []ids.ShortID // testing beacons from which nodes fast sync without network consensus
 	VM                      block.ChainVM
 	WeightTracker           common.WeightTracker

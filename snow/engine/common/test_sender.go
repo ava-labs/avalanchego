@@ -23,7 +23,7 @@ type SenderTest struct {
 
 	CantSendGetAcceptedFrontier, CantSendAcceptedFrontier,
 	CantSendGetAccepted, CantSendAccepted,
-	CantSendGet, CantSendGetAncestors, CantSendPut, CantSendMultiPut,
+	CantSendGet, CantSendGetAncestors, CantSendPut, CantSendAncestors,
 	CantSendPullQuery, CantSendPushQuery, CantSendChits,
 	CantSendGossip,
 	CantSendAppRequest, CantSendAppResponse, CantSendAppGossip, CantSendAppGossipSpecific,
@@ -37,7 +37,7 @@ type SenderTest struct {
 	SendGetF                 func(ids.ShortID, uint32, ids.ID)
 	SendGetAncestorsF        func(ids.ShortID, uint32, ids.ID)
 	SendPutF                 func(ids.ShortID, uint32, ids.ID, []byte)
-	SendMultiPutF            func(ids.ShortID, uint32, [][]byte)
+	SendAncestorsF           func(ids.ShortID, uint32, [][]byte)
 	SendPushQueryF           func(ids.ShortSet, uint32, ids.ID, []byte)
 	SendPullQueryF           func(ids.ShortSet, uint32, ids.ID)
 	SendChitsF               func(ids.ShortID, uint32, []ids.ID)
@@ -62,7 +62,7 @@ func (s *SenderTest) Default(cant bool) {
 	s.CantSendGet = cant
 	s.CantSendGetAccepted = cant
 	s.CantSendPut = cant
-	s.CantSendMultiPut = cant
+	s.CantSendAncestors = cant
 	s.CantSendPullQuery = cant
 	s.CantSendPushQuery = cant
 	s.CantSendChits = cant
@@ -154,14 +154,14 @@ func (s *SenderTest) SendPut(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vt
 	}
 }
 
-// SendMultiPut calls SendMultiPutF if it was initialized. If it wasn't
+// SendAncestors calls SendAncestorsF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) SendMultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte) {
-	if s.SendMultiPutF != nil {
-		s.SendMultiPutF(vdr, requestID, vtxs)
-	} else if s.CantSendMultiPut && s.T != nil {
-		s.T.Fatalf("Unexpectedly called SendMultiPut")
+func (s *SenderTest) SendAncestors(vdr ids.ShortID, requestID uint32, vtxs [][]byte) {
+	if s.SendAncestorsF != nil {
+		s.SendAncestorsF(vdr, requestID, vtxs)
+	} else if s.CantSendAncestors && s.T != nil {
+		s.T.Fatalf("Unexpectedly called SendAncestors")
 	}
 }
 

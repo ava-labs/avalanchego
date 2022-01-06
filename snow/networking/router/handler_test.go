@@ -134,7 +134,10 @@ func TestHandlerClosesOnError(t *testing.T) {
 	engine.Default(false)
 	engine.ContextF = func() *snow.ConsensusContext { return ctx }
 	handler.RegisterEngine(engine)
-	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
+
+	// assume bootstrapping is ongoing so that InboundGetAcceptedFrontier
+	// should normally be handled
+	ctx.SetState(snow.Bootstrapping)
 
 	go handler.Dispatch()
 
