@@ -102,15 +102,16 @@ type UnsignedTx interface {
 type UnsignedAtomicTx interface {
 	UnsignedTx
 
-	// UTXOs this tx consumes
+	// InputUTXOs returns the UTXOs this tx consumes
 	InputUTXOs() ids.Set
 	// Verify attempts to verify that the transaction is well formed
 	Verify(ctx *snow.Context, rules params.Rules) error
 	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(vm *VM, stx *Tx, parent *Block, baseFee *big.Int, rules params.Rules) error
-
-	// Accept this transaction with the additionally provided state transitions.
-	Accept() (ids.ID, *atomic.Requests, error)
+	// AtomicOps returns the blockchainID and set of atomic requests that
+	// must be applied to shared memory for this transaction to be accepted.
+	// The set of atomic requests must be returned in a consistent order.
+	AtomicOps() (ids.ID, *atomic.Requests, error)
 
 	EVMStateTransfer(ctx *snow.Context, state *state.StateDB) error
 }
@@ -277,4 +278,31 @@ func calculateDynamicFee(cost uint64, baseFee *big.Int) (uint64, error) {
 
 func calcBytesCost(len int) uint64 {
 	return uint64(len) * TxBytesGas
+}
+
+// mergeAtomicOps merges atomic requests represented by [txs]
+// to the [output] map, depending on whether [chainID] is present in the map.
+func mergeAtomicOps(txs []*Tx) (map[ids.ID]*atomic.Requests, error) {
+	if len(txs) > 1 {
+		// txs should be stored in order of txID to ensure consistency
+		// with txs initialized from the txID index.
+		copyTxs := make([]*Tx, len(txs))
+		copy(copyTxs, txs)
+		sort.Slice(copyTxs, func(i, j int) bool { return copyTxs[i].ID().Hex() < copyTxs[j].ID().Hex() })
+		txs = copyTxs
+	}
+	output := make(map[ids.ID]*atomic.Requests)
+	for _, tx := range txs {
+		chainID, txRequest, err := tx.UnsignedAtomicTx.AtomicOps()
+		if err != nil {
+			return nil, err
+		}
+		if request, exists := output[chainID]; exists {
+			request.PutRequests = append(request.PutRequests, txRequest.PutRequests...)
+			request.RemoveRequests = append(request.RemoveRequests, txRequest.RemoveRequests...)
+		} else {
+			output[chainID] = txRequest
+		}
+	}
+	return output, nil
 }
