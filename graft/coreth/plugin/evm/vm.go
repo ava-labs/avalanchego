@@ -110,9 +110,14 @@ const (
 
 var (
 	// Set last accepted key to be longer than the keys used to store accepted block IDs.
-	lastAcceptedKey        = []byte("last_accepted_key")
-	acceptedPrefix         = []byte("snowman_accepted")
-	ethDBPrefix            = []byte("ethdb")
+	lastAcceptedKey = []byte("last_accepted_key")
+	acceptedPrefix  = []byte("snowman_accepted")
+	ethDBPrefix     = []byte("ethdb")
+
+	// Prefixes for atomic trie
+	atomicTrieDBPrefix     = []byte("atomicTrieDB")
+	atomicTrieMetaDBPrefix = []byte("atomicTrieMetaDB")
+
 	pruneRejectedBlocksKey = []byte("pruned_rejected_blocks")
 )
 
@@ -190,6 +195,9 @@ type VM struct {
 	// - txID to accepted atomic tx
 	// - block height to list of atomic txs accepted on block at that height
 	atomicTxRepository AtomicTxRepository
+	// [atomicTrie] maintains a merkle forest of [height]=>[atomic txs].
+	//  Used to state sync clients.
+	atomicTrie AtomicTrie
 
 	builder *blockBuilder
 
@@ -249,7 +257,6 @@ func (vm *VM) GetActivationTime() time.Time {
 }
 
 // Initialize implements the snowman.ChainVM interface
-
 func (vm *VM) Initialize(
 	ctx *snow.Context,
 	dbManager manager.Manager,
@@ -314,6 +321,7 @@ func (vm *VM) Initialize(
 
 	ethConfig := ethconfig.NewDefaultConfig()
 	ethConfig.Genesis = g
+	ethConfig.NetworkId = vm.chainID.Uint64()
 
 	// Set log level
 	logLevel := defaultLogLevel
@@ -362,7 +370,7 @@ func (vm *VM) Initialize(
 	var lastAcceptedHash common.Hash
 	switch {
 	case lastAcceptedErr == database.ErrNotFound:
-		// // Set [lastAcceptedHash] to the genesis block hash.
+		// Set [lastAcceptedHash] to the genesis block hash.
 		lastAcceptedHash = ethConfig.Genesis.ToBlock(nil).Hash()
 	case lastAcceptedErr != nil:
 		return fmt.Errorf("failed to get last accepted block ID due to: %w", lastAcceptedErr)
@@ -381,6 +389,15 @@ func (vm *VM) Initialize(
 	vm.atomicTxRepository, err = NewAtomicTxRepository(vm.db, vm.codec, lastAccepted.NumberU64())
 	if err != nil {
 		return fmt.Errorf("failed to create atomic repository: %w", err)
+	}
+
+	bonusBlockHeights := make(map[uint64]ids.ID)
+	if vm.chainID.Cmp(params.AvalancheMainnetChainID) == 0 {
+		bonusBlockHeights = bonusBlockMainnetHeights
+	}
+	vm.atomicTrie, err = NewAtomicTrie(vm.db, bonusBlockHeights, vm.atomicTxRepository, vm.codec, lastAccepted.NumberU64())
+	if err != nil {
+		return fmt.Errorf("failed to create atomic trie: %w", err)
 	}
 
 	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect

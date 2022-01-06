@@ -44,10 +44,10 @@ var emptyCodeHash = crypto.Keccak256Hash(nil)
 type (
 	// CanTransferFunc is the signature of a transfer guard function
 	CanTransferFunc   func(StateDB, common.Address, *big.Int) bool
-	CanTransferMCFunc func(StateDB, common.Address, common.Address, *common.Hash, *big.Int) bool
+	CanTransferMCFunc func(StateDB, common.Address, common.Address, common.Hash, *big.Int) bool
 	// TransferFunc is the signature of a transfer function
 	TransferFunc   func(StateDB, common.Address, common.Address, *big.Int)
-	TransferMCFunc func(StateDB, common.Address, common.Address, *common.Hash, *big.Int)
+	TransferMCFunc func(StateDB, common.Address, common.Address, common.Hash, *big.Int)
 	// GetHashFunc returns the n'th block hash in the blockchain
 	// and is used by the BLOCKHASH EVM op code.
 	GetHashFunc func(uint64) common.Hash
@@ -261,7 +261,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 }
 
 // This allows the user transfer balance of a specified coinId in addition to a normal Call().
-func (evm *EVM) CallExpert(caller ContractRef, addr common.Address, input []byte, gas uint64, value *big.Int, coinID *common.Hash, value2 *big.Int) (ret []byte, leftOverGas uint64, err error) {
+func (evm *EVM) CallExpert(caller ContractRef, addr common.Address, input []byte, gas uint64, value *big.Int, coinID common.Hash, value2 *big.Int) (ret []byte, leftOverGas uint64, err error) {
 	// Fail if we're trying to execute above the call depth limit
 	if evm.depth > int(params.CallCreateDepth) {
 		return nil, gas, ErrDepth
@@ -501,6 +501,11 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	}
 	if !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
 		return nil, common.Address{}, gas, ErrInsufficientBalance
+	}
+	// If there is any collision with the Blackhole address, return an error instead
+	// of allowing the contract to be created.
+	if address == evm.Context.Coinbase {
+		return nil, common.Address{}, gas, ErrNoSenderBlackhole
 	}
 	nonce := evm.StateDB.GetNonce(caller.Address())
 	if nonce+1 < nonce {
