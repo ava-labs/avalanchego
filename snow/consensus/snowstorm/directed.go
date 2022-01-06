@@ -65,6 +65,9 @@ type Directed struct {
 	// Key: UTXO ID
 	// Value: IDs of transactions that consume the UTXO specified in the key
 	utxos map[ids.ID]ids.Set
+
+	// map transaction ID to the set of whitelisted transaction IDs.
+	whitelists map[ids.ID]ids.Set
 }
 
 type directedTx struct {
@@ -103,6 +106,7 @@ func (dg *Directed) Initialize(
 
 	dg.txs = make(map[ids.ID]*directedTx)
 	dg.utxos = make(map[ids.ID]ids.Set)
+	dg.whitelists = make(map[ids.ID]ids.Set)
 
 	return params.Verify()
 }
@@ -254,6 +258,39 @@ func (dg *Directed) Add(tx Tx) error {
 	txID := tx.ID()
 	txNode := &directedTx{tx: tx}
 
+	// First check the other whitelist transactions.
+	for otherID, otherWhitelist := range dg.whitelists {
+		// [txID] is not whitelisted by [otherWhitelist]
+		if !otherWhitelist.Contains(txID) {
+			otherNode := dg.txs[otherID]
+
+			// The [otherNode] should be preferred over [txNode] because a newly
+			// issued transaction's confidence is always 0 and times are broken
+			// by first issued.
+			dg.addEdge(txNode, otherNode)
+		}
+	}
+	whitelist, isWhitelist, err := tx.Whitelist()
+	if err != nil {
+		return err
+	}
+	if isWhitelist {
+		// Find all transactions that are not explicitly whitelisted and mark
+		// them as conflicting.
+		for otherID, otherNode := range dg.txs {
+			// [otherID] is not whitelisted by [whitelist]
+			if !whitelist.Contains(otherID) {
+				// The [otherNode] should be preferred over [txNode] because a
+				// newly issued transaction's confidence is always 0 and times
+				// are broken by first issued.
+				dg.addEdge(txNode, otherNode)
+			}
+		}
+
+		// Record the whitelist for future calls.
+		dg.whitelists[txID] = whitelist
+	}
+
 	// For each UTXO consumed by the tx:
 	// * Add edges between this tx and txs that consume this UTXO
 	// * Mark this tx as attempting to consume this UTXO
@@ -262,28 +299,16 @@ func (dg *Directed) Add(tx Tx) error {
 		// this UTXO
 		spenders := dg.utxos[inputID]
 
-		// Add all the txs that spend this UTXO to this txs conflicts. These
-		// conflicting txs must be preferred over this tx. We know this because
-		// this tx currently has a bias of 0 and the tie goes to the tx whose
-		// bias was updated first.
-		txNode.outs.Union(spenders)
-
 		// Update txs conflicting with tx to account for its issuance
 		for conflictIDKey := range spenders {
 			// Get the node that contains this conflicting tx
 			conflict := dg.txs[conflictIDKey]
 
-			// This conflicting tx can't be virtuous anymore. So, we attempt to
-			// remove it from all of the virtuous sets.
-			delete(dg.virtuous, conflictIDKey)
-			delete(dg.virtuousVoting, conflictIDKey)
-
-			// This tx should be set to rogue if it wasn't rogue before.
-			conflict.rogue = true
-
-			// This conflicting tx is preferred over the tx being inserted, as
-			// described above. So we add the conflict to the inbound set.
-			conflict.ins.Add(txID)
+			// Add all the txs that spend this UTXO to this txs conflicts. These
+			// conflicting txs must be preferred over this tx. We know this because
+			// this tx currently has a bias of 0 and the tie goes to the tx whose
+			// bias was updated first.
+			dg.addEdge(txNode, conflict)
 		}
 
 		// Add this tx to list of txs consuming the current UTXO
@@ -311,6 +336,33 @@ func (dg *Directed) Add(tx Tx) error {
 	// If a tx that this tx depends on is rejected, this tx should also be
 	// rejected.
 	return dg.registerRejector(tx)
+}
+
+// addEdge between the [src] and [dst] txs to represent a conflict.
+//
+// The edge goes from [src] to [dst]: [src] -> [dst].
+//
+// It is assumed that this is only called when [src] is being added. Which is
+// why only [dst] is removed from the virtuous set and marked as rogue. [src]
+// must be marked as rogue externally.
+//
+// For example:
+// - TxA is issued
+// - TxB is issued that consumes the same UTXO as TxA.
+//   - [addEdge(TxB, TxA)] would be called to register the conflict.
+func (dg *Directed) addEdge(src, dst *directedTx) {
+	srcID, dstID := src.tx.ID(), dst.tx.ID()
+
+	// Track the outbound edge from [src] to [dst].
+	src.outs.Add(dstID)
+
+	// Because we are adding a conflict, the transaction can't be virtuous.
+	dg.virtuous.Remove(dstID)
+	dg.virtuousVoting.Remove(dstID)
+	dst.rogue = true
+
+	// Track the inbound edge to [dst] from [src].
+	dst.ins.Add(srcID)
 }
 
 func (dg *Directed) Remove(txID ids.ID) error {
@@ -415,6 +467,7 @@ func (dg *Directed) accept(txID ids.ID) error {
 	txNode := dg.txs[txID]
 	// We are accepting the tx, so we should remove the node from the graph.
 	delete(dg.txs, txID)
+	delete(dg.whitelists, txID)
 
 	// This tx is consuming all the UTXOs from its inputs, so we can prune them
 	// all from memory
@@ -455,6 +508,7 @@ func (dg *Directed) reject(conflictIDs ids.Set) error {
 				continue
 			}
 			delete(txIDs, conflictKey)
+			delete(dg.whitelists, conflictKey)
 			if txIDs.Len() == 0 {
 				// If this tx was the last tx consuming this UTXO, we should
 				// prune the UTXO from memory entirely.
