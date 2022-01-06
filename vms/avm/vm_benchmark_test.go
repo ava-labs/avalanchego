@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -26,30 +26,14 @@ func BenchmarkLoadUser(b *testing.B) {
 			ctx.Lock.Unlock()
 		}()
 
-		db, err := vm.ctx.Keystore.GetDatabase(username, password)
+		user, err := keystore.NewUserFromKeystore(vm.ctx.Keystore, username, password)
 		if err != nil {
 			b.Fatalf("Failed to get user keystore db: %s", err)
 		}
 
-		user := userState{vm: vm}
-		factory := crypto.FactorySECP256K1R{}
-
-		addresses := make([]ids.ShortID, numKeys)
-		for i := 0; i < numKeys; i++ {
-			skIntf, err := factory.NewPrivateKey()
-			if err != nil {
-				b.Fatalf("problem generating private key: %s", err)
-			}
-			sk := skIntf.(*crypto.PrivateKeySECP256K1R)
-
-			if err := user.SetKey(db, sk); err != nil {
-				b.Fatalf("problem saving private key: %s", err)
-			}
-			addresses[i] = sk.PublicKey().Address()
-		}
-
-		if err := user.SetAddresses(db, addresses); err != nil {
-			b.Fatalf("problem saving address: %s", err)
+		keys, err := keystore.NewKeys(user, numKeys)
+		if err != nil {
+			b.Fatalf("problem generating private key: %s", err)
 		}
 
 		b.ResetTimer()
@@ -58,7 +42,7 @@ func BenchmarkLoadUser(b *testing.B) {
 		for n := 0; n < b.N; n++ {
 			addrIndex := n % numKeys
 			fromAddrs.Clear()
-			fromAddrs.Add(addresses[addrIndex])
+			fromAddrs.Add(keys[addrIndex].PublicKey().Address())
 			if _, _, err := vm.LoadUser(username, password, fromAddrs); err != nil {
 				b.Fatalf("Failed to load user: %s", err)
 			}
@@ -66,7 +50,7 @@ func BenchmarkLoadUser(b *testing.B) {
 
 		b.StopTimer()
 
-		if err := db.Close(); err != nil {
+		if err := user.Close(); err != nil {
 			b.Fatal(err)
 		}
 	}
