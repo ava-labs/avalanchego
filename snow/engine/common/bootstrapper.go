@@ -37,7 +37,8 @@ const (
 var _ Bootstrapper = &bootstrapper{}
 
 type Bootstrapper interface {
-	Handler
+	AcceptedFrontierHandler
+	AcceptedHandler
 	Haltable
 	Start(startReqID uint32) error
 	Startup() error
@@ -47,7 +48,6 @@ type Bootstrapper interface {
 // bootstrapper implements the Handler interface.
 // It collects mechanisms common to both snowman and avalanche bootstrappers
 type bootstrapper struct {
-	MsgHandlerNoOps
 	Config
 	Halter
 
@@ -70,8 +70,7 @@ type bootstrapper struct {
 
 func NewCommonBootstrapper(config Config) Bootstrapper {
 	return &bootstrapper{
-		Config:          config,
-		MsgHandlerNoOps: NewMsgHandlerNoOps(config.Ctx),
+		Config: config,
 		gR: NewGearRequester(
 			config.Ctx.Log,
 			[]message.Op{
@@ -81,45 +80,7 @@ func NewCommonBootstrapper(config Config) Bootstrapper {
 	}
 }
 
-func (b *bootstrapper) Start(startReqID uint32) error {
-	b.Ctx.Log.Info("Starting bootstrap...")
-	b.Ctx.SetState(snow.Bootstrapping)
-	b.Config.SharedCfg.RequestID = startReqID
-
-	if b.Config.StartupAlpha > 0 {
-		return nil
-	}
-
-	return b.Startup()
-}
-
-// GetAcceptedFrontier implements the Handler interface.
-func (b *bootstrapper) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
-	acceptedFrontier, err := b.Bootstrapable.CurrentAcceptedFrontier()
-	if err != nil {
-		return err
-	}
-	b.Sender.SendAcceptedFrontier(validatorID, requestID, acceptedFrontier)
-	return nil
-}
-
-// GetAcceptedFrontierFailed implements the Handler interface.
-func (b *bootstrapper) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
-	// ignores any late responses
-	if requestID != b.Config.SharedCfg.RequestID {
-		b.Ctx.Log.Debug("Received an Out-of-Sync GetAcceptedFrontierFailed - validator: %v - expectedRequestID: %v, requestID: %v",
-			validatorID, b.Config.SharedCfg.RequestID, requestID)
-		return nil
-	}
-
-	if err := b.gR.AddFailed(message.AcceptedFrontier, validatorID); err != nil {
-		return err
-	}
-
-	return b.AcceptedFrontier(validatorID, requestID, nil)
-}
-
-// AcceptedFrontier implements the Handler interface.
+// AcceptedFrontier implements the AcceptedFrontierHandler interface.
 func (b *bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	// ignores any late responses
 	if requestID != b.Config.SharedCfg.RequestID {
@@ -177,29 +138,23 @@ func (b *bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 	return b.sendGetAccepted()
 }
 
-// GetAccepted implements the Handler interface.
-func (b *bootstrapper) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	b.Sender.SendAccepted(validatorID, requestID, b.Bootstrapable.FilterAccepted(containerIDs))
-	return nil
-}
-
-// GetAcceptedFailed implements the Handler interface.
-func (b *bootstrapper) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
+// GetAcceptedFrontierFailed implements the AcceptedFrontierHandler interface.
+func (b *bootstrapper) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
 	// ignores any late responses
 	if requestID != b.Config.SharedCfg.RequestID {
-		b.Ctx.Log.Debug("Received an Out-of-Sync GetAcceptedFailed - validator: %v - expectedRequestID: %v, requestID: %v",
+		b.Ctx.Log.Debug("Received an Out-of-Sync GetAcceptedFrontierFailed - validator: %v - expectedRequestID: %v, requestID: %v",
 			validatorID, b.Config.SharedCfg.RequestID, requestID)
 		return nil
 	}
 
-	if err := b.gR.AddFailed(message.Accepted, validatorID); err != nil {
+	if err := b.gR.AddFailed(message.AcceptedFrontier, validatorID); err != nil {
 		return err
 	}
 
-	return b.Accepted(validatorID, requestID, nil)
+	return b.AcceptedFrontier(validatorID, requestID, nil)
 }
 
-// Accepted implements the Handler interface.
+// Accepted implements the AcceptedHandler interface.
 func (b *bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	// ignores any late responses
 	if requestID != b.Config.SharedCfg.RequestID {
@@ -272,19 +227,29 @@ func (b *bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 	return b.Bootstrapable.ForceAccepted(accepted)
 }
 
-func (b *bootstrapper) RestartBootstrap(reset bool) error {
-	// resets the attempts when we're pulling blocks/vertices we don't want to
-	// fail the bootstrap at that stage
-	if reset {
-		b.Ctx.Log.Debug("Checking for new frontiers")
-
-		b.Config.SharedCfg.Restarted = true
-		b.bootstrapAttempts = 0
+// GetAcceptedFailed implements the AcceptedHandler interface.
+func (b *bootstrapper) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
+	// ignores any late responses
+	if requestID != b.Config.SharedCfg.RequestID {
+		b.Ctx.Log.Debug("Received an Out-of-Sync GetAcceptedFailed - validator: %v - expectedRequestID: %v, requestID: %v",
+			validatorID, b.Config.SharedCfg.RequestID, requestID)
+		return nil
 	}
 
-	if b.bootstrapAttempts > 0 && b.bootstrapAttempts%b.RetryBootstrapWarnFrequency == 0 {
-		b.Ctx.Log.Debug("continuing to attempt to bootstrap after %d failed attempts. Is this node connected to the internet?",
-			b.bootstrapAttempts)
+	if err := b.gR.AddFailed(message.Accepted, validatorID); err != nil {
+		return err
+	}
+
+	return b.Accepted(validatorID, requestID, nil)
+}
+
+func (b *bootstrapper) Start(startReqID uint32) error {
+	b.Ctx.Log.Info("Starting bootstrap...")
+	b.Ctx.SetState(snow.Bootstrapping)
+	b.Config.SharedCfg.RequestID = startReqID
+
+	if b.Config.StartupAlpha > 0 {
+		return nil
 	}
 
 	return b.Startup()
@@ -335,6 +300,24 @@ func (b *bootstrapper) Startup() error {
 	return b.sendGetAcceptedFrontiers()
 }
 
+func (b *bootstrapper) RestartBootstrap(reset bool) error {
+	// resets the attempts when we're pulling blocks/vertices we don't want to
+	// fail the bootstrap at that stage
+	if reset {
+		b.Ctx.Log.Debug("Checking for new frontiers")
+
+		b.Config.SharedCfg.Restarted = true
+		b.bootstrapAttempts = 0
+	}
+
+	if b.bootstrapAttempts > 0 && b.bootstrapAttempts%b.RetryBootstrapWarnFrequency == 0 {
+		b.Ctx.Log.Debug("continuing to attempt to bootstrap after %d failed attempts. Is this node connected to the internet?",
+			b.bootstrapAttempts)
+	}
+
+	return b.Startup()
+}
+
 // Ask up to [MaxOutstandingBootstrapRequests] bootstrap validators to send
 // their accepted frontier with the current accepted frontier
 func (b *bootstrapper) sendGetAcceptedFrontiers() error {
@@ -373,14 +356,4 @@ func (b *bootstrapper) sendGetAccepted() error {
 	}
 
 	return nil
-}
-
-// Needed to disambiguate with MsgHandlerNoOps
-func (b *bootstrapper) Halt() {
-	b.Halter.Halt()
-}
-
-// Needed to disambiguate with MsgHandlerNoOps
-func (b *bootstrapper) Halted() bool {
-	return b.Halter.Halted()
 }

@@ -23,7 +23,7 @@ const (
 	GetAccepted
 	Accepted
 	GetAncestors
-	MultiPut
+	Ancestors
 	// Consensus:
 	Get
 	Put
@@ -84,7 +84,7 @@ var (
 	ConsensusResponseOps = []Op{
 		AcceptedFrontier,
 		Accepted,
-		MultiPut,
+		Ancestors,
 		Put,
 		Chits,
 		AppResponse,
@@ -134,7 +134,7 @@ var (
 	RequestToResponseOps = map[Op]Op{
 		GetAcceptedFrontier:     AcceptedFrontier,
 		GetAccepted:             Accepted,
-		GetAncestors:            MultiPut,
+		GetAncestors:            Ancestors,
 		Get:                     Put,
 		PushQuery:               Chits,
 		PullQuery:               Chits,
@@ -145,7 +145,7 @@ var (
 	ResponseToFailedOps = map[Op]Op{
 		AcceptedFrontier:     GetAcceptedFrontierFailed,
 		Accepted:             GetAcceptedFailed,
-		MultiPut:             GetAncestorsFailed,
+		Ancestors:            GetAncestorsFailed,
 		Put:                  GetFailed,
 		Chits:                QueryFailed,
 		AppResponse:          AppRequestFailed,
@@ -155,7 +155,7 @@ var (
 	FailedToResponseOps = map[Op]Op{
 		GetAcceptedFrontierFailed:     AcceptedFrontier,
 		GetAcceptedFailed:             Accepted,
-		GetAncestorsFailed:            MultiPut,
+		GetAncestorsFailed:            Ancestors,
 		GetFailed:                     Put,
 		QueryFailed:                   Chits,
 		AppRequestFailed:              AppResponse,
@@ -190,7 +190,7 @@ var (
 		GetAccepted:         {ChainID, RequestID, Deadline, ContainerIDs},
 		Accepted:            {ChainID, RequestID, ContainerIDs},
 		GetAncestors:        {ChainID, RequestID, Deadline, ContainerID},
-		MultiPut:            {ChainID, RequestID, MultiContainerBytes},
+		Ancestors:           {ChainID, RequestID, MultiContainerBytes},
 		// Consensus:
 		Get:       {ChainID, RequestID, Deadline, ContainerID},
 		Put:       {ChainID, RequestID, ContainerID, ContainerBytes},
@@ -211,7 +211,7 @@ var (
 
 func (op Op) Compressable() bool {
 	switch op {
-	case PeerList, Put, MultiPut, PushQuery, AppRequest, AppResponse, AppGossip:
+	case PeerList, Put, Ancestors, PushQuery, AppRequest, AppResponse, AppGossip:
 		return true
 	default:
 		return false
@@ -246,8 +246,8 @@ func (op Op) String() string {
 		return "get_ancestors"
 	case Put:
 		return "put"
-	case MultiPut:
-		return "multi_put"
+	case Ancestors:
+		return "ancestors"
 	case PushQuery:
 		return "push_query"
 	case PullQuery:

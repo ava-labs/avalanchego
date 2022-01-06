@@ -4,89 +4,94 @@
 package health
 
 import (
-	"net/http"
 	"time"
 
-	stdjson "encoding/json"
-
-	"github.com/gorilla/rpc/v2"
-
 	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/utils/logging"
-
-	healthlib "github.com/ava-labs/avalanchego/health"
 )
 
 var _ Health = &health{}
 
-// Health wraps a [healthlib.Service]. Handler() returns a handler that handles
-// incoming HTTP API requests. We have this in a separate package from
-// [healthlib] to avoid a circular import where this service imports
-// snow/engine/common but that package imports [healthlib].Checkable
+// Health defines the full health service interface for registering, reporting
+// and refreshing health checks.
 type Health interface {
-	healthlib.Service
+	Registerer
+	Reporter
 
-	Handler() (*common.HTTPHandler, error)
+	Start(freq time.Duration)
+	Stop()
 }
 
-func New(checkFreq time.Duration, log logging.Logger, namespace string, registry prometheus.Registerer) (Health, error) {
-	service, err := healthlib.NewService(checkFreq, log, namespace, registry)
-	return &health{
-		Service: service,
-		log:     log,
-	}, err
+// Registerer defines how to register new components to check the health of.
+type Registerer interface {
+	RegisterReadinessCheck(name string, checker Checker) error
+	RegisterHealthCheck(name string, checker Checker) error
+	RegisterLivenessCheck(name string, checker Checker) error
+}
+
+// Reporter returns the current health status.
+type Reporter interface {
+	Readiness() (map[string]Result, bool)
+	Health() (map[string]Result, bool)
+	Liveness() (map[string]Result, bool)
 }
 
 type health struct {
-	healthlib.Service
-	log logging.Logger
+	readiness *worker
+	health    *worker
+	liveness  *worker
 }
 
-func (h *health) Handler() (*common.HTTPHandler, error) {
-	newServer := rpc.NewServer()
-	codec := json.NewCodec()
-	newServer.RegisterCodec(codec, "application/json")
-	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
+func New(registerer prometheus.Registerer) (Health, error) {
+	readinessWorker, err := newWorker("readiness", registerer)
+	if err != nil {
+		return nil, err
+	}
 
-	// If a GET request is sent, we respond with a 200 if the node is healthy or
-	// a 503 if the node isn't healthy.
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			newServer.ServeHTTP(w, r)
-			return
-		}
+	healthWorker, err := newWorker("health", registerer)
+	if err != nil {
+		return nil, err
+	}
 
-		// Make sure the content type is set before writing the header.
-		w.Header().Set("Content-Type", "application/json")
-
-		checks, healthy := h.Results()
-		if !healthy {
-			// If a health check has failed, we should return a 503.
-			w.WriteHeader(http.StatusServiceUnavailable)
-		}
-		// The encoder will call write on the writer, which will write the
-		// header with a 200.
-		err := stdjson.NewEncoder(w).Encode(APIHealthServerReply{
-			Checks:  checks,
-			Healthy: healthy,
-		})
-		if err != nil {
-			h.log.Debug("failed to encode the health check response due to %s", err)
-		}
-	})
-
-	err := newServer.RegisterService(
-		&Service{
-			log:    h.log,
-			health: h.Service,
-		},
-		"health",
-	)
-	return &common.HTTPHandler{
-		LockOptions: common.NoLock,
-		Handler:     handler,
+	livenessWorker, err := newWorker("liveness", registerer)
+	return &health{
+		readiness: readinessWorker,
+		health:    healthWorker,
+		liveness:  livenessWorker,
 	}, err
+}
+
+func (h *health) RegisterReadinessCheck(name string, checker Checker) error {
+	return h.readiness.RegisterMonotonicCheck(name, checker)
+}
+
+func (h *health) RegisterHealthCheck(name string, checker Checker) error {
+	return h.health.RegisterCheck(name, checker)
+}
+
+func (h *health) RegisterLivenessCheck(name string, checker Checker) error {
+	return h.liveness.RegisterCheck(name, checker)
+}
+
+func (h *health) Readiness() (map[string]Result, bool) {
+	return h.readiness.Results()
+}
+
+func (h *health) Health() (map[string]Result, bool) {
+	return h.health.Results()
+}
+
+func (h *health) Liveness() (map[string]Result, bool) {
+	return h.liveness.Results()
+}
+
+func (h *health) Start(freq time.Duration) {
+	h.readiness.Start(freq)
+	h.health.Start(freq)
+	h.liveness.Start(freq)
+}
+
+func (h *health) Stop() {
+	h.readiness.Stop()
+	h.health.Stop()
+	h.liveness.Stop()
 }

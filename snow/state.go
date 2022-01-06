@@ -14,8 +14,6 @@ const (
 
 func (st State) String() string {
 	switch st {
-	case Unknown:
-		return "Unknown state"
 	case FastSyncing:
 		return "Fast syncing state"
 	case Bootstrapping:
@@ -23,6 +21,7 @@ func (st State) String() string {
 	case NormalOp:
 		return "Normal operations state"
 	default:
+		// State.Unknown treated as default
 		return "Unknown state"
 	}
 }

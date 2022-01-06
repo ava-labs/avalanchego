@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap"
+	avagetter "github.com/ava-labs/avalanchego/snow/engine/avalanche/getter"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -42,7 +43,7 @@ func (dh *dummyHandler) onDoneBootstrapping(lastReqID uint32) error {
 }
 
 func TestEngineShutdown(t *testing.T) {
-	_, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	vmShutdownCalled := false
 	vm := &vertex.TestVM{}
@@ -63,14 +64,13 @@ func TestEngineShutdown(t *testing.T) {
 }
 
 func TestEngineAdd(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -142,7 +142,7 @@ func TestEngineAdd(t *testing.T) {
 		return vtx, nil
 	}
 
-	if err := te.Put(vdr, 0, vtx.ID(), vtx.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, vtx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -158,7 +158,7 @@ func TestEngineAdd(t *testing.T) {
 
 	manager.ParseVtxF = func(b []byte) (avalanche.Vertex, error) { return nil, errFailedParsing }
 
-	if err := te.Put(vdr, *reqID, vtx.ParentsV[0].ID(), nil); err != nil {
+	if err := te.Put(vdr, *reqID, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -170,14 +170,13 @@ func TestEngineAdd(t *testing.T) {
 }
 
 func TestEngineQuery(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -326,7 +325,7 @@ func TestEngineQuery(t *testing.T) {
 
 	// Once the peer returns [vtx0], we will respond to its query and then issue
 	// our own push query for [vtx0].
-	if err := te.Put(vdr, 0, vtx0.ID(), vtx0.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, vtx0.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 	manager.ParseVtxF = nil
@@ -427,7 +426,7 @@ func TestEngineQuery(t *testing.T) {
 	// Once the peer returns [vtx1], the poll that was issued for [vtx0] will be
 	// able to terminate. Additionally the node will issue a push query with
 	// [vtx1].
-	if err := te.Put(vdr, 0, vtx1.ID(), vtx1.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, vtx1.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 	manager.ParseVtxF = nil
@@ -462,14 +461,13 @@ func TestEngineQuery(t *testing.T) {
 }
 
 func TestEngineMultipleQuery(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	engCfg.Params = avalanche.Parameters{
 		Parameters: snowball.Parameters{
@@ -656,7 +654,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 }
 
 func TestEngineBlockedIssue(t *testing.T) {
-	_, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -737,14 +735,13 @@ func TestEngineBlockedIssue(t *testing.T) {
 }
 
 func TestEngineAbandonResponse(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -820,14 +817,13 @@ func TestEngineAbandonResponse(t *testing.T) {
 }
 
 func TestEngineScheduleRepoll(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -915,7 +911,7 @@ func TestEngineScheduleRepoll(t *testing.T) {
 }
 
 func TestEngineRejectDoubleSpendTx(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	engCfg.Params.BatchSize = 2
 
@@ -931,7 +927,6 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1030,7 +1025,7 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 }
 
 func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	engCfg.Params.BatchSize = 2
 
@@ -1045,7 +1040,6 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1150,7 +1144,7 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 }
 
 func TestEngineIssueRepoll(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	engCfg.Params.BatchSize = 2
 
@@ -1165,7 +1159,6 @@ func TestEngineIssueRepoll(t *testing.T) {
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1226,7 +1219,7 @@ func TestEngineIssueRepoll(t *testing.T) {
 }
 
 func TestEngineReissue(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	engCfg.Params.BatchSize = 2
 	engCfg.Params.BetaVirtuous = 5
@@ -1243,7 +1236,6 @@ func TestEngineReissue(t *testing.T) {
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1398,7 +1390,7 @@ func TestEngineReissue(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := te.Put(vdr, 0, vtx.ID(), vtx.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, vtx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 	manager.ParseVtxF = nil
@@ -1421,7 +1413,7 @@ func TestEngineReissue(t *testing.T) {
 }
 
 func TestEngineLargeIssue(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 	engCfg.Params.BatchSize = 1
 	engCfg.Params.BetaVirtuous = 5
 	engCfg.Params.BetaRogue = 5
@@ -1437,7 +1429,6 @@ func TestEngineLargeIssue(t *testing.T) {
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1544,20 +1535,23 @@ func TestEngineLargeIssue(t *testing.T) {
 }
 
 func TestEngineGetVertex(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	commonCfg, _, engCfg := DefaultConfig()
 
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	vdr := validators.GenerateRandomValidator(1)
 
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
+	avaGetHandler, err := avagetter.New(manager, commonCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	engCfg.AllGetsServer = avaGetHandler
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -1605,14 +1599,13 @@ func TestEngineGetVertex(t *testing.T) {
 }
 
 func TestEngineInsufficientValidators(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
@@ -1683,14 +1676,13 @@ func TestEngineInsufficientValidators(t *testing.T) {
 }
 
 func TestEnginePushGossip(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1768,7 +1760,7 @@ func TestEnginePushGossip(t *testing.T) {
 
 	sender.CantSendPushQuery = false
 	sender.CantSendChits = false
-	if err := te.PushQuery(vdr, 0, vtx.ID(), vtx.Bytes()); err != nil {
+	if err := te.PushQuery(vdr, 0, vtx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1778,14 +1770,13 @@ func TestEnginePushGossip(t *testing.T) {
 }
 
 func TestEngineSingleQuery(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1857,14 +1848,13 @@ func TestEngineSingleQuery(t *testing.T) {
 }
 
 func TestEngineParentBlockingInsert(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1969,14 +1959,13 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 }
 
 func TestEngineBlockingChitRequest(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -2076,7 +2065,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	if err := te.PushQuery(vdr, 0, blockingVtx.ID(), blockingVtx.Bytes()); err != nil {
+	if err := te.PushQuery(vdr, 0, blockingVtx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2098,14 +2087,13 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 }
 
 func TestEngineBlockingChitResponse(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -2238,14 +2226,13 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 }
 
 func TestEngineMissingTx(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -2378,14 +2365,13 @@ func TestEngineMissingTx(t *testing.T) {
 }
 
 func TestEngineIssueBlockingTx(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -2449,14 +2435,13 @@ func TestEngineIssueBlockingTx(t *testing.T) {
 }
 
 func TestEngineReissueAbortedVertex(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -2550,7 +2535,7 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 		panic("Unknown bytes provided")
 	}
 
-	if err := te.PushQuery(vdr, 0, vtxID1, vtx1.Bytes()); err != nil {
+	if err := te.PushQuery(vdr, 0, vtx1.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2586,7 +2571,7 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 }
 
 func TestEngineBootstrappingIntoConsensus(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
@@ -2594,7 +2579,6 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -2793,7 +2777,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		panic("Unknown bytes provided")
 	}
 
-	if err := bootstrapper.MultiPut(vdr, *requestID, [][]byte{vtxBytes0}); err != nil {
+	if err := bootstrapper.Ancestors(vdr, *requestID, [][]byte{vtxBytes0}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2850,7 +2834,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		panic("Unknown bytes provided")
 	}
 
-	if err := te.PushQuery(vdr, 0, vtxID1, vtxBytes1); err != nil {
+	if err := te.PushQuery(vdr, 0, vtxBytes1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2861,7 +2845,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 }
 
 func TestEngineReBootstrapFails(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 	bootCfg.Alpha = 1
 	bootCfg.RetryBootstrap = true
 	bootCfg.RetryBootstrapWarnFrequency = 4
@@ -2872,7 +2856,6 @@ func TestEngineReBootstrapFails(t *testing.T) {
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -3024,7 +3007,7 @@ func TestEngineReBootstrapFails(t *testing.T) {
 }
 
 func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 	bootCfg.Alpha = 1
 	bootCfg.RetryBootstrap = true
 	bootCfg.RetryBootstrapWarnFrequency = 4
@@ -3035,7 +3018,6 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -3241,7 +3223,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 		panic("Unknown bytes provided")
 	}
 
-	if err := bootstrapper.MultiPut(vdr, *requestID, [][]byte{vtxBytes0}); err != nil {
+	if err := bootstrapper.Ancestors(vdr, *requestID, [][]byte{vtxBytes0}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3300,7 +3282,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 		panic("Unknown bytes provided")
 	}
 
-	if err := bootstrapper.PushQuery(vdr, 0, vtxID1, vtxBytes1); err != nil {
+	if err := bootstrapper.PushQuery(vdr, 0, vtxBytes1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3311,14 +3293,13 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 }
 
 func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -3421,14 +3402,13 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 }
 
 func TestEnginePartiallyValidVertex(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -3511,7 +3491,7 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 }
 
 func TestEngineGossip(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
@@ -3567,14 +3547,13 @@ func TestEngineGossip(t *testing.T) {
 }
 
 func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	secondVdr := ids.GenerateTestShortID()
@@ -3679,11 +3658,11 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 		}
 	}
 
-	if err := te.PushQuery(vdr, 0, vtx1.ID(), vtx1.Bytes()); err != nil {
+	if err := te.PushQuery(vdr, 0, vtx1.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := te.Put(secondVdr, *reqID, vtx0.ID(), []byte{3}); err != nil {
+	if err := te.Put(secondVdr, *reqID, []byte{3}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3711,7 +3690,7 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 
 	vtx0.StatusV = choices.Processing
 
-	if err := te.Put(vdr, *reqID, vtx0.ID(), vtx0.Bytes()); err != nil {
+	if err := te.Put(vdr, *reqID, vtx0.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3722,14 +3701,13 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 }
 
 func TestEnginePushQueryRequestIDConflict(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -3789,8 +3767,6 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 		BytesV:   []byte{2},
 	}
 
-	randomVtxID := ids.GenerateTestID()
-
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
@@ -3832,14 +3808,14 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 		}
 	}
 
-	if err := te.PushQuery(vdr, 0, vtx1.ID(), vtx1.Bytes()); err != nil {
+	if err := te.PushQuery(vdr, 0, vtx1.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
 	sender.SendGetF = nil
 	sender.CantSendGet = false
 
-	if err := te.PushQuery(vdr, *reqID, randomVtxID, []byte{3}); err != nil {
+	if err := te.PushQuery(vdr, *reqID, []byte{3}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3867,7 +3843,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 
 	vtx0.StatusV = choices.Processing
 
-	if err := te.Put(vdr, *reqID, vtx0.ID(), vtx0.Bytes()); err != nil {
+	if err := te.Put(vdr, *reqID, vtx0.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3878,7 +3854,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 }
 
 func TestEngineAggressivePolling(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	engCfg.Params.ConcurrentRepolls = 3
 	engCfg.Params.BetaRogue = 3
@@ -3888,7 +3864,6 @@ func TestEngineAggressivePolling(t *testing.T) {
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -3985,7 +3960,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	vm.CantPendingTxs = false
 
-	if err := te.Put(vdr, 0, vtx.ID(), vtx.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, vtx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3998,7 +3973,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 }
 
 func TestEngineDuplicatedIssuance(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 	engCfg.Params.BatchSize = 1
 	engCfg.Params.BetaVirtuous = 5
 	engCfg.Params.BetaRogue = 5
@@ -4014,7 +3989,6 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -4121,7 +4095,7 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 }
 
 func TestEngineDoubleChit(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	engCfg.Params.Alpha = 2
 	engCfg.Params.K = 2
@@ -4131,7 +4105,6 @@ func TestEngineDoubleChit(t *testing.T) {
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr0 := ids.GenerateTestShortID()
 	vdr1 := ids.GenerateTestShortID()
@@ -4259,14 +4232,13 @@ func TestEngineDoubleChit(t *testing.T) {
 }
 
 func TestEngineBubbleVotes(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
 	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	err := vals.AddWeight(vdr, 1)
@@ -4413,7 +4385,7 @@ func TestEngineBubbleVotes(t *testing.T) {
 }
 
 func TestEngineIssue(t *testing.T) {
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 	engCfg.Params.BatchSize = 1
 	engCfg.Params.BetaVirtuous = 1
 	engCfg.Params.BetaRogue = 1
@@ -4430,7 +4402,6 @@ func TestEngineIssue(t *testing.T) {
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
-	engCfg.WeightTracker = wt
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -4570,7 +4541,7 @@ func TestEngineIssue(t *testing.T) {
 // dependency fails verification.
 func TestAbandonTx(t *testing.T) {
 	assert := assert.New(t)
-	bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig()
 	engCfg.Params.BatchSize = 1
 	engCfg.Params.BetaVirtuous = 1
 	engCfg.Params.BetaRogue = 1
@@ -4686,7 +4657,7 @@ func TestAbandonTx(t *testing.T) {
 		assert.FailNow("should have asked to parse vtx1")
 		return nil, errors.New("should have asked to parse vtx1")
 	}
-	err = te.Put(vdr, 0, vtx1.ID(), vtx1.Bytes())
+	err = te.Put(vdr, 0, vtx1.Bytes())
 	assert.NoError(err)
 
 	// Verify that vtx1 is waiting to be issued.
@@ -4703,7 +4674,7 @@ func TestAbandonTx(t *testing.T) {
 		return nil, errors.New("should have asked to parse vtx0")
 	}
 	sender.CantSendChits = false // Engine will respond to the PullQuerys since the vertices were abandoned
-	err = te.Put(vdr, 0, vtx0.ID(), vtx0.Bytes())
+	err = te.Put(vdr, 0, vtx0.Bytes())
 	assert.NoError(err)
 
 	// Despite the fact that there is still an outstanding vertex request,
