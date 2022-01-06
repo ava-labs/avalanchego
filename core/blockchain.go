@@ -1222,7 +1222,7 @@ func (bc *BlockChain) RemoveRejectedBlocks(start, end uint64) error {
 	return nil
 }
 
-// recoverAncestors finds the closest ancestor with available state and re-execute
+// recoverAncestors finds the closest ancestor with available state and re-executes
 // all the ancestor blocks since that.
 // Note: recoverAncesotors then makes sure to commit the state of [block] so that if
 // we have another ungraceful shutdown immediately after recoverAncestors finishes we
