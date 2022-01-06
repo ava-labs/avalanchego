@@ -418,8 +418,7 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 
 // writeHeadBlock injects a new head block into the current block chain. This method
 // assumes that the block is indeed a true head. It will also reset the head
-// header and the head fast sync block to this very same block if they are older
-// or if they are on a different side chain.
+// header to this very same block if they are older or if they are on a different side chain.
 //
 // Note, this function assumes that the `mu` mutex is held!
 func (bc *BlockChain) writeHeadBlock(block *types.Block) {
@@ -596,7 +595,7 @@ func (bc *BlockChain) setPreference(block *types.Block) error {
 		return fmt.Errorf("unable to invoke writeKnownBlock: %w", err)
 	}
 
-	// Send an ChainHeadEvent if we end up altering
+	// Send a ChainHeadEvent if we end up altering
 	// the head block. Many internal aysnc processes rely on
 	// receiving these events (i.e. the TxPool).
 	bc.chainHeadFeed.Send(ChainHeadEvent{Block: block})
@@ -741,12 +740,29 @@ func (bc *BlockChain) newTip(block *types.Block) bool {
 	return block.ParentHash() == bc.CurrentBlock().Hash()
 }
 
+// writeBlockAndSetHead persists the block and associated state to the database
+// and optimistically updates the canonical chain if [block] extends the current
+// canonical chain.
+// writeBlockAndSetHead expects to be the last verification step during InsertBlock
+// since it creates a reference that will only be cleaned up by Accept/Reject.
+func (bc *BlockChain) writeBlockAndSetHead(block *types.Block, receipts []*types.Receipt, logs []*types.Log, state *state.StateDB) error {
+	if err := bc.writeBlockWithState(block, receipts, logs, state); err != nil {
+		return err
+	}
+
+	// If [block] represents a new tip of the canonical chain, we optimistically add it before
+	// setPreference is called. Otherwise, we consider it a side chain block.
+	if bc.newTip(block) {
+		bc.writeCanonicalBlockWithLogs(block, logs)
+	} else {
+		bc.chainSideFeed.Send(ChainSideEvent{Block: block})
+	}
+
+	return nil
+}
+
 // writeBlockWithState writes the block and all associated state to the database,
 // but it expects the chain mutex to be held.
-// writeBlockWithState expects to be the last verification step during InsertBlock
-// since it creates a reference that will only be cleaned up by Accept/Reject.
-// TODO: no longer return writeStatus in go-ethereum? Should we do this
-// (separate into writeBlockAndSetHead)?
 func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, state *state.StateDB) error {
 	bc.wg.Add(1)
 	defer bc.wg.Done()
@@ -790,14 +806,6 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 		return err
 	}
 
-	// If [block] represents a new tip of the canonical chain, we optimistically add it before
-	// setPreference is called. Otherwise, we consider it a side chain block.
-	if bc.newTip(block) {
-		bc.writeCanonicalBlockWithLogs(block, logs)
-		return nil
-	}
-
-	bc.chainSideFeed.Send(ChainSideEvent{Block: block})
 	return nil
 }
 
@@ -972,10 +980,10 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	}
 
 	// Write the block to the chain and get the status.
-	// writeBlockWithState creates a reference that will be cleaned up in Accept/Reject
-	// so we need to ensure an error cannot occur later in verification, since that would
-	// cause the referenced root to never be dereferenced.
-	if err := bc.writeBlockWithState(block, receipts, logs, statedb); err != nil {
+	// writeBlockWithState (called within writeBlockAndSethead) creates a reference that
+	//  will be cleaned up in Accept/Reject so we need to ensure an error cannot occur
+	// later in verification, since that would cause the referenced root to never be dereferenced.
+	if err := bc.writeBlockAndSetHead(block, receipts, logs, statedb); err != nil {
 		return err
 	}
 	log.Debug("Inserted new block", "number", block.Number(), "hash", block.Hash(),
