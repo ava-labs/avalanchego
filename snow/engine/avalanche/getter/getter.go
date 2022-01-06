@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package gethandler
+package getter
 
 import (
 	"time"
@@ -17,11 +17,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-// Get requests are always served. Hence Handler, common to bootstrapper and engine
-var _ common.AllGetsServer = &Handler{}
+// Get requests are always served, regardless node state (bootstrapping or normal operations).
+var _ common.AllGetsServer = &getter{}
 
-func New(manager vertex.Manager, commonCfg common.Config) (Handler, error) {
-	bh := Handler{
+func New(manager vertex.Manager, commonCfg common.Config) (common.AllGetsServer, error) {
+	gh := &getter{
 		manager: manager,
 		sender:  commonCfg.Sender,
 		cfg:     commonCfg,
@@ -29,7 +29,7 @@ func New(manager vertex.Manager, commonCfg common.Config) (Handler, error) {
 	}
 
 	errs := wrappers.Errs{}
-	bh.getAncestorsVtxs = metric.NewAveragerWithErrs(
+	gh.getAncestorsVtxs = metric.NewAveragerWithErrs(
 		"bs",
 		"get_ancestors_vtxs",
 		"vertices fetched in a call to GetAncestors",
@@ -37,10 +37,10 @@ func New(manager vertex.Manager, commonCfg common.Config) (Handler, error) {
 		&errs,
 	)
 
-	return bh, errs.Err
+	return gh, errs.Err
 }
 
-type Handler struct {
+type getter struct {
 	manager vertex.Manager
 	sender  common.Sender
 	cfg     common.Config
@@ -49,34 +49,34 @@ type Handler struct {
 	getAncestorsVtxs metric.Averager
 }
 
-func (bh Handler) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
-	acceptedFrontier := bh.currentAcceptedFrontier()
-	bh.sender.SendAcceptedFrontier(validatorID, requestID, acceptedFrontier)
+func (gh *getter) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
+	acceptedFrontier := gh.currentAcceptedFrontier()
+	gh.sender.SendAcceptedFrontier(validatorID, requestID, acceptedFrontier)
 	return nil
 }
 
-func (bh Handler) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	bh.sender.SendAccepted(validatorID, requestID, bh.filterAccepted(containerIDs))
+func (gh *getter) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+	gh.sender.SendAccepted(validatorID, requestID, gh.filterAccepted(containerIDs))
 	return nil
 }
 
-func (bh Handler) GetAncestors(validatorID ids.ShortID, requestID uint32, vtxID ids.ID) error {
+func (gh *getter) GetAncestors(validatorID ids.ShortID, requestID uint32, vtxID ids.ID) error {
 	startTime := time.Now()
-	bh.log.Verbo("GetAncestors(%s, %d, %s) called", validatorID, requestID, vtxID)
-	vertex, err := bh.manager.GetVtx(vtxID)
+	gh.log.Verbo("GetAncestors(%s, %d, %s) called", validatorID, requestID, vtxID)
+	vertex, err := gh.manager.GetVtx(vtxID)
 	if err != nil || vertex.Status() == choices.Unknown {
-		bh.log.Verbo("dropping getAncestors")
+		gh.log.Verbo("dropping getAncestors")
 		return nil // Don't have the requested vertex. Drop message.
 	}
 
-	queue := make([]avalanche.Vertex, 1, bh.cfg.MultiputMaxContainersSent) // for BFS
+	queue := make([]avalanche.Vertex, 1, gh.cfg.MultiputMaxContainersSent) // for BFS
 	queue[0] = vertex
 	ancestorsBytesLen := 0                                                // length, in bytes, of vertex and its ancestors
-	ancestorsBytes := make([][]byte, 0, bh.cfg.MultiputMaxContainersSent) // vertex and its ancestors in BFS order
+	ancestorsBytes := make([][]byte, 0, gh.cfg.MultiputMaxContainersSent) // vertex and its ancestors in BFS order
 	visited := ids.Set{}                                                  // IDs of vertices that have been in queue before
 	visited.Add(vertex.ID())
 
-	for len(ancestorsBytes) < bh.cfg.MultiputMaxContainersSent && len(queue) > 0 && time.Since(startTime) < bh.cfg.MaxTimeGetAncestors {
+	for len(ancestorsBytes) < gh.cfg.MultiputMaxContainersSent && len(queue) > 0 && time.Since(startTime) < gh.cfg.MaxTimeGetAncestors {
 		var vtx avalanche.Vertex
 		vtx, queue = queue[0], queue[1:] // pop
 		vtxBytes := vtx.Bytes()
@@ -103,31 +103,31 @@ func (bh Handler) GetAncestors(validatorID ids.ShortID, requestID uint32, vtxID 
 		}
 	}
 
-	bh.getAncestorsVtxs.Observe(float64(len(ancestorsBytes)))
-	bh.sender.SendMultiPut(validatorID, requestID, ancestorsBytes)
+	gh.getAncestorsVtxs.Observe(float64(len(ancestorsBytes)))
+	gh.sender.SendMultiPut(validatorID, requestID, ancestorsBytes)
 	return nil
 }
 
-func (bh Handler) Get(validatorID ids.ShortID, requestID uint32, vtxID ids.ID) error {
+func (gh *getter) Get(validatorID ids.ShortID, requestID uint32, vtxID ids.ID) error {
 	// If this engine has access to the requested vertex, provide it
-	if vtx, err := bh.manager.GetVtx(vtxID); err == nil {
-		bh.sender.SendPut(validatorID, requestID, vtxID, vtx.Bytes())
+	if vtx, err := gh.manager.GetVtx(vtxID); err == nil {
+		gh.sender.SendPut(validatorID, requestID, vtxID, vtx.Bytes())
 	}
 	return nil
 }
 
 // currentAcceptedFrontier returns the set of vertices that this node has accepted
 // that have no accepted children
-func (bh Handler) currentAcceptedFrontier() []ids.ID {
-	return bh.manager.Edge()
+func (gh *getter) currentAcceptedFrontier() []ids.ID {
+	return gh.manager.Edge()
 }
 
 // filterAccepted returns the subset of containerIDs that are accepted by this chain.
 // filterAccepted returns the IDs of vertices in [containerIDs] that this node has accepted
-func (bh Handler) filterAccepted(containerIDs []ids.ID) []ids.ID {
+func (gh *getter) filterAccepted(containerIDs []ids.ID) []ids.ID {
 	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, vtxID := range containerIDs {
-		if vtx, err := bh.manager.GetVtx(vtxID); err == nil && vtx.Status() == choices.Accepted {
+		if vtx, err := gh.manager.GetVtx(vtxID); err == nil && vtx.Status() == choices.Accepted {
 			acceptedVtxIDs = append(acceptedVtxIDs, vtxID)
 		}
 	}

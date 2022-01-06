@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package gethandler
+package getter
 
 import (
 	"errors"
@@ -63,9 +63,13 @@ func TestAcceptedFrontier(t *testing.T) {
 	vtxID1 := ids.GenerateTestID()
 	vtxID2 := ids.GenerateTestID()
 
-	bs, err := New(manager, config)
+	bsIntf, err := New(manager, config)
 	if err != nil {
 		t.Fatal(err)
+	}
+	bs, ok := bsIntf.(*getter)
+	if !ok {
+		t.Fatal("Unexpected get handler")
 	}
 
 	manager.EdgeF = func() []ids.ID {
@@ -108,9 +112,13 @@ func TestFilterAccepted(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	bs, err := New(manager, config)
+	bsIntf, err := New(manager, config)
 	if err != nil {
 		t.Fatal(err)
+	}
+	bs, ok := bsIntf.(*getter)
+	if !ok {
+		t.Fatal("Unexpected get handler")
 	}
 
 	vtxIDs := []ids.ID{vtxID0, vtxID1, vtxID2}

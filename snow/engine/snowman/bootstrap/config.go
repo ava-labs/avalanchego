@@ -7,13 +7,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	gethandler "github.com/ava-labs/avalanchego/snow/engine/snowman/get_handler"
 )
 
 type Config struct {
 	common.Config
-
-	gethandler.Handler
+	common.AllGetsServer
 
 	// Blocked tracks operations that are blocked on blocks
 	Blocked *queue.JobsWithMissing

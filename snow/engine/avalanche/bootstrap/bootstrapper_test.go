@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
-	agh "github.com/ava-labs/avalanchego/snow/engine/avalanche/get_handler"
+	avagetter "github.com/ava-labs/avalanchego/snow/engine/avalanche/getter"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
@@ -78,14 +78,14 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 		SharedCfg:                     &common.SharedConfig{},
 	}
 
-	avaGetHandler, err := agh.New(manager, commonConfig)
+	avaGetHandler, err := avagetter.New(manager, commonConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	return Config{
 		Config:        commonConfig,
-		Handler:       avaGetHandler,
+		AllGetsServer: avaGetHandler,
 		VtxBlocked:    vtxBlocker,
 		TxBlocked:     txBlocker,
 		Manager:       manager,

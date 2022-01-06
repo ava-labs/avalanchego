@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package gethandler
+package getter
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
@@ -15,10 +15,10 @@ import (
 )
 
 // Get requests are always served. Hence Handler, common to bootstrapper and engine
-var _ common.AllGetsServer = &Handler{}
+var _ common.AllGetsServer = &getter{}
 
-func New(vm block.ChainVM, commonCfg common.Config) (Handler, error) {
-	bh := Handler{
+func New(vm block.ChainVM, commonCfg common.Config) (common.AllGetsServer, error) {
+	gh := &getter{
 		vm:     vm,
 		sender: commonCfg.Sender,
 		cfg:    commonCfg,
@@ -26,7 +26,7 @@ func New(vm block.ChainVM, commonCfg common.Config) (Handler, error) {
 	}
 
 	errs := wrappers.Errs{}
-	bh.getAncestorsBlks = metric.NewAveragerWithErrs(
+	gh.getAncestorsBlks = metric.NewAveragerWithErrs(
 		"bs",
 		"get_ancestors_blks",
 		"blocks fetched in a call to GetAncestors",
@@ -34,10 +34,10 @@ func New(vm block.ChainVM, commonCfg common.Config) (Handler, error) {
 		&errs,
 	)
 
-	return bh, errs.Err
+	return gh, errs.Err
 }
 
-type Handler struct {
+type getter struct {
 	vm     block.ChainVM
 	sender common.Sender
 	cfg    common.Config
@@ -46,68 +46,68 @@ type Handler struct {
 	getAncestorsBlks metric.Averager
 }
 
-func (bh Handler) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
-	acceptedFrontier, err := bh.currentAcceptedFrontier()
+func (gh *getter) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
+	acceptedFrontier, err := gh.currentAcceptedFrontier()
 	if err != nil {
 		return err
 	}
-	bh.sender.SendAcceptedFrontier(validatorID, requestID, acceptedFrontier)
+	gh.sender.SendAcceptedFrontier(validatorID, requestID, acceptedFrontier)
 	return nil
 }
 
-func (bh Handler) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	bh.sender.SendAccepted(validatorID, requestID, bh.filterAccepted(containerIDs))
+func (gh *getter) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+	gh.sender.SendAccepted(validatorID, requestID, gh.filterAccepted(containerIDs))
 	return nil
 }
 
-func (bh Handler) GetAncestors(validatorID ids.ShortID, requestID uint32, blkID ids.ID) error {
+func (gh *getter) GetAncestors(validatorID ids.ShortID, requestID uint32, blkID ids.ID) error {
 	ancestorsBytes, err := block.GetAncestors(
-		bh.vm,
+		gh.vm,
 		blkID,
-		bh.cfg.MultiputMaxContainersSent,
+		gh.cfg.MultiputMaxContainersSent,
 		constants.MaxContainersLen,
-		bh.cfg.MaxTimeGetAncestors,
+		gh.cfg.MaxTimeGetAncestors,
 	)
 	if err != nil {
-		bh.log.Verbo("couldn't get ancestors with %s. Dropping GetAncestors(%s, %d, %s)",
+		gh.log.Verbo("couldn't get ancestors with %s. Dropping GetAncestors(%s, %d, %s)",
 			err, validatorID, requestID, blkID)
 		return nil
 	}
 
-	bh.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
-	bh.sender.SendMultiPut(validatorID, requestID, ancestorsBytes)
+	gh.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
+	gh.sender.SendMultiPut(validatorID, requestID, ancestorsBytes)
 	return nil
 }
 
-func (bh Handler) Get(validatorID ids.ShortID, requestID uint32, blkID ids.ID) error {
-	blk, err := bh.vm.GetBlock(blkID)
+func (gh *getter) Get(validatorID ids.ShortID, requestID uint32, blkID ids.ID) error {
+	blk, err := gh.vm.GetBlock(blkID)
 	if err != nil {
 		// If we failed to get the block, that means either an unexpected error
 		// has occurred, [vdr] is not following the protocol, or the
 		// block has been pruned.
-		bh.log.Debug("Get(%s, %d, %s) failed with: %s", validatorID, requestID, blkID, err)
+		gh.log.Debug("Get(%s, %d, %s) failed with: %s", validatorID, requestID, blkID, err)
 		return nil
 	}
 
 	// Respond to the validator with the fetched block and the same requestID.
-	bh.sender.SendPut(validatorID, requestID, blkID, blk.Bytes())
+	gh.sender.SendPut(validatorID, requestID, blkID, blk.Bytes())
 	return nil
 }
 
 // currentAcceptedFrontier returns the set of containerIDs that are accepted,
 // but have no accepted children.
 // currentAcceptedFrontier returns the last accepted block
-func (bh Handler) currentAcceptedFrontier() ([]ids.ID, error) {
-	lastAccepted, err := bh.vm.LastAccepted()
+func (gh *getter) currentAcceptedFrontier() ([]ids.ID, error) {
+	lastAccepted, err := gh.vm.LastAccepted()
 	return []ids.ID{lastAccepted}, err
 }
 
 // filterAccepted returns the subset of containerIDs that are accepted by this chain.
 // filterAccepted returns the blocks in [containerIDs] that we have accepted
-func (bh Handler) filterAccepted(containerIDs []ids.ID) []ids.ID {
+func (gh *getter) filterAccepted(containerIDs []ids.ID) []ids.ID {
 	acceptedIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, blkID := range containerIDs {
-		if blk, err := bh.vm.GetBlock(blkID); err == nil && blk.Status() == choices.Accepted {
+		if blk, err := gh.vm.GetBlock(blkID); err == nil && blk.Status() == choices.Accepted {
 			acceptedIDs = append(acceptedIDs, blkID)
 		}
 	}

@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package gethandler
+package getter
 
 import (
 	"errors"
@@ -83,9 +83,13 @@ func TestAcceptedFrontier(t *testing.T) {
 		return dummyBlk, nil
 	}
 
-	bs, err := New(vm, config)
+	bsIntf, err := New(vm, config)
 	if err != nil {
 		t.Fatal(err)
+	}
+	bs, ok := bsIntf.(*getter)
+	if !ok {
+		t.Fatal("Unexpected get handler")
 	}
 
 	accepted, err := bs.currentAcceptedFrontier()
@@ -124,9 +128,13 @@ func TestFilterAccepted(t *testing.T) {
 		return blk1, nil
 	}
 
-	bs, err := New(vm, config)
+	bsIntf, err := New(vm, config)
 	if err != nil {
 		t.Fatal(err)
+	}
+	bs, ok := bsIntf.(*getter)
+	if !ok {
+		t.Fatal("Unexpected get handler")
 	}
 
 	blkIDs := []ids.ID{blkID0, blkID1, blkID2}

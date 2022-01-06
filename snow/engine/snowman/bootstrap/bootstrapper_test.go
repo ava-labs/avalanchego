@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	sgh "github.com/ava-labs/avalanchego/snow/engine/snowman/get_handler"
+	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
@@ -69,14 +69,14 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 		SharedCfg:                     &common.SharedConfig{},
 	}
 
-	snowGetHandler, err := sgh.New(vm, commonConfig)
+	snowGetHandler, err := snowgetter.New(vm, commonConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	return Config{
 		Config:        commonConfig,
-		Handler:       snowGetHandler,
+		AllGetsServer: snowGetHandler,
 		Blocked:       blocker,
 		VM:            vm,
 		WeightTracker: common.NewWeightTracker(commonConfig.Beacons, commonConfig.StartupAlpha),
