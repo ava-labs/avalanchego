@@ -737,10 +737,6 @@ func (t *Tree) Rebuild(blockHash, root common.Hash) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	// Firstly delete any recovery flag in the database. Because now we are
-	// building a brand new snapshot. Also reenable the snapshot feature.
-	rawdb.DeleteSnapshotRecoveryNumber(t.diskdb)
-
 	// Track whether there's a wipe currently running and keep it alive if so
 	var wiper chan struct{}
 
