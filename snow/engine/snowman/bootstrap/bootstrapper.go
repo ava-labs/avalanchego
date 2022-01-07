@@ -178,15 +178,8 @@ func (b *bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) err
 
 // Connected implements the InternalHandler interface.
 func (b *bootstrapper) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
-	// TODO: remove this check and replace with a different flow for WeightTracker
-	if nodeID != ids.ShortEmpty {
-		if err := b.VM.Connected(nodeID, nodeVersion); err != nil {
-			return err
-		}
-
-		if err := b.WeightTracker.AddWeightForNode(nodeID); err != nil {
-			return err
-		}
+	if err := b.VM.Connected(nodeID, nodeVersion); err != nil {
+		return err
 	}
 
 	if b.WeightTracker.EnoughConnectedWeight() && !b.started {
@@ -214,7 +207,7 @@ func (b *bootstrapper) Timeout() error {
 	b.awaitingTimeout = false
 
 	if !b.Config.Subnet.IsBootstrapped() {
-		return b.RestartBootstrap(true)
+		return b.Restart(true)
 	}
 	return b.finish()
 }
@@ -233,6 +226,19 @@ func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
 
 // IsBootstrapped implements the common.Engine interface.
 func (b *bootstrapper) IsBootstrapped() bool { return b.Ctx.IsBootstrapped() }
+
+// Start implements the common.Engine interface.
+func (b *bootstrapper) Start(startReqID uint32) error {
+	b.Ctx.Log.Info("Starting bootstrap...")
+	b.Ctx.SetState(snow.Bootstrapping)
+	b.Config.SharedCfg.RequestID = startReqID
+
+	if b.WeightTracker.EnoughConnectedWeight() {
+		return nil
+	}
+
+	return b.Startup()
+}
 
 // HealthCheck implements the common.Engine interface.
 func (b *bootstrapper) HealthCheck() (interface{}, error) {
@@ -432,7 +438,7 @@ func (b *bootstrapper) checkFinish() error {
 	// so that the bootstrapping process will terminate even as new blocks are
 	// being issued.
 	if b.Config.RetryBootstrap && executedBlocks > 0 && executedBlocks < previouslyExecuted/2 {
-		return b.RestartBootstrap(true)
+		return b.Restart(true)
 	}
 
 	// If there is an additional callback, notify them that this chain has been

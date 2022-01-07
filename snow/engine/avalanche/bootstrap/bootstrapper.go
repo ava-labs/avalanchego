@@ -248,7 +248,7 @@ func (b *bootstrapper) Timeout() error {
 	b.awaitingTimeout = false
 
 	if !b.Config.Subnet.IsBootstrapped() {
-		return b.RestartBootstrap(true)
+		return b.Restart(true)
 	}
 	return b.finish()
 }
@@ -267,6 +267,19 @@ func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
 
 // IsBootstrapped implements the common.Engine interface.
 func (b *bootstrapper) IsBootstrapped() bool { return b.Ctx.IsBootstrapped() }
+
+// Start implements the common.Engine interface.
+func (b *bootstrapper) Start(startReqID uint32) error {
+	b.Ctx.Log.Info("Starting bootstrap...")
+	b.Ctx.SetState(snow.Bootstrapping)
+	b.Config.SharedCfg.RequestID = startReqID
+
+	if b.WeightTracker.EnoughConnectedWeight() {
+		return nil
+	}
+
+	return b.Startup()
+}
 
 // HealthCheck implements the common.Engine interface.
 func (b *bootstrapper) HealthCheck() (interface{}, error) {
@@ -500,7 +513,7 @@ func (b *bootstrapper) checkFinish() error {
 	// issued.
 	if executedVts > 0 && executedVts < previouslyExecuted/2 && b.Config.RetryBootstrap {
 		b.Ctx.Log.Debug("checking for more vertices before finishing bootstrapping")
-		return b.RestartBootstrap(true)
+		return b.Restart(true)
 	}
 
 	// Notify the subnet that this chain is synced
