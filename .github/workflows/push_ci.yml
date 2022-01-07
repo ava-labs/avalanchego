@@ -25,7 +25,7 @@ jobs:
           repository: ava-labs/avalanchego-internal
           ref: master
           path: avalanchego
-          token: ${{ secrets.avalanche_pat }}
+          token: ${{ secrets.AVALANCHE_PAT }}
           #repository: ${{ github.event.inputs.avalanchegoRepo }}
           #ref: ${{ github.event.inputs.avalanchegoBranch }}
       - name: change avalanchego dep
