@@ -22,17 +22,12 @@ import (
 const bootstrappingDelay = 10 * time.Second
 
 var (
-	_ SnowmanBootstrapper = &bootstrapper{}
+	_ common.BootstrapperEngine = &bootstrapper{}
 
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
 
-type SnowmanBootstrapper interface {
-	common.Engine
-	common.Bootstrapable
-}
-
-func New(config Config, onFinished func(lastReqID uint32) error) (SnowmanBootstrapper, error) {
+func New(config Config, onFinished func(lastReqID uint32) error) (common.BootstrapperEngine, error) {
 	b := &bootstrapper{
 		Config: config,
 

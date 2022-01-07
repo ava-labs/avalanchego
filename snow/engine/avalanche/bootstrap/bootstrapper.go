@@ -33,17 +33,12 @@ const (
 )
 
 var (
-	_ AvalancheBootstrapper = &bootstrapper{}
+	_ common.BootstrapableEngine = &bootstrapper{}
 
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
 
-type AvalancheBootstrapper interface {
-	common.Engine
-	common.Bootstrapable
-}
-
-func New(config Config, onFinished func(lastReqID uint32) error) (AvalancheBootstrapper, error) {
+func New(config Config, onFinished func(lastReqID uint32) error) (common.BootstrapableEngine, error) {
 	b := &bootstrapper{
 		Config: config,
 
