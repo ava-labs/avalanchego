@@ -110,7 +110,7 @@ func New(file string, configBytes []byte, log logging.Logger) (database.Database
 	}
 	if len(configBytes) > 0 {
 		if err := json.Unmarshal(configBytes, &parsedConfig); err != nil {
-			return nil, fmt.Errorf("failed to parse db config: %s", err)
+			return nil, fmt.Errorf("failed to parse db config: %w", err)
 		}
 	}
 	configJSON, err := json.Marshal(&parsedConfig)

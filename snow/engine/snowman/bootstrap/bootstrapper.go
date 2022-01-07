@@ -22,12 +22,12 @@ import (
 const bootstrappingDelay = 10 * time.Second
 
 var (
-	_ common.BootstrapperEngine = &bootstrapper{}
+	_ common.BootstrapableEngine = &bootstrapper{}
 
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
 
-func New(config Config, onFinished func(lastReqID uint32) error) (common.BootstrapperEngine, error) {
+func New(config Config, onFinished func(lastReqID uint32) error) (common.BootstrapableEngine, error) {
 	b := &bootstrapper{
 		Config: config,
 
@@ -45,11 +45,11 @@ func New(config Config, onFinished func(lastReqID uint32) error) (common.Bootstr
 
 	lastAcceptedID, err := b.VM.LastAccepted()
 	if err != nil {
-		return nil, fmt.Errorf("couldn't get last accepted ID: %s", err)
+		return nil, fmt.Errorf("couldn't get last accepted ID: %w", err)
 	}
 	lastAccepted, err := b.VM.GetBlock(lastAcceptedID)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't get last accepted block: %s", err)
+		return nil, fmt.Errorf("couldn't get last accepted block: %w", err)
 	}
 	b.startingHeight = lastAccepted.Height()
 
