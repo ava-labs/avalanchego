@@ -87,7 +87,7 @@ func New(config Config, onFinished func(lastReqID uint32) error) (AvalancheBoots
 		return nil, err
 	}
 
-	config.Bootstrapable = b
+	config.Config.Bootstrapable = b
 	b.Bootstrapper = common.NewCommonBootstrapper(config.Config)
 	return b, nil
 }
