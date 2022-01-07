@@ -26,7 +26,7 @@ jobs:
           repository: ${{ github.event.inputs.avalanchegoRepo }}
           ref: ${{ github.event.inputs.avalanchegoBranch }}
           path: avalanchego
-          token: ${{ secrets.SNOWBOT_PAT }}
+          token: ${{ secrets.AVALANCHE_PAT }}
       - name: change avalanchego dep
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
@@ -52,7 +52,7 @@ jobs:
         repository: ${{ github.event.inputs.avalanchegoRepo }}
         ref: ${{ github.event.inputs.avalanchegoBranch }}
         path: avalanchego
-        token: ${{ secrets.SNOWBOT_PAT }}
+        token: ${{ secrets.AVALANCHE_PAT }}
     - name: change avalanchego dep
       if: ${{ github.event_name == 'workflow_dispatch' }}
       run: go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
@@ -81,7 +81,7 @@ jobs:
         repository: ${{ github.event.inputs.avalanchegoRepo }}
         ref: ${{ github.event.inputs.avalanchegoBranch }}
         path: avalanchego
-        token: ${{ secrets.SNOWBOT_PAT }}
+        token: ${{ secrets.AVALANCHE_PAT }}
     - name: change avalanchego dep
       if: ${{ github.event_name == 'workflow_dispatch' }}
       run: go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
