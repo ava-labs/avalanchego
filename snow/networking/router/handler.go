@@ -98,11 +98,7 @@ func (h *Handler) RegisterEngine(engine common.Engine) {
 
 func (h *Handler) OnDoneFastSyncing(lastReqID uint32) error {
 	lastReqID++
-	if err := h.bootstrapper.Start(lastReqID); err != nil {
-		return err
-	}
-	// TODO: fix this by proper wiring of bootstrapper & weight tracker
-	return h.bootstrapper.Connected(ids.ShortEmpty, nil)
+	return h.bootstrapper.Start(lastReqID)
 }
 
 func (h *Handler) OnDoneBootstrapping(lastReqID uint32) error {
