@@ -268,17 +268,6 @@ func (bc *BlockChain) SenderCacher() *TxSenderCacher {
 	return bc.senderCacher
 }
 
-// empty returns an indicator whether the blockchain is empty.
-func (bc *BlockChain) empty() bool {
-	genesis := bc.genesisBlock.Hash()
-	for _, hash := range []common.Hash{rawdb.ReadHeadBlockHash(bc.db), rawdb.ReadHeadHeaderHash(bc.db)} {
-		if hash != genesis {
-			return false
-		}
-	}
-	return true
-}
-
 // loadLastState loads the last known chain state from the database. This method
 // assumes that the chain manager mutex is held.
 func (bc *BlockChain) loadLastState(lastAcceptedHash common.Hash) error {
@@ -422,20 +411,30 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 //
 // Note, this function assumes that the `mu` mutex is held!
 func (bc *BlockChain) writeHeadBlock(block *types.Block) {
+	// TODO: go-ethereum now assumes that the block passed in should always
+	// update heads. Should we do this?
+	updateHeads := rawdb.ReadCanonicalHash(bc.db, block.NumberU64()) != block.Hash()
+
 	// If the block is on a side chain or an unknown one, force other heads onto it too
 	// Add the block to the canonical chain number scheme and mark as the head
 	batch := bc.db.NewBatch()
 	rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
+
 	rawdb.WriteHeadBlockHash(batch, block.Hash())
 
-	// If the block is better than our head or is on a different chain, force update heads
-	rawdb.WriteHeadHeaderHash(batch, block.Hash())
+	if updateHeads {
+		// If the block is better than our head or is on a different chain, force update heads
+		rawdb.WriteHeadHeaderHash(batch, block.Hash())
+	}
+
 	// Flush the whole batch into the disk, exit the node if failed
 	if err := batch.Write(); err != nil {
 		log.Crit("Failed to update chain indexes and markers", "err", err)
 	}
 	// Update all in-memory chain markers in the last step
-	bc.hc.SetCurrentHeader(block.Header())
+	if updateHeads {
+		bc.hc.SetCurrentHeader(block.Header())
+	}
 	bc.currentBlock.Store(block)
 }
 
