@@ -33,9 +33,9 @@ type Transitive struct {
 	Config
 
 	// list of NoOpsHandler for messages dropped by engine
-	common.NoOpAcceptedFrontierHandler
-	common.NoOpAcceptedHandler
-	common.NoOpAncestorsHandler
+	common.AcceptedFrontierHandler
+	common.AcceptedHandler
+	common.AncestorsHandler
 
 	RequestID uint32
 
@@ -73,16 +73,10 @@ func newTransitive(config Config) (*Transitive, error) {
 
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t := &Transitive{
-		Config: config,
-		NoOpAcceptedFrontierHandler: common.NoOpAcceptedFrontierHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpAcceptedHandler: common.NoOpAcceptedHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpAncestorsHandler: common.NoOpAncestorsHandler{
-			Log: config.Ctx.Log,
-		},
+		Config:                  config,
+		AcceptedFrontierHandler: common.NewNoOpAcceptedFrontierHandler(config.Ctx.Log),
+		AcceptedHandler:         common.NewNoOpAcceptedHandler(config.Ctx.Log),
+		AncestorsHandler:        common.NewNoOpAncestorsHandler(config.Ctx.Log),
 		polls: poll.NewSet(factory,
 			config.Ctx.Log,
 			"",

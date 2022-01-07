@@ -47,18 +47,10 @@ func New(config Config, onFinished func(lastReqID uint32) error) (AvalancheBoots
 	b := &bootstrapper{
 		Config: config,
 
-		NoOpPutHandler: common.NoOpPutHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpQueryHandler: common.NoOpQueryHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpChitsHandler: common.NoOpChitsHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpAppHandler: common.NoOpAppHandler{
-			Log: config.Ctx.Log,
-		},
+		PutHandler:   common.NewNoOpPutHandler(config.Ctx.Log),
+		QueryHandler: common.NewNoOpQueryHandler(config.Ctx.Log),
+		ChitsHandler: common.NewNoOpChitsHandler(config.Ctx.Log),
+		AppHandler:   common.NewNoOpAppHandler(config.Ctx.Log),
 
 		processedCache:           &cache.LRU{Size: cacheSize},
 		Fetcher:                  common.Fetcher{OnFinished: onFinished},
@@ -96,10 +88,10 @@ type bootstrapper struct {
 	Config
 
 	// list of NoOpsHandler for messages dropped by bootstrapper
-	common.NoOpPutHandler
-	common.NoOpQueryHandler
-	common.NoOpChitsHandler
-	common.NoOpAppHandler
+	common.PutHandler
+	common.QueryHandler
+	common.ChitsHandler
+	common.AppHandler
 
 	common.Bootstrapper
 	common.Fetcher
