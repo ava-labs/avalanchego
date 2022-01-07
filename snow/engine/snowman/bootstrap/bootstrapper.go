@@ -178,12 +178,15 @@ func (b *bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) err
 
 // Connected implements the InternalHandler interface.
 func (b *bootstrapper) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
-	if err := b.VM.Connected(nodeID, nodeVersion); err != nil {
-		return err
-	}
+	// TODO: remove this check and replace with a different flow for WeightTracker
+	if nodeID != ids.ShortEmpty {
+		if err := b.VM.Connected(nodeID, nodeVersion); err != nil {
+			return err
+		}
 
-	if err := b.WeightTracker.AddWeightForNode(nodeID); err != nil {
-		return err
+		if err := b.WeightTracker.AddWeightForNode(nodeID); err != nil {
+			return err
+		}
 	}
 
 	if b.WeightTracker.EnoughConnectedWeight() && !b.started {
