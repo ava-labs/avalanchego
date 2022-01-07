@@ -18,7 +18,7 @@ import (
 
 var errUnknownVertex = errors.New("unknown vertex")
 
-func testSetup(t *testing.T) (*vertex.TestManager, common.Config) {
+func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Config) {
 	peers := validators.NewSet()
 	peer := ids.GenerateTestShortID()
 	if err := peers.AddWeight(peer, 1); err != nil {
@@ -53,11 +53,11 @@ func testSetup(t *testing.T) (*vertex.TestManager, common.Config) {
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
 
-	return manager, commonConfig
+	return manager, sender, commonConfig
 }
 
 func TestAcceptedFrontier(t *testing.T) {
-	manager, config := testSetup(t)
+	manager, sender, config := testSetup(t)
 
 	vtxID0 := ids.GenerateTestID()
 	vtxID1 := ids.GenerateTestID()
@@ -79,7 +79,15 @@ func TestAcceptedFrontier(t *testing.T) {
 		}
 	}
 
-	accepted := bs.currentAcceptedFrontier()
+	var accepted []ids.ID
+	sender.SendAcceptedFrontierF = func(_ ids.ShortID, _ uint32, frontier []ids.ID) {
+		accepted = frontier
+	}
+
+	if err := bs.GetAcceptedFrontier(ids.ShortEmpty, 0); err != nil {
+		t.Fatal(err)
+	}
+
 	acceptedSet := ids.Set{}
 	acceptedSet.Add(accepted...)
 
@@ -97,7 +105,7 @@ func TestAcceptedFrontier(t *testing.T) {
 }
 
 func TestFilterAccepted(t *testing.T) {
-	manager, config := testSetup(t)
+	manager, sender, config := testSetup(t)
 
 	vtxID0 := ids.GenerateTestID()
 	vtxID1 := ids.GenerateTestID()
@@ -136,7 +144,15 @@ func TestFilterAccepted(t *testing.T) {
 		return nil, errUnknownVertex
 	}
 
-	accepted := bs.filterAccepted(vtxIDs)
+	var accepted []ids.ID
+	sender.SendAcceptedF = func(_ ids.ShortID, _ uint32, frontier []ids.ID) {
+		accepted = frontier
+	}
+
+	if err := bs.GetAccepted(ids.ShortEmpty, 0, vtxIDs); err != nil {
+		t.Fatal(err)
+	}
+
 	acceptedSet := ids.Set{}
 	acceptedSet.Add(accepted...)
 
