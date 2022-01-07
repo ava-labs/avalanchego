@@ -31,6 +31,7 @@ func New(config Config) (Engine, error) {
 // transitive dependencies.
 type Transitive struct {
 	Config
+	metrics
 
 	// list of NoOpsHandler for messages dropped by engine
 	common.AcceptedFrontierHandler
@@ -38,8 +39,6 @@ type Transitive struct {
 	common.AncestorsHandler
 
 	RequestID uint32
-
-	metrics
 
 	polls poll.Set // track people I have asked for their preference
 
