@@ -9,7 +9,6 @@ import (
 	stdmath "math"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/math"
 )
@@ -39,9 +38,8 @@ type Bootstrapper interface {
 	AcceptedFrontierHandler
 	AcceptedHandler
 	Haltable
-	Start(startReqID uint32) error
 	Startup() error
-	RestartBootstrap(reset bool) error
+	Restart(reset bool) error
 }
 
 // bootstrapper implements the Handler interface.
@@ -136,7 +134,7 @@ func (b *bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 		if b.Config.RetryBootstrap {
 			b.Ctx.Log.Debug("Not enough frontiers received, restarting bootstrap... - Beacons: %d - Failed Bootstrappers: %d "+
 				"- bootstrap attempt: %d", b.Beacons.Len(), b.failedAcceptedFrontier.Len(), b.bootstrapAttempts)
-			return b.RestartBootstrap(false)
+			return b.Restart(false)
 		}
 
 		b.Ctx.Log.Debug("Didn't receive enough frontiers - failed validators: %d, "+
@@ -229,7 +227,7 @@ func (b *bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 		if b.Config.RetryBootstrap && b.Beacons.Weight()-b.Alpha < failedBeaconWeight {
 			b.Ctx.Log.Debug("Not enough votes received, restarting bootstrap... - Beacons: %d - Failed Bootstrappers: %d "+
 				"- bootstrap attempt: %d", b.Beacons.Len(), b.failedAccepted.Len(), b.bootstrapAttempts)
-			return b.RestartBootstrap(false)
+			return b.Restart(false)
 		}
 	}
 
@@ -257,18 +255,6 @@ func (b *bootstrapper) GetAcceptedFailed(validatorID ids.ShortID, requestID uint
 	// that they think none of the containers we sent them in GetAccepted are accepted
 	b.failedAccepted.Add(validatorID)
 	return b.Accepted(validatorID, requestID, nil)
-}
-
-func (b *bootstrapper) Start(startReqID uint32) error {
-	b.Ctx.Log.Info("Starting bootstrap...")
-	b.Ctx.SetState(snow.Bootstrapping)
-	b.Config.SharedCfg.RequestID = startReqID
-
-	if b.Config.StartupAlpha > 0 {
-		return nil
-	}
-
-	return b.Startup()
 }
 
 func (b *bootstrapper) Startup() error {
@@ -314,7 +300,7 @@ func (b *bootstrapper) Startup() error {
 	return nil
 }
 
-func (b *bootstrapper) RestartBootstrap(reset bool) error {
+func (b *bootstrapper) Restart(reset bool) error {
 	// resets the attempts when we're pulling blocks/vertices we don't want to
 	// fail the bootstrap at that stage
 	if reset {
