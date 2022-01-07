@@ -499,6 +499,9 @@ func (b *SimulatedBackend) AcceptedNonceAt(ctx context.Context, account common.A
 // SuggestGasPrice implements ContractTransactor.SuggestGasPrice. Since the simulated
 // chain doesn't have miners, we just return a gas price of 1 for any call.
 func (b *SimulatedBackend) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	if b.acceptedBlock.Header().BaseFee != nil {
 		return b.acceptedBlock.Header().BaseFee, nil
 	}
