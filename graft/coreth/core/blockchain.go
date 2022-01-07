@@ -234,8 +234,6 @@ func NewBlockChain(
 	// Create the state manager
 	bc.stateManager = NewTrieWriter(bc.stateCache.TrieDB(), cacheConfig)
 
-	// Note: we call loadLastState before initializing snapshots, which ensures that snapshots will
-	// not be used when re-processing blocks in recoverAncestors.
 	if err := bc.loadLastState(lastAcceptedHash); err != nil {
 		return nil, err
 	}
@@ -410,30 +408,20 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 //
 // Note, this function assumes that the `mu` mutex is held!
 func (bc *BlockChain) writeHeadBlock(block *types.Block) {
-	// TODO: go-ethereum now assumes that the block passed in should always
-	// update heads. Should we do this?
-	updateHeads := rawdb.ReadCanonicalHash(bc.db, block.NumberU64()) != block.Hash()
-
 	// If the block is on a side chain or an unknown one, force other heads onto it too
 	// Add the block to the canonical chain number scheme and mark as the head
 	batch := bc.db.NewBatch()
 	rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
 
 	rawdb.WriteHeadBlockHash(batch, block.Hash())
-
-	if updateHeads {
-		// If the block is better than our head or is on a different chain, force update heads
-		rawdb.WriteHeadHeaderHash(batch, block.Hash())
-	}
+	rawdb.WriteHeadHeaderHash(batch, block.Hash())
 
 	// Flush the whole batch into the disk, exit the node if failed
 	if err := batch.Write(); err != nil {
 		log.Crit("Failed to update chain indexes and markers", "err", err)
 	}
 	// Update all in-memory chain markers in the last step
-	if updateHeads {
-		bc.hc.SetCurrentHeader(block.Header())
-	}
+	bc.hc.SetCurrentHeader(block.Header())
 	bc.currentBlock.Store(block)
 }
 
@@ -528,11 +516,6 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 	}
 
 	return nil
-}
-
-// stopped returns true if Stop has been called on the chain.
-func (bc *BlockChain) stopped() bool {
-	return atomic.LoadInt32(&bc.running) == 1
 }
 
 // Stop stops the blockchain service. If any imports are currently in progress
