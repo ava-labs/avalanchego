@@ -326,7 +326,7 @@ func (bc *BlockChain) loadLastState(lastAcceptedHash common.Hash) error {
 		return fmt.Errorf("failed to set preference to last accepted block while loading last state: %w", err)
 	}
 
-	// recoverAncestors is necessary to ensure that the last accepted state is
+	// reprocessState is necessary to ensure that the last accepted state is
 	// available. The state may not be available if it was not committed due
 	// to an unclean shutdown.
 	return bc.reprocessState(bc.lastAccepted, 2*commitInterval)
