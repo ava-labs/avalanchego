@@ -97,8 +97,6 @@ func newTransitive(config Config) (*Transitive, error) {
 // Put implements the PutHandler interface
 func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxBytes []byte) error {
 	t.Ctx.Log.Verbo("Put(%s, %d) called", vdr, requestID)
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "Put received by Engine during Bootstrap")
-
 	vtx, err := t.Manager.ParseVtx(vtxBytes)
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse vertex due to: %s", err)
@@ -113,8 +111,6 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxBytes []byte) err
 
 // GetFailed implements the PutHandler interface
 func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "GetFailed received by Engine during Bootstrap")
-
 	vtxID, ok := t.outstandingVtxReqs.Remove(vdr, requestID)
 	if !ok {
 		t.Ctx.Log.Debug("GetFailed(%s, %d) called without having sent corresponding Get", vdr, requestID)
@@ -140,9 +136,6 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 
 // PullQuery implements the QueryHandler interface
 func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error {
-	// If the engine hasn't been bootstrapped, we aren't ready to respond to queries
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "PullQuery received by Engine during Bootstrap")
-
 	// Will send chits to [vdr] once we have [vtxID] and its dependencies
 	c := &convincer{
 		consensus: t.Consensus,
@@ -172,9 +165,6 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID) 
 
 // PushQuery implements the QueryHandler interface
 func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxBytes []byte) error {
-	// We're bootstrapping, so ignore this query.
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "PushQuery received by Engine during Bootstrap")
-
 	vtx, err := t.Manager.ParseVtx(vtxBytes)
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse vertex due to: %s", err)
@@ -191,8 +181,6 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxBytes []byt
 
 // Chits implements the ChitsHandler interface
 func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) error {
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "Chits received by Engine during Bootstrap")
-
 	v := &voter{
 		t:         t,
 		vdr:       vdr,
@@ -214,40 +202,29 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) er
 
 // QueryFailed implements the ChitsHandler interface
 func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
-	// If the engine hasn't been bootstrapped, we didn't issue a query
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "QueryFailed received by Engine during Bootstrap")
-
 	return t.Chits(vdr, requestID, nil)
 }
 
 // AppRequest implements the AppHandler interface
 func (t *Transitive) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppRequest received by Engine during Bootstrap")
-
 	// Notify the VM of this request
 	return t.VM.AppRequest(nodeID, requestID, deadline, request)
 }
 
 // AppRequestFailed implements the AppHandler interface
 func (t *Transitive) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppRequestFailed received by Engine during Bootstrap")
-
 	// Notify the VM that a request it made failed
 	return t.VM.AppRequestFailed(nodeID, requestID)
 }
 
 // AppResponse implements the AppHandler interface
 func (t *Transitive) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppResponse received by Engine during Bootstrap")
-
 	// Notify the VM of a response to its request
 	return t.VM.AppResponse(nodeID, requestID, response)
 }
 
 // AppGossip implements the AppHandler interface
 func (t *Transitive) AppGossip(nodeID ids.ShortID, msg []byte) error {
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppGossip received by Engine during Bootstrap")
-
 	// Notify the VM of this message which has been gossiped to it
 	return t.VM.AppGossip(nodeID, msg)
 }
