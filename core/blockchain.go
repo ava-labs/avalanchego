@@ -57,7 +57,6 @@ var (
 
 	errFutureBlockUnsupported  = errors.New("future block insertion not supported")
 	errCacheConfigNotSpecified = errors.New("must specify cache config")
-	errInsertionInterrupted    = errors.New("insertion is interrupted")
 )
 
 const (
@@ -332,7 +331,7 @@ func (bc *BlockChain) loadLastState(lastAcceptedHash common.Hash) error {
 	// recoverAncestors is necessary to ensure that the last accepted state is
 	// available. The state may not be available if it was not committed due
 	// to an unclean shutdown.
-	return bc.recoverAncestors(bc.lastAccepted)
+	return bc.reprocessState(bc.lastAccepted, 2*commitInterval)
 }
 
 // removeIndices removes all transaction lookup entries for the transactions contained in the canonical chain
@@ -1221,65 +1220,95 @@ func (bc *BlockChain) RemoveRejectedBlocks(start, end uint64) error {
 	return nil
 }
 
-// recoverAncestors finds the closest ancestor with available state and re-executes
-// all the ancestor blocks since that.
-// Note: recoverAncesotors then makes sure to commit the state of [block] so that if
-// we have another ungraceful shutdown immediately after recoverAncestors finishes we
-// will not have to start over.
-// Note: the geth equivalent is only used after the merge, whereas Coreth uses this
-// function to re-process state when an ungraceful shutdown occurs such that we do
-// not have a state trie on disk for the last accepted block.
-func (bc *BlockChain) recoverAncestors(target *types.Block) error {
-	// Gather all the sidechain hashes (full blocks may be memory heavy)
+// reprocessState reprocesses the state up to [block], iterating through its ancestors until
+// it reaches a block with a state committed to the database. reprocessState does not use
+// snapshots since the disk layer for snapshots will most likely be above the last committed
+// state that reprocessing will start from.
+func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64) error {
 	var (
-		start   = time.Now()
-		logged  time.Time
-		hashes  []common.Hash
-		numbers []uint64
-		parent  = target
+		origin = current.NumberU64()
 	)
-	for parent != nil && !bc.HasState(parent.Root()) {
-		hashes = append(hashes, parent.Hash())
-		numbers = append(numbers, parent.NumberU64())
-		parent = bc.GetBlock(parent.ParentHash(), parent.NumberU64()-1)
+	// If the state is already available, skip re-processing
+	statedb, err := state.New(current.Root(), bc.stateCache, nil)
+	if err == nil {
+		return nil
+	}
+	// Check how far back we need to re-execute, capped at [reexec]
+	for i := 0; i < int(reexec); i++ {
+		if current.NumberU64() == 0 {
+			return errors.New("genesis state is missing")
+		}
+		parent := bc.GetBlock(current.ParentHash(), current.NumberU64()-1)
+		if parent == nil {
+			return fmt.Errorf("missing block %s:%d", current.ParentHash().Hex(), current.NumberU64()-1)
+		}
+		current = parent
 
-		// If the chain is terminating, stop iteration
-		if bc.stopped() {
-			log.Debug("Abort during blocks iteration")
-			return errInsertionInterrupted
+		statedb, err = state.New(current.Root(), bc.stateCache, nil)
+		if err == nil {
+			break
 		}
 	}
-	if parent == nil {
-		return errors.New("missing parent")
-	}
-	// Import all the pruned blocks to make the state available
-	for i := len(hashes) - 1; i >= 0; i-- {
-		// If the chain is terminating, stop processing blocks
-		if bc.stopped() {
-			log.Debug("Abort during blocks processing")
-			return errInsertionInterrupted
-		}
-
-		b := bc.GetBlock(hashes[i], numbers[i])
-		if b == nil {
-			return fmt.Errorf("failed to fetch block (%s, %d) while recovering ancestors of target block (%s, %d)", hashes[i], numbers[i], target.Hash(), target.NumberU64())
-		}
-		if err := bc.insertBlock(b, true); err != nil {
+	if err != nil {
+		switch err.(type) {
+		case *trie.MissingNodeError:
+			return fmt.Errorf("required historical state unavailable (reexec=%d)", reexec)
+		default:
 			return err
 		}
+	}
+
+	// State was available at historical point, regenerate
+	var (
+		start        = time.Now()
+		logged       time.Time
+		previousRoot common.Hash
+		triedb       = bc.stateCache.TrieDB()
+	)
+	// Note: we add 1 since in each iteration, we attempt to re-execute the next block.
+	log.Info("Re-executing blocks to generate state for last accepted block", "from", current.NumberU64()+1, "to", origin)
+	for current.NumberU64() < origin {
 		// Print progress logs if long enough time elapsed
 		if time.Since(logged) > 8*time.Second {
-			log.Info("Recover ancestors", "block", b.NumberU64(), "target", target.NumberU64(), "remaining", target.NumberU64()-b.NumberU64(), "elapsed", time.Since(start))
+			log.Info("Regenerating historical state", "block", current.NumberU64()+1, "target", origin, "remaining", origin-current.NumberU64(), "elapsed", time.Since(start))
 			logged = time.Now()
 		}
+		// Retrieve the next block to regenerate and process it
+		parent := current
+		next := current.NumberU64() + 1
+		if current = bc.GetBlockByNumber(next); current == nil {
+			return fmt.Errorf("failed to retrieve block %d while re-generating state", next)
+		}
+		receipts, _, usedGas, err := bc.processor.Process(current, parent.Header(), statedb, vm.Config{})
+		if err != nil {
+			return fmt.Errorf("failed to re-process block (%s: %d): %v", current.Hash().Hex(), current.NumberU64(), err)
+		}
+		// Validate the state using the default validator
+		if err := bc.validator.ValidateState(current, statedb, receipts, usedGas); err != nil {
+			return fmt.Errorf("failed to validate state while re-processing block (%s: %d): %v", current.Hash().Hex(), current.NumberU64(), err)
+		}
+		log.Debug("processed block", "block", current.Hash(), "number", current.NumberU64())
+		// Finalize the state so any modifications are written to the trie
+		root, err := statedb.Commit(bc.chainConfig.IsEIP158(current.Number()))
+		if err != nil {
+			return err
+		}
+		statedb, err = state.New(root, bc.stateCache, nil)
+		if err != nil {
+			return fmt.Errorf("state reset after block %d failed: %v", current.NumberU64(), err)
+		}
+
+		triedb.Reference(root, common.Hash{})
+		if previousRoot != (common.Hash{}) {
+			triedb.Dereference(previousRoot)
+		}
+		previousRoot = root
 	}
 
-	// Make sure to commit the state root for the original block we are
-	// re-processing.
-	if err := bc.StateCache().TrieDB().Commit(target.Root(), true, nil); err != nil {
-		return err
+	nodes, imgs := triedb.Size()
+	log.Info("Historical state regenerated", "block", current.NumberU64(), "elapsed", time.Since(start), "nodes", nodes, "preimages", imgs)
+	if previousRoot != (common.Hash{}) {
+		return triedb.Commit(previousRoot, true, nil)
 	}
-
-	log.Info("Recover ancestors finished re-generating state successfully", "block", target.NumberU64(), "elapsed", time.Since(start))
 	return nil
 }
