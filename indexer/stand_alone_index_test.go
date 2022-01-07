@@ -29,7 +29,8 @@ func TestStandAloneIndex(t *testing.T) {
 	db := versiondb.New(baseDB)
 	ctx := snow.DefaultConsensusContextTest()
 
-	indexIntf, err := newStandAloneIndex(db, logging.NoLog{}, codec, mockable.Clock{})
+	dummyPrefix := []byte{'p', 'r', 'e', 'f', 'i', 'x'}
+	indexIntf, err := newStandAloneIndex(dummyPrefix, db, logging.NoLog{}, codec, mockable.Clock{})
 	assert.NoError(err)
 	idx := indexIntf.(*standAloneIndex)
 
@@ -83,7 +84,7 @@ func TestStandAloneIndex(t *testing.T) {
 	assert.NoError(db.Commit())
 	assert.NoError(idx.Close())
 	db = versiondb.New(baseDB)
-	indexIntf, err = newStandAloneIndex(db, logging.NoLog{}, codec, mockable.Clock{})
+	indexIntf, err = newStandAloneIndex(dummyPrefix, db, logging.NoLog{}, codec, mockable.Clock{})
 	assert.NoError(err)
 	idx = indexIntf.(*standAloneIndex)
 
@@ -118,7 +119,8 @@ func TestStandAloneIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 	assert.NoError(err)
 	db := memdb.New()
 	ctx := snow.DefaultConsensusContextTest()
-	indexIntf, err := newStandAloneIndex(db, logging.NoLog{}, codec, mockable.Clock{})
+	dummyPrefix := []byte{'p', 'r', 'e', 'f', 'i', 'x'}
+	indexIntf, err := newStandAloneIndex(dummyPrefix, db, logging.NoLog{}, codec, mockable.Clock{})
 	assert.NoError(err)
 	idx := indexIntf.(*standAloneIndex)
 
@@ -160,7 +162,8 @@ func TestDontStandAloneIndexSameContainerTwice(t *testing.T) {
 	assert.NoError(err)
 	db := memdb.New()
 	ctx := snow.DefaultConsensusContextTest()
-	idx, err := newStandAloneIndex(db, logging.NoLog{}, codec, mockable.Clock{})
+	dummyPrefix := []byte{'p', 'r', 'e', 'f', 'i', 'x'}
+	idx, err := newStandAloneIndex(dummyPrefix, db, logging.NoLog{}, codec, mockable.Clock{})
 	assert.NoError(err)
 
 	// Accept the same container twice

@@ -49,19 +49,21 @@ type standAloneIndex struct {
 // Returns a new, thread-safe Index.
 // Closes [baseDB] on close.
 func newStandAloneIndex(
-	baseDB database.Database,
+	prefix []byte,
+	rawDB database.Database,
 	log logging.Logger,
 	codec codec.Manager,
 	clock mockable.Clock,
 ) (Index, error) {
-	vDB := versiondb.New(baseDB)
+	prefixDB := prefixdb.New(prefix, rawDB)
+	vDB := versiondb.New(prefixDB)
 	indexToContainer := prefixdb.New(indexToContainerPrefix, vDB)
 	containerToIndex := prefixdb.New(containerToIDPrefix, vDB)
 
 	i := &standAloneIndex{
 		clock:            clock,
 		codec:            codec,
-		baseDB:           baseDB,
+		baseDB:           prefixDB,
 		vDB:              vDB,
 		indexToContainer: indexToContainer,
 		containerToIndex: containerToIndex,
@@ -76,6 +78,7 @@ func newStandAloneIndex(
 		return i, nil
 	}
 	if err != nil {
+		_ = prefixDB.Close()
 		return nil, fmt.Errorf("couldn't get next accepted index from database: %w", err)
 	}
 	i.nextAcceptedIndex = nextAcceptedIndex

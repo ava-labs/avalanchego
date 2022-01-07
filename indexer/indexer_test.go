@@ -164,9 +164,10 @@ func TestIndexer(t *testing.T) {
 	chainVM := &smblockmocks.ChainVM{}
 	chainEngine := &smengmocks.Engine{}
 	chainEngine.On("Context").Return(chain1Ctx)
-	chainEngine.On("GetVM").Return(chainVM)
 
+	chainEngine.On("GetVM").Return(chainVM)
 	idxr.RegisterChain("chain1", chainEngine)
+
 	isIncomplete, err = idxr.isIncomplete(chain1Ctx.ChainID)
 	assert.NoError(err)
 	assert.False(isIncomplete)
@@ -261,7 +262,9 @@ func TestIndexer(t *testing.T) {
 	assert.False(isIncomplete)
 
 	// Register the same chain as before
+	chainEngine.On("GetVM").Return(chainVM)
 	idxr.RegisterChain("chain1", chainEngine)
+
 	blkIdx = idxr.blockIndices[chain1Ctx.ChainID]
 	assert.NotNil(blkIdx)
 	container, err = blkIdx.GetLastAccepted()
@@ -280,8 +283,10 @@ func TestIndexer(t *testing.T) {
 	dagVM := &avvtxmocks.DAGVM{}
 	dagEngine := &mocks.Engine{}
 	dagEngine.On("Context").Return(chain2Ctx)
-	dagEngine.On("GetVM").Return(dagVM).Once()
+
+	dagEngine.On("GetVM").Return(dagVM).Twice()
 	idxr.RegisterChain("chain2", dagEngine)
+
 	assert.NoError(err)
 	server = config.APIServer.(*apiServerMock)
 	assert.EqualValues(3, server.timesCalled) // block index, vtx index, tx index
@@ -413,6 +418,8 @@ func TestIndexer(t *testing.T) {
 	idxr, ok = idxrIntf.(*indexer)
 	assert.True(ok)
 	idxr.RegisterChain("chain1", chainEngine)
+
+	dagEngine.On("GetVM").Return(dagVM).Twice()
 	idxr.RegisterChain("chain2", dagEngine)
 
 	// Verify state
@@ -463,6 +470,8 @@ func TestIncompleteIndex(t *testing.T) {
 	assert.False(previouslyIndexed)
 	chainEngine := &smengmocks.Engine{}
 	chainEngine.On("Context").Return(chain1Ctx)
+	chainVM := &smblockmocks.ChainVM{}
+	chainEngine.On("GetVM").Return(chainVM)
 	idxr.RegisterChain("chain1", chainEngine)
 	isIncomplete, err = idxr.isIncomplete(chain1Ctx.ChainID)
 	assert.NoError(err)

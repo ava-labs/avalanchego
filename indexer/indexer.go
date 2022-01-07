@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -225,7 +224,7 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 
 	switch engine.(type) {
 	case snowman.Engine:
-		index, err := i.registerChainHelper(chainID, blockPrefix, name, "block", i.consensusDispatcher)
+		index, err := i.registerChainHelper(engine, chainID, blockPrefix, name, "block", i.consensusDispatcher)
 		if err != nil {
 			i.log.Fatal("couldn't create block index for %s: %s", name, err)
 			if err := i.close(); err != nil {
@@ -235,7 +234,7 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 		}
 		i.blockIndices[chainID] = index
 	case avalanche.Engine:
-		vtxIndex, err := i.registerChainHelper(chainID, vtxPrefix, name, "vtx", i.consensusDispatcher)
+		vtxIndex, err := i.registerChainHelper(engine, chainID, vtxPrefix, name, "vtx", i.consensusDispatcher)
 		if err != nil {
 			i.log.Fatal("couldn't create vertex index for %s: %s", name, err)
 			if err := i.close(); err != nil {
@@ -245,7 +244,7 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 		}
 		i.vtxIndices[chainID] = vtxIndex
 
-		txIndex, err := i.registerChainHelper(chainID, txPrefix, name, "tx", i.decisionDispatcher)
+		txIndex, err := i.registerChainHelper(engine, chainID, txPrefix, name, "tx", i.decisionDispatcher)
 		if err != nil {
 			i.log.Fatal("couldn't create tx index for %s: %s", name, err)
 			if err := i.close(); err != nil {
@@ -264,19 +263,27 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 }
 
 func (i *indexer) registerChainHelper(
+	engine common.Engine,
 	chainID ids.ID,
 	prefixEnd byte,
 	name, endpoint string,
 	dispatcher *triggers.EventDispatcher,
 ) (Index, error) {
-	prefix := make([]byte, hashing.HashLen+wrappers.ByteLen)
-	copy(prefix, chainID[:])
-	prefix[hashing.HashLen] = prefixEnd
-	indexDB := prefixdb.New(prefix, i.db)
-	index, err := newStandAloneIndex(indexDB, i.log, i.codec, i.clock)
-	if err != nil {
-		_ = indexDB.Close()
-		return nil, err
+	var (
+		index Index
+		err   error
+	)
+
+	// try creating if VM backed index first
+	if index, err = newVMBackedBlockIndex(engine.GetVM()); err != nil {
+		// upon failure, try DB backed index
+		prefix := make([]byte, hashing.HashLen+wrappers.ByteLen)
+		copy(prefix, chainID[:])
+		prefix[hashing.HashLen] = prefixEnd
+
+		if index, err = newStandAloneIndex(prefix, i.db, i.log, i.codec, i.clock); err != nil {
+			return nil, err
+		}
 	}
 
 	// Register index to learn about new accepted vertices

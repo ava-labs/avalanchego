@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/math"
 )
@@ -25,13 +26,17 @@ type vmBackedBlockIndex struct {
 	hVM block.HeightIndexedChainVM
 }
 
-func newVMBackedBlockIndex(vm block.ChainVM) (Index, error) {
-	hVM, ok := vm.(block.HeightIndexedChainVM)
+func newVMBackedBlockIndex(vm common.VM) (Index, error) {
+	bVM, ok := vm.(block.ChainVM)
+	if !ok {
+		return nil, block.ErrHeightIndexedVMNotImplemented
+	}
+	hVM, ok := bVM.(block.HeightIndexedChainVM)
 	if !ok {
 		return nil, block.ErrHeightIndexedVMNotImplemented
 	}
 	return &vmBackedBlockIndex{
-		vm:  vm,
+		vm:  bVM,
 		hVM: hVM,
 	}, nil
 }
