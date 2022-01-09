@@ -22,34 +22,19 @@ import (
 const bootstrappingDelay = 10 * time.Second
 
 var (
-	_ SnowmanBootstrapper = &bootstrapper{}
+	_ common.BootstrapableEngine = &bootstrapper{}
 
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
 
-type SnowmanBootstrapper interface {
-	common.Engine
-	common.Bootstrapable
-}
-
-func New(config Config, onFinished func(lastReqID uint32) error) (SnowmanBootstrapper, error) {
+func New(config Config, onFinished func(lastReqID uint32) error) (common.BootstrapableEngine, error) {
 	b := &bootstrapper{
-		Config: config,
-		NoOpFastSyncHandler: common.NoOpFastSyncHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpPutHandler: common.NoOpPutHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpQueryHandler: common.NoOpQueryHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpChitsHandler: common.NoOpChitsHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpAppHandler: common.NoOpAppHandler{
-			Log: config.Ctx.Log,
-		},
+		Config:          config,
+		FastSyncHandler: common.NewNoOpFastSyncHandler(config.Ctx.Log),
+		PutHandler:      common.NewNoOpPutHandler(config.Ctx.Log),
+		QueryHandler:    common.NewNoOpQueryHandler(config.Ctx.Log),
+		ChitsHandler:    common.NewNoOpChitsHandler(config.Ctx.Log),
+		AppHandler:      common.NewNoOpAppHandler(config.Ctx.Log),
 
 		Fetcher: common.Fetcher{
 			OnFinished: onFinished,
@@ -60,11 +45,11 @@ func New(config Config, onFinished func(lastReqID uint32) error) (SnowmanBootstr
 
 	lastAcceptedID, err := b.VM.LastAccepted()
 	if err != nil {
-		return nil, fmt.Errorf("couldn't get last accepted ID: %s", err)
+		return nil, fmt.Errorf("couldn't get last accepted ID: %w", err)
 	}
 	lastAccepted, err := b.VM.GetBlock(lastAcceptedID)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't get last accepted block: %s", err)
+		return nil, fmt.Errorf("couldn't get last accepted block: %w", err)
 	}
 	b.startingHeight = lastAccepted.Height()
 
@@ -91,11 +76,11 @@ type bootstrapper struct {
 	Config
 
 	// list of NoOpsHandler for messages dropped by bootstrapper
-	common.NoOpFastSyncHandler
-	common.NoOpPutHandler
-	common.NoOpQueryHandler
-	common.NoOpChitsHandler
-	common.NoOpAppHandler
+	common.FastSyncHandler
+	common.PutHandler
+	common.QueryHandler
+	common.ChitsHandler
+	common.AppHandler
 
 	common.Bootstrapper
 	common.Fetcher

@@ -33,34 +33,19 @@ const (
 )
 
 var (
-	_ AvalancheBootstrapper = &bootstrapper{}
+	_ common.BootstrapableEngine = &bootstrapper{}
 
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
 
-type AvalancheBootstrapper interface {
-	common.Engine
-	common.Bootstrapable
-}
-
-func New(config Config, onFinished func(lastReqID uint32) error) (AvalancheBootstrapper, error) {
+func New(config Config, onFinished func(lastReqID uint32) error) (common.BootstrapableEngine, error) {
 	b := &bootstrapper{
-		Config: config,
-		NoOpFastSyncHandler: common.NoOpFastSyncHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpPutHandler: common.NoOpPutHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpQueryHandler: common.NoOpQueryHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpChitsHandler: common.NoOpChitsHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpAppHandler: common.NoOpAppHandler{
-			Log: config.Ctx.Log,
-		},
+		Config:                   config,
+		FastSyncHandler:          common.NewNoOpFastSyncHandler(config.Ctx.Log),
+		PutHandler:               common.NewNoOpPutHandler(config.Ctx.Log),
+		QueryHandler:             common.NewNoOpQueryHandler(config.Ctx.Log),
+		ChitsHandler:             common.NewNoOpChitsHandler(config.Ctx.Log),
+		AppHandler:               common.NewNoOpAppHandler(config.Ctx.Log),
 		processedCache:           &cache.LRU{Size: cacheSize},
 		Fetcher:                  common.Fetcher{OnFinished: onFinished},
 		executedStateTransitions: math.MaxInt32,
@@ -88,7 +73,7 @@ func New(config Config, onFinished func(lastReqID uint32) error) (AvalancheBoots
 		return nil, err
 	}
 
-	config.Bootstrapable = b
+	config.Config.Bootstrapable = b
 	b.Bootstrapper = common.NewCommonBootstrapper(config.Config)
 	return b, nil
 }
@@ -97,11 +82,11 @@ type bootstrapper struct {
 	Config
 
 	// list of NoOpsHandler for messages dropped by bootstrapper
-	common.NoOpFastSyncHandler
-	common.NoOpPutHandler
-	common.NoOpQueryHandler
-	common.NoOpChitsHandler
-	common.NoOpAppHandler
+	common.FastSyncHandler
+	common.PutHandler
+	common.QueryHandler
+	common.ChitsHandler
+	common.AppHandler
 
 	common.Bootstrapper
 	common.Fetcher

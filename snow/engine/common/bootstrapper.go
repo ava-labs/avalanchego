@@ -234,6 +234,8 @@ func (b *bootstrapper) GetAcceptedFailed(validatorID ids.ShortID, requestID uint
 		return nil
 	}
 
+	// If we can't get a response from [validatorID], act as though they said
+	// that they think none of the containers we sent them in GetAccepted are accepted
 	if err := b.gR.AddFailed(message.Accepted, validatorID); err != nil {
 		return err
 	}

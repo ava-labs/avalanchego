@@ -31,7 +31,6 @@ func New(vm block.ChainVM, commonCfg common.Config) (common.AllGetsServer, error
 		"blocks fetched in a call to GetAncestors",
 		commonCfg.Ctx.Registerer,
 	)
-
 	return gh, err
 }
 
@@ -75,16 +74,22 @@ func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uin
 }
 
 func (gh *getter) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
-	acceptedFrontier, err := gh.currentAcceptedFrontier()
+	lastAccepted, err := gh.vm.LastAccepted()
 	if err != nil {
 		return err
 	}
-	gh.sender.SendAcceptedFrontier(validatorID, requestID, acceptedFrontier)
+	gh.sender.SendAcceptedFrontier(validatorID, requestID, []ids.ID{lastAccepted})
 	return nil
 }
 
 func (gh *getter) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	gh.sender.SendAccepted(validatorID, requestID, gh.filterAccepted(containerIDs))
+	acceptedIDs := make([]ids.ID, 0, len(containerIDs))
+	for _, blkID := range containerIDs {
+		if blk, err := gh.vm.GetBlock(blkID); err == nil && blk.Status() == choices.Accepted {
+			acceptedIDs = append(acceptedIDs, blkID)
+		}
+	}
+	gh.sender.SendAccepted(validatorID, requestID, acceptedIDs)
 	return nil
 }
 
@@ -120,24 +125,4 @@ func (gh *getter) Get(validatorID ids.ShortID, requestID uint32, blkID ids.ID) e
 	// Respond to the validator with the fetched block and the same requestID.
 	gh.sender.SendPut(validatorID, requestID, blkID, blk.Bytes())
 	return nil
-}
-
-// currentAcceptedFrontier returns the set of containerIDs that are accepted,
-// but have no accepted children.
-// currentAcceptedFrontier returns the last accepted block
-func (gh *getter) currentAcceptedFrontier() ([]ids.ID, error) {
-	lastAccepted, err := gh.vm.LastAccepted()
-	return []ids.ID{lastAccepted}, err
-}
-
-// filterAccepted returns the subset of containerIDs that are accepted by this chain.
-// filterAccepted returns the blocks in [containerIDs] that we have accepted
-func (gh *getter) filterAccepted(containerIDs []ids.ID) []ids.ID {
-	acceptedIDs := make([]ids.ID, 0, len(containerIDs))
-	for _, blkID := range containerIDs {
-		if blk, err := gh.vm.GetBlock(blkID); err == nil && blk.Status() == choices.Accepted {
-			acceptedIDs = append(acceptedIDs, blkID)
-		}
-	}
-	return acceptedIDs
 }
