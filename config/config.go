@@ -507,7 +507,7 @@ func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
 		config.Nat = nat.NewNoRouter()
 		ip, err = dynamicip.FetchExternalIP(config.DynamicPublicIPResolver)
 		if err != nil {
-			return node.IPConfig{}, fmt.Errorf("dynamic ip address fetch failed: %s", err)
+			return node.IPConfig{}, fmt.Errorf("dynamic ip address fetch failed: %w", err)
 		}
 	case publicIP == "":
 		// User didn't specify a public IP to use; try with NAT traversal

@@ -29,15 +29,14 @@ func New(config Config) (Engine, error) {
 // Transitive dependencies.
 type Transitive struct {
 	Config
+	metrics
 
 	// list of NoOpsHandler for messages dropped by engine
-	common.NoOpAcceptedFrontierHandler
-	common.NoOpAcceptedHandler
-	common.NoOpAncestorsHandler
+	common.AcceptedFrontierHandler
+	common.AcceptedHandler
+	common.AncestorsHandler
 
 	RequestID uint32
-
-	metrics
 
 	// track outstanding preference requests
 	polls poll.Set
@@ -69,18 +68,12 @@ func newTransitive(config Config) (*Transitive, error) {
 
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t := &Transitive{
-		Config: config,
-		NoOpAcceptedFrontierHandler: common.NoOpAcceptedFrontierHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpAcceptedHandler: common.NoOpAcceptedHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpAncestorsHandler: common.NoOpAncestorsHandler{
-			Log: config.Ctx.Log,
-		},
-		pending:      make(map[ids.ID]snowman.Block),
-		nonVerifieds: NewAncestorTree(),
+		Config:                  config,
+		AcceptedFrontierHandler: common.NewNoOpAcceptedFrontierHandler(config.Ctx.Log),
+		AcceptedHandler:         common.NewNoOpAcceptedHandler(config.Ctx.Log),
+		AncestorsHandler:        common.NewNoOpAncestorsHandler(config.Ctx.Log),
+		pending:                 make(map[ids.ID]snowman.Block),
+		nonVerifieds:            NewAncestorTree(),
 		polls: poll.NewSet(factory,
 			config.Ctx.Log,
 			"",
@@ -93,8 +86,6 @@ func newTransitive(config Config) (*Transitive, error) {
 
 // Put implements the PutHandler interface
 func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkBytes []byte) error {
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "Put received by Engine during Bootstrap")
-
 	blk, err := t.VM.ParseBlock(blkBytes)
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse block: %s", err)
@@ -118,8 +109,6 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkBytes []byte) err
 
 // GetFailed implements the PutHandler interface
 func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "GetFailed received by Engine during Bootstrap")
-
 	// We don't assume that this function is called after a failed Get message.
 	// Check to see if we have an outstanding request and also get what the request was for if it exists.
 	blkID, ok := t.blkReqs.Remove(vdr, requestID)
@@ -136,9 +125,6 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 
 // PullQuery implements the QueryHandler interface
 func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
-	// If the engine hasn't been bootstrapped, we aren't ready to respond to queries
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "PullQuery received by Engine during Bootstrap")
-
 	// Will send chits once we've issued block [blkID] into consensus
 	c := &convincer{
 		consensus: t.Consensus,
@@ -167,9 +153,6 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) 
 
 // PushQuery implements the QueryHandler interface
 func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkBytes []byte) error {
-	// if the engine hasn't been bootstrapped, we aren't ready to respond to queries
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "PushQuery received by Engine during Bootstrap")
-
 	blk, err := t.VM.ParseBlock(blkBytes)
 	// If parsing fails, we just drop the request, as we didn't ask for it
 	if err != nil {
@@ -193,9 +176,6 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkBytes []byt
 
 // Chits implements the ChitsHandler interface
 func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) error {
-	// if the engine hasn't been bootstrapped, we shouldn't be receiving chits
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "Chits received by Engine during Bootstrap")
-
 	// Since this is a linear chain, there should only be one ID in the vote set
 	if len(votes) != 1 {
 		t.Ctx.Log.Debug("Chits(%s, %d) was called with %d votes (expected 1)", vdr, requestID, len(votes))
@@ -232,9 +212,6 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) er
 
 // QueryFailed implements the ChitsHandler interface
 func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
-	// If the engine hasn't been bootstrapped, we didn't issue a query
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "QueryFailed received by Engine during Bootstrap")
-
 	t.blocked.Register(&voter{
 		t:         t,
 		vdr:       vdr,
@@ -246,32 +223,24 @@ func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
 
 // AppRequest implements the AppHandler interface
 func (t *Transitive) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppRequest received by Engine during Bootstrap")
-
 	// Notify the VM of this request
 	return t.VM.AppRequest(nodeID, requestID, deadline, request)
 }
 
 // AppRequestFailed implements the AppHandler interface
 func (t *Transitive) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppRequestFailed received by Engine during Bootstrap")
-
 	// Notify the VM that a request it made failed
 	return t.VM.AppRequestFailed(nodeID, requestID)
 }
 
 // AppResponse implements the AppHandler interface
 func (t *Transitive) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppResponse received by Engine during Bootstrap")
-
 	// Notify the VM of a response to its request
 	return t.VM.AppResponse(nodeID, requestID, response)
 }
 
 // AppGossip implements the AppHandler interface
 func (t *Transitive) AppGossip(nodeID ids.ShortID, msg []byte) error {
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "AppGossip received by Engine during Bootstrap")
-
 	// Notify the VM of this message which has been gossiped to it
 	return t.VM.AppGossip(nodeID, msg)
 }
@@ -316,8 +285,6 @@ func (t *Transitive) Shutdown() error {
 
 // Notify implements the InternalHandler interface
 func (t *Transitive) Notify(msg common.Message) error {
-	// if the engine hasn't been bootstrapped, we shouldn't build/issue blocks from the VM
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "Notify received by Engine during Bootstrap")
 	t.Ctx.Log.Verbo("snowman engine notified of %s from the vm", msg)
 	switch msg {
 	case common.PendingTxs:
@@ -392,8 +359,6 @@ func (t *Transitive) Start(startReqID uint32) error {
 
 // HealthCheck implements the common.Engine interface.
 func (t *Transitive) HealthCheck() (interface{}, error) {
-	t.Ctx.Log.AssertTrue(t.IsBootstrapped(), "HealthCheck received by Engine during Bootstrap")
-
 	consensusIntf, consensusErr := t.Consensus.HealthCheck()
 	vmIntf, vmErr := t.VM.HealthCheck()
 	intf := map[string]interface{}{

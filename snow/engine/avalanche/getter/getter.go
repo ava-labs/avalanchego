@@ -35,7 +35,6 @@ func New(manager vertex.Manager, commonCfg common.Config) (common.AllGetsServer,
 		"vertices fetched in a call to GetAncestors",
 		commonCfg.Ctx.Registerer,
 	)
-
 	return gh, err
 }
 
@@ -49,13 +48,19 @@ type getter struct {
 }
 
 func (gh *getter) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
-	acceptedFrontier := gh.currentAcceptedFrontier()
+	acceptedFrontier := gh.manager.Edge()
 	gh.sender.SendAcceptedFrontier(validatorID, requestID, acceptedFrontier)
 	return nil
 }
 
 func (gh *getter) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	gh.sender.SendAccepted(validatorID, requestID, gh.filterAccepted(containerIDs))
+	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
+	for _, vtxID := range containerIDs {
+		if vtx, err := gh.manager.GetVtx(vtxID); err == nil && vtx.Status() == choices.Accepted {
+			acceptedVtxIDs = append(acceptedVtxIDs, vtxID)
+		}
+	}
+	gh.sender.SendAccepted(validatorID, requestID, acceptedVtxIDs)
 	return nil
 }
 
@@ -113,22 +118,4 @@ func (gh *getter) Get(validatorID ids.ShortID, requestID uint32, vtxID ids.ID) e
 		gh.sender.SendPut(validatorID, requestID, vtxID, vtx.Bytes())
 	}
 	return nil
-}
-
-// currentAcceptedFrontier returns the set of vertices that this node has accepted
-// that have no accepted children
-func (gh *getter) currentAcceptedFrontier() []ids.ID {
-	return gh.manager.Edge()
-}
-
-// filterAccepted returns the subset of containerIDs that are accepted by this chain.
-// filterAccepted returns the IDs of vertices in [containerIDs] that this node has accepted
-func (gh *getter) filterAccepted(containerIDs []ids.ID) []ids.ID {
-	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
-	for _, vtxID := range containerIDs {
-		if vtx, err := gh.manager.GetVtx(vtxID); err == nil && vtx.Status() == choices.Accepted {
-			acceptedVtxIDs = append(acceptedVtxIDs, vtxID)
-		}
-	}
-	return acceptedVtxIDs
 }

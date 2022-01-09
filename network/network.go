@@ -317,7 +317,7 @@ func NewNetwork(
 		config.ThrottlerConfig.InboundMsgThrottlerConfig,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("initializing inbound message throttler failed with: %s", err)
+		return nil, fmt.Errorf("initializing inbound message throttler failed with: %w", err)
 	}
 	netw.inboundMsgThrottler = inboundMsgThrottler
 
@@ -329,14 +329,14 @@ func NewNetwork(
 		config.ThrottlerConfig.OutboundMsgThrottlerConfig,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("initializing outbound message throttler failed with: %s", err)
+		return nil, fmt.Errorf("initializing outbound message throttler failed with: %w", err)
 	}
 	netw.outboundMsgThrottler = outboundMsgThrottler
 
 	netw.peers.initialize()
 	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, config.MaxSendFailRateHalflife, netw.clock.Time()))
 	if err := netw.metrics.initialize(config.Namespace, metricsRegisterer); err != nil {
-		return nil, fmt.Errorf("initializing network failed with: %s", err)
+		return nil, fmt.Errorf("initializing network failed with: %w", err)
 	}
 	return netw, nil
 }

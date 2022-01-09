@@ -19,7 +19,7 @@ import (
 
 var errUnknownBlock = errors.New("unknown block")
 
-func testSetup(t *testing.T) (*block.TestVM, common.Config) {
+func testSetup(t *testing.T) (*block.TestVM, *common.SenderTest, common.Config) {
 	ctx := snow.DefaultConsensusContextTest()
 
 	peers := validators.NewSet()
@@ -60,11 +60,11 @@ func testSetup(t *testing.T) (*block.TestVM, common.Config) {
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
-	return vm, commonConfig
+	return vm, sender, commonConfig
 }
 
 func TestAcceptedFrontier(t *testing.T) {
-	vm, config := testSetup(t)
+	vm, sender, config := testSetup(t)
 
 	blkID := ids.GenerateTestID()
 
@@ -92,8 +92,12 @@ func TestAcceptedFrontier(t *testing.T) {
 		t.Fatal("Unexpected get handler")
 	}
 
-	accepted, err := bs.currentAcceptedFrontier()
-	if err != nil {
+	var accepted []ids.ID
+	sender.SendAcceptedFrontierF = func(_ ids.ShortID, _ uint32, frontier []ids.ID) {
+		accepted = frontier
+	}
+
+	if err := bs.GetAcceptedFrontier(ids.ShortEmpty, 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -106,7 +110,7 @@ func TestAcceptedFrontier(t *testing.T) {
 }
 
 func TestFilterAccepted(t *testing.T) {
-	vm, config := testSetup(t)
+	vm, sender, config := testSetup(t)
 
 	blkID0 := ids.GenerateTestID()
 	blkID1 := ids.GenerateTestID()
@@ -151,7 +155,15 @@ func TestFilterAccepted(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	accepted := bs.filterAccepted(blkIDs)
+	var accepted []ids.ID
+	sender.SendAcceptedF = func(_ ids.ShortID, _ uint32, frontier []ids.ID) {
+		accepted = frontier
+	}
+
+	if err := bs.GetAccepted(ids.ShortEmpty, 0, blkIDs); err != nil {
+		t.Fatal(err)
+	}
+
 	acceptedSet := ids.Set{}
 	acceptedSet.Add(accepted...)
 

@@ -12,123 +12,151 @@ import (
 )
 
 var (
-	_ AcceptedFrontierHandler = &NoOpAcceptedFrontierHandler{}
-	_ AcceptedHandler         = &NoOpAcceptedHandler{}
-	_ AncestorsHandler        = &NoOpAncestorsHandler{}
-	_ PutHandler              = &NoOpPutHandler{}
-	_ QueryHandler            = &NoOpQueryHandler{}
-	_ ChitsHandler            = &NoOpChitsHandler{}
-	_ AppHandler              = &NoOpAppHandler{}
+	_ AcceptedFrontierHandler = &noOpAcceptedFrontierHandler{}
+	_ AcceptedHandler         = &noOpAcceptedHandler{}
+	_ AncestorsHandler        = &noOpAncestorsHandler{}
+	_ PutHandler              = &noOpPutHandler{}
+	_ QueryHandler            = &noOpQueryHandler{}
+	_ ChitsHandler            = &noOpChitsHandler{}
+	_ AppHandler              = &noOpAppHandler{}
 )
 
-type NoOpAcceptedFrontierHandler struct {
-	Log logging.Logger
+type noOpAcceptedFrontierHandler struct {
+	log logging.Logger
 }
 
-func (nop *NoOpAcceptedFrontierHandler) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	nop.Log.Debug("AcceptedFrontier(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+func NewNoOpAcceptedFrontierHandler(log logging.Logger) AcceptedFrontierHandler {
+	return &noOpAcceptedFrontierHandler{log: log}
+}
+
+func (nop *noOpAcceptedFrontierHandler) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+	nop.log.Debug("AcceptedFrontier(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
 
-func (nop *NoOpAcceptedFrontierHandler) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
-	nop.Log.Debug("GetAcceptedFrontierFailed(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+func (nop *noOpAcceptedFrontierHandler) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
+	nop.log.Debug("GetAcceptedFrontierFailed(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
 
-type NoOpAcceptedHandler struct {
-	Log logging.Logger
+type noOpAcceptedHandler struct {
+	log logging.Logger
 }
 
-func (nop *NoOpAcceptedHandler) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	nop.Log.Debug("Accepted(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+func NewNoOpAcceptedHandler(log logging.Logger) AcceptedHandler {
+	return &noOpAcceptedHandler{log: log}
+}
+
+func (nop *noOpAcceptedHandler) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+	nop.log.Debug("Accepted(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
 
-func (nop *NoOpAcceptedHandler) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
-	nop.Log.Debug("GetAcceptedFailed(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+func (nop *noOpAcceptedHandler) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
+	nop.log.Debug("GetAcceptedFailed(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
 
-type NoOpAncestorsHandler struct {
-	Log logging.Logger
+type noOpAncestorsHandler struct {
+	log logging.Logger
 }
 
-func (nop *NoOpAncestorsHandler) Ancestors(validatorID ids.ShortID, requestID uint32, containers [][]byte) error {
-	nop.Log.Debug("Ancestors(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+func NewNoOpAncestorsHandler(log logging.Logger) AncestorsHandler {
+	return &noOpAncestorsHandler{log: log}
+}
+
+func (nop *noOpAncestorsHandler) Ancestors(validatorID ids.ShortID, requestID uint32, containers [][]byte) error {
+	nop.log.Debug("Ancestors(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
 
-func (nop *NoOpAncestorsHandler) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) error {
-	nop.Log.Debug("GetAncestorsFailed(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+func (nop *noOpAncestorsHandler) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) error {
+	nop.log.Debug("GetAncestorsFailed(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
 
-type NoOpPutHandler struct {
-	Log logging.Logger
+type noOpPutHandler struct {
+	log logging.Logger
 }
 
-func (nop *NoOpPutHandler) Put(vdr ids.ShortID, requestID uint32, blkBytes []byte) error {
+func NewNoOpPutHandler(log logging.Logger) PutHandler {
+	return &noOpPutHandler{log: log}
+}
+
+func (nop *noOpPutHandler) Put(vdr ids.ShortID, requestID uint32, blkBytes []byte) error {
 	if requestID == constants.GossipMsgRequestID {
-		nop.Log.Verbo("Gossip Put(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
+		nop.log.Verbo("Gossip Put(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
 	} else {
-		nop.Log.Debug("Put(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
+		nop.log.Debug("Put(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
 	}
 	return nil
 }
 
-func (nop *NoOpPutHandler) GetFailed(validatorID ids.ShortID, requestID uint32) error {
-	nop.Log.Debug("GetFailed(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+func (nop *noOpPutHandler) GetFailed(validatorID ids.ShortID, requestID uint32) error {
+	nop.log.Debug("GetFailed(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
 
-type NoOpQueryHandler struct {
-	Log logging.Logger
+type noOpQueryHandler struct {
+	log logging.Logger
 }
 
-func (nop *NoOpQueryHandler) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
-	nop.Log.Debug("PullQuery(%s, %d, %s) unhandled by this gear. Dropped.", vdr, requestID, blkID)
+func NewNoOpQueryHandler(log logging.Logger) QueryHandler {
+	return &noOpQueryHandler{log: log}
+}
+
+func (nop *noOpQueryHandler) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
+	nop.log.Debug("PullQuery(%s, %d, %s) unhandled by this gear. Dropped.", vdr, requestID, blkID)
 	return nil
 }
 
-func (nop *NoOpQueryHandler) PushQuery(vdr ids.ShortID, requestID uint32, blkBytes []byte) error {
-	nop.Log.Debug("PushQuery(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
+func (nop *noOpQueryHandler) PushQuery(vdr ids.ShortID, requestID uint32, blkBytes []byte) error {
+	nop.log.Debug("PushQuery(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
 	return nil
 }
 
-type NoOpChitsHandler struct {
-	Log logging.Logger
+type noOpChitsHandler struct {
+	log logging.Logger
 }
 
-func (nop *NoOpChitsHandler) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) error {
-	nop.Log.Debug("Chits(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
+func NewNoOpChitsHandler(log logging.Logger) ChitsHandler {
+	return &noOpChitsHandler{log: log}
+}
+
+func (nop *noOpChitsHandler) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) error {
+	nop.log.Debug("Chits(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
 	return nil
 }
 
-func (nop *NoOpChitsHandler) QueryFailed(vdr ids.ShortID, requestID uint32) error {
-	nop.Log.Debug("QueryFailed(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
+func (nop *noOpChitsHandler) QueryFailed(vdr ids.ShortID, requestID uint32) error {
+	nop.log.Debug("QueryFailed(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
 	return nil
 }
 
-type NoOpAppHandler struct {
-	Log logging.Logger
+type noOpAppHandler struct {
+	log logging.Logger
 }
 
-func (nop *NoOpAppHandler) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
-	nop.Log.Debug("AppRequest(%s, %d) unhandled by this gear. Dropped.", nodeID, requestID)
+func NewNoOpAppHandler(log logging.Logger) AppHandler {
+	return &noOpAppHandler{log: log}
+}
+
+func (nop *noOpAppHandler) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
+	nop.log.Debug("AppRequest(%s, %d) unhandled by this gear. Dropped.", nodeID, requestID)
 	return nil
 }
 
-func (nop *NoOpAppHandler) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
-	nop.Log.Debug("AppRequestFailed(%s, %d) unhandled by this gear. Dropped.", nodeID, requestID)
+func (nop *noOpAppHandler) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	nop.log.Debug("AppRequestFailed(%s, %d) unhandled by this gear. Dropped.", nodeID, requestID)
 	return nil
 }
 
-func (nop *NoOpAppHandler) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
-	nop.Log.Debug("AppResponse(%s, %d) unhandled by this gear. Dropped.", nodeID, requestID)
+func (nop *noOpAppHandler) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	nop.log.Debug("AppResponse(%s, %d) unhandled by this gear. Dropped.", nodeID, requestID)
 	return nil
 }
 
-func (nop *NoOpAppHandler) AppGossip(nodeID ids.ShortID, msg []byte) error {
-	nop.Log.Debug("AppGossip(%s) unhandled by this gear. Dropped.", nodeID)
+func (nop *noOpAppHandler) AppGossip(nodeID ids.ShortID, msg []byte) error {
+	nop.log.Debug("AppGossip(%s) unhandled by this gear. Dropped.", nodeID)
 	return nil
 }

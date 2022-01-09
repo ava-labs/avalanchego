@@ -56,13 +56,13 @@ func newState(
 	jobsCacheMetricsNamespace := fmt.Sprintf("%s_jobs_cache", metricsNamespace)
 	jobsCache, err := metercacher.New(jobsCacheMetricsNamespace, metricsRegisterer, &cache.LRU{Size: jobsCacheSize})
 	if err != nil {
-		return nil, fmt.Errorf("couldn't create metered cache: %s", err)
+		return nil, fmt.Errorf("couldn't create metered cache: %w", err)
 	}
 
 	pendingJobs := prefixdb.New(pendingJobsKey, db)
 	numPendingJobs, err := getPendingJobs(pendingJobs)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't initialize pending jobs: %s", err)
+		return nil, fmt.Errorf("couldn't initialize pending jobs: %w", err)
 	}
 	return &state{
 		runnableJobIDs:  linkeddb.NewDefault(prefixdb.New(runnableJobIDsKey, db)),
@@ -125,7 +125,7 @@ func (s *state) RemoveRunnableJob() (Job, error) {
 
 	jobID, err := ids.ToID(jobIDBytes)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't convert job ID bytes to job ID: %s", err)
+		return nil, fmt.Errorf("couldn't convert job ID bytes to job ID: %w", err)
 	}
 	job, err := s.GetJob(jobID)
 	if err != nil {
