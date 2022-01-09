@@ -95,6 +95,11 @@ func (h *Handler) OnDoneBootstrapping(lastReqID uint32) error {
 	return h.engine.Start(lastReqID)
 }
 
+func (h *Handler) Start() error {
+	startReqID := uint32(0)
+	return h.bootstrapper.Start(startReqID)
+}
+
 // Context of this Handler
 func (h *Handler) Context() *snow.ConsensusContext { return h.ctx }
 

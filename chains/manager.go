@@ -282,9 +282,9 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	m.notifyRegistrants(chain.Name, chain.Engine)
 
 	// Tell the chain to start processing messages.
-	// If the X or P Chain panics, do not attempt to recover
 	ctx := chain.Engine.Context()
 	if m.CriticalChains.Contains(chainParams.ID) {
+		// If a required chain (i.e. X, P or C) panics, do not attempt to recover
 		go ctx.Log.RecoverAndPanic(chain.Handler.Dispatch)
 	} else {
 		go ctx.Log.RecoverAndExit(chain.Handler.Dispatch, func() {
@@ -294,6 +294,16 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 
 	// Allows messages to be routed to the new chain
 	m.ManagerConfig.Router.AddChain(chain.Handler)
+
+	// Finally start the chain so to send out messages
+	if err := m.ManagerConfig.Router.StartChain(chainParams.ID); err != nil {
+		m.Log.Error("error starting chain %s: %s", chainParams.ID, err)
+		if m.CriticalChains.Contains(chainParams.ID) {
+			// If a required chain (i.e. X, P or C) can't be started, panic
+			ctx.Log.StopOnPanic()
+		}
+		chain.Handler.StartShutdown()
+	}
 }
 
 // Create a chain
@@ -637,11 +647,6 @@ func (m *manager) createAvalancheChain(
 	}
 	handler.RegisterEngine(engine)
 
-	startReqID := uint32(0)
-	if err := bootstrapper.Start(startReqID); err != nil {
-		return nil, fmt.Errorf("error starting up avalanche bootstrapper: %w", err)
-	}
-
 	// Register health check for this chain
 	chainAlias, err := m.PrimaryAlias(ctx.ChainID)
 	if err != nil {
@@ -840,17 +845,12 @@ func (m *manager) createSnowmanChain(
 	}
 	handler.RegisterEngine(engine)
 
-	startReqID := uint32(0)
-	if err := bootstrapper.Start(startReqID); err != nil {
-		return nil, fmt.Errorf("error starting snowman bootstrapper: %w", err)
-	}
-
-	// Register health checks
 	chainAlias, err := m.PrimaryAlias(ctx.ChainID)
 	if err != nil {
 		chainAlias = ctx.ChainID.String()
 	}
 
+	// Register health checks
 	check := health.CheckerFunc(func() (interface{}, error) {
 		ctx.Lock.Lock()
 		defer ctx.Lock.Unlock()
