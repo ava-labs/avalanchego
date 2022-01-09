@@ -38,7 +38,7 @@ func New(
 	vdb := versiondb.New(db)
 	state, err := newState(vdb, metricsNamespace, metricsRegisterer)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't create new jobs state: %s", err)
+		return nil, fmt.Errorf("couldn't create new jobs state: %w", err)
 	}
 
 	return &Jobs{

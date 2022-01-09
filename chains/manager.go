@@ -598,7 +598,7 @@ func (m *manager) createAvalancheChain(
 
 	avaGetHandler, err := avagetter.New(vtxManager, commonCfg)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't initialize avalanche base message handler: %s", err)
+		return nil, fmt.Errorf("couldn't initialize avalanche base message handler: %w", err)
 	}
 
 	// create bootstrap gear
@@ -775,7 +775,7 @@ func (m *manager) createSnowmanChain(
 		msgChan,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't initialize message handler: %s", err)
+		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)
 	}
 
 	timer := &router.Timer{
@@ -803,7 +803,7 @@ func (m *manager) createSnowmanChain(
 
 	snowGetHandler, err := snowgetter.New(vm, commonCfg)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't initialize snow base message handler: %s", err)
+		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
 	}
 
 	// create bootstrap gear

@@ -22,32 +22,19 @@ import (
 const bootstrappingDelay = 10 * time.Second
 
 var (
-	_ SnowmanBootstrapper = &bootstrapper{}
+	_ common.BootstrapableEngine = &bootstrapper{}
 
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
 
-type SnowmanBootstrapper interface {
-	common.Engine
-	common.Bootstrapable
-}
-
-func New(config Config, onFinished func(lastReqID uint32) error) (SnowmanBootstrapper, error) {
+func New(config Config, onFinished func(lastReqID uint32) error) (common.BootstrapableEngine, error) {
 	b := &bootstrapper{
 		Config: config,
 
-		NoOpPutHandler: common.NoOpPutHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpQueryHandler: common.NoOpQueryHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpChitsHandler: common.NoOpChitsHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpAppHandler: common.NoOpAppHandler{
-			Log: config.Ctx.Log,
-		},
+		PutHandler:   common.NewNoOpPutHandler(config.Ctx.Log),
+		QueryHandler: common.NewNoOpQueryHandler(config.Ctx.Log),
+		ChitsHandler: common.NewNoOpChitsHandler(config.Ctx.Log),
+		AppHandler:   common.NewNoOpAppHandler(config.Ctx.Log),
 
 		Fetcher: common.Fetcher{
 			OnFinished: onFinished,
@@ -58,11 +45,11 @@ func New(config Config, onFinished func(lastReqID uint32) error) (SnowmanBootstr
 
 	lastAcceptedID, err := b.VM.LastAccepted()
 	if err != nil {
-		return nil, fmt.Errorf("couldn't get last accepted ID: %s", err)
+		return nil, fmt.Errorf("couldn't get last accepted ID: %w", err)
 	}
 	lastAccepted, err := b.VM.GetBlock(lastAcceptedID)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't get last accepted block: %s", err)
+		return nil, fmt.Errorf("couldn't get last accepted block: %w", err)
 	}
 	b.startingHeight = lastAccepted.Height()
 
@@ -89,10 +76,10 @@ type bootstrapper struct {
 	Config
 
 	// list of NoOpsHandler for messages dropped by bootstrapper
-	common.NoOpPutHandler
-	common.NoOpQueryHandler
-	common.NoOpChitsHandler
-	common.NoOpAppHandler
+	common.PutHandler
+	common.QueryHandler
+	common.ChitsHandler
+	common.AppHandler
 
 	common.Bootstrapper
 	common.Fetcher
@@ -208,7 +195,7 @@ func (b *bootstrapper) Timeout() error {
 	b.awaitingTimeout = false
 
 	if !b.Config.Subnet.IsBootstrapped() {
-		return b.RestartBootstrap(true)
+		return b.Restart(true)
 	}
 	return b.finish()
 }
@@ -227,6 +214,19 @@ func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
 
 // IsBootstrapped implements the common.Engine interface.
 func (b *bootstrapper) IsBootstrapped() bool { return b.Ctx.IsBootstrapped() }
+
+// Start implements the common.Engine interface.
+func (b *bootstrapper) Start(startReqID uint32) error {
+	b.Ctx.Log.Info("Starting bootstrap...")
+	b.Ctx.SetState(snow.Bootstrapping)
+	b.Config.SharedCfg.RequestID = startReqID
+
+	if b.WeightTracker.EnoughConnectedWeight() {
+		return nil
+	}
+
+	return b.Startup()
+}
 
 // HealthCheck implements the common.Engine interface.
 func (b *bootstrapper) HealthCheck() (interface{}, error) {
@@ -426,7 +426,7 @@ func (b *bootstrapper) checkFinish() error {
 	// so that the bootstrapping process will terminate even as new blocks are
 	// being issued.
 	if b.Config.RetryBootstrap && executedBlocks > 0 && executedBlocks < previouslyExecuted/2 {
-		return b.RestartBootstrap(true)
+		return b.Restart(true)
 	}
 
 	// If there is an additional callback, notify them that this chain has been
