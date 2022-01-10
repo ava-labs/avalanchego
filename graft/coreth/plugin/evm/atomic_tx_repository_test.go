@@ -58,6 +58,8 @@ func addTxs(t testing.TB, codec codec.Manager, acceptedAtomicTxDB database.Datab
 	}
 }
 
+// constTxsPerHeight returns a function for passing to [writeTxs], which will return a constant number
+// as the number of atomic txs per height to create.
 func constTxsPerHeight(txCount int) func(uint64) int {
 	return func(uint64) int { return txCount }
 }

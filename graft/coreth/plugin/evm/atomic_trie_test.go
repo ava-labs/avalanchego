@@ -98,10 +98,10 @@ func TestAtomicTrieInitialize(t *testing.T) {
 			lastAcceptedHeight:   101,
 			expectedCommitHeight: 100,
 			numTxsPerBlock: func(height uint64) int {
-				if uint64(50) <= height && height < uint64(100) {
-					return 0
+				if height <= 50 || height == 101 {
+					return 1
 				}
-				return 1
+				return 0
 			},
 		},
 	} {
@@ -120,6 +120,7 @@ func TestAtomicTrieInitialize(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+
 			rootHash1, commitHeight1 := atomicTrie1.LastCommitted()
 			assert.EqualValues(t, test.expectedCommitHeight, commitHeight1)
 			if test.expectedCommitHeight != 0 {
