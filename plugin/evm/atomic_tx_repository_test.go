@@ -76,6 +76,9 @@ func writeTxs(t testing.TB, repo AtomicTxRepository, fromHeight uint64, toHeight
 			if err != nil {
 				t.Fatal(err)
 			}
+			if len(atomicRequests) == 0 {
+				continue
+			}
 			operationsMap[height] = atomicRequests
 		}
 	}
