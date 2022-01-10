@@ -284,7 +284,7 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 	// process uncommitted ops for heights > finalCommitHeight
 	for height, ops := range uncommittedOpsMap {
 		if err := a.updateTrie(height, ops); err != nil {
-			return fmt.Errorf("updateTrie(height: %d): %w", height, err)
+			return fmt.Errorf("failed to update trie at height %d: %w", height, err)
 		}
 
 		postCommitTxIndexed++
