@@ -26,7 +26,7 @@ const (
 	defaultContinuousProfilerMaxFiles  = 5
 	defaultTxRegossipFrequency         = 1 * time.Minute
 	defaultTxRegossipMaxSize           = 15
-	defaultLogLevel                    = "debug"
+	defaultLogLevel                    = "info"
 )
 
 var defaultEnabledAPIs = []string{
