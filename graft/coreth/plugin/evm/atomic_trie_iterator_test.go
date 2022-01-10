@@ -26,7 +26,7 @@ func TestIteratorCanIterate(t *testing.T) {
 	// since each test transaction generates random ID for blockchainID we should get
 	// multiple blockchain IDs per block in the overall combined atomic operation map
 	operationsMap := make(map[uint64]map[ids.ID]*atomic.Requests)
-	writeTxs(t, repo, 0, lastAcceptedHeight, 3, nil, operationsMap)
+	writeTxs(t, repo, 0, lastAcceptedHeight, constTxsPerHeight(3), nil, operationsMap)
 
 	// create an atomic trie
 	// on create it will initialize all the transactions from the above atomic repository
@@ -63,7 +63,7 @@ func TestIteratorHandlesInvalidData(t *testing.T) {
 	// since each test transaction generates random ID for blockchainID we should get
 	// multiple blockchain IDs per block in the overall combined atomic operation map
 	operationsMap := make(map[uint64]map[ids.ID]*atomic.Requests)
-	writeTxs(t, repo, 0, lastAcceptedHeight, 3, nil, operationsMap)
+	writeTxs(t, repo, 0, lastAcceptedHeight, constTxsPerHeight(3), nil, operationsMap)
 
 	// create an atomic trie
 	// on create it will initialize all the transactions from the above atomic repository
