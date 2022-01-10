@@ -60,6 +60,5 @@ func (m *metrics) Initialize(
 		registerer.Register(m.numDroppedTxs),
 		registerer.Register(m.numAcceptedTxs),
 	)
-
 	return errs.Err
 }

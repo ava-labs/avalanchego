@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
-
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -77,7 +76,7 @@ func NewHandler(
 	}
 
 	if err := h.metrics.Initialize("handler", h.ctx.Registerer); err != nil {
-		return nil, fmt.Errorf("initializing handler metrics errored with: %s", err)
+		return nil, fmt.Errorf("initializing handler metrics errored with: %w", err)
 	}
 	var err error
 	h.unprocessedMsgs, err = newUnprocessedMsgs(h.ctx.Log, h.validators, h.cpuTracker, "handler", h.ctx.Registerer)
@@ -98,11 +97,7 @@ func (h *Handler) RegisterEngine(engine common.Engine) {
 
 func (h *Handler) OnDoneFastSyncing(lastReqID uint32) error {
 	lastReqID++
-	if err := h.bootstrapper.Start(lastReqID); err != nil {
-		return err
-	}
-	// TODO: fix this by proper wiring of bootstrapper & weight tracker
-	return h.bootstrapper.Connected(ids.ShortEmpty, nil)
+	return h.bootstrapper.Start(lastReqID)
 }
 
 func (h *Handler) OnDoneBootstrapping(lastReqID uint32) error {

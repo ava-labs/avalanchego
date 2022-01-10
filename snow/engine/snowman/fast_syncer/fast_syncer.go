@@ -40,31 +40,17 @@ func NewFastSyncer(
 		})
 
 	fs := &fastSyncer{
-		Config: cfg,
-		NoOpAcceptedFrontierHandler: common.NoOpAcceptedFrontierHandler{
-			Log: cfg.Ctx.Log,
-		},
-		NoOpAcceptedHandler: common.NoOpAcceptedHandler{
-			Log: cfg.Ctx.Log,
-		},
-		NoOpAncestorsHandler: common.NoOpAncestorsHandler{
-			Log: cfg.Ctx.Log,
-		},
-		NoOpPutHandler: common.NoOpPutHandler{
-			Log: cfg.Ctx.Log,
-		},
-		NoOpQueryHandler: common.NoOpQueryHandler{
-			Log: cfg.Ctx.Log,
-		},
-		NoOpChitsHandler: common.NoOpChitsHandler{
-			Log: cfg.Ctx.Log,
-		},
-		NoOpAppHandler: common.NoOpAppHandler{
-			Log: cfg.Ctx.Log,
-		},
-		gR:                gR,
-		fastSyncVM:        fsVM,
-		onDoneFastSyncing: onDoneFastSyncing,
+		Config:                  cfg,
+		AcceptedFrontierHandler: common.NewNoOpAcceptedFrontierHandler(cfg.Ctx.Log),
+		AcceptedHandler:         common.NewNoOpAcceptedHandler(cfg.Ctx.Log),
+		AncestorsHandler:        common.NewNoOpAncestorsHandler(cfg.Ctx.Log),
+		PutHandler:              common.NewNoOpPutHandler(cfg.Ctx.Log),
+		QueryHandler:            common.NewNoOpQueryHandler(cfg.Ctx.Log),
+		ChitsHandler:            common.NewNoOpChitsHandler(cfg.Ctx.Log),
+		AppHandler:              common.NewNoOpAppHandler(cfg.Ctx.Log),
+		gR:                      gR,
+		fastSyncVM:              fsVM,
+		onDoneFastSyncing:       onDoneFastSyncing,
 	}
 
 	return fs
@@ -74,13 +60,13 @@ type fastSyncer struct {
 	Config
 
 	// list of NoOpsHandler for messages dropped by fast syncer
-	common.NoOpAcceptedFrontierHandler
-	common.NoOpAcceptedHandler
-	common.NoOpAncestorsHandler
-	common.NoOpPutHandler
-	common.NoOpQueryHandler
-	common.NoOpChitsHandler
-	common.NoOpAppHandler
+	common.AcceptedFrontierHandler
+	common.AcceptedHandler
+	common.AncestorsHandler
+	common.PutHandler
+	common.QueryHandler
+	common.ChitsHandler
+	common.AppHandler
 
 	gR common.GearRequester
 

@@ -33,34 +33,19 @@ const (
 )
 
 var (
-	_ AvalancheBootstrapper = &bootstrapper{}
+	_ common.BootstrapableEngine = &bootstrapper{}
 
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
 
-type AvalancheBootstrapper interface {
-	common.Engine
-	common.Bootstrapable
-}
-
-func New(config Config, onFinished func(lastReqID uint32) error) (AvalancheBootstrapper, error) {
+func New(config Config, onFinished func(lastReqID uint32) error) (common.BootstrapableEngine, error) {
 	b := &bootstrapper{
-		Config: config,
-		NoOpFastSyncHandler: common.NoOpFastSyncHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpPutHandler: common.NoOpPutHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpQueryHandler: common.NoOpQueryHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpChitsHandler: common.NoOpChitsHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpAppHandler: common.NoOpAppHandler{
-			Log: config.Ctx.Log,
-		},
+		Config:                   config,
+		FastSyncHandler:          common.NewNoOpFastSyncHandler(config.Ctx.Log),
+		PutHandler:               common.NewNoOpPutHandler(config.Ctx.Log),
+		QueryHandler:             common.NewNoOpQueryHandler(config.Ctx.Log),
+		ChitsHandler:             common.NewNoOpChitsHandler(config.Ctx.Log),
+		AppHandler:               common.NewNoOpAppHandler(config.Ctx.Log),
 		processedCache:           &cache.LRU{Size: cacheSize},
 		Fetcher:                  common.Fetcher{OnFinished: onFinished},
 		executedStateTransitions: math.MaxInt32,
@@ -88,7 +73,7 @@ func New(config Config, onFinished func(lastReqID uint32) error) (AvalancheBoots
 		return nil, err
 	}
 
-	config.Bootstrapable = b
+	config.Config.Bootstrapable = b
 	b.Bootstrapper = common.NewCommonBootstrapper(config.Config)
 	return b, nil
 }
@@ -97,11 +82,11 @@ type bootstrapper struct {
 	Config
 
 	// list of NoOpsHandler for messages dropped by bootstrapper
-	common.NoOpFastSyncHandler
-	common.NoOpPutHandler
-	common.NoOpQueryHandler
-	common.NoOpChitsHandler
-	common.NoOpAppHandler
+	common.FastSyncHandler
+	common.PutHandler
+	common.QueryHandler
+	common.ChitsHandler
+	common.AppHandler
 
 	common.Bootstrapper
 	common.Fetcher
@@ -119,6 +104,17 @@ type bootstrapper struct {
 	executedStateTransitions int
 
 	awaitingTimeout bool
+}
+
+// Clear implements common.Bootstrapable interface
+func (b *bootstrapper) Clear() error {
+	_, err := b.TxBlocked.ClearAll(b.Config.Ctx, b, b.Config.SharedCfg.Restarted, b.Ctx.DecisionDispatcher)
+	if err != nil {
+		return err
+	}
+
+	_, err = b.VtxBlocked.ClearAll(b.Config.Ctx, b, b.Config.SharedCfg.Restarted, b.Ctx.ConsensusDispatcher)
+	return err
 }
 
 // Ancestors handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
@@ -248,7 +244,7 @@ func (b *bootstrapper) Timeout() error {
 	b.awaitingTimeout = false
 
 	if !b.Config.Subnet.IsBootstrapped() {
-		return b.RestartBootstrap(true)
+		return b.Restart(true)
 	}
 	return b.finish()
 }
@@ -267,6 +263,19 @@ func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
 
 // IsBootstrapped implements the common.Engine interface.
 func (b *bootstrapper) IsBootstrapped() bool { return b.Ctx.IsBootstrapped() }
+
+// Start implements the common.Engine interface.
+func (b *bootstrapper) Start(startReqID uint32) error {
+	b.Ctx.Log.Info("Starting bootstrap...")
+	b.Ctx.SetState(snow.Bootstrapping)
+	b.Config.SharedCfg.RequestID = startReqID
+
+	if b.WeightTracker.EnoughConnectedWeight() {
+		return nil
+	}
+
+	return b.Startup()
+}
 
 // HealthCheck implements the common.Engine interface.
 func (b *bootstrapper) HealthCheck() (interface{}, error) {
@@ -500,7 +509,7 @@ func (b *bootstrapper) checkFinish() error {
 	// issued.
 	if executedVts > 0 && executedVts < previouslyExecuted/2 && b.Config.RetryBootstrap {
 		b.Ctx.Log.Debug("checking for more vertices before finishing bootstrapping")
-		return b.RestartBootstrap(true)
+		return b.Restart(true)
 	}
 
 	// Notify the subnet that this chain is synced

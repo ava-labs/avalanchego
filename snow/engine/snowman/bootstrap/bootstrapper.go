@@ -22,35 +22,19 @@ import (
 const bootstrappingDelay = 10 * time.Second
 
 var (
-	_ SnowmanBootstrapper = &bootstrapper{}
+	_ common.BootstrapableEngine = &bootstrapper{}
 
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
 
-type SnowmanBootstrapper interface {
-	common.Engine
-	common.Bootstrapable
-	ClearJobs() error
-}
-
-func New(config Config, onFinished func(lastReqID uint32) error) (SnowmanBootstrapper, error) {
+func New(config Config, onFinished func(lastReqID uint32) error) (common.BootstrapableEngine, error) {
 	b := &bootstrapper{
-		Config: config,
-		NoOpFastSyncHandler: common.NoOpFastSyncHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpPutHandler: common.NoOpPutHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpQueryHandler: common.NoOpQueryHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpChitsHandler: common.NoOpChitsHandler{
-			Log: config.Ctx.Log,
-		},
-		NoOpAppHandler: common.NoOpAppHandler{
-			Log: config.Ctx.Log,
-		},
+		Config:          config,
+		FastSyncHandler: common.NewNoOpFastSyncHandler(config.Ctx.Log),
+		PutHandler:      common.NewNoOpPutHandler(config.Ctx.Log),
+		QueryHandler:    common.NewNoOpQueryHandler(config.Ctx.Log),
+		ChitsHandler:    common.NewNoOpChitsHandler(config.Ctx.Log),
+		AppHandler:      common.NewNoOpAppHandler(config.Ctx.Log),
 
 		Fetcher: common.Fetcher{
 			OnFinished: onFinished,
@@ -61,11 +45,11 @@ func New(config Config, onFinished func(lastReqID uint32) error) (SnowmanBootstr
 
 	lastAcceptedID, err := b.VM.LastAccepted()
 	if err != nil {
-		return nil, fmt.Errorf("couldn't get last accepted ID: %s", err)
+		return nil, fmt.Errorf("couldn't get last accepted ID: %w", err)
 	}
 	lastAccepted, err := b.VM.GetBlock(lastAcceptedID)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't get last accepted block: %s", err)
+		return nil, fmt.Errorf("couldn't get last accepted block: %w", err)
 	}
 	b.startingHeight = lastAccepted.Height()
 
@@ -92,11 +76,11 @@ type bootstrapper struct {
 	Config
 
 	// list of NoOpsHandler for messages dropped by bootstrapper
-	common.NoOpFastSyncHandler
-	common.NoOpPutHandler
-	common.NoOpQueryHandler
-	common.NoOpChitsHandler
-	common.NoOpAppHandler
+	common.FastSyncHandler
+	common.PutHandler
+	common.QueryHandler
+	common.ChitsHandler
+	common.AppHandler
 
 	common.Bootstrapper
 	common.Fetcher
@@ -183,10 +167,6 @@ func (b *bootstrapper) Connected(nodeID ids.ShortID, nodeVersion version.Applica
 		return err
 	}
 
-	if err := b.WeightTracker.AddWeightForNode(nodeID); err != nil {
-		return err
-	}
-
 	if b.WeightTracker.EnoughConnectedWeight() && !b.started {
 		b.started = true
 		return b.Startup()
@@ -212,7 +192,7 @@ func (b *bootstrapper) Timeout() error {
 	b.awaitingTimeout = false
 
 	if !b.Config.Subnet.IsBootstrapped() {
-		return b.RestartBootstrap(true)
+		return b.Restart(true)
 	}
 	return b.finish()
 }
@@ -231,6 +211,19 @@ func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
 
 // IsBootstrapped implements the common.Engine interface.
 func (b *bootstrapper) IsBootstrapped() bool { return b.Ctx.IsBootstrapped() }
+
+// Start implements the common.Engine interface.
+func (b *bootstrapper) Start(startReqID uint32) error {
+	b.Ctx.Log.Info("Starting bootstrap...")
+	b.Ctx.SetState(snow.Bootstrapping)
+	b.Config.SharedCfg.RequestID = startReqID
+
+	if b.WeightTracker.EnoughConnectedWeight() {
+		return nil
+	}
+
+	return b.Startup()
+}
 
 // HealthCheck implements the common.Engine interface.
 func (b *bootstrapper) HealthCheck() (interface{}, error) {
@@ -313,7 +306,8 @@ func (b *bootstrapper) fetch(blkID ids.ID) error {
 	return nil
 }
 
-func (b *bootstrapper) ClearJobs() error {
+// Clear implements common.Bootstrapable interface
+func (b *bootstrapper) Clear() error {
 	_, err := b.Config.Blocked.ClearAll(b.Config.Ctx, b, b.Config.SharedCfg.Restarted, nil)
 	return err
 }
@@ -435,7 +429,7 @@ func (b *bootstrapper) checkFinish() error {
 	// so that the bootstrapping process will terminate even as new blocks are
 	// being issued.
 	if b.Config.RetryBootstrap && executedBlocks > 0 && executedBlocks < previouslyExecuted/2 {
-		return b.RestartBootstrap(true)
+		return b.Restart(true)
 	}
 
 	// If there is an additional callback, notify them that this chain has been
