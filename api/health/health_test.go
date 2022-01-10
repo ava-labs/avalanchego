@@ -5,6 +5,8 @@ package health
 
 import (
 	"errors"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -242,4 +244,31 @@ func TestPassingThenFailingChecks(t *testing.T) {
 		_, liveness := h.Liveness()
 		assert.False(liveness)
 	}
+}
+
+func TestDeadlockRegression(t *testing.T) {
+	assert := assert.New(t)
+
+	h, err := New(prometheus.NewRegistry())
+	assert.NoError(err)
+
+	var lock sync.Mutex
+	check := CheckerFunc(func() (interface{}, error) {
+		lock.Lock()
+		time.Sleep(time.Nanosecond)
+		lock.Unlock()
+		return "", nil
+	})
+
+	h.Start(time.Nanosecond)
+	defer h.Stop()
+
+	for i := 0; i < 1000; i++ {
+		lock.Lock()
+		err = h.RegisterHealthCheck(fmt.Sprintf("check-%d", i), check)
+		lock.Unlock()
+		assert.NoError(err)
+	}
+
+	awaitHealthy(h, true)
 }

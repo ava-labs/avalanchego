@@ -93,20 +93,11 @@ func (w *worker) Start(freq time.Duration) {
 			ticker := time.NewTicker(freq)
 			defer ticker.Stop()
 
-			newResults := w.runChecks()
-
-			w.resultsLock.Lock()
-			w.results = newResults
-			w.resultsLock.Unlock()
-
+			w.runChecks()
 			for {
 				select {
 				case <-ticker.C:
-					newResults := w.runChecks()
-
-					w.resultsLock.Lock()
-					w.results = newResults
-					w.resultsLock.Unlock()
+					w.runChecks()
 				case <-w.closer:
 					return
 				}
@@ -121,57 +112,62 @@ func (w *worker) Stop() {
 	})
 }
 
-func (w *worker) runChecks() map[string]Result {
+func (w *worker) runChecks() {
 	w.checksLock.RLock()
-	defer w.checksLock.RUnlock()
+	// Copy the [w.checks] map to collect the checks that we will be running
+	// during this iteration. If [w.checks] is modified during this iteration of
+	// [runChecks], then the added check will not be run until the next
+	// iteration.
+	checks := make(map[string]Checker, len(w.checks))
+	for name, checker := range w.checks {
+		checks[name] = checker
+	}
+	w.checksLock.RUnlock()
 
-	w.resultsLock.RLock()
-	defer w.resultsLock.RUnlock()
-
-	var (
-		resultsLock sync.Mutex
-		results     = make(map[string]Result, len(w.checks))
-		wg          sync.WaitGroup
-	)
-	wg.Add(len(w.checks))
-	for name, check := range w.checks {
-		go func(name string, check Checker) {
-			defer wg.Done()
-
-			start := time.Now()
-			details, err := check.HealthCheck()
-			end := time.Now()
-
-			result := Result{
-				Details:   details,
-				Timestamp: end,
-				Duration:  end.Sub(start),
-			}
-
-			prevResult := w.results[name]
-			if err != nil {
-				errString := err.Error()
-				result.Error = &errString
-
-				result.ContiguousFailures = prevResult.ContiguousFailures + 1
-				if prevResult.ContiguousFailures > 0 {
-					result.TimeOfFirstFailure = prevResult.TimeOfFirstFailure
-				} else {
-					result.TimeOfFirstFailure = &end
-				}
-
-				if prevResult.Error == nil {
-					w.metrics.failingChecks.Inc()
-				}
-			} else if prevResult.Error != nil {
-				w.metrics.failingChecks.Dec()
-			}
-
-			resultsLock.Lock()
-			results[name] = result
-			resultsLock.Unlock()
-		}(name, check)
+	var wg sync.WaitGroup
+	wg.Add(len(checks))
+	for name, check := range checks {
+		go w.runCheck(&wg, name, check)
 	}
 	wg.Wait()
-	return results
+}
+
+func (w *worker) runCheck(wg *sync.WaitGroup, name string, check Checker) {
+	defer wg.Done()
+
+	start := time.Now()
+
+	// To avoid any deadlocks when [RegisterCheck] is called with a lock
+	// that is grabbed by [check.HealthCheck], we ensure that no locks
+	// are held when [check.HealthCheck] is called.
+	details, err := check.HealthCheck()
+	end := time.Now()
+
+	result := Result{
+		Details:   details,
+		Timestamp: end,
+		Duration:  end.Sub(start),
+	}
+
+	w.resultsLock.Lock()
+	defer w.resultsLock.Unlock()
+	prevResult := w.results[name]
+	if err != nil {
+		errString := err.Error()
+		result.Error = &errString
+
+		result.ContiguousFailures = prevResult.ContiguousFailures + 1
+		if prevResult.ContiguousFailures > 0 {
+			result.TimeOfFirstFailure = prevResult.TimeOfFirstFailure
+		} else {
+			result.TimeOfFirstFailure = &end
+		}
+
+		if prevResult.Error == nil {
+			w.metrics.failingChecks.Inc()
+		}
+	} else if prevResult.Error != nil {
+		w.metrics.failingChecks.Dec()
+	}
+	w.results[name] = result
 }
