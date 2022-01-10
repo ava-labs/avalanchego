@@ -58,12 +58,18 @@ func addTxs(t testing.TB, codec codec.Manager, acceptedAtomicTxDB database.Datab
 	}
 }
 
+func constTxsPerHeight(txCount int) func(uint64) int {
+	return func(uint64) int { return txCount }
+}
+
 // writeTxs writes [txsPerHeight] txs for heights ranging in [fromHeight, toHeight) through the Write call on [repo],
 // storing the resulting transactions in [txMap] if non-nil and the resulting atomic operations in [operationsMap]
 // if non-nil.
-func writeTxs(t testing.TB, repo AtomicTxRepository, fromHeight uint64, toHeight uint64, txsPerHeight int, txMap map[uint64][]*Tx, operationsMap map[uint64]map[ids.ID]*atomic.Requests) {
+func writeTxs(t testing.TB, repo AtomicTxRepository, fromHeight uint64, toHeight uint64,
+	txsPerHeight func(height uint64) int, txMap map[uint64][]*Tx, operationsMap map[uint64]map[ids.ID]*atomic.Requests,
+) {
 	for height := fromHeight; height < toHeight; height++ {
-		txs := newTestTxs(txsPerHeight)
+		txs := newTestTxs(txsPerHeight(height))
 		if err := repo.Write(height, txs); err != nil {
 			t.Fatal(err)
 		}
@@ -180,7 +186,7 @@ func TestAtomicRepositoryReadWriteSingleTx(t *testing.T) {
 	}
 	txMap := make(map[uint64][]*Tx)
 
-	writeTxs(t, repo, 0, 100, 1, txMap, nil)
+	writeTxs(t, repo, 0, 100, constTxsPerHeight(1), txMap, nil)
 	verifyTxs(t, repo, txMap)
 }
 
@@ -193,7 +199,7 @@ func TestAtomicRepositoryReadWriteMultipleTxs(t *testing.T) {
 	}
 	txMap := make(map[uint64][]*Tx)
 
-	writeTxs(t, repo, 0, 100, 10, txMap, nil)
+	writeTxs(t, repo, 0, 100, constTxsPerHeight(10), txMap, nil)
 	verifyTxs(t, repo, txMap)
 }
 
@@ -217,8 +223,8 @@ func TestAtomicRepositoryPreAP5Migration(t *testing.T) {
 	assert.NoError(t, err)
 	verifyTxs(t, repo, txMap)
 
-	writeTxs(t, repo, 100, 150, 1, txMap, nil)
-	writeTxs(t, repo, 150, 200, 10, txMap, nil)
+	writeTxs(t, repo, 100, 150, constTxsPerHeight(1), txMap, nil)
+	writeTxs(t, repo, 150, 200, constTxsPerHeight(10), txMap, nil)
 	verifyTxs(t, repo, txMap)
 }
 
@@ -243,7 +249,7 @@ func TestAtomicRepositoryPostAP5Migration(t *testing.T) {
 	assert.NoError(t, err)
 	verifyTxs(t, repo, txMap)
 
-	writeTxs(t, repo, 200, 300, 10, txMap, nil)
+	writeTxs(t, repo, 200, 300, constTxsPerHeight(10), txMap, nil)
 	verifyTxs(t, repo, txMap)
 }
 
