@@ -157,6 +157,12 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 		return
 	}
 
+	// Note: we currently support two types of indexes: stand-alone and VM-backed index.
+	// Stand-alone indexes require an ad-hoc db to store block, vertexes and transactions data;
+	// they may be incomplete and are enabled only on nodes which specify the flag <FLAG NAME>.
+	// VM-backed indexes are supported only for block indexing on Snowman++ VMs which enabled height indexing.
+	// VM-backed indexes do not require an ad-hoc db, by leveraging VM-storage and cannot be incomplete.
+	// Currently VM-backed indexes are currently available only for the C-chain index.
 	switch engine.(type) {
 	case snowman.Engine:
 		var (
