@@ -120,7 +120,6 @@ func TestAtomicTrieInitialize(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-
 			rootHash1, commitHeight1 := atomicTrie1.LastCommitted()
 			assert.EqualValues(t, test.expectedCommitHeight, commitHeight1)
 			if test.expectedCommitHeight != 0 {
