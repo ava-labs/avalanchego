@@ -715,7 +715,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			n.Log.Error("creating static API endpoints for %q errored with: %s", vmID, err)
 
 			if err := commonVM.Shutdown(); err != nil {
-				return fmt.Errorf("shutting down VM errored with: %s", err)
+				return fmt.Errorf("shutting down VM errored with: %w", err)
 			}
 			continue
 		}

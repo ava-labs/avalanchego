@@ -45,10 +45,12 @@ import (
 	avcon "github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	aveng "github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	avbootstrap "github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap"
+	avagetter "github.com/ava-labs/avalanchego/snow/engine/avalanche/getter"
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	smbootstrap "github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
+	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 )
 
 const defaultChannelSize = 1
@@ -561,43 +563,83 @@ func (m *manager) createAvalancheChain(
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
-	handler := &router.Handler{}
+	handler, err := router.NewHandler(
+		m.MsgCreator,
+		ctx,
+		vdrs,
+		msgChan,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing network handler: %w", err)
+	}
 
 	timer := &router.Timer{
 		Handler: handler,
 		Preempt: sb.afterBootstrapped(),
 	}
 
-	// The engine handles consensus
-	engine := &aveng.Transitive{}
-	if err := engine.Initialize(aveng.Config{
-		Config: avbootstrap.Config{
-			Config: common.Config{
-				Ctx:                            ctx,
-				Validators:                     vdrs,
-				Beacons:                        beacons,
-				SampleK:                        sampleK,
-				StartupAlpha:                   (3*bootstrapWeight + 3) / 4,
-				Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
-				Sender:                         &sender,
-				Subnet:                         sb,
-				Timer:                          timer,
-				RetryBootstrap:                 m.RetryBootstrap,
-				RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
-				MaxTimeGetAncestors:            m.BootstrapMaxTimeGetAncestors,
-				AncestorsMaxContainersSent:     m.BootstrapAncestorsMaxContainersSent,
-				AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
-			},
-			VtxBlocked: vtxBlocker,
-			TxBlocked:  txBlocker,
-			Manager:    vtxManager,
+	commonCfg := common.Config{
+		Ctx:                            ctx,
+		Validators:                     vdrs,
+		Beacons:                        beacons,
+		SampleK:                        sampleK,
+		StartupAlpha:                   (3*bootstrapWeight + 3) / 4,
+		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
+		Sender:                         &sender,
+		Subnet:                         sb,
+		Timer:                          timer,
+		RetryBootstrap:                 m.RetryBootstrap,
+		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
+		MaxTimeGetAncestors:            m.BootstrapMaxTimeGetAncestors,
+		AncestorsMaxContainersSent:     m.BootstrapAncestorsMaxContainersSent,
+		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
+		SharedCfg:                      &common.SharedConfig{},
+	}
 
-			VM: vm,
-		},
-		Params:    consensusParams,
-		Consensus: &avcon.Topological{},
-	}); err != nil {
+	avaGetHandler, err := avagetter.New(vtxManager, commonCfg)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize avalanche base message handler: %w", err)
+	}
+
+	// create bootstrap gear
+	bootstrapperConfig := avbootstrap.Config{
+		Config:        commonCfg,
+		AllGetsServer: avaGetHandler,
+		VtxBlocked:    vtxBlocker,
+		TxBlocked:     txBlocker,
+		Manager:       vtxManager,
+		VM:            vm,
+		WeightTracker: common.NewWeightTracker(beacons, commonCfg.StartupAlpha),
+	}
+	bootstrapper, err := avbootstrap.New(
+		bootstrapperConfig,
+		handler.OnDoneBootstrapping,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing avalanche bootstrapper: %w", err)
+	}
+	handler.RegisterBootstrap(bootstrapper)
+
+	// create engine gear
+	engineConfig := aveng.Config{
+		Ctx:           bootstrapperConfig.Ctx,
+		AllGetsServer: avaGetHandler,
+		VM:            bootstrapperConfig.VM,
+		Manager:       vtxManager,
+		Sender:        bootstrapperConfig.Sender,
+		Validators:    vdrs,
+		Params:        consensusParams,
+		Consensus:     &avcon.Topological{},
+	}
+	engine, err := aveng.New(engineConfig)
+	if err != nil {
 		return nil, fmt.Errorf("error initializing avalanche engine: %w", err)
+	}
+	handler.RegisterEngine(engine)
+
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
+		return nil, fmt.Errorf("error starting up avalanche bootstrapper: %w", err)
 	}
 
 	// Register health check for this chain
@@ -609,19 +651,14 @@ func (m *manager) createAvalancheChain(
 	check := health.CheckerFunc(func() (interface{}, error) {
 		ctx.Lock.Lock()
 		defer ctx.Lock.Unlock()
-
-		return engine.HealthCheck()
+		if ctx.IsBootstrapped() {
+			return engine.HealthCheck()
+		}
+		return bootstrapper.HealthCheck()
 	})
 	if err := m.Health.RegisterHealthCheck(chainAlias, check); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
-
-	err = handler.Initialize(
-		m.MsgCreator,
-		engine,
-		vdrs,
-		msgChan,
-	)
 
 	return &chain{
 		Name:    chainAlias,
@@ -731,51 +768,81 @@ func (m *manager) createSnowmanChain(
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
-	handler := &router.Handler{}
+	handler, err := router.NewHandler(
+		m.MsgCreator,
+		ctx,
+		vdrs,
+		msgChan,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)
+	}
 
 	timer := &router.Timer{
 		Handler: handler,
 		Preempt: sb.afterBootstrapped(),
 	}
 
-	// The engine handles consensus
-	engine := &smeng.Transitive{}
-	if err := engine.Initialize(smeng.Config{
-		Config: smbootstrap.Config{
-			Config: common.Config{
-				Ctx:                            ctx,
-				Validators:                     vdrs,
-				Beacons:                        beacons,
-				SampleK:                        sampleK,
-				StartupAlpha:                   (3*bootstrapWeight + 3) / 4,
-				Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
-				Sender:                         &sender,
-				Subnet:                         sb,
-				Timer:                          timer,
-				RetryBootstrap:                 m.RetryBootstrap,
-				RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
-				MaxTimeGetAncestors:            m.BootstrapMaxTimeGetAncestors,
-				AncestorsMaxContainersSent:     m.BootstrapAncestorsMaxContainersSent,
-				AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
-			},
-			Blocked:      blocked,
-			VM:           vm,
-			Bootstrapped: m.unblockChains,
-		},
-		Params:    consensusParams,
-		Consensus: &smcon.Topological{},
-	}); err != nil {
-		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
+	commonCfg := common.Config{
+		Ctx:                            ctx,
+		Validators:                     vdrs,
+		Beacons:                        beacons,
+		SampleK:                        sampleK,
+		StartupAlpha:                   (3*bootstrapWeight + 3) / 4,
+		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
+		Sender:                         &sender,
+		Subnet:                         sb,
+		Timer:                          timer,
+		RetryBootstrap:                 m.RetryBootstrap,
+		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
+		MaxTimeGetAncestors:            m.BootstrapMaxTimeGetAncestors,
+		AncestorsMaxContainersSent:     m.BootstrapAncestorsMaxContainersSent,
+		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
+		SharedCfg:                      &common.SharedConfig{},
 	}
 
-	err = handler.Initialize(
-		m.MsgCreator,
-		engine,
-		vdrs,
-		msgChan,
+	snowGetHandler, err := snowgetter.New(vm, commonCfg)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
+	}
+
+	// create bootstrap gear
+	bootstrapCfg := smbootstrap.Config{
+		Config:        commonCfg,
+		AllGetsServer: snowGetHandler,
+		Blocked:       blocked,
+		VM:            vm,
+		WeightTracker: common.NewWeightTracker(beacons, commonCfg.StartupAlpha),
+		Bootstrapped:  m.unblockChains,
+	}
+	bootstrapper, err := smbootstrap.New(
+		bootstrapCfg,
+		handler.OnDoneBootstrapping,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't initialize message handler: %s", err)
+		return nil, fmt.Errorf("error initializing snowman bootstrapper: %w", err)
+	}
+	handler.RegisterBootstrap(bootstrapper)
+
+	// create engine gear
+	engineConfig := smeng.Config{
+		Ctx:           bootstrapCfg.Ctx,
+		AllGetsServer: snowGetHandler,
+		VM:            bootstrapCfg.VM,
+		Sender:        bootstrapCfg.Sender,
+		Validators:    vdrs,
+		Params:        consensusParams,
+		Consensus:     &smcon.Topological{},
+	}
+	engine, err := smeng.New(engineConfig)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
+	}
+	handler.RegisterEngine(engine)
+
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
+		return nil, fmt.Errorf("error starting snowman bootstrapper: %w", err)
 	}
 
 	// Register health checks
@@ -787,8 +854,10 @@ func (m *manager) createSnowmanChain(
 	check := health.CheckerFunc(func() (interface{}, error) {
 		ctx.Lock.Lock()
 		defer ctx.Lock.Unlock()
-
-		return engine.HealthCheck()
+		if ctx.IsBootstrapped() {
+			return engine.HealthCheck()
+		}
+		return bootstrapper.HealthCheck()
 	})
 	if err := m.Health.RegisterHealthCheck(chainAlias, check); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)

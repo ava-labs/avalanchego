@@ -22,6 +22,9 @@ type Engine interface {
 	// Returns true iff the chain is done bootstrapping
 	IsBootstrapped() bool
 
+	// Start engine operations from given request ID
+	Start(startReqID uint32) error
+
 	// Returns nil if the engine is healthy.
 	// Periodically called and reported through the health API
 	health.Checker
@@ -31,41 +34,23 @@ type Engine interface {
 }
 
 type Handler interface {
-	GetAcceptedFrontierHandler
+	AllGetsServer
 	AcceptedFrontierHandler
-	GetAcceptedHandler
 	AcceptedHandler
-	GetAncestorsHandler
 	AncestorsHandler
-	GetHandler
 	PutHandler
 	QueryHandler
 	ChitsHandler
 	AppHandler
 
-	// Notify this engine of peer changes.
-	validators.Connector
+	InternalHandler
+}
 
-	// Notify this engine that a registered timeout has fired.
-	Timeout() error
-
-	// Gossip to the network a container on the accepted frontier
-	Gossip() error
-
-	// Halt this engine.
-	//
-	// This function will be called before the environment starts exiting. This
-	// function is slightly special, in that it does not expect the chain's
-	// context lock to be held before calling this function.
-	Halt()
-
-	// Shutdown this engine.
-	//
-	// This function will be called when the environment is exiting.
-	Shutdown() error
-
-	// Notify this engine of a message from the virtual machine.
-	Notify(Message) error
+type AllGetsServer interface {
+	GetAcceptedFrontierHandler
+	GetAcceptedHandler
+	GetAncestorsHandler
+	GetHandler
 }
 
 // GetAcceptedFrontierHandler defines how a consensus engine reacts to a get
@@ -382,4 +367,33 @@ type AppHandler interface {
 	// A node may gossip the same message multiple times. That is,
 	// AppGossip([nodeID], [msg]) may be called multiple times.
 	AppGossip(nodeID ids.ShortID, msg []byte) error
+}
+
+// InternalHandler defines how this consensus engine reacts to messages from
+// other components of this validator. Functions only return fatal errors if
+// they occur.
+type InternalHandler interface {
+	// Notify this engine of peer changes.
+	validators.Connector
+
+	// Notify this engine that a registered timeout has fired.
+	Timeout() error
+
+	// Gossip to the network a container on the accepted frontier
+	Gossip() error
+
+	// Halt this engine.
+	//
+	// This function will be called before the environment starts exiting. This
+	// function is slightly special, in that it does not expect the chain's
+	// context lock to be held before calling this function.
+	Halt()
+
+	// Shutdown this engine.
+	//
+	// This function will be called when the environment is exiting.
+	Shutdown() error
+
+	// Notify this engine of a message from the virtual machine.
+	Notify(Message) error
 }

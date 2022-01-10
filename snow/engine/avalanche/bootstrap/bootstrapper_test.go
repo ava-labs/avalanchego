@@ -6,10 +6,7 @@ package bootstrap
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"testing"
-
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -22,6 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/validators"
+
+	avagetter "github.com/ava-labs/avalanchego/snow/engine/avalanche/getter"
 )
 
 var (
@@ -77,14 +76,22 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 		Timer:                          &common.TimerTest{},
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
+		SharedCfg:                      &common.SharedConfig{},
+	}
+
+	avaGetHandler, err := avagetter.New(manager, commonConfig)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	return Config{
-		Config:     commonConfig,
-		VtxBlocked: vtxBlocker,
-		TxBlocked:  txBlocker,
-		Manager:    manager,
-		VM:         vm,
+		Config:        commonConfig,
+		AllGetsServer: avaGetHandler,
+		VtxBlocked:    vtxBlocker,
+		TxBlocked:     txBlocker,
+		Manager:       manager,
+		VM:            vm,
+		WeightTracker: common.NewWeightTracker(commonConfig.Beacons, commonConfig.StartupAlpha),
 	}, peer, sender, manager, vm
 }
 
@@ -125,15 +132,16 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		BytesV:  vtxBytes2,
 	}
 
-	bs := Bootstrapper{}
-	finished := new(bool)
-	err := bs.Initialize(
+	bs, err := New(
 		config,
-		func() error { *finished = true; return nil },
-		fmt.Sprintf("chain_%s_bs", config.Ctx.ChainID),
-		prometheus.NewRegistry(),
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
+		t.Fatal(err)
+	}
+
+	startReqID := uint32(0)
+	if err := bs.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -174,7 +182,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	}
 
 	switch {
-	case !*finished:
+	case config.Ctx.GetState() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
@@ -226,15 +234,16 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		BytesV:  vtxBytes2,
 	}
 
-	bs := Bootstrapper{}
-	finished := new(bool)
-	err := bs.Initialize(
+	bs, err := New(
 		config,
-		func() error { *finished = true; return nil },
-		fmt.Sprintf("chain_%s_bs", config.Ctx.ChainID),
-		prometheus.NewRegistry(),
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
+		t.Fatal(err)
+	}
+
+	startReqID := uint32(0)
+	if err := bs.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -322,7 +331,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	switch {
 	case *requestID != oldReqID:
 		t.Fatal("should not have issued new request")
-	case !*finished:
+	case config.Ctx.GetState() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
@@ -402,15 +411,16 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		BytesV:   vtxBytes1,
 	}
 
-	bs := Bootstrapper{}
-	finished := new(bool)
-	err := bs.Initialize(
+	bs, err := New(
 		config,
-		func() error { *finished = true; return nil },
-		fmt.Sprintf("chain_%s_bs", config.Ctx.ChainID),
-		prometheus.NewRegistry(),
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
+		t.Fatal(err)
+	}
+
+	startReqID := uint32(0)
+	if err := bs.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -476,7 +486,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !*finished {
+	if config.Ctx.GetState() != snow.NormalOp {
 		t.Fatalf("Should have finished bootstrapping")
 	}
 	if tx0.Status() != choices.Accepted {
@@ -545,15 +555,16 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 		BytesV:   vtxBytes1,
 	}
 
-	bs := Bootstrapper{}
-	finished := new(bool)
-	err := bs.Initialize(
+	bs, err := New(
 		config,
-		func() error { *finished = true; return nil },
-		fmt.Sprintf("chain_%s_bs", config.Ctx.ChainID),
-		prometheus.NewRegistry(),
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
+		t.Fatal(err)
+	}
+
+	startReqID := uint32(0)
+	if err := bs.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -608,7 +619,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !*finished {
+	if config.Ctx.GetState() != snow.NormalOp {
 		t.Fatalf("Bootstrapping should have finished")
 	}
 	if tx0.Status() != choices.Unknown { // never saw this tx
@@ -623,111 +634,6 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 	}
 	if vtx1.Status() != choices.Processing { // can't accept because we don't have tx1 accepted
 		t.Fatalf("Vertex should be processing")
-	}
-}
-
-func TestBootstrapperAcceptedFrontier(t *testing.T) {
-	config, _, _, manager, _ := newConfig(t)
-
-	vtxID0 := ids.GenerateTestID()
-	vtxID1 := ids.GenerateTestID()
-	vtxID2 := ids.GenerateTestID()
-
-	bs := Bootstrapper{}
-	err := bs.Initialize(
-		config,
-		nil,
-		fmt.Sprintf("chain_%s_bs", config.Ctx.ChainID),
-		prometheus.NewRegistry(),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	manager.EdgeF = func() []ids.ID {
-		return []ids.ID{
-			vtxID0,
-			vtxID1,
-		}
-	}
-
-	accepted, err := bs.CurrentAcceptedFrontier()
-	if err != nil {
-		t.Fatal(err)
-	}
-	acceptedSet := ids.Set{}
-	acceptedSet.Add(accepted...)
-
-	manager.EdgeF = nil
-
-	if !acceptedSet.Contains(vtxID0) {
-		t.Fatalf("Vtx should be accepted")
-	}
-	if !acceptedSet.Contains(vtxID1) {
-		t.Fatalf("Vtx should be accepted")
-	}
-	if acceptedSet.Contains(vtxID2) {
-		t.Fatalf("Vtx shouldn't be accepted")
-	}
-}
-
-func TestBootstrapperFilterAccepted(t *testing.T) {
-	config, _, _, manager, _ := newConfig(t)
-
-	vtxID0 := ids.GenerateTestID()
-	vtxID1 := ids.GenerateTestID()
-	vtxID2 := ids.GenerateTestID()
-
-	vtx0 := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
-		IDV:     vtxID0,
-		StatusV: choices.Accepted,
-	}}
-	vtx1 := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
-		IDV:     vtxID1,
-		StatusV: choices.Accepted,
-	}}
-
-	bs := Bootstrapper{}
-	finished := new(bool)
-	err := bs.Initialize(
-		config,
-		func() error { *finished = true; return nil },
-		fmt.Sprintf("chain_%s_bs", config.Ctx.ChainID),
-		prometheus.NewRegistry(),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	vtxIDs := []ids.ID{vtxID0, vtxID1, vtxID2}
-
-	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
-		switch vtxID {
-		case vtxID0:
-			return vtx0, nil
-		case vtxID1:
-			return vtx1, nil
-		case vtxID2:
-			return nil, errUnknownVertex
-		}
-		t.Fatal(errUnknownVertex)
-		return nil, errUnknownVertex
-	}
-
-	accepted := bs.FilterAccepted(vtxIDs)
-	acceptedSet := ids.Set{}
-	acceptedSet.Add(accepted...)
-
-	manager.GetVtxF = nil
-
-	if !acceptedSet.Contains(vtxID0) {
-		t.Fatalf("Vtx should be accepted")
-	}
-	if !acceptedSet.Contains(vtxID1) {
-		t.Fatalf("Vtx should be accepted")
-	}
-	if acceptedSet.Contains(vtxID2) {
-		t.Fatalf("Vtx shouldn't be accepted")
 	}
 }
 
@@ -770,15 +676,16 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 		BytesV:   vtxBytes2,
 	}
 
-	bs := Bootstrapper{}
-	finished := new(bool)
-	err := bs.Initialize(
+	bs, err := New(
 		config,
-		func() error { *finished = true; return nil },
-		fmt.Sprintf("chain_%s_bs", config.Ctx.ChainID),
-		prometheus.NewRegistry(),
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
+		t.Fatal(err)
+	}
+
+	startReqID := uint32(0)
+	if err := bs.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -839,7 +746,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	switch {
 	case err != nil: // Provide vtx1; should request vtx0
 		t.Fatal(err)
-	case bs.Ctx.IsBootstrapped():
+	case bs.IsBootstrapped():
 		t.Fatalf("should not have finished")
 	case requested != vtxID0:
 		t.Fatal("should hae requested vtx0")
@@ -851,7 +758,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	switch {
 	case err != nil: // Provide vtx0; can finish now
 		t.Fatal(err)
-	case !bs.Ctx.IsBootstrapped():
+	case !bs.IsBootstrapped():
 		t.Fatal("should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatal("should be accepted")
@@ -889,15 +796,16 @@ func TestBootstrapperFinalized(t *testing.T) {
 		BytesV:   vtxBytes1,
 	}
 
-	bs := Bootstrapper{}
-	finished := new(bool)
-	err := bs.Initialize(
+	bs, err := New(
 		config,
-		func() error { *finished = true; return nil },
-		fmt.Sprintf("chain_%s_bs", config.Ctx.ChainID),
-		prometheus.NewRegistry(),
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
+		t.Fatal(err)
+	}
+
+	startReqID := uint32(0)
+	if err := bs.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -971,7 +879,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	switch {
 	case err != nil:
 		t.Fatal(err)
-	case !*finished:
+	case config.Ctx.GetState() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
@@ -1019,15 +927,16 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 		BytesV:   vtxBytes2,
 	}
 
-	bs := Bootstrapper{}
-	finished := new(bool)
-	err := bs.Initialize(
+	bs, err := New(
 		config,
-		func() error { *finished = true; return nil },
-		fmt.Sprintf("chain_%s_bs", config.Ctx.ChainID),
-		prometheus.NewRegistry(),
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
+		t.Fatal(err)
+	}
+
+	startReqID := uint32(0)
+	if err := bs.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1103,7 +1012,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	}
 
 	switch {
-	case !*finished:
+	case config.Ctx.GetState() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
@@ -1185,15 +1094,20 @@ func TestRestartBootstrapping(t *testing.T) {
 		BytesV:   vtxBytes5,
 	}
 
-	bs := Bootstrapper{}
-	finished := new(bool)
-	err := bs.Initialize(
+	bsIntf, err := New(
 		config,
-		func() error { *finished = true; return nil },
-		fmt.Sprintf("chain_%s_bs", config.Ctx.ChainID),
-		prometheus.NewRegistry(),
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
+		t.Fatal(err)
+	}
+	bs, ok := bsIntf.(*bootstrapper)
+	if !ok {
+		t.Fatal("unexpected bootstrapper type")
+	}
+
+	startReqID := uint32(0)
+	if err := bs.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1346,7 +1260,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	switch {
-	case !*finished:
+	case config.Ctx.GetState() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")

@@ -57,10 +57,10 @@ func NewApp(config node.Config) app.App {
 func (p *process) Start() error {
 	// Set the data directory permissions to be read write.
 	if err := perms.ChmodR(p.config.DatabaseConfig.Path, true, perms.ReadWriteExecute); err != nil {
-		return fmt.Errorf("failed to restrict the permissions of the database directory with: %s", err)
+		return fmt.Errorf("failed to restrict the permissions of the database directory with: %w", err)
 	}
 	if err := perms.ChmodR(p.config.LoggingConfig.Directory, true, perms.ReadWriteExecute); err != nil {
-		return fmt.Errorf("failed to restrict the permissions of the log directory with: %s", err)
+		return fmt.Errorf("failed to restrict the permissions of the log directory with: %w", err)
 	}
 
 	// we want to create the logger after the plugin has started the app

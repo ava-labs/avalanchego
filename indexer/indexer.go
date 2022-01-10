@@ -94,7 +94,7 @@ func NewIndexer(config Config) (Indexer, error) {
 		codecVersion,
 		linearcodec.New(reflectcodec.DefaultTagName, math.MaxUint32),
 	); err != nil {
-		return nil, fmt.Errorf("couldn't register codec: %s", err)
+		return nil, fmt.Errorf("couldn't register codec: %w", err)
 	}
 	hasRun, err := indexer.hasRun()
 	if err != nil {
