@@ -51,6 +51,43 @@ func TestNearestCommitHeight(t *testing.T) {
 	}
 }
 
+func TestAtomicTrieInitializeWithMoreTxInRepoThanAccepted(t *testing.T) {
+	lastAcceptedHeight := uint64(100)
+	expectedCommitHeight := uint64(100)
+	commitInterval := uint64(10)
+	repoTxs := lastAcceptedHeight + commitInterval
+
+	db := versiondb.New(memdb.New())
+	codec := testTxCodec()
+	repo, err := NewAtomicTxRepository(db, codec, repoTxs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	operationsMap := make(map[uint64]map[ids.ID]*atomic.Requests)
+	writeTxs(t, repo, 0, repoTxs+1, 1, nil, operationsMap)
+
+	atomicTrie1, err := newAtomicTrie(db, make(map[uint64]ids.ID), repo, codec, lastAcceptedHeight, commitInterval)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootHash1, commitHeight1 := atomicTrie1.LastCommitted()
+	assert.EqualValues(t, expectedCommitHeight, commitHeight1)
+	if expectedCommitHeight != 0 {
+		assert.NotEqual(t, common.Hash{}, rootHash1)
+	}
+
+	// continue indexing later
+	lastAcceptedHeight = repoTxs
+	expectedCommitHeight = repoTxs
+	atomicTrie2, err := newAtomicTrie(db, nil, repo, codec, lastAcceptedHeight, commitInterval)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootHash2, commitHeight2 := atomicTrie2.LastCommitted()
+	assert.EqualValues(t, expectedCommitHeight, commitHeight2)
+	assert.NotEqual(t, rootHash1, rootHash2)
+}
+
 func TestAtomicTrieInitialize(t *testing.T) {
 	type test struct {
 		commitInterval, lastAcceptedHeight, expectedCommitHeight uint64
