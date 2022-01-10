@@ -59,9 +59,7 @@ func (tx *UnsignedExportTx) Addresses() [][]byte {
 			continue
 		}
 
-		for _, address := range addressable.Addresses() {
-			addrs = append(addrs, [][]byte{address}...)
-		}
+		addrs = append(addrs, addressable.Addresses()...)
 	}
 	for _, outputs := range tx.ExportedOutputs {
 		addressable, ok := outputs.Out.(avax.Addressable)
@@ -69,9 +67,7 @@ func (tx *UnsignedExportTx) Addresses() [][]byte {
 			continue
 		}
 
-		for _, address := range addressable.Addresses() {
-			addrs = append(addrs, [][]byte{address}...)
-		}
+		addrs = append(addrs, addressable.Addresses()...)
 	}
 
 	return addrs

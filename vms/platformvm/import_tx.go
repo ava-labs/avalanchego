@@ -59,9 +59,7 @@ func (tx *UnsignedImportTx) Addresses() [][]byte {
 			continue
 		}
 
-		for _, address := range addressable.Addresses() {
-			addrs = append(addrs, [][]byte{address}...)
-		}
+		addrs = append(addrs, addressable.Addresses()...)
 	}
 
 	return addrs
