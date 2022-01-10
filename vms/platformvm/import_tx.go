@@ -50,6 +50,24 @@ func (tx *UnsignedImportTx) InitCtx(ctx *snow.Context) {
 	}
 }
 
+func (tx *UnsignedImportTx) Addresses() [][]byte {
+	addrs := make([][]byte, 0)
+
+	for _, utxo := range tx.UTXOs() {
+		addressable, ok := utxo.Out.(avax.Addressable)
+		if !ok {
+			continue
+		}
+
+		for _, address := range addressable.Addresses() {
+			addrs = append(addrs, [][]byte{address}...)
+		}
+	}
+
+	return addrs
+}
+
+// SetVM sets Virtual Machine to [UnsignedExportTx]
 func (tx *UnsignedImportTx) SetVM(vm *VM) {
 	tx.vm = vm
 }
@@ -199,9 +217,9 @@ func (tx *UnsignedImportTx) AtomicAccept(ctx *snow.Context, batch database.Batch
 	if err != nil {
 		return err
 	}
-	tx.vm.pubsub.Publish(NewPubSubFilterer(&tx.BaseTx))
+	tx.vm.pubsub.Publish(NewPubSubFilterer(tx))
 
-	return ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{tx.SourceChain: {RemoveRequests: utxoIDs}}, batch)
+	return ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{chainID: requests}, batch)
 }
 
 // Create a new transaction

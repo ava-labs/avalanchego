@@ -50,6 +50,34 @@ func (tx *UnsignedExportTx) InitCtx(ctx *snow.Context) {
 	}
 }
 
+func (tx *UnsignedExportTx) Addresses() [][]byte {
+	addrs := make([][]byte, 0)
+
+	for _, utxo := range tx.UTXOs() {
+		addressable, ok := utxo.Out.(avax.Addressable)
+		if !ok {
+			continue
+		}
+
+		for _, address := range addressable.Addresses() {
+			addrs = append(addrs, [][]byte{address}...)
+		}
+	}
+	for _, outputs := range tx.ExportedOutputs {
+		addressable, ok := outputs.Out.(avax.Addressable)
+		if !ok {
+			continue
+		}
+
+		for _, address := range addressable.Addresses() {
+			addrs = append(addrs, [][]byte{address}...)
+		}
+	}
+
+	return addrs
+}
+
+// SetVM sets Virtual Machine to [UnsignedExportTx]
 func (tx *UnsignedExportTx) SetVM(vm *VM) {
 	tx.vm = vm
 }
@@ -182,7 +210,7 @@ func (tx *UnsignedExportTx) AtomicAccept(ctx *snow.Context, batch database.Batch
 	if err != nil {
 		return err
 	}
-	tx.vm.pubsub.Publish(NewPubSubExportFilterer(tx))
+	tx.vm.pubsub.Publish(NewPubSubFilterer(tx))
 
 	return ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{chainID: requests}, batch)
 }

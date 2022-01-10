@@ -3,6 +3,8 @@
 
 package avax
 
+import "github.com/ava-labs/avalanchego/ids"
+
 const (
 	codecVersion = 0
 )
@@ -11,4 +13,12 @@ const (
 // be tracked as a part of the utxo set for a set of addresses
 type Addressable interface {
 	Addresses() [][]byte
+}
+
+// AddressableID is the interface which compose Addressable interface and uniq ID
+type AddressableID interface {
+	Addressable
+
+	// ID returns the unique ID of this data
+	ID() ids.ID
 }
