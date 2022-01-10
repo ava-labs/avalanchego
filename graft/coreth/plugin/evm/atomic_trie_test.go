@@ -72,9 +72,7 @@ func TestAtomicTrieInitializeWithMoreTxInRepoThanAccepted(t *testing.T) {
 	}
 	rootHash1, commitHeight1 := atomicTrie1.LastCommitted()
 	assert.EqualValues(t, expectedCommitHeight, commitHeight1)
-	if expectedCommitHeight != 0 {
-		assert.NotEqual(t, common.Hash{}, rootHash1)
-	}
+	assert.NotEqual(t, common.Hash{}, rootHash1)
 
 	// continue indexing later
 	lastAcceptedHeight = repoTxs
@@ -85,6 +83,7 @@ func TestAtomicTrieInitializeWithMoreTxInRepoThanAccepted(t *testing.T) {
 	}
 	rootHash2, commitHeight2 := atomicTrie2.LastCommitted()
 	assert.EqualValues(t, expectedCommitHeight, commitHeight2)
+	assert.NotEqual(t, common.Hash{}, rootHash2)
 	assert.NotEqual(t, rootHash1, rootHash2)
 }
 
