@@ -167,6 +167,10 @@ func (b *bootstrapper) Connected(nodeID ids.ShortID, nodeVersion version.Applica
 		return err
 	}
 
+	if err := b.WeightTracker.AddWeightForNode(nodeID); err != nil {
+		return err
+	}
+
 	if b.WeightTracker.EnoughConnectedWeight() && !b.started {
 		b.started = true
 		return b.Startup()
