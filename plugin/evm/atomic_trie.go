@@ -244,6 +244,9 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 			// Dereference lashHash to avoid writing more intermediary
 			// trie nodes than needed to disk, while keeping the commit
 			// size under commitSizeCap (approximately).
+			// Check [lastHash != hash] here to avoid dereferencing the
+			// trie root in case there were no atomic txs since the
+			// last commit.
 			if (lastHash != common.Hash{} && lastHash != hash) {
 				a.trieDB.Dereference(lastHash)
 			}
