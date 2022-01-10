@@ -296,7 +296,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	m.ManagerConfig.Router.AddChain(chain.Handler)
 
 	// Finally start the chain so to send out messages
-	if err := m.ManagerConfig.Router.StartChain(chainParams.ID); err != nil {
+	if err := m.ManagerConfig.Router.StartChain(chain.Handler); err != nil {
 		m.Log.Error("error starting chain %s: %s", chainParams.ID, err)
 		if m.CriticalChains.Contains(chainParams.ID) {
 			// If a required chain (i.e. X, P or C) can't be started, panic
