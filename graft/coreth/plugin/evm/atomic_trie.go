@@ -244,10 +244,9 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 		// keep track of progress and keep commit size under commitSizeCap
 		commitHeight := nearestCommitHeight(height, a.commitHeightInterval)
 		if lastHeight < commitHeight {
-			log.Info("lastHeight less than commitHeight", "lastHeight", lastHeight, "commitHeight", commitHeight)
 			hash, _, err := a.trie.Commit(nil)
 			if err != nil {
-				return fmt.Errorf("could not commit trie in initialize %w", err)
+				return err
 			}
 			// Dereference lashHash to avoid writing more intermediary
 			// trie nodes than needed to disk, while keeping the commit
