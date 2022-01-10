@@ -198,29 +198,30 @@ func (b *Bootstrapper) fetch(blkID ids.ID) error {
 	return nil
 }
 
-// MultiPut handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
+// Ancestors handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
 // with request ID [requestID]
-func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte) error {
+func (b *Bootstrapper) Ancestors(vdr ids.ShortID, requestID uint32, blks [][]byte) error {
 	lenBlks := len(blks)
 	if lenBlks == 0 {
-		b.Ctx.Log.Debug("MultiPut(%s, %d) contains no blocks", vdr, requestID)
+		b.Ctx.Log.Debug("Ancestors(%s, %d) contains no blocks", vdr, requestID)
 		return b.GetAncestorsFailed(vdr, requestID)
 	}
-	if lenBlks > b.MultiputMaxContainersReceived {
-		blks = blks[:b.MultiputMaxContainersReceived]
-		b.Ctx.Log.Debug("ignoring %d containers in multiput(%s, %d)", lenBlks-b.MultiputMaxContainersReceived, vdr, requestID)
+	if lenBlks > b.AncestorsMaxContainersReceived {
+		blks = blks[:b.AncestorsMaxContainersReceived]
+		b.Ctx.Log.Debug("ignoring %d containers in Ancestors(%s, %d)",
+			lenBlks-b.AncestorsMaxContainersReceived, vdr, requestID)
 	}
 
 	// Make sure this is in response to a request we made
 	wantedBlkID, ok := b.OutstandingRequests.Remove(vdr, requestID)
 	if !ok { // this message isn't in response to a request we made
-		b.Ctx.Log.Debug("received unexpected MultiPut from %s with ID %d", vdr, requestID)
+		b.Ctx.Log.Debug("received unexpected Ancestors from %s with ID %d", vdr, requestID)
 		return nil
 	}
 
 	blocks, err := block.BatchedParseBlock(b.VM, blks)
 	if err != nil { // the provided blocks couldn't be parsed
-		b.Ctx.Log.Debug("failed to parse blocks in MultiPut from %s with ID %d", vdr, requestID)
+		b.Ctx.Log.Debug("failed to parse blocks in Ancestors from %s with ID %d", vdr, requestID)
 		return b.fetch(wantedBlkID)
 	}
 

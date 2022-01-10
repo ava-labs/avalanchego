@@ -147,7 +147,7 @@ type ManagerConfig struct {
 	CriticalChains              ids.Set          // Chains that can't exit gracefully
 	WhitelistedSubnets          ids.Set          // Subnets to validate
 	TimeoutManager              *timeout.Manager // Manages request timeouts when sending messages to other validators
-	HealthService               health.Health
+	Health                      health.Registerer
 	RetryBootstrap              bool                    // Should Bootstrap be retried
 	RetryBootstrapWarnFrequency int                     // Max number of times to retry bootstrap before warning the node operator
 	SubnetConfigs               map[ids.ID]SubnetConfig // ID -> SubnetConfig
@@ -164,11 +164,11 @@ type ManagerConfig struct {
 	// Max Time to spend fetching a container and its
 	// ancestors when responding to a GetAncestors
 	BootstrapMaxTimeGetAncestors time.Duration
-	// Max number of containers in a multiput message sent by this node.
-	BootstrapMultiputMaxContainersSent int
-	// This node will only consider the first [MultiputMaxContainersReceived]
-	// containers in a multiput it receives.
-	BootstrapMultiputMaxContainersReceived int
+	// Max number of containers in an ancestors message sent by this node.
+	BootstrapAncestorsMaxContainersSent int
+	// This node will only consider the first [AncestorsMaxContainersReceived]
+	// containers in an ancestors message it receives.
+	BootstrapAncestorsMaxContainersReceived int
 
 	ApricotPhase4Time            time.Time
 	ApricotPhase4MinPChainHeight uint64
@@ -573,20 +573,20 @@ func (m *manager) createAvalancheChain(
 	if err := engine.Initialize(aveng.Config{
 		Config: avbootstrap.Config{
 			Config: common.Config{
-				Ctx:                           ctx,
-				Validators:                    vdrs,
-				Beacons:                       beacons,
-				SampleK:                       sampleK,
-				StartupAlpha:                  (3*bootstrapWeight + 3) / 4,
-				Alpha:                         bootstrapWeight/2 + 1, // must be > 50%
-				Sender:                        &sender,
-				Subnet:                        sb,
-				Timer:                         timer,
-				RetryBootstrap:                m.RetryBootstrap,
-				RetryBootstrapWarnFrequency:   m.RetryBootstrapWarnFrequency,
-				MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
-				MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
-				MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
+				Ctx:                            ctx,
+				Validators:                     vdrs,
+				Beacons:                        beacons,
+				SampleK:                        sampleK,
+				StartupAlpha:                   (3*bootstrapWeight + 3) / 4,
+				Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
+				Sender:                         &sender,
+				Subnet:                         sb,
+				Timer:                          timer,
+				RetryBootstrap:                 m.RetryBootstrap,
+				RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
+				MaxTimeGetAncestors:            m.BootstrapMaxTimeGetAncestors,
+				AncestorsMaxContainersSent:     m.BootstrapAncestorsMaxContainersSent,
+				AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
 			},
 			VtxBlocked: vtxBlocker,
 			TxBlocked:  txBlocker,
@@ -606,12 +606,13 @@ func (m *manager) createAvalancheChain(
 		chainAlias = ctx.ChainID.String()
 	}
 	// Grab the context lock before calling the chain's health check
-	checkFn := func() (interface{}, error) {
+	check := health.CheckerFunc(func() (interface{}, error) {
 		ctx.Lock.Lock()
 		defer ctx.Lock.Unlock()
+
 		return engine.HealthCheck()
-	}
-	if err := m.HealthService.RegisterCheck(chainAlias, checkFn); err != nil {
+	})
+	if err := m.Health.RegisterHealthCheck(chainAlias, check); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
@@ -742,20 +743,20 @@ func (m *manager) createSnowmanChain(
 	if err := engine.Initialize(smeng.Config{
 		Config: smbootstrap.Config{
 			Config: common.Config{
-				Ctx:                           ctx,
-				Validators:                    vdrs,
-				Beacons:                       beacons,
-				SampleK:                       sampleK,
-				StartupAlpha:                  (3*bootstrapWeight + 3) / 4,
-				Alpha:                         bootstrapWeight/2 + 1, // must be > 50%
-				Sender:                        &sender,
-				Subnet:                        sb,
-				Timer:                         timer,
-				RetryBootstrap:                m.RetryBootstrap,
-				RetryBootstrapWarnFrequency:   m.RetryBootstrapWarnFrequency,
-				MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
-				MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
-				MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
+				Ctx:                            ctx,
+				Validators:                     vdrs,
+				Beacons:                        beacons,
+				SampleK:                        sampleK,
+				StartupAlpha:                   (3*bootstrapWeight + 3) / 4,
+				Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
+				Sender:                         &sender,
+				Subnet:                         sb,
+				Timer:                          timer,
+				RetryBootstrap:                 m.RetryBootstrap,
+				RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
+				MaxTimeGetAncestors:            m.BootstrapMaxTimeGetAncestors,
+				AncestorsMaxContainersSent:     m.BootstrapAncestorsMaxContainersSent,
+				AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
 			},
 			Blocked:      blocked,
 			VM:           vm,
@@ -783,12 +784,13 @@ func (m *manager) createSnowmanChain(
 		chainAlias = ctx.ChainID.String()
 	}
 
-	checkFn := func() (interface{}, error) {
+	check := health.CheckerFunc(func() (interface{}, error) {
 		ctx.Lock.Lock()
 		defer ctx.Lock.Unlock()
+
 		return engine.HealthCheck()
-	}
-	if err := m.HealthService.RegisterCheck(chainAlias, checkFn); err != nil {
+	})
+	if err := m.Health.RegisterHealthCheck(chainAlias, check); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 

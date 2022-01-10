@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	cjson "github.com/ava-labs/avalanchego/utils/json"
+	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 )
 
 var (
@@ -69,19 +70,16 @@ func defaultService(t *testing.T) *Service {
 func defaultAddress(t *testing.T, service *Service) {
 	service.vm.ctx.Lock.Lock()
 	defer service.vm.ctx.Lock.Unlock()
-	userDB, err := service.vm.ctx.Keystore.GetDatabase(testUsername, testPassword)
+	user, err := vmkeystore.NewUserFromKeystore(service.vm.ctx.Keystore, testUsername, testPassword)
 	if err != nil {
 		t.Fatal(err)
 	}
-	user := user{db: userDB}
 	pk, err := service.vm.factory.ToPrivateKey(testPrivateKey)
 	if err != nil {
 		t.Fatal(err)
 	}
 	privKey := pk.(*crypto.PrivateKeySECP256K1R)
-	if err := user.putAddress(privKey); err != nil {
-		t.Fatal(err)
-	} else if err := user.putAddress(keys[0]); err != nil {
+	if err := user.PutKeys(privKey, keys[0]); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -420,8 +418,10 @@ func TestGetBalance(t *testing.T) {
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis()
 	for _, utxo := range genesis.UTXOs {
-		request := api.JSONAddress{
-			Address: fmt.Sprintf("P-%s", utxo.Address),
+		request := GetBalanceRequest{
+			Addresses: []string{
+				fmt.Sprintf("P-%s", utxo.Address),
+			},
 		}
 		reply := GetBalanceResponse{}
 		if err := service.GetBalance(nil, &request, &reply); err != nil {

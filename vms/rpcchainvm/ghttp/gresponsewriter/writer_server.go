@@ -12,6 +12,7 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gconn"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gconn/gconnproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greader"
@@ -99,18 +100,30 @@ func (s *Server) Hijack(ctx context.Context, req *gresponsewriterproto.HijackReq
 	closer := grpcutils.ServerCloser{}
 
 	go s.broker.AcceptAndServe(connID, func(opts []grpc.ServerOption) *grpc.Server {
+		opts = append(opts,
+			grpc.MaxRecvMsgSize(math.MaxInt),
+			grpc.MaxSendMsgSize(math.MaxInt),
+		)
 		server := grpc.NewServer(opts...)
 		closer.Add(server)
 		gconnproto.RegisterConnServer(server, gconn.NewServer(conn, &closer))
 		return server
 	})
 	go s.broker.AcceptAndServe(readerID, func(opts []grpc.ServerOption) *grpc.Server {
+		opts = append(opts,
+			grpc.MaxRecvMsgSize(math.MaxInt),
+			grpc.MaxSendMsgSize(math.MaxInt),
+		)
 		server := grpc.NewServer(opts...)
 		closer.Add(server)
 		greaderproto.RegisterReaderServer(server, greader.NewServer(readWriter))
 		return server
 	})
 	go s.broker.AcceptAndServe(writerID, func(opts []grpc.ServerOption) *grpc.Server {
+		opts = append(opts,
+			grpc.MaxRecvMsgSize(math.MaxInt),
+			grpc.MaxSendMsgSize(math.MaxInt),
+		)
 		server := grpc.NewServer(opts...)
 		closer.Add(server)
 		gwriterproto.RegisterWriterServer(server, gwriter.NewServer(readWriter))

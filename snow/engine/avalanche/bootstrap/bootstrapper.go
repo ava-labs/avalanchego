@@ -286,17 +286,18 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 	return b.fetch()
 }
 
-// MultiPut handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
+// Ancestors handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
 // with request ID [requestID]. Expects vtxs[0] to be the vertex requested in the corresponding GetAncestors.
-func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte) error {
+func (b *Bootstrapper) Ancestors(vdr ids.ShortID, requestID uint32, vtxs [][]byte) error {
 	lenVtxs := len(vtxs)
 	if lenVtxs == 0 {
-		b.Ctx.Log.Debug("MultiPut(%s, %d) contains no vertices", vdr, requestID)
+		b.Ctx.Log.Debug("Ancestors(%s, %d) contains no vertices", vdr, requestID)
 		return b.GetAncestorsFailed(vdr, requestID)
 	}
-	if lenVtxs > b.MultiputMaxContainersReceived {
-		vtxs = vtxs[:b.MultiputMaxContainersReceived]
-		b.Ctx.Log.Debug("ignoring %d containers in multiput(%s, %d)", lenVtxs-b.MultiputMaxContainersReceived, vdr, requestID)
+	if lenVtxs > b.AncestorsMaxContainersReceived {
+		vtxs = vtxs[:b.AncestorsMaxContainersReceived]
+		b.Ctx.Log.Debug("ignoring %d containers in Ancestors(%s, %d)",
+			lenVtxs-b.AncestorsMaxContainersReceived, vdr, requestID)
 	}
 
 	requestedVtxID, requested := b.OutstandingRequests.Remove(vdr, requestID)
@@ -323,7 +324,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 	}
 
 	// Do not remove from outstanding requests if this did not answer a specific outstanding request
-	// to ensure that real responses are not dropped in favor of potentially byzantine MultiPut messages that
+	// to ensure that real responses are not dropped in favor of potentially byzantine Ancestors messages that
 	// could force the node to bootstrap 1 vertex at a time.
 	b.needToFetch.Remove(vtxID)
 
@@ -348,7 +349,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 		}
 		vtxID := vtx.ID()
 		if !eligibleVertices.Contains(vtxID) {
-			b.Ctx.Log.Debug("received vertex that should not have been included in MultiPut from %s with vertexID %s", vdr, vtxID)
+			b.Ctx.Log.Debug("received vertex that should not have been included in Ancestors from %s with vertexID %s", vdr, vtxID)
 			break
 		}
 		eligibleVertices.Remove(vtxID)

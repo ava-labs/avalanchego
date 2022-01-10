@@ -387,8 +387,8 @@ func (_m *Engine) IsBootstrapped() bool {
 	return r0
 }
 
-// MultiPut provides a mock function with given fields: validatorID, requestID, containers
-func (_m *Engine) MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) error {
+// Ancestors provides a mock function with given fields: validatorID, requestID, containers
+func (_m *Engine) Ancestors(validatorID ids.ShortID, requestID uint32, containers [][]byte) error {
 	ret := _m.Called(validatorID, requestID, containers)
 
 	var r0 error
@@ -429,13 +429,13 @@ func (_m *Engine) PullQuery(validatorID ids.ShortID, requestID uint32, container
 	return r0
 }
 
-// PushQuery provides a mock function with given fields: validatorID, requestID, containerID, container
-func (_m *Engine) PushQuery(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error {
-	ret := _m.Called(validatorID, requestID, containerID, container)
+// PushQuery provides a mock function with given fields: validatorID, requestID, container
+func (_m *Engine) PushQuery(validatorID ids.ShortID, requestID uint32, container []byte) error {
+	ret := _m.Called(validatorID, requestID, container)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, ids.ID, []byte) error); ok {
-		r0 = rf(validatorID, requestID, containerID, container)
+	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, []byte) error); ok {
+		r0 = rf(validatorID, requestID, container)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -443,13 +443,13 @@ func (_m *Engine) PushQuery(validatorID ids.ShortID, requestID uint32, container
 	return r0
 }
 
-// Put provides a mock function with given fields: validatorID, requestID, containerID, container
-func (_m *Engine) Put(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error {
-	ret := _m.Called(validatorID, requestID, containerID, container)
+// Put provides a mock function with given fields: validatorID, requestID, container
+func (_m *Engine) Put(validatorID ids.ShortID, requestID uint32, container []byte) error {
+	ret := _m.Called(validatorID, requestID, container)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, ids.ID, []byte) error); ok {
-		r0 = rf(validatorID, requestID, containerID, container)
+	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, []byte) error); ok {
+		r0 = rf(validatorID, requestID, container)
 	} else {
 		r0 = ret.Error(0)
 	}

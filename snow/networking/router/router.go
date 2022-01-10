@@ -6,7 +6,7 @@ package router
 import (
 	"time"
 
-	"github.com/ava-labs/avalanchego/health"
+	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
@@ -37,7 +37,7 @@ type Router interface {
 	) error
 	Shutdown()
 	AddChain(chain *Handler)
-	health.Checkable
+	health.Checker
 }
 
 // ExternalRouter routes messages from the network to the

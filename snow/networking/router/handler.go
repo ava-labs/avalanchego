@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -20,6 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/uptime"
 	"github.com/ava-labs/avalanchego/version"
 )
+
+const cpuHalflife = 15 * time.Second
 
 var errDuplicatedContainerID = errors.New("inbound message contains duplicated container ID")
 
@@ -70,7 +73,7 @@ func (h *Handler) Initialize(
 	h.validators = validators
 	var lock sync.Mutex
 	h.unprocessedMsgsCond = sync.NewCond(&lock)
-	h.cpuTracker = tracker.NewCPUTracker(uptime.ContinuousFactory{}, defaultCPUInterval)
+	h.cpuTracker = tracker.NewCPUTracker(uptime.ContinuousFactory{}, cpuHalflife)
 	var err error
 	h.unprocessedMsgs, err = newUnprocessedMsgs(h.ctx.Log, h.validators, h.cpuTracker, "handler", h.ctx.Registerer)
 	return err
@@ -281,10 +284,10 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 		reqID := msg.Get(message.RequestID).(uint32)
 		return h.engine.GetAncestorsFailed(nodeID, reqID)
 
-	case message.MultiPut:
+	case message.Ancestors:
 		reqID := msg.Get(message.RequestID).(uint32)
 		containers := msg.Get(message.MultiContainerBytes).([][]byte)
-		return h.engine.MultiPut(nodeID, reqID, containers)
+		return h.engine.Ancestors(nodeID, reqID, containers)
 
 	case message.Get:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -298,27 +301,23 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 
 	case message.Put:
 		reqID := msg.Get(message.RequestID).(uint32)
-		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
-		h.ctx.Log.AssertNoError(err)
 		container, ok := msg.Get(message.ContainerBytes).([]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse ContainerBytes",
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
-		return h.engine.Put(nodeID, reqID, containerID, container)
+		return h.engine.Put(nodeID, reqID, container)
 
 	case message.PushQuery:
 		reqID := msg.Get(message.RequestID).(uint32)
-		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
-		h.ctx.Log.AssertNoError(err)
 		container, ok := msg.Get(message.ContainerBytes).([]byte)
 		if !ok {
 			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse ContainerBytes",
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
-		return h.engine.PushQuery(nodeID, reqID, containerID, container)
+		return h.engine.PushQuery(nodeID, reqID, container)
 
 	case message.PullQuery:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -459,11 +458,6 @@ func (h *Handler) dispatchInternal() {
 			h.Push(inMsg)
 		}
 	}
-}
-
-func (h *Handler) endInterval() {
-	now := h.clock.Time()
-	h.cpuTracker.EndInterval(now)
 }
 
 // if subnet is validator only and this is not a validator or self, returns false.

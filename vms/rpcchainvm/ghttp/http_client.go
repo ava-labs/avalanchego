@@ -10,6 +10,7 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/ghttpproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greadcloser"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greadcloser/greadcloserproto"
@@ -44,6 +45,10 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	readerID := c.broker.NextId()
 	go c.broker.AcceptAndServe(readerID, func(opts []grpc.ServerOption) *grpc.Server {
+		opts = append(opts,
+			grpc.MaxRecvMsgSize(math.MaxInt),
+			grpc.MaxSendMsgSize(math.MaxInt),
+		)
 		reader := grpc.NewServer(opts...)
 		closer.Add(reader)
 		greadcloserproto.RegisterReaderServer(reader, greadcloser.NewServer(r.Body))
@@ -52,6 +57,10 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 	writerID := c.broker.NextId()
 	go c.broker.AcceptAndServe(writerID, func(opts []grpc.ServerOption) *grpc.Server {
+		opts = append(opts,
+			grpc.MaxRecvMsgSize(math.MaxInt),
+			grpc.MaxSendMsgSize(math.MaxInt),
+		)
 		writer := grpc.NewServer(opts...)
 		closer.Add(writer)
 		gresponsewriterproto.RegisterWriterServer(writer, gresponsewriter.NewServer(w, c.broker))
