@@ -65,8 +65,9 @@ func (vmi *vmBackedBlockIndex) GetContainerByIndex(index uint64) (Container, err
 	}
 
 	return Container{
-		ID:    blk.ID(),
-		Bytes: blk.Bytes(),
+		ID:        blk.ID(),
+		Bytes:     blk.Bytes(),
+		Timestamp: blk.Timestamp().Unix(),
 	}, nil
 }
 
@@ -104,8 +105,9 @@ func (vmi *vmBackedBlockIndex) GetContainerRange(startIndex uint64, numToFetch u
 			return nil, fmt.Errorf("couldn't get container at index %d: %w", j, err)
 		}
 		containers = append(containers, Container{
-			ID:    blk.ID(),
-			Bytes: blk.Bytes(),
+			ID:        blk.ID(),
+			Bytes:     blk.Bytes(),
+			Timestamp: blk.Timestamp().Unix(),
 		})
 	}
 	return containers, nil
@@ -122,8 +124,9 @@ func (vmi *vmBackedBlockIndex) GetLastAccepted() (Container, error) {
 	}
 
 	return Container{
-		ID:    lastBlk.ID(),
-		Bytes: lastBlk.Bytes(),
+		ID:        lastBlk.ID(),
+		Bytes:     lastBlk.Bytes(),
+		Timestamp: lastBlk.Timestamp().Unix(),
 	}, nil
 }
 
@@ -143,8 +146,9 @@ func (vmi *vmBackedBlockIndex) GetContainerByID(containerID ids.ID) (Container, 
 	}
 
 	return Container{
-		ID:    blk.ID(),
-		Bytes: blk.Bytes(),
+		ID:        blk.ID(),
+		Bytes:     blk.Bytes(),
+		Timestamp: blk.Timestamp().Unix(),
 	}, nil
 }
 

@@ -162,6 +162,7 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 		return
 	}
 
+	// TODO ABENEGIA: this section below must be specific to StandAloneIndexes or recreated for VMBacked ones
 	// If the index is incomplete, make sure that's OK. Otherwise, cause node to die.
 	isIncomplete, err := i.isIncomplete(chainID)
 	if err != nil {
