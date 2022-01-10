@@ -35,6 +35,10 @@ func newVMBackedBlockIndex(vm common.VM) (Index, error) {
 	if !ok {
 		return nil, block.ErrHeightIndexedVMNotImplemented
 	}
+	if !hVM.IsHeightIndexComplete() {
+		return nil, errIndexNotReady
+	}
+
 	return &vmBackedBlockIndex{
 		vm:  bVM,
 		hVM: hVM,
@@ -47,10 +51,6 @@ func (vmi *vmBackedBlockIndex) Accept(ctx *snow.ConsensusContext, containerID id
 }
 
 func (vmi *vmBackedBlockIndex) getBlkByIndex(index uint64) (snowman.Block, error) {
-	if !vmi.hVM.IsHeightIndexComplete() {
-		return nil, errIndexNotReady
-	}
-
 	blkID, err := vmi.hVM.GetBlockIDByHeight(index)
 	if err != nil {
 		return nil, fmt.Errorf("no container at index %d", index)
