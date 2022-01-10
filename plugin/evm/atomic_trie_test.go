@@ -62,6 +62,7 @@ func TestAtomicTrieInitializeWithNoTxsForAWhile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// 0..50 -> 1 atomic tx/block, 51..100 -> no atomic tx, 101 -> 1 atomic tx
 	operationsMap := make(map[uint64]map[ids.ID]*atomic.Requests)
 	writeTxs(t, repo, 0, lastAcceptedHeight/2+1, 1, nil, operationsMap)
 	writeTxs(t, repo, lastAcceptedHeight/2, lastAcceptedHeight, 0, nil, operationsMap)
@@ -75,6 +76,7 @@ func TestAtomicTrieInitializeWithNoTxsForAWhile(t *testing.T) {
 	assert.EqualValues(t, expectedCommitHeight, commitHeight1)
 	assert.NotEqual(t, common.Hash{}, rootHash1)
 
+	verifyOperations(t, atomicTrie1, codec, rootHash1, 0, expectedCommitHeight, operationsMap)
 }
 
 func TestAtomicTrieInitialize(t *testing.T) {
