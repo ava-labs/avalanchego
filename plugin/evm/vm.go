@@ -157,7 +157,6 @@ var (
 	errConflictingAtomicTx            = errors.New("conflicting atomic tx present")
 	errTooManyAtomicTx                = errors.New("too many atomic tx")
 	errMissingAtomicTxs               = errors.New("cannot build a block with non-empty extra data and zero atomic transactions")
-	defaultLogLevel                   = log.LvlDebug
 )
 
 var originalStderr *os.File
@@ -325,13 +324,9 @@ func (vm *VM) Initialize(
 	ethConfig.NetworkId = vm.chainID.Uint64()
 
 	// Set log level
-	logLevel := defaultLogLevel
-	if vm.config.LogLevel != "" {
-		configLogLevel, err := log.LvlFromString(vm.config.LogLevel)
-		if err != nil {
-			return fmt.Errorf("failed to initialize logger due to: %w ", err)
-		}
-		logLevel = configLogLevel
+	logLevel, err := log.LvlFromString(vm.config.LogLevel)
+	if err != nil {
+		return fmt.Errorf("failed to initialize logger due to: %w ", err)
 	}
 
 	vm.setLogLevel(logLevel)
