@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
@@ -65,15 +66,24 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 		Timer:                          &common.TimerTest{},
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
+		SharedCfg:                      &common.SharedConfig{},
 	}
+
+	snowGetHandler, err := snowgetter.New(vm, commonConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	return Config{
-		Config:  commonConfig,
-		Blocked: blocker,
-		VM:      vm,
+		Config:        commonConfig,
+		AllGetsServer: snowGetHandler,
+		Blocked:       blocker,
+		VM:            vm,
+		WeightTracker: common.NewWeightTracker(commonConfig.Beacons, commonConfig.StartupAlpha),
 	}, peer, sender, vm
 }
 
-// Single node in the accepted frontier; no need to fecth parent
+// Single node in the accepted frontier; no need to fetch parent
 func TestBootstrapperSingleFrontier(t *testing.T) {
 	config, _, _, vm := newConfig(t)
 
@@ -108,15 +118,16 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		return blk0, nil
 	}
 
-	finished := new(bool)
-	bs := Bootstrapper{}
-	err := bs.Initialize(
+	bs, err := New(
 		config,
-		func() error { *finished = true; return nil },
-		"chain_"+config.Ctx.ChainID.String(),
-		prometheus.NewRegistry(),
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
+		t.Fatal(err)
+	}
+
+	startReqID := uint32(0)
+	if err := bs.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -151,7 +162,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	switch {
 	case err != nil: // should finish
 		t.Fatal(err)
-	case !*finished:
+	case config.Ctx.GetState() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case blk1.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -207,15 +218,16 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 		return blk0, nil
 	}
 
-	finished := new(bool)
-	bs := Bootstrapper{}
-	err := bs.Initialize(
+	bs, err := New(
 		config,
-		func() error { *finished = true; return nil },
-		"chain_"+config.Ctx.ChainID.String(),
-		prometheus.NewRegistry(),
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
+		t.Fatal(err)
+	}
+
+	startReqID := uint32(0)
+	if err := bs.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -296,7 +308,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	switch {
 	case err != nil: // respond with right block
 		t.Fatal(err)
-	case !*finished:
+	case config.Ctx.GetState() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -364,15 +376,16 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		return blk0, nil
 	}
 
-	finished := new(bool)
-	bs := Bootstrapper{}
-	err := bs.Initialize(
+	bs, err := New(
 		config,
-		func() error { *finished = true; return nil },
-		"chain_"+config.Ctx.ChainID.String(),
-		prometheus.NewRegistry(),
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
+		t.Fatal(err)
+	}
+
+	startReqID := uint32(0)
+	if err := bs.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -456,7 +469,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	}
 
 	switch {
-	case !*finished:
+	case config.Ctx.GetState() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -524,15 +537,17 @@ func TestBootstrapperAncestors(t *testing.T) {
 		assert.Equal(t, blk0.ID(), blkID)
 		return blk0, nil
 	}
-	finished := new(bool)
-	bs := Bootstrapper{}
-	err := bs.Initialize(
+
+	bs, err := New(
 		config,
-		func() error { *finished = true; return nil },
-		"chain_"+config.Ctx.ChainID.String(),
-		prometheus.NewRegistry(),
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
+		t.Fatal(err)
+	}
+
+	startReqID := uint32(0)
+	if err := bs.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -608,7 +623,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 	}
 
 	switch {
-	case !*finished:
+	case config.Ctx.GetState() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -616,116 +631,6 @@ func TestBootstrapperAncestors(t *testing.T) {
 		t.Fatalf("Block should be accepted")
 	case blk2.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
-	}
-}
-
-func TestBootstrapperAcceptedFrontier(t *testing.T) {
-	config, _, _, vm := newConfig(t)
-
-	blkID := ids.GenerateTestID()
-
-	dummyBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID,
-			StatusV: choices.Accepted,
-		},
-		HeightV: 0,
-		BytesV:  []byte{1, 2, 3},
-	}
-	vm.CantLastAccepted = false
-	vm.LastAcceptedF = func() (ids.ID, error) { return blkID, nil }
-	vm.GetBlockF = func(bID ids.ID) (snowman.Block, error) {
-		assert.Equal(t, blkID, bID)
-		return dummyBlk, nil
-	}
-	bs := Bootstrapper{}
-	err := bs.Initialize(
-		config,
-		nil,
-		"chain_"+config.Ctx.ChainID.String(),
-		prometheus.NewRegistry(),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	accepted, err := bs.CurrentAcceptedFrontier()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(accepted) != 1 {
-		t.Fatalf("Only one block should be accepted")
-	}
-	if accepted[0] != blkID {
-		t.Fatalf("Blk should be accepted")
-	}
-}
-
-func TestBootstrapperFilterAccepted(t *testing.T) {
-	config, _, _, vm := newConfig(t)
-
-	blkID0 := ids.GenerateTestID()
-	blkID1 := ids.GenerateTestID()
-	blkID2 := ids.GenerateTestID()
-
-	blk0 := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
-		IDV:     blkID0,
-		StatusV: choices.Accepted,
-	}}
-	blk1 := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
-		IDV:     blkID1,
-		StatusV: choices.Accepted,
-	}}
-
-	vm.CantLastAccepted = false
-	vm.LastAcceptedF = func() (ids.ID, error) { return blk1.ID(), nil }
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		assert.Equal(t, blk1.ID(), blkID)
-		return blk1, nil
-	}
-
-	bs := Bootstrapper{}
-	err := bs.Initialize(
-		config,
-		nil,
-		"chain_"+config.Ctx.ChainID.String(),
-		prometheus.NewRegistry(),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	blkIDs := []ids.ID{blkID0, blkID1, blkID2}
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case blkID0:
-			return blk0, nil
-		case blkID1:
-			return blk1, nil
-		case blkID2:
-			return nil, errUnknownBlock
-		}
-		t.Fatal(errUnknownBlock)
-		return nil, errUnknownBlock
-	}
-	vm.CantBootstrapping = false
-
-	accepted := bs.FilterAccepted(blkIDs)
-	acceptedSet := ids.Set{}
-	acceptedSet.Add(accepted...)
-
-	if acceptedSet.Len() != 2 {
-		t.Fatalf("Two blocks should be accepted")
-	}
-	if !acceptedSet.Contains(blkID0) {
-		t.Fatalf("Blk should be accepted")
-	}
-	if !acceptedSet.Contains(blkID1) {
-		t.Fatalf("Blk should be accepted")
-	}
-	if acceptedSet.Contains(blkID2) {
-		t.Fatalf("Blk shouldn't be accepted")
 	}
 }
 
@@ -767,21 +672,22 @@ func TestBootstrapperFinalized(t *testing.T) {
 		BytesV:  blkBytes2,
 	}
 
-	finished := new(bool)
-	bs := Bootstrapper{}
 	vm.CantLastAccepted = false
 	vm.LastAcceptedF = func() (ids.ID, error) { return blk0.ID(), nil }
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		assert.Equal(t, blk0.ID(), blkID)
 		return blk0, nil
 	}
-	err := bs.Initialize(
+	bs, err := New(
 		config,
-		func() error { *finished = true; return nil },
-		"chain_"+config.Ctx.ChainID.String(),
-		prometheus.NewRegistry(),
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
+		t.Fatal(err)
+	}
+
+	startReqID := uint32(0)
+	if err := bs.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -849,7 +755,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	}
 
 	switch {
-	case !*finished:
+	case config.Ctx.GetState() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -980,15 +886,20 @@ func TestRestartBootstrapping(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	finished := new(bool)
-	bs := Bootstrapper{}
-	err := bs.Initialize(
+	bsIntf, err := New(
 		config,
-		func() error { *finished = true; return nil },
-		"chain_"+config.Ctx.ChainID.String(),
-		prometheus.NewRegistry(),
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
 	if err != nil {
+		t.Fatal(err)
+	}
+	bs, ok := bsIntf.(*bootstrapper)
+	if !ok {
+		t.Fatal("unexpected bootstrapper type")
+	}
+
+	startReqID := uint32(0)
+	if err := bs.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1024,7 +935,7 @@ func TestRestartBootstrapping(t *testing.T) {
 
 	// Remove request, so we can restart bootstrapping via ForceAccepted
 	if removed := bs.OutstandingRequests.RemoveAny(blkID1); !removed {
-		t.Fatal("Expeted to find an outstanding request for blk1")
+		t.Fatal("Expected to find an outstanding request for blk1")
 	}
 	requestIDs = map[ids.ID]uint32{}
 
@@ -1045,7 +956,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if *finished {
+	if config.Ctx.GetState() == snow.NormalOp {
 		t.Fatal("Bootstrapping should not have finished with outstanding request for blk4")
 	}
 
@@ -1054,7 +965,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	switch {
-	case !*finished:
+	case config.Ctx.GetState() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")

@@ -75,7 +75,7 @@ type ConsensusContext struct {
 	ConsensusDispatcher EventDispatcher
 
 	// Non-zero iff this chain bootstrapped.
-	bootstrapped utils.AtomicBool
+	state utils.AtomicInterface
 
 	// Non-zero iff this chain is executing transactions.
 	executing utils.AtomicBool
@@ -84,14 +84,20 @@ type ConsensusContext struct {
 	validatorOnly utils.AtomicBool
 }
 
-// IsBootstrapped returns true iff this chain is done bootstrapping
-func (ctx *ConsensusContext) IsBootstrapped() bool {
-	return ctx.bootstrapped.GetValue()
+func (ctx *ConsensusContext) SetState(newState State) {
+	ctx.state.SetValue(newState)
 }
 
-// Bootstrapped marks this chain as done bootstrapping
-func (ctx *ConsensusContext) Bootstrapped() {
-	ctx.bootstrapped.SetValue(true)
+func (ctx *ConsensusContext) GetState() State {
+	stateInf := ctx.state.GetValue()
+	if stateInf == nil {
+		return Unknown
+	}
+	return stateInf.(State)
+}
+
+func (ctx *ConsensusContext) IsBootstrapped() bool {
+	return ctx.GetState() == NormalOp
 }
 
 // IsExecuting returns true iff this chain is still executing transactions.

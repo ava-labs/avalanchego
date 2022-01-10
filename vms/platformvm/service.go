@@ -461,7 +461,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 		}
 		response.UTXOs[i], err = formatting.EncodeWithChecksum(args.Encoding, bytes)
 		if err != nil {
-			return fmt.Errorf("couldn't encode UTXO %s as string: %s", utxo.InputID(), err)
+			return fmt.Errorf("couldn't encode UTXO %s as string: %w", utxo.InputID(), err)
 		}
 	}
 
@@ -1934,7 +1934,7 @@ func (service *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *ap
 	txBytes := tx.Bytes()
 	response.Tx, err = formatting.EncodeWithChecksum(args.Encoding, txBytes)
 	if err != nil {
-		return fmt.Errorf("couldn't encode tx as a string: %s", err)
+		return fmt.Errorf("couldn't encode tx as a string: %w", err)
 	}
 	response.Encoding = args.Encoding
 	return nil
@@ -2175,7 +2175,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 		}
 		response.Outputs[i], err = formatting.EncodeWithChecksum(args.Encoding, bytes)
 		if err != nil {
-			return fmt.Errorf("couldn't encode output %s as string: %s", output.ID, err)
+			return fmt.Errorf("couldn't encode output %s as string: %w", output.ID, err)
 		}
 	}
 	response.Encoding = args.Encoding
@@ -2277,7 +2277,7 @@ func (service *Service) GetRewardUTXOs(_ *http.Request, args *api.GetTxArgs, rep
 
 		utxoStr, err := formatting.EncodeWithChecksum(args.Encoding, utxoBytes)
 		if err != nil {
-			return fmt.Errorf("couldn't encode utxo as a string: %s", err)
+			return fmt.Errorf("couldn't encode utxo as a string: %w", err)
 		}
 		reply.UTXOs[i] = utxoStr
 	}

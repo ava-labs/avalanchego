@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
+	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -26,11 +28,23 @@ var (
 	Genesis         = ids.GenerateTestID()
 )
 
+type dummyHandler struct {
+	startEngineF func(startReqID uint32) error
+}
+
+func (dh *dummyHandler) onDoneBootstrapping(lastReqID uint32) error {
+	lastReqID++
+	return dh.startEngineF(lastReqID)
+}
+
 func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
-	config := DefaultConfig()
+	bootCfg, engCfg := DefaultConfigs()
 
 	vals := validators.NewSet()
-	config.Validators = vals
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	bootCfg.Validators = vals
+	bootCfg.WeightTracker = wt
+	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -39,13 +53,21 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	bootCfg.VM = vm
+	engCfg.VM = vm
+
+	snowGetHandler, err := snowgetter.New(vm, bootCfg.Config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	engCfg.AllGetsServer = snowGetHandler
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -70,8 +92,23 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 		}
 	}
 
-	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	dh := &dummyHandler{}
+	bootstrapper, err := bootstrap.New(
+		bootCfg,
+		dh.onDoneBootstrapping,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	te, err := newTransitive(engCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dh.startEngineF = te.Start
+
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -381,9 +418,9 @@ func TestEngineQuery(t *testing.T) {
 }
 
 func TestEngineMultipleQuery(t *testing.T) {
-	config := DefaultConfig()
+	bootCfg, engCfg := DefaultConfigs()
 
-	config.Params = snowball.Parameters{
+	engCfg.Params = snowball.Parameters{
 		K:                     3,
 		Alpha:                 2,
 		BetaVirtuous:          1,
@@ -395,7 +432,10 @@ func TestEngineMultipleQuery(t *testing.T) {
 	}
 
 	vals := validators.NewSet()
-	config.Validators = vals
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	bootCfg.Validators = vals
+	bootCfg.WeightTracker = wt
+	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestShortID()
 	vdr1 := ids.GenerateTestShortID()
@@ -413,13 +453,15 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	bootCfg.VM = vm
+	engCfg.VM = vm
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -441,8 +483,23 @@ func TestEngineMultipleQuery(t *testing.T) {
 		return gBlk, nil
 	}
 
-	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	dh := &dummyHandler{}
+	bootstrapper, err := bootstrap.New(
+		bootCfg,
+		dh.onDoneBootstrapping,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	te, err := newTransitive(engCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dh.startEngineF = te.Start
+
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -868,9 +925,9 @@ func TestEngineRepoll(t *testing.T) {
 }
 
 func TestVoteCanceling(t *testing.T) {
-	config := DefaultConfig()
+	bootCfg, engCfg := DefaultConfigs()
 
-	config.Params = snowball.Parameters{
+	engCfg.Params = snowball.Parameters{
 		K:                     3,
 		Alpha:                 2,
 		BetaVirtuous:          1,
@@ -882,7 +939,10 @@ func TestVoteCanceling(t *testing.T) {
 	}
 
 	vals := validators.NewSet()
-	config.Validators = vals
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	bootCfg.Validators = vals
+	bootCfg.WeightTracker = wt
+	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestShortID()
 	vdr1 := ids.GenerateTestShortID()
@@ -900,13 +960,15 @@ func TestVoteCanceling(t *testing.T) {
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	bootCfg.VM = vm
+	engCfg.VM = vm
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -931,8 +993,23 @@ func TestVoteCanceling(t *testing.T) {
 	vm.CantBootstrapping = false
 	vm.CantBootstrapped = false
 
-	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	dh := &dummyHandler{}
+	bootstrapper, err := bootstrap.New(
+		bootCfg,
+		dh.onDoneBootstrapping,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	te, err := newTransitive(engCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dh.startEngineF = te.Start
+
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1000,11 +1077,16 @@ func TestVoteCanceling(t *testing.T) {
 }
 
 func TestEngineNoQuery(t *testing.T) {
-	config := DefaultConfig()
+	bootCfg, engCfg := DefaultConfigs()
+
+	vals := validators.NewSet()
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	bootCfg.WeightTracker = wt
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
@@ -1025,9 +1107,26 @@ func TestEngineNoQuery(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	config.VM = vm
-	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	bootCfg.VM = vm
+	engCfg.VM = vm
+
+	dh := &dummyHandler{}
+	bootstrapper, err := bootstrap.New(
+		bootCfg,
+		dh.onDoneBootstrapping,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	te, err := newTransitive(engCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dh.startEngineF = te.Start
+
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1047,11 +1146,16 @@ func TestEngineNoQuery(t *testing.T) {
 }
 
 func TestEngineNoRepollQuery(t *testing.T) {
-	config := DefaultConfig()
+	bootCfg, engCfg := DefaultConfigs()
+
+	vals := validators.NewSet()
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	bootCfg.WeightTracker = wt
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
@@ -1072,9 +1176,26 @@ func TestEngineNoRepollQuery(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	config.VM = vm
-	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	bootCfg.VM = vm
+	engCfg.VM = vm
+
+	dh := &dummyHandler{}
+	bootstrapper, err := bootstrap.New(
+		bootCfg,
+		dh.onDoneBootstrapping,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	te, err := newTransitive(engCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dh.startEngineF = te.Start
+
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1708,12 +1829,15 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 }
 
 func TestEngineAggressivePolling(t *testing.T) {
-	config := DefaultConfig()
+	bootCfg, engCfg := DefaultConfigs()
 
-	config.Params.ConcurrentRepolls = 2
+	engCfg.Params.ConcurrentRepolls = 2
 
 	vals := validators.NewSet()
-	config.Validators = vals
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	bootCfg.Validators = vals
+	bootCfg.WeightTracker = wt
+	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1722,13 +1846,15 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	bootCfg.VM = vm
+	engCfg.VM = vm
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -1751,8 +1877,23 @@ func TestEngineAggressivePolling(t *testing.T) {
 		return gBlk, nil
 	}
 
-	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	dh := &dummyHandler{}
+	bootstrapper, err := bootstrap.New(
+		bootCfg,
+		dh.onDoneBootstrapping,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	te, err := newTransitive(engCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dh.startEngineF = te.Start
+
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1818,9 +1959,9 @@ func TestEngineAggressivePolling(t *testing.T) {
 }
 
 func TestEngineDoubleChit(t *testing.T) {
-	config := DefaultConfig()
+	bootCfg, engCfg := DefaultConfigs()
 
-	config.Params = snowball.Parameters{
+	engCfg.Params = snowball.Parameters{
 		K:                     2,
 		Alpha:                 2,
 		BetaVirtuous:          1,
@@ -1832,7 +1973,10 @@ func TestEngineDoubleChit(t *testing.T) {
 	}
 
 	vals := validators.NewSet()
-	config.Validators = vals
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	bootCfg.Validators = vals
+	bootCfg.WeightTracker = wt
+	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestShortID()
 	vdr1 := ids.GenerateTestShortID()
@@ -1846,13 +1990,15 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	bootCfg.VM = vm
+	engCfg.VM = vm
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -1876,8 +2022,23 @@ func TestEngineDoubleChit(t *testing.T) {
 	vm.CantBootstrapping = false
 	vm.CantBootstrapped = false
 
-	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	dh := &dummyHandler{}
+	bootstrapper, err := bootstrap.New(
+		bootCfg,
+		dh.onDoneBootstrapping,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	te, err := newTransitive(engCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dh.startEngineF = te.Start
+
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1962,13 +2123,17 @@ func TestEngineDoubleChit(t *testing.T) {
 }
 
 func TestEngineBuildBlockLimit(t *testing.T) {
-	config := DefaultConfig()
-	config.Params.K = 1
-	config.Params.Alpha = 1
-	config.Params.OptimalProcessing = 1
+	bootCfg, engCfg := DefaultConfigs()
+
+	engCfg.Params.K = 1
+	engCfg.Params.Alpha = 1
+	engCfg.Params.OptimalProcessing = 1
 
 	vals := validators.NewSet()
-	config.Validators = vals
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	bootCfg.Validators = vals
+	bootCfg.WeightTracker = wt
+	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1977,13 +2142,15 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	bootCfg.VM = vm
+	engCfg.VM = vm
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -2006,8 +2173,23 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		return gBlk, nil
 	}
 
-	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	dh := &dummyHandler{}
+	bootstrapper, err := bootstrap.New(
+		bootCfg,
+		dh.onDoneBootstrapping,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	te, err := newTransitive(engCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dh.startEngineF = te.Start
+
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 

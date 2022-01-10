@@ -41,6 +41,8 @@ type Config struct {
 	// This node will only consider the first [AncestorsMaxContainersReceived]
 	// containers in an ancestors message it receives.
 	AncestorsMaxContainersReceived int
+
+	SharedCfg *SharedConfig
 }
 
 // Context implements the Engine interface
@@ -48,3 +50,12 @@ func (c *Config) Context() *snow.ConsensusContext { return c.Ctx }
 
 // IsBootstrapped returns true iff this chain is done bootstrapping
 func (c *Config) IsBootstrapped() bool { return c.Ctx.IsBootstrapped() }
+
+// Shared among common.bootstrapper and snowman/avalanche bootstrapper
+type SharedConfig struct {
+	// Tracks the last requestID that was used in a request
+	RequestID uint32
+
+	// True if RestartBootstrap has been called at least once
+	Restarted bool
+}

@@ -56,13 +56,13 @@ func newState(
 	jobsCacheMetricsNamespace := fmt.Sprintf("%s_jobs_cache", metricsNamespace)
 	jobsCache, err := metercacher.New(jobsCacheMetricsNamespace, metricsRegisterer, &cache.LRU{Size: jobsCacheSize})
 	if err != nil {
-		return nil, fmt.Errorf("couldn't create metered cache: %s", err)
+		return nil, fmt.Errorf("couldn't create metered cache: %w", err)
 	}
 
 	pendingJobs := prefixdb.New(pendingJobsKey, db)
 	numPendingJobs, err := getPendingJobs(pendingJobs)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't initialize pending jobs: %s", err)
+		return nil, fmt.Errorf("couldn't initialize pending jobs: %w", err)
 	}
 	return &state{
 		runnableJobIDs:  linkeddb.NewDefault(prefixdb.New(runnableJobIDsKey, db)),
@@ -107,7 +107,7 @@ func (s *state) AddRunnableJob(jobID ids.ID) error {
 	return s.runnableJobIDs.Put(jobID[:], nil)
 }
 
-// HasRunnableJob returns if there is a job that can be run on the queue
+// HasRunnableJob returns true if there is a job that can be run on the queue
 func (s *state) HasRunnableJob() (bool, error) {
 	isEmpty, err := s.runnableJobIDs.IsEmpty()
 	return !isEmpty, err
@@ -125,7 +125,7 @@ func (s *state) RemoveRunnableJob() (Job, error) {
 
 	jobID, err := ids.ToID(jobIDBytes)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't convert job ID bytes to job ID: %s", err)
+		return nil, fmt.Errorf("couldn't convert job ID bytes to job ID: %w", err)
 	}
 	job, err := s.GetJob(jobID)
 	if err != nil {
@@ -188,14 +188,14 @@ func (s *state) GetJob(id ids.ID) (Job, error) {
 	return job, err
 }
 
-// AddBlocking adds [dependent] as blocking on [dependency] being completed
+// AddDependency adds [dependent] as blocking on [dependency] being completed
 func (s *state) AddDependency(dependency, dependent ids.ID) error {
 	dependentsDB := s.getDependentsDB(dependency)
 	return dependentsDB.Put(dependent[:], nil)
 }
 
-// Blocking returns the set of IDs that are blocking on the completion of
-// [dependency] and removes them from the database.
+// RemoveDependencies removes the set of IDs that are blocking on the completion of
+// [dependency] from the database and returns them.
 func (s *state) RemoveDependencies(dependency ids.ID) ([]ids.ID, error) {
 	dependentsDB := s.getDependentsDB(dependency)
 	iterator := dependentsDB.NewIterator()

@@ -44,7 +44,7 @@ func (requester jsonRPCRequester) SendJSONRPCRequest(endpoint string, method str
 	url := fmt.Sprintf("%v/%v", requester.uri, endpoint)
 	resp, err := requester.client.Post(url, "application/json", bytes.NewBuffer(requestBodyBytes))
 	if err != nil {
-		return fmt.Errorf("problem while making JSON RPC POST request to %s: %s", url, err)
+		return fmt.Errorf("problem while making JSON RPC POST request to %s: %w", url, err)
 	}
 	statusCode := resp.StatusCode
 

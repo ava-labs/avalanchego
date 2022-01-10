@@ -195,7 +195,8 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 		return
 	}
 
-	if _, notRequested := message.UnrequestedOps[op]; notRequested || (op == message.Put && requestID == constants.GossipMsgRequestID) {
+	if _, notRequested := message.UnrequestedOps[op]; notRequested ||
+		(op == message.Put && requestID == constants.GossipMsgRequestID) {
 		if chain.ctx.IsExecuting() {
 			cr.log.Debug("dropping %s and skipping queue since the chain is currently executing", op)
 			cr.metrics.droppedRequests.Inc()
