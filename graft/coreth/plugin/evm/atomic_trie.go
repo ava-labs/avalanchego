@@ -203,13 +203,6 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 		// iterate over the transactions, indexing them if the height is < commit height
 		// otherwise, add the atomic operations from the transaction to the uncommittedOpsMap
 		height := binary.BigEndian.Uint64(iter.Key())
-		if height > lastAcceptedBlockNumber {
-			// stop indexing, in the event of a state replay
-			// it's possible [lastAcceptedNumber] is less than
-			// the maximum height indexed in [repo]
-			break
-		}
-
 		txs, err := ExtractAtomicTxs(iter.Value(), true, a.codec)
 		if err != nil {
 			return err
@@ -251,7 +244,7 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 			// Dereference lashHash to avoid writing more intermediary
 			// trie nodes than needed to disk, while keeping the commit
 			// size under commitSizeCap (approximately).
-			if (lastHash != common.Hash{}) {
+			if (lastHash != common.Hash{} && lastHash != hash) {
 				a.trieDB.Dereference(lastHash)
 			}
 			storage, _ := a.trieDB.Size()
@@ -288,7 +281,7 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 	// process uncommitted ops for heights > finalCommitHeight
 	for height, ops := range uncommittedOpsMap {
 		if err := a.updateTrie(height, ops); err != nil {
-			return err
+			return fmt.Errorf("updateTrie(height: %d): %w", height, err)
 		}
 
 		postCommitTxIndexed++
