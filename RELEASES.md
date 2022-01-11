@@ -4,6 +4,8 @@
 
 This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.
 
+**The first startup of the C-Chain will take a few minutes longer due to an index update.**
+
 ### Consensus
 
 - Removed deprecated Snowstorm consensus implementation that no longer aligned with the updated specification.
@@ -14,8 +16,9 @@ This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/ava
 
 ### Coreth
 
-- Added an index mapping height to the list of accepted atomic operations at that height in a trie. Generating this index will cause the node to take approximately 2 minutes longer to startup the C-Chain for the first restart.
+- Added an index mapping height to the list of accepted atomic operations at that height in a trie. Generating this index will cause the node to take a few minutes longer to startup the C-Chain for the first restart.
 - Updated Geth dependency to `v1.10.15`.
+- Updated `networkID` to match `chainID`.
 
 ### VMs
 
