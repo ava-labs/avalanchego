@@ -240,9 +240,14 @@ func (vm *VM) Clock() *mockable.Clock { return &vm.clock }
 // Logger implements the secp256k1fx interface
 func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
 
-// SetLogLevel sets the log level with the original [os.StdErr] interface
+// setLogLevel sets the log level with the original [os.StdErr] interface along
+// with the context logger.
 func (vm *VM) setLogLevel(logLevel log.Lvl) {
-	log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.StreamHandler(originalStderr, log.TerminalFormat(false))))
+	format := log.TerminalFormat(false)
+	log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.MultiHandler(
+		log.StreamHandler(originalStderr, format),
+		log.StreamHandler(vm.ctx.Log, format),
+	)))
 }
 
 /*
