@@ -244,7 +244,10 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 			// Dereference lashHash to avoid writing more intermediary
 			// trie nodes than needed to disk, while keeping the commit
 			// size under commitSizeCap (approximately).
-			if (lastHash != common.Hash{}) {
+			// Check [lastHash != hash] here to avoid dereferencing the
+			// trie root in case there were no atomic txs since the
+			// last commit.
+			if (lastHash != common.Hash{} && lastHash != hash) {
 				a.trieDB.Dereference(lastHash)
 			}
 			storage, _ := a.trieDB.Size()
@@ -281,7 +284,7 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 	// process uncommitted ops for heights > finalCommitHeight
 	for height, ops := range uncommittedOpsMap {
 		if err := a.updateTrie(height, ops); err != nil {
-			return err
+			return fmt.Errorf("failed to update trie at height %d: %w", height, err)
 		}
 
 		postCommitTxIndexed++
