@@ -71,7 +71,9 @@ type TransactOpts struct {
 
 	NoSend bool // Do all transact steps but do not send the transaction
 
-    DoNativeAssetCall bool // Do native asset call instead of normal transaction
+    DoNativeAssetCall bool              // Do native asset call instead of normal transaction
+    NativeAssetCallAssetID common.Hash  // Asset id for native asset call
+    NativeAssetCallAssetAmount *big.Int // Asset amount for native asset call
 }
 
 // FilterOpts is the collection of options to fine tune filtering for events
@@ -282,8 +284,15 @@ func (c *BoundContract) createDynamicTx(opts *TransactOpts, contract *common.Add
 	if err != nil {
 		return nil, err
 	}
+    toAddr := contract
+    if c.DoNativeAssetCall {
+        // wrap input with native asset call params
+        input = vm.PackNativeAssetCallInput(contract, c.NativeAssetCallAssetID, c.NativeAssetCallAssetAmount, input)
+        // target addr is now precompile
+        toAddr = vm.NativeAssetCallAddr
+    }
 	baseTx := &types.DynamicFeeTx{
-		To:        contract,
+		To:        toAddr,
 		Nonce:     nonce,
 		GasFeeCap: gasFeeCap,
 		GasTipCap: gasTipCap,
@@ -326,8 +335,15 @@ func (c *BoundContract) createLegacyTx(opts *TransactOpts, contract *common.Addr
 	if err != nil {
 		return nil, err
 	}
+    toAddr := contract
+    if c.DoNativeAssetCall {
+        // wrap input with native asset call params
+        input = vm.PackNativeAssetCallInput(contract, c.NativeAssetCallAssetID, c.NativeAssetCallAssetAmount, input)
+        // target addr is now precompile
+        toAddr = vm.NativeAssetCallAddr
+    }
 	baseTx := &types.LegacyTx{
-		To:       contract,
+		To:       toAddr,
 		Nonce:    nonce,
 		GasPrice: gasPrice,
 		Gas:      gasLimit,
