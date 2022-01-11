@@ -548,7 +548,7 @@ func testRepair(t *testing.T, tt *rewindTest, snapshots bool) {
 	}
 	os.RemoveAll(datadir)
 
-	db, err := NewLevelDBDatabase(datadir, 0, 0, "", false)
+	db, err := rawdb.NewLevelDBDatabase(datadir, 0, 0, "", false)
 	if err != nil {
 		t.Fatalf("Failed to create persistent database: %v", err)
 	}
@@ -608,7 +608,7 @@ func testRepair(t *testing.T, tt *rewindTest, snapshots bool) {
 	db.Close()
 
 	// Start a new blockchain back up and see where the repait leads us
-	db, err = NewLevelDBDatabase(datadir, 0, 0, "", false)
+	db, err = rawdb.NewLevelDBDatabase(datadir, 0, 0, "", false)
 	if err != nil {
 		t.Fatalf("Failed to reopen persistent database: %v", err)
 	}
