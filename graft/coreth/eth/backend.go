@@ -141,6 +141,9 @@ func New(
 	// Note: RecoverPruning must be called to handle the case that we are midway through offline pruning.
 	// If the data directory is changed in between runs preventing RecoverPruning from performing its job correctly,
 	// it may cause DB corruption.
+	// Since RecoverPruning will only continue a pruning run that already began, we do not need to ensure that
+	// reprocessState has already been called and completed successfully. To ensure this, we must maintain
+	// that Prune is only run after reprocessState has finished successfully.
 	if err := pruner.RecoverPruning(config.OfflinePruningDataDirectory, chainDb); err != nil {
 		log.Error("Failed to recover state", "error", err)
 	}
@@ -193,7 +196,6 @@ func New(
 	if err != nil {
 		return nil, err
 	}
-	eth.bloomIndexer.Start(eth.blockchain)
 
 	// Perform offline pruning after NewBlockChain has been called to ensure that we have rolled back the chain
 	// to the last accepted block before pruning begins.
@@ -208,13 +210,17 @@ func New(
 		if err := pruner.Prune(targetRoot); err != nil {
 			return nil, fmt.Errorf("failed to prune blockchain with target root: %s due to: %w", targetRoot, err)
 		}
-		log.Info("Completed offline pruning.")
+		log.Info("Completed offline pruning. Re-initializing blockchain.")
+		// After pruning completes, we must re-create the blockchain to ensure that the dirty cache is not left
+		// in an invalid state after pruning.
+		eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, chainConfig, eth.engine, vmConfig, lastAcceptedHash)
+		if err != nil {
+			return nil, fmt.Errorf("failed to re-initialize blockchain after pruning: %w", err)
+		}
 	}
 
-	// Original code (requires disk):
-	// if config.TxPool.Journal != "" {
-	// 	config.TxPool.Journal = stack.ResolvePath(config.TxPool.Journal)
-	// }
+	eth.bloomIndexer.Start(eth.blockchain)
+
 	config.TxPool.Journal = ""
 	eth.txPool = core.NewTxPool(config.TxPool, chainConfig, eth.blockchain)
 
