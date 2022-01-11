@@ -34,9 +34,8 @@ var (
 type Mode uint
 
 const (
-	ModeFake Mode = iota
-	ModeFullFake
-	ModeEthFake
+	ModeFullFake     Mode = 1
+	ModeSkipBlockFee Mode = 2
 )
 
 type (
@@ -64,14 +63,14 @@ func NewDummyEngine(cb *ConsensusCallbacks) *DummyEngine {
 func NewETHFaker() *DummyEngine {
 	return &DummyEngine{
 		cb:            new(ConsensusCallbacks),
-		consensusMode: ModeEthFake,
+		consensusMode: ModeSkipBlockFee,
 	}
 }
 
 func NewComplexETHFaker(cb *ConsensusCallbacks) *DummyEngine {
 	return &DummyEngine{
 		cb:            cb,
-		consensusMode: ModeEthFake,
+		consensusMode: ModeSkipBlockFee,
 	}
 }
 
@@ -264,7 +263,7 @@ func (self *DummyEngine) verifyBlockFee(
 	receipts []*types.Receipt,
 	extraStateChangeContribution *big.Int,
 ) error {
-	if self.consensusMode == ModeEthFake {
+	if self.consensusMode == ModeSkipBlockFee {
 		return nil
 	}
 	if baseFee == nil || baseFee.Sign() <= 0 {
@@ -382,7 +381,7 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 			return nil, err
 		}
 	}
-	if self.consensusMode == ModeEthFake {
+	if self.consensusMode == ModeSkipBlockFee {
 		extDataGasUsed = new(big.Int).Set(common.Big0)
 	}
 	if chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
