@@ -125,15 +125,8 @@ func CanTransfer(db vm.StateDB, addr common.Address, amount *big.Int) bool {
 	return db.GetBalance(addr).Cmp(amount) >= 0
 }
 
-func CanTransferMC(db vm.StateDB, addr common.Address, to common.Address, coinID *common.Hash, amount *big.Int) bool {
-	if coinID == nil {
-		return true
-	}
-	if db.GetBalanceMultiCoin(addr, *coinID).Cmp(amount) >= 0 {
-		return true
-	}
-	// insufficient balance
-	return false
+func CanTransferMC(db vm.StateDB, addr common.Address, to common.Address, coinID common.Hash, amount *big.Int) bool {
+	return db.GetBalanceMultiCoin(addr, coinID).Cmp(amount) >= 0
 }
 
 // Transfer subtracts amount from sender and adds amount to recipient using the given Db
@@ -143,10 +136,7 @@ func Transfer(db vm.StateDB, sender, recipient common.Address, amount *big.Int) 
 }
 
 // Transfer subtracts amount from sender and adds amount to recipient using the given Db
-func TransferMultiCoin(db vm.StateDB, sender, recipient common.Address, coinID *common.Hash, amount *big.Int) {
-	if coinID == nil {
-		return
-	}
-	db.SubBalanceMultiCoin(sender, *coinID, amount)
-	db.AddBalanceMultiCoin(recipient, *coinID, amount)
+func TransferMultiCoin(db vm.StateDB, sender, recipient common.Address, coinID common.Hash, amount *big.Int) {
+	db.SubBalanceMultiCoin(sender, coinID, amount)
+	db.AddBalanceMultiCoin(recipient, coinID, amount)
 }

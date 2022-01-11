@@ -166,16 +166,33 @@ func (self *ETHChain) NewRPCHandler(maximumDuration time.Duration) *rpc.Server {
 	return rpc.NewServer(maximumDuration)
 }
 
-func (self *ETHChain) AttachEthService(handler *rpc.Server, namespaces []string) {
-	nsmap := make(map[string]bool)
-	for _, ns := range namespaces {
-		nsmap[ns] = true
+// AttachEthService registers the backend RPC services provided by Ethereum
+// to the provided handler under their assigned namespaces.
+func (self *ETHChain) AttachEthService(handler *rpc.Server, names []string) error {
+	enabledServicesSet := make(map[string]struct{})
+	for _, ns := range names {
+		enabledServicesSet[ns] = struct{}{}
 	}
+
+	apiSet := make(map[string]rpc.API)
 	for _, api := range self.backend.APIs() {
-		if nsmap[api.Namespace] {
-			handler.RegisterName(api.Namespace, api.Service)
+		if existingAPI, exists := apiSet[api.Name]; exists {
+			return fmt.Errorf("duplicated API name: %s, namespaces %s and %s", api.Name, api.Namespace, existingAPI.Namespace)
+		}
+		apiSet[api.Name] = api
+	}
+
+	for name := range enabledServicesSet {
+		api, exists := apiSet[name]
+		if !exists {
+			return fmt.Errorf("API service %s not found", name)
+		}
+		if err := handler.RegisterName(api.Namespace, api.Service); err != nil {
+			return err
 		}
 	}
+
+	return nil
 }
 
 func (self *ETHChain) GetTxSubmitCh() <-chan core.NewTxsEvent {
