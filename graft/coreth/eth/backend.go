@@ -200,11 +200,12 @@ func New(
 	// Perform offline pruning after NewBlockChain has been called to ensure that we have rolled back the chain
 	// to the last accepted block before pruning begins.
 	if config.OfflinePruning {
+		// Allow the blockchain to be garbage collected immediately, since we will need to re-initialize it after pruning.
+		eth.blockchain = nil
 		log.Info("Starting offline pruning", "dataDir", config.OfflinePruningDataDirectory, "bloomFilterSize", config.OfflinePruningBloomFilterSize)
 		pruner, err := pruner.NewPruner(chainDb, config.OfflinePruningDataDirectory, config.OfflinePruningBloomFilterSize)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new pruner with data directory: %s, size: %d, due to: %w", config.OfflinePruningDataDirectory, config.OfflinePruningBloomFilterSize, err)
-
 		}
 		targetRoot := eth.blockchain.LastAcceptedBlock().Root()
 		if err := pruner.Prune(targetRoot); err != nil {
