@@ -34,8 +34,8 @@ var (
 type Mode uint
 
 const (
-	ModeFullFake     Mode = 1
-	ModeSkipBlockFee Mode = 2
+	ModeFullFake     Mode = 1 // Skip over header verification
+	ModeSkipBlockFee Mode = 2 // Skip block fee verification
 )
 
 type (
@@ -380,9 +380,6 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 		if err != nil {
 			return nil, err
 		}
-	}
-	if self.consensusMode == ModeSkipBlockFee {
-		extDataGasUsed = new(big.Int).Set(common.Big0)
 	}
 	if chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
 		header.ExtDataGasUsed = extDataGasUsed
