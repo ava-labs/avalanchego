@@ -1,5 +1,16 @@
 name: Branch Push CI
-on: [push]
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      avalanchegoRepo:
+        description: 'avalanchego github repository'
+        required: true
+        default: 'ava-labs/avalanchego'
+      avalanchegoBranch:
+        description: 'avalanchego branch'
+        required: true
+        default: 'master'
 
 jobs:
   lint:
@@ -7,6 +18,17 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
+      - name: check out ${{ github.event.inputs.avalanchegoRepo }} ${{ github.event.inputs.avalanchegoBranch }}
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ github.event.inputs.avalanchegoRepo }}
+          ref: ${{ github.event.inputs.avalanchegoBranch }}
+          path: avalanchego
+          token: ${{ secrets.AVALANCHE_PAT }}
+      - name: change avalanchego dep
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
         with:
@@ -22,6 +44,17 @@ jobs:
         os: [macos-11.0, ubuntu-18.04, ubuntu-20.04, windows-latest]
     steps:
     - uses: actions/checkout@v2
+    - name: check out ${{ github.event.inputs.avalanchegoRepo }} ${{ github.event.inputs.avalanchegoBranch }}
+      if: ${{ github.event_name == 'workflow_dispatch' }}
+      uses: actions/checkout@v2
+      with:
+        repository: ${{ github.event.inputs.avalanchegoRepo }}
+        ref: ${{ github.event.inputs.avalanchegoBranch }}
+        path: avalanchego
+        token: ${{ secrets.AVALANCHE_PAT }}
+    - name: change avalanchego dep
+      if: ${{ github.event_name == 'workflow_dispatch' }}
+      run: go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
     - uses: actions/setup-go@v1
       with:
         go-version: ${{ matrix.go }}
@@ -40,6 +73,17 @@ jobs:
         os: [ ubuntu-20.04 ]
     steps:
     - uses: actions/checkout@v2
+    - name: check out ${{ github.event.inputs.avalanchegoRepo }} ${{ github.event.inputs.avalanchegoBranch }}
+      if: ${{ github.event_name == 'workflow_dispatch' }}
+      uses: actions/checkout@v2
+      with:
+        repository: ${{ github.event.inputs.avalanchegoRepo }}
+        ref: ${{ github.event.inputs.avalanchegoBranch }}
+        path: avalanchego
+        token: ${{ secrets.AVALANCHE_PAT }}
+    - name: change avalanchego dep
+      if: ${{ github.event_name == 'workflow_dispatch' }}
+      run: go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
     - uses: actions/setup-go@v1
       with:
         go-version: ${{ matrix.go }}
