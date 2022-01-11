@@ -28,7 +28,7 @@ var (
 // HeightIndex contains mapping of blockHeights to accepted proposer block IDs.
 // Only accepted blocks are indexed; moreover only post-fork blocks are indexed.
 type HeightIndex interface {
-	SetBlockIDAtHeight(height uint64, blkID ids.ID) (int, error)
+	SetBlockIDAtHeight(height uint64, blkID ids.ID) error
 	GetBlockIDAtHeight(height uint64) (ids.ID, error)
 	DeleteBlockIDAtHeight(height uint64) error
 
@@ -62,7 +62,7 @@ func NewHeightIndex(db database.Database) HeightIndex {
 	}
 }
 
-func (hi *heightIndex) SetBlockIDAtHeight(height uint64, blkID ids.ID) (int, error) {
+func (hi *heightIndex) SetBlockIDAtHeight(height uint64, blkID ids.ID) error {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 	key := make([]byte, len(heightPrefix))
@@ -70,7 +70,7 @@ func (hi *heightIndex) SetBlockIDAtHeight(height uint64, blkID ids.ID) (int, err
 	key = append(key, heightBytes...)
 
 	hi.blkHeightsCache.Put(string(key), blkID)
-	return len(key) + len(blkID), hi.db.Put(key, blkID[:])
+	return hi.db.Put(key, blkID[:])
 }
 
 func (hi *heightIndex) GetBlockIDAtHeight(height uint64) (ids.ID, error) {

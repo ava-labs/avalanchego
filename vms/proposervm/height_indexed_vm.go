@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
-var errIndexIncomplete = errors.New("query failed since because height index is incomplete")
+var errIndexIncomplete = errors.New("query failed because height index is incomplete")
 
 // HeightIndexingEnabled implements HeightIndexedChainVM interface
 // vm.ctx.Lock should be held
@@ -74,7 +74,7 @@ func (vm *VM) updateHeightIndex(height uint64, blkID ids.ID) error {
 		}
 	}
 
-	if _, err = vm.State.SetBlockIDAtHeight(height, blkID); err != nil {
+	if err = vm.State.SetBlockIDAtHeight(height, blkID); err != nil {
 		vm.ctx.Log.Warn("Block indexing by height: new block. Failed updating index %v", err)
 		return err
 	}

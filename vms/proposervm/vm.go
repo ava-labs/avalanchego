@@ -97,8 +97,7 @@ func (vm *VM) Initialize(
 	vm.State = state.New(vm.db)
 	vm.Windower = proposer.New(ctx.ValidatorState, ctx.SubnetID, ctx.ChainID)
 	vm.Tree = tree.New()
-	vm.HeightIndexer = indexes.NewHeightIndexer(vm, vm.ctx.Log,
-		vm.State)
+	vm.HeightIndexer = indexes.NewHeightIndexer(vm, vm.ctx.Log, vm.State)
 
 	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine)
 	vm.Scheduler = scheduler
@@ -134,7 +133,7 @@ func (vm *VM) Initialize(
 		} else {
 			go func() {
 				if err := vm.HeightIndexer.RepairHeightIndex(); err != nil {
-					vm.ctx.Log.Info("Block indexing by height: failed with error %s", err)
+					vm.ctx.Log.Error("Block indexing by height: failed with error %s", err)
 					panic(err)
 				}
 			}()

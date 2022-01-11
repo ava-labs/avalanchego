@@ -116,7 +116,7 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 		logging.NoLog{},
 		storedState,
 	)
-	hIndex.commitMaxSize = 0 // commit each block
+	hIndex.commitMaxCount = 0 // commit each block
 
 	// show that height index should be rebuild and it is
 	doRepair, startBlkID, err := hIndex.shouldRepair()
@@ -210,7 +210,7 @@ func TestHeightBlockIndexPreFork(t *testing.T) {
 		logging.NoLog{},
 		storedState,
 	)
-	hIndex.commitMaxSize = 0 // commit each block
+	hIndex.commitMaxCount = 0 // commit each block
 
 	// with preFork only blocks there is nothing to rebuild
 	doRepair, _, err := hIndex.shouldRepair()
@@ -328,7 +328,7 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 		logging.NoLog{},
 		storedState,
 	)
-	hIndex.commitMaxSize = 0 // commit each block
+	hIndex.commitMaxCount = 0 // commit each block
 
 	// show that height index should be rebuild and it is
 	doRepair, startBlkID, err := hIndex.shouldRepair()
@@ -464,7 +464,7 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 		logging.NoLog{},
 		storedState,
 	)
-	hIndex.commitMaxSize = 0 // commit each block
+	hIndex.commitMaxCount = 0 // commit each block
 
 	// with no checkpoints repair starts from last accepted block
 	doRepair, startBlkID, err := hIndex.shouldRepair()
