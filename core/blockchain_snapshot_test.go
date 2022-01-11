@@ -54,7 +54,6 @@ type snapshotTestBasic struct {
 	snapshotBlock uint64 // Block number of the relevant snapshot disk layer
 
 	expCanonicalBlocks int    // Number of canonical blocks expected to remain in the database (excl. genesis)
-	expHeadHeader      uint64 // Block number of the expected head header
 	expHeadBlock       uint64 // Block number of the expected head full block
 	expSnapshotBottom  uint64 // The block height corresponding to the snapshot disk layer
 
@@ -110,7 +109,6 @@ func (basic *snapshotTestBasic) prepare(t *testing.T) (*BlockChain, []*types.Blo
 		startPoint = point
 
 		if basic.snapshotBlock > 0 && basic.snapshotBlock == point {
-
 			// Flushing from 0 to snapshotBlock into the disk
 			for i := uint64(0); i < point; i++ {
 				if err := chain.Accept(blocks[i]); err != nil {
@@ -142,8 +140,8 @@ func (basic *snapshotTestBasic) verify(t *testing.T, chain *BlockChain, blocks [
 	verifyNoGaps(t, chain, true, blocks)
 	verifyCutoff(t, chain, true, blocks, basic.expCanonicalBlocks)
 
-	if head := chain.CurrentHeader(); head.Number.Uint64() != basic.expHeadHeader {
-		t.Errorf("Head header mismatch: have %d, want %d", head.Number, basic.expHeadHeader)
+	if head := chain.CurrentHeader(); head.Number.Uint64() != basic.expHeadBlock {
+		t.Errorf("Head header mismatch: have %d, want %d", head.Number, basic.expHeadBlock)
 	}
 	if head := chain.CurrentBlock(); head.NumberU64() != basic.expHeadBlock {
 		t.Errorf("Head block mismatch: have %d, want %d", head.NumberU64(), basic.expHeadBlock)
@@ -192,7 +190,7 @@ func (basic *snapshotTestBasic) dump() string {
 		fmt.Fprintf(buffer, "->C%d", i+1)
 	}
 	fmt.Fprintf(buffer, "\n\n")
-	fmt.Fprintf(buffer, "Expected head header    : C%d\n", basic.expHeadHeader)
+	fmt.Fprintf(buffer, "Expected head header    : C%d\n", basic.expHeadBlock)
 	if basic.expHeadBlock == 0 {
 		fmt.Fprintf(buffer, "Expected head block     : G\n")
 	} else {
@@ -447,7 +445,6 @@ func TestRestartWithNewSnapshot(t *testing.T) {
 			chainBlocks:        8,
 			snapshotBlock:      4,
 			expCanonicalBlocks: 8,
-			expHeadHeader:      8,
 			expHeadBlock:       4,
 			expSnapshotBottom:  4, // Initial disk layer built from genesis
 		},
@@ -474,7 +471,6 @@ func TestNoCommitCrashWithNewSnapshot(t *testing.T) {
 	// Expected in leveldb:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8
 	//
-	// Expected head header    : C8
 	// Expected head block     : C4
 	// Expected snapshot disk  : C4
 	test := &crashSnapshotTest{
@@ -482,7 +478,6 @@ func TestNoCommitCrashWithNewSnapshot(t *testing.T) {
 			chainBlocks:        8,
 			snapshotBlock:      4,
 			expCanonicalBlocks: 8,
-			expHeadHeader:      8,
 			expHeadBlock:       4,
 			expSnapshotBottom:  4, // Last committed disk layer, wait recovery
 		},
@@ -509,7 +504,6 @@ func TestLowCommitCrashWithNewSnapshot(t *testing.T) {
 	// Expected in leveldb:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8
 	//
-	// Expected head header    : C8
 	// Expected head block     : C4
 	// Expected snapshot disk  : C4
 	test := &crashSnapshotTest{
@@ -517,7 +511,6 @@ func TestLowCommitCrashWithNewSnapshot(t *testing.T) {
 			chainBlocks:        8,
 			snapshotBlock:      4,
 			expCanonicalBlocks: 8,
-			expHeadHeader:      8,
 			expHeadBlock:       4,
 			expSnapshotBottom:  4, // Last committed disk layer, wait recovery
 		},
@@ -544,7 +537,6 @@ func TestHighCommitCrashWithNewSnapshot(t *testing.T) {
 	// Expected in leveldb:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8
 	//
-	// Expected head header    : C8
 	// Expected head block     : C4
 	// Expected snapshot disk  : C4
 	test := &crashSnapshotTest{
@@ -552,7 +544,6 @@ func TestHighCommitCrashWithNewSnapshot(t *testing.T) {
 			chainBlocks:        8,
 			snapshotBlock:      4,
 			expCanonicalBlocks: 8,
-			expHeadHeader:      8,
 			expHeadBlock:       4,
 			expSnapshotBottom:  4, // Last committed disk layer, wait recovery
 		},
@@ -575,7 +566,6 @@ func TestGappedNewSnapshot(t *testing.T) {
 	// Expected in leveldb:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10
 	//
-	// Expected head header    : C8
 	// Expected head block     : G
 	// Expected snapshot disk  : G
 	test := &gappedSnapshotTest{
@@ -583,7 +573,6 @@ func TestGappedNewSnapshot(t *testing.T) {
 			chainBlocks:        8,
 			snapshotBlock:      0,
 			expCanonicalBlocks: 10,
-			expHeadHeader:      8,
 			expHeadBlock:       0,
 			expSnapshotBottom:  0, // Rebuilt snapshot from the latest HEAD
 		},
@@ -607,7 +596,6 @@ func TestRecoverSnapshotFromWipingCrash(t *testing.T) {
 	// Expected in leveldb:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10
 	//
-	// Expected head header    : C8
 	// Expected head block     : C4
 	// Expected snapshot disk  : C4
 	test := &wipeCrashSnapshotTest{
@@ -615,7 +603,6 @@ func TestRecoverSnapshotFromWipingCrash(t *testing.T) {
 			chainBlocks:        8,
 			snapshotBlock:      4,
 			expCanonicalBlocks: 10,
-			expHeadHeader:      8,
 			expHeadBlock:       4,
 			expSnapshotBottom:  4,
 		},

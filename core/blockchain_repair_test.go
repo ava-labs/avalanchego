@@ -52,7 +52,6 @@ type rewindTest struct {
 
 	expCanonicalBlocks int    // Number of canonical blocks expected to remain in the database (excl. genesis)
 	expSidechainBlocks int    // Number of sidechain blocks expected to remain in the database (excl. genesis)
-	expHeadHeader      uint64 // Block number of the expected head header
 	expHeadBlock       uint64 // Block number of the expected head full block
 }
 
@@ -76,7 +75,6 @@ func testShortRepair(t *testing.T, snapshots bool) {
 	// Expected in leveldb:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8
 	//
-	// Expected head header    : C8
 	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    8,
@@ -84,7 +82,6 @@ func testShortRepair(t *testing.T, snapshots bool) {
 		commitBlock:        4,
 		expCanonicalBlocks: 8,
 		expSidechainBlocks: 0,
-		expHeadHeader:      8,
 		expHeadBlock:       0,
 	}
 	if snapshots {
@@ -116,7 +113,6 @@ func testShortOldForkedRepair(t *testing.T, snapshots bool) {
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8
 	//   └->S1->S2->S3
 	//
-	// Expected head header    : C8 (C3 with no snapshots)
 	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    8,
@@ -124,11 +120,9 @@ func testShortOldForkedRepair(t *testing.T, snapshots bool) {
 		commitBlock:        4,
 		expCanonicalBlocks: 8,
 		expSidechainBlocks: 3,
-		expHeadHeader:      3,
 		expHeadBlock:       0,
 	}
 	if snapshots {
-		rt.expHeadHeader = 8
 		rt.expHeadBlock = 4
 	}
 	testRepair(t, rt, snapshots)
@@ -157,7 +151,6 @@ func testShortNewlyForkedRepair(t *testing.T, snapshots bool) {
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8
 	//   └->S1->S2->S3->S4->S5->S6
 	//
-	// Expected head header    : C8 (C6 with no snapshots)
 	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    8,
@@ -165,11 +158,9 @@ func testShortNewlyForkedRepair(t *testing.T, snapshots bool) {
 		commitBlock:        4,
 		expCanonicalBlocks: 8,
 		expSidechainBlocks: 6,
-		expHeadHeader:      6,
 		expHeadBlock:       0,
 	}
 	if snapshots {
-		rt.expHeadHeader = 8
 		rt.expHeadBlock = 4
 	}
 	testRepair(t, rt, snapshots)
@@ -197,7 +188,6 @@ func testShortReorgedRepair(t *testing.T, snapshots bool) {
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8
 	//   └->S1->S2->S3->S4->S5->S6->S7->S8->S9->S10
 	//
-	// Expected head header    : C8 (C10 with no snapshots)
 	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    8,
@@ -205,11 +195,9 @@ func testShortReorgedRepair(t *testing.T, snapshots bool) {
 		commitBlock:        4,
 		expCanonicalBlocks: 8,
 		expSidechainBlocks: 10,
-		expHeadHeader:      10,
 		expHeadBlock:       0,
 	}
 	if snapshots {
-		rt.expHeadHeader = 8
 		rt.expHeadBlock = 4
 	}
 	testRepair(t, rt, snapshots)
@@ -235,7 +223,6 @@ func testLongShallowRepair(t *testing.T, snapshots bool) {
 	// Expected in leveldb:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18
 	//
-	// Expected head header    : C18
 	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    18,
@@ -243,7 +230,6 @@ func testLongShallowRepair(t *testing.T, snapshots bool) {
 		commitBlock:        4,
 		expCanonicalBlocks: 18,
 		expSidechainBlocks: 0,
-		expHeadHeader:      18,
 		expHeadBlock:       0,
 	}
 	if snapshots {
@@ -271,7 +257,6 @@ func testLongDeepRepair(t *testing.T, snapshots bool) {
 	// Expected in leveldb: none
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18->C19->C20->C21->C22->C23->C24
 	//
-	// Expected head header    : C24
 	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    24,
@@ -279,7 +264,6 @@ func testLongDeepRepair(t *testing.T, snapshots bool) {
 		commitBlock:        4,
 		expCanonicalBlocks: 24,
 		expSidechainBlocks: 0,
-		expHeadHeader:      24,
 		expHeadBlock:       0,
 	}
 	if snapshots {
@@ -315,7 +299,6 @@ func testLongOldForkedShallowRepair(t *testing.T, snapshots bool) {
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18
 	//   └->S1->S2->S3
 	//
-	// Expected head header    : C18 (C3 with no snapshots)
 	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    18,
@@ -323,11 +306,9 @@ func testLongOldForkedShallowRepair(t *testing.T, snapshots bool) {
 		commitBlock:        4,
 		expCanonicalBlocks: 18,
 		expSidechainBlocks: 3,
-		expHeadHeader:      3,
 		expHeadBlock:       0,
 	}
 	if snapshots {
-		rt.expHeadHeader = 18
 		rt.expHeadBlock = 4
 	}
 	testRepair(t, rt, snapshots)
@@ -355,7 +336,6 @@ func testLongOldForkedDeepRepair(t *testing.T, snapshots bool) {
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18->C19->C20->C21->C22->C23->C24
 	//   └->S1->S2->S3
 	//
-	// Expected head header    : C24 (C3 with no snapshots)
 	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    24,
@@ -363,11 +343,9 @@ func testLongOldForkedDeepRepair(t *testing.T, snapshots bool) {
 		commitBlock:        4,
 		expCanonicalBlocks: 24,
 		expSidechainBlocks: 3,
-		expHeadHeader:      3,
 		expHeadBlock:       0,
 	}
 	if snapshots {
-		rt.expHeadHeader = 24
 		rt.expHeadBlock = 4
 	}
 	testRepair(t, rt, snapshots)
@@ -399,7 +377,6 @@ func testLongNewerForkedShallowRepair(t *testing.T, snapshots bool) {
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18
 	//   └->S1->S2->S3->S4->S5->S6->S7->S8->S9->S10->S11->S12
 	//
-	// Expected head header    : C18 (C12 with no snapshots)
 	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    18,
@@ -407,11 +384,9 @@ func testLongNewerForkedShallowRepair(t *testing.T, snapshots bool) {
 		commitBlock:        4,
 		expCanonicalBlocks: 18,
 		expSidechainBlocks: 12,
-		expHeadHeader:      12,
 		expHeadBlock:       0,
 	}
 	if snapshots {
-		rt.expHeadHeader = 18
 		rt.expHeadBlock = 4
 	}
 	testRepair(t, rt, snapshots)
@@ -439,7 +414,6 @@ func testLongNewerForkedDeepRepair(t *testing.T, snapshots bool) {
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18->C19->C20->C21->C22->C23->C24
 	//   └->S1->S2->S3->S4->S5->S6->S7->S8->S9->S10->S11->S12
 	//
-	// Expected head header    : C24 (C12 with no snapshots)
 	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    24,
@@ -447,11 +421,9 @@ func testLongNewerForkedDeepRepair(t *testing.T, snapshots bool) {
 		commitBlock:        4,
 		expCanonicalBlocks: 24,
 		expSidechainBlocks: 12,
-		expHeadHeader:      12,
 		expHeadBlock:       0,
 	}
 	if snapshots {
-		rt.expHeadHeader = 24
 		rt.expHeadBlock = 4
 	}
 	testRepair(t, rt, snapshots)
@@ -478,7 +450,6 @@ func testLongReorgedShallowRepair(t *testing.T, snapshots bool) {
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18
 	//   └->S1->S2->S3->S4->S5->S6->S7->S8->S9->S10->S11->S12->S13->S14->S15->S16->S17->S18->S19->S20->S21->S22->S23->S24->S25->S26
 	//
-	// Expected head header    : C18 (C26 with no snapshots)
 	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    18,
@@ -486,11 +457,9 @@ func testLongReorgedShallowRepair(t *testing.T, snapshots bool) {
 		commitBlock:        4,
 		expCanonicalBlocks: 18,
 		expSidechainBlocks: 26,
-		expHeadHeader:      26,
 		expHeadBlock:       0,
 	}
 	if snapshots {
-		rt.expHeadHeader = 18
 		rt.expHeadBlock = 4
 	}
 	testRepair(t, rt, snapshots)
@@ -518,7 +487,6 @@ func testLongReorgedDeepRepair(t *testing.T, snapshots bool) {
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8->C9->C10->C11->C12->C13->C14->C15->C16->C17->C18->C19->C20->C21->C22->C23->C24
 	//   └->S1->S2->S3->S4->S5->S6->S7->S8->S9->S10->S11->S12->S13->S14->S15->S16->S17->S18->S19->S20->S21->S22->S23->S24->S25->S26
 	//
-	// Expected head header    : C24 (C26 with no snapshots)
 	// Expected head block     : C4 (C0 with no snapshots)
 	rt := &rewindTest{
 		canonicalBlocks:    24,
@@ -526,11 +494,9 @@ func testLongReorgedDeepRepair(t *testing.T, snapshots bool) {
 		commitBlock:        4,
 		expCanonicalBlocks: 24,
 		expSidechainBlocks: 26,
-		expHeadHeader:      26,
 		expHeadBlock:       0,
 	}
 	if snapshots {
-		rt.expHeadHeader = 24
 		rt.expHeadBlock = 4
 	}
 	testRepair(t, rt, snapshots)
@@ -626,8 +592,8 @@ func testRepair(t *testing.T, tt *rewindTest, snapshots bool) {
 	verifyCutoff(t, chain, true, canonblocks, tt.expCanonicalBlocks)
 	verifyCutoff(t, chain, false, sideblocks, tt.expSidechainBlocks)
 
-	if head := chain.CurrentHeader(); head.Number.Uint64() != tt.expHeadHeader {
-		t.Errorf("Head header mismatch: have %d, want %d", head.Number, tt.expHeadHeader)
+	if head := chain.CurrentHeader(); head.Number.Uint64() != tt.expHeadBlock {
+		t.Errorf("Head header mismatch: have %d, want %d", head.Number, tt.expHeadBlock)
 	}
 	if head := chain.CurrentBlock(); head.NumberU64() != tt.expHeadBlock {
 		t.Errorf("Head block mismatch: have %d, want %d", head.NumberU64(), tt.expHeadBlock)
