@@ -147,12 +147,11 @@ func (jm *JobsWithMissing) SetParser(parser Parser) error {
 
 func (jm *JobsWithMissing) ClearAll(ctx *snow.ConsensusContext, halter common.Haltable,
 	restarted bool, events ...snow.EventDispatcher) (int, error) {
-	clearedJobs := 0
 	if err := jm.state.RemoveMissingJobIDs(jm.missingIDs); err != nil {
-		return clearedJobs, err
+		return 0, err
 	}
 
-	clearedJobs = jm.missingIDs.Len()
+	clearedJobs := jm.missingIDs.Len()
 	jm.missingIDs.Clear()
 	jm.addToMissingIDs.Clear()
 	jm.removeFromMissingIDs.Clear()

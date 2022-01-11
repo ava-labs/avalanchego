@@ -820,12 +820,9 @@ func (m *manager) createSnowmanChain(
 		VM:                      vm,
 		WeightTracker:           weightTracker,
 	}
-	onDoneFastSyncing := func(lastReqID uint32) error {
-		return handler.OnDoneFastSyncing(lastReqID)
-	}
 	fastSync := fastsyncer.NewFastSyncer(
 		fastSyncCfg,
-		onDoneFastSyncing,
+		handler.OnDoneFastSyncing,
 	)
 	handler.RegisterFastSyncer(fastSync)
 
