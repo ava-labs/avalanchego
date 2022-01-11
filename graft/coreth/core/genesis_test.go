@@ -28,10 +28,8 @@ package core
 
 import (
 	_ "embed"
-	"encoding/json"
 	"math/big"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
@@ -42,19 +40,7 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/rlp"
 )
-
-//go:embed "genesis_test_data.json"
-var genesisTestAllocJsonData []byte
-
-type genesisTestAllocData struct {
-	FakeMainnetAllocData []byte `json:"fakeMainnetAllocData"`
-	FakeRopstenAllocData []byte `json:"fakeRopstenAllocData"`
-	FakeRinkebyAllocData []byte `json:"fakeRinkebyAllocData"`
-	FakeGoerliAllocData  []byte `json:"fakeGoerliAllocData"`
-}
 
 func setupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig, common.Hash, error) {
 	conf, err := SetupGenesisBlock(db, genesis)
@@ -67,25 +53,6 @@ func TestGenesisBlockForTesting(t *testing.T) {
 	block := GenesisBlockForTesting(rawdb.NewMemoryDatabase(), common.Address{1}, big.NewInt(1))
 	if block.Hash() != genesisBlockForTestingHash {
 		t.Errorf("wrong testing genesis hash, got %v, want %v", block.Hash(), genesisBlockForTestingHash)
-	}
-}
-
-func TestToBlock(t *testing.T) {
-	block := fakeMainnetGenesisBlock().ToBlock(nil)
-	if block.Hash() != fakeMainnetGenesisHash {
-		t.Errorf("wrong mainnet genesis hash, got %v, want %v", block.Hash(), fakeMainnetGenesisHash)
-	}
-	block = fakeRopstenGenesisBlock().ToBlock(nil)
-	if block.Hash() != fakeRopstenGenesisHash {
-		t.Errorf("wrong ropsten genesis hash, got %v, want %v", block.Hash(), fakeRopstenGenesisHash)
-	}
-	block = fakeRinkebyGenesisBlock().ToBlock(nil)
-	if block.Hash() != fakeRinkebyGenesisHash {
-		t.Errorf("wrong rinkeby genesis hash, got %v, want %v", block.Hash(), fakeRinkebyGenesisHash)
-	}
-	block = fakeGoerliGenesisBlock().ToBlock(nil)
-	if block.Hash() != fakeGoerliGenesisHash {
-		t.Errorf("wrong goerli genesis hash, got %v, want %v", block.Hash(), fakeGoerliGenesisHash)
 	}
 }
 
@@ -131,16 +98,6 @@ func TestSetupGenesis(t *testing.T) {
 			wantConfig: nil,
 		},
 		{
-			name: "mainnet block in DB, genesis == nil",
-			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
-				fakeMainnetGenesisBlock().MustCommit(db)
-				return setupGenesisBlock(db, nil)
-			},
-			wantErr:    ErrNoGenesis,
-			wantHash:   fakeMainnetGenesisHash,
-			wantConfig: nil,
-		},
-		{
 			name: "custom block in DB, genesis == nil",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
 				customg.MustCommit(db)
@@ -149,16 +106,6 @@ func TestSetupGenesis(t *testing.T) {
 			wantErr:    ErrNoGenesis,
 			wantHash:   customghash,
 			wantConfig: nil,
-		},
-		{
-			name: "custom block in DB, genesis == ropsten",
-			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
-				customg.MustCommit(db)
-				return setupGenesisBlock(db, fakeRopstenGenesisBlock())
-			},
-			wantErr:    &GenesisMismatchError{Stored: customghash, New: fakeRopstenGenesisHash},
-			wantHash:   customghash,
-			wantConfig: params.TestChainConfig,
 		},
 		{
 			name: "compatible config in DB",
@@ -211,110 +158,5 @@ func TestSetupGenesis(t *testing.T) {
 				t.Errorf("%s: block in DB has hash %s, want %s", test.name, stored.Hash(), test.wantHash)
 			}
 		}
-	}
-}
-
-// TestGenesisHashes checks the congruity of default genesis data to corresponding hardcoded genesis hash values.
-func TestGenesisHashes(t *testing.T) {
-	cases := []struct {
-		genesis *Genesis
-		hash    common.Hash
-	}{
-		{
-			genesis: fakeMainnetGenesisBlock(),
-			hash:    fakeMainnetGenesisHash,
-		},
-		{
-			genesis: fakeGoerliGenesisBlock(),
-			hash:    fakeGoerliGenesisHash,
-		},
-		{
-			genesis: fakeRopstenGenesisBlock(),
-			hash:    fakeRopstenGenesisHash,
-		},
-		{
-			genesis: fakeRinkebyGenesisBlock(),
-			hash:    fakeRinkebyGenesisHash,
-		},
-	}
-	for i, c := range cases {
-		b := c.genesis.MustCommit(rawdb.NewMemoryDatabase())
-		if got := b.Hash(); got != c.hash {
-			t.Errorf("case: %d, want: %s, got: %s", i, c.hash.Hex(), got.Hex())
-		}
-	}
-}
-
-func decodePrealloc(data string) GenesisAlloc {
-	var p []struct{ Addr, Balance *big.Int }
-	if err := rlp.NewStream(strings.NewReader(data), 0).Decode(&p); err != nil {
-		panic(err)
-	}
-	ga := make(GenesisAlloc, len(p))
-	for _, account := range p {
-		ga[common.BigToAddress(account.Addr)] = GenesisAccount{Balance: account.Balance}
-	}
-	return ga
-}
-
-var fakeMainnetGenesisHash = common.HexToHash("0x4c2016cf79d02e524b52d99fc5632a3c82938f00d7df1184dc73200369f33fa1")
-var fakeRopstenGenesisHash = common.HexToHash("0xffb37ef9bf631aed154333ea8a9da0115d3dd850b95b68a0ca4ab8ee9e2dd547")
-var fakeGoerliGenesisHash = common.HexToHash("0xc08f95ed5171e83fefc60bf1778803d289dc71d1b857390d283b8940d6d37cb6")
-var fakeRinkebyGenesisHash = common.HexToHash("0x661e25c2f8122a4c9eccff6b45bd1086e075dc069e90b7d5dcaf0b34bf86acf7")
-
-func loadGenesisTestAllocData() *genesisTestAllocData {
-	m := genesisTestAllocData{}
-	err := json.Unmarshal(genesisTestAllocJsonData, &m)
-	if err != nil {
-		panic(err)
-	}
-	return &m
-}
-
-func fakeMainnetGenesisBlock() *Genesis {
-	data := loadGenesisTestAllocData()
-	return &Genesis{
-		Config:     params.TestChainConfig,
-		Nonce:      66,
-		ExtraData:  hexutil.MustDecode("0x11bbe8db4e347b4e8c937c1c8370e4b5ed33adb3db69cbdb7a38e1e50b1b82fa"),
-		GasLimit:   5000,
-		Difficulty: big.NewInt(17179869184),
-		Alloc:      decodePrealloc(string(data.FakeMainnetAllocData)),
-	}
-}
-
-func fakeRopstenGenesisBlock() *Genesis {
-	data := loadGenesisTestAllocData()
-	return &Genesis{
-		Config:     params.TestChainConfig,
-		Nonce:      66,
-		ExtraData:  hexutil.MustDecode("0x3535353535353535353535353535353535353535353535353535353535353535"),
-		GasLimit:   16777216,
-		Difficulty: big.NewInt(1048576),
-		Alloc:      decodePrealloc(string(data.FakeRopstenAllocData)),
-	}
-}
-
-func fakeRinkebyGenesisBlock() *Genesis {
-	data := loadGenesisTestAllocData()
-	return &Genesis{
-		Config:     params.TestChainConfig,
-		Timestamp:  1492009146,
-		ExtraData:  hexutil.MustDecode("0x52657370656374206d7920617574686f7269746168207e452e436172746d616e42eb768f2244c8811c63729a21a3569731535f067ffc57839b00206d1ad20c69a1981b489f772031b279182d99e65703f0076e4812653aab85fca0f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
-		GasLimit:   4700000,
-		Difficulty: big.NewInt(1),
-		Alloc:      decodePrealloc(string(data.FakeRinkebyAllocData)),
-	}
-}
-
-func fakeGoerliGenesisBlock() *Genesis {
-	data := loadGenesisTestAllocData()
-	return &Genesis{
-		Config:     params.TestChainConfig,
-		Timestamp:  1548854791,
-		ExtraData:  hexutil.MustDecode("0x22466c6578692069732061207468696e6722202d204166726900000000000000e0a2bd4258d2768837baa26a28fe71dc079f84c70000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
-		GasLimit:   10485760,
-		Difficulty: big.NewInt(1),
-		Alloc:      decodePrealloc(string(data.FakeGoerliAllocData)),
 	}
 }
