@@ -37,9 +37,7 @@ func (b *preForkBlock) conditionalAccept(acceptInnerBlk bool) error {
 	}
 
 	if acceptInnerBlk {
-		if err := b.Block.Accept(); err != nil {
-			return err
-		}
+		return b.Block.Accept()
 	}
 
 	return nil

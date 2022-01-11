@@ -52,9 +52,7 @@ func (b *postForkBlock) conditionalAccept(acceptInnerBlk bool) error {
 	if acceptInnerBlk {
 		// mark the inner block as accepted and all conflicting inner blocks as
 		// rejected
-		if err := b.vm.Tree.Accept(b.innerBlk); err != nil {
-			return err
-		}
+		return b.vm.Tree.Accept(b.innerBlk)
 	}
 	return nil
 }
