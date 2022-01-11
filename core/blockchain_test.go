@@ -357,7 +357,7 @@ func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
 
 		if lastAcceptedHash != (common.Hash{}) {
 			tempDir := t.TempDir()
-			pruner, err := pruner.NewPruner(db, tempDir, 512)
+			pruner, err := pruner.NewPruner(db, tempDir, 256)
 			if err != nil {
 				return nil, fmt.Errorf("offline pruning failed (%s, %d)", tempDir, 512)
 			}
