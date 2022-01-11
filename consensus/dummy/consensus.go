@@ -34,7 +34,7 @@ var (
 type Mode uint
 
 const (
-	ModeFullFake     Mode = 1 // Skip over header verification
+	ModeSkipHeader   Mode = 1 // Skip over header verification
 	ModeSkipBlockFee Mode = 2 // Skip block fee verification
 )
 
@@ -81,7 +81,7 @@ func NewFaker() *DummyEngine {
 func NewFullFaker() *DummyEngine {
 	return &DummyEngine{
 		cb:            new(ConsensusCallbacks),
-		consensusMode: ModeFullFake,
+		consensusMode: ModeSkipHeader,
 	}
 }
 
@@ -228,7 +228,7 @@ func (self *DummyEngine) Author(header *types.Header) (common.Address, error) {
 
 func (self *DummyEngine) VerifyHeader(chain consensus.ChainHeaderReader, header *types.Header) error {
 	// If we're running a full engine faking, accept any input as valid
-	if self.consensusMode == ModeFullFake {
+	if self.consensusMode == ModeSkipHeader {
 		return nil
 	}
 	// Short circuit if the header is known, or it's parent not
