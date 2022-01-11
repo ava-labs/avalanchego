@@ -158,43 +158,63 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 	}
 
 	// Note: we currently support two types of indexes: stand-alone and VM-backed index.
-	// Stand-alone indexes require an ad-hoc db to store block, vertexes and transactions data;
-	// they may be incomplete and are enabled only on nodes which specify the flag <FLAG NAME>.
+	// Stand-alone indexes require an ad-hoc db to store blocks, vertexes and transactions data;
+	// they may be incomplete and are enabled only on nodes which specify the flag <index-enabled>.
+	// VM-backed indexes do not require an ad-hoc db; they leverage VM-storage and cannot be incomplete.
 	// VM-backed indexes are supported only for block indexing on Snowman++ VMs which enabled height indexing.
-	// VM-backed indexes do not require an ad-hoc db, by leveraging VM-storage and cannot be incomplete.
-	// Currently VM-backed indexes are currently available only for the C-chain index.
+	// Currently VM-backed indexes are available only for the C-chain index.
 	switch engine.(type) {
 	case snowman.Engine:
 		var (
-			blockIndex Index
-			err        error
-			endpoint   = "block"
+			blockIndex            Index
+			err                   error
+			endpoint              = "block"
+			standAloneBlockPrefix = standAlonePrefix(chainID, blockPrefix)
+			errorHandling         = func(chainID ids.ID, blockIndex Index, i *indexer, err error, name string) bool {
+				if err != nil {
+					i.log.Fatal("couldn't create block index for %s: %s", name, err)
+					if err := i.close(); err != nil {
+						i.log.Error("error while closing indexer: %s", err)
+					}
+					return true
+				}
+				i.blockIndices[chainID] = blockIndex
+				return false
+			}
 		)
 		// Try creating a VM-backed ...
 		blockIndex, err = newVMBackedBlockIndex(engine.GetVM())
 		if err == nil {
 			err = i.registerIndexHelper(blockIndex, chainID, name, endpoint, i.consensusDispatcher)
+			if errorHandling(chainID, blockIndex, i, err, name) {
+				return
+			}
+
+			// Historically stand-Alone indexes were introduced first.
+			// However, as soon as a VM-Backed index is available,
+			// there is no point maintaining it.
+			go func() {
+				if err := i.deleteStandAloneIndex(standAloneBlockPrefix); err != nil {
+					i.log.Fatal("Chain %s stand alone index deletion failed, error: %w", chainID, err)
+					panic(err)
+				}
+			}()
 		} else { // ... otherwise fallback on stand-alone indexes.
 			if i.standAloneIndexChecks(chainID, name) {
 				return
 			}
-			blockIndex, err = i.registerChainHelper(chainID, blockPrefix, name, endpoint, i.consensusDispatcher)
-		}
-
-		if err != nil {
-			i.log.Fatal("couldn't create block index for %s: %s", name, err)
-			if err := i.close(); err != nil {
-				i.log.Error("error while closing indexer: %s", err)
+			blockIndex, err = i.registerChainHelper(chainID, standAloneBlockPrefix, name, endpoint, i.consensusDispatcher)
+			if errorHandling(chainID, blockIndex, i, err, name) {
+				return
 			}
-			return
 		}
-		i.blockIndices[chainID] = blockIndex
 	case avalanche.Engine:
 		if i.standAloneIndexChecks(chainID, name) {
 			return
 		}
 
-		vtxIndex, err := i.registerChainHelper(chainID, vtxPrefix, name, "vtx", i.consensusDispatcher)
+		standAloneVertexPrefix := standAlonePrefix(chainID, vtxPrefix)
+		vtxIndex, err := i.registerChainHelper(chainID, standAloneVertexPrefix, name, "vtx", i.consensusDispatcher)
 		if err != nil {
 			i.log.Fatal("couldn't create vertex index for %s: %s", name, err)
 			if err := i.close(); err != nil {
@@ -204,7 +224,8 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 		}
 		i.vtxIndices[chainID] = vtxIndex
 
-		txIndex, err := i.registerChainHelper(chainID, txPrefix, name, "tx", i.decisionDispatcher)
+		standAloneTxPrefix := standAlonePrefix(chainID, txPrefix)
+		txIndex, err := i.registerChainHelper(chainID, standAloneTxPrefix, name, "tx", i.decisionDispatcher)
 		if err != nil {
 			i.log.Fatal("couldn't create tx index for %s: %s", name, err)
 			if err := i.close(); err != nil {
@@ -220,6 +241,17 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 		}
 		return
 	}
+}
+
+func (i *indexer) deleteStandAloneIndex(standAlonePrefix []byte) error {
+	// recreate standalone index and delete it
+	standAloneIdx, err := newStandAloneIndex(standAlonePrefix, i.db, i.log, i.codec, i.clock)
+	if err != nil {
+		return err
+	}
+
+	indexToRm, _ := standAloneIdx.(*standAloneIndex)
+	return indexToRm.Delete()
 }
 
 func (i *indexer) standAloneIndexChecks(chainID ids.ID, name string) bool {
@@ -303,19 +335,23 @@ func (i *indexer) needsRegisteringChain(ctx *snow.ConsensusContext, name string)
 
 func (i *indexer) registerChainHelper(
 	chainID ids.ID,
-	prefixEnd byte,
+	prefix []byte,
 	name, endpoint string,
 	dispatcher *triggers.EventDispatcher,
 ) (Index, error) {
-	prefix := make([]byte, hashing.HashLen+wrappers.ByteLen)
-	copy(prefix, chainID[:])
-	prefix[hashing.HashLen] = prefixEnd
 	index, err := newStandAloneIndex(prefix, i.db, i.log, i.codec, i.clock)
 	if err != nil {
 		return nil, err
 	}
 
 	return index, i.registerIndexHelper(index, chainID, name, endpoint, dispatcher)
+}
+
+func standAlonePrefix(chainID ids.ID, prefixEnd byte) []byte {
+	prefix := make([]byte, hashing.HashLen+wrappers.ByteLen)
+	copy(prefix, chainID[:])
+	prefix[hashing.HashLen] = prefixEnd
+	return prefix
 }
 
 func (i *indexer) registerIndexHelper(

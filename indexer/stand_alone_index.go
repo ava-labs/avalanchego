@@ -98,6 +98,45 @@ func (i *standAloneIndex) Close() error {
 	return errs.Err
 }
 
+// Following the introduction of VM-backed index, we may need to
+// wipe out the previous StandAlone index
+func (i *standAloneIndex) Delete() error {
+	// clear containerToIndex
+	containerToIdxBatch := i.containerToIndex.NewBatch()
+	itCnt := i.containerToIndex.NewIterator()
+	defer itCnt.Release()
+	for itCnt.Next() {
+		if err := containerToIdxBatch.Delete(itCnt.Key()); err != nil {
+			return err
+		}
+	}
+	if err := itCnt.Error(); err != nil {
+		return err
+	}
+	if err := containerToIdxBatch.Write(); err != nil {
+		return err
+	}
+
+	// clear indexToContainer
+	idxToContainerBatch := i.indexToContainer.NewBatch()
+	itIdx := i.indexToContainer.NewIterator()
+	defer itIdx.Release()
+	for itIdx.Next() {
+		if err := idxToContainerBatch.Delete(itIdx.Key()); err != nil {
+			return err
+		}
+	}
+	if err := itIdx.Error(); err != nil {
+		return err
+	}
+	if err := idxToContainerBatch.Write(); err != nil {
+		return err
+	}
+
+	// clear other metadata
+	return i.vDB.Delete(nextAcceptedIndexKey)
+}
+
 // Index that the given transaction is accepted
 // Returned error should be treated as fatal; the VM should not commit [containerID]
 // or any new containers as accepted.
