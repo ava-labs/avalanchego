@@ -112,8 +112,7 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 	if percent < 0 {
 		percent = 0
 		log.Warn("Sanitizing invalid gasprice oracle sample percentile", "provided", config.Percentile, "updated", percent)
-	}
-	if percent > 100 {
+	} else if percent > 100 {
 		percent = 100
 		log.Warn("Sanitizing invalid gasprice oracle sample percentile", "provided", config.Percentile, "updated", percent)
 	}
@@ -131,6 +130,16 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 	if minGasUsed == nil || minGasUsed.Int64() < 0 {
 		minGasUsed = DefaultMinGasUsed
 		log.Warn("Sanitizing invalid gasprice oracle min gas used", "provided", config.MinGasUsed, "updated", minGasUsed)
+	}
+	maxHeaderHistory := config.MaxHeaderHistory
+	if maxHeaderHistory < 1 {
+		maxHeaderHistory = 1
+		log.Warn("Sanitizing invalid gasprice oracle max header history", "provided", config.MaxHeaderHistory, "updated", maxHeaderHistory)
+	}
+	maxBlockHistory := config.MaxBlockHistory
+	if maxBlockHistory < 1 {
+		maxBlockHistory = 1
+		log.Warn("Sanitizing invalid gasprice oracle max block history", "provided", config.MaxBlockHistory, "updated", maxBlockHistory)
 	}
 
 	cache, _ := lru.New(2048)
@@ -155,8 +164,8 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 		minGasUsed:       minGasUsed,
 		checkBlocks:      blocks,
 		percentile:       percent,
-		maxHeaderHistory: config.MaxHeaderHistory,
-		maxBlockHistory:  config.MaxBlockHistory,
+		maxHeaderHistory: maxHeaderHistory,
+		maxBlockHistory:  maxBlockHistory,
 		historyCache:     cache,
 	}
 }
@@ -178,11 +187,20 @@ func (oracle *Oracle) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
 		log.Warn("failed to estimate next base fee", "err", err)
 		return baseFee, nil
 	}
+	// If base fees have not been enabled, return a nil value.
+	if nextBaseFee == nil {
+		return nil, nil
+	}
 
 	baseFee = math.BigMin(baseFee, nextBaseFee)
 	return baseFee, nil
 }
 
+// estimateNextBaseFee calculates what the base fee should be on the next block if it
+// were produced immediately. If the current time is less than the timestamp of the latest
+// block, this esimtate uses the timestamp of the latest block instead.
+// If the latest block has a nil base fee, this function will return nil as the base fee
+// of the next block.
 func (oracle *Oracle) estimateNextBaseFee(ctx context.Context) (*big.Int, error) {
 	// Fetch the most recent block by number
 	block, err := oracle.backend.BlockByNumber(ctx, rpc.LatestBlockNumber)
@@ -220,10 +238,13 @@ func (oracle *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 	// If [nextBaseFee] is lower than the estimate from sampling, then we return it
 	// to prevent returning an incorrectly high fee when the network is quiescent.
 	nextBaseFee, err := oracle.estimateNextBaseFee(ctx)
-	if err == nil {
-		baseFee = math.BigMin(baseFee, nextBaseFee)
-	} else {
+	if err != nil {
 		log.Warn("failed to estimate next base fee", "err", err)
+	}
+	// Separately from checking the error value, check that [nextBaseFee] is non-nil
+	// before attempting to take the minimum.
+	if nextBaseFee != nil {
+		baseFee = math.BigMin(baseFee, nextBaseFee)
 	}
 
 	return new(big.Int).Add(tip, baseFee), nil

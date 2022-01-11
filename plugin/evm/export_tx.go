@@ -230,8 +230,8 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	return nil
 }
 
-// Accept this transaction.
-func (tx *UnsignedExportTx) Accept() (ids.ID, *atomic.Requests, error) {
+// AtomicOps returns the atomic operations for this transaction.
+func (tx *UnsignedExportTx) AtomicOps() (ids.ID, *atomic.Requests, error) {
 	txID := tx.ID()
 
 	elems := make([]*atomic.Element, len(tx.ExportedOutputs))

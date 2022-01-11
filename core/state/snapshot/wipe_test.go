@@ -40,57 +40,35 @@ import (
 func TestWipe(t *testing.T) {
 	// Create a database with some random snapshot data
 	db := memorydb.New()
-
 	for i := 0; i < 128; i++ {
-		account := randomHash()
-		rawdb.WriteAccountSnapshot(db, account, randomHash().Bytes())
-		for j := 0; j < 1024; j++ {
-			rawdb.WriteStorageSnapshot(db, account, randomHash(), randomHash().Bytes())
-		}
+		rawdb.WriteAccountSnapshot(db, randomHash(), randomHash().Bytes())
 	}
 	rawdb.WriteSnapshotBlockHash(db, randomHash())
 	rawdb.WriteSnapshotRoot(db, randomHash())
 
 	// Add some random non-snapshot data too to make wiping harder
-	for i := 0; i < 65536; i++ {
-		// Generate a key that's the wrong length for a state snapshot item
-		var keysize int
-		for keysize == 0 || keysize == 32 || keysize == 64 {
-			keysize = 8 + rand.Intn(64) // +8 to ensure we will "never" randomize duplicates
-		}
-		// Randomize the suffix, dedup and inject it under the snapshot namespace
-		keysuffix := make([]byte, keysize)
+	for i := 0; i < 500; i++ {
+		// Generate keys with wrong length for a state snapshot item
+		keysuffix := make([]byte, 31)
 		rand.Read(keysuffix)
-
-		if rand.Int31n(2) == 0 {
-			db.Put(append(rawdb.SnapshotAccountPrefix, keysuffix...), randomHash().Bytes())
-		} else {
-			db.Put(append(rawdb.SnapshotStoragePrefix, keysuffix...), randomHash().Bytes())
+		db.Put(append(rawdb.SnapshotAccountPrefix, keysuffix...), randomHash().Bytes())
+		keysuffix = make([]byte, 33)
+		rand.Read(keysuffix)
+		db.Put(append(rawdb.SnapshotAccountPrefix, keysuffix...), randomHash().Bytes())
+	}
+	count := func() (items int) {
+		it := db.NewIterator(rawdb.SnapshotAccountPrefix, nil)
+		defer it.Release()
+		for it.Next() {
+			if len(it.Key()) == len(rawdb.SnapshotAccountPrefix)+common.HashLength {
+				items++
+			}
 		}
+		return items
 	}
 	// Sanity check that all the keys are present
-	var items int
-
-	it := db.NewIterator(rawdb.SnapshotAccountPrefix, nil)
-	defer it.Release()
-
-	for it.Next() {
-		key := it.Key()
-		if len(key) == len(rawdb.SnapshotAccountPrefix)+common.HashLength {
-			items++
-		}
-	}
-	it = db.NewIterator(rawdb.SnapshotStoragePrefix, nil)
-	defer it.Release()
-
-	for it.Next() {
-		key := it.Key()
-		if len(key) == len(rawdb.SnapshotStoragePrefix)+2*common.HashLength {
-			items++
-		}
-	}
-	if items != 128+128*1024 {
-		t.Fatalf("snapshot size mismatch: have %d, want %d", items, 128+128*1024)
+	if items := count(); items != 128 {
+		t.Fatalf("snapshot size mismatch: have %d, want %d", items, 128)
 	}
 	if hash := rawdb.ReadSnapshotBlockHash(db); hash == (common.Hash{}) {
 		t.Errorf("snapshot block hash marker mismatch: have %#x, want <not-nil>", hash)
@@ -102,40 +80,24 @@ func TestWipe(t *testing.T) {
 	<-wipeSnapshot(db, true)
 
 	// Iterate over the database end ensure no snapshot information remains
-	it = db.NewIterator(rawdb.SnapshotAccountPrefix, nil)
-	defer it.Release()
-
-	for it.Next() {
-		key := it.Key()
-		if len(key) == len(rawdb.SnapshotAccountPrefix)+common.HashLength {
-			t.Errorf("snapshot entry remained after wipe: %x", key)
-		}
+	if items := count(); items != 0 {
+		t.Fatalf("snapshot size mismatch: have %d, want %d", items, 0)
 	}
-	it = db.NewIterator(rawdb.SnapshotStoragePrefix, nil)
+	// Iterate over the database and ensure miscellaneous items are present
+	items := 0
+	it := db.NewIterator(nil, nil)
 	defer it.Release()
-
 	for it.Next() {
-		key := it.Key()
-		if len(key) == len(rawdb.SnapshotStoragePrefix)+2*common.HashLength {
-			t.Errorf("snapshot entry remained after wipe: %x", key)
-		}
+		items++
 	}
+	if items != 1000 {
+		t.Fatalf("misc item count mismatch: have %d, want %d", items, 1000)
+	}
+
 	if hash := rawdb.ReadSnapshotBlockHash(db); hash != (common.Hash{}) {
 		t.Errorf("snapshot block hash marker remained after wipe: %#x", hash)
 	}
 	if hash := rawdb.ReadSnapshotRoot(db); hash != (common.Hash{}) {
 		t.Errorf("snapshot block root marker remained after wipe: %#x", hash)
-	}
-	// Iterate over the database and ensure miscellaneous items are present
-	items = 0
-
-	it = db.NewIterator(nil, nil)
-	defer it.Release()
-
-	for it.Next() {
-		items++
-	}
-	if items != 65536 {
-		t.Fatalf("misc item count mismatch: have %d, want %d", items, 65536)
 	}
 }

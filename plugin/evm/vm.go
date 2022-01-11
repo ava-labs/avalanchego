@@ -32,6 +32,7 @@ import (
 	// We must import this package (not referenced elsewhere) so that the native "callTracer"
 	// is added to a map of client-accessible tracers. In geth, this is done
 	// inside of cmd/geth.
+	_ "github.com/ava-labs/coreth/eth/tracers/js"
 	_ "github.com/ava-labs/coreth/eth/tracers/native"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -60,7 +61,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -110,9 +111,14 @@ const (
 
 var (
 	// Set last accepted key to be longer than the keys used to store accepted block IDs.
-	lastAcceptedKey        = []byte("last_accepted_key")
-	acceptedPrefix         = []byte("snowman_accepted")
-	ethDBPrefix            = []byte("ethdb")
+	lastAcceptedKey = []byte("last_accepted_key")
+	acceptedPrefix  = []byte("snowman_accepted")
+	ethDBPrefix     = []byte("ethdb")
+
+	// Prefixes for atomic trie
+	atomicTrieDBPrefix     = []byte("atomicTrieDB")
+	atomicTrieMetaDBPrefix = []byte("atomicTrieMetaDB")
+
 	pruneRejectedBlocksKey = []byte("pruned_rejected_blocks")
 )
 
@@ -190,6 +196,9 @@ type VM struct {
 	// - txID to accepted atomic tx
 	// - block height to list of atomic txs accepted on block at that height
 	atomicTxRepository AtomicTxRepository
+	// [atomicTrie] maintains a merkle forest of [height]=>[atomic txs].
+	//  Used to state sync clients.
+	atomicTrie AtomicTrie
 
 	builder *blockBuilder
 
@@ -212,7 +221,7 @@ type VM struct {
 	bootstrapped bool
 }
 
-func (vm *VM) Connected(nodeID ids.ShortID) error {
+func (vm *VM) Connected(id ids.ShortID, nodeVersion version.Application) error {
 	return nil // noop
 }
 
@@ -249,7 +258,6 @@ func (vm *VM) GetActivationTime() time.Time {
 }
 
 // Initialize implements the snowman.ChainVM interface
-
 func (vm *VM) Initialize(
 	ctx *snow.Context,
 	dbManager manager.Manager,
@@ -314,6 +322,7 @@ func (vm *VM) Initialize(
 
 	ethConfig := ethconfig.NewDefaultConfig()
 	ethConfig.Genesis = g
+	ethConfig.NetworkId = vm.chainID.Uint64()
 
 	// Set log level
 	logLevel := defaultLogLevel
@@ -362,7 +371,7 @@ func (vm *VM) Initialize(
 	var lastAcceptedHash common.Hash
 	switch {
 	case lastAcceptedErr == database.ErrNotFound:
-		// // Set [lastAcceptedHash] to the genesis block hash.
+		// Set [lastAcceptedHash] to the genesis block hash.
 		lastAcceptedHash = ethConfig.Genesis.ToBlock(nil).Hash()
 	case lastAcceptedErr != nil:
 		return fmt.Errorf("failed to get last accepted block ID due to: %w", lastAcceptedErr)
@@ -381,6 +390,15 @@ func (vm *VM) Initialize(
 	vm.atomicTxRepository, err = NewAtomicTxRepository(vm.db, vm.codec, lastAccepted.NumberU64())
 	if err != nil {
 		return fmt.Errorf("failed to create atomic repository: %w", err)
+	}
+
+	bonusBlockHeights := make(map[uint64]ids.ID)
+	if vm.chainID.Cmp(params.AvalancheMainnetChainID) == 0 {
+		bonusBlockHeights = bonusBlockMainnetHeights
+	}
+	vm.atomicTrie, err = NewAtomicTrie(vm.db, bonusBlockHeights, vm.atomicTxRepository, vm.codec, lastAccepted.NumberU64())
+	if err != nil {
+		return fmt.Errorf("failed to create atomic trie: %w", err)
 	}
 
 	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
@@ -848,7 +866,9 @@ func newHandler(name string, service interface{}, lockOption ...commonEng.LockOp
 func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 	handler := vm.chain.NewRPCHandler(vm.config.APIMaxDuration.Duration)
 	enabledAPIs := vm.config.EthAPIs()
-	vm.chain.AttachEthService(handler, enabledAPIs)
+	if err := vm.chain.AttachEthService(handler, enabledAPIs); err != nil {
+		return nil, err
+	}
 
 	primaryAlias, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID)
 	if err != nil {
@@ -871,17 +891,11 @@ func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 		enabledAPIs = append(enabledAPIs, "coreth-admin")
 	}
 
-	errs := wrappers.Errs{}
 	if vm.config.SnowmanAPIEnabled {
-		errs.Add(handler.RegisterName("snowman", &SnowmanAPI{vm}))
+		if err := handler.RegisterName("snowman", &SnowmanAPI{vm}); err != nil {
+			return nil, err
+		}
 		enabledAPIs = append(enabledAPIs, "snowman")
-	}
-	if vm.config.Web3APIEnabled {
-		errs.Add(handler.RegisterName("web3", &Web3API{}))
-		enabledAPIs = append(enabledAPIs, "web3")
-	}
-	if errs.Errored() {
-		return nil, errs.Err
 	}
 
 	log.Info(fmt.Sprintf("Enabled APIs: %s", strings.Join(enabledAPIs, ", ")))
@@ -911,7 +925,6 @@ func (vm *VM) CreateStaticHandlers() (map[string]*commonEng.HTTPHandler, error) 
 
 	return map[string]*commonEng.HTTPHandler{
 		"/rpc": {LockOptions: commonEng.NoLock, Handler: handler},
-		"/ws":  {LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandler([]string{"*"})},
 	}, nil
 }
 

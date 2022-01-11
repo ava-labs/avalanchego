@@ -55,9 +55,9 @@ const (
 // HeaderChain is responsible for maintaining the header chain including the
 // header query and updating.
 //
-// The components maintained by headerchain includes: (1) total difficult
-// (2) header (3) block hash -> number mapping (4) canonical number -> hash mapping
-// and (5) head header flag.
+// The components maintained by headerchain includes:
+// (1) header (2) block hash -> number mapping (3) canonical number -> hash mapping
+// and (4) head header flag.
 //
 // It is not thread safe either, the encapsulating chain structures should do
 // the necessary mutex locking/unlocking.
