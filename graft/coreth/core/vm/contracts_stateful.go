@@ -20,8 +20,8 @@ import (
 
 var (
 	genesisContractAddr    = common.HexToAddress("0x0100000000000000000000000000000000000000")
-	nativeAssetBalanceAddr = common.HexToAddress("0x0100000000000000000000000000000000000001")
-	nativeAssetCallAddr    = common.HexToAddress("0x0100000000000000000000000000000000000002")
+	NativeAssetBalanceAddr = common.HexToAddress("0x0100000000000000000000000000000000000001")
+	NativeAssetCallAddr    = common.HexToAddress("0x0100000000000000000000000000000000000002")
 )
 
 // StatefulPrecompiledContract is the interface for executing a precompiled contract
