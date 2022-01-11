@@ -20,7 +20,7 @@ const defaultCommitSizeCap = 1 * units.MiB
 var _ HeightIndexer = &heightIndexer{}
 
 type HeightIndexer interface {
-	// signals whether index rebuilding it still ongoing
+	// signals whether index rebuilding is still ongoing
 	IsRepaired() bool
 
 	// checks whether index rebuilding is needed and if so, performs it
@@ -69,7 +69,7 @@ func (hi *heightIndexer) IsRepaired() bool {
 func (hi *heightIndexer) RepairHeightIndex() error {
 	needRepair, startBlkID, err := hi.shouldRepair()
 	if err != nil {
-		hi.log.Info("Block indexing by height starting: failed. Could not determine if index is complete, error %v", err)
+		hi.log.Error("Block indexing by height starting: failed. Could not determine if index is complete, error %v", err)
 		return err
 	}
 	if !needRepair {

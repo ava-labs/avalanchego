@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
-var errIndexIncomplete = errors.New("query failed since because height index is incomplete")
+var errIndexIncomplete = errors.New("query failed because height index is incomplete")
 
 // HeightIndexingEnabled implements HeightIndexedChainVM interface
 // vm.ctx.Lock should be held
