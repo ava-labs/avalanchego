@@ -36,6 +36,7 @@ import (
 
 	"github.com/ava-labs/coreth/accounts/abi"
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/interfaces"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -71,9 +72,9 @@ type TransactOpts struct {
 
 	NoSend bool // Do all transact steps but do not send the transaction
 
-    DoNativeAssetCall bool              // Do native asset call instead of normal transaction
-    NativeAssetCallAssetID common.Hash  // Asset id for native asset call
-    NativeAssetCallAssetAmount *big.Int // Asset amount for native asset call
+	DoNativeAssetCall          bool        // Do native asset call instead of normal transaction
+	NativeAssetCallAssetID     common.Hash // Asset id for native asset call
+	NativeAssetCallAssetAmount *big.Int    // Asset amount for native asset call
 }
 
 // FilterOpts is the collection of options to fine tune filtering for events
@@ -284,13 +285,18 @@ func (c *BoundContract) createDynamicTx(opts *TransactOpts, contract *common.Add
 	if err != nil {
 		return nil, err
 	}
-    toAddr := contract
-    if c.DoNativeAssetCall {
-        // wrap input with native asset call params
-        input = vm.PackNativeAssetCallInput(contract, c.NativeAssetCallAssetID, c.NativeAssetCallAssetAmount, input)
-        // target addr is now precompile
-        toAddr = vm.NativeAssetCallAddr
-    }
+	toAddr := contract
+	if opts.DoNativeAssetCall {
+		// wrap input with native asset call params
+		input = vm.PackNativeAssetCallInput(
+			*contract,
+			opts.NativeAssetCallAssetID,
+			opts.NativeAssetCallAssetAmount,
+			input,
+		)
+		// target addr is now precompile
+		toAddr = &vm.NativeAssetCallAddr
+	}
 	baseTx := &types.DynamicFeeTx{
 		To:        toAddr,
 		Nonce:     nonce,
@@ -335,13 +341,18 @@ func (c *BoundContract) createLegacyTx(opts *TransactOpts, contract *common.Addr
 	if err != nil {
 		return nil, err
 	}
-    toAddr := contract
-    if c.DoNativeAssetCall {
-        // wrap input with native asset call params
-        input = vm.PackNativeAssetCallInput(contract, c.NativeAssetCallAssetID, c.NativeAssetCallAssetAmount, input)
-        // target addr is now precompile
-        toAddr = vm.NativeAssetCallAddr
-    }
+	toAddr := contract
+	if opts.DoNativeAssetCall {
+		// wrap input with native asset call params
+		input = vm.PackNativeAssetCallInput(
+			*contract,
+			opts.NativeAssetCallAssetID,
+			opts.NativeAssetCallAssetAmount,
+			input,
+		)
+		// target addr is now precompile
+		toAddr = &vm.NativeAssetCallAddr
+	}
 	baseTx := &types.LegacyTx{
 		To:       toAddr,
 		Nonce:    nonce,
