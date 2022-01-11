@@ -70,6 +70,8 @@ type TransactOpts struct {
 	Context context.Context // Network context to support cancellation and timeouts (nil = no timeout)
 
 	NoSend bool // Do all transact steps but do not send the transaction
+
+    DoNativeAssetCall bool // Do native asset call instead of normal transaction
 }
 
 // FilterOpts is the collection of options to fine tune filtering for events
