@@ -50,10 +50,6 @@ func verifyUnbrokenCanonchain(bc *BlockChain) error {
 			return fmt.Errorf("Canon hash chain broken, block %d got %x, expected %x",
 				h.Number, canonHash[:8], exp[:8])
 		}
-		// Verify that we have the TD
-		if td := rawdb.ReadTd(bc.hc.chainDb, canonHash, h.Number.Uint64()); td == nil {
-			return fmt.Errorf("Canon TD missing at block %d", h.Number)
-		}
 		if h.Number.Uint64() == 0 {
 			break
 		}
