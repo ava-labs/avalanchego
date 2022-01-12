@@ -291,17 +291,6 @@ func RecoverPruning(datadir string, db ethdb.Database) error {
 	if headBlock == nil {
 		return errors.New("Failed to load head block")
 	}
-	// Initialize the snapshot tree in recovery mode to handle this special case:
-	// - Users run the `prune-state` command multiple times
-	// - Neither these `prune-state` running is finished(e.g. interrupted manually)
-	// - The state bloom filter is already generated, a part of state is deleted,
-	//   so that resuming the pruning here is mandatory
-	// - The state HEAD is rewound already because of multiple incomplete `prune-state`
-	// In this case, even the state HEAD is not exactly matched with snapshot, it
-	// still feasible to recover the pruning correctly.
-	if _, err := snapshot.New(db, trie.NewDatabase(db), 256, headBlock.Hash(), headBlock.Root(), false, false, false); err != nil {
-		return err // The relevant snapshot(s) might not exist
-	}
 	stateBloom, err := NewStateBloomFromDisk(stateBloomPath)
 	if err != nil {
 		return err
