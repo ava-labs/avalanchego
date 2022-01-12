@@ -192,6 +192,12 @@ func prune(maindb ethdb.Database, stateBloom *stateBloom, bloomPath string, star
 	iter.Release()
 	log.Info("Pruned state data", "nodes", count, "size", size, "elapsed", common.PrettyDuration(time.Since(pstart)))
 
+	// Write marker to DB to indicate offline pruning finished successfully. We write before calling os.RemoveAll
+	// to guarantee that if the node dies midway through pruning, then this will run during RecoverPruning.
+	if err := rawdb.WriteOfflinePruning(maindb); err != nil {
+		return fmt.Errorf("failed to write offline pruning success marker: %w", err)
+	}
+
 	// Delete the state bloom, it marks the entire pruning procedure is
 	// finished. If any crashes or manual exit happens before this,
 	// `RecoverPruning` will pick it up in the next restarts to redo all
