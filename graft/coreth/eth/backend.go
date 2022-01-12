@@ -49,6 +49,7 @@ import (
 	"github.com/ava-labs/coreth/eth/tracers"
 	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/internal/ethapi"
+	"github.com/ava-labs/coreth/internal/shutdowncheck"
 	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
@@ -99,6 +100,8 @@ type Ethereum struct {
 	netRPCService *ethapi.PublicNetAPI
 
 	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
+
+	shutdownTracker *shutdowncheck.ShutdownTracker // Tracks if and when the node has shutdown ungracefully
 
 	stackRPCs []rpc.API
 
@@ -160,6 +163,7 @@ func New(
 		bloomRequests:     make(chan chan *bloombits.Retrieval),
 		bloomIndexer:      core.NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
 		settings:          settings,
+		shutdownTracker:   shutdowncheck.NewShutdownTracker(chainDb),
 	}
 
 	bcVersion := rawdb.ReadDatabaseVersion(chainDb)
@@ -247,6 +251,9 @@ func New(
 	eth.netRPCService = ethapi.NewPublicNetAPI(eth.NetVersion())
 
 	eth.stackRPCs = stack.APIs()
+
+	// Successful startup; push a marker and check previous unclean shutdowns.
+	eth.shutdownTracker.MarkStartup()
 
 	return eth, nil
 }
@@ -352,6 +359,9 @@ func (s *Ethereum) BloomIndexer() *core.ChainIndexer { return s.bloomIndexer }
 func (s *Ethereum) Start() {
 	// Start the bloom bits servicing goroutines
 	s.startBloomHandlers(params.BloomBitsBlocks)
+
+	// Regularly update shutdown marker
+	s.shutdownTracker.Start()
 }
 
 // Stop implements node.Lifecycle, terminating all internal goroutines used by the
@@ -363,6 +373,10 @@ func (s *Ethereum) Stop() error {
 	s.txPool.Stop()
 	s.blockchain.Stop()
 	s.engine.Close()
+
+	// Clean shutdown marker as the last thing before closing db
+	s.shutdownTracker.Stop()
+
 	s.chainDb.Close()
 	s.eventMux.Stop()
 	return nil
