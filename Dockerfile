@@ -10,11 +10,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends bash=5.0-4 git=
 
 WORKDIR /build
 
-# Copy the code into the container
-COPY . .
+# Copy avalanche dependencies, and avalanchego directory -if present- for manual CI execution
+COPY go.mod go.sum avalanchego* .
 
 # Download avalanche dependencies using go mod
 RUN go mod download
+
+# Copy the code into the container
+COPY . .
 
 # Pass in CORETH_COMMIT as an arg to allow the build script to set this externally
 ARG CORETH_COMMIT
