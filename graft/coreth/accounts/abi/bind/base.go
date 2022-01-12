@@ -55,6 +55,12 @@ type CallOpts struct {
 	Context     context.Context // Network context to support cancellation and timeouts (nil = no timeout)
 }
 
+// NativeAssetCallOpts contains params for native asset call
+type NativeAssetCallOpts struct {
+	AssetID     common.Hash // Asset id
+	AssetAmount *big.Int    // Asset amount
+}
+
 // TransactOpts is the collection of authorization data required to create a
 // valid Ethereum transaction.
 type TransactOpts struct {
@@ -72,9 +78,7 @@ type TransactOpts struct {
 
 	NoSend bool // Do all transact steps but do not send the transaction
 
-	DoNativeAssetCall          bool        // Do native asset call instead of normal transaction
-	NativeAssetCallAssetID     common.Hash // Asset id for native asset call
-	NativeAssetCallAssetAmount *big.Int    // Asset amount for native asset call
+	NativeAssetCall *NativeAssetCallOpts // Params to do native asset call instead of normal transaction
 }
 
 // FilterOpts is the collection of options to fine tune filtering for events
@@ -245,6 +249,27 @@ func (c *BoundContract) Transfer(opts *TransactOpts) (*types.Transaction, error)
 	// or not, reject invalid transaction at the first place
 	return c.transact(opts, &c.address, nil)
 }
+
+// wrapNativeAssetCall preprocess [contract] and [input] to use native asset call address
+// and native aset call params from [opts]
+func wrapNativeAssetCall(opts *TransactOpts, contract *common.Address, input []byte) (*common.Address, []byte, error) {
+	if opts.NativeAssetCall != nil {
+		if opts.NativeAssetCall.AssetAmount == nil {
+			return nil, nil, errors.New("AssetAmount for native asset call is nil")
+		}
+		// wrap input with native asset call params
+		input = vm.PackNativeAssetCallInput(
+			*contract,
+			opts.NativeAssetCall.AssetID,
+			opts.NativeAssetCall.AssetAmount,
+			input,
+		)
+		// target addr is now precompile
+		contract = &vm.NativeAssetCallAddr
+	}
+	return contract, input, nil
+}
+
 func (c *BoundContract) createDynamicTx(opts *TransactOpts, contract *common.Address, input []byte, head *types.Header) (*types.Transaction, error) {
 	// Normalize value
 	value := opts.Value
@@ -285,20 +310,8 @@ func (c *BoundContract) createDynamicTx(opts *TransactOpts, contract *common.Add
 	if err != nil {
 		return nil, err
 	}
-	toAddr := contract
-	if opts.DoNativeAssetCall {
-		// wrap input with native asset call params
-		input = vm.PackNativeAssetCallInput(
-			*contract,
-			opts.NativeAssetCallAssetID,
-			opts.NativeAssetCallAssetAmount,
-			input,
-		)
-		// target addr is now precompile
-		toAddr = &vm.NativeAssetCallAddr
-	}
 	baseTx := &types.DynamicFeeTx{
-		To:        toAddr,
+		To:        contract,
 		Nonce:     nonce,
 		GasFeeCap: gasFeeCap,
 		GasTipCap: gasTipCap,
@@ -341,20 +354,8 @@ func (c *BoundContract) createLegacyTx(opts *TransactOpts, contract *common.Addr
 	if err != nil {
 		return nil, err
 	}
-	toAddr := contract
-	if opts.DoNativeAssetCall {
-		// wrap input with native asset call params
-		input = vm.PackNativeAssetCallInput(
-			*contract,
-			opts.NativeAssetCallAssetID,
-			opts.NativeAssetCallAssetAmount,
-			input,
-		)
-		// target addr is now precompile
-		toAddr = &vm.NativeAssetCallAddr
-	}
 	baseTx := &types.LegacyTx{
-		To:       toAddr,
+		To:       contract,
 		Nonce:    nonce,
 		GasPrice: gasPrice,
 		Gas:      gasLimit,
@@ -404,6 +405,11 @@ func (c *BoundContract) transact(opts *TransactOpts, contract *common.Address, i
 		rawTx *types.Transaction
 		err   error
 	)
+	// Preprocess native asset call if exists
+	contract, input, err = wrapNativeAssetCall(opts, contract, input)
+	if err != nil {
+		return nil, err
+	}
 	if opts.GasPrice != nil {
 		rawTx, err = c.createLegacyTx(opts, contract, input)
 	} else {
