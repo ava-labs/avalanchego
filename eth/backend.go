@@ -64,8 +64,7 @@ import (
 type Config = ethconfig.Config
 
 var (
-	DefaultSettings           Settings = Settings{MaxBlocksPerRequest: 2000}
-	errOfflinePruningComplete          = errors.New("shutting down chain after successful offline pruning")
+	DefaultSettings Settings = Settings{MaxBlocksPerRequest: 2000}
 )
 
 type Settings struct {
@@ -227,6 +226,10 @@ func New(
 		}
 		if err := pruner.Prune(targetRoot); err != nil {
 			return nil, fmt.Errorf("failed to prune blockchain with target root: %s due to: %w", targetRoot, err)
+		}
+		eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, chainConfig, eth.engine, vmConfig, lastAcceptedHash)
+		if err != nil {
+			return nil, fmt.Errorf("failed to re-initialize blockchain after offline pruning: %w", err)
 		}
 	} else {
 		// Delete the offline pruning marker to indicate that the node started with offline pruning disabled.
