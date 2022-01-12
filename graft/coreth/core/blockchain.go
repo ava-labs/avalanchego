@@ -1329,3 +1329,49 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64, report
 	}
 	return nil
 }
+
+// GatherBlockRootsAboveLastAccepted iterates forward from the last accepted block and returns a list of all block roots
+// for any blocks that were inserted above the last accepted block.
+// Given that we never insert a block into the chain unless all of its ancestors have been inserted, this should gather
+// all of the block roots for blocks inserted above the last accepted block that may have been in processing at some point
+// in the past and are therefore potentially still acceptable.
+// Note: there is an edge case where the node dies while the consensus engine is rejecting a branch of blocks since the
+// consensus engine will reject the lowest ancestor first. In this case, these blocks will not be considered acceptable in
+// the future.
+// Ex.
+//    A
+//  /   \
+// B     C
+// |
+// D
+// |
+// E
+// |
+// F
+//
+// The consensus engine accepts block C and proceeds to reject the other branch in order (B, D, E, F).
+// If the consensus engine dies after rejecting block D, block D will be deleted, such that the forward iteration
+// may not find any blocks at this height and will not reach the previously processing blocks E and F.
+func (bc *BlockChain) GatherBlockRootsAboveLastAccepted() []common.Hash {
+	blockRoots := make([]common.Hash, 0)
+	for height := bc.lastAccepted.NumberU64() + 1; ; height++ {
+		blockHashes := rawdb.ReadAllHashes(bc.db, height)
+		// If there are no block hashes at [height], then there should be no further acceptable blocks
+		// past this point.
+		if len(blockHashes) == 0 {
+			break
+		}
+
+		// Fetch the blocks and append their roots if they are found on disk.
+		for _, blockHash := range blockHashes {
+			block := bc.GetBlockByHash(blockHash)
+			if block == nil {
+				continue
+			}
+
+			blockRoots = append(blockRoots, block.Root())
+		}
+	}
+
+	return blockRoots
+}

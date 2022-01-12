@@ -201,6 +201,21 @@ func New(
 	// to the last accepted block before pruning begins.
 	if config.OfflinePruning {
 		targetRoot := eth.blockchain.LastAcceptedBlock().Root()
+
+		// Clean up any block roots above the last accepted block before we start pruning.
+		// Note: this takes the place of middleRoots in the geth implementation since we do not
+		// track processing block roots via snapshot journals in the same way.
+		processingRoots := eth.blockchain.GatherBlockRootsAboveLastAccepted()
+		for _, processingRoot := range processingRoots {
+			// Skip over the processingRoot if it matches the protected target.
+			if processingRoot == targetRoot {
+				continue
+			}
+			// Delete the processing root from disk to mark the trie as inaccessible (no need to handle this in a batch).
+			if err := chainDb.Delete(processingRoot[:]); err != nil {
+				return nil, fmt.Errorf("failed to remove processing root (%s) preparing for offline pruning: %w", processingRoot, err)
+			}
+		}
 		// Allow the blockchain to be garbage collected immediately, since we will need to re-initialize it after pruning.
 		eth.blockchain = nil
 		log.Info("Starting offline pruning", "dataDir", config.OfflinePruningDataDirectory, "bloomFilterSize", config.OfflinePruningBloomFilterSize)
