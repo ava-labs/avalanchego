@@ -184,7 +184,7 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 		start                  = time.Now()
 		lastLogTime            = start
 		indexedBlks            = 0
-		entriesInCurrentCommit = 0 // tracks of number of uncommitted entries
+		entriesInCurrentCommit = 0 // tracks number of uncommitted entries
 	)
 
 	for {
@@ -271,7 +271,7 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 			}
 
 			// Let's keep memory footprint under control by committing when a size threshold is reached
-			if entriesInCurrentCommit > hi.commitMaxCount {
+			if entriesInCurrentCommit >= hi.commitMaxCount {
 				if err := hi.doCheckpoint(currentAcceptedBlk); err != nil {
 					return err
 				}
