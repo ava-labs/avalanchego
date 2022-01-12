@@ -27,19 +27,18 @@ const (
 	defaultTxRegossipFrequency                  = 1 * time.Minute
 	defaultTxRegossipMaxSize                    = 15
 	defaultOfflinePruningBloomFilterSize uint64 = 512 // Default size (MB) for the offline pruner to use
+	defaultLogLevel                             = "info"
 )
 
-var (
-	defaultEnabledAPIs = []string{
-		"public-eth",
-		"public-eth-filter",
-		"net",
-		"web3",
-		"internal-public-eth",
-		"internal-public-blockchain",
-		"internal-public-transaction-pool",
-	}
-)
+var defaultEnabledAPIs = []string{
+	"public-eth",
+	"public-eth-filter",
+	"net",
+	"web3",
+	"internal-public-eth",
+	"internal-public-blockchain",
+	"internal-public-transaction-pool",
+}
 
 type Duration struct {
 	time.Duration
@@ -129,6 +128,7 @@ func (c *Config) SetDefaults() {
 	c.TxRegossipFrequency.Duration = defaultTxRegossipFrequency
 	c.TxRegossipMaxSize = defaultTxRegossipMaxSize
 	c.OfflinePruningBloomFilterSize = defaultOfflinePruningBloomFilterSize
+	c.LogLevel = defaultLogLevel
 }
 
 func (d *Duration) UnmarshalJSON(data []byte) (err error) {
