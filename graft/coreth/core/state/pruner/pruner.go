@@ -123,7 +123,7 @@ func NewPruner(db ethdb.Database, datadir string, bloomSize uint64) (*Pruner, er
 	}, nil
 }
 
-func prune(snaptree *snapshot.Tree, root common.Hash, maindb ethdb.Database, stateBloom *stateBloom, bloomPath string, start time.Time) error {
+func prune(maindb ethdb.Database, stateBloom *stateBloom, bloomPath string, start time.Time) error {
 	// Delete all stale trie nodes in the disk. With the help of state bloom
 	// the trie nodes(and codes) belong to the active state will be filtered
 	// out. A very small part of stale tries will also be filtered because of
@@ -269,7 +269,7 @@ func (p *Pruner) Prune(root common.Hash) error {
 		return err
 	}
 	log.Info("State bloom filter committed", "name", filterName)
-	return prune(p.snaptree, root, p.db, p.stateBloom, filterName, start)
+	return prune(p.db, p.stateBloom, filterName, start)
 }
 
 // RecoverPruning will resume the pruning procedure during the system restart.
@@ -299,8 +299,7 @@ func RecoverPruning(datadir string, db ethdb.Database) error {
 	// - The state HEAD is rewound already because of multiple incomplete `prune-state`
 	// In this case, even the state HEAD is not exactly matched with snapshot, it
 	// still feasible to recover the pruning correctly.
-	snaptree, err := snapshot.New(db, trie.NewDatabase(db), 256, headBlock.Hash(), headBlock.Root(), false, false, false)
-	if err != nil {
+	if _, err := snapshot.New(db, trie.NewDatabase(db), 256, headBlock.Hash(), headBlock.Root(), false, false, false); err != nil {
 		return err // The relevant snapshot(s) might not exist
 	}
 	stateBloom, err := NewStateBloomFromDisk(stateBloomPath)
@@ -315,7 +314,7 @@ func RecoverPruning(datadir string, db ethdb.Database) error {
 		return fmt.Errorf("cannot recover pruning to state bloom root: %s, with head block root: %s", stateBloomRoot, headBlock.Root())
 	}
 
-	return prune(snaptree, stateBloomRoot, db, stateBloom, stateBloomPath, time.Now())
+	return prune(db, stateBloom, stateBloomPath, time.Now())
 }
 
 // extractGenesis loads the genesis state and commits all the state entries
