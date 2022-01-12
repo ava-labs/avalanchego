@@ -63,7 +63,8 @@ import (
 type Config = ethconfig.Config
 
 var (
-	DefaultSettings Settings = Settings{MaxBlocksPerRequest: 2000}
+	DefaultSettings           Settings = Settings{MaxBlocksPerRequest: 2000}
+	errOfflinePruningComplete          = errors.New("shutting down chain after successful offline pruning")
 )
 
 type Settings struct {
@@ -216,7 +217,7 @@ func New(
 				return nil, fmt.Errorf("failed to remove processing root (%s) preparing for offline pruning: %w", processingRoot, err)
 			}
 		}
-		// Allow the blockchain to be garbage collected immediately, since we will need to re-initialize it after pruning.
+		// Allow the blockchain to be garbage collected immediately, since we will shut down the chain after offline pruning completes.
 		eth.blockchain = nil
 		log.Info("Starting offline pruning", "dataDir", config.OfflinePruningDataDirectory, "bloomFilterSize", config.OfflinePruningBloomFilterSize)
 		pruner, err := pruner.NewPruner(chainDb, config.OfflinePruningDataDirectory, config.OfflinePruningBloomFilterSize)
@@ -226,13 +227,9 @@ func New(
 		if err := pruner.Prune(targetRoot); err != nil {
 			return nil, fmt.Errorf("failed to prune blockchain with target root: %s due to: %w", targetRoot, err)
 		}
-		log.Info("Completed offline pruning. Re-initializing blockchain.")
-		// After pruning completes, we must re-create the blockchain to ensure that the dirty cache is not left
-		// in an invalid state after pruning.
-		eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, chainConfig, eth.engine, vmConfig, lastAcceptedHash)
-		if err != nil {
-			return nil, fmt.Errorf("failed to re-initialize blockchain after pruning: %w", err)
-		}
+
+		log.Info("Completed offline pruning. Returning an error to shut down the chain. Disable offline pruning in config to resume normal operation.")
+		return nil, errOfflinePruningComplete
 	}
 
 	eth.bloomIndexer.Start(eth.blockchain)
