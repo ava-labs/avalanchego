@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/coreth/accounts/abi"
 	"github.com/ava-labs/coreth/accounts/abi/bind"
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/interfaces"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -280,16 +281,34 @@ func TestUnpackIndexedBytesTyLogIntoMap(t *testing.T) {
 func TestTransactNativeAssetCall(t *testing.T) {
 	assert := assert.New(t)
 	mt := &mockTransactor{}
-	bc := bind.NewBoundContract(common.Address{}, abi.ABI{}, nil, mt, nil)
+	contractAddr := common.Address{11}
+	bc := bind.NewBoundContract(contractAddr, abi.ABI{}, nil, mt, nil)
 	opts := &bind.TransactOpts{
 		Signer: mockSign,
-		NativeAssetCall: &bind.NativeAssetCallOpts{
-			AssetID:     common.Hash{},
-			AssetAmount: nil,
-		},
+	}
+	// check fails if amount is nil
+	opts.NativeAssetCall = &bind.NativeAssetCallOpts{
+		AssetID:     common.Hash{},
+		AssetAmount: nil,
 	}
 	_, err := bc.Transact(opts, "")
 	assert.NotNil(err)
+	// chek correctly modifies tx params
+	assetID := common.Hash{22}
+	assetAmount := big.NewInt(33)
+	opts.NativeAssetCall = &bind.NativeAssetCallOpts{
+		AssetID:     assetID,
+		AssetAmount: assetAmount,
+	}
+	tx, err := bc.Transact(opts, "")
+	assert.Nil(err)
+	assert.Equal(vm.NativeAssetCallAddr, *tx.To())
+	unpackedAddr, unpackedAssetID, unpackedAssetAmount, unpackedData, err := vm.UnpackNativeAssetCallInput(tx.Data())
+	assert.Nil(err)
+	assert.Len(unpackedData, 0)
+	assert.Equal(unpackedAddr, contractAddr)
+	assert.Equal(unpackedAssetID, assetID)
+	assert.Equal(unpackedAssetAmount, assetAmount)
 }
 
 func TestTransactGasFee(t *testing.T) {
