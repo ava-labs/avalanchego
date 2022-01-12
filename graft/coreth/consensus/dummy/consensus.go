@@ -31,6 +31,13 @@ var (
 	errExtDataGasUsedTooLarge = errors.New("extDataGasUsed is not uint64")
 )
 
+type Mode uint
+
+const (
+	ModeSkipHeader   Mode = 1 // Skip over header verification
+	ModeSkipBlockFee Mode = 2 // Skip block fee verification
+)
+
 type (
 	OnFinalizeAndAssembleCallbackType = func(header *types.Header, state *state.StateDB, txs []*types.Transaction) (extraData []byte, blockFeeContribution *big.Int, extDataGasUsed *big.Int, err error)
 	OnAPIsCallbackType                = func(consensus.ChainHeaderReader) []rpc.API
@@ -42,8 +49,8 @@ type (
 	}
 
 	DummyEngine struct {
-		cb       *ConsensusCallbacks
-		ethFaker bool
+		cb            *ConsensusCallbacks
+		consensusMode Mode
 	}
 )
 
@@ -55,20 +62,27 @@ func NewDummyEngine(cb *ConsensusCallbacks) *DummyEngine {
 
 func NewETHFaker() *DummyEngine {
 	return &DummyEngine{
-		cb:       new(ConsensusCallbacks),
-		ethFaker: true,
+		cb:            new(ConsensusCallbacks),
+		consensusMode: ModeSkipBlockFee,
 	}
 }
 
 func NewComplexETHFaker(cb *ConsensusCallbacks) *DummyEngine {
 	return &DummyEngine{
-		cb:       cb,
-		ethFaker: true,
+		cb:            cb,
+		consensusMode: ModeSkipBlockFee,
 	}
 }
 
 func NewFaker() *DummyEngine {
 	return NewDummyEngine(new(ConsensusCallbacks))
+}
+
+func NewFullFaker() *DummyEngine {
+	return &DummyEngine{
+		cb:            new(ConsensusCallbacks),
+		consensusMode: ModeSkipHeader,
+	}
 }
 
 func (self *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, header *types.Header, parent *types.Header) error {
@@ -205,8 +219,7 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header 
 	if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {
 		return consensus.ErrInvalidNumber
 	}
-	// Verify the engine specific seal securing the block
-	return self.VerifySeal(chain, header)
+	return nil
 }
 
 func (self *DummyEngine) Author(header *types.Header) (common.Address, error) {
@@ -214,6 +227,10 @@ func (self *DummyEngine) Author(header *types.Header) (common.Address, error) {
 }
 
 func (self *DummyEngine) VerifyHeader(chain consensus.ChainHeaderReader, header *types.Header) error {
+	// If we're running a full engine faking, accept any input as valid
+	if self.consensusMode == ModeSkipHeader {
+		return nil
+	}
 	// Short circuit if the header is known, or it's parent not
 	number := header.Number.Uint64()
 	if chain.GetHeader(header.Hash(), number) != nil {
@@ -234,10 +251,6 @@ func (self *DummyEngine) VerifyUncles(chain consensus.ChainReader, block *types.
 	return nil
 }
 
-func (self *DummyEngine) VerifySeal(chain consensus.ChainHeaderReader, header *types.Header) error {
-	return nil
-}
-
 func (self *DummyEngine) Prepare(chain consensus.ChainHeaderReader, header *types.Header) error {
 	header.Difficulty = big.NewInt(1)
 	return nil
@@ -250,7 +263,7 @@ func (self *DummyEngine) verifyBlockFee(
 	receipts []*types.Receipt,
 	extraStateChangeContribution *big.Int,
 ) error {
-	if self.ethFaker {
+	if self.consensusMode == ModeSkipBlockFee {
 		return nil
 	}
 	if baseFee == nil || baseFee.Sign() <= 0 {
@@ -367,9 +380,6 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 		if err != nil {
 			return nil, err
 		}
-	}
-	if self.ethFaker {
-		extDataGasUsed = new(big.Int).Set(common.Big0)
 	}
 	if chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
 		header.ExtDataGasUsed = extDataGasUsed
