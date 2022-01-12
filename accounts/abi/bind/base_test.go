@@ -277,6 +277,21 @@ func TestUnpackIndexedBytesTyLogIntoMap(t *testing.T) {
 	unpackAndCheck(t, bc, expectedReceivedMap, mockLog)
 }
 
+func TestTransactNativeAssetCall(t *testing.T) {
+	assert := assert.New(t)
+	mt := &mockTransactor{}
+	bc := bind.NewBoundContract(common.Address{}, abi.ABI{}, nil, mt, nil)
+	opts := &bind.TransactOpts{
+		Signer: mockSign,
+		NativeAssetCall: &bind.NativeAssetCallOpts{
+			AssetID:     common.Hash{},
+			AssetAmount: nil,
+		},
+	}
+	_, err := bc.Transact(opts, "")
+	assert.NotNil(err)
+}
+
 func TestTransactGasFee(t *testing.T) {
 	assert := assert.New(t)
 
