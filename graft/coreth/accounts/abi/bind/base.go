@@ -78,7 +78,12 @@ type TransactOpts struct {
 
 	NoSend bool // Do all transact steps but do not send the transaction
 
-	NativeAssetCall *NativeAssetCallOpts // Params to do native asset call instead of normal transaction
+	NativeAssetCall *NativeAssetCallOpts // If set, tx target address will be set to the native asset call precompile
+                                         // address, and tx input data will be transformed to contain the params to 
+                                         // the native asset call (original tx target address, and given asset ID/amount)
+                                         // With this, the call will go through a native asset call, atomically 
+                                         // performing the native asset transfer and calling the contract method 
+                                         // (if defined in the original data)
 }
 
 // FilterOpts is the collection of options to fine tune filtering for events

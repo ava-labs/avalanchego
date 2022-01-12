@@ -278,6 +278,23 @@ func TestUnpackIndexedBytesTyLogIntoMap(t *testing.T) {
 	unpackAndCheck(t, bc, expectedReceivedMap, mockLog)
 }
 
+func TestTransactNativeAssetCallNilAmount(t *testing.T) {
+	assert := assert.New(t)
+	mt := &mockTransactor{}
+	contractAddr := common.Address{11}
+	bc := bind.NewBoundContract(contractAddr, abi.ABI{}, nil, mt, nil)
+	opts := &bind.TransactOpts{
+		Signer: mockSign,
+	}
+	// check that fails if amount is nil
+	opts.NativeAssetCall = &bind.NativeAssetCallOpts{
+		AssetID:     common.Hash{},
+		AssetAmount: nil,
+	}
+	_, err := bc.Transact(opts, "")
+	assert.NotNil(err)
+}
+
 func TestTransactNativeAssetCall(t *testing.T) {
 	assert := assert.New(t)
 	mt := &mockTransactor{}
@@ -286,21 +303,14 @@ func TestTransactNativeAssetCall(t *testing.T) {
 	opts := &bind.TransactOpts{
 		Signer: mockSign,
 	}
-	// check fails if amount is nil
-	opts.NativeAssetCall = &bind.NativeAssetCallOpts{
-		AssetID:     common.Hash{},
-		AssetAmount: nil,
-	}
-	_, err := bc.Transact(opts, "")
-	assert.NotNil(err)
-	// chek correctly modifies tx params
+	normalCallTx, err := bc.Transact(opts, "")
 	assetID := common.Hash{22}
 	assetAmount := big.NewInt(33)
 	opts.NativeAssetCall = &bind.NativeAssetCallOpts{
 		AssetID:     assetID,
 		AssetAmount: assetAmount,
 	}
-	tx, err := bc.Transact(opts, "")
+	nativeCallTx, err := bc.Transact(opts, "")
 	assert.Nil(err)
 	assert.Equal(vm.NativeAssetCallAddr, *tx.To())
 	unpackedAddr, unpackedAssetID, unpackedAssetAmount, unpackedData, err := vm.UnpackNativeAssetCallInput(tx.Data())
