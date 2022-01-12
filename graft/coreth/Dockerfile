@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends bash=5.0-4 git=
 WORKDIR /build
 
 # Copy avalanche dependencies, and avalanchego directory -if present- for manual CI execution
-COPY go.mod go.sum avalanchego* .
+COPY go.mod go.sum avalanchego* ./
 
 # Download avalanche dependencies using go mod
 RUN go mod download
