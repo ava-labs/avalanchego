@@ -53,13 +53,23 @@ func TransferMultiCoin(db StateDB, sender, recipient common.Address, coinID comm
 	db.AddBalanceMultiCoin(recipient, coinID, amount)
 }
 
+func TestPackNativeAssetCallInputNilAmount(t *testing.T) {
+	addr := common.Address{}
+	assetID := common.Hash{}
+	var assetAmount *big.Int
+	var callData []byte
+	_, err := PackNativeAssetCallInput(addr, assetID, assetAmount, callData)
+	assert.Error(t, err)
+}
+
 func TestPackNativeAssetCallInput(t *testing.T) {
 	addr := common.BytesToAddress([]byte("hello"))
 	assetID := common.BytesToHash([]byte("ScoobyCoin"))
 	assetAmount := big.NewInt(50)
 	callData := []byte{1, 2, 3, 4, 5, 6, 7, 8}
 
-	input := PackNativeAssetCallInput(addr, assetID, assetAmount, callData)
+	input, err := PackNativeAssetCallInput(addr, assetID, assetAmount, callData)
+	assert.NoError(t, err)
 
 	unpackedAddr, unpackedAssetID, unpackedAssetAmount, unpackedCallData, err := UnpackNativeAssetCallInput(input)
 	assert.NoError(t, err)
@@ -67,6 +77,13 @@ func TestPackNativeAssetCallInput(t *testing.T) {
 	assert.Equal(t, assetID, unpackedAssetID, "assetID")
 	assert.Equal(t, assetAmount, unpackedAssetAmount, "assetAmount")
 	assert.Equal(t, callData, unpackedCallData, "callData")
+}
+
+// packNativeAssetCallInputNoError calls NativeAssetCallInput, asserts there is no error, and returns packed data
+func packNativeAssetCallInputNoError(t *testing.T, address common.Address, assetID common.Hash, assetAmount *big.Int, callData []byte) []byte {
+	data, err := PackNativeAssetCallInput(address, assetID, assetAmount, callData)
+	assert.NoError(t, err)
+	return data
 }
 
 func TestStatefulPrecompile(t *testing.T) {
@@ -248,7 +265,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			},
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetCallAddr,
-			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
+			input:                packNativeAssetCallInputNoError(t, userAddr2, assetID, big.NewInt(50), nil),
 			value:                big0,
 			gasInput:             params.AssetCallApricot + params.CallNewAccountGas,
 			expectedGasRemaining: 0,
@@ -281,7 +298,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			},
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetCallAddr,
-			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
+			input:                packNativeAssetCallInputNoError(t, userAddr2, assetID, big.NewInt(50), nil),
 			value:                big.NewInt(49),
 			gasInput:             params.AssetCallApricot + params.CallNewAccountGas,
 			expectedGasRemaining: 0,
@@ -316,7 +333,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			},
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetCallAddr,
-			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(51), nil),
+			input:                packNativeAssetCallInputNoError(t, userAddr2, assetID, big.NewInt(51), nil),
 			value:                big.NewInt(50),
 			gasInput:             params.AssetCallApricot,
 			expectedGasRemaining: 0,
@@ -348,7 +365,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			},
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetCallAddr,
-			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
+			input:                packNativeAssetCallInputNoError(t, userAddr2, assetID, big.NewInt(50), nil),
 			value:                big.NewInt(51),
 			gasInput:             params.AssetCallApricot,
 			expectedGasRemaining: params.AssetCallApricot,
@@ -380,7 +397,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			},
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetCallAddr,
-			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
+			input:                packNativeAssetCallInputNoError(t, userAddr2, assetID, big.NewInt(50), nil),
 			value:                big.NewInt(50),
 			gasInput:             params.AssetCallApricot - 1,
 			expectedGasRemaining: 0,
@@ -401,7 +418,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			},
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetCallAddr,
-			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
+			input:                packNativeAssetCallInputNoError(t, userAddr2, assetID, big.NewInt(50), nil),
 			value:                big.NewInt(50),
 			gasInput:             params.AssetCallApricot + params.CallNewAccountGas - 1,
 			expectedGasRemaining: 0,
@@ -454,7 +471,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			},
 			from:                 userAddr1,
 			precompileAddr:       genesisContractAddr,
-			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
+			input:                packNativeAssetCallInputNoError(t, userAddr2, assetID, big.NewInt(50), nil),
 			value:                big0,
 			gasInput:             params.AssetCallApricot + params.CallNewAccountGas,
 			expectedGasRemaining: params.AssetCallApricot + params.CallNewAccountGas,

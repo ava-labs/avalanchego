@@ -297,25 +297,36 @@ func TestTransactNativeAssetCallNilAmount(t *testing.T) {
 
 func TestTransactNativeAssetCall(t *testing.T) {
 	assert := assert.New(t)
+	json := `[{"type":"function","name":"method","inputs":[{"type":"uint256" },{"type":"string"}]}]`
+	parsed, err := abi.JSON(strings.NewReader(json))
+	assert.Nil(err)
 	mt := &mockTransactor{}
 	contractAddr := common.Address{11}
-	bc := bind.NewBoundContract(contractAddr, abi.ABI{}, nil, mt, nil)
+	bc := bind.NewBoundContract(contractAddr, parsed, nil, mt, nil)
 	opts := &bind.TransactOpts{
 		Signer: mockSign,
 	}
-	normalCallTx, err := bc.Transact(opts, "")
-	assetID := common.Hash{22}
-	assetAmount := big.NewInt(33)
+	// normal call tx
+	methodName := "method"
+	arg1 := big.NewInt(22)
+	arg2 := "33"
+	normalCallTx, err := bc.Transact(opts, methodName, arg1, arg2)
+	assert.Nil(err)
+	// native asset call tx
+	assetID := common.Hash{44}
+	assetAmount := big.NewInt(55)
 	opts.NativeAssetCall = &bind.NativeAssetCallOpts{
 		AssetID:     assetID,
 		AssetAmount: assetAmount,
 	}
-	nativeCallTx, err := bc.Transact(opts, "")
+	nativeCallTx, err := bc.Transact(opts, methodName, arg1, arg2)
 	assert.Nil(err)
-	assert.Equal(vm.NativeAssetCallAddr, *tx.To())
-	unpackedAddr, unpackedAssetID, unpackedAssetAmount, unpackedData, err := vm.UnpackNativeAssetCallInput(tx.Data())
+	// verify transformations
+	assert.Equal(vm.NativeAssetCallAddr, *nativeCallTx.To())
+	unpackedAddr, unpackedAssetID, unpackedAssetAmount, unpackedData, err := vm.UnpackNativeAssetCallInput(nativeCallTx.Data())
 	assert.Nil(err)
-	assert.Len(unpackedData, 0)
+	assert.NotEmpty(unpackedData)
+	assert.Equal(unpackedData, normalCallTx.Data())
 	assert.Equal(unpackedAddr, contractAddr)
 	assert.Equal(unpackedAssetID, assetID)
 	assert.Equal(unpackedAssetAmount, assetAmount)
