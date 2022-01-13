@@ -281,8 +281,7 @@ func TestUnpackIndexedBytesTyLogIntoMap(t *testing.T) {
 func TestTransactNativeAssetCallNilAmount(t *testing.T) {
 	assert := assert.New(t)
 	mt := &mockTransactor{}
-	contractAddr := common.Address{11}
-	bc := bind.NewBoundContract(contractAddr, abi.ABI{}, nil, mt, nil)
+	bc := bind.NewBoundContract(common.Address{}, abi.ABI{}, nil, mt, nil)
 	opts := &bind.TransactOpts{
 		Signer: mockSign,
 	}
