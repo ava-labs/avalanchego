@@ -20,27 +20,36 @@ const (
 var (
 	_ HeightIndex = &heightIndex{}
 
-	heightPrefix     = []byte("heightkey")
-	preForkPrefix    = []byte("preForkKey")
-	checkpointPrefix = []byte("checkpoint")
+	heightPrefix = []byte("heightkey")
 )
 
-// HeightIndex contains mapping of blockHeights to accepted proposer block IDs.
-// Only accepted blocks are indexed; moreover only post-fork blocks are indexed.
-type HeightIndex interface {
-	SetBlockIDAtHeight(height uint64, blkID ids.ID) error
+type HeightIndexGetter interface {
 	GetBlockIDAtHeight(height uint64) (ids.ID, error)
-	DeleteBlockIDAtHeight(height uint64) error
-
-	SetForkHeight(height uint64) error
 	GetForkHeight() (uint64, error)
+}
+
+type HeightIndexWriterDeleter interface {
+	SetBlockIDAtHeight(height uint64, blkID ids.ID) error
+	DeleteBlockIDAtHeight(height uint64) error
+	SetForkHeight(height uint64) error
 	DeleteForkHeight() error
-
-	SetCheckpoint(blkID ids.ID) error
-	GetCheckpoint() (ids.ID, error)
-	DeleteCheckpoint() error
-
 	clearCache() // useful in testing
+}
+
+type HeightIndexBatchSupport interface {
+	GetBatch() database.Batch
+	GetCheckpoint() (ids.ID, error)
+	SetCheckpoint(blkID ids.ID) error
+	DeleteCheckpoint() error
+}
+
+// HeightIndex contains mapping of blockHeights to accepted proposer block IDs
+// along with some metadata (fork height and checkpoint).
+type HeightIndex interface {
+	HeightIndexWriterDeleter
+	HeightIndexGetter
+
+	HeightIndexBatchSupport
 }
 
 type heightIndex struct {
@@ -48,8 +57,7 @@ type heightIndex struct {
 	// as well as main goroutine querying blocks. Hence the lock
 	Lock sync.RWMutex
 
-	// Caches block height -> proposerVMBlockID. If the proposerVMBlockID is nil,
-	// the height is not in storage.
+	// Caches block height -> proposerVMBlockID.
 	blkHeightsCache cache.Cacher
 
 	db database.Database
@@ -62,29 +70,10 @@ func NewHeightIndex(db database.Database) HeightIndex {
 	}
 }
 
-func (hi *heightIndex) SetBlockIDAtHeight(height uint64, blkID ids.ID) error {
-	heightBytes := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(heightBytes, height)
-	key := make([]byte, len(heightPrefix))
-	copy(key, heightPrefix)
-	key = append(key, heightBytes...)
-
-	hi.blkHeightsCache.Put(string(key), blkID)
-	return hi.db.Put(key, blkID[:])
-}
-
+// GetBlockIDAtHeight implements HeightIndexGetter
 func (hi *heightIndex) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
-	heightBytes := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(heightBytes, height)
-	key := make([]byte, len(heightPrefix))
-	copy(key, heightPrefix)
-	key = append(key, heightBytes...)
-
+	key := GetEntryKey(height)
 	if blkIDIntf, found := hi.blkHeightsCache.Get(string(key)); found {
-		if blkIDIntf == nil {
-			return ids.Empty, database.ErrNotFound
-		}
-
 		res, _ := blkIDIntf.(ids.ID)
 		return res, nil
 	}
@@ -92,10 +81,11 @@ func (hi *heightIndex) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	bytes, err := hi.db.Get(key)
 	switch err {
 	case nil:
-		return ids.FromBytes(bytes), nil
+		res := ids.FromBytes(bytes)
+		hi.blkHeightsCache.Put(string(key), res)
+		return res, nil
 
 	case database.ErrNotFound:
-		hi.blkHeightsCache.Put(string(key), nil)
 		return ids.Empty, database.ErrNotFound
 
 	default:
@@ -103,26 +93,9 @@ func (hi *heightIndex) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	}
 }
 
-func (hi *heightIndex) DeleteBlockIDAtHeight(height uint64) error {
-	heightBytes := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(heightBytes, height)
-	key := make([]byte, len(heightPrefix))
-	copy(key, heightPrefix)
-	key = append(key, heightBytes...)
-
-	hi.blkHeightsCache.Put(string(key), nil)
-	return hi.db.Delete(key)
-}
-
-// ForkHeight are only read at the start of indexing repairing. No need to cache
-func (hi *heightIndex) SetForkHeight(height uint64) error {
-	heightBytes := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(heightBytes, height)
-	return hi.db.Put(preForkPrefix, heightBytes)
-}
-
+// GetForkHeight implements HeightIndexGetter
 func (hi *heightIndex) GetForkHeight() (uint64, error) {
-	switch bytes, err := hi.db.Get(preForkPrefix); err {
+	switch bytes, err := hi.db.Get(GetForkKey()); err {
 	case nil:
 		res := binary.BigEndian.Uint64(bytes)
 		return res, nil
@@ -135,17 +108,46 @@ func (hi *heightIndex) GetForkHeight() (uint64, error) {
 	}
 }
 
+// SetBlockIDAtHeight implements HeightIndexWriterDeleter
+func (hi *heightIndex) SetBlockIDAtHeight(height uint64, blkID ids.ID) error {
+	key := GetEntryKey(height)
+	hi.blkHeightsCache.Put(string(key), blkID)
+	return hi.db.Put(key, blkID[:])
+}
+
+// DeleteBlockIDAtHeight implements HeightIndexWriterDeleter
+func (hi *heightIndex) DeleteBlockIDAtHeight(height uint64) error {
+	key := GetEntryKey(height)
+	hi.blkHeightsCache.Evict(string(key))
+	return hi.db.Delete(key)
+}
+
+// SetForkHeight implements HeightIndexWriterDeleter
+func (hi *heightIndex) SetForkHeight(height uint64) error {
+	return hi.db.Put(GetForkKey(), GetForkHeightBytes(height))
+}
+
+// DeleteForkHeight implements HeightIndexWriterDeleter
 func (hi *heightIndex) DeleteForkHeight() error {
-	return hi.db.Delete(preForkPrefix)
+	return hi.db.Delete(GetForkKey())
 }
 
-// Checkpoints are only read at the start of indexing repairing. No need to cache
+// clearCache implements HeightIndexWriterDeleter
+func (hi *heightIndex) clearCache() {
+	hi.blkHeightsCache.Flush()
+}
+
+// GetBatch implements HeightIndexBatchSupport
+func (hi *heightIndex) GetBatch() database.Batch { return hi.db.NewBatch() }
+
+// SetCheckpoint implements HeightIndexBatchSupport
 func (hi *heightIndex) SetCheckpoint(blkID ids.ID) error {
-	return hi.db.Put(checkpointPrefix, blkID[:])
+	return hi.db.Put(GetCheckpointKey(), blkID[:])
 }
 
+// GetCheckpoint implements HeightIndexBatchSupport
 func (hi *heightIndex) GetCheckpoint() (ids.ID, error) {
-	switch bytes, err := hi.db.Get(checkpointPrefix); err {
+	switch bytes, err := hi.db.Get(GetCheckpointKey()); err {
 	case nil:
 		return ids.FromBytes(bytes), nil
 	case database.ErrNotFound:
@@ -155,10 +157,34 @@ func (hi *heightIndex) GetCheckpoint() (ids.ID, error) {
 	}
 }
 
+// DeleteCheckpoint implements HeightIndexBatchSupport
 func (hi *heightIndex) DeleteCheckpoint() error {
-	return hi.db.Delete(checkpointPrefix)
+	return hi.db.Delete(GetCheckpointKey())
 }
 
-func (hi *heightIndex) clearCache() {
-	hi.blkHeightsCache.Flush()
+// helpers functions to create keys/values.
+// Currently exported for indexer
+func GetEntryKey(height uint64) []byte {
+	heightBytes := make([]byte, wrappers.LongLen)
+	binary.BigEndian.PutUint64(heightBytes, height)
+	key := make([]byte, len(heightPrefix))
+	copy(key, heightPrefix)
+	key = append(key, heightBytes...)
+	return key
+}
+
+func GetForkKey() []byte {
+	preForkPrefix := []byte("preForkKey")
+	return preForkPrefix
+}
+
+func GetForkHeightBytes(height uint64) []byte {
+	heightBytes := make([]byte, wrappers.LongLen)
+	binary.BigEndian.PutUint64(heightBytes, height)
+	return heightBytes
+}
+
+func GetCheckpointKey() []byte {
+	checkpointPrefix := []byte("checkpoint")
+	return checkpointPrefix
 }

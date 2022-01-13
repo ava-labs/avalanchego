@@ -38,10 +38,3 @@ func (vm *VM) GetInnerBlk(id ids.ID) (snowman.Block, error) {
 	defer vm.ctx.Lock.Unlock()
 	return vm.ChainVM.GetBlock(id)
 }
-
-// DbCommit implements BlockServer interface
-func (vm *VM) DBCommit() error {
-	vm.ctx.Lock.Lock()
-	defer vm.ctx.Lock.Unlock()
-	return vm.db.Commit()
-}
