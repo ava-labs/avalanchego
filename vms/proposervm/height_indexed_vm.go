@@ -50,11 +50,10 @@ func (vm *VM) GetBlockIDByHeight(height uint64) (ids.ID, error) {
 
 // As postFork blocks/options are accepted, height index is updated
 // even if its repairing is ongoing.
-// updateHeightIndex should not be called for preFork blocks. Morever
+// updateHeightIndex should not be called for preFork blocks. Moreover
 // vm.ctx.Lock should be held
 func (vm *VM) updateHeightIndex(height uint64, blkID ids.ID) error {
-	innerHVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
-	if !ok || !innerHVM.IsHeightIndexComplete() {
+	if _, ok := vm.ChainVM.(block.HeightIndexedChainVM); !ok {
 		return nil // nothing to do
 	}
 

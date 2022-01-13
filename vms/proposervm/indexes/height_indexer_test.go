@@ -89,7 +89,6 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 		CantLastAcceptedInnerBlkID:    true,
 		CantGetWrappingBlk:            true,
 		CantGetInnerBlk:               true,
-		CantDBCommit:                  true,
 
 		LastAcceptedWrappingBlkIDF: func() (ids.ID, error) { return lastProBlk.ID(), nil },
 		LastAcceptedInnerBlkIDF:    func() (ids.ID, error) { return prevInnerBlk.ID(), nil },
@@ -107,7 +106,6 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 			}
 			return blk, nil
 		},
-		DBCommitF: func() error { return nil },
 	}
 
 	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
@@ -116,7 +114,7 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 		logging.NoLog{},
 		storedState,
 	)
-	hIndex.commitMaxCount = 0 // commit each block
+	hIndex.commitMaxSize = 0 // commit each block
 
 	// show that height index should be rebuild and it is
 	doRepair, startBlkID, err := hIndex.shouldRepair()
@@ -183,7 +181,6 @@ func TestHeightBlockIndexPreFork(t *testing.T) {
 		CantLastAcceptedInnerBlkID:    true,
 		CantGetWrappingBlk:            true,
 		CantGetInnerBlk:               true,
-		CantDBCommit:                  true,
 
 		LastAcceptedWrappingBlkIDF: func() (ids.ID, error) {
 			// all blocks are pre-fork
@@ -201,7 +198,6 @@ func TestHeightBlockIndexPreFork(t *testing.T) {
 			}
 			return blk, nil
 		},
-		DBCommitF: func() error { return nil },
 	}
 
 	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
@@ -210,7 +206,7 @@ func TestHeightBlockIndexPreFork(t *testing.T) {
 		logging.NoLog{},
 		storedState,
 	)
-	hIndex.commitMaxCount = 0 // commit each block
+	hIndex.commitMaxSize = 0 // commit each block
 
 	// with preFork only blocks there is nothing to rebuild
 	doRepair, _, err := hIndex.shouldRepair()
@@ -301,7 +297,6 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 		CantLastAcceptedInnerBlkID:    true,
 		CantGetWrappingBlk:            true,
 		CantGetInnerBlk:               true,
-		CantDBCommit:                  true,
 
 		LastAcceptedWrappingBlkIDF: func() (ids.ID, error) { return lastProBlk.ID(), nil },
 		LastAcceptedInnerBlkIDF:    func() (ids.ID, error) { return prevInnerBlk.ID(), nil },
@@ -319,7 +314,6 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 			}
 			return blk, nil
 		},
-		DBCommitF: func() error { return nil },
 	}
 
 	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
@@ -328,7 +322,7 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 		logging.NoLog{},
 		storedState,
 	)
-	hIndex.commitMaxCount = 0 // commit each block
+	hIndex.commitMaxSize = 0 // commit each block
 
 	// show that height index should be rebuild and it is
 	doRepair, startBlkID, err := hIndex.shouldRepair()
@@ -437,7 +431,6 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 		CantLastAcceptedInnerBlkID:    true,
 		CantGetWrappingBlk:            true,
 		CantGetInnerBlk:               true,
-		CantDBCommit:                  true,
 
 		LastAcceptedWrappingBlkIDF: func() (ids.ID, error) { return lastProBlk.ID(), nil },
 		LastAcceptedInnerBlkIDF:    func() (ids.ID, error) { return prevInnerBlk.ID(), nil },
@@ -455,7 +448,6 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 			}
 			return blk, nil
 		},
-		DBCommitF: func() error { return nil },
 	}
 
 	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
@@ -464,7 +456,7 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 		logging.NoLog{},
 		storedState,
 	)
-	hIndex.commitMaxCount = 0 // commit each block
+	hIndex.commitMaxSize = 0 // commit each block
 
 	// with no checkpoints repair starts from last accepted block
 	doRepair, startBlkID, err := hIndex.shouldRepair()

@@ -6,6 +6,7 @@ package indexes
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 )
 
 // BlockServer represents all requests heightIndexer can issue
@@ -15,5 +16,11 @@ type BlockServer interface {
 	LastAcceptedInnerBlkID() (ids.ID, error)
 	GetWrappingBlk(blkID ids.ID) (WrappingBlock, error)
 	GetInnerBlk(id ids.ID) (snowman.Block, error)
-	DBCommit() error
+}
+
+// heightIndexDBOps groups all the operations that indexer
+// need to perform on state.HeightIndex
+type heightIndexDBOps interface {
+	state.HeightIndexGetter
+	state.HeightIndexBatchSupport
 }
