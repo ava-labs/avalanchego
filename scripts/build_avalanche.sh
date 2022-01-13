@@ -44,7 +44,7 @@ source "$AVALANCHE_PATH"/scripts/constants.sh
 # Build with rocksdb allowed only if the environment variable ROCKSDBALLOWED is set
 if [ -z ${ROCKSDBALLOWED+x} ]; then
     echo "Building AvalancheGo..."
-    go build -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit $static_ld_flags" -o "$avalanchego_path" "$AVALANCHE_PATH/main/"*.go
+    go build -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit -X github.com/ava-labs/coreth/plugin/evm.Version=$coreth_version $static_ld_flags" -o "$avalanchego_path" "$AVALANCHE_PATH/main/"*.go
 else
     echo "Building AvalancheGo with rocksdb enabled..."
     go build -tags rocksdballowed -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit $static_ld_flags" -o "$avalanchego_path" "$AVALANCHE_PATH/main/"*.go
