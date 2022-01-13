@@ -134,7 +134,7 @@ func (vm *VM) Initialize(
 			go func() {
 				if err := vm.HeightIndexer.RepairHeightIndex(); err != nil {
 					vm.ctx.Log.Error("Block indexing by height: failed with error %s", err)
-					panic(err)
+					return
 				}
 			}()
 		}
