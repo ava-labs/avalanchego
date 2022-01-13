@@ -258,18 +258,17 @@ func (c *BoundContract) Transfer(opts *TransactOpts) (*types.Transaction, error)
 // wrapNativeAssetCall preprocess [contract] and [input] to use native asset call address
 // and native aset call params from [opts]
 func wrapNativeAssetCall(opts *TransactOpts, contract *common.Address, input []byte) (*common.Address, []byte, error) {
-	var err error
 	if opts.NativeAssetCall != nil {
+		if opts.NativeAssetCall.AssetAmount == nil {
+			return nil, nil, errors.New("AssetAmount for native asset call is nil")
+		}
 		// wrap input with native asset call params
-		input, err = vm.PackNativeAssetCallInput(
+		input = vm.PackNativeAssetCallInput(
 			*contract,
 			opts.NativeAssetCall.AssetID,
 			opts.NativeAssetCall.AssetAmount,
 			input,
 		)
-		if err != nil {
-			return nil, nil, err
-		}
 		// target addr is now precompile
 		contract = &vm.NativeAssetCallAddr
 	}

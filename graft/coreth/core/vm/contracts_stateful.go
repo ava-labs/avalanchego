@@ -4,7 +4,6 @@
 package vm
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 
@@ -98,16 +97,13 @@ type nativeAssetCall struct {
 	gasCost uint64
 }
 
-func PackNativeAssetCallInput(address common.Address, assetID common.Hash, assetAmount *big.Int, callData []byte) ([]byte, error) {
-	if assetAmount == nil {
-		return nil, errors.New("assetAmount for native asset call is nil")
-	}
+func PackNativeAssetCallInput(address common.Address, assetID common.Hash, assetAmount *big.Int, callData []byte) []byte {
 	input := make([]byte, 84+len(callData))
 	copy(input[0:20], address.Bytes())
 	copy(input[20:52], assetID.Bytes())
 	assetAmount.FillBytes(input[52:84])
 	copy(input[84:], callData)
-	return input, nil
+	return input
 }
 
 func UnpackNativeAssetCallInput(input []byte) (common.Address, common.Hash, *big.Int, []byte, error) {
