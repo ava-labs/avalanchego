@@ -108,13 +108,11 @@ type bootstrapper struct {
 
 // Clear implements common.Bootstrapable interface
 func (b *bootstrapper) Clear() error {
-	_, err := b.TxBlocked.ClearAll(b.Config.Ctx, b, b.Config.SharedCfg.Restarted, b.Ctx.DecisionDispatcher)
-	if err != nil {
+	if err := b.TxBlocked.ClearAll(); err != nil {
 		return err
 	}
 
-	_, err = b.VtxBlocked.ClearAll(b.Config.Ctx, b, b.Config.SharedCfg.Restarted, b.Ctx.ConsensusDispatcher)
-	return err
+	return b.VtxBlocked.ClearAll()
 }
 
 // Ancestors handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]

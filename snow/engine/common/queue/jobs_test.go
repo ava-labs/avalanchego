@@ -449,7 +449,11 @@ func TestClearAll(t *testing.T) {
 		}
 	}
 
-	cleared, err := jobs.ClearAll(snow.DefaultConsensusContextTest(), &common.Halter{}, false, nil)
+	assert.NoError(jobs.ClearAll())
+	hasJob0, err := jobs.Has(job0.ID())
 	assert.NoError(err)
-	assert.Equal(2, cleared)
+	assert.False(hasJob0)
+	hasJob1, err := jobs.Has(job1.ID())
+	assert.NoError(err)
+	assert.False(hasJob1)
 }
