@@ -2130,8 +2130,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 	handler.RegisterEngine(engine)
 
-	startReqID := uint32(0)
-	if err := bootstrapper.Start(startReqID); err != nil {
+	if err := handler.Start(); err != nil {
 		t.Fatal(err)
 	}
 
