@@ -6,6 +6,7 @@ package snowsyncer
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
@@ -14,5 +15,5 @@ type Config struct {
 	common.AllGetsServer
 	StateSyncTestingBeacons []ids.ShortID // testing beacons from which nodes fast sync without network consensus
 	VM                      block.ChainVM
-	WeightTracker           common.WeightTracker
+	WeightTracker           tracker.WeightTracker
 }
