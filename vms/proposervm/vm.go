@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/vms/proposervm/indexes"
+	"github.com/ava-labs/avalanchego/vms/proposervm/indexer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
@@ -39,7 +39,7 @@ var (
 
 	_ block.ChainVM         = &VM{}
 	_ block.BatchedChainVM  = &VM{}
-	_ indexes.HeightIndexer = &VM{}
+	_ indexer.HeightIndexer = &VM{}
 )
 
 type VM struct {
@@ -48,7 +48,7 @@ type VM struct {
 	minimumPChainHeight uint64
 
 	state.State
-	indexes.HeightIndexer
+	indexer.HeightIndexer
 
 	proposer.Windower
 	tree.Tree
@@ -97,7 +97,7 @@ func (vm *VM) Initialize(
 	vm.State = state.New(vm.db)
 	vm.Windower = proposer.New(ctx.ValidatorState, ctx.SubnetID, ctx.ChainID)
 	vm.Tree = tree.New()
-	vm.HeightIndexer = indexes.NewHeightIndexer(vm, vm.ctx.Log, vm.State)
+	vm.HeightIndexer = indexer.NewHeightIndexer(vm, vm.ctx.Log, vm.State)
 
 	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine)
 	vm.Scheduler = scheduler
