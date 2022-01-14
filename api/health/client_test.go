@@ -4,6 +4,7 @@
 package health
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -16,7 +17,7 @@ type mockClient struct {
 	onCall func()
 }
 
-func (mc *mockClient) SendRequest(method string, params interface{}, replyIntf interface{}) error {
+func (mc *mockClient) SendRequest(ctx context.Context, method string, params interface{}, replyIntf interface{}) error {
 	reply := replyIntf.(*APIHealthReply)
 	*reply = mc.reply
 	mc.onCall()
@@ -26,7 +27,7 @@ func (mc *mockClient) SendRequest(method string, params interface{}, replyIntf i
 func TestNewClient(t *testing.T) {
 	assert := assert.New(t)
 
-	c := NewClient("", time.Second)
+	c := NewClient("")
 	assert.NotNil(c)
 }
 
@@ -45,30 +46,27 @@ func TestClient(t *testing.T) {
 	}
 
 	{
-		readiness, err := c.Readiness()
+		readiness, err := c.Readiness(context.Background())
 		assert.NoError(err)
 		assert.True(readiness.Healthy)
 	}
 
 	{
-		health, err := c.Health()
+		health, err := c.Health(context.Background())
 		assert.NoError(err)
 		assert.True(health.Healthy)
 	}
 
 	{
-		liveness, err := c.Liveness()
+		liveness, err := c.Liveness(context.Background())
 		assert.NoError(err)
 		assert.True(liveness.Healthy)
 	}
 
 	{
-		_, err := c.AwaitHealthy(0, time.Second)
-		assert.Error(err)
-	}
-
-	{
-		healthy, err := c.AwaitHealthy(1, time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		healthy, err := c.AwaitHealthy(ctx, time.Second)
+		cancel()
 		assert.NoError(err)
 		assert.True(healthy)
 	}
@@ -76,8 +74,10 @@ func TestClient(t *testing.T) {
 	mc.reply.Healthy = false
 
 	{
-		healthy, err := c.AwaitHealthy(2, time.Microsecond)
-		assert.NoError(err)
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Microsecond)
+		healthy, err := c.AwaitHealthy(ctx, time.Microsecond)
+		cancel()
+		assert.Error(err)
 		assert.False(healthy)
 	}
 
@@ -86,7 +86,7 @@ func TestClient(t *testing.T) {
 	}
 
 	{
-		healthy, err := c.AwaitHealthy(2, time.Microsecond)
+		healthy, err := c.AwaitHealthy(context.Background(), time.Microsecond)
 		assert.NoError(err)
 		assert.True(healthy)
 	}

@@ -59,6 +59,7 @@ var (
 	}
 
 	errInvalidStakerWeights          = errors.New("staking weights must be positive")
+	errStakingDisableOnPublicNetwork = errors.New("staking disabled on public network")
 	errAuthPasswordTooWeak           = errors.New("API auth password is not strong enough")
 	errInvalidUptimeRequirement      = errors.New("uptime requirement must be in the range [0, 1]")
 	errMinValidatorStakeAboveMax     = errors.New("minimum validator stake can't be greater than maximum validator stake")
@@ -623,6 +624,10 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 	}
 	if !config.EnableStaking && config.DisabledStakingWeight == 0 {
 		return node.StakingConfig{}, errInvalidStakerWeights
+	}
+
+	if !config.EnableStaking && (networkID == constants.MainnetID || networkID == constants.FujiID) {
+		return node.StakingConfig{}, errStakingDisableOnPublicNetwork
 	}
 
 	var err error
