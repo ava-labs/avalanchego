@@ -1464,40 +1464,6 @@ func (vm *VM) repairAtomicRepositoryForBonusBlockTxs(
 		}
 		seenTxs[tx.ID()] = append(heights, height)
 	}
-	{
-		// TODO: remove for public release
-		metadataKeys, trieKeys := 0, 0
-		commitKeys := 10000
-		{
-			atomicTrieMetaDB := prefixdb.New(atomicTrieMetaDBPrefix, vm.db)
-			it := atomicTrieMetaDB.NewIterator()
-			defer it.Release()
-			for it.Next() {
-				metadataKeys++
-				atomicTrieMetaDB.Delete(it.Key())
-				if metadataKeys%commitKeys == 0 {
-					if err := vm.db.Commit(); err != nil {
-						return err
-					}
-				}
-			}
-		}
-		{
-			atomicTrieDB := prefixdb.New(atomicTrieDBPrefix, vm.db)
-			it := atomicTrieDB.NewIterator()
-			defer it.Release()
-			for it.Next() {
-				trieKeys++
-				atomicTrieDB.Delete(it.Key())
-				if trieKeys%commitKeys == 0 {
-					if err := vm.db.Commit(); err != nil {
-						return err
-					}
-				}
-			}
-		}
-		log.Info("wiped atomic trie db", "metadataKeys", metadataKeys, "trieKeys", trieKeys)
-	}
 	if err := vm.atomicTxRepository.MarkBonusBlocksRepaired(repairedEntries); err != nil {
 		return err
 	}
