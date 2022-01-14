@@ -23,6 +23,15 @@ import (
 var (
 	bonusBlocks              = ids.Set{}
 	bonusBlockMainnetHeights = make(map[uint64]ids.ID)
+	// first height that processed a TX included on a
+	// bonus block is the canonical height for that TX.
+	canonicalBonusBlocks = []uint64{
+		102928, 103035, 103038, 103114, 103193,
+		103234, 103338, 103444, 103480, 103491,
+		103513, 103533, 103535, 103538, 103541,
+		103546, 103571, 103572, 103619,
+		103287, 103624, 103591,
+	}
 )
 
 func init() {
@@ -141,15 +150,15 @@ func (b *Block) Accept() error {
 		vm.mempool.RemoveTx(tx.ID())
 	}
 
+	isBonus := bonusBlocks.Contains(b.id)
+	if err := b.indexAtomics(vm, b.Height(), b.atomicTxs, batchChainsAndInputs, isBonus); err != nil {
+		return err
+	}
 	// If [b] is a bonus block, then we commit the database without applying the requests from
 	// the atmoic transactions to shared memory.
-	if bonusBlocks.Contains(b.id) {
+	if isBonus {
 		log.Info("skipping atomic tx acceptance on bonus block", "block", b.id)
 		return vm.db.Commit()
-	}
-
-	if err := b.indexAtomics(vm, b.Height(), b.atomicTxs, batchChainsAndInputs); err != nil {
-		return err
 	}
 
 	batch, err := vm.db.CommitBatch()
@@ -161,12 +170,16 @@ func (b *Block) Accept() error {
 
 // indexAtomics writes given list of atomic transactions and atomic operations to atomic repository
 // and atomic trie respectively
-func (b *Block) indexAtomics(vm *VM, height uint64, atomicTxs []*Tx, batchChainsAndInputs map[ids.ID]*atomic.Requests) error {
-	// Update indexes the vm maintains on accepted atomic txs.
+func (b *Block) indexAtomics(vm *VM, height uint64, atomicTxs []*Tx, batchChainsAndInputs map[ids.ID]*atomic.Requests, isBonus bool) error {
+	if isBonus {
+		// avoid indexing atomic operations of txs on bonus blocks in the trie
+		// so we do not re-execute them the second time that they appear
+		return vm.atomicTxRepository.WriteBonus(height, atomicTxs)
+	}
+
 	if err := vm.atomicTxRepository.Write(height, atomicTxs); err != nil {
 		return err
 	}
-
 	return b.vm.atomicTrie.Index(height, batchChainsAndInputs)
 }
 
