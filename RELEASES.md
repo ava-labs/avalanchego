@@ -51,6 +51,7 @@ This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/ava
 - Improved `corruptabledb` error reporting by tracking the first reported error.
 - Updated CPU tracking to use the proper EWMA tracker rather than a linear approximation.
 - Separated health checks into `readiness`, `healthiness`, and `liveness` checks to support more fine-grained monitoring.
+- Refactored API client utilities to use a `Context` rather than an explicit timeout.
 
 ## [v1.7.3](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.3)
 

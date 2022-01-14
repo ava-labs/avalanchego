@@ -4,7 +4,7 @@
 package ipcs
 
 import (
-	"time"
+	"context"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
@@ -17,11 +17,11 @@ var _ Client = &client{}
 // Client interface for interacting with the IPCS endpoint
 type Client interface {
 	// PublishBlockchain requests the node to begin publishing consensus and decision events
-	PublishBlockchain(chainID string) (*PublishBlockchainReply, error)
+	PublishBlockchain(ctx context.Context, chainID string) (*PublishBlockchainReply, error)
 	// UnpublishBlockchain requests the node to stop publishing consensus and decision events
-	UnpublishBlockchain(chainID string) (bool, error)
+	UnpublishBlockchain(ctx context.Context, chainID string) (bool, error)
 	// GetPublishedBlockchains requests the node to get blockchains being published
-	GetPublishedBlockchains() ([]ids.ID, error)
+	GetPublishedBlockchains(ctx context.Context) ([]ids.ID, error)
 }
 
 // Client implementation for interacting with the IPCS endpoint
@@ -30,30 +30,30 @@ type client struct {
 }
 
 // NewClient returns a Client for interacting with the IPCS endpoint
-func NewClient(uri string, requestTimeout time.Duration) Client {
+func NewClient(uri string) Client {
 	return &client{
-		requester: rpc.NewEndpointRequester(uri, "/ext/ipcs", "ipcs", requestTimeout),
+		requester: rpc.NewEndpointRequester(uri, "/ext/ipcs", "ipcs"),
 	}
 }
 
-func (c *client) PublishBlockchain(blockchainID string) (*PublishBlockchainReply, error) {
+func (c *client) PublishBlockchain(ctx context.Context, blockchainID string) (*PublishBlockchainReply, error) {
 	res := &PublishBlockchainReply{}
-	err := c.requester.SendRequest("publishBlockchain", &PublishBlockchainArgs{
+	err := c.requester.SendRequest(ctx, "publishBlockchain", &PublishBlockchainArgs{
 		BlockchainID: blockchainID,
 	}, res)
 	return res, err
 }
 
-func (c *client) UnpublishBlockchain(blockchainID string) (bool, error) {
+func (c *client) UnpublishBlockchain(ctx context.Context, blockchainID string) (bool, error) {
 	res := &api.SuccessResponse{}
-	err := c.requester.SendRequest("unpublishBlockchain", &UnpublishBlockchainArgs{
+	err := c.requester.SendRequest(ctx, "unpublishBlockchain", &UnpublishBlockchainArgs{
 		BlockchainID: blockchainID,
 	}, res)
 	return res.Success, err
 }
 
-func (c *client) GetPublishedBlockchains() ([]ids.ID, error) {
+func (c *client) GetPublishedBlockchains(ctx context.Context) ([]ids.ID, error) {
 	res := &GetPublishedBlockchainsReply{}
-	err := c.requester.SendRequest("getPublishedBlockchains", nil, res)
+	err := c.requester.SendRequest(ctx, "getPublishedBlockchains", nil, res)
 	return res.Chains, err
 }
