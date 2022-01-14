@@ -18,6 +18,6 @@ type Bootstrapable interface {
 	// if they occur.
 	ForceAccepted(acceptedContainerIDs []ids.ID) error
 
-	// Clear remove all containers to be processed upon bootstrapping
+	// Clear removes all containers to be processed upon bootstrapping
 	Clear() error
 }
