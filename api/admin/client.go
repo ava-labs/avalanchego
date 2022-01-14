@@ -4,7 +4,7 @@
 package admin
 
 import (
-	"time"
+	"context"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/utils/rpc"
@@ -15,14 +15,14 @@ var _ Client = &client{}
 
 // Client interface for the Avalanche Platform Info API Endpoint
 type Client interface {
-	StartCPUProfiler() (bool, error)
-	StopCPUProfiler() (bool, error)
-	MemoryProfile() (bool, error)
-	LockProfile() (bool, error)
-	Alias(endpoint string, alias string) (bool, error)
-	AliasChain(chainID string, alias string) (bool, error)
-	GetChainAliases(chainID string) ([]string, error)
-	Stacktrace() (bool, error)
+	StartCPUProfiler(context.Context) (bool, error)
+	StopCPUProfiler(context.Context) (bool, error)
+	MemoryProfile(context.Context) (bool, error)
+	LockProfile(context.Context) (bool, error)
+	Alias(ctx context.Context, endpoint string, alias string) (bool, error)
+	AliasChain(ctx context.Context, chainID string, alias string) (bool, error)
+	GetChainAliases(ctx context.Context, chainID string) ([]string, error)
+	Stacktrace(context.Context) (bool, error)
 }
 
 // Client implementation for the Avalanche Platform Info API Endpoint
@@ -31,64 +31,64 @@ type client struct {
 }
 
 // NewClient returns a new Info API Client
-func NewClient(uri string, requestTimeout time.Duration) Client {
+func NewClient(uri string) Client {
 	return &client{
-		requester: rpc.NewEndpointRequester(uri, "/ext/admin", "admin", requestTimeout),
+		requester: rpc.NewEndpointRequester(uri, "/ext/admin", "admin"),
 	}
 }
 
-func (c *client) StartCPUProfiler() (bool, error) {
+func (c *client) StartCPUProfiler(ctx context.Context) (bool, error) {
 	res := &api.SuccessResponse{}
-	err := c.requester.SendRequest("startCPUProfiler", struct{}{}, res)
+	err := c.requester.SendRequest(ctx, "startCPUProfiler", struct{}{}, res)
 	return res.Success, err
 }
 
-func (c *client) StopCPUProfiler() (bool, error) {
+func (c *client) StopCPUProfiler(ctx context.Context) (bool, error) {
 	res := &api.SuccessResponse{}
-	err := c.requester.SendRequest("stopCPUProfiler", struct{}{}, res)
+	err := c.requester.SendRequest(ctx, "stopCPUProfiler", struct{}{}, res)
 	return res.Success, err
 }
 
-func (c *client) MemoryProfile() (bool, error) {
+func (c *client) MemoryProfile(ctx context.Context) (bool, error) {
 	res := &api.SuccessResponse{}
-	err := c.requester.SendRequest("memoryProfile", struct{}{}, res)
+	err := c.requester.SendRequest(ctx, "memoryProfile", struct{}{}, res)
 	return res.Success, err
 }
 
-func (c *client) LockProfile() (bool, error) {
+func (c *client) LockProfile(ctx context.Context) (bool, error) {
 	res := &api.SuccessResponse{}
-	err := c.requester.SendRequest("lockProfile", struct{}{}, res)
+	err := c.requester.SendRequest(ctx, "lockProfile", struct{}{}, res)
 	return res.Success, err
 }
 
-func (c *client) Alias(endpoint, alias string) (bool, error) {
+func (c *client) Alias(ctx context.Context, endpoint, alias string) (bool, error) {
 	res := &api.SuccessResponse{}
-	err := c.requester.SendRequest("alias", &AliasArgs{
+	err := c.requester.SendRequest(ctx, "alias", &AliasArgs{
 		Endpoint: endpoint,
 		Alias:    alias,
 	}, res)
 	return res.Success, err
 }
 
-func (c *client) AliasChain(chain, alias string) (bool, error) {
+func (c *client) AliasChain(ctx context.Context, chain, alias string) (bool, error) {
 	res := &api.SuccessResponse{}
-	err := c.requester.SendRequest("aliasChain", &AliasChainArgs{
+	err := c.requester.SendRequest(ctx, "aliasChain", &AliasChainArgs{
 		Chain: chain,
 		Alias: alias,
 	}, res)
 	return res.Success, err
 }
 
-func (c *client) GetChainAliases(chain string) ([]string, error) {
+func (c *client) GetChainAliases(ctx context.Context, chain string) ([]string, error) {
 	res := &GetChainAliasesReply{}
-	err := c.requester.SendRequest("getChainAliases", &GetChainAliasesArgs{
+	err := c.requester.SendRequest(ctx, "getChainAliases", &GetChainAliasesArgs{
 		Chain: chain,
 	}, res)
 	return res.Aliases, err
 }
 
-func (c *client) Stacktrace() (bool, error) {
+func (c *client) Stacktrace(ctx context.Context) (bool, error) {
 	res := &api.SuccessResponse{}
-	err := c.requester.SendRequest("stacktrace", struct{}{}, res)
+	err := c.requester.SendRequest(ctx, "stacktrace", struct{}{}, res)
 	return res.Success, err
 }
