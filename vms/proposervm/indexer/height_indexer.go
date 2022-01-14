@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package indexes
+package indexer
 
 import (
 	"math"
@@ -40,6 +40,7 @@ func newHeightIndexer(srv BlockServer,
 		server:        srv,
 		log:           log,
 		indexState:    indexState,
+		batch:         indexState.GetBatch(),
 		commitMaxSize: defaultCommitSizeCap,
 	}
 
@@ -52,6 +53,7 @@ type heightIndexer struct {
 
 	jobDone    utils.AtomicBool
 	indexState heightIndexDBOps
+	batch      database.Batch
 
 	commitMaxSize int
 }
@@ -72,6 +74,10 @@ func (hi *heightIndexer) RepairHeightIndex() error {
 		hi.log.Error("Block indexing by height starting: failed. Could not determine if index is complete, error %v", err)
 		return err
 	}
+	if err := hi.batch.Write(); err != nil {
+		hi.log.Warn("Failed writing height index batch, err %w", err)
+	}
+
 	if !needRepair {
 		forkHeight, err := hi.indexState.GetForkHeight()
 		if err != nil {
@@ -80,19 +86,20 @@ func (hi *heightIndexer) RepairHeightIndex() error {
 		hi.log.Info("Block indexing by height: already complete. Fork height %d", forkHeight)
 		return nil
 	}
-	return hi.doRepair(startBlkID)
+	if err := hi.doRepair(startBlkID); err != nil {
+		return err
+	}
+	if err := hi.batch.Write(); err != nil {
+		hi.log.Warn("Failed writing height index batch, err %w", err)
+		return err
+	}
+	return nil
 }
 
 // shouldRepair checks if height index is complete;
 // if not, it returns the checkpoint from which repairing should start.
+// Note: batch commit is deferred to shouldRepair caller
 func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
-	batch := hi.indexState.GetBatch()
-	defer func() {
-		if err := batch.Write(); err != nil {
-			hi.log.Warn("Failed writing height index batch, err %w", err)
-		}
-	}()
-
 	switch checkpointID, err := hi.indexState.GetCheckpoint(); err {
 	case nil:
 		// checkpoint found, repair must be resumed
@@ -117,7 +124,7 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 		// snowman++ has not forked yet; height block index is ok.
 		// forkHeight set at math.MaxUint64, aka +infinity
 		forkHeightBytes := state.GetForkHeightBytes(math.MaxUint64)
-		if err := batch.Put(state.GetForkKey(), forkHeightBytes); err != nil {
+		if err := hi.batch.Put(state.GetForkKey(), forkHeightBytes); err != nil {
 			return true, ids.Empty, err
 		}
 
@@ -153,7 +160,7 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 		// and the process is terminated before first commit,
 		// we do not miss rebuilding the full index.
 
-		if err := batch.Put(state.GetCheckpointKey(), latestProBlkID[:]); err != nil {
+		if err := hi.batch.Put(state.GetCheckpointKey(), latestProBlkID[:]); err != nil {
 			return true, ids.Empty, err
 		}
 
@@ -162,7 +169,7 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 		case database.ErrNotFound:
 			// fork height not found. Init it at math.MaxUint64, aka +infinity
 			forkHeightBytes := state.GetForkHeightBytes(math.MaxUint64)
-			if err := batch.Put(state.GetForkKey(), forkHeightBytes); err != nil {
+			if err := hi.batch.Put(state.GetForkKey(), forkHeightBytes); err != nil {
 				return true, ids.Empty, err
 			}
 		case nil:
@@ -183,22 +190,16 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 
 // if height index needs repairing, doRepair would do that. It
 // iterates back via parents, checking and rebuilding height indexing.
+// Note: batch commit is deferred to doRepair caller
 func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 	var (
 		currentProBlkID   = repairStartBlkID
 		currentInnerBlkID = ids.Empty
-		batch             = hi.indexState.GetBatch()
 
 		start       = time.Now()
 		lastLogTime = start
 		indexedBlks = 0
 	)
-	defer func() {
-		if err := batch.Write(); err != nil {
-			hi.log.Warn("Failed writing height index batch, err %w", err)
-		}
-	}()
-
 	for {
 		currentAcceptedBlk, err := hi.server.GetWrappingBlk(currentProBlkID)
 		switch err {
@@ -212,12 +213,12 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 			}
 			forkHeight := firstWrappedInnerBlk.Height()
 			forkHeightBytes := state.GetForkHeightBytes(forkHeight)
-			if err := batch.Put(state.GetForkKey(), forkHeightBytes); err != nil {
+			if err := hi.batch.Put(state.GetForkKey(), forkHeightBytes); err != nil {
 				return err
 			}
 
 			// ... delete checkpoint
-			if err := batch.Delete(state.GetCheckpointKey()); err != nil {
+			if err := hi.batch.Delete(state.GetCheckpointKey()); err != nil {
 				return err
 			}
 
@@ -240,29 +241,29 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 		case database.ErrNotFound:
 			// Rebuild height block index.
 			entryKey := state.GetEntryKey(currentAcceptedBlk.Height())
-			if err := batch.Put(entryKey, currentProBlkID[:]); err != nil {
+			if err := hi.batch.Put(entryKey, currentProBlkID[:]); err != nil {
 				return err
 			}
 
 			// Let's keep memory footprint under control by committing when a size threshold is reached
-			if batch.Size() > hi.commitMaxSize {
+			if hi.batch.Size() > hi.commitMaxSize {
 				// find and store checkpoint
-				if err := hi.doCheckpoint(batch, currentAcceptedBlk); err != nil {
+				if err := hi.doCheckpoint(currentAcceptedBlk); err != nil {
 					return err
 				}
 
 				// update fork height
 				forkHeightBytes := state.GetForkHeightBytes(currentAcceptedBlk.Height())
-				if err := batch.Put(state.GetForkKey(), forkHeightBytes); err != nil {
+				if err := hi.batch.Put(state.GetForkKey(), forkHeightBytes); err != nil {
 					return err
 				}
 
 				// finally commit and reset batch for reuse
-				committedSize := batch.Size()
-				if err := batch.Write(); err != nil {
+				committedSize := hi.batch.Size()
+				if err := hi.batch.Write(); err != nil {
 					return err
 				}
-				batch.Reset()
+				hi.batch.Reset()
 
 				hi.log.Info("Block indexing by height: ongoing. Indexed %d blocks, latest committed height %d, committed %d bytes",
 					indexedBlks, currentAcceptedBlk.Height()+1, committedSize)
@@ -284,7 +285,7 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 	}
 }
 
-func (hi *heightIndexer) doCheckpoint(batch database.Batch, currentProBlk WrappingBlock) error {
+func (hi *heightIndexer) doCheckpoint(currentProBlk WrappingBlock) error {
 	// checkpoint is current block's parent, it if exists
 	var checkpoint ids.ID
 	parentBlkID := currentProBlk.Parent()
@@ -292,7 +293,7 @@ func (hi *heightIndexer) doCheckpoint(batch database.Batch, currentProBlk Wrappi
 	switch err {
 	case nil:
 		checkpoint = checkpointBlk.ID()
-		if err := batch.Put(state.GetCheckpointKey(), checkpoint[:]); err != nil {
+		if err := hi.batch.Put(state.GetCheckpointKey(), checkpoint[:]); err != nil {
 			return err
 		}
 		hi.log.Info("Block indexing by height. Stored checkpoint %v at height %d",

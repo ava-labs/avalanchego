@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package indexes
+package indexer
 
 import (
 	"math/rand"
@@ -122,6 +122,7 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 	assert.True(doRepair)
 	assert.True(startBlkID == lastProBlk.ID())
 	assert.NoError(hIndex.doRepair(startBlkID))
+	assert.NoError(hIndex.batch.Write()) // batch write responsibility is on doRepair caller
 
 	// check that height index is fully built
 	loadedForkHeight, err := storedState.GetForkHeight()
@@ -327,9 +328,11 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 	// show that height index should be rebuild and it is
 	doRepair, startBlkID, err := hIndex.shouldRepair()
 	assert.NoError(err)
+	assert.NoError(hIndex.batch.Write()) // batch write responsibility is on shouldRepair caller
 	assert.True(doRepair)
 	assert.True(startBlkID == lastProBlk.ID())
 	assert.NoError(hIndex.doRepair(startBlkID))
+	assert.NoError(hIndex.batch.Write()) // batch write responsibility is on doRepair caller
 
 	// check that height index is fully built
 	loadedForkHeight, err := storedState.GetForkHeight()
@@ -460,6 +463,7 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 
 	// with no checkpoints repair starts from last accepted block
 	doRepair, startBlkID, err := hIndex.shouldRepair()
+	assert.NoError(hIndex.batch.Write()) // batch write responsibility is on shouldRepair caller
 	assert.True(doRepair)
 	assert.NoError(err)
 	assert.True(startBlkID == lastProBlk.ID())
@@ -481,11 +485,13 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 	doRepair, startBlkID, err = hIndex.shouldRepair()
 	assert.True(doRepair)
 	assert.NoError(err)
+	assert.NoError(hIndex.batch.Write()) // batch write responsibility is on shouldRepair caller
 	assert.True(startBlkID == checkpointBlk.ID())
 	assert.False(hIndex.IsRepaired())
 
 	// perform repair and show index is built
 	assert.NoError(hIndex.doRepair(startBlkID))
+	assert.NoError(hIndex.batch.Write()) // batch write responsibility is on doRepair caller
 
 	// check that height index is fully built
 	loadedForkHeight, err := storedState.GetForkHeight()

@@ -9,12 +9,12 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
-	"github.com/ava-labs/avalanchego/vms/proposervm/indexes"
+	"github.com/ava-labs/avalanchego/vms/proposervm/indexer"
 )
 
 var (
 	_ Block                 = &postForkOption{}
-	_ indexes.WrappingBlock = &preForkBlock{}
+	_ indexer.WrappingBlock = &preForkBlock{}
 )
 
 // The parent of a *postForkOption must be a *postForkBlock.

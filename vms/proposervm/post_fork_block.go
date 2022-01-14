@@ -8,12 +8,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
-	"github.com/ava-labs/avalanchego/vms/proposervm/indexes"
+	"github.com/ava-labs/avalanchego/vms/proposervm/indexer"
 )
 
 var (
 	_ Block                 = &postForkBlock{}
-	_ indexes.WrappingBlock = &preForkBlock{}
+	_ indexer.WrappingBlock = &preForkBlock{}
 )
 
 // postForkBlock implements proposervm.Block

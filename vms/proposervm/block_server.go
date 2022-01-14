@@ -6,10 +6,10 @@ package proposervm
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/proposervm/indexes"
+	"github.com/ava-labs/avalanchego/vms/proposervm/indexer"
 )
 
-var _ indexes.BlockServer = &VM{}
+var _ indexer.BlockServer = &VM{}
 
 // LastAcceptedWrappingBlkID implements BlockServer interface
 func (vm *VM) LastAcceptedWrappingBlkID() (ids.ID, error) {
@@ -26,7 +26,7 @@ func (vm *VM) LastAcceptedInnerBlkID() (ids.ID, error) {
 }
 
 // GetWrappingBlk implements BlockServer interface
-func (vm *VM) GetWrappingBlk(blkID ids.ID) (indexes.WrappingBlock, error) {
+func (vm *VM) GetWrappingBlk(blkID ids.ID) (indexer.WrappingBlock, error) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	return vm.getPostForkBlock(blkID)
