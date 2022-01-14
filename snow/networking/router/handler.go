@@ -24,7 +24,10 @@ import (
 
 const cpuHalflife = 15 * time.Second
 
-var errDuplicatedContainerID = errors.New("inbound message contains duplicated container ID")
+var (
+	errDuplicatedContainerID = errors.New("inbound message contains duplicated container ID")
+	errGearsNotRegistered    = errors.New("no handler gear registered")
+)
 
 // Handler passes incoming messages from the network to the consensus engine.
 // (Actually, it receives the incoming messages from a ChainRouter, but same difference.)
@@ -37,7 +40,7 @@ type Handler struct {
 	// The validator set that validates this chain
 	validators validators.Set
 
-	bootstrapper common.Engine
+	bootstrapper common.BootstrapableEngine
 	engine       common.Engine
 
 	// Closed when this handler and [engine] are done shutting down
@@ -82,7 +85,7 @@ func NewHandler(
 	return h, err
 }
 
-func (h *Handler) RegisterBootstrap(bootstrapper common.Engine) {
+func (h *Handler) RegisterBootstrap(bootstrapper common.BootstrapableEngine) {
 	h.bootstrapper = bootstrapper
 }
 
@@ -97,7 +100,12 @@ func (h *Handler) OnDoneBootstrapping(lastReqID uint32) error {
 
 func (h *Handler) Start() error {
 	startReqID := uint32(0)
-	return h.bootstrapper.Start(startReqID)
+	switch {
+	case h.bootstrapper != nil:
+		return h.bootstrapper.Start(startReqID)
+	default:
+		return errGearsNotRegistered
+	}
 }
 
 // Context of this Handler
