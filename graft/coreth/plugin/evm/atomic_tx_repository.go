@@ -30,6 +30,7 @@ var (
 	atomicHeightTxDBPrefix     = []byte("atomicHeightTxDB")
 	atomicRepoMetadataDBPrefix = []byte("atomicRepoMetadataDB")
 	maxIndexedHeightKey        = []byte("maxIndexedAtomicTxHeight")
+	bonusBlocksRepairedKey     = []byte("bonusBlocksRepaired")
 )
 
 // AtomicTxRepository defines an entity that manages storage and indexing of
@@ -39,7 +40,12 @@ type AtomicTxRepository interface {
 	GetByTxID(txID ids.ID) (*Tx, uint64, error)
 	GetByHeight(height uint64) ([]*Tx, error)
 	Write(height uint64, txs []*Tx) error
+	WriteBonus(height uint64, txs []*Tx) error
+
 	IterateByHeight([]byte) database.Iterator
+
+	IsBonusBlocksRepaired() (bool, error)
+	MarkBonusBlocksRepaired(repairedEntries uint64) error
 }
 
 // atomicTxRepository is a prefixdb implementation of the AtomicTxRepository interface
@@ -239,6 +245,16 @@ func (a *atomicTxRepository) getByHeightBytes(heightBytes []byte) ([]*Tx, error)
 // and [txs] must include all atomic txs for the block accepted at the
 // corresponding height.
 func (a *atomicTxRepository) Write(height uint64, txs []*Tx) error {
+	return a.write(height, txs, false)
+}
+
+// WriteBonus is similar to Write, except the [txID] => [height] is not
+// overwritten if already exists.
+func (a *atomicTxRepository) WriteBonus(height uint64, txs []*Tx) error {
+	return a.write(height, txs, true)
+}
+
+func (a *atomicTxRepository) write(height uint64, txs []*Tx, bonus bool) error {
 	if len(txs) > 1 {
 		// txs should be stored in order of txID to ensure consistency
 		// with txs initialized from the txID index.
@@ -249,10 +265,21 @@ func (a *atomicTxRepository) Write(height uint64, txs []*Tx) error {
 	}
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
-
 	// Skip adding an entry to the height index if [txs] is empty.
 	if len(txs) > 0 {
 		for _, tx := range txs {
+			if bonus {
+				switch _, _, err := a.GetByTxID(tx.ID()); err {
+				case nil:
+					// avoid overwriting existing value if [bonus] is true
+					continue
+				case database.ErrNotFound:
+					// no existing value to overwrite, proceed as normal
+				default:
+					// unexpected error
+					return err
+				}
+			}
 			if err := a.indexTxByID(heightBytes, tx); err != nil {
 				return err
 			}
@@ -324,4 +351,14 @@ func (a *atomicTxRepository) appendTxToHeightIndex(heightBytes []byte, tx *Tx) e
 
 func (a *atomicTxRepository) IterateByHeight(heightBytes []byte) database.Iterator {
 	return a.acceptedAtomicTxByHeightDB.NewIteratorWithStart(heightBytes)
+}
+
+func (a *atomicTxRepository) IsBonusBlocksRepaired() (bool, error) {
+	return a.atomicRepoMetadataDB.Has(bonusBlocksRepairedKey)
+}
+
+func (a *atomicTxRepository) MarkBonusBlocksRepaired(repairedEntries uint64) error {
+	val := make([]byte, wrappers.LongLen)
+	binary.BigEndian.PutUint64(val, repairedEntries)
+	return a.atomicRepoMetadataDB.Put(bonusBlocksRepairedKey, val)
 }

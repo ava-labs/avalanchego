@@ -54,44 +54,55 @@ func TestNearestCommitHeight(t *testing.T) {
 func TestAtomicTrieInitialize(t *testing.T) {
 	type test struct {
 		commitInterval, lastAcceptedHeight, expectedCommitHeight uint64
-		numTxsPerBlock                                           int
+		numTxsPerBlock                                           func(uint64) int
 	}
 	for name, test := range map[string]test{
 		"genesis": {
 			commitInterval:       10,
 			lastAcceptedHeight:   0,
 			expectedCommitHeight: 0,
-			numTxsPerBlock:       0,
+			numTxsPerBlock:       constTxsPerHeight(0),
 		},
 		"before first commit": {
 			commitInterval:       10,
 			lastAcceptedHeight:   5,
 			expectedCommitHeight: 0,
-			numTxsPerBlock:       3,
+			numTxsPerBlock:       constTxsPerHeight(3),
 		},
 		"first commit": {
 			commitInterval:       10,
 			lastAcceptedHeight:   10,
 			expectedCommitHeight: 10,
-			numTxsPerBlock:       3,
+			numTxsPerBlock:       constTxsPerHeight(3),
 		},
 		"past first commit": {
 			commitInterval:       10,
 			lastAcceptedHeight:   15,
 			expectedCommitHeight: 10,
-			numTxsPerBlock:       3,
+			numTxsPerBlock:       constTxsPerHeight(3),
 		},
 		"many existing commits": {
 			commitInterval:       10,
 			lastAcceptedHeight:   1000,
 			expectedCommitHeight: 1000,
-			numTxsPerBlock:       3,
+			numTxsPerBlock:       constTxsPerHeight(3),
 		},
 		"many existing commits plus 1": {
 			commitInterval:       10,
 			lastAcceptedHeight:   1001,
 			expectedCommitHeight: 1000,
-			numTxsPerBlock:       3,
+			numTxsPerBlock:       constTxsPerHeight(3),
+		},
+		"some blocks without atomic tx": {
+			commitInterval:       10,
+			lastAcceptedHeight:   101,
+			expectedCommitHeight: 100,
+			numTxsPerBlock: func(height uint64) int {
+				if height <= 50 || height == 101 {
+					return 1
+				}
+				return 0
+			},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -131,7 +142,7 @@ func TestAtomicTrieInitialize(t *testing.T) {
 			// during the initialization phase will cause an invalid root when indexing continues.
 			nextCommitHeight := nearestCommitHeight(test.lastAcceptedHeight+test.commitInterval, test.commitInterval)
 			for i := test.lastAcceptedHeight + 1; i <= nextCommitHeight; i++ {
-				txs := newTestTxs(test.numTxsPerBlock)
+				txs := newTestTxs(test.numTxsPerBlock(i))
 				if err := repo.Write(i, txs); err != nil {
 					t.Fatal(err)
 				}
@@ -172,7 +183,7 @@ func TestIndexerInitializesOnlyOnce(t *testing.T) {
 	repo, err := NewAtomicTxRepository(db, codec, lastAcceptedHeight)
 	assert.NoError(t, err)
 	operationsMap := make(map[uint64]map[ids.ID]*atomic.Requests)
-	writeTxs(t, repo, 0, lastAcceptedHeight+1, 2, nil, operationsMap)
+	writeTxs(t, repo, 0, lastAcceptedHeight+1, constTxsPerHeight(2), nil, operationsMap)
 
 	// Initialize atomic repository
 	atomicTrie, err := newAtomicTrie(db, make(map[uint64]ids.ID), repo, codec, lastAcceptedHeight, 10 /*commitHeightInterval*/)
@@ -291,7 +302,7 @@ func TestAtomicTrieSkipsBonusBlocks(t *testing.T) {
 		t.Fatal(err)
 	}
 	operationsMap := make(map[uint64]map[ids.ID]*atomic.Requests)
-	writeTxs(t, repo, 0, lastAcceptedHeight, numTxsPerBlock, nil, operationsMap)
+	writeTxs(t, repo, 0, lastAcceptedHeight, constTxsPerHeight(numTxsPerBlock), nil, operationsMap)
 
 	bonusBlocks := map[uint64]ids.ID{
 		10: {},
@@ -368,7 +379,7 @@ func BenchmarkAtomicTrieInit(b *testing.B) {
 	// add 25000 * 3 = 75000 transactions
 	repo, err := NewAtomicTxRepository(db, codec, lastAcceptedHeight)
 	assert.NoError(b, err)
-	writeTxs(b, repo, 0, 25000, 3, nil, operationsMap)
+	writeTxs(b, repo, 0, 25000, constTxsPerHeight(3), nil, operationsMap)
 
 	var atomicTrie AtomicTrie
 	var hash common.Hash
