@@ -43,6 +43,8 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 )
 
+var errNilAssetAmount = errors.New("cannot specify nil asset amount for native asset call")
+
 // SignerFn is a signer function callback when a contract requires a method to
 // sign the transaction before submission.
 type SignerFn func(common.Address, *types.Transaction) (*types.Transaction, error)
@@ -78,12 +80,13 @@ type TransactOpts struct {
 
 	NoSend bool // Do all transact steps but do not send the transaction
 
-	NativeAssetCall *NativeAssetCallOpts // If set, tx target address will be set to the native asset call precompile
-	// address, and tx input data will be transformed to contain the params to
-	// the native asset call (original tx target address, and given asset ID/amount)
-	// With this, the call will go through a native asset call, atomically
-	// performing the native asset transfer and calling the contract method
-	// (if defined in the original data)
+	// If set, the transaction is transformed to perform the requested call through the native asset
+	// precompile. This will update the to address of the transaction to that of the native asset precompile
+	// and pack the requested [to] address, [assetID], [assetAmount], and [input] data for the transaction
+	// into the call data of the transaction. When executed within the EVM, the precompile will parse the input
+	// data and attempt to atomically transfer [assetAmount] of [assetID] to the [to] address and invoke the
+	// contract at [to] if present, passing in the original [input] data.
+	NativeAssetCall *NativeAssetCallOpts
 }
 
 // FilterOpts is the collection of options to fine tune filtering for events
@@ -255,12 +258,17 @@ func (c *BoundContract) Transfer(opts *TransactOpts) (*types.Transaction, error)
 	return c.transact(opts, &c.address, nil)
 }
 
-// wrapNativeAssetCall preprocess [contract] and [input] to use native asset call address
-// and native aset call params from [opts]
+// wrapNativeAssetCall preprocesses the arguments to transform the requested call to go through the
+// native asset call precompile if it is specified on [opts].
 func wrapNativeAssetCall(opts *TransactOpts, contract *common.Address, input []byte) (*common.Address, []byte, error) {
 	if opts.NativeAssetCall != nil {
+		// Prevent the user from sending a non-zero value through native asset call precompile as this will
+		// transfer the funds to the precompile address and essentially burn the funds.
+		if opts.Value != nil && opts.Value.Cmp(common.Big0) > 0 {
+			return nil, nil, fmt.Errorf("value must be 0 when performing native asset call, found %d", opts.Value)
+		}
 		if opts.NativeAssetCall.AssetAmount == nil {
-			return nil, nil, errors.New("AssetAmount for native asset call is nil")
+			return nil, nil, errNilAssetAmount
 		}
 		// wrap input with native asset call params
 		input = vm.PackNativeAssetCallInput(
@@ -410,7 +418,7 @@ func (c *BoundContract) transact(opts *TransactOpts, contract *common.Address, i
 		rawTx *types.Transaction
 		err   error
 	)
-	// Preprocess native asset call if exists
+	// Preprocess native asset call arguments if present
 	contract, input, err = wrapNativeAssetCall(opts, contract, input)
 	if err != nil {
 		return nil, err

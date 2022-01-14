@@ -54,6 +54,8 @@ type nativeAssetBalance struct {
 	gasCost uint64
 }
 
+// PackNativeAssetBalanceInput packs the arguments into the required input data for a transaction to be passed into
+// the native asset balance precompile.
 func PackNativeAssetBalanceInput(address common.Address, assetID common.Hash) []byte {
 	input := make([]byte, 52)
 	copy(input, address.Bytes())
@@ -61,6 +63,7 @@ func PackNativeAssetBalanceInput(address common.Address, assetID common.Hash) []
 	return input
 }
 
+// UnpackNativeAssetBalanceInput attempts to unpack [input] into the arguments to the native asset balance precompile
 func UnpackNativeAssetBalanceInput(input []byte) (common.Address, common.Hash, error) {
 	if len(input) != 52 {
 		return common.Address{}, common.Hash{}, fmt.Errorf("native asset balance input had unexpcted length %d", len(input))
@@ -97,6 +100,9 @@ type nativeAssetCall struct {
 	gasCost uint64
 }
 
+// PackNativeAssetCallInput packs the arguments into the required input data for a transaction to be passed into
+// the native asset precompile.
+// Assumes that [assetAmount] is non-nil.
 func PackNativeAssetCallInput(address common.Address, assetID common.Hash, assetAmount *big.Int, callData []byte) []byte {
 	input := make([]byte, 84+len(callData))
 	copy(input[0:20], address.Bytes())
@@ -106,6 +112,7 @@ func PackNativeAssetCallInput(address common.Address, assetID common.Hash, asset
 	return input
 }
 
+// UnpackNativeAssetCallInput attempts to unpack [input] into the arguments to the native asset call precompile
 func UnpackNativeAssetCallInput(input []byte) (common.Address, common.Hash, *big.Int, []byte, error) {
 	if len(input) < 84 {
 		return common.Address{}, common.Hash{}, nil, nil, fmt.Errorf("native asset call input had unexpected length %d", len(input))
