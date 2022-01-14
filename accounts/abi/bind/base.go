@@ -264,7 +264,7 @@ func wrapNativeAssetCall(opts *TransactOpts, contract *common.Address, input []b
 	if opts.NativeAssetCall != nil {
 		// Prevent the user from sending a non-zero value through native asset call precompile as this will
 		// transfer the funds to the precompile address and essentially burn the funds.
-		if opts.Value != nil && opts.Value.Cmp(common.Big0) > 0 {
+		if opts.Value != nil && opts.Value.Cmp(common.Big0) != 0 {
 			return nil, nil, fmt.Errorf("value must be 0 when performing native asset call, found %d", opts.Value)
 		}
 		if opts.NativeAssetCall.AssetAmount == nil {
