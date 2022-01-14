@@ -24,7 +24,10 @@ import (
 
 const cpuHalflife = 15 * time.Second
 
-var errDuplicatedContainerID = errors.New("inbound message contains duplicated container ID")
+var (
+	errDuplicatedContainerID = errors.New("inbound message contains duplicated container ID")
+	errGearsNotRegistered    = errors.New("no handler gear registered")
+)
 
 // Handler passes incoming messages from the network to the consensus engine.
 // (Actually, it receives the incoming messages from a ChainRouter, but same difference.)
@@ -38,7 +41,7 @@ type Handler struct {
 	validators validators.Set
 
 	fastSyncer   common.FastSyncer
-	bootstrapper common.Engine
+	bootstrapper common.BootstrapableEngine
 	engine       common.Engine
 
 	// Closed when this handler and [engine] are done shutting down
@@ -87,7 +90,7 @@ func (h *Handler) RegisterFastSyncer(fastSyncer common.FastSyncer) {
 	h.fastSyncer = fastSyncer
 }
 
-func (h *Handler) RegisterBootstrap(bootstrapper common.Engine) {
+func (h *Handler) RegisterBootstrap(bootstrapper common.BootstrapableEngine) {
 	h.bootstrapper = bootstrapper
 }
 
@@ -103,6 +106,21 @@ func (h *Handler) OnDoneFastSyncing(lastReqID uint32) error {
 func (h *Handler) OnDoneBootstrapping(lastReqID uint32) error {
 	lastReqID++
 	return h.engine.Start(lastReqID)
+}
+
+func (h *Handler) Start() error {
+	startReqID := uint32(0)
+	switch {
+	case (h.fastSyncer != nil) && h.fastSyncer.IsEnabled():
+		if err := h.bootstrapper.Clear(); err != nil {
+			return err
+		}
+		return h.fastSyncer.Start(startReqID)
+	case h.bootstrapper != nil:
+		return h.bootstrapper.Start(startReqID)
+	default:
+		return errGearsNotRegistered
+	}
 }
 
 // Context of this Handler

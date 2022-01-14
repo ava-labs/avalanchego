@@ -644,9 +644,8 @@ func (m *manager) createAvalancheChain(
 	}
 	handler.RegisterEngine(engine)
 
-	startReqID := uint32(0)
-	if err := bootstrapper.Start(startReqID); err != nil {
-		return nil, fmt.Errorf("error starting up avalanche bootstrapper: %w", err)
+	if err := handler.Start(); err != nil {
+		return nil, err
 	}
 
 	// Register health check for this chain
@@ -862,16 +861,8 @@ func (m *manager) createSnowmanChain(
 	}
 	handler.RegisterEngine(engine)
 
-	startReqID := uint32(0)
-	if fastSync.IsEnabled() {
-		if err := bootstrapper.Clear(); err != nil {
-			return nil, fmt.Errorf("could not clear bootstrap before starting fast sync operations: %w", err)
-		}
-		if err := fastSync.Start(startReqID); err != nil {
-			return nil, fmt.Errorf("error starting fast sync operations: %w", err)
-		}
-	} else if err := bootstrapper.Start(startReqID); err != nil {
-		return nil, fmt.Errorf("error starting bootstrap operations: %w", err)
+	if err := handler.Start(); err != nil {
+		return nil, err
 	}
 
 	// Register health checks
