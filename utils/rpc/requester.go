@@ -5,16 +5,16 @@ package rpc
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	rpc "github.com/gorilla/rpc/v2/json2"
 )
 
 type Requester interface {
-	SendJSONRPCRequest(endpoint string, method string, params interface{}, reply interface{}) error
+	SendJSONRPCRequest(ctx context.Context, endpoint string, method string, params interface{}, reply interface{}) error
 }
 
 type jsonRPCRequester struct {
@@ -22,16 +22,14 @@ type jsonRPCRequester struct {
 	client http.Client
 }
 
-func NewRPCRequester(uri string, requestTimeout time.Duration) Requester {
+func NewRPCRequester(uri string) Requester {
 	return &jsonRPCRequester{
-		uri: uri,
-		client: http.Client{
-			Timeout: requestTimeout,
-		},
+		uri:    uri,
+		client: *http.DefaultClient,
 	}
 }
 
-func (requester jsonRPCRequester) SendJSONRPCRequest(endpoint string, method string, params interface{}, reply interface{}) error {
+func (requester jsonRPCRequester) SendJSONRPCRequest(ctx context.Context, endpoint string, method string, params interface{}, reply interface{}) error {
 	// Golang has a nasty & subtle behaviour where duplicated '//' in the URL is treated as GET, even if it's POST
 	// https://stackoverflow.com/questions/23463601/why-golang-treats-my-post-request-as-a-get-one
 	endpoint = strings.TrimLeft(endpoint, "/")
@@ -42,7 +40,14 @@ func (requester jsonRPCRequester) SendJSONRPCRequest(endpoint string, method str
 	}
 
 	url := fmt.Sprintf("%v/%v", requester.uri, endpoint)
-	resp, err := requester.client.Post(url, "application/json", bytes.NewBuffer(requestBodyBytes))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(requestBodyBytes))
+	if err != nil {
+		return fmt.Errorf("problem while creating JSON RPC POST request to %s: %s", url, err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := requester.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("problem while making JSON RPC POST request to %s: %w", url, err)
 	}
@@ -62,7 +67,7 @@ func (requester jsonRPCRequester) SendJSONRPCRequest(endpoint string, method str
 }
 
 type EndpointRequester interface {
-	SendRequest(method string, params interface{}, reply interface{}) error
+	SendRequest(ctx context.Context, method string, params interface{}, reply interface{}) error
 }
 
 type avalancheEndpointRequester struct {
@@ -70,16 +75,17 @@ type avalancheEndpointRequester struct {
 	endpoint, base string
 }
 
-func NewEndpointRequester(uri, endpoint, base string, requestTimeout time.Duration) EndpointRequester {
+func NewEndpointRequester(uri, endpoint, base string) EndpointRequester {
 	return &avalancheEndpointRequester{
-		requester: NewRPCRequester(uri, requestTimeout),
+		requester: NewRPCRequester(uri),
 		endpoint:  endpoint,
 		base:      base,
 	}
 }
 
-func (e *avalancheEndpointRequester) SendRequest(method string, params interface{}, reply interface{}) error {
+func (e *avalancheEndpointRequester) SendRequest(ctx context.Context, method string, params interface{}, reply interface{}) error {
 	return e.requester.SendJSONRPCRequest(
+		ctx,
 		e.endpoint,
 		fmt.Sprintf("%s.%s", e.base, method),
 		params,
