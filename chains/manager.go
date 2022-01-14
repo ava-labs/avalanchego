@@ -820,20 +820,9 @@ func (m *manager) createSnowmanChain(
 		VM:                      vm,
 		WeightTracker:           weightTracker,
 	}
-	onDoneFastSyncing := func(lastReqID uint32) error {
-		// TODO: should this code go somewhere else?
-		// clear the list of pending jobs to download for bootstrapping
-		// note this does not remove any blocks already downloaded and
-		// not accepted, just the job to download their dependencies.
-		blocked.RemoveMissingID(blocked.MissingIDs()...)
-		if err := blocked.Commit(); err != nil {
-			return err
-		}
-		return handler.OnDoneFastSyncing(lastReqID)
-	}
 	fastSync := fastsyncer.NewFastSyncer(
 		fastSyncCfg,
-		onDoneFastSyncing,
+		handler.OnDoneFastSyncing,
 	)
 	handler.RegisterFastSyncer(fastSync)
 
@@ -873,13 +862,14 @@ func (m *manager) createSnowmanChain(
 
 	startReqID := uint32(0)
 	if fastSync.IsEnabled() {
+		if err := bootstrapper.Clear(); err != nil {
+			return nil, fmt.Errorf("could not clear bootstrap before starting fast sync operations: %w", err)
+		}
 		if err := fastSync.Start(startReqID); err != nil {
 			return nil, fmt.Errorf("error starting fast sync operations: %w", err)
 		}
-	} else {
-		if err := bootstrapper.Start(startReqID); err != nil {
-			return nil, fmt.Errorf("error starting bootstrap operations: %w", err)
-		}
+	} else if err := bootstrapper.Start(startReqID); err != nil {
+		return nil, fmt.Errorf("error starting bootstrap operations: %w", err)
 	}
 
 	// Register health checks
