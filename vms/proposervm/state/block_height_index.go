@@ -95,10 +95,9 @@ func (hi *heightIndex) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 
 // GetForkHeight implements HeightIndexGetter
 func (hi *heightIndex) GetForkHeight() (uint64, error) {
-	switch bytes, err := hi.db.Get(GetForkKey()); err {
+	switch height, err := database.GetUInt64(hi.db, GetForkKey()); err {
 	case nil:
-		res := binary.BigEndian.Uint64(bytes)
-		return res, nil
+		return height, nil
 
 	case database.ErrNotFound:
 		return 0, database.ErrNotFound
@@ -124,7 +123,7 @@ func (hi *heightIndex) DeleteBlockIDAtHeight(height uint64) error {
 
 // SetForkHeight implements HeightIndexWriterDeleter
 func (hi *heightIndex) SetForkHeight(height uint64) error {
-	return hi.db.Put(GetForkKey(), GetForkHeightBytes(height))
+	return database.PutUInt64(hi.db, GetForkKey(), height)
 }
 
 // DeleteForkHeight implements HeightIndexWriterDeleter
@@ -176,12 +175,6 @@ func GetEntryKey(height uint64) []byte {
 func GetForkKey() []byte {
 	preForkPrefix := []byte("preForkKey")
 	return preForkPrefix
-}
-
-func GetForkHeightBytes(height uint64) []byte {
-	heightBytes := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(heightBytes, height)
-	return heightBytes
 }
 
 func GetCheckpointKey() []byte {

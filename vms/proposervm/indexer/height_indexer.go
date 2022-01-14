@@ -76,6 +76,7 @@ func (hi *heightIndexer) RepairHeightIndex() error {
 	}
 	if err := hi.batch.Write(); err != nil {
 		hi.log.Warn("Failed writing height index batch, err %w", err)
+		return err
 	}
 
 	if !needRepair {
@@ -122,9 +123,8 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 
 	case database.ErrNotFound:
 		// snowman++ has not forked yet; height block index is ok.
-		// forkHeight set at math.MaxUint64, aka +infinity
-		forkHeightBytes := state.GetForkHeightBytes(math.MaxUint64)
-		if err := hi.batch.Put(state.GetForkKey(), forkHeightBytes); err != nil {
+		// set forkHeight to math.MaxUint64, aka +infinity
+		if err := database.PutUInt64(hi.batch, state.GetForkKey(), math.MaxInt64); err != nil {
 			return true, ids.Empty, err
 		}
 
@@ -159,7 +159,6 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 		// in case new blocks are accepted while indexing is ongoing,
 		// and the process is terminated before first commit,
 		// we do not miss rebuilding the full index.
-
 		if err := hi.batch.Put(state.GetCheckpointKey(), latestProBlkID[:]); err != nil {
 			return true, ids.Empty, err
 		}
@@ -167,9 +166,8 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 		// Handle forkHeight
 		switch currentForkHeight, err := hi.indexState.GetForkHeight(); err {
 		case database.ErrNotFound:
-			// fork height not found. Init it at math.MaxUint64, aka +infinity
-			forkHeightBytes := state.GetForkHeightBytes(math.MaxUint64)
-			if err := hi.batch.Put(state.GetForkKey(), forkHeightBytes); err != nil {
+			// fork height not found, initialize it to math.MaxUint64, aka +infinity
+			if err := database.PutUInt64(hi.batch, state.GetForkKey(), math.MaxUint64); err != nil {
 				return true, ids.Empty, err
 			}
 		case nil:
@@ -212,8 +210,7 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 				return err
 			}
 			forkHeight := firstWrappedInnerBlk.Height()
-			forkHeightBytes := state.GetForkHeightBytes(forkHeight)
-			if err := hi.batch.Put(state.GetForkKey(), forkHeightBytes); err != nil {
+			if err := database.PutUInt64(hi.batch, state.GetForkKey(), forkHeight); err != nil {
 				return err
 			}
 
@@ -236,7 +233,7 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 		_, err = hi.indexState.GetBlockIDAtHeight(currentAcceptedBlk.Height())
 		switch err {
 		case nil:
-			hi.log.AssertTrue(err != nil, "There should not be an entry for this height")
+			hi.log.AssertTrue(err != nil, "unexpected height index entry at height %d", currentAcceptedBlk.Height())
 
 		case database.ErrNotFound:
 			// Rebuild height block index.
@@ -245,7 +242,7 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 				return err
 			}
 
-			// Let's keep memory footprint under control by committing when a size threshold is reached
+			// Keep memory footprint under control by committing when a size threshold is reached
 			if hi.batch.Size() > hi.commitMaxSize {
 				// find and store checkpoint
 				if err := hi.doCheckpoint(currentAcceptedBlk); err != nil {
@@ -253,8 +250,7 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 				}
 
 				// update fork height
-				forkHeightBytes := state.GetForkHeightBytes(currentAcceptedBlk.Height())
-				if err := hi.batch.Put(state.GetForkKey(), forkHeightBytes); err != nil {
+				if err := database.PutUInt64(hi.batch, state.GetForkKey(), currentAcceptedBlk.Height()); err != nil {
 					return err
 				}
 
