@@ -22,7 +22,7 @@ COPY . .
 RUN ./scripts/build.sh
 
 # ============= Cleanup Stage ================
-FROM debian:10.10-slim AS execution
+FROM debian:11-slim AS execution
 
 # Maintain compatibility with previous images
 RUN mkdir -p /avalanchego/build

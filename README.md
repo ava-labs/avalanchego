@@ -132,6 +132,16 @@ To connect to the Fuji Testnet, run:
 
 See [this tutorial.](https://docs.avax.network/build/tutorials/platform/create-a-local-test-network/)
 
+## Bootstrapping
+
+A node needs to catch up to the latest network state before it can participate in consensus and serve API calls. This process, called bootstrapping, currently takes several days for a new node connected to Mainnet.
+
+A node will not [report healthy](https://docs.avax.network/build/avalanchego-apis/health) until it is done bootstrapping.
+
+Improvements that reduce the amount of time it takes to bootstrap are under development.
+
+The bottleneck during bootstrapping is typically database IO. Using a more powerful CPU or increasing the database IOPS on the computer running a node will decrease the amount of time bootstrapping takes.
+
 ## Generating Code
 
 Avalanchego uses multiple tools to generate efficient and boilerplate code.
@@ -188,22 +198,22 @@ The following table lists currently supported platforms and their corresponding
 AvalancheGo support tiers:
 
 | Architecture | Operating system | Support tier  |
-|:------------:|:----------------:|:-------------:|
-| amd64        | Linux            | 1             |
-| arm64        | Linux            | 2             |
-| amd64        | Darwin           | 2             |
-| amd64        | Windows          | 3             |
-| arm          | Linux            | Not supported |
-| i386         | Linux            | Not supported |
-| arm64        | Darwin           | Not supported |
+| :----------: | :--------------: | :-----------: |
+|    amd64     |      Linux       |       1       |
+|    arm64     |      Linux       |       2       |
+|    amd64     |      Darwin      |       2       |
+|    amd64     |     Windows      |       3       |
+|     arm      |      Linux       | Not supported |
+|     i386     |      Linux       | Not supported |
+|    arm64     |      Darwin      | Not supported |
 
 To officially support a new platform, one must satisfy the following requirements:
 
-| AvalancheGo continuous integration    | Tier 1 | Tier 2 | Tier 3 |
-| ------------------------------------- |:------:|:------:|:------:|
-| Build passes                          | &check;| &check;| &check;|
-| Unit and integration tests pass       | &check;| &check;|        |
-| End-to-end and stress tests pass      | &check;|        |        |
+| AvalancheGo continuous integration | Tier 1  | Tier 2  | Tier 3  |
+| ---------------------------------- | :-----: | :-----: | :-----: |
+| Build passes                       | &check; | &check; | &check; |
+| Unit and integration tests pass    | &check; | &check; |         |
+| End-to-end and stress tests pass   | &check; |         |         |
 
 ## Security Bugs
 

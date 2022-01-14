@@ -4,6 +4,7 @@
 package admin
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -49,7 +50,7 @@ func NewMockClient(response interface{}, err error) rpc.EndpointRequester {
 	}
 }
 
-func (mc *mockClient) SendRequest(method string, params interface{}, reply interface{}) error {
+func (mc *mockClient) SendRequest(ctx context.Context, method string, params interface{}, reply interface{}) error {
 	if mc.err != nil {
 		return mc.err
 	}
@@ -72,7 +73,7 @@ func TestStartCPUProfiler(t *testing.T) {
 
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(api.SuccessResponse{Success: test.Success}, test.Err)}
-		success, err := mockClient.StartCPUProfiler()
+		success, err := mockClient.StartCPUProfiler(context.Background())
 		// if there is error as expected, the test passes
 		if err != nil && test.Err != nil {
 			continue
@@ -91,7 +92,7 @@ func TestStopCPUProfiler(t *testing.T) {
 
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(api.SuccessResponse{Success: test.Success}, test.Err)}
-		success, err := mockClient.StopCPUProfiler()
+		success, err := mockClient.StopCPUProfiler(context.Background())
 		// if there is error as expected, the test passes
 		if err != nil && test.Err != nil {
 			continue
@@ -110,7 +111,7 @@ func TestMemoryProfile(t *testing.T) {
 
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(api.SuccessResponse{Success: test.Success}, test.Err)}
-		success, err := mockClient.MemoryProfile()
+		success, err := mockClient.MemoryProfile(context.Background())
 		// if there is error as expected, the test passes
 		if err != nil && test.Err != nil {
 			continue
@@ -129,7 +130,7 @@ func TestLockProfile(t *testing.T) {
 
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(api.SuccessResponse{Success: test.Success}, test.Err)}
-		success, err := mockClient.LockProfile()
+		success, err := mockClient.LockProfile(context.Background())
 		// if there is error as expected, the test passes
 		if err != nil && test.Err != nil {
 			continue
@@ -148,7 +149,7 @@ func TestAlias(t *testing.T) {
 
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(api.SuccessResponse{Success: test.Success}, test.Err)}
-		success, err := mockClient.Alias("alias", "alias2")
+		success, err := mockClient.Alias(context.Background(), "alias", "alias2")
 		// if there is error as expected, the test passes
 		if err != nil && test.Err != nil {
 			continue
@@ -167,7 +168,7 @@ func TestAliasChain(t *testing.T) {
 
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(api.SuccessResponse{Success: test.Success}, test.Err)}
-		success, err := mockClient.AliasChain("chain", "chain-alias")
+		success, err := mockClient.AliasChain(context.Background(), "chain", "chain-alias")
 		// if there is error as expected, the test passes
 		if err != nil && test.Err != nil {
 			continue
@@ -188,7 +189,7 @@ func TestGetChainAliases(t *testing.T) {
 			Aliases: expectedReply,
 		}, nil)}
 
-		reply, err := mockClient.GetChainAliases("chain")
+		reply, err := mockClient.GetChainAliases(context.Background(), "chain")
 
 		assert.NoError(t, err)
 		assert.ElementsMatch(t, expectedReply, reply)
@@ -197,7 +198,7 @@ func TestGetChainAliases(t *testing.T) {
 	t.Run("failure", func(t *testing.T) {
 		mockClient := client{requester: NewMockClient(&GetChainAliasesReply{}, errors.New("some error"))}
 
-		_, err := mockClient.GetChainAliases("chain")
+		_, err := mockClient.GetChainAliases(context.Background(), "chain")
 
 		assert.EqualError(t, err, "some error")
 	})
@@ -208,7 +209,7 @@ func TestStacktrace(t *testing.T) {
 
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(api.SuccessResponse{Success: test.Success}, test.Err)}
-		success, err := mockClient.Stacktrace()
+		success, err := mockClient.Stacktrace(context.Background())
 		// if there is error as expected, the test passes
 		if err != nil && test.Err != nil {
 			continue
