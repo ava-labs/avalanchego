@@ -186,6 +186,11 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	if evm.depth > int(params.CallCreateDepth) {
 		return nil, gas, ErrDepth
 	}
+	// Fail for negative transfer value
+	// also avoided by current RLP encode mechanism
+	if value.Sign() < 0 {
+		return nil, gas, ErrNegativeTransferValue
+	}
 	// Fail if we're trying to transfer more than the available balance
 	if value.Sign() != 0 && !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
 		return nil, gas, ErrInsufficientBalance
@@ -272,11 +277,18 @@ func (evm *EVM) CallExpert(caller ContractRef, addr common.Address, input []byte
 		return nil, gas, ErrDepth
 	}
 
+	// Fail for negative transfer value
+	if value.Sign() < 0 {
+		return nil, gas, ErrNegativeTransferValue
+	}
 	// Fail if we're trying to transfer more than the available balance
 	if value.Sign() != 0 && !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
 		return nil, gas, ErrInsufficientBalance
 	}
 
+	if value2.Sign() < 0 {
+		return nil, gas, ErrNegativeNativeAssetAmount
+	}
 	if value2.Sign() != 0 && !evm.Context.CanTransferMC(evm.StateDB, caller.Address(), addr, coinID, value2) {
 		return nil, gas, ErrInsufficientBalance
 	}
@@ -350,6 +362,10 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 	// Fail if we're trying to execute above the call depth limit
 	if evm.depth > int(params.CallCreateDepth) {
 		return nil, gas, ErrDepth
+	}
+	// Fail for negative transfer value
+	if value.Sign() < 0 {
+		return nil, gas, ErrNegativeTransferValue
 	}
 	// Fail if we're trying to transfer more than the available balance
 	// Note although it's noop to transfer X ether to caller itself. But
@@ -509,6 +525,10 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	// limit.
 	if evm.depth > int(params.CallCreateDepth) {
 		return nil, common.Address{}, gas, ErrDepth
+	}
+	// Fail for negative transfer value
+	if value.Sign() < 0 {
+		return nil, common.Address{}, gas, ErrNegativeTransferValue
 	}
 	if !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
 		return nil, common.Address{}, gas, ErrInsufficientBalance
