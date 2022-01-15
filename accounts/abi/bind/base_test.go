@@ -278,19 +278,40 @@ func TestUnpackIndexedBytesTyLogIntoMap(t *testing.T) {
 	unpackAndCheck(t, bc, expectedReceivedMap, mockLog)
 }
 
-func TestTransactNativeAssetCallNilAmount(t *testing.T) {
+func TestTransactNativeAssetCallNilAssetAmount(t *testing.T) {
 	assert := assert.New(t)
 	mt := &mockTransactor{}
 	bc := bind.NewBoundContract(common.Address{}, abi.ABI{}, nil, mt, nil)
 	opts := &bind.TransactOpts{
 		Signer: mockSign,
 	}
-	// check that fails if amount is nil
+	// fails if asset amount is nil
 	opts.NativeAssetCall = &bind.NativeAssetCallOpts{
 		AssetID:     common.Hash{},
 		AssetAmount: nil,
 	}
 	_, err := bc.Transact(opts, "")
+	assert.NotNil(err)
+}
+
+func TestTransactNativeAssetCallNonZeroValue(t *testing.T) {
+	assert := assert.New(t)
+	mt := &mockTransactor{}
+	bc := bind.NewBoundContract(common.Address{}, abi.ABI{}, nil, mt, nil)
+	opts := &bind.TransactOpts{
+		Signer: mockSign,
+	}
+	opts.NativeAssetCall = &bind.NativeAssetCallOpts{
+		AssetID:     common.Hash{},
+		AssetAmount: big.NewInt(11),
+	}
+	// fails if value > 0
+	opts.Value = big.NewInt(11)
+	_, err := bc.Transact(opts, "")
+	assert.NotNil(err)
+	// fails if value < 0
+	opts.Value = big.NewInt(-11)
+	_, err = bc.Transact(opts, "")
 	assert.NotNil(err)
 }
 
