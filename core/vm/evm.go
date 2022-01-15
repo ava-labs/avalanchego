@@ -527,6 +527,7 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 		return nil, common.Address{}, gas, ErrDepth
 	}
 	// Fail for negative transfer value
+	// also avoided by current RLP encode mechanism -Create() call-
 	if value.Sign() < 0 {
 		return nil, common.Address{}, gas, ErrNegativeTransferValue
 	}
