@@ -193,6 +193,11 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	snapshot := evm.StateDB.Snapshot()
 	p, isPrecompile := evm.precompile(addr)
 
+	// Fail if precompile call with non null transfer value
+	if isPrecompile && value.Cmp(big.NewInt(0)) != 0 {
+		return nil, gas, ErrNonZeroValueToPrecompile
+	}
+
 	if !evm.StateDB.Exist(addr) {
 		if !isPrecompile && evm.chainRules.IsEIP158 && value.Sign() == 0 {
 			// Calling a non existing account, don't do anything, but ping the tracer
@@ -354,6 +359,12 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 		return nil, gas, ErrInsufficientBalance
 	}
 	var snapshot = evm.StateDB.Snapshot()
+	p, isPrecompile := evm.precompile(addr)
+
+	// Fail if precompile call with non null transfer value
+	if isPrecompile && value.Cmp(big.NewInt(0)) != 0 {
+		return nil, gas, ErrNonZeroValueToPrecompile
+	}
 
 	// Invoke tracer hooks that signal entering/exiting a call frame
 	if evm.Config.Debug {
@@ -364,7 +375,7 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 	}
 
 	// It is allowed to call precompiles, even via delegatecall
-	if p, isPrecompile := evm.precompile(addr); isPrecompile {
+	if isPrecompile {
 		ret, gas, err = p.Run(evm, caller, addr, input, gas, evm.interpreter.readOnly)
 	} else {
 		addrCopy := addr
