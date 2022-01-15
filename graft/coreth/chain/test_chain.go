@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/coreth/accounts/keystore"
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
@@ -88,6 +89,7 @@ func NewDefaultChain(t *testing.T) (*ETHChain, chan core.NewTxPoolHeadEvent, <-c
 		eth.DefaultSettings,
 		new(dummy.ConsensusCallbacks),
 		common.Hash{},
+		&mockable.Clock{},
 	)
 	if err != nil {
 		t.Fatal(err)

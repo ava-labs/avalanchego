@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/state"
@@ -34,12 +35,12 @@ type ETHChain struct {
 }
 
 // NewETHChain creates an Ethereum blockchain with the given configs.
-func NewETHChain(config *eth.Config, nodecfg *node.Config, chainDB ethdb.Database, settings eth.Settings, consensusCallbacks *dummy.ConsensusCallbacks, lastAcceptedHash common.Hash) (*ETHChain, error) {
+func NewETHChain(config *eth.Config, nodecfg *node.Config, chainDB ethdb.Database, settings eth.Settings, consensusCallbacks *dummy.ConsensusCallbacks, lastAcceptedHash common.Hash, clock *mockable.Clock) (*ETHChain, error) {
 	node, err := node.New(nodecfg)
 	if err != nil {
 		return nil, err
 	}
-	backend, err := eth.New(node, config, consensusCallbacks, chainDB, settings, lastAcceptedHash)
+	backend, err := eth.New(node, config, consensusCallbacks, chainDB, settings, lastAcceptedHash, clock)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backend: %w", err)
 	}
@@ -165,16 +166,33 @@ func (self *ETHChain) NewRPCHandler(maximumDuration time.Duration) *rpc.Server {
 	return rpc.NewServer(maximumDuration)
 }
 
-func (self *ETHChain) AttachEthService(handler *rpc.Server, namespaces []string) {
-	nsmap := make(map[string]bool)
-	for _, ns := range namespaces {
-		nsmap[ns] = true
+// AttachEthService registers the backend RPC services provided by Ethereum
+// to the provided handler under their assigned namespaces.
+func (self *ETHChain) AttachEthService(handler *rpc.Server, names []string) error {
+	enabledServicesSet := make(map[string]struct{})
+	for _, ns := range names {
+		enabledServicesSet[ns] = struct{}{}
 	}
+
+	apiSet := make(map[string]rpc.API)
 	for _, api := range self.backend.APIs() {
-		if nsmap[api.Namespace] {
-			handler.RegisterName(api.Namespace, api.Service)
+		if existingAPI, exists := apiSet[api.Name]; exists {
+			return fmt.Errorf("duplicated API name: %s, namespaces %s and %s", api.Name, api.Namespace, existingAPI.Namespace)
+		}
+		apiSet[api.Name] = api
+	}
+
+	for name := range enabledServicesSet {
+		api, exists := apiSet[name]
+		if !exists {
+			return fmt.Errorf("API service %s not found", name)
+		}
+		if err := handler.RegisterName(api.Namespace, api.Service); err != nil {
+			return err
 		}
 	}
+
+	return nil
 }
 
 func (self *ETHChain) GetTxSubmitCh() <-chan core.NewTxsEvent {

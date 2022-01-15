@@ -15,8 +15,8 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/params"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
@@ -92,7 +92,7 @@ func (in *EVMInput) Verify() error {
 type UnsignedTx interface {
 	Initialize(unsignedBytes, signedBytes []byte)
 	ID() ids.ID
-	GasUsed() (uint64, error)
+	GasUsed(fixedFee bool) (uint64, error)
 	Burned(assetID ids.ID) (uint64, error)
 	UnsignedBytes() []byte
 	Bytes() []byte
@@ -102,16 +102,16 @@ type UnsignedTx interface {
 type UnsignedAtomicTx interface {
 	UnsignedTx
 
-	// UTXOs this tx consumes
+	// InputUTXOs returns the UTXOs this tx consumes
 	InputUTXOs() ids.Set
 	// Verify attempts to verify that the transaction is well formed
-	// TODO: remove [xChainID] parameter since this is provided on [ctx]
-	Verify(xChainID ids.ID, ctx *snow.Context, rules params.Rules) error
+	Verify(ctx *snow.Context, rules params.Rules) error
 	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(vm *VM, stx *Tx, parent *Block, baseFee *big.Int, rules params.Rules) error
-
-	// Accept this transaction with the additionally provided state transitions.
-	Accept(ctx *snow.Context, batch database.Batch) error
+	// AtomicOps returns the blockchainID and set of atomic requests that
+	// must be applied to shared memory for this transaction to be accepted.
+	// The set of atomic requests must be returned in a consistent order.
+	AtomicOps() (ids.ID, *atomic.Requests, error)
 
 	EVMStateTransfer(ctx *snow.Context, state *state.StateDB) error
 }
@@ -160,14 +160,14 @@ func (tx *Tx) Sign(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) er
 // for via this transaction denominated in [avaxAssetID] with [baseFee] used to calculate the
 // cost of this transaction. This function also returns the [gasUsed] by the
 // transaction for inclusion in the [baseFee] algorithm.
-func (tx *Tx) BlockFeeContribution(avaxAssetID ids.ID, baseFee *big.Int) (*big.Int, *big.Int, error) {
+func (tx *Tx) BlockFeeContribution(fixedFee bool, avaxAssetID ids.ID, baseFee *big.Int) (*big.Int, *big.Int, error) {
 	if baseFee == nil {
 		return nil, nil, errNilBaseFee
 	}
 	if baseFee.Cmp(common.Big0) <= 0 {
 		return nil, nil, fmt.Errorf("cannot calculate tip with base fee %d <= 0", baseFee)
 	}
-	gasUsed, err := tx.GasUsed()
+	gasUsed, err := tx.GasUsed(fixedFee)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -278,4 +278,31 @@ func calculateDynamicFee(cost uint64, baseFee *big.Int) (uint64, error) {
 
 func calcBytesCost(len int) uint64 {
 	return uint64(len) * TxBytesGas
+}
+
+// mergeAtomicOps merges atomic requests represented by [txs]
+// to the [output] map, depending on whether [chainID] is present in the map.
+func mergeAtomicOps(txs []*Tx) (map[ids.ID]*atomic.Requests, error) {
+	if len(txs) > 1 {
+		// txs should be stored in order of txID to ensure consistency
+		// with txs initialized from the txID index.
+		copyTxs := make([]*Tx, len(txs))
+		copy(copyTxs, txs)
+		sort.Slice(copyTxs, func(i, j int) bool { return copyTxs[i].ID().Hex() < copyTxs[j].ID().Hex() })
+		txs = copyTxs
+	}
+	output := make(map[ids.ID]*atomic.Requests)
+	for _, tx := range txs {
+		chainID, txRequest, err := tx.UnsignedAtomicTx.AtomicOps()
+		if err != nil {
+			return nil, err
+		}
+		if request, exists := output[chainID]; exists {
+			request.PutRequests = append(request.PutRequests, txRequest.PutRequests...)
+			request.RemoveRequests = append(request.RemoveRequests, txRequest.RemoveRequests...)
+		} else {
+			output[chainID] = txRequest
+		}
+	}
+	return output, nil
 }
