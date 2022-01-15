@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -395,6 +396,9 @@ func (vm *VM) Initialize(
 	bonusBlockHeights := make(map[uint64]ids.ID)
 	if vm.chainID.Cmp(params.AvalancheMainnetChainID) == 0 {
 		bonusBlockHeights = bonusBlockMainnetHeights
+	}
+	if err := vm.repairAtomicRepositoryForBonusBlockTxs(getAtomicRepositoryRepairHeights(vm.chainID), vm.getAtomicTxFromPreApricot5BlockByHeight); err != nil {
+		return fmt.Errorf("failed to repair atomic repository: %w", err)
 	}
 	vm.atomicTrie, err = NewAtomicTrie(vm.db, bonusBlockHeights, vm.atomicTxRepository, vm.codec, lastAccepted.NumberU64())
 	if err != nil {
@@ -1384,4 +1388,119 @@ func (vm *VM) estimateBaseFee(ctx context.Context) (*big.Int, error) {
 	}
 
 	return baseFee, nil
+}
+
+func getAtomicRepositoryRepairHeights(chainID *big.Int) []uint64 {
+	if chainID.Cmp(params.AvalancheMainnetChainID) != 0 {
+		return nil
+	}
+	repairHeights := make([]uint64, 0, len(bonusBlockMainnetHeights)+len(canonicalBonusBlocks))
+	for height := range bonusBlockMainnetHeights {
+		repairHeights = append(repairHeights, height)
+	}
+	for _, height := range canonicalBonusBlocks {
+		if _, exists := bonusBlockMainnetHeights[height]; !exists {
+			repairHeights = append(repairHeights, height)
+		}
+	}
+	sort.Slice(repairHeights, func(i, j int) bool { return repairHeights[i] < repairHeights[j] })
+	return repairHeights
+}
+
+func (vm *VM) getAtomicTxFromPreApricot5BlockByHeight(height uint64) (*Tx, error) {
+	blk := vm.chain.GetBlockByNumber(height)
+	if blk == nil {
+		return nil, nil
+	}
+	return ExtractAtomicTx(blk.ExtData(), vm.codec)
+}
+
+// repairAtomicRepositoryForBonusBlockTxs ensures that atomic txs that were processed
+// on more than one block (canonical block + a number of bonus blocks) are indexed to
+// the first height they were processed on (canonical block).
+// [sortedHeights] should include all canonical block + bonus block heights in ascending
+// order, and will only be passed as non-empty on mainnet.
+func (vm *VM) repairAtomicRepositoryForBonusBlockTxs(
+	sortedHeights []uint64, getAtomicTxFromBlockByHeight func(height uint64) (*Tx, error),
+) error {
+	done, err := vm.atomicTxRepository.IsBonusBlocksRepaired()
+	if err != nil {
+		return err
+	}
+	if done {
+		return nil
+	}
+	repairedEntries := uint64(0)
+	seenTxs := make(map[ids.ID][]uint64)
+	for _, height := range sortedHeights {
+		// get atomic tx from block
+		tx, err := getAtomicTxFromBlockByHeight(height)
+		if err != nil {
+			return err
+		}
+		if tx == nil {
+			continue
+		}
+
+		// get the tx by txID and update it, the first time we encounter
+		// a given [txID], overwrite the previous [txID] => [height]
+		// mapping. This provides a canonical mapping across nodes.
+		heights, seen := seenTxs[tx.ID()]
+		_, foundHeight, err := vm.atomicTxRepository.GetByTxID(tx.ID())
+		if err != nil && !errors.Is(err, database.ErrNotFound) {
+			return err
+		}
+		if !seen {
+			if err := vm.atomicTxRepository.Write(height, []*Tx{tx}); err != nil {
+				return err
+			}
+		} else {
+			if err := vm.atomicTxRepository.WriteBonus(height, []*Tx{tx}); err != nil {
+				return err
+			}
+		}
+		if foundHeight != height && !seen {
+			repairedEntries++
+		}
+		seenTxs[tx.ID()] = append(heights, height)
+	}
+	{
+		// TODO: remove for public release
+		metadataKeys, trieKeys := 0, 0
+		commitKeys := 10000
+		{
+			atomicTrieMetaDB := prefixdb.New(atomicTrieMetaDBPrefix, vm.db)
+			it := atomicTrieMetaDB.NewIterator()
+			defer it.Release()
+			for it.Next() {
+				metadataKeys++
+				atomicTrieMetaDB.Delete(it.Key())
+				if metadataKeys%commitKeys == 0 {
+					if err := vm.db.Commit(); err != nil {
+						return err
+					}
+				}
+			}
+		}
+		{
+			atomicTrieDB := prefixdb.New(atomicTrieDBPrefix, vm.db)
+			it := atomicTrieDB.NewIterator()
+			defer it.Release()
+			for it.Next() {
+				trieKeys++
+				atomicTrieDB.Delete(it.Key())
+				if trieKeys%commitKeys == 0 {
+					if err := vm.db.Commit(); err != nil {
+						return err
+					}
+				}
+			}
+		}
+		log.Info("wiped atomic trie db", "metadataKeys", metadataKeys, "trieKeys", trieKeys)
+	}
+	if err := vm.atomicTxRepository.MarkBonusBlocksRepaired(repairedEntries); err != nil {
+		return err
+	}
+	log.Info("repairAtomicRepositoryForBonusBlockTxs complete", "repairedEntries", repairedEntries)
+	return vm.db.Commit()
 }
