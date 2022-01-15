@@ -28,6 +28,7 @@ package bind_test
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"reflect"
 	"strings"
@@ -291,7 +292,7 @@ func TestTransactNativeAssetCallNilAssetAmount(t *testing.T) {
 		AssetAmount: nil,
 	}
 	_, err := bc.Transact(opts, "")
-	assert.NotNil(err)
+	assert.ErrorIs(err, bind.ErrNilAssetAmount)
 }
 
 func TestTransactNativeAssetCallNonZeroValue(t *testing.T) {
@@ -308,11 +309,11 @@ func TestTransactNativeAssetCallNonZeroValue(t *testing.T) {
 	// fails if value > 0
 	opts.Value = big.NewInt(11)
 	_, err := bc.Transact(opts, "")
-	assert.NotNil(err)
+	assert.Equal(err.Error(), fmt.Sprintf("value must be 0 when performing native asset call, found %v", opts.Value))
 	// fails if value < 0
 	opts.Value = big.NewInt(-11)
 	_, err = bc.Transact(opts, "")
-	assert.NotNil(err)
+	assert.Equal(err.Error(), fmt.Sprintf("value must be 0 when performing native asset call, found %v", opts.Value))
 }
 
 func TestTransactNativeAssetCall(t *testing.T) {
