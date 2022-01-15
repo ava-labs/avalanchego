@@ -1334,7 +1334,7 @@ func TestGenerateChainInvalidBlockFee(t *testing.T, create func(db ethdb.Databas
 	if err == nil {
 		t.Fatal("should not have been able to build a block because of insufficient block fee")
 	}
-	if !strings.Contains(err.Error(), "insufficient gas (0) to cover the block cost (100000)") {
+	if !strings.Contains(err.Error(), "insufficient gas (0) to cover the block cost (400000)") {
 		t.Fatalf("should have gotten insufficient block fee error but got %v instead", err)
 	}
 }
@@ -1404,7 +1404,7 @@ func TestInsertChainInvalidBlockFee(t *testing.T, create func(db ethdb.Database,
 	if err == nil {
 		t.Fatal("should not have been able to build a block because of insufficient block fee")
 	}
-	if !strings.Contains(err.Error(), "insufficient gas (0) to cover the block cost (100000)") {
+	if !strings.Contains(err.Error(), "insufficient gas (0) to cover the block cost (400000)") {
 		t.Fatalf("should have gotten insufficient block fee error but got %v instead", err)
 	}
 }
@@ -1440,7 +1440,7 @@ func TestInsertChainValidBlockFee(t *testing.T, create func(db ethdb.Database, c
 	signer := types.LatestSigner(params.TestChainConfig)
 	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
 	// to the BlockChain's database while generating blocks.
-	tip := big.NewInt(2000 * params.GWei)
+	tip := big.NewInt(50000 * params.GWei)
 	transfer := big.NewInt(10000)
 	chain, _, err := GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, 3, 0, func(i int, gen *BlockGen) {
 		feeCap := new(big.Int).Add(gen.BaseFee(), tip)

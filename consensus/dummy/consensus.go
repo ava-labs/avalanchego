@@ -31,20 +31,26 @@ var (
 	errExtDataGasUsedTooLarge = errors.New("extDataGasUsed is not uint64")
 )
 
+type Mode uint
+
+const (
+	ModeSkipHeader   Mode = 1 // Skip over header verification
+	ModeSkipBlockFee Mode = 2 // Skip block fee verification
+)
+
 type (
 	OnFinalizeAndAssembleCallbackType = func(header *types.Header, state *state.StateDB, txs []*types.Transaction) (extraData []byte, blockFeeContribution *big.Int, extDataGasUsed *big.Int, err error)
 	OnAPIsCallbackType                = func(consensus.ChainHeaderReader) []rpc.API
 	OnExtraStateChangeType            = func(block *types.Block, statedb *state.StateDB) (blockFeeContribution *big.Int, extDataGasUsed *big.Int, err error)
 
 	ConsensusCallbacks struct {
-		OnAPIs                OnAPIsCallbackType
 		OnFinalizeAndAssemble OnFinalizeAndAssembleCallbackType
 		OnExtraStateChange    OnExtraStateChangeType
 	}
 
 	DummyEngine struct {
-		cb       *ConsensusCallbacks
-		ethFaker bool
+		cb            *ConsensusCallbacks
+		consensusMode Mode
 	}
 )
 
@@ -56,15 +62,15 @@ func NewDummyEngine(cb *ConsensusCallbacks) *DummyEngine {
 
 func NewETHFaker() *DummyEngine {
 	return &DummyEngine{
-		cb:       new(ConsensusCallbacks),
-		ethFaker: true,
+		cb:            new(ConsensusCallbacks),
+		consensusMode: ModeSkipBlockFee,
 	}
 }
 
 func NewComplexETHFaker(cb *ConsensusCallbacks) *DummyEngine {
 	return &DummyEngine{
-		cb:       cb,
-		ethFaker: true,
+		cb:            cb,
+		consensusMode: ModeSkipBlockFee,
 	}
 }
 
@@ -72,13 +78,19 @@ func NewFaker() *DummyEngine {
 	return NewDummyEngine(new(ConsensusCallbacks))
 }
 
+func NewFullFaker() *DummyEngine {
+	return &DummyEngine{
+		cb:            new(ConsensusCallbacks),
+		consensusMode: ModeSkipHeader,
+	}
+}
+
 func (self *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, header *types.Header, parent *types.Header) error {
 	timestamp := new(big.Int).SetUint64(header.Time)
 
 	// Verify that the gas limit is <= 2^63-1
-	cap := uint64(0x7fffffffffffffff)
-	if header.GasLimit > cap {
-		return fmt.Errorf("invalid gasLimit: have %v, max %v", header.GasLimit, cap)
+	if header.GasLimit > params.MaxGasLimit {
+		return fmt.Errorf("invalid gasLimit: have %v, max %v", header.GasLimit, params.MaxGasLimit)
 	}
 	// Verify that the gasUsed is <= gasLimit
 	if header.GasUsed > header.GasLimit {
@@ -138,12 +150,16 @@ func (self *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, heade
 		return nil
 	}
 
-	// Enforce Apricot Phase 4 constraints
+	// Enforce BlockGasCost constraints
+	blockGasCostStep := ApricotPhase4BlockGasCostStep
+	if config.IsApricotPhase5(timestamp) {
+		blockGasCostStep = ApricotPhase5BlockGasCostStep
+	}
 	expectedBlockGasCost := calcBlockGasCost(
 		ApricotPhase4TargetBlockRate,
 		ApricotPhase4MinBlockGasCost,
 		ApricotPhase4MaxBlockGasCost,
-		ApricotPhase4BlockGasCostStep,
+		blockGasCostStep,
 		parent.BlockGasCost,
 		parent.Time, header.Time,
 	)
@@ -203,8 +219,7 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header 
 	if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {
 		return consensus.ErrInvalidNumber
 	}
-	// Verify the engine specific seal securing the block
-	return self.VerifySeal(chain, header)
+	return nil
 }
 
 func (self *DummyEngine) Author(header *types.Header) (common.Address, error) {
@@ -212,6 +227,10 @@ func (self *DummyEngine) Author(header *types.Header) (common.Address, error) {
 }
 
 func (self *DummyEngine) VerifyHeader(chain consensus.ChainHeaderReader, header *types.Header) error {
+	// If we're running a full engine faking, accept any input as valid
+	if self.consensusMode == ModeSkipHeader {
+		return nil
+	}
 	// Short circuit if the header is known, or it's parent not
 	number := header.Number.Uint64()
 	if chain.GetHeader(header.Hash(), number) != nil {
@@ -232,10 +251,6 @@ func (self *DummyEngine) VerifyUncles(chain consensus.ChainReader, block *types.
 	return nil
 }
 
-func (self *DummyEngine) VerifySeal(chain consensus.ChainHeaderReader, header *types.Header) error {
-	return nil
-}
-
 func (self *DummyEngine) Prepare(chain consensus.ChainHeaderReader, header *types.Header) error {
 	header.Difficulty = big.NewInt(1)
 	return nil
@@ -248,7 +263,7 @@ func (self *DummyEngine) verifyBlockFee(
 	receipts []*types.Receipt,
 	extraStateChangeContribution *big.Int,
 ) error {
-	if self.ethFaker {
+	if self.consensusMode == ModeSkipBlockFee {
 		return nil
 	}
 	if baseFee == nil || baseFee.Sign() <= 0 {
@@ -324,11 +339,15 @@ func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *type
 		if blockExtDataGasUsed := block.ExtDataGasUsed(); blockExtDataGasUsed == nil || !blockExtDataGasUsed.IsUint64() || blockExtDataGasUsed.Cmp(extDataGasUsed) != 0 {
 			return fmt.Errorf("invalid extDataGasUsed: have %d, want %d", blockExtDataGasUsed, extDataGasUsed)
 		}
+		blockGasCostStep := ApricotPhase4BlockGasCostStep
+		if chain.Config().IsApricotPhase5(new(big.Int).SetUint64(block.Time())) {
+			blockGasCostStep = ApricotPhase5BlockGasCostStep
+		}
 		blockGasCost := calcBlockGasCost(
 			ApricotPhase4TargetBlockRate,
 			ApricotPhase4MinBlockGasCost,
 			ApricotPhase4MaxBlockGasCost,
-			ApricotPhase4BlockGasCostStep,
+			blockGasCostStep,
 			parent.BlockGasCost,
 			parent.Time, block.Time(),
 		)
@@ -362,19 +381,20 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 			return nil, err
 		}
 	}
-	if self.ethFaker {
-		extDataGasUsed = new(big.Int).Set(common.Big0)
-	}
 	if chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
 		header.ExtDataGasUsed = extDataGasUsed
 		if header.ExtDataGasUsed == nil {
 			header.ExtDataGasUsed = new(big.Int).Set(common.Big0)
 		}
+		blockGasCostStep := ApricotPhase4BlockGasCostStep
+		if chain.Config().IsApricotPhase5(new(big.Int).SetUint64(header.Time)) {
+			blockGasCostStep = ApricotPhase5BlockGasCostStep
+		}
 		header.BlockGasCost = calcBlockGasCost(
 			ApricotPhase4TargetBlockRate,
 			ApricotPhase4MinBlockGasCost,
 			ApricotPhase4MaxBlockGasCost,
-			ApricotPhase4BlockGasCostStep,
+			blockGasCostStep,
 			parent.BlockGasCost,
 			parent.Time, header.Time,
 		)
@@ -400,14 +420,6 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 
 func (self *DummyEngine) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, parent *types.Header) *big.Int {
 	return big.NewInt(1)
-}
-
-func (self *DummyEngine) APIs(chain consensus.ChainHeaderReader) (res []rpc.API) {
-	res = nil
-	if self.cb.OnAPIs != nil {
-		res = self.cb.OnAPIs(chain)
-	}
-	return
 }
 
 func (self *DummyEngine) Close() error {
