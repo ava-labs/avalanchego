@@ -91,11 +91,15 @@ func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 	case nil:
 	case database.ErrNotFound:
 		// we must have hit the snowman++ fork. Check it.
+		currentFork, err := vm.State.GetForkHeight()
+		if err != nil {
+			return common.Summary{}, err
+		}
 		innerBlk, err := vm.ChainVM.GetBlock(innerKey.BlkID)
 		if err != nil {
 			return common.Summary{}, err
 		}
-		if innerBlk.Height() > vm.latestPreForkHeight {
+		if innerBlk.Height() > currentFork {
 			return common.Summary{}, err
 		}
 
@@ -218,7 +222,7 @@ func (vm *VM) SetLastSummaryBlock(blkByte []byte) error {
 		err           error
 	)
 	if blk, err = vm.parsePostForkBlock(blkByte); err == nil {
-		innerBlkBytes = blk.getInnerBlk().Bytes()
+		innerBlkBytes = blk.GetInnerBlk().Bytes()
 	} else if blk, err = vm.parsePreForkBlock(blkByte); err == nil {
 		innerBlkBytes = blk.Bytes()
 	} else {

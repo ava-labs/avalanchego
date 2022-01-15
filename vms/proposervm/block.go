@@ -36,7 +36,7 @@ type Block interface {
 	snowman.Block
 
 	conditionalAccept(acceptInnerBlk bool) error
-	getInnerBlk() snowman.Block
+	GetInnerBlk() snowman.Block
 
 	verifyPreForkChild(child *preForkBlock) error
 	verifyPostForkChild(child *postForkBlock) error
@@ -232,7 +232,7 @@ func (p *postForkCommonComponents) buildChild(
 	return child, nil
 }
 
-func (p *postForkCommonComponents) getInnerBlk() snowman.Block {
+func (p *postForkCommonComponents) GetInnerBlk() snowman.Block {
 	return p.innerBlk
 }
 

@@ -45,6 +45,7 @@ type VMClient interface {
 	BatchedParseBlock(ctx context.Context, in *BatchedParseBlockRequest, opts ...grpc.CallOption) (*BatchedParseBlockResponse, error)
 	// HeightIndexedVM
 	GetBlockIDByHeight(ctx context.Context, in *GetBlockIDByHeightRequest, opts ...grpc.CallOption) (*GetBlockIDByHeightResponse, error)
+	IsHeightIndexComplete(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*IsHeightIndexCompleteResponse, error)
 	// State sync
 	RegisterFastSyncer(ctx context.Context, in *RegisterFastSyncerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	StateSyncEnabled(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncEnabledResponse, error)
@@ -288,6 +289,15 @@ func (c *vMClient) GetBlockIDByHeight(ctx context.Context, in *GetBlockIDByHeigh
 	return out, nil
 }
 
+func (c *vMClient) IsHeightIndexComplete(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*IsHeightIndexCompleteResponse, error) {
+	out := new(IsHeightIndexCompleteResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/IsHeightIndexComplete", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *vMClient) RegisterFastSyncer(ctx context.Context, in *RegisterFastSyncerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/RegisterFastSyncer", in, out, opts...)
@@ -381,6 +391,7 @@ type VMServer interface {
 	BatchedParseBlock(context.Context, *BatchedParseBlockRequest) (*BatchedParseBlockResponse, error)
 	// HeightIndexedVM
 	GetBlockIDByHeight(context.Context, *GetBlockIDByHeightRequest) (*GetBlockIDByHeightResponse, error)
+	IsHeightIndexComplete(context.Context, *emptypb.Empty) (*IsHeightIndexCompleteResponse, error)
 	// State sync
 	RegisterFastSyncer(context.Context, *RegisterFastSyncerRequest) (*emptypb.Empty, error)
 	StateSyncEnabled(context.Context, *emptypb.Empty) (*StateSyncEnabledResponse, error)
@@ -470,6 +481,9 @@ func (UnimplementedVMServer) BatchedParseBlock(context.Context, *BatchedParseBlo
 }
 func (UnimplementedVMServer) GetBlockIDByHeight(context.Context, *GetBlockIDByHeightRequest) (*GetBlockIDByHeightResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetBlockIDByHeight not implemented")
+}
+func (UnimplementedVMServer) IsHeightIndexComplete(context.Context, *emptypb.Empty) (*IsHeightIndexCompleteResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method IsHeightIndexComplete not implemented")
 }
 func (UnimplementedVMServer) RegisterFastSyncer(context.Context, *RegisterFastSyncerRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RegisterFastSyncer not implemented")
@@ -955,6 +969,24 @@ func _VM_GetBlockIDByHeight_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VM_IsHeightIndexComplete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).IsHeightIndexComplete(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/IsHeightIndexComplete",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).IsHeightIndexComplete(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _VM_RegisterFastSyncer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RegisterFastSyncerRequest)
 	if err := dec(in); err != nil {
@@ -1187,6 +1219,10 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetBlockIDByHeight",
 			Handler:    _VM_GetBlockIDByHeight_Handler,
+		},
+		{
+			MethodName: "IsHeightIndexComplete",
+			Handler:    _VM_IsHeightIndexComplete_Handler,
 		},
 		{
 			MethodName: "RegisterFastSyncer",

@@ -12,15 +12,19 @@ a blockchains platform with high throughput, and blazing fast transactions.
 Avalanche is an incredibly lightweight protocol, so the minimum computer requirements are quite modest.
 Note that as network usage increases, hardware requirements may change.
 
+The minimum recommended hardware specification for nodes connected to Mainnet is: 
+
 - CPU: Equivalent of 8 AWS vCPU
-- RAM: 16 GB
-- Storage: 200 GB
+- RAM: 16 GiB
+- Storage: 512 GiB
 - OS: Ubuntu 18.04/20.04 or macOS >= 10.15 (Catalina)
 - Network: Reliable IPv4 or IPv6 network connection, with an open public port.
-- Software Dependencies:
-  - [Go](https://golang.org/doc/install) version >= 1.16.8 and set up [`$GOPATH`](https://github.com/golang/go/wiki/SettingGOPATH).
-  - [gcc](https://gcc.gnu.org/)
-  - g++
+
+If you plan to build AvalancheGo from source, you will also need the following software:
+
+- [Go](https://golang.org/doc/install) version >= 1.16.8
+- [gcc](https://gcc.gnu.org/)
+- g++
 
 ### Native Install
 

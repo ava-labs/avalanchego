@@ -189,6 +189,10 @@ message BatchedParseBlockResponse {
 }
 
 // HeightIndexedVM related messages
+message IsHeightIndexCompleteResponse {
+    bool completed = 1;
+}
+
 message GetBlockIDByHeightRequest {
     uint64 height = 1;
 }
@@ -342,6 +346,7 @@ service VM {
 
     // HeightIndexedVM
     rpc GetBlockIDByHeight(GetBlockIDByHeightRequest) returns (GetBlockIDByHeightResponse);
+    rpc IsHeightIndexComplete(google.protobuf.Empty) returns (IsHeightIndexCompleteResponse);
 
     // State sync
     rpc RegisterFastSyncer(RegisterFastSyncerRequest) returns (google.protobuf.Empty);

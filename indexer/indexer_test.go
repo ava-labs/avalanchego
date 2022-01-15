@@ -19,15 +19,15 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
-	"github.com/ava-labs/avalanchego/snow/engine/avalanche/mocks"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
-	avvtxmocks "github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex/mocks"
-	smblockmocks "github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
-	smengmocks "github.com/ava-labs/avalanchego/snow/engine/snowman/mocks"
+	avaEngFake "github.com/ava-labs/avalanchego/snow/engine/avalanche"
+	avaVMFake "github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
+	snowEngFake "github.com/ava-labs/avalanchego/snow/engine/snowman"
+	snowVMFake "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 type apiServerMock struct {
@@ -161,12 +161,12 @@ func TestIndexer(t *testing.T) {
 	assert.False(previouslyIndexed)
 
 	// Register this chain, creating a new index
-	chainVM := &smblockmocks.ChainVM{}
-	chainEngine := &smengmocks.Engine{}
-	chainEngine.On("Context").Return(chain1Ctx)
-	chainEngine.On("GetVM").Return(chainVM)
-
+	chainVM := &snowVMFake.TestVM{}
+	chainEngine := &snowEngFake.EngineTest{}
+	chainEngine.ContextF = func() *snow.ConsensusContext { return chain1Ctx }
+	chainEngine.GetVMF = func() common.VM { return chainVM }
 	idxr.RegisterChain("chain1", chainEngine)
+
 	isIncomplete, err = idxr.isIncomplete(chain1Ctx.ChainID)
 	assert.NoError(err)
 	assert.False(isIncomplete)
@@ -189,15 +189,15 @@ func TestIndexer(t *testing.T) {
 		Timestamp: now.UnixNano(),
 	}
 	// Mocked VM knows about this block now
-	chainVM.On("GetBlock", blkID).Return(
-		&snowman.TestBlock{
+	chainVM.GetBlockF = func(i ids.ID) (snowman.Block, error) {
+		return &snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
 				StatusV: choices.Accepted,
 				IDV:     blkID,
 			},
 			BytesV: blkBytes,
-		}, nil,
-	).Twice()
+		}, nil
+	}
 
 	assert.NoError(cd.Accept(chain1Ctx, blkID, blkBytes))
 
@@ -262,6 +262,7 @@ func TestIndexer(t *testing.T) {
 
 	// Register the same chain as before
 	idxr.RegisterChain("chain1", chainEngine)
+
 	blkIdx = idxr.blockIndices[chain1Ctx.ChainID]
 	assert.NotNil(blkIdx)
 	container, err = blkIdx.GetLastAccepted()
@@ -277,11 +278,12 @@ func TestIndexer(t *testing.T) {
 	previouslyIndexed, err = idxr.previouslyIndexed(chain2Ctx.ChainID)
 	assert.NoError(err)
 	assert.False(previouslyIndexed)
-	dagVM := &avvtxmocks.DAGVM{}
-	dagEngine := &mocks.Engine{}
-	dagEngine.On("Context").Return(chain2Ctx)
-	dagEngine.On("GetVM").Return(dagVM).Once()
+	dagVM := &avaVMFake.TestVM{}
+	dagEngine := &avaEngFake.EngineTest{}
+	dagEngine.ContextF = func() *snow.ConsensusContext { return chain2Ctx }
+	dagEngine.GetVMF = func() common.VM { return dagVM }
 	idxr.RegisterChain("chain2", dagEngine)
+
 	assert.NoError(err)
 	server = config.APIServer.(*apiServerMock)
 	assert.EqualValues(3, server.timesCalled) // block index, vtx index, tx index
@@ -300,15 +302,15 @@ func TestIndexer(t *testing.T) {
 		Timestamp: now.UnixNano(),
 	}
 	// Mocked VM knows about this block now
-	dagEngine.On("GetVtx", vtxID).Return(
-		&avalanche.TestVertex{
+	dagEngine.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+		return &avalanche.TestVertex{
 			TestDecidable: choices.TestDecidable{
 				StatusV: choices.Accepted,
 				IDV:     vtxID,
 			},
 			BytesV: vtxBytes,
-		}, nil,
-	).Once()
+		}, nil
+	}
 
 	assert.NoError(cd.Accept(chain2Ctx, vtxID, blkBytes))
 
@@ -349,16 +351,15 @@ func TestIndexer(t *testing.T) {
 		Timestamp: now.UnixNano(),
 	}
 	// Mocked VM knows about this tx now
-	dagVM.On("GetTx", txID).Return(
-		&snowstorm.TestTx{
+	dagVM.GetTxF = func(i ids.ID) (snowstorm.Tx, error) {
+		return &snowstorm.TestTx{
 			TestDecidable: choices.TestDecidable{
 				IDV:     txID,
 				StatusV: choices.Accepted,
 			},
 			BytesV: txBytes,
-		}, nil,
-	).Once()
-
+		}, nil
+	}
 	assert.NoError(dd.Accept(chain2Ctx, txID, blkBytes))
 
 	txIdx := idxr.txIndices[chain2Ctx.ChainID]
@@ -461,8 +462,10 @@ func TestIncompleteIndex(t *testing.T) {
 	previouslyIndexed, err := idxr.previouslyIndexed(chain1Ctx.ChainID)
 	assert.NoError(err)
 	assert.False(previouslyIndexed)
-	chainEngine := &smengmocks.Engine{}
-	chainEngine.On("Context").Return(chain1Ctx)
+	chainVM := &snowVMFake.TestVM{}
+	chainEngine := &snowEngFake.EngineTest{}
+	chainEngine.ContextF = func() *snow.ConsensusContext { return chain1Ctx }
+	chainEngine.GetVMF = func() common.VM { return chainVM }
 	idxr.RegisterChain("chain1", chainEngine)
 	isIncomplete, err = idxr.isIncomplete(chain1Ctx.ChainID)
 	assert.NoError(err)
@@ -544,10 +547,10 @@ func TestIgnoreNonDefaultChains(t *testing.T) {
 	chain1Ctx.SubnetID = ids.GenerateTestID()
 
 	// RegisterChain should return without adding an index for this chain
-	chainVM := &smblockmocks.ChainVM{}
-	chainEngine := &smengmocks.Engine{}
-	chainEngine.On("Context").Return(chain1Ctx)
-	chainEngine.On("GetVM").Return(chainVM)
+	chainVM := &snowVMFake.TestVM{}
+	chainEngine := &snowEngFake.EngineTest{}
+	chainEngine.ContextF = func() *snow.ConsensusContext { return chain1Ctx }
+	chainEngine.GetVMF = func() common.VM { return chainVM }
 	idxr.RegisterChain("chain1", chainEngine)
 	assert.Len(idxr.blockIndices, 0)
 }

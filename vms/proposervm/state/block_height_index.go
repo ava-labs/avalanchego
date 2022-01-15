@@ -5,6 +5,7 @@ package state
 
 import (
 	"encoding/binary"
+	"sync"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
@@ -13,81 +14,78 @@ import (
 )
 
 const (
-	cacheSize = 8192
+	cacheSize = 8192 // bytes
 )
 
 var (
-	_ AcceptedPostForkBlockHeightIndex = &innerBlocksMapping{}
+	_ HeightIndex = &heightIndex{}
 
-	heightPrefix  = []byte("heightkey")
-	preForkPrefix = []byte("preForkKey")
+	heightPrefix = []byte("heightkey")
 )
 
-// AcceptedPostForkBlockHeightIndex contains mapping of blockHeights to accepted proposer block IDs.
-// Only accepted blocks are indexed; moreover only post-fork blocks are indexed.
-type AcceptedPostForkBlockHeightIndex interface {
-	SetBlkIDByHeight(height uint64, blkID ids.ID) error
-	GetBlkIDByHeight(height uint64) (ids.ID, error)
-	DeleteBlkIDByHeight(height uint64) error
+type HeightIndexGetter interface {
+	GetBlockIDAtHeight(height uint64) (ids.ID, error)
+	GetForkHeight() (uint64, error)
+}
 
-	SetLatestPreForkHeight(height uint64) error
-	GetLatestPreForkHeight() (uint64, error)
-	DeleteLatestPreForkHeight() error
-
+type HeightIndexWriterDeleter interface {
+	SetBlockIDAtHeight(height uint64, blkID ids.ID) error
+	DeleteBlockIDAtHeight(height uint64) error
+	SetForkHeight(height uint64) error
+	DeleteForkHeight() error
 	clearCache() // useful in testing
 }
 
-type innerBlocksMapping struct {
-	// Caches block height -> proposerVMBlockID. If the proposerVMBlockID is nil,
-	// the height is not in storage.
-	cache cache.Cacher
+type HeightIndexBatchSupport interface {
+	GetBatch() database.Batch
+	GetCheckpoint() (ids.ID, error)
+	SetCheckpoint(blkID ids.ID) error
+	DeleteCheckpoint() error
+}
+
+// HeightIndex contains mapping of blockHeights to accepted proposer block IDs
+// along with some metadata (fork height and checkpoint).
+type HeightIndex interface {
+	HeightIndexWriterDeleter
+	HeightIndexGetter
+
+	HeightIndexBatchSupport
+}
+
+type heightIndex struct {
+	// heightIndex may be accessed by a long-running goroutine rebuilding the index
+	// as well as main goroutine querying blocks. Hence the lock
+	Lock sync.RWMutex
+
+	// Caches block height -> proposerVMBlockID.
+	blkHeightsCache cache.Cacher
 
 	db database.Database
 }
 
-func NewBlockHeightIndex(db database.Database) AcceptedPostForkBlockHeightIndex {
-	return &innerBlocksMapping{
-		cache: &cache.LRU{Size: cacheSize},
-		db:    db,
+func NewHeightIndex(db database.Database) HeightIndex {
+	return &heightIndex{
+		blkHeightsCache: &cache.LRU{Size: cacheSize},
+		db:              db,
 	}
 }
 
-func (ibm *innerBlocksMapping) SetBlkIDByHeight(height uint64, blkID ids.ID) error {
-	heightBytes := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(heightBytes, height)
-	key := make([]byte, len(heightPrefix)+len(heightBytes))
-	copy(key, heightPrefix)
-	key = append(key, heightBytes...)
-
-	ibm.cache.Put(string(key), blkID)
-	return ibm.db.Put(key, blkID[:])
-}
-
-func (ibm *innerBlocksMapping) GetBlkIDByHeight(height uint64) (ids.ID, error) {
-	heightBytes := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(heightBytes, height)
-	key := make([]byte, len(heightPrefix)+len(heightBytes))
-	copy(key, heightPrefix)
-	key = append(key, heightBytes...)
-
-	if blkIDIntf, found := ibm.cache.Get(string(key)); found {
-		if blkIDIntf == nil {
-			return ids.Empty, database.ErrNotFound
-		}
-
+// GetBlockIDAtHeight implements HeightIndexGetter
+func (hi *heightIndex) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
+	key := GetEntryKey(height)
+	if blkIDIntf, found := hi.blkHeightsCache.Get(string(key)); found {
 		res, _ := blkIDIntf.(ids.ID)
 		return res, nil
 	}
 
-	bytes, err := ibm.db.Get(key)
+	bytes, err := hi.db.Get(key)
 	switch err {
 	case nil:
-		var ba [32]byte
-		copy(ba[:], bytes)
-		return ids.ID(ba), nil
+		res := ids.FromBytes(bytes)
+		hi.blkHeightsCache.Put(string(key), res)
+		return res, nil
 
 	case database.ErrNotFound:
-		ibm.cache.Put(string(key), nil)
 		return ids.Empty, database.ErrNotFound
 
 	default:
@@ -95,46 +93,14 @@ func (ibm *innerBlocksMapping) GetBlkIDByHeight(height uint64) (ids.ID, error) {
 	}
 }
 
-func (ibm *innerBlocksMapping) DeleteBlkIDByHeight(height uint64) error {
-	heightBytes := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(heightBytes, height)
-	key := make([]byte, len(heightPrefix)+len(heightBytes))
-	copy(key, heightPrefix)
-	key = append(key, heightBytes...)
-
-	ibm.cache.Put(string(key), nil)
-	return ibm.db.Delete(key)
-}
-
-func (ibm *innerBlocksMapping) SetLatestPreForkHeight(height uint64) error {
-	heightBytes := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(heightBytes, height)
-
-	ibm.cache.Put(string(preForkPrefix), heightBytes)
-	return ibm.db.Put(preForkPrefix, heightBytes)
-}
-
-func (ibm *innerBlocksMapping) GetLatestPreForkHeight() (uint64, error) {
-	key := preForkPrefix
-
-	if blkIDIntf, found := ibm.cache.Get(string(key)); found {
-		if blkIDIntf == nil {
-			return 0, database.ErrNotFound
-		}
-
-		heightBytes, _ := blkIDIntf.([]byte)
-		res := binary.BigEndian.Uint64(heightBytes)
-		return res, nil
-	}
-
-	bytes, err := ibm.db.Get(key)
-	switch err {
+// GetForkHeight implements HeightIndexGetter
+func (hi *heightIndex) GetForkHeight() (uint64, error) {
+	switch bytes, err := hi.db.Get(GetForkKey()); err {
 	case nil:
 		res := binary.BigEndian.Uint64(bytes)
 		return res, nil
 
 	case database.ErrNotFound:
-		ibm.cache.Put(string(key), nil)
 		return 0, database.ErrNotFound
 
 	default:
@@ -142,12 +108,83 @@ func (ibm *innerBlocksMapping) GetLatestPreForkHeight() (uint64, error) {
 	}
 }
 
-func (ibm *innerBlocksMapping) DeleteLatestPreForkHeight() error {
-	key := preForkPrefix
-	ibm.cache.Put(string(key), nil)
-	return ibm.db.Delete(key)
+// SetBlockIDAtHeight implements HeightIndexWriterDeleter
+func (hi *heightIndex) SetBlockIDAtHeight(height uint64, blkID ids.ID) error {
+	key := GetEntryKey(height)
+	hi.blkHeightsCache.Put(string(key), blkID)
+	return hi.db.Put(key, blkID[:])
 }
 
-func (ibm *innerBlocksMapping) clearCache() {
-	ibm.cache.Flush()
+// DeleteBlockIDAtHeight implements HeightIndexWriterDeleter
+func (hi *heightIndex) DeleteBlockIDAtHeight(height uint64) error {
+	key := GetEntryKey(height)
+	hi.blkHeightsCache.Evict(string(key))
+	return hi.db.Delete(key)
+}
+
+// SetForkHeight implements HeightIndexWriterDeleter
+func (hi *heightIndex) SetForkHeight(height uint64) error {
+	return hi.db.Put(GetForkKey(), GetForkHeightBytes(height))
+}
+
+// DeleteForkHeight implements HeightIndexWriterDeleter
+func (hi *heightIndex) DeleteForkHeight() error {
+	return hi.db.Delete(GetForkKey())
+}
+
+// clearCache implements HeightIndexWriterDeleter
+func (hi *heightIndex) clearCache() {
+	hi.blkHeightsCache.Flush()
+}
+
+// GetBatch implements HeightIndexBatchSupport
+func (hi *heightIndex) GetBatch() database.Batch { return hi.db.NewBatch() }
+
+// SetCheckpoint implements HeightIndexBatchSupport
+func (hi *heightIndex) SetCheckpoint(blkID ids.ID) error {
+	return hi.db.Put(GetCheckpointKey(), blkID[:])
+}
+
+// GetCheckpoint implements HeightIndexBatchSupport
+func (hi *heightIndex) GetCheckpoint() (ids.ID, error) {
+	switch bytes, err := hi.db.Get(GetCheckpointKey()); err {
+	case nil:
+		return ids.FromBytes(bytes), nil
+	case database.ErrNotFound:
+		return ids.Empty, database.ErrNotFound
+	default:
+		return ids.Empty, err
+	}
+}
+
+// DeleteCheckpoint implements HeightIndexBatchSupport
+func (hi *heightIndex) DeleteCheckpoint() error {
+	return hi.db.Delete(GetCheckpointKey())
+}
+
+// helpers functions to create keys/values.
+// Currently exported for indexer
+func GetEntryKey(height uint64) []byte {
+	heightBytes := make([]byte, wrappers.LongLen)
+	binary.BigEndian.PutUint64(heightBytes, height)
+	key := make([]byte, len(heightPrefix))
+	copy(key, heightPrefix)
+	key = append(key, heightBytes...)
+	return key
+}
+
+func GetForkKey() []byte {
+	preForkPrefix := []byte("preForkKey")
+	return preForkPrefix
+}
+
+func GetForkHeightBytes(height uint64) []byte {
+	heightBytes := make([]byte, wrappers.LongLen)
+	binary.BigEndian.PutUint64(heightBytes, height)
+	return heightBytes
+}
+
+func GetCheckpointKey() []byte {
+	checkpointPrefix := []byte("checkpoint")
+	return checkpointPrefix
 }

@@ -12,9 +12,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	snowmanVMs "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
+	"github.com/ava-labs/avalanchego/vms/proposervm/indexer"
 )
 
-var _ Block = &preForkBlock{}
+var (
+	_ Block                 = &preForkBlock{}
+	_ indexer.WrappingBlock = &preForkBlock{}
+)
 
 // preForkBlock implements proposervm.Block
 type preForkBlock struct {
@@ -28,9 +32,13 @@ func (b *preForkBlock) Accept() error {
 
 func (b *preForkBlock) conditionalAccept(acceptInnerBlk bool) error {
 	if _, ok := b.vm.ChainVM.(snowmanVMs.HeightIndexedChainVM); ok {
-		if b.Height() > b.vm.latestPreForkHeight {
-			b.vm.latestPreForkHeight = b.Height()
-			if err := b.vm.State.SetLatestPreForkHeight(b.vm.latestPreForkHeight); err != nil {
+		currentFork, err := b.vm.State.GetForkHeight()
+		if err != nil {
+			return err
+		}
+
+		if b.Height() > currentFork {
+			if err := b.vm.State.SetForkHeight(b.Height()); err != nil {
 				return err
 			}
 		}
@@ -78,7 +86,7 @@ func (b *preForkBlock) Options() ([2]snowman.Block, error) {
 	}, nil
 }
 
-func (b *preForkBlock) getInnerBlk() snowman.Block {
+func (b *preForkBlock) GetInnerBlk() snowman.Block {
 	return b.Block
 }
 

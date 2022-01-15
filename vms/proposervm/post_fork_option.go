@@ -8,11 +8,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	snowmanVMs "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
+	"github.com/ava-labs/avalanchego/vms/proposervm/indexer"
 )
 
-var _ Block = &postForkOption{}
+var (
+	_ Block                 = &postForkOption{}
+	_ indexer.WrappingBlock = &preForkBlock{}
+)
 
 // The parent of a *postForkOption must be a *postForkBlock.
 type postForkOption struct {
@@ -45,11 +48,8 @@ func (b *postForkOption) conditionalAccept(acceptInnerBlk bool) error {
 		return err
 	}
 
-	// write the mapping from inner to proposerVM block ID
-	if _, ok := b.vm.ChainVM.(snowmanVMs.HeightIndexedChainVM); ok {
-		if err := b.vm.State.SetBlkIDByHeight(b.Height(), blkID); err != nil {
-			return err
-		}
+	if err := b.vm.updateHeightIndex(b.Height(), blkID); err != nil {
+		return err
 	}
 
 	delete(b.vm.verifiedBlocks, blkID)
