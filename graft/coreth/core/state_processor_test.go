@@ -127,6 +127,14 @@ func TestStateProcessorErrors(t *testing.T) {
 				},
 				want: "could not apply tx 0 [0xfbe38b817aaa760c2766b56c019fcdba506560a28fd41c69ae96bdaa4569e317]: gas limit reached",
 			},
+			/*
+				{ // ErrInsufficientFundsForTransfer
+					txs: []*types.Transaction{
+						makeTx(0, common.Address{}, big.NewInt(-1000), params.TxGas, big.NewInt(225000000000), nil),
+					},
+					want: "",
+				},
+			*/
 			{ // ErrInsufficientFundsForTransfer
 				txs: []*types.Transaction{
 					makeTx(0, common.Address{}, big.NewInt(2000000000000000000), params.TxGas, big.NewInt(225000000000), nil),
