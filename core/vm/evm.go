@@ -186,22 +186,14 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	if evm.depth > int(params.CallCreateDepth) {
 		return nil, gas, ErrDepth
 	}
-	// Fail for negative transfer value
-	// also avoided by current RLP encode mechanism
-	if value.Sign() < 0 {
-		return nil, gas, ErrNegativeTransferValue
-	}
+	// It is not possible for a negative value to be passed in here due to the fact that rlp encoding
+	// fails for a negative *big.Int input, and also that stack only contains positive ints
 	// Fail if we're trying to transfer more than the available balance
 	if value.Sign() != 0 && !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
 		return nil, gas, ErrInsufficientBalance
 	}
 	snapshot := evm.StateDB.Snapshot()
 	p, isPrecompile := evm.precompile(addr)
-
-	// Fail if precompile call with non null transfer value
-	if isPrecompile && value.Cmp(big.NewInt(0)) != 0 {
-		return nil, gas, ErrNonZeroValueToPrecompile
-	}
 
 	if !evm.StateDB.Exist(addr) {
 		if !isPrecompile && evm.chainRules.IsEIP158 && value.Sign() == 0 {
@@ -277,18 +269,13 @@ func (evm *EVM) CallExpert(caller ContractRef, addr common.Address, input []byte
 		return nil, gas, ErrDepth
 	}
 
-	// Fail for negative transfer value
-	if value.Sign() < 0 {
-		return nil, gas, ErrNegativeTransferValue
-	}
+	// It is not possible for a negative value to be passed in here due to the fact that
+	// stack only contains positive ints
 	// Fail if we're trying to transfer more than the available balance
 	if value.Sign() != 0 && !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
 		return nil, gas, ErrInsufficientBalance
 	}
 
-	if value2.Sign() < 0 {
-		return nil, gas, ErrNegativeNativeAssetAmount
-	}
 	if value2.Sign() != 0 && !evm.Context.CanTransferMC(evm.StateDB, caller.Address(), addr, coinID, value2) {
 		return nil, gas, ErrInsufficientBalance
 	}
@@ -363,24 +350,16 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 	if evm.depth > int(params.CallCreateDepth) {
 		return nil, gas, ErrDepth
 	}
-	// Fail for negative transfer value
-	if value.Sign() < 0 {
-		return nil, gas, ErrNegativeTransferValue
-	}
 	// Fail if we're trying to transfer more than the available balance
 	// Note although it's noop to transfer X ether to caller itself. But
 	// if caller doesn't have enough balance, it would be an error to allow
 	// over-charging itself. So the check here is necessary.
+	// It is not possible for a negative value to be passed in here due to the fact that
+	// stack only contains positive ints
 	if !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
 		return nil, gas, ErrInsufficientBalance
 	}
 	var snapshot = evm.StateDB.Snapshot()
-	p, isPrecompile := evm.precompile(addr)
-
-	// Fail if precompile call with non null transfer value
-	if isPrecompile && value.Cmp(big.NewInt(0)) != 0 {
-		return nil, gas, ErrNonZeroValueToPrecompile
-	}
 
 	// Invoke tracer hooks that signal entering/exiting a call frame
 	if evm.Config.Debug {
@@ -391,7 +370,7 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 	}
 
 	// It is allowed to call precompiles, even via delegatecall
-	if isPrecompile {
+	if p, isPrecompile := evm.precompile(addr); isPrecompile {
 		ret, gas, err = p.Run(evm, caller, addr, input, gas, evm.interpreter.readOnly)
 	} else {
 		addrCopy := addr
@@ -526,11 +505,8 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	if evm.depth > int(params.CallCreateDepth) {
 		return nil, common.Address{}, gas, ErrDepth
 	}
-	// Fail for negative transfer value
-	// also avoided by current RLP encode mechanism -Create() call-
-	if value.Sign() < 0 {
-		return nil, common.Address{}, gas, ErrNegativeTransferValue
-	}
+	// It is not possible for a negative value to be passed in here due to the fact that rlp encoding
+	// fails for a negative *big.Int input, and also that stack only contains positive ints
 	if !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
 		return nil, common.Address{}, gas, ErrInsufficientBalance
 	}
