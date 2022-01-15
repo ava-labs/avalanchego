@@ -33,21 +33,23 @@ import (
 
 // List evm execution errors
 var (
-	ErrOutOfGas                 = errors.New("out of gas")
-	ErrCodeStoreOutOfGas        = errors.New("contract creation code storage out of gas")
-	ErrDepth                    = errors.New("max call depth exceeded")
-	ErrInsufficientBalance      = errors.New("insufficient balance for transfer")
-	ErrContractAddressCollision = errors.New("contract address collision")
-	ErrExecutionReverted        = errors.New("execution reverted")
-	ErrMaxCodeSizeExceeded      = errors.New("max code size exceeded")
-	ErrInvalidJump              = errors.New("invalid jump destination")
-	ErrWriteProtection          = errors.New("write protection")
-	ErrReturnDataOutOfBounds    = errors.New("return data out of bounds")
-	ErrGasUintOverflow          = errors.New("gas uint64 overflow")
-	ErrInvalidCode              = errors.New("invalid code: must not begin with 0xef")
-	ErrNonceUintOverflow        = errors.New("nonce uint64 overflow")
-	ErrNoSenderBlackhole        = errors.New("blackhole address cannot be used as sender")
-	ErrNonZeroValueToPrecompile = errors.New("precompile call was given non zero value")
+	ErrOutOfGas                  = errors.New("out of gas")
+	ErrCodeStoreOutOfGas         = errors.New("contract creation code storage out of gas")
+	ErrDepth                     = errors.New("max call depth exceeded")
+	ErrInsufficientBalance       = errors.New("insufficient balance for transfer")
+	ErrContractAddressCollision  = errors.New("contract address collision")
+	ErrExecutionReverted         = errors.New("execution reverted")
+	ErrMaxCodeSizeExceeded       = errors.New("max code size exceeded")
+	ErrInvalidJump               = errors.New("invalid jump destination")
+	ErrWriteProtection           = errors.New("write protection")
+	ErrReturnDataOutOfBounds     = errors.New("return data out of bounds")
+	ErrGasUintOverflow           = errors.New("gas uint64 overflow")
+	ErrInvalidCode               = errors.New("invalid code: must not begin with 0xef")
+	ErrNonceUintOverflow         = errors.New("nonce uint64 overflow")
+	ErrNoSenderBlackhole         = errors.New("blackhole address cannot be used as sender")
+	ErrNonZeroValueToPrecompile  = errors.New("precompile call was given non zero value")
+	ErrNegativeNativeAssetAmount = errors.New("negative asset amount at native asset call")
+	ErrNegativeTransferValue     = errors.New("negative transfer value")
 
 	// errStopToken is an internal token indicating interpreter loop termination,
 	// never returned to outside callers.

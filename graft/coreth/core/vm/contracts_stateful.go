@@ -141,6 +141,12 @@ func (c *nativeAssetCall) Run(evm *EVM, caller ContractRef, addr common.Address,
 		return nil, remainingGas, ErrExecutionReverted
 	}
 
+	// extra logical check to avoid negative transfers
+	// also avoided by current big.Int encode/decode mechanism
+	if assetAmount.Sign() < 0 {
+		return nil, remainingGas, ErrNegativeNativeAssetAmount
+	}
+
 	if assetAmount.Sign() != 0 && !evm.Context.CanTransferMC(evm.StateDB, caller.Address(), to, assetID, assetAmount) {
 		return nil, remainingGas, ErrInsufficientBalance
 	}
