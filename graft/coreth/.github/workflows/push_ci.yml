@@ -26,9 +26,15 @@ jobs:
           ref: ${{ github.event.inputs.avalanchegoBranch }}
           path: avalanchego
           token: ${{ secrets.AVALANCHE_PAT }}
+      - uses: actions/setup-go@v1
+        with:
+          go-version: 1.16
       - name: change avalanchego dep
         if: ${{ github.event_name == 'workflow_dispatch' }}
-        run: go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
+        run: |
+          go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
+          go mod tidy
+          go clean -modcache # avoid conflicts with the golangci-lint-action cache
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
         with:
@@ -52,12 +58,14 @@ jobs:
         ref: ${{ github.event.inputs.avalanchegoBranch }}
         path: avalanchego
         token: ${{ secrets.AVALANCHE_PAT }}
-    - name: change avalanchego dep
-      if: ${{ github.event_name == 'workflow_dispatch' }}
-      run: go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
     - uses: actions/setup-go@v1
       with:
         go-version: ${{ matrix.go }}
+    - name: change avalanchego dep
+      if: ${{ github.event_name == 'workflow_dispatch' }}
+      run: |
+        go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
+        go mod tidy
     - run: go mod download
       shell: bash
     - run: ./scripts/build.sh evm
@@ -81,12 +89,14 @@ jobs:
         ref: ${{ github.event.inputs.avalanchegoBranch }}
         path: avalanchego
         token: ${{ secrets.AVALANCHE_PAT }}
-    - name: change avalanchego dep
-      if: ${{ github.event_name == 'workflow_dispatch' }}
-      run: go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
     - uses: actions/setup-go@v1
       with:
         go-version: ${{ matrix.go }}
+    - name: change avalanchego dep
+      if: ${{ github.event_name == 'workflow_dispatch' }}
+      run: |
+        go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
+        go mod tidy
     - run: .github/workflows/run_e2e_tests.sh --parallelism 1 --client-id $KURTOSIS_CLIENT_ID --client-secret $KURTOSIS_CLIENT_SECRET
       shell: bash
       env:
