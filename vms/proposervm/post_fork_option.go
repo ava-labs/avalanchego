@@ -9,9 +9,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
+	"github.com/ava-labs/avalanchego/vms/proposervm/indexer"
 )
 
-var _ Block = &postForkOption{}
+var (
+	_ Block                 = &postForkOption{}
+	_ indexer.WrappingBlock = &preForkBlock{}
+)
 
 // The parent of a *postForkOption must be a *postForkBlock.
 type postForkOption struct {
@@ -37,6 +41,10 @@ func (b *postForkOption) Accept() error {
 	// Persist this block and its status
 	b.status = choices.Accepted
 	if err := b.vm.storePostForkBlock(b); err != nil {
+		return err
+	}
+
+	if err := b.vm.updateHeightIndex(b.Height(), blkID); err != nil {
 		return err
 	}
 

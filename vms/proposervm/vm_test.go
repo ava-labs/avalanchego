@@ -73,8 +73,11 @@ func initTestProposerVM(
 	}
 
 	initialState := []byte("genesis state")
-	coreVM := &block.TestVM{}
-	coreVM.T = t
+	coreVM := &block.TestVM{
+		TestVM: common.TestVM{
+			T: t,
+		},
+	}
 
 	coreVM.InitializeF = func(*snow.Context, manager.Manager,
 		[]byte, []byte, []byte, chan<- common.Message,

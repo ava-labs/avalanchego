@@ -251,6 +251,28 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	}, err
 }
 
+func (vm *VMServer) IsHeightIndexComplete(context.Context, *emptypb.Empty) (*vmproto.IsHeightIndexCompleteResponse, error) {
+	fsVM, ok := vm.vm.(block.HeightIndexedChainVM)
+	if !ok {
+		return nil, block.ErrHeightIndexedVMNotImplemented
+	}
+
+	response := fsVM.IsHeightIndexComplete()
+	return &vmproto.IsHeightIndexCompleteResponse{Completed: response}, nil
+}
+
+func (vm *VMServer) GetBlockIDByHeight(ctx context.Context, req *vmproto.GetBlockIDByHeightRequest) (*vmproto.GetBlockIDByHeightResponse, error) {
+	hVM, ok := vm.vm.(block.HeightIndexedChainVM)
+	if !ok {
+		return nil, block.ErrHeightIndexedVMNotImplemented
+	}
+	blkID, err := hVM.GetBlockIDByHeight(req.Height)
+	if err != nil {
+		return nil, err
+	}
+	return &vmproto.GetBlockIDByHeightResponse{BlkID: blkID[:]}, nil
+}
+
 func (vm *VMServer) OnStart(_ context.Context, stateReq *vmproto.StateRequest) (*emptypb.Empty, error) {
 	var state snow.State
 	switch stateReq.State {

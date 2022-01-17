@@ -11,9 +11,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
+	"github.com/ava-labs/avalanchego/vms/proposervm/indexer"
 )
 
-var _ Block = &preForkBlock{}
+var (
+	_ Block                 = &preForkBlock{}
+	_ indexer.WrappingBlock = &preForkBlock{}
+)
 
 // preForkBlock implements proposervm.Block
 type preForkBlock struct {
@@ -56,7 +60,7 @@ func (b *preForkBlock) Options() ([2]snowman.Block, error) {
 	}, nil
 }
 
-func (b *preForkBlock) getInnerBlk() snowman.Block {
+func (b *preForkBlock) GetInnerBlk() snowman.Block {
 	return b.Block
 }
 
