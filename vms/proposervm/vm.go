@@ -38,6 +38,7 @@ var (
 	_ block.ChainVM         = &VM{}
 	_ block.BatchedChainVM  = &VM{}
 	_ indexer.HeightIndexer = &VM{}
+	_ block.StateSyncableVM = &VM{}
 
 	dbPrefix = []byte("proposervm")
 )
@@ -70,6 +71,10 @@ type VM struct {
 	// timestamp if the last accepted block has been a PostForkOption block
 	// since having initialized the VM.
 	lastAcceptedTime time.Time
+
+	// state sync map to see which summary was accepted by the innerVM
+	// TODO ABENEGIA: this map should be persisted!
+	innerToProBlkID map[ids.ID]ids.ID
 }
 
 func New(vm block.ChainVM, activationTime time.Time, minimumPChainHeight uint64) *VM {
@@ -139,6 +144,8 @@ func (vm *VM) Initialize(
 			}()
 		}
 	}
+
+	// TODO ABENEGIA: consider repairing height index in case pro and core DBs gets disaligned
 
 	return vm.setLastAcceptedOptionTime()
 }

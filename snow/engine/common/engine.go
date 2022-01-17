@@ -35,6 +35,7 @@ type Engine interface {
 
 type Handler interface {
 	AllGetsServer
+	FastSyncHandler
 	AcceptedFrontierHandler
 	AcceptedHandler
 	AncestorsHandler
@@ -42,15 +43,27 @@ type Handler interface {
 	QueryHandler
 	ChitsHandler
 	AppHandler
-
 	InternalHandler
 }
 
 type AllGetsServer interface {
+	GeStateSummaryHandler
 	GetAcceptedFrontierHandler
 	GetAcceptedHandler
 	GetAncestorsHandler
 	GetHandler
+}
+
+type GeStateSummaryHandler interface {
+	GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error
+	GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error
+}
+
+type FastSyncHandler interface {
+	StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, key, summary []byte) error
+	GetStateSummaryFrontierFailed(validatorID ids.ShortID, requestID uint32) error
+	AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error
+	GetAcceptedStateSummaryFailed(validatorID ids.ShortID, requestID uint32) error
 }
 
 // GetAcceptedFrontierHandler defines how a consensus engine reacts to a get

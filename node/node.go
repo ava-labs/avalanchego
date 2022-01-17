@@ -359,6 +359,12 @@ func (n *Node) Dispatch() error {
 			n.Net.TrackIP(peerIP)
 		}
 	}
+	// Add state sync nodes to the peer network
+	for _, peerIP := range n.Config.StateSyncTestOnlyIPs {
+		if !peerIP.Equal(n.Config.IP.IP()) {
+			n.Net.TrackIP(peerIP)
+		}
+	}
 
 	// Start P2P connections
 	err := n.Net.Dispatch()
@@ -642,6 +648,9 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
 		ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
 		ApricotPhase4MinPChainHeight:            version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
+
+		// State sync
+		StateSyncTestingBeacons: n.Config.StateSyncTestOnlyIDs,
 	})
 
 	vdrs := n.vdrs

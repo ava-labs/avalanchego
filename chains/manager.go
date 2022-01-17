@@ -28,7 +28,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
+	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	fastsyncer "github.com/ava-labs/avalanchego/snow/engine/snowman/fast_syncer"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
@@ -174,6 +176,9 @@ type ManagerConfig struct {
 
 	ApricotPhase4Time            time.Time
 	ApricotPhase4MinPChainHeight uint64
+
+	// State sync
+	StateSyncTestingBeacons []ids.ShortID
 }
 
 type manager struct {
@@ -453,6 +458,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			chainParams.GenesisData,
 			vdrs,
 			beacons,
+			m.StateSyncTestingBeacons,
 			vm,
 			fxs,
 			consensusParams.Parameters,
@@ -606,6 +612,7 @@ func (m *manager) createAvalancheChain(
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
+	weightTracker := tracker.NewWeightTracker(beacons, commonCfg.StartupAlpha)
 	avaGetHandler, err := avagetter.New(vtxManager, commonCfg)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize avalanche base message handler: %w", err)
@@ -619,7 +626,7 @@ func (m *manager) createAvalancheChain(
 		TxBlocked:     txBlocker,
 		Manager:       vtxManager,
 		VM:            vm,
-		WeightTracker: common.NewWeightTracker(beacons, commonCfg.StartupAlpha),
+		WeightTracker: weightTracker,
 	}
 	bootstrapper, err := avbootstrap.New(
 		bootstrapperConfig,
@@ -682,6 +689,7 @@ func (m *manager) createSnowmanChain(
 	genesisData []byte,
 	vdrs,
 	beacons validators.Set,
+	stateSyncTestingBeacons []ids.ShortID,
 	vm block.ChainVM,
 	fxs []*common.Fx,
 	consensusParams snowball.Parameters,
@@ -810,10 +818,24 @@ func (m *manager) createSnowmanChain(
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
+	weightTracker := tracker.NewWeightTracker(beacons, commonCfg.StartupAlpha)
 	snowGetHandler, err := snowgetter.New(vm, commonCfg)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
 	}
+
+	// create fast sync gear
+	fastSyncCfg := fastsyncer.Config{
+		Config:                  commonCfg,
+		StateSyncTestingBeacons: stateSyncTestingBeacons,
+		VM:                      vm,
+		WeightTracker:           weightTracker,
+	}
+	fastSync := fastsyncer.NewFastSyncer(
+		fastSyncCfg,
+		handler.OnDoneFastSyncing,
+	)
+	handler.RegisterFastSyncer(fastSync)
 
 	// create bootstrap gear
 	bootstrapCfg := smbootstrap.Config{
@@ -821,7 +843,7 @@ func (m *manager) createSnowmanChain(
 		AllGetsServer: snowGetHandler,
 		Blocked:       blocked,
 		VM:            vm,
-		WeightTracker: common.NewWeightTracker(beacons, commonCfg.StartupAlpha),
+		WeightTracker: weightTracker,
 		Bootstrapped:  m.unblockChains,
 	}
 	bootstrapper, err := smbootstrap.New(

@@ -40,6 +40,7 @@ type Handler struct {
 	// The validator set that validates this chain
 	validators validators.Set
 
+	fastSyncer   common.FastSyncer
 	bootstrapper common.BootstrapableEngine
 	engine       common.Engine
 
@@ -85,12 +86,21 @@ func NewHandler(
 	return h, err
 }
 
+func (h *Handler) RegisterFastSyncer(fastSyncer common.FastSyncer) {
+	h.fastSyncer = fastSyncer
+}
+
 func (h *Handler) RegisterBootstrap(bootstrapper common.BootstrapableEngine) {
 	h.bootstrapper = bootstrapper
 }
 
 func (h *Handler) RegisterEngine(engine common.Engine) {
 	h.engine = engine
+}
+
+func (h *Handler) OnDoneFastSyncing(lastReqID uint32) error {
+	lastReqID++
+	return h.bootstrapper.Start(lastReqID)
 }
 
 func (h *Handler) OnDoneBootstrapping(lastReqID uint32) error {
@@ -101,6 +111,11 @@ func (h *Handler) OnDoneBootstrapping(lastReqID uint32) error {
 func (h *Handler) Start() error {
 	startReqID := uint32(0)
 	switch {
+	case (h.fastSyncer != nil) && h.fastSyncer.IsEnabled():
+		if err := h.bootstrapper.Clear(); err != nil {
+			return err
+		}
+		return h.fastSyncer.Start(startReqID)
 	case h.bootstrapper != nil:
 		return h.bootstrapper.Start(startReqID)
 	default:
@@ -218,6 +233,8 @@ func (h *Handler) handleMsg(msg message.InboundMessage) error {
 	)
 
 	switch h.ctx.GetState() {
+	case snow.FastSyncing:
+		targetGear = h.fastSyncer
 	case snow.Bootstrapping:
 		targetGear = h.bootstrapper
 	case snow.NormalOp:
@@ -273,6 +290,8 @@ func (h *Handler) handleMsg(msg message.InboundMessage) error {
 func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 	var targetGear common.Engine
 	switch h.ctx.GetState() {
+	case snow.FastSyncing:
+		targetGear = h.fastSyncer
 	case snow.Bootstrapping:
 		targetGear = h.bootstrapper
 	case snow.NormalOp:
@@ -283,6 +302,44 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 
 	nodeID := msg.NodeID()
 	switch msg.Op() {
+	case message.GetStateSummaryFrontier:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return h.fastSyncer.GetStateSummaryFrontier(nodeID, reqID)
+
+	case message.StateSummaryFrontier:
+		reqID := msg.Get(message.RequestID).(uint32)
+		key := msg.Get(message.SummaryKey).([]byte)
+		summary := msg.Get(message.ContainerBytes).([]byte)
+		return h.fastSyncer.StateSummaryFrontier(nodeID, reqID, key, summary)
+
+	case message.GetStateSummaryFrontierFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return h.fastSyncer.GetStateSummaryFrontierFailed(nodeID, reqID)
+
+	case message.GetAcceptedStateSummary:
+		reqID := msg.Get(message.RequestID).(uint32)
+		keys, ok := msg.Get(message.MultiSummaryKeys).([][]byte)
+		if !ok {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse MultiSummaryKeys",
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
+			return nil
+		}
+		return h.fastSyncer.GetAcceptedStateSummary(nodeID, reqID, keys)
+
+	case message.AcceptedStateSummary:
+		reqID := msg.Get(message.RequestID).(uint32)
+		keys, ok := msg.Get(message.MultiSummaryKeys).([][]byte)
+		if !ok {
+			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse MultiSummaryKeys",
+				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
+			return nil
+		}
+		return h.fastSyncer.AcceptedStateSummary(nodeID, reqID, keys)
+
+	case message.GetAcceptedStateSummaryFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return h.fastSyncer.GetAcceptedStateSummaryFailed(nodeID, reqID)
+
 	case message.GetAcceptedFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
 		return targetGear.GetAcceptedFrontier(nodeID, reqID)
@@ -450,7 +507,7 @@ func (h *Handler) Timeout() {
 // Gossip passes a gossip request to the consensus engine
 func (h *Handler) Gossip() {
 	if h.ctx.GetState() != snow.NormalOp {
-		// Shouldn't send gossiping messages while the chain is bootstrapping
+		// Shouldn't send gossiping messages while the chain is fast-syncing/bootstrapping
 		return
 	}
 

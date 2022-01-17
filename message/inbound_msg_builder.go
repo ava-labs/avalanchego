@@ -105,6 +105,36 @@ type InboundMsgBuilder interface {
 		container []byte,
 		nodeID ids.ShortID,
 	) InboundMessage // used in UTs only
+
+	InboundGetStateSummaryFrontier(
+		chainID ids.ID,
+		requestID uint32,
+		deadline time.Duration,
+		nodeID ids.ShortID,
+	) InboundMessage
+
+	InboundStateSummaryFrontier(
+		chainID ids.ID,
+		requestID uint32,
+		key []byte,
+		summary []byte,
+		nodeID ids.ShortID,
+	) InboundMessage
+
+	InboundGetAcceptedStateSummary(
+		chainID ids.ID,
+		requestID uint32,
+		containers [][]byte,
+		deadline time.Duration,
+		nodeID ids.ShortID,
+	) InboundMessage
+
+	InboundAcceptedStateSummary(
+		chainID ids.ID,
+		requestID uint32,
+		containers [][]byte,
+		nodeID ids.ShortID,
+	) InboundMessage
 }
 
 type inMsgBuilder struct {
@@ -356,6 +386,82 @@ func (b *inMsgBuilder) InboundAncestors(
 			ChainID:             chainID[:],
 			RequestID:           requestID,
 			MultiContainerBytes: containers,
+		},
+		nodeID: nodeID,
+	}
+}
+
+func (b *inMsgBuilder) InboundGetStateSummaryFrontier(
+	chainID ids.ID,
+	requestID uint32,
+	deadline time.Duration,
+	nodeID ids.ShortID,
+) InboundMessage {
+	received := b.clock.Time()
+	return &inboundMessage{
+		op: GetStateSummaryFrontier,
+		fields: map[Field]interface{}{
+			ChainID:   chainID[:],
+			RequestID: requestID,
+			Deadline:  uint64(deadline),
+		},
+		nodeID:         nodeID,
+		expirationTime: received.Add(deadline),
+	}
+}
+
+func (b *inMsgBuilder) InboundStateSummaryFrontier(
+	chainID ids.ID,
+	requestID uint32,
+	key []byte,
+	summary []byte,
+	nodeID ids.ShortID,
+) InboundMessage {
+	return &inboundMessage{
+		op: StateSummaryFrontier,
+		fields: map[Field]interface{}{
+			ChainID:        chainID[:],
+			RequestID:      requestID,
+			SummaryKey:     key,
+			ContainerBytes: summary,
+		},
+		nodeID: nodeID,
+	}
+}
+
+func (b *inMsgBuilder) InboundGetAcceptedStateSummary(
+	chainID ids.ID,
+	requestID uint32,
+	keys [][]byte,
+	deadline time.Duration,
+	nodeID ids.ShortID,
+) InboundMessage {
+	received := b.clock.Time()
+	return &inboundMessage{
+		op: GetAcceptedStateSummary,
+		fields: map[Field]interface{}{
+			ChainID:          chainID[:],
+			RequestID:        requestID,
+			Deadline:         uint64(deadline),
+			MultiSummaryKeys: keys,
+		},
+		nodeID:         nodeID,
+		expirationTime: received.Add(deadline),
+	}
+}
+
+func (b *inMsgBuilder) InboundAcceptedStateSummary(
+	chainID ids.ID,
+	requestID uint32,
+	keys [][]byte,
+	nodeID ids.ShortID,
+) InboundMessage {
+	return &inboundMessage{
+		op: AcceptedStateSummary,
+		fields: map[Field]interface{}{
+			ChainID:          chainID[:],
+			RequestID:        requestID,
+			MultiSummaryKeys: keys,
 		},
 		nodeID: nodeID,
 	}

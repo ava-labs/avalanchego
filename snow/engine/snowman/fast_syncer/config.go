@@ -1,11 +1,11 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package bootstrap
+package snowsyncer
 
 import (
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
@@ -13,12 +13,7 @@ import (
 type Config struct {
 	common.Config
 	common.AllGetsServer
-
-	// Blocked tracks operations that are blocked on blocks
-	Blocked *queue.JobsWithMissing
-
-	VM            block.ChainVM
-	WeightTracker tracker.WeightTracker
-
-	Bootstrapped func()
+	StateSyncTestingBeacons []ids.ShortID // testing beacons from which nodes fast sync without network consensus
+	VM                      block.ChainVM
+	WeightTracker           tracker.WeightTracker
 }

@@ -42,8 +42,17 @@ type VMClient interface {
 	BlockReject(ctx context.Context, in *BlockRejectRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetAncestors(ctx context.Context, in *GetAncestorsRequest, opts ...grpc.CallOption) (*GetAncestorsResponse, error)
 	BatchedParseBlock(ctx context.Context, in *BatchedParseBlockRequest, opts ...grpc.CallOption) (*BatchedParseBlockResponse, error)
+	// HeightIndexedVM
 	GetBlockIDByHeight(ctx context.Context, in *GetBlockIDByHeightRequest, opts ...grpc.CallOption) (*GetBlockIDByHeightResponse, error)
 	IsHeightIndexComplete(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*IsHeightIndexCompleteResponse, error)
+	// State sync
+	RegisterFastSyncer(ctx context.Context, in *RegisterFastSyncerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	StateSyncEnabled(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncEnabledResponse, error)
+	StateSyncGetLastSummary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncGetLastSummaryResponse, error)
+	StateSyncIsSummaryAccepted(ctx context.Context, in *StateSyncIsSummaryAcceptedRequest, opts ...grpc.CallOption) (*StateSyncIsSummaryAcceptedResponse, error)
+	StateSync(ctx context.Context, in *StateSyncRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	GetLastSummaryBlockID(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncLastSummaryBlockIDResponse, error)
+	SetLastSummaryBlock(ctx context.Context, in *StateSyncSetLastSummaryBlockRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type vMClient struct {
@@ -279,6 +288,69 @@ func (c *vMClient) IsHeightIndexComplete(ctx context.Context, in *emptypb.Empty,
 	return out, nil
 }
 
+func (c *vMClient) RegisterFastSyncer(ctx context.Context, in *RegisterFastSyncerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/RegisterFastSyncer", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) StateSyncEnabled(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncEnabledResponse, error) {
+	out := new(StateSyncEnabledResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/StateSyncEnabled", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) StateSyncGetLastSummary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncGetLastSummaryResponse, error) {
+	out := new(StateSyncGetLastSummaryResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/StateSyncGetLastSummary", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) StateSyncIsSummaryAccepted(ctx context.Context, in *StateSyncIsSummaryAcceptedRequest, opts ...grpc.CallOption) (*StateSyncIsSummaryAcceptedResponse, error) {
+	out := new(StateSyncIsSummaryAcceptedResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/StateSyncIsSummaryAccepted", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) StateSync(ctx context.Context, in *StateSyncRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/StateSync", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) GetLastSummaryBlockID(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncLastSummaryBlockIDResponse, error) {
+	out := new(StateSyncLastSummaryBlockIDResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/GetLastSummaryBlockID", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) SetLastSummaryBlock(ctx context.Context, in *StateSyncSetLastSummaryBlockRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/SetLastSummaryBlock", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // VMServer is the server API for VM service.
 // All implementations must embed UnimplementedVMServer
 // for forward compatibility
@@ -306,8 +378,17 @@ type VMServer interface {
 	BlockReject(context.Context, *BlockRejectRequest) (*emptypb.Empty, error)
 	GetAncestors(context.Context, *GetAncestorsRequest) (*GetAncestorsResponse, error)
 	BatchedParseBlock(context.Context, *BatchedParseBlockRequest) (*BatchedParseBlockResponse, error)
+	// HeightIndexedVM
 	GetBlockIDByHeight(context.Context, *GetBlockIDByHeightRequest) (*GetBlockIDByHeightResponse, error)
 	IsHeightIndexComplete(context.Context, *emptypb.Empty) (*IsHeightIndexCompleteResponse, error)
+	// State sync
+	RegisterFastSyncer(context.Context, *RegisterFastSyncerRequest) (*emptypb.Empty, error)
+	StateSyncEnabled(context.Context, *emptypb.Empty) (*StateSyncEnabledResponse, error)
+	StateSyncGetLastSummary(context.Context, *emptypb.Empty) (*StateSyncGetLastSummaryResponse, error)
+	StateSyncIsSummaryAccepted(context.Context, *StateSyncIsSummaryAcceptedRequest) (*StateSyncIsSummaryAcceptedResponse, error)
+	StateSync(context.Context, *StateSyncRequest) (*emptypb.Empty, error)
+	GetLastSummaryBlockID(context.Context, *emptypb.Empty) (*StateSyncLastSummaryBlockIDResponse, error)
+	SetLastSummaryBlock(context.Context, *StateSyncSetLastSummaryBlockRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedVMServer()
 }
 
@@ -389,6 +470,27 @@ func (UnimplementedVMServer) GetBlockIDByHeight(context.Context, *GetBlockIDByHe
 }
 func (UnimplementedVMServer) IsHeightIndexComplete(context.Context, *emptypb.Empty) (*IsHeightIndexCompleteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method IsHeightIndexComplete not implemented")
+}
+func (UnimplementedVMServer) RegisterFastSyncer(context.Context, *RegisterFastSyncerRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RegisterFastSyncer not implemented")
+}
+func (UnimplementedVMServer) StateSyncEnabled(context.Context, *emptypb.Empty) (*StateSyncEnabledResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StateSyncEnabled not implemented")
+}
+func (UnimplementedVMServer) StateSyncGetLastSummary(context.Context, *emptypb.Empty) (*StateSyncGetLastSummaryResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StateSyncGetLastSummary not implemented")
+}
+func (UnimplementedVMServer) StateSyncIsSummaryAccepted(context.Context, *StateSyncIsSummaryAcceptedRequest) (*StateSyncIsSummaryAcceptedResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StateSyncIsSummaryAccepted not implemented")
+}
+func (UnimplementedVMServer) StateSync(context.Context, *StateSyncRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StateSync not implemented")
+}
+func (UnimplementedVMServer) GetLastSummaryBlockID(context.Context, *emptypb.Empty) (*StateSyncLastSummaryBlockIDResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetLastSummaryBlockID not implemented")
+}
+func (UnimplementedVMServer) SetLastSummaryBlock(context.Context, *StateSyncSetLastSummaryBlockRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetLastSummaryBlock not implemented")
 }
 func (UnimplementedVMServer) mustEmbedUnimplementedVMServer() {}
 
@@ -853,6 +955,132 @@ func _VM_IsHeightIndexComplete_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VM_RegisterFastSyncer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterFastSyncerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).RegisterFastSyncer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/RegisterFastSyncer",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).RegisterFastSyncer(ctx, req.(*RegisterFastSyncerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_StateSyncEnabled_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).StateSyncEnabled(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/StateSyncEnabled",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).StateSyncEnabled(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_StateSyncGetLastSummary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).StateSyncGetLastSummary(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/StateSyncGetLastSummary",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).StateSyncGetLastSummary(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_StateSyncIsSummaryAccepted_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StateSyncIsSummaryAcceptedRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).StateSyncIsSummaryAccepted(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/StateSyncIsSummaryAccepted",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).StateSyncIsSummaryAccepted(ctx, req.(*StateSyncIsSummaryAcceptedRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_StateSync_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StateSyncRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).StateSync(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/StateSync",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).StateSync(ctx, req.(*StateSyncRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_GetLastSummaryBlockID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).GetLastSummaryBlockID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/GetLastSummaryBlockID",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).GetLastSummaryBlockID(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_SetLastSummaryBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StateSyncSetLastSummaryBlockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).SetLastSummaryBlock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/SetLastSummaryBlock",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).SetLastSummaryBlock(ctx, req.(*StateSyncSetLastSummaryBlockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // VM_ServiceDesc is the grpc.ServiceDesc for VM service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -959,6 +1187,34 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "IsHeightIndexComplete",
 			Handler:    _VM_IsHeightIndexComplete_Handler,
+		},
+		{
+			MethodName: "RegisterFastSyncer",
+			Handler:    _VM_RegisterFastSyncer_Handler,
+		},
+		{
+			MethodName: "StateSyncEnabled",
+			Handler:    _VM_StateSyncEnabled_Handler,
+		},
+		{
+			MethodName: "StateSyncGetLastSummary",
+			Handler:    _VM_StateSyncGetLastSummary_Handler,
+		},
+		{
+			MethodName: "StateSyncIsSummaryAccepted",
+			Handler:    _VM_StateSyncIsSummaryAccepted_Handler,
+		},
+		{
+			MethodName: "StateSync",
+			Handler:    _VM_StateSync_Handler,
+		},
+		{
+			MethodName: "GetLastSummaryBlockID",
+			Handler:    _VM_GetLastSummaryBlockID_Handler,
+		},
+		{
+			MethodName: "SetLastSummaryBlock",
+			Handler:    _VM_SetLastSummaryBlock_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

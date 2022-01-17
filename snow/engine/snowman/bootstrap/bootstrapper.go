@@ -29,12 +29,12 @@ var (
 
 func New(config Config, onFinished func(lastReqID uint32) error) (common.BootstrapableEngine, error) {
 	b := &bootstrapper{
-		Config: config,
-
-		PutHandler:   common.NewNoOpPutHandler(config.Ctx.Log),
-		QueryHandler: common.NewNoOpQueryHandler(config.Ctx.Log),
-		ChitsHandler: common.NewNoOpChitsHandler(config.Ctx.Log),
-		AppHandler:   common.NewNoOpAppHandler(config.Ctx.Log),
+		Config:          config,
+		FastSyncHandler: common.NewNoOpFastSyncHandler(config.Ctx.Log),
+		PutHandler:      common.NewNoOpPutHandler(config.Ctx.Log),
+		QueryHandler:    common.NewNoOpQueryHandler(config.Ctx.Log),
+		ChitsHandler:    common.NewNoOpChitsHandler(config.Ctx.Log),
+		AppHandler:      common.NewNoOpAppHandler(config.Ctx.Log),
 
 		Fetcher: common.Fetcher{
 			OnFinished: onFinished,
@@ -76,6 +76,7 @@ type bootstrapper struct {
 	Config
 
 	// list of NoOpsHandler for messages dropped by bootstrapper
+	common.FastSyncHandler
 	common.PutHandler
 	common.QueryHandler
 	common.ChitsHandler

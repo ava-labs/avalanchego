@@ -25,6 +25,20 @@ type preForkBlock struct {
 	vm *VM
 }
 
+func (b *preForkBlock) Accept() error {
+	return b.conditionalAccept(true /*acceptInnerBlk*/)
+}
+
+func (b *preForkBlock) conditionalAccept(acceptInnerBlk bool) error {
+	// Note: forkHeight is set to math.MaxUint64 until actual fork is reached.
+	// PreFork blocks do not need to update forkHeight
+	if acceptInnerBlk {
+		return b.Block.Accept()
+	}
+
+	return nil
+}
+
 func (b *preForkBlock) Parent() ids.ID {
 	return b.Block.Parent()
 }

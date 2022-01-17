@@ -114,22 +114,14 @@ func (s *state) Clear() error {
 
 	// clear jobs
 	s.jobsCache.Flush()
-	itj := s.jobs.NewIterator()
-	defer itj.Release()
-	for itj.Next() {
-		if err := s.jobs.Delete(itj.Key()); err != nil {
-			return err
-		}
+	if err := database.Clear(s.jobs, s.jobs); err != nil {
+		return err
 	}
 
 	// clear dependencies
 	s.dependentsCache.Flush()
-	itd := s.dependencies.NewIterator()
-	defer itd.Release()
-	for itd.Next() {
-		if err := s.dependencies.Delete(itd.Key()); err != nil {
-			return err
-		}
+	if err := database.Clear(s.dependencies, s.dependencies); err != nil {
+		return err
 	}
 
 	// clear missing jobs IDs

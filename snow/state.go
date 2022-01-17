@@ -11,12 +11,15 @@ var ErrUnknownState = errors.New("unknown node state")
 
 const (
 	Undefined State = iota
+	FastSyncing
 	Bootstrapping
 	NormalOp
 )
 
 func (st State) String() string {
 	switch st {
+	case FastSyncing:
+		return "Fast syncing state"
 	case Bootstrapping:
 		return "Bootstrapping state"
 	case NormalOp:

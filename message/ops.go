@@ -51,6 +51,14 @@ const (
 	Disconnected
 	Notify
 	GossipRequest
+
+	// Fast sync
+	GetStateSummaryFrontier
+	StateSummaryFrontier
+	GetStateSummaryFrontierFailed
+	GetAcceptedStateSummary
+	AcceptedStateSummary
+	GetAcceptedStateSummaryFailed
 )
 
 var (
@@ -105,42 +113,66 @@ var (
 	}
 	ConsensusOps = append(ConsensusExternalOps, ConsensusInternalOps...)
 
-	ExternalOps = append(ConsensusExternalOps, HandshakeOps...)
+	FastSyncRequestOps = []Op{
+		GetStateSummaryFrontier,
+		GetAcceptedStateSummary,
+	}
+	FastSyncResponseOps = []Op{
+		StateSummaryFrontier,
+		AcceptedStateSummary,
+	}
+	FastSyncExternalOps = append(FastSyncRequestOps, FastSyncResponseOps...)
+	FastSyncInternalOps = []Op{
+		GetStateSummaryFrontierFailed,
+		GetAcceptedStateSummaryFailed,
+	}
+	FastSyncOps = append(FastSyncExternalOps, FastSyncInternalOps...)
+
+	ConsensusAndNetworkOps = append(ConsensusExternalOps, HandshakeOps...)
+	ExternalOps            = append(ConsensusAndNetworkOps, FastSyncExternalOps...)
 
 	RequestToResponseOps = map[Op]Op{
-		GetAcceptedFrontier: AcceptedFrontier,
-		GetAccepted:         Accepted,
-		GetAncestors:        Ancestors,
-		Get:                 Put,
-		PushQuery:           Chits,
-		PullQuery:           Chits,
-		AppRequest:          AppResponse,
+		GetAcceptedFrontier:     AcceptedFrontier,
+		GetAccepted:             Accepted,
+		GetAncestors:            Ancestors,
+		Get:                     Put,
+		PushQuery:               Chits,
+		PullQuery:               Chits,
+		AppRequest:              AppResponse,
+		GetStateSummaryFrontier: StateSummaryFrontier,
+		GetAcceptedStateSummary: AcceptedStateSummary,
 	}
 	ResponseToFailedOps = map[Op]Op{
-		AcceptedFrontier: GetAcceptedFrontierFailed,
-		Accepted:         GetAcceptedFailed,
-		Ancestors:        GetAncestorsFailed,
-		Put:              GetFailed,
-		Chits:            QueryFailed,
-		AppResponse:      AppRequestFailed,
+		AcceptedFrontier:     GetAcceptedFrontierFailed,
+		Accepted:             GetAcceptedFailed,
+		Ancestors:            GetAncestorsFailed,
+		Put:                  GetFailed,
+		Chits:                QueryFailed,
+		AppResponse:          AppRequestFailed,
+		StateSummaryFrontier: GetStateSummaryFrontierFailed,
+		AcceptedStateSummary: GetAcceptedStateSummaryFailed,
 	}
 	FailedToResponseOps = map[Op]Op{
-		GetAcceptedFrontierFailed: AcceptedFrontier,
-		GetAcceptedFailed:         Accepted,
-		GetAncestorsFailed:        Ancestors,
-		GetFailed:                 Put,
-		QueryFailed:               Chits,
-		AppRequestFailed:          AppResponse,
+		GetAcceptedFrontierFailed:     AcceptedFrontier,
+		GetAcceptedFailed:             Accepted,
+		GetAncestorsFailed:            Ancestors,
+		GetFailed:                     Put,
+		QueryFailed:                   Chits,
+		AppRequestFailed:              AppResponse,
+		GetStateSummaryFrontierFailed: StateSummaryFrontier,
+		GetAcceptedStateSummaryFailed: AcceptedStateSummary,
 	}
 	UnrequestedOps = map[Op]struct{}{
-		GetAcceptedFrontier: {},
-		GetAccepted:         {},
-		GetAncestors:        {},
-		Get:                 {},
-		PushQuery:           {},
-		PullQuery:           {},
-		AppRequest:          {},
-		AppGossip:           {},
+		GetAcceptedFrontier:     {},
+		GetAccepted:             {},
+		GetAncestors:            {},
+		Get:                     {},
+		PushQuery:               {},
+		PullQuery:               {},
+		AppRequest:              {},
+		AppGossip:               {},
+		GetStateSummaryFrontier: {},
+		GetAcceptedStateSummary: {},
 	}
 
 	// Defines the messages that can be sent/received with this network
@@ -169,6 +201,11 @@ var (
 		AppRequest:  {ChainID, RequestID, Deadline, AppBytes},
 		AppResponse: {ChainID, RequestID, AppBytes},
 		AppGossip:   {ChainID, AppBytes},
+		// Fast Sync
+		GetStateSummaryFrontier: {ChainID, RequestID, Deadline},
+		StateSummaryFrontier:    {ChainID, RequestID, SummaryKey, ContainerBytes},
+		GetAcceptedStateSummary: {ChainID, RequestID, Deadline, MultiSummaryKeys},
+		AcceptedStateSummary:    {ChainID, RequestID, MultiSummaryKeys},
 	}
 )
 
@@ -223,6 +260,14 @@ func (op Op) String() string {
 		return "app_response"
 	case AppGossip:
 		return "app_gossip"
+	case GetStateSummaryFrontier:
+		return "get_state_summary_frontier"
+	case StateSummaryFrontier:
+		return "state_summary_frontier"
+	case GetAcceptedStateSummary:
+		return "get_accepted_state_summary"
+	case AcceptedStateSummary:
+		return "accepted_state_summary"
 
 	case GetAcceptedFrontierFailed:
 		return "get_accepted_frontier_failed"
@@ -236,6 +281,10 @@ func (op Op) String() string {
 		return "get_ancestors_failed"
 	case AppRequestFailed:
 		return "app_request_failed"
+	case GetStateSummaryFrontierFailed:
+		return "get_state_summary_frontier_failed"
+	case GetAcceptedStateSummaryFailed:
+		return "get_accepted_state_summary_failed"
 	case Timeout:
 		return "timeout"
 	case Connected:

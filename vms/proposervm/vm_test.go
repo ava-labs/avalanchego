@@ -8,6 +8,7 @@ import (
 	"crypto"
 	"crypto/tls"
 	"errors"
+	"math"
 	"testing"
 	"time"
 
@@ -29,6 +30,11 @@ import (
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
+
+type expandedCoreVM struct {
+	*block.TestVM
+	*block.TestHeightIndexedVM
+}
 
 var (
 	pTestCert *tls.Certificate
@@ -56,7 +62,7 @@ func initTestProposerVM(
 	proBlkStartTime time.Time,
 	minPChainHeight uint64,
 ) (
-	*block.TestVM,
+	expandedCoreVM,
 	*validators.TestState,
 	*VM,
 	*snowman.TestBlock,
@@ -73,8 +79,13 @@ func initTestProposerVM(
 	}
 
 	initialState := []byte("genesis state")
-	coreVM := &block.TestVM{
-		TestVM: common.TestVM{
+	coreVM := expandedCoreVM{
+		TestVM: &block.TestVM{
+			TestVM: common.TestVM{
+				T: t,
+			},
+		},
+		TestHeightIndexedVM: &block.TestHeightIndexedVM{
 			T: t,
 		},
 	}
@@ -139,6 +150,18 @@ func initTestProposerVM(
 
 	if err := proVM.SetPreference(coreGenBlk.IDV); err != nil {
 		t.Fatal(err)
+	}
+
+	// Store ForkHeight
+	if proBlkStartTime.Before(genesisTimestamp) {
+		if err := proVM.State.SetForkHeight(0); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if proBlkStartTime.Equal(mockable.MaxTime) {
+		if err := proVM.State.SetForkHeight(math.MaxUint64); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	return coreVM, valState, proVM, coreGenBlk, dummyDBManager

@@ -373,7 +373,7 @@ func (n *network) Gossip(
 // Assumes [n.stateLock] is not held.
 func (n *network) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error {
 	if ctx.GetState() != snow.NormalOp {
-		// don't gossip during bootstrapping
+		// don't gossip during fast-syncing/bootstrapping
 		return nil
 	}
 

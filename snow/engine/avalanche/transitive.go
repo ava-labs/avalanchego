@@ -34,6 +34,7 @@ type Transitive struct {
 	metrics
 
 	// list of NoOpsHandler for messages dropped by engine
+	common.FastSyncHandler
 	common.AcceptedFrontierHandler
 	common.AcceptedHandler
 	common.AncestorsHandler
@@ -73,6 +74,7 @@ func newTransitive(config Config) (*Transitive, error) {
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t := &Transitive{
 		Config:                  config,
+		FastSyncHandler:         common.NewNoOpFastSyncHandler(config.Ctx.Log),
 		AcceptedFrontierHandler: common.NewNoOpAcceptedFrontierHandler(config.Ctx.Log),
 		AcceptedHandler:         common.NewNoOpAcceptedHandler(config.Ctx.Log),
 		AncestorsHandler:        common.NewNoOpAncestorsHandler(config.Ctx.Log),
@@ -283,6 +285,8 @@ func (t *Transitive) Notify(msg common.Message) error {
 		t.pendingTxs = append(t.pendingTxs, t.VM.PendingTxs()...)
 		t.metrics.pendingTxs.Set(float64(len(t.pendingTxs)))
 		return t.attemptToIssueTxs()
+	case common.StateSyncLastBlockMissing, common.StateSyncDone:
+		t.Ctx.Log.Warn("unexpected message %s received in avalanche engine. Dropped", msg.String())
 	default:
 		t.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
 	}

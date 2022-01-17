@@ -127,6 +127,32 @@ type OutboundMsgBuilder interface {
 		chainID ids.ID,
 		msg []byte,
 	) (OutboundMessage, error)
+
+	GetStateSummaryFrontier(
+		chainID ids.ID,
+		requestID uint32,
+		deadline time.Duration,
+	) (OutboundMessage, error)
+
+	StateSummaryFrontier(
+		chainID ids.ID,
+		requestID uint32,
+		key []byte,
+		summary []byte,
+	) (OutboundMessage, error)
+
+	GetAcceptedStateSummary(
+		chainID ids.ID,
+		requestID uint32,
+		deadline time.Duration,
+		containers [][]byte,
+	) (OutboundMessage, error)
+
+	AcceptedStateSummary(
+		chainID ids.ID,
+		requestID uint32,
+		containers [][]byte,
+	) (OutboundMessage, error)
 }
 
 type outMsgBuilder struct {
@@ -467,5 +493,73 @@ func (b *outMsgBuilder) AppGossip(chainID ids.ID, msg []byte) (OutboundMessage, 
 			AppBytes: msg,
 		},
 		b.compress && AppGossip.Compressable(), // App messages may be compressed
+	)
+}
+
+func (b *outMsgBuilder) GetStateSummaryFrontier(
+	chainID ids.ID,
+	requestID uint32,
+	deadline time.Duration,
+) (OutboundMessage, error) {
+	return b.c.Pack(
+		GetStateSummaryFrontier,
+		map[Field]interface{}{
+			ChainID:   chainID[:],
+			RequestID: requestID,
+			Deadline:  uint64(deadline),
+		},
+		GetStateSummaryFrontier.Compressable(), // GetStateSummaryFrontier messages can't be compressed
+	)
+}
+
+func (b *outMsgBuilder) StateSummaryFrontier(
+	chainID ids.ID,
+	requestID uint32,
+	key []byte,
+	summary []byte,
+) (OutboundMessage, error) {
+	return b.c.Pack(
+		StateSummaryFrontier,
+		map[Field]interface{}{
+			ChainID:        chainID[:],
+			RequestID:      requestID,
+			SummaryKey:     key,
+			ContainerBytes: summary,
+		},
+		StateSummaryFrontier.Compressable(), // StateSummaryFrontier messages can't be compressed
+	)
+}
+
+func (b *outMsgBuilder) GetAcceptedStateSummary(
+	chainID ids.ID,
+	requestID uint32,
+	deadline time.Duration,
+	keys [][]byte,
+) (OutboundMessage, error) {
+	return b.c.Pack(
+		GetAcceptedStateSummary,
+		map[Field]interface{}{
+			ChainID:          chainID[:],
+			RequestID:        requestID,
+			Deadline:         uint64(deadline),
+			MultiSummaryKeys: keys,
+		},
+		GetAcceptedStateSummary.Compressable(), // GetAcceptedStateSummary messages can't be compressed
+	)
+}
+
+func (b *outMsgBuilder) AcceptedStateSummary(
+	chainID ids.ID,
+	requestID uint32,
+	keys [][]byte,
+) (OutboundMessage, error) {
+	return b.c.Pack(
+		AcceptedStateSummary,
+		map[Field]interface{}{
+			ChainID:          chainID[:],
+			RequestID:        requestID,
+			MultiSummaryKeys: keys,
+		},
+		AcceptedStateSummary.Compressable(), // AcceptedStateSummary messages can't be compressed
 	)
 }

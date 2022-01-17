@@ -53,6 +53,7 @@ var (
 	_ block.ChainVM              = &VMClient{}
 	_ block.BatchedChainVM       = &VMClient{}
 	_ block.HeightIndexedChainVM = &VMClient{}
+	_ block.StateSyncableVM      = &VMClient{}
 )
 
 const (
@@ -566,6 +567,96 @@ func (vm *VMClient) GetBlockIDByHeight(height uint64) (ids.ID, error) {
 		return ids.Empty, err
 	}
 	return ids.FromBytes(resp.BlkID), nil
+}
+
+func (vm *VMClient) RegisterFastSyncer(fastSyncer []ids.ShortID) error {
+	nodesID := make([][]byte, 0, len(fastSyncer))
+	for _, fs := range fastSyncer {
+		nodesID = append(nodesID, fs.Bytes())
+	}
+
+	_, err := vm.client.RegisterFastSyncer(
+		context.Background(),
+		&vmproto.RegisterFastSyncerRequest{
+			NodeIDs: nodesID,
+		},
+	)
+
+	return err
+}
+
+func (vm *VMClient) StateSyncEnabled() (bool, error) {
+	resp, err := vm.client.StateSyncEnabled(
+		context.Background(),
+		&emptypb.Empty{},
+	)
+	if err != nil {
+		return false, err
+	}
+	return resp.Enabled, nil
+}
+
+func (vm *VMClient) StateSyncGetLastSummary() (common.Summary, error) {
+	resp, err := vm.client.StateSyncGetLastSummary(
+		context.Background(),
+		&emptypb.Empty{},
+	)
+	if err != nil {
+		return common.Summary{}, err
+	}
+	return common.Summary{
+		Key:     resp.Key,
+		Content: resp.State,
+	}, nil
+}
+
+func (vm *VMClient) StateSyncIsSummaryAccepted(key []byte) (bool, error) {
+	resp, err := vm.client.StateSyncIsSummaryAccepted(
+		context.Background(),
+		&vmproto.StateSyncIsSummaryAcceptedRequest{
+			Key: key,
+		},
+	)
+	if err != nil {
+		return false, err
+	}
+	return resp.Accepted, nil
+}
+
+func (vm *VMClient) StateSync(summaries []common.Summary) error {
+	requestedSummaries := make([]*vmproto.StateSyncGetLastSummaryResponse, len(summaries))
+	for k, v := range summaries {
+		requestedSummaries[k] = &vmproto.StateSyncGetLastSummaryResponse{}
+		requestedSummaries[k].Key = v.Key
+		requestedSummaries[k].State = v.Content
+	}
+	_, err := vm.client.StateSync(
+		context.Background(),
+		&vmproto.StateSyncRequest{
+			Summaries: requestedSummaries,
+		},
+	)
+	return err
+}
+
+func (vm *VMClient) GetLastSummaryBlockID() (ids.ID, error) {
+	resp, err := vm.client.GetLastSummaryBlockID(context.Background(), &emptypb.Empty{})
+	if err != nil {
+		return ids.Empty, err
+	}
+
+	var ba [32]byte
+	copy(ba[:], resp.Bytes)
+	return ids.ID(ba), nil
+}
+
+func (vm *VMClient) SetLastSummaryBlock(blkByte []byte) error {
+	_, err := vm.client.SetLastSummaryBlock(context.Background(),
+		&vmproto.StateSyncSetLastSummaryBlockRequest{
+			Bytes: blkByte,
+		})
+
+	return err
 }
 
 func (vm *VMClient) GetAncestors(

@@ -43,6 +43,36 @@ type getter struct {
 	getAncestorsBlks metric.Averager
 }
 
+func (gh *getter) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error {
+	fsVM, ok := gh.vm.(block.StateSyncableVM)
+	if !ok {
+		gh.log.Debug("GetStateSummaryFrontier(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+	}
+	summary, err := fsVM.StateSyncGetLastSummary()
+	if err != nil {
+		return err
+	}
+	gh.sender.SendStateSummaryFrontier(validatorID, requestID, summary.Key, summary.Content)
+	return nil
+}
+
+func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error {
+	fsVM, ok := gh.vm.(block.StateSyncableVM)
+	if !ok {
+		gh.log.Debug("GetAcceptedStateSummary(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+	}
+	acceptedKeys := make([][]byte, 0, len(keys))
+	for _, key := range keys {
+		if accepted, err := fsVM.StateSyncIsSummaryAccepted(key); accepted && err == nil {
+			acceptedKeys = append(acceptedKeys, key)
+		} else if err != nil {
+			return err
+		}
+	}
+	gh.sender.SendAcceptedStateSummary(validatorID, requestID, acceptedKeys)
+	return nil
+}
+
 func (gh *getter) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
 	lastAccepted, err := gh.vm.LastAccepted()
 	if err != nil {
