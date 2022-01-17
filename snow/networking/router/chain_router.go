@@ -290,7 +290,19 @@ func (cr *ChainRouter) AddChain(chain *Handler) {
 	cr.log.Debug("registering chain %s with chain router", chainID)
 	chain.onCloseF = func() { cr.removeChain(chainID) }
 	cr.chains[chainID] = chain
+}
 
+func (cr *ChainRouter) StartChain(chain *Handler) error {
+	// Duly start chain handler ...
+	// Note: cr.lock must not be held here, to avoid reentrancy
+	// on RegisterRequest
+	if err := chain.Start(); err != nil {
+		return err
+	}
+
+	// Notify connected validators
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
 	for validatorID, version := range cr.peers {
 		// If this validator is benched on any chain, treat them as disconnected on all chains
 		if _, benched := cr.benched[validatorID]; !benched {
@@ -298,6 +310,7 @@ func (cr *ChainRouter) AddChain(chain *Handler) {
 			chain.Push(msg)
 		}
 	}
+	return nil
 }
 
 // Connected routes an incoming notification that a validator was just connected
