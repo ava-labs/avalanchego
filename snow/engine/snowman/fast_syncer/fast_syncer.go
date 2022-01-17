@@ -287,6 +287,8 @@ func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID ui
 				Content: v,
 			})
 		}
+
+		fs.Ctx.Log.Info("Received state summaries frontiers from all listed nodes. Starting state sync skipping voting rounds.")
 		return fs.fastSyncVM.StateSync(accepted)
 	}
 
