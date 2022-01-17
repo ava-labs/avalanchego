@@ -3,10 +3,14 @@
 
 package snow
 
+import "errors"
+
 type State uint8
 
+var ErrUnknownState = errors.New("unknown node state")
+
 const (
-	Unknown State = iota
+	Undefined State = iota
 	Bootstrapping
 	NormalOp
 )

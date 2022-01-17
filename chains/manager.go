@@ -656,10 +656,14 @@ func (m *manager) createAvalancheChain(
 	check := health.CheckerFunc(func() (interface{}, error) {
 		ctx.Lock.Lock()
 		defer ctx.Lock.Unlock()
-		if ctx.IsBootstrapped() {
+		switch ctx.GetState() {
+		case snow.Bootstrapping:
+			return bootstrapper.HealthCheck()
+		case snow.NormalOp:
 			return engine.HealthCheck()
+		default:
+			return nil, fmt.Errorf("unknown state; could not check health")
 		}
-		return bootstrapper.HealthCheck()
 	})
 	if err := m.Health.RegisterHealthCheck(chainAlias, check); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
@@ -845,19 +849,23 @@ func (m *manager) createSnowmanChain(
 	}
 	handler.RegisterEngine(engine)
 
+	// Register health checks
 	chainAlias, err := m.PrimaryAlias(ctx.ChainID)
 	if err != nil {
 		chainAlias = ctx.ChainID.String()
 	}
 
-	// Register health checks
 	check := health.CheckerFunc(func() (interface{}, error) {
 		ctx.Lock.Lock()
 		defer ctx.Lock.Unlock()
-		if ctx.IsBootstrapped() {
+		switch ctx.GetState() {
+		case snow.Bootstrapping:
+			return bootstrapper.HealthCheck()
+		case snow.NormalOp:
 			return engine.HealthCheck()
+		default:
+			return nil, fmt.Errorf("unknown state; could not check health")
 		}
-		return bootstrapper.HealthCheck()
 	})
 	if err := m.Health.RegisterHealthCheck(chainAlias, check); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)

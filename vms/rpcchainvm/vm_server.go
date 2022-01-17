@@ -251,12 +251,19 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	}, err
 }
 
-func (vm *VMServer) Bootstrapping(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
-	return &emptypb.Empty{}, vm.vm.Bootstrapping()
-}
-
-func (vm *VMServer) Bootstrapped(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
-	return &emptypb.Empty{}, vm.vm.Bootstrapped()
+func (vm *VMServer) OnStart(_ context.Context, stateReq *vmproto.StateRequest) (*emptypb.Empty, error) {
+	var state snow.State
+	switch stateReq.State {
+	case vmproto.StateRequest_Undefined:
+		state = snow.Undefined
+	case vmproto.StateRequest_Bootstrapping:
+		state = snow.Bootstrapping
+	case vmproto.StateRequest_NormalOp:
+		state = snow.NormalOp
+	default:
+		return &emptypb.Empty{}, snow.ErrUnknownState
+	}
+	return &emptypb.Empty{}, vm.vm.OnStart(state)
 }
 
 func (vm *VMServer) Shutdown(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {

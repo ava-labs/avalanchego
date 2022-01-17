@@ -260,7 +260,7 @@ func (b *bootstrapper) Notify(common.Message) error { return nil }
 func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
 
 // IsBootstrapped implements the common.Engine interface.
-func (b *bootstrapper) IsBootstrapped() bool { return b.Ctx.IsBootstrapped() }
+func (b *bootstrapper) IsBootstrapped() bool { return b.Ctx.GetState() == snow.NormalOp }
 
 // Start implements the common.Engine interface.
 func (b *bootstrapper) Start(startReqID uint32) error {
@@ -391,7 +391,6 @@ func (b *bootstrapper) process(vtxs ...avalanche.Vertex) error {
 			b.numFetchedVts.Inc()
 
 			verticesFetchedSoFar := b.VtxBlocked.Jobs.PendingJobs()
-
 			if verticesFetchedSoFar%common.StatusUpdateFrequency == 0 { // Periodically print progress
 				if !b.Config.SharedCfg.Restarted {
 					b.Ctx.Log.Info("fetched %d vertices", verticesFetchedSoFar)
@@ -443,7 +442,7 @@ func (b *bootstrapper) process(vtxs ...avalanche.Vertex) error {
 // ForceAccepted implements common.Bootstrapable interface
 // ForceAccepted starts bootstrapping. Process the vertices in [accepterContainerIDs].
 func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
-	if err := b.VM.Bootstrapping(); err != nil {
+	if err := b.VM.OnStart(snow.Bootstrapping); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
 			err)
 	}
@@ -474,7 +473,7 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 func (b *bootstrapper) checkFinish() error {
 	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
 	pendingJobs := b.VtxBlocked.MissingIDs()
-	if b.Ctx.IsBootstrapped() || len(pendingJobs) > 0 || b.awaitingTimeout {
+	if b.Ctx.GetState() == snow.NormalOp || len(pendingJobs) > 0 || b.awaitingTimeout {
 		return nil
 	}
 
@@ -534,7 +533,7 @@ func (b *bootstrapper) checkFinish() error {
 
 // Finish bootstrapping
 func (b *bootstrapper) finish() error {
-	if err := b.VM.Bootstrapped(); err != nil {
+	if err := b.VM.OnStart(snow.NormalOp); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has finished: %w",
 			err)
 	}

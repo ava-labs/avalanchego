@@ -125,14 +125,9 @@ func (vm *VM) Initialize(
 	return vm.setLastAcceptedOptionTime()
 }
 
-func (vm *VM) Bootstrapping() error {
-	vm.bootstrapped = false
-	return vm.ChainVM.Bootstrapping()
-}
-
-func (vm *VM) Bootstrapped() error {
-	vm.bootstrapped = true
-	return vm.ChainVM.Bootstrapped()
+func (vm *VM) OnStart(state snow.State) error {
+	vm.bootstrapped = (state == snow.NormalOp)
+	return vm.ChainVM.OnStart(state)
 }
 
 func (vm *VM) BuildBlock() (snowman.Block, error) {

@@ -307,11 +307,11 @@ func GenesisVMWithArgs(tb testing.TB, additionalFxs []*common.Fx, args *BuildGen
 	}
 	vm.batchTimeout = 0
 
-	if err := vm.Bootstrapping(); err != nil {
+	if err := vm.OnStart(snow.Bootstrapping); err != nil {
 		tb.Fatal(err)
 	}
 
-	if err := vm.Bootstrapped(); err != nil {
+	if err := vm.OnStart(snow.NormalOp); err != nil {
 		tb.Fatal(err)
 	}
 
@@ -784,12 +784,12 @@ func TestIssueNFT(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	err = vm.Bootstrapping()
+	err = vm.OnStart(snow.Bootstrapping)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.Bootstrapped()
+	err = vm.OnStart(snow.NormalOp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -936,12 +936,12 @@ func TestIssueProperty(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	err = vm.Bootstrapping()
+	err = vm.OnStart(snow.Bootstrapping)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.Bootstrapped()
+	err = vm.OnStart(snow.NormalOp)
 	if err != nil {
 		t.Fatal(err)
 	}
