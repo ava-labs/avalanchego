@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
@@ -41,7 +42,7 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 	bootCfg, engCfg := DefaultConfigs()
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -428,7 +429,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 	}
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -932,7 +933,7 @@ func TestVoteCanceling(t *testing.T) {
 	}
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -1069,7 +1070,7 @@ func TestEngineNoQuery(t *testing.T) {
 	bootCfg, engCfg := DefaultConfigs()
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.WeightTracker = wt
 
 	sender := &common.SenderTest{}
@@ -1138,7 +1139,7 @@ func TestEngineNoRepollQuery(t *testing.T) {
 	bootCfg, engCfg := DefaultConfigs()
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.WeightTracker = wt
 
 	sender := &common.SenderTest{}
@@ -1823,7 +1824,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	engCfg.Params.ConcurrentRepolls = 2
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -1958,7 +1959,7 @@ func TestEngineDoubleChit(t *testing.T) {
 	}
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -2111,7 +2112,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	engCfg.Params.OptimalProcessing = 1
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals

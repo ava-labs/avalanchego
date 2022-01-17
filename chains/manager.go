@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
+	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
@@ -606,6 +607,7 @@ func (m *manager) createAvalancheChain(
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
+	weightTracker := tracker.NewWeightTracker(beacons, commonCfg.StartupAlpha)
 	avaGetHandler, err := avagetter.New(vtxManager, commonCfg)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize avalanche base message handler: %w", err)
@@ -619,7 +621,7 @@ func (m *manager) createAvalancheChain(
 		TxBlocked:     txBlocker,
 		Manager:       vtxManager,
 		VM:            vm,
-		WeightTracker: common.NewWeightTracker(beacons, commonCfg.StartupAlpha),
+		WeightTracker: weightTracker,
 	}
 	bootstrapper, err := avbootstrap.New(
 		bootstrapperConfig,
@@ -810,6 +812,7 @@ func (m *manager) createSnowmanChain(
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
+	weightTracker := tracker.NewWeightTracker(beacons, commonCfg.StartupAlpha)
 	snowGetHandler, err := snowgetter.New(vm, commonCfg)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
@@ -821,7 +824,7 @@ func (m *manager) createSnowmanChain(
 		AllGetsServer: snowGetHandler,
 		Blocked:       blocked,
 		VM:            vm,
-		WeightTracker: common.NewWeightTracker(beacons, commonCfg.StartupAlpha),
+		WeightTracker: weightTracker,
 		Bootstrapped:  m.unblockChains,
 	}
 	bootstrapper, err := smbootstrap.New(
