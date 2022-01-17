@@ -80,34 +80,6 @@ func (_m *ChainVM) AppResponse(nodeID ids.ShortID, requestID uint32, response []
 	return r0
 }
 
-// Bootstrapped provides a mock function with given fields:
-func (_m *ChainVM) Bootstrapped() error {
-	ret := _m.Called()
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// Bootstrapping provides a mock function with given fields:
-func (_m *ChainVM) Bootstrapping() error {
-	ret := _m.Called()
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // BuildBlock provides a mock function with given fields:
 func (_m *ChainVM) BuildBlock() (snowman.Block, error) {
 	ret := _m.Called()
@@ -286,6 +258,20 @@ func (_m *ChainVM) LastAccepted() (ids.ID, error) {
 	}
 
 	return r0, r1
+}
+
+// OnStart provides a mock function with given fields: state
+func (_m *ChainVM) OnStart(state snow.State) error {
+	ret := _m.Called(state)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(snow.State) error); ok {
+		r0 = rf(state)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // ParseBlock provides a mock function with given fields: _a0
