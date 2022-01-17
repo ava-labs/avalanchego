@@ -106,6 +106,15 @@ type bootstrapper struct {
 	awaitingTimeout bool
 }
 
+// Clear implements common.Bootstrapable interface
+func (b *bootstrapper) Clear() error {
+	if err := b.TxBlocked.ClearAll(); err != nil {
+		return err
+	}
+
+	return b.VtxBlocked.ClearAll()
+}
+
 // Ancestors handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
 // with request ID [requestID]. Expects vtxs[0] to be the vertex requested in the corresponding GetAncestors.
 func (b *bootstrapper) Ancestors(vdr ids.ShortID, requestID uint32, vtxs [][]byte) error {

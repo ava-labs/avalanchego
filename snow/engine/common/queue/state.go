@@ -102,6 +102,54 @@ func getPendingJobs(d database.Database) (uint64, error) {
 	return pendingJobs, err
 }
 
+func (s *state) Clear() error {
+	// clear runnableJobIDs
+	it := s.runnableJobIDs.NewIterator()
+	defer it.Release()
+	for it.Next() {
+		if err := s.runnableJobIDs.Delete(it.Key()); err != nil {
+			return err
+		}
+	}
+
+	// clear jobs
+	s.jobsCache.Flush()
+	itj := s.jobs.NewIterator()
+	defer itj.Release()
+	for itj.Next() {
+		if err := s.jobs.Delete(itj.Key()); err != nil {
+			return err
+		}
+	}
+
+	// clear dependencies
+	s.dependentsCache.Flush()
+	itd := s.dependencies.NewIterator()
+	defer itd.Release()
+	for itd.Next() {
+		if err := s.dependencies.Delete(itd.Key()); err != nil {
+			return err
+		}
+	}
+
+	// clear missing jobs IDs
+	itm := s.missingJobIDs.NewIterator()
+	defer itm.Release()
+	for itm.Next() {
+		if err := s.missingJobIDs.Delete(itm.Key()); err != nil {
+			return err
+		}
+	}
+
+	// clear number of pending jobs
+	s.numPendingJobs = 0
+	if err := database.PutUInt64(s.pendingJobs, pendingJobsKey, s.numPendingJobs); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // AddRunnableJob adds [jobID] to the runnable queue
 func (s *state) AddRunnableJob(jobID ids.ID) error {
 	return s.runnableJobIDs.Put(jobID[:], nil)

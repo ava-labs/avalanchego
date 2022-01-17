@@ -309,6 +309,11 @@ func (b *bootstrapper) fetch(blkID ids.ID) error {
 	return nil
 }
 
+// Clear implements common.Bootstrapable interface
+func (b *bootstrapper) Clear() error {
+	return b.Config.Blocked.ClearAll()
+}
+
 // process a block
 func (b *bootstrapper) process(blk snowman.Block, processingBlocks map[ids.ID]snowman.Block) error {
 	status := blk.Status()
