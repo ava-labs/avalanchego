@@ -50,7 +50,9 @@ func (gh *getter) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uin
 	}
 	summary, err := fsVM.StateSyncGetLastSummary()
 	if err != nil {
-		return err
+		gh.log.Verbo("couldn't get state summary frontier with %s. Dropping GetStateSummaryFrontier(%s, %d)",
+			err, validatorID, requestID)
+		return nil
 	}
 	gh.sender.SendStateSummaryFrontier(validatorID, requestID, summary.Key, summary.Content)
 	return nil
@@ -63,10 +65,9 @@ func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uin
 	}
 	acceptedKeys := make([][]byte, 0, len(keys))
 	for _, key := range keys {
-		if accepted, err := fsVM.StateSyncIsSummaryAccepted(key); accepted && err == nil {
+		accepted, err := fsVM.StateSyncIsSummaryAccepted(key)
+		if err == nil && accepted {
 			acceptedKeys = append(acceptedKeys, key)
-		} else if err != nil {
-			return err
 		}
 	}
 	gh.sender.SendAcceptedStateSummary(validatorID, requestID, acceptedKeys)
