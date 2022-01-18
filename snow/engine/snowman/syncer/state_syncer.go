@@ -40,7 +40,7 @@ type stateSyncer struct {
 	common.AppHandler
 
 	started bool
-	// True if RestartBootstrap has been called at least once
+	// True if restart has been called at least once
 	restarted bool
 	// Tracks the last requestID that was used in a request
 	requestID uint32
@@ -139,8 +139,8 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 		return nil
 	}
 
-	// We've received the accepted frontier from every fast syncer
-	// Ask each fast syncer to filter the list of containers that we were
+	// We've received the accepted frontier from every state syncer
+	// Ask each state syncer to filter the list of containers that we were
 	// told are on the accepted frontier such that the list only contains containers
 	// they think are accepted
 	var err error
@@ -156,7 +156,7 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 		return err
 	}
 
-	// fail the bootstrap if the weight is not enough to bootstrap
+	// fail the fast sync if the weight is not enough to fast sync
 	if float64(ss.sampledBeacons.Weight())-newAlpha < float64(failedBeaconWeight) {
 		if ss.Config.RetryBootstrap {
 			ss.Ctx.Log.Debug("Not enough frontiers received, restarting state sync... - Beacons: %d - Failed Bootstrappers: %d "+
@@ -233,7 +233,7 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 		return nil
 	}
 
-	// We've received the filtered accepted frontier from every bootstrap validator
+	// We've received the filtered accepted frontier from every state sync validator
 	// Accept all containers that have a sufficient weight behind them
 	accepted := make([]common.Summary, 0, len(ss.acceptedVotes))
 	for key, weight := range ss.acceptedVotes {
@@ -248,7 +248,7 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 	// if we don't have enough weight for the state summary to be accepted then retry or fail the state sync
 	size := len(accepted)
 	if size == 0 && ss.Beacons.Len() > 0 {
-		// retry the bootstrap if the weight is not enough to bootstrap
+		// retry the fast sync if the weight is not enough to fast sync
 		failedBeaconWeight, err := ss.Beacons.SubsetWeight(ss.failedAcceptedStateSummaries)
 		if err != nil {
 			return err
@@ -256,7 +256,7 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 
 		// in a zero network there will be no accepted votes but the voting weight will be greater than the failed weight
 		if ss.Config.RetryBootstrap && ss.Beacons.Weight()-ss.Alpha < failedBeaconWeight {
-			ss.Ctx.Log.Debug("Not enough votes received, restarting state sync... - Beacons: %d - Failed Bootstrappers: %d "+
+			ss.Ctx.Log.Debug("Not enough votes received, restarting state sync... - Beacons: %d - Failed syncer: %d "+
 				"- state sync attempt: %d", ss.Beacons.Len(), ss.failedAcceptedStateSummaries.Len(), ss.attempts)
 			return ss.restart(false)
 		}
@@ -355,7 +355,7 @@ func (ss *stateSyncer) startup() error {
 		// initiate messages exchange
 		ss.attempts++
 		if len(ss.pendingSendStateSummaryFrontier) == 0 {
-			ss.Ctx.Log.Info("State syncing skipped due to no provided bootstraps")
+			ss.Ctx.Log.Info("State syncing skipped due to no provided syncers")
 			return ss.stateSyncVM.StateSync(nil)
 		}
 	}
@@ -366,7 +366,7 @@ func (ss *stateSyncer) startup() error {
 
 func (ss *stateSyncer) restart(reset bool) error {
 	// resets the attempts when we're pulling blocks/vertices we don't want to
-	// fail the bootstrap at that stage
+	// fail the state sync at that stage
 	if reset {
 		ss.Ctx.Log.Debug("Checking for new state sync frontiers")
 
@@ -400,7 +400,7 @@ func (ss *stateSyncer) sendGetStateSummaryFrontiers() error {
 	return nil
 }
 
-// Ask up to [MaxOutstandingStateSyncRequests] bootstrap validators to send
+// Ask up to [MaxOutstandingStateSyncRequests] syncers validators to send
 // their filtered accepted frontier
 func (ss *stateSyncer) sendGetAccepted() error {
 	vdrs := ids.NewShortSet(1)
