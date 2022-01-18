@@ -274,7 +274,7 @@ func wrapNativeAssetCall(opts *TransactOpts, contract *common.Address, input []b
 			return nil, nil, ErrNilAssetAmount
 		}
 		if opts.NativeAssetCall.AssetAmount.Cmp(common.Big0) < 0 {
-			return nil, nil, fmt.Errorf("asset value cannot be < 0 when performing native asset call, found %d", opts.NativeAssetCall.AssetID)
+			return nil, nil, fmt.Errorf("asset value cannot be < 0 when performing native asset call, found %d", opts.NativeAssetCall.AssetAmount)
 		}
 		// Prevent potential panic if [contract] is nil in the case that transact is called through DeployContract.
 		if contract == nil {
