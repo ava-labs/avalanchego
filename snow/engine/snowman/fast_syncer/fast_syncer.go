@@ -251,16 +251,6 @@ func (fs *fastSyncer) sendGetAccepted() error {
 }
 
 // FastSyncHandler interface implementation
-func (fs *fastSyncer) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error {
-	summary, err := fs.fastSyncVM.StateSyncGetLastSummary()
-	if err != nil {
-		return err
-	}
-	fs.Sender.SendStateSummaryFrontier(validatorID, requestID, summary.Key, summary.Content)
-	return nil
-}
-
-// FastSyncHandler interface implementation
 func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, key, summary []byte) error {
 	// ignores any late responses
 	if requestID != fs.RequestID {
@@ -339,20 +329,6 @@ func (fs *fastSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID ui
 	fs.acceptedKeys = acceptedFrontierList
 
 	return fs.sendGetAccepted()
-}
-
-// FastSyncHandler interface implementation
-func (fs *fastSyncer) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error {
-	acceptedKeys := make([][]byte, 0, len(keys))
-	for _, key := range keys {
-		if accepted, err := fs.fastSyncVM.StateSyncIsSummaryAccepted(key); accepted && err == nil {
-			acceptedKeys = append(acceptedKeys, key)
-		} else if err != nil {
-			return err
-		}
-	}
-	fs.Sender.SendAcceptedStateSummary(validatorID, requestID, acceptedKeys)
-	return nil
 }
 
 // FastSyncHandler interface implementation

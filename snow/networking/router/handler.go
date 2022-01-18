@@ -304,17 +304,17 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 	switch msg.Op() {
 	case message.GetStateSummaryFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return h.fastSyncer.GetStateSummaryFrontier(nodeID, reqID)
+		return targetGear.GetStateSummaryFrontier(nodeID, reqID)
 
 	case message.StateSummaryFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
 		key := msg.Get(message.SummaryKey).([]byte)
 		summary := msg.Get(message.ContainerBytes).([]byte)
-		return h.fastSyncer.StateSummaryFrontier(nodeID, reqID, key, summary)
+		return targetGear.StateSummaryFrontier(nodeID, reqID, key, summary)
 
 	case message.GetStateSummaryFrontierFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return h.fastSyncer.GetStateSummaryFrontierFailed(nodeID, reqID)
+		return targetGear.GetStateSummaryFrontierFailed(nodeID, reqID)
 
 	case message.GetAcceptedStateSummary:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -324,7 +324,7 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
-		return h.fastSyncer.GetAcceptedStateSummary(nodeID, reqID, keys)
+		return targetGear.GetAcceptedStateSummary(nodeID, reqID, keys)
 
 	case message.AcceptedStateSummary:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -334,11 +334,11 @@ func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
 			return nil
 		}
-		return h.fastSyncer.AcceptedStateSummary(nodeID, reqID, keys)
+		return targetGear.AcceptedStateSummary(nodeID, reqID, keys)
 
 	case message.GetAcceptedStateSummaryFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return h.fastSyncer.GetAcceptedStateSummaryFailed(nodeID, reqID)
+		return targetGear.GetAcceptedStateSummaryFailed(nodeID, reqID)
 
 	case message.GetAcceptedFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
