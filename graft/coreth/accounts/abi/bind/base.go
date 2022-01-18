@@ -43,7 +43,10 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 )
 
-var ErrNilAssetAmount = errors.New("cannot specify nil asset amount for native asset call")
+var (
+	ErrNilAssetAmount            = errors.New("cannot specify nil asset amount for native asset call")
+	errNativeAssetDeployContract = errors.New("cannot specify native asset params while deploying a contract")
+)
 
 // SignerFn is a signer function callback when a contract requires a method to
 // sign the transaction before submission.
@@ -269,6 +272,10 @@ func wrapNativeAssetCall(opts *TransactOpts, contract *common.Address, input []b
 		}
 		if opts.NativeAssetCall.AssetAmount == nil {
 			return nil, nil, ErrNilAssetAmount
+		}
+		// Prevent potential panic if [contract] is nil in the case that transact is called through DeployContract.
+		if contract == nil {
+			return nil, nil, errNativeAssetDeployContract
 		}
 		// wrap input with native asset call params
 		input = vm.PackNativeAssetCallInput(
