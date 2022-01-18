@@ -98,12 +98,12 @@ type BootstrapConfig struct {
 	// Timeout when connecting to bootstrapping beacons
 	BootstrapBeaconConnectionTimeout time.Duration `json:"bootstrapBeaconConnectionTimeout"`
 
-	// Max number of containers in a multiput message sent by this node.
-	BootstrapMultiputMaxContainersSent int `json:"bootstrapMultiputMaxContainersSent"`
+	// Max number of containers in an ancestors message sent by this node.
+	BootstrapAncestorsMaxContainersSent int `json:"bootstrapAncestorsMaxContainersSent"`
 
-	// This node will only consider the first [MultiputMaxContainersReceived]
-	// containers in a multiput it receives.
-	BootstrapMultiputMaxContainersReceived int `json:"bootstrapMultiputMaxContainersReceived"`
+	// This node will only consider the first [AncestorsMaxContainersReceived]
+	// containers in an ancestors message it receives.
+	BootstrapAncestorsMaxContainersReceived int `json:"bootstrapAncestorsMaxContainersReceived"`
 
 	// Max time to spend fetching a container and its
 	// ancestors while responding to a GetAncestors message

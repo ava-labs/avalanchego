@@ -4,22 +4,16 @@
 package health
 
 import (
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// metrics reports commonly used health check metrics.
 type metrics struct {
-	// log reports anomalous events.
-	log logging.Logger
-
 	// failingChecks keeps track of the number of check failing
 	failingChecks prometheus.Gauge
 }
 
-func newMetrics(log logging.Logger, namespace string, registerer prometheus.Registerer) (*metrics, error) {
+func newMetrics(namespace string, registerer prometheus.Registerer) (*metrics, error) {
 	metrics := &metrics{
-		log: log,
 		failingChecks: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "checks_failing",
@@ -27,14 +21,4 @@ func newMetrics(log logging.Logger, namespace string, registerer prometheus.Regi
 		}),
 	}
 	return metrics, registerer.Register(metrics.failingChecks)
-}
-
-// healthy handles the metrics for the healthy cases
-func (m *metrics) healthy() {
-	m.failingChecks.Dec()
-}
-
-// unHealthy handles the metrics for the unhealthy cases
-func (m *metrics) unHealthy() {
-	m.failingChecks.Inc()
 }

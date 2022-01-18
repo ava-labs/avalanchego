@@ -4,8 +4,8 @@
 package avm
 
 import (
+	"context"
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
@@ -21,9 +21,10 @@ var _ WalletClient = &client{}
 // interface of an AVM wallet client for interacting with avm managed wallet on [chain]
 type WalletClient interface {
 	// IssueTx issues a transaction to a node and returns the TxID
-	IssueTx(tx []byte) (ids.ID, error)
+	IssueTx(ctx context.Context, tx []byte) (ids.ID, error)
 	// Send [amount] of [assetID] to address [to]
 	Send(
+		ctx context.Context,
 		user api.UserPass,
 		from []string,
 		changeAddr string,
@@ -34,6 +35,7 @@ type WalletClient interface {
 	) (ids.ID, error)
 	// SendMultiple sends a transaction from [user] funding all [outputs]
 	SendMultiple(
+		ctx context.Context,
 		user api.UserPass,
 		from []string,
 		changeAddr string,
@@ -48,19 +50,19 @@ type walletClient struct {
 }
 
 // NewWalletClient returns an AVM wallet client for interacting with avm managed wallet on [chain]
-func NewWalletClient(uri, chain string, requestTimeout time.Duration) WalletClient {
+func NewWalletClient(uri, chain string) WalletClient {
 	return &walletClient{
-		requester: rpc.NewEndpointRequester(uri, fmt.Sprintf("/ext/%s/wallet", constants.ChainAliasPrefix+chain), "wallet", requestTimeout),
+		requester: rpc.NewEndpointRequester(uri, fmt.Sprintf("/ext/%s/wallet", constants.ChainAliasPrefix+chain), "wallet"),
 	}
 }
 
-func (c *walletClient) IssueTx(txBytes []byte) (ids.ID, error) {
+func (c *walletClient) IssueTx(ctx context.Context, txBytes []byte) (ids.ID, error) {
 	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, txBytes)
 	if err != nil {
 		return ids.ID{}, err
 	}
 	res := &api.JSONTxID{}
-	err = c.requester.SendRequest("issueTx", &api.FormattedTx{
+	err = c.requester.SendRequest(ctx, "issueTx", &api.FormattedTx{
 		Tx:       txStr,
 		Encoding: formatting.Hex,
 	}, res)
@@ -68,6 +70,7 @@ func (c *walletClient) IssueTx(txBytes []byte) (ids.ID, error) {
 }
 
 func (c *walletClient) Send(
+	ctx context.Context,
 	user api.UserPass,
 	from []string,
 	changeAddr string,
@@ -77,7 +80,7 @@ func (c *walletClient) Send(
 	memo string,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest("send", &SendArgs{
+	err := c.requester.SendRequest(ctx, "send", &SendArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
 			JSONFromAddrs:  api.JSONFromAddrs{From: from},
@@ -94,6 +97,7 @@ func (c *walletClient) Send(
 }
 
 func (c *walletClient) SendMultiple(
+	ctx context.Context,
 	user api.UserPass,
 	from []string,
 	changeAddr string,
@@ -101,7 +105,7 @@ func (c *walletClient) SendMultiple(
 	memo string,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest("sendMultiple", &SendMultipleArgs{
+	err := c.requester.SendRequest(ctx, "sendMultiple", &SendMultipleArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
 			JSONFromAddrs:  api.JSONFromAddrs{From: from},

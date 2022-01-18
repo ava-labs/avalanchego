@@ -12,8 +12,6 @@ import (
 
 	snow "github.com/ava-labs/avalanchego/snow"
 
-	snowman "github.com/ava-labs/avalanchego/snow/engine/snowman"
-
 	time "time"
 
 	version "github.com/ava-labs/avalanchego/version"
@@ -122,13 +120,13 @@ func (_m *Engine) Chits(validatorID ids.ShortID, requestID uint32, containerIDs 
 	return r0
 }
 
-// Connected provides a mock function with given fields: validatorID, nodeVersion
-func (_m *Engine) Connected(validatorID ids.ShortID, nodeVersion version.Application) error {
-	ret := _m.Called(validatorID, nodeVersion)
+// Connected provides a mock function with given fields: id, nodeVersion
+func (_m *Engine) Connected(id ids.ShortID, nodeVersion version.Application) error {
+	ret := _m.Called(id, nodeVersion)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, version.Version) error); ok {
-		r0 = rf(validatorID, nodeVersion)
+	if rf, ok := ret.Get(0).(func(ids.ShortID, version.Application) error); ok {
+		r0 = rf(id, nodeVersion)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -152,13 +150,13 @@ func (_m *Engine) Context() *snow.ConsensusContext {
 	return r0
 }
 
-// Disconnected provides a mock function with given fields: validatorID
-func (_m *Engine) Disconnected(validatorID ids.ShortID) error {
-	ret := _m.Called(validatorID)
+// Disconnected provides a mock function with given fields: id
+func (_m *Engine) Disconnected(id ids.ShortID) error {
+	ret := _m.Called(id)
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(ids.ShortID) error); ok {
-		r0 = rf(validatorID)
+		r0 = rf(id)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -359,20 +357,6 @@ func (_m *Engine) HealthCheck() (interface{}, error) {
 	return r0, r1
 }
 
-// Initialize provides a mock function with given fields: _a0
-func (_m *Engine) Initialize(_a0 snowman.Config) error {
-	ret := _m.Called(_a0)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(snowman.Config) error); ok {
-		r0 = rf(_a0)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // IsBootstrapped provides a mock function with given fields:
 func (_m *Engine) IsBootstrapped() bool {
 	ret := _m.Called()
@@ -387,8 +371,8 @@ func (_m *Engine) IsBootstrapped() bool {
 	return r0
 }
 
-// MultiPut provides a mock function with given fields: validatorID, requestID, containers
-func (_m *Engine) MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) error {
+// Ancestors provides a mock function with given fields: validatorID, requestID, containers
+func (_m *Engine) Ancestors(validatorID ids.ShortID, requestID uint32, containers [][]byte) error {
 	ret := _m.Called(validatorID, requestID, containers)
 
 	var r0 error
@@ -429,13 +413,13 @@ func (_m *Engine) PullQuery(validatorID ids.ShortID, requestID uint32, container
 	return r0
 }
 
-// PushQuery provides a mock function with given fields: validatorID, requestID, containerID, container
-func (_m *Engine) PushQuery(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error {
-	ret := _m.Called(validatorID, requestID, containerID, container)
+// PushQuery provides a mock function with given fields: validatorID, requestID, container
+func (_m *Engine) PushQuery(validatorID ids.ShortID, requestID uint32, container []byte) error {
+	ret := _m.Called(validatorID, requestID, container)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, ids.ID, []byte) error); ok {
-		r0 = rf(validatorID, requestID, containerID, container)
+	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, []byte) error); ok {
+		r0 = rf(validatorID, requestID, container)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -443,13 +427,13 @@ func (_m *Engine) PushQuery(validatorID ids.ShortID, requestID uint32, container
 	return r0
 }
 
-// Put provides a mock function with given fields: validatorID, requestID, containerID, container
-func (_m *Engine) Put(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error {
-	ret := _m.Called(validatorID, requestID, containerID, container)
+// Put provides a mock function with given fields: validatorID, requestID, container
+func (_m *Engine) Put(validatorID ids.ShortID, requestID uint32, container []byte) error {
+	ret := _m.Called(validatorID, requestID, container)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, ids.ID, []byte) error); ok {
-		r0 = rf(validatorID, requestID, containerID, container)
+	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, []byte) error); ok {
+		r0 = rf(validatorID, requestID, container)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -478,6 +462,20 @@ func (_m *Engine) Shutdown() error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func() error); ok {
 		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Start provides a mock function with given fields: startReqID
+func (_m *Engine) Start(startReqID uint32) error {
+	ret := _m.Called(startReqID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(uint32) error); ok {
+		r0 = rf(startReqID)
 	} else {
 		r0 = ret.Error(0)
 	}

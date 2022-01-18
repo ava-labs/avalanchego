@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 func TestSenderContext(t *testing.T) {
@@ -87,34 +88,40 @@ func TestTimeout(t *testing.T) {
 	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, 2, 2, 2)
 	assert.NoError(t, err)
 
-	engine := common.EngineTest{T: t}
-	engine.Default(true)
-	engine.CantConnected = false
-
-	engine.ContextF = snow.DefaultConsensusContextTest
-
 	wg := sync.WaitGroup{}
 	wg.Add(2)
-
 	failedVDRs := ids.ShortSet{}
-	engine.QueryFailedF = func(nodeID ids.ShortID, _ uint32) error {
-		failedVDRs.Add(nodeID)
-		wg.Done()
-		return nil
-	}
-
-	handler := router.Handler{}
-	err = handler.Initialize(
+	ctx := snow.DefaultConsensusContextTest()
+	handler, err := router.NewHandler(
 		mc,
-		&engine,
+		ctx,
 		vdrs,
 		nil,
 	)
 	assert.NoError(t, err)
 
+	bootstrapper := &common.BootstrapperTest{
+		BootstrapableTest: common.BootstrapableTest{
+			T: t,
+		},
+		EngineTest: common.EngineTest{
+			T: t,
+		},
+	}
+	bootstrapper.Default(true)
+	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
+	bootstrapper.ConnectedF = func(nodeID ids.ShortID, nodeVersion version.Application) error { return nil }
+	bootstrapper.QueryFailedF = func(nodeID ids.ShortID, _ uint32) error {
+		failedVDRs.Add(nodeID)
+		wg.Done()
+		return nil
+	}
+	handler.RegisterBootstrap(bootstrapper)
+	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
+
 	go handler.Dispatch()
 
-	chainRouter.AddChain(&handler)
+	chainRouter.AddChain(handler)
 
 	vdrIDs := ids.ShortSet{}
 	vdrIDs.Add(ids.ShortID{255})
@@ -168,36 +175,42 @@ func TestReliableMessages(t *testing.T) {
 	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, 2, 2, 2)
 	assert.NoError(t, err)
 
-	engine := common.EngineTest{T: t}
-	engine.Default(true)
-	engine.CantConnected = false
+	ctx := snow.DefaultConsensusContextTest()
 
-	engine.ContextF = snow.DefaultConsensusContextTest
-	engine.GossipF = func() error { return nil }
-
-	queriesToSend := 1000
-	awaiting := make([]chan struct{}, queriesToSend)
-	for i := 0; i < queriesToSend; i++ {
-		awaiting[i] = make(chan struct{}, 1)
-	}
-
-	engine.QueryFailedF = func(nodeID ids.ShortID, reqID uint32) error {
-		close(awaiting[int(reqID)])
-		return nil
-	}
-
-	handler := router.Handler{}
-	err = handler.Initialize(
+	handler, err := router.NewHandler(
 		mc,
-		&engine,
+		ctx,
 		vdrs,
 		nil,
 	)
 	assert.NoError(t, err)
 
+	bootstrapper := &common.BootstrapperTest{
+		BootstrapableTest: common.BootstrapableTest{
+			T: t,
+		},
+		EngineTest: common.EngineTest{
+			T: t,
+		},
+	}
+	bootstrapper.Default(true)
+	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
+	bootstrapper.ConnectedF = func(nodeID ids.ShortID, nodeVersion version.Application) error { return nil }
+	queriesToSend := 1000
+	awaiting := make([]chan struct{}, queriesToSend)
+	for i := 0; i < queriesToSend; i++ {
+		awaiting[i] = make(chan struct{}, 1)
+	}
+	bootstrapper.QueryFailedF = func(nodeID ids.ShortID, reqID uint32) error {
+		close(awaiting[int(reqID)])
+		return nil
+	}
+	handler.RegisterBootstrap(bootstrapper)
+	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
+
 	go handler.Dispatch()
 
-	chainRouter.AddChain(&handler)
+	chainRouter.AddChain(handler)
 
 	go func() {
 		for i := 0; i < queriesToSend; i++ {
@@ -259,36 +272,41 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, 2, 2, 2)
 	assert.NoError(t, err)
 
-	engine := common.EngineTest{T: t}
-	engine.Default(false)
-
-	engine.ContextF = snow.DefaultConsensusContextTest
-	engine.GossipF = func() error { return nil }
-	engine.CantPullQuery = false
-
-	queriesToSend := 2
-	awaiting := make([]chan struct{}, queriesToSend)
-	for i := 0; i < queriesToSend; i++ {
-		awaiting[i] = make(chan struct{}, 1)
-	}
-
-	engine.QueryFailedF = func(nodeID ids.ShortID, reqID uint32) error {
-		close(awaiting[int(reqID)])
-		return nil
-	}
-
-	handler := router.Handler{}
-	err = handler.Initialize(
+	ctx := snow.DefaultConsensusContextTest()
+	handler, err := router.NewHandler(
 		mc,
-		&engine,
+		ctx,
 		vdrs,
 		nil,
 	)
 	assert.NoError(t, err)
 
+	bootstrapper := &common.BootstrapperTest{
+		BootstrapableTest: common.BootstrapableTest{
+			T: t,
+		},
+		EngineTest: common.EngineTest{
+			T: t,
+		},
+	}
+	bootstrapper.Default(true)
+	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
+	bootstrapper.ConnectedF = func(nodeID ids.ShortID, nodeVersion version.Application) error { return nil }
+	queriesToSend := 2
+	awaiting := make([]chan struct{}, queriesToSend)
+	for i := 0; i < queriesToSend; i++ {
+		awaiting[i] = make(chan struct{}, 1)
+	}
+	bootstrapper.QueryFailedF = func(nodeID ids.ShortID, reqID uint32) error {
+		close(awaiting[int(reqID)])
+		return nil
+	}
+	handler.RegisterBootstrap(bootstrapper)
+	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
+
 	go handler.Dispatch()
 
-	chainRouter.AddChain(&handler)
+	chainRouter.AddChain(handler)
 
 	go func() {
 		for i := 0; i < queriesToSend; i++ {

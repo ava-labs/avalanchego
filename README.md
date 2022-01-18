@@ -12,15 +12,19 @@ a blockchains platform with high throughput, and blazing fast transactions.
 Avalanche is an incredibly lightweight protocol, so the minimum computer requirements are quite modest.
 Note that as network usage increases, hardware requirements may change.
 
+The minimum recommended hardware specification for nodes connected to Mainnet is: 
+
 - CPU: Equivalent of 8 AWS vCPU
-- RAM: 16 GB
-- Storage: 200 GB
+- RAM: 16 GiB
+- Storage: 512 GiB
 - OS: Ubuntu 18.04/20.04 or macOS >= 10.15 (Catalina)
 - Network: Reliable IPv4 or IPv6 network connection, with an open public port.
-- Software Dependencies:
-  - [Go](https://golang.org/doc/install) version >= 1.16.8 and set up [`$GOPATH`](https://github.com/golang/go/wiki/SettingGOPATH).
-  - [gcc](https://gcc.gnu.org/)
-  - g++
+
+If you plan to build AvalancheGo from source, you will also need the following software:
+
+- [Go](https://golang.org/doc/install) version >= 1.16.8
+- [gcc](https://gcc.gnu.org/)
+- g++
 
 ### Native Install
 
@@ -130,13 +134,17 @@ To connect to the Fuji Testnet, run:
 
 ### Creating a Local Testnet
 
-To create a single node testnet, run:
+See [this tutorial.](https://docs.avax.network/build/tutorials/platform/create-a-local-test-network/)
 
-```sh
-./build/avalanchego --network-id=local --staking-enabled=false --snow-sample-size=1 --snow-quorum-size=1
-```
+## Bootstrapping
 
-This launches an Avalanche network with one node.
+A node needs to catch up to the latest network state before it can participate in consensus and serve API calls. This process, called bootstrapping, currently takes several days for a new node connected to Mainnet.
+
+A node will not [report healthy](https://docs.avax.network/build/avalanchego-apis/health) until it is done bootstrapping.
+
+Improvements that reduce the amount of time it takes to bootstrap are under development.
+
+The bottleneck during bootstrapping is typically database IO. Using a more powerful CPU or increasing the database IOPS on the computer running a node will decrease the amount of time bootstrapping takes.
 
 ## Generating Code
 
@@ -194,22 +202,22 @@ The following table lists currently supported platforms and their corresponding
 AvalancheGo support tiers:
 
 | Architecture | Operating system | Support tier  |
-|:------------:|:----------------:|:-------------:|
-| amd64        | Linux            | 1             |
-| arm64        | Linux            | 2             |
-| amd64        | Darwin           | 2             |
-| amd64        | Windows          | 3             |
-| arm          | Linux            | Not supported |
-| i386         | Linux            | Not supported |
-| arm64        | Darwin           | Not supported |
+| :----------: | :--------------: | :-----------: |
+|    amd64     |      Linux       |       1       |
+|    arm64     |      Linux       |       2       |
+|    amd64     |      Darwin      |       2       |
+|    amd64     |     Windows      |       3       |
+|     arm      |      Linux       | Not supported |
+|     i386     |      Linux       | Not supported |
+|    arm64     |      Darwin      | Not supported |
 
 To officially support a new platform, one must satisfy the following requirements:
 
-| AvalancheGo continuous integration    | Tier 1 | Tier 2 | Tier 3 |
-| ------------------------------------- |:------:|:------:|:------:|
-| Build passes                          | &check;| &check;| &check;|
-| Unit and integration tests pass       | &check;| &check;|        |
-| End-to-end and stress tests pass      | &check;|        |        |
+| AvalancheGo continuous integration | Tier 1  | Tier 2  | Tier 3  |
+| ---------------------------------- | :-----: | :-----: | :-----: |
+| Build passes                       | &check; | &check; | &check; |
+| Unit and integration tests pass    | &check; | &check; |         |
+| End-to-end and stress tests pass   | &check; |         |         |
 
 ## Security Bugs
 

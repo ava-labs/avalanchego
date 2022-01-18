@@ -135,7 +135,7 @@ func (tx *UniqueTx) Accept() error {
 		if err != nil {
 			// should never happen because the UTXO was previously verified to
 			// exist
-			return fmt.Errorf("error finding UTXO %s: %s", utxoID, err)
+			return fmt.Errorf("error finding UTXO %s: %w", utxoID, err)
 		}
 		inputUTXOs = append(inputUTXOs, utxo)
 	}
@@ -143,7 +143,7 @@ func (tx *UniqueTx) Accept() error {
 	outputUTXOs := tx.UTXOs()
 	// index input and output UTXOs
 	if err := tx.vm.addressTxsIndexer.Accept(tx.ID(), inputUTXOs, outputUTXOs); err != nil {
-		return fmt.Errorf("error indexing tx: %s", err)
+		return fmt.Errorf("error indexing tx: %w", err)
 	}
 
 	// Remove spent utxos
@@ -154,7 +154,7 @@ func (tx *UniqueTx) Accept() error {
 		}
 		utxoID := utxo.InputID()
 		if err := tx.vm.state.DeleteUTXO(utxoID); err != nil {
-			return fmt.Errorf("couldn't delete UTXO %s: %s", utxoID, err)
+			return fmt.Errorf("couldn't delete UTXO %s: %w", utxoID, err)
 		}
 	}
 	// Add new utxos
@@ -265,6 +265,11 @@ func (tx *UniqueTx) InputIDs() []ids.ID {
 		tx.inputs[i] = utxo.InputID()
 	}
 	return tx.inputs
+}
+
+// Whitelist is not supported by this transaction type, so [false] is returned.
+func (tx *UniqueTx) Whitelist() (ids.Set, bool, error) {
+	return nil, false, nil
 }
 
 // InputUTXOs returns the utxos that will be consumed on tx acceptance

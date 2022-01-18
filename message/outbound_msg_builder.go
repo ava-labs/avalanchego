@@ -69,7 +69,7 @@ type OutboundMsgBuilder interface {
 		containerID ids.ID,
 	) (OutboundMessage, error)
 
-	MultiPut(
+	Ancestors(
 		chainID ids.ID,
 		requestID uint32,
 		containers [][]byte,
@@ -315,19 +315,19 @@ func (b *outMsgBuilder) GetAncestors(
 	)
 }
 
-func (b *outMsgBuilder) MultiPut(
+func (b *outMsgBuilder) Ancestors(
 	chainID ids.ID,
 	requestID uint32,
 	containers [][]byte,
 ) (OutboundMessage, error) {
 	return b.c.Pack(
-		MultiPut,
+		Ancestors,
 		map[Field]interface{}{
 			ChainID:             chainID[:],
 			RequestID:           requestID,
 			MultiContainerBytes: containers,
 		},
-		b.compress && MultiPut.Compressable(), // MultiPut messages may be compressed
+		b.compress && Ancestors.Compressable(), // Ancestors messages may be compressed
 	)
 }
 

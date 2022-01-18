@@ -36,6 +36,5 @@ func (m *vertexMetrics) Initialize(
 	m.verifyErr = newAverager(namespace, "verify_tx_err", reg, &errs)
 	m.accept = newAverager(namespace, "accept", reg, &errs)
 	m.reject = newAverager(namespace, "reject", reg, &errs)
-
 	return errs.Err
 }
