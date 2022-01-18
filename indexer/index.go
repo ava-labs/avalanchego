@@ -44,7 +44,7 @@ var (
 // Index assumes that Accept is called before the container is committed to the
 // database of the VM that the container exists in.
 type Index interface {
-	Accept(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error
+	snow.Acceptor
 	GetContainerByIndex(index uint64) (Container, error)
 	GetContainerRange(startIndex uint64, numToFetch uint64) ([]Container, error)
 	GetLastAccepted() (Container, error)

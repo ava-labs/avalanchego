@@ -95,3 +95,15 @@ func (a *addressManager) FormatAddress(chainID ids.ID, addr ids.ShortID) (string
 	hrp := constants.GetHRP(a.ctx.NetworkID)
 	return formatting.FormatAddress(chainIDAlias, hrp, addr.Bytes())
 }
+
+func ParseLocalAddresses(a AddressManager, addrStrs []string) (ids.ShortSet, error) {
+	addrs := make(ids.ShortSet, len(addrStrs))
+	for _, addrStr := range addrStrs {
+		addr, err := a.ParseLocalAddress(addrStr)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't parse address %q: %w", addrStr, err)
+		}
+		addrs.Add(addr)
+	}
+	return addrs, nil
+}

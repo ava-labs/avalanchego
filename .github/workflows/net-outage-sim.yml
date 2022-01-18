@@ -1,0 +1,32 @@
+name: network-outage-simulation 
+
+on:
+  schedule:
+   # * is a special character in YAML so you have to quote this string
+   # Run every day at 7 AM. (The database backup is created around 5 AM.)
+   - cron:  '0 7 * * *'
+  workflow_dispatch:
+
+jobs:
+  run_sim:
+    runs-on: [self-hosted, linux, x64, net-outage-sim]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Cleanup docker (avoid conflicts with previous runs) 
+        shell: bash
+        run: .github/workflows/cleanup-net-outage-sim.sh
+
+      - name: Download avalanchego:latest
+        run: docker pull avaplatform/avalanchego:latest
+
+      - name: Run the internet outage simulation 
+        shell: bash
+        run: .github/workflows/run-net-outage-sim.sh
+
+      - name: Cleanup again
+        if: always() # Always clean up
+        shell: bash
+        run: .github/workflows/cleanup-net-outage-sim.sh

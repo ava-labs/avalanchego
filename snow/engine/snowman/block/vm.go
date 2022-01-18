@@ -25,6 +25,7 @@ import (
 // Consensus will ensure the network agrees on the number at every block height.
 type ChainVM interface {
 	common.VM
+
 	Getter
 	Parser
 
