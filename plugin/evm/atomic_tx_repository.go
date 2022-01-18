@@ -122,10 +122,6 @@ func (a *atomicTxRepository) initializeHeightIndex(lastAcceptedHeight uint64) er
 	// Keep track of the size of the currently pending writes
 	pendingBytesApproximation := 0
 	for iter.Next() {
-		if err := iter.Error(); err != nil {
-			return fmt.Errorf("atomic tx DB iterator errored while initializing atomic trie: %w", err)
-		}
-
 		// iter.Value() consists of [height packed as uint64] + [tx serialized as packed []byte]
 		iterValue := iter.Value()
 		if len(iterValue) < wrappers.LongLen {
@@ -167,6 +163,9 @@ func (a *atomicTxRepository) initializeHeightIndex(lastAcceptedHeight uint64) er
 			lastLogTime = time.Now()
 			log.Info("Atomic repository initialization", "indexedTxs", indexedTxs)
 		}
+	}
+	if err := iter.Error(); err != nil {
+		return fmt.Errorf("atomic tx DB iterator errored while initializing atomic trie: %w", err)
 	}
 
 	// Updated the value stored [maxIndexedHeightKey] to be the lastAcceptedHeight
