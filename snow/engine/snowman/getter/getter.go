@@ -44,12 +44,12 @@ type getter struct {
 }
 
 func (gh *getter) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error {
-	fsVM, ok := gh.vm.(block.StateSyncableVM)
+	ssVM, ok := gh.vm.(block.StateSyncableVM)
 	if !ok {
-		gh.log.Debug("Fast sync not supported. GetStateSummaryFrontier(%s, %d) dropped.", validatorID, requestID)
+		gh.log.Debug("State sync not supported. GetStateSummaryFrontier(%s, %d) dropped.", validatorID, requestID)
 		return nil
 	}
-	summary, err := fsVM.StateSyncGetLastSummary()
+	summary, err := ssVM.StateSyncGetLastSummary()
 	if err != nil {
 		gh.log.Verbo("couldn't get state summary frontier with %s. Dropping GetStateSummaryFrontier(%s, %d)",
 			err, validatorID, requestID)
@@ -60,14 +60,14 @@ func (gh *getter) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uin
 }
 
 func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error {
-	fsVM, ok := gh.vm.(block.StateSyncableVM)
+	ssVM, ok := gh.vm.(block.StateSyncableVM)
 	if !ok {
-		gh.log.Debug("Fast sync not supported. GetAcceptedStateSummary(%s, %d) dropped.", validatorID, requestID)
+		gh.log.Debug("State sync not supported. GetAcceptedStateSummary(%s, %d) dropped.", validatorID, requestID)
 		return nil
 	}
 	acceptedKeys := make([][]byte, 0, len(keys))
 	for _, key := range keys {
-		accepted, err := fsVM.StateSyncIsSummaryAccepted(key)
+		accepted, err := ssVM.StateSyncIsSummaryAccepted(key)
 		if err == nil && accepted {
 			acceptedKeys = append(acceptedKeys, key)
 		}

@@ -3,7 +3,7 @@
 
 package common
 
-type FastSyncer interface {
+type StateSyncer interface {
 	Engine
 	IsEnabled() bool
 }

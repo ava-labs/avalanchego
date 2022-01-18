@@ -30,7 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	fastsyncer "github.com/ava-labs/avalanchego/snow/engine/snowman/fast_syncer"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/syncer"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
@@ -824,18 +824,18 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
 	}
 
-	// create fast sync gear
-	fastSyncCfg := fastsyncer.Config{
+	// create state sync gear
+	stateSyncCfg := syncer.Config{
 		Config:                  commonCfg,
 		StateSyncTestingBeacons: stateSyncTestingBeacons,
 		VM:                      vm,
 		WeightTracker:           weightTracker,
 	}
-	fastSync := fastsyncer.NewFastSyncer(
-		fastSyncCfg,
-		handler.OnDoneFastSyncing,
+	stateSyncer := syncer.New(
+		stateSyncCfg,
+		handler.OnDoneStateSyncing,
 	)
-	handler.RegisterFastSyncer(fastSync)
+	handler.RegisterStateSyncer(stateSyncer)
 
 	// create bootstrap gear
 	bootstrapCfg := smbootstrap.Config{

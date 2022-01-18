@@ -52,7 +52,7 @@ const (
 	Notify
 	GossipRequest
 
-	// Fast sync
+	// State sync
 	GetStateSummaryFrontier
 	StateSummaryFrontier
 	GetStateSummaryFrontierFailed
@@ -113,23 +113,23 @@ var (
 	}
 	ConsensusOps = append(ConsensusExternalOps, ConsensusInternalOps...)
 
-	FastSyncRequestOps = []Op{
+	StateSyncRequestOps = []Op{
 		GetStateSummaryFrontier,
 		GetAcceptedStateSummary,
 	}
-	FastSyncResponseOps = []Op{
+	StateSyncResponseOps = []Op{
 		StateSummaryFrontier,
 		AcceptedStateSummary,
 	}
-	FastSyncExternalOps = append(FastSyncRequestOps, FastSyncResponseOps...)
-	FastSyncInternalOps = []Op{
+	StateSyncExternalOps = append(StateSyncRequestOps, StateSyncResponseOps...)
+	StateSyncInternalOps = []Op{
 		GetStateSummaryFrontierFailed,
 		GetAcceptedStateSummaryFailed,
 	}
-	FastSyncOps = append(FastSyncExternalOps, FastSyncInternalOps...)
+	StateSyncOps = append(StateSyncExternalOps, StateSyncInternalOps...)
 
 	ConsensusAndNetworkOps = append(ConsensusExternalOps, HandshakeOps...)
-	ExternalOps            = append(ConsensusAndNetworkOps, FastSyncExternalOps...)
+	ExternalOps            = append(ConsensusAndNetworkOps, StateSyncExternalOps...)
 
 	RequestToResponseOps = map[Op]Op{
 		GetAcceptedFrontier:     AcceptedFrontier,
@@ -201,7 +201,7 @@ var (
 		AppRequest:  {ChainID, RequestID, Deadline, AppBytes},
 		AppResponse: {ChainID, RequestID, AppBytes},
 		AppGossip:   {ChainID, AppBytes},
-		// Fast Sync
+		// State Sync
 		GetStateSummaryFrontier: {ChainID, RequestID, Deadline},
 		StateSummaryFrontier:    {ChainID, RequestID, SummaryKey, ContainerBytes},
 		GetAcceptedStateSummary: {ChainID, RequestID, Deadline, MultiSummaryKeys},

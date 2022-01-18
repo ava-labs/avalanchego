@@ -40,7 +40,7 @@ type Handler struct {
 	// The validator set that validates this chain
 	validators validators.Set
 
-	fastSyncer   common.FastSyncer
+	stateSyncer  common.StateSyncer
 	bootstrapper common.BootstrapableEngine
 	engine       common.Engine
 
@@ -86,8 +86,8 @@ func NewHandler(
 	return h, err
 }
 
-func (h *Handler) RegisterFastSyncer(fastSyncer common.FastSyncer) {
-	h.fastSyncer = fastSyncer
+func (h *Handler) RegisterStateSyncer(stateSyncer common.StateSyncer) {
+	h.stateSyncer = stateSyncer
 }
 
 func (h *Handler) RegisterBootstrap(bootstrapper common.BootstrapableEngine) {
@@ -98,7 +98,7 @@ func (h *Handler) RegisterEngine(engine common.Engine) {
 	h.engine = engine
 }
 
-func (h *Handler) OnDoneFastSyncing(lastReqID uint32) error {
+func (h *Handler) OnDoneStateSyncing(lastReqID uint32) error {
 	lastReqID++
 	return h.bootstrapper.Start(lastReqID)
 }
@@ -111,11 +111,11 @@ func (h *Handler) OnDoneBootstrapping(lastReqID uint32) error {
 func (h *Handler) Start() error {
 	startReqID := uint32(0)
 	switch {
-	case (h.fastSyncer != nil) && h.fastSyncer.IsEnabled():
+	case (h.stateSyncer != nil) && h.stateSyncer.IsEnabled():
 		if err := h.bootstrapper.Clear(); err != nil {
 			return err
 		}
-		return h.fastSyncer.Start(startReqID)
+		return h.stateSyncer.Start(startReqID)
 	case h.bootstrapper != nil:
 		return h.bootstrapper.Start(startReqID)
 	default:
@@ -233,8 +233,8 @@ func (h *Handler) handleMsg(msg message.InboundMessage) error {
 	)
 
 	switch h.ctx.GetState() {
-	case snow.FastSyncing:
-		targetGear = h.fastSyncer
+	case snow.StateSyncing:
+		targetGear = h.stateSyncer
 	case snow.Bootstrapping:
 		targetGear = h.bootstrapper
 	case snow.NormalOp:
@@ -290,8 +290,8 @@ func (h *Handler) handleMsg(msg message.InboundMessage) error {
 func (h *Handler) handleConsensusMsg(msg message.InboundMessage) error {
 	var targetGear common.Engine
 	switch h.ctx.GetState() {
-	case snow.FastSyncing:
-		targetGear = h.fastSyncer
+	case snow.StateSyncing:
+		targetGear = h.stateSyncer
 	case snow.Bootstrapping:
 		targetGear = h.bootstrapper
 	case snow.NormalOp:
@@ -507,7 +507,7 @@ func (h *Handler) Timeout() {
 // Gossip passes a gossip request to the consensus engine
 func (h *Handler) Gossip() {
 	if h.ctx.GetState() != snow.NormalOp {
-		// Shouldn't send gossiping messages while the chain is fast-syncing/bootstrapping
+		// Shouldn't send gossiping messages while the chain is state-syncing/bootstrapping
 		return
 	}
 

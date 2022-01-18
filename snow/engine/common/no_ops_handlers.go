@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	_ FastSyncHandler         = &noOpFastSyncHandler{}
+	_ StateSyncHandler        = &noOpStateSyncHandler{}
 	_ AcceptedFrontierHandler = &noOpAcceptedFrontierHandler{}
 	_ AcceptedHandler         = &noOpAcceptedHandler{}
 	_ AncestorsHandler        = &noOpAncestorsHandler{}
@@ -22,30 +22,30 @@ var (
 	_ AppHandler              = &noOpAppHandler{}
 )
 
-type noOpFastSyncHandler struct {
+type noOpStateSyncHandler struct {
 	log logging.Logger
 }
 
-func NewNoOpFastSyncHandler(log logging.Logger) FastSyncHandler {
-	return &noOpFastSyncHandler{log: log}
+func NewNoOpStateSyncHandler(log logging.Logger) StateSyncHandler {
+	return &noOpStateSyncHandler{log: log}
 }
 
-func (nop *noOpFastSyncHandler) StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, key, summary []byte) error {
+func (nop *noOpStateSyncHandler) StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, key, summary []byte) error {
 	nop.log.Debug("StateSummaryFrontier(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
 
-func (nop *noOpFastSyncHandler) GetStateSummaryFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
+func (nop *noOpStateSyncHandler) GetStateSummaryFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
 	nop.log.Debug("GetStateSummaryFrontierFailed(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
 
-func (nop *noOpFastSyncHandler) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error {
+func (nop *noOpStateSyncHandler) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error {
 	nop.log.Debug("AcceptedStateSummary(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
 
-func (nop *noOpFastSyncHandler) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, requestID uint32) error {
+func (nop *noOpStateSyncHandler) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, requestID uint32) error {
 	nop.log.Debug("GetAcceptedStateSummaryFailed(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }

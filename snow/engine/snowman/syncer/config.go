@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package snowsyncer
+package syncer
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
@@ -13,7 +13,7 @@ import (
 type Config struct {
 	common.Config
 	common.AllGetsServer
-	StateSyncTestingBeacons []ids.ShortID // testing beacons from which nodes fast sync without network consensus
+	StateSyncTestingBeacons []ids.ShortID // testing beacons from which nodes state sync without network consensus
 	VM                      block.ChainVM
 	WeightTracker           tracker.WeightTracker
 }

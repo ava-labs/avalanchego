@@ -40,31 +40,31 @@ func init() {
 	}
 }
 
-func (vm *VM) RegisterFastSyncer(fastSyncers []ids.ShortID) error {
-	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
+func (vm *VM) RegisterStateSyncer(stateSyncers []ids.ShortID) error {
+	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
 		return common.ErrStateSyncableVMNotImplemented
 	}
 
-	return fsVM.RegisterFastSyncer(fastSyncers)
+	return ssVM.RegisterStateSyncer(stateSyncers)
 }
 
 func (vm *VM) StateSyncEnabled() (bool, error) {
-	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
+	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
 		return false, common.ErrStateSyncableVMNotImplemented
 	}
 
-	return fsVM.StateSyncEnabled()
+	return ssVM.StateSyncEnabled()
 }
 
 func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
-	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
+	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
 		return common.Summary{}, common.ErrStateSyncableVMNotImplemented
 	}
 
-	vmSummary, err := fsVM.StateSyncGetLastSummary()
+	vmSummary, err := ssVM.StateSyncGetLastSummary()
 	if err != nil {
 		return common.Summary{}, err
 	}
@@ -126,7 +126,7 @@ func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 }
 
 func (vm *VM) StateSyncIsSummaryAccepted(key []byte) (bool, error) {
-	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
+	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
 		return false, common.ErrStateSyncableVMNotImplemented
 	}
@@ -147,11 +147,11 @@ func (vm *VM) StateSyncIsSummaryAccepted(key []byte) (bool, error) {
 	}
 
 	// propagate request to innerVm
-	return fsVM.StateSyncIsSummaryAccepted(innerKey)
+	return ssVM.StateSyncIsSummaryAccepted(innerKey)
 }
 
 func (vm *VM) StateSync(accepted []common.Summary) error {
-	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
+	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
 		return common.ErrStateSyncableVMNotImplemented
 	}
@@ -186,16 +186,16 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 		vm.innerToProBlkID[innerID] = proKey.ProBlkID
 	}
 
-	return fsVM.StateSync(innerSummaries)
+	return ssVM.StateSync(innerSummaries)
 }
 
 func (vm *VM) GetLastSummaryBlockID() (ids.ID, error) {
-	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
+	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
 		return ids.Empty, common.ErrStateSyncableVMNotImplemented
 	}
 
-	innerBlkID, err := fsVM.GetLastSummaryBlockID()
+	innerBlkID, err := ssVM.GetLastSummaryBlockID()
 	if err != nil {
 		return ids.Empty, err
 	}
@@ -210,7 +210,7 @@ func (vm *VM) GetLastSummaryBlockID() (ids.ID, error) {
 }
 
 func (vm *VM) SetLastSummaryBlock(blkByte []byte) error {
-	fsVM, ok := vm.ChainVM.(block.StateSyncableVM)
+	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
 		return common.ErrStateSyncableVMNotImplemented
 	}
@@ -231,7 +231,7 @@ func (vm *VM) SetLastSummaryBlock(blkByte []byte) error {
 
 	// TODO ABENEGIA: return error if innerBlk's ID does not match lastSummaryBlockID
 	// TODO ABENEGIA: make idempotent (to cope with SetLastSummaryBlock inner success and outer failure)
-	if err := fsVM.SetLastSummaryBlock(innerBlkBytes); err != nil {
+	if err := ssVM.SetLastSummaryBlock(innerBlkBytes); err != nil {
 		return err
 	}
 

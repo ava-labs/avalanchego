@@ -32,7 +32,7 @@ type Transitive struct {
 	metrics
 
 	// list of NoOpsHandler for messages dropped by engine
-	common.FastSyncHandler
+	common.StateSyncHandler
 	common.AcceptedFrontierHandler
 	common.AcceptedHandler
 	common.AncestorsHandler
@@ -70,7 +70,7 @@ func newTransitive(config Config) (*Transitive, error) {
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t := &Transitive{
 		Config:                  config,
-		FastSyncHandler:         common.NewNoOpFastSyncHandler(config.Ctx.Log),
+		StateSyncHandler:        common.NewNoOpStateSyncHandler(config.Ctx.Log),
 		AcceptedFrontierHandler: common.NewNoOpAcceptedFrontierHandler(config.Ctx.Log),
 		AcceptedHandler:         common.NewNoOpAcceptedHandler(config.Ctx.Log),
 		AncestorsHandler:        common.NewNoOpAncestorsHandler(config.Ctx.Log),

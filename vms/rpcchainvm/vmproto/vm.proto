@@ -211,7 +211,7 @@ message GetBlockIDByHeightResponse {
 }
 
 // StateSyncableVM related messages
-message RegisterFastSyncerRequest {
+message RegisterStateSyncerRequest {
     repeated bytes nodeIDs = 1;
 }
 
@@ -282,7 +282,7 @@ service VM {
     rpc IsHeightIndexComplete(google.protobuf.Empty) returns (IsHeightIndexCompleteResponse);
 
     // State sync
-    rpc RegisterFastSyncer(RegisterFastSyncerRequest) returns (google.protobuf.Empty);
+    rpc RegisterStateSyncer(RegisterStateSyncerRequest) returns (google.protobuf.Empty);
     rpc StateSyncEnabled(google.protobuf.Empty) returns (StateSyncEnabledResponse);
     rpc StateSyncGetLastSummary(google.protobuf.Empty) returns (StateSyncGetLastSummaryResponse);
     rpc StateSyncIsSummaryAccepted(StateSyncIsSummaryAcceptedRequest) returns (StateSyncIsSummaryAcceptedResponse);
