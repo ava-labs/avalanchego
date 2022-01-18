@@ -8,11 +8,16 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
-// Default Network VMs have a specific structure for Summary.Key
-// However StateSyncableVM does not require usage of these default formats
+// Snowman-VMs implementing state sync, need to be able to link a state summary
+// to the block associated with it. This is achieved by structuring Summary.Key
+// as the following DefaultSummaryKey/ProposerSummaryKey. Note that these structures
+// do not reduce keys expressiveness since DefaultSummaryKey.Content is
+// totally defined by the Snowman-VM.
+
 const StateSyncDefaultKeysVersion = 0
 
-// DefaultSummaryKey is used by platform and contract VM.
+// DefaultSummaryKey is primarily used by platform and contract VM
+// (ProposerVM only needs to track Default to Proposer summary keys mapping).
 // Key is composed concatenating:
 //     blkID of block associated with the Summary
 //     hash of Summary content, which allows validating content-key relationship.
