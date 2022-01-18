@@ -46,7 +46,7 @@ type VMClient interface {
 	GetBlockIDByHeight(ctx context.Context, in *GetBlockIDByHeightRequest, opts ...grpc.CallOption) (*GetBlockIDByHeightResponse, error)
 	IsHeightIndexComplete(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*IsHeightIndexCompleteResponse, error)
 	// State sync
-	RegisterFastSyncer(ctx context.Context, in *RegisterFastSyncerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	RegisterStateSyncer(ctx context.Context, in *RegisterStateSyncerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	StateSyncEnabled(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncEnabledResponse, error)
 	StateSyncGetLastSummary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncGetLastSummaryResponse, error)
 	StateSyncIsSummaryAccepted(ctx context.Context, in *StateSyncIsSummaryAcceptedRequest, opts ...grpc.CallOption) (*StateSyncIsSummaryAcceptedResponse, error)
@@ -288,9 +288,9 @@ func (c *vMClient) IsHeightIndexComplete(ctx context.Context, in *emptypb.Empty,
 	return out, nil
 }
 
-func (c *vMClient) RegisterFastSyncer(ctx context.Context, in *RegisterFastSyncerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *vMClient) RegisterStateSyncer(ctx context.Context, in *RegisterStateSyncerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, "/vmproto.VM/RegisterFastSyncer", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/RegisterStateSyncer", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -382,7 +382,7 @@ type VMServer interface {
 	GetBlockIDByHeight(context.Context, *GetBlockIDByHeightRequest) (*GetBlockIDByHeightResponse, error)
 	IsHeightIndexComplete(context.Context, *emptypb.Empty) (*IsHeightIndexCompleteResponse, error)
 	// State sync
-	RegisterFastSyncer(context.Context, *RegisterFastSyncerRequest) (*emptypb.Empty, error)
+	RegisterStateSyncer(context.Context, *RegisterStateSyncerRequest) (*emptypb.Empty, error)
 	StateSyncEnabled(context.Context, *emptypb.Empty) (*StateSyncEnabledResponse, error)
 	StateSyncGetLastSummary(context.Context, *emptypb.Empty) (*StateSyncGetLastSummaryResponse, error)
 	StateSyncIsSummaryAccepted(context.Context, *StateSyncIsSummaryAcceptedRequest) (*StateSyncIsSummaryAcceptedResponse, error)
@@ -471,8 +471,8 @@ func (UnimplementedVMServer) GetBlockIDByHeight(context.Context, *GetBlockIDByHe
 func (UnimplementedVMServer) IsHeightIndexComplete(context.Context, *emptypb.Empty) (*IsHeightIndexCompleteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method IsHeightIndexComplete not implemented")
 }
-func (UnimplementedVMServer) RegisterFastSyncer(context.Context, *RegisterFastSyncerRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RegisterFastSyncer not implemented")
+func (UnimplementedVMServer) RegisterStateSyncer(context.Context, *RegisterStateSyncerRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RegisterStateSyncer not implemented")
 }
 func (UnimplementedVMServer) StateSyncEnabled(context.Context, *emptypb.Empty) (*StateSyncEnabledResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StateSyncEnabled not implemented")
@@ -955,20 +955,20 @@ func _VM_IsHeightIndexComplete_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VM_RegisterFastSyncer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RegisterFastSyncerRequest)
+func _VM_RegisterStateSyncer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterStateSyncerRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VMServer).RegisterFastSyncer(ctx, in)
+		return srv.(VMServer).RegisterStateSyncer(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/vmproto.VM/RegisterFastSyncer",
+		FullMethod: "/vmproto.VM/RegisterStateSyncer",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).RegisterFastSyncer(ctx, req.(*RegisterFastSyncerRequest))
+		return srv.(VMServer).RegisterStateSyncer(ctx, req.(*RegisterStateSyncerRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1189,8 +1189,8 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _VM_IsHeightIndexComplete_Handler,
 		},
 		{
-			MethodName: "RegisterFastSyncer",
-			Handler:    _VM_RegisterFastSyncer_Handler,
+			MethodName: "RegisterStateSyncer",
+			Handler:    _VM_RegisterStateSyncer_Handler,
 		},
 		{
 			MethodName: "StateSyncEnabled",

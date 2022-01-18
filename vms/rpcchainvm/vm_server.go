@@ -252,12 +252,12 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 }
 
 func (vm *VMServer) IsHeightIndexComplete(context.Context, *emptypb.Empty) (*vmproto.IsHeightIndexCompleteResponse, error) {
-	fsVM, ok := vm.vm.(block.HeightIndexedChainVM)
+	ssVM, ok := vm.vm.(block.HeightIndexedChainVM)
 	if !ok {
 		return nil, block.ErrHeightIndexedVMNotImplemented
 	}
 
-	response := fsVM.IsHeightIndexComplete()
+	response := ssVM.IsHeightIndexComplete()
 	return &vmproto.IsHeightIndexCompleteResponse{Completed: response}, nil
 }
 
@@ -273,29 +273,29 @@ func (vm *VMServer) GetBlockIDByHeight(ctx context.Context, req *vmproto.GetBloc
 	return &vmproto.GetBlockIDByHeightResponse{BlkID: blkID[:]}, nil
 }
 
-func (vm *VMServer) RegisterFastSyncer(ctx context.Context, req *vmproto.RegisterFastSyncerRequest) (*emptypb.Empty, error) {
-	fsVM, ok := vm.vm.(block.StateSyncableVM)
+func (vm *VMServer) RegisterStateSyncer(ctx context.Context, req *vmproto.RegisterStateSyncerRequest) (*emptypb.Empty, error) {
+	ssVM, ok := vm.vm.(block.StateSyncableVM)
 	if !ok {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	fastSyncers := make([]ids.ShortID, 0, len(req.NodeIDs))
+	stateSyncers := make([]ids.ShortID, 0, len(req.NodeIDs))
 	for _, bytes := range req.NodeIDs {
 		var nodeID ids.ShortID
 		copy(nodeID[:], bytes)
-		fastSyncers = append(fastSyncers, nodeID)
+		stateSyncers = append(stateSyncers, nodeID)
 	}
 
-	return &emptypb.Empty{}, fsVM.RegisterFastSyncer(fastSyncers)
+	return &emptypb.Empty{}, ssVM.RegisterStateSyncer(stateSyncers)
 }
 
 func (vm *VMServer) StateSyncEnabled(context.Context, *emptypb.Empty) (*vmproto.StateSyncEnabledResponse, error) {
-	fsVM, ok := vm.vm.(block.StateSyncableVM)
+	ssVM, ok := vm.vm.(block.StateSyncableVM)
 	if !ok {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	response, err := fsVM.StateSyncEnabled()
+	response, err := ssVM.StateSyncEnabled()
 	if err != nil {
 		return nil, err
 	}
@@ -303,12 +303,12 @@ func (vm *VMServer) StateSyncEnabled(context.Context, *emptypb.Empty) (*vmproto.
 }
 
 func (vm *VMServer) StateSyncGetLastSummary(ctx context.Context, empty *emptypb.Empty) (*vmproto.StateSyncGetLastSummaryResponse, error) {
-	fsVM, ok := vm.vm.(block.StateSyncableVM)
+	ssVM, ok := vm.vm.(block.StateSyncableVM)
 	if !ok {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	summary, err := fsVM.StateSyncGetLastSummary()
+	summary, err := ssVM.StateSyncGetLastSummary()
 	if err != nil {
 		return nil, err
 	}
@@ -319,12 +319,12 @@ func (vm *VMServer) StateSyncGetLastSummary(ctx context.Context, empty *emptypb.
 }
 
 func (vm *VMServer) StateSyncIsSummaryAccepted(ctx context.Context, req *vmproto.StateSyncIsSummaryAcceptedRequest) (*vmproto.StateSyncIsSummaryAcceptedResponse, error) {
-	fsVM, ok := vm.vm.(block.StateSyncableVM)
+	ssVM, ok := vm.vm.(block.StateSyncableVM)
 	if !ok {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	accepted, err := fsVM.StateSyncIsSummaryAccepted(req.Key)
+	accepted, err := ssVM.StateSyncIsSummaryAccepted(req.Key)
 	if err != nil {
 		return nil, err
 	}
@@ -332,7 +332,7 @@ func (vm *VMServer) StateSyncIsSummaryAccepted(ctx context.Context, req *vmproto
 }
 
 func (vm *VMServer) StateSync(ctx context.Context, req *vmproto.StateSyncRequest) (*emptypb.Empty, error) {
-	fsVM, ok := vm.vm.(block.StateSyncableVM)
+	ssVM, ok := vm.vm.(block.StateSyncableVM)
 	if !ok {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
@@ -342,7 +342,7 @@ func (vm *VMServer) StateSync(ctx context.Context, req *vmproto.StateSyncRequest
 		summaries[k].Key = v.Key
 		summaries[k].Content = v.State
 	}
-	err := fsVM.StateSync(summaries)
+	err := ssVM.StateSync(summaries)
 	if err != nil {
 		return nil, err
 	}
@@ -350,12 +350,12 @@ func (vm *VMServer) StateSync(ctx context.Context, req *vmproto.StateSyncRequest
 }
 
 func (vm *VMServer) GetLastSummaryBlockID(context.Context, *emptypb.Empty) (*vmproto.StateSyncLastSummaryBlockIDResponse, error) {
-	fsVM, ok := vm.vm.(block.StateSyncableVM)
+	ssVM, ok := vm.vm.(block.StateSyncableVM)
 	if !ok {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	blkID, err := fsVM.GetLastSummaryBlockID()
+	blkID, err := ssVM.GetLastSummaryBlockID()
 	if err != nil {
 		return nil, err
 	}
@@ -363,12 +363,12 @@ func (vm *VMServer) GetLastSummaryBlockID(context.Context, *emptypb.Empty) (*vmp
 }
 
 func (vm *VMServer) SetLastSummaryBlock(ctx context.Context, req *vmproto.StateSyncSetLastSummaryBlockRequest) (*emptypb.Empty, error) {
-	fsVM, ok := vm.vm.(block.StateSyncableVM)
+	ssVM, ok := vm.vm.(block.StateSyncableVM)
 	if !ok {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	return &emptypb.Empty{}, fsVM.SetLastSummaryBlock(req.Bytes)
+	return &emptypb.Empty{}, ssVM.SetLastSummaryBlock(req.Bytes)
 }
 
 func (vm *VMServer) OnStart(_ context.Context, stateReq *vmproto.StateRequest) (*emptypb.Empty, error) {

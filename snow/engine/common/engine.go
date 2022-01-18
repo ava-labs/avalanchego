@@ -35,7 +35,7 @@ type Engine interface {
 
 type Handler interface {
 	AllGetsServer
-	FastSyncHandler
+	StateSyncHandler
 	AcceptedFrontierHandler
 	AcceptedHandler
 	AncestorsHandler
@@ -59,7 +59,7 @@ type GeStateSummaryHandler interface {
 	GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error
 }
 
-type FastSyncHandler interface {
+type StateSyncHandler interface {
 	StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, key, summary []byte) error
 	GetStateSummaryFrontierFailed(validatorID ids.ShortID, requestID uint32) error
 	AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error

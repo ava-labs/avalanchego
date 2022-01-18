@@ -10,8 +10,8 @@ import (
 // Sender defines how a consensus engine sends messages and requests to other
 // validators
 type Sender interface {
-	FastSyncStateSummarySender
-	FastSyncAcceptedStateSummarySender
+	StateSummarySender
+	AcceptedStateSummarySender
 	FrontierSender
 	AcceptedSender
 	FetchSender
@@ -20,9 +20,9 @@ type Sender interface {
 	AppSender
 }
 
-// FastSyncSender defines how a consensus engine sends fast sync messages to
+// StateSummarySender defines how a consensus engine sends state sync messages to
 // other nodes.
-type FastSyncStateSummarySender interface {
+type StateSummarySender interface {
 	// ...
 	SendGetStateSummaryFrontier(nodeIDs ids.ShortSet, requestID uint32)
 
@@ -30,7 +30,7 @@ type FastSyncStateSummarySender interface {
 	SendStateSummaryFrontier(nodeID ids.ShortID, requestID uint32, key, summary []byte)
 }
 
-type FastSyncAcceptedStateSummarySender interface {
+type AcceptedStateSummarySender interface {
 	// ...
 	SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uint32, keys [][]byte)
 

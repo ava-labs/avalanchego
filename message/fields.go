@@ -32,8 +32,8 @@ const (
 	AppBytes                         // Used at application level
 	VMMessage                        // Used internally
 	Uptime                           // Used for Pong
-	SummaryKey                       // Used for fast sync
-	MultiSummaryKeys                 // Used for fast sync
+	SummaryKey                       // Used for state sync
+	MultiSummaryKeys                 // Used for state sync
 	VersionStruct                    // Used internally
 )
 

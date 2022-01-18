@@ -569,15 +569,15 @@ func (vm *VMClient) GetBlockIDByHeight(height uint64) (ids.ID, error) {
 	return ids.FromBytes(resp.BlkID), nil
 }
 
-func (vm *VMClient) RegisterFastSyncer(fastSyncer []ids.ShortID) error {
-	nodesID := make([][]byte, 0, len(fastSyncer))
-	for _, fs := range fastSyncer {
-		nodesID = append(nodesID, fs.Bytes())
+func (vm *VMClient) RegisterStateSyncer(stateSyncer []ids.ShortID) error {
+	nodesID := make([][]byte, 0, len(stateSyncer))
+	for _, ss := range stateSyncer {
+		nodesID = append(nodesID, ss.Bytes())
 	}
 
-	_, err := vm.client.RegisterFastSyncer(
+	_, err := vm.client.RegisterStateSyncer(
 		context.Background(),
-		&vmproto.RegisterFastSyncerRequest{
+		&vmproto.RegisterStateSyncerRequest{
 			NodeIDs: nodesID,
 		},
 	)

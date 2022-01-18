@@ -21,8 +21,8 @@ type Summary struct {
 // rather then boostrapping from genesis.
 // common.StateSyncableVM can be detailed for Snowman or Avalanche-like VMs by extending the interface.
 type StateSyncableVM interface {
-	// Register nodes from which fast sync summaries can be downloaded
-	RegisterFastSyncer(fastSyncer []ids.ShortID) error
+	// Register nodes from which state sync summaries can be downloaded
+	RegisterStateSyncer(stateSyncer []ids.ShortID) error
 
 	// Enabled indicates whether the state sync is enabled for this VM
 	StateSyncEnabled() (bool, error)
