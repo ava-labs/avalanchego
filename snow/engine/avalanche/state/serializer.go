@@ -107,6 +107,11 @@ func (s *Serializer) BuildVtx(
 	return uVtx, uVtx.setVertex(vtx)
 }
 
+// BuildStopVtx implements the avalanche.State interface
+func (s *Serializer) BuildStopVtx(parentIDs []ids.ID) (avalanche.Vertex, error) {
+	panic("not implemented")
+}
+
 // GetVtx implements the avalanche.State interface
 func (s *Serializer) GetVtx(vtxID ids.ID) (avalanche.Vertex, error) { return s.getVertex(vtxID) }
 

@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
+	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -26,11 +28,23 @@ var (
 	Genesis         = ids.GenerateTestID()
 )
 
+type dummyHandler struct {
+	startEngineF func(startReqID uint32) error
+}
+
+func (dh *dummyHandler) onDoneBootstrapping(lastReqID uint32) error {
+	lastReqID++
+	return dh.startEngineF(lastReqID)
+}
+
 func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
-	config := DefaultConfig()
+	bootCfg, engCfg := DefaultConfigs()
 
 	vals := validators.NewSet()
-	config.Validators = vals
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	bootCfg.Validators = vals
+	bootCfg.WeightTracker = wt
+	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -39,13 +53,21 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	bootCfg.VM = vm
+	engCfg.VM = vm
+
+	snowGetHandler, err := snowgetter.New(vm, bootCfg.Config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	engCfg.AllGetsServer = snowGetHandler
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -70,8 +92,23 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 		}
 	}
 
-	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	dh := &dummyHandler{}
+	bootstrapper, err := bootstrap.New(
+		bootCfg,
+		dh.onDoneBootstrapping,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	te, err := newTransitive(engCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dh.startEngineF = te.Start
+
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -153,7 +190,7 @@ func TestEngineAdd(t *testing.T) {
 		}
 	}
 
-	if err := te.Put(vdr, 0, blk.ID(), blk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, blk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -169,7 +206,7 @@ func TestEngineAdd(t *testing.T) {
 
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) { return nil, errUnknownBytes }
 
-	if err := te.Put(vdr, *reqID, blk.Parent(), nil); err != nil {
+	if err := te.Put(vdr, *reqID, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -272,7 +309,7 @@ func TestEngineQuery(t *testing.T) {
 		}
 		return blk, nil
 	}
-	if err := te.Put(vdr, *getRequestID, blk.ID(), blk.Bytes()); err != nil {
+	if err := te.Put(vdr, *getRequestID, blk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 	vm.ParseBlockF = nil
@@ -358,7 +395,7 @@ func TestEngineQuery(t *testing.T) {
 
 		return blk1, nil
 	}
-	if err := te.Put(vdr, *getRequestID, blk1.ID(), blk1.Bytes()); err != nil {
+	if err := te.Put(vdr, *getRequestID, blk1.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 	vm.ParseBlockF = nil
@@ -381,9 +418,9 @@ func TestEngineQuery(t *testing.T) {
 }
 
 func TestEngineMultipleQuery(t *testing.T) {
-	config := DefaultConfig()
+	bootCfg, engCfg := DefaultConfigs()
 
-	config.Params = snowball.Parameters{
+	engCfg.Params = snowball.Parameters{
 		K:                     3,
 		Alpha:                 2,
 		BetaVirtuous:          1,
@@ -395,7 +432,10 @@ func TestEngineMultipleQuery(t *testing.T) {
 	}
 
 	vals := validators.NewSet()
-	config.Validators = vals
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	bootCfg.Validators = vals
+	bootCfg.WeightTracker = wt
+	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestShortID()
 	vdr1 := ids.GenerateTestShortID()
@@ -413,13 +453,15 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	bootCfg.VM = vm
+	engCfg.VM = vm
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -441,8 +483,23 @@ func TestEngineMultipleQuery(t *testing.T) {
 		return gBlk, nil
 	}
 
-	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	dh := &dummyHandler{}
+	bootstrapper, err := bootstrap.New(
+		bootCfg,
+		dh.onDoneBootstrapping,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	te, err := newTransitive(engCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dh.startEngineF = te.Start
+
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -572,7 +629,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 			t.Fatalf("Asking for wrong block")
 		}
 	}
-	if err := te.Put(vdr0, *getRequestID, blk1.ID(), blk1.Bytes()); err != nil {
+	if err := te.Put(vdr0, *getRequestID, blk1.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -783,7 +840,7 @@ func TestEnginePushQuery(t *testing.T) {
 		}
 	}
 
-	if err := te.PushQuery(vdr, 20, blk.ID(), blk.Bytes()); err != nil {
+	if err := te.PushQuery(vdr, 20, blk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -868,9 +925,9 @@ func TestEngineRepoll(t *testing.T) {
 }
 
 func TestVoteCanceling(t *testing.T) {
-	config := DefaultConfig()
+	bootCfg, engCfg := DefaultConfigs()
 
-	config.Params = snowball.Parameters{
+	engCfg.Params = snowball.Parameters{
 		K:                     3,
 		Alpha:                 2,
 		BetaVirtuous:          1,
@@ -882,7 +939,10 @@ func TestVoteCanceling(t *testing.T) {
 	}
 
 	vals := validators.NewSet()
-	config.Validators = vals
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	bootCfg.Validators = vals
+	bootCfg.WeightTracker = wt
+	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestShortID()
 	vdr1 := ids.GenerateTestShortID()
@@ -900,13 +960,15 @@ func TestVoteCanceling(t *testing.T) {
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	bootCfg.VM = vm
+	engCfg.VM = vm
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -931,8 +993,23 @@ func TestVoteCanceling(t *testing.T) {
 	vm.CantBootstrapping = false
 	vm.CantBootstrapped = false
 
-	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	dh := &dummyHandler{}
+	bootstrapper, err := bootstrap.New(
+		bootCfg,
+		dh.onDoneBootstrapping,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	te, err := newTransitive(engCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dh.startEngineF = te.Start
+
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1000,11 +1077,16 @@ func TestVoteCanceling(t *testing.T) {
 }
 
 func TestEngineNoQuery(t *testing.T) {
-	config := DefaultConfig()
+	bootCfg, engCfg := DefaultConfigs()
+
+	vals := validators.NewSet()
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	bootCfg.WeightTracker = wt
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
@@ -1025,9 +1107,26 @@ func TestEngineNoQuery(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	config.VM = vm
-	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	bootCfg.VM = vm
+	engCfg.VM = vm
+
+	dh := &dummyHandler{}
+	bootstrapper, err := bootstrap.New(
+		bootCfg,
+		dh.onDoneBootstrapping,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	te, err := newTransitive(engCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dh.startEngineF = te.Start
+
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1047,11 +1146,16 @@ func TestEngineNoQuery(t *testing.T) {
 }
 
 func TestEngineNoRepollQuery(t *testing.T) {
-	config := DefaultConfig()
+	bootCfg, engCfg := DefaultConfigs()
+
+	vals := validators.NewSet()
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	bootCfg.WeightTracker = wt
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
@@ -1072,9 +1176,26 @@ func TestEngineNoRepollQuery(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	config.VM = vm
-	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	bootCfg.VM = vm
+	engCfg.VM = vm
+
+	dh := &dummyHandler{}
+	bootstrapper, err := bootstrap.New(
+		bootCfg,
+		dh.onDoneBootstrapping,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	te, err := newTransitive(engCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dh.startEngineF = te.Start
+
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1247,7 +1368,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := te.PushQuery(vdr, 0, blockingBlk.ID(), blockingBlk.Bytes()); err != nil {
+	if err := te.PushQuery(vdr, 0, blockingBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1560,11 +1681,11 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 		}
 	}
 
-	if err := te.PushQuery(vdr, 0, pendingBlk.ID(), pendingBlk.Bytes()); err != nil {
+	if err := te.PushQuery(vdr, 0, pendingBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := te.Put(secondVdr, *reqID, missingBlk.ID(), []byte{3}); err != nil {
+	if err := te.Put(secondVdr, *reqID, []byte{3}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1594,7 +1715,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 
 	missingBlk.StatusV = choices.Processing
 
-	if err := te.Put(vdr, *reqID, missingBlk.ID(), missingBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, *reqID, missingBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1627,8 +1748,6 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 		HeightV: 2,
 		BytesV:  []byte{2},
 	}
-
-	randomBlkID := ids.GenerateTestID()
 
 	parsed := new(bool)
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
@@ -1664,14 +1783,14 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 		}
 	}
 
-	if err := te.PushQuery(vdr, 0, pendingBlk.ID(), pendingBlk.Bytes()); err != nil {
+	if err := te.PushQuery(vdr, 0, pendingBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
 	sender.SendGetF = nil
 	sender.CantSendGet = false
 
-	if err := te.PushQuery(vdr, *reqID, randomBlkID, []byte{3}); err != nil {
+	if err := te.PushQuery(vdr, *reqID, []byte{3}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1699,7 +1818,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	sender.CantSendPushQuery = false
 	sender.CantSendChits = false
 
-	if err := te.Put(vdr, *reqID, missingBlk.ID(), missingBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, *reqID, missingBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1710,12 +1829,15 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 }
 
 func TestEngineAggressivePolling(t *testing.T) {
-	config := DefaultConfig()
+	bootCfg, engCfg := DefaultConfigs()
 
-	config.Params.ConcurrentRepolls = 2
+	engCfg.Params.ConcurrentRepolls = 2
 
 	vals := validators.NewSet()
-	config.Validators = vals
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	bootCfg.Validators = vals
+	bootCfg.WeightTracker = wt
+	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1724,13 +1846,15 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	bootCfg.VM = vm
+	engCfg.VM = vm
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -1753,8 +1877,23 @@ func TestEngineAggressivePolling(t *testing.T) {
 		return gBlk, nil
 	}
 
-	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	dh := &dummyHandler{}
+	bootstrapper, err := bootstrap.New(
+		bootCfg,
+		dh.onDoneBootstrapping,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	te, err := newTransitive(engCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dh.startEngineF = te.Start
+
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1806,7 +1945,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	numPulled := new(int)
 	sender.SendPullQueryF = func(_ ids.ShortSet, _ uint32, _ ids.ID) { *numPulled++ }
 
-	if err := te.Put(vdr, 0, pendingBlk.ID(), pendingBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, pendingBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1820,9 +1959,9 @@ func TestEngineAggressivePolling(t *testing.T) {
 }
 
 func TestEngineDoubleChit(t *testing.T) {
-	config := DefaultConfig()
+	bootCfg, engCfg := DefaultConfigs()
 
-	config.Params = snowball.Parameters{
+	engCfg.Params = snowball.Parameters{
 		K:                     2,
 		Alpha:                 2,
 		BetaVirtuous:          1,
@@ -1834,7 +1973,10 @@ func TestEngineDoubleChit(t *testing.T) {
 	}
 
 	vals := validators.NewSet()
-	config.Validators = vals
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	bootCfg.Validators = vals
+	bootCfg.WeightTracker = wt
+	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestShortID()
 	vdr1 := ids.GenerateTestShortID()
@@ -1848,13 +1990,15 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	bootCfg.VM = vm
+	engCfg.VM = vm
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -1878,8 +2022,23 @@ func TestEngineDoubleChit(t *testing.T) {
 	vm.CantBootstrapping = false
 	vm.CantBootstrapped = false
 
-	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	dh := &dummyHandler{}
+	bootstrapper, err := bootstrap.New(
+		bootCfg,
+		dh.onDoneBootstrapping,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	te, err := newTransitive(engCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dh.startEngineF = te.Start
+
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1964,13 +2123,17 @@ func TestEngineDoubleChit(t *testing.T) {
 }
 
 func TestEngineBuildBlockLimit(t *testing.T) {
-	config := DefaultConfig()
-	config.Params.K = 1
-	config.Params.Alpha = 1
-	config.Params.OptimalProcessing = 1
+	bootCfg, engCfg := DefaultConfigs()
+
+	engCfg.Params.K = 1
+	engCfg.Params.Alpha = 1
+	engCfg.Params.OptimalProcessing = 1
 
 	vals := validators.NewSet()
-	config.Validators = vals
+	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	bootCfg.Validators = vals
+	bootCfg.WeightTracker = wt
+	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
@@ -1979,13 +2142,15 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	config.Sender = sender
+	bootCfg.Sender = sender
+	engCfg.Sender = sender
 
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	bootCfg.VM = vm
+	engCfg.VM = vm
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -2008,8 +2173,23 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		return gBlk, nil
 	}
 
-	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
+	dh := &dummyHandler{}
+	bootstrapper, err := bootstrap.New(
+		bootCfg,
+		dh.onDoneBootstrapping,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	te, err := newTransitive(engCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dh.startEngineF = te.Start
+
+	startReqID := uint32(0)
+	if err := bootstrapper.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2179,7 +2359,7 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 		reqID = rID
 	}
 
-	if err := te.Put(vdr, 0, acceptedBlk.ID(), acceptedBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, acceptedBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2199,7 +2379,7 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 		reqID = rID
 	}
 
-	if err := te.Put(vdr, 0, pendingBlk.ID(), pendingBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, pendingBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2209,7 +2389,7 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 
 	rejectedBlk.StatusV = choices.Rejected
 
-	if err := te.Put(vdr, reqID, rejectedBlk.ID(), rejectedBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, reqID, rejectedBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2283,7 +2463,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 		reqID = rID
 	}
 
-	if err := te.Put(vdr, 0, acceptedBlk.ID(), acceptedBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, acceptedBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2324,7 +2504,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 		}
 	}
 
-	if err := te.Put(vdr, 0, pendingBlk.ID(), pendingBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, pendingBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2336,7 +2516,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 	}
 
 	rejectedBlk.StatusV = choices.Processing
-	if err := te.Put(vdr, reqID, rejectedBlk.ID(), rejectedBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, reqID, rejectedBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2415,7 +2595,7 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 		reqID = rID
 	}
 
-	if err := te.Put(vdr, 0, acceptedBlk.ID(), acceptedBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, acceptedBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2431,7 +2611,7 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 		t.Fatalf("Should have finalized the consensus instance")
 	}
 
-	if err := te.Put(vdr, 0, pendingBlk.ID(), pendingBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, pendingBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2511,7 +2691,7 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 		reqID = rID
 	}
 
-	if err := te.Put(vdr, 0, acceptedBlk.ID(), acceptedBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, acceptedBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2540,7 +2720,7 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 		t.Fatalf("Should have finalized the consensus instance")
 	}
 
-	if err := te.Put(vdr, 0, pendingBlk.ID(), pendingBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, pendingBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2608,11 +2788,11 @@ func TestEngineNonPreferredAmplification(t *testing.T) {
 		}
 	}
 
-	if err := te.Put(vdr, 0, preferredBlk.ID(), preferredBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, preferredBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := te.Put(vdr, 0, nonPreferredBlk.ID(), nonPreferredBlk.Bytes()); err != nil {
+	if err := te.Put(vdr, 0, nonPreferredBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -2694,7 +2874,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	}
 	// Receive Gossip message for [blk2] first and expect the sender to issue a Get request for
 	// its ancestor: [blk1].
-	if err := te.Put(vdr, constants.GossipMsgRequestID, blk2.ID(), blk2.Bytes()); err != nil {
+	if err := te.Put(vdr, constants.GossipMsgRequestID, blk2.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2724,7 +2904,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 
 	// Answer the request, this should allow [blk1] to be issued and cause [blk2] to
 	// fail verification.
-	if err := te.Put(vdr, *reqID, blk1.ID(), blk1.Bytes()); err != nil {
+	if err := te.Put(vdr, *reqID, blk1.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2778,7 +2958,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := te.Put(*reqVdr, *sendReqID, blk2.ID(), blk2.Bytes()); err != nil {
+	if err := te.Put(*reqVdr, *sendReqID, blk2.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2819,7 +2999,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		}
 	}
 	// Expect that the Engine will send a PushQuery after receiving this Gossip message for [blk2].
-	if err := te.Put(vdr, constants.GossipMsgRequestID, blk2.ID(), blk2.Bytes()); err != nil {
+	if err := te.Put(vdr, constants.GossipMsgRequestID, blk2.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2930,7 +3110,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	}
 	// Receive Gossip message for [blk3] first and expect the sender to issue a
 	// Get request for its ancestor: [blk2].
-	if err := te.Put(vdr, constants.GossipMsgRequestID, blk3.ID(), blk3.Bytes()); err != nil {
+	if err := te.Put(vdr, constants.GossipMsgRequestID, blk3.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2960,7 +3140,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	}
 
 	// Answer the request, this should result in [blk1] being issued as well.
-	if err := te.Put(vdr, *reqID, blk2.ID(), blk2.Bytes()); err != nil {
+	if err := te.Put(vdr, *reqID, blk2.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 

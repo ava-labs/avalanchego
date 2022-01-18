@@ -147,7 +147,7 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op: MultiPut,
+			op: Ancestors,
 			fields: map[Field]interface{}{
 				ChainID:             id[:],
 				RequestID:           uint32(1337),

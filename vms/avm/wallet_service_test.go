@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/components/keystore"
 )
 
 // Returns:
@@ -43,23 +44,18 @@ func setupWSWithKeys(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *WalletServic
 	genesisBytes, vm, ws, m, tx := setupWS(t, isAVAXAsset)
 
 	// Import the initially funded private keys
-	user := userState{vm: vm}
-	db, err := ws.vm.ctx.Keystore.GetDatabase(username, password)
+	user, err := keystore.NewUserFromKeystore(ws.vm.ctx.Keystore, username, password)
 	if err != nil {
-		t.Fatalf("Failed to get user database: %s", err)
+		t.Fatal(err)
 	}
 
-	addrs := []ids.ShortID{}
-	for _, sk := range keys {
-		if err := user.SetKey(db, sk); err != nil {
-			t.Fatalf("Failed to set key for user: %s", err)
-		}
-		addrs = append(addrs, sk.PublicKey().Address())
-	}
-	if err := user.SetAddresses(db, addrs); err != nil {
-		t.Fatalf("Failed to set user addresses: %s", err)
+	if err := user.PutKeys(keys...); err != nil {
+		t.Fatalf("Failed to set key for user: %s", err)
 	}
 
+	if err := user.Close(); err != nil {
+		t.Fatal(err)
+	}
 	return genesisBytes, vm, ws, m, tx
 }
 

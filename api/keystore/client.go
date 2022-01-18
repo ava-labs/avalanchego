@@ -4,7 +4,7 @@
 package keystore
 
 import (
-	"time"
+	"context"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -16,15 +16,15 @@ var _ Client = &client{}
 
 // Client interface for Avalanche Keystore API Endpoint
 type Client interface {
-	CreateUser(api.UserPass) (bool, error)
+	CreateUser(context.Context, api.UserPass) (bool, error)
 	// Returns the usernames of all keystore users
-	ListUsers() ([]string, error)
+	ListUsers(context.Context) ([]string, error)
 	// Returns the byte representation of the given user
-	ExportUser(api.UserPass) ([]byte, error)
+	ExportUser(context.Context, api.UserPass) ([]byte, error)
 	// Import [exportedUser] to [importTo]
-	ImportUser(importTo api.UserPass, exportedUser []byte) (bool, error)
+	ImportUser(ctx context.Context, importTo api.UserPass, exportedUser []byte) (bool, error)
 	// Delete the given user
-	DeleteUser(api.UserPass) (bool, error)
+	DeleteUser(context.Context, api.UserPass) (bool, error)
 }
 
 // Client implementation for Avalanche Keystore API Endpoint
@@ -32,43 +32,43 @@ type client struct {
 	requester rpc.EndpointRequester
 }
 
-func NewClient(uri string, requestTimeout time.Duration) Client {
+func NewClient(uri string) Client {
 	return &client{
-		requester: rpc.NewEndpointRequester(uri, "/ext/keystore", "keystore", requestTimeout),
+		requester: rpc.NewEndpointRequester(uri, "/ext/keystore", "keystore"),
 	}
 }
 
-func (c *client) CreateUser(user api.UserPass) (bool, error) {
+func (c *client) CreateUser(ctx context.Context, user api.UserPass) (bool, error) {
 	res := &api.SuccessResponse{}
-	err := c.requester.SendRequest("createUser", &user, res)
+	err := c.requester.SendRequest(ctx, "createUser", &user, res)
 	return res.Success, err
 }
 
-func (c *client) ListUsers() ([]string, error) {
+func (c *client) ListUsers(ctx context.Context) ([]string, error) {
 	res := &ListUsersReply{}
-	err := c.requester.SendRequest("listUsers", struct{}{}, res)
+	err := c.requester.SendRequest(ctx, "listUsers", struct{}{}, res)
 	return res.Users, err
 }
 
-func (c *client) ExportUser(user api.UserPass) ([]byte, error) {
+func (c *client) ExportUser(ctx context.Context, user api.UserPass) ([]byte, error) {
 	res := &ExportUserReply{
 		Encoding: formatting.Hex,
 	}
-	err := c.requester.SendRequest("exportUser", &user, res)
+	err := c.requester.SendRequest(ctx, "exportUser", &user, res)
 	if err != nil {
 		return nil, err
 	}
 	return formatting.Decode(res.Encoding, res.User)
 }
 
-func (c *client) ImportUser(user api.UserPass, account []byte) (bool, error) {
+func (c *client) ImportUser(ctx context.Context, user api.UserPass, account []byte) (bool, error) {
 	accountStr, err := formatting.EncodeWithChecksum(formatting.Hex, account)
 	if err != nil {
 		return false, err
 	}
 
 	res := &api.SuccessResponse{}
-	err = c.requester.SendRequest("importUser", &ImportUserArgs{
+	err = c.requester.SendRequest(ctx, "importUser", &ImportUserArgs{
 		UserPass: user,
 		User:     accountStr,
 		Encoding: formatting.Hex,
@@ -76,8 +76,8 @@ func (c *client) ImportUser(user api.UserPass, account []byte) (bool, error) {
 	return res.Success, err
 }
 
-func (c *client) DeleteUser(user api.UserPass) (bool, error) {
+func (c *client) DeleteUser(ctx context.Context, user api.UserPass) (bool, error) {
 	res := &api.SuccessResponse{}
-	err := c.requester.SendRequest("deleteUser", &user, res)
+	err := c.requester.SendRequest(ctx, "deleteUser", &user, res)
 	return res.Success, err
 }

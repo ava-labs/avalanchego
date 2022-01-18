@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 )
 
 var (
@@ -120,7 +121,7 @@ func (ab *AtomicBlock) Verify() error {
 		ab.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
 		return fmt.Errorf("tx %s failed semantic verification: %w", txID, err)
 	}
-	onAccept.AddTx(&ab.Tx, Committed)
+	onAccept.AddTx(&ab.Tx, status.Committed)
 
 	ab.onAcceptState = onAccept
 	ab.timestamp = onAccept.GetTimestamp()

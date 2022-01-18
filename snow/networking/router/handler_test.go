@@ -19,36 +19,47 @@ import (
 )
 
 func TestHandlerDropsTimedOutMessages(t *testing.T) {
-	engine := common.EngineTest{T: t}
-	engine.Default(true)
-	engine.ContextF = snow.DefaultConsensusContextTest
 	called := make(chan struct{})
 
-	engine.GetAcceptedFrontierF = func(nodeID ids.ShortID, requestID uint32) error {
-		t.Fatalf("GetAcceptedFrontier message should have timed out")
-		return nil
-	}
-
-	engine.GetAcceptedF = func(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-		called <- struct{}{}
-		return nil
-	}
-
-	handler := &Handler{}
-	vdrs := validators.NewSet()
-	vdr0 := ids.GenerateTestShortID()
-	err := vdrs.AddWeight(vdr0, 1)
-	assert.NoError(t, err)
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
 	assert.NoError(t, err)
-	err = handler.Initialize(
+
+	ctx := snow.DefaultConsensusContextTest()
+
+	vdrs := validators.NewSet()
+	vdr0 := ids.GenerateTestShortID()
+	err = vdrs.AddWeight(vdr0, 1)
+	assert.NoError(t, err)
+
+	handler, err := NewHandler(
 		mc,
-		&engine,
+		ctx,
 		vdrs,
 		nil,
 	)
 	assert.NoError(t, err)
+
+	bootstrapper := &common.BootstrapperTest{
+		BootstrapableTest: common.BootstrapableTest{
+			T: t,
+		},
+		EngineTest: common.EngineTest{
+			T: t,
+		},
+	}
+	bootstrapper.Default(false)
+	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
+	bootstrapper.GetAcceptedFrontierF = func(nodeID ids.ShortID, requestID uint32) error {
+		t.Fatalf("GetAcceptedFrontier message should have timed out")
+		return nil
+	}
+	bootstrapper.GetAcceptedF = func(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+		called <- struct{}{}
+		return nil
+	}
+	handler.RegisterBootstrap(bootstrapper)
+	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
 	pastTime := time.Now()
 	mc.SetTime(pastTime)
@@ -81,15 +92,8 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 }
 
 func TestHandlerClosesOnError(t *testing.T) {
-	engine := common.EngineTest{T: t}
-	engine.Default(false)
-
 	closed := make(chan struct{}, 1)
-
-	engine.ContextF = snow.DefaultConsensusContextTest
-	engine.GetAcceptedFrontierF = func(nodeID ids.ShortID, requestID uint32) error {
-		return errors.New("Engine error should cause handler to close")
-	}
+	ctx := snow.DefaultConsensusContextTest()
 
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
@@ -97,20 +101,44 @@ func TestHandlerClosesOnError(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
 	assert.NoError(t, err)
-	handler := &Handler{}
-	err = handler.Initialize(
+
+	handler, err := NewHandler(
 		mc,
-		&engine,
+		ctx,
 		vdrs,
 		nil,
 	)
 	assert.NoError(t, err)
 
 	handler.clock.Set(time.Now())
-
 	handler.onCloseF = func() {
 		closed <- struct{}{}
 	}
+
+	bootstrapper := &common.BootstrapperTest{
+		BootstrapableTest: common.BootstrapableTest{
+			T: t,
+		},
+		EngineTest: common.EngineTest{
+			T: t,
+		},
+	}
+	bootstrapper.Default(false)
+	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
+	bootstrapper.GetAcceptedFrontierF = func(nodeID ids.ShortID, requestID uint32) error {
+		return errors.New("Engine error should cause handler to close")
+	}
+	handler.RegisterBootstrap(bootstrapper)
+
+	engine := &common.EngineTest{T: t}
+	engine.Default(false)
+	engine.ContextF = func() *snow.ConsensusContext { return ctx }
+	handler.RegisterEngine(engine)
+
+	// assume bootstrapping is ongoing so that InboundGetAcceptedFrontier
+	// should normally be handled
+	ctx.SetState(snow.Bootstrapping)
+
 	go handler.Dispatch()
 
 	nodeID := ids.ShortEmpty
@@ -128,35 +156,41 @@ func TestHandlerClosesOnError(t *testing.T) {
 }
 
 func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
-	engine := common.EngineTest{T: t}
-	engine.Default(false)
-
-	engine.CantGossip = true
-
 	closed := make(chan struct{}, 1)
-
-	engine.ContextF = snow.DefaultConsensusContextTest
-	engine.GetFailedF = func(nodeID ids.ShortID, requestID uint32) error {
-		closed <- struct{}{}
-		return nil
-	}
-
+	ctx := snow.DefaultConsensusContextTest()
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
 	assert.NoError(t, err)
-	handler := &Handler{}
-	err = handler.Initialize(
+
+	handler, err := NewHandler(
 		mc,
-		&engine,
+		ctx,
 		vdrs,
 		nil,
 	)
 	assert.NoError(t, err)
 
 	handler.clock.Set(time.Now())
+
+	bootstrapper := &common.BootstrapperTest{
+		BootstrapableTest: common.BootstrapableTest{
+			T: t,
+		},
+		EngineTest: common.EngineTest{
+			T: t,
+		},
+	}
+	bootstrapper.Default(false)
+	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
+	bootstrapper.GetFailedF = func(nodeID ids.ShortID, requestID uint32) error {
+		closed <- struct{}{}
+		return nil
+	}
+	handler.RegisterBootstrap(bootstrapper)
+	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
 	go handler.Dispatch()
 
@@ -178,16 +212,8 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 
 // Test that messages from the VM are handled
 func TestHandlerDispatchInternal(t *testing.T) {
-	engine := common.EngineTest{T: t}
-	engine.Default(false)
-	engine.ContextF = snow.DefaultConsensusContextTest
 	calledNotify := make(chan struct{}, 1)
-	engine.NotifyF = func(common.Message) error {
-		calledNotify <- struct{}{}
-		return nil
-	}
-
-	handler := &Handler{}
+	ctx := snow.DefaultConsensusContextTest()
 	msgFromVMChan := make(chan common.Message)
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
@@ -195,13 +221,24 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
 	assert.NoError(t, err)
-	err = handler.Initialize(
+
+	handler, err := NewHandler(
 		mc,
-		&engine,
+		ctx,
 		vdrs,
 		msgFromVMChan,
 	)
 	assert.NoError(t, err)
+
+	engine := &common.EngineTest{T: t}
+	engine.Default(false)
+	engine.ContextF = func() *snow.ConsensusContext { return ctx }
+	engine.NotifyF = func(common.Message) error {
+		calledNotify <- struct{}{}
+		return nil
+	}
+	handler.RegisterEngine(engine)
+	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
 
 	go handler.Dispatch()
 	msgFromVMChan <- 0

@@ -163,9 +163,10 @@ func TestIndexer(t *testing.T) {
 	// Register this chain, creating a new index
 	chainVM := &smblockmocks.ChainVM{}
 	chainEngine := &smengmocks.Engine{}
+	chainEngine.On("Context").Return(chain1Ctx)
 	chainEngine.On("GetVM").Return(chainVM)
 
-	idxr.RegisterChain("chain1", chain1Ctx, chainEngine)
+	idxr.RegisterChain("chain1", chainEngine)
 	isIncomplete, err = idxr.isIncomplete(chain1Ctx.ChainID)
 	assert.NoError(err)
 	assert.False(isIncomplete)
@@ -260,7 +261,7 @@ func TestIndexer(t *testing.T) {
 	assert.False(isIncomplete)
 
 	// Register the same chain as before
-	idxr.RegisterChain("chain1", chain1Ctx, chainEngine)
+	idxr.RegisterChain("chain1", chainEngine)
 	blkIdx = idxr.blockIndices[chain1Ctx.ChainID]
 	assert.NotNil(blkIdx)
 	container, err = blkIdx.GetLastAccepted()
@@ -278,8 +279,9 @@ func TestIndexer(t *testing.T) {
 	assert.False(previouslyIndexed)
 	dagVM := &avvtxmocks.DAGVM{}
 	dagEngine := &mocks.Engine{}
+	dagEngine.On("Context").Return(chain2Ctx)
 	dagEngine.On("GetVM").Return(dagVM).Once()
-	idxr.RegisterChain("chain2", chain2Ctx, dagEngine)
+	idxr.RegisterChain("chain2", dagEngine)
 	assert.NoError(err)
 	server = config.APIServer.(*apiServerMock)
 	assert.EqualValues(3, server.timesCalled) // block index, vtx index, tx index
@@ -410,8 +412,8 @@ func TestIndexer(t *testing.T) {
 	assert.NoError(err)
 	idxr, ok = idxrIntf.(*indexer)
 	assert.True(ok)
-	idxr.RegisterChain("chain1", chain1Ctx, chainEngine)
-	idxr.RegisterChain("chain2", chain2Ctx, dagEngine)
+	idxr.RegisterChain("chain1", chainEngine)
+	idxr.RegisterChain("chain2", dagEngine)
 
 	// Verify state
 	lastAcceptedTx, err = idxr.txIndices[chain2Ctx.ChainID].GetLastAccepted()
@@ -460,7 +462,8 @@ func TestIncompleteIndex(t *testing.T) {
 	assert.NoError(err)
 	assert.False(previouslyIndexed)
 	chainEngine := &smengmocks.Engine{}
-	idxr.RegisterChain("chain1", chain1Ctx, chainEngine)
+	chainEngine.On("Context").Return(chain1Ctx)
+	idxr.RegisterChain("chain1", chainEngine)
 	isIncomplete, err = idxr.isIncomplete(chain1Ctx.ChainID)
 	assert.NoError(err)
 	assert.True(isIncomplete)
@@ -479,7 +482,7 @@ func TestIncompleteIndex(t *testing.T) {
 
 	// Register the chain again. Should die due to incomplete index.
 	assert.NoError(config.DB.(*versiondb.Database).Commit())
-	idxr.RegisterChain("chain1", chain1Ctx, chainEngine)
+	idxr.RegisterChain("chain1", chainEngine)
 	assert.True(idxr.closed)
 
 	// Close and re-open the indexer, this time with indexing enabled
@@ -494,7 +497,7 @@ func TestIncompleteIndex(t *testing.T) {
 	assert.True(idxr.allowIncompleteIndex)
 
 	// Register the chain again. Should be OK
-	idxr.RegisterChain("chain1", chain1Ctx, chainEngine)
+	idxr.RegisterChain("chain1", chainEngine)
 	assert.False(idxr.closed)
 
 	// Close the indexer and re-open with indexing disabled and
@@ -543,7 +546,8 @@ func TestIgnoreNonDefaultChains(t *testing.T) {
 	// RegisterChain should return without adding an index for this chain
 	chainVM := &smblockmocks.ChainVM{}
 	chainEngine := &smengmocks.Engine{}
+	chainEngine.On("Context").Return(chain1Ctx)
 	chainEngine.On("GetVM").Return(chainVM)
-	idxr.RegisterChain("chain1", chain1Ctx, chainEngine)
+	idxr.RegisterChain("chain1", chainEngine)
 	assert.Len(idxr.blockIndices, 0)
 }
