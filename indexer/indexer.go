@@ -277,8 +277,8 @@ func (i *indexer) standAloneIndexChecks(chainID ids.ID, name string) error {
 		if previouslyIndexed && !i.allowIncompleteIndex {
 			// We indexed this chain in a previous run but not in this run.
 			// This would create an incomplete index, which is not allowed, so exit.
-			i.log.Fatal("running would cause index %s would become incomplete but incomplete indices are disabled", name)
-			return fmt.Errorf("running would cause index %s would become incomplete but incomplete indices are disabled", name)
+			i.log.Fatal("running would cause index %s to become incomplete but incomplete indices are disabled", name)
+			return fmt.Errorf("running would cause index %s to become incomplete but incomplete indices are disabled", name)
 		}
 
 		// Creating an incomplete index is allowed. Mark index as incomplete.
