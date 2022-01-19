@@ -35,7 +35,8 @@ func ToID(bytes []byte) (ID, error) {
 	return hashing.ToHash256(bytes)
 }
 
-// FromBytes builds an ID from bytes. Note that this is different from ToID
+// FromBytes builds an ID from bytes, much like a type cast.
+// Note that this is different from ToID
 func FromBytes(b []byte) ID {
 	var res ID
 	copy(res[:], b)

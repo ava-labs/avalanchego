@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -94,6 +95,10 @@ type bootstrapper struct {
 	startingHeight uint64
 	// Blocks passed into ForceAccepted
 	startingAcceptedFrontier ids.Set
+	// Number of blocks that were fetched on ForceAccepted
+	initiallyFetched uint64
+	// Time that ForceAccepted was last called
+	startTime time.Time
 
 	// number of state transitions executed
 	executedStateTransitions int
@@ -276,6 +281,9 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 		}
 	}
 
+	b.initiallyFetched = b.Blocked.PendingJobs()
+	b.startTime = time.Now()
+
 	// Process received blocks
 	for _, blk := range toProcess {
 		if err := b.process(blk, nil); err != nil {
@@ -370,12 +378,17 @@ func (b *bootstrapper) process(blk snowman.Block, processingBlocks map[ids.ID]sn
 		b.numFetched.Inc()
 
 		blocksFetchedSoFar := b.Blocked.Jobs.PendingJobs()
-
 		if blocksFetchedSoFar%common.StatusUpdateFrequency == 0 { // Periodically print progress
+			eta := timer.EstimateETA(
+				b.startTime,
+				blocksFetchedSoFar-b.initiallyFetched, // Number of blocks we have fetched during this run
+				totalBlocksToFetch-b.initiallyFetched, // Number of blocks we expect to fetch during this run
+			)
+
 			if !b.Config.SharedCfg.Restarted {
-				b.Ctx.Log.Info("fetched %d of %d blocks", blocksFetchedSoFar, totalBlocksToFetch)
+				b.Ctx.Log.Info("fetched %d of %d blocks. ETA = %s", blocksFetchedSoFar, totalBlocksToFetch, eta)
 			} else {
-				b.Ctx.Log.Debug("fetched %d of %d blocks", blocksFetchedSoFar, totalBlocksToFetch)
+				b.Ctx.Log.Debug("fetched %d of %d blocks. ETA = %s", blocksFetchedSoFar, totalBlocksToFetch, eta)
 			}
 		}
 	}

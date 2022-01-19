@@ -143,6 +143,8 @@ type indexer struct {
 	decisionDispatcher *triggers.EventDispatcher
 }
 
+// RegisterChain verifies if and what kind of index can be created to support index queries.
+// It instantiate the index as well as the API.
 // Assumes [engine]'s context lock is not held
 func (i *indexer) RegisterChain(name string, engine common.Engine) {
 	i.lock.Lock()
@@ -185,7 +187,7 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 		// Try creating a VM-backed ...
 		blockIndex, err = newVMBackedBlockIndex(engine.GetVM())
 		if err == nil {
-			err = i.registerIndexHelper(blockIndex, chainID, name, endpoint, i.consensusDispatcher)
+			err = i.registerAndCreateEndpoint(blockIndex, chainID, name, endpoint, i.consensusDispatcher)
 			if errorHandling(chainID, blockIndex, i, err, name) {
 				return
 			}
@@ -344,7 +346,7 @@ func (i *indexer) registerChainHelper(
 		return nil, err
 	}
 
-	return index, i.registerIndexHelper(index, chainID, name, endpoint, dispatcher)
+	return index, i.registerAndCreateEndpoint(index, chainID, name, endpoint, dispatcher)
 }
 
 func standAlonePrefix(chainID ids.ID, prefixEnd byte) []byte {
@@ -354,7 +356,7 @@ func standAlonePrefix(chainID ids.ID, prefixEnd byte) []byte {
 	return prefix
 }
 
-func (i *indexer) registerIndexHelper(
+func (i *indexer) registerAndCreateEndpoint(
 	index Index,
 	chainID ids.ID,
 	name, endpoint string,

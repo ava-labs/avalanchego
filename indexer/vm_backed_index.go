@@ -53,7 +53,7 @@ func (vmi *vmBackedBlockIndex) Accept(ctx *snow.ConsensusContext, containerID id
 func (vmi *vmBackedBlockIndex) getBlkByIndex(index uint64) (snowman.Block, error) {
 	blkID, err := vmi.hVM.GetBlockIDByHeight(index)
 	if err != nil {
-		return nil, fmt.Errorf("no container at index %d", index)
+		return nil, fmt.Errorf("no container at index %d: %w", index, err)
 	}
 	return vmi.vm.GetBlock(blkID)
 }
@@ -85,7 +85,7 @@ func (vmi *vmBackedBlockIndex) GetContainerRange(startIndex uint64, numToFetch u
 	}
 	lastBlk, err := vmi.vm.GetBlock(lastBlkID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve last accepted container")
+		return nil, fmt.Errorf("could not retrieve last accepted container: %w", err)
 	}
 
 	lastAcceptedIndex := lastBlk.Height()
@@ -120,7 +120,7 @@ func (vmi *vmBackedBlockIndex) GetLastAccepted() (Container, error) {
 	}
 	lastBlk, err := vmi.vm.GetBlock(lastBlkID)
 	if err != nil {
-		return Container{}, fmt.Errorf("could not retrieve last accepted container")
+		return Container{}, fmt.Errorf("could not retrieve last accepted container: %w", err)
 	}
 
 	return Container{
@@ -133,7 +133,7 @@ func (vmi *vmBackedBlockIndex) GetLastAccepted() (Container, error) {
 func (vmi *vmBackedBlockIndex) GetIndex(containerID ids.ID) (uint64, error) {
 	blk, err := vmi.vm.GetBlock(containerID)
 	if err != nil {
-		return 0, fmt.Errorf("could not retrieve container %s", containerID)
+		return 0, fmt.Errorf("could not retrieve container %s: %w", containerID, err)
 	}
 
 	return blk.Height(), nil
@@ -142,7 +142,7 @@ func (vmi *vmBackedBlockIndex) GetIndex(containerID ids.ID) (uint64, error) {
 func (vmi *vmBackedBlockIndex) GetContainerByID(containerID ids.ID) (Container, error) {
 	blk, err := vmi.vm.GetBlock(containerID)
 	if err != nil {
-		return Container{}, fmt.Errorf("could not retrieve container %s", containerID)
+		return Container{}, fmt.Errorf("could not retrieve container %s: %w", containerID, err)
 	}
 
 	return Container{

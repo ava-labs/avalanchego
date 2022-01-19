@@ -10,6 +10,7 @@ This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/ava
 
 - Removed deprecated Snowstorm consensus implementation that no longer aligned with the updated specification.
 - Updated bootstrapping logs to no longer reset counters after a node restart.
+- Added bootstrapping ETAs for fetching Snowman blocks and executing operations.
 - Renamed the `MultiPut` message to the `Ancestors` message to match other message naming conventions.
 - Introduced Whitelist conflicts into the Snowstorm specification that will be used in future X-chain improvements.
 - Refactored the separation between the Bootstrapping engine and the Consensus engine to support Fast-Sync.
