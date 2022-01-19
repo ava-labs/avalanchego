@@ -202,7 +202,7 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 				}
 			}()
 		} else { // ... otherwise fallback on stand-alone indexes.
-			if i.standAloneIndexChecks(chainID, name) {
+			if err := i.standAloneIndexChecks(chainID, name); err != nil {
 				return
 			}
 			if incomplete, err := i.isIncomplete(chainID); incomplete && err == nil {
@@ -218,7 +218,7 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 			success = true
 		}
 	case avalanche.Engine:
-		if i.standAloneIndexChecks(chainID, name) {
+		if err := i.standAloneIndexChecks(chainID, name); err != nil {
 			return
 		}
 		if incomplete, err := i.isIncomplete(chainID); incomplete && err == nil {
@@ -259,18 +259,18 @@ func (i *indexer) deleteStandAloneIndex(standAlonePrefix []byte) error {
 	return indexToRm.Delete()
 }
 
-func (i *indexer) standAloneIndexChecks(chainID ids.ID, name string) bool {
+func (i *indexer) standAloneIndexChecks(chainID ids.ID, name string) error {
 	isIncomplete, err := i.isIncomplete(chainID)
 	if err != nil {
 		i.log.Error("couldn't get whether chain %s is incomplete: %s", name, err)
-		return true
+		return err
 	}
 
 	// See if this chain was indexed in a previous run
 	previouslyIndexed, err := i.previouslyIndexed(chainID)
 	if err != nil {
 		i.log.Error("couldn't get whether chain %s was previously indexed: %s", name, err)
-		return true
+		return err
 	}
 
 	if !i.indexingEnabled { // Indexing is disabled
@@ -278,29 +278,28 @@ func (i *indexer) standAloneIndexChecks(chainID ids.ID, name string) bool {
 			// We indexed this chain in a previous run but not in this run.
 			// This would create an incomplete index, which is not allowed, so exit.
 			i.log.Fatal("running would cause index %s would become incomplete but incomplete indices are disabled", name)
-			return true
+			return fmt.Errorf("running would cause index %s would become incomplete but incomplete indices are disabled", name)
 		}
 
 		// Creating an incomplete index is allowed. Mark index as incomplete.
-		err := i.markIncomplete(chainID)
-		if err == nil {
-			return false
+		if err := i.markIncomplete(chainID); err != nil {
+			i.log.Fatal("couldn't mark chain %s as incomplete: %s", name, err)
+			return err
 		}
-		i.log.Fatal("couldn't mark chain %s as incomplete: %s", name, err)
-		return true
+		return nil
 	}
 
 	if !i.allowIncompleteIndex && isIncomplete && (previouslyIndexed || i.hasRunBefore) {
 		i.log.Fatal("index %s is incomplete but incomplete indices are disabled. Shutting down", name)
-		return true
+		return fmt.Errorf("index %s is incomplete but incomplete indices are disabled.", name)
 	}
 
 	// Mark that in this run, this chain was indexed
 	if err := i.markPreviouslyIndexed(chainID); err != nil {
 		i.log.Error("couldn't mark chain %s as indexed: %s", name, err)
-		return true
+		return err
 	}
-	return false
+	return nil
 }
 
 func (i *indexer) needsRegisteringChain(ctx *snow.ConsensusContext, name string) bool {
