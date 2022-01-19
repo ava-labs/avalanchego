@@ -37,7 +37,7 @@ type HeightIndexWriterDeleter interface {
 }
 
 type HeightIndexBatchSupport interface {
-	GetBatch() database.Batch
+	NewBatch() database.Batch
 	GetCheckpoint() (ids.ID, error)
 	SetCheckpoint(blkID ids.ID) error
 	DeleteCheckpoint() error
@@ -137,7 +137,7 @@ func (hi *heightIndex) clearCache() {
 }
 
 // GetBatch implements HeightIndexBatchSupport
-func (hi *heightIndex) GetBatch() database.Batch { return hi.db.NewBatch() }
+func (hi *heightIndex) NewBatch() database.Batch { return hi.db.NewBatch() }
 
 // SetCheckpoint implements HeightIndexBatchSupport
 func (hi *heightIndex) SetCheckpoint(blkID ids.ID) error {

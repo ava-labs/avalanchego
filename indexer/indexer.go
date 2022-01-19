@@ -143,6 +143,8 @@ type indexer struct {
 	decisionDispatcher *triggers.EventDispatcher
 }
 
+// RegisterChain verifies if and what kind of index can be created to support index queries.
+// It instantiate the index as well as the API.
 // Assumes [engine]'s context lock is not held
 func (i *indexer) RegisterChain(name string, engine common.Engine) {
 	i.lock.Lock()

@@ -20,7 +20,7 @@ const defaultCommitSizeCap = 1 * units.MiB
 var _ HeightIndexer = &heightIndexer{}
 
 type HeightIndexer interface {
-	// signals whether index rebuilding is still ongoing
+	// checks whether the index is fully repaired or not
 	IsRepaired() bool
 
 	// checks whether index rebuilding is needed and if so, performs it
@@ -40,7 +40,7 @@ func newHeightIndexer(srv BlockServer,
 		server:        srv,
 		log:           log,
 		indexState:    indexState,
-		batch:         indexState.GetBatch(),
+		batch:         indexState.NewBatch(),
 		commitMaxSize: defaultCommitSizeCap,
 	}
 
