@@ -20,8 +20,8 @@ import (
 
 var (
 	genesisContractAddr    = common.HexToAddress("0x0100000000000000000000000000000000000000")
-	nativeAssetBalanceAddr = common.HexToAddress("0x0100000000000000000000000000000000000001")
-	nativeAssetCallAddr    = common.HexToAddress("0x0100000000000000000000000000000000000002")
+	NativeAssetBalanceAddr = common.HexToAddress("0x0100000000000000000000000000000000000001")
+	NativeAssetCallAddr    = common.HexToAddress("0x0100000000000000000000000000000000000002")
 )
 
 // StatefulPrecompiledContract is the interface for executing a precompiled contract
@@ -54,6 +54,8 @@ type nativeAssetBalance struct {
 	gasCost uint64
 }
 
+// PackNativeAssetBalanceInput packs the arguments into the required input data for a transaction to be passed into
+// the native asset balance precompile.
 func PackNativeAssetBalanceInput(address common.Address, assetID common.Hash) []byte {
 	input := make([]byte, 52)
 	copy(input, address.Bytes())
@@ -61,6 +63,7 @@ func PackNativeAssetBalanceInput(address common.Address, assetID common.Hash) []
 	return input
 }
 
+// UnpackNativeAssetBalanceInput attempts to unpack [input] into the arguments to the native asset balance precompile
 func UnpackNativeAssetBalanceInput(input []byte) (common.Address, common.Hash, error) {
 	if len(input) != 52 {
 		return common.Address{}, common.Hash{}, fmt.Errorf("native asset balance input had unexpcted length %d", len(input))
@@ -97,6 +100,9 @@ type nativeAssetCall struct {
 	gasCost uint64
 }
 
+// PackNativeAssetCallInput packs the arguments into the required input data for a transaction to be passed into
+// the native asset precompile.
+// Assumes that [assetAmount] is non-nil.
 func PackNativeAssetCallInput(address common.Address, assetID common.Hash, assetAmount *big.Int, callData []byte) []byte {
 	input := make([]byte, 84+len(callData))
 	copy(input[0:20], address.Bytes())
@@ -106,9 +112,10 @@ func PackNativeAssetCallInput(address common.Address, assetID common.Hash, asset
 	return input
 }
 
+// UnpackNativeAssetCallInput attempts to unpack [input] into the arguments to the native asset call precompile
 func UnpackNativeAssetCallInput(input []byte) (common.Address, common.Hash, *big.Int, []byte, error) {
 	if len(input) < 84 {
-		return common.Address{}, common.Hash{}, nil, nil, fmt.Errorf("native asset call input had unexpcted length %d", len(input))
+		return common.Address{}, common.Hash{}, nil, nil, fmt.Errorf("native asset call input had unexpected length %d", len(input))
 	}
 	to := common.BytesToAddress(input[:20])
 	assetID := common.BytesToHash(input[20:52])
@@ -134,6 +141,8 @@ func (c *nativeAssetCall) Run(evm *EVM, caller ContractRef, addr common.Address,
 		return nil, remainingGas, ErrExecutionReverted
 	}
 
+	// Note: it is not possible for a negative assetAmount to be passed in here due to the fact that decoding a
+	// byte slice into a *big.Int type will always return a positive value.
 	if assetAmount.Sign() != 0 && !evm.Context.CanTransferMC(evm.StateDB, caller.Address(), to, assetID, assetAmount) {
 		return nil, remainingGas, ErrInsufficientBalance
 	}
