@@ -482,8 +482,5 @@ func (b *bootstrapper) finish() error {
 	}
 
 	// Start consensus
-	if err := b.OnFinished(b.Config.SharedCfg.RequestID); err != nil {
-		return err
-	}
-	return nil
+	return b.OnFinished(b.Config.SharedCfg.RequestID)
 }
