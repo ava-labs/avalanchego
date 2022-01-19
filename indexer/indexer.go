@@ -159,6 +159,15 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 		return
 	}
 
+	success := false
+	defer func() {
+		if !success {
+			if err := i.close(); err != nil {
+				i.log.Error("error while closing indexer: %s", err)
+			}
+		}
+	}()
+
 	// Note: we currently support two types of indexes: stand-alone and VM-backed index.
 	// Stand-alone indexes require an ad-hoc db to store blocks, vertexes and transactions data;
 	// they may be incomplete and are enabled only on nodes which specify the flag <index-enabled>.
@@ -172,25 +181,16 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 			err                   error
 			endpoint              = "block"
 			standAloneBlockPrefix = standAlonePrefix(chainID, blockPrefix)
-			errorHandling         = func(chainID ids.ID, blockIndex Index, i *indexer, err error, name string) bool {
-				if err != nil {
-					i.log.Fatal("couldn't create block index for %s: %s", name, err)
-					if err := i.close(); err != nil {
-						i.log.Error("error while closing indexer: %s", err)
-					}
-					return true
-				}
-				i.blockIndices[chainID] = blockIndex
-				return false
-			}
 		)
 		// Try creating a VM-backed ...
 		blockIndex, err = newVMBackedBlockIndex(engine.GetVM())
 		if err == nil {
-			err = i.registerAndCreateEndpoint(blockIndex, chainID, name, endpoint, i.consensusDispatcher)
-			if errorHandling(chainID, blockIndex, i, err, name) {
+			if err := i.registerAndCreateEndpoint(blockIndex, chainID, name, endpoint, i.consensusDispatcher); err != nil {
+				i.log.Fatal("couldn't create block index for %s: %s", name, err)
 				return
 			}
+			i.blockIndices[chainID] = blockIndex
+			success = true
 
 			// Historically stand-Alone indexes were introduced first.
 			// However, as soon as a VM-Backed index is available,
@@ -206,9 +206,12 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 				return
 			}
 			blockIndex, err = i.registerChainHelper(chainID, standAloneBlockPrefix, name, endpoint, i.consensusDispatcher)
-			if errorHandling(chainID, blockIndex, i, err, name) {
+			if err != nil {
+				i.log.Fatal("couldn't create block index for %s: %s", name, err)
 				return
 			}
+			i.blockIndices[chainID] = blockIndex
+			success = true
 		}
 	case avalanche.Engine:
 		if i.standAloneIndexChecks(chainID, name) {
@@ -219,9 +222,6 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 		vtxIndex, err := i.registerChainHelper(chainID, standAloneVertexPrefix, name, "vtx", i.consensusDispatcher)
 		if err != nil {
 			i.log.Fatal("couldn't create vertex index for %s: %s", name, err)
-			if err := i.close(); err != nil {
-				i.log.Error("error while closing indexer: %s", err)
-			}
 			return
 		}
 		i.vtxIndices[chainID] = vtxIndex
@@ -230,17 +230,12 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 		txIndex, err := i.registerChainHelper(chainID, standAloneTxPrefix, name, "tx", i.decisionDispatcher)
 		if err != nil {
 			i.log.Fatal("couldn't create tx index for %s: %s", name, err)
-			if err := i.close(); err != nil {
-				i.log.Error("error while closing indexer: %s", err)
-			}
 			return
 		}
 		i.txIndices[chainID] = txIndex
+		success = true
 	default:
 		i.log.Error("got unexpected engine type %T", engine)
-		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
-		}
 		return
 	}
 }
@@ -260,9 +255,6 @@ func (i *indexer) standAloneIndexChecks(chainID ids.ID, name string) bool {
 	isIncomplete, err := i.isIncomplete(chainID)
 	if err != nil {
 		i.log.Error("couldn't get whether chain %s is incomplete: %s", name, err)
-		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
-		}
 		return true
 	}
 
@@ -270,9 +262,6 @@ func (i *indexer) standAloneIndexChecks(chainID ids.ID, name string) bool {
 	previouslyIndexed, err := i.previouslyIndexed(chainID)
 	if err != nil {
 		i.log.Error("couldn't get whether chain %s was previously indexed: %s", name, err)
-		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
-		}
 		return true
 	}
 
@@ -281,9 +270,6 @@ func (i *indexer) standAloneIndexChecks(chainID ids.ID, name string) bool {
 			// We indexed this chain in a previous run but not in this run.
 			// This would create an incomplete index, which is not allowed, so exit.
 			i.log.Fatal("running would cause index %s would become incomplete but incomplete indices are disabled", name)
-			if err := i.close(); err != nil {
-				i.log.Error("error while closing indexer: %s", err)
-			}
 			return true
 		}
 
@@ -293,26 +279,17 @@ func (i *indexer) standAloneIndexChecks(chainID ids.ID, name string) bool {
 			return true
 		}
 		i.log.Fatal("couldn't mark chain %s as incomplete: %s", name, err)
-		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
-		}
 		return true
 	}
 
 	if !i.allowIncompleteIndex && isIncomplete && (previouslyIndexed || i.hasRunBefore) {
 		i.log.Fatal("index %s is incomplete but incomplete indices are disabled. Shutting down", name)
-		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
-		}
 		return true
 	}
 
 	// Mark that in this run, this chain was indexed
 	if err := i.markPreviouslyIndexed(chainID); err != nil {
 		i.log.Error("couldn't mark chain %s as indexed: %s", name, err)
-		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
-		}
 		return true
 	}
 	return false
