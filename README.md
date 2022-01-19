@@ -12,7 +12,7 @@ a blockchains platform with high throughput, and blazing fast transactions.
 Avalanche is an incredibly lightweight protocol, so the minimum computer requirements are quite modest.
 Note that as network usage increases, hardware requirements may change.
 
-The minimum recommended hardware specification for nodes connected to Mainnet is: 
+The minimum recommended hardware specification for nodes connected to Mainnet is:
 
 - CPU: Equivalent of 8 AWS vCPU
 - RAM: 16 GiB
@@ -196,7 +196,7 @@ AvalancheGo can run on different platforms, with different support tiers:
 - **Tier 1**: Fully supported by the maintainers, guaranteed to pass all tests including e2e and stress tests.
 - **Tier 2**: Passes all unit and integration tests but not necessarily e2e tests.
 - **Tier 3**: Builds but lightly tested (or not), considered _experimental_.
-- **Not supported**: May not build and not tested, considered _unsafe_. To be supported in the future. 
+- **Not supported**: May not build and not tested, considered _unsafe_. To be supported in the future.
 
 The following table lists currently supported platforms and their corresponding
 AvalancheGo support tiers:

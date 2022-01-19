@@ -39,8 +39,8 @@ message InitializeRequest {
 message StateRequest {
     enum State {
         Undefined = 0;
-	    Bootstrapping = 1;
-	    NormalOp = 2;
+        Bootstrapping = 1;
+        NormalOp = 2;
     }
     State state = 1;
 }

@@ -63,8 +63,8 @@ github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310/go.mod h1:ufUuZ+zHj
 github.com/ava-labs/avalanchego v1.7.4-0.20211222191707-3163be793cc9/go.mod h1:YPIP9GyzXKjscsWlvbPWvV0TQcgV+0t8rMe8sLvc0xQ=
 github.com/ava-labs/avalanchego v1.7.4-0.20220113231534-ccb8039d74b9/go.mod h1:hm1T3Nui/qRALnNngXmC+lWeTEPtYyPBKxaWMWuRBrs=
 github.com/ava-labs/coreth v0.8.4-rc.1/go.mod h1:bP2Atm7pCJdx8fwzsPT3xU/kWOdHFklpja7aRNT++Qo=
-github.com/ava-labs/coreth v0.8.4-rc.2 h1:0jITGnjvt6/OSt2CG8EaHX7RgMxZNfuQ7FdIfiNqook=
-github.com/ava-labs/coreth v0.8.4-rc.2/go.mod h1:9TgpLJVY9ot6RV8Lh66F356S4MfalvaL3sAqw4+miTU=
+github.com/ava-labs/coreth v0.8.4-rc.3 h1:pe1mDRgit8eYYPdmFfCyNms7NN+24LaTvMB56lMZcFI=
+github.com/ava-labs/coreth v0.8.4-rc.3/go.mod h1:9TgpLJVY9ot6RV8Lh66F356S4MfalvaL3sAqw4+miTU=
 github.com/aws/aws-sdk-go-v2 v1.2.0/go.mod h1:zEQs02YRBw1DjK0PoJv3ygDYOFTre1ejlJWl8FwAuQo=
 github.com/aws/aws-sdk-go-v2/config v1.1.1/go.mod h1:0XsVy9lBI/BCXm+2Tuvt39YmdHwS5unDQmxZOYe8F5Y=
 github.com/aws/aws-sdk-go-v2/credentials v1.1.1/go.mod h1:mM2iIjwl7LULWtS6JCACyInboHirisUUdkBPoTHMOUo=
