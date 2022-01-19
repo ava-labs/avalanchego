@@ -101,8 +101,8 @@ var PrecompiledContractsApricotPhase2 = map[common.Address]StatefulPrecompiledCo
 	common.BytesToAddress([]byte{8}): newWrappedPrecompiledContract(&bn256PairingIstanbul{}),
 	common.BytesToAddress([]byte{9}): newWrappedPrecompiledContract(&blake2F{}),
 	genesisContractAddr:              &deprecatedContract{},
-	nativeAssetBalanceAddr:           &nativeAssetBalance{gasCost: params.AssetBalanceApricot},
-	nativeAssetCallAddr:              &nativeAssetCall{gasCost: params.AssetCallApricot},
+	NativeAssetBalanceAddr:           &nativeAssetBalance{gasCost: params.AssetBalanceApricot},
+	NativeAssetCallAddr:              &nativeAssetCall{gasCost: params.AssetCallApricot},
 }
 
 var (
