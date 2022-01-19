@@ -205,6 +205,10 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 			if i.standAloneIndexChecks(chainID, name) {
 				return
 			}
+			if incomplete, err := i.isIncomplete(chainID); incomplete && err == nil {
+				success = true
+				return
+			}
 			blockIndex, err = i.registerChainHelper(chainID, standAloneBlockPrefix, name, endpoint, i.consensusDispatcher)
 			if err != nil {
 				i.log.Fatal("couldn't create block index for %s: %s", name, err)
@@ -215,6 +219,10 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 		}
 	case avalanche.Engine:
 		if i.standAloneIndexChecks(chainID, name) {
+			return
+		}
+		if incomplete, err := i.isIncomplete(chainID); incomplete && err == nil {
+			success = true
 			return
 		}
 
@@ -276,7 +284,7 @@ func (i *indexer) standAloneIndexChecks(chainID ids.ID, name string) bool {
 		// Creating an incomplete index is allowed. Mark index as incomplete.
 		err := i.markIncomplete(chainID)
 		if err == nil {
-			return true
+			return false
 		}
 		i.log.Fatal("couldn't mark chain %s as incomplete: %s", name, err)
 		return true
