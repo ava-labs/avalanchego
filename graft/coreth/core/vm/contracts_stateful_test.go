@@ -121,7 +121,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				return statedb
 			},
 			from:                 userAddr1,
-			precompileAddr:       nativeAssetBalanceAddr,
+			precompileAddr:       NativeAssetBalanceAddr,
 			input:                PackNativeAssetBalanceInput(userAddr1, assetID),
 			value:                big0,
 			gasInput:             params.AssetBalanceApricot,
@@ -147,7 +147,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				return statedb
 			},
 			from:                 userAddr1,
-			precompileAddr:       nativeAssetBalanceAddr,
+			precompileAddr:       NativeAssetBalanceAddr,
 			input:                PackNativeAssetBalanceInput(userAddr1, assetID),
 			value:                big0,
 			gasInput:             params.AssetBalanceApricot,
@@ -172,7 +172,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				return statedb
 			},
 			from:                 userAddr1,
-			precompileAddr:       nativeAssetBalanceAddr,
+			precompileAddr:       NativeAssetBalanceAddr,
 			input:                PackNativeAssetBalanceInput(userAddr1, assetID),
 			value:                big0,
 			gasInput:             params.AssetBalanceApricot,
@@ -190,7 +190,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				return statedb
 			},
 			from:                 userAddr1,
-			precompileAddr:       nativeAssetBalanceAddr,
+			precompileAddr:       NativeAssetBalanceAddr,
 			input:                nil,
 			value:                big0,
 			gasInput:             params.AssetBalanceApricot,
@@ -208,7 +208,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				return statedb
 			},
 			from:                 userAddr1,
-			precompileAddr:       nativeAssetBalanceAddr,
+			precompileAddr:       NativeAssetBalanceAddr,
 			input:                PackNativeAssetBalanceInput(userAddr1, assetID),
 			value:                big0,
 			gasInput:             params.AssetBalanceApricot - 1,
@@ -226,7 +226,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				return statedb
 			},
 			from:                 userAddr1,
-			precompileAddr:       nativeAssetBalanceAddr,
+			precompileAddr:       NativeAssetBalanceAddr,
 			input:                PackNativeAssetBalanceInput(userAddr1, assetID),
 			value:                bigHundred,
 			gasInput:             params.AssetBalanceApricot,
@@ -247,7 +247,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				return statedb
 			},
 			from:                 userAddr1,
-			precompileAddr:       nativeAssetCallAddr,
+			precompileAddr:       NativeAssetCallAddr,
 			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
 			value:                big0,
 			gasInput:             params.AssetCallApricot + params.CallNewAccountGas,
@@ -280,7 +280,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				return statedb
 			},
 			from:                 userAddr1,
-			precompileAddr:       nativeAssetCallAddr,
+			precompileAddr:       NativeAssetCallAddr,
 			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
 			value:                big.NewInt(49),
 			gasInput:             params.AssetCallApricot + params.CallNewAccountGas,
@@ -291,7 +291,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			stateDBCheck: func(t *testing.T, stateDB StateDB) {
 				user1Balance := stateDB.GetBalance(userAddr1)
 				user2Balance := stateDB.GetBalance(userAddr2)
-				nativeAssetCallAddrBalance := stateDB.GetBalance(nativeAssetCallAddr)
+				nativeAssetCallAddrBalance := stateDB.GetBalance(NativeAssetCallAddr)
 				user1AssetBalance := stateDB.GetBalanceMultiCoin(userAddr1, assetID)
 				user2AssetBalance := stateDB.GetBalanceMultiCoin(userAddr2, assetID)
 				expectedBalance := big.NewInt(50)
@@ -315,7 +315,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				return statedb
 			},
 			from:                 userAddr1,
-			precompileAddr:       nativeAssetCallAddr,
+			precompileAddr:       NativeAssetCallAddr,
 			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(51), nil),
 			value:                big.NewInt(50),
 			gasInput:             params.AssetCallApricot,
@@ -347,7 +347,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				return statedb
 			},
 			from:                 userAddr1,
-			precompileAddr:       nativeAssetCallAddr,
+			precompileAddr:       NativeAssetCallAddr,
 			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
 			value:                big.NewInt(51),
 			gasInput:             params.AssetCallApricot,
@@ -379,7 +379,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				return statedb
 			},
 			from:                 userAddr1,
-			precompileAddr:       nativeAssetCallAddr,
+			precompileAddr:       NativeAssetCallAddr,
 			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
 			value:                big.NewInt(50),
 			gasInput:             params.AssetCallApricot - 1,
@@ -400,7 +400,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				return statedb
 			},
 			from:                 userAddr1,
-			precompileAddr:       nativeAssetCallAddr,
+			precompileAddr:       NativeAssetCallAddr,
 			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
 			value:                big.NewInt(50),
 			gasInput:             params.AssetCallApricot + params.CallNewAccountGas - 1,
@@ -432,7 +432,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				return statedb
 			},
 			from:                 userAddr1,
-			precompileAddr:       nativeAssetCallAddr,
+			precompileAddr:       NativeAssetCallAddr,
 			input:                make([]byte, 24),
 			value:                big.NewInt(50),
 			gasInput:             params.AssetCallApricot + params.CallNewAccountGas,
