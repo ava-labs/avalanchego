@@ -282,7 +282,7 @@ func (i *indexer) standAloneIndexChecks(chainID ids.ID, name string) error {
 
 	if !i.allowIncompleteIndex && isIncomplete && (previouslyIndexed || i.hasRunBefore) {
 		i.log.Fatal("index %s is incomplete but incomplete indices are disabled. Shutting down", name)
-		return fmt.Errorf("index %s is incomplete but incomplete indices are disabled.", name)
+		return fmt.Errorf("index %s is incomplete but incomplete indices are disabled", name)
 	}
 
 	// Mark that in this run, this chain was indexed
