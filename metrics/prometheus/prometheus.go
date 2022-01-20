@@ -178,7 +178,7 @@ func (g gatherer) Gather() ([]*dto.MetricFamily, error) {
 			})
 		}
 	}
-	log.Error("called", "names", names, "mfs", mfs)
+	log.Trace("called", "names", names, "mfs", mfs)
 	return mfs, nil
 }
 
