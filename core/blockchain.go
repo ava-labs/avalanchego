@@ -1308,11 +1308,10 @@ func (bc *BlockChain) CleanBlockRootsAboveLastAccepted() error {
 	// Note: this takes the place of middleRoots in the geth implementation since we do not
 	// track processing block roots via snapshot journals in the same way.
 	processingRoots := bc.gatherBlockRootsAboveLastAccepted()
-	for _, processingRoot := range processingRoots {
-		// Skip over the processingRoot if it matches the protected target.
-		if processingRoot == targetRoot {
-			continue
-		}
+	// If there is a block above the last accepted block with an identical state root, we
+	// explicitly remove it from the set to ensure we do not corrupt the last accepted trie.
+	delete(processingRoots, targetRoot)
+	for processingRoot := range processingRoots {
 		// Delete the processing root from disk to mark the trie as inaccessible (no need to handle this in a batch).
 		if err := bc.db.Delete(processingRoot[:]); err != nil {
 			return fmt.Errorf("failed to remove processing root (%s) preparing for offline pruning: %w", processingRoot, err)
@@ -1344,8 +1343,8 @@ func (bc *BlockChain) CleanBlockRootsAboveLastAccepted() error {
 // The consensus engine accepts block C and proceeds to reject the other branch in order (B, D, E, F).
 // If the consensus engine dies after rejecting block D, block D will be deleted, such that the forward iteration
 // may not find any blocks at this height and will not reach the previously processing blocks E and F.
-func (bc *BlockChain) gatherBlockRootsAboveLastAccepted() []common.Hash {
-	blockRoots := make([]common.Hash, 0)
+func (bc *BlockChain) gatherBlockRootsAboveLastAccepted() map[common.Hash]struct{} {
+	blockRoots := make(map[common.Hash]struct{})
 	for height := bc.lastAccepted.NumberU64() + 1; ; height++ {
 		blockHashes := rawdb.ReadAllHashes(bc.db, height)
 		// If there are no block hashes at [height], then there should be no further acceptable blocks
@@ -1354,14 +1353,14 @@ func (bc *BlockChain) gatherBlockRootsAboveLastAccepted() []common.Hash {
 			break
 		}
 
-		// Fetch the blocks and append their roots if they are found on disk.
+		// Fetch the blocks and append their roots.
 		for _, blockHash := range blockHashes {
 			block := bc.GetBlockByHash(blockHash)
 			if block == nil {
 				continue
 			}
 
-			blockRoots = append(blockRoots, block.Root())
+			blockRoots[block.Root()] = struct{}{}
 		}
 	}
 
