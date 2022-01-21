@@ -355,52 +355,50 @@ func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
 			return nil, err
 		}
 
-		if lastAcceptedHash != (common.Hash{}) {
-			tempDir := t.TempDir()
-			if err := blockchain.CleanBlockRootsAboveLastAccepted(); err != nil {
-				return nil, err
-			}
-			pruner, err := pruner.NewPruner(db, tempDir, 256)
-			if err != nil {
-				return nil, fmt.Errorf("offline pruning failed (%s, %d)", tempDir, 512)
-			}
-
-			targetRoot := blockchain.LastAcceptedBlock().Root()
-			if err := pruner.Prune(targetRoot); err != nil {
-				return nil, fmt.Errorf("failed to prune blockchain with target root: %s due to: %w", targetRoot, err)
-			}
-			// Re-initialize the blockchain after pruning
-			blockchain, err = NewBlockChain(
-				db,
-				&CacheConfig{
-					TrieCleanLimit: 256,
-					TrieDirtyLimit: 256,
-					Pruning:        true, // Enable pruning
-					SnapshotLimit:  256,
-				},
-				chainConfig,
-				dummy.NewDummyEngine(&dummy.ConsensusCallbacks{
-					OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, *big.Int, error) {
-						sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(block.Number().Int64()))
-						return nil, nil, nil
-					},
-					OnFinalizeAndAssemble: func(header *types.Header, sdb *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
-						sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
-						return nil, nil, nil, nil
-					},
-				}),
-				vm.Config{},
-				lastAcceptedHash,
-			)
-			if err != nil {
-				return nil, err
-			}
-		}
-
 		// Overwrite state manager, so that Shutdown is not called.
 		// This tests to ensure that the state manager handles an ungraceful shutdown correctly.
 		blockchain.stateManager = &wrappedStateManager{TrieWriter: blockchain.stateManager}
-		return blockchain, err
+
+		if lastAcceptedHash == (common.Hash{}) {
+			return blockchain, nil
+		}
+
+		tempDir := t.TempDir()
+		if err := blockchain.CleanBlockRootsAboveLastAccepted(); err != nil {
+			return nil, err
+		}
+		pruner, err := pruner.NewPruner(db, tempDir, 256)
+		if err != nil {
+			return nil, fmt.Errorf("offline pruning failed (%s, %d): %w", tempDir, 256, err)
+		}
+
+		targetRoot := blockchain.LastAcceptedBlock().Root()
+		if err := pruner.Prune(targetRoot); err != nil {
+			return nil, fmt.Errorf("failed to prune blockchain with target root: %s due to: %w", targetRoot, err)
+		}
+		// Re-initialize the blockchain after pruning
+		return NewBlockChain(
+			db,
+			&CacheConfig{
+				TrieCleanLimit: 256,
+				TrieDirtyLimit: 256,
+				Pruning:        true, // Enable pruning
+				SnapshotLimit:  256,
+			},
+			chainConfig,
+			dummy.NewDummyEngine(&dummy.ConsensusCallbacks{
+				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, *big.Int, error) {
+					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(block.Number().Int64()))
+					return nil, nil, nil
+				},
+				OnFinalizeAndAssemble: func(header *types.Header, sdb *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
+					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
+					return nil, nil, nil, nil
+				},
+			}),
+			vm.Config{},
+			lastAcceptedHash,
+		)
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
