@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -21,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -143,163 +143,223 @@ type indexer struct {
 	decisionDispatcher *triggers.EventDispatcher
 }
 
+// RegisterChain verifies if and what kind of index can be created to support index queries.
+// It instantiate the index as well as the API.
 // Assumes [engine]'s context lock is not held
 func (i *indexer) RegisterChain(name string, engine common.Engine) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
-	ctx := engine.Context()
-	if i.closed {
-		i.log.Debug("not registering chain %s because indexer is closed", name)
-		return
-	} else if ctx.SubnetID != constants.PrimaryNetworkID {
-		i.log.Debug("not registering chain %s because it's not in primary network", name)
+	var (
+		ctx     = engine.Context()
+		chainID = ctx.ChainID
+	)
+
+	if !i.needsRegisteringChain(ctx, name) {
 		return
 	}
 
-	chainID := ctx.ChainID
-	if i.blockIndices[chainID] != nil || i.txIndices[chainID] != nil || i.vtxIndices[chainID] != nil {
-		i.log.Warn("chain %s is already being indexed", chainID)
-		return
-	}
+	initializeIndexes := func() error {
+		// Note: we currently support two types of indexes: stand-alone and VM-backed index.
+		// Stand-alone indexes require an ad-hoc db to store blocks, vertexes and transactions data;
+		// they may be incomplete and are enabled only on nodes which specify the flag <index-enabled>.
+		// VM-backed indexes do not require an ad-hoc db; they leverage VM-storage and cannot be incomplete.
+		// VM-backed indexes are supported only for block indexing on Snowman++ VMs which enabled height indexing.
+		// Currently VM-backed indexes are available only for the C-chain index.
+		switch engine.(type) {
+		case snowman.Engine:
+			var (
+				blockIndex            Index
+				err                   error
+				endpoint              = "block"
+				standAloneBlockPrefix = standAlonePrefix(chainID, blockPrefix)
+			)
+			// Try creating a VM-backed ...
+			if blockIndex, err = newVMBackedBlockIndex(engine.GetVM()); err == nil {
+				if err := i.registerAndCreateEndpoint(blockIndex, chainID, name, endpoint, i.consensusDispatcher); err != nil {
+					return fmt.Errorf("couldn't create block index for %s: %w", name, err)
+				}
+				i.blockIndices[chainID] = blockIndex
 
-	// If the index is incomplete, make sure that's OK. Otherwise, cause node to die.
-	isIncomplete, err := i.isIncomplete(chainID)
-	if err != nil {
-		i.log.Error("couldn't get whether chain %s is incomplete: %s", name, err)
+				// Historically stand-Alone indexes were introduced first.
+				// However, as soon as a VM-Backed index is available,
+				// there is no point maintaining it.
+				go func() {
+					if err := i.deleteStandAloneIndex(standAloneBlockPrefix); err != nil {
+						i.log.Fatal("Chain %s stand alone index deletion failed, error: %w", chainID, err)
+						panic(err)
+					}
+				}()
+				return nil
+			}
+			// ... otherwise fallback on stand-alone indexes.
+			if err := i.standAloneIndexChecks(chainID, name); err != nil {
+				return err
+			}
+			if incomplete, err := i.isIncomplete(chainID); incomplete && err == nil {
+				return nil
+			}
+			blockIndex, err = i.registerChainHelper(chainID, standAloneBlockPrefix, name, endpoint, i.consensusDispatcher)
+			if err != nil {
+				return fmt.Errorf("couldn't create block index for %s: %w", name, err)
+			}
+			i.blockIndices[chainID] = blockIndex
+			return nil
+		case avalanche.Engine:
+			if err := i.standAloneIndexChecks(chainID, name); err != nil {
+				return err
+			}
+			if incomplete, err := i.isIncomplete(chainID); incomplete && err == nil {
+				return nil
+			}
+
+			standAloneVertexPrefix := standAlonePrefix(chainID, vtxPrefix)
+			vtxIndex, err := i.registerChainHelper(chainID, standAloneVertexPrefix, name, "vtx", i.consensusDispatcher)
+			if err != nil {
+				return fmt.Errorf("couldn't create vertex index for %s: %w", name, err)
+			}
+			i.vtxIndices[chainID] = vtxIndex
+
+			standAloneTxPrefix := standAlonePrefix(chainID, txPrefix)
+			txIndex, err := i.registerChainHelper(chainID, standAloneTxPrefix, name, "tx", i.decisionDispatcher)
+			if err != nil {
+				return fmt.Errorf("couldn't create tx index for %s: %w", name, err)
+			}
+			i.txIndices[chainID] = txIndex
+			return nil
+		default:
+			return fmt.Errorf("got unexpected engine type %T", engine)
+		}
+	}
+	if err := initializeIndexes(); err != nil {
+		i.log.Fatal("error initializing indexes", "err", err)
 		if err := i.close(); err != nil {
 			i.log.Error("error while closing indexer: %s", err)
 		}
-		return
+	}
+}
+
+func (i *indexer) deleteStandAloneIndex(standAlonePrefix []byte) error {
+	// recreate standalone index and delete it
+	standAloneIdx, err := newStandAloneIndex(standAlonePrefix, i.db, i.log, i.codec, i.clock)
+	if err != nil {
+		return err
+	}
+
+	indexToRm, _ := standAloneIdx.(*standAloneIndex)
+	return indexToRm.Delete()
+}
+
+func (i *indexer) standAloneIndexChecks(chainID ids.ID, name string) error {
+	isIncomplete, err := i.isIncomplete(chainID)
+	if err != nil {
+		i.log.Error("couldn't get whether chain %s is incomplete: %s", name, err)
+		return err
 	}
 
 	// See if this chain was indexed in a previous run
 	previouslyIndexed, err := i.previouslyIndexed(chainID)
 	if err != nil {
 		i.log.Error("couldn't get whether chain %s was previously indexed: %s", name, err)
-		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
-		}
-		return
+		return err
 	}
 
 	if !i.indexingEnabled { // Indexing is disabled
 		if previouslyIndexed && !i.allowIncompleteIndex {
 			// We indexed this chain in a previous run but not in this run.
 			// This would create an incomplete index, which is not allowed, so exit.
-			i.log.Fatal("running would cause index %s would become incomplete but incomplete indices are disabled", name)
-			if err := i.close(); err != nil {
-				i.log.Error("error while closing indexer: %s", err)
-			}
-			return
+			i.log.Fatal("running would cause index %s to become incomplete but incomplete indices are disabled", name)
+			return fmt.Errorf("running would cause index %s to become incomplete but incomplete indices are disabled", name)
 		}
 
 		// Creating an incomplete index is allowed. Mark index as incomplete.
-		err := i.markIncomplete(chainID)
-		if err == nil {
-			return
+		if err := i.markIncomplete(chainID); err != nil {
+			i.log.Fatal("couldn't mark chain %s as incomplete: %s", name, err)
+			return err
 		}
-		i.log.Fatal("couldn't mark chain %s as incomplete: %s", name, err)
-		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
-		}
-		return
+		return nil
 	}
 
 	if !i.allowIncompleteIndex && isIncomplete && (previouslyIndexed || i.hasRunBefore) {
 		i.log.Fatal("index %s is incomplete but incomplete indices are disabled. Shutting down", name)
-		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
-		}
-		return
+		return fmt.Errorf("index %s is incomplete but incomplete indices are disabled", name)
 	}
 
 	// Mark that in this run, this chain was indexed
 	if err := i.markPreviouslyIndexed(chainID); err != nil {
 		i.log.Error("couldn't mark chain %s as indexed: %s", name, err)
-		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
-		}
-		return
+		return err
+	}
+	return nil
+}
+
+func (i *indexer) needsRegisteringChain(ctx *snow.ConsensusContext, name string) bool {
+	if i.closed {
+		i.log.Debug("not registering chain %s because indexer is closed", name)
+		return false
+	} else if ctx.SubnetID != constants.PrimaryNetworkID {
+		i.log.Debug("not registering chain %s because it's not in primary network", name)
+		return false
 	}
 
-	switch engine.(type) {
-	case snowman.Engine:
-		index, err := i.registerChainHelper(chainID, blockPrefix, name, "block", i.consensusDispatcher)
-		if err != nil {
-			i.log.Fatal("couldn't create block index for %s: %s", name, err)
-			if err := i.close(); err != nil {
-				i.log.Error("error while closing indexer: %s", err)
-			}
-			return
-		}
-		i.blockIndices[chainID] = index
-	case avalanche.Engine:
-		vtxIndex, err := i.registerChainHelper(chainID, vtxPrefix, name, "vtx", i.consensusDispatcher)
-		if err != nil {
-			i.log.Fatal("couldn't create vertex index for %s: %s", name, err)
-			if err := i.close(); err != nil {
-				i.log.Error("error while closing indexer: %s", err)
-			}
-			return
-		}
-		i.vtxIndices[chainID] = vtxIndex
-
-		txIndex, err := i.registerChainHelper(chainID, txPrefix, name, "tx", i.decisionDispatcher)
-		if err != nil {
-			i.log.Fatal("couldn't create tx index for %s: %s", name, err)
-			if err := i.close(); err != nil {
-				i.log.Error("error while closing indexer: %s", err)
-			}
-			return
-		}
-		i.txIndices[chainID] = txIndex
-	default:
-		i.log.Error("got unexpected engine type %T", engine)
-		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
-		}
-		return
+	chainID := ctx.ChainID
+	if i.blockIndices[chainID] != nil || i.txIndices[chainID] != nil || i.vtxIndices[chainID] != nil {
+		i.log.Warn("chain %s is already being indexed", chainID)
+		return false
 	}
+	return true
 }
 
 func (i *indexer) registerChainHelper(
 	chainID ids.ID,
-	prefixEnd byte,
+	prefix []byte,
 	name, endpoint string,
 	dispatcher *triggers.EventDispatcher,
 ) (Index, error) {
+	index, err := newStandAloneIndex(prefix, i.db, i.log, i.codec, i.clock)
+	if err != nil {
+		return nil, err
+	}
+
+	return index, i.registerAndCreateEndpoint(index, chainID, name, endpoint, dispatcher)
+}
+
+func standAlonePrefix(chainID ids.ID, prefixEnd byte) []byte {
 	prefix := make([]byte, hashing.HashLen+wrappers.ByteLen)
 	copy(prefix, chainID[:])
 	prefix[hashing.HashLen] = prefixEnd
-	indexDB := prefixdb.New(prefix, i.db)
-	index, err := newIndex(indexDB, i.log, i.codec, i.clock)
-	if err != nil {
-		_ = indexDB.Close()
-		return nil, err
-	}
+	return prefix
+}
 
-	// Register index to learn about new accepted vertices
+func (i *indexer) registerAndCreateEndpoint(
+	index Index,
+	chainID ids.ID,
+	name, endpoint string,
+	dispatcher *triggers.EventDispatcher,
+) error {
 	if err := dispatcher.RegisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID), index, true); err != nil {
 		_ = index.Close()
-		return nil, err
+		return err
 	}
 
-	// Create an API endpoint for this index
+	return i.createAPIEndpoint(index, name, endpoint)
+}
+
+func (i *indexer) createAPIEndpoint(index Index, name string, endpoint string) error {
 	apiServer := rpc.NewServer()
 	codec := json.NewCodec()
 	apiServer.RegisterCodec(codec, "application/json")
 	apiServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	if err := apiServer.RegisterService(&service{Index: index}, "index"); err != nil {
 		_ = index.Close()
-		return nil, err
+		return err
 	}
 	handler := &common.HTTPHandler{LockOptions: common.NoLock, Handler: apiServer}
 	if err := i.routeAdder.AddRoute(handler, &sync.RWMutex{}, "index/"+name, "/"+endpoint, i.log); err != nil {
 		_ = index.Close()
-		return nil, err
+		return err
 	}
-	return index, nil
+	return nil
 }
 
 // Close this indexer. Stops indexing all chains.

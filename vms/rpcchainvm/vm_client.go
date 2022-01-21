@@ -50,8 +50,9 @@ import (
 var (
 	errUnsupportedFXs = errors.New("unsupported feature extensions")
 
-	_ block.ChainVM        = &VMClient{}
-	_ block.BatchedChainVM = &VMClient{}
+	_ block.ChainVM              = &VMClient{}
+	_ block.BatchedChainVM       = &VMClient{}
+	_ block.HeightIndexedChainVM = &VMClient{}
 )
 
 const (
@@ -543,6 +544,28 @@ func (vm *VMClient) AppGossip(nodeID ids.ShortID, msg []byte) error {
 		},
 	)
 	return err
+}
+
+func (vm *VMClient) IsHeightIndexComplete() bool {
+	resp, err := vm.client.IsHeightIndexComplete(
+		context.Background(),
+		&emptypb.Empty{},
+	)
+	if err != nil {
+		return false
+	}
+	return resp.Completed
+}
+
+func (vm *VMClient) GetBlockIDByHeight(height uint64) (ids.ID, error) {
+	resp, err := vm.client.GetBlockIDByHeight(
+		context.Background(),
+		&vmproto.GetBlockIDByHeightRequest{Height: height},
+	)
+	if err != nil {
+		return ids.Empty, err
+	}
+	return ids.FromBytes(resp.BlkID), nil
 }
 
 func (vm *VMClient) GetAncestors(
