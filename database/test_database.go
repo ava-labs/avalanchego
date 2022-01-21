@@ -1139,20 +1139,16 @@ func TestClear(t *testing.T, db Database) {
 	err = db.Put(key3, value3)
 	assert.NoError(err)
 
+	count, err := Count(db)
+	assert.NoError(err)
+	assert.Equal(3, count)
+
 	err = Clear(db, db)
 	assert.NoError(err)
 
-	has, err := db.Has(key1)
+	count, err = Count(db)
 	assert.NoError(err)
-	assert.False(has)
-
-	has, err = db.Has(key2)
-	assert.NoError(err)
-	assert.False(has)
-
-	has, err = db.Has(key3)
-	assert.NoError(err)
-	assert.False(has)
+	assert.Equal(0, count)
 
 	err = db.Close()
 	assert.NoError(err)
@@ -1180,8 +1176,16 @@ func TestClearPrefix(t *testing.T, db Database) {
 	err = db.Put(key3, value3)
 	assert.NoError(err)
 
+	count, err := Count(db)
+	assert.NoError(err)
+	assert.Equal(3, count)
+
 	err = ClearPrefix(db, db, []byte("hello"))
 	assert.NoError(err)
+
+	count, err = Count(db)
+	assert.NoError(err)
+	assert.Equal(1, count)
 
 	has, err := db.Has(key1)
 	assert.NoError(err)

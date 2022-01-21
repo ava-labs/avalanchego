@@ -18,7 +18,7 @@ import (
 
 // Magic value that comes from the size in bytes of a serialized key-value bootstrap checkpoint in a database +
 // the overhead of the key-value storage.
-const bootstrapProgressCheckpointSize = 59
+const bootstrapProgressCheckpointSize = 55
 
 // Test that creating a new queue can be created and that it is initially empty.
 func TestNew(t *testing.T) {
@@ -456,4 +456,64 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(2, count)
 	assert.True(executed1)
+}
+
+func TestInitializeNumJobs(t *testing.T) {
+	assert := assert.New(t)
+
+	parser := &TestParser{T: t}
+	db := memdb.New()
+
+	jobs, err := NewWithMissing(db, "", prometheus.NewRegistry())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := jobs.SetParser(parser); err != nil {
+		t.Fatal(err)
+	}
+
+	job0ID := ids.GenerateTestID()
+	job1ID := ids.GenerateTestID()
+
+	job0 := &TestJob{
+		T: t,
+
+		IDF:                     func() ids.ID { return job0ID },
+		MissingDependenciesF:    func() (ids.Set, error) { return nil, nil },
+		HasMissingDependenciesF: func() (bool, error) { return false, nil },
+		BytesF:                  func() []byte { return []byte{0} },
+	}
+	job1 := &TestJob{
+		T: t,
+
+		IDF:                     func() ids.ID { return job1ID },
+		MissingDependenciesF:    func() (ids.Set, error) { return nil, nil },
+		HasMissingDependenciesF: func() (bool, error) { return false, nil },
+		BytesF:                  func() []byte { return []byte{1} },
+	}
+
+	pushed, err := jobs.Push(job0)
+	assert.True(pushed)
+	assert.NoError(err)
+	assert.EqualValues(1, jobs.state.numJobs)
+
+	pushed, err = jobs.Push(job1)
+	assert.True(pushed)
+	assert.NoError(err)
+	assert.EqualValues(2, jobs.state.numJobs)
+
+	err = jobs.Commit()
+	assert.NoError(err)
+
+	err = database.Clear(jobs.state.metadataDB, jobs.state.metadataDB)
+	assert.NoError(err)
+
+	err = jobs.Commit()
+	assert.NoError(err)
+
+	jobs, err = NewWithMissing(db, "", prometheus.NewRegistry())
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.EqualValues(2, jobs.state.numJobs)
 }
