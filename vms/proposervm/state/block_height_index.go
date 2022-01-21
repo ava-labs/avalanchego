@@ -81,9 +81,11 @@ func (hi *heightIndex) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	bytes, err := hi.db.Get(key)
 	switch err {
 	case nil:
-		res := ids.FromBytes(bytes)
-		hi.blkHeightsCache.Put(string(key), res)
-		return res, nil
+		res, err := ids.ToID(bytes)
+		if err == nil {
+			hi.blkHeightsCache.Put(string(key), res)
+		}
+		return res, err
 
 	case database.ErrNotFound:
 		return ids.Empty, database.ErrNotFound
@@ -148,7 +150,7 @@ func (hi *heightIndex) SetCheckpoint(blkID ids.ID) error {
 func (hi *heightIndex) GetCheckpoint() (ids.ID, error) {
 	switch bytes, err := hi.db.Get(GetCheckpointKey()); err {
 	case nil:
-		return ids.FromBytes(bytes), nil
+		return ids.ToID(bytes)
 	case database.ErrNotFound:
 		return ids.Empty, database.ErrNotFound
 	default:

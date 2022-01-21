@@ -299,9 +299,7 @@ func (t *Transitive) Context() *snow.ConsensusContext {
 }
 
 // IsBootstrapped implements the common.Engine interface.
-func (t *Transitive) IsBootstrapped() bool {
-	return t.Ctx.GetState() == snow.NormalOp
-}
+func (t *Transitive) IsBootstrapped() bool { return t.Ctx.GetState() == snow.NormalOp }
 
 // Start implements the common.Engine interface.
 func (t *Transitive) Start(startReqID uint32) error {
