@@ -53,6 +53,13 @@ func (db *Database) Close() error {
 	return nil
 }
 
+func (db *Database) isClosed() bool {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	return db.db == nil
+}
+
 // Has implements the Database interface
 func (db *Database) Has(key []byte) (bool, error) {
 	db.lock.RLock()
@@ -144,6 +151,7 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 		values = append(values, db.db[key])
 	}
 	return &iterator{
+		db:     db,
 		keys:   keys,
 		values: values,
 	}
@@ -238,13 +246,23 @@ func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
 func (b *batch) Inner() database.Batch { return b }
 
 type iterator struct {
+	db          *Database
 	initialized bool
 	keys        []string
 	values      [][]byte
+	err         error
 }
 
 // Next implements the Iterator interface
 func (it *iterator) Next() bool {
+	// Short-circuit and set an error if the underlying database has been closed.
+	if it.db.isClosed() {
+		it.keys = nil
+		it.values = nil
+		it.err = database.ErrClosed
+		return false
+	}
+
 	// If the iterator was not yet initialized, do it now
 	if !it.initialized {
 		it.initialized = true
@@ -259,7 +277,7 @@ func (it *iterator) Next() bool {
 }
 
 // Error implements the Iterator interface
-func (it *iterator) Error() error { return nil }
+func (it *iterator) Error() error { return it.err }
 
 // Key implements the Iterator interface
 func (it *iterator) Key() []byte {
