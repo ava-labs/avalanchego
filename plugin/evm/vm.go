@@ -85,7 +85,8 @@ var (
 	x2cRate       = big.NewInt(x2cRateInt64)
 	x2cRateMinus1 = big.NewInt(x2cRateMinus1Int64)
 
-	_ block.ChainVM = &VM{}
+	_ block.ChainVM              = &VM{}
+	_ block.HeightIndexedChainVM = &VM{}
 )
 
 const (
@@ -221,7 +222,7 @@ type VM struct {
 	bootstrapped bool
 }
 
-func (vm *VM) Connected(id ids.ShortID, nodeVersion version.Application) error {
+func (vm *VM) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
 	return nil // noop
 }
 
@@ -440,7 +441,7 @@ func (vm *VM) Initialize(
 			status:    choices.Accepted,
 			atomicTxs: atomicTxs,
 		},
-		GetBlockIDAtHeight: vm.getBlockIDAtHeight,
+		GetBlockIDAtHeight: vm.GetBlockIDByHeight,
 		GetBlock:           vm.getBlock,
 		UnmarshalBlock:     vm.parseBlock,
 		BuildBlock:         vm.buildBlock,
@@ -830,10 +831,15 @@ func (vm *VM) SetPreference(blkID ids.ID) error {
 	return vm.chain.SetPreference(block.(*Block).ethBlock)
 }
 
-// getBlockIDAtHeight retrieves the blkID of the canonical block at [blkHeight]
+func (vm *VM) IsHeightIndexComplete() bool {
+	// our index is vm.chain.GetBlockByNumber
+	return true
+}
+
+// GetBlockIDByHeight retrieves the blkID of the canonical block at [blkHeight]
 // if [blkHeight] is less than the height of the last accepted block, this will return
 // a canonical block. Otherwise, it may return a blkID that has not yet been accepted.
-func (vm *VM) getBlockIDAtHeight(blkHeight uint64) (ids.ID, error) {
+func (vm *VM) GetBlockIDByHeight(blkHeight uint64) (ids.ID, error) {
 	ethBlock := vm.chain.GetBlockByNumber(blkHeight)
 	if ethBlock == nil {
 		return ids.ID{}, fmt.Errorf("could not find block at height: %d", blkHeight)
