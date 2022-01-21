@@ -139,6 +139,13 @@ func prune(maindb ethdb.Database, stateBloom *stateBloom, bloomPath string, star
 		batch  = maindb.NewBatch()
 		iter   = maindb.NewIterator(nil, nil)
 	)
+	// We wrap iter.Release() in an anonymous function so that the [iter]
+	// value captured is the value of [iter] at the end of the function as opposed
+	// to incorrectly capturing the first iterator immediately.
+	defer func() {
+		iter.Release()
+	}()
+
 	for iter.Next() {
 		key := iter.Key()
 
