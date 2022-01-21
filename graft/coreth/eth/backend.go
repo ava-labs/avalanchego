@@ -201,41 +201,8 @@ func New(
 		return nil, err
 	}
 
-	// Perform offline pruning after NewBlockChain has been called to ensure that we have rolled back the chain
-	// to the last accepted block before pruning begins.
-	if config.OfflinePruning {
-		// If offline pruning marker is on disk, then we force the node to be started with offline pruning disabled
-		// before allowing another run of offline pruning.
-		if _, err := rawdb.ReadOfflinePruning(chainDb); err == nil {
-			log.Error("Offline pruning is not meant to be left enabled permanently. Please disable offline pruning and allow your node to start successfully before running offline pruning again.")
-			return nil, errors.New("cannot start chain with offline pruning enabled on consecutive starts")
-		}
-
-		// Clean up middle roots
-		if err := eth.blockchain.CleanBlockRootsAboveLastAccepted(); err != nil {
-			return nil, err
-		}
-		targetRoot := eth.blockchain.LastAcceptedBlock().Root()
-
-		// Allow the blockchain to be garbage collected immediately, since we will shut down the chain after offline pruning completes.
-		eth.blockchain = nil
-		log.Info("Starting offline pruning", "dataDir", config.OfflinePruningDataDirectory, "bloomFilterSize", config.OfflinePruningBloomFilterSize)
-		pruner, err := pruner.NewPruner(chainDb, config.OfflinePruningDataDirectory, config.OfflinePruningBloomFilterSize)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create new pruner with data directory: %s, size: %d, due to: %w", config.OfflinePruningDataDirectory, config.OfflinePruningBloomFilterSize, err)
-		}
-		if err := pruner.Prune(targetRoot); err != nil {
-			return nil, fmt.Errorf("failed to prune blockchain with target root: %s due to: %w", targetRoot, err)
-		}
-		eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, chainConfig, eth.engine, vmConfig, lastAcceptedHash)
-		if err != nil {
-			return nil, fmt.Errorf("failed to re-initialize blockchain after offline pruning: %w", err)
-		}
-	} else {
-		// Delete the offline pruning marker to indicate that the node started with offline pruning disabled.
-		if err := rawdb.DeleteOfflinePruning(chainDb); err != nil {
-			return nil, fmt.Errorf("failed to write offline pruning disabled marker: %w", err)
-		}
+	if err := eth.handleOfflinePruning(cacheConfig, chainConfig, vmConfig, lastAcceptedHash); err != nil {
+		return nil, err
 	}
 
 	eth.bloomIndexer.Start(eth.blockchain)
@@ -397,4 +364,47 @@ func (s *Ethereum) Stop() error {
 
 func (s *Ethereum) LastAcceptedBlock() *types.Block {
 	return s.blockchain.LastAcceptedBlock()
+}
+
+func (s *Ethereum) handleOfflinePruning(cacheConfig *core.CacheConfig, chainConfig *params.ChainConfig, vmConfig vm.Config, lastAcceptedHash common.Hash) error {
+	if !s.config.OfflinePruning {
+		// Delete the offline pruning marker to indicate that the node started with offline pruning disabled.
+		if err := rawdb.DeleteOfflinePruning(s.chainDb); err != nil {
+			return fmt.Errorf("failed to write offline pruning disabled marker: %w", err)
+		}
+		return nil
+	}
+
+	// Perform offline pruning after NewBlockChain has been called to ensure that we have rolled back the chain
+	// to the last accepted block before pruning begins.
+	// If offline pruning marker is on disk, then we force the node to be started with offline pruning disabled
+	// before allowing another run of offline pruning.
+	if _, err := rawdb.ReadOfflinePruning(s.chainDb); err == nil {
+		log.Error("Offline pruning is not meant to be left enabled permanently. Please disable offline pruning and allow your node to start successfully before running offline pruning again.")
+		return errors.New("cannot start chain with offline pruning enabled on consecutive starts")
+	}
+
+	// Clean up middle roots
+	if err := s.blockchain.CleanBlockRootsAboveLastAccepted(); err != nil {
+		return err
+	}
+	targetRoot := s.blockchain.LastAcceptedBlock().Root()
+
+	// Allow the blockchain to be garbage collected immediately, since we will shut down the chain after offline pruning completes.
+	s.blockchain.Stop()
+	s.blockchain = nil
+	log.Info("Starting offline pruning", "dataDir", s.config.OfflinePruningDataDirectory, "bloomFilterSize", s.config.OfflinePruningBloomFilterSize)
+	pruner, err := pruner.NewPruner(s.chainDb, s.config.OfflinePruningDataDirectory, s.config.OfflinePruningBloomFilterSize)
+	if err != nil {
+		return fmt.Errorf("failed to create new pruner with data directory: %s, size: %d, due to: %w", s.config.OfflinePruningDataDirectory, s.config.OfflinePruningBloomFilterSize, err)
+	}
+	if err := pruner.Prune(targetRoot); err != nil {
+		return fmt.Errorf("failed to prune blockchain with target root: %s due to: %w", targetRoot, err)
+	}
+	s.blockchain, err = core.NewBlockChain(s.chainDb, cacheConfig, chainConfig, s.engine, vmConfig, lastAcceptedHash)
+	if err != nil {
+		return fmt.Errorf("failed to re-initialize blockchain after offline pruning: %w", err)
+	}
+
+	return nil
 }

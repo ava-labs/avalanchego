@@ -166,7 +166,9 @@ func prune(maindb ethdb.Database, stateBloom *stateBloom, bloomPath string, star
 			}
 			count += 1
 			size += common.StorageSize(len(key) + len(iter.Value()))
-			batch.Delete(key)
+			if err := batch.Delete(key); err != nil {
+				return err
+			}
 
 			var eta time.Duration // Realistically will never remain uninited
 			if done := binary.BigEndian.Uint64(key[:8]); done > 0 {
@@ -184,7 +186,9 @@ func prune(maindb ethdb.Database, stateBloom *stateBloom, bloomPath string, star
 			// Recreate the iterator after every batch commit in order
 			// to allow the underlying compactor to delete the entries.
 			if batch.ValueSize() >= ethdb.IdealBatchSize {
-				batch.Write()
+				if err := batch.Write(); err != nil {
+					return err
+				}
 				batch.Reset()
 
 				iter.Release()
@@ -192,8 +196,13 @@ func prune(maindb ethdb.Database, stateBloom *stateBloom, bloomPath string, star
 			}
 		}
 	}
+	if err := iter.Error(); err != nil {
+		return fmt.Errorf("failed to iterate db during pruning: %w", err)
+	}
 	if batch.ValueSize() > 0 {
-		batch.Write()
+		if err := batch.Write(); err != nil {
+			return err
+		}
 		batch.Reset()
 	}
 	iter.Release()
@@ -209,7 +218,9 @@ func prune(maindb ethdb.Database, stateBloom *stateBloom, bloomPath string, star
 	// finished. If any crashes or manual exit happens before this,
 	// `RecoverPruning` will pick it up in the next restarts to redo all
 	// the things.
-	os.RemoveAll(bloomPath)
+	if err := os.RemoveAll(bloomPath); err != nil {
+		return fmt.Errorf("failed to remove bloom filter from disk: %w", err)
+	}
 
 	// Start compactions, will remove the deleted data from the disk immediately.
 	// Note for small pruning, the compaction is skipped.
