@@ -235,8 +235,7 @@ func (vm *VM) Initialize(
 	return vm.db.Commit()
 }
 
-// onBootstrapStarted is called by the consensus engine when it starts onBootstrapStarted
-// this chain
+// onBootstrapStarted is called by the consensus engine when it starts bootstrapping this chain
 func (vm *VM) onBootstrapStarted() error {
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapping(); err != nil {
