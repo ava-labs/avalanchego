@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/message"
 	"github.com/stretchr/testify/assert"
 )
@@ -18,7 +18,7 @@ func getValidTx(vm *VM, t *testing.T) *Tx {
 	res, err := vm.newCreateChainTx(
 		testSubnet1.ID(),
 		nil,
-		avm.ID,
+		constants.AVMID,
 		nil,
 		"chain name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
