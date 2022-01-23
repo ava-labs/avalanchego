@@ -566,7 +566,7 @@ func (vm *VMClient) GetBlockIDByHeight(height uint64) (ids.ID, error) {
 	if err != nil {
 		return ids.Empty, err
 	}
-	return ids.FromBytes(resp.BlkID), nil
+	return ids.ToID(resp.BlkID)
 }
 
 func (vm *VMClient) RegisterStateSyncer(stateSyncer []ids.ShortID) error {

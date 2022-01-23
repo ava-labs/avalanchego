@@ -5,12 +5,14 @@ package queue
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -53,7 +55,7 @@ func (j *Jobs) SetParser(parser Parser) error { j.state.parser = parser; return 
 func (j *Jobs) Has(jobID ids.ID) (bool, error) { return j.state.HasJob(jobID) }
 
 // Returns how many pending jobs are waiting in the queue.
-func (j *Jobs) PendingJobs() uint64 { return j.state.numPendingJobs }
+func (j *Jobs) PendingJobs() uint64 { return j.state.numJobs }
 
 // Push adds a new job to the queue. Returns true if [job] was added to the queue and false
 // if [job] was already in the queue.
@@ -96,6 +98,8 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 	defer ctx.Executing(false)
 
 	numExecuted := 0
+	numToExecute := j.state.numJobs
+	startTime := time.Now()
 
 	// Disable and clear state caches to prevent us from attempting to execute
 	// a vertex that was previously parsed, but not saved to the VM. Some VMs
@@ -159,10 +163,16 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 
 		numExecuted++
 		if numExecuted%StatusUpdateFrequency == 0 { // Periodically print progress
+			eta := timer.EstimateETA(
+				startTime,
+				uint64(numExecuted),
+				numToExecute,
+			)
+
 			if !restarted {
-				ctx.Log.Info("executed %d operations", numExecuted)
+				ctx.Log.Info("executed %d of %d operations. ETA = %s", numExecuted, numToExecute, eta)
 			} else {
-				ctx.Log.Debug("executed %d operations", numExecuted)
+				ctx.Log.Debug("executed %d of %d  operations. ETA = %s", numExecuted, numToExecute, eta)
 			}
 		}
 	}

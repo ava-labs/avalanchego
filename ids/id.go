@@ -35,13 +35,6 @@ func ToID(bytes []byte) (ID, error) {
 	return hashing.ToHash256(bytes)
 }
 
-// FromBytes builds an ID from bytes. Note that this is different from ToID
-func FromBytes(b []byte) ID {
-	var res ID
-	copy(res[:], b)
-	return res
-}
-
 // FromString is the inverse of ID.String()
 func FromString(idStr string) (ID, error) {
 	bytes, err := formatting.Decode(defaultEncoding, idStr)

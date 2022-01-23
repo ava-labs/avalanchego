@@ -17,7 +17,7 @@ import (
 
 var (
 	errInitialize           = errors.New("unexpectedly called Initialize")
-	errOnStart              = errors.New("unexpectedly called Starting")
+	errOnStart              = errors.New("unexpectedly called OnStart")
 	errShutdown             = errors.New("unexpectedly called Shutdown")
 	errCreateHandlers       = errors.New("unexpectedly called CreateHandlers")
 	errCreateStaticHandlers = errors.New("unexpectedly called CreateStaticHandlers")

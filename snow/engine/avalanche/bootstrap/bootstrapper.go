@@ -473,7 +473,7 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 func (b *bootstrapper) checkFinish() error {
 	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
 	pendingJobs := b.VtxBlocked.MissingIDs()
-	if b.Ctx.GetState() == snow.NormalOp || len(pendingJobs) > 0 || b.awaitingTimeout {
+	if b.IsBootstrapped() || len(pendingJobs) > 0 || b.awaitingTimeout {
 		return nil
 	}
 
@@ -539,8 +539,5 @@ func (b *bootstrapper) finish() error {
 	}
 
 	// Start consensus
-	if err := b.OnFinished(b.Config.SharedCfg.RequestID); err != nil {
-		return err
-	}
-	return nil
+	return b.OnFinished(b.Config.SharedCfg.RequestID)
 }

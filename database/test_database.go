@@ -969,13 +969,21 @@ func TestIteratorClosed(t *testing.T, db Database) {
 	}
 }
 
-// TestIteratorError tests to make sure that an iterator still works after the
-// database is closed.
+// TestIteratorError tests to make sure that an iterator on a database will report
+// itself as being exhausted and return [ErrClosed] to indicate that the iteration
+// was not successful.
+// Additionally tests that an iterator that has already called Next() can still serve
+// its current value after the underlying DB was closed.
 func TestIteratorError(t *testing.T, db Database) {
-	key := []byte("hello1")
-	value := []byte("world1")
+	key1 := []byte("hello1")
+	value1 := []byte("world1")
+	key2 := []byte("hello2")
+	value2 := []byte("world2")
 
-	if err := db.Put(key, value); err != nil {
+	if err := db.Put(key1, value1); err != nil {
+		t.Fatalf("Unexpected error on batch.Put: %s", err)
+	}
+	if err := db.Put(key2, value2); err != nil {
 		t.Fatalf("Unexpected error on batch.Put: %s", err)
 	}
 
@@ -985,21 +993,28 @@ func TestIteratorError(t *testing.T, db Database) {
 	}
 	defer iterator.Release()
 
+	// Call Next() and ensure that if the database is closed, the iterator
+	// can still report the current contents.
+	if !iterator.Next() {
+		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", false, true)
+	}
 	if err := db.Close(); err != nil {
 		t.Fatalf("Unexpected error on db.Close: %s", err)
 	}
 
-	if !iterator.Next() {
-		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", false, true)
+	if itKey := iterator.Key(); !bytes.Equal(itKey, key1) {
+		t.Fatalf("iterator.Key Returned: 0x%x ; Expected: 0x%x", itKey, key1)
 	}
-	if itKey := iterator.Key(); !bytes.Equal(itKey, key) {
-		t.Fatalf("iterator.Key Returned: 0x%x ; Expected: 0x%x", itKey, key)
+	if itValue := iterator.Value(); !bytes.Equal(itValue, value1) {
+		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: 0x%x", itValue, value1)
 	}
-	if itValue := iterator.Value(); !bytes.Equal(itValue, value) {
-		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: 0x%x", itValue, value)
+
+	// Subsequent calls to the iterator should return false and report an error
+	if iterator.Next() {
+		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", true, false)
 	}
-	if err := iterator.Error(); err != nil {
-		t.Fatalf("Expected no error on iterator.Error but got %s", err)
+	if err := iterator.Error(); err != ErrClosed {
+		t.Fatalf("iterator.Error Returned: %v ; Expected: %v", err, ErrClosed)
 	}
 }
 
@@ -1124,20 +1139,16 @@ func TestClear(t *testing.T, db Database) {
 	err = db.Put(key3, value3)
 	assert.NoError(err)
 
+	count, err := Count(db)
+	assert.NoError(err)
+	assert.Equal(3, count)
+
 	err = Clear(db, db)
 	assert.NoError(err)
 
-	has, err := db.Has(key1)
+	count, err = Count(db)
 	assert.NoError(err)
-	assert.False(has)
-
-	has, err = db.Has(key2)
-	assert.NoError(err)
-	assert.False(has)
-
-	has, err = db.Has(key3)
-	assert.NoError(err)
-	assert.False(has)
+	assert.Equal(0, count)
 
 	err = db.Close()
 	assert.NoError(err)
@@ -1165,8 +1176,16 @@ func TestClearPrefix(t *testing.T, db Database) {
 	err = db.Put(key3, value3)
 	assert.NoError(err)
 
+	count, err := Count(db)
+	assert.NoError(err)
+	assert.Equal(3, count)
+
 	err = ClearPrefix(db, db, []byte("hello"))
 	assert.NoError(err)
+
+	count, err = Count(db)
+	assert.NoError(err)
+	assert.Equal(1, count)
 
 	has, err := db.Has(key1)
 	assert.NoError(err)
