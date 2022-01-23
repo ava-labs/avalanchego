@@ -131,6 +131,17 @@ func GetBool(db KeyValueReader, key []byte) (bool, error) {
 	return b[0] == 1, nil
 }
 
+func Count(db Iteratee) (int, error) {
+	iterator := db.NewIterator()
+	defer iterator.Release()
+
+	count := 0
+	for iterator.Next() {
+		count++
+	}
+	return count, iterator.Error()
+}
+
 func Size(db Iteratee) (int, error) {
 	iterator := db.NewIterator()
 	defer iterator.Release()
