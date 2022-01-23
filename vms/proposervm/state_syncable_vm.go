@@ -180,7 +180,7 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 		})
 
 		// record innerVm to proposerVM blockID mapping to be able to
-		// complete fasty-sync by requesting lastSummarBlockID.
+		// complete state-sync by requesting lastSummaryBlockID.
 		var innerID ids.ID
 		copy(innerID[:], innerKey)
 		vm.pendingSummariesBlockIDMapping[innerID] = proKey.ProBlkID
@@ -194,6 +194,10 @@ func (vm *VM) GetLastSummaryBlockID() (ids.ID, error) {
 	if !ok {
 		return ids.Empty, common.ErrStateSyncableVMNotImplemented
 	}
+	hVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
+	if !ok {
+		return ids.Empty, common.ErrStateSyncableVMNotImplemented
+	}
 
 	innerBlkID, err := ssVM.GetLastSummaryBlockID()
 	if err != nil {
@@ -203,10 +207,11 @@ func (vm *VM) GetLastSummaryBlockID() (ids.ID, error) {
 	if err != nil {
 		return ids.Empty, err
 	}
-	proBlkID, err := vm.State.GetBlockIDAtHeight(innerBlk.Height())
+
+	proBlkID, err := hVM.GetBlockIDByHeight(innerBlk.Height())
 	if err != nil {
 		// GetLastSummaryBlockID may be issued by engine itself to request
-		// LastSummaryBlockID and complete fast sync. In such case the node
+		// LastSummaryBlockID and complete state sync. In such case the node
 		// won't know yet the full block corresponding to the blockID.
 		// So search among the summaries discovered by peer validators.
 		found := false
