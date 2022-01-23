@@ -57,8 +57,9 @@ import (
 const defaultChannelSize = 1
 
 var (
-	errUnknownChainID = errors.New("unknown chain ID")
-	errUnknownVMType  = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
+	errUnknownChainID   = errors.New("unknown chain ID")
+	errUnknownVMType    = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
+	errCreatePlatformVM = errors.New("attempted to create a chain running the PlatformVM")
 
 	_ Manager = &manager{}
 )
@@ -317,6 +318,10 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	vmID, err := m.VMManager.Lookup(chainParams.VMAlias)
 	if err != nil {
 		return nil, fmt.Errorf("error while looking up VM: %w", err)
+	}
+
+	if chainParams.ID != constants.PlatformChainID && vmID == constants.PlatformVMID {
+		return nil, errCreatePlatformVM
 	}
 
 	primaryAlias, err := m.PrimaryAlias(chainParams.ID)

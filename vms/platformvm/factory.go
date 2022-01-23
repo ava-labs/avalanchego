@@ -14,11 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
-// ID of the platform VM
-var (
-	ID = ids.ID{'p', 'l', 'a', 't', 'f', 'o', 'r', 'm', 'v', 'm'}
-)
-
 // Factory can create new instances of the Platform Chain
 type Factory struct {
 	// The node's chain manager

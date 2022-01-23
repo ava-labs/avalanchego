@@ -208,6 +208,13 @@ func (db *Database) Close() error {
 	return nil
 }
 
+func (db *Database) isClosed() bool {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	return db.db == nil
+}
+
 // Return a copy of [key], prepended with this db's prefix.
 // The returned slice should be put back in the pool
 // when it's done being used.
@@ -321,13 +328,45 @@ func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
 type iterator struct {
 	database.Iterator
 	db *Database
+
+	key, val []byte
+	err      error
 }
 
-// Key calls the inner iterators Key and strips the prefix
-func (it *iterator) Key() []byte {
-	key := it.Iterator.Key()
-	if prefixLen := len(it.db.dbPrefix); len(key) >= prefixLen {
-		return key[prefixLen:]
+// Next calls the inner iterators Next() function and strips the keys prefix
+func (it *iterator) Next() bool {
+	if it.db.isClosed() {
+		it.key = nil
+		it.val = nil
+		it.err = database.ErrClosed
+		return false
 	}
-	return key
+
+	hasNext := it.Iterator.Next()
+	if hasNext {
+		key := it.Iterator.Key()
+		if prefixLen := len(it.db.dbPrefix); len(key) >= prefixLen {
+			key = key[prefixLen:]
+		}
+		it.key = key
+		it.val = it.Iterator.Value()
+	} else {
+		it.key = nil
+		it.val = nil
+	}
+
+	return hasNext
+}
+
+func (it *iterator) Key() []byte { return it.key }
+
+func (it *iterator) Value() []byte { return it.val }
+
+// Error returns [database.ErrClosed] if the underlying db was closed
+// otherwise it returns the normal iterator error.
+func (it *iterator) Error() error {
+	if it.err != nil {
+		return it.err
+	}
+	return it.Iterator.Error()
 }
