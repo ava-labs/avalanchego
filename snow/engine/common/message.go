@@ -20,7 +20,6 @@ const (
 
 	// snowman-VM related messages for state sync capable VMs
 	StateSyncLastBlockMissing
-	StateSyncDone
 )
 
 func (msg Message) String() string {
@@ -29,8 +28,6 @@ func (msg Message) String() string {
 		return "Pending Transactions"
 	case StateSyncLastBlockMissing:
 		return "State Sync Last Block Missing"
-	case StateSyncDone:
-		return "State Sync Done"
 	default:
 		return fmt.Sprintf("Unknown Message: %d", msg)
 	}
