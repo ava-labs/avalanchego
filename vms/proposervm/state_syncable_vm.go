@@ -158,7 +158,7 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 
 	// retrieve innerKey for each summary and propagate all to innerVM
 	innerSummaries := make([]common.Summary, 0, len(accepted))
-	vm.innerToProBlkID = make(map[ids.ID]ids.ID)
+	vm.pendingSummariesBlockIDMapping = make(map[ids.ID]ids.ID)
 	for _, summ := range accepted {
 		proKey := block.ProposerSummaryKey{}
 		parsedVersion, err := stateSyncCodec.Unmarshal(summ.Key, &proKey)
@@ -179,11 +179,11 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 			Content: summ.Content,
 		})
 
-		// remember the ProBlkID here so we can recall it later
-		// when the summary is accepted.
+		// record innerVm to proposerVM blockID mapping to be able to
+		// complete state-sync by requesting lastSummaryBlockID.
 		var innerID ids.ID
 		copy(innerID[:], innerKey)
-		vm.innerToProBlkID[innerID] = proKey.ProBlkID
+		vm.pendingSummariesBlockIDMapping[innerID] = proKey.ProBlkID
 	}
 
 	return ssVM.StateSync(innerSummaries)
@@ -199,13 +199,11 @@ func (vm *VM) GetLastSummaryBlockID() (ids.ID, error) {
 	if err != nil {
 		return ids.Empty, err
 	}
-
-	proBlkID, found := vm.innerToProBlkID[innerBlkID]
+	proBlkID, found := vm.pendingSummariesBlockIDMapping[innerBlkID]
 	vm.ctx.Log.Info("innerToProBlkID mapping found %v", proBlkID.String())
 	if !found {
 		return ids.Empty, errUnknownLastSummaryBlockID
 	}
-
 	return proBlkID, nil
 }
 
@@ -229,8 +227,6 @@ func (vm *VM) SetLastSummaryBlock(blkByte []byte) error {
 		return errBadLastSummaryBlock
 	}
 
-	// TODO ABENEGIA: return error if innerBlk's ID does not match lastSummaryBlockID
-	// TODO ABENEGIA: make idempotent (to cope with SetLastSummaryBlock inner success and outer failure)
 	if err := ssVM.SetLastSummaryBlock(innerBlkBytes); err != nil {
 		return err
 	}

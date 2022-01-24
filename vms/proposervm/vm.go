@@ -72,9 +72,9 @@ type VM struct {
 	// since having initialized the VM.
 	lastAcceptedTime time.Time
 
-	// state sync map to see which summary was accepted by the innerVM
-	// TODO ABENEGIA: this map should be persisted!
-	innerToProBlkID map[ids.ID]ids.ID
+	// pendingSummariesBlockIDMapping records innerVM and proposerVM blockIDs
+	// corresponding to the all summaries learned from validators.
+	pendingSummariesBlockIDMapping map[ids.ID]ids.ID
 }
 
 func New(vm block.ChainVM, activationTime time.Time, minimumPChainHeight uint64) *VM {
@@ -144,8 +144,6 @@ func (vm *VM) Initialize(
 			}()
 		}
 	}
-
-	// TODO ABENEGIA: consider repairing height index in case pro and core DBs gets disaligned
 
 	return vm.setLastAcceptedOptionTime()
 }

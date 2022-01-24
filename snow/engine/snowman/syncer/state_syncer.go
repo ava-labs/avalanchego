@@ -444,7 +444,7 @@ func (ss *stateSyncer) Notify(msg common.Message) error {
 	case common.PendingTxs:
 		ss.Ctx.Log.Warn("Message %s received in state sync. Dropped.", msg.String())
 
-	case common.StateSyncLastBlockMissing:
+	case common.StateSyncDone:
 		// retrieve the blkID to request
 		var err error
 		ss.lastSummaryBlkID, err = ss.stateSyncVM.GetLastSummaryBlockID()
@@ -453,9 +453,6 @@ func (ss *stateSyncer) Notify(msg common.Message) error {
 			return err
 		}
 		return ss.requestBlk(ss.lastSummaryBlkID)
-
-	case common.StateSyncDone:
-		return ss.onDoneStateSyncing(ss.requestID)
 
 	default:
 		ss.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
@@ -495,6 +492,10 @@ func (ss *stateSyncer) Put(validatorID ids.ShortID, requestID uint32, container 
 	if err := ss.stateSyncVM.SetLastSummaryBlock(container); err != nil {
 		ss.Ctx.Log.Warn("Could not accept last summary block, err :%v. Retrying block download.", err)
 		return ss.requestBlk(ss.lastSummaryBlkID)
+	}
+
+	if err := ss.onDoneStateSyncing(ss.requestID); err != nil {
+		ss.Ctx.Log.Warn("Could not complete state sync: %w", err)
 	}
 
 	return nil
