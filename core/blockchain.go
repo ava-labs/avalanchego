@@ -1295,3 +1295,74 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64) error 
 	}
 	return nil
 }
+
+// CleanBlockRootsAboveLastAccepted gathers the blocks that may have previously been in processing above the
+// last accepted block and wipes their block roots from disk to mark their tries as inaccessible.
+// This is used prior to pruning to ensure that all of the tries that may still be in processing are marked
+// as inaccessible and mirrors the handling of middle roots in the geth offline pruning implementation.
+// This is not strictly necessary, but maintains a soft assumption.
+func (bc *BlockChain) CleanBlockRootsAboveLastAccepted() error {
+	targetRoot := bc.LastAcceptedBlock().Root()
+
+	// Clean up any block roots above the last accepted block before we start pruning.
+	// Note: this takes the place of middleRoots in the geth implementation since we do not
+	// track processing block roots via snapshot journals in the same way.
+	processingRoots := bc.gatherBlockRootsAboveLastAccepted()
+	// If there is a block above the last accepted block with an identical state root, we
+	// explicitly remove it from the set to ensure we do not corrupt the last accepted trie.
+	delete(processingRoots, targetRoot)
+	for processingRoot := range processingRoots {
+		// Delete the processing root from disk to mark the trie as inaccessible (no need to handle this in a batch).
+		if err := bc.db.Delete(processingRoot[:]); err != nil {
+			return fmt.Errorf("failed to remove processing root (%s) preparing for offline pruning: %w", processingRoot, err)
+		}
+	}
+
+	return nil
+}
+
+// gatherBlockRootsAboveLastAccepted iterates forward from the last accepted block and returns a list of all block roots
+// for any blocks that were inserted above the last accepted block.
+// Given that we never insert a block into the chain unless all of its ancestors have been inserted, this should gather
+// all of the block roots for blocks inserted above the last accepted block that may have been in processing at some point
+// in the past and are therefore potentially still acceptable.
+// Note: there is an edge case where the node dies while the consensus engine is rejecting a branch of blocks since the
+// consensus engine will reject the lowest ancestor first. In this case, these blocks will not be considered acceptable in
+// the future.
+// Ex.
+//    A
+//  /   \
+// B     C
+// |
+// D
+// |
+// E
+// |
+// F
+//
+// The consensus engine accepts block C and proceeds to reject the other branch in order (B, D, E, F).
+// If the consensus engine dies after rejecting block D, block D will be deleted, such that the forward iteration
+// may not find any blocks at this height and will not reach the previously processing blocks E and F.
+func (bc *BlockChain) gatherBlockRootsAboveLastAccepted() map[common.Hash]struct{} {
+	blockRoots := make(map[common.Hash]struct{})
+	for height := bc.lastAccepted.NumberU64() + 1; ; height++ {
+		blockHashes := rawdb.ReadAllHashes(bc.db, height)
+		// If there are no block hashes at [height], then there should be no further acceptable blocks
+		// past this point.
+		if len(blockHashes) == 0 {
+			break
+		}
+
+		// Fetch the blocks and append their roots.
+		for _, blockHash := range blockHashes {
+			block := bc.GetBlockByHash(blockHash)
+			if block == nil {
+				continue
+			}
+
+			blockRoots[block.Root()] = struct{}{}
+		}
+	}
+
+	return blockRoots
+}
