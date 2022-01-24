@@ -35,3 +35,21 @@ The Subnet EVM is compatible with almost all Ethereum tooling, including [Remix,
 - Removed Atomic Txs and Shared Memory
 - Removed Multicoin Contract and State
 - Removed DAO Hardfork Support
+
+## Fuji Subnet Example
+TODO: all subnet-cli commands
+
+### Create Node + Sync to tip of Fuji
+
+### Add Node as Validator on Fuji
+
+### Create Subnet
+
+### Whitelist subnet + Add Binary to plugins
+
+### Add validator to subnet
+
+### Create Blockchain on Subnet
+
+-> use subnet-cli spell once you've got a node on Fuji and the rest happens for
+you
