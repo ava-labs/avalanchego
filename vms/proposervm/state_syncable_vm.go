@@ -194,32 +194,15 @@ func (vm *VM) GetLastSummaryBlockID() (ids.ID, error) {
 	if !ok {
 		return ids.Empty, common.ErrStateSyncableVMNotImplemented
 	}
-	hVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
-	if !ok {
-		return ids.Empty, common.ErrStateSyncableVMNotImplemented
-	}
 
 	innerBlkID, err := ssVM.GetLastSummaryBlockID()
 	if err != nil {
 		return ids.Empty, err
 	}
-	innerBlk, err := vm.ChainVM.GetBlock(innerBlkID)
-	if err != nil {
-		return ids.Empty, err
-	}
-
-	proBlkID, err := hVM.GetBlockIDByHeight(innerBlk.Height())
-	if err != nil {
-		// GetLastSummaryBlockID may be issued by engine itself to request
-		// LastSummaryBlockID and complete state sync. In such case the node
-		// won't know yet the full block corresponding to the blockID.
-		// So search among the summaries discovered by peer validators.
-		found := false
-		proBlkID, found = vm.pendingSummariesBlockIDMapping[innerBlkID]
-		vm.ctx.Log.Info("innerToProBlkID mapping found %v", proBlkID.String())
-		if !found {
-			return ids.Empty, errUnknownLastSummaryBlockID
-		}
+	proBlkID, found := vm.pendingSummariesBlockIDMapping[innerBlkID]
+	vm.ctx.Log.Info("innerToProBlkID mapping found %v", proBlkID.String())
+	if !found {
+		return ids.Empty, errUnknownLastSummaryBlockID
 	}
 	return proBlkID, nil
 }
