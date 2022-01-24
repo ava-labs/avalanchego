@@ -1696,11 +1696,15 @@ func (pool *TxPool) updateBaseFee() {
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 
-	_, baseFeeEstimate, err := dummy.CalcBaseFee(pool.chainconfig, pool.currentHead, uint64(time.Now().Unix()))
+	timestamp := uint64(time.Now().Unix())
+	if timestamp < pool.currentHead.Time {
+		timestamp = pool.currentHead.Time
+	}
+	_, baseFeeEstimate, err := dummy.CalcBaseFee(pool.chainconfig, pool.currentHead, timestamp)
 	if err == nil {
 		pool.priced.SetBaseFee(baseFeeEstimate)
 	} else {
-		log.Error("failed to update base fee", "currentHead", pool.currentHead.Hash(), "err", err)
+		log.Error("failed to update base fee", "currentHead", pool.currentHead.Hash(), "timestamp", timestamp, "err", err)
 	}
 }
 
