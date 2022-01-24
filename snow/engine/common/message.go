@@ -19,14 +19,14 @@ const (
 	PendingTxs Message = iota
 
 	// snowman-VM related messages for state sync capable VMs
-	StateSyncLastBlockMissing
+	StateSyncDone
 )
 
 func (msg Message) String() string {
 	switch msg {
 	case PendingTxs:
 		return "Pending Transactions"
-	case StateSyncLastBlockMissing:
+	case StateSyncDone:
 		return "State Sync Last Block Missing"
 	default:
 		return fmt.Sprintf("Unknown Message: %d", msg)

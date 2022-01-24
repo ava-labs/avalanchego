@@ -444,7 +444,7 @@ func (ss *stateSyncer) Notify(msg common.Message) error {
 	case common.PendingTxs:
 		ss.Ctx.Log.Warn("Message %s received in state sync. Dropped.", msg.String())
 
-	case common.StateSyncLastBlockMissing:
+	case common.StateSyncDone:
 		// retrieve the blkID to request
 		var err error
 		ss.lastSummaryBlkID, err = ss.stateSyncVM.GetLastSummaryBlockID()
