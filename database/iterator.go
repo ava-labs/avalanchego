@@ -19,10 +19,15 @@ package database
 type Iterator interface {
 	// Next moves the iterator to the next key/value pair. It returns whether
 	// the iterator successfully moved to a new key/value pair.
+	// The iterator may return false if the underlying database has been closed
+	// before the iteration has completed, in which case future calls to Error()
+	// must return [ErrClosed].
 	Next() bool
 
 	// Error returns any accumulated error. Exhausting all the key/value pairs
 	// is not considered to be an error.
+	// Error should be called after all key/value pairs have been exhausted ie.
+	// after Next() has returned false.
 	Error() error
 
 	// Key returns the key of the current key/value pair, or nil if done.
