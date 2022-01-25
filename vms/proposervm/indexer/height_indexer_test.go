@@ -40,29 +40,28 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 	}
 
 	var (
-		blkNumber = uint64(10)
-
-		prevInnerBlk = snowman.Block(innerGenBlk)
+		blkNumber    = uint64(10)
+		lastInnerBlk = snowman.Block(innerGenBlk)
 		lastProBlk   = snowman.Block(innerGenBlk)
-
-		innerBlks = make(map[ids.ID]snowman.Block)
-		proBlks   = make(map[ids.ID]WrappingBlock)
+		innerBlks    = make(map[ids.ID]snowman.Block)
+		proBlks      = make(map[ids.ID]WrappingBlock)
 	)
 	innerBlks[innerGenBlk.ID()] = innerGenBlk
 
 	for blkHeight := uint64(1); blkHeight <= blkNumber; blkHeight++ {
 		// build inner block
-		innerBlkID := ids.Empty.Prefix(blkHeight)
-		lastInnerBlk := &snowman.TestBlock{
+		innerBlkID = ids.Empty.Prefix(blkHeight)
+		innerBlk := &snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
 				IDV:     innerBlkID,
 				StatusV: choices.Accepted,
 			},
 			BytesV:  []byte{uint8(blkHeight)},
-			ParentV: prevInnerBlk.ID(),
+			ParentV: lastInnerBlk.ID(),
 			HeightV: blkHeight,
 		}
-		innerBlks[lastInnerBlk.ID()] = lastInnerBlk
+		innerBlks[innerBlk.ID()] = innerBlk
+		lastInnerBlk = innerBlk
 
 		// build wrapping post fork block
 		wrappingID := ids.Empty.Prefix(blkHeight + blkNumber + 1)
@@ -76,12 +75,10 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 				ParentV: lastProBlk.ID(),
 				HeightV: lastInnerBlk.Height(),
 			},
-			innerBlk: lastInnerBlk,
+			innerBlk: innerBlk,
 		}
 		proBlks[postForkBlk.ID()] = postForkBlk
-
 		lastProBlk = postForkBlk
-		prevInnerBlk = lastInnerBlk
 	}
 
 	blkSrv := &TestBlockServer{
@@ -91,7 +88,7 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 		CantGetInnerBlk:               true,
 
 		LastAcceptedWrappingBlkIDF: func() (ids.ID, error) { return lastProBlk.ID(), nil },
-		LastAcceptedInnerBlkIDF:    func() (ids.ID, error) { return prevInnerBlk.ID(), nil },
+		LastAcceptedInnerBlkIDF:    func() (ids.ID, error) { return lastInnerBlk.ID(), nil },
 		GetWrappingBlkF: func(blkID ids.ID) (WrappingBlock, error) {
 			blk, found := proBlks[blkID]
 			if !found {
@@ -154,27 +151,26 @@ func TestHeightBlockIndexPreFork(t *testing.T) {
 	}
 
 	var (
-		blkNumber = uint64(10)
-
-		prevInnerBlk = snowman.Block(innerGenBlk)
+		blkNumber    = uint64(10)
+		lastInnerBlk = snowman.Block(innerGenBlk)
 		innerBlks    = make(map[ids.ID]snowman.Block)
 	)
 	innerBlks[innerGenBlk.ID()] = innerGenBlk
 
 	for blkHeight := uint64(1); blkHeight <= blkNumber; blkHeight++ {
 		// build inner block
-		innerBlkID := ids.Empty.Prefix(blkHeight)
-		lastInnerBlk := &snowman.TestBlock{
+		innerBlkID = ids.Empty.Prefix(blkHeight)
+		innerBlk := &snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
 				IDV:     innerBlkID,
 				StatusV: choices.Accepted,
 			},
 			BytesV:  []byte{uint8(blkHeight)},
-			ParentV: prevInnerBlk.ID(),
+			ParentV: lastInnerBlk.ID(),
 			HeightV: blkHeight,
 		}
-		innerBlks[lastInnerBlk.ID()] = lastInnerBlk
-		prevInnerBlk = lastInnerBlk
+		innerBlks[innerBlk.ID()] = innerBlk
+		lastInnerBlk = innerBlk
 	}
 
 	blkSrv := &TestBlockServer{
@@ -187,7 +183,7 @@ func TestHeightBlockIndexPreFork(t *testing.T) {
 			// all blocks are pre-fork
 			return ids.Empty, database.ErrNotFound
 		},
-		LastAcceptedInnerBlkIDF: func() (ids.ID, error) { return prevInnerBlk.ID(), nil },
+		LastAcceptedInnerBlkIDF: func() (ids.ID, error) { return lastInnerBlk.ID(), nil },
 		GetWrappingBlkF: func(blkID ids.ID) (WrappingBlock, error) {
 			// all blocks are pre-fork
 			return nil, database.ErrNotFound
@@ -232,46 +228,45 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 	}
 
 	var (
-		blkNumber  = uint64(10)
-		forkHeight = blkNumber / 2
-
-		prevInnerBlk = snowman.Block(innerGenBlk)
+		blkNumber    = uint64(10)
+		forkHeight   = blkNumber / 2
+		lastInnerBlk = snowman.Block(innerGenBlk)
 		lastProBlk   = snowman.Block(innerGenBlk)
-
-		innerBlks = make(map[ids.ID]snowman.Block)
-		proBlks   = make(map[ids.ID]WrappingBlock)
+		innerBlks    = make(map[ids.ID]snowman.Block)
+		proBlks      = make(map[ids.ID]WrappingBlock)
 	)
 	innerBlks[innerGenBlk.ID()] = innerGenBlk
 
 	for blkHeight := uint64(1); blkHeight < forkHeight; blkHeight++ {
 		// build inner block
-		innerBlkID := ids.Empty.Prefix(blkHeight)
-		lastInnerBlk := &snowman.TestBlock{
+		innerBlkID = ids.Empty.Prefix(blkHeight)
+		innerBlk := &snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
 				IDV:     innerBlkID,
 				StatusV: choices.Accepted,
 			},
 			BytesV:  []byte{uint8(blkHeight)},
-			ParentV: prevInnerBlk.ID(),
+			ParentV: lastInnerBlk.ID(),
 			HeightV: blkHeight,
 		}
-		innerBlks[lastInnerBlk.ID()] = lastInnerBlk
-		prevInnerBlk = lastInnerBlk
+		innerBlks[innerBlk.ID()] = innerBlk
+		lastInnerBlk = innerBlk
 	}
 
 	for blkHeight := forkHeight; blkHeight <= blkNumber; blkHeight++ {
 		// build inner block
-		innerBlkID := ids.Empty.Prefix(blkHeight)
-		lastInnerBlk := &snowman.TestBlock{
+		innerBlkID = ids.Empty.Prefix(blkHeight)
+		innerBlk := &snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
 				IDV:     innerBlkID,
 				StatusV: choices.Accepted,
 			},
 			BytesV:  []byte{uint8(blkHeight)},
-			ParentV: prevInnerBlk.ID(),
+			ParentV: lastInnerBlk.ID(),
 			HeightV: blkHeight,
 		}
-		innerBlks[lastInnerBlk.ID()] = lastInnerBlk
+		innerBlks[innerBlk.ID()] = innerBlk
+		lastInnerBlk = innerBlk
 
 		// build wrapping post fork block
 		wrappingID := ids.Empty.Prefix(blkHeight + blkNumber + 1)
@@ -285,12 +280,10 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 				ParentV: lastProBlk.ID(),
 				HeightV: lastInnerBlk.Height(),
 			},
-			innerBlk: lastInnerBlk,
+			innerBlk: innerBlk,
 		}
 		proBlks[postForkBlk.ID()] = postForkBlk
-
 		lastProBlk = postForkBlk
-		prevInnerBlk = lastInnerBlk
 	}
 
 	blkSrv := &TestBlockServer{
@@ -300,7 +293,7 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 		CantGetInnerBlk:               true,
 
 		LastAcceptedWrappingBlkIDF: func() (ids.ID, error) { return lastProBlk.ID(), nil },
-		LastAcceptedInnerBlkIDF:    func() (ids.ID, error) { return prevInnerBlk.ID(), nil },
+		LastAcceptedInnerBlkIDF:    func() (ids.ID, error) { return lastInnerBlk.ID(), nil },
 		GetWrappingBlkF: func(blkID ids.ID) (WrappingBlock, error) {
 			blk, found := proBlks[blkID]
 			if !found {
@@ -371,7 +364,7 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 		blkNumber  = uint64(10)
 		forkHeight = blkNumber / 2
 
-		prevInnerBlk = snowman.Block(innerGenBlk)
+		lastInnerBlk = snowman.Block(innerGenBlk)
 		lastProBlk   = snowman.Block(innerGenBlk)
 
 		innerBlks = make(map[ids.ID]snowman.Block)
@@ -381,33 +374,34 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 
 	for blkHeight := uint64(1); blkHeight < forkHeight; blkHeight++ {
 		// build inner block
-		innerBlkID := ids.Empty.Prefix(blkHeight)
-		lastInnerBlk := &snowman.TestBlock{
+		innerBlkID = ids.Empty.Prefix(blkHeight)
+		innerBlk := &snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
 				IDV:     innerBlkID,
 				StatusV: choices.Accepted,
 			},
 			BytesV:  []byte{uint8(blkHeight)},
-			ParentV: prevInnerBlk.ID(),
+			ParentV: lastInnerBlk.ID(),
 			HeightV: blkHeight,
 		}
-		innerBlks[lastInnerBlk.ID()] = lastInnerBlk
-		prevInnerBlk = lastInnerBlk
+		innerBlks[innerBlk.ID()] = innerBlk
+		lastInnerBlk = innerBlk
 	}
 
 	for blkHeight := forkHeight; blkHeight <= blkNumber; blkHeight++ {
 		// build inner block
-		innerBlkID := ids.Empty.Prefix(blkHeight)
-		lastInnerBlk := &snowman.TestBlock{
+		innerBlkID = ids.Empty.Prefix(blkHeight)
+		innerBlk := &snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
 				IDV:     innerBlkID,
 				StatusV: choices.Accepted,
 			},
 			BytesV:  []byte{uint8(blkHeight)},
-			ParentV: prevInnerBlk.ID(),
+			ParentV: lastInnerBlk.ID(),
 			HeightV: blkHeight,
 		}
-		innerBlks[lastInnerBlk.ID()] = lastInnerBlk
+		innerBlks[innerBlk.ID()] = innerBlk
+		lastInnerBlk = innerBlk
 
 		// build wrapping post fork block
 		wrappingID := ids.Empty.Prefix(blkHeight + blkNumber + 1)
@@ -421,12 +415,10 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 				ParentV: lastProBlk.ID(),
 				HeightV: lastInnerBlk.Height(),
 			},
-			innerBlk: lastInnerBlk,
+			innerBlk: innerBlk,
 		}
 		proBlks[postForkBlk.ID()] = postForkBlk
-
 		lastProBlk = postForkBlk
-		prevInnerBlk = lastInnerBlk
 	}
 
 	blkSrv := &TestBlockServer{
@@ -436,7 +428,7 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 		CantGetInnerBlk:               true,
 
 		LastAcceptedWrappingBlkIDF: func() (ids.ID, error) { return lastProBlk.ID(), nil },
-		LastAcceptedInnerBlkIDF:    func() (ids.ID, error) { return prevInnerBlk.ID(), nil },
+		LastAcceptedInnerBlkIDF:    func() (ids.ID, error) { return lastInnerBlk.ID(), nil },
 		GetWrappingBlkF: func(blkID ids.ID) (WrappingBlock, error) {
 			blk, found := proBlks[blkID]
 			if !found {
