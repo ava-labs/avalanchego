@@ -46,7 +46,7 @@ func (m *metrics) RegisterChain(ctx *snow.ConsensusContext) error {
 }
 
 // Record that a response of type [op] took [latency]
-func (m *metrics) Observe(chainID ids.ID, op message.Op, latency time.Duration) {
+func (m *metrics) Observe(validatorID ids.ShortID, chainID ids.ID, op message.Op, latency time.Duration) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -55,7 +55,7 @@ func (m *metrics) Observe(chainID ids.ID, op message.Op, latency time.Duration) 
 		// TODO should this log an error?
 		return
 	}
-	cm.observe(ids.ShortEmpty, op, latency)
+	cm.observe(validatorID, op, latency)
 }
 
 // chainMetrics contains message response time metrics for a chain
