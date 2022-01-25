@@ -218,6 +218,7 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 			if err := hi.batch.Delete(state.GetCheckpointKey()); err != nil {
 				return err
 			}
+			hi.jobDone.SetValue(true)
 
 			// it will commit on exit
 			hi.log.Info("Block indexing by height: completed. Indexed %d blocks, duration %v, fork height %d",
