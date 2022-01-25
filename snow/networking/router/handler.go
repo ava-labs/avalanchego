@@ -134,12 +134,6 @@ func (h *Handler) SetEngine(engine common.Engine) { h.engine = engine }
 
 // Push the message onto the handler's queue
 func (h *Handler) Push(msg message.InboundMessage) {
-	nodeID := msg.NodeID()
-	if nodeID == ids.ShortEmpty {
-		// This should never happen
-		h.ctx.Log.Warn("message does not have node ID of sender. Message: %s", msg)
-	}
-
 	h.unprocessedMsgsCond.L.Lock()
 	defer h.unprocessedMsgsCond.L.Unlock()
 

@@ -85,7 +85,7 @@ func (m *Manager) RegisterResponse(
 	op message.Op,
 	latency time.Duration,
 ) {
-	m.metrics.Observe(chainID, op, latency)
+	m.metrics.Observe(validatorID, chainID, op, latency)
 	m.benchlistMgr.RegisterResponse(chainID, validatorID)
 	m.tm.Remove(uniqueRequestID)
 }
