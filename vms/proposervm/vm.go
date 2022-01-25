@@ -35,9 +35,9 @@ const (
 )
 
 var (
-	_ block.ChainVM         = &VM{}
-	_ block.BatchedChainVM  = &VM{}
-	_ indexer.HeightIndexer = &VM{}
+	_ block.ChainVM              = &VM{}
+	_ block.BatchedChainVM       = &VM{}
+	_ block.HeightIndexedChainVM = &VM{}
 
 	dbPrefix = []byte("proposervm")
 )
@@ -48,7 +48,7 @@ type VM struct {
 	minimumPChainHeight uint64
 
 	state.State
-	indexer.HeightIndexer
+	hIndexer indexer.HeightIndexer
 
 	proposer.Windower
 	tree.Tree
@@ -97,7 +97,7 @@ func (vm *VM) Initialize(
 	vm.State = state.New(vm.db)
 	vm.Windower = proposer.New(ctx.ValidatorState, ctx.SubnetID, ctx.ChainID)
 	vm.Tree = tree.New()
-	vm.HeightIndexer = indexer.NewHeightIndexer(vm, vm.ctx.Log, vm.State)
+	vm.hIndexer = indexer.NewHeightIndexer(vm, vm.ctx.Log, vm.State)
 
 	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine)
 	vm.Scheduler = scheduler
@@ -132,7 +132,7 @@ func (vm *VM) Initialize(
 			vm.ctx.Log.Info("Block indexing by height: repairing height index not started since innerVM index is incomplete.")
 		} else {
 			go func() {
-				if err := vm.HeightIndexer.RepairHeightIndex(); err != nil {
+				if err := vm.hIndexer.RepairHeightIndex(); err != nil {
 					vm.ctx.Log.Error("Block indexing by height: failed with error %s", err)
 					return
 				}

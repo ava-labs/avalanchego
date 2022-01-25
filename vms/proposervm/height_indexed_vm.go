@@ -20,7 +20,7 @@ func (vm *VM) IsHeightIndexComplete() bool {
 		return false
 	}
 
-	return vm.HeightIndexer.IsRepaired()
+	return vm.hIndexer.IsRepaired()
 }
 
 // GetBlockIDByHeight implements HeightIndexedChainVM interface
