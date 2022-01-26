@@ -10,8 +10,7 @@ type State uint8
 var ErrUnknownState = errors.New("unknown node state")
 
 const (
-	Undefined State = iota
-	Bootstrapping
+	Bootstrapping = iota + 1
 	NormalOp
 )
 

@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package router
+package handler
 
 import (
 	"errors"
@@ -32,13 +32,16 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	err = vdrs.AddWeight(vdr0, 1)
 	assert.NoError(t, err)
 
-	handler, err := NewHandler(
+	handlerIntf, err := New(
 		mc,
 		ctx,
 		vdrs,
 		nil,
+		nil,
+		time.Second,
 	)
 	assert.NoError(t, err)
+	handler := handlerIntf.(*handler)
 
 	bootstrapper := &common.BootstrapperTest{
 		BootstrapableTest: common.BootstrapableTest{
@@ -58,7 +61,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		called <- struct{}{}
 		return nil
 	}
-	handler.RegisterBootstrap(bootstrapper)
+	handler.SetBootstrapper(bootstrapper)
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
 	pastTime := time.Now()
@@ -80,7 +83,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	msg = mc.InboundGetAccepted(chainID, reqID, deadline, nil, nodeID)
 	handler.Push(msg)
 
-	go handler.Dispatch()
+	handler.StartDispatching(false)
 
 	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
@@ -102,18 +105,21 @@ func TestHandlerClosesOnError(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
 	assert.NoError(t, err)
 
-	handler, err := NewHandler(
+	handlerIntf, err := New(
 		mc,
 		ctx,
 		vdrs,
 		nil,
+		nil,
+		time.Second,
 	)
 	assert.NoError(t, err)
+	handler := handlerIntf.(*handler)
 
 	handler.clock.Set(time.Now())
-	handler.onCloseF = func() {
+	handler.SetOnStopped(func() {
 		closed <- struct{}{}
-	}
+	})
 
 	bootstrapper := &common.BootstrapperTest{
 		BootstrapableTest: common.BootstrapableTest{
@@ -128,18 +134,18 @@ func TestHandlerClosesOnError(t *testing.T) {
 	bootstrapper.GetAcceptedFrontierF = func(nodeID ids.ShortID, requestID uint32) error {
 		return errors.New("Engine error should cause handler to close")
 	}
-	handler.RegisterBootstrap(bootstrapper)
+	handler.SetBootstrapper(bootstrapper)
 
 	engine := &common.EngineTest{T: t}
 	engine.Default(false)
 	engine.ContextF = func() *snow.ConsensusContext { return ctx }
-	handler.RegisterEngine(engine)
+	handler.SetConsensus(engine)
 
 	// assume bootstrapping is ongoing so that InboundGetAcceptedFrontier
 	// should normally be handled
 	ctx.SetState(snow.Bootstrapping)
 
-	go handler.Dispatch()
+	handler.StartDispatching(false)
 
 	nodeID := ids.ShortEmpty
 	reqID := uint32(1)
@@ -165,13 +171,16 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
 	assert.NoError(t, err)
 
-	handler, err := NewHandler(
+	handlerIntf, err := New(
 		mc,
 		ctx,
 		vdrs,
 		nil,
+		nil,
+		1,
 	)
 	assert.NoError(t, err)
+	handler := handlerIntf.(*handler)
 
 	handler.clock.Set(time.Now())
 
@@ -189,12 +198,10 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		closed <- struct{}{}
 		return nil
 	}
-	handler.RegisterBootstrap(bootstrapper)
+	handler.SetBootstrapper(bootstrapper)
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
-	go handler.Dispatch()
-
-	handler.Gossip()
+	handler.StartDispatching(false)
 
 	nodeID := ids.ShortEmpty
 	chainID := ids.Empty
@@ -222,11 +229,13 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
 	assert.NoError(t, err)
 
-	handler, err := NewHandler(
+	handler, err := New(
 		mc,
 		ctx,
 		vdrs,
 		msgFromVMChan,
+		nil,
+		time.Second,
 	)
 	assert.NoError(t, err)
 
@@ -237,10 +246,10 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		calledNotify <- struct{}{}
 		return nil
 	}
-	handler.RegisterEngine(engine)
+	handler.SetConsensus(engine)
 	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
 
-	go handler.Dispatch()
+	handler.StartDispatching(false)
 	msgFromVMChan <- 0
 
 	select {

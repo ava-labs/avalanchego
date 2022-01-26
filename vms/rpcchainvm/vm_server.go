@@ -273,19 +273,17 @@ func (vm *VMServer) GetBlockIDByHeight(ctx context.Context, req *vmproto.GetBloc
 	return &vmproto.GetBlockIDByHeightResponse{BlkID: blkID[:]}, nil
 }
 
-func (vm *VMServer) OnStart(_ context.Context, stateReq *vmproto.StateRequest) (*emptypb.Empty, error) {
+func (vm *VMServer) SetState(_ context.Context, stateReq *vmproto.StateRequest) (*emptypb.Empty, error) {
 	var state snow.State
-	switch stateReq.State {
-	case vmproto.StateRequest_Undefined:
-		state = snow.Undefined
-	case vmproto.StateRequest_Bootstrapping:
+	switch uint8(stateReq.State) {
+	case snow.Bootstrapping:
 		state = snow.Bootstrapping
-	case vmproto.StateRequest_NormalOp:
+	case snow.NormalOp:
 		state = snow.NormalOp
 	default:
 		return &emptypb.Empty{}, snow.ErrUnknownState
 	}
-	return &emptypb.Empty{}, vm.vm.OnStart(state)
+	return &emptypb.Empty{}, vm.vm.SetState(state)
 }
 
 func (vm *VMServer) Shutdown(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {

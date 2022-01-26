@@ -61,11 +61,14 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	}
 	msgBytes, err := message.Build(&msg)
 	assert.NoError(err)
-
+	// Free lock because [AppGossip] waits for the context lock
+	vm.ctx.Lock.Unlock()
 	// show that unknown tx is added to mempool
 	err = vm.AppGossip(nodeID, msgBytes)
 	assert.NoError(err, "error in reception of gossiped tx")
 	assert.True(vm.mempool.Has(txID))
+	// Grab lock back
+	vm.ctx.Lock.Lock()
 
 	// and gossiped if it has just been discovered
 	assert.True(gossipedBytes != nil)
@@ -114,8 +117,9 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 	}
 	msgBytes, err := message.Build(&msg)
 	assert.NoError(err)
-
+	vm.ctx.Lock.Unlock()
 	err = vm.AppGossip(nodeID, msgBytes)
+	vm.ctx.Lock.Lock()
 	assert.NoError(err, "error in reception of gossiped tx")
 	assert.False(vm.mempool.Has(txID))
 }

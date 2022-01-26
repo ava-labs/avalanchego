@@ -102,6 +102,12 @@ func (n *network) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
 	tx.Initialize(unsignedBytes, msg.Tx)
 
 	txID := tx.ID()
+
+	// We need to grab the context lock here to avoid racy behavior with
+	// transaction verification + mempool modifications.
+	n.vm.ctx.Lock.Lock()
+	defer n.vm.ctx.Lock.Unlock()
+
 	if n.mempool.WasDropped(txID) {
 		// If the tx is being dropped - just ignore it
 		return nil

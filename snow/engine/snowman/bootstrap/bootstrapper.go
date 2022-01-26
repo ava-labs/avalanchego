@@ -217,9 +217,6 @@ func (b *bootstrapper) Notify(common.Message) error { return nil }
 // Context implements the common.Engine interface.
 func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
 
-// IsBootstrapped implements the common.Engine interface.
-func (b *bootstrapper) IsBootstrapped() bool { return b.Ctx.GetState() == snow.NormalOp }
-
 // Start implements the common.Engine interface.
 func (b *bootstrapper) Start(startReqID uint32) error {
 	b.Ctx.Log.Info("Starting bootstrap...")
@@ -248,7 +245,7 @@ func (b *bootstrapper) GetVM() common.VM { return b.VM }
 
 // ForceAccepted implements common.Bootstrapable interface
 func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
-	if err := b.VM.OnStart(snow.Bootstrapping); err != nil {
+	if err := b.VM.SetState(snow.Bootstrapping); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
 			err)
 	}
@@ -475,7 +472,7 @@ func (b *bootstrapper) checkFinish() error {
 }
 
 func (b *bootstrapper) finish() error {
-	if err := b.VM.OnStart(snow.NormalOp); err != nil {
+	if err := b.VM.SetState(snow.NormalOp); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has finished: %w",
 			err)
 	}

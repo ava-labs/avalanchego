@@ -295,20 +295,9 @@ func (vm *VMClient) startAppSenderServer(opts []grpc.ServerOption) *grpc.Server 
 	return server
 }
 
-func (vm *VMClient) OnStart(state snow.State) error {
-	var stateReq vmproto.StateRequest_State
-	switch state {
-	case snow.Undefined:
-		stateReq = vmproto.StateRequest_Undefined
-	case snow.Bootstrapping:
-		stateReq = vmproto.StateRequest_Bootstrapping
-	case snow.NormalOp:
-		stateReq = vmproto.StateRequest_NormalOp
-	default:
-		return snow.ErrUnknownState
-	}
-	_, err := vm.client.OnStart(context.Background(), &vmproto.StateRequest{
-		State: stateReq,
+func (vm *VMClient) SetState(state snow.State) error {
+	_, err := vm.client.SetState(context.Background(), &vmproto.StateRequest{
+		State: uint32(state),
 	})
 
 	return err

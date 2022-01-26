@@ -156,7 +156,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	err = bs.ForceAccepted(acceptedIDs)
 	switch {
 	case err != nil: // should finish
@@ -277,7 +277,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 		*requestID = reqID
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request blk1
 		t.Fatal(err)
 	}
@@ -445,7 +445,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		requested = vtxID
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request blk2
 		t.Fatal(err)
 	}
@@ -524,7 +524,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 		BytesV:  blkBytes3,
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	vm.CantLastAccepted = false
 	vm.LastAcceptedF = func() (ids.ID, error) { return blk0.ID(), nil }
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
@@ -729,7 +729,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		requestIDs[vtxID] = reqID
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	if err := bs.ForceAccepted([]ids.ID{blkID1, blkID2}); err != nil { // should request blk2 and blk1
 		t.Fatal(err)
 	}
@@ -900,7 +900,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		requestIDs[vtxID] = reqID
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 
 	// Force Accept blk3
 	if err := bs.ForceAccepted([]ids.ID{blkID3}); err != nil { // should request blk3

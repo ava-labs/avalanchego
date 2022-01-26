@@ -313,11 +313,8 @@ func (vm *VM) onNormalOperationsStarted() error {
 	return vm.internalState.Commit()
 }
 
-func (vm *VM) OnStart(state snow.State) error {
+func (vm *VM) SetState(state snow.State) error {
 	switch state {
-	case snow.Undefined:
-		// nothing to do here
-		return nil
 	case snow.Bootstrapping:
 		return vm.onBootstrapStarted()
 	case snow.NormalOp:
