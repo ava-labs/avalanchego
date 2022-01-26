@@ -692,11 +692,8 @@ func (vm *VM) pruneChain() error {
 	return vm.db.Commit()
 }
 
-func (vm *VM) OnStart(state snow.State) error {
+func (vm *VM) SetState(state snow.State) error {
 	switch state {
-	case snow.Undefined:
-		// nothing to do here
-		return nil
 	case snow.Bootstrapping:
 		vm.bootstrapped = false
 		return vm.fx.Bootstrapping()
