@@ -50,8 +50,8 @@ type VM interface {
 		appSender AppSender,
 	) error
 
-	// OnStart communicates node state as it starts
-	OnStart(state snow.State) error
+	// SetState communicates to VM its next state it starts
+	SetState(state snow.State) error
 
 	// Shutdown is called when the node is shutting down.
 	Shutdown() error

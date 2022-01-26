@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package router
+package handler
 
 import (
 	"fmt"
@@ -13,29 +13,27 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-type handlerMetrics struct {
+type metrics struct {
 	expired  prometheus.Counter
 	messages map[message.Op]metric.Averager
-	shutdown metric.Averager
 }
 
-// Initialize implements the Engine interface
-func (m *handlerMetrics) Initialize(namespace string, reg prometheus.Registerer) error {
-	m.expired = prometheus.NewCounter(prometheus.CounterOpts{
+func newMetrics(namespace string, reg prometheus.Registerer) (*metrics, error) {
+	errs := wrappers.Errs{}
+
+	expired := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      "expired",
 		Help:      "Incoming messages dropped because the message deadline expired",
 	})
-
-	errs := wrappers.Errs{}
-	errs.Add(reg.Register(m.expired))
+	errs.Add(reg.Register(expired))
 
 	meteredOps := message.ConsensusOps
 	meteredOps = append(meteredOps, message.StateSyncOps...)
-	m.messages = make(map[message.Op]metric.Averager, len(meteredOps))
+	messages := make(map[message.Op]metric.Averager, len(meteredOps))
 	for _, op := range meteredOps {
 		opStr := op.String()
-		m.messages[op] = metric.NewAveragerWithErrs(
+		messages[op] = metric.NewAveragerWithErrs(
 			namespace,
 			opStr,
 			fmt.Sprintf("time (in ns) of processing a %s", opStr),
@@ -44,12 +42,8 @@ func (m *handlerMetrics) Initialize(namespace string, reg prometheus.Registerer)
 		)
 	}
 
-	m.shutdown = metric.NewAveragerWithErrs(
-		namespace,
-		"shutdown",
-		"time (in ns) spent in the process of shutting down",
-		reg,
-		&errs,
-	)
-	return errs.Err
+	return &metrics{
+		expired:  expired,
+		messages: messages,
+	}, errs.Err
 }

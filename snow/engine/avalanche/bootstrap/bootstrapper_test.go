@@ -175,7 +175,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		return nil, errParsedUnknownVertex
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil {
 		t.Fatal(err)
 	}
@@ -290,7 +290,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		return nil, errParsedUnknownVertex
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx0
 		t.Fatal(err)
 	} else if reqVtxID != vtxID0 {
@@ -459,7 +459,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		*reqIDPtr = reqID
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx0
 		t.Fatal(err)
 	}
@@ -601,7 +601,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 		*reqIDPtr = reqID
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx1
 		t.Fatal(err)
 	}
@@ -725,7 +725,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 		requested = vtxID
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx1
 		t.Fatal(err)
 	} else if requested != vtxID1 {
@@ -736,7 +736,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	switch {
 	case err != nil: // Provide vtx1; should request vtx0
 		t.Fatal(err)
-	case bs.IsBootstrapped():
+	case bs.Context().GetState() == snow.NormalOp:
 		t.Fatalf("should not have finished")
 	case requested != vtxID0:
 		t.Fatal("should hae requested vtx0")
@@ -746,7 +746,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	switch {
 	case err != nil: // Provide vtx0; can finish now
 		t.Fatal(err)
-	case !bs.IsBootstrapped():
+	case bs.Context().GetState() != snow.NormalOp:
 		t.Fatal("should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatal("should be accepted")
@@ -841,7 +841,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		requestIDs[vtxID] = reqID
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx0 and vtx1
 		t.Fatal(err)
 	}
@@ -979,7 +979,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 		requestIDs[vtxID] = reqID
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx2
 		t.Fatal(err)
 	}
@@ -1172,7 +1172,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		requestIDs[vtxID] = reqID
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	if err := bs.ForceAccepted([]ids.ID{vtxID3, vtxID4}); err != nil { // should request vtx3 and vtx4
 		t.Fatal(err)
 	}

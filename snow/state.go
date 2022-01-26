@@ -10,8 +10,7 @@ type State uint8
 var ErrUnknownState = errors.New("unknown node state")
 
 const (
-	Undefined State = iota
-	StateSyncing
+	StateSyncing = iota + 1
 	Bootstrapping
 	NormalOp
 )
@@ -25,7 +24,6 @@ func (st State) String() string {
 	case NormalOp:
 		return "Normal operations state"
 	default:
-		// State.Unknown treated as default
 		return "Unknown state"
 	}
 }

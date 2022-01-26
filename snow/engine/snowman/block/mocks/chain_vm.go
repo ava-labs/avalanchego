@@ -260,20 +260,6 @@ func (_m *ChainVM) LastAccepted() (ids.ID, error) {
 	return r0, r1
 }
 
-// OnStart provides a mock function with given fields: state
-func (_m *ChainVM) OnStart(state snow.State) error {
-	ret := _m.Called(state)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(snow.State) error); ok {
-		r0 = rf(state)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // ParseBlock provides a mock function with given fields: _a0
 func (_m *ChainVM) ParseBlock(_a0 []byte) (snowman.Block, error) {
 	ret := _m.Called(_a0)
@@ -304,6 +290,20 @@ func (_m *ChainVM) SetPreference(_a0 ids.ID) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(ids.ID) error); ok {
 		r0 = rf(_a0)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetState provides a mock function with given fields: state
+func (_m *ChainVM) SetState(state snow.State) error {
+	ret := _m.Called(state)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(snow.State) error); ok {
+		r0 = rf(state)
 	} else {
 		r0 = ret.Error(0)
 	}

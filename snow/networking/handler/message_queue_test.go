@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package router
+package handler
 
 import (
 	"testing"
@@ -17,16 +17,16 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestUnprocessedMsgs(t *testing.T) {
+func TestQueue(t *testing.T) {
 	assert := assert.New(t)
 	cpuTracker := &tracker.MockTimeTracker{}
 	vdrs := validators.NewSet()
 	vdr1ID, vdr2ID := ids.GenerateTestShortID(), ids.GenerateTestShortID()
 	assert.NoError(vdrs.AddWeight(vdr1ID, 1))
 	assert.NoError(vdrs.AddWeight(vdr2ID, 1))
-	uIntf, err := newUnprocessedMsgs(logging.NoLog{}, vdrs, cpuTracker, "", prometheus.NewRegistry())
+	mIntf, err := NewMessageQueue(logging.NoLog{}, vdrs, cpuTracker, "", prometheus.NewRegistry())
 	assert.NoError(err)
-	u := uIntf.(*unprocessedMsgsImpl)
+	u := mIntf.(*messageQueue)
 	currentTime := time.Now()
 	u.clock.Set(currentTime)
 
@@ -46,7 +46,8 @@ func TestUnprocessedMsgs(t *testing.T) {
 	u.Push(msg1)
 	assert.EqualValues(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	assert.EqualValues(1, u.Len())
-	gotMsg1 := u.Pop()
+	gotMsg1, ok := u.Pop()
+	assert.True(ok)
 	assert.Len(u.nodeToUnprocessedMsgs, 0)
 	assert.EqualValues(0, u.Len())
 	assert.EqualValues(msg1, gotMsg1)
@@ -55,7 +56,8 @@ func TestUnprocessedMsgs(t *testing.T) {
 	u.Push(msg1)
 	assert.EqualValues(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	assert.EqualValues(1, u.Len())
-	gotMsg1 = u.Pop()
+	gotMsg1, ok = u.Pop()
+	assert.True(ok)
 	assert.Len(u.nodeToUnprocessedMsgs, 0)
 	assert.EqualValues(0, u.Len())
 	assert.EqualValues(msg1, gotMsg1)
@@ -64,7 +66,8 @@ func TestUnprocessedMsgs(t *testing.T) {
 	u.Push(msg1)
 	assert.EqualValues(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	assert.EqualValues(1, u.Len())
-	gotMsg1 = u.Pop()
+	gotMsg1, ok = u.Pop()
+	assert.True(ok)
 	assert.Len(u.nodeToUnprocessedMsgs, 0)
 	assert.EqualValues(0, u.Len())
 	assert.EqualValues(msg1, gotMsg1)
@@ -73,7 +76,8 @@ func TestUnprocessedMsgs(t *testing.T) {
 	u.Push(msg1)
 	assert.EqualValues(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	assert.EqualValues(1, u.Len())
-	gotMsg1 = u.Pop()
+	gotMsg1, ok = u.Pop()
+	assert.True(ok)
 	assert.Len(u.nodeToUnprocessedMsgs, 0)
 	assert.EqualValues(0, u.Len())
 	assert.EqualValues(msg1, gotMsg1)
@@ -93,10 +97,12 @@ func TestUnprocessedMsgs(t *testing.T) {
 	cpuTracker.On("Utilization", vdr1ID, mock.Anything).Return(.99).Twice()
 	cpuTracker.On("Utilization", vdr2ID, mock.Anything).Return(.01).Once()
 	// Pop should return msg2 first because vdr1 has exceeded it's portion of CPU time
-	gotMsg2 := u.Pop()
+	gotMsg2, ok := u.Pop()
+	assert.True(ok)
 	assert.EqualValues(1, u.Len())
 	assert.EqualValues(msg2, gotMsg2)
-	gotMsg1 = u.Pop()
+	gotMsg1, ok = u.Pop()
+	assert.True(ok)
 	assert.EqualValues(msg1, gotMsg1)
 	assert.Len(u.nodeToUnprocessedMsgs, 0)
 	assert.EqualValues(0, u.Len())
@@ -118,14 +124,17 @@ func TestUnprocessedMsgs(t *testing.T) {
 	cpuTracker.On("Utilization", vdr1ID, mock.Anything).Return(0.0).Once()
 
 	// u.msgs is [msg3, msg4, msg1]
-	gotMsg1 = u.Pop()
+	gotMsg1, ok = u.Pop()
+	assert.True(ok)
 	assert.EqualValues(msg1, gotMsg1)
 	// u.msgs is [msg3, msg4]
 	cpuTracker.On("Utilization", nonVdrNodeID1, mock.Anything).Return(.51).Twice()
-	gotMsg4 := u.Pop()
+	gotMsg4, ok := u.Pop()
+	assert.True(ok)
 	assert.EqualValues(msg4, gotMsg4)
 	// u.msgs is [msg3]
-	gotMsg3 := u.Pop()
+	gotMsg3, ok := u.Pop()
+	assert.True(ok)
 	assert.EqualValues(msg3, gotMsg3)
 	assert.EqualValues(0, u.Len())
 }

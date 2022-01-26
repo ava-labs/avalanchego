@@ -19,9 +19,6 @@ type Engine interface {
 	// Return the context of the chain this engine is working on
 	Context() *snow.ConsensusContext
 
-	// Returns true iff the chain is done bootstrapping
-	IsBootstrapped() bool
-
 	// Start engine operations from given request ID
 	Start(startReqID uint32) error
 

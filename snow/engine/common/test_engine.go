@@ -534,16 +534,6 @@ func (e *EngineTest) Disconnected(nodeID ids.ShortID) error {
 	return errDisconnected
 }
 
-func (e *EngineTest) IsBootstrapped() bool {
-	if e.IsBootstrappedF != nil {
-		return e.IsBootstrappedF()
-	}
-	if e.CantIsBootstrapped && e.T != nil {
-		e.T.Fatalf("Unexpectedly called IsBootstrapped")
-	}
-	return false
-}
-
 func (e *EngineTest) HealthCheck() (interface{}, error) {
 	if e.HealthF != nil {
 		return e.HealthF()

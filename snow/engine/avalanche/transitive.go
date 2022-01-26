@@ -275,7 +275,7 @@ func (t *Transitive) Shutdown() error {
 
 // Notify implements the InternalHandler interface
 func (t *Transitive) Notify(msg common.Message) error {
-	if !t.IsBootstrapped() {
+	if t.Ctx.GetState() != snow.NormalOp {
 		t.Ctx.Log.Debug("dropping Notify due to bootstrapping")
 		return nil
 	}
@@ -297,9 +297,6 @@ func (t *Transitive) Notify(msg common.Message) error {
 func (t *Transitive) Context() *snow.ConsensusContext {
 	return t.Ctx
 }
-
-// IsBootstrapped implements the common.Engine interface.
-func (t *Transitive) IsBootstrapped() bool { return t.Ctx.GetState() == snow.NormalOp }
 
 // Start implements the common.Engine interface.
 func (t *Transitive) Start(startReqID uint32) error {

@@ -81,7 +81,7 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 	sender.CantSendGetAcceptedFrontier = false
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
@@ -111,7 +111,7 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 		t.Fatal(err)
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
 	sender.CantSendGetAcceptedFrontier = true
@@ -471,7 +471,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 	sender.CantSendGetAcceptedFrontier = false
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		if blkID != gBlk.ID() {
 			t.Fatalf("Wrong block requested")
@@ -499,7 +499,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
 	sender.CantSendGetAcceptedFrontier = true
@@ -984,7 +984,7 @@ func TestVoteCanceling(t *testing.T) {
 	}
 	sender.CantSendGetAcceptedFrontier = false
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	dh := &dummyHandler{}
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
@@ -1005,7 +1005,7 @@ func TestVoteCanceling(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	vm.LastAcceptedF = nil
 	sender.CantSendGetAcceptedFrontier = true
 
@@ -1857,7 +1857,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 	sender.CantSendGetAcceptedFrontier = false
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		if blkID != gBlk.ID() {
 			t.Fatalf("Wrong block requested")
@@ -1885,7 +1885,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.CantOnStart = true
+	vm.CantSetState = true
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
 	sender.CantSendGetAcceptedFrontier = true
@@ -2005,7 +2005,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	dh := &dummyHandler{}
 	bootstrapper, err := bootstrap.New(
 		bootCfg,
@@ -2026,7 +2026,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.CantOnStart = true
+	vm.CantSetState = true
 	vm.LastAcceptedF = nil
 	sender.CantSendGetAcceptedFrontier = true
 
@@ -2145,7 +2145,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 	sender.CantSendGetAcceptedFrontier = false
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		if blkID != gBlk.ID() {
 			t.Fatalf("Wrong block requested")
@@ -2173,7 +2173,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.CantOnStart = true
+	vm.CantSetState = true
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
 	sender.CantSendGetAcceptedFrontier = true

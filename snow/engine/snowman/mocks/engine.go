@@ -441,20 +441,6 @@ func (_m *Engine) HealthCheck() (interface{}, error) {
 	return r0, r1
 }
 
-// IsBootstrapped provides a mock function with given fields:
-func (_m *Engine) IsBootstrapped() bool {
-	ret := _m.Called()
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func() bool); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
-}
-
 // Notify provides a mock function with given fields: _a0
 func (_m *Engine) Notify(_a0 common.Message) error {
 	ret := _m.Called(_a0)
