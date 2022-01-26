@@ -15,12 +15,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -48,14 +48,13 @@ type ChainRouter struct {
 	log        logging.Logger
 	msgCreator message.Creator
 	lock       sync.Mutex
-	chains     map[ids.ID]*Handler
+	chains     map[ids.ID]handler.Handler
 
 	// It is only safe to call [RegisterResponse] with the router lock held. Any
 	// other calls to the timeout manager with the router lock held could cause
 	// a deadlock because the timeout manager will call Benched and Unbenched.
 	timeoutManager *timeout.Manager
 
-	gossiper     *timer.Repeater
 	closeTimeout time.Duration
 	peers        map[ids.ShortID]version.Application
 	// node ID --> chains that node is benched on
@@ -78,15 +77,11 @@ type ChainRouter struct {
 // When this router receives an incoming message, it cancels the timeout in
 // [timeouts] associated with the request that caused the incoming message, if
 // applicable.
-//
-// This router also fires a gossip event every [gossipFrequency] to the engine,
-// notifying the engine it should gossip it's accepted set.
 func (cr *ChainRouter) Initialize(
 	nodeID ids.ShortID,
 	log logging.Logger,
 	msgCreator message.Creator,
 	timeoutManager *timeout.Manager,
-	gossipFrequency time.Duration,
 	closeTimeout time.Duration,
 	criticalChains ids.Set,
 	onFatal func(exitCode int),
@@ -96,9 +91,8 @@ func (cr *ChainRouter) Initialize(
 ) error {
 	cr.log = log
 	cr.msgCreator = msgCreator
-	cr.chains = make(map[ids.ID]*Handler)
+	cr.chains = make(map[ids.ID]handler.Handler)
 	cr.timeoutManager = timeoutManager
-	cr.gossiper = timer.NewRepeater(cr.Gossip, gossipFrequency)
 	cr.closeTimeout = closeTimeout
 	cr.benched = make(map[ids.ShortID]ids.Set)
 	cr.criticalChains = criticalChains
@@ -115,8 +109,6 @@ func (cr *ChainRouter) Initialize(
 		return err
 	}
 	cr.metrics = rMetrics
-
-	go log.RecoverAndPanic(cr.gossiper.Dispatch)
 	return nil
 }
 
@@ -182,7 +174,7 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
-	if !exists || !chain.isValidator(nodeID) {
+	if !exists || !chain.IsValidator(nodeID) {
 		cr.log.Debug(
 			"Message %s from (%s. %s) dropped. Error: %s",
 			op,
@@ -195,9 +187,11 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 		return
 	}
 
+	ctx := chain.Context()
+
 	if _, notRequested := message.UnrequestedOps[op]; notRequested ||
 		(op == message.Put && requestID == constants.GossipMsgRequestID) {
-		if chain.ctx.IsExecuting() {
+		if ctx.IsExecuting() {
 			cr.log.Debug("dropping %s and skipping queue since the chain is currently executing", op)
 			cr.metrics.droppedRequests.Inc()
 
@@ -226,7 +220,7 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 		return
 	}
 
-	if chain.ctx.IsExecuting() {
+	if ctx.IsExecuting() {
 		cr.log.Debug("dropping %s and skipping queue since the chain is currently executing", op)
 		cr.metrics.droppedRequests.Inc()
 
@@ -256,39 +250,37 @@ func (cr *ChainRouter) Shutdown() {
 	cr.log.Info("shutting down chain router")
 	cr.lock.Lock()
 	prevChains := cr.chains
-	cr.chains = map[ids.ID]*Handler{}
+	cr.chains = map[ids.ID]handler.Handler{}
 	cr.lock.Unlock()
 
-	cr.gossiper.Stop()
-
 	for _, chain := range prevChains {
-		chain.StartShutdown()
+		chain.Stop()
 	}
 
 	ticker := time.NewTicker(cr.closeTimeout)
-	timedOut := false
+	defer ticker.Stop()
+
 	for _, chain := range prevChains {
 		select {
-		case <-chain.closed:
+		case <-chain.Stopped():
 		case <-ticker.C:
-			timedOut = true
+			cr.log.Warn("timed out while shutting down the chains")
+			return
 		}
 	}
-	if timedOut {
-		cr.log.Warn("timed out while shutting down the chains")
-	}
-	ticker.Stop()
 }
 
 // AddChain registers the specified chain so that incoming
 // messages can be routed to it
-func (cr *ChainRouter) AddChain(chain *Handler) {
+func (cr *ChainRouter) AddChain(chain handler.Handler) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
 	chainID := chain.Context().ChainID
 	cr.log.Debug("registering chain %s with chain router", chainID)
-	chain.onCloseF = func() { cr.removeChain(chainID) }
+	chain.SetOnStopped(func() {
+		cr.removeChain(chainID)
+	})
 	cr.chains[chainID] = chain
 
 	for validatorID, version := range cr.peers {
@@ -386,16 +378,6 @@ func (cr *ChainRouter) Unbenched(chainID ids.ID, validatorID ids.ShortID) {
 	}
 }
 
-// Gossip accepted containers
-func (cr *ChainRouter) Gossip() {
-	cr.lock.Lock()
-	defer cr.lock.Unlock()
-
-	for _, chain := range cr.chains {
-		chain.Gossip()
-	}
-}
-
 // HealthCheck returns results of router health checks. Returns:
 // 1) Information about health check results
 // 2) An error if the health check reports unhealthy
@@ -449,15 +431,15 @@ func (cr *ChainRouter) removeChain(chainID ids.ID) {
 	delete(cr.chains, chainID)
 	cr.lock.Unlock()
 
-	chain.StartShutdown()
+	chain.Stop()
 
 	ticker := time.NewTicker(cr.closeTimeout)
+	defer ticker.Stop()
 	select {
-	case <-chain.closed:
+	case <-chain.Stopped():
 	case <-ticker.C:
 		chain.Context().Log.Warn("timed out while shutting down")
 	}
-	ticker.Stop()
 
 	if cr.onFatal != nil && cr.criticalChains.Contains(chainID) {
 		go cr.onFatal(1)

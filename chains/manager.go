@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
@@ -114,7 +115,7 @@ type ChainParameters struct {
 type chain struct {
 	Name    string
 	Engine  common.Engine
-	Handler *router.Handler
+	Handler handler.Handler
 	Beacons validators.Set
 }
 
@@ -160,6 +161,8 @@ type ManagerConfig struct {
 	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
 	Metrics          metrics.MultiGatherer
 
+	ConsensusGossipFrequency time.Duration
+
 	AppGossipValidatorSize     int
 	AppGossipNonValidatorSize  int
 	GossipAcceptedFrontierSize int
@@ -196,7 +199,7 @@ type manager struct {
 	chainsLock sync.Mutex
 	// Key: Chain's ID
 	// Value: The chain
-	chains map[ids.ID]*router.Handler
+	chains map[ids.ID]handler.Handler
 
 	// snowman++ related interface to allow validators retrival
 	validatorState validators.State
@@ -208,7 +211,7 @@ func New(config *ManagerConfig) Manager {
 		Aliaser:       ids.NewAliaser(),
 		ManagerConfig: *config,
 		subnets:       make(map[ids.ID]Subnet),
-		chains:        make(map[ids.ID]*router.Handler),
+		chains:        make(map[ids.ID]handler.Handler),
 	}
 }
 
@@ -283,15 +286,8 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	m.notifyRegistrants(chain.Name, chain.Engine)
 
 	// Tell the chain to start processing messages.
-	// If the X or P Chain panics, do not attempt to recover
-	ctx := chain.Engine.Context()
-	if m.CriticalChains.Contains(chainParams.ID) {
-		go ctx.Log.RecoverAndPanic(chain.Handler.Dispatch)
-	} else {
-		go ctx.Log.RecoverAndExit(chain.Handler.Dispatch, func() {
-			ctx.Log.Error("Chain with ID: %s was shutdown due to a panic", chainParams.ID)
-		})
-	}
+	// If the X, P, or C Chain panics, do not attempt to recover
+	chain.Handler.Start(!m.CriticalChains.Contains(chainParams.ID))
 
 	// Allows messages to be routed to the new chain
 	m.ManagerConfig.Router.AddChain(chain.Handler)
@@ -568,19 +564,16 @@ func (m *manager) createAvalancheChain(
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
-	handler, err := router.NewHandler(
+	handler, err := handler.New(
 		m.MsgCreator,
 		ctx,
 		vdrs,
 		msgChan,
+		sb.afterBootstrapped(),
+		m.ConsensusGossipFrequency,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing network handler: %w", err)
-	}
-
-	timer := &router.Timer{
-		Handler: handler,
-		Preempt: sb.afterBootstrapped(),
 	}
 
 	commonCfg := common.Config{
@@ -592,7 +585,7 @@ func (m *manager) createAvalancheChain(
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		Sender:                         &sender,
 		Subnet:                         sb,
-		Timer:                          timer,
+		Timer:                          handler,
 		RetryBootstrap:                 m.RetryBootstrap,
 		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
 		MaxTimeGetAncestors:            m.BootstrapMaxTimeGetAncestors,
@@ -618,12 +611,14 @@ func (m *manager) createAvalancheChain(
 	}
 	bootstrapper, err := avbootstrap.New(
 		bootstrapperConfig,
-		handler.OnDoneBootstrapping,
+		func(lastReqID uint32) error {
+			return handler.Consensus().Start(lastReqID + 1)
+		},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing avalanche bootstrapper: %w", err)
 	}
-	handler.RegisterBootstrap(bootstrapper)
+	handler.SetBootstrapper(bootstrapper)
 
 	// create engine gear
 	engineConfig := aveng.Config{
@@ -640,7 +635,7 @@ func (m *manager) createAvalancheChain(
 	if err != nil {
 		return nil, fmt.Errorf("error initializing avalanche engine: %w", err)
 	}
-	handler.RegisterEngine(engine)
+	handler.SetConsensus(engine)
 
 	startReqID := uint32(0)
 	if err := bootstrapper.Start(startReqID); err != nil {
@@ -773,19 +768,16 @@ func (m *manager) createSnowmanChain(
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
-	handler, err := router.NewHandler(
+	handler, err := handler.New(
 		m.MsgCreator,
 		ctx,
 		vdrs,
 		msgChan,
+		sb.afterBootstrapped(),
+		m.ConsensusGossipFrequency,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)
-	}
-
-	timer := &router.Timer{
-		Handler: handler,
-		Preempt: sb.afterBootstrapped(),
 	}
 
 	commonCfg := common.Config{
@@ -797,7 +789,7 @@ func (m *manager) createSnowmanChain(
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		Sender:                         &sender,
 		Subnet:                         sb,
-		Timer:                          timer,
+		Timer:                          handler,
 		RetryBootstrap:                 m.RetryBootstrap,
 		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
 		MaxTimeGetAncestors:            m.BootstrapMaxTimeGetAncestors,
@@ -822,12 +814,14 @@ func (m *manager) createSnowmanChain(
 	}
 	bootstrapper, err := smbootstrap.New(
 		bootstrapCfg,
-		handler.OnDoneBootstrapping,
+		func(lastReqID uint32) error {
+			return handler.Consensus().Start(lastReqID + 1)
+		},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman bootstrapper: %w", err)
 	}
-	handler.RegisterBootstrap(bootstrapper)
+	handler.SetBootstrapper(bootstrapper)
 
 	// create engine gear
 	engineConfig := smeng.Config{
@@ -843,7 +837,7 @@ func (m *manager) createSnowmanChain(
 	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
-	handler.RegisterEngine(engine)
+	handler.SetConsensus(engine)
 
 	startReqID := uint32(0)
 	if err := bootstrapper.Start(startReqID); err != nil {
@@ -894,7 +888,7 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 		return false
 	}
 
-	return chain.Engine().IsBootstrapped()
+	return chain.Context().IsBootstrapped()
 }
 
 // Shutdown stops all the chains

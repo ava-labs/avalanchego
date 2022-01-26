@@ -250,9 +250,6 @@ func (b *bootstrapper) Notify(common.Message) error { return nil }
 // Context implements the common.Engine interface.
 func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
 
-// IsBootstrapped implements the common.Engine interface.
-func (b *bootstrapper) IsBootstrapped() bool { return b.Ctx.IsBootstrapped() }
-
 // Start implements the common.Engine interface.
 func (b *bootstrapper) Start(startReqID uint32) error {
 	b.Ctx.Log.Info("Starting bootstrap...")

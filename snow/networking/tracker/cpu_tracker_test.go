@@ -20,11 +20,13 @@ func TestCPUTracker(t *testing.T) {
 	startTime1 := time.Now()
 	endTime1 := startTime1.Add(halflife)
 
-	cpuTracker.UtilizeTime(vdr1, startTime1, endTime1)
+	cpuTracker.StartCPU(vdr1, startTime1)
+	cpuTracker.StopCPU(vdr1, endTime1)
 
 	startTime2 := endTime1
 	endTime2 := startTime2.Add(halflife)
-	cpuTracker.UtilizeTime(vdr2, startTime2, endTime2)
+	cpuTracker.StartCPU(vdr2, startTime2)
+	cpuTracker.StopCPU(vdr2, endTime2)
 
 	utilization1 := cpuTracker.Utilization(vdr1, endTime2)
 	utilization2 := cpuTracker.Utilization(vdr2, endTime2)

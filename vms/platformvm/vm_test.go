@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
+	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
@@ -2029,7 +2030,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
 	assert.NoError(t, err)
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &timeoutManager, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &timeoutManager, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	externalSender := &sender.ExternalSenderTest{TB: t}
@@ -2089,22 +2090,26 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
-	handler, err := router.NewHandler(
+	handler, err := handler.New(
 		mc,
 		bootstrapConfig.Ctx,
 		vdrs,
 		msgChan,
+		nil,
+		time.Hour,
 	)
 	assert.NoError(t, err)
 
 	bootstrapper, err := bootstrap.New(
 		bootstrapConfig,
-		handler.OnDoneBootstrapping,
+		func(lastReqID uint32) error {
+			return handler.Consensus().Start(lastReqID + 1)
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler.RegisterBootstrap(bootstrapper)
+	handler.SetBootstrapper(bootstrapper)
 
 	engineConfig := smeng.Config{
 		Ctx:           bootstrapConfig.Ctx,
@@ -2128,7 +2133,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler.RegisterEngine(engine)
+	handler.SetConsensus(engine)
 
 	startReqID := uint32(0)
 	if err := bootstrapper.Start(startReqID); err != nil {
@@ -2137,7 +2142,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	// Allow incoming messages to be routed to the new chain
 	chainRouter.AddChain(handler)
-	go ctx.Log.RecoverAndPanic(handler.Dispatch)
+	handler.Start(false)
 
 	if err := bootstrapper.Connected(peerID, version.CurrentApp); err != nil {
 		t.Fatal(err)

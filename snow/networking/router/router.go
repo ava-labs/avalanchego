@@ -6,14 +6,16 @@ package router
 import (
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
+	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Router routes consensus messages to the Handler of the consensus
@@ -27,7 +29,6 @@ type Router interface {
 		log logging.Logger,
 		msgCreator message.Creator,
 		timeouts *timeout.Manager,
-		gossipFrequency,
 		shutdownTimeout time.Duration,
 		criticalChains ids.Set,
 		onFatal func(exitCode int),
@@ -36,7 +37,7 @@ type Router interface {
 		metricsRegisterer prometheus.Registerer,
 	) error
 	Shutdown()
-	AddChain(chain *Handler)
+	AddChain(chain handler.Handler)
 	health.Checker
 }
 

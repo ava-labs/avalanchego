@@ -302,12 +302,6 @@ func (t *Transitive) Context() *snow.ConsensusContext {
 	return t.Ctx
 }
 
-// IsBootstrapped implements the common.Engine interface.
-func (t *Transitive) IsBootstrapped() bool {
-	// IsBootstrapped returns true iff this chain is done bootstrapping
-	return t.Ctx.IsBootstrapped()
-}
-
 // Start implements the common.Engine interface.
 func (t *Transitive) Start(startReqID uint32) error {
 	t.RequestID = startReqID
