@@ -82,6 +82,10 @@ The easiest and fastest way to get your new subnet off the ground is to use the
 [`subnet-cli`](https://github.com/ava-labs/subnet-cli). This powerful CLI can
 add validators, create subnets, and create blockchains.
 
+_The `subnet-cli` DOES NOT need to be run on the same host where you are
+running your validator. By default, it interfaces exclusively with the public
+Avalanche API Endpoints._
+
 To make it as easy as possible to get started, the `subnet-cli` also provides
 a `wizard` command that takes care of EVERYTHING for you. TL;DR, type one
 command and you'll have a subnet with a running `subnet-evm` instance 5 minutes
