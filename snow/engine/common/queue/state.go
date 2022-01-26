@@ -133,11 +133,7 @@ func (s *state) Clear() error {
 
 	// clear number of pending jobs
 	s.numJobs = 0
-	if err := database.PutUInt64(s.metadataDB, numJobsKey, s.numJobs); err != nil {
-		return err
-	}
-
-	return nil
+	return database.PutUInt64(s.metadataDB, numJobsKey, s.numJobs)
 }
 
 // AddRunnableJob adds [jobID] to the runnable queue

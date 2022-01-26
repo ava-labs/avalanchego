@@ -357,20 +357,6 @@ func (_m *Engine) HealthCheck() (interface{}, error) {
 	return r0, r1
 }
 
-// IsBootstrapped provides a mock function with given fields:
-func (_m *Engine) IsBootstrapped() bool {
-	ret := _m.Called()
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func() bool); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
-}
-
 // Ancestors provides a mock function with given fields: validatorID, requestID, containers
 func (_m *Engine) Ancestors(validatorID ids.ShortID, requestID uint32, containers [][]byte) error {
 	ret := _m.Called(validatorID, requestID, containers)
