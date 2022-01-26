@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -93,40 +94,54 @@ func getNumJobs(d database.Database, jobs database.Iteratee) (uint64, error) {
 }
 
 func (s *state) Clear() error {
+	var (
+		runJobsIter  = s.runnableJobIDs.NewIterator()
+		jobsIter     = s.jobsDB.NewIterator()
+		depsIter     = s.dependenciesDB.NewIterator()
+		missJobsIter = s.missingJobIDs.NewIterator()
+	)
+
+	defer func() error {
+		errs := wrappers.Errs{}
+		errs.Add(
+			runJobsIter.Error(),
+			jobsIter.Error(),
+			depsIter.Error(),
+			missJobsIter.Error(),
+		)
+		return errs.Err
+	}()
+
 	// clear runnableJobIDs
-	it := s.runnableJobIDs.NewIterator()
-	defer it.Release()
-	for it.Next() {
-		if err := s.runnableJobIDs.Delete(it.Key()); err != nil {
+	defer runJobsIter.Release()
+	for runJobsIter.Next() {
+		if err := s.runnableJobIDs.Delete(runJobsIter.Key()); err != nil {
 			return err
 		}
 	}
 
 	// clear jobs
 	s.jobsCache.Flush()
-	itj := s.jobsDB.NewIterator()
-	defer itj.Release()
-	for itj.Next() {
-		if err := s.jobsDB.Delete(itj.Key()); err != nil {
+	defer jobsIter.Release()
+	for jobsIter.Next() {
+		if err := s.jobsDB.Delete(jobsIter.Key()); err != nil {
 			return err
 		}
 	}
 
 	// clear dependencies
 	s.dependentsCache.Flush()
-	itd := s.dependenciesDB.NewIterator()
-	defer itd.Release()
-	for itd.Next() {
-		if err := s.dependenciesDB.Delete(itd.Key()); err != nil {
+	defer depsIter.Release()
+	for depsIter.Next() {
+		if err := s.dependenciesDB.Delete(depsIter.Key()); err != nil {
 			return err
 		}
 	}
 
 	// clear missing jobs IDs
-	itm := s.missingJobIDs.NewIterator()
-	defer itm.Release()
-	for itm.Next() {
-		if err := s.missingJobIDs.Delete(itm.Key()); err != nil {
+	defer missJobsIter.Release()
+	for missJobsIter.Next() {
+		if err := s.missingJobIDs.Delete(missJobsIter.Key()); err != nil {
 			return err
 		}
 	}
