@@ -20,7 +20,7 @@ func (vm *VM) IsHeightIndexComplete() bool {
 		return false
 	}
 
-	return vm.HeightIndexer.IsRepaired()
+	return vm.hIndexer.IsRepaired()
 }
 
 // GetBlockIDByHeight implements HeightIndexedChainVM interface
@@ -53,7 +53,8 @@ func (vm *VM) GetBlockIDByHeight(height uint64) (ids.ID, error) {
 // updateHeightIndex should not be called for preFork blocks. Moreover
 // vm.ctx.Lock should be held
 func (vm *VM) updateHeightIndex(height uint64, blkID ids.ID) error {
-	if _, ok := vm.ChainVM.(block.HeightIndexedChainVM); !ok {
+	innerHVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
+	if !ok || !innerHVM.IsHeightIndexComplete() {
 		return nil // nothing to do
 	}
 
