@@ -1002,7 +1002,7 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 		}, nil
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
@@ -1013,7 +1013,7 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.CantOnStart = true
+	vm.CantSetState = true
 	sender.CantSendPushQuery = false
 	vm.PendingTxsF = func() []snowstorm.Tx { return []snowstorm.Tx{tx0, tx1} }
 	if err := te.Notify(common.PendingTxs); err != nil {
@@ -1099,7 +1099,7 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
@@ -1110,7 +1110,7 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.CantOnStart = true
+	vm.CantSetState = true
 	manager.BuildVtxF = func(_ []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
 		return &avalanche.TestVertex{
 			TestDecidable: choices.TestDecidable{
@@ -1323,7 +1323,7 @@ func TestEngineReissue(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
@@ -1334,7 +1334,7 @@ func TestEngineReissue(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.CantOnStart = true
+	vm.CantSetState = true
 	lastVtx := new(avalanche.TestVertex)
 	manager.BuildVtxF = func(_ []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
 		lastVtx = &avalanche.TestVertex{
@@ -1481,7 +1481,7 @@ func TestEngineLargeIssue(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
@@ -1492,7 +1492,7 @@ func TestEngineLargeIssue(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.CantOnStart = true
+	vm.CantSetState = true
 	lastVtx := new(avalanche.TestVertex)
 	manager.BuildVtxF = func(_ []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
 		lastVtx = &avalanche.TestVertex{
@@ -2588,7 +2588,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	bootCfg.VM = vm
 	engCfg.VM = vm
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	vm.CantConnected = false
 
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
@@ -2864,7 +2864,7 @@ func TestEngineReBootstrapFails(t *testing.T) {
 	bootCfg.VM = vm
 	engCfg.VM = vm
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
@@ -3025,7 +3025,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 	bootCfg.VM = vm
 	engCfg.VM = vm
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	vm.CantConnected = false
 
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
@@ -3899,7 +3899,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 		BytesV:   []byte{1},
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
@@ -3910,7 +3910,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.CantOnStart = true
+	vm.CantSetState = true
 	parsed := new(bool)
 	manager.ParseVtxF = func(b []byte) (avalanche.Vertex, error) {
 		if bytes.Equal(b, vtx.Bytes()) {
@@ -4021,7 +4021,7 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
@@ -4032,7 +4032,7 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.CantOnStart = true
+	vm.CantSetState = true
 	lastVtx := new(avalanche.TestVertex)
 	manager.BuildVtxF = func(_ []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
 		lastVtx = &avalanche.TestVertex{
@@ -4438,7 +4438,7 @@ func TestEngineIssue(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	vm.CantOnStart = false
+	vm.CantSetState = false
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
@@ -4449,7 +4449,7 @@ func TestEngineIssue(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.CantOnStart = true
+	vm.CantSetState = true
 	numBuilt := 0
 	manager.BuildVtxF = func(_ []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
 		numBuilt++
@@ -4541,7 +4541,7 @@ func TestAbandonTx(t *testing.T) {
 
 	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
 	vm.Default(true)
-	vm.CantOnStart = false
+	vm.CantSetState = false
 
 	bootCfg.VM = vm
 	engCfg.VM = vm

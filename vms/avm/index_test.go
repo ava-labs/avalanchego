@@ -542,11 +542,11 @@ func setupTestVM(t *testing.T, ctx *snow.Context, baseDBManager manager.Manager,
 	}
 	vm.batchTimeout = 0
 
-	if err := vm.OnStart(snow.Bootstrapping); err != nil {
+	if err := vm.SetState(snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm.OnStart(snow.NormalOp); err != nil {
+	if err := vm.SetState(snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}
 	return vm

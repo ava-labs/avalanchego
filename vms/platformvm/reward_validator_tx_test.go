@@ -405,11 +405,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstVM.clock.Set(defaultGenesisTime)
 	firstVM.uptimeManager.(uptime.TestManager).SetTime(defaultGenesisTime)
 
-	if err := firstVM.OnStart(snow.Bootstrapping); err != nil {
+	if err := firstVM.SetState(snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := firstVM.OnStart(snow.NormalOp); err != nil {
+	if err := firstVM.SetState(snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -446,11 +446,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	secondVM.clock.Set(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 
-	if err := secondVM.OnStart(snow.Bootstrapping); err != nil {
+	if err := secondVM.SetState(snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := secondVM.OnStart(snow.NormalOp); err != nil {
+	if err := secondVM.SetState(snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -610,11 +610,11 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	vm.clock.Set(defaultGenesisTime)
 	vm.uptimeManager.(uptime.TestManager).SetTime(defaultGenesisTime)
 
-	if err := vm.OnStart(snow.Bootstrapping); err != nil {
+	if err := vm.SetState(snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm.OnStart(snow.NormalOp); err != nil {
+	if err := vm.SetState(snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}
 

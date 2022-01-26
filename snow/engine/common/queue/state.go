@@ -93,7 +93,7 @@ func getNumJobs(d database.Database, jobs database.Iteratee) (uint64, error) {
 	return numJobs, err
 }
 
-func (s *state) Clear() error {
+func (s *state) Clear() (err error) {
 	var (
 		runJobsIter  = s.runnableJobIDs.NewIterator()
 		jobsIter     = s.jobsDB.NewIterator()
@@ -101,21 +101,22 @@ func (s *state) Clear() error {
 		missJobsIter = s.missingJobIDs.NewIterator()
 	)
 
-	defer func() error {
+	defer func() {
 		errs := wrappers.Errs{}
 		errs.Add(
+			err,
 			runJobsIter.Error(),
 			jobsIter.Error(),
 			depsIter.Error(),
 			missJobsIter.Error(),
 		)
-		return errs.Err
+		err = errs.Err
 	}()
 
 	// clear runnableJobIDs
 	defer runJobsIter.Release()
 	for runJobsIter.Next() {
-		if err := s.runnableJobIDs.Delete(runJobsIter.Key()); err != nil {
+		if err = s.runnableJobIDs.Delete(runJobsIter.Key()); err != nil {
 			return err
 		}
 	}
@@ -124,7 +125,7 @@ func (s *state) Clear() error {
 	s.jobsCache.Flush()
 	defer jobsIter.Release()
 	for jobsIter.Next() {
-		if err := s.jobsDB.Delete(jobsIter.Key()); err != nil {
+		if err = s.jobsDB.Delete(jobsIter.Key()); err != nil {
 			return err
 		}
 	}
@@ -133,7 +134,7 @@ func (s *state) Clear() error {
 	s.dependentsCache.Flush()
 	defer depsIter.Release()
 	for depsIter.Next() {
-		if err := s.dependenciesDB.Delete(depsIter.Key()); err != nil {
+		if err = s.dependenciesDB.Delete(depsIter.Key()); err != nil {
 			return err
 		}
 	}
@@ -141,14 +142,15 @@ func (s *state) Clear() error {
 	// clear missing jobs IDs
 	defer missJobsIter.Release()
 	for missJobsIter.Next() {
-		if err := s.missingJobIDs.Delete(missJobsIter.Key()); err != nil {
+		if err = s.missingJobIDs.Delete(missJobsIter.Key()); err != nil {
 			return err
 		}
 	}
 
 	// clear number of pending jobs
 	s.numJobs = 0
-	return database.PutUInt64(s.metadataDB, numJobsKey, s.numJobs)
+	err = database.PutUInt64(s.metadataDB, numJobsKey, s.numJobs)
+	return err
 }
 
 // AddRunnableJob adds [jobID] to the runnable queue

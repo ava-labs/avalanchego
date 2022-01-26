@@ -362,7 +362,7 @@ func defaultVM() (*VM, database.Database, *common.SenderTest) {
 	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
 		panic(err)
 	}
-	if err := vm.OnStart(snow.NormalOp); err != nil {
+	if err := vm.SetState(snow.NormalOp); err != nil {
 		panic(err)
 	}
 
@@ -436,7 +436,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
 		t.Fatal(err)
 	}
-	if err := vm.OnStart(snow.NormalOp); err != nil {
+	if err := vm.SetState(snow.NormalOp); err != nil {
 		panic(err)
 	}
 
@@ -1680,7 +1680,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		t.Fatalf("Block should have failed verification due to missing UTXOs")
 	}
 
-	if err := vm.OnStart(snow.Bootstrapping); err != nil {
+	if err := vm.SetState(snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1692,7 +1692,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.OnStart(snow.NormalOp); err != nil {
+	if err := vm.SetState(snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}
 

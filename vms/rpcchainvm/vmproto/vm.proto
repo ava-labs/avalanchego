@@ -37,12 +37,7 @@ message InitializeRequest {
 }
 
 message StateRequest {
-    enum State {
-        Undefined = 0;
-        Bootstrapping = 1;
-        NormalOp = 2;
-    }
-    State state = 1;
+    uint32 state = 1;
 }
 
 message InitializeResponse {
@@ -202,7 +197,7 @@ message GatherResponse {
 
 service VM {
     rpc Initialize(InitializeRequest) returns (InitializeResponse);
-    rpc OnStart(StateRequest) returns (google.protobuf.Empty);   
+    rpc SetState(StateRequest) returns (google.protobuf.Empty);   
     rpc Shutdown(google.protobuf.Empty) returns (google.protobuf.Empty);
     rpc CreateHandlers(google.protobuf.Empty) returns (CreateHandlersResponse);
     rpc CreateStaticHandlers(google.protobuf.Empty) returns (CreateStaticHandlersResponse);

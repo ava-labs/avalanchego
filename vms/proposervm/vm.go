@@ -127,7 +127,7 @@ func (vm *VM) Initialize(
 
 func (vm *VM) OnStart(state snow.State) error {
 	vm.bootstrapped = (state == snow.NormalOp)
-	return vm.ChainVM.OnStart(state)
+	return vm.ChainVM.SetState(state)
 }
 
 func (vm *VM) BuildBlock() (snowman.Block, error) {

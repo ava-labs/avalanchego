@@ -1057,11 +1057,11 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	if err := vm.OnStart(snow.Bootstrapping); err != nil {
+	if err := vm.SetState(snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm.OnStart(snow.NormalOp); err != nil {
+	if err := vm.SetState(snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1218,11 +1218,11 @@ func TestIssueExportTx(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	if err := vm.OnStart(snow.Bootstrapping); err != nil {
+	if err := vm.SetState(snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm.OnStart(snow.NormalOp); err != nil {
+	if err := vm.SetState(snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1356,11 +1356,11 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	if err = vm.OnStart(snow.Bootstrapping); err != nil {
+	if err = vm.SetState(snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.OnStart(snow.NormalOp)
+	err = vm.SetState(snow.NormalOp)
 	if err != nil {
 		t.Fatal(err)
 	}

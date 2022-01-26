@@ -17,7 +17,7 @@ import (
 
 var (
 	errInitialize           = errors.New("unexpectedly called Initialize")
-	errOnStart              = errors.New("unexpectedly called OnStart")
+	errSetState             = errors.New("unexpectedly called SetState")
 	errShutdown             = errors.New("unexpectedly called Shutdown")
 	errCreateHandlers       = errors.New("unexpectedly called CreateHandlers")
 	errCreateStaticHandlers = errors.New("unexpectedly called CreateStaticHandlers")
@@ -37,13 +37,13 @@ var (
 type TestVM struct {
 	T *testing.T
 
-	CantInitialize, CantOnStart,
+	CantInitialize, CantSetState,
 	CantShutdown, CantCreateHandlers, CantCreateStaticHandlers,
 	CantHealthCheck, CantConnected, CantDisconnected, CantVersion,
 	CantAppRequest, CantAppResponse, CantAppGossip, CantAppRequestFailed bool
 
 	InitializeF           func(*snow.Context, manager.Manager, []byte, []byte, []byte, chan<- Message, []*Fx, AppSender) error
-	OnStartF              func(snow.State) error
+	SetStateF             func(snow.State) error
 	ShutdownF             func() error
 	CreateHandlersF       func() (map[string]*HTTPHandler, error)
 	CreateStaticHandlersF func() (map[string]*HTTPHandler, error)
@@ -59,6 +59,7 @@ type TestVM struct {
 
 func (vm *TestVM) Default(cant bool) {
 	vm.CantInitialize = cant
+	vm.CantSetState = cant
 	vm.CantShutdown = cant
 	vm.CantCreateHandlers = cant
 	vm.CantCreateStaticHandlers = cant
@@ -82,15 +83,15 @@ func (vm *TestVM) Initialize(ctx *snow.Context, db manager.Manager, genesisBytes
 	return errInitialize
 }
 
-func (vm *TestVM) OnStart(state snow.State) error {
-	if vm.OnStartF != nil {
-		return vm.OnStartF(state)
+func (vm *TestVM) SetState(state snow.State) error {
+	if vm.SetStateF != nil {
+		return vm.SetStateF(state)
 	}
-	if vm.CantOnStart {
+	if vm.CantSetState {
 		if vm.T != nil {
-			vm.T.Fatal(errOnStart)
+			vm.T.Fatal(errSetState)
 		}
-		return errOnStart
+		return errSetState
 	}
 	return nil
 }
