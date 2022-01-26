@@ -40,8 +40,8 @@ type Handler interface {
 	Context() *snow.ConsensusContext
 	IsValidator(nodeID ids.ShortID) bool
 
-	SetBootstrapper(engine common.Engine)
-	Bootstrapper() common.Engine
+	SetBootstrapper(engine common.BootstrapableEngine)
+	Bootstrapper() common.BootstrapableEngine
 
 	SetConsensus(engine common.Engine)
 	Consensus() common.Engine
@@ -73,7 +73,7 @@ type handler struct {
 	preemptTimeouts chan struct{}
 	gossipFrequency time.Duration
 
-	bootstrapper common.Engine
+	bootstrapper common.BootstrapableEngine
 	engine       common.Engine
 	// onStopped is called in a goroutine when this handler finishes shutting
 	// down. If it is nil then it is skipped.
@@ -148,11 +148,28 @@ func (h *handler) IsValidator(nodeID ids.ShortID) bool {
 		h.validators.Contains(nodeID)
 }
 
-func (h *handler) SetBootstrapper(engine common.Engine) { h.bootstrapper = engine }
-func (h *handler) Bootstrapper() common.Engine          { return h.bootstrapper }
+// updateState update node state as reported in context
+func (h *handler) updateState() {
+	switch {
+	case h.bootstrapper != nil:
+		h.ctx.SetState(snow.Bootstrapping)
+	case h.engine != nil:
+		h.ctx.SetState(snow.NormalOp)
+	default:
+	}
+}
 
-func (h *handler) SetConsensus(engine common.Engine) { h.engine = engine }
-func (h *handler) Consensus() common.Engine          { return h.engine }
+func (h *handler) SetBootstrapper(engine common.BootstrapableEngine) {
+	h.bootstrapper = engine
+	h.updateState()
+}
+func (h *handler) Bootstrapper() common.BootstrapableEngine { return h.bootstrapper }
+
+func (h *handler) SetConsensus(engine common.Engine) {
+	h.engine = engine
+	h.updateState()
+}
+func (h *handler) Consensus() common.Engine { return h.engine }
 
 func (h *handler) SetOnStopped(onStopped func()) { h.onStopped = onStopped }
 
@@ -176,8 +193,8 @@ func (h *handler) StartDispatching(recoverPanic bool) {
 
 func (h *handler) StartChain() error {
 	startReqID := uint32(0)
-	switch {
-	case h.bootstrapper != nil:
+	switch h.ctx.GetState() {
+	case snow.Bootstrapping:
 		return h.bootstrapper.Start(startReqID)
 	default:
 		return errGearsNotRegistered
