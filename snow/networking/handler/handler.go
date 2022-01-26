@@ -152,14 +152,36 @@ func (h *handler) IsValidator(nodeID ids.ShortID) bool {
 		h.validators.Contains(nodeID)
 }
 
-func (h *handler) SetStateSyncer(engine common.StateSyncer) { h.stateSyncer = engine }
-func (h *handler) StateSyncer() common.StateSyncer          { return h.stateSyncer }
+// updateState update node state as reported in context
+func (h *handler) updateState() {
+	switch {
+	case (h.stateSyncer != nil) && h.stateSyncer.IsEnabled():
+		h.ctx.SetState(snow.StateSyncing)
+	case h.bootstrapper != nil:
+		h.ctx.SetState(snow.Bootstrapping)
+	case h.engine != nil:
+		h.ctx.SetState(snow.NormalOp)
+	default:
+	}
+}
 
-func (h *handler) SetBootstrapper(engine common.BootstrapableEngine) { h.bootstrapper = engine }
-func (h *handler) Bootstrapper() common.BootstrapableEngine          { return h.bootstrapper }
+func (h *handler) SetStateSyncer(engine common.StateSyncer) {
+	h.stateSyncer = engine
+	h.updateState()
+}
+func (h *handler) StateSyncer() common.StateSyncer { return h.stateSyncer }
 
-func (h *handler) SetConsensus(engine common.Engine) { h.engine = engine }
-func (h *handler) Consensus() common.Engine          { return h.engine }
+func (h *handler) SetBootstrapper(engine common.BootstrapableEngine) {
+	h.bootstrapper = engine
+	h.updateState()
+}
+func (h *handler) Bootstrapper() common.BootstrapableEngine { return h.bootstrapper }
+
+func (h *handler) SetConsensus(engine common.Engine) {
+	h.engine = engine
+	h.updateState()
+}
+func (h *handler) Consensus() common.Engine { return h.engine }
 
 func (h *handler) SetOnStopped(onStopped func()) { h.onStopped = onStopped }
 
@@ -183,13 +205,13 @@ func (h *handler) StartDispatching(recoverPanic bool) {
 
 func (h *handler) StartChain() error {
 	startReqID := uint32(0)
-	switch {
-	case (h.stateSyncer != nil) && h.stateSyncer.IsEnabled():
+	switch h.ctx.GetState() {
+	case snow.StateSyncing:
 		if err := h.bootstrapper.Clear(); err != nil {
 			return err
 		}
 		return h.stateSyncer.Start(startReqID)
-	case h.bootstrapper != nil:
+	case snow.Bootstrapping:
 		return h.bootstrapper.Start(startReqID)
 	default:
 		return errGearsNotRegistered
