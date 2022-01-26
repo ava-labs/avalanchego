@@ -113,6 +113,16 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 
 	// Mark that we received a response from [validatorID]
 	ss.pendingReceiveStateSummaryFrontier.Remove(validatorID)
+	ss.acceptedFrontierSet[string(key)] = summary
+
+	if err := ss.sendGetStateSummaryFrontiers(); err != nil {
+		return err
+	}
+
+	// still waiting on requests
+	if ss.pendingReceiveStateSummaryFrontier.Len() != 0 {
+		return nil
+	}
 
 	if len(ss.StateSyncTestingBeacons) != 0 {
 		// received what we needed. Just pass to VM
@@ -124,19 +134,8 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 			})
 		}
 
-		ss.Ctx.Log.Info("Received state summaries frontiers from all listed nodes. Starting state sync skipping voting rounds.")
+		ss.Ctx.Log.Info("Received (%d) state summaries frontiers from all listed nodes. Starting state sync skipping voting rounds.", len(accepted))
 		return ss.stateSyncVM.StateSync(accepted)
-	}
-
-	ss.acceptedFrontierSet[string(key)] = summary
-
-	if err := ss.sendGetStateSummaryFrontiers(); err != nil {
-		return err
-	}
-
-	// still waiting on requests
-	if ss.pendingReceiveStateSummaryFrontier.Len() != 0 {
-		return nil
 	}
 
 	// We've received the accepted frontier from every state syncer
