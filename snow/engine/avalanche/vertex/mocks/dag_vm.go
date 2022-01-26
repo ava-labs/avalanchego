@@ -80,34 +80,6 @@ func (_m *DAGVM) AppResponse(nodeID ids.ShortID, requestID uint32, response []by
 	return r0
 }
 
-// Bootstrapped provides a mock function with given fields:
-func (_m *DAGVM) Bootstrapped() error {
-	ret := _m.Called()
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// Bootstrapping provides a mock function with given fields:
-func (_m *DAGVM) Bootstrapping() error {
-	ret := _m.Called()
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // Connected provides a mock function with given fields: id, nodeVersion
 func (_m *DAGVM) Connected(id ids.ShortID, nodeVersion version.Application) error {
 	ret := _m.Called(id, nodeVersion)
@@ -276,6 +248,20 @@ func (_m *DAGVM) PendingTxs() []snowstorm.Tx {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]snowstorm.Tx)
 		}
+	}
+
+	return r0
+}
+
+// SetState provides a mock function with given fields: state
+func (_m *DAGVM) SetState(state snow.State) error {
+	ret := _m.Called(state)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(snow.State) error); ok {
+		r0 = rf(state)
+	} else {
+		r0 = ret.Error(0)
 	}
 
 	return r0
