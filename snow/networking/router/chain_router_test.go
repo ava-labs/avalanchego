@@ -196,6 +196,8 @@ func TestShutdownTimesOut(t *testing.T) {
 
 	chainRouter.AddChain(handler)
 	handler.Start(false)
+	chainRouter.AddChain(handler)
+	handler.Start(false)
 
 	shutdownFinished := make(chan struct{}, 1)
 
