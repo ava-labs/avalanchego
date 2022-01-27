@@ -234,7 +234,9 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 		_, err = hi.indexState.GetBlockIDAtHeight(currentAcceptedBlk.Height())
 		switch err {
 		case nil:
-			hi.log.AssertTrue(err != nil, "unexpected height index entry at height %d", currentAcceptedBlk.Height())
+			hi.log.Info("Block indexing by height: repaired. Indexed %d blocks, duration %v",
+				indexedBlks, time.Since(start))
+			return nil
 
 		case database.ErrNotFound:
 			// Rebuild height block index.
