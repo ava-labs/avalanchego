@@ -317,7 +317,10 @@ func (b *bootstrapper) fetch(blkID ids.ID) error {
 
 // Clear implements common.Bootstrapable interface
 func (b *bootstrapper) Clear() error {
-	return b.Config.Blocked.ClearAll()
+	if err := b.Config.Blocked.Clear(); err != nil {
+		return err
+	}
+	return b.Config.Blocked.Commit()
 }
 
 // process a block

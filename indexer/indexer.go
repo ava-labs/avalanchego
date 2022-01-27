@@ -12,7 +12,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -151,7 +150,18 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
-	if !i.needsRegisteringChain(engine.Context(), name) {
+	// check if chain can be registered
+	ctx := engine.Context()
+	if i.closed {
+		i.log.Debug("not registering chain %s because indexer is closed", name)
+		return
+	}
+	if ctx.SubnetID != constants.PrimaryNetworkID {
+		i.log.Debug("not registering chain %s because it's not in primary network", name)
+		return
+	}
+	if chainID := ctx.ChainID; i.blockIndices[chainID] != nil || i.txIndices[chainID] != nil || i.vtxIndices[chainID] != nil {
+		i.log.Warn("chain %s is already being indexed", chainID)
 		return
 	}
 
@@ -182,37 +192,34 @@ func (i *indexer) initializeIndexes(name string, engine common.Engine) error {
 			endpoint              = "block"
 			standAloneBlockPrefix = standAlonePrefix(chainID, blockPrefix)
 		)
-		// Try creating a VM-backed ...
-		if blockIndex, err = newVMBackedBlockIndex(engine.GetVM()); err == nil {
-			if err := i.registerAndCreateEndpoint(blockIndex, chainID, name, endpoint, i.consensusDispatcher); err != nil {
+
+		previouslyIndexed, err := i.previouslyIndexed(chainID)
+		if err != nil {
+			i.log.Error("couldn't get whether chain %s was previously indexed: %s", name, err)
+			return err
+		}
+
+		// a VM-backed index is built only if no stand-alone index was created before
+		// and VM is ready to support it. Otherwise stick with the stand-alone index.
+		if blockIndex, err = newVMBackedBlockIndex(engine.GetVM()); !previouslyIndexed && err == nil {
+			err := i.registerAndCreateEndpoint(blockIndex, chainID, name, endpoint, i.consensusDispatcher)
+			if err != nil {
 				return fmt.Errorf("couldn't create block index for %s: %w", name, err)
 			}
-			i.blockIndices[chainID] = blockIndex
-
-			// Historically stand-Alone indexes were introduced first.
-			// However, as soon as a VM-Backed index is available,
-			// there is no point maintaining it.
-			go func() {
-				if err := i.deleteStandAloneIndex(standAloneBlockPrefix); err != nil {
-					i.log.Fatal("Chain %s stand alone index deletion failed, error: %w", chainID, err)
-					panic(err)
+		} else {
+			switch err := i.standAloneIndexChecks(chainID, name); {
+			case err == errIndexIncompleteAndDone:
+				return nil
+			case err != nil:
+				return err
+			default:
+				blockIndex, err = i.registerChainHelper(chainID, standAloneBlockPrefix, name, endpoint, i.consensusDispatcher)
+				if err != nil {
+					return fmt.Errorf("couldn't create block index for %s: %w", name, err)
 				}
-			}()
-			return nil
-		}
-		// ... otherwise fallback on stand-alone indexes.
-		switch err := i.standAloneIndexChecks(chainID, name); {
-		case err == errIndexIncompleteAndDone:
-			return nil
-		case err != nil:
-			return err
-		default:
+			}
 		}
 
-		blockIndex, err = i.registerChainHelper(chainID, standAloneBlockPrefix, name, endpoint, i.consensusDispatcher)
-		if err != nil {
-			return fmt.Errorf("couldn't create block index for %s: %w", name, err)
-		}
 		i.blockIndices[chainID] = blockIndex
 		return nil
 	case avalanche.Engine:
@@ -241,17 +248,6 @@ func (i *indexer) initializeIndexes(name string, engine common.Engine) error {
 	default:
 		return fmt.Errorf("got unexpected engine type %T", engine)
 	}
-}
-
-func (i *indexer) deleteStandAloneIndex(standAlonePrefix []byte) error {
-	// recreate standalone index and delete it
-	standAloneIdx, err := newStandAloneIndex(standAlonePrefix, i.db, i.log, i.codec, i.clock)
-	if err != nil {
-		return err
-	}
-
-	indexToRm, _ := standAloneIdx.(*standAloneIndex)
-	return indexToRm.Delete()
 }
 
 func (i *indexer) standAloneIndexChecks(chainID ids.ID, name string) error {
@@ -295,22 +291,6 @@ func (i *indexer) standAloneIndexChecks(chainID ids.ID, name string) error {
 		return err
 	}
 	return nil
-}
-
-func (i *indexer) needsRegisteringChain(ctx *snow.ConsensusContext, name string) bool {
-	if i.closed {
-		i.log.Debug("not registering chain %s because indexer is closed", name)
-		return false
-	}
-	if ctx.SubnetID != constants.PrimaryNetworkID {
-		i.log.Debug("not registering chain %s because it's not in primary network", name)
-		return false
-	}
-	if chainID := ctx.ChainID; i.blockIndices[chainID] != nil || i.txIndices[chainID] != nil || i.vtxIndices[chainID] != nil {
-		i.log.Warn("chain %s is already being indexed", chainID)
-		return false
-	}
-	return true
 }
 
 func (i *indexer) registerChainHelper(

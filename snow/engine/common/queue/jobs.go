@@ -185,7 +185,7 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 	return numExecuted, nil
 }
 
-func (j *Jobs) ClearAll() error {
+func (j *Jobs) Clear() error {
 	return j.state.Clear()
 }
 
@@ -228,7 +228,7 @@ func (jm *JobsWithMissing) SetParser(parser Parser) error {
 	return jm.cleanRunnableStack()
 }
 
-func (jm *JobsWithMissing) ClearAll() error {
+func (jm *JobsWithMissing) Clear() error {
 	if err := jm.state.RemoveMissingJobIDs(jm.missingIDs); err != nil {
 		return err
 	}
@@ -237,7 +237,7 @@ func (jm *JobsWithMissing) ClearAll() error {
 	jm.addToMissingIDs.Clear()
 	jm.removeFromMissingIDs.Clear()
 
-	return jm.Jobs.ClearAll()
+	return jm.Jobs.Clear()
 }
 
 func (jm *JobsWithMissing) Has(jobID ids.ID) (bool, error) {

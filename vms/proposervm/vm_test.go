@@ -144,7 +144,7 @@ func initTestProposerVM(
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
-	if err := proVM.OnStart(snow.NormalOp); err != nil {
+	if err := proVM.SetState(snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -904,7 +904,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
-	if err := proVM.OnStart(snow.NormalOp); err != nil {
+	if err := proVM.SetState(snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1195,7 +1195,7 @@ func TestInnerVMRollback(t *testing.T) {
 		t.Fatalf("failed to initialize proposerVM with %s", err)
 	}
 
-	if err := proVM.OnStart(snow.NormalOp); err != nil {
+	if err := proVM.SetState(snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}
 

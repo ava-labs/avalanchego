@@ -295,22 +295,30 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	// Notify those that registered to be notified when a new chain is created
 	m.notifyRegistrants(chain.Name, chain.Engine)
 
-	// Tell the chain to start processing messages.
-	// If the X, P, or C Chain panics, do not attempt to recover
-	chain.Handler.StartDispatching(!m.CriticalChains.Contains(chainParams.ID))
-
-	// Once handler can process messages, allows messages to be routed to the new chain.
+	// Allows messages to be routed to the new chain. If the handler hasn't been
+	// started and a message is forwarded, then the message will block until the
+	// handler is started.
 	m.ManagerConfig.Router.AddChain(chain.Handler)
 
-	// Finally start the chain so to send out messages
-	if err := m.ManagerConfig.Router.StartChain(chain.Handler); err != nil {
-		// If a required chain (i.e. X, P or C) can't be started, panic
-		if m.CriticalChains.Contains(chainParams.ID) {
-			m.Log.Fatal("shutting down chain due to unexpected error: %s", err)
-			m.Log.AssertNoError(err)
-		} else {
-			chain.Handler.StopWithError(err)
-		}
+	ctx := chain.Handler.Context()
+	ctx.Lock.Lock()
+	defer ctx.Lock.Unlock()
+
+	// Start state-syncing if available or bootstrapping.
+	if chain.Handler.StateSyncer() != nil &&
+		chain.Handler.StateSyncer().IsEnabled() {
+		err = chain.Handler.StateSyncer().Start(0)
+	} else {
+		err = chain.Handler.Bootstrapper().Start(0)
+	}
+
+	// Tell the chain to start processing messages.
+	// If the X, P, or C Chain panics, do not attempt to recover
+	chain.Handler.Start(!m.CriticalChains.Contains(chainParams.ID))
+
+	// If startup errored, then shutdown the chain with the fatal error.
+	if err != nil {
+		chain.Handler.StopWithError(err)
 	}
 }
 
@@ -373,6 +381,10 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		ConsensusDispatcher: m.ConsensusEvents,
 		Registerer:          consensusMetrics,
 	}
+	// We set the state to bootstrapping here because bootstrapping is the first
+	// state, and failing to initialize the state before it's first access would
+	// cause a panic.
+	ctx.SetState(snow.Bootstrapping)
 
 	if sbConfigs, ok := m.SubnetConfigs[chainParams.SubnetID]; ok {
 		if sbConfigs.ValidatorOnly {
