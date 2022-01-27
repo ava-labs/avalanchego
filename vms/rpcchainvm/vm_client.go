@@ -295,7 +295,7 @@ func (vm *VMClient) startAppSenderServer(opts []grpc.ServerOption) *grpc.Server 
 }
 
 func (vm *VMClient) SetState(state snow.State) error {
-	_, err := vm.client.SetState(context.Background(), &vmproto.StateRequest{
+	_, err := vm.client.SetState(context.Background(), &vmproto.SetStateRequest{
 		State: uint32(state),
 	})
 

@@ -251,7 +251,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	}, err
 }
 
-func (vm *VMServer) SetState(_ context.Context, stateReq *vmproto.StateRequest) (*emptypb.Empty, error) {
+func (vm *VMServer) SetState(_ context.Context, stateReq *vmproto.SetStateRequest) (*emptypb.Empty, error) {
 	return &emptypb.Empty{}, vm.vm.SetState(snow.State(stateReq.State))
 }
 

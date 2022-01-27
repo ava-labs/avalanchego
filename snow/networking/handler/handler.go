@@ -142,26 +142,13 @@ func (h *handler) IsValidator(nodeID ids.ShortID) bool {
 		h.validators.Contains(nodeID)
 }
 
-// updateState update node state as reported in context
-func (h *handler) updateState() {
-	switch {
-	case h.bootstrapper != nil:
-		h.ctx.SetState(snow.Bootstrapping)
-	case h.engine != nil:
-		h.ctx.SetState(snow.NormalOp)
-	default:
-	}
-}
-
 func (h *handler) SetBootstrapper(engine common.BootstrapableEngine) {
 	h.bootstrapper = engine
-	h.updateState()
 }
 func (h *handler) Bootstrapper() common.BootstrapableEngine { return h.bootstrapper }
 
 func (h *handler) SetConsensus(engine common.Engine) {
 	h.engine = engine
-	h.updateState()
 }
 func (h *handler) Consensus() common.Engine { return h.engine }
 
