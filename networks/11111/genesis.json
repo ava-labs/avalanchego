@@ -19,7 +19,7 @@
       "baseFeeChangeDenominator": 48,
       "minBlockGasCost": 0,
       "maxBlockGasCost": 10000000,
-      "targetBlockRate": 1,
+      "targetBlockRate": 2,
       "blockGasCostStep": 500000
     }
   },

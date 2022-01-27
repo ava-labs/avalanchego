@@ -78,8 +78,8 @@ type Genesis struct {
 	Mixhash       common.Hash         `json:"mixHash"`
 	Coinbase      common.Address      `json:"coinbase"`
 	Alloc         GenesisAlloc        `json:"alloc"      gencodec:"required"`
-	AirdropHash   common.Hash         `json:"airdropHash" gencodec:"required"`
-	AirdropAmount *big.Int            `json:"airdropAmount" gencodec:"required"`
+	AirdropHash   common.Hash         `json:"airdropHash"`
+	AirdropAmount *big.Int            `json:"airdropAmount"`
 
 	// These fields are used for consensus tests. Please don't use them
 	// in actual genesis blocks.
@@ -245,7 +245,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	if err != nil {
 		panic(err)
 	}
-	if len(g.AirdropHash) > 0 {
+	if g.AirdropHash != (common.Hash{}) {
 		t := time.Now()
 		h := common.BytesToHash(crypto.Keccak256(AirdropData))
 		if g.AirdropHash != h {
