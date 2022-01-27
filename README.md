@@ -240,16 +240,24 @@ all validators to the WAGMI subnet, and created the WAGMI chain.
 
 ### Network Parameters
 **Network ID:** 11111
+
 **Chain ID:** 11111
+
 **Block Gas Limit:** 20,000,000 (2.5x C-Chain)
+
 **10s Gas Target:** 100,000,000 (~6.67x C-Chain)
+
 **Min Fee:** 1 GWei (4% of C-Chain)
+
 **Target Block Rate:** 2s (Same as C-Chain)
 
 ### Adding to MetaMask
 **Network Name:** WAGMI
+
 **RPC URL:** https://api.trywagmi.xyz/rpc
+
 **Chain ID:** 11111
+
 **Symbol:** WGM
 
 ![metamask](./imgs/metamask.png)
