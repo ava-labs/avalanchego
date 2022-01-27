@@ -151,7 +151,7 @@ func (vm *VM) Shutdown() error {
 	return vm.ChainVM.Shutdown()
 }
 
-func (vm *VM) OnStart(state snow.State) error {
+func (vm *VM) SetState(state snow.State) error {
 	vm.bootstrapped = (state == snow.NormalOp)
 	return vm.ChainVM.SetState(state)
 }

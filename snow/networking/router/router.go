@@ -38,7 +38,6 @@ type Router interface {
 	) error
 	Shutdown()
 	AddChain(chain handler.Handler)
-	StartChain(chain handler.Handler) error
 	health.Checker
 }
 

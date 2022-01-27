@@ -90,9 +90,6 @@ func (ctx *ConsensusContext) SetState(newState State) {
 
 func (ctx *ConsensusContext) GetState() State {
 	stateInf := ctx.state.GetValue()
-	if stateInf == nil {
-		ctx.Log.AssertNoError(ErrUnknownState)
-	}
 	return stateInf.(State)
 }
 

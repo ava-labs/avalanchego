@@ -509,7 +509,7 @@ func TestClearAll(t *testing.T) {
 		}
 	}
 
-	assert.NoError(jobs.ClearAll())
+	assert.NoError(jobs.Clear())
 	hasJob0, err := jobs.Has(job0.ID())
 	assert.NoError(err)
 	assert.False(hasJob0)

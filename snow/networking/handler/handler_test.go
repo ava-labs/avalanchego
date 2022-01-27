@@ -83,7 +83,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	msg = mc.InboundGetAccepted(chainID, reqID, deadline, nil, nodeID)
 	handler.Push(msg)
 
-	handler.StartDispatching(false)
+	handler.Start(false)
 
 	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
@@ -145,7 +145,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	// should normally be handled
 	ctx.SetState(snow.Bootstrapping)
 
-	handler.StartDispatching(false)
+	handler.Start(false)
 
 	nodeID := ids.ShortEmpty
 	reqID := uint32(1)
@@ -201,7 +201,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	handler.SetBootstrapper(bootstrapper)
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
-	handler.StartDispatching(false)
+	handler.Start(false)
 
 	nodeID := ids.ShortEmpty
 	chainID := ids.Empty
@@ -249,7 +249,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	handler.SetConsensus(engine)
 	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
 
-	handler.StartDispatching(false)
+	handler.Start(false)
 	msgFromVMChan <- 0
 
 	select {
