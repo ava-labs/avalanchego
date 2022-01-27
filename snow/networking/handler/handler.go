@@ -142,15 +142,11 @@ func (h *handler) IsValidator(nodeID ids.ShortID) bool {
 		h.validators.Contains(nodeID)
 }
 
-func (h *handler) SetBootstrapper(engine common.BootstrapableEngine) {
-	h.bootstrapper = engine
-}
-func (h *handler) Bootstrapper() common.BootstrapableEngine { return h.bootstrapper }
+func (h *handler) SetBootstrapper(engine common.BootstrapableEngine) { h.bootstrapper = engine }
+func (h *handler) Bootstrapper() common.BootstrapableEngine          { return h.bootstrapper }
 
-func (h *handler) SetConsensus(engine common.Engine) {
-	h.engine = engine
-}
-func (h *handler) Consensus() common.Engine { return h.engine }
+func (h *handler) SetConsensus(engine common.Engine) { h.engine = engine }
+func (h *handler) Consensus() common.Engine          { return h.engine }
 
 func (h *handler) SetOnStopped(onStopped func()) { h.onStopped = onStopped }
 
