@@ -206,17 +206,4 @@ INFO [01-26|05:54:19] chains/manager.go#246: creating chain:
 ERROR[01-26|05:54:19] chains/manager.go#270: error creating chain 2AM3vsuLoJdGBGqX2ibE8RGEq4Lg7g4bot6BT1Z7B9dH5corUD: error while looking up VM: there is no ID with alias sqja3uK17MJxfC7AN8nGadBw9JK5BcrsNwNynsqP5Gih8M5Bm
 ```
 
-## WAGMI Network
-_Genesis:_
-### Parameters
-NetworkID: 11111
-ChainID: 11111
-Block Gas Limit: 20,000,000
-10s Gas Target: 100,000,000
-Min Fee: 1 GWei
-Target Block Rate: 2s
-
-### Airdrop
-10 WGM to everyone that has used the C-Chain more than twice (~970k addresses)
-
 [become a Fuji Validator]: https://docs.avax.network/build/tutorials/nodes-and-staking/staking-avax-by-validating-or-delegating-with-the-avalanche-wallet
