@@ -122,9 +122,8 @@ func TestTimeout(t *testing.T) {
 	handler.SetBootstrapper(bootstrapper)
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
-	handler.Start(false)
-
 	chainRouter.AddChain(handler)
+	handler.Start(false)
 
 	vdrIDs := ids.ShortSet{}
 	vdrIDs.Add(ids.ShortID{255})
@@ -213,9 +212,8 @@ func TestReliableMessages(t *testing.T) {
 	handler.SetBootstrapper(bootstrapper)
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
-	handler.Start(false)
-
 	chainRouter.AddChain(handler)
+	handler.Start(false)
 
 	go func() {
 		for i := 0; i < queriesToSend; i++ {
@@ -304,9 +302,8 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	handler.SetBootstrapper(bootstrapper)
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
-	handler.Start(false)
-
 	chainRouter.AddChain(handler)
+	handler.Start(false)
 
 	go func() {
 		for i := 0; i < queriesToSend; i++ {
