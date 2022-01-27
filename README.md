@@ -206,4 +206,62 @@ INFO [01-26|05:54:19] chains/manager.go#246: creating chain:
 ERROR[01-26|05:54:19] chains/manager.go#270: error creating chain 2AM3vsuLoJdGBGqX2ibE8RGEq4Lg7g4bot6BT1Z7B9dH5corUD: error while looking up VM: there is no ID with alias sqja3uK17MJxfC7AN8nGadBw9JK5BcrsNwNynsqP5Gih8M5Bm
 ```
 
+## Join the WAGMI Subnet Demo
+The WAGMI ("We're All Going to Make It") Subnet Demo is a high throughput
+testbed for EVM (Ethereum Virtual Machine) optimizations. It is parameterized
+to run at a factor more capacity than Fuji/Mainnet C-Chain and will be used
+to experiment with release candidates before they make it into an
+official [`coreth`](https://github.com/ava-labs/coreth) release.
+
+We created a basic [WAGMI explorer](https://trywagmi.xyz) that surfaces
+aggregated usage statistics about the subnet. If you'd like to see any other
+stats added to this site, please send a DM to @\_patrickogrady.
+
+Everyone that has used the the C-Chain more than twice (~970k addresses) has
+been airdropped 10 WGM tokens. With the current fee parameterization, this
+should be enough for hundreds of txs.
+
+This is one of the first cases of using Avalanche Subnets as a proving ground
+for changes in a production VM (coreth). Many underestimate how useful the isolation
+of subnets is for performing complex VM testing on a live network (without impacting
+the stability of the primary network).
+
+### Network Creation
+To create WAGMI, all we had to do was run the following command:
+```bash
+subnet-cli wizard \
+--node-ids=NodeID-9TCq8np31pHjjhGaHtLjs6ptYYPEt3LGb,NodeID-BrYXghQSu6KKGjuzhs3nrkcB46Wc2yYHy,NodeID-89UCR1CsPzzEHuknxhJHKxuFPNCyPz7Bu,NodeID-Hfm8gpD4DpCz4KTzt2osJPfFvu7az3qiD,NodeID-LkdxkfYhg6nSw1EEUxDUSYPXPwmr2cUet \
+--vm-genesis-path=networks/11111/genesis.json \
+--vm-id=srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy \
+--chain-name=wagmi
+```
+
+This added these NodeIDs as validators on Fuji, created the WAGMI Subnet, added
+all validators to the WAGMI subnet, and created the WAGMI chain.
+
+```
+SubnetID: [28nrH5T2BMvNrWecFcV3mfccjs6axM1TVyqe79MCv2Mhs8kxiY](https://testnet.avascan.info/blockchains?subnet=28nrH5T2BMvNrWecFcV3mfccjs6axM1TVyqe79MCv2Mhs8kxiY)
+ChainID: [2ebCneCbwthjQ1rYT41nhd7M76Hc6YmosMAQrTFhBq8qeqh6tt](https://testnet.avascan.info/blockchain/2ebCneCbwthjQ1rYT41nhd7M76Hc6YmosMAQrTFhBq8qeqh6tt)
+```
+
+### Network Parameters
+```
+Network ID: 11111
+Chain ID: 11111
+Block Gas Limit: 20,000,000 (2.5x C-Chain)
+10s Gas Target: 100,000,000 (~6.67x C-Chain)
+Min Fee: 1 GWei (4% of C-Chain)
+Target Block Rate: 2s (Same as C-Chain)
+```
+
+### Adding to MetaMask
+```
+Network Name: WAGMI
+RPC URL: https://api.trywagmi.xyz/rpc
+Chain ID: 11111
+Symbol: WGM
+```
+
+![metamask](./imgs/metamask.png)
+
 [become a Fuji Validator]: https://docs.avax.network/build/tutorials/nodes-and-staking/staking-avax-by-validating-or-delegating-with-the-avalanche-wallet
