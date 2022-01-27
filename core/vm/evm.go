@@ -433,6 +433,11 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	if !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
 		return nil, common.Address{}, gas, ErrInsufficientBalance
 	}
+	// If there is any collision with the Blackhole address, return an error instead
+	// of allowing the contract to be created.
+	if address == evm.Context.Coinbase {
+		return nil, common.Address{}, gas, ErrNoSenderBlackhole
+	}
 	nonce := evm.StateDB.GetNonce(caller.Address())
 	evm.StateDB.SetNonce(caller.Address(), nonce+1)
 	// We add this to the access list _before_ taking a snapshot. Even if the creation fails,
