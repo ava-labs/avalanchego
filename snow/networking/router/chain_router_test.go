@@ -92,8 +92,8 @@ func TestShutdown(t *testing.T) {
 	handler.SetConsensus(engine)
 	ctx.SetState(snow.NormalOp) // assumed bootstrap is done
 
-	handler.Start(false)
 	chainRouter.AddChain(handler)
+	handler.Start(false)
 	chainRouter.Shutdown()
 
 	ticker := time.NewTicker(250 * time.Millisecond)
@@ -194,8 +194,8 @@ func TestShutdownTimesOut(t *testing.T) {
 	handler.SetConsensus(engine)
 	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
 
-	handler.Start(false)
 	chainRouter.AddChain(handler)
+	handler.Start(false)
 
 	shutdownFinished := make(chan struct{}, 1)
 
@@ -312,8 +312,8 @@ func TestRouterTimeout(t *testing.T) {
 	handler.SetBootstrapper(bootstrapper)
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
-	handler.Start(false)
 	chainRouter.AddChain(handler)
+	handler.Start(false)
 
 	// Register requests for each request type
 	msgs := []message.Op{
@@ -402,8 +402,8 @@ func TestRouterClearTimeouts(t *testing.T) {
 	handler.SetConsensus(engine)
 	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
 
-	handler.Start(false)
 	chainRouter.AddChain(handler)
+	handler.Start(false)
 
 	// Register requests for each request type
 	ops := []message.Op{
@@ -520,8 +520,8 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	engine.Default(false)
 	handler.SetConsensus(engine)
 
-	handler.Start(false)
 	chainRouter.AddChain(handler)
+	handler.Start(false)
 
 	var inMsg message.InboundMessage
 	dummyContainerID := ids.GenerateTestID()

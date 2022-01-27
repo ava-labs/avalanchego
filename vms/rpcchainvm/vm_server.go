@@ -371,7 +371,7 @@ func (vm *VMServer) SetLastSummaryBlock(ctx context.Context, req *vmproto.StateS
 	return &emptypb.Empty{}, ssVM.SetLastSummaryBlock(req.Bytes)
 }
 
-func (vm *VMServer) SetState(_ context.Context, stateReq *vmproto.StateRequest) (*emptypb.Empty, error) {
+func (vm *VMServer) SetState(_ context.Context, stateReq *vmproto.SetStateRequest) (*emptypb.Empty, error) {
 	return &emptypb.Empty{}, vm.vm.SetState(snow.State(stateReq.State))
 }
 

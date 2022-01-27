@@ -38,7 +38,7 @@ type state struct {
 	jobsDB         database.Database
 	// Should be prefixed with the jobID that we are attempting to find the
 	// dependencies of. This prefixdb.Database should then be wrapped in a
-	// linkeddb.LinkedDB to read the dependenciesDB.
+	// linkeddb.LinkedDB to read the dependencies.
 	dependenciesDB database.Database
 	// This is a cache that tracks LinkedDB iterators that have recently been
 	// made.

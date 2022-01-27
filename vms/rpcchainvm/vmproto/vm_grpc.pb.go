@@ -20,7 +20,7 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type VMClient interface {
 	Initialize(ctx context.Context, in *InitializeRequest, opts ...grpc.CallOption) (*InitializeResponse, error)
-	SetState(ctx context.Context, in *StateRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SetState(ctx context.Context, in *SetStateRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Shutdown(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	CreateHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateHandlersResponse, error)
 	CreateStaticHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateStaticHandlersResponse, error)
@@ -72,7 +72,7 @@ func (c *vMClient) Initialize(ctx context.Context, in *InitializeRequest, opts .
 	return out, nil
 }
 
-func (c *vMClient) SetState(ctx context.Context, in *StateRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *vMClient) SetState(ctx context.Context, in *SetStateRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/SetState", in, out, opts...)
 	if err != nil {
@@ -356,7 +356,7 @@ func (c *vMClient) SetLastSummaryBlock(ctx context.Context, in *StateSyncSetLast
 // for forward compatibility
 type VMServer interface {
 	Initialize(context.Context, *InitializeRequest) (*InitializeResponse, error)
-	SetState(context.Context, *StateRequest) (*emptypb.Empty, error)
+	SetState(context.Context, *SetStateRequest) (*emptypb.Empty, error)
 	Shutdown(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	CreateHandlers(context.Context, *emptypb.Empty) (*CreateHandlersResponse, error)
 	CreateStaticHandlers(context.Context, *emptypb.Empty) (*CreateStaticHandlersResponse, error)
@@ -399,7 +399,7 @@ type UnimplementedVMServer struct {
 func (UnimplementedVMServer) Initialize(context.Context, *InitializeRequest) (*InitializeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Initialize not implemented")
 }
-func (UnimplementedVMServer) SetState(context.Context, *StateRequest) (*emptypb.Empty, error) {
+func (UnimplementedVMServer) SetState(context.Context, *SetStateRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetState not implemented")
 }
 func (UnimplementedVMServer) Shutdown(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
@@ -524,7 +524,7 @@ func _VM_Initialize_Handler(srv interface{}, ctx context.Context, dec func(inter
 }
 
 func _VM_SetState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StateRequest)
+	in := new(SetStateRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -536,7 +536,7 @@ func _VM_SetState_Handler(srv interface{}, ctx context.Context, dec func(interfa
 		FullMethod: "/vmproto.VM/SetState",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).SetState(ctx, req.(*StateRequest))
+		return srv.(VMServer).SetState(ctx, req.(*SetStateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

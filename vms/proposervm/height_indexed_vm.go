@@ -80,5 +80,5 @@ func (vm *VM) updateHeightIndex(height uint64, blkID ids.ID) error {
 	}
 
 	vm.ctx.Log.Debug("Block indexing by height: added block %s at height %d", blkID, height)
-	return nil
+	return vm.db.Commit()
 }

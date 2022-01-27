@@ -641,6 +641,7 @@ func (n *network) NewPeerInfo(peer *peer) PeerInfo {
 		LastReceived:   time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
 		Benched:        n.benchlistManager.GetBenched(peer.nodeID),
 		ObservedUptime: json.Uint8(peer.observedUptime),
+		TrackedSubnets: peer.trackedSubnets.List(),
 	}
 }
 
