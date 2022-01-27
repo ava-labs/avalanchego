@@ -92,8 +92,8 @@ func TestShutdown(t *testing.T) {
 	handler.SetConsensus(engine)
 	ctx.SetState(snow.NormalOp) // assumed bootstrap is done
 
-	handler.Start(false)
 	chainRouter.AddChain(handler)
+	handler.Start(false)
 	chainRouter.Shutdown()
 
 	ticker := time.NewTicker(250 * time.Millisecond)
@@ -194,6 +194,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	handler.SetConsensus(engine)
 	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
 
+	chainRouter.AddChain(handler)
 	handler.Start(false)
 	chainRouter.AddChain(handler)
 

@@ -19,4 +19,5 @@ type PeerInfo struct {
 	LastReceived   time.Time  `json:"lastReceived"`
 	Benched        []ids.ID   `json:"benched"`
 	ObservedUptime json.Uint8 `json:"observedUptime"`
+	TrackedSubnets []ids.ID   `json:"trackedSubnets"`
 }
