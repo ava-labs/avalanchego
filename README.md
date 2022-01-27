@@ -213,6 +213,10 @@ to run at a factor more capacity than Fuji/Mainnet C-Chain and will be used
 to experiment with release candidates before they make it into an
 official [`coreth`](https://github.com/ava-labs/coreth) release.
 
+We created a basic [WAGMI explorer](https://trywagmi.xyz) that surfaces
+aggregated usage statistics about the subnet. If you'd like to see any other
+stats added to this site, please send a DM to @\_patrickogrady.
+
 Everyone that has used the the C-Chain more than twice (~970k addresses) has
 been airdropped 10 WGM tokens. With the current fee parameterization, this
 should be enough for hundreds of txs.
