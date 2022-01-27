@@ -181,9 +181,7 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 
 		// record innerVm to proposerVM blockID mapping to be able to
 		// complete state-sync by requesting lastSummaryBlockID.
-		var innerID ids.ID
-		copy(innerID[:], innerKey)
-		vm.pendingSummariesBlockIDMapping[innerID] = proKey.ProBlkID
+		vm.pendingSummariesBlockIDMapping[proKey.InnerKey.BlkID] = proKey.ProBlkID
 	}
 
 	return ssVM.StateSync(innerSummaries)
