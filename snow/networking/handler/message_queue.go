@@ -118,7 +118,7 @@ func (m *messageQueue) Pop() (message.InboundMessage, bool) {
 	i := 0
 	for {
 		if i == n {
-			m.log.Warn("canPop is false for all %d unprocessed messages", n)
+			m.log.Debug("canPop is false for all %d unprocessed messages", n)
 		}
 		msg := m.msgs[0]
 		nodeID := msg.NodeID()
