@@ -28,7 +28,7 @@ func (g Genesis) MarshalJSON() ([]byte, error) {
 		Coinbase      common.Address                              `json:"coinbase"`
 		Alloc         map[common.UnprefixedAddress]GenesisAccount `json:"alloc"      gencodec:"required"`
 		AirdropHash   common.Hash                                 `json:"airdropHash"`
-		AirdropAmount *big.Int                                    `json:"airdropAmount"`
+		AirdropAmount *math.HexOrDecimal256                       `json:"airdropAmount"`
 		Number        math.HexOrDecimal64                         `json:"number"`
 		GasUsed       math.HexOrDecimal64                         `json:"gasUsed"`
 		ParentHash    common.Hash                                 `json:"parentHash"`
@@ -50,7 +50,7 @@ func (g Genesis) MarshalJSON() ([]byte, error) {
 		}
 	}
 	enc.AirdropHash = g.AirdropHash
-	enc.AirdropAmount = g.AirdropAmount
+	enc.AirdropAmount = (*math.HexOrDecimal256)(g.AirdropAmount)
 	enc.Number = math.HexOrDecimal64(g.Number)
 	enc.GasUsed = math.HexOrDecimal64(g.GasUsed)
 	enc.ParentHash = g.ParentHash
@@ -71,7 +71,7 @@ func (g *Genesis) UnmarshalJSON(input []byte) error {
 		Coinbase      *common.Address                             `json:"coinbase"`
 		Alloc         map[common.UnprefixedAddress]GenesisAccount `json:"alloc"      gencodec:"required"`
 		AirdropHash   *common.Hash                                `json:"airdropHash"`
-		AirdropAmount *big.Int                                    `json:"airdropAmount"`
+		AirdropAmount *math.HexOrDecimal256                       `json:"airdropAmount"`
 		Number        *math.HexOrDecimal64                        `json:"number"`
 		GasUsed       *math.HexOrDecimal64                        `json:"gasUsed"`
 		ParentHash    *common.Hash                                `json:"parentHash"`
@@ -118,7 +118,7 @@ func (g *Genesis) UnmarshalJSON(input []byte) error {
 		g.AirdropHash = *dec.AirdropHash
 	}
 	if dec.AirdropAmount != nil {
-		g.AirdropAmount = dec.AirdropAmount
+		g.AirdropAmount = (*big.Int)(dec.AirdropAmount)
 	}
 	if dec.Number != nil {
 		g.Number = uint64(*dec.Number)

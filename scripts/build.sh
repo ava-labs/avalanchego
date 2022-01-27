@@ -15,8 +15,8 @@ source "$SUBNET_EVM_PATH"/scripts/constants.sh
 
 if [[ $# -eq 1 ]]; then
     binary_path=$1
-elif [[ $# -ne 0 ]]; then
-    echo "Invalid arguments to build subnet_evm. Requires either no arguments (default) or one arguments to specify binary location."
+else
+    echo "Invalid arguments to build subnet_evm. Requires one arguments to specify binary location."
     exit 1
 fi
 
