@@ -235,22 +235,28 @@ subnet-cli wizard \
 This added these NodeIDs as validators on Fuji, created the WAGMI Subnet, added
 all validators to the WAGMI subnet, and created the WAGMI chain.
 
+```
 SubnetID: [28nrH5T2BMvNrWecFcV3mfccjs6axM1TVyqe79MCv2Mhs8kxiY](https://testnet.avascan.info/blockchains?subnet=28nrH5T2BMvNrWecFcV3mfccjs6axM1TVyqe79MCv2Mhs8kxiY)
 ChainID: [2ebCneCbwthjQ1rYT41nhd7M76Hc6YmosMAQrTFhBq8qeqh6tt](https://testnet.avascan.info/blockchain/2ebCneCbwthjQ1rYT41nhd7M76Hc6YmosMAQrTFhBq8qeqh6tt)
+```
 
 ### Network Parameters
+```
 Network ID: 11111
 Chain ID: 11111
 Block Gas Limit: 20,000,000 (2.5x C-Chain)
 10s Gas Target: 100,000,000 (~6.67x C-Chain)
 Min Fee: 1 GWei (4% of C-Chain)
 Target Block Rate: 2s (Same as C-Chain)
+```
 
 ### Adding to MetaMask
+```
 Network Name: WAGMI
 RPC URL: https://api.trywagmi.xyz/rpc
 Chain ID: 11111
 Symbol: WGM
+```
 
 ![metamask](./imgs/metamask.png)
 
