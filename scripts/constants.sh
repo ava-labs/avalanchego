@@ -3,11 +3,6 @@
 # Set the PATHS
 GOPATH="$(go env GOPATH)"
 
-VMID="spePNvBxaWSYL2tB5e2xMmMNBQkXMN8z2XEbz1ML2Aahatwoc"
-
-# Set binary location
-binary_path=${SUBNET_EVM_BINARY_PATH:-"$GOPATH/src/github.com/ava-labs/avalanchego/build/plugins/$VMID"}
-
 # Avalabs docker hub
 dockerhub_repo="avaplatform/avalanchego"
 

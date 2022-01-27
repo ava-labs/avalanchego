@@ -130,6 +130,9 @@ func New(stack *node.Node, config *Config,
 	}
 	log.Info("Initialised chain configuration", "config", chainConfig)
 
+	// Free airdrop data to save memory usage
+	core.AirdropData = nil
+
 	eth := &Ethereum{
 		config:            config,
 		chainDb:           chainDb,

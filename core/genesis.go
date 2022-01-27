@@ -28,11 +28,13 @@ package core
 
 import (
 	"bytes"
+	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/state"
@@ -43,26 +45,41 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 )
+
+// All addresses on the C-Chain with > 2 transactions as of 1/15/22
+// Hash: 0xccbf8e430b30d08b5b3342208781c40b373d1b5885c1903828f367230a2568da
+
+// TODO: move to a better location
+//go:embed airdrops/011522.json
+var AirdropData []byte
 
 //go:generate gencodec -type Genesis -field-override genesisSpecMarshaling -out gen_genesis.go
 //go:generate gencodec -type GenesisAccount -field-override genesisAccountMarshaling -out gen_genesis_account.go
 
 var errGenesisNoConfig = errors.New("genesis has no chain configuration")
 
+type Airdrop struct {
+	// Address strings are hex-formatted common.Address
+	Address common.Address `json:"address"`
+}
+
 // Genesis specifies the header fields, state of a genesis block. It also defines hard
 // fork switch-over blocks through the chain configuration.
 type Genesis struct {
-	Config     *params.ChainConfig `json:"config"`
-	Nonce      uint64              `json:"nonce"`
-	Timestamp  uint64              `json:"timestamp"`
-	ExtraData  []byte              `json:"extraData"`
-	GasLimit   uint64              `json:"gasLimit"   gencodec:"required"`
-	Difficulty *big.Int            `json:"difficulty" gencodec:"required"`
-	Mixhash    common.Hash         `json:"mixHash"`
-	Coinbase   common.Address      `json:"coinbase"`
-	Alloc      GenesisAlloc        `json:"alloc"      gencodec:"required"`
+	Config        *params.ChainConfig `json:"config"`
+	Nonce         uint64              `json:"nonce"`
+	Timestamp     uint64              `json:"timestamp"`
+	ExtraData     []byte              `json:"extraData"`
+	GasLimit      uint64              `json:"gasLimit"   gencodec:"required"`
+	Difficulty    *big.Int            `json:"difficulty" gencodec:"required"`
+	Mixhash       common.Hash         `json:"mixHash"`
+	Coinbase      common.Address      `json:"coinbase"`
+	Alloc         GenesisAlloc        `json:"alloc"      gencodec:"required"`
+	AirdropHash   common.Hash         `json:"airdropHash"`
+	AirdropAmount *big.Int            `json:"airdropAmount"`
 
 	// These fields are used for consensus tests. Please don't use them
 	// in actual genesis blocks.
@@ -98,15 +115,16 @@ type GenesisAccount struct {
 
 // field type overrides for gencodec
 type genesisSpecMarshaling struct {
-	Nonce      math.HexOrDecimal64
-	Timestamp  math.HexOrDecimal64
-	ExtraData  hexutil.Bytes
-	GasLimit   math.HexOrDecimal64
-	GasUsed    math.HexOrDecimal64
-	Number     math.HexOrDecimal64
-	Difficulty *math.HexOrDecimal256
-	BaseFee    *math.HexOrDecimal256
-	Alloc      map[common.UnprefixedAddress]GenesisAccount
+	Nonce         math.HexOrDecimal64
+	Timestamp     math.HexOrDecimal64
+	ExtraData     hexutil.Bytes
+	GasLimit      math.HexOrDecimal64
+	GasUsed       math.HexOrDecimal64
+	Number        math.HexOrDecimal64
+	Difficulty    *math.HexOrDecimal256
+	BaseFee       *math.HexOrDecimal256
+	Alloc         map[common.UnprefixedAddress]GenesisAccount
+	AirdropAmount *math.HexOrDecimal256
 }
 
 type genesisAccountMarshaling struct {
@@ -228,8 +246,29 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	if err != nil {
 		panic(err)
 	}
+	if g.AirdropHash != (common.Hash{}) {
+		t := time.Now()
+		h := common.BytesToHash(crypto.Keccak256(AirdropData))
+		if g.AirdropHash != h {
+			panic(fmt.Sprintf("expected standard allocation %s but got %s", g.AirdropHash, h))
+		}
+		airdrop := []*Airdrop{}
+		if err := json.Unmarshal(AirdropData, &airdrop); err != nil {
+			panic(err)
+		}
+		for _, alloc := range airdrop {
+			statedb.SetBalance(alloc.Address, g.AirdropAmount)
+		}
+		log.Debug(
+			"applied airdrop allocation",
+			"hash", h, "addrs", len(airdrop), "balance", g.AirdropAmount,
+			"t", time.Since(t),
+		)
+	}
+	// Do cusotm allocation after airdrop in case an address shows up in standard
+	// allocation
 	for addr, account := range g.Alloc {
-		statedb.AddBalance(addr, account.Balance)
+		statedb.SetBalance(addr, account.Balance)
 		statedb.SetCode(addr, account.Code)
 		statedb.SetNonce(addr, account.Nonce)
 		for key, value := range account.Storage {
