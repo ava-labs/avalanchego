@@ -273,11 +273,6 @@ func (t *Transitive) Shutdown() error {
 
 // Notify implements the InternalHandler interface
 func (t *Transitive) Notify(msg common.Message) error {
-	if !t.Ctx.IsBootstrapped() {
-		t.Ctx.Log.Debug("dropping Notify due to bootstrapping")
-		return nil
-	}
-
 	switch msg {
 	case common.PendingTxs:
 		t.pendingTxs = append(t.pendingTxs, t.VM.PendingTxs()...)

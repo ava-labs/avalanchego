@@ -90,14 +90,7 @@ func (ctx *ConsensusContext) SetState(newState State) {
 
 func (ctx *ConsensusContext) GetState() State {
 	stateInf := ctx.state.GetValue()
-	if stateInf == nil {
-		return Unknown
-	}
 	return stateInf.(State)
-}
-
-func (ctx *ConsensusContext) IsBootstrapped() bool {
-	return ctx.GetState() == NormalOp
 }
 
 // IsExecuting returns true iff this chain is still executing transactions.

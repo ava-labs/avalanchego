@@ -36,6 +36,10 @@ message InitializeRequest {
     uint32 appSenderServer = 16;
 }
 
+message SetStateRequest {
+    uint32 state = 1;
+}
+
 message InitializeResponse {
     bytes lastAcceptedID = 1;
     bytes lastAcceptedParentID = 2;
@@ -193,8 +197,7 @@ message GatherResponse {
 
 service VM {
     rpc Initialize(InitializeRequest) returns (InitializeResponse);
-    rpc Bootstrapping(google.protobuf.Empty) returns (google.protobuf.Empty);
-    rpc Bootstrapped(google.protobuf.Empty) returns (google.protobuf.Empty);
+    rpc SetState(SetStateRequest) returns (google.protobuf.Empty);   
     rpc Shutdown(google.protobuf.Empty) returns (google.protobuf.Empty);
     rpc CreateHandlers(google.protobuf.Empty) returns (CreateHandlersResponse);
     rpc CreateStaticHandlers(google.protobuf.Empty) returns (CreateStaticHandlersResponse);

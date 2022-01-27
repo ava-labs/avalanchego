@@ -283,6 +283,7 @@ func (cr *ChainRouter) AddChain(chain handler.Handler) {
 	})
 	cr.chains[chainID] = chain
 
+	// Notify connected validators
 	for validatorID, version := range cr.peers {
 		// If this validator is benched on any chain, treat them as disconnected on all chains
 		if _, benched := cr.benched[validatorID]; !benched {

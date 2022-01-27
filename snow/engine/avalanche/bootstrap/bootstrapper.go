@@ -106,6 +106,20 @@ type bootstrapper struct {
 	awaitingTimeout bool
 }
 
+// Clear implements common.Bootstrapable interface
+func (b *bootstrapper) Clear() error {
+	if err := b.VtxBlocked.Clear(); err != nil {
+		return err
+	}
+	if err := b.TxBlocked.Clear(); err != nil {
+		return err
+	}
+	if err := b.VtxBlocked.Commit(); err != nil {
+		return err
+	}
+	return b.TxBlocked.Commit()
+}
+
 // Ancestors handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
 // with request ID [requestID]. Expects vtxs[0] to be the vertex requested in the corresponding GetAncestors.
 func (b *bootstrapper) Ancestors(vdr ids.ShortID, requestID uint32, vtxs [][]byte) error {
@@ -379,7 +393,6 @@ func (b *bootstrapper) process(vtxs ...avalanche.Vertex) error {
 			b.numFetchedVts.Inc()
 
 			verticesFetchedSoFar := b.VtxBlocked.Jobs.PendingJobs()
-
 			if verticesFetchedSoFar%common.StatusUpdateFrequency == 0 { // Periodically print progress
 				if !b.Config.SharedCfg.Restarted {
 					b.Ctx.Log.Info("fetched %d vertices", verticesFetchedSoFar)
@@ -431,7 +444,7 @@ func (b *bootstrapper) process(vtxs ...avalanche.Vertex) error {
 // ForceAccepted implements common.Bootstrapable interface
 // ForceAccepted starts bootstrapping. Process the vertices in [accepterContainerIDs].
 func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
-	if err := b.VM.Bootstrapping(); err != nil {
+	if err := b.VM.SetState(snow.Bootstrapping); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
 			err)
 	}
@@ -462,7 +475,7 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 func (b *bootstrapper) checkFinish() error {
 	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
 	pendingJobs := b.VtxBlocked.MissingIDs()
-	if b.Ctx.IsBootstrapped() || len(pendingJobs) > 0 || b.awaitingTimeout {
+	if b.IsBootstrapped() || len(pendingJobs) > 0 || b.awaitingTimeout {
 		return nil
 	}
 
@@ -522,7 +535,7 @@ func (b *bootstrapper) checkFinish() error {
 
 // Finish bootstrapping
 func (b *bootstrapper) finish() error {
-	if err := b.VM.Bootstrapped(); err != nil {
+	if err := b.VM.SetState(snow.NormalOp); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has finished: %w",
 			err)
 	}

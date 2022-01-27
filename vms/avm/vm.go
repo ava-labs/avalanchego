@@ -235,9 +235,8 @@ func (vm *VM) Initialize(
 	return vm.db.Commit()
 }
 
-// Bootstrapping is called by the consensus engine when it starts bootstrapping
-// this chain
-func (vm *VM) Bootstrapping() error {
+// onBootstrapStarted is called by the consensus engine when it starts bootstrapping this chain
+func (vm *VM) onBootstrapStarted() error {
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapping(); err != nil {
 			return err
@@ -246,9 +245,7 @@ func (vm *VM) Bootstrapping() error {
 	return nil
 }
 
-// Bootstrapped is called by the consensus engine when it is done bootstrapping
-// this chain
-func (vm *VM) Bootstrapped() error {
+func (vm *VM) onNormalOperationsStarted() error {
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapped(); err != nil {
 			return err
@@ -256,6 +253,17 @@ func (vm *VM) Bootstrapped() error {
 	}
 	vm.bootstrapped = true
 	return nil
+}
+
+func (vm *VM) SetState(state snow.State) error {
+	switch state {
+	case snow.Bootstrapping:
+		return vm.onBootstrapStarted()
+	case snow.NormalOp:
+		return vm.onNormalOperationsStarted()
+	default:
+		return snow.ErrUnknownState
+	}
 }
 
 // Shutdown implements the avalanche.DAGVM interface

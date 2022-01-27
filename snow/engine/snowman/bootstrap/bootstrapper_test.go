@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
+	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -79,7 +80,7 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 		AllGetsServer: snowGetHandler,
 		Blocked:       blocker,
 		VM:            vm,
-		WeightTracker: common.NewWeightTracker(commonConfig.Beacons, commonConfig.StartupAlpha),
+		WeightTracker: tracker.NewWeightTracker(commonConfig.Beacons, commonConfig.StartupAlpha),
 	}, peer, sender, vm
 }
 
@@ -155,9 +156,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	vm.CantBootstrapping = false
-	vm.CantBootstrapped = false
-
+	vm.CantSetState = false
 	err = bs.ForceAccepted(acceptedIDs)
 	switch {
 	case err != nil: // should finish
@@ -277,8 +276,8 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 		}
 		*requestID = reqID
 	}
-	vm.CantBootstrapping = false
 
+	vm.CantSetState = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request blk1
 		t.Fatal(err)
 	}
@@ -301,8 +300,6 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	} else if oldReqID == *requestID {
 		t.Fatal("should have sent new request")
 	}
-
-	vm.CantBootstrapped = false
 
 	err = bs.Ancestors(peerID, *requestID, [][]byte{blkBytes1})
 	switch {
@@ -448,8 +445,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		requested = vtxID
 	}
 
-	vm.CantBootstrapping = false
-
+	vm.CantSetState = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request blk2
 		t.Fatal(err)
 	}
@@ -459,8 +455,6 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	} else if requested != blkID1 {
 		t.Fatal("should have requested blk1")
 	}
-
-	vm.CantBootstrapped = false
 
 	if err := bs.Ancestors(peerID, *requestID, [][]byte{blkBytes1}); err != nil { // respond with blk1
 		t.Fatal(err)
@@ -530,7 +524,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 		BytesV:  blkBytes3,
 	}
 
-	vm.CantBootstrapping = false
+	vm.CantSetState = false
 	vm.CantLastAccepted = false
 	vm.LastAcceptedF = func() (ids.ID, error) { return blk0.ID(), nil }
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
@@ -613,8 +607,6 @@ func TestBootstrapperAncestors(t *testing.T) {
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request blk2
 		t.Fatal(err)
 	}
-
-	vm.CantBootstrapped = false
 
 	if err := bs.Ancestors(peerID, *requestID, [][]byte{blkBytes2, blkBytes1}); err != nil { // respond with blk2 and blk1
 		t.Fatal(err)
@@ -737,8 +729,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		requestIDs[vtxID] = reqID
 	}
 
-	vm.CantBootstrapping = false
-
+	vm.CantSetState = false
 	if err := bs.ForceAccepted([]ids.ID{blkID1, blkID2}); err != nil { // should request blk2 and blk1
 		t.Fatal(err)
 	}
@@ -747,8 +738,6 @@ func TestBootstrapperFinalized(t *testing.T) {
 	if !ok {
 		t.Fatalf("should have requested blk2")
 	}
-
-	vm.CantBootstrapped = false
 
 	if err := bs.Ancestors(peerID, reqIDBlk2, [][]byte{blkBytes2, blkBytes1}); err != nil {
 		t.Fatal(err)
@@ -911,7 +900,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		requestIDs[vtxID] = reqID
 	}
 
-	vm.CantBootstrapping = false
+	vm.CantSetState = false
 
 	// Force Accept blk3
 	if err := bs.ForceAccepted([]ids.ID{blkID3}); err != nil { // should request blk3
@@ -922,8 +911,6 @@ func TestRestartBootstrapping(t *testing.T) {
 	if !ok {
 		t.Fatalf("should have requested blk3")
 	}
-
-	vm.CantBootstrapped = false
 
 	if err := bs.Ancestors(peerID, reqID, [][]byte{blkBytes3, blkBytes2}); err != nil {
 		t.Fatal(err)

@@ -50,11 +50,8 @@ type VM interface {
 		appSender AppSender,
 	) error
 
-	// Bootstrapping is called when the node is starting to bootstrap this chain.
-	Bootstrapping() error
-
-	// Bootstrapped is called when the node is done bootstrapping this chain.
-	Bootstrapped() error
+	// SetState communicates to VM its next state it starts
+	SetState(state snow.State) error
 
 	// Shutdown is called when the node is shutting down.
 	Shutdown() error

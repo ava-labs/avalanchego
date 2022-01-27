@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -90,6 +91,66 @@ func getNumJobs(d database.Database, jobs database.Iteratee) (uint64, error) {
 		return uint64(count), err
 	}
 	return numJobs, err
+}
+
+func (s *state) Clear() error {
+	var (
+		runJobsIter  = s.runnableJobIDs.NewIterator()
+		jobsIter     = s.jobsDB.NewIterator()
+		depsIter     = s.dependenciesDB.NewIterator()
+		missJobsIter = s.missingJobIDs.NewIterator()
+	)
+	defer func() {
+		runJobsIter.Release()
+		jobsIter.Release()
+		depsIter.Release()
+		missJobsIter.Release()
+	}()
+
+	// clear runnableJobIDs
+	for runJobsIter.Next() {
+		if err := s.runnableJobIDs.Delete(runJobsIter.Key()); err != nil {
+			return err
+		}
+	}
+
+	// clear jobs
+	s.jobsCache.Flush()
+	for jobsIter.Next() {
+		if err := s.jobsDB.Delete(jobsIter.Key()); err != nil {
+			return err
+		}
+	}
+
+	// clear dependencies
+	s.dependentsCache.Flush()
+	for depsIter.Next() {
+		if err := s.dependenciesDB.Delete(depsIter.Key()); err != nil {
+			return err
+		}
+	}
+
+	// clear missing jobs IDs
+	for missJobsIter.Next() {
+		if err := s.missingJobIDs.Delete(missJobsIter.Key()); err != nil {
+			return err
+		}
+	}
+
+	// clear number of pending jobs
+	s.numJobs = 0
+	if err := database.PutUInt64(s.metadataDB, numJobsKey, s.numJobs); err != nil {
+		return err
+	}
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		runJobsIter.Error(),
+		jobsIter.Error(),
+		depsIter.Error(),
+		missJobsIter.Error(),
+	)
+	return errs.Err
 }
 
 // AddRunnableJob adds [jobID] to the runnable queue

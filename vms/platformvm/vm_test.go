@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
+	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
@@ -361,7 +362,7 @@ func defaultVM() (*VM, database.Database, *common.SenderTest) {
 	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
 		panic(err)
 	}
-	if err := vm.Bootstrapped(); err != nil {
+	if err := vm.SetState(snow.NormalOp); err != nil {
 		panic(err)
 	}
 
@@ -435,7 +436,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
 		t.Fatal(err)
 	}
-	if err := vm.Bootstrapped(); err != nil {
+	if err := vm.SetState(snow.NormalOp); err != nil {
 		panic(err)
 	}
 
@@ -1679,7 +1680,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		t.Fatalf("Block should have failed verification due to missing UTXOs")
 	}
 
-	if err := vm.Bootstrapping(); err != nil {
+	if err := vm.SetState(snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1691,7 +1692,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.Bootstrapped(); err != nil {
+	if err := vm.SetState(snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1969,6 +1970,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	ctx := defaultContext()
 	consensusCtx := snow.DefaultConsensusContextTest()
 	consensusCtx.Context = ctx
+	consensusCtx.SetState(snow.Bootstrapping)
 	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)
@@ -2086,7 +2088,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		AllGetsServer: snowGetHandler,
 		Blocked:       blocked,
 		VM:            vm,
-		WeightTracker: common.NewWeightTracker(commonCfg.Beacons, commonCfg.StartupAlpha),
+		WeightTracker: tracker.NewWeightTracker(commonCfg.Beacons, commonCfg.StartupAlpha),
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
@@ -2135,13 +2137,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 	handler.SetConsensus(engine)
 
-	startReqID := uint32(0)
-	if err := bootstrapper.Start(startReqID); err != nil {
+	// Allow incoming messages to be routed to the new chain
+	chainRouter.AddChain(handler)
+
+	if err := bootstrapper.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
-	// Allow incoming messages to be routed to the new chain
-	chainRouter.AddChain(handler)
 	handler.Start(false)
 
 	if err := bootstrapper.Connected(peerID, version.CurrentApp); err != nil {

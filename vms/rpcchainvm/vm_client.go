@@ -294,13 +294,11 @@ func (vm *VMClient) startAppSenderServer(opts []grpc.ServerOption) *grpc.Server 
 	return server
 }
 
-func (vm *VMClient) Bootstrapping() error {
-	_, err := vm.client.Bootstrapping(context.Background(), &emptypb.Empty{})
-	return err
-}
+func (vm *VMClient) SetState(state snow.State) error {
+	_, err := vm.client.SetState(context.Background(), &vmproto.SetStateRequest{
+		State: uint32(state),
+	})
 
-func (vm *VMClient) Bootstrapped() error {
-	_, err := vm.client.Bootstrapped(context.Background(), &emptypb.Empty{})
 	return err
 }
 

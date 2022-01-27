@@ -35,8 +35,8 @@ type Handler interface {
 	Context() *snow.ConsensusContext
 	IsValidator(nodeID ids.ShortID) bool
 
-	SetBootstrapper(engine common.Engine)
-	Bootstrapper() common.Engine
+	SetBootstrapper(engine common.BootstrapableEngine)
+	Bootstrapper() common.BootstrapableEngine
 
 	SetConsensus(engine common.Engine)
 	Consensus() common.Engine
@@ -67,7 +67,7 @@ type handler struct {
 	preemptTimeouts chan struct{}
 	gossipFrequency time.Duration
 
-	bootstrapper common.Engine
+	bootstrapper common.BootstrapableEngine
 	engine       common.Engine
 	// onStopped is called in a goroutine when this handler finishes shutting
 	// down. If it is nil then it is skipped.
@@ -142,8 +142,8 @@ func (h *handler) IsValidator(nodeID ids.ShortID) bool {
 		h.validators.Contains(nodeID)
 }
 
-func (h *handler) SetBootstrapper(engine common.Engine) { h.bootstrapper = engine }
-func (h *handler) Bootstrapper() common.Engine          { return h.bootstrapper }
+func (h *handler) SetBootstrapper(engine common.BootstrapableEngine) { h.bootstrapper = engine }
+func (h *handler) Bootstrapper() common.BootstrapableEngine          { return h.bootstrapper }
 
 func (h *handler) SetConsensus(engine common.Engine) { h.engine = engine }
 func (h *handler) Consensus() common.Engine          { return h.engine }
@@ -287,11 +287,6 @@ func (h *handler) dispatchChans() {
 			msg = h.mc.InternalVMMessage(h.ctx.NodeID, uint32(vmMSG))
 
 		case <-gossiper.C:
-			if !h.ctx.IsBootstrapped() {
-				// Shouldn't send gossiping messages while the chain is
-				// bootstrapping.
-				continue
-			}
 			msg = h.mc.InternalGossipRequest(h.ctx.NodeID)
 
 		case <-h.timeouts:

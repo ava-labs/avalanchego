@@ -279,14 +279,14 @@ func (vm *VM) createChain(tx *Tx) error {
 	return nil
 }
 
-// Bootstrapping marks this VM as bootstrapping
-func (vm *VM) Bootstrapping() error {
+// onBootstrapStarted marks this VM as bootstrapping
+func (vm *VM) onBootstrapStarted() error {
 	vm.bootstrapped.SetValue(false)
 	return vm.fx.Bootstrapping()
 }
 
-// Bootstrapped marks this VM as bootstrapped
-func (vm *VM) Bootstrapped() error {
+// onNormalOperationsStarted marks this VM as bootstrapped
+func (vm *VM) onNormalOperationsStarted() error {
 	if vm.bootstrapped.GetValue() {
 		return nil
 	}
@@ -311,6 +311,17 @@ func (vm *VM) Bootstrapped() error {
 		return err
 	}
 	return vm.internalState.Commit()
+}
+
+func (vm *VM) SetState(state snow.State) error {
+	switch state {
+	case snow.Bootstrapping:
+		return vm.onBootstrapStarted()
+	case snow.NormalOp:
+		return vm.onNormalOperationsStarted()
+	default:
+		return snow.ErrUnknownState
+	}
 }
 
 // Shutdown this blockchain

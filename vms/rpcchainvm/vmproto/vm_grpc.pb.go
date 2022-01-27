@@ -20,8 +20,7 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type VMClient interface {
 	Initialize(ctx context.Context, in *InitializeRequest, opts ...grpc.CallOption) (*InitializeResponse, error)
-	Bootstrapping(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	Bootstrapped(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SetState(ctx context.Context, in *SetStateRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Shutdown(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	CreateHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateHandlersResponse, error)
 	CreateStaticHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateStaticHandlersResponse, error)
@@ -62,18 +61,9 @@ func (c *vMClient) Initialize(ctx context.Context, in *InitializeRequest, opts .
 	return out, nil
 }
 
-func (c *vMClient) Bootstrapping(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *vMClient) SetState(ctx context.Context, in *SetStateRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, "/vmproto.VM/Bootstrapping", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *vMClient) Bootstrapped(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, "/vmproto.VM/Bootstrapped", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/SetState", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -274,8 +264,7 @@ func (c *vMClient) BatchedParseBlock(ctx context.Context, in *BatchedParseBlockR
 // for forward compatibility
 type VMServer interface {
 	Initialize(context.Context, *InitializeRequest) (*InitializeResponse, error)
-	Bootstrapping(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
-	Bootstrapped(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
+	SetState(context.Context, *SetStateRequest) (*emptypb.Empty, error)
 	Shutdown(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	CreateHandlers(context.Context, *emptypb.Empty) (*CreateHandlersResponse, error)
 	CreateStaticHandlers(context.Context, *emptypb.Empty) (*CreateStaticHandlersResponse, error)
@@ -307,11 +296,8 @@ type UnimplementedVMServer struct {
 func (UnimplementedVMServer) Initialize(context.Context, *InitializeRequest) (*InitializeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Initialize not implemented")
 }
-func (UnimplementedVMServer) Bootstrapping(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Bootstrapping not implemented")
-}
-func (UnimplementedVMServer) Bootstrapped(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Bootstrapped not implemented")
+func (UnimplementedVMServer) SetState(context.Context, *SetStateRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetState not implemented")
 }
 func (UnimplementedVMServer) Shutdown(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Shutdown not implemented")
@@ -407,38 +393,20 @@ func _VM_Initialize_Handler(srv interface{}, ctx context.Context, dec func(inter
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VM_Bootstrapping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
+func _VM_SetState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetStateRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VMServer).Bootstrapping(ctx, in)
+		return srv.(VMServer).SetState(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/vmproto.VM/Bootstrapping",
+		FullMethod: "/vmproto.VM/SetState",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).Bootstrapping(ctx, req.(*emptypb.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _VM_Bootstrapped_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(VMServer).Bootstrapped(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/vmproto.VM/Bootstrapped",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).Bootstrapped(ctx, req.(*emptypb.Empty))
+		return srv.(VMServer).SetState(ctx, req.(*SetStateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -833,12 +801,8 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _VM_Initialize_Handler,
 		},
 		{
-			MethodName: "Bootstrapping",
-			Handler:    _VM_Bootstrapping_Handler,
-		},
-		{
-			MethodName: "Bootstrapped",
-			Handler:    _VM_Bootstrapped_Handler,
+			MethodName: "SetState",
+			Handler:    _VM_SetState_Handler,
 		},
 		{
 			MethodName: "Shutdown",

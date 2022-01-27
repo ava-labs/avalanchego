@@ -6,6 +6,7 @@ package bootstrap
 import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
+	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
@@ -17,7 +18,7 @@ type Config struct {
 	Blocked *queue.JobsWithMissing
 
 	VM            block.ChainVM
-	WeightTracker common.WeightTracker
+	WeightTracker tracker.WeightTracker
 
 	Bootstrapped func()
 }

@@ -154,7 +154,6 @@ func TestFilterAccepted(t *testing.T) {
 		t.Fatal(errUnknownBlock)
 		return nil, errUnknownBlock
 	}
-	vm.CantBootstrapping = false
 
 	var accepted []ids.ID
 	sender.SendAcceptedF = func(_ ids.ShortID, _ uint32, frontier []ids.ID) {

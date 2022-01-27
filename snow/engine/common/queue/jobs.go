@@ -185,6 +185,10 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 	return numExecuted, nil
 }
 
+func (j *Jobs) Clear() error {
+	return j.state.Clear()
+}
+
 // Commit the versionDB to the underlying database.
 func (j *Jobs) Commit() error {
 	return j.db.Commit()
@@ -222,6 +226,18 @@ func NewWithMissing(
 func (jm *JobsWithMissing) SetParser(parser Parser) error {
 	jm.state.parser = parser
 	return jm.cleanRunnableStack()
+}
+
+func (jm *JobsWithMissing) Clear() error {
+	if err := jm.state.RemoveMissingJobIDs(jm.missingIDs); err != nil {
+		return err
+	}
+
+	jm.missingIDs.Clear()
+	jm.addToMissingIDs.Clear()
+	jm.removeFromMissingIDs.Clear()
+
+	return jm.Jobs.Clear()
 }
 
 func (jm *JobsWithMissing) Has(jobID ids.ID) (bool, error) {
