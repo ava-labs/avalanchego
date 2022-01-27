@@ -907,7 +907,7 @@ func initTestRemoteProposerVM(
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
-	if err := proVM.OnStart(snow.NormalOp); err != nil {
+	if err := proVM.SetState(snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}
 

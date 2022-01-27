@@ -252,16 +252,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 }
 
 func (vm *VMServer) SetState(_ context.Context, stateReq *vmproto.StateRequest) (*emptypb.Empty, error) {
-	var state snow.State
-	switch uint8(stateReq.State) {
-	case snow.Bootstrapping:
-		state = snow.Bootstrapping
-	case snow.NormalOp:
-		state = snow.NormalOp
-	default:
-		return &emptypb.Empty{}, snow.ErrUnknownState
-	}
-	return &emptypb.Empty{}, vm.vm.SetState(state)
+	return &emptypb.Empty{}, vm.vm.SetState(snow.State(stateReq.State))
 }
 
 func (vm *VMServer) Shutdown(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {

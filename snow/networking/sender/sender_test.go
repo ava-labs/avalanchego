@@ -122,7 +122,7 @@ func TestTimeout(t *testing.T) {
 	handler.SetBootstrapper(bootstrapper)
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
-	handler.StartDispatching(false)
+	handler.Start(false)
 
 	chainRouter.AddChain(handler)
 
@@ -209,10 +209,11 @@ func TestReliableMessages(t *testing.T) {
 		close(awaiting[int(reqID)])
 		return nil
 	}
+	bootstrapper.CantGossip = false
 	handler.SetBootstrapper(bootstrapper)
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
-	handler.StartDispatching(false)
+	handler.Start(false)
 
 	chainRouter.AddChain(handler)
 
@@ -303,7 +304,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	handler.SetBootstrapper(bootstrapper)
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
-	handler.StartDispatching(false)
+	handler.Start(false)
 
 	chainRouter.AddChain(handler)
 
