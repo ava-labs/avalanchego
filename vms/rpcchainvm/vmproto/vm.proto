@@ -36,7 +36,7 @@ message InitializeRequest {
     uint32 appSenderServer = 16;
 }
 
-message StateRequest {
+message SetStateRequest {
     uint32 state = 1;
 }
 
@@ -210,7 +210,7 @@ message GatherResponse {
 
 service VM {
     rpc Initialize(InitializeRequest) returns (InitializeResponse);
-    rpc SetState(StateRequest) returns (google.protobuf.Empty);   
+    rpc SetState(SetStateRequest) returns (google.protobuf.Empty);   
     rpc Shutdown(google.protobuf.Empty) returns (google.protobuf.Empty);
     rpc CreateHandlers(google.protobuf.Empty) returns (CreateHandlersResponse);
     rpc CreateStaticHandlers(google.protobuf.Empty) returns (CreateStaticHandlersResponse);

@@ -2137,12 +2137,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 	handler.SetConsensus(engine)
 
+	// Allow incoming messages to be routed to the new chain
+	chainRouter.AddChain(handler)
+
 	if err := bootstrapper.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
-	// Allow incoming messages to be routed to the new chain
-	chainRouter.AddChain(handler)
 	handler.Start(false)
 
 	if err := bootstrapper.Connected(peerID, version.CurrentApp); err != nil {
