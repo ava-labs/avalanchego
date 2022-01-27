@@ -702,18 +702,17 @@ func (vm *VM) pruneChain() error {
 	return vm.db.Commit()
 }
 
-// Bootstrapping notifies this VM that the consensus engine is performing
-// bootstrapping
-func (vm *VM) Bootstrapping() error {
-	vm.bootstrapped = false
-	return vm.fx.Bootstrapping()
-}
-
-// Bootstrapped notifies this VM that the consensus engine has finished
-// bootstrapping
-func (vm *VM) Bootstrapped() error {
-	vm.bootstrapped = true
-	return vm.fx.Bootstrapped()
+func (vm *VM) SetState(state snow.State) error {
+	switch state {
+	case snow.Bootstrapping:
+		vm.bootstrapped = false
+		return vm.fx.Bootstrapping()
+	case snow.NormalOp:
+		vm.bootstrapped = true
+		return vm.fx.Bootstrapped()
+	default:
+		return snow.ErrUnknownState
+	}
 }
 
 // Shutdown implements the snowman.ChainVM interface
