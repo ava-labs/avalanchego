@@ -170,3 +170,37 @@ func UpdateUncleanShutdownMarker(db ethdb.KeyValueStore) {
 		log.Warn("Failed to write unclean-shutdown marker", "err", err)
 	}
 }
+
+// WriteOfflinePruning writes a marker of the last attempt to run offline pruning
+// The marker is written when offline pruning completes and is deleted when the node
+// is started successfully with offline pruning disabled. This ensures users must
+// disable offline pruning and start their node successfully between runs of offline
+// pruning.
+func WriteOfflinePruning(db ethdb.KeyValueStore) error {
+	data, err := rlp.EncodeToBytes(uint64(time.Now().Unix()))
+	if err != nil {
+		return err
+	}
+	return db.Put(offlinePruningKey, data)
+}
+
+// ReadOfflinePruning reads to check if there is a marker of the last attempt
+// to run offline pruning.
+func ReadOfflinePruning(db ethdb.KeyValueStore) (uint64, error) {
+	data, err := db.Get(offlinePruningKey)
+	if err != nil {
+		return 0, err
+	}
+
+	var offlinePruningRun uint64
+	if err := rlp.DecodeBytes(data, &offlinePruningRun); err != nil {
+		return 0, err
+	}
+
+	return offlinePruningRun, nil
+}
+
+// DeleteOfflinePruning deletes any marker of the last attempt to run offline pruning.
+func DeleteOfflinePruning(db ethdb.KeyValueStore) error {
+	return db.Delete(offlinePruningKey)
+}
