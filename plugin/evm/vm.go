@@ -60,6 +60,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
@@ -350,6 +351,16 @@ func (vm *VM) Initialize(
 	ethConfig.Pruning = vm.config.Pruning
 	ethConfig.SnapshotAsync = vm.config.SnapshotAsync
 	ethConfig.SnapshotVerify = vm.config.SnapshotVerify
+	ethConfig.OfflinePruning = vm.config.OfflinePruning
+	ethConfig.OfflinePruningBloomFilterSize = vm.config.OfflinePruningBloomFilterSize
+	ethConfig.OfflinePruningDataDirectory = vm.config.OfflinePruningDataDirectory
+
+	if len(ethConfig.OfflinePruningDataDirectory) != 0 {
+		if err := os.MkdirAll(ethConfig.OfflinePruningDataDirectory, perms.ReadWriteExecute); err != nil {
+			log.Error("failed to create offline pruning data directory", "error", err)
+			return err
+		}
+	}
 
 	vm.chainConfig = g.Config
 	vm.networkID = ethConfig.NetworkId
@@ -1079,7 +1090,7 @@ func (vm *VM) verifyTxAtTip(tx *Tx) error {
 	timestamp := vm.clock.Time().Unix()
 	bigTimestamp := big.NewInt(timestamp)
 	if vm.chainConfig.IsApricotPhase3(bigTimestamp) {
-		_, nextBaseFee, err = dummy.CalcBaseFee(vm.chainConfig, parentHeader, uint64(timestamp))
+		_, nextBaseFee, err = dummy.EstimateNextBaseFee(vm.chainConfig, parentHeader, uint64(timestamp))
 		if err != nil {
 			// Return extremely detailed error since CalcBaseFee should never encounter an issue here
 			return fmt.Errorf("failed to calculate base fee with parent timestamp (%d), parent ExtraData: (0x%x), and current timestamp (%d): %w", parentHeader.Time, parentHeader.Extra, timestamp, err)
