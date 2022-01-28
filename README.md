@@ -207,7 +207,9 @@ ERROR[01-26|05:54:19] chains/manager.go#270: error creating chain 2AM3vsuLoJdGBG
 ```
 
 ## Join the WAGMI Subnet Demo
-![wagmi](./imgs/wagmi.png)
+<p align="center">
+  <img width="40%" alt="WAGMI" src="./imgs/wagmi.png">
+</p>
 The WAGMI ("We're All Going to Make It") Subnet Demo is a high throughput
 testbed for EVM (Ethereum Virtual Machine) optimizations. It is parameterized
 to run at a factor more capacity than Fuji/Mainnet C-Chain and will be used
