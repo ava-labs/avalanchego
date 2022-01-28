@@ -91,7 +91,7 @@ _You can find an example of a genesis file to use when launching your own
 `subnet-evm` in the [networks folder](./networks/11111/genesis.json)._
 
 ### Prerequisites
-* >= 1 node running on Fuji (does not need to be a validator)
+* 1+ nodes running on Fuji (does not need to be a validator)
 * [`subnet-cli`](https://github.com/ava-labs/subnet-cli) installed
 * `subnet-cli` private key with some Fuji AVAX (see [faucet](https://faucet.avax-test.network))
 
