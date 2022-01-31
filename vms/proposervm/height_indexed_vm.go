@@ -4,22 +4,23 @@
 package proposervm
 
 import (
-	"errors"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
-var errIndexIncomplete = errors.New("query failed because height index is incomplete")
-
-// HeightIndexingEnabled implements HeightIndexedChainVM interface
+// IsEnabled implements HeightIndexedChainVM interface
 // vm.ctx.Lock should be held
-func (vm *VM) IsHeightIndexComplete() bool {
+func (vm *VM) IsHeightIndexingEnabled() bool {
 	innerHVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
-	if !ok || !innerHVM.IsHeightIndexComplete() {
+	if !ok {
 		return false
 	}
+	return innerHVM.IsHeightIndexingEnabled()
+}
 
+// IsHeightIndexComplete implements HeightIndexedChainVM interface
+// vm.ctx.Lock should be held
+func (vm *VM) IsHeightIndexComplete() bool {
 	return vm.hIndexer.IsRepaired()
 }
 
@@ -31,7 +32,7 @@ func (vm *VM) GetBlockIDByHeight(height uint64) (ids.ID, error) {
 		return ids.Empty, block.ErrHeightIndexedVMNotImplemented
 	}
 	if !innerHVM.IsHeightIndexComplete() {
-		return ids.Empty, errIndexIncomplete
+		return ids.Empty, block.ErrIndexIncomplete
 	}
 
 	// preFork blocks are indexed in innerVM only

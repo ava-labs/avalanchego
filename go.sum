@@ -69,8 +69,8 @@ github.com/ava-labs/coreth v0.8.4-rc.1/go.mod h1:bP2Atm7pCJdx8fwzsPT3xU/kWOdHFkl
 github.com/ava-labs/coreth v0.8.4-rc.3/go.mod h1:9TgpLJVY9ot6RV8Lh66F356S4MfalvaL3sAqw4+miTU=
 github.com/ava-labs/coreth v0.8.5-0.20220119214827-9c78fe28f93f/go.mod h1:Zq2TWMkuK1Lj2hlyubB1N8WXahsQejnI9Tt5fJ3oFj8=
 github.com/ava-labs/coreth v0.8.5-0.20220126173024-037b29640e93/go.mod h1:+QbockKBSIdDWkostOcHFk/ZxZqJ4dMkKJ3Fo1JwL7Q=
-github.com/ava-labs/coreth v0.8.5-0.20220126184109-1388f84c94d3 h1:pi8c1kt4HPDQxwNTl2FVHcTmLAJujHoyQsgA1ENND0k=
-github.com/ava-labs/coreth v0.8.5-0.20220126184109-1388f84c94d3/go.mod h1:p0ffgZwokUIcQjwZcQcvQ69Hpssq+Kcaxy4D6ewGlX4=
+github.com/ava-labs/coreth v0.8.5-rc.0.0.20220131133119-4c18e1c815e5 h1:zgnL+EJYfA4jdKu3nZArQDxND8xARIji7xVwnJzBy4g=
+github.com/ava-labs/coreth v0.8.5-rc.0.0.20220131133119-4c18e1c815e5/go.mod h1:p0ffgZwokUIcQjwZcQcvQ69Hpssq+Kcaxy4D6ewGlX4=
 github.com/aws/aws-sdk-go-v2 v1.2.0/go.mod h1:zEQs02YRBw1DjK0PoJv3ygDYOFTre1ejlJWl8FwAuQo=
 github.com/aws/aws-sdk-go-v2/config v1.1.1/go.mod h1:0XsVy9lBI/BCXm+2Tuvt39YmdHwS5unDQmxZOYe8F5Y=
 github.com/aws/aws-sdk-go-v2/credentials v1.1.1/go.mod h1:mM2iIjwl7LULWtS6JCACyInboHirisUUdkBPoTHMOUo=

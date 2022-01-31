@@ -42,8 +42,9 @@ type VMClient interface {
 	BlockReject(ctx context.Context, in *BlockRejectRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetAncestors(ctx context.Context, in *GetAncestorsRequest, opts ...grpc.CallOption) (*GetAncestorsResponse, error)
 	BatchedParseBlock(ctx context.Context, in *BatchedParseBlockRequest, opts ...grpc.CallOption) (*BatchedParseBlockResponse, error)
-	GetBlockIDByHeight(ctx context.Context, in *GetBlockIDByHeightRequest, opts ...grpc.CallOption) (*GetBlockIDByHeightResponse, error)
+	IsHeightIndexingEnabled(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*IsHeightIndexingEnabledResponse, error)
 	IsHeightIndexComplete(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*IsHeightIndexCompleteResponse, error)
+	GetBlockIDByHeight(ctx context.Context, in *GetBlockIDByHeightRequest, opts ...grpc.CallOption) (*GetBlockIDByHeightResponse, error)
 }
 
 type vMClient struct {
@@ -261,9 +262,9 @@ func (c *vMClient) BatchedParseBlock(ctx context.Context, in *BatchedParseBlockR
 	return out, nil
 }
 
-func (c *vMClient) GetBlockIDByHeight(ctx context.Context, in *GetBlockIDByHeightRequest, opts ...grpc.CallOption) (*GetBlockIDByHeightResponse, error) {
-	out := new(GetBlockIDByHeightResponse)
-	err := c.cc.Invoke(ctx, "/vmproto.VM/GetBlockIDByHeight", in, out, opts...)
+func (c *vMClient) IsHeightIndexingEnabled(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*IsHeightIndexingEnabledResponse, error) {
+	out := new(IsHeightIndexingEnabledResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/IsHeightIndexingEnabled", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -273,6 +274,15 @@ func (c *vMClient) GetBlockIDByHeight(ctx context.Context, in *GetBlockIDByHeigh
 func (c *vMClient) IsHeightIndexComplete(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*IsHeightIndexCompleteResponse, error) {
 	out := new(IsHeightIndexCompleteResponse)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/IsHeightIndexComplete", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) GetBlockIDByHeight(ctx context.Context, in *GetBlockIDByHeightRequest, opts ...grpc.CallOption) (*GetBlockIDByHeightResponse, error) {
+	out := new(GetBlockIDByHeightResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/GetBlockIDByHeight", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -306,8 +316,9 @@ type VMServer interface {
 	BlockReject(context.Context, *BlockRejectRequest) (*emptypb.Empty, error)
 	GetAncestors(context.Context, *GetAncestorsRequest) (*GetAncestorsResponse, error)
 	BatchedParseBlock(context.Context, *BatchedParseBlockRequest) (*BatchedParseBlockResponse, error)
-	GetBlockIDByHeight(context.Context, *GetBlockIDByHeightRequest) (*GetBlockIDByHeightResponse, error)
+	IsHeightIndexingEnabled(context.Context, *emptypb.Empty) (*IsHeightIndexingEnabledResponse, error)
 	IsHeightIndexComplete(context.Context, *emptypb.Empty) (*IsHeightIndexCompleteResponse, error)
+	GetBlockIDByHeight(context.Context, *GetBlockIDByHeightRequest) (*GetBlockIDByHeightResponse, error)
 	mustEmbedUnimplementedVMServer()
 }
 
@@ -384,11 +395,14 @@ func (UnimplementedVMServer) GetAncestors(context.Context, *GetAncestorsRequest)
 func (UnimplementedVMServer) BatchedParseBlock(context.Context, *BatchedParseBlockRequest) (*BatchedParseBlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BatchedParseBlock not implemented")
 }
-func (UnimplementedVMServer) GetBlockIDByHeight(context.Context, *GetBlockIDByHeightRequest) (*GetBlockIDByHeightResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetBlockIDByHeight not implemented")
+func (UnimplementedVMServer) IsHeightIndexingEnabled(context.Context, *emptypb.Empty) (*IsHeightIndexingEnabledResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method IsHeightIndexingEnabled not implemented")
 }
 func (UnimplementedVMServer) IsHeightIndexComplete(context.Context, *emptypb.Empty) (*IsHeightIndexCompleteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method IsHeightIndexComplete not implemented")
+}
+func (UnimplementedVMServer) GetBlockIDByHeight(context.Context, *GetBlockIDByHeightRequest) (*GetBlockIDByHeightResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBlockIDByHeight not implemented")
 }
 func (UnimplementedVMServer) mustEmbedUnimplementedVMServer() {}
 
@@ -817,20 +831,20 @@ func _VM_BatchedParseBlock_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VM_GetBlockIDByHeight_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetBlockIDByHeightRequest)
+func _VM_IsHeightIndexingEnabled_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VMServer).GetBlockIDByHeight(ctx, in)
+		return srv.(VMServer).IsHeightIndexingEnabled(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/vmproto.VM/GetBlockIDByHeight",
+		FullMethod: "/vmproto.VM/IsHeightIndexingEnabled",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).GetBlockIDByHeight(ctx, req.(*GetBlockIDByHeightRequest))
+		return srv.(VMServer).IsHeightIndexingEnabled(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -849,6 +863,24 @@ func _VM_IsHeightIndexComplete_Handler(srv interface{}, ctx context.Context, dec
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(VMServer).IsHeightIndexComplete(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_GetBlockIDByHeight_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetBlockIDByHeightRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).GetBlockIDByHeight(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/GetBlockIDByHeight",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).GetBlockIDByHeight(ctx, req.(*GetBlockIDByHeightRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -953,12 +985,16 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _VM_BatchedParseBlock_Handler,
 		},
 		{
-			MethodName: "GetBlockIDByHeight",
-			Handler:    _VM_GetBlockIDByHeight_Handler,
+			MethodName: "IsHeightIndexingEnabled",
+			Handler:    _VM_IsHeightIndexingEnabled_Handler,
 		},
 		{
 			MethodName: "IsHeightIndexComplete",
 			Handler:    _VM_IsHeightIndexComplete_Handler,
+		},
+		{
+			MethodName: "GetBlockIDByHeight",
+			Handler:    _VM_GetBlockIDByHeight_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

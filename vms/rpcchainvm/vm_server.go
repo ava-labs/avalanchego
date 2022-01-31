@@ -251,6 +251,16 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	}, err
 }
 
+func (vm *VMServer) IsHeightIndexingEnabled(context.Context, *emptypb.Empty) (*vmproto.IsHeightIndexingEnabledResponse, error) {
+	fsVM, ok := vm.vm.(block.HeightIndexedChainVM)
+	if !ok {
+		return nil, block.ErrHeightIndexedVMNotImplemented
+	}
+
+	response := fsVM.IsHeightIndexComplete()
+	return &vmproto.IsHeightIndexingEnabledResponse{Enabled: response}, nil
+}
+
 func (vm *VMServer) IsHeightIndexComplete(context.Context, *emptypb.Empty) (*vmproto.IsHeightIndexCompleteResponse, error) {
 	fsVM, ok := vm.vm.(block.HeightIndexedChainVM)
 	if !ok {

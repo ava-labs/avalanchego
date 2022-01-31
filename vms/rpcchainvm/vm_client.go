@@ -535,6 +535,17 @@ func (vm *VMClient) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	return err
 }
 
+func (vm *VMClient) IsHeightIndexingEnabled() bool {
+	resp, err := vm.client.IsHeightIndexingEnabled(
+		context.Background(),
+		&emptypb.Empty{},
+	)
+	if err != nil {
+		return false
+	}
+	return resp.Enabled
+}
+
 func (vm *VMClient) IsHeightIndexComplete() bool {
 	resp, err := vm.client.IsHeightIndexComplete(
 		context.Background(),
