@@ -42,7 +42,7 @@ func New(db database.Database) State {
 func NewMetered(db database.Database, namespace string, metrics prometheus.Registerer) (State, error) {
 	chainDB := prefixdb.New(chainStatePrefix, db)
 	blockDB := prefixdb.New(blockStatePrefix, db)
-	heightIndexDB := prefixdb.New(heightIndexPrefix, db)
+	heightDB := prefixdb.New(heightIndexPrefix, db)
 
 	blockState, err := NewMeteredBlockState(blockDB, namespace, metrics)
 	if err != nil {
@@ -52,6 +52,6 @@ func NewMetered(db database.Database, namespace string, metrics prometheus.Regis
 	return &state{
 		ChainState:  NewChainState(chainDB),
 		BlockState:  blockState,
-		HeightIndex: NewHeightIndex(heightIndexDB),
+		HeightIndex: NewHeightIndex(heightDB),
 	}, nil
 }
