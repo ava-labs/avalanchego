@@ -25,8 +25,6 @@ func testChainState(a *assert.Assertions, cs ChainState) {
 	err = cs.SetLastAccepted(lastAccepted)
 	a.NoError(err)
 
-	cs.clearCache()
-
 	fetchedLastAccepted, err := cs.GetLastAccepted()
 	a.NoError(err)
 	a.Equal(lastAccepted, fetchedLastAccepted)

@@ -55,9 +55,3 @@ func NewMetered(db database.Database, namespace string, metrics prometheus.Regis
 		HeightIndex: NewHeightIndex(heightIndexDB),
 	}, nil
 }
-
-func (s *state) clearCache() {
-	s.ChainState.clearCache()
-	s.BlockState.clearCache()
-	s.HeightIndex.clearCache()
-}
