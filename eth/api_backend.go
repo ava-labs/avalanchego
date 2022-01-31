@@ -242,13 +242,6 @@ func (b *EthAPIBackend) GetLogs(ctx context.Context, hash common.Hash) ([][]*typ
 	return logs, nil
 }
 
-func (b *EthAPIBackend) GetTd(ctx context.Context, hash common.Hash) *big.Int {
-	if header := b.eth.blockchain.GetHeaderByHash(hash); header != nil {
-		return b.eth.blockchain.GetTd(hash, header.Number.Uint64())
-	}
-	return nil
-}
-
 func (b *EthAPIBackend) GetEVM(ctx context.Context, msg core.Message, state *state.StateDB, header *types.Header, vmConfig *vm.Config) (*vm.EVM, func() error, error) {
 	vmError := func() error { return nil }
 	if vmConfig == nil {
@@ -428,7 +421,7 @@ func (b *EthAPIBackend) GetMaxBlocksPerRequest() int64 {
 }
 
 func (b *EthAPIBackend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, checkLive bool, preferDisk bool) (*state.StateDB, error) {
-	return b.eth.stateAtBlock(block, reexec, base, checkLive, preferDisk)
+	return b.eth.StateAtBlock(block, reexec, base, checkLive, preferDisk)
 }
 
 func (b *EthAPIBackend) StateAtTransaction(ctx context.Context, block *types.Block, txIndex int, reexec uint64) (core.Message, vm.BlockContext, *state.StateDB, error) {

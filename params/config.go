@@ -40,9 +40,10 @@ var (
 	SubnetEVMChainID = big.NewInt(43214)
 
 	// For legacy tests
-	MinGasPrice    int64 = 225_000_000_000
-	TestMinBaseFee       = big.NewInt(75_000_000_000)
-	TestMaxBaseFee       = big.NewInt(225_000_000_000)
+	MinGasPrice        int64 = 225_000_000_000
+	TestInitialBaseFee int64 = 225_000_000_000
+	TestMinBaseFee           = big.NewInt(75_000_000_000)
+	TestMaxBaseFee           = big.NewInt(225_000_000_000)
 
 	ExtraDataSize        = 80
 	RollupWindow  uint64 = 10
@@ -189,8 +190,8 @@ func (c *ChainConfig) IsIstanbul(num *big.Int) bool {
 }
 
 // IsSubnetEVM returns whether num is either equal to the SubnetEVM fork block timestamp or greater.
-func (c *ChainConfig) IsSubnetEVM(timestamp *big.Int) bool {
-	return isForked(c.SubnetEVMTimestamp, timestamp)
+func (c *ChainConfig) IsSubnetEVM(blockTimestamp *big.Int) bool {
+	return isForked(c.SubnetEVMTimestamp, blockTimestamp)
 }
 
 // IsIstanbul returns whether num is either equal to the Istanbul fork block or greater.
@@ -238,7 +239,6 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "petersburgBlock", block: c.PetersburgBlock},
 		{name: "istanbulBlock", block: c.IstanbulBlock},
 		{name: "muirGlacierBlock", block: c.MuirGlacierBlock, optional: true},
-		{name: "subnetEVMTimestamp", block: c.SubnetEVMTimestamp},
 	} {
 		if cur.block != nil && common.Big0.Cmp(cur.block) != 0 {
 			return errNonGenesisForkByHeight
@@ -262,6 +262,33 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		}
 	}
 
+	// Note: In Avalanche, hard forks must take place via block timestamps instead
+	// of block numbers since blocks are produced asynchronously. Therefore, we do not
+	// check that the block timestamps in the same way as for
+	// the block number forks since it would not be a meaningful comparison.
+	// Instead, we check only that Phases are enabled in order.
+	lastFork = fork{}
+	for _, cur := range []fork{
+		{name: "subnetEVMTimestamp", block: c.SubnetEVMTimestamp},
+	} {
+		if lastFork.name != "" {
+			// Next one must be higher number
+			if lastFork.block == nil && cur.block != nil {
+				return fmt.Errorf("unsupported fork ordering: %v not enabled, but %v enabled at %v",
+					lastFork.name, cur.name, cur.block)
+			}
+			if lastFork.block != nil && cur.block != nil {
+				if lastFork.block.Cmp(cur.block) > 0 {
+					return fmt.Errorf("unsupported fork ordering: %v enabled at %v, but %v enabled at %v",
+						lastFork.name, lastFork.block, cur.name, cur.block)
+				}
+			}
+		}
+		// If it was optional and not set, then ignore it
+		if !cur.optional || cur.block != nil {
+			lastFork = cur
+		}
+	}
 	return nil
 }
 
@@ -300,7 +327,9 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, head *big.Int) *Confi
 	if isForkIncompatible(c.MuirGlacierBlock, newcfg.MuirGlacierBlock, head) {
 		return newCompatError("Muir Glacier fork block", c.MuirGlacierBlock, newcfg.MuirGlacierBlock)
 	}
-	// TODO(aaronbuchwald) ensure that Avalanche Blocktimestamps are not modified
+	if !configNumEqual(c.SubnetEVMTimestamp, newcfg.SubnetEVMTimestamp) {
+		return newCompatError("SubnetEVM fork block", c.SubnetEVMTimestamp, newcfg.SubnetEVMTimestamp)
+	}
 	return nil
 }
 

@@ -26,7 +26,7 @@ func TestArchiveBlockChain(t *testing.T) {
 				SnapshotLimit:  256,
 			},
 			chainConfig,
-			dummy.NewEngine(),
+			dummy.NewFaker(),
 			vm.Config{},
 			lastAcceptedHash,
 		)
@@ -51,7 +51,7 @@ func TestArchiveBlockChainSnapsDisabled(t *testing.T) {
 				SnapshotLimit:  0,     // Disable snapshots
 			},
 			chainConfig,
-			dummy.NewEngine(),
+			dummy.NewFaker(),
 			vm.Config{},
 			lastAcceptedHash,
 		)
@@ -76,7 +76,7 @@ func TestPruningBlockChain(t *testing.T) {
 				SnapshotLimit:  256,
 			},
 			chainConfig,
-			dummy.NewEngine(),
+			dummy.NewFaker(),
 			vm.Config{},
 			lastAcceptedHash,
 		)
@@ -101,7 +101,7 @@ func TestPruningBlockChainSnapsDisabled(t *testing.T) {
 				SnapshotLimit:  0,    // Disable snapshots
 			},
 			chainConfig,
-			dummy.NewEngine(),
+			dummy.NewFaker(),
 			vm.Config{},
 			lastAcceptedHash,
 		)
@@ -132,7 +132,7 @@ func TestPruningBlockChainUngracefulShutdown(t *testing.T) {
 				SnapshotLimit:  256,
 			},
 			chainConfig,
-			dummy.NewEngine(),
+			dummy.NewFaker(),
 			vm.Config{},
 			lastAcceptedHash,
 		)
@@ -164,7 +164,7 @@ func TestPruningBlockChainUngracefulShutdownSnapsDisabled(t *testing.T) {
 				SnapshotLimit:  0,    // Disable snapshots
 			},
 			chainConfig,
-			dummy.NewEngine(),
+			dummy.NewFaker(),
 			vm.Config{},
 			lastAcceptedHash,
 		)
@@ -198,7 +198,7 @@ func TestEnableSnapshots(t *testing.T) {
 				SnapshotLimit:  snapLimit, // Disable snapshots
 			},
 			chainConfig,
-			dummy.NewEngine(),
+			dummy.NewFaker(),
 			vm.Config{},
 			lastAcceptedHash,
 		)
@@ -232,7 +232,7 @@ func TestCorruptSnapshots(t *testing.T) {
 				SnapshotLimit:  256,  // Disable snapshots
 			},
 			chainConfig,
-			dummy.NewEngine(),
+			dummy.NewFaker(),
 			vm.Config{},
 			lastAcceptedHash,
 		)

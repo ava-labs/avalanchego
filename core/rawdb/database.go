@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/subnet-evm/ethdb"
+	"github.com/ava-labs/subnet-evm/ethdb/leveldb"
 	"github.com/ava-labs/subnet-evm/ethdb/memorydb"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -61,6 +62,16 @@ func NewMemoryDatabase() ethdb.Database {
 // chain segments into cold storage.
 func NewMemoryDatabaseWithCap(size int) ethdb.Database {
 	return NewDatabase(memorydb.NewWithCap(size))
+}
+
+// NewLevelDBDatabase creates a persistent key-value database without a freezer
+// moving immutable chain segments into cold storage.
+func NewLevelDBDatabase(file string, cache int, handles int, namespace string, readonly bool) (ethdb.Database, error) {
+	db, err := leveldb.New(file, cache, handles, namespace, readonly)
+	if err != nil {
+		return nil, err
+	}
+	return NewDatabase(db), nil
 }
 
 type counter uint64
@@ -108,7 +119,6 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		headers         stat
 		bodies          stat
 		receipts        stat
-		tds             stat
 		numHashPairings stat
 		hashNumPairings stat
 		tries           stat
@@ -145,8 +155,6 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 			bodies.Add(size)
 		case bytes.HasPrefix(key, blockReceiptsPrefix) && len(key) == (len(blockReceiptsPrefix)+8+common.HashLength):
 			receipts.Add(size)
-		case bytes.HasPrefix(key, headerPrefix) && bytes.HasSuffix(key, headerTDSuffix):
-			tds.Add(size)
 		case bytes.HasPrefix(key, headerPrefix) && bytes.HasSuffix(key, headerHashSuffix):
 			numHashPairings.Add(size)
 		case bytes.HasPrefix(key, headerNumberPrefix) && len(key) == (len(headerNumberPrefix)+common.HashLength):
@@ -182,10 +190,8 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		default:
 			var accounted bool
 			for _, meta := range [][]byte{
-				databaseVersionKey, headHeaderKey, headBlockKey, headFastBlockKey, lastPivotKey,
-				fastTrieProgressKey, snapshotDisabledKey, snapshotRootKey, snapshotJournalKey,
-				snapshotGeneratorKey, snapshotRecoveryKey, txIndexTailKey, fastTxLookupLimitKey,
-				uncleanShutdownKey, badBlockKey,
+				databaseVersionKey, headHeaderKey, headBlockKey,
+				snapshotRootKey, snapshotGeneratorKey, uncleanShutdownKey,
 			} {
 				if bytes.Equal(key, meta) {
 					metadata.Add(size)
@@ -208,7 +214,6 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		{"Key-Value store", "Headers", headers.Size(), headers.Count()},
 		{"Key-Value store", "Bodies", bodies.Size(), bodies.Count()},
 		{"Key-Value store", "Receipt lists", receipts.Size(), receipts.Count()},
-		{"Key-Value store", "Difficulties", tds.Size(), tds.Count()},
 		{"Key-Value store", "Block number->hash", numHashPairings.Size(), numHashPairings.Count()},
 		{"Key-Value store", "Block hash->number", hashNumPairings.Size(), hashNumPairings.Count()},
 		{"Key-Value store", "Transaction index", txLookups.Size(), txLookups.Count()},

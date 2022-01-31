@@ -323,12 +323,10 @@ func (g *Genesis) Commit(db ethdb.Database) (*types.Block, error) {
 	if err := config.CheckConfigForkOrder(); err != nil {
 		return nil, err
 	}
-	rawdb.WriteTd(db, block.Hash(), block.NumberU64(), g.Difficulty)
 	rawdb.WriteBlock(db, block)
 	rawdb.WriteReceipts(db, block.Hash(), block.NumberU64(), nil)
 	rawdb.WriteCanonicalHash(db, block.Hash(), block.NumberU64())
 	rawdb.WriteHeadBlockHash(db, block.Hash())
-	rawdb.WriteHeadFastBlockHash(db, block.Hash())
 	rawdb.WriteHeadHeaderHash(db, block.Hash())
 	rawdb.WriteChainConfig(db, block.Hash(), config)
 	return block, nil
@@ -342,4 +340,14 @@ func (g *Genesis) MustCommit(db ethdb.Database) *types.Block {
 		panic(err)
 	}
 	return block
+}
+
+// GenesisBlockForTesting creates and writes a block in which addr has the given wei balance.
+func GenesisBlockForTesting(db ethdb.Database, addr common.Address, balance *big.Int) *types.Block {
+	g := Genesis{
+		Config:  params.TestChainConfig,
+		Alloc:   GenesisAlloc{addr: {Balance: balance}},
+		BaseFee: big.NewInt(params.TestMaxBaseFee.Int64()),
+	}
+	return g.MustCommit(db)
 }

@@ -61,7 +61,7 @@ func ExampleGenerateChain() {
 	// each block and adds different features to gen based on the
 	// block index.
 	signer := types.HomesteadSigner{}
-	chain, _, err := GenerateChain(gspec.Config, genesis, dummy.NewEngine(), db, 3, 10, func(i int, gen *BlockGen) {
+	chain, _, err := GenerateChain(gspec.Config, genesis, dummy.NewFaker(), db, 3, 10, func(i int, gen *BlockGen) {
 		switch i {
 		case 0:
 			// In block 1, addr1 sends addr2 some ether.
@@ -82,7 +82,7 @@ func ExampleGenerateChain() {
 	}
 
 	// Import the chain. This runs all block validation rules.
-	blockchain, _ := NewBlockChain(db, DefaultCacheConfig, gspec.Config, dummy.NewEngine(), vm.Config{}, common.Hash{})
+	blockchain, _ := NewBlockChain(db, DefaultCacheConfig, gspec.Config, dummy.NewFaker(), vm.Config{}, common.Hash{})
 	defer blockchain.Stop()
 
 	if i, err := blockchain.InsertChain(chain); err != nil {

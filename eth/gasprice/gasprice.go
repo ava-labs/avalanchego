@@ -111,8 +111,7 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 	if percent < 0 {
 		percent = 0
 		log.Warn("Sanitizing invalid gasprice oracle sample percentile", "provided", config.Percentile, "updated", percent)
-	}
-	if percent > 100 {
+	} else if percent > 100 {
 		percent = 100
 		log.Warn("Sanitizing invalid gasprice oracle sample percentile", "provided", config.Percentile, "updated", percent)
 	}
@@ -130,6 +129,16 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 	if minGasUsed == nil || minGasUsed.Int64() < 0 {
 		minGasUsed = DefaultMinGasUsed
 		log.Warn("Sanitizing invalid gasprice oracle min gas used", "provided", config.MinGasUsed, "updated", minGasUsed)
+	}
+	maxHeaderHistory := config.MaxHeaderHistory
+	if maxHeaderHistory < 1 {
+		maxHeaderHistory = 1
+		log.Warn("Sanitizing invalid gasprice oracle max header history", "provided", config.MaxHeaderHistory, "updated", maxHeaderHistory)
+	}
+	maxBlockHistory := config.MaxBlockHistory
+	if maxBlockHistory < 1 {
+		maxBlockHistory = 1
+		log.Warn("Sanitizing invalid gasprice oracle max block history", "provided", config.MaxBlockHistory, "updated", maxBlockHistory)
 	}
 
 	cache, _ := lru.New(2048)
@@ -154,8 +163,8 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 		minGasUsed:       minGasUsed,
 		checkBlocks:      blocks,
 		percentile:       percent,
-		maxHeaderHistory: config.MaxHeaderHistory,
-		maxBlockHistory:  config.MaxBlockHistory,
+		maxHeaderHistory: maxHeaderHistory,
+		maxBlockHistory:  maxBlockHistory,
 		historyCache:     cache,
 	}
 }
@@ -253,7 +262,11 @@ func (oracle *Oracle) SuggestTipCap(ctx context.Context) (*big.Int, error) {
 
 // suggestDynamicFees estimates the gas tip and base fee based on a simple sampling method
 func (oracle *Oracle) suggestDynamicFees(ctx context.Context) (*big.Int, *big.Int, error) {
-	head, _ := oracle.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+	head, err := oracle.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	headHash := head.Hash()
 
 	// If the latest gasprice is still available, return it.

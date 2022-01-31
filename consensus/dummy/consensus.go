@@ -28,17 +28,32 @@ var (
 	errBaseFeeNil           = errors.New("base fee is nil")
 )
 
-type DummyEngine struct {
-	ethFaker bool
-}
+type Mode uint
 
-func NewEngine() *DummyEngine {
-	return &DummyEngine{}
-}
+const (
+	ModeSkipHeader   Mode = 1 // Skip over header verification
+	ModeSkipBlockFee Mode = 2 // Skip block fee verification
+)
+
+type (
+	DummyEngine struct {
+		consensusMode Mode
+	}
+)
 
 func NewETHFaker() *DummyEngine {
 	return &DummyEngine{
-		ethFaker: true,
+		consensusMode: ModeSkipBlockFee,
+	}
+}
+
+func NewFaker() *DummyEngine {
+	return &DummyEngine{}
+}
+
+func NewFullFaker() *DummyEngine {
+	return &DummyEngine{
+		consensusMode: ModeSkipHeader,
 	}
 }
 
@@ -46,9 +61,8 @@ func (self *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, heade
 	timestamp := new(big.Int).SetUint64(header.Time)
 
 	// Verify that the gas limit is <= 2^63-1
-	cap := uint64(0x7fffffffffffffff)
-	if header.GasLimit > cap {
-		return fmt.Errorf("invalid gasLimit: have %v, max %v", header.GasLimit, cap)
+	if header.GasLimit > params.MaxGasLimit {
+		return fmt.Errorf("invalid gasLimit: have %v, max %v", header.GasLimit, params.MaxGasLimit)
 	}
 	// Verify that the gasUsed is <= gasLimit
 	if header.GasUsed > header.GasLimit {
@@ -163,8 +177,7 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header 
 	if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {
 		return consensus.ErrInvalidNumber
 	}
-	// Verify the engine specific seal securing the block
-	return self.VerifySeal(chain, header)
+	return nil
 }
 
 func (self *DummyEngine) Author(header *types.Header) (common.Address, error) {
@@ -172,6 +185,10 @@ func (self *DummyEngine) Author(header *types.Header) (common.Address, error) {
 }
 
 func (self *DummyEngine) VerifyHeader(chain consensus.ChainHeaderReader, header *types.Header) error {
+	// If we're running a full engine faking, accept any input as valid
+	if self.consensusMode == ModeSkipHeader {
+		return nil
+	}
 	// Short circuit if the header is known, or it's parent not
 	number := header.Number.Uint64()
 	if chain.GetHeader(header.Hash(), number) != nil {
@@ -192,10 +209,6 @@ func (self *DummyEngine) VerifyUncles(chain consensus.ChainReader, block *types.
 	return nil
 }
 
-func (self *DummyEngine) VerifySeal(chain consensus.ChainHeaderReader, header *types.Header) error {
-	return nil
-}
-
 func (self *DummyEngine) Prepare(chain consensus.ChainHeaderReader, header *types.Header) error {
 	header.Difficulty = big.NewInt(1)
 	return nil
@@ -207,7 +220,7 @@ func (self *DummyEngine) verifyBlockFee(
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
 ) error {
-	if self.ethFaker {
+	if self.consensusMode == ModeSkipBlockFee {
 		return nil
 	}
 	if baseFee == nil || baseFee.Sign() <= 0 {

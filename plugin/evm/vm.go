@@ -46,9 +46,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	cjson "github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -95,7 +96,6 @@ var (
 	errHeaderExtraDataTooBig    = errors.New("header extra data too big")
 	errNilBaseFeeSubnetEVM      = errors.New("nil base fee is invalid after subnetEVM")
 	errNilBlockGasCostSubnetEVM = errors.New("nil blockGasCost is invalid after subnetEVM")
-	defaultLogLevel             = log.LvlDebug
 )
 
 var originalStderr *os.File
@@ -144,7 +144,7 @@ type VM struct {
 	bootstrapped bool
 }
 
-func (vm *VM) Connected(nodeID ids.ShortID) error {
+func (vm *VM) Connected(id ids.ShortID, nodeVersion version.Application) error {
 	return nil // noop
 }
 
@@ -152,9 +152,20 @@ func (vm *VM) Disconnected(nodeID ids.ShortID) error {
 	return nil // noop
 }
 
-// SetLogLevel sets the log level with the original [os.StdErr] interface
+// Clock implements the secp256k1fx interface
+func (vm *VM) Clock() *mockable.Clock { return &vm.clock }
+
+// Logger implements the secp256k1fx interface
+func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
+
+// setLogLevel sets the log level with the original [os.StdErr] interface along
+// with the context logger.
 func (vm *VM) setLogLevel(logLevel log.Lvl) {
-	log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.StreamHandler(originalStderr, log.TerminalFormat(false))))
+	format := log.TerminalFormat(false)
+	log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.MultiHandler(
+		log.StreamHandler(originalStderr, format),
+		log.StreamHandler(vm.ctx.Log, format),
+	)))
 }
 
 /*
@@ -209,13 +220,9 @@ func (vm *VM) Initialize(
 	vm.acceptedBlockDB = prefixdb.New(acceptedPrefix, vm.db)
 
 	// Set log level
-	logLevel := defaultLogLevel
-	if vm.config.LogLevel != "" {
-		configLogLevel, err := log.LvlFromString(vm.config.LogLevel)
-		if err != nil {
-			return fmt.Errorf("failed to initialize logger due to: %w ", err)
-		}
-		logLevel = configLogLevel
+	logLevel, err := log.LvlFromString(vm.config.LogLevel)
+	if err != nil {
+		return fmt.Errorf("failed to initialize logger due to: %w ", err)
 	}
 	vm.setLogLevel(logLevel)
 
@@ -265,7 +272,7 @@ func (vm *VM) Initialize(
 	var lastAcceptedHash common.Hash
 	switch {
 	case lastAcceptedErr == database.ErrNotFound:
-		// // Set [lastAcceptedHash] to the genesis block hash.
+		// Set [lastAcceptedHash] to the genesis block hash.
 		lastAcceptedHash = ethConfig.Genesis.ToBlock(nil).Hash()
 	case lastAcceptedErr != nil:
 		return fmt.Errorf("failed to get last accepted block ID due to: %w", lastAcceptedErr)
@@ -485,7 +492,9 @@ func newHandler(name string, service interface{}, lockOption ...commonEng.LockOp
 func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 	handler := vm.chain.NewRPCHandler(vm.config.APIMaxDuration.Duration)
 	enabledAPIs := vm.config.EthAPIs()
-	vm.chain.AttachEthService(handler, enabledAPIs)
+	if err := vm.chain.AttachEthService(handler, enabledAPIs); err != nil {
+		return nil, err
+	}
 
 	primaryAlias, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID)
 	if err != nil {
@@ -501,17 +510,11 @@ func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 		enabledAPIs = append(enabledAPIs, "subnet-evm-admin")
 	}
 
-	errs := wrappers.Errs{}
 	if vm.config.SnowmanAPIEnabled {
-		errs.Add(handler.RegisterName("snowman", &SnowmanAPI{vm}))
+		if err := handler.RegisterName("snowman", &SnowmanAPI{vm}); err != nil {
+			return nil, err
+		}
 		enabledAPIs = append(enabledAPIs, "snowman")
-	}
-	if vm.config.Web3APIEnabled {
-		errs.Add(handler.RegisterName("web3", &Web3API{}))
-		enabledAPIs = append(enabledAPIs, "web3")
-	}
-	if errs.Errored() {
-		return nil, errs.Err
 	}
 
 	log.Info(fmt.Sprintf("Enabled APIs: %s", strings.Join(enabledAPIs, ", ")))
@@ -544,10 +547,7 @@ func (vm *VM) CreateStaticHandlers() (map[string]*commonEng.HTTPHandler, error) 
 	}
 
 	return map[string]*commonEng.HTTPHandler{
-		"": {
-			LockOptions: commonEng.NoLock,
-			Handler:     server,
-		},
+		"/rpc": {LockOptions: commonEng.NoLock, Handler: server},
 	}, nil
 }
 

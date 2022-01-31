@@ -48,6 +48,7 @@ import (
 	"github.com/ava-labs/subnet-evm/eth/tracers"
 	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/internal/ethapi"
+	"github.com/ava-labs/subnet-evm/internal/shutdowncheck"
 	"github.com/ava-labs/subnet-evm/miner"
 	"github.com/ava-labs/subnet-evm/node"
 	"github.com/ava-labs/subnet-evm/params"
@@ -96,12 +97,18 @@ type Ethereum struct {
 
 	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
 
+	shutdownTracker *shutdowncheck.ShutdownTracker // Tracks if and when the node has shutdown ungracefully
+
+	stackRPCs []rpc.API
+
 	settings Settings // Settings for Ethereum API
 }
 
 // New creates a new Ethereum object (including the
 // initialisation of the common Ethereum object)
-func New(stack *node.Node, config *Config,
+func New(
+	stack *node.Node,
+	config *Config,
 	chainDb ethdb.Database,
 	settings Settings,
 	lastAcceptedHash common.Hash,
@@ -136,15 +143,16 @@ func New(stack *node.Node, config *Config,
 	eth := &Ethereum{
 		config:            config,
 		chainDb:           chainDb,
-		eventMux:          stack.EventMux(),
+		eventMux:          new(event.TypeMux),
 		accountManager:    stack.AccountManager(),
-		engine:            dummy.NewEngine(),
+		engine:            dummy.NewFaker(),
 		closeBloomHandler: make(chan struct{}),
 		networkID:         config.NetworkId,
 		etherbase:         config.Miner.Etherbase,
 		bloomRequests:     make(chan chan *bloombits.Retrieval),
 		bloomIndexer:      core.NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
 		settings:          settings,
+		shutdownTracker:   shutdowncheck.NewShutdownTracker(chainDb),
 	}
 
 	bcVersion := rawdb.ReadDatabaseVersion(chainDb)
@@ -211,8 +219,10 @@ func New(stack *node.Node, config *Config,
 	// Start the RPC service
 	eth.netRPCService = ethapi.NewPublicNetAPI(eth.NetVersion())
 
-	// Register the backend on the node
-	stack.RegisterAPIs(eth.APIs())
+	eth.stackRPCs = stack.APIs()
+
+	// Successful startup; push a marker and check previous unclean shutdowns.
+	eth.shutdownTracker.MarkStartup()
 
 	return eth, nil
 }
@@ -225,6 +235,9 @@ func (s *Ethereum) APIs() []rpc.API {
 	// Append tracing APIs
 	apis = append(apis, tracers.APIs(s.APIBackend)...)
 
+	// Add the APIs from the node
+	apis = append(apis, s.stackRPCs...)
+
 	// Append all the local APIs and return
 	return append(apis, []rpc.API{
 		{
@@ -232,29 +245,35 @@ func (s *Ethereum) APIs() []rpc.API {
 			Version:   "1.0",
 			Service:   NewPublicEthereumAPI(s),
 			Public:    true,
+			Name:      "public-eth",
 		}, {
 			Namespace: "eth",
 			Version:   "1.0",
 			Service:   filters.NewPublicFilterAPI(s.APIBackend, false, 5*time.Minute),
 			Public:    true,
+			Name:      "public-eth-filter",
 		}, {
 			Namespace: "admin",
 			Version:   "1.0",
 			Service:   NewPrivateAdminAPI(s),
+			Name:      "private-admin",
 		}, {
 			Namespace: "debug",
 			Version:   "1.0",
 			Service:   NewPublicDebugAPI(s),
 			Public:    true,
+			Name:      "public-debug",
 		}, {
 			Namespace: "debug",
 			Version:   "1.0",
 			Service:   NewPrivateDebugAPI(s),
+			Name:      "private-debug",
 		}, {
 			Namespace: "net",
 			Version:   "1.0",
 			Service:   s.netRPCService,
 			Public:    true,
+			Name:      "net",
 		},
 	}...)
 }
@@ -309,6 +328,9 @@ func (s *Ethereum) BloomIndexer() *core.ChainIndexer { return s.bloomIndexer }
 func (s *Ethereum) Start() {
 	// Start the bloom bits servicing goroutines
 	s.startBloomHandlers(params.BloomBitsBlocks)
+
+	// Regularly update shutdown marker
+	s.shutdownTracker.Start()
 }
 
 // Stop implements node.Lifecycle, terminating all internal goroutines used by the
@@ -320,6 +342,10 @@ func (s *Ethereum) Stop() error {
 	s.txPool.Stop()
 	s.blockchain.Stop()
 	s.engine.Close()
+
+	// Clean shutdown marker as the last thing before closing db
+	s.shutdownTracker.Stop()
+
 	s.chainDb.Close()
 	s.eventMux.Stop()
 	return nil
