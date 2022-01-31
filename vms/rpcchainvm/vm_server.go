@@ -256,9 +256,9 @@ func (vm *VMServer) IsHeightIndexingEnabled(context.Context, *emptypb.Empty) (*v
 	if !ok {
 		return nil, block.ErrHeightIndexedVMNotImplemented
 	}
-
-	response := hVM.IsHeightIndexingEnabled()
-	return &vmproto.IsHeightIndexingEnabledResponse{Enabled: response}, nil
+	return &vmproto.IsHeightIndexingEnabledResponse{
+		Enabled: hVM.IsHeightIndexingEnabled(),
+	}, nil
 }
 
 func (vm *VMServer) IsHeightIndexComplete(context.Context, *emptypb.Empty) (*vmproto.IsHeightIndexCompleteResponse, error) {
@@ -266,9 +266,9 @@ func (vm *VMServer) IsHeightIndexComplete(context.Context, *emptypb.Empty) (*vmp
 	if !ok {
 		return nil, block.ErrHeightIndexedVMNotImplemented
 	}
-
-	response := hVM.IsHeightIndexComplete()
-	return &vmproto.IsHeightIndexCompleteResponse{Completed: response}, nil
+	return &vmproto.IsHeightIndexCompleteResponse{
+		Completed: hVM.IsHeightIndexComplete(),
+	}, nil
 }
 
 func (vm *VMServer) GetBlockIDByHeight(ctx context.Context, req *vmproto.GetBlockIDByHeightRequest) (*vmproto.GetBlockIDByHeightResponse, error) {
@@ -277,10 +277,9 @@ func (vm *VMServer) GetBlockIDByHeight(ctx context.Context, req *vmproto.GetBloc
 		return nil, block.ErrHeightIndexedVMNotImplemented
 	}
 	blkID, err := hVM.GetBlockIDByHeight(req.Height)
-	if err != nil {
-		return nil, err
-	}
-	return &vmproto.GetBlockIDByHeightResponse{BlkID: blkID[:]}, nil
+	return &vmproto.GetBlockIDByHeightResponse{
+		BlkID: blkID[:],
+	}, err
 }
 
 func (vm *VMServer) SetState(_ context.Context, stateReq *vmproto.SetStateRequest) (*emptypb.Empty, error) {
