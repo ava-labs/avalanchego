@@ -226,8 +226,7 @@ func (hi *heightIndexer) doRepair(currentProBlkID ids.ID) error {
 
 		currentHeight := currentAcceptedBlk.Height()
 		_, err = hi.indexState.GetBlockIDAtHeight(currentHeight)
-		switch err {
-		case nil:
+		if err == nil {
 			// index completed. This may happen when node shuts down while
 			// accepting a new block.
 
@@ -244,52 +243,52 @@ func (hi *heightIndexer) doRepair(currentProBlkID ids.ID) error {
 				time.Since(start),
 			)
 			return nil
+		}
+		if err != database.ErrNotFound {
+			return err
+		}
 
-		case database.ErrNotFound:
-			// Keep memory footprint under control by committing when a size threshold is reached
-			if hi.batch.Size() > hi.commitMaxSize {
-				// store checkpoint
-				if err := database.PutID(hi.batch, state.CheckpointKey, currentProBlkID); err != nil {
-					return err
-				}
-
-				// commit and reset batch for reuse
-				committedSize := hi.batch.Size()
-				if err := hi.batch.Write(); err != nil {
-					return err
-				}
-				hi.batch.Reset()
-
-				hi.log.Info(
-					"Block indexing by height: ongoing. Indexed %d blocks, latest committed height %d, committed %d bytes",
-					indexedBlks,
-					currentHeight,
-					committedSize,
-				)
-			}
-
-			// Rebuild height block index.
-			entryKey := state.GetEntryKey(currentHeight)
-			if err := database.PutID(hi.batch, entryKey, currentProBlkID); err != nil {
+		// Keep memory footprint under control by committing when a size threshold is reached
+		if hi.batch.Size() > hi.commitMaxSize {
+			// store checkpoint
+			if err := database.PutID(hi.batch, state.CheckpointKey, currentProBlkID); err != nil {
 				return err
 			}
 
-			// Periodically log progress
-			indexedBlks++
-			if time.Since(lastLogTime) > 15*time.Second {
-				lastLogTime = time.Now()
-				hi.log.Info(
-					"Block indexing by height: ongoing. Indexed %d blocks, latest indexed height %d",
-					indexedBlks,
-					currentHeight,
-				)
+			// commit and reset batch for reuse
+			committedSize := hi.batch.Size()
+			if err := hi.batch.Write(); err != nil {
+				return err
 			}
+			hi.batch.Reset()
 
-			// keep checking the parent
-			currentProBlkID = currentAcceptedBlk.Parent()
-			previousHeight = currentHeight
-		default:
+			hi.log.Info(
+				"Block indexing by height: ongoing. Indexed %d blocks, latest committed height %d, committed %d bytes",
+				indexedBlks,
+				currentHeight,
+				committedSize,
+			)
+		}
+
+		// Rebuild height block index.
+		entryKey := state.GetEntryKey(currentHeight)
+		if err := database.PutID(hi.batch, entryKey, currentProBlkID); err != nil {
 			return err
 		}
+
+		// Periodically log progress
+		indexedBlks++
+		if time.Since(lastLogTime) > 15*time.Second {
+			lastLogTime = time.Now()
+			hi.log.Info(
+				"Block indexing by height: ongoing. Indexed %d blocks, latest indexed height %d",
+				indexedBlks,
+				currentHeight,
+			)
+		}
+
+		// keep checking the parent
+		currentProBlkID = currentAcceptedBlk.Parent()
+		previousHeight = currentHeight
 	}
 }
