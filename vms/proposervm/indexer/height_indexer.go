@@ -189,26 +189,17 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 // Note: batch commit is deferred to doRepair caller
 func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 	var (
-		currentProBlkID   = repairStartBlkID
-		currentInnerBlkID = ids.Empty
-
-		start       = time.Now()
-		lastLogTime = start
-		indexedBlks = 0
+		currentProBlkID = repairStartBlkID
+		start           = time.Now()
+		lastLogTime     = start
+		indexedBlks     int
+		previousHeight  uint64
 	)
 	for {
 		currentAcceptedBlk, err := hi.server.GetWrappingBlk(currentProBlkID)
-		switch err {
-		case nil:
-
-		case database.ErrNotFound:
+		if err == database.ErrNotFound {
 			// visited all proposerVM blocks. Let's record forkHeight ...
-			firstWrappedInnerBlk, err := hi.server.GetInnerBlk(currentInnerBlkID)
-			if err != nil {
-				return err
-			}
-			forkHeight := firstWrappedInnerBlk.Height()
-			if err := database.PutUInt64(hi.batch, state.ForkKey, forkHeight); err != nil {
+			if err := database.PutUInt64(hi.batch, state.ForkKey, previousHeight); err != nil {
 				return err
 			}
 
@@ -219,17 +210,20 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 			hi.jobDone.SetValue(true)
 
 			// it will commit on exit
-			hi.log.Info("Block indexing by height: completed. Indexed %d blocks, duration %v, fork height %d",
-				indexedBlks, time.Since(start), forkHeight)
+			hi.log.Info(
+				"Block indexing by height: completed. Indexed %d blocks, duration %v, fork height %d",
+				indexedBlks,
+				time.Since(start),
+				previousHeight,
+			)
 			return nil
-
-		default:
+		}
+		if err != nil {
 			return err
 		}
 
-		currentInnerBlkID = currentAcceptedBlk.GetInnerBlk().ID()
-
-		_, err = hi.indexState.GetBlockIDAtHeight(currentAcceptedBlk.Height())
+		currentHeight := currentAcceptedBlk.Height()
+		_, err = hi.indexState.GetBlockIDAtHeight(currentHeight)
 		switch err {
 		case nil:
 			// index completed. This may happen when node shuts down while
@@ -242,14 +236,17 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 			hi.jobDone.SetValue(true)
 
 			// it will commit on exit
-			hi.log.Info("Block indexing by height: repaired. Indexed %d blocks, duration %v",
-				indexedBlks, time.Since(start))
+			hi.log.Info(
+				"Block indexing by height: repaired. Indexed %d blocks, duration %v",
+				indexedBlks,
+				time.Since(start),
+			)
 			return nil
 
 		case database.ErrNotFound:
 			// Rebuild height block index.
-			entryKey := state.GetEntryKey(currentAcceptedBlk.Height())
-			if err := hi.batch.Put(entryKey, currentProBlkID[:]); err != nil {
+			entryKey := state.GetEntryKey(currentHeight)
+			if err := database.PutID(hi.batch, entryKey, currentProBlkID); err != nil {
 				return err
 			}
 
@@ -261,7 +258,7 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 				}
 
 				// update fork height
-				if err := database.PutUInt64(hi.batch, state.ForkKey, currentAcceptedBlk.Height()); err != nil {
+				if err := database.PutUInt64(hi.batch, state.ForkKey, currentHeight); err != nil {
 					return err
 				}
 
@@ -272,20 +269,28 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 				}
 				hi.batch.Reset()
 
-				hi.log.Info("Block indexing by height: ongoing. Indexed %d blocks, latest committed height %d, committed %d bytes",
-					indexedBlks, currentAcceptedBlk.Height()+1, committedSize)
+				hi.log.Info(
+					"Block indexing by height: ongoing. Indexed %d blocks, latest committed height %d, committed %d bytes",
+					indexedBlks,
+					currentHeight,
+					committedSize,
+				)
 			}
 
 			// Periodically log progress
 			indexedBlks++
 			if time.Since(lastLogTime) > 15*time.Second {
 				lastLogTime = time.Now()
-				hi.log.Info("Block indexing by height: ongoing. Indexed %d blocks, latest indexed height %d",
-					indexedBlks, currentAcceptedBlk.Height()+1)
+				hi.log.Info(
+					"Block indexing by height: ongoing. Indexed %d blocks, latest indexed height %d",
+					indexedBlks,
+					currentHeight,
+				)
 			}
 
 			// keep checking the parent
 			currentProBlkID = currentAcceptedBlk.Parent()
+			previousHeight = currentHeight
 		default:
 			return err
 		}
@@ -294,25 +299,22 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 
 func (hi *heightIndexer) doCheckpoint(currentProBlk WrappingBlock) error {
 	// checkpoint is current block's parent, it if exists
-	var checkpoint ids.ID
 	parentBlkID := currentProBlk.Parent()
 	checkpointBlk, err := hi.server.GetWrappingBlk(parentBlkID)
-	switch err {
-	case nil:
-		checkpoint = checkpointBlk.ID()
-		if err := hi.batch.Put(state.CheckpointKey, checkpoint[:]); err != nil {
-			return err
-		}
-		hi.log.Info("Block indexing by height. Stored checkpoint %v at height %d",
-			currentProBlk.ID(), currentProBlk.Height())
-		return nil
-
-	case database.ErrNotFound:
+	if err == database.ErrNotFound {
 		// parent must be a preFork block. We do not checkpoint here.
 		// Process will set forkHeight and terminate
 		return nil
-
-	default:
+	}
+	if err != nil {
 		return err
 	}
+
+	checkpoint := checkpointBlk.ID()
+	hi.log.Info(
+		"Block indexing by height. Stored checkpoint %v at height %d",
+		checkpoint,
+		currentProBlk.Height()-1,
+	)
+	return database.PutID(hi.batch, state.CheckpointKey, checkpoint)
 }
