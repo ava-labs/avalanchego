@@ -187,23 +187,25 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 // if height index needs repairing, doRepair would do that. It
 // iterates back via parents, checking and rebuilding height indexing.
 // Note: batch commit is deferred to doRepair caller
-func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
+func (hi *heightIndexer) doRepair(currentProBlkID ids.ID) error {
 	var (
-		currentProBlkID = repairStartBlkID
-		start           = time.Now()
-		lastLogTime     = start
-		indexedBlks     int
-		previousHeight  uint64
+		start          = time.Now()
+		lastLogTime    = start
+		indexedBlks    int
+		previousHeight uint64
 	)
 	for {
 		currentAcceptedBlk, err := hi.server.GetWrappingBlk(currentProBlkID)
 		if err == database.ErrNotFound {
-			// visited all proposerVM blocks. Let's record forkHeight ...
+			// We have visited all the proposerVM blocks. Because we previously
+			// verified that we needed to perform a repair, we know that this
+			// will not happen on the first iteration. This guarantees that
+			// [previousHeight] will be correctly initialized.
 			if err := database.PutUInt64(hi.batch, state.ForkKey, previousHeight); err != nil {
 				return err
 			}
 
-			// ... delete checkpoint
+			// delete checkpoint
 			if err := hi.batch.Delete(state.CheckpointKey); err != nil {
 				return err
 			}
@@ -244,25 +246,14 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 			return nil
 
 		case database.ErrNotFound:
-			// Rebuild height block index.
-			entryKey := state.GetEntryKey(currentHeight)
-			if err := database.PutID(hi.batch, entryKey, currentProBlkID); err != nil {
-				return err
-			}
-
 			// Keep memory footprint under control by committing when a size threshold is reached
 			if hi.batch.Size() > hi.commitMaxSize {
-				// find and store checkpoint
-				if err := hi.doCheckpoint(currentAcceptedBlk); err != nil {
+				// store checkpoint
+				if err := database.PutID(hi.batch, state.CheckpointKey, currentProBlkID); err != nil {
 					return err
 				}
 
-				// update fork height
-				if err := database.PutUInt64(hi.batch, state.ForkKey, currentHeight); err != nil {
-					return err
-				}
-
-				// finally commit and reset batch for reuse
+				// commit and reset batch for reuse
 				committedSize := hi.batch.Size()
 				if err := hi.batch.Write(); err != nil {
 					return err
@@ -275,6 +266,12 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 					currentHeight,
 					committedSize,
 				)
+			}
+
+			// Rebuild height block index.
+			entryKey := state.GetEntryKey(currentHeight)
+			if err := database.PutID(hi.batch, entryKey, currentProBlkID); err != nil {
+				return err
 			}
 
 			// Periodically log progress
@@ -295,26 +292,4 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 			return err
 		}
 	}
-}
-
-func (hi *heightIndexer) doCheckpoint(currentProBlk WrappingBlock) error {
-	// checkpoint is current block's parent, it if exists
-	parentBlkID := currentProBlk.Parent()
-	checkpointBlk, err := hi.server.GetWrappingBlk(parentBlkID)
-	if err == database.ErrNotFound {
-		// parent must be a preFork block. We do not checkpoint here.
-		// Process will set forkHeight and terminate
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-
-	checkpoint := checkpointBlk.ID()
-	hi.log.Info(
-		"Block indexing by height. Stored checkpoint %v at height %d",
-		checkpoint,
-		currentProBlk.Height()-1,
-	)
-	return database.PutID(hi.batch, state.CheckpointKey, checkpoint)
 }
