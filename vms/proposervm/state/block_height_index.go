@@ -19,9 +19,9 @@ const (
 var (
 	_ HeightIndex = &heightIndex{}
 
-	ForkPrefix       = []byte("ForkKey")
-	CheckpointPrefix = []byte("CheckpointKey")
-	heightPrefix     = []byte("heightkey")
+	ForkKey       = []byte("fork")
+	CheckpointKey = []byte("checkpoint")
+	heightPrefix  = []byte("height")
 )
 
 type HeightIndexGetter interface {
@@ -48,7 +48,6 @@ type HeightIndexBatchSupport interface {
 type HeightIndex interface {
 	HeightIndexWriter
 	HeightIndexGetter
-
 	HeightIndexBatchSupport
 }
 
@@ -74,51 +73,44 @@ func (hi *heightIndex) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 		return res, nil
 	}
 
-	bytes, err := hi.db.Get(key)
+	blkID, err := database.GetID(hi.db, key)
 	if err != nil {
 		return ids.Empty, err
 	}
-
-	res, err := ids.ToID(bytes)
-	if err == nil {
-		hi.blkHeightsCache.Put(string(key), res)
-	}
-	return res, err
+	hi.blkHeightsCache.Put(string(key), blkID)
+	return blkID, err
 }
 
 // GetForkHeight implements HeightIndexGetter
 func (hi *heightIndex) GetForkHeight() (uint64, error) {
-	return database.GetUInt64(hi.db, ForkPrefix)
+	return database.GetUInt64(hi.db, ForkKey)
 }
 
 // SetBlockIDAtHeight implements HeightIndexWriterDeleter
 func (hi *heightIndex) SetBlockIDAtHeight(height uint64, blkID ids.ID) error {
 	key := GetEntryKey(height)
 	hi.blkHeightsCache.Put(string(key), blkID)
-	return hi.db.Put(key, blkID[:])
+	return database.PutID(hi.db, key, blkID)
 }
 
 // SetForkHeight implements HeightIndexWriterDeleter
 func (hi *heightIndex) SetForkHeight(height uint64) error {
-	return database.PutUInt64(hi.db, ForkPrefix, height)
+	return database.PutUInt64(hi.db, ForkKey, height)
 }
 
 // GetBatch implements HeightIndexBatchSupport
-func (hi *heightIndex) NewBatch() database.Batch { return hi.db.NewBatch() }
+func (hi *heightIndex) NewBatch() database.Batch {
+	return hi.db.NewBatch()
+}
 
 // SetCheckpoint implements HeightIndexBatchSupport
 func (hi *heightIndex) SetCheckpoint(blkID ids.ID) error {
-	return hi.db.Put(CheckpointPrefix, blkID[:])
+	return database.PutID(hi.db, CheckpointKey, blkID)
 }
 
 // GetCheckpoint implements HeightIndexBatchSupport
 func (hi *heightIndex) GetCheckpoint() (ids.ID, error) {
-	bytes, err := hi.db.Get(CheckpointPrefix)
-	if err != nil {
-		return ids.Empty, err
-	}
-
-	return ids.ToID(bytes)
+	return database.GetID(hi.db, CheckpointKey)
 }
 
 // helpers functions to create keys/values.
