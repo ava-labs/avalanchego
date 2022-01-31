@@ -18,9 +18,9 @@ type BlockServer interface {
 	GetInnerBlk(id ids.ID) (snowman.Block, error)
 }
 
-// heightIndexDBOps groups all the operations that indexer
+// HeightIndexDBOps groups all the operations that indexer
 // need to perform on state.HeightIndex
-type heightIndexDBOps interface {
+type HeightIndexDBOps interface {
 	state.HeightIndexGetter
 	state.HeightIndexBatchSupport
 }

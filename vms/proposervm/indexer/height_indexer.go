@@ -27,24 +27,24 @@ type HeightIndexer interface {
 	RepairHeightIndex() error
 }
 
-func NewHeightIndexer(srv BlockServer,
+func NewHeightIndexer(
+	srv BlockServer,
 	log logging.Logger,
-	indexState heightIndexDBOps) HeightIndexer {
+	indexState HeightIndexDBOps) HeightIndexer {
 	return newHeightIndexer(srv, log, indexState)
 }
 
-func newHeightIndexer(srv BlockServer,
+func newHeightIndexer(
+	srv BlockServer,
 	log logging.Logger,
-	indexState heightIndexDBOps) *heightIndexer {
-	res := &heightIndexer{
+	indexState HeightIndexDBOps) *heightIndexer {
+	return &heightIndexer{
 		server:        srv,
 		log:           log,
 		indexState:    indexState,
 		batch:         indexState.NewBatch(),
 		commitMaxSize: defaultCommitSizeCap,
 	}
-
-	return res
 }
 
 type heightIndexer struct {
@@ -52,7 +52,7 @@ type heightIndexer struct {
 	log    logging.Logger
 
 	jobDone    utils.AtomicBool
-	indexState heightIndexDBOps
+	indexState HeightIndexDBOps
 	batch      database.Batch
 
 	commitMaxSize int
@@ -124,7 +124,7 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 	case database.ErrNotFound:
 		// snowman++ has not forked yet; height block index is ok.
 		// set forkHeight to math.MaxUint64, aka +infinity
-		if err := database.PutUInt64(hi.batch, state.GetForkKey(), math.MaxInt64); err != nil {
+		if err := database.PutUInt64(hi.batch, state.ForkPrefix, math.MaxInt64); err != nil {
 			return true, ids.Empty, err
 		}
 
@@ -159,7 +159,7 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 		// in case new blocks are accepted while indexing is ongoing,
 		// and the process is terminated before first commit,
 		// we do not miss rebuilding the full index.
-		if err := hi.batch.Put(state.GetCheckpointKey(), latestProBlkID[:]); err != nil {
+		if err := hi.batch.Put(state.CheckpointPrefix, latestProBlkID[:]); err != nil {
 			return true, ids.Empty, err
 		}
 
@@ -167,7 +167,7 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 		switch currentForkHeight, err := hi.indexState.GetForkHeight(); err {
 		case database.ErrNotFound:
 			// fork height not found, initialize it to math.MaxUint64, aka +infinity
-			if err := database.PutUInt64(hi.batch, state.GetForkKey(), math.MaxUint64); err != nil {
+			if err := database.PutUInt64(hi.batch, state.ForkPrefix, math.MaxUint64); err != nil {
 				return true, ids.Empty, err
 			}
 		case nil:
@@ -210,12 +210,12 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 				return err
 			}
 			forkHeight := firstWrappedInnerBlk.Height()
-			if err := database.PutUInt64(hi.batch, state.GetForkKey(), forkHeight); err != nil {
+			if err := database.PutUInt64(hi.batch, state.ForkPrefix, forkHeight); err != nil {
 				return err
 			}
 
 			// ... delete checkpoint
-			if err := hi.batch.Delete(state.GetCheckpointKey()); err != nil {
+			if err := hi.batch.Delete(state.CheckpointPrefix); err != nil {
 				return err
 			}
 			hi.jobDone.SetValue(true)
@@ -238,7 +238,7 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 			// accepting a new block.
 
 			// delete checkpoint
-			if err := hi.batch.Delete(state.GetCheckpointKey()); err != nil {
+			if err := hi.batch.Delete(state.CheckpointPrefix); err != nil {
 				return err
 			}
 			hi.jobDone.SetValue(true)
@@ -263,7 +263,7 @@ func (hi *heightIndexer) doRepair(repairStartBlkID ids.ID) error {
 				}
 
 				// update fork height
-				if err := database.PutUInt64(hi.batch, state.GetForkKey(), currentAcceptedBlk.Height()); err != nil {
+				if err := database.PutUInt64(hi.batch, state.ForkPrefix, currentAcceptedBlk.Height()); err != nil {
 					return err
 				}
 
@@ -302,7 +302,7 @@ func (hi *heightIndexer) doCheckpoint(currentProBlk WrappingBlock) error {
 	switch err {
 	case nil:
 		checkpoint = checkpointBlk.ID()
-		if err := hi.batch.Put(state.GetCheckpointKey(), checkpoint[:]); err != nil {
+		if err := hi.batch.Put(state.CheckpointPrefix, checkpoint[:]); err != nil {
 			return err
 		}
 		hi.log.Info("Block indexing by height. Stored checkpoint %v at height %d",
