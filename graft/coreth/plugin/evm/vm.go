@@ -839,6 +839,11 @@ func (vm *VM) SetPreference(blkID ids.ID) error {
 	return vm.chain.SetPreference(block.(*Block).ethBlock)
 }
 
+func (vm *VM) IsHeightIndexingEnabled() bool {
+	// our index is vm.chain.GetBlockByNumber
+	return true
+}
+
 func (vm *VM) IsHeightIndexComplete() bool {
 	// our index is vm.chain.GetBlockByNumber
 	return true
