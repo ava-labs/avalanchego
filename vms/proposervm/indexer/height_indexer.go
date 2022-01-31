@@ -30,14 +30,16 @@ type HeightIndexer interface {
 func NewHeightIndexer(
 	srv BlockServer,
 	log logging.Logger,
-	indexState HeightIndexDBOps) HeightIndexer {
+	indexState HeightIndexDBOps,
+) HeightIndexer {
 	return newHeightIndexer(srv, log, indexState)
 }
 
 func newHeightIndexer(
 	srv BlockServer,
 	log logging.Logger,
-	indexState HeightIndexDBOps) *heightIndexer {
+	indexState HeightIndexDBOps,
+) *heightIndexer {
 	return &heightIndexer{
 		server:        srv,
 		log:           log,
@@ -90,11 +92,7 @@ func (hi *heightIndexer) RepairHeightIndex() error {
 	if err := hi.doRepair(startBlkID); err != nil {
 		return err
 	}
-	if err := hi.batch.Write(); err != nil {
-		hi.log.Warn("Failed writing height index batch, err %w", err)
-		return err
-	}
-	return nil
+	return hi.batch.Write()
 }
 
 // shouldRepair checks if height index is complete;
