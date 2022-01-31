@@ -11,10 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/indexer"
 )
 
-var (
-	_ Block                 = &postForkBlock{}
-	_ indexer.WrappingBlock = &preForkBlock{}
-)
+var _ indexer.WrappingBlock = &preForkBlock{}
 
 // postForkBlock implements proposervm.Block
 type postForkBlock struct {

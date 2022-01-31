@@ -127,20 +127,35 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	if innerHVM, ok := vm.ChainVM.(block.HeightIndexedChainVM); ok {
-		if !innerHVM.IsHeightIndexComplete() {
-			vm.ctx.Log.Info("Block indexing by height: repairing height index not started since innerVM index is incomplete.")
-		} else {
-			go func() {
-				if err := vm.hIndexer.RepairHeightIndex(); err != nil {
-					vm.ctx.Log.Error("Block indexing by height: failed with error %s", err)
-					return
-				}
-			}()
-		}
+	if err := vm.setLastAcceptedOptionTime(); err != nil {
+		return err
 	}
 
-	return vm.setLastAcceptedOptionTime()
+	// check and possibly rebuild height index
+	innerHVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
+	if !ok {
+		return nil // nothing else to do
+	}
+
+	if !innerHVM.IsHeightIndexingEnabled() {
+		return nil // nothing else to do
+	}
+
+	// asynchronously rebuild height index, if needed
+	go func() {
+		// poll till index is complete
+		for !innerHVM.IsHeightIndexComplete() {
+			time.Sleep(10 * time.Second)
+		}
+
+		// finally repair index
+		if err := vm.hIndexer.RepairHeightIndex(); err != nil {
+			vm.ctx.Log.Error("Block indexing by height: failed with error %s", err)
+			return
+		}
+	}()
+
+	return nil
 }
 
 // shutdown ops then propagate shutdown to innerVM

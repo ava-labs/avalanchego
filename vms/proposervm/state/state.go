@@ -13,7 +13,7 @@ import (
 var (
 	chainStatePrefix  = []byte("chain")
 	blockStatePrefix  = []byte("block")
-	heightIndexPrefix = []byte("heightBlk")
+	heightIndexPrefix = []byte("height")
 )
 
 type State interface {
@@ -31,11 +31,11 @@ type state struct {
 func New(db database.Database) State {
 	chainDB := prefixdb.New(chainStatePrefix, db)
 	blockDB := prefixdb.New(blockStatePrefix, db)
-	heightIndexDB := prefixdb.New(heightIndexPrefix, db)
+	heightDB := prefixdb.New(heightIndexPrefix, db)
 	return &state{
 		ChainState:  NewChainState(chainDB),
 		BlockState:  NewBlockState(blockDB),
-		HeightIndex: NewHeightIndex(heightIndexDB),
+		HeightIndex: NewHeightIndex(heightDB),
 	}
 }
 

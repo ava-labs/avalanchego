@@ -12,10 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/indexer"
 )
 
-var (
-	_ Block                 = &postForkOption{}
-	_ indexer.WrappingBlock = &preForkBlock{}
-)
+var _ indexer.WrappingBlock = &preForkBlock{}
 
 // The parent of a *postForkOption must be a *postForkBlock.
 type postForkOption struct {
