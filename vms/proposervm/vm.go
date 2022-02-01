@@ -430,10 +430,14 @@ func (vm *VM) storePostForkBlock(blk PostForkBlock) error {
 		return err
 	}
 
-	if err := vm.updateHeightIndex(blk.Height(), blk.ID()); err != nil {
+	height := blk.Height()
+	blkID := blk.ID()
+	if err := vm.updateHeightIndex(height, blkID); err != nil {
+		vm.ctx.Log.Warn("Block indexing by height: new block. Failed updating index %v", err)
 		return err
 	}
 
+	vm.ctx.Log.Debug("Block indexing by height: added block %s at height %d", blkID, height)
 	return vm.db.Commit()
 }
 

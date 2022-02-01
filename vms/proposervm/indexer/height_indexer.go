@@ -99,20 +99,14 @@ func (hi *heightIndexer) RepairHeightIndex() error {
 // if not, it returns the checkpoint from which repairing should start.
 // Note: batch commit is deferred to shouldRepair caller
 func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
-	switch checkpointID, err := hi.indexState.GetCheckpoint(); err {
-	case nil:
-		// checkpoint found, repair must be resumed
-		hi.log.Info("Block indexing by height starting: success. Retrieved checkpoint %v", checkpointID)
-		return true, checkpointID, nil
-
-	case database.ErrNotFound:
-		// no checkpoint. Either index is complete or repair was never attempted.
-		hi.log.Info("Block indexing by height starting: checkpoint not found. Verifying index is complete...")
-
-	default:
-		return true, ids.Empty, err
+	checkpointID, err := hi.indexState.GetCheckpoint()
+	if err != database.ErrNotFound {
+		// if checkpoint is found, re-indexing can start.
+		// if unexpected error is returned, there nothing we can really do here.
+		return true, checkpointID, err
 	}
 
+	// no checkpoint. Either index is complete or repair was never attempted.
 	// index is complete iff lastAcceptedBlock is indexed
 	latestProBlkID, err := hi.server.LastAcceptedWrappingBlkID()
 	switch err {
@@ -144,10 +138,7 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 	_, err = hi.indexState.GetBlockIDAtHeight(lastAcceptedBlk.Height())
 	switch err {
 	case nil:
-		// index is complete already. Just make sure forkHeight can be read
-		if _, err := hi.indexState.GetForkHeight(); err != nil {
-			return true, ids.Empty, err
-		}
+		// index is complete already.
 		hi.jobDone.SetValue(true)
 		hi.log.Info("Block indexing by height starting: Index already complete, nothing to do.")
 		return false, ids.Empty, nil
