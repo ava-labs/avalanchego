@@ -225,7 +225,8 @@ func (hi *heightIndexer) doRepair(currentProBlkID ids.ID) error {
 
 		// Keep memory footprint under control by committing when a size threshold is reached
 		if hi.batch.Size() > hi.commitMaxSize {
-			// store checkpoint
+			// Note: checkpoint must be the lowest block in the batch. This ensures that
+			// checkpoint is the highest un-indexed block from which process would restart.
 			if err := database.PutID(hi.batch, state.CheckpointKey, currentProBlkID); err != nil {
 				return err
 			}
