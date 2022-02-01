@@ -54,11 +54,28 @@ func (vm *VM) GetBlockIDByHeight(height uint64) (ids.ID, error) {
 // updateHeightIndex should not be called for preFork blocks. Moreover
 // vm.ctx.Lock should be held
 func (vm *VM) updateHeightIndex(height uint64, blkID ids.ID) error {
-	innerHVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
-	if !ok || !innerHVM.IsHeightIndexComplete() {
-		return nil // nothing to do
-	}
+	checkpoint, err := vm.State.GetCheckpoint()
+	switch err {
+	case nil:
+		// index rebuilding is ongoing. We can update the index,
+		// stepping away from checkpointed blk, which will be handled by indexer.
+		if blkID != checkpoint {
+			return vm.storeHeightEntry(height, blkID)
+		}
 
+	case database.ErrNotFound:
+		// no checkpoint means indexing is not started or is already done
+		if vm.hIndexer.IsRepaired() {
+			return vm.storeHeightEntry(height, blkID)
+		}
+
+	default:
+		return err
+	}
+	return nil
+}
+
+func (vm *VM) storeHeightEntry(height uint64, blkID ids.ID) error {
 	switch _, err := vm.State.GetForkHeight(); err {
 	case nil:
 		// fork already reached. Just update the index
