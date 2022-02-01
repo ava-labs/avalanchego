@@ -4,6 +4,8 @@
 package proposervm
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -83,14 +85,13 @@ func (vm *VM) storeHeightEntry(height uint64, blkID ids.ID) error {
 	case database.ErrNotFound:
 		// this is the first post Fork block/option, store fork height
 		if err := vm.State.SetForkHeight(height); err != nil {
-			vm.ctx.Log.Warn("Block indexing by height: new block. Failed storing fork height %v", err)
-			return err
+			return fmt.Errorf("failed storing fork height: %w", err)
 		}
 
 	default:
-		vm.ctx.Log.Warn("Block indexing by height: new block. Could not load fork height %v", err)
-		return err
+		return fmt.Errorf("failed to load fork height: %w", err)
 	}
 
+	vm.ctx.Log.Debug("Block indexing by height: added block %s at height %d", blkID, height)
 	return vm.State.SetBlockIDAtHeight(height, blkID)
 }
