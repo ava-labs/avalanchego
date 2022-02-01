@@ -15,6 +15,7 @@ var _ indexer.BlockServer = &VM{}
 func (vm *VM) LastAcceptedWrappingBlkID() (ids.ID, error) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
+
 	return vm.State.GetLastAccepted()
 }
 
@@ -22,6 +23,7 @@ func (vm *VM) LastAcceptedWrappingBlkID() (ids.ID, error) {
 func (vm *VM) LastAcceptedInnerBlkID() (ids.ID, error) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
+
 	return vm.ChainVM.LastAccepted()
 }
 
@@ -29,6 +31,7 @@ func (vm *VM) LastAcceptedInnerBlkID() (ids.ID, error) {
 func (vm *VM) GetWrappingBlk(blkID ids.ID) (indexer.WrappingBlock, error) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
+
 	return vm.getPostForkBlock(blkID)
 }
 
@@ -36,5 +39,6 @@ func (vm *VM) GetWrappingBlk(blkID ids.ID) (indexer.WrappingBlock, error) {
 func (vm *VM) GetInnerBlk(id ids.ID) (snowman.Block, error) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
+
 	return vm.ChainVM.GetBlock(id)
 }
