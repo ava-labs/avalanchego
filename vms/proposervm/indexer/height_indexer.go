@@ -63,33 +63,21 @@ func (hi *heightIndexer) IsRepaired() bool {
 }
 
 // RepairHeightIndex ensures the height -> proBlkID height block index is well formed.
-// Starting from last accepted proposerVM block, it will go back to snowman++ activation fork
+// Starting from the checkpoint, it will go back to snowman++ activation fork
 // or genesis. PreFork blocks will be handled by innerVM height index.
 // RepairHeightIndex can take a non-trivial time to complete; hence we make sure
 // the process has limited memory footprint, can be resumed from periodic checkpoints
 // and works asynchronously without blocking the VM.
 func (hi *heightIndexer) RepairHeightIndex() error {
-	needRepair, startBlkID, err := hi.shouldRepair()
-	if err != nil {
-		return fmt.Errorf("could not determine if index should be repaired: %w", err)
+	startBlkID, err := hi.indexState.GetCheckpoint()
+	if err == database.ErrNotFound {
+		hi.jobDone.SetValue(true)
+		return nil // nothing to do
 	}
-	if err := hi.flush(); err != nil {
-		return fmt.Errorf("could not write height index updates: %w", err)
+	if err != nil {
+		return err
 	}
 
-	if !needRepair {
-		forkHeight, err := hi.indexState.GetForkHeight()
-		switch err {
-		case nil:
-			hi.log.Info("Block indexing by height: already complete. Fork height %d", forkHeight)
-			return nil
-		case database.ErrNotFound:
-			hi.log.Info("Block indexing by height: already complete. Fork not reached yet.")
-			return nil
-		default:
-			return err
-		}
-	}
 	if err := hi.doRepair(startBlkID); err != nil {
 		return fmt.Errorf("could not repair height index: %w", err)
 	}
@@ -97,67 +85,6 @@ func (hi *heightIndexer) RepairHeightIndex() error {
 		return fmt.Errorf("could not write final height index update: %w", err)
 	}
 	return nil
-}
-
-// shouldRepair checks if height index is complete;
-// if not, it returns the checkpoint from which repairing should start.
-// Note: batch commit is deferred to shouldRepair caller
-func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
-	checkpointID, err := hi.indexState.GetCheckpoint()
-	if err != database.ErrNotFound {
-		// if checkpoint is found, re-indexing can start.
-		// if unexpected error is returned, there nothing we can really do here.
-		return true, checkpointID, err
-	}
-
-	// no checkpoint. Either index is complete or repair was never attempted.
-	// index is complete iff lastAcceptedBlock is indexed
-	latestProBlkID, err := hi.server.LastAcceptedWrappingBlkID()
-	switch err {
-	case nil:
-		break
-
-	case database.ErrNotFound:
-		// snowman++ has not forked yet; height block index is ok.
-		hi.jobDone.SetValue(true)
-		hi.log.Info("Block indexing by height starting: Snowman++ fork not reached yet. No need to rebuild index.")
-		return false, ids.Empty, nil
-
-	default:
-		return true, ids.Empty, err
-	}
-
-	lastAcceptedBlk, err := hi.server.GetWrappingBlk(latestProBlkID)
-	if err != nil {
-		// Could not retrieve last accepted block.
-		// We got bigger problems than repairing the index
-		return true, ids.Empty, err
-	}
-
-	_, err = hi.indexState.GetBlockIDAtHeight(lastAcceptedBlk.Height())
-	switch err {
-	case nil:
-		// index is complete already.
-		hi.jobDone.SetValue(true)
-		hi.log.Info("Block indexing by height starting: Index already complete, nothing to do.")
-		return false, ids.Empty, nil
-
-	case database.ErrNotFound:
-		// Index needs repairing. Mark the checkpoint so that,
-		// in case new blocks are accepted while indexing is ongoing,
-		// and the process is terminated before first commit,
-		// we do not miss rebuilding the full index.
-		if err := hi.indexState.SetCheckpoint(latestProBlkID); err != nil {
-			return true, ids.Empty, err
-		}
-
-		// it will commit on exit
-		hi.log.Info("Block indexing by height starting: index incomplete. Rebuilding from %v", latestProBlkID)
-		return true, latestProBlkID, nil
-
-	default:
-		return true, ids.Empty, err
-	}
 }
 
 // if height index needs repairing, doRepair would do that. It

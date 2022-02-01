@@ -172,6 +172,16 @@ func (vm *VM) Initialize(
 		}
 
 		// finally repair index
+		err := vm.shouldHeightIndexBeRepaired()
+		if err == nil {
+			vm.ctx.Log.Info("Block indexing by height: index already complete, nothing to repair.")
+			return
+		}
+		if err != block.ErrIndexIncomplete {
+			vm.ctx.Log.Error("Block indexing by height: could not check height index, err %w", err)
+			return
+		}
+
 		if err := vm.hIndexer.RepairHeightIndex(); err != nil {
 			vm.ctx.Log.Error("Block indexing by height: failed with error %s", err)
 			return

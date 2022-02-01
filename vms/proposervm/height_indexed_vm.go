@@ -11,6 +11,67 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
+// shouldHeightIndexBeRepaired checks if index needs repairing.
+// If so, it stores a checkpoint shouldHeightIndexBeRepaired acquires
+// vm.ctx.Lock to avoid interleaving with updateHeightIndex.
+func (vm *VM) shouldHeightIndexBeRepaired() error {
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+
+	checkpointID, err := vm.State.GetCheckpoint()
+	if err == nil {
+		vm.ctx.Log.Info("Block indexing by height starting: found checkpoint %s", checkpointID)
+		return block.ErrIndexIncomplete
+	}
+	if err != database.ErrNotFound {
+		return err
+	}
+
+	// no checkpoint. Either index is complete or repair was never attempted.
+	// index is complete iff lastAcceptedBlock is indexed
+	latestProBlkID, err := vm.State.GetLastAccepted()
+	switch err {
+	case nil:
+		break
+
+	case database.ErrNotFound:
+		vm.ctx.Log.Info("Block indexing by height starting: Snowman++ fork not reached yet. No need to rebuild index.")
+		return nil
+
+	default:
+		return err
+	}
+
+	lastAcceptedBlk, err := vm.getPostForkBlock(latestProBlkID)
+	if err != nil {
+		// Could not retrieve last accepted block.
+		// We got bigger problems than repairing the index
+		return err
+	}
+
+	_, err = vm.State.GetBlockIDAtHeight(lastAcceptedBlk.Height())
+	switch err {
+	case nil:
+		vm.ctx.Log.Info("Block indexing by height starting: Index already complete, nothing to do.")
+		return nil
+
+	case database.ErrNotFound:
+		// Index needs repairing. Mark the checkpoint so that,
+		// in case new blocks are accepted while indexing is ongoing,
+		// and the process is terminated before first commit,
+		// we do not miss rebuilding the full index.
+		if err := vm.State.SetCheckpoint(latestProBlkID); err != nil {
+			return err
+		}
+
+		vm.ctx.Log.Info("Block indexing by height starting: index incomplete. Rebuilding from %v", latestProBlkID)
+		return block.ErrIndexIncomplete
+
+	default:
+		return err
+	}
+}
+
 // vm.ctx.Lock should be held
 func (vm *VM) VerifyHeightIndex() error {
 	if _, ok := vm.ChainVM.(block.HeightIndexedChainVM); !ok {
