@@ -80,6 +80,7 @@ func (hi *heightIndexer) RepairHeightIndex() error {
 		hi.log.Warn("Failed writing height index batch, err %w", err)
 		return err
 	}
+	hi.batch.Reset()
 
 	if !needRepair {
 		forkHeight, err := hi.indexState.GetForkHeight()
@@ -196,7 +197,6 @@ func (hi *heightIndexer) doRepair(currentProBlkID ids.ID) error {
 				return err
 			}
 
-			// delete checkpoint
 			if err := hi.batch.Delete(state.CheckpointKey); err != nil {
 				return err
 			}
@@ -221,7 +221,6 @@ func (hi *heightIndexer) doRepair(currentProBlkID ids.ID) error {
 			// index completed. This may happen when node shuts down while
 			// accepting a new block.
 
-			// delete checkpoint
 			if err := hi.batch.Delete(state.CheckpointKey); err != nil {
 				return err
 			}
