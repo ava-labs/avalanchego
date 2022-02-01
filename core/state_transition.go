@@ -241,6 +241,7 @@ func (st *StateTransition) preCheck() error {
 			return fmt.Errorf("%w: address %v, codehash: %s", ErrSenderNoEOA,
 				st.msg.From().Hex(), codeHash)
 		}
+		// Make sure the sender is not the Blackhole
 		if st.msg.From() == st.evm.Context.Coinbase {
 			return fmt.Errorf("%w: address %v", vm.ErrNoSenderBlackhole, st.msg.From())
 		}
