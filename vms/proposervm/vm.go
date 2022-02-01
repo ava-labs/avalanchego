@@ -4,6 +4,7 @@
 package proposervm
 
 import (
+	"context"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -16,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/indexer"
@@ -49,8 +49,7 @@ type VM struct {
 	minimumPChainHeight uint64
 
 	state.State
-	shutdownCalled utils.AtomicBool
-	hIndexer       indexer.HeightIndexer
+	hIndexer indexer.HeightIndexer
 
 	proposer.Windower
 	tree.Tree
@@ -67,6 +66,8 @@ type VM struct {
 	verifiedBlocks map[ids.ID]PostForkBlock
 	preferred      ids.ID
 	bootstrapped   bool
+	context        context.Context
+	onShutdown     func()
 
 	// lastAcceptedOptionTime is set to the last accepted PostForkBlock's
 	// timestamp if the last accepted block has been a PostForkOption block
@@ -113,6 +114,9 @@ func (vm *VM) Initialize(
 	})
 
 	vm.verifiedBlocks = make(map[ids.ID]PostForkBlock)
+	context, cancel := context.WithCancel(context.Background())
+	vm.context = context
+	vm.onShutdown = cancel
 
 	err := vm.ChainVM.Initialize(
 		ctx,
@@ -145,11 +149,9 @@ func (vm *VM) Initialize(
 	// asynchronously rebuild height index, if needed
 	go func() {
 		// poll till index is complete or shutdown happens
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
 		for {
-			if vm.shutdownCalled.GetValue() {
-				return
-			}
-
 			err := innerHVM.VerifyHeightIndex()
 			if err == nil {
 				// innerVM indexing complete. Let re-index this machine
@@ -161,7 +163,11 @@ func (vm *VM) Initialize(
 			}
 
 			// innerVM index is incomplete. Wait for completion and retry
-			time.Sleep(10 * time.Second)
+			select {
+			case <-vm.context.Done():
+				return
+			case <-ticker.C:
+			}
 		}
 
 		// finally repair index
@@ -176,7 +182,7 @@ func (vm *VM) Initialize(
 
 // shutdown ops then propagate shutdown to innerVM
 func (vm *VM) Shutdown() error {
-	vm.shutdownCalled.SetValue(true)
+	vm.onShutdown()
 
 	if err := vm.db.Commit(); err != nil {
 		return err
