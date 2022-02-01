@@ -30,10 +30,11 @@ var (
 // database of the VM that the container exists in.
 type Index interface {
 	snow.Acceptor
+	io.Closer
+
 	GetContainerByIndex(index uint64) (Container, error)
 	GetContainerRange(startIndex uint64, numToFetch uint64) ([]Container, error)
 	GetLastAccepted() (Container, error)
 	GetIndex(containerID ids.ID) (uint64, error)
 	GetContainerByID(containerID ids.ID) (Container, error)
-	io.Closer
 }
