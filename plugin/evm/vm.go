@@ -46,7 +46,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	cjson "github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
@@ -151,12 +150,6 @@ func (vm *VM) Connected(id ids.ShortID, nodeVersion version.Application) error {
 func (vm *VM) Disconnected(nodeID ids.ShortID) error {
 	return nil // noop
 }
-
-// Clock implements the secp256k1fx interface
-func (vm *VM) Clock() *mockable.Clock { return &vm.clock }
-
-// Logger implements the secp256k1fx interface
-func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
 
 // setLogLevel sets the log level with the original [os.StdErr] interface along
 // with the context logger.
