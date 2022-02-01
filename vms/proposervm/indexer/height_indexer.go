@@ -10,11 +10,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 )
 
-const defaultCommitSizeCap = 1 * units.MiB
+// default number of heights to index before committing
+const defaultCommitFrequency = 1024
 
 var _ HeightIndexer = &heightIndexer{}
 
@@ -29,7 +29,7 @@ type HeightIndexer interface {
 func NewHeightIndexer(
 	srv BlockServer,
 	log logging.Logger,
-	indexState HeightIndexDBOps,
+	indexState state.HeightIndex,
 ) HeightIndexer {
 	return newHeightIndexer(srv, log, indexState)
 }
@@ -37,14 +37,13 @@ func NewHeightIndexer(
 func newHeightIndexer(
 	srv BlockServer,
 	log logging.Logger,
-	indexState HeightIndexDBOps,
+	indexState state.HeightIndex,
 ) *heightIndexer {
 	return &heightIndexer{
-		server:        srv,
-		log:           log,
-		indexState:    indexState,
-		batch:         indexState.NewBatch(),
-		commitMaxSize: defaultCommitSizeCap,
+		server:          srv,
+		log:             log,
+		indexState:      indexState,
+		commitFrequency: defaultCommitFrequency,
 	}
 }
 
@@ -53,10 +52,9 @@ type heightIndexer struct {
 	log    logging.Logger
 
 	jobDone    utils.AtomicBool
-	indexState HeightIndexDBOps
-	batch      database.Batch
+	indexState state.HeightIndex
 
-	commitMaxSize int
+	commitFrequency int
 }
 
 func (hi *heightIndexer) IsRepaired() bool {
@@ -147,7 +145,7 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 		// in case new blocks are accepted while indexing is ongoing,
 		// and the process is terminated before first commit,
 		// we do not miss rebuilding the full index.
-		if err := hi.batch.Put(state.CheckpointKey, latestProBlkID[:]); err != nil {
+		if err := hi.indexState.SetCheckpoint(latestProBlkID); err != nil {
 			return true, ids.Empty, err
 		}
 
@@ -165,10 +163,11 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 // Note: batch commit is deferred to doRepair caller
 func (hi *heightIndexer) doRepair(currentProBlkID ids.ID) error {
 	var (
-		start          = time.Now()
-		lastLogTime    = start
-		indexedBlks    int
-		previousHeight uint64
+		start           = time.Now()
+		lastLogTime     = start
+		indexedBlks     int
+		lastIndexedBlks int
+		previousHeight  uint64
 	)
 	for {
 		currentAcceptedBlk, err := hi.server.GetWrappingBlk(currentProBlkID)
@@ -177,11 +176,10 @@ func (hi *heightIndexer) doRepair(currentProBlkID ids.ID) error {
 			// verified that we needed to perform a repair, we know that this
 			// will not happen on the first iteration. This guarantees that
 			// [previousHeight] will be correctly initialized.
-			if err := database.PutUInt64(hi.batch, state.ForkKey, previousHeight); err != nil {
+			if err := hi.indexState.SetForkHeight(previousHeight); err != nil {
 				return err
 			}
-
-			if err := hi.batch.Delete(state.CheckpointKey); err != nil {
+			if err := hi.indexState.DeleteCheckpoint(); err != nil {
 				return err
 			}
 			hi.jobDone.SetValue(true)
@@ -205,7 +203,7 @@ func (hi *heightIndexer) doRepair(currentProBlkID ids.ID) error {
 			// index completed. This may happen when node shuts down while
 			// accepting a new block.
 
-			if err := hi.batch.Delete(state.CheckpointKey); err != nil {
+			if err := hi.indexState.DeleteCheckpoint(); err != nil {
 				return err
 			}
 			hi.jobDone.SetValue(true)
@@ -223,29 +221,27 @@ func (hi *heightIndexer) doRepair(currentProBlkID ids.ID) error {
 		}
 
 		// Keep memory footprint under control by committing when a size threshold is reached
-		if hi.batch.Size() > hi.commitMaxSize {
+		if indexedBlks-lastIndexedBlks > hi.commitFrequency {
 			// Note: checkpoint must be the lowest block in the batch. This ensures that
 			// checkpoint is the highest un-indexed block from which process would restart.
-			if err := database.PutID(hi.batch, state.CheckpointKey, currentProBlkID); err != nil {
+			if err := hi.indexState.SetCheckpoint(currentProBlkID); err != nil {
 				return err
 			}
 
-			committedSize := hi.batch.Size()
 			if err := hi.flush(); err != nil {
 				return err
 			}
 
 			hi.log.Info(
-				"Block indexing by height: ongoing. Indexed %d blocks, latest committed height %d, committed %d bytes",
+				"Block indexing by height: ongoing. Indexed %d blocks, latest committed height %d",
 				indexedBlks,
 				currentHeight,
-				committedSize,
 			)
+			lastIndexedBlks = indexedBlks
 		}
 
 		// Rebuild height block index.
-		entryKey := state.GetEntryKey(currentHeight)
-		if err := database.PutID(hi.batch, entryKey, currentProBlkID); err != nil {
+		if err := hi.indexState.SetBlockIDAtHeight(currentHeight, currentProBlkID); err != nil {
 			return err
 		}
 
@@ -266,12 +262,10 @@ func (hi *heightIndexer) doRepair(currentProBlkID ids.ID) error {
 	}
 }
 
-// flush writes the batch and commits the underlying DB
+// flush writes the commits to the underlying DB
 func (hi *heightIndexer) flush() error {
-	if err := hi.batch.Write(); err != nil {
+	if err := hi.indexState.Commit(); err != nil {
 		return err
 	}
-	hi.batch.Reset()
-
 	return hi.server.Commit()
 }

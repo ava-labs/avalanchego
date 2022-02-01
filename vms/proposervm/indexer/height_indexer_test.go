@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 	"github.com/stretchr/testify/assert"
 )
@@ -107,13 +107,14 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 		CommitF: func() error { return nil },
 	}
 
-	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
-	storedState := state.NewHeightIndex(dbMan.Current().Database)
+	db := memdb.New()
+	vdb := versiondb.New(db)
+	storedState := state.NewHeightIndex(vdb, vdb)
 	hIndex := newHeightIndexer(blkSrv,
 		logging.NoLog{},
 		storedState,
 	)
-	hIndex.commitMaxSize = 0 // commit each block
+	hIndex.commitFrequency = 0 // commit each block
 
 	// show that height index should be rebuild and it is
 	doRepair, startBlkID, err := hIndex.shouldRepair()
@@ -121,7 +122,7 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 	assert.True(doRepair)
 	assert.True(startBlkID == lastProBlk.ID())
 	assert.NoError(hIndex.doRepair(startBlkID))
-	assert.NoError(hIndex.batch.Write()) // batch write responsibility is on doRepair caller
+	assert.NoError(hIndex.flush()) // batch write responsibility is on doRepair caller
 
 	// check that height index is fully built
 	loadedForkHeight, err := storedState.GetForkHeight()
@@ -201,13 +202,14 @@ func TestHeightBlockIndexPreFork(t *testing.T) {
 		CommitF: func() error { return nil },
 	}
 
-	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
-	storedState := state.NewHeightIndex(dbMan.Current().Database)
+	db := memdb.New()
+	vdb := versiondb.New(db)
+	storedState := state.NewHeightIndex(vdb, vdb)
 	hIndex := newHeightIndexer(blkSrv,
 		logging.NoLog{},
 		storedState,
 	)
-	hIndex.commitMaxSize = 0 // commit each block
+	hIndex.commitFrequency = 0 // commit each block
 
 	// with preFork only blocks there is nothing to rebuild
 	doRepair, _, err := hIndex.shouldRepair()
@@ -316,22 +318,23 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 		CommitF: func() error { return nil },
 	}
 
-	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
-	storedState := state.NewHeightIndex(dbMan.Current().Database)
+	db := memdb.New()
+	vdb := versiondb.New(db)
+	storedState := state.NewHeightIndex(vdb, vdb)
 	hIndex := newHeightIndexer(blkSrv,
 		logging.NoLog{},
 		storedState,
 	)
-	hIndex.commitMaxSize = 0 // commit each block
+	hIndex.commitFrequency = 0 // commit each block
 
 	// show that height index should be rebuild and it is
 	doRepair, startBlkID, err := hIndex.shouldRepair()
 	assert.NoError(err)
-	assert.NoError(hIndex.batch.Write()) // batch write responsibility is on shouldRepair caller
+	assert.NoError(hIndex.flush()) // batch write responsibility is on shouldRepair caller
 	assert.True(doRepair)
 	assert.True(startBlkID == lastProBlk.ID())
 	assert.NoError(hIndex.doRepair(startBlkID))
-	assert.NoError(hIndex.batch.Write()) // batch write responsibility is on doRepair caller
+	assert.NoError(hIndex.flush()) // batch write responsibility is on doRepair caller
 
 	// check that height index is fully built
 	loadedForkHeight, err := storedState.GetForkHeight()
@@ -453,17 +456,18 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 		CommitF: func() error { return nil },
 	}
 
-	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
-	storedState := state.NewHeightIndex(dbMan.Current().Database)
+	db := memdb.New()
+	vdb := versiondb.New(db)
+	storedState := state.NewHeightIndex(vdb, vdb)
 	hIndex := newHeightIndexer(blkSrv,
 		logging.NoLog{},
 		storedState,
 	)
-	hIndex.commitMaxSize = 0 // commit each block
+	hIndex.commitFrequency = 0 // commit each block
 
 	// with no checkpoints repair starts from last accepted block
 	doRepair, startBlkID, err := hIndex.shouldRepair()
-	assert.NoError(hIndex.batch.Write()) // batch write responsibility is on shouldRepair caller
+	assert.NoError(hIndex.flush()) // batch write responsibility is on shouldRepair caller
 	assert.True(doRepair)
 	assert.NoError(err)
 	assert.True(startBlkID == lastProBlk.ID())
@@ -485,13 +489,13 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 	doRepair, startBlkID, err = hIndex.shouldRepair()
 	assert.True(doRepair)
 	assert.NoError(err)
-	assert.NoError(hIndex.batch.Write()) // batch write responsibility is on shouldRepair caller
+	assert.NoError(hIndex.flush()) // batch write responsibility is on shouldRepair caller
 	assert.True(startBlkID == checkpointBlk.ID())
 	assert.False(hIndex.IsRepaired())
 
 	// perform repair and show index is built
 	assert.NoError(hIndex.doRepair(startBlkID))
-	assert.NoError(hIndex.batch.Write()) // batch write responsibility is on doRepair caller
+	assert.NoError(hIndex.flush()) // batch write responsibility is on doRepair caller
 
 	// check that height index is fully built
 	loadedForkHeight, err := storedState.GetForkHeight()
