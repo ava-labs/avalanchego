@@ -35,7 +35,7 @@ func newVMBackedBlockIndex(vm common.VM) (Index, error) {
 	if !ok {
 		return nil, block.ErrHeightIndexedVMNotImplemented
 	}
-	if !hVM.IsHeightIndexComplete() {
+	if hVM.IsHeightIndexComplete() != nil {
 		return nil, errIndexNotReady
 	}
 

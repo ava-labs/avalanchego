@@ -11,9 +11,8 @@ import (
 )
 
 var (
-	errIsHeightIndexingEnabled = errors.New("unexpectedly called IsEnabled")
-	errIsHeightIndexComplete   = errors.New("unexpectedly called IsHeightIndexComplete")
-	errGetBlockIDByHeight      = errors.New("unexpectedly called GetBlockIDByHeight")
+	errIsHeightIndexComplete = errors.New("unexpectedly called IsHeightIndexComplete")
+	errGetBlockIDByHeight    = errors.New("unexpectedly called GetBlockIDByHeight")
 
 	_ HeightIndexedChainVM = &TestHeightIndexedVM{}
 )
@@ -22,33 +21,21 @@ var (
 type TestHeightIndexedVM struct {
 	T *testing.T
 
-	CantIsHeightIndexingEnabled bool
-	CantIsHeightIndexComplete   bool
-	CantGetBlockIDByHeight      bool
+	CantIsHeightIndexComplete bool
+	CantGetBlockIDByHeight    bool
 
-	IsHeightIndexingEnabledF func() bool
-	IsHeightIndexCompleteF   func() bool
-	GetBlockIDByHeightF      func(height uint64) (ids.ID, error)
+	IsHeightIndexCompleteF func() error
+	GetBlockIDByHeightF    func(height uint64) (ids.ID, error)
 }
 
-func (vm *TestHeightIndexedVM) IsHeightIndexingEnabled() bool {
-	if vm.IsHeightIndexingEnabledF != nil {
-		return vm.IsHeightIndexingEnabledF()
-	}
-	if vm.CantIsHeightIndexingEnabled && vm.T != nil {
-		vm.T.Fatal(errIsHeightIndexingEnabled)
-	}
-	return false
-}
-
-func (vm *TestHeightIndexedVM) IsHeightIndexComplete() bool {
+func (vm *TestHeightIndexedVM) IsHeightIndexComplete() error {
 	if vm.IsHeightIndexCompleteF != nil {
 		return vm.IsHeightIndexCompleteF()
 	}
 	if vm.CantIsHeightIndexComplete && vm.T != nil {
 		vm.T.Fatal(errIsHeightIndexComplete)
 	}
-	return false
+	return errIsHeightIndexComplete
 }
 
 func (vm *TestHeightIndexedVM) GetBlockIDByHeight(height uint64) (ids.ID, error) {

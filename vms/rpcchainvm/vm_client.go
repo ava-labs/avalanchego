@@ -535,26 +535,12 @@ func (vm *VMClient) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	return err
 }
 
-func (vm *VMClient) IsHeightIndexingEnabled() bool {
-	resp, err := vm.client.IsHeightIndexingEnabled(
+func (vm *VMClient) IsHeightIndexComplete() error {
+	_, err := vm.client.IsHeightIndexComplete(
 		context.Background(),
 		&emptypb.Empty{},
 	)
-	if err != nil {
-		return false
-	}
-	return resp.Enabled
-}
-
-func (vm *VMClient) IsHeightIndexComplete() bool {
-	resp, err := vm.client.IsHeightIndexComplete(
-		context.Background(),
-		&emptypb.Empty{},
-	)
-	if err != nil {
-		return false
-	}
-	return resp.Completed
+	return err
 }
 
 func (vm *VMClient) GetBlockIDByHeight(height uint64) (ids.ID, error) {
