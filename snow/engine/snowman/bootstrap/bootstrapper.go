@@ -44,16 +44,6 @@ func New(config Config, onFinished func(lastReqID uint32) error) (common.Bootstr
 		startingAcceptedFrontier: ids.Set{},
 	}
 
-	lastAcceptedID, err := b.VM.LastAccepted()
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get last accepted ID: %w", err)
-	}
-	lastAccepted, err := b.VM.GetBlock(lastAcceptedID)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get last accepted block: %w", err)
-	}
-	b.startingHeight = lastAccepted.Height()
-
 	if err := b.metrics.Initialize("bs", config.Ctx.Registerer); err != nil {
 		return nil, err
 	}
@@ -92,7 +82,8 @@ type bootstrapper struct {
 	// Greatest height of the blocks passed in ForceAccepted
 	tipHeight uint64
 	// Height of the last accepted block when bootstrapping starts
-	startingHeight uint64
+	startingHeight            uint64
+	startingHeightInitialized bool
 	// Blocks passed into ForceAccepted
 	startingAcceptedFrontier ids.Set
 	// Number of blocks that were fetched on ForceAccepted
@@ -106,6 +97,25 @@ type bootstrapper struct {
 	parser *parser
 
 	awaitingTimeout bool
+}
+
+// setStartingHeight stores the VM's last accepted block height in [startingHeight]
+func (b *bootstrapper) setStartingHeightIfNeeded() error {
+	if b.startingHeightInitialized {
+		return nil
+	}
+
+	lastAcceptedID, err := b.VM.LastAccepted()
+	if err != nil {
+		return fmt.Errorf("couldn't get last accepted ID: %w", err)
+	}
+	lastAccepted, err := b.VM.GetBlock(lastAcceptedID)
+	if err != nil {
+		return fmt.Errorf("couldn't get last accepted block: %w", err)
+	}
+	b.startingHeight = lastAccepted.Height()
+	b.startingHeightInitialized = true
+	return nil
 }
 
 // Ancestors handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
@@ -328,6 +338,9 @@ func (b *bootstrapper) process(blk snowman.Block, processingBlocks map[ids.ID]sn
 	status := blk.Status()
 	blkID := blk.ID()
 	blkHeight := blk.Height()
+	if err := b.setStartingHeightIfNeeded(); err != nil {
+		return err
+	}
 	totalBlocksToFetch := b.tipHeight - b.startingHeight
 
 	if blkHeight > b.tipHeight && b.startingAcceptedFrontier.Contains(blkID) {
