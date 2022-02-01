@@ -251,13 +251,12 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	}, err
 }
 
-func (vm *VMServer) IsHeightIndexComplete(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
+func (vm *VMServer) VerifyHeightIndex(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	hVM, ok := vm.vm.(block.HeightIndexedChainVM)
 	if !ok {
 		return nil, block.ErrHeightIndexedVMNotImplemented
 	}
-
-	return &emptypb.Empty{}, hVM.IsHeightIndexComplete()
+	return &emptypb.Empty{}, hVM.VerifyHeightIndex()
 }
 
 func (vm *VMServer) GetBlockIDByHeight(ctx context.Context, req *vmproto.GetBlockIDByHeightRequest) (*vmproto.GetBlockIDByHeightResponse, error) {

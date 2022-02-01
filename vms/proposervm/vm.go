@@ -150,7 +150,7 @@ func (vm *VM) Initialize(
 				return
 			}
 
-			err := innerHVM.IsHeightIndexComplete()
+			err := innerHVM.VerifyHeightIndex()
 			if err == nil {
 				// innerVM indexing complete. Let re-index this machine
 				break

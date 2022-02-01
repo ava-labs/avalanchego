@@ -535,8 +535,8 @@ func (vm *VMClient) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	return err
 }
 
-func (vm *VMClient) IsHeightIndexComplete() error {
-	_, err := vm.client.IsHeightIndexComplete(
+func (vm *VMClient) VerifyHeightIndex() error {
+	_, err := vm.client.VerifyHeightIndex(
 		context.Background(),
 		&emptypb.Empty{},
 	)

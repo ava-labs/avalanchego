@@ -232,7 +232,7 @@ service VM {
     rpc GetAncestors(GetAncestorsRequest) returns (GetAncestorsResponse);
     rpc BatchedParseBlock(BatchedParseBlockRequest) returns (BatchedParseBlockResponse);
     
-    rpc IsHeightIndexComplete(google.protobuf.Empty) returns (google.protobuf.Empty);
+    rpc VerifyHeightIndex(google.protobuf.Empty) returns (google.protobuf.Empty);
     rpc GetBlockIDByHeight(GetBlockIDByHeightRequest) returns (GetBlockIDByHeightResponse);
     
 }

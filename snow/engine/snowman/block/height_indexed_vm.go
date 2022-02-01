@@ -15,9 +15,15 @@ var (
 
 // HeightIndexedChainVM extends ChainVM to allow querying block IDs by height.
 type HeightIndexedChainVM interface {
-	// IsHeightIndexComplete should return
-	// ErrHeightIndexedVMNotImplemented or ErrIndexIncomplete
-	// if height index is not supported or is not currently available
-	IsHeightIndexComplete() error
+	// VerifyHeightIndex should return:
+	// - nil if the height index is available.
+	// - ErrHeightIndexedVMNotImplemented if the height index is not supported.
+	// - ErrIndexIncomplete if the height index is not currently available.
+	// - Any other non-standard error that may have occurred when verifying the
+	//   index.
+	VerifyHeightIndex() error
+
+	// GetBlockIDByHeight returns the ID of the block that was accepted with
+	// [height].
 	GetBlockIDByHeight(height uint64) (ids.ID, error)
 }

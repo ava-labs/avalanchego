@@ -33,7 +33,7 @@ func TestVMBackedBlockIndex(t *testing.T) {
 	_, err := newVMBackedBlockIndex(&block.TestVM{})
 	assert.Error(err, "non HeightIndexedVM should not be used for the index")
 
-	vm.IsHeightIndexCompleteF = func() error { return nil }
+	vm.VerifyHeightIndexF = func() error { return nil }
 	vmBackedIndex, err := newVMBackedBlockIndex(vm)
 	assert.NoError(err)
 
@@ -137,7 +137,7 @@ func TestVMBackedBlockIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 	_, err := newVMBackedBlockIndex(&block.TestVM{})
 	assert.Error(err, "non HeightIndexedVM should not be used for the index")
 
-	vm.IsHeightIndexCompleteF = func() error { return nil }
+	vm.VerifyHeightIndexF = func() error { return nil }
 	vmBackedIndex, err := newVMBackedBlockIndex(vm)
 	assert.NoError(err)
 
