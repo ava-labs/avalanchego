@@ -34,7 +34,7 @@ func (b *postForkOption) Accept() error {
 		return err
 	}
 
-	// Persist this block, its height index and its status
+	// Persist this block, its height index, and its status
 	b.status = choices.Accepted
 	if err := b.vm.storePostForkBlock(b); err != nil {
 		return err
