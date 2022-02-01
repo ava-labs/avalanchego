@@ -31,8 +31,9 @@ import (
 const (
 	// minBlockDelay should be kept as whole seconds because block timestamps
 	// are only specific to the second.
-	minBlockDelay             = time.Second
-	optimalHeightDelay uint64 = 256
+	minBlockDelay                = time.Second
+	checkIndexedFrequency        = 10 * time.Second
+	optimalHeightDelay    uint64 = 256
 )
 
 var (
@@ -149,7 +150,7 @@ func (vm *VM) Initialize(
 	// asynchronously rebuild height index, if needed
 	go func() {
 		// poll till index is complete or shutdown happens
-		ticker := time.NewTicker(10 * time.Second)
+		ticker := time.NewTicker(checkIndexedFrequency)
 		defer ticker.Stop()
 		for {
 			err := innerHVM.VerifyHeightIndex()
