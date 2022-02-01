@@ -42,7 +42,7 @@ type VMClient interface {
 	BlockReject(ctx context.Context, in *BlockRejectRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetAncestors(ctx context.Context, in *GetAncestorsRequest, opts ...grpc.CallOption) (*GetAncestorsResponse, error)
 	BatchedParseBlock(ctx context.Context, in *BatchedParseBlockRequest, opts ...grpc.CallOption) (*BatchedParseBlockResponse, error)
-	VerifyHeightIndex(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	VerifyHeightIndex(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*VerifyHeightIndexResponse, error)
 	GetBlockIDByHeight(ctx context.Context, in *GetBlockIDByHeightRequest, opts ...grpc.CallOption) (*GetBlockIDByHeightResponse, error)
 }
 
@@ -261,8 +261,8 @@ func (c *vMClient) BatchedParseBlock(ctx context.Context, in *BatchedParseBlockR
 	return out, nil
 }
 
-func (c *vMClient) VerifyHeightIndex(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *vMClient) VerifyHeightIndex(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*VerifyHeightIndexResponse, error) {
+	out := new(VerifyHeightIndexResponse)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/VerifyHeightIndex", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -306,7 +306,7 @@ type VMServer interface {
 	BlockReject(context.Context, *BlockRejectRequest) (*emptypb.Empty, error)
 	GetAncestors(context.Context, *GetAncestorsRequest) (*GetAncestorsResponse, error)
 	BatchedParseBlock(context.Context, *BatchedParseBlockRequest) (*BatchedParseBlockResponse, error)
-	VerifyHeightIndex(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
+	VerifyHeightIndex(context.Context, *emptypb.Empty) (*VerifyHeightIndexResponse, error)
 	GetBlockIDByHeight(context.Context, *GetBlockIDByHeightRequest) (*GetBlockIDByHeightResponse, error)
 	mustEmbedUnimplementedVMServer()
 }
@@ -384,7 +384,7 @@ func (UnimplementedVMServer) GetAncestors(context.Context, *GetAncestorsRequest)
 func (UnimplementedVMServer) BatchedParseBlock(context.Context, *BatchedParseBlockRequest) (*BatchedParseBlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BatchedParseBlock not implemented")
 }
-func (UnimplementedVMServer) VerifyHeightIndex(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
+func (UnimplementedVMServer) VerifyHeightIndex(context.Context, *emptypb.Empty) (*VerifyHeightIndexResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method VerifyHeightIndex not implemented")
 }
 func (UnimplementedVMServer) GetBlockIDByHeight(context.Context, *GetBlockIDByHeightRequest) (*GetBlockIDByHeightResponse, error) {

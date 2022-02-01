@@ -251,23 +251,32 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	}, err
 }
 
-func (vm *VMServer) VerifyHeightIndex(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
-	hVM, ok := vm.vm.(block.HeightIndexedChainVM)
-	if !ok {
-		return nil, block.ErrHeightIndexedVMNotImplemented
+func (vm *VMServer) VerifyHeightIndex(context.Context, *emptypb.Empty) (*vmproto.VerifyHeightIndexResponse, error) {
+	var err error
+	if hVM, ok := vm.vm.(block.HeightIndexedChainVM); ok {
+		err = hVM.VerifyHeightIndex()
+	} else {
+		err = block.ErrHeightIndexedVMNotImplemented
 	}
-	return &emptypb.Empty{}, hVM.VerifyHeightIndex()
+	return &vmproto.VerifyHeightIndexResponse{
+		Err: errorToErrCode[err],
+	}, errorToRPCError(err)
 }
 
 func (vm *VMServer) GetBlockIDByHeight(ctx context.Context, req *vmproto.GetBlockIDByHeightRequest) (*vmproto.GetBlockIDByHeightResponse, error) {
-	hVM, ok := vm.vm.(block.HeightIndexedChainVM)
-	if !ok {
-		return nil, block.ErrHeightIndexedVMNotImplemented
+	var (
+		blkID ids.ID
+		err   error
+	)
+	if hVM, ok := vm.vm.(block.HeightIndexedChainVM); ok {
+		blkID, err = hVM.GetBlockIDByHeight(req.Height)
+	} else {
+		err = block.ErrHeightIndexedVMNotImplemented
 	}
-	blkID, err := hVM.GetBlockIDByHeight(req.Height)
 	return &vmproto.GetBlockIDByHeightResponse{
 		BlkID: blkID[:],
-	}, err
+		Err:   errorToErrCode[err],
+	}, errorToRPCError(err)
 }
 
 func (vm *VMServer) SetState(_ context.Context, stateReq *vmproto.SetStateRequest) (*emptypb.Empty, error) {

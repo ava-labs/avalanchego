@@ -536,11 +536,14 @@ func (vm *VMClient) AppGossip(nodeID ids.ShortID, msg []byte) error {
 }
 
 func (vm *VMClient) VerifyHeightIndex() error {
-	_, err := vm.client.VerifyHeightIndex(
+	resp, err := vm.client.VerifyHeightIndex(
 		context.Background(),
 		&emptypb.Empty{},
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	return errCodeToError[resp.Err]
 }
 
 func (vm *VMClient) GetBlockIDByHeight(height uint64) (ids.ID, error) {
@@ -550,6 +553,9 @@ func (vm *VMClient) GetBlockIDByHeight(height uint64) (ids.ID, error) {
 	)
 	if err != nil {
 		return ids.Empty, err
+	}
+	if errCode := resp.Err; errCode != 0 {
+		return ids.Empty, errCodeToError[errCode]
 	}
 	return ids.ToID(resp.BlkID)
 }
