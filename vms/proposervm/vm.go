@@ -172,7 +172,6 @@ func (vm *VM) Initialize(
 			}
 		}
 
-		// Check
 		shouldRepair, err := vm.shouldHeightIndexBeRepaired()
 		if err != nil {
 			vm.ctx.Log.Error("could not verify the status of height indexing: %s", err)
