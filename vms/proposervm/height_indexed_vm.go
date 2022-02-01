@@ -57,8 +57,8 @@ func (vm *VM) updateHeightIndex(height uint64, blkID ids.ID) error {
 	checkpoint, err := vm.State.GetCheckpoint()
 	switch err {
 	case nil:
-		// index rebuilding is ongoing. We can update the index,
-		// stepping away from checkpointed blk, which will be handled by indexer.
+		// index rebuilding is ongoing. We can update the index with current block
+		// except if it is checkpointed blk, which will be handled by indexer.
 		if blkID != checkpoint {
 			return vm.storeHeightEntry(height, blkID)
 		}

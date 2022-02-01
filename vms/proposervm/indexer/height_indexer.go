@@ -230,7 +230,6 @@ func (hi *heightIndexer) doRepair(currentProBlkID ids.ID) error {
 				return err
 			}
 
-			// commit and reset batch for reuse
 			committedSize := hi.batch.Size()
 			if err := hi.flush(); err != nil {
 				return err
@@ -267,7 +266,7 @@ func (hi *heightIndexer) doRepair(currentProBlkID ids.ID) error {
 	}
 }
 
-// flush write the batch and commit the underlying DB
+// flush writes the batch and commits the underlying DB
 func (hi *heightIndexer) flush() error {
 	if err := hi.batch.Write(); err != nil {
 		return err

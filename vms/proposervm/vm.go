@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/indexer"
@@ -48,7 +49,8 @@ type VM struct {
 	minimumPChainHeight uint64
 
 	state.State
-	hIndexer indexer.HeightIndexer
+	shutdownCalled utils.AtomicBool
+	hIndexer       indexer.HeightIndexer
 
 	proposer.Windower
 	tree.Tree
@@ -143,8 +145,12 @@ func (vm *VM) Initialize(
 
 	// asynchronously rebuild height index, if needed
 	go func() {
-		// poll till index is complete
+		// poll till index is complete or shutdown happens
 		for !innerHVM.IsHeightIndexComplete() {
+			if vm.shutdownCalled.GetValue() {
+				return
+			}
+
 			time.Sleep(10 * time.Second)
 		}
 
@@ -160,6 +166,8 @@ func (vm *VM) Initialize(
 
 // shutdown ops then propagate shutdown to innerVM
 func (vm *VM) Shutdown() error {
+	vm.shutdownCalled.SetValue(true)
+
 	if err := vm.db.Commit(); err != nil {
 		return err
 	}
