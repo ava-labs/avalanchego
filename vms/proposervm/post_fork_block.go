@@ -28,13 +28,9 @@ func (b *postForkBlock) Accept() error {
 		return err
 	}
 
-	// Persist this block with its status
+	// Persist this block, its height index and its status
 	b.status = choices.Accepted
 	if err := b.vm.storePostForkBlock(b); err != nil {
-		return err
-	}
-
-	if err := b.vm.updateHeightIndex(b.Height(), blkID); err != nil {
 		return err
 	}
 

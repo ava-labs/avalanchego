@@ -429,6 +429,11 @@ func (vm *VM) storePostForkBlock(blk PostForkBlock) error {
 	if err := vm.State.PutBlock(blk.getStatelessBlk(), blk.Status()); err != nil {
 		return err
 	}
+
+	if err := vm.updateHeightIndex(blk.Height(), blk.ID()); err != nil {
+		return err
+	}
+
 	return vm.db.Commit()
 }
 
