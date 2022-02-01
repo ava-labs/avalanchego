@@ -4,7 +4,6 @@
 package indexer
 
 import (
-	"math"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -84,11 +83,16 @@ func (hi *heightIndexer) RepairHeightIndex() error {
 
 	if !needRepair {
 		forkHeight, err := hi.indexState.GetForkHeight()
-		if err != nil {
+		switch err {
+		case nil:
+			hi.log.Info("Block indexing by height: already complete. Fork height %d", forkHeight)
+			return nil
+		case database.ErrNotFound:
+			hi.log.Info("Block indexing by height: already complete. Fork not reached yet.")
+			return nil
+		default:
 			return err
 		}
-		hi.log.Info("Block indexing by height: already complete. Fork height %d", forkHeight)
-		return nil
 	}
 	if err := hi.doRepair(startBlkID); err != nil {
 		return err
@@ -116,11 +120,6 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 
 	case database.ErrNotFound:
 		// snowman++ has not forked yet; height block index is ok.
-		// set forkHeight to math.MaxUint64, aka +infinity
-		if err := database.PutUInt64(hi.batch, state.ForkKey, math.MaxInt64); err != nil {
-			return true, ids.Empty, err
-		}
-
 		hi.jobDone.SetValue(true)
 		hi.log.Info("Block indexing by height starting: Snowman++ fork not reached yet. No need to rebuild index.")
 		return false, ids.Empty, nil
@@ -150,20 +149,6 @@ func (hi *heightIndexer) shouldRepair() (bool, ids.ID, error) {
 		// and the process is terminated before first commit,
 		// we do not miss rebuilding the full index.
 		if err := hi.batch.Put(state.CheckpointKey, latestProBlkID[:]); err != nil {
-			return true, ids.Empty, err
-		}
-
-		// Handle forkHeight
-		switch currentForkHeight, err := hi.indexState.GetForkHeight(); err {
-		case database.ErrNotFound:
-			// fork height not found, initialize it to math.MaxUint64, aka +infinity
-			if err := database.PutUInt64(hi.batch, state.ForkKey, math.MaxUint64); err != nil {
-				return true, ids.Empty, err
-			}
-		case nil:
-			hi.log.Info("Block indexing by height starting: forkHeight already set to %d", currentForkHeight)
-
-		default:
 			return true, ids.Empty, err
 		}
 

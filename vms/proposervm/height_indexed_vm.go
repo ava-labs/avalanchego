@@ -4,6 +4,7 @@
 package proposervm
 
 import (
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
@@ -27,26 +28,25 @@ func (vm *VM) IsHeightIndexComplete() bool {
 // GetBlockIDByHeight implements HeightIndexedChainVM interface
 // vm.ctx.Lock should be held
 func (vm *VM) GetBlockIDByHeight(height uint64) (ids.ID, error) {
-	innerHVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
-	if !ok {
-		return ids.Empty, block.ErrHeightIndexedVMNotImplemented
-	}
-	if !innerHVM.IsHeightIndexComplete() {
+	if !vm.hIndexer.IsRepaired() {
 		return ids.Empty, block.ErrIndexIncomplete
 	}
 
-	// preFork blocks are indexed in innerVM only
-	forkHeight, err := vm.State.GetForkHeight()
-	if err != nil {
+	innerHVM, _ := vm.ChainVM.(block.HeightIndexedChainVM)
+	switch forkHeight, err := vm.State.GetForkHeight(); err {
+	case nil:
+		if height < forkHeight {
+			return innerHVM.GetBlockIDByHeight(height)
+		}
+		return vm.State.GetBlockIDAtHeight(height)
+
+	case database.ErrNotFound:
+		// fork not reached yet. Block must be pre-fork
+		return innerHVM.GetBlockIDByHeight(height)
+
+	default:
 		return ids.Empty, err
 	}
-
-	if height < forkHeight {
-		return innerHVM.GetBlockIDByHeight(height)
-	}
-
-	// postFork blocks are indexed in proposerVM
-	return vm.State.GetBlockIDAtHeight(height)
 }
 
 // As postFork blocks/options are accepted, height index is updated
@@ -59,20 +59,20 @@ func (vm *VM) updateHeightIndex(height uint64, blkID ids.ID) error {
 		return nil // nothing to do
 	}
 
-	forkHeight, err := vm.State.GetForkHeight()
-	if err != nil {
-		vm.ctx.Log.Warn("Block indexing by height: new block. Could not load fork height %v", err)
-		return err
-	}
+	switch _, err := vm.State.GetForkHeight(); err {
+	case nil:
+		// fork already reached. Just update the index
 
-	if forkHeight > height {
-		vm.ctx.Log.Info("Block indexing by height: new block. Moved fork height from %d to %d with block %v",
-			forkHeight, height, blkID)
-
+	case database.ErrNotFound:
+		// this is the first post Fork block/option, store fork height
 		if err := vm.State.SetForkHeight(height); err != nil {
-			vm.ctx.Log.Warn("Block indexing by height: new block. Failed storing new fork height %v", err)
+			vm.ctx.Log.Warn("Block indexing by height: new block. Failed storing fork height %v", err)
 			return err
 		}
+
+	default:
+		vm.ctx.Log.Warn("Block indexing by height: new block. Could not load fork height %v", err)
+		return err
 	}
 
 	return vm.State.SetBlockIDAtHeight(height, blkID)

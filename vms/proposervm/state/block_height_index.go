@@ -26,6 +26,9 @@ var (
 
 type HeightIndexGetter interface {
 	GetBlockIDAtHeight(height uint64) (ids.ID, error)
+
+	// Fork height is stored when the first post-fork block/option is accepted.
+	// Before that, fork height won't be found.
 	GetForkHeight() (uint64, error)
 }
 
