@@ -82,8 +82,7 @@ type bootstrapper struct {
 	// Greatest height of the blocks passed in ForceAccepted
 	tipHeight uint64
 	// Height of the last accepted block when bootstrapping starts
-	startingHeight            uint64
-	startingHeightInitialized bool
+	startingHeight uint64
 	// Blocks passed into ForceAccepted
 	startingAcceptedFrontier ids.Set
 	// Number of blocks that were fetched on ForceAccepted
@@ -100,11 +99,7 @@ type bootstrapper struct {
 }
 
 // setStartingHeight stores the VM's last accepted block height in [startingHeight]
-func (b *bootstrapper) setStartingHeightIfNeeded() error {
-	if b.startingHeightInitialized {
-		return nil
-	}
-
+func (b *bootstrapper) setStartingHeight() error {
 	lastAcceptedID, err := b.VM.LastAccepted()
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted ID: %w", err)
@@ -114,7 +109,6 @@ func (b *bootstrapper) setStartingHeightIfNeeded() error {
 		return fmt.Errorf("couldn't get last accepted block: %w", err)
 	}
 	b.startingHeight = lastAccepted.Height()
-	b.startingHeightInitialized = true
 	return nil
 }
 
@@ -230,6 +224,9 @@ func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
 
 // Start implements the common.Engine interface.
 func (b *bootstrapper) Start(startReqID uint32) error {
+	if err := b.setStartingHeight(); err != nil {
+		return err
+	}
 	b.Ctx.Log.Info("Starting bootstrap...")
 	b.Ctx.SetState(snow.Bootstrapping)
 	b.Config.SharedCfg.RequestID = startReqID
@@ -338,13 +335,13 @@ func (b *bootstrapper) process(blk snowman.Block, processingBlocks map[ids.ID]sn
 	status := blk.Status()
 	blkID := blk.ID()
 	blkHeight := blk.Height()
-	if err := b.setStartingHeightIfNeeded(); err != nil {
-		return err
-	}
-	totalBlocksToFetch := b.tipHeight - b.startingHeight
 
 	if blkHeight > b.tipHeight && b.startingAcceptedFrontier.Contains(blkID) {
 		b.tipHeight = blkHeight
+	}
+	totalBlocksToFetch := b.tipHeight - b.startingHeight
+	if b.tipHeight < b.startingHeight {
+		totalBlocksToFetch = 0
 	}
 
 	for status == choices.Processing {
@@ -391,7 +388,7 @@ func (b *bootstrapper) process(blk snowman.Block, processingBlocks map[ids.ID]sn
 		b.numFetched.Inc()
 
 		blocksFetchedSoFar := b.Blocked.Jobs.PendingJobs()
-		if blocksFetchedSoFar%common.StatusUpdateFrequency == 0 { // Periodically print progress
+		if blocksFetchedSoFar%common.StatusUpdateFrequency == 0 && totalBlocksToFetch > 0 { // Periodically print progress
 			eta := timer.EstimateETA(
 				b.startTime,
 				blocksFetchedSoFar-b.initiallyFetched, // Number of blocks we have fetched during this run
