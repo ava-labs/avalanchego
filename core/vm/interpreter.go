@@ -34,11 +34,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-var BuiltinAddr = common.Address{
-	1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-}
-
 // Config are the configuration options for the Interpreter
 type Config struct {
 	Debug                   bool      // Enables debugging
@@ -128,18 +123,6 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 // considered a revert-and-consume-all-gas operation except for
 // ErrExecutionReverted which means revert-and-keep-gas-left.
 func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (ret []byte, err error) {
-	// Deprecate special handling of [BuiltinAddr] as of SubnetEVM.
-	// In SubnetEVM, the contract deployed in the genesis is overridden by a deprecated precompiled
-	// contract which will return an error immediately if its ever called. Therefore, this function should
-	// never be called after SubnetEVM with [BuiltinAddr] as the contract address.
-	if !in.evm.chainRules.IsSubnetEVM && contract.Address() == BuiltinAddr {
-		self := AccountRef(contract.Caller())
-		if _, ok := contract.caller.(*Contract); ok {
-			contract = contract.AsDelegate()
-		}
-		contract.self = self
-	}
-
 	// Increment the call depth which is restricted to 1024
 	in.evm.depth++
 	defer func() { in.evm.depth-- }()
