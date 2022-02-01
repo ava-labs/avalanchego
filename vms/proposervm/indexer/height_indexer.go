@@ -4,6 +4,7 @@
 package indexer
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -70,12 +71,10 @@ func (hi *heightIndexer) IsRepaired() bool {
 func (hi *heightIndexer) RepairHeightIndex() error {
 	needRepair, startBlkID, err := hi.shouldRepair()
 	if err != nil {
-		hi.log.Error("Block indexing by height starting: failed. Could not determine if index is complete, error %v", err)
-		return err
+		return fmt.Errorf("could not determine if index should be repaired: %w", err)
 	}
 	if err := hi.flush(); err != nil {
-		hi.log.Warn("Failed writing height index batch, err %w", err)
-		return err
+		return fmt.Errorf("could not write height index updates: %w", err)
 	}
 
 	if !needRepair {
@@ -92,9 +91,12 @@ func (hi *heightIndexer) RepairHeightIndex() error {
 		}
 	}
 	if err := hi.doRepair(startBlkID); err != nil {
-		return err
+		return fmt.Errorf("could not repair height index: %w", err)
 	}
-	return hi.flush()
+	if err := hi.flush(); err != nil {
+		return fmt.Errorf("could not write final height index update: %w", err)
+	}
+	return nil
 }
 
 // shouldRepair checks if height index is complete;
