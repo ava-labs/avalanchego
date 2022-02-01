@@ -44,14 +44,17 @@ const (
 )
 
 var (
-	txPrefix                          = byte(0x01)
-	vtxPrefix                         = byte(0x02)
-	blockPrefix                       = byte(0x03)
-	isIncompletePrefix                = byte(0x04)
-	previouslyIndexedPrefix           = byte(0x05)
-	hasRunKey                         = []byte{0x07}
-	errIndexIncompleteAndDone         = errors.New("index marked incomplete. Nothing else to do")
-	_                         Indexer = &indexer{}
+	txPrefix                byte = 0x01
+	vtxPrefix               byte = 0x02
+	blockPrefix             byte = 0x03
+	isIncompletePrefix      byte = 0x04
+	previouslyIndexedPrefix byte = 0x05
+
+	hasRunKey = []byte{0x07}
+
+	errIndexIncompleteAndDone = errors.New("index marked incomplete. Nothing else to do")
+
+	_ Indexer = &indexer{}
 )
 
 // Config for an indexer
