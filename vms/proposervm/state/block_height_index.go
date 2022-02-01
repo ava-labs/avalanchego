@@ -78,12 +78,12 @@ func NewHeightIndex(db database.Database, commitable versiondb.Commitable) Heigh
 }
 
 func (hi *heightIndex) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
-	key := database.PackUInt64(height)
 	if blkIDIntf, found := hi.heightsCache.Get(height); found {
 		res, _ := blkIDIntf.(ids.ID)
 		return res, nil
 	}
 
+	key := database.PackUInt64(height)
 	blkID, err := database.GetID(hi.heightDB, key)
 	if err != nil {
 		return ids.Empty, err
@@ -93,8 +93,8 @@ func (hi *heightIndex) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 }
 
 func (hi *heightIndex) SetBlockIDAtHeight(height uint64, blkID ids.ID) error {
-	key := database.PackUInt64(height)
 	hi.heightsCache.Put(height, blkID)
+	key := database.PackUInt64(height)
 	return database.PutID(hi.heightDB, key, blkID)
 }
 
