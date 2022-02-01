@@ -16,6 +16,7 @@ var (
 	errLastAcceptedInnerBlkID    = errors.New("unexpectedly called LastAcceptedInnerBlkID")
 	errGetWrappingBlk            = errors.New("unexpectedly called GetWrappingBlk")
 	errGetInnerBlk               = errors.New("unexpectedly called GetInnerBlk")
+	errCommit                    = errors.New("unexpectedly called Commit")
 
 	_ BlockServer = &TestBlockServer{}
 )
@@ -28,11 +29,13 @@ type TestBlockServer struct {
 	CantLastAcceptedInnerBlkID    bool
 	CantGetWrappingBlk            bool
 	CantGetInnerBlk               bool
+	CantCommit                    bool
 
 	LastAcceptedWrappingBlkIDF func() (ids.ID, error)
 	LastAcceptedInnerBlkIDF    func() (ids.ID, error)
 	GetWrappingBlkF            func(blkID ids.ID) (WrappingBlock, error)
 	GetInnerBlkF               func(id ids.ID) (snowman.Block, error)
+	CommitF                    func() error
 }
 
 func (tsb *TestBlockServer) LastAcceptedWrappingBlkID() (ids.ID, error) {
@@ -73,4 +76,14 @@ func (tsb *TestBlockServer) GetInnerBlk(id ids.ID) (snowman.Block, error) {
 		tsb.T.Fatal(errGetInnerBlk)
 	}
 	return nil, errGetInnerBlk
+}
+
+func (tsb *TestBlockServer) Commit() error {
+	if tsb.CommitF != nil {
+		return tsb.CommitF()
+	}
+	if tsb.CantCommit && tsb.T != nil {
+		tsb.T.Fatal(errCommit)
+	}
+	return errCommit
 }

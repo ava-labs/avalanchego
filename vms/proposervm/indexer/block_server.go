@@ -16,6 +16,7 @@ type BlockServer interface {
 	LastAcceptedInnerBlkID() (ids.ID, error)
 	GetWrappingBlk(blkID ids.ID) (WrappingBlock, error)
 	GetInnerBlk(id ids.ID) (snowman.Block, error)
+	Commit() error
 }
 
 // HeightIndexDBOps groups all the operations that indexer

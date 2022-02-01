@@ -86,6 +86,7 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 		CantLastAcceptedInnerBlkID:    true,
 		CantGetWrappingBlk:            true,
 		CantGetInnerBlk:               true,
+		CantCommit:                    true,
 
 		LastAcceptedWrappingBlkIDF: func() (ids.ID, error) { return lastProBlk.ID(), nil },
 		LastAcceptedInnerBlkIDF:    func() (ids.ID, error) { return lastInnerBlk.ID(), nil },
@@ -103,6 +104,7 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 			}
 			return blk, nil
 		},
+		CommitF: func() error { return nil },
 	}
 
 	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
@@ -178,6 +180,7 @@ func TestHeightBlockIndexPreFork(t *testing.T) {
 		CantLastAcceptedInnerBlkID:    true,
 		CantGetWrappingBlk:            true,
 		CantGetInnerBlk:               true,
+		CantCommit:                    true,
 
 		LastAcceptedWrappingBlkIDF: func() (ids.ID, error) {
 			// all blocks are pre-fork
@@ -195,6 +198,7 @@ func TestHeightBlockIndexPreFork(t *testing.T) {
 			}
 			return blk, nil
 		},
+		CommitF: func() error { return nil },
 	}
 
 	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
@@ -291,6 +295,7 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 		CantLastAcceptedInnerBlkID:    true,
 		CantGetWrappingBlk:            true,
 		CantGetInnerBlk:               true,
+		CantCommit:                    true,
 
 		LastAcceptedWrappingBlkIDF: func() (ids.ID, error) { return lastProBlk.ID(), nil },
 		LastAcceptedInnerBlkIDF:    func() (ids.ID, error) { return lastInnerBlk.ID(), nil },
@@ -308,6 +313,7 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 			}
 			return blk, nil
 		},
+		CommitF: func() error { return nil },
 	}
 
 	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)
@@ -426,6 +432,7 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 		CantLastAcceptedInnerBlkID:    true,
 		CantGetWrappingBlk:            true,
 		CantGetInnerBlk:               true,
+		CantCommit:                    true,
 
 		LastAcceptedWrappingBlkIDF: func() (ids.ID, error) { return lastProBlk.ID(), nil },
 		LastAcceptedInnerBlkIDF:    func() (ids.ID, error) { return lastInnerBlk.ID(), nil },
@@ -443,6 +450,7 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 			}
 			return blk, nil
 		},
+		CommitF: func() error { return nil },
 	}
 
 	dbMan := manager.NewMemDB(version.DefaultVersion1_0_0)

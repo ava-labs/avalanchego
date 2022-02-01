@@ -75,11 +75,10 @@ func (hi *heightIndexer) RepairHeightIndex() error {
 		hi.log.Error("Block indexing by height starting: failed. Could not determine if index is complete, error %v", err)
 		return err
 	}
-	if err := hi.batch.Write(); err != nil {
+	if err := hi.flush(); err != nil {
 		hi.log.Warn("Failed writing height index batch, err %w", err)
 		return err
 	}
-	hi.batch.Reset()
 
 	if !needRepair {
 		forkHeight, err := hi.indexState.GetForkHeight()
@@ -97,7 +96,7 @@ func (hi *heightIndexer) RepairHeightIndex() error {
 	if err := hi.doRepair(startBlkID); err != nil {
 		return err
 	}
-	return hi.batch.Write()
+	return hi.flush()
 }
 
 // shouldRepair checks if height index is complete;
@@ -233,10 +232,9 @@ func (hi *heightIndexer) doRepair(currentProBlkID ids.ID) error {
 
 			// commit and reset batch for reuse
 			committedSize := hi.batch.Size()
-			if err := hi.batch.Write(); err != nil {
+			if err := hi.flush(); err != nil {
 				return err
 			}
-			hi.batch.Reset()
 
 			hi.log.Info(
 				"Block indexing by height: ongoing. Indexed %d blocks, latest committed height %d, committed %d bytes",
@@ -267,4 +265,14 @@ func (hi *heightIndexer) doRepair(currentProBlkID ids.ID) error {
 		currentProBlkID = currentAcceptedBlk.Parent()
 		previousHeight = currentHeight
 	}
+}
+
+// flush write the batch and commit the underlying DB
+func (hi *heightIndexer) flush() error {
+	if err := hi.batch.Write(); err != nil {
+		return err
+	}
+	hi.batch.Reset()
+
+	return hi.server.Commit()
 }
