@@ -66,13 +66,15 @@ github.com/ava-labs/avalanchego v1.7.5-0.20220119165932-7bc71fe42255/go.mod h1:+
 github.com/ava-labs/avalanchego v1.7.5-0.20220126153921-5b5a563a5d5c/go.mod h1:sQIhpg1VMERV/wDkkSo92SNNmjDwGh5KSXCfJCr0bRE=
 github.com/ava-labs/avalanchego v1.7.5-0.20220126183610-9dc3e9a76b86/go.mod h1:vIGzZmTpm9jIIEPyE3kA3zbliFZu36964Ggz+uGKVw4=
 github.com/ava-labs/avalanchego v1.7.5-0.20220201163130-960280f7b1f9/go.mod h1:DzOGU3YoVtejtuXMUKTm6zgaCc/BipZrPRHR7HJMZIo=
+github.com/ava-labs/avalanchego v1.7.5-0.20220201200306-09a2fa1bd460/go.mod h1:aizcBy+qaussG6mPxxcunYG04fShnjQ7EmVw7lMgDEQ=
 github.com/ava-labs/coreth v0.8.4-rc.1/go.mod h1:bP2Atm7pCJdx8fwzsPT3xU/kWOdHFklpja7aRNT++Qo=
 github.com/ava-labs/coreth v0.8.4-rc.3/go.mod h1:9TgpLJVY9ot6RV8Lh66F356S4MfalvaL3sAqw4+miTU=
 github.com/ava-labs/coreth v0.8.5-0.20220119214827-9c78fe28f93f/go.mod h1:Zq2TWMkuK1Lj2hlyubB1N8WXahsQejnI9Tt5fJ3oFj8=
 github.com/ava-labs/coreth v0.8.5-0.20220126173024-037b29640e93/go.mod h1:+QbockKBSIdDWkostOcHFk/ZxZqJ4dMkKJ3Fo1JwL7Q=
 github.com/ava-labs/coreth v0.8.5-rc.0.0.20220131133119-4c18e1c815e5/go.mod h1:p0ffgZwokUIcQjwZcQcvQ69Hpssq+Kcaxy4D6ewGlX4=
-github.com/ava-labs/coreth v0.8.5-rc.0.0.20220201164959-220593efdba5 h1:otziSvEZchHujatGkKL4tRjuO9ABLPnOV+SRu8zEwnk=
 github.com/ava-labs/coreth v0.8.5-rc.0.0.20220201164959-220593efdba5/go.mod h1:lV9E4uMtW3pj61gbqK7y2FVoL54xsCGtei+wjdU88U4=
+github.com/ava-labs/coreth v0.8.5-rc.0.0.20220201201426-d9ed7bce8c35 h1:pCLy+4EiAZjnmPlEAxit1/zfKWSbenRd3S7+hSog4us=
+github.com/ava-labs/coreth v0.8.5-rc.0.0.20220201201426-d9ed7bce8c35/go.mod h1:cDidfHZqwDEL6UmM0cEl4UayB8IZd8qxe6hJod2s0zI=
 github.com/aws/aws-sdk-go-v2 v1.2.0/go.mod h1:zEQs02YRBw1DjK0PoJv3ygDYOFTre1ejlJWl8FwAuQo=
 github.com/aws/aws-sdk-go-v2/config v1.1.1/go.mod h1:0XsVy9lBI/BCXm+2Tuvt39YmdHwS5unDQmxZOYe8F5Y=
 github.com/aws/aws-sdk-go-v2/credentials v1.1.1/go.mod h1:mM2iIjwl7LULWtS6JCACyInboHirisUUdkBPoTHMOUo=
