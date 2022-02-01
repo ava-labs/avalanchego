@@ -20,10 +20,10 @@ const defaultCommitFrequency = 1024
 var _ HeightIndexer = &heightIndexer{}
 
 type HeightIndexer interface {
-	// checks whether the index is fully repaired or not
+	// Returns whether the height index is fully repaired.
 	IsRepaired() bool
 
-	// checks whether index rebuilding is needed and if so, performs it
+	// Resumes repairing of the height index from the checkpoint.
 	RepairHeightIndex() error
 }
 

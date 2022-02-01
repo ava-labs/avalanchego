@@ -11,65 +11,44 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
-// shouldHeightIndexBeRepaired checks if index needs repairing.
-// If so, it stores a checkpoint shouldHeightIndexBeRepaired acquires
-// vm.ctx.Lock to avoid interleaving with updateHeightIndex.
-func (vm *VM) shouldHeightIndexBeRepaired() error {
+// shouldHeightIndexBeRepaired checks if index needs repairing and stores a
+// checkpoint if repairing is needed.
+//
+// vm.ctx.Lock is acquired to avoid interleaving with block acceptance.
+func (vm *VM) shouldHeightIndexBeRepaired() (bool, error) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	checkpointID, err := vm.State.GetCheckpoint()
-	if err == nil {
-		vm.ctx.Log.Info("Block indexing by height starting: found checkpoint %s", checkpointID)
-		return block.ErrIndexIncomplete
-	}
+	_, err := vm.State.GetCheckpoint()
 	if err != database.ErrNotFound {
-		return err
+		return true, err
 	}
 
 	// no checkpoint. Either index is complete or repair was never attempted.
 	// index is complete iff lastAcceptedBlock is indexed
 	latestProBlkID, err := vm.State.GetLastAccepted()
-	switch err {
-	case nil:
-		break
-
-	case database.ErrNotFound:
-		vm.ctx.Log.Info("Block indexing by height starting: Snowman++ fork not reached yet. No need to rebuild index.")
-		return nil
-
-	default:
-		return err
+	if err == database.ErrNotFound {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
 	}
 
 	lastAcceptedBlk, err := vm.getPostForkBlock(latestProBlkID)
 	if err != nil {
 		// Could not retrieve last accepted block.
-		// We got bigger problems than repairing the index
-		return err
+		return false, err
 	}
 
 	_, err = vm.State.GetBlockIDAtHeight(lastAcceptedBlk.Height())
-	switch err {
-	case nil:
-		vm.ctx.Log.Info("Block indexing by height starting: Index already complete, nothing to do.")
-		return nil
-
-	case database.ErrNotFound:
-		// Index needs repairing. Mark the checkpoint so that,
-		// in case new blocks are accepted while indexing is ongoing,
-		// and the process is terminated before first commit,
-		// we do not miss rebuilding the full index.
-		if err := vm.State.SetCheckpoint(latestProBlkID); err != nil {
-			return err
-		}
-
-		vm.ctx.Log.Info("Block indexing by height starting: index incomplete. Rebuilding from %v", latestProBlkID)
-		return block.ErrIndexIncomplete
-
-	default:
-		return err
+	if err != database.ErrNotFound {
+		return false, err
 	}
+
+	// Index needs repairing. Mark the checkpoint so that, in case new blocks
+	// are accepted after the lock is released here but before indexing has
+	// started, we do not miss rebuilding the full index.
+	return true, vm.State.SetCheckpoint(latestProBlkID)
 }
 
 // vm.ctx.Lock should be held
@@ -107,39 +86,39 @@ func (vm *VM) GetBlockIDByHeight(height uint64) (ids.ID, error) {
 	}
 }
 
-// As postFork blocks/options are accepted, height index is updated
-// even if its repairing is ongoing.
-// updateHeightIndex should not be called for preFork blocks. Moreover
+// As postFork blocks/options are accepted, height index is updated even if its
+// repairing is ongoing.
 // vm.ctx.Lock should be held
 func (vm *VM) updateHeightIndex(height uint64, blkID ids.ID) error {
-	checkpoint, err := vm.State.GetCheckpoint()
+	_, err := vm.State.GetCheckpoint()
 	switch err {
 	case nil:
-		// index rebuilding is ongoing. We can update the index with current block
-		// except if it is checkpointed blk, which will be handled by indexer.
-		if blkID != checkpoint {
-			return vm.storeHeightEntry(height, blkID)
-		}
+		// Index rebuilding is ongoing. We can update the index with the current
+		// block.
 
 	case database.ErrNotFound:
-		// no checkpoint means indexing is not started or is already done
-		if vm.hIndexer.IsRepaired() {
-			return vm.storeHeightEntry(height, blkID)
+		// No checkpoint means indexing has either not started or is already
+		// done.
+		if !vm.hIndexer.IsRepaired() {
+			return nil
 		}
 
+		// Indexing must have finished. We can update the index with the current
+		// block.
+
 	default:
-		return err
+		return fmt.Errorf("failed to load index checkpoint: %w", err)
 	}
-	return nil
+	return vm.storeHeightEntry(height, blkID)
 }
 
 func (vm *VM) storeHeightEntry(height uint64, blkID ids.ID) error {
 	switch _, err := vm.State.GetForkHeight(); err {
 	case nil:
-		// fork already reached. Just update the index
+		// The fork was already reached. Just update the index.
 
 	case database.ErrNotFound:
-		// this is the first post Fork block/option, store fork height
+		// This is the first post fork block, store the fork height.
 		if err := vm.State.SetForkHeight(height); err != nil {
 			return fmt.Errorf("failed storing fork height: %w", err)
 		}

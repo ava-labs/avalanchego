@@ -149,7 +149,8 @@ func (vm *VM) Initialize(
 
 	// asynchronously rebuild height index, if needed
 	go func() {
-		// poll till index is complete or shutdown happens
+		// Poll until the underlying chain's index is complete or shutdown is
+		// called.
 		ticker := time.NewTicker(checkIndexedFrequency)
 		defer ticker.Stop()
 		for {
@@ -171,21 +172,23 @@ func (vm *VM) Initialize(
 			}
 		}
 
-		// finally repair index
-		err := vm.shouldHeightIndexBeRepaired()
-		if err == nil {
-			vm.ctx.Log.Info("Block indexing by height: index already complete, nothing to repair.")
+		// Check
+		shouldRepair, err := vm.shouldHeightIndexBeRepaired()
+		if err != nil {
+			vm.ctx.Log.Error("could not verify the status of height indexing: %s", err)
 			return
 		}
-		if err != block.ErrIndexIncomplete {
-			vm.ctx.Log.Error("Block indexing by height: could not check height index, err %w", err)
+		if !shouldRepair {
+			vm.ctx.Log.Info("block height indexing is already complete")
 			return
 		}
 
 		if err := vm.hIndexer.RepairHeightIndex(); err != nil {
-			vm.ctx.Log.Error("Block indexing by height: failed with error %s", err)
+			vm.ctx.Log.Error("block height indexing failed: %s", err)
 			return
 		}
+
+		vm.ctx.Log.Info("block height indexing finished")
 	}()
 
 	return nil
@@ -299,6 +302,9 @@ func (vm *VM) repairAcceptedChain() error {
 			if err := vm.State.DeleteLastAccepted(); err != nil {
 				return err
 			}
+			if err := vm.State.DeleteCheckpoint(); err != nil {
+				return err
+			}
 			return vm.db.Commit()
 		}
 		if err != nil {
@@ -313,14 +319,32 @@ func (vm *VM) repairAcceptedChain() error {
 			return vm.db.Commit()
 		}
 
-		// Advance to the parent block
-		lastAcceptedID = lastAccepted.Parent()
-
+		// Mark the last accepted block as processing - rather than accepted.
 		lastAccepted.setStatus(choices.Processing)
+		if err := vm.State.PutBlock(lastAccepted.getStatelessBlk(), choices.Processing); err != nil {
+			return err
+		}
+
+		// Advance to the parent block
+		previousLastAcceptedID := lastAcceptedID
+		lastAcceptedID = lastAccepted.Parent()
 		if err := vm.State.SetLastAccepted(lastAcceptedID); err != nil {
 			return err
 		}
-		if err := vm.State.PutBlock(lastAccepted.getStatelessBlk(), choices.Processing); err != nil {
+
+		// If the indexer checkpoint was previously pointing to the last
+		// accepted block, roll it back to the new last accepted block.
+		checkpoint, err := vm.State.GetCheckpoint()
+		if err == database.ErrNotFound {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if previousLastAcceptedID != checkpoint {
+			continue
+		}
+		if err := vm.State.SetCheckpoint(lastAcceptedID); err != nil {
 			return err
 		}
 	}
