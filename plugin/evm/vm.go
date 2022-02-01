@@ -839,14 +839,9 @@ func (vm *VM) SetPreference(blkID ids.ID) error {
 	return vm.chain.SetPreference(block.(*Block).ethBlock)
 }
 
-func (vm *VM) IsHeightIndexingEnabled() bool {
+func (vm *VM) IsHeightIndexComplete() error {
 	// our index is vm.chain.GetBlockByNumber
-	return true
-}
-
-func (vm *VM) IsHeightIndexComplete() bool {
-	// our index is vm.chain.GetBlockByNumber
-	return true
+	return nil
 }
 
 // GetBlockIDByHeight retrieves the blkID of the canonical block at [blkHeight]
