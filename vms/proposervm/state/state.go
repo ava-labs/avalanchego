@@ -32,6 +32,7 @@ func New(db *versiondb.Database) State {
 	chainDB := prefixdb.New(chainStatePrefix, db)
 	blockDB := prefixdb.New(blockStatePrefix, db)
 	heightDB := prefixdb.New(heightIndexPrefix, db)
+
 	return &state{
 		ChainState:  NewChainState(chainDB),
 		BlockState:  NewBlockState(blockDB),
