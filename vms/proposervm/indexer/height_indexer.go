@@ -247,8 +247,9 @@ func (hi *heightIndexer) doRepair(currentProBlkID ids.ID) error {
 
 		// Periodically log progress
 		indexedBlks++
-		if time.Since(lastLogTime) > 15*time.Second {
-			lastLogTime = time.Now()
+		now := time.Now()
+		if now.Sub(lastLogTime) > 15*time.Second {
+			lastLogTime = now
 			hi.log.Info(
 				"Block indexing by height: ongoing. Indexed %d blocks, latest indexed height %d",
 				indexedBlks,
