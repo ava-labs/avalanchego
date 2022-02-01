@@ -139,18 +139,25 @@ func (vm *VM) Initialize(
 		return nil // nothing else to do
 	}
 
-	if !innerHVM.IsHeightIndexingEnabled() {
-		return nil // nothing else to do
-	}
-
 	// asynchronously rebuild height index, if needed
 	go func() {
 		// poll till index is complete or shutdown happens
-		for !innerHVM.IsHeightIndexComplete() {
+		for {
 			if vm.shutdownCalled.GetValue() {
 				return
 			}
 
+			err := innerHVM.IsHeightIndexComplete()
+			if err == nil {
+				// innerVM indexing complete. Let re-index this machine
+				break
+			}
+			if err != block.ErrIndexIncomplete {
+				vm.ctx.Log.Error("Block indexing by height: failed with error %s", err)
+				return
+			}
+
+			// innerVM index is incomplete. Wait for completion and retry
 			time.Sleep(10 * time.Second)
 		}
 

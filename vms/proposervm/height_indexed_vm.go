@@ -11,20 +11,18 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
-// IsEnabled implements HeightIndexedChainVM interface
-// vm.ctx.Lock should be held
-func (vm *VM) IsHeightIndexingEnabled() bool {
-	innerHVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
-	if !ok {
-		return false
-	}
-	return innerHVM.IsHeightIndexingEnabled()
-}
-
 // IsHeightIndexComplete implements HeightIndexedChainVM interface
 // vm.ctx.Lock should be held
-func (vm *VM) IsHeightIndexComplete() bool {
-	return vm.hIndexer.IsRepaired()
+func (vm *VM) IsHeightIndexComplete() error {
+	if _, ok := vm.ChainVM.(block.HeightIndexedChainVM); !ok {
+		return block.ErrHeightIndexedVMNotImplemented
+	}
+
+	if !vm.hIndexer.IsRepaired() {
+		return block.ErrIndexIncomplete
+	}
+
+	return nil
 }
 
 // GetBlockIDByHeight implements HeightIndexedChainVM interface

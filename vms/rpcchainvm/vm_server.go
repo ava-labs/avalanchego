@@ -251,24 +251,13 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	}, err
 }
 
-func (vm *VMServer) IsHeightIndexingEnabled(context.Context, *emptypb.Empty) (*vmproto.IsHeightIndexingEnabledResponse, error) {
+func (vm *VMServer) IsHeightIndexComplete(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	hVM, ok := vm.vm.(block.HeightIndexedChainVM)
 	if !ok {
 		return nil, block.ErrHeightIndexedVMNotImplemented
 	}
-	return &vmproto.IsHeightIndexingEnabledResponse{
-		Enabled: hVM.IsHeightIndexingEnabled(),
-	}, nil
-}
 
-func (vm *VMServer) IsHeightIndexComplete(context.Context, *emptypb.Empty) (*vmproto.IsHeightIndexCompleteResponse, error) {
-	hVM, ok := vm.vm.(block.HeightIndexedChainVM)
-	if !ok {
-		return nil, block.ErrHeightIndexedVMNotImplemented
-	}
-	return &vmproto.IsHeightIndexCompleteResponse{
-		Completed: hVM.IsHeightIndexComplete(),
-	}, nil
+	return &emptypb.Empty{}, hVM.IsHeightIndexComplete()
 }
 
 func (vm *VMServer) GetBlockIDByHeight(ctx context.Context, req *vmproto.GetBlockIDByHeightRequest) (*vmproto.GetBlockIDByHeightResponse, error) {

@@ -13,10 +13,11 @@ var (
 	ErrIndexIncomplete               = errors.New("query failed because height index is incomplete")
 )
 
-// HeightIndexedChainVM extends the minimal functionalities exposed by ChainVM to allow querying
-// block IDs by height.
+// HeightIndexedChainVM extends ChainVM to allow querying block IDs by height.
 type HeightIndexedChainVM interface {
-	IsHeightIndexingEnabled() bool
-	IsHeightIndexComplete() bool
+	// IsHeightIndexComplete should return
+	// ErrHeightIndexedVMNotImplemented or ErrIndexIncomplete
+	// if height index is not supported or is not currently available
+	IsHeightIndexComplete() error
 	GetBlockIDByHeight(height uint64) (ids.ID, error)
 }
