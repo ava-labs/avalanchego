@@ -4,6 +4,7 @@
 package indexer
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -24,7 +25,7 @@ type HeightIndexer interface {
 	IsRepaired() bool
 
 	// Resumes repairing of the height index from the checkpoint.
-	RepairHeightIndex() error
+	RepairHeightIndex(context.Context) error
 }
 
 func NewHeightIndexer(
@@ -68,7 +69,7 @@ func (hi *heightIndexer) IsRepaired() bool {
 // RepairHeightIndex can take a non-trivial time to complete; hence we make sure
 // the process has limited memory footprint, can be resumed from periodic checkpoints
 // and works asynchronously without blocking the VM.
-func (hi *heightIndexer) RepairHeightIndex() error {
+func (hi *heightIndexer) RepairHeightIndex(ctx context.Context) error {
 	startBlkID, err := hi.indexState.GetCheckpoint()
 	if err == database.ErrNotFound {
 		hi.jobDone.SetValue(true)
@@ -78,7 +79,7 @@ func (hi *heightIndexer) RepairHeightIndex() error {
 		return err
 	}
 
-	if err := hi.doRepair(startBlkID); err != nil {
+	if err := hi.doRepair(ctx, startBlkID); err != nil {
 		return fmt.Errorf("could not repair height index: %w", err)
 	}
 	if err := hi.flush(); err != nil {
@@ -90,7 +91,7 @@ func (hi *heightIndexer) RepairHeightIndex() error {
 // if height index needs repairing, doRepair would do that. It
 // iterates back via parents, checking and rebuilding height indexing.
 // Note: batch commit is deferred to doRepair caller
-func (hi *heightIndexer) doRepair(currentProBlkID ids.ID) error {
+func (hi *heightIndexer) doRepair(ctx context.Context, currentProBlkID ids.ID) error {
 	var (
 		start           = time.Now()
 		lastLogTime     = start
@@ -99,6 +100,9 @@ func (hi *heightIndexer) doRepair(currentProBlkID ids.ID) error {
 		previousHeight  uint64
 	)
 	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		currentAcceptedBlk, err := hi.server.GetWrappingBlk(currentProBlkID)
 		if err == database.ErrNotFound {
 			// We have visited all the proposerVM blocks. Because we previously

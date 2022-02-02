@@ -186,12 +186,20 @@ func (vm *VM) Initialize(
 			return
 		}
 
-		if err := vm.hIndexer.RepairHeightIndex(); err != nil {
-			vm.ctx.Log.Error("block height indexing failed: %s", err)
+		err = vm.hIndexer.RepairHeightIndex(vm.context)
+		if err == nil {
+			vm.ctx.Log.Info("block height indexing finished")
 			return
 		}
 
-		vm.ctx.Log.Info("block height indexing finished")
+		// Note that we don't check if `err` is `context.Canceled` here because
+		// repairing the height index may have returned a non-standard errored
+		// due to the chain shutting down.
+		if vm.context.Err() == nil {
+			// The context wasn't closed, so the chain hasn't been shutdown.
+			// This must have been an unexpected error.
+			vm.ctx.Log.Error("block height indexing failed: %s", err)
+		}
 	}()
 
 	return nil
