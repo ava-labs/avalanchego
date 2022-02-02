@@ -191,6 +191,20 @@ message BatchedParseBlockResponse {
     repeated ParseBlockResponse response = 1;
 }
 
+// HeightIndexedVM related messages
+message VerifyHeightIndexResponse {
+    uint32 err = 1;
+}
+
+message GetBlockIDAtHeightRequest {
+    uint64 height = 1;
+}
+
+message GetBlockIDAtHeightResponse {
+    bytes blkID = 1;
+    uint32 err = 2;
+}
+
 message GatherResponse {
     repeated io.prometheus.client.MetricFamily metricFamilies = 1;
 }
@@ -222,4 +236,8 @@ service VM {
 
     rpc GetAncestors(GetAncestorsRequest) returns (GetAncestorsResponse);
     rpc BatchedParseBlock(BatchedParseBlockRequest) returns (BatchedParseBlockResponse);
+    
+    rpc VerifyHeightIndex(google.protobuf.Empty) returns (VerifyHeightIndexResponse);
+    rpc GetBlockIDAtHeight(GetBlockIDAtHeightRequest) returns (GetBlockIDAtHeightResponse);
+    
 }

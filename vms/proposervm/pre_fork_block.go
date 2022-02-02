@@ -56,7 +56,7 @@ func (b *preForkBlock) Options() ([2]snowman.Block, error) {
 	}, nil
 }
 
-func (b *preForkBlock) getInnerBlk() snowman.Block {
+func (b *preForkBlock) GetInnerBlk() snowman.Block {
 	return b.Block
 }
 

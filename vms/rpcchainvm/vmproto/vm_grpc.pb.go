@@ -42,6 +42,8 @@ type VMClient interface {
 	BlockReject(ctx context.Context, in *BlockRejectRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetAncestors(ctx context.Context, in *GetAncestorsRequest, opts ...grpc.CallOption) (*GetAncestorsResponse, error)
 	BatchedParseBlock(ctx context.Context, in *BatchedParseBlockRequest, opts ...grpc.CallOption) (*BatchedParseBlockResponse, error)
+	VerifyHeightIndex(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*VerifyHeightIndexResponse, error)
+	GetBlockIDAtHeight(ctx context.Context, in *GetBlockIDAtHeightRequest, opts ...grpc.CallOption) (*GetBlockIDAtHeightResponse, error)
 }
 
 type vMClient struct {
@@ -259,6 +261,24 @@ func (c *vMClient) BatchedParseBlock(ctx context.Context, in *BatchedParseBlockR
 	return out, nil
 }
 
+func (c *vMClient) VerifyHeightIndex(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*VerifyHeightIndexResponse, error) {
+	out := new(VerifyHeightIndexResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/VerifyHeightIndex", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) GetBlockIDAtHeight(ctx context.Context, in *GetBlockIDAtHeightRequest, opts ...grpc.CallOption) (*GetBlockIDAtHeightResponse, error) {
+	out := new(GetBlockIDAtHeightResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/GetBlockIDAtHeight", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // VMServer is the server API for VM service.
 // All implementations must embed UnimplementedVMServer
 // for forward compatibility
@@ -286,6 +306,8 @@ type VMServer interface {
 	BlockReject(context.Context, *BlockRejectRequest) (*emptypb.Empty, error)
 	GetAncestors(context.Context, *GetAncestorsRequest) (*GetAncestorsResponse, error)
 	BatchedParseBlock(context.Context, *BatchedParseBlockRequest) (*BatchedParseBlockResponse, error)
+	VerifyHeightIndex(context.Context, *emptypb.Empty) (*VerifyHeightIndexResponse, error)
+	GetBlockIDAtHeight(context.Context, *GetBlockIDAtHeightRequest) (*GetBlockIDAtHeightResponse, error)
 	mustEmbedUnimplementedVMServer()
 }
 
@@ -361,6 +383,12 @@ func (UnimplementedVMServer) GetAncestors(context.Context, *GetAncestorsRequest)
 }
 func (UnimplementedVMServer) BatchedParseBlock(context.Context, *BatchedParseBlockRequest) (*BatchedParseBlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BatchedParseBlock not implemented")
+}
+func (UnimplementedVMServer) VerifyHeightIndex(context.Context, *emptypb.Empty) (*VerifyHeightIndexResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method VerifyHeightIndex not implemented")
+}
+func (UnimplementedVMServer) GetBlockIDAtHeight(context.Context, *GetBlockIDAtHeightRequest) (*GetBlockIDAtHeightResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBlockIDAtHeight not implemented")
 }
 func (UnimplementedVMServer) mustEmbedUnimplementedVMServer() {}
 
@@ -789,6 +817,42 @@ func _VM_BatchedParseBlock_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VM_VerifyHeightIndex_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).VerifyHeightIndex(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/VerifyHeightIndex",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).VerifyHeightIndex(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_GetBlockIDAtHeight_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetBlockIDAtHeightRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).GetBlockIDAtHeight(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/GetBlockIDAtHeight",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).GetBlockIDAtHeight(ctx, req.(*GetBlockIDAtHeightRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // VM_ServiceDesc is the grpc.ServiceDesc for VM service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -887,6 +951,14 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "BatchedParseBlock",
 			Handler:    _VM_BatchedParseBlock_Handler,
+		},
+		{
+			MethodName: "VerifyHeightIndex",
+			Handler:    _VM_VerifyHeightIndex_Handler,
+		},
+		{
+			MethodName: "GetBlockIDAtHeight",
+			Handler:    _VM_GetBlockIDAtHeight_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
