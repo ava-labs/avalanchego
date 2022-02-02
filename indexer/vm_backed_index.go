@@ -51,7 +51,7 @@ func (vmi *vmBackedBlockIndex) Accept(ctx *snow.ConsensusContext, containerID id
 }
 
 func (vmi *vmBackedBlockIndex) getBlkByIndex(index uint64) (snowman.Block, error) {
-	blkID, err := vmi.hVM.GetBlockIDByHeight(index)
+	blkID, err := vmi.hVM.GetBlockIDAtHeight(index)
 	if err != nil {
 		return nil, fmt.Errorf("no container at index %d: %w", index, err)
 	}

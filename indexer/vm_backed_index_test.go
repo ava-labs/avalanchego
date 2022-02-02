@@ -62,7 +62,7 @@ func TestVMBackedBlockIndex(t *testing.T) {
 		}
 		return blk, nil
 	}
-	vm.GetBlockIDByHeightF = func(height uint64) (ids.ID, error) {
+	vm.GetBlockIDAtHeightF = func(height uint64) (ids.ID, error) {
 		if height >= uint64(len(blksList)) {
 			return ids.Empty, database.ErrNotFound
 		}
@@ -166,7 +166,7 @@ func TestVMBackedBlockIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 		}
 		return blk, nil
 	}
-	vm.GetBlockIDByHeightF = func(height uint64) (ids.ID, error) {
+	vm.GetBlockIDAtHeightF = func(height uint64) (ids.ID, error) {
 		if height >= uint64(len(blksList)) {
 			return ids.Empty, database.ErrNotFound
 		}

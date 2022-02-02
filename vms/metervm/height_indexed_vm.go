@@ -18,10 +18,10 @@ func (vm *blockVM) VerifyHeightIndex() error {
 	return hVM.VerifyHeightIndex()
 }
 
-func (vm *blockVM) GetBlockIDByHeight(height uint64) (ids.ID, error) {
+func (vm *blockVM) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	hVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
 	if !ok {
 		return ids.Empty, block.ErrHeightIndexedVMNotImplemented
 	}
-	return hVM.GetBlockIDByHeight(height)
+	return hVM.GetBlockIDAtHeight(height)
 }

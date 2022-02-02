@@ -546,10 +546,10 @@ func (vm *VMClient) VerifyHeightIndex() error {
 	return errCodeToError[resp.Err]
 }
 
-func (vm *VMClient) GetBlockIDByHeight(height uint64) (ids.ID, error) {
-	resp, err := vm.client.GetBlockIDByHeight(
+func (vm *VMClient) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
+	resp, err := vm.client.GetBlockIDAtHeight(
 		context.Background(),
-		&vmproto.GetBlockIDByHeightRequest{Height: height},
+		&vmproto.GetBlockIDAtHeightRequest{Height: height},
 	)
 	if err != nil {
 		return ids.Empty, err

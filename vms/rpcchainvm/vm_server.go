@@ -263,17 +263,17 @@ func (vm *VMServer) VerifyHeightIndex(context.Context, *emptypb.Empty) (*vmproto
 	}, errorToRPCError(err)
 }
 
-func (vm *VMServer) GetBlockIDByHeight(ctx context.Context, req *vmproto.GetBlockIDByHeightRequest) (*vmproto.GetBlockIDByHeightResponse, error) {
+func (vm *VMServer) GetBlockIDAtHeight(ctx context.Context, req *vmproto.GetBlockIDAtHeightRequest) (*vmproto.GetBlockIDAtHeightResponse, error) {
 	var (
 		blkID ids.ID
 		err   error
 	)
 	if hVM, ok := vm.vm.(block.HeightIndexedChainVM); ok {
-		blkID, err = hVM.GetBlockIDByHeight(req.Height)
+		blkID, err = hVM.GetBlockIDAtHeight(req.Height)
 	} else {
 		err = block.ErrHeightIndexedVMNotImplemented
 	}
-	return &vmproto.GetBlockIDByHeightResponse{
+	return &vmproto.GetBlockIDAtHeightResponse{
 		BlkID: blkID[:],
 		Err:   errorToErrCode[err],
 	}, errorToRPCError(err)

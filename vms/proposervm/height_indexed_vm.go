@@ -64,7 +64,7 @@ func (vm *VM) VerifyHeightIndex() error {
 }
 
 // vm.ctx.Lock should be held
-func (vm *VM) GetBlockIDByHeight(height uint64) (ids.ID, error) {
+func (vm *VM) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	if !vm.hIndexer.IsRepaired() {
 		return ids.Empty, block.ErrIndexIncomplete
 	}
@@ -75,13 +75,13 @@ func (vm *VM) GetBlockIDByHeight(height uint64) (ids.ID, error) {
 	switch forkHeight, err := vm.State.GetForkHeight(); err {
 	case nil:
 		if height < forkHeight {
-			return innerHVM.GetBlockIDByHeight(height)
+			return innerHVM.GetBlockIDAtHeight(height)
 		}
 		return vm.State.GetBlockIDAtHeight(height)
 
 	case database.ErrNotFound:
 		// fork not reached yet. Block must be pre-fork
-		return innerHVM.GetBlockIDByHeight(height)
+		return innerHVM.GetBlockIDAtHeight(height)
 
 	default:
 		return ids.Empty, err

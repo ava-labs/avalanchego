@@ -1812,7 +1812,7 @@ func (x *VerifyHeightIndexResponse) GetErr() uint32 {
 	return 0
 }
 
-type GetBlockIDByHeightRequest struct {
+type GetBlockIDAtHeightRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -1820,8 +1820,8 @@ type GetBlockIDByHeightRequest struct {
 	Height uint64 `protobuf:"varint,1,opt,name=height,proto3" json:"height,omitempty"`
 }
 
-func (x *GetBlockIDByHeightRequest) Reset() {
-	*x = GetBlockIDByHeightRequest{}
+func (x *GetBlockIDAtHeightRequest) Reset() {
+	*x = GetBlockIDAtHeightRequest{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_vm_proto_msgTypes[30]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1829,13 +1829,13 @@ func (x *GetBlockIDByHeightRequest) Reset() {
 	}
 }
 
-func (x *GetBlockIDByHeightRequest) String() string {
+func (x *GetBlockIDAtHeightRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetBlockIDByHeightRequest) ProtoMessage() {}
+func (*GetBlockIDAtHeightRequest) ProtoMessage() {}
 
-func (x *GetBlockIDByHeightRequest) ProtoReflect() protoreflect.Message {
+func (x *GetBlockIDAtHeightRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_vm_proto_msgTypes[30]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1847,19 +1847,19 @@ func (x *GetBlockIDByHeightRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetBlockIDByHeightRequest.ProtoReflect.Descriptor instead.
-func (*GetBlockIDByHeightRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetBlockIDAtHeightRequest.ProtoReflect.Descriptor instead.
+func (*GetBlockIDAtHeightRequest) Descriptor() ([]byte, []int) {
 	return file_vm_proto_rawDescGZIP(), []int{30}
 }
 
-func (x *GetBlockIDByHeightRequest) GetHeight() uint64 {
+func (x *GetBlockIDAtHeightRequest) GetHeight() uint64 {
 	if x != nil {
 		return x.Height
 	}
 	return 0
 }
 
-type GetBlockIDByHeightResponse struct {
+type GetBlockIDAtHeightResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -1868,8 +1868,8 @@ type GetBlockIDByHeightResponse struct {
 	Err   uint32 `protobuf:"varint,2,opt,name=err,proto3" json:"err,omitempty"`
 }
 
-func (x *GetBlockIDByHeightResponse) Reset() {
-	*x = GetBlockIDByHeightResponse{}
+func (x *GetBlockIDAtHeightResponse) Reset() {
+	*x = GetBlockIDAtHeightResponse{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_vm_proto_msgTypes[31]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1877,13 +1877,13 @@ func (x *GetBlockIDByHeightResponse) Reset() {
 	}
 }
 
-func (x *GetBlockIDByHeightResponse) String() string {
+func (x *GetBlockIDAtHeightResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetBlockIDByHeightResponse) ProtoMessage() {}
+func (*GetBlockIDAtHeightResponse) ProtoMessage() {}
 
-func (x *GetBlockIDByHeightResponse) ProtoReflect() protoreflect.Message {
+func (x *GetBlockIDAtHeightResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_vm_proto_msgTypes[31]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1895,19 +1895,19 @@ func (x *GetBlockIDByHeightResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetBlockIDByHeightResponse.ProtoReflect.Descriptor instead.
-func (*GetBlockIDByHeightResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetBlockIDAtHeightResponse.ProtoReflect.Descriptor instead.
+func (*GetBlockIDAtHeightResponse) Descriptor() ([]byte, []int) {
 	return file_vm_proto_rawDescGZIP(), []int{31}
 }
 
-func (x *GetBlockIDByHeightResponse) GetBlkID() []byte {
+func (x *GetBlockIDAtHeightResponse) GetBlkID() []byte {
 	if x != nil {
 		return x.BlkID
 	}
 	return nil
 }
 
-func (x *GetBlockIDByHeightResponse) GetErr() uint32 {
+func (x *GetBlockIDAtHeightResponse) GetErr() uint32 {
 	if x != nil {
 		return x.Err
 	}
@@ -2149,10 +2149,10 @@ var file_vm_proto_rawDesc = []byte{
 	0x65, 0x69, 0x67, 0x68, 0x74, 0x49, 0x6e, 0x64, 0x65, 0x78, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
 	0x73, 0x65, 0x12, 0x10, 0x0a, 0x03, 0x65, 0x72, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0d, 0x52,
 	0x03, 0x65, 0x72, 0x72, 0x22, 0x33, 0x0a, 0x19, 0x47, 0x65, 0x74, 0x42, 0x6c, 0x6f, 0x63, 0x6b,
-	0x49, 0x44, 0x42, 0x79, 0x48, 0x65, 0x69, 0x67, 0x68, 0x74, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73,
+	0x49, 0x44, 0x41, 0x74, 0x48, 0x65, 0x69, 0x67, 0x68, 0x74, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73,
 	0x74, 0x12, 0x16, 0x0a, 0x06, 0x68, 0x65, 0x69, 0x67, 0x68, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28,
 	0x04, 0x52, 0x06, 0x68, 0x65, 0x69, 0x67, 0x68, 0x74, 0x22, 0x44, 0x0a, 0x1a, 0x47, 0x65, 0x74,
-	0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x49, 0x44, 0x42, 0x79, 0x48, 0x65, 0x69, 0x67, 0x68, 0x74, 0x52,
+	0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x49, 0x44, 0x41, 0x74, 0x48, 0x65, 0x69, 0x67, 0x68, 0x74, 0x52,
 	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x62, 0x6c, 0x6b, 0x49, 0x44,
 	0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x05, 0x62, 0x6c, 0x6b, 0x49, 0x44, 0x12, 0x10, 0x0a,
 	0x03, 0x65, 0x72, 0x72, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x03, 0x65, 0x72, 0x72, 0x22,
@@ -2267,11 +2267,11 @@ var file_vm_proto_rawDesc = []byte{
 	0x22, 0x2e, 0x76, 0x6d, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x56, 0x65, 0x72, 0x69, 0x66, 0x79,
 	0x48, 0x65, 0x69, 0x67, 0x68, 0x74, 0x49, 0x6e, 0x64, 0x65, 0x78, 0x52, 0x65, 0x73, 0x70, 0x6f,
 	0x6e, 0x73, 0x65, 0x12, 0x5d, 0x0a, 0x12, 0x47, 0x65, 0x74, 0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x49,
-	0x44, 0x42, 0x79, 0x48, 0x65, 0x69, 0x67, 0x68, 0x74, 0x12, 0x22, 0x2e, 0x76, 0x6d, 0x70, 0x72,
-	0x6f, 0x74, 0x6f, 0x2e, 0x47, 0x65, 0x74, 0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x49, 0x44, 0x42, 0x79,
+	0x44, 0x41, 0x74, 0x48, 0x65, 0x69, 0x67, 0x68, 0x74, 0x12, 0x22, 0x2e, 0x76, 0x6d, 0x70, 0x72,
+	0x6f, 0x74, 0x6f, 0x2e, 0x47, 0x65, 0x74, 0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x49, 0x44, 0x41, 0x74,
 	0x48, 0x65, 0x69, 0x67, 0x68, 0x74, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x23, 0x2e,
 	0x76, 0x6d, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x47, 0x65, 0x74, 0x42, 0x6c, 0x6f, 0x63, 0x6b,
-	0x49, 0x44, 0x42, 0x79, 0x48, 0x65, 0x69, 0x67, 0x68, 0x74, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
+	0x49, 0x44, 0x41, 0x74, 0x48, 0x65, 0x69, 0x67, 0x68, 0x74, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
 	0x73, 0x65, 0x42, 0x38, 0x5a, 0x36, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d,
 	0x2f, 0x61, 0x76, 0x61, 0x2d, 0x6c, 0x61, 0x62, 0x73, 0x2f, 0x61, 0x76, 0x61, 0x6c, 0x61, 0x6e,
 	0x63, 0x68, 0x65, 0x67, 0x6f, 0x2f, 0x76, 0x6d, 0x73, 0x2f, 0x72, 0x70, 0x63, 0x63, 0x68, 0x61,
@@ -2323,8 +2323,8 @@ var file_vm_proto_goTypes = []interface{}{
 	(*BatchedParseBlockRequest)(nil),     // 27: vmproto.BatchedParseBlockRequest
 	(*BatchedParseBlockResponse)(nil),    // 28: vmproto.BatchedParseBlockResponse
 	(*VerifyHeightIndexResponse)(nil),    // 29: vmproto.VerifyHeightIndexResponse
-	(*GetBlockIDByHeightRequest)(nil),    // 30: vmproto.GetBlockIDByHeightRequest
-	(*GetBlockIDByHeightResponse)(nil),   // 31: vmproto.GetBlockIDByHeightResponse
+	(*GetBlockIDAtHeightRequest)(nil),    // 30: vmproto.GetBlockIDAtHeightRequest
+	(*GetBlockIDAtHeightResponse)(nil),   // 31: vmproto.GetBlockIDAtHeightResponse
 	(*GatherResponse)(nil),               // 32: vmproto.GatherResponse
 	(*_go.MetricFamily)(nil),             // 33: io.prometheus.client.MetricFamily
 	(*emptypb.Empty)(nil),                // 34: google.protobuf.Empty
@@ -2359,7 +2359,7 @@ var file_vm_proto_depIdxs = []int32{
 	25, // 26: vmproto.VM.GetAncestors:input_type -> vmproto.GetAncestorsRequest
 	27, // 27: vmproto.VM.BatchedParseBlock:input_type -> vmproto.BatchedParseBlockRequest
 	34, // 28: vmproto.VM.VerifyHeightIndex:input_type -> google.protobuf.Empty
-	30, // 29: vmproto.VM.GetBlockIDByHeight:input_type -> vmproto.GetBlockIDByHeightRequest
+	30, // 29: vmproto.VM.GetBlockIDAtHeight:input_type -> vmproto.GetBlockIDAtHeightRequest
 	2,  // 30: vmproto.VM.Initialize:output_type -> vmproto.InitializeResponse
 	34, // 31: vmproto.VM.SetState:output_type -> google.protobuf.Empty
 	34, // 32: vmproto.VM.Shutdown:output_type -> google.protobuf.Empty
@@ -2384,7 +2384,7 @@ var file_vm_proto_depIdxs = []int32{
 	26, // 51: vmproto.VM.GetAncestors:output_type -> vmproto.GetAncestorsResponse
 	28, // 52: vmproto.VM.BatchedParseBlock:output_type -> vmproto.BatchedParseBlockResponse
 	29, // 53: vmproto.VM.VerifyHeightIndex:output_type -> vmproto.VerifyHeightIndexResponse
-	31, // 54: vmproto.VM.GetBlockIDByHeight:output_type -> vmproto.GetBlockIDByHeightResponse
+	31, // 54: vmproto.VM.GetBlockIDAtHeight:output_type -> vmproto.GetBlockIDAtHeightResponse
 	30, // [30:55] is the sub-list for method output_type
 	5,  // [5:30] is the sub-list for method input_type
 	5,  // [5:5] is the sub-list for extension type_name
@@ -2759,7 +2759,7 @@ func file_vm_proto_init() {
 			}
 		}
 		file_vm_proto_msgTypes[30].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetBlockIDByHeightRequest); i {
+			switch v := v.(*GetBlockIDAtHeightRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2771,7 +2771,7 @@ func file_vm_proto_init() {
 			}
 		}
 		file_vm_proto_msgTypes[31].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetBlockIDByHeightResponse); i {
+			switch v := v.(*GetBlockIDAtHeightResponse); i {
 			case 0:
 				return &v.state
 			case 1:
