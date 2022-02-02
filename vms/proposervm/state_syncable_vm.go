@@ -86,7 +86,7 @@ func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 		return common.Summary{}, errWrongStateSyncVersion
 	}
 
-	proBlkID, err := vm.GetBlockIDByHeight(innerBlk.Height())
+	proBlkID, err := vm.GetBlockIDAtHeight(innerBlk.Height())
 	switch err {
 	case nil:
 	case database.ErrNotFound:

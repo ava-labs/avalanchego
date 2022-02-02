@@ -4,40 +4,46 @@
 package state
 
 import (
-	"encoding/binary"
-	"sync"
-
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
-	cacheSize = 8192 // bytes
+	cacheSize = 8192 // max cache entries
 )
 
 var (
 	_ HeightIndex = &heightIndex{}
 
-	heightPrefix = []byte("heightkey")
+	heightPrefix   = []byte("height")
+	metadataPrefix = []byte("metadata")
+
+	forkKey       = []byte("fork")
+	checkpointKey = []byte("checkpoint")
 )
 
 type HeightIndexGetter interface {
 	GetBlockIDAtHeight(height uint64) (ids.ID, error)
+
+	// Fork height is stored when the first post-fork block/option is accepted.
+	// Before that, fork height won't be found.
 	GetForkHeight() (uint64, error)
 }
 
-type HeightIndexWriterDeleter interface {
+type HeightIndexWriter interface {
 	SetBlockIDAtHeight(height uint64, blkID ids.ID) error
-	DeleteBlockIDAtHeight(height uint64) error
 	SetForkHeight(height uint64) error
-	DeleteForkHeight() error
-	clearCache() // useful in testing
 }
 
+// A checkpoint is the blockID of the next block to be considered
+// for height indexing. We store checkpoints to be able to duly resume
+// long-running re-indexing ops.
 type HeightIndexBatchSupport interface {
-	NewBatch() database.Batch
+	versiondb.Commitable
+
 	GetCheckpoint() (ids.ID, error)
 	SetCheckpoint(blkID ids.ID) error
 	DeleteCheckpoint() error
@@ -46,140 +52,68 @@ type HeightIndexBatchSupport interface {
 // HeightIndex contains mapping of blockHeights to accepted proposer block IDs
 // along with some metadata (fork height and checkpoint).
 type HeightIndex interface {
-	HeightIndexWriterDeleter
+	HeightIndexWriter
 	HeightIndexGetter
-
 	HeightIndexBatchSupport
 }
 
 type heightIndex struct {
-	// heightIndex may be accessed by a long-running goroutine rebuilding the index
-	// as well as main goroutine querying blocks. Hence the lock
-	Lock sync.RWMutex
+	versiondb.Commitable
 
 	// Caches block height -> proposerVMBlockID.
-	blkHeightsCache cache.Cacher
+	heightsCache cache.Cacher
 
-	db database.Database
+	heightDB   database.Database
+	metadataDB database.Database
 }
 
-func NewHeightIndex(db database.Database) HeightIndex {
+func NewHeightIndex(db database.Database, commitable versiondb.Commitable) HeightIndex {
 	return &heightIndex{
-		blkHeightsCache: &cache.LRU{Size: cacheSize},
-		db:              db,
+		Commitable: commitable,
+
+		heightsCache: &cache.LRU{Size: cacheSize},
+		heightDB:     prefixdb.New(heightPrefix, db),
+		metadataDB:   prefixdb.New(metadataPrefix, db),
 	}
 }
 
-// GetBlockIDAtHeight implements HeightIndexGetter
 func (hi *heightIndex) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
-	key := GetEntryKey(height)
-	if blkIDIntf, found := hi.blkHeightsCache.Get(string(key)); found {
+	if blkIDIntf, found := hi.heightsCache.Get(height); found {
 		res, _ := blkIDIntf.(ids.ID)
 		return res, nil
 	}
 
-	bytes, err := hi.db.Get(key)
-	switch err {
-	case nil:
-		res, err := ids.ToID(bytes)
-		if err == nil {
-			hi.blkHeightsCache.Put(string(key), res)
-		}
-		return res, err
-
-	case database.ErrNotFound:
-		return ids.Empty, database.ErrNotFound
-
-	default:
+	key := database.PackUInt64(height)
+	blkID, err := database.GetID(hi.heightDB, key)
+	if err != nil {
 		return ids.Empty, err
 	}
+	hi.heightsCache.Put(height, blkID)
+	return blkID, err
 }
 
-// GetForkHeight implements HeightIndexGetter
-func (hi *heightIndex) GetForkHeight() (uint64, error) {
-	switch height, err := database.GetUInt64(hi.db, GetForkKey()); err {
-	case nil:
-		return height, nil
-
-	case database.ErrNotFound:
-		return 0, database.ErrNotFound
-
-	default:
-		return 0, err
-	}
-}
-
-// SetBlockIDAtHeight implements HeightIndexWriterDeleter
 func (hi *heightIndex) SetBlockIDAtHeight(height uint64, blkID ids.ID) error {
-	key := GetEntryKey(height)
-	hi.blkHeightsCache.Put(string(key), blkID)
-	return hi.db.Put(key, blkID[:])
+	hi.heightsCache.Put(height, blkID)
+	key := database.PackUInt64(height)
+	return database.PutID(hi.heightDB, key, blkID)
 }
 
-// DeleteBlockIDAtHeight implements HeightIndexWriterDeleter
-func (hi *heightIndex) DeleteBlockIDAtHeight(height uint64) error {
-	key := GetEntryKey(height)
-	hi.blkHeightsCache.Evict(string(key))
-	return hi.db.Delete(key)
+func (hi *heightIndex) GetForkHeight() (uint64, error) {
+	return database.GetUInt64(hi.metadataDB, forkKey)
 }
 
-// SetForkHeight implements HeightIndexWriterDeleter
 func (hi *heightIndex) SetForkHeight(height uint64) error {
-	return database.PutUInt64(hi.db, GetForkKey(), height)
+	return database.PutUInt64(hi.metadataDB, forkKey, height)
 }
 
-// DeleteForkHeight implements HeightIndexWriterDeleter
-func (hi *heightIndex) DeleteForkHeight() error {
-	return hi.db.Delete(GetForkKey())
-}
-
-// clearCache implements HeightIndexWriterDeleter
-func (hi *heightIndex) clearCache() {
-	hi.blkHeightsCache.Flush()
-}
-
-// GetBatch implements HeightIndexBatchSupport
-func (hi *heightIndex) NewBatch() database.Batch { return hi.db.NewBatch() }
-
-// SetCheckpoint implements HeightIndexBatchSupport
-func (hi *heightIndex) SetCheckpoint(blkID ids.ID) error {
-	return hi.db.Put(GetCheckpointKey(), blkID[:])
-}
-
-// GetCheckpoint implements HeightIndexBatchSupport
 func (hi *heightIndex) GetCheckpoint() (ids.ID, error) {
-	switch bytes, err := hi.db.Get(GetCheckpointKey()); err {
-	case nil:
-		return ids.ToID(bytes)
-	case database.ErrNotFound:
-		return ids.Empty, database.ErrNotFound
-	default:
-		return ids.Empty, err
-	}
+	return database.GetID(hi.metadataDB, checkpointKey)
 }
 
-// DeleteCheckpoint implements HeightIndexBatchSupport
+func (hi *heightIndex) SetCheckpoint(blkID ids.ID) error {
+	return database.PutID(hi.metadataDB, checkpointKey, blkID)
+}
+
 func (hi *heightIndex) DeleteCheckpoint() error {
-	return hi.db.Delete(GetCheckpointKey())
-}
-
-// helpers functions to create keys/values.
-// Currently exported for indexer
-func GetEntryKey(height uint64) []byte {
-	heightBytes := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(heightBytes, height)
-	key := make([]byte, len(heightPrefix))
-	copy(key, heightPrefix)
-	key = append(key, heightBytes...)
-	return key
-}
-
-func GetForkKey() []byte {
-	preForkPrefix := []byte("preForkKey")
-	return preForkPrefix
-}
-
-func GetCheckpointKey() []byte {
-	checkpointPrefix := []byte("checkpoint")
-	return checkpointPrefix
+	return hi.metadataDB.Delete(checkpointKey)
 }

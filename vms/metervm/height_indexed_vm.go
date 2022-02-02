@@ -10,20 +10,18 @@ import (
 
 var _ block.HeightIndexedChainVM = &blockVM{}
 
-func (vm *blockVM) IsHeightIndexComplete() bool {
+func (vm *blockVM) VerifyHeightIndex() error {
 	hVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
 	if !ok {
-		return false
+		return block.ErrHeightIndexedVMNotImplemented
 	}
-
-	return hVM.IsHeightIndexComplete()
+	return hVM.VerifyHeightIndex()
 }
 
-func (vm *blockVM) GetBlockIDByHeight(height uint64) (ids.ID, error) {
+func (vm *blockVM) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	hVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
 	if !ok {
 		return ids.Empty, block.ErrHeightIndexedVMNotImplemented
 	}
-
-	return hVM.GetBlockIDByHeight(height)
+	return hVM.GetBlockIDAtHeight(height)
 }

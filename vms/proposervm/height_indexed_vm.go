@@ -4,81 +4,131 @@
 package proposervm
 
 import (
-	"errors"
+	"fmt"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
-var errIndexIncomplete = errors.New("query failed because height index is incomplete")
+// shouldHeightIndexBeRepaired checks if index needs repairing and stores a
+// checkpoint if repairing is needed.
+//
+// vm.ctx.Lock is acquired to avoid interleaving with block acceptance.
+func (vm *VM) shouldHeightIndexBeRepaired() (bool, error) {
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
 
-// HeightIndexingEnabled implements HeightIndexedChainVM interface
-// vm.ctx.Lock should be held
-func (vm *VM) IsHeightIndexComplete() bool {
-	innerHVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
-	if !ok || !innerHVM.IsHeightIndexComplete() {
-		return false
+	_, err := vm.State.GetCheckpoint()
+	if err != database.ErrNotFound {
+		return true, err
 	}
 
-	return vm.hIndexer.IsRepaired()
+	// no checkpoint. Either index is complete or repair was never attempted.
+	// index is complete iff lastAcceptedBlock is indexed
+	latestProBlkID, err := vm.State.GetLastAccepted()
+	if err == database.ErrNotFound {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	lastAcceptedBlk, err := vm.getPostForkBlock(latestProBlkID)
+	if err != nil {
+		// Could not retrieve last accepted block.
+		return false, err
+	}
+
+	_, err = vm.State.GetBlockIDAtHeight(lastAcceptedBlk.Height())
+	if err != database.ErrNotFound {
+		return false, err
+	}
+
+	// Index needs repairing. Mark the checkpoint so that, in case new blocks
+	// are accepted after the lock is released here but before indexing has
+	// started, we do not miss rebuilding the full index.
+	return true, vm.State.SetCheckpoint(latestProBlkID)
 }
 
-// GetBlockIDByHeight implements HeightIndexedChainVM interface
 // vm.ctx.Lock should be held
-func (vm *VM) GetBlockIDByHeight(height uint64) (ids.ID, error) {
-	innerHVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
-	if !ok {
-		return ids.Empty, block.ErrHeightIndexedVMNotImplemented
-	}
-	if !innerHVM.IsHeightIndexComplete() {
-		return ids.Empty, errIndexIncomplete
+func (vm *VM) VerifyHeightIndex() error {
+	if _, ok := vm.ChainVM.(block.HeightIndexedChainVM); !ok {
+		return block.ErrHeightIndexedVMNotImplemented
 	}
 
-	// preFork blocks are indexed in innerVM only
-	forkHeight, err := vm.State.GetForkHeight()
-	if err != nil {
+	if !vm.hIndexer.IsRepaired() {
+		return block.ErrIndexIncomplete
+	}
+	return nil
+}
+
+// vm.ctx.Lock should be held
+func (vm *VM) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
+	if !vm.hIndexer.IsRepaired() {
+		return ids.Empty, block.ErrIndexIncomplete
+	}
+
+	// The indexer will only report that the index has been repaired if the
+	// underlying VM supports indexing.
+	innerHVM := vm.ChainVM.(block.HeightIndexedChainVM)
+	switch forkHeight, err := vm.State.GetForkHeight(); err {
+	case nil:
+		if height < forkHeight {
+			return innerHVM.GetBlockIDAtHeight(height)
+		}
+		return vm.State.GetBlockIDAtHeight(height)
+
+	case database.ErrNotFound:
+		// fork not reached yet. Block must be pre-fork
+		return innerHVM.GetBlockIDAtHeight(height)
+
+	default:
 		return ids.Empty, err
 	}
-
-	if height < forkHeight {
-		return innerHVM.GetBlockIDByHeight(height)
-	}
-
-	// postFork blocks are indexed in proposerVM
-	return vm.State.GetBlockIDAtHeight(height)
 }
 
-// As postFork blocks/options are accepted, height index is updated
-// even if its repairing is ongoing.
-// updateHeightIndex should not be called for preFork blocks. Moreover
+// As postFork blocks/options are accepted, height index is updated even if its
+// repairing is ongoing.
 // vm.ctx.Lock should be held
 func (vm *VM) updateHeightIndex(height uint64, blkID ids.ID) error {
-	innerHVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
-	if !ok || !innerHVM.IsHeightIndexComplete() {
-		return nil // nothing to do
-	}
+	_, err := vm.State.GetCheckpoint()
+	switch err {
+	case nil:
+		// Index rebuilding is ongoing. We can update the index with the current
+		// block.
 
-	forkHeight, err := vm.State.GetForkHeight()
-	if err != nil {
-		vm.ctx.Log.Warn("Block indexing by height: new block. Could not load fork height %v", err)
-		return err
-	}
-
-	if forkHeight > height {
-		vm.ctx.Log.Info("Block indexing by height: new block. Moved fork height from %d to %d with block %v",
-			forkHeight, height, blkID)
-
-		if err := vm.State.SetForkHeight(height); err != nil {
-			vm.ctx.Log.Warn("Block indexing by height: new block. Failed storing new fork height %v", err)
-			return err
+	case database.ErrNotFound:
+		// No checkpoint means indexing has either not started or is already
+		// done.
+		if !vm.hIndexer.IsRepaired() {
+			return nil
 		}
-	}
 
-	if err = vm.State.SetBlockIDAtHeight(height, blkID); err != nil {
-		vm.ctx.Log.Warn("Block indexing by height: new block. Failed updating index %v", err)
-		return err
+		// Indexing must have finished. We can update the index with the current
+		// block.
+
+	default:
+		return fmt.Errorf("failed to load index checkpoint: %w", err)
+	}
+	return vm.storeHeightEntry(height, blkID)
+}
+
+func (vm *VM) storeHeightEntry(height uint64, blkID ids.ID) error {
+	switch _, err := vm.State.GetForkHeight(); err {
+	case nil:
+		// The fork was already reached. Just update the index.
+
+	case database.ErrNotFound:
+		// This is the first post fork block, store the fork height.
+		if err := vm.State.SetForkHeight(height); err != nil {
+			return fmt.Errorf("failed storing fork height: %w", err)
+		}
+
+	default:
+		return fmt.Errorf("failed to load fork height: %w", err)
 	}
 
 	vm.ctx.Log.Debug("Block indexing by height: added block %s at height %d", blkID, height)
-	return vm.db.Commit()
+	return vm.State.SetBlockIDAtHeight(height, blkID)
 }

@@ -4,6 +4,7 @@
 package proposervm
 
 import (
+	"context"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -30,8 +31,9 @@ import (
 const (
 	// minBlockDelay should be kept as whole seconds because block timestamps
 	// are only specific to the second.
-	minBlockDelay             = time.Second
-	optimalHeightDelay uint64 = 256
+	minBlockDelay                = time.Second
+	checkIndexedFrequency        = 10 * time.Second
+	optimalHeightDelay    uint64 = 256
 )
 
 var (
@@ -66,6 +68,8 @@ type VM struct {
 	verifiedBlocks map[ids.ID]PostForkBlock
 	preferred      ids.ID
 	bootstrapped   bool
+	context        context.Context
+	onShutdown     func()
 
 	// lastAcceptedOptionTime is set to the last accepted PostForkBlock's
 	// timestamp if the last accepted block has been a PostForkOption block
@@ -102,7 +106,10 @@ func (vm *VM) Initialize(
 	vm.State = state.New(vm.db)
 	vm.Windower = proposer.New(ctx.ValidatorState, ctx.SubnetID, ctx.ChainID)
 	vm.Tree = tree.New()
-	vm.hIndexer = indexer.NewHeightIndexer(vm, vm.ctx.Log, vm.State)
+
+	indexerDB := versiondb.New(vm.db)
+	indexerState := state.New(indexerDB)
+	vm.hIndexer = indexer.NewHeightIndexer(vm, vm.ctx.Log, indexerState)
 
 	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine)
 	vm.Scheduler = scheduler
@@ -113,6 +120,9 @@ func (vm *VM) Initialize(
 	})
 
 	vm.verifiedBlocks = make(map[ids.ID]PostForkBlock)
+	context, cancel := context.WithCancel(context.Background())
+	vm.context = context
+	vm.onShutdown = cancel
 
 	err := vm.ChainVM.Initialize(
 		ctx,
@@ -132,24 +142,78 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	if innerHVM, ok := vm.ChainVM.(block.HeightIndexedChainVM); ok {
-		if !innerHVM.IsHeightIndexComplete() {
-			vm.ctx.Log.Info("Block indexing by height: repairing height index not started since innerVM index is incomplete.")
-		} else {
-			go func() {
-				if err := vm.hIndexer.RepairHeightIndex(); err != nil {
-					vm.ctx.Log.Error("Block indexing by height: failed with error %s", err)
-					return
-				}
-			}()
-		}
+	if err := vm.setLastAcceptedOptionTime(); err != nil {
+		return err
 	}
 
-	return vm.setLastAcceptedOptionTime()
+	// check and possibly rebuild height index
+	innerHVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
+	if !ok {
+		return nil // nothing else to do
+	}
+
+	// asynchronously rebuild height index, if needed
+	go func() {
+		// Poll until the underlying chain's index is complete or shutdown is
+		// called.
+		ticker := time.NewTicker(checkIndexedFrequency)
+		defer ticker.Stop()
+		for {
+			// The underlying VM expects the lock to be held here.
+			vm.ctx.Lock.Lock()
+			err := innerHVM.VerifyHeightIndex()
+			vm.ctx.Lock.Unlock()
+
+			if err == nil {
+				// innerVM indexing complete. Let re-index this machine
+				break
+			}
+			if err != block.ErrIndexIncomplete {
+				vm.ctx.Log.Error("Block indexing by height: failed with error %s", err)
+				return
+			}
+
+			// innerVM index is incomplete. Wait for completion and retry
+			select {
+			case <-vm.context.Done():
+				return
+			case <-ticker.C:
+			}
+		}
+
+		shouldRepair, err := vm.shouldHeightIndexBeRepaired()
+		if err != nil {
+			vm.ctx.Log.Error("could not verify the status of height indexing: %s", err)
+			return
+		}
+		if !shouldRepair {
+			vm.ctx.Log.Info("block height indexing is already complete")
+			return
+		}
+
+		err = vm.hIndexer.RepairHeightIndex(vm.context)
+		if err == nil {
+			vm.ctx.Log.Info("block height indexing finished")
+			return
+		}
+
+		// Note that we don't check if `err` is `context.Canceled` here because
+		// repairing the height index may have returned a non-standard errored
+		// due to the chain shutting down.
+		if vm.context.Err() == nil {
+			// The context wasn't closed, so the chain hasn't been shutdown.
+			// This must have been an unexpected error.
+			vm.ctx.Log.Error("block height indexing failed: %s", err)
+		}
+	}()
+
+	return nil
 }
 
 // shutdown ops then propagate shutdown to innerVM
 func (vm *VM) Shutdown() error {
+	vm.onShutdown()
+
 	if err := vm.db.Commit(); err != nil {
 		return err
 	}
@@ -254,6 +318,9 @@ func (vm *VM) repairAcceptedChain() error {
 			if err := vm.State.DeleteLastAccepted(); err != nil {
 				return err
 			}
+			if err := vm.State.DeleteCheckpoint(); err != nil {
+				return err
+			}
 			return vm.db.Commit()
 		}
 		if err != nil {
@@ -268,14 +335,32 @@ func (vm *VM) repairAcceptedChain() error {
 			return vm.db.Commit()
 		}
 
-		// Advance to the parent block
-		lastAcceptedID = lastAccepted.Parent()
-
+		// Mark the last accepted block as processing - rather than accepted.
 		lastAccepted.setStatus(choices.Processing)
+		if err := vm.State.PutBlock(lastAccepted.getStatelessBlk(), choices.Processing); err != nil {
+			return err
+		}
+
+		// Advance to the parent block
+		previousLastAcceptedID := lastAcceptedID
+		lastAcceptedID = lastAccepted.Parent()
 		if err := vm.State.SetLastAccepted(lastAcceptedID); err != nil {
 			return err
 		}
-		if err := vm.State.PutBlock(lastAccepted.getStatelessBlk(), choices.Processing); err != nil {
+
+		// If the indexer checkpoint was previously pointing to the last
+		// accepted block, roll it back to the new last accepted block.
+		checkpoint, err := vm.State.GetCheckpoint()
+		if err == database.ErrNotFound {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if previousLastAcceptedID != checkpoint {
+			continue
+		}
+		if err := vm.State.SetCheckpoint(lastAcceptedID); err != nil {
 			return err
 		}
 	}
@@ -417,6 +502,12 @@ func (vm *VM) getPreForkBlock(blkID ids.ID) (*preForkBlock, error) {
 
 func (vm *VM) storePostForkBlock(blk PostForkBlock) error {
 	if err := vm.State.PutBlock(blk.getStatelessBlk(), blk.Status()); err != nil {
+		return err
+	}
+
+	height := blk.Height()
+	blkID := blk.ID()
+	if err := vm.updateHeightIndex(height, blkID); err != nil {
 		return err
 	}
 	return vm.db.Commit()

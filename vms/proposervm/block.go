@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
+	"github.com/ava-labs/avalanchego/vms/proposervm/indexer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
@@ -33,10 +34,9 @@ var (
 )
 
 type Block interface {
-	snowman.Block
+	indexer.WrappingBlock
 
 	conditionalAccept(acceptInnerBlk bool) error
-	GetInnerBlk() snowman.Block
 
 	verifyPreForkChild(child *preForkBlock) error
 	verifyPostForkChild(child *postForkBlock) error

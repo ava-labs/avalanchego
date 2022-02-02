@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestStandAloneIndex(t *testing.T) {
+func TestIndex(t *testing.T) {
 	// Setup
 	pageSize := uint64(64)
 	assert := assert.New(t)
@@ -29,10 +29,9 @@ func TestStandAloneIndex(t *testing.T) {
 	db := versiondb.New(baseDB)
 	ctx := snow.DefaultConsensusContextTest()
 
-	dummyPrefix := []byte{'p', 'r', 'e', 'f', 'i', 'x'}
-	indexIntf, err := newStandAloneIndex(dummyPrefix, db, logging.NoLog{}, codec, mockable.Clock{})
+	indexIntf, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
 	assert.NoError(err)
-	idx := indexIntf.(*standAloneIndex)
+	idx := indexIntf.(*index)
 
 	// Populate "containers" with random IDs/bytes
 	containers := map[ids.ID][]byte{}
@@ -84,9 +83,9 @@ func TestStandAloneIndex(t *testing.T) {
 	assert.NoError(db.Commit())
 	assert.NoError(idx.Close())
 	db = versiondb.New(baseDB)
-	indexIntf, err = newStandAloneIndex(dummyPrefix, db, logging.NoLog{}, codec, mockable.Clock{})
+	indexIntf, err = newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
 	assert.NoError(err)
-	idx = indexIntf.(*standAloneIndex)
+	idx = indexIntf.(*index)
 
 	// Get all of the containers
 	containersList, err := idx.GetContainerRange(0, pageSize)
@@ -111,7 +110,7 @@ func TestStandAloneIndex(t *testing.T) {
 	}
 }
 
-func TestStandAloneIndexGetContainerByRangeMaxPageSize(t *testing.T) {
+func TestIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 	// Setup
 	assert := assert.New(t)
 	codec := codec.NewDefaultManager()
@@ -119,10 +118,9 @@ func TestStandAloneIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 	assert.NoError(err)
 	db := memdb.New()
 	ctx := snow.DefaultConsensusContextTest()
-	dummyPrefix := []byte{'p', 'r', 'e', 'f', 'i', 'x'}
-	indexIntf, err := newStandAloneIndex(dummyPrefix, db, logging.NoLog{}, codec, mockable.Clock{})
+	indexIntf, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
 	assert.NoError(err)
-	idx := indexIntf.(*standAloneIndex)
+	idx := indexIntf.(*index)
 
 	// Insert [MaxFetchedByRange] + 1 containers
 	for i := uint64(0); i < MaxFetchedByRange+1; i++ {
@@ -154,7 +152,7 @@ func TestStandAloneIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 	assert.EqualValues(containers[0], containers2[MaxFetchedByRange-2])
 }
 
-func TestDontStandAloneIndexSameContainerTwice(t *testing.T) {
+func TestDontIndexSameContainerTwice(t *testing.T) {
 	// Setup
 	assert := assert.New(t)
 	codec := codec.NewDefaultManager()
@@ -162,8 +160,7 @@ func TestDontStandAloneIndexSameContainerTwice(t *testing.T) {
 	assert.NoError(err)
 	db := memdb.New()
 	ctx := snow.DefaultConsensusContextTest()
-	dummyPrefix := []byte{'p', 'r', 'e', 'f', 'i', 'x'}
-	idx, err := newStandAloneIndex(dummyPrefix, db, logging.NoLog{}, codec, mockable.Clock{})
+	idx, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
 	assert.NoError(err)
 
 	// Accept the same container twice

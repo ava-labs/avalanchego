@@ -12,10 +12,8 @@ import (
 )
 
 var (
-	errLastAcceptedWrappingBlkID = errors.New("unexpectedly called LastAcceptedWrappingBlkID")
-	errLastAcceptedInnerBlkID    = errors.New("unexpectedly called LastAcceptedInnerBlkID")
-	errGetWrappingBlk            = errors.New("unexpectedly called GetWrappingBlk")
-	errGetInnerBlk               = errors.New("unexpectedly called GetInnerBlk")
+	errGetWrappingBlk = errors.New("unexpectedly called GetWrappingBlk")
+	errCommit         = errors.New("unexpectedly called Commit")
 
 	_ BlockServer = &TestBlockServer{}
 )
@@ -24,35 +22,12 @@ var (
 type TestBlockServer struct {
 	T *testing.T
 
-	CantLastAcceptedWrappingBlkID bool
-	CantLastAcceptedInnerBlkID    bool
-	CantGetWrappingBlk            bool
-	CantGetInnerBlk               bool
+	CantGetWrappingBlk bool
+	CantCommit         bool
 
-	LastAcceptedWrappingBlkIDF func() (ids.ID, error)
-	LastAcceptedInnerBlkIDF    func() (ids.ID, error)
-	GetWrappingBlkF            func(blkID ids.ID) (WrappingBlock, error)
-	GetInnerBlkF               func(id ids.ID) (snowman.Block, error)
-}
-
-func (tsb *TestBlockServer) LastAcceptedWrappingBlkID() (ids.ID, error) {
-	if tsb.LastAcceptedWrappingBlkIDF != nil {
-		return tsb.LastAcceptedWrappingBlkIDF()
-	}
-	if tsb.CantLastAcceptedWrappingBlkID && tsb.T != nil {
-		tsb.T.Fatal(errLastAcceptedWrappingBlkID)
-	}
-	return ids.Empty, errLastAcceptedWrappingBlkID
-}
-
-func (tsb *TestBlockServer) LastAcceptedInnerBlkID() (ids.ID, error) {
-	if tsb.LastAcceptedInnerBlkIDF != nil {
-		return tsb.LastAcceptedInnerBlkIDF()
-	}
-	if tsb.CantLastAcceptedInnerBlkID && tsb.T != nil {
-		tsb.T.Fatal(errLastAcceptedInnerBlkID)
-	}
-	return ids.Empty, errLastAcceptedInnerBlkID
+	GetWrappingBlkF func(blkID ids.ID) (WrappingBlock, error)
+	GetInnerBlkF    func(id ids.ID) (snowman.Block, error)
+	CommitF         func() error
 }
 
 func (tsb *TestBlockServer) GetWrappingBlk(blkID ids.ID) (WrappingBlock, error) {
@@ -65,12 +40,12 @@ func (tsb *TestBlockServer) GetWrappingBlk(blkID ids.ID) (WrappingBlock, error) 
 	return nil, errGetWrappingBlk
 }
 
-func (tsb *TestBlockServer) GetInnerBlk(id ids.ID) (snowman.Block, error) {
-	if tsb.GetInnerBlkF != nil {
-		return tsb.GetInnerBlkF(id)
+func (tsb *TestBlockServer) Commit() error {
+	if tsb.CommitF != nil {
+		return tsb.CommitF()
 	}
-	if tsb.CantGetInnerBlk && tsb.T != nil {
-		tsb.T.Fatal(errGetInnerBlk)
+	if tsb.CantCommit && tsb.T != nil {
+		tsb.T.Fatal(errCommit)
 	}
-	return nil, errGetInnerBlk
+	return errCommit
 }

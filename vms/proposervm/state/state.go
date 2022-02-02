@@ -6,14 +6,14 @@ package state
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/database/versiondb"
 )
 
 var (
 	chainStatePrefix  = []byte("chain")
 	blockStatePrefix  = []byte("block")
-	heightIndexPrefix = []byte("heightBlk")
+	heightIndexPrefix = []byte("height")
 )
 
 type State interface {
@@ -28,21 +28,22 @@ type state struct {
 	HeightIndex
 }
 
-func New(db database.Database) State {
+func New(db *versiondb.Database) State {
 	chainDB := prefixdb.New(chainStatePrefix, db)
 	blockDB := prefixdb.New(blockStatePrefix, db)
-	heightIndexDB := prefixdb.New(heightIndexPrefix, db)
+	heightDB := prefixdb.New(heightIndexPrefix, db)
+
 	return &state{
 		ChainState:  NewChainState(chainDB),
 		BlockState:  NewBlockState(blockDB),
-		HeightIndex: NewHeightIndex(heightIndexDB),
+		HeightIndex: NewHeightIndex(heightDB, db),
 	}
 }
 
-func NewMetered(db database.Database, namespace string, metrics prometheus.Registerer) (State, error) {
+func NewMetered(db *versiondb.Database, namespace string, metrics prometheus.Registerer) (State, error) {
 	chainDB := prefixdb.New(chainStatePrefix, db)
 	blockDB := prefixdb.New(blockStatePrefix, db)
-	heightIndexDB := prefixdb.New(heightIndexPrefix, db)
+	heightDB := prefixdb.New(heightIndexPrefix, db)
 
 	blockState, err := NewMeteredBlockState(blockDB, namespace, metrics)
 	if err != nil {
@@ -52,12 +53,6 @@ func NewMetered(db database.Database, namespace string, metrics prometheus.Regis
 	return &state{
 		ChainState:  NewChainState(chainDB),
 		BlockState:  blockState,
-		HeightIndex: NewHeightIndex(heightIndexDB),
+		HeightIndex: NewHeightIndex(heightDB, db),
 	}, nil
-}
-
-func (s *state) clearCache() {
-	s.ChainState.clearCache()
-	s.BlockState.clearCache()
-	s.HeightIndex.clearCache()
 }

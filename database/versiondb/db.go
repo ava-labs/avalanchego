@@ -20,9 +20,17 @@ const (
 
 var (
 	_ database.Database = &Database{}
+	_ Commitable        = &Database{}
 	_ database.Batch    = &batch{}
 	_ database.Iterator = &iterator{}
 )
+
+// Commitable defines the interface that specifies that something may be
+// committed.
+type Commitable interface {
+	// Commit writes all the queued operations to the underlying data structure.
+	Commit() error
+}
 
 // Database implements the Database interface by living on top of another
 // database, writing changes to the underlying database only when commit is

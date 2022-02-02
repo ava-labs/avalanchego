@@ -9,5 +9,6 @@ import "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 // out of a PostForkBlock
 type WrappingBlock interface {
 	snowman.Block
+
 	GetInnerBlk() snowman.Block
 }
