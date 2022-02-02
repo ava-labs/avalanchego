@@ -112,6 +112,7 @@ func TestTimeout(t *testing.T) {
 		},
 	}
 	bootstrapper.Default(true)
+	bootstrapper.CantGossip = false
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.ShortID, nodeVersion version.Application) error { return nil }
 	bootstrapper.QueryFailedF = func(nodeID ids.ShortID, _ uint32) error {
@@ -197,6 +198,7 @@ func TestReliableMessages(t *testing.T) {
 		},
 	}
 	bootstrapper.Default(true)
+	bootstrapper.CantGossip = false
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.ShortID, nodeVersion version.Application) error { return nil }
 	queriesToSend := 1000
@@ -288,6 +290,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		},
 	}
 	bootstrapper.Default(true)
+	bootstrapper.CantGossip = false
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.ShortID, nodeVersion version.Application) error { return nil }
 	queriesToSend := 2
