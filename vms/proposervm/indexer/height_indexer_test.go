@@ -82,14 +82,9 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 	}
 
 	blkSrv := &TestBlockServer{
-		CantLastAcceptedWrappingBlkID: true,
-		CantLastAcceptedInnerBlkID:    true,
-		CantGetWrappingBlk:            true,
-		CantGetInnerBlk:               true,
-		CantCommit:                    true,
+		CantGetWrappingBlk: true,
+		CantCommit:         true,
 
-		LastAcceptedWrappingBlkIDF: func() (ids.ID, error) { return lastProBlk.ID(), nil },
-		LastAcceptedInnerBlkIDF:    func() (ids.ID, error) { return lastInnerBlk.ID(), nil },
 		GetWrappingBlkF: func(blkID ids.ID) (WrappingBlock, error) {
 			blk, found := proBlks[blkID]
 			if !found {
@@ -206,14 +201,9 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 	}
 
 	blkSrv := &TestBlockServer{
-		CantLastAcceptedWrappingBlkID: true,
-		CantLastAcceptedInnerBlkID:    true,
-		CantGetWrappingBlk:            true,
-		CantGetInnerBlk:               true,
-		CantCommit:                    true,
+		CantGetWrappingBlk: true,
+		CantCommit:         true,
 
-		LastAcceptedWrappingBlkIDF: func() (ids.ID, error) { return lastProBlk.ID(), nil },
-		LastAcceptedInnerBlkIDF:    func() (ids.ID, error) { return lastInnerBlk.ID(), nil },
 		GetWrappingBlkF: func(blkID ids.ID) (WrappingBlock, error) {
 			blk, found := proBlks[blkID]
 			if !found {
@@ -336,14 +326,9 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 	}
 
 	blkSrv := &TestBlockServer{
-		CantLastAcceptedWrappingBlkID: true,
-		CantLastAcceptedInnerBlkID:    true,
-		CantGetWrappingBlk:            true,
-		CantGetInnerBlk:               true,
-		CantCommit:                    true,
+		CantGetWrappingBlk: true,
+		CantCommit:         true,
 
-		LastAcceptedWrappingBlkIDF: func() (ids.ID, error) { return lastProBlk.ID(), nil },
-		LastAcceptedInnerBlkIDF:    func() (ids.ID, error) { return lastInnerBlk.ID(), nil },
 		GetWrappingBlkF: func(blkID ids.ID) (WrappingBlock, error) {
 			blk, found := proBlks[blkID]
 			if !found {
