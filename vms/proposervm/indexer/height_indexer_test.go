@@ -4,6 +4,7 @@
 package indexer
 
 import (
+	"context"
 	"math/rand"
 	"testing"
 	"time"
@@ -113,7 +114,7 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 
 	// checkpoint last accepted block and show the whole chain in reindexed
 	assert.NoError(hIndex.indexState.SetCheckpoint(lastProBlk.ID()))
-	assert.NoError(hIndex.RepairHeightIndex())
+	assert.NoError(hIndex.RepairHeightIndex(context.Background()))
 	assert.True(hIndex.IsRepaired())
 
 	// check that height index is fully built
@@ -232,7 +233,7 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 
 	// checkpoint last accepted block and show the whole chain in reindexed
 	assert.NoError(hIndex.indexState.SetCheckpoint(lastProBlk.ID()))
-	assert.NoError(hIndex.RepairHeightIndex())
+	assert.NoError(hIndex.RepairHeightIndex(context.Background()))
 	assert.True(hIndex.IsRepaired())
 
 	// check that height index is fully built
@@ -369,7 +370,7 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 	}
 
 	// perform repair and show index is built
-	assert.NoError(hIndex.RepairHeightIndex())
+	assert.NoError(hIndex.RepairHeightIndex(context.Background()))
 	assert.True(hIndex.IsRepaired())
 
 	// check that height index is fully built
