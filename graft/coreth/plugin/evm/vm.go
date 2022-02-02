@@ -452,7 +452,7 @@ func (vm *VM) Initialize(
 			status:    choices.Accepted,
 			atomicTxs: atomicTxs,
 		},
-		GetBlockIDAtHeight: vm.GetBlockIDByHeight,
+		GetBlockIDAtHeight: vm.GetBlockIDAtHeight,
 		GetBlock:           vm.getBlock,
 		UnmarshalBlock:     vm.parseBlock,
 		BuildBlock:         vm.buildBlock,
@@ -844,10 +844,10 @@ func (vm *VM) VerifyHeightIndex() error {
 	return nil
 }
 
-// GetBlockIDByHeight retrieves the blkID of the canonical block at [blkHeight]
+// GetBlockIDAtHeight retrieves the blkID of the canonical block at [blkHeight]
 // if [blkHeight] is less than the height of the last accepted block, this will return
 // a canonical block. Otherwise, it may return a blkID that has not yet been accepted.
-func (vm *VM) GetBlockIDByHeight(blkHeight uint64) (ids.ID, error) {
+func (vm *VM) GetBlockIDAtHeight(blkHeight uint64) (ids.ID, error) {
 	ethBlock := vm.chain.GetBlockByNumber(blkHeight)
 	if ethBlock == nil {
 		return ids.ID{}, fmt.Errorf("could not find block at height: %d", blkHeight)
