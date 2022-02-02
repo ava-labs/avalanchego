@@ -12,7 +12,7 @@ import (
 
 var (
 	errVerifyHeightIndex  = errors.New("unexpectedly called VerifyHeightIndex")
-	errGetBlockIDByHeight = errors.New("unexpectedly called GetBlockIDByHeight")
+	errGetBlockIDAtHeight = errors.New("unexpectedly called GetBlockIDAtHeight")
 
 	_ HeightIndexedChainVM = &TestHeightIndexedVM{}
 )
@@ -22,10 +22,10 @@ type TestHeightIndexedVM struct {
 	T *testing.T
 
 	CantVerifyHeightIndex  bool
-	CantGetBlockIDByHeight bool
+	CantGetBlockIDAtHeight bool
 
 	VerifyHeightIndexF  func() error
-	GetBlockIDByHeightF func(height uint64) (ids.ID, error)
+	GetBlockIDAtHeightF func(height uint64) (ids.ID, error)
 }
 
 func (vm *TestHeightIndexedVM) VerifyHeightIndex() error {
@@ -38,12 +38,12 @@ func (vm *TestHeightIndexedVM) VerifyHeightIndex() error {
 	return errVerifyHeightIndex
 }
 
-func (vm *TestHeightIndexedVM) GetBlockIDByHeight(height uint64) (ids.ID, error) {
-	if vm.GetBlockIDByHeightF != nil {
-		return vm.GetBlockIDByHeightF(height)
+func (vm *TestHeightIndexedVM) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
+	if vm.GetBlockIDAtHeightF != nil {
+		return vm.GetBlockIDAtHeightF(height)
 	}
-	if vm.CantGetBlockIDByHeight && vm.T != nil {
+	if vm.CantGetBlockIDAtHeight && vm.T != nil {
 		vm.T.Fatal(errGetAncestor)
 	}
-	return ids.Empty, errGetBlockIDByHeight
+	return ids.Empty, errGetBlockIDAtHeight
 }

@@ -43,7 +43,7 @@ type VMClient interface {
 	GetAncestors(ctx context.Context, in *GetAncestorsRequest, opts ...grpc.CallOption) (*GetAncestorsResponse, error)
 	BatchedParseBlock(ctx context.Context, in *BatchedParseBlockRequest, opts ...grpc.CallOption) (*BatchedParseBlockResponse, error)
 	VerifyHeightIndex(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*VerifyHeightIndexResponse, error)
-	GetBlockIDByHeight(ctx context.Context, in *GetBlockIDByHeightRequest, opts ...grpc.CallOption) (*GetBlockIDByHeightResponse, error)
+	GetBlockIDAtHeight(ctx context.Context, in *GetBlockIDAtHeightRequest, opts ...grpc.CallOption) (*GetBlockIDAtHeightResponse, error)
 }
 
 type vMClient struct {
@@ -270,9 +270,9 @@ func (c *vMClient) VerifyHeightIndex(ctx context.Context, in *emptypb.Empty, opt
 	return out, nil
 }
 
-func (c *vMClient) GetBlockIDByHeight(ctx context.Context, in *GetBlockIDByHeightRequest, opts ...grpc.CallOption) (*GetBlockIDByHeightResponse, error) {
-	out := new(GetBlockIDByHeightResponse)
-	err := c.cc.Invoke(ctx, "/vmproto.VM/GetBlockIDByHeight", in, out, opts...)
+func (c *vMClient) GetBlockIDAtHeight(ctx context.Context, in *GetBlockIDAtHeightRequest, opts ...grpc.CallOption) (*GetBlockIDAtHeightResponse, error) {
+	out := new(GetBlockIDAtHeightResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/GetBlockIDAtHeight", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +307,7 @@ type VMServer interface {
 	GetAncestors(context.Context, *GetAncestorsRequest) (*GetAncestorsResponse, error)
 	BatchedParseBlock(context.Context, *BatchedParseBlockRequest) (*BatchedParseBlockResponse, error)
 	VerifyHeightIndex(context.Context, *emptypb.Empty) (*VerifyHeightIndexResponse, error)
-	GetBlockIDByHeight(context.Context, *GetBlockIDByHeightRequest) (*GetBlockIDByHeightResponse, error)
+	GetBlockIDAtHeight(context.Context, *GetBlockIDAtHeightRequest) (*GetBlockIDAtHeightResponse, error)
 	mustEmbedUnimplementedVMServer()
 }
 
@@ -387,8 +387,8 @@ func (UnimplementedVMServer) BatchedParseBlock(context.Context, *BatchedParseBlo
 func (UnimplementedVMServer) VerifyHeightIndex(context.Context, *emptypb.Empty) (*VerifyHeightIndexResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method VerifyHeightIndex not implemented")
 }
-func (UnimplementedVMServer) GetBlockIDByHeight(context.Context, *GetBlockIDByHeightRequest) (*GetBlockIDByHeightResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetBlockIDByHeight not implemented")
+func (UnimplementedVMServer) GetBlockIDAtHeight(context.Context, *GetBlockIDAtHeightRequest) (*GetBlockIDAtHeightResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBlockIDAtHeight not implemented")
 }
 func (UnimplementedVMServer) mustEmbedUnimplementedVMServer() {}
 
@@ -835,20 +835,20 @@ func _VM_VerifyHeightIndex_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VM_GetBlockIDByHeight_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetBlockIDByHeightRequest)
+func _VM_GetBlockIDAtHeight_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetBlockIDAtHeightRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VMServer).GetBlockIDByHeight(ctx, in)
+		return srv.(VMServer).GetBlockIDAtHeight(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/vmproto.VM/GetBlockIDByHeight",
+		FullMethod: "/vmproto.VM/GetBlockIDAtHeight",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).GetBlockIDByHeight(ctx, req.(*GetBlockIDByHeightRequest))
+		return srv.(VMServer).GetBlockIDAtHeight(ctx, req.(*GetBlockIDAtHeightRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -957,8 +957,8 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _VM_VerifyHeightIndex_Handler,
 		},
 		{
-			MethodName: "GetBlockIDByHeight",
-			Handler:    _VM_GetBlockIDByHeight_Handler,
+			MethodName: "GetBlockIDAtHeight",
+			Handler:    _VM_GetBlockIDAtHeight_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

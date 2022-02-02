@@ -196,11 +196,11 @@ message VerifyHeightIndexResponse {
     uint32 err = 1;
 }
 
-message GetBlockIDByHeightRequest {
+message GetBlockIDAtHeightRequest {
     uint64 height = 1;
 }
 
-message GetBlockIDByHeightResponse {
+message GetBlockIDAtHeightResponse {
     bytes blkID = 1;
     uint32 err = 2;
 }
@@ -238,6 +238,6 @@ service VM {
     rpc BatchedParseBlock(BatchedParseBlockRequest) returns (BatchedParseBlockResponse);
     
     rpc VerifyHeightIndex(google.protobuf.Empty) returns (VerifyHeightIndexResponse);
-    rpc GetBlockIDByHeight(GetBlockIDByHeightRequest) returns (GetBlockIDByHeightResponse);
+    rpc GetBlockIDAtHeight(GetBlockIDAtHeightRequest) returns (GetBlockIDAtHeightResponse);
     
 }

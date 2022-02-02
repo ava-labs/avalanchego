@@ -28,20 +28,20 @@ type HeightIndexer interface {
 }
 
 func NewHeightIndexer(
-	srv BlockServer,
+	server BlockServer,
 	log logging.Logger,
 	indexState state.HeightIndex,
 ) HeightIndexer {
-	return newHeightIndexer(srv, log, indexState)
+	return newHeightIndexer(server, log, indexState)
 }
 
 func newHeightIndexer(
-	srv BlockServer,
+	server BlockServer,
 	log logging.Logger,
 	indexState state.HeightIndex,
 ) *heightIndexer {
 	return &heightIndexer{
-		server:          srv,
+		server:          server,
 		log:             log,
 		indexState:      indexState,
 		commitFrequency: defaultCommitFrequency,

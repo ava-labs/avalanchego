@@ -23,7 +23,7 @@ type HeightIndexedChainVM interface {
 	//   index.
 	VerifyHeightIndex() error
 
-	// GetBlockIDByHeight returns the ID of the block that was accepted with
+	// GetBlockIDAtHeight returns the ID of the block that was accepted with
 	// [height].
-	GetBlockIDByHeight(height uint64) (ids.ID, error)
+	GetBlockIDAtHeight(height uint64) (ids.ID, error)
 }
