@@ -459,7 +459,7 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error)
 	// If the block has been decided, we don't need to issue it.
 	// If the block is processing, we don't need to issue it.
 	// If the block is queued to be issued, we don't need to issue it.
-	for !t.Consensus.DecidedOrProcessing(blk) && !t.pendingContains(blkID) {
+	for !(t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) || t.pendingContains(blkID)) {
 		if err := t.issue(blk); err != nil {
 			return false, err
 		}
@@ -478,7 +478,7 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error)
 	// Remove any outstanding requests for this block
 	t.blkReqs.RemoveAny(blkID)
 
-	issued := t.Consensus.DecidedOrProcessing(blk)
+	issued := t.Consensus.Decided(blk) || t.Consensus.Processing(blkID)
 	if issued {
 		// A dependency should never be waiting on a decided or processing
 		// block. However, if the block was marked as rejected by the VM, the
@@ -499,7 +499,7 @@ func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 	blkID := blk.ID()
 	// issue [blk] and its ancestors into consensus
 	status := blk.Status()
-	for status.Fetched() && !t.Consensus.DecidedOrProcessing(blk) && !t.pendingContains(blkID) {
+	for status.Fetched() && !(t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) || t.pendingContains(blkID)) {
 		if err := t.issue(blk); err != nil {
 			return false, err
 		}
@@ -513,7 +513,7 @@ func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 	}
 
 	// The block was issued into consensus. This is the happy path.
-	if status != choices.Unknown && t.Consensus.DecidedOrProcessing(blk) {
+	if status != choices.Unknown && (t.Consensus.Decided(blk) || t.Consensus.Processing(blkID)) {
 		return true, nil
 	}
 
@@ -548,7 +548,7 @@ func (t *Transitive) issue(blk snowman.Block) error {
 
 	// block on the parent if needed
 	parentID := blk.Parent()
-	if parent, err := t.GetBlock(parentID); err != nil || !t.Consensus.DecidedOrProcessing(parent) {
+	if parent, err := t.GetBlock(parentID); err != nil || !(t.Consensus.Decided(parent) || t.Consensus.Processing(parentID)) {
 		t.Ctx.Log.Verbo("block %s waiting for parent %s to be issued", blkID, parentID)
 		i.deps.Add(parentID)
 	}
@@ -622,20 +622,20 @@ func (t *Transitive) pushQuery(blk snowman.Block) {
 
 // issue [blk] to consensus
 func (t *Transitive) deliver(blk snowman.Block) error {
-	if t.Consensus.DecidedOrProcessing(blk) {
+	blkID := blk.ID()
+	if t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) {
 		return nil
 	}
 
 	// we are no longer waiting on adding the block to consensus, so it is no
 	// longer pending
-	blkID := blk.ID()
 	t.removeFromPending(blk)
 	parentID := blk.Parent()
 	parent, err := t.GetBlock(parentID)
 	// Because the dependency must have been fulfilled by the time this function
 	// is called - we don't expect [err] to be non-nil. But it is handled for
 	// completness and future proofing.
-	if err != nil || !t.Consensus.AcceptedOrProcessing(parent) {
+	if err != nil || !(parent.Status() == choices.Accepted || t.Consensus.Processing(parentID)) {
 		// if the parent isn't processing or the last accepted block, then this
 		// block is effectively rejected
 		t.blocked.Abandon(blkID)
@@ -758,21 +758,16 @@ func (t *Transitive) removeFromPending(blk snowman.Block) {
 
 func (t *Transitive) addToNonVerifieds(blk snowman.Block) {
 	// don't add this blk if it's decided or processing.
-	if t.Consensus.DecidedOrProcessing(blk) {
+	blkID := blk.ID()
+	if t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) {
 		return
 	}
 	parentID := blk.Parent()
 	// we might still need this block so we can bubble votes to the parent
 	// only add blocks with parent already in the tree or processing.
 	// decided parents should not be in this map.
-	if t.nonVerifieds.Has(parentID) || t.parentProcessing(blk) {
-		t.nonVerifieds.Add(blk.ID(), parentID)
+	if t.nonVerifieds.Has(parentID) || t.Consensus.Processing(parentID) {
+		t.nonVerifieds.Add(blkID, parentID)
 		t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
 	}
-}
-
-func (t *Transitive) parentProcessing(blk snowman.Block) bool {
-	parentID := blk.Parent()
-	parentBlk, err := t.GetBlock(parentID)
-	return err == nil && !parentBlk.Status().Decided() && t.Consensus.DecidedOrProcessing(parentBlk)
 }
