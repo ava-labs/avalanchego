@@ -571,12 +571,13 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 	if threads > len(txs) {
 		threads = len(txs)
 	}
-	blockCtx := core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), nil)
 	blockHash := block.Hash()
 	for th := 0; th < threads; th++ {
 		pend.Add(1)
 		go func() {
 			defer pend.Done()
+
+			blockCtx := core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), nil)
 			// Fetch and execute the next transaction trace tasks
 			for task := range jobs {
 				msg, _ := txs[task.index].AsMessage(signer, block.BaseFee())
@@ -596,6 +597,7 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 	}
 	// Feed the transactions into the tracers and return
 	var failed error
+	blockCtx := core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), nil)
 	for i, tx := range txs {
 		// Send the trace task over for execution
 		jobs <- &txTraceTask{statedb: statedb.Copy(), index: i}
