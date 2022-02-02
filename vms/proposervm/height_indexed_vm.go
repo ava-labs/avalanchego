@@ -69,7 +69,9 @@ func (vm *VM) GetBlockIDByHeight(height uint64) (ids.ID, error) {
 		return ids.Empty, block.ErrIndexIncomplete
 	}
 
-	innerHVM, _ := vm.ChainVM.(block.HeightIndexedChainVM)
+	// The indexer will only report that the index has been repaired if the
+	// underlying VM supports indexing.
+	innerHVM := vm.ChainVM.(block.HeightIndexedChainVM)
 	switch forkHeight, err := vm.State.GetForkHeight(); err {
 	case nil:
 		if height < forkHeight {

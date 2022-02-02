@@ -154,7 +154,11 @@ func (vm *VM) Initialize(
 		ticker := time.NewTicker(checkIndexedFrequency)
 		defer ticker.Stop()
 		for {
+			// The underlying VM expects the lock to be held here.
+			vm.ctx.Lock.Lock()
 			err := innerHVM.VerifyHeightIndex()
+			vm.ctx.Lock.Unlock()
+
 			if err == nil {
 				// innerVM indexing complete. Let re-index this machine
 				break
