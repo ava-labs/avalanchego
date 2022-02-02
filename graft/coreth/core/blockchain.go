@@ -962,7 +962,7 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 
 	// Write the block to the chain and get the status.
 	// writeBlockWithState (called within writeBlockAndSethead) creates a reference that
-	//  will be cleaned up in Accept/Reject so we need to ensure an error cannot occur
+	// will be cleaned up in Accept/Reject so we need to ensure an error cannot occur
 	// later in verification, since that would cause the referenced root to never be dereferenced.
 	if err := bc.writeBlockAndSetHead(block, receipts, logs, statedb); err != nil {
 		return err
