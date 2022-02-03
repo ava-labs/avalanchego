@@ -28,6 +28,7 @@ const (
 	defaultTxRegossipMaxSize                    = 15
 	defaultOfflinePruningBloomFilterSize uint64 = 512 // Default size (MB) for the offline pruner to use
 	defaultLogLevel                             = "info"
+	defaultMaxOutboundActiveRequests            = 8
 )
 
 var defaultEnabledAPIs = []string{
@@ -100,6 +101,9 @@ type Config struct {
 	OfflinePruning                bool   `json:"offline-pruning-enabled"`
 	OfflinePruningBloomFilterSize uint64 `json:"offline-pruning-bloom-filter-size"`
 	OfflinePruningDataDirectory   string `json:"offline-pruning-data-directory"`
+
+	// VM2VM network
+	MaxOutboundActiveRequests int64 `json:"max-outbound-active-requests"`
 }
 
 // EthAPIs returns an array of strings representing the Eth APIs that should be enabled
@@ -129,6 +133,7 @@ func (c *Config) SetDefaults() {
 	c.TxRegossipMaxSize = defaultTxRegossipMaxSize
 	c.OfflinePruningBloomFilterSize = defaultOfflinePruningBloomFilterSize
 	c.LogLevel = defaultLogLevel
+	c.MaxOutboundActiveRequests = defaultMaxOutboundActiveRequests
 }
 
 func (d *Duration) UnmarshalJSON(data []byte) (err error) {

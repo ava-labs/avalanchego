@@ -17,6 +17,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/coreth/plugin/evm/message"
+
 	coreth "github.com/ava-labs/coreth/chain"
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
@@ -26,6 +28,7 @@ import (
 	"github.com/ava-labs/coreth/metrics/prometheus"
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/peer"
 	"github.com/ava-labs/coreth/rpc"
 
 	// Force-load tracer engine to trigger registration
@@ -63,7 +66,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -204,7 +206,7 @@ type VM struct {
 
 	builder *blockBuilder
 
-	network Network
+	gossiper Gossiper
 
 	baseCodec codec.Registry
 	codec     codec.Manager
@@ -220,15 +222,11 @@ type VM struct {
 	// Continuous Profiler
 	profiler profiler.ContinuousProfiler
 
+	peer.Network
+	client       peer.Client
+	networkCodec codec.Manager
+
 	bootstrapped bool
-}
-
-func (vm *VM) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
-	return nil // noop
-}
-
-func (vm *VM) Disconnected(nodeID ids.ShortID) error {
-	return nil // noop
 }
 
 // Codec implements the secp256k1fx interface
@@ -420,10 +418,15 @@ func (vm *VM) Initialize(
 	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
 	vm.handleGasPriceUpdates()
 
-	// initialize new gossip network
-	//
-	// NOTE: This network must be initialized after the atomic mempool.
-	vm.network = vm.NewNetwork(appSender)
+	vm.networkCodec, err = message.BuildCodec()
+	if err != nil {
+		return err
+	}
+
+	// initialize peer network
+	vm.Network = peer.NewNetwork(appSender, vm.networkCodec, ctx.NodeID, vm.config.MaxOutboundActiveRequests)
+	vm.client = peer.NewClient(vm.Network)
+	vm.initGossipHandling()
 
 	// start goroutines to manage block building
 	//
@@ -484,6 +487,16 @@ func (vm *VM) Initialize(
 	}
 
 	return vm.fx.Initialize(vm)
+}
+
+func (vm *VM) initGossipHandling() {
+	if vm.chainConfig.ApricotPhase4BlockTimestamp != nil {
+		vm.gossiper = vm.newPushGossiper()
+		vm.Network.SetGossipHandler(NewGossipHandler(vm))
+	} else {
+		vm.gossiper = &noopGossiper{}
+		vm.Network.SetGossipHandler(message.NoopMempoolGossipHandler{})
+	}
 }
 
 func (vm *VM) createConsensusCallbacks() *dummy.ConsensusCallbacks {

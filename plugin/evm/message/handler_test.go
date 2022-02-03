@@ -15,12 +15,12 @@ type CounterHandler struct {
 	AtomicTx, EthTxs int
 }
 
-func (h *CounterHandler) HandleAtomicTx(ids.ShortID, uint32, *AtomicTx) error {
+func (h *CounterHandler) HandleAtomicTx(ids.ShortID, *AtomicTx) error {
 	h.AtomicTx++
 	return nil
 }
 
-func (h *CounterHandler) HandleEthTxs(ids.ShortID, uint32, *EthTxs) error {
+func (h *CounterHandler) HandleEthTxs(ids.ShortID, *EthTxs) error {
 	h.EthTxs++
 	return nil
 }
@@ -31,7 +31,7 @@ func TestHandleAtomicTx(t *testing.T) {
 	handler := CounterHandler{}
 	msg := AtomicTx{}
 
-	err := msg.Handle(&handler, ids.ShortEmpty, 0)
+	err := msg.Handle(&handler, ids.ShortEmpty)
 	assert.NoError(err)
 	assert.Equal(1, handler.AtomicTx)
 	assert.Zero(handler.EthTxs)
@@ -43,7 +43,7 @@ func TestHandleEthTxs(t *testing.T) {
 	handler := CounterHandler{}
 	msg := EthTxs{}
 
-	err := msg.Handle(&handler, ids.ShortEmpty, 0)
+	err := msg.Handle(&handler, ids.ShortEmpty)
 	assert.NoError(err)
 	assert.Zero(handler.AtomicTx)
 	assert.Equal(1, handler.EthTxs)
@@ -52,11 +52,11 @@ func TestHandleEthTxs(t *testing.T) {
 func TestNoopHandler(t *testing.T) {
 	assert := assert.New(t)
 
-	handler := NoopHandler{}
+	handler := NoopMempoolGossipHandler{}
 
-	err := handler.HandleAtomicTx(ids.ShortEmpty, 0, nil)
+	err := handler.HandleAtomicTx(ids.ShortEmpty, nil)
 	assert.NoError(err)
 
-	err = handler.HandleEthTxs(ids.ShortEmpty, 0, nil)
+	err = handler.HandleEthTxs(ids.ShortEmpty, nil)
 	assert.NoError(err)
 }

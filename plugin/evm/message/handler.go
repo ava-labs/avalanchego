@@ -9,21 +9,39 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ Handler = NoopHandler{}
+var _ GossipHandler = NoopMempoolGossipHandler{}
 
-type Handler interface {
-	HandleAtomicTx(nodeID ids.ShortID, requestID uint32, msg *AtomicTx) error
-	HandleEthTxs(nodeID ids.ShortID, requestID uint32, msg *EthTxs) error
+// GossipHandler handles incoming gossip messages
+type GossipHandler interface {
+	HandleAtomicTx(nodeID ids.ShortID, msg *AtomicTx) error
+	HandleEthTxs(nodeID ids.ShortID, msg *EthTxs) error
 }
 
-type NoopHandler struct{}
+type NoopMempoolGossipHandler struct{}
 
-func (NoopHandler) HandleAtomicTx(nodeID ids.ShortID, requestID uint32, _ *AtomicTx) error {
-	log.Debug("dropping unexpected AtomicTx message", "peerID", nodeID, "requestID", requestID)
+func (NoopMempoolGossipHandler) HandleAtomicTx(nodeID ids.ShortID, _ *AtomicTx) error {
+	log.Debug("dropping unexpected AtomicTx message", "peerID", nodeID)
 	return nil
 }
 
-func (NoopHandler) HandleEthTxs(nodeID ids.ShortID, requestID uint32, _ *EthTxs) error {
-	log.Debug("dropping unexpected EthTxs message", "peerID", nodeID, "requestID", requestID)
+func (NoopMempoolGossipHandler) HandleEthTxs(nodeID ids.ShortID, _ *EthTxs) error {
+	log.Debug("dropping unexpected EthTxs message", "peerID", nodeID)
 	return nil
+}
+
+// RequestHandler interface handles incoming requests from peers
+// Must have methods in format of handleType(context.Context, ids.ShortID, uint32, request Type) error
+// so that the Request object of relevant Type can invoke its respective handle method
+// on this struct.
+// Also see GossipHandler for implementation style.
+type RequestHandler interface{}
+
+// ResponseHandler handles response for a sent request
+// Only one of OnResponse or OnFailure is called for a given requestID, not both
+type ResponseHandler interface {
+	// OnResponse is invoked when the peer responded to a request
+	OnResponse(nodeID ids.ShortID, requestID uint32, response []byte) error
+	// OnFailure is invoked when there was a failure in processing a request
+	// The FailureReason outlines the underlying cause.
+	OnFailure(nodeID ids.ShortID, requestID uint32) error
 }

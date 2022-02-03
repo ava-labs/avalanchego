@@ -52,9 +52,9 @@ type blockBuilder struct {
 	ctx         *snow.Context
 	chainConfig *params.ChainConfig
 
-	chain   *coreth.ETHChain
-	mempool *Mempool
-	network Network
+	chain    *coreth.ETHChain
+	mempool  *Mempool
+	gossiper Gossiper
 
 	shutdownChan <-chan struct{}
 	shutdownWg   *sync.WaitGroup
@@ -90,7 +90,7 @@ func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *bl
 		chainConfig:          vm.chainConfig,
 		chain:                vm.chain,
 		mempool:              vm.mempool,
-		network:              vm.network,
+		gossiper:             vm.gossiper,
 		shutdownChan:         vm.shutdownChan,
 		shutdownWg:           &vm.shutdownWg,
 		notifyBuildBlockChan: notifyBuildBlockChan,
@@ -279,13 +279,13 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 				b.signalTxsReady()
 
 				// We only attempt to invoke [GossipEthTxs] once AP4 is activated
-				if b.isAP4 && b.network != nil && len(ethTxsEvent.Txs) > 0 {
+				if b.isAP4 && b.gossiper != nil && len(ethTxsEvent.Txs) > 0 {
 					// Give time for this node to build a block before attempting to
 					// gossip
 					time.Sleep(waitBlockTime)
-					// [GossipEthTxs] will block unless [pushNetwork.ethTxsToGossipChan] (an
+					// [GossipEthTxs] will block unless [gossiper.ethTxsToGossipChan] (an
 					// unbuffered channel) is listened on
-					if err := b.network.GossipEthTxs(ethTxsEvent.Txs); err != nil {
+					if err := b.gossiper.GossipEthTxs(ethTxsEvent.Txs); err != nil {
 						log.Warn(
 							"failed to gossip new eth transactions",
 							"err", err,
@@ -298,11 +298,11 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 
 				// We only attempt to invoke [GossipAtomicTxs] once AP4 is activated
 				newTxs := b.mempool.GetNewTxs()
-				if b.isAP4 && b.network != nil && len(newTxs) > 0 {
+				if b.isAP4 && b.gossiper != nil && len(newTxs) > 0 {
 					// Give time for this node to build a block before attempting to
 					// gossip
 					time.Sleep(waitBlockTime)
-					if err := b.network.GossipAtomicTxs(newTxs); err != nil {
+					if err := b.gossiper.GossipAtomicTxs(newTxs); err != nil {
 						log.Warn(
 							"failed to gossip new atomic transactions",
 							"err", err,

@@ -1,4 +1,4 @@
-// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// (c) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -6,31 +6,21 @@ package message
 import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-const (
-	codecVersion   uint16 = 0
-	maxMessageSize        = 512 * units.KiB
-	maxSliceLen           = maxMessageSize
-)
+const Version = uint16(0)
+const maxMessageSize = 1 * units.MiB
 
-// Codec does serialization and deserialization
-var c codec.Manager
-
-func init() {
-	c = codec.NewManager(maxMessageSize)
-	lc := linearcodec.New(reflectcodec.DefaultTagName, maxSliceLen)
-
+func BuildCodec() (codec.Manager, error) {
+	codecManager := codec.NewManager(maxMessageSize)
+	c := linearcodec.NewDefault()
 	errs := wrappers.Errs{}
 	errs.Add(
-		lc.RegisterType(&AtomicTx{}),
-		lc.RegisterType(&EthTxs{}),
-		c.RegisterCodec(codecVersion, lc),
+		c.RegisterType(&AtomicTx{}),
+		c.RegisterType(&EthTxs{}),
 	)
-	if errs.Errored() {
-		panic(errs.Err)
-	}
+	errs.Add(codecManager.RegisterCodec(Version, c))
+	return codecManager, errs.Err
 }
