@@ -6,8 +6,8 @@ package galiasreader
 import (
 	"context"
 
+	"github.com/ava-labs/avalanchego/api/proto/galiasreaderproto"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/ids/galiasreader/galiasreaderproto"
 )
 
 var _ galiasreaderproto.AliasReaderServer = &Server{}

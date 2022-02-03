@@ -1,0 +1,22 @@
+syntax = "proto3";
+package greadcloserproto;
+option go_package = "github.com/ava-labs/avalanchego/api/greadcloserproto";
+
+message ReadRequest {
+    int32 length = 1;
+}
+
+message ReadResponse {
+    bytes read = 1;
+    string error = 2;
+    bool errored = 3;
+}
+
+message CloseRequest {}
+
+message CloseResponse {}
+
+service Reader {
+    rpc Read(ReadRequest) returns (ReadResponse);
+    rpc Close(CloseRequest) returns (CloseResponse);
+}

@@ -8,8 +8,8 @@ import (
 
 	stdatomic "sync/atomic"
 
+	"github.com/ava-labs/avalanchego/api/proto/gsharedmemoryproto"
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory/gsharedmemoryproto"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -39,7 +39,7 @@ func NewClient(client gsharedmemoryproto.SharedMemoryClient) *Client {
 
 func (c *Client) Get(peerChainID ids.ID, keys [][]byte) ([][]byte, error) {
 	req := &gsharedmemoryproto.GetRequest{
-		PeerChainID: peerChainID[:],
+		PeerChainId: peerChainID[:],
 		Id:          stdatomic.AddInt64(&c.uniqueID, 1),
 		Continues:   true,
 	}
@@ -56,7 +56,7 @@ func (c *Client) Get(peerChainID ids.ID, keys [][]byte) ([][]byte, error) {
 
 			currentSize = 0
 			prevIndex = i
-			req.PeerChainID = nil
+			req.PeerChainId = nil
 		}
 		currentSize += sizeChange
 
@@ -71,7 +71,7 @@ func (c *Client) Get(peerChainID ids.ID, keys [][]byte) ([][]byte, error) {
 
 	values := resp.Values
 
-	req.PeerChainID = nil
+	req.PeerChainId = nil
 	req.Keys = nil
 	for resp.Continues {
 		resp, err = c.client.Get(context.Background(), req)
@@ -96,7 +96,7 @@ func (c *Client) Indexed(
 	error,
 ) {
 	req := &gsharedmemoryproto.IndexedRequest{
-		PeerChainID: peerChainID[:],
+		PeerChainId: peerChainID[:],
 		StartTrait:  startTrait,
 		StartKey:    startKey,
 		Limit:       int32(limit),
@@ -116,7 +116,7 @@ func (c *Client) Indexed(
 
 			currentSize = 0
 			prevIndex = i
-			req.PeerChainID = nil
+			req.PeerChainId = nil
 			req.StartTrait = nil
 			req.StartKey = nil
 			req.Limit = 0
@@ -135,7 +135,7 @@ func (c *Client) Indexed(
 	lastKey := resp.LastKey
 	values := resp.Values
 
-	req.PeerChainID = nil
+	req.PeerChainId = nil
 	req.Traits = nil
 	req.StartTrait = nil
 	req.StartKey = nil
@@ -161,7 +161,7 @@ func (c *Client) Apply(requests map[ids.ID]*atomic.Requests, batch ...database.B
 		key := key
 
 		chainReq := &gsharedmemoryproto.AtomicRequest{
-			PeerChainID: key[:],
+			PeerChainId: key[:],
 		}
 		req.Requests = append(req.Requests, chainReq)
 
@@ -179,7 +179,7 @@ func (c *Client) Apply(requests map[ids.ID]*atomic.Requests, batch ...database.B
 				}
 
 				chainReq = &gsharedmemoryproto.AtomicRequest{
-					PeerChainID: key[:],
+					PeerChainId: key[:],
 				}
 				req.Requests = []*gsharedmemoryproto.AtomicRequest{chainReq}
 			}
@@ -202,7 +202,7 @@ func (c *Client) Apply(requests map[ids.ID]*atomic.Requests, batch ...database.B
 				}
 
 				chainReq = &gsharedmemoryproto.AtomicRequest{
-					PeerChainID: key[:],
+					PeerChainId: key[:],
 				}
 				req.Requests = []*gsharedmemoryproto.AtomicRequest{chainReq}
 			}

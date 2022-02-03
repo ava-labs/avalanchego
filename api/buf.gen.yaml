@@ -1,0 +1,8 @@
+version: v1
+plugins:
+  - name: go
+    out: proto
+    opt: paths=source_relative
+  - name: go-grpc
+    out: proto
+    opt: paths=source_relative

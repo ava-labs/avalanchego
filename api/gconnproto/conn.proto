@@ -1,0 +1,54 @@
+syntax = "proto3";
+package gconnproto;
+option go_package = "github.com/ava-labs/avalanchego/api/gconnproto";
+
+message ReadRequest {
+    int32 length = 1;
+}
+
+message ReadResponse {
+    bytes read = 1;
+    string error = 2;
+    bool errored = 3;
+}
+
+message WriteRequest {
+    bytes payload = 1;
+}
+
+message WriteResponse {
+    int32 length = 1;
+    string error = 2;
+    bool errored = 3;
+}
+
+message CloseRequest {}
+
+message CloseResponse {}
+
+message SetDeadlineRequest {
+    bytes time = 1;
+}
+
+message SetDeadlineResponse {}
+
+message SetReadDeadlineRequest {
+    bytes time = 1;
+}
+
+message SetReadDeadlineResponse {}
+
+message SetWriteDeadlineRequest {
+    bytes time = 1;
+}
+
+message SetWriteDeadlineResponse {}
+
+service Conn {
+    rpc Read(ReadRequest) returns (ReadResponse);
+    rpc Write(WriteRequest) returns (WriteResponse);
+    rpc Close(CloseRequest) returns (CloseResponse);
+    rpc SetDeadline(SetDeadlineRequest) returns (SetDeadlineResponse);
+    rpc SetReadDeadline(SetReadDeadlineRequest) returns (SetReadDeadlineResponse);
+    rpc SetWriteDeadline(SetWriteDeadlineRequest) returns (SetWriteDeadlineResponse);
+}

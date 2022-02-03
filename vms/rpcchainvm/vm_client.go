@@ -17,34 +17,34 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
-	"github.com/ava-labs/avalanchego/api/keystore/gkeystore/gkeystoreproto"
 	"github.com/ava-labs/avalanchego/api/metrics"
+	"github.com/ava-labs/avalanchego/api/proto/appsenderproto"
+	"github.com/ava-labs/avalanchego/api/proto/galiasreaderproto"
+	"github.com/ava-labs/avalanchego/api/proto/ghttpproto"
+	"github.com/ava-labs/avalanchego/api/proto/gkeystoreproto"
+	"github.com/ava-labs/avalanchego/api/proto/gsharedmemoryproto"
+	"github.com/ava-labs/avalanchego/api/proto/gsubnetlookupproto"
+	"github.com/ava-labs/avalanchego/api/proto/messengerproto"
+	"github.com/ava-labs/avalanchego/api/proto/rpcdbproto"
+	"github.com/ava-labs/avalanchego/api/proto/vmproto"
 	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory"
-	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory/gsharedmemoryproto"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
-	"github.com/ava-labs/avalanchego/database/rpcdb/rpcdbproto"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ids/galiasreader"
-	"github.com/ava-labs/avalanchego/ids/galiasreader/galiasreaderproto"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
-	"github.com/ava-labs/avalanchego/snow/engine/common/appsender/appsenderproto"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/ghttpproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gsubnetlookup"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gsubnetlookup/gsubnetlookupproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/messenger"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/messenger/messengerproto"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/vmproto"
 )
 
 var (
@@ -157,12 +157,12 @@ func (vm *VMClient) Initialize(
 	go vm.broker.AcceptAndServe(appSenderBrokerID, vm.startAppSenderServer)
 
 	resp, err := vm.client.Initialize(context.Background(), &vmproto.InitializeRequest{
-		NetworkID:          ctx.NetworkID,
-		SubnetID:           ctx.SubnetID[:],
-		ChainID:            ctx.ChainID[:],
-		NodeID:             ctx.NodeID.Bytes(),
-		XChainID:           ctx.XChainID[:],
-		AvaxAssetID:        ctx.AVAXAssetID[:],
+		NetworkId:          ctx.NetworkID,
+		SubnetId:           ctx.SubnetID[:],
+		ChainId:            ctx.ChainID[:],
+		NodeId:             ctx.NodeID.Bytes(),
+		XChainId:           ctx.XChainID[:],
+		AvaxAssetId:        ctx.AVAXAssetID[:],
 		GenesisBytes:       genesisBytes,
 		UpgradeBytes:       upgradeBytes,
 		ConfigBytes:        configBytes,
@@ -178,11 +178,11 @@ func (vm *VMClient) Initialize(
 		return err
 	}
 
-	id, err := ids.ToID(resp.LastAcceptedID)
+	id, err := ids.ToID(resp.LastAcceptedId)
 	if err != nil {
 		return err
 	}
-	parentID, err := ids.ToID(resp.LastAcceptedParentID)
+	parentID, err := ids.ToID(resp.LastAcceptedParentId)
 	if err != nil {
 		return err
 	}
@@ -372,7 +372,7 @@ func (vm *VMClient) buildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 
-	parentID, err := ids.ToID(resp.ParentID)
+	parentID, err := ids.ToID(resp.ParentId)
 	if err != nil {
 		return nil, err
 	}
@@ -406,7 +406,7 @@ func (vm *VMClient) parseBlock(bytes []byte) (snowman.Block, error) {
 		return nil, err
 	}
 
-	parentID, err := ids.ToID(resp.ParentID)
+	parentID, err := ids.ToID(resp.ParentId)
 	if err != nil {
 		return nil, err
 	}
@@ -442,7 +442,7 @@ func (vm *VMClient) getBlock(id ids.ID) (snowman.Block, error) {
 		return nil, err
 	}
 
-	parentID, err := ids.ToID(resp.ParentID)
+	parentID, err := ids.ToID(resp.ParentId)
 	if err != nil {
 		return nil, err
 	}
@@ -492,8 +492,8 @@ func (vm *VMClient) AppRequest(nodeID ids.ShortID, requestID uint32, deadline ti
 	_, err = vm.client.AppRequest(
 		context.Background(),
 		&vmproto.AppRequestMsg{
-			NodeID:    nodeID[:],
-			RequestID: requestID,
+			NodeId:    nodeID[:],
+			RequestId: requestID,
 			Request:   request,
 			Deadline:  deadlineBytes,
 		},
@@ -505,8 +505,8 @@ func (vm *VMClient) AppResponse(nodeID ids.ShortID, requestID uint32, response [
 	_, err := vm.client.AppResponse(
 		context.Background(),
 		&vmproto.AppResponseMsg{
-			NodeID:    nodeID[:],
-			RequestID: requestID,
+			NodeId:    nodeID[:],
+			RequestId: requestID,
 			Response:  response,
 		},
 	)
@@ -517,8 +517,8 @@ func (vm *VMClient) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error
 	_, err := vm.client.AppRequestFailed(
 		context.Background(),
 		&vmproto.AppRequestFailedMsg{
-			NodeID:    nodeID[:],
-			RequestID: requestID,
+			NodeId:    nodeID[:],
+			RequestId: requestID,
 		},
 	)
 	return err
@@ -528,7 +528,7 @@ func (vm *VMClient) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	_, err := vm.client.AppGossip(
 		context.Background(),
 		&vmproto.AppGossipMsg{
-			NodeID: nodeID[:],
+			NodeId: nodeID[:],
 			Msg:    msg,
 		},
 	)
@@ -557,7 +557,7 @@ func (vm *VMClient) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	if errCode := resp.Err; errCode != 0 {
 		return ids.Empty, errCodeToError[errCode]
 	}
-	return ids.ToID(resp.BlkID)
+	return ids.ToID(resp.BlkId)
 }
 
 func (vm *VMClient) GetAncestors(
@@ -567,7 +567,7 @@ func (vm *VMClient) GetAncestors(
 	maxBlocksRetrivalTime time.Duration,
 ) ([][]byte, error) {
 	resp, err := vm.client.GetAncestors(context.Background(), &vmproto.GetAncestorsRequest{
-		BlkID:                 blkID[:],
+		BlkId:                 blkID[:],
 		MaxBlocksNum:          int32(maxBlocksNum),
 		MaxBlocksSize:         int32(maxBlocksSize),
 		MaxBlocksRetrivalTime: int64(maxBlocksRetrivalTime),
@@ -596,7 +596,7 @@ func (vm *VMClient) BatchedParseBlock(blksBytes [][]byte) ([]snowman.Block, erro
 			return nil, err
 		}
 
-		parentID, err := ids.ToID(blkResp.ParentID)
+		parentID, err := ids.ToID(blkResp.ParentId)
 		if err != nil {
 			return nil, err
 		}
@@ -640,7 +640,7 @@ func (vm *VMClient) Version() (string, error) {
 
 func (vm *VMClient) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
 	_, err := vm.client.Connected(context.Background(), &vmproto.ConnectedRequest{
-		NodeID:  nodeID[:],
+		NodeId:  nodeID[:],
 		Version: nodeVersion.String(),
 	})
 	return err
@@ -648,7 +648,7 @@ func (vm *VMClient) Connected(nodeID ids.ShortID, nodeVersion version.Applicatio
 
 func (vm *VMClient) Disconnected(nodeID ids.ShortID) error {
 	_, err := vm.client.Disconnected(context.Background(), &vmproto.DisconnectedRequest{
-		NodeID: nodeID[:],
+		NodeId: nodeID[:],
 	})
 	return err
 }
