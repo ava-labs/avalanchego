@@ -35,7 +35,7 @@ func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 		gossipedLock.Lock()
 		defer gossipedLock.Unlock()
 
-		notifyMsgIntf, err := message.Parse(gossipedBytes)
+		notifyMsgIntf, err := message.ParseMessage(vm.networkCodec, gossipedBytes)
 		assert.NoError(err)
 
 		requestMsg, ok := notifyMsgIntf.(*message.AtomicTx)
@@ -61,7 +61,7 @@ func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 	gossipedLock.Unlock()
 
 	// Test hash on retry
-	assert.NoError(vm.network.GossipAtomicTxs([]*Tx{tx}))
+	assert.NoError(vm.gossiper.GossipAtomicTxs([]*Tx{tx}))
 	gossipedLock.Lock()
 	assert.Equal(1, gossiped)
 	gossipedLock.Unlock()
@@ -111,7 +111,7 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 	msg := message.AtomicTx{
 		Tx: tx.Bytes(),
 	}
-	msgBytes, err := message.Build(&msg)
+	msgBytes, err := message.BuildMessage(vm.networkCodec, &msg)
 	assert.NoError(err)
 
 	// show that no txID is requested
@@ -134,7 +134,7 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 	msg = message.AtomicTx{
 		Tx: conflictingTx.Bytes(),
 	}
-	msgBytes, err = message.Build(&msg)
+	msgBytes, err = message.BuildMessage(vm.networkCodec, &msg)
 	assert.NoError(err)
 	assert.NoError(vm.AppGossip(nodeID, msgBytes))
 	assert.False(txRequested, "tx should not have been requested")
@@ -190,7 +190,7 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 	msg := message.AtomicTx{
 		Tx: tx.Bytes(),
 	}
-	msgBytes, err := message.Build(&msg)
+	msgBytes, err := message.BuildMessage(vm.networkCodec, &msg)
 	assert.NoError(err)
 
 	assert.NoError(vm.AppGossip(nodeID, msgBytes))
@@ -208,7 +208,7 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 	msg = message.AtomicTx{
 		Tx: conflictingTx.Bytes(),
 	}
-	msgBytes, err = message.Build(&msg)
+	msgBytes, err = message.BuildMessage(vm.networkCodec, &msg)
 	assert.NoError(err)
 
 	assert.NoError(vm.AppGossip(nodeID, msgBytes))

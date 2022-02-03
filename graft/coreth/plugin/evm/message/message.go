@@ -6,6 +6,8 @@ package message
 import (
 	"errors"
 
+	"github.com/ava-labs/avalanchego/codec"
+
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -18,6 +20,8 @@ const (
 	// this size, however. Max inbound message size is enforced by the codec
 	// (512KB).
 	EthMsgSoftCapSize = common.StorageSize(64 * units.KiB)
+	atomicTxType      = "atomic-tx"
+	ethTxsType        = "eth-txs"
 )
 
 var (
@@ -29,7 +33,7 @@ var (
 
 type Message interface {
 	// Handle this message with the correct message handler
-	Handle(handler Handler, nodeID ids.ShortID, requestID uint32) error
+	Handle(handler GossipHandler, nodeID ids.ShortID) error
 
 	// initialize should be called whenever a message is built or parsed
 	initialize([]byte)
@@ -38,6 +42,9 @@ type Message interface {
 	//
 	// Bytes should only be called after being initialized
 	Bytes() []byte
+
+	// Type returns user-friendly name for this object that can be used for logging
+	Type() string
 }
 
 type message []byte
@@ -51,8 +58,12 @@ type AtomicTx struct {
 	Tx []byte `serialize:"true"`
 }
 
-func (msg *AtomicTx) Handle(handler Handler, nodeID ids.ShortID, requestID uint32) error {
-	return handler.HandleAtomicTx(nodeID, requestID, msg)
+func (msg *AtomicTx) Handle(handler GossipHandler, nodeID ids.ShortID) error {
+	return handler.HandleAtomicTx(nodeID, msg)
+}
+
+func (msg *AtomicTx) Type() string {
+	return atomicTxType
 }
 
 type EthTxs struct {
@@ -61,25 +72,29 @@ type EthTxs struct {
 	Txs []byte `serialize:"true"`
 }
 
-func (msg *EthTxs) Handle(handler Handler, nodeID ids.ShortID, requestID uint32) error {
-	return handler.HandleEthTxs(nodeID, requestID, msg)
+func (msg *EthTxs) Handle(handler GossipHandler, nodeID ids.ShortID) error {
+	return handler.HandleEthTxs(nodeID, msg)
 }
 
-func Parse(bytes []byte) (Message, error) {
+func (msg *EthTxs) Type() string {
+	return ethTxsType
+}
+
+func ParseMessage(codec codec.Manager, bytes []byte) (Message, error) {
 	var msg Message
-	version, err := c.Unmarshal(bytes, &msg)
+	version, err := codec.Unmarshal(bytes, &msg)
 	if err != nil {
 		return nil, err
 	}
-	if version != codecVersion {
+	if version != Version {
 		return nil, errUnexpectedCodecVersion
 	}
 	msg.initialize(bytes)
 	return msg, nil
 }
 
-func Build(msg Message) ([]byte, error) {
-	bytes, err := c.Marshal(codecVersion, &msg)
+func BuildMessage(codec codec.Manager, msg Message) ([]byte, error) {
+	bytes, err := codec.Marshal(Version, &msg)
 	msg.initialize(bytes)
 	return bytes, err
 }
