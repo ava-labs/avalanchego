@@ -6,7 +6,6 @@ package config
 import (
 	"bytes"
 	"encoding/base64"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -15,8 +14,6 @@ import (
 
 	"github.com/spf13/viper"
 )
-
-var errMissingConfigFormat = errors.New("config content format not specified")
 
 // BuildViper returns the viper environment from parsing config file from
 // default search paths and any parsed command line flags
@@ -40,10 +37,6 @@ func BuildViper(fs *flag.FlagSet, args []string) (*viper.Viper, error) {
 	// load node configs from flags or file, depending on which flags are set
 	switch {
 	case v.IsSet(ConfigContentKey):
-		if !v.IsSet(ConfigContentTypeKey) {
-			return nil, errMissingConfigFormat
-		}
-
 		configContentB64 := v.GetString(ConfigContentKey)
 		configBytes, err := base64.StdEncoding.DecodeString(configContentB64)
 		if err != nil {
