@@ -119,7 +119,7 @@ func (hi *heightIndexer) doRepair(ctx context.Context, currentProBlkID ids.ID) e
 
 			// it will commit on exit
 			hi.log.Info(
-				"Block indexing by height: completed. Indexed %d blocks, duration %v, fork height %d",
+				"indexing finished after %d blocks, duration %v, with fork height %d",
 				indexedBlks,
 				time.Since(start),
 				previousHeight,
@@ -127,29 +127,6 @@ func (hi *heightIndexer) doRepair(ctx context.Context, currentProBlkID ids.ID) e
 			return nil
 		}
 		if err != nil {
-			return err
-		}
-
-		currentHeight := currentAcceptedBlk.Height()
-		_, err = hi.indexState.GetBlockIDAtHeight(currentHeight)
-		if err == nil {
-			// index completed. This may happen when node shuts down while
-			// accepting a new block.
-
-			if err := hi.indexState.DeleteCheckpoint(); err != nil {
-				return err
-			}
-			hi.jobDone.SetValue(true)
-
-			// it will commit on exit
-			hi.log.Info(
-				"Block indexing by height: repaired. Indexed %d blocks, duration %v",
-				indexedBlks,
-				time.Since(start),
-			)
-			return nil
-		}
-		if err != database.ErrNotFound {
 			return err
 		}
 
@@ -165,15 +142,15 @@ func (hi *heightIndexer) doRepair(ctx context.Context, currentProBlkID ids.ID) e
 				return err
 			}
 
-			hi.log.Info(
-				"Block indexing by height: ongoing. Indexed %d blocks, latest committed height %d",
+			hi.log.Debug(
+				"indexed %d blocks",
 				indexedBlks,
-				currentHeight,
 			)
 			lastIndexedBlks = indexedBlks
 		}
 
 		// Rebuild height block index.
+		currentHeight := currentAcceptedBlk.Height()
 		if err := hi.indexState.SetBlockIDAtHeight(currentHeight, currentProBlkID); err != nil {
 			return err
 		}
@@ -184,7 +161,7 @@ func (hi *heightIndexer) doRepair(ctx context.Context, currentProBlkID ids.ID) e
 		if now.Sub(lastLogTime) > 15*time.Second {
 			lastLogTime = now
 			hi.log.Info(
-				"Block indexing by height: ongoing. Indexed %d blocks, latest indexed height %d",
+				"indexed %d blocks, last height = %d",
 				indexedBlks,
 				currentHeight,
 			)
