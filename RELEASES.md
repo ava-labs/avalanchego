@@ -29,6 +29,7 @@ This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/ava
 - Marked RPC call metrics as expensive.
 - Added Abigen support for native asset call precompile.
 - Fixed bug in BLOCKHASH opcode during traceBlock.
+- Fixed bug in handling updated chain config on startup.
 
 ## [v1.7.4](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.4)
 
