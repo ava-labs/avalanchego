@@ -97,6 +97,9 @@ jobs:
       run: |
         go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
         go mod tidy
+    - name: prepare avalanchego directory for docker copy # required because "COPY dir ." copies dir/* to .
+      if: ${{ github.event_name == 'workflow_dispatch' }}
+      run: mkdir avalanchego_tmp && mv avalanchego avalanchego_tmp && mv avalanchego_tmp avalanchego
     - run: .github/workflows/run_e2e_tests.sh --parallelism 1 --client-id $KURTOSIS_CLIENT_ID --client-secret $KURTOSIS_CLIENT_SECRET
       shell: bash
       env:
