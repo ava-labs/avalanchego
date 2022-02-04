@@ -8,3 +8,4 @@
 - Mark RPC call specific metrics as expensive
 - Add Abigen support for native asset call precompile
 - Fix bug in BLOCKHASH opcode during traceBlock
+- Fix bug in handling updated chain config on startup
