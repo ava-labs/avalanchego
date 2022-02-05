@@ -240,7 +240,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 		return nil, err
 	}
 	parentID := blk.Parent()
-	timeBytes, err := blk.Timestamp().MarshalBinary()
+	timeBytes, err := blk.Timestamp().MarshalText()
 	return &vmproto.InitializeResponse{
 		LastAcceptedID:       lastAccepted[:],
 		LastAcceptedParentID: parentID[:],
@@ -334,7 +334,7 @@ func (vm *VMServer) BuildBlock(context.Context, *emptypb.Empty) (*vmproto.BuildB
 	}
 	blkID := blk.ID()
 	parentID := blk.Parent()
-	timeBytes, err := blk.Timestamp().MarshalBinary()
+	timeBytes, err := blk.Timestamp().MarshalText()
 	return &vmproto.BuildBlockResponse{
 		Id:        blkID[:],
 		ParentID:  parentID[:],
@@ -351,7 +351,7 @@ func (vm *VMServer) ParseBlock(_ context.Context, req *vmproto.ParseBlockRequest
 	}
 	blkID := blk.ID()
 	parentID := blk.Parent()
-	timeBytes, err := blk.Timestamp().MarshalBinary()
+	timeBytes, err := blk.Timestamp().MarshalText()
 	return &vmproto.ParseBlockResponse{
 		Id:        blkID[:],
 		ParentID:  parentID[:],
@@ -411,7 +411,7 @@ func (vm *VMServer) GetBlock(_ context.Context, req *vmproto.GetBlockRequest) (*
 		return nil, err
 	}
 	parentID := blk.Parent()
-	timeBytes, err := blk.Timestamp().MarshalBinary()
+	timeBytes, err := blk.Timestamp().MarshalText()
 	return &vmproto.GetBlockResponse{
 		ParentID:  parentID[:],
 		Bytes:     blk.Bytes(),
@@ -491,7 +491,7 @@ func (vm *VMServer) AppRequest(_ context.Context, req *vmproto.AppRequestMsg) (*
 		return nil, err
 	}
 	var deadline time.Time
-	if err := deadline.UnmarshalBinary(req.Deadline); err != nil {
+	if err := deadline.UnmarshalText(req.Deadline); err != nil {
 		return nil, err
 	}
 	return &emptypb.Empty{}, vm.vm.AppRequest(nodeID, req.RequestID, deadline, req.Request)
@@ -529,7 +529,7 @@ func (vm *VMServer) BlockVerify(_ context.Context, req *vmproto.BlockVerifyReque
 	if err := blk.Verify(); err != nil {
 		return nil, err
 	}
-	timeBytes, err := blk.Timestamp().MarshalBinary()
+	timeBytes, err := blk.Timestamp().MarshalText()
 	return &vmproto.BlockVerifyResponse{
 		Timestamp: timeBytes,
 	}, err

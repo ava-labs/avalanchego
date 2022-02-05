@@ -78,7 +78,7 @@ func (c *Client) LocalAddr() net.Addr  { return c.local }
 func (c *Client) RemoteAddr() net.Addr { return c.remote }
 
 func (c *Client) SetDeadline(t time.Time) error {
-	bytes, err := t.MarshalBinary()
+	bytes, err := t.MarshalText()
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func (c *Client) SetDeadline(t time.Time) error {
 }
 
 func (c *Client) SetReadDeadline(t time.Time) error {
-	bytes, err := t.MarshalBinary()
+	bytes, err := t.MarshalText()
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func (c *Client) SetReadDeadline(t time.Time) error {
 }
 
 func (c *Client) SetWriteDeadline(t time.Time) error {
-	bytes, err := t.MarshalBinary()
+	bytes, err := t.MarshalText()
 	if err != nil {
 		return err
 	}

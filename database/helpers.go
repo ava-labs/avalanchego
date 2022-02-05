@@ -88,7 +88,7 @@ func ParseUInt32(b []byte) (uint32, error) {
 }
 
 func PutTimestamp(db KeyValueWriter, key []byte, val time.Time) error {
-	valBytes, err := val.MarshalBinary()
+	valBytes, err := val.MarshalText()
 	if err != nil {
 		return err
 	}
@@ -105,7 +105,7 @@ func GetTimestamp(db KeyValueReader, key []byte) (time.Time, error) {
 
 func ParseTimestamp(b []byte) (time.Time, error) {
 	val := time.Time{}
-	if err := val.UnmarshalBinary(b); err != nil {
+	if err := val.UnmarshalText(b); err != nil {
 		return time.Time{}, err
 	}
 	return val, nil

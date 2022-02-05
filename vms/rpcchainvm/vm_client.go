@@ -192,7 +192,7 @@ func (vm *VMClient) Initialize(
 	}
 
 	timestamp := time.Time{}
-	if err := timestamp.UnmarshalBinary(resp.Timestamp); err != nil {
+	if err := timestamp.UnmarshalText(resp.Timestamp); err != nil {
 		return err
 	}
 
@@ -379,7 +379,7 @@ func (vm *VMClient) buildBlock() (snowman.Block, error) {
 	}
 
 	timestamp := time.Time{}
-	if err := timestamp.UnmarshalBinary(resp.Timestamp); err != nil {
+	if err := timestamp.UnmarshalText(resp.Timestamp); err != nil {
 		return nil, err
 	}
 
@@ -418,7 +418,7 @@ func (vm *VMClient) parseBlock(bytes []byte) (snowman.Block, error) {
 	}
 
 	timestamp := time.Time{}
-	if err := timestamp.UnmarshalBinary(resp.Timestamp); err != nil {
+	if err := timestamp.UnmarshalText(resp.Timestamp); err != nil {
 		return nil, err
 	}
 
@@ -454,7 +454,7 @@ func (vm *VMClient) getBlock(id ids.ID) (snowman.Block, error) {
 	}
 
 	timestamp := time.Time{}
-	if err := timestamp.UnmarshalBinary(resp.Timestamp); err != nil {
+	if err := timestamp.UnmarshalText(resp.Timestamp); err != nil {
 		return nil, err
 	}
 
@@ -486,7 +486,7 @@ func (vm *VMClient) HealthCheck() (interface{}, error) {
 }
 
 func (vm *VMClient) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
-	deadlineBytes, err := deadline.MarshalBinary()
+	deadlineBytes, err := deadline.MarshalText()
 	if err != nil {
 		return err
 	}
@@ -583,7 +583,7 @@ func (vm *VMClient) BatchedParseBlock(blksBytes [][]byte) ([]snowman.Block, erro
 		}
 
 		timestamp := time.Time{}
-		if err := timestamp.UnmarshalBinary(blkResp.Timestamp); err != nil {
+		if err := timestamp.UnmarshalText(blkResp.Timestamp); err != nil {
 			return nil, err
 		}
 
@@ -672,7 +672,7 @@ func (b *BlockClient) Verify() error {
 	if err != nil {
 		return err
 	}
-	return b.time.UnmarshalBinary(resp.Timestamp)
+	return b.time.UnmarshalText(resp.Timestamp)
 }
 
 func (b *BlockClient) Bytes() []byte        { return b.bytes }
