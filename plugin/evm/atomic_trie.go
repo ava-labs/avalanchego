@@ -5,6 +5,7 @@ package evm
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"time"
 
@@ -127,6 +128,9 @@ func newAtomicTrie(
 	bonusBlocks map[uint64]ids.ID, repo AtomicTxRepository, codec codec.Manager,
 	lastAcceptedHeight uint64, commitHeightInterval uint64,
 ) (*atomicTrie, error) {
+	if sharedMemory == nil {
+		return nil, errors.New("non-nil sharedMemory required in newAtomicTrie")
+	}
 	atomicTrieDB := prefixdb.New(atomicTrieDBPrefix, db)
 	metadataDB := prefixdb.New(atomicTrieMetaDBPrefix, db)
 	root, height, err := lastCommittedRootIfExists(metadataDB)
@@ -161,10 +165,12 @@ func newAtomicTrie(
 		log:                  log.New("c", "atomicTrie"),
 		sharedMemory:         sharedMemory,
 	}
-	if sharedMemory != nil {
-		if err := atomicTrie.ApplyToSharedMemory(lastAcceptedHeight); err != nil {
-			return nil, err
-		}
+	// ApplyToSharedMemory is called here in case the node was shut down after state sync
+	// in the middle of applying atomic ops to shared memory, to finish that operation.
+	// In normal operations, the atomicTrie will not contain operations for heights greater
+	// than lastAcceptedHeight and this call will be a noop.
+	if err := atomicTrie.ApplyToSharedMemory(lastAcceptedHeight); err != nil {
+		return nil, err
 	}
 	return atomicTrie, atomicTrie.initialize(lastAcceptedHeight)
 }
@@ -412,6 +418,7 @@ func (a *atomicTrie) LastCommitted() (common.Hash, uint64) {
 	return a.lastCommittedHash, a.lastCommittedHeight
 }
 
+// UpdateLastCommitted sets the state to last committed hash and height
 func (a *atomicTrie) UpdateLastCommitted(hash common.Hash, height uint64) error {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
@@ -467,6 +474,8 @@ func (a *atomicTrie) Root(height uint64) (common.Hash, error) {
 	return common.BytesToHash(hash), nil
 }
 
+// ApplyToSharedMemory iterates over atomic ops indexed in the trie and applies them
+// to sharedMemory, for heights less than or equal to [lastAcceptedBlock].
 func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 	lastAppliedToSharedMemoryHeight, err := a.lastAppliedToSharedMemoryHeight(lastAcceptedBlock)
 	if err != nil {
@@ -477,10 +486,10 @@ func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 
 	it, err := a.Iterator(a.lastCommittedHash, startHeight)
 	if err != nil {
-		log.Error("error reading atomic trie", "err", err)
 		return err
 	}
 	lastUpdate := time.Now()
+	putRequests, removeRequests := 0, 0
 	for it.Next() {
 		height := it.BlockNumber()
 		atomicOps := it.AtomicOps()
@@ -489,8 +498,10 @@ func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 			break
 		}
 
+		putRequests += len(atomicOps.PutRequests)
+		removeRequests += len(atomicOps.RemoveRequests)
 		if time.Since(lastUpdate) > 10*time.Second {
-			log.Info("atomic trie iteration", "height", height, "puts", len(atomicOps.PutRequests), "removes", len(atomicOps.RemoveRequests))
+			log.Info("atomic trie iteration", "height", height, "puts", putRequests, "removes", removeRequests)
 			lastUpdate = time.Now()
 		}
 
@@ -502,13 +513,12 @@ func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 		if err != nil {
 			return err
 		}
+		// calling [sharedMemory.Apply] updates the last applied pointer atomically with the shared memory operation.
 		if err = a.sharedMemory.Apply(map[ids.ID]*atomic.Requests{it.BlockchainID(): atomicOps}, batch); err != nil {
-			log.Error("could not apply operations to shared memory", "height", height, "puts", len(atomicOps.PutRequests), "removes", len(atomicOps.RemoveRequests))
 			return err
 		}
 	}
 	if err := it.Error(); err != nil {
-		log.Error("error in iterator read on atomic trie", "err", err)
 		return err
 	}
 	log.Info("finished applying atomic operations")
@@ -518,6 +528,11 @@ func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 	return a.db.Commit()
 }
 
+// lastAppliedToSharedMemoryHeight returns the last height applied to the shared memory.
+// In case lastAppliedToSharedMemoryKey is stored with a value of [height], the trie
+// contains atomic ops [height+1, lastCommittedHeight) that need to be applied to shared memory.
+// If the key is not present, all the atomic ops in the trie are already applied and this
+// function returns lastAcceptedBlock.
 func (a *atomicTrie) lastAppliedToSharedMemoryHeight(lastAcceptedBlock uint64) (uint64, error) {
 	height, err := database.GetUInt64(a.metadataDB, lastAppliedToSharedMemoryKey)
 	switch err {
@@ -530,6 +545,9 @@ func (a *atomicTrie) lastAppliedToSharedMemoryHeight(lastAcceptedBlock uint64) (
 	}
 }
 
+// SetLastAppliedToSharedMemoryHeight marks the atomic trie as containing atomic ops
+// that must be applied to shared memory (on initialization). Heights less than or
+// equal to [height] must already be applied to shared memory.
 func (a *atomicTrie) SetLastAppliedToSharedMemoryHeight(height uint64) error {
 	return database.PutUInt64(a.metadataDB, lastAppliedToSharedMemoryKey, height)
 }
