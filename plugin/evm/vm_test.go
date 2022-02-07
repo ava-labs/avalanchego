@@ -671,8 +671,10 @@ func TestBuildEthTxBlock(t *testing.T) {
 	}
 
 	restartedVM := &VM{}
+	ctx := NewContext()
+	ctx.SharedMemory = testSharedMemory()
 	if err := restartedVM.Initialize(
-		NewContext(),
+		ctx,
 		dbManager,
 		[]byte(genesisJSONApricotPhase2),
 		[]byte(""),
