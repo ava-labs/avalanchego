@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
@@ -55,6 +56,9 @@ type HeightIndex interface {
 	HeightIndexWriter
 	HeightIndexGetter
 	HeightIndexBatchSupport
+
+	// ResetHeightIndex deletes all index DB entries
+	ResetHeightIndex() error
 }
 
 type heightIndex struct {
@@ -75,6 +79,41 @@ func NewHeightIndex(db database.Database, commitable versiondb.Commitable) Heigh
 		heightDB:     prefixdb.New(heightPrefix, db),
 		metadataDB:   prefixdb.New(metadataPrefix, db),
 	}
+}
+
+func (hi *heightIndex) ResetHeightIndex() error {
+	var (
+		itHeight   = hi.heightDB.NewIterator()
+		itMetadata = hi.metadataDB.NewIterator()
+	)
+	defer func() {
+		itHeight.Release()
+		itMetadata.Release()
+	}()
+
+	// clear height cache
+	hi.heightsCache.Flush()
+
+	// clear heightDB
+	for itHeight.Next() {
+		if err := hi.heightDB.Delete(itHeight.Key()); err != nil {
+			return err
+		}
+	}
+
+	// clear metadataDB
+	for itMetadata.Next() {
+		if err := hi.metadataDB.Delete(itMetadata.Key()); err != nil {
+			return err
+		}
+	}
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		itHeight.Error(),
+		itMetadata.Error(),
+	)
+	return errs.Err
 }
 
 func (hi *heightIndex) GetBlockIDAtHeight(height uint64) (ids.ID, error) {

@@ -1183,5 +1183,9 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	if err != nil {
 		return node.Config{}, err
 	}
+
+	// reset proposerVM height index
+	nodeConfig.ResetProposerVMHeightIndex = v.GetBool(ResetProposerVMHeightIndexKey)
+
 	return nodeConfig, nil
 }

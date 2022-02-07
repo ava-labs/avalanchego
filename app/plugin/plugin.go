@@ -10,8 +10,8 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
+	"github.com/ava-labs/avalanchego/api/proto/pluginproto"
 	"github.com/ava-labs/avalanchego/app"
-	"github.com/ava-labs/avalanchego/app/plugin/pluginproto"
 )
 
 const (

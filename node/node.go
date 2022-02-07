@@ -649,7 +649,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		ApricotPhase4MinPChainHeight:            version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
 
 		// State sync
-		StateSyncTestingBeacons: n.Config.StateSyncTestOnlyIDs,
+		StateSyncTestingBeacons:    n.Config.StateSyncTestOnlyIDs,
+		ResetProposerVMHeightIndex: n.Config.ResetProposerVMHeightIndex,
 	})
 
 	vdrs := n.vdrs
@@ -1260,7 +1261,7 @@ func (n *Node) shutdown() {
 		n.Log.Debug("error during API shutdown: %s", err)
 	}
 	if err := n.indexer.Close(); err != nil {
-		n.Log.Debug("error closing tx indexer: %w", err)
+		n.Log.Debug("error closing tx indexer: %s", err)
 	}
 
 	// Make sure all plugin subprocesses are killed

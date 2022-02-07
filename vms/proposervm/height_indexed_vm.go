@@ -89,9 +89,12 @@ func (vm *VM) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 }
 
 // As postFork blocks/options are accepted, height index is updated even if its
-// repairing is ongoing.
-// vm.ctx.Lock should be held
+// repairing is ongoing. vm.ctx.Lock should be held
 func (vm *VM) updateHeightIndex(height uint64, blkID ids.ID) error {
+	if vm.resetHeightIndexOngoing.GetValue() {
+		return nil
+	}
+
 	_, err := vm.State.GetCheckpoint()
 	switch err {
 	case nil:
@@ -129,6 +132,6 @@ func (vm *VM) storeHeightEntry(height uint64, blkID ids.ID) error {
 		return fmt.Errorf("failed to load fork height: %w", err)
 	}
 
-	vm.ctx.Log.Debug("Block indexing by height: added block %s at height %d", blkID, height)
+	vm.ctx.Log.Debug("indexed block %s at height %d", blkID, height)
 	return vm.State.SetBlockIDAtHeight(height, blkID)
 }

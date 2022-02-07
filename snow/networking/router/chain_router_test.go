@@ -77,6 +77,7 @@ func TestShutdown(t *testing.T) {
 		},
 	}
 	bootstrapper.Default(true)
+	bootstrapper.CantGossip = false
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ShutdownF = func() error { shutdownCalled <- struct{}{}; return nil }
 	bootstrapper.ConnectedF = func(nodeID ids.ShortID, nodeVersion version.Application) error { return nil }
@@ -85,6 +86,7 @@ func TestShutdown(t *testing.T) {
 
 	engine := &common.EngineTest{T: t}
 	engine.Default(true)
+	engine.CantGossip = false
 	engine.ContextF = func() *snow.ConsensusContext { return ctx }
 	engine.ShutdownF = func() error { shutdownCalled <- struct{}{}; return nil }
 	engine.ConnectedF = func(nodeID ids.ShortID, nodeVersion version.Application) error { return nil }
@@ -175,6 +177,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		},
 	}
 	bootstrapper.Default(true)
+	bootstrapper.CantGossip = false
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.ShortID, nodeVersion version.Application) error { return nil }
 	bootstrapper.HaltF = func() {}
@@ -281,6 +284,7 @@ func TestRouterTimeout(t *testing.T) {
 		},
 	}
 	bootstrapper.Default(true)
+	bootstrapper.CantGossip = false
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.ShortID, nodeVersion version.Application) error { return nil }
 	bootstrapper.HaltF = func() {}

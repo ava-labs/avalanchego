@@ -193,7 +193,7 @@ func (b *benchlist) remove(validator *benchData) {
 	benchedStake, err := b.vdrs.SubsetWeight(b.benchlistSet)
 	if err != nil {
 		// This should never happen
-		b.log.Error("couldn't get benched stake: %w", err)
+		b.log.Error("couldn't get benched stake: %s", err)
 		return
 	}
 	b.metrics.weightBenched.Set(float64(benchedStake))
@@ -285,7 +285,7 @@ func (b *benchlist) bench(validatorID ids.ShortID) {
 	benchedStake, err := b.vdrs.SubsetWeight(b.benchlistSet)
 	if err != nil {
 		// This should never happen
-		b.log.Error("couldn't get benched stake: %w. Resetting benchlist", err)
+		b.log.Error("couldn't get benched stake: %s. Resetting benchlist", err)
 		return
 	}
 

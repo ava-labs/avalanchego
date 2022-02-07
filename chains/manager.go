@@ -182,7 +182,8 @@ type ManagerConfig struct {
 	ApricotPhase4MinPChainHeight uint64
 
 	// State sync
-	StateSyncTestingBeacons []ids.ShortID
+	StateSyncTestingBeacons    []ids.ShortID
+	ResetProposerVMHeightIndex bool
 }
 
 type manager struct {
@@ -779,7 +780,7 @@ func (m *manager) createSnowmanChain(
 	}
 
 	// enable ProposerVM on this VM
-	vm = proposervm.New(vm, m.ApricotPhase4Time, m.ApricotPhase4MinPChainHeight)
+	vm = proposervm.New(vm, m.ApricotPhase4Time, m.ApricotPhase4MinPChainHeight, m.ResetProposerVMHeightIndex)
 
 	if m.MeterVMEnabled {
 		vm = metervm.NewBlockVM(vm)

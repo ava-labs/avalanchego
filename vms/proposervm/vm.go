@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/indexer"
@@ -51,7 +52,8 @@ type VM struct {
 	minimumPChainHeight uint64
 
 	state.State
-	hIndexer indexer.HeightIndexer
+	hIndexer                indexer.HeightIndexer
+	resetHeightIndexOngoing utils.AtomicBool
 
 	proposer.Windower
 	tree.Tree
@@ -81,12 +83,20 @@ type VM struct {
 	pendingSummariesBlockIDMapping map[ids.ID]ids.ID
 }
 
-func New(vm block.ChainVM, activationTime time.Time, minimumPChainHeight uint64) *VM {
-	return &VM{
+func New(
+	vm block.ChainVM,
+	activationTime time.Time,
+	minimumPChainHeight uint64,
+	resetHeightIndex bool,
+) *VM {
+	proVM := &VM{
 		ChainVM:             vm,
 		activationTime:      activationTime,
 		minimumPChainHeight: minimumPChainHeight,
 	}
+
+	proVM.resetHeightIndexOngoing.SetValue(resetHeightIndex)
+	return proVM
 }
 
 func (vm *VM) Initialize(
@@ -154,6 +164,25 @@ func (vm *VM) Initialize(
 
 	// asynchronously rebuild height index, if needed
 	go func() {
+		// If index reset has been requested, carry it out first
+		if vm.resetHeightIndexOngoing.GetValue() {
+			if err := indexerState.ResetHeightIndex(); err != nil {
+				vm.ctx.Log.Error("block height indexing reset failed with: %s", err)
+				return
+			}
+			if err := indexerState.Commit(); err != nil {
+				vm.ctx.Log.Error("block height indexing reset commit failed with: %s", err)
+				return
+			}
+			if err := vm.Commit(); err != nil {
+				vm.ctx.Log.Error("block height indexing reset atomic commit failed with: %s", err)
+				return
+			}
+
+			vm.ctx.Log.Info("block height indexing reset finished")
+			vm.resetHeightIndexOngoing.SetValue(false)
+		}
+
 		// Poll until the underlying chain's index is complete or shutdown is
 		// called.
 		ticker := time.NewTicker(checkIndexedFrequency)
@@ -169,7 +198,7 @@ func (vm *VM) Initialize(
 				break
 			}
 			if err != block.ErrIndexIncomplete {
-				vm.ctx.Log.Error("Block indexing by height: failed with error %s", err)
+				vm.ctx.Log.Error("block height indexing failed with: %s", err)
 				return
 			}
 

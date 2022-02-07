@@ -1,0 +1,80 @@
+syntax = "proto3";
+package ghttpproto;
+option go_package = "github.com/ava-labs/avalanchego/api/ghttpproto";
+
+message Userinfo {
+    string username = 1;
+    string password = 2;
+    bool password_set = 3;
+}
+
+message URL {
+    string scheme = 1;
+    string opaque = 2;
+    Userinfo user = 3;
+    string host = 4;
+    string path = 5;
+    string raw_path = 6;
+    bool force_query = 7;
+    string raw_query = 8;
+    string fragment = 9;
+}
+
+message Element {
+    string key = 1;
+    repeated string values = 2;
+}
+
+message Certificates {
+    repeated bytes cert = 1;
+}
+
+message ConnectionState {
+    uint32 version = 1;
+    bool handshake_complete = 2;
+    bool did_resume = 3;
+    uint32 cipher_suite = 4;
+    string negotiated_protocol = 5;
+    bool negotiated_protocol_is_mutual = 6;
+    string server_name = 7;
+    Certificates peer_certificates = 8;
+    repeated Certificates verified_chains = 9;
+    repeated bytes signed_certificate_timestamps = 10;
+    bytes ocsp_response = 11;
+    bytes tls_unique = 12;
+}
+
+message Request {
+    string method = 1;
+    URL url = 2;
+    string proto = 3;
+    int32 proto_major = 4;
+    int32 proto_minor = 5;
+    repeated Element header = 6;
+    uint32 body = 7; // server ID
+    int64 content_length = 8;
+    repeated string transfer_encoding = 9;
+    string host = 10;
+    repeated Element form = 11;
+    repeated Element post_form = 12;
+    repeated string trailer_keys = 13;
+    string remote_addr = 14;
+    string request_uri = 15;
+    ConnectionState tls = 16;
+}
+
+message ResponseWriter {
+    uint32 id = 1; // server ID
+    repeated Element header = 2;
+}
+
+message HTTPRequest {
+    ResponseWriter response_writer = 1;
+    Request request = 2;
+}
+
+message HTTPResponse {}
+
+service HTTP {
+    rpc Handle(HTTPRequest) returns (HTTPResponse);
+}
