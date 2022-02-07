@@ -27,7 +27,7 @@ jobs:
           go-version: ${{ matrix.go }}
       - run: go mod download
         shell: bash
-      - run: ./scripts/build.sh evm
+      - run: ./scripts/build.sh ./build/subnetevm
         shell: bash
       - run: ./scripts/build_test.sh
         shell: bash

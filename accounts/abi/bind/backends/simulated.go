@@ -110,7 +110,7 @@ func NewSimulatedBackendWithDatabase(database ethdb.Database, alloc core.Genesis
 	genesis := core.Genesis{Config: cpcfg, GasLimit: gasLimit, Alloc: alloc}
 	genesis.MustCommit(database)
 	cacheConfig := &core.CacheConfig{}
-	blockchain, _ := core.NewBlockChain(database, cacheConfig, genesis.Config, dummy.NewEngine(), vm.Config{}, common.Hash{})
+	blockchain, _ := core.NewBlockChain(database, cacheConfig, genesis.Config, dummy.NewFaker(), vm.Config{}, common.Hash{})
 
 	backend := &SimulatedBackend{
 		database:   database,
@@ -163,7 +163,7 @@ func (b *SimulatedBackend) Rollback() {
 }
 
 func (b *SimulatedBackend) rollback(parent *types.Block) {
-	blocks, _, _ := core.GenerateChain(b.config, parent, dummy.NewEngine(), b.database, 1, 10, func(int, *core.BlockGen) {})
+	blocks, _, _ := core.GenerateChain(b.config, parent, dummy.NewFaker(), b.database, 1, 10, func(int, *core.BlockGen) {})
 
 	b.acceptedBlock = blocks[0]
 	b.acceptedState, _ = state.New(b.acceptedBlock.Root(), b.blockchain.StateCache(), nil)
@@ -499,6 +499,9 @@ func (b *SimulatedBackend) AcceptedNonceAt(ctx context.Context, account common.A
 // SuggestGasPrice implements ContractTransactor.SuggestGasPrice. Since the simulated
 // chain doesn't have miners, we just return a gas price of 1 for any call.
 func (b *SimulatedBackend) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	if b.acceptedBlock.Header().BaseFee != nil {
 		return b.acceptedBlock.Header().BaseFee, nil
 	}
@@ -814,7 +817,7 @@ func (b *SimulatedBackend) AdjustTime(adjustment time.Duration) error {
 		return errors.New("Could not adjust time on non-empty block")
 	}
 
-	blocks, _, _ := core.GenerateChain(b.config, b.blockchain.CurrentBlock(), dummy.NewEngine(), b.database, 1, 10, func(number int, block *core.BlockGen) {
+	blocks, _, _ := core.GenerateChain(b.config, b.blockchain.CurrentBlock(), dummy.NewFaker(), b.database, 1, 10, func(number int, block *core.BlockGen) {
 		block.OffsetTime(int64(adjustment.Seconds()))
 	})
 	stateDB, _ := b.blockchain.State()

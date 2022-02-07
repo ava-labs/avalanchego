@@ -55,9 +55,9 @@ const (
 // HeaderChain is responsible for maintaining the header chain including the
 // header query and updating.
 //
-// The components maintained by headerchain includes: (1) total difficult
-// (2) header (3) block hash -> number mapping (4) canonical number -> hash mapping
-// and (5) head header flag.
+// The components maintained by headerchain includes:
+// (1) header (2) block hash -> number mapping (3) canonical number -> hash mapping
+// and (4) head header flag.
 //
 // It is not thread safe either, the encapsulating chain structures should do
 // the necessary mutex locking/unlocking.
@@ -129,22 +129,6 @@ func (hc *HeaderChain) GetBlockNumber(hash common.Hash) *uint64 {
 		hc.numberCache.Add(hash, *number)
 	}
 	return number
-}
-
-// GetTd retrieves a block's total difficulty in the canonical chain from the
-// database by hash and number, caching it if found.
-func (hc *HeaderChain) GetTd(hash common.Hash, number uint64) *big.Int {
-	// Short circuit if the td's already in the cache, retrieve otherwise
-	if cached, ok := hc.tdCache.Get(hash); ok {
-		return cached.(*big.Int)
-	}
-	td := rawdb.ReadTd(hc.chainDb, hash, number)
-	if td == nil {
-		return nil
-	}
-	// Cache the found body for next time and return
-	hc.tdCache.Add(hash, td)
-	return td
 }
 
 // GetHeader retrieves a block header from the database by hash and number,

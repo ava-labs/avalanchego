@@ -127,7 +127,7 @@ func TestVerifyBlockFee(t *testing.T) {
 				test.parentBlockGasCost,
 				test.parentTime, test.currentTime,
 			)
-			engine := NewEngine()
+			engine := NewFaker()
 			if err := engine.verifyBlockFee(test.baseFee, blockGasCost, test.txs, test.receipts); err != nil {
 				if !test.shouldErr {
 					t.Fatalf("Unexpected error: %s", err)

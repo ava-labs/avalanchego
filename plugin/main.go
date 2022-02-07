@@ -9,6 +9,7 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
+	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
 
 	"github.com/ava-labs/subnet-evm/plugin/evm"
@@ -23,6 +24,10 @@ func main() {
 	if version {
 		fmt.Println(evm.Version)
 		os.Exit(0)
+	}
+	if err := ulimit.Set(ulimit.DefaultFDLimit); err != nil {
+		fmt.Printf("failed to set fd limit correctly due to: %s", err)
+		os.Exit(1)
 	}
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: rpcchainvm.Handshake,

@@ -4,59 +4,73 @@
 package evm
 
 import (
+	"context"
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ethereum/go-ethereum/log"
 )
 
-// Client ...
-type Client struct {
+// Interface compliance
+var _ Client = (*client)(nil)
+
+// Client interface for interacting with EVM [chain]
+type Client interface {
+	StartCPUProfiler(ctx context.Context) (bool, error)
+	StopCPUProfiler(ctx context.Context) (bool, error)
+	MemoryProfile(ctx context.Context) (bool, error)
+	LockProfile(ctx context.Context) (bool, error)
+	SetLogLevel(ctx context.Context, level log.Lvl) (bool, error)
+}
+
+// Client implementation for interacting with EVM [chain]
+type client struct {
+	requester      rpc.EndpointRequester
 	adminRequester rpc.EndpointRequester
 }
 
 // NewClient returns a Client for interacting with EVM [chain]
-func NewClient(uri, chain string, requestTimeout time.Duration) *Client {
-	return &Client{
-		adminRequester: rpc.NewEndpointRequester(uri, fmt.Sprintf("/ext/bc/%s/admin", chain), "admin", requestTimeout),
+func NewClient(uri, chain string) Client {
+	return &client{
+		requester:      rpc.NewEndpointRequester(uri, fmt.Sprintf("/ext/bc/%s/avax", chain), "avax"),
+		adminRequester: rpc.NewEndpointRequester(uri, fmt.Sprintf("/ext/bc/%s/admin", chain), "admin"),
 	}
 }
 
 // NewCChainClient returns a Client for interacting with the C Chain
-func NewCChainClient(uri string, requestTimeout time.Duration) *Client {
-	return NewClient(uri, "C", requestTimeout)
+func NewCChainClient(uri string) Client {
+	return NewClient(uri, "C")
 }
 
-func (c *Client) StartCPUProfiler() (bool, error) {
+func (c *client) StartCPUProfiler(ctx context.Context) (bool, error) {
 	res := &api.SuccessResponse{}
-	err := c.adminRequester.SendRequest("startCPUProfiler", struct{}{}, res)
+	err := c.adminRequester.SendRequest(ctx, "startCPUProfiler", struct{}{}, res)
 	return res.Success, err
 }
 
-func (c *Client) StopCPUProfiler() (bool, error) {
+func (c *client) StopCPUProfiler(ctx context.Context) (bool, error) {
 	res := &api.SuccessResponse{}
-	err := c.adminRequester.SendRequest("stopCPUProfiler", struct{}{}, res)
+	err := c.adminRequester.SendRequest(ctx, "stopCPUProfiler", struct{}{}, res)
 	return res.Success, err
 }
 
-func (c *Client) MemoryProfile() (bool, error) {
+func (c *client) MemoryProfile(ctx context.Context) (bool, error) {
 	res := &api.SuccessResponse{}
-	err := c.adminRequester.SendRequest("memoryProfile", struct{}{}, res)
+	err := c.adminRequester.SendRequest(ctx, "memoryProfile", struct{}{}, res)
 	return res.Success, err
 }
 
-func (c *Client) LockProfile() (bool, error) {
+func (c *client) LockProfile(ctx context.Context) (bool, error) {
 	res := &api.SuccessResponse{}
-	err := c.adminRequester.SendRequest("lockProfile", struct{}{}, res)
+	err := c.adminRequester.SendRequest(ctx, "lockProfile", struct{}{}, res)
 	return res.Success, err
 }
 
 // SetLogLevel dynamically sets the log level for the C Chain
-func (c *Client) SetLogLevel(level log.Lvl) (bool, error) {
+func (c *client) SetLogLevel(ctx context.Context, level log.Lvl) (bool, error) {
 	res := &api.SuccessResponse{}
-	err := c.adminRequester.SendRequest("setLogLevel", &SetLogLevelArgs{
+	err := c.adminRequester.SendRequest(ctx, "setLogLevel", &SetLogLevelArgs{
 		Level: level.String(),
 	}, res)
 	return res.Success, err

@@ -187,29 +187,6 @@ func TestPartialBlockStorage(t *testing.T) {
 	}
 }
 
-// Tests block total difficulty storage and retrieval operations.
-func TestTdStorage(t *testing.T) {
-	db := NewMemoryDatabase()
-
-	// Create a test TD to move around the database and make sure it's really new
-	hash, td := common.Hash{}, big.NewInt(314)
-	if entry := ReadTd(db, hash, 0); entry != nil {
-		t.Fatalf("Non existent TD returned: %v", entry)
-	}
-	// Write and verify the TD in the database
-	WriteTd(db, hash, 0, td)
-	if entry := ReadTd(db, hash, 0); entry == nil {
-		t.Fatalf("Stored TD not found")
-	} else if entry.Cmp(td) != 0 {
-		t.Fatalf("Retrieved TD mismatch: have %v, want %v", entry, td)
-	}
-	// Delete the TD and verify the execution
-	DeleteTd(db, hash, 0)
-	if entry := ReadTd(db, hash, 0); entry != nil {
-		t.Fatalf("Deleted TD returned: %v", entry)
-	}
-}
-
 // Tests that canonical numbers can be mapped to hashes and retrieved.
 func TestCanonicalMappingStorage(t *testing.T) {
 	db := NewMemoryDatabase()
@@ -239,7 +216,6 @@ func TestHeadStorage(t *testing.T) {
 
 	blockHead := types.NewBlockWithHeader(&types.Header{Extra: []byte("test block header")})
 	blockFull := types.NewBlockWithHeader(&types.Header{Extra: []byte("test block full")})
-	blockFast := types.NewBlockWithHeader(&types.Header{Extra: []byte("test block fast")})
 
 	// Check that no head entries are in a pristine database
 	if entry := ReadHeadHeaderHash(db); entry != (common.Hash{}) {
@@ -248,13 +224,9 @@ func TestHeadStorage(t *testing.T) {
 	if entry := ReadHeadBlockHash(db); entry != (common.Hash{}) {
 		t.Fatalf("Non head block entry returned: %v", entry)
 	}
-	if entry := ReadHeadFastBlockHash(db); entry != (common.Hash{}) {
-		t.Fatalf("Non fast head block entry returned: %v", entry)
-	}
 	// Assign separate entries for the head header and block
 	WriteHeadHeaderHash(db, blockHead.Hash())
 	WriteHeadBlockHash(db, blockFull.Hash())
-	WriteHeadFastBlockHash(db, blockFast.Hash())
 
 	// Check that both heads are present, and different (i.e. two heads maintained)
 	if entry := ReadHeadHeaderHash(db); entry != blockHead.Hash() {
@@ -262,9 +234,6 @@ func TestHeadStorage(t *testing.T) {
 	}
 	if entry := ReadHeadBlockHash(db); entry != blockFull.Hash() {
 		t.Fatalf("Head block hash mismatch: have %v, want %v", entry, blockFull.Hash())
-	}
-	if entry := ReadHeadFastBlockHash(db); entry != blockFast.Hash() {
-		t.Fatalf("Fast head block hash mismatch: have %v, want %v", entry, blockFast.Hash())
 	}
 }
 
@@ -393,7 +362,6 @@ func TestCanonicalHashIteration(t *testing.T) {
 	// Fill database with testing data.
 	for i := uint64(1); i <= 8; i++ {
 		WriteCanonicalHash(db, common.Hash{}, i)
-		WriteTd(db, common.Hash{}, i, big.NewInt(10)) // Write some interferential data
 	}
 	for i, c := range cases {
 		numbers, _ := ReadAllCanonicalHashes(db, c.from, c.to, c.limit)

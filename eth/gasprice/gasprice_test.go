@@ -124,7 +124,7 @@ func newTestBackend(t *testing.T, config *params.ChainConfig, numBlocks int, gen
 		Alloc:  core.GenesisAlloc{addr: core.GenesisAccount{Balance: bal}},
 	}
 
-	engine := dummy.NewEngine()
+	engine := dummy.NewFaker()
 	db := rawdb.NewMemoryDatabase()
 	genesis := gspec.MustCommit(db)
 
@@ -389,6 +389,43 @@ func TestSuggestGasPricePreSubnetEVM(t *testing.T) {
 		b.SetCoinbase(common.Address{1})
 
 		signer := types.LatestSigner(params.TestPreSubnetEVMConfig)
+		gasPrice := big.NewInt(params.MinGasPrice)
+		for j := 0; j < 50; j++ {
+			tx := types.NewTx(&types.LegacyTx{
+				Nonce:    b.TxNonce(addr),
+				To:       &common.Address{},
+				Gas:      params.TxGas,
+				GasPrice: gasPrice,
+				Data:     []byte{},
+			})
+			tx, err := types.SignTx(tx, signer, key)
+			if err != nil {
+				t.Fatalf("failed to create tx: %s", err)
+			}
+			b.AddTx(tx)
+		}
+	})
+	oracle := NewOracle(backend, config)
+
+	_, err := oracle.SuggestPrice(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Regression test to ensure that SuggestPrice does not panic prior to activation of SubnetEVM
+// Note: support for gas estimation without activated hard forks has been deprecated, but we still
+// ensure that the call does not panic.
+func TestSuggestGasPricePreAP3(t *testing.T) {
+	config := Config{
+		Blocks:     20,
+		Percentile: 60,
+	}
+
+	backend := newTestBackend(t, params.TestChainConfig, 3, func(i int, b *core.BlockGen) {
+		b.SetCoinbase(common.Address{1})
+
+		signer := types.LatestSigner(params.TestChainConfig)
 		gasPrice := big.NewInt(params.MinGasPrice)
 		for j := 0; j < 50; j++ {
 			tx := types.NewTx(&types.LegacyTx{

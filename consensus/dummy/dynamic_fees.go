@@ -79,7 +79,6 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 			common.Big1,
 		)
 
-		// Gas price is increasing, so ensure it does not increase past the maximum
 		baseFee.Add(baseFee, baseFeeDelta)
 	} else {
 		// Otherwise if the parent block used less gas than its target, the baseFee should decrease.
