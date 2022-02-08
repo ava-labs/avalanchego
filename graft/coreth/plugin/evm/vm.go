@@ -19,6 +19,7 @@ import (
 
 	"github.com/ava-labs/coreth/plugin/evm/message"
 
+	avalanchegoMetrics "github.com/ava-labs/avalanchego/api/metrics"
 	coreth "github.com/ava-labs/coreth/chain"
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
@@ -448,11 +449,10 @@ func (vm *VM) Initialize(
 
 	// Register metered state if metrics are enabled
 	if metrics.Enabled {
-		registerer := prometheus.NewRegistry()
-		if err := ctx.Metrics.Register(registerer); err != nil {
-			return err
-		}
-		state, err := chain.NewMeteredState(registerer, &chain.Config{
+		multiGatherer := avalanchegoMetrics.NewMultiGatherer()
+
+		chainStateRegisterer := prometheus.NewRegistry()
+		state, err := chain.NewMeteredState(chainStateRegisterer, &chain.Config{
 			DecidedCacheSize:    decidedCacheSize,
 			MissingCacheSize:    missingCacheSize,
 			UnverifiedCacheSize: unverifiedCacheSize,
@@ -472,6 +472,20 @@ func (vm *VM) Initialize(
 			return err
 		}
 		vm.State = state
+
+		// Register the geth-based metrics
+		gatherer := corethPrometheus.Gatherer(metrics.DefaultRegistry)
+		if err := multiGatherer.Register("chainState", chainStateRegisterer); err != nil {
+			return err
+		}
+
+		// Register both metrics to [multiGatherer]
+		if err := multiGatherer.Register("", gatherer); err != nil {
+			return err
+		}
+		if err := ctx.Metrics.Register(multiGatherer); err != nil {
+			return err
+		}
 	} else {
 		vm.State = chain.NewState(&chain.Config{
 			DecidedCacheSize:    decidedCacheSize,
@@ -507,14 +521,6 @@ func (vm *VM) Initialize(
 	// if err := vm.pruneChain(); err != nil {
 	// 	return err
 	// }
-
-	// Only provide metrics if they are being populated.
-	if metrics.Enabled {
-		gatherer := corethPrometheus.Gatherer(metrics.DefaultRegistry)
-		if err := ctx.Metrics.Register(gatherer); err != nil {
-			return err
-		}
-	}
 
 	return vm.fx.Initialize(vm)
 }
