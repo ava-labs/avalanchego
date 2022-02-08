@@ -9,15 +9,33 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ Handler = NoopHandler{}
+var _ GossipHandler = NoopMempoolGossipHandler{}
 
-type Handler interface {
-	HandleTxs(nodeID ids.ShortID, requestID uint32, msg *Txs) error
+// GossipHandler handles incoming gossip messages
+type GossipHandler interface {
+	HandleTxs(nodeID ids.ShortID, msg *Txs) error
 }
 
-type NoopHandler struct{}
+type NoopMempoolGossipHandler struct{}
 
-func (NoopHandler) HandleTxs(nodeID ids.ShortID, requestID uint32, _ *Txs) error {
-	log.Debug("dropping unexpected EthTxs message", "peerID", nodeID, "requestID", requestID)
+func (NoopMempoolGossipHandler) HandleTxs(nodeID ids.ShortID, _ *Txs) error {
+	log.Debug("dropping unexpected Txs message", "peerID", nodeID)
 	return nil
+}
+
+// RequestHandler interface handles incoming requests from peers
+// Must have methods in format of handleType(context.Context, ids.ShortID, uint32, request Type) error
+// so that the Request object of relevant Type can invoke its respective handle method
+// on this struct.
+// Also see GossipHandler for implementation style.
+type RequestHandler interface{}
+
+// ResponseHandler handles response for a sent request
+// Only one of OnResponse or OnFailure is called for a given requestID, not both
+type ResponseHandler interface {
+	// OnResponse is invoked when the peer responded to a request
+	OnResponse(nodeID ids.ShortID, requestID uint32, response []byte) error
+	// OnFailure is invoked when there was a failure in processing a request
+	// The FailureReason outlines the underlying cause.
+	OnFailure(nodeID ids.ShortID, requestID uint32) error
 }

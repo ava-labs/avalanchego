@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,6 +23,8 @@ import (
 	"github.com/ava-labs/subnet-evm/metrics/prometheus"
 	"github.com/ava-labs/subnet-evm/node"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/peer"
+	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 
 	// Force-load tracer engine to trigger registration
 	//
@@ -38,6 +41,7 @@ import (
 
 	avalancheRPC "github.com/gorilla/rpc/v2"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -48,9 +52,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	cjson "github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -58,7 +62,10 @@ import (
 	avalancheJSON "github.com/ava-labs/avalanchego/utils/json"
 )
 
-var _ block.ChainVM = &VM{}
+var (
+	_ block.ChainVM              = &VM{}
+	_ block.HeightIndexedChainVM = &VM{}
+)
 
 const (
 	// Max time from current time allowed for blocks, before they're considered future blocks
@@ -79,9 +86,10 @@ const (
 
 var (
 	// Set last accepted key to be longer than the keys used to store accepted block IDs.
-	lastAcceptedKey = []byte("last_accepted_key")
-	acceptedPrefix  = []byte("snowman_accepted")
-	ethDBPrefix     = []byte("ethdb")
+	lastAcceptedKey        = []byte("last_accepted_key")
+	acceptedPrefix         = []byte("snowman_accepted")
+	ethDBPrefix            = []byte("ethdb")
+	pruneRejectedBlocksKey = []byte("pruned_rejected_blocks")
 )
 
 var (
@@ -92,6 +100,7 @@ var (
 	errUnclesUnsupported        = errors.New("uncles unsupported")
 	errTxHashMismatch           = errors.New("txs hash does not match header")
 	errUncleHashMismatch        = errors.New("uncle hash mismatch")
+	errRejectedParent           = errors.New("rejected parent")
 	errInvalidDifficulty        = errors.New("invalid difficulty")
 	errInvalidMixDigest         = errors.New("invalid mix digest")
 	errHeaderExtraDataTooBig    = errors.New("header extra data too big")
@@ -132,7 +141,7 @@ type VM struct {
 
 	builder *blockBuilder
 
-	network Network
+	gossiper Gossiper
 
 	clock mockable.Clock
 
@@ -142,15 +151,11 @@ type VM struct {
 	// Continuous Profiler
 	profiler profiler.ContinuousProfiler
 
+	peer.Network
+	client       peer.Client
+	networkCodec codec.Manager
+
 	bootstrapped bool
-}
-
-func (vm *VM) Connected(id ids.ShortID, nodeVersion version.Application) error {
-	return nil // noop
-}
-
-func (vm *VM) Disconnected(nodeID ids.ShortID) error {
-	return nil // noop
 }
 
 // setLogLevel sets the log level with the original [os.StdErr] interface along
@@ -250,6 +255,8 @@ func (vm *VM) Initialize(
 	ethConfig.Pruning = vm.config.Pruning
 	ethConfig.SnapshotAsync = vm.config.SnapshotAsync
 	ethConfig.SnapshotVerify = vm.config.SnapshotVerify
+
+	// Handle custom fee recipient
 	ethConfig.Miner.Etherbase = schain.BlackholeAddr
 	switch {
 	case common.IsHexAddress(vm.config.FeeRecipient):
@@ -262,6 +269,17 @@ func (vm *VM) Initialize(
 		return errors.New("cannot specify a custom fee recipient on this blockchain")
 	case g.Config.AllowFeeRecipients:
 		log.Warn("Chain enabled `AllowFeeRecipients`, but chain config has not specified any coinbase address. Defaulting to the blackhole address.")
+	}
+
+	// Handle offline pruning
+	ethConfig.OfflinePruning = vm.config.OfflinePruning
+	ethConfig.OfflinePruningBloomFilterSize = vm.config.OfflinePruningBloomFilterSize
+	ethConfig.OfflinePruningDataDirectory = vm.config.OfflinePruningDataDirectory
+	if len(ethConfig.OfflinePruningDataDirectory) != 0 {
+		if err := os.MkdirAll(ethConfig.OfflinePruningDataDirectory, perms.ReadWriteExecute); err != nil {
+			log.Error("failed to create offline pruning data directory", "error", err)
+			return err
+		}
 	}
 
 	vm.chainConfig = g.Config
@@ -299,8 +317,15 @@ func (vm *VM) Initialize(
 	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
 	vm.handleGasPriceUpdates()
 
-	// initialize new gossip network
-	vm.network = vm.NewNetwork(appSender)
+	vm.networkCodec, err = message.BuildCodec()
+	if err != nil {
+		return err
+	}
+
+	// initialize peer network
+	vm.Network = peer.NewNetwork(appSender, vm.networkCodec, ctx.NodeID, vm.config.MaxOutboundActiveRequests)
+	vm.client = peer.NewClient(vm.Network)
+	vm.initGossipHandling()
 
 	// start goroutines to manage block building
 	//
@@ -323,7 +348,7 @@ func (vm *VM) Initialize(
 			vm:       vm,
 			status:   choices.Accepted,
 		},
-		GetBlockIDAtHeight: vm.getBlockIDAtHeight,
+		GetBlockIDAtHeight: vm.GetBlockIDAtHeight,
 		GetBlock:           vm.getBlock,
 		UnmarshalBlock:     vm.parseBlock,
 		BuildBlock:         vm.buildBlock,
@@ -343,18 +368,51 @@ func (vm *VM) Initialize(
 	return nil
 }
 
-// Bootstrapping notifies this VM that the consensus engine is performing
-// bootstrapping
-func (vm *VM) Bootstrapping() error {
-	vm.bootstrapped = false
-	return nil
+func (vm *VM) initGossipHandling() {
+	if vm.chainConfig.SubnetEVMTimestamp != nil {
+		vm.gossiper = vm.newPushGossiper()
+		vm.Network.SetGossipHandler(NewGossipHandler(vm))
+	} else {
+		vm.gossiper = &noopGossiper{}
+		vm.Network.SetGossipHandler(message.NoopMempoolGossipHandler{})
+	}
 }
 
-// Bootstrapped notifies this VM that the consensus engine has finished
-// bootstrapping
-func (vm *VM) Bootstrapped() error {
-	vm.bootstrapped = true
-	return nil
+func (vm *VM) pruneChain() error {
+	if !vm.config.Pruning {
+		return nil
+	}
+	pruned, err := vm.db.Has(pruneRejectedBlocksKey)
+	if err != nil {
+		return fmt.Errorf("failed to check if the VM has pruned rejected blocks: %w", err)
+	}
+	if pruned {
+		return nil
+	}
+
+	lastAcceptedHeight := vm.LastAcceptedBlock().Height()
+	if err := vm.chain.RemoveRejectedBlocks(0, lastAcceptedHeight); err != nil {
+		return err
+	}
+	heightBytes := make([]byte, 8)
+	binary.PutUvarint(heightBytes, lastAcceptedHeight)
+	if err := vm.db.Put(pruneRejectedBlocksKey, heightBytes); err != nil {
+		return err
+	}
+	return vm.db.Commit()
+}
+
+func (vm *VM) SetState(state snow.State) error {
+	switch state {
+	case snow.Bootstrapping:
+		vm.bootstrapped = false
+		return nil
+	case snow.NormalOp:
+		vm.bootstrapped = true
+		return nil
+	default:
+		return snow.ErrUnknownState
+	}
 }
 
 // Shutdown implements the snowman.ChainVM interface
@@ -458,10 +516,15 @@ func (vm *VM) SetPreference(blkID ids.ID) error {
 	return vm.chain.SetPreference(block.(*Block).ethBlock)
 }
 
-// getBlockIDAtHeight retrieves the blkID of the canonical block at [blkHeight]
+func (vm *VM) VerifyHeightIndex() error {
+	// our index is vm.chain.GetBlockByNumber
+	return nil
+}
+
+// GetBlockIDAtHeight retrieves the blkID of the canonical block at [blkHeight]
 // if [blkHeight] is less than the height of the last accepted block, this will return
 // a canonical block. Otherwise, it may return a blkID that has not yet been accepted.
-func (vm *VM) getBlockIDAtHeight(blkHeight uint64) (ids.ID, error) {
+func (vm *VM) GetBlockIDAtHeight(blkHeight uint64) (ids.ID, error) {
 	ethBlock := vm.chain.GetBlockByNumber(blkHeight)
 	if ethBlock == nil {
 		return ids.ID{}, fmt.Errorf("could not find block at height: %d", blkHeight)
@@ -564,6 +627,39 @@ func (vm *VM) CreateStaticHandlers() (map[string]*commonEng.HTTPHandler, error) 
  *********************************** Helpers **********************************
  ******************************************************************************
  */
+
+// conflicts returns an error if [inputs] conflicts with any of the atomic inputs contained in [ancestor]
+// or any of its ancestor blocks going back to the last accepted block in its ancestry. If [ancestor] is
+// accepted, then nil will be returned immediately.
+// If the ancestry of [ancestor] cannot be fetched, then [errRejectedParent] may be returned.
+func (vm *VM) conflicts(inputs ids.Set, ancestor *Block) error {
+	for ancestor.Status() != choices.Accepted {
+		// Move up the chain.
+		nextAncestorID := ancestor.Parent()
+		// If the ancestor is unknown, then the parent failed
+		// verification when it was called.
+		// If the ancestor is rejected, then this block shouldn't be
+		// inserted into the canonical chain because the parent is
+		// will be missing.
+		// If the ancestor is processing, then the block may have
+		// been verified.
+		nextAncestorIntf, err := vm.GetBlockInternal(nextAncestorID)
+		if err != nil {
+			return errRejectedParent
+		}
+
+		if blkStatus := nextAncestorIntf.Status(); blkStatus == choices.Unknown || blkStatus == choices.Rejected {
+			return errRejectedParent
+		}
+		nextAncestor, ok := nextAncestorIntf.(*Block)
+		if !ok {
+			return fmt.Errorf("ancestor block %s had unexpected type %T", nextAncestor.ID(), nextAncestorIntf)
+		}
+		ancestor = nextAncestor
+	}
+
+	return nil
+}
 
 // GetCurrentNonce returns the nonce associated with the address at the
 // preferred block

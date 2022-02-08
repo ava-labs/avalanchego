@@ -211,17 +211,10 @@ func (oracle *Oracle) estimateNextBaseFee(ctx context.Context) (*big.Int, error)
 		return nil, nil
 	}
 
-	// If the current time is prior to the parent timestamp, then we use the parent
-	// timestamp instead.
-	header := block.Header()
-	timestamp := oracle.clock.Unix()
-	if timestamp < header.Time {
-		timestamp = header.Time
-	}
 	// If the block does have a baseFee, calculate the next base fee
 	// based on the current time and add it to the tip to estimate the
 	// total gas price estimate.
-	_, nextBaseFee, err := dummy.CalcBaseFee(oracle.backend.ChainConfig(), header, timestamp)
+	_, nextBaseFee, err := dummy.EstimateNextBaseFee(oracle.backend.ChainConfig(), block.Header(), oracle.clock.Unix())
 	return nextBaseFee, err
 }
 

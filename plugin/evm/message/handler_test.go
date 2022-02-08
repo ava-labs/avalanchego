@@ -12,11 +12,11 @@ import (
 )
 
 type CounterHandler struct {
-	EthTxs int
+	Txs int
 }
 
-func (h *CounterHandler) HandleTxs(ids.ShortID, uint32, *Txs) error {
-	h.EthTxs++
+func (h *CounterHandler) HandleTxs(ids.ShortID, *Txs) error {
+	h.Txs++
 	return nil
 }
 
@@ -26,16 +26,16 @@ func TestHandleTxs(t *testing.T) {
 	handler := CounterHandler{}
 	msg := Txs{}
 
-	err := msg.Handle(&handler, ids.ShortEmpty, 0)
+	err := msg.Handle(&handler, ids.ShortEmpty)
 	assert.NoError(err)
-	assert.Equal(1, handler.EthTxs)
+	assert.Equal(1, handler.Txs)
 }
 
 func TestNoopHandler(t *testing.T) {
 	assert := assert.New(t)
 
-	handler := NoopHandler{}
+	handler := NoopMempoolGossipHandler{}
 
-	err := handler.HandleTxs(ids.ShortEmpty, 0, nil)
+	err := handler.HandleTxs(ids.ShortEmpty, nil)
 	assert.NoError(err)
 }

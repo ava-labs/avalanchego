@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -178,7 +177,7 @@ func (g gatherer) Gather() ([]*dto.MetricFamily, error) {
 			})
 		}
 	}
-	log.Error("called", "names", names, "mfs", mfs)
+
 	return mfs, nil
 }
 

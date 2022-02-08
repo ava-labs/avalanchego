@@ -12,21 +12,23 @@ import (
 )
 
 const (
-	defaultPruningEnabled              = true
-	defaultSnapshotAsync               = true
-	defaultRpcGasCap                   = 50_000_000 // Default to 50M Gas Limit
-	defaultRpcTxFeeCap                 = 100        // 100 AVAX
-	defaultMetricsEnabled              = false
-	defaultMetricsExpensiveEnabled     = false
-	defaultApiMaxDuration              = 0 // Default to no maximum API call duration
-	defaultWsCpuRefillRate             = 0 // Default to no maximum WS CPU usage
-	defaultWsCpuMaxStored              = 0 // Default to no maximum WS CPU usage
-	defaultMaxBlocksPerRequest         = 0 // Default to no maximum on the number of blocks per getLogs request
-	defaultContinuousProfilerFrequency = 15 * time.Minute
-	defaultContinuousProfilerMaxFiles  = 5
-	defaultTxRegossipFrequency         = 1 * time.Minute
-	defaultTxRegossipMaxSize           = 15
-	defaultLogLevel                    = "info"
+	defaultPruningEnabled                       = true
+	defaultSnapshotAsync                        = true
+	defaultRpcGasCap                            = 50_000_000 // Default to 50M Gas Limit
+	defaultRpcTxFeeCap                          = 100        // 100 AVAX
+	defaultMetricsEnabled                       = true
+	defaultMetricsExpensiveEnabled              = false
+	defaultApiMaxDuration                       = 0 // Default to no maximum API call duration
+	defaultWsCpuRefillRate                      = 0 // Default to no maximum WS CPU usage
+	defaultWsCpuMaxStored                       = 0 // Default to no maximum WS CPU usage
+	defaultMaxBlocksPerRequest                  = 0 // Default to no maximum on the number of blocks per getLogs request
+	defaultContinuousProfilerFrequency          = 15 * time.Minute
+	defaultContinuousProfilerMaxFiles           = 5
+	defaultTxRegossipFrequency                  = 1 * time.Minute
+	defaultTxRegossipMaxSize                    = 15
+	defaultOfflinePruningBloomFilterSize uint64 = 512 // Default size (MB) for the offline pruner to use
+	defaultLogLevel                             = "info"
+	defaultMaxOutboundActiveRequests            = 8
 )
 
 var defaultEnabledAPIs = []string{
@@ -97,6 +99,14 @@ type Config struct {
 
 	// Address for Tx Fees (must be empty if not supported by blockchain)
 	FeeRecipient string `json:"feeRecipient"`
+
+	// Offline Pruning Settings
+	OfflinePruning                bool   `json:"offline-pruning-enabled"`
+	OfflinePruningBloomFilterSize uint64 `json:"offline-pruning-bloom-filter-size"`
+	OfflinePruningDataDirectory   string `json:"offline-pruning-data-directory"`
+
+	// VM2VM network
+	MaxOutboundActiveRequests int64 `json:"max-outbound-active-requests"`
 }
 
 // EthAPIs returns an array of strings representing the Eth APIs that should be enabled
@@ -124,7 +134,9 @@ func (c *Config) SetDefaults() {
 	c.SnapshotAsync = defaultSnapshotAsync
 	c.TxRegossipFrequency.Duration = defaultTxRegossipFrequency
 	c.TxRegossipMaxSize = defaultTxRegossipMaxSize
+	c.OfflinePruningBloomFilterSize = defaultOfflinePruningBloomFilterSize
 	c.LogLevel = defaultLogLevel
+	c.MaxOutboundActiveRequests = defaultMaxOutboundActiveRequests
 }
 
 func (d *Duration) UnmarshalJSON(data []byte) (err error) {

@@ -28,50 +28,50 @@ type ChainTest struct {
 }
 
 var tests = []ChainTest{
-	{
-		"InsertChainAcceptSingleBlock",
-		TestInsertChainAcceptSingleBlock,
-	},
-	{
-		"InsertForkedChain",
-		TestInsertLongForkedChain,
-	},
-	{
-		"AcceptNonCanonicalBlock",
-		TestAcceptNonCanonicalBlock,
-	},
-	{
-		"SetPreferenceRewind",
-		TestSetPreferenceRewind,
-	},
-	{
-		"BuildOnVariousStages",
-		TestBuildOnVariousStages,
-	},
+	// {
+	// 	"InsertChainAcceptSingleBlock",
+	// 	TestInsertChainAcceptSingleBlock,
+	// },
+	// {
+	// 	"InsertForkedChain",
+	// 	TestInsertLongForkedChain,
+	// },
+	// {
+	// 	"AcceptNonCanonicalBlock",
+	// 	TestAcceptNonCanonicalBlock,
+	// },
+	// {
+	// 	"SetPreferenceRewind",
+	// 	TestSetPreferenceRewind,
+	// },
+	// {
+	// 	"BuildOnVariousStages",
+	// 	TestBuildOnVariousStages,
+	// },
 	{
 		"EmptyBlocks",
 		TestEmptyBlocks,
 	},
-	{
-		"AcceptBlockIdenticalStateRoot",
-		TestAcceptBlockIdenticalStateRoot,
-	},
-	{
-		"ReprocessAcceptBlockIdenticalStateRoot",
-		TestReprocessAcceptBlockIdenticalStateRoot,
-	},
-	{
-		"GenerateChainInvalidBlockFee",
-		TestGenerateChainInvalidBlockFee,
-	},
-	{
-		"InsertChainInvalidBlockFee",
-		TestInsertChainInvalidBlockFee,
-	},
-	{
-		"InsertChainValidBlockFee",
-		TestInsertChainValidBlockFee,
-	},
+	// {
+	// 	"AcceptBlockIdenticalStateRoot",
+	// 	TestAcceptBlockIdenticalStateRoot,
+	// },
+	// {
+	// 	"ReprocessAcceptBlockIdenticalStateRoot",
+	// 	TestReprocessAcceptBlockIdenticalStateRoot,
+	// },
+	// {
+	// 	"GenerateChainInvalidBlockFee",
+	// 	TestGenerateChainInvalidBlockFee,
+	// },
+	// {
+	// 	"InsertChainInvalidBlockFee",
+	// 	TestInsertChainInvalidBlockFee,
+	// },
+	// {
+	// 	"InsertChainValidBlockFee",
+	// 	TestInsertChainValidBlockFee,
+	// },
 }
 
 func copyMemDB(db ethdb.Database) (ethdb.Database, error) {

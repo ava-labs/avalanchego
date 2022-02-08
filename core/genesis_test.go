@@ -31,7 +31,6 @@ import (
 	"math/big"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
@@ -57,23 +56,22 @@ func TestGenesisBlockForTesting(t *testing.T) {
 }
 
 func TestSetupGenesis(t *testing.T) {
+	preSubnetConfig := *params.TestPreSubnetEVMConfig
+	preSubnetConfig.SubnetEVMTimestamp = big.NewInt(100)
 	var (
 		customghash = common.HexToHash("0x89c99d90b79719238d2645c7642f2c9295246e80775b38cfd162b696817fbd50")
 		customg     = Genesis{
-			Config: &params.ChainConfig{
-				HomesteadBlock:     big.NewInt(0),
-				SubnetEVMTimestamp: big.NewInt(time.Date(2021, time.July, 31, 14, 0, 0, 0, time.UTC).Unix()),
-			},
+			Config: &preSubnetConfig,
 			Alloc: GenesisAlloc{
 				{1}: {Balance: big.NewInt(1), Storage: map[common.Hash]common.Hash{{1}: {1}}},
 			},
 		}
 		oldcustomg = customg
 	)
-	oldcustomg.Config = &params.ChainConfig{
-		HomesteadBlock:     big.NewInt(0),
-		SubnetEVMTimestamp: big.NewInt(time.Date(2021, time.March, 31, 14, 0, 0, 0, time.UTC).Unix()),
-	}
+
+	rollbackpreSubnetConfig := preSubnetConfig
+	rollbackpreSubnetConfig.SubnetEVMTimestamp = big.NewInt(90)
+	oldcustomg.Config = &rollbackpreSubnetConfig
 	tests := []struct {
 		name       string
 		fn         func(ethdb.Database) (*params.ChainConfig, common.Hash, error)
@@ -117,46 +115,53 @@ func TestSetupGenesis(t *testing.T) {
 			wantConfig: customg.Config,
 		},
 		{
-			name: "incompatible config in DB",
+			name: "incompatible config for avalanche fork in DB",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
+				// Commit the 'old' genesis block with SubnetEVM transition at 90.
+				// Advance to block #4, past the SubnetEVM transition block of customg.
 				genesis := oldcustomg.MustCommit(db)
+
 				bc, _ := NewBlockChain(db, DefaultCacheConfig, oldcustomg.Config, dummy.NewFullFaker(), vm.Config{}, common.Hash{})
 				defer bc.Stop()
-				blocks, _, _ := GenerateChain(oldcustomg.Config, genesis, dummy.NewFaker(), db, 4, 10, nil)
+
+				blocks, _, _ := GenerateChain(oldcustomg.Config, genesis, dummy.NewFullFaker(), db, 4, 25, nil)
 				bc.InsertChain(blocks)
 				bc.CurrentBlock()
+				// This should return a compatibility error.
 				return setupGenesisBlock(db, &customg)
 			},
 			wantHash:   customghash,
 			wantConfig: customg.Config,
 			wantErr: &params.ConfigCompatError{
-				What:         "SubnetEVM fork block",
-				StoredConfig: big.NewInt(1617199200),
-				NewConfig:    big.NewInt(1627740000),
-				RewindTo:     1617199199,
+				What:         "SubnetEVM fork block timestamp",
+				StoredConfig: big.NewInt(90),
+				NewConfig:    big.NewInt(100),
+				RewindTo:     89,
 			},
 		},
 	}
 
 	for _, test := range tests {
-		db := rawdb.NewMemoryDatabase()
-		config, hash, err := test.fn(db)
-		// Check the return values.
-		if !reflect.DeepEqual(err, test.wantErr) {
-			spew := spew.ConfigState{DisablePointerAddresses: true, DisableCapacities: true}
-			t.Errorf("%s: returned error %#v, want %#v", test.name, spew.NewFormatter(err), spew.NewFormatter(test.wantErr))
-		}
-		if !reflect.DeepEqual(config, test.wantConfig) {
-			t.Errorf("%s:\nreturned %v\nwant     %v", test.name, config, test.wantConfig)
-		}
-		if hash != test.wantHash {
-			t.Errorf("%s: returned hash %s, want %s", test.name, hash.Hex(), test.wantHash.Hex())
-		} else if err == nil {
-			// Check database content.
-			stored := rawdb.ReadBlock(db, test.wantHash, 0)
-			if stored.Hash() != test.wantHash {
-				t.Errorf("%s: block in DB has hash %s, want %s", test.name, stored.Hash(), test.wantHash)
+		t.Run(test.name, func(t *testing.T) {
+			db := rawdb.NewMemoryDatabase()
+			config, hash, err := test.fn(db)
+			// Check the return values.
+			if !reflect.DeepEqual(err, test.wantErr) {
+				spew := spew.ConfigState{DisablePointerAddresses: true, DisableCapacities: true}
+				t.Errorf("returned error %#v, want %#v", spew.NewFormatter(err), spew.NewFormatter(test.wantErr))
 			}
-		}
+			if !reflect.DeepEqual(config, test.wantConfig) {
+				t.Errorf("returned %v\nwant     %v", config, test.wantConfig)
+			}
+			if hash != test.wantHash {
+				t.Errorf("returned hash %s, want %s", hash.Hex(), test.wantHash.Hex())
+			} else if err == nil {
+				// Check database content.
+				stored := rawdb.ReadBlock(db, test.wantHash, 0)
+				if stored.Hash() != test.wantHash {
+					t.Errorf("block in DB has hash %s, want %s", stored.Hash(), test.wantHash)
+				}
+			}
+		})
 	}
 }

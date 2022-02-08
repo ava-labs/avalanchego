@@ -79,18 +79,29 @@ func init() {
 	genesisBalance = new(big.Int).Mul(big.NewInt(testMinGasPrice), big.NewInt(21000*1000))
 }
 
+func fundGenesis(genesisJSON string) (string, error) {
+	genesis := &core.Genesis{}
+	if err := json.Unmarshal([]byte(genesisJSON), genesis); err != nil {
+		return "", fmt.Errorf("Problem unmarshaling genesis JSON: %s", err)
+	}
+
+	// add test allocs
+	genesis.Alloc = core.GenesisAlloc{
+		testEthAddrs[0]: core.GenesisAccount{Balance: genesisBalance},
+		testEthAddrs[1]: core.GenesisAccount{Balance: genesisBalance},
+	}
+
+	bytes, err := json.Marshal(genesis)
+	return string(bytes), err
+}
+
 // BuildGenesisTest returns the genesis bytes for Subnet EVM VM to be used in testing
-func BuildGenesisTestWithAlloc(t *testing.T, genesisJSON string) []byte {
+func buildGenesisTest(t *testing.T, genesisJSON string) []byte {
 	ss := CreateStaticService()
 
 	genesis := &core.Genesis{}
 	if err := json.Unmarshal([]byte(genesisJSON), genesis); err != nil {
 		t.Fatalf("Problem unmarshaling genesis JSON: %s", err)
-	}
-	// add test allocs
-	genesis.Alloc = core.GenesisAlloc{
-		testEthAddrs[0]: core.GenesisAccount{Balance: genesisBalance},
-		testEthAddrs[1]: core.GenesisAccount{Balance: genesisBalance},
 	}
 	args := &BuildGenesisArgs{GenesisData: genesis}
 	reply := &BuildGenesisReply{}
@@ -144,7 +155,7 @@ func setupGenesis(t *testing.T,
 	manager.Manager,
 	[]byte,
 	chan engCommon.Message) {
-	genesisBytes := BuildGenesisTestWithAlloc(t, genesisJSON)
+	genesisBytes := buildGenesisTest(t, genesisJSON)
 	ctx := NewContext()
 
 	baseDBManager := manager.NewMemDB(version.NewDefaultVersion(1, 4, 5))
@@ -193,8 +204,8 @@ func GenesisVM(t *testing.T,
 	}
 
 	if finishBootstrapping {
-		assert.NoError(t, vm.Bootstrapping())
-		assert.NoError(t, vm.Bootstrapped())
+		assert.NoError(t, vm.SetState(snow.Bootstrapping))
+		assert.NoError(t, vm.SetState(snow.NormalOp))
 	}
 
 	return issuer, vm, dbManager, appSender
@@ -324,7 +335,9 @@ func TestVMUpgrades(t *testing.T) {
 
 func TestBuildEthTxBlock(t *testing.T) {
 	// reduce block gas cost
-	issuer, vm, dbManager, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "{\"pruning-enabled\":true}", "")
+	genesisString, err := fundGenesis(genesisJSONSubnetEVM)
+	assert.NoError(t, err)
+	issuer, vm, dbManager, _ := GenesisVM(t, true, genesisString, "{\"pruning-enabled\":true}", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -463,7 +476,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 	}
 
 	restartedVM := &VM{}
-	genesisBytes := BuildGenesisTestWithAlloc(t, genesisJSONSubnetEVM)
+	genesisBytes := buildGenesisTest(t, genesisString)
 
 	if err := restartedVM.Initialize(
 		NewContext(),
@@ -502,8 +515,10 @@ func TestBuildEthTxBlock(t *testing.T) {
 func TestSetPreferenceRace(t *testing.T) {
 	// Create two VMs which will agree on block A and then
 	// build the two distinct preferred chains above
-	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "{\"pruning-enabled\":true}", "")
-	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "{\"pruning-enabled\":true}", "")
+	genesisString, err := fundGenesis(genesisJSONMuirGlacier)
+	assert.NoError(t, err)
+	issuer1, vm1, _, _ := GenesisVM(t, true, genesisString, "{\"pruning-enabled\":true}", "")
+	issuer2, vm2, _, _ := GenesisVM(t, true, genesisString, "{\"pruning-enabled\":true}", "")
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
@@ -757,8 +772,10 @@ func TestSetPreferenceRace(t *testing.T) {
 // accept block C, which should be an orphaned block at this point and
 // get rejected.
 func TestReorgProtection(t *testing.T) {
-	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "{\"pruning-enabled\":false}", "")
-	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "{\"pruning-enabled\":false}", "")
+	genesisString, err := fundGenesis(genesisJSONMuirGlacier)
+	assert.NoError(t, err)
+	issuer1, vm1, _, _ := GenesisVM(t, true, genesisString, "{\"pruning-enabled\":false}", "")
+	issuer2, vm2, _, _ := GenesisVM(t, true, genesisString, "{\"pruning-enabled\":false}", "")
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
@@ -939,8 +956,10 @@ func TestReorgProtection(t *testing.T) {
 //  / \
 // B   C
 func TestNonCanonicalAccept(t *testing.T) {
-	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
-	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
+	genesisString, err := fundGenesis(genesisJSONMuirGlacier)
+	assert.NoError(t, err)
+	issuer1, vm1, _, _ := GenesisVM(t, true, genesisString, "", "")
+	issuer2, vm2, _, _ := GenesisVM(t, true, genesisString, "", "")
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
@@ -1114,8 +1133,10 @@ func TestNonCanonicalAccept(t *testing.T) {
 //     |
 //     D
 func TestStickyPreference(t *testing.T) {
-	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
-	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
+	genesisString, err := fundGenesis(genesisJSONMuirGlacier)
+	assert.NoError(t, err)
+	issuer1, vm1, _, _ := GenesisVM(t, true, genesisString, "", "")
+	issuer2, vm2, _, _ := GenesisVM(t, true, genesisString, "", "")
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
@@ -1388,8 +1409,10 @@ func TestStickyPreference(t *testing.T) {
 //     |
 //     D
 func TestUncleBlock(t *testing.T) {
-	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
-	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
+	genesisString, err := fundGenesis(genesisJSONMuirGlacier)
+	assert.NoError(t, err)
+	issuer1, vm1, _, _ := GenesisVM(t, true, genesisString, "", "")
+	issuer2, vm2, _, _ := GenesisVM(t, true, genesisString, "", "")
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
@@ -1585,7 +1608,9 @@ func TestUncleBlock(t *testing.T) {
 // Regression test to ensure that a VM that is not able to parse a block that
 // contains no transactions.
 func TestEmptyBlock(t *testing.T) {
-	issuer, vm, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
+	genesisString, err := fundGenesis(genesisJSONMuirGlacier)
+	assert.NoError(t, err)
+	issuer, vm, _, _ := GenesisVM(t, true, genesisString, "", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1651,8 +1676,10 @@ func TestEmptyBlock(t *testing.T) {
 //     |
 //     D
 func TestAcceptReorg(t *testing.T) {
-	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
-	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
+	genesisString, err := fundGenesis(genesisJSONMuirGlacier)
+	assert.NoError(t, err)
+	issuer1, vm1, _, _ := GenesisVM(t, true, genesisString, "", "")
+	issuer2, vm2, _, _ := GenesisVM(t, true, genesisString, "", "")
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
@@ -1863,7 +1890,9 @@ func TestAcceptReorg(t *testing.T) {
 }
 
 func TestFutureBlock(t *testing.T) {
-	issuer, vm, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
+	genesisString, err := fundGenesis(genesisJSONMuirGlacier)
+	assert.NoError(t, err)
+	issuer, vm, _, _ := GenesisVM(t, true, genesisString, "", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1926,7 +1955,9 @@ func TestFutureBlock(t *testing.T) {
 }
 
 func TestLastAcceptedBlockNumberAllow(t *testing.T) {
-	issuer, vm, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
+	genesisString, err := fundGenesis(genesisJSONMuirGlacier)
+	assert.NoError(t, err)
+	issuer, vm, _, _ := GenesisVM(t, true, genesisString, "", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -2070,7 +2101,9 @@ func TestConfigureLogLevel(t *testing.T) {
 // Regression test to ensure we can build blocks if we are starting with the
 // Subnet EVM ruleset in genesis.
 func TestBuildSubnetEVMBlock(t *testing.T) {
-	issuer, vm, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
+	genesisString, err := fundGenesis(genesisJSONSubnetEVM)
+	assert.NoError(t, err)
+	issuer, vm, _, _ := GenesisVM(t, true, genesisString, "", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
