@@ -280,7 +280,7 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 		return vm.ChainVM.SetPreference(preferred)
 	}
 
-	if err := vm.ChainVM.SetPreference(blk.GetInnerBlk().ID()); err != nil {
+	if err := vm.ChainVM.SetPreference(blk.getInnerBlk().ID()); err != nil {
 		return err
 	}
 
@@ -351,7 +351,7 @@ func (vm *VM) repairAcceptedChain() error {
 			return err
 		}
 
-		shouldBeAccepted := lastAccepted.GetInnerBlk()
+		shouldBeAccepted := lastAccepted.getInnerBlk()
 
 		// If the inner block is accepted, then we don't need to revert any more
 		// blocks.
@@ -543,7 +543,7 @@ func (vm *VM) verifyAndRecordInnerBlk(postFork PostForkBlock) error {
 	// Note that if [innerBlk.Verify] returns nil, this method returns nil. This
 	// must always remain the case to maintain the inner block's invariant that
 	// if it's Verify() returns nil, it is eventually accepted or rejected.
-	currentInnerBlk := postFork.GetInnerBlk()
+	currentInnerBlk := postFork.getInnerBlk()
 	if originalInnerBlk, contains := vm.Tree.Get(currentInnerBlk); !contains {
 		if err := currentInnerBlk.Verify(); err != nil {
 			return err

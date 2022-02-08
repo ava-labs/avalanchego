@@ -6,6 +6,7 @@ package indexer
 import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
 // BlockServer represents all requests heightIndexer can issue
@@ -13,5 +14,7 @@ import (
 type BlockServer interface {
 	versiondb.Commitable
 
-	GetWrappingBlk(blkID ids.ID) (WrappingBlock, error)
+	// Note: this is a contention heavy call that should be avoided
+	// for frequent/repeated indexer ops
+	GetFullPostForkBlock(blkID ids.ID) (snowman.Block, error)
 }

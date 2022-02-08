@@ -16,85 +16,59 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 	"github.com/stretchr/testify/assert"
-)
-
-var (
-	genesisUnixTimestamp int64 = 1000
-	genesisTimestamp           = time.Unix(genesisUnixTimestamp, 0)
 )
 
 func TestHeightBlockIndexPostFork(t *testing.T) {
 	assert := assert.New(t)
 
-	// Build a chain of wrapping blocks, representing post fork blocks
-	innerBlkID := ids.Empty.Prefix(0)
-	innerGenBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     innerBlkID,
-			StatusV: choices.Accepted,
-		},
-		HeightV:    0,
-		TimestampV: genesisTimestamp,
-		BytesV:     []byte{0},
-	}
+	db := memdb.New()
+	vdb := versiondb.New(db)
+	storedState := state.New(vdb)
 
+	// Build a chain of post fork blocks
 	var (
-		blkNumber    = uint64(10)
-		lastInnerBlk = snowman.Block(innerGenBlk)
-		lastProBlk   = snowman.Block(innerGenBlk)
-		innerBlks    = make(map[ids.ID]snowman.Block)
-		proBlks      = make(map[ids.ID]WrappingBlock)
+		blkNumber = uint64(10)
+		lastBlkID = ids.Empty.Prefix(0) // initially set to a dummyGenesisID
+		proBlks   = make(map[ids.ID]snowman.Block)
 	)
-	innerBlks[innerGenBlk.ID()] = innerGenBlk
 
 	for blkHeight := uint64(1); blkHeight <= blkNumber; blkHeight++ {
-		// build inner block
-		innerBlkID = ids.Empty.Prefix(blkHeight)
-		innerBlk := &snowman.TestBlock{
+		blockBytes := ids.Empty.Prefix(blkHeight + blkNumber + 1)
+		dummyTS := time.Time{}
+		dummyPCH := uint64(2022)
+
+		// store postForkStatelessBlk in State ...
+		postForkStatelessBlk, err := block.BuildUnsigned(
+			lastBlkID,
+			dummyTS,
+			dummyPCH,
+			blockBytes[:],
+		)
+		assert.NoError(err)
+		assert.NoError(storedState.PutBlock(postForkStatelessBlk, choices.Accepted))
+
+		// ... and create a corresponding test block just for block server
+		postForkBlk := &snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
-				IDV:     innerBlkID,
+				IDV:     postForkStatelessBlk.ID(),
 				StatusV: choices.Accepted,
 			},
-			BytesV:  []byte{uint8(blkHeight)},
-			ParentV: lastInnerBlk.ID(),
 			HeightV: blkHeight,
 		}
-		innerBlks[innerBlk.ID()] = innerBlk
-		lastInnerBlk = innerBlk
-
-		// build wrapping post fork block
-		wrappingID := ids.Empty.Prefix(blkHeight + blkNumber + 1)
-		postForkBlk := &TestWrappingBlock{
-			TestBlock: &snowman.TestBlock{
-				TestDecidable: choices.TestDecidable{
-					IDV:     wrappingID,
-					StatusV: choices.Accepted,
-				},
-				BytesV:  wrappingID[:],
-				ParentV: lastProBlk.ID(),
-				HeightV: lastInnerBlk.Height(),
-			},
-			innerBlk: innerBlk,
-		}
 		proBlks[postForkBlk.ID()] = postForkBlk
-		lastProBlk = postForkBlk
+
+		lastBlkID = postForkStatelessBlk.ID()
 	}
 
 	blkSrv := &TestBlockServer{
-		CantGetWrappingBlk: true,
-		CantCommit:         true,
+		CantGetFullPostForkBlock: true,
+		CantCommit:               true,
 
-		GetWrappingBlkF: func(blkID ids.ID) (WrappingBlock, error) {
+		GetFullPostForkBlockF: func(blkID ids.ID) (snowman.Block, error) {
 			blk, found := proBlks[blkID]
-			if !found {
-				return nil, database.ErrNotFound
-			}
-			return blk, nil
-		},
-		GetInnerBlkF: func(id ids.ID) (snowman.Block, error) {
-			blk, found := innerBlks[id]
 			if !found {
 				return nil, database.ErrNotFound
 			}
@@ -103,9 +77,6 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 		CommitF: func() error { return nil },
 	}
 
-	db := memdb.New()
-	vdb := versiondb.New(db)
-	storedState := state.NewHeightIndex(vdb, vdb)
 	hIndex := newHeightIndexer(blkSrv,
 		logging.NoLog{},
 		storedState,
@@ -113,7 +84,7 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 	hIndex.commitFrequency = 0 // commit each block
 
 	// checkpoint last accepted block and show the whole chain in reindexed
-	assert.NoError(hIndex.indexState.SetCheckpoint(lastProBlk.ID()))
+	assert.NoError(hIndex.state.SetCheckpoint(lastBlkID))
 	assert.NoError(hIndex.RepairHeightIndex(context.Background()))
 	assert.True(hIndex.IsRepaired())
 
@@ -130,90 +101,52 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 func TestHeightBlockIndexAcrossFork(t *testing.T) {
 	assert := assert.New(t)
 
-	// Build a chain of non-wrapping and wrapping blocks, representing pre and post fork blocks
-	innerBlkID := ids.Empty.Prefix(0)
-	innerGenBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     innerBlkID,
-			StatusV: choices.Accepted,
-		},
-		HeightV:    0,
-		TimestampV: genesisTimestamp,
-		BytesV:     []byte{0},
-	}
+	db := memdb.New()
+	vdb := versiondb.New(db)
+	storedState := state.New(vdb)
 
+	// Build a chain of post fork blocks
 	var (
-		blkNumber    = uint64(10)
-		forkHeight   = blkNumber / 2
-		lastInnerBlk = snowman.Block(innerGenBlk)
-		lastProBlk   = snowman.Block(innerGenBlk)
-		innerBlks    = make(map[ids.ID]snowman.Block)
-		proBlks      = make(map[ids.ID]WrappingBlock)
+		blkNumber  = uint64(10)
+		forkHeight = blkNumber / 2
+		lastBlkID  = ids.Empty.Prefix(0) // initially set to a last pre fork blk
+		proBlks    = make(map[ids.ID]snowman.Block)
 	)
-	innerBlks[innerGenBlk.ID()] = innerGenBlk
-
-	for blkHeight := uint64(1); blkHeight < forkHeight; blkHeight++ {
-		// build inner block
-		innerBlkID = ids.Empty.Prefix(blkHeight)
-		innerBlk := &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     innerBlkID,
-				StatusV: choices.Accepted,
-			},
-			BytesV:  []byte{uint8(blkHeight)},
-			ParentV: lastInnerBlk.ID(),
-			HeightV: blkHeight,
-		}
-		innerBlks[innerBlk.ID()] = innerBlk
-		lastInnerBlk = innerBlk
-	}
 
 	for blkHeight := forkHeight; blkHeight <= blkNumber; blkHeight++ {
-		// build inner block
-		innerBlkID = ids.Empty.Prefix(blkHeight)
-		innerBlk := &snowman.TestBlock{
+		blockBytes := ids.Empty.Prefix(blkHeight + blkNumber + 1)
+		dummyTS := time.Time{}
+		dummyPCH := uint64(2022)
+
+		// store postForkStatelessBlk in State ...
+		postForkStatelessBlk, err := block.BuildUnsigned(
+			lastBlkID,
+			dummyTS,
+			dummyPCH,
+			blockBytes[:],
+		)
+		assert.NoError(err)
+		assert.NoError(storedState.PutBlock(postForkStatelessBlk, choices.Accepted))
+
+		// ... and create a corresponding test block just for block server
+		postForkBlk := &snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
-				IDV:     innerBlkID,
+				IDV:     postForkStatelessBlk.ID(),
 				StatusV: choices.Accepted,
 			},
-			BytesV:  []byte{uint8(blkHeight)},
-			ParentV: lastInnerBlk.ID(),
 			HeightV: blkHeight,
 		}
-		innerBlks[innerBlk.ID()] = innerBlk
-		lastInnerBlk = innerBlk
-
-		// build wrapping post fork block
-		wrappingID := ids.Empty.Prefix(blkHeight + blkNumber + 1)
-		postForkBlk := &TestWrappingBlock{
-			TestBlock: &snowman.TestBlock{
-				TestDecidable: choices.TestDecidable{
-					IDV:     wrappingID,
-					StatusV: choices.Accepted,
-				},
-				BytesV:  wrappingID[:],
-				ParentV: lastProBlk.ID(),
-				HeightV: lastInnerBlk.Height(),
-			},
-			innerBlk: innerBlk,
-		}
 		proBlks[postForkBlk.ID()] = postForkBlk
-		lastProBlk = postForkBlk
+
+		lastBlkID = postForkStatelessBlk.ID()
 	}
 
 	blkSrv := &TestBlockServer{
-		CantGetWrappingBlk: true,
-		CantCommit:         true,
+		CantGetFullPostForkBlock: true,
+		CantCommit:               true,
 
-		GetWrappingBlkF: func(blkID ids.ID) (WrappingBlock, error) {
+		GetFullPostForkBlockF: func(blkID ids.ID) (snowman.Block, error) {
 			blk, found := proBlks[blkID]
-			if !found {
-				return nil, database.ErrNotFound
-			}
-			return blk, nil
-		},
-		GetInnerBlkF: func(id ids.ID) (snowman.Block, error) {
-			blk, found := innerBlks[id]
 			if !found {
 				return nil, database.ErrNotFound
 			}
@@ -222,9 +155,6 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 		CommitF: func() error { return nil },
 	}
 
-	db := memdb.New()
-	vdb := versiondb.New(db)
-	storedState := state.NewHeightIndex(vdb, vdb)
 	hIndex := newHeightIndexer(blkSrv,
 		logging.NoLog{},
 		storedState,
@@ -232,7 +162,7 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 	hIndex.commitFrequency = 0 // commit each block
 
 	// checkpoint last accepted block and show the whole chain in reindexed
-	assert.NoError(hIndex.indexState.SetCheckpoint(lastProBlk.ID()))
+	assert.NoError(hIndex.state.SetCheckpoint(lastBlkID))
 	assert.NoError(hIndex.RepairHeightIndex(context.Background()))
 	assert.True(hIndex.IsRepaired())
 
@@ -253,92 +183,52 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 	assert := assert.New(t)
 
-	// Build a chain of non-wrapping and wrapping blocks, representing pre and post fork blocks
-	innerBlkID := ids.Empty.Prefix(0)
-	innerGenBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     innerBlkID,
-			StatusV: choices.Accepted,
-		},
-		HeightV:    0,
-		TimestampV: genesisTimestamp,
-		BytesV:     []byte{0},
-	}
+	db := memdb.New()
+	vdb := versiondb.New(db)
+	storedState := state.New(vdb)
 
+	// Build a chain of post fork blocks
 	var (
 		blkNumber  = uint64(10)
 		forkHeight = blkNumber / 2
-
-		lastInnerBlk = snowman.Block(innerGenBlk)
-		lastProBlk   = snowman.Block(innerGenBlk)
-
-		innerBlks = make(map[ids.ID]snowman.Block)
-		proBlks   = make(map[ids.ID]WrappingBlock)
+		lastBlkID  = ids.Empty.Prefix(0) // initially set to a last pre fork blk
+		proBlks    = make(map[ids.ID]snowman.Block)
 	)
-	innerBlks[innerGenBlk.ID()] = innerGenBlk
-
-	for blkHeight := uint64(1); blkHeight < forkHeight; blkHeight++ {
-		// build inner block
-		innerBlkID = ids.Empty.Prefix(blkHeight)
-		innerBlk := &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     innerBlkID,
-				StatusV: choices.Accepted,
-			},
-			BytesV:  []byte{uint8(blkHeight)},
-			ParentV: lastInnerBlk.ID(),
-			HeightV: blkHeight,
-		}
-		innerBlks[innerBlk.ID()] = innerBlk
-		lastInnerBlk = innerBlk
-	}
 
 	for blkHeight := forkHeight; blkHeight <= blkNumber; blkHeight++ {
-		// build inner block
-		innerBlkID = ids.Empty.Prefix(blkHeight)
-		innerBlk := &snowman.TestBlock{
+		blockBytes := ids.Empty.Prefix(blkHeight + blkNumber + 1)
+		dummyTS := time.Time{}
+		dummyPCH := uint64(2022)
+
+		// store postForkStatelessBlk in State ...
+		postForkStatelessBlk, err := block.BuildUnsigned(
+			lastBlkID,
+			dummyTS,
+			dummyPCH,
+			blockBytes[:],
+		)
+		assert.NoError(err)
+		assert.NoError(storedState.PutBlock(postForkStatelessBlk, choices.Accepted))
+
+		// ... and create a corresponding test block just for block server
+		postForkBlk := &snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
-				IDV:     innerBlkID,
+				IDV:     postForkStatelessBlk.ID(),
 				StatusV: choices.Accepted,
 			},
-			BytesV:  []byte{uint8(blkHeight)},
-			ParentV: lastInnerBlk.ID(),
 			HeightV: blkHeight,
 		}
-		innerBlks[innerBlk.ID()] = innerBlk
-		lastInnerBlk = innerBlk
-
-		// build wrapping post fork block
-		wrappingID := ids.Empty.Prefix(blkHeight + blkNumber + 1)
-		postForkBlk := &TestWrappingBlock{
-			TestBlock: &snowman.TestBlock{
-				TestDecidable: choices.TestDecidable{
-					IDV:     wrappingID,
-					StatusV: choices.Accepted,
-				},
-				BytesV:  wrappingID[:],
-				ParentV: lastProBlk.ID(),
-				HeightV: lastInnerBlk.Height(),
-			},
-			innerBlk: innerBlk,
-		}
 		proBlks[postForkBlk.ID()] = postForkBlk
-		lastProBlk = postForkBlk
+
+		lastBlkID = postForkStatelessBlk.ID()
 	}
 
 	blkSrv := &TestBlockServer{
-		CantGetWrappingBlk: true,
-		CantCommit:         true,
+		CantGetFullPostForkBlock: true,
+		CantCommit:               true,
 
-		GetWrappingBlkF: func(blkID ids.ID) (WrappingBlock, error) {
+		GetFullPostForkBlockF: func(blkID ids.ID) (snowman.Block, error) {
 			blk, found := proBlks[blkID]
-			if !found {
-				return nil, database.ErrNotFound
-			}
-			return blk, nil
-		},
-		GetInnerBlkF: func(id ids.ID) (snowman.Block, error) {
-			blk, found := innerBlks[id]
 			if !found {
 				return nil, database.ErrNotFound
 			}
@@ -347,9 +237,6 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 		CommitF: func() error { return nil },
 	}
 
-	db := memdb.New()
-	vdb := versiondb.New(db)
-	storedState := state.NewHeightIndex(vdb, vdb)
 	hIndex := newHeightIndexer(blkSrv,
 		logging.NoLog{},
 		storedState,
@@ -358,14 +245,14 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 
 	// pick a random block in the chain and checkpoint it;...
 	rndPostForkHeight := rand.Intn(int(blkNumber-forkHeight)) + int(forkHeight) // #nosec G404
-	var checkpointBlk WrappingBlock
+	var checkpointBlk snowman.Block
 	for _, blk := range proBlks {
 		if blk.Height() != uint64(rndPostForkHeight) {
 			continue // not the blk we are looking for
 		}
 
 		checkpointBlk = blk
-		assert.NoError(hIndex.indexState.SetCheckpoint(checkpointBlk.ID()))
+		assert.NoError(hIndex.state.SetCheckpoint(checkpointBlk.ID()))
 		break
 	}
 

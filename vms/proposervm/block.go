@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
-	"github.com/ava-labs/avalanchego/vms/proposervm/indexer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
@@ -34,7 +33,9 @@ var (
 )
 
 type Block interface {
-	indexer.WrappingBlock
+	snowman.Block
+
+	getInnerBlk() snowman.Block
 
 	verifyPreForkChild(child *preForkBlock) error
 	verifyPostForkChild(child *postForkBlock) error
@@ -230,7 +231,7 @@ func (p *postForkCommonComponents) buildChild(
 	return child, nil
 }
 
-func (p *postForkCommonComponents) GetInnerBlk() snowman.Block {
+func (p *postForkCommonComponents) getInnerBlk() snowman.Block {
 	return p.innerBlk
 }
 
