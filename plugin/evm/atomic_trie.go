@@ -29,7 +29,7 @@ const (
 
 var (
 	lastCommittedKey             = []byte("atomicTrieLastCommittedBlock")
-	lastAppliedToSharedMemoryKey = []byte("atomicTrieLastAppliedToSharedMemory")
+	appliedSharedMemoryCursorKey = []byte("atomicTrieLastAppliedToSharedMemory")
 )
 
 // AtomicTrie maintains an index of atomic operations by blockchainIDs for every block
@@ -46,7 +46,7 @@ type AtomicTrie interface {
 
 	// Iterator returns an AtomicTrieIterator to iterate the trie at the given
 	// root hash
-	Iterator(hash common.Hash, startHeight uint64) (AtomicTrieIterator, error)
+	Iterator(hash common.Hash, cursor []byte) (AtomicTrieIterator, error)
 
 	// LastCommitted returns the last committed hash and corresponding block height
 	LastCommitted() (common.Hash, uint64)
@@ -66,10 +66,10 @@ type AtomicTrie interface {
 	// to sharedMemory, for heights less than or equal to [lastAcceptedBlock].
 	ApplyToSharedMemory(lastAcceptedBlock uint64) error
 
-	// SetLastAppliedToSharedMemoryHeight marks the atomic trie as containing atomic ops
+	// SetAppliedSharedMemoryHeight marks the atomic trie as containing atomic ops
 	// that must be applied to shared memory (on initialization). Heights less than or
 	// equal to [height] must already be applied to shared memory.
-	SetLastAppliedToSharedMemoryHeight(height uint64) error
+	SetAppliedSharedMemoryHeight(height uint64) error
 }
 
 // AtomicTrieIterator is a stateful iterator that iterates the leafs of an AtomicTrie
@@ -77,6 +77,10 @@ type AtomicTrieIterator interface {
 	// Next advances the iterator to the next node in the atomic trie and
 	// returns true if there are more nodes to iterate
 	Next() bool
+
+	// Key returns the current database key that the iterator is iterating
+	// returned []byte can be freely modified
+	Key() []byte
 
 	// BlockNumber returns the current block number
 	BlockNumber() uint64
@@ -439,17 +443,14 @@ func (a *atomicTrie) UpdateLastCommitted(hash common.Hash, height uint64) error 
 }
 
 // Iterator returns a types.AtomicTrieIterator that iterates the trie from the given
-// atomic trie root, starting at the specified height
-func (a *atomicTrie) Iterator(root common.Hash, startHeight uint64) (AtomicTrieIterator, error) {
-	startKey := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(startKey, startHeight)
-
+// atomic trie root, starting at the specified prefix
+func (a *atomicTrie) Iterator(root common.Hash, cursor []byte) (AtomicTrieIterator, error) {
 	t, err := trie.New(root, a.trieDB)
 	if err != nil {
 		return nil, err
 	}
 
-	iter := trie.NewIterator(t.NodeIterator(startKey))
+	iter := trie.NewIterator(t.NodeIterator(cursor))
 	return NewAtomicTrieIterator(iter, a.codec), iter.Err
 }
 
@@ -477,19 +478,31 @@ func (a *atomicTrie) Root(height uint64) (common.Hash, error) {
 // ApplyToSharedMemory iterates over atomic ops indexed in the trie and applies them
 // to sharedMemory, for heights less than or equal to [lastAcceptedBlock].
 func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
-	lastAppliedToSharedMemoryHeight, err := a.lastAppliedToSharedMemoryHeight(lastAcceptedBlock)
-	if err != nil {
+	sharedMemoryCursor, err := a.metadataDB.Get(appliedSharedMemoryCursorKey)
+	if err == database.ErrNotFound {
+		return nil
+	} else if err != nil {
 		return err
 	}
-	startHeight := lastAppliedToSharedMemoryHeight + 1
-	log.Info("ApplyToSharedMemory", "atomicRoot", a.lastCommittedHash, "lastAcceptedBlock", lastAcceptedBlock, "startHeight", startHeight)
 
-	it, err := a.Iterator(a.lastCommittedHash, startHeight)
+	log.Info("ApplyToSharedMemory", "atomicRoot", a.lastCommittedHash, "lastAcceptedBlock", lastAcceptedBlock, "startHeight", binary.BigEndian.Uint64(sharedMemoryCursor[:wrappers.LongLen]))
+
+	it, err := a.Iterator(a.lastCommittedHash, sharedMemoryCursor)
 	if err != nil {
 		return err
 	}
 	lastUpdate := time.Now()
 	putRequests, removeRequests := 0, 0
+
+	// value of sharedMemoryCursor is either a uint64 signifying the
+	// height iteration should begin at or is a uint64+blockchainID
+	// specifying the last trie node applied to shared memory.
+	// to avoid applying the same atomic ops, in the later case, we
+	// call [it.Next] once here.
+	if len(sharedMemoryCursor) > wrappers.LongLen {
+		it.Next()
+	}
+
 	for it.Next() {
 		height := it.BlockNumber()
 		atomicOps := it.AtomicOps()
@@ -506,7 +519,7 @@ func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 		}
 
 		// update last applied pointer
-		if err := a.SetLastAppliedToSharedMemoryHeight(height); err != nil {
+		if err = a.metadataDB.Put(appliedSharedMemoryCursorKey, it.Key()); err != nil {
 			return err
 		}
 		batch, err := a.db.CommitBatch()
@@ -522,36 +535,13 @@ func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 		return err
 	}
 	log.Info("finished applying atomic operations")
-	if err := a.clearLastAppliedToSharedMemoryHeight(); err != nil {
+	if err := a.metadataDB.Delete(appliedSharedMemoryCursorKey); err != nil {
 		return err
 	}
 	return a.db.Commit()
 }
 
-// lastAppliedToSharedMemoryHeight returns the last height applied to the shared memory.
-// In case lastAppliedToSharedMemoryKey is stored with a value of [height], the trie
-// contains atomic ops [height+1, lastCommittedHeight) that need to be applied to shared memory.
-// If the key is not present, all the atomic ops in the trie are already applied and this
-// function returns lastAcceptedBlock.
-func (a *atomicTrie) lastAppliedToSharedMemoryHeight(lastAcceptedBlock uint64) (uint64, error) {
-	height, err := database.GetUInt64(a.metadataDB, lastAppliedToSharedMemoryKey)
-	switch err {
-	case database.ErrNotFound:
-		return lastAcceptedBlock, nil
-	case nil:
-		return height, nil
-	default:
-		return 0, err
-	}
-}
-
-// SetLastAppliedToSharedMemoryHeight marks the atomic trie as containing atomic ops
-// that must be applied to shared memory (on initialization). Heights less than or
-// equal to [height] must already be applied to shared memory.
-func (a *atomicTrie) SetLastAppliedToSharedMemoryHeight(height uint64) error {
-	return database.PutUInt64(a.metadataDB, lastAppliedToSharedMemoryKey, height)
-}
-
-func (a *atomicTrie) clearLastAppliedToSharedMemoryHeight() error {
-	return a.metadataDB.Delete(lastAppliedToSharedMemoryKey)
+func (a *atomicTrie) SetAppliedSharedMemoryHeight(height uint64) error {
+	// store the height of the last applied block + 1 so iteration begins there
+	return database.PutUInt64(a.metadataDB, appliedSharedMemoryCursorKey, height+1)
 }
