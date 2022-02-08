@@ -25,12 +25,13 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth/ethconfig"
-	"github.com/ava-labs/coreth/metrics/prometheus"
+	corethPrometheus "github.com/ava-labs/coreth/metrics/prometheus"
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/peer"
 	"github.com/ava-labs/coreth/rpc"
 
+	"github.com/prometheus/client_golang/prometheus"
 	// Force-load tracer engine to trigger registration
 	//
 	// We must import this package (not referenced elsewhere) so that the native "callTracer"
@@ -444,22 +445,51 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return err
 	}
-	vm.State = chain.NewState(&chain.Config{
-		DecidedCacheSize:    decidedCacheSize,
-		MissingCacheSize:    missingCacheSize,
-		UnverifiedCacheSize: unverifiedCacheSize,
-		LastAcceptedBlock: &Block{
-			id:        ids.ID(lastAccepted.Hash()),
-			ethBlock:  lastAccepted,
-			vm:        vm,
-			status:    choices.Accepted,
-			atomicTxs: atomicTxs,
-		},
-		GetBlockIDAtHeight: vm.GetBlockIDAtHeight,
-		GetBlock:           vm.getBlock,
-		UnmarshalBlock:     vm.parseBlock,
-		BuildBlock:         vm.buildBlock,
-	})
+
+	// Register metered state if metrics are enabled
+	if metrics.Enabled {
+		registerer := prometheus.NewRegistry()
+		if err := ctx.Metrics.Register(registerer); err != nil {
+			return err
+		}
+		state, err := chain.NewMeteredState(registerer, &chain.Config{
+			DecidedCacheSize:    decidedCacheSize,
+			MissingCacheSize:    missingCacheSize,
+			UnverifiedCacheSize: unverifiedCacheSize,
+			LastAcceptedBlock: &Block{
+				id:        ids.ID(lastAccepted.Hash()),
+				ethBlock:  lastAccepted,
+				vm:        vm,
+				status:    choices.Accepted,
+				atomicTxs: atomicTxs,
+			},
+			GetBlockIDAtHeight: vm.GetBlockIDAtHeight,
+			GetBlock:           vm.getBlock,
+			UnmarshalBlock:     vm.parseBlock,
+			BuildBlock:         vm.buildBlock,
+		})
+		if err != nil {
+			return err
+		}
+		vm.State = state
+	} else {
+		vm.State = chain.NewState(&chain.Config{
+			DecidedCacheSize:    decidedCacheSize,
+			MissingCacheSize:    missingCacheSize,
+			UnverifiedCacheSize: unverifiedCacheSize,
+			LastAcceptedBlock: &Block{
+				id:        ids.ID(lastAccepted.Hash()),
+				ethBlock:  lastAccepted,
+				vm:        vm,
+				status:    choices.Accepted,
+				atomicTxs: atomicTxs,
+			},
+			GetBlockIDAtHeight: vm.GetBlockIDAtHeight,
+			GetBlock:           vm.getBlock,
+			UnmarshalBlock:     vm.parseBlock,
+			BuildBlock:         vm.buildBlock,
+		})
+	}
 
 	vm.builder.awaitSubmittedTxs()
 	go vm.ctx.Log.RecoverAndPanic(vm.startContinuousProfiler)
@@ -480,7 +510,7 @@ func (vm *VM) Initialize(
 
 	// Only provide metrics if they are being populated.
 	if metrics.Enabled {
-		gatherer := prometheus.Gatherer(metrics.DefaultRegistry)
+		gatherer := corethPrometheus.Gatherer(metrics.DefaultRegistry)
 		if err := ctx.Metrics.Register(gatherer); err != nil {
 			return err
 		}
