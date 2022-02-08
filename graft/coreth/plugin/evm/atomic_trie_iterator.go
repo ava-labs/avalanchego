@@ -23,6 +23,7 @@ const atomicTrieKeyLen = wrappers.LongLen + common.HashLength
 type atomicTrieIterator struct {
 	trieIterator *trie.Iterator // underlying trie.Iterator
 	codec        codec.Manager
+	key          []byte
 	atomicOps    *atomic.Requests // atomic operation entries at this iteration
 	blockchainID ids.ID           // blockchain ID
 	blockNumber  uint64           // block number at this iteration
@@ -83,6 +84,7 @@ func (a *atomicTrieIterator) Next() bool {
 	a.blockNumber = blockNumber
 	a.blockchainID = blockchainID
 	a.atomicOps = requests
+	a.key = common.CopyBytes(a.trieIterator.Key)
 	return true
 }
 
@@ -92,6 +94,7 @@ func (a *atomicTrieIterator) resetFields(err error) {
 	a.blockNumber = 0
 	a.blockchainID = ids.ID{}
 	a.atomicOps = nil
+	a.key = nil
 }
 
 // BlockNumber returns the current block number
@@ -107,4 +110,10 @@ func (a *atomicTrieIterator) BlockchainID() ids.ID {
 // AtomicOps returns atomic requests for the blockchainID at the current block number
 func (a *atomicTrieIterator) AtomicOps() *atomic.Requests {
 	return a.atomicOps
+}
+
+// Key returns the current database key that the iterator is iterating
+// returned []byte can be freely modified
+func (a *atomicTrieIterator) Key() []byte {
+	return a.key
 }

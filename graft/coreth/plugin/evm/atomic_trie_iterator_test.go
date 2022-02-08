@@ -89,7 +89,7 @@ func TestIteratorHandlesInvalidData(t *testing.T) {
 	assert.NoError(t, atomicTrie.trie.TryUpdate(utils.RandomBytes(50), utils.RandomBytes(50)))
 	assert.NoError(t, atomicTrie.commit(lastCommittedHeight+1))
 	corruptedHash, _ := atomicTrie.LastCommitted()
-	iter, err := atomicTrie.Iterator(corruptedHash, 0)
+	iter, err := atomicTrie.Iterator(corruptedHash, nil)
 	assert.NoError(t, err)
 	for iter.Next() {
 	}

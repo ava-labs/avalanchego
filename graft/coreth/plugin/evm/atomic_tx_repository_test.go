@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"encoding/binary"
 	"sort"
 	"testing"
 
@@ -120,7 +121,9 @@ func verifyTxs(t testing.TB, repo AtomicTxRepository, txMap map[uint64][]*Tx) {
 // the atomic operations contained in [operationsMap] on the same interval.
 func verifyOperations(t testing.TB, atomicTrie AtomicTrie, codec codec.Manager, rootHash common.Hash, from, to uint64, operationsMap map[uint64]map[ids.ID]*atomic.Requests) {
 	// Start the iterator at [from]
-	iter, err := atomicTrie.Iterator(rootHash, from)
+	fromBytes := make([]byte, wrappers.LongLen)
+	binary.BigEndian.PutUint64(fromBytes, from)
+	iter, err := atomicTrie.Iterator(rootHash, fromBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
