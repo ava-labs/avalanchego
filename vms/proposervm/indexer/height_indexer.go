@@ -16,7 +16,12 @@ import (
 )
 
 // default number of heights to index before committing
-const defaultCommitFrequency = 1024
+const (
+	defaultCommitFrequency = 1024
+	// Sleep [sleepDurationMultiplier]x (5x) the amount of time we spend processing the block
+	// to ensure the async indexing does not bottleneck the node.
+	sleepDurationMultiplier = 5
+)
 
 var _ HeightIndexer = &heightIndexer{}
 
@@ -103,6 +108,7 @@ func (hi *heightIndexer) doRepair(ctx context.Context, currentProBlkID ids.ID) e
 		if err := ctx.Err(); err != nil {
 			return err
 		}
+		processingStart := time.Now()
 		currentAcceptedBlk, err := hi.server.GetWrappingBlk(currentProBlkID)
 		if err == database.ErrNotFound {
 			// We have visited all the proposerVM blocks. Because we previously
@@ -170,6 +176,11 @@ func (hi *heightIndexer) doRepair(ctx context.Context, currentProBlkID ids.ID) e
 		// keep checking the parent
 		currentProBlkID = currentAcceptedBlk.Parent()
 		previousHeight = currentHeight
+
+		processingDuration := time.Since(processingStart)
+		// Sleep [sleepDurationMultiplier]x (5x) the amount of time we spend processing the block
+		// to ensure the indexing does not bottleneck the node.
+		time.Sleep(processingDuration * sleepDurationMultiplier)
 	}
 }
 
