@@ -228,6 +228,9 @@ type VM struct {
 	client       peer.Client
 	networkCodec codec.Manager
 
+	// Metrics
+	multiGatherer avalanchegoMetrics.MultiGatherer
+
 	bootstrapped bool
 }
 
@@ -447,62 +450,17 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	// Register metered state if metrics are enabled
-	if metrics.Enabled {
-		multiGatherer := avalanchegoMetrics.NewMultiGatherer()
+	vm.multiGatherer = avalanchegoMetrics.NewMultiGatherer()
 
-		chainStateRegisterer := prometheus.NewRegistry()
-		state, err := chain.NewMeteredState(chainStateRegisterer, &chain.Config{
-			DecidedCacheSize:    decidedCacheSize,
-			MissingCacheSize:    missingCacheSize,
-			UnverifiedCacheSize: unverifiedCacheSize,
-			LastAcceptedBlock: &Block{
-				id:        ids.ID(lastAccepted.Hash()),
-				ethBlock:  lastAccepted,
-				vm:        vm,
-				status:    choices.Accepted,
-				atomicTxs: atomicTxs,
-			},
-			GetBlockIDAtHeight: vm.GetBlockIDAtHeight,
-			GetBlock:           vm.getBlock,
-			UnmarshalBlock:     vm.parseBlock,
-			BuildBlock:         vm.buildBlock,
-		})
-		if err != nil {
-			return err
-		}
-		vm.State = state
-
-		// Register the geth-based metrics
-		gatherer := corethPrometheus.Gatherer(metrics.DefaultRegistry)
-		if err := multiGatherer.Register("chainState", chainStateRegisterer); err != nil {
-			return err
-		}
-
-		// Register both metrics to [multiGatherer]
-		if err := multiGatherer.Register("", gatherer); err != nil {
-			return err
-		}
-		if err := ctx.Metrics.Register(multiGatherer); err != nil {
-			return err
-		}
-	} else {
-		vm.State = chain.NewState(&chain.Config{
-			DecidedCacheSize:    decidedCacheSize,
-			MissingCacheSize:    missingCacheSize,
-			UnverifiedCacheSize: unverifiedCacheSize,
-			LastAcceptedBlock: &Block{
-				id:        ids.ID(lastAccepted.Hash()),
-				ethBlock:  lastAccepted,
-				vm:        vm,
-				status:    choices.Accepted,
-				atomicTxs: atomicTxs,
-			},
-			GetBlockIDAtHeight: vm.GetBlockIDAtHeight,
-			GetBlock:           vm.getBlock,
-			UnmarshalBlock:     vm.parseBlock,
-			BuildBlock:         vm.buildBlock,
-		})
+	// Initialize [vm.State]
+	if err := vm.initChainState(&Block{
+		id:        ids.ID(lastAccepted.Hash()),
+		ethBlock:  lastAccepted,
+		vm:        vm,
+		status:    choices.Accepted,
+		atomicTxs: atomicTxs,
+	}); err != nil {
+		return err
 	}
 
 	vm.builder.awaitSubmittedTxs()
@@ -522,7 +480,54 @@ func (vm *VM) Initialize(
 	// 	return err
 	// }
 
+	// If metrics are enabled, register the default metrics regitry
+	if metrics.Enabled {
+		gatherer := corethPrometheus.Gatherer(metrics.DefaultRegistry)
+		if err := vm.multiGatherer.Register("", gatherer); err != nil {
+			return err
+		}
+	}
+	// Register [multiGatherer] after registerers have been registered to it
+	if err := ctx.Metrics.Register(vm.multiGatherer); err != nil {
+		return err
+	}
+
 	return vm.fx.Initialize(vm)
+}
+
+func (vm *VM) initChainState(lastAccepted *Block) error {
+	if !metrics.Enabled {
+		vm.State = chain.NewState(&chain.Config{
+			DecidedCacheSize:    decidedCacheSize,
+			MissingCacheSize:    missingCacheSize,
+			UnverifiedCacheSize: unverifiedCacheSize,
+			LastAcceptedBlock:   lastAccepted,
+			GetBlockIDAtHeight:  vm.GetBlockIDAtHeight,
+			GetBlock:            vm.getBlock,
+			UnmarshalBlock:      vm.parseBlock,
+			BuildBlock:          vm.buildBlock,
+		})
+		return nil
+	}
+
+	// Register chain state metrics
+	chainStateRegisterer := prometheus.NewRegistry()
+	state, err := chain.NewMeteredState(chainStateRegisterer, &chain.Config{
+		DecidedCacheSize:    decidedCacheSize,
+		MissingCacheSize:    missingCacheSize,
+		UnverifiedCacheSize: unverifiedCacheSize,
+		LastAcceptedBlock:   lastAccepted,
+		GetBlockIDAtHeight:  vm.GetBlockIDAtHeight,
+		GetBlock:            vm.getBlock,
+		UnmarshalBlock:      vm.parseBlock,
+		BuildBlock:          vm.buildBlock,
+	})
+	if err != nil {
+		return err
+	}
+	vm.State = state
+
+	return vm.multiGatherer.Register("chainState", chainStateRegisterer)
 }
 
 func (vm *VM) initGossipHandling() {
