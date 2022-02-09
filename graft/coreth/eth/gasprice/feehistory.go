@@ -28,10 +28,8 @@ package gasprice
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 	"sort"
 	"sync/atomic"
@@ -44,8 +42,9 @@ import (
 )
 
 var (
-	errInvalidPercentile = errors.New("invalid reward percentile")
-	errRequestBeyondHead = errors.New("request beyond head block")
+	errInvalidPercentile     = errors.New("invalid reward percentile")
+	errRequestBeyondHead     = errors.New("request beyond head block")
+	errBeyondHistoricalLimit = errors.New("request beyond historical limit")
 )
 
 const (
@@ -153,44 +152,35 @@ func (sb *slimBlock) processPercentiles(percentiles []float64) processedFees {
 // also returned if requested and available.
 // Note: an error is only returned if retrieving the head header has failed. If there are no
 // retrievable blocks in the specified range then zero block count is returned with no error.
-func (oracle *Oracle) resolveBlockRange(ctx context.Context, lastBlock rpc.BlockNumber, blocks int) (*types.Block, []*types.Receipt, uint64, int, error) {
-	var (
-		headBlock       rpc.BlockNumber
-		pendingBlock    *types.Block
-		pendingReceipts types.Receipts
-	)
+func (oracle *Oracle) resolveBlockRange(ctx context.Context, lastBlock rpc.BlockNumber, blocks int) (uint64, int, error) {
+	var headBlock rpc.BlockNumber
 	// query either pending block or head header and set headBlock
 	if lastBlock == rpc.PendingBlockNumber {
-		if pendingBlock, pendingReceipts = oracle.backend.PendingBlockAndReceipts(); pendingBlock != nil {
-			lastBlock = rpc.BlockNumber(pendingBlock.NumberU64())
-			headBlock = lastBlock - 1
-		} else {
-			// pending block not supported by backend, process until latest block
-			lastBlock = rpc.LatestBlockNumber
-			blocks--
-			if blocks == 0 {
-				return nil, nil, 0, 0, nil
-			}
-		}
+		// pending block not supported by backend, process until latest block
+		lastBlock = rpc.LatestBlockNumber
 	}
-	if pendingBlock == nil {
-		// if pending block is not fetched then we retrieve the head header to get the head block number
-		if latestHeader, err := oracle.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber); err == nil {
-			headBlock = rpc.BlockNumber(latestHeader.Number.Uint64())
-		} else {
-			return nil, nil, 0, 0, err
-		}
+	if blocks == 0 {
+		return 0, 0, nil
 	}
+
+	latestHeader, err := oracle.backend.HeaderByNumber(ctx, lastBlock)
+	if err != nil {
+		return 0, 0, err
+	}
+	headBlock = rpc.BlockNumber(latestHeader.Number.Uint64())
+
 	if lastBlock == rpc.LatestBlockNumber {
 		lastBlock = headBlock
-	} else if pendingBlock == nil && lastBlock > headBlock {
-		return nil, nil, 0, 0, fmt.Errorf("%w: requested %d, head %d", errRequestBeyondHead, lastBlock, headBlock)
+	} else if headBlock > rpc.BlockNumber(oracle.maxBlockHistory) && headBlock-rpc.BlockNumber(oracle.maxBlockHistory) > lastBlock {
+		return 0, 0, fmt.Errorf("%w: requested %d, head %d", errBeyondHistoricalLimit, lastBlock, headBlock)
+	} else if lastBlock > headBlock {
+		return 0, 0, fmt.Errorf("%w: requested %d, head %d", errRequestBeyondHead, lastBlock, headBlock)
 	}
 	// ensure not trying to retrieve before genesis
 	if rpc.BlockNumber(blocks) > lastBlock+1 {
 		blocks = int(lastBlock + 1)
 	}
-	return pendingBlock, pendingReceipts, uint64(lastBlock), blocks, nil
+	return uint64(lastBlock), blocks, nil
 }
 
 // FeeHistory returns data relevant for fee estimation based on the specified range of blocks.
@@ -226,12 +216,7 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 			return common.Big0, nil, nil, nil, fmt.Errorf("%w: #%d:%f > #%d:%f", errInvalidPercentile, i-1, rewardPercentiles[i-1], i, p)
 		}
 	}
-	var (
-		pendingBlock    *types.Block
-		pendingReceipts []*types.Receipt
-		err             error
-	)
-	pendingBlock, pendingReceipts, lastBlock, blocks, err := oracle.resolveBlockRange(ctx, unresolvedLastBlock, blocks)
+	lastBlock, blocks, err := oracle.resolveBlockRange(ctx, unresolvedLastBlock, blocks)
 	if err != nil || blocks == 0 {
 		return common.Big0, nil, nil, nil, err
 	}
@@ -241,10 +226,6 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 		next    = oldestBlock
 		results = make(chan *blockFees, blocks)
 	)
-	percentileKey := make([]byte, 8*len(rewardPercentiles))
-	for i, p := range rewardPercentiles {
-		binary.LittleEndian.PutUint64(percentileKey[i*8:(i+1)*8], math.Float64bits(p))
-	}
 	for i := 0; i < maxBlockFetchers && i < blocks; i++ {
 		go func() {
 			for {
@@ -255,34 +236,27 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 				}
 
 				fees := &blockFees{blockNumber: blockNumber}
-				if pendingBlock != nil && blockNumber >= pendingBlock.NumberU64() {
-					sb := processBlock(pendingBlock, pendingReceipts)
-					fees.results = sb.processPercentiles(rewardPercentiles)
-					results <- fees
+				var sb *slimBlock
+				if sbRaw, ok := oracle.historyCache.Get(blockNumber); ok {
+					sb = sbRaw.(*slimBlock)
 				} else {
-					var sb *slimBlock
-					sbRaw, ok := oracle.historyCache.Get(blockNumber)
-					if ok {
-						sb = sbRaw.(*slimBlock)
-					} else {
-						block, err := oracle.backend.BlockByNumber(ctx, rpc.BlockNumber(blockNumber))
-						if block == nil || err != nil {
-							fees.err = err
-							results <- fees
-							return
-						}
-						receipts, err := oracle.backend.GetReceipts(ctx, block.Hash())
-						if err != nil {
-							fees.err = err
-							results <- fees
-							return
-						}
-						sb = processBlock(block, receipts)
-						oracle.historyCache.Add(blockNumber, sb)
+					block, err := oracle.backend.BlockByNumber(ctx, rpc.BlockNumber(blockNumber))
+					if block == nil || err != nil {
+						fees.err = err
+						results <- fees
+						return
 					}
-					fees.results = sb.processPercentiles(rewardPercentiles)
-					results <- fees
+					receipts, err := oracle.backend.GetReceipts(ctx, block.Hash())
+					if err != nil {
+						fees.err = err
+						results <- fees
+						return
+					}
+					sb = processBlock(block, receipts)
+					oracle.historyCache.Add(blockNumber, sb)
 				}
+				fees.results = sb.processPercentiles(rewardPercentiles)
+				results <- fees
 			}
 		}()
 	}
