@@ -153,7 +153,6 @@ func (sb *slimBlock) processPercentiles(percentiles []float64) processedFees {
 // Note: an error is only returned if retrieving the head header has failed. If there are no
 // retrievable blocks in the specified range then zero block count is returned with no error.
 func (oracle *Oracle) resolveBlockRange(ctx context.Context, lastBlock rpc.BlockNumber, blocks int) (uint64, int, error) {
-	var headBlock rpc.BlockNumber
 	// query either pending block or head header and set headBlock
 	if lastBlock == rpc.PendingBlockNumber {
 		// pending block not supported by backend, process until latest block
@@ -163,12 +162,7 @@ func (oracle *Oracle) resolveBlockRange(ctx context.Context, lastBlock rpc.Block
 		return 0, 0, nil
 	}
 
-	latestHeader, err := oracle.backend.HeaderByNumber(ctx, lastBlock)
-	if err != nil {
-		return 0, 0, err
-	}
-	headBlock = rpc.BlockNumber(latestHeader.Number.Uint64())
-
+	headBlock := rpc.BlockNumber(oracle.backend.LastAcceptedBlock().NumberU64())
 	if lastBlock == rpc.LatestBlockNumber {
 		lastBlock = headBlock
 	} else if headBlock > rpc.BlockNumber(oracle.maxBlockHistory) && headBlock-rpc.BlockNumber(oracle.maxBlockHistory) > lastBlock {
