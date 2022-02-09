@@ -218,7 +218,7 @@ func (vm *VM) SetLastSummaryBlock(blkByte []byte) error {
 		err           error
 	)
 	if blk, err = vm.parsePostForkBlock(blkByte); err == nil {
-		innerBlkBytes = blk.GetInnerBlk().Bytes()
+		innerBlkBytes = blk.getInnerBlk().Bytes()
 	} else if blk, err = vm.parsePreForkBlock(blkByte); err == nil {
 		innerBlkBytes = blk.Bytes()
 	} else {

@@ -22,19 +22,18 @@ var (
 type TestBlockServer struct {
 	T *testing.T
 
-	CantGetWrappingBlk bool
-	CantCommit         bool
+	CantGetFullPostForkBlock bool
+	CantCommit               bool
 
-	GetWrappingBlkF func(blkID ids.ID) (WrappingBlock, error)
-	GetInnerBlkF    func(id ids.ID) (snowman.Block, error)
-	CommitF         func() error
+	GetFullPostForkBlockF func(blkID ids.ID) (snowman.Block, error)
+	CommitF               func() error
 }
 
-func (tsb *TestBlockServer) GetWrappingBlk(blkID ids.ID) (WrappingBlock, error) {
-	if tsb.GetWrappingBlkF != nil {
-		return tsb.GetWrappingBlkF(blkID)
+func (tsb *TestBlockServer) GetFullPostForkBlock(blkID ids.ID) (snowman.Block, error) {
+	if tsb.GetFullPostForkBlockF != nil {
+		return tsb.GetFullPostForkBlockF(blkID)
 	}
-	if tsb.CantGetWrappingBlk && tsb.T != nil {
+	if tsb.CantGetFullPostForkBlock && tsb.T != nil {
 		tsb.T.Fatal(errGetWrappingBlk)
 	}
 	return nil, errGetWrappingBlk
