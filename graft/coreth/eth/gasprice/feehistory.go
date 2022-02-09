@@ -58,9 +58,6 @@ const (
 type blockFees struct {
 	// set by the caller
 	blockNumber uint64
-	header      *types.Header
-	block       *types.Block // only set if reward percentiles are requested
-	receipts    types.Receipts
 	// filled by processBlock
 	results processedFees
 	err     error
@@ -93,22 +90,37 @@ func (s sortGasAndReward) Less(i, j int) bool {
 // processBlock takes a blockFees structure with the blockNumber, the header and optionally
 // the block field filled in, retrieves the block from the backend if not present yet and
 // fills in the rest of the fields.
-func (oracle *Oracle) processBlock(bf *blockFees, percentiles []float64) {
-	if bf.results.baseFee = bf.header.BaseFee; bf.results.baseFee == nil {
-		bf.results.baseFee = new(big.Int)
+func processBlock(block *types.Block, receipts types.Receipts) *slimBlock {
+	var sb slimBlock
+	if sb.BaseFee = block.BaseFee(); sb.BaseFee == nil {
+		sb.BaseFee = new(big.Int)
 	}
-	bf.results.gasUsedRatio = float64(bf.header.GasUsed) / float64(bf.header.GasLimit)
+	sb.GasUsed = block.GasUsed()
+	sb.GasLimit = block.GasLimit()
+	sorter := make(sortGasAndReward, len(block.Transactions()))
+	for i, tx := range block.Transactions() {
+		reward, _ := tx.EffectiveGasTip(sb.BaseFee)
+		sorter[i] = txGasAndReward{gasUsed: receipts[i].GasUsed, reward: reward}
+	}
+	sort.Sort(sorter)
+	sb.Txs = sorter
+	return &sb
+}
+
+// processPercentiles takes a blockFees structure with the blockNumber, the header and optionally
+// the block field filled in, retrieves the block from the backend if not present yet and
+// fills in the rest of the fields.
+func (sb *slimBlock) processPercentiles(bf *blockFees, percentiles []float64) {
+	bf.results.baseFee = sb.BaseFee // already set to be non-nil
+	bf.results.gasUsedRatio = float64(sb.GasUsed) / float64(sb.GasLimit)
 	if len(percentiles) == 0 {
 		// rewards were not requested, return null
 		return
 	}
-	if bf.block == nil || (bf.receipts == nil && len(bf.block.Transactions()) != 0) {
-		log.Error("Block or receipts are missing while reward percentiles are requested")
-		return
-	}
 
+	txLen := len(sb.Txs)
 	bf.results.reward = make([]*big.Int, len(percentiles))
-	if len(bf.block.Transactions()) == 0 {
+	if txLen == 0 {
 		// return an all zero row if there are no transactions to gather data from
 		for i := range bf.results.reward {
 			bf.results.reward[i] = new(big.Int)
@@ -116,31 +128,24 @@ func (oracle *Oracle) processBlock(bf *blockFees, percentiles []float64) {
 		return
 	}
 
-	sorter := make(sortGasAndReward, len(bf.block.Transactions()))
-	for i, tx := range bf.block.Transactions() {
-		reward, _ := tx.EffectiveGasTip(bf.block.BaseFee())
-		sorter[i] = txGasAndReward{gasUsed: bf.receipts[i].GasUsed, reward: reward}
-	}
-	sort.Sort(sorter)
-
+	// txs in block already sorted
 	var txIndex int
-	sumGasUsed := sorter[0].gasUsed
-
+	sumGasUsed := sb.Txs[0].gasUsed
 	for i, p := range percentiles {
-		thresholdGasUsed := uint64(float64(bf.block.GasUsed()) * p / 100)
-		for sumGasUsed < thresholdGasUsed && txIndex < len(bf.block.Transactions())-1 {
+		thresholdGasUsed := uint64(float64(sb.GasUsed) * p / 100)
+		for sumGasUsed < thresholdGasUsed && txIndex < txLen-1 {
 			txIndex++
-			sumGasUsed += sorter[txIndex].gasUsed
+			sumGasUsed += sb.Txs[txIndex].gasUsed
 		}
-		bf.results.reward[i] = sorter[txIndex].reward
+		bf.results.reward[i] = sb.Txs[txIndex].reward
 	}
 }
 
 type slimBlock struct {
 	GasUsed  uint64
 	GasLimit uint64
-	BaseFee  uint64
-	Txs      []*txGasAndReward
+	BaseFee  *big.Int
+	Txs      []txGasAndReward
 }
 
 // resolveBlockRange resolves the specified block range to absolute block numbers while also
@@ -251,28 +256,31 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 
 				fees := &blockFees{blockNumber: blockNumber}
 				if pendingBlock != nil && blockNumber >= pendingBlock.NumberU64() {
-					fees.block, fees.receipts = pendingBlock, pendingReceipts
-					fees.header = fees.block.Header()
-					oracle.processBlock(fees, rewardPercentiles)
+					sb := processBlock(pendingBlock, pendingReceipts)
+					sb.processPercentiles(fees, rewardPercentiles)
 					results <- fees
 				} else {
-					sb, ok := oracle.historyCache.Get(blockNumber)
-					if !ok {
+					var sb *slimBlock
+					sbRaw, ok := oracle.historyCache.Get(blockNumber)
+					if ok {
+						sb = sbRaw.(*slimBlock)
+					} else {
 						block, err := oracle.backend.BlockByNumber(ctx, rpc.BlockNumber(blockNumber))
 						if block == nil || err != nil {
+							fees.err = err
+							results <- fees
 							return
 						}
-
 						receipts, err := oracle.backend.GetReceipts(ctx, block.Hash())
 						if err != nil {
+							fees.err = err
+							results <- fees
 							return
 						}
-						header := fees.block.Header()
-						sb = &slimBlock{}
+						sb = processBlock(block, receipts)
 						oracle.historyCache.Add(blockNumber, sb)
 					}
-					r := oracle.processBlock(fees, rewardPercentiles)
-					fees.results = p.(processedFees)
+					sb.processPercentiles(fees, rewardPercentiles)
 					results <- fees
 				}
 			}
