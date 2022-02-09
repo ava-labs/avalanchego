@@ -77,6 +77,12 @@ type (
 		reward  *big.Int
 	}
 	sortGasAndReward []txGasAndReward
+	slimBlock        struct {
+		GasUsed  uint64
+		GasLimit uint64
+		BaseFee  *big.Int
+		Txs      []txGasAndReward
+	}
 )
 
 func (s sortGasAndReward) Len() int { return len(s) }
@@ -107,28 +113,29 @@ func processBlock(block *types.Block, receipts types.Receipts) *slimBlock {
 	return &sb
 }
 
-// processPercentiles takes a blockFees structure with the blockNumber, the header and optionally
-// the block field filled in, retrieves the block from the backend if not present yet and
-// fills in the rest of the fields.
-func (sb *slimBlock) processPercentiles(bf *blockFees, percentiles []float64) {
-	bf.results.baseFee = sb.BaseFee // already set to be non-nil
-	bf.results.gasUsedRatio = float64(sb.GasUsed) / float64(sb.GasLimit)
+// processPercentiles returns a [processedFees] object with a populated
+// baseFee, gasUsedRatio, and optionally reward percentiles (if any are
+// requested)
+func (sb *slimBlock) processPercentiles(percentiles []float64) processedFees {
+	var results processedFees
+	results.baseFee = sb.BaseFee // already set to be non-nil
+	results.gasUsedRatio = float64(sb.GasUsed) / float64(sb.GasLimit)
 	if len(percentiles) == 0 {
-		// rewards were not requested, return null
-		return
+		// rewards were not requested
+		return results
 	}
 
 	txLen := len(sb.Txs)
-	bf.results.reward = make([]*big.Int, len(percentiles))
+	results.reward = make([]*big.Int, len(percentiles))
 	if txLen == 0 {
 		// return an all zero row if there are no transactions to gather data from
-		for i := range bf.results.reward {
-			bf.results.reward[i] = new(big.Int)
+		for i := range results.reward {
+			results.reward[i] = new(big.Int)
 		}
-		return
+		return results
 	}
 
-	// txs in block already sorted
+	// sb transactions are already sorted by tip, so we don't need to re-sort
 	var txIndex int
 	sumGasUsed := sb.Txs[0].gasUsed
 	for i, p := range percentiles {
@@ -137,15 +144,9 @@ func (sb *slimBlock) processPercentiles(bf *blockFees, percentiles []float64) {
 			txIndex++
 			sumGasUsed += sb.Txs[txIndex].gasUsed
 		}
-		bf.results.reward[i] = sb.Txs[txIndex].reward
+		results.reward[i] = sb.Txs[txIndex].reward
 	}
-}
-
-type slimBlock struct {
-	GasUsed  uint64
-	GasLimit uint64
-	BaseFee  *big.Int
-	Txs      []txGasAndReward
+	return results
 }
 
 // resolveBlockRange resolves the specified block range to absolute block numbers while also
@@ -257,7 +258,7 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 				fees := &blockFees{blockNumber: blockNumber}
 				if pendingBlock != nil && blockNumber >= pendingBlock.NumberU64() {
 					sb := processBlock(pendingBlock, pendingReceipts)
-					sb.processPercentiles(fees, rewardPercentiles)
+					fees.results = sb.processPercentiles(rewardPercentiles)
 					results <- fees
 				} else {
 					var sb *slimBlock
@@ -280,7 +281,7 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 						sb = processBlock(block, receipts)
 						oracle.historyCache.Add(blockNumber, sb)
 					}
-					sb.processPercentiles(fees, rewardPercentiles)
+					fees.results = sb.processPercentiles(rewardPercentiles)
 					results <- fees
 				}
 			}
