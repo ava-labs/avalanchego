@@ -93,9 +93,8 @@ func (s sortGasAndReward) Less(i, j int) bool {
 	return s[i].reward.Cmp(s[j].reward) < 0
 }
 
-// processBlock takes a blockFees structure with the blockNumber, the header and optionally
-// the block field filled in, retrieves the block from the backend if not present yet and
-// fills in the rest of the fields.
+// processBlock prepares a [slimBlock] from a retrieved block and list of
+// receipts. This slimmed block can be cached and used for future calls.
 func processBlock(block *types.Block, receipts types.Receipts) *slimBlock {
 	var sb slimBlock
 	if sb.BaseFee = block.BaseFee(); sb.BaseFee == nil {
