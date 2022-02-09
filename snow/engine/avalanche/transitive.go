@@ -273,11 +273,6 @@ func (t *Transitive) Shutdown() error {
 
 // Notify implements the InternalHandler interface
 func (t *Transitive) Notify(msg common.Message) error {
-	if !t.IsBootstrapped() {
-		t.Ctx.Log.Debug("dropping Notify due to bootstrapping")
-		return nil
-	}
-
 	switch msg {
 	case common.PendingTxs:
 		t.pendingTxs = append(t.pendingTxs, t.VM.PendingTxs()...)
@@ -292,11 +287,6 @@ func (t *Transitive) Notify(msg common.Message) error {
 // Context implements the common.Engine interface.
 func (t *Transitive) Context() *snow.ConsensusContext {
 	return t.Ctx
-}
-
-// IsBootstrapped implements the common.Engine interface.
-func (t *Transitive) IsBootstrapped() bool {
-	return t.Ctx.IsBootstrapped()
 }
 
 // Start implements the common.Engine interface.

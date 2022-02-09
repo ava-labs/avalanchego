@@ -18,7 +18,8 @@ const (
 
 // TimeTracker is an interface for tracking peers' usage of CPU Time
 type TimeTracker interface {
-	UtilizeTime(ids.ShortID, time.Time, time.Time)
+	StartCPU(ids.ShortID, time.Time)
+	StopCPU(ids.ShortID, time.Time)
 	Utilization(ids.ShortID, time.Time) float64
 	CumulativeUtilization(time.Time) float64
 	Len() int
@@ -47,28 +48,40 @@ func NewCPUTracker(factory uptime.Factory, halflife time.Duration) TimeTracker {
 	}
 }
 
-// UtilizeTime registers the use of CPU time by [vdr] from [startTime] to
-// [endTime]
-func (ct *cpuTracker) UtilizeTime(vdr ids.ShortID, startTime, endTime time.Time) {
+// getMeter returns the meter used to measure CPU time spent processing
+// messages from [vdr]
+// assumes the lock is held
+func (ct *cpuTracker) getMeter(vdr ids.ShortID) uptime.Meter {
+	meter, exists := ct.cpuSpenders.Get(vdr)
+	if exists {
+		return meter.(uptime.Meter)
+	}
+
+	newMeter := ct.factory.New(ct.halflife)
+	ct.cpuSpenders.Put(vdr, newMeter)
+	return newMeter
+}
+
+// UtilizeTime registers the use of CPU time by [vdr] from [startTime]
+// to [endTime]
+func (ct *cpuTracker) StartCPU(vdr ids.ShortID, startTime time.Time) {
 	ct.lock.Lock()
 	defer ct.lock.Unlock()
 
-	var meter uptime.Meter
-	if meterIntf, exists := ct.cpuSpenders.Get(vdr); exists {
-		meter = meterIntf.(uptime.Meter)
-	} else {
-		meter = ct.factory.New(ct.halflife)
-	}
-	// Put is called when the map already contains the meter in order to move
-	// the meter to the back of the list.
-	ct.cpuSpenders.Put(vdr, meter)
-
+	meter := ct.getMeter(vdr)
 	ct.cumulativeMeter.Start(startTime)
-	ct.cumulativeMeter.Stop(endTime)
 	meter.Start(startTime)
-	meter.Stop(endTime)
+}
 
-	ct.prune(endTime)
+// UtilizeTime registers the use of CPU time by [vdr] from [startTime]
+// to [endTime]
+func (ct *cpuTracker) StopCPU(vdr ids.ShortID, endTime time.Time) {
+	ct.lock.Lock()
+	defer ct.lock.Unlock()
+
+	meter := ct.getMeter(vdr)
+	ct.cumulativeMeter.Stop(endTime)
+	meter.Stop(endTime)
 }
 
 // Utilization returns the current EWMA of CPU utilization for [vdr]

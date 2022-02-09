@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -1579,7 +1578,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	// TODO: Document FXs and have user specify them in API call
 	fxIDsSet := ids.Set{}
 	fxIDsSet.Add(fxIDs...)
-	if vmID == avm.ID && !fxIDsSet.Contains(secp256k1fx.ID) {
+	if vmID == constants.AVMID && !fxIDsSet.Contains(secp256k1fx.ID) {
 		fxIDs = append(fxIDs, secp256k1fx.ID)
 	}
 

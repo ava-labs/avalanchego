@@ -20,9 +20,17 @@ const (
 
 var (
 	_ database.Database = &Database{}
+	_ Commitable        = &Database{}
 	_ database.Batch    = &batch{}
 	_ database.Iterator = &iterator{}
 )
+
+// Commitable defines the interface that specifies that something may be
+// committed.
+type Commitable interface {
+	// Commit writes all the queued operations to the underlying data structure.
+	Commit() error
+}
 
 // Database implements the Database interface by living on top of another
 // database, writing changes to the underlying database only when commit is
@@ -145,6 +153,7 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	}
 
 	return &iterator{
+		db:       db,
 		Iterator: db.db.NewIteratorWithStartAndPrefix(start, prefix),
 		keys:     keys,
 		values:   values,
@@ -278,6 +287,13 @@ func (db *Database) Close() error {
 	return nil
 }
 
+func (db *Database) isClosed() bool {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	return db.db == nil
+}
+
 type keyValue struct {
 	key    []byte
 	value  []byte
@@ -355,9 +371,11 @@ func (b *batch) Inner() database.Batch { return b }
 // iterator walks over both the in memory database and the underlying database
 // at the same time.
 type iterator struct {
+	db *Database
 	database.Iterator
 
 	key, value []byte
+	err        error
 
 	keys   []string
 	values []valueDelete
@@ -369,6 +387,14 @@ type iterator struct {
 // iterator is exhausted. We must pay careful attention to set the proper values
 // based on if the in memory db or the underlying db should be read next
 func (it *iterator) Next() bool {
+	// Short-circuit and set an error if the underlying database has been closed.
+	if it.db.isClosed() {
+		it.key = nil
+		it.value = nil
+		it.err = database.ErrClosed
+		return false
+	}
+
 	if !it.initialized {
 		it.exhausted = !it.Iterator.Next()
 		it.initialized = true
@@ -432,6 +458,13 @@ func (it *iterator) Next() bool {
 			}
 		}
 	}
+}
+
+func (it *iterator) Error() error {
+	if it.err != nil {
+		return it.err
+	}
+	return it.Iterator.Error()
 }
 
 // Key implements the Iterator interface

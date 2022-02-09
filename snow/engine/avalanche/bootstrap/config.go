@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
+	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 )
 
 type Config struct {
@@ -20,5 +21,5 @@ type Config struct {
 
 	Manager       vertex.Manager
 	VM            vertex.DAGVM
-	WeightTracker common.WeightTracker
+	WeightTracker tracker.WeightTracker
 }

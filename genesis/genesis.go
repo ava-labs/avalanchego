@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm"
-	"github.com/ava-labs/avalanchego/vms/evm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
@@ -426,7 +425,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		{
 			GenesisData: avmReply.Bytes,
 			SubnetID:    constants.PrimaryNetworkID,
-			VMID:        avm.ID,
+			VMID:        constants.AVMID,
 			FxIDs: []ids.ID{
 				secp256k1fx.ID,
 				nftfx.ID,
@@ -437,7 +436,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		{
 			GenesisData: genesisStr,
 			SubnetID:    constants.PrimaryNetworkID,
-			VMID:        evm.ID,
+			VMID:        constants.EVMID,
 			Name:        "C-Chain",
 		},
 	}

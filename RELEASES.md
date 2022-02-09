@@ -1,5 +1,36 @@
 # Release Notes
 
+## [v1.7.5](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.5)
+
+This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.
+
+### Consensus
+
+- Added asynchronous processing of `App.*` messages.
+- Added height indexing support to the `proposervm` and `rpcchainvm`. If a node is updated to `>=v1.7.5` and then downgraded to `<v1.7.5`, the user must enable the `--reset-proposervm-height-index=true` flag to ensure the `proposervm` height index is correctly updated going forward.
+- Fixed bootstrapping job counter initialization that could cause negative ETAs to be reported.
+- Fixed incorrect processing check that could log incorrect information.
+- Removed incorrect warning logs.
+
+### Miscellaneous
+
+- Added tracked subnets to be reported in calls to the `info.peers` API.
+- Updated gRPC implementations to use `buf` tooling and standardized naming and locations.
+- Added a consistent hashing implementation to be used in future improvements.
+- Fixed database iteration invariants to report `ErrClosed` rather than silently exiting.
+- Added additional sanity checks to prevent users from incorrectly configuring their node.
+- Updated log timestamps to include milliseconds.
+
+### Coreth
+
+- Added beta support for offline pruning.
+- Refactored peer networking layer.
+- Enabled cheap metrics by default.
+- Marked RPC call metrics as expensive.
+- Added Abigen support for native asset call precompile.
+- Fixed bug in BLOCKHASH opcode during traceBlock.
+- Fixed bug in handling updated chain config on startup.
+
 ## [v1.7.4](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.4)
 
 This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.

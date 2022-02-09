@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -21,11 +22,12 @@ const (
 )
 
 var (
-	runnableJobIDsKey = []byte("runnable")
-	jobsKey           = []byte("jobs")
-	dependenciesKey   = []byte("dependencies")
-	missingJobIDsKey  = []byte("missing job IDs")
-	pendingJobsKey    = []byte("pendingJobs")
+	runnableJobIDsPrefix = []byte("runnable")
+	jobsPrefix           = []byte("jobs")
+	dependenciesPrefix   = []byte("dependencies")
+	missingJobIDsPrefix  = []byte("missing job IDs")
+	metadataPrefix       = []byte("metadata")
+	numJobsKey           = []byte("numJobs")
 )
 
 type state struct {
@@ -33,19 +35,22 @@ type state struct {
 	runnableJobIDs linkeddb.LinkedDB
 	cachingEnabled bool
 	jobsCache      cache.Cacher
-	jobs           database.Database
+	jobsDB         database.Database
 	// Should be prefixed with the jobID that we are attempting to find the
 	// dependencies of. This prefixdb.Database should then be wrapped in a
 	// linkeddb.LinkedDB to read the dependencies.
-	dependencies database.Database
+	dependenciesDB database.Database
 	// This is a cache that tracks LinkedDB iterators that have recently been
 	// made.
 	dependentsCache cache.Cacher
 	missingJobIDs   linkeddb.LinkedDB
-	// data store that tracks the last known checkpoint of how many jobs were pending in the queue.
-	pendingJobs database.KeyValueReaderWriter
-	// represents the number of pending jobs in the queue.
-	numPendingJobs uint64
+	// This tracks the summary values of this state. Currently, this only
+	// contains the last known checkpoint of how many jobs are currently in the
+	// queue to execute.
+	metadataDB database.Database
+	// This caches the number of jobs that are currently in the queue to
+	// execute.
+	numJobs uint64
 }
 
 func newState(
@@ -59,47 +64,93 @@ func newState(
 		return nil, fmt.Errorf("couldn't create metered cache: %w", err)
 	}
 
-	pendingJobs := prefixdb.New(pendingJobsKey, db)
-	numPendingJobs, err := getPendingJobs(pendingJobs)
+	metadataDB := prefixdb.New(metadataPrefix, db)
+	jobs := prefixdb.New(jobsPrefix, db)
+	numJobs, err := getNumJobs(metadataDB, jobs)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize pending jobs: %w", err)
 	}
 	return &state{
-		runnableJobIDs:  linkeddb.NewDefault(prefixdb.New(runnableJobIDsKey, db)),
+		runnableJobIDs:  linkeddb.NewDefault(prefixdb.New(runnableJobIDsPrefix, db)),
 		cachingEnabled:  true,
 		jobsCache:       jobsCache,
-		jobs:            prefixdb.New(jobsKey, db),
-		dependencies:    prefixdb.New(dependenciesKey, db),
+		jobsDB:          jobs,
+		dependenciesDB:  prefixdb.New(dependenciesPrefix, db),
 		dependentsCache: &cache.LRU{Size: dependentsCacheSize},
-		missingJobIDs:   linkeddb.NewDefault(prefixdb.New(missingJobIDsKey, db)),
-		pendingJobs:     pendingJobs,
-		numPendingJobs:  numPendingJobs,
+		missingJobIDs:   linkeddb.NewDefault(prefixdb.New(missingJobIDsPrefix, db)),
+		metadataDB:      metadataDB,
+		numJobs:         numJobs,
 	}, nil
 }
 
-// TODO remove this in a future release, since by then it's likely most customers will have a checkpoint set.
-// This is to avoid the edge-condition where a customer may have partially bootstrapped before this release,
-// and won't have a checkpoint on disk to go off of.
-func initializePendingJobs(d database.Database) (uint64, error) {
-	var pendingJobs uint64
-	iterator := d.NewIterator()
-	defer iterator.Release()
-
-	for iterator.Next() {
-		pendingJobs++
+func getNumJobs(d database.Database, jobs database.Iteratee) (uint64, error) {
+	numJobs, err := database.GetUInt64(d, numJobsKey)
+	if err == database.ErrNotFound {
+		// If we don't have a checkpoint, we need to initialize it.
+		count, err := database.Count(jobs)
+		return uint64(count), err
 	}
-
-	return pendingJobs, iterator.Error()
+	return numJobs, err
 }
 
-func getPendingJobs(d database.Database) (uint64, error) {
-	pendingJobs, err := database.GetUInt64(d, pendingJobsKey)
+func (s *state) Clear() error {
+	var (
+		runJobsIter  = s.runnableJobIDs.NewIterator()
+		jobsIter     = s.jobsDB.NewIterator()
+		depsIter     = s.dependenciesDB.NewIterator()
+		missJobsIter = s.missingJobIDs.NewIterator()
+	)
+	defer func() {
+		runJobsIter.Release()
+		jobsIter.Release()
+		depsIter.Release()
+		missJobsIter.Release()
+	}()
 
-	if err == database.ErrNotFound {
-		return initializePendingJobs(d) // If we don't have a checkpoint, we need to initialize it.
+	// clear runnableJobIDs
+	for runJobsIter.Next() {
+		if err := s.runnableJobIDs.Delete(runJobsIter.Key()); err != nil {
+			return err
+		}
 	}
 
-	return pendingJobs, err
+	// clear jobs
+	s.jobsCache.Flush()
+	for jobsIter.Next() {
+		if err := s.jobsDB.Delete(jobsIter.Key()); err != nil {
+			return err
+		}
+	}
+
+	// clear dependencies
+	s.dependentsCache.Flush()
+	for depsIter.Next() {
+		if err := s.dependenciesDB.Delete(depsIter.Key()); err != nil {
+			return err
+		}
+	}
+
+	// clear missing jobs IDs
+	for missJobsIter.Next() {
+		if err := s.missingJobIDs.Delete(missJobsIter.Key()); err != nil {
+			return err
+		}
+	}
+
+	// clear number of pending jobs
+	s.numJobs = 0
+	if err := database.PutUInt64(s.metadataDB, numJobsKey, s.numJobs); err != nil {
+		return err
+	}
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		runJobsIter.Error(),
+		jobsIter.Error(),
+		depsIter.Error(),
+		missJobsIter.Error(),
+	)
+	return errs.Err
 }
 
 // AddRunnableJob adds [jobID] to the runnable queue
@@ -132,17 +183,17 @@ func (s *state) RemoveRunnableJob() (Job, error) {
 		return nil, err
 	}
 
-	if err := s.jobs.Delete(jobIDBytes); err != nil {
+	if err := s.jobsDB.Delete(jobIDBytes); err != nil {
 		return job, err
 	}
 
 	// Guard rail to make sure we don't underflow.
-	if s.numPendingJobs == 0 {
+	if s.numJobs == 0 {
 		return job, nil
 	}
-	s.numPendingJobs--
+	s.numJobs--
 
-	return job, database.PutUInt64(s.pendingJobs, pendingJobsKey, s.numPendingJobs)
+	return job, database.PutUInt64(s.metadataDB, numJobsKey, s.numJobs)
 }
 
 // PutJob adds the job to the queue
@@ -152,12 +203,12 @@ func (s *state) PutJob(job Job) error {
 		s.jobsCache.Put(id, job)
 	}
 
-	if err := s.jobs.Put(id[:], job.Bytes()); err != nil {
+	if err := s.jobsDB.Put(id[:], job.Bytes()); err != nil {
 		return err
 	}
 
-	s.numPendingJobs++
-	return database.PutUInt64(s.pendingJobs, pendingJobsKey, s.numPendingJobs)
+	s.numJobs++
+	return database.PutUInt64(s.metadataDB, numJobsKey, s.numJobs)
 }
 
 // HasJob returns true if the job [id] is in the queue
@@ -167,7 +218,7 @@ func (s *state) HasJob(id ids.ID) (bool, error) {
 			return true, nil
 		}
 	}
-	return s.jobs.Has(id[:])
+	return s.jobsDB.Has(id[:])
 }
 
 // GetJob returns the job [id]
@@ -177,7 +228,7 @@ func (s *state) GetJob(id ids.ID) (Job, error) {
 			return job.(Job), nil
 		}
 	}
-	jobBytes, err := s.jobs.Get(id[:])
+	jobBytes, err := s.jobsDB.Get(id[:])
 	if err != nil {
 		return nil, err
 	}
@@ -194,8 +245,8 @@ func (s *state) AddDependency(dependency, dependent ids.ID) error {
 	return dependentsDB.Put(dependent[:], nil)
 }
 
-// RemoveDependencies removes the set of IDs that are blocking on the completion of
-// [dependency] from the database and returns them.
+// RemoveDependencies removes the set of IDs that are blocking on the completion
+// of [dependency] from the database and returns them.
 func (s *state) RemoveDependencies(dependency ids.ID) ([]ids.ID, error) {
 	dependentsDB := s.getDependentsDB(dependency)
 	iterator := dependentsDB.NewIterator()
@@ -263,7 +314,7 @@ func (s *state) getDependentsDB(dependency ids.ID) linkeddb.LinkedDB {
 			return dependentsDBIntf.(linkeddb.LinkedDB)
 		}
 	}
-	dependencyDB := prefixdb.New(dependency[:], s.dependencies)
+	dependencyDB := prefixdb.New(dependency[:], s.dependenciesDB)
 	dependentsDB := linkeddb.NewDefault(dependencyDB)
 	if s.cachingEnabled {
 		s.dependentsCache.Put(dependency, dependentsDB)

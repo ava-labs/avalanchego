@@ -1,0 +1,13 @@
+syntax = "proto3";
+package messengerproto;
+option go_package = "github.com/ava-labs/avalanchego/api/messengerproto";
+
+message NotifyRequest {
+    uint32 message = 1;
+}
+
+message NotifyResponse {}
+
+service Messenger {
+    rpc Notify(NotifyRequest) returns (NotifyResponse);
+}

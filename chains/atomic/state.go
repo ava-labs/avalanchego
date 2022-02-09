@@ -105,7 +105,7 @@ func (s *state) RemoveValue(key []byte) error {
 			return err
 		}
 
-		// The value doesn't exist, so we should optimistically deleted it
+		// The value doesn't exist, so we should optimistically delete it
 		dbElem := dbElement{Present: false}
 		valueBytes, err := s.c.Marshal(codecVersion, &dbElem)
 		if err != nil {

@@ -1,0 +1,232 @@
+syntax = "proto3";
+package vmproto;
+option go_package = "github.com/ava-labs/avalanchego/api/vmproto";
+import "google/protobuf/empty.proto";
+
+import "io/prometheus/client/metrics.proto";
+
+message InitializeRequest {
+    uint32 network_id = 1;
+    bytes subnet_id = 2;
+    bytes chain_id = 3;
+    bytes node_id = 4;
+    bytes x_chain_id = 5;
+    bytes avax_asset_id = 6;
+    bytes genesis_bytes = 7;
+    bytes upgrade_bytes = 8;
+    bytes config_bytes = 9;
+
+    repeated VersionedDBServer db_servers = 10;
+    uint32 engine_server = 11;
+    uint32 keystore_server = 12;
+    uint32 shared_memory_server = 13;
+    uint32 bc_lookup_server = 14;
+    uint32 sn_lookup_server = 15;
+    uint32 app_sender_server = 16;
+}
+
+message SetStateRequest {
+    uint32 state = 1;
+}
+
+message InitializeResponse {
+    bytes last_accepted_id = 1;
+    bytes last_accepted_parent_id = 2;
+    uint32 status = 3;
+    uint64 height = 4;
+    bytes bytes = 5;
+    bytes timestamp = 6;
+}
+
+message VersionedDBServer {
+    uint32 db_server = 1;
+    string version = 2;
+}
+
+message CreateHandlersResponse {
+    repeated Handler handlers = 1;
+}
+
+message CreateStaticHandlersResponse {
+    repeated Handler handlers = 1;
+}
+
+message Handler {
+    string prefix = 1;
+    uint32 lock_options = 2;
+    uint32 server = 3;
+}
+
+message BuildBlockResponse {
+    bytes id = 1;
+    bytes parent_id = 2;
+    bytes bytes = 3;
+    uint64 height = 4;
+    bytes timestamp = 5;
+    // status is always processing
+}
+
+message ParseBlockRequest {
+    bytes bytes = 1;
+}
+
+message ParseBlockResponse {
+    bytes id = 1;
+    bytes parent_id = 2;
+    uint32 status = 3;
+    uint64 height = 4;
+    bytes timestamp = 5;
+}
+
+message GetBlockRequest {
+    bytes id = 1;
+}
+
+message GetBlockResponse {
+    bytes parent_id = 1;
+    bytes bytes = 2;
+    uint32 status = 3;
+    uint64 height = 4;
+    bytes timestamp = 5;
+}
+
+message SetPreferenceRequest {
+    bytes id = 1;
+}
+
+message BlockVerifyRequest {
+    bytes bytes = 1;
+}
+
+message BlockVerifyResponse {
+    bytes timestamp = 1;
+}
+
+message BlockAcceptRequest {
+    bytes id = 1;
+}
+
+message BlockRejectRequest {
+    bytes id = 1;
+}
+
+message HealthResponse {
+    string details = 1;
+}
+
+message VersionResponse {
+    string version = 1;
+}
+
+message AppRequestMsg {
+    // The node that sent us this request
+    bytes node_id = 1;
+    // The ID of this request
+    uint32 request_id = 2;
+    // deadline for this request
+    bytes deadline = 3;
+    // The request body
+    bytes request = 4;
+}
+
+message AppRequestFailedMsg {
+    // The node that we failed to get a response from
+    bytes node_id = 1;
+    // The ID of the request we sent and didn't get a response to
+    uint32 request_id = 2;
+}
+
+message AppResponseMsg {
+    // The node that we got a response from
+    bytes node_id = 1;
+    // Request ID of request that this is in response to
+    uint32 request_id = 2;
+    // The response body
+    bytes response = 3;
+}
+
+message AppGossipMsg {
+    // The node that sent us a gossip message
+    bytes node_id = 1;
+    // The message body
+    bytes msg = 2;
+}
+
+message ConnectedRequest {
+    bytes node_id = 1; 
+    string version = 2;
+}
+ 
+message DisconnectedRequest {
+    bytes node_id = 1; 
+}
+
+message GetAncestorsRequest {
+    bytes blk_id = 1;
+    int32 max_blocks_num = 2;
+    int32 max_blocks_size = 3;
+    int64 max_blocks_retrival_time = 4;
+}
+
+message GetAncestorsResponse {
+    repeated bytes blks_bytes = 1;
+}
+
+message BatchedParseBlockRequest {
+    repeated bytes request = 1;
+}
+
+message BatchedParseBlockResponse {
+    repeated ParseBlockResponse response = 1;
+}
+
+// HeightIndexedVM related messages
+message VerifyHeightIndexResponse {
+    uint32 err = 1;
+}
+
+message GetBlockIDAtHeightRequest {
+    uint64 height = 1;
+}
+
+message GetBlockIDAtHeightResponse {
+    bytes blk_id = 1;
+    uint32 err = 2;
+}
+
+message GatherResponse {
+    repeated io.prometheus.client.MetricFamily metric_families = 1;
+}
+
+service VM {
+    rpc Initialize(InitializeRequest) returns (InitializeResponse);
+    rpc SetState(SetStateRequest) returns (google.protobuf.Empty);   
+    rpc Shutdown(google.protobuf.Empty) returns (google.protobuf.Empty);
+    rpc CreateHandlers(google.protobuf.Empty) returns (CreateHandlersResponse);
+    rpc CreateStaticHandlers(google.protobuf.Empty) returns (CreateStaticHandlersResponse);
+    rpc Connected(ConnectedRequest) returns (google.protobuf.Empty);
+    rpc Disconnected(DisconnectedRequest) returns (google.protobuf.Empty);
+    rpc BuildBlock(google.protobuf.Empty) returns (BuildBlockResponse);
+    rpc ParseBlock(ParseBlockRequest) returns (ParseBlockResponse);
+    rpc GetBlock(GetBlockRequest) returns (GetBlockResponse);
+    rpc SetPreference(SetPreferenceRequest) returns (google.protobuf.Empty);
+    rpc Health(google.protobuf.Empty) returns (HealthResponse);
+    rpc Version(google.protobuf.Empty) returns (VersionResponse);
+    rpc AppRequest(AppRequestMsg) returns (google.protobuf.Empty);
+    rpc AppRequestFailed(AppRequestFailedMsg) returns (google.protobuf.Empty);
+    rpc AppResponse(AppResponseMsg) returns (google.protobuf.Empty);
+    rpc AppGossip(AppGossipMsg) returns (google.protobuf.Empty);
+
+    rpc Gather(google.protobuf.Empty) returns (GatherResponse);
+
+    rpc BlockVerify(BlockVerifyRequest) returns (BlockVerifyResponse);
+    rpc BlockAccept(BlockAcceptRequest) returns (google.protobuf.Empty);
+    rpc BlockReject(BlockRejectRequest) returns (google.protobuf.Empty);
+
+    rpc GetAncestors(GetAncestorsRequest) returns (GetAncestorsResponse);
+    rpc BatchedParseBlock(BatchedParseBlockRequest) returns (BatchedParseBlockResponse);
+    
+    rpc VerifyHeightIndex(google.protobuf.Empty) returns (VerifyHeightIndexResponse);
+    rpc GetBlockIDAtHeight(GetBlockIDAtHeightRequest) returns (GetBlockIDAtHeightResponse);
+    
+}

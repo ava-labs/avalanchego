@@ -4,17 +4,24 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
 	"github.com/ava-labs/avalanchego/app/runner"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/spf13/pflag"
 )
 
 func main() {
 	fs := config.BuildFlagSet()
 	v, err := config.BuildViper(fs, os.Args[1:])
+
+	if errors.Is(err, pflag.ErrHelp) {
+		os.Exit(0)
+	}
+
 	if err != nil {
 		fmt.Printf("couldn't configure flags: %s\n", err)
 		os.Exit(1)

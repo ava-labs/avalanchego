@@ -6,9 +6,9 @@ package gsubnetlookup
 import (
 	"context"
 
+	"github.com/ava-labs/avalanchego/api/proto/gsubnetlookupproto"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gsubnetlookup/gsubnetlookupproto"
 )
 
 var _ gsubnetlookupproto.SubnetLookupServer = &Server{}
@@ -28,7 +28,7 @@ func (s *Server) SubnetID(
 	_ context.Context,
 	req *gsubnetlookupproto.SubnetIDRequest,
 ) (*gsubnetlookupproto.SubnetIDResponse, error) {
-	chainID, err := ids.ToID(req.ChainID)
+	chainID, err := ids.ToID(req.ChainId)
 	if err != nil {
 		return nil, err
 	}

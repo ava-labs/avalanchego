@@ -26,8 +26,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
+	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
+	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
@@ -360,7 +362,7 @@ func defaultVM() (*VM, database.Database, *common.SenderTest) {
 	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
 		panic(err)
 	}
-	if err := vm.Bootstrapped(); err != nil {
+	if err := vm.SetState(snow.NormalOp); err != nil {
 		panic(err)
 	}
 
@@ -434,7 +436,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
 		t.Fatal(err)
 	}
-	if err := vm.Bootstrapped(); err != nil {
+	if err := vm.SetState(snow.NormalOp); err != nil {
 		panic(err)
 	}
 
@@ -1678,7 +1680,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		t.Fatalf("Block should have failed verification due to missing UTXOs")
 	}
 
-	if err := vm.Bootstrapping(); err != nil {
+	if err := vm.SetState(snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1690,7 +1692,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.Bootstrapped(); err != nil {
+	if err := vm.SetState(snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1968,6 +1970,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	ctx := defaultContext()
 	consensusCtx := snow.DefaultConsensusContextTest()
 	consensusCtx.Context = ctx
+	consensusCtx.SetState(snow.Bootstrapping)
 	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)
@@ -2029,7 +2032,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
 	assert.NoError(t, err)
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &timeoutManager, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &timeoutManager, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	externalSender := &sender.ExternalSenderTest{TB: t}
@@ -2085,26 +2088,30 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		AllGetsServer: snowGetHandler,
 		Blocked:       blocked,
 		VM:            vm,
-		WeightTracker: common.NewWeightTracker(commonCfg.Beacons, commonCfg.StartupAlpha),
+		WeightTracker: tracker.NewWeightTracker(commonCfg.Beacons, commonCfg.StartupAlpha),
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
-	handler, err := router.NewHandler(
+	handler, err := handler.New(
 		mc,
 		bootstrapConfig.Ctx,
 		vdrs,
 		msgChan,
+		nil,
+		time.Hour,
 	)
 	assert.NoError(t, err)
 
 	bootstrapper, err := bootstrap.New(
 		bootstrapConfig,
-		handler.OnDoneBootstrapping,
+		func(lastReqID uint32) error {
+			return handler.Consensus().Start(lastReqID + 1)
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler.RegisterBootstrap(bootstrapper)
+	handler.SetBootstrapper(bootstrapper)
 
 	engineConfig := smeng.Config{
 		Ctx:           bootstrapConfig.Ctx,
@@ -2128,16 +2135,16 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler.RegisterEngine(engine)
-
-	startReqID := uint32(0)
-	if err := bootstrapper.Start(startReqID); err != nil {
-		t.Fatal(err)
-	}
+	handler.SetConsensus(engine)
 
 	// Allow incoming messages to be routed to the new chain
 	chainRouter.AddChain(handler)
-	go ctx.Log.RecoverAndPanic(handler.Dispatch)
+
+	if err := bootstrapper.Start(0); err != nil {
+		t.Fatal(err)
+	}
+
+	handler.Start(false)
 
 	if err := bootstrapper.Connected(peerID, version.CurrentApp); err != nil {
 		t.Fatal(err)

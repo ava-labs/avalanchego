@@ -1,0 +1,74 @@
+syntax = "proto3";
+package gsharedmemoryproto;
+option go_package = "github.com/ava-labs/avalanchego/api/gsharedmemoryproto";
+
+message BatchPut {
+    bytes key = 1;
+    bytes value = 2;
+}
+
+message BatchDelete {
+    bytes key = 1;
+}
+
+message Batch {
+    repeated BatchPut puts = 1;
+    repeated BatchDelete deletes = 2;
+    int64 id = 3;
+}
+
+message AtomicRequest {
+    repeated bytes remove_requests = 1;
+    repeated Element put_requests = 2;
+    bytes peer_chain_id = 3;
+}
+
+message Element {
+    bytes key = 1;
+    bytes value = 2;
+    repeated bytes traits = 3;
+}
+
+message GetRequest {
+    bytes peer_chain_id = 1;
+    repeated bytes keys = 2;
+    int64 id = 3;
+    bool continues = 4;
+}
+
+message GetResponse {
+    repeated bytes values = 1;
+    bool continues = 2;
+}
+
+message IndexedRequest {
+    bytes peer_chain_id = 1;
+    repeated bytes traits = 2;
+    bytes start_trait = 3;
+    bytes start_key = 4;
+    int32 limit = 5;
+    int64 id = 6;
+    bool continues = 7;
+}
+
+message IndexedResponse {
+    repeated bytes values = 1;
+    bytes last_trait = 2;
+    bytes last_key = 3;
+    bool continues = 4;
+}
+
+message ApplyRequest {
+    repeated AtomicRequest requests = 1;
+    repeated Batch batches = 2;
+    int64 id = 3;
+    bool continues = 4;
+}
+
+message ApplyResponse {}
+
+service SharedMemory {
+    rpc Get(GetRequest) returns (GetResponse);
+    rpc Indexed(IndexedRequest) returns (IndexedResponse);
+    rpc Apply(ApplyRequest) returns (ApplyResponse);
+}

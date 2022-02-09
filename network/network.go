@@ -372,7 +372,7 @@ func (n *network) Gossip(
 // Accept is called after every consensus decision
 // Assumes [n.stateLock] is not held.
 func (n *network) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error {
-	if !ctx.IsBootstrapped() {
+	if ctx.GetState() != snow.NormalOp {
 		// don't gossip during bootstrapping
 		return nil
 	}
@@ -641,6 +641,7 @@ func (n *network) NewPeerInfo(peer *peer) PeerInfo {
 		LastReceived:   time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
 		Benched:        n.benchlistManager.GetBenched(peer.nodeID),
 		ObservedUptime: json.Uint8(peer.observedUptime),
+		TrackedSubnets: peer.trackedSubnets.List(),
 	}
 }
 

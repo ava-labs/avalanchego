@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
+	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -78,7 +79,7 @@ func TestTimeout(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	context := snow.DefaultConsensusContextTest()
@@ -92,11 +93,13 @@ func TestTimeout(t *testing.T) {
 	wg.Add(2)
 	failedVDRs := ids.ShortSet{}
 	ctx := snow.DefaultConsensusContextTest()
-	handler, err := router.NewHandler(
+	handler, err := handler.New(
 		mc,
 		ctx,
 		vdrs,
 		nil,
+		nil,
+		time.Hour,
 	)
 	assert.NoError(t, err)
 
@@ -109,6 +112,7 @@ func TestTimeout(t *testing.T) {
 		},
 	}
 	bootstrapper.Default(true)
+	bootstrapper.CantGossip = false
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.ShortID, nodeVersion version.Application) error { return nil }
 	bootstrapper.QueryFailedF = func(nodeID ids.ShortID, _ uint32) error {
@@ -116,12 +120,11 @@ func TestTimeout(t *testing.T) {
 		wg.Done()
 		return nil
 	}
-	handler.RegisterBootstrap(bootstrapper)
+	handler.SetBootstrapper(bootstrapper)
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
-	go handler.Dispatch()
-
 	chainRouter.AddChain(handler)
+	handler.Start(false)
 
 	vdrIDs := ids.ShortSet{}
 	vdrIDs.Add(ids.ShortID{255})
@@ -163,8 +166,7 @@ func TestReliableMessages(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Hour, time.Second,
-		ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	context := snow.DefaultConsensusContextTest()
@@ -177,11 +179,13 @@ func TestReliableMessages(t *testing.T) {
 
 	ctx := snow.DefaultConsensusContextTest()
 
-	handler, err := router.NewHandler(
+	handler, err := handler.New(
 		mc,
 		ctx,
 		vdrs,
 		nil,
+		nil,
+		1,
 	)
 	assert.NoError(t, err)
 
@@ -194,6 +198,7 @@ func TestReliableMessages(t *testing.T) {
 		},
 	}
 	bootstrapper.Default(true)
+	bootstrapper.CantGossip = false
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.ShortID, nodeVersion version.Application) error { return nil }
 	queriesToSend := 1000
@@ -205,12 +210,12 @@ func TestReliableMessages(t *testing.T) {
 		close(awaiting[int(reqID)])
 		return nil
 	}
-	handler.RegisterBootstrap(bootstrapper)
+	bootstrapper.CantGossip = false
+	handler.SetBootstrapper(bootstrapper)
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
-	go handler.Dispatch()
-
 	chainRouter.AddChain(handler)
+	handler.Start(false)
 
 	go func() {
 		for i := 0; i < queriesToSend; i++ {
@@ -218,13 +223,6 @@ func TestReliableMessages(t *testing.T) {
 			vdrIDs.Add(ids.ShortID{1})
 
 			sender.SendPullQuery(vdrIDs, uint32(i), ids.Empty)
-			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
-		}
-	}()
-
-	go func() {
-		for {
-			chainRouter.Gossip()
 			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
 		}
 	}()
@@ -261,7 +259,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
 	assert.NoError(t, err)
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	context := snow.DefaultConsensusContextTest()
@@ -273,11 +271,13 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
-	handler, err := router.NewHandler(
+	handler, err := handler.New(
 		mc,
 		ctx,
 		vdrs,
 		nil,
+		nil,
+		time.Second,
 	)
 	assert.NoError(t, err)
 
@@ -290,6 +290,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		},
 	}
 	bootstrapper.Default(true)
+	bootstrapper.CantGossip = false
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.ShortID, nodeVersion version.Application) error { return nil }
 	queriesToSend := 2
@@ -301,12 +302,11 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		close(awaiting[int(reqID)])
 		return nil
 	}
-	handler.RegisterBootstrap(bootstrapper)
+	handler.SetBootstrapper(bootstrapper)
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
-	go handler.Dispatch()
-
 	chainRouter.AddChain(handler)
+	handler.Start(false)
 
 	go func() {
 		for i := 0; i < queriesToSend; i++ {

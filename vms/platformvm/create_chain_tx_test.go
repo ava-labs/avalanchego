@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/stretchr/testify/assert"
@@ -45,7 +45,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			shouldErr:   true,
 			subnetID:    testSubnet1.ID(),
 			genesisData: nil,
-			vmID:        avm.ID,
+			vmID:        constants.AVMID,
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -56,7 +56,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			shouldErr:   true,
 			subnetID:    testSubnet1.ID(),
 			genesisData: nil,
-			vmID:        avm.ID,
+			vmID:        constants.AVMID,
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -67,7 +67,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			shouldErr:   true,
 			subnetID:    testSubnet1.ID(),
 			genesisData: nil,
-			vmID:        avm.ID,
+			vmID:        constants.AVMID,
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -78,7 +78,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			shouldErr:   true,
 			subnetID:    testSubnet1.ID(),
 			genesisData: nil,
-			vmID:        avm.ID,
+			vmID:        constants.AVMID,
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -89,7 +89,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			shouldErr:   true,
 			subnetID:    testSubnet1.ID(),
 			genesisData: nil,
-			vmID:        avm.ID,
+			vmID:        constants.AVMID,
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -103,7 +103,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			shouldErr:   true,
 			subnetID:    testSubnet1.ID(),
 			genesisData: nil,
-			vmID:        avm.ID,
+			vmID:        constants.AVMID,
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -117,7 +117,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			shouldErr:   true,
 			subnetID:    testSubnet1.ID(),
 			genesisData: nil,
-			vmID:        avm.ID,
+			vmID:        constants.AVMID,
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -165,7 +165,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	tx, err := vm.newCreateChainTx(
 		testSubnet1.ID(),
 		nil,
-		avm.ID,
+		constants.AVMID,
 		nil,
 		"chain name",
 		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
@@ -202,7 +202,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	tx, err := vm.newCreateChainTx( // create a tx
 		testSubnet1.ID(),
 		nil,
-		avm.ID,
+		constants.AVMID,
 		nil,
 		"chain name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -251,7 +251,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	tx, err := vm.newCreateChainTx(
 		testSubnet1.ID(),
 		nil,
-		avm.ID,
+		constants.AVMID,
 		nil,
 		"chain name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -288,7 +288,7 @@ func TestCreateChainTxValid(t *testing.T) {
 	tx, err := vm.newCreateChainTx(
 		testSubnet1.ID(),
 		nil,
-		avm.ID,
+		constants.AVMID,
 		nil,
 		"chain name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -369,7 +369,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 					Outs:         outs,
 				}},
 				SubnetID:   testSubnet1.ID(),
-				VMID:       avm.ID,
+				VMID:       constants.AVMID,
 				SubnetAuth: subnetAuth,
 			}
 			tx := &Tx{UnsignedTx: utx}

@@ -24,11 +24,11 @@ func (ContinuousFactory) New(halflife time.Duration) Meter {
 }
 
 type continuousMeter struct {
-	running bool
+	halflife float64
+	value    float64
 
-	halflife    float64
-	value       float64
-	lastUpdated time.Time
+	numCoresRunning uint
+	lastUpdated     time.Time
 }
 
 // NewMeter returns a new Meter with the provided halflife
@@ -39,19 +39,13 @@ func NewMeter(halflife time.Duration) Meter {
 }
 
 func (a *continuousMeter) Start(currentTime time.Time) {
-	a.update(currentTime, true)
+	a.Read(currentTime)
+	a.numCoresRunning++
 }
 
 func (a *continuousMeter) Stop(currentTime time.Time) {
-	a.update(currentTime, false)
-}
-
-func (a *continuousMeter) update(currentTime time.Time, running bool) {
-	if a.running == running {
-		return
-	}
 	a.Read(currentTime)
-	a.running = running
+	a.numCoresRunning--
 }
 
 func (a *continuousMeter) Read(currentTime time.Time) float64 {
@@ -63,8 +57,6 @@ func (a *continuousMeter) Read(currentTime time.Time) float64 {
 
 	factor := math.Exp(float64(timeSincePreviousUpdate) / a.halflife)
 	a.value *= factor
-	if a.running {
-		a.value += 1 - factor
-	}
+	a.value += float64(a.numCoresRunning) * (1 - factor)
 	return a.value
 }

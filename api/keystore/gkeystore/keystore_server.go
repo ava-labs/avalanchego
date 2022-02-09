@@ -11,10 +11,10 @@ import (
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/ava-labs/avalanchego/api/keystore"
-	"github.com/ava-labs/avalanchego/api/keystore/gkeystore/gkeystoreproto"
+	"github.com/ava-labs/avalanchego/api/proto/gkeystoreproto"
+	"github.com/ava-labs/avalanchego/api/proto/rpcdbproto"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
-	"github.com/ava-labs/avalanchego/database/rpcdb/rpcdbproto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )

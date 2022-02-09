@@ -1,0 +1,47 @@
+syntax = "proto3";
+package gresponsewriterproto;
+option go_package = "github.com/ava-labs/avalanchego/api/gresponsewriterproto";
+
+message Header {
+    string key = 1;
+    repeated string values = 2;
+}
+
+message WriteRequest {
+    repeated Header headers = 1;
+    bytes payload = 2;
+}
+
+message WriteResponse {
+    int32 written = 1;
+}
+
+message WriteHeaderRequest {
+    repeated Header headers = 1;
+    int32 status_code = 2;
+}
+
+message WriteHeaderResponse {}
+
+message FlushRequest {}
+
+message FlushResponse {}
+
+message HijackRequest {}
+
+message HijackResponse {
+    uint32 conn_server = 1;
+    string local_network = 2;
+    string local_string = 3;
+    string remote_network = 4;
+    string remote_string = 5;
+    uint32 reader_server = 6;
+    uint32 writer_server = 7;
+}
+
+service Writer {
+    rpc Write(WriteRequest) returns (WriteResponse);
+    rpc WriteHeader(WriteHeaderRequest) returns (WriteHeaderResponse);
+    rpc Flush(FlushRequest) returns (FlushResponse);
+    rpc Hijack(HijackRequest) returns (HijackResponse);
+}

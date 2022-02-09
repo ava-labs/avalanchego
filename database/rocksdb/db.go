@@ -292,6 +292,13 @@ func (db *Database) Close() error {
 	return nil
 }
 
+func (db *Database) isClosed() bool {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	return db.db == nil
+}
+
 // batch is a wrapper around a levelDB batch to contain sizes.
 type batch struct {
 	batch *grocksdb.WriteBatch
@@ -362,10 +369,16 @@ type iterator struct {
 	started bool
 	key     []byte
 	value   []byte
+	err     error
 }
 
 // Error implements the Iterator interface
-func (it *iterator) Error() error { return it.it.Err() }
+func (it *iterator) Error() error {
+	if it.err != nil {
+		return it.err
+	}
+	return it.it.Err()
+}
 
 // Key implements the Iterator interface
 func (it *iterator) Key() []byte {
@@ -387,6 +400,12 @@ func (it *iterator) Release() {
 }
 
 func (it *iterator) Next() bool {
+	if it.db.isClosed() {
+		it.key = nil
+		it.value = nil
+		it.err = database.ErrClosed
+		return false
+	}
 	if it.started {
 		it.it.Next()
 	}

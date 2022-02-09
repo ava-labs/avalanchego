@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/version"
@@ -891,12 +892,11 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	err = vm.Bootstrapping()
-	if err != nil {
+	if err = vm.SetState(snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.Bootstrapped()
+	err = vm.SetState(snow.NormalOp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1318,12 +1318,11 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	err = vm.Bootstrapping()
-	if err != nil {
+	if err = vm.SetState(snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.Bootstrapped()
+	err = vm.SetState(snow.NormalOp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1464,12 +1463,11 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	err = vm.Bootstrapping()
-	if err != nil {
+	if err = vm.SetState(snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.Bootstrapped()
+	err = vm.SetState(snow.NormalOp)
 	if err != nil {
 		t.Fatal(err)
 	}

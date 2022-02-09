@@ -1,0 +1,15 @@
+syntax = "proto3";
+package gsubnetlookupproto;
+option go_package = "github.com/ava-labs/avalanchego/api/gsubnetlookupproto";
+
+message SubnetIDRequest {
+    bytes chain_id = 1;
+}
+
+message SubnetIDResponse {
+    bytes id = 1;
+}
+
+service SubnetLookup {
+    rpc SubnetID(SubnetIDRequest) returns (SubnetIDResponse);
+}

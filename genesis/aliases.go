@@ -6,8 +6,6 @@ package genesis
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/vms/avm"
-	"github.com/ava-labs/avalanchego/vms/evm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
@@ -38,10 +36,10 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, err
 	for _, chain := range genesis.Chains {
 		uChain := chain.UnsignedTx.(*platformvm.UnsignedCreateChainTx)
 		switch uChain.VMID {
-		case avm.ID:
+		case constants.AVMID:
 			apiAliases[constants.ChainAliasPrefix+chain.ID().String()] = []string{"X", "avm", constants.ChainAliasPrefix + "X", constants.ChainAliasPrefix + "avm"}
 			chainAliases[chain.ID()] = GetXChainAliases()
-		case evm.ID:
+		case constants.EVMID:
 			apiAliases[constants.ChainAliasPrefix+chain.ID().String()] = []string{"C", "evm", constants.ChainAliasPrefix + "C", constants.ChainAliasPrefix + "evm"}
 			chainAliases[chain.ID()] = GetCChainAliases()
 		}
@@ -59,11 +57,11 @@ func GetXChainAliases() []string {
 
 func GetVMAliases() map[ids.ID][]string {
 	return map[ids.ID][]string{
-		platformvm.ID:  {"platform"},
-		avm.ID:         {"avm"},
-		evm.ID:         {"evm"},
-		secp256k1fx.ID: {"secp256k1fx"},
-		nftfx.ID:       {"nftfx"},
-		propertyfx.ID:  {"propertyfx"},
+		constants.PlatformVMID: {"platform"},
+		constants.AVMID:        {"avm"},
+		constants.EVMID:        {"evm"},
+		secp256k1fx.ID:         {"secp256k1fx"},
+		nftfx.ID:               {"nftfx"},
+		propertyfx.ID:          {"propertyfx"},
 	}
 }

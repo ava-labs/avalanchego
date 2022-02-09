@@ -7,7 +7,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greader/greaderproto"
+	"github.com/ava-labs/avalanchego/api/proto/greaderproto"
 )
 
 var _ greaderproto.ReaderServer = &Server{}

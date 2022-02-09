@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -68,7 +69,7 @@ func TestEngineAdd(t *testing.T) {
 	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -174,7 +175,7 @@ func TestEngineQuery(t *testing.T) {
 	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -465,7 +466,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -739,7 +740,7 @@ func TestEngineAbandonResponse(t *testing.T) {
 	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -821,7 +822,7 @@ func TestEngineScheduleRepoll(t *testing.T) {
 	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -924,7 +925,7 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 	sender.CantSendGetAcceptedFrontier = false
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -1001,9 +1002,7 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 		}, nil
 	}
 
-	vm.CantBootstrapping = false
-	vm.CantBootstrapped = false
-
+	vm.CantSetState = false
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
@@ -1014,11 +1013,8 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.CantBootstrapping = true
-	vm.CantBootstrapped = true
-
+	vm.CantSetState = true
 	sender.CantSendPushQuery = false
-
 	vm.PendingTxsF = func() []snowstorm.Tx { return []snowstorm.Tx{tx0, tx1} }
 	if err := te.Notify(common.PendingTxs); err != nil {
 		t.Fatal(err)
@@ -1037,7 +1033,7 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 	sender.CantSendGetAcceptedFrontier = false
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -1103,9 +1099,7 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	vm.CantBootstrapping = false
-	vm.CantBootstrapped = false
-
+	vm.CantSetState = false
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
@@ -1116,8 +1110,7 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.CantBootstrapping = true
-	vm.CantBootstrapped = true
+	vm.CantSetState = true
 	manager.BuildVtxF = func(_ []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
 		return &avalanche.TestVertex{
 			TestDecidable: choices.TestDecidable{
@@ -1156,7 +1149,7 @@ func TestEngineIssueRepoll(t *testing.T) {
 	engCfg.Sender = sender
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -1233,7 +1226,7 @@ func TestEngineReissue(t *testing.T) {
 	engCfg.Sender = sender
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -1330,9 +1323,7 @@ func TestEngineReissue(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	vm.CantBootstrapping = false
-	vm.CantBootstrapped = false
-
+	vm.CantSetState = false
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
@@ -1343,9 +1334,7 @@ func TestEngineReissue(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.CantBootstrapping = true
-	vm.CantBootstrapped = true
-
+	vm.CantSetState = true
 	lastVtx := new(avalanche.TestVertex)
 	manager.BuildVtxF = func(_ []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
 		lastVtx = &avalanche.TestVertex{
@@ -1426,7 +1415,7 @@ func TestEngineLargeIssue(t *testing.T) {
 	engCfg.Sender = sender
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -1492,9 +1481,7 @@ func TestEngineLargeIssue(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	vm.CantBootstrapping = false
-	vm.CantBootstrapped = false
-
+	vm.CantSetState = false
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
@@ -1505,9 +1492,7 @@ func TestEngineLargeIssue(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.CantBootstrapping = true
-	vm.CantBootstrapped = true
-
+	vm.CantSetState = true
 	lastVtx := new(avalanche.TestVertex)
 	manager.BuildVtxF = func(_ []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
 		lastVtx = &avalanche.TestVertex{
@@ -1603,7 +1588,7 @@ func TestEngineInsufficientValidators(t *testing.T) {
 	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -1680,7 +1665,7 @@ func TestEnginePushGossip(t *testing.T) {
 	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -1774,7 +1759,7 @@ func TestEngineSingleQuery(t *testing.T) {
 	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -1852,7 +1837,7 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -1963,7 +1948,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -2091,7 +2076,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -2230,7 +2215,7 @@ func TestEngineMissingTx(t *testing.T) {
 	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -2369,7 +2354,7 @@ func TestEngineIssueBlockingTx(t *testing.T) {
 	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -2439,7 +2424,7 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -2575,7 +2560,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Beacons = vals
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
@@ -2603,8 +2588,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	bootCfg.VM = vm
 	engCfg.VM = vm
 
-	vm.CantBootstrapping = false
-	vm.CantBootstrapped = false
+	vm.CantSetState = false
 	vm.CantConnected = false
 
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
@@ -2852,7 +2836,7 @@ func TestEngineReBootstrapFails(t *testing.T) {
 	bootCfg.RetryBootstrapWarnFrequency = 4
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Beacons = vals
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
@@ -2880,8 +2864,7 @@ func TestEngineReBootstrapFails(t *testing.T) {
 	bootCfg.VM = vm
 	engCfg.VM = vm
 
-	vm.CantBootstrapping = false
-	vm.CantBootstrapped = false
+	vm.CantSetState = false
 
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
@@ -3014,7 +2997,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 	bootCfg.RetryBootstrapWarnFrequency = 4
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Beacons = vals
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
@@ -3042,8 +3025,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 	bootCfg.VM = vm
 	engCfg.VM = vm
 
-	vm.CantBootstrapping = false
-	vm.CantBootstrapped = false
+	vm.CantSetState = false
 	vm.CantConnected = false
 
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
@@ -3297,7 +3279,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -3406,7 +3388,7 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -3551,7 +3533,7 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -3705,7 +3687,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -3861,7 +3843,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	engCfg.Params.BetaRogue = 3
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -3917,9 +3899,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 		BytesV:   []byte{1},
 	}
 
-	vm.CantBootstrapping = false
-	vm.CantBootstrapped = false
-
+	vm.CantSetState = false
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
@@ -3930,9 +3910,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.CantBootstrapping = true
-	vm.CantBootstrapped = true
-
+	vm.CantSetState = true
 	parsed := new(bool)
 	manager.ParseVtxF = func(b []byte) (avalanche.Vertex, error) {
 		if bytes.Equal(b, vtx.Bytes()) {
@@ -3986,7 +3964,7 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 	engCfg.Sender = sender
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -4043,9 +4021,7 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	vm.CantBootstrapping = false
-	vm.CantBootstrapped = false
-
+	vm.CantSetState = false
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
@@ -4056,9 +4032,7 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.CantBootstrapping = true
-	vm.CantBootstrapped = true
-
+	vm.CantSetState = true
 	lastVtx := new(avalanche.TestVertex)
 	manager.BuildVtxF = func(_ []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
 		lastVtx = &avalanche.TestVertex{
@@ -4102,7 +4076,7 @@ func TestEngineDoubleChit(t *testing.T) {
 	engCfg.Params.K = 2
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -4236,7 +4210,7 @@ func TestEngineBubbleVotes(t *testing.T) {
 	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -4399,7 +4373,7 @@ func TestEngineIssue(t *testing.T) {
 	engCfg.Sender = sender
 
 	vals := validators.NewSet()
-	wt := common.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
@@ -4464,9 +4438,7 @@ func TestEngineIssue(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	vm.CantBootstrapping = false
-	vm.CantBootstrapped = false
-
+	vm.CantSetState = false
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
@@ -4477,9 +4449,7 @@ func TestEngineIssue(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.CantBootstrapping = true
-	vm.CantBootstrapped = true
-
+	vm.CantSetState = true
 	numBuilt := 0
 	manager.BuildVtxF = func(_ []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
 		numBuilt++
@@ -4571,8 +4541,8 @@ func TestAbandonTx(t *testing.T) {
 
 	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
 	vm.Default(true)
-	vm.CantBootstrapping = false
-	vm.CantBootstrapped = false
+	vm.CantSetState = false
+
 	bootCfg.VM = vm
 	engCfg.VM = vm
 

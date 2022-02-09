@@ -10,12 +10,12 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
+	"github.com/ava-labs/avalanchego/api/proto/ghttpproto"
+	"github.com/ava-labs/avalanchego/api/proto/greadcloserproto"
+	"github.com/ava-labs/avalanchego/api/proto/gresponsewriterproto"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/ghttpproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greadcloser"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greadcloser/greadcloserproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter/gresponsewriterproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
 
@@ -86,7 +86,7 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Form:             make([]*ghttpproto.Element, 0, len(r.Form)),
 			PostForm:         make([]*ghttpproto.Element, 0, len(r.PostForm)),
 			RemoteAddr:       r.RemoteAddr,
-			RequestURI:       r.RequestURI,
+			RequestUri:       r.RequestURI,
 		},
 	}
 	for key, values := range w.Header() {

@@ -217,9 +217,6 @@ func (b *bootstrapper) Notify(common.Message) error { return nil }
 // Context implements the common.Engine interface.
 func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
 
-// IsBootstrapped implements the common.Engine interface.
-func (b *bootstrapper) IsBootstrapped() bool { return b.Ctx.IsBootstrapped() }
-
 // Start implements the common.Engine interface.
 func (b *bootstrapper) Start(startReqID uint32) error {
 	b.Ctx.Log.Info("Starting bootstrap...")
@@ -248,7 +245,7 @@ func (b *bootstrapper) GetVM() common.VM { return b.VM }
 
 // ForceAccepted implements common.Bootstrapable interface
 func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
-	if err := b.VM.Bootstrapping(); err != nil {
+	if err := b.VM.SetState(snow.Bootstrapping); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
 			err)
 	}
@@ -315,6 +312,14 @@ func (b *bootstrapper) fetch(blkID ids.ID) error {
 	b.OutstandingRequests.Add(validatorID, b.Config.SharedCfg.RequestID, blkID)
 	b.Config.Sender.SendGetAncestors(validatorID, b.Config.SharedCfg.RequestID, blkID) // request block and ancestors
 	return nil
+}
+
+// Clear implements common.Bootstrapable interface
+func (b *bootstrapper) Clear() error {
+	if err := b.Config.Blocked.Clear(); err != nil {
+		return err
+	}
+	return b.Config.Blocked.Commit()
 }
 
 // process a block
@@ -470,14 +475,11 @@ func (b *bootstrapper) checkFinish() error {
 }
 
 func (b *bootstrapper) finish() error {
-	if err := b.VM.Bootstrapped(); err != nil {
+	if err := b.VM.SetState(snow.NormalOp); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has finished: %w",
 			err)
 	}
 
 	// Start consensus
-	if err := b.OnFinished(b.Config.SharedCfg.RequestID); err != nil {
-		return err
-	}
-	return nil
+	return b.OnFinished(b.Config.SharedCfg.RequestID)
 }

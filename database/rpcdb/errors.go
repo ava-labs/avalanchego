@@ -19,10 +19,8 @@ var (
 )
 
 func errorToRPCError(err error) error {
-	switch err {
-	case database.ErrClosed, database.ErrNotFound:
+	if _, ok := errorToErrCode[err]; ok {
 		return nil
-	default:
-		return err
 	}
+	return err
 }

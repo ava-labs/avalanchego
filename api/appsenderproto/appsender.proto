@@ -1,0 +1,42 @@
+syntax = "proto3";
+package appsenderproto;
+option go_package = "github.com/ava-labs/avalanchego/snow/engine/common/appsender/appsenderproto";
+import "google/protobuf/empty.proto";
+
+message SendAppRequestMsg {
+    // The nodes to send this request to
+    repeated bytes node_ids = 1;
+    // The ID of this request
+    uint32 request_id = 2;
+    // The request body
+    bytes request = 3;
+}
+
+
+message SendAppResponseMsg {
+    // The node to send a response to
+    bytes node_id = 1;
+    // ID of this request
+    uint32 request_id = 2;
+    // The response body
+    bytes response = 3;
+}
+
+message SendAppGossipMsg {
+    // The message body
+    bytes msg = 1;
+}
+
+message SendAppGossipSpecificMsg {
+    // The nodes to send this request to
+    repeated bytes node_ids = 1;
+    // The message body
+    bytes msg = 2;
+}
+
+service AppSender {
+    rpc SendAppRequest(SendAppRequestMsg) returns (google.protobuf.Empty);
+    rpc SendAppResponse(SendAppResponseMsg) returns (google.protobuf.Empty);
+    rpc SendAppGossip(SendAppGossipMsg) returns (google.protobuf.Empty);
+    rpc SendAppGossipSpecific(SendAppGossipSpecificMsg) returns (google.protobuf.Empty);
+}

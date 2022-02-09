@@ -73,8 +73,11 @@ func initTestProposerVM(
 	}
 
 	initialState := []byte("genesis state")
-	coreVM := &block.TestVM{}
-	coreVM.T = t
+	coreVM := &block.TestVM{
+		TestVM: common.TestVM{
+			T: t,
+		},
+	}
 
 	coreVM.InitializeF = func(*snow.Context, manager.Manager,
 		[]byte, []byte, []byte, chan<- common.Message,
@@ -99,7 +102,7 @@ func initTestProposerVM(
 		}
 	}
 
-	proVM := New(coreVM, proBlkStartTime, minPChainHeight)
+	proVM := New(coreVM, proBlkStartTime, minPChainHeight, false)
 
 	valState := &validators.TestState{
 		T: t,
@@ -130,7 +133,7 @@ func initTestProposerVM(
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
-	if err := proVM.Bootstrapped(); err != nil {
+	if err := proVM.SetState(snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -834,7 +837,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		}
 	}
 
-	proVM := New(coreVM, time.Time{}, 0)
+	proVM := New(coreVM, time.Time{}, 0, false)
 
 	valState := &validators.TestState{
 		T: t,
@@ -878,7 +881,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
-	if err := proVM.Bootstrapped(); err != nil {
+	if err := proVM.SetState(snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1163,13 +1166,13 @@ func TestInnerVMRollback(t *testing.T) {
 
 	dbManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 
-	proVM := New(coreVM, time.Time{}, 0)
+	proVM := New(coreVM, time.Time{}, 0, false)
 
 	if err := proVM.Initialize(ctx, dbManager, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("failed to initialize proposerVM with %s", err)
 	}
 
-	if err := proVM.Bootstrapped(); err != nil {
+	if err := proVM.SetState(snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1245,7 +1248,7 @@ func TestInnerVMRollback(t *testing.T) {
 
 	coreBlk.StatusV = choices.Processing
 
-	proVM = New(coreVM, time.Time{}, 0)
+	proVM = New(coreVM, time.Time{}, 0, false)
 
 	if err := proVM.Initialize(ctx, dbManager, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("failed to initialize proposerVM with %s", err)

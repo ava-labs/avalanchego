@@ -55,7 +55,7 @@ func (j *Jobs) SetParser(parser Parser) error { j.state.parser = parser; return 
 func (j *Jobs) Has(jobID ids.ID) (bool, error) { return j.state.HasJob(jobID) }
 
 // Returns how many pending jobs are waiting in the queue.
-func (j *Jobs) PendingJobs() uint64 { return j.state.numPendingJobs }
+func (j *Jobs) PendingJobs() uint64 { return j.state.numJobs }
 
 // Push adds a new job to the queue. Returns true if [job] was added to the queue and false
 // if [job] was already in the queue.
@@ -98,7 +98,7 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 	defer ctx.Executing(false)
 
 	numExecuted := 0
-	numToExecute := j.state.numPendingJobs
+	numToExecute := j.state.numJobs
 	startTime := time.Now()
 
 	// Disable and clear state caches to prevent us from attempting to execute
@@ -185,6 +185,10 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 	return numExecuted, nil
 }
 
+func (j *Jobs) Clear() error {
+	return j.state.Clear()
+}
+
 // Commit the versionDB to the underlying database.
 func (j *Jobs) Commit() error {
 	return j.db.Commit()
@@ -222,6 +226,18 @@ func NewWithMissing(
 func (jm *JobsWithMissing) SetParser(parser Parser) error {
 	jm.state.parser = parser
 	return jm.cleanRunnableStack()
+}
+
+func (jm *JobsWithMissing) Clear() error {
+	if err := jm.state.RemoveMissingJobIDs(jm.missingIDs); err != nil {
+		return err
+	}
+
+	jm.missingIDs.Clear()
+	jm.addToMissingIDs.Clear()
+	jm.removeFromMissingIDs.Clear()
+
+	return jm.Jobs.Clear()
 }
 
 func (jm *JobsWithMissing) Has(jobID ids.ID) (bool, error) {

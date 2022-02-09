@@ -10,13 +10,13 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
+	"github.com/ava-labs/avalanchego/api/proto/vmproto"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/vmproto"
 )
 
 // Handshake is a common handshake that is shared by plugin and host.
 var Handshake = plugin.HandshakeConfig{
-	ProtocolVersion:  9,
+	ProtocolVersion:  10,
 	MagicCookieKey:   "VM_PLUGIN",
 	MagicCookieValue: "dynamic",
 }

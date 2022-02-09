@@ -56,7 +56,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm"
-	"github.com/ava-labs/avalanchego/vms/evm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
@@ -482,7 +481,7 @@ func (n *Node) initChains(genesisBytes []byte) {
 		ID:            constants.PlatformChainID,
 		SubnetID:      constants.PrimaryNetworkID,
 		GenesisData:   genesisBytes, // Specifies other chains to create
-		VMAlias:       platformvm.ID.String(),
+		VMAlias:       constants.PlatformVMID.String(),
 		CustomBeacons: n.beacons,
 	})
 }
@@ -552,13 +551,13 @@ func (n *Node) addDefaultVMAliases() error {
 // AVM, Simple Payments DAG, Simple Payments Chain, and Platform VM
 // Assumes n.DBManager, n.vdrs all initialized (non-nil)
 func (n *Node) initChainManager(avaxAssetID ids.ID) error {
-	createAVMTx, err := genesis.VMGenesis(n.Config.GenesisBytes, avm.ID)
+	createAVMTx, err := genesis.VMGenesis(n.Config.GenesisBytes, constants.AVMID)
 	if err != nil {
 		return err
 	}
 	xChainID := createAVMTx.ID()
 
-	createEVMTx, err := genesis.VMGenesis(n.Config.GenesisBytes, evm.ID)
+	createEVMTx, err := genesis.VMGenesis(n.Config.GenesisBytes, constants.EVMID)
 	if err != nil {
 		return err
 	}
@@ -590,7 +589,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		n.Log,
 		n.msgCreator,
 		timeoutManager,
-		n.Config.ConsensusGossipFrequency,
 		n.Config.ConsensusShutdownTimeout,
 		criticalChains,
 		n.Shutdown,
@@ -634,6 +632,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		Metrics:                                 n.MetricsGatherer,
 		SubnetConfigs:                           n.Config.SubnetConfigs,
 		ChainConfigs:                            n.Config.ChainConfigs,
+		ConsensusGossipFrequency:                n.Config.ConsensusGossipFrequency,
 		AppGossipValidatorSize:                  int(n.Config.NetworkConfig.AppGossipValidatorSize),
 		AppGossipNonValidatorSize:               int(n.Config.NetworkConfig.AppGossipNonValidatorSize),
 		GossipAcceptedFrontierSize:              int(n.Config.NetworkConfig.GossipAcceptedFrontierSize),
@@ -642,6 +641,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
 		ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
 		ApricotPhase4MinPChainHeight:            version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
+		ResetProposerVMHeightIndex:              n.Config.ResetProposerVMHeightIndex,
 	})
 
 	vdrs := n.vdrs
@@ -656,7 +656,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	// Register the VMs that Avalanche supports
 	errs := wrappers.Errs{}
 	errs.Add(
-		n.Config.VMManager.RegisterFactory(platformvm.ID, &platformvm.Factory{
+		n.Config.VMManager.RegisterFactory(constants.PlatformVMID, &platformvm.Factory{
 			Chains:                 n.chainManager,
 			Validators:             vdrs,
 			UptimeLockedCalculator: n.uptimeCalculator,
@@ -678,14 +678,14 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			ApricotPhase4Time:      version.GetApricotPhase4Time(n.Config.NetworkID),
 			ApricotPhase5Time:      version.GetApricotPhase5Time(n.Config.NetworkID),
 		}),
-		n.Config.VMManager.RegisterFactory(avm.ID, &avm.Factory{
+		n.Config.VMManager.RegisterFactory(constants.AVMID, &avm.Factory{
 			TxFee:            n.Config.TxFee,
 			CreateAssetTxFee: n.Config.CreateAssetTxFee,
 		}),
 		n.Config.VMManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
 		n.Config.VMManager.RegisterFactory(nftfx.ID, &nftfx.Factory{}),
 		n.Config.VMManager.RegisterFactory(propertyfx.ID, &propertyfx.Factory{}),
-		n.Config.VMManager.RegisterFactory(evm.ID, &coreth.Factory{}),
+		n.Config.VMManager.RegisterFactory(constants.EVMID, &coreth.Factory{}),
 		rpcchainvm.RegisterPlugins(n.Config.PluginDir, n.Config.VMManager),
 	)
 	if errs.Errored() {
@@ -1252,7 +1252,7 @@ func (n *Node) shutdown() {
 		n.Log.Debug("error during API shutdown: %s", err)
 	}
 	if err := n.indexer.Close(); err != nil {
-		n.Log.Debug("error closing tx indexer: %w", err)
+		n.Log.Debug("error closing tx indexer: %s", err)
 	}
 
 	// Make sure all plugin subprocesses are killed
