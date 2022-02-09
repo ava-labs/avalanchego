@@ -181,8 +181,8 @@ func (blockValidatorSubnetEVM) SyntacticVerify(b *Block) error {
 	if uncleHash != ethHeader.UncleHash {
 		return errUncleHashMismatch
 	}
-	// Coinbase must be zero on C-Chain
-	if b.ethBlock.Coinbase() != subnetEVM.BlackholeAddr {
+	// Coinbase must be zero, if AllowFeeRecipients is not enabled
+	if !b.vm.chainConfig.AllowFeeRecipients && b.ethBlock.Coinbase() != subnetEVM.BlackholeAddr {
 		return errInvalidBlock
 	}
 	// Block must not have any uncles

@@ -249,6 +249,11 @@ func (vm *VM) Initialize(
 	ethConfig.Pruning = vm.config.Pruning
 	ethConfig.SnapshotAsync = vm.config.SnapshotAsync
 	ethConfig.SnapshotVerify = vm.config.SnapshotVerify
+	if common.IsHexAddress(vm.config.Coinbase) {
+		address := common.HexToAddress(vm.config.Coinbase)
+		log.Info("Setting coinbase", "address", address)
+		ethConfig.Miner.Etherbase = address
+	}
 
 	vm.chainConfig = g.Config
 	vm.networkID = ethConfig.NetworkId
