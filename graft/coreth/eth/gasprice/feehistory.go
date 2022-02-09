@@ -136,6 +136,13 @@ func (oracle *Oracle) processBlock(bf *blockFees, percentiles []float64) {
 	}
 }
 
+type slimBlock struct {
+	GasUsed  uint64
+	GasLimit uint64
+	BaseFee  uint64
+	Txs      []*txGasAndReward
+}
+
 // resolveBlockRange resolves the specified block range to absolute block numbers while also
 // enforcing backend specific limitations. The pending block and corresponding receipts are
 // also returned if requested and available.
@@ -249,33 +256,24 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 					oracle.processBlock(fees, rewardPercentiles)
 					results <- fees
 				} else {
-					cacheKey := struct {
-						number      uint64
-						percentiles string
-					}{blockNumber, string(percentileKey)}
+					sb, ok := oracle.historyCache.Get(blockNumber)
+					if !ok {
+						block, err := oracle.backend.BlockByNumber(ctx, rpc.BlockNumber(blockNumber))
+						if block == nil || err != nil {
+							return
+						}
 
-					if p, ok := oracle.historyCache.Get(cacheKey); ok {
-						fees.results = p.(processedFees)
-						results <- fees
-					} else {
-						if len(rewardPercentiles) != 0 {
-							fees.block, fees.err = oracle.backend.BlockByNumber(ctx, rpc.BlockNumber(blockNumber))
-							if fees.block != nil && fees.err == nil {
-								fees.receipts, fees.err = oracle.backend.GetReceipts(ctx, fees.block.Hash())
-								fees.header = fees.block.Header()
-							}
-						} else {
-							fees.header, fees.err = oracle.backend.HeaderByNumber(ctx, rpc.BlockNumber(blockNumber))
+						receipts, err := oracle.backend.GetReceipts(ctx, block.Hash())
+						if err != nil {
+							return
 						}
-						if fees.header != nil && fees.err == nil {
-							oracle.processBlock(fees, rewardPercentiles)
-							if fees.err == nil {
-								oracle.historyCache.Add(cacheKey, fees.results)
-							}
-						}
-						// send to results even if empty to guarantee that blocks items are sent in total
-						results <- fees
+						header := fees.block.Header()
+						sb = &slimBlock{}
+						oracle.historyCache.Add(blockNumber, sb)
 					}
+					r := oracle.processBlock(fees, rewardPercentiles)
+					fees.results = p.(processedFees)
+					results <- fees
 				}
 			}
 		}()
