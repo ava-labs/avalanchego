@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	schain "github.com/ava-labs/subnet-evm/chain"
 	subnetEVM "github.com/ava-labs/subnet-evm/chain"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/types"
@@ -249,10 +250,15 @@ func (vm *VM) Initialize(
 	ethConfig.Pruning = vm.config.Pruning
 	ethConfig.SnapshotAsync = vm.config.SnapshotAsync
 	ethConfig.SnapshotVerify = vm.config.SnapshotVerify
-	if common.IsHexAddress(vm.config.Coinbase) {
-		address := common.HexToAddress(vm.config.Coinbase)
-		log.Info("Setting coinbase", "address", address)
+	if common.IsHexAddress(vm.config.FeeRecipient) {
+		address := common.HexToAddress(vm.config.FeeRecipient)
+		log.Info("Setting fee recipient", "address", address)
 		ethConfig.Miner.Etherbase = address
+	} else {
+		if g.Config.AllowFeeRecipients {
+			log.Warn("Chain enabled AllowFeeRecipients, but chain config has not specified any coinbase address. Defaulting to the blackhole address.")
+		}
+		ethConfig.Miner.Etherbase = schain.BlackholeAddr
 	}
 
 	vm.chainConfig = g.Config

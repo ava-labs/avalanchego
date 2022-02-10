@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/subnet-evm/node"
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 )
 
 var BlackholeAddr = common.Address{
@@ -45,16 +44,7 @@ func NewETHChain(config *eth.Config, nodecfg *node.Config, chainDB ethdb.Databas
 		return nil, fmt.Errorf("failed to create backend: %w", err)
 	}
 	chain := &ETHChain{backend: backend}
-	if config.Genesis.Config.AllowFeeRecipients {
-		if (config.Miner.Etherbase == common.Address{}) {
-			log.Warn("Chain enabled AllowFeeRecipients, but chain config has not specified any coinbase address. Defaulting to the blackhole address.")
-			backend.SetEtherbase(BlackholeAddr)
-		} else {
-			backend.SetEtherbase(config.Miner.Etherbase)
-		}
-	} else {
-		backend.SetEtherbase(BlackholeAddr)
-	}
+	backend.SetEtherbase(config.Miner.Etherbase)
 	return chain, nil
 }
 

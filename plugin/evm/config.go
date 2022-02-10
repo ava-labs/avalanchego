@@ -96,7 +96,7 @@ type Config struct {
 	LogLevel string `json:"log-level"`
 
 	// Address for Tx Fees
-	Coinbase string `json:"coinbase"`
+	FeeRecipient string `json:"feeRecipient"`
 }
 
 // EthAPIs returns an array of strings representing the Eth APIs that should be enabled

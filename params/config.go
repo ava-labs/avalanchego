@@ -112,7 +112,7 @@ type ChainConfig struct {
 	SubnetEVMTimestamp *big.Int `json:"subnetEVMTimestamp,omitempty"` // A placeholder for the latest avalanche forks (nil = no fork, 0 = already activated)
 
 	FeeConfig          *FeeConfig `json:"feeConfig,omitempty"`
-	AllowFeeRecipients bool       `json:"allowFeeRecipients"` // Allows fees to be collected by block builders.
+	AllowFeeRecipients bool       `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
 }
 
 type FeeConfig struct {
