@@ -457,21 +457,12 @@ func (vm *VM) Initialize(
 	vm.multiGatherer = avalanchegoMetrics.NewMultiGatherer()
 
 	// Initialize [vm.State]
-	if err := vm.initChainState(&chain.Config{
-		DecidedCacheSize:    decidedCacheSize,
-		MissingCacheSize:    missingCacheSize,
-		UnverifiedCacheSize: unverifiedCacheSize,
-		LastAcceptedBlock: &Block{
-			id:        ids.ID(lastAccepted.Hash()),
-			ethBlock:  lastAccepted,
-			vm:        vm,
-			status:    choices.Accepted,
-			atomicTxs: atomicTxs,
-		},
-		GetBlockIDAtHeight: vm.GetBlockIDAtHeight,
-		GetBlock:           vm.getBlock,
-		UnmarshalBlock:     vm.parseBlock,
-		BuildBlock:         vm.buildBlock,
+	if err := vm.initChainState(&Block{
+		id:        ids.ID(lastAccepted.Hash()),
+		ethBlock:  lastAccepted,
+		vm:        vm,
+		status:    choices.Accepted,
+		atomicTxs: atomicTxs,
 	}, metrics.Enabled); err != nil {
 		return err
 	}
@@ -508,7 +499,17 @@ func (vm *VM) Initialize(
 	return vm.fx.Initialize(vm)
 }
 
-func (vm *VM) initChainState(config *chain.Config, metricsEnabled bool) error {
+func (vm *VM) initChainState(lastAcceptedBlock *Block, metricsEnabled bool) error {
+	config := &chain.Config{
+		DecidedCacheSize:    decidedCacheSize,
+		MissingCacheSize:    missingCacheSize,
+		UnverifiedCacheSize: unverifiedCacheSize,
+		LastAcceptedBlock:   lastAcceptedBlock,
+		GetBlockIDAtHeight:  vm.GetBlockIDAtHeight,
+		GetBlock:            vm.getBlock,
+		UnmarshalBlock:      vm.parseBlock,
+		BuildBlock:          vm.buildBlock,
+	}
 	if !metricsEnabled {
 		vm.State = chain.NewState(config)
 		return nil
