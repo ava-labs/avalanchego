@@ -5,7 +5,6 @@ package evm
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"time"
 
@@ -141,9 +140,6 @@ func newAtomicTrie(
 	bonusBlocks map[uint64]ids.ID, repo AtomicTxRepository, codec codec.Manager,
 	lastAcceptedHeight uint64, commitHeightInterval uint64,
 ) (*atomicTrie, error) {
-	if sharedMemory == nil {
-		return nil, errors.New("non-nil sharedMemory required in newAtomicTrie")
-	}
 	atomicTrieDB := prefixdb.New(atomicTrieDBPrefix, db)
 	metadataDB := prefixdb.New(atomicTrieMetaDBPrefix, db)
 	root, height, err := lastCommittedRootIfExists(metadataDB)
