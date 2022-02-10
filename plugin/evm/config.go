@@ -95,7 +95,7 @@ type Config struct {
 	// Log level
 	LogLevel string `json:"log-level"`
 
-	// Address for Tx Fees
+	// Address for Tx Fees (must be empty if not supported by blockchain)
 	FeeRecipient string `json:"feeRecipient"`
 }
 
