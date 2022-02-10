@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"encoding/binary"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -11,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 )
@@ -448,16 +450,34 @@ func newSharedMemories(db *versiondb.Database, thisChainID, peerChainID ids.ID) 
 
 func TestApplyToSharedMemory(t *testing.T) {
 	type test struct {
-		commitInterval, lastAcceptedHeight, lastAppliedHeight uint64
-		expectOpsApplied                                      func(height uint64) bool
+		commitInterval, lastAcceptedHeight uint64
+		setMarker                          func(*atomicTrie) error
+		expectOpsApplied                   func(height uint64) bool
 	}
 
 	for name, test := range map[string]test{
-		"last applied before last accepted": {
+		"marker is set to height": {
 			commitInterval:     10,
 			lastAcceptedHeight: 25,
-			lastAppliedHeight:  10,
+			setMarker:          func(a *atomicTrie) error { return a.SetAppliedSharedMemoryHeight(10) },
 			expectOpsApplied:   func(height uint64) bool { return height > 10 && height <= 20 },
+		},
+		"marker is set to height + blockchain ID": {
+			commitInterval:     10,
+			lastAcceptedHeight: 25,
+			setMarker: func(a *atomicTrie) error {
+				cursor := make([]byte, wrappers.LongLen+len(blockChainID[:]))
+				binary.BigEndian.PutUint64(cursor, 10)
+				copy(cursor[wrappers.LongLen:], blockChainID[:])
+				return a.metadataDB.Put(appliedSharedMemoryCursorKey, cursor)
+			},
+			expectOpsApplied: func(height uint64) bool { return height > 10 && height <= 20 },
+		},
+		"marker not set": {
+			commitInterval:     10,
+			lastAcceptedHeight: 25,
+			setMarker:          func(*atomicTrie) error { return nil },
+			expectOpsApplied:   func(uint64) bool { return false },
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -484,7 +504,7 @@ func TestApplyToSharedMemory(t *testing.T) {
 				}
 			}
 
-			assert.NoError(t, atomicTrie.SetAppliedSharedMemoryHeight(test.lastAppliedHeight))
+			assert.NoError(t, test.setMarker(atomicTrie))
 			assert.NoError(t, db.Commit())
 			assert.NoError(t, atomicTrie.ApplyToSharedMemory(test.lastAcceptedHeight))
 
@@ -496,6 +516,11 @@ func TestApplyToSharedMemory(t *testing.T) {
 					sharedMemories.assertOpsNotApplied(t, ops)
 				}
 			}
+
+			// marker should be removed after ApplyToSharedMemory is complete
+			hasMarker, err := atomicTrie.metadataDB.Has(appliedSharedMemoryCursorKey)
+			assert.NoError(t, err)
+			assert.False(t, hasMarker)
 		})
 	}
 
