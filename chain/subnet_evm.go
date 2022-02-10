@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/subnet-evm/node"
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 var BlackholeAddr = common.Address{
@@ -44,7 +45,12 @@ func NewETHChain(config *eth.Config, nodecfg *node.Config, chainDB ethdb.Databas
 		return nil, fmt.Errorf("failed to create backend: %w", err)
 	}
 	chain := &ETHChain{backend: backend}
-	backend.SetEtherbase(config.Miner.Etherbase)
+	if config.Miner.Etherbase == (common.Address{}) { // used for testing
+		log.Warn("Etherbase not set. Falling back to blackhole address.")
+		backend.SetEtherbase(BlackholeAddr)
+	} else {
+		backend.SetEtherbase(config.Miner.Etherbase)
+	}
 	return chain, nil
 }
 
