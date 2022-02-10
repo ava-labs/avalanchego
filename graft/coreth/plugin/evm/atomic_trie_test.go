@@ -484,7 +484,7 @@ func TestApplyToSharedMemory(t *testing.T) {
 				}
 			}
 
-			assert.NoError(t, atomicTrie.SetAppliedSharedMemoryHeight(test.lastAppliedHeight))
+			assert.NoError(t, atomicTrie.setAppliedSharedMemoryHeight(test.lastAppliedHeight))
 			assert.NoError(t, db.Commit())
 			assert.NoError(t, atomicTrie.ApplyToSharedMemory(test.lastAcceptedHeight))
 

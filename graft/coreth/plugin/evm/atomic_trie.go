@@ -52,6 +52,8 @@ type AtomicTrie interface {
 	LastCommitted() (common.Hash, uint64)
 
 	// UpdateLastCommitted sets the state to last committed hash and height
+	// This function is used by statesync.Syncer to set the atomic trie metadata
+	// as it is not synced as part of the atomic trie.
 	UpdateLastCommitted(hash common.Hash, height uint64) error
 
 	// TrieDB returns the underlying trie database
@@ -64,11 +66,18 @@ type AtomicTrie interface {
 
 	// ApplyToSharedMemory iterates over atomic ops indexed in the trie and applies them
 	// to sharedMemory, for heights less than or equal to [lastAcceptedBlock].
+	// This function is called by the statesync.Syncer to execute operations into shared memory
+	// once the atomic trie is synced
 	ApplyToSharedMemory(lastAcceptedBlock uint64) error
 
 	// SetAppliedSharedMemoryHeight marks the atomic trie as containing atomic ops
 	// that must be applied to shared memory (on initialization). Heights less than or
 	// equal to [height] must already be applied to shared memory.
+	// This function is called by statesync.Syncer to set the height of blocks containing
+	// atomic transactions executed into shared memory. When subsequently ApplyToSharedMemory
+	// is called with lastAcceptedBlock parameter it will execute from this height to
+	// the lastAcceptedBlock. This serves as a dirty marker that is removed once all atomic
+	// operations have been executed.
 	SetAppliedSharedMemoryHeight(height uint64) error
 }
 
@@ -541,6 +550,9 @@ func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 	return a.db.Commit()
 }
 
+// SetAppliedSharedMemoryHeight sets given height as the height of executed
+// blocks containing atomic transactions
+// This function is used for testing only.
 func (a *atomicTrie) SetAppliedSharedMemoryHeight(height uint64) error {
 	// store the height of the last applied block + 1 so iteration begins there
 	return database.PutUInt64(a.metadataDB, appliedSharedMemoryCursorKey, height+1)
