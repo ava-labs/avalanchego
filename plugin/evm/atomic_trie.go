@@ -543,7 +543,7 @@ func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 	if err := it.Error(); err != nil {
 		return err
 	}
-	log.Info("finished applying atomic operations")
+	log.Info("finished applying atomic operations", "puts", putRequests, "removes", removeRequests)
 	if err := a.metadataDB.Delete(appliedSharedMemoryCursorKey); err != nil {
 		return err
 	}
