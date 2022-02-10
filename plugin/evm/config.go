@@ -94,6 +94,9 @@ type Config struct {
 
 	// Log level
 	LogLevel string `json:"log-level"`
+
+	// Address for Tx Fees (must be empty if not supported by blockchain)
+	FeeRecipient string `json:"feeRecipient"`
 }
 
 // EthAPIs returns an array of strings representing the Eth APIs that should be enabled

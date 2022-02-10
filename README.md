@@ -36,6 +36,29 @@ The Subnet EVM is compatible with almost all Ethereum tooling, including [Remix,
 - Removed Multicoin Contract and State
 - Removed DAO Hardfork Support
 
+## Setting a Custom Fee Recipient
+By default, all fees are burned (sent to the blackhole address). However, it is
+possible to enable block producers to set a fee recipient (get compensated for
+blocks they produce).
+
+To enabke this feature, you'll need to add the following to your
+genesis file:
+```json
+{
+  "allowFeeRecipients":true
+}
+```
+
+Next, you'll need to update your VM config with the following:
+```json
+{
+  "feeRecipient":"<YOU 0x-ADDRESS>"
+}
+```
+
+_Note: If you enable this feature but a validator doesn't specify
+a "feeRecipient", the fees will be burned in blocks they produce._
+
 ## Run Local Network
 [`scripts/run.sh`](scripts/run.sh) automatically installs [avalanchego], sets up a local network,
 and creates a `subnet-evm` genesis file.

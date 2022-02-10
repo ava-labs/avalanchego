@@ -27,6 +27,7 @@
 package params
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -78,10 +79,11 @@ var (
 		MuirGlacierBlock:    big.NewInt(0),
 		SubnetEVMTimestamp:  big.NewInt(0),
 		FeeConfig:           DefaultFeeConfig,
+		AllowFeeRecipients:  false,
 	}
 
-	TestChainConfig        = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), DefaultFeeConfig}
-	TestPreSubnetEVMConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, DefaultFeeConfig}
+	TestChainConfig        = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), DefaultFeeConfig, false}
+	TestPreSubnetEVMConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, DefaultFeeConfig, false}
 )
 
 // ChainConfig is the core config which determines the blockchain settings.
@@ -109,7 +111,8 @@ type ChainConfig struct {
 
 	SubnetEVMTimestamp *big.Int `json:"subnetEVMTimestamp,omitempty"` // A placeholder for the latest avalanche forks (nil = no fork, 0 = already activated)
 
-	FeeConfig *FeeConfig `json:"feeConfig,omitempty"`
+	FeeConfig          *FeeConfig `json:"feeConfig,omitempty"`
+	AllowFeeRecipients bool       `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
 }
 
 type FeeConfig struct {
@@ -127,7 +130,11 @@ type FeeConfig struct {
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	return fmt.Sprintf("{ChainID: %v Homestead: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Subnet EVM: %v, Engine: Dummy Consensus Engine}",
+	feeBytes, err := json.Marshal(c.FeeConfig)
+	if err != nil {
+		feeBytes = []byte("cannot unmarshal FeeConfig")
+	}
+	return fmt.Sprintf("{ChainID: %v Homestead: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Subnet EVM: %v, FeeConfig: %v, AllowFeeRecipients: %v, Engine: Dummy Consensus Engine}",
 		c.ChainID,
 		c.HomesteadBlock,
 		c.EIP150Block,
@@ -139,6 +146,8 @@ func (c *ChainConfig) String() string {
 		c.IstanbulBlock,
 		c.MuirGlacierBlock,
 		c.SubnetEVMTimestamp,
+		string(feeBytes),
+		c.AllowFeeRecipients,
 	)
 }
 
