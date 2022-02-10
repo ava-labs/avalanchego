@@ -494,7 +494,7 @@ func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 		return err
 	}
 
-	log.Info("ApplyToSharedMemory", "atomicRoot", a.lastCommittedHash, "lastAcceptedBlock", lastAcceptedBlock, "startHeight", binary.BigEndian.Uint64(sharedMemoryCursor[:wrappers.LongLen]))
+	log.Info("applying atomic operations to shared memory", "root", a.lastCommittedHash, "lastAcceptedBlock", lastAcceptedBlock, "startHeight", binary.BigEndian.Uint64(sharedMemoryCursor[:wrappers.LongLen]))
 
 	it, err := a.Iterator(a.lastCommittedHash, sharedMemoryCursor)
 	if err != nil {
