@@ -164,11 +164,14 @@ func (oracle *Oracle) resolveBlockRange(ctx context.Context, lastBlock rpc.Block
 	}
 
 	lastAcceptedBlock := rpc.BlockNumber(oracle.backend.LastAcceptedBlock().NumberU64())
-	if lastBlock == rpc.LatestBlockNumber {
+	if lastBlock.IsAccepted() {
 		lastBlock = lastAcceptedBlock
 	} else if lastAcceptedBlock > rpc.BlockNumber(oracle.maxBlockHistory) && lastAcceptedBlock-rpc.BlockNumber(oracle.maxBlockHistory) > lastBlock {
+		// If the requested last block reaches further back than [oracle.maxBlockHistory] past the last accepted block return an error
+		// Note: this allows some blocks past this point to be fetched since it will start fetching [blocks] from this point.
 		return 0, 0, fmt.Errorf("%w: requested %d, head %d", errBeyondHistoricalLimit, lastBlock, lastAcceptedBlock)
 	} else if lastBlock > lastAcceptedBlock {
+		// If the requested block is above the accepted block return an error
 		return 0, 0, fmt.Errorf("%w: requested %d, head %d", errRequestBeyondHead, lastBlock, lastAcceptedBlock)
 	}
 	// ensure not trying to retrieve before genesis
