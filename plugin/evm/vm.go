@@ -453,13 +453,22 @@ func (vm *VM) Initialize(
 	vm.multiGatherer = avalanchegoMetrics.NewMultiGatherer()
 
 	// Initialize [vm.State]
-	if err := vm.initChainState(&Block{
-		id:        ids.ID(lastAccepted.Hash()),
-		ethBlock:  lastAccepted,
-		vm:        vm,
-		status:    choices.Accepted,
-		atomicTxs: atomicTxs,
-	}); err != nil {
+	if err := vm.initChainState(&chain.Config{
+		DecidedCacheSize:    decidedCacheSize,
+		MissingCacheSize:    missingCacheSize,
+		UnverifiedCacheSize: unverifiedCacheSize,
+		LastAcceptedBlock: &Block{
+			id:        ids.ID(lastAccepted.Hash()),
+			ethBlock:  lastAccepted,
+			vm:        vm,
+			status:    choices.Accepted,
+			atomicTxs: atomicTxs,
+		},
+		GetBlockIDAtHeight: vm.GetBlockIDAtHeight,
+		GetBlock:           vm.getBlock,
+		UnmarshalBlock:     vm.parseBlock,
+		BuildBlock:         vm.buildBlock,
+	}, metrics.Enabled); err != nil {
 		return err
 	}
 
@@ -483,7 +492,7 @@ func (vm *VM) Initialize(
 	// If metrics are enabled, register the default metrics regitry
 	if metrics.Enabled {
 		gatherer := corethPrometheus.Gatherer(metrics.DefaultRegistry)
-		if err := vm.multiGatherer.Register("", gatherer); err != nil {
+		if err := vm.multiGatherer.Register("eth", gatherer); err != nil {
 			return err
 		}
 	}
@@ -495,33 +504,15 @@ func (vm *VM) Initialize(
 	return vm.fx.Initialize(vm)
 }
 
-func (vm *VM) initChainState(lastAccepted *Block) error {
-	if !metrics.Enabled {
-		vm.State = chain.NewState(&chain.Config{
-			DecidedCacheSize:    decidedCacheSize,
-			MissingCacheSize:    missingCacheSize,
-			UnverifiedCacheSize: unverifiedCacheSize,
-			LastAcceptedBlock:   lastAccepted,
-			GetBlockIDAtHeight:  vm.GetBlockIDAtHeight,
-			GetBlock:            vm.getBlock,
-			UnmarshalBlock:      vm.parseBlock,
-			BuildBlock:          vm.buildBlock,
-		})
+func (vm *VM) initChainState(config *chain.Config, metricsEnabled bool) error {
+	if !metricsEnabled {
+		vm.State = chain.NewState(config)
 		return nil
 	}
 
 	// Register chain state metrics
 	chainStateRegisterer := prometheus.NewRegistry()
-	state, err := chain.NewMeteredState(chainStateRegisterer, &chain.Config{
-		DecidedCacheSize:    decidedCacheSize,
-		MissingCacheSize:    missingCacheSize,
-		UnverifiedCacheSize: unverifiedCacheSize,
-		LastAcceptedBlock:   lastAccepted,
-		GetBlockIDAtHeight:  vm.GetBlockIDAtHeight,
-		GetBlock:            vm.getBlock,
-		UnmarshalBlock:      vm.parseBlock,
-		BuildBlock:          vm.buildBlock,
-	})
+	state, err := chain.NewMeteredState(chainStateRegisterer, config)
 	if err != nil {
 		return err
 	}
