@@ -157,6 +157,7 @@ func (oracle *Oracle) resolveBlockRange(ctx context.Context, lastBlock rpc.Block
 	if lastBlock == rpc.PendingBlockNumber {
 		// pending block not supported by backend, process until latest block
 		lastBlock = rpc.LatestBlockNumber
+		blocks--
 	}
 	if blocks == 0 {
 		return 0, 0, nil
