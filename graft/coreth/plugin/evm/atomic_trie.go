@@ -66,7 +66,8 @@ type AtomicTrie interface {
 	// ApplyToSharedMemory iterates over atomic ops indexed in the trie and applies them
 	// to sharedMemory, for heights less than or equal to [lastAcceptedBlock].
 	// This function is called by the statesync.Syncer to execute operations into shared memory
-	// once the atomic trie is synced
+	// once the atomic trie is synced. If interrupted, this function will resume from last operation
+	// that was applied to the shared memory.
 	ApplyToSharedMemory(lastAcceptedBlock uint64) error
 
 	// SetAppliedSharedMemoryHeight marks the atomic trie as containing atomic ops
