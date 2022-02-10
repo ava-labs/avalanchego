@@ -518,7 +518,7 @@ func (vm *VM) initChainState(config *chain.Config, metricsEnabled bool) error {
 	}
 	vm.State = state
 
-	return vm.multiGatherer.Register("chainState", chainStateRegisterer)
+	return vm.multiGatherer.Register("chain_state", chainStateRegisterer)
 }
 
 func (vm *VM) initGossipHandling() {
