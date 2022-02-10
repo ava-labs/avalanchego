@@ -80,6 +80,10 @@ import (
 const (
 	x2cRateInt64       int64 = 1_000_000_000
 	x2cRateMinus1Int64 int64 = x2cRateInt64 - 1
+
+	// Prefixes for metrics gatherers
+	ethMetricsPrefix        = "eth"
+	chainStateMetricsPrefix = "chain_state"
 )
 
 var (
@@ -492,7 +496,7 @@ func (vm *VM) Initialize(
 	// If metrics are enabled, register the default metrics regitry
 	if metrics.Enabled {
 		gatherer := corethPrometheus.Gatherer(metrics.DefaultRegistry)
-		if err := vm.multiGatherer.Register("eth", gatherer); err != nil {
+		if err := vm.multiGatherer.Register(ethMetricsPrefix, gatherer); err != nil {
 			return err
 		}
 	}
@@ -518,7 +522,7 @@ func (vm *VM) initChainState(config *chain.Config, metricsEnabled bool) error {
 	}
 	vm.State = state
 
-	return vm.multiGatherer.Register("chain_state", chainStateRegisterer)
+	return vm.multiGatherer.Register(chainStateMetricsPrefix, chainStateRegisterer)
 }
 
 func (vm *VM) initGossipHandling() {
