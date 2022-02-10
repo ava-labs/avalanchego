@@ -250,15 +250,18 @@ func (vm *VM) Initialize(
 	ethConfig.Pruning = vm.config.Pruning
 	ethConfig.SnapshotAsync = vm.config.SnapshotAsync
 	ethConfig.SnapshotVerify = vm.config.SnapshotVerify
-	if common.IsHexAddress(vm.config.FeeRecipient) {
-		address := common.HexToAddress(vm.config.FeeRecipient)
-		log.Info("Setting fee recipient", "address", address)
-		ethConfig.Miner.Etherbase = address
-	} else {
+	ethConfig.Miner.Etherbase = schain.BlackholeAddr
+	switch {
+	case common.IsHexAddress(vm.config.FeeRecipient):
 		if g.Config.AllowFeeRecipients {
-			log.Warn("Chain enabled AllowFeeRecipients, but chain config has not specified any coinbase address. Defaulting to the blackhole address.")
+			address := common.HexToAddress(vm.config.FeeRecipient)
+			log.Info("Setting fee recipient", "address", address)
+			ethConfig.Miner.Etherbase = address
+			break
 		}
-		ethConfig.Miner.Etherbase = schain.BlackholeAddr
+		return errors.New("cannot specify a custom fee recipient on this blockchain")
+	case g.Config.AllowFeeRecipients:
+		log.Warn("Chain enabled `AllowFeeRecipients`, but chain config has not specified any coinbase address. Defaulting to the blackhole address.")
 	}
 
 	vm.chainConfig = g.Config
