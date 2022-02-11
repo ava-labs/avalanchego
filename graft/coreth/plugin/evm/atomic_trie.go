@@ -63,8 +63,8 @@ type AtomicTrie interface {
 	// common.Hash{} instead
 	Root(height uint64) (common.Hash, error)
 
-	// ApplyToSharedMemory iterates over atomic ops indexed in the trie and applies them
-	// to sharedMemory, for heights less than or equal to [lastAcceptedBlock].
+	// ApplyToSharedMemory iterates over atomic ops indexed in the trie from [lastCommittedHeight]
+	// and applies them to sharedMemory, for heights less than or equal to [lastAcceptedBlock].
 	// This function is called by the statesync.Syncer to execute operations into shared memory
 	// once the atomic trie is synced. If interrupted, this function will resume from last operation
 	// that was applied to the shared memory.
@@ -345,6 +345,7 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 }
 
 // Index updates the trie with entries in atomicOps
+// height must be greater than lastCommittedHeight and less than (lastCommittedHeight+commitInterval)
 // This function updates the following:
 // - heightBytes => trie root hash (if the trie was committed)
 // - lastCommittedBlock => height (if the trie was committed)
@@ -481,8 +482,8 @@ func (a *atomicTrie) Root(height uint64) (common.Hash, error) {
 	return common.BytesToHash(hash), nil
 }
 
-// ApplyToSharedMemory iterates over atomic ops indexed in the trie and applies them
-// to sharedMemory, for heights less than or equal to [lastAcceptedBlock].
+// ApplyToSharedMemory iterates over atomic ops indexed in the trie from [lastCommitted]
+// and applies them to sharedMemory, for heights less than or equal to [lastAcceptedBlock].
 func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 	sharedMemoryCursor, err := a.metadataDB.Get(appliedSharedMemoryCursorKey)
 	if err == database.ErrNotFound {
