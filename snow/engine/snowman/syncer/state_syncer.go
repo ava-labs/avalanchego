@@ -137,8 +137,8 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 
 	// Mark that we received a response from [validatorID]
 	ss.pendingReceiveStateSummaryFrontier.Remove(validatorID)
-	ws, ok := ss.weightedSummaries[string(key)]
-	if !ok {
+	ws, exists := ss.weightedSummaries[string(key)]
+	if !exists {
 		ss.weightedSummaries[string(key)] = weightedSummary{
 			Summary: common.Summary{
 				Key:     key,
