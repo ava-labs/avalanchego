@@ -459,8 +459,12 @@ func TestApplyToSharedMemory(t *testing.T) {
 		"marker is set to height": {
 			commitInterval:     10,
 			lastAcceptedHeight: 25,
-			setMarker:          func(a *atomicTrie) error { return a.SetAppliedSharedMemoryHeight(10) },
-			expectOpsApplied:   func(height uint64) bool { return height > 10 && height <= 20 },
+			setMarker: func(a *atomicTrie) error {
+				markerBytes := make([]byte, wrappers.LongLen+common.HashLength)
+				binary.BigEndian.PutUint64(markerBytes, 10)
+				return a.metadataDB.Put(appliedSharedMemoryCursorKey, markerBytes)
+			},
+			expectOpsApplied: func(height uint64) bool { return height > 10 && height <= 20 },
 		},
 		"marker is set to height + blockchain ID": {
 			commitInterval:     10,
@@ -472,12 +476,6 @@ func TestApplyToSharedMemory(t *testing.T) {
 				return a.metadataDB.Put(appliedSharedMemoryCursorKey, cursor)
 			},
 			expectOpsApplied: func(height uint64) bool { return height > 10 && height <= 20 },
-		},
-		"marker not set": {
-			commitInterval:     10,
-			lastAcceptedHeight: 25,
-			setMarker:          func(*atomicTrie) error { return nil },
-			expectOpsApplied:   func(uint64) bool { return false },
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -506,7 +504,7 @@ func TestApplyToSharedMemory(t *testing.T) {
 
 			assert.NoError(t, test.setMarker(atomicTrie))
 			assert.NoError(t, db.Commit())
-			assert.NoError(t, atomicTrie.ApplyToSharedMemory(test.lastAcceptedHeight))
+			assert.NoError(t, atomicTrie.ApplyToSharedMemory(0, test.lastAcceptedHeight))
 
 			// check if ops were applied or not
 			for height, ops := range operationsMap {
