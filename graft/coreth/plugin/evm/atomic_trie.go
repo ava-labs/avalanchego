@@ -135,7 +135,8 @@ type atomicTrie struct {
 var _ AtomicTrie = &atomicTrie{}
 
 // NewAtomicTrie returns a new instance of a atomicTrie with the default commitHeightInterval.
-// Initializes the trie before returning it.
+// Initializes the trie before returning it. Applies any pending atomic operations under the cursor
+// set by MarkApplyToSharedMemoryCursor (if set) blockingly.
 func NewAtomicTrie(
 	db *versiondb.Database, sharedMemory atomic.SharedMemory,
 	bonusBlocks map[uint64]ids.ID, repo AtomicTxRepository, codec codec.Manager, lastAcceptedHeight uint64,
