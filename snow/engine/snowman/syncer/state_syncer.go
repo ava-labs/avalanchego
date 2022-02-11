@@ -182,6 +182,8 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 			summaries = append(summaries, ws)
 		}
 		sort.Sort(sort.Reverse(summaries))
+		// if state sync beacons are specified, we keep any summary frontier
+		// a beacon has sent. No filtering out of low votes summaries.
 		accepted := summaries.FilterAbove(0)
 
 		ss.Ctx.Log.Info("Received (%d) state summaries frontiers from all listed nodes. Starting state sync skipping voting rounds.", len(accepted))
