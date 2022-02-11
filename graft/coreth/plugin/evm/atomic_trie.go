@@ -556,6 +556,7 @@ func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 			return err
 		}
 		// calling [sharedMemory.Apply] updates the last applied pointer atomically with the shared memory operation.
+		// TODO: batch the application of atomic ops so we commit to the DB less frequently
 		if err = a.sharedMemory.Apply(map[ids.ID]*atomic.Requests{it.BlockchainID(): atomicOps}, batch); err != nil {
 			return err
 		}
