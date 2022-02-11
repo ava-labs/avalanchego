@@ -137,11 +137,33 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 
 	// Mark that we received a response from [validatorID]
 	ss.pendingReceiveStateSummaryFrontier.Remove(validatorID)
-	ss.weightedSummaries[string(key)] = weightedSummary{
-		Summary: common.Summary{
-			Key:     key,
-			Content: summary,
-		},
+	ws, ok := ss.weightedSummaries[string(key)]
+	if !ok {
+		ss.weightedSummaries[string(key)] = weightedSummary{
+			Summary: common.Summary{
+				Key:     key,
+				Content: summary,
+			},
+		}
+	}
+
+	if len(ss.StateSyncTestingBeacons) != 0 {
+		// if state sync beacons are specified, immediately count
+		// their frontier as voted by them, as no network wide vote
+		// will be held
+		weight := uint64(0)
+		if w, ok := ss.Beacons.GetWeight(validatorID); ok {
+			weight = w
+		}
+
+		previousWeight := ws.weight
+		newWeight, err := math.Add64(weight, previousWeight)
+		if err != nil {
+			ss.Ctx.Log.Error("Error calculating the Accepted votes - weight: %v, previousWeight: %v", weight, previousWeight)
+			newWeight = stdmath.MaxUint64
+		}
+		ws.weight = newWeight
+		ss.weightedSummaries[string(key)] = ws
 	}
 
 	if err := ss.sendGetStateSummaryFrontiers(); err != nil {
