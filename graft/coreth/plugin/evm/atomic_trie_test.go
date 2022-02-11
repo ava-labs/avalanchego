@@ -521,6 +521,18 @@ func TestApplyToSharedMemory(t *testing.T) {
 			hasMarker, err := atomicTrie.metadataDB.Has(appliedSharedMemoryCursorKey)
 			assert.NoError(t, err)
 			assert.False(t, hasMarker)
+			// reinitialize the atomic trie
+			atomicTrie, err = newAtomicTrie(db, sharedMemories.thisChain, nil, repo, codec, test.lastAcceptedHeight, test.commitInterval)
+			assert.NoError(t, err)
+			// no further changes should have occurred in shared memory
+			// assert they are as they were prior to reinitializing
+			for height, ops := range operationsMap {
+				if test.expectOpsApplied(height) {
+					sharedMemories.assertOpsApplied(t, ops)
+				} else {
+					sharedMemories.assertOpsNotApplied(t, ops)
+				}
+			}
 		})
 	}
 
