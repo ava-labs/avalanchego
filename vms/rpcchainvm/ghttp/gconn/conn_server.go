@@ -8,7 +8,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gconn/gconnproto"
+	"github.com/ava-labs/avalanchego/api/proto/gconnproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
 

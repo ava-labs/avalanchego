@@ -876,7 +876,7 @@ func initTestRemoteProposerVM(
 		}
 	}
 
-	proVM := New(coreVM, proBlkStartTime, 0)
+	proVM := New(coreVM, proBlkStartTime, 0, false)
 
 	valState := &validators.TestState{
 		T: t,
@@ -907,7 +907,7 @@ func initTestRemoteProposerVM(
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
-	if err := proVM.Bootstrapped(); err != nil {
+	if err := proVM.SetState(snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}
 

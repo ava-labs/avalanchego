@@ -35,16 +35,27 @@ type Config struct {
 	// to a GetAncestors
 	MaxTimeGetAncestors time.Duration
 
-	// Max number of containers in a multiput message sent by this node.
-	MultiputMaxContainersSent int
+	// Max number of containers in an ancestors message sent by this node.
+	AncestorsMaxContainersSent int
 
-	// This node will only consider the first [MultiputMaxContainersReceived]
-	// containers in a multiput it receives.
-	MultiputMaxContainersReceived int
+	// This node will only consider the first [AncestorsMaxContainersReceived]
+	// containers in an ancestors message it receives.
+	AncestorsMaxContainersReceived int
+
+	SharedCfg *SharedConfig
 }
 
 // Context implements the Engine interface
 func (c *Config) Context() *snow.ConsensusContext { return c.Ctx }
 
 // IsBootstrapped returns true iff this chain is done bootstrapping
-func (c *Config) IsBootstrapped() bool { return c.Ctx.IsBootstrapped() }
+func (c *Config) IsBootstrapped() bool { return c.Ctx.GetState() == snow.NormalOp }
+
+// Shared among common.bootstrapper and snowman/avalanche bootstrapper
+type SharedConfig struct {
+	// Tracks the last requestID that was used in a request
+	RequestID uint32
+
+	// True if RestartBootstrap has been called at least once
+	Restarted bool
+}

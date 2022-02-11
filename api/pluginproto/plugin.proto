@@ -1,0 +1,16 @@
+syntax = "proto3";
+package pluginproto;
+option go_package = "github.com/ava-labs/avalanchego/api/pluginproto";
+import "google/protobuf/empty.proto";
+
+// To compile: protoc --go_out=plugins=grpc:. app.proto
+
+message ExitCodeResponse {
+    int32 exit_code = 1;
+}
+
+service Node {
+    rpc Start(google.protobuf.Empty) returns (google.protobuf.Empty);
+    rpc ExitCode(google.protobuf.Empty) returns (ExitCodeResponse);
+    rpc Stop(google.protobuf.Empty) returns (google.protobuf.Empty);
+}

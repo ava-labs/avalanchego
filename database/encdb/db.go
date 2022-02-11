@@ -176,6 +176,13 @@ func (db *Database) Close() error {
 	return nil
 }
 
+func (db *Database) isClosed() bool {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	return db.db == nil
+}
+
 type keyValue struct {
 	key    []byte
 	value  []byte
@@ -225,7 +232,7 @@ func (b *batch) Reset() {
 }
 
 // Replay replays the batch contents.
-func (b *batch) Replay(w database.KeyValueWriter) error {
+func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
 	for _, keyvalue := range b.writes {
 		if keyvalue.delete {
 			if err := w.Delete(keyvalue.key); err != nil {
@@ -242,11 +249,19 @@ type iterator struct {
 	database.Iterator
 	db *Database
 
-	val []byte
-	err error
+	val, key []byte
+	err      error
 }
 
 func (it *iterator) Next() bool {
+	// Short-circuit and set an error if the underlying database has been closed.
+	if it.db.isClosed() {
+		it.val = nil
+		it.key = nil
+		it.err = database.ErrClosed
+		return false
+	}
+
 	next := it.Iterator.Next()
 	if next {
 		encVal := it.Iterator.Value()
@@ -256,8 +271,10 @@ func (it *iterator) Next() bool {
 			return false
 		}
 		it.val = val
+		it.key = it.Iterator.Key()
 	} else {
 		it.val = nil
+		it.key = nil
 	}
 	return next
 }
@@ -268,6 +285,8 @@ func (it *iterator) Error() error {
 	}
 	return it.Iterator.Error()
 }
+
+func (it *iterator) Key() []byte { return it.key }
 
 func (it *iterator) Value() []byte { return it.val }
 

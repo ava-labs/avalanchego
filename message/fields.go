@@ -24,7 +24,7 @@ const (
 	ContainerID                      // Used for querying
 	ContainerBytes                   // Used for gossiping
 	ContainerIDs                     // Used for querying
-	MultiContainerBytes              // Used in MultiPut
+	MultiContainerBytes              // Used in Ancestors
 	SigBytes                         // Used in handshake / peer gossiping
 	VersionTime                      // Used in handshake / peer gossiping
 	SignedPeers                      // Used in peer gossiping
@@ -32,6 +32,7 @@ const (
 	AppBytes                         // Used at application level
 	VMMessage                        // Used internally
 	Uptime                           // Used for Pong
+	VersionStruct                    // Used internally
 )
 
 // Packer returns the packer function that can be used to pack this field.
@@ -168,6 +169,8 @@ func (f Field) String() string {
 		return "VMMessage"
 	case Uptime:
 		return "Uptime"
+	case VersionStruct:
+		return "VersionStruct"
 	default:
 		return "Unknown Field"
 	}

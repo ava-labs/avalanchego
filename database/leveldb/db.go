@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"sync/atomic"
 
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
@@ -54,12 +53,7 @@ var (
 // in binary-alphabetical order.
 type Database struct {
 	*leveldb.DB
-	log logging.Logger
-
-	// 1 if there was previously an error other than "not found" or "closed"
-	// while performing a db operation. If [errored] == 1, Has, Get, Put,
-	// Delete and batch writes fail with ErrAvoidCorruption.
-	errored uint64
+	closed utils.AtomicBool
 }
 
 type config struct {
@@ -117,7 +111,7 @@ func New(file string, configBytes []byte, log logging.Logger) (database.Database
 	}
 	if len(configBytes) > 0 {
 		if err := json.Unmarshal(configBytes, &parsedConfig); err != nil {
-			return nil, fmt.Errorf("failed to parse db config: %s", err)
+			return nil, fmt.Errorf("failed to parse db config: %w", err)
 		}
 	}
 	configJSON, err := json.Marshal(&parsedConfig)
@@ -146,43 +140,30 @@ func New(file string, configBytes []byte, log logging.Logger) (database.Database
 		db, err = leveldb.RecoverFile(file, nil)
 	}
 	return &Database{
-		DB:  db,
-		log: log,
+		DB: db,
 	}, err
 }
 
 // Has returns if the key is set in the database
 func (db *Database) Has(key []byte) (bool, error) {
-	if db.corrupted() {
-		return false, database.ErrAvoidCorruption
-	}
 	has, err := db.DB.Has(key, nil)
-	return has, db.handleError(err)
+	return has, updateError(err)
 }
 
 // Get returns the value the key maps to in the database
 func (db *Database) Get(key []byte) ([]byte, error) {
-	if db.corrupted() {
-		return nil, database.ErrAvoidCorruption
-	}
 	value, err := db.DB.Get(key, nil)
-	return value, db.handleError(err)
+	return value, updateError(err)
 }
 
 // Put sets the value of the provided key to the provided value
 func (db *Database) Put(key []byte, value []byte) error {
-	if db.corrupted() {
-		return database.ErrAvoidCorruption
-	}
-	return db.handleError(db.DB.Put(key, value, nil))
+	return updateError(db.DB.Put(key, value, nil))
 }
 
 // Delete removes the key from the database
 func (db *Database) Delete(key []byte) error {
-	if db.corrupted() {
-		return database.ErrAvoidCorruption
-	}
-	return db.handleError(db.DB.Delete(key, nil))
+	return updateError(db.DB.Delete(key, nil))
 }
 
 // NewBatch creates a write/delete-only buffer that is atomically committed to
@@ -191,19 +172,28 @@ func (db *Database) NewBatch() database.Batch { return &batch{db: db} }
 
 // NewIterator creates a lexicographically ordered iterator over the database
 func (db *Database) NewIterator() database.Iterator {
-	return &iter{db.DB.NewIterator(new(util.Range), nil)}
+	return &iter{
+		db:       db,
+		Iterator: db.DB.NewIterator(new(util.Range), nil),
+	}
 }
 
 // NewIteratorWithStart creates a lexicographically ordered iterator over the
 // database starting at the provided key
 func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
-	return &iter{db.DB.NewIterator(&util.Range{Start: start}, nil)}
+	return &iter{
+		db:       db,
+		Iterator: db.DB.NewIterator(&util.Range{Start: start}, nil),
+	}
 }
 
 // NewIteratorWithPrefix creates a lexicographically ordered iterator over the
 // database ignoring keys that do not start with the provided prefix
 func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
-	return &iter{db.DB.NewIterator(util.BytesPrefix(prefix), nil)}
+	return &iter{
+		db:       db,
+		Iterator: db.DB.NewIterator(util.BytesPrefix(prefix), nil),
+	}
 }
 
 // NewIteratorWithStartAndPrefix creates a lexicographically ordered iterator
@@ -214,13 +204,16 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	if bytes.Compare(start, prefix) == 1 {
 		iterRange.Start = start
 	}
-	return &iter{db.DB.NewIterator(iterRange, nil)}
+	return &iter{
+		db:       db,
+		Iterator: db.DB.NewIterator(iterRange, nil),
+	}
 }
 
 // Stat returns a particular internal stat of the database.
 func (db *Database) Stat(property string) (string, error) {
 	stat, err := db.DB.GetProperty(property)
-	return stat, db.handleError(err)
+	return stat, updateError(err)
 }
 
 // This comment is basically copy pasted from the underlying levelDB library:
@@ -235,27 +228,13 @@ func (db *Database) Stat(property string) (string, error) {
 // And a nil limit is treated as a key after all keys in the DB.
 // Therefore if both are nil then it will compact entire DB.
 func (db *Database) Compact(start []byte, limit []byte) error {
-	return db.handleError(db.DB.CompactRange(util.Range{Start: start, Limit: limit}))
+	return updateError(db.DB.CompactRange(util.Range{Start: start, Limit: limit}))
 }
 
 // Close implements the Database interface
-func (db *Database) Close() error { return db.handleError(db.DB.Close()) }
-
-func (db *Database) corrupted() bool {
-	return atomic.LoadUint64(&db.errored) == 1
-}
-
-func (db *Database) handleError(err error) error {
-	err = updateError(err)
-	switch err {
-	case nil, database.ErrNotFound, database.ErrClosed:
-	// If we get an error other than "not found" or "closed", disallow future
-	// database operations to avoid possible corruption
-	default:
-		db.log.Fatal("leveldb error: %s", err)
-		atomic.StoreUint64(&db.errored, 1)
-	}
-	return err
+func (db *Database) Close() error {
+	db.closed.SetValue(true)
+	return updateError(db.DB.Close())
 }
 
 // batch is a wrapper around a levelDB batch to contain sizes.
@@ -284,10 +263,7 @@ func (b *batch) Size() int { return b.size }
 
 // Write flushes any accumulated data to disk.
 func (b *batch) Write() error {
-	if b.db.corrupted() {
-		return database.ErrAvoidCorruption
-	}
-	return b.db.handleError(b.db.DB.Write(&b.Batch, nil))
+	return updateError(b.db.DB.Write(&b.Batch, nil))
 }
 
 // Reset resets the batch for reuse.
@@ -297,8 +273,8 @@ func (b *batch) Reset() {
 }
 
 // Replay the batch contents.
-func (b *batch) Replay(w database.KeyValueWriter) error {
-	replay := &replayer{writer: w}
+func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
+	replay := &replayer{writerDeleter: w}
 	if err := b.Batch.Replay(replay); err != nil {
 		// Never actually returns an error, because Replay just returns nil
 		return err
@@ -310,34 +286,65 @@ func (b *batch) Replay(w database.KeyValueWriter) error {
 func (b *batch) Inner() database.Batch { return b }
 
 type replayer struct {
-	writer database.KeyValueWriter
-	err    error
+	writerDeleter database.KeyValueWriterDeleter
+	err           error
 }
 
 func (r *replayer) Put(key, value []byte) {
 	if r.err != nil {
 		return
 	}
-	r.err = r.writer.Put(key, value)
+	r.err = r.writerDeleter.Put(key, value)
 }
 
 func (r *replayer) Delete(key []byte) {
 	if r.err != nil {
 		return
 	}
-	r.err = r.writer.Delete(key)
+	r.err = r.writerDeleter.Delete(key)
 }
 
-type iter struct{ iterator.Iterator }
+type iter struct {
+	db *Database
+	iterator.Iterator
+
+	key, val []byte
+	err      error
+}
+
+func (it *iter) Next() bool {
+	// Short-circuit and set an error if the underlying database has been closed.
+	if it.db.closed.GetValue() {
+		it.key = nil
+		it.val = nil
+		it.err = database.ErrClosed
+		return false
+	}
+
+	hasNext := it.Iterator.Next()
+	if hasNext {
+		it.key = utils.CopyBytes(it.Iterator.Key())
+		it.val = utils.CopyBytes(it.Iterator.Value())
+	} else {
+		it.key = nil
+		it.val = nil
+	}
+	return hasNext
+}
 
 // Error implements the Iterator interface
-func (it *iter) Error() error { return updateError(it.Iterator.Error()) }
+func (it *iter) Error() error {
+	if it.err != nil {
+		return it.err
+	}
+	return updateError(it.Iterator.Error())
+}
 
 // Key implements the Iterator interface
-func (it *iter) Key() []byte { return utils.CopyBytes(it.Iterator.Key()) }
+func (it *iter) Key() []byte { return it.key }
 
 // Value implements the Iterator interface
-func (it *iter) Value() []byte { return utils.CopyBytes(it.Iterator.Value()) }
+func (it *iter) Value() []byte { return it.val }
 
 func updateError(err error) error {
 	switch err {

@@ -112,16 +112,7 @@ func TestNewImportTx(t *testing.T) {
 			shouldVerify:  true,
 		},
 		{
-			description:   "attempting to import from C-chain before AP5",
-			sourceChainID: cChainID,
-			sharedMemory:  fundedSharedMemory(cChainID, vm.TxFee),
-			sourceKeys:    []*crypto.PrivateKeySECP256K1R{sourceKey},
-			timestamp:     defaultValidateStartTime,
-			shouldErr:     false,
-			shouldVerify:  false,
-		},
-		{
-			description:   "attempting to import from C-chain after AP5",
+			description:   "attempting to import from C-chain",
 			sourceChainID: cChainID,
 			sharedMemory:  fundedSharedMemory(cChainID, vm.TxFee),
 			sourceKeys:    []*crypto.PrivateKeySECP256K1R{sourceKey},

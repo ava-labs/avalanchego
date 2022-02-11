@@ -1,0 +1,126 @@
+syntax = "proto3";
+package rpcdbproto;
+option go_package = "github.com/ava-labs/avalanchego/api/proto/rpcdbproto";
+
+message HasRequest {
+    bytes key = 1;
+}
+
+message HasResponse {
+    bool has = 1;
+    uint32 err = 2;
+}
+
+message GetRequest {
+    bytes key = 1;
+}
+
+message GetResponse {
+    bytes value = 1;
+    uint32 err = 2;
+}
+
+message PutRequest {
+    bytes key = 1;
+    bytes value = 2;
+}
+
+message PutResponse {
+    uint32 err = 1;
+}
+
+message DeleteRequest {
+    bytes key = 1;
+}
+
+message DeleteResponse {
+    uint32 err = 1;
+}
+
+message StatRequest {
+    string property = 1;
+}
+
+message StatResponse {
+    string stat = 1;
+    uint32 err = 2;
+}
+
+message CompactRequest {
+    bytes start = 1;
+    bytes limit = 2;
+}
+
+message CompactResponse {
+    uint32 err = 1;
+}
+
+message CloseRequest {}
+
+message CloseResponse {
+    uint32 err = 1;
+}
+
+message WriteBatchRequest {
+    repeated PutRequest puts = 1;
+    repeated DeleteRequest deletes = 2;
+    int64 id = 3;
+    bool continues = 4;
+}
+
+message WriteBatchResponse {
+    uint32 err = 1;
+}
+
+message NewIteratorRequest {}
+
+message NewIteratorWithStartAndPrefixRequest {
+    bytes start = 1;
+    bytes prefix = 2;
+}
+
+message NewIteratorWithStartAndPrefixResponse {
+    uint64 id = 1;
+}
+
+message IteratorNextRequest {
+    uint64 id = 1;
+}
+
+message IteratorNextResponse {
+    repeated PutRequest data = 1;
+}
+
+message IteratorErrorRequest {
+    uint64 id = 1;
+}
+
+message IteratorErrorResponse {
+    uint32 err = 1;
+}
+
+message IteratorReleaseRequest {
+    uint64 id = 1;
+}
+
+message IteratorReleaseResponse {
+    uint32 err = 1;
+}
+
+service Database {
+    rpc Has(HasRequest) returns (HasResponse);
+    rpc Get(GetRequest) returns (GetResponse);
+    rpc Put(PutRequest) returns (PutResponse);
+    rpc Delete(DeleteRequest) returns (DeleteResponse);
+    rpc Stat(StatRequest) returns (StatResponse);
+    rpc Compact(CompactRequest) returns (CompactResponse);
+    rpc Close(CloseRequest) returns (CloseResponse);
+
+    rpc WriteBatch(WriteBatchRequest) returns (WriteBatchResponse);
+
+    rpc NewIteratorWithStartAndPrefix(NewIteratorWithStartAndPrefixRequest) returns (NewIteratorWithStartAndPrefixResponse);
+
+    rpc IteratorNext(IteratorNextRequest) returns (IteratorNextResponse);
+    rpc IteratorError(IteratorErrorRequest) returns (IteratorErrorResponse);
+    rpc IteratorRelease(IteratorReleaseRequest) returns (IteratorReleaseResponse);
+}

@@ -131,6 +131,17 @@ func GetBool(db KeyValueReader, key []byte) (bool, error) {
 	return b[0] == 1, nil
 }
 
+func Count(db Iteratee) (int, error) {
+	iterator := db.NewIterator()
+	defer iterator.Release()
+
+	count := 0
+	for iterator.Next() {
+		count++
+	}
+	return count, iterator.Error()
+}
+
 func Size(db Iteratee) (int, error) {
 	iterator := db.NewIterator()
 	defer iterator.Release()
@@ -142,17 +153,17 @@ func Size(db Iteratee) (int, error) {
 	return size, iterator.Error()
 }
 
-func Clear(readerDB Iteratee, writerDB KeyValueWriter) error {
-	return ClearPrefix(readerDB, writerDB, nil)
+func Clear(readerDB Iteratee, deleterDB KeyValueDeleter) error {
+	return ClearPrefix(readerDB, deleterDB, nil)
 }
 
-func ClearPrefix(readerDB Iteratee, writerDB KeyValueWriter, prefix []byte) error {
+func ClearPrefix(readerDB Iteratee, deleterDB KeyValueDeleter, prefix []byte) error {
 	iterator := readerDB.NewIteratorWithPrefix(prefix)
 	defer iterator.Release()
 
 	for iterator.Next() {
 		key := iterator.Key()
-		if err := writerDB.Delete(key); err != nil {
+		if err := deleterDB.Delete(key); err != nil {
 			return err
 		}
 	}

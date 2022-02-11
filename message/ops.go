@@ -14,18 +14,16 @@ const (
 	GetVersion Op = iota
 	_
 	GetPeerList
-	// TODO: NetworkUpgrade/Rename this to Pong
-	UptimePong
-	Ping
-	// TODO: NetworkUpgrade/delete this in favor of UptimePong
 	Pong
+	Ping
+	_
 	// Bootstrapping:
 	GetAcceptedFrontier
 	AcceptedFrontier
 	GetAccepted
 	Accepted
 	GetAncestors
-	MultiPut
+	Ancestors
 	// Consensus:
 	Get
 	Put
@@ -63,7 +61,6 @@ var (
 		PeerList,
 		Ping,
 		Pong,
-		UptimePong,
 	}
 
 	// List of all consensus request message types
@@ -79,7 +76,7 @@ var (
 	ConsensusResponseOps = []Op{
 		AcceptedFrontier,
 		Accepted,
-		MultiPut,
+		Ancestors,
 		Put,
 		Chits,
 		AppResponse,
@@ -113,7 +110,7 @@ var (
 	RequestToResponseOps = map[Op]Op{
 		GetAcceptedFrontier: AcceptedFrontier,
 		GetAccepted:         Accepted,
-		GetAncestors:        MultiPut,
+		GetAncestors:        Ancestors,
 		Get:                 Put,
 		PushQuery:           Chits,
 		PullQuery:           Chits,
@@ -122,7 +119,7 @@ var (
 	ResponseToFailedOps = map[Op]Op{
 		AcceptedFrontier: GetAcceptedFrontierFailed,
 		Accepted:         GetAcceptedFailed,
-		MultiPut:         GetAncestorsFailed,
+		Ancestors:        GetAncestorsFailed,
 		Put:              GetFailed,
 		Chits:            QueryFailed,
 		AppResponse:      AppRequestFailed,
@@ -130,7 +127,7 @@ var (
 	FailedToResponseOps = map[Op]Op{
 		GetAcceptedFrontierFailed: AcceptedFrontier,
 		GetAcceptedFailed:         Accepted,
-		GetAncestorsFailed:        MultiPut,
+		GetAncestorsFailed:        Ancestors,
 		GetFailed:                 Put,
 		QueryFailed:               Chits,
 		AppRequestFailed:          AppResponse,
@@ -154,15 +151,14 @@ var (
 		GetPeerList: {},
 		PeerList:    {SignedPeers},
 		Ping:        {},
-		Pong:        {},
-		UptimePong:  {Uptime},
+		Pong:        {Uptime},
 		// Bootstrapping:
 		GetAcceptedFrontier: {ChainID, RequestID, Deadline},
 		AcceptedFrontier:    {ChainID, RequestID, ContainerIDs},
 		GetAccepted:         {ChainID, RequestID, Deadline, ContainerIDs},
 		Accepted:            {ChainID, RequestID, ContainerIDs},
 		GetAncestors:        {ChainID, RequestID, Deadline, ContainerID},
-		MultiPut:            {ChainID, RequestID, MultiContainerBytes},
+		Ancestors:           {ChainID, RequestID, MultiContainerBytes},
 		// Consensus:
 		Get:       {ChainID, RequestID, Deadline, ContainerID},
 		Put:       {ChainID, RequestID, ContainerID, ContainerBytes},
@@ -178,7 +174,7 @@ var (
 
 func (op Op) Compressable() bool {
 	switch op {
-	case PeerList, Put, MultiPut, PushQuery, AppRequest, AppResponse, AppGossip:
+	case PeerList, Put, Ancestors, PushQuery, AppRequest, AppResponse, AppGossip:
 		return true
 	default:
 		return false
@@ -199,8 +195,6 @@ func (op Op) String() string {
 		return "ping"
 	case Pong:
 		return "pong"
-	case UptimePong:
-		return "uptime_pong"
 	case GetAcceptedFrontier:
 		return "get_accepted_frontier"
 	case AcceptedFrontier:
@@ -215,8 +209,8 @@ func (op Op) String() string {
 		return "get_ancestors"
 	case Put:
 		return "put"
-	case MultiPut:
-		return "multi_put"
+	case Ancestors:
+		return "ancestors"
 	case PushQuery:
 		return "push_query"
 	case PullQuery:

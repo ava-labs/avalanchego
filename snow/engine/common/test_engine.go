@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 var (
@@ -27,11 +28,12 @@ var (
 	errGetFailed                 = errors.New("unexpectedly called GetFailed")
 	errGetAncestorsFailed        = errors.New("unexpectedly called GetAncestorsFailed")
 	errPut                       = errors.New("unexpectedly called Put")
-	errMultiPut                  = errors.New("unexpectedly called MultiPut")
+	errAncestors                 = errors.New("unexpectedly called Ancestors")
 	errPushQuery                 = errors.New("unexpectedly called PushQuery")
 	errPullQuery                 = errors.New("unexpectedly called PullQuery")
 	errQueryFailed               = errors.New("unexpectedly called QueryFailed")
 	errChits                     = errors.New("unexpectedly called Chits")
+	errStart                     = errors.New("unexpectedly called Start")
 
 	_ Engine = &EngineTest{}
 )
@@ -39,6 +41,8 @@ var (
 // EngineTest is a test engine
 type EngineTest struct {
 	T *testing.T
+
+	CantStart,
 
 	CantIsBootstrapped,
 	CantTimeout,
@@ -63,7 +67,7 @@ type EngineTest struct {
 	CantGetFailed,
 	CantGetAncestorsFailed,
 	CantPut,
-	CantMultiPut,
+	CantAncestors,
 
 	CantPushQuery,
 	CantPullQuery,
@@ -82,18 +86,20 @@ type EngineTest struct {
 
 	CantGetVM bool
 
+	StartF                                             func(startReqID uint32) error
 	IsBootstrappedF                                    func() bool
 	ContextF                                           func() *snow.ConsensusContext
 	HaltF                                              func()
 	TimeoutF, GossipF, ShutdownF                       func() error
 	NotifyF                                            func(Message) error
 	GetF, GetAncestorsF, PullQueryF                    func(nodeID ids.ShortID, requestID uint32, containerID ids.ID) error
-	PutF, PushQueryF                                   func(nodeID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error
-	MultiPutF                                          func(nodeID ids.ShortID, requestID uint32, containers [][]byte) error
+	PutF, PushQueryF                                   func(nodeID ids.ShortID, requestID uint32, container []byte) error
+	AncestorsF                                         func(nodeID ids.ShortID, requestID uint32, containers [][]byte) error
 	AcceptedFrontierF, GetAcceptedF, AcceptedF, ChitsF func(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) error
 	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
 	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF, AppRequestFailedF func(nodeID ids.ShortID, requestID uint32) error
-	ConnectedF, DisconnectedF func(nodeID ids.ShortID) error
+	ConnectedF                func(nodeID ids.ShortID, nodeVersion version.Application) error
+	DisconnectedF             func(nodeID ids.ShortID) error
 	HealthF                   func() (interface{}, error)
 	GetVMF                    func() VM
 	AppRequestF, AppResponseF func(nodeID ids.ShortID, requestID uint32, msg []byte) error
@@ -101,6 +107,7 @@ type EngineTest struct {
 }
 
 func (e *EngineTest) Default(cant bool) {
+	e.CantStart = cant
 	e.CantIsBootstrapped = cant
 	e.CantTimeout = cant
 	e.CantGossip = cant
@@ -119,7 +126,7 @@ func (e *EngineTest) Default(cant bool) {
 	e.CantGetAncestorsFailed = cant
 	e.CantGetFailed = cant
 	e.CantPut = cant
-	e.CantMultiPut = cant
+	e.CantAncestors = cant
 	e.CantPushQuery = cant
 	e.CantPullQuery = cant
 	e.CantQueryFailed = cant
@@ -132,6 +139,16 @@ func (e *EngineTest) Default(cant bool) {
 	e.CantAppResponse = cant
 	e.CantAppGossip = cant
 	e.CantGetVM = cant
+}
+
+func (e *EngineTest) Start(startReqID uint32) error {
+	if e.StartF != nil {
+		return e.StartF(startReqID)
+	}
+	if e.CantStart && e.T != nil {
+		e.T.Fatalf("Unexpectedly called Start")
+	}
+	return errStart
 }
 
 func (e *EngineTest) Context() *snow.ConsensusContext {
@@ -334,9 +351,9 @@ func (e *EngineTest) GetAncestorsFailed(nodeID ids.ShortID, requestID uint32) er
 	return errGetAncestorsFailed
 }
 
-func (e *EngineTest) Put(nodeID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error {
+func (e *EngineTest) Put(nodeID ids.ShortID, requestID uint32, container []byte) error {
 	if e.PutF != nil {
-		return e.PutF(nodeID, requestID, containerID, container)
+		return e.PutF(nodeID, requestID, container)
 	}
 	if !e.CantPut {
 		return nil
@@ -347,22 +364,22 @@ func (e *EngineTest) Put(nodeID ids.ShortID, requestID uint32, containerID ids.I
 	return errPut
 }
 
-func (e *EngineTest) MultiPut(nodeID ids.ShortID, requestID uint32, containers [][]byte) error {
-	if e.MultiPutF != nil {
-		return e.MultiPutF(nodeID, requestID, containers)
+func (e *EngineTest) Ancestors(nodeID ids.ShortID, requestID uint32, containers [][]byte) error {
+	if e.AncestorsF != nil {
+		return e.AncestorsF(nodeID, requestID, containers)
 	}
-	if !e.CantMultiPut {
+	if !e.CantAncestors {
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatal(errMultiPut)
+		e.T.Fatal(errAncestors)
 	}
-	return errMultiPut
+	return errAncestors
 }
 
-func (e *EngineTest) PushQuery(nodeID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error {
+func (e *EngineTest) PushQuery(nodeID ids.ShortID, requestID uint32, container []byte) error {
 	if e.PushQueryF != nil {
-		return e.PushQueryF(nodeID, requestID, containerID, container)
+		return e.PushQueryF(nodeID, requestID, container)
 	}
 	if !e.CantPushQuery {
 		return nil
@@ -464,9 +481,9 @@ func (e *EngineTest) Chits(nodeID ids.ShortID, requestID uint32, containerIDs []
 	return errChits
 }
 
-func (e *EngineTest) Connected(nodeID ids.ShortID) error {
+func (e *EngineTest) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
 	if e.ConnectedF != nil {
-		return e.ConnectedF(nodeID)
+		return e.ConnectedF(nodeID, nodeVersion)
 	}
 	if !e.CantConnected {
 		return nil
@@ -488,16 +505,6 @@ func (e *EngineTest) Disconnected(nodeID ids.ShortID) error {
 		e.T.Fatal(errDisconnected)
 	}
 	return errDisconnected
-}
-
-func (e *EngineTest) IsBootstrapped() bool {
-	if e.IsBootstrappedF != nil {
-		return e.IsBootstrappedF()
-	}
-	if e.CantIsBootstrapped && e.T != nil {
-		e.T.Fatalf("Unexpectedly called IsBootstrapped")
-	}
-	return false
 }
 
 func (e *EngineTest) HealthCheck() (interface{}, error) {

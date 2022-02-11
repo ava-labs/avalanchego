@@ -22,7 +22,7 @@ var (
 
 func init() {
 	lc := linearcodec.New(reflectcodec.DefaultTagName, math.MaxUint32)
-	c = codec.NewManager(math.MaxUint32)
+	c = codec.NewManager(math.MaxInt32)
 
 	if err := c.RegisterCodec(codecVersion, lc); err != nil {
 		panic(err)

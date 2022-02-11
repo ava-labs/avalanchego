@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -43,7 +45,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 
@@ -65,7 +67,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 
@@ -97,7 +99,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 
@@ -123,7 +125,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 
@@ -145,7 +147,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 
@@ -180,12 +182,12 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
+	} else if _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've errored because start time too early")
 	}
 
@@ -196,12 +198,12 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		uint64(defaultValidateStartTime.Add(maxFutureStartTime).Add(defaultMinStakingDuration).Unix()+1),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
+	} else if _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've errored because start time too far in the future")
 	}
 
@@ -212,12 +214,12 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID, // node ID
 		nodeID, // reward address
-		PercentDenominator,
+		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
+	} else if _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've errored because validator already validating")
 	}
 
@@ -233,7 +235,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		uint64(startTime.Add(defaultMinStakingDuration).Unix()), // end time
 		nodeID,                     // node ID
 		key2.PublicKey().Address(), // reward address
-		PercentDenominator,         // shares
+		reward.PercentDenominator,  // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr // key
 	)
@@ -242,7 +244,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 	}
 
 	vm.internalState.AddCurrentStaker(tx, 0)
-	vm.internalState.AddTx(tx, Committed)
+	vm.internalState.AddTx(tx, status.Committed)
 	if err := vm.internalState.Commit(); err != nil {
 		t.Fatal(err)
 	}
@@ -250,7 +252,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
+	if _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed because validator in pending validator set")
 	}
 
@@ -261,7 +263,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	); err != nil {
@@ -276,7 +278,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		vm.internalState.DeleteUTXO(utxoID)
 	}
 	// Now keys[0] has no funds
-	if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
+	if _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed because tx fee paying key has no funds")
 	}
 }

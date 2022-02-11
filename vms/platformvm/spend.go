@@ -52,7 +52,7 @@ func (vm *VM) stake(
 	for _, key := range keys {
 		addrs.Add(key.PublicKey().Address())
 	}
-	utxos, err := vm.getAllUTXOs(addrs) // The UTXOs controlled by [keys]
+	utxos, err := avax.GetAllUTXOs(vm.internalState, addrs) // The UTXOs controlled by [keys]
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("couldn't get UTXOs: %w", err)
 	}
@@ -332,18 +332,16 @@ func (vm *VM) semanticVerifySpend(
 	creds []verify.Verifiable,
 	feeAmount uint64,
 	feeAssetID ids.ID,
-) TxError {
+) error {
 	utxos := make([]*avax.UTXO, len(ins))
 	for index, input := range ins {
 		utxo, err := utxoDB.GetUTXO(input.InputID())
 		if err != nil {
-			return tempError{
-				fmt.Errorf(
-					"failed to read consumed UTXO %s due to: %w",
-					&input.UTXOID,
-					err,
-				),
-			}
+			return fmt.Errorf(
+				"failed to read consumed UTXO %s due to: %w",
+				&input.UTXOID,
+				err,
+			)
 		}
 		utxos[index] = utxo
 	}
@@ -365,18 +363,24 @@ func (vm *VM) semanticVerifySpendUTXOs(
 	creds []verify.Verifiable,
 	feeAmount uint64,
 	feeAssetID ids.ID,
-) TxError {
+) error {
 	if len(ins) != len(creds) {
-		return permError{fmt.Errorf("there are %d inputs but %d credentials. Should be same number",
-			len(ins), len(creds))}
+		return fmt.Errorf(
+			"there are %d inputs but %d credentials. Should be same number",
+			len(ins),
+			len(creds),
+		)
 	}
 	if len(ins) != len(utxos) {
-		return permError{fmt.Errorf("there are %d inputs but %d utxos. Should be same number",
-			len(ins), len(utxos))}
+		return fmt.Errorf(
+			"there are %d inputs but %d utxos. Should be same number",
+			len(ins),
+			len(utxos),
+		)
 	}
 	for _, cred := range creds { // Verify credentials are well-formed.
 		if err := cred.Verify(); err != nil {
-			return permError{err}
+			return err
 		}
 	}
 
@@ -396,10 +400,10 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		utxo := utxos[index] // The UTXO consumed by [input]
 
 		if assetID := utxo.AssetID(); assetID != feeAssetID {
-			return permError{errAssetIDMismatch}
+			return errAssetIDMismatch
 		}
 		if assetID := input.AssetID(); assetID != feeAssetID {
-			return permError{errAssetIDMismatch}
+			return errAssetIDMismatch
 		}
 
 		out := utxo.Out
@@ -415,20 +419,18 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		// consumes it, is not locked even though [locktime] hasn't passed. This
 		// is invalid.
 		if inner, ok := in.(*StakeableLockIn); now < locktime && !ok {
-			return permError{errLockedFundsNotMarkedAsLocked}
+			return errLockedFundsNotMarkedAsLocked
 		} else if ok {
 			if inner.Locktime != locktime {
 				// This input is locked, but its locktime is wrong
-				return permError{errWrongLocktime}
+				return errWrongLocktime
 			}
 			in = inner.TransferableIn
 		}
 
 		// Verify that this tx's credentials allow [in] to be spent
 		if err := vm.fx.VerifyTransfer(tx, in, creds[index], out); err != nil {
-			return permError{
-				fmt.Errorf("failed to verify transfer: %w", err),
-			}
+			return fmt.Errorf("failed to verify transfer: %w", err)
 		}
 
 		amount := in.Amount()
@@ -436,7 +438,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		if now >= locktime {
 			newUnlockedConsumed, err := math.Add64(unlockedConsumed, amount)
 			if err != nil {
-				return permError{err}
+				return err
 			}
 			unlockedConsumed = newUnlockedConsumed
 			continue
@@ -444,14 +446,12 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 		owned, ok := out.(Owned)
 		if !ok {
-			return permError{errUnknownOwners}
+			return errUnknownOwners
 		}
 		owner := owned.Owners()
 		ownerBytes, err := Codec.Marshal(CodecVersion, owner)
 		if err != nil {
-			return tempError{
-				fmt.Errorf("couldn't marshal owner: %w", err),
-			}
+			return fmt.Errorf("couldn't marshal owner: %w", err)
 		}
 		ownerID := hashing.ComputeHash256Array(ownerBytes)
 		owners, ok := lockedConsumed[locktime]
@@ -461,14 +461,14 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		}
 		newAmount, err := math.Add64(owners[ownerID], amount)
 		if err != nil {
-			return permError{err}
+			return err
 		}
 		owners[ownerID] = newAmount
 	}
 
 	for _, out := range outs {
 		if assetID := out.AssetID(); assetID != feeAssetID {
-			return permError{errAssetIDMismatch}
+			return errAssetIDMismatch
 		}
 
 		output := out.Output()
@@ -484,7 +484,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		if locktime == 0 {
 			newUnlockedProduced, err := math.Add64(unlockedProduced, amount)
 			if err != nil {
-				return permError{err}
+				return err
 			}
 			unlockedProduced = newUnlockedProduced
 			continue
@@ -492,14 +492,12 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 		owned, ok := output.(Owned)
 		if !ok {
-			return permError{errUnknownOwners}
+			return errUnknownOwners
 		}
 		owner := owned.Owners()
 		ownerBytes, err := Codec.Marshal(CodecVersion, owner)
 		if err != nil {
-			return tempError{
-				fmt.Errorf("couldn't marshal owner: %w", err),
-			}
+			return fmt.Errorf("couldn't marshal owner: %w", err)
 		}
 		ownerID := hashing.ComputeHash256Array(ownerBytes)
 		owners, ok := lockedProduced[locktime]
@@ -509,7 +507,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		}
 		newAmount, err := math.Add64(owners[ownerID], amount)
 		if err != nil {
-			return permError{err}
+			return err
 		}
 		owners[ownerID] = newAmount
 	}
@@ -523,7 +521,13 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			if producedAmount > consumedAmount {
 				increase := producedAmount - consumedAmount
 				if increase > unlockedConsumed {
-					return permError{fmt.Errorf("address %s produces %d unlocked and consumes %d unlocked for locktime %d", ownerID, increase, unlockedConsumed, locktime)}
+					return fmt.Errorf(
+						"address %s produces %d unlocked and consumes %d unlocked for locktime %d",
+						ownerID,
+						increase,
+						unlockedConsumed,
+						locktime,
+					)
 				}
 				unlockedConsumed -= increase
 			}
@@ -532,9 +536,12 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 	// More unlocked tokens produced than consumed. Invalid.
 	if unlockedProduced > unlockedConsumed {
-		return permError{fmt.Errorf("tx produces more unlocked (%d) than it consumes (%d)", unlockedProduced, unlockedConsumed)}
+		return fmt.Errorf(
+			"tx produces more unlocked (%d) than it consumes (%d)",
+			unlockedProduced,
+			unlockedConsumed,
+		)
 	}
-
 	return nil
 }
 

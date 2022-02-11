@@ -73,7 +73,7 @@ type FetchSender interface {
 
 	// Give the specified node several containers at once. Should be in response
 	// to a GetAncestors message with request ID [requestID] from the node.
-	SendMultiPut(nodeID ids.ShortID, requestID uint32, containers [][]byte)
+	SendAncestors(nodeID ids.ShortID, requestID uint32, containers [][]byte)
 }
 
 // QuerySender defines how a consensus engine sends query messages to other

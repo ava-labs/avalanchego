@@ -307,11 +307,11 @@ func GenesisVMWithArgs(tb testing.TB, additionalFxs []*common.Fx, args *BuildGen
 	}
 	vm.batchTimeout = 0
 
-	if err := vm.Bootstrapping(); err != nil {
+	if err := vm.SetState(snow.Bootstrapping); err != nil {
 		tb.Fatal(err)
 	}
 
-	if err := vm.Bootstrapped(); err != nil {
+	if err := vm.SetState(snow.NormalOp); err != nil {
 		tb.Fatal(err)
 	}
 
@@ -712,130 +712,6 @@ func TestIssueTx(t *testing.T) {
 	}
 }
 
-func TestGenesisGetUTXOs(t *testing.T) {
-	_, _, vm, _ := GenesisVM(t)
-	ctx := vm.ctx
-	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
-		ctx.Lock.Unlock()
-	}()
-
-	addrsSet := ids.ShortSet{}
-	addrsSet.Add(addrs[0])
-
-	utxos, _, _, err := vm.getPaginatedUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(utxos) != 4 {
-		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", 4, len(utxos))
-	}
-
-	utxos, err = vm.getAllUTXOs(addrsSet)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(utxos) != 4 {
-		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", 4, len(utxos))
-	}
-
-	utxos, _, _, err = vm.getPaginatedUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(utxos) != 4 {
-		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", 4, len(utxos))
-	}
-}
-
-// TestGenesisGetPaginatedUTXOs tests
-// - Pagination when the total UTXOs exceed maxUTXOsToFetch (1024)
-// - Fetching all UTXOs when they exceed maxUTXOsToFetch (1024)
-func TestGenesisGetPaginatedUTXOs(t *testing.T) {
-	addr0Str, _ := formatting.FormatBech32(testHRP, addrs[0].Bytes())
-	addr1Str, _ := formatting.FormatBech32(testHRP, addrs[1].Bytes())
-	addr2Str, _ := formatting.FormatBech32(testHRP, addrs[2].Bytes())
-
-	// Create a starting point of 3000 UTXOs on different addresses
-	utxoCount := 2345
-	holder := map[string][]interface{}{}
-	for i := 0; i < utxoCount; i++ {
-		holder["fixedCap"] = append(holder["fixedCap"],
-			Holder{
-				Amount:  json.Uint64(startBalance),
-				Address: addr0Str,
-			},
-			Holder{
-				Amount:  json.Uint64(startBalance),
-				Address: addr1Str,
-			},
-			Holder{
-				Amount:  json.Uint64(startBalance),
-				Address: addr2Str,
-			})
-	}
-
-	// Inject them in the Genesis build
-	genesisArgs := &BuildGenesisArgs{
-		Encoding: formatting.Hex,
-		GenesisData: map[string]AssetDefinition{
-			"asset1": {
-				Name:         "AVAX",
-				Symbol:       "SYMB",
-				InitialState: holder,
-			},
-		},
-	}
-	_, _, vm, _ := GenesisVMWithArgs(t, nil, genesisArgs)
-	ctx := vm.ctx
-	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
-		ctx.Lock.Unlock()
-	}()
-
-	addrsSet := ids.ShortSet{}
-	addrsSet.Add(addrs[0], addrs[1])
-
-	var (
-		fetchedUTXOs []*avax.UTXO
-		err          error
-	)
-
-	lastAddr := ids.ShortEmpty
-	lastIdx := ids.Empty
-
-	var totalUTXOs []*avax.UTXO
-	for i := 0; i <= 3; i++ {
-		fetchedUTXOs, lastAddr, lastIdx, err = vm.getPaginatedUTXOs(addrsSet, lastAddr, lastIdx, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if len(fetchedUTXOs) == utxoCount {
-			t.Fatalf("Wrong number of utxos. Should be Paginated. Expected (%d) returned (%d)", maxUTXOsToFetch, len(fetchedUTXOs))
-		}
-		totalUTXOs = append(totalUTXOs, fetchedUTXOs...)
-	}
-
-	if len(totalUTXOs) != 4*maxUTXOsToFetch {
-		t.Fatalf("Wrong number of utxos. Should have paginated through all. Expected (%d) returned (%d)", 4*maxUTXOsToFetch, len(totalUTXOs))
-	}
-
-	// Fetch all UTXOs
-	notPaginatedUTXOs, err := vm.getAllUTXOs(addrsSet)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(notPaginatedUTXOs) != 2*utxoCount {
-		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", 2*utxoCount, len(notPaginatedUTXOs))
-	}
-}
-
 // Test issuing a transaction that consumes a currently pending UTXO. The
 // transaction should be issued successfully.
 func TestIssueDependentTx(t *testing.T) {
@@ -908,12 +784,12 @@ func TestIssueNFT(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	err = vm.Bootstrapping()
+	err = vm.SetState(snow.Bootstrapping)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.Bootstrapped()
+	err = vm.SetState(snow.NormalOp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1060,12 +936,12 @@ func TestIssueProperty(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	err = vm.Bootstrapping()
+	err = vm.SetState(snow.Bootstrapping)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.Bootstrapped()
+	err = vm.SetState(snow.NormalOp)
 	if err != nil {
 		t.Fatal(err)
 	}

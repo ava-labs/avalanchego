@@ -4,24 +4,26 @@
 package health
 
 import (
-	"errors"
+	"context"
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
-
-var errInvalidNumberOfChecks = errors.New("expected at least 1 check attempt")
 
 // Interface compliance
 var _ Client = &client{}
 
 // Client interface for Avalanche Health API Endpoint
 type Client interface {
-	// Health returns a health check on the Avalanche node
-	Health() (*APIHealthClientReply, error)
-	// AwaitHealthy queries the Health endpoint [checks] times, with a pause of
-	// [interval] in between checks and returns early if Health returns healthy
-	AwaitHealthy(numChecks int, freq time.Duration) (bool, error)
+	// Readiness returns if the node has finished initialization
+	Readiness(context.Context) (*APIHealthReply, error)
+	// Health returns a summation of the health of the node
+	Health(context.Context) (*APIHealthReply, error)
+	// Liveness returns if the node is in need of a restart
+	Liveness(context.Context) (*APIHealthReply, error)
+	// AwaitHealthy queries the Health endpoint with a pause of [interval]
+	// in between checks and returns early if Health returns healthy
+	AwaitHealthy(ctx context.Context, freq time.Duration) (bool, error)
 }
 
 // Client implementation for Avalanche Health API Endpoint
@@ -29,61 +31,50 @@ type client struct {
 	requester rpc.EndpointRequester
 }
 
-type ErrorMsg struct {
-	Message string `json:"message"`
-}
-
-// Result represents the output of a health check execution.
-type Result struct {
-	// the details of task Result - may be nil
-	Details interface{} `json:"message,omitempty"`
-	// the error returned from a failed health check - an empty string when successful
-	Error ErrorMsg `json:"error,omitempty"`
-	// the time of the last health check
-	Timestamp time.Time `json:"timestamp"`
-	// the execution duration of the last check
-	Duration time.Duration `json:"duration,omitempty"`
-	// the number of failures that occurred in a row
-	ContiguousFailures int64 `json:"contiguousFailures"`
-	// the time of the initial transitional failure
-	TimeOfFirstFailure *time.Time `json:"timeOfFirstFailure"`
-}
-
-type APIHealthClientReply struct {
-	Checks  map[string]Result `json:"checks"`
-	Healthy bool              `json:"healthy"`
-}
-
 // NewClient returns a client to interact with Health API endpoint
-func NewClient(uri string, requestTimeout time.Duration) Client {
+func NewClient(uri string) Client {
 	return &client{
-		requester: rpc.NewEndpointRequester(uri, "/ext/health", "health", requestTimeout),
+		requester: rpc.NewEndpointRequester(uri, "/ext/health", "health"),
 	}
 }
 
-func (c *client) Health() (*APIHealthClientReply, error) {
-	res := &APIHealthClientReply{}
-	err := c.requester.SendRequest("health", struct{}{}, res)
+func (c *client) Readiness(ctx context.Context) (*APIHealthReply, error) {
+	res := &APIHealthReply{}
+	err := c.requester.SendRequest(ctx, "readiness", struct{}{}, res)
 	return res, err
 }
 
-func (c *client) AwaitHealthy(numChecks int, freq time.Duration) (bool, error) {
-	if numChecks < 1 {
-		return false, errInvalidNumberOfChecks
-	}
+func (c *client) Health(ctx context.Context) (*APIHealthReply, error) {
+	res := &APIHealthReply{}
+	err := c.requester.SendRequest(ctx, "health", struct{}{}, res)
+	return res, err
+}
 
-	// Check health once outside the loop to avoid sleeping unnecessarily.
-	res, err := c.Health()
+func (c *client) Liveness(ctx context.Context) (*APIHealthReply, error) {
+	res := &APIHealthReply{}
+	err := c.requester.SendRequest(ctx, "liveness", struct{}{}, res)
+	return res, err
+}
+
+func (c *client) AwaitHealthy(ctx context.Context, freq time.Duration) (bool, error) {
+	// Check health once outside the loop to avoid waiting unnecessarily.
+	res, err := c.Health(ctx)
 	if err == nil && res.Healthy {
 		return true, nil
 	}
 
-	for i := 1; i < numChecks; i++ {
-		time.Sleep(freq)
-		res, err = c.Health()
-		if err == nil && res.Healthy {
-			return true, nil
+	ticker := time.NewTicker(freq)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			res, err = c.Health(ctx)
+			if err == nil && res.Healthy {
+				return true, nil
+			}
+		case <-ctx.Done():
+			return false, ctx.Err()
 		}
 	}
-	return false, err
 }

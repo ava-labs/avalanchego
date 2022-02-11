@@ -4,6 +4,8 @@
 package config
 
 import (
+	"bytes"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"io"
@@ -31,8 +33,24 @@ func BuildViper(fs *flag.FlagSet, args []string) (*viper.Viper, error) {
 	if err := v.BindPFlags(pfs); err != nil {
 		return nil, err
 	}
-	if v.IsSet(ConfigFileKey) {
-		v.SetConfigFile(os.ExpandEnv(v.GetString(ConfigFileKey)))
+
+	// load node configs from flags or file, depending on which flags are set
+	switch {
+	case v.IsSet(ConfigContentKey):
+		configContentB64 := v.GetString(ConfigContentKey)
+		configBytes, err := base64.StdEncoding.DecodeString(configContentB64)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode base64 content: %w", err)
+		}
+
+		v.SetConfigType(v.GetString(ConfigContentTypeKey))
+		if err := v.ReadConfig(bytes.NewBuffer(configBytes)); err != nil {
+			return nil, err
+		}
+
+	case v.IsSet(ConfigFileKey):
+		filename := os.ExpandEnv(v.GetString(ConfigFileKey))
+		v.SetConfigFile(filename)
 		if err := v.ReadInConfig(); err != nil {
 			return nil, err
 		}

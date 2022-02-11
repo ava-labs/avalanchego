@@ -11,49 +11,36 @@ import (
 )
 
 var (
-	errForceAccepted = errors.New("unexpectedly called ForceAccepted")
-
 	_ Bootstrapable = &BootstrapableTest{}
+
+	errForceAccepted = errors.New("unexpectedly called ForceAccepted")
+	errClear         = errors.New("unexpectedly called Clear")
 )
 
 // BootstrapableTest is a test engine that supports bootstrapping
 type BootstrapableTest struct {
 	T *testing.T
 
-	CantCurrentAcceptedFrontier,
-	CantFilterAccepted,
-	CantForceAccepted bool
+	CantForceAccepted, CantClear bool
 
-	CurrentAcceptedFrontierF func() (acceptedContainerIDs []ids.ID, err error)
-	FilterAcceptedF          func(containerIDs []ids.ID) (acceptedContainerIDs []ids.ID)
-	ForceAcceptedF           func(acceptedContainerIDs []ids.ID) error
+	ClearF         func() error
+	ForceAcceptedF func(acceptedContainerIDs []ids.ID) error
 }
 
 // Default sets the default on call handling
 func (b *BootstrapableTest) Default(cant bool) {
-	b.CantCurrentAcceptedFrontier = cant
-	b.CantFilterAccepted = cant
 	b.CantForceAccepted = cant
 }
 
-// CurrentAcceptedFrontier implements the Bootstrapable interface
-func (b *BootstrapableTest) CurrentAcceptedFrontier() ([]ids.ID, error) {
-	if b.CurrentAcceptedFrontierF != nil {
-		return b.CurrentAcceptedFrontierF()
-	}
-	if b.CantCurrentAcceptedFrontier && b.T != nil {
-		b.T.Fatalf("Unexpectedly called CurrentAcceptedFrontier")
-	}
-	return nil, nil
-}
-
-// FilterAccepted implements the Bootstrapable interface
-func (b *BootstrapableTest) FilterAccepted(containerIDs []ids.ID) []ids.ID {
-	if b.FilterAcceptedF != nil {
-		return b.FilterAcceptedF(containerIDs)
-	}
-	if b.CantFilterAccepted && b.T != nil {
-		b.T.Fatalf("Unexpectedly called FilterAccepted")
+// Clear implements the Bootstrapable interface
+func (b *BootstrapableTest) Clear() error {
+	if b.ClearF != nil {
+		return b.ClearF()
+	} else if b.CantClear {
+		if b.T != nil {
+			b.T.Fatalf("Unexpectedly called Clear")
+		}
+		return errClear
 	}
 	return nil
 }

@@ -23,8 +23,7 @@ var (
 
 // LinkedDB provides a key value interface while allowing iteration.
 type LinkedDB interface {
-	database.KeyValueReader
-	database.KeyValueWriter
+	database.KeyValueReaderWriterDeleter
 
 	IsEmpty() (bool, error)
 	HeadKey() ([]byte, error)

@@ -44,15 +44,7 @@ func TestNewExportTx(t *testing.T) {
 			shouldVerify:       true,
 		},
 		{
-			description:        "P->C export before AP5",
-			destinationChainID: cChainID,
-			sourceKeys:         []*crypto.PrivateKeySECP256K1R{sourceKey},
-			timestamp:          defaultValidateStartTime,
-			shouldErr:          false,
-			shouldVerify:       false,
-		},
-		{
-			description:        "P->C export after AP5",
+			description:        "P->C export",
 			destinationChainID: cChainID,
 			sourceKeys:         []*crypto.PrivateKeySECP256K1R{sourceKey},
 			timestamp:          vm.ApricotPhase5Time,

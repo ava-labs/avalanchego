@@ -4,135 +4,55 @@
 package health
 
 import (
+	"encoding/json"
 	"net/http"
-	"time"
 
-	stdjson "encoding/json"
-
-	health "github.com/AppsFlyer/go-sundheit"
-
-	"github.com/gorilla/rpc/v2"
-
-	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
-
-	healthlib "github.com/ava-labs/avalanchego/health"
 )
 
-var _ Service = &apiServer{}
-
-// Service wraps a [healthlib.Service]. Handler() returns a handler
-// that handles incoming HTTP API requests. We have this in a separate
-// package from [healthlib] to avoid a circular import where this service
-// imports snow/engine/common but that package imports [healthlib].Checkable
-type Service interface {
-	healthlib.Service
-	Handler() (*common.HTTPHandler, error)
+type Service struct {
+	log    logging.Logger
+	health Reporter
 }
-
-func NewService(checkFreq time.Duration, log logging.Logger, namespace string, registry prometheus.Registerer) (Service, error) {
-	service, err := healthlib.NewService(checkFreq, log, namespace, registry)
-	if err != nil {
-		return nil, err
-	}
-	return &apiServer{
-		Service: service,
-		log:     log,
-	}, nil
-}
-
-// APIServer serves HTTP for a health service
-type apiServer struct {
-	healthlib.Service
-	log logging.Logger
-}
-
-func (as *apiServer) Handler() (*common.HTTPHandler, error) {
-	newServer := rpc.NewServer()
-	codec := json.NewCodec()
-	newServer.RegisterCodec(codec, "application/json")
-	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	if err := newServer.RegisterService(as, "health"); err != nil {
-		return nil, err
-	}
-
-	// If a GET request is sent, we respond with a 200 if the node is healthy or
-	// a 503 if the node isn't healthy.
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			newServer.ServeHTTP(w, r)
-			return
-		}
-
-		// Make sure the content type is set before writing the header.
-		w.Header().Set("Content-Type", "application/json")
-
-		checks, healthy := as.Results()
-		if !healthy {
-			// If a health check has failed, we should return a 503.
-			w.WriteHeader(http.StatusServiceUnavailable)
-		}
-		// The encoder will call write on the writer, which will write the
-		// header with a 200.
-		err := stdjson.NewEncoder(w).Encode(APIHealthServerReply{
-			Checks:  checks,
-			Healthy: healthy,
-		})
-		if err != nil {
-			as.log.Debug("failed to encode the health check response due to %s", err)
-		}
-	})
-	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: handler}, nil
-}
-
-// APIHealthArgs are the arguments for Health
-type APIHealthArgs struct{}
 
 // APIHealthReply is the response for Health
-type APIHealthServerReply struct {
-	Checks  map[string]health.Result `json:"checks"`
-	Healthy bool                     `json:"healthy"`
+type APIHealthReply struct {
+	Checks  map[string]Result `json:"checks"`
+	Healthy bool              `json:"healthy"`
 }
 
-// Health returns a summation of the health of the node
-func (as *apiServer) Health(_ *http.Request, _ *APIHealthArgs, reply *APIHealthServerReply) error {
-	as.log.Debug("Health.health called")
-	reply.Checks, reply.Healthy = as.Results()
+// Readiness returns if the node has finished initialization
+func (s *Service) Readiness(_ *http.Request, _ *struct{}, reply *APIHealthReply) error {
+	s.log.Debug("Health.readiness called")
+	reply.Checks, reply.Healthy = s.health.Readiness()
 	if reply.Healthy {
 		return nil
 	}
-	replyStr, err := stdjson.Marshal(reply.Checks)
-	as.log.Warn("Health.health is returning an error: %s", string(replyStr))
+	replyStr, err := json.Marshal(reply.Checks)
+	s.log.Warn("Health.readiness is returning an error: %s", string(replyStr))
 	return err
 }
 
-type noOp struct{}
-
-// NewNoOpService returns a NoOp version of health check
-// for when the Health API is disabled
-func NewNoOpService() Service {
-	return &noOp{}
+// Health returns a summation of the health of the node
+func (s *Service) Health(_ *http.Request, _ *struct{}, reply *APIHealthReply) error {
+	s.log.Debug("Health.health called")
+	reply.Checks, reply.Healthy = s.health.Health()
+	if reply.Healthy {
+		return nil
+	}
+	replyStr, err := json.Marshal(reply.Checks)
+	s.log.Warn("Health.health is returning an error: %s", string(replyStr))
+	return err
 }
 
-// RegisterCheck implements the Service interface
-func (n *noOp) Results() (map[string]health.Result, bool) {
-	return map[string]health.Result{}, true
-}
-
-// RegisterCheck implements the Service interface
-func (n *noOp) Handler() (_ *common.HTTPHandler, _ error) {
-	return nil, nil
-}
-
-// RegisterCheckFn implements the Service interface
-func (n *noOp) RegisterCheck(_ string, _ healthlib.Check) error {
-	return nil
-}
-
-// RegisterMonotonicCheckFn implements the Service interface
-func (n *noOp) RegisterMonotonicCheck(_ string, _ healthlib.Check) error {
-	return nil
+// Liveness returns if the node is in need of a restart
+func (s *Service) Liveness(_ *http.Request, _ *struct{}, reply *APIHealthReply) error {
+	s.log.Debug("Health.liveness called")
+	reply.Checks, reply.Healthy = s.health.Liveness()
+	if reply.Healthy {
+		return nil
+	}
+	replyStr, err := json.Marshal(reply.Checks)
+	s.log.Warn("Health.liveness is returning an error: %s", string(replyStr))
+	return err
 }

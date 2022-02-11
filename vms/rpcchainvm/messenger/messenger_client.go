@@ -6,8 +6,8 @@ package messenger
 import (
 	"context"
 
+	"github.com/ava-labs/avalanchego/api/proto/messengerproto"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/messenger/messengerproto"
 )
 
 // Client is an implementation of a messenger channel that talks over RPC.

@@ -4,6 +4,8 @@
 package genesis
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"testing"
@@ -14,8 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/perms"
-	"github.com/ava-labs/avalanchego/vms/avm"
-	"github.com/ava-labs/avalanchego/vms/evm"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 )
 
@@ -230,7 +230,7 @@ var (
 	}`
 )
 
-func TestGenesis(t *testing.T) {
+func TestGenesisFromFile(t *testing.T) {
 	tests := map[string]struct {
 		networkID       uint32
 		customConfig    string
@@ -239,12 +239,14 @@ func TestGenesis(t *testing.T) {
 		expected        string
 	}{
 		"mainnet": {
-			networkID: constants.MainnetID,
-			expected:  "3e6662fdbd88bcf4c7dd82cb4699c0807f1d7315d493bc38532697e11b226276",
+			networkID:    constants.MainnetID,
+			customConfig: customGenesisConfigJSON,
+			err:          "cannot override genesis config for standard network mainnet (1)",
 		},
 		"fuji": {
-			networkID: constants.FujiID,
-			expected:  "2e6b699298a664793bff42dae9c1af8d9c54645d8b376fd331e0b67475578e0a",
+			networkID:    constants.FujiID,
+			customConfig: customGenesisConfigJSON,
+			err:          "cannot override genesis config for standard network fuji (5)",
 		},
 		"fuji (with custom specified)": {
 			networkID:    constants.FujiID,
@@ -252,8 +254,9 @@ func TestGenesis(t *testing.T) {
 			err:          "cannot override genesis config for standard network fuji (5)",
 		},
 		"local": {
-			networkID: constants.LocalID,
-			expected:  "0495fd22c09aa8551664f0874abea2d90628c28ca897091e69188ed6052dc768",
+			networkID:    constants.LocalID,
+			customConfig: customGenesisConfigJSON,
+			err:          "cannot override genesis config for standard network local (12345)",
 		},
 		"local (with custom specified)": {
 			networkID:    constants.LocalID,
@@ -284,8 +287,9 @@ func TestGenesis(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert := assert.New(t)
+			// test loading of genesis from file
 
+			assert := assert.New(t)
 			var customFile string
 			if len(test.customConfig) > 0 {
 				customFile = filepath.Join(t.TempDir(), "config.json")
@@ -296,7 +300,97 @@ func TestGenesis(t *testing.T) {
 				customFile = test.missingFilepath
 			}
 
-			genesisBytes, _, err := Genesis(test.networkID, customFile)
+			genesisBytes, _, err := FromFile(test.networkID, customFile)
+			if len(test.err) > 0 {
+				assert.Error(err)
+				assert.Contains(err.Error(), test.err)
+				return
+			}
+			assert.NoError(err)
+
+			genesisHash := fmt.Sprintf("%x", hashing.ComputeHash256(genesisBytes))
+			assert.Equal(test.expected, genesisHash, "genesis hash mismatch")
+
+			genesis := platformvm.Genesis{}
+			_, err = platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis)
+			assert.NoError(err)
+		})
+	}
+}
+
+func TestGenesisFromFlag(t *testing.T) {
+	tests := map[string]struct {
+		networkID    uint32
+		customConfig string
+		err          string
+		expected     string
+	}{
+		"mainnet": {
+			networkID: constants.MainnetID,
+			err:       "cannot override genesis config for standard network mainnet (1)",
+		},
+		"fuji": {
+			networkID: constants.FujiID,
+			err:       "cannot override genesis config for standard network fuji (5)",
+		},
+		"local": {
+			networkID: constants.LocalID,
+			err:       "cannot override genesis config for standard network local (12345)",
+		},
+		"local (with custom specified)": {
+			networkID:    constants.LocalID,
+			customConfig: customGenesisConfigJSON,
+			err:          "cannot override genesis config for standard network local (12345)",
+		},
+		"custom": {
+			networkID:    9999,
+			customConfig: customGenesisConfigJSON,
+			expected:     "a1d1838586db85fe94ab1143560c3356df9ba2445794b796bba050be89f4fcb4",
+		},
+		"custom (networkID mismatch)": {
+			networkID:    9999,
+			customConfig: localGenesisConfigJSON,
+			err:          "networkID 9999 specified but genesis config contains networkID 12345",
+		},
+		"custom (invalid format)": {
+			networkID:    9999,
+			customConfig: invalidGenesisConfigJSON,
+			err:          "unable to load genesis content from flag",
+		},
+		"custom (missing content)": {
+			networkID: 9999,
+			err:       "unable to load genesis content from flag",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			// test loading of genesis content from flag/env-var
+
+			assert := assert.New(t)
+			var genBytes []byte
+			if len(test.customConfig) == 0 {
+				// try loading a default config
+				var err error
+				switch test.networkID {
+				case constants.MainnetID:
+					genBytes, err = json.Marshal(&MainnetConfig)
+					assert.NoError(err)
+				case constants.TestnetID:
+					genBytes, err = json.Marshal(&FujiConfig)
+					assert.NoError(err)
+				case constants.LocalID:
+					genBytes, err = json.Marshal(&LocalConfig)
+					assert.NoError(err)
+				default:
+					genBytes = make([]byte, 0)
+				}
+			} else {
+				genBytes = []byte(test.customConfig)
+			}
+			content := base64.StdEncoding.EncodeToString(genBytes)
+
+			genesisBytes, _, err := FromFlag(test.networkID, content)
 			if len(test.err) > 0 {
 				assert.Error(err)
 				assert.Contains(err.Error(), test.err)
@@ -327,11 +421,11 @@ func TestVMGenesis(t *testing.T) {
 			networkID: constants.MainnetID,
 			vmTest: []vmTest{
 				{
-					vmID:       avm.ID,
+					vmID:       constants.AVMID,
 					expectedID: "2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM",
 				},
 				{
-					vmID:       evm.ID,
+					vmID:       constants.EVMID,
 					expectedID: "2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5",
 				},
 			},
@@ -340,11 +434,11 @@ func TestVMGenesis(t *testing.T) {
 			networkID: constants.FujiID,
 			vmTest: []vmTest{
 				{
-					vmID:       avm.ID,
+					vmID:       constants.AVMID,
 					expectedID: "2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm",
 				},
 				{
-					vmID:       evm.ID,
+					vmID:       constants.EVMID,
 					expectedID: "yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp",
 				},
 			},
@@ -353,11 +447,11 @@ func TestVMGenesis(t *testing.T) {
 			networkID: constants.LocalID,
 			vmTest: []vmTest{
 				{
-					vmID:       avm.ID,
+					vmID:       constants.AVMID,
 					expectedID: "2eNy1mUFdmaxXNj1eQHUe7Np4gju9sJsEtWQ4MX3ToiNKuADed",
 				},
 				{
-					vmID:       evm.ID,
+					vmID:       constants.EVMID,
 					expectedID: "2CA6j5zYzasynPsFeNoqWkmTCt3VScMvXUZHbfDJ8k3oGzAPtU",
 				},
 			},
@@ -373,7 +467,8 @@ func TestVMGenesis(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				assert := assert.New(t)
 
-				genesisBytes, _, err := Genesis(test.networkID, "")
+				config := GetConfig(test.networkID)
+				genesisBytes, _, err := FromConfig(config)
 				assert.NoError(err)
 
 				genesisTx, err := VMGenesis(genesisBytes, vmTest.vmID)
@@ -414,7 +509,8 @@ func TestAVAXAssetID(t *testing.T) {
 		t.Run(constants.NetworkIDToNetworkName[test.networkID], func(t *testing.T) {
 			assert := assert.New(t)
 
-			_, avaxAssetID, err := Genesis(test.networkID, "")
+			config := GetConfig(test.networkID)
+			_, avaxAssetID, err := FromConfig(config)
 			assert.NoError(err)
 
 			assert.Equal(

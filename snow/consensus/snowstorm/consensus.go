@@ -32,6 +32,10 @@ type Consensus interface {
 	// occurred.
 	Add(Tx) error
 
+	// Remove a transaction from the set of currently processing txs. It is
+	// assumed that the provided transaction ID is currently processing.
+	Remove(ids.ID) error
+
 	// Returns true iff transaction <Tx> has been added
 	Issued(Tx) bool
 
@@ -41,6 +45,9 @@ type Consensus interface {
 
 	// Returns the currently preferred transactions to be finalized
 	Preferences() ids.Set
+
+	// Return the current virtuous transactions that are being voted on.
+	VirtuousVoting() ids.Set
 
 	// Returns the set of transactions conflicting with <Tx>
 	Conflicts(Tx) ids.Set
@@ -62,10 +69,4 @@ type Consensus interface {
 
 	// HealthCheck returns information about the consensus health.
 	HealthCheck() (interface{}, error)
-
-	// Accept the provided tx remove it from the graph
-	accept(txID ids.ID) error
-
-	// Reject all the provided txs and remove them from the graph
-	reject(txIDs ids.Set) error
 }

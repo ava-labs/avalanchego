@@ -16,6 +16,36 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Magic value that comes from the size in bytes of a serialized key-value bootstrap checkpoint in a database +
+// the overhead of the key-value storage.
+const bootstrapProgressCheckpointSize = 55
+
+func testJob(t *testing.T, jobID ids.ID, executed *bool, parentID ids.ID, parentExecuted *bool) *TestJob {
+	return &TestJob{
+		T:   t,
+		IDF: func() ids.ID { return jobID },
+		MissingDependenciesF: func() (ids.Set, error) {
+			if parentID != ids.Empty && !*parentExecuted {
+				return ids.Set{parentID: struct{}{}}, nil
+			}
+			return ids.Set{}, nil
+		},
+		HasMissingDependenciesF: func() (bool, error) {
+			if parentID != ids.Empty && !*parentExecuted {
+				return true, nil
+			}
+			return false, nil
+		},
+		ExecuteF: func() error {
+			if executed != nil {
+				*executed = true
+			}
+			return nil
+		},
+		BytesF: func() []byte { return []byte{0} },
+	}
+}
+
 // Test that creating a new queue can be created and that it is initially empty.
 func TestNew(t *testing.T) {
 	assert := assert.New(t)
@@ -53,15 +83,7 @@ func TestPushAndExecute(t *testing.T) {
 	}
 
 	jobID := ids.GenerateTestID()
-	job := &TestJob{
-		T: t,
-
-		IDF:                  func() ids.ID { return jobID },
-		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{}, nil },
-		ExecuteF:             func() error { return nil },
-		BytesF:               func() []byte { return []byte{0} },
-	}
-
+	job := testJob(t, jobID, nil, ids.Empty, nil)
 	has, err := jobs.Has(jobID)
 	assert.NoError(err)
 	assert.False(has)
@@ -110,7 +132,7 @@ func TestPushAndExecute(t *testing.T) {
 
 	dbSize, err := database.Size(db)
 	assert.NoError(err)
-	assert.Zero(dbSize)
+	assert.Equal(bootstrapProgressCheckpointSize, dbSize)
 }
 
 // Test that executing a job will cause a dependent job to be placed on to the
@@ -129,37 +151,12 @@ func TestRemoveDependency(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	job0ID := ids.GenerateTestID()
-	executed0 := false
-	job1ID := ids.GenerateTestID()
-	executed1 := false
+	job0ID, executed0 := ids.GenerateTestID(), false
+	job1ID, executed1 := ids.GenerateTestID(), false
 
-	job1 := &TestJob{
-		T: t,
-
-		IDF:                     func() ids.ID { return job1ID },
-		MissingDependenciesF:    func() (ids.Set, error) { return ids.Set{job0ID: struct{}{}}, nil },
-		HasMissingDependenciesF: func() (bool, error) { return true, nil },
-		ExecuteF:                func() error { executed1 = true; return nil },
-		BytesF:                  func() []byte { return []byte{1} },
-	}
-	job0 := &TestJob{
-		T: t,
-
-		IDF:                     func() ids.ID { return job0ID },
-		HasMissingDependenciesF: func() (bool, error) { return false, nil },
-		ExecuteF: func() error {
-			executed0 = true
-			job1.HasMissingDependenciesF = func() (bool, error) {
-				return false, nil
-			}
-			job1.MissingDependenciesF = func() (ids.Set, error) {
-				return ids.Set{}, nil
-			}
-			return nil
-		},
-		BytesF: func() []byte { return []byte{0} },
-	}
+	job0 := testJob(t, job0ID, &executed0, ids.Empty, nil)
+	job1 := testJob(t, job1ID, &executed1, job0ID, &executed0)
+	job1.BytesF = func() []byte { return []byte{1} }
 
 	pushed, err := jobs.Push(job1)
 	assert.True(pushed)
@@ -201,7 +198,7 @@ func TestRemoveDependency(t *testing.T) {
 
 	dbSize, err := database.Size(db)
 	assert.NoError(err)
-	assert.Zero(dbSize)
+	assert.Equal(bootstrapProgressCheckpointSize, dbSize)
 }
 
 // Test that a job that is ready to be executed can only be added once
@@ -216,14 +213,7 @@ func TestDuplicatedExecutablePush(t *testing.T) {
 	}
 
 	jobID := ids.GenerateTestID()
-	job := &TestJob{
-		T: t,
-
-		IDF:                  func() ids.ID { return jobID },
-		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{}, nil },
-		ExecuteF:             func() error { return nil },
-		BytesF:               func() []byte { return []byte{0} },
-	}
+	job := testJob(t, jobID, nil, ids.Empty, nil)
 
 	pushed, err := jobs.Push(job)
 	assert.True(pushed)
@@ -255,16 +245,9 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	job0ID := ids.GenerateTestID()
+	job0ID, executed0 := ids.GenerateTestID(), false
 	job1ID := ids.GenerateTestID()
-	job1 := &TestJob{
-		T: t,
-
-		IDF:                  func() ids.ID { return job1ID },
-		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{job0ID: struct{}{}}, nil },
-		ExecuteF:             func() error { return nil },
-		BytesF:               func() []byte { return []byte{1} },
-	}
+	job1 := testJob(t, job1ID, nil, job0ID, &executed0)
 
 	pushed, err := jobs.Push(job1)
 	assert.True(pushed)
@@ -353,39 +336,12 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	job0ID := ids.GenerateTestID()
-	executed0 := false
-	job1ID := ids.GenerateTestID()
-	executed1 := false
-
-	job1 := &TestJob{
-		T: t,
-
-		IDF:                     func() ids.ID { return job1ID },
-		MissingDependenciesF:    func() (ids.Set, error) { return ids.Set{job0ID: struct{}{}}, nil },
-		HasMissingDependenciesF: func() (bool, error) { return true, nil },
-		ExecuteF:                func() error { return database.ErrClosed }, // job1 fails to execute the first time due to a closed database
-		BytesF:                  func() []byte { return []byte{1} },
-	}
-	job0 := &TestJob{
-		T: t,
-
-		IDF:                     func() ids.ID { return job0ID },
-		MissingDependenciesF:    func() (ids.Set, error) { return ids.Set{}, nil },
-		HasMissingDependenciesF: func() (bool, error) { return false, nil },
-
-		ExecuteF: func() error {
-			executed0 = true
-			job1.MissingDependenciesF = func() (ids.Set, error) {
-				return ids.Set{}, nil
-			}
-			job1.HasMissingDependenciesF = func() (bool, error) {
-				return false, nil
-			}
-			return nil
-		},
-		BytesF: func() []byte { return []byte{0} },
-	}
+	job0ID, executed0 := ids.GenerateTestID(), false
+	job1ID, executed1 := ids.GenerateTestID(), false
+	job0 := testJob(t, job0ID, &executed0, ids.Empty, nil)
+	job1 := testJob(t, job1ID, &executed1, job0ID, &executed0)
+	job1.ExecuteF = func() error { return database.ErrClosed } // job1 fails to execute the first time due to a closed database
+	job1.BytesF = func() []byte { return []byte{1} }
 
 	pushed, err := jobs.Push(job1)
 	assert.True(pushed)
@@ -422,8 +378,8 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	assert.True(executed0)
 	assert.False(executed1)
 
-	job1.MissingDependenciesF = func() (ids.Set, error) { return ids.Set{job0ID: struct{}{}}, nil }
-	job1.ExecuteF = func() error { executed1 = true; return nil }
+	executed0 = false
+	job1.ExecuteF = func() error { executed1 = true; return nil } // job1 succeeds the second time
 
 	// Create jobs queue from the same database and ensure that the jobs queue
 	// recovers correctly.
@@ -452,4 +408,112 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(2, count)
 	assert.True(executed1)
+}
+
+func TestInitializeNumJobs(t *testing.T) {
+	assert := assert.New(t)
+
+	parser := &TestParser{T: t}
+	db := memdb.New()
+
+	jobs, err := NewWithMissing(db, "", prometheus.NewRegistry())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := jobs.SetParser(parser); err != nil {
+		t.Fatal(err)
+	}
+
+	job0ID := ids.GenerateTestID()
+	job1ID := ids.GenerateTestID()
+
+	job0 := &TestJob{
+		T: t,
+
+		IDF:                     func() ids.ID { return job0ID },
+		MissingDependenciesF:    func() (ids.Set, error) { return nil, nil },
+		HasMissingDependenciesF: func() (bool, error) { return false, nil },
+		BytesF:                  func() []byte { return []byte{0} },
+	}
+	job1 := &TestJob{
+		T: t,
+
+		IDF:                     func() ids.ID { return job1ID },
+		MissingDependenciesF:    func() (ids.Set, error) { return nil, nil },
+		HasMissingDependenciesF: func() (bool, error) { return false, nil },
+		BytesF:                  func() []byte { return []byte{1} },
+	}
+
+	pushed, err := jobs.Push(job0)
+	assert.True(pushed)
+	assert.NoError(err)
+	assert.EqualValues(1, jobs.state.numJobs)
+
+	pushed, err = jobs.Push(job1)
+	assert.True(pushed)
+	assert.NoError(err)
+	assert.EqualValues(2, jobs.state.numJobs)
+
+	err = jobs.Commit()
+	assert.NoError(err)
+
+	err = database.Clear(jobs.state.metadataDB, jobs.state.metadataDB)
+	assert.NoError(err)
+
+	err = jobs.Commit()
+	assert.NoError(err)
+
+	jobs, err = NewWithMissing(db, "", prometheus.NewRegistry())
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.EqualValues(2, jobs.state.numJobs)
+}
+
+func TestClearAll(t *testing.T) {
+	assert := assert.New(t)
+
+	parser := &TestParser{T: t}
+	db := memdb.New()
+
+	jobs, err := NewWithMissing(db, "", prometheus.NewRegistry())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := jobs.SetParser(parser); err != nil {
+		t.Fatal(err)
+	}
+	job0ID, executed0 := ids.GenerateTestID(), false
+	job1ID, executed1 := ids.GenerateTestID(), false
+	job0 := testJob(t, job0ID, &executed0, ids.Empty, nil)
+	job1 := testJob(t, job1ID, &executed1, job0ID, &executed0)
+	job1.BytesF = func() []byte { return []byte{1} }
+
+	pushed, err := jobs.Push(job0)
+	assert.NoError(err)
+	assert.True(pushed)
+
+	pushed, err = jobs.Push(job1)
+	assert.True(pushed)
+	assert.NoError(err)
+
+	parser.ParseF = func(b []byte) (Job, error) {
+		switch {
+		case bytes.Equal(b, []byte{0}):
+			return job0, nil
+		case bytes.Equal(b, []byte{1}):
+			return job1, nil
+		default:
+			assert.FailNow("Unknown job")
+			return nil, nil
+		}
+	}
+
+	assert.NoError(jobs.Clear())
+	hasJob0, err := jobs.Has(job0.ID())
+	assert.NoError(err)
+	assert.False(hasJob0)
+	hasJob1, err := jobs.Has(job1.ID())
+	assert.NoError(err)
+	assert.False(hasJob1)
 }

@@ -19,7 +19,4 @@ import (
 type Engine interface {
 	common.Engine
 	block.Getter
-
-	// Initialize this engine.
-	Initialize(Config) error
 }

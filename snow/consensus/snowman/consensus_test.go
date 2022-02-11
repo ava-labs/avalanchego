@@ -127,6 +127,7 @@ func NumProcessingTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
 	}
 
 	if numProcessing := sm.NumProcessing(); numProcessing != 0 {
@@ -178,6 +179,7 @@ func AddToTailTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
 	}
 
 	// Adding to the previous preference will update the preference
@@ -215,6 +217,7 @@ func AddToNonTailTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
 	}
 	secondBlock := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -222,6 +225,7 @@ func AddToNonTailTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
 	}
 
 	// Adding to the previous preference will update the preference
@@ -271,6 +275,7 @@ func AddToUnknownTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: parent.IDV,
+		HeightV: parent.HeightV + 1,
 	}
 
 	// Adding a block with an unknown parent means the parent must have already
@@ -302,10 +307,13 @@ func StatusOrProcessingPreviouslyAcceptedTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	if !sm.AcceptedOrProcessing(Genesis) {
-		t.Fatalf("Should have marked an accepted block as having been decided")
+	if Genesis.Status() != choices.Accepted {
+		t.Fatalf("Should have marked an accepted block as having been accepted")
 	}
-	if !sm.DecidedOrProcessing(Genesis) {
+	if sm.Processing(Genesis.ID()) {
+		t.Fatalf("Shouldn't have marked an accepted block as having been processing")
+	}
+	if !sm.Decided(Genesis) {
 		t.Fatalf("Should have marked an accepted block as having been decided")
 	}
 	if !sm.IsPreferred(Genesis) {
@@ -337,12 +345,16 @@ func StatusOrProcessingPreviouslyRejectedTest(t *testing.T, factory Factory) {
 			StatusV: choices.Rejected,
 		},
 		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
 	}
 
-	if sm.AcceptedOrProcessing(block) {
+	if block.Status() == choices.Accepted {
 		t.Fatalf("Shouldn't have marked a rejected block as having been accepted")
 	}
-	if !sm.DecidedOrProcessing(block) {
+	if sm.Processing(block.ID()) {
+		t.Fatalf("Shouldn't have marked a rejected block as having been processing")
+	}
+	if !sm.Decided(block) {
 		t.Fatalf("Should have marked a rejected block as having been decided")
 	}
 	if sm.IsPreferred(block) {
@@ -374,14 +386,17 @@ func StatusOrProcessingUnissuedTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
-		HeightV: 1,
+		HeightV: Genesis.HeightV + 1,
 	}
 
-	if sm.AcceptedOrProcessing(block) {
-		t.Fatalf("Shouldn't have marked an unissued block as being processing")
+	if block.Status() == choices.Accepted {
+		t.Fatalf("Shouldn't have marked an unissued block as having been accepted")
 	}
-	if sm.DecidedOrProcessing(block) {
-		t.Fatalf("Shouldn't have marked an unissued block as being processing")
+	if sm.Processing(block.ID()) {
+		t.Fatalf("Shouldn't have marked an unissued block as having been processing")
+	}
+	if sm.Decided(block) {
+		t.Fatalf("Should't have marked an unissued block as having been decided")
 	}
 	if sm.IsPreferred(block) {
 		t.Fatalf("Shouldn't have marked an unissued block as being preferred")
@@ -412,16 +427,20 @@ func StatusOrProcessingIssuedTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
 	}
 
 	if err := sm.Add(block); err != nil {
 		t.Fatal(err)
 	}
-	if !sm.AcceptedOrProcessing(block) {
-		t.Fatalf("Should have marked a the block as processing")
+	if block.Status() == choices.Accepted {
+		t.Fatalf("Shouldn't have marked the block as accepted")
 	}
-	if !sm.DecidedOrProcessing(block) {
-		t.Fatalf("Should have marked a the block as processing")
+	if !sm.Processing(block.ID()) {
+		t.Fatalf("Should have marked the block as processing")
+	}
+	if sm.Decided(block) {
+		t.Fatalf("Shouldn't have marked the block as decided")
 	}
 	if !sm.IsPreferred(block) {
 		t.Fatalf("Should have marked the tail as being preferred")
@@ -452,6 +471,7 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
 	}
 
 	if err := sm.Add(block); err != nil {
@@ -503,6 +523,7 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
 	}
 	secondBlock := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -510,6 +531,7 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
 	}
 
 	if err := sm.Add(firstBlock); err != nil {
@@ -597,6 +619,7 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
 	}
 	block1 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -604,6 +627,7 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
 	}
 	block2 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -611,6 +635,7 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: block1.IDV,
+		HeightV: block1.HeightV + 1,
 	}
 
 	if err := sm.Add(block0); err != nil {
@@ -676,6 +701,7 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
 	}
 	block1 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -683,6 +709,7 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
 	}
 	block2 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -690,6 +717,7 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: block1.IDV,
+		HeightV: block1.HeightV + 1,
 	}
 	block3 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -697,6 +725,7 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: block1.IDV,
+		HeightV: block1.HeightV + 1,
 	}
 
 	if err := sm.Add(block0); err != nil {
@@ -790,6 +819,7 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
 	}
 	unknownBlockID := ids.Empty.Prefix(2)
 
@@ -840,6 +870,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
 	}
 	block1 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -847,6 +878,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: block0.IDV,
+		HeightV: block0.HeightV + 1,
 	}
 	block2 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -854,6 +886,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: block1.IDV,
+		HeightV: block1.HeightV + 1,
 	}
 	block3 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -861,6 +894,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: block0.IDV,
+		HeightV: block0.HeightV + 1,
 	}
 	block4 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -868,6 +902,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: block3.IDV,
+		HeightV: block3.HeightV + 1,
 	}
 
 	if err := sm.Add(block0); err != nil {
@@ -981,6 +1016,7 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
 	}
 	block1 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -988,6 +1024,7 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
 	}
 	block2 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -995,6 +1032,7 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
 	}
 	block3 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1002,6 +1040,7 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: block2.IDV,
+		HeightV: block2.HeightV + 1,
 	}
 
 	if err := sm.Add(block0); err != nil {
@@ -1063,7 +1102,7 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
-		HeightV: 1,
+		HeightV: Genesis.HeightV + 1,
 	}
 	b1Block := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1071,7 +1110,7 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
-		HeightV: 1,
+		HeightV: Genesis.HeightV + 1,
 	}
 	a2Block := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1079,7 +1118,7 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: a1Block.IDV,
-		HeightV: 2,
+		HeightV: a1Block.HeightV + 1,
 	}
 	b2Block := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1087,7 +1126,7 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: b1Block.IDV,
-		HeightV: 2,
+		HeightV: b1Block.HeightV + 1,
 	}
 
 	if err := sm.Add(a1Block); err != nil {
@@ -1290,6 +1329,7 @@ func ErrorOnInitialRejectionTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: rejectedBlock.IDV,
+		HeightV: rejectedBlock.HeightV + 1,
 	}
 
 	if err := sm.Add(block); err == nil {
@@ -1323,6 +1363,7 @@ func ErrorOnAcceptTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
 	}
 
 	if err := sm.Add(block); err != nil {
@@ -1361,6 +1402,7 @@ func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
 	}
 	block1 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1369,6 +1411,7 @@ func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
 	}
 
 	if err := sm.Add(block0); err != nil {
@@ -1409,6 +1452,7 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
 	}
 	block1 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1416,6 +1460,7 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
 	}
 	block2 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1424,6 +1469,7 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: block1.IDV,
+		HeightV: block1.HeightV + 1,
 	}
 
 	if err := sm.Add(block0); err != nil {

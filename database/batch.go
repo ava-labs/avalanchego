@@ -10,7 +10,7 @@ package database
 // Batch is a write-only database that commits changes to its host database
 // when Write is called. A batch cannot be used concurrently.
 type Batch interface {
-	KeyValueWriter
+	KeyValueWriterDeleter
 
 	// Size retrieves the amount of data queued up for writing, this includes
 	// the keys, values, and deleted keys.
@@ -24,7 +24,7 @@ type Batch interface {
 
 	// Replay replays the batch contents in the same order they were written
 	// to the batch.
-	Replay(w KeyValueWriter) error
+	Replay(w KeyValueWriterDeleter) error
 
 	// Inner returns a Batch writing to the inner database, if one exists. If
 	// this batch is already writing to the base DB, then itself should be

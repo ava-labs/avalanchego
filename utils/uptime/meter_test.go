@@ -22,10 +22,6 @@ var (
 			name:    "continuous",
 			factory: ContinuousFactory{},
 		},
-		{
-			name:    "interval",
-			factory: IntervalFactory{},
-		},
 	}
 
 	meterTests = []struct {
@@ -131,14 +127,14 @@ func StandardUsageTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong uptime value. Expected %f got %f", .625, uptime)
 	}
 
-	currentTime = currentTime.Add((maxSkippedIntervals + 2) * halflife)
+	currentTime = currentTime.Add(34 * halflife)
 	if uptime := m.Read(currentTime); math.Abs(uptime-1) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %d got %f", 1, uptime)
 	}
 
 	m.Stop(currentTime)
 
-	currentTime = currentTime.Add((maxSkippedIntervals + 2) * halflife)
+	currentTime = currentTime.Add(34 * halflife)
 	if uptime := m.Read(currentTime); math.Abs(uptime-0) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %d got %f", 0, uptime)
 	}
@@ -148,5 +144,21 @@ func StandardUsageTest(t *testing.T, factory Factory) {
 	currentTime = currentTime.Add(2 * halflife)
 	if uptime := m.Read(currentTime); math.Abs(uptime-.75) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %f got %f", .75, uptime)
+	}
+
+	// Second start
+	m.Start(currentTime)
+
+	currentTime = currentTime.Add(34 * halflife)
+	if uptime := m.Read(currentTime); math.Abs(uptime-2) > epsilon {
+		t.Fatalf("Wrong uptime value. Expected %d got %f", 2, uptime)
+	}
+
+	// Stop the second CPU
+	m.Stop(currentTime)
+
+	currentTime = currentTime.Add(34 * halflife)
+	if uptime := m.Read(currentTime); math.Abs(uptime-1) > epsilon {
+		t.Fatalf("Wrong uptime value. Expected %d got %f", 1, uptime)
 	}
 }

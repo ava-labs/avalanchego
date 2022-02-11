@@ -1,0 +1,28 @@
+# ref. https://goreleaser.com/customization/build/
+builds:
+  - main: ./main
+    binary: avalanchego
+    flags:
+      - -v
+    ignore:
+      - goos: linux
+        goarch: arm64
+      - goos: darwin
+        goarch: amd64
+      - goos: darwin
+        goarch: arm64
+      - goos: darwin
+        goarch: 386
+      - goos: linux
+        goarch: 386
+      - goos: windows
+        goarch: 386
+      - goos: freebsd
+        goarch: 386
+
+release:
+  # Repo in which the release will be created.
+  # Default is extracted from the origin remote URL or empty if its private hosted.
+  github:
+    owner: ava-labs
+    name: avalanchego

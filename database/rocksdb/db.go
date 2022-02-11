@@ -12,7 +12,6 @@ import (
 	"os"
 	"runtime"
 	"sync"
-	"sync/atomic"
 
 	"github.com/linxGnu/grocksdb"
 
@@ -52,13 +51,6 @@ type Database struct {
 	readOptions     *grocksdb.ReadOptions
 	iteratorOptions *grocksdb.ReadOptions
 	writeOptions    *grocksdb.WriteOptions
-
-	log logging.Logger
-
-	// 1 if there was previously an error other than "not found" or "closed"
-	// while performing a db operation. If [errored] == 1, Has, Get, Put,
-	// Delete and batch writes fail with ErrAvoidCorruption.
-	errored uint64
 }
 
 // New returns a wrapped RocksDB object.
@@ -93,7 +85,6 @@ func New(file string, configBytes []byte, log logging.Logger) (database.Database
 		readOptions:     grocksdb.NewDefaultReadOptions(),
 		iteratorOptions: iteratorOptions,
 		writeOptions:    grocksdb.NewDefaultWriteOptions(),
-		log:             log,
 	}, nil
 }
 
@@ -115,16 +106,12 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	switch {
-	case db.db == nil:
+	if db.db == nil {
 		return nil, database.ErrClosed
-	case db.corrupted():
-		return nil, database.ErrAvoidCorruption
 	}
 
 	value, err := db.db.GetBytes(db.readOptions, key)
 	if err != nil {
-		atomic.StoreUint64(&db.errored, 1)
 		return nil, err
 	}
 	if value != nil {
@@ -138,18 +125,10 @@ func (db *Database) Put(key []byte, value []byte) error {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	switch {
-	case db.db == nil:
+	if db.db == nil {
 		return database.ErrClosed
-	case db.corrupted():
-		return database.ErrAvoidCorruption
 	}
-
-	err := db.db.Put(db.writeOptions, key, value)
-	if err != nil {
-		atomic.StoreUint64(&db.errored, 1)
-	}
-	return err
+	return db.db.Put(db.writeOptions, key, value)
 }
 
 // Delete removes the key from the database
@@ -157,18 +136,10 @@ func (db *Database) Delete(key []byte) error {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	switch {
-	case db.db == nil:
+	if db.db == nil {
 		return database.ErrClosed
-	case db.corrupted():
-		return database.ErrAvoidCorruption
 	}
-
-	err := db.db.Delete(db.writeOptions, key)
-	if err != nil {
-		atomic.StoreUint64(&db.errored, 1)
-	}
-	return err
+	return db.db.Delete(db.writeOptions, key)
 }
 
 // NewBatch creates a write/delete-only buffer that is atomically committed to
@@ -192,11 +163,8 @@ func (db *Database) NewIterator() database.Iterator {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	switch {
-	case db.db == nil:
+	if db.db == nil {
 		return &nodb.Iterator{Err: database.ErrClosed}
-	case db.corrupted():
-		return &nodb.Iterator{Err: database.ErrAvoidCorruption}
 	}
 
 	it := db.db.NewIterator(db.iteratorOptions)
@@ -216,11 +184,8 @@ func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	switch {
-	case db.db == nil:
+	if db.db == nil {
 		return &nodb.Iterator{Err: database.ErrClosed}
-	case db.corrupted():
-		return &nodb.Iterator{Err: database.ErrAvoidCorruption}
 	}
 
 	it := db.db.NewIterator(db.iteratorOptions)
@@ -240,11 +205,8 @@ func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	switch {
-	case db.db == nil:
+	if db.db == nil {
 		return &nodb.Iterator{Err: database.ErrClosed}
-	case db.corrupted():
-		return &nodb.Iterator{Err: database.ErrAvoidCorruption}
 	}
 
 	it := db.db.NewIterator(db.iteratorOptions)
@@ -266,11 +228,8 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	switch {
-	case db.db == nil:
+	if db.db == nil {
 		return &nodb.Iterator{Err: database.ErrClosed}
-	case db.corrupted():
-		return &nodb.Iterator{Err: database.ErrAvoidCorruption}
 	}
 
 	it := db.db.NewIterator(db.iteratorOptions)
@@ -307,11 +266,8 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	switch {
-	case db.db == nil:
+	if db.db == nil {
 		return database.ErrClosed
-	case db.corrupted():
-		return database.ErrAvoidCorruption
 	}
 
 	db.db.CompactRange(grocksdb.Range{Start: start, Limit: limit})
@@ -336,8 +292,11 @@ func (db *Database) Close() error {
 	return nil
 }
 
-func (db *Database) corrupted() bool {
-	return atomic.LoadUint64(&db.errored) == 1
+func (db *Database) isClosed() bool {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	return db.db == nil
 }
 
 // batch is a wrapper around a levelDB batch to contain sizes.
@@ -369,12 +328,10 @@ func (b *batch) Write() error {
 	b.db.lock.RLock()
 	defer b.db.lock.RUnlock()
 
-	switch {
-	case b.db.db == nil:
+	if b.db.db == nil {
 		return database.ErrClosed
-	case b.db.corrupted():
-		return database.ErrAvoidCorruption
 	}
+
 	return b.db.db.Write(b.db.writeOptions, b.batch)
 }
 
@@ -385,7 +342,7 @@ func (b *batch) Reset() {
 }
 
 // Replay the batch contents.
-func (b *batch) Replay(w database.KeyValueWriter) error {
+func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
 	it := b.batch.NewIterator()
 	for it.Next() {
 		rec := it.Record()
@@ -412,10 +369,16 @@ type iterator struct {
 	started bool
 	key     []byte
 	value   []byte
+	err     error
 }
 
 // Error implements the Iterator interface
-func (it *iterator) Error() error { return it.it.Err() }
+func (it *iterator) Error() error {
+	if it.err != nil {
+		return it.err
+	}
+	return it.it.Err()
+}
 
 // Key implements the Iterator interface
 func (it *iterator) Key() []byte {
@@ -437,6 +400,12 @@ func (it *iterator) Release() {
 }
 
 func (it *iterator) Next() bool {
+	if it.db.isClosed() {
+		it.key = nil
+		it.value = nil
+		it.err = database.ErrClosed
+		return false
+	}
 	if it.started {
 		it.it.Next()
 	}

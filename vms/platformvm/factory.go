@@ -11,11 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
-)
-
-// ID of the platform VM
-var (
-	ID = ids.ID{'p', 'l', 'a', 't', 'f', 'o', 'r', 'm', 'v', 'm'}
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
 // Factory can create new instances of the Platform Chain
@@ -71,8 +67,8 @@ type Factory struct {
 	// Maximum amount of time to allow a staker to stake
 	MaxStakeDuration time.Duration
 
-	// Consumption period for the minting function
-	StakeMintingPeriod time.Duration
+	// Config for the minting function
+	RewardConfig reward.Config
 
 	// Time of the AP3 network upgrade
 	ApricotPhase3Time time.Time

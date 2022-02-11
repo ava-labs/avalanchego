@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
@@ -37,6 +38,9 @@ var (
 		VirtuousTest,
 		IsVirtuousTest,
 		QuiesceTest,
+		AddNonEmptyWhitelistTest,
+		AddWhitelistedVirtuousTest,
+		WhitelistConflictsTest,
 		AcceptingDependencyTest,
 		AcceptingSlowDependencyTest,
 		RejectingDependencyTest,
@@ -48,6 +52,7 @@ var (
 		ErrorOnRejectingLowerConfidenceConflictTest,
 		ErrorOnRejectingHigherConfidenceConflictTest,
 		UTXOCleanupTest,
+		RemoveVirtuousTest,
 	}
 
 	Red, Green, Blue, Alpha *TestTx
@@ -607,6 +612,278 @@ func QuiesceTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	} else if !graph.Quiesce() {
 		t.Fatalf("Should quiesce")
+	}
+}
+
+func AddNonEmptyWhitelistTest(t *testing.T, factory Factory) {
+	graph := factory.New()
+
+	params := sbcon.Parameters{
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
+	}
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	inputA := ids.Empty.Prefix(1000)
+	inputB := ids.Empty.Prefix(2000)
+	inputC := ids.Empty.Prefix(3000)
+	inputD := ids.Empty.Prefix(4000)
+	inputE := ids.Empty.Prefix(5000)
+
+	/*
+	                    [tx1]
+	                   ⬈     ⬉
+	              [tx2]       [tx3]
+	            ⬈      ⬉      ⬈
+	       [tx6]         [tx4]
+	         ⬆             ⬆
+	    {stop stx7}    {stop stx5}
+	   Add stx5 => no conflict
+	   Add  tx6 => stx5 conflicts with tx6
+	   Add stx7 => stx5 conflicts with tx6
+	               stx5 conflicts with stx7
+	               stx7 conflicts with tx3
+	               stx7 conflicts with tx4
+	               stx7 conflicts with stx5
+	*/
+	tx1 := createTestTx(1, inputA, inputB)
+
+	// tx1 is prev tx that spends A, so tx2.out = tx1
+	// tx1 is prev tx that spends B, so tx3.out = tx1
+	tx2 := createTestTx(2, inputA, inputD)
+	tx3 := createTestTx(3, inputB)
+
+	// tx2 is prev tx that spends A, so tx4.out = tx2
+	// tx3 is prev tx that spends B, so tx4.out = tx3
+	tx4 := createTestTx(4, inputA, inputB, inputC)
+
+	// stx5 as stop vertex
+	// when added, no conflict
+	stx5 := createTestTx(5)
+	stx5.InputIDsV = []ids.ID{stx5.IDV}
+	stx5.WhitelistIsV = true
+	stx5.WhitelistV = ids.Set{
+		tx1.IDV: struct{}{},
+		tx2.IDV: struct{}{},
+		tx3.IDV: struct{}{},
+		tx4.IDV: struct{}{},
+	}
+
+	// tx2 is prev tx that spends D, so tx6.out = tx2
+	tx6 := createTestTx(6, inputD, inputE)
+
+	// stx7 as stop vertex
+	// tx6 is prev tx that spends E, so stx7.out = tx6
+	stx7 := createTestTx(7)
+	stx7.InputIDsV = []ids.ID{stx7.IDV}
+	stx7.WhitelistIsV = true
+	stx7.WhitelistV = ids.Set{
+		tx1.IDV: struct{}{},
+		tx2.IDV: struct{}{},
+		tx6.IDV: struct{}{},
+	}
+
+	txs := []*TestTx{tx1, tx2, tx3, tx4, stx5, tx6, stx7}
+	for i, tx := range txs {
+		t.Logf("adding transaction[%02d]: %v", i+1, tx.IDV)
+		if err := tx.Verify(); err != nil {
+			t.Fatal(err)
+		}
+		if err := graph.Add(tx); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	vset1 := graph.Virtuous()
+	if !vset1.Equals(ids.Set{}) {
+		t.Fatalf("unexpected virtuous %v", vset1)
+	}
+	pset1 := graph.Preferences()
+	if !pset1.Equals(ids.Set{
+		tx1.IDV:  struct{}{},
+		stx5.IDV: struct{}{},
+	}) {
+		t.Fatalf("unexpected preferences %v", pset1)
+	}
+	if graph.Finalized() {
+		t.Fatal("unexpected Finalized")
+	}
+
+	r := ids.Bag{}
+	r.SetThreshold(2)
+	r.AddCount(tx1.ID(), 2)
+
+	updated, err := graph.RecordPoll(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !updated {
+		t.Fatal("should have updated the frontiers")
+	}
+
+	vset2 := graph.Virtuous()
+	if !vset2.Equals(ids.Set{}) {
+		t.Fatalf("unexpected virtuous %v", vset2)
+	}
+	pset2 := graph.Preferences()
+	if !pset2.Equals(ids.Set{
+		stx5.IDV: struct{}{},
+	}) {
+		t.Fatalf("unexpected preferences %v", pset2)
+	}
+}
+
+func AddWhitelistedVirtuousTest(t *testing.T, factory Factory) {
+	graph := factory.New()
+
+	params := sbcon.Parameters{
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
+	}
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tx0 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: []ids.ID{ids.GenerateTestID()},
+		BytesV:    utils.RandomBytes(32),
+	}
+	tx1 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		InputIDsV:    []ids.ID{ids.GenerateTestID()},
+		BytesV:       utils.RandomBytes(32),
+		WhitelistIsV: true,
+	}
+
+	txs := []*TestTx{tx0, tx1}
+	for _, tx := range txs {
+		if err := graph.Add(tx); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	vset := graph.Virtuous()
+	if vset.Len() != 0 {
+		t.Fatalf("unexpected virtuous %v", vset)
+	}
+}
+
+// When a transaction supporting whitelisting is added to the conflict graph,
+// all txs outside of its whitelist should be marked in conflict.
+func WhitelistConflictsTest(t *testing.T, factory Factory) {
+	graph := factory.New()
+
+	params := sbcon.Parameters{
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
+	}
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	n := 10
+	txIDs := make([]ids.ID, n)
+	for i := range txIDs {
+		txIDs[i] = ids.GenerateTestID()
+	}
+	allTxIDs := ids.NewSet(n)
+	allTxIDs.Add(txIDs...)
+
+	// each spending each other
+	allTxs := make([]Tx, n)
+	for i, txID := range txIDs {
+		tx := &TestTx{
+			TestDecidable: choices.TestDecidable{
+				IDV:     txID,
+				AcceptV: nil,
+				StatusV: choices.Processing,
+			},
+			InputIDsV:    []ids.ID{txID},
+			WhitelistV:   nil,
+			WhitelistIsV: false,
+		}
+		allTxs[i] = tx
+		if err := graph.Add(tx); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	whitelist := ids.NewSet(1)
+	whitelist.Add(ids.GenerateTestID())
+
+	// make whitelist transaction that conflicts with tx outside of its
+	// whitelist
+	wlTxID := ids.GenerateTestID()
+	wlTx := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     wlTxID,
+			AcceptV: nil,
+			StatusV: choices.Processing,
+		},
+		InputIDsV:     []ids.ID{wlTxID},
+		WhitelistV:    whitelist,
+		WhitelistIsV:  true,
+		WhitelistErrV: nil,
+	}
+	if err := graph.Add(wlTx); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tx := range allTxs {
+		conflicts := graph.Conflicts(tx)
+		if conflicts.Len() != 1 {
+			t.Fatal("wrong number of conflicts")
+		}
+		if !conflicts.Contains(wlTxID) {
+			t.Fatal("unexpected conflict")
+		}
+	}
+
+	// the transitive vertex should be conflicting with everything
+	conflicts := graph.Conflicts(wlTx)
+	if !allTxIDs.Equals(conflicts) {
+		t.Fatal("transitive vertex outs != all txs")
+	}
+}
+
+func createTestTx(id uint64, inputIDs ...ids.ID) *TestTx {
+	return &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(id),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: inputIDs,
+		BytesV:    []byte{byte(id)},
 	}
 }
 
@@ -1355,6 +1632,35 @@ func UTXOCleanupTest(t *testing.T, factory Factory) {
 	assert.True(t, changed, "should have accepted the blue tx")
 
 	assert.Equal(t, choices.Accepted, Blue.Status())
+}
+
+func RemoveVirtuousTest(t *testing.T, factory Factory) {
+	graph := factory.New()
+
+	params := sbcon.Parameters{
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
+	}
+	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
+	assert.NoError(t, err)
+
+	err = graph.Add(Red)
+	assert.NoError(t, err)
+
+	virtuous := graph.Virtuous()
+	assert.NotEmpty(t, virtuous, "a virtuous transaction was added but not tracked")
+
+	err = graph.Remove(Red.ID())
+	assert.NoError(t, err)
+
+	virtuous = graph.Virtuous()
+	assert.Empty(t, virtuous, "removal of a virtuous transaction should have emptied the virtuous set")
 }
 
 func StringTest(t *testing.T, factory Factory, prefix string) {

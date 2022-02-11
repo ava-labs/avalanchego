@@ -10,13 +10,15 @@ import (
 	"fmt"
 	"net"
 	"path/filepath"
-	"strings"
 	"sync"
+	"time"
 
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	coreth "github.com/ava-labs/coreth/plugin/evm"
 
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/api/auth"
@@ -54,7 +56,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm"
-	"github.com/ava-labs/avalanchego/vms/evm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
@@ -68,11 +69,12 @@ var (
 	genesisHashKey  = []byte("genesisID")
 	indexerDBPrefix = []byte{0x00}
 
-	errInvalidTLSKey               = errors.New("invalid TLS key")
-	errPNotCreated                 = errors.New("P-Chain not created")
-	errXNotCreated                 = errors.New("X-Chain not created")
-	errCNotCreated                 = errors.New("C-Chain not created")
-	errFailedToRegisterHealthCheck = errors.New("couldn't register network health check")
+	errInvalidTLSKey   = errors.New("invalid TLS key")
+	errPNotCreated     = errors.New("P-Chain not created")
+	errXNotCreated     = errors.New("X-Chain not created")
+	errCNotCreated     = errors.New("C-Chain not created")
+	errNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
+	errShuttingDown    = errors.New("server shutting down")
 )
 
 // Node is an instance of an Avalanche node.
@@ -102,7 +104,7 @@ type Node struct {
 	sharedMemory atomic.Memory
 
 	// Monitors node health and runs health checks
-	healthService health.Service
+	health health.Health
 
 	// Build and parse messages, for both network layer and chain manager
 	msgCreator message.Creator
@@ -273,9 +275,9 @@ type insecureValidatorManager struct {
 	weight uint64
 }
 
-func (i *insecureValidatorManager) Connected(vdrID ids.ShortID) {
+func (i *insecureValidatorManager) Connected(vdrID ids.ShortID, nodeVersion version.Application) {
 	_ = i.vdrs.AddWeight(vdrID, i.weight)
-	i.Router.Connected(vdrID)
+	i.Router.Connected(vdrID, nodeVersion)
 }
 
 func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) {
@@ -293,24 +295,24 @@ type beaconManager struct {
 	totalWeight    uint64
 }
 
-func (b *beaconManager) Connected(vdrID ids.ShortID) {
+func (b *beaconManager) Connected(vdrID ids.ShortID, nodeVersion version.Application) {
 	// TODO: this is always 1, beacons can be reduced to ShortSet?
 	weight, ok := b.beacons.GetWeight(vdrID)
 	if !ok {
-		b.Router.Connected(vdrID)
+		b.Router.Connected(vdrID, nodeVersion)
 		return
 	}
 	weight, err := math.Add64(weight, b.totalWeight)
 	if err != nil {
 		b.timer.Cancel()
-		b.Router.Connected(vdrID)
+		b.Router.Connected(vdrID, nodeVersion)
 		return
 	}
 	b.totalWeight = weight
 	if b.totalWeight >= b.requiredWeight {
 		b.timer.Cancel()
 	}
-	b.Router.Connected(vdrID)
+	b.Router.Connected(vdrID, nodeVersion)
 }
 
 func (b *beaconManager) Disconnected(vdrID ids.ShortID) {
@@ -334,7 +336,7 @@ func (n *Node) Dispatch() error {
 		var err error
 		if n.Config.HTTPSEnabled {
 			n.Log.Debug("initializing API server with TLS")
-			err = n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
+			err = n.APIServer.DispatchTLS(n.Config.HTTPSCert, n.Config.HTTPSKey)
 		} else {
 			n.Log.Debug("initializing API server without TLS")
 			err = n.APIServer.Dispatch()
@@ -479,7 +481,7 @@ func (n *Node) initChains(genesisBytes []byte) {
 		ID:            constants.PlatformChainID,
 		SubnetID:      constants.PrimaryNetworkID,
 		GenesisData:   genesisBytes, // Specifies other chains to create
-		VMAlias:       platformvm.ID.String(),
+		VMAlias:       constants.PlatformVMID.String(),
 		CustomBeacons: n.beacons,
 	})
 }
@@ -495,6 +497,7 @@ func (n *Node) initAPIServer() error {
 			n.Config.HTTPHost,
 			n.Config.HTTPPort,
 			n.Config.APIAllowedOrigins,
+			n.Config.ShutdownTimeout,
 			n.ID,
 		)
 		return nil
@@ -511,6 +514,7 @@ func (n *Node) initAPIServer() error {
 		n.Config.HTTPHost,
 		n.Config.HTTPPort,
 		n.Config.APIAllowedOrigins,
+		n.Config.ShutdownTimeout,
 		n.ID,
 		a,
 	)
@@ -547,13 +551,13 @@ func (n *Node) addDefaultVMAliases() error {
 // AVM, Simple Payments DAG, Simple Payments Chain, and Platform VM
 // Assumes n.DBManager, n.vdrs all initialized (non-nil)
 func (n *Node) initChainManager(avaxAssetID ids.ID) error {
-	createAVMTx, err := genesis.VMGenesis(n.Config.GenesisBytes, avm.ID)
+	createAVMTx, err := genesis.VMGenesis(n.Config.GenesisBytes, constants.AVMID)
 	if err != nil {
 		return err
 	}
 	xChainID := createAVMTx.ID()
 
-	createEVMTx, err := genesis.VMGenesis(n.Config.GenesisBytes, evm.ID)
+	createEVMTx, err := genesis.VMGenesis(n.Config.GenesisBytes, constants.EVMID)
 	if err != nil {
 		return err
 	}
@@ -585,7 +589,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		n.Log,
 		n.msgCreator,
 		timeoutManager,
-		n.Config.ConsensusGossipFrequency,
 		n.Config.ConsensusShutdownTimeout,
 		criticalChains,
 		n.Shutdown,
@@ -598,45 +601,47 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	}
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
-		StakingEnabled:                         n.Config.EnableStaking,
-		StakingCert:                            n.Config.StakingTLSCert,
-		Log:                                    n.Log,
-		LogFactory:                             n.LogFactory,
-		VMManager:                              n.Config.VMManager,
-		DecisionEvents:                         n.DecisionDispatcher,
-		ConsensusEvents:                        n.ConsensusDispatcher,
-		DBManager:                              n.DBManager,
-		MsgCreator:                             n.msgCreator,
-		Router:                                 n.Config.ConsensusRouter,
-		Net:                                    n.Net,
-		ConsensusParams:                        n.Config.ConsensusParams,
-		Validators:                             n.vdrs,
-		NodeID:                                 n.ID,
-		NetworkID:                              n.Config.NetworkID,
-		Server:                                 &n.APIServer,
-		Keystore:                               n.keystore,
-		AtomicMemory:                           &n.sharedMemory,
-		AVAXAssetID:                            avaxAssetID,
-		XChainID:                               xChainID,
-		CriticalChains:                         criticalChains,
-		TimeoutManager:                         timeoutManager,
-		HealthService:                          n.healthService,
-		WhitelistedSubnets:                     n.Config.WhitelistedSubnets,
-		RetryBootstrap:                         n.Config.RetryBootstrap,
-		RetryBootstrapWarnFrequency:            n.Config.RetryBootstrapWarnFrequency,
-		ShutdownNodeFunc:                       n.Shutdown,
-		MeterVMEnabled:                         n.Config.MeterVMEnabled,
-		Metrics:                                n.MetricsGatherer,
-		SubnetConfigs:                          n.Config.SubnetConfigs,
-		ChainConfigs:                           n.Config.ChainConfigs,
-		AppGossipValidatorSize:                 int(n.Config.NetworkConfig.AppGossipValidatorSize),
-		AppGossipNonValidatorSize:              int(n.Config.NetworkConfig.AppGossipNonValidatorSize),
-		GossipAcceptedFrontierSize:             int(n.Config.NetworkConfig.GossipAcceptedFrontierSize),
-		BootstrapMaxTimeGetAncestors:           n.Config.BootstrapMaxTimeGetAncestors,
-		BootstrapMultiputMaxContainersSent:     n.Config.BootstrapMultiputMaxContainersSent,
-		BootstrapMultiputMaxContainersReceived: n.Config.BootstrapMultiputMaxContainersReceived,
-		ApricotPhase4Time:                      version.GetApricotPhase4Time(n.Config.NetworkID),
-		ApricotPhase4MinPChainHeight:           version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
+		StakingEnabled:                          n.Config.EnableStaking,
+		StakingCert:                             n.Config.StakingTLSCert,
+		Log:                                     n.Log,
+		LogFactory:                              n.LogFactory,
+		VMManager:                               n.Config.VMManager,
+		DecisionEvents:                          n.DecisionDispatcher,
+		ConsensusEvents:                         n.ConsensusDispatcher,
+		DBManager:                               n.DBManager,
+		MsgCreator:                              n.msgCreator,
+		Router:                                  n.Config.ConsensusRouter,
+		Net:                                     n.Net,
+		ConsensusParams:                         n.Config.ConsensusParams,
+		Validators:                              n.vdrs,
+		NodeID:                                  n.ID,
+		NetworkID:                               n.Config.NetworkID,
+		Server:                                  &n.APIServer,
+		Keystore:                                n.keystore,
+		AtomicMemory:                            &n.sharedMemory,
+		AVAXAssetID:                             avaxAssetID,
+		XChainID:                                xChainID,
+		CriticalChains:                          criticalChains,
+		TimeoutManager:                          timeoutManager,
+		Health:                                  n.health,
+		WhitelistedSubnets:                      n.Config.WhitelistedSubnets,
+		RetryBootstrap:                          n.Config.RetryBootstrap,
+		RetryBootstrapWarnFrequency:             n.Config.RetryBootstrapWarnFrequency,
+		ShutdownNodeFunc:                        n.Shutdown,
+		MeterVMEnabled:                          n.Config.MeterVMEnabled,
+		Metrics:                                 n.MetricsGatherer,
+		SubnetConfigs:                           n.Config.SubnetConfigs,
+		ChainConfigs:                            n.Config.ChainConfigs,
+		ConsensusGossipFrequency:                n.Config.ConsensusGossipFrequency,
+		AppGossipValidatorSize:                  int(n.Config.NetworkConfig.AppGossipValidatorSize),
+		AppGossipNonValidatorSize:               int(n.Config.NetworkConfig.AppGossipNonValidatorSize),
+		GossipAcceptedFrontierSize:              int(n.Config.NetworkConfig.GossipAcceptedFrontierSize),
+		BootstrapMaxTimeGetAncestors:            n.Config.BootstrapMaxTimeGetAncestors,
+		BootstrapAncestorsMaxContainersSent:     n.Config.BootstrapAncestorsMaxContainersSent,
+		BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
+		ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
+		ApricotPhase4MinPChainHeight:            version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
+		ResetProposerVMHeightIndex:              n.Config.ResetProposerVMHeightIndex,
 	})
 
 	vdrs := n.vdrs
@@ -651,7 +656,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	// Register the VMs that Avalanche supports
 	errs := wrappers.Errs{}
 	errs.Add(
-		n.Config.VMManager.RegisterFactory(platformvm.ID, &platformvm.Factory{
+		n.Config.VMManager.RegisterFactory(constants.PlatformVMID, &platformvm.Factory{
 			Chains:                 n.chainManager,
 			Validators:             vdrs,
 			UptimeLockedCalculator: n.uptimeCalculator,
@@ -668,18 +673,19 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			MinDelegationFee:       n.Config.MinDelegationFee,
 			MinStakeDuration:       n.Config.MinStakeDuration,
 			MaxStakeDuration:       n.Config.MaxStakeDuration,
-			StakeMintingPeriod:     n.Config.StakeMintingPeriod,
+			RewardConfig:           n.Config.RewardConfig,
 			ApricotPhase3Time:      version.GetApricotPhase3Time(n.Config.NetworkID),
 			ApricotPhase4Time:      version.GetApricotPhase4Time(n.Config.NetworkID),
 			ApricotPhase5Time:      version.GetApricotPhase5Time(n.Config.NetworkID),
 		}),
-		n.Config.VMManager.RegisterFactory(avm.ID, &avm.Factory{
+		n.Config.VMManager.RegisterFactory(constants.AVMID, &avm.Factory{
 			TxFee:            n.Config.TxFee,
 			CreateAssetTxFee: n.Config.CreateAssetTxFee,
 		}),
 		n.Config.VMManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
 		n.Config.VMManager.RegisterFactory(nftfx.ID, &nftfx.Factory{}),
 		n.Config.VMManager.RegisterFactory(propertyfx.ID, &propertyfx.Factory{}),
+		n.Config.VMManager.RegisterFactory(constants.EVMID, &coreth.Factory{}),
 		rpcchainvm.RegisterPlugins(n.Config.PluginDir, n.Config.VMManager),
 	)
 	if errs.Errored() {
@@ -712,7 +718,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			n.Log.Error("creating static API endpoints for %q errored with: %s", vmID, err)
 
 			if err := commonVM.Shutdown(); err != nil {
-				return fmt.Errorf("shutting down VM errored with: %s", err)
+				return fmt.Errorf("shutting down VM errored with: %w", err)
 			}
 			continue
 		}
@@ -912,26 +918,20 @@ func (n *Node) initInfoAPI() error {
 // initHealthAPI initializes the Health API service
 // Assumes n.Log, n.Net, n.APIServer, n.HTTPLog already initialized
 func (n *Node) initHealthAPI() error {
+	healthChecker, err := health.New(n.MetricsRegisterer)
+	if err != nil {
+		return err
+	}
+	n.health = healthChecker
+
 	if !n.Config.HealthAPIEnabled {
-		n.healthService = health.NewNoOpService()
 		n.Log.Info("skipping health API initialization because it has been disabled")
 		return nil
 	}
 
 	n.Log.Info("initializing Health API")
-	healthService, err := health.NewService(
-		n.Config.HealthCheckFreq,
-		n.Log,
-		"health",
-		n.MetricsRegisterer,
-	)
-	if err != nil {
-		return err
-	}
-	n.healthService = healthService
-
 	chainsNotBootstrapped := func(pChainID ids.ID, xChainID ids.ID, cChainID ids.ID) []string {
-		var chains []string
+		chains := make([]string, 0, 3)
 		if !n.chainManager.IsBootstrapped(pChainID) {
 			chains = append(chains, "'P'")
 		}
@@ -944,43 +944,107 @@ func (n *Node) initHealthAPI() error {
 		return chains
 	}
 
-	isBootstrappedFunc := func() (interface{}, error) {
-		if pChainID, err := n.chainManager.Lookup("P"); err != nil {
+	// Passes if the P, X and C chains are finished bootstrapping
+	bootstrappedCheck := health.CheckerFunc(func() (interface{}, error) {
+		pChainID, err := n.chainManager.Lookup("P")
+		if err != nil {
 			return nil, errPNotCreated
-		} else if xChainID, err := n.chainManager.Lookup("X"); err != nil {
-			return nil, errXNotCreated
-		} else if cChainID, err := n.chainManager.Lookup("C"); err != nil {
-			return nil, errCNotCreated
-		} else if chains := chainsNotBootstrapped(pChainID, xChainID, cChainID); len(chains) != 0 {
-			return nil, fmt.Errorf("primary subnet has not finished bootstrapping %s", strings.Join(chains, ", "))
 		}
 
-		return nil, nil
-	}
-	// Passes if the P, X and C chains are finished bootstrapping
-	err = n.healthService.RegisterMonotonicCheck("isBootstrapped", isBootstrappedFunc)
+		xChainID, err := n.chainManager.Lookup("X")
+		if err != nil {
+			return nil, errXNotCreated
+		}
+
+		cChainID, err := n.chainManager.Lookup("C")
+		if err != nil {
+			return nil, errCNotCreated
+		}
+
+		chains := chainsNotBootstrapped(pChainID, xChainID, cChainID)
+		if len(chains) != 0 {
+			return chains, errNotBootstrapped
+		}
+		return chains, nil
+	})
+
+	err = healthChecker.RegisterReadinessCheck("bootstrapped", bootstrappedCheck)
 	if err != nil {
-		return fmt.Errorf("couldn't register isBootstrapped health check: %w", err)
+		return fmt.Errorf("couldn't register bootstrapped readiness check: %w", err)
 	}
 
-	// Register the network layer with the health service
-	err = n.healthService.RegisterCheck("network", n.Net.HealthCheck)
+	err = healthChecker.RegisterHealthCheck("bootstrapped", bootstrappedCheck)
 	if err != nil {
-		return errFailedToRegisterHealthCheck
+		return fmt.Errorf("couldn't register bootstrapped health check: %w", err)
 	}
 
-	// Register the router with the health service
-	err = n.healthService.RegisterCheck("router", n.Config.ConsensusRouter.HealthCheck)
+	err = healthChecker.RegisterHealthCheck("network", n.Net)
 	if err != nil {
-		return errFailedToRegisterHealthCheck
+		return fmt.Errorf("couldn't register network health check: %w", err)
 	}
 
-	handler, err := n.healthService.Handler()
+	err = healthChecker.RegisterHealthCheck("router", n.Config.ConsensusRouter)
+	if err != nil {
+		return fmt.Errorf("couldn't register router health check: %w", err)
+	}
+
+	handler, err := health.NewGetAndPostHandler(n.Log, healthChecker)
 	if err != nil {
 		return err
 	}
 
-	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "health", "", n.HTTPLog)
+	err = n.APIServer.AddRoute(
+		&common.HTTPHandler{
+			LockOptions: common.NoLock,
+			Handler:     handler,
+		},
+		&sync.RWMutex{},
+		"health",
+		"",
+		n.HTTPLog,
+	)
+	if err != nil {
+		return err
+	}
+
+	err = n.APIServer.AddRoute(
+		&common.HTTPHandler{
+			LockOptions: common.NoLock,
+			Handler:     health.NewGetHandler(healthChecker.Readiness),
+		},
+		&sync.RWMutex{},
+		"health",
+		"/readiness",
+		n.HTTPLog,
+	)
+	if err != nil {
+		return err
+	}
+
+	err = n.APIServer.AddRoute(
+		&common.HTTPHandler{
+			LockOptions: common.NoLock,
+			Handler:     health.NewGetHandler(healthChecker.Health),
+		},
+		&sync.RWMutex{},
+		"health",
+		"/health",
+		n.HTTPLog,
+	)
+	if err != nil {
+		return err
+	}
+
+	return n.APIServer.AddRoute(
+		&common.HTTPHandler{
+			LockOptions: common.NoLock,
+			Handler:     health.NewGetHandler(healthChecker.Liveness),
+		},
+		&sync.RWMutex{},
+		"health",
+		"/liveness",
+		n.HTTPLog,
+	)
 }
 
 // initIPCAPI initializes the IPC API service
@@ -1132,6 +1196,7 @@ func (n *Node) Initialize(
 		return fmt.Errorf("couldn't initialize indexer: %w", err)
 	}
 
+	n.health.Start(n.Config.HealthCheckFreq)
 	n.initProfiler()
 
 	// Start the Platform chain
@@ -1151,6 +1216,23 @@ func (n *Node) Shutdown(exitCode int) {
 
 func (n *Node) shutdown() {
 	n.Log.Info("shutting down node with exit code %d", n.ExitCode())
+
+	if n.health != nil {
+		// Passes if the node is not shutting down
+		shuttingDownCheck := health.CheckerFunc(func() (interface{}, error) {
+			return map[string]interface{}{
+				"isShuttingDown": true,
+			}, errShuttingDown
+		})
+
+		err := n.health.RegisterHealthCheck("shuttingDown", shuttingDownCheck)
+		if err != nil {
+			n.Log.Debug("couldn't register shuttingDown health check: %s", err)
+		}
+
+		time.Sleep(n.Config.ShutdownWait)
+	}
+
 	if n.IPCs != nil {
 		if err := n.IPCs.Shutdown(); err != nil {
 			n.Log.Debug("error during IPC shutdown: %s", err)
@@ -1170,7 +1252,7 @@ func (n *Node) shutdown() {
 		n.Log.Debug("error during API shutdown: %s", err)
 	}
 	if err := n.indexer.Close(); err != nil {
-		n.Log.Debug("error closing tx indexer: %w", err)
+		n.Log.Debug("error closing tx indexer: %s", err)
 	}
 
 	// Make sure all plugin subprocesses are killed

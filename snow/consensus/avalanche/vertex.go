@@ -11,6 +11,7 @@ import (
 // Vertex is a collection of multiple transactions tied to other vertices
 type Vertex interface {
 	choices.Decidable
+	snowstorm.Whitelister
 
 	// Returns the vertices this vertex depends on
 	Parents() ([]Vertex, error)

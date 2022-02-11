@@ -108,11 +108,7 @@ func TestCodecPackParseGzip(t *testing.T) {
 			fields: map[Field]interface{}{},
 		},
 		{
-			op:     Pong,
-			fields: map[Field]interface{}{},
-		},
-		{
-			op: UptimePong,
+			op: Pong,
 			fields: map[Field]interface{}{
 				Uptime: uint8(80),
 			},
@@ -151,7 +147,7 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op: MultiPut,
+			op: Ancestors,
 			fields: map[Field]interface{}{
 				ChainID:             id[:],
 				RequestID:           uint32(1337),

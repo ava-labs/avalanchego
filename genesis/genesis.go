@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm"
-	"github.com/ava-labs/avalanchego/vms/evm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
@@ -165,43 +164,38 @@ func validateConfig(networkID uint32, config *Config) error {
 	return nil
 }
 
-// Genesis returns the genesis data of the Platform Chain.
+// FromFile returns the genesis data of the Platform Chain.
 //
 // Since an Avalanche network has exactly one Platform Chain, and the Platform
 // Chain defines the genesis state of the network (who is staking, which chains
 // exist, etc.), defining the genesis state of the Platform Chain is the same as
 // defining the genesis state of the network.
 //
-// Genesis accepts:
+// FromFile accepts:
 // 1) The ID of the new network. [networkID]
 // 2) The location of a custom genesis config to load. [filepath]
 //
-// If [filepath] is empty or the given network ID is Mainnet, Testnet, or Local, loads the
-// network genesis state from predefined configs. If [filepath] is non-empty and networkID
-// isn't Mainnet, Testnet, or Local, loads the network genesis data from the config at [filepath].
+// If [filepath] is empty or the given network ID is Mainnet, Testnet, or Local, returns error.
+// If [filepath] is non-empty and networkID isn't Mainnet, Testnet, or Local,
+// loads the network genesis data from the config at [filepath].
 //
-// Genesis returns:
+// FromFile returns:
 // 1) The byte representation of the genesis state of the platform chain
 //    (ie the genesis state of the network)
 // 2) The asset ID of AVAX
-func Genesis(networkID uint32, filepath string) ([]byte, ids.ID, error) {
-	config := GetConfig(networkID)
-	if len(filepath) > 0 {
-		switch networkID {
-		case constants.MainnetID, constants.TestnetID, constants.LocalID:
-			return nil, ids.ID{}, fmt.Errorf(
-				"cannot override genesis config for standard network %s (%d)",
-				constants.NetworkName(networkID),
-				networkID,
-			)
-		}
+func FromFile(networkID uint32, filepath string) ([]byte, ids.ID, error) {
+	switch networkID {
+	case constants.MainnetID, constants.TestnetID, constants.LocalID:
+		return nil, ids.ID{}, fmt.Errorf(
+			"cannot override genesis config for standard network %s (%d)",
+			constants.NetworkName(networkID),
+			networkID,
+		)
+	}
 
-		customConfig, err := GetConfigFile(filepath)
-		if err != nil {
-			return nil, ids.ID{}, fmt.Errorf("unable to load provided genesis config at %s: %w", filepath, err)
-		}
-
-		config = customConfig
+	config, err := GetConfigFile(filepath)
+	if err != nil {
+		return nil, ids.ID{}, fmt.Errorf("unable to load provided genesis config at %s: %w", filepath, err)
 	}
 
 	if err := validateConfig(networkID, config); err != nil {
@@ -209,6 +203,47 @@ func Genesis(networkID uint32, filepath string) ([]byte, ids.ID, error) {
 	}
 
 	return FromConfig(config)
+}
+
+// FromFlag returns the genesis data of the Platform Chain.
+//
+// Since an Avalanche network has exactly one Platform Chain, and the Platform
+// Chain defines the genesis state of the network (who is staking, which chains
+// exist, etc.), defining the genesis state of the Platform Chain is the same as
+// defining the genesis state of the network.
+//
+// FromFlag accepts:
+// 1) The ID of the new network. [networkID]
+// 2) The content of a custom genesis config to load. [genesisContent]
+//
+// If [genesisContent] is empty or the given network ID is Mainnet, Testnet, or Local, returns error.
+// If [genesisContent] is non-empty and networkID isn't Mainnet, Testnet, or Local,
+// loads the network genesis data from [genesisContent].
+//
+// FromFlag returns:
+// 1) The byte representation of the genesis state of the platform chain
+//    (ie the genesis state of the network)
+// 2) The asset ID of AVAX
+func FromFlag(networkID uint32, genesisContent string) ([]byte, ids.ID, error) {
+	switch networkID {
+	case constants.MainnetID, constants.TestnetID, constants.LocalID:
+		return nil, ids.ID{}, fmt.Errorf(
+			"cannot override genesis config for standard network %s (%d)",
+			constants.NetworkName(networkID),
+			networkID,
+		)
+	}
+
+	customConfig, err := GetConfigContent(genesisContent)
+	if err != nil {
+		return nil, ids.ID{}, fmt.Errorf("unable to load genesis content from flag: %w", err)
+	}
+
+	if err := validateConfig(networkID, customConfig); err != nil {
+		return nil, ids.ID{}, fmt.Errorf("genesis config validation failed: %w", err)
+	}
+
+	return FromConfig(customConfig)
 }
 
 // FromConfig returns:
@@ -390,7 +425,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		{
 			GenesisData: avmReply.Bytes,
 			SubnetID:    constants.PrimaryNetworkID,
-			VMID:        avm.ID,
+			VMID:        constants.AVMID,
 			FxIDs: []ids.ID{
 				secp256k1fx.ID,
 				nftfx.ID,
@@ -401,7 +436,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		{
 			GenesisData: genesisStr,
 			SubnetID:    constants.PrimaryNetworkID,
-			VMID:        evm.ID,
+			VMID:        constants.EVMID,
 			Name:        "C-Chain",
 		},
 	}
@@ -502,7 +537,7 @@ func VMGenesis(genesisBytes []byte, vmID ids.ID) (*platformvm.Tx, error) {
 
 func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
 	c := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
-	m := codec.NewManager(math.MaxUint32)
+	m := codec.NewManager(math.MaxInt32)
 	errs := wrappers.Errs{}
 	errs.Add(
 		c.RegisterType(&avm.BaseTx{}),

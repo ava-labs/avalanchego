@@ -32,40 +32,22 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
-	// PercentDenominator is the denominator used to calculate percentages
-	PercentDenominator = 1000000
-
 	droppedTxCacheSize     = 64
 	validatorSetsCacheSize = 64
-
-	maxUTXOsToFetch = 1024
-
-	// TODO: Turn these constants into governable parameters
-
-	// MaxSubMinConsumptionRate is the % consumption that incentivizes staking
-	// longer
-	MaxSubMinConsumptionRate = 20000 // 2%
-	// MinConsumptionRate is the minimum % consumption of the remaining tokens
-	// to be minted
-	MinConsumptionRate = 100000 // 10%
 
 	// MaxValidatorWeightFactor is the maximum factor of the validator stake
 	// that is allowed to be placed on a validator.
 	MaxValidatorWeightFactor uint64 = 5
-
-	// SupplyCap is the maximum amount of AVAX that should ever exist
-	SupplyCap = 720 * units.MegaAvax
 
 	// Maximum future start time for staking/delegating
 	maxFutureStartTime = 24 * 7 * 2 * time.Hour
@@ -101,6 +83,8 @@ type VM struct {
 	blockBuilder blockBuilder
 
 	uptimeManager uptime.Manager
+
+	rewards reward.Calculator
 
 	// The context of this vm
 	ctx       *snow.Context
@@ -139,8 +123,6 @@ type VM struct {
 	// Key: block ID
 	// Value: the block
 	currentBlocks map[ids.ID]Block
-
-	lastVdrUpdate time.Time
 }
 
 // Initialize this blockchain.
@@ -195,6 +177,7 @@ func (vm *VM) Initialize(
 		)
 	}
 	vm.network = newNetwork(vm.ApricotPhase4Time, appSender, vm)
+	vm.rewards = reward.NewCalculator(vm.RewardConfig)
 
 	is, err := NewMeteredInternalState(vm, vm.dbManager.Current().Database, genesisBytes, registerer)
 	if err != nil {
@@ -206,7 +189,7 @@ func (vm *VM) Initialize(
 	vm.uptimeManager = uptime.NewManager(is)
 	vm.UptimeLockedCalculator.SetCalculator(&vm.bootstrapped, &ctx.Lock, vm.uptimeManager)
 
-	if err := vm.updateValidators(true); err != nil {
+	if err := vm.updateValidators(); err != nil {
 		return fmt.Errorf(
 			"failed to initialize validator sets: %w",
 			err,
@@ -296,26 +279,21 @@ func (vm *VM) createChain(tx *Tx) error {
 	return nil
 }
 
-// Bootstrapping marks this VM as bootstrapping
-func (vm *VM) Bootstrapping() error {
+// onBootstrapStarted marks this VM as bootstrapping
+func (vm *VM) onBootstrapStarted() error {
 	vm.bootstrapped.SetValue(false)
 	return vm.fx.Bootstrapping()
 }
 
-// Bootstrapped marks this VM as bootstrapped
-func (vm *VM) Bootstrapped() error {
+// onNormalOperationsStarted marks this VM as bootstrapped
+func (vm *VM) onNormalOperationsStarted() error {
 	if vm.bootstrapped.GetValue() {
 		return nil
 	}
 	vm.bootstrapped.SetValue(true)
 
-	errs := wrappers.Errs{}
-	errs.Add(
-		vm.updateValidators(false),
-		vm.fx.Bootstrapped(),
-	)
-	if errs.Errored() {
-		return errs.Err
+	if err := vm.fx.Bootstrapped(); err != nil {
+		return err
 	}
 
 	primaryValidatorSet, exist := vm.Validators.GetValidators(constants.PrimaryNetworkID)
@@ -333,6 +311,17 @@ func (vm *VM) Bootstrapped() error {
 		return err
 	}
 	return vm.internalState.Commit()
+}
+
+func (vm *VM) SetState(state snow.State) error {
+	switch state {
+	case snow.Bootstrapping:
+		return vm.onBootstrapStarted()
+	case snow.NormalOp:
+		return vm.onNormalOperationsStarted()
+	default:
+		return snow.ErrUnknownState
+	}
 }
 
 // Shutdown this blockchain
@@ -478,7 +467,7 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 }
 
 // Connected implements validators.Connector
-func (vm *VM) Connected(vdrID ids.ShortID) error {
+func (vm *VM) Connected(vdrID ids.ShortID, nodeVersion version.Application) error {
 	return vm.uptimeManager.Connect(vdrID)
 }
 
@@ -582,13 +571,7 @@ func (vm *VM) GetCurrentHeight() (uint64, error) {
 	return lastAccepted.Height(), nil
 }
 
-func (vm *VM) updateValidators(force bool) error {
-	now := vm.clock.Time()
-	if !force && !vm.bootstrapped.GetValue() && now.Sub(vm.lastVdrUpdate) < 5*time.Second {
-		return nil
-	}
-	vm.lastVdrUpdate = now
-
+func (vm *VM) updateValidators() error {
 	currentValidators := vm.internalState.CurrentStakerChainState()
 	primaryValidators, err := currentValidators.ValidatorSet(constants.PrimaryNetworkID)
 	if err != nil {
@@ -676,18 +659,4 @@ func (vm *VM) getPercentConnected() (float64, error) {
 		}
 	}
 	return float64(connectedStake) / float64(vdrSet.Weight()), nil
-}
-
-// TODO: remove after AP5
-func (vm *VM) isValidCrossChainID(vs VersionedState, peerChainID ids.ID) TxError {
-	currentTimestamp := vs.GetTimestamp()
-	enabledAP5 := !currentTimestamp.Before(vm.ApricotPhase5Time)
-	if enabledAP5 {
-		if err := verify.SameSubnet(vm.ctx, peerChainID); err != nil {
-			return tempError{err}
-		}
-	} else if peerChainID != vm.ctx.XChainID {
-		return permError{errWrongChainID}
-	}
-	return nil
 }

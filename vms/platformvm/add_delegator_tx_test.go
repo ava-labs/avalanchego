@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 )
 
 func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
@@ -94,7 +96,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			newValidatorEndTime,                     // end time
 			newValidatorID,                          // node ID
 			rewardAddress,                           // Reward Address
-			PercentDenominator,                      // subnet
+			reward.PercentDenominator,               // subnet
 			[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 			ids.ShortEmpty,                          // change addr
 		)
@@ -103,7 +105,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 		}
 
 		vm.internalState.AddCurrentStaker(tx, 0)
-		vm.internalState.AddTx(tx, Committed)
+		vm.internalState.AddTx(tx, status.Committed)
 		if err := vm.internalState.Commit(); err != nil {
 			t.Fatal(err)
 		}
@@ -121,7 +123,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			newValidatorEndTime,                     // end time
 			newValidatorID,                          // node ID
 			rewardAddress,                           // Reward Address
-			PercentDenominator,                      // subnet
+			reward.PercentDenominator,               // subnet
 			[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 			ids.ShortEmpty,                          // change addr
 		)
@@ -130,7 +132,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 		}
 
 		vm.internalState.AddCurrentStaker(tx, 0)
-		vm.internalState.AddTx(tx, Committed)
+		vm.internalState.AddTx(tx, status.Committed)
 		if err := vm.internalState.Commit(); err != nil {
 			t.Fatal(err)
 		}
@@ -329,7 +331,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			if tt.setup != nil {
 				tt.setup(vm)
 			}
-			if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err != nil && !tt.shouldErr {
+			if _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err != nil && !tt.shouldErr {
 				t.Fatalf("shouldn't have errored but got %s", err)
 			} else if err == nil && tt.shouldErr {
 				t.Fatalf("expected test to error but got none")
@@ -365,7 +367,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		uint64(validatorEndTime.Unix()),
 		id,
 		id,
-		PercentDenominator,
+		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	)
@@ -530,7 +532,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				uint64(validatorEndTime.Unix()),
 				id,
 				id,
-				PercentDenominator,
+				reward.PercentDenominator,
 				[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
 				changeAddr,
 			)

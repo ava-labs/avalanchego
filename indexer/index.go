@@ -44,7 +44,7 @@ var (
 // Index assumes that Accept is called before the container is committed to the
 // database of the VM that the container exists in.
 type Index interface {
-	Accept(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error
+	snow.Acceptor
 	GetContainerByIndex(index uint64) (Container, error)
 	GetContainerRange(startIndex uint64, numToFetch uint64) ([]Container, error)
 	GetLastAccepted() (Container, error)
@@ -196,7 +196,7 @@ func (i *index) getContainerByIndex(index uint64) (Container, error) {
 func (i *index) getContainerByIndexBytes(indexBytes []byte) (Container, error) {
 	containerBytes, err := i.indexToContainer.Get(indexBytes)
 	if err != nil {
-		i.log.Error("couldn't read container from database: %w", err)
+		i.log.Error("couldn't read container from database: %s", err)
 		return Container{}, fmt.Errorf("couldn't read from database: %w", err)
 	}
 	var container Container

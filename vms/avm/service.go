@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -28,9 +29,6 @@ import (
 const (
 	// Max number of addresses that can be passed in as argument to GetUTXOs
 	maxGetUTXOsAddrs = 1024
-
-	// Max number of addresses allowed for a single keystore user
-	maxKeystoreAddresses = 5000
 
 	// Max number of items allowed in a page
 	maxPageSize uint64 = 1024
@@ -180,7 +178,7 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.G
 	var err error
 	reply.Tx, err = formatting.EncodeWithChecksum(args.Encoding, tx.Bytes())
 	if err != nil {
-		return fmt.Errorf("couldn't encode tx as string: %s", err)
+		return fmt.Errorf("couldn't encode tx as string: %w", err)
 	}
 	return nil
 }
@@ -207,19 +205,14 @@ func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 		sourceChain = chainID
 	}
 
-	addrSet := ids.ShortSet{}
-	for _, addrStr := range args.Addresses {
-		addr, err := service.vm.ParseLocalAddress(addrStr)
-		if err != nil {
-			return fmt.Errorf("couldn't parse address %q: %w", addrStr, err)
-		}
-		addrSet.Add(addr)
+	addrSet, err := avax.ParseLocalAddresses(service.vm, args.Addresses)
+	if err != nil {
+		return err
 	}
 
 	startAddr := ids.ShortEmpty
 	startUTXO := ids.Empty
 	if args.StartIndex.Address != "" || args.StartIndex.UTXO != "" {
-		var err error
 		startAddr, err = service.vm.ParseLocalAddress(args.StartIndex.Address)
 		if err != nil {
 			return fmt.Errorf("couldn't parse start index address %q: %w", args.StartIndex.Address, err)
@@ -234,14 +227,18 @@ func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 		utxos     []*avax.UTXO
 		endAddr   ids.ShortID
 		endUTXOID ids.ID
-		err       error
 	)
+	limit := int(args.Limit)
+	if limit <= 0 || int(maxPageSize) < limit {
+		limit = int(maxPageSize)
+	}
 	if sourceChain == service.vm.ctx.ChainID {
-		utxos, endAddr, endUTXOID, err = service.vm.getPaginatedUTXOs(
+		utxos, endAddr, endUTXOID, err = avax.GetPaginatedUTXOs(
+			service.vm.state,
 			addrSet,
 			startAddr,
 			startUTXO,
-			int(args.Limit),
+			limit,
 		)
 	} else {
 		utxos, endAddr, endUTXOID, err = service.vm.GetAtomicUTXOs(
@@ -249,7 +246,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 			addrSet,
 			startAddr,
 			startUTXO,
-			int(args.Limit),
+			limit,
 		)
 	}
 	if err != nil {
@@ -264,7 +261,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 		}
 		reply.UTXOs[i], err = formatting.EncodeWithChecksum(args.Encoding, b)
 		if err != nil {
-			return fmt.Errorf("couldn't encode UTXO %s as string: %s", utxo.InputID(), err)
+			return fmt.Errorf("couldn't encode UTXO %s as string: %w", utxo.InputID(), err)
 		}
 	}
 
@@ -356,7 +353,7 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 	addrSet := ids.ShortSet{}
 	addrSet.Add(addr)
 
-	utxos, err := service.vm.getAllUTXOs(addrSet)
+	utxos, err := avax.GetAllUTXOs(service.vm.state, addrSet)
 	if err != nil {
 		return fmt.Errorf("problem retrieving UTXOs: %w", err)
 	}
@@ -418,7 +415,7 @@ func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs
 	addrSet := ids.ShortSet{}
 	addrSet.Add(address)
 
-	utxos, err := service.vm.getAllUTXOs(addrSet)
+	utxos, err := avax.GetAllUTXOs(service.vm.state, addrSet)
 	if err != nil {
 		return fmt.Errorf("couldn't get address's UTXOs: %w", err)
 	}
@@ -509,13 +506,9 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 	}
 
 	// Parse the from addresses
-	fromAddrs := ids.ShortSet{}
-	for _, addrStr := range args.From {
-		addr, err := service.vm.ParseLocalAddress(addrStr)
-		if err != nil {
-			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
-		}
-		fromAddrs.Add(addr)
+	fromAddrs, err := avax.ParseLocalAddresses(service.vm, args.From)
+	if err != nil {
+		return err
 	}
 
 	// Get the UTXOs/keys for the from addresses
@@ -664,13 +657,9 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 	}
 
 	// Parse the from addresses
-	fromAddrs := ids.ShortSet{}
-	for _, addrStr := range args.From {
-		addr, err := service.vm.ParseLocalAddress(addrStr)
-		if err != nil {
-			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
-		}
-		fromAddrs.Add(addr)
+	fromAddrs, err := avax.ParseLocalAddresses(service.vm, args.From)
+	if err != nil {
+		return err
 	}
 
 	// Get the UTXOs/keys for the from addresses
@@ -767,35 +756,17 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 func (service *Service) CreateAddress(r *http.Request, args *api.UserPass, reply *api.JSONAddress) error {
 	service.vm.ctx.Log.Debug("AVM: CreateAddress called for user '%s'", args.Username)
 
-	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
+	user, err := keystore.NewUserFromKeystore(service.vm.ctx.Keystore, args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
+		return err
 	}
-	defer db.Close()
+	defer user.Close()
 
-	user := userState{vm: service.vm}
-
-	addresses, _ := user.Addresses(db)
-	if len(addresses) >= maxKeystoreAddresses {
-		return fmt.Errorf("keystore user has reached its limit of %d addresses", maxKeystoreAddresses)
-	}
-
-	factory := crypto.FactorySECP256K1R{}
-	skIntf, err := factory.NewPrivateKey()
+	sk, err := keystore.NewKey(user)
 	if err != nil {
-		return fmt.Errorf("problem generating private key: %w", err)
-	}
-	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
-
-	if err := user.SetKey(db, sk); err != nil {
-		return fmt.Errorf("problem saving private key: %w", err)
+		return err
 	}
 
-	addresses = append(addresses, sk.PublicKey().Address())
-
-	if err := user.SetAddresses(db, addresses); err != nil {
-		return fmt.Errorf("problem saving address: %w", err)
-	}
 	reply.Address, err = service.vm.FormatLocalAddress(sk.PublicKey().Address())
 	if err != nil {
 		return fmt.Errorf("problem formatting address: %w", err)
@@ -803,26 +774,25 @@ func (service *Service) CreateAddress(r *http.Request, args *api.UserPass, reply
 
 	// Return an error if the DB can't close, this will execute before the above
 	// db close.
-	return db.Close()
+	return user.Close()
 }
 
 // ListAddresses returns all of the addresses controlled by user [args.Username]
 func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, response *api.JSONAddresses) error {
 	service.vm.ctx.Log.Debug("AVM: ListAddresses called for user '%s'", args.Username)
 
-	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
+	user, err := keystore.NewUserFromKeystore(service.vm.ctx.Keystore, args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return err
 	}
 
 	response.Addresses = []string{}
 
-	user := userState{vm: service.vm}
-	addresses, err := user.Addresses(db)
+	addresses, err := user.GetAddresses()
 	if err != nil {
 		// An error fetching the addresses may just mean that the user has no
 		// addresses.
-		return db.Close()
+		return user.Close()
 	}
 
 	for _, address := range addresses {
@@ -830,12 +800,12 @@ func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, respo
 		if err != nil {
 			// Drop any potential error closing the database to report the
 			// original error
-			_ = db.Close()
+			_ = user.Close()
 			return fmt.Errorf("problem formatting address: %w", err)
 		}
 		response.Addresses = append(response.Addresses, addr)
 	}
-	return db.Close()
+	return user.Close()
 }
 
 // ExportKeyArgs are arguments for ExportKey
@@ -859,16 +829,16 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 		return fmt.Errorf("problem parsing address %q: %w", args.Address, err)
 	}
 
-	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
+	user, err := keystore.NewUserFromKeystore(service.vm.ctx.Keystore, args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
+		return err
 	}
-	defer db.Close()
 
-	user := userState{vm: service.vm}
-
-	sk, err := user.Key(db, addr)
+	sk, err := user.GetKey(addr)
 	if err != nil {
+		// Drop any potential error closing the database to report the original
+		// error
+		_ = user.Close()
 		return fmt.Errorf("problem retrieving private key: %w", err)
 	}
 
@@ -876,7 +846,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 	// can be stringified is at least the length of a SECP256K1 private key
 	privKeyStr, _ := formatting.EncodeWithChecksum(formatting.CB58, sk.Bytes())
 	reply.PrivateKey = constants.SecretKeyPrefix + privKeyStr
-	return db.Close()
+	return user.Close()
 }
 
 // ImportKeyArgs are arguments for ImportKey
@@ -895,22 +865,10 @@ type ImportKeyReply struct {
 func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JSONAddress) error {
 	service.vm.ctx.Log.Debug("AVM: ImportKey called for user '%s'", args.Username)
 
-	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
-	if err != nil {
-		return fmt.Errorf("problem retrieving data: %w", err)
-	}
-	defer db.Close()
-
-	user := userState{vm: service.vm}
-
-	addresses, _ := user.Addresses(db)
-	if len(addresses) >= maxKeystoreAddresses {
-		return fmt.Errorf("keystore user has reached its limit of %d addresses", maxKeystoreAddresses)
-	}
-
 	if !strings.HasPrefix(args.PrivateKey, constants.SecretKeyPrefix) {
 		return fmt.Errorf("private key missing %s prefix", constants.SecretKeyPrefix)
 	}
+
 	trimmedPrivateKey := strings.TrimPrefix(args.PrivateKey, constants.SecretKeyPrefix)
 	privKeyBytes, err := formatting.Decode(formatting.CB58, trimmedPrivateKey)
 	if err != nil {
@@ -924,7 +882,13 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 	}
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
 
-	if err := user.SetKey(db, sk); err != nil {
+	user, err := keystore.NewUserFromKeystore(service.vm.ctx.Keystore, args.Username, args.Password)
+	if err != nil {
+		return err
+	}
+	defer user.Close()
+
+	if err := user.PutKeys(sk); err != nil {
 		return fmt.Errorf("problem saving key %w", err)
 	}
 
@@ -933,18 +897,8 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 	if err != nil {
 		return fmt.Errorf("problem formatting address: %w", err)
 	}
-	for _, address := range addresses {
-		if newAddress == address {
-			return db.Close()
-		}
-	}
 
-	addresses = append(addresses, newAddress)
-	if err := user.SetAddresses(db, addresses); err != nil {
-		return fmt.Errorf("problem saving addresses: %w", err)
-	}
-
-	return db.Close()
+	return user.Close()
 }
 
 // SendOutput specifies that [Amount] of asset [AssetID] be sent to [To]
@@ -1005,13 +959,9 @@ func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 	}
 
 	// Parse the from addresses
-	fromAddrs := ids.ShortSet{}
-	for _, addrStr := range args.From {
-		addr, err := service.vm.ParseLocalAddress(addrStr)
-		if err != nil {
-			return fmt.Errorf("couldn't parse 'From' address %s: %w", addrStr, err)
-		}
-		fromAddrs.Add(addr)
+	fromAddrs, err := avax.ParseLocalAddresses(service.vm, args.From)
+	if err != nil {
+		return err
 	}
 
 	// Load user's UTXOs/keys
@@ -1163,13 +1113,9 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JSONTxI
 	}
 
 	// Parse the from addresses
-	fromAddrs := ids.ShortSet{}
-	for _, addrStr := range args.From {
-		addr, err := service.vm.ParseLocalAddress(addrStr)
-		if err != nil {
-			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
-		}
-		fromAddrs.Add(addr)
+	fromAddrs, err := avax.ParseLocalAddresses(service.vm, args.From)
+	if err != nil {
+		return err
 	}
 
 	// Get the UTXOs/keys for the from addresses
@@ -1280,13 +1226,9 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 	}
 
 	// Parse the from addresses
-	fromAddrs := ids.ShortSet{}
-	for _, addrStr := range args.From {
-		addr, err := service.vm.ParseLocalAddress(addrStr)
-		if err != nil {
-			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
-		}
-		fromAddrs.Add(addr)
+	fromAddrs, err := avax.ParseLocalAddresses(service.vm, args.From)
+	if err != nil {
+		return err
 	}
 
 	// Get the UTXOs/keys for the from addresses
@@ -1396,13 +1338,9 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 	}
 
 	// Parse the from addresses
-	fromAddrs := ids.ShortSet{}
-	for _, addrStr := range args.From {
-		addr, err := service.vm.ParseLocalAddress(addrStr)
-		if err != nil {
-			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
-		}
-		fromAddrs.Add(addr)
+	fromAddrs, err := avax.ParseLocalAddresses(service.vm, args.From)
+	if err != nil {
+		return err
 	}
 
 	// Get the UTXOs/keys for the from addresses
@@ -1522,7 +1460,7 @@ func (service *Service) Import(_ *http.Request, args *ImportArgs, reply *api.JSO
 		return err
 	}
 
-	atomicUTXOs, _, _, err := service.vm.GetAtomicUTXOs(chainID, kc.Addrs, ids.ShortEmpty, ids.Empty, -1)
+	atomicUTXOs, _, _, err := service.vm.GetAtomicUTXOs(chainID, kc.Addrs, ids.ShortEmpty, ids.Empty, int(maxPageSize))
 	if err != nil {
 		return fmt.Errorf("problem retrieving user's atomic UTXOs: %w", err)
 	}
@@ -1639,13 +1577,9 @@ func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JSO
 	}
 
 	// Parse the from addresses
-	fromAddrs := ids.ShortSet{}
-	for _, addrStr := range args.From {
-		addr, err := service.vm.ParseLocalAddress(addrStr)
-		if err != nil {
-			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
-		}
-		fromAddrs.Add(addr)
+	fromAddrs, err := avax.ParseLocalAddresses(service.vm, args.From)
+	if err != nil {
+		return err
 	}
 
 	// Get the UTXOs/keys for the from addresses

@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 )
 
 var (
@@ -69,13 +70,6 @@ func (sb *StandardBlock) Verify() error {
 	blkID := sb.ID()
 
 	if err := sb.CommonDecisionBlock.Verify(); err != nil {
-		if err := sb.Reject(); err != nil {
-			sb.vm.ctx.Log.Error(
-				"failed to reject standard block %s due to %s",
-				blkID,
-				err,
-			)
-		}
 		return err
 	}
 
@@ -88,13 +82,6 @@ func (sb *StandardBlock) Verify() error {
 	// be a decision.
 	parent, ok := parentIntf.(decision)
 	if !ok {
-		if err := sb.Reject(); err != nil {
-			sb.vm.ctx.Log.Error(
-				"failed to reject standard block %s due to %s",
-				blkID,
-				err,
-			)
-		}
 		return errInvalidBlockType
 	}
 
@@ -108,9 +95,6 @@ func (sb *StandardBlock) Verify() error {
 	// clear inputs so that multiple [Verify] calls can be made
 	sb.inputs.Clear()
 
-	currentTimestamp := parentState.GetTimestamp()
-	enabledAP5 := !currentTimestamp.Before(sb.vm.ApricotPhase5Time)
-
 	funcs := make([]func() error, 0, len(sb.Txs))
 	for _, tx := range sb.Txs {
 		txID := tx.ID()
@@ -120,17 +104,8 @@ func (sb *StandardBlock) Verify() error {
 			return errWrongTxType
 		}
 
-		// TODO: remove after AP5.
-		if _, ok := tx.UnsignedTx.(UnsignedAtomicTx); ok && !enabledAP5 {
-			return fmt.Errorf(
-				"the chain timestamp (%d) is before the apricot phase 5 time (%d), hence atomic transactions should go through the atomic block",
-				currentTimestamp.Unix(),
-				sb.vm.ApricotPhase5Time.Unix(),
-			)
-		}
-
 		inputUTXOs := utx.InputUTXOs()
-		// ensure it doesnt overlap with current input batch
+		// ensure it doesn't overlap with current input batch
 		if sb.inputs.Overlaps(inputUTXOs) {
 			return errConflictingBatchTxs
 		}
@@ -140,17 +115,10 @@ func (sb *StandardBlock) Verify() error {
 		onAccept, err := utx.Execute(sb.vm, sb.onAcceptState, tx)
 		if err != nil {
 			sb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
-			if err := sb.Reject(); err != nil {
-				sb.vm.ctx.Log.Error(
-					"failed to reject standard block %s due to %s",
-					blkID,
-					err,
-				)
-			}
 			return err
 		}
 
-		sb.onAcceptState.AddTx(tx, Committed)
+		sb.onAcceptState.AddTx(tx, status.Committed)
 		if onAccept != nil {
 			funcs = append(funcs, onAccept)
 		}
@@ -183,7 +151,6 @@ func (sb *StandardBlock) Verify() error {
 	sb.timestamp = sb.onAcceptState.GetTimestamp()
 
 	sb.vm.blockBuilder.RemoveDecisionTxs(sb.Txs)
-	sb.vm.blockBuilder.RemoveAtomicTxs(sb.Txs)
 	sb.vm.currentBlocks[blkID] = sb
 	parentIntf.addChild(sb)
 	return nil

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 var (
 	fileSuffix = "utils/logging/log.go"
 	filePrefix string
+	timeFormat = "01-02|15:04:05.000"
 )
 
 func init() {
@@ -194,7 +196,7 @@ func (l *Log) log(level Level, format string, args ...interface{}) {
 func (l *Log) format(level Level, format string, args ...interface{}) string {
 	loc := "?"
 	if _, file, no, ok := runtime.Caller(3); ok {
-		localFile := file[len(filePrefix):]
+		localFile := strings.TrimPrefix(file, filePrefix)
 		loc = fmt.Sprintf("%s#%d", localFile, no)
 	}
 	text := fmt.Sprintf("%s: %s", loc, fmt.Sprintf(format, args...))
@@ -206,7 +208,7 @@ func (l *Log) format(level Level, format string, args ...interface{}) string {
 
 	return fmt.Sprintf("%s[%s]%s %s\n",
 		level.AlignedString(),
-		time.Now().Format("01-02|15:04:05"),
+		time.Now().Format(timeFormat),
 		prefix,
 		text)
 }

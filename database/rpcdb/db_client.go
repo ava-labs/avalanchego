@@ -8,9 +8,9 @@ import (
 
 	"golang.org/x/net/context"
 
+	"github.com/ava-labs/avalanchego/api/proto/rpcdbproto"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/nodb"
-	"github.com/ava-labs/avalanchego/database/rpcdb/rpcdbproto"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -34,6 +34,7 @@ var (
 type DatabaseClient struct {
 	client rpcdbproto.DatabaseClient
 
+	closed     utils.AtomicBool
 	batchIndex int64
 }
 
@@ -145,6 +146,7 @@ func (db *DatabaseClient) Compact(start, limit []byte) error {
 
 // Close attempts to close the database
 func (db *DatabaseClient) Close() error {
+	db.closed.SetValue(true)
 	resp, err := db.client.Close(context.Background(), &rpcdbproto.CloseRequest{})
 	if err != nil {
 		return err
@@ -237,7 +239,7 @@ func (b *batch) Reset() {
 	b.size = 0
 }
 
-func (b *batch) Replay(w database.KeyValueWriter) error {
+func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
 	for _, keyvalue := range b.writes {
 		if keyvalue.delete {
 			if err := w.Delete(keyvalue.key); err != nil {
@@ -263,6 +265,11 @@ type iterator struct {
 // Next attempts to move the iterator to the next element and returns if this
 // succeeded
 func (it *iterator) Next() bool {
+	if it.db.closed.GetValue() {
+		it.data = nil
+		it.errs.Add(database.ErrClosed)
+		return false
+	}
 	if len(it.data) > 1 {
 		it.data = it.data[1:]
 		return true

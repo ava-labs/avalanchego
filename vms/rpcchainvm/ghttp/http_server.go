@@ -12,12 +12,12 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
+	"github.com/ava-labs/avalanchego/api/proto/ghttpproto"
+	"github.com/ava-labs/avalanchego/api/proto/greadcloserproto"
+	"github.com/ava-labs/avalanchego/api/proto/gresponsewriterproto"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/ghttpproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greadcloser"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greadcloser/greadcloserproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter/gresponsewriterproto"
 )
 
 var _ ghttpproto.HTTPServer = &Server{}
@@ -63,7 +63,7 @@ func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*ghtt
 	request, err := http.NewRequestWithContext(
 		ctx,
 		req.Request.Method,
-		req.Request.RequestURI,
+		req.Request.RequestUri,
 		reader,
 	)
 	if err != nil {
@@ -110,7 +110,7 @@ func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*ghtt
 	}
 	request.Trailer = make(http.Header)
 	request.RemoteAddr = req.Request.RemoteAddr
-	request.RequestURI = req.Request.RequestURI
+	request.RequestURI = req.Request.RequestUri
 
 	if req.Request.Tls != nil {
 		request.TLS = &tls.ConnectionState{

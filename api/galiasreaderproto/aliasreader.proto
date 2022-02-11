@@ -1,0 +1,21 @@
+syntax = "proto3";
+package galiasreaderproto;
+option go_package = "github.com/ava-labs/avalanchego/api/galiasreaderproto";
+
+message ID {
+    bytes id = 1;
+}
+
+message Alias {
+    string alias = 1;
+}
+
+message AliasList {
+    repeated string aliases = 1;
+}
+
+service AliasReader {
+    rpc Lookup(Alias) returns (ID);
+    rpc PrimaryAlias(ID) returns (Alias);
+    rpc Aliases(ID) returns (AliasList);
+}

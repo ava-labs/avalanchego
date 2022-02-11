@@ -35,9 +35,7 @@ type OutboundMsgBuilder interface {
 
 	Ping() (OutboundMessage, error)
 
-	Pong() (OutboundMessage, error)
-
-	UptimePong(uptimePercentage uint8) (OutboundMessage, error)
+	Pong(uptimePercentage uint8) (OutboundMessage, error)
 
 	GetAcceptedFrontier(
 		chainID ids.ID,
@@ -71,7 +69,7 @@ type OutboundMsgBuilder interface {
 		containerID ids.ID,
 	) (OutboundMessage, error)
 
-	MultiPut(
+	Ancestors(
 		chainID ids.ID,
 		requestID uint32,
 		containers [][]byte,
@@ -208,21 +206,13 @@ func (b *outMsgBuilder) Ping() (OutboundMessage, error) {
 	)
 }
 
-func (b *outMsgBuilder) Pong() (OutboundMessage, error) {
+func (b *outMsgBuilder) Pong(uptimePercentage uint8) (OutboundMessage, error) {
 	return b.c.Pack(
 		Pong,
-		nil,
-		Pong.Compressable(), // Pong messages can't be compressed
-	)
-}
-
-func (b *outMsgBuilder) UptimePong(uptimePercentage uint8) (OutboundMessage, error) {
-	return b.c.Pack(
-		UptimePong,
 		map[Field]interface{}{
 			Uptime: uptimePercentage,
 		},
-		UptimePong.Compressable(), // UptimePong messages can't be compressed
+		Pong.Compressable(), // Pong messages can't be compressed
 	)
 }
 
@@ -325,19 +315,19 @@ func (b *outMsgBuilder) GetAncestors(
 	)
 }
 
-func (b *outMsgBuilder) MultiPut(
+func (b *outMsgBuilder) Ancestors(
 	chainID ids.ID,
 	requestID uint32,
 	containers [][]byte,
 ) (OutboundMessage, error) {
 	return b.c.Pack(
-		MultiPut,
+		Ancestors,
 		map[Field]interface{}{
 			ChainID:             chainID[:],
 			RequestID:           requestID,
 			MultiContainerBytes: containers,
 		},
-		b.compress && MultiPut.Compressable(), // MultiPut messages may be compressed
+		b.compress && Ancestors.Compressable(), // Ancestors messages may be compressed
 	)
 }
 

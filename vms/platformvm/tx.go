@@ -54,7 +54,7 @@ type UnsignedDecisionTx interface {
 	// Execute this transaction with the provided state.
 	Execute(vm *VM, vs VersionedState, stx *Tx) (
 		onAcceptFunc func() error,
-		err TxError,
+		err error,
 	)
 
 	// To maintain consistency with the Atomic txs
@@ -72,9 +72,7 @@ type UnsignedProposalTx interface {
 	Execute(vm *VM, state MutableState, stx *Tx) (
 		onCommitState VersionedState,
 		onAbortState VersionedState,
-		onCommitFunc func() error,
-		onAbortFunc func() error,
-		err TxError,
+		err error,
 	)
 	InitiallyPrefersCommit(vm *VM) bool
 }
@@ -84,7 +82,7 @@ type UnsignedAtomicTx interface {
 	UnsignedDecisionTx
 
 	// Execute this transaction with the provided state.
-	AtomicExecute(vm *VM, parentState MutableState, stx *Tx) (VersionedState, TxError)
+	AtomicExecute(vm *VM, parentState MutableState, stx *Tx) (VersionedState, error)
 
 	// Accept this transaction with the additionally provided state transitions.
 	AtomicAccept(ctx *snow.Context, batch database.Batch) error

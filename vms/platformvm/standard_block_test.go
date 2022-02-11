@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/stretchr/testify/assert"
 )
@@ -80,7 +81,7 @@ func TestAtomicTxImports(t *testing.T) {
 	}
 	vm.internalState.SetTimestamp(vm.ApricotPhase5Time.Add(100 * time.Second))
 
-	vm.mempool.AddAtomicTx(tx)
+	vm.mempool.AddDecisionTx(tx)
 	b, err := vm.BuildBlock()
 	assert.NoError(err)
 	// Test multiple verify calls work
@@ -88,10 +89,10 @@ func TestAtomicTxImports(t *testing.T) {
 	assert.NoError(err)
 	err = b.Accept()
 	assert.NoError(err)
-	_, status, err := vm.internalState.GetTx(tx.ID())
+	_, txStatus, err := vm.internalState.GetTx(tx.ID())
 	assert.NoError(err)
 	// Ensure transaction is in the committed state
-	assert.Equal(status, Committed)
+	assert.Equal(txStatus, status.Committed)
 	// Ensure standard block contains one atomic transaction
 	assert.Equal(b.(*StandardBlock).inputs.Len(), 1)
 }
