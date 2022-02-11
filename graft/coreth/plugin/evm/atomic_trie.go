@@ -67,16 +67,24 @@ type AtomicTrie interface {
 	// to sharedMemory, for heights less than or equal to [lastAcceptedBlock].
 	// This function is called by the statesync.Syncer to execute operations into shared memory
 	// once the atomic trie is synced. Syncer scenarios:
-	// - sync from genesis: fromBlock is 0, lastAcceptedBlock is state sync block
-	// - fast-forward state sync: fromBlock is last accepted+1, lastAcceptedBlock is state sync block
+	// - sync from genesis: lastAcceptedBlock is state sync block, cursor is at 0.
+	// - fast-forward state sync: cursor is last accepted+1, lastAcceptedBlock is state sync block
 	// If interrupted the resume logic is as follows:
-	// - if persisted cursor position is ahead of the fromBlock, then apply to shared memory continues
-	//   from the cursor position
-	// - if persisted cursor position is behind fromBlock, apply to shared memory resets cursor position
-	//   to the fromBlock
-	// Does nothing if fromBlock is ahead of lastCommittedHeight
+	// - if cursor is set, apply to shared memory continues from the cursor position either in
+	//   Initialize() or ApplyToSharedMemory
+	// - if cursor is not set, call is skipped
 	// Cursor is deleted after a full run from fromBlock to lastAcceptedBlock
-	ApplyToSharedMemory(fromBlock uint64, lastAcceptedBlock uint64) error
+	ApplyToSharedMemory(lastAcceptedBlock uint64) error
+
+	// MarkApplyToSharedMemoryCursor marks the atomic trie as containing atomic ops
+	// that must be applied to shared memory (on initialize or ApplyToSharedMemory).
+	// Assumes heights less than or equal to [height] must already be applied to shared memory.
+	// This function is called by statesync.Syncer to set the height of blocks containing
+	// atomic transactions executed into shared memory. When subsequently ApplyToSharedMemory
+	// is called with lastAcceptedBlock parameter it will execute from this height to
+	// the lastAcceptedBlock. This serves as a dirty marker that is removed once all atomic
+	// operations have been executed.
+	MarkApplyToSharedMemoryCursor(height uint64) error
 }
 
 // AtomicTrieIterator is a stateful iterator that iterates the leafs of an AtomicTrie
@@ -173,15 +181,13 @@ func newAtomicTrie(
 		log:                  log.New("c", "atomicTrie"),
 		sharedMemory:         sharedMemory,
 	}
-	/*
-		// TODO: do we even need this?
-		// ApplyToSharedMemory is called here in case the node was shut down after state sync
-		// in the middle of applying atomic ops to shared memory, to finish that operation.
-		// In normal operations, the atomicTrie will not contain operations for heights greater
-		// than lastAcceptedHeight and this call will be a noop.
-		if err := atomicTrie.ApplyToSharedMemory(0, lastAcceptedHeight); err != nil {
-			return nil, err
-		}*/
+	// ApplyToSharedMemory is called here in case the node was shut down after state sync
+	// in the middle of applying atomic ops to shared memory, to finish that operation.
+	// In normal operations, the atomicTrie will not contain operations for heights greater
+	// than lastAcceptedHeight and this call will be a noop.
+	if err := atomicTrie.ApplyToSharedMemory(lastAcceptedHeight); err != nil {
+		return nil, err
+	}
 	return atomicTrie, atomicTrie.initialize(lastAcceptedHeight)
 }
 
@@ -484,24 +490,15 @@ func (a *atomicTrie) Root(height uint64) (common.Hash, error) {
 
 // ApplyToSharedMemory iterates over atomic ops indexed in the trie from lastCommittedHash
 // and applies them to sharedMemory, for heights starting startingHeight to endingHeight.
-func (a *atomicTrie) ApplyToSharedMemory(startingHeight, endingHeight uint64) error {
+func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 	sharedMemoryCursor, err := a.metadataDB.Get(appliedSharedMemoryCursorKey)
-	switch {
-	case err == database.ErrNotFound:
-		sharedMemoryCursor = make([]byte, wrappers.LongLen+common.HashLength)
-		binary.BigEndian.PutUint64(sharedMemoryCursor, startingHeight)
-	case err != nil:
+	if err == database.ErrNotFound {
+		return nil
+	} else if err != nil {
 		return err
 	}
 
-	if cursorHeight := binary.BigEndian.Uint64(sharedMemoryCursor[:wrappers.LongLen]); cursorHeight < startingHeight {
-		// we're processing from a newer height
-		log.Info("updating shared memory cursor", "cursorHeight", cursorHeight, "startingHeight", startingHeight)
-		sharedMemoryCursor = make([]byte, wrappers.LongLen+common.HashLength)
-		binary.BigEndian.PutUint64(sharedMemoryCursor, startingHeight)
-	}
-
-	log.Info("applying atomic operations to shared memory", "root", a.lastCommittedHash, "startHeight", binary.BigEndian.Uint64(sharedMemoryCursor[:wrappers.LongLen]), "endingHeight", endingHeight)
+	log.Info("applying atomic operations to shared memory", "root", a.lastCommittedHash, "lastAcceptedBlock", lastAcceptedBlock, "startHeight", binary.BigEndian.Uint64(sharedMemoryCursor[:wrappers.LongLen]))
 
 	it, err := a.Iterator(a.lastCommittedHash, sharedMemoryCursor)
 	if err != nil {
@@ -523,7 +520,7 @@ func (a *atomicTrie) ApplyToSharedMemory(startingHeight, endingHeight uint64) er
 		height := it.BlockNumber()
 		atomicOps := it.AtomicOps()
 
-		if height > endingHeight {
+		if height > lastAcceptedBlock {
 			break
 		}
 
@@ -555,4 +552,11 @@ func (a *atomicTrie) ApplyToSharedMemory(startingHeight, endingHeight uint64) er
 		return err
 	}
 	return a.db.Commit()
+}
+
+// MarkApplyToSharedMemoryCursor sets given height as the height of executed
+// blocks containing atomic transactions
+func (a *atomicTrie) MarkApplyToSharedMemoryCursor(height uint64) error {
+	// store the height of the last applied block + 1 so iteration begins there
+	return database.PutUInt64(a.metadataDB, appliedSharedMemoryCursorKey, height+1)
 }
