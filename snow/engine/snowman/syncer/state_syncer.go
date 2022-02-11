@@ -6,6 +6,7 @@ package syncer
 import (
 	"fmt"
 	"math/rand"
+	"sort"
 	"time"
 
 	stdmath "math"
@@ -26,6 +27,33 @@ const (
 )
 
 var _ common.StateSyncer = &stateSyncer{}
+
+// summary content as received from network, along cumulated weight.
+type weightedSummary struct {
+	common.Summary
+	weight uint64
+}
+
+// We want to order summaries passed to VM by weight,
+// as a proxy of summary data availability
+type summaryWeightedList []weightedSummary
+
+func (swl summaryWeightedList) Len() int           { return len(swl) }
+func (swl summaryWeightedList) Less(i, j int) bool { return swl[i].weight < swl[j].weight }
+func (swl summaryWeightedList) Swap(i, j int)      { swl[i], swl[j] = swl[j], swl[i] }
+func (swl summaryWeightedList) FilterAbove(minWeight uint64) []common.Summary {
+	res := make([]common.Summary, 0, len(swl))
+	for _, s := range swl {
+		if s.weight < minWeight {
+			continue
+		}
+		res = append(res, common.Summary{
+			Key:     s.Key,
+			Content: s.Content,
+		})
+	}
+	return res
+}
 
 type stateSyncer struct {
 	Config
@@ -67,12 +95,8 @@ type stateSyncer struct {
 	pendingReceiveAcceptedStateSummaries ids.ShortSet
 	// IDs of validators that failed to respond with their filtered accepted state summaries
 	failedAcceptedStateSummaries ids.ShortSet
-	// IDs of all the returned accepted frontiers
-	acceptedFrontierSet map[string][]byte
-	// IDs of the returned accepted containers and the stake weight that has
-	// marked them as accepted
-	acceptedVotes map[string]uint64
-	acceptedKeys  [][]byte
+
+	weightedSummaries map[string]weightedSummary // key --> (summary, weight)
 
 	// number of times the state sync has been attempted
 	attempts int
@@ -113,7 +137,34 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 
 	// Mark that we received a response from [validatorID]
 	ss.pendingReceiveStateSummaryFrontier.Remove(validatorID)
-	ss.acceptedFrontierSet[string(key)] = summary
+	ws, exists := ss.weightedSummaries[string(key)]
+	if !exists {
+		ss.weightedSummaries[string(key)] = weightedSummary{
+			Summary: common.Summary{
+				Key:     key,
+				Content: summary,
+			},
+		}
+	}
+
+	if len(ss.StateSyncTestingBeacons) != 0 {
+		// if state sync beacons are specified, immediately count
+		// their frontier as voted by them, as no network wide vote
+		// will be held
+		weight := uint64(0)
+		if w, ok := ss.Beacons.GetWeight(validatorID); ok {
+			weight = w
+		}
+
+		previousWeight := ws.weight
+		newWeight, err := math.Add64(weight, previousWeight)
+		if err != nil {
+			ss.Ctx.Log.Error("Error calculating the Accepted votes - weight: %v, previousWeight: %v", weight, previousWeight)
+			newWeight = stdmath.MaxUint64
+		}
+		ws.weight = newWeight
+		ss.weightedSummaries[string(key)] = ws
+	}
 
 	if err := ss.sendGetStateSummaryFrontiers(); err != nil {
 		return err
@@ -125,14 +176,15 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 	}
 
 	if len(ss.StateSyncTestingBeacons) != 0 {
-		// received what we needed. Just pass to VM
-		accepted := make([]common.Summary, 0, len(ss.acceptedFrontierSet))
-		for k, v := range ss.acceptedFrontierSet {
-			accepted = append(accepted, common.Summary{
-				Key:     []byte(k),
-				Content: v,
-			})
+		// received what we needed. Just pass to VM, ordered by decreasing weight
+		summaries := make(summaryWeightedList, 0, len(ss.weightedSummaries))
+		for _, ws := range ss.weightedSummaries {
+			summaries = append(summaries, ws)
 		}
+		sort.Sort(sort.Reverse(summaries))
+		// if state sync beacons are specified, we keep any summary frontier
+		// a beacon has sent. No filtering out of low votes summaries.
+		accepted := summaries.FilterAbove(0)
 
 		ss.Ctx.Log.Info("Received (%d) state summaries frontiers from all listed nodes. Starting state sync skipping voting rounds.", len(accepted))
 		return ss.stateSyncVM.StateSync(accepted)
@@ -168,12 +220,6 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 	}
 
 	ss.requestID++
-	acceptedFrontierList := make([][]byte, 0)
-	for _, acceptedFrontier := range ss.acceptedFrontierSet {
-		acceptedFrontierList = append(acceptedFrontierList, acceptedFrontier)
-	}
-	ss.acceptedKeys = acceptedFrontierList
-
 	return ss.sendGetAccepted()
 }
 
@@ -214,13 +260,15 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 	}
 
 	for _, key := range keys {
-		previousWeight := ss.acceptedVotes[string(key)]
+		ws := ss.weightedSummaries[string(key)]
+		previousWeight := ws.weight
 		newWeight, err := math.Add64(weight, previousWeight)
 		if err != nil {
 			ss.Ctx.Log.Error("Error calculating the Accepted votes - weight: %v, previousWeight: %v", weight, previousWeight)
 			newWeight = stdmath.MaxUint64
 		}
-		ss.acceptedVotes[string(key)] = newWeight
+		ws.weight = newWeight
+		ss.weightedSummaries[string(key)] = ws
 	}
 
 	if err := ss.sendGetAccepted(); err != nil {
@@ -234,15 +282,12 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 
 	// We've received the filtered accepted frontier from every state sync validator
 	// Accept all containers that have a sufficient weight behind them
-	accepted := make([]common.Summary, 0, len(ss.acceptedVotes))
-	for key, weight := range ss.acceptedVotes {
-		if weight >= ss.Alpha {
-			accepted = append(accepted, common.Summary{
-				Key:     []byte(key),
-				Content: ss.acceptedFrontierSet[key],
-			})
-		}
+	summaries := make(summaryWeightedList, len(ss.weightedSummaries))
+	for _, ws := range ss.weightedSummaries {
+		summaries = append(summaries, ws)
 	}
+	sort.Sort(sort.Reverse(summaries))
+	accepted := summaries.FilterAbove(ss.Alpha)
 
 	// if we don't have enough weight for the state summary to be accepted then retry or fail the state sync
 	size := len(accepted)
@@ -312,15 +357,15 @@ func (ss *stateSyncer) startup() error {
 	ss.started = true
 
 	// clear up messages tracker
+	ss.weightedSummaries = make(map[string]weightedSummary)
+
 	ss.pendingSendStateSummaryFrontier.Clear()
 	ss.pendingReceiveStateSummaryFrontier.Clear()
 	ss.failedStateSummaryFrontier.Clear()
-	ss.acceptedFrontierSet = make(map[string][]byte)
 
 	ss.pendingSendAcceptedStateSummaries.Clear()
 	ss.pendingReceiveAcceptedStateSummaries.Clear()
 	ss.failedAcceptedStateSummaries.Clear()
-	ss.acceptedVotes = make(map[string]uint64)
 
 	// set beacons
 	if len(ss.StateSyncTestingBeacons) != 0 {
@@ -414,7 +459,12 @@ func (ss *stateSyncer) sendGetAccepted() error {
 	if vdrs.Len() > 0 {
 		ss.Ctx.Log.Debug("sent %d more GetAcceptedStateSummary messages with %d more to send",
 			vdrs.Len(), ss.pendingSendAcceptedStateSummaries)
-		ss.Sender.SendGetAcceptedStateSummary(vdrs, ss.requestID, ss.acceptedKeys)
+
+		acceptedKeys := make([][]byte, len(ss.weightedSummaries))
+		for k := range ss.weightedSummaries {
+			acceptedKeys = append(acceptedKeys, []byte(k))
+		}
+		ss.Sender.SendGetAcceptedStateSummary(vdrs, ss.requestID, acceptedKeys)
 	}
 	return nil
 }
