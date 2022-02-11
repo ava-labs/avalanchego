@@ -508,7 +508,7 @@ func TestApplyToSharedMemory(t *testing.T) {
 			assert.NoError(t, db.Commit())
 			assert.NoError(t, atomicTrie.ApplyToSharedMemory(test.lastAcceptedHeight))
 
-			// check if ops were applied or not
+			// assert ops were applied as expected
 			for height, ops := range operationsMap {
 				if test.expectOpsApplied(height) {
 					sharedMemories.assertOpsApplied(t, ops)
