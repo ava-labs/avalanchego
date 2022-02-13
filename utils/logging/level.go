@@ -6,6 +6,7 @@ package logging
 import (
 	"encoding/json"
 	"fmt"
+	"log/syslog"
 	"strings"
 )
 
@@ -80,6 +81,28 @@ func (l Level) Color() Color {
 		return LightGreen
 	default:
 		return Reset
+	}
+}
+
+// Map level to a Syslog severity
+func (l Level) Severity() syslog.Priority {
+	// Level <-> Syslog Severity isn't a one-to-one mapping
+	// LOG_ALERT is another candidate for Fatal
+	// LOG_NOTICE has no corresponding Level
+	// Trace & Verbo don't have corresponding severities
+	switch l {
+	case Fatal:
+		return syslog.LOG_CRIT
+	case Error:
+		return syslog.LOG_ERR
+	case Warn:
+		return syslog.LOG_WARNING
+	case Info:
+		return syslog.LOG_INFO
+	case Trace, Debug, Verbo:
+		return syslog.LOG_DEBUG
+	default:
+		return syslog.LOG_INFO
 	}
 }
 

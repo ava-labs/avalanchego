@@ -172,7 +172,10 @@ func (l *Log) log(level Level, format string, args ...interface{}) {
 
 	args = SanitizeArgs(args)
 
-	output := l.format(level, format, args...)
+	prefix := l.config.MsgPrefix
+	loc := l.location()
+	msg := fmt.Sprintf(format, args...)
+	output := l.formatContext(level, prefix, loc, msg)
 
 	if shouldLog {
 		l.flushLock.Lock()
@@ -183,35 +186,47 @@ func (l *Log) log(level Level, format string, args ...interface{}) {
 	}
 
 	if shouldDisplay {
-		switch {
-		case l.config.DisableContextualDisplaying:
-			fmt.Println(fmt.Sprintf(format, args...))
-		case l.config.DisplayHighlight == Plain:
-			fmt.Print(output)
+		switch l.config.DisplayHighlight {
+		case Plain:
+			if l.config.DisableContextualDisplaying {
+				fmt.Println(msg)
+			} else {
+				fmt.Print(output)
+			}
+		case Syslog:
+			fmt.Print(l.formatSyslog(level, prefix, loc, msg))
 		default:
 			fmt.Print(level.Color().Wrap(output))
 		}
 	}
 }
 
-func (l *Log) format(level Level, format string, args ...interface{}) string {
+func (l *Log) location() string {
 	loc := "?"
 	if _, file, no, ok := runtime.Caller(3); ok {
 		localFile := strings.TrimPrefix(file, filePrefix)
 		loc = fmt.Sprintf("%s#%d", localFile, no)
 	}
-	text := fmt.Sprintf("%s: %s", loc, fmt.Sprintf(format, args...))
+	return loc
+}
 
-	prefix := ""
-	if l.config.MsgPrefix != "" {
-		prefix = fmt.Sprintf(" <%s>", l.config.MsgPrefix)
+func (l *Log) formatContext(level Level, prefix string, loc string, msg string) string {
+	logLevel := level.AlignedString()
+	logTime := time.Now().Format(timeFormat)
+	if prefix != "" {
+		return fmt.Sprintf("%s[%s] <%s> %s: %s\n", logLevel, logTime, prefix, loc, msg)
+	} else {
+		return fmt.Sprintf("%s[%s] %s: %s\n", logLevel, logTime, loc, msg)
 	}
+}
 
-	return fmt.Sprintf("%s[%s]%s %s\n",
-		level.AlignedString(),
-		time.Now().Format(timeFormat),
-		prefix,
-		text)
+func (l *Log) formatSyslog(level Level, prefix string, loc string, msg string) string {
+	severity := level.Severity()
+	if prefix != "" {
+		return fmt.Sprintf("<%d><%s> %s: %s\n", severity, prefix, loc, msg)
+	} else {
+		return fmt.Sprintf("<%d>%s: %s\n", severity, loc, msg)
+	}
 }
 
 func (l *Log) Fatal(format string, args ...interface{}) { l.log(Fatal, format, args...) }

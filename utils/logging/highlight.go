@@ -15,6 +15,7 @@ import (
 const (
 	Plain Highlight = iota
 	Colors
+	Syslog
 )
 
 var errUnknownHighlight = errors.New("unknown highlight")
@@ -29,7 +30,12 @@ func ToHighlight(h string, fd uintptr) (Highlight, error) {
 		return Plain, nil
 	case "COLORS":
 		return Colors, nil
+	case "SYSLOG":
+		return Syslog, nil
 	case "AUTO":
+		if isJournal, _ := IsJournal(int(fd)); isJournal {
+			return Syslog, nil
+		}
 		if !terminal.IsTerminal(int(fd)) {
 			return Plain, nil
 		}
@@ -45,6 +51,8 @@ func (h *Highlight) MarshalJSON() ([]byte, error) {
 		return []byte("\"PLAIN\""), nil
 	case Colors:
 		return []byte("\"COLORS\""), nil
+	case Syslog:
+		return []byte("\"SYSLOG\""), nil
 	default:
 		return nil, errUnknownHighlight
 	}

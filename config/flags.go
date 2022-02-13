@@ -104,7 +104,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(LogsDirKey, "", "Logging directory for Avalanche")
 	fs.String(LogLevelKey, "info", "The log level. Should be one of {verbo, debug, trace, info, warn, error, fatal, off}")
 	fs.String(LogDisplayLevelKey, "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, info, warn, error, fatal, off}")
-	fs.String(LogDisplayHighlightKey, "auto", "Whether to color/highlight display logs. Default highlights when the output is a terminal. Otherwise, should be one of {auto, plain, colors}")
+	fs.String(LogDisplayHighlightKey, "auto", "How to format displayed logs. Default applies color when the output is a terminal, syslog when it is the systemd journal. Otherwise, should be one of {auto, colors, plain, syslog}")
 
 	// Assertions
 	fs.Bool(AssertionsEnabledKey, true, "Turn on assertion execution")
