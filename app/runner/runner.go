@@ -9,6 +9,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
+	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/ava-labs/avalanchego/app"
 	"github.com/ava-labs/avalanchego/app/process"
@@ -36,7 +37,9 @@ func Run(config Config, nodeConfig node.Config) {
 		return
 	}
 
-	fmt.Println(process.Header)
+	if terminal.IsTerminal(int(os.Stdout.Fd())) {
+		fmt.Println(process.Header)
+	}
 
 	exitCode := app.Run(nodeApp)
 	os.Exit(exitCode)
