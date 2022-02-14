@@ -90,6 +90,9 @@ func (i *issuer) Update() {
 	// Issue a poll for this vertex.
 	p := i.t.Consensus.Parameters()
 	vdrs, err := i.t.Validators.Sample(p.K) // Validators to sample
+	if err != nil {
+		i.t.Ctx.Log.Error("Query for %s was dropped due to an insufficient number of validators", vtxID)
+	}
 
 	vdrBag := ids.ShortBag{} // Validators to sample repr. as a set
 	for _, vdr := range vdrs {
@@ -103,8 +106,6 @@ func (i *issuer) Update() {
 	i.t.RequestID++
 	if err == nil && i.t.polls.Add(i.t.RequestID, vdrBag) {
 		i.t.Sender.SendPushQuery(vdrSet, i.t.RequestID, vtxID, i.vtx.Bytes())
-	} else if err != nil {
-		i.t.Ctx.Log.Error("Query for %s was dropped due to an insufficient number of validators", vtxID)
 	}
 
 	// Notify vertices waiting on this one that it (and its transactions) have been issued.
