@@ -148,8 +148,7 @@ func (sb *slimBlock) processPercentiles(percentiles []float64) processedFees {
 }
 
 // resolveBlockRange resolves the specified block range to absolute block numbers while also
-// enforcing backend specific limitations. The pending block and corresponding receipts are
-// also returned if requested and available.
+// enforcing backend specific limitations.
 // Note: an error is only returned if retrieving the head header has failed. If there are no
 // retrievable blocks in the specified range then zero block count is returned with no error.
 func (oracle *Oracle) resolveBlockRange(ctx context.Context, lastBlock rpc.BlockNumber, blocks int) (uint64, int, error) {
