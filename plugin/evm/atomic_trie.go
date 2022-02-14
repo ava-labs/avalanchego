@@ -24,10 +24,9 @@ import (
 )
 
 const (
-	trieCommitSizeCap         = 10 * units.MiB
-	sharedMemoryCommitSizeCap = 10 * units.MiB
-	commitHeightInterval      = uint64(4096)
-	progressLogUpdate         = 30 * time.Second
+	trieCommitSizeCap    = 10 * units.MiB
+	commitHeightInterval = uint64(4096)
+	progressLogUpdate    = 30 * time.Second
 )
 
 var (
@@ -536,25 +535,7 @@ func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 		it.Next()
 	}
 
-	// create a CommitBatch. Any write operations to this batch
-	// will write to the underlying database
-	batch, err := a.db.CommitBatch()
-	if err != nil {
-		return err
-	}
 	for it.Next() {
-		// write the batch if we're over the size cap
-		if size := batch.Size(); size > sharedMemoryCommitSizeCap {
-			if err = batch.Write(); err != nil {
-				return err
-			}
-
-			batch, err = a.db.CommitBatch()
-			if err != nil {
-				return err
-			}
-		}
-
 		height := it.BlockNumber()
 		atomicOps := it.AtomicOps()
 
@@ -573,21 +554,20 @@ func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 		if err = a.metadataDB.Put(appliedSharedMemoryCursorKey, it.Key()); err != nil {
 			return err
 		}
-
+		batch, err := a.db.CommitBatch()
+		if err != nil {
+			return err
+		}
 		// calling [sharedMemory.Apply] updates the last applied pointer atomically with the shared memory operation.
+		// TODO: batch the application of atomic ops so we commit to the DB less frequently
 		if err = a.sharedMemory.Apply(map[ids.ID]*atomic.Requests{it.BlockchainID(): atomicOps}, batch); err != nil {
 			return err
 		}
 	}
 
-	if err = batch.Write(); err != nil {
+	if err := it.Error(); err != nil {
 		return err
 	}
-
-	if err = it.Error(); err != nil {
-		return err
-	}
-
 	log.Info("finished applying atomic operations", "puts", putRequests, "removes", removeRequests)
 	if err = a.metadataDB.Delete(appliedSharedMemoryCursorKey); err != nil {
 		return err
