@@ -41,7 +41,7 @@ By default, all fees are burned (sent to the blackhole address). However, it is
 possible to enable block producers to set a fee recipient (get compensated for
 blocks they produce).
 
-To enabke this feature, you'll need to add the following to your
+To enable this feature, you'll need to add the following to your
 genesis file (under the `"config"` key):
 ```json
 {
