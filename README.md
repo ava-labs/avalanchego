@@ -42,14 +42,16 @@ possible to enable block producers to set a fee recipient (get compensated for
 blocks they produce).
 
 To enabke this feature, you'll need to add the following to your
-genesis file:
+genesis file (under the `"config"` key):
 ```json
 {
-  "allowFeeRecipients":true
+  "config": {
+    "allowFeeRecipients":true
+  }
 }
 ```
 
-Next, you'll need to update your VM config with the following:
+Next, you'll need to update your [chain config](https://docs.avax.network/build/references/command-line-interface/#chain-configs) with the following:
 ```json
 {
   "feeRecipient":"<YOU 0x-ADDRESS>"
