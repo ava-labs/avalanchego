@@ -59,8 +59,8 @@ var (
 	password        = "CjasdjhiPeirbSenfeI13" // #nosec G101
 	// Use chainId: 43111, so that it does not overlap with any Avalanche ChainIDs, which may have their
 	// config overridden in vm.Initialize.
-	genesisJSONMuirGlacier = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x5f5e100\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0100000000000000000000000000000000000000\":{\"code\":\"0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033\",\"balance\":\"0x0\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
-	genesisJSONSubnetEVM   = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0,\"subnetEVMTimestamp\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x5f5e100\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0100000000000000000000000000000000000000\":{\"code\":\"0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033\",\"balance\":\"0x0\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
+	genesisJSONMuirGlacier = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x5f5e100\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0100000000000000000000000000000000000000\":{\"code\":\"0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033\",\"balance\":\"0x0\"}, \"0x71562b71999873DB5b286dF957af199Ec94617F7\": {\"balance\":\"0x4192927743b88000\"}, \"0x703c4b2bD70c169f5717101CaeE543299Fc946C7\": {\"balance\":\"0x4192927743b88000\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
+	genesisJSONSubnetEVM   = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0,\"subnetEVMTimestamp\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x5f5e100\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0100000000000000000000000000000000000000\":{\"code\":\"0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033\",\"balance\":\"0x0\"}, \"0x71562b71999873DB5b286dF957af199Ec94617F7\": {\"balance\":\"0x4192927743b88000\"}, \"0x703c4b2bD70c169f5717101CaeE543299Fc946C7\": {\"balance\":\"0x4192927743b88000\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
 	firstTxAmount          *big.Int
 	genesisBalance         *big.Int
 )
@@ -77,22 +77,6 @@ func init() {
 	maxBlockTime = time.Millisecond
 	firstTxAmount = new(big.Int).Mul(big.NewInt(testMinGasPrice), big.NewInt(21000*100))
 	genesisBalance = new(big.Int).Mul(big.NewInt(testMinGasPrice), big.NewInt(21000*1000))
-}
-
-func fundGenesis(genesisJSON string) (string, error) {
-	genesis := &core.Genesis{}
-	if err := json.Unmarshal([]byte(genesisJSON), genesis); err != nil {
-		return "", fmt.Errorf("Problem unmarshaling genesis JSON: %s", err)
-	}
-
-	// add test allocs
-	genesis.Alloc = core.GenesisAlloc{
-		testEthAddrs[0]: core.GenesisAccount{Balance: genesisBalance},
-		testEthAddrs[1]: core.GenesisAccount{Balance: genesisBalance},
-	}
-
-	bytes, err := json.Marshal(genesis)
-	return string(bytes), err
 }
 
 // BuildGenesisTest returns the genesis bytes for Subnet EVM VM to be used in testing
@@ -335,9 +319,7 @@ func TestVMUpgrades(t *testing.T) {
 
 func TestBuildEthTxBlock(t *testing.T) {
 	// reduce block gas cost
-	genesisString, err := fundGenesis(genesisJSONSubnetEVM)
-	assert.NoError(t, err)
-	issuer, vm, dbManager, _ := GenesisVM(t, true, genesisString, "{\"pruning-enabled\":true}", "")
+	issuer, vm, dbManager, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "{\"pruning-enabled\":true}", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -476,7 +458,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 	}
 
 	restartedVM := &VM{}
-	genesisBytes := buildGenesisTest(t, genesisString)
+	genesisBytes := buildGenesisTest(t, genesisJSONSubnetEVM)
 
 	if err := restartedVM.Initialize(
 		NewContext(),
@@ -515,10 +497,8 @@ func TestBuildEthTxBlock(t *testing.T) {
 func TestSetPreferenceRace(t *testing.T) {
 	// Create two VMs which will agree on block A and then
 	// build the two distinct preferred chains above
-	genesisString, err := fundGenesis(genesisJSONMuirGlacier)
-	assert.NoError(t, err)
-	issuer1, vm1, _, _ := GenesisVM(t, true, genesisString, "{\"pruning-enabled\":true}", "")
-	issuer2, vm2, _, _ := GenesisVM(t, true, genesisString, "{\"pruning-enabled\":true}", "")
+	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "{\"pruning-enabled\":true}", "")
+	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "{\"pruning-enabled\":true}", "")
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
@@ -772,10 +752,8 @@ func TestSetPreferenceRace(t *testing.T) {
 // accept block C, which should be an orphaned block at this point and
 // get rejected.
 func TestReorgProtection(t *testing.T) {
-	genesisString, err := fundGenesis(genesisJSONMuirGlacier)
-	assert.NoError(t, err)
-	issuer1, vm1, _, _ := GenesisVM(t, true, genesisString, "{\"pruning-enabled\":false}", "")
-	issuer2, vm2, _, _ := GenesisVM(t, true, genesisString, "{\"pruning-enabled\":false}", "")
+	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "{\"pruning-enabled\":false}", "")
+	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "{\"pruning-enabled\":false}", "")
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
@@ -956,10 +934,8 @@ func TestReorgProtection(t *testing.T) {
 //  / \
 // B   C
 func TestNonCanonicalAccept(t *testing.T) {
-	genesisString, err := fundGenesis(genesisJSONMuirGlacier)
-	assert.NoError(t, err)
-	issuer1, vm1, _, _ := GenesisVM(t, true, genesisString, "", "")
-	issuer2, vm2, _, _ := GenesisVM(t, true, genesisString, "", "")
+	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
+	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
@@ -1133,10 +1109,8 @@ func TestNonCanonicalAccept(t *testing.T) {
 //     |
 //     D
 func TestStickyPreference(t *testing.T) {
-	genesisString, err := fundGenesis(genesisJSONMuirGlacier)
-	assert.NoError(t, err)
-	issuer1, vm1, _, _ := GenesisVM(t, true, genesisString, "", "")
-	issuer2, vm2, _, _ := GenesisVM(t, true, genesisString, "", "")
+	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
+	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
@@ -1409,10 +1383,8 @@ func TestStickyPreference(t *testing.T) {
 //     |
 //     D
 func TestUncleBlock(t *testing.T) {
-	genesisString, err := fundGenesis(genesisJSONMuirGlacier)
-	assert.NoError(t, err)
-	issuer1, vm1, _, _ := GenesisVM(t, true, genesisString, "", "")
-	issuer2, vm2, _, _ := GenesisVM(t, true, genesisString, "", "")
+	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
+	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
@@ -1608,9 +1580,7 @@ func TestUncleBlock(t *testing.T) {
 // Regression test to ensure that a VM that is not able to parse a block that
 // contains no transactions.
 func TestEmptyBlock(t *testing.T) {
-	genesisString, err := fundGenesis(genesisJSONMuirGlacier)
-	assert.NoError(t, err)
-	issuer, vm, _, _ := GenesisVM(t, true, genesisString, "", "")
+	issuer, vm, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1676,10 +1646,8 @@ func TestEmptyBlock(t *testing.T) {
 //     |
 //     D
 func TestAcceptReorg(t *testing.T) {
-	genesisString, err := fundGenesis(genesisJSONMuirGlacier)
-	assert.NoError(t, err)
-	issuer1, vm1, _, _ := GenesisVM(t, true, genesisString, "", "")
-	issuer2, vm2, _, _ := GenesisVM(t, true, genesisString, "", "")
+	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
+	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
@@ -1890,9 +1858,7 @@ func TestAcceptReorg(t *testing.T) {
 }
 
 func TestFutureBlock(t *testing.T) {
-	genesisString, err := fundGenesis(genesisJSONMuirGlacier)
-	assert.NoError(t, err)
-	issuer, vm, _, _ := GenesisVM(t, true, genesisString, "", "")
+	issuer, vm, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1955,9 +1921,7 @@ func TestFutureBlock(t *testing.T) {
 }
 
 func TestLastAcceptedBlockNumberAllow(t *testing.T) {
-	genesisString, err := fundGenesis(genesisJSONMuirGlacier)
-	assert.NoError(t, err)
-	issuer, vm, _, _ := GenesisVM(t, true, genesisString, "", "")
+	issuer, vm, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -2101,9 +2065,7 @@ func TestConfigureLogLevel(t *testing.T) {
 // Regression test to ensure we can build blocks if we are starting with the
 // Subnet EVM ruleset in genesis.
 func TestBuildSubnetEVMBlock(t *testing.T) {
-	genesisString, err := fundGenesis(genesisJSONSubnetEVM)
-	assert.NoError(t, err)
-	issuer, vm, _, _ := GenesisVM(t, true, genesisString, "", "")
+	issuer, vm, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {

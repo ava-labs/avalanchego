@@ -21,12 +21,11 @@ import (
 type buildingBlkStatus uint8
 
 var (
-	// Subnet EVM Params
+	// Pre-Subnet EVM Params
 	minBlockTime = 2 * time.Second
 	maxBlockTime = 3 * time.Second
-
-	// SC Params
-	minBlockTimeSC = 500 * time.Millisecond
+	// Subnet EVM Params
+	minBlockTimeSE = 500 * time.Millisecond
 )
 
 const (
@@ -43,7 +42,7 @@ const (
 	waitBlockTime = 100 * time.Millisecond
 
 	dontBuild        buildingBlkStatus = iota
-	conditionalBuild                   // Only used prior to SC
+	conditionalBuild                   // Only used prior to SubnetEVM
 	mayBuild
 	building
 )
@@ -77,7 +76,7 @@ type blockBuilder struct {
 	// [building] indicates the VM has sent a request to the engine to build a block.
 	buildStatus buildingBlkStatus
 
-	// isSC is a boolean indicating if SubnetEVM is activated. This prevents us from
+	// isSE is a boolean indicating if SubnetEVM is activated. This prevents us from
 	// getting the current time and comparing it to the *params.chainConfig more
 	// than once.
 	isSE bool
@@ -105,16 +104,16 @@ func (b *blockBuilder) handleBlockBuilding() {
 
 	if !b.chainConfig.IsSubnetEVM(big.NewInt(time.Now().Unix())) {
 		b.shutdownWg.Add(1)
-		go b.ctx.Log.RecoverAndPanic(b.migrateSC)
+		go b.ctx.Log.RecoverAndPanic(b.migrateSE)
 	} else {
 		b.isSE = true
 	}
 }
 
-func (b *blockBuilder) migrateSC() {
+func (b *blockBuilder) migrateSE() {
 	defer b.shutdownWg.Done()
 
-	// In some tests, the SC timestamp is not populated. If this is the case, we
+	// In some tests, the SubnetEVM timestamp is not populated. If this is the case, we
 	// should only stop [buildBlockTwoStageTimer] on shutdown.
 	if b.chainConfig.SubnetEVMTimestamp == nil {
 		<-b.shutdownChan
@@ -162,13 +161,13 @@ func (b *blockBuilder) handleGenerateBlock() {
 		}
 	} else {
 		// If we still need to build a block immediately after building, we let the
-		// engine know it [mayBuild] in [minBlockTimeSC].
+		// engine know it [mayBuild] in [minBlockTimeSE].
 		//
-		// It is often the case in SC that a block (with the same txs) could be built
+		// It is often the case in SubnetEVM that a block (with the same txs) could be built
 		// after a few seconds of delay as the [baseFee] and/or [blockGasCost] decrease.
 		if b.needToBuild() {
 			b.buildStatus = mayBuild
-			b.buildBlockTimer.SetTimeoutIn(minBlockTimeSC)
+			b.buildBlockTimer.SetTimeoutIn(minBlockTimeSE)
 		} else {
 			b.buildStatus = dontBuild
 		}
@@ -185,7 +184,7 @@ func (b *blockBuilder) needToBuild() bool {
 // buildEarly returns true if there are sufficient outstanding transactions to
 // be issued into a block to build a block early.
 //
-// NOTE: Only used prior to SC.
+// NOTE: Only used prior to SubnetEVM.
 func (b *blockBuilder) buildEarly() bool {
 	size := b.chain.PendingSize()
 	return size > batchSize

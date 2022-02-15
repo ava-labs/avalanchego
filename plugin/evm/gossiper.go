@@ -314,7 +314,7 @@ func (n *pushGossiper) gossipTxs(force bool) (int, error) {
 	msgTxsSize := common.StorageSize(0)
 	for _, tx := range selectedTxs {
 		size := tx.Size()
-		if msgTxsSize+size > message.EthMsgSoftCapSize {
+		if msgTxsSize+size > message.TxMsgSoftCapSize {
 			if err := n.sendTxs(msgTxs); err != nil {
 				return len(selectedTxs), err
 			}

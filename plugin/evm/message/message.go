@@ -15,11 +15,11 @@ import (
 )
 
 const (
-	// EthMsgSoftCapSize is the ideal size of encoded transaction bytes we send in
+	// TxMsgSoftCapSize is the ideal size of encoded transaction bytes we send in
 	// any [Txs] message. We do not limit inbound messages to
 	// this size, however. Max inbound message size is enforced by the codec
 	// (512KB).
-	EthMsgSoftCapSize = common.StorageSize(64 * units.KiB)
+	TxMsgSoftCapSize = common.StorageSize(64 * units.KiB)
 )
 
 var (

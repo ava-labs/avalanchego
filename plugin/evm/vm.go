@@ -4,7 +4,6 @@
 package evm
 
 import (
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -86,10 +85,9 @@ const (
 
 var (
 	// Set last accepted key to be longer than the keys used to store accepted block IDs.
-	lastAcceptedKey        = []byte("last_accepted_key")
-	acceptedPrefix         = []byte("snowman_accepted")
-	ethDBPrefix            = []byte("ethdb")
-	pruneRejectedBlocksKey = []byte("pruned_rejected_blocks")
+	lastAcceptedKey = []byte("last_accepted_key")
+	acceptedPrefix  = []byte("snowman_accepted")
+	ethDBPrefix     = []byte("ethdb")
 )
 
 var (
@@ -378,30 +376,6 @@ func (vm *VM) initGossipHandling() {
 	}
 }
 
-func (vm *VM) pruneChain() error {
-	if !vm.config.Pruning {
-		return nil
-	}
-	pruned, err := vm.db.Has(pruneRejectedBlocksKey)
-	if err != nil {
-		return fmt.Errorf("failed to check if the VM has pruned rejected blocks: %w", err)
-	}
-	if pruned {
-		return nil
-	}
-
-	lastAcceptedHeight := vm.LastAcceptedBlock().Height()
-	if err := vm.chain.RemoveRejectedBlocks(0, lastAcceptedHeight); err != nil {
-		return err
-	}
-	heightBytes := make([]byte, 8)
-	binary.PutUvarint(heightBytes, lastAcceptedHeight)
-	if err := vm.db.Put(pruneRejectedBlocksKey, heightBytes); err != nil {
-		return err
-	}
-	return vm.db.Commit()
-}
-
 func (vm *VM) SetState(state snow.State) error {
 	switch state {
 	case snow.Bootstrapping:
@@ -627,39 +601,6 @@ func (vm *VM) CreateStaticHandlers() (map[string]*commonEng.HTTPHandler, error) 
  *********************************** Helpers **********************************
  ******************************************************************************
  */
-
-// conflicts returns an error if [inputs] conflicts with any of the atomic inputs contained in [ancestor]
-// or any of its ancestor blocks going back to the last accepted block in its ancestry. If [ancestor] is
-// accepted, then nil will be returned immediately.
-// If the ancestry of [ancestor] cannot be fetched, then [errRejectedParent] may be returned.
-func (vm *VM) conflicts(inputs ids.Set, ancestor *Block) error {
-	for ancestor.Status() != choices.Accepted {
-		// Move up the chain.
-		nextAncestorID := ancestor.Parent()
-		// If the ancestor is unknown, then the parent failed
-		// verification when it was called.
-		// If the ancestor is rejected, then this block shouldn't be
-		// inserted into the canonical chain because the parent is
-		// will be missing.
-		// If the ancestor is processing, then the block may have
-		// been verified.
-		nextAncestorIntf, err := vm.GetBlockInternal(nextAncestorID)
-		if err != nil {
-			return errRejectedParent
-		}
-
-		if blkStatus := nextAncestorIntf.Status(); blkStatus == choices.Unknown || blkStatus == choices.Rejected {
-			return errRejectedParent
-		}
-		nextAncestor, ok := nextAncestorIntf.(*Block)
-		if !ok {
-			return fmt.Errorf("ancestor block %s had unexpected type %T", nextAncestor.ID(), nextAncestorIntf)
-		}
-		ancestor = nextAncestor
-	}
-
-	return nil
-}
 
 // GetCurrentNonce returns the nonce associated with the address at the
 // preferred block
