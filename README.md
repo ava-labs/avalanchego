@@ -74,12 +74,12 @@ and creates a `subnet-evm` genesis file.
 ```bash
 # to startup a local cluster (good for development)
 cd ${HOME}/go/src/github.com/ava-labs/subnet-evm
-./scripts/run.sh 1.7.4
+./scripts/run.sh 1.7.5
 ```
 
 ```bash
 # inspect cluster endpoints when ready
-cat /tmp/avalanchego-v1.7.4/output.yaml
+cat /tmp/avalanchego-v1.7.5/output.yaml
 <<COMMENT
 endpoint: /ext/bc/2VCAhX6vE3UnXC6s1CBPE6jJ4c4cHWMfPgCptuWS59pQ9vbeLM
 logsDir: ...
