@@ -1922,20 +1922,26 @@ func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response
 }
 
 // GetTx gets a tx
-func (service *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *api.FormattedTx) error {
+func (service *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *api.GetTxReply) error {
 	service.vm.ctx.Log.Debug("Platform: GetTx called")
 
 	tx, _, err := service.vm.internalState.GetTx(args.TxID)
 	if err != nil {
 		return fmt.Errorf("couldn't get tx: %w", err)
 	}
-
 	txBytes := tx.Bytes()
+	response.Encoding = args.Encoding
+
+	if args.Encoding == formatting.JSON {
+		tx.InitCtx(service.vm.ctx)
+		response.Tx = tx
+		return nil
+	}
+
 	response.Tx, err = formatting.EncodeWithChecksum(args.Encoding, txBytes)
 	if err != nil {
 		return fmt.Errorf("couldn't encode tx as a string: %w", err)
 	}
-	response.Encoding = args.Encoding
 	return nil
 }
 
