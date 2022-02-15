@@ -32,7 +32,7 @@ const (
 	WriteBufferSize = 12 * opt.MiB
 
 	// HandleCap is the number of files descriptors to cap levelDB to use.
-	HandleCap = 64
+	HandleCap = 256
 
 	// BitsPerKey is the number of bits to add to the bloom filter per key.
 	BitsPerKey = 10
@@ -57,46 +57,79 @@ type Database struct {
 }
 
 type config struct {
-	// BlockSize is the minimum uncompressed size in bytes of each 'sorted
-	// table' block.
+	// BlockCacheCapacity defines the capacity of the 'sorted table' block caching.
+	// Use -1 for zero, this has same effect as specifying NoCacher to BlockCacher.
+	//
+	// The default value is 12MiB.
 	BlockCacheCapacity int `json:"blockCacheCapacity"`
-	// BlockSize is the minimum uncompressed size in bytes of each 'sorted
-	// table' block.
+	// BlockSize is the minimum uncompressed size in bytes of each 'sorted table'
+	// block.
+	//
+	// The default value is 4KiB.
 	BlockSize int `json:"blockSize"`
-	// CompactionExpandLimitFactor limits compaction size after expanded.  This
-	// will be multiplied by table size limit at compaction target level.
+	// CompactionExpandLimitFactor limits compaction size after expanded.
+	// This will be multiplied by table size limit at compaction target level.
+	//
+	// The default value is 25.
 	CompactionExpandLimitFactor int `json:"compactionExpandLimitFactor"`
 	// CompactionGPOverlapsFactor limits overlaps in grandparent (Level + 2)
 	// that a single 'sorted table' generates.  This will be multiplied by
 	// table size limit at grandparent level.
+	//
+	// The default value is 10.
 	CompactionGPOverlapsFactor int `json:"compactionGPOverlapsFactor"`
 	// CompactionL0Trigger defines number of 'sorted table' at level-0 that will
 	// trigger compaction.
+	//
+	// The default value is 4.
 	CompactionL0Trigger int `json:"compactionL0Trigger"`
-	// CompactionSourceLimitFactor limits compaction source size. This doesn't
-	// apply to level-0.  This will be multiplied by table size limit at
-	// compaction target level.
+	// CompactionSourceLimitFactor limits compaction source size. This doesn't apply to
+	// level-0.
+	// This will be multiplied by table size limit at compaction target level.
+	//
+	// The default value is 1.
 	CompactionSourceLimitFactor int `json:"compactionSourceLimitFactor"`
-	// CompactionTableSize limits size of 'sorted table' that compaction
-	// generates.  The limits for each level will be calculated as:
+	// CompactionTableSize limits size of 'sorted table' that compaction generates.
+	// The limits for each level will be calculated as:
 	//   CompactionTableSize * (CompactionTableSizeMultiplier ^ Level)
-	// The multiplier for each level can also fine-tuned using
-	// CompactionTableSizeMultiplierPerLevel.
+	// The multiplier for each level can also fine-tuned using CompactionTableSizeMultiplierPerLevel.
+	//
+	// The default value is 2MiB.
 	CompactionTableSize int `json:"compactionTableSize"`
 	// CompactionTableSizeMultiplier defines multiplier for CompactionTableSize.
-	CompactionTableSizeMultiplier         float64   `json:"compactionTableSizeMultiplier"`
+	//
+	// The default value is 1.
+	CompactionTableSizeMultiplier float64 `json:"compactionTableSizeMultiplier"`
+	// CompactionTableSizeMultiplierPerLevel defines per-level multiplier for
+	// CompactionTableSize.
+	// Use zero to skip a level.
+	//
+	// The default value is nil.
 	CompactionTableSizeMultiplierPerLevel []float64 `json:"compactionTableSizeMultiplierPerLevel"`
 	// CompactionTotalSize limits total size of 'sorted table' for each level.
 	// The limits for each level will be calculated as:
 	//   CompactionTotalSize * (CompactionTotalSizeMultiplier ^ Level)
 	// The multiplier for each level can also fine-tuned using
 	// CompactionTotalSizeMultiplierPerLevel.
+	//
+	// The default value is 10MiB.
 	CompactionTotalSize int `json:"compactionTotalSize"`
 	// CompactionTotalSizeMultiplier defines multiplier for CompactionTotalSize.
+	//
+	// The default value is 10.
 	CompactionTotalSizeMultiplier float64 `json:"compactionTotalSizeMultiplier"`
 	// OpenFilesCacheCapacity defines the capacity of the open files caching.
+	// Use -1 for zero, this has same effect as specifying NoCacher to OpenFilesCacher.
+	//
+	// The default value is 256.
 	OpenFilesCacheCapacity int `json:"openFilesCacheCapacity"`
-	// There are two buffers of size WriteBuffer used.
+	// WriteBuffer defines maximum size of a 'memdb' before flushed to
+	// 'sorted table'. 'memdb' is an in-memory DB backed by an on-disk
+	// unsorted journal.
+	//
+	// LevelDB may held up to two 'memdb' at the same time.
+	//
+	// The default value is 6MiB.
 	WriteBuffer      int `json:"writeBuffer"`
 	FilterBitsPerKey int `json:"filterBitsPerKey"`
 }

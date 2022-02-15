@@ -587,19 +587,22 @@ func (t *Transitive) pullQuery(blkID ids.ID) {
 	t.Ctx.Log.Verbo("about to sample from: %s", t.Validators)
 	// The validators we will query
 	vdrs, err := t.Validators.Sample(t.Params.K)
+	if err != nil {
+		t.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", blkID)
+		return
+	}
+
 	vdrBag := ids.ShortBag{}
 	for _, vdr := range vdrs {
 		vdrBag.Add(vdr.ID())
 	}
 
 	t.RequestID++
-	if err == nil && t.polls.Add(t.RequestID, vdrBag) {
+	if t.polls.Add(t.RequestID, vdrBag) {
 		vdrList := vdrBag.List()
 		vdrSet := ids.NewShortSet(len(vdrList))
 		vdrSet.Add(vdrList...)
 		t.Sender.SendPullQuery(vdrSet, t.RequestID, blkID)
-	} else if err != nil {
-		t.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", blkID)
 	}
 }
 
@@ -607,20 +610,23 @@ func (t *Transitive) pullQuery(blkID ids.ID) {
 func (t *Transitive) pushQuery(blk snowman.Block) {
 	t.Ctx.Log.Verbo("about to sample from: %s", t.Validators)
 	vdrs, err := t.Validators.Sample(t.Params.K)
+	if err != nil {
+		t.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", blk.ID())
+		return
+	}
+
 	vdrBag := ids.ShortBag{}
 	for _, vdr := range vdrs {
 		vdrBag.Add(vdr.ID())
 	}
 
 	t.RequestID++
-	if err == nil && t.polls.Add(t.RequestID, vdrBag) {
+	if t.polls.Add(t.RequestID, vdrBag) {
 		vdrList := vdrBag.List()
 		vdrSet := ids.NewShortSet(len(vdrList))
 		vdrSet.Add(vdrList...)
 
 		t.Sender.SendPushQuery(vdrSet, t.RequestID, blk.ID(), blk.Bytes())
-	} else if err != nil {
-		t.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", blk.ID())
 	}
 }
 

@@ -565,7 +565,12 @@ func (t *Transitive) issueRepoll() {
 
 	vtxID := preferredIDs.CappedList(1)[0]
 	vdrs, err := t.Validators.Sample(t.Params.K) // Validators to sample
-	vdrBag := ids.ShortBag{}                     // IDs of validators to be sampled
+	if err != nil {
+		t.Ctx.Log.Error("re-query for %s was dropped due to an insufficient number of validators", vtxID)
+		return
+	}
+
+	vdrBag := ids.ShortBag{} // IDs of validators to be sampled
 	for _, vdr := range vdrs {
 		vdrBag.Add(vdr.ID())
 	}
@@ -576,10 +581,8 @@ func (t *Transitive) issueRepoll() {
 
 	// Poll the network
 	t.RequestID++
-	if err == nil && t.polls.Add(t.RequestID, vdrBag) {
+	if t.polls.Add(t.RequestID, vdrBag) {
 		t.Sender.SendPullQuery(vdrSet, t.RequestID, vtxID)
-	} else if err != nil {
-		t.Ctx.Log.Error("re-query for %s was dropped due to an insufficient number of validators", vtxID)
 	}
 }
 
