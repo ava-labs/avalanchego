@@ -3691,9 +3691,8 @@ func TestGetAtomicRepositoryRepairHeights(t *testing.T) {
 
 func TestRepairAtomicRepositoryForBonusBlockTxs(t *testing.T) {
 	var err error
-	_, vm, _, _, _ := GenesisVM(t, true, genesisJSONApricotPhase5, "", "")
-	db := versiondb.New(memdb.New())
-	vm.db = db
+	vm := &VM{}
+	vm.db = versiondb.New(memdb.New())
 	vm.codec = testTxCodec()
 	vm.atomicTxRepository, err = NewAtomicTxRepository(vm.db, vm.codec, 0)
 	if err != nil {
