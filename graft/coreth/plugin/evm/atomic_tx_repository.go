@@ -45,8 +45,8 @@ type AtomicTxRepository interface {
 
 	IterateByHeight([]byte) database.Iterator
 
-	RepairAtomicRepositoryForBonusBlockTxs(
-		sortedHeights []uint64, getAtomicTxFromBlockByHeight func(height uint64) (*Tx, error)) error
+	IsBonusBlocksRepaired() (bool, error)
+	MarkBonusBlocksRepaired(repairedEntries uint64) error
 }
 
 // atomicTxRepository is a prefixdb implementation of the AtomicTxRepository interface
@@ -353,25 +353,26 @@ func (a *atomicTxRepository) IterateByHeight(heightBytes []byte) database.Iterat
 	return a.acceptedAtomicTxByHeightDB.NewIteratorWithStart(heightBytes)
 }
 
-func (a *atomicTxRepository) isBonusBlocksRepaired() (bool, error) {
+func (a *atomicTxRepository) IsBonusBlocksRepaired() (bool, error) {
 	return a.atomicRepoMetadataDB.Has(bonusBlocksRepairedKey)
 }
 
-func (a *atomicTxRepository) markBonusBlocksRepaired(repairedEntries uint64) error {
+func (a *atomicTxRepository) MarkBonusBlocksRepaired(repairedEntries uint64) error {
 	val := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(val, repairedEntries)
 	return a.atomicRepoMetadataDB.Put(bonusBlocksRepairedKey, val)
 }
 
-// RepairAtomicRepositoryForBonusBlockTxs ensures that atomic txs that were processed
+// repairAtomicRepositoryForBonusBlockTxs ensures that atomic txs that were processed
 // on more than one block (canonical block + a number of bonus blocks) are indexed to
 // the first height they were processed on (canonical block).
 // [sortedHeights] should include all canonical block + bonus block heights in ascending
 // order, and will only be passed as non-empty on mainnet.
-func (a *atomicTxRepository) RepairAtomicRepositoryForBonusBlockTxs(
+func repairAtomicRepositoryForBonusBlockTxs(
+	atomicTxRepository AtomicTxRepository, db *versiondb.Database,
 	sortedHeights []uint64, getAtomicTxFromBlockByHeight func(height uint64) (*Tx, error),
 ) error {
-	done, err := a.isBonusBlocksRepaired()
+	done, err := atomicTxRepository.IsBonusBlocksRepaired()
 	if err != nil {
 		return err
 	}
@@ -394,16 +395,16 @@ func (a *atomicTxRepository) RepairAtomicRepositoryForBonusBlockTxs(
 		// a given [txID], overwrite the previous [txID] => [height]
 		// mapping. This provides a canonical mapping across nodes.
 		heights, seen := seenTxs[tx.ID()]
-		_, foundHeight, err := a.GetByTxID(tx.ID())
+		_, foundHeight, err := atomicTxRepository.GetByTxID(tx.ID())
 		if err != nil && !errors.Is(err, database.ErrNotFound) {
 			return err
 		}
 		if !seen {
-			if err := a.Write(height, []*Tx{tx}); err != nil {
+			if err := atomicTxRepository.Write(height, []*Tx{tx}); err != nil {
 				return err
 			}
 		} else {
-			if err := a.WriteBonus(height, []*Tx{tx}); err != nil {
+			if err := atomicTxRepository.WriteBonus(height, []*Tx{tx}); err != nil {
 				return err
 			}
 		}
@@ -412,9 +413,9 @@ func (a *atomicTxRepository) RepairAtomicRepositoryForBonusBlockTxs(
 		}
 		seenTxs[tx.ID()] = append(heights, height)
 	}
-	if err := a.markBonusBlocksRepaired(repairedEntries); err != nil {
+	if err := atomicTxRepository.MarkBonusBlocksRepaired(repairedEntries); err != nil {
 		return err
 	}
-	log.Info("RepairAtomicRepositoryForBonusBlockTxs complete", "repairedEntries", repairedEntries)
-	return a.db.Commit()
+	log.Info("repairAtomicRepositoryForBonusBlockTxs complete", "repairedEntries", repairedEntries)
+	return db.Commit()
 }

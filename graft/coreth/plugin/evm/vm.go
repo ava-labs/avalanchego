@@ -416,7 +416,12 @@ func (vm *VM) Initialize(
 	if vm.chainID.Cmp(params.AvalancheMainnetChainID) == 0 {
 		bonusBlockHeights = bonusBlockMainnetHeights
 	}
-	if err := vm.atomicTxRepository.RepairAtomicRepositoryForBonusBlockTxs(getAtomicRepositoryRepairHeights(vm.chainID), vm.getAtomicTxFromPreApricot5BlockByHeight); err != nil {
+	if err := repairAtomicRepositoryForBonusBlockTxs(
+		vm.atomicTxRepository,
+		vm.db,
+		getAtomicRepositoryRepairHeights(vm.chainID),
+		vm.getAtomicTxFromPreApricot5BlockByHeight,
+	); err != nil {
 		return fmt.Errorf("failed to repair atomic repository: %w", err)
 	}
 	vm.atomicTrie, err = NewAtomicTrie(vm.db, bonusBlockHeights, vm.atomicTxRepository, vm.codec, lastAccepted.NumberU64())
