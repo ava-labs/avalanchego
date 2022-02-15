@@ -16,6 +16,7 @@ Please go through this checklist and check the item relevant, delete unrelevant 
 * [ ] Does this PR require a network upgrade?
 * [ ] Does this PR require a database upgrade?
 * [ ] Does this PR change any P2P message types?
+* [ ] Any testing details/results you would like to share?
 * [ ] If this PR is a release, do the release notes reflect all the changes above?
 
 * If you have other related issues/tickets, please link them here
