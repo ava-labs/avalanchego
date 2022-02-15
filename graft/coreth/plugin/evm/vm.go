@@ -1485,3 +1485,60 @@ func (vm *VM) getAtomicTxFromPreApricot5BlockByHeight(height uint64) (*Tx, error
 	}
 	return ExtractAtomicTx(blk.ExtData(), vm.codec)
 }
+
+// repairAtomicRepositoryForBonusBlockTxs ensures that atomic txs that were processed
+// on more than one block (canonical block + a number of bonus blocks) are indexed to
+// the first height they were processed on (canonical block).
+// [sortedHeights] should include all canonical block + bonus block heights in ascending
+// order, and will only be passed as non-empty on mainnet.
+func repairAtomicRepositoryForBonusBlockTxs(
+	atomicTxRepository AtomicTxRepository, db *versiondb.Database,
+	sortedHeights []uint64, getAtomicTxFromBlockByHeight func(height uint64) (*Tx, error),
+) error {
+	done, err := atomicTxRepository.IsBonusBlocksRepaired()
+	if err != nil {
+		return err
+	}
+	if done {
+		return nil
+	}
+	repairedEntries := uint64(0)
+	seenTxs := make(map[ids.ID][]uint64)
+	for _, height := range sortedHeights {
+		// get atomic tx from block
+		tx, err := getAtomicTxFromBlockByHeight(height)
+		if err != nil {
+			return err
+		}
+		if tx == nil {
+			continue
+		}
+
+		// get the tx by txID and update it, the first time we encounter
+		// a given [txID], overwrite the previous [txID] => [height]
+		// mapping. This provides a canonical mapping across nodes.
+		heights, seen := seenTxs[tx.ID()]
+		_, foundHeight, err := atomicTxRepository.GetByTxID(tx.ID())
+		if err != nil && !errors.Is(err, database.ErrNotFound) {
+			return err
+		}
+		if !seen {
+			if err := atomicTxRepository.Write(height, []*Tx{tx}); err != nil {
+				return err
+			}
+		} else {
+			if err := atomicTxRepository.WriteBonus(height, []*Tx{tx}); err != nil {
+				return err
+			}
+		}
+		if foundHeight != height && !seen {
+			repairedEntries++
+		}
+		seenTxs[tx.ID()] = append(heights, height)
+	}
+	if err := atomicTxRepository.MarkBonusBlocksRepaired(repairedEntries); err != nil {
+		return err
+	}
+	log.Info("repairAtomicRepositoryForBonusBlockTxs complete", "repairedEntries", repairedEntries)
+	return db.Commit()
+}
