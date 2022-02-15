@@ -98,7 +98,6 @@ var (
 	errUnclesUnsupported        = errors.New("uncles unsupported")
 	errTxHashMismatch           = errors.New("txs hash does not match header")
 	errUncleHashMismatch        = errors.New("uncle hash mismatch")
-	errRejectedParent           = errors.New("rejected parent")
 	errInvalidDifficulty        = errors.New("invalid difficulty")
 	errInvalidMixDigest         = errors.New("invalid mix digest")
 	errHeaderExtraDataTooBig    = errors.New("header extra data too big")
