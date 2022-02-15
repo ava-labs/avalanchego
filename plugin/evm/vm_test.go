@@ -27,9 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -3687,64 +3685,4 @@ func TestGetAtomicRepositoryRepairHeights(t *testing.T) {
 	assert.True(t, sorted)
 	testnetHeights := getAtomicRepositoryRepairHeights(params.AvalancheFujiChainID)
 	assert.Empty(t, testnetHeights)
-}
-
-func TestRepairAtomicRepositoryForBonusBlockTxs(t *testing.T) {
-	db := versiondb.New(memdb.New())
-	atomicTxRepository, err := NewAtomicTxRepository(db, testTxCodec(), 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// check completion flag is not set
-	done, err := atomicTxRepository.IsBonusBlocksRepaired()
-	assert.NoError(t, err)
-	assert.False(t, done)
-
-	tx := newTestTx()
-	// write the same tx to 3 heights.
-	canonical, bonus1, bonus2 := uint64(10), uint64(20), uint64(30)
-	atomicTxRepository.Write(canonical, []*Tx{tx})
-	atomicTxRepository.Write(bonus1, []*Tx{tx})
-	atomicTxRepository.Write(bonus2, []*Tx{tx})
-	db.Commit()
-
-	_, foundHeight, err := atomicTxRepository.GetByTxID(tx.ID())
-	assert.NoError(t, err)
-	assert.Equal(t, bonus2, foundHeight)
-
-	allHeights := []uint64{canonical, bonus1, bonus2}
-	if err := repairAtomicRepositoryForBonusBlockTxs(
-		atomicTxRepository,
-		db,
-		allHeights,
-		func(height uint64) (*Tx, error) {
-			if height == 10 || height == 20 || height == 30 {
-				return tx, nil
-			}
-			return nil, fmt.Errorf("unexpected height %d", height)
-		},
-	); err != nil {
-		t.Fatal(err)
-	}
-
-	// check canonical height is indexed against txID
-	_, foundHeight, err = atomicTxRepository.GetByTxID(tx.ID())
-	assert.NoError(t, err)
-	assert.Equal(t, canonical, foundHeight)
-
-	// check tx can be found with any of the heights
-	for _, height := range allHeights {
-		txs, err := atomicTxRepository.GetByHeight(height)
-		if err != nil {
-			t.Fatal(err)
-		}
-		assert.Len(t, txs, 1)
-		assert.Equal(t, tx.ID(), txs[0].ID())
-	}
-
-	// check completion flag is set
-	done, err = atomicTxRepository.IsBonusBlocksRepaired()
-	assert.NoError(t, err)
-	assert.True(t, done)
 }
