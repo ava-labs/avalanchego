@@ -9,9 +9,7 @@ import (
 
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
-	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/state/pruner"
-	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/params"
@@ -265,16 +263,7 @@ func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
 				SnapshotLimit:  256,
 			},
 			chainConfig,
-			dummy.NewTestConsensusCB(&dummy.ConsensusCallbacks{
-				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) error {
-					sdb.SetState(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), common.HexToHash("0xdeadbeef"))
-					return nil
-				},
-				OnFinalizeAndAssemble: func(header *types.Header, sdb *state.StateDB, txs []*types.Transaction) error {
-					sdb.SetState(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), common.HexToHash("0xdeadbeef"))
-					return nil
-				},
-			}),
+			dummy.NewFaker(),
 			vm.Config{},
 			lastAcceptedHash,
 		)
@@ -290,6 +279,11 @@ func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
 			return blockchain, nil
 		}
 
+		targetRoot := blockchain.LastAcceptedBlock().Root()
+		if targetRoot == blockchain.Genesis().Root() {
+			return blockchain, nil
+		}
+
 		tempDir := t.TempDir()
 		if err := blockchain.CleanBlockRootsAboveLastAccepted(); err != nil {
 			return nil, err
@@ -299,10 +293,10 @@ func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
 			return nil, fmt.Errorf("offline pruning failed (%s, %d): %w", tempDir, 256, err)
 		}
 
-		targetRoot := blockchain.LastAcceptedBlock().Root()
 		if err := pruner.Prune(targetRoot); err != nil {
 			return nil, fmt.Errorf("failed to prune blockchain with target root: %s due to: %w", targetRoot, err)
 		}
+
 		// Re-initialize the blockchain after pruning
 		return NewBlockChain(
 			db,
@@ -313,16 +307,7 @@ func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
 				SnapshotLimit:  256,
 			},
 			chainConfig,
-			dummy.NewTestConsensusCB(&dummy.ConsensusCallbacks{
-				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) error {
-					sdb.SetState(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), common.HexToHash("0xdeadbeef"))
-					return nil
-				},
-				OnFinalizeAndAssemble: func(header *types.Header, sdb *state.StateDB, txs []*types.Transaction) error {
-					sdb.SetState(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), common.HexToHash("0xdeadbeef"))
-					return nil
-				},
-			}),
+			dummy.NewFaker(),
 			vm.Config{},
 			lastAcceptedHash,
 		)
