@@ -71,6 +71,7 @@ type OracleBackend interface {
 	ChainConfig() *params.ChainConfig
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 	MinRequiredTip(ctx context.Context, header *types.Header) (*big.Int, error)
+	LastAcceptedBlock() *types.Block
 }
 
 // Oracle recommends gas prices based on the content of recent
