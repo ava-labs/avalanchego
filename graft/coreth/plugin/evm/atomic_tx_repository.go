@@ -60,14 +60,14 @@ type atomicTxRepository struct {
 	// has indexed.
 	atomicRepoMetadataDB database.Database
 
-	// This db is used to store [maxIndexedHeightKey] to avoid interfering with the iterators over the atomic transaction DBs.
+	// [db] is used to commit to the underlying versiondb.
 	db *versiondb.Database
 
 	// Use this codec for serializing
 	codec codec.Manager
 }
 
-func NewAtomicTxRepository(db *versiondb.Database, codec codec.Manager, lastAcceptedHeight uint64) (AtomicTxRepository, error) {
+func NewAtomicTxRepository(db *versiondb.Database, codec codec.Manager, lastAcceptedHeight uint64) (*atomicTxRepository, error) {
 	repo := &atomicTxRepository{
 		acceptedAtomicTxDB:         prefixdb.New(atomicTxIDDBPrefix, db),
 		acceptedAtomicTxByHeightDB: prefixdb.New(atomicHeightTxDBPrefix, db),
