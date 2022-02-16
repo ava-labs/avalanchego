@@ -180,6 +180,9 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		return nil, gas, ErrDepth
 	}
 	// Fail if we're trying to transfer more than the available balance
+	// Note: it is not possible for a negative value to be passed in here due to the fact
+	// that [value] will be popped from the stack and decoded to a *big.Int, which will
+	// always yield a positive result.
 	if value.Sign() != 0 && !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
 		return nil, gas, ErrInsufficientBalance
 	}
@@ -269,6 +272,9 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 	// Note although it's noop to transfer X ether to caller itself. But
 	// if caller doesn't have enough balance, it would be an error to allow
 	// over-charging itself. So the check here is necessary.
+	// Note: it is not possible for a negative value to be passed in here due to the fact
+	// that [value] will be popped from the stack and decoded to a *big.Int, which will
+	// always yield a positive result.
 	if !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
 		return nil, gas, ErrInsufficientBalance
 	}
@@ -418,6 +424,9 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	if evm.depth > int(params.CallCreateDepth) {
 		return nil, common.Address{}, gas, ErrDepth
 	}
+	// Note: it is not possible for a negative value to be passed in here due to the fact
+	// that [value] will be popped from the stack and decoded to a *big.Int, which will
+	// always yield a positive result.
 	if !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
 		return nil, common.Address{}, gas, ErrInsufficientBalance
 	}

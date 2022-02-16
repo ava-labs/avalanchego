@@ -9,11 +9,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/codec"
+
+	"github.com/ava-labs/subnet-evm/peer"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-
-	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -23,8 +25,6 @@ import (
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
-
-	subnetEVM "github.com/ava-labs/subnet-evm/chain"
 )
 
 const (
@@ -32,96 +32,58 @@ const (
 	// in the cache, not entire transactions.
 	recentCacheSize = 512
 
-	// [ethTxsGossipInterval] is how often we attempt to gossip newly seen
+	// [txsGossipInterval] is how often we attempt to gossip newly seen
 	// transactions to other nodes.
-	ethTxsGossipInterval = 500 * time.Millisecond
+	txsGossipInterval = 500 * time.Millisecond
 )
 
-type Network interface {
-	// Message handling
-	AppRequestFailed(nodeID ids.ShortID, requestID uint32) error
-	AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, msgBytes []byte) error
-	AppResponse(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error
-	AppGossip(nodeID ids.ShortID, msgBytes []byte) error
-
-	// Gossip entrypoints
-	GossipEthTxs(txs []*types.Transaction) error
+// Gossiper handles outgoing gossip of transactions
+type Gossiper interface {
+	// GossipTxs sends AppGossip message containing the given [txs]
+	GossipTxs(txs []*types.Transaction) error
 }
 
-func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
-	return vm.network.AppRequest(nodeID, requestID, deadline, request)
-}
-
-func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
-	return vm.network.AppResponse(nodeID, requestID, response)
-}
-
-func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
-	return vm.network.AppRequestFailed(nodeID, requestID)
-}
-
-func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
-	return vm.network.AppGossip(nodeID, msg)
-}
-
-// NewNetwork creates a new Network based on the [vm.chainConfig].
-func (vm *VM) NewNetwork(appSender commonEng.AppSender) Network {
-	if vm.chainConfig.SubnetEVMTimestamp != nil {
-		return vm.newPushNetwork(
-			time.Unix(vm.chainConfig.SubnetEVMTimestamp.Int64(), 0),
-			vm.config,
-			appSender,
-			vm.chain,
-		)
-	}
-
-	return &noopNetwork{}
-}
-
-type pushNetwork struct {
+// pushGossiper is used to gossip transactions to the network
+type pushGossiper struct {
 	ctx                  *snow.Context
 	gossipActivationTime time.Time
 	config               Config
 
-	appSender commonEng.AppSender
-	chain     *subnetEVM.ETHChain
-
-	gossipHandler message.Handler
+	client     peer.Client
+	blockchain *core.BlockChain
+	txPool     *core.TxPool
 
 	// We attempt to batch transactions we need to gossip to avoid runaway
 	// amplification of mempol chatter.
-	ethTxsToGossipChan chan []*types.Transaction
-	ethTxsToGossip     map[common.Hash]*types.Transaction
-	lastGossiped       time.Time
-	shutdownChan       chan struct{}
-	shutdownWg         *sync.WaitGroup
+	txsToGossipChan chan []*types.Transaction
+	txsToGossip     map[common.Hash]*types.Transaction
+	lastGossiped    time.Time
+	shutdownChan    chan struct{}
+	shutdownWg      *sync.WaitGroup
 
-	// [recentEthTxs] prevent us from over-gossiping the
+	// [recentTxs] prevent us from over-gossiping the
 	// same transaction in a short period of time.
-	recentEthTxs *cache.LRU
+	recentTxs *cache.LRU
+
+	codec codec.Manager
 }
 
-func (vm *VM) newPushNetwork(
-	activationTime time.Time,
-	config Config,
-	appSender commonEng.AppSender,
-	chain *subnetEVM.ETHChain,
-) Network {
-	net := &pushNetwork{
+// newPushGossiper constructs and returns a pushGossiper
+// assumes vm.chainConfig.SubnetEVMTimestamp is set
+func (vm *VM) newPushGossiper() Gossiper {
+	net := &pushGossiper{
 		ctx:                  vm.ctx,
-		gossipActivationTime: activationTime,
-		config:               config,
-		appSender:            appSender,
-		chain:                chain,
-		ethTxsToGossipChan:   make(chan []*types.Transaction),
-		ethTxsToGossip:       make(map[common.Hash]*types.Transaction),
+		gossipActivationTime: time.Unix(vm.chainConfig.SubnetEVMTimestamp.Int64(), 0),
+		config:               vm.config,
+		client:               vm.client,
+		blockchain:           vm.chain.BlockChain(),
+		txPool:               vm.chain.GetTxPool(),
+		txsToGossipChan:      make(chan []*types.Transaction),
+		txsToGossip:          make(map[common.Hash]*types.Transaction),
 		shutdownChan:         vm.shutdownChan,
 		shutdownWg:           &vm.shutdownWg,
-		recentEthTxs:         &cache.LRU{Size: recentCacheSize},
-	}
-	net.gossipHandler = &GossipHandler{
-		vm:  vm,
-		net: net,
+		recentTxs:            &cache.LRU{Size: recentCacheSize},
+		codec:                vm.networkCodec,
 	}
 	net.awaitEthTxGossip()
 	return net
@@ -133,7 +95,7 @@ func (vm *VM) newPushNetwork(
 // We assume that [txs] contains an array of nonce-ordered transactions for a given
 // account. This array of transactions can have gaps and start at a nonce lower
 // than the current state of an account.
-func (n *pushNetwork) queueExecutableTxs(state *state.StateDB, baseFee *big.Int, txs map[common.Address]types.Transactions, maxTxs int) types.Transactions {
+func (n *pushGossiper) queueExecutableTxs(state *state.StateDB, baseFee *big.Int, txs map[common.Address]types.Transactions, maxTxs int) types.Transactions {
 	// Setup heap for transactions
 	heads := make(types.TxByPriceAndTime, 0, len(txs))
 	for addr, accountTxs := range txs {
@@ -197,17 +159,15 @@ func (n *pushNetwork) queueExecutableTxs(state *state.StateDB, baseFee *big.Int,
 }
 
 // queueRegossipTxs finds the best transactions in the mempool and adds up to
-// [TxRegossipMaxSize] of them to [ethTxsToGossip].
-func (n *pushNetwork) queueRegossipTxs() types.Transactions {
-	txPool := n.chain.GetTxPool()
-
+// [TxRegossipMaxSize] of them to [txsToGossip].
+func (n *pushGossiper) queueRegossipTxs() types.Transactions {
 	// Fetch all pending transactions
-	pending := txPool.Pending(true)
+	pending := n.txPool.Pending(true)
 
 	// Split the pending transactions into locals and remotes
 	localTxs := make(map[common.Address]types.Transactions)
 	remoteTxs := pending
-	for _, account := range txPool.Locals() {
+	for _, account := range n.txPool.Locals() {
 		if txs := remoteTxs[account]; len(txs) > 0 {
 			delete(remoteTxs, account)
 			localTxs[account] = txs
@@ -215,8 +175,8 @@ func (n *pushNetwork) queueRegossipTxs() types.Transactions {
 	}
 
 	// Add best transactions to be gossiped (preferring local txs)
-	tip := n.chain.BlockChain().CurrentBlock()
-	state, err := n.chain.BlockChain().StateAt(tip.Root())
+	tip := n.blockchain.CurrentBlock()
+	state, err := n.blockchain.StateAt(tip.Root())
 	if err != nil || state == nil {
 		log.Debug(
 			"could not get state at tip",
@@ -235,21 +195,21 @@ func (n *pushNetwork) queueRegossipTxs() types.Transactions {
 }
 
 // awaitEthTxGossip periodically gossips transactions that have been queued for
-// gossip at least once every [ethTxsGossipInterval].
-func (n *pushNetwork) awaitEthTxGossip() {
+// gossip at least once every [txsGossipInterval].
+func (n *pushGossiper) awaitEthTxGossip() {
 	n.shutdownWg.Add(1)
 	go n.ctx.Log.RecoverAndPanic(func() {
 		defer n.shutdownWg.Done()
 
 		var (
-			gossipTicker   = time.NewTicker(ethTxsGossipInterval)
+			gossipTicker   = time.NewTicker(txsGossipInterval)
 			regossipTicker = time.NewTicker(n.config.TxRegossipFrequency.Duration)
 		)
 
 		for {
 			select {
 			case <-gossipTicker.C:
-				if attempted, err := n.gossipEthTxs(false); err != nil {
+				if attempted, err := n.gossipTxs(false); err != nil {
 					log.Warn(
 						"failed to send eth transactions",
 						"len(txs)", attempted,
@@ -258,20 +218,20 @@ func (n *pushNetwork) awaitEthTxGossip() {
 				}
 			case <-regossipTicker.C:
 				for _, tx := range n.queueRegossipTxs() {
-					n.ethTxsToGossip[tx.Hash()] = tx
+					n.txsToGossip[tx.Hash()] = tx
 				}
-				if attempted, err := n.gossipEthTxs(true); err != nil {
+				if attempted, err := n.gossipTxs(true); err != nil {
 					log.Warn(
 						"failed to send eth transactions",
 						"len(txs)", attempted,
 						"err", err,
 					)
 				}
-			case txs := <-n.ethTxsToGossipChan:
+			case txs := <-n.txsToGossipChan:
 				for _, tx := range txs {
-					n.ethTxsToGossip[tx.Hash()] = tx
+					n.txsToGossip[tx.Hash()] = tx
 				}
-				if attempted, err := n.gossipEthTxs(false); err != nil {
+				if attempted, err := n.gossipTxs(false); err != nil {
 					log.Warn(
 						"failed to send eth transactions",
 						"len(txs)", attempted,
@@ -285,29 +245,7 @@ func (n *pushNetwork) awaitEthTxGossip() {
 	})
 }
 
-func (n *pushNetwork) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
-	return nil
-}
-
-func (n *pushNetwork) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, msgBytes []byte) error {
-	return nil
-}
-
-func (n *pushNetwork) AppResponse(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error {
-	return nil
-}
-
-func (n *pushNetwork) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
-	return n.handle(
-		n.gossipHandler,
-		"Gossip",
-		nodeID,
-		0,
-		msgBytes,
-	)
-}
-
-func (n *pushNetwork) sendEthTxs(txs []*types.Transaction) error {
+func (n *pushGossiper) sendTxs(txs []*types.Transaction) error {
 	if len(txs) == 0 {
 		return nil
 	}
@@ -319,7 +257,7 @@ func (n *pushNetwork) sendEthTxs(txs []*types.Transaction) error {
 	msg := message.Txs{
 		Txs: txBytes,
 	}
-	msgBytes, err := message.Build(&msg)
+	msgBytes, err := message.BuildMessage(n.codec, &msg)
 	if err != nil {
 		return err
 	}
@@ -329,41 +267,40 @@ func (n *pushNetwork) sendEthTxs(txs []*types.Transaction) error {
 		"len(txs)", len(txs),
 		"size(txs)", len(msg.Txs),
 	)
-	return n.appSender.SendAppGossip(msgBytes)
+	return n.client.Gossip(msgBytes)
 }
 
-func (n *pushNetwork) gossipEthTxs(force bool) (int, error) {
-	if (!force && time.Since(n.lastGossiped) < ethTxsGossipInterval) || len(n.ethTxsToGossip) == 0 {
+func (n *pushGossiper) gossipTxs(force bool) (int, error) {
+	if (!force && time.Since(n.lastGossiped) < txsGossipInterval) || len(n.txsToGossip) == 0 {
 		return 0, nil
 	}
 	n.lastGossiped = time.Now()
-	txs := make([]*types.Transaction, 0, len(n.ethTxsToGossip))
-	for _, tx := range n.ethTxsToGossip {
+	txs := make([]*types.Transaction, 0, len(n.txsToGossip))
+	for _, tx := range n.txsToGossip {
 		txs = append(txs, tx)
-		delete(n.ethTxsToGossip, tx.Hash())
+		delete(n.txsToGossip, tx.Hash())
 	}
 
-	pool := n.chain.GetTxPool()
 	selectedTxs := make([]*types.Transaction, 0)
 	for _, tx := range txs {
 		txHash := tx.Hash()
-		txStatus := pool.Status([]common.Hash{txHash})[0]
+		txStatus := n.txPool.Status([]common.Hash{txHash})[0]
 		if txStatus != core.TxStatusPending {
 			continue
 		}
 
-		if n.config.RemoteTxGossipOnlyEnabled && pool.HasLocal(txHash) {
+		if n.config.RemoteTxGossipOnlyEnabled && n.txPool.HasLocal(txHash) {
 			continue
 		}
 
 		// We check [force] outside of the if statement to avoid an unnecessary
 		// cache lookup.
 		if !force {
-			if _, has := n.recentEthTxs.Get(txHash); has {
+			if _, has := n.recentTxs.Get(txHash); has {
 				continue
 			}
 		}
-		n.recentEthTxs.Put(txHash, nil)
+		n.recentTxs.Put(txHash, nil)
 
 		selectedTxs = append(selectedTxs, tx)
 	}
@@ -377,8 +314,8 @@ func (n *pushNetwork) gossipEthTxs(force bool) (int, error) {
 	msgTxsSize := common.StorageSize(0)
 	for _, tx := range selectedTxs {
 		size := tx.Size()
-		if msgTxsSize+size > message.EthMsgSoftCapSize {
-			if err := n.sendEthTxs(msgTxs); err != nil {
+		if msgTxsSize+size > message.TxMsgSoftCapSize {
+			if err := n.sendTxs(msgTxs); err != nil {
 				return len(selectedTxs), err
 			}
 			msgTxs = msgTxs[:0]
@@ -389,16 +326,16 @@ func (n *pushNetwork) gossipEthTxs(force bool) (int, error) {
 	}
 
 	// Send any remaining [msgTxs]
-	return len(selectedTxs), n.sendEthTxs(msgTxs)
+	return len(selectedTxs), n.sendTxs(msgTxs)
 }
 
-// GossipEthTxs enqueues the provided [txs] for gossiping. At some point, the
-// [pushNetwork] will attempt to gossip the provided txs to other nodes
+// GossipTxs enqueues the provided [txs] for gossiping. At some point, the
+// [pushGossiper] will attempt to gossip the provided txs to other nodes
 // (usually right away if not under load).
 //
 // NOTE: We never return a non-nil error from this function but retain the
 // option to do so in case it becomes useful.
-func (n *pushNetwork) GossipEthTxs(txs []*types.Transaction) error {
+func (n *pushGossiper) GossipTxs(txs []*types.Transaction) error {
 	if time.Now().Before(n.gossipActivationTime) {
 		log.Trace(
 			"not gossiping eth txs before the gossiping activation time",
@@ -408,61 +345,35 @@ func (n *pushNetwork) GossipEthTxs(txs []*types.Transaction) error {
 	}
 
 	select {
-	case n.ethTxsToGossipChan <- txs:
+	case n.txsToGossipChan <- txs:
 	case <-n.shutdownChan:
 	}
 	return nil
 }
 
-func (n *pushNetwork) handle(
-	handler message.Handler,
-	handlerName string,
-	nodeID ids.ShortID,
-	requestID uint32,
-	msgBytes []byte,
-) error {
-	log.Trace(
-		"App message handler called",
-		"handler", handlerName,
-		"peerID", nodeID,
-		"requestID", requestID,
-		"len(msg)", len(msgBytes),
-	)
-
-	if time.Now().Before(n.gossipActivationTime) {
-		log.Trace("App message called before activation time")
-		return nil
-	}
-
-	msg, err := message.Parse(msgBytes)
-	if err != nil {
-		log.Trace(
-			"dropping App message due to failing to parse message",
-			"err", err,
-		)
-		return nil
-	}
-
-	return msg.Handle(handler, nodeID, requestID)
-}
-
+// GossipHandler handles incoming gossip messages
 type GossipHandler struct {
-	message.NoopHandler
-
-	vm  *VM
-	net *pushNetwork
+	vm     *VM
+	txPool *core.TxPool
 }
 
-func (h *GossipHandler) HandleTxs(nodeID ids.ShortID, _ uint32, msg *message.Txs) error {
+func NewGossipHandler(vm *VM) *GossipHandler {
+	return &GossipHandler{
+		vm:     vm,
+		txPool: vm.chain.GetTxPool(),
+	}
+}
+
+func (h *GossipHandler) HandleTxs(nodeID ids.ShortID, msg *message.Txs) error {
 	log.Trace(
-		"AppGossip called with EthTxs",
+		"AppGossip called with Txs",
 		"peerID", nodeID,
 		"size(txs)", len(msg.Txs),
 	)
 
 	if len(msg.Txs) == 0 {
 		log.Trace(
-			"AppGossip received empty EthTxs Message",
+			"AppGossip received empty Txs Message",
 			"peerID", nodeID,
 		)
 		return nil
@@ -478,7 +389,7 @@ func (h *GossipHandler) HandleTxs(nodeID ids.ShortID, _ uint32, msg *message.Txs
 		)
 		return nil
 	}
-	errs := h.net.chain.GetTxPool().AddRemotes(txs)
+	errs := h.txPool.AddRemotes(txs)
 	for i, err := range errs {
 		if err != nil {
 			log.Trace(
@@ -491,25 +402,9 @@ func (h *GossipHandler) HandleTxs(nodeID ids.ShortID, _ uint32, msg *message.Txs
 	return nil
 }
 
-// noopNetwork should be used when gossip communication is not supported
-type noopNetwork struct{}
+// noopGossiper should be used when gossip communication is not supported
+type noopGossiper struct{}
 
-func (n *noopNetwork) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
-	return nil
-}
-
-func (n *noopNetwork) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, msgBytes []byte) error {
-	return nil
-}
-
-func (n *noopNetwork) AppResponse(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error {
-	return nil
-}
-
-func (n *noopNetwork) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
-	return nil
-}
-
-func (n *noopNetwork) GossipEthTxs(txs []*types.Transaction) error {
+func (n *noopGossiper) GossipTxs([]*types.Transaction) error {
 	return nil
 }

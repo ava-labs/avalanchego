@@ -83,7 +83,7 @@ func TestBlockBuilderStopsTimer(t *testing.T) {
 	if builder.buildStatus != mayBuild {
 		t.Fatalf("expected build status to be %d but got %d", dontBuild, builder.buildStatus)
 	}
-	if !builder.isSC {
-		t.Fatal("expected isSC to be true")
+	if !builder.isSE {
+		t.Fatal("expected isSE to be true")
 	}
 }

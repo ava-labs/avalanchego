@@ -22,6 +22,8 @@ import (
 	"github.com/ava-labs/subnet-evm/metrics/prometheus"
 	"github.com/ava-labs/subnet-evm/node"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/peer"
+	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 
 	// Force-load tracer engine to trigger registration
 	//
@@ -38,6 +40,7 @@ import (
 
 	avalancheRPC "github.com/gorilla/rpc/v2"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -48,9 +51,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	cjson "github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -58,7 +61,10 @@ import (
 	avalancheJSON "github.com/ava-labs/avalanchego/utils/json"
 )
 
-var _ block.ChainVM = &VM{}
+var (
+	_ block.ChainVM              = &VM{}
+	_ block.HeightIndexedChainVM = &VM{}
+)
 
 const (
 	// Max time from current time allowed for blocks, before they're considered future blocks
@@ -132,7 +138,7 @@ type VM struct {
 
 	builder *blockBuilder
 
-	network Network
+	gossiper Gossiper
 
 	clock mockable.Clock
 
@@ -142,15 +148,11 @@ type VM struct {
 	// Continuous Profiler
 	profiler profiler.ContinuousProfiler
 
+	peer.Network
+	client       peer.Client
+	networkCodec codec.Manager
+
 	bootstrapped bool
-}
-
-func (vm *VM) Connected(id ids.ShortID, nodeVersion version.Application) error {
-	return nil // noop
-}
-
-func (vm *VM) Disconnected(nodeID ids.ShortID) error {
-	return nil // noop
 }
 
 // setLogLevel sets the log level with the original [os.StdErr] interface along
@@ -250,6 +252,8 @@ func (vm *VM) Initialize(
 	ethConfig.Pruning = vm.config.Pruning
 	ethConfig.SnapshotAsync = vm.config.SnapshotAsync
 	ethConfig.SnapshotVerify = vm.config.SnapshotVerify
+
+	// Handle custom fee recipient
 	ethConfig.Miner.Etherbase = schain.BlackholeAddr
 	switch {
 	case common.IsHexAddress(vm.config.FeeRecipient):
@@ -262,6 +266,17 @@ func (vm *VM) Initialize(
 		return errors.New("cannot specify a custom fee recipient on this blockchain")
 	case g.Config.AllowFeeRecipients:
 		log.Warn("Chain enabled `AllowFeeRecipients`, but chain config has not specified any coinbase address. Defaulting to the blackhole address.")
+	}
+
+	// Handle offline pruning
+	ethConfig.OfflinePruning = vm.config.OfflinePruning
+	ethConfig.OfflinePruningBloomFilterSize = vm.config.OfflinePruningBloomFilterSize
+	ethConfig.OfflinePruningDataDirectory = vm.config.OfflinePruningDataDirectory
+	if len(ethConfig.OfflinePruningDataDirectory) != 0 {
+		if err := os.MkdirAll(ethConfig.OfflinePruningDataDirectory, perms.ReadWriteExecute); err != nil {
+			log.Error("failed to create offline pruning data directory", "error", err)
+			return err
+		}
 	}
 
 	vm.chainConfig = g.Config
@@ -299,8 +314,15 @@ func (vm *VM) Initialize(
 	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
 	vm.handleGasPriceUpdates()
 
-	// initialize new gossip network
-	vm.network = vm.NewNetwork(appSender)
+	vm.networkCodec, err = message.BuildCodec()
+	if err != nil {
+		return err
+	}
+
+	// initialize peer network
+	vm.Network = peer.NewNetwork(appSender, vm.networkCodec, ctx.NodeID, vm.config.MaxOutboundActiveRequests)
+	vm.client = peer.NewClient(vm.Network)
+	vm.initGossipHandling()
 
 	// start goroutines to manage block building
 	//
@@ -323,7 +345,7 @@ func (vm *VM) Initialize(
 			vm:       vm,
 			status:   choices.Accepted,
 		},
-		GetBlockIDAtHeight: vm.getBlockIDAtHeight,
+		GetBlockIDAtHeight: vm.GetBlockIDAtHeight,
 		GetBlock:           vm.getBlock,
 		UnmarshalBlock:     vm.parseBlock,
 		BuildBlock:         vm.buildBlock,
@@ -343,18 +365,27 @@ func (vm *VM) Initialize(
 	return nil
 }
 
-// Bootstrapping notifies this VM that the consensus engine is performing
-// bootstrapping
-func (vm *VM) Bootstrapping() error {
-	vm.bootstrapped = false
-	return nil
+func (vm *VM) initGossipHandling() {
+	if vm.chainConfig.SubnetEVMTimestamp != nil {
+		vm.gossiper = vm.newPushGossiper()
+		vm.Network.SetGossipHandler(NewGossipHandler(vm))
+	} else {
+		vm.gossiper = &noopGossiper{}
+		vm.Network.SetGossipHandler(message.NoopMempoolGossipHandler{})
+	}
 }
 
-// Bootstrapped notifies this VM that the consensus engine has finished
-// bootstrapping
-func (vm *VM) Bootstrapped() error {
-	vm.bootstrapped = true
-	return nil
+func (vm *VM) SetState(state snow.State) error {
+	switch state {
+	case snow.Bootstrapping:
+		vm.bootstrapped = false
+		return nil
+	case snow.NormalOp:
+		vm.bootstrapped = true
+		return nil
+	default:
+		return snow.ErrUnknownState
+	}
 }
 
 // Shutdown implements the snowman.ChainVM interface
@@ -458,10 +489,15 @@ func (vm *VM) SetPreference(blkID ids.ID) error {
 	return vm.chain.SetPreference(block.(*Block).ethBlock)
 }
 
-// getBlockIDAtHeight retrieves the blkID of the canonical block at [blkHeight]
+func (vm *VM) VerifyHeightIndex() error {
+	// our index is vm.chain.GetBlockByNumber
+	return nil
+}
+
+// GetBlockIDAtHeight retrieves the blkID of the canonical block at [blkHeight]
 // if [blkHeight] is less than the height of the last accepted block, this will return
 // a canonical block. Otherwise, it may return a blkID that has not yet been accepted.
-func (vm *VM) getBlockIDAtHeight(blkHeight uint64) (ids.ID, error) {
+func (vm *VM) GetBlockIDAtHeight(blkHeight uint64) (ids.ID, error) {
 	ethBlock := vm.chain.GetBlockByNumber(blkHeight)
 	if ethBlock == nil {
 		return ids.ID{}, fmt.Errorf("could not find block at height: %d", blkHeight)

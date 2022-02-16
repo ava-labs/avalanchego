@@ -21,12 +21,11 @@ import (
 type buildingBlkStatus uint8
 
 var (
-	// Subnet EVM Params
+	// Pre-Subnet EVM Params
 	minBlockTime = 2 * time.Second
 	maxBlockTime = 3 * time.Second
-
-	// SC Params
-	minBlockTimeSC = 500 * time.Millisecond
+	// Subnet EVM Params
+	minBlockTimeSE = 500 * time.Millisecond
 )
 
 const (
@@ -43,7 +42,7 @@ const (
 	waitBlockTime = 100 * time.Millisecond
 
 	dontBuild        buildingBlkStatus = iota
-	conditionalBuild                   // Only used prior to SC
+	conditionalBuild                   // Only used prior to SubnetEVM
 	mayBuild
 	building
 )
@@ -52,8 +51,8 @@ type blockBuilder struct {
 	ctx         *snow.Context
 	chainConfig *params.ChainConfig
 
-	chain   *subnetEVM.ETHChain
-	network Network
+	chain    *subnetEVM.ETHChain
+	gossiper Gossiper
 
 	shutdownChan <-chan struct{}
 	shutdownWg   *sync.WaitGroup
@@ -77,10 +76,10 @@ type blockBuilder struct {
 	// [building] indicates the VM has sent a request to the engine to build a block.
 	buildStatus buildingBlkStatus
 
-	// isSC is a boolean indicating if SubnetEVM is activated. This prevents us from
+	// isSE is a boolean indicating if SubnetEVM is activated. This prevents us from
 	// getting the current time and comparing it to the *params.chainConfig more
 	// than once.
-	isSC bool
+	isSE bool
 }
 
 func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *blockBuilder {
@@ -88,7 +87,7 @@ func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *bl
 		ctx:                  vm.ctx,
 		chainConfig:          vm.chainConfig,
 		chain:                vm.chain,
-		network:              vm.network,
+		gossiper:             vm.gossiper,
 		shutdownChan:         vm.shutdownChan,
 		shutdownWg:           &vm.shutdownWg,
 		notifyBuildBlockChan: notifyBuildBlockChan,
@@ -105,16 +104,16 @@ func (b *blockBuilder) handleBlockBuilding() {
 
 	if !b.chainConfig.IsSubnetEVM(big.NewInt(time.Now().Unix())) {
 		b.shutdownWg.Add(1)
-		go b.ctx.Log.RecoverAndPanic(b.migrateSC)
+		go b.ctx.Log.RecoverAndPanic(b.migrateSE)
 	} else {
-		b.isSC = true
+		b.isSE = true
 	}
 }
 
-func (b *blockBuilder) migrateSC() {
+func (b *blockBuilder) migrateSE() {
 	defer b.shutdownWg.Done()
 
-	// In some tests, the SC timestamp is not populated. If this is the case, we
+	// In some tests, the SubnetEVM timestamp is not populated. If this is the case, we
 	// should only stop [buildBlockTwoStageTimer] on shutdown.
 	if b.chainConfig.SubnetEVMTimestamp == nil {
 		<-b.shutdownChan
@@ -126,7 +125,7 @@ func (b *blockBuilder) migrateSC() {
 	duration := time.Until(timestamp)
 	select {
 	case <-time.After(duration):
-		b.isSC = true
+		b.isSE = true
 		b.buildBlockLock.Lock()
 		// Flush any invalid statuses leftover from legacy block timer builder
 		if b.buildStatus == conditionalBuild {
@@ -147,7 +146,7 @@ func (b *blockBuilder) handleGenerateBlock() {
 	b.buildBlockLock.Lock()
 	defer b.buildBlockLock.Unlock()
 
-	if !b.isSC {
+	if !b.isSE {
 		// Set the buildStatus before calling Cancel or Issue on
 		// the mempool and after generating the block.
 		// This prevents [needToBuild] from returning true when the
@@ -162,13 +161,13 @@ func (b *blockBuilder) handleGenerateBlock() {
 		}
 	} else {
 		// If we still need to build a block immediately after building, we let the
-		// engine know it [mayBuild] in [minBlockTimeSC].
+		// engine know it [mayBuild] in [minBlockTimeSE].
 		//
-		// It is often the case in SC that a block (with the same txs) could be built
+		// It is often the case in SubnetEVM that a block (with the same txs) could be built
 		// after a few seconds of delay as the [baseFee] and/or [blockGasCost] decrease.
 		if b.needToBuild() {
 			b.buildStatus = mayBuild
-			b.buildBlockTimer.SetTimeoutIn(minBlockTimeSC)
+			b.buildBlockTimer.SetTimeoutIn(minBlockTimeSE)
 		} else {
 			b.buildStatus = dontBuild
 		}
@@ -185,7 +184,7 @@ func (b *blockBuilder) needToBuild() bool {
 // buildEarly returns true if there are sufficient outstanding transactions to
 // be issued into a block to build a block early.
 //
-// NOTE: Only used prior to SC.
+// NOTE: Only used prior to SubnetEVM.
 func (b *blockBuilder) buildEarly() bool {
 	size := b.chain.PendingSize()
 	return size > batchSize
@@ -244,7 +243,7 @@ func (b *blockBuilder) signalTxsReady() {
 		return
 	}
 
-	if !b.isSC {
+	if !b.isSE {
 		b.buildStatus = conditionalBuild
 		b.buildBlockTimer.SetTimeoutIn(minBlockTime)
 		return
@@ -272,18 +271,18 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 		txSubmitChan := b.chain.GetTxSubmitCh()
 		for {
 			select {
-			case ethTxsEvent := <-txSubmitChan:
+			case txsEvent := <-txSubmitChan:
 				log.Trace("New tx detected, trying to generate a block")
 				b.signalTxsReady()
 
-				// We only attempt to invoke [GossipEthTxs] once SC is activated
-				if b.isSC && b.network != nil && len(ethTxsEvent.Txs) > 0 {
+				// We only attempt to invoke [GossipTxs] once AP4 is activated
+				if b.isSE && b.gossiper != nil && len(txsEvent.Txs) > 0 {
 					// Give time for this node to build a block before attempting to
 					// gossip
 					time.Sleep(waitBlockTime)
-					// [GossipEthTxs] will block unless [pushNetwork.ethTxsToGossipChan] (an
+					// [GossipTxs] will block unless [gossiper.txsToGossipChan] (an
 					// unbuffered channel) is listened on
-					if err := b.network.GossipEthTxs(ethTxsEvent.Txs); err != nil {
+					if err := b.gossiper.GossipTxs(txsEvent.Txs); err != nil {
 						log.Warn(
 							"failed to gossip new eth transactions",
 							"err", err,

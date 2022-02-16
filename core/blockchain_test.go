@@ -4,10 +4,12 @@
 package core
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
+	"github.com/ava-labs/subnet-evm/core/state/pruner"
 	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/params"
@@ -241,6 +243,74 @@ func TestCorruptSnapshots(t *testing.T) {
 		}
 
 		return blockchain, err
+	}
+	for _, tt := range tests {
+		t.Run(tt.Name, func(t *testing.T) {
+			tt.testFunc(t, create)
+		})
+	}
+}
+
+func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
+	create := func(db ethdb.Database, chainConfig *params.ChainConfig, lastAcceptedHash common.Hash) (*BlockChain, error) {
+		// Import the chain. This runs all block validation rules.
+		blockchain, err := NewBlockChain(
+			db,
+			&CacheConfig{
+				TrieCleanLimit: 256,
+				TrieDirtyLimit: 256,
+				Pruning:        true, // Enable pruning
+				SnapshotLimit:  256,
+			},
+			chainConfig,
+			dummy.NewFaker(),
+			vm.Config{},
+			lastAcceptedHash,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Overwrite state manager, so that Shutdown is not called.
+		// This tests to ensure that the state manager handles an ungraceful shutdown correctly.
+		blockchain.stateManager = &wrappedStateManager{TrieWriter: blockchain.stateManager}
+
+		if lastAcceptedHash == (common.Hash{}) {
+			return blockchain, nil
+		}
+
+		targetRoot := blockchain.LastAcceptedBlock().Root()
+		if targetRoot == blockchain.Genesis().Root() {
+			return blockchain, nil
+		}
+
+		tempDir := t.TempDir()
+		if err := blockchain.CleanBlockRootsAboveLastAccepted(); err != nil {
+			return nil, err
+		}
+		pruner, err := pruner.NewPruner(db, tempDir, 256)
+		if err != nil {
+			return nil, fmt.Errorf("offline pruning failed (%s, %d): %w", tempDir, 256, err)
+		}
+
+		if err := pruner.Prune(targetRoot); err != nil {
+			return nil, fmt.Errorf("failed to prune blockchain with target root: %s due to: %w", targetRoot, err)
+		}
+
+		// Re-initialize the blockchain after pruning
+		return NewBlockChain(
+			db,
+			&CacheConfig{
+				TrieCleanLimit: 256,
+				TrieDirtyLimit: 256,
+				Pruning:        true, // Enable pruning
+				SnapshotLimit:  256,
+			},
+			chainConfig,
+			dummy.NewFaker(),
+			vm.Config{},
+			lastAcceptedHash,
+		)
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {

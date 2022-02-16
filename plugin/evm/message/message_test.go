@@ -12,18 +12,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestEthTxs(t *testing.T) {
+func TestTxs(t *testing.T) {
 	assert := assert.New(t)
 
 	msg := []byte("blah")
 	builtMsg := Txs{
 		Txs: msg,
 	}
-	builtMsgBytes, err := Build(&builtMsg)
+	codec, err := BuildCodec()
+	assert.NoError(err)
+	builtMsgBytes, err := BuildMessage(codec, &builtMsg)
 	assert.NoError(err)
 	assert.Equal(builtMsgBytes, builtMsg.Bytes())
 
-	parsedMsgIntf, err := Parse(builtMsgBytes)
+	parsedMsgIntf, err := ParseMessage(codec, builtMsgBytes)
 	assert.NoError(err)
 	assert.Equal(builtMsgBytes, parsedMsgIntf.Bytes())
 
@@ -33,20 +35,24 @@ func TestEthTxs(t *testing.T) {
 	assert.Equal(msg, parsedMsg.Txs)
 }
 
-func TestEthTxsTooLarge(t *testing.T) {
+func TestTxsTooLarge(t *testing.T) {
 	assert := assert.New(t)
 
 	builtMsg := Txs{
 		Txs: utils.RandomBytes(1024 * units.KiB),
 	}
-	_, err := Build(&builtMsg)
+	codec, err := BuildCodec()
+	assert.NoError(err)
+	_, err = BuildMessage(codec, &builtMsg)
 	assert.Error(err)
 }
 
 func TestParseGibberish(t *testing.T) {
 	assert := assert.New(t)
 
+	codec, err := BuildCodec()
+	assert.NoError(err)
 	randomBytes := utils.RandomBytes(256 * units.KiB)
-	_, err := Parse(randomBytes)
+	_, err = ParseMessage(codec, randomBytes)
 	assert.Error(err)
 }

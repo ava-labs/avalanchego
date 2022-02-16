@@ -6,6 +6,8 @@ package message
 import (
 	"errors"
 
+	"github.com/ava-labs/avalanchego/codec"
+
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -13,11 +15,11 @@ import (
 )
 
 const (
-	// EthMsgSoftCapSize is the ideal size of encoded transaction bytes we send in
-	// any [EthTxs] message. We do not limit inbound messages to
+	// TxMsgSoftCapSize is the ideal size of encoded transaction bytes we send in
+	// any [Txs] message. We do not limit inbound messages to
 	// this size, however. Max inbound message size is enforced by the codec
 	// (512KB).
-	EthMsgSoftCapSize = common.StorageSize(64 * units.KiB)
+	TxMsgSoftCapSize = common.StorageSize(64 * units.KiB)
 )
 
 var (
@@ -28,7 +30,7 @@ var (
 
 type Message interface {
 	// Handle this message with the correct message handler
-	Handle(handler Handler, nodeID ids.ShortID, requestID uint32) error
+	Handle(handler GossipHandler, nodeID ids.ShortID) error
 
 	// initialize should be called whenever a message is built or parsed
 	initialize([]byte)
@@ -50,25 +52,25 @@ type Txs struct {
 	Txs []byte `serialize:"true"`
 }
 
-func (msg *Txs) Handle(handler Handler, nodeID ids.ShortID, requestID uint32) error {
-	return handler.HandleTxs(nodeID, requestID, msg)
+func (msg *Txs) Handle(handler GossipHandler, nodeID ids.ShortID) error {
+	return handler.HandleTxs(nodeID, msg)
 }
 
-func Parse(bytes []byte) (Message, error) {
+func ParseMessage(codec codec.Manager, bytes []byte) (Message, error) {
 	var msg Message
-	version, err := c.Unmarshal(bytes, &msg)
+	version, err := codec.Unmarshal(bytes, &msg)
 	if err != nil {
 		return nil, err
 	}
-	if version != codecVersion {
+	if version != Version {
 		return nil, errUnexpectedCodecVersion
 	}
 	msg.initialize(bytes)
 	return msg, nil
 }
 
-func Build(msg Message) ([]byte, error) {
-	bytes, err := c.Marshal(codecVersion, &msg)
+func BuildMessage(codec codec.Manager, msg Message) ([]byte, error) {
+	bytes, err := codec.Marshal(Version, &msg)
 	msg.initialize(bytes)
 	return bytes, err
 }
