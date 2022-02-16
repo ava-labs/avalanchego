@@ -116,7 +116,7 @@ func TestMempoolTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 			assert.NoError(rlp.DecodeBytes(requestMsg.Txs, &txs))
 			assert.Len(txs, 2)
 			assert.ElementsMatch(
-				[]common.Hash{ethTxs[0].Hash(), txs[1].Hash()},
+				[]common.Hash{ethTxs[0].Hash(), ethTxs[1].Hash()},
 				[]common.Hash{txs[0].Hash(), txs[1].Hash()},
 			)
 			seen++
