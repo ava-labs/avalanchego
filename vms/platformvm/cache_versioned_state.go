@@ -32,11 +32,6 @@ type UTXOState interface {
 	UTXODeleter
 }
 
-type ValidatorState interface {
-	CurrentStakerChainState() currentStakerChainState
-	PendingStakerChainState() pendingStakerChainState
-}
-
 type MutableState interface {
 	UTXOState
 	ValidatorState

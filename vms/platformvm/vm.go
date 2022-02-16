@@ -90,9 +90,6 @@ type VM struct {
 	ctx       *snow.Context
 	dbManager manager.Manager
 
-	// channel to send messages to the consensus engine
-	toEngine chan<- common.Message
-
 	internalState InternalState
 
 	// ID of the preferred block
@@ -133,7 +130,7 @@ func (vm *VM) Initialize(
 	genesisBytes []byte,
 	upgradeBytes []byte,
 	configBytes []byte,
-	msgs chan<- common.Message,
+	toEngine chan<- common.Message,
 	_ []*common.Fx,
 	appSender common.AppSender,
 ) error {
@@ -159,7 +156,6 @@ func (vm *VM) Initialize(
 
 	vm.ctx = ctx
 	vm.dbManager = dbManager
-	vm.toEngine = msgs
 
 	vm.codecRegistry = linearcodec.NewDefault()
 	if err := vm.fx.Initialize(vm); err != nil {
@@ -170,7 +166,7 @@ func (vm *VM) Initialize(
 	vm.validatorSetCaches = make(map[ids.ID]cache.Cacher)
 	vm.currentBlocks = make(map[ids.ID]Block)
 
-	if err := vm.blockBuilder.Initialize(vm, registerer); err != nil {
+	if err := vm.blockBuilder.Initialize(vm, toEngine, registerer); err != nil {
 		return fmt.Errorf(
 			"failed to initialize the block builder: %w",
 			err,
@@ -413,16 +409,6 @@ func (vm *VM) Preferred() (Block, error) {
 	return vm.getBlock(vm.preferred)
 }
 
-// NotifyBlockReady tells the consensus engine that a new block is ready to be
-// created
-func (vm *VM) NotifyBlockReady() {
-	select {
-	case vm.toEngine <- common.PendingTxs:
-	default:
-		vm.ctx.Log.Debug("dropping message to consensus engine")
-	}
-}
-
 func (vm *VM) Version() (string, error) {
 	return version.Current.String(), nil
 }
@@ -595,38 +581,6 @@ func (vm *VM) updateValidators() error {
 		}
 	}
 	return nil
-}
-
-// Returns the time when the next staker of any subnet starts/stops staking
-// after the current timestamp
-func (vm *VM) nextStakerChangeTime(vs ValidatorState) (time.Time, error) {
-	currentStakers := vs.CurrentStakerChainState()
-	pendingStakers := vs.PendingStakerChainState()
-
-	earliest := mockable.MaxTime
-	if currentStakers := currentStakers.Stakers(); len(currentStakers) > 0 {
-		nextStakerToRemove := currentStakers[0]
-		staker, ok := nextStakerToRemove.UnsignedTx.(TimedTx)
-		if !ok {
-			return time.Time{}, errWrongTxType
-		}
-		endTime := staker.EndTime()
-		if endTime.Before(earliest) {
-			earliest = endTime
-		}
-	}
-	if pendingStakers := pendingStakers.Stakers(); len(pendingStakers) > 0 {
-		nextStakerToAdd := pendingStakers[0]
-		staker, ok := nextStakerToAdd.UnsignedTx.(TimedTx)
-		if !ok {
-			return time.Time{}, errWrongTxType
-		}
-		startTime := staker.StartTime()
-		if startTime.Before(earliest) {
-			earliest = startTime
-		}
-	}
-	return earliest, nil
 }
 
 func (vm *VM) CodecRegistry() codec.Registry { return vm.codecRegistry }
