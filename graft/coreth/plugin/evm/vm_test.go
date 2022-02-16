@@ -131,6 +131,7 @@ func NewContext() *snow.Context {
 	ctx.ChainID = testCChainID
 	ctx.AVAXAssetID = testAvaxAssetID
 	ctx.XChainID = testXChainID
+	ctx.SharedMemory = testSharedMemory()
 	aliaser := ctx.BCLookup.(ids.Aliaser)
 	_ = aliaser.Alias(testCChainID, "C")
 	_ = aliaser.Alias(testCChainID, testCChainID.String())
@@ -671,10 +672,8 @@ func TestBuildEthTxBlock(t *testing.T) {
 	}
 
 	restartedVM := &VM{}
-	ctx := NewContext()
-	ctx.SharedMemory = testSharedMemory()
 	if err := restartedVM.Initialize(
-		ctx,
+		NewContext(),
 		dbManager,
 		[]byte(genesisJSONApricotPhase2),
 		[]byte(""),
