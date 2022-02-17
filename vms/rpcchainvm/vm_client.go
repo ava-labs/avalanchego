@@ -598,7 +598,7 @@ func (vm *VMClient) StateSyncGetLastSummary() (common.Summary, error) {
 	}
 	return common.Summary{
 		Key:     resp.Key,
-		Content: resp.State,
+		Content: resp.Content,
 	}, nil
 }
 
@@ -620,7 +620,7 @@ func (vm *VMClient) StateSync(summaries []common.Summary) error {
 	for k, v := range summaries {
 		requestedSummaries[k] = &vmproto.StateSyncGetLastSummaryResponse{}
 		requestedSummaries[k].Key = v.Key
-		requestedSummaries[k].State = v.Content
+		requestedSummaries[k].Content = v.Content
 	}
 	_, err := vm.client.StateSync(
 		context.Background(),
@@ -637,9 +637,7 @@ func (vm *VMClient) GetLastSummaryBlockID() (ids.ID, error) {
 		return ids.Empty, err
 	}
 
-	var ba [32]byte
-	copy(ba[:], resp.Bytes)
-	return ids.ID(ba), nil
+	return ids.ToID(resp.Bytes)
 }
 
 func (vm *VMClient) SetLastSummaryBlock(blkByte []byte) error {

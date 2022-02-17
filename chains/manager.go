@@ -306,9 +306,9 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	defer ctx.Lock.Unlock()
 
 	// Start state-syncing if available or bootstrapping.
-	if chain.Handler.StateSyncer() != nil &&
-		chain.Handler.StateSyncer().IsEnabled() {
-		err = chain.Handler.StateSyncer().Start(0)
+	if stateSyncer := chain.Handler.StateSyncer(); stateSyncer != nil &&
+		stateSyncer.IsEnabled() {
+		err = stateSyncer.Start(0)
 	} else {
 		err = chain.Handler.Bootstrapper().Start(0)
 	}

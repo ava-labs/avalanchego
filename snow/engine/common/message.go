@@ -27,7 +27,7 @@ func (msg Message) String() string {
 	case PendingTxs:
 		return "Pending Transactions"
 	case StateSyncDone:
-		return "State Sync Last Block Missing"
+		return "State Sync Done"
 	default:
 		return fmt.Sprintf("Unknown Message: %d", msg)
 	}

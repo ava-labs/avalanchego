@@ -205,7 +205,7 @@ message StateSyncEnabledResponse {
 
 message StateSyncGetLastSummaryResponse {
     bytes key = 1;
-    bytes state = 2;
+    bytes content = 2;
 }
 
 message StateSyncIsSummaryAcceptedRequest {
