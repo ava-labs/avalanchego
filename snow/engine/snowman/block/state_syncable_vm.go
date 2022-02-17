@@ -11,14 +11,14 @@ import (
 // Snowman-VMs implementing state sync, need to be able to link a state summary
 // to the block associated with it. This is achieved by structuring Summary.Key
 // as the following DefaultSummaryKey/ProposerSummaryKey. Note that these structures
-// do not reduce keys expressiveness since DefaultSummaryKey.Content is
+// do not reduce keys expressiveness since DefaultSummaryKey.ContentHash is
 // totally defined by the Snowman-VM.
 
 const StateSyncDefaultKeysVersion = 0
 
 // DefaultSummaryKey is primarily used by platform and contract VM
 // (ProposerVM only needs to track Default to Proposer summary keys mapping).
-// Key is composed concatenating:
+// Key is composed associating:
 //     blkID of block associated with the Summary
 //     hash of Summary content, which allows validating content-key relationship.
 type DefaultSummaryKey struct {
@@ -27,8 +27,9 @@ type DefaultSummaryKey struct {
 }
 
 // ProposerSummaryKey is used by ProposerVM.
-// Key is composed prepending innerVM key with ProposerVm BlkID
-// of the block wrapping DefaultSummaryKey.BlkID block.
+// Key is composed associating:
+// proposer block ID of the block wrapping InnerKey.BlkID block
+// InnerKey as defined above.
 type ProposerSummaryKey struct {
 	ProBlkID ids.ID            `serialize:"true"`
 	InnerKey DefaultSummaryKey `serialize:"true"`

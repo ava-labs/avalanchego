@@ -23,18 +23,23 @@ type Sender interface {
 // StateSummarySender defines how a consensus engine sends state sync messages to
 // other nodes.
 type StateSummarySender interface {
-	// ...
+	// SendGetStateSummaryFrontier requests that every node in [nodeIDs] sends a
+	// StateSummaryFrontier message.
 	SendGetStateSummaryFrontier(nodeIDs ids.ShortSet, requestID uint32)
 
-	// ...
+	// SendStateSummaryFrontier responds to a StateSummaryFrontier message with this
+	// engine's current state summary frontier.
 	SendStateSummaryFrontier(nodeID ids.ShortID, requestID uint32, key, summary []byte)
 }
 
 type AcceptedStateSummarySender interface {
-	// ...
+	// SendGetAcceptedStateSummary requests that every node in [nodeIDs] sends an
+	// AcceptedStateSummary message with all the keys in [keys] that the node thinks are
+	// accepted.
 	SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uint32, keys [][]byte)
 
-	// ...
+	// SendAcceptedStateSummary responds to a AcceptedStateSummary message with a
+	// set of summary keys that are accepted.
 	SendAcceptedStateSummary(nodeID ids.ShortID, requestID uint32, keys [][]byte)
 }
 

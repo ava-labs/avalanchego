@@ -28,7 +28,7 @@ const (
 
 var _ common.StateSyncer = &stateSyncer{}
 
-// summary content as received from network, along cumulated weight.
+// summary content as received from network, along with accumulated weight.
 type weightedSummary struct {
 	common.Summary
 	weight uint64

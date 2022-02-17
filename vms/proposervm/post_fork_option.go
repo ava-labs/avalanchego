@@ -32,6 +32,11 @@ func (b *postForkOption) Accept() error {
 	return b.conditionalAccept(true /*acceptInnerBlk*/)
 }
 
+// Following the introduction of state sync, we may need to
+// update last accepted block data for proposervm, without
+// propagating changes to innerVM. This is especially true for
+// the block associated with last state summary. conditionalAccept has
+// a boolean paramenter to control acceptance of inner blocks.
 func (b *postForkOption) conditionalAccept(acceptInnerBlk bool) error {
 	blkID := b.ID()
 	if err := b.vm.State.SetLastAccepted(blkID); err != nil {
