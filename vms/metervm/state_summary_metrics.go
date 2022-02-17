@@ -24,7 +24,7 @@ func (ssM *stateSummaryMetrics) Initialize(
 	errs := wrappers.Errs{}
 	ssM.lastSummary = newAverager(namespace, "last_summary", reg, &errs)
 	ssM.lastSummaryBlockID = newAverager(namespace, "last_summary_block_id", reg, &errs)
-	ssM.setLastSummaryBlockID = newAverager(namespace, "last_summary_block_id", reg, &errs)
+	ssM.setLastSummaryBlockID = newAverager(namespace, "set_last_summary_block_id", reg, &errs)
 	ssM.isSummaryAccepted = newAverager(namespace, "summary_accepted", reg, &errs)
 	ssM.syncState = newAverager(namespace, "sync_state", reg, &errs)
 	return errs.Err
