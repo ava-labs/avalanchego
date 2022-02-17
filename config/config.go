@@ -381,11 +381,12 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 			InitialReconnectDelay: v.GetDuration(NetworkInitialReconnectDelayKey),
 		},
 
-		MaxClockDifference: v.GetDuration(NetworkMaxClockDifferenceKey),
-		CompressionEnabled: v.GetBool(NetworkCompressionEnabledKey),
-		PingFrequency:      v.GetDuration(NetworkPingFrequencyKey),
-		AllowPrivateIPs:    v.GetBool(NetworkAllowPrivateIPsKey),
-		UptimeMetricFreq:   v.GetDuration(UptimeMetricFreqKey),
+		MaxClockDifference:           v.GetDuration(NetworkMaxClockDifferenceKey),
+		CompressionEnabled:           v.GetBool(NetworkCompressionEnabledKey),
+		PingFrequency:                v.GetDuration(NetworkPingFrequencyKey),
+		AllowPrivateIPs:              v.GetBool(NetworkAllowPrivateIPsKey),
+		UptimeMetricFreq:             v.GetDuration(UptimeMetricFreqKey),
+		MaximumInboundMessageTimeout: v.GetDuration(NetworkMaximumInboundTimeoutKey),
 
 		RequireValidatorToConnect: v.GetBool(NetworkRequireValidatorToConnectKey),
 	}

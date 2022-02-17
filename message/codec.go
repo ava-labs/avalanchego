@@ -37,6 +37,9 @@ type Packer interface {
 
 type Parser interface {
 	SetTime(t time.Time) // useful in UTs
+
+	// Parse reads given bytes as InboundMessage
+	// Overrides client specified deadline in a message to maxDeadlineDuration
 	Parse(bytes []byte, nodeID ids.ShortID, onFinishedHandling func()) (InboundMessage, error)
 }
 
@@ -57,9 +60,10 @@ type codec struct {
 	compressTimeMetrics   map[Op]metric.Averager
 	decompressTimeMetrics map[Op]metric.Averager
 	compressor            compression.Compressor
+	maxMessageTimeout     time.Duration
 }
 
-func NewCodecWithMemoryPool(namespace string, metrics prometheus.Registerer, maxMessageSize int64) (Codec, error) {
+func NewCodecWithMemoryPool(namespace string, metrics prometheus.Registerer, maxMessageSize int64, maxMessageTimeout time.Duration) (Codec, error) {
 	c := &codec{
 		byteSlicePool: sync.Pool{
 			New: func() interface{} {
@@ -69,6 +73,7 @@ func NewCodecWithMemoryPool(namespace string, metrics prometheus.Registerer, max
 		compressTimeMetrics:   make(map[Op]metric.Averager, len(ExternalOps)),
 		decompressTimeMetrics: make(map[Op]metric.Averager, len(ExternalOps)),
 		compressor:            compression.NewGzipCompressor(maxMessageSize),
+		maxMessageTimeout:     maxMessageTimeout,
 	}
 
 	errs := wrappers.Errs{}
@@ -169,6 +174,7 @@ func (c *codec) Pack(
 
 // Parse attempts to convert bytes into a message.
 // The first byte of the message is the opcode of the message.
+// Overrides client specified deadline in a message to maxDeadlineDuration
 func (c *codec) Parse(bytes []byte, nodeID ids.ShortID, onFinishedHandling func()) (InboundMessage, error) {
 	p := wrappers.Packer{Bytes: bytes}
 
@@ -224,7 +230,11 @@ func (c *codec) Parse(bytes []byte, nodeID ids.ShortID, onFinishedHandling func(
 
 	var expirationTime time.Time
 	if deadline, hasDeadline := fieldValues[Deadline]; hasDeadline {
-		expirationTime = c.clock.Time().Add(time.Duration(deadline.(uint64)))
+		deadlineDuration := time.Duration(deadline.(uint64))
+		if deadlineDuration > c.maxMessageTimeout {
+			deadlineDuration = c.maxMessageTimeout
+		}
+		expirationTime = c.clock.Time().Add(deadlineDuration)
 	}
 
 	return &inboundMessage{

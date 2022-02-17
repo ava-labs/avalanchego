@@ -257,6 +257,10 @@ type Config struct {
 	// 2 peers. This can be useful to enable if the node wants to connect to the
 	// minimum number of nodes without impacting the network negatively.
 	RequireValidatorToConnect bool `json:"requireValidatorToConnect"`
+
+	// Maximum deadline duration in a message. Messages sent by clients setting
+	// values higher than this value will be reset to this value.
+	MaximumInboundMessageTimeout time.Duration
 }
 
 // peerElement holds onto the peer object as a result of helper functions

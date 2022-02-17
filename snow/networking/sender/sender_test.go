@@ -31,7 +31,7 @@ import (
 func TestSenderContext(t *testing.T) {
 	context := snow.DefaultConsensusContextTest()
 	metrics := prometheus.NewRegistry()
-	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	msgCreator, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(true)
@@ -77,7 +77,7 @@ func TestTimeout(t *testing.T) {
 
 	chainRouter := router.ChainRouter{}
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
@@ -164,7 +164,7 @@ func TestReliableMessages(t *testing.T) {
 
 	chainRouter := router.ChainRouter{}
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
@@ -257,7 +257,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 
 	chainRouter := router.ChainRouter{}
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)

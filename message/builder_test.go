@@ -27,7 +27,7 @@ var (
 )
 
 func init() {
-	codec, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB)
+	codec, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
 	if err != nil {
 		panic(err)
 	}

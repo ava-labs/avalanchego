@@ -67,6 +67,7 @@ const (
 	NetworkInitialTimeoutKey                    = "network-initial-timeout"
 	NetworkMinimumTimeoutKey                    = "network-minimum-timeout"
 	NetworkMaximumTimeoutKey                    = "network-maximum-timeout"
+	NetworkMaximumInboundTimeoutKey             = "network-maximum-inbound-timeout"
 	NetworkTimeoutHalflifeKey                   = "network-timeout-halflife"
 	NetworkTimeoutCoefficientKey                = "network-timeout-coefficient"
 	NetworkHealthMinPeersKey                    = "network-health-min-conn-peers"
