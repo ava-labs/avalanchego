@@ -137,8 +137,7 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 
 	// Mark that we received a response from [validatorID]
 	ss.pendingReceiveStateSummaryFrontier.Remove(validatorID)
-	ws, exists := ss.weightedSummaries[string(key)]
-	if !exists {
+	if _, exists := ss.weightedSummaries[string(key)]; !exists {
 		ss.weightedSummaries[string(key)] = weightedSummary{
 			Summary: common.Summary{
 				Key:     key,
@@ -146,6 +145,7 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 			},
 		}
 	}
+	ws := ss.weightedSummaries[string(key)]
 
 	if len(ss.StateSyncTestingBeacons) != 0 {
 		// if state sync beacons are specified, immediately count
