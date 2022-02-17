@@ -5,6 +5,7 @@ package message
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/prometheus/client_golang/prometheus"
@@ -24,9 +25,9 @@ type creator struct {
 	InternalMsgBuilder
 }
 
-func NewCreator(metrics prometheus.Registerer, compressionEnabled bool, parentNamespace string) (Creator, error) {
+func NewCreator(metrics prometheus.Registerer, compressionEnabled bool, parentNamespace string, maxInboundMessageTimeout time.Duration) (Creator, error) {
 	namespace := fmt.Sprintf("%s_codec", parentNamespace)
-	codec, err := NewCodecWithMemoryPool(namespace, metrics, int64(constants.DefaultMaxMessageSize))
+	codec, err := NewCodecWithMemoryPool(namespace, metrics, int64(constants.DefaultMaxMessageSize), maxInboundMessageTimeout)
 	if err != nil {
 		return nil, err
 	}

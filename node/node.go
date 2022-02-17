@@ -1160,7 +1160,8 @@ func (n *Node) Initialize(
 	n.networkNamespace = "network"
 	if n.msgCreator, err = message.NewCreator(n.MetricsRegisterer,
 		n.Config.NetworkConfig.CompressionEnabled,
-		n.networkNamespace); err != nil {
+		n.networkNamespace,
+		n.Config.NetworkConfig.MaximumInboundMessageTimeout); err != nil {
 		return fmt.Errorf("problem TheOneCreator: %w", err)
 	}
 

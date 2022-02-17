@@ -30,7 +30,7 @@ func TestQueue(t *testing.T) {
 	currentTime := time.Now()
 	u.clock.Set(currentTime)
 
-	mc, err := message.NewCreator(prometheus.NewRegistry(), true /*compressionEnabled*/, "dummyNamespace")
+	mc, err := message.NewCreator(prometheus.NewRegistry(), true, "dummyNamespace", 10*time.Second)
 	assert.NoError(err)
 	mc.SetTime(currentTime)
 	msg1 := mc.InboundPut(ids.Empty,
