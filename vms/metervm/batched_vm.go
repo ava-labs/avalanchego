@@ -11,21 +11,18 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
-var _ block.BatchedChainVM = &blockVM{}
-
 func (vm *blockVM) GetAncestors(
 	blkID ids.ID,
 	maxBlocksNum int,
 	maxBlocksSize int,
 	maxBlocksRetrivalTime time.Duration,
 ) ([][]byte, error) {
-	rVM, ok := vm.ChainVM.(block.BatchedChainVM)
-	if !ok {
+	if vm.bVM == nil {
 		return nil, block.ErrRemoteVMNotImplemented
 	}
 
 	start := vm.clock.Time()
-	ancestors, err := rVM.GetAncestors(
+	ancestors, err := vm.bVM.GetAncestors(
 		blkID,
 		maxBlocksNum,
 		maxBlocksSize,
@@ -37,13 +34,12 @@ func (vm *blockVM) GetAncestors(
 }
 
 func (vm *blockVM) BatchedParseBlock(blks [][]byte) ([]snowman.Block, error) {
-	rVM, ok := vm.ChainVM.(block.BatchedChainVM)
-	if !ok {
+	if vm.bVM == nil {
 		return nil, block.ErrRemoteVMNotImplemented
 	}
 
 	start := vm.clock.Time()
-	blocks, err := rVM.BatchedParseBlock(blks)
+	blocks, err := vm.bVM.BatchedParseBlock(blks)
 	end := vm.clock.Time()
 	vm.blockMetrics.batchedParseBlock.Observe(float64(end.Sub(start)))
 

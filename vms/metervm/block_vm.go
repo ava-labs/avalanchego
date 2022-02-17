@@ -17,8 +17,10 @@ import (
 )
 
 var (
-	_ block.ChainVM         = &blockVM{}
-	_ block.StateSyncableVM = &blockVM{}
+	_ block.ChainVM              = &blockVM{}
+	_ block.BatchedChainVM       = &blockVM{}
+	_ block.HeightIndexedChainVM = &blockVM{}
+	_ block.StateSyncableVM      = &blockVM{}
 )
 
 func NewBlockVM(vm block.ChainVM) block.ChainVM {
@@ -29,6 +31,10 @@ func NewBlockVM(vm block.ChainVM) block.ChainVM {
 
 type blockVM struct {
 	block.ChainVM
+	bVM  block.BatchedChainVM
+	hVM  block.HeightIndexedChainVM
+	ssVM block.StateSyncableVM
+
 	blockMetrics
 	stateSummaryMetrics
 	clock mockable.Clock
@@ -44,6 +50,19 @@ func (vm *blockVM) Initialize(
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
+	bVM, ok := vm.ChainVM.(block.BatchedChainVM)
+	if ok {
+		vm.bVM = bVM
+	}
+	hVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
+	if ok {
+		vm.hVM = hVM
+	}
+	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
+	if ok {
+		vm.ssVM = ssVM
+	}
+
 	registerer := prometheus.NewRegistry()
 	_, supportsBatchedFetching := vm.ChainVM.(block.BatchedChainVM)
 	if err := vm.blockMetrics.Initialize(supportsBatchedFetching, "", registerer); err != nil {
