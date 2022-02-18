@@ -356,22 +356,12 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.GetAcceptedStateSummary:
 		reqID := msg.Get(message.RequestID).(uint32)
-		keys, ok := msg.Get(message.MultiSummaryKeys).([][]byte)
-		if !ok {
-			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse MultiSummaryKeys",
-				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
-			return nil
-		}
+		keys := msg.Get(message.MultiSummaryKeys).([][]byte)
 		return engine.GetAcceptedStateSummary(nodeID, reqID, keys)
 
 	case message.AcceptedStateSummary:
 		reqID := msg.Get(message.RequestID).(uint32)
-		keys, ok := msg.Get(message.MultiSummaryKeys).([][]byte)
-		if !ok {
-			h.ctx.Log.Debug("Malformed message %s from (%s, %s, %d) dropped. Error: could not parse MultiSummaryKeys",
-				msg.Op(), nodeID, h.engine.Context().ChainID, reqID)
-			return nil
-		}
+		keys := msg.Get(message.MultiSummaryKeys).([][]byte)
 		return engine.AcceptedStateSummary(nodeID, reqID, keys)
 
 	case message.GetAcceptedStateSummaryFailed:

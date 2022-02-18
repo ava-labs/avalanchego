@@ -294,7 +294,7 @@ func (t *Transitive) Notify(msg common.Message) error {
 		t.pendingBuildBlocks++
 		return t.buildBlocks()
 	case common.StateSyncDone:
-		t.Ctx.Log.Warn("unexpected message %s received in snowman engine. Dropped", msg.String())
+		t.Ctx.Log.Warn("unexpected message %s received in snowman engine. Dropped", msg)
 	default:
 		t.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
 	}
