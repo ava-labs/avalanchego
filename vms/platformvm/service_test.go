@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -763,4 +765,60 @@ func TestGetTimestamp(t *testing.T) {
 	assert.NoError(err)
 
 	assert.Equal(newTimestamp, reply.Timestamp)
+}
+
+func TestGetBlock(t *testing.T) {
+	tests := []struct {
+		name     string
+		encoding formatting.Encoding
+	}{
+		{
+			name:     "json",
+			encoding: formatting.JSON,
+		},
+		{
+			name:     "cb58",
+			encoding: formatting.CB58,
+		},
+		{
+			name:     "hex",
+			encoding: formatting.Hex,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			service := defaultService(t)
+
+			block, err := service.vm.newStandardBlock(ids.GenerateTestID(), 1234, nil)
+			if err != nil {
+				t.Fatal("couldn't create block: %w", err)
+			}
+			internalState := NewMockInternalState(ctrl)
+			internalState.EXPECT().GetBlock(block.ID()).Times(1).Return(block, nil)
+
+			service.vm.internalState = internalState
+
+			args := api.GetBlockArgs{
+				BlockID:  block.ID(),
+				Encoding: test.encoding,
+			}
+			response := api.GetBlockResponse{}
+			err = service.GetBlock(nil, &args, &response)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			switch {
+			case test.encoding == formatting.JSON:
+				assert.Equal(t, block, response.Block)
+			default:
+				decoded, _ := formatting.Decode(response.Encoding, response.Block.(string))
+				assert.Equal(t, block.Bytes(), decoded)
+			}
+
+			assert.Equal(t, test.encoding, response.Encoding)
+		})
+	}
 }

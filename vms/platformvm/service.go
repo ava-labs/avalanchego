@@ -2335,3 +2335,25 @@ func (service *Service) GetValidatorsAt(_ *http.Request, args *GetValidatorsAtAr
 	}
 	return nil
 }
+
+func (service *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, response *api.GetBlockResponse) error {
+	service.vm.ctx.Log.Debug("Platform: GetBlock called with args %s", args)
+
+	block, err := service.vm.GetBlock(args.BlockID)
+	if err != nil {
+		return fmt.Errorf("couldn't get block with id %s: %w", args.BlockID, err)
+	}
+	response.Encoding = args.Encoding
+
+	if args.Encoding == formatting.JSON {
+		response.Block = block
+		return nil
+	}
+
+	response.Block, err = formatting.EncodeWithChecksum(args.Encoding, block.Bytes())
+	if err != nil {
+		return fmt.Errorf("couldn't encode block %s as string: %w", args.BlockID, err)
+	}
+
+	return nil
+}
