@@ -45,3 +45,9 @@ For the full documentation of precompiles for interacting with ANTs and using th
 Blocks are produced asynchronously in Snowman Consensus, so the timing assumptions that apply to Ethereum do not apply to Coreth. To support block production in an async environment, a block is permitted to have the same timestamp as its parent. Since there is no general assumption that a block will be produced every 10 seconds, smart contracts built on Avalanche should use the block timestamp instead of the block number for their timing assumptions.
 
 A block with a timestamp more than 10 seconds in the future will not be considered valid. However, a block with a timestamp more than 10 seconds in the past will still be considered valid as long as its timestamp is greater than or equal to the timestamp of its parent block.
+
+## Difficulty and Random OpCode
+
+Snowman consensus does not use difficulty in any way, so the difficulty of every block is required to be set to 1. This means that the DIFFICULTY opcode should not be used as a source of randomness.
+
+Additionally, with the change from the DIFFICULTY OpCode to the RANDOM OpCode, there is no planned change to provide a stronger source of randomness. The RANDOM OpCode relies on the Eth2.0 Randomness Beacon, which has no direct parallel within the context of coreth or Snowman consensus. Therefore, instead of providing some weak source of randomness that may be manipulated, the RANDOM OpCode will not be supported.
