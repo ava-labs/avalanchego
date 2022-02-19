@@ -23,7 +23,7 @@ type ModifyStatus common.Hash
 var (
 	None     ModifyStatus = ModifyStatus(common.Hash{})  // No role assigned - this is equivalent to common.Hash{}
 	Deployer ModifyStatus = ModifyStatus(common.Hash{1}) // Deployers are allowed to create new contracts
-	Admin    ModifyStatus = ModifyStatus(common.Hash{1}) // Admin - allowed to modify both the admin and deployer lists
+	Admin    ModifyStatus = ModifyStatus(common.Hash{2}) // Admin - allowed to modify both the admin and deployer lists
 )
 
 // valid returns nil if the status is a valid status.
