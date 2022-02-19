@@ -27,6 +27,7 @@
 package vm
 
 import (
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -34,6 +35,7 @@ import (
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/holiman/uint256"
 )
 
@@ -449,6 +451,12 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	contractHash := evm.StateDB.GetCodeHash(address)
 	if evm.StateDB.GetNonce(address) != 0 || (contractHash != (common.Hash{}) && contractHash != emptyCodeHash) {
 		return nil, common.Address{}, 0, ErrContractAddressCollision
+	}
+	// Check that [caller] has the right to deploy contracts
+	modifyStatus := getAllowListStatus(evm.StateDB, caller.Address())
+	if !modifyStatus.HasDeployPrivileges() {
+		log.Info("caller is not authorized to deploy a contract", "caller", caller.Address(), "status", modifyStatus)
+		return nil, common.Address{}, 0, fmt.Errorf("caller %s is not authorized to deploy a contract", caller.Address())
 	}
 	// Create a new account on the state
 	snapshot := evm.StateDB.Snapshot()

@@ -7,6 +7,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+var (
+	AllowListPrecompileAddress = common.HexToAddress("0x0200000000000000000000000000000000000000")
+)
+
 // StatefulPrecompiledContract is the interface for executing a precompiled contract
 // This wraps the PrecompiledContracts native to Ethereum and allows adding in stateful
 // precompiled contracts to support native Avalanche asset transfers.
