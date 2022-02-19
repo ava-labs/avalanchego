@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/types"
+	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/trie"
@@ -87,6 +88,9 @@ type Genesis struct {
 	GasUsed    uint64      `json:"gasUsed"`
 	ParentHash common.Hash `json:"parentHash"`
 	BaseFee    *big.Int    `json:"baseFeePerGas"`
+
+	// Addresses for the original set of admins over the contract allow list precompile
+	ContractAllowListAdmin []common.Address `json:"allowListAdmin"`
 }
 
 // GenesisAlloc specifies the initial state that is part of the genesis block.
@@ -266,6 +270,12 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 			"hash", h, "addrs", len(airdrop), "balance", g.AirdropAmount,
 			"t", time.Since(t),
 		)
+	}
+	// Configure each address in [ContractAllowListAdmin] to be an admin for the allow list precompile
+	for _, addr := range g.ContractAllowListAdmin {
+		if err := vm.SetAllowListStatus(statedb, addr, vm.Admin); err != nil {
+			panic(fmt.Errorf("set allow list errored during genesis configuration: %w", err))
+		}
 	}
 	// Do cusotm allocation after airdrop in case an address shows up in standard
 	// allocation
