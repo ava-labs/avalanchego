@@ -11,9 +11,16 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 )
+
+func testSharedMemory() atomic.SharedMemory {
+	m := &atomic.Memory{}
+	m.Initialize(logging.NoLog{}, memdb.New())
+	return m.NewSharedMemory(testCChainID)
+}
 
 func TestIteratorCanIterate(t *testing.T) {
 	lastAcceptedHeight := uint64(1000)
@@ -30,7 +37,7 @@ func TestIteratorCanIterate(t *testing.T) {
 
 	// create an atomic trie
 	// on create it will initialize all the transactions from the above atomic repository
-	atomicTrie1, err := newAtomicTrie(db, make(map[uint64]ids.ID), repo, codec, lastAcceptedHeight, 100)
+	atomicTrie1, err := newAtomicTrie(db, testSharedMemory(), nil, repo, codec, lastAcceptedHeight, 100)
 	assert.NoError(t, err)
 
 	lastCommittedHash1, lastCommittedHeight1 := atomicTrie1.LastCommitted()
@@ -42,7 +49,7 @@ func TestIteratorCanIterate(t *testing.T) {
 
 	// iterate on a new atomic trie to make sure there is no resident state affecting the data and the
 	// iterator
-	atomicTrie2, err := newAtomicTrie(db, make(map[uint64]ids.ID), repo, codec, lastAcceptedHeight, 100)
+	atomicTrie2, err := newAtomicTrie(db, testSharedMemory(), nil, repo, codec, lastAcceptedHeight, 100)
 	assert.NoError(t, err)
 	lastCommittedHash2, lastCommittedHeight2 := atomicTrie2.LastCommitted()
 	assert.NoError(t, err)
@@ -67,7 +74,7 @@ func TestIteratorHandlesInvalidData(t *testing.T) {
 
 	// create an atomic trie
 	// on create it will initialize all the transactions from the above atomic repository
-	atomicTrie, err := newAtomicTrie(db, make(map[uint64]ids.ID), repo, codec, lastAcceptedHeight, 100)
+	atomicTrie, err := newAtomicTrie(db, testSharedMemory(), nil, repo, codec, lastAcceptedHeight, 100)
 	assert.NoError(t, err)
 
 	lastCommittedHash, lastCommittedHeight := atomicTrie.LastCommitted()
@@ -82,7 +89,7 @@ func TestIteratorHandlesInvalidData(t *testing.T) {
 	assert.NoError(t, atomicTrie.trie.TryUpdate(utils.RandomBytes(50), utils.RandomBytes(50)))
 	assert.NoError(t, atomicTrie.commit(lastCommittedHeight+1))
 	corruptedHash, _ := atomicTrie.LastCommitted()
-	iter, err := atomicTrie.Iterator(corruptedHash, 0)
+	iter, err := atomicTrie.Iterator(corruptedHash, nil)
 	assert.NoError(t, err)
 	for iter.Next() {
 	}
