@@ -520,6 +520,7 @@ func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 		atomicOps := it.AtomicOps()
 
 		if height > lastAcceptedBlock {
+			log.Warn("Found height above last accepted block while applying operations to shared memory", "height", height, "lastAcceptedBlock", lastAcceptedBlock)
 			break
 		}
 
