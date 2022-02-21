@@ -41,13 +41,11 @@ var (
 // at the corresponding height.
 type AtomicTrie interface {
 	// Index indexes the given atomicOps at the specified block height
-	// Returns an optional root hash
-	// A non-empty root hash is returned when the atomic trie has been committed
 	// Atomic trie is committed if the block height is multiple of commit interval
 	Index(height uint64, atomicOps map[ids.ID]*atomic.Requests) error
 
 	// Iterator returns an AtomicTrieIterator to iterate the trie at the given
-	// root hash
+	// root hash starting at [cursor].
 	Iterator(hash common.Hash, cursor []byte) (AtomicTrieIterator, error)
 
 	// LastCommitted returns the last committed hash and corresponding block height
@@ -66,31 +64,19 @@ type AtomicTrie interface {
 	// common.Hash{} instead
 	Root(height uint64) (common.Hash, error)
 
-	// ApplyToSharedMemory iterates over atomic ops indexed in the trie and applies them
-	// to sharedMemory, for heights less than or equal to [lastAcceptedBlock].
-	// This function is called by the statesync.Syncer to execute operations into shared memory
-	// once the atomic trie is synced. Syncer scenarios:
-	// - sync from genesis: lastAcceptedBlock is state sync block, cursor is at 1. Shared memory
-	//   updated from 1 to lastAcceptedBlock (inclusive)
-	// - fast-forward state sync: cursor is last accepted+1, lastAcceptedBlock is state sync block.
-	//   Shared memory applied from last accepted+1 to lastAccepted block (inclusive)
-	// If interrupted the resume logic is as follows:
-	// - if cursor is set with blockchainID, apply to shared memory continues from the next record in atomic trie
-	//   cursor position
-	// - if cursor is set without blockchainID, apply to shared memory continues from the record at the cursor
-	// - if cursor is not set, this call is skipped
-	// Cursor is deleted at the end of this call if one existed.
+	// ApplyToSharedMemory applies the atomic operations that have been indexed into the trie
+	// but not yet applied to shared memory for heights less than or equal to [lastAcceptedBlock].
+	// This executes operations in the range [cursorHeight+1, lastAcceptedBlock].
+	// The cursor is initially set by  MarkApplyToSharedMemoryCursor to signal to the atomic trie
+	// the range of operations that were added to the trie without being executed on shared memory.
 	ApplyToSharedMemory(lastAcceptedBlock uint64) error
 
-	// MarkApplyToSharedMemoryCursor marks the atomic trie as containing atomic ops
-	// that must be applied to shared memory (on initialize or ApplyToSharedMemory).
-	// Assumes heights less than or equal to [height] must already be applied to shared memory.
-	// This function is called by statesync.Syncer to set the height of blocks containing
-	// atomic transactions executed into shared memory. When subsequently ApplyToSharedMemory
-	// is called with lastAcceptedBlock parameter it will execute from this height to
-	// the lastAcceptedBlock. This serves as a dirty marker that is removed once all atomic
-	// operations have been executed.
-	MarkApplyToSharedMemoryCursor(height uint64) error
+	// MarkApplyToSharedMemoryCursor marks the atomic trie as containing atomic ops that
+	// have not been executed on shared memory starting at [previousLastAcceptedHeight+1].
+	// This is used when state sync syncs the atomic trie, such that the atomic operations
+	// from [previousLastAcceptedHeight+1] to the [lastAcceptedHeight] set by state sync
+	// will not have been executed on shared memory.
+	MarkApplyToSharedMemoryCursor(previousLastAcceptedHeight uint64) error
 }
 
 // AtomicTrieIterator is a stateful iterator that iterates the leafs of an AtomicTrie
@@ -138,8 +124,9 @@ type atomicTrie struct {
 var _ AtomicTrie = &atomicTrie{}
 
 // NewAtomicTrie returns a new instance of a atomicTrie with the default commitHeightInterval.
-// Initializes the trie before returning it. Applies any pending atomic operations under the cursor
-// set by MarkApplyToSharedMemoryCursor (if set) blockingly.
+// Initializes the trie before returning it.
+// If the cursor set by MarkApplyToSharedMemoryCursor exists, the atomic operations are applied synchronously
+// during initialization (blocks until ApplyToSharedMemory completes).
 func NewAtomicTrie(
 	db *versiondb.Database, sharedMemory atomic.SharedMemory,
 	bonusBlocks map[uint64]ids.ID, repo AtomicTxRepository, codec codec.Manager, lastAcceptedHeight uint64,
@@ -188,10 +175,11 @@ func newAtomicTrie(
 		log:                  log.New("c", "atomicTrie"),
 		sharedMemory:         sharedMemory,
 	}
-	// ApplyToSharedMemory is called here in case the node was shut down after state sync
-	// in the middle of applying atomic ops to shared memory, to finish that operation.
-	// In normal operations, the atomicTrie will not contain operations for heights greater
-	// than lastAcceptedHeight and this call will be a noop.
+
+	// We call ApplyToSharedMemory here to ensure that if the node was shut down in the middle
+	// of applying atomic operations from state sync, we finish the operation to ensure we never
+	// return an atomic trie that is out of sync with shared memory.
+	// In normal operation, the cursor is not set, such that this call will be a no-op.
 	if err := atomicTrie.ApplyToSharedMemory(lastAcceptedHeight); err != nil {
 		return nil, err
 	}
@@ -442,13 +430,14 @@ func (a *atomicTrie) LastCommitted() (common.Hash, uint64) {
 	return a.lastCommittedHash, a.lastCommittedHeight
 }
 
-// UpdateLastCommitted sets the state to last committed hash and height
-func (a *atomicTrie) UpdateLastCommitted(hash common.Hash, height uint64) error {
+// UpdateLastCommitted adds [height] -> [root] to the index and marks it as the
+// last committed pair.
+func (a *atomicTrie) UpdateLastCommitted(root common.Hash, height uint64) error {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 
 	// now save the trie hash against the height it was committed at
-	if err := a.metadataDB.Put(heightBytes, hash[:]); err != nil {
+	if err := a.metadataDB.Put(heightBytes, root[:]); err != nil {
 		return err
 	}
 
@@ -457,13 +446,13 @@ func (a *atomicTrie) UpdateLastCommitted(hash common.Hash, height uint64) error 
 		return err
 	}
 
-	a.lastCommittedHash = hash
+	a.lastCommittedHash = root
 	a.lastCommittedHeight = height
 	return nil
 }
 
 // Iterator returns a types.AtomicTrieIterator that iterates the trie from the given
-// atomic trie root, starting at the specified prefix
+// atomic trie root, starting at the specified [cursor].
 func (a *atomicTrie) Iterator(root common.Hash, cursor []byte) (AtomicTrieIterator, error) {
 	t, err := trie.New(root, a.trieDB)
 	if err != nil {
@@ -495,20 +484,11 @@ func (a *atomicTrie) Root(height uint64) (common.Hash, error) {
 	return common.BytesToHash(hash), nil
 }
 
-// ApplyToSharedMemory iterates over atomic ops indexed in the trie and applies them
-// to sharedMemory, for heights less than or equal to [lastAcceptedBlock].
-// This function is called by the statesync.Syncer to execute operations into shared memory
-// once the atomic trie is synced. Syncer scenarios:
-// - sync from genesis: lastAcceptedBlock is state sync block, cursor is at 1. Shared memory
-//   updated from 1 to lastAcceptedBlock (inclusive)
-// - fast-forward state sync: cursor is last accepted+1, lastAcceptedBlock is state sync block.
-//   Shared memory applied from last accepted+1 to lastAccepted block (inclusive)
-// If interrupted the resume logic is as follows:
-// - if cursor is set with blockchainID, apply to shared memory continues from the next record in atomic trie
-//   cursor position
-// - if cursor is set without blockchainID, apply to shared memory continues from the record at the cursor
-// - if cursor is not set, this call is skipped
-// Cursor is deleted at the end of this call if one existed.
+// ApplyToSharedMemory applies the atomic operations that have been indexed into the trie
+// but not yet applied to shared memory for heights less than or equal to [lastAcceptedBlock].
+// This executes operations in the range [cursorHeight+1, lastAcceptedBlock].
+// The cursor is initially set by  MarkApplyToSharedMemoryCursor to signal to the atomic trie
+// the range of operations that were added to the trie without being executed on shared memory.
 func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 	sharedMemoryCursor, err := a.metadataDB.Get(appliedSharedMemoryCursorKey)
 	if err == database.ErrNotFound {
@@ -528,9 +508,9 @@ func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 
 	// value of sharedMemoryCursor is either a uint64 signifying the
 	// height iteration should begin at or is a uint64+blockchainID
-	// specifying the last trie node applied to shared memory.
-	// to avoid applying the same atomic ops, in the later case, we
-	// call [it.Next] once here.
+	// specifying the last atomic operation that was applied to shared memory.
+	// To avoid applying the same operation twice, we call [it.Next()] in the
+	// latter case.
 	if len(sharedMemoryCursor) > wrappers.LongLen {
 		it.Next()
 	}
@@ -550,7 +530,9 @@ func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 			lastUpdate = time.Now()
 		}
 
-		// update last applied pointer
+		// Update the cursor to the key of the atomic operation being executed on shared memory.
+		// If the node shuts down in the middle of this function call, ApplyToSharedMemory will
+		// resume operation starting at the key immediately following [it.Key()].
 		if err = a.metadataDB.Put(appliedSharedMemoryCursorKey, it.Key()); err != nil {
 			return err
 		}
@@ -575,10 +557,13 @@ func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 	return a.db.Commit()
 }
 
-// MarkApplyToSharedMemoryCursor sets given height as the height of executed
-// blocks containing atomic transactions.
-// On ApplyToSharedMemory call the
-func (a *atomicTrie) MarkApplyToSharedMemoryCursor(height uint64) error {
-	// store the height of the last applied block + 1 so iteration begins there
-	return database.PutUInt64(a.metadataDB, appliedSharedMemoryCursorKey, height+1)
+// MarkApplyToSharedMemoryCursor marks the atomic trie as containing atomic ops that
+// have not been executed on shared memory starting at [previousLastAcceptedHeight+1].
+// This is used when state sync syncs the atomic trie, such that the atomic operations
+// from [previousLastAcceptedHeight+1] to the [lastAcceptedHeight] set by state sync
+// will not have been executed on shared memory.
+func (a *atomicTrie) MarkApplyToSharedMemoryCursor(previousLastAcceptedHeight uint64) error {
+	// Set the cursor to [previousLastAcceptedHeight+1] so that we begin the iteration at the
+	// first item that has not been applied to shared memory.
+	return database.PutUInt64(a.metadataDB, appliedSharedMemoryCursorKey, previousLastAcceptedHeight+1)
 }
