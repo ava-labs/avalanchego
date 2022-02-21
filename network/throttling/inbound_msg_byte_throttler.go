@@ -53,7 +53,6 @@ type msgMetadata struct {
 	closeOnAcquireChan chan struct{}
 }
 
-// msgThrottler implements MsgThrottler.
 // It gives more space to validators with more stake.
 // Messages are guaranteed to make progress toward
 // acquiring enough bytes to be read.

@@ -42,11 +42,15 @@ var Tests = []func(c GeneralCodec, t testing.TB){
 // The below structs and interfaces exist
 // for the sake of testing
 
+var (
+	_ Foo = &MyInnerStruct{}
+	_ Foo = &MyInnerStruct2{}
+)
+
 type Foo interface {
 	Foo() int
 }
 
-// *MyInnerStruct implements Foo
 type MyInnerStruct struct {
 	Str string `serialize:"true"`
 }
@@ -55,7 +59,6 @@ func (m *MyInnerStruct) Foo() int {
 	return 1
 }
 
-// *MyInnerStruct2 implements Foo
 type MyInnerStruct2 struct {
 	Bool bool `serialize:"true"`
 }

@@ -41,7 +41,6 @@ type Serializer struct {
 	edge  ids.Set
 }
 
-// Initialize implements the avalanche.State interface
 func (s *Serializer) Initialize(ctx *snow.Context, vm vertex.DAGVM, db database.Database) {
 	s.ctx = ctx
 	s.vm = vm
@@ -59,12 +58,10 @@ func (s *Serializer) Initialize(ctx *snow.Context, vm vertex.DAGVM, db database.
 	s.edge.Add(s.state.Edge()...)
 }
 
-// ParseVtx implements the avalanche.State interface
 func (s *Serializer) ParseVtx(b []byte) (avalanche.Vertex, error) {
 	return newUniqueVertex(s, b)
 }
 
-// BuildVtx implements the avalanche.State interface
 func (s *Serializer) BuildVtx(
 	parentIDs []ids.ID,
 	txs []snowstorm.Tx,
@@ -107,15 +104,12 @@ func (s *Serializer) BuildVtx(
 	return uVtx, uVtx.setVertex(vtx)
 }
 
-// BuildStopVtx implements the avalanche.State interface
 func (s *Serializer) BuildStopVtx(parentIDs []ids.ID) (avalanche.Vertex, error) {
 	panic("not implemented")
 }
 
-// GetVtx implements the avalanche.State interface
 func (s *Serializer) GetVtx(vtxID ids.ID) (avalanche.Vertex, error) { return s.getVertex(vtxID) }
 
-// Edge implements the avalanche.State interface
 func (s *Serializer) Edge() []ids.ID { return s.edge.List() }
 
 func (s *Serializer) parseVertex(b []byte) (vertex.StatelessVertex, error) {

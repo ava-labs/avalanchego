@@ -26,6 +26,8 @@ const (
 	capacityReductionFactor = 2
 )
 
+var _ Set = &set{}
+
 // Set of validators that can be sampled
 type Set interface {
 	fmt.Stringer
@@ -103,7 +105,6 @@ type set struct {
 	maskedVdrs       ids.ShortSet
 }
 
-// Set implements the Set interface.
 func (s *set) Set(vdrs []Validator) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -165,7 +166,6 @@ func (s *set) set(vdrs []Validator) error {
 	return nil
 }
 
-// Add implements the Set interface.
 func (s *set) AddWeight(vdrID ids.ShortID, weight uint64) error {
 	if weight == 0 {
 		return nil // This validator would never be sampled anyway
@@ -209,7 +209,6 @@ func (s *set) addWeight(vdrID ids.ShortID, weight uint64) error {
 	return nil
 }
 
-// GetWeight implements the Set interface.
 func (s *set) GetWeight(vdrID ids.ShortID) (uint64, bool) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
@@ -224,7 +223,6 @@ func (s *set) getWeight(vdrID ids.ShortID) (uint64, bool) {
 	return 0, false
 }
 
-// SubsetWeight implements the Set interface.
 func (s *set) SubsetWeight(subset ids.ShortSet) (uint64, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
@@ -244,7 +242,6 @@ func (s *set) SubsetWeight(subset ids.ShortSet) (uint64, error) {
 	return totalWeight, nil
 }
 
-// RemoveWeight implements the Set interface.
 func (s *set) RemoveWeight(vdrID ids.ShortID, weight uint64) error {
 	if weight == 0 {
 		return nil
@@ -281,7 +278,6 @@ func (s *set) removeWeight(vdrID ids.ShortID, weight uint64) error {
 	return nil
 }
 
-// Get implements the Set interface.
 func (s *set) Get(vdrID ids.ShortID) (Validator, bool) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
@@ -332,7 +328,6 @@ func (s *set) remove(vdrID ids.ShortID) error {
 	return nil
 }
 
-// Contains implements the Set interface.
 func (s *set) Contains(vdrID ids.ShortID) bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
@@ -345,7 +340,6 @@ func (s *set) contains(vdrID ids.ShortID) bool {
 	return contains
 }
 
-// Len implements the Set interface.
 func (s *set) Len() int {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
@@ -355,7 +349,6 @@ func (s *set) Len() int {
 
 func (s *set) len() int { return len(s.vdrSlice) }
 
-// List implements the Group interface.
 func (s *set) List() []Validator {
 	s.lock.RLock()
 	defer s.lock.RUnlock()

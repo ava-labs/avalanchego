@@ -29,7 +29,6 @@ type Operation struct {
 	Op         FxOperation    `serialize:"true" json:"operation"`
 }
 
-// Verify implements the verify.Verifiable interface
 func (op *Operation) Verify(c codec.Manager) error {
 	switch {
 	case op == nil:

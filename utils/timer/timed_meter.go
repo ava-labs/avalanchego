@@ -26,7 +26,6 @@ type TimedMeter struct {
 	tickList *list.List
 }
 
-// Tick implements the Meter interface
 func (tm *TimedMeter) Tick() {
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
@@ -34,7 +33,6 @@ func (tm *TimedMeter) Tick() {
 	tm.tick()
 }
 
-// Ticks implements the Meter interface
 func (tm *TimedMeter) Ticks() int {
 	tm.lock.Lock()
 	defer tm.lock.Unlock()

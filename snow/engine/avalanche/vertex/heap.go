@@ -15,7 +15,6 @@ var (
 	_ heap.Interface = &priorityQueue{}
 )
 
-// A priorityQueue implements heap.Interface and holds vertexItems.
 type priorityQueue []avalanche.Vertex
 
 func (pq priorityQueue) Len() int { return len(pq) }

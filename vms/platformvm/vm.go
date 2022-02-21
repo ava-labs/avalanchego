@@ -66,7 +66,6 @@ var (
 	_ Fx                   = &secp256k1fx.Fx{}
 )
 
-// VM implements the snowman.ChainVM interface
 type VM struct {
 	Factory
 	metrics
@@ -359,7 +358,6 @@ func (vm *VM) Shutdown() error {
 // BuildBlock builds a block to be added to consensus
 func (vm *VM) BuildBlock() (snowman.Block, error) { return vm.blockBuilder.BuildBlock() }
 
-// ParseBlock implements the snowman.ChainVM interface
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	var blk Block
 	if _, err := Codec.Unmarshal(b, &blk); err != nil {
@@ -378,7 +376,6 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	return blk, nil
 }
 
-// GetBlock implements the snowman.ChainVM interface
 func (vm *VM) GetBlock(blkID ids.ID) (snowman.Block, error) { return vm.getBlock(blkID) }
 
 func (vm *VM) getBlock(blkID ids.ID) (Block, error) {
@@ -452,12 +449,10 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	}, nil
 }
 
-// Connected implements validators.Connector
-func (vm *VM) Connected(vdrID ids.ShortID, nodeVersion version.Application) error {
+func (vm *VM) Connected(vdrID ids.ShortID, _ version.Application) error {
 	return vm.uptimeManager.Connect(vdrID)
 }
 
-// Disconnected implements validators.Connector
 func (vm *VM) Disconnected(vdrID ids.ShortID) error {
 	if err := vm.uptimeManager.Disconnect(vdrID); err != nil {
 		return err

@@ -198,7 +198,6 @@ func NewNoOutboundThrottler() OutboundMsgThrottler {
 	return &noOutboundMsgThrottler{}
 }
 
-// noOutboundMsgThrottler implements OutboundMsgThrottler.
 // [Acquire] always returns true. [Release] does nothing.
 type noOutboundMsgThrottler struct{}
 

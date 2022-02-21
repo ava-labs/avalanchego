@@ -16,12 +16,14 @@ import (
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
-var _ Consensus = &Directed{}
+var (
+	_ Factory   = &DirectedFactory{}
+	_ Consensus = &Directed{}
+)
 
 // DirectedFactory implements Factory by returning a directed struct
 type DirectedFactory struct{}
 
-// New implements Factory
 func (DirectedFactory) New() Consensus { return &Directed{} }
 
 // Directed is an implementation of a multi-color, non-transitive, snowball
@@ -89,7 +91,6 @@ type directedTx struct {
 	tx Tx
 }
 
-// Initialize implements the Consensus interface
 func (dg *Directed) Initialize(
 	ctx *snow.ConsensusContext,
 	params sbcon.Parameters,
@@ -111,18 +112,14 @@ func (dg *Directed) Initialize(
 	return params.Verify()
 }
 
-// Parameters implements the Snowstorm interface
 func (dg *Directed) Parameters() sbcon.Parameters { return dg.params }
 
-// Virtuous implements the ConflictGraph interface
 func (dg *Directed) Virtuous() ids.Set { return dg.virtuous }
 
-// Preferences implements the ConflictGraph interface
 func (dg *Directed) Preferences() ids.Set { return dg.preferences }
 
 func (dg *Directed) VirtuousVoting() ids.Set { return dg.virtuousVoting }
 
-// Quiesce implements the ConflictGraph interface
 func (dg *Directed) Quiesce() bool {
 	numVirtuous := dg.virtuousVoting.Len()
 	dg.ctx.Log.Verbo("Conflict graph has %d voting virtuous transactions",
@@ -130,7 +127,6 @@ func (dg *Directed) Quiesce() bool {
 	return numVirtuous == 0
 }
 
-// Finalized implements the ConflictGraph interface
 func (dg *Directed) Finalized() bool {
 	numPreferences := dg.preferences.Len()
 	dg.ctx.Log.Verbo("Conflict graph has %d preferred transactions",
@@ -203,7 +199,6 @@ func (dg *Directed) shouldVote(tx Tx) (bool, error) {
 	return false, nil
 }
 
-// IsVirtuous implements the Consensus interface
 func (dg *Directed) IsVirtuous(tx Tx) bool {
 	txID := tx.ID()
 	// If the tx is currently processing, we should just return if was
@@ -226,7 +221,6 @@ func (dg *Directed) IsVirtuous(tx Tx) bool {
 	return true
 }
 
-// Conflicts implements the Consensus interface
 func (dg *Directed) Conflicts(tx Tx) ids.Set {
 	var conflicts ids.Set
 	if node, exists := dg.txs[tx.ID()]; exists {
@@ -249,7 +243,6 @@ func (dg *Directed) Conflicts(tx Tx) ids.Set {
 	return conflicts
 }
 
-// Add implements the Consensus interface
 func (dg *Directed) Add(tx Tx) error {
 	if shouldVote, err := dg.shouldVote(tx); !shouldVote || err != nil {
 		return err
@@ -372,7 +365,6 @@ func (dg *Directed) Remove(txID ids.ID) error {
 	return dg.reject(s)
 }
 
-// Issued implements the Consensus interface
 func (dg *Directed) Issued(tx Tx) bool {
 	// If the tx is either Accepted or Rejected, then it must have been issued
 	// previously.
@@ -385,7 +377,6 @@ func (dg *Directed) Issued(tx Tx) bool {
 	return ok
 }
 
-// RecordPoll implements the Consensus interface
 func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 	// Increase the vote ID. This is only updated here and is used to reset the
 	// confidence values of transactions lazily.

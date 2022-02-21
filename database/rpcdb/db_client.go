@@ -91,17 +91,14 @@ func (db *DatabaseClient) Delete(key []byte) error {
 // NewBatch returns a new batch
 func (db *DatabaseClient) NewBatch() database.Batch { return &batch{db: db} }
 
-// NewIterator implements the Database interface
 func (db *DatabaseClient) NewIterator() database.Iterator {
 	return db.NewIteratorWithStartAndPrefix(nil, nil)
 }
 
-// NewIteratorWithStart implements the Database interface
 func (db *DatabaseClient) NewIteratorWithStart(start []byte) database.Iterator {
 	return db.NewIteratorWithStartAndPrefix(start, nil)
 }
 
-// NewIteratorWithPrefix implements the Database interface
 func (db *DatabaseClient) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 	return db.NewIteratorWithStartAndPrefix(nil, prefix)
 }

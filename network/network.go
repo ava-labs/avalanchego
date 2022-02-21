@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"net"
 	"strings"
@@ -63,6 +64,11 @@ type Network interface {
 	// Thread safety must be managed internally in the network.
 	snow.Acceptor
 
+	// Close this network and all existing connections it has. Thread safety
+	// must be managed internally to the network. Calling close multiple times
+	// will return a nil error.
+	io.Closer
+
 	// Should only be called once, will run until either a fatal error occurs,
 	// or the network is closed. Returns a non-nil error.
 	Dispatch() error
@@ -80,11 +86,6 @@ type Network interface {
 	// connected to externally or all nodes this network is connected to if [nodeIDs]
 	// is empty. Thread safety must be managed internally to the network.
 	Peers(nodeIDs []ids.ShortID) []PeerInfo
-
-	// Close this network and all existing connections it has. Thread safety
-	// must be managed internally to the network. Calling close multiple times
-	// will return a nil error.
-	Close() error
 
 	// Return the IP of the node
 	IP() utils.IPDesc
@@ -649,7 +650,6 @@ func (n *network) NewPeerInfo(peer *peer) PeerInfo {
 	}
 }
 
-// Close implements the Network interface
 // Assumes [n.stateLock] is not held.
 func (n *network) Close() error {
 	n.closeOnce.Do(n.close)
@@ -684,13 +684,11 @@ func (n *network) close() {
 	}
 }
 
-// TrackIP implements the Network interface
 // Assumes [n.stateLock] is not held.
 func (n *network) TrackIP(ip utils.IPDesc) {
 	n.Track(ip, ids.ShortEmpty)
 }
 
-// Track implements the Network interface
 // Assumes [n.stateLock] is not held.
 func (n *network) Track(ip utils.IPDesc, nodeID ids.ShortID) {
 	n.stateLock.Lock()
