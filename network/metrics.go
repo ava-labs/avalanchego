@@ -54,7 +54,7 @@ func newMessageMetrics(op message.Op, namespace string, metrics prometheus.Regis
 		metrics.Register(msg.sentBytes),
 	)
 
-	if op.Compressable() {
+	if op.Compressible() {
 		msg.savedReceivedBytes = metric.NewAveragerWithErrs(
 			namespace,
 			fmt.Sprintf("%s_compression_saved_received_bytes", op),

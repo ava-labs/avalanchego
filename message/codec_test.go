@@ -76,7 +76,7 @@ func TestDeadlineOverride(t *testing.T) {
 		},
 	}
 
-	packedIntf, err := c.Pack(m.op, m.fields, m.op.Compressable())
+	packedIntf, err := c.Pack(m.op, m.fields, m.op.Compressible())
 	assert.NoError(t, err, "failed to pack on operation %s", m.op)
 
 	unpackedIntf, err := c.Parse(packedIntf.Bytes(), dummyNodeID, dummyOnFinishedHandling)
@@ -228,7 +228,7 @@ func TestCodecPackParseGzip(t *testing.T) {
 		},
 	}
 	for _, m := range msgs {
-		packedIntf, err := c.Pack(m.op, m.fields, m.op.Compressable())
+		packedIntf, err := c.Pack(m.op, m.fields, m.op.Compressible())
 		assert.NoError(t, err, "failed to pack on operation %s", m.op)
 
 		unpackedIntf, err := c.Parse(packedIntf.Bytes(), dummyNodeID, dummyOnFinishedHandling)

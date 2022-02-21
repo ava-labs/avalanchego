@@ -172,7 +172,7 @@ var (
 	}
 )
 
-func (op Op) Compressable() bool {
+func (op Op) Compressible() bool {
 	switch op {
 	case PeerList, Put, Ancestors, PushQuery, AppRequest, AppResponse, AppGossip:
 		return true

@@ -78,7 +78,7 @@ func NewCodecWithMemoryPool(namespace string, metrics prometheus.Registerer, max
 
 	errs := wrappers.Errs{}
 	for _, op := range ExternalOps {
-		if !op.Compressable() {
+		if !op.Compressible() {
 			continue
 		}
 
@@ -129,7 +129,7 @@ func (c *codec) Pack(
 	p.PackByte(byte(op))
 
 	// Optionally, pack whether the payload is compressed
-	if op.Compressable() {
+	if op.Compressible() {
 		p.PackBool(compress)
 	}
 
@@ -188,7 +188,7 @@ func (c *codec) Parse(bytes []byte, nodeID ids.ShortID, onFinishedHandling func(
 
 	// See if messages of this type may be compressed
 	compressed := false
-	if op.Compressable() {
+	if op.Compressible() {
 		compressed = p.UnpackBool()
 	}
 	if p.Err != nil {
