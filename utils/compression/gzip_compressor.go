@@ -16,7 +16,6 @@ import (
 
 var _ Compressor = &gzipCompressor{}
 
-// gzipCompressor implements Compressor
 type gzipCompressor struct {
 	maxSize int64
 

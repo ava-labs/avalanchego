@@ -364,7 +364,6 @@ func (s *set) list() []Validator {
 	return list
 }
 
-// Sample implements the Group interface.
 func (s *set) Sample(size int) ([]Validator, error) {
 	if size == 0 {
 		return nil, nil
