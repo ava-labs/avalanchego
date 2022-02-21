@@ -487,7 +487,6 @@ func (ss *stateSyncer) AppRequestFailed(nodeID ids.ShortID, requestID uint32) er
 // InternalHandler interface implementation
 func (ss *stateSyncer) Notify(msg common.Message) error {
 	// if state sync and bootstrap is done, we shouldn't receive StateSyncDone from the VM
-	ss.Ctx.Log.AssertTrue(!ss.IsBootstrapped(), "Notify received by StateSync after Bootstrap is done")
 	ss.Ctx.Log.Verbo("snowman engine notified of %s from the vm", msg)
 	switch msg {
 	case common.PendingTxs:
