@@ -430,8 +430,8 @@ func (a *atomicTrie) LastCommitted() (common.Hash, uint64) {
 	return a.lastCommittedHash, a.lastCommittedHeight
 }
 
-// UpdateLastCommitted adds [height] -> [root] to the index and marks it as the
-// last committed pair.
+// UpdateLastCommitted adds [height] -> [root] to the index and marks it as the last committed
+// root/height pair.
 func (a *atomicTrie) UpdateLastCommitted(root common.Hash, height uint64) error {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
