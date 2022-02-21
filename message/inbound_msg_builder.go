@@ -420,10 +420,10 @@ func (b *inMsgBuilder) InboundStateSummaryFrontier(
 	return &inboundMessage{
 		op: StateSummaryFrontier,
 		fields: map[Field]interface{}{
-			ChainID:        chainID[:],
-			RequestID:      requestID,
-			SummaryKey:     key,
-			ContainerBytes: summary,
+			ChainID:      chainID[:],
+			RequestID:    requestID,
+			SummaryKey:   key,
+			SummaryBytes: summary,
 		},
 		nodeID: nodeID,
 	}

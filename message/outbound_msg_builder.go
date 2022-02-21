@@ -521,10 +521,10 @@ func (b *outMsgBuilder) StateSummaryFrontier(
 	return b.c.Pack(
 		StateSummaryFrontier,
 		map[Field]interface{}{
-			ChainID:        chainID[:],
-			RequestID:      requestID,
-			SummaryKey:     key,
-			ContainerBytes: summary,
+			ChainID:      chainID[:],
+			RequestID:    requestID,
+			SummaryKey:   key,
+			SummaryBytes: summary,
 		},
 		StateSummaryFrontier.Compressable(), // StateSummaryFrontier messages can't be compressed
 	)
