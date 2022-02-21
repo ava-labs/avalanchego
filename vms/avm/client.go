@@ -26,12 +26,10 @@ type Client interface {
 	WalletClient
 	// GetTxStatus returns the status of [txID]
 	GetTxStatus(ctx context.Context, txID ids.ID) (choices.Status, error)
-	// ConfirmTx attempts to confirm [txID] by checking its status [numChecks] times
-	// with [checkFreq] between each attempt. If the transaction has not been decided
-	// by the final attempt, it returns the status of the last attempt.
-	// Note: ConfirmTx will block until either the last attempt finishes or the client
-	// returns a decided status.
-	ConfirmTx(ctx context.Context, txID ids.ID, numChecks int, checkFreq time.Duration) (choices.Status, error)
+	// ConfirmTx attempts to confirm [txID] by repeatedly checking its status.
+	// Note: ConfirmTx will block until either the context is done or the client
+	//       returns a decided status.
+	ConfirmTx(ctx context.Context, txID ids.ID, freq time.Duration) (choices.Status, error)
 	// GetTx returns the byte representation of [txID]
 	GetTx(ctx context.Context, txID ids.ID) ([]byte, error)
 	// GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
@@ -190,20 +188,24 @@ func (c *client) GetTxStatus(ctx context.Context, txID ids.ID) (choices.Status, 
 	return res.Status, err
 }
 
-func (c *client) ConfirmTx(ctx context.Context, txID ids.ID, attempts int, delay time.Duration) (choices.Status, error) {
-	for i := 0; i < attempts-1; i++ {
+func (c *client) ConfirmTx(ctx context.Context, txID ids.ID, freq time.Duration) (choices.Status, error) {
+	ticker := time.NewTicker(freq)
+	defer ticker.Stop()
+
+	for {
 		status, err := c.GetTxStatus(ctx, txID)
-		if err != nil {
-			return status, err
+		if err == nil {
+			if status.Decided() {
+				return status, nil
+			}
 		}
 
-		if status.Decided() {
-			return status, nil
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return status, ctx.Err()
 		}
-		time.Sleep(delay)
 	}
-
-	return c.GetTxStatus(ctx, txID)
 }
 
 func (c *client) GetTx(ctx context.Context, txID ids.ID) ([]byte, error) {

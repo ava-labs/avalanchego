@@ -157,6 +157,9 @@ type Client interface {
 	GetTx(ctx context.Context, txID ids.ID) ([]byte, error)
 	// GetTxStatus returns the status of the transaction corresponding to [txID]
 	GetTxStatus(ctx context.Context, txID ids.ID, includeReason bool) (*GetTxStatusResponse, error)
+	// AwaitTxDecided polls [GetTxStatus] until a status is returned that
+	// implies the tx may be decided.
+	AwaitTxDecided(ctx context.Context, txID ids.ID, includeReason bool, freq time.Duration) (*GetTxStatusResponse, error)
 	// GetStake returns the amount of nAVAX that [addresses] have cumulatively
 	// staked on the Primary Network.
 	GetStake(ctx context.Context, addrs []string) (*GetStakeReply, error)
@@ -574,6 +577,27 @@ func (c *client) GetTxStatus(ctx context.Context, txID ids.ID, includeReason boo
 		IncludeReason: includeReason,
 	}, res)
 	return res, err
+}
+
+func (c *client) AwaitTxDecided(ctx context.Context, txID ids.ID, includeReason bool, freq time.Duration) (*GetTxStatusResponse, error) {
+	ticker := time.NewTicker(freq)
+	defer ticker.Stop()
+
+	for {
+		res, err := c.GetTxStatus(ctx, txID, includeReason)
+		if err == nil {
+			switch res.Status {
+			case status.Committed, status.Aborted, status.Dropped:
+				return res, nil
+			}
+		}
+
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
 }
 
 func (c *client) GetStake(ctx context.Context, addrs []string) (*GetStakeReply, error) {

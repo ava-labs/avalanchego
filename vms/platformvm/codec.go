@@ -27,7 +27,7 @@ var (
 func init() {
 	c := linearcodec.NewDefault()
 	Codec = codec.NewDefaultManager()
-	gc := linearcodec.New(reflectcodec.DefaultTagName, math.MaxUint32)
+	gc := linearcodec.New(reflectcodec.DefaultTagName, math.MaxInt32)
 	GenesisCodec = codec.NewManager(math.MaxInt32)
 
 	errs := wrappers.Errs{}

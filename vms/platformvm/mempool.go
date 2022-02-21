@@ -140,7 +140,7 @@ func (m *mempool) Add(tx *Tx) error {
 		m.AddDecisionTx(tx)
 	default:
 		m.unknownTxs.Inc()
-		return errUnknownTxType
+		return fmt.Errorf("%w: %T", errUnknownTxType, tx.UnsignedTx)
 	}
 
 	// Mark these UTXOs as consumed in the mempool
