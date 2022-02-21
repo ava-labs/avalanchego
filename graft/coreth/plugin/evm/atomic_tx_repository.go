@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	commitSizeCap = 10 * units.MiB
+	repoCommitSizeCap = 10 * units.MiB
 )
 
 var (
@@ -147,7 +147,7 @@ func (a *atomicTxRepository) initializeHeightIndex(lastAcceptedHeight uint64) er
 
 		// call commitFn to write to underlying DB if we have reached
 		// [commitSizeCap]
-		if pendingBytesApproximation > commitSizeCap {
+		if pendingBytesApproximation > repoCommitSizeCap {
 			if err := a.atomicRepoMetadataDB.Put(maxIndexedHeightKey, lastTxID[:]); err != nil {
 				return err
 			}

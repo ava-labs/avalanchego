@@ -424,7 +424,7 @@ func (vm *VM) Initialize(
 	); err != nil {
 		return fmt.Errorf("failed to repair atomic repository: %w", err)
 	}
-	vm.atomicTrie, err = NewAtomicTrie(vm.db, bonusBlockHeights, vm.atomicTxRepository, vm.codec, lastAccepted.NumberU64())
+	vm.atomicTrie, err = NewAtomicTrie(vm.db, vm.ctx.SharedMemory, bonusBlockHeights, vm.atomicTxRepository, vm.codec, lastAccepted.NumberU64())
 	if err != nil {
 		return fmt.Errorf("failed to create atomic trie: %w", err)
 	}
