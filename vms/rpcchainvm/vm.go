@@ -38,6 +38,12 @@ type vmPlugin struct {
 	vm block.ChainVM
 }
 
+// New will be called by the server side of the plugin to pass into the server
+// side PluginMap for dispatching.
+func New(vm block.ChainVM) plugin.Plugin {
+	return &vmPlugin{vm: vm}
+}
+
 // GRPCServer registers a new GRPC server.
 func (p *vmPlugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server) error {
 	vmproto.RegisterVMServer(s, NewServer(p.vm, broker))

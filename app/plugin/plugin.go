@@ -37,6 +37,12 @@ type appPlugin struct {
 	app app.App
 }
 
+// New will be called by the server side of the plugin to pass into the server
+// side PluginMap for dispatching.
+func New(app app.App) plugin.Plugin {
+	return &appPlugin{app: app}
+}
+
 // GRPCServer registers a new GRPC server.
 func (p *appPlugin) GRPCServer(_ *plugin.GRPCBroker, s *grpc.Server) error {
 	pluginproto.RegisterNodeServer(s, NewServer(p.app))
