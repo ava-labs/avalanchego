@@ -539,13 +539,13 @@ func (_m *Engine) Start(startReqID uint32) error {
 	return r0
 }
 
-// StateSummaryFrontier provides a mock function with given fields: validatorID, requestID, key, summary
-func (_m *Engine) StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, key []byte, summary []byte) error {
-	ret := _m.Called(validatorID, requestID, key, summary)
+// StateSummaryFrontier provides a mock function with given fields: validatorID, requestID, summary
+func (_m *Engine) StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summary []byte) error {
+	ret := _m.Called(validatorID, requestID, summary)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, []byte, []byte) error); ok {
-		r0 = rf(validatorID, requestID, key, summary)
+	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, []byte) error); ok {
+		r0 = rf(validatorID, requestID, summary)
 	} else {
 		r0 = ret.Error(0)
 	}

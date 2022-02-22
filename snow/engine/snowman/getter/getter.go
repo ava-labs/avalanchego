@@ -61,7 +61,7 @@ func (gh *getter) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uin
 			err, validatorID, requestID)
 		return nil
 	}
-	gh.sender.SendStateSummaryFrontier(validatorID, requestID, summary.Key, summary.Content)
+	gh.sender.SendStateSummaryFrontier(validatorID, requestID, summary.Content)
 	return nil
 }
 
@@ -72,10 +72,9 @@ func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uin
 	}
 
 	acceptedKeys := make([][]byte, 0, len(keys))
-	for _, key := range keys {
-		accepted, err := gh.ssVM.StateSyncIsSummaryAccepted(key)
-		if err == nil && accepted {
-			acceptedKeys = append(acceptedKeys, key)
+	for _, keyBytes := range keys {
+		if _, err := gh.ssVM.StateSyncGetSummary(common.Key{Content: keyBytes}); err == nil {
+			acceptedKeys = append(acceptedKeys, keyBytes)
 		}
 	}
 	gh.sender.SendAcceptedStateSummary(validatorID, requestID, acceptedKeys)

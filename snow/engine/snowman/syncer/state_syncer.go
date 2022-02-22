@@ -48,7 +48,6 @@ func (swl summaryWeightedList) FilterAbove(minWeight uint64) []common.Summary {
 			continue
 		}
 		res = append(res, common.Summary{
-			Key:     s.Key,
 			Content: s.Content,
 		})
 	}
@@ -122,7 +121,7 @@ func New(
 }
 
 // StateSyncHandler interface implementation
-func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, key, summary []byte) error {
+func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summary []byte) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("Received an Out-of-Sync StateSummaryFrontier - validator: %v - expectedRequestID: %v, requestID: %v",
@@ -137,15 +136,21 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 
 	// Mark that we received a response from [validatorID]
 	ss.pendingReceiveStateSummaryFrontier.Remove(validatorID)
-	if _, exists := ss.weightedSummaries[string(key)]; !exists {
-		ss.weightedSummaries[string(key)] = weightedSummary{
+
+	// retrieve key for summary and register frontier
+	key, err := ss.stateSyncVM.StateSyncGetKey(common.Summary{Content: summary})
+	if err != nil {
+		ss.Ctx.Log.Debug("Could not retrieve key from summary %s: %v", summary, err)
+		return nil
+	}
+	if _, exists := ss.weightedSummaries[string(key.Content)]; !exists {
+		ss.weightedSummaries[string(key.Content)] = weightedSummary{
 			Summary: common.Summary{
-				Key:     key,
 				Content: summary,
 			},
 		}
 	}
-	ws := ss.weightedSummaries[string(key)]
+	ws := ss.weightedSummaries[string(key.Content)]
 
 	if len(ss.StateSyncTestingBeacons) != 0 {
 		// if state sync beacons are specified, immediately count
@@ -163,7 +168,7 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 			newWeight = stdmath.MaxUint64
 		}
 		ws.weight = newWeight
-		ss.weightedSummaries[string(key)] = ws
+		ss.weightedSummaries[string(key.Content)] = ws
 	}
 
 	if err := ss.sendGetStateSummaryFrontiers(); err != nil {
@@ -194,12 +199,10 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 	// Ask each state syncer to filter the list of containers that we were
 	// told are on the accepted frontier such that the list only contains containers
 	// they think are accepted
-	var err error
 
 	// Create a newAlpha taking using the sampled beacon
 	// Keep the proportion of b.Alpha in the newAlpha
 	// newAlpha := totalSampledWeight * b.Alpha / totalWeight
-
 	newAlpha := float64(ss.sampledBeacons.Weight()*ss.Alpha) / float64(ss.Beacons.Weight())
 
 	failedBeaconWeight, err := ss.Beacons.SubsetWeight(ss.failedStateSummaryFrontier)
@@ -235,7 +238,7 @@ func (ss *stateSyncer) GetStateSummaryFrontierFailed(validatorID ids.ShortID, re
 	// If we can't get a response from [validatorID], act as though they said their state summary frontier is empty
 	// and we add the validator to the failed list
 	ss.failedStateSummaryFrontier.Add(validatorID)
-	return ss.StateSummaryFrontier(validatorID, requestID, []byte{}, []byte{})
+	return ss.StateSummaryFrontier(validatorID, requestID, []byte{})
 }
 
 // StateSyncHandler interface implementation

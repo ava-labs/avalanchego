@@ -116,7 +116,6 @@ type InboundMsgBuilder interface {
 	InboundStateSummaryFrontier(
 		chainID ids.ID,
 		requestID uint32,
-		key []byte,
 		summary []byte,
 		nodeID ids.ShortID,
 	) InboundMessage
@@ -413,7 +412,6 @@ func (b *inMsgBuilder) InboundGetStateSummaryFrontier(
 func (b *inMsgBuilder) InboundStateSummaryFrontier(
 	chainID ids.ID,
 	requestID uint32,
-	key []byte,
 	summary []byte,
 	nodeID ids.ShortID,
 ) InboundMessage {
@@ -422,7 +420,6 @@ func (b *inMsgBuilder) InboundStateSummaryFrontier(
 		fields: map[Field]interface{}{
 			ChainID:      chainID[:],
 			RequestID:    requestID,
-			SummaryKey:   key,
 			SummaryBytes: summary,
 		},
 		nodeID: nodeID,

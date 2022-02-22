@@ -30,7 +30,7 @@ func NewNoOpStateSyncHandler(log logging.Logger) StateSyncHandler {
 	return &noOpStateSyncHandler{log: log}
 }
 
-func (nop *noOpStateSyncHandler) StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, key, summary []byte) error {
+func (nop *noOpStateSyncHandler) StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summary []byte) error {
 	nop.log.Debug("StateSummaryFrontier(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }

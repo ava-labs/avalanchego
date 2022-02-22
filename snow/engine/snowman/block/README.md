@@ -27,11 +27,12 @@ The requirements above bring us to the following structure for StateSummaries an
 
 |            | StateKey                                | StateSummary                   |
 |:----------:|:---------------------------------------:|:------------------------------:|
-| CoreVM     | CoreBlkID + SummaryID                   | CoreBlkID + SummaryContent     |
+| CoreVM     | BlkID + SummaryID                       | BlkID + SummaryContent         |
 | ProposerVM | ProBlkID + ProSummaryID + CoreSummaryID | ProBlkID + CoreVM StateSummary |
 
 It can easily verify by inspection that the structure above allows support the required operations. Below we content ourselves with some observations:
 
 1. Both CoreVM and ProposerVM StateKeys can directly be derived from their StateSummary via hashing and concatenation operations, without accessing any state or index. This
-2. Note also that CoreBlkID must be included in CoreVM StateSummary and StateKey because we required seamless operability for Snowman and Snowman++ VMs. Should we drop this requirement, and allow State Syncing only for Snowman++ VMs, CoreVM StateSummary and StateKey could be shortened by dropping CoreBlkID and using a simpler hash.
-3. Finally note that StateKeys are smaller then StateSummaries as long as SummaryHashes are smaller than SummaryContent.
+2. Note also that BlkID must be included in CoreVM StateSummary and StateKey because we required seamless operability for Snowman and Snowman++ VMs. Should we drop this requirement, and allow State Syncing only for Snowman++ VMs, CoreVM StateSummary and StateKey could be shortened by dropping BlkID and using a simpler hash.
+3. Note that both ProSummaryID and CoreSummaryID must be included into ProposerVM StateKey to allow full matching verification with CoreVM and ProposerVM StateSummaries. Should we drop this requirement, CoreVM StateSummary and StateKey could be shortened by dropping ProSummaryID and CoreSummaryID.
+4. Note that StateKeys are smaller then StateSummaries as long as SummaryHashes are smaller than SummaryContent.

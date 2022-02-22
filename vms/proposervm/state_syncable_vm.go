@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -32,7 +33,7 @@ func init() {
 	errs := wrappers.Errs{}
 	errs.Add(
 		lc.RegisterType(&common.Summary{}),
-		lc.RegisterType(&block.DefaultSummaryKey{}),
+		lc.RegisterType(&block.CoreSummaryKey{}),
 		stateSyncCodec.RegisterCodec(block.StateSyncDefaultKeysVersion, lc),
 	)
 	if err := errs.Err; err != nil {
@@ -58,96 +59,156 @@ func (vm *VM) StateSyncEnabled() (bool, error) {
 	return ssVM.StateSyncEnabled()
 }
 
+func (vm *VM) StateSyncGetKey(summary common.Summary) (common.Key, error) {
+	if _, ok := vm.ChainVM.(block.StateSyncableVM); !ok {
+		return common.Key{}, common.ErrStateSyncableVMNotImplemented
+	}
+
+	proContent := block.ProposerSummaryContent{}
+	ver, err := stateSyncCodec.Unmarshal(summary.Content, &proContent)
+	if err != nil {
+		return common.Key{}, fmt.Errorf("could not unmarshal ProposerSummaryContent due to: %w", err)
+	}
+	if ver != block.StateSyncDefaultKeysVersion {
+		return common.Key{}, errWrongStateSyncVersion
+	}
+
+	coreSummaryID, err := ids.ToID(hashing.ComputeHash256(proContent.CoreContent.Content))
+	if err != nil {
+		return common.Key{}, fmt.Errorf("could not compute core summary ID due to: %w", err)
+	}
+	proSummaryID, err := ids.ToID(hashing.ComputeHash256(summary.Content))
+	if err != nil {
+		return common.Key{}, fmt.Errorf("could not compute pro summary ID due to: %w", err)
+	}
+
+	proKey := block.ProposerSummaryKey{
+		ProBlkID:      proContent.ProBlkID,
+		CoreSummaryID: coreSummaryID,
+		ProSummaryID:  proSummaryID,
+	}
+	proKeyBytes, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, &proKey)
+	if err != nil {
+		return common.Key{}, fmt.Errorf("cannot marshal proposerVMKey due to: %w", err)
+	}
+
+	return common.Key{Content: proKeyBytes}, nil
+}
+
 func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
 		return common.Summary{}, common.ErrStateSyncableVMNotImplemented
 	}
 
+	// Extract core last state summary
 	vmSummary, err := ssVM.StateSyncGetLastSummary()
 	if err != nil {
 		return common.Summary{}, err
 	}
-
-	// Extract innerBlkID from summary key
-	innerKey := block.DefaultSummaryKey{}
-	parsedVersion, err := stateSyncCodec.Unmarshal(vmSummary.Key, &innerKey)
+	coreContent := block.CoreSummaryContent{}
+	ver, err := stateSyncCodec.Unmarshal(vmSummary.Content, &coreContent)
 	if err != nil {
 		return common.Summary{}, fmt.Errorf("cannot unmarshal vmSummary.Key due to: %w", err)
 	}
-	if parsedVersion != block.StateSyncDefaultKeysVersion {
+	if ver != block.StateSyncDefaultKeysVersion {
 		return common.Summary{}, errWrongStateSyncVersion
 	}
 
-	// retrieve proposer Block wrapping innerBlock
-	innerBlk, err := vm.ChainVM.GetBlock(innerKey.BlkID)
+	// retrieve proposer Block wrapping coreBlock
+	coreBlk, err := vm.ChainVM.GetBlock(coreContent.BlkID)
 	if err != nil {
-		// innerVM internal error. Could retrieve innerBlk matching last summary
 		return common.Summary{}, errWrongStateSyncVersion
 	}
-
-	proBlkID, err := vm.GetBlockIDAtHeight(innerBlk.Height())
-	switch err {
-	case nil:
-	case database.ErrNotFound:
+	proBlkID, err := vm.GetBlockIDAtHeight(coreBlk.Height())
+	if err == database.ErrNotFound {
 		// we must have hit the snowman++ fork. Check it.
 		currentFork, err := vm.State.GetForkHeight()
 		if err != nil {
 			return common.Summary{}, err
 		}
-		innerBlk, err := vm.ChainVM.GetBlock(innerKey.BlkID)
-		if err != nil {
-			return common.Summary{}, err
-		}
-		if innerBlk.Height() > currentFork {
+		if coreBlk.Height() > currentFork {
 			return common.Summary{}, err
 		}
 
-		// preFork blockID matched inner ones
-		proBlkID = innerKey.BlkID
-	default:
+		proBlkID = coreContent.BlkID
+	}
+	if err != nil {
 		return common.Summary{}, err
 	}
 
-	// recreate key
-	proKey := block.ProposerSummaryKey{
-		ProBlkID: proBlkID,
-		InnerKey: innerKey,
+	// Build ProposerSummaryContent
+	proContent := block.ProposerSummaryContent{
+		ProBlkID:    proBlkID,
+		CoreContent: coreContent,
 	}
-	proKeyBytes, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, &proKey)
+	proContentBytes, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, &proContent)
 	if err != nil {
 		return common.Summary{}, fmt.Errorf("cannot marshal proposerVMKey due to: %w", err)
 	}
 
 	return common.Summary{
-		Key:     proKeyBytes,
-		Content: vmSummary.Content,
+		Content: proContentBytes,
 	}, err
 }
 
-func (vm *VM) StateSyncIsSummaryAccepted(key []byte) (bool, error) {
+func (vm *VM) StateSyncGetSummary(key common.Key) (common.Summary, error) {
 	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
-		return false, common.ErrStateSyncableVMNotImplemented
+		return common.Summary{}, common.ErrStateSyncableVMNotImplemented
 	}
 
-	// Extract innerKey from summary key
 	proKey := block.ProposerSummaryKey{}
-	parsedVersion, err := stateSyncCodec.Unmarshal(key, &proKey)
+	ver, err := stateSyncCodec.Unmarshal(key.Content, &proKey)
 	if err != nil {
-		return false, err
+		return common.Summary{}, err
 	}
-	if parsedVersion != block.StateSyncDefaultKeysVersion {
-		return false, errWrongStateSyncVersion
+	if ver != block.StateSyncDefaultKeysVersion {
+		return common.Summary{}, errWrongStateSyncVersion
 	}
 
-	innerKey, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, proKey.InnerKey)
-	if err != nil {
-		return false, err
+	// retrieve coreBlkID
+	var coreBlkID ids.ID
+	switch proBlk, err := vm.getPostForkBlock(proKey.ProBlkID); err {
+	case nil:
+		coreBlkID = proBlk.getInnerBlk().ID()
+	case database.ErrNotFound:
+		coreBlkID = proKey.ProBlkID
+	default:
+		return common.Summary{}, err
 	}
 
-	// propagate request to innerVm
-	return ssVM.StateSyncIsSummaryAccepted(innerKey)
+	coreKey := block.CoreSummaryKey{
+		BlkID:     coreBlkID,
+		ContentID: proKey.CoreSummaryID,
+	}
+	coreKeyBytes, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, &coreKey)
+	if err != nil {
+		return common.Summary{}, fmt.Errorf("cannot marshal coreVMKey due to: %w", err)
+	}
+
+	coreSummary, err := ssVM.StateSyncGetSummary(common.Key{Content: coreKeyBytes})
+	coreContent := block.CoreSummaryContent{}
+	ver, err = stateSyncCodec.Unmarshal(coreSummary.Content, &coreContent)
+	if err != nil {
+		return common.Summary{}, fmt.Errorf("cannot unmarshal vmSummary.Key due to: %w", err)
+	}
+	if ver != block.StateSyncDefaultKeysVersion {
+		return common.Summary{}, errWrongStateSyncVersion
+	}
+
+	proContent := block.ProposerSummaryContent{
+		ProBlkID:    proKey.ProBlkID,
+		CoreContent: coreContent,
+	}
+	proContentBytes, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, &proContent)
+	if err != nil {
+		return common.Summary{}, fmt.Errorf("cannot marshal proposerVMKey due to: %w", err)
+	}
+
+	return common.Summary{
+		Content: proContentBytes,
+	}, err
 }
 
 func (vm *VM) StateSync(accepted []common.Summary) error {
@@ -156,35 +217,28 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 		return common.ErrStateSyncableVMNotImplemented
 	}
 
-	// retrieve innerKey for each summary and propagate all to innerVM
-	innerSummaries := make([]common.Summary, 0, len(accepted))
+	coreSummaries := make([]common.Summary, 0, len(accepted))
 	vm.pendingSummariesBlockIDMapping = make(map[ids.ID]ids.ID)
 	for _, summ := range accepted {
-		proKey := block.ProposerSummaryKey{}
-		parsedVersion, err := stateSyncCodec.Unmarshal(summ.Key, &proKey)
+		proContent := block.ProposerSummaryContent{}
+		ver, err := stateSyncCodec.Unmarshal(summ.Content, &proContent)
 		if err != nil {
 			return err
 		}
-		if parsedVersion != block.StateSyncDefaultKeysVersion {
+		if ver != block.StateSyncDefaultKeysVersion {
 			return errWrongStateSyncVersion
 		}
 
-		innerKey, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, proKey.InnerKey)
-		if err != nil {
-			return err
-		}
-
-		innerSummaries = append(innerSummaries, common.Summary{
-			Key:     innerKey,
+		coreSummaries = append(coreSummaries, common.Summary{
 			Content: summ.Content,
 		})
 
-		// record innerVm to proposerVM blockID mapping to be able to
+		// record coreVm to proposerVM blockID mapping to be able to
 		// complete state-sync by requesting lastSummaryBlockID.
-		vm.pendingSummariesBlockIDMapping[proKey.InnerKey.BlkID] = proKey.ProBlkID
+		vm.pendingSummariesBlockIDMapping[proContent.CoreContent.BlkID] = proContent.ProBlkID
 	}
 
-	return ssVM.StateSync(innerSummaries)
+	return ssVM.StateSync(coreSummaries)
 }
 
 func (vm *VM) GetLastSummaryBlockID() (ids.ID, error) {
@@ -193,12 +247,12 @@ func (vm *VM) GetLastSummaryBlockID() (ids.ID, error) {
 		return ids.Empty, common.ErrStateSyncableVMNotImplemented
 	}
 
-	innerBlkID, err := ssVM.GetLastSummaryBlockID()
+	coreBlkID, err := ssVM.GetLastSummaryBlockID()
 	if err != nil {
 		return ids.Empty, err
 	}
-	proBlkID, found := vm.pendingSummariesBlockIDMapping[innerBlkID]
-	vm.ctx.Log.Info("innerToProBlkID mapping found %v", proBlkID.String())
+	proBlkID, found := vm.pendingSummariesBlockIDMapping[coreBlkID]
+	vm.ctx.Log.Info("coreToProBlkID mapping found %v", proBlkID.String())
 	if !found {
 		return ids.Empty, errUnknownLastSummaryBlockID
 	}
@@ -211,23 +265,23 @@ func (vm *VM) SetLastSummaryBlock(blkByte []byte) error {
 		return common.ErrStateSyncableVMNotImplemented
 	}
 
-	// retrieve inner block
+	// retrieve core block
 	var (
-		innerBlkBytes []byte
-		blk           Block
-		err           error
+		coreBlkBytes []byte
+		blk          Block
+		err          error
 	)
 	if blk, err = vm.parsePostForkBlock(blkByte); err == nil {
-		innerBlkBytes = blk.getInnerBlk().Bytes()
+		coreBlkBytes = blk.getInnerBlk().Bytes()
 	} else if blk, err = vm.parsePreForkBlock(blkByte); err == nil {
-		innerBlkBytes = blk.Bytes()
+		coreBlkBytes = blk.Bytes()
 	} else {
 		return errBadLastSummaryBlock
 	}
 
-	if err := ssVM.SetLastSummaryBlock(innerBlkBytes); err != nil {
+	if err := ssVM.SetLastSummaryBlock(coreBlkBytes); err != nil {
 		return err
 	}
 
-	return blk.conditionalAccept(false /*acceptInnerBlk*/)
+	return blk.conditionalAccept(false /*acceptcoreBlk*/)
 }

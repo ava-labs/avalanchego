@@ -29,7 +29,7 @@ type StateSummarySender interface {
 
 	// SendStateSummaryFrontier responds to a StateSummaryFrontier message with this
 	// engine's current state summary frontier.
-	SendStateSummaryFrontier(nodeID ids.ShortID, requestID uint32, key, summary []byte)
+	SendStateSummaryFrontier(nodeID ids.ShortID, requestID uint32, summary []byte)
 }
 
 type AcceptedStateSummarySender interface {

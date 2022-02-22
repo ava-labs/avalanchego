@@ -137,7 +137,6 @@ type OutboundMsgBuilder interface {
 	StateSummaryFrontier(
 		chainID ids.ID,
 		requestID uint32,
-		key []byte,
 		summary []byte,
 	) (OutboundMessage, error)
 
@@ -515,7 +514,6 @@ func (b *outMsgBuilder) GetStateSummaryFrontier(
 func (b *outMsgBuilder) StateSummaryFrontier(
 	chainID ids.ID,
 	requestID uint32,
-	key []byte,
 	summary []byte,
 ) (OutboundMessage, error) {
 	return b.c.Pack(
@@ -523,7 +521,6 @@ func (b *outMsgBuilder) StateSummaryFrontier(
 		map[Field]interface{}{
 			ChainID:      chainID[:],
 			RequestID:    requestID,
-			SummaryKey:   key,
 			SummaryBytes: summary,
 		},
 		StateSummaryFrontier.Compressable(), // StateSummaryFrontier messages can't be compressed

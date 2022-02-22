@@ -278,22 +278,21 @@ func (s *Sender) SendGetStateSummaryFrontier(nodeIDs ids.ShortSet, requestID uin
 	}
 }
 
-func (s *Sender) SendStateSummaryFrontier(nodeID ids.ShortID, requestID uint32, key, summary []byte) {
+func (s *Sender) SendStateSummaryFrontier(nodeID ids.ShortID, requestID uint32, summary []byte) {
 	// Sending this message to myself.
 	if nodeID == s.ctx.NodeID {
-		inMsg := s.msgCreator.InboundStateSummaryFrontier(s.ctx.ChainID, requestID, key, summary, nodeID)
+		inMsg := s.msgCreator.InboundStateSummaryFrontier(s.ctx.ChainID, requestID, summary, nodeID)
 		go s.router.HandleInbound(inMsg)
 		return
 	}
 
 	// Create the outbound message.
-	outMsg, err := s.msgCreator.StateSummaryFrontier(s.ctx.ChainID, requestID, key, summary)
+	outMsg, err := s.msgCreator.StateSummaryFrontier(s.ctx.ChainID, requestID, summary)
 	if err != nil {
 		s.ctx.Log.Error(
-			"failed to build StateSummaryFrontier(%s, %d, %v, %v): %s",
+			"failed to build StateSummaryFrontier(%s, %d, %v): %s",
 			s.ctx.ChainID,
 			requestID,
-			key,
 			summary,
 			err,
 		)

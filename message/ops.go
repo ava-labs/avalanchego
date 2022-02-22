@@ -203,7 +203,7 @@ var (
 		AppGossip:   {ChainID, AppBytes},
 		// State Sync
 		GetStateSummaryFrontier: {ChainID, RequestID, Deadline},
-		StateSummaryFrontier:    {ChainID, RequestID, SummaryKey, SummaryBytes},
+		StateSummaryFrontier:    {ChainID, RequestID, SummaryBytes},
 		GetAcceptedStateSummary: {ChainID, RequestID, Deadline, MultiSummaryKeys},
 		AcceptedStateSummary:    {ChainID, RequestID, MultiSummaryKeys},
 	}

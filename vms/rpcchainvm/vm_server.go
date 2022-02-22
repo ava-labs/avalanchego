@@ -308,6 +308,19 @@ func (vm *VMServer) StateSyncEnabled(context.Context, *emptypb.Empty) (*vmproto.
 	return &vmproto.StateSyncEnabledResponse{Enabled: response}, nil
 }
 
+func (vm *VMServer) StateSyncGetKey(ctx context.Context, req *vmproto.StateSyncGetKeyRequest) (*vmproto.StateSyncGetKeyResponse, error) {
+	ssVM, ok := vm.vm.(block.StateSyncableVM)
+	if !ok {
+		return nil, common.ErrStateSyncableVMNotImplemented
+	}
+
+	key, err := ssVM.StateSyncGetKey(common.Summary{Content: req.Summary})
+	if err != nil {
+		return nil, err
+	}
+	return &vmproto.StateSyncGetKeyResponse{Key: key.Content}, nil
+}
+
 func (vm *VMServer) StateSyncGetLastSummary(ctx context.Context, empty *emptypb.Empty) (*vmproto.StateSyncGetLastSummaryResponse, error) {
 	ssVM, ok := vm.vm.(block.StateSyncableVM)
 	if !ok {
@@ -319,22 +332,21 @@ func (vm *VMServer) StateSyncGetLastSummary(ctx context.Context, empty *emptypb.
 		return nil, err
 	}
 	return &vmproto.StateSyncGetLastSummaryResponse{
-		Key:     summary.Key,
 		Content: summary.Content,
 	}, nil
 }
 
-func (vm *VMServer) StateSyncIsSummaryAccepted(ctx context.Context, req *vmproto.StateSyncIsSummaryAcceptedRequest) (*vmproto.StateSyncIsSummaryAcceptedResponse, error) {
+func (vm *VMServer) StateSyncGetSummary(ctx context.Context, req *vmproto.StateSyncGetSummaryRequest) (*vmproto.StateSyncGetSummaryResponse, error) {
 	ssVM, ok := vm.vm.(block.StateSyncableVM)
 	if !ok {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	accepted, err := ssVM.StateSyncIsSummaryAccepted(req.Key)
+	summary, err := ssVM.StateSyncGetSummary(common.Key{Content: req.Key})
 	if err != nil {
 		return nil, err
 	}
-	return &vmproto.StateSyncIsSummaryAcceptedResponse{Accepted: accepted}, nil
+	return &vmproto.StateSyncGetSummaryResponse{Summary: summary.Content}, nil
 }
 
 func (vm *VMServer) StateSync(ctx context.Context, req *vmproto.StateSyncRequest) (*emptypb.Empty, error) {
@@ -345,7 +357,6 @@ func (vm *VMServer) StateSync(ctx context.Context, req *vmproto.StateSyncRequest
 
 	summaries := make([]common.Summary, len(req.Summaries))
 	for k, v := range req.Summaries {
-		summaries[k].Key = v.Key
 		summaries[k].Content = v.Content
 	}
 	err := ssVM.StateSync(summaries)
