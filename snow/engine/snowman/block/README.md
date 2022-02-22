@@ -9,9 +9,9 @@ State syncing allows safe rebuilding the VM state at a given height without the 
 StateSummaries contains enough information to allow a VM to download, verify and rebuild its state. StateKeys must uniquely identify a StateSummary.
 The whole StateSummaries and StateKeys system **must** support the following operations:
 
-1. `StateSyncGetLastSummary()`, i.e. retrieval of last accepted StateSummary. This enables disseminating around StateSummaries frontiers upon request.
-2. `StateSyncGetKey(Summary)`, i.e. retrieval of StateKey from a StateSummary. This enables requesting votes by passing around a StateKey, rather than the full StateSummary.
-3. `StateSyncGetSummary(Key)`, i.e. retrieval of StateSummary from its StateKey. This enables to verify availability of a StateSummary by passing around StateKey only.
+1. Retrieval of last accepted StateSummary. This enables disseminating around StateSummaries frontiers upon request.
+2. Retrieval of StateKey from a StateSummary. This enables requesting votes by passing around a StateKey, rather than the full StateSummary.
+3. Verify StateKey validity and availability. This enables verifying and voting on a StateSummary by passing around StateKey only.
 
 Moreover we impose the following requirements on StateSummaries and StateKeys:
 
@@ -41,9 +41,7 @@ It can easily verify by inspection that the structure above allows support the r
 
 State sync is implemented internally via the `StateSyncableVM` interface. `StateSyncableVM` supports the following operations:
 
-1. `StateSyncGetSummary(Key.height) -> Summary`
-2. `StateSyncGetKey(Summary) -> Key`
-3. `IsValidKey(Key) -> bool` which verifies the key validity upon voting via the following flow:
-   a. `StateSyncGetSummary(Key.height) -> retrieveSummary`
-   b. `StateSyncGetKey(retrievedSummary) -> retrievedKey`
-   c. `return Key == retrievedKey`
+1. `StateSyncGetLastSummary() -> Summary` to retrieve StateSummary frontier
+2. `StateSyncGetKey(Summary) -> Key` to extract StateKey from StateSummary
+3. `StateSyncGetSummary(Key.height) -> Summary` helper to retrieve StateSummary associated with a given StateKey. Note that height is enough of an index
+4. `IsKeyValid(Key, Summary) -> bool`, to be used along `StateSyncGetSummary` to verify key availability and hash matching and vote on it.
