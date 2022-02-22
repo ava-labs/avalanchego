@@ -6,12 +6,12 @@ package vm
 import (
 	"fmt"
 
+	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 )
 
 const (
-	allowListGasCost                  = 5000
 	modifyStatusPrecompileInputLength = common.AddressLength + common.HashLength
 )
 
@@ -67,7 +67,7 @@ func createAddressKey(address common.Address) common.Hash {
 // the ModifyStatus of [address]
 func getAllowListStatus(state StateDB, address common.Address) ModifyStatus {
 	stateSlot := createAddressKey(address)
-	res := state.GetState(AllowListPrecompileAddress, stateSlot)
+	res := state.GetState(params.ModifyAllowListAddress, stateSlot)
 	return ModifyStatus(res)
 }
 
@@ -112,16 +112,16 @@ func SetAllowListStatus(stateDB StateDB, address common.Address, status ModifySt
 	role := common.Hash(status)
 	log.Info("modify allow list", "address", address, "role", role)
 	// Assign [role] to the address
-	stateDB.SetState(AllowListPrecompileAddress, addressKey, role)
+	stateDB.SetState(params.ModifyAllowListAddress, addressKey, role)
 	return nil
 }
 
 func (al *allowListPrecompile) Run(evm *EVM, caller ContractRef, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
-	if suppliedGas < allowListGasCost {
+	if suppliedGas < params.ModifyAllowListGasCost {
 		return nil, 0, ErrOutOfGas
 	}
 
-	remainingGas = suppliedGas - allowListGasCost
+	remainingGas = suppliedGas - params.ModifyAllowListGasCost
 
 	// Verify that the caller is in the allow list and therefore has the right to modify it
 	callerAddr := caller.Address()

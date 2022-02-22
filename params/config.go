@@ -32,6 +32,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -82,8 +83,8 @@ var (
 		AllowFeeRecipients:  false,
 	}
 
-	TestChainConfig        = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), DefaultFeeConfig, false}
-	TestPreSubnetEVMConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, DefaultFeeConfig, false}
+	TestChainConfig        = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), DefaultFeeConfig, false, nil}
+	TestPreSubnetEVMConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, DefaultFeeConfig, false, nil}
 )
 
 // ChainConfig is the core config which determines the blockchain settings.
@@ -113,6 +114,8 @@ type ChainConfig struct {
 
 	FeeConfig          *FeeConfig `json:"feeConfig,omitempty"`
 	AllowFeeRecipients bool       `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
+
+	AllowListConfig *precompile.AllowListConfig `json:"allowListConfig,omitempty"` // Config for the allow list precompile
 }
 
 type FeeConfig struct {
@@ -198,9 +201,17 @@ func (c *ChainConfig) IsIstanbul(num *big.Int) bool {
 	return isForked(c.IstanbulBlock, num)
 }
 
-// IsSubnetEVM returns whether num is either equal to the SubnetEVM fork block timestamp or greater.
+// IsSubnetEVM returns whether [blockTimestamp] is either equal to the SubnetEVM fork block timestamp or greater.
 func (c *ChainConfig) IsSubnetEVM(blockTimestamp *big.Int) bool {
 	return isForked(c.SubnetEVMTimestamp, blockTimestamp)
+}
+
+// IsSubnetEVM returns whether [blockTimestamp] is either equal to the AllowList fork block timestamp or greater.
+func (c *ChainConfig) IsAllowList(blockTimestamp *big.Int) bool {
+	if c.AllowListConfig == nil {
+		return false
+	}
+	return isForked(c.AllowListConfig.Timestamp(), blockTimestamp)
 }
 
 // IsIstanbul returns whether num is either equal to the Istanbul fork block or greater.
@@ -277,6 +288,8 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 	// check that the block timestamps in the same way as for
 	// the block number forks since it would not be a meaningful comparison.
 	// Instead, we check only that Phases are enabled in order.
+	// Note: we do not add the optional stateful precompile configs in here because they are optional
+	// and independent, so they can be configured and enabled at any point in time.
 	lastFork = fork{}
 	for _, cur := range []fork{
 		{name: "subnetEVMTimestamp", block: c.SubnetEVMTimestamp},
@@ -339,6 +352,17 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headHeight *big.Int, 
 	}
 	if isForkIncompatible(c.SubnetEVMTimestamp, newcfg.SubnetEVMTimestamp, headTimestamp) {
 		return newCompatError("SubnetEVM fork block timestamp", c.SubnetEVMTimestamp, newcfg.SubnetEVMTimestamp)
+	}
+
+	var allowListTimestamp, newAllowListTimestamp *big.Int
+	if c.AllowListConfig != nil {
+		allowListTimestamp = c.AllowListConfig.Timestamp()
+	}
+	if newcfg.AllowListConfig != nil {
+		newAllowListTimestamp = newcfg.AllowListConfig.Timestamp()
+	}
+	if isForkIncompatible(allowListTimestamp, newAllowListTimestamp, headTimestamp) {
+		return newCompatError("AllowList fork block timestamp", allowListTimestamp, newAllowListTimestamp)
 	}
 
 	return nil
@@ -411,6 +435,9 @@ type Rules struct {
 
 	// Rules for Avalanche releases
 	IsSubnetEVM bool
+
+	// Optional stateful precompile rules
+	IsAllowListEnabled bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -438,5 +465,6 @@ func (c *ChainConfig) AvalancheRules(blockNum, blockTimestamp *big.Int) Rules {
 	rules := c.rules(blockNum)
 
 	rules.IsSubnetEVM = c.IsSubnetEVM(blockTimestamp)
+	rules.IsAllowListEnabled = c.IsAllowList(blockTimestamp)
 	return rules
 }

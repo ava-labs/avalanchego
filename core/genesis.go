@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ava-labs/subnet-evm/trie"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -277,6 +278,11 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 			panic(fmt.Errorf("set allow list errored during genesis configuration: %w", err))
 		}
 	}
+
+	genesisTimestamp := new(big.Int).SetUint64(g.Timestamp)
+	// Configure the AllowList if enabled from genesis
+	precompile.CheckConfigure(nil, genesisTimestamp, g.Config.AllowListConfig, statedb)
+
 	// Do cusotm allocation after airdrop in case an address shows up in standard
 	// allocation
 	for addr, account := range g.Alloc {

@@ -452,12 +452,15 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	if evm.StateDB.GetNonce(address) != 0 || (contractHash != (common.Hash{}) && contractHash != emptyCodeHash) {
 		return nil, common.Address{}, 0, ErrContractAddressCollision
 	}
-	// Check that [tx.origin] has the right to deploy contracts
-	modifyStatus := getAllowListStatus(evm.StateDB, evm.Origin)
-	if !modifyStatus.HasDeployPrivileges() {
-		log.Info("origin is not authorized to deploy a contract", "origin", evm.Origin, "status", modifyStatus)
-		return nil, common.Address{}, 0, fmt.Errorf("origin %s is not authorized to deploy a contract", evm.Origin)
+	// If the allow list is enabled, check that [evm.TxContext.Origin] is allowed to deploy a contract.
+	if evm.chainRules.IsAllowListEnabled {
+		modifyStatus := getAllowListStatus(evm.StateDB, evm.TxContext.Origin)
+		if !modifyStatus.HasDeployPrivileges() {
+			log.Info("tx.origin is not authorized to deploy a contract", "origin", evm.TxContext.Origin, "status", modifyStatus)
+			return nil, common.Address{}, 0, fmt.Errorf("tx.origin %s is not authorized to deploy a contract", evm.TxContext.Origin)
+		}
 	}
+
 	// Create a new account on the state
 	snapshot := evm.StateDB.Snapshot()
 	evm.StateDB.CreateAccount(address)
