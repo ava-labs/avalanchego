@@ -34,6 +34,9 @@ func init() {
 	errs.Add(
 		lc.RegisterType(&common.Summary{}),
 		lc.RegisterType(&block.CoreSummaryKey{}),
+		lc.RegisterType(&block.CoreSummaryContent{}),
+		lc.RegisterType(&block.ProposerSummaryKey{}),
+		lc.RegisterType(&block.ProposerSummaryContent{}),
 		stateSyncCodec.RegisterCodec(block.StateSyncDefaultKeysVersion, lc),
 	)
 	if err := errs.Err; err != nil {

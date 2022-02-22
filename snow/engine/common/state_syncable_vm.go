@@ -9,7 +9,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var ErrStateSyncableVMNotImplemented = errors.New("vm does not implement StateSyncableVM interface")
+var (
+	ErrStateSyncableVMNotImplemented = errors.New("vm does not implement StateSyncableVM interface")
+	ErrUnknownStateSummary           = errors.New("state summary not found")
+)
 
 // Summary represents the information needed for state sync processing
 type Key struct {
