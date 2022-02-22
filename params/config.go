@@ -115,7 +115,7 @@ type ChainConfig struct {
 	FeeConfig          *FeeConfig `json:"feeConfig,omitempty"`
 	AllowFeeRecipients bool       `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
 
-	AllowListConfig *precompile.AllowListConfig `json:"allowListConfig,omitempty"` // Config for the allow list precompile
+	AllowListConfig precompile.StatefulPrecompileConfig `json:"allowListConfig,omitempty"` // Config for the allow list precompile
 }
 
 type FeeConfig struct {
