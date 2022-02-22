@@ -94,6 +94,7 @@ type Client interface {
 	AcceptedNonceAt(context.Context, common.Address) (uint64, error)
 	AcceptedCallContract(context.Context, interfaces.CallMsg) ([]byte, error)
 	CallContract(context.Context, interfaces.CallMsg, *big.Int) ([]byte, error)
+	CallContractAtHash(ctx context.Context, msg interfaces.CallMsg, blockHash common.Hash) ([]byte, error)
 	SuggestGasPrice(context.Context) (*big.Int, error)
 	SuggestGasTipCap(context.Context) (*big.Int, error)
 	EstimateGas(context.Context, interfaces.CallMsg) (uint64, error)
@@ -500,6 +501,17 @@ func (ec *client) AcceptedCallContract(ctx context.Context, msg interfaces.CallM
 func (ec *client) CallContract(ctx context.Context, msg interfaces.CallMsg, blockNumber *big.Int) ([]byte, error) {
 	var hex hexutil.Bytes
 	err := ec.c.CallContext(ctx, &hex, "eth_call", toCallArg(msg), ToBlockNumArg(blockNumber))
+	if err != nil {
+		return nil, err
+	}
+	return hex, nil
+}
+
+// CallContractAtHash is almost the same as CallContract except that it selects
+// the block by block hash instead of block height.
+func (ec *client) CallContractAtHash(ctx context.Context, msg interfaces.CallMsg, blockHash common.Hash) ([]byte, error) {
+	var hex hexutil.Bytes
+	err := ec.c.CallContext(ctx, &hex, "eth_call", toCallArg(msg), rpc.BlockNumberOrHashWithHash(blockHash, false))
 	if err != nil {
 		return nil, err
 	}
