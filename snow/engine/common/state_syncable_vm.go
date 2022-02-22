@@ -13,7 +13,7 @@ var ErrStateSyncableVMNotImplemented = errors.New("vm does not implement StateSy
 
 // Summary represents the information needed for state sync processing
 type Key struct {
-	Content []byte `serialize:"true"` // actual state summary content
+	Content []byte `serialize:"true"` // actual state key content
 }
 
 type Summary struct {
