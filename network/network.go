@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/throttling"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
@@ -35,7 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -59,10 +57,6 @@ type Network interface {
 	// All consensus messages can be sent through this interface. Thread safety
 	// must be managed internally in the network.
 	sender.ExternalSender
-
-	// The network must be able to broadcast accepted decisions to random peers.
-	// Thread safety must be managed internally in the network.
-	snow.Acceptor
 
 	// Close this network and all existing connections it has. Thread safety
 	// must be managed internally to the network. Calling close multiple times
@@ -210,13 +204,6 @@ type DelayConfig struct {
 	MaxReconnectDelay     time.Duration `json:"maxReconnectDelay"`
 }
 
-type GossipConfig struct {
-	GossipAcceptedFrontierSize uint `json:"gossipAcceptedFrontierSize"`
-	GossipOnAcceptSize         uint `json:"gossipOnAcceptSize"`
-	AppGossipNonValidatorSize  uint `json:"appGossipNonValidatorSize"`
-	AppGossipValidatorSize     uint `json:"appGossipValidatorSize"`
-}
-
 type ThrottlerConfig struct {
 	InboundConnUpgradeThrottlerConfig throttling.InboundConnUpgradeThrottlerConfig `json:"inboundConnUpgradeThrottlerConfig"`
 	InboundMsgThrottlerConfig         throttling.InboundMsgThrottlerConfig         `json:"inboundMsgThrottlerConfig"`
@@ -227,7 +214,6 @@ type ThrottlerConfig struct {
 type Config struct {
 	HealthConfig         `json:"healthConfig"`
 	PeerListGossipConfig `json:"peerListGossipConfig"`
-	GossipConfig         `json:"gossipConfig"`
 	TimeoutConfig        `json:"timeoutConfigs"`
 	DelayConfig          `json:"delayConfig"`
 	ThrottlerConfig      ThrottlerConfig `json:"throttlerConfig"`
@@ -372,27 +358,6 @@ func (n *network) Gossip(
 		return nil
 	}
 	return n.send(msg, peers, true)
-}
-
-// Accept is called after every consensus decision
-// Assumes [n.stateLock] is not held.
-func (n *network) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error {
-	if ctx.GetState() != snow.NormalOp {
-		// don't gossip during bootstrapping
-		return nil
-	}
-
-	now := n.clock.Time()
-	msg, err := n.mc.Put(ctx.ChainID, constants.GossipMsgRequestID, containerID, container)
-	if err != nil {
-		n.log.Debug("failed to build Put message for gossip (%s, %s): %s", ctx.ChainID, containerID, err)
-		n.log.Verbo("container:\n%s", formatting.DumpBytes(container))
-		n.sendFailRateCalculator.Observe(1, now)
-		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
-	}
-
-	n.Gossip(msg, ctx.SubnetID, ctx.IsValidatorOnly(), 0, int(n.config.GossipOnAcceptSize))
-	return nil
 }
 
 // Select peers to gossip to.

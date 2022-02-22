@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -151,6 +152,8 @@ type Config struct {
 
 	// Network configuration
 	NetworkConfig network.Config `json:"networkConfig"`
+
+	GossipConfig sender.GossipConfig `json:"gossipConfig"`
 
 	AdaptiveTimeoutConfig timer.AdaptiveTimeoutConfig `json:"adaptiveTimeoutConfig"`
 

@@ -420,14 +420,9 @@ func (n *Node) initBeacons() error {
 
 // Create the EventDispatcher used for hooking events
 // into the general process flow.
-func (n *Node) initEventDispatcher() error {
-	n.DecisionDispatcher = &triggers.EventDispatcher{}
-	n.DecisionDispatcher.Initialize(n.Log)
-
-	n.ConsensusDispatcher = &triggers.EventDispatcher{}
-	n.ConsensusDispatcher.Initialize(n.Log)
-
-	return n.ConsensusDispatcher.Register("gossip", n.Net)
+func (n *Node) initEventDispatchers() {
+	n.DecisionDispatcher = triggers.New(n.Log)
+	n.ConsensusDispatcher = triggers.New(n.Log)
 }
 
 func (n *Node) initIPCs() error {
@@ -633,9 +628,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		SubnetConfigs:                           n.Config.SubnetConfigs,
 		ChainConfigs:                            n.Config.ChainConfigs,
 		ConsensusGossipFrequency:                n.Config.ConsensusGossipFrequency,
-		AppGossipValidatorSize:                  int(n.Config.NetworkConfig.AppGossipValidatorSize),
-		AppGossipNonValidatorSize:               int(n.Config.NetworkConfig.AppGossipNonValidatorSize),
-		GossipAcceptedFrontierSize:              int(n.Config.NetworkConfig.GossipAcceptedFrontierSize),
+		GossipConfig:                            n.Config.GossipConfig,
 		BootstrapMaxTimeGetAncestors:            n.Config.BootstrapMaxTimeGetAncestors,
 		BootstrapAncestorsMaxContainersSent:     n.Config.BootstrapAncestorsMaxContainersSent,
 		BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
@@ -1159,9 +1152,8 @@ func (n *Node) Initialize(
 	if err = n.initNetworking(); err != nil { // Set up all networking
 		return fmt.Errorf("problem initializing networking: %w", err)
 	}
-	if err = n.initEventDispatcher(); err != nil { // Set up the event dipatcher
-		return fmt.Errorf("problem initializing event dispatcher: %w", err)
-	}
+
+	n.initEventDispatchers()
 
 	// Start the Health API
 	// Has to be initialized before chain manager
