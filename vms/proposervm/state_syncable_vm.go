@@ -188,6 +188,9 @@ func (vm *VM) StateSyncGetSummary(key common.Key) (common.Summary, error) {
 	}
 
 	coreSummary, err := ssVM.StateSyncGetSummary(common.Key{Content: coreKeyBytes})
+	if err != nil {
+		return common.Summary{}, fmt.Errorf("cannot not retrieve coreVM summary due to: %w", err)
+	}
 	coreContent := block.CoreSummaryContent{}
 	ver, err = stateSyncCodec.Unmarshal(coreSummary.Content, &coreContent)
 	if err != nil {
