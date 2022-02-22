@@ -33,6 +33,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -54,7 +55,7 @@ type PrecompiledContract interface {
 
 // PrecompiledContractsHomestead contains the default set of pre-compiled Ethereum
 // contracts used in the Frontier and Homestead releases.
-var PrecompiledContractsHomestead = map[common.Address]StatefulPrecompiledContract{
+var PrecompiledContractsHomestead = map[common.Address]precompile.StatefulPrecompiledContract{
 	common.BytesToAddress([]byte{1}): newWrappedPrecompiledContract(&ecrecover{}),
 	common.BytesToAddress([]byte{2}): newWrappedPrecompiledContract(&sha256hash{}),
 	common.BytesToAddress([]byte{3}): newWrappedPrecompiledContract(&ripemd160hash{}),
@@ -63,7 +64,7 @@ var PrecompiledContractsHomestead = map[common.Address]StatefulPrecompiledContra
 
 // PrecompiledContractsByzantium contains the default set of pre-compiled Ethereum
 // contracts used in the Byzantium release.
-var PrecompiledContractsByzantium = map[common.Address]StatefulPrecompiledContract{
+var PrecompiledContractsByzantium = map[common.Address]precompile.StatefulPrecompiledContract{
 	common.BytesToAddress([]byte{1}): newWrappedPrecompiledContract(&ecrecover{}),
 	common.BytesToAddress([]byte{2}): newWrappedPrecompiledContract(&sha256hash{}),
 	common.BytesToAddress([]byte{3}): newWrappedPrecompiledContract(&ripemd160hash{}),
@@ -76,7 +77,7 @@ var PrecompiledContractsByzantium = map[common.Address]StatefulPrecompiledContra
 
 // PrecompiledContractsIstanbul contains the default set of pre-compiled Ethereum
 // contracts used in the Istanbul release.
-var PrecompiledContractsIstanbul = map[common.Address]StatefulPrecompiledContract{
+var PrecompiledContractsIstanbul = map[common.Address]precompile.StatefulPrecompiledContract{
 	common.BytesToAddress([]byte{1}): newWrappedPrecompiledContract(&ecrecover{}),
 	common.BytesToAddress([]byte{2}): newWrappedPrecompiledContract(&sha256hash{}),
 	common.BytesToAddress([]byte{3}): newWrappedPrecompiledContract(&ripemd160hash{}),
@@ -90,7 +91,7 @@ var PrecompiledContractsIstanbul = map[common.Address]StatefulPrecompiledContrac
 
 // PrecompiledContractsBerlin contains the default set of pre-compiled Ethereum
 // contracts used in the Berlin release.
-var PrecompiledContractsBerlin = map[common.Address]StatefulPrecompiledContract{
+var PrecompiledContractsBerlin = map[common.Address]precompile.StatefulPrecompiledContract{
 	common.BytesToAddress([]byte{1}): newWrappedPrecompiledContract(&ecrecover{}),
 	common.BytesToAddress([]byte{2}): newWrappedPrecompiledContract(&sha256hash{}),
 	common.BytesToAddress([]byte{3}): newWrappedPrecompiledContract(&ripemd160hash{}),
@@ -104,7 +105,7 @@ var PrecompiledContractsBerlin = map[common.Address]StatefulPrecompiledContract{
 
 // PrecompiledContractsBLS contains the set of pre-compiled Ethereum
 // contracts specified in EIP-2537. These are exported for testing purposes.
-var PrecompiledContractsBLS = map[common.Address]StatefulPrecompiledContract{
+var PrecompiledContractsBLS = map[common.Address]precompile.StatefulPrecompiledContract{
 	common.BytesToAddress([]byte{10}): newWrappedPrecompiledContract(&bls12381G1Add{}),
 	common.BytesToAddress([]byte{11}): newWrappedPrecompiledContract(&bls12381G1Mul{}),
 	common.BytesToAddress([]byte{12}): newWrappedPrecompiledContract(&bls12381G1MultiExp{}),

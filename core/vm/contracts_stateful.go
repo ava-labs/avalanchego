@@ -4,18 +4,9 @@
 package vm
 
 import (
+	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ethereum/go-ethereum/common"
 )
-
-// StatefulPrecompiledContract is the interface for executing a precompiled contract
-// This wraps the PrecompiledContracts native to Ethereum and allows adding in stateful
-// precompiled contracts to support native Avalanche asset transfers.
-type StatefulPrecompiledContract interface {
-	// Run executes a precompiled contract in the current state
-	// assumes that it has already been verified that [caller] can
-	// transfer [value].
-	Run(evm *EVM, caller ContractRef, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error)
-}
 
 // wrappedPrecompiledContract implements StatefulPrecompiledContract by wrapping stateless native precompiled contracts
 // in Ethereum.
@@ -23,11 +14,24 @@ type wrappedPrecompiledContract struct {
 	p PrecompiledContract
 }
 
-func newWrappedPrecompiledContract(p PrecompiledContract) StatefulPrecompiledContract {
+func newWrappedPrecompiledContract(p PrecompiledContract) precompile.StatefulPrecompiledContract {
 	return &wrappedPrecompiledContract{p: p}
 }
 
 // Run implements the StatefulPrecompiledContract interface
-func (w *wrappedPrecompiledContract) Run(evm *EVM, caller ContractRef, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+func (w *wrappedPrecompiledContract) Run(accessibleState precompile.PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	return RunPrecompiledContract(w.p, input, suppliedGas)
+}
+
+func (w *wrappedPrecompiledContract) RequiredGas(input []byte) uint64 {
+	return w.p.RequiredGas(input)
+}
+
+func RunStatefulPrecompiledContract(precompile precompile.StatefulPrecompiledContract, accessibleState precompile.PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+	requiredGas := precompile.RequiredGas(input)
+	if requiredGas > suppliedGas {
+		return nil, 0, ErrOutOfGas
+	}
+
+	return precompile.Run(accessibleState, caller, addr, input, suppliedGas, readOnly)
 }

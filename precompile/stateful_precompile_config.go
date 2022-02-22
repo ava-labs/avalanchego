@@ -15,35 +15,6 @@ type StateDB interface {
 	SetState(common.Address, common.Hash, common.Hash)
 }
 
-// PrecompileStateDB is the interface for accessing the key-value store of an individual
-// precompile's address within the EVM State.
-type PrecompileStateDB interface {
-	GetState(key common.Hash) common.Hash
-	SetState(key common.Hash, value common.Hash)
-}
-
-// precompileStateDB implements the PrecompileStateDB interface
-type precompileStateDB struct {
-	precompileAddress common.Address
-	stateDB           StateDB
-}
-
-// newPrecompileStateDB returns an instance of [PrecompileStateDB] specific to [precompileAddress].
-func newPrecompileStateDB(state StateDB, precompileAddress common.Address) PrecompileStateDB {
-	return &precompileStateDB{
-		precompileAddress: precompileAddress,
-		stateDB:           state,
-	}
-}
-
-func (pdb *precompileStateDB) SetState(key common.Hash, value common.Hash) {
-	pdb.stateDB.SetState(pdb.precompileAddress, key, value)
-}
-
-func (pdb *precompileStateDB) GetState(key common.Hash) common.Hash {
-	return pdb.stateDB.GetState(pdb.precompileAddress, key)
-}
-
 // StatefulPrecompileConfig defines the interface for a stateful precompile to
 type StatefulPrecompileConfig interface {
 	// PrecompileAddress returns the address of the stateful precompile
@@ -56,7 +27,7 @@ type StatefulPrecompileConfig interface {
 	// This function must be deterministic since it will impact the EVM state. If a change to the
 	// config causes a change to the state modifications made in Configure, then it cannot be safely
 	// made to the config after the network upgrade has gone into effect.
-	Configure(PrecompileStateDB)
+	Configure(StateDB)
 }
 
 // CheckConfigure checks if [config] is activated by the transition from block at [parentTimestamp] to [currentTimestamp].
@@ -75,8 +46,7 @@ func CheckConfigure(parentTimestamp *big.Int, currentTimestamp *big.Int, config 
 	isCurrentBlockForked := isForked(currentTimestamp, forkTimestamp)
 	// If the network upgrade goes into effect within this transition, configure the stateful precompile
 	if !isParentForked && isCurrentBlockForked {
-		precompileDB := newPrecompileStateDB(state, config.PrecompileAddress())
-		config.Configure(precompileDB)
+		config.Configure(state)
 	}
 }
 
