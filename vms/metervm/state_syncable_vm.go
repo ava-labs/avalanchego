@@ -24,14 +24,6 @@ func (vm *blockVM) StateSyncEnabled() (bool, error) {
 	return vm.ssVM.StateSyncEnabled()
 }
 
-func (vm *blockVM) StateSyncGetKey(summary common.Summary) (common.Key, error) {
-	if vm.ssVM == nil {
-		return common.Key{}, common.ErrStateSyncableVMNotImplemented
-	}
-
-	return vm.ssVM.StateSyncGetKey(summary)
-}
-
 func (vm *blockVM) StateSyncGetLastSummary() (common.Summary, error) {
 	if vm.ssVM == nil {
 		return common.Summary{}, common.ErrStateSyncableVMNotImplemented
@@ -45,13 +37,37 @@ func (vm *blockVM) StateSyncGetLastSummary() (common.Summary, error) {
 	return summary, err
 }
 
-func (vm *blockVM) StateSyncGetSummary(key common.Key) (common.Summary, error) {
+func (vm *blockVM) StateSyncGetKey(summary common.Summary) (common.Key, error) {
+	if vm.ssVM == nil {
+		return common.Key{}, common.ErrStateSyncableVMNotImplemented
+	}
+
+	return vm.ssVM.StateSyncGetKey(summary)
+}
+
+func (vm *blockVM) StateSyncCheckPair(key common.Key, summary common.Summary) (bool, error) {
+	if vm.ssVM == nil {
+		return false, common.ErrStateSyncableVMNotImplemented
+	}
+
+	return vm.ssVM.StateSyncCheckPair(key, summary)
+}
+
+func (vm *blockVM) StateSyncGetKeyHeight(key common.Key) (uint64, error) {
+	if vm.ssVM == nil {
+		return uint64(0), common.ErrStateSyncableVMNotImplemented
+	}
+
+	return vm.ssVM.StateSyncGetKeyHeight(key)
+}
+
+func (vm *blockVM) StateSyncGetSummary(height uint64) (common.Summary, error) {
 	if vm.ssVM == nil {
 		return common.Summary{}, common.ErrStateSyncableVMNotImplemented
 	}
 
 	start := vm.clock.Time()
-	summary, err := vm.ssVM.StateSyncGetSummary(key)
+	summary, err := vm.ssVM.StateSyncGetSummary(height)
 	end := vm.clock.Time()
 	vm.stateSummaryMetrics.isSummaryAccepted.Observe(float64(end.Sub(start)))
 

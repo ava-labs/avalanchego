@@ -26,10 +26,10 @@ Moreover we impose the following requirements on StateSummaries and StateKeys:
 
 The requirements above bring us to the following structure for StateSummaries and StateKeys:
 
-|            | StateKey                                | StateSummary                    |
-|:----------:|:---------------------------------------:|:-------------------------------:|
-| CoreVM     | height + SummaryHash                    | BlkID + height + SummaryContent |
-| ProposerVM | height + ProSummaryHash                 | ProBlkID + CoreVM_StateSummary  |
+|            | StateKey                 | StateSummary                   |
+|:----------:|:------------------------:|:------------------------------:|
+| CoreVM     | height + SummaryHash     | BlkID + height + Content       |
+| ProposerVM | height + ProSummaryHash  | ProBlkID + CoreVM_StateSummary |
 
 It can easily verify by inspection that the structure above allows support the required operations. Below we content ourselves with some observations:
 
@@ -43,5 +43,6 @@ State sync is implemented internally via the `StateSyncableVM` interface. `State
 
 1. `StateSyncGetLastSummary() -> Summary` to retrieve StateSummary frontier
 2. `StateSyncGetKey(Summary) -> Key` to extract StateKey from StateSummary
-3. `StateSyncGetSummary(Key.height) -> Summary` helper to retrieve StateSummary associated with a given StateKey. Note that height is enough of an index
-4. `IsKeyValid(Key, Summary) -> bool`, to be used along `StateSyncGetSummary` to verify key availability and hash matching and vote on it.
+3. `StateSyncGetKeyHeight(key) -> height` helper to retrieve height encoded in key.
+4. `StateSyncGetSummary(height) -> Summary` helper to be used along `StateSyncGetKeyHeight` to retrieve StateSummary associated with a given StateKey.
+5. `CheckPair(Key, Summary) -> bool`, to be used along `StateSyncGetSummary` to verify key availability and hash matching and vote on it.

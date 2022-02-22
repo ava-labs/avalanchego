@@ -33,14 +33,14 @@ type StateSyncableVM interface {
 	// StateSyncEnabled indicates whether the state sync is enabled for this VM
 	StateSyncEnabled() (bool, error)
 
-	// StateSyncGetKey retrieves a summary key out of a summary
-	StateSyncGetKey(Summary) (Key, error)
-
 	// StateSyncGetLastSummary returns latest Summary with an optional error
 	StateSyncGetLastSummary() (Summary, error)
 
-	// StateSyncGetSummary returns the summary associate with key if it is available.
-	StateSyncGetSummary(Key) (Summary, error)
+	// StateSyncGetKey retrieves a summary key out of a summary
+	StateSyncGetKey(Summary) (Key, error)
+
+	// StateSyncCheckPair checks whether a locally available key is valid and matches Summary
+	StateSyncCheckPair(Key, Summary) (bool, error)
 
 	// StateSync is called with a list of valid summaries to sync from.
 	// These summaries were collected from peers and validated with validators.

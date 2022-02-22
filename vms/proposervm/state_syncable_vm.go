@@ -62,40 +62,30 @@ func (vm *VM) StateSyncEnabled() (bool, error) {
 	return ssVM.StateSyncEnabled()
 }
 
-func (vm *VM) StateSyncGetKey(summary common.Summary) (common.Key, error) {
-	if _, ok := vm.ChainVM.(block.StateSyncableVM); !ok {
-		return common.Key{}, common.ErrStateSyncableVMNotImplemented
+func (vm *VM) buildProContentFrom(coreContent block.CoreSummaryContent) (block.ProposerSummaryContent, error) {
+	// retrieve ProBlkID is available
+	proBlkID, err := vm.GetBlockIDAtHeight(coreContent.Height)
+	if err == database.ErrNotFound {
+		// we must have hit the snowman++ fork. Check it.
+		currentFork, err := vm.State.GetForkHeight()
+		if err != nil {
+			return block.ProposerSummaryContent{}, err
+		}
+		if coreContent.Height > currentFork {
+			return block.ProposerSummaryContent{}, err
+		}
+
+		proBlkID = coreContent.BlkID
+	}
+	if err != nil {
+		return block.ProposerSummaryContent{}, err
 	}
 
-	proContent := block.ProposerSummaryContent{}
-	ver, err := stateSyncCodec.Unmarshal(summary.Content, &proContent)
-	if err != nil {
-		return common.Key{}, fmt.Errorf("could not unmarshal ProposerSummaryContent due to: %w", err)
-	}
-	if ver != block.StateSyncDefaultKeysVersion {
-		return common.Key{}, errWrongStateSyncVersion
-	}
-
-	coreSummaryID, err := ids.ToID(hashing.ComputeHash256(proContent.CoreContent.Content))
-	if err != nil {
-		return common.Key{}, fmt.Errorf("could not compute core summary ID due to: %w", err)
-	}
-	proSummaryID, err := ids.ToID(hashing.ComputeHash256(summary.Content))
-	if err != nil {
-		return common.Key{}, fmt.Errorf("could not compute pro summary ID due to: %w", err)
-	}
-
-	proKey := block.ProposerSummaryKey{
-		ProBlkID:      proContent.ProBlkID,
-		CoreSummaryID: coreSummaryID,
-		ProSummaryID:  proSummaryID,
-	}
-	proKeyBytes, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, &proKey)
-	if err != nil {
-		return common.Key{}, fmt.Errorf("cannot marshal proposerVMKey due to: %w", err)
-	}
-
-	return common.Key{Content: proKeyBytes}, nil
+	// Build ProposerSummaryContent
+	return block.ProposerSummaryContent{
+		ProBlkID:    proBlkID,
+		CoreContent: coreContent,
+	}, nil
 }
 
 func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
@@ -118,33 +108,11 @@ func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 		return common.Summary{}, errWrongStateSyncVersion
 	}
 
-	// retrieve proposer Block wrapping coreBlock
-	coreBlk, err := vm.ChainVM.GetBlock(coreContent.BlkID)
+	proContent, err := vm.buildProContentFrom(coreContent)
 	if err != nil {
-		return common.Summary{}, errWrongStateSyncVersion
-	}
-	proBlkID, err := vm.GetBlockIDAtHeight(coreBlk.Height())
-	if err == database.ErrNotFound {
-		// we must have hit the snowman++ fork. Check it.
-		currentFork, err := vm.State.GetForkHeight()
-		if err != nil {
-			return common.Summary{}, err
-		}
-		if coreBlk.Height() > currentFork {
-			return common.Summary{}, err
-		}
-
-		proBlkID = coreContent.BlkID
-	}
-	if err != nil {
-		return common.Summary{}, err
+		return common.Summary{}, fmt.Errorf("could not build proposerVm Summary from core one due to: %w", err)
 	}
 
-	// Build ProposerSummaryContent
-	proContent := block.ProposerSummaryContent{
-		ProBlkID:    proBlkID,
-		CoreContent: coreContent,
-	}
 	proContentBytes, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, &proContent)
 	if err != nil {
 		return common.Summary{}, fmt.Errorf("cannot marshal proposerVMKey due to: %w", err)
@@ -155,58 +123,108 @@ func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 	}, err
 }
 
-func (vm *VM) StateSyncGetSummary(key common.Key) (common.Summary, error) {
-	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
-	if !ok {
-		return common.Summary{}, common.ErrStateSyncableVMNotImplemented
+func (vm *VM) StateSyncGetKey(summary common.Summary) (common.Key, error) {
+	if _, ok := vm.ChainVM.(block.StateSyncableVM); !ok {
+		return common.Key{}, common.ErrStateSyncableVMNotImplemented
+	}
+
+	proContent := block.ProposerSummaryContent{}
+	ver, err := stateSyncCodec.Unmarshal(summary.Content, &proContent)
+	if err != nil {
+		return common.Key{}, fmt.Errorf("could not unmarshal ProposerSummaryContent due to: %w", err)
+	}
+	if ver != block.StateSyncDefaultKeysVersion {
+		return common.Key{}, errWrongStateSyncVersion
+	}
+
+	proSummaryHash, err := ids.ToID(hashing.ComputeHash256(summary.Content))
+	if err != nil {
+		return common.Key{}, fmt.Errorf("could not compute pro summary hash due to: %w", err)
+	}
+
+	proKey := block.ProposerSummaryKey{
+		Height:         proContent.CoreContent.Height,
+		ProSummaryHash: proSummaryHash,
+	}
+	proKeyBytes, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, &proKey)
+	if err != nil {
+		return common.Key{}, fmt.Errorf("cannot marshal proposerVMKey due to: %w", err)
+	}
+
+	return common.Key{Content: proKeyBytes}, nil
+}
+
+func (vm *VM) StateSyncCheckPair(key common.Key, summary common.Summary) (bool, error) {
+	if _, ok := vm.ChainVM.(block.StateSyncableVM); !ok {
+		return false, common.ErrStateSyncableVMNotImplemented
 	}
 
 	proKey := block.ProposerSummaryKey{}
 	ver, err := stateSyncCodec.Unmarshal(key.Content, &proKey)
 	if err != nil {
-		return common.Summary{}, err
+		return false, fmt.Errorf("could not unmarshal ProposerSummaryKey due to: %w", err)
 	}
 	if ver != block.StateSyncDefaultKeysVersion {
-		return common.Summary{}, errWrongStateSyncVersion
+		return false, errWrongStateSyncVersion
 	}
 
-	// retrieve coreBlkID
-	var coreBlkID ids.ID
-	switch proBlk, err := vm.getPostForkBlock(proKey.ProBlkID); err {
-	case nil:
-		coreBlkID = proBlk.getInnerBlk().ID()
-	case database.ErrNotFound:
-		coreBlkID = proKey.ProBlkID
-	default:
-		return common.Summary{}, err
-	}
-
-	coreKey := block.CoreSummaryKey{
-		BlkID:     coreBlkID,
-		ContentID: proKey.CoreSummaryID,
-	}
-	coreKeyBytes, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, &coreKey)
+	proContent := block.ProposerSummaryContent{}
+	ver, err = stateSyncCodec.Unmarshal(summary.Content, &proContent)
 	if err != nil {
-		return common.Summary{}, fmt.Errorf("cannot marshal coreVMKey due to: %w", err)
+		return false, fmt.Errorf("could not unmarshal ProposerSummaryContent due to: %w", err)
+	}
+	if ver != block.StateSyncDefaultKeysVersion {
+		return false, errWrongStateSyncVersion
+	}
+	proSummaryHash, err := ids.ToID(hashing.ComputeHash256(summary.Content))
+	if err != nil {
+		return false, fmt.Errorf("could not compute pro summary hash due to: %w", err)
 	}
 
-	coreSummary, err := ssVM.StateSyncGetSummary(common.Key{Content: coreKeyBytes})
+	return proKey.ProSummaryHash == proSummaryHash, nil
+}
+
+func (vm *VM) StateSyncGetKeyHeight(key common.Key) (uint64, error) {
+	if _, ok := vm.ChainVM.(block.StateSyncableVM); !ok {
+		return uint64(0), common.ErrStateSyncableVMNotImplemented
+	}
+
+	proKey := block.ProposerSummaryKey{}
+	ver, err := stateSyncCodec.Unmarshal(key.Content, &proKey)
 	if err != nil {
-		return common.Summary{}, fmt.Errorf("cannot not retrieve coreVM summary due to: %w", err)
+		return uint64(0), fmt.Errorf("could not unmarshal ProposerSummaryKey due to: %w", err)
+	}
+	if ver != block.StateSyncDefaultKeysVersion {
+		return uint64(0), errWrongStateSyncVersion
+	}
+
+	return proKey.Height, nil
+}
+
+func (vm *VM) StateSyncGetSummary(height uint64) (common.Summary, error) {
+	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
+	if !ok {
+		return common.Summary{}, common.ErrStateSyncableVMNotImplemented
+	}
+
+	coreSummaryBytes, err := ssVM.StateSyncGetSummary(height)
+	if err != nil {
+		return common.Summary{}, fmt.Errorf("could not retrieve core summary at height %d due to: %w", height, err)
 	}
 	coreContent := block.CoreSummaryContent{}
-	ver, err = stateSyncCodec.Unmarshal(coreSummary.Content, &coreContent)
+	ver, err := stateSyncCodec.Unmarshal(coreSummaryBytes.Content, &coreContent)
 	if err != nil {
-		return common.Summary{}, fmt.Errorf("cannot unmarshal vmSummary.Key due to: %w", err)
+		return common.Summary{}, err
 	}
 	if ver != block.StateSyncDefaultKeysVersion {
 		return common.Summary{}, errWrongStateSyncVersion
 	}
 
-	proContent := block.ProposerSummaryContent{
-		ProBlkID:    proKey.ProBlkID,
-		CoreContent: coreContent,
+	proContent, err := vm.buildProContentFrom(coreContent)
+	if err != nil {
+		return common.Summary{}, fmt.Errorf("could not build proposerVm Summary from core one due to: %w", err)
 	}
+
 	proContentBytes, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, &proContent)
 	if err != nil {
 		return common.Summary{}, fmt.Errorf("cannot marshal proposerVMKey due to: %w", err)

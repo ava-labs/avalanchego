@@ -203,6 +203,11 @@ message StateSyncEnabledResponse {
     bool enabled = 1;
 }
 
+message StateSyncGetLastSummaryResponse {
+    bytes key = 1;
+    bytes content = 2;
+}
+
 message StateSyncGetKeyRequest {
   bytes summary = 1; 
 }
@@ -211,13 +216,25 @@ message StateSyncGetKeyResponse {
   bytes key = 1; 
 }
 
-message StateSyncGetLastSummaryResponse {
+message StateSyncCheckPairRequest {
     bytes key = 1;
-    bytes content = 2;
+    bytes summary = 2; 
+}
+
+message StateSyncCheckPairResponse {
+    bool valid = 1;
+}
+
+message StateSyncGetKeyHeightRequest {
+    bytes key = 1;
+}
+
+message StateSyncGetKeyHeightResponse {
+    uint64 height = 1;
 }
 
 message StateSyncGetSummaryRequest {
-    bytes key = 1;
+    uint64 height = 1;
 }
 
 message StateSyncGetSummaryResponse {
@@ -277,8 +294,11 @@ service VM {
     // State sync
     rpc RegisterStateSyncer(RegisterStateSyncerRequest) returns (google.protobuf.Empty);
     rpc StateSyncEnabled(google.protobuf.Empty) returns (StateSyncEnabledResponse);
-    rpc StateSyncGetKey(StateSyncGetKeyRequest) returns (StateSyncGetKeyResponse);
+    
     rpc StateSyncGetLastSummary(google.protobuf.Empty) returns (StateSyncGetLastSummaryResponse);
+    rpc StateSyncGetKey(StateSyncGetKeyRequest) returns (StateSyncGetKeyResponse);
+    rpc StateSyncCheckPair(StateSyncCheckPairRequest) returns (StateSyncCheckPairResponse);
+    rpc StateSyncGetKeyHeight(StateSyncGetKeyHeightRequest) returns (StateSyncGetKeyHeightResponse);
     rpc StateSyncGetSummary(StateSyncGetSummaryRequest) returns (StateSyncGetSummaryResponse);
     rpc StateSync(StateSyncRequest) returns (google.protobuf.Empty);
     rpc GetLastSummaryBlockID(google.protobuf.Empty) returns (StateSyncLastSummaryBlockIDResponse);

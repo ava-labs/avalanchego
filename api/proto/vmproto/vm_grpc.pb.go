@@ -52,8 +52,10 @@ type VMClient interface {
 	// State sync
 	RegisterStateSyncer(ctx context.Context, in *RegisterStateSyncerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	StateSyncEnabled(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncEnabledResponse, error)
-	StateSyncGetKey(ctx context.Context, in *StateSyncGetKeyRequest, opts ...grpc.CallOption) (*StateSyncGetKeyResponse, error)
 	StateSyncGetLastSummary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncGetLastSummaryResponse, error)
+	StateSyncGetKey(ctx context.Context, in *StateSyncGetKeyRequest, opts ...grpc.CallOption) (*StateSyncGetKeyResponse, error)
+	StateSyncCheckPair(ctx context.Context, in *StateSyncCheckPairRequest, opts ...grpc.CallOption) (*StateSyncCheckPairResponse, error)
+	StateSyncGetKeyHeight(ctx context.Context, in *StateSyncGetKeyHeightRequest, opts ...grpc.CallOption) (*StateSyncGetKeyHeightResponse, error)
 	StateSyncGetSummary(ctx context.Context, in *StateSyncGetSummaryRequest, opts ...grpc.CallOption) (*StateSyncGetSummaryResponse, error)
 	StateSync(ctx context.Context, in *StateSyncRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetLastSummaryBlockID(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncLastSummaryBlockIDResponse, error)
@@ -311,6 +313,15 @@ func (c *vMClient) StateSyncEnabled(ctx context.Context, in *emptypb.Empty, opts
 	return out, nil
 }
 
+func (c *vMClient) StateSyncGetLastSummary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncGetLastSummaryResponse, error) {
+	out := new(StateSyncGetLastSummaryResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/StateSyncGetLastSummary", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *vMClient) StateSyncGetKey(ctx context.Context, in *StateSyncGetKeyRequest, opts ...grpc.CallOption) (*StateSyncGetKeyResponse, error) {
 	out := new(StateSyncGetKeyResponse)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/StateSyncGetKey", in, out, opts...)
@@ -320,9 +331,18 @@ func (c *vMClient) StateSyncGetKey(ctx context.Context, in *StateSyncGetKeyReque
 	return out, nil
 }
 
-func (c *vMClient) StateSyncGetLastSummary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncGetLastSummaryResponse, error) {
-	out := new(StateSyncGetLastSummaryResponse)
-	err := c.cc.Invoke(ctx, "/vmproto.VM/StateSyncGetLastSummary", in, out, opts...)
+func (c *vMClient) StateSyncCheckPair(ctx context.Context, in *StateSyncCheckPairRequest, opts ...grpc.CallOption) (*StateSyncCheckPairResponse, error) {
+	out := new(StateSyncCheckPairResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/StateSyncCheckPair", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) StateSyncGetKeyHeight(ctx context.Context, in *StateSyncGetKeyHeightRequest, opts ...grpc.CallOption) (*StateSyncGetKeyHeightResponse, error) {
+	out := new(StateSyncGetKeyHeightResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/StateSyncGetKeyHeight", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -398,8 +418,10 @@ type VMServer interface {
 	// State sync
 	RegisterStateSyncer(context.Context, *RegisterStateSyncerRequest) (*emptypb.Empty, error)
 	StateSyncEnabled(context.Context, *emptypb.Empty) (*StateSyncEnabledResponse, error)
-	StateSyncGetKey(context.Context, *StateSyncGetKeyRequest) (*StateSyncGetKeyResponse, error)
 	StateSyncGetLastSummary(context.Context, *emptypb.Empty) (*StateSyncGetLastSummaryResponse, error)
+	StateSyncGetKey(context.Context, *StateSyncGetKeyRequest) (*StateSyncGetKeyResponse, error)
+	StateSyncCheckPair(context.Context, *StateSyncCheckPairRequest) (*StateSyncCheckPairResponse, error)
+	StateSyncGetKeyHeight(context.Context, *StateSyncGetKeyHeightRequest) (*StateSyncGetKeyHeightResponse, error)
 	StateSyncGetSummary(context.Context, *StateSyncGetSummaryRequest) (*StateSyncGetSummaryResponse, error)
 	StateSync(context.Context, *StateSyncRequest) (*emptypb.Empty, error)
 	GetLastSummaryBlockID(context.Context, *emptypb.Empty) (*StateSyncLastSummaryBlockIDResponse, error)
@@ -492,11 +514,17 @@ func (UnimplementedVMServer) RegisterStateSyncer(context.Context, *RegisterState
 func (UnimplementedVMServer) StateSyncEnabled(context.Context, *emptypb.Empty) (*StateSyncEnabledResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StateSyncEnabled not implemented")
 }
+func (UnimplementedVMServer) StateSyncGetLastSummary(context.Context, *emptypb.Empty) (*StateSyncGetLastSummaryResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StateSyncGetLastSummary not implemented")
+}
 func (UnimplementedVMServer) StateSyncGetKey(context.Context, *StateSyncGetKeyRequest) (*StateSyncGetKeyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StateSyncGetKey not implemented")
 }
-func (UnimplementedVMServer) StateSyncGetLastSummary(context.Context, *emptypb.Empty) (*StateSyncGetLastSummaryResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method StateSyncGetLastSummary not implemented")
+func (UnimplementedVMServer) StateSyncCheckPair(context.Context, *StateSyncCheckPairRequest) (*StateSyncCheckPairResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StateSyncCheckPair not implemented")
+}
+func (UnimplementedVMServer) StateSyncGetKeyHeight(context.Context, *StateSyncGetKeyHeightRequest) (*StateSyncGetKeyHeightResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StateSyncGetKeyHeight not implemented")
 }
 func (UnimplementedVMServer) StateSyncGetSummary(context.Context, *StateSyncGetSummaryRequest) (*StateSyncGetSummaryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StateSyncGetSummary not implemented")
@@ -1009,6 +1037,24 @@ func _VM_StateSyncEnabled_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VM_StateSyncGetLastSummary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).StateSyncGetLastSummary(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/StateSyncGetLastSummary",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).StateSyncGetLastSummary(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _VM_StateSyncGetKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(StateSyncGetKeyRequest)
 	if err := dec(in); err != nil {
@@ -1027,20 +1073,38 @@ func _VM_StateSyncGetKey_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VM_StateSyncGetLastSummary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
+func _VM_StateSyncCheckPair_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StateSyncCheckPairRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VMServer).StateSyncGetLastSummary(ctx, in)
+		return srv.(VMServer).StateSyncCheckPair(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/vmproto.VM/StateSyncGetLastSummary",
+		FullMethod: "/vmproto.VM/StateSyncCheckPair",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).StateSyncGetLastSummary(ctx, req.(*emptypb.Empty))
+		return srv.(VMServer).StateSyncCheckPair(ctx, req.(*StateSyncCheckPairRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_StateSyncGetKeyHeight_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StateSyncGetKeyHeightRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).StateSyncGetKeyHeight(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/StateSyncGetKeyHeight",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).StateSyncGetKeyHeight(ctx, req.(*StateSyncGetKeyHeightRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1233,12 +1297,20 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _VM_StateSyncEnabled_Handler,
 		},
 		{
+			MethodName: "StateSyncGetLastSummary",
+			Handler:    _VM_StateSyncGetLastSummary_Handler,
+		},
+		{
 			MethodName: "StateSyncGetKey",
 			Handler:    _VM_StateSyncGetKey_Handler,
 		},
 		{
-			MethodName: "StateSyncGetLastSummary",
-			Handler:    _VM_StateSyncGetLastSummary_Handler,
+			MethodName: "StateSyncCheckPair",
+			Handler:    _VM_StateSyncCheckPair_Handler,
+		},
+		{
+			MethodName: "StateSyncGetKeyHeight",
+			Handler:    _VM_StateSyncGetKeyHeight_Handler,
 		},
 		{
 			MethodName: "StateSyncGetSummary",

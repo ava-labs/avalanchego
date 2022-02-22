@@ -73,7 +73,17 @@ func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uin
 
 	acceptedKeys := make([][]byte, 0, len(keys))
 	for _, keyBytes := range keys {
-		if _, err := gh.ssVM.StateSyncGetSummary(common.Key{Content: keyBytes}); err == nil {
+		key := common.Key{Content: keyBytes}
+		keyHeight, err := gh.ssVM.StateSyncGetKeyHeight(key)
+		if err != nil {
+			continue
+		}
+		summary, err := gh.ssVM.StateSyncGetSummary(keyHeight)
+		if err != nil {
+			continue
+		}
+		valid, err := gh.ssVM.StateSyncCheckPair(key, summary)
+		if err != nil && valid {
 			acceptedKeys = append(acceptedKeys, keyBytes)
 		}
 	}
