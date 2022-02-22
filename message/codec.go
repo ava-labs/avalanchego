@@ -32,6 +32,7 @@ type Packer interface {
 		op Op,
 		fieldValues map[Field]interface{},
 		compress bool,
+		bypassThrottling bool,
 	) (OutboundMessage, error)
 }
 
@@ -110,10 +111,12 @@ func (c *codec) SetTime(t time.Time) {
 // [buffer]'s contents may be overwritten by this method.
 // [buffer] may be nil.
 // If [compress], compress the payload.
+// If [bypassThrottling], mark the message to avoid outbound throttling checks.
 func (c *codec) Pack(
 	op Op,
 	fieldValues map[Field]interface{},
 	compress bool,
+	bypassThrottling bool,
 ) (OutboundMessage, error) {
 	msgFields, ok := messages[op]
 	if !ok {
@@ -145,10 +148,11 @@ func (c *codec) Pack(
 		return nil, p.Err
 	}
 	msg := &outboundMessage{
-		op:    op,
-		bytes: p.Bytes,
-		refs:  1,
-		c:     c,
+		op:               op,
+		bytes:            p.Bytes,
+		refs:             1,
+		c:                c,
+		bypassThrottling: bypassThrottling,
 	}
 	if !compress {
 		return msg, nil

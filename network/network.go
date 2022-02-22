@@ -350,7 +350,7 @@ func NewNetwork(
 func (n *network) Send(msg message.OutboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) ids.ShortSet {
 	// retrieve target peers
 	peers := n.getPeers(nodeIDs, subnetID, validatorOnly)
-	return n.send(msg, true, peers)
+	return n.send(msg, peers, true)
 }
 
 // Assumes [n.stateLock] is not held.
@@ -371,7 +371,7 @@ func (n *network) Gossip(
 		msg.DecRef()
 		return nil
 	}
-	return n.send(msg, true, peers)
+	return n.send(msg, peers, true)
 }
 
 // Accept is called after every consensus decision
@@ -427,7 +427,7 @@ func (n *network) selectPeersForGossip(subnetID ids.ID, validatorOnly bool, numV
 // increased.
 //
 // Assumes stateLock is not held.
-func (n *network) send(msg message.OutboundMessage, connectedOnly bool, peers []*peer) ids.ShortSet {
+func (n *network) send(msg message.OutboundMessage, peers []*peer, connectedOnly bool) ids.ShortSet {
 	var (
 		now    = n.clock.Time()
 		msgLen = len(msg.Bytes())

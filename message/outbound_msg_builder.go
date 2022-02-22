@@ -146,6 +146,7 @@ func (b *outMsgBuilder) GetVersion() (OutboundMessage, error) {
 		GetVersion,
 		nil,
 		GetVersion.Compressible(), // GetVersion messages can't be compressed
+		false,
 	)
 }
 
@@ -177,6 +178,7 @@ func (b *outMsgBuilder) Version(
 			TrackedSubnets: subnetIDBytes,
 		},
 		Version.Compressible(), // Version Messages can't be compressed
+		false,
 	)
 }
 
@@ -185,6 +187,7 @@ func (b *outMsgBuilder) GetPeerList() (OutboundMessage, error) {
 		GetPeerList,
 		nil,
 		GetPeerList.Compressible(), // GetPeerList messages can't be compressed
+		false,
 	)
 }
 
@@ -195,6 +198,7 @@ func (b *outMsgBuilder) PeerList(peers []utils.IPCertDesc) (OutboundMessage, err
 			SignedPeers: peers,
 		},
 		b.compress && PeerList.Compressible(), // PeerList messages may be compressed
+		false,
 	)
 }
 
@@ -203,6 +207,7 @@ func (b *outMsgBuilder) Ping() (OutboundMessage, error) {
 		Ping,
 		nil,
 		Ping.Compressible(), // Ping messages can't be compressed
+		false,
 	)
 }
 
@@ -213,6 +218,7 @@ func (b *outMsgBuilder) Pong(uptimePercentage uint8) (OutboundMessage, error) {
 			Uptime: uptimePercentage,
 		},
 		Pong.Compressible(), // Pong messages can't be compressed
+		false,
 	)
 }
 
@@ -229,6 +235,7 @@ func (b *outMsgBuilder) GetAcceptedFrontier(
 			Deadline:  uint64(deadline),
 		},
 		GetAcceptedFrontier.Compressible(), // GetAcceptedFrontier messages can't be compressed
+		false,
 	)
 }
 
@@ -250,6 +257,7 @@ func (b *outMsgBuilder) AcceptedFrontier(
 			ContainerIDs: containerIDBytes,
 		},
 		AcceptedFrontier.Compressible(), // AcceptedFrontier messages can't be compressed
+		false,
 	)
 }
 
@@ -273,6 +281,7 @@ func (b *outMsgBuilder) GetAccepted(
 			ContainerIDs: containerIDBytes,
 		},
 		GetAccepted.Compressible(), // GetAccepted messages can't be compressed
+		false,
 	)
 }
 
@@ -294,6 +303,7 @@ func (b *outMsgBuilder) Accepted(
 			ContainerIDs: containerIDBytes,
 		},
 		Accepted.Compressible(), // Accepted messages can't be compressed
+		false,
 	)
 }
 
@@ -312,6 +322,7 @@ func (b *outMsgBuilder) GetAncestors(
 			ContainerID: containerID[:],
 		},
 		GetAncestors.Compressible(), // GetAncestors messages can't be compressed
+		false,
 	)
 }
 
@@ -328,6 +339,7 @@ func (b *outMsgBuilder) Ancestors(
 			MultiContainerBytes: containers,
 		},
 		b.compress && Ancestors.Compressible(), // Ancestors messages may be compressed
+		false,
 	)
 }
 
@@ -346,6 +358,7 @@ func (b *outMsgBuilder) Get(
 			ContainerID: containerID[:],
 		},
 		Get.Compressible(), // Get messages can't be compressed
+		false,
 	)
 }
 
@@ -364,6 +377,7 @@ func (b *outMsgBuilder) Put(
 			ContainerBytes: container,
 		},
 		b.compress && Put.Compressible(), // Put messages may be compressed
+		false,
 	)
 }
 
@@ -384,6 +398,7 @@ func (b *outMsgBuilder) PushQuery(
 			ContainerBytes: container,
 		},
 		b.compress && PushQuery.Compressible(), // PushQuery messages may be compressed
+		false,
 	)
 }
 
@@ -402,6 +417,7 @@ func (b *outMsgBuilder) PullQuery(
 			ContainerID: containerID[:],
 		},
 		PullQuery.Compressible(), // PullQuery messages can't be compressed
+		false,
 	)
 }
 
@@ -423,6 +439,7 @@ func (b *outMsgBuilder) Chits(
 			ContainerIDs: containerIDBytes,
 		},
 		Chits.Compressible(), // Chits messages can't be compressed
+		false,
 	)
 }
 
@@ -442,6 +459,7 @@ func (b *outMsgBuilder) AppRequest(
 			AppBytes:  msg,
 		},
 		b.compress && AppRequest.Compressible(), // App messages may be compressed
+		false,
 	)
 }
 
@@ -455,6 +473,7 @@ func (b *outMsgBuilder) AppResponse(chainID ids.ID, requestID uint32, msg []byte
 			AppBytes:  msg,
 		},
 		b.compress && AppResponse.Compressible(), // App messages may be compressed
+		false,
 	)
 }
 
@@ -467,5 +486,6 @@ func (b *outMsgBuilder) AppGossip(chainID ids.ID, msg []byte) (OutboundMessage, 
 			AppBytes: msg,
 		},
 		b.compress && AppGossip.Compressible(), // App messages may be compressed
+		false,
 	)
 }

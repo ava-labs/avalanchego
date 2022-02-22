@@ -335,7 +335,7 @@ func (p *peer) WriteMessages() {
 		p.sendQueueCond.L.Unlock()
 
 		msgLen := uint32(len(msg.Bytes()))
-		p.net.outboundMsgThrottler.Release(uint64(msgLen), p.nodeID)
+		p.net.outboundMsgThrottler.Release(msg, p.nodeID)
 		p.net.log.Verbo("sending message to %s%s at %s:\n%s", constants.NodeIDPrefix, p.nodeID, p.getIP(), formatting.DumpBytes(msg.Bytes()))
 		msgb := [wrappers.IntLen]byte{}
 		binary.BigEndian.PutUint32(msgb[:], msgLen)
@@ -369,20 +369,14 @@ func (p *peer) WriteMessages() {
 }
 
 // send assumes that the [stateLock] is not held.
-// If [canModifyMsg], [msg] may be modified by this method.
-// If ![canModifyMsg], [msg] will not be modified by this method.
-// [canModifyMsg] should be false if [msg] is sent in a loop, for example/.
 func (p *peer) Send(msg message.OutboundMessage) bool {
-	msgBytes := msg.Bytes()
-	msgLen := int64(len(msgBytes))
-
 	// Acquire space on the outbound message queue, or drop [msg] if we can't
-	dropMsg := !p.net.outboundMsgThrottler.Acquire(uint64(msgLen), p.nodeID)
-	if dropMsg {
+	if !p.net.outboundMsgThrottler.Acquire(msg, p.nodeID) {
 		p.net.log.Debug("dropping %s message to %s%s at %s due to rate-limiting", msg.Op(), constants.NodeIDPrefix, p.nodeID, p.getIP())
 		return false
 	}
-	// Invariant: must call p.net.outboundMsgThrottler.Release(uint64(msgLen), p.nodeID)
+
+	// Invariant: must call p.net.outboundMsgThrottler.Release(msg, p.nodeID)
 	// when done sending [msg] or when we give up sending [msg]
 
 	p.sendQueueCond.L.Lock()
@@ -390,7 +384,7 @@ func (p *peer) Send(msg message.OutboundMessage) bool {
 
 	if p.closed.GetValue() {
 		p.net.log.Debug("dropping message to %s%s at %s due to a closed connection", constants.NodeIDPrefix, p.nodeID, p.getIP())
-		p.net.outboundMsgThrottler.Release(uint64(msgLen), p.nodeID)
+		p.net.outboundMsgThrottler.Release(msg, p.nodeID)
 		return false
 	}
 
@@ -486,7 +480,7 @@ func (p *peer) close() {
 	// Release the bytes of the unsent messages to the outbound message throttler
 	for i := 0; i < len(p.sendQueue); i++ {
 		msg := p.sendQueue[i]
-		p.net.outboundMsgThrottler.Release(uint64(len(msg.Bytes())), p.nodeID)
+		p.net.outboundMsgThrottler.Release(msg, p.nodeID)
 		msg.DecRef()
 	}
 	p.sendQueue = nil
@@ -502,7 +496,7 @@ func (p *peer) close() {
 func (p *peer) sendGetVersion() {
 	msg, err := p.net.mc.GetVersion()
 	p.net.log.AssertNoError(err)
-	p.net.send(msg, false, []*peer{p})
+	p.net.send(msg, []*peer{p}, false)
 }
 
 // assumes the [stateLock] is not held
@@ -528,7 +522,7 @@ func (p *peer) sendVersion() {
 	p.net.stateLock.RUnlock()
 	p.net.log.AssertNoError(err)
 
-	p.net.send(msg, false, []*peer{p})
+	p.net.send(msg, []*peer{p}, false)
 }
 
 // assumes the [stateLock] is not held
@@ -536,7 +530,7 @@ func (p *peer) sendGetPeerList() {
 	msg, err := p.net.mc.GetPeerList()
 	p.net.log.AssertNoError(err)
 
-	p.net.send(msg, false, []*peer{p})
+	p.net.send(msg, []*peer{p}, false)
 }
 
 // assumes the stateLock is not held
@@ -552,7 +546,7 @@ func (p *peer) sendPeerList() {
 		return
 	}
 
-	p.net.send(msg, false, []*peer{p})
+	p.net.send(msg, []*peer{p}, false)
 }
 
 // assumes the [stateLock] is not held
@@ -560,7 +554,7 @@ func (p *peer) sendPing() {
 	msg, err := p.net.mc.Ping()
 	p.net.log.AssertNoError(err)
 
-	p.net.send(msg, false, []*peer{p})
+	p.net.send(msg, []*peer{p}, false)
 }
 
 // assumes the [stateLock] is not held
@@ -576,7 +570,7 @@ func (p *peer) sendPong() {
 	msg, err := p.net.mc.Pong(percentage)
 	p.net.log.AssertNoError(err)
 
-	p.net.send(msg, false, []*peer{p})
+	p.net.send(msg, []*peer{p}, false)
 }
 
 // assumes the [stateLock] is not held

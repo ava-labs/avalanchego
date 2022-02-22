@@ -93,11 +93,13 @@ func (inMsg *inboundMessage) String() string {
 	return sb.String()
 }
 
-// OutboundMessage represents a set of fields for an outbound message that can be serialized into a byte stream
+// OutboundMessage represents a set of fields for an outbound message that can
+// be serialized into a byte stream
 type OutboundMessage interface {
 	BytesSavedCompression() int
 	Bytes() []byte
 	Op() Op
+	BypassThrottling() bool
 
 	AddRef()
 	DecRef()
@@ -107,6 +109,7 @@ type outboundMessage struct {
 	bytes                 []byte
 	bytesSavedCompression int
 	op                    Op
+	bypassThrottling      bool
 
 	refLock sync.Mutex
 	refs    int
@@ -143,3 +146,28 @@ func (outMsg *outboundMessage) DecRef() {
 		outMsg.c.byteSlicePool.Put(outMsg.bytes)
 	}
 }
+
+// BypassThrottling when attempting to send this message
+func (outMsg *outboundMessage) BypassThrottling() bool { return outMsg.bypassThrottling }
+
+type TestMsg struct {
+	op               Op
+	bytes            []byte
+	bypassThrottling bool
+}
+
+func NewTestMsg(op Op, bytes []byte, bypassThrottling bool) *TestMsg {
+	return &TestMsg{
+		op:               op,
+		bytes:            bytes,
+		bypassThrottling: bypassThrottling,
+	}
+}
+
+func (m *TestMsg) Op() Op                   { return m.op }
+func (*TestMsg) Get(Field) interface{}      { return nil }
+func (m *TestMsg) Bytes() []byte            { return m.bytes }
+func (*TestMsg) BytesSavedCompression() int { return 0 }
+func (*TestMsg) AddRef()                    {}
+func (*TestMsg) DecRef()                    {}
+func (m *TestMsg) BypassThrottling() bool   { return m.bypassThrottling }
