@@ -208,6 +208,7 @@ func (c *ChainConfig) IsSubnetEVM(blockTimestamp *big.Int) bool {
 
 // IsSubnetEVM returns whether [blockTimestamp] is either equal to the AllowList fork block timestamp or greater.
 func (c *ChainConfig) IsAllowList(blockTimestamp *big.Int) bool {
+	// If [AllowListConfig] is nil, then this upgrade is not enabled.
 	if c.AllowListConfig == nil {
 		return false
 	}
@@ -289,7 +290,8 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 	// the block number forks since it would not be a meaningful comparison.
 	// Instead, we check only that Phases are enabled in order.
 	// Note: we do not add the optional stateful precompile configs in here because they are optional
-	// and independent, so they can be configured and enabled at any point in time.
+	// and independent, such that the ordering they are enabled does not impact the correctness of the
+	// chain config.
 	lastFork = fork{}
 	for _, cur := range []fork{
 		{name: "subnetEVMTimestamp", block: c.SubnetEVMTimestamp},

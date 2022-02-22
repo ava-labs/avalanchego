@@ -5,28 +5,24 @@ package precompile
 
 import (
 	"math/big"
-
-	"github.com/ethereum/go-ethereum/common"
 )
-
-// StateDB is the interface for accessing the EVM State.
-type StateDB interface {
-	GetState(common.Address, common.Hash) common.Hash
-	SetState(common.Address, common.Hash, common.Hash)
-}
 
 // StatefulPrecompileConfig defines the interface for a stateful precompile to
 type StatefulPrecompileConfig interface {
-	// PrecompileAddress returns the address of the stateful precompile
-	PrecompileAddress() common.Address
-	// Timestamp returns the timestamp that the stateful precompile is enabled or nil
-	// if it is not enabled.
+	// Timestamp returns the timestamp at which this stateful precompile should be enabled.
+	// 1) 0 indicates that the precompile should be enabled from genesis.
+	// 2) n indicates that the precompile should be enabled in the first block with timestamp >= [n].
+	// 3) nil indicates that the precompile is never enabled.
 	Timestamp() *big.Int
 	// Configure is called on the first block where the stateful precompile should be enabled.
 	// This allows the stateful precompile to configure its own state via [StateDB] as necessary.
 	// This function must be deterministic since it will impact the EVM state. If a change to the
 	// config causes a change to the state modifications made in Configure, then it cannot be safely
 	// made to the config after the network upgrade has gone into effect.
+
+	// Configure is called on the first block where the stateful precompile should be enabled. This
+	// provides the config the ability to set its initial state and should only modify the state within
+	// its own address space.
 	Configure(StateDB)
 }
 
@@ -48,12 +44,4 @@ func CheckConfigure(parentTimestamp *big.Int, currentTimestamp *big.Int, config 
 	if !isParentForked && isCurrentBlockForked {
 		config.Configure(state)
 	}
-}
-
-// isForked returns whether a fork scheduled at block s is active at the given head block.
-func isForked(s, head *big.Int) bool {
-	if s == nil || head == nil {
-		return false
-	}
-	return s.Cmp(head) <= 0
 }

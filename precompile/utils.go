@@ -3,11 +3,23 @@
 
 package precompile
 
-import "github.com/ethereum/go-ethereum/common"
+import (
+	"math/big"
 
-// CreateAddressKey converts [address] into a [common.Hash] value that can be used for a storage slot key
+	"github.com/ethereum/go-ethereum/common"
+)
+
+// CreateAddressKey converts [address] into a [common.Hash] value to be used as a storage slot key
 func CreateAddressKey(address common.Address) common.Hash {
 	hashBytes := make([]byte, common.HashLength)
 	copy(hashBytes, address[:])
 	return common.BytesToHash(hashBytes)
+}
+
+// isForked returns whether a fork scheduled at block s is active at the given head block.
+func isForked(s, head *big.Int) bool {
+	if s == nil || head == nil {
+		return false
+	}
+	return s.Cmp(head) <= 0
 }
