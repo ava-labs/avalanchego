@@ -138,19 +138,22 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 	ss.pendingReceiveStateSummaryFrontier.Remove(validatorID)
 
 	// retrieve key for summary and register frontier
-	key, err := ss.stateSyncVM.StateSyncGetKey(common.Summary{Content: summary})
+	key, hash, err := ss.stateSyncVM.StateSyncGetKey(common.Summary{Content: summary})
 	if err != nil {
 		ss.Ctx.Log.Debug("Could not retrieve key from summary %s: %v", summary, err)
 		return nil
 	}
-	if _, exists := ss.weightedSummaries[string(key.Content)]; !exists {
-		ss.weightedSummaries[string(key.Content)] = weightedSummary{
+	// append hash.Content to key.Content in case different nodes are sending
+	// different content for the same key.
+	mapKey := string(key.Content) + string(hash.Content)
+	if _, exists := ss.weightedSummaries[mapKey]; !exists {
+		ss.weightedSummaries[mapKey] = weightedSummary{
 			Summary: common.Summary{
 				Content: summary,
 			},
 		}
 	}
-	ws := ss.weightedSummaries[string(key.Content)]
+	ws := ss.weightedSummaries[mapKey]
 
 	if len(ss.StateSyncTestingBeacons) != 0 {
 		// if state sync beacons are specified, immediately count
@@ -168,7 +171,7 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 			newWeight = stdmath.MaxUint64
 		}
 		ws.weight = newWeight
-		ss.weightedSummaries[string(key.Content)] = ws
+		ss.weightedSummaries[mapKey] = ws
 	}
 
 	if err := ss.sendGetStateSummaryFrontiers(); err != nil {
@@ -242,7 +245,7 @@ func (ss *stateSyncer) GetStateSummaryFrontierFailed(validatorID ids.ShortID, re
 }
 
 // StateSyncHandler interface implementation
-func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error {
+func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte, hashes [][]byte) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("Received an Out-of-Sync Accepted - validator: %v - expectedRequestID: %v, requestID: %v",
@@ -262,8 +265,15 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 		weight = w
 	}
 
-	for _, key := range keys {
-		ws := ss.weightedSummaries[string(key)]
+	if len(keys) != len(hashes) {
+		return fmt.Errorf("length of keys %d does not match length of hashes %d", len(keys), len(hashes))
+	}
+
+	for idx, key := range keys {
+		// append hash.Content to key.Content in case different nodes are sending
+		// different content for the same key.
+		mapKey := string(key) + string(hashes[idx])
+		ws := ss.weightedSummaries[mapKey]
 		previousWeight := ws.weight
 		newWeight, err := math.Add64(weight, previousWeight)
 		if err != nil {
@@ -271,7 +281,7 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 			newWeight = stdmath.MaxUint64
 		}
 		ws.weight = newWeight
-		ss.weightedSummaries[string(key)] = ws
+		ss.weightedSummaries[mapKey] = ws
 	}
 
 	if err := ss.sendGetAccepted(); err != nil {
@@ -336,7 +346,7 @@ func (ss *stateSyncer) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, re
 	// that they think none of the containers we sent them in GetAccepted are accepted
 	ss.failedAcceptedStateSummaries.Add(validatorID)
 
-	return ss.AcceptedStateSummary(validatorID, requestID, [][]byte{})
+	return ss.AcceptedStateSummary(validatorID, requestID, [][]byte{}, [][]byte{})
 }
 
 // Engine interface implementation
@@ -464,10 +474,16 @@ func (ss *stateSyncer) sendGetAccepted() error {
 			vdrs.Len(), ss.pendingSendAcceptedStateSummaries)
 
 		acceptedKeys := make([][]byte, len(ss.weightedSummaries))
-		for k := range ss.weightedSummaries {
-			acceptedKeys = append(acceptedKeys, []byte(k))
+		acceptedHashes := make([][]byte, len(ss.weightedSummaries))
+		for _, summary := range ss.weightedSummaries {
+			key, hash, err := ss.stateSyncVM.StateSyncGetKey(summary.Summary)
+			if err != nil {
+				return err
+			}
+			acceptedKeys = append(acceptedKeys, key.Content)
+			acceptedHashes = append(acceptedHashes, hash.Content)
 		}
-		ss.Sender.SendGetAcceptedStateSummary(vdrs, ss.requestID, acceptedKeys)
+		ss.Sender.SendGetAcceptedStateSummary(vdrs, ss.requestID, acceptedKeys, acceptedHashes)
 	}
 	return nil
 }

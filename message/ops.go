@@ -204,8 +204,8 @@ var (
 		// State Sync
 		GetStateSummaryFrontier: {ChainID, RequestID, Deadline},
 		StateSummaryFrontier:    {ChainID, RequestID, SummaryBytes},
-		GetAcceptedStateSummary: {ChainID, RequestID, Deadline, MultiSummaryKeys},
-		AcceptedStateSummary:    {ChainID, RequestID, MultiSummaryKeys},
+		GetAcceptedStateSummary: {ChainID, RequestID, Deadline, MultiSummaryKeys, MultiSummaryHashes},
+		AcceptedStateSummary:    {ChainID, RequestID, MultiSummaryKeys, MultiSummaryHashes},
 	}
 )
 

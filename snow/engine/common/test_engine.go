@@ -122,8 +122,8 @@ type EngineTest struct {
 	GetStateSummaryFrontierF       func(validatorID ids.ShortID, requestID uint32) error
 	StateSummaryFrontierF          func(validatorID ids.ShortID, requestID uint32, summary []byte) error
 	GetStateSummaryFrontierFailedF func(validatorID ids.ShortID, requestID uint32) error
-	GetAcceptedStateSummaryF       func(validatorID ids.ShortID, requestID uint32, keys [][]byte) error
-	AcceptedStateSummaryF          func(validatorID ids.ShortID, requestID uint32, keys [][]byte) error
+	GetAcceptedStateSummaryF       func(validatorID ids.ShortID, requestID uint32, keys [][]byte, hashes [][]byte) error
+	AcceptedStateSummaryF          func(validatorID ids.ShortID, requestID uint32, keys [][]byte, hashes [][]byte) error
 	GetAcceptedStateSummaryFailedF func(validatorID ids.ShortID, requestID uint32) error
 }
 
@@ -584,9 +584,9 @@ func (e *EngineTest) GetStateSummaryFrontierFailed(validatorID ids.ShortID, requ
 	return errGetStateSummaryFrontierFailed
 }
 
-func (e *EngineTest) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error {
+func (e *EngineTest) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte, hashes [][]byte) error {
 	if e.GetAcceptedStateSummaryF != nil {
-		return e.GetAcceptedStateSummaryF(validatorID, requestID, keys)
+		return e.GetAcceptedStateSummaryF(validatorID, requestID, keys, hashes)
 	}
 	if e.CantGetAcceptedStateSummary && e.T != nil {
 		e.T.Fatalf("Unexpectedly called GetAcceptedStateSummary")
@@ -594,9 +594,9 @@ func (e *EngineTest) GetAcceptedStateSummary(validatorID ids.ShortID, requestID 
 	return errGetAcceptedStateSummary
 }
 
-func (e *EngineTest) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error {
+func (e *EngineTest) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte, hashes [][]byte) error {
 	if e.AcceptedStateSummaryF != nil {
-		return e.AcceptedStateSummaryF(validatorID, requestID, keys)
+		return e.AcceptedStateSummaryF(validatorID, requestID, keys, hashes)
 	}
 	if e.CantAcceptedStateSummary && e.T != nil {
 		e.T.Fatalf("Unexpectedly called AcceptedStateSummary")

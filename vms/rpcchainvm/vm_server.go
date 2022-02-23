@@ -329,37 +329,11 @@ func (vm *VMServer) StateSyncGetKey(ctx context.Context, req *vmproto.StateSyncG
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	key, err := ssVM.StateSyncGetKey(common.Summary{Content: req.Summary})
+	key, hash, err := ssVM.StateSyncGetKey(common.Summary{Content: req.Summary})
 	if err != nil {
 		return nil, err
 	}
-	return &vmproto.StateSyncGetKeyResponse{Key: key.Content}, nil
-}
-
-func (vm *VMServer) StateSyncCheckPair(ctx context.Context, req *vmproto.StateSyncCheckPairRequest) (*vmproto.StateSyncCheckPairResponse, error) {
-	ssVM, ok := vm.vm.(block.StateSyncableVM)
-	if !ok {
-		return nil, common.ErrStateSyncableVMNotImplemented
-	}
-
-	valid, err := ssVM.StateSyncCheckPair(common.SummaryKey{Content: req.Key}, common.Summary{Content: req.Summary})
-	if err != nil {
-		return nil, err
-	}
-	return &vmproto.StateSyncCheckPairResponse{Valid: valid}, nil
-}
-
-func (vm *VMServer) StateSyncGetKeyHeight(ctx context.Context, req *vmproto.StateSyncGetKeyHeightRequest) (*vmproto.StateSyncGetKeyHeightResponse, error) {
-	ssVM, ok := vm.vm.(block.StateSyncableVM)
-	if !ok {
-		return nil, common.ErrStateSyncableVMNotImplemented
-	}
-
-	height, err := ssVM.StateSyncGetKeyHeight(common.SummaryKey{Content: req.Key})
-	if err != nil {
-		return nil, err
-	}
-	return &vmproto.StateSyncGetKeyHeightResponse{Height: height}, nil
+	return &vmproto.StateSyncGetKeyResponse{Key: key.Content, Hash: hash.Content}, nil
 }
 
 func (vm *VMServer) StateSyncGetSummary(ctx context.Context, req *vmproto.StateSyncGetSummaryRequest) (*vmproto.StateSyncGetSummaryResponse, error) {
@@ -368,7 +342,7 @@ func (vm *VMServer) StateSyncGetSummary(ctx context.Context, req *vmproto.StateS
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	summary, err := ssVM.StateSyncGetSummary(req.Height)
+	summary, err := ssVM.StateSyncGetSummary(common.SummaryKey{Content: req.Key})
 	if err != nil {
 		return nil, err
 	}

@@ -601,7 +601,7 @@ func (vm *VMClient) StateSyncGetLastSummary() (common.Summary, error) {
 	}, nil
 }
 
-func (vm *VMClient) StateSyncGetKey(summary common.Summary) (common.SummaryKey, error) {
+func (vm *VMClient) StateSyncGetKey(summary common.Summary) (common.SummaryKey, common.SummaryHash, error) {
 	resp, err := vm.client.StateSyncGetKey(
 		context.Background(),
 		&vmproto.StateSyncGetKeyRequest{
@@ -609,37 +609,14 @@ func (vm *VMClient) StateSyncGetKey(summary common.Summary) (common.SummaryKey, 
 		},
 	)
 
-	return common.SummaryKey{Content: resp.Key}, err
+	return common.SummaryKey{Content: resp.Key}, common.SummaryHash{Content: resp.Hash}, err
 }
 
-func (vm *VMClient) StateSyncCheckPair(key common.SummaryKey, summary common.Summary) (bool, error) {
-	resp, err := vm.client.StateSyncCheckPair(
-		context.Background(),
-		&vmproto.StateSyncCheckPairRequest{
-			Key:     key.Content,
-			Summary: summary.Content,
-		},
-	)
-
-	return resp.Valid, err
-}
-
-func (vm *VMClient) StateSyncGetKeyHeight(key common.SummaryKey) (uint64, error) {
-	resp, err := vm.client.StateSyncGetKeyHeight(
-		context.Background(),
-		&vmproto.StateSyncGetKeyHeightRequest{
-			Key: key.Content,
-		},
-	)
-
-	return resp.Height, err
-}
-
-func (vm *VMClient) StateSyncGetSummary(height uint64) (common.Summary, error) {
+func (vm *VMClient) StateSyncGetSummary(key common.SummaryKey) (common.Summary, error) {
 	resp, err := vm.client.StateSyncGetSummary(
 		context.Background(),
 		&vmproto.StateSyncGetSummaryRequest{
-			Height: height,
+			Key: key.Content,
 		},
 	)
 

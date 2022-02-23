@@ -4,6 +4,7 @@
 package proposervm
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -33,9 +34,9 @@ func init() {
 	errs := wrappers.Errs{}
 	errs.Add(
 		lc.RegisterType(&common.Summary{}),
-		lc.RegisterType(&block.CoreSummaryKey{}),
+		lc.RegisterType(&common.SummaryHash{}),
+		lc.RegisterType(&common.SummaryKey{}),
 		lc.RegisterType(&block.CoreSummaryContent{}),
-		lc.RegisterType(&block.ProposerSummaryKey{}),
 		lc.RegisterType(&block.ProposerSummaryContent{}),
 		stateSyncCodec.RegisterCodec(block.StateSyncDefaultKeysVersion, lc),
 	)
@@ -137,17 +138,11 @@ func (vm *VM) StateSyncGetKey(summary common.Summary) (common.SummaryKey, common
 		return common.SummaryKey{}, common.SummaryHash{}, errWrongStateSyncVersion
 	}
 
-	proKey := block.SummaryKey{
-		Height: proContent.CoreContent.Height,
-	}
-	proKeyBytes, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, &proKey)
-	if err != nil {
-		return common.SummaryKey{}, common.SummaryHash{}, fmt.Errorf("cannot marshal proposerVMKey due to: %w", err)
-	}
+	heightBytes := make([]byte, wrappers.LongLen)
+	binary.BigEndian.PutUint64(heightBytes, proContent.CoreContent.Height)
+	key := common.SummaryKey{Content: heightBytes}
 
-	return common.SummaryKey{Content: proKeyBytes},
-		common.SummaryHash{Content: hashing.ComputeHash256(summary.Content)},
-		nil
+	return key, common.SummaryHash{Content: hashing.ComputeHash256(summary.Content)}, nil
 }
 
 func (vm *VM) StateSyncGetSummary(key common.SummaryKey) (common.Summary, error) {

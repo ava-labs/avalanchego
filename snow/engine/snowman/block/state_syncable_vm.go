@@ -10,10 +10,6 @@ import (
 
 const StateSyncDefaultKeysVersion = 0
 
-type SummaryKey struct {
-	Height uint64 `serialize:"true"`
-}
-
 type CoreSummaryContent struct {
 	BlkID   ids.ID `serialize:"true"`
 	Height  uint64 `serialize:"true"`

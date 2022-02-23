@@ -74,6 +74,7 @@ func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uin
 	}
 
 	acceptedKeys := make([][]byte, 0, len(keys))
+	acceptedHashes := make([][]byte, 0, len(hashes))
 	for idx, keyBytes := range keys {
 		key := common.SummaryKey{Content: keyBytes}
 		summary, err := gh.ssVM.StateSyncGetSummary(key)
@@ -84,9 +85,10 @@ func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uin
 		_, hash, err := gh.ssVM.StateSyncGetKey(summary)
 		if bytes.Equal(hash.Content, hashes[idx]) {
 			acceptedKeys = append(acceptedKeys, keyBytes)
+			acceptedHashes = append(acceptedHashes, hashes[idx])
 		}
 	}
-	gh.sender.SendAcceptedStateSummary(validatorID, requestID, acceptedKeys)
+	gh.sender.SendAcceptedStateSummary(validatorID, requestID, acceptedKeys, acceptedHashes)
 	return nil
 }
 

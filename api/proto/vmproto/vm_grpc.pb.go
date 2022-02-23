@@ -54,8 +54,6 @@ type VMClient interface {
 	StateSyncEnabled(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncEnabledResponse, error)
 	StateSyncGetLastSummary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncGetLastSummaryResponse, error)
 	StateSyncGetKey(ctx context.Context, in *StateSyncGetKeyRequest, opts ...grpc.CallOption) (*StateSyncGetKeyResponse, error)
-	StateSyncCheckPair(ctx context.Context, in *StateSyncCheckPairRequest, opts ...grpc.CallOption) (*StateSyncCheckPairResponse, error)
-	StateSyncGetKeyHeight(ctx context.Context, in *StateSyncGetKeyHeightRequest, opts ...grpc.CallOption) (*StateSyncGetKeyHeightResponse, error)
 	StateSyncGetSummary(ctx context.Context, in *StateSyncGetSummaryRequest, opts ...grpc.CallOption) (*StateSyncGetSummaryResponse, error)
 	StateSync(ctx context.Context, in *StateSyncRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetLastSummaryBlockID(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncLastSummaryBlockIDResponse, error)
@@ -331,24 +329,6 @@ func (c *vMClient) StateSyncGetKey(ctx context.Context, in *StateSyncGetKeyReque
 	return out, nil
 }
 
-func (c *vMClient) StateSyncCheckPair(ctx context.Context, in *StateSyncCheckPairRequest, opts ...grpc.CallOption) (*StateSyncCheckPairResponse, error) {
-	out := new(StateSyncCheckPairResponse)
-	err := c.cc.Invoke(ctx, "/vmproto.VM/StateSyncCheckPair", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *vMClient) StateSyncGetKeyHeight(ctx context.Context, in *StateSyncGetKeyHeightRequest, opts ...grpc.CallOption) (*StateSyncGetKeyHeightResponse, error) {
-	out := new(StateSyncGetKeyHeightResponse)
-	err := c.cc.Invoke(ctx, "/vmproto.VM/StateSyncGetKeyHeight", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *vMClient) StateSyncGetSummary(ctx context.Context, in *StateSyncGetSummaryRequest, opts ...grpc.CallOption) (*StateSyncGetSummaryResponse, error) {
 	out := new(StateSyncGetSummaryResponse)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/StateSyncGetSummary", in, out, opts...)
@@ -420,8 +400,6 @@ type VMServer interface {
 	StateSyncEnabled(context.Context, *emptypb.Empty) (*StateSyncEnabledResponse, error)
 	StateSyncGetLastSummary(context.Context, *emptypb.Empty) (*StateSyncGetLastSummaryResponse, error)
 	StateSyncGetKey(context.Context, *StateSyncGetKeyRequest) (*StateSyncGetKeyResponse, error)
-	StateSyncCheckPair(context.Context, *StateSyncCheckPairRequest) (*StateSyncCheckPairResponse, error)
-	StateSyncGetKeyHeight(context.Context, *StateSyncGetKeyHeightRequest) (*StateSyncGetKeyHeightResponse, error)
 	StateSyncGetSummary(context.Context, *StateSyncGetSummaryRequest) (*StateSyncGetSummaryResponse, error)
 	StateSync(context.Context, *StateSyncRequest) (*emptypb.Empty, error)
 	GetLastSummaryBlockID(context.Context, *emptypb.Empty) (*StateSyncLastSummaryBlockIDResponse, error)
@@ -519,12 +497,6 @@ func (UnimplementedVMServer) StateSyncGetLastSummary(context.Context, *emptypb.E
 }
 func (UnimplementedVMServer) StateSyncGetKey(context.Context, *StateSyncGetKeyRequest) (*StateSyncGetKeyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StateSyncGetKey not implemented")
-}
-func (UnimplementedVMServer) StateSyncCheckPair(context.Context, *StateSyncCheckPairRequest) (*StateSyncCheckPairResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method StateSyncCheckPair not implemented")
-}
-func (UnimplementedVMServer) StateSyncGetKeyHeight(context.Context, *StateSyncGetKeyHeightRequest) (*StateSyncGetKeyHeightResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method StateSyncGetKeyHeight not implemented")
 }
 func (UnimplementedVMServer) StateSyncGetSummary(context.Context, *StateSyncGetSummaryRequest) (*StateSyncGetSummaryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StateSyncGetSummary not implemented")
@@ -1073,42 +1045,6 @@ func _VM_StateSyncGetKey_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VM_StateSyncCheckPair_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StateSyncCheckPairRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(VMServer).StateSyncCheckPair(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/vmproto.VM/StateSyncCheckPair",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).StateSyncCheckPair(ctx, req.(*StateSyncCheckPairRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _VM_StateSyncGetKeyHeight_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StateSyncGetKeyHeightRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(VMServer).StateSyncGetKeyHeight(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/vmproto.VM/StateSyncGetKeyHeight",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).StateSyncGetKeyHeight(ctx, req.(*StateSyncGetKeyHeightRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _VM_StateSyncGetSummary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(StateSyncGetSummaryRequest)
 	if err := dec(in); err != nil {
@@ -1303,14 +1239,6 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "StateSyncGetKey",
 			Handler:    _VM_StateSyncGetKey_Handler,
-		},
-		{
-			MethodName: "StateSyncCheckPair",
-			Handler:    _VM_StateSyncCheckPair_Handler,
-		},
-		{
-			MethodName: "StateSyncGetKeyHeight",
-			Handler:    _VM_StateSyncGetKeyHeight_Handler,
 		},
 		{
 			MethodName: "StateSyncGetSummary",

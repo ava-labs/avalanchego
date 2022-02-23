@@ -123,7 +123,8 @@ type InboundMsgBuilder interface {
 	InboundGetAcceptedStateSummary(
 		chainID ids.ID,
 		requestID uint32,
-		containers [][]byte,
+		keys [][]byte,
+		hashes [][]byte,
 		deadline time.Duration,
 		nodeID ids.ShortID,
 	) InboundMessage
@@ -131,7 +132,8 @@ type InboundMsgBuilder interface {
 	InboundAcceptedStateSummary(
 		chainID ids.ID,
 		requestID uint32,
-		containers [][]byte,
+		keys [][]byte,
+		hashes [][]byte,
 		nodeID ids.ShortID,
 	) InboundMessage
 }
@@ -430,6 +432,7 @@ func (b *inMsgBuilder) InboundGetAcceptedStateSummary(
 	chainID ids.ID,
 	requestID uint32,
 	keys [][]byte,
+	hashes [][]byte,
 	deadline time.Duration,
 	nodeID ids.ShortID,
 ) InboundMessage {
@@ -437,10 +440,11 @@ func (b *inMsgBuilder) InboundGetAcceptedStateSummary(
 	return &inboundMessage{
 		op: GetAcceptedStateSummary,
 		fields: map[Field]interface{}{
-			ChainID:          chainID[:],
-			RequestID:        requestID,
-			Deadline:         uint64(deadline),
-			MultiSummaryKeys: keys,
+			ChainID:            chainID[:],
+			RequestID:          requestID,
+			Deadline:           uint64(deadline),
+			MultiSummaryKeys:   keys,
+			MultiSummaryHashes: hashes,
 		},
 		nodeID:         nodeID,
 		expirationTime: received.Add(deadline),
@@ -451,14 +455,16 @@ func (b *inMsgBuilder) InboundAcceptedStateSummary(
 	chainID ids.ID,
 	requestID uint32,
 	keys [][]byte,
+	hashes [][]byte,
 	nodeID ids.ShortID,
 ) InboundMessage {
 	return &inboundMessage{
 		op: AcceptedStateSummary,
 		fields: map[Field]interface{}{
-			ChainID:          chainID[:],
-			RequestID:        requestID,
-			MultiSummaryKeys: keys,
+			ChainID:            chainID[:],
+			RequestID:          requestID,
+			MultiSummaryKeys:   keys,
+			MultiSummaryHashes: hashes,
 		},
 		nodeID: nodeID,
 	}

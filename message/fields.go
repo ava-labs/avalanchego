@@ -34,6 +34,7 @@ const (
 	Uptime                           // Used for Pong
 	SummaryBytes                     // Used for state sync
 	MultiSummaryKeys                 // Used for state sync
+	MultiSummaryHashes               // Used for state sync
 	VersionStruct                    // Used internally
 )
 
