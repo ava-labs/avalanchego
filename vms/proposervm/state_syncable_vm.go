@@ -63,7 +63,16 @@ func (vm *VM) StateSyncEnabled() (bool, error) {
 	return ssVM.StateSyncEnabled()
 }
 
-func (vm *VM) buildProContentFrom(coreContent block.CoreSummaryContent) (block.ProposerSummaryContent, error) {
+func (vm *VM) buildProContentFrom(coreSummaryBytes common.Summary) (block.ProposerSummaryContent, error) {
+	coreContent := block.CoreSummaryContent{}
+	ver, err := stateSyncCodec.Unmarshal(coreSummaryBytes.Content, &coreContent)
+	if err != nil {
+		return block.ProposerSummaryContent{}, err
+	}
+	if ver != block.StateSyncDefaultKeysVersion {
+		return block.ProposerSummaryContent{}, errWrongStateSyncVersion
+	}
+
 	// retrieve ProBlkID is available
 	proBlkID, err := vm.GetBlockIDAtHeight(coreContent.Height)
 	if err == database.ErrNotFound {
@@ -100,16 +109,8 @@ func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 	if err != nil {
 		return common.Summary{}, err
 	}
-	coreContent := block.CoreSummaryContent{}
-	ver, err := stateSyncCodec.Unmarshal(vmSummary.Content, &coreContent)
-	if err != nil {
-		return common.Summary{}, fmt.Errorf("cannot unmarshal vmSummary.Key due to: %w", err)
-	}
-	if ver != block.StateSyncDefaultKeysVersion {
-		return common.Summary{}, errWrongStateSyncVersion
-	}
 
-	proContent, err := vm.buildProContentFrom(coreContent)
+	proContent, err := vm.buildProContentFrom(vmSummary)
 	if err != nil {
 		return common.Summary{}, fmt.Errorf("could not build proposerVm Summary from core one due to: %w", err)
 	}
@@ -151,20 +152,11 @@ func (vm *VM) StateSyncGetSummary(key common.SummaryKey) (common.Summary, error)
 		return common.Summary{}, common.ErrStateSyncableVMNotImplemented
 	}
 
-	coreSummaryBytes, err := ssVM.StateSyncGetSummary(key)
+	coreSummary, err := ssVM.StateSyncGetSummary(key)
 	if err != nil {
 		return common.Summary{}, fmt.Errorf("could not retrieve core summary due to: %w", err)
 	}
-	coreContent := block.CoreSummaryContent{}
-	ver, err := stateSyncCodec.Unmarshal(coreSummaryBytes.Content, &coreContent)
-	if err != nil {
-		return common.Summary{}, err
-	}
-	if ver != block.StateSyncDefaultKeysVersion {
-		return common.Summary{}, errWrongStateSyncVersion
-	}
-
-	proContent, err := vm.buildProContentFrom(coreContent)
+	proContent, err := vm.buildProContentFrom(coreSummary)
 	if err != nil {
 		return common.Summary{}, fmt.Errorf("could not build proposerVm Summary from core one due to: %w", err)
 	}
