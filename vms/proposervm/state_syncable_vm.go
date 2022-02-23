@@ -123,93 +123,42 @@ func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 	}, err
 }
 
-func (vm *VM) StateSyncGetKey(summary common.Summary) (common.SummaryKey, error) {
+func (vm *VM) StateSyncGetKey(summary common.Summary) (common.SummaryKey, common.SummaryHash, error) {
 	if _, ok := vm.ChainVM.(block.StateSyncableVM); !ok {
-		return common.SummaryKey{}, common.ErrStateSyncableVMNotImplemented
+		return common.SummaryKey{}, common.SummaryHash{}, common.ErrStateSyncableVMNotImplemented
 	}
 
 	proContent := block.ProposerSummaryContent{}
 	ver, err := stateSyncCodec.Unmarshal(summary.Content, &proContent)
 	if err != nil {
-		return common.SummaryKey{}, fmt.Errorf("could not unmarshal ProposerSummaryContent due to: %w", err)
+		return common.SummaryKey{}, common.SummaryHash{}, fmt.Errorf("could not unmarshal ProposerSummaryContent due to: %w", err)
 	}
 	if ver != block.StateSyncDefaultKeysVersion {
-		return common.SummaryKey{}, errWrongStateSyncVersion
+		return common.SummaryKey{}, common.SummaryHash{}, errWrongStateSyncVersion
 	}
 
-	proSummaryHash, err := ids.ToID(hashing.ComputeHash256(summary.Content))
-	if err != nil {
-		return common.SummaryKey{}, fmt.Errorf("could not compute pro summary hash due to: %w", err)
-	}
-
-	proKey := block.ProposerSummaryKey{
-		Height:         proContent.CoreContent.Height,
-		ProSummaryHash: proSummaryHash,
+	proKey := block.SummaryKey{
+		Height: proContent.CoreContent.Height,
 	}
 	proKeyBytes, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, &proKey)
 	if err != nil {
-		return common.SummaryKey{}, fmt.Errorf("cannot marshal proposerVMKey due to: %w", err)
+		return common.SummaryKey{}, common.SummaryHash{}, fmt.Errorf("cannot marshal proposerVMKey due to: %w", err)
 	}
 
-	return common.SummaryKey{Content: proKeyBytes}, nil
+	return common.SummaryKey{Content: proKeyBytes},
+		common.SummaryHash{Content: hashing.ComputeHash256(summary.Content)},
+		nil
 }
 
-func (vm *VM) StateSyncCheckPair(key common.SummaryKey, summary common.Summary) (bool, error) {
-	if _, ok := vm.ChainVM.(block.StateSyncableVM); !ok {
-		return false, common.ErrStateSyncableVMNotImplemented
-	}
-
-	proKey := block.ProposerSummaryKey{}
-	ver, err := stateSyncCodec.Unmarshal(key.Content, &proKey)
-	if err != nil {
-		return false, fmt.Errorf("could not unmarshal ProposerSummaryKey due to: %w", err)
-	}
-	if ver != block.StateSyncDefaultKeysVersion {
-		return false, errWrongStateSyncVersion
-	}
-
-	proContent := block.ProposerSummaryContent{}
-	ver, err = stateSyncCodec.Unmarshal(summary.Content, &proContent)
-	if err != nil {
-		return false, fmt.Errorf("could not unmarshal ProposerSummaryContent due to: %w", err)
-	}
-	if ver != block.StateSyncDefaultKeysVersion {
-		return false, errWrongStateSyncVersion
-	}
-	proSummaryHash, err := ids.ToID(hashing.ComputeHash256(summary.Content))
-	if err != nil {
-		return false, fmt.Errorf("could not compute pro summary hash due to: %w", err)
-	}
-
-	return proKey.ProSummaryHash == proSummaryHash, nil
-}
-
-func (vm *VM) StateSyncGetKeyHeight(key common.SummaryKey) (uint64, error) {
-	if _, ok := vm.ChainVM.(block.StateSyncableVM); !ok {
-		return uint64(0), common.ErrStateSyncableVMNotImplemented
-	}
-
-	proKey := block.ProposerSummaryKey{}
-	ver, err := stateSyncCodec.Unmarshal(key.Content, &proKey)
-	if err != nil {
-		return uint64(0), fmt.Errorf("could not unmarshal ProposerSummaryKey due to: %w", err)
-	}
-	if ver != block.StateSyncDefaultKeysVersion {
-		return uint64(0), errWrongStateSyncVersion
-	}
-
-	return proKey.Height, nil
-}
-
-func (vm *VM) StateSyncGetSummary(height uint64) (common.Summary, error) {
+func (vm *VM) StateSyncGetSummary(key common.SummaryKey) (common.Summary, error) {
 	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
 		return common.Summary{}, common.ErrStateSyncableVMNotImplemented
 	}
 
-	coreSummaryBytes, err := ssVM.StateSyncGetSummary(height)
+	coreSummaryBytes, err := ssVM.StateSyncGetSummary(key)
 	if err != nil {
-		return common.Summary{}, fmt.Errorf("could not retrieve core summary at height %d due to: %w", height, err)
+		return common.Summary{}, fmt.Errorf("could not retrieve core summary due to: %w", err)
 	}
 	coreContent := block.CoreSummaryContent{}
 	ver, err := stateSyncCodec.Unmarshal(coreSummaryBytes.Content, &coreContent)

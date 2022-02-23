@@ -4,6 +4,8 @@
 package getter
 
 import (
+	"bytes"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -74,16 +76,13 @@ func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uin
 	acceptedKeys := make([][]byte, 0, len(keys))
 	for idx, keyBytes := range keys {
 		key := common.SummaryKey{Content: keyBytes}
-		keyHeight, err := gh.ssVM.StateSyncGetKeyHeight(key)
+		summary, err := gh.ssVM.StateSyncGetSummary(key)
 		if err != nil {
+			// TODO: add log
 			continue
 		}
-		summary, err := gh.ssVM.StateSyncGetSummary(keyHeight)
-		if err != nil {
-			continue
-		}
-		valid, err := gh.ssVM.StateSyncCheckPair(key, summary)
-		if err != nil && valid {
+		_, hash, err := gh.ssVM.StateSyncGetKey(summary)
+		if bytes.Equal(hash.Content, hashes[idx]) {
 			acceptedKeys = append(acceptedKeys, keyBytes)
 		}
 	}
