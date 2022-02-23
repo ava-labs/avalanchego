@@ -37,15 +37,15 @@ func (vm *blockVM) StateSyncGetLastSummary() (common.Summary, error) {
 	return summary, err
 }
 
-func (vm *blockVM) StateSyncGetKey(summary common.Summary) (common.Key, error) {
+func (vm *blockVM) StateSyncGetKey(summary common.Summary) (common.SummaryKey, error) {
 	if vm.ssVM == nil {
-		return common.Key{}, common.ErrStateSyncableVMNotImplemented
+		return common.SummaryKey{}, common.ErrStateSyncableVMNotImplemented
 	}
 
 	return vm.ssVM.StateSyncGetKey(summary)
 }
 
-func (vm *blockVM) StateSyncCheckPair(key common.Key, summary common.Summary) (bool, error) {
+func (vm *blockVM) StateSyncCheckPair(key common.SummaryKey, summary common.Summary) (bool, error) {
 	if vm.ssVM == nil {
 		return false, common.ErrStateSyncableVMNotImplemented
 	}
@@ -53,7 +53,7 @@ func (vm *blockVM) StateSyncCheckPair(key common.Key, summary common.Summary) (b
 	return vm.ssVM.StateSyncCheckPair(key, summary)
 }
 
-func (vm *blockVM) StateSyncGetKeyHeight(key common.Key) (uint64, error) {
+func (vm *blockVM) StateSyncGetKeyHeight(key common.SummaryKey) (uint64, error) {
 	if vm.ssVM == nil {
 		return uint64(0), common.ErrStateSyncableVMNotImplemented
 	}

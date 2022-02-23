@@ -123,23 +123,23 @@ func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 	}, err
 }
 
-func (vm *VM) StateSyncGetKey(summary common.Summary) (common.Key, error) {
+func (vm *VM) StateSyncGetKey(summary common.Summary) (common.SummaryKey, error) {
 	if _, ok := vm.ChainVM.(block.StateSyncableVM); !ok {
-		return common.Key{}, common.ErrStateSyncableVMNotImplemented
+		return common.SummaryKey{}, common.ErrStateSyncableVMNotImplemented
 	}
 
 	proContent := block.ProposerSummaryContent{}
 	ver, err := stateSyncCodec.Unmarshal(summary.Content, &proContent)
 	if err != nil {
-		return common.Key{}, fmt.Errorf("could not unmarshal ProposerSummaryContent due to: %w", err)
+		return common.SummaryKey{}, fmt.Errorf("could not unmarshal ProposerSummaryContent due to: %w", err)
 	}
 	if ver != block.StateSyncDefaultKeysVersion {
-		return common.Key{}, errWrongStateSyncVersion
+		return common.SummaryKey{}, errWrongStateSyncVersion
 	}
 
 	proSummaryHash, err := ids.ToID(hashing.ComputeHash256(summary.Content))
 	if err != nil {
-		return common.Key{}, fmt.Errorf("could not compute pro summary hash due to: %w", err)
+		return common.SummaryKey{}, fmt.Errorf("could not compute pro summary hash due to: %w", err)
 	}
 
 	proKey := block.ProposerSummaryKey{
@@ -148,13 +148,13 @@ func (vm *VM) StateSyncGetKey(summary common.Summary) (common.Key, error) {
 	}
 	proKeyBytes, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, &proKey)
 	if err != nil {
-		return common.Key{}, fmt.Errorf("cannot marshal proposerVMKey due to: %w", err)
+		return common.SummaryKey{}, fmt.Errorf("cannot marshal proposerVMKey due to: %w", err)
 	}
 
-	return common.Key{Content: proKeyBytes}, nil
+	return common.SummaryKey{Content: proKeyBytes}, nil
 }
 
-func (vm *VM) StateSyncCheckPair(key common.Key, summary common.Summary) (bool, error) {
+func (vm *VM) StateSyncCheckPair(key common.SummaryKey, summary common.Summary) (bool, error) {
 	if _, ok := vm.ChainVM.(block.StateSyncableVM); !ok {
 		return false, common.ErrStateSyncableVMNotImplemented
 	}
@@ -184,7 +184,7 @@ func (vm *VM) StateSyncCheckPair(key common.Key, summary common.Summary) (bool, 
 	return proKey.ProSummaryHash == proSummaryHash, nil
 }
 
-func (vm *VM) StateSyncGetKeyHeight(key common.Key) (uint64, error) {
+func (vm *VM) StateSyncGetKeyHeight(key common.SummaryKey) (uint64, error) {
 	if _, ok := vm.ChainVM.(block.StateSyncableVM); !ok {
 		return uint64(0), common.ErrStateSyncableVMNotImplemented
 	}

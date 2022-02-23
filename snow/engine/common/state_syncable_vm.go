@@ -15,12 +15,16 @@ var (
 )
 
 // Summary represents the information needed for state sync processing
-type Key struct {
-	Content []byte `serialize:"true"` // actual state key content
+type SummaryKey struct {
+	Content []byte `serialize:"true"`
+}
+
+type SummaryHash struct {
+	Content []byte `serialize:"true"`
 }
 
 type Summary struct {
-	Content []byte `serialize:"true"` // actual state summary content
+	Content []byte `serialize:"true"`
 }
 
 // StateSyncableVM represents functionalities to allow VMs to sync to a given state,
@@ -36,11 +40,12 @@ type StateSyncableVM interface {
 	// StateSyncGetLastSummary returns latest Summary with an optional error
 	StateSyncGetLastSummary() (Summary, error)
 
-	// StateSyncGetKey retrieves a summary key out of a summary
-	StateSyncGetKey(Summary) (Key, error)
+	// StateSyncGetKey retrieves a summary key out of a summary and computes a hash
+	// used to verify the summary through validator voting.
+	StateSyncGetKey(Summary) (SummaryKey, SummaryHash, error)
 
-	// StateSyncCheckPair checks whether a locally available key is valid and matches Summary
-	StateSyncCheckPair(Key, Summary) (bool, error)
+	// StateSyncGetSummary retrieves the summary related to key, if available.
+	StateSyncGetSummary(SummaryKey) (Summary, error)
 
 	// StateSync is called with a list of valid summaries to sync from.
 	// These summaries were collected from peers and validated with validators.

@@ -342,7 +342,7 @@ func (vm *VMServer) StateSyncCheckPair(ctx context.Context, req *vmproto.StateSy
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	valid, err := ssVM.StateSyncCheckPair(common.Key{Content: req.Key}, common.Summary{Content: req.Summary})
+	valid, err := ssVM.StateSyncCheckPair(common.SummaryKey{Content: req.Key}, common.Summary{Content: req.Summary})
 	if err != nil {
 		return nil, err
 	}
@@ -355,7 +355,7 @@ func (vm *VMServer) StateSyncGetKeyHeight(ctx context.Context, req *vmproto.Stat
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	height, err := ssVM.StateSyncGetKeyHeight(common.Key{Content: req.Key})
+	height, err := ssVM.StateSyncGetKeyHeight(common.SummaryKey{Content: req.Key})
 	if err != nil {
 		return nil, err
 	}
