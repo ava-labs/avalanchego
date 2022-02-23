@@ -26,10 +26,10 @@ Moreover we impose the following requirements on StateSummaries and StateKeys:
 
 The requirements above bring us to the following structure for StateSummaries, StateKeys and StateHashes:
 
-|            | StateKey  | StateHash      | StateSummary                   |
-|:----------:|:---------:|:--------------:|:------------------------------:|
-| CoreVM     | height    | SummaryHash    | BlkID + height + Content       |
-| ProposerVM | height    | ProSummaryHash | ProBlkID + CoreVM_StateSummary |
+|            | StateKey  | StateSummary                   | StateHash      |
+|:----------:|:---------:|:------------------------------:|:--------------:|
+| CoreVM     | height    | BlkID + height + Content       | SummaryHash    |
+| ProposerVM | height    | ProBlkID + CoreVM_StateSummary | ProSummaryHash |
 
 It can easily verify by inspection that the structure above allows support the required operations. Note that:
 

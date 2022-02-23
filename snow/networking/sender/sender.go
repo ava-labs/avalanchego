@@ -316,7 +316,7 @@ func (s *Sender) SendStateSummaryFrontier(nodeID ids.ShortID, requestID uint32, 
 	}
 }
 
-func (s *Sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uint32, keys [][]byte, hashes [][]byte) {
+func (s *Sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uint32, keys [][]byte) {
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -334,12 +334,12 @@ func (s *Sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uin
 	// Just put it right into the router. Asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
-		inMsg := s.msgCreator.InboundGetAcceptedStateSummary(s.ctx.ChainID, requestID, keys, hashes, deadline, s.ctx.NodeID)
+		inMsg := s.msgCreator.InboundGetAcceptedStateSummary(s.ctx.ChainID, requestID, keys, deadline, s.ctx.NodeID)
 		go s.router.HandleInbound(inMsg)
 	}
 
 	// Create the outbound message.
-	outMsg, err := s.msgCreator.GetAcceptedStateSummary(s.ctx.ChainID, requestID, deadline, keys, hashes)
+	outMsg, err := s.msgCreator.GetAcceptedStateSummary(s.ctx.ChainID, requestID, deadline, keys)
 
 	// Send the message over the network.
 	var sentTo ids.ShortSet
@@ -347,11 +347,10 @@ func (s *Sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uin
 		sentTo = s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
 	} else {
 		s.ctx.Log.Error(
-			"failed to build GetAcceptedStateSummary(%s, %d, %s, %s): %s",
+			"failed to build GetAcceptedStateSummary(%s, %d, %s): %s",
 			s.ctx.ChainID,
 			requestID,
 			keys,
-			hashes,
 			err,
 		)
 	}
@@ -369,21 +368,21 @@ func (s *Sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uin
 	}
 }
 
-func (s *Sender) SendAcceptedStateSummary(nodeID ids.ShortID, requestID uint32, keys [][]byte, hashes [][]byte) {
+func (s *Sender) SendAcceptedStateSummary(nodeID ids.ShortID, requestID uint32, hashes [][]byte) {
 	if nodeID == s.ctx.NodeID {
-		inMsg := s.msgCreator.InboundAcceptedStateSummary(s.ctx.ChainID, requestID, keys, hashes, nodeID)
+		inMsg := s.msgCreator.InboundAcceptedStateSummary(s.ctx.ChainID, requestID, hashes, nodeID)
 		go s.router.HandleInbound(inMsg)
 		return
 	}
 
 	// Create the outbound message.
-	outMsg, err := s.msgCreator.AcceptedStateSummary(s.ctx.ChainID, requestID, keys, hashes)
+	outMsg, err := s.msgCreator.AcceptedStateSummary(s.ctx.ChainID, requestID, hashes)
 	if err != nil {
 		s.ctx.Log.Error(
 			"failed to build AcceptedStateSummary(%s, %d, %s): %s",
 			s.ctx.ChainID,
 			requestID,
-			keys,
+			hashes,
 			err,
 		)
 		return
@@ -397,7 +396,7 @@ func (s *Sender) SendAcceptedStateSummary(nodeID ids.ShortID, requestID uint32, 
 			nodeID,
 			s.ctx.ChainID,
 			requestID,
-			keys,
+			hashes,
 		)
 	}
 }

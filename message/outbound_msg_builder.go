@@ -145,13 +145,11 @@ type OutboundMsgBuilder interface {
 		requestID uint32,
 		deadline time.Duration,
 		keys [][]byte,
-		hashes [][]byte,
 	) (OutboundMessage, error)
 
 	AcceptedStateSummary(
 		chainID ids.ID,
 		requestID uint32,
-		keys [][]byte,
 		hashes [][]byte,
 	) (OutboundMessage, error)
 }
@@ -556,16 +554,14 @@ func (b *outMsgBuilder) GetAcceptedStateSummary(
 	requestID uint32,
 	deadline time.Duration,
 	keys [][]byte,
-	hashes [][]byte,
 ) (OutboundMessage, error) {
 	return b.c.Pack(
 		GetAcceptedStateSummary,
 		map[Field]interface{}{
-			ChainID:            chainID[:],
-			RequestID:          requestID,
-			Deadline:           uint64(deadline),
-			MultiSummaryKeys:   keys,
-			MultiSummaryHashes: hashes,
+			ChainID:          chainID[:],
+			RequestID:        requestID,
+			Deadline:         uint64(deadline),
+			MultiSummaryKeys: keys,
 		},
 		GetAcceptedStateSummary.Compressible(), // GetAcceptedStateSummary messages can't be compressed
 		false,
@@ -575,7 +571,6 @@ func (b *outMsgBuilder) GetAcceptedStateSummary(
 func (b *outMsgBuilder) AcceptedStateSummary(
 	chainID ids.ID,
 	requestID uint32,
-	keys [][]byte,
 	hashes [][]byte,
 ) (OutboundMessage, error) {
 	return b.c.Pack(
@@ -583,7 +578,6 @@ func (b *outMsgBuilder) AcceptedStateSummary(
 		map[Field]interface{}{
 			ChainID:            chainID[:],
 			RequestID:          requestID,
-			MultiSummaryKeys:   keys,
 			MultiSummaryHashes: hashes,
 		},
 		AcceptedStateSummary.Compressible(), // AcceptedStateSummary messages can't be compressed

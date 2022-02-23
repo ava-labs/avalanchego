@@ -4,8 +4,6 @@
 package getter
 
 import (
-	"bytes"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -67,15 +65,14 @@ func (gh *getter) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uin
 	return nil
 }
 
-func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte, hashes [][]byte) error {
+func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error {
 	if gh.ssVM == nil {
 		gh.log.Debug("State sync not supported. GetAcceptedStateSummary(%s, %d) dropped.", validatorID, requestID)
 		return nil
 	}
 
-	acceptedKeys := make([][]byte, 0, len(keys))
-	acceptedHashes := make([][]byte, 0, len(hashes))
-	for idx, keyBytes := range keys {
+	retrievedHashes := make([][]byte, 0, len(keys))
+	for _, keyBytes := range keys {
 		key := common.SummaryKey{Content: keyBytes}
 		summary, err := gh.ssVM.StateSyncGetSummary(key)
 		if err != nil {
@@ -85,12 +82,10 @@ func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uin
 		if err != nil {
 			continue
 		}
-		if bytes.Equal(hash.Content, hashes[idx]) {
-			acceptedKeys = append(acceptedKeys, keyBytes)
-			acceptedHashes = append(acceptedHashes, hashes[idx])
-		}
+
+		retrievedHashes = append(retrievedHashes, hash.Content)
 	}
-	gh.sender.SendAcceptedStateSummary(validatorID, requestID, acceptedKeys, acceptedHashes)
+	gh.sender.SendAcceptedStateSummary(validatorID, requestID, retrievedHashes)
 	return nil
 }
 
