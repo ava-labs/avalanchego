@@ -35,7 +35,6 @@ func init() {
 	errs.Add(
 		lc.RegisterType(&common.Summary{}),
 		lc.RegisterType(&common.SummaryHash{}),
-		lc.RegisterType(&common.SummaryKey{}),
 		lc.RegisterType(&block.CoreSummaryContent{}),
 		lc.RegisterType(&block.ProposerSummaryContent{}),
 		stateSyncCodec.RegisterCodec(block.StateSyncDefaultKeysVersion, lc),
@@ -61,41 +60,6 @@ func (vm *VM) StateSyncEnabled() (bool, error) {
 	}
 
 	return ssVM.StateSyncEnabled()
-}
-
-func (vm *VM) buildProContentFrom(coreSummaryBytes common.Summary) (block.ProposerSummaryContent, error) {
-	coreContent := block.CoreSummaryContent{}
-	ver, err := stateSyncCodec.Unmarshal(coreSummaryBytes.Content, &coreContent)
-	if err != nil {
-		return block.ProposerSummaryContent{}, err
-	}
-	if ver != block.StateSyncDefaultKeysVersion {
-		return block.ProposerSummaryContent{}, errWrongStateSyncVersion
-	}
-
-	// retrieve ProBlkID is available
-	proBlkID, err := vm.GetBlockIDAtHeight(coreContent.Height)
-	if err == database.ErrNotFound {
-		// we must have hit the snowman++ fork. Check it.
-		currentFork, err := vm.State.GetForkHeight()
-		if err != nil {
-			return block.ProposerSummaryContent{}, err
-		}
-		if coreContent.Height > currentFork {
-			return block.ProposerSummaryContent{}, err
-		}
-
-		proBlkID = coreContent.BlkID
-	}
-	if err != nil {
-		return block.ProposerSummaryContent{}, err
-	}
-
-	// Build ProposerSummaryContent
-	return block.ProposerSummaryContent{
-		ProBlkID:    proBlkID,
-		CoreContent: coreContent,
-	}, nil
 }
 
 func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
@@ -125,7 +89,7 @@ func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 	}, err
 }
 
-func (vm *VM) StateSyncGetKey(summary common.Summary) (common.SummaryKey, common.SummaryHash, error) {
+func (vm *VM) StateSyncGetKeyHash(summary common.Summary) (common.SummaryKey, common.SummaryHash, error) {
 	if _, ok := vm.ChainVM.(block.StateSyncableVM); !ok {
 		return common.SummaryKey{}, common.SummaryHash{}, common.ErrStateSyncableVMNotImplemented
 	}
@@ -244,4 +208,39 @@ func (vm *VM) SetLastSummaryBlock(blkByte []byte) error {
 	}
 
 	return blk.conditionalAccept(false /*acceptcoreBlk*/)
+}
+
+func (vm *VM) buildProContentFrom(coreSummaryBytes common.Summary) (block.ProposerSummaryContent, error) {
+	coreContent := block.CoreSummaryContent{}
+	ver, err := stateSyncCodec.Unmarshal(coreSummaryBytes.Content, &coreContent)
+	if err != nil {
+		return block.ProposerSummaryContent{}, err
+	}
+	if ver != block.StateSyncDefaultKeysVersion {
+		return block.ProposerSummaryContent{}, errWrongStateSyncVersion
+	}
+
+	// retrieve ProBlkID is available
+	proBlkID, err := vm.GetBlockIDAtHeight(coreContent.Height)
+	if err == database.ErrNotFound {
+		// we must have hit the snowman++ fork. Check it.
+		currentFork, err := vm.State.GetForkHeight()
+		if err != nil {
+			return block.ProposerSummaryContent{}, err
+		}
+		if coreContent.Height > currentFork {
+			return block.ProposerSummaryContent{}, err
+		}
+
+		proBlkID = coreContent.BlkID
+	}
+	if err != nil {
+		return block.ProposerSummaryContent{}, err
+	}
+
+	// Build ProposerSummaryContent
+	return block.ProposerSummaryContent{
+		ProBlkID:    proBlkID,
+		CoreContent: coreContent,
+	}, nil
 }

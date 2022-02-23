@@ -323,17 +323,17 @@ func (vm *VMServer) StateSyncGetLastSummary(ctx context.Context, empty *emptypb.
 	}, nil
 }
 
-func (vm *VMServer) StateSyncGetKey(ctx context.Context, req *vmproto.StateSyncGetKeyRequest) (*vmproto.StateSyncGetKeyResponse, error) {
+func (vm *VMServer) StateSyncGetKeyHash(ctx context.Context, req *vmproto.StateSyncGetKeyHashRequest) (*vmproto.StateSyncGetKeyHashResponse, error) {
 	ssVM, ok := vm.vm.(block.StateSyncableVM)
 	if !ok {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	key, hash, err := ssVM.StateSyncGetKey(common.Summary{Content: req.Summary})
+	key, hash, err := ssVM.StateSyncGetKeyHash(common.Summary{Content: req.Summary})
 	if err != nil {
 		return nil, err
 	}
-	return &vmproto.StateSyncGetKeyResponse{Key: key.Content, Hash: hash.Content}, nil
+	return &vmproto.StateSyncGetKeyHashResponse{Key: key.Content, Hash: hash.Content}, nil
 }
 
 func (vm *VMServer) StateSyncGetSummary(ctx context.Context, req *vmproto.StateSyncGetSummaryRequest) (*vmproto.StateSyncGetSummaryResponse, error) {

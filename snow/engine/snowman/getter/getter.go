@@ -81,7 +81,7 @@ func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uin
 		if err != nil {
 			continue
 		}
-		_, hash, err := gh.ssVM.StateSyncGetKey(summary)
+		_, hash, err := gh.ssVM.StateSyncGetKeyHash(summary)
 		if err != nil {
 			continue
 		}

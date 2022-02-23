@@ -138,7 +138,7 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 	ss.pendingReceiveStateSummaryFrontier.Remove(validatorID)
 
 	// retrieve key for summary and register frontier
-	key, hash, err := ss.stateSyncVM.StateSyncGetKey(common.Summary{Content: summary})
+	key, hash, err := ss.stateSyncVM.StateSyncGetKeyHash(common.Summary{Content: summary})
 	if err != nil {
 		ss.Ctx.Log.Debug("Could not retrieve key from summary %s: %v", summary, err)
 		return nil
@@ -476,7 +476,7 @@ func (ss *stateSyncer) sendGetAccepted() error {
 		acceptedKeys := make([][]byte, len(ss.weightedSummaries))
 		acceptedHashes := make([][]byte, len(ss.weightedSummaries))
 		for _, summary := range ss.weightedSummaries {
-			key, hash, err := ss.stateSyncVM.StateSyncGetKey(summary.Summary)
+			key, hash, err := ss.stateSyncVM.StateSyncGetKeyHash(summary.Summary)
 			if err != nil {
 				return err
 			}

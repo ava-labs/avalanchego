@@ -40,9 +40,9 @@ type StateSyncableVM interface {
 	// StateSyncGetLastSummary returns latest Summary with an optional error
 	StateSyncGetLastSummary() (Summary, error)
 
-	// StateSyncGetKey retrieves a summary key out of a summary and computes a hash
+	// StateSyncGetKeyHash retrieves a summary key out of a summary and computes a hash
 	// used to verify the summary through validator voting.
-	StateSyncGetKey(Summary) (SummaryKey, SummaryHash, error)
+	StateSyncGetKeyHash(Summary) (SummaryKey, SummaryHash, error)
 
 	// StateSyncGetSummary retrieves the summary related to key, if available.
 	StateSyncGetSummary(SummaryKey) (Summary, error)

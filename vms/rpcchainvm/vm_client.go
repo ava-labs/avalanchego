@@ -601,10 +601,10 @@ func (vm *VMClient) StateSyncGetLastSummary() (common.Summary, error) {
 	}, nil
 }
 
-func (vm *VMClient) StateSyncGetKey(summary common.Summary) (common.SummaryKey, common.SummaryHash, error) {
-	resp, err := vm.client.StateSyncGetKey(
+func (vm *VMClient) StateSyncGetKeyHash(summary common.Summary) (common.SummaryKey, common.SummaryHash, error) {
+	resp, err := vm.client.StateSyncGetKeyHash(
 		context.Background(),
-		&vmproto.StateSyncGetKeyRequest{
+		&vmproto.StateSyncGetKeyHashRequest{
 			Summary: summary.Content,
 		},
 	)

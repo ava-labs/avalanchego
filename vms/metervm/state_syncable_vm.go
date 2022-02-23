@@ -37,12 +37,12 @@ func (vm *blockVM) StateSyncGetLastSummary() (common.Summary, error) {
 	return summary, err
 }
 
-func (vm *blockVM) StateSyncGetKey(summary common.Summary) (common.SummaryKey, common.SummaryHash, error) {
+func (vm *blockVM) StateSyncGetKeyHash(summary common.Summary) (common.SummaryKey, common.SummaryHash, error) {
 	if vm.ssVM == nil {
 		return common.SummaryKey{}, common.SummaryHash{}, common.ErrStateSyncableVMNotImplemented
 	}
 
-	return vm.ssVM.StateSyncGetKey(summary)
+	return vm.ssVM.StateSyncGetKeyHash(summary)
 }
 
 func (vm *blockVM) StateSyncGetSummary(key common.SummaryKey) (common.Summary, error) {

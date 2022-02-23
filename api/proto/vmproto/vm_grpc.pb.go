@@ -53,7 +53,7 @@ type VMClient interface {
 	RegisterStateSyncer(ctx context.Context, in *RegisterStateSyncerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	StateSyncEnabled(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncEnabledResponse, error)
 	StateSyncGetLastSummary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncGetLastSummaryResponse, error)
-	StateSyncGetKey(ctx context.Context, in *StateSyncGetKeyRequest, opts ...grpc.CallOption) (*StateSyncGetKeyResponse, error)
+	StateSyncGetKeyHash(ctx context.Context, in *StateSyncGetKeyHashRequest, opts ...grpc.CallOption) (*StateSyncGetKeyHashResponse, error)
 	StateSyncGetSummary(ctx context.Context, in *StateSyncGetSummaryRequest, opts ...grpc.CallOption) (*StateSyncGetSummaryResponse, error)
 	StateSync(ctx context.Context, in *StateSyncRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetLastSummaryBlockID(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncLastSummaryBlockIDResponse, error)
@@ -320,9 +320,9 @@ func (c *vMClient) StateSyncGetLastSummary(ctx context.Context, in *emptypb.Empt
 	return out, nil
 }
 
-func (c *vMClient) StateSyncGetKey(ctx context.Context, in *StateSyncGetKeyRequest, opts ...grpc.CallOption) (*StateSyncGetKeyResponse, error) {
-	out := new(StateSyncGetKeyResponse)
-	err := c.cc.Invoke(ctx, "/vmproto.VM/StateSyncGetKey", in, out, opts...)
+func (c *vMClient) StateSyncGetKeyHash(ctx context.Context, in *StateSyncGetKeyHashRequest, opts ...grpc.CallOption) (*StateSyncGetKeyHashResponse, error) {
+	out := new(StateSyncGetKeyHashResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/StateSyncGetKeyHash", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -399,7 +399,7 @@ type VMServer interface {
 	RegisterStateSyncer(context.Context, *RegisterStateSyncerRequest) (*emptypb.Empty, error)
 	StateSyncEnabled(context.Context, *emptypb.Empty) (*StateSyncEnabledResponse, error)
 	StateSyncGetLastSummary(context.Context, *emptypb.Empty) (*StateSyncGetLastSummaryResponse, error)
-	StateSyncGetKey(context.Context, *StateSyncGetKeyRequest) (*StateSyncGetKeyResponse, error)
+	StateSyncGetKeyHash(context.Context, *StateSyncGetKeyHashRequest) (*StateSyncGetKeyHashResponse, error)
 	StateSyncGetSummary(context.Context, *StateSyncGetSummaryRequest) (*StateSyncGetSummaryResponse, error)
 	StateSync(context.Context, *StateSyncRequest) (*emptypb.Empty, error)
 	GetLastSummaryBlockID(context.Context, *emptypb.Empty) (*StateSyncLastSummaryBlockIDResponse, error)
@@ -495,8 +495,8 @@ func (UnimplementedVMServer) StateSyncEnabled(context.Context, *emptypb.Empty) (
 func (UnimplementedVMServer) StateSyncGetLastSummary(context.Context, *emptypb.Empty) (*StateSyncGetLastSummaryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StateSyncGetLastSummary not implemented")
 }
-func (UnimplementedVMServer) StateSyncGetKey(context.Context, *StateSyncGetKeyRequest) (*StateSyncGetKeyResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method StateSyncGetKey not implemented")
+func (UnimplementedVMServer) StateSyncGetKeyHash(context.Context, *StateSyncGetKeyHashRequest) (*StateSyncGetKeyHashResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StateSyncGetKeyHash not implemented")
 }
 func (UnimplementedVMServer) StateSyncGetSummary(context.Context, *StateSyncGetSummaryRequest) (*StateSyncGetSummaryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StateSyncGetSummary not implemented")
@@ -1027,20 +1027,20 @@ func _VM_StateSyncGetLastSummary_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VM_StateSyncGetKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StateSyncGetKeyRequest)
+func _VM_StateSyncGetKeyHash_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StateSyncGetKeyHashRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VMServer).StateSyncGetKey(ctx, in)
+		return srv.(VMServer).StateSyncGetKeyHash(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/vmproto.VM/StateSyncGetKey",
+		FullMethod: "/vmproto.VM/StateSyncGetKeyHash",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).StateSyncGetKey(ctx, req.(*StateSyncGetKeyRequest))
+		return srv.(VMServer).StateSyncGetKeyHash(ctx, req.(*StateSyncGetKeyHashRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1237,8 +1237,8 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _VM_StateSyncGetLastSummary_Handler,
 		},
 		{
-			MethodName: "StateSyncGetKey",
-			Handler:    _VM_StateSyncGetKey_Handler,
+			MethodName: "StateSyncGetKeyHash",
+			Handler:    _VM_StateSyncGetKeyHash_Handler,
 		},
 		{
 			MethodName: "StateSyncGetSummary",
