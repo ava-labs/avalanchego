@@ -55,7 +55,7 @@ func TestReload_Success(t *testing.T) {
 		Return(nil)
 
 	installedVMs, failedVMs, err := resources.vmRegistry.Reload()
-	assert.Equal(t, []ids.ID{id3, id4}, installedVMs)
+	assert.ElementsMatch(t, []ids.ID{id3, id4}, installedVMs)
 	assert.Empty(t, failedVMs)
 	assert.Nil(t, err)
 }
@@ -149,7 +149,7 @@ func TestReloadWithReadLock_Success(t *testing.T) {
 		Return(nil)
 
 	installedVMs, failedVMs, err := resources.vmRegistry.ReloadWithReadLock()
-	assert.Equal(t, []ids.ID{id3, id4}, installedVMs)
+	assert.ElementsMatch(t, []ids.ID{id3, id4}, installedVMs)
 	assert.Empty(t, failedVMs)
 	assert.Nil(t, err)
 }
