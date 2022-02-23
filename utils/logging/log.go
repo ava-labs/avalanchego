@@ -21,6 +21,9 @@ var (
 	fileSuffix = "utils/logging/log.go"
 	filePrefix string
 	timeFormat = "01-02|15:04:05.000"
+
+	_ Logger         = &Log{}
+	_ RotatingWriter = &fileWriter{}
 )
 
 func init() {
@@ -34,7 +37,6 @@ func init() {
 	filePrefix = file[:len(file)-len(fileSuffix)]
 }
 
-// Log implements the Logger interface
 type Log struct {
 	config Config
 
@@ -143,7 +145,6 @@ func (l *Log) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// Stop implements the Logger interface
 func (l *Log) Stop() {
 	l.flushLock.Lock()
 	l.closed = true
@@ -213,28 +214,20 @@ func (l *Log) format(level Level, format string, args ...interface{}) string {
 		text)
 }
 
-// Fatal implements the Logger interface
 func (l *Log) Fatal(format string, args ...interface{}) { l.log(Fatal, format, args...) }
 
-// Error implements the Logger interface
 func (l *Log) Error(format string, args ...interface{}) { l.log(Error, format, args...) }
 
-// Warn implements the Logger interface
 func (l *Log) Warn(format string, args ...interface{}) { l.log(Warn, format, args...) }
 
-// Info implements the Logger interface
 func (l *Log) Info(format string, args ...interface{}) { l.log(Info, format, args...) }
 
-// Trace implements the Logger interface
 func (l *Log) Trace(format string, args ...interface{}) { l.log(Trace, format, args...) }
 
-// Debug implements the Logger interface
 func (l *Log) Debug(format string, args ...interface{}) { l.log(Debug, format, args...) }
 
-// Verbo implements the Logger interface
 func (l *Log) Verbo(format string, args ...interface{}) { l.log(Verbo, format, args...) }
 
-// AssertNoError implements the Logger interface
 func (l *Log) AssertNoError(err error) {
 	if err != nil {
 		l.log(Fatal, "%s", err)
@@ -245,7 +238,6 @@ func (l *Log) AssertNoError(err error) {
 	}
 }
 
-// AssertTrue implements the Logger interface
 func (l *Log) AssertTrue(b bool, format string, args ...interface{}) {
 	if !b {
 		l.log(Fatal, format, args...)
@@ -256,7 +248,6 @@ func (l *Log) AssertTrue(b bool, format string, args ...interface{}) {
 	}
 }
 
-// AssertDeferredTrue implements the Logger interface
 func (l *Log) AssertDeferredTrue(f func() bool, format string, args ...interface{}) {
 	// Note, the logger will only be notified here if assertions are enabled
 	if l.config.Assertions && !f() {
@@ -267,7 +258,6 @@ func (l *Log) AssertDeferredTrue(f func() bool, format string, args ...interface
 	}
 }
 
-// AssertDeferredNoError implements the Logger interface
 func (l *Log) AssertDeferredNoError(f func() error) {
 	if l.config.Assertions {
 		err := f()
@@ -281,7 +271,6 @@ func (l *Log) AssertDeferredNoError(f func() error) {
 	}
 }
 
-// StopOnPanic implements the Logger interface
 func (l *Log) StopOnPanic() {
 	if r := recover(); r != nil {
 		l.Fatal("Panicking due to:\n%s\nFrom:\n%s", r, Stacktrace{})
@@ -290,7 +279,6 @@ func (l *Log) StopOnPanic() {
 	}
 }
 
-// RecoverAndPanic implements the Logger interface
 func (l *Log) RecoverAndPanic(f func()) { defer l.StopOnPanic(); f() }
 
 func (l *Log) stopAndExit(exit func()) {
@@ -301,7 +289,6 @@ func (l *Log) stopAndExit(exit func()) {
 	}
 }
 
-// RecoverAndExit implements the Logger interface
 func (l *Log) RecoverAndExit(f, exit func()) { defer l.stopAndExit(exit); f() }
 
 func (l *Log) SetLogLevel(lvl Level) {
@@ -311,7 +298,6 @@ func (l *Log) SetLogLevel(lvl Level) {
 	l.config.LogLevel = lvl
 }
 
-// GetLogLevel ...
 func (l *Log) GetLogLevel() Level {
 	l.configLock.Lock()
 	defer l.configLock.Unlock()
@@ -319,7 +305,6 @@ func (l *Log) GetLogLevel() Level {
 	return l.config.LogLevel
 }
 
-// GetDisplayLevel implements the Logger interface
 func (l *Log) GetDisplayLevel() Level {
 	l.configLock.Lock()
 	defer l.configLock.Unlock()
@@ -327,7 +312,6 @@ func (l *Log) GetDisplayLevel() Level {
 	return l.config.DisplayLevel
 }
 
-// SetDisplayLevel implements the Logger interface
 func (l *Log) SetDisplayLevel(lvl Level) {
 	l.configLock.Lock()
 	defer l.configLock.Unlock()
@@ -335,7 +319,6 @@ func (l *Log) SetDisplayLevel(lvl Level) {
 	l.config.DisplayLevel = lvl
 }
 
-// SetPrefix implements the Logger interface
 func (l *Log) SetPrefix(prefix string) {
 	l.configLock.Lock()
 	defer l.configLock.Unlock()
@@ -343,7 +326,6 @@ func (l *Log) SetPrefix(prefix string) {
 	l.config.MsgPrefix = prefix
 }
 
-// SetLoggingEnabled implements the Logger interface
 func (l *Log) SetLoggingEnabled(enabled bool) {
 	l.configLock.Lock()
 	defer l.configLock.Unlock()
@@ -351,7 +333,6 @@ func (l *Log) SetLoggingEnabled(enabled bool) {
 	l.config.DisableLogging = !enabled
 }
 
-// SetDisplayingEnabled implements the Logger interface
 func (l *Log) SetDisplayingEnabled(enabled bool) {
 	l.configLock.Lock()
 	defer l.configLock.Unlock()
@@ -359,7 +340,6 @@ func (l *Log) SetDisplayingEnabled(enabled bool) {
 	l.config.DisableDisplaying = !enabled
 }
 
-// SetContextualDisplayingEnabled implements the Logger interface
 func (l *Log) SetContextualDisplayingEnabled(enabled bool) {
 	l.configLock.Lock()
 	defer l.configLock.Unlock()
@@ -367,7 +347,6 @@ func (l *Log) SetContextualDisplayingEnabled(enabled bool) {
 	l.config.DisableContextualDisplaying = !enabled
 }
 
-// fileWriter implements the RotatingWriter interface
 type fileWriter struct {
 	writer *bufio.Writer
 	file   *os.File
@@ -375,27 +354,22 @@ type fileWriter struct {
 	config Config
 }
 
-// Flush implements the RotatingWriter interface
 func (fw *fileWriter) Flush() error {
 	return fw.writer.Flush()
 }
 
-// Write implements the RotatingWriter interface
 func (fw *fileWriter) Write(b []byte) (int, error) {
 	return fw.writer.Write(b)
 }
 
-// WriteString implements the RotatingWriter interface
 func (fw *fileWriter) WriteString(s string) (int, error) {
 	return fw.writer.WriteString(s)
 }
 
-// Close implements the RotatingWriter interface
 func (fw *fileWriter) Close() error {
 	return fw.file.Close()
 }
 
-// Rotate implements the RotatingWriter interface
 func (fw *fileWriter) Rotate() error {
 	for i := fw.config.RotationSize - 1; i > 0; i-- {
 		sourceFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log.%d", fw.config.LoggerName, i))
@@ -431,7 +405,6 @@ func (fw *fileWriter) create() (*bufio.Writer, *os.File, error) {
 	return writer, file, nil
 }
 
-// Initialize implements the RotatingWriter interface
 func (fw *fileWriter) Initialize(config Config) (int, error) {
 	fw.config = config
 	writer, file, err := fw.create()

@@ -24,7 +24,7 @@ func TestQueue(t *testing.T) {
 	vdr1ID, vdr2ID := ids.GenerateTestShortID(), ids.GenerateTestShortID()
 	assert.NoError(vdrs.AddWeight(vdr1ID, 1))
 	assert.NoError(vdrs.AddWeight(vdr2ID, 1))
-	mIntf, err := NewMessageQueue(logging.NoLog{}, vdrs, cpuTracker, "", prometheus.NewRegistry())
+	mIntf, err := NewMessageQueue(logging.NoLog{}, vdrs, cpuTracker, "", prometheus.NewRegistry(), message.SynchronousOps)
 	assert.NoError(err)
 	u := mIntf.(*messageQueue)
 	currentTime := time.Now()

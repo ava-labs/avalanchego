@@ -264,7 +264,6 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 	return updateError(db.DB.CompactRange(util.Range{Start: start, Limit: limit}))
 }
 
-// Close implements the Database interface
 func (db *Database) Close() error {
 	db.closed.SetValue(true)
 	return updateError(db.DB.Close())
@@ -365,7 +364,6 @@ func (it *iter) Next() bool {
 	return hasNext
 }
 
-// Error implements the Iterator interface
 func (it *iter) Error() error {
 	if it.err != nil {
 		return it.err
@@ -373,10 +371,8 @@ func (it *iter) Error() error {
 	return updateError(it.Iterator.Error())
 }
 
-// Key implements the Iterator interface
 func (it *iter) Key() []byte { return it.key }
 
-// Value implements the Iterator interface
 func (it *iter) Value() []byte { return it.val }
 
 func updateError(err error) error {

@@ -8,10 +8,12 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 type messageQueueMetrics struct {
+	ops               map[message.Op]prometheus.Gauge
 	len               prometheus.Gauge
 	nodesWithMessages prometheus.Gauge
 	numExcessiveCPU   prometheus.Counter
@@ -20,6 +22,7 @@ type messageQueueMetrics struct {
 func (m *messageQueueMetrics) initialize(
 	metricsNamespace string,
 	metricsRegisterer prometheus.Registerer,
+	ops []message.Op,
 ) error {
 	namespace := fmt.Sprintf("%s_%s", metricsNamespace, "unprocessed_msgs")
 	m.len = prometheus.NewGauge(prometheus.GaugeOpts{
@@ -39,6 +42,19 @@ func (m *messageQueueMetrics) initialize(
 	})
 
 	errs := wrappers.Errs{}
+	m.ops = make(map[message.Op]prometheus.Gauge, len(ops))
+
+	for _, op := range ops {
+		opStr := op.String()
+		opMetric := prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      fmt.Sprintf("%s_count", opStr),
+			Help:      fmt.Sprintf("Number of of %s messages in the message queue.", opStr),
+		})
+		m.ops[op] = opMetric
+		errs.Add(metricsRegisterer.Register(opMetric))
+	}
+
 	errs.Add(
 		metricsRegisterer.Register(m.len),
 		metricsRegisterer.Register(m.nodesWithMessages),

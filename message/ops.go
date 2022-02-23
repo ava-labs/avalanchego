@@ -131,6 +131,34 @@ var (
 	ConsensusAndNetworkOps = append(ConsensusExternalOps, HandshakeOps...)
 	ExternalOps            = append(ConsensusAndNetworkOps, StateSyncExternalOps...)
 
+	SynchronousOps = []Op{
+		GetAcceptedFrontier,
+		AcceptedFrontier,
+		GetAccepted,
+		Accepted,
+		GetAncestors,
+		Ancestors,
+		Get,
+		Put,
+		PushQuery,
+		PullQuery,
+		Chits,
+		GetAcceptedFrontierFailed,
+		GetAcceptedFailed,
+		GetFailed,
+		QueryFailed,
+		GetAncestorsFailed,
+		Connected,
+		Disconnected,
+	}
+
+	AsynchronousOps = []Op{
+		AppRequest,
+		AppGossip,
+		AppRequestFailed,
+		AppResponse,
+	}
+
 	RequestToResponseOps = map[Op]Op{
 		GetAcceptedFrontier:     AcceptedFrontier,
 		GetAccepted:             Accepted,
@@ -209,7 +237,7 @@ var (
 	}
 )
 
-func (op Op) Compressable() bool {
+func (op Op) Compressible() bool {
 	switch op {
 	case PeerList, Put, Ancestors, PushQuery, AppRequest, AppResponse, AppGossip:
 		return true

@@ -158,7 +158,6 @@ func (b *bootstrapper) Ancestors(vdr ids.ShortID, requestID uint32, blks [][]byt
 	return b.process(requestedBlock, blockSet)
 }
 
-// GetAncestorsFailed implements the AncestorsHandler interface
 func (b *bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) error {
 	blkID, ok := b.OutstandingRequests.Remove(vdr, requestID)
 	if !ok {
@@ -170,7 +169,6 @@ func (b *bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) err
 	return b.fetch(blkID)
 }
 
-// Connected implements the InternalHandler interface.
 func (b *bootstrapper) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
 	if err := b.VM.Connected(nodeID, nodeVersion); err != nil {
 		return err
@@ -188,7 +186,6 @@ func (b *bootstrapper) Connected(nodeID ids.ShortID, nodeVersion version.Applica
 	return nil
 }
 
-// Disconnected implements the InternalHandler interface.
 func (b *bootstrapper) Disconnected(nodeID ids.ShortID) error {
 	if err := b.VM.Disconnected(nodeID); err != nil {
 		return err
@@ -197,7 +194,6 @@ func (b *bootstrapper) Disconnected(nodeID ids.ShortID) error {
 	return b.WeightTracker.RemoveWeightForNode(nodeID)
 }
 
-// Timeout implements the InternalHandler interface.
 func (b *bootstrapper) Timeout() error {
 	if !b.awaitingTimeout {
 		return errUnexpectedTimeout
@@ -210,19 +206,14 @@ func (b *bootstrapper) Timeout() error {
 	return b.finish()
 }
 
-// Gossip implements the InternalHandler interface.
 func (b *bootstrapper) Gossip() error { return nil }
 
-// Shutdown implements the InternalHandler interface.
 func (b *bootstrapper) Shutdown() error { return nil }
 
-// Notify implements the InternalHandler interface.
 func (b *bootstrapper) Notify(common.Message) error { return nil }
 
-// Context implements the common.Engine interface.
 func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
 
-// Start implements the common.Engine interface.
 func (b *bootstrapper) Start(startReqID uint32) error {
 	if err := b.setStartingHeight(); err != nil {
 		return err
@@ -238,7 +229,6 @@ func (b *bootstrapper) Start(startReqID uint32) error {
 	return b.Startup()
 }
 
-// HealthCheck implements the common.Engine interface.
 func (b *bootstrapper) HealthCheck() (interface{}, error) {
 	vmIntf, vmErr := b.VM.HealthCheck()
 	intf := map[string]interface{}{
@@ -248,10 +238,8 @@ func (b *bootstrapper) HealthCheck() (interface{}, error) {
 	return intf, vmErr
 }
 
-// GetVM implements the common.Engine interface.
 func (b *bootstrapper) GetVM() common.VM { return b.VM }
 
-// ForceAccepted implements common.Bootstrapable interface
 func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	if err := b.VM.SetState(snow.Bootstrapping); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
@@ -322,7 +310,6 @@ func (b *bootstrapper) fetch(blkID ids.ID) error {
 	return nil
 }
 
-// Clear implements common.Bootstrapable interface
 func (b *bootstrapper) Clear() error {
 	if err := b.Config.Blocked.Clear(); err != nil {
 		return err

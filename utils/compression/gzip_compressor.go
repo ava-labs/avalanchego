@@ -14,7 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-// gzipCompressor implements Compressor
+var _ Compressor = &gzipCompressor{}
+
 type gzipCompressor struct {
 	maxSize int64
 

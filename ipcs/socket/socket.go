@@ -18,9 +18,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-// ErrMessageTooLarge is returned when reading a message that is larger than
-// our max size
-var ErrMessageTooLarge = errors.New("message too large")
+var (
+	// ErrMessageTooLarge is returned when reading a message that is larger than
+	// our max size
+	ErrMessageTooLarge = errors.New("message too large")
+
+	_ error = errReadTimeout{}
+)
 
 // Socket manages sending messages over a socket to many subscribed clients
 type Socket struct {
@@ -195,7 +199,6 @@ type errReadTimeout struct {
 	addr net.Addr
 }
 
-// Error implements the error interface
 func (e errReadTimeout) Error() string {
 	return fmt.Sprintf("read from %s timed out", e.addr)
 }

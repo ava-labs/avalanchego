@@ -12,7 +12,6 @@ func NewNoInboundThrottler() InboundMsgThrottler {
 	return &noInboundMsgThrottler{}
 }
 
-// noMsgThrottler implements MsgThrottler.
 // [Acquire] always returns immediately.
 type noInboundMsgThrottler struct{}
 

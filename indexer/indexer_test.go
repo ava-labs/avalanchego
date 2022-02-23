@@ -46,15 +46,13 @@ func (a *apiServerMock) AddRoute(_ *common.HTTPHandler, _ *sync.RWMutex, base, e
 // Test that newIndexer sets fields correctly
 func TestNewIndexer(t *testing.T) {
 	assert := assert.New(t)
-	ed := &triggers.EventDispatcher{}
-	ed.Initialize(logging.NoLog{})
 	config := Config{
 		IndexingEnabled:      true,
 		AllowIncompleteIndex: true,
 		Log:                  logging.NoLog{},
 		DB:                   memdb.New(),
-		ConsensusDispatcher:  ed,
-		DecisionDispatcher:   ed,
+		ConsensusDispatcher:  triggers.New(logging.NoLog{}),
+		DecisionDispatcher:   triggers.New(logging.NoLog{}),
 		APIServer:            &apiServerMock{},
 		ShutdownF:            func() {},
 	}
@@ -85,10 +83,6 @@ func TestNewIndexer(t *testing.T) {
 // Test that [hasRunBefore] is set correctly and that Shutdown is called on close
 func TestMarkHasRunAndShutdown(t *testing.T) {
 	assert := assert.New(t)
-	cd := &triggers.EventDispatcher{}
-	cd.Initialize(logging.NoLog{})
-	dd := &triggers.EventDispatcher{}
-	dd.Initialize(logging.NoLog{})
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
 	shutdown := &sync.WaitGroup{}
@@ -97,8 +91,8 @@ func TestMarkHasRunAndShutdown(t *testing.T) {
 		IndexingEnabled:     true,
 		Log:                 logging.NoLog{},
 		DB:                  db,
-		ConsensusDispatcher: cd,
-		DecisionDispatcher:  dd,
+		ConsensusDispatcher: triggers.New(logging.NoLog{}),
+		DecisionDispatcher:  triggers.New(logging.NoLog{}),
 		APIServer:           &apiServerMock{},
 		ShutdownF:           func() { shutdown.Done() },
 	}
@@ -125,10 +119,8 @@ func TestMarkHasRunAndShutdown(t *testing.T) {
 // some vertices
 func TestIndexer(t *testing.T) {
 	assert := assert.New(t)
-	cd := &triggers.EventDispatcher{}
-	cd.Initialize(logging.NoLog{})
-	dd := &triggers.EventDispatcher{}
-	dd.Initialize(logging.NoLog{})
+	cd := triggers.New(logging.NoLog{})
+	dd := triggers.New(logging.NoLog{})
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
 	config := Config{
@@ -431,18 +423,14 @@ func TestIndexer(t *testing.T) {
 func TestIncompleteIndex(t *testing.T) {
 	// Create an indexer with indexing disabled
 	assert := assert.New(t)
-	cd := &triggers.EventDispatcher{}
-	cd.Initialize(logging.NoLog{})
-	dd := &triggers.EventDispatcher{}
-	dd.Initialize(logging.NoLog{})
 	baseDB := memdb.New()
 	config := Config{
 		IndexingEnabled:      false,
 		AllowIncompleteIndex: false,
 		Log:                  logging.NoLog{},
 		DB:                   versiondb.New(baseDB),
-		ConsensusDispatcher:  cd,
-		DecisionDispatcher:   dd,
+		ConsensusDispatcher:  triggers.New(logging.NoLog{}),
+		DecisionDispatcher:   triggers.New(logging.NoLog{}),
 		APIServer:            &apiServerMock{},
 		ShutdownF:            func() {},
 	}
@@ -515,10 +503,6 @@ func TestIncompleteIndex(t *testing.T) {
 // Ensure we only index chains in the primary network
 func TestIgnoreNonDefaultChains(t *testing.T) {
 	assert := assert.New(t)
-	cd := &triggers.EventDispatcher{}
-	cd.Initialize(logging.NoLog{})
-	dd := &triggers.EventDispatcher{}
-	dd.Initialize(logging.NoLog{})
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
 	config := Config{
@@ -526,8 +510,8 @@ func TestIgnoreNonDefaultChains(t *testing.T) {
 		AllowIncompleteIndex: false,
 		Log:                  logging.NoLog{},
 		DB:                   db,
-		ConsensusDispatcher:  cd,
-		DecisionDispatcher:   dd,
+		ConsensusDispatcher:  triggers.New(logging.NoLog{}),
+		DecisionDispatcher:   triggers.New(logging.NoLog{}),
 		APIServer:            &apiServerMock{},
 		ShutdownF:            func() {},
 	}

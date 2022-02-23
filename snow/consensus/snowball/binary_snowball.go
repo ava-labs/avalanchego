@@ -7,6 +7,8 @@ import (
 	"fmt"
 )
 
+var _ BinarySnowball = &binarySnowball{}
+
 // binarySnowball is the implementation of a binary snowball instance
 type binarySnowball struct {
 	// wrap the binary snowflake logic
@@ -21,13 +23,11 @@ type binarySnowball struct {
 	numSuccessfulPolls [2]int
 }
 
-// Initialize implements the BinarySnowball interface
 func (sb *binarySnowball) Initialize(beta, choice int) {
 	sb.binarySnowflake.Initialize(beta, choice)
 	sb.preference = choice
 }
 
-// Preference implements the BinarySnowball interface
 func (sb *binarySnowball) Preference() int {
 	// It is possible, with low probability, that the snowflake preference is
 	// not equal to the snowball preference when snowflake finalizes. However,
@@ -39,7 +39,6 @@ func (sb *binarySnowball) Preference() int {
 	return sb.preference
 }
 
-// RecordSuccessfulPoll implements the BinarySnowball interface
 func (sb *binarySnowball) RecordSuccessfulPoll(choice int) {
 	sb.numSuccessfulPolls[choice]++
 	if sb.numSuccessfulPolls[choice] > sb.numSuccessfulPolls[1-choice] {

@@ -86,7 +86,6 @@ func newTransitive(config Config) (*Transitive, error) {
 	return t, t.metrics.Initialize("", config.Ctx.Registerer)
 }
 
-// Put implements the PutHandler interface
 func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkBytes []byte) error {
 	blk, err := t.VM.ParseBlock(blkBytes)
 	if err != nil {
@@ -109,7 +108,6 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkBytes []byte) err
 	return t.buildBlocks()
 }
 
-// GetFailed implements the PutHandler interface
 func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 	// We don't assume that this function is called after a failed Get message.
 	// Check to see if we have an outstanding request and also get what the request was for if it exists.
@@ -125,7 +123,6 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 	return t.buildBlocks()
 }
 
-// PullQuery implements the QueryHandler interface
 func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
 	// Will send chits once we've issued block [blkID] into consensus
 	c := &convincer{
@@ -153,7 +150,6 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) 
 	return t.buildBlocks()
 }
 
-// PushQuery implements the QueryHandler interface
 func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkBytes []byte) error {
 	blk, err := t.VM.ParseBlock(blkBytes)
 	// If parsing fails, we just drop the request, as we didn't ask for it
@@ -176,7 +172,6 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkBytes []byt
 	return t.PullQuery(vdr, requestID, blk.ID())
 }
 
-// Chits implements the ChitsHandler interface
 func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) error {
 	// Since this is a linear chain, there should only be one ID in the vote set
 	if len(votes) != 1 {
@@ -212,7 +207,6 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) er
 	return t.buildBlocks()
 }
 
-// QueryFailed implements the ChitsHandler interface
 func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
 	t.blocked.Register(&voter{
 		t:         t,
@@ -223,44 +217,36 @@ func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
 	return t.buildBlocks()
 }
 
-// AppRequest implements the AppHandler interface
 func (t *Transitive) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
 	// Notify the VM of this request
 	return t.VM.AppRequest(nodeID, requestID, deadline, request)
 }
 
-// AppRequestFailed implements the AppHandler interface
 func (t *Transitive) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 	// Notify the VM that a request it made failed
 	return t.VM.AppRequestFailed(nodeID, requestID)
 }
 
-// AppResponse implements the AppHandler interface
 func (t *Transitive) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
 	// Notify the VM of a response to its request
 	return t.VM.AppResponse(nodeID, requestID, response)
 }
 
-// AppGossip implements the AppHandler interface
 func (t *Transitive) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	// Notify the VM of this message which has been gossiped to it
 	return t.VM.AppGossip(nodeID, msg)
 }
 
-// Connected implements the InternalHandler interface.
 func (t *Transitive) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
 	return t.VM.Connected(nodeID, nodeVersion)
 }
 
-// Disconnected implements the InternalHandler interface.
 func (t *Transitive) Disconnected(nodeID ids.ShortID) error {
 	return t.VM.Disconnected(nodeID)
 }
 
-// Timeout implements the InternalHandler interface
 func (t *Transitive) Timeout() error { return nil }
 
-// Gossip implements the InternalHandler interface
 func (t *Transitive) Gossip() error {
 	blkID, err := t.VM.LastAccepted()
 	if err != nil {
@@ -276,16 +262,13 @@ func (t *Transitive) Gossip() error {
 	return nil
 }
 
-// Halt implements the InternalHandler interface
 func (t *Transitive) Halt() {}
 
-// Shutdown implements the InternalHandler interface
 func (t *Transitive) Shutdown() error {
 	t.Ctx.Log.Info("shutting down consensus engine")
 	return t.VM.Shutdown()
 }
 
-// Notify implements the InternalHandler interface
 func (t *Transitive) Notify(msg common.Message) error {
 	t.Ctx.Log.Verbo("snowman engine notified of %s from the vm", msg)
 	switch msg {
@@ -301,12 +284,10 @@ func (t *Transitive) Notify(msg common.Message) error {
 	return nil
 }
 
-// Context implements the common.Engine interface.
 func (t *Transitive) Context() *snow.ConsensusContext {
 	return t.Ctx
 }
 
-// Start implements the common.Engine interface.
 func (t *Transitive) Start(startReqID uint32) error {
 	t.RequestID = startReqID
 	lastAcceptedID, err := t.VM.LastAccepted()
@@ -355,7 +336,6 @@ func (t *Transitive) Start(startReqID uint32) error {
 	return nil
 }
 
-// HealthCheck implements the common.Engine interface.
 func (t *Transitive) HealthCheck() (interface{}, error) {
 	consensusIntf, consensusErr := t.Consensus.HealthCheck()
 	vmIntf, vmErr := t.VM.HealthCheck()
@@ -372,12 +352,10 @@ func (t *Transitive) HealthCheck() (interface{}, error) {
 	return intf, fmt.Errorf("vm: %s ; consensus: %s", vmErr, consensusErr)
 }
 
-// GetVM implements the common.Engine interface.
 func (t *Transitive) GetVM() common.VM {
 	return t.VM
 }
 
-// GetBlock implements the snowman.Getter interface.
 func (t *Transitive) GetBlock(blkID ids.ID) (snowman.Block, error) {
 	if blk, ok := t.pending[blkID]; ok {
 		return blk, nil

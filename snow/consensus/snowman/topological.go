@@ -14,10 +14,14 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
+var (
+	_ Factory   = &TopologicalFactory{}
+	_ Consensus = &Topological{}
+)
+
 // TopologicalFactory implements Factory by returning a topological struct
 type TopologicalFactory struct{}
 
-// New implements Factory
 func (TopologicalFactory) New() Consensus { return &Topological{} }
 
 // Topological implements the Snowman interface by using a tree tracking the
@@ -82,7 +86,6 @@ type votes struct {
 	votes ids.Bag
 }
 
-// Initialize implements the Snowman interface
 func (ts *Topological) Initialize(ctx *snow.ConsensusContext, params snowball.Parameters, rootID ids.ID, rootHeight uint64) error {
 	if err := params.Verify(); err != nil {
 		return err
@@ -106,13 +109,10 @@ func (ts *Topological) Initialize(ctx *snow.ConsensusContext, params snowball.Pa
 	return nil
 }
 
-// Parameters implements the Snowman interface
 func (ts *Topological) Parameters() snowball.Parameters { return ts.params }
 
-// NumProcessing implements the Snowman interface
 func (ts *Topological) NumProcessing() int { return len(ts.blocks) - 1 }
 
-// Add implements the Snowman interface
 func (ts *Topological) Add(blk Block) error {
 	parentID := blk.Parent()
 
@@ -163,7 +163,6 @@ func (ts *Topological) Add(blk Block) error {
 	return nil
 }
 
-// Decided implements the Snowman interface
 func (ts *Topological) Decided(blk Block) bool {
 	// If the block is decided, then it must have been previously issued.
 	if blk.Status().Decided() {
@@ -174,7 +173,6 @@ func (ts *Topological) Decided(blk Block) bool {
 	return blk.Status() == choices.Processing && blk.Height() <= ts.height
 }
 
-// Processing implements the Snowman interface
 func (ts *Topological) Processing(blkID ids.ID) bool {
 	// The last accepted block is in the blocks map, so we first must ensure the
 	// requested block isn't the last accepted block.
@@ -187,7 +185,6 @@ func (ts *Topological) Processing(blkID ids.ID) bool {
 	return ok
 }
 
-// IsPreferred implements the Snowman interface
 func (ts *Topological) IsPreferred(blk Block) bool {
 	// If the block is accepted, then it must be transitively preferred.
 	if blk.Status() == choices.Accepted {
@@ -196,11 +193,8 @@ func (ts *Topological) IsPreferred(blk Block) bool {
 	return ts.preferredIDs.Contains(blk.ID())
 }
 
-// Preference implements the Snowman interface
 func (ts *Topological) Preference() ids.ID { return ts.tail }
 
-// RecordPoll implements the Snowman interface
-//
 // The votes bag contains at most K votes for blocks in the tree. If there is a
 // vote for a block that isn't in the tree, the vote is dropped.
 //
@@ -276,7 +270,6 @@ func (ts *Topological) RecordPoll(voteBag ids.Bag) error {
 	return nil
 }
 
-// Finalized implements the Snowman interface
 func (ts *Topological) Finalized() bool { return len(ts.blocks) == 1 }
 
 // HealthCheck returns information about the consensus health.

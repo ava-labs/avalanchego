@@ -28,6 +28,13 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
+var defaultGossipConfig = GossipConfig{
+	AcceptedFrontierSize:      2,
+	OnAcceptSize:              2,
+	AppGossipNonValidatorSize: 2,
+	AppGossipValidatorSize:    2,
+}
+
 func TestSenderContext(t *testing.T) {
 	context := snow.DefaultConsensusContextTest()
 	metrics := prometheus.NewRegistry()
@@ -35,16 +42,13 @@ func TestSenderContext(t *testing.T) {
 	assert.NoError(t, err)
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(true)
-	sender := Sender{}
-	err = sender.Initialize(
+	sender, err := New(
 		context,
 		msgCreator,
 		externalSender,
 		&router.ChainRouter{},
 		&timeout.Manager{},
-		2,
-		2,
-		2,
+		defaultGossipConfig,
 	)
 	assert.NoError(t, err)
 	if res := sender.Context(); !reflect.DeepEqual(res, context) {
@@ -85,8 +89,8 @@ func TestTimeout(t *testing.T) {
 	context := snow.DefaultConsensusContextTest()
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
-	sender := Sender{}
-	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, 2, 2, 2)
+
+	sender, err := New(context, mc, externalSender, &chainRouter, &tm, defaultGossipConfig)
 	assert.NoError(t, err)
 
 	wg := sync.WaitGroup{}
@@ -173,8 +177,8 @@ func TestReliableMessages(t *testing.T) {
 
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
-	sender := Sender{}
-	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, 2, 2, 2)
+
+	sender, err := New(context, mc, externalSender, &chainRouter, &tm, defaultGossipConfig)
 	assert.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
@@ -264,10 +268,10 @@ func TestReliableMessagesToMyself(t *testing.T) {
 
 	context := snow.DefaultConsensusContextTest()
 
-	sender := Sender{}
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
-	err = sender.Initialize(context, mc, externalSender, &chainRouter, &tm, 2, 2, 2)
+
+	sender, err := New(context, mc, externalSender, &chainRouter, &tm, defaultGossipConfig)
 	assert.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()

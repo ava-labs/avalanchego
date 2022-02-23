@@ -23,10 +23,10 @@ func TestCodecPackInvalidOp(t *testing.T) {
 	codec, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
 	assert.NoError(t, err)
 
-	_, err = codec.Pack(math.MaxUint8, make(map[Field]interface{}), false)
+	_, err = codec.Pack(math.MaxUint8, make(map[Field]interface{}), false, false)
 	assert.Error(t, err)
 
-	_, err = codec.Pack(math.MaxUint8, make(map[Field]interface{}), true)
+	_, err = codec.Pack(math.MaxUint8, make(map[Field]interface{}), true, false)
 	assert.Error(t, err)
 }
 
@@ -34,10 +34,10 @@ func TestCodecPackMissingField(t *testing.T) {
 	codec, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
 	assert.NoError(t, err)
 
-	_, err = codec.Pack(Get, make(map[Field]interface{}), false)
+	_, err = codec.Pack(Get, make(map[Field]interface{}), false, false)
 	assert.Error(t, err)
 
-	_, err = codec.Pack(Get, make(map[Field]interface{}), true)
+	_, err = codec.Pack(Get, make(map[Field]interface{}), true, false)
 	assert.Error(t, err)
 }
 
@@ -76,7 +76,7 @@ func TestDeadlineOverride(t *testing.T) {
 		},
 	}
 
-	packedIntf, err := c.Pack(m.op, m.fields, m.op.Compressable())
+	packedIntf, err := c.Pack(m.op, m.fields, m.op.Compressible(), false)
 	assert.NoError(t, err, "failed to pack on operation %s", m.op)
 
 	unpackedIntf, err := c.Parse(packedIntf.Bytes(), dummyNodeID, dummyOnFinishedHandling)
@@ -228,7 +228,7 @@ func TestCodecPackParseGzip(t *testing.T) {
 		},
 	}
 	for _, m := range msgs {
-		packedIntf, err := c.Pack(m.op, m.fields, m.op.Compressable())
+		packedIntf, err := c.Pack(m.op, m.fields, m.op.Compressible(), false)
 		assert.NoError(t, err, "failed to pack on operation %s", m.op)
 
 		unpackedIntf, err := c.Parse(packedIntf.Bytes(), dummyNodeID, dummyOnFinishedHandling)

@@ -137,7 +137,7 @@ func TestOperationSorting(t *testing.T) {
 	if isSortedAndUniqueOperations(ops, m) {
 		t.Fatalf("Shouldn't be sorted")
 	}
-	sortOperations(ops, m)
+	SortOperations(ops, m)
 	if !isSortedAndUniqueOperations(ops, m) {
 		t.Fatalf("Should be sorted")
 	}

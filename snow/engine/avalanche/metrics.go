@@ -16,7 +16,6 @@ type metrics struct {
 	blockerVtxs, blockerTxs prometheus.Gauge
 }
 
-// Initialize implements the Engine interface
 func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error {
 	errs := wrappers.Errs{}
 	m.bootstrapFinished = prometheus.NewGauge(prometheus.GaugeOpts{

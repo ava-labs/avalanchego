@@ -215,7 +215,7 @@ func (m *metrics) AcceptTx(tx *Tx) error {
 	case *UnsignedRewardValidatorTx:
 		m.numRewardValidatorTxs.Inc()
 	default:
-		return errUnknownTxType
+		return fmt.Errorf("%w: %T", errUnknownTxType, tx.UnsignedTx)
 	}
 	return nil
 }

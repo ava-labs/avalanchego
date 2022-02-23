@@ -7,6 +7,8 @@ import (
 	"fmt"
 )
 
+var _ BinarySlush = &binarySlush{}
+
 // binarySlush is the implementation of a binary slush instance
 type binarySlush struct {
 	// preference is the choice that last had a successful poll. Unless there
@@ -15,13 +17,10 @@ type binarySlush struct {
 	preference int
 }
 
-// Initialize implements the BinarySlush interface
 func (sl *binarySlush) Initialize(choice int) { sl.preference = choice }
 
-// Preference implements the BinarySlush interface
 func (sl *binarySlush) Preference() int { return sl.preference }
 
-// RecordSuccessfulPoll implements the BinarySlush interface
 func (sl *binarySlush) RecordSuccessfulPoll(choice int) { sl.preference = choice }
 
 func (sl *binarySlush) String() string { return fmt.Sprintf("SL(Preference = %d)", sl.preference) }

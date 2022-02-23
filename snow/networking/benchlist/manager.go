@@ -14,7 +14,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-var errUnknownValidators = errors.New("unknown validator set for provided chain")
+var (
+	errUnknownValidators = errors.New("unknown validator set for provided chain")
+
+	_ Manager = &manager{}
+)
 
 // Manager provides an interface for a benchlist to register whether
 // queries have been successful or unsuccessful and place validators with
@@ -145,7 +149,6 @@ func (m *manager) RegisterChain(ctx *snow.ConsensusContext) error {
 	return nil
 }
 
-// RegisterResponse implements the Manager interface
 func (m *manager) RegisterResponse(chainID ids.ID, validatorID ids.ShortID) {
 	m.lock.RLock()
 	benchlist, exists := m.chainBenchlists[chainID]
@@ -157,7 +160,6 @@ func (m *manager) RegisterResponse(chainID ids.ID, validatorID ids.ShortID) {
 	benchlist.RegisterResponse(validatorID)
 }
 
-// RegisterFailure implements the Manager interface
 func (m *manager) RegisterFailure(chainID ids.ID, validatorID ids.ShortID) {
 	m.lock.RLock()
 	benchlist, exists := m.chainBenchlists[chainID]
