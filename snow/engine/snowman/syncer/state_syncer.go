@@ -95,8 +95,7 @@ type stateSyncer struct {
 	// IDs of validators that failed to respond with their filtered accepted state summaries
 	failedAcceptedStateSummaries ids.ShortSet
 
-	weightedSummaries map[string]weightedSummary // key --> (summary, weight)
-	hashToKey         map[string]string          // hash --> key
+	weightedSummaries map[string]weightedSummary // hash --> (summary, weight)
 
 	// number of times the state sync has been attempted
 	attempts int
@@ -139,21 +138,20 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 	ss.pendingReceiveStateSummaryFrontier.Remove(validatorID)
 
 	// retrieve key for summary and register frontier
-	key, hash, err := ss.stateSyncVM.StateSyncGetKeyHash(common.Summary{Content: summary})
+	_, hash, err := ss.stateSyncVM.StateSyncGetKeyHash(common.Summary{Content: summary})
 	if err != nil {
 		ss.Ctx.Log.Debug("Could not retrieve key from summary %s: %v", summary, err)
 		return nil
 	}
 
-	if _, exists := ss.weightedSummaries[string(key.Content)]; !exists {
-		ss.weightedSummaries[string(key.Content)] = weightedSummary{
+	if _, exists := ss.weightedSummaries[string(hash.Content)]; !exists {
+		ss.weightedSummaries[string(hash.Content)] = weightedSummary{
 			Summary: common.Summary{
 				Content: summary,
 			},
 		}
-		ss.hashToKey[string(hash.Content)] = string(key.Content)
 	}
-	ws := ss.weightedSummaries[string(key.Content)]
+	ws := ss.weightedSummaries[string(hash.Content)]
 
 	if len(ss.StateSyncTestingBeacons) != 0 {
 		// if state sync beacons are specified, immediately count
@@ -171,7 +169,7 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 			newWeight = stdmath.MaxUint64
 		}
 		ws.weight = newWeight
-		ss.weightedSummaries[string(key.Content)] = ws
+		ss.weightedSummaries[string(hash.Content)] = ws
 	}
 
 	if err := ss.sendGetStateSummaryFrontiers(); err != nil {
@@ -266,13 +264,7 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 	}
 
 	for _, hash := range hashes {
-		key, ok := ss.hashToKey[string(hash)]
-		if !ok {
-			ss.Ctx.Log.Error("Received summary hash %s not matching one of the outstanding one. Dropped.", hash)
-			continue
-		}
-
-		ws := ss.weightedSummaries[key]
+		ws := ss.weightedSummaries[string(hash)]
 		previousWeight := ws.weight
 		newWeight, err := math.Add64(weight, previousWeight)
 		if err != nil {
@@ -280,7 +272,7 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 			newWeight = stdmath.MaxUint64
 		}
 		ws.weight = newWeight
-		ss.weightedSummaries[key] = ws
+		ss.weightedSummaries[string(hash)] = ws
 	}
 
 	if err := ss.sendGetAccepted(); err != nil {
@@ -370,7 +362,6 @@ func (ss *stateSyncer) startup() error {
 
 	// clear up messages tracker
 	ss.weightedSummaries = make(map[string]weightedSummary)
-	ss.hashToKey = make(map[string]string)
 
 	ss.pendingSendStateSummaryFrontier.Clear()
 	ss.pendingReceiveStateSummaryFrontier.Clear()
