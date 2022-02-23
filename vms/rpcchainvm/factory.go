@@ -5,21 +5,17 @@ package rpcchainvm
 
 import (
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"log"
-	"path/filepath"
 
 	"google.golang.org/grpc"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/subprocess"
-	"github.com/ava-labs/avalanchego/vms"
 )
 
 var (
@@ -33,17 +29,30 @@ var (
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(math.MaxInt)),
 		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(math.MaxInt)),
 	}
+
+	_ Factory = &factory{}
 )
 
-type Factory struct {
-	Path string
+type Factory interface {
+	// New returns an instance of a virtual machine.
+	New(*snow.Context) (interface{}, error)
 }
 
-func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
+type factory struct {
+	path string
+}
+
+func NewFactory(path string) Factory {
+	return &factory{
+		path: path,
+	}
+}
+
+func (f *factory) New(ctx *snow.Context) (interface{}, error) {
 	config := &plugin.ClientConfig{
 		HandshakeConfig: Handshake,
 		Plugins:         PluginMap,
-		Cmd:             subprocess.New(f.Path),
+		Cmd:             subprocess.New(f.path),
 		AllowedProtocols: []plugin.Protocol{
 			plugin.ProtocolGRPC,
 		},
@@ -97,61 +106,4 @@ func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
 	vm.SetProcess(client)
 	vm.ctx = ctx
 	return vm, nil
-}
-
-// RegisterPlugins iterates over a given plugin dir and registers rpcchain VMs
-// for each of the discovered plugins.
-func RegisterPlugins(pluginDir string, manager vms.Manager) error {
-	files, err := ioutil.ReadDir(pluginDir)
-	if err != nil {
-		return err
-	}
-
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		}
-
-		nameWithExtension := file.Name()
-		// Strip any extension from the file. This is to support windows .exe
-		// files.
-		name := nameWithExtension[:len(nameWithExtension)-len(filepath.Ext(nameWithExtension))]
-
-		// Skip hidden files.
-		if len(name) == 0 {
-			continue
-		}
-
-		vmID, err := manager.Lookup(name)
-		if err != nil {
-			// there is no alias with plugin name, try to use full vmID.
-			vmID, err = ids.FromString(name)
-			if err != nil {
-				return fmt.Errorf("invalid vmID %s", name)
-			}
-		}
-
-		_, err = manager.GetFactory(vmID)
-		if err == nil {
-			// If we already have the VM registered, we shouldn't attempt to
-			// register it again.
-			continue
-		}
-
-		// If the error isn't "not found", then we should report the error.
-		if !errors.Is(err, vms.ErrNotFound) {
-			return err
-		}
-
-		err = manager.RegisterFactory(
-			vmID,
-			&Factory{
-				Path: filepath.Join(pluginDir, file.Name()),
-			},
-		)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }

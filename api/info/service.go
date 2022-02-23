@@ -46,6 +46,7 @@ type Parameters struct {
 	CreateAssetTxFee      uint64
 	CreateSubnetTxFee     uint64
 	CreateBlockchainTxFee uint64
+	VMManager             vms.Manager
 }
 
 // NewService returns a new admin API service
@@ -275,4 +276,23 @@ func (service *Info) GetTxFee(_ *http.Request, args *struct{}, reply *GetTxFeeRe
 	reply.CreateSubnetTxFee = json.Uint64(service.CreateSubnetTxFee)
 	reply.CreateBlockchainTxFee = json.Uint64(service.CreateBlockchainTxFee)
 	return nil
+}
+
+// GetVMsReply contains the response metadata for GetVMs
+type GetVMsReply struct {
+	VMs map[ids.ID][]string `json:"vms"`
+}
+
+// GetVMs lists the virtual machines installed on the node
+func (service *Info) GetVMs(_ *http.Request, _ *struct{}, reply *GetVMsReply) error {
+	service.log.Debug("Info: GetVMs called")
+
+	// Fetch the VMs registered on this node.
+	vmIDs, err := service.VMManager.ListVMs()
+	if err != nil {
+		return err
+	}
+
+	reply.VMs, err = ids.GetRelevantAliases(service.VMManager, vmIDs)
+	return err
 }

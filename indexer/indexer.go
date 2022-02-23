@@ -61,7 +61,7 @@ type Config struct {
 	IndexingEnabled                         bool
 	AllowIncompleteIndex                    bool
 	DecisionDispatcher, ConsensusDispatcher *triggers.EventDispatcher
-	APIServer                               server.RouteAdder
+	APIServer                               server.PathAdder
 	ShutdownF                               func()
 }
 
@@ -88,7 +88,7 @@ func NewIndexer(config Config) (Indexer, error) {
 		txIndices:            map[ids.ID]Index{},
 		vtxIndices:           map[ids.ID]Index{},
 		blockIndices:         map[ids.ID]Index{},
-		routeAdder:           config.APIServer,
+		pathAdder:            config.APIServer,
 		shutdownF:            config.ShutdownF,
 	}
 	if err := indexer.codec.RegisterCodec(
@@ -120,7 +120,7 @@ type indexer struct {
 	hasRunBefore bool
 
 	// Used to add API endpoint for new indices
-	routeAdder server.RouteAdder
+	pathAdder server.PathAdder
 
 	// If true, allow running in such a way that could allow the creation
 	// of an index which could be missing accepted containers.
@@ -294,7 +294,7 @@ func (i *indexer) registerChainHelper(
 		return nil, err
 	}
 	handler := &common.HTTPHandler{LockOptions: common.NoLock, Handler: apiServer}
-	if err := i.routeAdder.AddRoute(handler, &sync.RWMutex{}, "index/"+name, "/"+endpoint, i.log); err != nil {
+	if err := i.pathAdder.AddRoute(handler, &sync.RWMutex{}, "index/"+name, "/"+endpoint, i.log); err != nil {
 		_ = index.Close()
 		return nil, err
 	}

@@ -26,6 +26,7 @@ type Client interface {
 	IsBootstrapped(context.Context, string) (bool, error)
 	GetTxFee(context.Context) (*GetTxFeeResponse, error)
 	Uptime(context.Context) (*UptimeResponse, error)
+	GetVMs(context.Context) (map[ids.ID][]string, error)
 }
 
 // Client implementation for an Info API Client
@@ -102,4 +103,10 @@ func (c *client) Uptime(ctx context.Context) (*UptimeResponse, error) {
 	res := &UptimeResponse{}
 	err := c.requester.SendRequest(ctx, "uptime", struct{}{}, res)
 	return res, err
+}
+
+func (c *client) GetVMs(ctx context.Context) (map[ids.ID][]string, error) {
+	res := &GetVMsReply{}
+	err := c.requester.SendRequest(ctx, "getVMs", struct{}{}, res)
+	return res.VMs, err
 }

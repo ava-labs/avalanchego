@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
@@ -23,6 +24,7 @@ type Client interface {
 	AliasChain(ctx context.Context, chainID string, alias string) (bool, error)
 	GetChainAliases(ctx context.Context, chainID string) ([]string, error)
 	Stacktrace(context.Context) (bool, error)
+	LoadVMs(context.Context) (map[ids.ID][]string, map[ids.ID]string, error)
 }
 
 // Client implementation for the Avalanche Platform Info API Endpoint
@@ -91,4 +93,10 @@ func (c *client) Stacktrace(ctx context.Context) (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.requester.SendRequest(ctx, "stacktrace", struct{}{}, res)
 	return res.Success, err
+}
+
+func (c *client) LoadVMs(ctx context.Context) (map[ids.ID][]string, map[ids.ID]string, error) {
+	res := &LoadVMsReply{}
+	err := c.requester.SendRequest(ctx, "loadVMs", struct{}{}, res)
+	return res.NewVMs, res.FailedVMs, err
 }
