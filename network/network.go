@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"net"
 	"strings"
@@ -26,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/throttling"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
@@ -34,7 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -59,9 +58,10 @@ type Network interface {
 	// must be managed internally in the network.
 	sender.ExternalSender
 
-	// The network must be able to broadcast accepted decisions to random peers.
-	// Thread safety must be managed internally in the network.
-	snow.Acceptor
+	// Close this network and all existing connections it has. Thread safety
+	// must be managed internally to the network. Calling close multiple times
+	// will return a nil error.
+	io.Closer
 
 	// Should only be called once, will run until either a fatal error occurs,
 	// or the network is closed. Returns a non-nil error.
@@ -80,11 +80,6 @@ type Network interface {
 	// connected to externally or all nodes this network is connected to if [nodeIDs]
 	// is empty. Thread safety must be managed internally to the network.
 	Peers(nodeIDs []ids.ShortID) []PeerInfo
-
-	// Close this network and all existing connections it has. Thread safety
-	// must be managed internally to the network. Calling close multiple times
-	// will return a nil error.
-	Close() error
 
 	// Return the IP of the node
 	IP() utils.IPDesc
@@ -209,13 +204,6 @@ type DelayConfig struct {
 	MaxReconnectDelay     time.Duration `json:"maxReconnectDelay"`
 }
 
-type GossipConfig struct {
-	GossipAcceptedFrontierSize uint `json:"gossipAcceptedFrontierSize"`
-	GossipOnAcceptSize         uint `json:"gossipOnAcceptSize"`
-	AppGossipNonValidatorSize  uint `json:"appGossipNonValidatorSize"`
-	AppGossipValidatorSize     uint `json:"appGossipValidatorSize"`
-}
-
 type ThrottlerConfig struct {
 	InboundConnUpgradeThrottlerConfig throttling.InboundConnUpgradeThrottlerConfig `json:"inboundConnUpgradeThrottlerConfig"`
 	InboundMsgThrottlerConfig         throttling.InboundMsgThrottlerConfig         `json:"inboundMsgThrottlerConfig"`
@@ -226,7 +214,6 @@ type ThrottlerConfig struct {
 type Config struct {
 	HealthConfig         `json:"healthConfig"`
 	PeerListGossipConfig `json:"peerListGossipConfig"`
-	GossipConfig         `json:"gossipConfig"`
 	TimeoutConfig        `json:"timeoutConfigs"`
 	DelayConfig          `json:"delayConfig"`
 	ThrottlerConfig      ThrottlerConfig `json:"throttlerConfig"`
@@ -349,7 +336,7 @@ func NewNetwork(
 func (n *network) Send(msg message.OutboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) ids.ShortSet {
 	// retrieve target peers
 	peers := n.getPeers(nodeIDs, subnetID, validatorOnly)
-	return n.send(msg, true, peers)
+	return n.send(msg, peers, true)
 }
 
 // Assumes [n.stateLock] is not held.
@@ -370,28 +357,7 @@ func (n *network) Gossip(
 		msg.DecRef()
 		return nil
 	}
-	return n.send(msg, true, peers)
-}
-
-// Accept is called after every consensus decision
-// Assumes [n.stateLock] is not held.
-func (n *network) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error {
-	if ctx.GetState() != snow.NormalOp {
-		// don't gossip during state-syncing/bootstrapping
-		return nil
-	}
-
-	now := n.clock.Time()
-	msg, err := n.mc.Put(ctx.ChainID, constants.GossipMsgRequestID, containerID, container)
-	if err != nil {
-		n.log.Debug("failed to build Put message for gossip (%s, %s): %s", ctx.ChainID, containerID, err)
-		n.log.Verbo("container:\n%s", formatting.DumpBytes(container))
-		n.sendFailRateCalculator.Observe(1, now)
-		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
-	}
-
-	n.Gossip(msg, ctx.SubnetID, ctx.IsValidatorOnly(), 0, int(n.config.GossipOnAcceptSize))
-	return nil
+	return n.send(msg, peers, true)
 }
 
 // Select peers to gossip to.
@@ -426,7 +392,7 @@ func (n *network) selectPeersForGossip(subnetID ids.ID, validatorOnly bool, numV
 // increased.
 //
 // Assumes stateLock is not held.
-func (n *network) send(msg message.OutboundMessage, connectedOnly bool, peers []*peer) ids.ShortSet {
+func (n *network) send(msg message.OutboundMessage, peers []*peer, connectedOnly bool) ids.ShortSet {
 	var (
 		now    = n.clock.Time()
 		msgLen = len(msg.Bytes())
@@ -649,7 +615,6 @@ func (n *network) NewPeerInfo(peer *peer) PeerInfo {
 	}
 }
 
-// Close implements the Network interface
 // Assumes [n.stateLock] is not held.
 func (n *network) Close() error {
 	n.closeOnce.Do(n.close)
@@ -684,13 +649,11 @@ func (n *network) close() {
 	}
 }
 
-// TrackIP implements the Network interface
 // Assumes [n.stateLock] is not held.
 func (n *network) TrackIP(ip utils.IPDesc) {
 	n.Track(ip, ids.ShortEmpty)
 }
 
-// Track implements the Network interface
 // Assumes [n.stateLock] is not held.
 func (n *network) Track(ip utils.IPDesc, nodeID ids.ShortID) {
 	n.stateLock.Lock()

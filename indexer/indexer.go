@@ -105,7 +105,6 @@ func NewIndexer(config Config) (Indexer, error) {
 	return indexer, indexer.markHasRun()
 }
 
-// indexer implements Indexer
 type indexer struct {
 	codec  codec.Manager
 	clock  mockable.Clock

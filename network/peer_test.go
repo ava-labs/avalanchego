@@ -21,35 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-type TestMsg struct {
-	op    message.Op
-	bytes []byte
-}
-
-func newTestMsg(op message.Op, bits []byte) *TestMsg {
-	return &TestMsg{op: op, bytes: bits}
-}
-
-func (m *TestMsg) Op() message.Op {
-	return m.op
-}
-
-func (*TestMsg) Get(message.Field) interface{} {
-	return nil
-}
-
-func (m *TestMsg) Bytes() []byte {
-	return m.bytes
-}
-
-func (m *TestMsg) BytesSavedCompression() int {
-	return 0
-}
-
-func (m *TestMsg) AddRef() {}
-
-func (m *TestMsg) DecRef() {}
-
 func TestPeer_Close(t *testing.T) {
 	initCerts(t)
 
@@ -115,7 +86,7 @@ func TestPeer_Close(t *testing.T) {
 	// fake a peer, and write a message
 	peer := newPeer(basenetwork, conn, ip1.IP())
 	peer.sendQueue = make([]message.OutboundMessage, 0)
-	testMsg := newTestMsg(message.GetVersion, newmsgbytes)
+	testMsg := message.NewTestMsg(message.GetVersion, newmsgbytes, false)
 	peer.Send(testMsg)
 
 	go func() {

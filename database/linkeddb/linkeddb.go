@@ -363,7 +363,6 @@ type iterator struct {
 	err                    error
 }
 
-// Next implements the Iterator interface
 func (it *iterator) Next() bool {
 	// If the iterator has been exhausted, there is no next value.
 	if it.exhausted {

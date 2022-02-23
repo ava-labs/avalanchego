@@ -9,6 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+var _ NnarySnowball = &nnarySnowball{}
+
 // nnarySnowball is a naive implementation of a multi-color snowball instance
 type nnarySnowball struct {
 	// wrap the n-nary snowflake logic
@@ -27,14 +29,12 @@ type nnarySnowball struct {
 	numSuccessfulPolls map[ids.ID]int
 }
 
-// Initialize implements the NnarySnowball interface
 func (sb *nnarySnowball) Initialize(betaVirtuous, betaRogue int, choice ids.ID) {
 	sb.nnarySnowflake.Initialize(betaVirtuous, betaRogue, choice)
 	sb.preference = choice
 	sb.numSuccessfulPolls = make(map[ids.ID]int)
 }
 
-// Preference implements the NnarySnowball interface
 func (sb *nnarySnowball) Preference() ids.ID {
 	// It is possible, with low probability, that the snowflake preference is
 	// not equal to the snowball preference when snowflake finalizes. However,
@@ -46,7 +46,6 @@ func (sb *nnarySnowball) Preference() ids.ID {
 	return sb.preference
 }
 
-// RecordSuccessfulPoll implements the NnarySnowball interface
 func (sb *nnarySnowball) RecordSuccessfulPoll(choice ids.ID) {
 	numSuccessfulPolls := sb.numSuccessfulPolls[choice] + 1
 	sb.numSuccessfulPolls[choice] = numSuccessfulPolls

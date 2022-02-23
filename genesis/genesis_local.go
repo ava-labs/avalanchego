@@ -6,7 +6,10 @@ package genesis
 import (
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
@@ -14,7 +17,15 @@ import (
 // PrivateKey-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN => X-local18jma8ppw3nhx5r4ap8clazz0dps7rv5u00z96u
 // 56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027 => 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
 
+const (
+	vmrqKeyStr = "vmRQiZeXEXYMyJhEiqdC2z5JhuDbxL8ix9UVvjgMu2Er1NepE"
+	ewoqKeyStr = "ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"
+)
+
 var (
+	VMRQKey *crypto.PrivateKeySECP256K1R
+	EWOQKey *crypto.PrivateKeySECP256K1R
+
 	localGenesisConfigJSON = `{
 		"networkID": 12345,
 		"allocations": [
@@ -117,3 +128,24 @@ var (
 		},
 	}
 )
+
+func init() {
+	errs := wrappers.Errs{}
+	vmrqBytes, err := formatting.Decode(formatting.CB58, vmrqKeyStr)
+	errs.Add(err)
+	ewoqBytes, err := formatting.Decode(formatting.CB58, ewoqKeyStr)
+	errs.Add(err)
+
+	factory := crypto.FactorySECP256K1R{}
+	vmrqIntf, err := factory.ToPrivateKey(vmrqBytes)
+	errs.Add(err)
+	ewoqIntf, err := factory.ToPrivateKey(ewoqBytes)
+	errs.Add(err)
+
+	if errs.Err != nil {
+		panic(errs.Err)
+	}
+
+	VMRQKey = vmrqIntf.(*crypto.PrivateKeySECP256K1R)
+	EWOQKey = ewoqIntf.(*crypto.PrivateKeySECP256K1R)
+}

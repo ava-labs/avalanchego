@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -367,13 +368,6 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 			PeerListGossipFreq:           v.GetDuration(NetworkPeerListGossipFreqKey),
 			PeerListGossipSize:           v.GetUint32(NetworkPeerListGossipSizeKey),
 			PeerListStakerGossipFraction: v.GetUint32(NetworkPeerListStakerGossipFractionKey),
-		},
-
-		GossipConfig: network.GossipConfig{
-			GossipAcceptedFrontierSize: uint(v.GetUint32(ConsensusGossipAcceptedFrontierSizeKey)),
-			GossipOnAcceptSize:         uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey)),
-			AppGossipNonValidatorSize:  uint(v.GetUint32(AppGossipNonValidatorSizeKey)),
-			AppGossipValidatorSize:     uint(v.GetUint32(AppGossipValidatorSizeKey)),
 		},
 
 		DelayConfig: network.DelayConfig{
@@ -1118,6 +1112,13 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.NetworkConfig, err = getNetworkConfig(v, healthCheckAveragerHalflife)
 	if err != nil {
 		return node.Config{}, err
+	}
+
+	nodeConfig.GossipConfig = sender.GossipConfig{
+		AcceptedFrontierSize:      uint(v.GetUint32(ConsensusGossipAcceptedFrontierSizeKey)),
+		OnAcceptSize:              uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey)),
+		AppGossipNonValidatorSize: uint(v.GetUint32(AppGossipNonValidatorSizeKey)),
+		AppGossipValidatorSize:    uint(v.GetUint32(AppGossipValidatorSizeKey)),
 	}
 
 	// Benchlist

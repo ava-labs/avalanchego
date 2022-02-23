@@ -282,7 +282,6 @@ type DoubleDecisionBlock struct {
 	CommonDecisionBlock `serialize:"true"`
 }
 
-// Accept implements the snowman.Block interface
 func (ddb *DoubleDecisionBlock) Accept() error {
 	ddb.vm.ctx.Log.Verbo("Accepting block with ID %s", ddb.ID())
 

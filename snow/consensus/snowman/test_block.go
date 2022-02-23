@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
+var _ Block = &TestBlock{}
+
 // TestBlock is a useful test block
 type TestBlock struct {
 	choices.TestDecidable
@@ -22,20 +24,11 @@ type TestBlock struct {
 	BytesV     []byte
 }
 
-// Parent implements the Block interface
-func (b *TestBlock) Parent() ids.ID { return b.ParentV }
-
-// Height returns the height of the block
-func (b *TestBlock) Height() uint64 { return b.HeightV }
-
-// Timestamp returns the time of the block
+func (b *TestBlock) Parent() ids.ID       { return b.ParentV }
+func (b *TestBlock) Height() uint64       { return b.HeightV }
 func (b *TestBlock) Timestamp() time.Time { return b.TimestampV }
-
-// Verify implements the Block interface
-func (b *TestBlock) Verify() error { return b.VerifyV }
-
-// Bytes implements the Block interface
-func (b *TestBlock) Bytes() []byte { return b.BytesV }
+func (b *TestBlock) Verify() error        { return b.VerifyV }
+func (b *TestBlock) Bytes() []byte        { return b.BytesV }
 
 type sortBlocks []*TestBlock
 

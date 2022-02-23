@@ -5,11 +5,12 @@ package platformvm
 
 import (
 	"fmt"
-
-	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-// HealthCheck implements the common.VM interface
+// MinConnectedStake is the minimum percentage of the Primary Network's that
+// this node must be connected to to be considered healthy
+const MinConnectedStake = .80
+
 func (vm *VM) HealthCheck() (interface{}, error) {
 	// Returns nil if this node is connected to > alpha percent of the Primary Network's stake
 	percentConnected, err := vm.getPercentConnected()
@@ -22,10 +23,10 @@ func (vm *VM) HealthCheck() (interface{}, error) {
 	details := map[string]float64{
 		"percentConnected": percentConnected,
 	}
-	if percentConnected < constants.MinConnectedStake { // Use alpha from consensus instead of const
+	if percentConnected < MinConnectedStake { // Use alpha from consensus instead of const
 		return details, fmt.Errorf("connected to %f%% of the stake; should be connected to at least %f%%",
 			percentConnected*100,
-			constants.MinConnectedStake*100,
+			MinConnectedStake*100,
 		)
 	}
 	return details, nil

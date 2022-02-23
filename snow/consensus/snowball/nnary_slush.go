@@ -9,6 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+var _ NnarySlush = &nnarySlush{}
+
 // nnarySlush is the implementation of a slush instance with an unbounded number
 // of choices
 type nnarySlush struct {
@@ -18,13 +20,10 @@ type nnarySlush struct {
 	preference ids.ID
 }
 
-// Initialize implements the NnarySlush interface
 func (sl *nnarySlush) Initialize(choice ids.ID) { sl.preference = choice }
 
-// Preference implements the NnarySlush interface
 func (sl *nnarySlush) Preference() ids.ID { return sl.preference }
 
-// RecordSuccessfulPoll implements the NnarySlush interface
 func (sl *nnarySlush) RecordSuccessfulPoll(choice ids.ID) { sl.preference = choice }
 
 func (sl *nnarySlush) String() string { return fmt.Sprintf("SL(Preference = %s)", sl.preference) }

@@ -63,6 +63,30 @@ type JSONSpendHeader struct {
 	JSONChangeAddr
 }
 
+// GetBlockArgs is the parameters supplied to the GetBlock API
+type GetBlockArgs struct {
+	BlockID  ids.ID              `json:"blockID"`
+	Encoding formatting.Encoding `json:"encoding"`
+}
+
+// GetBlockResponse is the response object for the GetBlock API.
+type GetBlockResponse struct {
+	Block interface{} `json:"block"`
+	// If GetBlockResponse.Encoding is formatting.Hex or formatting.CB58,
+	// GetBlockResponse.Block is the string representation of the block
+	// under the respective encoding.
+	// If GetBlockResponse.Encoding is formatting.JSON, GetBlockResponse.Block
+	// is the actual block returned as a JSON.
+	Encoding formatting.Encoding `json:"encoding"`
+}
+
+// FormattedBlock defines a JSON formatted struct containing a block in
+// CB58/Hex format
+type FormattedBlock struct {
+	Block    string              `json:"block"`
+	Encoding formatting.Encoding `json:"encoding"`
+}
+
 type GetTxArgs struct {
 	TxID     ids.ID              `json:"txID"`
 	Encoding formatting.Encoding `json:"encoding"`

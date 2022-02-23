@@ -18,11 +18,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var _ Block = &TestBlock{}
+
 type TestBlock struct {
 	*snowman.TestBlock
 }
 
-// SetStatus sets the status of the Block. Implements the BlockWrapper interface.
+// SetStatus sets the status of the Block.
 func (b *TestBlock) SetStatus(status choices.Status) { b.TestBlock.TestDecidable.StatusV = status }
 
 // NewTestBlock returns a new test block with height, bytes, and ID derived from [i]

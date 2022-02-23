@@ -165,9 +165,7 @@ type ManagerConfig struct {
 
 	ConsensusGossipFrequency time.Duration
 
-	AppGossipValidatorSize     int
-	AppGossipNonValidatorSize  int
-	GossipAcceptedFrontierSize int
+	GossipConfig sender.GossipConfig
 
 	// Max Time to spend fetching a container and its
 	// ancestors when responding to a GetAncestors
@@ -553,18 +551,20 @@ func (m *manager) createAvalancheChain(
 	msgChan := make(chan common.Message, defaultChannelSize)
 
 	// Passes messages from the consensus engine to the network
-	sender := sender.Sender{}
-	if err := sender.Initialize(
+	sender, err := sender.New(
 		ctx,
 		m.MsgCreator,
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
-		m.AppGossipValidatorSize,
-		m.AppGossipNonValidatorSize,
-		m.GossipAcceptedFrontierSize,
-	); err != nil {
+		m.GossipConfig,
+	)
+	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
+	}
+
+	if err := m.ConsensusEvents.RegisterChain(ctx.ChainID, "gossip", sender, false); err != nil { // Set up the event dipatcher
+		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 
 	chainConfig, err := m.getChainConfig(ctx.ChainID)
@@ -583,7 +583,7 @@ func (m *manager) createAvalancheChain(
 		chainConfig.Config,
 		msgChan,
 		fxs,
-		&sender,
+		sender,
 	); err != nil {
 		return nil, fmt.Errorf("error during vm's Initialize: %w", err)
 	}
@@ -618,7 +618,7 @@ func (m *manager) createAvalancheChain(
 		SampleK:                        sampleK,
 		StartupAlpha:                   (3*bootstrapWeight + 3) / 4,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
-		Sender:                         &sender,
+		Sender:                         sender,
 		Subnet:                         sb,
 		Timer:                          handler,
 		RetryBootstrap:                 m.RetryBootstrap,
@@ -738,18 +738,20 @@ func (m *manager) createSnowmanChain(
 	msgChan := make(chan common.Message, defaultChannelSize)
 
 	// Passes messages from the consensus engine to the network
-	sender := sender.Sender{}
-	if err := sender.Initialize(
+	sender, err := sender.New(
 		ctx,
 		m.MsgCreator,
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
-		m.AppGossipValidatorSize,
-		m.AppGossipNonValidatorSize,
-		m.GossipAcceptedFrontierSize,
-	); err != nil {
+		m.GossipConfig,
+	)
+	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
+	}
+
+	if err := m.ConsensusEvents.RegisterChain(ctx.ChainID, "gossip", sender, false); err != nil { // Set up the event dipatcher
+		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 
 	// first vm to be init is P-Chain once, which provides validator interface to all ProposerVMs
@@ -793,7 +795,7 @@ func (m *manager) createSnowmanChain(
 		chainConfig.Config,
 		msgChan,
 		fxs,
-		&sender,
+		sender,
 	); err != nil {
 		return nil, err
 	}
@@ -823,7 +825,7 @@ func (m *manager) createSnowmanChain(
 		SampleK:                        sampleK,
 		StartupAlpha:                   (3*bootstrapWeight + 3) / 4,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
-		Sender:                         &sender,
+		Sender:                         sender,
 		Subnet:                         sb,
 		Timer:                          handler,
 		RetryBootstrap:                 m.RetryBootstrap,

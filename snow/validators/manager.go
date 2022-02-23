@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+var _ Manager = &manager{}
+
 // Manager holds the validator set of each subnet
 type Manager interface {
 	fmt.Stringer
@@ -47,7 +49,6 @@ func NewManager() Manager {
 	}
 }
 
-// manager implements Manager
 type manager struct {
 	lock sync.Mutex
 
@@ -70,7 +71,6 @@ func (m *manager) Set(subnetID ids.ID, newSet Set) error {
 	return oldSet.Set(newSet.List())
 }
 
-// AddWeight implements the Manager interface.
 func (m *manager) AddWeight(subnetID ids.ID, vdrID ids.ShortID, weight uint64) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -88,7 +88,6 @@ func (m *manager) AddWeight(subnetID ids.ID, vdrID ids.ShortID, weight uint64) e
 	return vdrs.AddWeight(vdrID, weight)
 }
 
-// RemoveValidatorSet implements the Manager interface.
 func (m *manager) RemoveWeight(subnetID ids.ID, vdrID ids.ShortID, weight uint64) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -99,7 +98,6 @@ func (m *manager) RemoveWeight(subnetID ids.ID, vdrID ids.ShortID, weight uint64
 	return nil
 }
 
-// GetValidatorSet implements the Manager interface.
 func (m *manager) GetValidators(subnetID ids.ID) (Set, bool) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -108,7 +106,6 @@ func (m *manager) GetValidators(subnetID ids.ID) (Set, bool) {
 	return vdrs, ok
 }
 
-// MaskValidator implements the Manager interface.
 func (m *manager) MaskValidator(vdrID ids.ShortID) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -126,7 +123,6 @@ func (m *manager) MaskValidator(vdrID ids.ShortID) error {
 	return nil
 }
 
-// RevealValidator implements the Manager interface.
 func (m *manager) RevealValidator(vdrID ids.ShortID) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -144,7 +140,6 @@ func (m *manager) RevealValidator(vdrID ids.ShortID) error {
 	return nil
 }
 
-// Contains implements the Manager interface.
 func (m *manager) Contains(subnetID ids.ID, vdrID ids.ShortID) bool {
 	m.lock.Lock()
 	defer m.lock.Unlock()

@@ -30,10 +30,7 @@ type testKey struct {
 	hash uint64
 }
 
-// ConsistentHashKey implements Hashable
-func (t testKey) ConsistentHashKey() []byte {
-	return []byte(t.key)
-}
+func (t testKey) ConsistentHashKey() []byte { return []byte(t.key) }
 
 // Tests that a key routes to its closest clockwise node.
 // Test cases are described in greater detail below; see diagrams for Ring.

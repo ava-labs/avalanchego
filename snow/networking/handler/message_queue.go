@@ -66,6 +66,7 @@ func NewMessageQueue(
 	cpuTracker tracker.TimeTracker,
 	metricsNamespace string,
 	metricsRegisterer prometheus.Registerer,
+	ops []message.Op,
 ) (MessageQueue, error) {
 	m := &messageQueue{
 		log:                   log,
@@ -74,7 +75,7 @@ func NewMessageQueue(
 		cond:                  sync.NewCond(&sync.Mutex{}),
 		nodeToUnprocessedMsgs: make(map[ids.ShortID]int),
 	}
-	return m, m.metrics.initialize(metricsNamespace, metricsRegisterer)
+	return m, m.metrics.initialize(metricsNamespace, metricsRegisterer, ops)
 }
 
 func (m *messageQueue) Push(msg message.InboundMessage) {
@@ -93,6 +94,7 @@ func (m *messageQueue) Push(msg message.InboundMessage) {
 	// Update metrics
 	m.metrics.nodesWithMessages.Set(float64(len(m.nodeToUnprocessedMsgs)))
 	m.metrics.len.Inc()
+	m.metrics.ops[msg.Op()].Inc()
 
 	// Signal a waiting thread
 	m.cond.Signal()
@@ -135,6 +137,7 @@ func (m *messageQueue) Pop() (message.InboundMessage, bool) {
 			}
 			m.metrics.nodesWithMessages.Set(float64(len(m.nodeToUnprocessedMsgs)))
 			m.metrics.len.Dec()
+			m.metrics.ops[msg.Op()].Dec()
 			return msg, true
 		}
 		// [msg.nodeID] is causing excessive CPU usage.
