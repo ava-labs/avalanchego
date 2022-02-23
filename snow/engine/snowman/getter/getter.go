@@ -79,10 +79,12 @@ func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uin
 		key := common.SummaryKey{Content: keyBytes}
 		summary, err := gh.ssVM.StateSyncGetSummary(key)
 		if err != nil {
-			// TODO: add log
 			continue
 		}
 		_, hash, err := gh.ssVM.StateSyncGetKey(summary)
+		if err != nil {
+			continue
+		}
 		if bytes.Equal(hash.Content, hashes[idx]) {
 			acceptedKeys = append(acceptedKeys, keyBytes)
 			acceptedHashes = append(acceptedHashes, hashes[idx])
