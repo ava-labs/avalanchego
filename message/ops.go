@@ -150,6 +150,14 @@ var (
 		GetAncestorsFailed,
 		Connected,
 		Disconnected,
+
+		// State sync
+		GetStateSummaryFrontier,
+		StateSummaryFrontier,
+		GetAcceptedStateSummary,
+		AcceptedStateSummary,
+		GetStateSummaryFrontierFailed,
+		GetAcceptedStateSummaryFailed,
 	}
 
 	AsynchronousOps = []Op{
