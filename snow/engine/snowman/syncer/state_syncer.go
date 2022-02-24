@@ -384,6 +384,8 @@ func (ss *stateSyncer) Notify(msg common.Message) error {
 	return nil
 }
 
+// following completion of state sync on VM side, engine needs to request
+// the full block associated with state summary.
 func (ss *stateSyncer) requestBlk(blkID ids.ID) error {
 	// pick random beacon
 	vdrsList, err := ss.StateSyncBeacons.Sample(1)
@@ -397,7 +399,8 @@ func (ss *stateSyncer) requestBlk(blkID ids.ID) error {
 	return nil
 }
 
-// FetchHandler interface implementation
+// following completion of state sync on VM side, block associated with state summary is requested.
+// Pass it to VM, declare state sync done and move onto bootstrapping
 func (ss *stateSyncer) Put(validatorID ids.ShortID, requestID uint32, container []byte) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
@@ -418,6 +421,8 @@ func (ss *stateSyncer) Put(validatorID ids.ShortID, requestID uint32, container 
 	return nil
 }
 
+// following completion of state sync on VM side, block associated with state summary is requested.
+// Since Put failed, request again the block to a different validator
 func (ss *stateSyncer) GetFailed(validatorID ids.ShortID, requestID uint32) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
