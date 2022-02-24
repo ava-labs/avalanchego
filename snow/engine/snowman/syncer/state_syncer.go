@@ -368,6 +368,12 @@ func (ss *stateSyncer) Notify(msg common.Message) error {
 	case common.PendingTxs:
 		ss.Ctx.Log.Warn("Message %s received in state sync. Dropped.", msg.String())
 
+	case common.StateSyncSkipped:
+		// State sync completed
+		if err := ss.onDoneStateSyncing(ss.requestID); err != nil {
+			ss.Ctx.Log.Warn("Could not complete state sync: %w", err)
+		}
+
 	case common.StateSyncDone:
 		// retrieve the blkID to request
 		var err error
