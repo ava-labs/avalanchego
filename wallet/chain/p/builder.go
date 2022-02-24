@@ -31,6 +31,21 @@ var (
 // Builder provides a convenient interface for building unsigned P-chain
 // transactions.
 type Builder interface {
+	// GetBalance calculates the amount of each asset that this builder has
+	// control over.
+	GetBalance(
+		options ...common.Option,
+	) (map[ids.ID]uint64, error)
+
+	// GetImportableBalance calculates the amount of each asset that this
+	// builder could import from the provided chain.
+	//
+	// - [chainID] specifies the chain the funds are from.
+	GetImportableBalance(
+		chainID ids.ID,
+		options ...common.Option,
+	) (map[ids.ID]uint64, error)
+
 	// NewAddValidatorTx creates a new validator of the primary network.
 	//
 	// - [validator] specifies all the details of the validation period such as
@@ -142,6 +157,21 @@ func NewBuilder(addrs ids.ShortSet, backend BuilderBackend) Builder {
 		addrs:   addrs,
 		backend: backend,
 	}
+}
+
+func (b *builder) GetBalance(
+	options ...common.Option,
+) (map[ids.ID]uint64, error) {
+	ops := common.NewOptions(options)
+	return b.getBalance(constants.PlatformChainID, ops)
+}
+
+func (b *builder) GetImportableBalance(
+	chainID ids.ID,
+	options ...common.Option,
+) (map[ids.ID]uint64, error) {
+	ops := common.NewOptions(options)
+	return b.getBalance(chainID, ops)
 }
 
 func (b *builder) NewAddValidatorTx(
@@ -318,6 +348,7 @@ func (b *builder) NewImportTx(
 	}
 
 	var (
+		addrs           = ops.Addresses(b.addrs)
 		minIssuanceTime = ops.MinIssuanceTime()
 		avaxAssetID     = b.backend.AVAXAssetID()
 		txFee           = b.backend.BaseTxFee()
@@ -337,7 +368,7 @@ func (b *builder) NewImportTx(
 			continue
 		}
 
-		inputSigIndices, ok := b.match(&out.OutputOwners, minIssuanceTime)
+		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
 		if !ok {
 			// We couldn't spend this UTXO, so we skip to the next one
 			continue
@@ -452,6 +483,54 @@ func (b *builder) NewExportTx(
 	}, nil
 }
 
+func (b *builder) getBalance(
+	chainID ids.ID,
+	options *common.Options,
+) (
+	balance map[ids.ID]uint64,
+	err error,
+) {
+	utxos, err := b.backend.UTXOs(options.Context(), chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	addrs := options.Addresses(b.addrs)
+	minIssuanceTime := options.MinIssuanceTime()
+	balance = make(map[ids.ID]uint64)
+
+	// Iterate over the UTXOs
+	for _, utxo := range utxos {
+		outIntf := utxo.Out
+		if lockedOut, ok := outIntf.(*platformvm.StakeableLockOut); ok {
+			if !options.AllowStakeableLocked() && lockedOut.Locktime > minIssuanceTime {
+				// This output is currently locked, so this output can't be
+				// burned.
+				continue
+			}
+			outIntf = lockedOut.TransferableOut
+		}
+
+		out, ok := outIntf.(*secp256k1fx.TransferOutput)
+		if !ok {
+			return nil, errUnknownOutputType
+		}
+
+		_, ok = common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
+		if !ok {
+			// We couldn't spend this UTXO, so we skip to the next one
+			continue
+		}
+
+		assetID := utxo.AssetID()
+		balance[assetID], err = math.Add64(balance[assetID], out.Amt)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return balance, nil
+}
+
 // spend takes in the requested burn amounts and the requested stake amounts.
 //
 // - [amountsToBurn] maps assetID to the amount of the asset to spend without
@@ -477,9 +556,11 @@ func (b *builder) spend(
 	if err != nil {
 		return nil, nil, nil, err
 	}
+
+	addrs := options.Addresses(b.addrs)
 	minIssuanceTime := options.MinIssuanceTime()
 
-	addr, ok := b.addrs.Peek()
+	addr, ok := addrs.Peek()
 	if !ok {
 		return nil, nil, nil, errNoChangeAddress
 	}
@@ -517,7 +598,7 @@ func (b *builder) spend(
 			return nil, nil, nil, errUnknownOutputType
 		}
 
-		inputSigIndices, ok := b.match(&out.OutputOwners, minIssuanceTime)
+		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
 		if !ok {
 			// We couldn't spend this UTXO, so we skip to the next one
 			continue
@@ -598,7 +679,7 @@ func (b *builder) spend(
 			return nil, nil, nil, errUnknownOutputType
 		}
 
-		inputSigIndices, ok := b.match(&out.OutputOwners, minIssuanceTime)
+		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
 		if !ok {
 			// We couldn't spend this UTXO, so we skip to the next one
 			continue
@@ -697,8 +778,9 @@ func (b *builder) authorizeSubnet(subnetID ids.ID, options *common.Options) (*se
 		return nil, errUnknownOwnerType
 	}
 
+	addrs := options.Addresses(b.addrs)
 	minIssuanceTime := options.MinIssuanceTime()
-	inputSigIndices, ok := b.match(owner, minIssuanceTime)
+	inputSigIndices, ok := common.MatchOwners(owner, addrs, minIssuanceTime)
 	if !ok {
 		// We can't authorize the subnet
 		return nil, errInsufficientAuthorization
@@ -706,20 +788,4 @@ func (b *builder) authorizeSubnet(subnetID ids.ID, options *common.Options) (*se
 	return &secp256k1fx.Input{
 		SigIndices: inputSigIndices,
 	}, nil
-}
-
-// match attempts to match a list of addresses up to the provided threshold
-func (b *builder) match(owners *secp256k1fx.OutputOwners, minIssuanceTime uint64) ([]uint32, bool) {
-	if owners.Locktime > minIssuanceTime {
-		return nil, false
-	}
-
-	sigs := make([]uint32, 0, owners.Threshold)
-	for i := uint32(0); i < uint32(len(owners.Addrs)) && uint32(len(sigs)) < owners.Threshold; i++ {
-		addr := owners.Addrs[i]
-		if b.addrs.Contains(addr) {
-			sigs = append(sigs, i)
-		}
-	}
-	return sigs, uint32(len(sigs)) == owners.Threshold
 }

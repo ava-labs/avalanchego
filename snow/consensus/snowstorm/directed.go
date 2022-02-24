@@ -32,6 +32,7 @@ type Directed struct {
 	// metrics that describe this consensus instance
 	metrics.Latency
 	metrics.Polls
+	whitelistTxMetrics metrics.Latency
 
 	// context that this consensus instance is executing in
 	ctx *snow.ConsensusContext
@@ -101,6 +102,9 @@ func (dg *Directed) Initialize(
 	if err := dg.Latency.Initialize("txs", "transaction(s)", ctx.Log, "", ctx.Registerer); err != nil {
 		return fmt.Errorf("failed to initialize latency metrics: %w", err)
 	}
+	if err := dg.whitelistTxMetrics.Initialize("whitelist_tx", "whitelist transaction(s)", ctx.Log, "", ctx.Registerer); err != nil {
+		return fmt.Errorf("failed to initialize whitelist tx metrics: %w", err)
+	}
 	if err := dg.Polls.Initialize("", ctx.Registerer); err != nil {
 		return fmt.Errorf("failed to initialize poll metrics: %w", err)
 	}
@@ -169,7 +173,12 @@ func (dg *Directed) shouldVote(tx Tx) (bool, error) {
 	}
 
 	// Notify the metrics that this transaction is being issued.
-	dg.Latency.Issued(txID, dg.pollNumber)
+	if tx.HasWhitelist() {
+		dg.ctx.Log.Info("whitelist tx successfully issued %s", txID)
+		dg.whitelistTxMetrics.Issued(txID, dg.pollNumber)
+	} else {
+		dg.Latency.Issued(txID, dg.pollNumber)
+	}
 
 	// If this tx has inputs, it needs to be voted on before being accepted.
 	if inputs := tx.InputIDs(); len(inputs) != 0 {
@@ -263,11 +272,13 @@ func (dg *Directed) Add(tx Tx) error {
 			dg.addEdge(txNode, otherNode)
 		}
 	}
-	whitelist, isWhitelist, err := tx.Whitelist()
-	if err != nil {
-		return err
-	}
-	if isWhitelist {
+	if tx.HasWhitelist() {
+		whitelist, err := tx.Whitelist()
+		if err != nil {
+			return err
+		}
+		dg.ctx.Log.Info("processing whitelist tx %s", txID)
+
 		// Find all transactions that are not explicitly whitelisted and mark
 		// them as conflicting.
 		for otherID, otherNode := range dg.txs {
@@ -611,7 +622,14 @@ func (dg *Directed) acceptTx(tx Tx) error {
 	}
 
 	// Update the metrics to account for this transaction's acceptance
-	dg.Latency.Accepted(txID, dg.pollNumber)
+	if tx.HasWhitelist() {
+		dg.ctx.Log.Info("whitelist tx accepted %s", txID)
+		dg.whitelistTxMetrics.Accepted(txID, dg.pollNumber)
+	} else {
+		// just regular tx
+		dg.Latency.Accepted(txID, dg.pollNumber)
+	}
+
 	// If there is a tx that was accepted pending on this tx, the ancestor
 	// should be notified that it doesn't need to block on this tx anymore.
 	dg.pendingAccept.Fulfill(txID)
@@ -642,7 +660,12 @@ func (dg *Directed) rejectTx(tx Tx) error {
 	}
 
 	// Update the metrics to account for this transaction's rejection
-	dg.Latency.Rejected(txID, dg.pollNumber)
+	if tx.HasWhitelist() {
+		dg.ctx.Log.Info("whitelist tx rejected %s", txID)
+		dg.whitelistTxMetrics.Rejected(txID, dg.pollNumber)
+	} else {
+		dg.Latency.Rejected(txID, dg.pollNumber)
+	}
 
 	// If there is a tx that was accepted pending on this tx, the ancestor
 	// tx can't be accepted.

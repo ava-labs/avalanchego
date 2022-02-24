@@ -1,0 +1,27 @@
+name: Test e2e
+
+on:
+  push:
+    branches:
+      - dev
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test_e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v2
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17
+      - name: Build the avalanchego binaries
+        shell: bash
+        run: ./scripts/build.sh
+      - name: Run e2e tests
+        shell: bash
+        run: scripts/tests.e2e.sh ./build/avalanchego

@@ -32,6 +32,8 @@ type Client interface {
 	ConfirmTx(ctx context.Context, txID ids.ID, freq time.Duration) (choices.Status, error)
 	// GetTx returns the byte representation of [txID]
 	GetTx(ctx context.Context, txID ids.ID) ([]byte, error)
+	// IssueStopVertex issues a stop vertex.
+	IssueStopVertex(ctx context.Context) error
 	// GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
 	GetUTXOs(
 		ctx context.Context,
@@ -178,6 +180,10 @@ func (c *client) IssueTx(ctx context.Context, txBytes []byte) (ids.ID, error) {
 		Encoding: formatting.Hex,
 	}, res)
 	return res.TxID, err
+}
+
+func (c *client) IssueStopVertex(ctx context.Context) error {
+	return c.requester.SendRequest(ctx, "issueStopVertex", &struct{}{}, &struct{}{})
 }
 
 func (c *client) GetTxStatus(ctx context.Context, txID ids.ID) (choices.Status, error) {

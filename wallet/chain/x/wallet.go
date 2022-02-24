@@ -24,6 +24,12 @@ var (
 type Wallet interface {
 	Context
 
+	// Builder returns the builder that will be used to create the transactions.
+	Builder() Builder
+
+	// Signer returns the signer that will be used to sign the transactions.
+	Signer() Signer
+
 	// IssueBaseTx creates, signs, and issues a new simple value transfer.
 	//
 	// - [outputs] specifies all the recipients and amounts that should be sent
@@ -158,6 +164,10 @@ type wallet struct {
 	client  avm.Client
 }
 
+func (w *wallet) Builder() Builder { return w.builder }
+
+func (w *wallet) Signer() Signer { return w.signer }
+
 func (w *wallet) IssueBaseTx(
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
@@ -242,11 +252,11 @@ func (w *wallet) IssueOperationTxBurnProperty(
 }
 
 func (w *wallet) IssueImportTx(
-	sourceChainID ids.ID,
+	chainID ids.ID,
 	to *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (ids.ID, error) {
-	utx, err := w.builder.NewImportTx(sourceChainID, to, options...)
+	utx, err := w.builder.NewImportTx(chainID, to, options...)
 	if err != nil {
 		return ids.Empty, err
 	}
@@ -265,7 +275,10 @@ func (w *wallet) IssueExportTx(
 	return w.IssueUnsignedTx(utx, options...)
 }
 
-func (w *wallet) IssueUnsignedTx(utx avm.UnsignedTx, options ...common.Option) (ids.ID, error) {
+func (w *wallet) IssueUnsignedTx(
+	utx avm.UnsignedTx,
+	options ...common.Option,
+) (ids.ID, error) {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
 	tx, err := w.signer.SignUnsigned(ctx, utx)
@@ -276,7 +289,10 @@ func (w *wallet) IssueUnsignedTx(utx avm.UnsignedTx, options ...common.Option) (
 	return w.IssueTx(tx, options...)
 }
 
-func (w *wallet) IssueTx(tx *avm.Tx, options ...common.Option) (ids.ID, error) {
+func (w *wallet) IssueTx(
+	tx *avm.Tx,
+	options ...common.Option,
+) (ids.ID, error) {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
 	txID, err := w.client.IssueTx(ctx, tx.Bytes())

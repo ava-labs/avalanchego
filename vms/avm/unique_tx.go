@@ -268,8 +268,13 @@ func (tx *UniqueTx) InputIDs() []ids.ID {
 }
 
 // Whitelist is not supported by this transaction type, so [false] is returned.
-func (tx *UniqueTx) Whitelist() (ids.Set, bool, error) {
-	return nil, false, nil
+func (tx *UniqueTx) HasWhitelist() bool {
+	return false
+}
+
+// Whitelist is not supported by this transaction type, so [false] is returned.
+func (tx *UniqueTx) Whitelist() (ids.Set, error) {
+	return nil, nil
 }
 
 // InputUTXOs returns the utxos that will be consumed on tx acceptance
