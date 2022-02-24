@@ -520,7 +520,7 @@ func (ss *stateSyncer) requestBlk(blkID ids.ID) error {
 	// pick random beacon
 	var valID ids.ShortID
 	if len(ss.StateSyncTestingBeacons) > 0 {
-		rndIdx := rand.Intn(len(ss.StateSyncTestingBeacons) - 1) // #nosec G404
+		rndIdx := rand.Intn(len(ss.StateSyncTestingBeacons)) // #nosec G404
 		valID = ss.StateSyncTestingBeacons[rndIdx]
 	} else {
 		// sample from validators
