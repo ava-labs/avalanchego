@@ -5,6 +5,8 @@ package precompile
 
 import (
 	"math/big"
+
+	"github.com/ava-labs/subnet-evm/utils"
 )
 
 // StatefulPrecompileConfig defines the interface for a stateful precompile to
@@ -38,8 +40,8 @@ func CheckConfigure(parentTimestamp *big.Int, currentTimestamp *big.Int, config 
 		return
 	}
 	forkTimestamp := config.Timestamp()
-	isParentForked := isForked(parentTimestamp, forkTimestamp)
-	isCurrentBlockForked := isForked(currentTimestamp, forkTimestamp)
+	isParentForked := utils.IsForked(parentTimestamp, forkTimestamp)
+	isCurrentBlockForked := utils.IsForked(currentTimestamp, forkTimestamp)
 	// If the network upgrade goes into effect within this transition, configure the stateful precompile
 	if !isParentForked && isCurrentBlockForked {
 		config.Configure(state)
