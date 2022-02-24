@@ -314,7 +314,7 @@ func (ss *stateSyncer) restart(reset bool) error {
 	return ss.startup()
 }
 
-// Ask up to [MaxOutstandingStateSyncRequests] state sync validators to send
+// Ask up to [maxOutstandingStateSyncRequests] state sync validators to send
 // their accepted state summary
 func (ss *stateSyncer) sendGetStateSummaryFrontiers() {
 	if vdrs := ss.pickSeedersToContact(); vdrs.Len() > 0 {
@@ -323,7 +323,7 @@ func (ss *stateSyncer) sendGetStateSummaryFrontiers() {
 	}
 }
 
-// Ask up to [MaxOutstandingStateSyncRequests] syncers validators to send
+// Ask up to [maxOutstandingStateSyncRequests] syncers validators to send
 // their filtered accepted frontier
 func (ss *stateSyncer) sendGetAccepted() error {
 	if vdrs := ss.pickVotersToContact(); len(vdrs) > 0 {

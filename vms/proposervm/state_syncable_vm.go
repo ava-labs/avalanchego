@@ -153,9 +153,12 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 			return errWrongStateSyncVersion
 		}
 
-		coreSummaries = append(coreSummaries, common.Summary{
-			Content: summ.Content,
-		})
+		coreSummaryBytes, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, proContent.CoreContent)
+		if err != nil {
+			return err
+		}
+
+		coreSummaries = append(coreSummaries, common.Summary{Content: coreSummaryBytes})
 
 		// record coreVm to proposerVM blockID mapping to be able to
 		// complete state-sync by requesting lastSummaryBlockID.
