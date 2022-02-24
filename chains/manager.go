@@ -180,7 +180,7 @@ type ManagerConfig struct {
 	ApricotPhase4MinPChainHeight uint64
 
 	// State sync
-	StateSyncTestingBeacons    []ids.ShortID
+	StateSyncBeacons           []ids.ShortID
 	ResetProposerVMHeightIndex bool
 }
 
@@ -476,7 +476,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			chainParams.GenesisData,
 			vdrs,
 			beacons,
-			m.StateSyncTestingBeacons,
 			vm,
 			fxs,
 			consensusParams.Parameters,
@@ -708,7 +707,6 @@ func (m *manager) createSnowmanChain(
 	genesisData []byte,
 	vdrs,
 	beacons validators.Set,
-	stateSyncTestingBeacons []ids.ShortID,
 	vm block.ChainVM,
 	fxs []*common.Fx,
 	consensusParams snowball.Parameters,
@@ -843,11 +841,14 @@ func (m *manager) createSnowmanChain(
 	}
 
 	// create state sync gear
-	stateSyncCfg := syncer.Config{
-		Config:                  commonCfg,
-		StateSyncTestingBeacons: stateSyncTestingBeacons,
-		VM:                      vm,
-		WeightTracker:           weightTracker,
+	stateSyncCfg, err := syncer.NewConfig(
+		commonCfg,
+		m.StateSyncBeacons,
+		snowGetHandler,
+		vm,
+		weightTracker)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize state syncer configuration: %w", err)
 	}
 	stateSyncer := syncer.New(
 		stateSyncCfg,

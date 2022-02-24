@@ -114,9 +114,9 @@ type BootstrapConfig struct {
 	BootstrapIPs []utils.IPDesc `json:"bootstrapIPs"`
 }
 
-type StateSyncTestingConfig struct {
-	StateSyncTestOnlyIDs []ids.ShortID  `json:"stateSyncIDs"`
-	StateSyncTestOnlyIPs []utils.IPDesc `json:"stateSyncIPs"`
+type StateSyncConfig struct {
+	StateSyncIDs []ids.ShortID  `json:"stateSyncIDs"`
+	StateSyncIPs []utils.IPDesc `json:"stateSyncIPs"`
 }
 
 type DatabaseConfig struct {
@@ -132,13 +132,13 @@ type DatabaseConfig struct {
 
 // Config contains all of the configurations of an Avalanche node.
 type Config struct {
-	HTTPConfig             `json:"httpConfig"`
-	IPConfig               `json:"ipConfig"`
-	StakingConfig          `json:"stakingConfig"`
-	genesis.TxFeeConfig    `json:"txFeeConfig"`
-	BootstrapConfig        `json:"bootstrapConfig"`
-	StateSyncTestingConfig `json:"stateSyncConfig"`
-	DatabaseConfig         `json:"databaseConfig"`
+	HTTPConfig          `json:"httpConfig"`
+	IPConfig            `json:"ipConfig"`
+	StakingConfig       `json:"stakingConfig"`
+	genesis.TxFeeConfig `json:"txFeeConfig"`
+	BootstrapConfig     `json:"bootstrapConfig"`
+	StateSyncConfig     `json:"stateSyncConfig"`
+	DatabaseConfig      `json:"databaseConfig"`
 
 	// Genesis information
 	GenesisBytes []byte `json:"-"`
