@@ -41,7 +41,6 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/params"
-	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ava-labs/subnet-evm/trie"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -270,8 +269,8 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	}
 
 	genesisTimestamp := new(big.Int).SetUint64(g.Timestamp)
-	// Configure the AllowList if enabled from genesis
-	precompile.CheckConfigure(nil, genesisTimestamp, g.Config.AllowListConfig, statedb)
+	// Configure any stateful precompiles that should be enabled in the genesis.
+	g.Config.CheckConfigurePrecompiles(nil, genesisTimestamp, statedb)
 
 	// Do cusotm allocation after airdrop in case an address shows up in standard
 	// allocation

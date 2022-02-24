@@ -93,7 +93,7 @@ func PackModifyAllowList(address common.Address, status AllowListRole) ([]byte, 
 
 	input := make([]byte, modifyAllowListInputLength)
 	copy(input, address[:])
-	copy(input[20:], status[:])
+	copy(input[common.AddressLength:], status[:])
 	return input, nil
 }
 
@@ -117,13 +117,12 @@ func UnpackModifyAllowList(input []byte) (common.Address, common.Hash, error) {
 
 // setAllowListStatus sets the permissions of [address] to [status]
 // assumes [status] has already been verified as valid.
-func setAllowListStatus(stateDB StateDB, address common.Address, status common.Hash) error {
+func setAllowListStatus(stateDB StateDB, address common.Address, status common.Hash) {
 	// Generate the state key for [address]
 	addressKey := CreateAddressKey(address)
 	log.Info("modify allow list", "address", address, "role", status)
 	// Assign [role] to the address
 	stateDB.SetState(ModifyAllowListAddress, addressKey, status)
-	return nil
 }
 
 // allowListPrecompile implements StatefulPrecompiledContract and can be used as a thread-safe singleton.
@@ -153,9 +152,7 @@ func (al *allowListPrecompile) Run(evm PrecompileAccessibleState, callerAddr com
 		return nil, remainingGas, fmt.Errorf("failed to unpack modify allow list input: %w", err)
 	}
 
-	if err := setAllowListStatus(evm.GetStateDB(), address, status); err != nil {
-		return nil, remainingGas, err
-	}
+	setAllowListStatus(evm.GetStateDB(), address, status)
 
 	// Return an empty output and the remaining gas
 	return []byte{}, remainingGas, nil

@@ -161,6 +161,8 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new current environment: %w", err)
 	}
+	// Configure any stateful precompiles that should go into effect during this block.
+	w.chainConfig.CheckConfigurePrecompiles(new(big.Int).SetUint64(parent.Time()), bigTimestamp, env.state)
 
 	// Fill the block with all available pending transactions.
 	pending := w.eth.TxPool().Pending(true)

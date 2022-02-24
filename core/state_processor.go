@@ -35,7 +35,6 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/params"
-	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -78,8 +77,8 @@ func (p *StateProcessor) Process(block *types.Block, parent *types.Header, state
 		timestamp   = new(big.Int).SetUint64(header.Time)
 	)
 
-	// Configure the allow list if it goes into effect during the transition from [parent] to [block].
-	precompile.CheckConfigure(new(big.Int).SetUint64(parent.Time), timestamp, p.config.AllowListConfig, statedb)
+	// Configure any stateful precompiles that should go into effect during this block.
+	p.config.CheckConfigurePrecompiles(new(big.Int).SetUint64(parent.Time), timestamp, statedb)
 
 	blockContext := NewEVMBlockContext(header, p.bc, nil)
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, p.config, cfg)

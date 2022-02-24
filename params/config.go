@@ -207,7 +207,7 @@ func (c *ChainConfig) IsSubnetEVM(blockTimestamp *big.Int) bool {
 	return utils.IsForked(c.SubnetEVMTimestamp, blockTimestamp)
 }
 
-// IsSubnetEVM returns whether [blockTimestamp] is either equal to the AllowList fork block timestamp or greater.
+// IsAllowList returns whether [blockTimestamp] is either equal to the AllowList fork block timestamp or greater.
 func (c *ChainConfig) IsAllowList(blockTimestamp *big.Int) bool {
 	// If [AllowListConfig] is nil, then this upgrade is not enabled.
 	if c.AllowListConfig == nil {
@@ -462,4 +462,25 @@ func (c *ChainConfig) AvalancheRules(blockNum, blockTimestamp *big.Int) Rules {
 	rules.IsSubnetEVM = c.IsSubnetEVM(blockTimestamp)
 	rules.IsAllowListEnabled = c.IsAllowList(blockTimestamp)
 	return rules
+}
+
+// enabledStatefulPrecompiles returns a list of stateful precompile configs in the order that they are enabled
+// by block timestamp.
+func (c *ChainConfig) enabledStatefulPrecompiles() []precompile.StatefulPrecompileConfig {
+	statefulPrecompileConfigs := make([]precompile.StatefulPrecompileConfig, 0)
+
+	if c.AllowListConfig != nil {
+		statefulPrecompileConfigs = append(statefulPrecompileConfigs, c.AllowListConfig)
+	}
+
+	return statefulPrecompileConfigs
+}
+
+// CheckConfigurePrecompiles iterates over any stateful precompile configs that go into effect at some point and configures them
+// if they are activated between [parentTimestamp] and [currentTimestamp].
+func (c *ChainConfig) CheckConfigurePrecompiles(parentTimestamp *big.Int, currentTimestamp *big.Int, statedb precompile.StateDB) {
+	// Iterate the enabled stateful precompiles and configure them if needed
+	for _, config := range c.enabledStatefulPrecompiles() {
+		precompile.CheckConfigure(parentTimestamp, currentTimestamp, config, statedb)
+	}
 }
