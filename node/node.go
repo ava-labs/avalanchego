@@ -359,7 +359,7 @@ func (n *Node) Dispatch() error {
 		}
 	}
 	// Add state sync nodes to the peer network
-	for _, peerIP := range n.Config.StateSyncTestOnlyIPs {
+	for _, peerIP := range n.Config.StateSyncIPs {
 		if !peerIP.Equal(n.Config.IP.IP()) {
 			n.Net.TrackIP(peerIP)
 		}
@@ -642,7 +642,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		ApricotPhase4MinPChainHeight:            version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
 
 		// State sync
-		StateSyncTestingBeacons:    n.Config.StateSyncTestOnlyIDs,
+		StateSyncBeacons:           n.Config.StateSyncIDs,
 		ResetProposerVMHeightIndex: n.Config.ResetProposerVMHeightIndex,
 	})
 

@@ -483,12 +483,12 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 	return config, nil
 }
 
-func getStateSyncTestingConfig(v *viper.Viper) (node.StateSyncTestingConfig, error) {
-	config := node.StateSyncTestingConfig{}
+func getStateSyncConfig(v *viper.Viper) (node.StateSyncConfig, error) {
+	config := node.StateSyncConfig{}
 	var stateSyncIPs, stateSyncIDs []string
 
-	if v.IsSet(StateSyncTestingIPsKey) {
-		stateSyncIPs = strings.Split(v.GetString(StateSyncTestingIPsKey), ",")
+	if v.IsSet(StateSyncIPsKey) {
+		stateSyncIPs = strings.Split(v.GetString(StateSyncIPsKey), ",")
 	}
 	for _, ip := range stateSyncIPs {
 		if ip == "" {
@@ -496,13 +496,13 @@ func getStateSyncTestingConfig(v *viper.Viper) (node.StateSyncTestingConfig, err
 		}
 		addr, err := utils.ToIPDesc(ip)
 		if err != nil {
-			return node.StateSyncTestingConfig{}, fmt.Errorf("couldn't parse state sync ip %s: %w", ip, err)
+			return node.StateSyncConfig{}, fmt.Errorf("couldn't parse state sync ip %s: %w", ip, err)
 		}
-		config.StateSyncTestOnlyIPs = append(config.StateSyncTestOnlyIPs, addr)
+		config.StateSyncIPs = append(config.StateSyncIPs, addr)
 	}
 
-	if v.IsSet(StateSyncTestingIDsKey) {
-		stateSyncIDs = strings.Split(v.GetString(StateSyncTestingIDsKey), ",")
+	if v.IsSet(StateSyncIDsKey) {
+		stateSyncIDs = strings.Split(v.GetString(StateSyncIDsKey), ",")
 	}
 	for _, id := range stateSyncIDs {
 		if id == "" {
@@ -510,9 +510,9 @@ func getStateSyncTestingConfig(v *viper.Viper) (node.StateSyncTestingConfig, err
 		}
 		nodeID, err := ids.ShortFromPrefixedString(id, constants.NodeIDPrefix)
 		if err != nil {
-			return node.StateSyncTestingConfig{}, fmt.Errorf("couldn't parse state sync peer id %s: %w", id, err)
+			return node.StateSyncConfig{}, fmt.Errorf("couldn't parse state sync peer id %s: %w", id, err)
 		}
-		config.StateSyncTestOnlyIDs = append(config.StateSyncTestOnlyIDs, nodeID)
+		config.StateSyncIDs = append(config.StateSyncIDs, nodeID)
 	}
 	return config, nil
 }
@@ -1156,7 +1156,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	}
 
 	// StateSync Configs
-	nodeConfig.StateSyncTestingConfig, err = getStateSyncTestingConfig(v)
+	nodeConfig.StateSyncConfig, err = getStateSyncConfig(v)
 	if err != nil {
 		return node.Config{}, err
 	}
