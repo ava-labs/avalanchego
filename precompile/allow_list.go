@@ -11,8 +11,11 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-// AllowListPrecompile is a singleton to be used by the EVM as a stateful precompile contract
-var AllowListPrecompile StatefulPrecompiledContract = &allowListPrecompile{}
+// Singleton StatefulPrecompiledContracts for W/R access to the contract deployer allow list.
+var (
+	ModifyAllowListPrecompile StatefulPrecompiledContract = &modifyAllowListPrecompile{}
+	ReadAllowListPrecompile   StatefulPrecompiledContract = &readAllowListPrecompile{}
+)
 
 type AllowListRole common.Hash
 
@@ -125,24 +128,28 @@ func setAllowListStatus(stateDB StateDB, address common.Address, status common.H
 	stateDB.SetState(ModifyAllowListAddress, addressKey, status)
 }
 
-// allowListPrecompile implements StatefulPrecompiledContract and can be used as a thread-safe singleton.
-type allowListPrecompile struct{}
+// modifyAllowListPrecompile implements StatefulPrecompiledContract and can be used as a thread-safe singleton.
+// Provides designated admins to modify the contract deployers allow list.
+type modifyAllowListPrecompile struct{}
 
 // Run verifies that [callerAddr] has the correct permissions to modify the allow list and if so updates the the allow list
 // as requested by the arguments encoded in [input].
-func (al *allowListPrecompile) Run(evm PrecompileAccessibleState, callerAddr common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+func (mal *modifyAllowListPrecompile) Run(evm PrecompileAccessibleState, callerAddr common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	// Note: this should never happen since the required gas should be verified before calling Run.
 	if suppliedGas < ModifyAllowListGasCost {
 		return nil, 0, fmt.Errorf("running allow list exceeds gas allowance (%d) < (%d)", ModifyAllowListGasCost, suppliedGas)
 	}
 
 	remainingGas = suppliedGas - ModifyAllowListGasCost
+	if readOnly {
+		return nil, remainingGas, fmt.Errorf("cannot modify allow list in read only")
+	}
 
 	// Verify that the caller is in the allow list and therefore has the right to modify it
 	callerStatus := GetAllowListStatus(evm.GetStateDB(), callerAddr)
 	if !callerStatus.IsAdmin() {
 		log.Info("EVM received attempt to modify the allow list from a non-allowed address", "callerAddr", callerAddr)
-		return nil, remainingGas, fmt.Errorf("cannot ")
+		return nil, remainingGas, fmt.Errorf("caller %s cannot modify allow list", callerAddr)
 	}
 
 	// Unpack the precompile's input into the arguments for setAllowListStatus
@@ -159,4 +166,30 @@ func (al *allowListPrecompile) Run(evm PrecompileAccessibleState, callerAddr com
 }
 
 // RequiredGas returns the amount of gas consumed by this precompile.
-func (al *allowListPrecompile) RequiredGas(input []byte) uint64 { return ModifyAllowListGasCost }
+func (mal *modifyAllowListPrecompile) RequiredGas(input []byte) uint64 { return ModifyAllowListGasCost }
+
+// readAllowListPrecompile implements StatefulPrecompiledContract and can be used as a thread-safe singleton.
+// Provides read access to the contract deployer allow list.
+type readAllowListPrecompile struct{}
+
+// Run implements StatefulPrecompiledContract
+// parses [input] into a single address and returns the 32 byte hash that specifies the designated role of that address.
+func (ral *readAllowListPrecompile) Run(evm PrecompileAccessibleState, callerAddr common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+	// Note: this should never happen since the required gas should be verified before calling Run.
+	if suppliedGas < ReadAllowListGasCost {
+		return nil, 0, fmt.Errorf("running allow list exceeds gas allowance (%d) < (%d)", ReadAllowListGasCost, suppliedGas)
+	}
+
+	remainingGas = suppliedGas - ReadAllowListGasCost
+
+	if len(input) != common.AddressLength {
+		return nil, remainingGas, fmt.Errorf("invalid input length for read allow list: %d", len(input))
+	}
+
+	readAddress := common.BytesToAddress(input)
+	roleBytes := common.Hash(GetAllowListStatus(evm.GetStateDB(), readAddress)).Bytes()
+	return roleBytes, remainingGas, nil
+}
+
+// RequiredGas returns the amount of gas consumed by this precompile.
+func (mal *readAllowListPrecompile) RequiredGas(input []byte) uint64 { return ReadAllowListGasCost }

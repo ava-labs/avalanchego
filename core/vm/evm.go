@@ -69,7 +69,8 @@ func (evm *EVM) precompile(addr common.Address) (precompile.StatefulPrecompiledC
 
 	// Enable the optional stateful precompiles
 	if evm.chainRules.IsAllowListEnabled {
-		precompiles[precompile.ModifyAllowListAddress] = precompile.AllowListPrecompile
+		precompiles[precompile.ModifyAllowListAddress] = precompile.ModifyAllowListPrecompile
+		precompiles[precompile.ReadAllowListAddress] = precompile.ReadAllowListPrecompile
 	}
 	p, ok := precompiles[addr]
 	return p, ok

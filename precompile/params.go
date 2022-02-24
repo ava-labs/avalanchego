@@ -8,6 +8,7 @@ import "github.com/ethereum/go-ethereum/common"
 // Gas costs for stateful precompiles
 const (
 	ModifyAllowListGasCost = 20_000
+	ReadAllowListGasCost   = 5_000
 )
 
 // Designated addresses of stateful precompiles
@@ -20,4 +21,5 @@ const (
 // in the future.
 var (
 	ModifyAllowListAddress = common.HexToAddress("0x0200000000000000000000000000000000000000")
+	ReadAllowListAddress   = common.HexToAddress("0x0200000000000000000000000000000000000001")
 )
