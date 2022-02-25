@@ -32,6 +32,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ethereum/go-ethereum/common"
@@ -41,26 +42,25 @@ import (
 )
 
 var (
-	// TODO: move to types?
-	BlackholeAddr = common.Address{
-		1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	}
-
 	prohibitedAddresses = append(
-		[]common.Address{BlackholeAddr},
+		[]common.Address{constants.BlackholeAddr},
 		precompile.PrecompileAddresses...,
 	)
+	prohibitedAddressesSet map[common.Address]struct{}
 )
 
-// TODO: use a set or map
-func IsProhibited(addr common.Address) bool {
-	for _, prohibited := range prohibitedAddresses {
-		if prohibited == addr {
-			return true
-		}
+func init() {
+	prohibitedAddressesSet = make(map[common.Address]struct{})
+	for _, addr := range prohibitedAddresses {
+		prohibitedAddressesSet[addr] = struct{}{}
 	}
-	return false
+}
+
+// IsProhibited returns true if [addr] is in the prohibited list of addresses which should
+// not be allowed as an EOA or newly created contract address.
+func IsProhibited(addr common.Address) bool {
+	_, ok := prohibitedAddressesSet[addr]
+	return ok
 }
 
 // emptyCodeHash is used by create to ensure deployment is disallowed to already

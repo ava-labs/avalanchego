@@ -9,11 +9,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/trie"
-
-	subnetEVM "github.com/ava-labs/subnet-evm/chain"
 )
 
 var (
@@ -84,7 +83,7 @@ func (v blockValidatorLegacy) SyntacticVerify(b *Block) error {
 		return errUncleHashMismatch
 	}
 	// Coinbase must be zero on C-Chain
-	if b.ethBlock.Coinbase() != subnetEVM.BlackholeAddr {
+	if b.ethBlock.Coinbase() != constants.BlackholeAddr {
 		return errInvalidBlock
 	}
 	// Block must not have any uncles
@@ -182,7 +181,7 @@ func (blockValidatorSubnetEVM) SyntacticVerify(b *Block) error {
 		return errUncleHashMismatch
 	}
 	// Coinbase must be zero, if AllowFeeRecipients is not enabled
-	if !b.vm.chainConfig.AllowFeeRecipients && b.ethBlock.Coinbase() != subnetEVM.BlackholeAddr {
+	if !b.vm.chainConfig.AllowFeeRecipients && b.ethBlock.Coinbase() != constants.BlackholeAddr {
 		return errInvalidBlock
 	}
 	// Block must not have any uncles
