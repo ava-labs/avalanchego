@@ -306,7 +306,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	// Start state-syncing if available or bootstrapping.
 	if stateSyncer := chain.Handler.StateSyncer(); stateSyncer != nil && stateSyncer.IsEnabled() {
 		// drop boostrap state from previous runs
-		if err = chain.Handler.Bootstrapper().Clear(); err != nil {
+		if err = chain.Handler.Bootstrapper().Clear(); err == nil {
 			err = stateSyncer.Start(0)
 		}
 	} else {
