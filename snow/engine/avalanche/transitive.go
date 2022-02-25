@@ -265,6 +265,11 @@ func (t *Transitive) Notify(msg common.Message) error {
 		return t.attemptToIssueTxs()
 	case common.StateSyncSkipped, common.StateSyncDone:
 		t.Ctx.Log.Warn("unexpected message %s received in avalanche engine. Dropped", msg)
+
+	case common.StopVertex:
+		// stop vertex doesn't have any txs, issue directly!
+		return t.issueStopVtx()
+
 	default:
 		t.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
 	}
@@ -327,7 +332,7 @@ func (t *Transitive) attemptToIssueTxs() error {
 		return err
 	}
 
-	t.pendingTxs, err = t.batch(t.pendingTxs, false /*=force*/, false /*=empty*/, true /*=limit*/)
+	t.pendingTxs, err = t.batch(t.pendingTxs, batchOption{limit: true})
 	t.metrics.pendingTxs.Set(float64(len(t.pendingTxs)))
 	return err
 }
@@ -477,12 +482,19 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 	return t.errs.Err
 }
 
+type batchOption struct {
+	// if [force], allow for a conflict to be issued, and force each tx to be issued
+	// otherwise, some txs may not be put into vertices that are issued.
+	force bool
+	// if [empty], always result in a new poll
+	empty bool
+	// if [limit], stop when "Params.OptimalProcessing <= Consensus.NumProcessing"
+	limit bool
+}
+
 // Batchs [txs] into vertices and issue them.
-// If [force] is true, forces each tx to be issued.
-// Otherwise, some txs may not be put into vertices that are issued.
-// If [empty], will always result in a new poll.
-func (t *Transitive) batch(txs []snowstorm.Tx, force, empty, limit bool) ([]snowstorm.Tx, error) {
-	if limit && t.Params.OptimalProcessing <= t.Consensus.NumProcessing() {
+func (t *Transitive) batch(txs []snowstorm.Tx, opt batchOption) ([]snowstorm.Tx, error) {
+	if opt.limit && t.Params.OptimalProcessing <= t.Consensus.NumProcessing() {
 		return txs, nil
 	}
 	issuedTxs := ids.Set{}
@@ -496,11 +508,11 @@ func (t *Transitive) batch(txs []snowstorm.Tx, force, empty, limit bool) ([]snow
 		inputs := ids.Set{}
 		inputs.Add(tx.InputIDs()...)
 		overlaps := consumed.Overlaps(inputs)
-		if end-start >= t.Params.BatchSize || (force && overlaps) {
+		if end-start >= t.Params.BatchSize || (opt.force && overlaps) {
 			if err := t.issueBatch(txs[start:end]); err != nil {
 				return nil, err
 			}
-			if limit && t.Params.OptimalProcessing <= t.Consensus.NumProcessing() {
+			if opt.limit && t.Params.OptimalProcessing <= t.Consensus.NumProcessing() {
 				return txs[end:], nil
 			}
 			start = end
@@ -511,7 +523,7 @@ func (t *Transitive) batch(txs []snowstorm.Tx, force, empty, limit bool) ([]snow
 
 		if txID := tx.ID(); !overlaps && // should never allow conflicting txs in the same vertex
 			!issuedTxs.Contains(txID) && // shouldn't issue duplicated transactions to the same vertex
-			(force || t.Consensus.IsVirtuous(tx)) && // force allows for a conflict to be issued
+			(opt.force || t.Consensus.IsVirtuous(tx)) && // force allows for a conflict to be issued
 			(!t.Consensus.TxIssued(tx) || orphans.Contains(txID)) { // should only reissue orphaned txs
 			end++
 			issuedTxs.Add(txID)
@@ -527,7 +539,7 @@ func (t *Transitive) batch(txs []snowstorm.Tx, force, empty, limit bool) ([]snow
 	if end > start {
 		return txs[end:], t.issueBatch(txs[start:end])
 	}
-	if empty && !issued {
+	if opt.empty && !issued {
 		t.issueRepoll()
 	}
 	return txs[end:], nil
@@ -589,6 +601,19 @@ func (t *Transitive) issueBatch(txs []snowstorm.Tx) error {
 	if err != nil {
 		t.Ctx.Log.Warn("error building new vertex with %d parents and %d transactions",
 			len(parentIDs), len(txs))
+		return nil
+	}
+
+	return t.issue(vtx)
+}
+
+// to be triggered via X-Chain API
+func (t *Transitive) issueStopVtx() error {
+	// use virtuous frontier (accepted) as parents
+	virtuousSet := t.Consensus.Virtuous()
+	vtx, err := t.Manager.BuildStopVtx(virtuousSet.List())
+	if err != nil {
+		t.Ctx.Log.Warn("error building new stop vertex with %d parents", virtuousSet.Len())
 		return nil
 	}
 	return t.issue(vtx)

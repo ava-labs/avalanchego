@@ -370,6 +370,15 @@ func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
 	return tx.ID(), nil
 }
 
+func (vm *VM) issueStopVertex() error {
+	select {
+	case vm.toEngine <- common.StopVertex:
+	default:
+		vm.ctx.Log.Debug("dropping common.StopVertex message to engine due to contention")
+	}
+	return nil
+}
+
 /*
  ******************************************************************************
  ********************************** Timer API *********************************

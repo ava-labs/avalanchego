@@ -226,8 +226,8 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 			return node.HTTPConfig{}, fmt.Errorf("unable to decode base64 content: %w", err)
 		}
 	case v.IsSet(HTTPSCertFileKey):
-		httpsKeyFilepath := os.ExpandEnv(v.GetString(HTTPSCertFileKey))
-		if httpsCert, err = ioutil.ReadFile(filepath.Clean(httpsKeyFilepath)); err != nil {
+		httpsCertFilepath := os.ExpandEnv(v.GetString(HTTPSCertFileKey))
+		if httpsCert, err = ioutil.ReadFile(filepath.Clean(httpsCertFilepath)); err != nil {
 			return node.HTTPConfig{}, err
 		}
 	}

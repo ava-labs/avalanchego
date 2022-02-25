@@ -21,6 +21,8 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
+var _ heap.Interface = &benchedQueue{}
+
 // If a peer consistently does not respond to queries, it will
 // increase latencies on the network whenever that peer is polled.
 // If we cannot terminate the poll early, then the poll will wait
@@ -47,7 +49,7 @@ type benchData struct {
 	index        int
 }
 
-// Implements heap.Interface. Each element is a benched validator
+// Each element is a benched validator
 type benchedQueue []*benchData
 
 func (bq benchedQueue) Len() int           { return len(bq) }

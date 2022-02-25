@@ -31,6 +31,21 @@ var (
 // Builder provides a convenient interface for building unsigned X-chain
 // transactions.
 type Builder interface {
+	// GetFTBalance calculates the amount of each fungible asset that this
+	// builder has control over.
+	GetFTBalance(
+		options ...common.Option,
+	) (map[ids.ID]uint64, error)
+
+	// GetImportableBalance calculates the amount of each fungible asset that
+	// this builder could import from the provided chain.
+	//
+	// - [chainID] specifies the chain the funds are from.
+	GetImportableBalance(
+		chainID ids.ID,
+		options ...common.Option,
+	) (map[ids.ID]uint64, error)
+
 	// NewBaseTx creates a new simple value transfer.
 	//
 	// - [outputs] specifies all the recipients and amounts that should be sent
@@ -156,6 +171,21 @@ func NewBuilder(addrs ids.ShortSet, backend BuilderBackend) Builder {
 		addrs:   addrs,
 		backend: backend,
 	}
+}
+
+func (b *builder) GetFTBalance(
+	options ...common.Option,
+) (map[ids.ID]uint64, error) {
+	ops := common.NewOptions(options)
+	return b.getBalance(b.backend.BlockchainID(), ops)
+}
+
+func (b *builder) GetImportableBalance(
+	chainID ids.ID,
+	options ...common.Option,
+) (map[ids.ID]uint64, error) {
+	ops := common.NewOptions(options)
+	return b.getBalance(chainID, ops)
 }
 
 func (b *builder) NewBaseTx(
@@ -312,20 +342,18 @@ func (b *builder) NewOperationTxBurnProperty(
 }
 
 func (b *builder) NewImportTx(
-	sourceChainID ids.ID,
+	chainID ids.ID,
 	to *secp256k1fx.OutputOwners,
 	options ...common.Option,
-) (
-	*avm.ImportTx,
-	error,
-) {
+) (*avm.ImportTx, error) {
 	ops := common.NewOptions(options)
-	utxos, err := b.backend.UTXOs(ops.Context(), sourceChainID)
+	utxos, err := b.backend.UTXOs(ops.Context(), chainID)
 	if err != nil {
 		return nil, err
 	}
 
 	var (
+		addrs           = ops.Addresses(b.addrs)
 		minIssuanceTime = ops.MinIssuanceTime()
 		avaxAssetID     = b.backend.AVAXAssetID()
 		txFee           = b.backend.BaseTxFee()
@@ -341,7 +369,7 @@ func (b *builder) NewImportTx(
 			continue
 		}
 
-		inputSigIndices, ok := b.match(&out.OutputOwners, minIssuanceTime)
+		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
 		if !ok {
 			// We couldn't spend this UTXO, so we skip to the next one
 			continue
@@ -414,7 +442,7 @@ func (b *builder) NewImportTx(
 			Outs:         outputs,
 			Memo:         ops.Memo(),
 		}},
-		SourceChain: sourceChainID,
+		SourceChain: chainID,
 		ImportedIns: importedInputs,
 	}, nil
 }
@@ -456,6 +484,46 @@ func (b *builder) NewExportTx(
 	}, nil
 }
 
+func (b *builder) getBalance(
+	chainID ids.ID,
+	options *common.Options,
+) (
+	balance map[ids.ID]uint64,
+	err error,
+) {
+	utxos, err := b.backend.UTXOs(options.Context(), chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	addrs := options.Addresses(b.addrs)
+	minIssuanceTime := options.MinIssuanceTime()
+	balance = make(map[ids.ID]uint64)
+
+	// Iterate over the UTXOs
+	for _, utxo := range utxos {
+		outIntf := utxo.Out
+		out, ok := outIntf.(*secp256k1fx.TransferOutput)
+		if !ok {
+			// We only support [secp256k1fx.TransferOutput]s.
+			continue
+		}
+
+		_, ok = common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
+		if !ok {
+			// We couldn't spend this UTXO, so we skip to the next one
+			continue
+		}
+
+		assetID := utxo.AssetID()
+		balance[assetID], err = math.Add64(balance[assetID], out.Amt)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return balance, nil
+}
+
 func (b *builder) spend(
 	amountsToBurn map[ids.ID]uint64,
 	options *common.Options,
@@ -469,9 +537,10 @@ func (b *builder) spend(
 		return nil, nil, err
 	}
 
+	addrs := options.Addresses(b.addrs)
 	minIssuanceTime := options.MinIssuanceTime()
 
-	addr, ok := b.addrs.Peek()
+	addr, ok := addrs.Peek()
 	if !ok {
 		return nil, nil, errNoChangeAddress
 	}
@@ -498,7 +567,7 @@ func (b *builder) spend(
 			continue
 		}
 
-		inputSigIndices, ok := b.match(&out.OutputOwners, minIssuanceTime)
+		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
 		if !ok {
 			// We couldn't spend this UTXO, so we skip to the next one
 			continue
@@ -561,6 +630,7 @@ func (b *builder) mintFTs(
 		return nil, err
 	}
 
+	addrs := options.Addresses(b.addrs)
 	minIssuanceTime := options.MinIssuanceTime()
 
 	for _, utxo := range utxos {
@@ -575,7 +645,7 @@ func (b *builder) mintFTs(
 			continue
 		}
 
-		inputSigIndices, ok := b.match(&out.OutputOwners, minIssuanceTime)
+		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
 		if !ok {
 			continue
 		}
@@ -622,6 +692,7 @@ func (b *builder) mintNFTs(
 		return nil, err
 	}
 
+	addrs := options.Addresses(b.addrs)
 	minIssuanceTime := options.MinIssuanceTime()
 
 	for _, utxo := range utxos {
@@ -635,7 +706,7 @@ func (b *builder) mintNFTs(
 			continue
 		}
 
-		inputSigIndices, ok := b.match(&out.OutputOwners, minIssuanceTime)
+		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
 		if !ok {
 			continue
 		}
@@ -677,6 +748,7 @@ func (b *builder) mintProperty(
 		return nil, err
 	}
 
+	addrs := options.Addresses(b.addrs)
 	minIssuanceTime := options.MinIssuanceTime()
 
 	for _, utxo := range utxos {
@@ -690,7 +762,7 @@ func (b *builder) mintProperty(
 			continue
 		}
 
-		inputSigIndices, ok := b.match(&out.OutputOwners, minIssuanceTime)
+		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
 		if !ok {
 			continue
 		}
@@ -732,6 +804,7 @@ func (b *builder) burnProperty(
 		return nil, err
 	}
 
+	addrs := options.Addresses(b.addrs)
 	minIssuanceTime := options.MinIssuanceTime()
 
 	for _, utxo := range utxos {
@@ -745,7 +818,7 @@ func (b *builder) burnProperty(
 			continue
 		}
 
-		inputSigIndices, ok := b.match(&out.OutputOwners, minIssuanceTime)
+		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
 		if !ok {
 			continue
 		}
@@ -771,20 +844,4 @@ func (b *builder) burnProperty(
 		)
 	}
 	return operations, nil
-}
-
-// match attempts to match a list of addresses up to the provided threshold
-func (b *builder) match(owners *secp256k1fx.OutputOwners, minIssuanceTime uint64) ([]uint32, bool) {
-	if owners.Locktime > minIssuanceTime {
-		return nil, false
-	}
-
-	sigs := make([]uint32, 0, owners.Threshold)
-	for i := uint32(0); i < uint32(len(owners.Addrs)) && uint32(len(sigs)) < owners.Threshold; i++ {
-		addr := owners.Addrs[i]
-		if b.addrs.Contains(addr) {
-			sigs = append(sigs, i)
-		}
-	}
-	return sigs, uint32(len(sigs)) == owners.Threshold
 }

@@ -21,6 +21,8 @@ const (
 	// snowman-VM related messages for state sync capable VMs
 	StateSyncSkipped
 	StateSyncDone
+	// StopVertex notifies a consensus that it has a pending stop vertex
+	StopVertex
 )
 
 func (msg Message) String() string {
@@ -31,6 +33,8 @@ func (msg Message) String() string {
 		return "State Sync Skipped"
 	case StateSyncDone:
 		return "State Sync Done"
+	case StopVertex:
+		return "Pending Stop Vertex"
 	default:
 		return fmt.Sprintf("Unknown Message: %d", msg)
 	}

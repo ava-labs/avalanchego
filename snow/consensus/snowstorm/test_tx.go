@@ -17,8 +17,8 @@ type TestTx struct {
 	DependenciesV    []Tx
 	DependenciesErrV error
 	InputIDsV        []ids.ID
+	HasWhitelistV    bool
 	WhitelistV       ids.Set
-	WhitelistIsV     bool
 	WhitelistErrV    error
 	VerifyV          error
 	BytesV           []byte
@@ -26,8 +26,7 @@ type TestTx struct {
 
 func (t *TestTx) Dependencies() ([]Tx, error) { return t.DependenciesV, t.DependenciesErrV }
 func (t *TestTx) InputIDs() []ids.ID          { return t.InputIDsV }
-func (t *TestTx) Whitelist() (ids.Set, bool, error) {
-	return t.WhitelistV, t.WhitelistIsV, t.WhitelistErrV
-}
-func (t *TestTx) Verify() error { return t.VerifyV }
-func (t *TestTx) Bytes() []byte { return t.BytesV }
+func (t *TestTx) HasWhitelist() bool          { return t.HasWhitelistV }
+func (t *TestTx) Whitelist() (ids.Set, error) { return t.WhitelistV, t.WhitelistErrV }
+func (t *TestTx) Verify() error               { return t.VerifyV }
+func (t *TestTx) Bytes() []byte               { return t.BytesV }

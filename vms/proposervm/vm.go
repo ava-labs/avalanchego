@@ -217,6 +217,7 @@ func (vm *VM) Initialize(
 		}
 		if !shouldRepair {
 			vm.ctx.Log.Info("block height indexing is already complete")
+			vm.hIndexer.MarkRepaired()
 			return
 		}
 
@@ -227,7 +228,7 @@ func (vm *VM) Initialize(
 		}
 
 		// Note that we don't check if `err` is `context.Canceled` here because
-		// repairing the height index may have returned a non-standard errored
+		// repairing the height index may have returned a non-standard error
 		// due to the chain shutting down.
 		if vm.context.Err() == nil {
 			// The context wasn't closed, so the chain hasn't been shutdown.

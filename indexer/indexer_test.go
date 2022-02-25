@@ -4,6 +4,7 @@
 package indexer
 
 import (
+	"errors"
 	"io"
 	"sync"
 	"testing"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -30,6 +32,8 @@ import (
 	smengmocks "github.com/ava-labs/avalanchego/snow/engine/snowman/mocks"
 )
 
+var _ server.PathAdder = &apiServerMock{}
+
 type apiServerMock struct {
 	timesCalled int
 	bases       []string
@@ -41,6 +45,10 @@ func (a *apiServerMock) AddRoute(_ *common.HTTPHandler, _ *sync.RWMutex, base, e
 	a.bases = append(a.bases, base)
 	a.endpoints = append(a.endpoints, endpoint)
 	return nil
+}
+
+func (a *apiServerMock) AddAliases(string, ...string) error {
+	return errors.New("unimplemented")
 }
 
 // Test that newIndexer sets fields correctly
@@ -65,7 +73,7 @@ func TestNewIndexer(t *testing.T) {
 	assert.NotNil(idxr.log)
 	assert.NotNil(idxr.db)
 	assert.False(idxr.closed)
-	assert.NotNil(idxr.routeAdder)
+	assert.NotNil(idxr.pathAdder)
 	assert.True(idxr.indexingEnabled)
 	assert.True(idxr.allowIncompleteIndex)
 	assert.NotNil(idxr.blockIndices)

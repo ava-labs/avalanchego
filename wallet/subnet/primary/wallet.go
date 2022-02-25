@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 var _ Wallet = &wallet{}
@@ -111,6 +112,13 @@ func NewWallet(ctx context.Context, uri string, kc *secp256k1fx.Keychain) (Walle
 		p: p.NewWallet(pBuilder, pSigner, pClient, pBackend),
 		x: x.NewWallet(xBuilder, xSigner, xClient, xBackend),
 	}, nil
+}
+
+func NewWalletWithOptions(w Wallet, options ...common.Option) Wallet {
+	return &wallet{
+		p: p.NewWalletWithOptions(w.P(), options...),
+		x: x.NewWalletWithOptions(w.X(), options...),
+	}
 }
 
 type wallet struct {

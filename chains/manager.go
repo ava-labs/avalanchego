@@ -99,7 +99,6 @@ type Manager interface {
 
 	// Returns true iff the chain with the given ID exists and is finished bootstrapping
 	IsBootstrapped(ids.ID) bool
-
 	Shutdown()
 }
 
@@ -145,7 +144,7 @@ type ManagerConfig struct {
 	Validators                  validators.Manager // Validators validating on this chain
 	NodeID                      ids.ShortID        // The ID of this node
 	NetworkID                   uint32             // ID of the network this node is connected to
-	Server                      *server.Server     // Handles HTTP API calls
+	Server                      server.Server      // Handles HTTP API calls
 	Keystore                    keystore.Keystore
 	AtomicMemory                *atomic.Memory
 	AVAXAssetID                 ids.ID
@@ -499,7 +498,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	return chain, nil
 }
 
-// Implements Manager.AddRegistrant
 func (m *manager) AddRegistrant(r Registrant) { m.registrants = append(m.registrants, r) }
 
 func (m *manager) unblockChains() {

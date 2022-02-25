@@ -7,6 +7,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -17,8 +18,13 @@ type Option func(*Options)
 type Options struct {
 	ctx context.Context
 
+	customAddressesSet bool
+	customAddresses    ids.ShortSet
+
 	minIssuanceTimeSet bool
 	minIssuanceTime    uint64
+
+	allowStakeableLocked bool
 
 	changeOwner *secp256k1fx.OutputOwners
 
@@ -36,6 +42,14 @@ func NewOptions(ops []Option) *Options {
 	return o
 }
 
+func UnionOptions(first, second []Option) []Option {
+	firstLen := len(first)
+	newOptions := make([]Option, firstLen+len(second))
+	copy(newOptions, first)
+	copy(newOptions[firstLen:], second)
+	return newOptions
+}
+
 func (o *Options) applyOptions(ops []Option) {
 	for _, op := range ops {
 		op(o)
@@ -49,12 +63,21 @@ func (o *Options) Context() context.Context {
 	return context.Background()
 }
 
+func (o *Options) Addresses(defaultAddresses ids.ShortSet) ids.ShortSet {
+	if o.customAddressesSet {
+		return o.customAddresses
+	}
+	return defaultAddresses
+}
+
 func (o *Options) MinIssuanceTime() uint64 {
 	if o.minIssuanceTimeSet {
 		return o.minIssuanceTime
 	}
 	return uint64(time.Now().Unix())
 }
+
+func (o *Options) AllowStakeableLocked() bool { return o.allowStakeableLocked }
 
 func (o *Options) ChangeOwner(defaultOwner *secp256k1fx.OutputOwners) *secp256k1fx.OutputOwners {
 	if o.changeOwner != nil {
@@ -80,10 +103,23 @@ func WithContext(ctx context.Context) Option {
 	}
 }
 
+func WithCustomAddresses(addrs ids.ShortSet) Option {
+	return func(o *Options) {
+		o.customAddressesSet = true
+		o.customAddresses = addrs
+	}
+}
+
 func WithMinIssuanceTime(minIssuanceTime uint64) Option {
 	return func(o *Options) {
 		o.minIssuanceTimeSet = true
 		o.minIssuanceTime = minIssuanceTime
+	}
+}
+
+func WithStakeableLocked() Option {
+	return func(o *Options) {
+		o.allowStakeableLocked = true
 	}
 }
 
