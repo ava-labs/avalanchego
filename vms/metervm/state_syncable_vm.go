@@ -37,17 +37,25 @@ func (vm *blockVM) StateSyncGetLastSummary() (common.Summary, error) {
 	return summary, err
 }
 
-func (vm *blockVM) StateSyncIsSummaryAccepted(key []byte) (bool, error) {
+func (vm *blockVM) StateSyncGetKeyHash(summary common.Summary) (common.SummaryKey, common.SummaryHash, error) {
 	if vm.ssVM == nil {
-		return false, common.ErrStateSyncableVMNotImplemented
+		return common.SummaryKey{}, common.SummaryHash{}, common.ErrStateSyncableVMNotImplemented
+	}
+
+	return vm.ssVM.StateSyncGetKeyHash(summary)
+}
+
+func (vm *blockVM) StateSyncGetSummary(key common.SummaryKey) (common.Summary, error) {
+	if vm.ssVM == nil {
+		return common.Summary{}, common.ErrStateSyncableVMNotImplemented
 	}
 
 	start := vm.clock.Time()
-	accepted, err := vm.ssVM.StateSyncIsSummaryAccepted(key)
+	summary, err := vm.ssVM.StateSyncGetSummary(key)
 	end := vm.clock.Time()
 	vm.stateSummaryMetrics.isSummaryAccepted.Observe(float64(end.Sub(start)))
 
-	return accepted, err
+	return summary, err
 }
 
 func (vm *blockVM) StateSync(accepted []common.Summary) error {

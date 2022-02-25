@@ -137,7 +137,6 @@ type OutboundMsgBuilder interface {
 	StateSummaryFrontier(
 		chainID ids.ID,
 		requestID uint32,
-		key []byte,
 		summary []byte,
 	) (OutboundMessage, error)
 
@@ -145,13 +144,13 @@ type OutboundMsgBuilder interface {
 		chainID ids.ID,
 		requestID uint32,
 		deadline time.Duration,
-		containers [][]byte,
+		keys [][]byte,
 	) (OutboundMessage, error)
 
 	AcceptedStateSummary(
 		chainID ids.ID,
 		requestID uint32,
-		containers [][]byte,
+		hashes [][]byte,
 	) (OutboundMessage, error)
 }
 
@@ -536,7 +535,6 @@ func (b *outMsgBuilder) GetStateSummaryFrontier(
 func (b *outMsgBuilder) StateSummaryFrontier(
 	chainID ids.ID,
 	requestID uint32,
-	key []byte,
 	summary []byte,
 ) (OutboundMessage, error) {
 	return b.c.Pack(
@@ -544,7 +542,6 @@ func (b *outMsgBuilder) StateSummaryFrontier(
 		map[Field]interface{}{
 			ChainID:      chainID[:],
 			RequestID:    requestID,
-			SummaryKey:   key,
 			SummaryBytes: summary,
 		},
 		StateSummaryFrontier.Compressible(), // StateSummaryFrontier messages can't be compressed
@@ -574,14 +571,14 @@ func (b *outMsgBuilder) GetAcceptedStateSummary(
 func (b *outMsgBuilder) AcceptedStateSummary(
 	chainID ids.ID,
 	requestID uint32,
-	keys [][]byte,
+	hashes [][]byte,
 ) (OutboundMessage, error) {
 	return b.c.Pack(
 		AcceptedStateSummary,
 		map[Field]interface{}{
-			ChainID:          chainID[:],
-			RequestID:        requestID,
-			MultiSummaryKeys: keys,
+			ChainID:            chainID[:],
+			RequestID:          requestID,
+			MultiSummaryHashes: hashes,
 		},
 		AcceptedStateSummary.Compressible(), // AcceptedStateSummary messages can't be compressed
 		false,

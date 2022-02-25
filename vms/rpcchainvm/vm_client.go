@@ -596,31 +596,36 @@ func (vm *VMClient) StateSyncGetLastSummary() (common.Summary, error) {
 	if err != nil {
 		return common.Summary{}, err
 	}
-	return common.Summary{
-		Key:     resp.Key,
-		Content: resp.Content,
-	}, nil
+	return resp.Content, nil
 }
 
-func (vm *VMClient) StateSyncIsSummaryAccepted(key []byte) (bool, error) {
-	resp, err := vm.client.StateSyncIsSummaryAccepted(
+func (vm *VMClient) StateSyncGetKeyHash(summary common.Summary) (common.SummaryKey, common.SummaryHash, error) {
+	resp, err := vm.client.StateSyncGetKeyHash(
 		context.Background(),
-		&vmproto.StateSyncIsSummaryAcceptedRequest{
+		&vmproto.StateSyncGetKeyHashRequest{
+			Summary: summary,
+		},
+	)
+
+	return resp.Key, resp.Hash, err
+}
+
+func (vm *VMClient) StateSyncGetSummary(key common.SummaryKey) (common.Summary, error) {
+	resp, err := vm.client.StateSyncGetSummary(
+		context.Background(),
+		&vmproto.StateSyncGetSummaryRequest{
 			Key: key,
 		},
 	)
-	if err != nil {
-		return false, err
-	}
-	return resp.Accepted, nil
+
+	return resp.Summary, err
 }
 
-func (vm *VMClient) StateSync(summaries []common.Summary) error {
-	requestedSummaries := make([]*vmproto.StateSyncGetLastSummaryResponse, len(summaries))
-	for k, v := range summaries {
+func (vm *VMClient) StateSync(accepted []common.Summary) error {
+	requestedSummaries := make([]*vmproto.StateSyncGetLastSummaryResponse, len(accepted))
+	for k, v := range accepted {
 		requestedSummaries[k] = &vmproto.StateSyncGetLastSummaryResponse{}
-		requestedSummaries[k].Key = v.Key
-		requestedSummaries[k].Content = v.Content
+		requestedSummaries[k].Content = v
 	}
 	_, err := vm.client.StateSync(
 		context.Background(),

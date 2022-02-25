@@ -150,6 +150,14 @@ var (
 		GetAncestorsFailed,
 		Connected,
 		Disconnected,
+
+		// State sync
+		GetStateSummaryFrontier,
+		StateSummaryFrontier,
+		GetAcceptedStateSummary,
+		AcceptedStateSummary,
+		GetStateSummaryFrontierFailed,
+		GetAcceptedStateSummaryFailed,
 	}
 
 	AsynchronousOps = []Op{
@@ -231,9 +239,9 @@ var (
 		AppGossip:   {ChainID, AppBytes},
 		// State Sync
 		GetStateSummaryFrontier: {ChainID, RequestID, Deadline},
-		StateSummaryFrontier:    {ChainID, RequestID, SummaryKey, SummaryBytes},
+		StateSummaryFrontier:    {ChainID, RequestID, SummaryBytes},
 		GetAcceptedStateSummary: {ChainID, RequestID, Deadline, MultiSummaryKeys},
-		AcceptedStateSummary:    {ChainID, RequestID, MultiSummaryKeys},
+		AcceptedStateSummary:    {ChainID, RequestID, MultiSummaryHashes},
 	}
 )
 

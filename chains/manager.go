@@ -180,7 +180,7 @@ type ManagerConfig struct {
 	ApricotPhase4MinPChainHeight uint64
 
 	// State sync
-	StateSyncTestingBeacons    []ids.ShortID
+	StateSyncBeacons           []ids.ShortID
 	ResetProposerVMHeightIndex bool
 }
 
@@ -304,9 +304,11 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	defer ctx.Lock.Unlock()
 
 	// Start state-syncing if available or bootstrapping.
-	if stateSyncer := chain.Handler.StateSyncer(); stateSyncer != nil &&
-		stateSyncer.IsEnabled() {
-		err = stateSyncer.Start(0)
+	if stateSyncer := chain.Handler.StateSyncer(); stateSyncer != nil && stateSyncer.IsEnabled() {
+		// drop boostrap state from previous runs
+		if err = chain.Handler.Bootstrapper().Clear(); err != nil {
+			err = stateSyncer.Start(0)
+		}
 	} else {
 		err = chain.Handler.Bootstrapper().Start(0)
 	}
@@ -476,7 +478,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			chainParams.GenesisData,
 			vdrs,
 			beacons,
-			m.StateSyncTestingBeacons,
 			vm,
 			fxs,
 			consensusParams.Parameters,
@@ -708,7 +709,6 @@ func (m *manager) createSnowmanChain(
 	genesisData []byte,
 	vdrs,
 	beacons validators.Set,
-	stateSyncTestingBeacons []ids.ShortID,
 	vm block.ChainVM,
 	fxs []*common.Fx,
 	consensusParams snowball.Parameters,
@@ -843,11 +843,14 @@ func (m *manager) createSnowmanChain(
 	}
 
 	// create state sync gear
-	stateSyncCfg := syncer.Config{
-		Config:                  commonCfg,
-		StateSyncTestingBeacons: stateSyncTestingBeacons,
-		VM:                      vm,
-		WeightTracker:           weightTracker,
+	stateSyncCfg, err := syncer.NewConfig(
+		commonCfg,
+		m.StateSyncBeacons,
+		snowGetHandler,
+		vm,
+		weightTracker)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize state syncer configuration: %w", err)
 	}
 	stateSyncer := syncer.New(
 		stateSyncCfg,

@@ -9,13 +9,17 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var ErrStateSyncableVMNotImplemented = errors.New("vm does not implement StateSyncableVM interface")
+var (
+	ErrStateSyncableVMNotImplemented = errors.New("vm does not implement StateSyncableVM interface")
+	ErrUnknownStateSummary           = errors.New("state summary not found")
+)
 
 // Summary represents the information needed for state sync processing
-type Summary struct {
-	Key     []byte `serialize:"true"` // Should uniquely identify Summary
-	Content []byte `serialize:"true"` // actual state summary content
-}
+type (
+	SummaryKey  []byte
+	SummaryHash []byte
+	Summary     []byte
+)
 
 // StateSyncableVM represents functionalities to allow VMs to sync to a given state,
 // rather then boostrapping from genesis.
@@ -30,9 +34,12 @@ type StateSyncableVM interface {
 	// StateSyncGetLastSummary returns latest Summary with an optional error
 	StateSyncGetLastSummary() (Summary, error)
 
-	// StateSyncIsSummaryAccepted returns true if input []bytes represent a valid state summary
-	// for state sync.
-	StateSyncIsSummaryAccepted(key []byte) (bool, error)
+	// StateSyncGetKeyHash retrieves a summary key out of a summary and computes a hash
+	// used to verify the summary through validator voting.
+	StateSyncGetKeyHash(Summary) (SummaryKey, SummaryHash, error)
+
+	// StateSyncGetSummary retrieves the summary related to key, if available.
+	StateSyncGetSummary(SummaryKey) (Summary, error)
 
 	// StateSync is called with a list of valid summaries to sync from.
 	// These summaries were collected from peers and validated with validators.

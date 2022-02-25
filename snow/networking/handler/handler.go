@@ -341,9 +341,8 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.StateSummaryFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
-		key := msg.Get(message.SummaryKey).([]byte)
 		summary := msg.Get(message.SummaryBytes).([]byte)
-		return engine.StateSummaryFrontier(nodeID, reqID, key, summary)
+		return engine.StateSummaryFrontier(nodeID, reqID, summary)
 
 	case message.GetStateSummaryFrontierFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -356,8 +355,8 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.AcceptedStateSummary:
 		reqID := msg.Get(message.RequestID).(uint32)
-		keys := msg.Get(message.MultiSummaryKeys).([][]byte)
-		return engine.AcceptedStateSummary(nodeID, reqID, keys)
+		hashes := msg.Get(message.MultiSummaryHashes).([][]byte)
+		return engine.AcceptedStateSummary(nodeID, reqID, hashes)
 
 	case message.GetAcceptedStateSummaryFailed:
 		reqID := msg.Get(message.RequestID).(uint32)

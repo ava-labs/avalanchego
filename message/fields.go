@@ -32,9 +32,9 @@ const (
 	AppBytes                         // Used at application level
 	VMMessage                        // Used internally
 	Uptime                           // Used for Pong
-	SummaryKey                       // Used for state sync
 	SummaryBytes                     // Used for state sync
 	MultiSummaryKeys                 // Used for state sync
+	MultiSummaryHashes               // Used for state sync
 	VersionStruct                    // Used internally
 )
 
@@ -79,10 +79,10 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPackHashes
 	case Uptime:
 		return wrappers.TryPackByte
-	case SummaryKey:
-		return wrappers.TryPackBytes
 	case SummaryBytes:
 		return wrappers.TryPackBytes
+	case MultiSummaryHashes:
+		return wrappers.TryPack2DBytes
 	case MultiSummaryKeys:
 		return wrappers.TryPack2DBytes
 	default:
@@ -131,10 +131,10 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackHashes
 	case Uptime:
 		return wrappers.TryUnpackByte
-	case SummaryKey:
-		return wrappers.TryUnpackBytes
 	case SummaryBytes:
 		return wrappers.TryUnpackBytes
+	case MultiSummaryHashes:
+		return wrappers.TryUnpack2DBytes
 	case MultiSummaryKeys:
 		return wrappers.TryUnpack2DBytes
 	default:
@@ -184,10 +184,10 @@ func (f Field) String() string {
 		return "VMMessage"
 	case Uptime:
 		return "Uptime"
-	case SummaryKey:
-		return "SummaryKey"
 	case SummaryBytes:
 		return "Summary"
+	case MultiSummaryHashes:
+		return "MultiSummaryHashes"
 	case MultiSummaryKeys:
 		return "MultiSummaryKeys"
 	case VersionStruct:

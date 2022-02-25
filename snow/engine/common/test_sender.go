@@ -48,7 +48,7 @@ type SenderTest struct {
 	SendAppGossipSpecificF   func(ids.ShortSet, []byte) error
 
 	SendGetStateSummaryFrontierF func(ids.ShortSet, uint32)
-	SendStateSummaryFrontierF    func(ids.ShortID, uint32, []byte, []byte)
+	SendStateSummaryFrontierF    func(ids.ShortID, uint32, []byte)
 	SendGetAcceptedStateSummaryF func(ids.ShortSet, uint32, [][]byte)
 	SendAcceptedStateSummaryF    func(ids.ShortID, uint32, [][]byte)
 }
@@ -275,9 +275,9 @@ func (s *SenderTest) SendGetStateSummaryFrontier(validatorIDs ids.ShortSet, requ
 // SendAcceptedFrontier calls SendAcceptedFrontierF if it was initialized. If it
 // wasn't initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) SendStateSummaryFrontier(validatorID ids.ShortID, requestID uint32, key, summary []byte) {
+func (s *SenderTest) SendStateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summary []byte) {
 	if s.SendStateSummaryFrontierF != nil {
-		s.SendStateSummaryFrontierF(validatorID, requestID, key, summary)
+		s.SendStateSummaryFrontierF(validatorID, requestID, summary)
 	} else if s.CantSendStateSummaryFrontier && s.T != nil {
 		s.T.Fatalf("Unexpectedly called SendStateSummaryFrontier")
 	}
@@ -297,9 +297,9 @@ func (s *SenderTest) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID
 // SendAcceptedStateSummary calls SendAcceptedStateSummaryF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) SendAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) {
+func (s *SenderTest) SendAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, hashes [][]byte) {
 	if s.SendAcceptedStateSummaryF != nil {
-		s.SendAcceptedStateSummaryF(validatorID, requestID, keys)
+		s.SendAcceptedStateSummaryF(validatorID, requestID, hashes)
 	} else if s.CantSendAcceptedStateSummary && s.T != nil {
 		s.T.Fatalf("Unexpectedly called SendAcceptedStateSummary")
 	}
