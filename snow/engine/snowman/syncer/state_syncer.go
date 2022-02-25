@@ -209,7 +209,7 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 
 	// We've received the filtered accepted frontier from every state sync validator
 	// Accept all containers that have a sufficient weight behind them
-	summaries := make(summaryWeightedList, len(ss.weightedSummaries))
+	summaries := make(summaryWeightedList, 0, len(ss.weightedSummaries))
 	for _, ws := range ss.weightedSummaries {
 		if ws.weight < ss.Alpha {
 			continue

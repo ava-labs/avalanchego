@@ -853,6 +853,9 @@ func (m *manager) createSnowmanChain(
 	stateSyncer := syncer.New(
 		stateSyncCfg,
 		func(lastReqID uint32) error {
+			if err := handler.Bootstrapper().Clear(); err != nil {
+				return err
+			}
 			return handler.Bootstrapper().Start(lastReqID + 1)
 		},
 	)
