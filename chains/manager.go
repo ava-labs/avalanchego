@@ -304,9 +304,12 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	defer ctx.Lock.Unlock()
 
 	// Start state-syncing if available or bootstrapping.
-	if stateSyncer := chain.Handler.StateSyncer(); stateSyncer != nil &&
-		stateSyncer.IsEnabled() {
-		err = stateSyncer.Start(0)
+	if stateSyncer := chain.Handler.StateSyncer(); stateSyncer != nil && stateSyncer.IsEnabled() {
+		// drop boostrap state from previous runs
+		err = chain.Handler.Bootstrapper().Clear()
+		if err != nil {
+			err = stateSyncer.Start(0)
+		}
 	} else {
 		err = chain.Handler.Bootstrapper().Start(0)
 	}
@@ -853,9 +856,6 @@ func (m *manager) createSnowmanChain(
 	stateSyncer := syncer.New(
 		stateSyncCfg,
 		func(lastReqID uint32) error {
-			if err := handler.Bootstrapper().Clear(); err != nil {
-				return err
-			}
 			return handler.Bootstrapper().Start(lastReqID + 1)
 		},
 	)
