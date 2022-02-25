@@ -40,6 +40,29 @@ import (
 	"github.com/holiman/uint256"
 )
 
+var (
+	// TODO: move to types?
+	BlackholeAddr = common.Address{
+		1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	}
+
+	prohibitedAddresses = append(
+		[]common.Address{BlackholeAddr},
+		precompile.PrecompileAddresses...,
+	)
+)
+
+// TODO: use a set or map
+func IsProhibited(addr common.Address) bool {
+	for _, prohibited := range prohibitedAddresses {
+		if prohibited == addr {
+			return true
+		}
+	}
+	return false
+}
+
 // emptyCodeHash is used by create to ensure deployment is disallowed to already
 // deployed contract addresses (relevant after the account abstraction).
 var emptyCodeHash = crypto.Keccak256Hash(nil)
@@ -446,8 +469,8 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	}
 	// If there is any collision with the Blackhole address, return an error instead
 	// of allowing the contract to be created.
-	if address == evm.Context.Coinbase {
-		return nil, common.Address{}, gas, ErrNoSenderBlackhole
+	if IsProhibited(address) {
+		return nil, common.Address{}, gas, ErrAddrProhibited
 	}
 	nonce := evm.StateDB.GetNonce(caller.Address())
 	if nonce+1 < nonce {

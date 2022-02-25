@@ -22,4 +22,9 @@ const (
 var (
 	ModifyAllowListAddress = common.HexToAddress("0x0200000000000000000000000000000000000000")
 	ReadAllowListAddress   = common.HexToAddress("0x0200000000000000000000000000000000000001")
+
+	PrecompileAddresses = []common.Address{
+		ModifyAllowListAddress,
+		ReadAllowListAddress,
+	}
 )
