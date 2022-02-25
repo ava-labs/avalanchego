@@ -15,17 +15,11 @@ var (
 )
 
 // Summary represents the information needed for state sync processing
-type SummaryKey struct {
-	Content []byte `serialize:"true"`
-}
-
-type SummaryHash struct {
-	Content []byte `serialize:"true"`
-}
-
-type Summary struct {
-	Content []byte `serialize:"true"`
-}
+type (
+	SummaryKey  []byte
+	SummaryHash []byte
+	Summary     []byte
+)
 
 // StateSyncableVM represents functionalities to allow VMs to sync to a given state,
 // rather then boostrapping from genesis.

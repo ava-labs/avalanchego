@@ -98,17 +98,15 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 	ss.markSeederResponded(validatorID)
 
 	// retrieve key for summary and register frontier
-	_, hash, err := ss.stateSyncVM.StateSyncGetKeyHash(common.Summary{Content: summary})
+	_, hash, err := ss.stateSyncVM.StateSyncGetKeyHash(summary)
 	if err != nil {
 		ss.Ctx.Log.Debug("Could not retrieve key from summary %s: %v", summary, err)
 		return nil
 	}
 
-	if _, exists := ss.weightedSummaries[string(hash.Content)]; !exists {
-		ss.weightedSummaries[string(hash.Content)] = weightedSummary{
-			Summary: common.Summary{
-				Content: summary,
-			},
+	if _, exists := ss.weightedSummaries[string(hash)]; !exists {
+		ss.weightedSummaries[string(hash)] = weightedSummary{
+			Summary: summary,
 		}
 	}
 
@@ -336,7 +334,7 @@ func (ss *stateSyncer) sendGetAccepted() error {
 			if err != nil {
 				return err
 			}
-			acceptedKeys = append(acceptedKeys, key.Content)
+			acceptedKeys = append(acceptedKeys, key)
 		}
 		ss.Sender.SendGetAcceptedStateSummary(vdrs, ss.requestID, acceptedKeys)
 		ss.markVoterContacted(vdrs)

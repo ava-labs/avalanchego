@@ -25,9 +25,7 @@ func (swl summaryWeightedList) Swap(i, j int)      { swl[i], swl[j] = swl[j], sw
 func (swl summaryWeightedList) List() []common.Summary {
 	res := make([]common.Summary, 0, len(swl))
 	for _, s := range swl {
-		res = append(res, common.Summary{
-			Content: s.Content,
-		})
+		res = append(res, s.Summary)
 	}
 	return res
 }

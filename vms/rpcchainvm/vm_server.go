@@ -319,7 +319,7 @@ func (vm *VMServer) StateSyncGetLastSummary(ctx context.Context, empty *emptypb.
 		return nil, err
 	}
 	return &vmproto.StateSyncGetLastSummaryResponse{
-		Content: summary.Content,
+		Content: summary,
 	}, nil
 }
 
@@ -329,11 +329,11 @@ func (vm *VMServer) StateSyncGetKeyHash(ctx context.Context, req *vmproto.StateS
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	key, hash, err := ssVM.StateSyncGetKeyHash(common.Summary{Content: req.Summary})
+	key, hash, err := ssVM.StateSyncGetKeyHash(req.Summary)
 	if err != nil {
 		return nil, err
 	}
-	return &vmproto.StateSyncGetKeyHashResponse{Key: key.Content, Hash: hash.Content}, nil
+	return &vmproto.StateSyncGetKeyHashResponse{Key: key, Hash: hash}, nil
 }
 
 func (vm *VMServer) StateSyncGetSummary(ctx context.Context, req *vmproto.StateSyncGetSummaryRequest) (*vmproto.StateSyncGetSummaryResponse, error) {
@@ -342,11 +342,11 @@ func (vm *VMServer) StateSyncGetSummary(ctx context.Context, req *vmproto.StateS
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	summary, err := ssVM.StateSyncGetSummary(common.SummaryKey{Content: req.Key})
+	summary, err := ssVM.StateSyncGetSummary(req.Key)
 	if err != nil {
 		return nil, err
 	}
-	return &vmproto.StateSyncGetSummaryResponse{Summary: summary.Content}, nil
+	return &vmproto.StateSyncGetSummaryResponse{Summary: summary}, nil
 }
 
 func (vm *VMServer) StateSync(ctx context.Context, req *vmproto.StateSyncRequest) (*emptypb.Empty, error) {
@@ -357,7 +357,7 @@ func (vm *VMServer) StateSync(ctx context.Context, req *vmproto.StateSyncRequest
 
 	summaries := make([]common.Summary, len(req.Summaries))
 	for k, v := range req.Summaries {
-		summaries[k].Content = v.Content
+		summaries[k] = v.Content
 	}
 	err := ssVM.StateSync(summaries)
 	if err != nil {

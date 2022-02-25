@@ -79,14 +79,12 @@ func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 		return common.Summary{}, fmt.Errorf("could not build proposerVm Summary from core one due to: %w", err)
 	}
 
-	proContentBytes, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, &proContent)
+	proSummary, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, &proContent)
 	if err != nil {
 		return common.Summary{}, fmt.Errorf("cannot marshal proposerVMKey due to: %w", err)
 	}
 
-	return common.Summary{
-		Content: proContentBytes,
-	}, err
+	return proSummary, err
 }
 
 func (vm *VM) StateSyncGetKeyHash(summary common.Summary) (common.SummaryKey, common.SummaryHash, error) {
@@ -95,7 +93,7 @@ func (vm *VM) StateSyncGetKeyHash(summary common.Summary) (common.SummaryKey, co
 	}
 
 	proContent := block.ProposerSummaryContent{}
-	ver, err := stateSyncCodec.Unmarshal(summary.Content, &proContent)
+	ver, err := stateSyncCodec.Unmarshal(summary, &proContent)
 	if err != nil {
 		return common.SummaryKey{}, common.SummaryHash{}, fmt.Errorf("could not unmarshal ProposerSummaryContent due to: %w", err)
 	}
@@ -105,9 +103,8 @@ func (vm *VM) StateSyncGetKeyHash(summary common.Summary) (common.SummaryKey, co
 
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, proContent.CoreContent.Height)
-	key := common.SummaryKey{Content: heightBytes}
 
-	return key, common.SummaryHash{Content: hashing.ComputeHash256(summary.Content)}, nil
+	return heightBytes, hashing.ComputeHash256(summary), nil
 }
 
 func (vm *VM) StateSyncGetSummary(key common.SummaryKey) (common.Summary, error) {
@@ -125,14 +122,12 @@ func (vm *VM) StateSyncGetSummary(key common.SummaryKey) (common.Summary, error)
 		return common.Summary{}, fmt.Errorf("could not build proposerVm Summary from core one due to: %w", err)
 	}
 
-	proContentBytes, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, &proContent)
+	proSummary, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, &proContent)
 	if err != nil {
 		return common.Summary{}, fmt.Errorf("cannot marshal proposerVMKey due to: %w", err)
 	}
 
-	return common.Summary{
-		Content: proContentBytes,
-	}, err
+	return proSummary, err
 }
 
 func (vm *VM) StateSync(accepted []common.Summary) error {
@@ -143,9 +138,9 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 
 	coreSummaries := make([]common.Summary, 0, len(accepted))
 	vm.pendingSummariesBlockIDMapping = make(map[ids.ID]ids.ID)
-	for _, summ := range accepted {
+	for _, summary := range accepted {
 		proContent := block.ProposerSummaryContent{}
-		ver, err := stateSyncCodec.Unmarshal(summ.Content, &proContent)
+		ver, err := stateSyncCodec.Unmarshal(summary, &proContent)
 		if err != nil {
 			return err
 		}
@@ -153,12 +148,12 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 			return errWrongStateSyncVersion
 		}
 
-		coreSummaryBytes, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, proContent.CoreContent)
+		coreSummary, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, proContent.CoreContent)
 		if err != nil {
 			return err
 		}
 
-		coreSummaries = append(coreSummaries, common.Summary{Content: coreSummaryBytes})
+		coreSummaries = append(coreSummaries, coreSummary)
 
 		// record coreVm to proposerVM blockID mapping to be able to
 		// complete state-sync by requesting lastSummaryBlockID.
@@ -213,9 +208,9 @@ func (vm *VM) SetLastSummaryBlock(blkByte []byte) error {
 	return blk.conditionalAccept(false /*acceptcoreBlk*/)
 }
 
-func (vm *VM) buildProContentFrom(coreSummaryBytes common.Summary) (block.ProposerSummaryContent, error) {
+func (vm *VM) buildProContentFrom(coreSummary common.Summary) (block.ProposerSummaryContent, error) {
 	coreContent := block.CoreSummaryContent{}
-	ver, err := stateSyncCodec.Unmarshal(coreSummaryBytes.Content, &coreContent)
+	ver, err := stateSyncCodec.Unmarshal(coreSummary, &coreContent)
 	if err != nil {
 		return block.ProposerSummaryContent{}, err
 	}
