@@ -46,7 +46,7 @@ var (
 	ErrGasUintOverflow          = errors.New("gas uint64 overflow")
 	ErrInvalidCode              = errors.New("invalid code: must not begin with 0xef")
 	ErrNonceUintOverflow        = errors.New("nonce uint64 overflow")
-	ErrAddrProhibited           = errors.New("prohibited address cannot be sender or created")
+	ErrAddrProhibited           = errors.New("prohibited address cannot be sender or created contract address")
 
 	// errStopToken is an internal token indicating interpreter loop termination,
 	// never returned to outside callers.
