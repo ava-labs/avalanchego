@@ -32,6 +32,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ethereum/go-ethereum/common"
@@ -39,6 +40,23 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/holiman/uint256"
 )
+
+var prohibitedAddresses = map[common.Address]struct{}{
+	constants.BlackholeAddr: {},
+}
+
+func init() {
+	for _, addr := range precompile.PrecompileAddresses {
+		prohibitedAddresses[addr] = struct{}{}
+	}
+}
+
+// IsProhibited returns true if [addr] is in the prohibited list of addresses which should
+// not be allowed as an EOA or newly created contract address.
+func IsProhibited(addr common.Address) bool {
+	_, ok := prohibitedAddresses[addr]
+	return ok
+}
 
 // emptyCodeHash is used by create to ensure deployment is disallowed to already
 // deployed contract addresses (relevant after the account abstraction).
@@ -446,8 +464,8 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	}
 	// If there is any collision with the Blackhole address, return an error instead
 	// of allowing the contract to be created.
-	if address == evm.Context.Coinbase {
-		return nil, common.Address{}, gas, ErrNoSenderBlackhole
+	if IsProhibited(address) {
+		return nil, common.Address{}, gas, ErrAddrProhibited
 	}
 	nonce := evm.StateDB.GetNonce(caller.Address())
 	if nonce+1 < nonce {

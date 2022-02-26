@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/types"
@@ -18,11 +19,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 )
-
-var BlackholeAddr = common.Address{
-	1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-}
 
 type (
 	Tx    = types.Transaction
@@ -47,7 +43,7 @@ func NewETHChain(config *eth.Config, nodecfg *node.Config, chainDB ethdb.Databas
 	chain := &ETHChain{backend: backend}
 	if config.Miner.Etherbase == (common.Address{}) { // used for testing
 		log.Warn("Etherbase not set. Falling back to blackhole address.")
-		backend.SetEtherbase(BlackholeAddr)
+		backend.SetEtherbase(constants.BlackholeAddr)
 	} else {
 		backend.SetEtherbase(config.Miner.Etherbase)
 	}
