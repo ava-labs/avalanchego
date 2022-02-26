@@ -45,6 +45,11 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 )
 
+const (
+	DefaultMaxHeaderHistory int = 1024
+	DefaultMaxBlockHistory  int = 25_000
+)
+
 var (
 	DefaultMaxPrice   = big.NewInt(150 * params.GWei)
 	DefaultMinPrice   = big.NewInt(0 * params.GWei)
@@ -53,13 +58,17 @@ var (
 )
 
 type Config struct {
-	Blocks           int
-	Percentile       int
+	// Blocks specifies the number of blocks to fetch during gas price estimation
+	Blocks     int
+	Percentile int
+	// MaxHeaderHistory specifies the number of blocks to fetch during fee history.
 	MaxHeaderHistory int
-	MaxBlockHistory  int
-	MaxPrice         *big.Int `toml:",omitempty"`
-	MinPrice         *big.Int `toml:",omitempty"`
-	MinGasUsed       *big.Int `toml:",omitempty"`
+	// MaxBlockHistory specifies the furthest back behind the last accepted block that can
+	// be requested by fee history.
+	MaxBlockHistory int
+	MaxPrice        *big.Int `toml:",omitempty"`
+	MinPrice        *big.Int `toml:",omitempty"`
+	MinGasUsed      *big.Int `toml:",omitempty"`
 }
 
 // OracleBackend includes all necessary background APIs for oracle.

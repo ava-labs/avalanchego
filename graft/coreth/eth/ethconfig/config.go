@@ -39,8 +39,8 @@ import (
 var DefaultFullGPOConfig = gasprice.Config{
 	Blocks:           40,
 	Percentile:       60,
-	MaxHeaderHistory: 1024,
-	MaxBlockHistory:  1024,
+	MaxHeaderHistory: gasprice.DefaultMaxHeaderHistory,
+	MaxBlockHistory:  gasprice.DefaultMaxBlockHistory,
 	MinPrice:         gasprice.DefaultMinPrice,
 	MaxPrice:         gasprice.DefaultMaxPrice,
 	MinGasUsed:       gasprice.DefaultMinGasUsed,
