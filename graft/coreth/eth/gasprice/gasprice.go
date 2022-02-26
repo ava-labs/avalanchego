@@ -152,7 +152,7 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 		log.Warn("Sanitizing invalid gasprice oracle max block history", "provided", config.MaxBlockHistory, "updated", maxBlockHistory)
 	}
 
-	cache, _ := lru.New(2048)
+	cache, _ := lru.New(30000)
 	headEvent := make(chan core.ChainHeadEvent, 1)
 	backend.SubscribeChainHeadEvent(headEvent)
 	go func() {
