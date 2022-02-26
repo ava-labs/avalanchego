@@ -41,25 +41,20 @@ import (
 	"github.com/holiman/uint256"
 )
 
-var (
-	prohibitedAddresses = append(
-		[]common.Address{constants.BlackholeAddr},
-		precompile.PrecompileAddresses...,
-	)
-	prohibitedAddressesSet map[common.Address]struct{}
-)
+var prohibitedAddresses = map[common.Address]struct{}{
+	constants.BlackholeAddr: {},
+}
 
 func init() {
-	prohibitedAddressesSet = make(map[common.Address]struct{})
-	for _, addr := range prohibitedAddresses {
-		prohibitedAddressesSet[addr] = struct{}{}
+	for _, addr := range precompile.PrecompileAddresses {
+		prohibitedAddresses[addr] = struct{}{}
 	}
 }
 
 // IsProhibited returns true if [addr] is in the prohibited list of addresses which should
 // not be allowed as an EOA or newly created contract address.
 func IsProhibited(addr common.Address) bool {
-	_, ok := prohibitedAddressesSet[addr]
+	_, ok := prohibitedAddresses[addr]
 	return ok
 }
 
