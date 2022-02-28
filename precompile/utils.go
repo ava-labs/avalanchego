@@ -4,7 +4,6 @@
 package precompile
 
 import (
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -16,9 +15,8 @@ func CalculateFunctionSelector(functionSignature string) []byte {
 	return hash[:4]
 }
 
-// CreateAddressKey converts [address] into a [common.Hash] value to be used as a storage slot key
-func CreateAddressKey(address common.Address) common.Hash {
-	hashBytes := make([]byte, common.HashLength)
-	copy(hashBytes, address[:])
-	return common.BytesToHash(hashBytes)
+// createConstantRequiredGasFunc returns a required gas function that always returns [requiredGas]
+// on any input.
+func createConstantRequiredGasFunc(requiredGas uint64) func([]byte) uint64 {
+	return func(b []byte) uint64 { return requiredGas }
 }

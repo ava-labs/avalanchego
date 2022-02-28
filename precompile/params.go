@@ -20,11 +20,9 @@ const (
 // that their own modifications do not conflict with stateful precompiles that may be added to subnet-evm
 // in the future.
 var (
-	ModifyAllowListAddress = common.HexToAddress("0x0200000000000000000000000000000000000000")
-	ReadAllowListAddress   = common.HexToAddress("0x0200000000000000000000000000000000000001")
+	AllowListAddress = common.HexToAddress("0x0200000000000000000000000000000000000000")
 
 	PrecompileAddresses = []common.Address{
-		ModifyAllowListAddress,
-		ReadAllowListAddress,
+		AllowListAddress,
 	}
 )

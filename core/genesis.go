@@ -311,7 +311,9 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		}
 	}
 	statedb.Commit(false)
-	statedb.Database().TrieDB().Commit(root, true, nil)
+	if err := statedb.Database().TrieDB().Commit(root, true, nil); err != nil {
+		panic(err)
+	}
 
 	return types.NewBlock(head, nil, nil, nil, trie.NewStackTrie(nil))
 }

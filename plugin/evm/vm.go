@@ -230,6 +230,9 @@ func (vm *VM) Initialize(
 
 	if g.Config == nil {
 		g.Config = params.SubnetEVMDefaultChainConfig
+	} else if g.Config.ChainID.Cmp(big.NewInt(43112)) == 0 {
+		log.Info("Setting allow list config")
+		g.Config = params.AllowListConfig // Set the config
 	}
 
 	if g.Config.FeeConfig == nil {

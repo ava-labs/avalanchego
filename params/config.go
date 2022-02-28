@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 var (
@@ -82,6 +83,30 @@ var (
 		SubnetEVMTimestamp:  big.NewInt(0),
 		FeeConfig:           DefaultFeeConfig,
 		AllowFeeRecipients:  false,
+	}
+
+	AllowListConfig = &ChainConfig{
+		ChainID:             big.NewInt(43112),
+		HomesteadBlock:      big.NewInt(0),
+		EIP150Block:         big.NewInt(0),
+		EIP150Hash:          common.HexToHash("0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0"),
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(0),
+		ConstantinopleBlock: big.NewInt(0),
+		PetersburgBlock:     big.NewInt(0),
+		IstanbulBlock:       big.NewInt(0),
+		MuirGlacierBlock:    big.NewInt(0),
+		SubnetEVMTimestamp:  big.NewInt(0),
+		FeeConfig:           DefaultFeeConfig,
+		AllowFeeRecipients:  false,
+		AllowListConfig: precompile.AllowListConfig{
+			BlockTimestamp: big.NewInt(0),
+			AllowListAdmins: []common.Address{
+				common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"),
+				common.HexToAddress("0xF60C45c607D0f41687c94C314d300f483661E13a"),
+			},
+		},
 	}
 
 	TestChainConfig        = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), DefaultFeeConfig, false, precompile.AllowListConfig{}}
@@ -470,6 +495,7 @@ func (c *ChainConfig) enabledStatefulPrecompiles() []precompile.StatefulPrecompi
 func (c *ChainConfig) CheckConfigurePrecompiles(parentTimestamp *big.Int, currentTimestamp *big.Int, statedb precompile.StateDB) {
 	// Iterate the enabled stateful precompiles and configure them if needed
 	for _, config := range c.enabledStatefulPrecompiles() {
+		log.Info("CheckConfigurePrecompiles", "parentTimestamp", parentTimestamp, "currentTimestamp", currentTimestamp, "config", config)
 		precompile.CheckConfigure(parentTimestamp, currentTimestamp, config, statedb)
 	}
 }
