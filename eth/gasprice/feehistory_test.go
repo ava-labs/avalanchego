@@ -51,21 +51,24 @@ func TestFeeHistory(t *testing.T) {
 		expCount int
 		expErr   error
 	}{
+		// Standard go-ethereum tests
 		{false, 1000, 10, 30, nil, 21, 10, nil},
-		{false, 10, 10, 30, nil, 23, 8, nil}, // limit lookback based on maxHistory from tip
 		{false, 1000, 10, 30, []float64{0, 10}, 21, 10, nil},
 		{false, 1000, 10, 30, []float64{20, 10}, 0, 0, errInvalidPercentile},
 		{false, 1000, 1000000000, 30, nil, 0, 31, nil},
 		{false, 1000, 1000000000, rpc.LatestBlockNumber, nil, 0, 33, nil},
 		{false, 1000, 10, 40, nil, 0, 0, errRequestBeyondHead},
 		{true, 1000, 10, 40, nil, 0, 0, errRequestBeyondHead},
-		{false, 2, 100, rpc.LatestBlockNumber, nil, 31, 2, nil},
 		{false, 2, 100, rpc.LatestBlockNumber, []float64{0, 10}, 31, 2, nil},
 		{false, 2, 100, 32, []float64{0, 10}, 31, 2, nil},
 		{false, 1000, 1, rpc.PendingBlockNumber, nil, 0, 0, nil},
 		{false, 1000, 2, rpc.PendingBlockNumber, nil, 32, 1, nil},
 		{true, 1000, 2, rpc.PendingBlockNumber, nil, 32, 1, nil},
 		{true, 1000, 2, rpc.PendingBlockNumber, []float64{0, 10}, 32, 1, nil},
+
+		// Modified tests
+		{false, 2, 100, rpc.LatestBlockNumber, nil, 31, 2, nil}, // apply block lookback limits even if only headers required
+		{false, 10, 10, 30, nil, 23, 8, nil},                    // limit lookback based on maxHistory from latest block
 	}
 	for i, c := range cases {
 		config := Config{
