@@ -187,7 +187,7 @@ func (oracle *Oracle) resolveBlockRange(ctx context.Context, lastBlock rpc.Block
 	// It is possible that there could be no remaining blocks after the fee
 	// truncation
 	if blocks == 0 {
-		return 0, 0, nil
+		return 0, 0, fmt.Errorf("%w: requested %d, head %d", errBeyondHistoricalLimit, lastBlock, lastAcceptedBlock)
 	}
 	return uint64(lastBlock), blocks, nil
 }
