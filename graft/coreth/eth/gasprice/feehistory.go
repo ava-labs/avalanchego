@@ -163,10 +163,10 @@ func (oracle *Oracle) resolveBlockRange(ctx context.Context, lastBlock rpc.Block
 	}
 
 	lastAcceptedBlock := rpc.BlockNumber(oracle.backend.LastAcceptedBlock().NumberU64())
-	maxBlockDepth := rpc.BlockNumber(oracle.maxBlockHistory) - 1
+	maxQueryDepth := rpc.BlockNumber(oracle.maxBlockHistory) - 1
 	if lastBlock.IsAccepted() {
 		lastBlock = lastAcceptedBlock
-	} else if lastAcceptedBlock > maxBlockDepth && lastAcceptedBlock-maxBlockDepth > lastBlock {
+	} else if lastAcceptedBlock > maxQueryDepth && lastAcceptedBlock-maxQueryDepth > lastBlock {
 		// If the requested last block reaches further back than [oracle.maxBlockHistory] past the last accepted block return an error
 		// Note: this allows some blocks past this point to be fetched since it will start fetching [blocks] from this point.
 		return 0, 0, fmt.Errorf("%w: requested %d, head %d", errBeyondHistoricalLimit, lastBlock, lastAcceptedBlock)
@@ -179,14 +179,14 @@ func (oracle *Oracle) resolveBlockRange(ctx context.Context, lastBlock rpc.Block
 		blocks = int(lastBlock + 1)
 	}
 	// Truncate blocks range if extending past [oracle.maxBlockHistory]
-	oldestIndex := lastBlock - rpc.BlockNumber(blocks) + 1
-	if queryDepth := lastAcceptedBlock - oldestIndex; queryDepth > maxBlockDepth {
-		overage := int(queryDepth - maxBlockDepth)
+	oldestQueriedIndex := lastBlock - rpc.BlockNumber(blocks) + 1
+	if queryDepth := lastAcceptedBlock - oldestQueriedIndex; queryDepth > maxQueryDepth {
+		overage := int(queryDepth - maxQueryDepth)
 		blocks -= overage
 	}
-	// It is not possible that there could be no remaining blocks after
-	// truncation (the height requested will at least by fetchable otherwise, we
-	// would've returned an error earlier)
+	// It is not possible that [blocks] could be <= 0 after
+	// truncation as the [lastBlock] requested will at least by fetchable.
+	// Otherwise, we would've returned an error earlier.
 	return uint64(lastBlock), blocks, nil
 }
 
