@@ -204,9 +204,9 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 	if blocks < 1 {
 		return common.Big0, nil, nil, nil, nil // returning with no data and no error means there are no retrievable blocks
 	}
-	if blocks > oracle.maxBlockHistory {
-		log.Warn("Sanitizing fee history length", "requested", blocks, "truncated", oracle.maxBlockHistory)
-		blocks = oracle.maxBlockHistory
+	if blocks > oracle.maxCallBlockHistory {
+		log.Warn("Sanitizing fee history length", "requested", blocks, "truncated", oracle.maxCallBlockHistory)
+		blocks = oracle.maxCallBlockHistory
 	}
 	for i, p := range rewardPercentiles {
 		if p < 0 || p > 100 {
