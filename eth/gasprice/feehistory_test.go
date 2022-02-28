@@ -69,6 +69,7 @@ func TestFeeHistory(t *testing.T) {
 		// Modified tests
 		{false, 2, 100, rpc.LatestBlockNumber, nil, 31, 2, nil}, // apply block lookback limits even if only headers required
 		{false, 10, 10, 30, nil, 23, 8, nil},                    // limit lookback based on maxHistory from latest block
+		{false, 33, 1000000000, 10, nil, 0, 11, nil},            // handle truncation edge case
 	}
 	for i, c := range cases {
 		config := Config{
