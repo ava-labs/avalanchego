@@ -40,8 +40,8 @@ func CheckConfigure(parentTimestamp *big.Int, currentTimestamp *big.Int, config 
 		return
 	}
 	forkTimestamp := config.Timestamp()
-	isParentForked := utils.IsForked(parentTimestamp, forkTimestamp)
-	isCurrentBlockForked := utils.IsForked(currentTimestamp, forkTimestamp)
+	isParentForked := utils.IsForked(forkTimestamp, parentTimestamp)
+	isCurrentBlockForked := utils.IsForked(forkTimestamp, currentTimestamp)
 	// If the network upgrade goes into effect within this transition, configure the stateful precompile
 	if !isParentForked && isCurrentBlockForked {
 		config.Configure(state)

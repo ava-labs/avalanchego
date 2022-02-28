@@ -13,3 +13,13 @@ func IsForked(s, head *big.Int) bool {
 	}
 	return s.Cmp(head) <= 0
 }
+
+// IsForkTransition returns true if [fork] activates during the transition from [parent]
+// to [current].
+// Note: this works for both block number and timestamp activated forks.
+func IsForkTransition(fork *big.Int, parent *big.Int, current *big.Int) bool {
+	parentForked := IsForked(fork, parent)
+	currentForked := IsForked(fork, current)
+
+	return !parentForked && currentForked
+}

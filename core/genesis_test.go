@@ -34,9 +34,11 @@ import (
 
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
+	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -164,4 +166,45 @@ func TestSetupGenesis(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestStatefulPrecompilesConfigure(t *testing.T) {
+	config := *params.TestChainConfig
+	// Include the StatefulPrecompileConfigs here so that they will be configured in the genesis
+	allowListAdminAddr := common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC")
+	config.AllowListConfig = precompile.AllowListConfig{
+		BlockTimestamp: big.NewInt(0),
+		AllowListAdmins: []common.Address{
+			allowListAdminAddr,
+		},
+	}
+
+	genesis := &Genesis{
+		Config: &config,
+		Alloc: GenesisAlloc{
+			{1}: {Balance: big.NewInt(1), Storage: map[common.Hash]common.Hash{{1}: {1}}},
+		},
+	}
+
+	db := rawdb.NewMemoryDatabase()
+	_, err := SetupGenesisBlock(db, genesis)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	genesisBlock := genesis.ToBlock(nil)
+	genesisRoot := genesisBlock.Root()
+
+	statedb, err := state.New(genesisRoot, state.NewDatabase(db), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that the stateful precompiles were configured correctly
+	if role := precompile.GetAllowListStatus(statedb, allowListAdminAddr); !precompile.IsAllowListAdmin(role) {
+		t.Fatalf("Expected allow list status to be %s, but found %s", precompile.Admin, role)
+	}
+
+	// Any new stateful precompiles can add a genesis test by including their config above and check that [statedb]
+	// contains the expected result if the config is enabled in the genesis.
 }
