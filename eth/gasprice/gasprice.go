@@ -51,8 +51,7 @@ const (
 	DefaultMaxBlockHistory int = 25_000
 	// DefaultFeeHistoryCacheSize is chosen to be some value larger than
 	// [DefaultMaxBlockHistory] to ensure all block lookups can be cached when
-	// serving a history query and to ensure some client call cannot trigger cache
-	// eviction.
+	// serving a fee history query.
 	DefaultFeeHistoryCacheSize int = 30000
 )
 
