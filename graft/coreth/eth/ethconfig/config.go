@@ -37,13 +37,13 @@ import (
 
 // DefaultFullGPOConfig contains default gasprice oracle settings for full node.
 var DefaultFullGPOConfig = gasprice.Config{
-	Blocks:           40,
-	Percentile:       60,
-	MaxHeaderHistory: gasprice.DefaultMaxHeaderHistory,
-	MaxBlockHistory:  gasprice.DefaultMaxBlockHistory,
-	MinPrice:         gasprice.DefaultMinPrice,
-	MaxPrice:         gasprice.DefaultMaxPrice,
-	MinGasUsed:       gasprice.DefaultMinGasUsed,
+	Blocks:              40,
+	Percentile:          60,
+	MaxCallBlockHistory: gasprice.DefaultMaxCallBlockHistory,
+	MaxBlockHistory:     gasprice.DefaultMaxBlockHistory,
+	MinPrice:            gasprice.DefaultMinPrice,
+	MaxPrice:            gasprice.DefaultMaxPrice,
+	MinGasUsed:          gasprice.DefaultMinGasUsed,
 }
 
 // DefaultConfig contains default settings for use on the Avalanche main net.
