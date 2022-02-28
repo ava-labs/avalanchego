@@ -47,12 +47,12 @@ import (
 
 const (
 	// DefaultMaxBlockHistory is chosen to be a value larger than the required
-	// fee lookback window that MetaMask uses (20000 blocks).
+	// fee lookback window that MetaMask uses (20k blocks).
 	DefaultMaxBlockHistory int = 25_000
 	// DefaultFeeHistoryCacheSize is chosen to be some value larger than
 	// [DefaultMaxBlockHistory] to ensure all block lookups can be cached when
 	// serving a fee history query.
-	DefaultFeeHistoryCacheSize int = 30000
+	DefaultFeeHistoryCacheSize int = 30_000
 )
 
 var (
