@@ -42,39 +42,42 @@ import (
 
 func TestFeeHistory(t *testing.T) {
 	var cases = []struct {
-		pending  bool
-		maxBlock int
-		count    int
-		last     rpc.BlockNumber
-		percent  []float64
-		expFirst uint64
-		expCount int
-		expErr   error
+		pending      bool
+		maxCallBlock int
+		maxBlock     int
+		count        int
+		last         rpc.BlockNumber
+		percent      []float64
+		expFirst     uint64
+		expCount     int
+		expErr       error
 	}{
 		// Standard go-ethereum tests
-		{false, 1000, 10, 30, nil, 21, 10, nil},
-		{false, 1000, 10, 30, []float64{0, 10}, 21, 10, nil},
-		{false, 1000, 10, 30, []float64{20, 10}, 0, 0, errInvalidPercentile},
-		{false, 1000, 1000000000, 30, nil, 0, 31, nil},
-		{false, 1000, 1000000000, rpc.LatestBlockNumber, nil, 0, 33, nil},
-		{false, 1000, 10, 40, nil, 0, 0, errRequestBeyondHead},
-		{true, 1000, 10, 40, nil, 0, 0, errRequestBeyondHead},
-		{false, 2, 100, rpc.LatestBlockNumber, []float64{0, 10}, 31, 2, nil},
-		{false, 2, 100, 32, []float64{0, 10}, 31, 2, nil},
-		{false, 1000, 1, rpc.PendingBlockNumber, nil, 0, 0, nil},
-		{false, 1000, 2, rpc.PendingBlockNumber, nil, 32, 1, nil},
-		{true, 1000, 2, rpc.PendingBlockNumber, nil, 32, 1, nil},
-		{true, 1000, 2, rpc.PendingBlockNumber, []float64{0, 10}, 32, 1, nil},
+		{false, 0, 1000, 10, 30, nil, 21, 10, nil},
+		{false, 0, 1000, 10, 30, []float64{0, 10}, 21, 10, nil},
+		{false, 0, 1000, 10, 30, []float64{20, 10}, 0, 0, errInvalidPercentile},
+		{false, 0, 1000, 1000000000, 30, nil, 0, 31, nil},
+		{false, 0, 1000, 1000000000, rpc.LatestBlockNumber, nil, 0, 33, nil},
+		{false, 0, 1000, 10, 40, nil, 0, 0, errRequestBeyondHead},
+		{true, 0, 1000, 10, 40, nil, 0, 0, errRequestBeyondHead},
+		{false, 0, 2, 100, rpc.LatestBlockNumber, []float64{0, 10}, 31, 2, nil},
+		{false, 0, 2, 100, 32, []float64{0, 10}, 31, 2, nil},
+		{false, 0, 1000, 1, rpc.PendingBlockNumber, nil, 0, 0, nil},
+		{false, 0, 1000, 2, rpc.PendingBlockNumber, nil, 32, 1, nil},
+		{true, 0, 1000, 2, rpc.PendingBlockNumber, nil, 32, 1, nil},
+		{true, 0, 1000, 2, rpc.PendingBlockNumber, []float64{0, 10}, 32, 1, nil},
 
 		// Modified tests
-		{false, 2, 100, rpc.LatestBlockNumber, nil, 31, 2, nil}, // apply block lookback limits even if only headers required
-		{false, 10, 10, 30, nil, 23, 8, nil},                    // limit lookback based on maxHistory from latest block
-		{false, 33, 1000000000, 10, nil, 0, 11, nil},            // handle truncation edge case
-		{false, 2, 10, 20, nil, 0, 0, errBeyondHistoricalLimit}, // query behind historical limit
+		{false, 0, 2, 100, rpc.LatestBlockNumber, nil, 31, 2, nil},    // apply block lookback limits even if only headers required
+		{false, 0, 10, 10, 30, nil, 23, 8, nil},                       // limit lookback based on maxHistory from latest block
+		{false, 0, 33, 1000000000, 10, nil, 0, 11, nil},               // handle truncation edge case
+		{false, 0, 2, 10, 20, nil, 0, 0, errBeyondHistoricalLimit},    // query behind historical limit
+		{false, 10, 30, 100, rpc.LatestBlockNumber, nil, 23, 10, nil}, // ensure [MaxCallBlockHistory] is honored
 	}
 	for i, c := range cases {
 		config := Config{
-			MaxBlockHistory: c.maxBlock,
+			MaxCallBlockHistory: c.maxCallBlock,
+			MaxBlockHistory:     c.maxBlock,
 		}
 		tip := big.NewInt(1 * params.GWei)
 		backend := newTestBackendFakerEngine(t, params.TestChainConfig, 32, common.Big0, func(i int, b *core.BlockGen) {
@@ -87,7 +90,6 @@ func TestFeeHistory(t *testing.T) {
 			feeCap := new(big.Int).Add(baseFee, tip)
 
 			var tx *types.Transaction
-			// if apricotPhase3BlockTimestamp != nil && b.Number().Cmp(apricotPhase3BlockTimestamp) >= 0 {
 			txdata := &types.DynamicFeeTx{
 				ChainID:   params.TestChainConfig.ChainID,
 				Nonce:     b.TxNonce(addr),
