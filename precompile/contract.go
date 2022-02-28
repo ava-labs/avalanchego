@@ -18,7 +18,6 @@ type PrecompileAccessibleState interface {
 
 // StateDB is the interface for accessing EVM state
 type StateDB interface {
-	CreateAccount(common.Address)
 	GetState(common.Address, common.Hash) common.Hash
 	SetState(common.Address, common.Hash, common.Hash)
 }
