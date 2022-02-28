@@ -108,9 +108,9 @@ type Oracle struct {
 	// clock to decide what set of rules to use when recommending a gas price
 	clock mockable.Clock
 
-	checkBlocks, percentile           int
-	maxHeaderHistory, maxBlockHistory int
-	historyCache                      *lru.Cache
+	checkBlocks, percentile int
+	maxBlockHistory         int
+	historyCache            *lru.Cache
 }
 
 // NewOracle returns a new gasprice oracle which can recommend suitable
