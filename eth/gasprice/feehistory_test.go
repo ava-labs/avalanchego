@@ -52,6 +52,7 @@ func TestFeeHistory(t *testing.T) {
 		expErr   error
 	}{
 		{false, 1000, 10, 30, nil, 21, 10, nil},
+		{false, 10, 10, 30, nil, 23, 8, nil}, // limit lookback based on maxHistory from tip
 		{false, 1000, 10, 30, []float64{0, 10}, 21, 10, nil},
 		{false, 1000, 10, 30, []float64{20, 10}, 0, 0, errInvalidPercentile},
 		{false, 1000, 1000000000, 30, nil, 0, 31, nil},
