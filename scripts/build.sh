@@ -19,7 +19,7 @@ go mod download
 "$AVALANCHE_PATH"/scripts/build_avalanche.sh
 
 # Build coreth
-"$AVALANCHE_PATH"/scripts/build_coreth.sh
+"$AVALANCHE_PATH"/scripts/build_coreth.sh "$@"
 
 # Exit build successfully if the binaries are created
 if [[ -f "$avalanchego_path" && -f "$evm_path" ]]; then
