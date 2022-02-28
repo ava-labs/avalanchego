@@ -48,6 +48,7 @@ import (
 const (
 	DefaultMaxHeaderHistory int = 1024
 	DefaultMaxBlockHistory  int = 25_000
+	feeHistoryCacheSize     int = 30000
 )
 
 var (
@@ -58,7 +59,7 @@ var (
 )
 
 type Config struct {
-	// Blocks specifies the number of blocks to fetch during gas price estimation
+	// Blocks specifies the number of blocks to fetch during gas price estimation.
 	Blocks     int
 	Percentile int
 	// MaxHeaderHistory specifies the number of blocks to fetch during fee history.
@@ -152,7 +153,7 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 		log.Warn("Sanitizing invalid gasprice oracle max block history", "provided", config.MaxBlockHistory, "updated", maxBlockHistory)
 	}
 
-	cache, _ := lru.New(30000)
+	cache, _ := lru.New(feeHistoryCacheSize)
 	headEvent := make(chan core.ChainHeadEvent, 1)
 	backend.SubscribeChainHeadEvent(headEvent)
 	go func() {
