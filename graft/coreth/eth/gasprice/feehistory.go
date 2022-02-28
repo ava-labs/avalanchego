@@ -166,6 +166,7 @@ func (oracle *Oracle) resolveBlockRange(ctx context.Context, lastBlock rpc.Block
 	maxBlockHistory := rpc.BlockNumber(oracle.maxBlockHistory)
 	if lastBlock.IsAccepted() {
 		lastBlock = lastAcceptedBlock
+		// TODO: there is a bug here if lastAcceptedBlock > maxBlockHistory
 	} else if lastAcceptedBlock > maxBlockHistory && lastAcceptedBlock-maxBlockHistory > lastBlock {
 		// If the requested last block reaches further back than [oracle.maxBlockHistory] past the last accepted block return an error
 		// Note: this allows some blocks past this point to be fetched since it will start fetching [blocks] from this point.
