@@ -33,8 +33,8 @@ type StatefulPrecompiledContract interface {
 
 // statefulPrecompileFunction defines a function implemented by a stateful precompile
 type statefulPrecompileFunction struct {
-	// signature is the function signature
-	signature string
+	// selector is the function selector for this function
+	selector []byte
 	// execute is performed when this function is selected
 	execute RunStatefulPrecompileFunc
 	// requiredGas calculates the amount of gas consumed by this function on [input].
@@ -42,10 +42,9 @@ type statefulPrecompileFunction struct {
 }
 
 // newStatefulPrecompileFunction creates a stateful precompile function with the given arguments
-func newStatefulPrecompileFunction(signature string, execute RunStatefulPrecompileFunc, requiredGas func(input []byte) uint64) *statefulPrecompileFunction {
-	// TODO add regex to verify [signature] is valid and panic if not.
+func newStatefulPrecompileFunction(selector []byte, execute RunStatefulPrecompileFunc, requiredGas func(input []byte) uint64) *statefulPrecompileFunction {
 	return &statefulPrecompileFunction{
-		signature:   signature,
+		selector:    selector,
 		execute:     execute,
 		requiredGas: requiredGas,
 	}
@@ -62,12 +61,11 @@ type statefulPrecompileWithFunctionSelectors struct {
 func newStatefulPrecompileWithFunctionSelectors(functions ...*statefulPrecompileFunction) StatefulPrecompiledContract {
 	contract := &statefulPrecompileWithFunctionSelectors{functions: make(map[string]*statefulPrecompileFunction)}
 	for _, function := range functions {
-		selector := CalculateFunctionSelector(function.signature)
-		_, exists := contract.functions[string(selector)]
+		_, exists := contract.functions[string(function.selector)]
 		if exists {
-			panic(fmt.Errorf("cannot create stateful precompile with duplicated function selector: %q", function.signature))
+			panic(fmt.Errorf("cannot create stateful precompile with duplicated function selector: %q", function.selector))
 		}
-		contract.functions[string(selector)] = function
+		contract.functions[string(function.selector)] = function
 	}
 
 	return contract

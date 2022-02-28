@@ -26,7 +26,7 @@ func TestAllowListConfigure(t *testing.T) {
 	type test struct {
 		caller         common.Address
 		precompileAddr common.Address
-		input          []byte
+		input          func() []byte
 		suppliedGas    uint64
 		readOnly       bool
 
@@ -37,7 +37,112 @@ func TestAllowListConfigure(t *testing.T) {
 		assertState func(t *testing.T, state *state.StateDB)
 	}
 
-	for name, test := range map[string]test{} {
+	adminAddr := common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC")
+	noRoleAddr := common.HexToAddress("0xF60C45c607D0f41687c94C314d300f483661E13a")
+
+	for name, test := range map[string]test{
+		"set admin": {
+			caller:         adminAddr,
+			precompileAddr: precompile.AllowListAddress,
+			input: func() []byte {
+				input, err := precompile.PackModifyAllowList(noRoleAddr, precompile.Admin)
+				if err != nil {
+					panic(err)
+				}
+				return input
+			},
+			suppliedGas: precompile.ModifyAllowListGasCost,
+			readOnly:    false,
+			setupState: func(state *state.StateDB) {
+				precompile.SetAllowListRole(state, adminAddr, precompile.Admin)
+			},
+			expectedRes: []byte{},
+			assertState: func(t *testing.T, state *state.StateDB) {
+				res := precompile.GetAllowListStatus(state, adminAddr)
+				assert.Equal(t, precompile.Admin, res)
+
+				res = precompile.GetAllowListStatus(state, noRoleAddr)
+				assert.Equal(t, precompile.Admin, res)
+			},
+		},
+		"set deployer": {
+			caller:         adminAddr,
+			precompileAddr: precompile.AllowListAddress,
+			input: func() []byte {
+				input, err := precompile.PackModifyAllowList(noRoleAddr, precompile.Deployer)
+				if err != nil {
+					panic(err)
+				}
+				return input
+			},
+			suppliedGas: precompile.ModifyAllowListGasCost,
+			readOnly:    false,
+			setupState: func(state *state.StateDB) {
+				precompile.SetAllowListRole(state, adminAddr, precompile.Admin)
+			},
+			expectedRes: []byte{},
+			assertState: func(t *testing.T, state *state.StateDB) {
+				res := precompile.GetAllowListStatus(state, adminAddr)
+				assert.Equal(t, precompile.Admin, res)
+
+				res = precompile.GetAllowListStatus(state, noRoleAddr)
+				assert.Equal(t, precompile.Deployer, res)
+			},
+		},
+		"set no role": {
+			caller:         adminAddr,
+			precompileAddr: precompile.AllowListAddress,
+			input: func() []byte {
+				input, err := precompile.PackModifyAllowList(adminAddr, precompile.None)
+				if err != nil {
+					panic(err)
+				}
+				return input
+			},
+			suppliedGas: precompile.ModifyAllowListGasCost,
+			readOnly:    false,
+			setupState: func(state *state.StateDB) {
+				precompile.SetAllowListRole(state, adminAddr, precompile.Admin)
+			},
+			expectedRes: []byte{},
+			assertState: func(t *testing.T, state *state.StateDB) {
+				res := precompile.GetAllowListStatus(state, adminAddr)
+				assert.Equal(t, precompile.None, res)
+			},
+		},
+		"read allow list no role": {
+			caller:         adminAddr,
+			precompileAddr: precompile.AllowListAddress,
+			input: func() []byte {
+				return precompile.PackReadAllowList(noRoleAddr)
+			},
+			suppliedGas: precompile.ModifyAllowListGasCost,
+			readOnly:    false,
+			setupState:  func(state *state.StateDB) {},
+			expectedRes: precompile.None.Bytes(),
+			assertState: func(t *testing.T, state *state.StateDB) {
+				res := precompile.GetAllowListStatus(state, adminAddr)
+				assert.Equal(t, precompile.None, res)
+			},
+		},
+		"read allow list admin role": {
+			caller:         adminAddr,
+			precompileAddr: precompile.AllowListAddress,
+			input: func() []byte {
+				return precompile.PackReadAllowList(noRoleAddr)
+			},
+			suppliedGas: precompile.ModifyAllowListGasCost,
+			readOnly:    false,
+			setupState: func(state *state.StateDB) {
+				precompile.SetAllowListRole(state, adminAddr, precompile.Admin)
+			},
+			expectedRes: precompile.None.Bytes(),
+			assertState: func(t *testing.T, state *state.StateDB) {
+				res := precompile.GetAllowListStatus(state, adminAddr)
+				assert.Equal(t, precompile.Admin, res)
+			},
+		},
+	} {
 		t.Run(name, func(t *testing.T) {
 			db := rawdb.NewMemoryDatabase()
 			state, err := state.New(common.Hash{}, state.NewDatabase(db), nil)
@@ -46,7 +151,7 @@ func TestAllowListConfigure(t *testing.T) {
 			}
 			test.setupState(state)
 
-			ret, _, err := precompile.AllowListPrecompile.Run(&mockAccessibleState{state: state}, test.caller, test.precompileAddr, test.input, test.suppliedGas, test.readOnly)
+			ret, _, err := precompile.AllowListPrecompile.Run(&mockAccessibleState{state: state}, test.caller, test.precompileAddr, test.input(), test.suppliedGas, test.readOnly)
 			if len(test.expectedErr) != 0 {
 				assert.True(t, strings.Contains(err.Error(), test.expectedErr), "expected error (%s) to contain substring (%s)", err, test.expectedErr)
 				return

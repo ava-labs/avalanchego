@@ -21,6 +21,12 @@ var (
 	None     common.Hash = common.BigToHash(big.NewInt(0)) // No role assigned - this is equivalent to common.Hash{} and deletes the key from the DB when set
 	Deployer common.Hash = common.BigToHash(big.NewInt(1)) // Deployers are allowed to create new contracts
 	Admin    common.Hash = common.BigToHash(big.NewInt(2)) // Admin - allowed to modify both the admin and deployer list as well as deploy contracts
+
+	// AllowList function signatures
+	setAdminSignature      = CalculateFunctionSelector("setAdmin(address)")
+	setDeployerSignature   = CalculateFunctionSelector("setDeployer(address)")
+	setNoneSignature       = CalculateFunctionSelector("setNone(address)")
+	readAllowListSignature = CalculateFunctionSelector("readAllowList(address)")
 )
 
 // AllowListConfig specifies the configuration of the allow list.
@@ -38,7 +44,7 @@ func (c *AllowListConfig) Timestamp() *big.Int { return c.BlockTimestamp }
 // the addresses in [AllowListAdmins].
 func (c *AllowListConfig) Configure(state StateDB) {
 	for _, adminAddr := range c.AllowListAdmins {
-		setAllowListStatus(state, adminAddr, Admin)
+		SetAllowListRole(state, adminAddr, Admin)
 	}
 }
 
@@ -80,9 +86,9 @@ func GetAllowListStatus(state StateDB, address common.Address) common.Hash {
 	return res
 }
 
-// setAllowListStatus sets the permissions of [address] to [status]
+// SetAllowListRole sets the permissions of [address] to [status]
 // assumes [status] has already been verified as valid.
-func setAllowListStatus(stateDB StateDB, address common.Address, role common.Hash) {
+func SetAllowListRole(stateDB StateDB, address common.Address, role common.Hash) {
 	// Generate the state key for [address]
 	addressKey := address.Hash()
 	log.Info("allow list write", "address", address, "role", role)
@@ -93,6 +99,36 @@ func setAllowListStatus(stateDB StateDB, address common.Address, role common.Has
 	if foundRole != role {
 		panic(fmt.Errorf("found role %s, expected role %s", foundRole, role))
 	}
+}
+
+// PackModifyAllowList packs [address] and [role] into the appropriate arguments for modifying the allow list.
+// Note: [role] is not packed in the input value returned, but is instead used as a selector for the function
+// selector that should be encoded in the input.
+func PackModifyAllowList(address common.Address, role common.Hash) ([]byte, error) {
+	// function selector (4 bytes) + hash for address
+	input := make([]byte, 0, 4+common.HashLength)
+
+	switch role {
+	case Admin:
+		input = append(input, setAdminSignature...)
+	case Deployer:
+		input = append(input, setDeployerSignature...)
+	case None:
+		input = append(input, setNoneSignature...)
+	default:
+		return nil, fmt.Errorf("cannot pack modify list input with invalid role: %s", role)
+	}
+
+	input = append(input, address.Hash().Bytes()...)
+	return input, nil
+}
+
+// PackReadAllowList packs [address] into the input data to the read allow list function
+func PackReadAllowList(address common.Address) []byte {
+	input := make([]byte, 0, 4+common.HashLength)
+	input = append(input, readAllowListSignature...)
+	input = append(input, address.Hash().Bytes()...)
+	return input
 }
 
 // writeAllowList verifies that [callerAddr] has the correct permissions to modify the allow list and if so updates [modifyAddress] permissions
@@ -121,7 +157,7 @@ func writeAllowList(evm PrecompileAccessibleState, callerAddr common.Address, mo
 		return nil, remainingGas, fmt.Errorf("failed to unpack modify allow list input: %w", err)
 	}
 
-	setAllowListStatus(evm.GetStateDB(), modifyAddress, role)
+	SetAllowListRole(evm.GetStateDB(), modifyAddress, role)
 
 	// Return an empty output and the remaining gas
 	return []byte{}, remainingGas, nil
@@ -160,10 +196,10 @@ func readAllowList(evm PrecompileAccessibleState, callerAddr common.Address, add
 
 // createAllowListPrecompile returns a StatefulPrecompiledContract with R/W control of the allow list
 func createAllowListPrecompile() StatefulPrecompiledContract {
-	setAdmin := newStatefulPrecompileFunction("setAdmin(address)", createAllowListSetter(Admin), createConstantRequiredGasFunc(ModifyAllowListGasCost))
-	setDeployer := newStatefulPrecompileFunction("setDeployer(address)", createAllowListSetter(Deployer), createConstantRequiredGasFunc(ModifyAllowListGasCost))
-	setNone := newStatefulPrecompileFunction("setNone(address)", createAllowListSetter(None), createConstantRequiredGasFunc(ModifyAllowListGasCost))
-	read := newStatefulPrecompileFunction("readAllowList(address)", readAllowList, createConstantRequiredGasFunc(ReadAllowListGasCost))
+	setAdmin := newStatefulPrecompileFunction(setAdminSignature, createAllowListSetter(Admin), createConstantRequiredGasFunc(ModifyAllowListGasCost))
+	setDeployer := newStatefulPrecompileFunction(setDeployerSignature, createAllowListSetter(Deployer), createConstantRequiredGasFunc(ModifyAllowListGasCost))
+	setNone := newStatefulPrecompileFunction(setNoneSignature, createAllowListSetter(None), createConstantRequiredGasFunc(ModifyAllowListGasCost))
+	read := newStatefulPrecompileFunction(readAllowListSignature, readAllowList, createConstantRequiredGasFunc(ReadAllowListGasCost))
 
 	contract := newStatefulPrecompileWithFunctionSelectors(setAdmin, setDeployer, setNone, read)
 	return contract
