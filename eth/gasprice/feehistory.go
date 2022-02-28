@@ -152,9 +152,9 @@ func (sb *slimBlock) processPercentiles(percentiles []float64) processedFees {
 // Note: an error is only returned if retrieving the head header has failed. If there are no
 // retrievable blocks in the specified range then zero block count is returned with no error.
 func (oracle *Oracle) resolveBlockRange(ctx context.Context, lastBlock rpc.BlockNumber, blocks int) (uint64, int, error) {
-	// query either pending block or head header and set headBlock
+	// Query either pending block or head header and set headBlock
 	if lastBlock == rpc.PendingBlockNumber {
-		// pending block not supported by backend, process until latest block
+		// Pending block not supported by backend, process until latest block
 		lastBlock = rpc.LatestBlockNumber
 		blocks--
 	}
@@ -163,9 +163,10 @@ func (oracle *Oracle) resolveBlockRange(ctx context.Context, lastBlock rpc.Block
 	}
 
 	lastAcceptedBlock := rpc.BlockNumber(oracle.backend.LastAcceptedBlock().NumberU64())
+	maxQueryDepth := rpc.BlockNumber(oracle.maxBlockHistory) - 1
 	if lastBlock.IsAccepted() {
 		lastBlock = lastAcceptedBlock
-	} else if lastAcceptedBlock > rpc.BlockNumber(oracle.maxBlockHistory) && lastAcceptedBlock-rpc.BlockNumber(oracle.maxBlockHistory) > lastBlock {
+	} else if lastAcceptedBlock > maxQueryDepth && lastAcceptedBlock-maxQueryDepth > lastBlock {
 		// If the requested last block reaches further back than [oracle.maxBlockHistory] past the last accepted block return an error
 		// Note: this allows some blocks past this point to be fetched since it will start fetching [blocks] from this point.
 		return 0, 0, fmt.Errorf("%w: requested %d, head %d", errBeyondHistoricalLimit, lastBlock, lastAcceptedBlock)
@@ -173,10 +174,19 @@ func (oracle *Oracle) resolveBlockRange(ctx context.Context, lastBlock rpc.Block
 		// If the requested block is above the accepted block return an error
 		return 0, 0, fmt.Errorf("%w: requested %d, head %d", errRequestBeyondHead, lastBlock, lastAcceptedBlock)
 	}
-	// ensure not trying to retrieve before genesis
+	// Ensure not trying to retrieve before genesis
 	if rpc.BlockNumber(blocks) > lastBlock+1 {
 		blocks = int(lastBlock + 1)
 	}
+	// Truncate blocks range if extending past [oracle.maxBlockHistory]
+	oldestQueriedIndex := lastBlock - rpc.BlockNumber(blocks) + 1
+	if queryDepth := lastAcceptedBlock - oldestQueriedIndex; queryDepth > maxQueryDepth {
+		overage := int(queryDepth - maxQueryDepth)
+		blocks -= overage
+	}
+	// It is not possible that [blocks] could be <= 0 after
+	// truncation as the [lastBlock] requested will at least by fetchable.
+	// Otherwise, we would've returned an error earlier.
 	return uint64(lastBlock), blocks, nil
 }
 
@@ -197,13 +207,9 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 	if blocks < 1 {
 		return common.Big0, nil, nil, nil, nil // returning with no data and no error means there are no retrievable blocks
 	}
-	maxFeeHistory := oracle.maxHeaderHistory
-	if len(rewardPercentiles) != 0 {
-		maxFeeHistory = oracle.maxBlockHistory
-	}
-	if blocks > maxFeeHistory {
-		log.Warn("Sanitizing fee history length", "requested", blocks, "truncated", maxFeeHistory)
-		blocks = maxFeeHistory
+	if blocks > oracle.maxCallBlockHistory {
+		log.Warn("Sanitizing fee history length", "requested", blocks, "truncated", oracle.maxCallBlockHistory)
+		blocks = oracle.maxCallBlockHistory
 	}
 	for i, p := range rewardPercentiles {
 		if p < 0 || p > 100 {
