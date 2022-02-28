@@ -46,9 +46,14 @@ import (
 )
 
 const (
-	DefaultMaxHeaderHistory int = 1024
-	DefaultMaxBlockHistory  int = 25_000
-	feeHistoryCacheSize     int = 30000
+	// DefaultMaxBlockHistory is chosen to be a value larger than the required
+	// fee lookback window that MetaMask uses (20000 blocks).
+	DefaultMaxBlockHistory int = 25_000
+	// DefaultFeeHistoryCacheSize is chosen to be some value larger than
+	// [DefaultMaxBlockHistory] to ensure all block lookups can be cached when
+	// serving a history query and to ensure some client call cannot trigger cache
+	// eviction.
+	DefaultFeeHistoryCacheSize int = 30000
 )
 
 var (
@@ -62,8 +67,6 @@ type Config struct {
 	// Blocks specifies the number of blocks to fetch during gas price estimation.
 	Blocks     int
 	Percentile int
-	// MaxHeaderHistory specifies the number of blocks to fetch during fee history.
-	MaxHeaderHistory int
 	// MaxBlockHistory specifies the furthest back behind the last accepted block that can
 	// be requested by fee history.
 	MaxBlockHistory int
@@ -142,18 +145,13 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 		minGasUsed = DefaultMinGasUsed
 		log.Warn("Sanitizing invalid gasprice oracle min gas used", "provided", config.MinGasUsed, "updated", minGasUsed)
 	}
-	maxHeaderHistory := config.MaxHeaderHistory
-	if maxHeaderHistory < 1 {
-		maxHeaderHistory = 1
-		log.Warn("Sanitizing invalid gasprice oracle max header history", "provided", config.MaxHeaderHistory, "updated", maxHeaderHistory)
-	}
 	maxBlockHistory := config.MaxBlockHistory
 	if maxBlockHistory < 1 {
 		maxBlockHistory = 1
 		log.Warn("Sanitizing invalid gasprice oracle max block history", "provided", config.MaxBlockHistory, "updated", maxBlockHistory)
 	}
 
-	cache, _ := lru.New(feeHistoryCacheSize)
+	cache, _ := lru.New(DefaultFeeHistoryCacheSize)
 	headEvent := make(chan core.ChainHeadEvent, 1)
 	backend.SubscribeChainHeadEvent(headEvent)
 	go func() {
@@ -167,17 +165,16 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 	}()
 
 	return &Oracle{
-		backend:          backend,
-		lastPrice:        minPrice,
-		lastBaseFee:      DefaultMinBaseFee,
-		minPrice:         minPrice,
-		maxPrice:         maxPrice,
-		minGasUsed:       minGasUsed,
-		checkBlocks:      blocks,
-		percentile:       percent,
-		maxHeaderHistory: maxHeaderHistory,
-		maxBlockHistory:  maxBlockHistory,
-		historyCache:     cache,
+		backend:         backend,
+		lastPrice:       minPrice,
+		lastBaseFee:     DefaultMinBaseFee,
+		minPrice:        minPrice,
+		maxPrice:        maxPrice,
+		minGasUsed:      minGasUsed,
+		checkBlocks:     blocks,
+		percentile:      percent,
+		maxBlockHistory: maxBlockHistory,
+		historyCache:    cache,
 	}
 }
 

@@ -42,7 +42,8 @@ import (
 
 func TestFeeHistory(t *testing.T) {
 	var cases = []struct {
-		pending             bool
+		pending bool
+		// TODO: remove header
 		maxHeader, maxBlock int
 		count               int
 		last                rpc.BlockNumber
@@ -68,8 +69,7 @@ func TestFeeHistory(t *testing.T) {
 	}
 	for i, c := range cases {
 		config := Config{
-			MaxHeaderHistory: c.maxHeader,
-			MaxBlockHistory:  c.maxBlock,
+			MaxBlockHistory: c.maxBlock,
 		}
 		tip := big.NewInt(1 * params.GWei)
 		backend := newTestBackendFakerEngine(t, params.TestChainConfig, 32, common.Big0, func(i int, b *core.BlockGen) {
