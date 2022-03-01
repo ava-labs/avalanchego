@@ -196,6 +196,7 @@ func createAllowListPrecompile() StatefulPrecompiledContract {
 	setNone := newStatefulPrecompileFunction(setNoneSignature, createAllowListSetter(AllowListNoRole), createConstantRequiredGasFunc(ModifyAllowListGasCost))
 	read := newStatefulPrecompileFunction(readAllowListSignature, readAllowList, createConstantRequiredGasFunc(ReadAllowListGasCost))
 
-	contract := newStatefulPrecompileWithFunctionSelectors(setAdmin, setDeployer, setNone, read)
+	// Construct the contract with no fallback function.
+	contract := newStatefulPrecompileWithFunctionSelectors(nil, []*statefulPrecompileFunction{setAdmin, setDeployer, setNone, read})
 	return contract
 }
