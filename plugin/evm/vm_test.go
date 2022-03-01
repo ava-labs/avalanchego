@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ava-labs/subnet-evm/trie"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -2190,5 +2191,96 @@ func TestBuildSubnetEVMBlock(t *testing.T) {
 		if ethBlkTxs[i].Hash() != tx.Hash() {
 			t.Fatalf("expected tx at index %d to have hash: %x but has: %x", i, txs[i].Hash(), tx.Hash())
 		}
+	}
+}
+
+func TestBuildAllowListActivationBlock(t *testing.T) {
+	genesis := &core.Genesis{}
+	if err := genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)); err != nil {
+		t.Fatal(err)
+	}
+	genesis.Config.AllowListConfig = precompile.AllowListConfig{
+		BlockTimestamp:  big.NewInt(time.Now().Unix()),
+		AllowListAdmins: testEthAddrs,
+	}
+	genesisJSON, err := genesis.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	issuer, vm, _, _ := GenesisVM(t, true, string(genesisJSON), "", "")
+
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
+
+	key, err := accountKeystore.NewKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	genesisState, err := vm.chain.BlockChain().StateAt(vm.chain.GetGenesisBlock().Root())
+	if err != nil {
+		t.Fatal(err)
+	}
+	role := precompile.GetAllowListStatus(genesisState, testEthAddrs[0])
+	if role != precompile.AllowListNoRole {
+		t.Fatalf("Expected allow list status to be set to no role: %s, but found: %s", precompile.AllowListNoRole, role)
+	}
+
+	// Send basic transaction to construct a simple block and confirm that the precompile state configuration in the worker behaves correctly.
+	tx := types.NewTransaction(uint64(0), key.Address, new(big.Int).Mul(firstTxAmount, big.NewInt(4)), 21000, big.NewInt(testMinGasPrice*3), nil)
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	txErrors := vm.chain.AddRemoteTxsSync([]*types.Transaction{signedTx})
+	for i, err := range txErrors {
+		if err != nil {
+			t.Fatalf("Failed to add tx at index %d: %s", i, err)
+		}
+	}
+
+	<-issuer
+
+	blk, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if status := blk.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
+	}
+
+	if err := vm.SetPreference(blk.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Accept(); err != nil {
+		t.Fatal(err)
+	}
+
+	newHead := <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blk.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+
+	// Verify that the allow list config activation was handled correctly in the first block.
+	blkState, err := vm.chain.BlockState(blk.(*chain.BlockWrapper).Block.(*Block).ethBlock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	role = precompile.GetAllowListStatus(blkState, testEthAddrs[0])
+	if role != precompile.AllowListAdmin {
+		t.Fatalf("Expected allow list status to be set to Admin: %s, but found: %s", precompile.AllowListAdmin, role)
 	}
 }
