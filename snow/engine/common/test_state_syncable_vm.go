@@ -6,14 +6,11 @@ package common
 import (
 	"errors"
 	"testing"
-
-	"github.com/ava-labs/avalanchego/ids"
 )
 
 var (
 	_ StateSyncableVM = &TestStateSyncableVM{}
 
-	errRegisterStateSyncer     = errors.New("unexpectedly called RegisterStateSyncer")
 	errStateSyncEnabled        = errors.New("unexpectedly called StateSyncEnabled")
 	errStateSyncGetLastSummary = errors.New("unexpectedly called StateSyncGetLastSummary")
 	errStateSyncGetKeyHash     = errors.New("unexpectedly called StateSyncGetKeyHash")
@@ -24,26 +21,15 @@ var (
 type TestStateSyncableVM struct {
 	T *testing.T
 
-	CantRegisterStateSyncer, CantStateSyncEnabled,
-	CantStateSyncGetLastSummary, CantStateSyncGetKeyHash,
-	CantStateSyncGetSummary, CantStateSync bool
+	CantStateSyncEnabled, CantStateSyncGetLastSummary,
+	CantStateSyncGetKeyHash, CantStateSyncGetSummary,
+	CantStateSync bool
 
-	RegisterStateSyncerF     func(stateSyncer []ids.ShortID) error
 	StateSyncEnabledF        func() (bool, error)
 	StateSyncGetLastSummaryF func() (Summary, error)
 	StateSyncGetKeyHashF     func(Summary) (SummaryKey, SummaryHash, error)
 	StateSyncGetSummaryF     func(SummaryKey) (Summary, error)
 	StateSyncF               func([]Summary) error
-}
-
-func (tss *TestStateSyncableVM) RegisterStateSyncer(stateSyncer []ids.ShortID) error {
-	if tss.RegisterStateSyncerF != nil {
-		return tss.RegisterStateSyncerF(stateSyncer)
-	}
-	if tss.CantRegisterStateSyncer && tss.T != nil {
-		tss.T.Fatalf("Unexpectedly called RegisterStateSyncer")
-	}
-	return errRegisterStateSyncer
 }
 
 func (tss *TestStateSyncableVM) StateSyncEnabled() (bool, error) {

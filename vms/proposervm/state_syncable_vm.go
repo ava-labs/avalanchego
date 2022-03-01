@@ -44,15 +44,6 @@ func init() {
 	}
 }
 
-func (vm *VM) RegisterStateSyncer(stateSyncers []ids.ShortID) error {
-	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
-	if !ok {
-		return common.ErrStateSyncableVMNotImplemented
-	}
-
-	return ssVM.RegisterStateSyncer(stateSyncers)
-}
-
 func (vm *VM) StateSyncEnabled() (bool, error) {
 	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {

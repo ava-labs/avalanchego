@@ -5,8 +5,6 @@ package common
 
 import (
 	"errors"
-
-	"github.com/ava-labs/avalanchego/ids"
 )
 
 var (
@@ -25,9 +23,6 @@ type (
 // rather then boostrapping from genesis.
 // common.StateSyncableVM can be detailed for Snowman or Avalanche-like VMs by extending the interface.
 type StateSyncableVM interface {
-	// RegisterStateSyncer registers nodes from which state sync summaries can be downloaded
-	RegisterStateSyncer(stateSyncer []ids.ShortID) error
-
 	// StateSyncEnabled indicates whether the state sync is enabled for this VM
 	StateSyncEnabled() (bool, error)
 

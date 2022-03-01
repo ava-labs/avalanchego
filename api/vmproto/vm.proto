@@ -195,10 +195,6 @@ message GetBlockIDAtHeightResponse {
 }
 
 // StateSyncableVM related messages
-message RegisterStateSyncerRequest {
-    repeated bytes node_id_s = 1;
-}
-
 message StateSyncEnabledResponse {
     bool enabled = 1;
 }
@@ -276,9 +272,7 @@ service VM {
 
 
     // State sync
-    rpc RegisterStateSyncer(RegisterStateSyncerRequest) returns (google.protobuf.Empty);
     rpc StateSyncEnabled(google.protobuf.Empty) returns (StateSyncEnabledResponse);
-    
     rpc StateSyncGetLastSummary(google.protobuf.Empty) returns (StateSyncGetLastSummaryResponse);
     rpc StateSyncGetKeyHash(StateSyncGetKeyHashRequest) returns (StateSyncGetKeyHashResponse);
     rpc StateSyncGetSummary(StateSyncGetSummaryRequest) returns (StateSyncGetSummaryResponse);
