@@ -1570,11 +1570,25 @@ func TestStatefulPrecompiles(t *testing.T, create func(db ethdb.Database, chainC
 				gen.AddTx(signedTx)
 			},
 			verifyState: func(sdb *state.StateDB) error {
-				res := precompile.GetAllowListStatus(sdb, addr2)
+				res := precompile.GetAllowListStatus(sdb, addr1)
 				if precompile.AllowListAdmin != res {
-					return fmt.Errorf("unexpected allow list status %s, expected %s", res, precompile.AllowListAdmin)
+					return fmt.Errorf("unexpected allow list status for addr1 %s, expected %s", res, precompile.AllowListAdmin)
+				}
+				res = precompile.GetAllowListStatus(sdb, addr2)
+				if precompile.AllowListAdmin != res {
+					return fmt.Errorf("unexpected allow list status for addr2 %s, expected %s", res, precompile.AllowListAdmin)
 				}
 				return nil
+			},
+			verifyGenesis: func(sdb *state.StateDB) {
+				res := precompile.GetAllowListStatus(sdb, addr1)
+				if precompile.AllowListAdmin != res {
+					t.Fatalf("unexpected allow list status for addr1 %s, expected %s", res, precompile.AllowListAdmin)
+				}
+				res = precompile.GetAllowListStatus(sdb, addr2)
+				if precompile.AllowListNoRole != res {
+					t.Fatalf("unexpected allow list status for addr2 %s, expected %s", res, precompile.AllowListNoRole)
+				}
 			},
 		},
 	}
