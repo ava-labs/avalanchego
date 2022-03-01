@@ -4,6 +4,7 @@
 package precompile
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -29,6 +30,10 @@ var (
 	setDeployerSignature   = CalculateFunctionSelector("setDeployer(address)")
 	setNoneSignature       = CalculateFunctionSelector("setNone(address)")
 	readAllowListSignature = CalculateFunctionSelector("readAllowList(address)")
+
+	// Error returned when an invalid write is attempted
+	ErrReadOnlyModifyAllowList = errors.New("cannot modify allow list in read only")
+	ErrCannotModifyAllowList   = errors.New("non-admin cannot modify allow list")
 )
 
 // AllowListConfig specifies the configuration of the allow list.
@@ -112,7 +117,7 @@ func PackModifyAllowList(address common.Address, role AllowListRole) ([]byte, er
 	switch role {
 	case AllowListAdmin:
 		input = append(input, setAdminSignature...)
-	case AllowListAdmin:
+	case AllowListEnabled:
 		input = append(input, setDeployerSignature...)
 	case AllowListNoRole:
 		input = append(input, setNoneSignature...)
@@ -142,13 +147,13 @@ func writeAllowList(evm PrecompileAccessibleState, callerAddr common.Address, mo
 
 	remainingGas = suppliedGas - ModifyAllowListGasCost
 	if readOnly {
-		return nil, remainingGas, fmt.Errorf("cannot modify allow list in read only")
+		return nil, remainingGas, ErrReadOnlyModifyAllowList
 	}
 
 	// Verify that the caller is in the allow list and therefore has the right to modify it
 	callerStatus := GetAllowListStatus(evm.GetStateDB(), callerAddr)
 	if !callerStatus.IsAdmin() {
-		return nil, remainingGas, fmt.Errorf("caller %s cannot modify allow list", callerAddr)
+		return nil, remainingGas, fmt.Errorf("%w: %s", ErrCannotModifyAllowList, callerAddr)
 	}
 
 	SetAllowListRole(evm.GetStateDB(), modifyAddress, role)
