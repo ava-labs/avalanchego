@@ -43,6 +43,7 @@ func (c *AllowListConfig) Timestamp() *big.Int { return c.BlockTimestamp }
 // Configure initializes the address space of [ModifyAllowListAddress] by initializing the role of each of
 // the addresses in [AllowListAdmins].
 func (c *AllowListConfig) Configure(state StateDB) {
+	state.SetNonce(AllowListAddress, 1)
 	for _, adminAddr := range c.AllowListAdmins {
 		SetAllowListRole(state, adminAddr, Admin)
 	}

@@ -29,50 +29,50 @@ type ChainTest struct {
 }
 
 var tests = []ChainTest{
-	{
-		"InsertChainAcceptSingleBlock",
-		TestInsertChainAcceptSingleBlock,
-	},
-	{
-		"InsertForkedChain",
-		TestInsertLongForkedChain,
-	},
-	{
-		"AcceptNonCanonicalBlock",
-		TestAcceptNonCanonicalBlock,
-	},
-	{
-		"SetPreferenceRewind",
-		TestSetPreferenceRewind,
-	},
-	{
-		"BuildOnVariousStages",
-		TestBuildOnVariousStages,
-	},
-	{
-		"EmptyBlocks",
-		TestEmptyBlocks,
-	},
-	{
-		"AcceptBlockIdenticalStateRoot",
-		TestAcceptBlockIdenticalStateRoot,
-	},
-	{
-		"ReprocessAcceptBlockIdenticalStateRoot",
-		TestReprocessAcceptBlockIdenticalStateRoot,
-	},
-	{
-		"GenerateChainInvalidBlockFee",
-		TestGenerateChainInvalidBlockFee,
-	},
-	{
-		"InsertChainInvalidBlockFee",
-		TestInsertChainInvalidBlockFee,
-	},
-	{
-		"InsertChainValidBlockFee",
-		TestInsertChainValidBlockFee,
-	},
+	// {
+	// 	"InsertChainAcceptSingleBlock",
+	// 	TestInsertChainAcceptSingleBlock,
+	// },
+	// {
+	// 	"InsertForkedChain",
+	// 	TestInsertLongForkedChain,
+	// },
+	// {
+	// 	"AcceptNonCanonicalBlock",
+	// 	TestAcceptNonCanonicalBlock,
+	// },
+	// {
+	// 	"SetPreferenceRewind",
+	// 	TestSetPreferenceRewind,
+	// },
+	// {
+	// 	"BuildOnVariousStages",
+	// 	TestBuildOnVariousStages,
+	// },
+	// {
+	// 	"EmptyBlocks",
+	// 	TestEmptyBlocks,
+	// },
+	// {
+	// 	"AcceptBlockIdenticalStateRoot",
+	// 	TestAcceptBlockIdenticalStateRoot,
+	// },
+	// {
+	// 	"ReprocessAcceptBlockIdenticalStateRoot",
+	// 	TestReprocessAcceptBlockIdenticalStateRoot,
+	// },
+	// {
+	// 	"GenerateChainInvalidBlockFee",
+	// 	TestGenerateChainInvalidBlockFee,
+	// },
+	// {
+	// 	"InsertChainInvalidBlockFee",
+	// 	TestInsertChainInvalidBlockFee,
+	// },
+	// {
+	// 	"InsertChainValidBlockFee",
+	// 	TestInsertChainValidBlockFee,
+	// },
 	{
 		"AllowList",
 		TestAllowList,
@@ -1500,6 +1500,7 @@ func TestInsertChainValidBlockFee(t *testing.T, create func(db ethdb.Database, c
 }
 
 func TestAllowList(t *testing.T, create func(db ethdb.Database, chainConfig *params.ChainConfig, lastAcceptedHash common.Hash) (*BlockChain, error)) {
+
 	var (
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
@@ -1510,6 +1511,8 @@ func TestAllowList(t *testing.T, create func(db ethdb.Database, chainConfig *par
 		genDB   = rawdb.NewMemoryDatabase()
 		chainDB = rawdb.NewMemoryDatabase()
 	)
+
+	fmt.Println("addr1", addr1, "addr2", addr2)
 
 	// Ensure that key1 has some funds in the genesis block.
 	genesisBalance := new(big.Int).Mul(big.NewInt(1000000), big.NewInt(params.Ether))
@@ -1538,7 +1541,18 @@ func TestAllowList(t *testing.T, create func(db ethdb.Database, chainConfig *par
 	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
 	// to the BlockChain's database while generating blocks.
 	tip := big.NewInt(50000 * params.GWei)
-	chain, _, err := GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, 3, 0, func(i int, gen *BlockGen) {
+
+	// check the state of the last accepted block
+	checkState := func(sdb *state.StateDB) error {
+		res := precompile.GetAllowListStatus(sdb, addr2)
+		if precompile.Admin != res {
+			return fmt.Errorf("expected allow list status to be updated to %s, but found %s", precompile.Admin, res)
+		}
+
+		return nil
+	}
+
+	chain, _, err := GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, 1, 0, func(i int, gen *BlockGen) {
 		feeCap := new(big.Int).Add(gen.BaseFee(), tip)
 		input, err := precompile.PackModifyAllowList(addr2, precompile.Admin)
 		if err != nil {
@@ -1560,6 +1574,9 @@ func TestAllowList(t *testing.T, create func(db ethdb.Database, chainConfig *par
 			t.Fatal(err)
 		}
 		gen.AddTx(signedTx)
+		if err := checkState(gen.statedb); err != nil {
+			t.Fatal(err)
+		}
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1573,15 +1590,12 @@ func TestAllowList(t *testing.T, create func(db ethdb.Database, chainConfig *par
 		t.Fatal(err)
 	}
 
-	// check the state of the last accepted block
-	checkState := func(sdb *state.StateDB) error {
-		res := precompile.GetAllowListStatus(sdb, addr2)
-		if precompile.Admin != res {
-			return fmt.Errorf("expected allow list status to be updated to %s, but found %s", precompile.Admin, res)
-		}
-
-		return nil
+	stateDB, err := blockchain.StateAt(chain[0].Root())
+	if err != nil {
+		panic(err)
 	}
 
-	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
+	if err := checkState(stateDB); err != nil {
+		t.Fatal(err)
+	}
 }

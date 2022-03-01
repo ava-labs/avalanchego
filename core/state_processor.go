@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -115,12 +116,28 @@ func applyTransaction(msg types.Message, config *params.ChainConfig, bc ChainCon
 		return nil, err
 	}
 
+	input := msg.Data()
+	if len(input) == 36 {
+		res := precompile.GetAllowListStatus(evm.StateDB, common.BytesToAddress(input[4:]))
+		fmt.Println("precompile state post", res)
+	} else {
+		panic(fmt.Errorf("unexpected input length: %d", len(input)))
+	}
+
 	// Update the state with pending changes.
 	var root []byte
 	if config.IsByzantium(blockNumber) {
+		fmt.Println("isByzantium")
 		statedb.Finalise(true)
 	} else {
+		fmt.Println("Intermdediate root")
 		root = statedb.IntermediateRoot(config.IsEIP158(blockNumber)).Bytes()
+	}
+	if len(input) == 36 {
+		res := precompile.GetAllowListStatus(evm.StateDB, common.BytesToAddress(input[4:]))
+		fmt.Println("precompile state post", res)
+	} else {
+		panic(fmt.Errorf("unexpected input length: %d", len(input)))
 	}
 	*usedGas += result.UsedGas
 
@@ -146,6 +163,12 @@ func applyTransaction(msg types.Message, config *params.ChainConfig, bc ChainCon
 	receipt.BlockHash = blockHash
 	receipt.BlockNumber = blockNumber
 	receipt.TransactionIndex = uint(statedb.TxIndex())
+	if len(input) == 36 {
+		res := precompile.GetAllowListStatus(evm.StateDB, common.BytesToAddress(input[4:]))
+		fmt.Println("precompile state post", res)
+	} else {
+		panic(fmt.Errorf("unexpected input length: %d", len(input)))
+	}
 	return receipt, err
 }
 
