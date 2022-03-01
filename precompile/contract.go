@@ -20,7 +20,7 @@ type PrecompileAccessibleState interface {
 type StateDB interface {
 	GetState(common.Address, common.Hash) common.Hash
 	SetState(common.Address, common.Hash, common.Hash)
-	SetNonce(common.Address, uint64)
+	SetCode(common.Address, []byte)
 }
 
 // StatefulPrecompiledContract is the interface for executing a precompiled contract

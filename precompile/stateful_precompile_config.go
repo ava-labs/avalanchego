@@ -6,11 +6,19 @@ package precompile
 import (
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/ava-labs/subnet-evm/utils"
+)
+
+var (
+	statefulPrecompileMarker = []byte{0x1}
 )
 
 // StatefulPrecompileConfig defines the interface for a stateful precompile to
 type StatefulPrecompileConfig interface {
+	// Address returns the address where the stateful precompile is accessible.
+	Address() common.Address
 	// Timestamp returns the timestamp at which this stateful precompile should be enabled.
 	// 1) 0 indicates that the precompile should be enabled from genesis.
 	// 2) n indicates that the precompile should be enabled in the first block with timestamp >= [n].
@@ -44,6 +52,9 @@ func CheckConfigure(parentTimestamp *big.Int, currentTimestamp *big.Int, config 
 	isCurrentBlockForked := utils.IsForked(forkTimestamp, currentTimestamp)
 	// If the network upgrade goes into effect within this transition, configure the stateful precompile
 	if !isParentForked && isCurrentBlockForked {
+		// Setting some value for code prevents the account from getting cleared
+		// when the block is committed
+		state.SetCode(config.Address(), statefulPrecompileMarker)
 		config.Configure(state)
 	}
 }
