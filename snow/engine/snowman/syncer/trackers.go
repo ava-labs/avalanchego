@@ -103,7 +103,8 @@ func (ft *frontierTracker) anyPendingSeederResponse() bool {
 }
 
 func (ft *frontierTracker) markSeederFailed(vdrID ids.ShortID) {
-	ft.failedSeeders.Remove(vdrID)
+	ft.contactedSeeders.Remove(vdrID)
+	ft.failedSeeders.Add(vdrID)
 }
 
 type voteTracker struct {

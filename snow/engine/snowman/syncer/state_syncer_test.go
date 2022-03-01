@@ -340,3 +340,93 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	assert.True(isSummaryDecoded)
 	assert.True(len(syncer.weightedSummaries) == 0)
 }
+
+func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
+	assert := assert.New(t)
+
+	beacons := validators.NewSet()
+	beaconsIDs := []ids.ShortID{
+		ids.GenerateTestShortID(),
+	}
+	for _, beaconID := range beaconsIDs {
+		assert.NoError(beacons.AddWeight(beaconID, uint64(1)))
+	}
+
+	sender := &common.SenderTest{T: t}
+	fullVM := &fullVM{
+		TestVM: &block.TestVM{
+			TestVM: common.TestVM{T: t},
+		},
+		TestStateSyncableVM: &block.TestStateSyncableVM{
+			TestStateSyncableVM: common.TestStateSyncableVM{T: t},
+		},
+	}
+
+	commonCfg := common.Config{
+		Ctx:     snow.DefaultConsensusContextTest(),
+		Beacons: beacons,
+		SampleK: beacons.Len(),
+		Alpha:   (beacons.Weight() + 1) / 2,
+		Sender:  sender,
+	}
+	dummyGetter, err := getter.New(fullVM, commonCfg)
+	assert.NoError(err)
+	dummyWeightTracker := tracker.NewWeightTracker(beacons, commonCfg.StartupAlpha)
+
+	cfg, err := NewConfig(
+		commonCfg,
+		nil,
+		dummyGetter,
+		fullVM,
+		dummyWeightTracker)
+	assert.NoError(err)
+	commonSyncer := New(cfg, func(lastReqID uint32) error { return nil })
+	syncer, ok := commonSyncer.(*stateSyncer)
+	assert.True(ok)
+	assert.True(syncer.stateSyncVM != nil)
+
+	// set sender to track nodes reached out
+	contactedBeacons := make(map[ids.ShortID]uint32) // nodeID -> reqID map
+	sender.CantSendGetStateSummaryFrontier = true
+	sender.SendGetStateSummaryFrontierF = func(ss ids.ShortSet, reqID uint32) {
+		for nodeID := range ss {
+			contactedBeacons[nodeID] = reqID
+		}
+	}
+
+	// check Start returns no errors
+	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
+
+	// pick one of the beacons that have been reached out
+	unresponsiveBeaconID := beaconsIDs[0]
+	unresponsiveBeaconReqID := contactedBeacons[unresponsiveBeaconID]
+
+	// assume timeout is reached and beacons is marked as unresponsive
+	assert.NoError(syncer.GetStateSummaryFrontierFailed(
+		unresponsiveBeaconID,
+		unresponsiveBeaconReqID,
+	))
+
+	// responsiveBeacon not pending anymore
+	assert.False(syncer.hasSeederBeenContacted(unresponsiveBeaconID))
+	assert.True(syncer.failedSeeders.Contains(unresponsiveBeaconID))
+
+	// mock VM to simulate an valid but late summary is returned
+	summary := []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
+	key := []byte{'k', 'e', 'y'}
+	hash := []byte{'h', 'a', 's', 'h'}
+	fullVM.CantStateSyncGetKeyHash = true
+	fullVM.StateSyncGetKeyHashF = func(s common.Summary) (common.SummaryKey, common.SummaryHash, error) {
+		return key, hash, nil
+	}
+
+	// check a valid but late response is not recorded
+	assert.NoError(syncer.StateSummaryFrontier(
+		unresponsiveBeaconID,
+		unresponsiveBeaconReqID,
+		summary,
+	))
+
+	// late summary is not recorded
+	assert.True(len(syncer.weightedSummaries) == 0)
+}
