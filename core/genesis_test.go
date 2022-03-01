@@ -172,7 +172,7 @@ func TestStatefulPrecompilesConfigure(t *testing.T) {
 	config := *params.TestChainConfig
 	// Include the StatefulPrecompileConfigs here so that they will be configured in the genesis
 	allowListAdminAddr := common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC")
-	config.AllowListConfig = &precompile.AllowListConfig{
+	config.AllowListConfig = precompile.AllowListConfig{
 		BlockTimestamp: big.NewInt(0),
 		AllowListAdmins: []common.Address{
 			allowListAdminAddr,
