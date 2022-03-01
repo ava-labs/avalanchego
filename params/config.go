@@ -343,6 +343,17 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 	return nil
 }
 
+func matchNil(a, b interface{}) (match, n bool) {
+	switch {
+	case a == nil && b == nil:
+		return true, true
+	case a != nil && b != nil:
+		return true, false
+	default:
+		return false, false
+	}
+}
+
 func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headHeight *big.Int, headTimestamp *big.Int) *ConfigCompatError {
 	if isForkIncompatible(c.HomesteadBlock, newcfg.HomesteadBlock, headHeight) {
 		return newCompatError("Homestead fork block", c.HomesteadBlock, newcfg.HomesteadBlock)
@@ -384,20 +395,20 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headHeight *big.Int, 
 		return newCompatError("SubnetEVM fork block timestamp", c.SubnetEVMTimestamp, newcfg.SubnetEVMTimestamp)
 	}
 	currentTime := big.NewInt(time.Now().Unix())
-	if c.AllowListConfig != nil && newcfg.AllowListConfig != nil {
+	if match, n := matchNil(c.AllowListConfig, newcfg.AllowListConfig); match && !n {
 		if isForkIncompatible(c.AllowListConfig.Timestamp(), newcfg.AllowListConfig.Timestamp(), headTimestamp) {
 			return newCompatError("AllowList fork block timestamp", c.AllowListConfig.Timestamp(), newcfg.AllowListConfig.Timestamp())
 		}
-	} else if (c.AllowListConfig == nil && newcfg.AllowListConfig != nil) || (c.AllowListConfig != nil && newcfg.AllowListConfig == nil) {
+	} else if !match {
 		return newCompatError("AllowList", currentTime, currentTime)
 	}
 
 	// Check compatibility of misc, non-timed configs ([currentTime] returns on
 	// incompatibility to force error propagation)
-	if (c.FeeConfig == nil && newcfg.FeeConfig != nil) || (c.FeeConfig != nil && newcfg.FeeConfig == nil) {
+	if match, _ := matchNil(c.FeeConfig, newcfg.FeeConfig); !match {
 		return newCompatError("FeeConfig", currentTime, currentTime)
 	}
-	if (c.AllowFeeRecipients && !newcfg.AllowFeeRecipients) || (!c.AllowFeeRecipients && newcfg.AllowFeeRecipients) {
+	if c.AllowFeeRecipients != newcfg.AllowFeeRecipients {
 		return newCompatError("AllowFeeRecipients", currentTime, currentTime)
 	}
 
