@@ -91,8 +91,6 @@ func (evm *EVM) precompile(addr common.Address) (precompile.StatefulPrecompiledC
 	}
 
 	// Otherwise, check the chain rules for the additionally configured precompiles.
-	// TODO add a test to ensure that no precompile will be added that conflicts with
-	// an existing precompile.
 	p, ok = evm.chainRules.Precompiles[addr]
 	return p, ok
 }
