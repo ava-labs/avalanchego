@@ -189,7 +189,7 @@ func TestStatefulPrecompilesConfigure(t *testing.T) {
 				return &config
 			},
 			assertState: func(t *testing.T, sdb *state.StateDB) {
-				assert.Equal(t, precompile.Admin, precompile.GetAllowListStatus(sdb, addr), "unexpected allow list status for modified address")
+				assert.Equal(t, precompile.AllowListAdmin, precompile.GetAllowListStatus(sdb, addr), "unexpected allow list status for modified address")
 				assert.Equal(t, 1, sdb.GetNonce(precompile.AllowListAddress))
 			},
 		},

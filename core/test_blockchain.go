@@ -1548,7 +1548,7 @@ func TestStatefulPrecompiles(t *testing.T, create func(db ethdb.Database, chainC
 		"allow list": {
 			addTx: func(gen *BlockGen) {
 				feeCap := new(big.Int).Add(gen.BaseFee(), tip)
-				input, err := precompile.PackModifyAllowList(addr2, precompile.Admin)
+				input, err := precompile.PackModifyAllowList(addr2, precompile.AllowListAdmin)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -1571,8 +1571,8 @@ func TestStatefulPrecompiles(t *testing.T, create func(db ethdb.Database, chainC
 			},
 			verifyState: func(sdb *state.StateDB) error {
 				res := precompile.GetAllowListStatus(sdb, addr2)
-				if precompile.Admin != res {
-					return fmt.Errorf("unexpected allow list status %s, expected %s", res, precompile.Admin)
+				if precompile.AllowListAdmin != res {
+					return fmt.Errorf("unexpected allow list status %s, expected %s", res, precompile.AllowListAdmin)
 				}
 				return nil
 			},

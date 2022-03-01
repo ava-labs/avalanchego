@@ -45,7 +45,7 @@ func TestAllowListConfigure(t *testing.T) {
 			caller:         adminAddr,
 			precompileAddr: precompile.AllowListAddress,
 			input: func() []byte {
-				input, err := precompile.PackModifyAllowList(noRoleAddr, precompile.Admin)
+				input, err := precompile.PackModifyAllowList(noRoleAddr, precompile.AllowListAdmin)
 				if err != nil {
 					panic(err)
 				}
@@ -54,22 +54,22 @@ func TestAllowListConfigure(t *testing.T) {
 			suppliedGas: precompile.ModifyAllowListGasCost,
 			readOnly:    false,
 			setupState: func(state *state.StateDB) {
-				precompile.SetAllowListRole(state, adminAddr, precompile.Admin)
+				precompile.SetAllowListRole(state, adminAddr, precompile.AllowListAdmin)
 			},
 			expectedRes: []byte{},
 			assertState: func(t *testing.T, state *state.StateDB) {
 				res := precompile.GetAllowListStatus(state, adminAddr)
-				assert.Equal(t, precompile.Admin, res)
+				assert.Equal(t, precompile.AllowListAdmin, res)
 
 				res = precompile.GetAllowListStatus(state, noRoleAddr)
-				assert.Equal(t, precompile.Admin, res)
+				assert.Equal(t, precompile.AllowListAdmin, res)
 			},
 		},
 		"set deployer": {
 			caller:         adminAddr,
 			precompileAddr: precompile.AllowListAddress,
 			input: func() []byte {
-				input, err := precompile.PackModifyAllowList(noRoleAddr, precompile.Deployer)
+				input, err := precompile.PackModifyAllowList(noRoleAddr, precompile.AllowListEnabled)
 				if err != nil {
 					panic(err)
 				}
@@ -78,22 +78,22 @@ func TestAllowListConfigure(t *testing.T) {
 			suppliedGas: precompile.ModifyAllowListGasCost,
 			readOnly:    false,
 			setupState: func(state *state.StateDB) {
-				precompile.SetAllowListRole(state, adminAddr, precompile.Admin)
+				precompile.SetAllowListRole(state, adminAddr, precompile.AllowListAdmin)
 			},
 			expectedRes: []byte{},
 			assertState: func(t *testing.T, state *state.StateDB) {
 				res := precompile.GetAllowListStatus(state, adminAddr)
-				assert.Equal(t, precompile.Admin, res)
+				assert.Equal(t, precompile.AllowListAdmin, res)
 
 				res = precompile.GetAllowListStatus(state, noRoleAddr)
-				assert.Equal(t, precompile.Deployer, res)
+				assert.Equal(t, precompile.AllowListEnabled, res)
 			},
 		},
 		"set no role": {
 			caller:         adminAddr,
 			precompileAddr: precompile.AllowListAddress,
 			input: func() []byte {
-				input, err := precompile.PackModifyAllowList(adminAddr, precompile.None)
+				input, err := precompile.PackModifyAllowList(adminAddr, precompile.AllowListNoRole)
 				if err != nil {
 					panic(err)
 				}
@@ -102,12 +102,12 @@ func TestAllowListConfigure(t *testing.T) {
 			suppliedGas: precompile.ModifyAllowListGasCost,
 			readOnly:    false,
 			setupState: func(state *state.StateDB) {
-				precompile.SetAllowListRole(state, adminAddr, precompile.Admin)
+				precompile.SetAllowListRole(state, adminAddr, precompile.AllowListAdmin)
 			},
 			expectedRes: []byte{},
 			assertState: func(t *testing.T, state *state.StateDB) {
 				res := precompile.GetAllowListStatus(state, adminAddr)
-				assert.Equal(t, precompile.None, res)
+				assert.Equal(t, precompile.AllowListNoRole, res)
 			},
 		},
 		"read allow list no role": {
@@ -119,10 +119,10 @@ func TestAllowListConfigure(t *testing.T) {
 			suppliedGas: precompile.ModifyAllowListGasCost,
 			readOnly:    false,
 			setupState:  func(state *state.StateDB) {},
-			expectedRes: precompile.None.Bytes(),
+			expectedRes: common.Hash(precompile.AllowListNoRole).Bytes(),
 			assertState: func(t *testing.T, state *state.StateDB) {
 				res := precompile.GetAllowListStatus(state, adminAddr)
-				assert.Equal(t, precompile.None, res)
+				assert.Equal(t, precompile.AllowListNoRole, res)
 			},
 		},
 		"read allow list admin role": {
@@ -134,12 +134,12 @@ func TestAllowListConfigure(t *testing.T) {
 			suppliedGas: precompile.ModifyAllowListGasCost,
 			readOnly:    false,
 			setupState: func(state *state.StateDB) {
-				precompile.SetAllowListRole(state, adminAddr, precompile.Admin)
+				precompile.SetAllowListRole(state, adminAddr, precompile.AllowListAdmin)
 			},
-			expectedRes: precompile.None.Bytes(),
+			expectedRes: common.Hash(precompile.AllowListNoRole).Bytes(),
 			assertState: func(t *testing.T, state *state.StateDB) {
 				res := precompile.GetAllowListStatus(state, adminAddr)
-				assert.Equal(t, precompile.Admin, res)
+				assert.Equal(t, precompile.AllowListAdmin, res)
 			},
 		},
 	} {
