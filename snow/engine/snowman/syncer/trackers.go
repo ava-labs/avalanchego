@@ -154,3 +154,7 @@ func (vt *voteTracker) markVoterResponded(vdrID ids.ShortID) {
 func (vt *voteTracker) anyPendingVoterResponse() bool {
 	return vt.contactedVoters.Len() != 0
 }
+
+func (vt *voteTracker) markVoterFailed(vdrID ids.ShortID) {
+	vt.failedVoters.Remove(vdrID)
+}

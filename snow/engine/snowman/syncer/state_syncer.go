@@ -51,11 +51,8 @@ type stateSyncer struct {
 	frontierTracker
 	voteTracker
 
-	// // IDs of validators we should request filtering the accepted state summaries from
-	// IDs of validators that failed to respond with their filtered accepted state summaries
-	failedAcceptedStateSummaries ids.ShortSet
-
-	weightedSummaries map[string]weightedSummary // hash --> (summary, weight)
+	// hash --> (summary, weight)
+	weightedSummaries map[string]weightedSummary
 
 	// number of times the state sync has been attempted
 	attempts int
@@ -254,7 +251,7 @@ func (ss *stateSyncer) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, re
 
 	// If we can't get a response from [validatorID], act as though they said
 	// that they think none of the containers we sent them in GetAccepted are accepted
-	ss.failedAcceptedStateSummaries.Add(validatorID)
+	ss.markVoterFailed(validatorID)
 
 	return ss.AcceptedStateSummary(validatorID, requestID, [][]byte{})
 }

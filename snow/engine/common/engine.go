@@ -44,14 +44,14 @@ type Handler interface {
 }
 
 type AllGetsServer interface {
-	GeStateSummaryHandler
+	GetStateSummaryHandler
 	GetAcceptedFrontierHandler
 	GetAcceptedHandler
 	GetAncestorsHandler
 	GetHandler
 }
 
-type GeStateSummaryHandler interface {
+type GetStateSummaryHandler interface {
 	GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error
 	GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error
 }
