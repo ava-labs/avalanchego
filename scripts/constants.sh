@@ -24,6 +24,6 @@ static_ld_flags=''
 if [ "${STATIC_COMPILATION:-}" = 1 ]
 then
     export CC=musl-gcc
-    which $CC > /dev/null || ( echo $CC must be available for static compilation && exit 1 )
+    command -v $CC || ( echo $CC must be available for static compilation && exit 1 )
     static_ld_flags=' -extldflags "-static" -linkmode external '
 fi
