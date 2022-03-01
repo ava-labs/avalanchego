@@ -80,7 +80,7 @@ func TestStateSyncIsSkippedIfNoBeaconIsProvided(t *testing.T) {
 	commonCfg := common.Config{
 		Ctx:          snow.DefaultConsensusContextTest(),
 		Beacons:      noBeacons,
-		SampleK:      noBeacons.Len(),
+		SampleK:      int(noBeacons.Weight()),
 		Alpha:        (noBeacons.Weight() + 1) / 2,
 		StartupAlpha: (3*beacons.Weight() + 3) / 4,
 		Sender:       sender,
@@ -134,7 +134,7 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	commonCfg := common.Config{
 		Ctx:          snow.DefaultConsensusContextTest(),
 		Beacons:      beacons,
-		SampleK:      beacons.Len(),
+		SampleK:      int(beacons.Weight()),
 		Alpha:        (beacons.Weight() + 1) / 2,
 		StartupAlpha: (3*beacons.Weight() + 3) / 4,
 		Sender:       sender,
@@ -192,7 +192,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	commonCfg := common.Config{
 		Ctx:          snow.DefaultConsensusContextTest(),
 		Beacons:      beacons,
-		SampleK:      beacons.Len(),
+		SampleK:      int(beacons.Weight()),
 		Alpha:        (beacons.Weight() + 1) / 2,
 		StartupAlpha: (3*beacons.Weight() + 3) / 4,
 		Sender:       sender,
@@ -297,7 +297,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	commonCfg := common.Config{
 		Ctx:          snow.DefaultConsensusContextTest(),
 		Beacons:      beacons,
-		SampleK:      beacons.Len(),
+		SampleK:      int(beacons.Weight()),
 		Alpha:        (beacons.Weight() + 1) / 2,
 		StartupAlpha: (3*beacons.Weight() + 3) / 4,
 		Sender:       sender,
@@ -383,7 +383,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	commonCfg := common.Config{
 		Ctx:          snow.DefaultConsensusContextTest(),
 		Beacons:      beacons,
-		SampleK:      beacons.Len(),
+		SampleK:      int(beacons.Weight()),
 		Alpha:        (beacons.Weight() + 1) / 2,
 		StartupAlpha: (3*beacons.Weight() + 3) / 4,
 		Sender:       sender,
@@ -481,7 +481,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	commonCfg := common.Config{
 		Ctx:          snow.DefaultConsensusContextTest(),
 		Beacons:      beacons,
-		SampleK:      beacons.Len(),
+		SampleK:      int(beacons.Weight()),
 		Alpha:        (beacons.Weight() + 1) / 2,
 		StartupAlpha: (3*beacons.Weight() + 3) / 4,
 		Sender:       sender,
