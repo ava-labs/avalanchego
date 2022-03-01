@@ -14,6 +14,7 @@ import (
 // Singleton StatefulPrecompiledContract for W/R access to the contract deployer allow list.
 var (
 	AllowListPrecompile StatefulPrecompiledContract = createAllowListPrecompile()
+	_                   StatefulPrecompileConfig    = &AllowListConfig{}
 )
 
 // Enum constants for valid AllowListRole
@@ -50,6 +51,9 @@ func (c *AllowListConfig) Configure(state StateDB) {
 		SetAllowListRole(state, adminAddr, Admin)
 	}
 }
+
+// Contract returns the singleton stateful precompiled contract to be used for the allow list.
+func (c *AllowListConfig) Contract() StatefulPrecompiledContract { return AllowListPrecompile }
 
 // Valid returns true iff [s] represents a valid role.
 func ValidAllowListRole(s common.Hash) bool {

@@ -450,6 +450,8 @@ type Rules struct {
 
 	// Optional stateful precompile rules
 	IsAllowListEnabled bool
+
+	Precompiles map[common.Address]precompile.StatefulPrecompiledContract
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -478,6 +480,15 @@ func (c *ChainConfig) AvalancheRules(blockNum, blockTimestamp *big.Int) Rules {
 
 	rules.IsSubnetEVM = c.IsSubnetEVM(blockTimestamp)
 	rules.IsAllowListEnabled = c.IsAllowList(blockTimestamp)
+
+	// Initialize the stateful precompiles that should be enabled at [blockTimestamp].
+	rules.Precompiles = make(map[common.Address]precompile.StatefulPrecompiledContract)
+	for _, config := range c.enabledStatefulPrecompiles() {
+		if utils.IsForked(config.Timestamp(), blockTimestamp) {
+			rules.Precompiles[config.Address()] = config.Contract()
+		}
+	}
+
 	return rules
 }
 

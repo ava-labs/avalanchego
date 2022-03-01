@@ -85,11 +85,16 @@ func (evm *EVM) precompile(addr common.Address) (precompile.StatefulPrecompiledC
 		precompiles = PrecompiledContractsHomestead
 	}
 
-	// Enable the optional stateful precompiles
-	if evm.chainRules.IsAllowListEnabled {
-		precompiles[precompile.AllowListAddress] = precompile.AllowListPrecompile
-	}
+	// Check the existing precompiles first
 	p, ok := precompiles[addr]
+	if ok {
+		return p, true
+	}
+
+	// Otherwise, check the chain rules for the additionally configured precompiles.
+	// TODO add a test to ensure that no precompile will be added that conflicts with
+	// an existing precompile.
+	p, ok = evm.chainRules.Precompiles[addr]
 	return p, ok
 }
 
