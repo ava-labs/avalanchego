@@ -33,14 +33,18 @@ type fullVM struct {
 func init() {
 	ctx := snow.DefaultContextTest()
 	beacons = validators.NewSet()
-	beaconsIDs := []ids.ShortID{
-		ids.GenerateTestShortID(),
-		ids.GenerateTestShortID(),
-		ids.GenerateTestShortID(),
+	for idx := 0; idx < maxOutstandingStateSyncRequests+1; idx++ {
+		beaconID := ids.GenerateTestShortID()
+		err := beacons.AddWeight(beaconID, uint64(1))
+		ctx.Log.AssertNoError(err)
 	}
-	for _, beaconID := range beaconsIDs {
-		ctx.Log.AssertNoError(beacons.AddWeight(beaconID, uint64(1)))
+}
+
+func min(rhs, lhs int) int {
+	if rhs <= lhs {
+		return rhs
 	}
+	return lhs
 }
 
 func TestStateSyncIsSkippedIfNoBeaconIsProvided(t *testing.T) {
@@ -146,12 +150,9 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
 
 	// check that all beacons are reached out for frontiers
-	assert.True(beacons.Len() == len(contactedBeacons))
-	for _, beacon := range beacons.List() {
-		beaconID := beacon.ID()
-		assert.True(contactedBeacons.Contains(beaconID))
-
-		// check that beacon is duly marked is reached out
+	assert.True(len(contactedBeacons) == min(beacons.Len(), maxOutstandingStateSyncRequests))
+	for beaconID := range contactedBeacons {
+		// check that beacon is duly marked as reached out
 		assert.True(syncer.hasSeederBeenContacted(beaconID))
 	}
 
@@ -512,12 +513,8 @@ func TestVotingRoundStart(t *testing.T) {
 
 	// once frontier is received from a majority of beacons,
 	// all beacons are reached out for votes
-	assert.True(beacons.Len() == len(contactedBeacons))
-	for _, beacon := range beacons.List() {
-		beaconID := beacon.ID()
-		_, ok := contactedBeacons[beaconID]
-		assert.True(ok)
-
+	assert.True(len(contactedVoters) == min(beacons.Len(), maxOutstandingStateSyncRequests))
+	for beaconID := range contactedVoters {
 		// check that beacon is duly marked is reached out
 		assert.True(syncer.hasVoterBeenContacted(beaconID))
 	}

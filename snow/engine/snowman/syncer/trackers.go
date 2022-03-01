@@ -70,7 +70,7 @@ func (ft *frontierTracker) clear() {
 
 func (ft *frontierTracker) pickSeedersToContact() ids.ShortSet {
 	res := ids.NewShortSet(1)
-	for ft.targetSeeders.Len() > 0 && ft.targetSeeders.Len() < maxOutstandingStateSyncRequests {
+	for ft.targetSeeders.Len() > 0 && res.Len() < maxOutstandingStateSyncRequests {
 		vdr, _ := ft.targetSeeders.Pop()
 		res.Add(vdr)
 	}
@@ -133,7 +133,7 @@ func (vt *voteTracker) storeVoters(vdrs validators.Set) {
 
 func (vt *voteTracker) pickVotersToContact() ids.ShortSet {
 	res := ids.NewShortSet(1)
-	for vt.targetVoters.Len() > 0 && vt.targetVoters.Len() < maxOutstandingStateSyncRequests {
+	for vt.targetVoters.Len() > 0 && res.Len() < maxOutstandingStateSyncRequests {
 		vdr, _ := vt.targetVoters.Pop()
 		res.Add(vdr)
 	}
