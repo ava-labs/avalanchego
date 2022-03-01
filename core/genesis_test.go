@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/assert"
 )
 
 func setupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig, common.Hash, error) {
@@ -170,8 +171,8 @@ func TestSetupGenesis(t *testing.T) {
 
 func TestStatefulPrecompilesConfigure(t *testing.T) {
 	type test struct {
-		getConfig   func() *params.ChainConfig
-		assertState func(t *testing.T, sdb *state.StateDB)
+		getConfig   func() *params.ChainConfig             // Return the config that enables the stateful precompile at the genesis for the test
+		assertState func(t *testing.T, sdb *state.StateDB) // Check that the stateful precompiles were configured correctly
 	}
 
 	addr := common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC")
@@ -188,10 +189,8 @@ func TestStatefulPrecompilesConfigure(t *testing.T) {
 				return &config
 			},
 			assertState: func(t *testing.T, sdb *state.StateDB) {
-				// Check that the stateful precompiles were configured correctly
-				if role := precompile.GetAllowListStatus(sdb, addr); !precompile.IsAllowListAdmin(role) {
-					t.Fatalf("Expected allow list status to be %s, but found %s", precompile.Admin, role)
-				}
+				assert.Equal(t, precompile.Admin, precompile.GetAllowListStatus(sdb, addr), "unexpected allow list status for modified address")
+				assert.Equal(t, 1, sdb.GetNonce(precompile.AllowListAddress))
 			},
 		},
 	} {
