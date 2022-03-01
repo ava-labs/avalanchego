@@ -4,6 +4,9 @@
 package precompile
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -11,6 +14,10 @@ import (
 // Ex. the function setBalance(addr address, balance uint256) should be passed in as the string:
 // "setBalance(address,uint256)"
 func CalculateFunctionSelector(functionSignature string) []byte {
+	// TODO replace with more complete regex for valid function signatures.
+	if containsSpaces := strings.Contains(functionSignature, " "); containsSpaces {
+		panic(fmt.Errorf("function signature %q should not contain any spaces", functionSignature))
+	}
 	hash := crypto.Keccak256([]byte(functionSignature))
 	return hash[:4]
 }
