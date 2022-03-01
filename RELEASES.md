@@ -4,11 +4,35 @@
 
 This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.
 
+### Consensus
+
+- Introduced a new vertex type to support future `Avalanche` based network upgrades.
+- Added pending message metrics to the chain message queues.
+- Refactored event dispatchers to simplify dependencies and remove dead code.
+
+### PlatformVM
+
+- Added `json` encoding option to the `platform.getTx` call.
+- Added `platform.getBlock` API.
+- Cleaned up block building logic to be more modular and testable.
+
 ### Coreth
 
-- Migrate go-ethereum v1.10.16 changes
-- Increase FeeHistory maximum historical limit to improve MetaMask UI on C-Chain
-- Enable chain state metrics
+- Increased `FeeHistory` maximum historical limit to improve MetaMask UI on the C-Chain.
+- Enabled chain state metrics.
+- Migrated go-ethereum v1.10.16 changes.
+
+### Miscellaneous
+
+- Added the ability to load new VM plugins dynamically.
+- Implemented X-chain + P-chain wallet that can be used to build and sign transactions. Without providing a full node private keys.
+- Integrated e2e testing to the repo to avoid maintaining multiple synced repos.
+- Fixed `proposervm` height indexing check to correctly mark the indexer as repaired.
+- Introduced message throttling overrides to be used in future improvements to reliably send messages.
+- Introduced a cap on the client specified request deadline.
+- Increased the default `leveldb` open files limit to `1024`.
+- Documented the `leveldb` configurations.
+- Performed various cleanup passes.
 
 ## [v1.7.5](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.5)
 
