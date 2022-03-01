@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"math/rand"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -49,6 +50,19 @@ func min(rhs, lhs int) int {
 		return rhs
 	}
 	return lhs
+}
+
+func pickRandomFrom(population map[ids.ShortID]uint32) ids.ShortID {
+	rnd := rand.Intn(len(population)) // #nosec G404
+	res := ids.ShortEmpty
+	for k := range population {
+		if rnd == 0 {
+			res = k
+			break
+		}
+		rnd--
+	}
+	return res
 }
 
 func TestStateSyncIsSkippedIfNoBeaconIsProvided(t *testing.T) {
@@ -99,7 +113,7 @@ func TestStateSyncIsSkippedIfNoBeaconIsProvided(t *testing.T) {
 		return nil
 	}
 
-	// check Start returns no errors
+	// Start syncer without errors
 	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
 
 	// check that StateSync is called immediately with no frontiers
@@ -150,7 +164,7 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 		contactedBeacons.Union(ss)
 	}
 
-	// check Start returns no errors
+	// Start syncer without errors
 	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
 
 	// check that all beacons are reached out for frontiers
@@ -210,7 +224,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 		}
 	}
 
-	// check Start returns no errors
+	// Start syncer without errors
 	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
 	initiallyReachedOutBeaconsSize := len(contactedBeacons)
 	assert.True(initiallyReachedOutBeaconsSize > 0)
@@ -227,11 +241,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	}
 
 	// pick one of the beacons that have been reached out
-	var responsiveBeaconID ids.ShortID
-	for k := range contactedBeacons {
-		responsiveBeaconID = k
-		break
-	}
+	responsiveBeaconID := pickRandomFrom(contactedBeacons)
 	responsiveBeaconReqID := contactedBeacons[responsiveBeaconID]
 
 	// check a response with wrong request ID is dropped
@@ -317,7 +327,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 		}
 	}
 
-	// check Start returns no errors
+	// Start syncer without errors
 	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
 	initiallyReachedOutBeaconsSize := len(contactedBeacons)
 	assert.True(initiallyReachedOutBeaconsSize > 0)
@@ -333,11 +343,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	}
 
 	// pick one of the beacons that have been reached out
-	var responsiveBeaconID ids.ShortID
-	for k := range contactedBeacons {
-		responsiveBeaconID = k
-		break
-	}
+	responsiveBeaconID := pickRandomFrom(contactedBeacons)
 	responsiveBeaconReqID := contactedBeacons[responsiveBeaconID]
 
 	// response is valid, but invalid summary is not recorded
@@ -405,15 +411,14 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 		}
 	}
 
-	// check Start returns no errors
+	// Start syncer without errors
 	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
+	initiallyReachedOutBeaconsSize := len(contactedBeacons)
+	assert.True(initiallyReachedOutBeaconsSize > 0)
+	assert.True(initiallyReachedOutBeaconsSize <= maxOutstandingStateSyncRequests)
 
 	// pick one of the beacons that have been reached out
-	var unresponsiveBeaconID ids.ShortID
-	for k := range contactedBeacons {
-		unresponsiveBeaconID = k
-		break
-	}
+	unresponsiveBeaconID := pickRandomFrom(contactedBeacons)
 	unresponsiveBeaconReqID := contactedBeacons[unresponsiveBeaconID]
 
 	fullVM.CantStateSyncGetKeyHash = true
@@ -431,6 +436,10 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	// unresponsiveBeacon not pending anymore
 	assert.False(syncer.hasSeederBeenContacted(unresponsiveBeaconID))
 	assert.True(syncer.failedSeeders.Contains(unresponsiveBeaconID))
+
+	// even in case of timeouts, other listed beacons
+	// are reached for data
+	assert.True(len(contactedBeacons) > initiallyReachedOutBeaconsSize)
 
 	// mock VM to simulate an valid but late summary is returned
 	summary := []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
