@@ -52,7 +52,7 @@ func CheckConfigure(parentTimestamp *big.Int, currentTimestamp *big.Int, config 
 	isCurrentBlockForked := utils.IsForked(forkTimestamp, currentTimestamp)
 	// If the network upgrade goes into effect within this transition, configure the stateful precompile
 	if !isParentForked && isCurrentBlockForked {
-		// Setting some value for code prevents the account from getting cleared
+		// Setting some value for code prevents the state in the contract from getting cleared
 		// when the block is committed
 		state.SetCode(config.Address(), statefulPrecompileMarker)
 		config.Configure(state)
