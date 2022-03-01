@@ -31,6 +31,8 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"reflect"
+	"time"
 
 	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ava-labs/subnet-evm/utils"
@@ -100,7 +102,7 @@ var (
 		SubnetEVMTimestamp:  big.NewInt(0),
 		FeeConfig:           DefaultFeeConfig,
 		AllowFeeRecipients:  false,
-		AllowListConfig: precompile.AllowListConfig{
+		AllowListConfig: &precompile.AllowListConfig{
 			BlockTimestamp: big.NewInt(0),
 			AllowListAdmins: []common.Address{
 				common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"),
@@ -109,8 +111,8 @@ var (
 		},
 	}
 
-	TestChainConfig        = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), DefaultFeeConfig, false, precompile.AllowListConfig{}}
-	TestPreSubnetEVMConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, DefaultFeeConfig, false, precompile.AllowListConfig{}}
+	TestChainConfig        = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), DefaultFeeConfig, false, nil}
+	TestPreSubnetEVMConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, DefaultFeeConfig, false, nil}
 )
 
 // ChainConfig is the core config which determines the blockchain settings.
@@ -141,7 +143,7 @@ type ChainConfig struct {
 	FeeConfig          *FeeConfig `json:"feeConfig,omitempty"`
 	AllowFeeRecipients bool       `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
 
-	AllowListConfig precompile.AllowListConfig `json:"allowListConfig"` // Config for the allow list precompile
+	AllowListConfig *precompile.AllowListConfig `json:"allowListConfig,omitempty"` // Config for the allow list precompile
 }
 
 type FeeConfig struct {
@@ -234,10 +236,13 @@ func (c *ChainConfig) IsSubnetEVM(blockTimestamp *big.Int) bool {
 
 // IsAllowList returns whether [blockTimestamp] is either equal to the AllowList fork block timestamp or greater.
 func (c *ChainConfig) IsAllowList(blockTimestamp *big.Int) bool {
+	if c.AllowListConfig == nil {
+		return false
+	}
 	return utils.IsForked(c.AllowListConfig.Timestamp(), blockTimestamp)
 }
 
-// IsIstanbul returns whether num is either equal to the Istanbul fork block or greater.
+// GetFeeConfig returns the *FeeConfig if it exists.
 func (c *ChainConfig) GetFeeConfig() *FeeConfig {
 	if c.FeeConfig == nil {
 		return DefaultFeeConfig
@@ -339,6 +344,21 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 	return nil
 }
 
+func isNil(a interface{}) bool {
+	return a == nil || reflect.ValueOf(a).IsNil()
+}
+
+func matchNil(a, b interface{}) (match, ni bool) {
+	switch {
+	case isNil(a) && isNil(b):
+		return true, true
+	case !isNil(a) && !isNil(b):
+		return true, false
+	default:
+		return false, false
+	}
+}
+
 func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headHeight *big.Int, headTimestamp *big.Int) *ConfigCompatError {
 	if isForkIncompatible(c.HomesteadBlock, newcfg.HomesteadBlock, headHeight) {
 		return newCompatError("Homestead fork block", c.HomesteadBlock, newcfg.HomesteadBlock)
@@ -374,12 +394,27 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headHeight *big.Int, 
 	if isForkIncompatible(c.MuirGlacierBlock, newcfg.MuirGlacierBlock, headHeight) {
 		return newCompatError("Muir Glacier fork block", c.MuirGlacierBlock, newcfg.MuirGlacierBlock)
 	}
+
+	// Check subnet-evm specific activations
 	if isForkIncompatible(c.SubnetEVMTimestamp, newcfg.SubnetEVMTimestamp, headTimestamp) {
 		return newCompatError("SubnetEVM fork block timestamp", c.SubnetEVMTimestamp, newcfg.SubnetEVMTimestamp)
 	}
+	currentTime := big.NewInt(time.Now().Unix())
+	if match, ni := matchNil(c.AllowListConfig, newcfg.AllowListConfig); match && !ni {
+		if isForkIncompatible(c.AllowListConfig.Timestamp(), newcfg.AllowListConfig.Timestamp(), headTimestamp) {
+			return newCompatError("AllowList fork block timestamp", c.AllowListConfig.Timestamp(), newcfg.AllowListConfig.Timestamp())
+		}
+	} else if !match {
+		return newCompatError("AllowList", currentTime, currentTime)
+	}
 
-	if isForkIncompatible(c.AllowListConfig.Timestamp(), newcfg.AllowListConfig.Timestamp(), headTimestamp) {
-		return newCompatError("AllowList fork block timestamp", c.AllowListConfig.Timestamp(), newcfg.AllowListConfig.Timestamp())
+	// Check compatibility of misc, non-timed configs ([currentTime] returns on
+	// incompatibility to force error propagation)
+	if match, _ := matchNil(c.FeeConfig, newcfg.FeeConfig); !match {
+		return newCompatError("FeeConfig", currentTime, currentTime)
+	}
+	if c.AllowFeeRecipients != newcfg.AllowFeeRecipients {
+		return newCompatError("AllowFeeRecipients", currentTime, currentTime)
 	}
 
 	return nil
@@ -483,8 +518,8 @@ func (c *ChainConfig) AvalancheRules(blockNum, blockTimestamp *big.Int) Rules {
 func (c *ChainConfig) enabledStatefulPrecompiles() []precompile.StatefulPrecompileConfig {
 	statefulPrecompileConfigs := make([]precompile.StatefulPrecompileConfig, 0)
 
-	if c.AllowListConfig.Timestamp() != nil {
-		statefulPrecompileConfigs = append(statefulPrecompileConfigs, &c.AllowListConfig)
+	if c.AllowListConfig != nil {
+		statefulPrecompileConfigs = append(statefulPrecompileConfigs, c.AllowListConfig)
 	}
 
 	return statefulPrecompileConfigs
