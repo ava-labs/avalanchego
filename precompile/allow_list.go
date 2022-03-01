@@ -8,11 +8,10 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 )
 
-// Singleton StatefulPrecompiledContract for W/R access to the contract deployer allow list.
 var (
+	// Singleton StatefulPrecompiledContract for W/R access to the contract deployer allow list.
 	AllowListPrecompile StatefulPrecompiledContract = createAllowListPrecompile()
 	_                   StatefulPrecompileConfig    = &AllowListConfig{}
 )
@@ -147,7 +146,6 @@ func writeAllowList(evm PrecompileAccessibleState, callerAddr common.Address, mo
 	// Verify that the caller is in the allow list and therefore has the right to modify it
 	callerStatus := GetAllowListStatus(evm.GetStateDB(), callerAddr)
 	if !IsAllowListAdmin(callerStatus) {
-		log.Info("allow list EVM received attempt to modify the allow list from a non-allowed address", "callerAddr", callerAddr, "callerStatus", callerStatus)
 		return nil, remainingGas, fmt.Errorf("caller %s cannot modify allow list", callerAddr)
 	}
 
@@ -169,7 +167,8 @@ func createAllowListSetter(role common.Hash) func(evm PrecompileAccessibleState,
 	}
 }
 
-// readAllowList parses [input] into a single address and returns the 32 byte hash that specifies the designated role of that address.
+// readAllowList is the execution function for read access to the allow list.
+// parses [input] into a single address and returns the 32 byte hash that specifies the designated role of that address.
 func readAllowList(evm PrecompileAccessibleState, callerAddr common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	// Note: this should never happen since the required gas should be verified before calling Run.
 	if suppliedGas < ReadAllowListGasCost {

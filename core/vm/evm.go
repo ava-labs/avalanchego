@@ -37,7 +37,6 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/holiman/uint256"
 )
 
@@ -490,7 +489,6 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	if evm.chainRules.IsAllowListEnabled {
 		allowListRole := precompile.GetAllowListStatus(evm.StateDB, evm.TxContext.Origin)
 		if !precompile.IsAllowListDeployer(allowListRole) {
-			log.Info("tx.origin is not authorized to deploy a contract", "origin", evm.TxContext.Origin, "status", allowListRole)
 			return nil, common.Address{}, 0, fmt.Errorf("tx.origin %s is not authorized to deploy a contract", evm.TxContext.Origin)
 		}
 	}

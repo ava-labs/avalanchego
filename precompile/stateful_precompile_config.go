@@ -11,8 +11,6 @@ import (
 	"github.com/ava-labs/subnet-evm/utils"
 )
 
-var statefulPrecompileMarker = []byte{0x1}
-
 // StatefulPrecompileConfig defines the interface for a stateful precompile to
 type StatefulPrecompileConfig interface {
 	// Address returns the address where the stateful precompile is accessible.
@@ -43,19 +41,14 @@ type StatefulPrecompileConfig interface {
 // configured at genesis, or happens during block processing to update the state before processing the given block.
 // TODO: add ability to call Configure at different timestamps, so that developers can easily re-configure by updating the
 // stateful precompile config.
+// Assumes that [config] is non-nil.
 func CheckConfigure(parentTimestamp *big.Int, currentTimestamp *big.Int, config StatefulPrecompileConfig, state StateDB) {
-	// If the stateful precompile is nil, skip configuring it
-	if config == nil {
-		return
-	}
 	forkTimestamp := config.Timestamp()
-	isParentForked := utils.IsForked(forkTimestamp, parentTimestamp)
-	isCurrentBlockForked := utils.IsForked(forkTimestamp, currentTimestamp)
 	// If the network upgrade goes into effect within this transition, configure the stateful precompile
-	if !isParentForked && isCurrentBlockForked {
-		// Setting some value for code prevents the state in the contract from getting cleared
-		// when the block is committed
-		state.SetCode(config.Address(), statefulPrecompileMarker)
+	if utils.IsForkTransition(forkTimestamp, parentTimestamp, currentTimestamp) {
+		// Set the nonce of the precompile's address (as is done when a contract is created) to ensure
+		// that it is marked as non-empty and will not be cleaned up when the statedb is finalized.
+		state.SetNonce(config.Address(), 1)
 		config.Configure(state)
 	}
 }

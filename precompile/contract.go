@@ -24,7 +24,7 @@ type PrecompileAccessibleState interface {
 type StateDB interface {
 	GetState(common.Address, common.Hash) common.Hash
 	SetState(common.Address, common.Hash, common.Hash)
-	SetCode(common.Address, []byte)
+	SetNonce(common.Address, uint64)
 }
 
 // StatefulPrecompiledContract is the interface for executing a precompiled contract
@@ -38,7 +38,8 @@ type StatefulPrecompiledContract interface {
 
 // statefulPrecompileFunction defines a function implemented by a stateful precompile
 type statefulPrecompileFunction struct {
-	// selector is the function selector for this function
+	// selector is the 4 byte function selector for this function
+	// This should be calculated from the function signature using CalculateFunctionSelector
 	selector []byte
 	// execute is performed when this function is selected
 	execute RunStatefulPrecompileFunc

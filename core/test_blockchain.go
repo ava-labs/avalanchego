@@ -74,8 +74,8 @@ var tests = []ChainTest{
 		TestInsertChainValidBlockFee,
 	},
 	{
-		"AllowList",
-		TestAllowList,
+		"TestStatefulPrecompiles",
+		TestStatefulPrecompiles,
 	},
 }
 
@@ -1499,8 +1499,8 @@ func TestInsertChainValidBlockFee(t *testing.T, create func(db ethdb.Database, c
 	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
 }
 
-func TestAllowList(t *testing.T, create func(db ethdb.Database, chainConfig *params.ChainConfig, lastAcceptedHash common.Hash) (*BlockChain, error)) {
-
+// TestStatefulPrecompiles provides a testing framework to ensure that processing transactions interacting with the stateful precompiles work as expected.
+func TestStatefulPrecompiles(t *testing.T, create func(db ethdb.Database, chainConfig *params.ChainConfig, lastAcceptedHash common.Hash) (*BlockChain, error)) {
 	var (
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
@@ -1512,11 +1512,10 @@ func TestAllowList(t *testing.T, create func(db ethdb.Database, chainConfig *par
 		chainDB = rawdb.NewMemoryDatabase()
 	)
 
-	fmt.Println("addr1", addr1, "addr2", addr2)
-
-	// Ensure that key1 has some funds in the genesis block.
+	// Ensure that key1 has sufficient funds in the genesis block for all of the tests.
 	genesisBalance := new(big.Int).Mul(big.NewInt(1000000), big.NewInt(params.Ether))
 	config := *params.TestChainConfig
+	// Set all of the required config parameters
 	config.AllowListConfig = precompile.AllowListConfig{
 		BlockTimestamp: big.NewInt(0),
 		AllowListAdmins: []common.Address{
@@ -1536,46 +1535,55 @@ func TestAllowList(t *testing.T, create func(db ethdb.Database, chainConfig *par
 	}
 	defer blockchain.Stop()
 
-	// This call generates a chain of 3 blocks.
 	signer := types.LatestSigner(params.TestChainConfig)
-	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
-	// to the BlockChain's database while generating blocks.
 	tip := big.NewInt(50000 * params.GWei)
 
-	// check the state of the last accepted block
-	checkState := func(sdb *state.StateDB) error {
-		res := precompile.GetAllowListStatus(sdb, addr2)
-		if precompile.Admin != res {
-			return fmt.Errorf("expected allow list status to be updated to %s, but found %s", precompile.Admin, res)
-		}
+	// Simple framework to add a test that the stateful precompile works as expected
+	type test struct {
+		addTx         func(gen *BlockGen)
+		verifyGenesis func(sdb *state.StateDB)
+		verifyState   func(sdb *state.StateDB) error
+	}
+	tests := map[string]test{
+		"allow list": {
+			addTx: func(gen *BlockGen) {
+				feeCap := new(big.Int).Add(gen.BaseFee(), tip)
+				input, err := precompile.PackModifyAllowList(addr2, precompile.Admin)
+				if err != nil {
+					t.Fatal(err)
+				}
+				tx := types.NewTx(&types.DynamicFeeTx{
+					ChainID:   params.TestChainConfig.ChainID,
+					Nonce:     gen.TxNonce(addr1),
+					To:        &precompile.AllowListAddress,
+					Gas:       3_000_000,
+					Value:     common.Big0,
+					GasFeeCap: feeCap,
+					GasTipCap: tip,
+					Data:      input,
+				})
 
-		return nil
+				signedTx, err := types.SignTx(tx, signer, key1)
+				if err != nil {
+					t.Fatal(err)
+				}
+				gen.AddTx(signedTx)
+			},
+			verifyState: func(sdb *state.StateDB) error {
+				res := precompile.GetAllowListStatus(sdb, addr2)
+				if precompile.Admin != res {
+					return fmt.Errorf("unexpected allow list status %s, expected %s", res, precompile.Admin)
+				}
+				return nil
+			},
+		},
 	}
 
+	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
+	// to the BlockChain's database while generating blocks.
 	chain, _, err := GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, 1, 0, func(i int, gen *BlockGen) {
-		feeCap := new(big.Int).Add(gen.BaseFee(), tip)
-		input, err := precompile.PackModifyAllowList(addr2, precompile.Admin)
-		if err != nil {
-			t.Fatal(err)
-		}
-		tx := types.NewTx(&types.DynamicFeeTx{
-			ChainID:   params.TestChainConfig.ChainID,
-			Nonce:     gen.TxNonce(addr1),
-			To:        &precompile.AllowListAddress,
-			Gas:       3_000_000,
-			Value:     common.Big0,
-			GasFeeCap: feeCap,
-			GasTipCap: tip,
-			Data:      input,
-		})
-
-		signedTx, err := types.SignTx(tx, signer, key1)
-		if err != nil {
-			t.Fatal(err)
-		}
-		gen.AddTx(signedTx)
-		if err := checkState(gen.statedb); err != nil {
-			t.Fatal(err)
+		for _, test := range tests {
+			test.addTx(gen)
 		}
 	})
 	if err != nil {
@@ -1590,12 +1598,28 @@ func TestAllowList(t *testing.T, create func(db ethdb.Database, chainConfig *par
 		t.Fatal(err)
 	}
 
-	stateDB, err := blockchain.StateAt(chain[0].Root())
+	genesisState, err := blockchain.StateAt(blockchain.Genesis().Root())
 	if err != nil {
-		panic(err)
-	}
-
-	if err := checkState(stateDB); err != nil {
 		t.Fatal(err)
 	}
+	for _, test := range tests {
+		if test.verifyGenesis == nil {
+			continue
+		}
+		test.verifyGenesis(genesisState)
+	}
+
+	// Run all of the necessary state verification
+	checkState := func(sdb *state.StateDB) error {
+		for _, test := range tests {
+			if err := test.verifyState(sdb); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	// This tests that the precompiles work as expected when they are enabled
+
+	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
 }

@@ -169,42 +169,56 @@ func TestSetupGenesis(t *testing.T) {
 }
 
 func TestStatefulPrecompilesConfigure(t *testing.T) {
-	config := *params.TestChainConfig
-	// Include the StatefulPrecompileConfigs here so that they will be configured in the genesis
-	allowListAdminAddr := common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC")
-	config.AllowListConfig = precompile.AllowListConfig{
-		BlockTimestamp: big.NewInt(0),
-		AllowListAdmins: []common.Address{
-			allowListAdminAddr,
+	type test struct {
+		getConfig   func() *params.ChainConfig
+		assertState func(t *testing.T, sdb *state.StateDB)
+	}
+
+	addr := common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC")
+
+	// Test suite to ensure that stateful precompiles are configured correctly in the genesis.
+	for name, test := range map[string]test{
+		"allow list enabled in genesis": {
+			getConfig: func() *params.ChainConfig {
+				config := *params.TestChainConfig
+				config.AllowListConfig = precompile.AllowListConfig{
+					BlockTimestamp:  big.NewInt(0),
+					AllowListAdmins: []common.Address{addr},
+				}
+				return &config
+			},
+			assertState: func(t *testing.T, sdb *state.StateDB) {
+				// Check that the stateful precompiles were configured correctly
+				if role := precompile.GetAllowListStatus(sdb, addr); !precompile.IsAllowListAdmin(role) {
+					t.Fatalf("Expected allow list status to be %s, but found %s", precompile.Admin, role)
+				}
+			},
 		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			config := test.getConfig()
+
+			genesis := &Genesis{
+				Config: config,
+				Alloc: GenesisAlloc{
+					{1}: {Balance: big.NewInt(1), Storage: map[common.Hash]common.Hash{{1}: {1}}},
+				},
+			}
+
+			db := rawdb.NewMemoryDatabase()
+			_, err := SetupGenesisBlock(db, genesis)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			genesisBlock := genesis.ToBlock(nil)
+			genesisRoot := genesisBlock.Root()
+
+			statedb, err := state.New(genesisRoot, state.NewDatabase(db), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			test.assertState(t, statedb)
+		})
 	}
-
-	genesis := &Genesis{
-		Config: &config,
-		Alloc: GenesisAlloc{
-			{1}: {Balance: big.NewInt(1), Storage: map[common.Hash]common.Hash{{1}: {1}}},
-		},
-	}
-
-	db := rawdb.NewMemoryDatabase()
-	_, err := SetupGenesisBlock(db, genesis)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	genesisBlock := genesis.ToBlock(nil)
-	genesisRoot := genesisBlock.Root()
-
-	statedb, err := state.New(genesisRoot, state.NewDatabase(db), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Check that the stateful precompiles were configured correctly
-	if role := precompile.GetAllowListStatus(statedb, allowListAdminAddr); !precompile.IsAllowListAdmin(role) {
-		t.Fatalf("Expected allow list status to be %s, but found %s", precompile.Admin, role)
-	}
-
-	// Any new stateful precompiles can add a genesis test by including their config above and check that [statedb]
-	// contains the expected result if the config is enabled in the genesis.
 }
