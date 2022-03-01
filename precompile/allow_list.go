@@ -147,12 +147,6 @@ func writeAllowList(evm PrecompileAccessibleState, callerAddr common.Address, mo
 		return nil, remainingGas, fmt.Errorf("caller %s cannot modify allow list", callerAddr)
 	}
 
-	log.Info("allow list args", "address", modifyAddress, "status", role)
-	if err != nil {
-		log.Info("allow list reverted", "err", err)
-		return nil, remainingGas, fmt.Errorf("failed to unpack modify allow list input: %w", err)
-	}
-
 	SetAllowListRole(evm.GetStateDB(), modifyAddress, role)
 
 	// Return an empty output and the remaining gas

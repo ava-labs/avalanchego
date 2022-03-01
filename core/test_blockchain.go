@@ -1517,7 +1517,7 @@ func TestAllowList(t *testing.T, create func(db ethdb.Database, chainConfig *par
 	// Ensure that key1 has some funds in the genesis block.
 	genesisBalance := new(big.Int).Mul(big.NewInt(1000000), big.NewInt(params.Ether))
 	config := *params.TestChainConfig
-	config.AllowListConfig = precompile.AllowListConfig{
+	config.AllowListConfig = &precompile.AllowListConfig{
 		BlockTimestamp: big.NewInt(0),
 		AllowListAdmins: []common.Address{
 			addr1,
