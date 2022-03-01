@@ -29,50 +29,50 @@ type ChainTest struct {
 }
 
 var tests = []ChainTest{
-	// {
-	// 	"InsertChainAcceptSingleBlock",
-	// 	TestInsertChainAcceptSingleBlock,
-	// },
-	// {
-	// 	"InsertForkedChain",
-	// 	TestInsertLongForkedChain,
-	// },
-	// {
-	// 	"AcceptNonCanonicalBlock",
-	// 	TestAcceptNonCanonicalBlock,
-	// },
-	// {
-	// 	"SetPreferenceRewind",
-	// 	TestSetPreferenceRewind,
-	// },
-	// {
-	// 	"BuildOnVariousStages",
-	// 	TestBuildOnVariousStages,
-	// },
-	// {
-	// 	"EmptyBlocks",
-	// 	TestEmptyBlocks,
-	// },
-	// {
-	// 	"AcceptBlockIdenticalStateRoot",
-	// 	TestAcceptBlockIdenticalStateRoot,
-	// },
-	// {
-	// 	"ReprocessAcceptBlockIdenticalStateRoot",
-	// 	TestReprocessAcceptBlockIdenticalStateRoot,
-	// },
-	// {
-	// 	"GenerateChainInvalidBlockFee",
-	// 	TestGenerateChainInvalidBlockFee,
-	// },
-	// {
-	// 	"InsertChainInvalidBlockFee",
-	// 	TestInsertChainInvalidBlockFee,
-	// },
-	// {
-	// 	"InsertChainValidBlockFee",
-	// 	TestInsertChainValidBlockFee,
-	// },
+	{
+		"InsertChainAcceptSingleBlock",
+		TestInsertChainAcceptSingleBlock,
+	},
+	{
+		"InsertForkedChain",
+		TestInsertLongForkedChain,
+	},
+	{
+		"AcceptNonCanonicalBlock",
+		TestAcceptNonCanonicalBlock,
+	},
+	{
+		"SetPreferenceRewind",
+		TestSetPreferenceRewind,
+	},
+	{
+		"BuildOnVariousStages",
+		TestBuildOnVariousStages,
+	},
+	{
+		"EmptyBlocks",
+		TestEmptyBlocks,
+	},
+	{
+		"AcceptBlockIdenticalStateRoot",
+		TestAcceptBlockIdenticalStateRoot,
+	},
+	{
+		"ReprocessAcceptBlockIdenticalStateRoot",
+		TestReprocessAcceptBlockIdenticalStateRoot,
+	},
+	{
+		"GenerateChainInvalidBlockFee",
+		TestGenerateChainInvalidBlockFee,
+	},
+	{
+		"InsertChainInvalidBlockFee",
+		TestInsertChainInvalidBlockFee,
+	},
+	{
+		"InsertChainValidBlockFee",
+		TestInsertChainValidBlockFee,
+	},
 	{
 		"AllowList",
 		TestAllowList,
