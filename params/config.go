@@ -31,6 +31,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ava-labs/subnet-evm/utils"
@@ -377,25 +378,27 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headHeight *big.Int, 
 	if isForkIncompatible(c.MuirGlacierBlock, newcfg.MuirGlacierBlock, headHeight) {
 		return newCompatError("Muir Glacier fork block", c.MuirGlacierBlock, newcfg.MuirGlacierBlock)
 	}
+
+	// Check subnet-evm specific activations
 	if isForkIncompatible(c.SubnetEVMTimestamp, newcfg.SubnetEVMTimestamp, headTimestamp) {
 		return newCompatError("SubnetEVM fork block timestamp", c.SubnetEVMTimestamp, newcfg.SubnetEVMTimestamp)
 	}
-
-	// TODO: enforce compat
-	if c.FeeConfig != nil && newcfg.FeeConfig == nil {
-	}
-
-	if c.AllowFeeRecipients && newcfg.AllowFeeRecipients {
-	}
-
+	currentTime := big.NewInt(time.Now().Unix())
 	if c.AllowListConfig != nil && newcfg.AllowListConfig != nil {
 		if isForkIncompatible(c.AllowListConfig.Timestamp(), newcfg.AllowListConfig.Timestamp(), headTimestamp) {
 			return newCompatError("AllowList fork block timestamp", c.AllowListConfig.Timestamp(), newcfg.AllowListConfig.Timestamp())
 		}
-	} else if c.AllowListConfig == nil && newcfg.AllowListConfig == nil {
-		return nil
-	} else {
-		return newCompatError("AllowList fork block timestamp", big.NewInt(-1), big.NewInt(-1))
+	} else if (c.AllowListConfig == nil && newcfg.AllowListConfig != nil) || (c.AllowListConfig != nil && newcfg.AllowListConfig == nil) {
+		return newCompatError("AllowList", currentTime, currentTime)
+	}
+
+	// Check compatibility of misc, non-timed configs ([currentTime] returns on
+	// incompatibility to force error propagation)
+	if (c.FeeConfig == nil && newcfg.FeeConfig != nil) || (c.FeeConfig != nil && newcfg.FeeConfig == nil) {
+		return newCompatError("FeeConfig", currentTime, currentTime)
+	}
+	if (c.AllowFeeRecipients && !newcfg.AllowFeeRecipients) || (!c.AllowFeeRecipients && newcfg.AllowFeeRecipients) {
+		return newCompatError("AllowFeeRecipients", currentTime, currentTime)
 	}
 
 	return nil
