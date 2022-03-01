@@ -278,7 +278,9 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	assert.True(bytes.Equal(ws.Summary, summary))
 
 	// other listed beacons are reached for data
-	assert.True(len(contactedBeacons) > initiallyReachedOutBeaconsSize)
+	assert.True(
+		len(contactedBeacons) > initiallyReachedOutBeaconsSize ||
+			len(contactedBeacons) == beacons.Len())
 }
 
 func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
@@ -362,7 +364,9 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 
 	// even in case of invalid summaries, other listed beacons
 	// are reached for data
-	assert.True(len(contactedBeacons) > initiallyReachedOutBeaconsSize)
+	assert.True(
+		len(contactedBeacons) > initiallyReachedOutBeaconsSize ||
+			len(contactedBeacons) == beacons.Len())
 }
 
 func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
@@ -439,7 +443,9 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 
 	// even in case of timeouts, other listed beacons
 	// are reached for data
-	assert.True(len(contactedBeacons) > initiallyReachedOutBeaconsSize)
+	assert.True(
+		len(contactedBeacons) > initiallyReachedOutBeaconsSize ||
+			len(contactedBeacons) == beacons.Len())
 
 	// mock VM to simulate an valid but late summary is returned
 	summary := []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
