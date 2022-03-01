@@ -30,6 +30,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/ava-labs/subnet-evm/params"
@@ -122,6 +123,8 @@ var (
 	PrecompiledAddressesIstanbul  []common.Address
 	PrecompiledAddressesByzantium []common.Address
 	PrecompiledAddressesHomestead []common.Address
+	PrecompiledAddressesBLS       []common.Address
+	PrecompileAllNativeAddresses  map[common.Address]struct{}
 )
 
 func init() {
@@ -136,6 +139,23 @@ func init() {
 	}
 	for k := range PrecompiledContractsBerlin {
 		PrecompiledAddressesBerlin = append(PrecompiledAddressesBerlin, k)
+	}
+	for k := range PrecompiledContractsBLS {
+		PrecompiledAddressesBLS = append(PrecompiledAddressesBLS, k)
+	}
+
+	// Set of all native precompile addresses that are in use
+	PrecompileAllNativeAddresses = make(map[common.Address]struct{})
+	for _, k := range append(PrecompiledAddressesBerlin, PrecompiledAddressesBLS...) {
+		PrecompileAllNativeAddresses[k] = struct{}{}
+	}
+
+	// Ensure that this package will not compile if there is a conflict present with the declared
+	// precompile addresses.
+	for _, k := range precompile.UsedAddresses {
+		if _, ok := PrecompileAllNativeAddresses[k]; ok {
+			panic(fmt.Errorf("precompile address collides with existing native address: %s", k))
+		}
 	}
 }
 

@@ -22,7 +22,7 @@ const (
 var (
 	AllowListAddress = common.HexToAddress("0x0200000000000000000000000000000000000000")
 
-	PrecompileAddresses = []common.Address{
+	UsedAddresses = []common.Address{
 		AllowListAddress,
 	}
 )

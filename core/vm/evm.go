@@ -45,7 +45,7 @@ var prohibitedAddresses = map[common.Address]struct{}{
 }
 
 func init() {
-	for _, addr := range precompile.PrecompileAddresses {
+	for _, addr := range precompile.UsedAddresses {
 		prohibitedAddresses[addr] = struct{}{}
 	}
 }
