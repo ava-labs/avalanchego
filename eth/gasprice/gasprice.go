@@ -45,6 +45,22 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 )
 
+const (
+	// DefaultMaxCallBlockHistory is the number of blocks that can be fetched in
+	// a single call to eth_feeHistory.
+	DefaultMaxCallBlockHistory int = 2048
+	// DefaultMaxBlockHistory is the number of blocks from the last accepted
+	// block that can be fetched in eth_feeHistory.
+	//
+	// DefaultMaxBlockHistory is chosen to be a value larger than the required
+	// fee lookback window that MetaMask uses (20k blocks).
+	DefaultMaxBlockHistory int = 25_000
+	// DefaultFeeHistoryCacheSize is chosen to be some value larger than
+	// [DefaultMaxBlockHistory] to ensure all block lookups can be cached when
+	// serving a fee history query.
+	DefaultFeeHistoryCacheSize int = 30_000
+)
+
 var (
 	DefaultMaxPrice   = big.NewInt(150 * params.GWei)
 	DefaultMinPrice   = big.NewInt(0 * params.GWei)
@@ -52,13 +68,18 @@ var (
 )
 
 type Config struct {
-	Blocks           int
-	Percentile       int
-	MaxHeaderHistory int
-	MaxBlockHistory  int
-	MaxPrice         *big.Int `toml:",omitempty"`
-	MinPrice         *big.Int `toml:",omitempty"`
-	MinGasUsed       *big.Int `toml:",omitempty"`
+	// Blocks specifies the number of blocks to fetch during gas price estimation.
+	Blocks     int
+	Percentile int
+	// MaxCallBlockHistory specifies the maximum number of blocks that can be
+	// fetched in a single eth_feeHistory call.
+	MaxCallBlockHistory int
+	// MaxBlockHistory specifies the furthest back behind the last accepted block that can
+	// be requested by fee history.
+	MaxBlockHistory int
+	MaxPrice        *big.Int `toml:",omitempty"`
+	MinPrice        *big.Int `toml:",omitempty"`
+	MinGasUsed      *big.Int `toml:",omitempty"`
 }
 
 // OracleBackend includes all necessary background APIs for oracle.
@@ -70,6 +91,7 @@ type OracleBackend interface {
 	ChainConfig() *params.ChainConfig
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 	MinRequiredTip(ctx context.Context, header *types.Header) (*big.Int, error)
+	LastAcceptedBlock() *types.Block
 }
 
 // Oracle recommends gas prices based on the content of recent
@@ -94,9 +116,10 @@ type Oracle struct {
 	// clock to decide what set of rules to use when recommending a gas price
 	clock mockable.Clock
 
-	checkBlocks, percentile           int
-	maxHeaderHistory, maxBlockHistory int
-	historyCache                      *lru.Cache
+	checkBlocks, percentile int
+	maxCallBlockHistory     int
+	maxBlockHistory         int
+	historyCache            *lru.Cache
 }
 
 // NewOracle returns a new gasprice oracle which can recommend suitable
@@ -130,18 +153,18 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 		minGasUsed = DefaultMinGasUsed
 		log.Warn("Sanitizing invalid gasprice oracle min gas used", "provided", config.MinGasUsed, "updated", minGasUsed)
 	}
-	maxHeaderHistory := config.MaxHeaderHistory
-	if maxHeaderHistory < 1 {
-		maxHeaderHistory = 1
-		log.Warn("Sanitizing invalid gasprice oracle max header history", "provided", config.MaxHeaderHistory, "updated", maxHeaderHistory)
+	maxCallBlockHistory := config.MaxCallBlockHistory
+	if maxCallBlockHistory < 1 {
+		maxCallBlockHistory = DefaultMaxCallBlockHistory
+		log.Warn("Sanitizing invalid gasprice oracle max call block history", "provided", config.MaxCallBlockHistory, "updated", maxCallBlockHistory)
 	}
 	maxBlockHistory := config.MaxBlockHistory
 	if maxBlockHistory < 1 {
-		maxBlockHistory = 1
+		maxBlockHistory = DefaultMaxBlockHistory
 		log.Warn("Sanitizing invalid gasprice oracle max block history", "provided", config.MaxBlockHistory, "updated", maxBlockHistory)
 	}
 
-	cache, _ := lru.New(2048)
+	cache, _ := lru.New(DefaultFeeHistoryCacheSize)
 	headEvent := make(chan core.ChainHeadEvent, 1)
 	backend.SubscribeChainHeadEvent(headEvent)
 	go func() {
@@ -155,17 +178,17 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 	}()
 	minBaseFee := backend.ChainConfig().GetFeeConfig().MinBaseFee
 	return &Oracle{
-		backend:          backend,
-		lastPrice:        minPrice,
-		lastBaseFee:      new(big.Int).Set(minBaseFee),
-		minPrice:         minPrice,
-		maxPrice:         maxPrice,
-		minGasUsed:       minGasUsed,
-		checkBlocks:      blocks,
-		percentile:       percent,
-		maxHeaderHistory: maxHeaderHistory,
-		maxBlockHistory:  maxBlockHistory,
-		historyCache:     cache,
+		backend:             backend,
+		lastPrice:           minPrice,
+		lastBaseFee:         minBaseFee,
+		minPrice:            minPrice,
+		maxPrice:            maxPrice,
+		minGasUsed:          minGasUsed,
+		checkBlocks:         blocks,
+		percentile:          percent,
+		maxCallBlockHistory: maxCallBlockHistory,
+		maxBlockHistory:     maxBlockHistory,
+		historyCache:        cache,
 	}
 }
 

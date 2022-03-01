@@ -154,6 +154,10 @@ func (b *testBackend) CurrentHeader() *types.Header {
 	return b.chain.CurrentHeader()
 }
 
+func (b *testBackend) LastAcceptedBlock() *types.Block {
+	return b.chain.CurrentBlock()
+}
+
 func (b *testBackend) GetBlockByNumber(number uint64) *types.Block {
 	return b.chain.GetBlockByNumber(number)
 }
