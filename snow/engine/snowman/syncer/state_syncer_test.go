@@ -21,6 +21,8 @@ import (
 var (
 	_ block.ChainVM         = fullVM{}
 	_ block.StateSyncableVM = fullVM{}
+
+	beacons validators.Set
 )
 
 type fullVM struct {
@@ -28,10 +30,23 @@ type fullVM struct {
 	*block.TestStateSyncableVM
 }
 
+func init() {
+	ctx := snow.DefaultContextTest()
+	beacons = validators.NewSet()
+	beaconsIDs := []ids.ShortID{
+		ids.GenerateTestShortID(),
+		ids.GenerateTestShortID(),
+		ids.GenerateTestShortID(),
+	}
+	for _, beaconID := range beaconsIDs {
+		ctx.Log.AssertNoError(beacons.AddWeight(beaconID, uint64(1)))
+	}
+}
+
 func TestStateSyncIsSkippedIfNoBeaconIsProvided(t *testing.T) {
 	assert := assert.New(t)
 
-	emptyBeaconsList := validators.NewSet()
+	noBeacons := validators.NewSet()
 	sender := &common.SenderTest{T: t}
 	fullVM := &fullVM{
 		TestVM: &block.TestVM{
@@ -43,15 +58,16 @@ func TestStateSyncIsSkippedIfNoBeaconIsProvided(t *testing.T) {
 	}
 
 	commonCfg := common.Config{
-		Ctx:     snow.DefaultConsensusContextTest(),
-		Beacons: emptyBeaconsList,
-		SampleK: emptyBeaconsList.Len(),
-		Alpha:   (emptyBeaconsList.Weight() + 1) / 2,
-		Sender:  sender,
+		Ctx:          snow.DefaultConsensusContextTest(),
+		Beacons:      noBeacons,
+		SampleK:      noBeacons.Len(),
+		Alpha:        (noBeacons.Weight() + 1) / 2,
+		StartupAlpha: (3*beacons.Weight() + 3) / 4,
+		Sender:       sender,
 	}
 	dummyGetter, err := getter.New(fullVM, commonCfg)
 	assert.NoError(err)
-	dummyWeightTracker := tracker.NewWeightTracker(emptyBeaconsList, commonCfg.StartupAlpha)
+	dummyWeightTracker := tracker.NewWeightTracker(noBeacons, commonCfg.StartupAlpha)
 
 	cfg, err := NewConfig(
 		commonCfg,
@@ -82,18 +98,8 @@ func TestStateSyncIsSkippedIfNoBeaconIsProvided(t *testing.T) {
 	assert.True(stateSyncEmpty)
 }
 
-func TestBeaconsAreReachedForFrontierUponStartup(t *testing.T) {
+func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	assert := assert.New(t)
-
-	beacons := validators.NewSet()
-	beaconsIDs := []ids.ShortID{
-		ids.GenerateTestShortID(),
-		ids.GenerateTestShortID(),
-		ids.GenerateTestShortID(),
-	}
-	for _, beaconID := range beaconsIDs {
-		assert.NoError(beacons.AddWeight(beaconID, uint64(1)))
-	}
 
 	sender := &common.SenderTest{T: t}
 	fullVM := &fullVM{
@@ -106,11 +112,12 @@ func TestBeaconsAreReachedForFrontierUponStartup(t *testing.T) {
 	}
 
 	commonCfg := common.Config{
-		Ctx:     snow.DefaultConsensusContextTest(),
-		Beacons: beacons,
-		SampleK: beacons.Len(),
-		Alpha:   (beacons.Weight() + 1) / 2,
-		Sender:  sender,
+		Ctx:          snow.DefaultConsensusContextTest(),
+		Beacons:      beacons,
+		SampleK:      beacons.Len(),
+		Alpha:        (beacons.Weight() + 1) / 2,
+		StartupAlpha: (3*beacons.Weight() + 3) / 4,
+		Sender:       sender,
 	}
 	dummyGetter, err := getter.New(fullVM, commonCfg)
 	assert.NoError(err)
@@ -138,9 +145,10 @@ func TestBeaconsAreReachedForFrontierUponStartup(t *testing.T) {
 	// check Start returns no errors
 	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
 
-	// check that all the beacons are reached out for frontiers
-	assert.True(len(beaconsIDs) == len(contactedBeacons))
-	for _, beaconID := range beaconsIDs {
+	// check that all beacons are reached out for frontiers
+	assert.True(beacons.Len() == len(contactedBeacons))
+	for _, beacon := range beacons.List() {
+		beaconID := beacon.ID()
 		assert.True(contactedBeacons.Contains(beaconID))
 
 		// check that beacon is duly marked is reached out
@@ -154,16 +162,6 @@ func TestBeaconsAreReachedForFrontierUponStartup(t *testing.T) {
 func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	assert := assert.New(t)
 
-	beacons := validators.NewSet()
-	beaconsIDs := []ids.ShortID{
-		ids.GenerateTestShortID(),
-		ids.GenerateTestShortID(),
-		ids.GenerateTestShortID(),
-	}
-	for _, beaconID := range beaconsIDs {
-		assert.NoError(beacons.AddWeight(beaconID, uint64(1)))
-	}
-
 	sender := &common.SenderTest{T: t}
 	fullVM := &fullVM{
 		TestVM: &block.TestVM{
@@ -175,11 +173,12 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	}
 
 	commonCfg := common.Config{
-		Ctx:     snow.DefaultConsensusContextTest(),
-		Beacons: beacons,
-		SampleK: beacons.Len(),
-		Alpha:   (beacons.Weight() + 1) / 2,
-		Sender:  sender,
+		Ctx:          snow.DefaultConsensusContextTest(),
+		Beacons:      beacons,
+		SampleK:      beacons.Len(),
+		Alpha:        (beacons.Weight() + 1) / 2,
+		StartupAlpha: (3*beacons.Weight() + 3) / 4,
+		Sender:       sender,
 	}
 	dummyGetter, err := getter.New(fullVM, commonCfg)
 	assert.NoError(err)
@@ -220,7 +219,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	}
 
 	// pick one of the beacons that have been reached out
-	responsiveBeaconID := beaconsIDs[0]
+	responsiveBeaconID := beacons.List()[0].ID()
 	responsiveBeaconReqID := contactedBeacons[responsiveBeaconID]
 
 	// check a response with wrong request ID is dropped
@@ -260,14 +259,6 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	assert := assert.New(t)
 
-	beacons := validators.NewSet()
-	beaconsIDs := []ids.ShortID{
-		ids.GenerateTestShortID(),
-	}
-	for _, beaconID := range beaconsIDs {
-		assert.NoError(beacons.AddWeight(beaconID, uint64(1)))
-	}
-
 	sender := &common.SenderTest{T: t}
 	fullVM := &fullVM{
 		TestVM: &block.TestVM{
@@ -279,11 +270,12 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	}
 
 	commonCfg := common.Config{
-		Ctx:     snow.DefaultConsensusContextTest(),
-		Beacons: beacons,
-		SampleK: beacons.Len(),
-		Alpha:   (beacons.Weight() + 1) / 2,
-		Sender:  sender,
+		Ctx:          snow.DefaultConsensusContextTest(),
+		Beacons:      beacons,
+		SampleK:      beacons.Len(),
+		Alpha:        (beacons.Weight() + 1) / 2,
+		StartupAlpha: (3*beacons.Weight() + 3) / 4,
+		Sender:       sender,
 	}
 	dummyGetter, err := getter.New(fullVM, commonCfg)
 	assert.NoError(err)
@@ -323,7 +315,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	}
 
 	// pick one of the beacons that have been reached out
-	responsiveBeaconID := beaconsIDs[0]
+	responsiveBeaconID := beacons.List()[0].ID()
 	responsiveBeaconReqID := contactedBeacons[responsiveBeaconID]
 
 	// response is valid, but invalid summary is not recorded
@@ -344,14 +336,6 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	assert := assert.New(t)
 
-	beacons := validators.NewSet()
-	beaconsIDs := []ids.ShortID{
-		ids.GenerateTestShortID(),
-	}
-	for _, beaconID := range beaconsIDs {
-		assert.NoError(beacons.AddWeight(beaconID, uint64(1)))
-	}
-
 	sender := &common.SenderTest{T: t}
 	fullVM := &fullVM{
 		TestVM: &block.TestVM{
@@ -363,11 +347,12 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	}
 
 	commonCfg := common.Config{
-		Ctx:     snow.DefaultConsensusContextTest(),
-		Beacons: beacons,
-		SampleK: beacons.Len(),
-		Alpha:   (beacons.Weight() + 1) / 2,
-		Sender:  sender,
+		Ctx:          snow.DefaultConsensusContextTest(),
+		Beacons:      beacons,
+		SampleK:      beacons.Len(),
+		Alpha:        (beacons.Weight() + 1) / 2,
+		StartupAlpha: (3*beacons.Weight() + 3) / 4,
+		Sender:       sender,
 	}
 	dummyGetter, err := getter.New(fullVM, commonCfg)
 	assert.NoError(err)
@@ -398,8 +383,14 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
 
 	// pick one of the beacons that have been reached out
-	unresponsiveBeaconID := beaconsIDs[0]
+	unresponsiveBeaconID := beacons.List()[0].ID()
 	unresponsiveBeaconReqID := contactedBeacons[unresponsiveBeaconID]
+
+	fullVM.CantStateSyncGetKeyHash = true
+	fullVM.StateSyncGetKeyHashF = func(s common.Summary) (common.SummaryKey, common.SummaryHash, error) {
+		assert.True(len(s) == 0)
+		return nil, nil, fmt.Errorf("empty summary")
+	}
 
 	// assume timeout is reached and beacons is marked as unresponsive
 	assert.NoError(syncer.GetStateSummaryFrontierFailed(
@@ -407,7 +398,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 		unresponsiveBeaconReqID,
 	))
 
-	// responsiveBeacon not pending anymore
+	// unresponsiveBeacon not pending anymore
 	assert.False(syncer.hasSeederBeenContacted(unresponsiveBeaconID))
 	assert.True(syncer.failedSeeders.Contains(unresponsiveBeaconID))
 
@@ -429,4 +420,105 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 
 	// late summary is not recorded
 	assert.True(len(syncer.weightedSummaries) == 0)
+}
+
+// once all beacons respond, with possibly only a minority
+// having timeout, votes on collected frontiers are requested
+func TestVotingRoundStart(t *testing.T) {
+	assert := assert.New(t)
+
+	sender := &common.SenderTest{T: t}
+	fullVM := &fullVM{
+		TestVM: &block.TestVM{
+			TestVM: common.TestVM{T: t},
+		},
+		TestStateSyncableVM: &block.TestStateSyncableVM{
+			TestStateSyncableVM: common.TestStateSyncableVM{T: t},
+		},
+	}
+	commonCfg := common.Config{
+		Ctx:          snow.DefaultConsensusContextTest(),
+		Beacons:      beacons,
+		SampleK:      beacons.Len(),
+		Alpha:        (beacons.Weight() + 1) / 2,
+		StartupAlpha: (3*beacons.Weight() + 3) / 4,
+		Sender:       sender,
+	}
+	dummyGetter, err := getter.New(fullVM, commonCfg)
+	assert.NoError(err)
+	dummyWeightTracker := tracker.NewWeightTracker(beacons, commonCfg.StartupAlpha)
+	cfg, err := NewConfig(
+		commonCfg,
+		nil,
+		dummyGetter,
+		fullVM,
+		dummyWeightTracker)
+	assert.NoError(err)
+
+	commonSyncer := New(cfg, func(lastReqID uint32) error { return nil })
+	syncer, ok := commonSyncer.(*stateSyncer)
+	assert.True(ok)
+	assert.True(syncer.stateSyncVM != nil)
+
+	// set sender to track nodes reached out
+	contactedBeacons := make(map[ids.ShortID]uint32) // nodeID -> reqID map
+	sender.CantSendGetStateSummaryFrontier = true
+	sender.SendGetStateSummaryFrontierF = func(ss ids.ShortSet, reqID uint32) {
+		for nodeID := range ss {
+			contactedBeacons[nodeID] = reqID
+		}
+	}
+
+	// check Start returns no errors
+	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
+
+	// mock VM to simulate a valid summary is returned
+	summary := []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
+	fullVM.CantStateSyncGetKeyHash = true
+	fullVM.StateSyncGetKeyHashF = func(s common.Summary) (common.SummaryKey, common.SummaryHash, error) {
+		key := []byte{'k', 'e', 'y'}
+		hash := []byte{'h', 'a', 's', 'h'}
+		return key, hash, nil
+	}
+
+	contactedVoters := make(map[ids.ShortID]uint32) // nodeID -> reqID map
+	sender.CantSendGetAcceptedStateSummary = true
+	sender.SendGetAcceptedStateSummaryF = func(votersIDs ids.ShortSet, reqID uint32, sumList [][]byte) {
+		for nodeID := range votersIDs {
+			contactedVoters[nodeID] = reqID
+		}
+	}
+
+	for idx, beacon := range beacons.List() {
+		beaconID := beacon.ID()
+		reqID := contactedBeacons[beaconID]
+
+		// a majority of beacons returns its frontier
+		if idx <= int(commonCfg.Alpha-1) {
+			assert.NoError(syncer.StateSummaryFrontier(
+				beaconID,
+				reqID,
+				summary,
+			))
+			continue
+		}
+
+		// the rest of the beacons timeout
+		assert.NoError(syncer.GetStateSummaryFrontierFailed(
+			beaconID,
+			reqID,
+		))
+	}
+
+	// once frontier is received from a majority of beacons,
+	// all beacons are reached out for votes
+	assert.True(beacons.Len() == len(contactedBeacons))
+	for _, beacon := range beacons.List() {
+		beaconID := beacon.ID()
+		_, ok := contactedBeacons[beaconID]
+		assert.True(ok)
+
+		// check that beacon is duly marked is reached out
+		assert.True(syncer.hasVoterBeenContacted(beaconID))
+	}
 }

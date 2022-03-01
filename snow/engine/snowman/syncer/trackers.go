@@ -102,8 +102,9 @@ func (ft *frontierTracker) anyPendingSeederResponse() bool {
 	return ft.contactedSeeders.Len() != 0
 }
 
+// Note: markSeederFailed does not remove vdrID from contactedSeeders.
+// That is left up to a subsequent markSeederResponded call (with empty summary placeholder)
 func (ft *frontierTracker) markSeederFailed(vdrID ids.ShortID) {
-	ft.contactedSeeders.Remove(vdrID)
 	ft.failedSeeders.Add(vdrID)
 }
 
