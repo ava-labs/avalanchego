@@ -312,7 +312,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	}
 	statedb.Commit(false)
 	if err := statedb.Database().TrieDB().Commit(root, true, nil); err != nil {
-		panic(err)
+		panic(fmt.Sprintf("unable to commit genesis block: %v", err))
 	}
 
 	return types.NewBlock(head, nil, nil, nil, trie.NewStackTrie(nil))

@@ -83,10 +83,9 @@ func IsAllowListDeployer(s common.Hash) bool {
 
 // GetAllowListStatus returns the allow list role of [address].
 func GetAllowListStatus(state StateDB, address common.Address) common.Hash {
-	stateSlot := address.Hash()
-	res := state.GetState(AllowListAddress, stateSlot)
-	log.Info("allow list read", "address", address, "role", res)
-	return res
+	// Generate the state key for [address]
+	addressKey := address.Hash()
+	return state.GetState(AllowListAddress, addressKey)
 }
 
 // SetAllowListRole sets the permissions of [address] to [status]
@@ -94,14 +93,8 @@ func GetAllowListStatus(state StateDB, address common.Address) common.Hash {
 func SetAllowListRole(stateDB StateDB, address common.Address, role common.Hash) {
 	// Generate the state key for [address]
 	addressKey := address.Hash()
-	log.Info("allow list write", "address", address, "role", role)
 	// Assign [role] to the address
 	stateDB.SetState(AllowListAddress, addressKey, role)
-
-	foundRole := GetAllowListStatus(stateDB, address)
-	if foundRole != role {
-		panic(fmt.Errorf("found role %s, expected role %s", foundRole, role))
-	}
 }
 
 // PackModifyAllowList packs [address] and [role] into the appropriate arguments for modifying the allow list.
@@ -109,7 +102,7 @@ func SetAllowListRole(stateDB StateDB, address common.Address, role common.Hash)
 // selector that should be encoded in the input.
 func PackModifyAllowList(address common.Address, role common.Hash) ([]byte, error) {
 	// function selector (4 bytes) + hash for address
-	input := make([]byte, 0, 4+common.HashLength)
+	input := make([]byte, 0, selectorLen+common.HashLength)
 
 	switch role {
 	case Admin:
@@ -128,7 +121,7 @@ func PackModifyAllowList(address common.Address, role common.Hash) ([]byte, erro
 
 // PackReadAllowList packs [address] into the input data to the read allow list function
 func PackReadAllowList(address common.Address) []byte {
-	input := make([]byte, 0, 4+common.HashLength)
+	input := make([]byte, 0, selectorLen+common.HashLength)
 	input = append(input, readAllowListSignature...)
 	input = append(input, address.Hash().Bytes()...)
 	return input

@@ -9,6 +9,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+const (
+	selectorLen = 4
+)
+
 type RunStatefulPrecompileFunc func(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error)
 
 // PrecompileAccessibleState defines the interface exposed to stateful precompile contracts
@@ -75,12 +79,12 @@ func newStatefulPrecompileWithFunctionSelectors(functions ...*statefulPrecompile
 // Run selects the function using the 4 byte function selector at the start of the input and executes the underlying function on the
 // given arguments.
 func (s *statefulPrecompileWithFunctionSelectors) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
-	if len(input) < 4 {
+	if len(input) < selectorLen {
 		return nil, suppliedGas, fmt.Errorf("missing function selector to precompile - input length (%d)", len(input))
 	}
 
-	selector := input[:4]
-	functionInput := input[4:]
+	selector := input[:selectorLen]
+	functionInput := input[selectorLen:]
 	function, ok := s.functions[string(selector)]
 	if !ok {
 		return nil, suppliedGas, fmt.Errorf("invalid function selector %#x", selector)
@@ -91,12 +95,12 @@ func (s *statefulPrecompileWithFunctionSelectors) Run(accessibleState Precompile
 
 // RequiredGas returns the amount of gas consumed by the underlying function
 func (s *statefulPrecompileWithFunctionSelectors) RequiredGas(input []byte) uint64 {
-	if len(input) < 4 {
+	if len(input) < selectorLen {
 		return 0
 	}
 
-	selector := input[:4]
-	functionInput := input[4:]
+	selector := input[:selectorLen]
+	functionInput := input[selectorLen:]
 	function, ok := s.functions[string(selector)]
 	if !ok {
 		return 0

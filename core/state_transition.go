@@ -36,7 +36,6 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/params"
-	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -340,23 +339,8 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
 		ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
 	}
-
-	input := st.data
-	if len(input) == 36 {
-		res := precompile.GetAllowListStatus(st.state, common.BytesToAddress(input[4:]))
-		fmt.Println("precompile state post", res)
-	} else {
-		panic(fmt.Errorf("unexpected input length: %d", len(input)))
-	}
 	st.refundGas(subnetEVM)
 	st.state.AddBalance(st.evm.Context.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice))
-
-	if len(input) == 36 {
-		res := precompile.GetAllowListStatus(st.state, common.BytesToAddress(input[4:]))
-		fmt.Println("precompile state post", res)
-	} else {
-		panic(fmt.Errorf("unexpected input length: %d", len(input)))
-	}
 
 	return &ExecutionResult{
 		UsedGas:    st.gasUsed(),

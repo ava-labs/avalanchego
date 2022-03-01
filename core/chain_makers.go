@@ -37,7 +37,6 @@ import (
 	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/params"
-	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -114,19 +113,10 @@ func (b *BlockGen) AddTxWithChain(bc *BlockChain, tx *types.Transaction) {
 		b.SetCoinbase(common.Address{})
 	}
 	b.statedb.Prepare(tx.Hash(), len(b.txs))
-	// fmt.Println("start root", b.header.Root)
 	receipt, err := ApplyTransaction(b.config, bc, &b.header.Coinbase, b.gasPool, b.statedb, b.header, tx, &b.header.GasUsed, vm.Config{})
 	if err != nil {
 		panic(err)
 	}
-
-	modAddr := common.BytesToAddress(tx.Data()[4:])
-	res := precompile.GetAllowListStatus(b.statedb, modAddr)
-	if precompile.Admin != res {
-		panic(fmt.Sprintf("Unexpected res %s, modAddr: %s", res, modAddr))
-	}
-
-	// fmt.Println("end root", common.BytesToHash(receipt.PostState))
 	b.txs = append(b.txs, tx)
 	b.receipts = append(b.receipts, receipt)
 }

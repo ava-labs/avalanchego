@@ -255,20 +255,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	}
 
 	if isPrecompile {
-		if len(input) == 36 {
-			res := precompile.GetAllowListStatus(evm.StateDB, common.BytesToAddress(input[4:]))
-			fmt.Println("precompile state pre", res)
-		} else {
-			panic(fmt.Errorf("unexpected input length: %d", len(input)))
-		}
 		ret, gas, err = RunStatefulPrecompiledContract(p, evm, caller.Address(), addr, input, gas, evm.interpreter.readOnly)
-
-		if len(input) == 36 {
-			res := precompile.GetAllowListStatus(evm.StateDB, common.BytesToAddress(input[4:]))
-			fmt.Println("precompile state post", res)
-		} else {
-			panic(fmt.Errorf("unexpected input length: %d", len(input)))
-		}
 	} else {
 		// Initialise a new contract and set the code that is to be used by the EVM.
 		// The contract is a scoped environment for this execution context only.
@@ -293,22 +280,10 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		if err != ErrExecutionReverted {
 			gas = 0
 		}
-		if true {
-			panic("reverted")
-		}
 		// TODO: consider clearing up unused snapshots:
 		//} else {
 		//	evm.StateDB.DiscardSnapshot(snapshot)
 	}
-
-	// This should print it one more time and check the value in the StateDB
-	if len(input) == 36 {
-		res := precompile.GetAllowListStatus(evm.StateDB, common.BytesToAddress(input[4:]))
-		fmt.Println("precompile state post", res)
-	} else {
-		panic(fmt.Errorf("unexpected input length: %d", len(input)))
-	}
-
 	return ret, gas, err
 }
 
