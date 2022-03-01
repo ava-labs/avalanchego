@@ -561,22 +561,6 @@ func (vm *VMClient) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	return ids.ToID(resp.BlkId)
 }
 
-func (vm *VMClient) RegisterStateSyncer(stateSyncer []ids.ShortID) error {
-	nodesID := make([][]byte, 0, len(stateSyncer))
-	for _, ss := range stateSyncer {
-		nodesID = append(nodesID, ss.Bytes())
-	}
-
-	_, err := vm.client.RegisterStateSyncer(
-		context.Background(),
-		&vmproto.RegisterStateSyncerRequest{
-			NodeIdS: nodesID,
-		},
-	)
-
-	return err
-}
-
 func (vm *VMClient) StateSyncEnabled() (bool, error) {
 	resp, err := vm.client.StateSyncEnabled(
 		context.Background(),

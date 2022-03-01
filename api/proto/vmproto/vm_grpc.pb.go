@@ -50,7 +50,6 @@ type VMClient interface {
 	VerifyHeightIndex(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*VerifyHeightIndexResponse, error)
 	GetBlockIDAtHeight(ctx context.Context, in *GetBlockIDAtHeightRequest, opts ...grpc.CallOption) (*GetBlockIDAtHeightResponse, error)
 	// State sync
-	RegisterStateSyncer(ctx context.Context, in *RegisterStateSyncerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	StateSyncEnabled(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncEnabledResponse, error)
 	StateSyncGetLastSummary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncGetLastSummaryResponse, error)
 	StateSyncGetKeyHash(ctx context.Context, in *StateSyncGetKeyHashRequest, opts ...grpc.CallOption) (*StateSyncGetKeyHashResponse, error)
@@ -293,15 +292,6 @@ func (c *vMClient) GetBlockIDAtHeight(ctx context.Context, in *GetBlockIDAtHeigh
 	return out, nil
 }
 
-func (c *vMClient) RegisterStateSyncer(ctx context.Context, in *RegisterStateSyncerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, "/vmproto.VM/RegisterStateSyncer", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *vMClient) StateSyncEnabled(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncEnabledResponse, error) {
 	out := new(StateSyncEnabledResponse)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/StateSyncEnabled", in, out, opts...)
@@ -396,7 +386,6 @@ type VMServer interface {
 	VerifyHeightIndex(context.Context, *emptypb.Empty) (*VerifyHeightIndexResponse, error)
 	GetBlockIDAtHeight(context.Context, *GetBlockIDAtHeightRequest) (*GetBlockIDAtHeightResponse, error)
 	// State sync
-	RegisterStateSyncer(context.Context, *RegisterStateSyncerRequest) (*emptypb.Empty, error)
 	StateSyncEnabled(context.Context, *emptypb.Empty) (*StateSyncEnabledResponse, error)
 	StateSyncGetLastSummary(context.Context, *emptypb.Empty) (*StateSyncGetLastSummaryResponse, error)
 	StateSyncGetKeyHash(context.Context, *StateSyncGetKeyHashRequest) (*StateSyncGetKeyHashResponse, error)
@@ -485,9 +474,6 @@ func (UnimplementedVMServer) VerifyHeightIndex(context.Context, *emptypb.Empty) 
 }
 func (UnimplementedVMServer) GetBlockIDAtHeight(context.Context, *GetBlockIDAtHeightRequest) (*GetBlockIDAtHeightResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetBlockIDAtHeight not implemented")
-}
-func (UnimplementedVMServer) RegisterStateSyncer(context.Context, *RegisterStateSyncerRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RegisterStateSyncer not implemented")
 }
 func (UnimplementedVMServer) StateSyncEnabled(context.Context, *emptypb.Empty) (*StateSyncEnabledResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StateSyncEnabled not implemented")
@@ -973,24 +959,6 @@ func _VM_GetBlockIDAtHeight_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VM_RegisterStateSyncer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RegisterStateSyncerRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(VMServer).RegisterStateSyncer(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/vmproto.VM/RegisterStateSyncer",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).RegisterStateSyncer(ctx, req.(*RegisterStateSyncerRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _VM_StateSyncEnabled_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
@@ -1223,10 +1191,6 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetBlockIDAtHeight",
 			Handler:    _VM_GetBlockIDAtHeight_Handler,
-		},
-		{
-			MethodName: "RegisterStateSyncer",
-			Handler:    _VM_RegisterStateSyncer_Handler,
 		},
 		{
 			MethodName: "StateSyncEnabled",

@@ -8,14 +8,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
-func (vm *blockVM) RegisterStateSyncer(stateSyncers []ids.ShortID) error {
-	if vm.ssVM == nil {
-		return common.ErrStateSyncableVMNotImplemented
-	}
-
-	return vm.ssVM.RegisterStateSyncer(stateSyncers)
-}
-
 func (vm *blockVM) StateSyncEnabled() (bool, error) {
 	if vm.ssVM == nil {
 		return false, common.ErrStateSyncableVMNotImplemented

@@ -279,22 +279,6 @@ func (vm *VMServer) GetBlockIDAtHeight(ctx context.Context, req *vmproto.GetBloc
 	}, errorToRPCError(err)
 }
 
-func (vm *VMServer) RegisterStateSyncer(ctx context.Context, req *vmproto.RegisterStateSyncerRequest) (*emptypb.Empty, error) {
-	ssVM, ok := vm.vm.(block.StateSyncableVM)
-	if !ok {
-		return nil, common.ErrStateSyncableVMNotImplemented
-	}
-
-	stateSyncers := make([]ids.ShortID, 0, len(req.NodeIdS))
-	for _, bytes := range req.NodeIdS {
-		var nodeID ids.ShortID
-		copy(nodeID[:], bytes)
-		stateSyncers = append(stateSyncers, nodeID)
-	}
-
-	return &emptypb.Empty{}, ssVM.RegisterStateSyncer(stateSyncers)
-}
-
 func (vm *VMServer) StateSyncEnabled(context.Context, *emptypb.Empty) (*vmproto.StateSyncEnabledResponse, error) {
 	ssVM, ok := vm.vm.(block.StateSyncableVM)
 	if !ok {
