@@ -31,6 +31,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"reflect"
 	"time"
 
 	"github.com/ava-labs/subnet-evm/precompile"
@@ -343,11 +344,15 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 	return nil
 }
 
-func matchNil(a, b interface{}) (match, n bool) {
+func isNil(a interface{}) bool {
+	return a == nil || reflect.ValueOf(a).IsNil()
+}
+
+func matchNil(a, b interface{}) (match, ni bool) {
 	switch {
-	case a == nil && b == nil:
+	case isNil(a) && isNil(b):
 		return true, true
-	case a != nil && b != nil:
+	case !isNil(a) && !isNil(b):
 		return true, false
 	default:
 		return false, false
@@ -395,7 +400,7 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headHeight *big.Int, 
 		return newCompatError("SubnetEVM fork block timestamp", c.SubnetEVMTimestamp, newcfg.SubnetEVMTimestamp)
 	}
 	currentTime := big.NewInt(time.Now().Unix())
-	if match, n := matchNil(c.AllowListConfig, newcfg.AllowListConfig); match && !n {
+	if match, ni := matchNil(c.AllowListConfig, newcfg.AllowListConfig); match && !ni {
 		if isForkIncompatible(c.AllowListConfig.Timestamp(), newcfg.AllowListConfig.Timestamp(), headTimestamp) {
 			return newCompatError("AllowList fork block timestamp", c.AllowListConfig.Timestamp(), newcfg.AllowListConfig.Timestamp())
 		}
