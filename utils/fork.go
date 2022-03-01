@@ -20,6 +20,5 @@ func IsForked(s, head *big.Int) bool {
 func IsForkTransition(fork *big.Int, parent *big.Int, current *big.Int) bool {
 	parentForked := IsForked(fork, parent)
 	currentForked := IsForked(fork, current)
-
 	return !parentForked && currentForked
 }

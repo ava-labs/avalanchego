@@ -924,19 +924,3 @@ func TestStateDBAccessList(t *testing.T) {
 		t.Fatalf("expected empty, got %d", got)
 	}
 }
-
-func TestStateDB1(t *testing.T) {
-	memDb := rawdb.NewMemoryDatabase()
-	db := NewDatabase(memDb)
-	state, _ := New(common.Hash{}, db, nil)
-
-	addr := common.Address{1}
-	key := common.Hash{1}
-	value := common.Hash{2}
-
-	state.SetState(addr, key, value)
-
-	if !state.Exist(addr) {
-		t.Fatal("not exist")
-	}
-}
