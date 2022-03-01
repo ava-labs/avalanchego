@@ -94,17 +94,18 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 	// Mark that we received a response from [validatorID]
 	ss.markSeederResponded(validatorID)
 
-	// retrieve key for summary and register frontier
+	// retrieve key for summary and register frontier;
+	// make sure next beacons are reached out
+	// even in case invalid summaries are received
 	_, hash, err := ss.stateSyncVM.StateSyncGetKeyHash(summary)
-	if err != nil {
-		ss.Ctx.Log.Debug("Could not retrieve key from summary %s: %v", summary, err)
-		return nil
-	}
-
-	if _, exists := ss.weightedSummaries[string(hash)]; !exists {
-		ss.weightedSummaries[string(hash)] = weightedSummary{
-			Summary: summary,
+	if err == nil {
+		if _, exists := ss.weightedSummaries[string(hash)]; !exists {
+			ss.weightedSummaries[string(hash)] = weightedSummary{
+				Summary: summary,
+			}
 		}
+	} else {
+		ss.Ctx.Log.Debug("Could not retrieve key from summary %s: %v", summary, err)
 	}
 
 	ss.sendGetStateSummaryFrontiers()
