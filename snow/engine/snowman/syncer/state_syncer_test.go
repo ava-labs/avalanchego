@@ -36,8 +36,6 @@ func init() {
 	ctx := snow.DefaultContextTest()
 	beacons = validators.NewSet()
 
-	// TODO: currently testing for large number of beacons.
-	// Add test for small beacons set too (wrt maxOutstandingStateSyncRequests)
 	for idx := 0; idx < 2*maxOutstandingStateSyncRequests; idx++ {
 		beaconID := ids.GenerateTestShortID()
 		err := beacons.AddWeight(beaconID, uint64(1))
@@ -465,4 +463,92 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 
 	// late summary is not recorded
 	assert.True(len(syncer.weightedSummaries) == 0)
+}
+
+func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
+	assert := assert.New(t)
+
+	sender := &common.SenderTest{T: t}
+	fullVM := &fullVM{
+		TestVM: &block.TestVM{
+			TestVM: common.TestVM{T: t},
+		},
+		TestStateSyncableVM: &block.TestStateSyncableVM{
+			TestStateSyncableVM: common.TestStateSyncableVM{T: t},
+		},
+	}
+
+	commonCfg := common.Config{
+		Ctx:          snow.DefaultConsensusContextTest(),
+		Beacons:      beacons,
+		SampleK:      beacons.Len(),
+		Alpha:        (beacons.Weight() + 1) / 2,
+		StartupAlpha: (3*beacons.Weight() + 3) / 4,
+		Sender:       sender,
+	}
+	dummyGetter, err := getter.New(fullVM, commonCfg)
+	assert.NoError(err)
+	dummyWeightTracker := tracker.NewWeightTracker(beacons, commonCfg.StartupAlpha)
+
+	cfg, err := NewConfig(
+		commonCfg,
+		nil,
+		dummyGetter,
+		fullVM,
+		dummyWeightTracker)
+	assert.NoError(err)
+	commonSyncer := New(cfg, func(lastReqID uint32) error { return nil })
+	syncer, ok := commonSyncer.(*stateSyncer)
+	assert.True(ok)
+	assert.True(syncer.stateSyncVM != nil)
+
+	// set sender to track nodes reached out
+	contactedBeacons := make(map[ids.ShortID]uint32) // nodeID -> reqID map
+	sender.CantSendGetStateSummaryFrontier = true
+	sender.SendGetStateSummaryFrontierF = func(ss ids.ShortSet, reqID uint32) {
+		for nodeID := range ss {
+			contactedBeacons[nodeID] = reqID
+		}
+	}
+
+	// mock VM to simulate an valid but late summary is returned
+	summary := []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
+	key := []byte{'k', 'e', 'y'}
+	hash := []byte{'h', 'a', 's', 'h'}
+	fullVM.CantStateSyncGetKeyHash = true
+	fullVM.StateSyncGetKeyHashF = func(s common.Summary) (common.SummaryKey, common.SummaryHash, error) {
+		return key, hash, nil
+	}
+
+	contactedVoters := make(map[ids.ShortID]uint32) // nodeID -> reqID map
+	sender.CantSendGetAcceptedStateSummary = true
+	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl [][]byte) {
+		for nodeID := range ss {
+			contactedVoters[nodeID] = reqID
+		}
+	}
+
+	// Start syncer without errors
+	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
+	assert.True(syncer.contactedSeeders.Len() != 0)
+
+	// have all reached out beacons respond
+	cumulatedWeight := uint64(0)
+	for syncer.contactedSeeders.Len() != 0 {
+		beaconID, found := syncer.contactedSeeders.Peek()
+		assert.True(found)
+		reqID := contactedBeacons[beaconID]
+
+		bw, _ := beacons.GetWeight(beaconID)
+		cumulatedWeight += bw
+
+		assert.NoError(syncer.StateSummaryFrontier(
+			beaconID,
+			reqID,
+			summary,
+		))
+	}
+
+	// check that vote requests are issued
+	assert.True(len(contactedVoters) != 0)
 }
