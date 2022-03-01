@@ -1,5 +1,15 @@
 # Release Notes
 
+## [v1.7.6](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.6)
+
+This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.
+
+### Coreth
+
+- Migrate go-ethereum v1.10.16 changes
+- Increase FeeHistory maximum historical limit to improve MetaMask UI on C-Chain
+- Enable chain state metrics
+
 ## [v1.7.5](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.5)
 
 This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.

@@ -32,7 +32,7 @@ const (
 	WriteBufferSize = 12 * opt.MiB
 
 	// HandleCap is the number of files descriptors to cap levelDB to use.
-	HandleCap = 256
+	HandleCap = 1024
 
 	// BitsPerKey is the number of bits to add to the bloom filter per key.
 	BitsPerKey = 10
@@ -121,7 +121,7 @@ type config struct {
 	// OpenFilesCacheCapacity defines the capacity of the open files caching.
 	// Use -1 for zero, this has same effect as specifying NoCacher to OpenFilesCacher.
 	//
-	// The default value is 256.
+	// The default value is 1024.
 	OpenFilesCacheCapacity int `json:"openFilesCacheCapacity"`
 	// WriteBuffer defines maximum size of a 'memdb' before flushed to
 	// 'sorted table'. 'memdb' is an in-memory DB backed by an on-disk
