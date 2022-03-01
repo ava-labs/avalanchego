@@ -4,6 +4,7 @@
 package syncer
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -140,5 +141,111 @@ func TestBeaconsAreReachedForFrontierUponStartup(t *testing.T) {
 	assert.True(len(beaconsIDs) == len(contactedBeacons))
 	for _, beaconID := range beaconsIDs {
 		assert.True(contactedBeacons.Contains(beaconID))
+
+		// check that beacon is duly marked is reached out
+		assert.True(syncer.hasSeederBeenContacted(beaconID))
 	}
+
+	// check that, obviously, no summary is yet registered
+	assert.True(len(syncer.weightedSummaries) == 0)
+}
+
+func TestUnrequestedStateSummaryFrontiersAreDropped(t *testing.T) {
+	assert := assert.New(t)
+
+	beacons := validators.NewSet()
+	beaconsIDs := []ids.ShortID{
+		ids.GenerateTestShortID(),
+		ids.GenerateTestShortID(),
+		ids.GenerateTestShortID(),
+	}
+	for _, beaconID := range beaconsIDs {
+		assert.NoError(beacons.AddWeight(beaconID, uint64(1)))
+	}
+
+	sender := &common.SenderTest{T: t}
+	fullVM := &fullVM{
+		TestVM: &block.TestVM{
+			TestVM: common.TestVM{T: t},
+		},
+		TestStateSyncableVM: &block.TestStateSyncableVM{
+			TestStateSyncableVM: common.TestStateSyncableVM{T: t},
+		},
+	}
+
+	commonCfg := common.Config{
+		Ctx:     snow.DefaultConsensusContextTest(),
+		Beacons: beacons,
+		SampleK: beacons.Len(),
+		Alpha:   (beacons.Weight() + 1) / 2,
+		Sender:  sender,
+	}
+	dummyGetter, err := getter.New(fullVM, commonCfg)
+	assert.NoError(err)
+	dummyWeightTracker := tracker.NewWeightTracker(beacons, commonCfg.StartupAlpha)
+
+	cfg, err := NewConfig(
+		commonCfg,
+		nil,
+		dummyGetter,
+		fullVM,
+		dummyWeightTracker)
+	assert.NoError(err)
+	commonSyncer := New(cfg, func(lastReqID uint32) error { return nil })
+	syncer, ok := commonSyncer.(*stateSyncer)
+	assert.True(ok)
+	assert.True(syncer.stateSyncVM != nil)
+
+	// set sender to track nodes reached out
+	contactedBeacons := make(map[ids.ShortID]uint32) // nodeID -> reqID map
+	sender.CantSendGetStateSummaryFrontier = true
+	sender.SendGetStateSummaryFrontierF = func(ss ids.ShortSet, reqID uint32) {
+		for nodeID := range ss {
+			contactedBeacons[nodeID] = reqID
+		}
+	}
+
+	// check Start returns no errors
+	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
+
+	// pick one of the beacons that have been reached out
+	key := []byte{'k', 'e', 'y'}
+	summary := []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
+	hash := []byte{'h', 'a', 's', 'h'}
+
+	fullVM.CantStateSyncGetKeyHash = true
+	fullVM.StateSyncGetKeyHashF = func(s common.Summary) (common.SummaryKey, common.SummaryHash, error) {
+		return key, hash, nil
+	}
+
+	responsiveBeaconID := beaconsIDs[0]
+	responsiveBeaconReqID := contactedBeacons[responsiveBeaconID]
+
+	// check a response with wrong request ID is dropped
+	assert.NoError(syncer.StateSummaryFrontier(
+		responsiveBeaconID,
+		responsiveBeaconReqID+1,
+		summary,
+	))
+	assert.True(syncer.hasSeederBeenContacted(responsiveBeaconID)) // responsiveBeacon still pending
+	assert.True(len(syncer.weightedSummaries) == 0)
+
+	// check a response from unsolicited node is dropped
+	unsolicitedNodeID := ids.GenerateTestShortID()
+	assert.NoError(syncer.StateSummaryFrontier(
+		unsolicitedNodeID,
+		responsiveBeaconReqID,
+		summary,
+	))
+	assert.True(len(syncer.weightedSummaries) == 0)
+
+	// check a valid response is duly recorded
+	assert.NoError(syncer.StateSummaryFrontier(
+		responsiveBeaconID,
+		responsiveBeaconReqID,
+		summary,
+	))
+	ws, ok := syncer.weightedSummaries[string(hash)]
+	assert.True(ok)
+	assert.True(bytes.Equal(ws.Summary, summary))
 }
