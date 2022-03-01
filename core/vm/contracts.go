@@ -150,7 +150,7 @@ func init() {
 		PrecompileAllNativeAddresses[k] = struct{}{}
 	}
 
-	// Ensure that this package will not compile if there is a conflict present with the declared
+	// Ensure that this package will panic during init if there is a conflict present with the declared
 	// precompile addresses.
 	for _, k := range precompile.UsedAddresses {
 		if _, ok := PrecompileAllNativeAddresses[k]; ok {
