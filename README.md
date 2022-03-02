@@ -74,33 +74,35 @@ and creates a `subnet-evm` genesis file.
 ```bash
 # to startup a local cluster (good for development)
 cd ${HOME}/go/src/github.com/ava-labs/subnet-evm
-./scripts/run.sh 1.7.5
+./scripts/run.sh 1.7.5 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
 ```
 
 Once the the network is started up, the following info will be printed to the
 console:
 ```bash
-Logs Directory: /var/folders/mp/6jm81gc11dv3xtcwxmrd8mcr0000gn/T/runnerlogs1191601352
-PID: 82023
+Logs Directory: /var/folders/mp/6jm81gc11dv3xtcwxmrd8mcr0000gn/T/runnerlogs2402729383
+PID: 90118
 
 EVM Chain ID: 99999
+Funded Address: 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
 RPC Endpoints:
-- http://localhost:62862/ext/bc/2UhiE7xptEJ39Br8WrGVqVVwrjd89ypr8qMWTruVn1Zajkk939/rpc
-- http://localhost:62864/ext/bc/2UhiE7xptEJ39Br8WrGVqVVwrjd89ypr8qMWTruVn1Zajkk939/rpc
-- http://localhost:62866/ext/bc/2UhiE7xptEJ39Br8WrGVqVVwrjd89ypr8qMWTruVn1Zajkk939/rpc
-- http://localhost:62868/ext/bc/2UhiE7xptEJ39Br8WrGVqVVwrjd89ypr8qMWTruVn1Zajkk939/rpc
-- http://localhost:62870/ext/bc/2UhiE7xptEJ39Br8WrGVqVVwrjd89ypr8qMWTruVn1Zajkk939/rpc
+- http://localhost:53423/ext/bc/AHdWCyWDaudRX4JkHNgpzyMFdhHK7iEgB4HHMTuarzWghkAdg/rpc
+- http://localhost:53425/ext/bc/AHdWCyWDaudRX4JkHNgpzyMFdhHK7iEgB4HHMTuarzWghkAdg/rpc
+- http://localhost:53427/ext/bc/AHdWCyWDaudRX4JkHNgpzyMFdhHK7iEgB4HHMTuarzWghkAdg/rpc
+- http://localhost:53429/ext/bc/AHdWCyWDaudRX4JkHNgpzyMFdhHK7iEgB4HHMTuarzWghkAdg/rpc
+- http://localhost:53431/ext/bc/AHdWCyWDaudRX4JkHNgpzyMFdhHK7iEgB4HHMTuarzWghkAdg/rpc
 
 WS Endpoints:
-- ws://localhost:62862/ext/bc/2UhiE7xptEJ39Br8WrGVqVVwrjd89ypr8qMWTruVn1Zajkk939/ws
-- ws://localhost:62864/ext/bc/2UhiE7xptEJ39Br8WrGVqVVwrjd89ypr8qMWTruVn1Zajkk939/ws
-- ws://localhost:62866/ext/bc/2UhiE7xptEJ39Br8WrGVqVVwrjd89ypr8qMWTruVn1Zajkk939/ws
-- ws://localhost:62868/ext/bc/2UhiE7xptEJ39Br8WrGVqVVwrjd89ypr8qMWTruVn1Zajkk939/ws
-- ws://localhost:62870/ext/bc/2UhiE7xptEJ39Br8WrGVqVVwrjd89ypr8qMWTruVn1Zajkk939/ws
+- ws://localhost:53423/ext/bc/AHdWCyWDaudRX4JkHNgpzyMFdhHK7iEgB4HHMTuarzWghkAdg/ws
+- ws://localhost:53425/ext/bc/AHdWCyWDaudRX4JkHNgpzyMFdhHK7iEgB4HHMTuarzWghkAdg/ws
+- ws://localhost:53427/ext/bc/AHdWCyWDaudRX4JkHNgpzyMFdhHK7iEgB4HHMTuarzWghkAdg/ws
+- ws://localhost:53429/ext/bc/AHdWCyWDaudRX4JkHNgpzyMFdhHK7iEgB4HHMTuarzWghkAdg/ws
+- ws://localhost:53431/ext/bc/AHdWCyWDaudRX4JkHNgpzyMFdhHK7iEgB4HHMTuarzWghkAdg/ws
 
 MetaMask Quick Start:
+Funded Address: 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
 Network Name: Local EVM
-RPC URL: http://localhost:62862/ext/bc/2UhiE7xptEJ39Br8WrGVqVVwrjd89ypr8qMWTruVn1Zajkk939/rpc
+RPC URL: http://localhost:53423/ext/bc/AHdWCyWDaudRX4JkHNgpzyMFdhHK7iEgB4HHMTuarzWghkAdg/rpc
 Chain ID: 99999
 Curreny Symbol: LEVM
 ```

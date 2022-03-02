@@ -34,8 +34,8 @@ type output struct {
 }
 
 func main() {
-	if len(os.Args) != 3 {
-		panic("missing args <yaml> <chainID>")
+	if len(os.Args) != 4 {
+		panic("missing args <yaml> <chainID> <address>")
 	}
 
 	yamlFile, err := ioutil.ReadFile(os.Args[1])
@@ -53,6 +53,7 @@ func main() {
 	color.Green("\n")
 
 	color.Green("EVM Chain ID: %s", os.Args[2])
+	color.Green("Funded Address: %s", os.Args[3])
 	color.Green("RPC Endpoints:")
 	for _, uri := range o.URIs {
 		color.Green("- %s%s/rpc", uri, o.Endpoint)
@@ -67,6 +68,7 @@ func main() {
 	color.Green("\n")
 
 	color.Yellow("MetaMask Quick Start:")
+	color.Yellow("Funded Address: %s", os.Args[3])
 	color.Yellow("Network Name: Local EVM")
 	color.Yellow("RPC URL: %s%s/rpc", o.URIs[0], o.Endpoint)
 	color.Yellow("Chain ID: %s", os.Args[2])

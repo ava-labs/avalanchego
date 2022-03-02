@@ -17,7 +17,14 @@ source "$SUBNET_EVM_PATH"/scripts/constants.sh
 VERSION=$1
 if [[ -z "${VERSION}" ]]; then
   echo "Missing version argument!"
-  echo "Usage: ${0} [VERSION]" >> /dev/stderr
+  echo "Usage: ${0} [VERSION] [GENESIS_ADDRESS]" >> /dev/stderr
+  exit 255
+fi
+
+GENESIS_ADDRESS=$2
+if [ -z "${GENESIS_ADDRESS}" ]; then
+  echo "Missing address argument!"
+  echo "Usage: ${0} [VERSION] [GENESIS_ADDRESS]" >> /dev/stderr
   exit 255
 fi
 
@@ -92,7 +99,7 @@ cat <<EOF > /tmp/genesis.json
     }
   },
   "alloc": {
-    "D23cbfA7eA985213aD81223309f588A7E66A246A": {
+    "${GENESIS_ADDRESS:2}": {
       "balance": "0x52B7D2DCC80CD2E4000000"
     }
   },
@@ -139,7 +146,7 @@ EOF
 #   "airdropHash":"0xccbf8e430b30d08b5b3342208781c40b373d1b5885c1903828f367230a2568da",
 #   "airdropAmount":"0x8AC7230489E80000",
 #   "alloc": {
-#     "D23cbfA7eA985213aD81223309f588A7E66A246A": {
+#     "${GENESIS_ADDRESS:2}": {
 #       "balance": "0x52B7D2DCC80CD2E4000000"
 #     }
 #   },
@@ -179,7 +186,7 @@ done
 
 if [[ -f "/tmp/avalanchego-v${VERSION}/output.yaml" ]]; then
   echo "cluster is ready!"
-  go run scripts/parser/parse_output.go /tmp/avalanchego-v${VERSION}/output.yaml $CHAIN_ID
+  go run scripts/parser/main.go /tmp/avalanchego-v${VERSION}/output.yaml $CHAIN_ID $GENESIS_ADDRESS
 else
   echo "cluster is not ready in time... terminating ${PID}"
   kill ${PID}
