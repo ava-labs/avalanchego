@@ -431,6 +431,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 			summary,
 		))
 	}
+	assert.False(syncer.anyPendingSeederResponse())
 
 	// check that vote requests are issued
 	initiallyContactedVotersSize := len(contactedVoters)
@@ -492,6 +493,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 			summary,
 		))
 	}
+	assert.False(syncer.anyPendingSeederResponse())
 
 	// check that vote requests are issued
 	initiallyContactedVotersSize := len(contactedVoters)
@@ -598,6 +600,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 			summary,
 		))
 	}
+	assert.False(syncer.anyPendingSeederResponse())
 
 	// check that vote requests are issued
 	initiallyContactedVotersSize := len(contactedVoters)
@@ -691,6 +694,7 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 			summary,
 		))
 	}
+	assert.False(syncer.anyPendingSeederResponse())
 
 	isVMStateSyncCalled := false
 	fullVM.CantStateSync = true
@@ -724,6 +728,104 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 		}
 	}
 
-	// check the finally summary is passed to VM
+	// check that finally summary is passed to VM
 	assert.True(isVMStateSyncCalled)
+}
+
+func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
+	assert := assert.New(t)
+
+	commonCfg := common.Config{
+		Ctx:                         snow.DefaultConsensusContextTest(),
+		Beacons:                     beacons,
+		SampleK:                     int(beacons.Weight()),
+		Alpha:                       (beacons.Weight() + 1) / 2,
+		StartupAlpha:                (3*beacons.Weight() + 3) / 4,
+		RetryBootstrap:              true, // this enable RetryStateSyncinc too
+		RetryBootstrapWarnFrequency: 1,    // this enable RetrySyncingWarnFrequency too
+	}
+	syncer, fullVM, sender := buildTestsObjects(&commonCfg, t)
+
+	// set sender to track nodes reached out
+	contactedFrontiersProviders := make(map[ids.ShortID]uint32) // nodeID -> reqID map
+	sender.CantSendGetStateSummaryFrontier = true
+	sender.SendGetStateSummaryFrontierF = func(ss ids.ShortSet, reqID uint32) {
+		for nodeID := range ss {
+			contactedFrontiersProviders[nodeID] = reqID
+		}
+	}
+
+	// mock VM to simulate a valid summary is returned
+	summary := []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
+	key := []byte{'k', 'e', 'y'}
+	hash := []byte{'h', 'a', 's', 'h'}
+	fullVM.CantStateSyncGetKeyHash = true
+	fullVM.StateSyncGetKeyHashF = func(s common.Summary) (common.SummaryKey, common.SummaryHash, error) {
+		return key, hash, nil
+	}
+
+	contactedVoters := make(map[ids.ShortID]uint32) // nodeID -> reqID map
+	sender.CantSendGetAcceptedStateSummary = true
+	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl [][]byte) {
+		for nodeID := range ss {
+			contactedVoters[nodeID] = reqID
+		}
+	}
+
+	// Start syncer without errors
+	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
+	assert.True(syncer.contactedSeeders.Len() != 0)
+
+	// let all contacted beacons respond
+	for syncer.contactedSeeders.Len() != 0 {
+		beaconID, found := syncer.contactedSeeders.Peek()
+		assert.True(found)
+		reqID := contactedFrontiersProviders[beaconID]
+
+		assert.NoError(syncer.StateSummaryFrontier(
+			beaconID,
+			reqID,
+			summary,
+		))
+	}
+	assert.False(syncer.anyPendingSeederResponse())
+
+	isVMStateSyncCalled := false
+	fullVM.CantStateSync = true
+	fullVM.StateSyncF = func(summaries []common.Summary) error {
+		isVMStateSyncCalled = true
+		assert.True(len(summaries) == 1)
+		assert.True(bytes.Equal(summaries[0], summary))
+		return nil
+	}
+
+	// Let a majority of voters timeout.
+	timedOutWeight := uint64(0)
+	for syncer.contactedVoters.Len() != 0 {
+		voterID, found := syncer.contactedVoters.Peek()
+		assert.True(found)
+		reqID := contactedVoters[voterID]
+
+		if timedOutWeight <= commonCfg.Alpha {
+			assert.NoError(syncer.GetAcceptedStateSummaryFailed(
+				voterID,
+				reqID,
+			))
+			bw, _ := beacons.GetWeight(voterID)
+			timedOutWeight += bw
+		} else {
+			assert.NoError(syncer.AcceptedStateSummary(
+				voterID,
+				reqID,
+				[][]byte{hash},
+			))
+		}
+	}
+
+	// No state summary is passed to VM
+	assert.False(isVMStateSyncCalled)
+
+	// instead the whole process is restared
+	assert.False(syncer.anyPendingVoterResponse()) // no voters reached
+	assert.True(syncer.anyPendingSeederResponse()) // frontiers providers reached again
 }
