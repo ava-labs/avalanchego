@@ -420,14 +420,10 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	assert.True(syncer.contactedSeeders.Len() != 0)
 
 	// let all contacted beacons respond
-	cumulatedWeight := uint64(0)
 	for syncer.contactedSeeders.Len() != 0 {
 		beaconID, found := syncer.contactedSeeders.Peek()
 		assert.True(found)
 		reqID := contactedFrontiersProviders[beaconID]
-
-		bw, _ := beacons.GetWeight(beaconID)
-		cumulatedWeight += bw
 
 		assert.NoError(syncer.StateSummaryFrontier(
 			beaconID,
@@ -485,14 +481,10 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	assert.True(syncer.contactedSeeders.Len() != 0)
 
 	// let all contacted beacons respond
-	cumulatedWeight := uint64(0)
 	for syncer.contactedSeeders.Len() != 0 {
 		beaconID, found := syncer.contactedSeeders.Peek()
 		assert.True(found)
 		reqID := contactedFrontiersProviders[beaconID]
-
-		bw, _ := beacons.GetWeight(beaconID)
-		cumulatedWeight += bw
 
 		assert.NoError(syncer.StateSummaryFrontier(
 			beaconID,
@@ -595,14 +587,10 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	assert.True(syncer.contactedSeeders.Len() != 0)
 
 	// let all contacted beacons respond
-	cumulatedWeight := uint64(0)
 	for syncer.contactedSeeders.Len() != 0 {
 		beaconID, found := syncer.contactedSeeders.Peek()
 		assert.True(found)
 		reqID := contactedFrontiersProviders[beaconID]
-
-		bw, _ := beacons.GetWeight(beaconID)
-		cumulatedWeight += bw
 
 		assert.NoError(syncer.StateSummaryFrontier(
 			beaconID,
@@ -647,4 +635,95 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	assert.True(
 		len(contactedVoters) > initiallyContactedVotersSize ||
 			len(contactedVoters) == beacons.Len())
+}
+
+func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
+	assert := assert.New(t)
+
+	commonCfg := common.Config{
+		Ctx:          snow.DefaultConsensusContextTest(),
+		Beacons:      beacons,
+		SampleK:      int(beacons.Weight()),
+		Alpha:        (beacons.Weight() + 1) / 2,
+		StartupAlpha: (3*beacons.Weight() + 3) / 4,
+	}
+	syncer, fullVM, sender := buildTestsObjects(&commonCfg, t)
+
+	// set sender to track nodes reached out
+	contactedFrontiersProviders := make(map[ids.ShortID]uint32) // nodeID -> reqID map
+	sender.CantSendGetStateSummaryFrontier = true
+	sender.SendGetStateSummaryFrontierF = func(ss ids.ShortSet, reqID uint32) {
+		for nodeID := range ss {
+			contactedFrontiersProviders[nodeID] = reqID
+		}
+	}
+
+	// mock VM to simulate a valid summary is returned
+	summary := []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
+	key := []byte{'k', 'e', 'y'}
+	hash := []byte{'h', 'a', 's', 'h'}
+	fullVM.CantStateSyncGetKeyHash = true
+	fullVM.StateSyncGetKeyHashF = func(s common.Summary) (common.SummaryKey, common.SummaryHash, error) {
+		return key, hash, nil
+	}
+
+	contactedVoters := make(map[ids.ShortID]uint32) // nodeID -> reqID map
+	sender.CantSendGetAcceptedStateSummary = true
+	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl [][]byte) {
+		for nodeID := range ss {
+			contactedVoters[nodeID] = reqID
+		}
+	}
+
+	// Start syncer without errors
+	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
+	assert.True(syncer.contactedSeeders.Len() != 0)
+
+	// let all contacted beacons respond
+	for syncer.contactedSeeders.Len() != 0 {
+		beaconID, found := syncer.contactedSeeders.Peek()
+		assert.True(found)
+		reqID := contactedFrontiersProviders[beaconID]
+
+		assert.NoError(syncer.StateSummaryFrontier(
+			beaconID,
+			reqID,
+			summary,
+		))
+	}
+
+	isVMStateSyncCalled := false
+	fullVM.CantStateSync = true
+	fullVM.StateSyncF = func(summaries []common.Summary) error {
+		isVMStateSyncCalled = true
+		assert.True(len(summaries) == 1)
+		assert.True(bytes.Equal(summaries[0], summary))
+		return nil
+	}
+
+	// let just a majority of voters return the summary. The rest timeout.
+	cumulatedWeight := uint64(0)
+	for syncer.contactedVoters.Len() != 0 {
+		voterID, found := syncer.contactedVoters.Peek()
+		assert.True(found)
+		reqID := contactedVoters[voterID]
+
+		if cumulatedWeight < commonCfg.Alpha {
+			assert.NoError(syncer.AcceptedStateSummary(
+				voterID,
+				reqID,
+				[][]byte{hash},
+			))
+			bw, _ := beacons.GetWeight(voterID)
+			cumulatedWeight += bw
+		} else {
+			assert.NoError(syncer.GetAcceptedStateSummaryFailed(
+				voterID,
+				reqID,
+			))
+		}
+	}
+
+	// check the finally summary is passed to VM
+	assert.True(isVMStateSyncCalled)
 }
