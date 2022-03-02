@@ -484,8 +484,8 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 		return nil, common.Address{}, 0, ErrContractAddressCollision
 	}
 	// If the allow list is enabled, check that [evm.TxContext.Origin] has permission to deploy a contract.
-	if evm.chainRules.IsAllowListEnabled {
-		allowListRole := precompile.GetAllowListStatus(evm.StateDB, evm.TxContext.Origin)
+	if evm.chainRules.IsContractDeployerAllowListEnabled {
+		allowListRole := precompile.GetContractDeployerAllowListStatus(evm.StateDB, evm.TxContext.Origin)
 		if !allowListRole.IsEnabled() {
 			return nil, common.Address{}, 0, fmt.Errorf("tx.origin %s is not authorized to deploy a contract", evm.TxContext.Origin)
 		}

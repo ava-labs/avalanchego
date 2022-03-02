@@ -11,12 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-var (
-	// Singleton StatefulPrecompiledContract for W/R access to the contract deployer allow list.
-	AllowListPrecompile StatefulPrecompiledContract = createAllowListPrecompile()
-	_                   StatefulPrecompileConfig    = &AllowListConfig{}
-)
-
 // Enum constants for valid AllowListRole
 type AllowListRole common.Hash
 
@@ -44,22 +38,16 @@ type AllowListConfig struct {
 	AllowListAdmins []common.Address `json:"adminAddresses"`
 }
 
-// Address returns the address where the stateful precompile is accessible.
-func (c *AllowListConfig) Address() common.Address { return AllowListAddress }
-
 // Timestamp returns the timestamp at which the allow list should be enabled
 func (c *AllowListConfig) Timestamp() *big.Int { return c.BlockTimestamp }
 
-// Configure initializes the address space of [ModifyAllowListAddress] by initializing the role of each of
+// Configure initializes the address space of [precompileAddr] by initializing the role of each of
 // the addresses in [AllowListAdmins].
-func (c *AllowListConfig) Configure(state StateDB) {
+func (c *AllowListConfig) Configure(state StateDB, precompileAddr common.Address) {
 	for _, adminAddr := range c.AllowListAdmins {
-		SetAllowListRole(state, adminAddr, AllowListAdmin)
+		setAllowListRole(state, precompileAddr, adminAddr, AllowListAdmin)
 	}
 }
-
-// Contract returns the singleton stateful precompiled contract to be used for the allow list.
-func (c *AllowListConfig) Contract() StatefulPrecompiledContract { return AllowListPrecompile }
 
 // Valid returns true iff [s] represents a valid role.
 func (s AllowListRole) Valid() bool {
@@ -91,20 +79,22 @@ func (s AllowListRole) IsEnabled() bool {
 	}
 }
 
-// GetAllowListStatus returns the allow list role of [address].
-func GetAllowListStatus(state StateDB, address common.Address) AllowListRole {
+// getAllowListStatus returns the allow list role of [address] for the precompile
+// at [precompileAddr]
+func getAllowListStatus(state StateDB, precompileAddr common.Address, address common.Address) AllowListRole {
 	// Generate the state key for [address]
 	addressKey := address.Hash()
-	return AllowListRole(state.GetState(AllowListAddress, addressKey))
+	return AllowListRole(state.GetState(precompileAddr, addressKey))
 }
 
-// SetAllowListRole sets the permissions of [address] to [role]
+// setAllowListRole sets the permissions of [address] to [role] for the precompile
+// at [precompileAddr].
 // assumes [role] has already been verified as valid.
-func SetAllowListRole(stateDB StateDB, address common.Address, role AllowListRole) {
+func setAllowListRole(stateDB StateDB, precompileAddr, address common.Address, role AllowListRole) {
 	// Generate the state key for [address]
 	addressKey := address.Hash()
 	// Assign [role] to the address
-	stateDB.SetState(AllowListAddress, addressKey, common.Hash(role))
+	stateDB.SetState(precompileAddr, addressKey, common.Hash(role))
 }
 
 // PackModifyAllowList packs [address] and [role] into the appropriate arguments for modifying the allow list.
@@ -138,8 +128,8 @@ func PackReadAllowList(address common.Address) []byte {
 }
 
 // writeAllowList verifies that [callerAddr] has the correct permissions to modify the allow list and if so updates [modifyAddress] permissions
-// to [role].
-func writeAllowList(evm PrecompileAccessibleState, callerAddr common.Address, modifyAddress common.Address, role AllowListRole, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+// to [role] within the state of [precompileAddr].
+func writeAllowList(evm PrecompileAccessibleState, precompileAddr common.Address, callerAddr common.Address, modifyAddress common.Address, role AllowListRole, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	// Note: this should never happen since the required gas should be verified before calling Run.
 	if suppliedGas < ModifyAllowListGasCost {
 		return nil, 0, fmt.Errorf("running allow list exceeds gas allowance (%d) < (%d)", ModifyAllowListGasCost, suppliedGas)
@@ -151,55 +141,59 @@ func writeAllowList(evm PrecompileAccessibleState, callerAddr common.Address, mo
 	}
 
 	// Verify that the caller is in the allow list and therefore has the right to modify it
-	callerStatus := GetAllowListStatus(evm.GetStateDB(), callerAddr)
+	callerStatus := getAllowListStatus(evm.GetStateDB(), precompileAddr, callerAddr)
 	if !callerStatus.IsAdmin() {
 		return nil, remainingGas, fmt.Errorf("%w: %s", ErrCannotModifyAllowList, callerAddr)
 	}
 
-	SetAllowListRole(evm.GetStateDB(), modifyAddress, role)
+	setAllowListRole(evm.GetStateDB(), precompileAddr, modifyAddress, role)
 
 	// Return an empty output and the remaining gas
 	return []byte{}, remainingGas, nil
 }
 
 // createAllowListSetter returns an execution function for setting the allow list status of the input address argument to [role].
-func createAllowListSetter(role AllowListRole) func(evm PrecompileAccessibleState, callerAddr common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+// This execution function is speciifc to [precompileAddr].
+func createAllowListSetter(precompileAddr common.Address, role AllowListRole) func(evm PrecompileAccessibleState, callerAddr common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	return func(evm PrecompileAccessibleState, callerAddr, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 		if len(input) != common.HashLength {
 			return nil, remainingGas, fmt.Errorf("invalid input length for modifying allow list: %d", len(input))
 		}
 
 		modifyAddress := common.BytesToAddress(input)
-		return writeAllowList(evm, callerAddr, modifyAddress, role, suppliedGas, readOnly)
+		return writeAllowList(evm, precompileAddr, callerAddr, modifyAddress, role, suppliedGas, readOnly)
 	}
 }
 
-// readAllowList is the execution function for read access to the allow list.
-// parses [input] into a single address and returns the 32 byte hash that specifies the designated role of that address.
-func readAllowList(evm PrecompileAccessibleState, callerAddr common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
-	// Note: this should never happen since the required gas should be verified before calling Run.
-	if suppliedGas < ReadAllowListGasCost {
-		return nil, 0, fmt.Errorf("running allow list exceeds gas allowance (%d) < (%d)", ReadAllowListGasCost, suppliedGas)
+// createReadAllowList returns an execution function that reads the allow list for the given [precompileAddr].
+// THe execution function parses the input into a single address and returns the 32 byte hash that specifies the
+// designated role of that address
+func createReadAllowList(precompileAddr common.Address) RunStatefulPrecompileFunc {
+	return func(evm PrecompileAccessibleState, callerAddr common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+		// Note: this should never happen since the required gas should be verified before calling Run.
+		if suppliedGas < ReadAllowListGasCost {
+			return nil, 0, fmt.Errorf("running allow list exceeds gas allowance (%d) < (%d)", ReadAllowListGasCost, suppliedGas)
+		}
+
+		remainingGas = suppliedGas - ReadAllowListGasCost
+
+		if len(input) != common.HashLength {
+			return nil, remainingGas, fmt.Errorf("invalid input length for read allow list: %d", len(input))
+		}
+
+		readAddress := common.BytesToAddress(input)
+		role := getAllowListStatus(evm.GetStateDB(), precompileAddr, readAddress)
+		roleBytes := common.Hash(role).Bytes()
+		return roleBytes, remainingGas, nil
 	}
-
-	remainingGas = suppliedGas - ReadAllowListGasCost
-
-	if len(input) != common.HashLength {
-		return nil, remainingGas, fmt.Errorf("invalid input length for read allow list: %d", len(input))
-	}
-
-	readAddress := common.BytesToAddress(input)
-	role := GetAllowListStatus(evm.GetStateDB(), readAddress)
-	roleBytes := common.Hash(role).Bytes()
-	return roleBytes, remainingGas, nil
 }
 
-// createAllowListPrecompile returns a StatefulPrecompiledContract with R/W control of the allow list
-func createAllowListPrecompile() StatefulPrecompiledContract {
-	setAdmin := newStatefulPrecompileFunction(setAdminSignature, createAllowListSetter(AllowListAdmin), createConstantRequiredGasFunc(ModifyAllowListGasCost))
-	setDeployer := newStatefulPrecompileFunction(setDeployerSignature, createAllowListSetter(AllowListEnabled), createConstantRequiredGasFunc(ModifyAllowListGasCost))
-	setNone := newStatefulPrecompileFunction(setNoneSignature, createAllowListSetter(AllowListNoRole), createConstantRequiredGasFunc(ModifyAllowListGasCost))
-	read := newStatefulPrecompileFunction(readAllowListSignature, readAllowList, createConstantRequiredGasFunc(ReadAllowListGasCost))
+// createAllowListPrecompile returns a StatefulPrecompiledContract with R/W control of an allow list at [precompileAddr]
+func createAllowListPrecompile(precompileAddr common.Address) StatefulPrecompiledContract {
+	setAdmin := newStatefulPrecompileFunction(setAdminSignature, createAllowListSetter(precompileAddr, AllowListAdmin), createConstantRequiredGasFunc(ModifyAllowListGasCost))
+	setDeployer := newStatefulPrecompileFunction(setDeployerSignature, createAllowListSetter(precompileAddr, AllowListEnabled), createConstantRequiredGasFunc(ModifyAllowListGasCost))
+	setNone := newStatefulPrecompileFunction(setNoneSignature, createAllowListSetter(precompileAddr, AllowListNoRole), createConstantRequiredGasFunc(ModifyAllowListGasCost))
+	read := newStatefulPrecompileFunction(readAllowListSignature, createReadAllowList(precompileAddr), createConstantRequiredGasFunc(ReadAllowListGasCost))
 
 	// Construct the contract with no fallback function.
 	contract := newStatefulPrecompileWithFunctionSelectors(nil, []*statefulPrecompileFunction{setAdmin, setDeployer, setNone, read})

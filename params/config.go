@@ -84,8 +84,8 @@ var (
 		AllowFeeRecipients:  false,
 	}
 
-	TestChainConfig        = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), DefaultFeeConfig, false, precompile.AllowListConfig{}}
-	TestPreSubnetEVMConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, DefaultFeeConfig, false, precompile.AllowListConfig{}}
+	TestChainConfig        = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), DefaultFeeConfig, false, precompile.ContractDeployerAllowListConfig{}}
+	TestPreSubnetEVMConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, DefaultFeeConfig, false, precompile.ContractDeployerAllowListConfig{}}
 )
 
 // ChainConfig is the core config which determines the blockchain settings.
@@ -116,7 +116,7 @@ type ChainConfig struct {
 	FeeConfig          *FeeConfig `json:"feeConfig,omitempty"`
 	AllowFeeRecipients bool       `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
 
-	AllowListConfig precompile.AllowListConfig `json:"allowListConfig,omitempty"` // Config for the allow list precompile
+	ContractDeployerAllowListConfig precompile.ContractDeployerAllowListConfig `json:"contractDeployerAllowListConfig,omitempty"` // Config for the allow list precompile
 }
 
 type FeeConfig struct {
@@ -209,7 +209,7 @@ func (c *ChainConfig) IsSubnetEVM(blockTimestamp *big.Int) bool {
 
 // IsAllowList returns whether [blockTimestamp] is either equal to the AllowList fork block timestamp or greater.
 func (c *ChainConfig) IsAllowList(blockTimestamp *big.Int) bool {
-	return utils.IsForked(c.AllowListConfig.Timestamp(), blockTimestamp)
+	return utils.IsForked(c.ContractDeployerAllowListConfig.Timestamp(), blockTimestamp)
 }
 
 // GetFeeConfig returns the *FeeConfig if it exists, otherwise it returns [DefaultFeeConfig].
@@ -356,8 +356,8 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headHeight *big.Int, 
 	}
 
 	// Check that the configuration of the optional stateful precompiles is enabled.
-	if isForkIncompatible(c.AllowListConfig.Timestamp(), newcfg.AllowListConfig.Timestamp(), headTimestamp) {
-		return newCompatError("AllowList fork block timestamp", c.AllowListConfig.Timestamp(), newcfg.AllowListConfig.Timestamp())
+	if isForkIncompatible(c.ContractDeployerAllowListConfig.Timestamp(), newcfg.ContractDeployerAllowListConfig.Timestamp(), headTimestamp) {
+		return newCompatError("AllowList fork block timestamp", c.ContractDeployerAllowListConfig.Timestamp(), newcfg.ContractDeployerAllowListConfig.Timestamp())
 	}
 
 	// TODO verify that the fee config is fully compatible between [c] and [newcfg].
@@ -426,7 +426,7 @@ type Rules struct {
 	IsSubnetEVM bool
 
 	// Optional stateful precompile rules
-	IsAllowListEnabled bool
+	IsContractDeployerAllowListEnabled bool
 
 	// Precompiles maps addresses to stateful precompiled contracts that are enabled
 	// for this rule set.
@@ -460,7 +460,7 @@ func (c *ChainConfig) AvalancheRules(blockNum, blockTimestamp *big.Int) Rules {
 	rules := c.rules(blockNum)
 
 	rules.IsSubnetEVM = c.IsSubnetEVM(blockTimestamp)
-	rules.IsAllowListEnabled = c.IsAllowList(blockTimestamp)
+	rules.IsContractDeployerAllowListEnabled = c.IsAllowList(blockTimestamp)
 
 	// Initialize the stateful precompiles that should be enabled at [blockTimestamp].
 	rules.Precompiles = make(map[common.Address]precompile.StatefulPrecompiledContract)
@@ -478,8 +478,8 @@ func (c *ChainConfig) AvalancheRules(blockNum, blockTimestamp *big.Int) Rules {
 func (c *ChainConfig) enabledStatefulPrecompiles() []precompile.StatefulPrecompileConfig {
 	statefulPrecompileConfigs := make([]precompile.StatefulPrecompileConfig, 0)
 
-	if c.AllowListConfig.Timestamp() != nil {
-		statefulPrecompileConfigs = append(statefulPrecompileConfigs, &c.AllowListConfig)
+	if c.ContractDeployerAllowListConfig.Timestamp() != nil {
+		statefulPrecompileConfigs = append(statefulPrecompileConfigs, &c.ContractDeployerAllowListConfig)
 	}
 
 	return statefulPrecompileConfigs

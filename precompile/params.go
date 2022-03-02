@@ -20,9 +20,9 @@ const (
 // that their own modifications do not conflict with stateful precompiles that may be added to subnet-evm
 // in the future.
 var (
-	AllowListAddress = common.HexToAddress("0x0200000000000000000000000000000000000000")
+	ContractDeployerAllowListAddress = common.HexToAddress("0x0200000000000000000000000000000000000000")
 
 	UsedAddresses = []common.Address{
-		AllowListAddress,
+		ContractDeployerAllowListAddress,
 	}
 )

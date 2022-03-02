@@ -2199,9 +2199,11 @@ func TestBuildAllowListActivationBlock(t *testing.T) {
 	if err := genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)); err != nil {
 		t.Fatal(err)
 	}
-	genesis.Config.AllowListConfig = precompile.AllowListConfig{
-		BlockTimestamp:  big.NewInt(time.Now().Unix()),
-		AllowListAdmins: testEthAddrs,
+	genesis.Config.ContractDeployerAllowListConfig = precompile.ContractDeployerAllowListConfig{
+		AllowListConfig: precompile.AllowListConfig{
+			BlockTimestamp:  big.NewInt(time.Now().Unix()),
+			AllowListAdmins: testEthAddrs,
+		},
 	}
 	genesisJSON, err := genesis.MarshalJSON()
 	if err != nil {
@@ -2227,7 +2229,7 @@ func TestBuildAllowListActivationBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	role := precompile.GetAllowListStatus(genesisState, testEthAddrs[0])
+	role := precompile.GetContractDeployerAllowListStatus(genesisState, testEthAddrs[0])
 	if role != precompile.AllowListNoRole {
 		t.Fatalf("Expected allow list status to be set to no role: %s, but found: %s", precompile.AllowListNoRole, role)
 	}
@@ -2279,7 +2281,7 @@ func TestBuildAllowListActivationBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	role = precompile.GetAllowListStatus(blkState, testEthAddrs[0])
+	role = precompile.GetContractDeployerAllowListStatus(blkState, testEthAddrs[0])
 	if role != precompile.AllowListAdmin {
 		t.Fatalf("Expected allow list status to be set to Admin: %s, but found: %s", precompile.AllowListAdmin, role)
 	}

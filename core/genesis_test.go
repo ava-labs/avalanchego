@@ -182,15 +182,17 @@ func TestStatefulPrecompilesConfigure(t *testing.T) {
 		"allow list enabled in genesis": {
 			getConfig: func() *params.ChainConfig {
 				config := *params.TestChainConfig
-				config.AllowListConfig = precompile.AllowListConfig{
-					BlockTimestamp:  big.NewInt(0),
-					AllowListAdmins: []common.Address{addr},
+				config.ContractDeployerAllowListConfig = precompile.ContractDeployerAllowListConfig{
+					AllowListConfig: precompile.AllowListConfig{
+						BlockTimestamp:  big.NewInt(0),
+						AllowListAdmins: []common.Address{addr},
+					},
 				}
 				return &config
 			},
 			assertState: func(t *testing.T, sdb *state.StateDB) {
-				assert.Equal(t, precompile.AllowListAdmin, precompile.GetAllowListStatus(sdb, addr), "unexpected allow list status for modified address")
-				assert.Equal(t, uint64(1), sdb.GetNonce(precompile.AllowListAddress))
+				assert.Equal(t, precompile.AllowListAdmin, precompile.GetContractDeployerAllowListStatus(sdb, addr), "unexpected allow list status for modified address")
+				assert.Equal(t, uint64(1), sdb.GetNonce(precompile.ContractDeployerAllowListAddress))
 			},
 		},
 	} {

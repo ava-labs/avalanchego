@@ -95,7 +95,7 @@ subnet, you can provide an `AllowList` configuration in your genesis file:
       "targetBlockRate": 2,
       "blockGasCostStep": 500000
     },
-    "allowListConfig": {
+    "contractDeployerAllowListConfig": {
       "blockTimestamp": 0,
       "adminAddresses":["0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"]
     }
