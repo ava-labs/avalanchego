@@ -6,12 +6,7 @@ package logging
 import "testing"
 
 func TestLog(t *testing.T) {
-	config, err := DefaultConfig()
-	if err != nil {
-		t.Fatalf("Error: %s", err)
-	}
-
-	log, err := NewTestLog(config)
+	log, err := NewTestLog(DefaultConfig)
 	if err != nil {
 		t.Fatalf("Error creating log: %s", err)
 	}
