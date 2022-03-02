@@ -179,9 +179,8 @@ while [[ ! -s /tmp/avalanchego-v${VERSION}/output.yaml ]]
 done
 
 if [[ -f "/tmp/avalanchego-v${VERSION}/output.yaml" ]]; then
-  # TODO: ADD /RPC and /WS ENDING TO OUTPUT.YAML
   echo "cluster is ready!"
-  cat /tmp/avalanchego-v${VERSION}/output.yaml
+  go run scripts/parse_output.go /tmp/avalanchego-v${VERSION}/output.yaml
 else
   echo "cluster is not ready in time... terminating ${PID}"
   kill ${PID}
