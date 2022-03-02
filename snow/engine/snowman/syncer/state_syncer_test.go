@@ -551,3 +551,100 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 		len(contactedVoters) > initiallyContactedVotersSize ||
 			len(contactedVoters) == beacons.Len())
 }
+
+func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
+	assert := assert.New(t)
+
+	commonCfg := common.Config{
+		Ctx:          snow.DefaultConsensusContextTest(),
+		Beacons:      beacons,
+		SampleK:      int(beacons.Weight()),
+		Alpha:        (beacons.Weight() + 1) / 2,
+		StartupAlpha: (3*beacons.Weight() + 3) / 4,
+	}
+	syncer, fullVM, sender := buildTestsObjects(&commonCfg, t)
+
+	// set sender to track nodes reached out
+	contactedFrontiersProviders := make(map[ids.ShortID]uint32) // nodeID -> reqID map
+	sender.CantSendGetStateSummaryFrontier = true
+	sender.SendGetStateSummaryFrontierF = func(ss ids.ShortSet, reqID uint32) {
+		for nodeID := range ss {
+			contactedFrontiersProviders[nodeID] = reqID
+		}
+	}
+
+	// mock VM to simulate a valid summary is returned
+	summary := []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
+	key := []byte{'k', 'e', 'y'}
+	hash := []byte{'h', 'a', 's', 'h'}
+	fullVM.CantStateSyncGetKeyHash = true
+	fullVM.StateSyncGetKeyHashF = func(s common.Summary) (common.SummaryKey, common.SummaryHash, error) {
+		return key, hash, nil
+	}
+
+	contactedVoters := make(map[ids.ShortID]uint32) // nodeID -> reqID map
+	sender.CantSendGetAcceptedStateSummary = true
+	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl [][]byte) {
+		for nodeID := range ss {
+			contactedVoters[nodeID] = reqID
+		}
+	}
+
+	// Start syncer without errors
+	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
+	assert.True(syncer.contactedSeeders.Len() != 0)
+
+	// let all contacted beacons respond
+	cumulatedWeight := uint64(0)
+	for syncer.contactedSeeders.Len() != 0 {
+		beaconID, found := syncer.contactedSeeders.Peek()
+		assert.True(found)
+		reqID := contactedFrontiersProviders[beaconID]
+
+		bw, _ := beacons.GetWeight(beaconID)
+		cumulatedWeight += bw
+
+		assert.NoError(syncer.StateSummaryFrontier(
+			beaconID,
+			reqID,
+			summary,
+		))
+	}
+
+	// check that vote requests are issued
+	initiallyContactedVotersSize := len(contactedVoters)
+	assert.True(initiallyContactedVotersSize > 0)
+	assert.True(initiallyContactedVotersSize <= maxOutstandingStateSyncRequests)
+
+	_, found := syncer.weightedSummaries[string(hash)]
+	assert.True(found)
+
+	// pick one of the voters that have been reached out
+	responsiveVoterID := pickRandomFrom(contactedVoters)
+	responsiveVoterReqID := contactedVoters[responsiveVoterID]
+
+	// check a response for unRequested summary is dropped
+	unknownHash := []byte{'g', 'a', 'r', 'b', 'a', 'g', 'e'}
+	assert.NoError(syncer.AcceptedStateSummary(
+		responsiveVoterID,
+		responsiveVoterReqID,
+		[][]byte{unknownHash},
+	))
+	_, found = syncer.weightedSummaries[string(unknownHash)]
+	assert.False(found)
+
+	// check that responsiveVoter cannot cast another vote
+	assert.False(syncer.hasSeederBeenContacted(responsiveVoterID))
+	assert.NoError(syncer.AcceptedStateSummary(
+		responsiveVoterID,
+		responsiveVoterReqID,
+		[][]byte{hash},
+	))
+	assert.True(syncer.weightedSummaries[string(hash)].weight == 0)
+
+	// other listed voters are reached out, even in the face of vote
+	// on unknown summary
+	assert.True(
+		len(contactedVoters) > initiallyContactedVotersSize ||
+			len(contactedVoters) == beacons.Len())
+}
