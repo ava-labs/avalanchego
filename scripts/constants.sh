@@ -18,3 +18,12 @@ subnet_evm_commit="$(git --git-dir="$SUBNET_EVM_PATH/.git" rev-parse HEAD)"
 subnet_evm_commit_id="${subnet_evm_commit::8}"
 
 build_image_id=${BUILD_IMAGE_ID:-"$avalanche_version-$subnet_evm_commit_id"}
+
+# Static compilation
+static_ld_flags=''
+if [ "${STATIC_COMPILATION:-}" = 1 ]
+then
+    export CC=musl-gcc
+    command -v $CC || ( echo $CC must be available for static compilation && exit 1 )
+    static_ld_flags=' -extldflags "-static" -linkmode external '
+fi

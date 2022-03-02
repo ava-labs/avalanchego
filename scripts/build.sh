@@ -16,7 +16,7 @@ source "$SUBNET_EVM_PATH"/scripts/constants.sh
 if [[ $# -eq 1 ]]; then
     binary_path=$1
 else
-    echo "Invalid arguments to build subnet_evm. Requires one arguments to specify binary location."
+    echo "Invalid arguments to build subnet-evm. Requires one arguments to specify binary location."
     exit 1
 fi
 
@@ -27,4 +27,4 @@ subnet_evm_commit=${SUBNET_EVM_COMMIT:-$( git rev-list -1 HEAD )}
 
 # Build Subnet EVM, which is run as a subprocess
 echo "Building Subnet EVM Version: $subnet_evm_version; GitCommit: $subnet_evm_commit"
-go build -ldflags "-X github.com/ava-labs/subnet_evm/plugin/evm.GitCommit=$subnet_evm_commit -X github.com/ava-labs/subnet_evm/plugin/evm.Version=$subnet_evm_version" -o "$binary_path" "plugin/"*.go
+go build -ldflags "-X github.com/ava-labs/subnet-evm/plugin/evm.GitCommit=$subnet_evm_commit -X github.com/ava-labs/subnet-evm/plugin/evm.Version=$subnet_evm_version $static_ld_flags" -o "$binary_path" "plugin/"*.go
