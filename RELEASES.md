@@ -32,6 +32,7 @@ This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/ava
 - Introduced a cap on the client specified request deadline.
 - Increased the default `leveldb` open files limit to `1024`.
 - Documented the `leveldb` configurations.
+- Extended chain shutdown timeout.
 - Performed various cleanup passes.
 
 ## [v1.7.5](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.5)
