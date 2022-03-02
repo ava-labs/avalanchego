@@ -168,11 +168,9 @@ echo "launch local test cluster in the background"
 --output-path=/tmp/avalanchego-v${VERSION}/output.yaml 2> /dev/null &
 PID=${!}
 
-echo "wait until local cluster is ready from PID ${PID}"
-sleep 360
-while [[ ! -s /tmp/avalanchego-v${VERSION}/output.yaml ]]
-  do
-  echo "waiting for /tmp/avalanchego-v${VERSION}/output.yaml creation"
+sleep 30
+while [[ ! -s /tmp/avalanchego-v${VERSION}/output.yaml ]]; do
+  echo "waiting for local cluster on PID ${PID}"
   sleep 5
   # wait up to 5-minute
   ((c++)) && ((c==60)) && break

@@ -77,14 +77,13 @@ cd ${HOME}/go/src/github.com/ava-labs/subnet-evm
 ./scripts/run.sh 1.7.5
 ```
 
+Once the the network is started up, the following info will be printed to the
+console:
 ```bash
-# inspect cluster endpoints when ready
-cat /tmp/avalanchego-v1.7.5/output.yaml
-<<COMMENT
 Logs Directory: /var/folders/mp/6jm81gc11dv3xtcwxmrd8mcr0000gn/T/runnerlogs2984620995
 PID: 55547
 
-RPC Endpoints:
+RPC Endpoints (use with MetaMask):
 - http://localhost:61278/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/rpc
 - http://localhost:61280/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/rpc
 - http://localhost:61282/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/rpc
@@ -97,10 +96,11 @@ WS Endpoints:
 - ws://localhost:61282/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/ws
 - ws://localhost:61284/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/ws
 - ws://localhost:61286/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/ws
-COMMENT
+```
 
-# ping the local cluster
-curl --location --request POST 'http://localhost:62045/ext/bc/x7gVMwHuGG4H1zXytxN8LRpShExiHnAiXG336EAhavpPmm8gF/rpc' \
+You can then ping the local cluster or add the network to MetaMask:
+```bash
+curl --location --request POST 'http://localhost:61278/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/rpc' \
 --header 'Content-Type: application/json' \
 --data-raw '{
     "jsonrpc": "2.0",
@@ -115,9 +115,11 @@ curl --location --request POST 'http://localhost:62045/ext/bc/x7gVMwHuGG4H1zXytx
     "result": "0x0"
 }
 COMMENT
+```
 
-# to terminate the cluster
-kill 12811
+To terminate the cluster, kill the PID:
+```bash
+kill -2 55547
 ```
 
 ## Fuji Subnet Deployment

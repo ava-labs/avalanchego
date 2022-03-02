@@ -1,11 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
 
+	"github.com/fatih/color"
 	"gopkg.in/yaml.v2"
 )
 
@@ -44,19 +44,20 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println("Logs Directory:", o.Logs)
-	fmt.Println("PID:", o.PID)
-	fmt.Println()
+	color.Green("\n")
+	color.Green("Logs Directory: %s", o.Logs)
+	color.Green("PID: %d", o.PID)
+	color.Green("\n")
 
-	fmt.Println("RPC Endpoints:")
+	color.Green("RPC Endpoints (use with MetaMask):")
 	for _, uri := range o.URIs {
-		fmt.Printf("- %s%s/rpc\n", uri, o.Endpoint)
+		color.Green("- %s%s/rpc", uri, o.Endpoint)
 	}
-	fmt.Println()
+	color.Green("\n")
 
-	fmt.Println("WS Endpoints:")
+	color.Green("WS Endpoints:")
 	for _, uri := range o.URIs {
 		wsURI := strings.ReplaceAll(uri, "http", "ws")
-		fmt.Printf("- %s%s/ws\n", wsURI, o.Endpoint)
+		color.Green("- %s%s/ws", wsURI, o.Endpoint)
 	}
 }
