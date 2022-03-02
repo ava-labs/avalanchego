@@ -143,18 +143,18 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	syncer, _, sender := buildTestsObjects(&commonCfg, t)
 
 	// set sender to track nodes reached out
-	contactedBeacons := ids.NewShortSet(3)
+	contactedFrontiersProviders := ids.NewShortSet(3)
 	sender.CantSendGetStateSummaryFrontier = true
 	sender.SendGetStateSummaryFrontierF = func(ss ids.ShortSet, u uint32) {
-		contactedBeacons.Union(ss)
+		contactedFrontiersProviders.Union(ss)
 	}
 
 	// Start syncer without errors
 	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
 
-	// check that all beacons are reached out for frontiers
-	assert.True(len(contactedBeacons) == min(beacons.Len(), maxOutstandingStateSyncRequests))
-	for beaconID := range contactedBeacons {
+	// check that beacons are reached out for frontiers
+	assert.True(len(contactedFrontiersProviders) == min(beacons.Len(), maxOutstandingStateSyncRequests))
+	for beaconID := range contactedFrontiersProviders {
 		// check that beacon is duly marked as reached out
 		assert.True(syncer.hasSeederBeenContacted(beaconID))
 	}
@@ -176,17 +176,17 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	syncer, fullVM, sender := buildTestsObjects(&commonCfg, t)
 
 	// set sender to track nodes reached out
-	contactedBeacons := make(map[ids.ShortID]uint32) // nodeID -> reqID map
+	contactedFrontiersProviders := make(map[ids.ShortID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
 	sender.SendGetStateSummaryFrontierF = func(ss ids.ShortSet, reqID uint32) {
 		for nodeID := range ss {
-			contactedBeacons[nodeID] = reqID
+			contactedFrontiersProviders[nodeID] = reqID
 		}
 	}
 
 	// Start syncer without errors
 	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
-	initiallyReachedOutBeaconsSize := len(contactedBeacons)
+	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
 	assert.True(initiallyReachedOutBeaconsSize > 0)
 	assert.True(initiallyReachedOutBeaconsSize <= maxOutstandingStateSyncRequests)
 
@@ -201,8 +201,8 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	}
 
 	// pick one of the beacons that have been reached out
-	responsiveBeaconID := pickRandomFrom(contactedBeacons)
-	responsiveBeaconReqID := contactedBeacons[responsiveBeaconID]
+	responsiveBeaconID := pickRandomFrom(contactedFrontiersProviders)
+	responsiveBeaconReqID := contactedFrontiersProviders[responsiveBeaconID]
 
 	// check a response with wrong request ID is dropped
 	assert.NoError(syncer.StateSummaryFrontier(
@@ -239,8 +239,8 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 
 	// other listed beacons are reached for data
 	assert.True(
-		len(contactedBeacons) > initiallyReachedOutBeaconsSize ||
-			len(contactedBeacons) == beacons.Len())
+		len(contactedFrontiersProviders) > initiallyReachedOutBeaconsSize ||
+			len(contactedFrontiersProviders) == beacons.Len())
 }
 
 func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
@@ -256,17 +256,17 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	syncer, fullVM, sender := buildTestsObjects(&commonCfg, t)
 
 	// set sender to track nodes reached out
-	contactedBeacons := make(map[ids.ShortID]uint32) // nodeID -> reqID map
+	contactedFrontiersProviders := make(map[ids.ShortID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
 	sender.SendGetStateSummaryFrontierF = func(ss ids.ShortSet, reqID uint32) {
 		for nodeID := range ss {
-			contactedBeacons[nodeID] = reqID
+			contactedFrontiersProviders[nodeID] = reqID
 		}
 	}
 
 	// Start syncer without errors
 	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
-	initiallyReachedOutBeaconsSize := len(contactedBeacons)
+	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
 	assert.True(initiallyReachedOutBeaconsSize > 0)
 	assert.True(initiallyReachedOutBeaconsSize <= maxOutstandingStateSyncRequests)
 
@@ -280,8 +280,8 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	}
 
 	// pick one of the beacons that have been reached out
-	responsiveBeaconID := pickRandomFrom(contactedBeacons)
-	responsiveBeaconReqID := contactedBeacons[responsiveBeaconID]
+	responsiveBeaconID := pickRandomFrom(contactedFrontiersProviders)
+	responsiveBeaconReqID := contactedFrontiersProviders[responsiveBeaconID]
 
 	// response is valid, but invalid summary is not recorded
 	assert.NoError(syncer.StateSummaryFrontier(
@@ -300,8 +300,8 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	// even in case of invalid summaries, other listed beacons
 	// are reached for data
 	assert.True(
-		len(contactedBeacons) > initiallyReachedOutBeaconsSize ||
-			len(contactedBeacons) == beacons.Len())
+		len(contactedFrontiersProviders) > initiallyReachedOutBeaconsSize ||
+			len(contactedFrontiersProviders) == beacons.Len())
 }
 
 func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
@@ -317,23 +317,23 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	syncer, fullVM, sender := buildTestsObjects(&commonCfg, t)
 
 	// set sender to track nodes reached out
-	contactedBeacons := make(map[ids.ShortID]uint32) // nodeID -> reqID map
+	contactedFrontiersProviders := make(map[ids.ShortID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
 	sender.SendGetStateSummaryFrontierF = func(ss ids.ShortSet, reqID uint32) {
 		for nodeID := range ss {
-			contactedBeacons[nodeID] = reqID
+			contactedFrontiersProviders[nodeID] = reqID
 		}
 	}
 
 	// Start syncer without errors
 	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
-	initiallyReachedOutBeaconsSize := len(contactedBeacons)
+	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
 	assert.True(initiallyReachedOutBeaconsSize > 0)
 	assert.True(initiallyReachedOutBeaconsSize <= maxOutstandingStateSyncRequests)
 
 	// pick one of the beacons that have been reached out
-	unresponsiveBeaconID := pickRandomFrom(contactedBeacons)
-	unresponsiveBeaconReqID := contactedBeacons[unresponsiveBeaconID]
+	unresponsiveBeaconID := pickRandomFrom(contactedFrontiersProviders)
+	unresponsiveBeaconReqID := contactedFrontiersProviders[unresponsiveBeaconID]
 
 	fullVM.CantStateSyncGetKeyHash = true
 	fullVM.StateSyncGetKeyHashF = func(s common.Summary) (common.SummaryKey, common.SummaryHash, error) {
@@ -354,8 +354,8 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	// even in case of timeouts, other listed beacons
 	// are reached for data
 	assert.True(
-		len(contactedBeacons) > initiallyReachedOutBeaconsSize ||
-			len(contactedBeacons) == beacons.Len())
+		len(contactedFrontiersProviders) > initiallyReachedOutBeaconsSize ||
+			len(contactedFrontiersProviders) == beacons.Len())
 
 	// mock VM to simulate an valid but late summary is returned
 	summary := []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
@@ -390,15 +390,15 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	syncer, fullVM, sender := buildTestsObjects(&commonCfg, t)
 
 	// set sender to track nodes reached out
-	contactedBeacons := make(map[ids.ShortID]uint32) // nodeID -> reqID map
+	contactedFrontiersProviders := make(map[ids.ShortID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
 	sender.SendGetStateSummaryFrontierF = func(ss ids.ShortSet, reqID uint32) {
 		for nodeID := range ss {
-			contactedBeacons[nodeID] = reqID
+			contactedFrontiersProviders[nodeID] = reqID
 		}
 	}
 
-	// mock VM to simulate an valid but late summary is returned
+	// mock VM to simulate a valid summary is returned
 	summary := []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
 	key := []byte{'k', 'e', 'y'}
 	hash := []byte{'h', 'a', 's', 'h'}
@@ -419,12 +419,12 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
 	assert.True(syncer.contactedSeeders.Len() != 0)
 
-	// have all reached out beacons respond
+	// let all contacted beacons respond
 	cumulatedWeight := uint64(0)
 	for syncer.contactedSeeders.Len() != 0 {
 		beaconID, found := syncer.contactedSeeders.Peek()
 		assert.True(found)
-		reqID := contactedBeacons[beaconID]
+		reqID := contactedFrontiersProviders[beaconID]
 
 		bw, _ := beacons.GetWeight(beaconID)
 		cumulatedWeight += bw
@@ -437,5 +437,117 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	}
 
 	// check that vote requests are issued
-	assert.True(len(contactedVoters) != 0)
+	initiallyContactedVotersSize := len(contactedVoters)
+	assert.True(initiallyContactedVotersSize > 0)
+	assert.True(initiallyContactedVotersSize <= maxOutstandingStateSyncRequests)
+}
+
+func TestUnRequestedVotesAreDropped(t *testing.T) {
+	assert := assert.New(t)
+
+	commonCfg := common.Config{
+		Ctx:          snow.DefaultConsensusContextTest(),
+		Beacons:      beacons,
+		SampleK:      int(beacons.Weight()),
+		Alpha:        (beacons.Weight() + 1) / 2,
+		StartupAlpha: (3*beacons.Weight() + 3) / 4,
+	}
+	syncer, fullVM, sender := buildTestsObjects(&commonCfg, t)
+
+	// set sender to track nodes reached out
+	contactedFrontiersProviders := make(map[ids.ShortID]uint32) // nodeID -> reqID map
+	sender.CantSendGetStateSummaryFrontier = true
+	sender.SendGetStateSummaryFrontierF = func(ss ids.ShortSet, reqID uint32) {
+		for nodeID := range ss {
+			contactedFrontiersProviders[nodeID] = reqID
+		}
+	}
+
+	// mock VM to simulate a valid summary is returned
+	summary := []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
+	key := []byte{'k', 'e', 'y'}
+	hash := []byte{'h', 'a', 's', 'h'}
+	fullVM.CantStateSyncGetKeyHash = true
+	fullVM.StateSyncGetKeyHashF = func(s common.Summary) (common.SummaryKey, common.SummaryHash, error) {
+		return key, hash, nil
+	}
+
+	contactedVoters := make(map[ids.ShortID]uint32) // nodeID -> reqID map
+	sender.CantSendGetAcceptedStateSummary = true
+	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl [][]byte) {
+		for nodeID := range ss {
+			contactedVoters[nodeID] = reqID
+		}
+	}
+
+	// Start syncer without errors
+	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
+	assert.True(syncer.contactedSeeders.Len() != 0)
+
+	// let all contacted beacons respond
+	cumulatedWeight := uint64(0)
+	for syncer.contactedSeeders.Len() != 0 {
+		beaconID, found := syncer.contactedSeeders.Peek()
+		assert.True(found)
+		reqID := contactedFrontiersProviders[beaconID]
+
+		bw, _ := beacons.GetWeight(beaconID)
+		cumulatedWeight += bw
+
+		assert.NoError(syncer.StateSummaryFrontier(
+			beaconID,
+			reqID,
+			summary,
+		))
+	}
+
+	// check that vote requests are issued
+	initiallyContactedVotersSize := len(contactedVoters)
+	assert.True(initiallyContactedVotersSize > 0)
+	assert.True(initiallyContactedVotersSize <= maxOutstandingStateSyncRequests)
+
+	_, found := syncer.weightedSummaries[string(hash)]
+	assert.True(found)
+
+	// pick one of the voters that have been reached out
+	responsiveVoterID := pickRandomFrom(contactedVoters)
+	responsiveVoterReqID := contactedVoters[responsiveVoterID]
+
+	// check a response with wrong request ID is dropped
+	assert.NoError(syncer.AcceptedStateSummary(
+		responsiveVoterID,
+		math.MaxInt32,
+		[][]byte{hash},
+	))
+
+	// responsiveVoter still pending
+	assert.True(syncer.hasVoterBeenContacted(responsiveVoterID))
+	assert.True(syncer.weightedSummaries[string(hash)].weight == 0)
+
+	// check a response from unsolicited node is dropped
+	unsolicitedVoterID := ids.GenerateTestShortID()
+	assert.NoError(syncer.AcceptedStateSummary(
+		unsolicitedVoterID,
+		responsiveVoterReqID,
+		[][]byte{hash},
+	))
+	assert.True(syncer.weightedSummaries[string(hash)].weight == 0)
+
+	// check a valid response is duly recorded
+	assert.NoError(syncer.AcceptedStateSummary(
+		responsiveVoterID,
+		responsiveVoterReqID,
+		[][]byte{hash},
+	))
+
+	// responsiveBeacon not pending anymore
+	assert.False(syncer.hasSeederBeenContacted(responsiveVoterID))
+	voterWeight, found := beacons.GetWeight(responsiveVoterID)
+	assert.True(found)
+	assert.True(syncer.weightedSummaries[string(hash)].weight == voterWeight)
+
+	// other listed voters are reached out
+	assert.True(
+		len(contactedVoters) > initiallyContactedVotersSize ||
+			len(contactedVoters) == beacons.Len())
 }

@@ -183,7 +183,11 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 	}
 
 	for _, hash := range hashes {
-		ws := ss.weightedSummaries[string(hash)]
+		ws, ok := ss.weightedSummaries[string(hash)]
+		if !ok {
+			// received vote for a unknown summary. Skipped
+			continue
+		}
 		previousWeight := ws.weight
 		newWeight, err := math.Add64(weight, previousWeight)
 		if err != nil {
