@@ -43,6 +43,43 @@ func init() {
 	}
 }
 
+// helper to build
+func buildTestsObjects(commonCfg *common.Config, t *testing.T) (
+	*stateSyncer,
+	*fullVM,
+	*common.SenderTest,
+
+) {
+	sender := &common.SenderTest{T: t}
+	commonCfg.Sender = sender
+
+	fullVM := &fullVM{
+		TestVM: &block.TestVM{
+			TestVM: common.TestVM{T: t},
+		},
+		TestStateSyncableVM: &block.TestStateSyncableVM{
+			TestStateSyncableVM: common.TestStateSyncableVM{T: t},
+		},
+	}
+	dummyGetter, err := getter.New(fullVM, *commonCfg)
+	assert.NoError(t, err)
+	dummyWeightTracker := tracker.NewWeightTracker(commonCfg.Beacons, commonCfg.StartupAlpha)
+
+	cfg, err := NewConfig(
+		*commonCfg,
+		nil,
+		dummyGetter,
+		fullVM,
+		dummyWeightTracker)
+	assert.NoError(t, err)
+	commonSyncer := New(cfg, func(lastReqID uint32) error { return nil })
+	syncer, ok := commonSyncer.(*stateSyncer)
+	assert.True(t, ok)
+	assert.True(t, syncer.stateSyncVM != nil)
+
+	return syncer, fullVM, sender
+}
+
 func min(rhs, lhs int) int {
 	if rhs <= lhs {
 		return rhs
@@ -67,39 +104,14 @@ func TestStateSyncIsSkippedIfNoBeaconIsProvided(t *testing.T) {
 	assert := assert.New(t)
 
 	noBeacons := validators.NewSet()
-	sender := &common.SenderTest{T: t}
-	fullVM := &fullVM{
-		TestVM: &block.TestVM{
-			TestVM: common.TestVM{T: t},
-		},
-		TestStateSyncableVM: &block.TestStateSyncableVM{
-			TestStateSyncableVM: common.TestStateSyncableVM{T: t},
-		},
-	}
-
 	commonCfg := common.Config{
 		Ctx:          snow.DefaultConsensusContextTest(),
 		Beacons:      noBeacons,
 		SampleK:      int(noBeacons.Weight()),
 		Alpha:        (noBeacons.Weight() + 1) / 2,
 		StartupAlpha: (3*beacons.Weight() + 3) / 4,
-		Sender:       sender,
 	}
-	dummyGetter, err := getter.New(fullVM, commonCfg)
-	assert.NoError(err)
-	dummyWeightTracker := tracker.NewWeightTracker(noBeacons, commonCfg.StartupAlpha)
-
-	cfg, err := NewConfig(
-		commonCfg,
-		nil,
-		dummyGetter,
-		fullVM,
-		dummyWeightTracker)
-	assert.NoError(err)
-	commonSyncer := New(cfg, func(lastReqID uint32) error { return nil })
-	syncer, ok := commonSyncer.(*stateSyncer)
-	assert.True(ok)
-	assert.True(syncer.stateSyncVM != nil)
+	syncer, fullVM, _ := buildTestsObjects(&commonCfg, t)
 
 	// set VM to check for StateSync call
 	stateSyncEmpty := false
@@ -121,39 +133,14 @@ func TestStateSyncIsSkippedIfNoBeaconIsProvided(t *testing.T) {
 func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	assert := assert.New(t)
 
-	sender := &common.SenderTest{T: t}
-	fullVM := &fullVM{
-		TestVM: &block.TestVM{
-			TestVM: common.TestVM{T: t},
-		},
-		TestStateSyncableVM: &block.TestStateSyncableVM{
-			TestStateSyncableVM: common.TestStateSyncableVM{T: t},
-		},
-	}
-
 	commonCfg := common.Config{
 		Ctx:          snow.DefaultConsensusContextTest(),
 		Beacons:      beacons,
 		SampleK:      int(beacons.Weight()),
 		Alpha:        (beacons.Weight() + 1) / 2,
 		StartupAlpha: (3*beacons.Weight() + 3) / 4,
-		Sender:       sender,
 	}
-	dummyGetter, err := getter.New(fullVM, commonCfg)
-	assert.NoError(err)
-	dummyWeightTracker := tracker.NewWeightTracker(beacons, commonCfg.StartupAlpha)
-
-	cfg, err := NewConfig(
-		commonCfg,
-		nil,
-		dummyGetter,
-		fullVM,
-		dummyWeightTracker)
-	assert.NoError(err)
-	commonSyncer := New(cfg, func(lastReqID uint32) error { return nil })
-	syncer, ok := commonSyncer.(*stateSyncer)
-	assert.True(ok)
-	assert.True(syncer.stateSyncVM != nil)
+	syncer, _, sender := buildTestsObjects(&commonCfg, t)
 
 	// set sender to track nodes reached out
 	contactedBeacons := ids.NewShortSet(3)
@@ -179,39 +166,14 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	assert := assert.New(t)
 
-	sender := &common.SenderTest{T: t}
-	fullVM := &fullVM{
-		TestVM: &block.TestVM{
-			TestVM: common.TestVM{T: t},
-		},
-		TestStateSyncableVM: &block.TestStateSyncableVM{
-			TestStateSyncableVM: common.TestStateSyncableVM{T: t},
-		},
-	}
-
 	commonCfg := common.Config{
 		Ctx:          snow.DefaultConsensusContextTest(),
 		Beacons:      beacons,
 		SampleK:      int(beacons.Weight()),
 		Alpha:        (beacons.Weight() + 1) / 2,
 		StartupAlpha: (3*beacons.Weight() + 3) / 4,
-		Sender:       sender,
 	}
-	dummyGetter, err := getter.New(fullVM, commonCfg)
-	assert.NoError(err)
-	dummyWeightTracker := tracker.NewWeightTracker(beacons, commonCfg.StartupAlpha)
-
-	cfg, err := NewConfig(
-		commonCfg,
-		nil,
-		dummyGetter,
-		fullVM,
-		dummyWeightTracker)
-	assert.NoError(err)
-	commonSyncer := New(cfg, func(lastReqID uint32) error { return nil })
-	syncer, ok := commonSyncer.(*stateSyncer)
-	assert.True(ok)
-	assert.True(syncer.stateSyncVM != nil)
+	syncer, fullVM, sender := buildTestsObjects(&commonCfg, t)
 
 	// set sender to track nodes reached out
 	contactedBeacons := make(map[ids.ShortID]uint32) // nodeID -> reqID map
@@ -284,39 +246,14 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	assert := assert.New(t)
 
-	sender := &common.SenderTest{T: t}
-	fullVM := &fullVM{
-		TestVM: &block.TestVM{
-			TestVM: common.TestVM{T: t},
-		},
-		TestStateSyncableVM: &block.TestStateSyncableVM{
-			TestStateSyncableVM: common.TestStateSyncableVM{T: t},
-		},
-	}
-
 	commonCfg := common.Config{
 		Ctx:          snow.DefaultConsensusContextTest(),
 		Beacons:      beacons,
 		SampleK:      int(beacons.Weight()),
 		Alpha:        (beacons.Weight() + 1) / 2,
 		StartupAlpha: (3*beacons.Weight() + 3) / 4,
-		Sender:       sender,
 	}
-	dummyGetter, err := getter.New(fullVM, commonCfg)
-	assert.NoError(err)
-	dummyWeightTracker := tracker.NewWeightTracker(beacons, commonCfg.StartupAlpha)
-
-	cfg, err := NewConfig(
-		commonCfg,
-		nil,
-		dummyGetter,
-		fullVM,
-		dummyWeightTracker)
-	assert.NoError(err)
-	commonSyncer := New(cfg, func(lastReqID uint32) error { return nil })
-	syncer, ok := commonSyncer.(*stateSyncer)
-	assert.True(ok)
-	assert.True(syncer.stateSyncVM != nil)
+	syncer, fullVM, sender := buildTestsObjects(&commonCfg, t)
 
 	// set sender to track nodes reached out
 	contactedBeacons := make(map[ids.ShortID]uint32) // nodeID -> reqID map
@@ -370,39 +307,14 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	assert := assert.New(t)
 
-	sender := &common.SenderTest{T: t}
-	fullVM := &fullVM{
-		TestVM: &block.TestVM{
-			TestVM: common.TestVM{T: t},
-		},
-		TestStateSyncableVM: &block.TestStateSyncableVM{
-			TestStateSyncableVM: common.TestStateSyncableVM{T: t},
-		},
-	}
-
 	commonCfg := common.Config{
 		Ctx:          snow.DefaultConsensusContextTest(),
 		Beacons:      beacons,
 		SampleK:      int(beacons.Weight()),
 		Alpha:        (beacons.Weight() + 1) / 2,
 		StartupAlpha: (3*beacons.Weight() + 3) / 4,
-		Sender:       sender,
 	}
-	dummyGetter, err := getter.New(fullVM, commonCfg)
-	assert.NoError(err)
-	dummyWeightTracker := tracker.NewWeightTracker(beacons, commonCfg.StartupAlpha)
-
-	cfg, err := NewConfig(
-		commonCfg,
-		nil,
-		dummyGetter,
-		fullVM,
-		dummyWeightTracker)
-	assert.NoError(err)
-	commonSyncer := New(cfg, func(lastReqID uint32) error { return nil })
-	syncer, ok := commonSyncer.(*stateSyncer)
-	assert.True(ok)
-	assert.True(syncer.stateSyncVM != nil)
+	syncer, fullVM, sender := buildTestsObjects(&commonCfg, t)
 
 	// set sender to track nodes reached out
 	contactedBeacons := make(map[ids.ShortID]uint32) // nodeID -> reqID map
@@ -468,39 +380,14 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	assert := assert.New(t)
 
-	sender := &common.SenderTest{T: t}
-	fullVM := &fullVM{
-		TestVM: &block.TestVM{
-			TestVM: common.TestVM{T: t},
-		},
-		TestStateSyncableVM: &block.TestStateSyncableVM{
-			TestStateSyncableVM: common.TestStateSyncableVM{T: t},
-		},
-	}
-
 	commonCfg := common.Config{
 		Ctx:          snow.DefaultConsensusContextTest(),
 		Beacons:      beacons,
 		SampleK:      int(beacons.Weight()),
 		Alpha:        (beacons.Weight() + 1) / 2,
 		StartupAlpha: (3*beacons.Weight() + 3) / 4,
-		Sender:       sender,
 	}
-	dummyGetter, err := getter.New(fullVM, commonCfg)
-	assert.NoError(err)
-	dummyWeightTracker := tracker.NewWeightTracker(beacons, commonCfg.StartupAlpha)
-
-	cfg, err := NewConfig(
-		commonCfg,
-		nil,
-		dummyGetter,
-		fullVM,
-		dummyWeightTracker)
-	assert.NoError(err)
-	commonSyncer := New(cfg, func(lastReqID uint32) error { return nil })
-	syncer, ok := commonSyncer.(*stateSyncer)
-	assert.True(ok)
-	assert.True(syncer.stateSyncVM != nil)
+	syncer, fullVM, sender := buildTestsObjects(&commonCfg, t)
 
 	// set sender to track nodes reached out
 	contactedBeacons := make(map[ids.ShortID]uint32) // nodeID -> reqID map
