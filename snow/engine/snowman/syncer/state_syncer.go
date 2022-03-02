@@ -38,8 +38,6 @@ type stateSyncer struct {
 	common.AppHandler
 
 	started bool
-	// True if restart has been called at least once
-	restarted bool
 	// Tracks the last requestID that was used in a request
 	requestID uint32
 
@@ -135,7 +133,7 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 		if ss.Config.RetrySyncing {
 			ss.Ctx.Log.Debug("Not enough frontiers received, restarting state sync... - Beacons: %d - Failed Bootstrappers: %d "+
 				"- state sync attempt: %d", ss.StateSyncBeacons.Len(), ss.failedSeeders.Len(), ss.attempts)
-			return ss.restart(false)
+			return ss.restart()
 		}
 
 		ss.Ctx.Log.Debug("Didn't receive enough frontiers - failed validators: %d, "+
@@ -232,16 +230,11 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 		if ss.Config.RetrySyncing && ss.StateSyncBeacons.Weight()-ss.Alpha < failedBeaconWeight {
 			ss.Ctx.Log.Debug("Not enough votes received, restarting state sync... - Beacons: %d - Failed syncer: %d "+
 				"- state sync attempt: %d", ss.StateSyncBeacons.Len(), ss.failedVoters.Len(), ss.attempts)
-			return ss.restart(false)
+			return ss.restart()
 		}
 	}
 
-	if !ss.restarted {
-		ss.Ctx.Log.Info("State sync started syncing with %d vertices in the accepted frontier", size)
-	} else {
-		ss.Ctx.Log.Debug("State sync started syncing with %d vertices in the accepted frontier", size)
-	}
-
+	ss.Ctx.Log.Info("State sync started syncing with %d vertices in the accepted frontier", size)
 	return ss.stateSyncVM.StateSync(accepted)
 }
 
@@ -296,16 +289,7 @@ func (ss *stateSyncer) startup() error {
 	return nil
 }
 
-func (ss *stateSyncer) restart(reset bool) error {
-	// resets the attempts when we're pulling blocks/vertices we don't want to
-	// fail the state sync at that stage
-	if reset {
-		ss.Ctx.Log.Debug("Checking for new state sync frontiers")
-
-		ss.restarted = true
-		ss.attempts = 0
-	}
-
+func (ss *stateSyncer) restart() error {
 	if ss.attempts > 0 && ss.attempts%ss.RetrySyncingWarnFrequency == 0 {
 		ss.Ctx.Log.Debug("continuing to attempt to state sync after %d failed attempts. Is this node connected to the internet?",
 			ss.attempts)
