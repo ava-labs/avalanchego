@@ -179,7 +179,7 @@ done
 
 if [[ -f "/tmp/avalanchego-v${VERSION}/output.yaml" ]]; then
   echo "cluster is ready!"
-  go run scripts/parse_output.go /tmp/avalanchego-v${VERSION}/output.yaml $CHAIN_ID
+  go run scripts/parser/parse_output.go /tmp/avalanchego-v${VERSION}/output.yaml $CHAIN_ID
 else
   echo "cluster is not ready in time... terminating ${PID}"
   kill ${PID}
