@@ -33,6 +33,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ethereum/go-ethereum/common"
@@ -145,8 +146,13 @@ func init() {
 	}
 
 	// Set of all native precompile addresses that are in use
+	// Note: this will repeat some addresses, but this is cheap and makes the code clearer.
 	PrecompileAllNativeAddresses = make(map[common.Address]struct{})
-	for _, k := range append(PrecompiledAddressesBerlin, PrecompiledAddressesBLS...) {
+	addrsList := append(PrecompiledAddressesHomestead, PrecompiledAddressesByzantium...)
+	addrsList = append(addrsList, PrecompiledAddressesIstanbul...)
+	addrsList = append(addrsList, PrecompiledAddressesBerlin...)
+	addrsList = append(addrsList, PrecompiledAddressesBLS...)
+	for _, k := range addrsList {
 		PrecompileAllNativeAddresses[k] = struct{}{}
 	}
 
@@ -155,6 +161,9 @@ func init() {
 	for _, k := range precompile.UsedAddresses {
 		if _, ok := PrecompileAllNativeAddresses[k]; ok {
 			panic(fmt.Errorf("precompile address collides with existing native address: %s", k))
+		}
+		if k == constants.BlackholeAddr {
+			panic(fmt.Errorf("cannot use address %s for stateful precompile - overlaps with blackhole address", k))
 		}
 	}
 }
