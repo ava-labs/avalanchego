@@ -19,7 +19,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-var errNonPositiveHalflife = errors.New("timeout halflife must be positive")
+var (
+	errNonPositiveHalflife = errors.New("timeout halflife must be positive")
+
+	_ heap.Interface = &timeoutQueue{}
+)
 
 type adaptiveTimeout struct {
 	index    int           // Index in the wait queue
@@ -30,7 +34,6 @@ type adaptiveTimeout struct {
 	op       message.Op    // Type of this outstanding request
 }
 
-// A timeoutQueue implements heap.Interface and holds adaptiveTimeouts.
 type timeoutQueue []*adaptiveTimeout
 
 func (tq timeoutQueue) Len() int           { return len(tq) }

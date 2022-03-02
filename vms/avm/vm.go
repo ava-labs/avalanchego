@@ -58,7 +58,6 @@ var (
 	_ vertex.DAGVM = &VM{}
 )
 
-// VM implements the avalanche.DAGVM interface
 type VM struct {
 	Factory
 	metrics
@@ -125,7 +124,6 @@ type Config struct {
 	IndexAllowIncomplete bool `json:"index-allow-incomplete"`
 }
 
-// Initialize implements the avalanche.DAGVM interface
 func (vm *VM) Initialize(
 	ctx *snow.Context,
 	dbManager manager.Manager,
@@ -266,7 +264,6 @@ func (vm *VM) SetState(state snow.State) error {
 	}
 }
 
-// Shutdown implements the avalanche.DAGVM interface
 func (vm *VM) Shutdown() error {
 	if vm.timer == nil {
 		return nil
@@ -281,12 +278,10 @@ func (vm *VM) Shutdown() error {
 	return vm.baseDB.Close()
 }
 
-// Get implements the avalanche.DAGVM interface
 func (vm *VM) Version() (string, error) {
 	return version.Current.String(), nil
 }
 
-// CreateHandlers implements the avalanche.DAGVM interface
 func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	codec := cjson.NewCodec()
 
@@ -315,7 +310,6 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	}, err
 }
 
-// CreateStaticHandlers implements the common.StaticVM interface
 func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := cjson.NewCodec()
@@ -329,7 +323,6 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	}, newServer.RegisterService(staticService, "avm")
 }
 
-// Pending implements the avalanche.DAGVM interface
 func (vm *VM) PendingTxs() []snowstorm.Tx {
 	vm.timer.Cancel()
 
@@ -338,12 +331,10 @@ func (vm *VM) PendingTxs() []snowstorm.Tx {
 	return txs
 }
 
-// Parse implements the avalanche.DAGVM interface
 func (vm *VM) ParseTx(b []byte) (snowstorm.Tx, error) {
 	return vm.parseTx(b)
 }
 
-// Get implements the avalanche.DAGVM interface
 func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
 	tx := &UniqueTx{
 		vm:   vm,
@@ -377,6 +368,15 @@ func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
 	}
 	vm.issueTx(tx)
 	return tx.ID(), nil
+}
+
+func (vm *VM) issueStopVertex() error {
+	select {
+	case vm.toEngine <- common.StopVertex:
+	default:
+		vm.ctx.Log.Debug("dropping common.StopVertex message to engine due to contention")
+	}
+	return nil
 }
 
 /*

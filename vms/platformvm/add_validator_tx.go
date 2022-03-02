@@ -121,6 +121,12 @@ func (tx *UnsignedAddValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 
 // Attempts to verify this transaction with the provided state.
 func (tx *UnsignedAddValidatorTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
+	startTime := tx.StartTime()
+	maxLocalStartTime := vm.clock.Time().Add(maxFutureStartTime)
+	if startTime.After(maxLocalStartTime) {
+		return errFutureStakeTime
+	}
+
 	_, _, err := tx.Execute(vm, parentState, stx)
 	// We ignore [errFutureStakeTime] here because an advanceTimeTx will be
 	// issued before this transaction is issued.
@@ -255,10 +261,10 @@ func (tx *UnsignedAddValidatorTx) InitiallyPrefersCommit(vm *VM) bool {
 
 // NewAddValidatorTx returns a new NewAddValidatorTx
 func (vm *VM) newAddValidatorTx(
-	stakeAmt, // Amount the delegator stakes
-	startTime, // Unix time they start delegating
-	endTime uint64, // Unix time they stop delegating
-	nodeID ids.ShortID, // ID of the node we are delegating to
+	stakeAmt, // Amount the validator stakes
+	startTime, // Unix time they start validating
+	endTime uint64, // Unix time they stop validating
+	nodeID ids.ShortID, // ID of the node we want to validate with
 	rewardAddress ids.ShortID, // Address to send reward to, if applicable
 	shares uint32, // 10,000 times percentage of reward taken from delegators
 	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens

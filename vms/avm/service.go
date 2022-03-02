@@ -75,6 +75,10 @@ func (service *Service) IssueTx(r *http.Request, args *api.FormattedTx, reply *a
 	return nil
 }
 
+func (service *Service) IssueStopVertex(_ *http.Request, _ *struct{}, _ *struct{}) error {
+	return service.vm.issueStopVertex()
+}
+
 // GetTxStatusReply defines the GetTxStatus replies returned from the API
 type GetTxStatusReply struct {
 	Status choices.Status `json:"status"`

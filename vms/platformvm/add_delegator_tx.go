@@ -110,6 +110,12 @@ func (tx *UnsignedAddDelegatorTx) SyntacticVerify(ctx *snow.Context) error {
 
 // Attempts to verify this transaction with the provided state.
 func (tx *UnsignedAddDelegatorTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
+	startTime := tx.StartTime()
+	maxLocalStartTime := vm.clock.Time().Add(maxFutureStartTime)
+	if startTime.After(maxLocalStartTime) {
+		return errFutureStakeTime
+	}
+
 	_, _, err := tx.Execute(vm, parentState, stx)
 	// We ignore [errFutureStakeTime] here because an advanceTimeTx will be
 	// issued before this transaction is issued.

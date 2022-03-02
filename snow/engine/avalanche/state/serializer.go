@@ -7,6 +7,7 @@ package state
 
 import (
 	"errors"
+	"time"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
@@ -18,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 const (
@@ -34,14 +36,14 @@ var _ vertex.Manager = &Serializer{}
 
 // Serializer manages the state of multiple vertices
 type Serializer struct {
-	ctx   *snow.Context
-	vm    vertex.DAGVM
-	state *prefixedState
-	db    *versiondb.Database
-	edge  ids.Set
+	ctx                 *snow.Context
+	vm                  vertex.DAGVM
+	state               *prefixedState
+	db                  *versiondb.Database
+	edge                ids.Set
+	xChainMigrationTime time.Time
 }
 
-// Initialize implements the avalanche.State interface
 func (s *Serializer) Initialize(ctx *snow.Context, vm vertex.DAGVM, db database.Database) {
 	s.ctx = ctx
 	s.vm = vm
@@ -57,17 +59,26 @@ func (s *Serializer) Initialize(ctx *snow.Context, vm vertex.DAGVM, db database.
 	s.db = vdb
 
 	s.edge.Add(s.state.Edge()...)
+
+	s.xChainMigrationTime = version.GetXChainMigrationTime(ctx.NetworkID)
 }
 
-// ParseVtx implements the avalanche.State interface
 func (s *Serializer) ParseVtx(b []byte) (avalanche.Vertex, error) {
 	return newUniqueVertex(s, b)
 }
 
-// BuildVtx implements the avalanche.State interface
-func (s *Serializer) BuildVtx(
+func (s *Serializer) BuildVtx(parentIDs []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
+	return s.buildVtx(parentIDs, txs, false)
+}
+
+func (s *Serializer) BuildStopVtx(parentIDs []ids.ID) (avalanche.Vertex, error) {
+	return s.buildVtx(parentIDs, nil, true)
+}
+
+func (s *Serializer) buildVtx(
 	parentIDs []ids.ID,
 	txs []snowstorm.Tx,
+	stopVtx bool,
 ) (avalanche.Vertex, error) {
 	height := uint64(0)
 	for _, parentID := range parentIDs {
@@ -83,17 +94,28 @@ func (s *Serializer) BuildVtx(
 		height = math.Max64(height, childHeight)
 	}
 
-	txBytes := make([][]byte, len(txs))
-	for i, tx := range txs {
-		txBytes[i] = tx.Bytes()
-	}
-
-	vtx, err := vertex.Build(
-		s.ctx.ChainID,
-		height,
-		parentIDs,
-		txBytes,
+	var (
+		vtx vertex.StatelessVertex
+		err error
 	)
+	if !stopVtx {
+		txBytes := make([][]byte, len(txs))
+		for i, tx := range txs {
+			txBytes[i] = tx.Bytes()
+		}
+		vtx, err = vertex.Build(
+			s.ctx.ChainID,
+			height,
+			parentIDs,
+			txBytes,
+		)
+	} else {
+		vtx, err = vertex.BuildStopVertex(
+			s.ctx.ChainID,
+			height,
+			parentIDs,
+		)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -107,15 +129,8 @@ func (s *Serializer) BuildVtx(
 	return uVtx, uVtx.setVertex(vtx)
 }
 
-// BuildStopVtx implements the avalanche.State interface
-func (s *Serializer) BuildStopVtx(parentIDs []ids.ID) (avalanche.Vertex, error) {
-	panic("not implemented")
-}
-
-// GetVtx implements the avalanche.State interface
 func (s *Serializer) GetVtx(vtxID ids.ID) (avalanche.Vertex, error) { return s.getVertex(vtxID) }
 
-// Edge implements the avalanche.State interface
 func (s *Serializer) Edge() []ids.ID { return s.edge.List() }
 
 func (s *Serializer) parseVertex(b []byte) (vertex.StatelessVertex, error) {

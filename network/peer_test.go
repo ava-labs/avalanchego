@@ -8,44 +8,18 @@ import (
 	"crypto"
 	"net"
 	"testing"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/assert"
 )
-
-type TestMsg struct {
-	op    message.Op
-	bytes []byte
-}
-
-func newTestMsg(op message.Op, bits []byte) *TestMsg {
-	return &TestMsg{op: op, bytes: bits}
-}
-
-func (m *TestMsg) Op() message.Op {
-	return m.op
-}
-
-func (*TestMsg) Get(message.Field) interface{} {
-	return nil
-}
-
-func (m *TestMsg) Bytes() []byte {
-	return m.bytes
-}
-
-func (m *TestMsg) BytesSavedCompression() int {
-	return 0
-}
-
-func (m *TestMsg) AddRef() {}
-
-func (m *TestMsg) DecRef() {}
 
 func TestPeer_Close(t *testing.T) {
 	initCerts(t)
@@ -75,7 +49,7 @@ func TestPeer_Close(t *testing.T) {
 	vdrs := getDefaultManager()
 	beacons := validators.NewSet()
 	metrics := prometheus.NewRegistry()
-	msgCreator, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace" /*parentNamespace*/)
+	msgCreator, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 	handler := &testHandler{}
 
@@ -112,7 +86,7 @@ func TestPeer_Close(t *testing.T) {
 	// fake a peer, and write a message
 	peer := newPeer(basenetwork, conn, ip1.IP())
 	peer.sendQueue = make([]message.OutboundMessage, 0)
-	testMsg := newTestMsg(message.GetVersion, newmsgbytes)
+	testMsg := message.NewTestMsg(message.GetVersion, newmsgbytes, false)
 	peer.Send(testMsg)
 
 	go func() {

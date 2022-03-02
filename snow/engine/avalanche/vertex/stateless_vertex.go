@@ -78,7 +78,9 @@ type innerStatelessVertex struct {
 }
 
 func (v innerStatelessVertex) Verify() error {
-	// TODO: allow stop vertex issuance
+	if v.Version == codecVersionWithStopVtx {
+		return v.verifyStopVertex()
+	}
 	return v.verify()
 }
 

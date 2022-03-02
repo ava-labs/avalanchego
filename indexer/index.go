@@ -39,7 +39,6 @@ var (
 )
 
 // Index indexes containers in their order of acceptance
-// Index implements triggers.Acceptor
 // Index is thread-safe.
 // Index assumes that Accept is called before the container is committed to the
 // database of the VM that the container exists in.

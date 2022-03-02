@@ -98,3 +98,25 @@ func (a *aliaser) RemoveAliases(id ID) {
 		delete(a.dealias, alias)
 	}
 }
+
+// GetRelevantAliases returns the aliases with the redundant identity alias
+// removed (each id is aliased to at least itself).
+func GetRelevantAliases(aliaser Aliaser, ids []ID) (map[ID][]string, error) {
+	result := make(map[ID][]string, len(ids))
+	for _, id := range ids {
+		aliases, err := aliaser.Aliases(id)
+		if err != nil {
+			return nil, err
+		}
+
+		// remove the redundant alias where alias = id.
+		relevantAliases := make([]string, 0, len(aliases)-1)
+		for _, alias := range aliases {
+			if alias != id.String() {
+				relevantAliases = append(relevantAliases, alias)
+			}
+		}
+		result[id] = relevantAliases
+	}
+	return result, nil
+}

@@ -9,14 +9,14 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
+var _ Weighted = &weightedHeap{}
+
 type weightedHeapElement struct {
 	weight           uint64
 	cumulativeWeight uint64
 	index            int
 }
 
-// weightedHeap implements the Weighted interface.
-//
 // Sampling is performed by executing a search over a tree of elements in the
 // order of their probabilistic occurrence.
 //

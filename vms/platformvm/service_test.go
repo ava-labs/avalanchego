@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -51,6 +53,10 @@ var (
 	// 3cb7d3842e8cee6a0ebd09f1fe884f6861e1b29c
 	// Platform address resulting from the above private key
 	testAddress = "P-testing18jma8ppw3nhx5r4ap8clazz0dps7rv5umpc36y"
+
+	encodings = []formatting.Encoding{
+		formatting.JSON, formatting.Hex, formatting.CB58,
+	}
 )
 
 func defaultService(t *testing.T) *Service {
@@ -299,25 +305,15 @@ func TestGetTxStatus(t *testing.T) {
 
 // Test issuing and then retrieving a transaction
 func TestGetTx(t *testing.T) {
-	service := defaultService(t)
-	defaultAddress(t, service)
-	service.vm.ctx.Lock.Lock()
-	defer func() {
-		if err := service.vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
-		service.vm.ctx.Lock.Unlock()
-	}()
-
 	type test struct {
 		description string
-		createTx    func() (*Tx, error)
+		createTx    func(service *Service) (*Tx, error)
 	}
 
 	tests := []test{
 		{
 			"standard block",
-			func() (*Tx, error) {
+			func(service *Service) (*Tx, error) {
 				return service.vm.newCreateChainTx( // Test GetTx works for standard blocks
 					testSubnet1.ID(),
 					nil,
@@ -331,7 +327,7 @@ func TestGetTx(t *testing.T) {
 		},
 		{
 			"proposal block",
-			func() (*Tx, error) {
+			func(service *Service) (*Tx, error) {
 				return service.vm.newAddValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.MinValidatorStake,
 					uint64(service.vm.clock.Time().Add(syncBound).Unix()),
@@ -346,7 +342,7 @@ func TestGetTx(t *testing.T) {
 		},
 		{
 			"atomic block",
-			func() (*Tx, error) {
+			func(service *Service) (*Tx, error) {
 				return service.vm.newExportTx( // Test GetTx works for proposal blocks
 					100,
 					service.vm.ctx.XChainID,
@@ -359,45 +355,64 @@ func TestGetTx(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		tx, err := test.createTx()
-		if err != nil {
-			t.Fatalf("failed test '%s': %s", test.description, err)
-		}
-		arg := &api.GetTxArgs{
-			TxID:     tx.ID(),
-			Encoding: formatting.CB58,
-		}
-		var response api.FormattedTx
-		if err := service.GetTx(nil, arg, &response); err == nil {
-			t.Fatalf("failed test '%s': haven't issued tx yet so shouldn't be able to get it", test.description)
-		} else if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
-			t.Fatalf("failed test '%s': %s", test.description, err)
-		} else if block, err := service.vm.BuildBlock(); err != nil {
-			t.Fatalf("failed test '%s': %s", test.description, err)
-		} else if err := block.Verify(); err != nil {
-			t.Fatalf("failed test '%s': %s", test.description, err)
-		} else if err := block.Accept(); err != nil {
-			t.Fatalf("failed test '%s': %s", test.description, err)
-		} else if blk, ok := block.(*ProposalBlock); ok { // For proposal blocks, commit them
-			if options, err := blk.Options(); err != nil {
-				t.Fatalf("failed test '%s': %s", test.description, err)
-			} else if commit, ok := options[0].(*CommitBlock); !ok {
-				t.Fatalf("failed test '%s': should prefer to commit", test.description)
-			} else if err := commit.Verify(); err != nil {
-				t.Fatalf("failed test '%s': %s", test.description, err)
-			} else if err := commit.Accept(); err != nil {
-				t.Fatalf("failed test '%s': %s", test.description, err)
-			}
-		} else if err := service.GetTx(nil, arg, &response); err != nil {
-			t.Fatalf("failed test '%s': %s", test.description, err)
-		} else {
-			responseTxBytes, err := formatting.Decode(response.Encoding, response.Tx)
+		for _, encoding := range encodings {
+			service := defaultService(t)
+			defaultAddress(t, service)
+			service.vm.ctx.Lock.Lock()
+
+			tx, err := test.createTx(service)
 			if err != nil {
-				t.Fatalf("failed test '%s': %s", test.description, err)
+				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 			}
-			if !bytes.Equal(responseTxBytes, tx.Bytes()) {
-				t.Fatalf("failed test '%s': byte representation of tx in response is incorrect", test.description)
+			arg := &api.GetTxArgs{
+				TxID:     tx.ID(),
+				Encoding: encoding,
 			}
+			var response api.GetTxReply
+			if err := service.GetTx(nil, arg, &response); err == nil {
+				t.Fatalf("failed test '%s - %s': haven't issued tx yet so shouldn't be able to get it", test.description, encoding.String())
+			} else if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
+				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
+			} else if block, err := service.vm.BuildBlock(); err != nil {
+				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
+			} else if err := block.Verify(); err != nil {
+				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
+			} else if err := block.Accept(); err != nil {
+				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
+			} else if blk, ok := block.(*ProposalBlock); ok { // For proposal blocks, commit them
+				if options, err := blk.Options(); err != nil {
+					t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
+				} else if commit, ok := options[0].(*CommitBlock); !ok {
+					t.Fatalf("failed test '%s - %s': should prefer to commit", test.description, encoding.String())
+				} else if err := commit.Verify(); err != nil {
+					t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
+				} else if err := commit.Accept(); err != nil {
+					t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
+				}
+			} else if err := service.GetTx(nil, arg, &response); err != nil {
+				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
+			} else {
+				switch encoding {
+				case formatting.Hex, formatting.CB58:
+					// we're always guaranteed a string for hex/cb58 encodings.
+					responseTxBytes, err := formatting.Decode(response.Encoding, response.Tx.(string))
+					if err != nil {
+						t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
+					}
+					if !bytes.Equal(responseTxBytes, tx.Bytes()) {
+						t.Fatalf("failed test '%s - %s': byte representation of tx in response is incorrect", test.description, encoding.String())
+					}
+				case formatting.JSON:
+					if response.Tx != tx {
+						t.Fatalf("failed test '%s - %s': byte representation of tx in response is incorrect", test.description, encoding.String())
+					}
+				}
+			}
+
+			if err := service.vm.Shutdown(); err != nil {
+				t.Fatal(err)
+			}
+			service.vm.ctx.Lock.Unlock()
 		}
 	}
 }
@@ -750,4 +765,60 @@ func TestGetTimestamp(t *testing.T) {
 	assert.NoError(err)
 
 	assert.Equal(newTimestamp, reply.Timestamp)
+}
+
+func TestGetBlock(t *testing.T) {
+	tests := []struct {
+		name     string
+		encoding formatting.Encoding
+	}{
+		{
+			name:     "json",
+			encoding: formatting.JSON,
+		},
+		{
+			name:     "cb58",
+			encoding: formatting.CB58,
+		},
+		{
+			name:     "hex",
+			encoding: formatting.Hex,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			service := defaultService(t)
+
+			block, err := service.vm.newStandardBlock(ids.GenerateTestID(), 1234, nil)
+			if err != nil {
+				t.Fatal("couldn't create block: %w", err)
+			}
+			internalState := NewMockInternalState(ctrl)
+			internalState.EXPECT().GetBlock(block.ID()).Times(1).Return(block, nil)
+
+			service.vm.internalState = internalState
+
+			args := api.GetBlockArgs{
+				BlockID:  block.ID(),
+				Encoding: test.encoding,
+			}
+			response := api.GetBlockResponse{}
+			err = service.GetBlock(nil, &args, &response)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			switch {
+			case test.encoding == formatting.JSON:
+				assert.Equal(t, block, response.Block)
+			default:
+				decoded, _ := formatting.Decode(response.Encoding, response.Block.(string))
+				assert.Equal(t, block.Bytes(), decoded)
+			}
+
+			assert.Equal(t, test.encoding, response.Encoding)
+		})
+	}
 }

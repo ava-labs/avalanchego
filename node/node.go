@@ -48,6 +48,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/filesystem"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -59,7 +60,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
+	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
@@ -155,6 +156,9 @@ type Node struct {
 	// Metrics Registerer
 	MetricsRegisterer *prometheus.Registry
 	MetricsGatherer   metrics.MultiGatherer
+
+	// VM endpoint registry
+	VMRegistry registry.VMRegistry
 }
 
 /*
@@ -420,14 +424,9 @@ func (n *Node) initBeacons() error {
 
 // Create the EventDispatcher used for hooking events
 // into the general process flow.
-func (n *Node) initEventDispatcher() error {
-	n.DecisionDispatcher = &triggers.EventDispatcher{}
-	n.DecisionDispatcher.Initialize(n.Log)
-
-	n.ConsensusDispatcher = &triggers.EventDispatcher{}
-	n.ConsensusDispatcher.Initialize(n.Log)
-
-	return n.ConsensusDispatcher.Register("gossip", n.Net)
+func (n *Node) initEventDispatchers() {
+	n.DecisionDispatcher = triggers.New(n.Log)
+	n.ConsensusDispatcher = triggers.New(n.Log)
 }
 
 func (n *Node) initIPCs() error {
@@ -458,7 +457,7 @@ func (n *Node) initIndexer() error {
 		Log:                  n.Log,
 		DecisionDispatcher:   n.DecisionDispatcher,
 		ConsensusDispatcher:  n.ConsensusDispatcher,
-		APIServer:            &n.APIServer,
+		APIServer:            n.APIServer,
 		ShutdownF:            func() { n.Shutdown(0) }, // TODO put exit code here
 	})
 	if err != nil {
@@ -489,6 +488,7 @@ func (n *Node) initChains(genesisBytes []byte) {
 // initAPIServer initializes the server that handles HTTP calls
 func (n *Node) initAPIServer() error {
 	n.Log.Info("initializing API server")
+	n.APIServer = server.New()
 
 	if !n.Config.APIRequireAuthToken {
 		n.APIServer.Initialize(
@@ -616,7 +616,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		Validators:                              n.vdrs,
 		NodeID:                                  n.ID,
 		NetworkID:                               n.Config.NetworkID,
-		Server:                                  &n.APIServer,
+		Server:                                  n.APIServer,
 		Keystore:                                n.keystore,
 		AtomicMemory:                            &n.sharedMemory,
 		AVAXAssetID:                             avaxAssetID,
@@ -633,15 +633,36 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		SubnetConfigs:                           n.Config.SubnetConfigs,
 		ChainConfigs:                            n.Config.ChainConfigs,
 		ConsensusGossipFrequency:                n.Config.ConsensusGossipFrequency,
-		AppGossipValidatorSize:                  int(n.Config.NetworkConfig.AppGossipValidatorSize),
-		AppGossipNonValidatorSize:               int(n.Config.NetworkConfig.AppGossipNonValidatorSize),
-		GossipAcceptedFrontierSize:              int(n.Config.NetworkConfig.GossipAcceptedFrontierSize),
+		GossipConfig:                            n.Config.GossipConfig,
 		BootstrapMaxTimeGetAncestors:            n.Config.BootstrapMaxTimeGetAncestors,
 		BootstrapAncestorsMaxContainersSent:     n.Config.BootstrapAncestorsMaxContainersSent,
 		BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
 		ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
 		ApricotPhase4MinPChainHeight:            version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
 		ResetProposerVMHeightIndex:              n.Config.ResetProposerVMHeightIndex,
+	})
+
+	// Notify the API server when new chains are created
+	n.chainManager.AddRegistrant(n.APIServer)
+	return nil
+}
+
+// initVMs initializes the VMs Avalanche supports + any additional vms installed as plugins.
+func (n *Node) initVMs() error {
+	n.Log.Info("initializing VMs")
+
+	// initialize the vm registry
+	n.VMRegistry = registry.NewVMRegistry(registry.VMRegistryConfig{
+		VMGetter: registry.NewVMGetter(registry.VMGetterConfig{
+			FileReader:      filesystem.NewReader(),
+			Manager:         n.Config.VMManager,
+			PluginDirectory: n.Config.PluginDir,
+		}),
+		VMRegisterer: registry.NewVMRegisterer(registry.VMRegistererConfig{
+			APIServer: n.APIServer,
+			Log:       n.Log,
+			VMManager: n.Config.VMManager,
+		}),
 	})
 
 	vdrs := n.vdrs
@@ -686,82 +707,17 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		n.Config.VMManager.RegisterFactory(nftfx.ID, &nftfx.Factory{}),
 		n.Config.VMManager.RegisterFactory(propertyfx.ID, &propertyfx.Factory{}),
 		n.Config.VMManager.RegisterFactory(constants.EVMID, &coreth.Factory{}),
-		rpcchainvm.RegisterPlugins(n.Config.PluginDir, n.Config.VMManager),
 	)
 	if errs.Errored() {
 		return errs.Err
 	}
 
-	vmIDs, err := n.Config.VMManager.ListFactories()
-	if err != nil {
-		return err
+	// register any vms that need to be installed as plugins from disk
+	_, failedVMs, err := n.VMRegistry.Reload()
+	for failedVM, err := range failedVMs {
+		n.Log.Error("failed to register %s: %w", failedVM, err)
 	}
-
-	for _, vmID := range vmIDs {
-		factory, err := n.Config.VMManager.GetFactory(vmID)
-		if err != nil {
-			return err
-		}
-
-		vm, err := factory.New(nil)
-		if err != nil {
-			return err
-		}
-
-		commonVM, ok := vm.(common.VM)
-		if !ok {
-			continue
-		}
-
-		handlers, err := commonVM.CreateStaticHandlers()
-		if err != nil {
-			n.Log.Error("creating static API endpoints for %q errored with: %s", vmID, err)
-
-			if err := commonVM.Shutdown(); err != nil {
-				return fmt.Errorf("shutting down VM errored with: %w", err)
-			}
-			continue
-		}
-
-		// all static endpoints go to the vm endpoint, defaulting to the vm id
-		defaultEndpoint := constants.VMAliasPrefix + vmID.String()
-
-		// use a single lock for this entire vm
-		lock := new(sync.RWMutex)
-		// register the static endpoints
-		for extension, service := range handlers {
-			n.Log.Verbo("adding static API endpoint: %s%s", defaultEndpoint, extension)
-			if err := n.APIServer.AddRoute(service, lock, defaultEndpoint, extension, n.Log); err != nil {
-				return fmt.Errorf(
-					"failed to add static API endpoint %s%s: %s",
-					defaultEndpoint,
-					extension,
-					err,
-				)
-			}
-		}
-
-		aliases, err := n.Config.VMManager.Aliases(vmID)
-		if err != nil {
-			return err
-		}
-
-		urlAliases := []string{}
-		for _, alias := range aliases {
-			urlAlias := constants.VMAliasPrefix + alias
-			if urlAlias != defaultEndpoint {
-				urlAliases = append(urlAliases, urlAlias)
-			}
-		}
-
-		if err := n.APIServer.AddAliases(defaultEndpoint, urlAliases...); err != nil {
-			return err
-		}
-	}
-
-	// Notify the API server when new chains are created
-	n.chainManager.AddRegistrant(&n.APIServer)
-	return nil
+	return err
 }
 
 // initSharedMemory initializes the shared memory for cross chain interation
@@ -849,10 +805,12 @@ func (n *Node) initAdminAPI() error {
 		admin.Config{
 			Log:          n.Log,
 			ChainManager: n.chainManager,
-			HTTPServer:   &n.APIServer,
+			HTTPServer:   n.APIServer,
 			ProfileDir:   n.Config.ProfilerConfig.Dir,
 			LogFactory:   n.LogFactory,
 			NodeConfig:   n.Config,
+			VMManager:    n.Config.VMManager,
+			VMRegistry:   n.VMRegistry,
 		},
 	)
 	if err != nil {
@@ -901,6 +859,7 @@ func (n *Node) initInfoAPI() error {
 			CreateAssetTxFee:      n.Config.CreateAssetTxFee,
 			CreateSubnetTxFee:     n.Config.CreateSubnetTxFee,
 			CreateBlockchainTxFee: n.Config.CreateBlockchainTxFee,
+			VMManager:             n.Config.VMManager,
 		},
 		n.Log,
 		n.chainManager,
@@ -1055,7 +1014,7 @@ func (n *Node) initIPCAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing ipc API")
-	service, err := ipcsapi.NewService(n.Log, n.chainManager, &n.APIServer, n.IPCs)
+	service, err := ipcsapi.NewService(n.Log, n.chainManager, n.APIServer, n.IPCs)
 	if err != nil {
 		return err
 	}
@@ -1149,18 +1108,20 @@ func (n *Node) Initialize(
 	// and the engine (initChains) but after the metrics (initMetricsAPI)
 	// message.Creator currently record metrics under network namespace
 	n.networkNamespace = "network"
-	if n.msgCreator, err = message.NewCreator(n.MetricsRegisterer,
+	n.msgCreator, err = message.NewCreator(n.MetricsRegisterer,
 		n.Config.NetworkConfig.CompressionEnabled,
-		n.networkNamespace); err != nil {
+		n.networkNamespace,
+		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
+	)
+	if err != nil {
 		return fmt.Errorf("problem TheOneCreator: %w", err)
 	}
 
 	if err = n.initNetworking(); err != nil { // Set up all networking
 		return fmt.Errorf("problem initializing networking: %w", err)
 	}
-	if err = n.initEventDispatcher(); err != nil { // Set up the event dipatcher
-		return fmt.Errorf("problem initializing event dispatcher: %w", err)
-	}
+
+	n.initEventDispatchers()
 
 	// Start the Health API
 	// Has to be initialized before chain manager
@@ -1173,6 +1134,9 @@ func (n *Node) Initialize(
 	}
 	if err := n.initChainManager(n.Config.AvaxAssetID); err != nil { // Set up the chain manager
 		return fmt.Errorf("couldn't initialize chain manager: %w", err)
+	}
+	if err := n.initVMs(); err != nil { // Initialize the VM registry.
+		return fmt.Errorf("couldn't initialize VM registry: %w", err)
 	}
 	if err := n.initAdminAPI(); err != nil { // Start the Admin API
 		return fmt.Errorf("couldn't initialize admin API: %w", err)

@@ -16,12 +16,14 @@ import (
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
-var _ Consensus = &Directed{}
+var (
+	_ Factory   = &DirectedFactory{}
+	_ Consensus = &Directed{}
+)
 
 // DirectedFactory implements Factory by returning a directed struct
 type DirectedFactory struct{}
 
-// New implements Factory
 func (DirectedFactory) New() Consensus { return &Directed{} }
 
 // Directed is an implementation of a multi-color, non-transitive, snowball
@@ -30,6 +32,7 @@ type Directed struct {
 	// metrics that describe this consensus instance
 	metrics.Latency
 	metrics.Polls
+	whitelistTxMetrics metrics.Latency
 
 	// context that this consensus instance is executing in
 	ctx *snow.ConsensusContext
@@ -89,7 +92,6 @@ type directedTx struct {
 	tx Tx
 }
 
-// Initialize implements the Consensus interface
 func (dg *Directed) Initialize(
 	ctx *snow.ConsensusContext,
 	params sbcon.Parameters,
@@ -99,6 +101,9 @@ func (dg *Directed) Initialize(
 
 	if err := dg.Latency.Initialize("txs", "transaction(s)", ctx.Log, "", ctx.Registerer); err != nil {
 		return fmt.Errorf("failed to initialize latency metrics: %w", err)
+	}
+	if err := dg.whitelistTxMetrics.Initialize("whitelist_tx", "whitelist transaction(s)", ctx.Log, "", ctx.Registerer); err != nil {
+		return fmt.Errorf("failed to initialize whitelist tx metrics: %w", err)
 	}
 	if err := dg.Polls.Initialize("", ctx.Registerer); err != nil {
 		return fmt.Errorf("failed to initialize poll metrics: %w", err)
@@ -111,18 +116,14 @@ func (dg *Directed) Initialize(
 	return params.Verify()
 }
 
-// Parameters implements the Snowstorm interface
 func (dg *Directed) Parameters() sbcon.Parameters { return dg.params }
 
-// Virtuous implements the ConflictGraph interface
 func (dg *Directed) Virtuous() ids.Set { return dg.virtuous }
 
-// Preferences implements the ConflictGraph interface
 func (dg *Directed) Preferences() ids.Set { return dg.preferences }
 
 func (dg *Directed) VirtuousVoting() ids.Set { return dg.virtuousVoting }
 
-// Quiesce implements the ConflictGraph interface
 func (dg *Directed) Quiesce() bool {
 	numVirtuous := dg.virtuousVoting.Len()
 	dg.ctx.Log.Verbo("Conflict graph has %d voting virtuous transactions",
@@ -130,7 +131,6 @@ func (dg *Directed) Quiesce() bool {
 	return numVirtuous == 0
 }
 
-// Finalized implements the ConflictGraph interface
 func (dg *Directed) Finalized() bool {
 	numPreferences := dg.preferences.Len()
 	dg.ctx.Log.Verbo("Conflict graph has %d preferred transactions",
@@ -173,7 +173,12 @@ func (dg *Directed) shouldVote(tx Tx) (bool, error) {
 	}
 
 	// Notify the metrics that this transaction is being issued.
-	dg.Latency.Issued(txID, dg.pollNumber)
+	if tx.HasWhitelist() {
+		dg.ctx.Log.Info("whitelist tx successfully issued %s", txID)
+		dg.whitelistTxMetrics.Issued(txID, dg.pollNumber)
+	} else {
+		dg.Latency.Issued(txID, dg.pollNumber)
+	}
 
 	// If this tx has inputs, it needs to be voted on before being accepted.
 	if inputs := tx.InputIDs(); len(inputs) != 0 {
@@ -203,7 +208,6 @@ func (dg *Directed) shouldVote(tx Tx) (bool, error) {
 	return false, nil
 }
 
-// IsVirtuous implements the Consensus interface
 func (dg *Directed) IsVirtuous(tx Tx) bool {
 	txID := tx.ID()
 	// If the tx is currently processing, we should just return if was
@@ -226,7 +230,6 @@ func (dg *Directed) IsVirtuous(tx Tx) bool {
 	return true
 }
 
-// Conflicts implements the Consensus interface
 func (dg *Directed) Conflicts(tx Tx) ids.Set {
 	var conflicts ids.Set
 	if node, exists := dg.txs[tx.ID()]; exists {
@@ -249,7 +252,6 @@ func (dg *Directed) Conflicts(tx Tx) ids.Set {
 	return conflicts
 }
 
-// Add implements the Consensus interface
 func (dg *Directed) Add(tx Tx) error {
 	if shouldVote, err := dg.shouldVote(tx); !shouldVote || err != nil {
 		return err
@@ -270,11 +272,13 @@ func (dg *Directed) Add(tx Tx) error {
 			dg.addEdge(txNode, otherNode)
 		}
 	}
-	whitelist, isWhitelist, err := tx.Whitelist()
-	if err != nil {
-		return err
-	}
-	if isWhitelist {
+	if tx.HasWhitelist() {
+		whitelist, err := tx.Whitelist()
+		if err != nil {
+			return err
+		}
+		dg.ctx.Log.Info("processing whitelist tx %s", txID)
+
 		// Find all transactions that are not explicitly whitelisted and mark
 		// them as conflicting.
 		for otherID, otherNode := range dg.txs {
@@ -372,7 +376,6 @@ func (dg *Directed) Remove(txID ids.ID) error {
 	return dg.reject(s)
 }
 
-// Issued implements the Consensus interface
 func (dg *Directed) Issued(tx Tx) bool {
 	// If the tx is either Accepted or Rejected, then it must have been issued
 	// previously.
@@ -385,7 +388,6 @@ func (dg *Directed) Issued(tx Tx) bool {
 	return ok
 }
 
-// RecordPoll implements the Consensus interface
 func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 	// Increase the vote ID. This is only updated here and is used to reset the
 	// confidence values of transactions lazily.
@@ -620,7 +622,14 @@ func (dg *Directed) acceptTx(tx Tx) error {
 	}
 
 	// Update the metrics to account for this transaction's acceptance
-	dg.Latency.Accepted(txID, dg.pollNumber)
+	if tx.HasWhitelist() {
+		dg.ctx.Log.Info("whitelist tx accepted %s", txID)
+		dg.whitelistTxMetrics.Accepted(txID, dg.pollNumber)
+	} else {
+		// just regular tx
+		dg.Latency.Accepted(txID, dg.pollNumber)
+	}
+
 	// If there is a tx that was accepted pending on this tx, the ancestor
 	// should be notified that it doesn't need to block on this tx anymore.
 	dg.pendingAccept.Fulfill(txID)
@@ -651,7 +660,12 @@ func (dg *Directed) rejectTx(tx Tx) error {
 	}
 
 	// Update the metrics to account for this transaction's rejection
-	dg.Latency.Rejected(txID, dg.pollNumber)
+	if tx.HasWhitelist() {
+		dg.ctx.Log.Info("whitelist tx rejected %s", txID)
+		dg.whitelistTxMetrics.Rejected(txID, dg.pollNumber)
+	} else {
+		dg.Latency.Rejected(txID, dg.pollNumber)
+	}
 
 	// If there is a tx that was accepted pending on this tx, the ancestor
 	// tx can't be accepted.

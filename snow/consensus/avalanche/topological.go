@@ -15,18 +15,18 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 )
 
-const (
-	minMapSize = 16
+const minMapSize = 16
+
+var (
+	errNoLeaves = errors.New("couldn't pop a leaf from leaf set")
+
+	_ Factory   = &TopologicalFactory{}
+	_ Consensus = &Topological{}
 )
-
-var errNoLeaves = errors.New("couldn't pop a leaf from leaf set")
-
-var _ Consensus = &Topological{}
 
 // TopologicalFactory implements Factory by returning a topological struct
 type TopologicalFactory struct{}
 
-// New implements Factory
 func (TopologicalFactory) New() Consensus { return &Topological{} }
 
 // TODO: Implement pruning of decisions.
@@ -99,7 +99,6 @@ type kahnNode struct {
 	votes    ids.BitSet
 }
 
-// Initialize implements the Avalanche interface
 func (ta *Topological) Initialize(
 	ctx *snow.ConsensusContext,
 	params Parameters,
@@ -133,16 +132,12 @@ func (ta *Topological) Initialize(
 	return ta.updateFrontiers()
 }
 
-// NumProcessing implements the Avalanche interface
 func (ta *Topological) NumProcessing() int { return len(ta.nodes) }
 
-// Parameters implements the Avalanche interface
 func (ta *Topological) Parameters() Parameters { return ta.params }
 
-// IsVirtuous implements the Avalanche interface
 func (ta *Topological) IsVirtuous(tx snowstorm.Tx) bool { return ta.cg.IsVirtuous(tx) }
 
-// Add implements the Avalanche interface
 func (ta *Topological) Add(vtx Vertex) error {
 	ta.ctx.Log.AssertTrue(vtx != nil, "Attempting to insert nil vertex")
 
@@ -205,7 +200,6 @@ func (ta *Topological) Add(vtx Vertex) error {
 	return ta.update(vtx) // Update the vertices preference and virtuous status
 }
 
-// VertexIssued implements the Avalanche interface
 func (ta *Topological) VertexIssued(vtx Vertex) bool {
 	if vtx.Status().Decided() {
 		return true
@@ -214,19 +208,14 @@ func (ta *Topological) VertexIssued(vtx Vertex) bool {
 	return ok
 }
 
-// TxIssued implements the Avalanche interface
 func (ta *Topological) TxIssued(tx snowstorm.Tx) bool { return ta.cg.Issued(tx) }
 
-// Orphans implements the Avalanche interface
 func (ta *Topological) Orphans() ids.Set { return ta.orphans }
 
-// Virtuous implements the Avalanche interface
 func (ta *Topological) Virtuous() ids.Set { return ta.virtuous }
 
-// Preferences implements the Avalanche interface
 func (ta *Topological) Preferences() ids.Set { return ta.preferred }
 
-// RecordPoll implements the Avalanche interface
 func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
 	// Register a new poll call
 	ta.pollNumber++
@@ -271,10 +260,8 @@ func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
 	return ta.updateFrontiers()
 }
 
-// Quiesce implements the Avalanche interface
 func (ta *Topological) Quiesce() bool { return ta.virtuousVoting.Len() == 0 }
 
-// Finalized implements the Avalanche interface
 func (ta *Topological) Finalized() bool { return ta.cg.Finalized() }
 
 // HealthCheck returns information about the consensus health.

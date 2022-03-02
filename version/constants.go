@@ -11,7 +11,7 @@ import (
 
 // These are globals that describe network upgrades and node versions
 var (
-	Current                      = NewDefaultVersion(1, 7, 5)
+	Current                      = NewDefaultVersion(1, 7, 6)
 	CurrentApp                   = NewDefaultApplication(constants.PlatformName, Current.Major(), Current.Minor(), Current.Patch())
 	MinimumCompatibleVersion     = NewDefaultApplication(constants.PlatformName, 1, 7, 0)
 	PrevMinimumCompatibleVersion = NewDefaultApplication(constants.PlatformName, 1, 6, 0)
@@ -65,6 +65,13 @@ var (
 		constants.FujiID:    time.Date(2021, time.November, 24, 15, 0, 0, 0, time.UTC),
 	}
 	ApricotPhase5DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
+
+	// FIXME: update this before release
+	XChainMigrationTimes = map[uint32]time.Time{
+		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
+	}
+	XChainMigrationDefaultTime = time.Date(2022, time.January, 1, 1, 0, 0, 0, time.UTC)
 )
 
 func GetApricotPhase0Time(networkID uint32) time.Time {
@@ -114,6 +121,13 @@ func GetApricotPhase5Time(networkID uint32) time.Time {
 		return upgradeTime
 	}
 	return ApricotPhase5DefaultTime
+}
+
+func GetXChainMigrationTime(networkID uint32) time.Time {
+	if upgradeTime, exists := XChainMigrationTimes[networkID]; exists {
+		return upgradeTime
+	}
+	return XChainMigrationDefaultTime
 }
 
 func GetCompatibility(networkID uint32) Compatibility {

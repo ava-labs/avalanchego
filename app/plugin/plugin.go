@@ -14,41 +14,42 @@ import (
 	"github.com/ava-labs/avalanchego/app"
 )
 
-const (
-	Name = "nodeProcess"
+const Name = "nodeProcess"
+
+var (
+	Handshake = plugin.HandshakeConfig{
+		ProtocolVersion:  2,
+		MagicCookieKey:   "NODE_PROCESS_PLUGIN",
+		MagicCookieValue: "dynamic",
+	}
+
+	// PluginMap is the map of plugins we can dispense.
+	PluginMap = map[string]plugin.Plugin{
+		Name: &appPlugin{},
+	}
+
+	_ plugin.Plugin     = &appPlugin{}
+	_ plugin.GRPCPlugin = &appPlugin{}
 )
 
-var Handshake = plugin.HandshakeConfig{
-	ProtocolVersion:  2,
-	MagicCookieKey:   "NODE_PROCESS_PLUGIN",
-	MagicCookieValue: "dynamic",
-}
-
-// PluginMap is the map of plugins we can dispense.
-var PluginMap = map[string]plugin.Plugin{
-	Name: &AppPlugin{},
-}
-
-// AppPlugin is can be served/consumed with the hashicorp plugin library.
-// Plugin implements plugin.GRPCPlugin
-type AppPlugin struct {
+type appPlugin struct {
 	plugin.NetRPCUnsupportedPlugin
 	app app.App
 }
 
-func New(app app.App) *AppPlugin {
-	return &AppPlugin{
-		app: app,
-	}
+// New will be called by the server side of the plugin to pass into the server
+// side PluginMap for dispatching.
+func New(app app.App) plugin.Plugin {
+	return &appPlugin{app: app}
 }
 
 // GRPCServer registers a new GRPC server.
-func (p *AppPlugin) GRPCServer(_ *plugin.GRPCBroker, s *grpc.Server) error {
+func (p *appPlugin) GRPCServer(_ *plugin.GRPCBroker, s *grpc.Server) error {
 	pluginproto.RegisterNodeServer(s, NewServer(p.app))
 	return nil
 }
 
 // GRPCClient returns a new GRPC client
-func (p *AppPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
+func (p *appPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
 	return NewClient(pluginproto.NewNodeClient(c)), nil
 }

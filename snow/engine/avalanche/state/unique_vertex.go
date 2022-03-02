@@ -4,8 +4,10 @@
 package state
 
 import (
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
@@ -33,6 +35,9 @@ type uniqueVertex struct {
 
 	vtxID ids.ID
 	v     *vertexState
+
+	// default to "time.Now", used for testing
+	time func() time.Time
 }
 
 // newUniqueVertex returns a uniqueVertex instance from [b] by checking the cache
@@ -179,7 +184,7 @@ func (vtx *uniqueVertex) Accept() error {
 		vtx.serializer.edge.Remove(parent.ID())
 	}
 
-	if err := vtx.serializer.state.SetEdge(vtx.serializer.edge.List()); err != nil {
+	if err := vtx.serializer.state.SetEdge(vtx.serializer.Edge()); err != nil {
 		return fmt.Errorf("failed to set edge while accepting vertex %s due to %w", vtx.vtxID, err)
 	}
 
@@ -228,11 +233,149 @@ func (vtx *uniqueVertex) Parents() ([]avalanche.Vertex, error) {
 	return vtx.v.parents, nil
 }
 
+var (
+	errStopVertexNotAllowedTimestamp = errors.New("stop vertex not allowed timestamp")
+	errStopVertexAlreadyAccepted     = errors.New("stop vertex already accepted")
+	errUnexpectedEdges               = errors.New("unexpected edge, expected accepted frontier")
+	errUnexpectedDependencyStopVtx   = errors.New("unexpected dependencies found in stop vertex transitive path")
+)
+
+// "uniqueVertex" itself implements "Verify" regardless of whether the underlying vertex
+// is stop vertex or not. Called before issuing the vertex to the consensus.
+// No vertex should ever be able to refer to a stop vertex in its transitive closure.
+func (vtx *uniqueVertex) Verify() error {
+	// first verify the underlying stateless vertex
+	if err := vtx.v.vtx.Verify(); err != nil {
+		return err
+	}
+
+	whitelistVtx := vtx.v.vtx.StopVertex()
+	if whitelistVtx {
+		now := time.Now()
+		if vtx.time != nil {
+			now = vtx.time()
+		}
+		allowed := vtx.serializer.xChainMigrationTime
+		if now.Before(allowed) {
+			return errStopVertexNotAllowedTimestamp
+		}
+	}
+
+	// edge is updated in "vtx.Accept"
+	// and "vtx.serializer.Edge()" is global
+	acceptedEdges := ids.NewSet(0)
+	acceptedEdges.Add(vtx.serializer.Edge()...)
+	for id := range acceptedEdges {
+		edgeVtx, err := vtx.serializer.getVertex(id)
+		if err != nil {
+			return err
+		}
+		// MUST error if stop vertex has already been accepted (can't be accepted twice)
+		// regardless of whether the underlying vertex is stop vertex or not
+		if edgeVtx.v.vtx.StopVertex() {
+			return errStopVertexAlreadyAccepted
+		}
+	}
+	if !whitelistVtx {
+		// below are stop vertex specific verifications
+		// no need to continue
+		return nil
+	}
+
+	//      (accepted)           (accepted)
+	//        vtx_1                vtx_2
+	//    [tx_a, tx_b]          [tx_c, tx_d]
+	//          ⬆      ⬉     ⬈       ⬆
+	//        vtx_3                vtx_4
+	//    [tx_e, tx_f]          [tx_g, tx_h]
+	//                               ⬆
+	//                         stop_vertex_5
+	//
+	// [tx_a, tx_b] transitively referenced by "stop_vertex_5"
+	// has the dependent transactions [tx_e, tx_f]
+	// that are not transitively referenced by "stop_vertex_5"
+	// in case "tx_g" depends on "tx_e" that is not in vtx4.
+	// Thus "stop_vertex_5" is invalid!
+	//
+	// To make sure such transitive paths of the stop vertex reach all accepted frontier:
+	// 1. check the edge of the transitive paths refers to the accepted frontier
+	// 2. check dependencies of all txs must be subset of transitive paths
+	queue := []avalanche.Vertex{vtx}
+	visitedVtx := ids.NewSet(0)
+
+	acceptedFrontier := ids.NewSet(0)
+	transitivePaths := ids.NewSet(0)
+	dependencies := ids.NewSet(0)
+	for len(queue) > 0 { // perform BFS
+		cur := queue[0]
+		queue = queue[1:]
+
+		curID := cur.ID()
+		if cur.Status() == choices.Accepted {
+			// 1. check the edge of the transitive paths refers to the accepted frontier
+			acceptedFrontier.Add(curID)
+
+			// have reached the accepted frontier on the transitive closure
+			// no need to continue the search on this path
+			continue
+		}
+
+		if visitedVtx.Contains(curID) {
+			continue
+		}
+		visitedVtx.Add(curID)
+		transitivePaths.Add(curID)
+
+		txs, err := cur.Txs()
+		if err != nil {
+			return err
+		}
+		for _, tx := range txs {
+			transitivePaths.Add(tx.ID())
+			deps, err := tx.Dependencies()
+			if err != nil {
+				return err
+			}
+			for _, dep := range deps {
+				// only add non-accepted dependencies
+				if dep.Status() != choices.Accepted {
+					dependencies.Add(dep.ID())
+				}
+			}
+		}
+
+		parents, err := cur.Parents()
+		if err != nil {
+			return err
+		}
+		queue = append(queue, parents...)
+	}
+
+	// stop vertex should be able to reach all IDs
+	// that are returned by the "Edge"
+	if !acceptedFrontier.Equals(acceptedEdges) {
+		return errUnexpectedEdges
+	}
+
+	// 2. check dependencies of all txs must be subset of transitive paths
+	prev := transitivePaths.Len()
+	transitivePaths.Union(dependencies)
+	if prev != transitivePaths.Len() {
+		return errUnexpectedDependencyStopVtx
+	}
+
+	return nil
+}
+
+func (vtx *uniqueVertex) HasWhitelist() bool {
+	return vtx.v.vtx.StopVertex()
+}
+
 // "uniqueVertex" itself implements "Whitelist" traversal iff its underlying
 // "vertex.StatelessVertex" is marked as a stop vertex.
-func (vtx *uniqueVertex) Whitelist() (ids.Set, bool, error) {
+func (vtx *uniqueVertex) Whitelist() (ids.Set, error) {
 	if !vtx.v.vtx.StopVertex() {
-		return nil, false, nil
+		return nil, nil
 	}
 
 	// perform BFS on transitive paths until reaching the accepted frontier
@@ -242,36 +385,36 @@ func (vtx *uniqueVertex) Whitelist() (ids.Set, bool, error) {
 	whitlist := ids.NewSet(0)
 	visitedVtx := ids.NewSet(0)
 	for len(queue) > 0 {
-		front := queue[0]
+		cur := queue[0]
 		queue = queue[1:]
 
-		if front.Status() == choices.Accepted {
+		if cur.Status() == choices.Accepted {
 			// have reached the accepted frontier on the transitive closure
 			// no need to continue the search on this path
 			continue
 		}
-		frontID := front.ID()
-		if visitedVtx.Contains(frontID) {
+		curID := cur.ID()
+		if visitedVtx.Contains(curID) {
 			continue
 		}
-		visitedVtx.Add(frontID)
+		visitedVtx.Add(curID)
 
-		txs, err := front.Txs()
+		txs, err := cur.Txs()
 		if err != nil {
-			return nil, true, err
+			return nil, err
 		}
 		for _, tx := range txs {
 			whitlist.Add(tx.ID())
 		}
-		whitlist.Add(frontID)
+		whitlist.Add(curID)
 
-		parents, err := front.Parents()
+		parents, err := cur.Parents()
 		if err != nil {
-			return nil, true, err
+			return nil, err
 		}
 		queue = append(queue, parents...)
 	}
-	return whitlist, true, nil
+	return whitlist, nil
 }
 
 func (vtx *uniqueVertex) Height() (uint64, error) {
@@ -317,8 +460,6 @@ func (vtx *uniqueVertex) Txs() ([]snowstorm.Tx, error) {
 }
 
 func (vtx *uniqueVertex) Bytes() []byte { return vtx.v.vtx.Bytes() }
-
-func (vtx *uniqueVertex) Verify() error { return vtx.v.vtx.Verify() }
 
 func (vtx *uniqueVertex) String() string {
 	sb := strings.Builder{}

@@ -45,10 +45,29 @@ func (i *issuer) Update() {
 	if i.abandoned || i.issued || i.vtxDeps.Len() != 0 || i.txDeps.Len() != 0 || i.t.Consensus.VertexIssued(i.vtx) || i.t.errs.Errored() {
 		return
 	}
+
+	vtxID := i.vtx.ID()
+
 	// All dependencies have been met
 	i.issued = true
 
-	vtxID := i.vtx.ID()
+	// check stop vertex validity
+	err := i.vtx.Verify()
+	if err != nil {
+		if i.vtx.HasWhitelist() {
+			// do not update "i.t.errs" since it's only used for critical errors
+			// which will cause chain shutdown in the engine
+			// (see "handleSyncMsg" and "handleChanMsg")
+			i.t.Ctx.Log.Debug("stop vertex %q failed verification due to %q; abandoned", vtxID, err)
+			i.t.metrics.whitelistVtxIssueFailure.Inc()
+		} else {
+			i.t.Ctx.Log.Debug("vertex %q failed verification due to %q; abandoned", vtxID, err)
+		}
+
+		i.t.vtxBlocked.Abandon(vtxID)
+		return
+	}
+
 	i.t.pending.Remove(vtxID) // Remove from set of vertices waiting to be issued.
 
 	// Make sure the transactions in this vertex are valid
@@ -71,7 +90,7 @@ func (i *issuer) Update() {
 	// Take the valid transactions and issue a new vertex with them.
 	if len(validTxs) != len(txs) {
 		i.t.Ctx.Log.Debug("Abandoning %s due to failed transaction verification", vtxID)
-		if _, err := i.t.batch(validTxs, false /*=force*/, false /*=empty*/, false /*=limit*/); err != nil {
+		if _, err := i.t.batch(validTxs, batchOption{}); err != nil {
 			i.t.errs.Add(err)
 		}
 		i.t.vtxBlocked.Abandon(vtxID)
@@ -90,6 +109,9 @@ func (i *issuer) Update() {
 	// Issue a poll for this vertex.
 	p := i.t.Consensus.Parameters()
 	vdrs, err := i.t.Validators.Sample(p.K) // Validators to sample
+	if err != nil {
+		i.t.Ctx.Log.Error("Query for %s was dropped due to an insufficient number of validators", vtxID)
+	}
 
 	vdrBag := ids.ShortBag{} // Validators to sample repr. as a set
 	for _, vdr := range vdrs {
@@ -103,8 +125,6 @@ func (i *issuer) Update() {
 	i.t.RequestID++
 	if err == nil && i.t.polls.Add(i.t.RequestID, vdrBag) {
 		i.t.Sender.SendPushQuery(vdrSet, i.t.RequestID, vtxID, i.vtx.Bytes())
-	} else if err != nil {
-		i.t.Ctx.Log.Error("Query for %s was dropped due to an insufficient number of validators", vtxID)
 	}
 
 	// Notify vertices waiting on this one that it (and its transactions) have been issued.
@@ -114,6 +134,11 @@ func (i *issuer) Update() {
 	}
 	i.t.metrics.blockerTxs.Set(float64(i.t.txBlocked.Len()))
 	i.t.metrics.blockerVtxs.Set(float64(i.t.vtxBlocked.Len()))
+
+	if i.vtx.HasWhitelist() {
+		i.t.Ctx.Log.Info("successfully issued stop vertex %s", vtxID)
+		i.t.metrics.whitelistVtxIssueSuccess.Inc()
+	}
 
 	// Issue a repoll
 	i.t.repoll()

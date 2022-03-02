@@ -2030,7 +2030,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	chainRouter := &router.ChainRouter{}
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &timeoutManager, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
@@ -2039,8 +2039,19 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	externalSender.Default(true)
 
 	// Passes messages from the consensus engine to the network
-	sender := sender.Sender{}
-	err = sender.Initialize(consensusCtx, mc, externalSender, chainRouter, &timeoutManager, 1, 1, 1)
+	sender, err := sender.New(
+		consensusCtx,
+		mc,
+		externalSender,
+		chainRouter,
+		&timeoutManager,
+		sender.GossipConfig{
+			AcceptedFrontierSize:      1,
+			OnAcceptSize:              1,
+			AppGossipNonValidatorSize: 1,
+			AppGossipValidatorSize:    1,
+		},
+	)
 	assert.NoError(t, err)
 
 	var reqID uint32
@@ -2073,7 +2084,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		SampleK:                        beacons.Len(),
 		StartupAlpha:                   (beacons.Weight() + 1) / 2,
 		Alpha:                          (beacons.Weight() + 1) / 2,
-		Sender:                         &sender,
+		Sender:                         sender,
 		Subnet:                         subnet,
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
