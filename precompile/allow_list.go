@@ -154,7 +154,7 @@ func writeAllowList(evm PrecompileAccessibleState, precompileAddr common.Address
 
 // createAllowListSetter returns an execution function for setting the allow list status of the input address argument to [role].
 // This execution function is speciifc to [precompileAddr].
-func createAllowListSetter(precompileAddr common.Address, role AllowListRole) func(evm PrecompileAccessibleState, callerAddr common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+func createAllowListSetter(precompileAddr common.Address, role AllowListRole) RunStatefulPrecompileFunc {
 	return func(evm PrecompileAccessibleState, callerAddr, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 		if len(input) != common.HashLength {
 			return nil, remainingGas, fmt.Errorf("invalid input length for modifying allow list: %d", len(input))

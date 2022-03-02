@@ -11,14 +11,18 @@ var (
 	ContractDeployerAllowListPrecompile StatefulPrecompiledContract = createAllowListPrecompile(ContractDeployerAllowListAddress)
 )
 
+// ContractDeployerAllowListConfig wraps [AllowListConfig] and uses it to implement the StatefulPrecompileConfig
+// interface while adding in the contract deployer specific precompile address.
 type ContractDeployerAllowListConfig struct {
 	AllowListConfig
 }
 
+// Address returns the address of the contract deployer allow list.
 func (c *ContractDeployerAllowListConfig) Address() common.Address {
 	return ContractDeployerAllowListAddress
 }
 
+// Configure configures [state] with the desired admins based on [c].
 func (c *ContractDeployerAllowListConfig) Configure(state StateDB) {
 	c.AllowListConfig.Configure(state, ContractDeployerAllowListAddress)
 }
