@@ -67,6 +67,98 @@ Next, you'll need to update your [chain config](https://docs.avax.network/build/
 _Note: If you enable this feature but a validator doesn't specify
 a "feeRecipient", the fees will be burned in blocks they produce._
 
+## Restricting Smart Contract Deployers
+If you'd like to restrict who has the ability to deploy contracts on your
+subnet, you can provide an `AllowList` configuration in your genesis file:
+```json
+{
+  "config": {
+    "chainId": 99999,
+    "homesteadBlock": 0,
+    "eip150Block": 0,
+    "eip150Hash": "0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0",
+    "eip155Block": 0,
+    "eip158Block": 0,
+    "byzantiumBlock": 0,
+    "constantinopleBlock": 0,
+    "petersburgBlock": 0,
+    "istanbulBlock": 0,
+    "muirGlacierBlock": 0,
+    "subnetEVMTimestamp": 0,
+    "feeConfig": {
+      "gasLimit": 20000000,
+      "minBaseFee": 1000000000,
+      "targetGas": 100000000,
+      "baseFeeChangeDenominator": 48,
+      "minBlockGasCost": 0,
+      "maxBlockGasCost": 10000000,
+      "targetBlockRate": 2,
+      "blockGasCostStep": 500000
+    },
+    "allowListConfig": {
+      "blockTimestamp": 0,
+      "adminAddresses":["0xD23cbfA7eA985213aD81223309f588A7E66A246A"]
+    }
+  },
+  "alloc": {
+    "D23cbfA7eA985213aD81223309f588A7E66A246A": {
+      "balance": "0x52B7D2DCC80CD2E4000000"
+    }
+  },
+  "nonce": "0x0",
+  "timestamp": "0x0",
+  "extraData": "0x00",
+  "gasLimit": "0x1312D00",
+  "difficulty": "0x0",
+  "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "coinbase": "0x0000000000000000000000000000000000000000",
+  "number": "0x0",
+  "gasUsed": "0x0",
+  "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+}
+```
+
+In this example, `0xD23cbfA7eA985213aD81223309f588A7E66A246A` is named as the
+`Admin` of the `AllowList`. This enables them to add other `Admins` or to add
+`Deployers`. Both `Admins` and `Deployers` can deploy contracts. To provide
+a great UX with factory contracts, the `tx.Origin` is checked for being a valid
+deployer instead of the caller of `CREATE`.
+
+The `Stateful Precompile` powering the `AllowList` adheres to the following
+Solidity interface at `0x0200000000000000000000000000000000000000` (you can
+load this interface and interact directly in Remix):
+```solidity
+// (c) 2022-2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+// SPDX-License-Identifier: MIT
+
+pragma solidity >=0.8.0;
+
+interface AllowListInterface {
+    // Set [addr] to have the admin role over the allow list
+    function setAdmin(address addr) external;
+
+    // Set [addr] to have the deployer role over the allow list
+    function setDeployer(address addr) external;
+
+    // Set [addr] to have no role over the allow list
+    function setNone(address addr) external;
+
+    // Read the status of [addr]
+    function readAllowList(address addr) external view returns (uint256);
+}
+```
+
+If you attempt to add a `Deployer` and you are not an `Admin`, you will see
+something like:
+![admin fail](./imgs/admin_fail.png)
+
+If you attempt to deploy a contract but you are not an `Admin` not
+a `Deployer`, you will see something like:
+![deploy fail](./imgs/deploy_fail.png)
+
+
 ## Run Local Network
 [`scripts/run.sh`](scripts/run.sh) automatically installs [avalanchego], sets up a local network,
 and creates a `subnet-evm` genesis file.
