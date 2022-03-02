@@ -32,7 +32,6 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
-	"sync/atomic"
 
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/rpc"
@@ -45,28 +44,6 @@ var (
 	errRequestBeyondHead     = errors.New("request beyond head block")
 	errBeyondHistoricalLimit = errors.New("request beyond historical limit")
 )
-
-const (
-	// maxBlockFetchers is the max number of goroutines to spin up to pull blocks
-	// for the fee history calculation (mostly relevant for LES).
-	maxBlockFetchers = 4
-)
-
-// blockFees represents a single block for processing
-type blockFees struct {
-	// set by the caller
-	blockNumber uint64
-	// filled by processBlock
-	results processedFees
-	err     error
-}
-
-// processedFees contains the results of a processed block and is also used for caching
-type processedFees struct {
-	reward       []*big.Int
-	baseFee      *big.Int
-	gasUsedRatio float64
-}
 
 // txGasAndReward is sorted in ascending order based on reward
 type (
@@ -110,26 +87,23 @@ func processBlock(block *types.Block, receipts types.Receipts) *slimBlock {
 	return &sb
 }
 
-// processPercentiles returns a [processedFees] object with a populated
-// baseFee, gasUsedRatio, and optionally reward percentiles (if any are
+// processPercentiles returns baseFee, gasUsedRatio, and optionally reward percentiles (if any are
 // requested)
-func (sb *slimBlock) processPercentiles(percentiles []float64) processedFees {
-	var results processedFees
-	results.baseFee = sb.BaseFee // already set to be non-nil
-	results.gasUsedRatio = float64(sb.GasUsed) / float64(sb.GasLimit)
+func (sb *slimBlock) processPercentiles(percentiles []float64) ([]*big.Int, *big.Int, float64) {
+	gasUsedRatio := float64(sb.GasUsed) / float64(sb.GasLimit)
 	if len(percentiles) == 0 {
 		// rewards were not requested
-		return results
+		return nil, sb.BaseFee, gasUsedRatio
 	}
 
 	txLen := len(sb.Txs)
-	results.reward = make([]*big.Int, len(percentiles))
+	reward := make([]*big.Int, len(percentiles))
 	if txLen == 0 {
 		// return an all zero row if there are no transactions to gather data from
-		for i := range results.reward {
-			results.reward[i] = new(big.Int)
+		for i := range reward {
+			reward[i] = new(big.Int)
 		}
-		return results
+		return reward, sb.BaseFee, gasUsedRatio
 	}
 
 	// sb transactions are already sorted by tip, so we don't need to re-sort
@@ -141,9 +115,9 @@ func (sb *slimBlock) processPercentiles(percentiles []float64) processedFees {
 			txIndex++
 			sumGasUsed += sb.Txs[txIndex].gasUsed
 		}
-		results.reward[i] = sb.Txs[txIndex].reward
+		reward[i] = sb.Txs[txIndex].reward
 	}
-	return results
+	return reward, sb.BaseFee, gasUsedRatio
 }
 
 // resolveBlockRange resolves the specified block range to absolute block numbers while also
@@ -225,67 +199,45 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 	oldestBlock := lastBlock + 1 - uint64(blocks)
 
 	var (
-		next    = oldestBlock
-		results = make(chan *blockFees, blocks)
-	)
-	for i := 0; i < maxBlockFetchers && i < blocks; i++ {
-		go func() {
-			for {
-				// Retrieve the next block number to fetch with this goroutine
-				blockNumber := atomic.AddUint64(&next, 1) - 1
-				if blockNumber > lastBlock {
-					return
-				}
-
-				fees := &blockFees{blockNumber: blockNumber}
-				var sb *slimBlock
-				if sbRaw, ok := oracle.historyCache.Get(blockNumber); ok {
-					sb = sbRaw.(*slimBlock)
-				} else {
-					block, err := oracle.backend.BlockByNumber(ctx, rpc.BlockNumber(blockNumber))
-					if block == nil || err != nil {
-						fees.err = err
-						results <- fees
-						return
-					}
-					receipts, err := oracle.backend.GetReceipts(ctx, block.Hash())
-					if err != nil {
-						fees.err = err
-						results <- fees
-						return
-					}
-					sb = processBlock(block, receipts)
-					oracle.historyCache.Add(blockNumber, sb)
-				}
-				fees.results = sb.processPercentiles(rewardPercentiles)
-				results <- fees
-			}
-		}()
-	}
-	var (
 		reward       = make([][]*big.Int, blocks)
 		baseFee      = make([]*big.Int, blocks)
 		gasUsedRatio = make([]float64, blocks)
 		firstMissing = blocks
 	)
-	for ; blocks > 0; blocks-- {
-		fees := <-results
-		if fees.err != nil {
-			return common.Big0, nil, nil, nil, fees.err
+
+	for blockNumber := oldestBlock; blockNumber < oldestBlock+uint64(blocks); blockNumber++ {
+		// Check if the context has errored
+		if err := ctx.Err(); err != nil {
+			return common.Big0, nil, nil, nil, err
 		}
-		i := int(fees.blockNumber - oldestBlock)
-		if fees.results.baseFee != nil {
-			reward[i], baseFee[i], gasUsedRatio[i] = fees.results.reward, fees.results.baseFee, fees.results.gasUsedRatio
+
+		i := int(blockNumber - oldestBlock)
+		var sb *slimBlock
+		if sbRaw, ok := oracle.historyCache.Get(blockNumber); ok {
+			sb = sbRaw.(*slimBlock)
 		} else {
-			// getting no block and no error means we are requesting into the future (might happen because of a reorg)
-			if i < firstMissing {
-				firstMissing = i
+			block, err := oracle.backend.BlockByNumber(ctx, rpc.BlockNumber(blockNumber))
+			if err != nil {
+				return common.Big0, nil, nil, nil, err
 			}
+			// getting no block and no error means we are requesting into the future (might happen because of a reorg)
+			if block == nil {
+				if i == 0 {
+					return common.Big0, nil, nil, nil, nil
+				}
+				firstMissing = i
+				break
+			}
+			receipts, err := oracle.backend.GetReceipts(ctx, block.Hash())
+			if err != nil {
+				return common.Big0, nil, nil, nil, err
+			}
+			sb = processBlock(block, receipts)
+			oracle.historyCache.Add(blockNumber, sb)
 		}
+		reward[i], baseFee[i], gasUsedRatio[i] = sb.processPercentiles(rewardPercentiles)
 	}
-	if firstMissing == 0 {
-		return common.Big0, nil, nil, nil, nil
-	}
+
 	if len(rewardPercentiles) != 0 {
 		reward = reward[:firstMissing]
 	} else {
