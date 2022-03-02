@@ -81,15 +81,22 @@ cd ${HOME}/go/src/github.com/ava-labs/subnet-evm
 # inspect cluster endpoints when ready
 cat /tmp/avalanchego-v1.7.5/output.yaml
 <<COMMENT
-endpoint: /ext/bc/2VCAhX6vE3UnXC6s1CBPE6jJ4c4cHWMfPgCptuWS59pQ9vbeLM
-logsDir: ...
-pid: 12811
-uris:
-- http://localhost:56239
-- http://localhost:56251
-- http://localhost:56253
-- http://localhost:56255
-- http://localhost:56257
+Logs Directory: /var/folders/mp/6jm81gc11dv3xtcwxmrd8mcr0000gn/T/runnerlogs2984620995
+PID: 55547
+
+RPC Endpoints:
+- http://localhost:61278/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/rpc
+- http://localhost:61280/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/rpc
+- http://localhost:61282/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/rpc
+- http://localhost:61284/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/rpc
+- http://localhost:61286/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/rpc
+
+WS Endpoints:
+- ws://localhost:61278/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/ws
+- ws://localhost:61280/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/ws
+- ws://localhost:61282/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/ws
+- ws://localhost:61284/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/ws
+- ws://localhost:61286/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/ws
 COMMENT
 
 # ping the local cluster
