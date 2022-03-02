@@ -97,7 +97,7 @@ subnet, you can provide an `AllowList` configuration in your genesis file:
     },
     "allowListConfig": {
       "blockTimestamp": 0,
-      "adminAddresses":["0xD23cbfA7eA985213aD81223309f588A7E66A246A"]
+      "adminAddresses":["0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"]
     }
   },
   "alloc": {
