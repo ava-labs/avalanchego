@@ -80,22 +80,29 @@ cd ${HOME}/go/src/github.com/ava-labs/subnet-evm
 Once the the network is started up, the following info will be printed to the
 console:
 ```bash
-Logs Directory: /var/folders/mp/6jm81gc11dv3xtcwxmrd8mcr0000gn/T/runnerlogs2984620995
-PID: 55547
+Logs Directory: /var/folders/mp/6jm81gc11dv3xtcwxmrd8mcr0000gn/T/runnerlogs1191601352
+PID: 82023
 
-RPC Endpoints (use with MetaMask):
-- http://localhost:61278/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/rpc
-- http://localhost:61280/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/rpc
-- http://localhost:61282/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/rpc
-- http://localhost:61284/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/rpc
-- http://localhost:61286/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/rpc
+EVM Chain ID: 99999
+RPC Endpoints:
+- http://localhost:62862/ext/bc/2UhiE7xptEJ39Br8WrGVqVVwrjd89ypr8qMWTruVn1Zajkk939/rpc
+- http://localhost:62864/ext/bc/2UhiE7xptEJ39Br8WrGVqVVwrjd89ypr8qMWTruVn1Zajkk939/rpc
+- http://localhost:62866/ext/bc/2UhiE7xptEJ39Br8WrGVqVVwrjd89ypr8qMWTruVn1Zajkk939/rpc
+- http://localhost:62868/ext/bc/2UhiE7xptEJ39Br8WrGVqVVwrjd89ypr8qMWTruVn1Zajkk939/rpc
+- http://localhost:62870/ext/bc/2UhiE7xptEJ39Br8WrGVqVVwrjd89ypr8qMWTruVn1Zajkk939/rpc
 
 WS Endpoints:
-- ws://localhost:61278/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/ws
-- ws://localhost:61280/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/ws
-- ws://localhost:61282/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/ws
-- ws://localhost:61284/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/ws
-- ws://localhost:61286/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/ws
+- ws://localhost:62862/ext/bc/2UhiE7xptEJ39Br8WrGVqVVwrjd89ypr8qMWTruVn1Zajkk939/ws
+- ws://localhost:62864/ext/bc/2UhiE7xptEJ39Br8WrGVqVVwrjd89ypr8qMWTruVn1Zajkk939/ws
+- ws://localhost:62866/ext/bc/2UhiE7xptEJ39Br8WrGVqVVwrjd89ypr8qMWTruVn1Zajkk939/ws
+- ws://localhost:62868/ext/bc/2UhiE7xptEJ39Br8WrGVqVVwrjd89ypr8qMWTruVn1Zajkk939/ws
+- ws://localhost:62870/ext/bc/2UhiE7xptEJ39Br8WrGVqVVwrjd89ypr8qMWTruVn1Zajkk939/ws
+
+MetaMask Quick Start:
+Network Name: Local EVM
+RPC URL: http://localhost:62862/ext/bc/2UhiE7xptEJ39Br8WrGVqVVwrjd89ypr8qMWTruVn1Zajkk939/rpc
+Chain ID: 99999
+Curreny Symbol: LEVM
 ```
 
 You can then ping the local cluster or add the network to MetaMask:

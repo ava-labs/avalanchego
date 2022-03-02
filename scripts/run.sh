@@ -63,11 +63,12 @@ find /tmp/avalanchego-v${VERSION}
 
 # Create genesis file to use in network (make sure to add your address to
 # "alloc")
+export CHAIN_ID=99999
 echo "creating genesis"
 cat <<EOF > /tmp/genesis.json
 {
   "config": {
-    "chainId": 99999,
+    "chainId": $CHAIN_ID,
     "homesteadBlock": 0,
     "eip150Block": 0,
     "eip150Hash": "0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0",
@@ -112,7 +113,7 @@ EOF
 # cat <<EOF > /tmp/genesis.json
 # {
 #   "config": {
-#     "chainId": 99999,
+#     "chainId": $CHAIN_ID,
 #     "homesteadBlock": 0,
 #     "eip150Block": 0,
 #     "eip150Hash": "0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0",
@@ -178,7 +179,7 @@ done
 
 if [[ -f "/tmp/avalanchego-v${VERSION}/output.yaml" ]]; then
   echo "cluster is ready!"
-  go run scripts/parse_output.go /tmp/avalanchego-v${VERSION}/output.yaml
+  go run scripts/parse_output.go /tmp/avalanchego-v${VERSION}/output.yaml $CHAIN_ID
 else
   echo "cluster is not ready in time... terminating ${PID}"
   kill ${PID}
