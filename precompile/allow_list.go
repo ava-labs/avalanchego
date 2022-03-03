@@ -133,7 +133,7 @@ func PackReadAllowList(address common.Address) []byte {
 func writeAllowList(evm PrecompileAccessibleState, precompileAddr common.Address, callerAddr common.Address, modifyAddress common.Address, role AllowListRole, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	// Note: this should never happen since the required gas should be verified before calling Run.
 	if suppliedGas < ModifyAllowListGasCost {
-		return nil, 0, fmt.Errorf("running allow list exceeds gas allowance (%d) < (%d)", ModifyAllowListGasCost, suppliedGas)
+		return nil, 0, fmt.Errorf("%w (%d) < (%d)", ErrExceedsGasAllowance, ModifyAllowListGasCost, suppliedGas)
 	}
 
 	remainingGas = suppliedGas - ModifyAllowListGasCost

@@ -208,8 +208,8 @@ func (c *ChainConfig) IsSubnetEVM(blockTimestamp *big.Int) bool {
 	return utils.IsForked(c.SubnetEVMTimestamp, blockTimestamp)
 }
 
-// IsAllowList returns whether [blockTimestamp] is either equal to the AllowList fork block timestamp or greater.
-func (c *ChainConfig) IsAllowList(blockTimestamp *big.Int) bool {
+// IsContractDeployerAllowList returns whether [blockTimestamp] is either equal to the AllowList fork block timestamp or greater.
+func (c *ChainConfig) IsContractDeployerAllowList(blockTimestamp *big.Int) bool {
 	return utils.IsForked(c.ContractDeployerAllowListConfig.Timestamp(), blockTimestamp)
 }
 
@@ -461,7 +461,7 @@ func (c *ChainConfig) AvalancheRules(blockNum, blockTimestamp *big.Int) Rules {
 	rules := c.rules(blockNum)
 
 	rules.IsSubnetEVM = c.IsSubnetEVM(blockTimestamp)
-	rules.IsContractDeployerAllowListEnabled = c.IsAllowList(blockTimestamp)
+	rules.IsContractDeployerAllowListEnabled = c.IsContractDeployerAllowList(blockTimestamp)
 
 	// Initialize the stateful precompiles that should be enabled at [blockTimestamp].
 	rules.Precompiles = make(map[common.Address]precompile.StatefulPrecompiledContract)
