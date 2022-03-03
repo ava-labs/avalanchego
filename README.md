@@ -40,7 +40,6 @@ The Subnet EVM is compatible with almost all Ethereum tooling, including [Remix,
 - Merged Avalanche hardforks into the single "Subnet EVM" hardfork
 - Removed Atomic Txs and Shared Memory
 - Removed Multicoin Contract and State
-- Removed DAO Hardfork Support
 
 ## Setting a Custom Fee Recipient
 By default, all fees are burned (sent to the blackhole address). However, it is
