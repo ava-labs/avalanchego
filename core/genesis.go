@@ -267,6 +267,11 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 			"t", time.Since(t),
 		)
 	}
+
+	genesisTimestamp := new(big.Int).SetUint64(g.Timestamp)
+	// Configure any stateful precompiles that should be enabled in the genesis.
+	g.Config.CheckConfigurePrecompiles(nil, genesisTimestamp, statedb)
+
 	// Do cusotm allocation after airdrop in case an address shows up in standard
 	// allocation
 	for addr, account := range g.Alloc {
@@ -306,7 +311,9 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		}
 	}
 	statedb.Commit(false)
-	statedb.Database().TrieDB().Commit(root, true, nil)
+	if err := statedb.Database().TrieDB().Commit(root, true, nil); err != nil {
+		panic(fmt.Sprintf("unable to commit genesis block: %v", err))
+	}
 
 	return types.NewBlock(head, nil, nil, nil, trie.NewStackTrie(nil))
 }

@@ -34,11 +34,14 @@ import (
 
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
+	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/assert"
 )
 
 func setupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig, common.Hash, error) {
@@ -162,6 +165,61 @@ func TestSetupGenesis(t *testing.T) {
 					t.Errorf("block in DB has hash %s, want %s", stored.Hash(), test.wantHash)
 				}
 			}
+		})
+	}
+}
+
+func TestStatefulPrecompilesConfigure(t *testing.T) {
+	type test struct {
+		getConfig   func() *params.ChainConfig             // Return the config that enables the stateful precompile at the genesis for the test
+		assertState func(t *testing.T, sdb *state.StateDB) // Check that the stateful precompiles were configured correctly
+	}
+
+	addr := common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC")
+
+	// Test suite to ensure that stateful precompiles are configured correctly in the genesis.
+	for name, test := range map[string]test{
+		"allow list enabled in genesis": {
+			getConfig: func() *params.ChainConfig {
+				config := *params.TestChainConfig
+				config.ContractDeployerAllowListConfig = precompile.ContractDeployerAllowListConfig{
+					AllowListConfig: precompile.AllowListConfig{
+						BlockTimestamp:  big.NewInt(0),
+						AllowListAdmins: []common.Address{addr},
+					},
+				}
+				return &config
+			},
+			assertState: func(t *testing.T, sdb *state.StateDB) {
+				assert.Equal(t, precompile.AllowListAdmin, precompile.GetContractDeployerAllowListStatus(sdb, addr), "unexpected allow list status for modified address")
+				assert.Equal(t, uint64(1), sdb.GetNonce(precompile.ContractDeployerAllowListAddress))
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			config := test.getConfig()
+
+			genesis := &Genesis{
+				Config: config,
+				Alloc: GenesisAlloc{
+					{1}: {Balance: big.NewInt(1), Storage: map[common.Hash]common.Hash{{1}: {1}}},
+				},
+			}
+
+			db := rawdb.NewMemoryDatabase()
+			_, err := SetupGenesisBlock(db, genesis)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			genesisBlock := genesis.ToBlock(nil)
+			genesisRoot := genesisBlock.Root()
+
+			statedb, err := state.New(genesisRoot, state.NewDatabase(db), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			test.assertState(t, statedb)
 		})
 	}
 }

@@ -27,15 +27,35 @@
 package vm
 
 import (
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
 
+	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/holiman/uint256"
 )
+
+var prohibitedAddresses = map[common.Address]struct{}{
+	constants.BlackholeAddr: {},
+}
+
+func init() {
+	for _, addr := range precompile.UsedAddresses {
+		prohibitedAddresses[addr] = struct{}{}
+	}
+}
+
+// IsProhibited returns true if [addr] is in the prohibited list of addresses which should
+// not be allowed as an EOA or newly created contract address.
+func IsProhibited(addr common.Address) bool {
+	_, ok := prohibitedAddresses[addr]
+	return ok
+}
 
 // emptyCodeHash is used by create to ensure deployment is disallowed to already
 // deployed contract addresses (relevant after the account abstraction).
@@ -51,8 +71,8 @@ type (
 	GetHashFunc func(uint64) common.Hash
 )
 
-func (evm *EVM) precompile(addr common.Address) (StatefulPrecompiledContract, bool) {
-	var precompiles map[common.Address]StatefulPrecompiledContract
+func (evm *EVM) precompile(addr common.Address) (precompile.StatefulPrecompiledContract, bool) {
+	var precompiles map[common.Address]precompile.StatefulPrecompiledContract
 	switch {
 	case evm.chainRules.IsSubnetEVM:
 		precompiles = PrecompiledContractsBerlin
@@ -63,7 +83,15 @@ func (evm *EVM) precompile(addr common.Address) (StatefulPrecompiledContract, bo
 	default:
 		precompiles = PrecompiledContractsHomestead
 	}
+
+	// Check the existing precompiles first
 	p, ok := precompiles[addr]
+	if ok {
+		return p, true
+	}
+
+	// Otherwise, check the chain rules for the additionally configured precompiles.
+	p, ok = evm.chainRules.Precompiles[addr]
 	return p, ok
 }
 
@@ -165,6 +193,11 @@ func (evm *EVM) Cancelled() bool {
 	return atomic.LoadInt32(&evm.abort) == 1
 }
 
+// GetStateDB returns the evm's StateDB
+func (evm *EVM) GetStateDB() precompile.StateDB {
+	return evm.StateDB
+}
+
 // Interpreter returns the current interpreter
 func (evm *EVM) Interpreter() *EVMInterpreter {
 	return evm.interpreter
@@ -224,7 +257,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	}
 
 	if isPrecompile {
-		ret, gas, err = p.Run(evm, caller, addr, input, gas, evm.interpreter.readOnly)
+		ret, gas, err = RunStatefulPrecompiledContract(p, evm, caller.Address(), addr, input, gas, evm.interpreter.readOnly)
 	} else {
 		// Initialise a new contract and set the code that is to be used by the EVM.
 		// The contract is a scoped environment for this execution context only.
@@ -290,7 +323,7 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 
 	// It is allowed to call precompiles, even via delegatecall
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
-		ret, gas, err = p.Run(evm, caller, addr, input, gas, evm.interpreter.readOnly)
+		ret, gas, err = RunStatefulPrecompiledContract(p, evm, caller.Address(), addr, input, gas, evm.interpreter.readOnly)
 	} else {
 		addrCopy := addr
 		// Initialise a new contract and set the code that is to be used by the EVM.
@@ -331,7 +364,7 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 
 	// It is allowed to call precompiles, even via delegatecall
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
-		ret, gas, err = p.Run(evm, caller, addr, input, gas, evm.interpreter.readOnly)
+		ret, gas, err = RunStatefulPrecompiledContract(p, evm, caller.Address(), addr, input, gas, evm.interpreter.readOnly)
 	} else {
 		addrCopy := addr
 		// Initialise a new contract and make initialise the delegate values
@@ -380,7 +413,7 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 	}
 
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
-		ret, gas, err = p.Run(evm, caller, addr, input, gas, true)
+		ret, gas, err = RunStatefulPrecompiledContract(p, evm, caller.Address(), addr, input, gas, true)
 	} else {
 		// At this point, we use a copy of address. If we don't, the go compiler will
 		// leak the 'contract' to the outer scope, and make allocation for 'contract'
@@ -432,8 +465,8 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	}
 	// If there is any collision with the Blackhole address, return an error instead
 	// of allowing the contract to be created.
-	if address == evm.Context.Coinbase {
-		return nil, common.Address{}, gas, ErrNoSenderBlackhole
+	if IsProhibited(address) {
+		return nil, common.Address{}, gas, ErrAddrProhibited
 	}
 	nonce := evm.StateDB.GetNonce(caller.Address())
 	if nonce+1 < nonce {
@@ -450,6 +483,14 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	if evm.StateDB.GetNonce(address) != 0 || (contractHash != (common.Hash{}) && contractHash != emptyCodeHash) {
 		return nil, common.Address{}, 0, ErrContractAddressCollision
 	}
+	// If the allow list is enabled, check that [evm.TxContext.Origin] has permission to deploy a contract.
+	if evm.chainRules.IsContractDeployerAllowListEnabled {
+		allowListRole := precompile.GetContractDeployerAllowListStatus(evm.StateDB, evm.TxContext.Origin)
+		if !allowListRole.IsEnabled() {
+			return nil, common.Address{}, 0, fmt.Errorf("tx.origin %s is not authorized to deploy a contract", evm.TxContext.Origin)
+		}
+	}
+
 	// Create a new account on the state
 	snapshot := evm.StateDB.Snapshot()
 	evm.StateDB.CreateAccount(address)

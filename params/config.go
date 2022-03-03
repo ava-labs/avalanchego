@@ -32,6 +32,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/subnet-evm/precompile"
+	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -82,8 +84,8 @@ var (
 		AllowFeeRecipients:  false,
 	}
 
-	TestChainConfig        = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), DefaultFeeConfig, false}
-	TestPreSubnetEVMConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, DefaultFeeConfig, false}
+	TestChainConfig        = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), DefaultFeeConfig, false, precompile.ContractDeployerAllowListConfig{}}
+	TestPreSubnetEVMConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, DefaultFeeConfig, false, precompile.ContractDeployerAllowListConfig{}}
 )
 
 // ChainConfig is the core config which determines the blockchain settings.
@@ -113,6 +115,8 @@ type ChainConfig struct {
 
 	FeeConfig          *FeeConfig `json:"feeConfig,omitempty"`
 	AllowFeeRecipients bool       `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
+
+	ContractDeployerAllowListConfig precompile.ContractDeployerAllowListConfig `json:"contractDeployerAllowListConfig,omitempty"` // Config for the allow list precompile
 }
 
 type FeeConfig struct {
@@ -134,7 +138,7 @@ func (c *ChainConfig) String() string {
 	if err != nil {
 		feeBytes = []byte("cannot unmarshal FeeConfig")
 	}
-	return fmt.Sprintf("{ChainID: %v Homestead: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Subnet EVM: %v, FeeConfig: %v, AllowFeeRecipients: %v, Engine: Dummy Consensus Engine}",
+	return fmt.Sprintf("{ChainID: %v Homestead: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Subnet EVM: %v, FeeConfig: %v, AllowFeeRecipients: %v, ContractDeployerAllowListConfig: %v, Engine: Dummy Consensus Engine}",
 		c.ChainID,
 		c.HomesteadBlock,
 		c.EIP150Block,
@@ -148,62 +152,68 @@ func (c *ChainConfig) String() string {
 		c.SubnetEVMTimestamp,
 		string(feeBytes),
 		c.AllowFeeRecipients,
+		c.ContractDeployerAllowListConfig,
 	)
 }
 
 // IsHomestead returns whether num is either equal to the homestead block or greater.
 func (c *ChainConfig) IsHomestead(num *big.Int) bool {
-	return isForked(c.HomesteadBlock, num)
+	return utils.IsForked(c.HomesteadBlock, num)
 }
 
 // IsEIP150 returns whether num is either equal to the EIP150 fork block or greater.
 func (c *ChainConfig) IsEIP150(num *big.Int) bool {
-	return isForked(c.EIP150Block, num)
+	return utils.IsForked(c.EIP150Block, num)
 }
 
 // IsEIP155 returns whether num is either equal to the EIP155 fork block or greater.
 func (c *ChainConfig) IsEIP155(num *big.Int) bool {
-	return isForked(c.EIP155Block, num)
+	return utils.IsForked(c.EIP155Block, num)
 }
 
 // IsEIP158 returns whether num is either equal to the EIP158 fork block or greater.
 func (c *ChainConfig) IsEIP158(num *big.Int) bool {
-	return isForked(c.EIP158Block, num)
+	return utils.IsForked(c.EIP158Block, num)
 }
 
 // IsByzantium returns whether num is either equal to the Byzantium fork block or greater.
 func (c *ChainConfig) IsByzantium(num *big.Int) bool {
-	return isForked(c.ByzantiumBlock, num)
+	return utils.IsForked(c.ByzantiumBlock, num)
 }
 
 // IsConstantinople returns whether num is either equal to the Constantinople fork block or greater.
 func (c *ChainConfig) IsConstantinople(num *big.Int) bool {
-	return isForked(c.ConstantinopleBlock, num)
+	return utils.IsForked(c.ConstantinopleBlock, num)
 }
 
 // IsMuirGlacier returns whether num is either equal to the Muir Glacier (EIP-2384) fork block or greater.
 func (c *ChainConfig) IsMuirGlacier(num *big.Int) bool {
-	return isForked(c.MuirGlacierBlock, num)
+	return utils.IsForked(c.MuirGlacierBlock, num)
 }
 
 // IsPetersburg returns whether num is either
 // - equal to or greater than the PetersburgBlock fork block,
 // - OR is nil, and Constantinople is active
 func (c *ChainConfig) IsPetersburg(num *big.Int) bool {
-	return isForked(c.PetersburgBlock, num) || c.PetersburgBlock == nil && isForked(c.ConstantinopleBlock, num)
+	return utils.IsForked(c.PetersburgBlock, num) || c.PetersburgBlock == nil && utils.IsForked(c.ConstantinopleBlock, num)
 }
 
 // IsIstanbul returns whether num is either equal to the Istanbul fork block or greater.
 func (c *ChainConfig) IsIstanbul(num *big.Int) bool {
-	return isForked(c.IstanbulBlock, num)
+	return utils.IsForked(c.IstanbulBlock, num)
 }
 
-// IsSubnetEVM returns whether num is either equal to the SubnetEVM fork block timestamp or greater.
+// IsSubnetEVM returns whether [blockTimestamp] is either equal to the SubnetEVM fork block timestamp or greater.
 func (c *ChainConfig) IsSubnetEVM(blockTimestamp *big.Int) bool {
-	return isForked(c.SubnetEVMTimestamp, blockTimestamp)
+	return utils.IsForked(c.SubnetEVMTimestamp, blockTimestamp)
 }
 
-// IsIstanbul returns whether num is either equal to the Istanbul fork block or greater.
+// IsContractDeployerAllowList returns whether [blockTimestamp] is either equal to the AllowList fork block timestamp or greater.
+func (c *ChainConfig) IsContractDeployerAllowList(blockTimestamp *big.Int) bool {
+	return utils.IsForked(c.ContractDeployerAllowListConfig.Timestamp(), blockTimestamp)
+}
+
+// GetFeeConfig returns the *FeeConfig if it exists, otherwise it returns [DefaultFeeConfig].
 func (c *ChainConfig) GetFeeConfig() *FeeConfig {
 	if c.FeeConfig == nil {
 		return DefaultFeeConfig
@@ -277,6 +287,9 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 	// check that the block timestamps in the same way as for
 	// the block number forks since it would not be a meaningful comparison.
 	// Instead, we check only that Phases are enabled in order.
+	// Note: we do not add the optional stateful precompile configs in here because they are optional
+	// and independent, such that the ordering they are enabled does not impact the correctness of the
+	// chain config.
 	lastFork = fork{}
 	for _, cur := range []fork{
 		{name: "subnetEVMTimestamp", block: c.SubnetEVMTimestamp},
@@ -337,9 +350,18 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headHeight *big.Int, 
 	if isForkIncompatible(c.MuirGlacierBlock, newcfg.MuirGlacierBlock, headHeight) {
 		return newCompatError("Muir Glacier fork block", c.MuirGlacierBlock, newcfg.MuirGlacierBlock)
 	}
+
+	// Check subnet-evm specific activations
 	if isForkIncompatible(c.SubnetEVMTimestamp, newcfg.SubnetEVMTimestamp, headTimestamp) {
 		return newCompatError("SubnetEVM fork block timestamp", c.SubnetEVMTimestamp, newcfg.SubnetEVMTimestamp)
 	}
+
+	// Check that the configuration of the optional stateful precompiles is compatible.
+	if isForkIncompatible(c.ContractDeployerAllowListConfig.Timestamp(), newcfg.ContractDeployerAllowListConfig.Timestamp(), headTimestamp) {
+		return newCompatError("AllowList fork block timestamp", c.ContractDeployerAllowListConfig.Timestamp(), newcfg.ContractDeployerAllowListConfig.Timestamp())
+	}
+
+	// TODO verify that the fee config is fully compatible between [c] and [newcfg].
 
 	return nil
 }
@@ -347,15 +369,7 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headHeight *big.Int, 
 // isForkIncompatible returns true if a fork scheduled at s1 cannot be rescheduled to
 // block s2 because head is already past the fork.
 func isForkIncompatible(s1, s2, head *big.Int) bool {
-	return (isForked(s1, head) || isForked(s2, head)) && !configNumEqual(s1, s2)
-}
-
-// isForked returns whether a fork scheduled at block s is active at the given head block.
-func isForked(s, head *big.Int) bool {
-	if s == nil || head == nil {
-		return false
-	}
-	return s.Cmp(head) <= 0
+	return (utils.IsForked(s1, head) || utils.IsForked(s2, head)) && !configNumEqual(s1, s2)
 }
 
 func configNumEqual(x, y *big.Int) bool {
@@ -411,6 +425,15 @@ type Rules struct {
 
 	// Rules for Avalanche releases
 	IsSubnetEVM bool
+
+	// Optional stateful precompile rules
+	IsContractDeployerAllowListEnabled bool
+
+	// Precompiles maps addresses to stateful precompiled contracts that are enabled
+	// for this rule set.
+	// Note: none of these addresses should conflict with the address space used by
+	// any existing precompiles.
+	Precompiles map[common.Address]precompile.StatefulPrecompiledContract
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -438,5 +461,36 @@ func (c *ChainConfig) AvalancheRules(blockNum, blockTimestamp *big.Int) Rules {
 	rules := c.rules(blockNum)
 
 	rules.IsSubnetEVM = c.IsSubnetEVM(blockTimestamp)
+	rules.IsContractDeployerAllowListEnabled = c.IsContractDeployerAllowList(blockTimestamp)
+
+	// Initialize the stateful precompiles that should be enabled at [blockTimestamp].
+	rules.Precompiles = make(map[common.Address]precompile.StatefulPrecompiledContract)
+	for _, config := range c.enabledStatefulPrecompiles() {
+		if utils.IsForked(config.Timestamp(), blockTimestamp) {
+			rules.Precompiles[config.Address()] = config.Contract()
+		}
+	}
+
 	return rules
+}
+
+// enabledStatefulPrecompiles returns a list of stateful precompile configs in the order that they are enabled
+// by block timestamp.
+func (c *ChainConfig) enabledStatefulPrecompiles() []precompile.StatefulPrecompileConfig {
+	statefulPrecompileConfigs := make([]precompile.StatefulPrecompileConfig, 0)
+
+	if c.ContractDeployerAllowListConfig.Timestamp() != nil {
+		statefulPrecompileConfigs = append(statefulPrecompileConfigs, &c.ContractDeployerAllowListConfig)
+	}
+
+	return statefulPrecompileConfigs
+}
+
+// CheckConfigurePrecompiles iterates over any stateful precompile configs that go into effect at some point and configures them
+// if they are activated between [parentTimestamp] and [currentTimestamp].
+func (c *ChainConfig) CheckConfigurePrecompiles(parentTimestamp *big.Int, currentTimestamp *big.Int, statedb precompile.StateDB) {
+	// Iterate the enabled stateful precompiles and configure them if needed
+	for _, config := range c.enabledStatefulPrecompiles() {
+		precompile.CheckConfigure(parentTimestamp, currentTimestamp, config, statedb)
+	}
 }

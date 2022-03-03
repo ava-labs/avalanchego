@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -72,6 +73,10 @@ var tests = []ChainTest{
 		"InsertChainValidBlockFee",
 		TestInsertChainValidBlockFee,
 	},
+	{
+		"TestStatefulPrecompiles",
+		TestStatefulPrecompiles,
+	},
 }
 
 func copyMemDB(db ethdb.Database) (ethdb.Database, error) {
@@ -88,7 +93,7 @@ func copyMemDB(db ethdb.Database) (ethdb.Database, error) {
 }
 
 // checkBlockChainState creates a new BlockChain instance and checks that exporting each block from
-// genesis to last acceptd from the original instance yields the same last accepted block and state
+// genesis to last accepted from the original instance yields the same last accepted block and state
 // root.
 // Additionally, create another BlockChain instance from [originalDB] to ensure that BlockChain is
 // persisted correctly through a restart.
@@ -1490,6 +1495,147 @@ func TestInsertChainValidBlockFee(t *testing.T, create func(db ethdb.Database, c
 		}
 		return nil
 	}
+
+	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
+}
+
+// TestStatefulPrecompiles provides a testing framework to ensure that processing transactions interacting with the stateful precompiles work as expected.
+func TestStatefulPrecompiles(t *testing.T, create func(db ethdb.Database, chainConfig *params.ChainConfig, lastAcceptedHash common.Hash) (*BlockChain, error)) {
+	var (
+		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
+		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
+		addr2   = crypto.PubkeyToAddress(key2.PublicKey)
+		// We use two separate databases since GenerateChain commits the state roots to its underlying
+		// database.
+		genDB   = rawdb.NewMemoryDatabase()
+		chainDB = rawdb.NewMemoryDatabase()
+	)
+
+	// Ensure that key1 has sufficient funds in the genesis block for all of the tests.
+	genesisBalance := new(big.Int).Mul(big.NewInt(1000000), big.NewInt(params.Ether))
+	config := *params.TestChainConfig
+	// Set all of the required config parameters
+	config.ContractDeployerAllowListConfig = precompile.ContractDeployerAllowListConfig{
+		AllowListConfig: precompile.AllowListConfig{
+			BlockTimestamp: big.NewInt(0),
+			AllowListAdmins: []common.Address{
+				addr1,
+			},
+		},
+	}
+	gspec := &Genesis{
+		Config: &config,
+		Alloc:  GenesisAlloc{addr1: {Balance: genesisBalance}},
+	}
+	genesis := gspec.MustCommit(genDB)
+	_ = gspec.MustCommit(chainDB)
+
+	blockchain, err := create(chainDB, gspec.Config, common.Hash{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer blockchain.Stop()
+
+	signer := types.LatestSigner(params.TestChainConfig)
+	tip := big.NewInt(50000 * params.GWei)
+
+	// Simple framework to add a test that the stateful precompile works as expected
+	type test struct {
+		addTx         func(gen *BlockGen)
+		verifyGenesis func(sdb *state.StateDB)
+		verifyState   func(sdb *state.StateDB) error
+	}
+	tests := map[string]test{
+		"allow list": {
+			addTx: func(gen *BlockGen) {
+				feeCap := new(big.Int).Add(gen.BaseFee(), tip)
+				input, err := precompile.PackModifyAllowList(addr2, precompile.AllowListAdmin)
+				if err != nil {
+					t.Fatal(err)
+				}
+				tx := types.NewTx(&types.DynamicFeeTx{
+					ChainID:   params.TestChainConfig.ChainID,
+					Nonce:     gen.TxNonce(addr1),
+					To:        &precompile.ContractDeployerAllowListAddress,
+					Gas:       3_000_000,
+					Value:     common.Big0,
+					GasFeeCap: feeCap,
+					GasTipCap: tip,
+					Data:      input,
+				})
+
+				signedTx, err := types.SignTx(tx, signer, key1)
+				if err != nil {
+					t.Fatal(err)
+				}
+				gen.AddTx(signedTx)
+			},
+			verifyState: func(sdb *state.StateDB) error {
+				res := precompile.GetContractDeployerAllowListStatus(sdb, addr1)
+				if precompile.AllowListAdmin != res {
+					return fmt.Errorf("unexpected allow list status for addr1 %s, expected %s", res, precompile.AllowListAdmin)
+				}
+				res = precompile.GetContractDeployerAllowListStatus(sdb, addr2)
+				if precompile.AllowListAdmin != res {
+					return fmt.Errorf("unexpected allow list status for addr2 %s, expected %s", res, precompile.AllowListAdmin)
+				}
+				return nil
+			},
+			verifyGenesis: func(sdb *state.StateDB) {
+				res := precompile.GetContractDeployerAllowListStatus(sdb, addr1)
+				if precompile.AllowListAdmin != res {
+					t.Fatalf("unexpected allow list status for addr1 %s, expected %s", res, precompile.AllowListAdmin)
+				}
+				res = precompile.GetContractDeployerAllowListStatus(sdb, addr2)
+				if precompile.AllowListNoRole != res {
+					t.Fatalf("unexpected allow list status for addr2 %s, expected %s", res, precompile.AllowListNoRole)
+				}
+			},
+		},
+	}
+
+	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
+	// to the BlockChain's database while generating blocks.
+	chain, _, err := GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, 1, 0, func(i int, gen *BlockGen) {
+		for _, test := range tests {
+			test.addTx(gen)
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Insert three blocks into the chain and accept only the first block.
+	if _, err := blockchain.InsertChain(chain); err != nil {
+		t.Fatal(err)
+	}
+	if err := blockchain.Accept(chain[0]); err != nil {
+		t.Fatal(err)
+	}
+
+	genesisState, err := blockchain.StateAt(blockchain.Genesis().Root())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range tests {
+		if test.verifyGenesis == nil {
+			continue
+		}
+		test.verifyGenesis(genesisState)
+	}
+
+	// Run all of the necessary state verification
+	checkState := func(sdb *state.StateDB) error {
+		for _, test := range tests {
+			if err := test.verifyState(sdb); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	// This tests that the precompiles work as expected when they are enabled
 
 	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
 }

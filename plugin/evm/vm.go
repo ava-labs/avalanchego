@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	schain "github.com/ava-labs/subnet-evm/chain"
 	subnetEVM "github.com/ava-labs/subnet-evm/chain"
+	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/eth/ethconfig"
@@ -254,7 +254,7 @@ func (vm *VM) Initialize(
 	ethConfig.SnapshotVerify = vm.config.SnapshotVerify
 
 	// Handle custom fee recipient
-	ethConfig.Miner.Etherbase = schain.BlackholeAddr
+	ethConfig.Miner.Etherbase = constants.BlackholeAddr
 	switch {
 	case common.IsHexAddress(vm.config.FeeRecipient):
 		if g.Config.AllowFeeRecipients {

@@ -30,9 +30,12 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -54,7 +57,7 @@ type PrecompiledContract interface {
 
 // PrecompiledContractsHomestead contains the default set of pre-compiled Ethereum
 // contracts used in the Frontier and Homestead releases.
-var PrecompiledContractsHomestead = map[common.Address]StatefulPrecompiledContract{
+var PrecompiledContractsHomestead = map[common.Address]precompile.StatefulPrecompiledContract{
 	common.BytesToAddress([]byte{1}): newWrappedPrecompiledContract(&ecrecover{}),
 	common.BytesToAddress([]byte{2}): newWrappedPrecompiledContract(&sha256hash{}),
 	common.BytesToAddress([]byte{3}): newWrappedPrecompiledContract(&ripemd160hash{}),
@@ -63,7 +66,7 @@ var PrecompiledContractsHomestead = map[common.Address]StatefulPrecompiledContra
 
 // PrecompiledContractsByzantium contains the default set of pre-compiled Ethereum
 // contracts used in the Byzantium release.
-var PrecompiledContractsByzantium = map[common.Address]StatefulPrecompiledContract{
+var PrecompiledContractsByzantium = map[common.Address]precompile.StatefulPrecompiledContract{
 	common.BytesToAddress([]byte{1}): newWrappedPrecompiledContract(&ecrecover{}),
 	common.BytesToAddress([]byte{2}): newWrappedPrecompiledContract(&sha256hash{}),
 	common.BytesToAddress([]byte{3}): newWrappedPrecompiledContract(&ripemd160hash{}),
@@ -76,7 +79,7 @@ var PrecompiledContractsByzantium = map[common.Address]StatefulPrecompiledContra
 
 // PrecompiledContractsIstanbul contains the default set of pre-compiled Ethereum
 // contracts used in the Istanbul release.
-var PrecompiledContractsIstanbul = map[common.Address]StatefulPrecompiledContract{
+var PrecompiledContractsIstanbul = map[common.Address]precompile.StatefulPrecompiledContract{
 	common.BytesToAddress([]byte{1}): newWrappedPrecompiledContract(&ecrecover{}),
 	common.BytesToAddress([]byte{2}): newWrappedPrecompiledContract(&sha256hash{}),
 	common.BytesToAddress([]byte{3}): newWrappedPrecompiledContract(&ripemd160hash{}),
@@ -90,7 +93,7 @@ var PrecompiledContractsIstanbul = map[common.Address]StatefulPrecompiledContrac
 
 // PrecompiledContractsBerlin contains the default set of pre-compiled Ethereum
 // contracts used in the Berlin release.
-var PrecompiledContractsBerlin = map[common.Address]StatefulPrecompiledContract{
+var PrecompiledContractsBerlin = map[common.Address]precompile.StatefulPrecompiledContract{
 	common.BytesToAddress([]byte{1}): newWrappedPrecompiledContract(&ecrecover{}),
 	common.BytesToAddress([]byte{2}): newWrappedPrecompiledContract(&sha256hash{}),
 	common.BytesToAddress([]byte{3}): newWrappedPrecompiledContract(&ripemd160hash{}),
@@ -104,7 +107,7 @@ var PrecompiledContractsBerlin = map[common.Address]StatefulPrecompiledContract{
 
 // PrecompiledContractsBLS contains the set of pre-compiled Ethereum
 // contracts specified in EIP-2537. These are exported for testing purposes.
-var PrecompiledContractsBLS = map[common.Address]StatefulPrecompiledContract{
+var PrecompiledContractsBLS = map[common.Address]precompile.StatefulPrecompiledContract{
 	common.BytesToAddress([]byte{10}): newWrappedPrecompiledContract(&bls12381G1Add{}),
 	common.BytesToAddress([]byte{11}): newWrappedPrecompiledContract(&bls12381G1Mul{}),
 	common.BytesToAddress([]byte{12}): newWrappedPrecompiledContract(&bls12381G1MultiExp{}),
@@ -121,6 +124,8 @@ var (
 	PrecompiledAddressesIstanbul  []common.Address
 	PrecompiledAddressesByzantium []common.Address
 	PrecompiledAddressesHomestead []common.Address
+	PrecompiledAddressesBLS       []common.Address
+	PrecompileAllNativeAddresses  map[common.Address]struct{}
 )
 
 func init() {
@@ -135,6 +140,31 @@ func init() {
 	}
 	for k := range PrecompiledContractsBerlin {
 		PrecompiledAddressesBerlin = append(PrecompiledAddressesBerlin, k)
+	}
+	for k := range PrecompiledContractsBLS {
+		PrecompiledAddressesBLS = append(PrecompiledAddressesBLS, k)
+	}
+
+	// Set of all native precompile addresses that are in use
+	// Note: this will repeat some addresses, but this is cheap and makes the code clearer.
+	PrecompileAllNativeAddresses = make(map[common.Address]struct{})
+	addrsList := append(PrecompiledAddressesHomestead, PrecompiledAddressesByzantium...)
+	addrsList = append(addrsList, PrecompiledAddressesIstanbul...)
+	addrsList = append(addrsList, PrecompiledAddressesBerlin...)
+	addrsList = append(addrsList, PrecompiledAddressesBLS...)
+	for _, k := range addrsList {
+		PrecompileAllNativeAddresses[k] = struct{}{}
+	}
+
+	// Ensure that this package will panic during init if there is a conflict present with the declared
+	// precompile addresses.
+	for _, k := range precompile.UsedAddresses {
+		if _, ok := PrecompileAllNativeAddresses[k]; ok {
+			panic(fmt.Errorf("precompile address collides with existing native address: %s", k))
+		}
+		if k == constants.BlackholeAddr {
+			panic(fmt.Errorf("cannot use address %s for stateful precompile - overlaps with blackhole address", k))
+		}
 	}
 }
 
