@@ -119,12 +119,12 @@ subnet, you can provide an `AllowList` configuration in your genesis file:
 ```
 
 In this example, `0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC` is named as the
-`Admin` of the `AllowList`. This enables them to add other `Admins` or to add
+`Admin` of the `ContractDeployerAllowList`. This enables them to add other `Admins` or to add
 `Deployers`. Both `Admins` and `Deployers` can deploy contracts. To provide
 a great UX with factory contracts, the `tx.Origin` is checked for being a valid
 deployer instead of the caller of `CREATE`.
 
-The `Stateful Precompile` powering the `AllowList` adheres to the following
+The `Stateful Precompile` powering the `ContractDeployerAllowList` adheres to the following
 Solidity interface at `0x0200000000000000000000000000000000000000` (you can
 load this interface and interact directly in Remix):
 ```solidity
