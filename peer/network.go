@@ -10,16 +10,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/coreth/plugin/evm/message"
-
-	"github.com/ava-labs/avalanchego/snow/validators"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/version"
+
+	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ethereum/go-ethereum/log"
-	"golang.org/x/sync/semaphore"
 )
 
 // Minimum amount of time to handle a request
@@ -39,8 +39,11 @@ type Network interface {
 	// RequestAny synchronously sends request to the first connected peer that matches the specified minVersion in
 	// random order.
 	// A peer is considered a match if its version is greater than or equal to the specified minVersion
-	// Returns errNoPeersMatchingVersion if no peer could be found matching specified version
+	// Returns an error if the request could not be sent to a peer with the desired [minVersion].
 	RequestAny(minVersion version.Application, message []byte, handler message.ResponseHandler) error
+
+	// Request sends message to given nodeID, notifying handler when there's a response or timeout
+	Request(nodeID ids.ShortID, message []byte, handler message.ResponseHandler) error
 
 	// Gossip sends given gossip message to peers
 	Gossip(gossip []byte) error
@@ -113,9 +116,27 @@ func (n *network) RequestAny(minVersion version.Application, request []byte, han
 	return fmt.Errorf("no peers found matching version %s out of %d peers", minVersion, len(n.peers))
 }
 
-// Request sends request message bytes to specified nodeID and adds [responseHandler] to [outstandingResponseHandlerMap]
+// Request sends request message bytes to specified nodeID, notifying the responseHandler on response or failure
+func (n *network) Request(nodeID ids.ShortID, request []byte, responseHandler message.ResponseHandler) error {
+	if nodeID == ids.ShortEmpty {
+		return fmt.Errorf("cannot send request to empty nodeID, nodeID=%s, requestLen=%d", nodeID, len(request))
+	}
+
+	// Take a slot from total [activeRequests] and block until a slot becomes available.
+	if err := n.activeRequests.Acquire(context.Background(), 1); err != nil {
+		return errAcquiringSemaphore
+	}
+
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	return n.request(nodeID, request, responseHandler)
+}
+
+// request sends request message bytes to specified nodeID and adds [responseHandler] to [outstandingResponseHandlerMap]
 // so that it can be invoked when the network receives either a response or failure message.
 // Assumes [nodeID] is never [self] since we guarantee [self] will not be added to the [peers] map.
+// Releases active requests semaphore if there was an error in sending the request
 // Returns an error if [appSender] is unable to make the request.
 // Assumes write lock is held
 func (n *network) request(nodeID ids.ShortID, request []byte, responseHandler message.ResponseHandler) error {
@@ -137,7 +158,6 @@ func (n *network) request(nodeID ids.ShortID, request []byte, responseHandler me
 	if err := n.appSender.SendAppRequest(nodeIDs, requestID, request); err != nil {
 		n.activeRequests.Release(1)
 		delete(n.outstandingResponseHandlerMap, requestID)
-		log.Error("could not send app message", "err", err, "nodeID", nodeID, "requestID", requestID)
 		return err
 	}
 
@@ -173,11 +193,11 @@ func (n *network) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time
 	// check if we have enough time to handle this request
 	if time.Until(bufferedDeadline) < minRequestHandlingDuration {
 		// Drop the request if we already missed the deadline to respond.
-		log.Debug("deadline to process AppRequest has expired, skipping", "nodeID", nodeID, "requestID", requestID, "type", req.Type())
+		log.Debug("deadline to process AppRequest has expired, skipping", "nodeID", nodeID, "requestID", requestID, "req", req)
 		return nil
 	}
 
-	log.Debug("processing incoming request", "nodeID", nodeID, "requestID", requestID, "type", req.Type())
+	log.Debug("processing incoming request", "nodeID", nodeID, "requestID", requestID, "req", req)
 	ctx, cancel := context.WithDeadline(context.Background(), bufferedDeadline)
 	defer cancel()
 
@@ -256,13 +276,13 @@ func (n *network) Gossip(gossip []byte) error {
 // error returned by this function is expected to be treated as fatal by the engine
 // returns error if request could not be parsed as message.Request or when the requestHandler returns an error
 func (n *network) AppGossip(nodeID ids.ShortID, gossipBytes []byte) error {
-	var gossipMsg message.Message
+	var gossipMsg message.GossipMessage
 	if _, err := n.codec.Unmarshal(gossipBytes, &gossipMsg); err != nil {
 		log.Debug("could not parse app gossip", "nodeID", nodeID, "gossipLen", len(gossipBytes), "err", err)
 		return nil
 	}
 
-	log.Debug("processing AppGossip from node", "nodeID", nodeID, "type", gossipMsg.Type(), "gossipLen", len(gossipBytes))
+	log.Debug("processing AppGossip from node", "nodeID", nodeID, "msg", gossipMsg)
 	return gossipMsg.Handle(n.gossipHandler, nodeID)
 }
 

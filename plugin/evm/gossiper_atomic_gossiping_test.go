@@ -35,10 +35,10 @@ func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 		gossipedLock.Lock()
 		defer gossipedLock.Unlock()
 
-		notifyMsgIntf, err := message.ParseMessage(vm.networkCodec, gossipedBytes)
+		notifyMsgIntf, err := message.ParseGossipMessage(vm.networkCodec, gossipedBytes)
 		assert.NoError(err)
 
-		requestMsg, ok := notifyMsgIntf.(*message.AtomicTx)
+		requestMsg, ok := notifyMsgIntf.(message.AtomicTxGossip)
 		assert.NotEmpty(requestMsg.Tx)
 		assert.True(ok)
 
@@ -108,10 +108,10 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 	tx, conflictingTx := importTxs[0], importTxs[1]
 
 	// gossip tx and check it is accepted and gossiped
-	msg := message.AtomicTx{
+	msg := message.AtomicTxGossip{
 		Tx: tx.Bytes(),
 	}
-	msgBytes, err := message.BuildMessage(vm.networkCodec, &msg)
+	msgBytes, err := message.BuildGossipMessage(vm.networkCodec, msg)
 	assert.NoError(err)
 
 	// show that no txID is requested
@@ -131,10 +131,10 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 	txGossipedLock.Unlock()
 
 	// show that conflicting tx is not added to mempool
-	msg = message.AtomicTx{
+	msg = message.AtomicTxGossip{
 		Tx: conflictingTx.Bytes(),
 	}
-	msgBytes, err = message.BuildMessage(vm.networkCodec, &msg)
+	msgBytes, err = message.BuildGossipMessage(vm.networkCodec, msg)
 	assert.NoError(err)
 	assert.NoError(vm.AppGossip(nodeID, msgBytes))
 	assert.False(txRequested, "tx should not have been requested")
@@ -187,10 +187,10 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 	// Gossip the transaction to the VM and ensure that it is not added to the mempool
 	// and is not re-gossipped.
 	nodeID := ids.GenerateTestShortID()
-	msg := message.AtomicTx{
+	msg := message.AtomicTxGossip{
 		Tx: tx.Bytes(),
 	}
-	msgBytes, err := message.BuildMessage(vm.networkCodec, &msg)
+	msgBytes, err := message.BuildGossipMessage(vm.networkCodec, msg)
 	assert.NoError(err)
 
 	assert.NoError(vm.AppGossip(nodeID, msgBytes))
@@ -205,10 +205,10 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 	// discarded tx and ensure it is accepted into the mempool and gossipped
 	// to the network.
 	nodeID = ids.GenerateTestShortID()
-	msg = message.AtomicTx{
+	msg = message.AtomicTxGossip{
 		Tx: conflictingTx.Bytes(),
 	}
-	msgBytes, err = message.BuildMessage(vm.networkCodec, &msg)
+	msgBytes, err = message.BuildGossipMessage(vm.networkCodec, msg)
 	assert.NoError(err)
 
 	assert.NoError(vm.AppGossip(nodeID, msgBytes))
