@@ -21,7 +21,7 @@ var (
 
 	// AllowList function signatures
 	setAdminSignature      = CalculateFunctionSelector("setAdmin(address)")
-	setDeployerSignature   = CalculateFunctionSelector("setDeployer(address)")
+	setEnabledSignature    = CalculateFunctionSelector("setEnabled(address)")
 	setNoneSignature       = CalculateFunctionSelector("setNone(address)")
 	readAllowListSignature = CalculateFunctionSelector("readAllowList(address)")
 
@@ -109,7 +109,7 @@ func PackModifyAllowList(address common.Address, role AllowListRole) ([]byte, er
 	case AllowListAdmin:
 		input = append(input, setAdminSignature...)
 	case AllowListEnabled:
-		input = append(input, setDeployerSignature...)
+		input = append(input, setEnabledSignature...)
 	case AllowListNoRole:
 		input = append(input, setNoneSignature...)
 	default:
@@ -192,11 +192,11 @@ func createReadAllowList(precompileAddr common.Address) RunStatefulPrecompileFun
 // createAllowListPrecompile returns a StatefulPrecompiledContract with R/W control of an allow list at [precompileAddr]
 func createAllowListPrecompile(precompileAddr common.Address) StatefulPrecompiledContract {
 	setAdmin := newStatefulPrecompileFunction(setAdminSignature, createAllowListSetter(precompileAddr, AllowListAdmin), createConstantRequiredGasFunc(ModifyAllowListGasCost))
-	setDeployer := newStatefulPrecompileFunction(setDeployerSignature, createAllowListSetter(precompileAddr, AllowListEnabled), createConstantRequiredGasFunc(ModifyAllowListGasCost))
+	setEnabled := newStatefulPrecompileFunction(setEnabledSignature, createAllowListSetter(precompileAddr, AllowListEnabled), createConstantRequiredGasFunc(ModifyAllowListGasCost))
 	setNone := newStatefulPrecompileFunction(setNoneSignature, createAllowListSetter(precompileAddr, AllowListNoRole), createConstantRequiredGasFunc(ModifyAllowListGasCost))
 	read := newStatefulPrecompileFunction(readAllowListSignature, createReadAllowList(precompileAddr), createConstantRequiredGasFunc(ReadAllowListGasCost))
 
 	// Construct the contract with no fallback function.
-	contract := newStatefulPrecompileWithFunctionSelectors(nil, []*statefulPrecompileFunction{setAdmin, setDeployer, setNone, read})
+	contract := newStatefulPrecompileWithFunctionSelectors(nil, []*statefulPrecompileFunction{setAdmin, setEnabled, setNone, read})
 	return contract
 }
