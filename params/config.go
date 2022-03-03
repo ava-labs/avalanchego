@@ -356,7 +356,7 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headHeight *big.Int, 
 		return newCompatError("SubnetEVM fork block timestamp", c.SubnetEVMTimestamp, newcfg.SubnetEVMTimestamp)
 	}
 
-	// Check that the configuration of the optional stateful precompiles is enabled.
+	// Check that the configuration of the optional stateful precompiles is compatible.
 	if isForkIncompatible(c.ContractDeployerAllowListConfig.Timestamp(), newcfg.ContractDeployerAllowListConfig.Timestamp(), headTimestamp) {
 		return newCompatError("AllowList fork block timestamp", c.ContractDeployerAllowListConfig.Timestamp(), newcfg.ContractDeployerAllowListConfig.Timestamp())
 	}
