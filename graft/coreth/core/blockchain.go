@@ -750,7 +750,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 
 	// Irrelevant of the canonical status, write the block itself to the database.
 	//
-	// Note all the components of block(td, hash->number map, header, body, receipts)
+	// Note all the components of block(hash->number map, header, body, receipts)
 	// should be written atomically. BlockBatch is used for containing all components.
 	blockBatch := bc.db.NewBatch()
 	rawdb.WriteBlock(blockBatch, block)
@@ -1365,4 +1365,60 @@ func (bc *BlockChain) gatherBlockRootsAboveLastAccepted() map[common.Hash]struct
 	}
 
 	return blockRoots
+}
+
+// ResetState reinitializes the state of the blockchain
+// to the trie represented by [block.Root()] after updating
+// in-memory current block pointers to [block].
+// Only used in state sync.
+func (bc *BlockChain) ResetState(block *types.Block) error {
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
+
+	// Update head block and snapshot pointers on disk
+	batch := bc.db.NewBatch()
+	rawdb.WriteHeadBlockHash(batch, block.Hash())
+	rawdb.WriteHeadHeaderHash(batch, block.Hash())
+	rawdb.WriteSnapshotBlockHash(batch, block.Hash())
+	rawdb.WriteSnapshotRoot(batch, block.Root())
+	if err := batch.Write(); err != nil {
+		return err
+	}
+
+	// Update all in-memory chain markers
+	bc.lastAccepted = block
+	bc.currentBlock.Store(block)
+	bc.hc.SetCurrentHeader(block.Header())
+
+	lastAcceptedHash := block.Hash()
+	bc.stateCache = state.NewDatabaseWithConfig(bc.db, &trie.Config{
+		Cache:     bc.cacheConfig.TrieCleanLimit,
+		Preimages: bc.cacheConfig.Preimages,
+	})
+	if err := bc.loadLastState(lastAcceptedHash); err != nil {
+		return err
+	}
+	// Create the state manager
+	bc.stateManager = NewTrieWriter(bc.stateCache.TrieDB(), bc.cacheConfig)
+
+	// Make sure the state associated with the block is available
+	head := bc.CurrentBlock()
+	if _, err := state.New(head.Root(), bc.stateCache, nil); err != nil {
+		return fmt.Errorf("head state missing %d:%s", head.Number(), head.Hash())
+	}
+
+	// Load any existing snapshot, regenerating it if loading failed
+	if bc.cacheConfig.SnapshotLimit > 0 {
+		var err error
+		// If we are starting from genesis, generate the original snapshot disk layer
+		// up front, so we can use it while executing blocks in bootstrapping. This
+		// also avoids a costly async generation process when reaching tip.
+		async := bc.cacheConfig.SnapshotAsync && head.NumberU64() > 0
+		log.Info("Initializing snapshots", "async", async)
+		bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), async, true, bc.cacheConfig.SnapshotVerify)
+		if err != nil {
+			log.Error("failed to initialize snapshots", "headHash", head.Hash(), "headRoot", head.Root(), "err", err, "async", async)
+		}
+	}
+	return nil
 }

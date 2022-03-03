@@ -5,6 +5,7 @@ package message
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/codec"
 
@@ -16,72 +17,53 @@ import (
 
 const (
 	// EthMsgSoftCapSize is the ideal size of encoded transaction bytes we send in
-	// any [EthTxs] or [AtomicTx] message. We do not limit inbound messages to
+	// any [EthTxsGossip] or [AtomicTxGossip] message. We do not limit inbound messages to
 	// this size, however. Max inbound message size is enforced by the codec
 	// (512KB).
 	EthMsgSoftCapSize = common.StorageSize(64 * units.KiB)
-	atomicTxType      = "atomic-tx"
-	ethTxsType        = "eth-txs"
 )
 
 var (
-	_ Message = &AtomicTx{}
-	_ Message = &EthTxs{}
+	_ GossipMessage = AtomicTxGossip{}
+	_ GossipMessage = EthTxsGossip{}
 
 	errUnexpectedCodecVersion = errors.New("unexpected codec version")
 )
 
-type Message interface {
-	// Handle this message with the correct message handler
+type GossipMessage interface {
+	// types implementing GossipMessage should also implement fmt.Stringer for logging purposes.
+	fmt.Stringer
+
+	// Handle this gossip message with the gossip handler.
 	Handle(handler GossipHandler, nodeID ids.ShortID) error
-
-	// initialize should be called whenever a message is built or parsed
-	initialize([]byte)
-
-	// Bytes returns the binary representation of this message
-	//
-	// Bytes should only be called after being initialized
-	Bytes() []byte
-
-	// Type returns user-friendly name for this object that can be used for logging
-	Type() string
 }
 
-type message []byte
-
-func (m *message) initialize(bytes []byte) { *m = bytes }
-func (m *message) Bytes() []byte           { return *m }
-
-type AtomicTx struct {
-	message
-
+type AtomicTxGossip struct {
 	Tx []byte `serialize:"true"`
 }
 
-func (msg *AtomicTx) Handle(handler GossipHandler, nodeID ids.ShortID) error {
+func (msg AtomicTxGossip) Handle(handler GossipHandler, nodeID ids.ShortID) error {
 	return handler.HandleAtomicTx(nodeID, msg)
 }
 
-func (msg *AtomicTx) Type() string {
-	return atomicTxType
+func (msg AtomicTxGossip) String() string {
+	return fmt.Sprintf("AtomicTxGossip(Len=%d)", len(msg.Tx))
 }
 
-type EthTxs struct {
-	message
-
+type EthTxsGossip struct {
 	Txs []byte `serialize:"true"`
 }
 
-func (msg *EthTxs) Handle(handler GossipHandler, nodeID ids.ShortID) error {
+func (msg EthTxsGossip) Handle(handler GossipHandler, nodeID ids.ShortID) error {
 	return handler.HandleEthTxs(nodeID, msg)
 }
 
-func (msg *EthTxs) Type() string {
-	return ethTxsType
+func (msg EthTxsGossip) String() string {
+	return fmt.Sprintf("EthTxsGossip(Len=%d)", len(msg.Txs))
 }
 
-func ParseMessage(codec codec.Manager, bytes []byte) (Message, error) {
-	var msg Message
+func ParseGossipMessage(codec codec.Manager, bytes []byte) (GossipMessage, error) {
+	var msg GossipMessage
 	version, err := codec.Unmarshal(bytes, &msg)
 	if err != nil {
 		return nil, err
@@ -89,12 +71,10 @@ func ParseMessage(codec codec.Manager, bytes []byte) (Message, error) {
 	if version != Version {
 		return nil, errUnexpectedCodecVersion
 	}
-	msg.initialize(bytes)
 	return msg, nil
 }
 
-func BuildMessage(codec codec.Manager, msg Message) ([]byte, error) {
+func BuildGossipMessage(codec codec.Manager, msg GossipMessage) ([]byte, error) {
 	bytes, err := codec.Marshal(Version, &msg)
-	msg.initialize(bytes)
 	return bytes, err
 }

@@ -4,6 +4,7 @@
 package message
 
 import (
+	"encoding/base64"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/utils"
@@ -12,47 +13,51 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestAtomicTx(t *testing.T) {
+// TestMarshalAtomicTx asserts that the structure or serialization logic hasn't changed, primarily to
+// ensure compatibility with the network.
+func TestMarshalAtomicTx(t *testing.T) {
 	assert := assert.New(t)
 
+	base64AtomicTxGossip := "AAAAAAAAAAAABGJsYWg="
 	msg := []byte("blah")
-	builtMsg := AtomicTx{
+	builtMsg := AtomicTxGossip{
 		Tx: msg,
 	}
 	codec, err := BuildCodec()
 	assert.NoError(err)
-	builtMsgBytes, err := BuildMessage(codec, &builtMsg)
+	builtMsgBytes, err := BuildGossipMessage(codec, builtMsg)
 	assert.NoError(err)
-	assert.Equal(builtMsgBytes, builtMsg.Bytes())
+	assert.Equal(base64AtomicTxGossip, base64.StdEncoding.EncodeToString(builtMsgBytes))
 
-	parsedMsgIntf, err := ParseMessage(codec, builtMsgBytes)
+	parsedMsgIntf, err := ParseGossipMessage(codec, builtMsgBytes)
 	assert.NoError(err)
-	assert.Equal(builtMsgBytes, parsedMsgIntf.Bytes())
 
-	parsedMsg, ok := parsedMsgIntf.(*AtomicTx)
+	parsedMsg, ok := parsedMsgIntf.(AtomicTxGossip)
 	assert.True(ok)
 
 	assert.Equal(msg, parsedMsg.Tx)
 }
 
-func TestEthTxs(t *testing.T) {
+// TestMarshalEthTxs asserts that the structure or serialization logic hasn't changed, primarily to
+// ensure compatibility with the network.
+func TestMarshalEthTxs(t *testing.T) {
 	assert := assert.New(t)
 
+	base64EthTxGossip := "AAAAAAABAAAABGJsYWg="
 	msg := []byte("blah")
-	builtMsg := EthTxs{
+	builtMsg := EthTxsGossip{
 		Txs: msg,
 	}
 	codec, err := BuildCodec()
 	assert.NoError(err)
-	builtMsgBytes, err := BuildMessage(codec, &builtMsg)
+	builtMsgBytes, err := BuildGossipMessage(codec, builtMsg)
 	assert.NoError(err)
-	assert.Equal(builtMsgBytes, builtMsg.Bytes())
+	assert.Equal(base64EthTxGossip, base64.StdEncoding.EncodeToString(builtMsgBytes))
 
-	parsedMsgIntf, err := ParseMessage(codec, builtMsgBytes)
+	parsedMsgIntf, err := ParseGossipMessage(codec, builtMsgBytes)
 	assert.NoError(err)
-	assert.Equal(builtMsgBytes, parsedMsgIntf.Bytes())
 
-	parsedMsg, ok := parsedMsgIntf.(*EthTxs)
+	parsedMsg, ok := parsedMsgIntf.(EthTxsGossip)
 	assert.True(ok)
 
 	assert.Equal(msg, parsedMsg.Txs)
@@ -61,12 +66,12 @@ func TestEthTxs(t *testing.T) {
 func TestEthTxsTooLarge(t *testing.T) {
 	assert := assert.New(t)
 
-	builtMsg := EthTxs{
+	builtMsg := EthTxsGossip{
 		Txs: utils.RandomBytes(1024 * units.KiB),
 	}
 	codec, err := BuildCodec()
 	assert.NoError(err)
-	_, err = BuildMessage(codec, &builtMsg)
+	_, err = BuildGossipMessage(codec, builtMsg)
 	assert.Error(err)
 }
 
@@ -76,6 +81,6 @@ func TestParseGibberish(t *testing.T) {
 	codec, err := BuildCodec()
 	assert.NoError(err)
 	randomBytes := utils.RandomBytes(256 * units.KiB)
-	_, err = ParseMessage(codec, randomBytes)
+	_, err = ParseGossipMessage(codec, randomBytes)
 	assert.Error(err)
 }

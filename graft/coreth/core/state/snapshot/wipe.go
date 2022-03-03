@@ -36,11 +36,11 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-// wipeSnapshot starts a goroutine to iterate over the entire key-value database
+// WipeSnapshot starts a goroutine to iterate over the entire key-value database
 // and delete all the data associated with the snapshot (accounts, storage,
 // metadata). After all is done, the snapshot range of the database is compacted
 // to free up unused data blocks.
-func wipeSnapshot(db ethdb.KeyValueStore, full bool) chan struct{} {
+func WipeSnapshot(db ethdb.KeyValueStore, full bool) chan struct{} {
 	// Wipe the snapshot root marker synchronously
 	if full {
 		rawdb.DeleteSnapshotBlockHash(db)

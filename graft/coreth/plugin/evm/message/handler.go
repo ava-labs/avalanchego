@@ -4,6 +4,8 @@
 package message
 
 import (
+	"context"
+
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -13,19 +15,19 @@ var _ GossipHandler = NoopMempoolGossipHandler{}
 
 // GossipHandler handles incoming gossip messages
 type GossipHandler interface {
-	HandleAtomicTx(nodeID ids.ShortID, msg *AtomicTx) error
-	HandleEthTxs(nodeID ids.ShortID, msg *EthTxs) error
+	HandleAtomicTx(nodeID ids.ShortID, msg AtomicTxGossip) error
+	HandleEthTxs(nodeID ids.ShortID, msg EthTxsGossip) error
 }
 
 type NoopMempoolGossipHandler struct{}
 
-func (NoopMempoolGossipHandler) HandleAtomicTx(nodeID ids.ShortID, _ *AtomicTx) error {
-	log.Debug("dropping unexpected AtomicTx message", "peerID", nodeID)
+func (NoopMempoolGossipHandler) HandleAtomicTx(nodeID ids.ShortID, msg AtomicTxGossip) error {
+	log.Debug("dropping unexpected AtomicTxGossip message", "peerID", nodeID)
 	return nil
 }
 
-func (NoopMempoolGossipHandler) HandleEthTxs(nodeID ids.ShortID, _ *EthTxs) error {
-	log.Debug("dropping unexpected EthTxs message", "peerID", nodeID)
+func (NoopMempoolGossipHandler) HandleEthTxs(nodeID ids.ShortID, msg EthTxsGossip) error {
+	log.Debug("dropping unexpected EthTxsGossip message", "peerID", nodeID)
 	return nil
 }
 
@@ -34,7 +36,12 @@ func (NoopMempoolGossipHandler) HandleEthTxs(nodeID ids.ShortID, _ *EthTxs) erro
 // so that the Request object of relevant Type can invoke its respective handle method
 // on this struct.
 // Also see GossipHandler for implementation style.
-type RequestHandler interface{}
+type RequestHandler interface {
+	HandleStateTrieLeafsRequest(ctx context.Context, nodeID ids.ShortID, requestID uint32, leafsRequest LeafsRequest) ([]byte, error)
+	HandleAtomicTrieLeafsRequest(ctx context.Context, nodeID ids.ShortID, requestID uint32, leafsRequest LeafsRequest) ([]byte, error)
+	HandleBlockRequest(ctx context.Context, nodeID ids.ShortID, requestID uint32, request BlockRequest) ([]byte, error)
+	HandleCodeRequest(ctx context.Context, nodeID ids.ShortID, requestID uint32, codeRequest CodeRequest) ([]byte, error)
+}
 
 // ResponseHandler handles response for a sent request
 // Only one of OnResponse or OnFailure is called for a given requestID, not both

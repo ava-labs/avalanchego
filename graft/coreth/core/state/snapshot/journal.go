@@ -105,7 +105,7 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, 
 		var wiper chan struct{}
 		if generator.Wiping {
 			log.Info("Resuming previous snapshot wipe")
-			wiper = wipeSnapshot(diskdb, false)
+			wiper = WipeSnapshot(diskdb, false)
 		}
 		// Whether or not wiping was in progress, load any generator progress too
 		snapshot.genMarker = generator.Marker

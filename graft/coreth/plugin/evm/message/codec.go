@@ -18,9 +18,23 @@ func BuildCodec() (codec.Manager, error) {
 	c := linearcodec.NewDefault()
 	errs := wrappers.Errs{}
 	errs.Add(
-		c.RegisterType(&AtomicTx{}),
-		c.RegisterType(&EthTxs{}),
+		// Gossip types
+		c.RegisterType(AtomicTxGossip{}),
+		c.RegisterType(EthTxsGossip{}),
+
+		// Types for state sync frontier consensus
+		c.RegisterType(SyncableBlock{}),
+
+		// state sync types
+		c.RegisterType(BlockRequest{}),
+		c.RegisterType(BlockResponse{}),
+		c.RegisterType(LeafsRequest{}),
+		c.RegisterType(LeafsResponse{}),
+		c.RegisterType(CodeRequest{}),
+		c.RegisterType(CodeResponse{}),
+		c.RegisterType(SerializedMap{}),
+
+		codecManager.RegisterCodec(Version, c),
 	)
-	errs.Add(codecManager.RegisterCodec(Version, c))
 	return codecManager, errs.Err
 }

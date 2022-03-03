@@ -36,7 +36,7 @@ var (
 	_ message.RequestHandler = &testRequestHandler{}
 
 	_ common.AppSender      = testAppSender{}
-	_ message.Message       = HelloGossip{}
+	_ message.GossipMessage = HelloGossip{}
 	_ message.GossipHandler = &testGossipHandler{}
 )
 
@@ -47,7 +47,7 @@ func TestNetworkDoesNotConnectToItself(t *testing.T) {
 	assert.EqualValues(t, 0, n.Size())
 }
 
-func TestRequestsRoutingAndResponse(t *testing.T) {
+func TestRequestAnyRequestsRoutingAndResponse(t *testing.T) {
 	callNum := uint32(0)
 	senderWg := &sync.WaitGroup{}
 	var net Network
@@ -99,9 +99,8 @@ func TestRequestsRoutingAndResponse(t *testing.T) {
 			defer wg.Done()
 			requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
 			assert.NoError(t, err)
-			responseBytes, failed, err := client.RequestAny(defaultPeerVersion, requestBytes)
+			responseBytes, err := client.RequestAny(defaultPeerVersion, requestBytes)
 			assert.NoError(t, err)
-			assert.False(t, failed)
 			assert.NotNil(t, responseBytes)
 
 			var response TestMessage
@@ -115,6 +114,100 @@ func TestRequestsRoutingAndResponse(t *testing.T) {
 	requestWg.Wait()
 	senderWg.Wait()
 	assert.Equal(t, totalCalls, int(atomic.LoadUint32(&callNum)))
+}
+
+func TestRequestRequestsRoutingAndResponse(t *testing.T) {
+	callNum := uint32(0)
+	senderWg := &sync.WaitGroup{}
+	var net Network
+	var lock sync.Mutex
+	contactedNodes := make(map[ids.ShortID]struct{})
+	sender := testAppSender{
+		sendAppRequestFn: func(nodes ids.ShortSet, requestID uint32, requestBytes []byte) error {
+			nodeID, _ := nodes.Pop()
+			lock.Lock()
+			contactedNodes[nodeID] = struct{}{}
+			lock.Unlock()
+			senderWg.Add(1)
+			go func() {
+				defer senderWg.Done()
+				if err := net.AppRequest(nodeID, requestID, time.Now().Add(5*time.Second), requestBytes); err != nil {
+					panic(err)
+				}
+			}()
+			return nil
+		},
+		sendAppResponseFn: func(nodeID ids.ShortID, requestID uint32, responseBytes []byte) error {
+			senderWg.Add(1)
+			go func() {
+				defer senderWg.Done()
+				if err := net.AppResponse(nodeID, requestID, responseBytes); err != nil {
+					panic(err)
+				}
+				atomic.AddUint32(&callNum, 1)
+			}()
+			return nil
+		},
+	}
+
+	codecManager := buildCodec(t, HelloRequest{}, HelloResponse{})
+	net = NewNetwork(sender, codecManager, ids.ShortEmpty, 16)
+	net.SetRequestHandler(&HelloGreetingRequestHandler{codec: codecManager})
+	client := NewClient(net)
+
+	nodes := []ids.ShortID{
+		ids.GenerateTestShortID(),
+		ids.GenerateTestShortID(),
+		ids.GenerateTestShortID(),
+		ids.GenerateTestShortID(),
+		ids.GenerateTestShortID(),
+	}
+	for _, nodeID := range nodes {
+		assert.NoError(t, net.Connected(nodeID, defaultPeerVersion))
+	}
+
+	requestMessage := HelloRequest{Message: "this is a request"}
+	defer net.Shutdown()
+
+	totalRequests := 5000
+	numCallsPerRequest := 1 // on sending response
+	totalCalls := totalRequests * numCallsPerRequest
+
+	requestWg := &sync.WaitGroup{}
+	requestWg.Add(totalCalls)
+	nodeIdx := 0
+	for i := 0; i < totalCalls; i++ {
+		nodeIdx = (nodeIdx + 1) % (len(nodes))
+		nodeID := nodes[nodeIdx]
+		go func(wg *sync.WaitGroup, nodeID ids.ShortID) {
+			defer wg.Done()
+			requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
+			assert.NoError(t, err)
+			responseBytes, err := client.Request(nodeID, requestBytes)
+			assert.NoError(t, err)
+			assert.NotNil(t, responseBytes)
+
+			var response TestMessage
+			if _, err = codecManager.Unmarshal(responseBytes, &response); err != nil {
+				panic(fmt.Errorf("unexpected error during unmarshal: %w", err))
+			}
+			assert.Equal(t, "Hi", response.Message)
+		}(requestWg, nodeID)
+	}
+
+	requestWg.Wait()
+	senderWg.Wait()
+	assert.Equal(t, totalCalls, int(atomic.LoadUint32(&callNum)))
+	for _, nodeID := range nodes {
+		if _, exists := contactedNodes[nodeID]; !exists {
+			t.Fatalf("expected nodeID %s to be contacted but was not", nodeID)
+		}
+	}
+
+	// ensure empty nodeID is not allowed
+	_, err := client.Request(ids.ShortID{}, []byte("hello there"))
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot send request to empty nodeID")
 }
 
 func TestRequestMinVersion(t *testing.T) {
@@ -152,15 +245,13 @@ func TestRequestMinVersion(t *testing.T) {
 	assert.NoError(t, net.Connected(nodeID, version.NewDefaultApplication("corethtest", 1, 7, 1)))
 
 	// ensure version does not match
-	responseBytes, failed, err := client.RequestAny(version.NewDefaultApplication("corethtest", 2, 0, 0), requestBytes)
+	responseBytes, err := client.RequestAny(version.NewDefaultApplication("corethtest", 2, 0, 0), requestBytes)
 	assert.Equal(t, err.Error(), "no peers found matching version corethtest/2.0.0 out of 1 peers")
-	assert.True(t, failed)
 	assert.Nil(t, responseBytes)
 
 	// ensure version matches and the request goes through
-	responseBytes, failed, err = client.RequestAny(version.NewDefaultApplication("corethtest", 1, 0, 0), requestBytes)
+	responseBytes, err = client.RequestAny(version.NewDefaultApplication("corethtest", 1, 0, 0), requestBytes)
 	assert.NoError(t, err)
-	assert.False(t, failed)
 
 	var response TestMessage
 	if _, err = codecManager.Unmarshal(responseBytes, &response); err != nil {
@@ -336,7 +427,7 @@ func marshalStruct(codec codec.Manager, obj interface{}) ([]byte, error) {
 	return codec.Marshal(message.Version, &obj)
 }
 
-func buildGossip(codec codec.Manager, msg message.Message) ([]byte, error) {
+func buildGossip(codec codec.Manager, msg message.GossipMessage) ([]byte, error) {
 	return codec.Marshal(message.Version, &msg)
 }
 
@@ -371,8 +462,8 @@ func (h HelloRequest) Handle(ctx context.Context, nodeID ids.ShortID, requestID 
 	return handler.(TestRequestHandler).HandleHelloRequest(ctx, nodeID, requestID, &h)
 }
 
-func (h HelloRequest) Type() string {
-	return "hello-request"
+func (h HelloRequest) String() string {
+	return fmt.Sprintf("HelloRequest(%s)", h.Message)
 }
 
 type GreetingRequest struct {
@@ -384,8 +475,8 @@ func (g GreetingRequest) Handle(ctx context.Context, nodeID ids.ShortID, request
 	return handler.(TestRequestHandler).HandleGreetingRequest(ctx, nodeID, requestID, &g)
 }
 
-func (g GreetingRequest) Type() string {
-	return "greeting-request"
+func (g GreetingRequest) String() string {
+	return fmt.Sprintf("GreetingRequest(%s)", g.Greeting)
 }
 
 type HelloResponse struct {
@@ -402,6 +493,7 @@ type TestRequestHandler interface {
 }
 
 type HelloGreetingRequestHandler struct {
+	message.RequestHandler
 	codec codec.Manager
 }
 
@@ -421,21 +513,20 @@ func (t TestMessage) Handle(ctx context.Context, nodeID ids.ShortID, requestID u
 	return handler.(*testRequestHandler).handleTestRequest(ctx, nodeID, requestID, &t)
 }
 
-func (t TestMessage) Type() string {
-	return "test-message"
+func (t TestMessage) String() string {
+	return fmt.Sprintf("TestMessage(%s)", t.Message)
 }
 
 type HelloGossip struct {
-	message.Message
 	Msg string `serialize:"true"`
 }
 
 func (h HelloGossip) Handle(handler message.GossipHandler, nodeID ids.ShortID) error {
-	return handler.HandleEthTxs(nodeID, nil)
+	return handler.HandleEthTxs(nodeID, message.EthTxsGossip{})
 }
 
-func (h HelloGossip) Type() string {
-	return "hello-gossip"
+func (h HelloGossip) String() string {
+	return fmt.Sprintf("HelloGossip(%s)", h.Msg)
 }
 
 func (h HelloGossip) initialize(_ []byte) {
@@ -453,19 +544,20 @@ type testGossipHandler struct {
 	msg      []byte
 }
 
-func (t *testGossipHandler) HandleAtomicTx(nodeID ids.ShortID, _ *message.AtomicTx) error {
+func (t *testGossipHandler) HandleAtomicTx(nodeID ids.ShortID, msg message.AtomicTxGossip) error {
 	t.received = true
 	t.nodeID = nodeID
 	return nil
 }
 
-func (t *testGossipHandler) HandleEthTxs(nodeID ids.ShortID, _ *message.EthTxs) error {
+func (t *testGossipHandler) HandleEthTxs(nodeID ids.ShortID, msg message.EthTxsGossip) error {
 	t.received = true
 	t.nodeID = nodeID
 	return nil
 }
 
 type testRequestHandler struct {
+	message.RequestHandler
 	calls              uint32
 	processingDuration time.Duration
 	response           []byte

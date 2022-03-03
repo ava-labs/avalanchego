@@ -207,6 +207,5 @@ func (self *ETHChain) GetTxAcceptedSubmitCh() <-chan core.NewTxsEvent {
 	return newTxsChan
 }
 
-func (self *ETHChain) GetTxPool() *core.TxPool {
-	return self.backend.TxPool()
-}
+func (self *ETHChain) GetTxPool() *core.TxPool          { return self.backend.TxPool() }
+func (self *ETHChain) BloomIndexer() *core.ChainIndexer { return self.backend.BloomIndexer() }
