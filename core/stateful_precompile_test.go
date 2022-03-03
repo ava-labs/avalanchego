@@ -22,7 +22,7 @@ func (m *mockAccessibleState) GetStateDB() precompile.StateDB { return m.state }
 
 // This test is added within the core package so that it can import all of the required code
 // without creating any import cycles
-func TestContractDeployerAllowListConfigure(t *testing.T) {
+func TestContractDeployerAllowListRun(t *testing.T) {
 	type test struct {
 		caller         common.Address
 		precompileAddr common.Address
@@ -172,13 +172,30 @@ func TestContractDeployerAllowListConfigure(t *testing.T) {
 			},
 			expectedErr: precompile.ErrReadOnlyModifyAllowList.Error(),
 		},
+		"set no role insufficient gas": {
+			caller:         adminAddr,
+			precompileAddr: precompile.ContractDeployerAllowListAddress,
+			input: func() []byte {
+				input, err := precompile.PackModifyAllowList(adminAddr, precompile.AllowListNoRole)
+				if err != nil {
+					panic(err)
+				}
+				return input
+			},
+			suppliedGas: precompile.ModifyAllowListGasCost - 1,
+			readOnly:    false,
+			setupState: func(state *state.StateDB) {
+				precompile.SetContractDeployerAllowListStatus(state, adminAddr, precompile.AllowListAdmin)
+			},
+			expectedErr: precompile.ErrExceedsGasAllowance.Error(),
+		},
 		"read allow list no role": {
 			caller:         adminAddr,
 			precompileAddr: precompile.ContractDeployerAllowListAddress,
 			input: func() []byte {
 				return precompile.PackReadAllowList(noRoleAddr)
 			},
-			suppliedGas: precompile.ModifyAllowListGasCost,
+			suppliedGas: precompile.ReadAllowListGasCost,
 			readOnly:    false,
 			setupState:  func(state *state.StateDB) {},
 			expectedRes: common.Hash(precompile.AllowListNoRole).Bytes(),
@@ -193,7 +210,7 @@ func TestContractDeployerAllowListConfigure(t *testing.T) {
 			input: func() []byte {
 				return precompile.PackReadAllowList(noRoleAddr)
 			},
-			suppliedGas: precompile.ModifyAllowListGasCost,
+			suppliedGas: precompile.ReadAllowListGasCost,
 			readOnly:    false,
 			setupState: func(state *state.StateDB) {
 				precompile.SetContractDeployerAllowListStatus(state, adminAddr, precompile.AllowListAdmin)
@@ -210,7 +227,7 @@ func TestContractDeployerAllowListConfigure(t *testing.T) {
 			input: func() []byte {
 				return precompile.PackReadAllowList(noRoleAddr)
 			},
-			suppliedGas: precompile.ModifyAllowListGasCost,
+			suppliedGas: precompile.ReadAllowListGasCost,
 			readOnly:    true,
 			setupState: func(state *state.StateDB) {
 				precompile.SetContractDeployerAllowListStatus(state, adminAddr, precompile.AllowListAdmin)
@@ -221,6 +238,19 @@ func TestContractDeployerAllowListConfigure(t *testing.T) {
 				assert.Equal(t, precompile.AllowListAdmin, res)
 			},
 		},
+		"read allow list out of gas": {
+			caller:         adminAddr,
+			precompileAddr: precompile.ContractDeployerAllowListAddress,
+			input: func() []byte {
+				return precompile.PackReadAllowList(noRoleAddr)
+			},
+			suppliedGas: precompile.ReadAllowListGasCost - 1,
+			readOnly:    true,
+			setupState: func(state *state.StateDB) {
+				precompile.SetContractDeployerAllowListStatus(state, adminAddr, precompile.AllowListAdmin)
+			},
+			expectedErr: precompile.ErrExceedsGasAllowance.Error(),
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			db := rawdb.NewMemoryDatabase()
@@ -230,7 +260,7 @@ func TestContractDeployerAllowListConfigure(t *testing.T) {
 			}
 			test.setupState(state)
 
-			ret, _, err := precompile.ContractDeployerAllowListPrecompile.Run(&mockAccessibleState{state: state}, test.caller, test.precompileAddr, test.input(), test.suppliedGas, test.readOnly)
+			ret, remainingGas, err := precompile.ContractDeployerAllowListPrecompile.Run(&mockAccessibleState{state: state}, test.caller, test.precompileAddr, test.input(), test.suppliedGas, test.readOnly)
 			if len(test.expectedErr) != 0 {
 				if err == nil {
 					assert.Failf(t, "run expectedly passed without error", "expected error %q", test.expectedErr)
@@ -244,6 +274,7 @@ func TestContractDeployerAllowListConfigure(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			assert.Equal(t, uint64(0), remainingGas)
 			assert.Equal(t, test.expectedRes, ret)
 
 			test.assertState(t, state)

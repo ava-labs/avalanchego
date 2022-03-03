@@ -28,6 +28,7 @@ var (
 	// Error returned when an invalid write is attempted
 	ErrReadOnlyModifyAllowList = errors.New("cannot modify allow list in read only")
 	ErrCannotModifyAllowList   = errors.New("non-admin cannot modify allow list")
+	ErrExceedsGasAllowance     = errors.New("running allow list exceeds gas allowance")
 )
 
 // AllowListConfig specifies the configuration of the allow list.
@@ -172,7 +173,7 @@ func createReadAllowList(precompileAddr common.Address) RunStatefulPrecompileFun
 	return func(evm PrecompileAccessibleState, callerAddr common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 		// Note: this should never happen since the required gas should be verified before calling Run.
 		if suppliedGas < ReadAllowListGasCost {
-			return nil, 0, fmt.Errorf("running allow list exceeds gas allowance (%d) < (%d)", ReadAllowListGasCost, suppliedGas)
+			return nil, 0, fmt.Errorf("%w (%d) < (%d)", ErrExceedsGasAllowance, ReadAllowListGasCost, suppliedGas)
 		}
 
 		remainingGas = suppliedGas - ReadAllowListGasCost
