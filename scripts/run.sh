@@ -17,7 +17,14 @@ source "$SUBNET_EVM_PATH"/scripts/constants.sh
 VERSION=$1
 if [[ -z "${VERSION}" ]]; then
   echo "Missing version argument!"
-  echo "Usage: ${0} [VERSION]" >> /dev/stderr
+  echo "Usage: ${0} [VERSION] [GENESIS_ADDRESS]" >> /dev/stderr
+  exit 255
+fi
+
+GENESIS_ADDRESS=$2
+if [ -z "${GENESIS_ADDRESS}" ]; then
+  echo "Missing address argument!"
+  echo "Usage: ${0} [VERSION] [GENESIS_ADDRESS]" >> /dev/stderr
   exit 255
 fi
 
@@ -61,11 +68,14 @@ go build \
 "plugin/"*.go
 find /tmp/avalanchego-v${VERSION}
 
+# Create genesis file to use in network (make sure to add your address to
+# "alloc")
+export CHAIN_ID=99999
 echo "creating genesis"
 cat <<EOF > /tmp/genesis.json
 {
   "config": {
-    "chainId": 99999,
+    "chainId": $CHAIN_ID,
     "homesteadBlock": 0,
     "eip150Block": 0,
     "eip150Hash": "0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0",
@@ -88,10 +98,8 @@ cat <<EOF > /tmp/genesis.json
       "blockGasCostStep": 500000
     }
   },
-  "airdropHash":"0xccbf8e430b30d08b5b3342208781c40b373d1b5885c1903828f367230a2568da",
-  "airdropAmount":"0x8AC7230489E80000",
   "alloc": {
-    "D23cbfA7eA985213aD81223309f588A7E66A246A": {
+    "${GENESIS_ADDRESS:2}": {
       "balance": "0x52B7D2DCC80CD2E4000000"
     }
   },
@@ -108,6 +116,53 @@ cat <<EOF > /tmp/genesis.json
 }
 EOF
 
+# If you'd like to try the airdrop feature, use the commented genesis
+# cat <<EOF > /tmp/genesis.json
+# {
+#   "config": {
+#     "chainId": $CHAIN_ID,
+#     "homesteadBlock": 0,
+#     "eip150Block": 0,
+#     "eip150Hash": "0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0",
+#     "eip155Block": 0,
+#     "eip158Block": 0,
+#     "byzantiumBlock": 0,
+#     "constantinopleBlock": 0,
+#     "petersburgBlock": 0,
+#     "istanbulBlock": 0,
+#     "muirGlacierBlock": 0,
+#     "subnetEVMTimestamp": 0,
+#     "feeConfig": {
+#       "gasLimit": 20000000,
+#       "minBaseFee": 1000000000,
+#       "targetGas": 100000000,
+#       "baseFeeChangeDenominator": 48,
+#       "minBlockGasCost": 0,
+#       "maxBlockGasCost": 10000000,
+#       "targetBlockRate": 2,
+#       "blockGasCostStep": 500000
+#     }
+#   },
+#   "airdropHash":"0xccbf8e430b30d08b5b3342208781c40b373d1b5885c1903828f367230a2568da",
+#   "airdropAmount":"0x8AC7230489E80000",
+#   "alloc": {
+#     "${GENESIS_ADDRESS:2}": {
+#       "balance": "0x52B7D2DCC80CD2E4000000"
+#     }
+#   },
+#   "nonce": "0x0",
+#   "timestamp": "0x0",
+#   "extraData": "0x00",
+#   "gasLimit": "0x1312D00",
+#   "difficulty": "0x0",
+#   "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+#   "coinbase": "0x0000000000000000000000000000000000000000",
+#   "number": "0x0",
+#   "gasUsed": "0x0",
+#   "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+# }
+# EOF
+
 echo "building runner"
 pushd ./runner
 go build -v -o /tmp/runner .
@@ -121,11 +176,9 @@ echo "launch local test cluster in the background"
 --output-path=/tmp/avalanchego-v${VERSION}/output.yaml 2> /dev/null &
 PID=${!}
 
-echo "wait until local cluster is ready from PID ${PID}"
-sleep 360
-while [[ ! -s /tmp/avalanchego-v${VERSION}/output.yaml ]]
-  do
-  echo "waiting for /tmp/avalanchego-v${VERSION}/output.yaml creation"
+sleep 30
+while [[ ! -s /tmp/avalanchego-v${VERSION}/output.yaml ]]; do
+  echo "waiting for local cluster on PID ${PID}"
   sleep 5
   # wait up to 5-minute
   ((c++)) && ((c==60)) && break
@@ -133,7 +186,7 @@ done
 
 if [[ -f "/tmp/avalanchego-v${VERSION}/output.yaml" ]]; then
   echo "cluster is ready!"
-  cat /tmp/avalanchego-v${VERSION}/output.yaml
+  go run scripts/parser/main.go /tmp/avalanchego-v${VERSION}/output.yaml $CHAIN_ID $GENESIS_ADDRESS
 else
   echo "cluster is not ready in time... terminating ${PID}"
   kill ${PID}

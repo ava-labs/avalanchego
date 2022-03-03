@@ -166,26 +166,42 @@ and creates a `subnet-evm` genesis file.
 ```bash
 # to startup a local cluster (good for development)
 cd ${HOME}/go/src/github.com/ava-labs/subnet-evm
-./scripts/run.sh 1.7.5
+./scripts/run.sh 1.7.5 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
 ```
 
+Once the the network is started up, the following info will be printed to the
+console:
 ```bash
-# inspect cluster endpoints when ready
-cat /tmp/avalanchego-v1.7.5/output.yaml
-<<COMMENT
-endpoint: /ext/bc/2VCAhX6vE3UnXC6s1CBPE6jJ4c4cHWMfPgCptuWS59pQ9vbeLM
-logsDir: ...
-pid: 12811
-uris:
-- http://localhost:56239
-- http://localhost:56251
-- http://localhost:56253
-- http://localhost:56255
-- http://localhost:56257
-COMMENT
+Logs Directory: /var/folders/mp/6jm81gc11dv3xtcwxmrd8mcr0000gn/T/runnerlogs2402729383
+PID: 90118
 
-# ping the local cluster
-curl --location --request POST 'http://localhost:62045/ext/bc/x7gVMwHuGG4H1zXytxN8LRpShExiHnAiXG336EAhavpPmm8gF/rpc' \
+EVM Chain ID: 99999
+Funded Address: 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
+RPC Endpoints:
+- http://localhost:53423/ext/bc/AHdWCyWDaudRX4JkHNgpzyMFdhHK7iEgB4HHMTuarzWghkAdg/rpc
+- http://localhost:53425/ext/bc/AHdWCyWDaudRX4JkHNgpzyMFdhHK7iEgB4HHMTuarzWghkAdg/rpc
+- http://localhost:53427/ext/bc/AHdWCyWDaudRX4JkHNgpzyMFdhHK7iEgB4HHMTuarzWghkAdg/rpc
+- http://localhost:53429/ext/bc/AHdWCyWDaudRX4JkHNgpzyMFdhHK7iEgB4HHMTuarzWghkAdg/rpc
+- http://localhost:53431/ext/bc/AHdWCyWDaudRX4JkHNgpzyMFdhHK7iEgB4HHMTuarzWghkAdg/rpc
+
+WS Endpoints:
+- ws://localhost:53423/ext/bc/AHdWCyWDaudRX4JkHNgpzyMFdhHK7iEgB4HHMTuarzWghkAdg/ws
+- ws://localhost:53425/ext/bc/AHdWCyWDaudRX4JkHNgpzyMFdhHK7iEgB4HHMTuarzWghkAdg/ws
+- ws://localhost:53427/ext/bc/AHdWCyWDaudRX4JkHNgpzyMFdhHK7iEgB4HHMTuarzWghkAdg/ws
+- ws://localhost:53429/ext/bc/AHdWCyWDaudRX4JkHNgpzyMFdhHK7iEgB4HHMTuarzWghkAdg/ws
+- ws://localhost:53431/ext/bc/AHdWCyWDaudRX4JkHNgpzyMFdhHK7iEgB4HHMTuarzWghkAdg/ws
+
+MetaMask Quick Start:
+Funded Address: 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
+Network Name: Local EVM
+RPC URL: http://localhost:53423/ext/bc/AHdWCyWDaudRX4JkHNgpzyMFdhHK7iEgB4HHMTuarzWghkAdg/rpc
+Chain ID: 99999
+Curreny Symbol: LEVM
+```
+
+You can then ping the local cluster or add the network to MetaMask:
+```bash
+curl --location --request POST 'http://localhost:61278/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/rpc' \
 --header 'Content-Type: application/json' \
 --data-raw '{
     "jsonrpc": "2.0",
@@ -200,9 +216,11 @@ curl --location --request POST 'http://localhost:62045/ext/bc/x7gVMwHuGG4H1zXytx
     "result": "0x0"
 }
 COMMENT
+```
 
-# to terminate the cluster
-kill 12811
+To terminate the cluster, kill the PID:
+```bash
+kill -2 55547
 ```
 
 ## Fuji Subnet Deployment
