@@ -9,8 +9,8 @@ interface AllowListInterface {
     // Set [addr] to have the admin role over the allow list
     function setAdmin(address addr) external;
 
-    // Set [addr] to have the deployer role over the allow list
-    function setDeployer(address addr) external;
+    // Set [addr] to be enabled on the allow list
+    function setEnabled(address addr) external;
 
     // Set [addr] to have no role over the allow list
     function setNone(address addr) external;
