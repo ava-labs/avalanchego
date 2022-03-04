@@ -1,5 +1,9 @@
 # Release Notes
 
+## [v0.8.7](https://github.com/ava-labs/coreth/releases/tag/v0.8.7)
+
+- Optimize FeeHistory API
+
 ## [v0.8.6](https://github.com/ava-labs/coreth/releases/tag/v0.8.6)
 
 - Migrate go-ethereum v1.10.16 changes
