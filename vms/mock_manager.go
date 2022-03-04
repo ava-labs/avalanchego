@@ -162,6 +162,20 @@ func (mr *MockManagerMockRecorder) PrimaryAlias(id interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrimaryAlias", reflect.TypeOf((*MockManager)(nil).PrimaryAlias), id)
 }
 
+// PrimaryAliasOrDefault mocks base method.
+func (m *MockManager) PrimaryAliasOrDefault(id ids.ID) string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PrimaryAliasOrDefault", id)
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// PrimaryAliasOrDefault indicates an expected call of PrimaryAliasOrDefault.
+func (mr *MockManagerMockRecorder) PrimaryAliasOrDefault(id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrimaryAliasOrDefault", reflect.TypeOf((*MockManager)(nil).PrimaryAliasOrDefault), id)
+}
+
 // RegisterFactory mocks base method.
 func (m *MockManager) RegisterFactory(vmID ids.ID, factory Factory) error {
 	m.ctrl.T.Helper()

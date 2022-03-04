@@ -20,6 +20,7 @@ func (mm MockManager) ForceCreateChain(ChainParameters)    {}
 func (mm MockManager) AddRegistrant(Registrant)            {}
 func (mm MockManager) Aliases(ids.ID) ([]string, error)    { return nil, nil }
 func (mm MockManager) PrimaryAlias(ids.ID) (string, error) { return "", nil }
+func (mm MockManager) PrimaryAliasOrDefault(ids.ID) string { return "" }
 func (mm MockManager) Alias(ids.ID, string) error          { return nil }
 func (mm MockManager) RemoveAliases(ids.ID)                {}
 func (mm MockManager) Shutdown()                           {}

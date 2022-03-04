@@ -27,6 +27,7 @@ type AliaserWriter interface {
 type Aliaser interface {
 	AliaserReader
 	AliaserWriter
+	PrimaryAliasOrDefault(id ID) string
 }
 
 type aliaser struct {
@@ -63,6 +64,15 @@ func (a *aliaser) PrimaryAlias(id ID) (string, error) {
 		return "", fmt.Errorf("there is no alias for ID %s", id)
 	}
 	return aliases[0], nil
+}
+
+// PrimaryAliasOrDefault returns the first alias of [id], or ID string as default
+func (a *aliaser) PrimaryAliasOrDefault(id ID) string {
+	alias, err := a.PrimaryAlias(id)
+	if err != nil {
+		return id.String()
+	}
+	return alias
 }
 
 // Aliases returns the aliases of an ID
