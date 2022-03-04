@@ -7,6 +7,10 @@ service HTTP {
     // Handle wraps http1 over http2 and provides support for websockets by implementing
     // net conn and responsewriter in http2.
     rpc Handle(HTTPRequest) returns (google.protobuf.Empty);
+    // HandleSimple wraps http1 requests over http2 similar to Handle but only passes headers
+    // and body bytes. Because the request and response are single protos without any inline
+    // gRPC servers the CPU cost is much less at scale.
+    rpc HandleSimple(HandleSimpleHTTPRequest) returns (HandleSimpleHTTPResponse);
 }
 
 // URL is a net.URL see: https://pkg.go.dev/net/url#URL
@@ -143,4 +147,26 @@ message HTTPRequest {
     ResponseWriter response_writer = 1;
     // request is an http request
     Request request = 2;
+}
+
+message HandleSimpleHTTPRequest {
+    // method specifies the HTTP method (GET, POST, PUT, etc.)
+    string method = 1;
+    // url specifies either the URI being requested
+    string url = 2;
+    //headers contains the request header fields either received
+    // by the server or to be sent by the client.
+    repeated Element headers = 3;
+    // body is the request payload in bytes
+    bytes body = 4;
+}
+
+message HandleSimpleHTTPResponse {
+    // code is the response code
+    int32 code = 1;
+    // header contains the request header fields either received
+    // by the server or to be sent by the client.
+    repeated Element headers = 2;
+    // body is the response payload in bytes
+    bytes body = 3;
 }

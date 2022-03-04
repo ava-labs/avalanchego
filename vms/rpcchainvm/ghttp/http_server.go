@@ -4,9 +4,13 @@
 package ghttp
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 
@@ -19,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/proto/gresponsewriterproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greadcloser"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
 
 var _ ghttpproto.HTTPServer = &Server{}
@@ -142,4 +147,83 @@ func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*empt
 	s.handler.ServeHTTP(writer, request)
 
 	return &emptypb.Empty{}, readWriteConn.Close()
+}
+
+// HandleSimple handles http requests over http2 using a simple request response model.
+// Websockets are not supported. Based on https://www.weave.works/blog/turtles-way-http-grpc/
+func (s *Server) HandleSimple(ctx context.Context, r *ghttpproto.HandleSimpleHTTPRequest) (*ghttpproto.HandleSimpleHTTPResponse, error) {
+	req, err := http.NewRequest(r.Method, r.Url, nopCloser{Buffer: bytes.NewBuffer(r.Body)})
+	if err != nil {
+		return nil, err
+	}
+	grpcutils.MergeHTTPHeader(r.Headers, req.Header)
+
+	req = req.WithContext(ctx)
+	req.RequestURI = r.Url
+	req.ContentLength = int64(len(r.Body))
+
+	w := newResponseWriter()
+	s.handler.ServeHTTP(w, req)
+
+	resp := &ghttpproto.HandleSimpleHTTPResponse{
+		Code:    int32(w.statusCode),
+		Headers: grpcutils.GetHTTPHeader(w.Header()),
+		Body:    w.body.Bytes(),
+	}
+
+	if w.statusCode == http.StatusInternalServerError {
+		return nil, grpcutils.GetGRPCErrorFromHTTPResponse(resp)
+	}
+	return resp, nil
+}
+
+type nopCloser struct {
+	*bytes.Buffer
+}
+
+type ResponseWriter struct {
+	http.ResponseWriter
+	body       *bytes.Buffer
+	header     http.Header
+	statusCode int
+}
+
+// newResponseWriter returns very basic implementation of the http.ResponseWriter
+func newResponseWriter() *ResponseWriter {
+	w := &ResponseWriter{
+		body:       new(bytes.Buffer),
+		header:     make(http.Header),
+		statusCode: 200,
+	}
+	return w
+}
+
+func (w *ResponseWriter) Header() http.Header {
+	return w.header
+}
+
+func (w *ResponseWriter) Write(buf []byte) (int, error) {
+	w.body.Write(buf)
+	return len(buf), nil
+}
+
+func (w *ResponseWriter) WriteHeader(code int) {
+	w.statusCode = code
+}
+
+func (w *ResponseWriter) StatusCode() int {
+	return w.statusCode
+}
+
+func (w *ResponseWriter) Body() *bytes.Buffer {
+	return w.body
+}
+
+// Hijack will not work here ensure error is clear.
+func (w *ResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := w.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("gateway: responseWriter doesn't support the Hijacker interface")
+	}
+	return hijacker.Hijack()
 }

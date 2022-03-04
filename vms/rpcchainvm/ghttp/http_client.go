@@ -4,6 +4,7 @@
 package ghttp
 
 import (
+	"io"
 	"net/http"
 
 	"google.golang.org/grpc"
@@ -37,6 +38,15 @@ func NewClient(client ghttpproto.HTTPClient, broker *plugin.GRPCBroker) *Client 
 }
 
 func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// rfc2616#section-14.42: The Upgrade general-header allows the client
+	// to specify a communication protocols it supports and would like to
+	// use. Upgrade (e.g. websockets) is a more expensive transaction and
+	// if not required use the less expensive HTTPSimple.
+	if !isUpgradeRequest(r) {
+		c.serveHTTPSimple(w, r)
+		return
+	}
+
 	closer := grpcutils.ServerCloser{}
 	defer closer.GracefulStop()
 
@@ -162,4 +172,58 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
+}
+
+// serveHTTPSimple converts an http request to a gRPC HTTPRequest and returns the
+// response to the client. Protocol upgrade requests (websockets) are not supported
+// and should use ServerHTTP. Based on https://www.weave.works/blog/turtles-way-http-grpc.
+func (c *Client) serveHTTPSimple(w http.ResponseWriter, r *http.Request) {
+	req, err := getHTTPRequest(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp, err := c.client.HandleSimple(r.Context(), req)
+	if err != nil {
+		// Some errors will actually contain a valid resp, just need to unpack it
+		var ok bool
+		resp, ok = grpcutils.GetHTTPResponseFromError(err)
+		if !ok {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if err := convertWriteResponse(w, resp); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+// getHTTPRequest takes an http request as input and returns a gRPC HandleSimpleHTTPRequest.
+func getHTTPRequest(r *http.Request) (*ghttpproto.HandleSimpleHTTPRequest, error) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return nil, err
+	}
+	return &ghttpproto.HandleSimpleHTTPRequest{
+		Method:  r.Method,
+		Url:     r.RequestURI,
+		Body:    body,
+		Headers: grpcutils.GetHTTPHeader(r.Header),
+	}, nil
+}
+
+// convertWriteResponse converts a gRPC HandleSimpleHTTPResponse to an HTTP response.
+func convertWriteResponse(w http.ResponseWriter, resp *ghttpproto.HandleSimpleHTTPResponse) error {
+	grpcutils.MergeHTTPHeader(resp.Headers, w.Header())
+	w.WriteHeader(int(resp.Code))
+	_, err := w.Write(resp.Body)
+	return err
+}
+
+// isUpgradeRequest returns true if the upgrade key exists in header and is non empty.
+func isUpgradeRequest(req *http.Request) bool {
+	return req.Header.Get("Upgrade") != ""
 }
