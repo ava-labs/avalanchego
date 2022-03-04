@@ -176,7 +176,7 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // serveHTTPSimple converts an http request to a gRPC HTTPRequest and returns the
 // response to the client. Protocol upgrade requests (websockets) are not supported
-// and should use ServerHTTP. Based on https://www.weave.works/blog/turtles-way-http-grpc.
+// and should use ServeHTTP. Based on https://www.weave.works/blog/turtles-way-http-grpc.
 func (c *Client) serveHTTPSimple(w http.ResponseWriter, r *http.Request) {
 	req, err := getHTTPRequest(r)
 	if err != nil {
@@ -225,5 +225,8 @@ func convertWriteResponse(w http.ResponseWriter, resp *ghttpproto.HandleSimpleHT
 
 // isUpgradeRequest returns true if the upgrade key exists in header and is non empty.
 func isUpgradeRequest(req *http.Request) bool {
+	if req.Header == nil {
+		return false
+	}
 	return req.Header.Get("Upgrade") != ""
 }
