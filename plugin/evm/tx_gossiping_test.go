@@ -77,6 +77,7 @@ func getValidTxs(key *ecdsa.PrivateKey, count int, gasPrice *big.Int) []*types.T
 // to ease up UT, which target only VM behaviors in response to subnet-evm mempool
 // signals
 func TestMempoolTxsAddedTxsGossipedAfterActivation(t *testing.T) {
+	t.Skip("FLAKY")
 	assert := assert.New(t)
 
 	key, err := crypto.GenerateKey()
@@ -162,6 +163,7 @@ func TestMempoolTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 
 // show that locally issued eth txs are chunked correctly
 func TestMempoolTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
+	t.Skip("FLAKY")
 	assert := assert.New(t)
 
 	key, err := crypto.GenerateKey()
@@ -221,6 +223,7 @@ func TestMempoolTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 // show that a geth tx discovered from gossip is requested to the same node that
 // gossiped it
 func TestMempoolTxsAppGossipHandling(t *testing.T) {
+	t.Skip("FLAKY")
 	assert := assert.New(t)
 
 	key, err := crypto.GenerateKey()
