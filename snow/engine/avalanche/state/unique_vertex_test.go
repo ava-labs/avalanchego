@@ -284,6 +284,30 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 	validateVertex(vtx, choices.Processing)
 }
 
+func TestParseVertexWithIncorrectChainID(t *testing.T) {
+	statelessVertex, err := vertex.Build( // regular, non-stop vertex
+		ids.GenerateTestID(),
+		0,
+		nil,
+		[][]byte{{1}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vtxBytes := statelessVertex.Bytes()
+
+	s := newTestSerializer(t, func(b []byte) (snowstorm.Tx, error) {
+		if bytes.Equal(b, []byte{1}) {
+			return &snowstorm.TestTx{}, nil
+		}
+		return nil, errors.New("invalid tx")
+	})
+
+	if _, err := s.ParseVtx(vtxBytes); err == nil {
+		t.Fatal("should have failed to parse the vertex due to invalid chainID")
+	}
+}
+
 func TestParseVertexWithInvalidTxs(t *testing.T) {
 	ctx := snow.DefaultContextTest()
 	statelessVertex, err := vertex.Build( // regular, non-stop vertex
