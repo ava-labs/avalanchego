@@ -1,6 +1,7 @@
-name: Branch Push CI
+name: CI
 on:
   push:
+  pull_request:
   workflow_dispatch:
     inputs:
       avalanchegoRepo:
@@ -47,7 +48,7 @@ jobs:
     strategy:
       matrix:
         go: ['1.16']
-        os: [macos-11.0, ubuntu-18.04, ubuntu-20.04, windows-latest]
+        os: [macos-11.0, ubuntu-18.04, windows-latest]
     steps:
     - uses: actions/checkout@v2
     - name: check out ${{ github.event.inputs.avalanchegoRepo }} ${{ github.event.inputs.avalanchegoBranch }}
@@ -70,7 +71,40 @@ jobs:
       shell: bash
     - run: ./scripts/build.sh evm
       shell: bash
-    - run: ./scripts/build_test.sh
+    - run: ./scripts/build_test.sh -p 2
+      shell: bash
+    - run: ./scripts/coverage.sh
+      shell: bash
+  test-race:
+    name: Golang Unit Tests Race Detection v${{ matrix.go }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        go: ['1.16']
+        os: [ubuntu-20.04]
+    steps:
+    - uses: actions/checkout@v2
+    - name: check out ${{ github.event.inputs.avalanchegoRepo }} ${{ github.event.inputs.avalanchegoBranch }}
+      if: ${{ github.event_name == 'workflow_dispatch' }}
+      uses: actions/checkout@v2
+      with:
+        repository: ${{ github.event.inputs.avalanchegoRepo }}
+        ref: ${{ github.event.inputs.avalanchegoBranch }}
+        path: avalanchego
+        token: ${{ secrets.AVALANCHE_PAT }}
+    - uses: actions/setup-go@v1
+      with:
+        go-version: ${{ matrix.go }}
+    - name: change avalanchego dep
+      if: ${{ github.event_name == 'workflow_dispatch' }}
+      run: |
+        go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
+        go mod tidy
+    - run: go mod download
+      shell: bash
+    - run: ./scripts/build.sh evm
+      shell: bash
+    - run: ./scripts/build_test.sh -race
       shell: bash
   e2e:
     name: Golang E2E Tests v${{ matrix.go }} (${{ matrix.os }})
