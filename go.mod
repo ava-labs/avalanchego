@@ -13,7 +13,7 @@ require (
 	github.com/Microsoft/go-winio v0.4.16
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/ava-labs/avalanche-network-runner v1.0.5
-	github.com/ava-labs/coreth v0.8.6-rc.1
+	github.com/ava-labs/coreth v0.8.7-rc.0
 	github.com/btcsuite/btcutil v1.0.2
 	github.com/decred/dcrd/dcrec/secp256k1/v3 v3.0.0-20200627015759-01fd2de07837
 	github.com/golang-jwt/jwt v3.2.1+incompatible
