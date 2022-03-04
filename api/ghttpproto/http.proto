@@ -73,7 +73,7 @@ message ConnectionState {
     // negotiated_protocol_is_mutual used to indicate a mutual NPN negotiation.
     bool negotiated_protocol_is_mutual = 6;
     // server_name is the value of the Server Name Indication extension sent by
-    // the client.
+    // the client
     string server_name = 7;
     // peer_certificates are the parsed certificates sent by the peer, in the
     // order in which they were sent
@@ -83,7 +83,7 @@ message ConnectionState {
     // client side) or Config.ClientCAs (on the server side).
     repeated Certificates verified_chains = 9;
     // signed_certificate_timestamps is a list of SCTs provided by the peer
-    // through the TLS handshake for the leaf certificate, if any.
+    // through the TLS handshake for the leaf certificate, if any
     repeated bytes signed_certificate_timestamps = 10;
     // ocsp_response is a stapled Online Certificate Status Protocol (OCSP)
     // response provided by the peer for the leaf certificate, if any.
@@ -106,11 +106,11 @@ message Request {
     // proto_minor is the minor version
     int32 proto_minor = 5;
     // header contains the request header fields either received
-    // by the server or to be sent by the client.
+    // by the server or to be sent by the client
     repeated Element header = 6;
     // body is the unused
     uint32 body = 7;
-    // content_length records the length of the associated content.
+    // content_length records the length of the associated content
     int64 content_length = 8;
     // transfer_encoding lists the transfer encodings from outermost to
     // innermost
@@ -143,7 +143,7 @@ message ResponseWriter {
 }
 
 message HTTPRequest {
-    // response_writer is used by an HTTP handler to construct an HTTP response.
+    // response_writer is used by an HTTP handler to construct an HTTP response
     ResponseWriter response_writer = 1;
     // request is an http request
     Request request = 2;
@@ -154,8 +154,8 @@ message HandleSimpleHTTPRequest {
     string method = 1;
     // url specifies either the URI being requested
     string url = 2;
-    //headers contains the request header fields either received
-    // by the server or to be sent by the client.
+    // headers contains the request header fields either received
+    // by the server or to be sent by the client
     repeated Element headers = 3;
     // body is the request payload in bytes
     bytes body = 4;
@@ -164,8 +164,8 @@ message HandleSimpleHTTPRequest {
 message HandleSimpleHTTPResponse {
     // code is the response code
     int32 code = 1;
-    // header contains the request header fields either received
-    // by the server or to be sent by the client.
+    // headers contains the request header fields either received
+    // by the server or to be sent by the client
     repeated Element headers = 2;
     // body is the response payload in bytes
     bytes body = 3;

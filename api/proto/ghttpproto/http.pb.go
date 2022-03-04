@@ -334,7 +334,7 @@ type ConnectionState struct {
 	// negotiated_protocol_is_mutual used to indicate a mutual NPN negotiation.
 	NegotiatedProtocolIsMutual bool `protobuf:"varint,6,opt,name=negotiated_protocol_is_mutual,json=negotiatedProtocolIsMutual,proto3" json:"negotiated_protocol_is_mutual,omitempty"`
 	// server_name is the value of the Server Name Indication extension sent by
-	// the client.
+	// the client
 	ServerName string `protobuf:"bytes,7,opt,name=server_name,json=serverName,proto3" json:"server_name,omitempty"`
 	// peer_certificates are the parsed certificates sent by the peer, in the
 	// order in which they were sent
@@ -344,7 +344,7 @@ type ConnectionState struct {
 	// client side) or Config.ClientCAs (on the server side).
 	VerifiedChains []*Certificates `protobuf:"bytes,9,rep,name=verified_chains,json=verifiedChains,proto3" json:"verified_chains,omitempty"`
 	// signed_certificate_timestamps is a list of SCTs provided by the peer
-	// through the TLS handshake for the leaf certificate, if any.
+	// through the TLS handshake for the leaf certificate, if any
 	SignedCertificateTimestamps [][]byte `protobuf:"bytes,10,rep,name=signed_certificate_timestamps,json=signedCertificateTimestamps,proto3" json:"signed_certificate_timestamps,omitempty"`
 	// ocsp_response is a stapled Online Certificate Status Protocol (OCSP)
 	// response provided by the peer for the leaf certificate, if any.
@@ -487,11 +487,11 @@ type Request struct {
 	// proto_minor is the minor version
 	ProtoMinor int32 `protobuf:"varint,5,opt,name=proto_minor,json=protoMinor,proto3" json:"proto_minor,omitempty"`
 	// header contains the request header fields either received
-	// by the server or to be sent by the client.
+	// by the server or to be sent by the client
 	Header []*Element `protobuf:"bytes,6,rep,name=header,proto3" json:"header,omitempty"`
 	// body is the unused
 	Body uint32 `protobuf:"varint,7,opt,name=body,proto3" json:"body,omitempty"`
-	// content_length records the length of the associated content.
+	// content_length records the length of the associated content
 	ContentLength int64 `protobuf:"varint,8,opt,name=content_length,json=contentLength,proto3" json:"content_length,omitempty"`
 	// transfer_encoding lists the transfer encodings from outermost to
 	// innermost
@@ -722,7 +722,7 @@ type HTTPRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// response_writer is used by an HTTP handler to construct an HTTP response.
+	// response_writer is used by an HTTP handler to construct an HTTP response
 	ResponseWriter *ResponseWriter `protobuf:"bytes,1,opt,name=response_writer,json=responseWriter,proto3" json:"response_writer,omitempty"`
 	// request is an http request
 	Request *Request `protobuf:"bytes,2,opt,name=request,proto3" json:"request,omitempty"`
@@ -783,8 +783,8 @@ type HandleSimpleHTTPRequest struct {
 	Method string `protobuf:"bytes,1,opt,name=method,proto3" json:"method,omitempty"`
 	// url specifies either the URI being requested
 	Url string `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
-	//headers contains the request header fields either received
-	// by the server or to be sent by the client.
+	// headers contains the request header fields either received
+	// by the server or to be sent by the client
 	Headers []*Element `protobuf:"bytes,3,rep,name=headers,proto3" json:"headers,omitempty"`
 	// body is the request payload in bytes
 	Body []byte `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`
@@ -857,8 +857,8 @@ type HandleSimpleHTTPResponse struct {
 
 	// code is the response code
 	Code int32 `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
-	// header contains the request header fields either received
-	// by the server or to be sent by the client.
+	// headers contains the request header fields either received
+	// by the server or to be sent by the client
 	Headers []*Element `protobuf:"bytes,2,rep,name=headers,proto3" json:"headers,omitempty"`
 	// body is the response payload in bytes
 	Body []byte `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"`
