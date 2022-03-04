@@ -124,60 +124,20 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 		return nil, err
 	}
 
-	msgConn, err := vm.broker.Dial(req.EngineServer)
+	clientConn, err := vm.broker.Dial(req.InitServer)
 	if err != nil {
 		// Ignore closing errors to return the original error
 		_ = vm.connCloser.Close()
 		return nil, err
 	}
-	vm.connCloser.Add(msgConn)
+	vm.connCloser.Add(clientConn)
 
-	keystoreConn, err := vm.broker.Dial(req.KeystoreServer)
-	if err != nil {
-		// Ignore closing error to return the original error
-		_ = vm.connCloser.Close()
-		return nil, err
-	}
-	vm.connCloser.Add(keystoreConn)
-
-	sharedMemoryConn, err := vm.broker.Dial(req.SharedMemoryServer)
-	if err != nil {
-		// Ignore closing error to return the original error
-		_ = vm.connCloser.Close()
-		return nil, err
-	}
-	vm.connCloser.Add(sharedMemoryConn)
-
-	bcLookupConn, err := vm.broker.Dial(req.BcLookupServer)
-	if err != nil {
-		// Ignore closing error to return the original error
-		_ = vm.connCloser.Close()
-		return nil, err
-	}
-	vm.connCloser.Add(bcLookupConn)
-
-	snLookupConn, err := vm.broker.Dial(req.SnLookupServer)
-	if err != nil {
-		// Ignore closing error to return the original error
-		_ = vm.connCloser.Close()
-		return nil, err
-	}
-	vm.connCloser.Add(snLookupConn)
-
-	appSenderConn, err := vm.broker.Dial(req.AppSenderServer)
-	if err != nil {
-		// Ignore closing error to return the original error
-		_ = vm.connCloser.Close()
-		return nil, err
-	}
-	vm.connCloser.Add(appSenderConn)
-
-	msgClient := messenger.NewClient(messengerproto.NewMessengerClient(msgConn))
-	keystoreClient := gkeystore.NewClient(gkeystoreproto.NewKeystoreClient(keystoreConn), vm.broker)
-	sharedMemoryClient := gsharedmemory.NewClient(gsharedmemoryproto.NewSharedMemoryClient(sharedMemoryConn))
-	bcLookupClient := galiasreader.NewClient(galiasreaderproto.NewAliasReaderClient(bcLookupConn))
-	snLookupClient := gsubnetlookup.NewClient(gsubnetlookupproto.NewSubnetLookupClient(snLookupConn))
-	appSenderClient := appsender.NewClient(appsenderproto.NewAppSenderClient(appSenderConn))
+	msgClient := messenger.NewClient(messengerproto.NewMessengerClient(clientConn))
+	keystoreClient := gkeystore.NewClient(gkeystoreproto.NewKeystoreClient(clientConn), vm.broker)
+	sharedMemoryClient := gsharedmemory.NewClient(gsharedmemoryproto.NewSharedMemoryClient(clientConn))
+	bcLookupClient := galiasreader.NewClient(galiasreaderproto.NewAliasReaderClient(clientConn))
+	snLookupClient := gsubnetlookup.NewClient(gsubnetlookupproto.NewSubnetLookupClient(clientConn))
+	appSenderClient := appsender.NewClient(appsenderproto.NewAppSenderClient(clientConn))
 
 	toEngine := make(chan common.Message, 1)
 	vm.closed = make(chan struct{})

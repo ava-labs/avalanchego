@@ -132,47 +132,22 @@ func (vm *VMClient) Initialize(
 	vm.snLookup = gsubnetlookup.NewServer(ctx.SNLookup)
 	vm.appSender = appsender.NewServer(appSender)
 
-	// start the messenger server
-	messengerBrokerID := vm.broker.NextId()
-	go vm.broker.AcceptAndServe(messengerBrokerID, vm.startMessengerServer)
-
-	// start the keystore server
-	keystoreBrokerID := vm.broker.NextId()
-	go vm.broker.AcceptAndServe(keystoreBrokerID, vm.startKeystoreServer)
-
-	// start the shared memory server
-	sharedMemoryBrokerID := vm.broker.NextId()
-	go vm.broker.AcceptAndServe(sharedMemoryBrokerID, vm.startSharedMemoryServer)
-
-	// start the blockchain alias server
-	bcLookupBrokerID := vm.broker.NextId()
-	go vm.broker.AcceptAndServe(bcLookupBrokerID, vm.startBCLookupServer)
-
-	// start the subnet alias server
-	snLookupBrokerID := vm.broker.NextId()
-	go vm.broker.AcceptAndServe(snLookupBrokerID, vm.startSNLookupServer)
-
-	// start the AppSender server
-	appSenderBrokerID := vm.broker.NextId()
-	go vm.broker.AcceptAndServe(appSenderBrokerID, vm.startAppSenderServer)
+	// start the gRPC init server
+	initServerID := vm.broker.NextId()
+	go vm.broker.AcceptAndServe(initServerID, vm.startInitServer)
 
 	resp, err := vm.client.Initialize(context.Background(), &vmproto.InitializeRequest{
-		NetworkId:          ctx.NetworkID,
-		SubnetId:           ctx.SubnetID[:],
-		ChainId:            ctx.ChainID[:],
-		NodeId:             ctx.NodeID.Bytes(),
-		XChainId:           ctx.XChainID[:],
-		AvaxAssetId:        ctx.AVAXAssetID[:],
-		GenesisBytes:       genesisBytes,
-		UpgradeBytes:       upgradeBytes,
-		ConfigBytes:        configBytes,
-		DbServers:          versionedDBServers,
-		EngineServer:       messengerBrokerID,
-		KeystoreServer:     keystoreBrokerID,
-		SharedMemoryServer: sharedMemoryBrokerID,
-		BcLookupServer:     bcLookupBrokerID,
-		SnLookupServer:     snLookupBrokerID,
-		AppSenderServer:    appSenderBrokerID,
+		NetworkId:    ctx.NetworkID,
+		SubnetId:     ctx.SubnetID[:],
+		ChainId:      ctx.ChainID[:],
+		NodeId:       ctx.NodeID.Bytes(),
+		XChainId:     ctx.XChainID[:],
+		AvaxAssetId:  ctx.AVAXAssetID[:],
+		GenesisBytes: genesisBytes,
+		UpgradeBytes: upgradeBytes,
+		ConfigBytes:  configBytes,
+		DbServers:    versionedDBServers,
+		InitServer:   initServerID,
 	})
 	if err != nil {
 		return err
@@ -242,56 +217,31 @@ func (vm *VMClient) startDBServerFunc(db rpcdbproto.DatabaseServer) func(opts []
 		opts = append(opts, serverOptions...)
 		server := grpc.NewServer(opts...)
 		vm.serverCloser.Add(server)
+
 		rpcdbproto.RegisterDatabaseServer(server, db)
+
 		return server
 	}
 }
 
-func (vm *VMClient) startMessengerServer(opts []grpc.ServerOption) *grpc.Server {
+func (vm *VMClient) startInitServer(opts []grpc.ServerOption) *grpc.Server {
 	opts = append(opts, serverOptions...)
 	server := grpc.NewServer(opts...)
 	vm.serverCloser.Add(server)
+
+	// register the messenger service
 	messengerproto.RegisterMessengerServer(server, vm.messenger)
-	return server
-}
-
-func (vm *VMClient) startKeystoreServer(opts []grpc.ServerOption) *grpc.Server {
-	opts = append(opts, serverOptions...)
-	server := grpc.NewServer(opts...)
-	vm.serverCloser.Add(server)
+	// register the keystore service
 	gkeystoreproto.RegisterKeystoreServer(server, vm.keystore)
-	return server
-}
-
-func (vm *VMClient) startSharedMemoryServer(opts []grpc.ServerOption) *grpc.Server {
-	opts = append(opts, serverOptions...)
-	server := grpc.NewServer(opts...)
-	vm.serverCloser.Add(server)
+	// register the shared memory service
 	gsharedmemoryproto.RegisterSharedMemoryServer(server, vm.sharedMemory)
-	return server
-}
-
-func (vm *VMClient) startBCLookupServer(opts []grpc.ServerOption) *grpc.Server {
-	opts = append(opts, serverOptions...)
-	server := grpc.NewServer(opts...)
-	vm.serverCloser.Add(server)
+	// register the blockchain alias service
 	galiasreaderproto.RegisterAliasReaderServer(server, vm.bcLookup)
-	return server
-}
-
-func (vm *VMClient) startSNLookupServer(opts []grpc.ServerOption) *grpc.Server {
-	opts = append(opts, serverOptions...)
-	server := grpc.NewServer(opts...)
-	vm.serverCloser.Add(server)
+	// register the subnet alias service
 	gsubnetlookupproto.RegisterSubnetLookupServer(server, vm.snLookup)
-	return server
-}
-
-func (vm *VMClient) startAppSenderServer(opts []grpc.ServerOption) *grpc.Server {
-	opts = append(opts, serverOptions...)
-	server := grpc.NewServer(opts...)
-	vm.serverCloser.Add(server)
+	// register the AppSender service
 	appsenderproto.RegisterAppSenderServer(server, vm.appSender)
+
 	return server
 }
 

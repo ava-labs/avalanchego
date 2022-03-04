@@ -10,12 +10,13 @@ import (
 	"net/http"
 	"net/url"
 
+	"google.golang.org/protobuf/types/known/emptypb"
+
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/ava-labs/avalanchego/api/proto/ghttpproto"
 	"github.com/ava-labs/avalanchego/api/proto/greadcloserproto"
 	"github.com/ava-labs/avalanchego/api/proto/gresponsewriterproto"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greadcloser"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter"
 )
@@ -37,17 +38,9 @@ func NewServer(handler http.Handler, broker *plugin.GRPCBroker) *Server {
 	}
 }
 
-func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*ghttpproto.HTTPResponse, error) {
-	writerConn, err := s.broker.Dial(req.ResponseWriter.Id)
+func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*emptypb.Empty, error) {
+	readWriteConn, err := s.broker.Dial(req.ResponseWriter.Id)
 	if err != nil {
-		return nil, err
-	}
-
-	readerConn, err := s.broker.Dial(req.Request.Body)
-	if err != nil {
-		// Drop any error that occurs during closing to return the original
-		// error.
-		_ = writerConn.Close()
 		return nil, err
 	}
 
@@ -56,8 +49,8 @@ func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*ghtt
 		writerHeaders[elem.Key] = elem.Values
 	}
 
-	writer := gresponsewriter.NewClient(writerHeaders, gresponsewriterproto.NewWriterClient(writerConn), s.broker)
-	reader := greadcloser.NewClient(greadcloserproto.NewReaderClient(readerConn))
+	writer := gresponsewriter.NewClient(writerHeaders, gresponsewriterproto.NewWriterClient(readWriteConn), s.broker)
+	reader := greadcloser.NewClient(greadcloserproto.NewReaderClient(readWriteConn))
 
 	// create the request with the current context
 	request, err := http.NewRequestWithContext(
@@ -148,10 +141,5 @@ func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*ghtt
 
 	s.handler.ServeHTTP(writer, request)
 
-	errs := wrappers.Errs{}
-	errs.Add(
-		writerConn.Close(),
-		readerConn.Close(),
-	)
-	return &ghttpproto.HTTPResponse{}, errs.Err
+	return &emptypb.Empty{}, readWriteConn.Close()
 }

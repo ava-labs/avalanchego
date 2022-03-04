@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -22,7 +23,9 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type HTTPClient interface {
-	Handle(ctx context.Context, in *HTTPRequest, opts ...grpc.CallOption) (*HTTPResponse, error)
+	// Handle wraps http1 over http2 and provides support for websockets by implementing
+	// net conn and responsewriter in http2.
+	Handle(ctx context.Context, in *HTTPRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type hTTPClient struct {
@@ -33,8 +36,8 @@ func NewHTTPClient(cc grpc.ClientConnInterface) HTTPClient {
 	return &hTTPClient{cc}
 }
 
-func (c *hTTPClient) Handle(ctx context.Context, in *HTTPRequest, opts ...grpc.CallOption) (*HTTPResponse, error) {
-	out := new(HTTPResponse)
+func (c *hTTPClient) Handle(ctx context.Context, in *HTTPRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/ghttpproto.HTTP/Handle", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -46,7 +49,9 @@ func (c *hTTPClient) Handle(ctx context.Context, in *HTTPRequest, opts ...grpc.C
 // All implementations must embed UnimplementedHTTPServer
 // for forward compatibility
 type HTTPServer interface {
-	Handle(context.Context, *HTTPRequest) (*HTTPResponse, error)
+	// Handle wraps http1 over http2 and provides support for websockets by implementing
+	// net conn and responsewriter in http2.
+	Handle(context.Context, *HTTPRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedHTTPServer()
 }
 
@@ -54,7 +59,7 @@ type HTTPServer interface {
 type UnimplementedHTTPServer struct {
 }
 
-func (UnimplementedHTTPServer) Handle(context.Context, *HTTPRequest) (*HTTPResponse, error) {
+func (UnimplementedHTTPServer) Handle(context.Context, *HTTPRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Handle not implemented")
 }
 func (UnimplementedHTTPServer) mustEmbedUnimplementedHTTPServer() {}

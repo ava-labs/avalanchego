@@ -10,6 +10,8 @@ import (
 	"net"
 	"time"
 
+	"google.golang.org/protobuf/types/known/emptypb"
+
 	"github.com/ava-labs/avalanchego/api/proto/gconnproto"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -65,7 +67,7 @@ func (c *Client) Write(b []byte) (int, error) {
 }
 
 func (c *Client) Close() error {
-	_, err := c.client.Close(context.Background(), &gconnproto.CloseRequest{})
+	_, err := c.client.Close(context.Background(), &emptypb.Empty{})
 	errs := wrappers.Errs{}
 	errs.Add(err)
 	for _, toClose := range c.toClose {
@@ -93,7 +95,7 @@ func (c *Client) SetReadDeadline(t time.Time) error {
 	if err != nil {
 		return err
 	}
-	_, err = c.client.SetReadDeadline(context.Background(), &gconnproto.SetReadDeadlineRequest{
+	_, err = c.client.SetReadDeadline(context.Background(), &gconnproto.SetDeadlineRequest{
 		Time: bytes,
 	})
 	return err
@@ -104,7 +106,7 @@ func (c *Client) SetWriteDeadline(t time.Time) error {
 	if err != nil {
 		return err
 	}
-	_, err = c.client.SetWriteDeadline(context.Background(), &gconnproto.SetWriteDeadlineRequest{
+	_, err = c.client.SetWriteDeadline(context.Background(), &gconnproto.SetDeadlineRequest{
 		Time: bytes,
 	})
 	return err

@@ -7,6 +7,8 @@ import (
 	"context"
 	"io"
 
+	"google.golang.org/protobuf/types/known/emptypb"
+
 	"github.com/ava-labs/avalanchego/api/proto/greadcloserproto"
 )
 
@@ -36,6 +38,6 @@ func (s *Server) Read(ctx context.Context, req *greadcloserproto.ReadRequest) (*
 	return resp, nil
 }
 
-func (s *Server) Close(ctx context.Context, req *greadcloserproto.CloseRequest) (*greadcloserproto.CloseResponse, error) {
-	return &greadcloserproto.CloseResponse{}, s.readCloser.Close()
+func (s *Server) Close(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
+	return &emptypb.Empty{}, s.readCloser.Close()
 }

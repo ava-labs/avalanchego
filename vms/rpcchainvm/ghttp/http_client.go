@@ -43,43 +43,35 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Wrap [w] with a lock to ensure that it is accessed in a thread-safe manner.
 	w = gresponsewriter.NewLockedWriter(w)
 
-	readerID := c.broker.NextId()
-	go c.broker.AcceptAndServe(readerID, func(opts []grpc.ServerOption) *grpc.Server {
+	readerWriterID := c.broker.NextId()
+	// start gRPC server which serves the request body and manages responsewriter io.
+	go c.broker.AcceptAndServe(readerWriterID, func(opts []grpc.ServerOption) *grpc.Server {
 		opts = append(opts,
 			grpc.MaxRecvMsgSize(math.MaxInt),
 			grpc.MaxSendMsgSize(math.MaxInt),
 		)
-		reader := grpc.NewServer(opts...)
-		closer.Add(reader)
-		greadcloserproto.RegisterReaderServer(reader, greadcloser.NewServer(r.Body))
-
-		return reader
-	})
-	writerID := c.broker.NextId()
-	go c.broker.AcceptAndServe(writerID, func(opts []grpc.ServerOption) *grpc.Server {
-		opts = append(opts,
-			grpc.MaxRecvMsgSize(math.MaxInt),
-			grpc.MaxSendMsgSize(math.MaxInt),
-		)
-		writer := grpc.NewServer(opts...)
-		closer.Add(writer)
-		gresponsewriterproto.RegisterWriterServer(writer, gresponsewriter.NewServer(w, c.broker))
-
-		return writer
+		server := grpc.NewServer(opts...)
+		closer.Add(server)
+		// register read closer service
+		greadcloserproto.RegisterReaderServer(server, greadcloser.NewServer(r.Body))
+		// register responsewriter service
+		gresponsewriterproto.RegisterWriterServer(server, gresponsewriter.NewServer(w, c.broker))
+		return server
 	})
 
 	req := &ghttpproto.HTTPRequest{
 		ResponseWriter: &ghttpproto.ResponseWriter{
-			Id:     writerID,
+			Id:     readerWriterID,
 			Header: make([]*ghttpproto.Element, 0, len(r.Header)),
 		},
 		Request: &ghttpproto.Request{
-			Method:           r.Method,
-			Proto:            r.Proto,
-			ProtoMajor:       int32(r.ProtoMajor),
-			ProtoMinor:       int32(r.ProtoMinor),
-			Header:           make([]*ghttpproto.Element, 0, len(r.Header)),
-			Body:             readerID,
+			Method:     r.Method,
+			Proto:      r.Proto,
+			ProtoMajor: int32(r.ProtoMajor),
+			ProtoMinor: int32(r.ProtoMinor),
+			Header:     make([]*ghttpproto.Element, 0, len(r.Header)),
+			// Body: the body is unused in the request itself and is served via the
+			// read closer service above.
 			ContentLength:    r.ContentLength,
 			TransferEncoding: r.TransferEncoding,
 			Host:             r.Host,

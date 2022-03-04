@@ -25,6 +25,7 @@ type ReadRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// length is the request in bytes
 	Length int32 `protobuf:"varint,1,opt,name=length,proto3" json:"length,omitempty"`
 }
 
@@ -72,9 +73,12 @@ type ReadResponse struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Read    []byte `protobuf:"bytes,1,opt,name=read,proto3" json:"read,omitempty"`
-	Error   string `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
-	Errored bool   `protobuf:"varint,3,opt,name=errored,proto3" json:"errored,omitempty"`
+	// read is the payload in bytes
+	Read []byte `protobuf:"bytes,1,opt,name=read,proto3" json:"read,omitempty"`
+	// error is an error message
+	Error string `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	// errored is true if an error has been set
+	Errored bool `protobuf:"varint,3,opt,name=errored,proto3" json:"errored,omitempty"`
 }
 
 func (x *ReadResponse) Reset() {

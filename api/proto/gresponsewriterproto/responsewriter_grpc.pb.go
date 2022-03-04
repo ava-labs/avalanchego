@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -22,10 +23,15 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type WriterClient interface {
+	// Write writes the data to the connection as part of an HTTP reply
 	Write(ctx context.Context, in *WriteRequest, opts ...grpc.CallOption) (*WriteResponse, error)
-	WriteHeader(ctx context.Context, in *WriteHeaderRequest, opts ...grpc.CallOption) (*WriteHeaderResponse, error)
-	Flush(ctx context.Context, in *FlushRequest, opts ...grpc.CallOption) (*FlushResponse, error)
-	Hijack(ctx context.Context, in *HijackRequest, opts ...grpc.CallOption) (*HijackResponse, error)
+	// WriteHeader sends an HTTP response header with the provided
+	// status code
+	WriteHeader(ctx context.Context, in *WriteHeaderRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Flush is a no-op
+	Flush(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Hijack lets the caller take over the connection
+	Hijack(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HijackResponse, error)
 }
 
 type writerClient struct {
@@ -45,8 +51,8 @@ func (c *writerClient) Write(ctx context.Context, in *WriteRequest, opts ...grpc
 	return out, nil
 }
 
-func (c *writerClient) WriteHeader(ctx context.Context, in *WriteHeaderRequest, opts ...grpc.CallOption) (*WriteHeaderResponse, error) {
-	out := new(WriteHeaderResponse)
+func (c *writerClient) WriteHeader(ctx context.Context, in *WriteHeaderRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/gresponsewriterproto.Writer/WriteHeader", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -54,8 +60,8 @@ func (c *writerClient) WriteHeader(ctx context.Context, in *WriteHeaderRequest, 
 	return out, nil
 }
 
-func (c *writerClient) Flush(ctx context.Context, in *FlushRequest, opts ...grpc.CallOption) (*FlushResponse, error) {
-	out := new(FlushResponse)
+func (c *writerClient) Flush(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/gresponsewriterproto.Writer/Flush", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -63,7 +69,7 @@ func (c *writerClient) Flush(ctx context.Context, in *FlushRequest, opts ...grpc
 	return out, nil
 }
 
-func (c *writerClient) Hijack(ctx context.Context, in *HijackRequest, opts ...grpc.CallOption) (*HijackResponse, error) {
+func (c *writerClient) Hijack(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HijackResponse, error) {
 	out := new(HijackResponse)
 	err := c.cc.Invoke(ctx, "/gresponsewriterproto.Writer/Hijack", in, out, opts...)
 	if err != nil {
@@ -76,10 +82,15 @@ func (c *writerClient) Hijack(ctx context.Context, in *HijackRequest, opts ...gr
 // All implementations must embed UnimplementedWriterServer
 // for forward compatibility
 type WriterServer interface {
+	// Write writes the data to the connection as part of an HTTP reply
 	Write(context.Context, *WriteRequest) (*WriteResponse, error)
-	WriteHeader(context.Context, *WriteHeaderRequest) (*WriteHeaderResponse, error)
-	Flush(context.Context, *FlushRequest) (*FlushResponse, error)
-	Hijack(context.Context, *HijackRequest) (*HijackResponse, error)
+	// WriteHeader sends an HTTP response header with the provided
+	// status code
+	WriteHeader(context.Context, *WriteHeaderRequest) (*emptypb.Empty, error)
+	// Flush is a no-op
+	Flush(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
+	// Hijack lets the caller take over the connection
+	Hijack(context.Context, *emptypb.Empty) (*HijackResponse, error)
 	mustEmbedUnimplementedWriterServer()
 }
 
@@ -90,13 +101,13 @@ type UnimplementedWriterServer struct {
 func (UnimplementedWriterServer) Write(context.Context, *WriteRequest) (*WriteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Write not implemented")
 }
-func (UnimplementedWriterServer) WriteHeader(context.Context, *WriteHeaderRequest) (*WriteHeaderResponse, error) {
+func (UnimplementedWriterServer) WriteHeader(context.Context, *WriteHeaderRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method WriteHeader not implemented")
 }
-func (UnimplementedWriterServer) Flush(context.Context, *FlushRequest) (*FlushResponse, error) {
+func (UnimplementedWriterServer) Flush(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Flush not implemented")
 }
-func (UnimplementedWriterServer) Hijack(context.Context, *HijackRequest) (*HijackResponse, error) {
+func (UnimplementedWriterServer) Hijack(context.Context, *emptypb.Empty) (*HijackResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Hijack not implemented")
 }
 func (UnimplementedWriterServer) mustEmbedUnimplementedWriterServer() {}
@@ -149,7 +160,7 @@ func _Writer_WriteHeader_Handler(srv interface{}, ctx context.Context, dec func(
 }
 
 func _Writer_Flush_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(FlushRequest)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -161,13 +172,13 @@ func _Writer_Flush_Handler(srv interface{}, ctx context.Context, dec func(interf
 		FullMethod: "/gresponsewriterproto.Writer/Flush",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(WriterServer).Flush(ctx, req.(*FlushRequest))
+		return srv.(WriterServer).Flush(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _Writer_Hijack_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(HijackRequest)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -179,7 +190,7 @@ func _Writer_Hijack_Handler(srv interface{}, ctx context.Context, dec func(inter
 		FullMethod: "/gresponsewriterproto.Writer/Hijack",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(WriterServer).Hijack(ctx, req.(*HijackRequest))
+		return srv.(WriterServer).Hijack(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }

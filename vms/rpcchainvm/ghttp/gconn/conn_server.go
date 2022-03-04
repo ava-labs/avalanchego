@@ -8,6 +8,8 @@ import (
 	"net"
 	"time"
 
+	"google.golang.org/protobuf/types/known/emptypb"
+
 	"github.com/ava-labs/avalanchego/api/proto/gconnproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
@@ -52,35 +54,35 @@ func (s *Server) Write(ctx context.Context, req *gconnproto.WriteRequest) (*gcon
 	}, nil
 }
 
-func (s *Server) Close(ctx context.Context, req *gconnproto.CloseRequest) (*gconnproto.CloseResponse, error) {
+func (s *Server) Close(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
 	err := s.conn.Close()
 	s.closer.Stop()
-	return &gconnproto.CloseResponse{}, err
+	return &emptypb.Empty{}, err
 }
 
-func (s *Server) SetDeadline(ctx context.Context, req *gconnproto.SetDeadlineRequest) (*gconnproto.SetDeadlineResponse, error) {
+func (s *Server) SetDeadline(ctx context.Context, req *gconnproto.SetDeadlineRequest) (*emptypb.Empty, error) {
 	deadline := time.Time{}
 	err := deadline.UnmarshalBinary(req.Time)
 	if err != nil {
 		return nil, err
 	}
-	return &gconnproto.SetDeadlineResponse{}, s.conn.SetDeadline(deadline)
+	return &emptypb.Empty{}, s.conn.SetDeadline(deadline)
 }
 
-func (s *Server) SetReadDeadline(ctx context.Context, req *gconnproto.SetReadDeadlineRequest) (*gconnproto.SetReadDeadlineResponse, error) {
+func (s *Server) SetReadDeadline(ctx context.Context, req *gconnproto.SetDeadlineRequest) (*emptypb.Empty, error) {
 	deadline := time.Time{}
 	err := deadline.UnmarshalBinary(req.Time)
 	if err != nil {
 		return nil, err
 	}
-	return &gconnproto.SetReadDeadlineResponse{}, s.conn.SetReadDeadline(deadline)
+	return &emptypb.Empty{}, s.conn.SetReadDeadline(deadline)
 }
 
-func (s *Server) SetWriteDeadline(ctx context.Context, req *gconnproto.SetWriteDeadlineRequest) (*gconnproto.SetWriteDeadlineResponse, error) {
+func (s *Server) SetWriteDeadline(ctx context.Context, req *gconnproto.SetDeadlineRequest) (*emptypb.Empty, error) {
 	deadline := time.Time{}
 	err := deadline.UnmarshalBinary(req.Time)
 	if err != nil {
 		return nil, err
 	}
-	return &gconnproto.SetWriteDeadlineResponse{}, s.conn.SetWriteDeadline(deadline)
+	return &emptypb.Empty{}, s.conn.SetWriteDeadline(deadline)
 }

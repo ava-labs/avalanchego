@@ -17,6 +17,7 @@ lint:
     # TODO: how will fixing this affect functionality. Multiple fields are used as the request
     # or response type for multiple RPCs
     - galiasreaderproto/aliasreader.proto
+    - gconnproto/conn.proto
   # allows RPC requests or responses to be google.protobuf.Empty messages. This can be set if you
   # want to allow messages to be void forever, that is they will never take any parameters. 
   rpc_allow_google_protobuf_empty_requests: true

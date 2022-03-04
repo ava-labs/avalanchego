@@ -8,6 +8,8 @@ import (
 	"errors"
 	"io"
 
+	"google.golang.org/protobuf/types/known/emptypb"
+
 	"github.com/ava-labs/avalanchego/api/proto/greadcloserproto"
 )
 
@@ -38,6 +40,6 @@ func (c *Client) Read(p []byte) (int, error) {
 }
 
 func (c *Client) Close() error {
-	_, err := c.client.Close(context.Background(), &greadcloserproto.CloseRequest{})
+	_, err := c.client.Close(context.Background(), &emptypb.Empty{})
 	return err
 }

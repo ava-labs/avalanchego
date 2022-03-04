@@ -22,6 +22,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type WriterClient interface {
+	// Write writes len(p) bytes from p to the underlying data stream.
 	Write(ctx context.Context, in *WriteRequest, opts ...grpc.CallOption) (*WriteResponse, error)
 }
 
@@ -46,6 +47,7 @@ func (c *writerClient) Write(ctx context.Context, in *WriteRequest, opts ...grpc
 // All implementations must embed UnimplementedWriterServer
 // for forward compatibility
 type WriterServer interface {
+	// Write writes len(p) bytes from p to the underlying data stream.
 	Write(context.Context, *WriteRequest) (*WriteResponse, error)
 	mustEmbedUnimplementedWriterServer()
 }
