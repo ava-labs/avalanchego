@@ -1,10 +1,10 @@
 syntax = "proto3";
-package gatewaytest.vm.v1alpha;
-option go_package = "github.com/ava-labs/avalanchego/gateway/tests/api/gatewaytest/vm/v1alpha";
+package vmtest;
+option go_package = "github.com/ava-labs/avalanchego/vms/rpcchainvm/tests/api/vmtest";
 
 import "google/protobuf/empty.proto";
 
-service TestVM {
+service VMTest {
     // CreateHandlers populates a slice of http handlers exposed by the subnet which
     // will be routed by the apiserver.
     rpc CreateHandlers(google.protobuf.Empty) returns (CreateHandlersResponse);

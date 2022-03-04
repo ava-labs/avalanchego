@@ -28,7 +28,7 @@ import (
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
-	testvmproto "github.com/ava-labs/avalanchego/vms/rpcchainvm/tests/api/proto/gatewaytest/vm/v1alpha"
+	vmtestpb "github.com/ava-labs/avalanchego/vms/rpcchainvm/tests/api/proto/vmtest"
 )
 
 var (
@@ -262,15 +262,15 @@ func NewTestVM(vm TestVM) plugin.Plugin {
 }
 
 func (p *testVMPlugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server) error {
-	testvmproto.RegisterTestVMServer(s, NewTestServer(p.vm, broker))
+	vmtestpb.RegisterVMTestServer(s, NewTestServer(p.vm, broker))
 	return nil
 }
 
 func (p *testVMPlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
-	return NewTestClient(testvmproto.NewTestVMClient(c), broker), nil
+	return NewTestClient(vmtestpb.NewVMTestClient(c), broker), nil
 }
 
-var _ testvmproto.TestVMServer = &TestVMServer{}
+var _ vmtestpb.VMTestServer = &TestVMServer{}
 
 type TestVM interface {
 	CreateHandlers() (map[string]*common.HTTPHandler, error)
@@ -284,20 +284,20 @@ func NewTestServer(vm TestVM, broker *plugin.GRPCBroker) *TestVMServer {
 }
 
 type TestVMServer struct {
-	testvmproto.UnimplementedTestVMServer
+	vmtestpb.UnimplementedVMTestServer
 	vm     TestVM
 	broker *plugin.GRPCBroker
 
 	serverCloser grpcutils.ServerCloser
 }
 
-func (vm *TestVMServer) CreateHandlers(context.Context, *emptypb.Empty) (*testvmproto.CreateHandlersResponse, error) {
+func (vm *TestVMServer) CreateHandlers(context.Context, *emptypb.Empty) (*vmtestpb.CreateHandlersResponse, error) {
 	handlers, err := vm.vm.CreateHandlers()
 	if err != nil {
 		return nil, err
 	}
 
-	resp := &testvmproto.CreateHandlersResponse{}
+	resp := &vmtestpb.CreateHandlersResponse{}
 	for prefix, h := range handlers {
 		handler := h
 
@@ -310,7 +310,7 @@ func (vm *TestVMServer) CreateHandlers(context.Context, *emptypb.Empty) (*testvm
 			return server
 		})
 
-		resp.Handlers = append(resp.Handlers, &testvmproto.Handler{
+		resp.Handlers = append(resp.Handlers, &vmtestpb.Handler{
 			Prefix:      prefix,
 			LockOptions: uint32(handler.LockOptions),
 			Server:      serverID,
@@ -320,13 +320,13 @@ func (vm *TestVMServer) CreateHandlers(context.Context, *emptypb.Empty) (*testvm
 }
 
 type TestVMClient struct {
-	client testvmproto.TestVMClient
+	client vmtestpb.VMTestClient
 	broker *plugin.GRPCBroker
 
 	conns []*grpc.ClientConn
 }
 
-func NewTestClient(client testvmproto.TestVMClient, broker *plugin.GRPCBroker) *TestVMClient {
+func NewTestClient(client vmtestpb.VMTestClient, broker *plugin.GRPCBroker) *TestVMClient {
 	return &TestVMClient{
 		client: client,
 		broker: broker,
