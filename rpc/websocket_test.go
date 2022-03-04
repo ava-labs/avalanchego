@@ -205,6 +205,7 @@ func TestClientWebsocketLargeMessage(t *testing.T) {
 }
 
 func TestClientWebsocketSevered(t *testing.T) {
+	t.Skip("FLAKY")
 	var (
 		server = wsPingTestServer(t, nil)
 		ctx    = context.Background()
