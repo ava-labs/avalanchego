@@ -5,16 +5,32 @@ package logging
 
 import (
 	"fmt"
+	"os"
 	"time"
-
-	"github.com/mitchellh/go-homedir"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-// DefaultLogDirectory is the default directory where logs are saved
-var DefaultLogDirectory = fmt.Sprintf("~/.%s/logs", constants.AppName)
+var (
+	homeDir = os.ExpandEnv("$HOME")
+	// DefaultLogDirectory is the default directory where logs are saved
+	DefaultLogDirectory = fmt.Sprintf("%s/.%s/logs", homeDir, constants.AppName)
+
+	// DefaultConfig provides a reasonable default logger configuration. It
+	// should not be modified, it should be copied if changes are intended on
+	// being made.
+	DefaultConfig = Config{
+		RotationInterval: 24 * time.Hour,
+		FileSize:         8 * units.MiB,
+		RotationSize:     7,
+		FlushSize:        1,
+		DisplayLevel:     Info,
+		DisplayHighlight: Plain,
+		LogLevel:         Debug,
+		Directory:        DefaultLogDirectory,
+	}
+)
 
 // Config defines the configuration of a logger
 type Config struct {
@@ -30,22 +46,7 @@ type Config struct {
 	LogLevel                    Level         `json:"logLevel"`
 	DisplayLevel                Level         `json:"displayLevel"`
 	DisplayHighlight            Highlight     `json:"displayHighlight"`
-	Directory                   string        `json:"-"`
+	Directory                   string        `json:"directory"`
 	MsgPrefix                   string        `json:"-"`
 	LoggerName                  string        `json:"-"`
-}
-
-// DefaultConfig returns a logger configuration with default parameters
-func DefaultConfig() (Config, error) {
-	dir, err := homedir.Expand(DefaultLogDirectory)
-	return Config{
-		RotationInterval: 24 * time.Hour,
-		FileSize:         8 * units.MiB,
-		RotationSize:     7,
-		FlushSize:        1,
-		DisplayLevel:     Info,
-		DisplayHighlight: Plain,
-		LogLevel:         Debug,
-		Directory:        dir,
-	}, err
 }

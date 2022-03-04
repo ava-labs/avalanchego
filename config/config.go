@@ -136,13 +136,11 @@ func getConsensusConfig(v *viper.Viper) avalanche.Parameters {
 }
 
 func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
-	loggingConfig, err := logging.DefaultConfig()
-	if err != nil {
-		return loggingConfig, err
-	}
+	loggingConfig := logging.DefaultConfig
 	if v.IsSet(LogsDirKey) {
 		loggingConfig.Directory = os.ExpandEnv(v.GetString(LogsDirKey))
 	}
+	var err error
 	loggingConfig.LogLevel, err = logging.ToLevel(v.GetString(LogLevelKey))
 	if err != nil {
 		return loggingConfig, err

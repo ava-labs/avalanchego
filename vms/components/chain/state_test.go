@@ -714,3 +714,136 @@ func TestStateBytesToIDCache(t *testing.T) {
 	_, ok = chainState.bytesToIDCache.Get(string(blk1.Bytes()))
 	assert.False(t, ok)
 }
+
+// TestSetLastAcceptedBlock ensures chainState's last accepted block
+// can be updated by calling [SetLastAcceptedBlock].
+func TestSetLastAcceptedBlock(t *testing.T) {
+	testBlks := NewTestBlocks(1)
+	genesisBlock := testBlks[0]
+	genesisBlock.SetStatus(choices.Accepted)
+
+	postSetBlk1ParentID := hashing.ComputeHash256Array([]byte{byte(199)})
+	postSetBlk1Bytes := []byte{byte(200)}
+	postSetBlk2Bytes := []byte{byte(201)}
+	postSetBlk1 := &TestBlock{
+		TestBlock: &snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     hashing.ComputeHash256Array(postSetBlk1Bytes),
+				StatusV: choices.Accepted,
+			},
+			HeightV: uint64(200),
+			BytesV:  postSetBlk1Bytes,
+			ParentV: postSetBlk1ParentID,
+		},
+	}
+	postSetBlk2 := &TestBlock{
+		TestBlock: &snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     hashing.ComputeHash256Array(postSetBlk2Bytes),
+				StatusV: choices.Processing,
+			},
+			HeightV: uint64(201),
+			BytesV:  postSetBlk2Bytes,
+			ParentV: postSetBlk1.IDV,
+		},
+	}
+	// note we do not need to parse postSetBlk1 so it is omitted here
+	testBlks = append(testBlks, postSetBlk2)
+
+	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	chainState := NewState(&Config{
+		LastAcceptedBlock:  genesisBlock,
+		GetBlock:           getBlock,
+		UnmarshalBlock:     parseBlock,
+		BuildBlock:         cantBuildBlock,
+		GetBlockIDAtHeight: getCanonicalBlockID,
+	})
+	lastAcceptedID, err := chainState.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lastAcceptedID != genesisBlock.ID() {
+		t.Fatal("Expected last accepted block to be the genesis block")
+	}
+
+	// call SetLastAcceptedBlock for postSetBlk1
+	if err := chainState.SetLastAcceptedBlock(postSetBlk1); err != nil {
+		t.Fatal(err)
+	}
+	lastAcceptedID, err = chainState.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lastAcceptedID != postSetBlk1.ID() {
+		t.Fatal("Expected last accepted block to be postSetBlk1")
+	}
+	if lastAcceptedID = chainState.LastAcceptedBlock().ID(); lastAcceptedID != postSetBlk1.ID() {
+		t.Fatal("Expected last accepted block to be postSetBlk1")
+	}
+
+	// ensure further blocks can be accepted
+	parsedpostSetBlk2, err := chainState.ParseBlock(postSetBlk2.Bytes())
+	if err != nil {
+		t.Fatal("Failed to parse postSetBlk2 due to: %w", err)
+	}
+	if err := parsedpostSetBlk2.Verify(); err != nil {
+		t.Fatal("Parsed postSetBlk2 failed verification unexpectedly due to %w", err)
+	}
+	if err := parsedpostSetBlk2.Accept(); err != nil {
+		t.Fatal(err)
+	}
+	lastAcceptedID, err = chainState.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lastAcceptedID != postSetBlk2.ID() {
+		t.Fatal("Expected last accepted block to be postSetBlk2")
+	}
+	if lastAcceptedID = chainState.LastAcceptedBlock().ID(); lastAcceptedID != postSetBlk2.ID() {
+		t.Fatal("Expected last accepted block to be postSetBlk2")
+	}
+
+	checkAcceptedBlock(t, chainState, parsedpostSetBlk2, false)
+}
+
+func TestSetLastAcceptedBlockWithProcessingBlocksErrors(t *testing.T) {
+	testBlks := NewTestBlocks(5)
+	genesisBlock := testBlks[0]
+	genesisBlock.SetStatus(choices.Accepted)
+	blk1 := testBlks[1]
+	resetBlk := testBlks[4]
+
+	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	buildBlock := func() (snowman.Block, error) {
+		// Once the block is built, mark it as processing
+		blk1.SetStatus(choices.Processing)
+		return blk1, nil
+	}
+
+	chainState := NewState(&Config{
+		DecidedCacheSize:    2,
+		MissingCacheSize:    2,
+		UnverifiedCacheSize: 2,
+		BytesToIDCacheSize:  2,
+		LastAcceptedBlock:   genesisBlock,
+		GetBlock:            getBlock,
+		UnmarshalBlock:      parseBlock,
+		BuildBlock:          buildBlock,
+		GetBlockIDAtHeight:  getCanonicalBlockID,
+	})
+
+	builtBlk, err := chainState.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Len(t, chainState.verifiedBlocks, 0)
+
+	if err := builtBlk.Verify(); err != nil {
+		t.Fatalf("Built block failed verification due to %s", err)
+	}
+	assert.Len(t, chainState.verifiedBlocks, 1)
+
+	checkProcessingBlock(t, chainState, builtBlk)
+
+	assert.Error(t, chainState.SetLastAcceptedBlock(resetBlk), "should have errored resetting chain state with processing block")
+}
