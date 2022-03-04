@@ -1,5 +1,6 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
+
 package rpcchainvm
 
 import (
@@ -67,7 +68,7 @@ func TestSubnet_HTTPGRPC(t *testing.T) {
 		wantResponse   string
 	}{
 		{
-			name:    "rpc server /rpc endpoint",
+			name:    "check basic service for /rpc and /ws",
 			payload: pingBody,
 		},
 	}
@@ -128,7 +129,7 @@ func TestSubnet_HTTPGRPC(t *testing.T) {
 					assert.NoErrorf(err, "%s test failed: %v", endpoint, err)
 
 				case "/ws":
-					err := testWebsocketPingRequest(target, endpoint, scenario.payload)
+					err := testWebsocketEchoRequest(target, endpoint, scenario.payload)
 					assert.NoErrorf(err, "%s test failed: %v", endpoint, err)
 				default:
 					t.Fatal("unknown endpoint")
@@ -167,7 +168,7 @@ func testHTTPPingRequest(target, endpoint string, payload []byte) error {
 	return nil
 }
 
-func testWebsocketPingRequest(target, endpoint string, payload []byte) error {
+func testWebsocketEchoRequest(target, endpoint string, payload []byte) error {
 	dialTarget := fmt.Sprintf("ws://%s%s", target, endpoint)
 	cli, _, err := websocket.DefaultDialer.Dial(dialTarget, nil) //nolint
 	if err != nil {
@@ -180,8 +181,11 @@ func testWebsocketPingRequest(target, endpoint string, payload []byte) error {
 		return err
 	}
 
+	// expected number of msg echos to receive from websocket server.
+	// This test is sanity for conn hijack and server push.
+	expectedMsgCount := 5
 	i := 0
-	for i < 4 {
+	for i < expectedMsgCount {
 		i++
 		// TODO: verify message body
 		_, _, err := cli.ReadMessage()
@@ -190,8 +194,7 @@ func testWebsocketPingRequest(target, endpoint string, payload []byte) error {
 		}
 	}
 
-	// TODO this test is too basic...
-	expectedMsgCount := 4
+	// TODO more rubut test...
 	if i != expectedMsgCount {
 		return fmt.Errorf("want (%d) messages got (%d)", expectedMsgCount, i)
 	}
@@ -363,8 +366,9 @@ type TestSubnetVM struct {
 func (vm TestSubnetVM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	apis := make(map[string]*common.HTTPHandler)
 
+	testEchoMsgCount := 5
 	apis["/ws"] = &common.HTTPHandler{
-		LockOptions: common.NoLock, Handler: websocketHandlerWithDuration(),
+		LockOptions: common.NoLock, Handler: websocketHandlerWithDuration(testEchoMsgCount),
 	}
 	rpcServer, err := getTestRPCServer()
 	if err != nil {
@@ -409,7 +413,9 @@ func getTestRPCServer() (*gorillarpc.Server, error) {
 	return server, nil
 }
 
-func websocketHandlerWithDuration() http.Handler {
+// websocketHandlerWithDuration upgrades the request and sends back N(msgCount)
+// echos.
+func websocketHandlerWithDuration(msgCount int) http.Handler {
 	upgrader := websocket.Upgrader{} // use default options
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -426,7 +432,7 @@ func websocketHandlerWithDuration() http.Handler {
 			}
 			return
 		}
-		for i := 0; i < 5; i++ {
+		for i := 0; i < msgCount; i++ {
 			err = c.WriteMessage(mt, b)
 			if err != nil {
 				return
