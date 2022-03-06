@@ -12,10 +12,8 @@ import (
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/ava-labs/avalanchego/api/proto/ghttpproto"
-	"github.com/ava-labs/avalanchego/api/proto/greadcloserproto"
 	"github.com/ava-labs/avalanchego/api/proto/gresponsewriterproto"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greadcloser"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
@@ -62,12 +60,11 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		)
 		server := grpc.NewServer(opts...)
 		closer.Add(server)
-		// register read closer service
-		greadcloserproto.RegisterReaderServer(server, greadcloser.NewServer(r.Body))
-		// register responsewriter service
 		gresponsewriterproto.RegisterWriterServer(server, gresponsewriter.NewServer(w, c.broker))
 		return server
 	})
+
+	body, _ := io.ReadAll(r.Body)
 
 	req := &ghttpproto.HTTPRequest{
 		ResponseWriter: &ghttpproto.ResponseWriter{
@@ -75,13 +72,12 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Header: make([]*ghttpproto.Element, 0, len(r.Header)),
 		},
 		Request: &ghttpproto.Request{
-			Method:     r.Method,
-			Proto:      r.Proto,
-			ProtoMajor: int32(r.ProtoMajor),
-			ProtoMinor: int32(r.ProtoMinor),
-			Header:     make([]*ghttpproto.Element, 0, len(r.Header)),
-			// Body: the body is unused in the request itself and is served via the
-			// read closer service above.
+			Method:           r.Method,
+			Proto:            r.Proto,
+			ProtoMajor:       int32(r.ProtoMajor),
+			ProtoMinor:       int32(r.ProtoMinor),
+			Header:           make([]*ghttpproto.Element, 0, len(r.Header)),
+			Body:             body,
 			ContentLength:    r.ContentLength,
 			TransferEncoding: r.TransferEncoding,
 			Host:             r.Host,
@@ -168,7 +164,12 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_, err := c.client.Handle(r.Context(), req)
+	stream, err := c.client.Handle(r.Context(), req)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+
+	_, err = stream.Recv()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
@@ -225,7 +226,7 @@ func convertWriteResponse(w http.ResponseWriter, resp *ghttpproto.HandleSimpleHT
 
 // isUpgradeRequest returns true if the upgrade key exists in header and is non empty.
 func isUpgradeRequest(req *http.Request) bool {
-	if req.Header == nil {
+	if len(req.Header) == 0 {
 		return false
 	}
 	return req.Header.Get("Upgrade") != ""

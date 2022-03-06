@@ -14,14 +14,10 @@ import (
 	"net/http"
 	"net/url"
 
-	"google.golang.org/protobuf/types/known/emptypb"
-
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/ava-labs/avalanchego/api/proto/ghttpproto"
-	"github.com/ava-labs/avalanchego/api/proto/greadcloserproto"
 	"github.com/ava-labs/avalanchego/api/proto/gresponsewriterproto"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greadcloser"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
@@ -43,10 +39,10 @@ func NewServer(handler http.Handler, broker *plugin.GRPCBroker) *Server {
 	}
 }
 
-func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*emptypb.Empty, error) {
+func (s *Server) Handle(req *ghttpproto.HTTPRequest, stream ghttpproto.HTTP_HandleServer) error {
 	readWriteConn, err := s.broker.Dial(req.ResponseWriter.Id)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	writerHeaders := make(http.Header)
@@ -55,17 +51,17 @@ func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*empt
 	}
 
 	writer := gresponsewriter.NewClient(writerHeaders, gresponsewriterproto.NewWriterClient(readWriteConn), s.broker)
-	reader := greadcloser.NewClient(greadcloserproto.NewReaderClient(readWriteConn))
+	reader := nopCloser{Buffer: bytes.NewBuffer(req.Request.Body)}
 
 	// create the request with the current context
 	request, err := http.NewRequestWithContext(
-		ctx,
+		stream.Context(),
 		req.Request.Method,
 		req.Request.RequestUri,
 		reader,
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if req.Request.Url != nil {
@@ -128,7 +124,7 @@ func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*empt
 		for i, certBytes := range req.Request.Tls.PeerCertificates.Cert {
 			cert, err := x509.ParseCertificate(certBytes)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			request.TLS.PeerCertificates[i] = cert
 		}
@@ -137,7 +133,7 @@ func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*empt
 			for j, certBytes := range chain.Cert {
 				cert, err := x509.ParseCertificate(certBytes)
 				if err != nil {
-					return nil, err
+					return err
 				}
 				request.TLS.VerifiedChains[i][j] = cert
 			}
@@ -146,7 +142,7 @@ func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*empt
 
 	s.handler.ServeHTTP(writer, request)
 
-	return &emptypb.Empty{}, readWriteConn.Close()
+	return readWriteConn.Close()
 }
 
 // HandleSimple handles http requests over http2 using a simple request response model.
