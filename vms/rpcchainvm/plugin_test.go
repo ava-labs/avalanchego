@@ -194,7 +194,7 @@ func testWebsocketEchoRequest(target, endpoint string, payload []byte) error {
 		}
 	}
 
-	// TODO more rubut test...
+	// TODO more robust test...
 	if i != expectedMsgCount {
 		return fmt.Errorf("want (%d) messages got (%d)", expectedMsgCount, i)
 	}
@@ -275,6 +275,7 @@ func (p *testVMPlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker
 
 var _ vmtestpb.VMTestServer = &TestVMServer{}
 
+// TODO: this needs to be the real vmproto
 type TestVM interface {
 	CreateHandlers() (map[string]*common.HTTPHandler, error)
 }
@@ -368,7 +369,7 @@ func (vm TestSubnetVM) CreateHandlers() (map[string]*common.HTTPHandler, error) 
 
 	testEchoMsgCount := 5
 	apis["/ws"] = &common.HTTPHandler{
-		LockOptions: common.NoLock, Handler: websocketHandlerWithDuration(testEchoMsgCount),
+		LockOptions: common.NoLock, Handler: websocketEchoHandler(testEchoMsgCount),
 	}
 	rpcServer, err := getTestRPCServer()
 	if err != nil {
@@ -413,9 +414,9 @@ func getTestRPCServer() (*gorillarpc.Server, error) {
 	return server, nil
 }
 
-// websocketHandlerWithDuration upgrades the request and sends back N(msgCount)
+// websocketEchoHandler upgrades the request and sends back N(msgCount)
 // echos.
-func websocketHandlerWithDuration(msgCount int) http.Handler {
+func websocketEchoHandler(msgCount int) http.Handler {
 	upgrader := websocket.Upgrader{} // use default options
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

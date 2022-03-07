@@ -40,6 +40,7 @@ func NewServer(handler http.Handler, broker *plugin.GRPCBroker) *Server {
 		broker:  broker,
 	}
 }
+
 func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*emptypb.Empty, error) {
 	readWriteConn, err := s.broker.Dial(req.ResponseWriter.Id)
 	if err != nil {
