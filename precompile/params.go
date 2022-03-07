@@ -11,9 +11,8 @@ const (
 	ReadAllowListGasCost   = 5_000
 
 	MintGasCost = 20_000
-	BurnGasCost = 20_000
 
-	CallNewAccountGas = 25000 // Paid for CALL when the destination address didn't exist prior.
+	CallNewAccountGas = 25_000 // Paid for CALL when the destination address didn't exist prior.
 )
 
 // Designated addresses of stateful precompiles
@@ -26,7 +25,7 @@ const (
 // in the future.
 var (
 	ContractDeployerAllowListAddress = common.HexToAddress("0x0200000000000000000000000000000000000000")
-	ContractNativeMinterAddress      = common.HexToAddress("0x0300000000000000000000000000000000000000")
+	ContractNativeMinterAddress      = common.HexToAddress("0x0200000000000000000000000000000000000001")
 
 	UsedAddresses = []common.Address{
 		ContractDeployerAllowListAddress,
