@@ -25,7 +25,7 @@ const _ = grpc.SupportPackageIsVersion7
 type HTTPClient interface {
 	// Handle wraps http1 over http2 and provides support for websockets by implementing
 	// net conn and responsewriter in http2.
-	Handle(ctx context.Context, in *HTTPRequest, opts ...grpc.CallOption) (HTTP_HandleClient, error)
+	Handle(ctx context.Context, in *HTTPRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// HandleSimple wraps http1 requests over http2 similar to Handle but only passes headers
 	// and body bytes. Because the request and response are single protos without any inline
 	// gRPC servers the CPU cost is much less at scale.
@@ -40,36 +40,13 @@ func NewHTTPClient(cc grpc.ClientConnInterface) HTTPClient {
 	return &hTTPClient{cc}
 }
 
-func (c *hTTPClient) Handle(ctx context.Context, in *HTTPRequest, opts ...grpc.CallOption) (HTTP_HandleClient, error) {
-	stream, err := c.cc.NewStream(ctx, &HTTP_ServiceDesc.Streams[0], "/ghttpproto.HTTP/Handle", opts...)
+func (c *hTTPClient) Handle(ctx context.Context, in *HTTPRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/ghttpproto.HTTP/Handle", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &hTTPHandleClient{stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-type HTTP_HandleClient interface {
-	Recv() (*emptypb.Empty, error)
-	grpc.ClientStream
-}
-
-type hTTPHandleClient struct {
-	grpc.ClientStream
-}
-
-func (x *hTTPHandleClient) Recv() (*emptypb.Empty, error) {
-	m := new(emptypb.Empty)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
+	return out, nil
 }
 
 func (c *hTTPClient) HandleSimple(ctx context.Context, in *HandleSimpleHTTPRequest, opts ...grpc.CallOption) (*HandleSimpleHTTPResponse, error) {
@@ -87,7 +64,7 @@ func (c *hTTPClient) HandleSimple(ctx context.Context, in *HandleSimpleHTTPReque
 type HTTPServer interface {
 	// Handle wraps http1 over http2 and provides support for websockets by implementing
 	// net conn and responsewriter in http2.
-	Handle(*HTTPRequest, HTTP_HandleServer) error
+	Handle(context.Context, *HTTPRequest) (*emptypb.Empty, error)
 	// HandleSimple wraps http1 requests over http2 similar to Handle but only passes headers
 	// and body bytes. Because the request and response are single protos without any inline
 	// gRPC servers the CPU cost is much less at scale.
@@ -99,8 +76,8 @@ type HTTPServer interface {
 type UnimplementedHTTPServer struct {
 }
 
-func (UnimplementedHTTPServer) Handle(*HTTPRequest, HTTP_HandleServer) error {
-	return status.Errorf(codes.Unimplemented, "method Handle not implemented")
+func (UnimplementedHTTPServer) Handle(context.Context, *HTTPRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Handle not implemented")
 }
 func (UnimplementedHTTPServer) HandleSimple(context.Context, *HandleSimpleHTTPRequest) (*HandleSimpleHTTPResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HandleSimple not implemented")
@@ -118,25 +95,22 @@ func RegisterHTTPServer(s grpc.ServiceRegistrar, srv HTTPServer) {
 	s.RegisterService(&HTTP_ServiceDesc, srv)
 }
 
-func _HTTP_Handle_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(HTTPRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
+func _HTTP_Handle_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HTTPRequest)
+	if err := dec(in); err != nil {
+		return nil, err
 	}
-	return srv.(HTTPServer).Handle(m, &hTTPHandleServer{stream})
-}
-
-type HTTP_HandleServer interface {
-	Send(*emptypb.Empty) error
-	grpc.ServerStream
-}
-
-type hTTPHandleServer struct {
-	grpc.ServerStream
-}
-
-func (x *hTTPHandleServer) Send(m *emptypb.Empty) error {
-	return x.ServerStream.SendMsg(m)
+	if interceptor == nil {
+		return srv.(HTTPServer).Handle(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ghttpproto.HTTP/Handle",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(HTTPServer).Handle(ctx, req.(*HTTPRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _HTTP_HandleSimple_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -165,16 +139,14 @@ var HTTP_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*HTTPServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
+			MethodName: "Handle",
+			Handler:    _HTTP_Handle_Handler,
+		},
+		{
 			MethodName: "HandleSimple",
 			Handler:    _HTTP_HandleSimple_Handler,
 		},
 	},
-	Streams: []grpc.StreamDesc{
-		{
-			StreamName:    "Handle",
-			Handler:       _HTTP_Handle_Handler,
-			ServerStreams: true,
-		},
-	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "ghttpproto/http.proto",
 }

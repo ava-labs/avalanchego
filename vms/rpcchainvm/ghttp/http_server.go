@@ -14,6 +14,8 @@ import (
 	"net/http"
 	"net/url"
 
+	"google.golang.org/protobuf/types/known/emptypb"
+
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/ava-labs/avalanchego/api/proto/ghttpproto"
@@ -38,11 +40,10 @@ func NewServer(handler http.Handler, broker *plugin.GRPCBroker) *Server {
 		broker:  broker,
 	}
 }
-
-func (s *Server) Handle(req *ghttpproto.HTTPRequest, stream ghttpproto.HTTP_HandleServer) error {
+func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*emptypb.Empty, error) {
 	readWriteConn, err := s.broker.Dial(req.ResponseWriter.Id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	writerHeaders := make(http.Header)
@@ -55,13 +56,13 @@ func (s *Server) Handle(req *ghttpproto.HTTPRequest, stream ghttpproto.HTTP_Hand
 
 	// create the request with the current context
 	request, err := http.NewRequestWithContext(
-		stream.Context(),
+		ctx,
 		req.Request.Method,
 		req.Request.RequestUri,
 		reader,
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if req.Request.Url != nil {
@@ -122,7 +123,7 @@ func (s *Server) Handle(req *ghttpproto.HTTPRequest, stream ghttpproto.HTTP_Hand
 		for i, certBytes := range req.Request.Tls.PeerCertificates.Cert {
 			cert, err := x509.ParseCertificate(certBytes)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			request.TLS.PeerCertificates[i] = cert
 		}
@@ -131,7 +132,7 @@ func (s *Server) Handle(req *ghttpproto.HTTPRequest, stream ghttpproto.HTTP_Hand
 			for j, certBytes := range chain.Cert {
 				cert, err := x509.ParseCertificate(certBytes)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				request.TLS.VerifiedChains[i][j] = cert
 			}
@@ -140,7 +141,7 @@ func (s *Server) Handle(req *ghttpproto.HTTPRequest, stream ghttpproto.HTTP_Hand
 
 	s.handler.ServeHTTP(writer, request)
 
-	return readWriteConn.Close()
+	return &emptypb.Empty{}, readWriteConn.Close()
 }
 
 // HandleSimple handles http requests over http2 using a simple request response model.

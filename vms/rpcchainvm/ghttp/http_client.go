@@ -139,12 +139,12 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if r.TLS != nil {
 		req.Request.Tls = &ghttpproto.ConnectionState{
-			Version:                    uint32(r.TLS.Version),
-			HandshakeComplete:          r.TLS.HandshakeComplete,
-			DidResume:                  r.TLS.DidResume,
-			CipherSuite:                uint32(r.TLS.CipherSuite),
-			NegotiatedProtocol:         r.TLS.NegotiatedProtocol,
-			ServerName:                 r.TLS.ServerName,
+			Version:            uint32(r.TLS.Version),
+			HandshakeComplete:  r.TLS.HandshakeComplete,
+			DidResume:          r.TLS.DidResume,
+			CipherSuite:        uint32(r.TLS.CipherSuite),
+			NegotiatedProtocol: r.TLS.NegotiatedProtocol,
+			ServerName:         r.TLS.ServerName,
 			PeerCertificates: &ghttpproto.Certificates{
 				Cert: make([][]byte, len(r.TLS.PeerCertificates)),
 			},
@@ -165,12 +165,7 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	stream, err := c.client.Handle(r.Context(), req)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-
-	_, err = stream.Recv()
+	_, err = c.client.Handle(r.Context(), req)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 	}

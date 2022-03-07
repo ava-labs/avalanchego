@@ -6,7 +6,7 @@ import "google/protobuf/empty.proto";
 service HTTP {
     // Handle wraps http1 over http2 and provides support for websockets by implementing
     // net conn and responsewriter in http2.
-    rpc Handle(HTTPRequest) returns (stream google.protobuf.Empty);
+    rpc Handle(HTTPRequest) returns (google.protobuf.Empty);
     // HandleSimple wraps http1 requests over http2 similar to Handle but only passes headers
     // and body bytes. Because the request and response are single protos without any inline
     // gRPC servers the CPU cost is much less at scale.
