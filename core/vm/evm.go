@@ -200,11 +200,6 @@ func (evm *EVM) GetStateDB() precompile.StateDB {
 	return evm.StateDB
 }
 
-// GetChainRules returns the evm's ChainRules
-func (evm *EVM) GetChainRules() precompile.Rules {
-	return evm.chainRules
-}
-
 // Interpreter returns the current interpreter
 func (evm *EVM) Interpreter() *EVMInterpreter {
 	return evm.interpreter

@@ -19,12 +19,6 @@ type RunStatefulPrecompileFunc func(accessibleState PrecompileAccessibleState, c
 // PrecompileAccessibleState defines the interface exposed to stateful precompile contracts
 type PrecompileAccessibleState interface {
 	GetStateDB() StateDB
-	GetChainRules() Rules
-}
-
-type Rules interface {
-	ContractDeployerAllowListEnabled() bool
-	ContractNativeMinterEnabled() bool
 }
 
 // StateDB is the interface for accessing EVM state

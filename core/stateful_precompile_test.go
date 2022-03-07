@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/state"
-	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
@@ -17,12 +16,9 @@ import (
 
 type mockAccessibleState struct {
 	state *state.StateDB
-	rules *params.Rules
 }
 
 func (m *mockAccessibleState) GetStateDB() precompile.StateDB { return m.state }
-
-func (m *mockAccessibleState) GetChainRules() precompile.Rules { return m.rules }
 
 // This test is added within the core package so that it can import all of the required code
 // without creating any import cycles

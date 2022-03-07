@@ -85,10 +85,6 @@ func createMint(precompileAddr common.Address) RunStatefulPrecompileFunc {
 		}
 		remainingGas = suppliedGas - MintGasCost
 
-		if !evm.GetChainRules().ContractNativeMinterEnabled() {
-			return nil, remainingGas, fmt.Errorf("native minter is not activated")
-		}
-
 		if readOnly {
 			return nil, remainingGas, ErrWriteProtection
 		}

@@ -488,14 +488,6 @@ func (c *ChainConfig) AvalancheRules(blockNum, blockTimestamp *big.Int) Rules {
 	return rules
 }
 
-func (r Rules) ContractDeployerAllowListEnabled() bool {
-	return r.IsContractDeployerAllowListEnabled
-}
-
-func (r Rules) ContractNativeMinterEnabled() bool {
-	return r.IsContractNativeMinterEnabled
-}
-
 // enabledStatefulPrecompiles returns a list of stateful precompile configs in the order that they are enabled
 // by block timestamp.
 func (c *ChainConfig) enabledStatefulPrecompiles() []precompile.StatefulPrecompileConfig {
