@@ -267,6 +267,9 @@ func (b *SimulatedBackend) TransactionReceipt(ctx context.Context, txHash common
 	defer b.mu.Unlock()
 
 	receipt, _, _, _ := rawdb.ReadReceipt(b.database, txHash, b.config)
+	if receipt == nil {
+		return nil, interfaces.NotFound
+	}
 	return receipt, nil
 }
 
@@ -675,7 +678,6 @@ func (b *SimulatedBackend) callContract(ctx context.Context, call interfaces.Cal
 }
 
 // SendTransaction updates the pending block to include the given transaction.
-// It panics if the transaction is invalid.
 func (b *SimulatedBackend) SendTransaction(ctx context.Context, tx *types.Transaction) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -683,17 +685,17 @@ func (b *SimulatedBackend) SendTransaction(ctx context.Context, tx *types.Transa
 	// Get the last block
 	block, err := b.blockByHash(ctx, b.acceptedBlock.ParentHash())
 	if err != nil {
-		panic("could not fetch parent")
+		return errors.New("could not fetch parent")
 	}
 	// Check transaction validity
 	signer := types.NewLondonSigner(b.blockchain.Config().ChainID)
 	sender, err := types.Sender(signer, tx)
 	if err != nil {
-		panic(fmt.Errorf("invalid transaction: %v", err))
+		return fmt.Errorf("invalid transaction: %v", err)
 	}
 	nonce := b.acceptedState.GetNonce(sender)
 	if tx.Nonce() != nonce {
-		panic(fmt.Errorf("invalid transaction nonce: got %d, want %d", tx.Nonce(), nonce))
+		return fmt.Errorf("invalid transaction nonce: got %d, want %d", tx.Nonce(), nonce)
 	}
 	// Include tx in chain
 	blocks, _, err := core.GenerateChain(b.config, block, dummy.NewETHFaker(), b.database, 1, 10, func(number int, block *core.BlockGen) {

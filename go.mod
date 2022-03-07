@@ -3,11 +3,12 @@ module github.com/ava-labs/subnet-evm
 go 1.16
 
 require (
-	github.com/VictoriaMetrics/fastcache v1.6.0
-	github.com/ava-labs/avalanchego v1.7.5
+	github.com/VictoriaMetrics/fastcache v1.9.0
+	github.com/ava-labs/avalanchego v1.7.5-0.20220202014036-7c45dd1e2377
+	github.com/btcsuite/btcd v0.21.0-beta // indirect
 	github.com/cespare/cp v0.1.0
 	github.com/davecgh/go-spew v1.1.1
-	github.com/deckarep/golang-set v1.7.1
+	github.com/deckarep/golang-set v1.8.0
 	github.com/ethereum/go-ethereum v1.10.15
 	github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08
@@ -24,6 +25,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/prometheus/client_golang v1.7.1
 	github.com/prometheus/client_model v0.2.0
+	github.com/prometheus/tsdb v0.10.0 // indirect
 	github.com/rjeczalik/notify v0.9.2
 	github.com/spf13/cast v1.3.1
 	github.com/spf13/pflag v1.0.5

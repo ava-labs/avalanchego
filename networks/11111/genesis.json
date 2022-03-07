@@ -23,8 +23,8 @@
       "blockGasCostStep": 500000
     }
   },
-  "airdropHash":"0xccbf8e430b30d08b5b3342208781c40b373d1b5885c1903828f367230a2568da",
-  "airdropAmount":"0x8AC7230489E80000",
+  "airdropHash": "0xccbf8e430b30d08b5b3342208781c40b373d1b5885c1903828f367230a2568da",
+  "airdropAmount": "0x8AC7230489E80000",
   "alloc": {
     "6f0f6DA1852857d7789f68a28bba866671f3880D": {
       "balance": "0x52B7D2DCC80CD2E4000000"

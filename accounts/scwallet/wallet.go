@@ -648,7 +648,7 @@ func (w *Wallet) Derive(path accounts.DerivationPath, pin bool) (accounts.Accoun
 // accounts.
 //
 // Note, self derivation will increment the last component of the specified path
-// opposed to decending into a child path to allow discovering accounts starting
+// opposed to descending into a child path to allow discovering accounts starting
 // from non zero components.
 //
 // Some hardware wallets switched derivation paths through their evolution, so
@@ -676,7 +676,7 @@ func (w *Wallet) SelfDerive(bases []accounts.DerivationPath, chain interfaces.Ch
 // or optionally with the aid of any location metadata from the embedded URL field.
 //
 // If the wallet requires additional authentication to sign the request (e.g.
-// a password to decrypt the account, or a PIN code o verify the transaction),
+// a password to decrypt the account, or a PIN code to verify the transaction),
 // an AuthNeededError instance will be returned, containing infos for the user
 // about which fields or actions are needed. The user may retry by providing
 // the needed details via SignDataWithPassphrase, or by other means (e.g. unlock
@@ -703,7 +703,7 @@ func (w *Wallet) signHash(account accounts.Account, hash []byte) ([]byte, error)
 // or optionally with the aid of any location metadata from the embedded URL field.
 //
 // If the wallet requires additional authentication to sign the request (e.g.
-// a password to decrypt the account, or a PIN code o verify the transaction),
+// a password to decrypt the account, or a PIN code to verify the transaction),
 // an AuthNeededError instance will be returned, containing infos for the user
 // about which fields or actions are needed. The user may retry by providing
 // the needed details via SignTxWithPassphrase, or by other means (e.g. unlock
@@ -743,7 +743,7 @@ func (w *Wallet) signHashWithPassphrase(account accounts.Account, passphrase str
 // or optionally with the aid of any location metadata from the embedded URL field.
 //
 // If the wallet requires additional authentication to sign the request (e.g.
-// a password to decrypt the account, or a PIN code o verify the transaction),
+// a password to decrypt the account, or a PIN code to verify the transaction),
 // an AuthNeededError instance will be returned, containing infos for the user
 // about which fields or actions are needed. The user may retry by providing
 // the needed details via SignHashWithPassphrase, or by other means (e.g. unlock
