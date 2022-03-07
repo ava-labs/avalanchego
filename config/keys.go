@@ -90,7 +90,6 @@ const (
 	NetworkAllowPrivateIPsKey                   = "network-allow-private-ips"
 	NetworkRequireValidatorToConnectKey         = "network-require-validator-to-connect"
 	BenchlistFailThresholdKey                   = "benchlist-fail-threshold"
-	BenchlistPeerSummaryEnabledKey              = "benchlist-peer-summary-enabled"
 	BenchlistDurationKey                        = "benchlist-duration"
 	BenchlistMinFailingDurationKey              = "benchlist-min-failing-duration"
 	BuildDirKey                                 = "build-dir"

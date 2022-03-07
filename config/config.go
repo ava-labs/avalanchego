@@ -424,7 +424,6 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 func getBenchlistConfig(v *viper.Viper, alpha, k int) (benchlist.Config, error) {
 	config := benchlist.Config{
 		Threshold:              v.GetInt(BenchlistFailThresholdKey),
-		PeerSummaryEnabled:     v.GetBool(BenchlistPeerSummaryEnabledKey),
 		Duration:               v.GetDuration(BenchlistDurationKey),
 		MinimumFailingDuration: v.GetDuration(BenchlistMinFailingDurationKey),
 		MaxPortion:             (1.0 - (float64(alpha) / float64(k))) / 3.0,
