@@ -52,7 +52,7 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w = gresponsewriter.NewLockedWriter(w)
 
 	readerWriterID := c.broker.NextId()
-	// start gRPC server which serves the request body and manages responsewriter io.
+	// start gRPC server which serves responsewriter io.
 	go c.broker.AcceptAndServe(readerWriterID, func(opts []grpc.ServerOption) *grpc.Server {
 		opts = append(opts,
 			grpc.MaxRecvMsgSize(math.MaxInt),
@@ -64,7 +64,10 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return server
 	})
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 
 	req := &ghttpproto.HTTPRequest{
 		ResponseWriter: &ghttpproto.ResponseWriter{
@@ -141,7 +144,6 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			DidResume:                  r.TLS.DidResume,
 			CipherSuite:                uint32(r.TLS.CipherSuite),
 			NegotiatedProtocol:         r.TLS.NegotiatedProtocol,
-			NegotiatedProtocolIsMutual: r.TLS.NegotiatedProtocolIsMutual,
 			ServerName:                 r.TLS.ServerName,
 			PeerCertificates: &ghttpproto.Certificates{
 				Cert: make([][]byte, len(r.TLS.PeerCertificates)),
@@ -149,7 +151,6 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			VerifiedChains:              make([]*ghttpproto.Certificates, len(r.TLS.VerifiedChains)),
 			SignedCertificateTimestamps: r.TLS.SignedCertificateTimestamps,
 			OcspResponse:                r.TLS.OCSPResponse,
-			TlsUnique:                   r.TLS.TLSUnique,
 		}
 		for i, cert := range r.TLS.PeerCertificates {
 			req.Request.Tls.PeerCertificates.Cert[i] = cert.Raw

@@ -113,13 +113,11 @@ func (s *Server) Handle(req *ghttpproto.HTTPRequest, stream ghttpproto.HTTP_Hand
 			DidResume:                   req.Request.Tls.DidResume,
 			CipherSuite:                 uint16(req.Request.Tls.CipherSuite),
 			NegotiatedProtocol:          req.Request.Tls.NegotiatedProtocol,
-			NegotiatedProtocolIsMutual:  req.Request.Tls.NegotiatedProtocolIsMutual,
 			ServerName:                  req.Request.Tls.ServerName,
 			PeerCertificates:            make([]*x509.Certificate, len(req.Request.Tls.PeerCertificates.Cert)),
 			VerifiedChains:              make([][]*x509.Certificate, len(req.Request.Tls.VerifiedChains)),
 			SignedCertificateTimestamps: req.Request.Tls.SignedCertificateTimestamps,
 			OCSPResponse:                req.Request.Tls.OcspResponse,
-			TLSUnique:                   req.Request.Tls.TlsUnique,
 		}
 		for i, certBytes := range req.Request.Tls.PeerCertificates.Cert {
 			cert, err := x509.ParseCertificate(certBytes)
