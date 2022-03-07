@@ -21,4 +21,3 @@ lint:
   # allows the same message type to be used for a single RPC's request and response type.
   # TODO: this should not be tolerated and if it is only perscriptivly
   rpc_allow_same_request_response: true
-  

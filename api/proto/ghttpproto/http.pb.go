@@ -471,7 +471,7 @@ type Request struct {
 	// header contains the request header fields either received
 	// by the server or to be sent by the client
 	Header []*Element `protobuf:"bytes,6,rep,name=header,proto3" json:"header,omitempty"`
-	// body is the unused
+	// body is the request payload in bytes
 	Body []byte `protobuf:"bytes,7,opt,name=body,proto3" json:"body,omitempty"`
 	// content_length records the length of the associated content
 	ContentLength int64 `protobuf:"varint,8,opt,name=content_length,json=contentLength,proto3" json:"content_length,omitempty"`

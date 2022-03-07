@@ -4,6 +4,7 @@ option go_package = "github.com/ava-labs/avalanchego/vms/rpcchainvm/tests/api/vm
 
 import "google/protobuf/empty.proto";
 
+// TODO: this proto is temporary and should be removed and replaced with the real vmproto.
 service VMTest {
     // CreateHandlers populates a slice of http handlers exposed by the subnet which
     // will be routed by the apiserver.

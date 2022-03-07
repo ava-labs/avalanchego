@@ -52,7 +52,7 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w = gresponsewriter.NewLockedWriter(w)
 
 	readerWriterID := c.broker.NextId()
-	// start gRPC server which serves responsewriter io.
+	// Start responsewriter gRPC service.
 	go c.broker.AcceptAndServe(readerWriterID, func(opts []grpc.ServerOption) *grpc.Server {
 		opts = append(opts,
 			grpc.MaxRecvMsgSize(math.MaxInt),

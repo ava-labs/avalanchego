@@ -8,8 +8,9 @@ service HTTP {
     // net conn and responsewriter in http2.
     rpc Handle(HTTPRequest) returns (google.protobuf.Empty);
     // HandleSimple wraps http1 requests over http2 similar to Handle but only passes headers
-    // and body bytes. Because the request and response are single protos without any inline
-    // gRPC servers the CPU cost is much less at scale.
+    // and body bytes. Because the request and response are single protos with no inline
+    // gRPC servers the CPU cost as well as file descriptor overhead is less
+    // (no additional goroutines).
     rpc HandleSimple(HandleSimpleHTTPRequest) returns (HandleSimpleHTTPResponse);
 }
 
@@ -106,7 +107,7 @@ message Request {
     // header contains the request header fields either received
     // by the server or to be sent by the client
     repeated Element header = 6;
-    // body is the unused
+    // body is the request payload in bytes
     bytes body = 7;
     // content_length records the length of the associated content
     int64 content_length = 8;

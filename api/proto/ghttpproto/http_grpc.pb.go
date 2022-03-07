@@ -27,8 +27,9 @@ type HTTPClient interface {
 	// net conn and responsewriter in http2.
 	Handle(ctx context.Context, in *HTTPRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// HandleSimple wraps http1 requests over http2 similar to Handle but only passes headers
-	// and body bytes. Because the request and response are single protos without any inline
-	// gRPC servers the CPU cost is much less at scale.
+	// and body bytes. Because the request and response are single protos with no inline
+	// gRPC servers the CPU cost as well as file descriptor overhead (no additional goroutines).
+	// is less.
 	HandleSimple(ctx context.Context, in *HandleSimpleHTTPRequest, opts ...grpc.CallOption) (*HandleSimpleHTTPResponse, error)
 }
 
@@ -66,8 +67,9 @@ type HTTPServer interface {
 	// net conn and responsewriter in http2.
 	Handle(context.Context, *HTTPRequest) (*emptypb.Empty, error)
 	// HandleSimple wraps http1 requests over http2 similar to Handle but only passes headers
-	// and body bytes. Because the request and response are single protos without any inline
-	// gRPC servers the CPU cost is much less at scale.
+	// and body bytes. Because the request and response are single protos with no inline
+	// gRPC servers the CPU cost as well as file descriptor overhead (no additional goroutines).
+	// is less.
 	HandleSimple(context.Context, *HandleSimpleHTTPRequest) (*HandleSimpleHTTPResponse, error)
 	mustEmbedUnimplementedHTTPServer()
 }
