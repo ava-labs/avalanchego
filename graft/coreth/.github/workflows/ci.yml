@@ -71,7 +71,7 @@ jobs:
       shell: bash
     - run: ./scripts/build.sh evm
       shell: bash
-    - run: ./scripts/build_test.sh -p 2
+    - run: ./scripts/build_test.sh
       shell: bash
     - run: ./scripts/coverage.sh
       shell: bash
