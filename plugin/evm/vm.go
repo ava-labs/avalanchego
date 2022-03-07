@@ -14,18 +14,16 @@ import (
 	"sync"
 	"time"
 
-	avalanchegoMetrics "github.com/ava-labs/avalanchego/api/metrics"
 	subnetEVM "github.com/ava-labs/subnet-evm/chain"
 	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/eth/ethconfig"
-	subnetEVMPrometheus "github.com/ava-labs/subnet-evm/metrics/prometheus"
+	"github.com/ava-labs/subnet-evm/metrics/prometheus"
 	"github.com/ava-labs/subnet-evm/node"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/peer"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
-	"github.com/prometheus/client_golang/prometheus"
 
 	// Force-load tracer engine to trigger registration
 	//
@@ -61,12 +59,6 @@ import (
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 
 	avalancheJSON "github.com/ava-labs/avalanchego/utils/json"
-)
-
-const (
-	// Prefixes for metrics gatherers
-	ethMetricsPrefix        = "eth"
-	chainStateMetricsPrefix = "chain_state"
 )
 
 var (
@@ -159,9 +151,6 @@ type VM struct {
 	peer.Network
 	client       peer.Client
 	networkCodec codec.Manager
-
-	// Metrics
-	multiGatherer avalanchegoMetrics.MultiGatherer
 
 	bootstrapped bool
 }
@@ -356,61 +345,34 @@ func (vm *VM) Initialize(
 	vm.genesisHash = vm.chain.GetGenesisBlock().Hash()
 	log.Info(fmt.Sprintf("lastAccepted = %s", lastAccepted.Hash().Hex()))
 
-	vm.multiGatherer = avalanchegoMetrics.NewMultiGatherer()
-
-	// Initialize [vm.State]
-	if err := vm.initChainState(&Block{
-		id:       ids.ID(lastAccepted.Hash()),
-		ethBlock: lastAccepted,
-		vm:       vm,
-		status:   choices.Accepted,
-	}, metrics.Enabled); err != nil {
-		return err
-	}
+	vm.State = chain.NewState(&chain.Config{
+		DecidedCacheSize:    decidedCacheSize,
+		MissingCacheSize:    missingCacheSize,
+		UnverifiedCacheSize: unverifiedCacheSize,
+		LastAcceptedBlock: &Block{
+			id:       ids.ID(lastAccepted.Hash()),
+			ethBlock: lastAccepted,
+			vm:       vm,
+			status:   choices.Accepted,
+		},
+		GetBlockIDAtHeight: vm.GetBlockIDAtHeight,
+		GetBlock:           vm.getBlock,
+		UnmarshalBlock:     vm.parseBlock,
+		BuildBlock:         vm.buildBlock,
+	})
 
 	vm.builder.awaitSubmittedTxs()
 	go vm.ctx.Log.RecoverAndPanic(vm.startContinuousProfiler)
 
 	// Only provide metrics if they are being populated.
 	if metrics.Enabled {
-		gatherer := subnetEVMPrometheus.Gatherer(metrics.DefaultRegistry)
-		if err := vm.multiGatherer.Register(ethMetricsPrefix, gatherer); err != nil {
+		gatherer := prometheus.Gatherer(metrics.DefaultRegistry)
+		if err := ctx.Metrics.Register(gatherer); err != nil {
 			return err
 		}
 	}
-	// Register [multiGatherer] after registerers have been registered to it
-	if err := ctx.Metrics.Register(vm.multiGatherer); err != nil {
-		return err
-	}
 
 	return nil
-}
-
-func (vm *VM) initChainState(lastAcceptedBlock *Block, metricsEnabled bool) error {
-	config := &chain.Config{
-		DecidedCacheSize:    decidedCacheSize,
-		MissingCacheSize:    missingCacheSize,
-		UnverifiedCacheSize: unverifiedCacheSize,
-		LastAcceptedBlock:   lastAcceptedBlock,
-		GetBlockIDAtHeight:  vm.GetBlockIDAtHeight,
-		GetBlock:            vm.getBlock,
-		UnmarshalBlock:      vm.parseBlock,
-		BuildBlock:          vm.buildBlock,
-	}
-	if !metricsEnabled {
-		vm.State = chain.NewState(config)
-		return nil
-	}
-
-	// Register chain state metrics
-	chainStateRegisterer := prometheus.NewRegistry()
-	state, err := chain.NewMeteredState(chainStateRegisterer, config)
-	if err != nil {
-		return err
-	}
-	vm.State = state
-
-	return vm.multiGatherer.Register(chainStateMetricsPrefix, chainStateRegisterer)
 }
 
 func (vm *VM) initGossipHandling() {
