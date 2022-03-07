@@ -131,7 +131,6 @@ func addNodeFlags(fs *flag.FlagSet) {
 
 	// Inbound Connection Throttling
 	fs.Duration(InboundConnUpgradeThrottlerCooldownKey, 10*time.Second, "Upgrade an inbound connection from a given IP at most once per this duration. If 0, don't rate-limit inbound connection upgrades")
-	fs.Int(InboundConnUpgradeThrottlerMaxRecentKey, 5120, "DEPRECATED") // Deprecated starting in v1.6.0. TODO remove in future release.
 	fs.Float64(InboundThrottlerMaxConnsPerSecKey, 256, "Max number of inbound connections to accept (from all peers) per second")
 	// Outbound Connection Throttling
 	fs.Uint(OutboundConnectionThrottlingRps, 50, "Make at most this number of outgoing peer connection attempts per second")
