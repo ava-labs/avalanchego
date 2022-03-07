@@ -40,6 +40,8 @@ import (
 	"github.com/holiman/uint256"
 )
 
+var _ precompile.PrecompileAccessibleState = &EVM{}
+
 var prohibitedAddresses = map[common.Address]struct{}{
 	constants.BlackholeAddr: {},
 }
@@ -196,6 +198,11 @@ func (evm *EVM) Cancelled() bool {
 // GetStateDB returns the evm's StateDB
 func (evm *EVM) GetStateDB() precompile.StateDB {
 	return evm.StateDB
+}
+
+// GetChainRules returns the evm's ChainRules
+func (evm *EVM) GetChainRules() precompile.Rules {
+	return evm.chainRules
 }
 
 // Interpreter returns the current interpreter

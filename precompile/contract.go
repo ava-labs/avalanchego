@@ -5,6 +5,7 @@ package precompile
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -18,13 +19,25 @@ type RunStatefulPrecompileFunc func(accessibleState PrecompileAccessibleState, c
 // PrecompileAccessibleState defines the interface exposed to stateful precompile contracts
 type PrecompileAccessibleState interface {
 	GetStateDB() StateDB
+	GetChainRules() Rules
+}
+
+type Rules interface {
+	ContractDeployerAllowListEnabled() bool
+	ContractNativeMinterEnabled() bool
 }
 
 // StateDB is the interface for accessing EVM state
 type StateDB interface {
 	GetState(common.Address, common.Hash) common.Hash
 	SetState(common.Address, common.Hash, common.Hash)
+
 	SetNonce(common.Address, uint64)
+
+	AddBalance(common.Address, *big.Int)
+
+	CreateAccount(common.Address)
+	Exist(common.Address) bool
 }
 
 // StatefulPrecompiledContract is the interface for executing a precompiled contract

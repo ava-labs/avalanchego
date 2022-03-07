@@ -26,9 +26,7 @@ var (
 	readAllowListSignature = CalculateFunctionSelector("readAllowList(address)")
 
 	// Error returned when an invalid write is attempted
-	ErrReadOnlyModifyAllowList = errors.New("cannot modify allow list in read only")
-	ErrCannotModifyAllowList   = errors.New("non-admin cannot modify allow list")
-	ErrExceedsGasAllowance     = errors.New("running allow list exceeds gas allowance")
+	ErrCannotModifyAllowList = errors.New("non-admin cannot modify allow list")
 )
 
 // AllowListConfig specifies the configuration of the allow list.
@@ -138,7 +136,7 @@ func writeAllowList(evm PrecompileAccessibleState, precompileAddr common.Address
 
 	remainingGas = suppliedGas - ModifyAllowListGasCost
 	if readOnly {
-		return nil, remainingGas, ErrReadOnlyModifyAllowList
+		return nil, remainingGas, ErrWriteProtection
 	}
 
 	// Verify that the caller is in the allow list and therefore has the right to modify it
