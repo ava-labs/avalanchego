@@ -54,6 +54,7 @@ func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*empt
 	}
 
 	writer := gresponsewriter.NewClient(writerHeaders, gresponsewriterproto.NewWriterClient(readWriteConn), s.broker)
+	// Explicitly wrap buffer with io.NopCloser, this is later handeled transparently by http.NewRequestWithContext.
 	reader := io.NopCloser(bytes.NewBuffer(req.Request.Body))
 
 	// create the request with the current context
@@ -183,12 +184,11 @@ type ResponseWriter struct {
 
 // newResponseWriter returns very basic implementation of the http.ResponseWriter
 func newResponseWriter() *ResponseWriter {
-	w := &ResponseWriter{
+	return &ResponseWriter{
 		body:       new(bytes.Buffer),
 		header:     make(http.Header),
-		statusCode: 200,
+		statusCode: http.StatusOK,
 	}
-	return w
 }
 
 func (w *ResponseWriter) Header() http.Header {

@@ -14,8 +14,9 @@ import (
 	"testing"
 
 	"github.com/gorilla/mux"
-	gorillarpc "github.com/gorilla/rpc/v2"
 	"github.com/gorilla/websocket"
+
+	gorillarpc "github.com/gorilla/rpc/v2"
 
 	hclog "github.com/hashicorp/go-hclog"
 	plugin "github.com/hashicorp/go-plugin"
@@ -28,9 +29,10 @@ import (
 	"github.com/ava-labs/avalanchego/api/proto/ghttpproto"
 	"github.com/ava-labs/avalanchego/api/proto/vmproto"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	cjson "github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
+
+	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
 
 // Test_VMCreateHandlers tests the Handle and HandleSimple RPCs by creating a plugin and
