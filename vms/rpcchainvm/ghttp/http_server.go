@@ -4,16 +4,13 @@
 package ghttp
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
-	"net"
+	"io"
 	"net/http"
 	"net/url"
-	"io"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -25,7 +22,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
 
-var _ ghttpproto.HTTPServer = &Server{}
+var (
+	_ ghttpproto.HTTPServer = &Server{}
+	_ http.ResponseWriter   = &ResponseWriter{}
+)
 
 // Server is an http.Handler that is managed over RPC.
 type Server struct {
@@ -54,7 +54,7 @@ func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*empt
 	}
 
 	writer := gresponsewriter.NewClient(writerHeaders, gresponsewriterproto.NewWriterClient(readWriteConn), s.broker)
-	reader := nopCloser{Buffer: bytes.NewBuffer(req.Request.Body)}
+	reader := io.NopCloser(bytes.NewBuffer(req.Request.Body))
 
 	// create the request with the current context
 	request, err := http.NewRequestWithContext(
@@ -176,7 +176,6 @@ func (s *Server) HandleSimple(ctx context.Context, r *ghttpproto.HandleSimpleHTT
 }
 
 type ResponseWriter struct {
-	http.ResponseWriter
 	body       *bytes.Buffer
 	header     http.Header
 	statusCode int
@@ -211,13 +210,4 @@ func (w *ResponseWriter) StatusCode() int {
 
 func (w *ResponseWriter) Body() *bytes.Buffer {
 	return w.body
-}
-
-// Hijack will not work here ensure error is clear.
-func (w *ResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	hijacker, ok := w.ResponseWriter.(http.Hijacker)
-	if !ok {
-		return nil, nil, fmt.Errorf("gateway: responseWriter doesn't support the Hijacker interface")
-	}
-	return hijacker.Hijack()
 }
