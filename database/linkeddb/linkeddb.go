@@ -34,7 +34,7 @@ type LinkedDB interface {
 }
 
 type linkedDB struct {
-	// lock ensure that this datastructure handles its thread safety correctly.
+	// lock ensure that this data structure handles its thread safety correctly.
 	lock sync.RWMutex
 
 	cacheLock sync.Mutex

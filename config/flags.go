@@ -114,15 +114,16 @@ func addNodeFlags(fs *flag.FlagSet) {
 
 	// Peer List Gossip
 	gossipHelpMsg := fmt.Sprintf(
-		"Gossip [%s] peers to [%s] peers every [%s]",
-		NetworkPeerListSizeKey,
-		NetworkPeerListGossipSizeKey,
+		"Gossip [%s] validator IPs to [%s] validators and [%s] non-validators every [%s]",
+		NetworkPeerListNumValidatorIPsKey,
+		NetworkPeerListValidatorGossipSizeKey,
+		NetworkPeerListNonValidatorGossipSizeKey,
 		NetworkPeerListGossipFreqKey,
 	)
-	fs.Uint(NetworkPeerListSizeKey, 20, gossipHelpMsg)
-	fs.Uint(NetworkPeerListGossipSizeKey, 50, gossipHelpMsg)
+	fs.Uint(NetworkPeerListNumValidatorIPsKey, 20, gossipHelpMsg)
+	fs.Uint(NetworkPeerListValidatorGossipSizeKey, 25, gossipHelpMsg)
+	fs.Uint(NetworkPeerListNonValidatorGossipSizeKey, 25, gossipHelpMsg)
 	fs.Duration(NetworkPeerListGossipFreqKey, time.Minute, gossipHelpMsg)
-	fs.Uint(NetworkPeerListStakerGossipFractionKey, 2, fmt.Sprintf("1 of each %s peer list messages gossiped will be to validators", NetworkPeerListStakerGossipFractionKey))
 
 	// Public IP Resolution
 	fs.String(PublicIPKey, "", "Public IP of this node for P2P communication. If empty, try to discover with NAT. Ignored if dynamic-public-ip is non-empty")
@@ -142,17 +143,14 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(NetworkMaximumInboundTimeoutKey, 10*time.Second, "Maximum timeout value of an inbound message. Defines duration within which an incoming message must be fulfilled. Incoming messages containing deadline higher than this value will be overridden with this value.")
 	fs.Duration(NetworkTimeoutHalflifeKey, 5*time.Minute, "Halflife of average network response time. Higher value --> network timeout is less volatile. Can't be 0")
 	fs.Float64(NetworkTimeoutCoefficientKey, 2, "Multiplied by average network response time to get the network timeout. Must be >= 1")
-	fs.Duration(NetworkGetVersionTimeoutKey, 10*time.Second, "Timeout for waiting GetVersion response from peers in handshake")
 	fs.Duration(NetworkReadHandshakeTimeoutKey, 15*time.Second, "Timeout value for reading handshake messages")
 	fs.Duration(NetworkPingTimeoutKey, constants.DefaultPingPongTimeout, "Timeout value for Ping-Pong with a peer")
 	fs.Duration(NetworkPingFrequencyKey, constants.DefaultPingFrequency, "Frequency of pinging other peers")
 
 	fs.Bool(NetworkCompressionEnabledKey, true, "If true, compress certain outbound messages. This node will be able to parse compressed inbound messages regardless of this flag's value")
 	fs.Duration(NetworkMaxClockDifferenceKey, time.Minute, "Max allowed clock difference value between this node and peers")
-	fs.Bool(NetworkAllowPrivateIPsKey, true, "Allows the node to connect peers with private IPs")
+	fs.Bool(NetworkAllowPrivateIPsKey, true, "Allows the node to initiate outbound connection attempts to peers with private IPs")
 	fs.Bool(NetworkRequireValidatorToConnectKey, false, "If true, this node will only maintain a connection with another node if this node is a validator, the other node is a validator, or the other node is a beacon")
-	// Peer alias configuration
-	fs.Duration(PeerAliasTimeoutKey, 10*time.Minute, "How often the node will attempt to connect to an IP address previously associated with a peer (i.e. a peer alias)")
 
 	// Benchlist
 	fs.Int(BenchlistFailThresholdKey, 10, "Number of consecutive failed queries before benchlisting a node")

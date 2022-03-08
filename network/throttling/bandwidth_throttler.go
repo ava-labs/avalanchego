@@ -117,7 +117,7 @@ func (t *bandwidthThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 		return
 	}
 	// TODO Allow cancellation using context?
-	if err := limiter.WaitN(context.Background(), int(msgSize)); err != nil {
+	if err := limiter.WaitN(context.TODO(), int(msgSize)); err != nil {
 		// This should never happen.
 		t.log.Warn("error while awaiting %d bytes for %s: %s", msgSize, nodeID.PrefixedString(constants.NodeIDPrefix), err)
 	}

@@ -16,11 +16,8 @@ var _ OutboundMsgBuilder = &outMsgBuilder{}
 // with a reference count of 1. Once the reference count hits 0, the message
 // bytes should no longer be accessed.
 type OutboundMsgBuilder interface {
-	GetVersion() (OutboundMessage, error)
-
 	Version(
-		networkID,
-		nodeID uint32,
+		networkID uint32,
 		myTime uint64,
 		ip utils.IPDesc,
 		myVersion string,
@@ -29,9 +26,10 @@ type OutboundMsgBuilder interface {
 		trackedSubnets []ids.ID,
 	) (OutboundMessage, error)
 
-	GetPeerList() (OutboundMessage, error)
-
-	PeerList(peers []utils.IPCertDesc) (OutboundMessage, error)
+	PeerList(
+		peers []utils.IPCertDesc,
+		bypassThrottling bool,
+	) (OutboundMessage, error)
 
 	Ping() (OutboundMessage, error)
 
@@ -141,18 +139,8 @@ func NewOutboundBuilder(c Codec, enableCompression bool) OutboundMsgBuilder {
 	}
 }
 
-func (b *outMsgBuilder) GetVersion() (OutboundMessage, error) {
-	return b.c.Pack(
-		GetVersion,
-		nil,
-		GetVersion.Compressible(), // GetVersion messages can't be compressed
-		false,
-	)
-}
-
 func (b *outMsgBuilder) Version(
-	networkID,
-	nodeID uint32,
+	networkID uint32,
 	myTime uint64,
 	ip utils.IPDesc,
 	myVersion string,
@@ -169,7 +157,7 @@ func (b *outMsgBuilder) Version(
 		Version,
 		map[Field]interface{}{
 			NetworkID:      networkID,
-			NodeID:         nodeID,
+			NodeID:         uint32(0),
 			MyTime:         myTime,
 			IP:             ip,
 			VersionStr:     myVersion,
@@ -178,27 +166,18 @@ func (b *outMsgBuilder) Version(
 			TrackedSubnets: subnetIDBytes,
 		},
 		Version.Compressible(), // Version Messages can't be compressed
-		false,
+		true,
 	)
 }
 
-func (b *outMsgBuilder) GetPeerList() (OutboundMessage, error) {
-	return b.c.Pack(
-		GetPeerList,
-		nil,
-		GetPeerList.Compressible(), // GetPeerList messages can't be compressed
-		false,
-	)
-}
-
-func (b *outMsgBuilder) PeerList(peers []utils.IPCertDesc) (OutboundMessage, error) {
+func (b *outMsgBuilder) PeerList(peers []utils.IPCertDesc, bypassThrottling bool) (OutboundMessage, error) {
 	return b.c.Pack(
 		PeerList,
 		map[Field]interface{}{
 			SignedPeers: peers,
 		},
 		b.compress && PeerList.Compressible(), // PeerList messages may be compressed
-		false,
+		bypassThrottling,
 	)
 }
 

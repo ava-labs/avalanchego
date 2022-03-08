@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package network
+package peer
 
 import (
 	"crypto/tls"
@@ -14,9 +14,10 @@ import (
 )
 
 var (
-	errNoCert          = errors.New("tls handshake finished with no peer certificate")
-	_         Upgrader = &tlsServerUpgrader{}
-	_         Upgrader = &tlsClientUpgrader{}
+	errNoCert = errors.New("tls handshake finished with no peer certificate")
+
+	_ Upgrader = &tlsServerUpgrader{}
+	_ Upgrader = &tlsClientUpgrader{}
 )
 
 type Upgrader interface {
@@ -62,11 +63,11 @@ func connToIDAndCert(conn *tls.Conn) (ids.ShortID, net.Conn, *x509.Certificate, 
 		return ids.ShortID{}, nil, nil, errNoCert
 	}
 	peerCert := state.PeerCertificates[0]
-	return certToID(peerCert), conn, peerCert, nil
+	return CertToID(peerCert), conn, peerCert, nil
 }
 
-func certToID(cert *x509.Certificate) ids.ShortID {
-	return ids.ShortID(
-		hashing.ComputeHash160Array(
-			hashing.ComputeHash256(cert.Raw)))
+func CertToID(cert *x509.Certificate) ids.ShortID {
+	return hashing.ComputeHash160Array(
+		hashing.ComputeHash256(cert.Raw),
+	)
 }

@@ -15,14 +15,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/version"
 )
 
 // Router routes consensus messages to the Handler of the consensus
 // engine that the messages are intended for
 type Router interface {
-	ExternalRouter
-	InternalRouter
+	ExternalHandler
+	InternalHandler
 
 	Initialize(
 		nodeID ids.ShortID,
@@ -41,10 +40,9 @@ type Router interface {
 	health.Checker
 }
 
-// ExternalRouter routes messages from the network to the
-// Handler of the consensus engine that the message is intended for
-type ExternalRouter interface {
-	HandleInbound(msg message.InboundMessage)
+// InternalHandler deals with messages internal to this node
+type InternalHandler interface {
+	benchlist.Benchable
 
 	RegisterRequest(
 		nodeID ids.ShortID,
@@ -52,12 +50,4 @@ type ExternalRouter interface {
 		requestID uint32,
 		op message.Op,
 	)
-}
-
-// InternalRouter deals with messages internal to this node
-type InternalRouter interface {
-	benchlist.Benchable
-
-	Connected(nodeID ids.ShortID, nodeVersion version.Application)
-	Disconnected(nodeID ids.ShortID)
 }
