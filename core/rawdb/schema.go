@@ -61,6 +61,13 @@ var (
 	// offlinePruningKey tracks runs of offline pruning
 	offlinePruningKey = []byte("OfflinePruning")
 
+	// populateMissingTriesKey tracks runs of trie backfills
+	populateMissingTriesKey = []byte("PopulateMissingTries")
+
+	// pruningDisabledKey tracks whether the node has ever run in archival mode
+	// to ensure that a user does not accidentally corrupt an archival node.
+	pruningDisabledKey = []byte("PruningDisabled")
+
 	// Data item prefixes (use single byte to avoid mixing data types, avoid `i`, used for indexes).
 	headerPrefix       = []byte("h") // headerPrefix + num (uint64 big endian) + hash -> header
 	headerHashSuffix   = []byte("n") // headerPrefix + num (uint64 big endian) + headerHashSuffix -> hash

@@ -186,15 +186,22 @@ func New(
 			AllowUnfinalizedQueries: config.AllowUnfinalizedQueries,
 		}
 		cacheConfig = &core.CacheConfig{
-			TrieCleanLimit: config.TrieCleanCache,
-			TrieDirtyLimit: config.TrieDirtyCache,
-			Pruning:        config.Pruning,
-			SnapshotLimit:  config.SnapshotCache,
-			SnapshotAsync:  config.SnapshotAsync,
-			SnapshotVerify: config.SnapshotVerify,
-			Preimages:      config.Preimages,
+			TrieCleanLimit:       config.TrieCleanCache,
+			TrieDirtyLimit:       config.TrieDirtyCache,
+			Pruning:              config.Pruning,
+			PopulateMissingTries: config.PopulateMissingTries,
+			AllowMissingTries:    config.AllowMissingTries,
+			SnapshotLimit:        config.SnapshotCache,
+			SnapshotAsync:        config.SnapshotAsync,
+			SnapshotVerify:       config.SnapshotVerify,
+			Preimages:            config.Preimages,
 		}
 	)
+
+	if err := eth.precheckPopulateMissingTries(); err != nil {
+		return nil, err
+	}
+
 	var err error
 	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, chainConfig, eth.engine, vmConfig, lastAcceptedHash)
 	if err != nil {
@@ -366,7 +373,41 @@ func (s *Ethereum) LastAcceptedBlock() *types.Block {
 	return s.blockchain.LastAcceptedBlock()
 }
 
+// precheckPopulateMissingTries returns an error if config flags should prevent
+// [populateMissingTries]
+//
+// NOTE: [populateMissingTries] is called from [New] to ensure all
+// state is repaired before any async processes (specifically snapshot re-generation)
+// are started which could interfere with historical re-generation.
+func (s *Ethereum) precheckPopulateMissingTries() error {
+	if s.config.PopulateMissingTries != nil && (s.config.Pruning || s.config.OfflinePruning) {
+		return fmt.Errorf("cannot run populate missing tries when pruning (enabled: %t)/offline pruning (enabled: %t) is enabled", s.config.Pruning, s.config.OfflinePruning)
+	}
+
+	if s.config.PopulateMissingTries == nil {
+		// Delete the populate missing tries marker to indicate that the node started with
+		// populate missing tries disabled.
+		if err := rawdb.DeletePopulateMissingTries(s.chainDb); err != nil {
+			return fmt.Errorf("failed to write populate missing tries disabled marker: %w", err)
+		}
+		return nil
+	}
+
+	if lastRun, err := rawdb.ReadPopulateMissingTries(s.chainDb); err == nil {
+		log.Error("Populate missing tries is not meant to be left enabled permanently. Please disable populate missing tries and allow your node to start successfully before running again.")
+		return fmt.Errorf("cannot start chain with populate missing tries enabled on consecutive starts (last=%v)", lastRun)
+	}
+
+	// Note: Time Marker is written inside of [populateMissingTries] once it
+	// succeeds inside of [NewBlockChain]
+	return nil
+}
+
 func (s *Ethereum) handleOfflinePruning(cacheConfig *core.CacheConfig, chainConfig *params.ChainConfig, vmConfig vm.Config, lastAcceptedHash common.Hash) error {
+	if s.config.OfflinePruning && !s.config.Pruning {
+		return core.ErrRefuseToCorruptArchiver
+	}
+
 	if !s.config.OfflinePruning {
 		// Delete the offline pruning marker to indicate that the node started with offline pruning disabled.
 		if err := rawdb.DeleteOfflinePruning(s.chainDb); err != nil {
@@ -379,9 +420,9 @@ func (s *Ethereum) handleOfflinePruning(cacheConfig *core.CacheConfig, chainConf
 	// to the last accepted block before pruning begins.
 	// If offline pruning marker is on disk, then we force the node to be started with offline pruning disabled
 	// before allowing another run of offline pruning.
-	if _, err := rawdb.ReadOfflinePruning(s.chainDb); err == nil {
+	if lastRun, err := rawdb.ReadOfflinePruning(s.chainDb); err == nil {
 		log.Error("Offline pruning is not meant to be left enabled permanently. Please disable offline pruning and allow your node to start successfully before running offline pruning again.")
-		return errors.New("cannot start chain with offline pruning enabled on consecutive starts")
+		return fmt.Errorf("cannot start chain with offline pruning enabled on consecutive starts (last=%v)", lastRun)
 	}
 
 	// Clean up middle roots
@@ -401,6 +442,8 @@ func (s *Ethereum) handleOfflinePruning(cacheConfig *core.CacheConfig, chainConf
 	if err := pruner.Prune(targetRoot); err != nil {
 		return fmt.Errorf("failed to prune blockchain with target root: %s due to: %w", targetRoot, err)
 	}
+	// Note: Time Marker is written inside of [Prune] before compaction begins
+	// (considered an optional optimization)
 	s.blockchain, err = core.NewBlockChain(s.chainDb, cacheConfig, chainConfig, s.engine, vmConfig, lastAcceptedHash)
 	if err != nil {
 		return fmt.Errorf("failed to re-initialize blockchain after offline pruning: %w", err)
