@@ -66,7 +66,7 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
 	req := &ghttpproto.HTTPRequest{
@@ -167,7 +167,7 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	_, err = c.client.Handle(r.Context(), req)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
