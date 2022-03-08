@@ -16,9 +16,12 @@ import (
 	"github.com/gorilla/mux"
 	gorillarpc "github.com/gorilla/rpc/v2"
 	"github.com/gorilla/websocket"
+
 	hclog "github.com/hashicorp/go-hclog"
 	plugin "github.com/hashicorp/go-plugin"
+
 	"github.com/stretchr/testify/assert"
+
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 

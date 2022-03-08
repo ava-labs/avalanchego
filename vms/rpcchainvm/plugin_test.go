@@ -12,6 +12,7 @@ import (
 
 	hclog "github.com/hashicorp/go-hclog"
 	plugin "github.com/hashicorp/go-plugin"
+
 	"google.golang.org/grpc"
 
 	"github.com/ava-labs/avalanchego/api/proto/vmproto"
