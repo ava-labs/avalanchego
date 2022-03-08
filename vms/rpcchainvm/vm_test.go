@@ -30,7 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
 
-// Test_VMCreateHandlers tests the HTTP and HTTPSimple services by creating a plugin and
+// Test_VMCreateHandlers tests the Handle and HandleSimple RPCs by creating a plugin and
 // serving the handlers exposed by the subnet. The test then will exercise the service
 // as a regression test.
 func Test_VMCreateHandlers(t *testing.T) {
@@ -49,7 +49,7 @@ func Test_VMCreateHandlers(t *testing.T) {
 		payload []byte
 	}{
 		{
-			name:    "test rpc and websocket",
+			name:    "test HTTP gRPC service",
 			payload: pingBody,
 		},
 	}
@@ -107,16 +107,16 @@ func Test_VMCreateHandlers(t *testing.T) {
 				switch endpoint {
 				case "/rpc":
 					err := testHTTPPingRequest(target, endpoint, scenario.payload)
-					assert.NoErrorf(err, "%s test failed: %v", endpoint, err)
+					assert.NoErrorf(err, "%s rpc ping failed: %v", endpoint, err)
 
 				case "/ws":
 					// expected number of msg echos to receive from websocket server.
 					// This test is sanity for conn hijack and server push.
 					expectedMsgCount := 5
 					err := testWebsocketEchoRequest(target, endpoint, expectedMsgCount, scenario.payload)
-					assert.NoErrorf(err, "%s test failed: %v", endpoint, err)
+					assert.NoErrorf(err, "%s websocket echo failed: %v", endpoint, err)
 				default:
-					t.Fatal("unknown endpoint")
+					t.Fatal("unknown handler")
 				}
 			}
 		})
@@ -152,7 +152,7 @@ func testHTTPPingRequest(target, endpoint string, payload []byte) error {
 	return nil
 }
 
-func testWebsocketEchoRequest(target, endpoint string, expectedMsgCount int ,payload []byte) error {
+func testWebsocketEchoRequest(target, endpoint string, expectedMsgCount int, payload []byte) error {
 	dialTarget := fmt.Sprintf("ws://%s%s", target, endpoint)
 	cli, _, err := websocket.DefaultDialer.Dial(dialTarget, nil) //nolint
 	if err != nil {
