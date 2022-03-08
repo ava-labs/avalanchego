@@ -55,7 +55,7 @@ func NewDefaultConfig() Config {
 		LightPeers:         100,
 		UltraLightFraction: 75,
 		DatabaseCache:      512,
-		TrieCleanCache:     75,
+		TrieCleanCache:     128,
 		TrieDirtyCache:     256,
 		SnapshotCache:      128,
 		Miner:              miner.Config{},
