@@ -117,6 +117,7 @@ func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*empt
 			DidResume:                   req.Request.Tls.DidResume,
 			CipherSuite:                 uint16(req.Request.Tls.CipherSuite),
 			NegotiatedProtocol:          req.Request.Tls.NegotiatedProtocol,
+			NegotiatedProtocolIsMutual:  true, // always true per https://pkg.go.dev/crypto/tls#ConnectionState
 			ServerName:                  req.Request.Tls.ServerName,
 			PeerCertificates:            make([]*x509.Certificate, len(req.Request.Tls.PeerCertificates.Cert)),
 			VerifiedChains:              make([][]*x509.Certificate, len(req.Request.Tls.VerifiedChains)),

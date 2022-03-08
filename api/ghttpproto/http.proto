@@ -61,7 +61,7 @@ message Certificates {
 // ConnectionState is tls.ConnectionState see: https://pkg.go.dev/crypto/tls#ConnectionState
 message ConnectionState {
     // reserved fields ids have been removed and should not be reused
-    reserved 6, 12;
+    reserved 12;
     // version is the TLS version used by the connection (e.g. VersionTLS12)
     uint32 version = 1;
     // handshake_complete is true if the handshake has concluded
@@ -73,6 +73,8 @@ message ConnectionState {
     uint32 cipher_suite = 4;
     // negotiated_protocol is the application protocol negotiated with ALPN
     string negotiated_protocol = 5;
+    // negotiated_protocol_is_mutual used to indicate a mutual NPN negotiation.
+    bool negotiated_protocol_is_mutual = 6;
     // server_name is the value of the Server Name Indication extension sent by
     // the client
     string server_name = 7;
