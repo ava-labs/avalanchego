@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"net/http"
 
-	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
+
+	spb "google.golang.org/genproto/googleapis/rpc/status"
 
 	"github.com/ava-labs/avalanchego/api/proto/ghttpproto"
 )
