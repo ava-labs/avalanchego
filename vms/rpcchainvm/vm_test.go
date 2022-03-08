@@ -110,7 +110,10 @@ func Test_VMCreateHandlers(t *testing.T) {
 					assert.NoErrorf(err, "%s test failed: %v", endpoint, err)
 
 				case "/ws":
-					err := testWebsocketEchoRequest(target, endpoint, scenario.payload)
+					// expected number of msg echos to receive from websocket server.
+					// This test is sanity for conn hijack and server push.
+					expectedMsgCount := 5
+					err := testWebsocketEchoRequest(target, endpoint, expectedMsgCount, scenario.payload)
 					assert.NoErrorf(err, "%s test failed: %v", endpoint, err)
 				default:
 					t.Fatal("unknown endpoint")
@@ -149,7 +152,7 @@ func testHTTPPingRequest(target, endpoint string, payload []byte) error {
 	return nil
 }
 
-func testWebsocketEchoRequest(target, endpoint string, payload []byte) error {
+func testWebsocketEchoRequest(target, endpoint string, expectedMsgCount int ,payload []byte) error {
 	dialTarget := fmt.Sprintf("ws://%s%s", target, endpoint)
 	cli, _, err := websocket.DefaultDialer.Dial(dialTarget, nil) //nolint
 	if err != nil {
@@ -162,9 +165,6 @@ func testWebsocketEchoRequest(target, endpoint string, payload []byte) error {
 		return err
 	}
 
-	// expected number of msg echos to receive from websocket server.
-	// This test is sanity for conn hijack and server push.
-	expectedMsgCount := 5
 	i := 0
 	for i < expectedMsgCount {
 		i++
