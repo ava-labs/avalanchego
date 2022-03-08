@@ -15,7 +15,7 @@ The Subnet EVM runs in a separate process from the main AvalancheGo process and 
 ### AvalancheGo Compatibility
 ```
 [v0.1.0] AvalancheGo@v1.7.0-v1.7.4
-[v0.1.1] AvalancheGo@v1.7.5
+[v0.1.1-v0.1.2] AvalancheGo@v1.7.5-v1.7.6
 ```
 
 ## API
