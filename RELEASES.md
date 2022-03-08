@@ -3,6 +3,9 @@
 ## [v0.8.7](https://github.com/ava-labs/coreth/releases/tag/v0.8.7)
 
 - Optimize FeeHistory API
+- Add protection to prevent accidental corruption of archival node trie index
+- Add capability to restore complete trie index on best effort basis
+- Round up fastcache sizes to utilize all mmap'd memory in chunks of 64MB
 
 ## [v0.8.6](https://github.com/ava-labs/coreth/releases/tag/v0.8.6)
 
