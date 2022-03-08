@@ -4,6 +4,7 @@
 package ghttp
 
 import (
+	"io"
 	"net/http"
 
 	"google.golang.org/grpc"
@@ -11,10 +12,8 @@ import (
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/ava-labs/avalanchego/api/proto/ghttpproto"
-	"github.com/ava-labs/avalanchego/api/proto/greadcloserproto"
 	"github.com/ava-labs/avalanchego/api/proto/gresponsewriterproto"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greadcloser"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
@@ -37,6 +36,15 @@ func NewClient(client ghttpproto.HTTPClient, broker *plugin.GRPCBroker) *Client 
 }
 
 func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// rfc2616#section-14.42: The Upgrade general-header allows the client
+	// to specify a communication protocols it supports and would like to
+	// use. Upgrade (e.g. websockets) is a more expensive transaction and
+	// if not required use the less expensive HTTPSimple.
+	if !isUpgradeRequest(r) {
+		c.serveHTTPSimple(w, r)
+		return
+	}
+
 	closer := grpcutils.ServerCloser{}
 	defer closer.GracefulStop()
 
@@ -44,7 +52,7 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w = gresponsewriter.NewLockedWriter(w)
 
 	readerWriterID := c.broker.NextId()
-	// start gRPC server which serves the request body and manages responsewriter io.
+	// Start responsewriter gRPC service.
 	go c.broker.AcceptAndServe(readerWriterID, func(opts []grpc.ServerOption) *grpc.Server {
 		opts = append(opts,
 			grpc.MaxRecvMsgSize(math.MaxInt),
@@ -52,12 +60,15 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		)
 		server := grpc.NewServer(opts...)
 		closer.Add(server)
-		// register read closer service
-		greadcloserproto.RegisterReaderServer(server, greadcloser.NewServer(r.Body))
-		// register responsewriter service
 		gresponsewriterproto.RegisterWriterServer(server, gresponsewriter.NewServer(w, c.broker))
 		return server
 	})
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	req := &ghttpproto.HTTPRequest{
 		ResponseWriter: &ghttpproto.ResponseWriter{
@@ -65,13 +76,12 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Header: make([]*ghttpproto.Element, 0, len(r.Header)),
 		},
 		Request: &ghttpproto.Request{
-			Method:     r.Method,
-			Proto:      r.Proto,
-			ProtoMajor: int32(r.ProtoMajor),
-			ProtoMinor: int32(r.ProtoMinor),
-			Header:     make([]*ghttpproto.Element, 0, len(r.Header)),
-			// Body: the body is unused in the request itself and is served via the
-			// read closer service above.
+			Method:           r.Method,
+			Proto:            r.Proto,
+			ProtoMajor:       int32(r.ProtoMajor),
+			ProtoMinor:       int32(r.ProtoMinor),
+			Header:           make([]*ghttpproto.Element, 0, len(r.Header)),
+			Body:             body,
 			ContentLength:    r.ContentLength,
 			TransferEncoding: r.TransferEncoding,
 			Host:             r.Host,
@@ -130,20 +140,18 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if r.TLS != nil {
 		req.Request.Tls = &ghttpproto.ConnectionState{
-			Version:                    uint32(r.TLS.Version),
-			HandshakeComplete:          r.TLS.HandshakeComplete,
-			DidResume:                  r.TLS.DidResume,
-			CipherSuite:                uint32(r.TLS.CipherSuite),
-			NegotiatedProtocol:         r.TLS.NegotiatedProtocol,
-			NegotiatedProtocolIsMutual: r.TLS.NegotiatedProtocolIsMutual,
-			ServerName:                 r.TLS.ServerName,
+			Version:            uint32(r.TLS.Version),
+			HandshakeComplete:  r.TLS.HandshakeComplete,
+			DidResume:          r.TLS.DidResume,
+			CipherSuite:        uint32(r.TLS.CipherSuite),
+			NegotiatedProtocol: r.TLS.NegotiatedProtocol,
+			ServerName:         r.TLS.ServerName,
 			PeerCertificates: &ghttpproto.Certificates{
 				Cert: make([][]byte, len(r.TLS.PeerCertificates)),
 			},
 			VerifiedChains:              make([]*ghttpproto.Certificates, len(r.TLS.VerifiedChains)),
 			SignedCertificateTimestamps: r.TLS.SignedCertificateTimestamps,
 			OcspResponse:                r.TLS.OCSPResponse,
-			TlsUnique:                   r.TLS.TLSUnique,
 		}
 		for i, cert := range r.TLS.PeerCertificates {
 			req.Request.Tls.PeerCertificates.Cert[i] = cert.Raw
@@ -158,8 +166,62 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_, err := c.client.Handle(r.Context(), req)
+	_, err = c.client.Handle(r.Context(), req)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+// serveHTTPSimple converts an http request to a gRPC HTTPRequest and returns the
+// response to the client. Protocol upgrade requests (websockets) are not supported
+// and should use ServeHTTP. Based on https://www.weave.works/blog/turtles-way-http-grpc.
+func (c *Client) serveHTTPSimple(w http.ResponseWriter, r *http.Request) {
+	req, err := getHTTPSimpleRequest(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	resp, err := c.client.HandleSimple(r.Context(), req)
+	if err != nil {
+		// Some errors will actually contain a valid resp, just need to unpack it
+		var ok bool
+		resp, ok = grpcutils.GetHTTPResponseFromError(err)
+		if !ok {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if err := convertWriteResponse(w, resp); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+// getHTTPSimpleRequest takes an http request as input and returns a gRPC HandleSimpleHTTPRequest.
+func getHTTPSimpleRequest(r *http.Request) (*ghttpproto.HandleSimpleHTTPRequest, error) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return nil, err
+	}
+	return &ghttpproto.HandleSimpleHTTPRequest{
+		Method:  r.Method,
+		Url:     r.RequestURI,
+		Body:    body,
+		Headers: grpcutils.GetHTTPHeader(r.Header),
+	}, nil
+}
+
+// convertWriteResponse converts a gRPC HandleSimpleHTTPResponse to an HTTP response.
+func convertWriteResponse(w http.ResponseWriter, resp *ghttpproto.HandleSimpleHTTPResponse) error {
+	grpcutils.MergeHTTPHeader(resp.Headers, w.Header())
+	w.WriteHeader(int(resp.Code))
+	_, err := w.Write(resp.Body)
+	return err
+}
+
+// isUpgradeRequest returns true if the upgrade key exists in header and value is non empty.
+func isUpgradeRequest(req *http.Request) bool {
+	return req.Header.Get("Upgrade") != ""
 }
