@@ -5,6 +5,7 @@ package evm
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/coreth/eth"
@@ -67,9 +68,13 @@ type Config struct {
 
 	// Eth Settings
 	Preimages      bool `json:"preimages-enabled"`
-	Pruning        bool `json:"pruning-enabled"`
 	SnapshotAsync  bool `json:"snapshot-async"`
 	SnapshotVerify bool `json:"snapshot-verification-enabled"`
+
+	// Pruning Settings
+	Pruning              bool    `json:"pruning-enabled"`                  // If enabled, trie roots are only persisted every 4096 blocks
+	AllowMissingTries    bool    `json:"allow-missing-tries"`              // If enabled, warnings preventing an incomplete trie index are suppressed
+	PopulateMissingTries *uint64 `json:"populate-missing-tries,omitempty"` // Sets the starting point for re-populating missing tries. Disables re-generation if nil.
 
 	// Metric Settings
 	MetricsEnabled          bool `json:"metrics-enabled"`
@@ -143,4 +148,17 @@ func (d *Duration) UnmarshalJSON(data []byte) (err error) {
 	}
 	d.Duration, err = cast.ToDurationE(v)
 	return err
+}
+
+// Validate returns an error if this is an invalid config.
+func (c *Config) Validate() error {
+	if c.PopulateMissingTries != nil && (c.OfflinePruning || c.Pruning) {
+		return fmt.Errorf("cannot enable populate missing tries while offline pruning (enabled: %t)/pruning (enabled: %t) are enabled", c.OfflinePruning, c.Pruning)
+	}
+
+	if !c.Pruning && c.OfflinePruning {
+		return fmt.Errorf("cannot run offline pruning while pruning is disabled")
+	}
+
+	return nil
 }

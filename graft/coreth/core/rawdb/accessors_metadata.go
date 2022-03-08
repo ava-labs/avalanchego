@@ -171,36 +171,87 @@ func UpdateUncleanShutdownMarker(db ethdb.KeyValueStore) {
 	}
 }
 
+// WriteTimeMarker writes a marker of the current time in the db at [key]
+func WriteTimeMarker(db ethdb.KeyValueStore, key []byte) error {
+	data, err := rlp.EncodeToBytes(uint64(time.Now().Unix()))
+	if err != nil {
+		return err
+	}
+	return db.Put(key, data)
+}
+
+// ReadTimeMarker reads the timestamp stored at [key]
+func ReadTimeMarker(db ethdb.KeyValueStore, key []byte) (time.Time, error) {
+	data, err := db.Get(key)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	var lastRun uint64
+	if err := rlp.DecodeBytes(data, &lastRun); err != nil {
+		return time.Time{}, err
+	}
+
+	return time.Unix(int64(lastRun), 0), nil
+}
+
+// DeleteTimeMarker deletes any value stored at [key]
+func DeleteTimeMarker(db ethdb.KeyValueStore, key []byte) error {
+	return db.Delete(key)
+}
+
 // WriteOfflinePruning writes a marker of the last attempt to run offline pruning
 // The marker is written when offline pruning completes and is deleted when the node
 // is started successfully with offline pruning disabled. This ensures users must
 // disable offline pruning and start their node successfully between runs of offline
 // pruning.
 func WriteOfflinePruning(db ethdb.KeyValueStore) error {
-	data, err := rlp.EncodeToBytes(uint64(time.Now().Unix()))
-	if err != nil {
-		return err
-	}
-	return db.Put(offlinePruningKey, data)
+	return WriteTimeMarker(db, offlinePruningKey)
 }
 
-// ReadOfflinePruning reads to check if there is a marker of the last attempt
-// to run offline pruning.
-func ReadOfflinePruning(db ethdb.KeyValueStore) (uint64, error) {
-	data, err := db.Get(offlinePruningKey)
-	if err != nil {
-		return 0, err
-	}
-
-	var offlinePruningRun uint64
-	if err := rlp.DecodeBytes(data, &offlinePruningRun); err != nil {
-		return 0, err
-	}
-
-	return offlinePruningRun, nil
+// ReadOfflinePruning reads the most recent timestamp of an attempt to run offline
+// pruning if present.
+func ReadOfflinePruning(db ethdb.KeyValueStore) (time.Time, error) {
+	return ReadTimeMarker(db, offlinePruningKey)
 }
 
 // DeleteOfflinePruning deletes any marker of the last attempt to run offline pruning.
 func DeleteOfflinePruning(db ethdb.KeyValueStore) error {
-	return db.Delete(offlinePruningKey)
+	return DeleteTimeMarker(db, offlinePruningKey)
+}
+
+// WritePopulateMissingTries writes a marker for the current attempt to populate
+// missing tries.
+func WritePopulateMissingTries(db ethdb.KeyValueStore) error {
+	return WriteTimeMarker(db, populateMissingTriesKey)
+}
+
+// ReadPopulateMissingTries reads the most recent timestamp of an attempt to
+// re-populate missing trie nodes.
+func ReadPopulateMissingTries(db ethdb.KeyValueStore) (time.Time, error) {
+	return ReadTimeMarker(db, populateMissingTriesKey)
+}
+
+// DeletePopulateMissingTries deletes any marker of the last attempt to
+// re-populate missing trie nodes.
+func DeletePopulateMissingTries(db ethdb.KeyValueStore) error {
+	return DeleteTimeMarker(db, populateMissingTriesKey)
+}
+
+// WritePruningDisabled writes a marker to track whether the node has ever run
+// with pruning disabled.
+func WritePruningDisabled(db ethdb.KeyValueStore) error {
+	return db.Put(pruningDisabledKey, nil)
+}
+
+// HasPruningDisabled returns true if there is a marker present indicating that
+// the node has run with pruning disabled at some pooint.
+func HasPruningDisabled(db ethdb.KeyValueStore) (bool, error) {
+	return db.Has(pruningDisabledKey)
+}
+
+// DeletePruningDisabled deletes the marker indicating that the node has
+// run with pruning disabled.
+func DeletePruningDisabled(db ethdb.KeyValueStore) error {
+	return db.Delete(pruningDisabledKey)
 }
