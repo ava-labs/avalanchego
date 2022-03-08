@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"io"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -148,10 +149,11 @@ func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*empt
 // HandleSimple handles http requests over http2 using a simple request response model.
 // Websockets are not supported. Based on https://www.weave.works/blog/turtles-way-http-grpc/
 func (s *Server) HandleSimple(ctx context.Context, r *ghttpproto.HandleSimpleHTTPRequest) (*ghttpproto.HandleSimpleHTTPResponse, error) {
-	req, err := http.NewRequest(r.Method, r.Url, nopCloser{Buffer: bytes.NewBuffer(r.Body)})
+	req, err := http.NewRequest(r.Method, r.Url, io.NopCloser(bytes.NewBuffer(r.Body)))
 	if err != nil {
 		return nil, err
 	}
+
 	grpcutils.MergeHTTPHeader(r.Headers, req.Header)
 
 	req = req.WithContext(ctx)
@@ -171,10 +173,6 @@ func (s *Server) HandleSimple(ctx context.Context, r *ghttpproto.HandleSimpleHTT
 		return nil, grpcutils.GetGRPCErrorFromHTTPResponse(resp)
 	}
 	return resp, nil
-}
-
-type nopCloser struct {
-	*bytes.Buffer
 }
 
 type ResponseWriter struct {
