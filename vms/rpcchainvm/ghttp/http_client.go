@@ -66,7 +66,8 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	req := &ghttpproto.HTTPRequest{
@@ -177,7 +178,7 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (c *Client) serveHTTPSimple(w http.ResponseWriter, r *http.Request) {
 	req, err := getHTTPSimpleRequest(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -220,10 +221,7 @@ func convertWriteResponse(w http.ResponseWriter, resp *ghttpproto.HandleSimpleHT
 	return err
 }
 
-// isUpgradeRequest returns true if the upgrade key exists in header and is non empty.
+// isUpgradeRequest returns true if the upgrade key exists in header and value is non empty.
 func isUpgradeRequest(req *http.Request) bool {
-	if len(req.Header) == 0 {
-		return false
-	}
 	return req.Header.Get("Upgrade") != ""
 }
