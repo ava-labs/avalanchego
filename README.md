@@ -8,8 +8,14 @@ This chain implements the Ethereum Virtual Machine and supports Solidity smart c
 
 ## Building
 
-The C-Chain runs in a separate process from the main AvalancheGo process and communicates with it over a local gRPC connection.
-AvalancheGo's build script downloads Coreth, compiles it, and places the binary into the `avalanchego/build/plugins` directory.
+Coreth is a dependency of AvalancheGo which is used to implement the EVM based Virtual Machine for the Avalanche C-Chain. In order to run with a local version of Coreth, users must update their Coreth dependency within AvalancheGo to point to their local Coreth directory. If Coreth and AvalancheGo are at the standard location within your GOPATH, this will look like the following:
+
+```bash
+cd $GOPATH/src/github.com/ava-labs/avalanchego
+go mod edit -replace github.com/ava-labs/coreth=../coreth
+```
+
+Note: the C-Chain originally ran in a separate process from the main AvalancheGo process and communicated with it over a local gRPC connection. When this was the case, AvalancheGo's build script would download Coreth, compile it, and place the binary into the `avalanchego/build/plugins` directory.
 
 ## API
 
