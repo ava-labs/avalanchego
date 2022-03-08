@@ -107,6 +107,12 @@ type Ethereum struct {
 	settings Settings // Settings for Ethereum API
 }
 
+// roundUpCacheSize returns [input] rounded up to the next multiple of [allocSize]
+func roundUpCacheSize(input int, allocSize int) int {
+	cacheChunks := (input + allocSize - 1) / allocSize
+	return cacheChunks * allocSize
+}
+
 // New creates a new Ethereum object (including the
 // initialisation of the common Ethereum object)
 func New(
@@ -133,6 +139,12 @@ func New(
 			config.TrieDirtyCache = 0
 		}
 	}
+
+	// round TrieCleanCache and SnapshotCache up to nearest 64MB, since fastcache will mmap
+	// memory in 64MBs chunks.
+	config.TrieCleanCache = roundUpCacheSize(config.TrieCleanCache, 64)
+	config.SnapshotCache = roundUpCacheSize(config.SnapshotCache, 64)
+
 	log.Info("Allocated trie memory caches", "clean", common.StorageSize(config.TrieCleanCache)*1024*1024, "dirty", common.StorageSize(config.TrieDirtyCache)*1024*1024)
 
 	chainConfig, genesisErr := core.SetupGenesisBlock(chainDb, config.Genesis)
