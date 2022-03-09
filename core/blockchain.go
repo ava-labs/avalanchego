@@ -169,9 +169,7 @@ type BlockChain struct {
 	blockCache    *lru.Cache // Cache for the most recent entire blocks
 	txLookupCache *lru.Cache // Cache for the most recent transaction lookup data.
 
-	quit    chan struct{}  // blockchain quit channel
-	wg      sync.WaitGroup // chain processing wait group for shutting down
-	running int32          // 0 if chain is running, 1 when stopped
+	running int32 // 0 if chain is running, 1 when stopped
 
 	engine     consensus.Engine
 	validator  Validator  // Block and state validator interface
@@ -210,7 +208,6 @@ func NewBlockChain(
 			Cache:     cacheConfig.TrieCleanLimit,
 			Preimages: cacheConfig.Preimages,
 		}),
-		quit:          make(chan struct{}),
 		bodyCache:     bodyCache,
 		receiptsCache: receiptsCache,
 		blockCache:    blockCache,
@@ -547,10 +544,6 @@ func (bc *BlockChain) Stop() {
 	// Unsubscribe all subscriptions registered from blockchain.
 	bc.scope.Close()
 
-	// Signal shutdown to all goroutines.
-	close(bc.quit)
-	bc.wg.Wait()
-
 	if err := bc.stateManager.Shutdown(); err != nil {
 		log.Error("Failed to Shutdown state manager", "err", err)
 	}
@@ -710,9 +703,6 @@ func (bc *BlockChain) Reject(block *types.Block) error {
 // writeKnownBlock updates the head block flag with a known block
 // and introduces chain reorg if necessary.
 func (bc *BlockChain) writeKnownBlock(block *types.Block) error {
-	bc.wg.Add(1)
-	defer bc.wg.Done()
-
 	current := bc.CurrentBlock()
 	if block.ParentHash() != current.Hash() {
 		if err := bc.reorg(current, block); err != nil {
@@ -764,9 +754,6 @@ func (bc *BlockChain) writeBlockAndSetHead(block *types.Block, receipts []*types
 // writeBlockWithState writes the block and all associated state to the database,
 // but it expects the chain mutex to be held.
 func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, state *state.StateDB) error {
-	bc.wg.Add(1)
-	defer bc.wg.Done()
-
 	// Irrelevant of the canonical status, write the block itself to the database.
 	//
 	// Note all the components of block(hash->number map, header, body, receipts)
@@ -840,9 +827,6 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 		}
 	}
 	// Pre-checks passed, start the full block imports
-	bc.wg.Add(1)
-	defer bc.wg.Done()
-
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
 	for n, block := range chain {
@@ -862,11 +846,9 @@ func (bc *BlockChain) InsertBlockManual(block *types.Block, writes bool) error {
 	bc.blockProcFeed.Send(true)
 	defer bc.blockProcFeed.Send(false)
 
-	bc.wg.Add(1)
 	bc.chainmu.Lock()
 	err := bc.insertBlock(block, writes)
 	bc.chainmu.Unlock()
-	bc.wg.Done()
 
 	return err
 }
