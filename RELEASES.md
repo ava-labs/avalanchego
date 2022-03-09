@@ -1,5 +1,54 @@
 # Release Notes
 
+## [v1.7.7](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.7)
+
+This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.
+
+### Networking
+
+- Refactored the networking library to track potential peers by nodeID rather than IP.
+- Separated peer connections from the mesh network implementation to simplify testing.
+- Fixed duplicate `Connected` messages bug.
+- Supported establishing outbound connections with peers reporting different inbound and outbound IPs.
+
+### Database
+
+- Disabled seek compaction in leveldb by default.
+
+### GRPC
+
+- Increased protocol version, this requires all plugin definitions to update their communication dependencies.
+- Merged services to be served using the same server when possible.
+- Implemented a fast path for simple HTTP requests.
+- Removed duplicated message definitions.
+- Improved error reporting around invalid plugins.
+
+### Coreth
+
+- Optimized FeeHistory API.
+- Added protection to prevent accidental corruption of archival node trie index.
+- Added capability to restore complete trie index on best effort basis.
+- Rounded up fastcache sizes to utilize all mmap'd memory in chunks of 64MB.
+
+### Configs
+
+- Removed `--inbound-connection-throttling-max-recent`
+- Renamed `--network-peer-list-size` to `--network-peer-list-num-validator-ips`
+- Removed `--network-peer-list-gossip-size`
+- Removed `--network-peer-list-staker-gossip-fraction`
+- Added `--network-peer-list-validator-gossip-size`
+- Added `--network-peer-list-non-validator-gossip-size`
+- Removed `--network-get-version-timeout`
+- Removed `--benchlist-peer-summary-enabled`
+- Removed `--peer-alias-timeout`
+
+### Miscellaneous
+
+- Fixed error reporting when making Avalanche chains that did not manually specify a primary alias.
+- Added beacon utils for easier programmatic handling of beacon nodes.
+- Resolved the default log directory on initialization to avoid additional error handling.
+- Added support to the chain state module to specify an arbitrary new accepted block.
+
 ## [v1.7.6](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.6)
 
 This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.

@@ -17,7 +17,7 @@ import (
 var (
 	// Handshake is a common handshake that is shared by plugin and host.
 	Handshake = plugin.HandshakeConfig{
-		ProtocolVersion:  10,
+		ProtocolVersion:  11,
 		MagicCookieKey:   "VM_PLUGIN",
 		MagicCookieValue: "dynamic",
 	}
