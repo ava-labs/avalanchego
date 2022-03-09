@@ -364,9 +364,9 @@ func (n *Node) Dispatch() error {
 		n.Net.ManuallyTrack(n.Config.BootstrapIDs[i], peerIP)
 	}
 	// Add state sync nodes to the peer network
-	for _, peerIP := range n.Config.StateSyncIPs {
+	for i, peerIP := range n.Config.StateSyncIPs {
 		if !peerIP.Equal(n.Config.IP.IP()) {
-			n.Net.TrackIP(peerIP)
+			n.Net.ManuallyTrack(n.Config.StateSyncIDs[i], peerIP)
 		}
 	}
 
