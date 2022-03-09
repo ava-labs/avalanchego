@@ -13,8 +13,11 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -31,11 +34,13 @@ var (
 type Info struct {
 	Parameters
 	log           logging.Logger
+	myIP          *utils.DynamicIPDesc
 	networking    network.Network
 	chainManager  chains.Manager
 	vmManager     vms.Manager
 	versionParser version.ApplicationParser
 	validators    validators.Set
+	benchlist     benchlist.Manager
 }
 
 type Parameters struct {
@@ -55,9 +60,11 @@ func NewService(
 	log logging.Logger,
 	chainManager chains.Manager,
 	vmManager vms.Manager,
+	myIP *utils.DynamicIPDesc,
 	network network.Network,
 	versionParser version.ApplicationParser,
 	validators validators.Set,
+	benchlist benchlist.Manager,
 ) (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := json.NewCodec()
@@ -68,9 +75,11 @@ func NewService(
 		log:           log,
 		chainManager:  chainManager,
 		vmManager:     vmManager,
+		myIP:          myIP,
 		networking:    network,
 		versionParser: versionParser,
 		validators:    validators,
+		benchlist:     benchlist,
 	}, "info"); err != nil {
 		return nil, err
 	}
@@ -128,7 +137,7 @@ type GetNodeIPReply struct {
 func (service *Info) GetNodeIP(_ *http.Request, _ *struct{}, reply *GetNodeIPReply) error {
 	service.log.Debug("Info: GetNodeIP called")
 
-	reply.IP = service.networking.IP().String()
+	reply.IP = service.myIP.IP().String()
 	return nil
 }
 
@@ -177,12 +186,18 @@ type PeersArgs struct {
 	NodeIDs []string `json:"nodeIDs"`
 }
 
+type Peer struct {
+	peer.Info
+
+	Benched []ids.ID `json:"benched"`
+}
+
 // PeersReply are the results from calling Peers
 type PeersReply struct {
 	// Number of elements in [Peers]
 	NumPeers json.Uint64 `json:"numPeers"`
 	// Each element is a peer
-	Peers []network.PeerInfo `json:"peers"`
+	Peers []Peer `json:"peers"`
 }
 
 // Peers returns the list of current validators
@@ -197,7 +212,21 @@ func (service *Info) Peers(_ *http.Request, args *PeersArgs, reply *PeersReply) 
 		nodeIDs = append(nodeIDs, nID)
 	}
 
-	reply.Peers = service.networking.Peers(nodeIDs)
+	peers := service.networking.PeerInfo(nodeIDs)
+	peerInfo := make([]Peer, len(peers))
+	for i, peer := range peers {
+		nodeID, err := ids.ShortFromPrefixedString(peer.ID, constants.NodeIDPrefix)
+		if err != nil {
+			return err
+		}
+
+		peerInfo[i] = Peer{
+			Info:    peer,
+			Benched: service.benchlist.GetBenched(nodeID),
+		}
+	}
+
+	reply.Peers = peerInfo
 	reply.NumPeers = json.Uint64(len(reply.Peers))
 	return nil
 }

@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -22,12 +23,21 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ConnClient interface {
+	// Read reads data from the connection.
 	Read(ctx context.Context, in *ReadRequest, opts ...grpc.CallOption) (*ReadResponse, error)
+	// Write writes data to the connection.
 	Write(ctx context.Context, in *WriteRequest, opts ...grpc.CallOption) (*WriteResponse, error)
-	Close(ctx context.Context, in *CloseRequest, opts ...grpc.CallOption) (*CloseResponse, error)
-	SetDeadline(ctx context.Context, in *SetDeadlineRequest, opts ...grpc.CallOption) (*SetDeadlineResponse, error)
-	SetReadDeadline(ctx context.Context, in *SetReadDeadlineRequest, opts ...grpc.CallOption) (*SetReadDeadlineResponse, error)
-	SetWriteDeadline(ctx context.Context, in *SetWriteDeadlineRequest, opts ...grpc.CallOption) (*SetWriteDeadlineResponse, error)
+	// Close closes the connection.
+	Close(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// SetDeadline sets the read and write deadlines associated
+	// with the connection.
+	SetDeadline(ctx context.Context, in *SetDeadlineRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// SetReadDeadline sets the deadline for future Read calls
+	// and any currently-blocked Read call.
+	SetReadDeadline(ctx context.Context, in *SetDeadlineRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// SetWriteDeadline sets the deadline for future Write calls
+	// and any currently-blocked Write call.
+	SetWriteDeadline(ctx context.Context, in *SetDeadlineRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type connClient struct {
@@ -56,8 +66,8 @@ func (c *connClient) Write(ctx context.Context, in *WriteRequest, opts ...grpc.C
 	return out, nil
 }
 
-func (c *connClient) Close(ctx context.Context, in *CloseRequest, opts ...grpc.CallOption) (*CloseResponse, error) {
-	out := new(CloseResponse)
+func (c *connClient) Close(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/gconnproto.Conn/Close", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -65,8 +75,8 @@ func (c *connClient) Close(ctx context.Context, in *CloseRequest, opts ...grpc.C
 	return out, nil
 }
 
-func (c *connClient) SetDeadline(ctx context.Context, in *SetDeadlineRequest, opts ...grpc.CallOption) (*SetDeadlineResponse, error) {
-	out := new(SetDeadlineResponse)
+func (c *connClient) SetDeadline(ctx context.Context, in *SetDeadlineRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/gconnproto.Conn/SetDeadline", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -74,8 +84,8 @@ func (c *connClient) SetDeadline(ctx context.Context, in *SetDeadlineRequest, op
 	return out, nil
 }
 
-func (c *connClient) SetReadDeadline(ctx context.Context, in *SetReadDeadlineRequest, opts ...grpc.CallOption) (*SetReadDeadlineResponse, error) {
-	out := new(SetReadDeadlineResponse)
+func (c *connClient) SetReadDeadline(ctx context.Context, in *SetDeadlineRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/gconnproto.Conn/SetReadDeadline", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -83,8 +93,8 @@ func (c *connClient) SetReadDeadline(ctx context.Context, in *SetReadDeadlineReq
 	return out, nil
 }
 
-func (c *connClient) SetWriteDeadline(ctx context.Context, in *SetWriteDeadlineRequest, opts ...grpc.CallOption) (*SetWriteDeadlineResponse, error) {
-	out := new(SetWriteDeadlineResponse)
+func (c *connClient) SetWriteDeadline(ctx context.Context, in *SetDeadlineRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/gconnproto.Conn/SetWriteDeadline", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -96,12 +106,21 @@ func (c *connClient) SetWriteDeadline(ctx context.Context, in *SetWriteDeadlineR
 // All implementations must embed UnimplementedConnServer
 // for forward compatibility
 type ConnServer interface {
+	// Read reads data from the connection.
 	Read(context.Context, *ReadRequest) (*ReadResponse, error)
+	// Write writes data to the connection.
 	Write(context.Context, *WriteRequest) (*WriteResponse, error)
-	Close(context.Context, *CloseRequest) (*CloseResponse, error)
-	SetDeadline(context.Context, *SetDeadlineRequest) (*SetDeadlineResponse, error)
-	SetReadDeadline(context.Context, *SetReadDeadlineRequest) (*SetReadDeadlineResponse, error)
-	SetWriteDeadline(context.Context, *SetWriteDeadlineRequest) (*SetWriteDeadlineResponse, error)
+	// Close closes the connection.
+	Close(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
+	// SetDeadline sets the read and write deadlines associated
+	// with the connection.
+	SetDeadline(context.Context, *SetDeadlineRequest) (*emptypb.Empty, error)
+	// SetReadDeadline sets the deadline for future Read calls
+	// and any currently-blocked Read call.
+	SetReadDeadline(context.Context, *SetDeadlineRequest) (*emptypb.Empty, error)
+	// SetWriteDeadline sets the deadline for future Write calls
+	// and any currently-blocked Write call.
+	SetWriteDeadline(context.Context, *SetDeadlineRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedConnServer()
 }
 
@@ -115,16 +134,16 @@ func (UnimplementedConnServer) Read(context.Context, *ReadRequest) (*ReadRespons
 func (UnimplementedConnServer) Write(context.Context, *WriteRequest) (*WriteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Write not implemented")
 }
-func (UnimplementedConnServer) Close(context.Context, *CloseRequest) (*CloseResponse, error) {
+func (UnimplementedConnServer) Close(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Close not implemented")
 }
-func (UnimplementedConnServer) SetDeadline(context.Context, *SetDeadlineRequest) (*SetDeadlineResponse, error) {
+func (UnimplementedConnServer) SetDeadline(context.Context, *SetDeadlineRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetDeadline not implemented")
 }
-func (UnimplementedConnServer) SetReadDeadline(context.Context, *SetReadDeadlineRequest) (*SetReadDeadlineResponse, error) {
+func (UnimplementedConnServer) SetReadDeadline(context.Context, *SetDeadlineRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetReadDeadline not implemented")
 }
-func (UnimplementedConnServer) SetWriteDeadline(context.Context, *SetWriteDeadlineRequest) (*SetWriteDeadlineResponse, error) {
+func (UnimplementedConnServer) SetWriteDeadline(context.Context, *SetDeadlineRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetWriteDeadline not implemented")
 }
 func (UnimplementedConnServer) mustEmbedUnimplementedConnServer() {}
@@ -177,7 +196,7 @@ func _Conn_Write_Handler(srv interface{}, ctx context.Context, dec func(interfac
 }
 
 func _Conn_Close_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CloseRequest)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -189,7 +208,7 @@ func _Conn_Close_Handler(srv interface{}, ctx context.Context, dec func(interfac
 		FullMethod: "/gconnproto.Conn/Close",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ConnServer).Close(ctx, req.(*CloseRequest))
+		return srv.(ConnServer).Close(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -213,7 +232,7 @@ func _Conn_SetDeadline_Handler(srv interface{}, ctx context.Context, dec func(in
 }
 
 func _Conn_SetReadDeadline_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SetReadDeadlineRequest)
+	in := new(SetDeadlineRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -225,13 +244,13 @@ func _Conn_SetReadDeadline_Handler(srv interface{}, ctx context.Context, dec fun
 		FullMethod: "/gconnproto.Conn/SetReadDeadline",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ConnServer).SetReadDeadline(ctx, req.(*SetReadDeadlineRequest))
+		return srv.(ConnServer).SetReadDeadline(ctx, req.(*SetDeadlineRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _Conn_SetWriteDeadline_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SetWriteDeadlineRequest)
+	in := new(SetDeadlineRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -243,7 +262,7 @@ func _Conn_SetWriteDeadline_Handler(srv interface{}, ctx context.Context, dec fu
 		FullMethod: "/gconnproto.Conn/SetWriteDeadline",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ConnServer).SetWriteDeadline(ctx, req.(*SetWriteDeadlineRequest))
+		return srv.(ConnServer).SetWriteDeadline(ctx, req.(*SetDeadlineRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

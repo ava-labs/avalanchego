@@ -55,9 +55,7 @@ const (
 )
 
 var (
-	deprecatedKeys = map[string]string{
-		InboundConnUpgradeThrottlerMaxRecentKey: fmt.Sprintf("please use --%s to specify connection upgrade throttling", InboundThrottlerMaxConnsPerSecKey),
-	}
+	deprecatedKeys = map[string]string{}
 
 	errInvalidStakerWeights          = errors.New("staking weights must be positive")
 	errStakingDisableOnPublicNetwork = errors.New("staking disabled on public network")
@@ -314,7 +312,7 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 	config := network.Config{
 		// Throttling
 		ThrottlerConfig: network.ThrottlerConfig{
-			MaxIncomingConnsPerSec: maxInboundConnsPerSec,
+			MaxInboundConnsPerSec: maxInboundConnsPerSec,
 			InboundConnUpgradeThrottlerConfig: throttling.InboundConnUpgradeThrottlerConfig{
 				UpgradeCooldown:        upgradeCooldown,
 				MaxRecentConnsUpgraded: maxRecentConnsUpgraded,
@@ -346,7 +344,7 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 			MaxPortionSendQueueBytesFull: v.GetFloat64(NetworkHealthMaxPortionSendQueueFillKey),
 			MinConnectedPeers:            v.GetUint(NetworkHealthMinPeersKey),
 			MaxSendFailRate:              v.GetFloat64(NetworkHealthMaxSendFailRateKey),
-			MaxSendFailRateHalflife:      halflife,
+			SendFailRateHalflife:         halflife,
 		},
 
 		DialerConfig: dialer.Config{
@@ -355,17 +353,15 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 		},
 
 		TimeoutConfig: network.TimeoutConfig{
-			PeerAliasTimeout:     v.GetDuration(PeerAliasTimeoutKey),
-			GetVersionTimeout:    v.GetDuration(NetworkGetVersionTimeoutKey),
 			PingPongTimeout:      v.GetDuration(NetworkPingTimeoutKey),
 			ReadHandshakeTimeout: v.GetDuration(NetworkReadHandshakeTimeoutKey),
 		},
 
 		PeerListGossipConfig: network.PeerListGossipConfig{
-			PeerListSize:                 v.GetUint32(NetworkPeerListSizeKey),
-			PeerListGossipFreq:           v.GetDuration(NetworkPeerListGossipFreqKey),
-			PeerListGossipSize:           v.GetUint32(NetworkPeerListGossipSizeKey),
-			PeerListStakerGossipFraction: v.GetUint32(NetworkPeerListStakerGossipFractionKey),
+			PeerListNumValidatorIPs:        v.GetUint32(NetworkPeerListNumValidatorIPsKey),
+			PeerListValidatorGossipSize:    v.GetUint32(NetworkPeerListValidatorGossipSizeKey),
+			PeerListNonValidatorGossipSize: v.GetUint32(NetworkPeerListNonValidatorGossipSizeKey),
+			PeerListGossipFreq:             v.GetDuration(NetworkPeerListGossipFreqKey),
 		},
 
 		DelayConfig: network.DelayConfig{
@@ -394,14 +390,8 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 		return network.Config{}, fmt.Errorf("%s must be in [0,1]", NetworkHealthMaxPortionSendQueueFillKey)
 	case config.DialerConfig.ConnectionTimeout < 0:
 		return network.Config{}, fmt.Errorf("%q must be >= 0", OutboundConnectionTimeout)
-	case config.PeerAliasTimeout < 0:
-		return network.Config{}, fmt.Errorf("%q must be >= 0", PeerAliasTimeoutKey)
 	case config.PeerListGossipFreq < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListGossipFreqKey)
-	case config.GetVersionTimeout < 0:
-		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkGetVersionTimeoutKey)
-	case config.PeerListStakerGossipFraction < 1:
-		return network.Config{}, fmt.Errorf("%s must be >= 1", NetworkPeerListStakerGossipFractionKey)
 	case config.MaxReconnectDelay < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkMaxReconnectDelayKey)
 	case config.InitialReconnectDelay < 0:
@@ -426,7 +416,6 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 func getBenchlistConfig(v *viper.Viper, alpha, k int) (benchlist.Config, error) {
 	config := benchlist.Config{
 		Threshold:              v.GetInt(BenchlistFailThresholdKey),
-		PeerSummaryEnabled:     v.GetBool(BenchlistPeerSummaryEnabledKey),
 		Duration:               v.GetDuration(BenchlistDurationKey),
 		MinimumFailingDuration: v.GetDuration(BenchlistMinFailingDurationKey),
 		MaxPortion:             (1.0 - (float64(alpha) / float64(k))) / 3.0,
@@ -450,8 +439,17 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 		BootstrapAncestorsMaxContainersReceived: int(v.GetUint(BootstrapAncestorsMaxContainersReceivedKey)),
 	}
 
+	ipsSet := v.IsSet(BootstrapIPsKey)
+	idsSet := v.IsSet(BootstrapIDsKey)
+	if ipsSet && !idsSet {
+		return node.BootstrapConfig{}, fmt.Errorf("set %q but didn't set %q", BootstrapIPsKey, BootstrapIDsKey)
+	}
+	if !ipsSet && idsSet {
+		return node.BootstrapConfig{}, fmt.Errorf("set %q but didn't set %q", BootstrapIDsKey, BootstrapIPsKey)
+	}
+
 	bootstrapIPs, bootstrapIDs := genesis.SampleBeacons(networkID, 5)
-	if v.IsSet(BootstrapIPsKey) {
+	if ipsSet {
 		bootstrapIPs = strings.Split(v.GetString(BootstrapIPsKey), ",")
 	}
 	for _, ip := range bootstrapIPs {
@@ -465,7 +463,7 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 		config.BootstrapIPs = append(config.BootstrapIPs, addr)
 	}
 
-	if v.IsSet(BootstrapIDsKey) {
+	if idsSet {
 		bootstrapIDs = strings.Split(v.GetString(BootstrapIDsKey), ",")
 	}
 	for _, id := range bootstrapIDs {
@@ -478,6 +476,13 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 		}
 		config.BootstrapIDs = append(config.BootstrapIDs, nodeID)
 	}
+
+	lenIPs := len(config.BootstrapIPs)
+	lenIDs := len(config.BootstrapIDs)
+	if lenIPs != lenIDs {
+		return node.BootstrapConfig{}, fmt.Errorf("expected the number of bootstrapIPs (%d) to match the number of bootstrapIDs (%d)", lenIPs, lenIDs)
+	}
+
 	return config, nil
 }
 

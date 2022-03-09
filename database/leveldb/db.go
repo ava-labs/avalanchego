@@ -118,6 +118,13 @@ type config struct {
 	//
 	// The default value is 10.
 	CompactionTotalSizeMultiplier float64 `json:"compactionTotalSizeMultiplier"`
+	// DisableSeeksCompaction allows disabling 'seeks triggered compaction'.
+	// The purpose of 'seeks triggered compaction' is to optimize database so
+	// that 'level seeks' can be minimized, however this might generate many
+	// small compaction which may not preferable.
+	//
+	// The default is true.
+	DisableSeeksCompaction bool `json:"disableSeeksCompaction"`
 	// OpenFilesCacheCapacity defines the capacity of the open files caching.
 	// Use -1 for zero, this has same effect as specifying NoCacher to OpenFilesCacher.
 	//
@@ -138,6 +145,7 @@ type config struct {
 func New(file string, configBytes []byte, log logging.Logger) (database.Database, error) {
 	parsedConfig := config{
 		BlockCacheCapacity:     BlockCacheSize,
+		DisableSeeksCompaction: true,
 		OpenFilesCacheCapacity: HandleCap,
 		WriteBuffer:            WriteBufferSize / 2,
 		FilterBitsPerKey:       BitsPerKey,
@@ -165,6 +173,7 @@ func New(file string, configBytes []byte, log logging.Logger) (database.Database
 		CompactionTableSizeMultiplier: parsedConfig.CompactionTableSizeMultiplier,
 		CompactionTotalSize:           parsedConfig.CompactionTotalSize,
 		CompactionTotalSizeMultiplier: parsedConfig.CompactionTotalSizeMultiplier,
+		DisableSeeksCompaction:        parsedConfig.DisableSeeksCompaction,
 		OpenFilesCacheCapacity:        parsedConfig.OpenFilesCacheCapacity,
 		WriteBuffer:                   parsedConfig.WriteBuffer,
 		Filter:                        filter.NewBloomFilter(parsedConfig.FilterBitsPerKey),
