@@ -8,25 +8,25 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/units"
-
+	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
-
-	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 )
 
 const (
-	trieCommitSizeCap    = 10 * units.MiB
-	commitHeightInterval = uint64(4096)
-	progressLogUpdate    = 30 * time.Second
+	trieCommitSizeCap          = 10 * units.MiB
+	commitHeightInterval       = uint64(4096)
+	progressLogUpdate          = 30 * time.Second
+	sharedMemoryApplyBatchSize = 2000 // sepcifies the number of atomic operations to batch progress updates
 )
 
 var (
@@ -151,7 +151,7 @@ func newAtomicTrie(
 	triedb := trie.NewDatabaseWithConfig(
 		Database{atomicTrieDB},
 		&trie.Config{
-			Cache:     10,    // Allocate 10MB of memory for clean cache
+			Cache:     64,    // Allocate 64MB of memory for clean cache
 			Preimages: false, // Keys are not hashed, so there is no need for preimages
 		},
 	)
@@ -505,6 +505,7 @@ func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 	}
 	lastUpdate := time.Now()
 	putRequests, removeRequests := 0, 0
+	totalPutRequests, totalRemoveRequests := 0, 0
 
 	// value of sharedMemoryCursor is either a uint64 signifying the
 	// height iteration should begin at or is a uint64+blockchainID
@@ -515,6 +516,7 @@ func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 		it.Next()
 	}
 
+	batchOps := make(map[ids.ID]*atomic.Requests)
 	for it.Next() {
 		height := it.BlockNumber()
 		atomicOps := it.AtomicOps()
@@ -526,36 +528,49 @@ func (a *atomicTrie) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 
 		putRequests += len(atomicOps.PutRequests)
 		removeRequests += len(atomicOps.RemoveRequests)
+		totalPutRequests += len(atomicOps.PutRequests)
+		totalRemoveRequests += len(atomicOps.RemoveRequests)
 		if time.Since(lastUpdate) > 10*time.Second {
-			log.Info("atomic trie iteration", "height", height, "puts", putRequests, "removes", removeRequests)
+			log.Info("atomic trie iteration", "height", height, "puts", totalPutRequests, "removes", totalRemoveRequests)
 			lastUpdate = time.Now()
 		}
+		mergeAtomicOpsToMap(batchOps, it.BlockchainID(), atomicOps)
 
-		// Update the cursor to the key of the atomic operation being executed on shared memory.
-		// If the node shuts down in the middle of this function call, ApplyToSharedMemory will
-		// resume operation starting at the key immediately following [it.Key()].
-		if err = a.metadataDB.Put(appliedSharedMemoryCursorKey, it.Key()); err != nil {
-			return err
-		}
-		batch, err := a.db.CommitBatch()
-		if err != nil {
-			return err
-		}
-		// calling [sharedMemory.Apply] updates the last applied pointer atomically with the shared memory operation.
-		// TODO: batch the application of atomic ops so we commit to the DB less frequently
-		if err = a.sharedMemory.Apply(map[ids.ID]*atomic.Requests{it.BlockchainID(): atomicOps}, batch); err != nil {
-			return err
+		if putRequests+removeRequests > sharedMemoryApplyBatchSize {
+			// Update the cursor to the key of the atomic operation being executed on shared memory.
+			// If the node shuts down in the middle of this function call, ApplyToSharedMemory will
+			// resume operation starting at the key immediately following [it.Key()].
+			if err = a.metadataDB.Put(appliedSharedMemoryCursorKey, it.Key()); err != nil {
+				return err
+			}
+			batch, err := a.db.CommitBatch()
+			if err != nil {
+				return err
+			}
+			// calling [sharedMemory.Apply] updates the last applied pointer atomically with the shared memory operation.
+			if err = a.sharedMemory.Apply(batchOps, batch); err != nil {
+				return err
+			}
+			putRequests, removeRequests = 0, 0
+			batchOps = make(map[ids.ID]*atomic.Requests)
 		}
 	}
-
 	if err := it.Error(); err != nil {
 		return err
 	}
-	log.Info("finished applying atomic operations", "puts", putRequests, "removes", removeRequests)
+
 	if err = a.metadataDB.Delete(appliedSharedMemoryCursorKey); err != nil {
 		return err
 	}
-	return a.db.Commit()
+	batch, err := a.db.CommitBatch()
+	if err != nil {
+		return err
+	}
+	if err = a.sharedMemory.Apply(batchOps, batch); err != nil {
+		return err
+	}
+	log.Info("finished applying atomic operations", "puts", totalPutRequests, "removes", totalRemoveRequests)
+	return nil
 }
 
 // MarkApplyToSharedMemoryCursor marks the atomic trie as containing atomic ops that

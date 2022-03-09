@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -548,7 +550,7 @@ func BenchmarkAtomicTrieInit(b *testing.B) {
 	// add 25000 * 3 = 75000 transactions
 	repo, err := NewAtomicTxRepository(db, codec, lastAcceptedHeight)
 	assert.NoError(b, err)
-	writeTxs(b, repo, 0, 25000, constTxsPerHeight(3), nil, operationsMap)
+	writeTxs(b, repo, 0, lastAcceptedHeight, constTxsPerHeight(3), nil, operationsMap)
 
 	var atomicTrie AtomicTrie
 	var hash common.Hash
@@ -567,4 +569,122 @@ func BenchmarkAtomicTrieInit(b *testing.B) {
 
 	// Verify operations
 	verifyOperations(b, atomicTrie, codec, hash, 0, lastAcceptedHeight, operationsMap)
+}
+
+func BenchmarkAtomicTrieIterate(b *testing.B) {
+	db := versiondb.New(memdb.New())
+	codec := testTxCodec()
+
+	operationsMap := make(map[uint64]map[ids.ID]*atomic.Requests)
+
+	lastAcceptedHeight := uint64(25_000)
+	// add 25000 * 3 = 75000 transactions
+	repo, err := NewAtomicTxRepository(db, codec, lastAcceptedHeight)
+	assert.NoError(b, err)
+	writeTxs(b, repo, 1, lastAcceptedHeight, constTxsPerHeight(3), nil, operationsMap)
+
+	var (
+		atomicTrie AtomicTrie
+		hash       common.Hash
+		height     uint64
+	)
+	atomicTrie, err = newAtomicTrie(db, testSharedMemory(), nil, repo, codec, lastAcceptedHeight, 5000)
+	assert.NoError(b, err)
+
+	hash, height = atomicTrie.LastCommitted()
+	assert.Equal(b, lastAcceptedHeight, height)
+	assert.NotEqual(b, common.Hash{}, hash)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		it, err := atomicTrie.Iterator(hash, nil)
+		if err != nil {
+			b.Fatal("could not initialize atomic trie iterator")
+		}
+		for it.Next() {
+			assert.NotZero(b, it.BlockNumber())
+			assert.NotZero(b, it.BlockchainID())
+		}
+		assert.NoError(b, it.Error())
+	}
+}
+
+func levelDB(t testing.TB) database.Database {
+	db, err := leveldb.New(t.TempDir(), nil, logging.NoLog{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return db
+}
+
+func BenchmarkApplyToSharedMemory(b *testing.B) {
+	tests := []struct {
+		name   string
+		newDB  func() database.Database
+		blocks uint64
+	}{
+		{
+			name:   "memdb-25k",
+			newDB:  func() database.Database { return memdb.New() },
+			blocks: 25_000,
+		},
+		{
+			name:   "memdb-250k",
+			newDB:  func() database.Database { return memdb.New() },
+			blocks: 250_000,
+		},
+		{
+			name:   "leveldb-25k",
+			newDB:  func() database.Database { return levelDB(b) },
+			blocks: 25_000,
+		},
+		{
+			name:   "leveldb-250k",
+			newDB:  func() database.Database { return levelDB(b) },
+			blocks: 250_000,
+		},
+	}
+	for _, test := range tests {
+		b.Run(test.name, func(b *testing.B) {
+			disk := test.newDB()
+			defer disk.Close()
+			benchmarkApplyToSharedMemory(b, disk, test.blocks)
+		})
+	}
+}
+
+func benchmarkApplyToSharedMemory(b *testing.B, disk database.Database, blocks uint64) {
+	db := versiondb.New(disk)
+	codec := testTxCodec()
+
+	lastAcceptedHeight := blocks
+	repo, err := NewAtomicTxRepository(db, codec, lastAcceptedHeight)
+	assert.NoError(b, err)
+
+	var atomicTrie *atomicTrie
+	var hash common.Hash
+	var height uint64
+	atomicTrie, err = newAtomicTrie(db, testSharedMemory(), nil, repo, codec, 0, 5000)
+	assert.NoError(b, err)
+
+	for height := uint64(1); height <= lastAcceptedHeight; height++ {
+		txs := newTestTxs(constTxsPerHeight(3)(height))
+		ops, err := mergeAtomicOps(txs)
+		assert.NoError(b, err)
+		assert.NoError(b, atomicTrie.Index(height, ops))
+	}
+
+	hash, height = atomicTrie.LastCommitted()
+	assert.Equal(b, lastAcceptedHeight, height)
+	assert.NotEqual(b, common.Hash{}, hash)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		atomicTrie.sharedMemory = testSharedMemory()
+		assert.NoError(b, atomicTrie.MarkApplyToSharedMemoryCursor(0))
+		assert.NoError(b, atomicTrie.db.Commit())
+		assert.NoError(b, atomicTrie.ApplyToSharedMemory(lastAcceptedHeight))
+	}
 }

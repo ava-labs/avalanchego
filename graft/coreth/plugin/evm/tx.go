@@ -293,16 +293,22 @@ func mergeAtomicOps(txs []*Tx) (map[ids.ID]*atomic.Requests, error) {
 	}
 	output := make(map[ids.ID]*atomic.Requests)
 	for _, tx := range txs {
-		chainID, txRequest, err := tx.UnsignedAtomicTx.AtomicOps()
+		chainID, txRequests, err := tx.UnsignedAtomicTx.AtomicOps()
 		if err != nil {
 			return nil, err
 		}
-		if request, exists := output[chainID]; exists {
-			request.PutRequests = append(request.PutRequests, txRequest.PutRequests...)
-			request.RemoveRequests = append(request.RemoveRequests, txRequest.RemoveRequests...)
-		} else {
-			output[chainID] = txRequest
-		}
+		mergeAtomicOpsToMap(output, chainID, txRequests)
 	}
 	return output, nil
+}
+
+// mergeAtomicOps merges atomic ops for [chainID] represented by [requests]
+// to the [output] map provided.
+func mergeAtomicOpsToMap(output map[ids.ID]*atomic.Requests, chainID ids.ID, requests *atomic.Requests) {
+	if request, exists := output[chainID]; exists {
+		request.PutRequests = append(request.PutRequests, requests.PutRequests...)
+		request.RemoveRequests = append(request.RemoveRequests, requests.RemoveRequests...)
+	} else {
+		output[chainID] = requests
+	}
 }

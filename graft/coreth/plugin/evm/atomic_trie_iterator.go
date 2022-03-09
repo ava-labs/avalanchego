@@ -7,11 +7,11 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/codec"
-
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -45,14 +45,8 @@ func (a *atomicTrieIterator) Error() error {
 // It is the responsibility of the caller to check the result of Error() after an iterator reports
 // having no more elements to iterate.
 func (a *atomicTrieIterator) Next() bool {
-	hasNext := a.trieIterator.Next()
-
-	if a.trieIterator.Err != nil {
+	if !a.trieIterator.Next() {
 		a.resetFields(a.trieIterator.Err)
-		return false
-	}
-	if !hasNext {
-		a.resetFields(nil)
 		return false
 	}
 
@@ -84,7 +78,7 @@ func (a *atomicTrieIterator) Next() bool {
 	a.blockNumber = blockNumber
 	a.blockchainID = blockchainID
 	a.atomicOps = requests
-	a.key = common.CopyBytes(a.trieIterator.Key)
+	a.key = a.trieIterator.Key // trieIterator.Key is already newly allocated so copy is not needed here
 	return true
 }
 
@@ -108,6 +102,7 @@ func (a *atomicTrieIterator) BlockchainID() ids.ID {
 }
 
 // AtomicOps returns atomic requests for the blockchainID at the current block number
+// returned object can be freely modified
 func (a *atomicTrieIterator) AtomicOps() *atomic.Requests {
 	return a.atomicOps
 }
