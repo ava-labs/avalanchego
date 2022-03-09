@@ -762,12 +762,12 @@ func (n *network) dial(nodeID ids.ShortID, ip *trackedIP) {
 			// to an already connected peer here. It does prevent unnecessary
 			// outbound connections. Additionally, because the peer would
 			// immediately drop a duplicated connection, this prevents any
-			// "connection reset by peer" errors from interfeering with the
+			// "connection reset by peer" errors from interfering with the
 			// later duplicated connection check.
 			if connecting || connected {
 				n.peerConfig.Log.Verbo(
 					"exiting attempt to dial %s%s as we are already connected",
-					nodeID,
+					constants.NodeIDPrefix, nodeID,
 				)
 				return
 			}
