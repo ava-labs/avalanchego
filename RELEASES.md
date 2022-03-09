@@ -17,6 +17,7 @@ This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/ava
 
 ### GRPC
 
+- Increased protocol version, this requires all plugin definitions to update their communication dependencies.
 - Merged services to be served using the same server when possible.
 - Implemented a fast path for simple HTTP requests.
 - Removed duplicated message definitions.
