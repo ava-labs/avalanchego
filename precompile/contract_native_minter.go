@@ -17,7 +17,7 @@ var (
 	// Singleton StatefulPrecompiledContract for minting native assets by permissioned callers.
 	ContractNativeMinterPrecompile StatefulPrecompiledContract = createNativeMinterPrecompile(ContractNativeMinterAddress)
 
-	mintSignature = CalculateFunctionSelector("mint(address,uint256)") // address, amount
+	mintSignature = CalculateFunctionSelector("mintNativeToken(address,uint256)") // address, amount
 
 	errCannotMint = errors.New("non-enabled cannot mint")
 
@@ -78,7 +78,7 @@ func UnpackMintInput(input []byte) (common.Address, *big.Int, error) {
 
 // createMint checks if the caller is permissioned for minting operation.
 // The execution function parses the [input] into native token amount and receiver address.
-func createMint(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+func createNativeMintToken(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	if suppliedGas < MintGasCost {
 		return nil, 0, fmt.Errorf("%w (%d) < (%d)", vm.ErrOutOfGas, MintGasCost, suppliedGas)
 	}
@@ -100,6 +100,7 @@ func createMint(accessibleState PrecompileAccessibleState, caller common.Address
 		return nil, remainingGas, fmt.Errorf("%w: %s", errCannotMint, caller)
 	}
 
+	// if there is no address in the state, we should charge for creating one.
 	if !stateDB.Exist(to) {
 		if remainingGas < CallNewAccountGas {
 			return nil, 0, fmt.Errorf("%w (%d) < (%d)", vm.ErrOutOfGas, CallNewAccountGas, suppliedGas)
@@ -113,14 +114,14 @@ func createMint(accessibleState PrecompileAccessibleState, caller common.Address
 	return []byte{}, remainingGas, nil
 }
 
-// createNativeMinterPrecompile returns a StatefulPrecompiledContract with R/W control of an allow list at [precompileAddr]
+// createNativeMinterPrecompile returns a StatefulPrecompiledContract with R/W control of an allow list at [precompileAddr] and a native token minter.
 func createNativeMinterPrecompile(precompileAddr common.Address) StatefulPrecompiledContract {
 	setAdmin := newStatefulPrecompileFunction(setAdminSignature, createAllowListRoleSetter(precompileAddr, AllowListAdmin))
 	setEnabled := newStatefulPrecompileFunction(setEnabledSignature, createAllowListRoleSetter(precompileAddr, AllowListEnabled))
 	setNone := newStatefulPrecompileFunction(setNoneSignature, createAllowListRoleSetter(precompileAddr, AllowListNoRole))
 	read := newStatefulPrecompileFunction(readAllowListSignature, createReadAllowList(precompileAddr))
 
-	mint := newStatefulPrecompileFunction(mintSignature, createMint)
+	mint := newStatefulPrecompileFunction(mintSignature, createNativeMintToken)
 
 	// Construct the contract with no fallback function.
 	contract := newStatefulPrecompileWithFunctionSelectors(nil, []*statefulPrecompileFunction{setAdmin, setEnabled, setNone, read, mint})
