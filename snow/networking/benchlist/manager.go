@@ -52,7 +52,6 @@ type Config struct {
 	MinimumFailingDuration time.Duration      `json:"minimumFailingDuration"`
 	Duration               time.Duration      `json:"duration"`
 	MaxPortion             float64            `json:"maxPortion"`
-	PeerSummaryEnabled     bool               `json:"peerSummaryEnabled"`
 }
 
 type manager struct {

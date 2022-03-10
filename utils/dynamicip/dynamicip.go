@@ -63,7 +63,7 @@ func (r *OpenDNSResolver) IsResolver() bool {
 }
 
 func (r *OpenDNSResolver) Resolve() (net.IP, error) {
-	ip, err := r.Resolver.LookupHost(context.Background(), "myip.opendns.com")
+	ip, err := r.Resolver.LookupHost(context.TODO(), "myip.opendns.com")
 	if err != nil {
 		return nil, err
 	}

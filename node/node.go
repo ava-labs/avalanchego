@@ -38,6 +38,8 @@ import (
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/network/dialer"
+	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
@@ -173,7 +175,7 @@ func (n *Node) initNetworking() error {
 		return err
 	}
 	// Wrap listener so it will only accept a certain number of incoming connections per second
-	listener = throttling.NewThrottledListener(listener, n.Config.NetworkConfig.ThrottlerConfig.MaxIncomingConnsPerSec)
+	listener = throttling.NewThrottledListener(listener, n.Config.NetworkConfig.ThrottlerConfig.MaxInboundConnsPerSec)
 
 	ipDesc, err := utils.ToIPDesc(listener.Addr().String())
 	if err != nil {
@@ -191,7 +193,7 @@ func (n *Node) initNetworking() error {
 		return errInvalidTLSKey
 	}
 
-	tlsConfig := network.TLSConfig(n.Config.StakingTLSCert)
+	tlsConfig := peer.TLSConfig(n.Config.StakingTLSCert)
 
 	// Initialize validator manager and primary network's validator set
 	primaryNetworkValidators := validators.NewSet()
@@ -266,6 +268,7 @@ func (n *Node) initNetworking() error {
 		n.MetricsRegisterer,
 		n.Log,
 		listener,
+		dialer.NewDialer(constants.NetworkType, n.Config.NetworkConfig.DialerConfig, n.Log),
 		consensusRouter,
 		n.benchlistManager,
 	)
@@ -357,10 +360,8 @@ func (n *Node) Dispatch() error {
 	})
 
 	// Add bootstrap nodes to the peer network
-	for _, peerIP := range n.Config.BootstrapIPs {
-		if !peerIP.Equal(n.Config.IP.IP()) {
-			n.Net.TrackIP(peerIP)
-		}
+	for i, peerIP := range n.Config.BootstrapIPs {
+		n.Net.ManuallyTrack(n.Config.BootstrapIDs[i], peerIP)
 	}
 
 	// Start P2P connections
@@ -864,9 +865,11 @@ func (n *Node) initInfoAPI() error {
 		n.Log,
 		n.chainManager,
 		n.Config.VMManager,
+		&n.Config.NetworkConfig.MyIP,
 		n.Net,
 		version.NewDefaultApplicationParser(),
 		primaryValidators,
+		n.benchlistManager,
 	)
 	if err != nil {
 		return err
@@ -1065,10 +1068,7 @@ func (n *Node) Initialize(
 	n.Log = logger
 	n.Config = config
 	var err error
-	n.ID, err = ids.ToShortID(hashing.PubkeyBytesToAddress(n.Config.StakingTLSCert.Leaf.Raw))
-	if err != nil {
-		return fmt.Errorf("problem deriving node ID from certificate: %w", err)
-	}
+	n.ID = peer.CertToID(n.Config.StakingTLSCert.Leaf)
 	n.LogFactory = logFactory
 	n.DoneShuttingDown.Add(1)
 	n.Log.Info("node version is: %s", version.CurrentApp)
@@ -1209,8 +1209,7 @@ func (n *Node) shutdown() {
 		n.profiler.Shutdown()
 	}
 	if n.Net != nil {
-		// Close already logs its own error if one occurs, so the error is ignored here
-		_ = n.Net.Close()
+		n.Net.StartClose()
 	}
 	if err := n.APIServer.Shutdown(); err != nil {
 		n.Log.Debug("error during API shutdown: %s", err)

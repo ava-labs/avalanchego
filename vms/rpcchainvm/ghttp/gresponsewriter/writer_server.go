@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/hashicorp/go-plugin"
 
@@ -63,7 +64,7 @@ func (s *Server) Write(ctx context.Context, req *gresponsewriterproto.WriteReque
 	}, nil
 }
 
-func (s *Server) WriteHeader(ctx context.Context, req *gresponsewriterproto.WriteHeaderRequest) (*gresponsewriterproto.WriteHeaderResponse, error) {
+func (s *Server) WriteHeader(ctx context.Context, req *gresponsewriterproto.WriteHeaderRequest) (*emptypb.Empty, error) {
 	headers := s.writer.Header()
 	for key := range headers {
 		delete(headers, key)
@@ -72,19 +73,19 @@ func (s *Server) WriteHeader(ctx context.Context, req *gresponsewriterproto.Writ
 		headers[header.Key] = header.Values
 	}
 	s.writer.WriteHeader(int(req.StatusCode))
-	return &gresponsewriterproto.WriteHeaderResponse{}, nil
+	return &emptypb.Empty{}, nil
 }
 
-func (s *Server) Flush(ctx context.Context, req *gresponsewriterproto.FlushRequest) (*gresponsewriterproto.FlushResponse, error) {
+func (s *Server) Flush(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
 	flusher, ok := s.writer.(http.Flusher)
 	if !ok {
 		return nil, errUnsupportedFlushing
 	}
 	flusher.Flush()
-	return &gresponsewriterproto.FlushResponse{}, nil
+	return &emptypb.Empty{}, nil
 }
 
-func (s *Server) Hijack(ctx context.Context, req *gresponsewriterproto.HijackRequest) (*gresponsewriterproto.HijackResponse, error) {
+func (s *Server) Hijack(ctx context.Context, req *emptypb.Empty) (*gresponsewriterproto.HijackResponse, error) {
 	hijacker, ok := s.writer.(http.Hijacker)
 	if !ok {
 		return nil, errUnsupportedHijacking
@@ -94,12 +95,10 @@ func (s *Server) Hijack(ctx context.Context, req *gresponsewriterproto.HijackReq
 		return nil, err
 	}
 
-	connID := s.broker.NextId()
-	readerID := s.broker.NextId()
-	writerID := s.broker.NextId()
+	connReadWriterID := s.broker.NextId()
 	closer := grpcutils.ServerCloser{}
 
-	go s.broker.AcceptAndServe(connID, func(opts []grpc.ServerOption) *grpc.Server {
+	go s.broker.AcceptAndServe(connReadWriterID, func(opts []grpc.ServerOption) *grpc.Server {
 		opts = append(opts,
 			grpc.MaxRecvMsgSize(math.MaxInt),
 			grpc.MaxSendMsgSize(math.MaxInt),
@@ -107,25 +106,7 @@ func (s *Server) Hijack(ctx context.Context, req *gresponsewriterproto.HijackReq
 		server := grpc.NewServer(opts...)
 		closer.Add(server)
 		gconnproto.RegisterConnServer(server, gconn.NewServer(conn, &closer))
-		return server
-	})
-	go s.broker.AcceptAndServe(readerID, func(opts []grpc.ServerOption) *grpc.Server {
-		opts = append(opts,
-			grpc.MaxRecvMsgSize(math.MaxInt),
-			grpc.MaxSendMsgSize(math.MaxInt),
-		)
-		server := grpc.NewServer(opts...)
-		closer.Add(server)
 		greaderproto.RegisterReaderServer(server, greader.NewServer(readWriter))
-		return server
-	})
-	go s.broker.AcceptAndServe(writerID, func(opts []grpc.ServerOption) *grpc.Server {
-		opts = append(opts,
-			grpc.MaxRecvMsgSize(math.MaxInt),
-			grpc.MaxSendMsgSize(math.MaxInt),
-		)
-		server := grpc.NewServer(opts...)
-		closer.Add(server)
 		gwriterproto.RegisterWriterServer(server, gwriter.NewServer(readWriter))
 		return server
 	})
@@ -134,12 +115,10 @@ func (s *Server) Hijack(ctx context.Context, req *gresponsewriterproto.HijackReq
 	remote := conn.RemoteAddr()
 
 	return &gresponsewriterproto.HijackResponse{
-		ConnServer:    connID,
-		LocalNetwork:  local.Network(),
-		LocalString:   local.String(),
-		RemoteNetwork: remote.Network(),
-		RemoteString:  remote.String(),
-		ReaderServer:  readerID,
-		WriterServer:  writerID,
+		LocalNetwork:         local.Network(),
+		LocalString:          local.String(),
+		RemoteNetwork:        remote.Network(),
+		RemoteString:         remote.String(),
+		ConnReadWriterServer: connReadWriterID,
 	}, nil
 }

@@ -9,14 +9,18 @@ type Op byte
 // Types of messages that may be sent between nodes
 // Note: If you add a new parseable Op below, you must also add it to ops
 // (declared below)
+//
+// "_" are used in places where old message types were defined that are no
+// longer supported. When new messages are introduced these values are typically
+// safe to reuse.
 const (
 	// Handshake:
-	GetVersion Op = iota
-	_
-	GetPeerList
+	_ Op = iota // Used to be a GetVersion message
+	_           // Used to be a Version message
+	_           // Used to be a GetPeerList message
 	Pong
 	Ping
-	_
+	_ // Used to be a Pong message
 	// Bootstrapping:
 	GetAcceptedFrontier
 	AcceptedFrontier
@@ -31,7 +35,7 @@ const (
 	PullQuery
 	Chits
 	// Handshake / peer gossiping
-	_
+	_ // Used to be a Version message
 	PeerList
 	Version
 	// Application level:
@@ -55,9 +59,7 @@ const (
 
 var (
 	HandshakeOps = []Op{
-		GetVersion,
 		Version,
-		GetPeerList,
 		PeerList,
 		Ping,
 		Pong,
@@ -174,12 +176,11 @@ var (
 	// Defines the messages that can be sent/received with this network
 	messages = map[Op][]Field{
 		// Handshake:
-		GetVersion:  {},
-		Version:     {NetworkID, NodeID, MyTime, IP, VersionStr, VersionTime, SigBytes, TrackedSubnets},
-		GetPeerList: {},
-		PeerList:    {SignedPeers},
-		Ping:        {},
-		Pong:        {Uptime},
+		// TODO: remove NodeID from the Version message
+		Version:  {NetworkID, NodeID, MyTime, IP, VersionStr, VersionTime, SigBytes, TrackedSubnets},
+		PeerList: {SignedPeers},
+		Ping:     {},
+		Pong:     {Uptime},
 		// Bootstrapping:
 		GetAcceptedFrontier: {ChainID, RequestID, Deadline},
 		AcceptedFrontier:    {ChainID, RequestID, ContainerIDs},
@@ -211,12 +212,8 @@ func (op Op) Compressible() bool {
 
 func (op Op) String() string {
 	switch op {
-	case GetVersion:
-		return "get_version"
 	case Version:
 		return "version"
-	case GetPeerList:
-		return "get_peerlist"
 	case PeerList:
 		return "peerlist"
 	case Ping:

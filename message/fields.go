@@ -14,7 +14,7 @@ type Field uint32
 const (
 	VersionStr          Field = iota // Used in handshake
 	NetworkID                        // Used in handshake
-	NodeID                           // Used in handshake
+	NodeID                           // TODO: remove NodeID. Used in handshake
 	MyTime                           // Used in handshake
 	IP                               // Used in handshake
 	Peers                            // Used in handshake

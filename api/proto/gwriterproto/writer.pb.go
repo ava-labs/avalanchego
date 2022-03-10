@@ -25,6 +25,7 @@ type WriteRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// payload is the write request in bytes
 	Payload []byte `protobuf:"bytes,1,opt,name=payload,proto3" json:"payload,omitempty"`
 }
 
@@ -72,9 +73,12 @@ type WriteResponse struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Written int32  `protobuf:"varint,1,opt,name=written,proto3" json:"written,omitempty"`
-	Error   string `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
-	Errored bool   `protobuf:"varint,3,opt,name=errored,proto3" json:"errored,omitempty"`
+	// written is the length of payload in bytes
+	Written int32 `protobuf:"varint,1,opt,name=written,proto3" json:"written,omitempty"`
+	// error is an error message
+	Error string `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	// errored is true if an error has been set
+	Errored bool `protobuf:"varint,3,opt,name=errored,proto3" json:"errored,omitempty"`
 }
 
 func (x *WriteResponse) Reset() {

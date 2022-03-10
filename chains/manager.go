@@ -322,11 +322,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	if chainParams.ID != constants.PlatformChainID && vmID == constants.PlatformVMID {
 		return nil, errCreatePlatformVM
 	}
-
-	primaryAlias, err := m.PrimaryAlias(chainParams.ID)
-	if err != nil {
-		primaryAlias = chainParams.ID.String()
-	}
+	primaryAlias := m.PrimaryAliasOrDefault(chainParams.ID)
 
 	// Create the log and context of the chain
 	chainLog, err := m.LogFactory.MakeChain(primaryAlias)
@@ -663,10 +659,8 @@ func (m *manager) createAvalancheChain(
 	handler.SetConsensus(engine)
 
 	// Register health check for this chain
-	chainAlias, err := m.PrimaryAlias(ctx.ChainID)
-	if err != nil {
-		chainAlias = ctx.ChainID.String()
-	}
+	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
+
 	// Grab the context lock before calling the chain's health check
 	check := health.CheckerFunc(func() (interface{}, error) {
 		ctx.Lock.Lock()
@@ -688,7 +682,7 @@ func (m *manager) createAvalancheChain(
 		Name:    chainAlias,
 		Engine:  engine,
 		Handler: handler,
-	}, err
+	}, nil
 }
 
 // Create a linear chain using the Snowman consensus engine
@@ -867,10 +861,7 @@ func (m *manager) createSnowmanChain(
 	handler.SetConsensus(engine)
 
 	// Register health checks
-	chainAlias, err := m.PrimaryAlias(ctx.ChainID)
-	if err != nil {
-		chainAlias = ctx.ChainID.String()
-	}
+	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
 
 	check := health.CheckerFunc(func() (interface{}, error) {
 		ctx.Lock.Lock()

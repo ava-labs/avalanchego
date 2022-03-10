@@ -22,7 +22,7 @@ fi
 # TODO: migrate to upstream avalanche-network-runner
 GOARCH=$(go env GOARCH)
 GOOS=$(go env GOOS)
-NETWORK_RUNNER_VERSION=1.0.5
+NETWORK_RUNNER_VERSION=1.0.6
 DOWNLOAD_PATH=/tmp/avalanche-network-runner.tar.gz
 DOWNLOAD_URL=https://github.com/ava-labs/avalanche-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/avalanche-network-runner_${NETWORK_RUNNER_VERSION}_linux_amd64.tar.gz
 if [[ ${GOOS} == "darwin" ]]; then

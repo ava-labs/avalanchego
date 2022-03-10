@@ -53,10 +53,10 @@ func TestCodecParseExtraSpace(t *testing.T) {
 	codec, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
 	assert.NoError(t, err)
 
-	_, err = codec.Parse([]byte{byte(GetVersion), 0x00, 0x00}, dummyNodeID, dummyOnFinishedHandling)
+	_, err = codec.Parse([]byte{byte(Ping), 0x00, 0x00}, dummyNodeID, dummyOnFinishedHandling)
 	assert.Error(t, err)
 
-	_, err = codec.Parse([]byte{byte(GetVersion), 0x00, 0x01}, dummyNodeID, dummyOnFinishedHandling)
+	_, err = codec.Parse([]byte{byte(Ping), 0x00, 0x01}, dummyNodeID, dummyOnFinishedHandling)
 	assert.Error(t, err)
 }
 
@@ -97,10 +97,6 @@ func TestCodecPackParseGzip(t *testing.T) {
 
 	msgs := []inboundMessage{
 		{
-			op:     GetVersion,
-			fields: map[Field]interface{}{},
-		},
-		{
 			op: Version,
 			fields: map[Field]interface{}{
 				NetworkID:      uint32(0),
@@ -112,10 +108,6 @@ func TestCodecPackParseGzip(t *testing.T) {
 				SigBytes:       []byte{'y', 'e', 'e', 't'},
 				TrackedSubnets: [][]byte{id[:]},
 			},
-		},
-		{
-			op:     GetPeerList,
-			fields: map[Field]interface{}{},
 		},
 		{
 			op: PeerList,
