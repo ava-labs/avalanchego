@@ -10,9 +10,7 @@ const (
 	ModifyAllowListGasCost = 20_000
 	ReadAllowListGasCost   = 5_000
 
-	MintGasCost = 20_000
-
-	CallNewAccountGas = 25_000 // Paid for CALL when the destination address didn't exist prior.
+	MintGasCost = 30_000
 )
 
 // Designated addresses of stateful precompiles

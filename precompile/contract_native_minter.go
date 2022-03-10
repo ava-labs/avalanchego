@@ -9,7 +9,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/vm"
 )
 
 var (
@@ -19,7 +18,7 @@ var (
 
 	mintSignature = CalculateFunctionSelector("mintNativeToken(address,uint256)") // address, amount
 
-	errCannotMint = errors.New("non-enabled cannot mint")
+	ErrCannotMint = errors.New("non-enabled cannot mint")
 
 	mintInputLen = common.HashLength + common.HashLength
 )
@@ -79,10 +78,9 @@ func UnpackMintInput(input []byte) (common.Address, *big.Int, error) {
 // createMint checks if the caller is permissioned for minting operation.
 // The execution function parses the [input] into native token amount and receiver address.
 func createNativeMintToken(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
-	if suppliedGas < MintGasCost {
-		return nil, 0, fmt.Errorf("%w (%d) < (%d)", vm.ErrOutOfGas, MintGasCost, suppliedGas)
+	if remainingGas, err = deductGas(suppliedGas, MintGasCost); err != nil {
+		return nil, 0, err
 	}
-	remainingGas = suppliedGas - MintGasCost
 
 	if readOnly {
 		return nil, remainingGas, ErrWriteProtection
@@ -97,15 +95,11 @@ func createNativeMintToken(accessibleState PrecompileAccessibleState, caller com
 	// Verify that the caller is in the allow list and therefore has the right to modify it
 	callerStatus := getAllowListStatus(stateDB, ContractNativeMinterAddress, caller)
 	if !callerStatus.IsEnabled() {
-		return nil, remainingGas, fmt.Errorf("%w: %s", errCannotMint, caller)
+		return nil, remainingGas, fmt.Errorf("%w: %s", ErrCannotMint, caller)
 	}
 
 	// if there is no address in the state, we should charge for creating one.
 	if !stateDB.Exist(to) {
-		if remainingGas < CallNewAccountGas {
-			return nil, 0, fmt.Errorf("%w (%d) < (%d)", vm.ErrOutOfGas, CallNewAccountGas, suppliedGas)
-		}
-		remainingGas -= CallNewAccountGas
 		stateDB.CreateAccount(to)
 	}
 

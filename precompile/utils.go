@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -21,4 +22,12 @@ func CalculateFunctionSelector(functionSignature string) []byte {
 	}
 	hash := crypto.Keccak256([]byte(functionSignature))
 	return hash[:4]
+}
+
+// deductGas checks if [suppliedGas] is sufficient against [requiredGas] and deducts [requiredGas] from [suppliedGas].
+func deductGas(suppliedGas uint64, requiredGas uint64) (uint64, error) {
+	if suppliedGas < requiredGas {
+		return 0, fmt.Errorf("%w (%d) < (%d)", vm.ErrOutOfGas, requiredGas, suppliedGas)
+	}
+	return suppliedGas - requiredGas, nil
 }

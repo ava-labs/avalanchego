@@ -9,7 +9,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/vm"
 )
 
 // Enum constants for valid AllowListRole
@@ -133,8 +132,8 @@ func PackReadAllowList(address common.Address) []byte {
 // This execution function is speciifc to [precompileAddr].
 func createAllowListRoleSetter(precompileAddr common.Address, role AllowListRole) RunStatefulPrecompileFunc {
 	return func(evm PrecompileAccessibleState, callerAddr, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
-		if suppliedGas < ModifyAllowListGasCost {
-			return nil, 0, fmt.Errorf("%w (%d) < (%d)", vm.ErrOutOfGas, ModifyAllowListGasCost, suppliedGas)
+		if remainingGas, err = deductGas(suppliedGas, ModifyAllowListGasCost); err != nil {
+			return nil, 0, err
 		}
 
 		if len(input) != allowListInputLen {
@@ -143,7 +142,6 @@ func createAllowListRoleSetter(precompileAddr common.Address, role AllowListRole
 
 		modifyAddress := common.BytesToAddress(input)
 
-		remainingGas = suppliedGas - ModifyAllowListGasCost
 		if readOnly {
 			return nil, remainingGas, ErrWriteProtection
 		}
@@ -165,11 +163,9 @@ func createAllowListRoleSetter(precompileAddr common.Address, role AllowListRole
 // designated role of that address
 func createReadAllowList(precompileAddr common.Address) RunStatefulPrecompileFunc {
 	return func(evm PrecompileAccessibleState, callerAddr common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
-		if suppliedGas < ReadAllowListGasCost {
-			return nil, 0, fmt.Errorf("%w (%d) < (%d)", vm.ErrOutOfGas, ReadAllowListGasCost, suppliedGas)
+		if remainingGas, err = deductGas(suppliedGas, ReadAllowListGasCost); err != nil {
+			return nil, 0, err
 		}
-
-		remainingGas = suppliedGas - ReadAllowListGasCost
 
 		if len(input) != allowListInputLen {
 			return nil, remainingGas, fmt.Errorf("invalid input length for read allow list: %d", len(input))
