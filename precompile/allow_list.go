@@ -60,6 +60,16 @@ func (s AllowListRole) Valid() bool {
 	}
 }
 
+// IsNoRole returns true if [s] indicates no specific role.
+func (s AllowListRole) IsNoRole() bool {
+	switch s {
+	case AllowListNoRole:
+		return true
+	default:
+		return false
+	}
+}
+
 // IsAdmin returns true if [s] indicates the permission to modify the allow list.
 func (s AllowListRole) IsAdmin() bool {
 	switch s {
