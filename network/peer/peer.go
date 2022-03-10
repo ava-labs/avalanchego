@@ -187,6 +187,8 @@ func Start(
 		canSend:           true,
 	}
 
+	p.trackedSubnets.Add(constants.PrimaryNetworkID)
+
 	// Make sure that the version is the first message sent
 	msg, err := p.Network.Version()
 	p.Log.AssertNoError(err)

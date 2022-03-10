@@ -591,7 +591,7 @@ func (n *network) getPeers(
 		}
 
 		trackedSubnets := peer.TrackedSubnets()
-		if subnetID != constants.PrimaryNetworkID && !trackedSubnets.Contains(subnetID) {
+		if !trackedSubnets.Contains(subnetID) {
 			continue
 		}
 
