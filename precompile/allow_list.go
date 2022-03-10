@@ -161,7 +161,7 @@ func createAllowListRoleSetter(precompileAddr common.Address, role AllowListRole
 }
 
 // createReadAllowList returns an execution function that reads the allow list for the given [precompileAddr].
-// THe execution function parses the input into a single address and returns the 32 byte hash that specifies the
+// The execution function parses the input into a single address and returns the 32 byte hash that specifies the
 // designated role of that address
 func createReadAllowList(precompileAddr common.Address) RunStatefulPrecompileFunc {
 	return func(evm PrecompileAccessibleState, callerAddr common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {

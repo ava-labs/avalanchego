@@ -14,12 +14,12 @@ import (
 
 var (
 	_ StatefulPrecompileConfig = &ContractNativeMinterConfig{}
-	// Singleton StatefulPrecompiledContract for W/R access to the contract deployer allow list.
+	// Singleton StatefulPrecompiledContract for minting native assets by permissioned callers.
 	ContractNativeMinterPrecompile StatefulPrecompiledContract = createNativeMinterPrecompile(ContractNativeMinterAddress)
 
 	mintSignature = CalculateFunctionSelector("mint(address,uint256)") // address, amount
 
-	ErrCannotMint = errors.New("non-enabled cannot mint")
+	errCannotMint = errors.New("non-enabled cannot mint")
 
 	mintInputLen = common.HashLength + common.HashLength
 )
@@ -30,7 +30,7 @@ type ContractNativeMinterConfig struct {
 	AllowListConfig
 }
 
-// Address returns the address of the contract deployer allow list.
+// Address returns the address of the native minter contract.
 func (c *ContractNativeMinterConfig) Address() common.Address {
 	return ContractNativeMinterAddress
 }
@@ -40,7 +40,7 @@ func (c *ContractNativeMinterConfig) Configure(state StateDB) {
 	c.AllowListConfig.Configure(state, ContractNativeMinterAddress)
 }
 
-// Contract returns the singleton stateful precompiled contract to be used for the allow list.
+// Contract returns the singleton stateful precompiled contract to be used for the native minter.
 func (c *ContractNativeMinterConfig) Contract() StatefulPrecompiledContract {
 	return ContractNativeMinterPrecompile
 }
@@ -51,8 +51,7 @@ func GetContractNativeMinterStatus(stateDB StateDB, address common.Address) Allo
 }
 
 // SetContractNativeMinterStatus sets the permissions of [address] to [role] for the
-// contract deployer allow list.
-// assumes [role] has already been verified as valid.
+// minter list. assumes [role] has already been verified as valid.
 func SetContractNativeMinterStatus(stateDB StateDB, address common.Address, role AllowListRole) {
 	setAllowListRole(stateDB, ContractNativeMinterAddress, address, role)
 }
@@ -77,7 +76,8 @@ func UnpackMintInput(input []byte) (common.Address, *big.Int, error) {
 	return to, assetAmount, nil
 }
 
-// createMint // TODO: add comment
+// createMint checks if the caller is permissioned for minting operation.
+// The execution function parses the [input] into native token amount and receiver address.
 func createMint(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	if suppliedGas < MintGasCost {
 		return nil, 0, fmt.Errorf("%w (%d) < (%d)", vm.ErrOutOfGas, MintGasCost, suppliedGas)
@@ -93,21 +93,22 @@ func createMint(accessibleState PrecompileAccessibleState, caller common.Address
 		return nil, remainingGas, err
 	}
 
+	stateDB := accessibleState.GetStateDB()
 	// Verify that the caller is in the allow list and therefore has the right to modify it
-	callerStatus := getAllowListStatus(accessibleState.GetStateDB(), ContractNativeMinterAddress, caller)
+	callerStatus := getAllowListStatus(stateDB, ContractNativeMinterAddress, caller)
 	if !callerStatus.IsEnabled() {
-		return nil, remainingGas, fmt.Errorf("%w: %s", ErrCannotMint, caller)
+		return nil, remainingGas, fmt.Errorf("%w: %s", errCannotMint, caller)
 	}
 
-	if !accessibleState.GetStateDB().Exist(to) {
+	if !stateDB.Exist(to) {
 		if remainingGas < CallNewAccountGas {
 			return nil, 0, fmt.Errorf("%w (%d) < (%d)", vm.ErrOutOfGas, CallNewAccountGas, suppliedGas)
 		}
 		remainingGas -= CallNewAccountGas
-		accessibleState.GetStateDB().CreateAccount(to)
+		stateDB.CreateAccount(to)
 	}
 
-	accessibleState.GetStateDB().AddBalance(to, amount)
+	stateDB.AddBalance(to, amount)
 	// Return an empty output and the remaining gas
 	return []byte{}, remainingGas, nil
 }
