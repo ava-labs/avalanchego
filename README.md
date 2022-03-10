@@ -163,7 +163,7 @@ The allow list has three roles: `None`, `Deployer`, and `Admin`.
 
 If you call `readAllowList(addr)` then you can read the current role of `addr`, which will return a uint256 with a value of 0, 1, or 2, corresponding to the roles `None`, `Deployer`, and `Admin` respectively.
 
-WARNING: if you remove all of the admins from the allow list, it will no longer be possible to update the allow list without modifying modifying the subnet-evm to schedule a network upgrade.
+WARNING: if you remove all of the admins from the allow list, it will no longer be possible to update the allow list without modifying the subnet-evm to schedule a network upgrade.
 
 
 ## Run Local Network
