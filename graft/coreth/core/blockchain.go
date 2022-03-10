@@ -28,6 +28,7 @@
 package core
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -102,15 +103,16 @@ const (
 // CacheConfig contains the configuration values for the trie caching/pruning
 // that's resident in a blockchain.
 type CacheConfig struct {
-	TrieCleanLimit       int     // Memory allowance (MB) to use for caching trie nodes in memory
-	TrieDirtyLimit       int     // Memory limit (MB) at which to start flushing dirty trie nodes to disk
-	Pruning              bool    // Whether to disable trie write caching and GC altogether (archive node)
-	PopulateMissingTries *uint64 // If non-nil, sets the starting height for re-generating historical tries.
-	AllowMissingTries    bool    // Whether to allow an archive node to run with pruning enabled
-	SnapshotLimit        int     // Memory allowance (MB) to use for caching snapshot entries in memory
-	SnapshotAsync        bool    // Generate snapshot tree async
-	SnapshotVerify       bool    // Verify generated snapshots
-	Preimages            bool    // Whether to store preimage of trie key to the disk
+	TrieCleanLimit                  int     // Memory allowance (MB) to use for caching trie nodes in memory
+	TrieDirtyLimit                  int     // Memory limit (MB) at which to start flushing dirty trie nodes to disk
+	Pruning                         bool    // Whether to disable trie write caching and GC altogether (archive node)
+	PopulateMissingTries            *uint64 // If non-nil, sets the starting height for re-generating historical tries.
+	PopulateMissingTriesParallelism int     // Is the number of readers to use when trying to populate missing tries.
+	AllowMissingTries               bool    // Whether to allow an archive node to run with pruning enabled
+	SnapshotLimit                   int     // Memory allowance (MB) to use for caching snapshot entries in memory
+	SnapshotAsync                   bool    // Generate snapshot tree async
+	SnapshotVerify                  bool    // Verify generated snapshots
+	Preimages                       bool    // Whether to store preimage of trie key to the disk
 }
 
 var DefaultCacheConfig = &CacheConfig{
@@ -1373,28 +1375,32 @@ func (bc *BlockChain) populateMissingTries() error {
 		return fmt.Errorf("failed to fetch initial parent block for re-populate missing tries at height %d", startHeight-1)
 	}
 
-	for i := startHeight; i < lastAccepted; i++ {
-		// TODO: handle canceled context
+	it := newBlockChainIterator(bc, startHeight, bc.cacheConfig.PopulateMissingTriesParallelism)
+	defer it.Stop()
 
+	for i := startHeight; i < lastAccepted; i++ {
 		// Print progress logs if long enough time elapsed
 		if time.Since(logged) > 8*time.Second {
 			log.Info("Populating missing tries", "missing", missing, "block", i, "remaining", lastAccepted-i, "elapsed", time.Since(startTime))
 			logged = time.Now()
 		}
-		// Retrieve the next block to regenerate and process it (if its root
-		// doesn't exist)
-		current := bc.GetBlockByNumber(i)
-		if current == nil {
-			return fmt.Errorf("missing block %s:%d", current.ParentHash().Hex(), current.NumberU64()-1)
+
+		// TODO: handle canceled context
+		current, hasState, err := it.Next(context.TODO())
+		if err != nil {
+			return fmt.Errorf("error while populating missing tries: %w", err)
 		}
-		if bc.HasState(current.Root()) {
+
+		if hasState {
 			parent = current
 			continue
 		}
+
 		root, err := bc.reprocessBlock(parent, current)
 		if err != nil {
 			return err
 		}
+
 		// Commit root to disk so that it can be accessed directly
 		if err := triedb.Commit(root, false, nil); err != nil {
 			return err
