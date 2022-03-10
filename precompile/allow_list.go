@@ -73,7 +73,7 @@ func (s AllowListRole) IsAdmin() bool {
 // IsEnabled returns true if [s] indicates that it has permission to access the resource.
 func (s AllowListRole) IsEnabled() bool {
 	switch s {
-	case AllowListAdmin, AllowListEnabled:
+	case AllowListEnabled:
 		return true
 	default:
 		return false

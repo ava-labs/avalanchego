@@ -58,20 +58,22 @@ func SetContractNativeMinterStatus(stateDB StateDB, address common.Address, role
 // PackMintInput packs [address] and [amount] into the appropriate arguments for minting operation.
 func PackMintInput(address common.Address, amount *big.Int) ([]byte, error) {
 	// function selector (4 bytes) + input(hash for address + hash for amount)
-	input := make([]byte, 0, selectorLen+mintInputLen)
-	input = append(input, mintSignature...)
-	input = append(input, address.Hash().Bytes()...)
-	input = append(input, amount.Bytes()...)
+	fullLen := selectorLen + mintInputLen
+	input := make([]byte, fullLen)
+	copy(input[:selectorLen], mintSignature)
+	copy(input[selectorLen:selectorLen+common.HashLength], address.Hash().Bytes())
+	amount.FillBytes(input[selectorLen+common.HashLength : fullLen])
 	return input, nil
 }
 
 // UnpackMintInput attempts to unpack [input] into the arguments to the mint precompile
+// assumes that [input] does not include selector (omits first 4 bytes in PackMintInput)
 func UnpackMintInput(input []byte) (common.Address, *big.Int, error) {
 	if len(input) != mintInputLen {
 		return common.Address{}, nil, fmt.Errorf("invalid input length for minting: %d", len(input))
 	}
-	to := common.BytesToAddress(input[:common.AddressLength])
-	assetAmount := new(big.Int).SetBytes(input[common.AddressLength : common.AddressLength+common.HashLength])
+	to := common.BytesToAddress(input[:common.HashLength])
+	assetAmount := new(big.Int).SetBytes(input[common.HashLength : common.HashLength+common.HashLength])
 	return to, assetAmount, nil
 }
 
@@ -98,7 +100,7 @@ func createNativeMintToken(accessibleState PrecompileAccessibleState, caller com
 		return nil, remainingGas, fmt.Errorf("%w: %s", ErrCannotMint, caller)
 	}
 
-	// if there is no address in the state, we should charge for creating one.
+	// if there is no address in the state, create one.
 	if !stateDB.Exist(to) {
 		stateDB.CreateAccount(to)
 	}
