@@ -1,5 +1,9 @@
 # Release Notes
 
+## [v0.8.8](https://github.com/ava-labs/coreth/releases/tag/v0.8.8)
+
+- Parallelize trie index re-generation
+
 ## [v0.8.7](https://github.com/ava-labs/coreth/releases/tag/v0.8.7)
 
 - Optimize FeeHistory API
