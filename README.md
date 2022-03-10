@@ -159,6 +159,10 @@ If you attempt to deploy a contract but you are not an `Admin` not
 a `Deployer`, you will see something like:
 ![deploy fail](./imgs/deploy_fail.png)
 
+The allow list has three roles: `None`, `Deployer`, and `Admin`.
+
+If you call `readAllowList(addr)` then you can read the current role of `addr`, which will return a uint256 with a value of 0, 1, or 2, corresponding to the roles `None`, `Deployer`, and `Admin` respectively.
+
 
 ## Run Local Network
 [`scripts/run.sh`](scripts/run.sh) automatically installs [avalanchego], sets up a local network,
