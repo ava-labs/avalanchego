@@ -78,40 +78,38 @@ func UnpackMintInput(input []byte) (common.Address, *big.Int, error) {
 }
 
 // createMint // TODO: add comment
-func createMint(precompileAddr common.Address) RunStatefulPrecompileFunc {
-	return func(evm PrecompileAccessibleState, callerAddr, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
-		if suppliedGas < MintGasCost {
-			return nil, 0, fmt.Errorf("%w (%d) < (%d)", vm.ErrOutOfGas, MintGasCost, suppliedGas)
-		}
-		remainingGas = suppliedGas - MintGasCost
-
-		if readOnly {
-			return nil, remainingGas, ErrWriteProtection
-		}
-
-		to, amount, err := UnpackMintInput(input)
-		if err != nil {
-			return nil, remainingGas, err
-		}
-
-		// Verify that the caller is in the allow list and therefore has the right to modify it
-		callerStatus := getAllowListStatus(evm.GetStateDB(), precompileAddr, callerAddr)
-		if !callerStatus.IsEnabled() {
-			return nil, remainingGas, fmt.Errorf("%w: %s", ErrCannotMint, callerAddr)
-		}
-
-		if !evm.GetStateDB().Exist(to) {
-			if remainingGas < CallNewAccountGas {
-				return nil, 0, fmt.Errorf("%w (%d) < (%d)", vm.ErrOutOfGas, CallNewAccountGas, suppliedGas)
-			}
-			remainingGas -= CallNewAccountGas
-			evm.GetStateDB().CreateAccount(to)
-		}
-
-		evm.GetStateDB().AddBalance(to, amount)
-		// Return an empty output and the remaining gas
-		return []byte{}, remainingGas, nil
+func createMint(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+	if suppliedGas < MintGasCost {
+		return nil, 0, fmt.Errorf("%w (%d) < (%d)", vm.ErrOutOfGas, MintGasCost, suppliedGas)
 	}
+	remainingGas = suppliedGas - MintGasCost
+
+	if readOnly {
+		return nil, remainingGas, ErrWriteProtection
+	}
+
+	to, amount, err := UnpackMintInput(input)
+	if err != nil {
+		return nil, remainingGas, err
+	}
+
+	// Verify that the caller is in the allow list and therefore has the right to modify it
+	callerStatus := getAllowListStatus(accessibleState.GetStateDB(), ContractNativeMinterAddress, caller)
+	if !callerStatus.IsEnabled() {
+		return nil, remainingGas, fmt.Errorf("%w: %s", ErrCannotMint, caller)
+	}
+
+	if !accessibleState.GetStateDB().Exist(to) {
+		if remainingGas < CallNewAccountGas {
+			return nil, 0, fmt.Errorf("%w (%d) < (%d)", vm.ErrOutOfGas, CallNewAccountGas, suppliedGas)
+		}
+		remainingGas -= CallNewAccountGas
+		accessibleState.GetStateDB().CreateAccount(to)
+	}
+
+	accessibleState.GetStateDB().AddBalance(to, amount)
+	// Return an empty output and the remaining gas
+	return []byte{}, remainingGas, nil
 }
 
 // createNativeMinterPrecompile returns a StatefulPrecompiledContract with R/W control of an allow list at [precompileAddr]
@@ -121,7 +119,7 @@ func createNativeMinterPrecompile(precompileAddr common.Address) StatefulPrecomp
 	setNone := newStatefulPrecompileFunction(setNoneSignature, createAllowListRoleSetter(precompileAddr, AllowListNoRole))
 	read := newStatefulPrecompileFunction(readAllowListSignature, createReadAllowList(precompileAddr))
 
-	mint := newStatefulPrecompileFunction(mintSignature, createMint(precompileAddr))
+	mint := newStatefulPrecompileFunction(mintSignature, createMint)
 
 	// Construct the contract with no fallback function.
 	contract := newStatefulPrecompileWithFunctionSelectors(nil, []*statefulPrecompileFunction{setAdmin, setEnabled, setNone, read, mint})
