@@ -131,15 +131,15 @@ func PackReadAllowList(address common.Address) []byte {
 // This execution function is speciifc to [precompileAddr].
 func createAllowListRoleSetter(precompileAddr common.Address, role AllowListRole) RunStatefulPrecompileFunc {
 	return func(evm PrecompileAccessibleState, callerAddr, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+		if suppliedGas < ModifyAllowListGasCost {
+			return nil, 0, fmt.Errorf("%w (%d) < (%d)", vm.ErrOutOfGas, ModifyAllowListGasCost, suppliedGas)
+		}
+
 		if len(input) != common.HashLength {
 			return nil, remainingGas, fmt.Errorf("invalid input length for modifying allow list: %d", len(input))
 		}
 
 		modifyAddress := common.BytesToAddress(input)
-
-		if suppliedGas < ModifyAllowListGasCost {
-			return nil, 0, fmt.Errorf("%w (%d) < (%d)", vm.ErrOutOfGas, ModifyAllowListGasCost, suppliedGas)
-		}
 
 		remainingGas = suppliedGas - ModifyAllowListGasCost
 		if readOnly {
