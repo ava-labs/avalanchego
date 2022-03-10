@@ -7,7 +7,4 @@ import (
 	"errors"
 )
 
-var (
-	ErrExceedsGasAllowance = errors.New("exceeds gas allowance")
-	ErrWriteProtection     = errors.New("cannot modify in read only")
-)
+var ErrWriteProtection = errors.New("cannot modify in read only")

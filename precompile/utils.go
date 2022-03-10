@@ -22,9 +22,3 @@ func CalculateFunctionSelector(functionSignature string) []byte {
 	hash := crypto.Keccak256([]byte(functionSignature))
 	return hash[:4]
 }
-
-// createConstantRequiredGasFunc returns a required gas function that always returns [requiredGas]
-// on any input.
-func createConstantRequiredGasFunc(requiredGas uint64) func([]byte) uint64 {
-	return func(b []byte) uint64 { return requiredGas }
-}

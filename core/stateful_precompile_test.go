@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/state"
+	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
@@ -187,7 +188,7 @@ func TestContractDeployerAllowListRun(t *testing.T) {
 			setupState: func(state *state.StateDB) {
 				precompile.SetContractDeployerAllowListStatus(state, adminAddr, precompile.AllowListAdmin)
 			},
-			expectedErr: precompile.ErrExceedsGasAllowance.Error(),
+			expectedErr: vm.ErrOutOfGas.Error(),
 		},
 		"read allow list no role": {
 			caller:         adminAddr,
@@ -249,7 +250,7 @@ func TestContractDeployerAllowListRun(t *testing.T) {
 			setupState: func(state *state.StateDB) {
 				precompile.SetContractDeployerAllowListStatus(state, adminAddr, precompile.AllowListAdmin)
 			},
-			expectedErr: precompile.ErrExceedsGasAllowance.Error(),
+			expectedErr: vm.ErrOutOfGas.Error(),
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

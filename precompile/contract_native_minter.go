@@ -9,6 +9,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/vm"
 )
 
 var (
@@ -79,9 +80,8 @@ func UnpackMintInput(input []byte) (common.Address, *big.Int, error) {
 // createMint // TODO: add comment
 func createMint(precompileAddr common.Address) RunStatefulPrecompileFunc {
 	return func(evm PrecompileAccessibleState, callerAddr, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
-		// Note: this should never happen since the required gas should be verified before calling Run.
 		if suppliedGas < MintGasCost {
-			return nil, 0, fmt.Errorf("%w (%d) < (%d)", ErrExceedsGasAllowance, MintGasCost, suppliedGas)
+			return nil, 0, fmt.Errorf("%w (%d) < (%d)", vm.ErrOutOfGas, MintGasCost, suppliedGas)
 		}
 		remainingGas = suppliedGas - MintGasCost
 
@@ -102,7 +102,7 @@ func createMint(precompileAddr common.Address) RunStatefulPrecompileFunc {
 
 		if !evm.GetStateDB().Exist(to) {
 			if remainingGas < CallNewAccountGas {
-				return nil, 0, fmt.Errorf("%w (%d) < (%d)", ErrExceedsGasAllowance, CallNewAccountGas, suppliedGas)
+				return nil, 0, fmt.Errorf("%w (%d) < (%d)", vm.ErrOutOfGas, CallNewAccountGas, suppliedGas)
 			}
 			remainingGas -= CallNewAccountGas
 			evm.GetStateDB().CreateAccount(to)
@@ -116,12 +116,12 @@ func createMint(precompileAddr common.Address) RunStatefulPrecompileFunc {
 
 // createNativeMinterPrecompile returns a StatefulPrecompiledContract with R/W control of an allow list at [precompileAddr]
 func createNativeMinterPrecompile(precompileAddr common.Address) StatefulPrecompiledContract {
-	setAdmin := newStatefulPrecompileFunction(setAdminSignature, createAllowListSetter(precompileAddr, AllowListAdmin), createConstantRequiredGasFunc(ModifyAllowListGasCost))
-	setEnabled := newStatefulPrecompileFunction(setEnabledSignature, createAllowListSetter(precompileAddr, AllowListEnabled), createConstantRequiredGasFunc(ModifyAllowListGasCost))
-	setNone := newStatefulPrecompileFunction(setNoneSignature, createAllowListSetter(precompileAddr, AllowListNoRole), createConstantRequiredGasFunc(ModifyAllowListGasCost))
-	read := newStatefulPrecompileFunction(readAllowListSignature, createReadAllowList(precompileAddr), createConstantRequiredGasFunc(ReadAllowListGasCost))
+	setAdmin := newStatefulPrecompileFunction(setAdminSignature, createAllowListRoleSetter(precompileAddr, AllowListAdmin))
+	setEnabled := newStatefulPrecompileFunction(setEnabledSignature, createAllowListRoleSetter(precompileAddr, AllowListEnabled))
+	setNone := newStatefulPrecompileFunction(setNoneSignature, createAllowListRoleSetter(precompileAddr, AllowListNoRole))
+	read := newStatefulPrecompileFunction(readAllowListSignature, createReadAllowList(precompileAddr))
 
-	mint := newStatefulPrecompileFunction(mintSignature, createMint(precompileAddr), createConstantRequiredGasFunc(MintGasCost))
+	mint := newStatefulPrecompileFunction(mintSignature, createMint(precompileAddr))
 
 	// Construct the contract with no fallback function.
 	contract := newStatefulPrecompileWithFunctionSelectors(nil, []*statefulPrecompileFunction{setAdmin, setEnabled, setNone, read, mint})
