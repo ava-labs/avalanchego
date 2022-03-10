@@ -198,15 +198,16 @@ func New(
 			AllowUnfinalizedQueries: config.AllowUnfinalizedQueries,
 		}
 		cacheConfig = &core.CacheConfig{
-			TrieCleanLimit:       config.TrieCleanCache,
-			TrieDirtyLimit:       config.TrieDirtyCache,
-			Pruning:              config.Pruning,
-			PopulateMissingTries: config.PopulateMissingTries,
-			AllowMissingTries:    config.AllowMissingTries,
-			SnapshotLimit:        config.SnapshotCache,
-			SnapshotAsync:        config.SnapshotAsync,
-			SnapshotVerify:       config.SnapshotVerify,
-			Preimages:            config.Preimages,
+			TrieCleanLimit:                  config.TrieCleanCache,
+			TrieDirtyLimit:                  config.TrieDirtyCache,
+			Pruning:                         config.Pruning,
+			PopulateMissingTries:            config.PopulateMissingTries,
+			PopulateMissingTriesParallelism: config.PopulateMissingTriesParallelism,
+			AllowMissingTries:               config.AllowMissingTries,
+			SnapshotLimit:                   config.SnapshotCache,
+			SnapshotAsync:                   config.SnapshotAsync,
+			SnapshotVerify:                  config.SnapshotVerify,
+			Preimages:                       config.Preimages,
 		}
 	)
 

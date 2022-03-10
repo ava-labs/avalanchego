@@ -361,6 +361,7 @@ func (vm *VM) Initialize(
 	ethConfig.Preimages = vm.config.Preimages
 	ethConfig.Pruning = vm.config.Pruning
 	ethConfig.PopulateMissingTries = vm.config.PopulateMissingTries
+	ethConfig.PopulateMissingTriesParallelism = vm.config.PopulateMissingTriesParallelism
 	ethConfig.AllowMissingTries = vm.config.AllowMissingTries
 	ethConfig.SnapshotAsync = vm.config.SnapshotAsync
 	ethConfig.SnapshotVerify = vm.config.SnapshotVerify

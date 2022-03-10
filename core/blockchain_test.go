@@ -266,7 +266,7 @@ func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
 	}
 }
 
-func TestRepopulateMissingTries(t *testing.T) {
+func testRepopulateMissingTriesParallel(t *testing.T, parallelism int) {
 	var (
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
@@ -324,7 +324,7 @@ func TestRepopulateMissingTries(t *testing.T) {
 	}
 
 	// Confirm that the node does not have the state for intermediate nodes (exclude the last accepted block)
-	for _, block := range chain[:8] {
+	for _, block := range chain[:len(chain)-1] {
 		if blockchain.HasState(block.Root()) {
 			t.Fatalf("Expected blockchain to be missing state for intermediate block %d with pruning enabled", block.NumberU64())
 		}
@@ -336,11 +336,12 @@ func TestRepopulateMissingTries(t *testing.T) {
 	blockchain, err = createBlockChain(
 		chainDB,
 		&CacheConfig{
-			TrieCleanLimit:       256,
-			TrieDirtyLimit:       256,
-			Pruning:              false, // Archive mode
-			SnapshotLimit:        256,
-			PopulateMissingTries: &startHeight, // Starting point for re-populating.
+			TrieCleanLimit:                  256,
+			TrieDirtyLimit:                  256,
+			Pruning:                         false, // Archive mode
+			SnapshotLimit:                   256,
+			PopulateMissingTries:            &startHeight, // Starting point for re-populating.
+			PopulateMissingTriesParallelism: parallelism,
 		},
 		gspec.Config,
 		lastAcceptedHash,
@@ -353,5 +354,12 @@ func TestRepopulateMissingTries(t *testing.T) {
 		if !blockchain.HasState(block.Root()) {
 			t.Fatalf("failed to re-generate state for block %d", block.NumberU64())
 		}
+	}
+}
+
+func TestRepopulateMissingTries(t *testing.T) {
+	// Test with different levels of parallelism as a regression test.
+	for _, parallelism := range []int{1, 2, 4, 1024} {
+		testRepopulateMissingTriesParallel(t, parallelism)
 	}
 }
