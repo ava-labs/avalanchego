@@ -28,6 +28,8 @@ var (
 
 	// Error returned when an invalid write is attempted
 	ErrCannotModifyAllowList = errors.New("non-admin cannot modify allow list")
+
+	allowListInputLen = common.HashLength
 )
 
 // AllowListConfig specifies the configuration of the allow list.
@@ -135,7 +137,7 @@ func createAllowListRoleSetter(precompileAddr common.Address, role AllowListRole
 			return nil, 0, fmt.Errorf("%w (%d) < (%d)", vm.ErrOutOfGas, ModifyAllowListGasCost, suppliedGas)
 		}
 
-		if len(input) != common.HashLength {
+		if len(input) != allowListInputLen {
 			return nil, remainingGas, fmt.Errorf("invalid input length for modifying allow list: %d", len(input))
 		}
 
@@ -169,7 +171,7 @@ func createReadAllowList(precompileAddr common.Address) RunStatefulPrecompileFun
 
 		remainingGas = suppliedGas - ReadAllowListGasCost
 
-		if len(input) != common.HashLength {
+		if len(input) != allowListInputLen {
 			return nil, remainingGas, fmt.Errorf("invalid input length for read allow list: %d", len(input))
 		}
 

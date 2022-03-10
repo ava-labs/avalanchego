@@ -21,7 +21,7 @@ var (
 
 	ErrCannotMint = errors.New("non-enabled cannot mint")
 
-	inputLen = common.HashLength + common.HashLength
+	mintInputLen = common.HashLength + common.HashLength
 )
 
 // ContractNativeMinterConfig wraps [AllowListConfig] and uses it to implement the StatefulPrecompileConfig
@@ -60,7 +60,7 @@ func SetContractNativeMinterStatus(stateDB StateDB, address common.Address, role
 // PackMintInput packs [address] and [amount] into the appropriate arguments for minting operation.
 func PackMintInput(address common.Address, amount *big.Int) ([]byte, error) {
 	// function selector (4 bytes) + input(hash for address + hash for amount)
-	input := make([]byte, 0, selectorLen+inputLen)
+	input := make([]byte, 0, selectorLen+mintInputLen)
 	input = append(input, mintSignature...)
 	input = append(input, address.Hash().Bytes()...)
 	input = append(input, amount.Bytes()...)
@@ -69,7 +69,7 @@ func PackMintInput(address common.Address, amount *big.Int) ([]byte, error) {
 
 // UnpackMintInput attempts to unpack [input] into the arguments to the mint precompile
 func UnpackMintInput(input []byte) (common.Address, *big.Int, error) {
-	if len(input) != inputLen {
+	if len(input) != mintInputLen {
 		return common.Address{}, nil, fmt.Errorf("invalid input length for minting: %d", len(input))
 	}
 	to := common.BytesToAddress(input[:common.AddressLength])
