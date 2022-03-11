@@ -1120,7 +1120,6 @@ func (vm *VM) issueTx(tx *Tx, local bool) error {
 		}
 		return err
 	}
-
 	// add to mempool and possibly re-gossip
 	if err := vm.mempool.AddTx(tx); err != nil {
 		if !local {

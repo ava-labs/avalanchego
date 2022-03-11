@@ -39,11 +39,11 @@ type Mempool struct {
 	Pending chan struct{}
 	// newTxs is an array of [Tx] that are ready to be gossiped.
 	newTxs []*Tx
-	// utxoSet is a collection of all pending and issued UTXOs
-	utxoSet ids.Set
 	// txHeap is a sorted record of all txs in the mempool by [gasPrice]
 	// NOTE: [txHeap] ONLY contains pending txs
 	txHeap *txHeap
+	// utxoSpenders maps utxoIDs to the transaction consuming them in the mempool
+	utxoSpenders map[ids.ID]*Tx
 }
 
 // NewMempool returns a Mempool with [maxSize]
@@ -54,9 +54,9 @@ func NewMempool(AVAXAssetID ids.ID, maxSize int) *Mempool {
 		discardedTxs: &cache.LRU{Size: discardedTxsCacheSize},
 		currentTxs:   make(map[ids.ID]*Tx),
 		Pending:      make(chan struct{}, 1),
-		utxoSet:      ids.NewSet(maxSize),
 		txHeap:       newTxHeap(maxSize),
 		maxSize:      maxSize,
+		utxoSpenders: make(map[ids.ID]*Tx),
 	}
 }
 
@@ -114,6 +114,38 @@ func (m *Mempool) ForceAddTx(tx *Tx) error {
 	return m.addTx(tx, true)
 }
 
+// checkConflictTx checks for any transactions in the mempool that spend the same input UTXOs as [tx].
+// If any conflicts are present, it returns the highest gas price of any conflicting transaction, the
+// txID of the corresponding tx and the full list of transactions that conflict with [tx].
+func (m *Mempool) checkConflictTx(tx *Tx) (uint64, ids.ID, []*Tx, error) {
+	utxoSet := tx.InputUTXOs()
+
+	var (
+		highestGasPrice             uint64 = 0
+		conflictingTxs              []*Tx  = make([]*Tx, 0)
+		highestGasPriceConflictTxID ids.ID = ids.ID{}
+	)
+	for utxoID := range utxoSet {
+		// Get current gas price of the existing tx in the mempool
+		conflictTx, ok := m.utxoSpenders[utxoID]
+		if !ok {
+			continue
+		}
+		conflictTxID := conflictTx.ID()
+		conflictTxGasPrice, err := m.atomicTxGasPrice(conflictTx)
+		// Should never error to calculate the gas price of a transaction already in the mempool
+		if err != nil {
+			return 0, ids.ID{}, conflictingTxs, fmt.Errorf("failed to re-calculate gas price for conflict tx due to: %w", err)
+		}
+		if highestGasPrice < conflictTxGasPrice {
+			highestGasPrice = conflictTxGasPrice
+			highestGasPriceConflictTxID = conflictTxID
+		}
+		conflictingTxs = append(conflictingTxs, conflictTx)
+	}
+	return highestGasPrice, highestGasPriceConflictTxID, conflictingTxs, nil
+}
+
 // addTx adds [tx] to the mempool. Assumes [m.lock] is held.
 // If [force], skips conflict checks within the mempool.
 func (m *Mempool) addTx(tx *Tx, force bool) error {
@@ -130,22 +162,38 @@ func (m *Mempool) addTx(tx *Tx, force bool) error {
 		return nil
 	}
 
-	// Check if the submitted transaction's UTXOs conflict with what is already
-	// in the mempool
 	utxoSet := tx.InputUTXOs()
-	if overlaps := m.utxoSet.Overlaps(utxoSet); overlaps && !force {
-		return errConflictingAtomicTx
-	}
-
-	// Add tx to heap sorted by gasPrice
-	gasPrice, err := m.atomicTxGasPrice(tx)
+	gasPrice, _ := m.atomicTxGasPrice(tx)
+	highestGasPrice, highestGasPriceConflictTxID, conflictingTxs, err := m.checkConflictTx(tx)
 	if err != nil {
 		return err
 	}
+	if len(conflictingTxs) != 0 && !force {
+		// If [tx] does not have a higher fee than all of its conflicts,
+		// we refuse to issue it to the mempool.
+		if highestGasPrice >= gasPrice {
+			return fmt.Errorf(
+				"%w: issued tx (%s) gas price %d <= conflict tx (%s) gas price %d (%d total conflicts in mempool)",
+				errConflictingAtomicTx,
+				txID,
+				gasPrice,
+				highestGasPriceConflictTxID,
+				highestGasPrice,
+				len(conflictingTxs),
+			)
+		}
+		// Remove any conflicting transactions from the mempool
+		for _, conflictTx := range conflictingTxs {
+			m.removeTx(conflictTx)
+			m.discardedTxs.Put(conflictTx.ID(), conflictTx)
+		}
+	}
+	// If adding this transaction would exceed the mempool's size, check if there is a lower priced
+	// transaction that can be evicted from the mempool
 	if m.length() >= m.maxSize {
 		if m.txHeap.Len() > 0 {
 			// Get the lowest price item from [txHeap]
-			_, minGasPrice := m.txHeap.PeekMin()
+			minTx, minGasPrice := m.txHeap.PeekMin()
 			// If the [gasPrice] of the lowest item is >= the [gasPrice] of the
 			// submitted item, discard the submitted item (we prefer items
 			// already in the mempool).
@@ -158,9 +206,8 @@ func (m *Mempool) addTx(tx *Tx, force bool) error {
 				)
 			}
 
-			tx := m.txHeap.PopMin()
-			m.utxoSet.Remove(tx.InputUTXOs().List()...)
-			m.discardedTxs.Evict(tx.ID())
+			m.removeTx(minTx)
+			m.discardedTxs.Put(minTx.ID(), minTx)
 		} else {
 			// This could occur if we have used our entire size allowance on
 			// transactions that are currently processing.
@@ -181,8 +228,9 @@ func (m *Mempool) addTx(tx *Tx, force bool) error {
 	// on how their [gasPrice] compares and add to [utxoSet] to make sure we can
 	// reject conflicting transactions.
 	m.txHeap.Push(tx, gasPrice)
-	m.utxoSet.Union(utxoSet)
-
+	for utxoID := range utxoSet {
+		m.utxoSpenders[utxoID] = tx
+	}
 	// When adding [tx] to the mempool make sure that there is an item in Pending
 	// to signal the VM to produce a block. Note: if the VM's buildStatus has already
 	// been set to something other than [dontBuild], this will be ignored and won't be
@@ -306,7 +354,7 @@ func (m *Mempool) cancelTx(tx *Tx) {
 		// If the err is not nil, we simply discard the transaction because it is
 		// invalid. This should never happen but we guard against the case it does.
 		log.Error("failed to calculate atomic tx gas price while canceling current tx", "err", err)
-		m.utxoSet.Remove(tx.InputUTXOs().List()...)
+		m.removeSpenders(tx)
 		m.discardedTxs.Put(tx.ID(), tx)
 	}
 
@@ -337,33 +385,46 @@ func (m *Mempool) DiscardCurrentTxs() {
 // discardCurrentTx discards [tx] from the set of current transactions.
 // Assumes the lock is held.
 func (m *Mempool) discardCurrentTx(tx *Tx) {
-	m.utxoSet.Remove(tx.InputUTXOs().List()...)
+	m.removeSpenders(tx)
 	m.discardedTxs.Put(tx.ID(), tx)
 	delete(m.currentTxs, tx.ID())
 }
 
+// removeTx removes [txID] from the mempool.
+// Note: removeTx will delete all entries from [utxoSpenders] corresponding
+// to input UTXOs of [txID]. This means that when replacing a conflicting tx,
+// removeTx must be called for all conflicts before overwriting the utxoSpenders
+// map.
+// Assumes lock is held.
+func (m *Mempool) removeTx(tx *Tx) {
+	txID := tx.ID()
+
+	// Remove from [currentTxs], [txHeap], and [issuedTxs].
+	delete(m.currentTxs, txID)
+	m.txHeap.Remove(txID)
+	delete(m.issuedTxs, txID)
+
+	// Remove all entries from [utxoSpenders].
+	m.removeSpenders(tx)
+}
+
+// removeSpenders deletes the entries for all input UTXOs of [tx] from the
+// [utxoSpenders] map.
+// Assumes the lock is held.
+func (m *Mempool) removeSpenders(tx *Tx) {
+	for utxoID := range tx.InputUTXOs() {
+		delete(m.utxoSpenders, utxoID)
+	}
+}
+
 // RemoveTx removes [txID] from the mempool completely.
-func (m *Mempool) RemoveTx(txID ids.ID) {
+// Evicts [tx] from the discarded cache if present.
+func (m *Mempool) RemoveTx(tx *Tx) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	var removedTx *Tx
-	if tx, ok := m.currentTxs[txID]; ok {
-		removedTx = tx
-		delete(m.currentTxs, txID)
-	}
-	if tx, ok := m.txHeap.Get(txID); ok {
-		removedTx = tx
-		m.txHeap.Remove(txID)
-	}
-	if tx, ok := m.issuedTxs[txID]; ok {
-		removedTx = tx
-		delete(m.issuedTxs, txID)
-	}
-	if removedTx != nil {
-		m.utxoSet.Remove(removedTx.InputUTXOs().List()...)
-	}
-	m.discardedTxs.Evict(txID)
+	m.removeTx(tx)
+	m.discardedTxs.Evict(tx.ID())
 }
 
 // addPending makes sure that an item is in the Pending channel.
