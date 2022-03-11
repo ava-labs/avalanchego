@@ -333,7 +333,7 @@ func TestContractNativeMinterRun(t *testing.T) {
 				res := precompile.GetContractNativeMinterStatus(state, allowAddr)
 				assert.Equal(t, precompile.AllowListEnabled, res)
 
-				assert.Equal(t, common.Big1, state.GetBalance(allowAddr), "expected increased admin funds")
+				assert.Equal(t, common.Big1, state.GetBalance(allowAddr), "expected increased funds")
 			},
 		},
 		"mint funds from admin address": {
