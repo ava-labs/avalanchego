@@ -501,6 +501,7 @@ func (p *peer) writeMessages() {
 			p.sendQueueCond.Wait()
 		}
 		msg := p.sendQueue[0]
+		p.sendQueue[0] = nil
 		p.sendQueue = p.sendQueue[1:]
 		p.sendQueueCond.L.Unlock()
 
