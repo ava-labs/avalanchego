@@ -360,7 +360,7 @@ func (p *peer) readMessages() {
 	}()
 
 	// Continuously read and handle messages from this peer.
-	reader := bufio.NewReader(p.conn)
+	reader := bufio.NewReaderSize(p.conn, p.Config.ReadBufferSize)
 	msgLenBytes := make([]byte, wrappers.IntLen)
 	for {
 		// Time out and close connection if we can't read the message length
@@ -485,7 +485,7 @@ func (p *peer) writeMessages() {
 	}()
 
 	var reader bytes.Reader
-	writer := bufio.NewWriter(p.conn)
+	writer := bufio.NewWriterSize(p.conn, p.Config.WriteBufferSize)
 	for { // When this loop exits, p.sendQueueCond.L is unlocked
 		p.sendQueueCond.L.Lock()
 		for {

@@ -192,6 +192,8 @@ func NewNetwork(
 	}
 
 	peerConfig := &peer.Config{
+		ReadBufferSize:       config.PeerReadBufferSize,
+		WriteBufferSize:      config.PeerWriteBufferSize,
 		Metrics:              peerMetrics,
 		MessageCreator:       msgCreator,
 		Log:                  log,

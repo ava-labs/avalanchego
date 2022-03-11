@@ -144,4 +144,12 @@ type Config struct {
 	// message. Messages sent by clients setting values higher than this value
 	// will be reset to this value.
 	MaximumInboundMessageTimeout time.Duration `json:"maximumInboundMessageTimeout"`
+
+	// Size, in bytes, of the buffer that we read peer messages into
+	// (there is one buffer per peer)
+	PeerReadBufferSize int `json:"peerReadBufferSize"`
+
+	// Size, in bytes, of the buffer that we write peer messages into
+	// (there is one buffer per peer)
+	PeerWriteBufferSize int `json:"peerWriteBufferSize"`
 }
