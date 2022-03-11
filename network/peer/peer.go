@@ -476,7 +476,6 @@ func (p *peer) writeMessages() {
 		for _, msg := range p.sendQueue {
 			p.OutboundMsgThrottler.Release(msg, p.id)
 			p.Metrics.SendFailed(msg)
-			msg.DecRef()
 		}
 		p.sendQueue = nil
 		p.sendQueueCond.L.Unlock()
