@@ -881,6 +881,128 @@ func testConflictingImportTxs(t *testing.T, genesis string) {
 	}
 }
 
+func TestReissueAtomicTxHigherGasPrice(t *testing.T) {
+	kc := secp256k1fx.NewKeychain(testKeys...)
+
+	for name, issueTxs := range map[string]func(t *testing.T, vm *VM, sharedMemory *atomic.Memory) (issued []*Tx, discarded []*Tx){
+		"single UTXO override": func(t *testing.T, vm *VM, sharedMemory *atomic.Memory) (issued []*Tx, evicted []*Tx) {
+			utxo, err := addUTXO(sharedMemory, vm.ctx, ids.GenerateTestID(), 0, vm.ctx.AVAXAssetID, units.Avax, testShortIDAddrs[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			tx1, err := vm.newImportTxWithUTXOs(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, kc, []*avax.UTXO{utxo})
+			if err != nil {
+				t.Fatal(err)
+			}
+			tx2, err := vm.newImportTxWithUTXOs(vm.ctx.XChainID, testEthAddrs[0], new(big.Int).Mul(common.Big2, initialBaseFee), kc, []*avax.UTXO{utxo})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if err := vm.issueTx(tx1, true); err != nil {
+				t.Fatal(err)
+			}
+			if err := vm.issueTx(tx2, true); err != nil {
+				t.Fatal(err)
+			}
+
+			return []*Tx{tx2}, []*Tx{tx1}
+		},
+		"one of two UTXOs overrides": func(t *testing.T, vm *VM, sharedMemory *atomic.Memory) (issued []*Tx, evicted []*Tx) {
+			utxo1, err := addUTXO(sharedMemory, vm.ctx, ids.GenerateTestID(), 0, vm.ctx.AVAXAssetID, units.Avax, testShortIDAddrs[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			utxo2, err := addUTXO(sharedMemory, vm.ctx, ids.GenerateTestID(), 0, vm.ctx.AVAXAssetID, units.Avax, testShortIDAddrs[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			tx1, err := vm.newImportTxWithUTXOs(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, kc, []*avax.UTXO{utxo1, utxo2})
+			if err != nil {
+				t.Fatal(err)
+			}
+			tx2, err := vm.newImportTxWithUTXOs(vm.ctx.XChainID, testEthAddrs[0], new(big.Int).Mul(common.Big2, initialBaseFee), kc, []*avax.UTXO{utxo1})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if err := vm.issueTx(tx1, true); err != nil {
+				t.Fatal(err)
+			}
+			if err := vm.issueTx(tx2, true); err != nil {
+				t.Fatal(err)
+			}
+
+			return []*Tx{tx2}, []*Tx{tx1}
+		},
+		"hola": func(t *testing.T, vm *VM, sharedMemory *atomic.Memory) (issued []*Tx, evicted []*Tx) {
+			utxo1, err := addUTXO(sharedMemory, vm.ctx, ids.GenerateTestID(), 0, vm.ctx.AVAXAssetID, units.Avax, testShortIDAddrs[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			utxo2, err := addUTXO(sharedMemory, vm.ctx, ids.GenerateTestID(), 0, vm.ctx.AVAXAssetID, units.Avax, testShortIDAddrs[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			importTx1, err := vm.newImportTxWithUTXOs(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, kc, []*avax.UTXO{utxo1})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			importTx2, err := vm.newImportTxWithUTXOs(vm.ctx.XChainID, testEthAddrs[0], new(big.Int).Mul(big.NewInt(3), initialBaseFee), kc, []*avax.UTXO{utxo2})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			reissuanceTx1, err := vm.newImportTxWithUTXOs(vm.ctx.XChainID, testEthAddrs[0], new(big.Int).Mul(big.NewInt(2), initialBaseFee), kc, []*avax.UTXO{utxo1, utxo2})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := vm.issueTx(importTx1, true /*=local*/); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := vm.issueTx(importTx2, true /*=local*/); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := vm.issueTx(reissuanceTx1, true /*=local*/); !errors.Is(err, errConflictingAtomicTx) {
+				t.Fatalf("Expected to fail with err: %s, but found err: %s", errConflictingAtomicTx, err)
+			}
+
+			assert.True(t, vm.mempool.has(importTx1.ID()))
+			assert.True(t, vm.mempool.has(importTx2.ID()))
+			assert.False(t, vm.mempool.has(reissuanceTx1.ID()))
+
+			reissuanceTx2, err := vm.newImportTxWithUTXOs(vm.ctx.XChainID, testEthAddrs[0], new(big.Int).Mul(big.NewInt(4), initialBaseFee), kc, []*avax.UTXO{utxo1, utxo2})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := vm.issueTx(reissuanceTx2, true /*=local*/); err != nil {
+				t.Fatal(err)
+			}
+
+			return []*Tx{reissuanceTx2}, []*Tx{importTx1, importTx2}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, vm, _, sharedMemory, _ := GenesisVM(t, true, genesisJSONApricotPhase5, "", "")
+			issuedTxs, evictedTxs := issueTxs(t, vm, sharedMemory)
+
+			for i, tx := range issuedTxs {
+				_, issued := vm.mempool.txHeap.Get(tx.ID())
+				assert.True(t, issued, "expected issued tx at index %d to be issued", i)
+			}
+
+			for i, tx := range evictedTxs {
+				_, discarded := vm.mempool.discardedTxs.Get(tx.ID())
+				assert.True(t, discarded, "expected discarded tx at index %d to be discarded", i)
+			}
+		})
+	}
+}
+
 func TestConflictingImportTxsAcrossBlocks(t *testing.T) {
 	for name, genesis := range map[string]string{
 		"apricotPhase1": genesisJSONApricotPhase1,
@@ -2488,7 +2610,6 @@ func TestAcceptReorg(t *testing.T) {
 	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkCHash {
 		t.Fatalf("expected current block to have hash %s but got %s", blkCHash.Hex(), b.Hash().Hex())
 	}
-
 	if err := vm1BlkB.Reject(); err != nil {
 		t.Fatal(err)
 	}
@@ -2496,7 +2617,6 @@ func TestAcceptReorg(t *testing.T) {
 	if err := vm1BlkD.Accept(); err != nil {
 		t.Fatal(err)
 	}
-
 	blkDHash := vm1BlkD.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
 	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkDHash {
 		t.Fatalf("expected current block to have hash %s but got %s", blkDHash.Hex(), b.Hash().Hex())
