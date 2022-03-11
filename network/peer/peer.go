@@ -5,7 +5,6 @@ package peer
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"crypto/x509"
 	"encoding/binary"
@@ -484,7 +483,6 @@ func (p *peer) writeMessages() {
 		p.close()
 	}()
 
-	var reader bytes.Reader
 	writer := bufio.NewWriterSize(p.conn, p.Config.WriteBufferSize)
 	for { // When this loop exits, p.sendQueueCond.L is unlocked
 		p.sendQueueCond.L.Lock()
@@ -513,32 +511,31 @@ func (p *peer) writeMessages() {
 		)
 
 		msgLen := uint32(len(msgBytes))
-
 		msgLenBytes := [wrappers.IntLen]byte{}
 		binary.BigEndian.PutUint32(msgLenBytes[:], msgLen)
 
-		for _, byteSlice := range [2][]byte{msgLenBytes[:], msgBytes} {
-			reader.Reset(byteSlice)
-			if err := p.conn.SetWriteDeadline(p.nextTimeout()); err != nil {
-				p.Log.Verbo(
-					"error setting write deadline to %s%s due to: %s",
-					constants.NodeIDPrefix, p.id,
-					err,
-				)
-				p.OutboundMsgThrottler.Release(msg, p.id)
-				msg.DecRef()
-				return
-			}
-			if _, err := io.CopyN(writer, &reader, int64(len((byteSlice)))); err != nil {
-				p.Log.Verbo(
-					"error writing to %s%s due to: %s",
-					constants.NodeIDPrefix, p.id,
-					err,
-				)
-				p.OutboundMsgThrottler.Release(msg, p.id)
-				msg.DecRef()
-				return
-			}
+		if err := p.conn.SetWriteDeadline(p.nextTimeout()); err != nil {
+			p.Log.Verbo(
+				"error setting write deadline to %s%s due to: %s",
+				constants.NodeIDPrefix, p.id,
+				err,
+			)
+			p.OutboundMsgThrottler.Release(msg, p.id)
+			msg.DecRef()
+			return
+		}
+
+		// Write the message
+		var buf net.Buffers = [][]byte{msgLenBytes[:], msgBytes}
+		if _, err := io.CopyN(writer, &buf, int64(wrappers.IntLen+msgLen)); err != nil {
+			p.Log.Verbo(
+				"error writing to %s%s due to: %s",
+				constants.NodeIDPrefix, p.id,
+				err,
+			)
+			p.OutboundMsgThrottler.Release(msg, p.id)
+			msg.DecRef()
+			return
 		}
 
 		// Make sure the peer got the entire message
