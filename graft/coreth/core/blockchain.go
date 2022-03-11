@@ -541,6 +541,9 @@ func (bc *BlockChain) Stop() {
 		return
 	}
 
+	// Stop senderCacher's goroutines
+	bc.senderCacher.Shutdown()
+
 	// Unsubscribe all subscriptions registered from blockchain.
 	bc.scope.Close()
 
