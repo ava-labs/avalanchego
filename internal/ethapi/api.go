@@ -44,6 +44,7 @@ import (
 	"github.com/ava-labs/subnet-evm/eth/tracers/logger"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/rpc"
+	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -1101,7 +1102,7 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 			return 0, err
 		}
 		if failed {
-			if result != nil && result.Err != vm.ErrOutOfGas {
+			if result != nil && result.Err != vmerrs.ErrOutOfGas {
 				if len(result.Revert()) > 0 {
 					return 0, newRevertError(result)
 				}

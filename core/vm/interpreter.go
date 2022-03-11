@@ -29,6 +29,7 @@ package vm
 import (
 	"hash"
 
+	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/log"
@@ -206,7 +207,7 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 			return nil, &ErrStackOverflow{stackLen: sLen, limit: operation.maxStack}
 		}
 		if !contract.UseGas(cost) {
-			return nil, ErrOutOfGas
+			return nil, vmerrs.ErrOutOfGas
 		}
 
 		if operation.dynamicGas != nil {
@@ -219,12 +220,12 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 			if operation.memorySize != nil {
 				memSize, overflow := operation.memorySize(stack)
 				if overflow {
-					return nil, ErrGasUintOverflow
+					return nil, vmerrs.ErrGasUintOverflow
 				}
 				// memory is expanded in words of 32 bytes. Gas
 				// is also calculated in words.
 				if memorySize, overflow = math.SafeMul(toWordSize(memSize), 32); overflow {
-					return nil, ErrGasUintOverflow
+					return nil, vmerrs.ErrGasUintOverflow
 				}
 			}
 			// Consume the gas and return an error if not enough gas is available.
@@ -233,7 +234,7 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 			dynamicCost, err = operation.dynamicGas(in.evm, contract, stack, mem, memorySize)
 			cost += dynamicCost // for tracing
 			if err != nil || !contract.UseGas(dynamicCost) {
-				return nil, ErrOutOfGas
+				return nil, vmerrs.ErrOutOfGas
 			}
 			if memorySize > 0 {
 				mem.Resize(memorySize)

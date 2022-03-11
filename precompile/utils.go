@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -27,7 +27,7 @@ func CalculateFunctionSelector(functionSignature string) []byte {
 // deductGas checks if [suppliedGas] is sufficient against [requiredGas] and deducts [requiredGas] from [suppliedGas].
 func deductGas(suppliedGas uint64, requiredGas uint64) (uint64, error) {
 	if suppliedGas < requiredGas {
-		return 0, fmt.Errorf("%w (%d) < (%d)", vm.ErrOutOfGas, requiredGas, suppliedGas)
+		return 0, vmerrs.ErrOutOfGas
 	}
 	return suppliedGas - requiredGas, nil
 }

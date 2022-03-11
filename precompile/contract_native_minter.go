@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -85,7 +86,7 @@ func createNativeMintToken(accessibleState PrecompileAccessibleState, caller com
 	}
 
 	if readOnly {
-		return nil, remainingGas, ErrWriteProtection
+		return nil, remainingGas, vmerrs.ErrWriteProtection
 	}
 
 	to, amount, err := UnpackMintInput(input)

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -83,7 +84,7 @@ func (s AllowListRole) IsAdmin() bool {
 // IsEnabled returns true if [s] indicates that it has permission to access the resource.
 func (s AllowListRole) IsEnabled() bool {
 	switch s {
-	case AllowListEnabled:
+	case AllowListAdmin, AllowListEnabled:
 		return true
 	default:
 		return false
@@ -153,7 +154,7 @@ func createAllowListRoleSetter(precompileAddr common.Address, role AllowListRole
 		modifyAddress := common.BytesToAddress(input)
 
 		if readOnly {
-			return nil, remainingGas, ErrWriteProtection
+			return nil, remainingGas, vmerrs.ErrWriteProtection
 		}
 
 		// Verify that the caller is in the allow list and therefore has the right to modify it

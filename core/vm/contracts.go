@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile"
+	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -190,7 +191,7 @@ func ActivePrecompiles(rules params.Rules) []common.Address {
 func RunPrecompiledContract(p PrecompiledContract, input []byte, suppliedGas uint64) (ret []byte, remainingGas uint64, err error) {
 	gasCost := p.RequiredGas(input)
 	if suppliedGas < gasCost {
-		return nil, 0, ErrOutOfGas
+		return nil, 0, vmerrs.ErrOutOfGas
 	}
 	suppliedGas -= gasCost
 	output, err := p.Run(input)
