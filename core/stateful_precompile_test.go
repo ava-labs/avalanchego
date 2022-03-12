@@ -182,7 +182,7 @@ func TestContractDeployerAllowListRun(t *testing.T) {
 			readOnly:    false,
 			expectedRes: common.Hash(precompile.AllowListNoRole).Bytes(),
 			assertState: func(t *testing.T, state *state.StateDB) {
-				res := precompile.GetContractDeployerAllowListStatus(state, adminAddr)
+				res := precompile.GetContractDeployerAllowListStatus(state, noRoleAddr)
 				assert.Equal(t, precompile.AllowListNoRole, res)
 			},
 		},
@@ -231,6 +231,10 @@ func TestContractDeployerAllowListRun(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+
+			// Set up the state so that each address has the expected permissions at the start.
+			precompile.SetContractDeployerAllowListStatus(state, adminAddr, precompile.AllowListAdmin)
+			precompile.SetContractDeployerAllowListStatus(state, noRoleAddr, precompile.AllowListNoRole)
 
 			ret, remainingGas, err := precompile.ContractDeployerAllowListPrecompile.Run(&mockAccessibleState{state: state}, test.caller, test.precompileAddr, test.input(), test.suppliedGas, test.readOnly)
 			if len(test.expectedErr) != 0 {
