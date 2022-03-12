@@ -49,6 +49,10 @@ func CheckConfigure(parentTimestamp *big.Int, currentTimestamp *big.Int, config 
 		// Set the nonce of the precompile's address (as is done when a contract is created) to ensure
 		// that it is marked as non-empty and will not be cleaned up when the statedb is finalized.
 		state.SetNonce(config.Address(), 1)
+		// Set the code of the precompile's address to a non-zero length byte slice to ensure that the precompile
+		// can be called from within Solidity contracts. Solidity adds a check before invoking a contract to ensure
+		// that it does not attempt to invoke a non-existent contract.
+		state.SetCode(config.Address(), []byte{0x00})
 		config.Configure(state)
 	}
 }
