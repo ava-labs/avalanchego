@@ -139,7 +139,8 @@ func setupGenesis(t *testing.T,
 ) (*snow.Context,
 	manager.Manager,
 	[]byte,
-	chan engCommon.Message) {
+	chan engCommon.Message,
+) {
 	genesisBytes := buildGenesisTest(t, genesisJSON)
 	ctx := NewContext()
 
@@ -169,7 +170,8 @@ func GenesisVM(t *testing.T,
 	upgradeJSON string,
 ) (chan engCommon.Message,
 	*VM, manager.Manager,
-	*engCommon.SenderTest) {
+	*engCommon.SenderTest,
+) {
 	vm := &VM{}
 	ctx, dbManager, genesisBytes, issuer := setupGenesis(t, genesisJSON)
 	appSender := &engCommon.SenderTest{}
