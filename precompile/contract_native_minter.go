@@ -17,7 +17,7 @@ var (
 	// Singleton StatefulPrecompiledContract for minting native assets by permissioned callers.
 	ContractNativeMinterPrecompile StatefulPrecompiledContract = createNativeMinterPrecompile(ContractNativeMinterAddress)
 
-	mintSignature = CalculateFunctionSelector("mintNativeToken(address,uint256)") // address, amount
+	mintSignature = CalculateFunctionSelector("mintNativeCoin(address,uint256)") // address, amount
 
 	ErrCannotMint = errors.New("non-enabled cannot mint")
 
@@ -78,9 +78,9 @@ func UnpackMintInput(input []byte) (common.Address, *big.Int, error) {
 	return to, assetAmount, nil
 }
 
-// createMint checks if the caller is permissioned for minting operation.
-// The execution function parses the [input] into native token amount and receiver address.
-func createNativeMintToken(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+// createMintNativeCoin checks if the caller is permissioned for minting operation.
+// The execution function parses the [input] into native coin amount and receiver address.
+func createMintNativeCoin(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	if remainingGas, err = deductGas(suppliedGas, MintGasCost); err != nil {
 		return nil, 0, err
 	}
@@ -111,14 +111,14 @@ func createNativeMintToken(accessibleState PrecompileAccessibleState, caller com
 	return []byte{}, remainingGas, nil
 }
 
-// createNativeMinterPrecompile returns a StatefulPrecompiledContract with R/W control of an allow list at [precompileAddr] and a native token minter.
+// createNativeMinterPrecompile returns a StatefulPrecompiledContract with R/W control of an allow list at [precompileAddr] and a native coin minter.
 func createNativeMinterPrecompile(precompileAddr common.Address) StatefulPrecompiledContract {
 	setAdmin := newStatefulPrecompileFunction(setAdminSignature, createAllowListRoleSetter(precompileAddr, AllowListAdmin))
 	setEnabled := newStatefulPrecompileFunction(setEnabledSignature, createAllowListRoleSetter(precompileAddr, AllowListEnabled))
 	setNone := newStatefulPrecompileFunction(setNoneSignature, createAllowListRoleSetter(precompileAddr, AllowListNoRole))
 	read := newStatefulPrecompileFunction(readAllowListSignature, createReadAllowList(precompileAddr))
 
-	mint := newStatefulPrecompileFunction(mintSignature, createNativeMintToken)
+	mint := newStatefulPrecompileFunction(mintSignature, createMintNativeCoin)
 
 	// Construct the contract with no fallback function.
 	contract := newStatefulPrecompileWithFunctionSelectors(nil, []*statefulPrecompileFunction{setAdmin, setEnabled, setNone, read, mint})

@@ -18,6 +18,6 @@ interface NativeMinterInterface {
     // Read the status of [addr]
     function readAllowList(address addr) external view returns (uint256);
 
-    // Mint [amount] number of native token and send to [addr]
-    function mintNativeToken(address addr, uint256 amount) external;
+    // Mint [amount] number of native coins and send to [addr]
+    function mintNativeCoin(address addr, uint256 amount) external;
 }

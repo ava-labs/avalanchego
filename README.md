@@ -13,6 +13,7 @@ This chain implements the Ethereum Virtual Machine and supports Solidity smart c
 The Subnet EVM runs in a separate process from the main AvalancheGo process and communicates with it over a local gRPC connection.
 
 ### AvalancheGo Compatibility
+
 ```
 [v0.1.0] AvalancheGo@v1.7.0-v1.7.4
 [v0.1.1-v0.1.2] AvalancheGo@v1.7.5-v1.7.6
@@ -42,24 +43,27 @@ The Subnet EVM is compatible with almost all Ethereum tooling, including [Remix,
 - Removed Multicoin Contract and State
 
 ## Setting a Custom Fee Recipient
+
 By default, all fees are burned (sent to the blackhole address). However, it is
 possible to enable block producers to set a fee recipient (get compensated for
 blocks they produce).
 
 To enable this feature, you'll need to add the following to your
 genesis file (under the `"config"` key):
+
 ```json
 {
   "config": {
-    "allowFeeRecipients":true
+    "allowFeeRecipients": true
   }
 }
 ```
 
 Next, you'll need to update your [chain config](https://docs.avax.network/build/references/command-line-interface/#chain-configs) with the following:
+
 ```json
 {
-  "feeRecipient":"<YOU 0x-ADDRESS>"
+  "feeRecipient": "<YOU 0x-ADDRESS>"
 }
 ```
 
@@ -67,8 +71,10 @@ _Note: If you enable this feature but a validator doesn't specify
 a "feeRecipient", the fees will be burned in blocks they produce._
 
 ## Restricting Smart Contract Deployers
+
 If you'd like to restrict who has the ability to deploy contracts on your
 subnet, you can provide an `AllowList` configuration in your genesis file:
+
 ```json
 {
   "config": {
@@ -96,7 +102,7 @@ subnet, you can provide an `AllowList` configuration in your genesis file:
     },
     "contractDeployerAllowListConfig": {
       "blockTimestamp": 0,
-      "adminAddresses":["0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"]
+      "adminAddresses": ["0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"]
     }
   },
   "alloc": {
@@ -128,6 +134,7 @@ listed deployer.
 The `Stateful Precompile` powering the `ContractDeployerAllowList` adheres to the following
 Solidity interface at `0x0200000000000000000000000000000000000000` (you can
 load this interface and interact directly in Remix):
+
 ```solidity
 // (c) 2022-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
@@ -159,8 +166,12 @@ If you attempt to deploy a contract but you are not an `Admin` not
 a `Deployer`, you will see something like:
 ![deploy fail](./imgs/deploy_fail.png)
 
+## Minting Native Coins
+
+You can mint native(gas) tokens
 
 ## Run Local Network
+
 [`scripts/run.sh`](scripts/run.sh) automatically installs [avalanchego], sets up a local network,
 and creates a `subnet-evm` genesis file.
 
@@ -172,6 +183,7 @@ cd ${HOME}/go/src/github.com/ava-labs/subnet-evm
 
 Once the the network is started up, the following info will be printed to the
 console:
+
 ```bash
 Logs Directory: /var/folders/mp/6jm81gc11dv3xtcwxmrd8mcr0000gn/T/runnerlogs2402729383
 PID: 90118
@@ -201,6 +213,7 @@ Curreny Symbol: LEVM
 ```
 
 You can then ping the local cluster or add the network to MetaMask:
+
 ```bash
 curl --location --request POST 'http://localhost:61278/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/rpc' \
 --header 'Content-Type: application/json' \
@@ -220,11 +233,13 @@ COMMENT
 ```
 
 To terminate the cluster, kill the PID:
+
 ```bash
 kill -2 55547
 ```
 
 ## Fuji Subnet Deployment
+
 Ready to take the `subnet-evm` for a spin? Follow this
 tutorial and you can get your own EVM on your own subnet
 spun up on Fuji in a jiffy!
@@ -233,14 +248,17 @@ _You can find an example of a genesis file to use when launching your own
 `subnet-evm` in the [networks folder](./networks/11111/genesis.json)._
 
 ### Prerequisites
-* 1+ nodes running on Fuji (does not need to be a validator)
-* [`subnet-cli`](https://github.com/ava-labs/subnet-cli) installed
-* `subnet-cli` private key with some Fuji AVAX (see [faucet](https://faucet.avax-test.network))
+
+- 1+ nodes running on Fuji (does not need to be a validator)
+- [`subnet-cli`](https://github.com/ava-labs/subnet-cli) installed
+- `subnet-cli` private key with some Fuji AVAX (see [faucet](https://faucet.avax-test.network))
 
 ### Build Binary
+
 First, you'll need to compile the subnet-evm into a binary that AvalancheGo
 can interact with. To do this, run the following commands (assumes you don't
 yet have the `subnet-evm` repository downloaded):
+
 ```bash
 git clone https://github.com/ava-labs/subnet-evm.git;
 cd subnet-evm;
@@ -248,10 +266,12 @@ cd subnet-evm;
 ```
 
 #### Move Binary
+
 Once the `subnet-evm` binary is built, you'll need to move it to AvalancheGo's
 plugin directory (within the `--build-dir`) so it can be run by your node.
 When building from source, this defaults to `~/avalanchego/build/plugins`.
 This build directory is structured as:
+
 ```
 build-dir
 |_avalanchego
@@ -261,11 +281,13 @@ build-dir
 
 To put the `subnet-evm` binary in the right place, run the following command
 (assuming the `avalanchego` and `subnet-evm` repos are in the same folder):
+
 ```bash
 mv ./subnet-evm/build/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy ./avalanchego/build/plugins;
 ```
 
 ### Run `subnet-cli wizard`
+
 The easiest and fastest way to get your new subnet off the ground is to use the
 [`subnet-cli`](https://github.com/ava-labs/subnet-cli). This powerful CLI can
 add validators, create subnets, and create blockchains.
@@ -294,34 +316,38 @@ _The `vm-id` was generated by calling `subnet-cli create VMID subnetevm`. You ca
 use any value here, the only important thing is to make sure the binary you
 generate has the same name._
 
-
 #### Add New Subnet to Node Whitelist
+
 During the execution of the `wizard` command, you will be prompted to add your
 new subnetID to your node. This is done using the `whitelisted-subnets` config.
 You can provide the `whitelisted-subnets` argument by modifying your config
 file or providing an argument on startup.
 
 Example Config File:
+
 ```json
 {
-  "network-id":"fuji",
-  "health-check-frequency":"2s",
-  "log-display-level":"INFO",
-  "log-level":"INFO",
-  "whitelisted-subnets":"<PROVIDED BY SPACES-CLI>"
+  "network-id": "fuji",
+  "health-check-frequency": "2s",
+  "log-display-level": "INFO",
+  "log-level": "INFO",
+  "whitelisted-subnets": "<PROVIDED BY SPACES-CLI>"
 }
 ```
 
 Example Node Args:
+
 ```bash
 --whitelisted-subnets=<PROVIDED BY SPACES CLI> --network-id=fuji
 ```
 
 #### Restart Node
+
 Once you've updated your config, you'll need to restart your
 AvalancheGo node for the changes to take effect.
 
 If you completed the steps successfully, you'll see the node print out:
+
 ```bash
 INFO [01-25|16:47:04] chains/manager.go#246: creating chain:
     ID: 2AM3vsuLoJdGBGqX2ibE8RGEq4Lg7g4bot6BT1Z7B9dH5corUD
@@ -341,6 +367,7 @@ INFO [01-25|16:47:06] <2AM3vsuLoJdGBGqX2ibE8RGEq4Lg7g4bot6BT1Z7B9dH5corUD Chain>
 
 If you didn't put the `subnet-evm` binary in the right place, you'll see something
 like:
+
 ```bash
 INFO [01-26|05:54:19] chains/manager.go#246: creating chain:
     ID: 2AM3vsuLoJdGBGqX2ibE8RGEq4Lg7g4bot6BT1Z7B9dH5corUD
@@ -349,6 +376,7 @@ ERROR[01-26|05:54:19] chains/manager.go#270: error creating chain 2AM3vsuLoJdGBG
 ```
 
 ## Join the WAGMI Subnet Demo
+
 <p align="center">
   <img width="40%" alt="WAGMI" src="./imgs/wagmi.png">
 </p>
@@ -375,7 +403,9 @@ of subnets is for performing complex VM testing on a live network (without impac
 the stability of the primary network).
 
 ### Network Creation
+
 To create WAGMI, all we had to do was run the following command:
+
 ```bash
 subnet-cli wizard \
 --node-ids=NodeID-9TCq8np31pHjjhGaHtLjs6ptYYPEt3LGb,NodeID-BrYXghQSu6KKGjuzhs3nrkcB46Wc2yYHy,NodeID-89UCR1CsPzzEHuknxhJHKxuFPNCyPz7Bu,NodeID-Hfm8gpD4DpCz4KTzt2osJPfFvu7az3qiD,NodeID-LkdxkfYhg6nSw1EEUxDUSYPXPwmr2cUet \
@@ -387,12 +417,11 @@ subnet-cli wizard \
 This added these NodeIDs as validators on Fuji, created the WAGMI Subnet, added
 all validators to the WAGMI subnet, and created the WAGMI chain.
 
-
-* SubnetID: [28nrH5T2BMvNrWecFcV3mfccjs6axM1TVyqe79MCv2Mhs8kxiY](https://testnet.avascan.info/blockchains?subnet=28nrH5T2BMvNrWecFcV3mfccjs6axM1TVyqe79MCv2Mhs8kxiY)
-* ChainID: [2ebCneCbwthjQ1rYT41nhd7M76Hc6YmosMAQrTFhBq8qeqh6tt](https://testnet.avascan.info/blockchain/2ebCneCbwthjQ1rYT41nhd7M76Hc6YmosMAQrTFhBq8qeqh6tt)
-
+- SubnetID: [28nrH5T2BMvNrWecFcV3mfccjs6axM1TVyqe79MCv2Mhs8kxiY](https://testnet.avascan.info/blockchains?subnet=28nrH5T2BMvNrWecFcV3mfccjs6axM1TVyqe79MCv2Mhs8kxiY)
+- ChainID: [2ebCneCbwthjQ1rYT41nhd7M76Hc6YmosMAQrTFhBq8qeqh6tt](https://testnet.avascan.info/blockchain/2ebCneCbwthjQ1rYT41nhd7M76Hc6YmosMAQrTFhBq8qeqh6tt)
 
 ### Network Parameters
+
 ```
 Network ID: 11111
 Chain ID: 11111
@@ -403,6 +432,7 @@ Target Block Rate: 2s (Same as C-Chain)
 ```
 
 ### Adding to MetaMask
+
 ```
 Network Name: WAGMI
 RPC URL: https://api.trywagmi.xyz/rpc
@@ -413,17 +443,259 @@ Symbol: WGM
 ![metamask](./imgs/metamask.png)
 
 ### Wrapped WAGMI
+
 #### Info
+
 ```
 Address: 0x3Ee7094DADda15810F191DD6AcF7E4FFa37571e4
 IPFS: /ipfs/QmVAuheeidjD2ktdX3sSHMQqSfcjtmca1g9jr7w9GQf7pU
 ```
+
 #### Metadata
+
 ```json
-{"compiler":{"version":"0.5.17+commit.d19bba13"},"language":"Solidity","output":{"abi":[{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"src","type":"address"},{"indexed":true,"internalType":"address","name":"guy","type":"address"},{"indexed":false,"internalType":"uint256","name":"wad","type":"uint256"}],"name":"Approval","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"dst","type":"address"},{"indexed":false,"internalType":"uint256","name":"wad","type":"uint256"}],"name":"Deposit","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"src","type":"address"},{"indexed":true,"internalType":"address","name":"dst","type":"address"},{"indexed":false,"internalType":"uint256","name":"wad","type":"uint256"}],"name":"Transfer","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"src","type":"address"},{"indexed":false,"internalType":"uint256","name":"wad","type":"uint256"}],"name":"Withdrawal","type":"event"},{"payable":true,"stateMutability":"payable","type":"fallback"},{"constant":true,"inputs":[{"internalType":"address","name":"","type":"address"},{"internalType":"address","name":"","type":"address"}],"name":"allowance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"internalType":"address","name":"guy","type":"address"},{"internalType":"uint256","name":"wad","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[],"name":"deposit","outputs":[],"payable":true,"stateMutability":"payable","type":"function"},{"constant":true,"inputs":[],"name":"name","outputs":[{"internalType":"string","name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"symbol","outputs":[{"internalType":"string","name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"totalSupply","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"internalType":"address","name":"dst","type":"address"},{"internalType":"uint256","name":"wad","type":"uint256"}],"name":"transfer","outputs":[{"internalType":"bool","name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"internalType":"address","name":"src","type":"address"},{"internalType":"address","name":"dst","type":"address"},{"internalType":"uint256","name":"wad","type":"uint256"}],"name":"transferFrom","outputs":[{"internalType":"bool","name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"internalType":"uint256","name":"wad","type":"uint256"}],"name":"withdraw","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"}],"devdoc":{"methods":{}},"userdoc":{"methods":{}}},"settings":{"compilationTarget":{"contracts/wwagmi.sol":"WWAGMI"},"evmVersion":"istanbul","libraries":{},"optimizer":{"enabled":false,"runs":200},"remappings":[]},"sources":{"contracts/wwagmi.sol":{"keccak256":"0x0a6ce5559225d3c99db4a5e24777049df3c84886ba9a08147f23afae4261b509","urls":["bzz-raw://0aef254c65ae30b578256a7e2496ed18bf0cb68e97f5831050e17a2cf0192a7e","dweb:/ipfs/QmSwAbdnaYvrjDHTKnE3qBZ3smT7uipSSfSGBUiKWmNWEY"]}},"version":1}
+{
+  "compiler": { "version": "0.5.17+commit.d19bba13" },
+  "language": "Solidity",
+  "output": {
+    "abi": [
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "src",
+            "type": "address"
+          },
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "guy",
+            "type": "address"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint256",
+            "name": "wad",
+            "type": "uint256"
+          }
+        ],
+        "name": "Approval",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "dst",
+            "type": "address"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint256",
+            "name": "wad",
+            "type": "uint256"
+          }
+        ],
+        "name": "Deposit",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "src",
+            "type": "address"
+          },
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "dst",
+            "type": "address"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint256",
+            "name": "wad",
+            "type": "uint256"
+          }
+        ],
+        "name": "Transfer",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "src",
+            "type": "address"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint256",
+            "name": "wad",
+            "type": "uint256"
+          }
+        ],
+        "name": "Withdrawal",
+        "type": "event"
+      },
+      { "payable": true, "stateMutability": "payable", "type": "fallback" },
+      {
+        "constant": true,
+        "inputs": [
+          { "internalType": "address", "name": "", "type": "address" },
+          { "internalType": "address", "name": "", "type": "address" }
+        ],
+        "name": "allowance",
+        "outputs": [
+          { "internalType": "uint256", "name": "", "type": "uint256" }
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "constant": false,
+        "inputs": [
+          { "internalType": "address", "name": "guy", "type": "address" },
+          { "internalType": "uint256", "name": "wad", "type": "uint256" }
+        ],
+        "name": "approve",
+        "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "constant": true,
+        "inputs": [
+          { "internalType": "address", "name": "", "type": "address" }
+        ],
+        "name": "balanceOf",
+        "outputs": [
+          { "internalType": "uint256", "name": "", "type": "uint256" }
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "constant": true,
+        "inputs": [],
+        "name": "decimals",
+        "outputs": [{ "internalType": "uint8", "name": "", "type": "uint8" }],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "constant": false,
+        "inputs": [],
+        "name": "deposit",
+        "outputs": [],
+        "payable": true,
+        "stateMutability": "payable",
+        "type": "function"
+      },
+      {
+        "constant": true,
+        "inputs": [],
+        "name": "name",
+        "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "constant": true,
+        "inputs": [],
+        "name": "symbol",
+        "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "constant": true,
+        "inputs": [],
+        "name": "totalSupply",
+        "outputs": [
+          { "internalType": "uint256", "name": "", "type": "uint256" }
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "constant": false,
+        "inputs": [
+          { "internalType": "address", "name": "dst", "type": "address" },
+          { "internalType": "uint256", "name": "wad", "type": "uint256" }
+        ],
+        "name": "transfer",
+        "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "constant": false,
+        "inputs": [
+          { "internalType": "address", "name": "src", "type": "address" },
+          { "internalType": "address", "name": "dst", "type": "address" },
+          { "internalType": "uint256", "name": "wad", "type": "uint256" }
+        ],
+        "name": "transferFrom",
+        "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "constant": false,
+        "inputs": [
+          { "internalType": "uint256", "name": "wad", "type": "uint256" }
+        ],
+        "name": "withdraw",
+        "outputs": [],
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "function"
+      }
+    ],
+    "devdoc": { "methods": {} },
+    "userdoc": { "methods": {} }
+  },
+  "settings": {
+    "compilationTarget": { "contracts/wwagmi.sol": "WWAGMI" },
+    "evmVersion": "istanbul",
+    "libraries": {},
+    "optimizer": { "enabled": false, "runs": 200 },
+    "remappings": []
+  },
+  "sources": {
+    "contracts/wwagmi.sol": {
+      "keccak256": "0x0a6ce5559225d3c99db4a5e24777049df3c84886ba9a08147f23afae4261b509",
+      "urls": [
+        "bzz-raw://0aef254c65ae30b578256a7e2496ed18bf0cb68e97f5831050e17a2cf0192a7e",
+        "dweb:/ipfs/QmSwAbdnaYvrjDHTKnE3qBZ3smT7uipSSfSGBUiKWmNWEY"
+      ]
+    }
+  },
+  "version": 1
+}
 ```
 
 #### Code
+
 ```solidity
 // Copyright (C) 2015, 2016, 2017 Dapphub
 
@@ -506,4 +778,4 @@ contract WWAGMI{
 }
 ```
 
-[become a Fuji Validator]: https://docs.avax.network/build/tutorials/nodes-and-staking/staking-avax-by-validating-or-delegating-with-the-avalanche-wallet
+[become a fuji validator]: https://docs.avax.network/build/tutorials/nodes-and-staking/staking-avax-by-validating-or-delegating-with-the-avalanche-wallet
