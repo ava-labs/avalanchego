@@ -149,8 +149,11 @@ Next, you'll need to update your [chain config](https://docs.avax.network/build/
 _Note: If you enable this feature but a validator doesn't specify
 a "feeRecipient", the fees will be burned in blocks they produce._
 
-## Restricting Smart Contract Deployers
+## Precompiles
 
+Subnet EVM can provide custom functionalities with precompiled contracts. These precompiled contracts can be activated through `ChainConfig` (in genesis or as an upgrade).
+
+### Restricting Smart Contract Deployers
 If you'd like to restrict who has the ability to deploy contracts on your
 subnet, you can provide an `AllowList` configuration in your genesis file:
 ```json
@@ -209,9 +212,7 @@ deployer instead of the caller of `CREATE`. This means that factory contracts wi
 able to create new contracts as long as the sender of the original transaction is an allow
 listed deployer.
 
-The `Stateful Precompile` powering the `ContractDeployerAllowList` adheres to the following
-Solidity interface at `0x0200000000000000000000000000000000000000` (you can
-load this interface and interact directly in Remix):
+The `Stateful Precompile` powering the `ContractDeployerAllowList` adheres to the following Solidity interface at `0x0200000000000000000000000000000000000000` (you can load this interface and interact directly in Remix):
 ```solidity
 // (c) 2022-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
@@ -249,6 +250,87 @@ If you call `readAllowList(addr)` then you can read the current role of `addr`, 
 
 WARNING: if you remove all of the admins from the allow list, it will no longer be possible to update the allow list without modifying the subnet-evm to schedule a network upgrade.
 
+### Minting Native Coins
+
+You can mint native(gas) coins with a precompiled contract. In order to activate this feature, you can provide `nativeMinterConfig` in genesis:
+```json
+{
+  "config": {
+    "chainId": 99999,
+    "homesteadBlock": 0,
+    "eip150Block": 0,
+    "eip150Hash": "0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0",
+    "eip155Block": 0,
+    "eip158Block": 0,
+    "byzantiumBlock": 0,
+    "constantinopleBlock": 0,
+    "petersburgBlock": 0,
+    "istanbulBlock": 0,
+    "muirGlacierBlock": 0,
+    "subnetEVMTimestamp": 0,
+    "feeConfig": {
+      "gasLimit": 20000000,
+      "minBaseFee": 1000000000,
+      "targetGas": 100000000,
+      "baseFeeChangeDenominator": 48,
+      "minBlockGasCost": 0,
+      "maxBlockGasCost": 10000000,
+      "targetBlockRate": 2,
+      "blockGasCostStep": 500000
+    },
+    "contractNativeMinterConfig": {
+      "blockTimestamp": 0,
+      "adminAddresses":["0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"]
+    }
+  },
+  "alloc": {
+    "8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC": {
+      "balance": "0x52B7D2DCC80CD2E4000000"
+    }
+  },
+  "nonce": "0x0",
+  "timestamp": "0x0",
+  "extraData": "0x00",
+  "gasLimit": "0x1312D00",
+  "difficulty": "0x0",
+  "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "coinbase": "0x0000000000000000000000000000000000000000",
+  "number": "0x0",
+  "gasUsed": "0x0",
+  "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+}
+```
+
+`adminAddresses` denotes admin accounts who can add other `Admin` or `Minter` accounts. `Minters` and `Admins` are both eligible to mint native coins for other addresses. `ContractNativeMinter` uses same methods as in `ContractDeployerAllowList`.
+
+The `Stateful Precompile` powering the `ContractNativeMinter` adheres to the following Solidity interface at `0x0200000000000000000000000000000000000001` (you can load this interface and interact directly in Remix):
+```solidity
+// (c) 2022-2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+// SPDX-License-Identifier: MIT
+
+pragma solidity >=0.8.0;
+
+interface NativeMinterInterface {
+    // Set [addr] to have the admin role over the minter list
+    function setAdmin(address addr) external;
+
+    // Set [addr] to be enabled on the minter list
+    function setEnabled(address addr) external;
+
+    // Set [addr] to have no role over the minter list
+    function setNone(address addr) external;
+
+    // Read the status of [addr]
+    function readAllowList(address addr) external view returns (uint256);
+
+    // Mint [amount] number of native coins and send to [addr]
+    function mintNativeCoin(address addr, uint256 amount) external;
+}
+```
+
+_Note: Both `ContractDeployerAllowList` and `ContractNativeMinter` can be used together.
 
 ## Run Local Network
 

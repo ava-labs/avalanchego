@@ -9,6 +9,8 @@ import "github.com/ethereum/go-ethereum/common"
 const (
 	ModifyAllowListGasCost = 20_000
 	ReadAllowListGasCost   = 5_000
+
+	MintGasCost = 30_000
 )
 
 // Designated addresses of stateful precompiles
@@ -21,8 +23,10 @@ const (
 // in the future.
 var (
 	ContractDeployerAllowListAddress = common.HexToAddress("0x0200000000000000000000000000000000000000")
+	ContractNativeMinterAddress      = common.HexToAddress("0x0200000000000000000000000000000000000001")
 
 	UsedAddresses = []common.Address{
 		ContractDeployerAllowListAddress,
+		ContractNativeMinterAddress,
 	}
 )
