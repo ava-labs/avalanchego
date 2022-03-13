@@ -315,6 +315,42 @@ To terminate the cluster, kill the PID:
 kill -2 55547
 ```
 
+## Load Simulator
+`0x27a0D44AC25233652c02b1a92dD2C7D46059b053`
+
+```yaml
+endpoints:
+  - https://api.avax-test.network/ext/bc/C/rpc
+base-fee: 25
+priority-fee: 1
+concurrency: 10
+```
+
+```bash
+2022/03/13 13:35:38 starting simulator (endpoints=[https://api.avax-test.network/ext/bc/C/rpc] concurrency=25 base fee=1 priority fee=10)
+2022/03/13 13:35:38 loaded worker 0x10c7529d2e598a91e57f1BD6954Fbb161DC4B36c (balance=39858000000000088 nonce=27)
+2022/03/13 13:35:39 loaded worker 0x155a4BeedAC767b85c9Fd15198c06064f9F7952E (balance=41496000000000103 nonce=24)
+2022/03/13 13:35:39 loaded worker 0x28db65C88b4763c3Fa1837c6c7398cA770BE2fCe (balance=42588000000000101 nonce=22)
+2022/03/13 13:35:39 loaded worker 0x2d1BcD523440f83435d6b485be0dC5ef64760337 (balance=40404000000000086 nonce=26)
+2022/03/13 13:35:39 loaded worker 0x315C6538E791cE600A3733F354db77Ac719a0beC (balance=43134000000000097 nonce=21)
+2022/03/13 13:35:39 loaded worker 0xF2839C033cb9947F43471702233F608220a12569 (balance=9448539999999999000 nonce=10)
+2022/03/13 13:35:39 loaded worker 0xa179C0203625f3ffdADe299A056C35191d7b65ad (balance=42042000000000107 nonce=23)
+2022/03/13 13:35:40 loaded worker 0xb7D559A889495C485aFF8C17Bf6b4b9D63123BC0 (balance=43134000000000109 nonce=21)
+2022/03/13 13:35:40 loaded worker 0xcE921E2EC4a8919cb7F3D27Db733750fdC95940b (balance=42042000000000113 nonce=23)
+2022/03/13 13:35:40 loaded worker 0xda17f72F349d86c3451620edB5Fd32f4352881a2 (balance=42042000000000109 nonce=23)
+2022/03/13 13:35:40 loaded worker 0xe8ca46F9F93Ecb1b77CE8e6BcE1d5F635898FDD8 (balance=37674000000000087 nonce=31)
+2022/03/13 13:35:41 [block created] index: 7262002 base fee: 25 block gas cost: 400000 block txs: 2
+2022/03/13 13:35:43 [block created] index: 7262003 base fee: 25 block gas cost: 0 block txs: 3
+2022/03/13 13:35:43 [stats] historical TPS: 1.250000 last 10s TPS: 0.200000 total txs: 5 total time(s): 4s
+2022/03/13 13:35:45 [block created] index: 7262004 base fee: 25 block gas cost: 0 block txs: 9
+2022/03/13 13:35:45 [stats] historical TPS: 2.333333 last 10s TPS: 0.500000 total txs: 14 total time(s): 6s
+2022/03/13 13:35:48 [block created] index: 7262005 base fee: 25 block gas cost: 0 block txs: 9
+2022/03/13 13:35:48 [block created] index: 7262006 base fee: 25 block gas cost: 200000 block txs: 8
+2022/03/13 13:35:48 [stats] historical TPS: 3.444444 last 10s TPS: 2.300000 total txs: 31 total time(s): 9s
+2022/03/13 13:35:53 [block created] index: 7262007 base fee: 25 block gas cost: 0 block txs: 12
+2022/03/13 13:35:53 [stats] historical TPS: 3.583333 last 10s TPS: 2.900000 total txs: 43 total time(s): 12s
+```
+
 ## Fuji Subnet Deployment
 Ready to take the `subnet-evm` for a spin? Follow this
 tutorial and you can get your own EVM on your own subnet

@@ -8,9 +8,9 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/ava-labs/subnet-evm/core/types"
+	"github.com/ava-labs/subnet-evm/ethclient"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/params"
 	"golang.org/x/sync/errgroup"
 )
@@ -92,7 +92,7 @@ func CreateWorkers(ctx context.Context, keys []*Key, endpoints []string, desired
 }
 
 type Worker struct {
-	c *ethclient.Client
+	c ethclient.Client
 	k *Key
 
 	balance *big.Int
@@ -140,7 +140,7 @@ func (w *Worker) FetchBalance(ctx context.Context) error {
 
 func (w *Worker) FetchNonce(ctx context.Context) error {
 	for ctx.Err() == nil {
-		nonce, err := w.c.PendingNonceAt(ctx, w.k.addr)
+		nonce, err := w.c.NonceAt(ctx, w.k.addr, nil)
 		if err != nil {
 			log.Printf("could not get nonce: %s\n", err.Error())
 			time.Sleep(retryDelay)
@@ -196,7 +196,6 @@ func (w *Worker) sendTx(ctx context.Context, recipient common.Address, value *bi
 			continue
 		}
 		txHash := signedTx.Hash()
-		log.Printf("%s broadcasted transaction: %s\n", w.k.addr.Hex(), txHash.Hex())
 		cost, err := w.confirmTransaction(ctx, txHash)
 		if err != nil {
 			log.Printf("failed to confirm %s: %s", txHash.Hex(), err.Error())
@@ -283,6 +282,9 @@ func Run(ctx context.Context, endpoints []string, concurrency int, baseFee uint6
 	}
 
 	g, gctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		return MonitorTPS(gctx, rclient)
+	})
 	fundRequest := make(chan common.Address)
 	g.Go(func() error {
 		return master.Fund(gctx, fundRequest)

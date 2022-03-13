@@ -128,6 +128,8 @@ github.com/ava-labs/coreth v0.8.4-rc.3/go.mod h1:9TgpLJVY9ot6RV8Lh66F356S4Mfalva
 github.com/ava-labs/coreth v0.8.6-rc.1/go.mod h1:D60h55zuIQu6/dc7nWpXNyk3xakq3xsWMFuumttcpqw=
 github.com/ava-labs/coreth v0.8.7-rc.1/go.mod h1:E9yfBswaDbV3WeFeX90wS0eRAfeW7WPbxgbc4b0KJlk=
 github.com/ava-labs/coreth v0.8.7-rc.2/go.mod h1:HC8D4Ei7PNRzpPpqGC/M08YYeBp1kogJBVcWIfGseVA=
+github.com/ava-labs/subnet-evm v0.1.2 h1:cmndL8fDTrR9nIbCJrEaDYcJ8O71rsAiW7dGXfCgA1s=
+github.com/ava-labs/subnet-evm v0.1.2/go.mod h1:BU4UpYk5bCRlSGu+4f7P0ydlDFUM53yun53yuM5iYT0=
 github.com/aws/aws-sdk-go-v2 v1.2.0/go.mod h1:zEQs02YRBw1DjK0PoJv3ygDYOFTre1ejlJWl8FwAuQo=
 github.com/aws/aws-sdk-go-v2/config v1.1.1/go.mod h1:0XsVy9lBI/BCXm+2Tuvt39YmdHwS5unDQmxZOYe8F5Y=
 github.com/aws/aws-sdk-go-v2/credentials v1.1.1/go.mod h1:mM2iIjwl7LULWtS6JCACyInboHirisUUdkBPoTHMOUo=
