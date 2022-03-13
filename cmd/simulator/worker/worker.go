@@ -17,19 +17,32 @@ import (
 
 var (
 	transferGasLimit = uint64(21000)
-	transferGasPrice = big.NewInt(225 * params.GWei)
-	transferGas      = new(big.Int).Mul(big.NewInt(int64(transferGasLimit)), transferGasPrice)
 	transferAmount   = big.NewInt(1)
+	workDelay        = time.Duration(100 * time.Millisecond)
+	retryDelay       = time.Duration(500 * time.Millisecond)
 
-	transferBalance  = new(big.Int).Add(transferGas, transferAmount)
-	requestBalance   = new(big.Int).Mul(transferBalance, big.NewInt(50))
-	minFunderBalance = new(big.Int).Add(transferBalance, requestBalance)
+	chainID     *big.Int
+	signer      types.Signer
+	feeCap      *big.Int
+	priorityFee *big.Int
 
-	chainID = big.NewInt(43112)
-	signer  = types.LatestSignerForChainID(chainID)
-
-	workDelay = time.Duration(100 * time.Millisecond)
+	maxTransferCost  *big.Int
+	requestAmount    *big.Int
+	minFunderBalance *big.Int
 )
+
+func SetupVars(cID uint64, bFee uint64, pFee uint64) {
+	chainID = new(big.Int).SetUint64(cID)
+	signer = types.LatestSignerForChainID(chainID)
+	priorityFee = new(big.Int).SetUint64(pFee * params.GWei)
+	feeCap = new(big.Int).Add(new(big.Int).SetUint64(bFee*params.GWei), priorityFee)
+
+	maxTransferCost = new(big.Int).Mul(new(big.Int).SetUint64(transferGasLimit), feeCap)
+	maxTransferCost = new(big.Int).Add(maxTransferCost, transferAmount)
+
+	requestAmount = new(big.Int).Mul(maxTransferCost, big.NewInt(100))
+	minFunderBalance = new(big.Int).Add(maxTransferCost, requestAmount)
+}
 
 func CreateWorkers(ctx context.Context, keys []*Key, endpoints []string, desiredWorkers int) (*Worker, []*Worker, error) {
 	var master *Worker
@@ -39,12 +52,14 @@ func CreateWorkers(ctx context.Context, keys []*Key, endpoints []string, desired
 		if err != nil {
 			return nil, nil, err
 		}
-
 		if err := worker.FetchBalance(ctx); err != nil {
 			return nil, nil, err
 		}
+		if err := worker.FetchNonce(ctx); err != nil {
+			return nil, nil, fmt.Errorf("could not get nonce: %w", err)
+		}
+		log.Printf("loaded worker %s (balance=%s nonce=%d)\n", worker.k.addr.Hex(), worker.balance.String(), worker.nonce)
 
-		log.Printf("loaded worker %s with balance %s\n", worker.k.addr.Hex(), worker.balance.String())
 		switch {
 		case master == nil:
 			master = worker
@@ -81,6 +96,7 @@ type Worker struct {
 	k *Key
 
 	balance *big.Int
+	nonce   uint64
 }
 
 func New(k *Key, endpoint string) (*Worker, error) {
@@ -104,21 +120,40 @@ func New(k *Key, endpoint string) (*Worker, error) {
 		c:       client,
 		k:       k,
 		balance: big.NewInt(0),
+		nonce:   0,
 	}, nil
 }
 
 func (w *Worker) FetchBalance(ctx context.Context) error {
-	balance, err := w.c.BalanceAt(ctx, w.k.addr, nil)
-	if err != nil {
-		return fmt.Errorf("could not get balance: %w", err)
+	for ctx.Err() == nil {
+		balance, err := w.c.BalanceAt(ctx, w.k.addr, nil)
+		if err != nil {
+			log.Printf("could not get balance: %s\n", err.Error())
+			time.Sleep(retryDelay)
+			continue
+		}
+		w.balance = balance
+		return nil
 	}
+	return ctx.Err()
+}
 
-	w.balance = balance
-	return nil
+func (w *Worker) FetchNonce(ctx context.Context) error {
+	for ctx.Err() == nil {
+		nonce, err := w.c.PendingNonceAt(ctx, w.k.addr)
+		if err != nil {
+			log.Printf("could not get nonce: %s\n", err.Error())
+			time.Sleep(retryDelay)
+			continue
+		}
+		w.nonce = nonce
+		return nil
+	}
+	return ctx.Err()
 }
 
 func (w *Worker) waitForBalance(ctx context.Context, stdout bool, minBalance *big.Int) error {
-	for {
+	for ctx.Err() == nil {
 		if err := w.FetchBalance(ctx); err != nil {
 			return fmt.Errorf("could not get balance: %w", err)
 		}
@@ -134,71 +169,70 @@ func (w *Worker) waitForBalance(ctx context.Context, stdout bool, minBalance *bi
 		}
 		time.Sleep(5 * time.Second)
 	}
+	return ctx.Err()
 }
 
-func (w *Worker) Work(ctx context.Context, availableWorkers []*Worker, fundRequest chan common.Address) error {
-	nonce, err := w.c.PendingNonceAt(ctx, w.k.addr)
-	if err != nil {
-		return fmt.Errorf("could not get nonce: %w", err)
-	}
-
+func (w *Worker) sendTx(ctx context.Context, recipient common.Address, value *big.Int) error {
 	for ctx.Err() == nil {
-		if new(big.Int).Sub(w.balance, transferBalance).Sign() < 0 {
-			log.Printf("%s requesting funds from master\n", w.k.addr.Hex())
-			fundRequest <- w.k.addr
-			if err := w.waitForBalance(ctx, false, transferBalance); err != nil {
-				return fmt.Errorf("could not get minimum balance: %w", err)
-			}
-		}
-
-		recipient := availableWorkers[rand.Intn(len(availableWorkers))]
-		if recipient.k.addr == w.k.addr {
-			continue
-		}
-
 		tx := types.NewTx(&types.DynamicFeeTx{
-			ChainID: chainID,
-			Nonce:   nonce,
-			To:      &recipient.k.addr,
-			Gas:     transferGasLimit,
-			// TODO: replace
-			GasFeeCap: transferGasPrice,
-			GasTipCap: common.Big0,
+			ChainID:   chainID,
+			Nonce:     w.nonce,
+			To:        &recipient,
+			Gas:       transferGasLimit,
+			GasFeeCap: feeCap,
+			GasTipCap: priorityFee,
+			Value:     value,
 			Data:      []byte{},
 		})
 		signedTx, err := types.SignTx(tx, signer, w.k.pk)
 		if err != nil {
-			return fmt.Errorf("failed to sign transaction: %w", err)
-		}
-
-		if err := w.c.SendTransaction(ctx, signedTx); err != nil {
-			// return fmt.Errorf("unable to send tx: %w", err)
-			time.Sleep(workDelay)
+			log.Printf("failed to sign transaction: %s", err.Error())
+			time.Sleep(retryDelay)
 			continue
 		}
-
-		log.Printf("%s broadcasted transaction: %s\n", w.k.addr.Hex(), signedTx.Hash().Hex())
-
-		if err := w.confirmTransaction(ctx, nonce); err != nil {
-			return fmt.Errorf("unable to confirm %s: %w", signedTx.Hash().Hex(), err)
+		if err := w.c.SendTransaction(ctx, signedTx); err != nil {
+			log.Printf("failed to send transaction: %s", err.Error())
+			time.Sleep(retryDelay)
+			continue
 		}
+		txHash := signedTx.Hash()
+		log.Printf("%s broadcasted transaction: %s\n", w.k.addr.Hex(), txHash.Hex())
+		cost, err := w.confirmTransaction(ctx, txHash)
+		if err != nil {
+			log.Printf("failed to confirm %s: %s", txHash.Hex(), err.Error())
+			time.Sleep(retryDelay)
+			continue
+		}
+		w.nonce++
+		w.balance = new(big.Int).Sub(w.balance, cost)
+		w.balance = new(big.Int).Sub(w.balance, transferAmount)
+		return nil
+	}
+	return ctx.Err()
+}
 
-		nonce++
-		// TODO: need to pull receipt to see how much went
-		w.balance = new(big.Int).Sub(w.balance, transferBalance)
-
+func (w *Worker) Work(ctx context.Context, availableWorkers []*Worker, fundRequest chan common.Address) error {
+	for ctx.Err() == nil {
+		if new(big.Int).Sub(w.balance, maxTransferCost).Sign() < 0 {
+			log.Printf("%s requesting funds from master\n", w.k.addr.Hex())
+			fundRequest <- w.k.addr
+			if err := w.waitForBalance(ctx, false, maxTransferCost); err != nil {
+				return fmt.Errorf("could not get balance: %w", err)
+			}
+		}
+		recipient := availableWorkers[rand.Intn(len(availableWorkers))]
+		if recipient.k.addr == w.k.addr {
+			continue
+		}
+		if err := w.sendTx(ctx, recipient.k.addr, transferAmount); err != nil {
+			return err
+		}
 		time.Sleep(workDelay)
 	}
-
 	return ctx.Err()
 }
 
 func (w *Worker) Fund(ctx context.Context, fundRequest chan common.Address) error {
-	nonce, err := w.c.PendingNonceAt(ctx, w.k.addr)
-	if err != nil {
-		return fmt.Errorf("could not get nonce: %w", err)
-	}
-
 	for {
 		select {
 		case recipient := <-fundRequest:
@@ -207,62 +241,35 @@ func (w *Worker) Fund(ctx context.Context, fundRequest chan common.Address) erro
 					return fmt.Errorf("could not get minimum balance: %w", err)
 				}
 			}
-
-			// TODO: unify to single tx func
-			tx := types.NewTransaction(
-				nonce,
-				recipient,
-				requestBalance,
-				transferGasLimit,
-				transferGasPrice,
-				nil,
-			)
-
-			signedTx, err := types.SignTx(tx, signer, w.k.pk)
-			if err != nil {
-				return fmt.Errorf("failed to sign transaction: %w", err)
-			}
-
-			if err := w.c.SendTransaction(ctx, signedTx); err != nil {
+			if err := w.sendTx(ctx, recipient, requestAmount); err != nil {
 				return fmt.Errorf("unable to send tx: %w", err)
 			}
-			log.Printf("broadcasted funding transaction: %s\n", signedTx.Hash().Hex())
-
-			if err := w.confirmTransaction(ctx, nonce); err != nil {
-				return fmt.Errorf("unable to confirm %s: %w", signedTx.Hash().Hex(), err)
-			}
-
-			nonce++
-			w.balance = new(big.Int).Sub(w.balance, requestBalance)
-			w.balance = new(big.Int).Sub(w.balance, transferGas)
 		case <-ctx.Done():
 			return ctx.Err()
 		}
 	}
 }
 
-func (w *Worker) confirmTransaction(ctx context.Context, broadcastNonce uint64) error {
+func (w *Worker) confirmTransaction(ctx context.Context, tx common.Hash) (*big.Int, error) {
 	for ctx.Err() == nil {
-		// TODO: get receipt
-		nonce, err := w.c.NonceAt(ctx, w.k.addr, nil)
-		if err == nil && nonce >= broadcastNonce {
-			return nil
+		result, pending, _ := w.c.TransactionByHash(ctx, tx)
+		if result == nil || pending {
+			time.Sleep(retryDelay)
+			continue
 		}
-
-		time.Sleep(2 * time.Second)
-		continue
+		return result.Cost(), nil
 	}
-
-	return ctx.Err()
+	return nil, ctx.Err()
 }
 
-func Run(ctx context.Context, endpoints []string, cWorkers int, maxBaseFee uint64, maxPriorityFee uint64) error {
-	rpks, err := LoadAvailableKeys(ctx)
+func Run(ctx context.Context, endpoints []string, chainId uint64, concurrency int, baseFee uint64, priorityFee uint64) error {
+	SetupVars(chainId, baseFee, priorityFee)
+
+	ks, err := LoadAvailableKeys(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to load keys: %w", err)
 	}
-
-	master, workers, err := CreateWorkers(ctx, rpks, endpoints, cWorkers)
+	master, workers, err := CreateWorkers(ctx, ks, endpoints, concurrency)
 	if err != nil {
 		return fmt.Errorf("unable to load available workers: %w", err)
 	}
