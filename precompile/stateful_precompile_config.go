@@ -52,7 +52,7 @@ func CheckConfigure(parentTimestamp *big.Int, currentTimestamp *big.Int, config 
 		// Set the code of the precompile's address to a non-zero length byte slice to ensure that the precompile
 		// can be called from within Solidity contracts. Solidity adds a check before invoking a contract to ensure
 		// that it does not attempt to invoke a non-existent contract.
-		state.SetCode(config.Address(), []byte{0x01})
+		state.SetCode(config.Address(), []byte{0x1})
 		config.Configure(state)
 	}
 }
