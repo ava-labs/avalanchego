@@ -43,9 +43,13 @@ The Subnet EVM is compatible with almost all Ethereum tooling, including [Remix,
 
 ## Setting the Genesis Allocation
 
-When creating an instance of the subnet-evm, you will need to define the genesis state of the new chain. Part of this includes defining the genesis allocation. The genesis allocation allows you to define starting balances for whatever addresses you want.
+When creating an instance of the subnet-evm, you will need to define the genesis
+state of the new chain. Part of this includes defining the genesis allocation
+(setting the starting balances for whatever addresses you want). If you don't
+provide any genesis allocation, you won't be able to interact with your new
+chain (all transactions require a fee to be paid from an address's balance).
 
-Simply define the `alloc` field in the genesis JSON as follows:
+To specify a genesis allocation, populate the `alloc` field in the genesis JSON as follows:
 
 ```json
   "alloc": {
@@ -58,16 +62,19 @@ Simply define the `alloc` field in the genesis JSON as follows:
   },
 ```
 
-The keys in the allocation are the hex addresses to provide initial funds with the normal `0x` prefix stripped from the string. The balances are defined as hex strings with the `0x` prefix included and denominated in Wei.
+The keys in the allocation are [hex](https://en.wikipedia.org/wiki/Hexadecimal) addresses **without the canonical `0x` prefix**.
+The balances are denominated in Wei ([10^18 Wei = 1 Whole Unit of Native Token](https://eth-converter.com/)) and expressed as
+hex strings **with the canonical `0x` prefix**. You can use [this converter](https://www.rapidtables.com/convert/number/hex-to-decimal.html)
+to translate between decimal and hex numbers.
 
-Therefore, the above example defines the following genesis allocations denominated in whole units of the native token ie. 1 AVAX/1 WAGMI.
+The above example yields the following genesis allocations (denominated in whole units of the native token ie. 1 AVAX/1 WAGMI):
 
 ```
-0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC: 100000000
+0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC: 100000000 (0x52B7D2DCC80CD2E4000000=100000000000000000000000000 Wei)
 0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B: 49463
 ```
 
-Simply embed the `alloc` field in the genesis JSON as below and the balances will be minted in the genesis block of your chain.
+A fully populated genesis JSON with the above allocation would look like (_note the `alloc` field)_:
 
 ```json
 {
