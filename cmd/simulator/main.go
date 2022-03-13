@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
 	"github.com/spf13/viper"
+
+	"github.com/ava-labs/subnet-evm/cmd/simulator/worker"
 )
 
 const (
@@ -51,4 +54,6 @@ func main() {
 		maxPriorityFee,
 		concurrency,
 	)
+	ctx := context.Background()
+	log.Fatal(worker.RunLoad(ctx, endpoints, concurrency, maxBaseFee, maxPriorityFee))
 }
