@@ -66,7 +66,11 @@ Next, you'll need to update your [chain config](https://docs.avax.network/build/
 _Note: If you enable this feature but a validator doesn't specify
 a "feeRecipient", the fees will be burned in blocks they produce._
 
-## Restricting Smart Contract Deployers
+## Precompiles
+
+Subnet EVM can provide custom functionalities with precompiled contracts. These precompiled contracts can be activated through `ChainConfig` (in genesis or as an upgrade).
+
+### Restricting Smart Contract Deployers
 If you'd like to restrict who has the ability to deploy contracts on your
 subnet, you can provide an `AllowList` configuration in your genesis file:
 ```json
@@ -157,7 +161,7 @@ If you attempt to deploy a contract but you are not an `Admin` not
 a `Deployer`, you will see something like:
 ![deploy fail](./imgs/deploy_fail.png)
 
-## Minting Native Coins
+### Minting Native Coins
 
 You can mint native(gas) coins with a precompiled contract. In order to activate this feature, you can provide `nativeMinterConfig` in genesis:
 ```json
