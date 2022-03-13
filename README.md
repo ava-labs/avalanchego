@@ -167,7 +167,7 @@ and creates a `subnet-evm` genesis file.
 ```bash
 # to startup a local cluster (good for development)
 cd ${HOME}/go/src/github.com/ava-labs/subnet-evm
-./scripts/run.sh 1.7.5 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
+./scripts/run.sh 1.7.7 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
 ```
 
 Once the the network is started up, the following info will be printed to the
