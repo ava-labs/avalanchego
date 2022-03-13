@@ -47,7 +47,7 @@ When creating an instance of the subnet-evm, you will need to define the genesis
 state of the new chain. Part of this includes defining the genesis allocation
 (setting the starting balances for whatever addresses you want). If you don't
 provide any genesis allocation, you won't be able to interact with your new
-chain (all transactions require a fee to be paid from an address's balance).
+chain (all transactions require a fee to be paid from the sender's balance).
 
 To specify a genesis allocation, populate the `alloc` field in the genesis JSON as follows:
 
@@ -74,7 +74,7 @@ The above example yields the following genesis allocations (denominated in whole
 0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B: 49463
 ```
 
-A fully populated genesis JSON with the above allocation would look like (_note the `alloc` field)_:
+A fully populated genesis JSON with the above allocation would look like (note the `alloc` field):
 
 ```json
 {
