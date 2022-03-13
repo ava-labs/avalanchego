@@ -527,10 +527,12 @@ func (bc *BlockChain) Stop() {
 
 	// Unsubscribe all subscriptions registered from blockchain.
 	bc.scope.Close()
+	log.Info("Blockchain subscriptions closed")
 
 	// Signal shutdown to all goroutines.
 	close(bc.quit)
 	bc.wg.Wait()
+	log.Info("Blockchain waitgroup stopped")
 
 	if err := bc.stateManager.Shutdown(); err != nil {
 		log.Error("Failed to Shutdown state manager", "err", err)

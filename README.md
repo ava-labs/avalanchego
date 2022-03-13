@@ -41,7 +41,90 @@ The Subnet EVM is compatible with almost all Ethereum tooling, including [Remix,
 - Removed Atomic Txs and Shared Memory
 - Removed Multicoin Contract and State
 
+## Setting the Genesis Allocation
+
+When creating an instance of the subnet-evm, you will need to define the genesis
+state of the new chain. Part of this includes defining the genesis allocation
+(setting the starting balances for whatever addresses you want). If you don't
+provide any genesis allocation, you won't be able to interact with your new
+chain (all transactions require a fee to be paid from the sender's balance).
+
+To specify a genesis allocation, populate the `alloc` field in the genesis JSON as follows:
+
+```json
+  "alloc": {
+    "8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC": {
+      "balance": "0x52B7D2DCC80CD2E4000000"
+    },
+    "Ab5801a7D398351b8bE11C439e05C5B3259aeC9B": {
+      "balance": "0xa796504b1cb5a7c0000"
+    }
+  },
+```
+
+The keys in the allocation are [hex](https://en.wikipedia.org/wiki/Hexadecimal) addresses **without the canonical `0x` prefix**.
+The balances are denominated in Wei ([10^18 Wei = 1 Whole Unit of Native Token](https://eth-converter.com/)) and expressed as
+hex strings **with the canonical `0x` prefix**. You can use [this converter](https://www.rapidtables.com/convert/number/hex-to-decimal.html)
+to translate between decimal and hex numbers.
+
+The above example yields the following genesis allocations (denominated in whole units of the native token ie. 1 AVAX/1 WAGMI):
+
+```
+0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC: 100000000 (0x52B7D2DCC80CD2E4000000=100000000000000000000000000 Wei)
+0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B: 49463
+```
+
+A fully populated genesis JSON with the above allocation would look like (note the `alloc` field):
+
+```json
+{
+  "config": {
+    "chainId": 99999,
+    "homesteadBlock": 0,
+    "eip150Block": 0,
+    "eip150Hash": "0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0",
+    "eip155Block": 0,
+    "eip158Block": 0,
+    "byzantiumBlock": 0,
+    "constantinopleBlock": 0,
+    "petersburgBlock": 0,
+    "istanbulBlock": 0,
+    "muirGlacierBlock": 0,
+    "subnetEVMTimestamp": 0,
+    "feeConfig": {
+      "gasLimit": 20000000,
+      "minBaseFee": 1000000000,
+      "targetGas": 100000000,
+      "baseFeeChangeDenominator": 48,
+      "minBlockGasCost": 0,
+      "maxBlockGasCost": 10000000,
+      "targetBlockRate": 2,
+      "blockGasCostStep": 500000
+    },
+  },
+  "alloc": {
+    "8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC": {
+      "balance": "0x52B7D2DCC80CD2E4000000"
+    },
+    "Ab5801a7D398351b8bE11C439e05C5B3259aeC9B": {
+      "balance": "0xa796504b1cb5a7c0000"
+    }
+  },
+  "nonce": "0x0",
+  "timestamp": "0x0",
+  "extraData": "0x00",
+  "gasLimit": "0x1312D00",
+  "difficulty": "0x0",
+  "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "coinbase": "0x0000000000000000000000000000000000000000",
+  "number": "0x0",
+  "gasUsed": "0x0",
+  "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+}
+```
+
 ## Setting a Custom Fee Recipient
+
 By default, all fees are burned (sent to the blackhole address). However, it is
 possible to enable block producers to set a fee recipient (get compensated for
 blocks they produce).
@@ -161,6 +244,12 @@ If you attempt to deploy a contract but you are not an `Admin` not
 a `Deployer`, you will see something like:
 ![deploy fail](./imgs/deploy_fail.png)
 
+The allow list has three roles: `None`, `Deployer`, and `Admin`.
+
+If you call `readAllowList(addr)` then you can read the current role of `addr`, which will return a uint256 with a value of 0, 1, or 2, corresponding to the roles `None`, `Deployer`, and `Admin` respectively.
+
+WARNING: if you remove all of the admins from the allow list, it will no longer be possible to update the allow list without modifying the subnet-evm to schedule a network upgrade.
+
 ### Minting Native Coins
 
 You can mint native(gas) coins with a precompiled contract. In order to activate this feature, you can provide `nativeMinterConfig` in genesis:
@@ -244,13 +333,14 @@ interface NativeMinterInterface {
 _Note: Both `ContractDeployerAllowList` and `ContractNativeMinter` can be used together.
 
 ## Run Local Network
+
 [`scripts/run.sh`](scripts/run.sh) automatically installs [avalanchego], sets up a local network,
 and creates a `subnet-evm` genesis file.
 
 ```bash
 # to startup a local cluster (good for development)
 cd ${HOME}/go/src/github.com/ava-labs/subnet-evm
-./scripts/run.sh 1.7.5 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
+./scripts/run.sh 1.7.7 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
 ```
 
 Once the the network is started up, the following info will be printed to the
@@ -401,6 +491,7 @@ Example Node Args:
 ```
 
 #### Restart Node
+
 Once you've updated your config, you'll need to restart your
 AvalancheGo node for the changes to take effect.
 
@@ -432,6 +523,7 @@ ERROR[01-26|05:54:19] chains/manager.go#270: error creating chain 2AM3vsuLoJdGBG
 ```
 
 ## Join the WAGMI Subnet Demo
+
 <p align="center">
   <img width="40%" alt="WAGMI" src="./imgs/wagmi.png">
 </p>
@@ -458,6 +550,7 @@ of subnets is for performing complex VM testing on a live network (without impac
 the stability of the primary network).
 
 ### Network Creation
+
 To create WAGMI, all we had to do was run the following command:
 ```bash
 subnet-cli wizard \
@@ -476,6 +569,7 @@ all validators to the WAGMI subnet, and created the WAGMI chain.
 
 
 ### Network Parameters
+
 ```
 Network ID: 11111
 Chain ID: 11111
@@ -486,6 +580,7 @@ Target Block Rate: 2s (Same as C-Chain)
 ```
 
 ### Adding to MetaMask
+
 ```
 Network Name: WAGMI
 RPC URL: https://api.trywagmi.xyz/rpc
@@ -496,17 +591,21 @@ Symbol: WGM
 ![metamask](./imgs/metamask.png)
 
 ### Wrapped WAGMI
+
 #### Info
+
 ```
 Address: 0x3Ee7094DADda15810F191DD6AcF7E4FFa37571e4
 IPFS: /ipfs/QmVAuheeidjD2ktdX3sSHMQqSfcjtmca1g9jr7w9GQf7pU
 ```
 #### Metadata
+
 ```json
 {"compiler":{"version":"0.5.17+commit.d19bba13"},"language":"Solidity","output":{"abi":[{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"src","type":"address"},{"indexed":true,"internalType":"address","name":"guy","type":"address"},{"indexed":false,"internalType":"uint256","name":"wad","type":"uint256"}],"name":"Approval","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"dst","type":"address"},{"indexed":false,"internalType":"uint256","name":"wad","type":"uint256"}],"name":"Deposit","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"src","type":"address"},{"indexed":true,"internalType":"address","name":"dst","type":"address"},{"indexed":false,"internalType":"uint256","name":"wad","type":"uint256"}],"name":"Transfer","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"src","type":"address"},{"indexed":false,"internalType":"uint256","name":"wad","type":"uint256"}],"name":"Withdrawal","type":"event"},{"payable":true,"stateMutability":"payable","type":"fallback"},{"constant":true,"inputs":[{"internalType":"address","name":"","type":"address"},{"internalType":"address","name":"","type":"address"}],"name":"allowance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"internalType":"address","name":"guy","type":"address"},{"internalType":"uint256","name":"wad","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[],"name":"deposit","outputs":[],"payable":true,"stateMutability":"payable","type":"function"},{"constant":true,"inputs":[],"name":"name","outputs":[{"internalType":"string","name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"symbol","outputs":[{"internalType":"string","name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"totalSupply","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"internalType":"address","name":"dst","type":"address"},{"internalType":"uint256","name":"wad","type":"uint256"}],"name":"transfer","outputs":[{"internalType":"bool","name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"internalType":"address","name":"src","type":"address"},{"internalType":"address","name":"dst","type":"address"},{"internalType":"uint256","name":"wad","type":"uint256"}],"name":"transferFrom","outputs":[{"internalType":"bool","name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"internalType":"uint256","name":"wad","type":"uint256"}],"name":"withdraw","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"}],"devdoc":{"methods":{}},"userdoc":{"methods":{}}},"settings":{"compilationTarget":{"contracts/wwagmi.sol":"WWAGMI"},"evmVersion":"istanbul","libraries":{},"optimizer":{"enabled":false,"runs":200},"remappings":[]},"sources":{"contracts/wwagmi.sol":{"keccak256":"0x0a6ce5559225d3c99db4a5e24777049df3c84886ba9a08147f23afae4261b509","urls":["bzz-raw://0aef254c65ae30b578256a7e2496ed18bf0cb68e97f5831050e17a2cf0192a7e","dweb:/ipfs/QmSwAbdnaYvrjDHTKnE3qBZ3smT7uipSSfSGBUiKWmNWEY"]}},"version":1}
 ```
 
 #### Code
+
 ```solidity
 // Copyright (C) 2015, 2016, 2017 Dapphub
 

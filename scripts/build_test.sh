@@ -8,4 +8,4 @@ export GOGC=25
 
 # We pass in the arguments to this script directly to enable easily passing parameters such as enabling race detection,
 # parallelism, and test coverage.
-go test -coverprofile=coverage.out -covermode=atomic -timeout="30m" ./... $@
+go test -coverprofile=coverage.out -covermode=atomic -timeout="20m" ./... $@
