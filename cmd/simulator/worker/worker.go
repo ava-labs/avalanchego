@@ -31,8 +31,8 @@ var (
 	minFunderBalance *big.Int
 )
 
-func SetupVars(cID uint64, bFee uint64, pFee uint64) {
-	chainID = new(big.Int).SetUint64(cID)
+func SetupVars(cID *big.Int, bFee uint64, pFee uint64) {
+	chainID = cID
 	signer = types.LatestSignerForChainID(chainID)
 	priorityFee = new(big.Int).SetUint64(pFee * params.GWei)
 	feeCap = new(big.Int).Add(new(big.Int).SetUint64(bFee*params.GWei), priorityFee)
@@ -262,7 +262,15 @@ func (w *Worker) confirmTransaction(ctx context.Context, tx common.Hash) (*big.I
 	return nil, ctx.Err()
 }
 
-func Run(ctx context.Context, endpoints []string, chainId uint64, concurrency int, baseFee uint64, priorityFee uint64) error {
+func Run(ctx context.Context, endpoints []string, concurrency int, baseFee uint64, priorityFee uint64) error {
+	rclient, err := ethclient.Dial(endpoints[0])
+	if err != nil {
+		return err
+	}
+	chainId, err := rclient.ChainID(ctx)
+	if err != nil {
+		return err
+	}
 	SetupVars(chainId, baseFee, priorityFee)
 
 	ks, err := LoadAvailableKeys(ctx)

@@ -12,7 +12,6 @@ import (
 
 const (
 	endpointsKey   = "endpoints"
-	chainIdKey     = "chain-id"
 	baseFeeKey     = "base-fee"
 	priorityFeeKey = "priority-fee"
 	concurrencyKey = "concurrency"
@@ -38,10 +37,6 @@ func main() {
 	if len(endpoints) == 0 {
 		log.Fatal("no available endpoints")
 	}
-	chainId := v.GetUint64(chainIdKey)
-	if chainId == 0 {
-		log.Fatal("chainID is 0")
-	}
 	concurrency := v.GetInt(concurrencyKey)
 	if concurrency == 0 {
 		log.Fatal("concurrency is 0")
@@ -53,13 +48,12 @@ func main() {
 	// We allow a priority fee of 0, so we don't check this
 	priorityFee := v.GetUint64(priorityFeeKey)
 	log.Printf(
-		"starting simulator (endpoints=%v chainID=%d concurrency=%d base fee=%d priority fee=%d)\n",
+		"starting simulator (endpoints=%v concurrency=%d base fee=%d priority fee=%d)\n",
 		endpoints,
-		chainId,
 		baseFee,
 		priorityFee,
 		concurrency,
 	)
 	ctx := context.Background()
-	log.Fatal(worker.Run(ctx, endpoints, chainId, concurrency, baseFee, priorityFee))
+	log.Fatal(worker.Run(ctx, endpoints, concurrency, baseFee, priorityFee))
 }
