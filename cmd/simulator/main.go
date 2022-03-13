@@ -11,10 +11,10 @@ import (
 )
 
 const (
-	endpointsKey      = "endpoints"
-	maxBaseFeeKey     = "max-base-fee"
-	maxPriorityFeeKey = "max-priority-fee"
-	concurrencyKey    = "concurrency"
+	endpointsKey   = "endpoints"
+	baseFeeKey     = "base-fee"
+	priorityFeeKey = "priority-fee"
+	concurrencyKey = "concurrency"
 )
 
 func loadConfig() (*viper.Viper, error) {
@@ -37,23 +37,23 @@ func main() {
 	if len(endpoints) == 0 {
 		log.Fatal("no available endpoints")
 	}
-	maxBaseFee := v.GetUint64(maxBaseFeeKey)
-	if maxBaseFee == 0 {
-		log.Fatal("max base fee is 0")
+	baseFee := v.GetUint64(baseFeeKey)
+	if baseFee == 0 {
+		log.Fatal("base fee is 0")
 	}
 	// We allow a priority fee of 0, so we don't check this
-	maxPriorityFee := v.GetUint64(maxPriorityFeeKey)
+	priorityFee := v.GetUint64(priorityFeeKey)
 	concurrency := v.GetInt(concurrencyKey)
 	if concurrency == 0 {
 		log.Fatal("concurrency is 0")
 	}
 	log.Printf(
-		"starting simulator (endpoints=%v max base fee=%d max priority fee=%d concurrency=%d)\n",
+		"starting simulator (endpoints=%v base fee=%d priority fee=%d concurrency=%d)\n",
 		endpoints,
-		maxBaseFee,
-		maxPriorityFee,
+		baseFee,
+		priorityFee,
 		concurrency,
 	)
 	ctx := context.Background()
-	log.Fatal(worker.RunLoad(ctx, endpoints, concurrency, maxBaseFee, maxPriorityFee))
+	log.Fatal(worker.Run(ctx, endpoints, concurrency, baseFee, priorityFee))
 }

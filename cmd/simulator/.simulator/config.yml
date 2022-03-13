@@ -1,5 +1,5 @@
 endpoints:
   - http://localhost:9650/ext/bc/C/rpc
-max-base-fee: 25
-max-priority-fee: 1
+base-fee: 25
+priority-fee: 1
 concurrency: 10
