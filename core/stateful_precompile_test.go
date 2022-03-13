@@ -10,7 +10,9 @@ import (
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/precompile"
+	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,7 +32,6 @@ func TestContractDeployerAllowListRun(t *testing.T) {
 		suppliedGas    uint64
 		readOnly       bool
 
-		setupState  func(state *state.StateDB)
 		expectedRes []byte
 		expectedErr string
 
@@ -53,9 +54,6 @@ func TestContractDeployerAllowListRun(t *testing.T) {
 			},
 			suppliedGas: precompile.ModifyAllowListGasCost,
 			readOnly:    false,
-			setupState: func(state *state.StateDB) {
-				precompile.SetContractDeployerAllowListStatus(state, adminAddr, precompile.AllowListAdmin)
-			},
 			expectedRes: []byte{},
 			assertState: func(t *testing.T, state *state.StateDB) {
 				res := precompile.GetContractDeployerAllowListStatus(state, adminAddr)
@@ -77,9 +75,6 @@ func TestContractDeployerAllowListRun(t *testing.T) {
 			},
 			suppliedGas: precompile.ModifyAllowListGasCost,
 			readOnly:    false,
-			setupState: func(state *state.StateDB) {
-				precompile.SetContractDeployerAllowListStatus(state, adminAddr, precompile.AllowListAdmin)
-			},
 			expectedRes: []byte{},
 			assertState: func(t *testing.T, state *state.StateDB) {
 				res := precompile.GetContractDeployerAllowListStatus(state, adminAddr)
@@ -101,9 +96,6 @@ func TestContractDeployerAllowListRun(t *testing.T) {
 			},
 			suppliedGas: precompile.ModifyAllowListGasCost,
 			readOnly:    false,
-			setupState: func(state *state.StateDB) {
-				precompile.SetContractDeployerAllowListStatus(state, adminAddr, precompile.AllowListAdmin)
-			},
 			expectedRes: []byte{},
 			assertState: func(t *testing.T, state *state.StateDB) {
 				res := precompile.GetContractDeployerAllowListStatus(state, adminAddr)
@@ -122,7 +114,6 @@ func TestContractDeployerAllowListRun(t *testing.T) {
 			},
 			suppliedGas: precompile.ModifyAllowListGasCost,
 			readOnly:    false,
-			setupState:  func(state *state.StateDB) {},
 			expectedErr: precompile.ErrCannotModifyAllowList.Error(),
 		},
 		"set deployer from non-admin": {
@@ -137,7 +128,6 @@ func TestContractDeployerAllowListRun(t *testing.T) {
 			},
 			suppliedGas: precompile.ModifyAllowListGasCost,
 			readOnly:    false,
-			setupState:  func(state *state.StateDB) {},
 			expectedErr: precompile.ErrCannotModifyAllowList.Error(),
 		},
 		"set admin from non-admin": {
@@ -152,7 +142,6 @@ func TestContractDeployerAllowListRun(t *testing.T) {
 			},
 			suppliedGas: precompile.ModifyAllowListGasCost,
 			readOnly:    false,
-			setupState:  func(state *state.StateDB) {},
 			expectedErr: precompile.ErrCannotModifyAllowList.Error(),
 		},
 		"set no role with readOnly enabled": {
@@ -167,10 +156,7 @@ func TestContractDeployerAllowListRun(t *testing.T) {
 			},
 			suppliedGas: precompile.ModifyAllowListGasCost,
 			readOnly:    true,
-			setupState: func(state *state.StateDB) {
-				precompile.SetContractDeployerAllowListStatus(state, adminAddr, precompile.AllowListAdmin)
-			},
-			expectedErr: precompile.ErrReadOnlyModifyAllowList.Error(),
+			expectedErr: vmerrs.ErrWriteProtection.Error(),
 		},
 		"set no role insufficient gas": {
 			caller:         adminAddr,
@@ -184,23 +170,19 @@ func TestContractDeployerAllowListRun(t *testing.T) {
 			},
 			suppliedGas: precompile.ModifyAllowListGasCost - 1,
 			readOnly:    false,
-			setupState: func(state *state.StateDB) {
-				precompile.SetContractDeployerAllowListStatus(state, adminAddr, precompile.AllowListAdmin)
-			},
-			expectedErr: precompile.ErrExceedsGasAllowance.Error(),
+			expectedErr: vmerrs.ErrOutOfGas.Error(),
 		},
 		"read allow list no role": {
-			caller:         adminAddr,
+			caller:         noRoleAddr,
 			precompileAddr: precompile.ContractDeployerAllowListAddress,
 			input: func() []byte {
 				return precompile.PackReadAllowList(noRoleAddr)
 			},
 			suppliedGas: precompile.ReadAllowListGasCost,
 			readOnly:    false,
-			setupState:  func(state *state.StateDB) {},
 			expectedRes: common.Hash(precompile.AllowListNoRole).Bytes(),
 			assertState: func(t *testing.T, state *state.StateDB) {
-				res := precompile.GetContractDeployerAllowListStatus(state, adminAddr)
+				res := precompile.GetContractDeployerAllowListStatus(state, noRoleAddr)
 				assert.Equal(t, precompile.AllowListNoRole, res)
 			},
 		},
@@ -212,9 +194,6 @@ func TestContractDeployerAllowListRun(t *testing.T) {
 			},
 			suppliedGas: precompile.ReadAllowListGasCost,
 			readOnly:    false,
-			setupState: func(state *state.StateDB) {
-				precompile.SetContractDeployerAllowListStatus(state, adminAddr, precompile.AllowListAdmin)
-			},
 			expectedRes: common.Hash(precompile.AllowListNoRole).Bytes(),
 			assertState: func(t *testing.T, state *state.StateDB) {
 				res := precompile.GetContractDeployerAllowListStatus(state, adminAddr)
@@ -229,9 +208,6 @@ func TestContractDeployerAllowListRun(t *testing.T) {
 			},
 			suppliedGas: precompile.ReadAllowListGasCost,
 			readOnly:    true,
-			setupState: func(state *state.StateDB) {
-				precompile.SetContractDeployerAllowListStatus(state, adminAddr, precompile.AllowListAdmin)
-			},
 			expectedRes: common.Hash(precompile.AllowListNoRole).Bytes(),
 			assertState: func(t *testing.T, state *state.StateDB) {
 				res := precompile.GetContractDeployerAllowListStatus(state, adminAddr)
@@ -246,10 +222,7 @@ func TestContractDeployerAllowListRun(t *testing.T) {
 			},
 			suppliedGas: precompile.ReadAllowListGasCost - 1,
 			readOnly:    true,
-			setupState: func(state *state.StateDB) {
-				precompile.SetContractDeployerAllowListStatus(state, adminAddr, precompile.AllowListAdmin)
-			},
-			expectedErr: precompile.ErrExceedsGasAllowance.Error(),
+			expectedErr: vmerrs.ErrOutOfGas.Error(),
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -258,9 +231,262 @@ func TestContractDeployerAllowListRun(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			test.setupState(state)
+
+			// Set up the state so that each address has the expected permissions at the start.
+			precompile.SetContractDeployerAllowListStatus(state, adminAddr, precompile.AllowListAdmin)
+			precompile.SetContractDeployerAllowListStatus(state, noRoleAddr, precompile.AllowListNoRole)
 
 			ret, remainingGas, err := precompile.ContractDeployerAllowListPrecompile.Run(&mockAccessibleState{state: state}, test.caller, test.precompileAddr, test.input(), test.suppliedGas, test.readOnly)
+			if len(test.expectedErr) != 0 {
+				if err == nil {
+					assert.Failf(t, "run expectedly passed without error", "expected error %q", test.expectedErr)
+				} else {
+					assert.True(t, strings.Contains(err.Error(), test.expectedErr), "expected error (%s) to contain substring (%s)", err, test.expectedErr)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			assert.Equal(t, uint64(0), remainingGas)
+			assert.Equal(t, test.expectedRes, ret)
+
+			test.assertState(t, state)
+		})
+	}
+}
+
+func TestContractNativeMinterRun(t *testing.T) {
+	type test struct {
+		caller         common.Address
+		precompileAddr common.Address
+		input          func() []byte
+		suppliedGas    uint64
+		readOnly       bool
+
+		expectedRes []byte
+		expectedErr string
+
+		assertState func(t *testing.T, state *state.StateDB)
+	}
+
+	adminAddr := common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC")
+	allowAddr := common.HexToAddress("0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B")
+	noRoleAddr := common.HexToAddress("0xF60C45c607D0f41687c94C314d300f483661E13a")
+
+	for name, test := range map[string]test{
+		"mint funds from no role fails": {
+			caller:         noRoleAddr,
+			precompileAddr: precompile.ContractNativeMinterAddress,
+			input: func() []byte {
+				input, err := precompile.PackMintInput(noRoleAddr, common.Big1)
+				if err != nil {
+					panic(err)
+				}
+				return input
+			},
+			suppliedGas: precompile.MintGasCost,
+			readOnly:    false,
+			expectedErr: precompile.ErrCannotMint.Error(),
+		},
+		"mint funds from allow address": {
+			caller:         allowAddr,
+			precompileAddr: precompile.ContractNativeMinterAddress,
+			input: func() []byte {
+				input, err := precompile.PackMintInput(allowAddr, common.Big1)
+				if err != nil {
+					panic(err)
+				}
+				return input
+			},
+			suppliedGas: precompile.MintGasCost,
+			readOnly:    false,
+			expectedRes: []byte{},
+			assertState: func(t *testing.T, state *state.StateDB) {
+				res := precompile.GetContractNativeMinterStatus(state, allowAddr)
+				assert.Equal(t, precompile.AllowListEnabled, res)
+
+				assert.Equal(t, common.Big1, state.GetBalance(allowAddr), "expected minted funds")
+			},
+		},
+		"mint funds from admin address": {
+			caller:         adminAddr,
+			precompileAddr: precompile.ContractNativeMinterAddress,
+			input: func() []byte {
+				input, err := precompile.PackMintInput(adminAddr, common.Big1)
+				if err != nil {
+					panic(err)
+				}
+				return input
+			},
+			suppliedGas: precompile.MintGasCost,
+			readOnly:    false,
+			expectedRes: []byte{},
+			assertState: func(t *testing.T, state *state.StateDB) {
+				res := precompile.GetContractNativeMinterStatus(state, adminAddr)
+				assert.Equal(t, precompile.AllowListAdmin, res)
+
+				assert.Equal(t, common.Big1, state.GetBalance(adminAddr), "expected minted funds")
+			},
+		},
+		"mint max big funds": {
+			caller:         adminAddr,
+			precompileAddr: precompile.ContractNativeMinterAddress,
+			input: func() []byte {
+				input, err := precompile.PackMintInput(adminAddr, math.MaxBig256)
+				if err != nil {
+					panic(err)
+				}
+				return input
+			},
+			suppliedGas: precompile.MintGasCost,
+			readOnly:    false,
+			expectedRes: []byte{},
+			assertState: func(t *testing.T, state *state.StateDB) {
+				res := precompile.GetContractNativeMinterStatus(state, adminAddr)
+				assert.Equal(t, precompile.AllowListAdmin, res)
+
+				assert.Equal(t, math.MaxBig256, state.GetBalance(adminAddr), "expected minted funds")
+			},
+		},
+		"readOnly mint with noRole fails": {
+			caller:         noRoleAddr,
+			precompileAddr: precompile.ContractNativeMinterAddress,
+			input: func() []byte {
+				input, err := precompile.PackMintInput(adminAddr, common.Big1)
+				if err != nil {
+					panic(err)
+				}
+				return input
+			},
+			suppliedGas: precompile.MintGasCost,
+			readOnly:    true,
+			expectedErr: vmerrs.ErrWriteProtection.Error(),
+		},
+		"readOnly mint with allow role fails": {
+			caller:         allowAddr,
+			precompileAddr: precompile.ContractNativeMinterAddress,
+			input: func() []byte {
+				input, err := precompile.PackMintInput(allowAddr, common.Big1)
+				if err != nil {
+					panic(err)
+				}
+				return input
+			},
+			suppliedGas: precompile.MintGasCost,
+			readOnly:    true,
+			expectedErr: vmerrs.ErrWriteProtection.Error(),
+		},
+		"readOnly mint with admin role fails": {
+			caller:         adminAddr,
+			precompileAddr: precompile.ContractNativeMinterAddress,
+			input: func() []byte {
+				input, err := precompile.PackMintInput(adminAddr, common.Big1)
+				if err != nil {
+					panic(err)
+				}
+				return input
+			},
+			suppliedGas: precompile.MintGasCost,
+			readOnly:    true,
+			expectedErr: vmerrs.ErrWriteProtection.Error(),
+		},
+		"insufficient gas mint from admin": {
+			caller:         adminAddr,
+			precompileAddr: precompile.ContractNativeMinterAddress,
+			input: func() []byte {
+				input, err := precompile.PackMintInput(allowAddr, common.Big1)
+				if err != nil {
+					panic(err)
+				}
+				return input
+			},
+			suppliedGas: precompile.MintGasCost - 1,
+			readOnly:    false,
+			expectedErr: vmerrs.ErrOutOfGas.Error(),
+		},
+		"read from noRole address": {
+			caller:         noRoleAddr,
+			precompileAddr: precompile.ContractNativeMinterAddress,
+			input: func() []byte {
+				return precompile.PackReadAllowList(noRoleAddr)
+			},
+			suppliedGas: precompile.ReadAllowListGasCost,
+			readOnly:    false,
+			expectedRes: common.Hash(precompile.AllowListNoRole).Bytes(),
+			assertState: func(t *testing.T, state *state.StateDB) {},
+		},
+		"read from noRole address readOnly enabled": {
+			caller:         noRoleAddr,
+			precompileAddr: precompile.ContractNativeMinterAddress,
+			input: func() []byte {
+				return precompile.PackReadAllowList(noRoleAddr)
+			},
+			suppliedGas: precompile.ReadAllowListGasCost,
+			readOnly:    true,
+			expectedRes: common.Hash(precompile.AllowListNoRole).Bytes(),
+			assertState: func(t *testing.T, state *state.StateDB) {},
+		},
+		"read from noRole address with insufficient gas": {
+			caller:         noRoleAddr,
+			precompileAddr: precompile.ContractNativeMinterAddress,
+			input: func() []byte {
+				return precompile.PackReadAllowList(noRoleAddr)
+			},
+			suppliedGas: precompile.ReadAllowListGasCost - 1,
+			readOnly:    false,
+			expectedErr: vmerrs.ErrOutOfGas.Error(),
+		},
+		"set allow role from admin": {
+			caller:         adminAddr,
+			precompileAddr: precompile.ContractNativeMinterAddress,
+			input: func() []byte {
+				input, err := precompile.PackModifyAllowList(noRoleAddr, precompile.AllowListEnabled)
+				if err != nil {
+					panic(err)
+				}
+				return input
+			},
+			suppliedGas: precompile.ModifyAllowListGasCost,
+			readOnly:    false,
+			expectedRes: []byte{},
+			assertState: func(t *testing.T, state *state.StateDB) {
+				res := precompile.GetContractNativeMinterStatus(state, adminAddr)
+				assert.Equal(t, precompile.AllowListAdmin, res)
+
+				res = precompile.GetContractNativeMinterStatus(state, noRoleAddr)
+				assert.Equal(t, precompile.AllowListEnabled, res)
+			},
+		},
+		"set allow role from non-admin fails": {
+			caller:         allowAddr,
+			precompileAddr: precompile.ContractNativeMinterAddress,
+			input: func() []byte {
+				input, err := precompile.PackModifyAllowList(noRoleAddr, precompile.AllowListEnabled)
+				if err != nil {
+					panic(err)
+				}
+				return input
+			},
+			suppliedGas: precompile.ModifyAllowListGasCost,
+			readOnly:    false,
+			expectedErr: precompile.ErrCannotModifyAllowList.Error(),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			db := rawdb.NewMemoryDatabase()
+			state, err := state.New(common.Hash{}, state.NewDatabase(db), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Set up the state so that each address has the expected permissions at the start.
+			precompile.SetContractNativeMinterStatus(state, adminAddr, precompile.AllowListAdmin)
+			precompile.SetContractNativeMinterStatus(state, allowAddr, precompile.AllowListEnabled)
+			precompile.SetContractNativeMinterStatus(state, noRoleAddr, precompile.AllowListNoRole)
+
+			ret, remainingGas, err := precompile.ContractNativeMinterPrecompile.Run(&mockAccessibleState{state: state}, test.caller, test.precompileAddr, test.input(), test.suppliedGas, test.readOnly)
 			if len(test.expectedErr) != 0 {
 				if err == nil {
 					assert.Failf(t, "run expectedly passed without error", "expected error %q", test.expectedErr)

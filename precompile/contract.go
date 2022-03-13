@@ -5,6 +5,7 @@ package precompile
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -24,16 +25,24 @@ type PrecompileAccessibleState interface {
 type StateDB interface {
 	GetState(common.Address, common.Hash) common.Hash
 	SetState(common.Address, common.Hash, common.Hash)
+
+	SetCode(common.Address, []byte)
+
 	SetNonce(common.Address, uint64)
+	GetNonce(common.Address) uint64
+
+	GetBalance(common.Address) *big.Int
+	AddBalance(common.Address, *big.Int)
+	SubBalance(common.Address, *big.Int)
+
+	CreateAccount(common.Address)
+	Exist(common.Address) bool
 }
 
 // StatefulPrecompiledContract is the interface for executing a precompiled contract
 type StatefulPrecompiledContract interface {
-	// Run executes the precompiled contract. Assumes that [suppliedGas] exceeds the amount
-	// returned by RequiredGas.
+	// Run executes the precompiled contract.
 	Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error)
-	// RequiredGas returns the amount of gas required to execute this precompile on [input].
-	RequiredGas(input []byte) uint64
 }
 
 // statefulPrecompileFunction defines a function implemented by a stateful precompile
@@ -43,16 +52,13 @@ type statefulPrecompileFunction struct {
 	selector []byte
 	// execute is performed when this function is selected
 	execute RunStatefulPrecompileFunc
-	// requiredGas calculates the amount of gas consumed by this function on [input].
-	requiredGas func(input []byte) uint64
 }
 
 // newStatefulPrecompileFunction creates a stateful precompile function with the given arguments
-func newStatefulPrecompileFunction(selector []byte, execute RunStatefulPrecompileFunc, requiredGas func(input []byte) uint64) *statefulPrecompileFunction {
+func newStatefulPrecompileFunction(selector []byte, execute RunStatefulPrecompileFunc) *statefulPrecompileFunction {
 	return &statefulPrecompileFunction{
-		selector:    selector,
-		execute:     execute,
-		requiredGas: requiredGas,
+		selector: selector,
+		execute:  execute,
 	}
 }
 
@@ -110,27 +116,4 @@ func (s *statefulPrecompileWithFunctionSelectors) Run(accessibleState Precompile
 	}
 
 	return function.execute(accessibleState, caller, addr, functionInput, suppliedGas, readOnly)
-}
-
-// RequiredGas returns the amount of gas consumed by the underlying function
-func (s *statefulPrecompileWithFunctionSelectors) RequiredGas(input []byte) uint64 {
-	// If there is no input data present, call the fallback function if present.
-	if len(input) == 0 && s.fallback != nil {
-		return s.fallback.requiredGas(input)
-	}
-
-	// Otherwise, an unexpected input size will result in an error when the function is executed.
-	// This will result in consuming all of the available gas, so we simply return 0 here.
-	if len(input) < selectorLen {
-		return 0
-	}
-
-	selector := input[:selectorLen]
-	functionInput := input[selectorLen:]
-	function, ok := s.functions[string(selector)]
-	if !ok {
-		return 0
-	}
-
-	return function.requiredGas(functionInput)
 }

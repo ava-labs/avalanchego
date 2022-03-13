@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 
+	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -23,8 +24,10 @@ func CalculateFunctionSelector(functionSignature string) []byte {
 	return hash[:4]
 }
 
-// createConstantRequiredGasFunc returns a required gas function that always returns [requiredGas]
-// on any input.
-func createConstantRequiredGasFunc(requiredGas uint64) func([]byte) uint64 {
-	return func(b []byte) uint64 { return requiredGas }
+// deductGas checks if [suppliedGas] is sufficient against [requiredGas] and deducts [requiredGas] from [suppliedGas].
+func deductGas(suppliedGas uint64, requiredGas uint64) (uint64, error) {
+	if suppliedGas < requiredGas {
+		return 0, vmerrs.ErrOutOfGas
+	}
+	return suppliedGas - requiredGas, nil
 }

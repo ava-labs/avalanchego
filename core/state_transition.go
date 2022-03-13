@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -118,7 +119,7 @@ func (result *ExecutionResult) Return() []byte {
 // Revert returns the concrete revert reason if the execution is aborted by `REVERT`
 // opcode. Note the reason can be nil if no data supplied with revert opcode.
 func (result *ExecutionResult) Revert() []byte {
-	if result.Err != vm.ErrExecutionReverted {
+	if result.Err != vmerrs.ErrExecutionReverted {
 		return nil
 	}
 	return common.CopyBytes(result.ReturnData)
@@ -243,7 +244,7 @@ func (st *StateTransition) preCheck() error {
 		}
 		// Make sure the sender is not prohibited
 		if vm.IsProhibited(st.msg.From()) {
-			return fmt.Errorf("%w: address %v", vm.ErrAddrProhibited, st.msg.From())
+			return fmt.Errorf("%w: address %v", vmerrs.ErrAddrProhibited, st.msg.From())
 		}
 	}
 	// Make sure that transaction gasFeeCap is greater than the baseFee (post london)
