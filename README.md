@@ -320,14 +320,14 @@ kill -2 55547
 
 ```yaml
 endpoints:
-  - https://api.avax-test.network/ext/bc/C/rpc
+  - http://localhost:9650/ext/bc/my-chain/rpc
 base-fee: 25
 priority-fee: 1
 concurrency: 10
 ```
 
 ```bash
-2022/03/13 13:35:38 starting simulator (endpoints=[https://api.avax-test.network/ext/bc/C/rpc] concurrency=25 base fee=1 priority fee=10)
+2022/03/13 13:35:38 starting simulator (endpoints=[http://localhost:9650/ext/bc/my-chain/rpc] concurrency=25 base fee=1 priority fee=10)
 2022/03/13 13:35:38 loaded worker 0x10c7529d2e598a91e57f1BD6954Fbb161DC4B36c (balance=39858000000000088 nonce=27)
 2022/03/13 13:35:39 loaded worker 0x155a4BeedAC767b85c9Fd15198c06064f9F7952E (balance=41496000000000103 nonce=24)
 2022/03/13 13:35:39 loaded worker 0x28db65C88b4763c3Fa1837c6c7398cA770BE2fCe (balance=42588000000000101 nonce=22)
