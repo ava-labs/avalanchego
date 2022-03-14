@@ -15,43 +15,46 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 )
 
+const (
+	checkInterval = 2 * time.Second
+)
+
 // MonitorTPS periodically prints metrics related to transaction activity on
 // a given network.
 func MonitorTPS(ctx context.Context, client ethclient.Client) error {
-	blockNumber, err := client.BlockNumber(ctx)
+	lastBlockNumber, err := client.BlockNumber(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get block number: %w", err)
 	}
-
-	block, err := client.BlockByNumber(ctx, new(big.Int).SetUint64(blockNumber))
+	block, err := client.BlockByNumber(ctx, new(big.Int).SetUint64(lastBlockNumber))
 	if err != nil {
-		return fmt.Errorf("failed to get block at number %d: %w", blockNumber, err)
+		return fmt.Errorf("failed to get block at number %d: %w", lastBlockNumber, err)
 	}
 
 	startTime := block.Time()
 	currentTime := startTime
 	totalTxs := 0
-	timeTxs := map[uint64]int{}
+	timeTxs := make(map[uint64]int)
 	for ctx.Err() == nil {
 		newBlockNumber, err := client.BlockNumber(ctx)
 		if err != nil {
 			log.Printf("failed to get block number: %s", err)
-			time.Sleep(2 * time.Second)
+			time.Sleep(checkInterval)
 			continue
 		}
 
-		if blockNumber > newBlockNumber {
-			time.Sleep(2 * time.Second)
+		if newBlockNumber <= lastBlockNumber {
+			time.Sleep(checkInterval)
 			continue
 		}
 
 		var block *types.Block
-		for i := blockNumber; i <= newBlockNumber; i++ {
+		for i := lastBlockNumber + 1; i <= newBlockNumber; i++ {
 			for ctx.Err() == nil {
 				block, err = client.BlockByNumber(ctx, new(big.Int).SetUint64(i))
 				if err != nil {
-					log.Printf("failed to get block at number %d: %s", blockNumber, err)
-					time.Sleep(2 * time.Second)
+					log.Printf("failed to get block at number %d: %s", i, err)
+					time.Sleep(checkInterval)
 					continue
 				}
 				log.Printf("[block created] index: %d base fee: %d block gas cost: %d block txs: %d\n", i, block.BaseFee().Div(block.BaseFee(), big.NewInt(params.GWei)), block.BlockGasCost(), len(block.Body().Transactions))
@@ -63,7 +66,7 @@ func MonitorTPS(ctx context.Context, client ethclient.Client) error {
 				break
 			}
 		}
-		blockNumber = newBlockNumber + 1
+		lastBlockNumber = newBlockNumber
 		currentTime = block.Time()
 
 		// log TPS

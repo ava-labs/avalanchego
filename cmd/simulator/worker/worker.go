@@ -57,8 +57,8 @@ func setupVars(cID *big.Int, bFee uint64, pFee uint64) {
 func createWorkers(ctx context.Context, keys []*key.Key, endpoints []string, desiredWorkers int) (*worker, []*worker, error) {
 	var master *worker
 	var workers []*worker
-	for _, k := range keys {
-		worker, err := newWorker(k, endpoints[rand.Intn(len(endpoints))])
+	for i, k := range keys {
+		worker, err := newWorker(k, endpoints[i%len(endpoints)])
 		if err != nil {
 			return nil, nil, err
 		}
@@ -73,7 +73,9 @@ func createWorkers(ctx context.Context, keys []*key.Key, endpoints []string, des
 		switch {
 		case master == nil:
 			master = worker
-		case new(big.Int).Sub(master.balance, worker.balance).Sign() < 0:
+		case master.balance.Cmp(worker.balance) < 0:
+			// We swap the worker with the master if it has a larger balance to
+			// ensure the master is the key with the largest balance
 			workers = append(workers, master)
 			master = worker
 		default:
@@ -85,13 +87,16 @@ func createWorkers(ctx context.Context, keys []*key.Key, endpoints []string, des
 	if master == nil {
 		master, err = newWorker(nil, endpoints[rand.Intn(len(endpoints))])
 		if err != nil {
+			// This should never happen
 			return nil, nil, fmt.Errorf("unable to create master: %w", err)
 		}
 	}
 
 	for len(workers) < desiredWorkers {
-		worker, err := newWorker(nil, endpoints[rand.Intn(len(endpoints))])
+		i := len(workers)
+		worker, err := newWorker(nil, endpoints[i%len(endpoints)])
 		if err != nil {
+			// This should never happen
 			return nil, nil, fmt.Errorf("unable to create worker: %w", err)
 		}
 
@@ -168,7 +173,7 @@ func (w *worker) waitForBalance(ctx context.Context, stdout bool, minBalance *bi
 			return fmt.Errorf("could not get balance: %w", err)
 		}
 
-		if new(big.Int).Sub(w.balance, minBalance).Sign() >= 0 {
+		if w.balance.Cmp(minBalance) >= 0 {
 			if stdout {
 				log.Printf("found balance of %s\n", w.balance.String())
 			}
@@ -222,7 +227,7 @@ func (w *worker) sendTx(ctx context.Context, recipient common.Address, value *bi
 
 func (w *worker) work(ctx context.Context, availableWorkers []*worker, fundRequest chan common.Address) error {
 	for ctx.Err() == nil {
-		if new(big.Int).Sub(w.balance, maxTransferCost).Sign() < 0 {
+		if w.balance.Cmp(maxTransferCost) < 0 {
 			log.Printf("%s requesting funds from master\n", w.k.Address.Hex())
 			fundRequest <- w.k.Address
 			if err := w.waitForBalance(ctx, false, maxTransferCost); err != nil {
@@ -245,7 +250,7 @@ func (w *worker) fund(ctx context.Context, fundRequest chan common.Address) erro
 	for {
 		select {
 		case recipient := <-fundRequest:
-			if new(big.Int).Sub(w.balance, minFunderBalance).Sign() < 0 {
+			if w.balance.Cmp(minFunderBalance) < 0 {
 				if err := w.waitForBalance(ctx, true, minFunderBalance); err != nil {
 					return fmt.Errorf("could not get minimum balance: %w", err)
 				}
