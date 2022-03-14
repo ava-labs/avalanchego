@@ -64,7 +64,7 @@ func Monitor(ctx context.Context, client ethclient.Client) error {
 				timeTxs[t] += txs
 				totalTxs += txs
 
-				// Update Gas USage
+				// Update Gas Usage
 				timeGas[t] += gas
 				totalGas += gas
 				break
