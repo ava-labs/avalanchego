@@ -428,28 +428,49 @@ If you do not add this key to genesis, you'll need to manually fund the
 
 If you followed the directions successfully, you should see the following:
 ```bash
-2022/03/13 13:35:38 starting simulator (endpoints=[http://localhost:9650/ext/bc/my-chain/rpc] concurrency=25 base fee=1 priority fee=10)
-2022/03/13 13:35:38 loaded worker 0x10c7529d2e598a91e57f1BD6954Fbb161DC4B36c (balance=39858000000000088 nonce=27)
-2022/03/13 13:35:39 loaded worker 0x155a4BeedAC767b85c9Fd15198c06064f9F7952E (balance=41496000000000103 nonce=24)
-2022/03/13 13:35:39 loaded worker 0x28db65C88b4763c3Fa1837c6c7398cA770BE2fCe (balance=42588000000000101 nonce=22)
-2022/03/13 13:35:39 loaded worker 0x2d1BcD523440f83435d6b485be0dC5ef64760337 (balance=40404000000000086 nonce=26)
-2022/03/13 13:35:39 loaded worker 0x315C6538E791cE600A3733F354db77Ac719a0beC (balance=43134000000000097 nonce=21)
-2022/03/13 13:35:39 loaded worker 0xF2839C033cb9947F43471702233F608220a12569 (balance=9448539999999999000 nonce=10)
-2022/03/13 13:35:39 loaded worker 0xa179C0203625f3ffdADe299A056C35191d7b65ad (balance=42042000000000107 nonce=23)
-2022/03/13 13:35:40 loaded worker 0xb7D559A889495C485aFF8C17Bf6b4b9D63123BC0 (balance=43134000000000109 nonce=21)
-2022/03/13 13:35:40 loaded worker 0xcE921E2EC4a8919cb7F3D27Db733750fdC95940b (balance=42042000000000113 nonce=23)
-2022/03/13 13:35:40 loaded worker 0xda17f72F349d86c3451620edB5Fd32f4352881a2 (balance=42042000000000109 nonce=23)
-2022/03/13 13:35:40 loaded worker 0xe8ca46F9F93Ecb1b77CE8e6BcE1d5F635898FDD8 (balance=37674000000000087 nonce=31)
-2022/03/13 13:35:41 [block created] index: 7262002 base fee: 25 block gas cost: 400000 block txs: 2
-2022/03/13 13:35:43 [block created] index: 7262003 base fee: 25 block gas cost: 0 block txs: 3
-2022/03/13 13:35:43 [stats] historical TPS: 1.250000 last 10s TPS: 0.200000 total txs: 5 total time(s): 4s
-2022/03/13 13:35:45 [block created] index: 7262004 base fee: 25 block gas cost: 0 block txs: 9
-2022/03/13 13:35:45 [stats] historical TPS: 2.333333 last 10s TPS: 0.500000 total txs: 14 total time(s): 6s
-2022/03/13 13:35:48 [block created] index: 7262005 base fee: 25 block gas cost: 0 block txs: 9
-2022/03/13 13:35:48 [block created] index: 7262006 base fee: 25 block gas cost: 200000 block txs: 8
-2022/03/13 13:35:48 [stats] historical TPS: 3.444444 last 10s TPS: 2.300000 total txs: 31 total time(s): 9s
-2022/03/13 13:35:53 [block created] index: 7262007 base fee: 25 block gas cost: 0 block txs: 12
-2022/03/13 13:35:53 [stats] historical TPS: 3.583333 last 10s TPS: 2.900000 total txs: 43 total time(s): 12s
+2022/03/14 08:13:32 loaded config (endpoints=[http://localhost:53120/ext/bc/367dTowpd77GrwTsxcnw7EPPzkAQVnFqga4EQxHPUxcBBNjCQ/rpc http://localhost:53122/ext/bc/367dTowpd77GrwTsxcnw7EPPzkAQVnFqga4EQxHPUxcBBNjCQ/rpc http://localhost:53124/ext/bc/367dTowpd77GrwTsxcnw7EPPzkAQVnFqga4EQxHPUxcBBNjCQ/rpc http://localhost:53126/ext/bc/367dTowpd77GrwTsxcnw7EPPzkAQVnFqga4EQxHPUxcBBNjCQ/rpc http://localhost:53128/ext/bc/367dTowpd77GrwTsxcnw7EPPzkAQVnFqga4EQxHPUxcBBNjCQ/rpc] concurrency=1000 base fee=1 priority fee=250)
+2022/03/14 08:13:32 loaded worker 0x27a0D44AC25233652c02b1a92dD2C7D46059b053 (balance=100000000000000000000000000 nonce=0)
+2022/03/14 08:13:32 loaded worker 0xdea66C24b333E0aAfD1fFA828976D8C666D73d77 (balance=0 nonce=0)
+2022/03/14 08:13:32 loaded worker 0xe15BCae0612A6fbf3f7dF99dD4Ab3FE88A33b759 (balance=0 nonce=0)
+2022/03/14 08:13:32 loaded worker 0xe2848eF46c89d235d66021d82d80DeBB009Ee787 (balance=0 nonce=0)
+2022/03/14 08:13:32 loaded worker 0xeAB317a6525298c862A07EE66A9Ea772C549834D (balance=0 nonce=0)
+2022/03/14 08:13:32 loaded worker 0xeAfA0Aa4e5f2F55C55dc32E41b87C11fBFF8770C (balance=0 nonce=0)
+2022/03/14 08:13:32 loaded worker 0xf4ee33ABa173E95179D48A0b3D52623d8b239Ba9 (balance=0 nonce=0)
+2022/03/14 08:13:32 loaded worker 0xf7C811A6563eb527e2AfF6026A11EE17994eF9F5 (balance=0 nonce=0)
+2022/03/14 08:13:32 loaded worker 0xfD27a32854e612D62858a5ac520a5f17A4d223c7 (balance=0 nonce=0)
+2022/03/14 08:13:32 loaded worker 0xfD757bc4966BB48321928a8c64A3113B682AEADa (balance=0 nonce=0)
+2022/03/14 08:13:32 loaded worker 0xfE8458B6cFA844B55331511b785cED82EBF56630 (balance=0 nonce=0)
+2022/03/14 08:13:32 loaded worker 0xfc5649FE1FC631d6B8e1D48B21300F2E8F3508E5 (balance=0 nonce=0)
+2022/03/14 08:13:32 [block created] index: 0 base fee: 1 block gas cost: <nil> block txs: 0
+2022/03/14 08:13:34 [block created] index: 1 base fee: 1 block gas cost: 0 block txs: 1
+2022/03/14 08:13:34 [block created] index: 2 base fee: 1 block gas cost: 0 block txs: 1
+2022/03/14 08:13:34 [stats] historical TPS: 1.000000 last 10s TPS: 0.100000 total txs: 2 total time(s): 2
+2022/03/14 08:13:36 [block created] index: 3 base fee: 1 block gas cost: 0 block txs: 1
+2022/03/14 08:13:36 [stats] historical TPS: 0.750000 last 10s TPS: 0.200000 total txs: 3 total time(s): 4
+.....
+2022/03/14 08:17:36 [block created] index: 125 base fee: 1 block gas cost: 2000000 block txs: 101
+2022/03/14 08:17:36 [stats] historical TPS: 30.409836 last 10s TPS: 49.900000 total txs: 7420 total time(s): 244
+2022/03/14 08:17:38 0x7A3Bba23Db6247E4474D9bFF4C11bB755137276d requesting funds from master
+2022/03/14 08:17:38 [block created] index: 126 base fee: 1 block gas cost: 2000000 block txs: 101
+2022/03/14 08:17:38 [stats] historical TPS: 30.573171 last 10s TPS: 50.000000 total txs: 7521 total time(s): 246
+2022/03/14 08:17:40 0x44461F32FeCa6c5a0De1DEF46FD170325464e0fE requesting funds from master
+2022/03/14 08:17:40 [block created] index: 127 base fee: 1 block gas cost: 2000000 block txs: 101
+2022/03/14 08:17:40 [stats] historical TPS: 30.733871 last 10s TPS: 50.100000 total txs: 7622 total time(s): 248
+2022/03/14 08:17:40 0x77d027fA9E6B4a217247398abDdDA93bDeE38d30 requesting funds from master
+2022/03/14 08:17:42 [block created] index: 128 base fee: 1 block gas cost: 2000000 block txs: 99
+2022/03/14 08:17:42 [stats] historical TPS: 30.884000 last 10s TPS: 50.300000 total txs: 7721 total time(s): 250
+2022/03/14 08:17:44 0x5f46A3E9D0A94351CE60e0205A9C4028eD9474c2 requesting funds from master
+2022/03/14 08:17:44 0x7C51Ca57Ab8a3BbfE4C13a25683Ca0756eDb7f0A requesting funds from master
+2022/03/14 08:17:44 [block created] index: 129 base fee: 1 block gas cost: 2000000 block txs: 101
+2022/03/14 08:17:44 [stats] historical TPS: 31.039683 last 10s TPS: 50.200000 total txs: 7822 total time(s): 252
+2022/03/14 08:17:46 [block created] index: 130 base fee: 1 block gas cost: 2000000 block txs: 99
+2022/03/14 08:17:46 [stats] historical TPS: 31.185039 last 10s TPS: 50.300000 total txs: 7921 total time(s): 254
+2022/03/14 08:17:48 0x6e0BdcdD7813A5eb2C2767D5FD5535a4358081ed requesting funds from master
+2022/03/14 08:17:48 0x19499a0FdE9eAe40df7dd4108e174168a920499F requesting funds from master
+2022/03/14 08:17:48 [block created] index: 131 base fee: 1 block gas cost: 2000000 block txs: 100
+2022/03/14 08:17:48 [stats] historical TPS: 31.332031 last 10s TPS: 50.100000 total txs: 8021 total time(s): 256
+2022/03/14 08:17:50 [block created] index: 132 base fee: 1 block gas cost: 2000000 block txs: 99
+2022/03/14 08:17:50 [stats] historical TPS: 31.472868 last 10s TPS: 50.000000 total txs: 8120 total time(s): 258
 ```
 
 ## Fuji Subnet Deployment

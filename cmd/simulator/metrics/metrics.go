@@ -57,6 +57,9 @@ func MonitorTPS(ctx context.Context, client ethclient.Client) error {
 				log.Printf("[block created] index: %d base fee: %d block gas cost: %d block txs: %d\n", i, block.BaseFee().Div(block.BaseFee(), big.NewInt(params.GWei)), block.BlockGasCost(), len(block.Body().Transactions))
 				timeTxs[block.Time()] += len(block.Transactions())
 				totalTxs += len(block.Transactions())
+				if i == 1 { // genesis is usually the unix epoch
+					startTime = block.Time()
+				}
 				break
 			}
 		}
@@ -72,7 +75,7 @@ func MonitorTPS(ctx context.Context, client ethclient.Client) error {
 			log.Printf(
 				"[stats] historical TPS: %f last 10s TPS: %f total txs: %d total time(s): %v\n",
 				float64(totalTxs)/float64(currentTime-startTime), float64(tenStxs)/float64(10),
-				totalTxs, time.Duration(currentTime-startTime)*time.Second,
+				totalTxs, currentTime-startTime,
 			)
 		}
 	}
