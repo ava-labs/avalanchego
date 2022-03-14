@@ -12,8 +12,13 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ava-labs/subnet-evm/cmd/simulator/key"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/ethclient"
+)
+
+const (
+	workerKeyDir = ".simulator/keys"
 )
 
 var (
@@ -32,7 +37,7 @@ var (
 	minFunderBalance *big.Int
 )
 
-func SetupVars(cID *big.Int, bFee uint64, pFee uint64) {
+func setupVars(cID *big.Int, bFee uint64, pFee uint64) {
 	chainID = cID
 	signer = types.LatestSignerForChainID(chainID)
 	priorityFee = new(big.Int).SetUint64(pFee * params.GWei)
@@ -45,21 +50,21 @@ func SetupVars(cID *big.Int, bFee uint64, pFee uint64) {
 	minFunderBalance = new(big.Int).Add(maxTransferCost, requestAmount)
 }
 
-func CreateWorkers(ctx context.Context, keys []*Key, endpoints []string, desiredWorkers int) (*Worker, []*Worker, error) {
-	var master *Worker
-	var workers []*Worker
+func createWorkers(ctx context.Context, keys []*key.Key, endpoints []string, desiredWorkers int) (*worker, []*worker, error) {
+	var master *worker
+	var workers []*worker
 	for _, k := range keys {
-		worker, err := New(k, endpoints[rand.Intn(len(endpoints))])
+		worker, err := newWorker(k, endpoints[rand.Intn(len(endpoints))])
 		if err != nil {
 			return nil, nil, err
 		}
-		if err := worker.FetchBalance(ctx); err != nil {
+		if err := worker.fetchBalance(ctx); err != nil {
 			return nil, nil, err
 		}
-		if err := worker.FetchNonce(ctx); err != nil {
+		if err := worker.fetchNonce(ctx); err != nil {
 			return nil, nil, fmt.Errorf("could not get nonce: %w", err)
 		}
-		log.Printf("loaded worker %s (balance=%s nonce=%d)\n", worker.k.addr.Hex(), worker.balance.String(), worker.nonce)
+		log.Printf("loaded worker %s (balance=%s nonce=%d)\n", worker.k.Address.Hex(), worker.balance.String(), worker.nonce)
 
 		switch {
 		case master == nil:
@@ -74,14 +79,14 @@ func CreateWorkers(ctx context.Context, keys []*Key, endpoints []string, desired
 
 	var err error
 	if master == nil {
-		master, err = New(nil, endpoints[rand.Intn(len(endpoints))])
+		master, err = newWorker(nil, endpoints[rand.Intn(len(endpoints))])
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to create master: %w", err)
 		}
 	}
 
 	for len(workers) < desiredWorkers {
-		worker, err := New(nil, endpoints[rand.Intn(len(endpoints))])
+		worker, err := newWorker(nil, endpoints[rand.Intn(len(endpoints))])
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to create worker: %w", err)
 		}
@@ -92,32 +97,32 @@ func CreateWorkers(ctx context.Context, keys []*Key, endpoints []string, desired
 	return master, workers[:desiredWorkers], nil
 }
 
-type Worker struct {
+type worker struct {
 	c ethclient.Client
-	k *Key
+	k *key.Key
 
 	balance *big.Int
 	nonce   uint64
 }
 
-func New(k *Key, endpoint string) (*Worker, error) {
+func newWorker(k *key.Key, endpoint string) (*worker, error) {
 	client, err := ethclient.Dial(endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ethclient: %w", err)
 	}
 
 	if k == nil {
-		k, err = GenerateKey()
+		k, err = key.Generate()
 		if err != nil {
 			return nil, fmt.Errorf("problem creating new private key: %w", err)
 		}
 
-		if err := SaveKey(k); err != nil {
+		if err := k.Save(workerKeyDir); err != nil {
 			return nil, fmt.Errorf("could not save key: %w", err)
 		}
 	}
 
-	return &Worker{
+	return &worker{
 		c:       client,
 		k:       k,
 		balance: big.NewInt(0),
@@ -125,9 +130,9 @@ func New(k *Key, endpoint string) (*Worker, error) {
 	}, nil
 }
 
-func (w *Worker) FetchBalance(ctx context.Context) error {
+func (w *worker) fetchBalance(ctx context.Context) error {
 	for ctx.Err() == nil {
-		balance, err := w.c.BalanceAt(ctx, w.k.addr, nil)
+		balance, err := w.c.BalanceAt(ctx, w.k.Address, nil)
 		if err != nil {
 			log.Printf("could not get balance: %s\n", err.Error())
 			time.Sleep(retryDelay)
@@ -139,9 +144,9 @@ func (w *Worker) FetchBalance(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func (w *Worker) FetchNonce(ctx context.Context) error {
+func (w *worker) fetchNonce(ctx context.Context) error {
 	for ctx.Err() == nil {
-		nonce, err := w.c.NonceAt(ctx, w.k.addr, nil)
+		nonce, err := w.c.NonceAt(ctx, w.k.Address, nil)
 		if err != nil {
 			log.Printf("could not get nonce: %s\n", err.Error())
 			time.Sleep(retryDelay)
@@ -153,9 +158,9 @@ func (w *Worker) FetchNonce(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func (w *Worker) waitForBalance(ctx context.Context, stdout bool, minBalance *big.Int) error {
+func (w *worker) waitForBalance(ctx context.Context, stdout bool, minBalance *big.Int) error {
 	for ctx.Err() == nil {
-		if err := w.FetchBalance(ctx); err != nil {
+		if err := w.fetchBalance(ctx); err != nil {
 			return fmt.Errorf("could not get balance: %w", err)
 		}
 
@@ -166,14 +171,14 @@ func (w *Worker) waitForBalance(ctx context.Context, stdout bool, minBalance *bi
 			return nil
 		}
 		if stdout {
-			log.Printf("waiting for balance of %s on %s\n", minBalance.String(), w.k.addr.Hex())
+			log.Printf("waiting for balance of %s on %s\n", minBalance.String(), w.k.Address.Hex())
 		}
 		time.Sleep(5 * time.Second)
 	}
 	return ctx.Err()
 }
 
-func (w *Worker) sendTx(ctx context.Context, recipient common.Address, value *big.Int) error {
+func (w *worker) sendTx(ctx context.Context, recipient common.Address, value *big.Int) error {
 	for ctx.Err() == nil {
 		tx := types.NewTx(&types.DynamicFeeTx{
 			ChainID:   chainID,
@@ -185,7 +190,7 @@ func (w *Worker) sendTx(ctx context.Context, recipient common.Address, value *bi
 			Value:     value,
 			Data:      []byte{},
 		})
-		signedTx, err := types.SignTx(tx, signer, w.k.pk)
+		signedTx, err := types.SignTx(tx, signer, w.k.PrivKey)
 		if err != nil {
 			log.Printf("failed to sign transaction: %s", err.Error())
 			time.Sleep(retryDelay)
@@ -211,20 +216,20 @@ func (w *Worker) sendTx(ctx context.Context, recipient common.Address, value *bi
 	return ctx.Err()
 }
 
-func (w *Worker) Work(ctx context.Context, availableWorkers []*Worker, fundRequest chan common.Address) error {
+func (w *worker) work(ctx context.Context, availableWorkers []*worker, fundRequest chan common.Address) error {
 	for ctx.Err() == nil {
 		if new(big.Int).Sub(w.balance, maxTransferCost).Sign() < 0 {
-			log.Printf("%s requesting funds from master\n", w.k.addr.Hex())
-			fundRequest <- w.k.addr
+			log.Printf("%s requesting funds from master\n", w.k.Address.Hex())
+			fundRequest <- w.k.Address
 			if err := w.waitForBalance(ctx, false, maxTransferCost); err != nil {
 				return fmt.Errorf("could not get balance: %w", err)
 			}
 		}
 		recipient := availableWorkers[rand.Intn(len(availableWorkers))]
-		if recipient.k.addr == w.k.addr {
+		if recipient.k.Address == w.k.Address {
 			continue
 		}
-		if err := w.sendTx(ctx, recipient.k.addr, transferAmount); err != nil {
+		if err := w.sendTx(ctx, recipient.k.Address, transferAmount); err != nil {
 			return err
 		}
 		time.Sleep(workDelay)
@@ -232,7 +237,7 @@ func (w *Worker) Work(ctx context.Context, availableWorkers []*Worker, fundReque
 	return ctx.Err()
 }
 
-func (w *Worker) Fund(ctx context.Context, fundRequest chan common.Address) error {
+func (w *worker) fund(ctx context.Context, fundRequest chan common.Address) error {
 	for {
 		select {
 		case recipient := <-fundRequest:
@@ -250,7 +255,7 @@ func (w *Worker) Fund(ctx context.Context, fundRequest chan common.Address) erro
 	}
 }
 
-func (w *Worker) confirmTransaction(ctx context.Context, tx common.Hash) (*big.Int, error) {
+func (w *worker) confirmTransaction(ctx context.Context, tx common.Hash) (*big.Int, error) {
 	for ctx.Err() == nil {
 		result, pending, _ := w.c.TransactionByHash(ctx, tx)
 		if result == nil || pending {
@@ -271,13 +276,13 @@ func Run(ctx context.Context, c *Config) error {
 	if err != nil {
 		return err
 	}
-	SetupVars(chainId, c.BaseFee, c.PriorityFee)
+	setupVars(chainId, c.BaseFee, c.PriorityFee)
 
-	ks, err := LoadAvailableKeys(ctx)
+	ks, err := key.LoadAll(ctx, workerKeyDir)
 	if err != nil {
 		return fmt.Errorf("unable to load keys: %w", err)
 	}
-	master, workers, err := CreateWorkers(ctx, ks, c.Endpoints, c.Concurrency)
+	master, workers, err := createWorkers(ctx, ks, c.Endpoints, c.Concurrency)
 	if err != nil {
 		return fmt.Errorf("unable to load available workers: %w", err)
 	}
@@ -288,12 +293,12 @@ func Run(ctx context.Context, c *Config) error {
 	})
 	fundRequest := make(chan common.Address)
 	g.Go(func() error {
-		return master.Fund(gctx, fundRequest)
+		return master.fund(gctx, fundRequest)
 	})
 	for _, worker := range workers {
 		w := worker
 		g.Go(func() error {
-			return w.Work(gctx, workers, fundRequest)
+			return w.work(gctx, workers, fundRequest)
 		})
 	}
 	return g.Wait()
