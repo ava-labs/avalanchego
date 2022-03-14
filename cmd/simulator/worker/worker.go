@@ -8,11 +8,12 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/ava-labs/subnet-evm/core/types"
-	"github.com/ava-labs/subnet-evm/ethclient"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/ava-labs/subnet-evm/core/types"
+	"github.com/ava-labs/subnet-evm/ethclient"
 )
 
 var (
@@ -261,8 +262,8 @@ func (w *Worker) confirmTransaction(ctx context.Context, tx common.Hash) (*big.I
 	return nil, ctx.Err()
 }
 
-func Run(ctx context.Context, endpoints []string, concurrency int, baseFee uint64, priorityFee uint64) error {
-	rclient, err := ethclient.Dial(endpoints[0])
+func Run(ctx context.Context, c *Config) error {
+	rclient, err := ethclient.Dial(c.Endpoints[0])
 	if err != nil {
 		return err
 	}
@@ -270,13 +271,13 @@ func Run(ctx context.Context, endpoints []string, concurrency int, baseFee uint6
 	if err != nil {
 		return err
 	}
-	SetupVars(chainId, baseFee, priorityFee)
+	SetupVars(chainId, c.BaseFee, c.PriorityFee)
 
 	ks, err := LoadAvailableKeys(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to load keys: %w", err)
 	}
-	master, workers, err := CreateWorkers(ctx, ks, endpoints, concurrency)
+	master, workers, err := CreateWorkers(ctx, ks, c.Endpoints, c.Concurrency)
 	if err != nil {
 		return fmt.Errorf("unable to load available workers: %w", err)
 	}
