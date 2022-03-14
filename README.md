@@ -398,7 +398,15 @@ kill -2 55547
 ```
 
 ## Load Simulator
-`0x27a0D44AC25233652c02b1a92dD2C7D46059b053`
+When building developing your own blockchain using `subnet-evm`, you may want
+to analyze how your fee paramterization behaves and/or how many resources your VM
+uses under different load patterns. For this reason, we developed `cmd/simulator`.
+`cmd/simulator` lets your drive arbitrary load across any number of [endpoints]
+with a user-specified [concurrency], [base-fee], and [priority-fee].
+
+To get started, open the directory `cmd/simulator` and add your chain's endpoints to
+the file at `.simulator/config.yml` (these will be provided after running
+`./scripts/run.sh`):
 
 ```yaml
 endpoints:
@@ -408,6 +416,16 @@ priority-fee: 1
 concurrency: 10
 ```
 
+Once your config is specified, you can run the tool by either invoking `go run
+main.go` or by installing the tool (`go install -v .`) and running the binary
+(`simulator`).
+
+To make setup easier, the key for `0x27a0D44AC25233652c02b1a92dD2C7D46059b053`
+is saved in the simulator key directory and can be added to genesis during
+local network creation (`./scripts/run.sh 1.7.7
+0x27a0D44AC25233652c02b1a92dD2C7D46059b053`).
+
+If you followed the directions successfully, you should see the following:
 ```bash
 2022/03/13 13:35:38 starting simulator (endpoints=[http://localhost:9650/ext/bc/my-chain/rpc] concurrency=25 base fee=1 priority fee=10)
 2022/03/13 13:35:38 loaded worker 0x10c7529d2e598a91e57f1BD6954Fbb161DC4B36c (balance=39858000000000088 nonce=27)
