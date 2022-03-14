@@ -410,7 +410,7 @@ the file at `.simulator/config.yml` (these will be provided after running
 
 ```yaml
 endpoints:
-  - http://localhost:9650/ext/bc/my-chain/rpc
+- http://localhost:9650/ext/bc/my-chain/rpc
 base-fee: 25
 priority-fee: 1
 concurrency: 10
@@ -420,9 +420,9 @@ Once your config is specified, you can run the tool by either invoking `go run
 main.go` or by installing the tool (`go install -v .`) and running the binary
 (`simulator`).
 
-To make getting started easier, the key for `0x27a0D44AC25233652c02b1a92dD2C7D46059b053`
-is saved in the simulator key directory and can be added to genesis during local network
-creation (`./scripts/run.sh 1.7.7 0x27a0D44AC25233652c02b1a92dD2C7D46059b053`).
+To make getting started easier, the ewoq key `0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC`
+has been pre-added to the simulator key directory and can be added to genesis during local network
+creation (`./scripts/run.sh 1.7.7 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC`).
 If you do not add this key to genesis, you'll need to manually fund the
 `master` account when prompted in the terminal.
 
