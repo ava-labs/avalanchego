@@ -254,9 +254,11 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	toProcess := make([]snowman.Block, 0, len(acceptedContainerIDs))
 	b.Ctx.Log.Debug("Starting bootstrapping with %d pending blocks and %d from the accepted frontier",
 		len(pendingContainerIDs), len(acceptedContainerIDs))
+
 	for _, blkID := range pendingContainerIDs {
 		b.startingAcceptedFrontier.Add(blkID)
 		if blk, err := b.VM.GetBlock(blkID); err == nil {
+			// known block, decide if it needs processing.
 			if height := blk.Height(); height > b.tipHeight {
 				b.tipHeight = height
 			}
@@ -265,11 +267,13 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 			} else {
 				toProcess = append(toProcess, blk)
 			}
-		} else {
-			b.Blocked.AddMissingID(blkID)
-			if err := b.fetch(blkID); err != nil {
-				return err
-			}
+			continue
+		}
+
+		// unknown block, request it.
+		b.Blocked.AddMissingID(blkID)
+		if err := b.fetch(blkID); err != nil {
+			return err
 		}
 	}
 
@@ -322,13 +326,10 @@ func (b *bootstrapper) process(blk snowman.Block, processingBlocks map[ids.ID]sn
 	status := blk.Status()
 	blkID := blk.ID()
 	blkHeight := blk.Height()
+	totalBlocksToFetch := b.tipHeight - b.startingHeight
 
 	if blkHeight > b.tipHeight && b.startingAcceptedFrontier.Contains(blkID) {
 		b.tipHeight = blkHeight
-	}
-	totalBlocksToFetch := b.tipHeight - b.startingHeight
-	if b.tipHeight < b.startingHeight {
-		totalBlocksToFetch = 0
 	}
 
 	for status == choices.Processing {
@@ -375,7 +376,7 @@ func (b *bootstrapper) process(blk snowman.Block, processingBlocks map[ids.ID]sn
 		b.numFetched.Inc()
 
 		blocksFetchedSoFar := b.Blocked.Jobs.PendingJobs()
-		if blocksFetchedSoFar%common.StatusUpdateFrequency == 0 && totalBlocksToFetch > 0 { // Periodically print progress
+		if blocksFetchedSoFar%common.StatusUpdateFrequency == 0 { // Periodically print progress
 			eta := timer.EstimateETA(
 				b.startTime,
 				blocksFetchedSoFar-b.initiallyFetched, // Number of blocks we have fetched during this run
