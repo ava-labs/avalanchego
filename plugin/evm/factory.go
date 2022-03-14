@@ -11,7 +11,7 @@ import (
 
 var (
 	// ID this VM should be referenced by
-	ID = ids.ID{'e', 'v', 'm'}
+	ID = ids.ID{'s', 'u', 'b', 'n', 'e', 't', 'e', 'v', 'm'}
 
 	_ vms.Factory = &Factory{}
 )
