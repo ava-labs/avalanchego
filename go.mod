@@ -53,3 +53,5 @@ require (
 	google.golang.org/protobuf v1.27.1
 	gotest.tools v2.2.0+incompatible
 )
+
+replace github.com/ava-labs/coreth v0.8.7-rc.2 => github.com/chain4travel/coreth v0.8.7-rc.2

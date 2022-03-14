@@ -129,8 +129,6 @@ github.com/ava-labs/coreth v0.8.4-rc.1/go.mod h1:bP2Atm7pCJdx8fwzsPT3xU/kWOdHFkl
 github.com/ava-labs/coreth v0.8.4-rc.3/go.mod h1:9TgpLJVY9ot6RV8Lh66F356S4MfalvaL3sAqw4+miTU=
 github.com/ava-labs/coreth v0.8.6-rc.1/go.mod h1:D60h55zuIQu6/dc7nWpXNyk3xakq3xsWMFuumttcpqw=
 github.com/ava-labs/coreth v0.8.7-rc.1/go.mod h1:E9yfBswaDbV3WeFeX90wS0eRAfeW7WPbxgbc4b0KJlk=
-github.com/ava-labs/coreth v0.8.7-rc.2 h1:QrQiAIl4zGRy8eOQWXubm2Hs+zXJLggjItZa8q35Yww=
-github.com/ava-labs/coreth v0.8.7-rc.2/go.mod h1:HC8D4Ei7PNRzpPpqGC/M08YYeBp1kogJBVcWIfGseVA=
 github.com/aws/aws-sdk-go-v2 v1.2.0/go.mod h1:zEQs02YRBw1DjK0PoJv3ygDYOFTre1ejlJWl8FwAuQo=
 github.com/aws/aws-sdk-go-v2/config v1.1.1/go.mod h1:0XsVy9lBI/BCXm+2Tuvt39YmdHwS5unDQmxZOYe8F5Y=
 github.com/aws/aws-sdk-go-v2/credentials v1.1.1/go.mod h1:mM2iIjwl7LULWtS6JCACyInboHirisUUdkBPoTHMOUo=
@@ -179,6 +177,8 @@ github.com/cespare/xxhash v1.1.0/go.mod h1:XrSqR1VqqWfGrhpAt58auRo0WTKS1nRRg3ghf
 github.com/cespare/xxhash/v2 v2.1.1/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
 github.com/cespare/xxhash/v2 v2.1.2 h1:YRXhKfTDauu4ajMg1TPgFO5jnlC2HCbmLXMcTG5cbYE=
 github.com/cespare/xxhash/v2 v2.1.2/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
+github.com/chain4travel/coreth v0.8.7-rc.2 h1:0vsKFwumYr9sduc09e9geEEp6KPCC34EesRH9ea8xGw=
+github.com/chain4travel/coreth v0.8.7-rc.2/go.mod h1:HC8D4Ei7PNRzpPpqGC/M08YYeBp1kogJBVcWIfGseVA=
 github.com/chzyer/logex v1.1.10/go.mod h1:+Ywpsq7O8HXn0nuIou7OrIPyXbp3wmkHB+jjWRnGsAI=
 github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e/go.mod h1:nSuG5e5PlCu98SY8svDHJxuZscDgtXS6KTTbou5AhLI=
 github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1/go.mod h1:Q3SI9o4m/ZMnBNeIyt5eFwwo7qiLfzFZmjNmxjkiQlU=
