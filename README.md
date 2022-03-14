@@ -402,9 +402,9 @@ When building developing your own blockchain using `subnet-evm`, you may want
 to analyze how your fee paramterization behaves and/or how many resources your VM
 uses under different load patterns. For this reason, we developed `cmd/simulator`.
 `cmd/simulator` lets your drive arbitrary load across any number of [endpoints]
-with a user-specified [concurrency], [base-fee], and [priority-fee].
+with a user-specified `concurrency`, `base-fee`, and `priority-fee`.
 
-To get started, open the directory `cmd/simulator` and add your chain's endpoints to
+To get started, open the directory `cmd/simulator` and add your network's endpoints to
 the file at `.simulator/config.yml` (these will be provided after running
 `./scripts/run.sh`):
 
@@ -420,10 +420,11 @@ Once your config is specified, you can run the tool by either invoking `go run
 main.go` or by installing the tool (`go install -v .`) and running the binary
 (`simulator`).
 
-To make setup easier, the key for `0x27a0D44AC25233652c02b1a92dD2C7D46059b053`
-is saved in the simulator key directory and can be added to genesis during
-local network creation (`./scripts/run.sh 1.7.7
-0x27a0D44AC25233652c02b1a92dD2C7D46059b053`).
+To make getting started easier, the key for `0x27a0D44AC25233652c02b1a92dD2C7D46059b053`
+is saved in the simulator key directory and can be added to genesis during local network
+creation (`./scripts/run.sh 1.7.7 0x27a0D44AC25233652c02b1a92dD2C7D46059b053`).
+If you do not add this key to genesis, you'll need to manually fund the
+`master` account when prompted in the terminal.
 
 If you followed the directions successfully, you should see the following:
 ```bash
