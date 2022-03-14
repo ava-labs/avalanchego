@@ -303,7 +303,7 @@ func Run(ctx context.Context) error {
 
 	g, gctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		return metrics.MonitorTPS(gctx, rclient)
+		return metrics.Monitor(gctx, rclient)
 	})
 	fundRequest := make(chan common.Address)
 	g.Go(func() error {
