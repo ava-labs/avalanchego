@@ -44,3 +44,5 @@ awscpu
 
 bin/
 build/
+
+cmd/simulator/.simulator/keys/*
