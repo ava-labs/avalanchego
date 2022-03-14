@@ -87,7 +87,6 @@ func createWorkers(ctx context.Context, keys []*key.Key, endpoints []string, des
 	if master == nil {
 		master, err = newWorker(nil, endpoints[rand.Intn(len(endpoints))])
 		if err != nil {
-			// This should never happen
 			return nil, nil, fmt.Errorf("unable to create master: %w", err)
 		}
 	}
@@ -96,7 +95,6 @@ func createWorkers(ctx context.Context, keys []*key.Key, endpoints []string, des
 		i := len(workers)
 		worker, err := newWorker(nil, endpoints[i%len(endpoints)])
 		if err != nil {
-			// This should never happen
 			return nil, nil, fmt.Errorf("unable to create worker: %w", err)
 		}
 
