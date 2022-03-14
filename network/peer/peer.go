@@ -485,23 +485,24 @@ func (p *peer) writeMessages() {
 
 	writer := bufio.NewWriterSize(p.conn, p.Config.WriteBufferSize)
 	for { // When this loop exits, p.sendQueueCond.L is unlocked
-		p.sendQueueCond.L.Lock()
-		for {
-			if p.closing {
-				p.sendQueueCond.L.Unlock()
+		msg, ok := p.nextMessageWithoutBlocking()
+		if !ok {
+			// Make sure the peer was fully sent all prior messages before
+			// blocking.
+			if err := writer.Flush(); err != nil {
+				p.Log.Verbo(
+					"couldn't flush writer to %s%s: %s",
+					constants.NodeIDPrefix, p.id,
+					err,
+				)
 				return
 			}
-			if len(p.sendQueue) > 0 {
-				// There is a message to send
-				break
+			msg, ok = p.nextMessageWithBlocking()
+			if !ok {
+				// This peer is closing
+				return
 			}
-			// Wait until there is a message to send
-			p.sendQueueCond.Wait()
 		}
-		msg := p.sendQueue[0]
-		p.sendQueue[0] = nil
-		p.sendQueue = p.sendQueue[1:]
-		p.sendQueueCond.L.Unlock()
 
 		msgBytes := msg.Bytes()
 		p.Log.Verbo(
@@ -538,18 +539,6 @@ func (p *peer) writeMessages() {
 			return
 		}
 
-		// Make sure the peer got the entire message
-		if err := writer.Flush(); err != nil {
-			p.Log.Verbo(
-				"couldn't flush writer to %s%s: %s",
-				constants.NodeIDPrefix, p.id,
-				err,
-			)
-			p.OutboundMsgThrottler.Release(msg, p.id)
-			msg.DecRef()
-			return
-		}
-
 		p.OutboundMsgThrottler.Release(msg, p.id)
 
 		now := p.Clock.Time().Unix()
@@ -557,6 +546,47 @@ func (p *peer) writeMessages() {
 		atomic.StoreInt64(&p.lastSent, now)
 		p.Metrics.Sent(msg)
 	}
+}
+
+// Returns the next message to send to this peer.
+// If there is no message to send or the peer is closing, returns false.
+func (p *peer) nextMessageWithoutBlocking() (message.OutboundMessage, bool) {
+	p.sendQueueCond.L.Lock()
+	defer p.sendQueueCond.L.Unlock()
+
+	if len(p.sendQueue) == 0 || p.closing {
+		// There isn't a message to send or the peer is closing.
+		return nil, false
+	}
+
+	msg := p.sendQueue[0]
+	p.sendQueue[0] = nil
+	p.sendQueue = p.sendQueue[1:]
+	return msg, true
+}
+
+// Blocks until there is a message to send to this peer, then returns it.
+// Returns false if the peer is closing.
+func (p *peer) nextMessageWithBlocking() (message.OutboundMessage, bool) {
+	p.sendQueueCond.L.Lock()
+	defer p.sendQueueCond.L.Unlock()
+
+	for {
+		if p.closing {
+			return nil, false
+		}
+		if len(p.sendQueue) > 0 {
+			// There is a message to send
+			break
+		}
+		// Wait until there is a message to send
+		p.sendQueueCond.Wait()
+	}
+
+	msg := p.sendQueue[0]
+	p.sendQueue[0] = nil
+	p.sendQueue = p.sendQueue[1:]
+	return msg, true
 }
 
 func (p *peer) sendPings() {
