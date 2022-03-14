@@ -8,10 +8,6 @@ import (
 )
 
 func main() {
-	c, err := worker.LoadConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
 	ctx := context.Background()
-	log.Fatal(worker.Run(ctx, c))
+	log.Fatal(worker.Run(ctx))
 }

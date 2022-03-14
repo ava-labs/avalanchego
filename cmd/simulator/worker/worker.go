@@ -8,13 +8,14 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/ava-labs/subnet-evm/core/types"
+	"github.com/ava-labs/subnet-evm/ethclient"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/subnet-evm/cmd/simulator/key"
-	"github.com/ava-labs/subnet-evm/core/types"
-	"github.com/ava-labs/subnet-evm/ethclient"
+	"github.com/ava-labs/subnet-evm/cmd/simulator/metrics"
 )
 
 const (
@@ -267,7 +268,14 @@ func (w *worker) confirmTransaction(ctx context.Context, tx common.Hash) (*big.I
 	return nil, ctx.Err()
 }
 
-func Run(ctx context.Context, c *Config) error {
+// Run attempts to apply load to a network specified in .simulator/config.yml
+// and periodically prints metrics about the traffic it generates.
+func Run(ctx context.Context) error {
+	c, err := LoadConfig()
+	if err != nil {
+		return fmt.Errorf("%w: cannot load config", err)
+	}
+
 	rclient, err := ethclient.Dial(c.Endpoints[0])
 	if err != nil {
 		return err
@@ -289,7 +297,7 @@ func Run(ctx context.Context, c *Config) error {
 
 	g, gctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		return MonitorTPS(gctx, rclient)
+		return metrics.MonitorTPS(gctx, rclient)
 	})
 	fundRequest := make(chan common.Address)
 	g.Go(func() error {

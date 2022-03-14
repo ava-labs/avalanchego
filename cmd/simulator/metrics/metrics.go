@@ -1,4 +1,4 @@
-package worker
+package metrics
 
 import (
 	"context"
@@ -12,6 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 )
 
+// MonitorTPS periodically prints metrics related to transaction activity on
+// a given network.
 func MonitorTPS(ctx context.Context, client ethclient.Client) error {
 	blockNumber, err := client.BlockNumber(ctx)
 	if err != nil {
