@@ -392,7 +392,9 @@ func (it *iterator) Next() bool {
 			nextKey := it.keys[0]
 			nextValue := it.values[0]
 
+			it.keys[0] = ""
 			it.keys = it.keys[1:]
+			it.values[0].value = nil
 			it.values = it.values[1:]
 
 			if !nextValue.delete {
@@ -414,7 +416,9 @@ func (it *iterator) Next() bool {
 			dbStringKey := string(dbKey)
 			switch {
 			case memKey < dbStringKey:
+				it.keys[0] = ""
 				it.keys = it.keys[1:]
+				it.values[0].value = nil
 				it.values = it.values[1:]
 
 				if !memValue.delete {
@@ -428,7 +432,9 @@ func (it *iterator) Next() bool {
 				it.exhausted = !it.Iterator.Next()
 				return true
 			default:
+				it.keys[0] = ""
 				it.keys = it.keys[1:]
+				it.values[0].value = nil
 				it.values = it.values[1:]
 				it.exhausted = !it.Iterator.Next()
 

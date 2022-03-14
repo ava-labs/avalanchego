@@ -24,10 +24,10 @@ type Dialer interface {
 }
 
 type dialer struct {
-	log               logging.Logger
-	network           string
-	throttler         throttling.DialThrottler
-	connectionTimeout time.Duration
+	dialer    net.Dialer
+	log       logging.Logger
+	network   string
+	throttler throttling.DialThrottler
 }
 
 type Config struct {
@@ -53,10 +53,10 @@ func NewDialer(network string, dialerConfig Config, log logging.Logger) Dialer {
 		dialerConfig.ConnectionTimeout,
 	)
 	return &dialer{
-		log:               log,
-		network:           network,
-		throttler:         throttler,
-		connectionTimeout: dialerConfig.ConnectionTimeout,
+		dialer:    net.Dialer{Timeout: dialerConfig.ConnectionTimeout},
+		log:       log,
+		network:   network,
+		throttler: throttler,
 	}
 }
 
@@ -65,8 +65,7 @@ func (d *dialer) Dial(ctx context.Context, ip utils.IPDesc) (net.Conn, error) {
 		return nil, err
 	}
 	d.log.Verbo("dialing %s", ip)
-	dialer := net.Dialer{Timeout: d.connectionTimeout}
-	conn, err := dialer.DialContext(ctx, d.network, ip.String())
+	conn, err := d.dialer.DialContext(ctx, d.network, ip.String())
 	if err != nil {
 		return nil, fmt.Errorf("error while dialing %s: %w", ip, err)
 	}

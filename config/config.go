@@ -377,6 +377,8 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 		MaximumInboundMessageTimeout: v.GetDuration(NetworkMaximumInboundTimeoutKey),
 
 		RequireValidatorToConnect: v.GetBool(NetworkRequireValidatorToConnectKey),
+		PeerReadBufferSize:        int(v.GetUint(NetworkPeerReadBufferSizeKey)),
+		PeerWriteBufferSize:       int(v.GetUint(NetworkPeerWriteBufferSizeKey)),
 	}
 
 	switch {
