@@ -1,6 +1,6 @@
 # Subnet EVM Contracts
 
-CONTRACTS HERE ARE CONSIDERED [ALPHA SOFTWARE](https://en.wikipedia.org/wiki/Software_release_life_cycle#Alpha). USE AT YOUR OWN RISK!
+CONTRACTS HERE ARE [ALPHA SOFTWARE](https://en.wikipedia.org/wiki/Software_release_life_cycle#Alpha) AND ARE NOT YET AUDITED. USE AT YOUR OWN RISK!
 
 ## Introduction
 
