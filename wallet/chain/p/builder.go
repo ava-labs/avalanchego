@@ -46,6 +46,17 @@ type Builder interface {
 		options ...common.Option,
 	) (map[ids.ID]uint64, error)
 
+	// NewBaseTx creates a new simple value transfer. Because the P-chain
+	// doesn't intend for balance transfers to occur, this method is expensive
+	// and abuses the creation of subnets.
+	//
+	// - [outputs] specifies all the recipients and amounts that should be sent
+	//   from this transaction.
+	NewBaseTx(
+		outputs []*avax.TransferableOutput,
+		options ...common.Option,
+	) (*platformvm.UnsignedCreateSubnetTx, error)
+
 	// NewAddValidatorTx creates a new validator of the primary network.
 	//
 	// - [validator] specifies all the details of the validation period such as
@@ -172,6 +183,43 @@ func (b *builder) GetImportableBalance(
 ) (map[ids.ID]uint64, error) {
 	ops := common.NewOptions(options)
 	return b.getBalance(chainID, ops)
+}
+
+func (b *builder) NewBaseTx(
+	outputs []*avax.TransferableOutput,
+	options ...common.Option,
+) (*platformvm.UnsignedCreateSubnetTx, error) {
+	toBurn := map[ids.ID]uint64{
+		b.backend.AVAXAssetID(): b.backend.CreateSubnetTxFee(),
+	}
+	for _, out := range outputs {
+		assetID := out.AssetID()
+		amountToBurn, err := math.Add64(toBurn[assetID], out.Out.Amount())
+		if err != nil {
+			return nil, err
+		}
+		toBurn[assetID] = amountToBurn
+	}
+	toStake := map[ids.ID]uint64{}
+
+	ops := common.NewOptions(options)
+	inputs, changeOutputs, _, err := b.spend(toBurn, toStake, ops)
+	if err != nil {
+		return nil, err
+	}
+	outputs = append(outputs, changeOutputs...)
+	avax.SortTransferableOutputs(outputs, platformvm.Codec) // sort the outputs
+
+	return &platformvm.UnsignedCreateSubnetTx{
+		BaseTx: platformvm.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Ins:          inputs,
+			Outs:         outputs,
+			Memo:         ops.Memo(),
+		}},
+		Owner: &secp256k1fx.OutputOwners{},
+	}, nil
 }
 
 func (b *builder) NewAddValidatorTx(
@@ -414,20 +462,11 @@ func (b *builder) NewImportTx(
 			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 		}
 	} else if importedAmount > txFee {
-		addr, ok := b.addrs.Peek()
-		if !ok {
-			return nil, errNoChangeAddress
-		}
-		changeOwner := ops.ChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr},
-		})
-
 		outputs = append(outputs, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: avaxAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt:          importedAmount - txFee,
-				OutputOwners: *changeOwner,
+				OutputOwners: *to,
 			},
 		})
 	}

@@ -53,7 +53,7 @@ var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 			// 5-second is enough to fetch initial UTXOs for test cluster in "primary.NewWallet"
 			ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
 			var err error
-			wallet, err = primary.NewWallet(ctx, walletURI, keys)
+			wallet, err = primary.NewWalletFromURI(ctx, walletURI, keys)
 			cancel()
 			gomega.Expect(err).Should(gomega.BeNil())
 		})

@@ -29,6 +29,17 @@ type Wallet interface {
 	// Signer returns the signer that will be used to sign the transactions.
 	Signer() Signer
 
+	// IssueBaseTx creates, signs, and issues a new simple value transfer.
+	// Because the P-chain doesn't intend for balance transfers to occur, this
+	// method is expensive and abuses the creation of subnets.
+	//
+	// - [outputs] specifies all the recipients and amounts that should be sent
+	//   from this transaction.
+	IssueBaseTx(
+		outputs []*avax.TransferableOutput,
+		options ...common.Option,
+	) (ids.ID, error)
+
 	// IssueAddValidatorTx creates, signs, and issues a new validator of the
 	// primary network.
 	//
@@ -156,6 +167,17 @@ type wallet struct {
 func (w *wallet) Builder() Builder { return w.builder }
 
 func (w *wallet) Signer() Signer { return w.signer }
+
+func (w *wallet) IssueBaseTx(
+	outputs []*avax.TransferableOutput,
+	options ...common.Option,
+) (ids.ID, error) {
+	utx, err := w.builder.NewBaseTx(outputs, options...)
+	if err != nil {
+		return ids.Empty, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
 
 func (w *wallet) IssueAddValidatorTx(
 	validator *platformvm.Validator,
