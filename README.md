@@ -349,7 +349,7 @@ cd ${HOME}/go/src/github.com/ava-labs/subnet-evm
 ```
 
 _The private key for the ewoq address (`0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC`) is
-`56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027`._
+`0x56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027`._
 
 Once the the network is started up, the following info will be printed to the
 console:
@@ -435,7 +435,7 @@ If you do not add this key to genesis, you'll need to manually fund the
 `master` account when prompted in the terminal.
 
 _The private key for the ewoq address (`0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC`) is
-`56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027`._
+`0x56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027`._
 
 If you followed the directions successfully, you should see the following:
 ```bash
