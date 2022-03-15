@@ -19,6 +19,7 @@ import (
 const (
 	// The encoding used to convert IDs from bytes to string and vice versa
 	defaultEncoding = formatting.CB58
+	nullStr         = "null"
 )
 
 var (
@@ -54,7 +55,7 @@ func (id ID) MarshalJSON() ([]byte, error) {
 
 func (id *ID) UnmarshalJSON(b []byte) error {
 	str := string(b)
-	if str == "null" { // If "null", do nothing
+	if str == nullStr { // If "null", do nothing
 		return nil
 	} else if len(str) < 2 {
 		return errMissingQuotes
