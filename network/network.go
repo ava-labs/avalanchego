@@ -524,7 +524,6 @@ func (n *network) Dispatch() error {
 
 func (n *network) WantsConnection(nodeID ids.ShortID) bool {
 	return n.config.Validators.Contains(constants.PrimaryNetworkID, nodeID) ||
-		n.config.Beacons.Contains(nodeID) ||
 		n.manuallyTrackedIDs.Contains(nodeID)
 }
 

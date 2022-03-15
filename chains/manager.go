@@ -840,7 +840,8 @@ func (m *manager) createSnowmanChain(
 		m.StateSyncBeacons,
 		snowGetHandler,
 		vm,
-		weightTracker)
+		weightTracker,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize state syncer configuration: %w", err)
 	}
