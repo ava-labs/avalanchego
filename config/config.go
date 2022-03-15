@@ -489,12 +489,12 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 }
 
 func getStateSyncConfig(v *viper.Viper) (node.StateSyncConfig, error) {
-	config := node.StateSyncConfig{}
-	var stateSyncIPs, stateSyncIDs []string
-
-	if v.IsSet(StateSyncIPsKey) {
+	var (
+		config       = node.StateSyncConfig{}
 		stateSyncIPs = strings.Split(v.GetString(StateSyncIPsKey), ",")
-	}
+		stateSyncIDs = strings.Split(v.GetString(StateSyncIDsKey), ",")
+	)
+
 	for _, ip := range stateSyncIPs {
 		if ip == "" {
 			continue
@@ -506,9 +506,6 @@ func getStateSyncConfig(v *viper.Viper) (node.StateSyncConfig, error) {
 		config.StateSyncIPs = append(config.StateSyncIPs, addr)
 	}
 
-	if v.IsSet(StateSyncIDsKey) {
-		stateSyncIDs = strings.Split(v.GetString(StateSyncIDsKey), ",")
-	}
 	for _, id := range stateSyncIDs {
 		if id == "" {
 			continue
@@ -519,6 +516,13 @@ func getStateSyncConfig(v *viper.Viper) (node.StateSyncConfig, error) {
 		}
 		config.StateSyncIDs = append(config.StateSyncIDs, nodeID)
 	}
+
+	lenIPs := len(config.StateSyncIPs)
+	lenIDs := len(config.StateSyncIDs)
+	if lenIPs != lenIDs {
+		return node.StateSyncConfig{}, fmt.Errorf("expected the number of stateSyncIPs (%d) to match the number of stateSyncIDs (%d)", lenIPs, lenIDs)
+	}
+
 	return config, nil
 }
 

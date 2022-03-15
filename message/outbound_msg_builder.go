@@ -506,7 +506,7 @@ func (b *outMsgBuilder) GetStateSummaryFrontier(
 			RequestID: requestID,
 			Deadline:  uint64(deadline),
 		},
-		GetStateSummaryFrontier.Compressible(), // GetStateSummaryFrontier messages can't be compressed
+		b.compress && GetStateSummaryFrontier.Compressible(), // GetStateSummaryFrontier messages may be compressed
 		false,
 	)
 }
@@ -542,7 +542,7 @@ func (b *outMsgBuilder) GetAcceptedStateSummary(
 			Deadline:         uint64(deadline),
 			MultiSummaryKeys: keys,
 		},
-		GetAcceptedStateSummary.Compressible(), // GetAcceptedStateSummary messages can't be compressed
+		b.compress && GetAcceptedStateSummary.Compressible(), // GetAcceptedStateSummary messages may be compressed
 		false,
 	)
 }
@@ -559,7 +559,7 @@ func (b *outMsgBuilder) AcceptedStateSummary(
 			RequestID:          requestID,
 			MultiSummaryHashes: hashes,
 		},
-		AcceptedStateSummary.Compressible(), // AcceptedStateSummary messages can't be compressed
+		b.compress && AcceptedStateSummary.Compressible(), // AcceptedStateSummary messages may be compressed
 		false,
 	)
 }
