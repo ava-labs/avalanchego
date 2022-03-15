@@ -45,7 +45,7 @@ type Info struct {
 
 type Parameters struct {
 	Version               version.Application
-	NodeID                ids.ShortID
+	NodeID                ids.NodeID
 	NetworkID             uint32
 	TxFee                 uint64
 	CreateAssetTxFee      uint64
@@ -203,9 +203,9 @@ type PeersReply struct {
 // Peers returns the list of current validators
 func (service *Info) Peers(_ *http.Request, args *PeersArgs, reply *PeersReply) error {
 	service.log.Debug("Info: Peers called")
-	nodeIDs := make([]ids.ShortID, 0, len(args.NodeIDs))
+	nodeIDs := make([]ids.NodeID, 0, len(args.NodeIDs))
 	for _, nodeID := range args.NodeIDs {
-		nID, err := ids.ShortFromPrefixedString(nodeID, constants.NodeIDPrefix)
+		nID, err := ids.NodeIDFromString(nodeID)
 		if err != nil {
 			return err
 		}
@@ -215,7 +215,7 @@ func (service *Info) Peers(_ *http.Request, args *PeersArgs, reply *PeersReply) 
 	peers := service.networking.PeerInfo(nodeIDs)
 	peerInfo := make([]Peer, len(peers))
 	for i, peer := range peers {
-		nodeID, err := ids.ShortFromPrefixedString(peer.ID, constants.NodeIDPrefix)
+		nodeID, err := ids.NodeIDFromString(peer.ID)
 		if err != nil {
 			return err
 		}

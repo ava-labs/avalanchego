@@ -110,7 +110,7 @@ type BootstrapConfig struct {
 	// ancestors while responding to a GetAncestors message
 	BootstrapMaxTimeGetAncestors time.Duration `json:"bootstrapMaxTimeGetAncestors"`
 
-	BootstrapIDs []ids.ShortID  `json:"bootstrapIDs"`
+	BootstrapIDs []ids.NodeID   `json:"bootstrapIDs"`
 	BootstrapIPs []utils.IPDesc `json:"bootstrapIPs"`
 }
 

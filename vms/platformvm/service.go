@@ -660,9 +660,9 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	vdrToDelegators := map[string][]APIPrimaryDelegator{}
 
 	// Create set of nodeIDs
-	nodeIDs := ids.ShortSet{}
+	nodeIDs := ids.NodeIDSet{}
 	for _, nodeID := range args.NodeIDs {
-		nID, err := ids.ShortFromPrefixedString(nodeID, constants.NodeIDPrefix)
+		nID, err := ids.NodeIDFromString(nodeID)
 		if err != nil {
 			return err
 		}
@@ -711,7 +711,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 					StartTime:   json.Uint64(staker.StartTime().Unix()),
 					EndTime:     json.Uint64(staker.EndTime().Unix()),
 					StakeAmount: &weight,
-					NodeID:      staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
+					NodeID:      staker.Validator.ID().String(),
 				},
 				RewardOwner:     rewardOwner,
 				PotentialReward: &potentialReward,
@@ -757,7 +757,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			reply.Validators = append(reply.Validators, APIPrimaryValidator{
 				APIStaker: APIStaker{
 					TxID:        tx.ID(),
-					NodeID:      nodeID.PrefixedString(constants.NodeIDPrefix),
+					NodeID:      nodeID.String(),
 					StartTime:   json.Uint64(startTime.Unix()),
 					EndTime:     json.Uint64(staker.EndTime().Unix()),
 					StakeAmount: &weight,
@@ -779,7 +779,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			weight := json.Uint64(staker.Validator.Weight())
 			reply.Validators = append(reply.Validators, APIStaker{
 				TxID:      tx.ID(),
-				NodeID:    staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
+				NodeID:    staker.Validator.ID().String(),
 				StartTime: json.Uint64(staker.StartTime().Unix()),
 				EndTime:   json.Uint64(staker.EndTime().Unix()),
 				Weight:    &weight,
@@ -1008,7 +1008,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 	}
 
 	// Parse the node ID
-	var nodeID ids.ShortID
+	var nodeID ids.NodeID
 	if args.NodeID == "" {
 		nodeID = service.vm.ctx.NodeID // If omitted, use this node's ID
 	} else {
@@ -1115,7 +1115,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 	}
 
 	// Parse the node ID
-	var nodeID ids.ShortID
+	var nodeID ids.NodeID
 	if args.NodeID == "" { // If ID unspecified, use this node's ID
 		nodeID = service.vm.ctx.NodeID
 	} else {

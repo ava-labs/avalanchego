@@ -41,7 +41,7 @@ type Parser interface {
 
 	// Parse reads given bytes as InboundMessage
 	// Overrides client specified deadline in a message to maxDeadlineDuration
-	Parse(bytes []byte, nodeID ids.ShortID, onFinishedHandling func()) (InboundMessage, error)
+	Parse(bytes []byte, nodeID ids.NodeID, onFinishedHandling func()) (InboundMessage, error)
 }
 
 type Codec interface {
@@ -179,7 +179,7 @@ func (c *codec) Pack(
 // Parse attempts to convert bytes into a message.
 // The first byte of the message is the opcode of the message.
 // Overrides client specified deadline in a message to maxDeadlineDuration
-func (c *codec) Parse(bytes []byte, nodeID ids.ShortID, onFinishedHandling func()) (InboundMessage, error) {
+func (c *codec) Parse(bytes []byte, nodeID ids.NodeID, onFinishedHandling func()) (InboundMessage, error) {
 	p := wrappers.Packer{Bytes: bytes}
 
 	// Unpack the op code (message type)

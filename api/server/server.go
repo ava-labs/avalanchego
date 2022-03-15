@@ -67,7 +67,7 @@ type Server interface {
 		port uint16,
 		allowedOrigins []string,
 		shutdownTimeout time.Duration,
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 		wrappers ...Wrapper)
 	// Dispatch starts the API server
 	Dispatch() error
@@ -123,7 +123,7 @@ func (s *server) Initialize(
 	port uint16,
 	allowedOrigins []string,
 	shutdownTimeout time.Duration,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 	wrappers ...Wrapper,
 ) {
 	s.log = log
@@ -143,7 +143,7 @@ func (s *server) Initialize(
 	s.handler = http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			// Attach this node's ID as a header
-			w.Header().Set("node-id", nodeID.PrefixedString(constants.NodeIDPrefix))
+			w.Header().Set("node-id", nodeID.String())
 			gzipHandler.ServeHTTP(w, r)
 		},
 	)

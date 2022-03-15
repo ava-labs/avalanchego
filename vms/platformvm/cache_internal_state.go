@@ -79,7 +79,7 @@ type InternalState interface {
 
 	AddCurrentStaker(tx *Tx, potentialReward uint64)
 	DeleteCurrentStaker(tx *Tx)
-	GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.ShortID]*ValidatorWeightDiff, error)
+	GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error)
 
 	AddPendingStaker(tx *Tx)
 	DeletePendingStaker(tx *Tx)
@@ -162,8 +162,8 @@ type internalStateImpl struct {
 	deletedCurrentStakers []*Tx
 	addedPendingStakers   []*Tx
 	deletedPendingStakers []*Tx
-	uptimes               map[ids.ShortID]*currentValidatorState // nodeID -> uptimes
-	updatedUptimes        map[ids.ShortID]struct{}               // nodeID -> nil
+	uptimes               map[ids.NodeID]*currentValidatorState // nodeID -> uptimes
+	updatedUptimes        map[ids.NodeID]struct{}               // nodeID -> nil
 
 	validatorsDB                 database.Database
 	currentValidatorsDB          database.Database
@@ -261,8 +261,8 @@ func newInternalStateDatabases(vm *VM, db database.Database) *internalStateImpl 
 
 		baseDB: baseDB,
 
-		uptimes:        make(map[ids.ShortID]*currentValidatorState),
-		updatedUptimes: make(map[ids.ShortID]struct{}),
+		uptimes:        make(map[ids.NodeID]*currentValidatorState),
+		updatedUptimes: make(map[ids.NodeID]struct{}),
 
 		validatorsDB:                 validatorsDB,
 		currentValidatorsDB:          currentValidatorsDB,
@@ -693,7 +693,7 @@ func (st *internalStateImpl) SetPendingStakerChainState(ps pendingStakerChainSta
 	st.pendingStakerChainState = ps
 }
 
-func (st *internalStateImpl) GetUptime(nodeID ids.ShortID) (upDuration time.Duration, lastUpdated time.Time, err error) {
+func (st *internalStateImpl) GetUptime(nodeID ids.NodeID) (upDuration time.Duration, lastUpdated time.Time, err error) {
 	uptime, exists := st.uptimes[nodeID]
 	if !exists {
 		return 0, time.Time{}, database.ErrNotFound
@@ -701,7 +701,7 @@ func (st *internalStateImpl) GetUptime(nodeID ids.ShortID) (upDuration time.Dura
 	return uptime.UpDuration, uptime.lastUpdated, nil
 }
 
-func (st *internalStateImpl) SetUptime(nodeID ids.ShortID, upDuration time.Duration, lastUpdated time.Time) error {
+func (st *internalStateImpl) SetUptime(nodeID ids.NodeID, upDuration time.Duration, lastUpdated time.Time) error {
 	uptime, exists := st.uptimes[nodeID]
 	if !exists {
 		return database.ErrNotFound
@@ -712,7 +712,7 @@ func (st *internalStateImpl) SetUptime(nodeID ids.ShortID, upDuration time.Durat
 	return nil
 }
 
-func (st *internalStateImpl) GetStartTime(nodeID ids.ShortID) (time.Time, error) {
+func (st *internalStateImpl) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 	currentValidator, err := st.currentStakerChainState.GetValidator(nodeID)
 	if err != nil {
 		return time.Time{}, err
@@ -863,14 +863,14 @@ type currentValidatorState struct {
 }
 
 func (st *internalStateImpl) writeCurrentStakers() error {
-	weightDiffs := make(map[ids.ID]map[ids.ShortID]*ValidatorWeightDiff) // subnetID -> nodeID -> weightDiff
+	weightDiffs := make(map[ids.ID]map[ids.NodeID]*ValidatorWeightDiff) // subnetID -> nodeID -> weightDiff
 	for _, currentStaker := range st.addedCurrentStakers {
 		txID := currentStaker.addStakerTx.ID()
 		potentialReward := currentStaker.potentialReward
 
 		var (
 			subnetID ids.ID
-			nodeID   ids.ShortID
+			nodeID   ids.NodeID
 			weight   uint64
 		)
 		switch tx := currentStaker.addStakerTx.UnsignedTx.(type) {
@@ -920,7 +920,7 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 
 		subnetDiffs, ok := weightDiffs[subnetID]
 		if !ok {
-			subnetDiffs = make(map[ids.ShortID]*ValidatorWeightDiff)
+			subnetDiffs = make(map[ids.NodeID]*ValidatorWeightDiff)
 			weightDiffs[subnetID] = subnetDiffs
 		}
 
@@ -942,7 +942,7 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 		var (
 			db       database.KeyValueDeleter
 			subnetID ids.ID
-			nodeID   ids.ShortID
+			nodeID   ids.NodeID
 			weight   uint64
 		)
 		switch tx := tx.UnsignedTx.(type) {
@@ -1287,7 +1287,7 @@ func (st *internalStateImpl) loadSingletons() error {
 
 func (st *internalStateImpl) loadCurrentValidators() error {
 	cs := &currentStakerChainStateImpl{
-		validatorsByNodeID: make(map[ids.ShortID]*currentValidatorImpl),
+		validatorsByNodeID: make(map[ids.NodeID]*currentValidatorImpl),
 		validatorsByTxID:   make(map[ids.ID]*validatorReward),
 	}
 

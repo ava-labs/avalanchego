@@ -121,7 +121,7 @@ func (s *Sender) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, requestID uint32)
 	}
 }
 
-func (s *Sender) SendAcceptedFrontier(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
+func (s *Sender) SendAcceptedFrontier(nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
 	// Sending this message to myself.
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundAcceptedFrontier(s.ctx.ChainID, requestID, containerIDs, nodeID)
@@ -208,7 +208,7 @@ func (s *Sender) SendGetAccepted(nodeIDs ids.ShortSet, requestID uint32, contain
 	}
 }
 
-func (s *Sender) SendAccepted(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
+func (s *Sender) SendAccepted(nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundAccepted(s.ctx.ChainID, requestID, containerIDs, nodeID)
 		go s.router.HandleInbound(inMsg)
@@ -241,7 +241,7 @@ func (s *Sender) SendAccepted(nodeID ids.ShortID, requestID uint32, containerIDs
 	}
 }
 
-func (s *Sender) SendGetAncestors(nodeID ids.ShortID, requestID uint32, containerID ids.ID) {
+func (s *Sender) SendGetAncestors(nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
 	s.ctx.Log.Verbo(
 		"Sending GetAncestors to node %s. RequestID: %d. ContainerID: %s",
 		nodeID.PrefixedString(constants.NodeIDPrefix),
@@ -302,7 +302,7 @@ func (s *Sender) SendGetAncestors(nodeID ids.ShortID, requestID uint32, containe
 // SendAncestors sends an Ancestors message to the consensus engine running on the specified chain
 // on the specified node.
 // The Ancestors message gives the recipient the contents of several containers.
-func (s *Sender) SendAncestors(nodeID ids.ShortID, requestID uint32, containers [][]byte) {
+func (s *Sender) SendAncestors(nodeID ids.NodeID, requestID uint32, containers [][]byte) {
 	s.ctx.Log.Verbo("Sending Ancestors to node %s. RequestID: %d. NumContainers: %d", nodeID, requestID, len(containers))
 
 	// Create the outbound message.
@@ -333,7 +333,7 @@ func (s *Sender) SendAncestors(nodeID ids.ShortID, requestID uint32, containers 
 // chain to the specified node. The Get message signifies that this
 // consensus engine would like the recipient to send this consensus engine the
 // specified container.
-func (s *Sender) SendGet(nodeID ids.ShortID, requestID uint32, containerID ids.ID) {
+func (s *Sender) SendGet(nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
 	s.ctx.Log.Verbo(
 		"Sending Get to node %s. RequestID: %d. ContainerID: %s",
 		nodeID.PrefixedString(constants.NodeIDPrefix),
@@ -391,7 +391,7 @@ func (s *Sender) SendGet(nodeID ids.ShortID, requestID uint32, containerID ids.I
 // on the specified node.
 // The Put message signifies that this consensus engine is giving to the recipient
 // the contents of the specified container.
-func (s *Sender) SendPut(nodeID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) {
+func (s *Sender) SendPut(nodeID ids.NodeID, requestID uint32, containerID ids.ID, container []byte) {
 	s.ctx.Log.Verbo(
 		"Sending Put to node %s. RequestID: %d. ContainerID: %s",
 		nodeID.PrefixedString(constants.NodeIDPrefix),
@@ -584,7 +584,7 @@ func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, container
 }
 
 // SendChits sends chits
-func (s *Sender) SendChits(nodeID ids.ShortID, requestID uint32, votes []ids.ID) {
+func (s *Sender) SendChits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) {
 	s.ctx.Log.Verbo(
 		"Sending Chits to node %s. RequestID: %d. Votes: %s",
 		nodeID.PrefixedString(constants.NodeIDPrefix),
@@ -709,7 +709,7 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 
 // SendAppResponse sends a response to an application-level request from the
 // given node
-func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte) error {
+func (s *Sender) SendAppResponse(nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundAppResponse(s.ctx.ChainID, requestID, appResponseBytes, nodeID)
 		go s.router.HandleInbound(inMsg)

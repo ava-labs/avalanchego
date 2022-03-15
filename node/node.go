@@ -88,7 +88,7 @@ type Node struct {
 
 	// This node's unique ID used when communicating with other nodes
 	// (in consensus, for example)
-	ID ids.ShortID
+	ID ids.NodeID
 
 	// Storage for this node
 	DBManager manager.Manager
@@ -232,7 +232,7 @@ func (n *Node) initNetworking() error {
 		timer := timer.NewTimer(func() {
 			// If the timeout fires and we're already shutting down, nothing to do.
 			if !n.shuttingDown.GetValue() {
-				n.Log.Debug("node %s failed to connect to bootstrap nodes %s in time", n.ID.PrefixedString(constants.NodeIDPrefix), n.beacons)
+				n.Log.Debug("node %s failed to connect to bootstrap nodes %s in time", n.ID, n.beacons)
 				n.Log.Fatal("Failed to connect to bootstrap nodes. Node shutting down...")
 				go n.Shutdown(1)
 			}
@@ -282,12 +282,12 @@ type insecureValidatorManager struct {
 	weight uint64
 }
 
-func (i *insecureValidatorManager) Connected(vdrID ids.ShortID, nodeVersion version.Application) {
+func (i *insecureValidatorManager) Connected(vdrID ids.NodeID, nodeVersion version.Application) {
 	_ = i.vdrs.AddWeight(vdrID, i.weight)
 	i.Router.Connected(vdrID, nodeVersion)
 }
 
-func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) {
+func (i *insecureValidatorManager) Disconnected(vdrID ids.NodeID) {
 	// Shouldn't error unless the set previously had an error, which should
 	// never happen as described above
 	_ = i.vdrs.RemoveWeight(vdrID, i.weight)
@@ -302,7 +302,7 @@ type beaconManager struct {
 	totalWeight    uint64
 }
 
-func (b *beaconManager) Connected(vdrID ids.ShortID, nodeVersion version.Application) {
+func (b *beaconManager) Connected(vdrID ids.NodeID, nodeVersion version.Application) {
 	// TODO: this is always 1, beacons can be reduced to ShortSet?
 	weight, ok := b.beacons.GetWeight(vdrID)
 	if !ok {
@@ -322,7 +322,7 @@ func (b *beaconManager) Connected(vdrID ids.ShortID, nodeVersion version.Applica
 	b.Router.Connected(vdrID, nodeVersion)
 }
 
-func (b *beaconManager) Disconnected(vdrID ids.ShortID) {
+func (b *beaconManager) Disconnected(vdrID ids.NodeID) {
 	if weight, ok := b.beacons.GetWeight(vdrID); ok {
 		// TODO: Account for weight changes in a more robust manner.
 
@@ -1072,7 +1072,7 @@ func (n *Node) Initialize(
 	n.LogFactory = logFactory
 	n.DoneShuttingDown.Add(1)
 	n.Log.Info("node version is: %s", version.CurrentApp)
-	n.Log.Info("node ID is: %s", n.ID.PrefixedString(constants.NodeIDPrefix))
+	n.Log.Info("node ID is: %s", n.ID)
 	n.Log.Info("current database version: %s", dbManager.Current().Version)
 
 	httpLog, err := logFactory.Make("http")

@@ -41,7 +41,7 @@ func (c *Client) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, request 
 	return err
 }
 
-func (c *Client) SendAppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+func (c *Client) SendAppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
 	_, err := c.client.SendAppResponse(
 		context.Background(),
 		&appsenderproto.SendAppResponseMsg{

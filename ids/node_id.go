@@ -12,6 +12,8 @@ const NodeIDPrefix = "NodeID-"
 
 type NodeID ShortID
 
+var EmptyNodeID = NodeID{}
+
 func (id NodeID) String() string {
 	return ShortID(id).PrefixedString(NodeIDPrefix)
 }
@@ -40,6 +42,15 @@ func (id *NodeID) UnmarshalJSON(b []byte) error {
 	var err error
 	*id, err = NodeIDFromString(str[1:lastIndex])
 	return err
+}
+
+// ToNodeID attempt to convert a byte slice into a node id
+func ToNodeID(bytes []byte) (NodeID, error) {
+	nodeID, err := ToShortID(bytes)
+	if err != nil {
+		return NodeID{}, nil
+	}
+	return NodeID(nodeID), nil
 }
 
 type sortNodeIDData []NodeID

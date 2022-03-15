@@ -32,7 +32,7 @@ var _ Handler = &handler{}
 type Handler interface {
 	common.Timer
 	Context() *snow.ConsensusContext
-	IsValidator(nodeID ids.ShortID) bool
+	IsValidator(nodeID ids.NodeID) bool
 	SetBootstrapper(engine common.BootstrapableEngine)
 	Bootstrapper() common.BootstrapableEngine
 	SetConsensus(engine common.Engine)
@@ -131,7 +131,7 @@ func New(
 
 func (h *handler) Context() *snow.ConsensusContext { return h.ctx }
 
-func (h *handler) IsValidator(nodeID ids.ShortID) bool {
+func (h *handler) IsValidator(nodeID ids.NodeID) bool {
 	return !h.ctx.IsValidatorOnly() ||
 		nodeID == h.ctx.NodeID ||
 		h.validators.Contains(nodeID)

@@ -313,7 +313,7 @@ func (mr *MockInternalStateMockRecorder) GetRewardUTXOs(txID interface{}) *gomoc
 }
 
 // GetStartTime mocks base method.
-func (m *MockInternalState) GetStartTime(nodeID ids.ShortID) (time.Time, error) {
+func (m *MockInternalState) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetStartTime", nodeID)
 	ret0, _ := ret[0].(time.Time)
@@ -388,7 +388,7 @@ func (mr *MockInternalStateMockRecorder) GetUTXO(utxoID interface{}) *gomock.Cal
 }
 
 // GetUptime mocks base method.
-func (m *MockInternalState) GetUptime(nodeID ids.ShortID) (time.Duration, time.Time, error) {
+func (m *MockInternalState) GetUptime(nodeID ids.NodeID) (time.Duration, time.Time, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetUptime", nodeID)
 	ret0, _ := ret[0].(time.Duration)
@@ -505,7 +505,7 @@ func (mr *MockInternalStateMockRecorder) SetTimestamp(arg0 interface{}) *gomock.
 }
 
 // SetUptime mocks base method.
-func (m *MockInternalState) SetUptime(nodeID ids.ShortID, upDuration time.Duration, lastUpdated time.Time) error {
+func (m *MockInternalState) SetUptime(nodeID ids.NodeID, upDuration time.Duration, lastUpdated time.Time) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetUptime", nodeID, upDuration, lastUpdated)
 	ret0, _ := ret[0].(error)

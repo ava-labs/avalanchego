@@ -65,7 +65,7 @@ func (_m *Engine) Ancestors(validatorID ids.ShortID, requestID uint32, container
 }
 
 // AppGossip provides a mock function with given fields: nodeID, msg
-func (_m *Engine) AppGossip(nodeID ids.ShortID, msg []byte) error {
+func (_m *Engine) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	ret := _m.Called(nodeID, msg)
 
 	var r0 error
@@ -79,7 +79,7 @@ func (_m *Engine) AppGossip(nodeID ids.ShortID, msg []byte) error {
 }
 
 // AppRequest provides a mock function with given fields: nodeID, requestID, deadline, request
-func (_m *Engine) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
+func (_m *Engine) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	ret := _m.Called(nodeID, requestID, deadline, request)
 
 	var r0 error
@@ -93,7 +93,7 @@ func (_m *Engine) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time
 }
 
 // AppRequestFailed provides a mock function with given fields: nodeID, requestID
-func (_m *Engine) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+func (_m *Engine) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
 	ret := _m.Called(nodeID, requestID)
 
 	var r0 error
@@ -107,7 +107,7 @@ func (_m *Engine) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 }
 
 // AppResponse provides a mock function with given fields: nodeID, requestID, response
-func (_m *Engine) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+func (_m *Engine) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
 	ret := _m.Called(nodeID, requestID, response)
 
 	var r0 error

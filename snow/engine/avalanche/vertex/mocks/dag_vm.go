@@ -25,7 +25,7 @@ type DAGVM struct {
 }
 
 // AppGossip provides a mock function with given fields: nodeID, msg
-func (_m *DAGVM) AppGossip(nodeID ids.ShortID, msg []byte) error {
+func (_m *DAGVM) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	ret := _m.Called(nodeID, msg)
 
 	var r0 error
@@ -39,7 +39,7 @@ func (_m *DAGVM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 }
 
 // AppRequest provides a mock function with given fields: nodeID, requestID, deadline, request
-func (_m *DAGVM) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
+func (_m *DAGVM) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	ret := _m.Called(nodeID, requestID, deadline, request)
 
 	var r0 error
@@ -53,7 +53,7 @@ func (_m *DAGVM) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.
 }
 
 // AppRequestFailed provides a mock function with given fields: nodeID, requestID
-func (_m *DAGVM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+func (_m *DAGVM) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
 	ret := _m.Called(nodeID, requestID)
 
 	var r0 error
@@ -67,7 +67,7 @@ func (_m *DAGVM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 }
 
 // AppResponse provides a mock function with given fields: nodeID, requestID, response
-func (_m *DAGVM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+func (_m *DAGVM) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
 	ret := _m.Called(nodeID, requestID, response)
 
 	var r0 error

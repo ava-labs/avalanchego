@@ -74,12 +74,12 @@ type Network interface {
 
 	// Attempt to connect to this IP. The network will never stop attempting to
 	// connect to this IP.
-	ManuallyTrack(nodeID ids.ShortID, ip utils.IPDesc)
+	ManuallyTrack(nodeID ids.NodeID, ip utils.IPDesc)
 
 	// PeerInfo returns information about peers. If [nodeIDs] is empty, returns
 	// info about all peers that have finished the handshake. Otherwise, returns
 	// info about the peers in [nodeIDs] that have finished the handshake.
-	PeerInfo(nodeIDs []ids.ShortID) []peer.Info
+	PeerInfo(nodeIDs []ids.NodeID) []peer.Info
 
 	NodeUptime() (UptimeResult, bool)
 }
@@ -119,7 +119,7 @@ type network struct {
 	// connect to. An entry is added to this set when we first start attempting
 	// to connect to the peer. An entry is deleted from this set once we have
 	// finished the handshake.
-	trackedIPs      map[ids.ShortID]*trackedIP
+	trackedIPs      map[ids.NodeID]*trackedIP
 	connectingPeers peer.Set
 	connectedPeers  peer.Set
 	closing         bool
@@ -225,7 +225,7 @@ func NewNetwork(
 			time.Now(),
 		)),
 
-		trackedIPs:      make(map[ids.ShortID]*trackedIP),
+		trackedIPs:      make(map[ids.NodeID]*trackedIP),
 		connectingPeers: peer.NewSet(),
 		connectedPeers:  peer.NewSet(),
 		router:          router,
@@ -234,7 +234,7 @@ func NewNetwork(
 	return n, nil
 }
 
-func (n *network) Send(msg message.OutboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) ids.ShortSet {
+func (n *network) Send(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, subnetID ids.ID, validatorOnly bool) ids.NodeIDSet {
 	peers := n.getPeers(nodeIDs, subnetID, validatorOnly)
 	n.peerConfig.Metrics.MultipleSendsFailed(
 		msg.Op(),
@@ -249,7 +249,7 @@ func (n *network) Gossip(
 	validatorOnly bool,
 	numValidatorsToSend int,
 	numNonValidatorsToSend int,
-) ids.ShortSet {
+) ids.NodeIDSet {
 	peers := n.samplePeers(subnetID, validatorOnly, numValidatorsToSend, numNonValidatorsToSend)
 	return n.send(msg, peers)
 }
@@ -318,7 +318,7 @@ func (n *network) HealthCheck() (interface{}, error) {
 
 // Connected is called after the peer finishes the handshake.
 // Will not be called after [Disconnected] is called with this peer.
-func (n *network) Connected(nodeID ids.ShortID) {
+func (n *network) Connected(nodeID ids.NodeID) {
 	n.peersLock.Lock()
 	peer, ok := n.connectingPeers.GetByID(nodeID)
 	if !ok {
@@ -350,7 +350,7 @@ func (n *network) Connected(nodeID ids.ShortID) {
 // provided nodeID. If the node is attempting to connect to the minimum number
 // of peers, then it should only connect if this node is a validator, or the
 // peer is a validator/beacon.
-func (n *network) AllowConnection(nodeID ids.ShortID) bool {
+func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 	return !n.config.RequireValidatorToConnect ||
 		n.config.Validators.Contains(constants.PrimaryNetworkID, n.config.MyNodeID) ||
 		n.WantsConnection(nodeID)
@@ -404,7 +404,7 @@ func (n *network) Track(ip utils.IPCertDesc) {
 // It is guaranteed that [Connected] will not be called with [nodeID] after this
 // call. Note that this is from the perspective of a single peer object, because
 // a peer with the same ID can reconnect to this network instance.
-func (n *network) Disconnected(nodeID ids.ShortID) {
+func (n *network) Disconnected(nodeID ids.NodeID) {
 	n.peersLock.RLock()
 	_, connecting := n.connectingPeers.GetByID(nodeID)
 	peer, connected := n.connectedPeers.GetByID(nodeID)
@@ -439,7 +439,7 @@ func (n *network) Peers() (message.OutboundMessage, error) {
 	return n.peerConfig.MessageCreator.PeerList(peers, true)
 }
 
-func (n *network) Pong(nodeID ids.ShortID) (message.OutboundMessage, error) {
+func (n *network) Pong(nodeID ids.NodeID) (message.OutboundMessage, error) {
 	uptimePercentFloat, err := n.config.UptimeCalculator.CalculateUptimePercent(nodeID)
 	if err != nil {
 		uptimePercentFloat = 0
@@ -514,12 +514,12 @@ func (n *network) Dispatch() error {
 	return errs.Err
 }
 
-func (n *network) WantsConnection(nodeID ids.ShortID) bool {
+func (n *network) WantsConnection(nodeID ids.NodeID) bool {
 	return n.config.Validators.Contains(constants.PrimaryNetworkID, nodeID) ||
 		n.config.Beacons.Contains(nodeID)
 }
 
-func (n *network) ManuallyTrack(nodeID ids.ShortID, ip utils.IPDesc) {
+func (n *network) ManuallyTrack(nodeID ids.NodeID, ip utils.IPDesc) {
 	n.peersLock.Lock()
 	defer n.peersLock.Unlock()
 
@@ -575,7 +575,7 @@ func (n *network) sampleValidatorIPs() []utils.IPCertDesc {
 // - [validatorOnly] is the flag to drop any nodes from [nodeIDs] that are not
 //   validators in [subnetID].
 func (n *network) getPeers(
-	nodeIDs ids.ShortSet,
+	nodeIDs ids.NodeIDSet,
 	subnetID ids.ID,
 	validatorOnly bool,
 ) []peer.Peer {
@@ -638,8 +638,8 @@ func (n *network) samplePeers(
 // send takes ownership of the provided message reference. So, the provided
 // message should only be inspected if the reference has been externally
 // increased.
-func (n *network) send(msg message.OutboundMessage, peers []peer.Peer) ids.ShortSet {
-	sentTo := ids.NewShortSet(len(peers))
+func (n *network) send(msg message.OutboundMessage, peers []peer.Peer) ids.NodeIDSet {
+	sentTo := ids.NewNodeIDSet(len(peers))
 	now := n.peerConfig.Clock.Time()
 
 	// send to peer and update metrics
@@ -665,7 +665,7 @@ func (n *network) send(msg message.OutboundMessage, peers []peer.Peer) ids.Short
 	return sentTo
 }
 
-func (n *network) disconnectedFromConnecting(nodeID ids.ShortID) {
+func (n *network) disconnectedFromConnecting(nodeID ids.NodeID) {
 	n.peersLock.Lock()
 	defer n.peersLock.Unlock()
 
@@ -687,7 +687,7 @@ func (n *network) disconnectedFromConnecting(nodeID ids.ShortID) {
 	n.metrics.disconnected.Inc()
 }
 
-func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.ShortID) {
+func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
 	n.router.Disconnected(nodeID)
 
 	n.peersLock.Lock()
@@ -727,7 +727,7 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.ShortID) 
 // If initiating a connection to [ip] fails, then dial will reattempt. However,
 // there is a randomized exponential backoff to avoid spamming connection
 // attempts.
-func (n *network) dial(nodeID ids.ShortID, ip *trackedIP) {
+func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 	go func() {
 		n.metrics.numTracked.Inc()
 		defer n.metrics.numTracked.Dec()
@@ -899,7 +899,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 	return nil
 }
 
-func (n *network) PeerInfo(nodeIDs []ids.ShortID) []peer.Info {
+func (n *network) PeerInfo(nodeIDs []ids.NodeID) []peer.Info {
 	n.peersLock.RLock()
 	defer n.peersLock.RUnlock()
 

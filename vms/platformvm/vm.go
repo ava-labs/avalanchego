@@ -297,7 +297,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 	}
 	primaryValidators := primaryValidatorSet.List()
 
-	validatorIDs := make([]ids.ShortID, len(primaryValidators))
+	validatorIDs := make([]ids.NodeID, len(primaryValidators))
 	for i, vdr := range primaryValidators {
 		validatorIDs[i] = vdr.ID()
 	}
@@ -334,7 +334,7 @@ func (vm *VM) Shutdown() error {
 		}
 		primaryValidators := primaryValidatorSet.List()
 
-		validatorIDs := make([]ids.ShortID, len(primaryValidators))
+		validatorIDs := make([]ids.NodeID, len(primaryValidators))
 		for i, vdr := range primaryValidators {
 			validatorIDs[i] = vdr.ID()
 		}
@@ -449,11 +449,11 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	}, nil
 }
 
-func (vm *VM) Connected(vdrID ids.ShortID, _ version.Application) error {
+func (vm *VM) Connected(vdrID ids.NodeID, _ version.Application) error {
 	return vm.uptimeManager.Connect(vdrID)
 }
 
-func (vm *VM) Disconnected(vdrID ids.ShortID) error {
+func (vm *VM) Disconnected(vdrID ids.NodeID) error {
 	if err := vm.uptimeManager.Disconnect(vdrID); err != nil {
 		return err
 	}
@@ -498,7 +498,7 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]u
 	}
 	currentValidatorList := currentValidators.List()
 
-	vdrSet := make(map[ids.ShortID]uint64, len(currentValidatorList))
+	vdrSet := make(map[ids.NodeID]uint64, len(currentValidatorList))
 	for _, vdr := range currentValidatorList {
 		vdrSet[vdr.ID()] = vdr.Weight()
 	}

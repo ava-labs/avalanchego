@@ -214,7 +214,7 @@ func (s *SenderTest) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appR
 // SendAppResponse calls SendAppResponseF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) SendAppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte) error {
+func (s *SenderTest) SendAppResponse(nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
 	switch {
 	case s.SendAppResponseF != nil:
 		return s.SendAppResponseF(nodeID, requestID, appResponseBytes)

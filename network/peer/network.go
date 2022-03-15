@@ -13,11 +13,11 @@ import (
 // connected p2p network.
 type Network interface {
 	// Connected is called by the peer once the handshake is finished.
-	Connected(ids.ShortID)
+	Connected(ids.NodeID)
 
 	// AllowConnection enables the network is signal to the peer that its
 	// connection is no longer desired and should be terminated.
-	AllowConnection(ids.ShortID) bool
+	AllowConnection(ids.NodeID) bool
 
 	// Track allows the peer to notify the network of a potential new peer to
 	// connect to.
@@ -27,7 +27,7 @@ type Network interface {
 	// guaranteed that [Connected] was called for the provided peer. However, it
 	// is guaranteed that [Connected] will not be called after [Disconnected]
 	// for a given [Peer] object.
-	Disconnected(ids.ShortID)
+	Disconnected(ids.NodeID)
 
 	// Version provides the peer with the Version message to send to the peer
 	// during the handshake.
@@ -39,5 +39,5 @@ type Network interface {
 
 	// Pong provides the peer with a Pong message to send to the peer in
 	// response to a Ping message.
-	Pong(ids.ShortID) (message.OutboundMessage, error)
+	Pong(ids.NodeID) (message.OutboundMessage, error)
 }

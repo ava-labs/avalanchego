@@ -35,7 +35,7 @@ func NewLockedCalculator() LockedCalculator {
 	return &lockedCalculator{}
 }
 
-func (c *lockedCalculator) CalculateUptime(nodeID ids.ShortID) (time.Duration, time.Time, error) {
+func (c *lockedCalculator) CalculateUptime(nodeID ids.NodeID) (time.Duration, time.Time, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -49,7 +49,7 @@ func (c *lockedCalculator) CalculateUptime(nodeID ids.ShortID) (time.Duration, t
 	return c.c.CalculateUptime(nodeID)
 }
 
-func (c *lockedCalculator) CalculateUptimePercent(nodeID ids.ShortID) (float64, error) {
+func (c *lockedCalculator) CalculateUptimePercent(nodeID ids.NodeID) (float64, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -63,7 +63,7 @@ func (c *lockedCalculator) CalculateUptimePercent(nodeID ids.ShortID) (float64, 
 	return c.c.CalculateUptimePercent(nodeID)
 }
 
-func (c *lockedCalculator) CalculateUptimePercentFrom(nodeID ids.ShortID, startTime time.Time) (float64, error) {
+func (c *lockedCalculator) CalculateUptimePercentFrom(nodeID ids.NodeID, startTime time.Time) (float64, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 

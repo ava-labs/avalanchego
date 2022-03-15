@@ -141,22 +141,22 @@ func NewNoOpAppHandler(log logging.Logger) AppHandler {
 	return &noOpAppHandler{log: log}
 }
 
-func (nop *noOpAppHandler) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
+func (nop *noOpAppHandler) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	nop.log.Debug("AppRequest(%s, %d) unhandled by this gear. Dropped.", nodeID, requestID)
 	return nil
 }
 
-func (nop *noOpAppHandler) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+func (nop *noOpAppHandler) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
 	nop.log.Debug("AppRequestFailed(%s, %d) unhandled by this gear. Dropped.", nodeID, requestID)
 	return nil
 }
 
-func (nop *noOpAppHandler) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+func (nop *noOpAppHandler) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
 	nop.log.Debug("AppResponse(%s, %d) unhandled by this gear. Dropped.", nodeID, requestID)
 	return nil
 }
 
-func (nop *noOpAppHandler) AppGossip(nodeID ids.ShortID, msg []byte) error {
+func (nop *noOpAppHandler) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	nop.log.Debug("AppGossip(%s) unhandled by this gear. Dropped.", nodeID)
 	return nil
 }

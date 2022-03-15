@@ -182,7 +182,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 			dialer,
 			&testHandler{
 				InboundHandler: handlers[i],
-				ConnectedF: func(nodeID ids.ShortID, _ version.Application) {
+				ConnectedF: func(nodeID ids.NodeID, _ version.Application) {
 					t.Logf("%s connected to %s", config.MyNodeID, nodeID)
 
 					globalLock.Lock()

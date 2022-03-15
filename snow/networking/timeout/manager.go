@@ -42,9 +42,9 @@ func (m *Manager) TimeoutDuration() time.Duration {
 	return m.tm.TimeoutDuration()
 }
 
-// IsBenched returns true if messages to [validatorID] regarding [chainID]
+// IsBenched returns true if messages to [nodeID] regarding [chainID]
 // should not be sent over the network and should immediately fail.
-func (m *Manager) IsBenched(validatorID ids.ShortID, chainID ids.ID) bool {
+func (m *Manager) IsBenched(nodeID ids.NodeID, chainID ids.ID) bool {
 	return m.benchlistMgr.IsBenched(validatorID, chainID)
 }
 
@@ -59,10 +59,10 @@ func (m *Manager) RegisterChain(ctx *snow.ConsensusContext) error {
 }
 
 // RegisterRequest notes that we expect a response of type [op] from
-// [validatorID] regarding chain [chainID]. If we don't receive a response in
+// [nodeID] regarding chain [chainID]. If we don't receive a response in
 // time, [timeoutHandler]  is executed.
 func (m *Manager) RegisterRequest(
-	validatorID ids.ShortID,
+	nodeID ids.NodeID,
 	chainID ids.ID,
 	op message.Op,
 	uniqueRequestID ids.ID,
@@ -70,16 +70,16 @@ func (m *Manager) RegisterRequest(
 ) (time.Time, bool) {
 	newTimeoutHandler := func() {
 		// If this request timed out, tell the benchlist manager
-		m.benchlistMgr.RegisterFailure(chainID, validatorID)
+		m.benchlistMgr.RegisterFailure(chainID, nodeID)
 		timeoutHandler()
 	}
 	return m.tm.Put(uniqueRequestID, op, newTimeoutHandler), true
 }
 
-// RegisterResponse registers that we received a response from [validatorID]
+// RegisterResponse registers that we received a response from [nodeID]
 // regarding the given request ID and chain.
 func (m *Manager) RegisterResponse(
-	validatorID ids.ShortID,
+	nodeID ids.NodeID,
 	chainID ids.ID,
 	uniqueRequestID ids.ID,
 	op message.Op,

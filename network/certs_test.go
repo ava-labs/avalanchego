@@ -19,7 +19,7 @@ var (
 	tlsConfigs []*tls.Config
 )
 
-func getTLS(t *testing.T, index int) (ids.ShortID, *tls.Certificate, *tls.Config) {
+func getTLS(t *testing.T, index int) (ids.NodeID, *tls.Certificate, *tls.Config) {
 	certLock.Lock()
 	defer certLock.Unlock()
 

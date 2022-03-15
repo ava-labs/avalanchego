@@ -115,7 +115,7 @@ func (i *issuer) Update() {
 
 	vdrBag := ids.ShortBag{} // Validators to sample repr. as a set
 	for _, vdr := range vdrs {
-		vdrBag.Add(vdr.ID())
+		vdrBag.Add(ids.ShortID(vdr.ID()))
 	}
 
 	vdrList := vdrBag.List()

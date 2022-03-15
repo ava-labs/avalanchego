@@ -15,7 +15,7 @@ type Calculator struct {
 }
 
 // CalculateUptime provides a mock function with given fields: nodeID
-func (_m *Calculator) CalculateUptime(nodeID ids.ShortID) (time.Duration, time.Time, error) {
+func (_m *Calculator) CalculateUptime(nodeID ids.NodeID) (time.Duration, time.Time, error) {
 	ret := _m.Called(nodeID)
 
 	var r0 time.Duration
@@ -43,7 +43,7 @@ func (_m *Calculator) CalculateUptime(nodeID ids.ShortID) (time.Duration, time.T
 }
 
 // CalculateUptimePercent provides a mock function with given fields: nodeID
-func (_m *Calculator) CalculateUptimePercent(nodeID ids.ShortID) (float64, error) {
+func (_m *Calculator) CalculateUptimePercent(nodeID ids.NodeID) (float64, error) {
 	ret := _m.Called(nodeID)
 
 	var r0 float64
@@ -64,7 +64,7 @@ func (_m *Calculator) CalculateUptimePercent(nodeID ids.ShortID) (float64, error
 }
 
 // CalculateUptimePercentFrom provides a mock function with given fields: nodeID, startTime
-func (_m *Calculator) CalculateUptimePercentFrom(nodeID ids.ShortID, startTime time.Time) (float64, error) {
+func (_m *Calculator) CalculateUptimePercentFrom(nodeID ids.NodeID, startTime time.Time) (float64, error) {
 	ret := _m.Called(nodeID, startTime)
 
 	var r0 float64

@@ -14,7 +14,7 @@ import (
 type convincer struct {
 	consensus avalanche.Consensus
 	sender    common.Sender
-	vdr       ids.ShortID
+	vdr       ids.NodeID
 	requestID uint32
 	sent      bool
 	abandoned bool

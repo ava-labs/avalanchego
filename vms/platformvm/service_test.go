@@ -332,7 +332,7 @@ func TestGetTx(t *testing.T) {
 					service.vm.MinValidatorStake,
 					uint64(service.vm.clock.Time().Add(syncBound).Unix()),
 					uint64(service.vm.clock.Time().Add(syncBound).Add(defaultMinStakingDuration).Unix()),
-					ids.GenerateTestShortID(),
+					ids.GenerateTestNodeID(),
 					ids.GenerateTestShortID(),
 					0,
 					[]*crypto.PrivateKeySECP256K1R{keys[0]},
@@ -530,7 +530,7 @@ func TestGetStake(t *testing.T) {
 
 	// Add a delegator
 	stakeAmt := service.vm.MinDelegatorStake + 12345
-	delegatorNodeID := keys[0].PublicKey().Address()
+	delegatorNodeID := ids.NodeID(keys[0].PublicKey().Address())
 	delegatorEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
 	tx, err := service.vm.newAddDelegatorTx(
 		stakeAmt,

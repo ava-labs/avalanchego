@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -27,7 +26,7 @@ type BandwidthThrottler interface {
 	// AddNode([nodeID], ...) must have been called since
 	// the last time RemoveNode([nodeID]) was called, if any.
 	// It's safe for multiple goroutines to concurrently call Acquire.
-	Acquire(msgSize uint64, nodeID ids.ShortID)
+	Acquire(msgSize uint64, nodeID ids.NodeID)
 
 	// Add a new node to this throttler.
 	// Must be called before Acquire(..., [nodeID]) is called.
@@ -37,14 +36,14 @@ type BandwidthThrottler interface {
 	// Its bandwidth allocation can hold up to [maxBurstSize] at a time.
 	// [maxBurstSize] must be at least the maximum message size.
 	// It's safe for multiple goroutines to concurrently call AddNode.
-	AddNode(nodeID ids.ShortID)
+	AddNode(nodeID ids.NodeID)
 
 	// Remove a node from this throttler.
 	// AddNode([nodeID], ...) must have been called since
 	// the last time RemoveNode([nodeID]) was called, if any.
 	// Must be called when we stop reading messages from [nodeID].
 	// It's safe for multiple goroutines to concurrently call RemoveNode.
-	RemoveNode(nodeID ids.ShortID)
+	RemoveNode(nodeID ids.NodeID)
 }
 
 type BandwidthThrottlerConfig struct {
@@ -64,7 +63,7 @@ func NewBandwidthThrottler(
 	t := &bandwidthThrottler{
 		BandwidthThrottlerConfig: config,
 		log:                      log,
-		limiters:                 make(map[ids.ShortID]*rate.Limiter),
+		limiters:                 make(map[ids.NodeID]*rate.Limiter),
 		metrics: bandwidthThrottlerMetrics{
 			acquireLatency: metric.NewAveragerWithErrs(
 				namespace,
@@ -96,11 +95,11 @@ type bandwidthThrottler struct {
 	lock    sync.RWMutex
 	// Node ID --> token bucket based rate limiter where each token
 	// is a byte of bandwidth.
-	limiters map[ids.ShortID]*rate.Limiter
+	limiters map[ids.NodeID]*rate.Limiter
 }
 
 // See BandwidthThrottler.
-func (t *bandwidthThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
+func (t *bandwidthThrottler) Acquire(msgSize uint64, nodeID ids.NodeID) {
 	startTime := time.Now()
 	defer func() {
 		t.metrics.acquireLatency.Observe(float64(time.Since(startTime)))
@@ -113,34 +112,34 @@ func (t *bandwidthThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 	t.lock.RUnlock()
 	if !ok {
 		// This should never happen. If it is, the caller is misusing this struct.
-		t.log.Debug("tried to acquire %d bytes for %s but that node isn't registered", msgSize, nodeID.PrefixedString(constants.NodeIDPrefix))
+		t.log.Debug("tried to acquire %d bytes for %s but that node isn't registered", msgSize, nodeID)
 		return
 	}
 	// TODO Allow cancellation using context?
 	if err := limiter.WaitN(context.TODO(), int(msgSize)); err != nil {
 		// This should never happen.
-		t.log.Warn("error while awaiting %d bytes for %s: %s", msgSize, nodeID.PrefixedString(constants.NodeIDPrefix), err)
+		t.log.Warn("error while awaiting %d bytes for %s: %s", msgSize, nodeID, err)
 	}
 }
 
 // See BandwidthThrottler.
-func (t *bandwidthThrottler) AddNode(nodeID ids.ShortID) {
+func (t *bandwidthThrottler) AddNode(nodeID ids.NodeID) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
 	if _, ok := t.limiters[nodeID]; ok {
-		t.log.Debug("tried to add %s but it's already registered", nodeID.PrefixedString(constants.NodeIDPrefix))
+		t.log.Debug("tried to add %s but it's already registered", nodeID)
 	}
 	t.limiters[nodeID] = rate.NewLimiter(rate.Limit(t.RefillRate), int(t.MaxBurstSize))
 }
 
 // See BandwidthThrottler.
-func (t *bandwidthThrottler) RemoveNode(nodeID ids.ShortID) {
+func (t *bandwidthThrottler) RemoveNode(nodeID ids.NodeID) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
 	if _, ok := t.limiters[nodeID]; !ok {
-		t.log.Debug("tried to remove %s but it isn't registered", nodeID.PrefixedString(constants.NodeIDPrefix))
+		t.log.Debug("tried to remove %s but it isn't registered", nodeID)
 	}
 	delete(t.limiters, nodeID)
 }

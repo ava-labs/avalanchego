@@ -37,7 +37,7 @@ var (
 // messages with a remote peer.
 type Peer interface {
 	// ID returns the nodeID of the remote peer.
-	ID() ids.ShortID
+	ID() ids.NodeID
 
 	// Cert returns the certificate that the remote peer is using to
 	// authenticate their messages.
@@ -108,7 +108,7 @@ type peer struct {
 	cert *x509.Certificate
 
 	// node ID of this peer.
-	id ids.ShortID
+	id ids.NodeID
 
 	// ip is the claimed IP the peer gave us in the Version message.
 	ip *SignedIP
@@ -172,7 +172,7 @@ func Start(
 	config *Config,
 	conn net.Conn,
 	cert *x509.Certificate,
-	id ids.ShortID,
+	id ids.NodeID,
 ) Peer {
 	p := &peer{
 		Config:            config,
@@ -199,7 +199,7 @@ func Start(
 	return p
 }
 
-func (p *peer) ID() ids.ShortID { return p.id }
+func (p *peer) ID() ids.NodeID { return p.id }
 
 func (p *peer) Cert() *x509.Certificate { return p.cert }
 
@@ -238,7 +238,7 @@ func (p *peer) Info() Info {
 	return Info{
 		IP:             p.conn.RemoteAddr().String(),
 		PublicIP:       publicIPStr,
-		ID:             p.id.PrefixedString(constants.NodeIDPrefix),
+		ID:             p.id.String(),
 		Version:        p.version.String(),
 		LastSent:       time.Unix(atomic.LoadInt64(&p.lastSent), 0),
 		LastReceived:   time.Unix(atomic.LoadInt64(&p.lastReceived), 0),

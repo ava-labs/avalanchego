@@ -80,7 +80,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	if err != nil {
 		return nil, err
 	}
-	nodeID, err := ids.ToShortID(req.NodeId)
+	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
@@ -448,7 +448,7 @@ func (vm *VMServer) Version(context.Context, *emptypb.Empty) (*vmproto.VersionRe
 }
 
 func (vm *VMServer) Connected(_ context.Context, req *vmproto.ConnectedRequest) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToShortID(req.NodeId)
+	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
@@ -462,7 +462,7 @@ func (vm *VMServer) Connected(_ context.Context, req *vmproto.ConnectedRequest) 
 }
 
 func (vm *VMServer) Disconnected(_ context.Context, req *vmproto.DisconnectedRequest) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToShortID(req.NodeId)
+	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
@@ -470,7 +470,7 @@ func (vm *VMServer) Disconnected(_ context.Context, req *vmproto.DisconnectedReq
 }
 
 func (vm *VMServer) AppRequest(_ context.Context, req *vmproto.AppRequestMsg) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToShortID(req.NodeId)
+	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
@@ -482,7 +482,7 @@ func (vm *VMServer) AppRequest(_ context.Context, req *vmproto.AppRequestMsg) (*
 }
 
 func (vm *VMServer) AppRequestFailed(_ context.Context, req *vmproto.AppRequestFailedMsg) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToShortID(req.NodeId)
+	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
@@ -490,7 +490,7 @@ func (vm *VMServer) AppRequestFailed(_ context.Context, req *vmproto.AppRequestF
 }
 
 func (vm *VMServer) AppResponse(_ context.Context, req *vmproto.AppResponseMsg) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToShortID(req.NodeId)
+	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
@@ -498,7 +498,7 @@ func (vm *VMServer) AppResponse(_ context.Context, req *vmproto.AppResponseMsg) 
 }
 
 func (vm *VMServer) AppGossip(_ context.Context, req *vmproto.AppGossipMsg) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToShortID(req.NodeId)
+	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}

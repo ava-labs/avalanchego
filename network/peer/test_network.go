@@ -27,13 +27,13 @@ type testNetwork struct {
 	uptime uint8
 }
 
-func (n *testNetwork) Connected(ids.ShortID) {}
+func (n *testNetwork) Connected(ids.NodeID) {}
 
-func (n *testNetwork) AllowConnection(ids.ShortID) bool { return true }
+func (n *testNetwork) AllowConnection(ids.NodeID) bool { return true }
 
 func (n *testNetwork) Track(utils.IPCertDesc) {}
 
-func (n *testNetwork) Disconnected(ids.ShortID) {}
+func (n *testNetwork) Disconnected(ids.NodeID) {}
 
 func (n *testNetwork) Version() (message.OutboundMessage, error) {
 	now := uint64(time.Now().Unix())
@@ -60,6 +60,6 @@ func (n *testNetwork) Peers() (message.OutboundMessage, error) {
 	return n.mc.PeerList(nil, true)
 }
 
-func (n *testNetwork) Pong(ids.ShortID) (message.OutboundMessage, error) {
+func (n *testNetwork) Pong(ids.NodeID) (message.OutboundMessage, error) {
 	return n.mc.Pong(n.uptime)
 }
