@@ -13,7 +13,7 @@ var (
 
 	errStateSyncEnabled        = errors.New("unexpectedly called StateSyncEnabled")
 	errStateSyncGetLastSummary = errors.New("unexpectedly called StateSyncGetLastSummary")
-	errStateSyncGetKeyHash     = errors.New("unexpectedly called StateSyncGetKeyHash")
+	errParseSummary            = errors.New("unexpectedly called ParseSummary")
 	errStateSyncGetSummary     = errors.New("unexpectedly called StateSyncGetSummary")
 	errStateSync               = errors.New("unexpectedly called StateSync")
 )
@@ -22,12 +22,12 @@ type TestStateSyncableVM struct {
 	T *testing.T
 
 	CantStateSyncEnabled, CantStateSyncGetLastSummary,
-	CantStateSyncGetKeyHash, CantStateSyncGetSummary,
+	CantParseSummary, CantStateSyncGetSummary,
 	CantStateSync bool
 
 	StateSyncEnabledF        func() (bool, error)
 	StateSyncGetLastSummaryF func() (Summary, error)
-	StateSyncGetKeyHashF     func(Summary) (SummaryKey, SummaryHash, error)
+	ParseSummaryF            func(summaryBytes []byte) (Summary, error)
 	StateSyncGetSummaryF     func(SummaryKey) (Summary, error)
 	StateSyncF               func([]Summary) error
 }
@@ -52,14 +52,14 @@ func (tss *TestStateSyncableVM) StateSyncGetLastSummary() (Summary, error) {
 	return nil, errStateSyncGetLastSummary
 }
 
-func (tss *TestStateSyncableVM) StateSyncGetKeyHash(summary Summary) (SummaryKey, SummaryHash, error) {
-	if tss.StateSyncGetKeyHashF != nil {
-		return tss.StateSyncGetKeyHashF(summary)
+func (tss *TestStateSyncableVM) ParseSummary(summaryBytes []byte) (Summary, error) {
+	if tss.ParseSummaryF != nil {
+		return tss.ParseSummaryF(summaryBytes)
 	}
-	if tss.CantStateSyncGetKeyHash && tss.T != nil {
-		tss.T.Fatalf("Unexpectedly called StateSyncGetKeyHash")
+	if tss.CantParseSummary && tss.T != nil {
+		tss.T.Fatalf("Unexpectedly called ParseSummary")
 	}
-	return nil, nil, errStateSyncGetKeyHash
+	return nil, errParseSummary
 }
 
 func (tss *TestStateSyncableVM) StateSyncGetSummary(key SummaryKey) (Summary, error) {

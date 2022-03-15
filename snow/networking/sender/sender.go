@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -316,7 +317,7 @@ func (s *Sender) SendStateSummaryFrontier(nodeID ids.ShortID, requestID uint32, 
 	}
 }
 
-func (s *Sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uint32, keys [][]byte) {
+func (s *Sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uint32, summKeys []common.SummaryKey) {
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -329,6 +330,9 @@ func (s *Sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uin
 	for nodeID := range nodeIDs {
 		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.AcceptedStateSummary)
 	}
+
+	keys := make([]uint64, len(summKeys))
+	encodeSummaryKeys(summKeys, keys)
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Asynchronously to avoid deadlock.
@@ -350,7 +354,7 @@ func (s *Sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uin
 			"failed to build GetAcceptedStateSummary(%s, %d, %s): %s",
 			s.ctx.ChainID,
 			requestID,
-			keys,
+			summKeys,
 			err,
 		)
 	}
@@ -362,27 +366,30 @@ func (s *Sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uin
 				nodeID,
 				s.ctx.ChainID,
 				requestID,
-				keys,
+				summKeys,
 			)
 		}
 	}
 }
 
-func (s *Sender) SendAcceptedStateSummary(nodeID ids.ShortID, requestID uint32, hashes [][]byte) {
+func (s *Sender) SendAcceptedStateSummary(nodeID ids.ShortID, requestID uint32, summaryIDs []common.SummaryHash) {
+	hashesBytes := make([][]byte, len(summaryIDs))
+	encodeSummaryIDs(summaryIDs, hashesBytes)
+
 	if nodeID == s.ctx.NodeID {
-		inMsg := s.msgCreator.InboundAcceptedStateSummary(s.ctx.ChainID, requestID, hashes, nodeID)
+		inMsg := s.msgCreator.InboundAcceptedStateSummary(s.ctx.ChainID, requestID, hashesBytes, nodeID)
 		go s.router.HandleInbound(inMsg)
 		return
 	}
 
 	// Create the outbound message.
-	outMsg, err := s.msgCreator.AcceptedStateSummary(s.ctx.ChainID, requestID, hashes)
+	outMsg, err := s.msgCreator.AcceptedStateSummary(s.ctx.ChainID, requestID, hashesBytes)
 	if err != nil {
 		s.ctx.Log.Error(
 			"failed to build AcceptedStateSummary(%s, %d, %s): %s",
 			s.ctx.ChainID,
 			requestID,
-			hashes,
+			summaryIDs,
 			err,
 		)
 		return
@@ -396,7 +403,7 @@ func (s *Sender) SendAcceptedStateSummary(nodeID ids.ShortID, requestID uint32, 
 			nodeID,
 			s.ctx.ChainID,
 			requestID,
-			hashes,
+			summaryIDs,
 		)
 	}
 }
@@ -989,4 +996,17 @@ func (s *Sender) Accept(ctx *snow.ConsensusContext, containerID ids.ID, containe
 		s.ctx.Log.Debug("failed to gossip GossipMsg(%s)", s.ctx.ChainID)
 	}
 	return nil
+}
+
+func encodeSummaryIDs(summaryIDs []common.SummaryHash, result [][]byte) {
+	for i, containerID := range summaryIDs {
+		copy := containerID
+		result[i] = copy[:]
+	}
+}
+
+func encodeSummaryKeys(summaryKeys []common.SummaryKey, result []uint64) {
+	for i, key := range summaryKeys {
+		result[i] = uint64(key)
+	}
 }

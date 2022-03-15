@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/stretchr/testify/assert"
 )
@@ -107,13 +108,13 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	assert.True(initiallyReachedOutBeaconsSize <= maxOutstandingStateSyncRequests)
 
 	// mock VM to simulate a valid summary is returned
-	key := []byte{'k', 'e', 'y'}
-	summary := []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
-	hash := []byte{'h', 'a', 's', 'h'}
-
-	fullVM.CantStateSyncGetKeyHash = true
-	fullVM.StateSyncGetKeyHashF = func(s common.Summary) (common.SummaryKey, common.SummaryHash, error) {
-		return key, hash, nil
+	fullVM.CantParseSummary = true
+	fullVM.ParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
+		return &block.Summary{
+			SummaryKey:   key,
+			SummaryHash:  hash,
+			ContentBytes: summaryBytes,
+		}, nil
 	}
 
 	// pick one of the beacons that have been reached out
@@ -124,7 +125,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	assert.NoError(syncer.StateSummaryFrontier(
 		responsiveBeaconID,
 		math.MaxInt32,
-		summary,
+		summaryBytes,
 	))
 	assert.True(syncer.hasSeederBeenContacted(responsiveBeaconID)) // responsiveBeacon still pending
 	assert.True(len(syncer.weightedSummaries) == 0)
@@ -134,7 +135,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	assert.NoError(syncer.StateSummaryFrontier(
 		unsolicitedNodeID,
 		responsiveBeaconReqID,
-		summary,
+		summaryBytes,
 	))
 	assert.True(len(syncer.weightedSummaries) == 0)
 
@@ -142,16 +143,16 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	assert.NoError(syncer.StateSummaryFrontier(
 		responsiveBeaconID,
 		responsiveBeaconReqID,
-		summary,
+		summaryBytes,
 	))
 
 	// responsiveBeacon not pending anymore
 	assert.False(syncer.hasSeederBeenContacted(responsiveBeaconID))
 
 	// valid summary is recorded
-	ws, ok := syncer.weightedSummaries[string(hash)]
+	ws, ok := syncer.weightedSummaries[hash]
 	assert.True(ok)
-	assert.True(bytes.Equal(ws.Summary, summary))
+	assert.True(bytes.Equal(ws.Summary.Bytes(), summaryBytes))
 
 	// other listed beacons are reached for data
 	assert.True(
@@ -189,10 +190,10 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	// mock VM to simulate an invalid summary is returned
 	summary := []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
 	isSummaryDecoded := false
-	fullVM.CantStateSyncGetKeyHash = true
-	fullVM.StateSyncGetKeyHashF = func(s common.Summary) (common.SummaryKey, common.SummaryHash, error) {
+	fullVM.CantParseSummary = true
+	fullVM.ParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
 		isSummaryDecoded = true
-		return nil, nil, fmt.Errorf("invalid state summary")
+		return nil, fmt.Errorf("invalid state summary")
 	}
 
 	// pick one of the beacons that have been reached out
@@ -251,10 +252,10 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	unresponsiveBeaconID := pickRandomFrom(contactedFrontiersProviders)
 	unresponsiveBeaconReqID := contactedFrontiersProviders[unresponsiveBeaconID]
 
-	fullVM.CantStateSyncGetKeyHash = true
-	fullVM.StateSyncGetKeyHashF = func(s common.Summary) (common.SummaryKey, common.SummaryHash, error) {
-		assert.True(len(s) == 0)
-		return nil, nil, fmt.Errorf("empty summary")
+	fullVM.CantParseSummary = true
+	fullVM.ParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
+		assert.True(len(summaryBytes) == 0)
+		return nil, fmt.Errorf("empty summary")
 	}
 
 	// assume timeout is reached and beacons is marked as unresponsive
@@ -275,16 +276,20 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 
 	// mock VM to simulate an valid but late summary is returned
 
-	fullVM.CantStateSyncGetKeyHash = true
-	fullVM.StateSyncGetKeyHashF = func(s common.Summary) (common.SummaryKey, common.SummaryHash, error) {
-		return key, hash, nil
+	fullVM.CantParseSummary = true
+	fullVM.ParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
+		return &block.Summary{
+			SummaryKey:   key,
+			SummaryHash:  hash,
+			ContentBytes: summaryBytes,
+		}, nil
 	}
 
 	// check a valid but late response is not recorded
 	assert.NoError(syncer.StateSummaryFrontier(
 		unresponsiveBeaconID,
 		unresponsiveBeaconReqID,
-		summary,
+		summaryBytes,
 	))
 
 	// late summary is not recorded
@@ -312,14 +317,19 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 		}
 	}
 
-	// mock VM to simulate a valid summary is returned	fullVM.CantStateSyncGetKeyHash = true
-	fullVM.StateSyncGetKeyHashF = func(s common.Summary) (common.SummaryKey, common.SummaryHash, error) {
-		return key, hash, nil
+	// mock VM to simulate a valid summary is returned
+	fullVM.CantParseSummary = true
+	fullVM.ParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
+		return &block.Summary{
+			SummaryKey:   key,
+			SummaryHash:  hash,
+			ContentBytes: summaryBytes,
+		}, nil
 	}
 
 	contactedVoters := make(map[ids.ShortID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl [][]byte) {
+	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl []common.SummaryKey) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -338,7 +348,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 		assert.NoError(syncer.StateSummaryFrontier(
 			beaconID,
 			reqID,
-			summary,
+			summaryBytes,
 		))
 	}
 	assert.False(syncer.anyPendingSeederResponse())
@@ -370,14 +380,19 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 		}
 	}
 
-	// mock VM to simulate a valid summary is returned	fullVM.CantStateSyncGetKeyHash = true
-	fullVM.StateSyncGetKeyHashF = func(s common.Summary) (common.SummaryKey, common.SummaryHash, error) {
-		return key, hash, nil
+	// mock VM to simulate a valid summary is returned
+	fullVM.CantParseSummary = true
+	fullVM.ParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
+		return &block.Summary{
+			SummaryKey:   key,
+			SummaryHash:  hash,
+			ContentBytes: summaryBytes,
+		}, nil
 	}
 
 	contactedVoters := make(map[ids.ShortID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl [][]byte) {
+	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl []common.SummaryKey) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -396,7 +411,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 		assert.NoError(syncer.StateSummaryFrontier(
 			beaconID,
 			reqID,
-			summary,
+			summaryBytes,
 		))
 	}
 	assert.False(syncer.anyPendingSeederResponse())
@@ -406,7 +421,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	assert.True(initiallyContactedVotersSize > 0)
 	assert.True(initiallyContactedVotersSize <= maxOutstandingStateSyncRequests)
 
-	_, found := syncer.weightedSummaries[string(hash)]
+	_, found := syncer.weightedSummaries[hash]
 	assert.True(found)
 
 	// pick one of the voters that have been reached out
@@ -417,34 +432,34 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	assert.NoError(syncer.AcceptedStateSummary(
 		responsiveVoterID,
 		math.MaxInt32,
-		[][]byte{hash},
+		[]common.SummaryHash{hash},
 	))
 
 	// responsiveVoter still pending
 	assert.True(syncer.hasVoterBeenContacted(responsiveVoterID))
-	assert.True(syncer.weightedSummaries[string(hash)].weight == 0)
+	assert.True(syncer.weightedSummaries[hash].weight == 0)
 
 	// check a response from unsolicited node is dropped
 	unsolicitedVoterID := ids.GenerateTestShortID()
 	assert.NoError(syncer.AcceptedStateSummary(
 		unsolicitedVoterID,
 		responsiveVoterReqID,
-		[][]byte{hash},
+		[]common.SummaryHash{hash},
 	))
-	assert.True(syncer.weightedSummaries[string(hash)].weight == 0)
+	assert.True(syncer.weightedSummaries[hash].weight == 0)
 
 	// check a valid response is duly recorded
 	assert.NoError(syncer.AcceptedStateSummary(
 		responsiveVoterID,
 		responsiveVoterReqID,
-		[][]byte{hash},
+		[]common.SummaryHash{hash},
 	))
 
 	// responsiveBeacon not pending anymore
 	assert.False(syncer.hasSeederBeenContacted(responsiveVoterID))
 	voterWeight, found := beacons.GetWeight(responsiveVoterID)
 	assert.True(found)
-	assert.True(syncer.weightedSummaries[string(hash)].weight == voterWeight)
+	assert.True(syncer.weightedSummaries[hash].weight == voterWeight)
 
 	// other listed voters are reached out
 	assert.True(
@@ -473,14 +488,19 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 		}
 	}
 
-	// mock VM to simulate a valid summary is returned	fullVM.CantStateSyncGetKeyHash = true
-	fullVM.StateSyncGetKeyHashF = func(s common.Summary) (common.SummaryKey, common.SummaryHash, error) {
-		return key, hash, nil
+	// mock VM to simulate a valid summary is returned
+	fullVM.CantParseSummary = true
+	fullVM.ParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
+		return &block.Summary{
+			SummaryKey:   key,
+			SummaryHash:  hash,
+			ContentBytes: summaryBytes,
+		}, nil
 	}
 
 	contactedVoters := make(map[ids.ShortID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl [][]byte) {
+	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl []common.SummaryKey) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -499,7 +519,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 		assert.NoError(syncer.StateSummaryFrontier(
 			beaconID,
 			reqID,
-			summary,
+			summaryBytes,
 		))
 	}
 	assert.False(syncer.anyPendingSeederResponse())
@@ -509,7 +529,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	assert.True(initiallyContactedVotersSize > 0)
 	assert.True(initiallyContactedVotersSize <= maxOutstandingStateSyncRequests)
 
-	_, found := syncer.weightedSummaries[string(hash)]
+	_, found := syncer.weightedSummaries[hash]
 	assert.True(found)
 
 	// pick one of the voters that have been reached out
@@ -520,9 +540,9 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	assert.NoError(syncer.AcceptedStateSummary(
 		responsiveVoterID,
 		responsiveVoterReqID,
-		[][]byte{unknownHash},
+		[]common.SummaryHash{unknownHash},
 	))
-	_, found = syncer.weightedSummaries[string(unknownHash)]
+	_, found = syncer.weightedSummaries[unknownHash]
 	assert.False(found)
 
 	// check that responsiveVoter cannot cast another vote
@@ -530,9 +550,9 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	assert.NoError(syncer.AcceptedStateSummary(
 		responsiveVoterID,
 		responsiveVoterReqID,
-		[][]byte{hash},
+		[]common.SummaryHash{hash},
 	))
-	assert.True(syncer.weightedSummaries[string(hash)].weight == 0)
+	assert.True(syncer.weightedSummaries[hash].weight == 0)
 
 	// other listed voters are reached out, even in the face of vote
 	// on unknown summary
@@ -562,14 +582,19 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 		}
 	}
 
-	// mock VM to simulate a valid summary is returned	fullVM.CantStateSyncGetKeyHash = true
-	fullVM.StateSyncGetKeyHashF = func(s common.Summary) (common.SummaryKey, common.SummaryHash, error) {
-		return key, hash, nil
+	// mock VM to simulate a valid summary is returned
+	fullVM.CantParseSummary = true
+	fullVM.ParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
+		return &block.Summary{
+			SummaryKey:   key,
+			SummaryHash:  hash,
+			ContentBytes: summaryBytes,
+		}, nil
 	}
 
 	contactedVoters := make(map[ids.ShortID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl [][]byte) {
+	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl []common.SummaryKey) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -588,7 +613,7 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 		assert.NoError(syncer.StateSummaryFrontier(
 			beaconID,
 			reqID,
-			summary,
+			summaryBytes,
 		))
 	}
 	assert.False(syncer.anyPendingSeederResponse())
@@ -598,7 +623,7 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	fullVM.StateSyncF = func(summaries []common.Summary) error {
 		isVMStateSyncCalled = true
 		assert.True(len(summaries) == 1)
-		assert.True(bytes.Equal(summaries[0], summary))
+		assert.True(bytes.Equal(summaries[0].Bytes(), summaryBytes))
 		return nil
 	}
 
@@ -613,7 +638,7 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 			assert.NoError(syncer.AcceptedStateSummary(
 				voterID,
 				reqID,
-				[][]byte{hash},
+				[]common.SummaryHash{hash},
 			))
 			bw, _ := beacons.GetWeight(voterID)
 			cumulatedWeight += bw
@@ -652,14 +677,19 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 		}
 	}
 
-	// mock VM to simulate a valid summary is returned	fullVM.CantStateSyncGetKeyHash = true
-	fullVM.StateSyncGetKeyHashF = func(s common.Summary) (common.SummaryKey, common.SummaryHash, error) {
-		return key, hash, nil
+	// mock VM to simulate a valid summary is returned
+	fullVM.CantParseSummary = true
+	fullVM.ParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
+		return &block.Summary{
+			SummaryKey:   key,
+			SummaryHash:  hash,
+			ContentBytes: summaryBytes,
+		}, nil
 	}
 
 	contactedVoters := make(map[ids.ShortID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl [][]byte) {
+	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl []common.SummaryKey) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -678,7 +708,7 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 		assert.NoError(syncer.StateSummaryFrontier(
 			beaconID,
 			reqID,
-			summary,
+			summaryBytes,
 		))
 	}
 	assert.False(syncer.anyPendingSeederResponse())
@@ -688,7 +718,7 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 	fullVM.StateSyncF = func(summaries []common.Summary) error {
 		isVMStateSyncCalled = true
 		assert.True(len(summaries) == 1)
-		assert.True(bytes.Equal(summaries[0], summary))
+		assert.True(bytes.Equal(summaries[0].Bytes(), summaryBytes))
 		return nil
 	}
 
@@ -710,7 +740,7 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 			assert.NoError(syncer.AcceptedStateSummary(
 				voterID,
 				reqID,
-				[][]byte{hash},
+				[]common.SummaryHash{hash},
 			))
 		}
 	}

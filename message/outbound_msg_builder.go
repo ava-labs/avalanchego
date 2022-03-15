@@ -142,7 +142,7 @@ type OutboundMsgBuilder interface {
 		chainID ids.ID,
 		requestID uint32,
 		deadline time.Duration,
-		keys [][]byte,
+		keys []uint64,
 	) (OutboundMessage, error)
 
 	AcceptedStateSummary(
@@ -532,7 +532,7 @@ func (b *outMsgBuilder) GetAcceptedStateSummary(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
-	keys [][]byte,
+	keys []uint64,
 ) (OutboundMessage, error) {
 	return b.c.Pack(
 		GetAcceptedStateSummary,

@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -262,22 +263,32 @@ func (vm *VMServer) StateSyncGetLastSummary(ctx context.Context, empty *emptypb.
 	if err != nil {
 		return nil, err
 	}
+
+	hash := ids.ID(summary.Hash())
 	return &vmproto.StateSyncGetLastSummaryResponse{
-		Content: summary,
-	}, nil
+		Key:     uint64(summary.Key()),
+		Hash:    hash[:],
+		Content: summary.Bytes(),
+	}, err
 }
 
-func (vm *VMServer) StateSyncGetKeyHash(ctx context.Context, req *vmproto.StateSyncGetKeyHashRequest) (*vmproto.StateSyncGetKeyHashResponse, error) {
+func (vm *VMServer) ParseSummary(ctx context.Context, req *vmproto.ParseSummaryRequest) (*vmproto.ParseSummaryResponse, error) {
 	ssVM, ok := vm.vm.(block.StateSyncableVM)
 	if !ok {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	key, hash, err := ssVM.StateSyncGetKeyHash(req.Summary)
+	summary, err := ssVM.ParseSummary(req.Summary)
 	if err != nil {
 		return nil, err
 	}
-	return &vmproto.StateSyncGetKeyHashResponse{Key: key, Hash: hash}, nil
+
+	hash := ids.ID(summary.Hash())
+	return &vmproto.ParseSummaryResponse{
+		Key:     uint64(summary.Key()),
+		Hash:    hash[:],
+		Content: summary.Bytes(),
+	}, nil
 }
 
 func (vm *VMServer) StateSyncGetSummary(ctx context.Context, req *vmproto.StateSyncGetSummaryRequest) (*vmproto.StateSyncGetSummaryResponse, error) {
@@ -286,11 +297,17 @@ func (vm *VMServer) StateSyncGetSummary(ctx context.Context, req *vmproto.StateS
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	summary, err := ssVM.StateSyncGetSummary(req.Key)
+	summary, err := ssVM.StateSyncGetSummary(common.SummaryKey(req.Key))
 	if err != nil {
 		return nil, err
 	}
-	return &vmproto.StateSyncGetSummaryResponse{Summary: summary}, nil
+
+	hash := ids.ID(summary.Hash())
+	return &vmproto.StateSyncGetSummaryResponse{
+		Key:     uint64(summary.Key()),
+		Hash:    hash[:],
+		Content: summary.Bytes(),
+	}, nil
 }
 
 func (vm *VMServer) StateSync(ctx context.Context, req *vmproto.StateSyncRequest) (*emptypb.Empty, error) {
@@ -300,8 +317,16 @@ func (vm *VMServer) StateSync(ctx context.Context, req *vmproto.StateSyncRequest
 	}
 
 	summaries := make([]common.Summary, len(req.Summaries))
-	for k, v := range req.Summaries {
-		summaries[k] = v.Content
+	for i, sum := range req.Summaries {
+		hash, err := ids.ToID(hashing.ComputeHash256(sum.Hash))
+		if err != nil {
+			return nil, err
+		}
+		summaries[i] = &block.Summary{
+			SummaryKey:   common.SummaryKey(sum.Key),
+			SummaryHash:  common.SummaryHash(hash),
+			ContentBytes: sum.Content,
+		}
 	}
 	err := ssVM.StateSync(summaries)
 	if err != nil {

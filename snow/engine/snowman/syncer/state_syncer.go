@@ -50,7 +50,7 @@ type stateSyncer struct {
 	voteTracker
 
 	// hash --> (summary, weight)
-	weightedSummaries map[string]weightedSummary
+	weightedSummaries map[common.SummaryHash]weightedSummary
 
 	// number of times the state sync has been attempted
 	attempts int
@@ -76,7 +76,7 @@ func New(
 }
 
 // StateSyncHandler interface implementation
-func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summary []byte) error {
+func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summaryBytes []byte) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("Received an Out-of-Sync StateSummaryFrontier - validator: %v - expectedRequestID: %v, requestID: %v",
@@ -95,15 +95,15 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 	// retrieve key for summary and register frontier;
 	// make sure next beacons are reached out
 	// even in case invalid summaries are received
-	_, hash, err := ss.stateSyncVM.StateSyncGetKeyHash(summary)
-	if err == nil {
-		if _, exists := ss.weightedSummaries[string(hash)]; !exists {
-			ss.weightedSummaries[string(hash)] = weightedSummary{
+
+	if summary, err := ss.stateSyncVM.ParseSummary(summaryBytes); err == nil {
+		if _, exists := ss.weightedSummaries[summary.Hash()]; !exists {
+			ss.weightedSummaries[summary.Hash()] = weightedSummary{
 				Summary: summary,
 			}
 		}
 	} else {
-		ss.Ctx.Log.Debug("Could not retrieve key from summary %s: %v", summary, err)
+		ss.Ctx.Log.Debug("Could not parse summary from bytes%s: %v", summaryBytes, err)
 	}
 
 	ss.sendGetStateSummaryFrontiers()
@@ -160,7 +160,7 @@ func (ss *stateSyncer) GetStateSummaryFrontierFailed(validatorID ids.ShortID, re
 }
 
 // StateSyncHandler interface implementation
-func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, hashes [][]byte) error {
+func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, hashes []common.SummaryHash) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("Received an Out-of-Sync Accepted - validator: %v - expectedRequestID: %v, requestID: %v",
@@ -181,7 +181,7 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 	}
 
 	for _, hash := range hashes {
-		ws, ok := ss.weightedSummaries[string(hash)]
+		ws, ok := ss.weightedSummaries[hash]
 		if !ok {
 			// received vote for a unknown summary. Skipped
 			continue
@@ -193,7 +193,7 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 			newWeight = stdmath.MaxUint64
 		}
 		ws.weight = newWeight
-		ss.weightedSummaries[string(hash)] = ws
+		ss.weightedSummaries[hash] = ws
 	}
 
 	if err := ss.sendGetAccepted(); err != nil {
@@ -251,7 +251,7 @@ func (ss *stateSyncer) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, re
 	// that they think none of the containers we sent them in GetAccepted are accepted
 	ss.markVoterFailed(validatorID)
 
-	return ss.AcceptedStateSummary(validatorID, requestID, [][]byte{})
+	return ss.AcceptedStateSummary(validatorID, requestID, []common.SummaryHash{})
 }
 
 // Engine interface implementation
@@ -266,7 +266,7 @@ func (ss *stateSyncer) startup() error {
 	ss.started = true
 
 	// clear up messages trackers
-	ss.weightedSummaries = make(map[string]weightedSummary)
+	ss.weightedSummaries = make(map[common.SummaryHash]weightedSummary)
 	ss.frontierTracker.clear()
 	ss.voteTracker.clear()
 
@@ -314,13 +314,9 @@ func (ss *stateSyncer) sendGetAccepted() error {
 		ss.Ctx.Log.Debug("sent %d more GetAcceptedStateSummary messages with %d more to send",
 			vdrs.Len(), ss.targetVoters.Len())
 
-		acceptedKeys := make([][]byte, 0, len(ss.weightedSummaries))
+		acceptedKeys := make([]common.SummaryKey, 0, len(ss.weightedSummaries))
 		for _, summary := range ss.weightedSummaries {
-			key, _, err := ss.stateSyncVM.StateSyncGetKeyHash(summary.Summary)
-			if err != nil {
-				return err
-			}
-			acceptedKeys = append(acceptedKeys, key)
+			acceptedKeys = append(acceptedKeys, summary.Key())
 		}
 		ss.Sender.SendGetAcceptedStateSummary(vdrs, ss.requestID, acceptedKeys)
 		ss.markVoterContacted(vdrs)

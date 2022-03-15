@@ -61,30 +61,25 @@ func (gh *getter) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uin
 			err, validatorID, requestID)
 		return nil
 	}
-	gh.sender.SendStateSummaryFrontier(validatorID, requestID, summary)
+	gh.sender.SendStateSummaryFrontier(validatorID, requestID, summary.Bytes())
 	return nil
 }
 
-func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error {
+func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys []common.SummaryKey) error {
 	if gh.ssVM == nil {
 		gh.log.Debug("State sync not supported. GetAcceptedStateSummary(%s, %d) dropped.", validatorID, requestID)
 		return nil
 	}
 
-	retrievedHashes := make([][]byte, 0, len(keys))
+	summaryIDs := make([]common.SummaryHash, 0, len(keys))
 	for _, key := range keys {
 		summary, err := gh.ssVM.StateSyncGetSummary(key)
 		if err != nil {
 			continue
 		}
-		_, hash, err := gh.ssVM.StateSyncGetKeyHash(summary)
-		if err != nil {
-			continue
-		}
-
-		retrievedHashes = append(retrievedHashes, hash)
+		summaryIDs = append(summaryIDs, summary.Hash())
 	}
-	gh.sender.SendAcceptedStateSummary(validatorID, requestID, retrievedHashes)
+	gh.sender.SendAcceptedStateSummary(validatorID, requestID, summaryIDs)
 	return nil
 }
 

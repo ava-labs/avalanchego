@@ -5,6 +5,8 @@ package common
 
 import (
 	"errors"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 var (
@@ -14,9 +16,14 @@ var (
 
 // Summary represents the information needed for state sync processing
 type (
-	SummaryKey  []byte
-	SummaryHash []byte
-	Summary     []byte
+	SummaryKey  uint64
+	SummaryHash ids.ID
+
+	Summary interface {
+		Bytes() []byte
+		Key() SummaryKey
+		Hash() SummaryHash
+	}
 )
 
 // StateSyncableVM represents functionalities to allow VMs to sync to a given state,
@@ -29,9 +36,8 @@ type StateSyncableVM interface {
 	// StateSyncGetLastSummary returns latest Summary with an optional error
 	StateSyncGetLastSummary() (Summary, error)
 
-	// StateSyncGetKeyHash retrieves a summary key out of a summary and computes a hash
-	// used to verify the summary through validator voting.
-	StateSyncGetKeyHash(Summary) (SummaryKey, SummaryHash, error)
+	// ParseSummary builds a Summary out of summaryBytes
+	ParseSummary(summaryBytes []byte) (Summary, error)
 
 	// StateSyncGetSummary retrieves the summary related to key, if available.
 	StateSyncGetSummary(SummaryKey) (Summary, error)

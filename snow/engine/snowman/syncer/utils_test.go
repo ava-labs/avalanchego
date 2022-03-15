@@ -21,11 +21,11 @@ var (
 	_ block.ChainVM         = fullVM{}
 	_ block.StateSyncableVM = fullVM{}
 
-	beacons     validators.Set
-	summary     []byte
-	key         []byte
-	hash        []byte
-	unknownHash []byte
+	beacons      validators.Set
+	summaryBytes []byte
+	key          common.SummaryKey
+	hash         common.SummaryHash
+	unknownHash  common.SummaryHash
 )
 
 type fullVM struct {
@@ -43,10 +43,10 @@ func init() {
 		ctx.Log.AssertNoError(err)
 	}
 
-	summary = []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
-	key = []byte{'k', 'e', 'y'}
-	hash = []byte{'h', 'a', 's', 'h'}
-	unknownHash = []byte{'g', 'a', 'r', 'b', 'a', 'g', 'e'}
+	summaryBytes = []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
+	key = common.SummaryKey(2022)
+	hash = common.SummaryHash{'h', 'a', 's', 'h'}
+	unknownHash = common.SummaryHash{'g', 'a', 'r', 'b', 'a', 'g', 'e'}
 }
 
 // helper to build

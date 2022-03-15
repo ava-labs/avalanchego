@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
@@ -528,38 +529,64 @@ func (vm *VMClient) StateSyncGetLastSummary() (common.Summary, error) {
 		&emptypb.Empty{},
 	)
 	if err != nil {
-		return common.Summary{}, err
+		return nil, err
 	}
-	return resp.Content, nil
+
+	hash, err := ids.ToID(hashing.ComputeHash256(resp.Hash))
+	return &block.Summary{
+		SummaryKey:   common.SummaryKey(resp.Key),
+		SummaryHash:  common.SummaryHash(hash),
+		ContentBytes: resp.Content,
+	}, err
 }
 
-func (vm *VMClient) StateSyncGetKeyHash(summary common.Summary) (common.SummaryKey, common.SummaryHash, error) {
-	resp, err := vm.client.StateSyncGetKeyHash(
+func (vm *VMClient) ParseSummary(summaryBytes []byte) (common.Summary, error) {
+	resp, err := vm.client.ParseSummary(
 		context.Background(),
-		&vmproto.StateSyncGetKeyHashRequest{
-			Summary: summary,
+		&vmproto.ParseSummaryRequest{
+			Summary: summaryBytes,
 		},
 	)
+	if err != nil {
+		return nil, err
+	}
 
-	return resp.Key, resp.Hash, err
+	hash, err := ids.ToID(hashing.ComputeHash256(resp.Hash))
+	return &block.Summary{
+		SummaryKey:   common.SummaryKey(resp.Key),
+		SummaryHash:  common.SummaryHash(hash),
+		ContentBytes: resp.Content,
+	}, err
 }
 
 func (vm *VMClient) StateSyncGetSummary(key common.SummaryKey) (common.Summary, error) {
 	resp, err := vm.client.StateSyncGetSummary(
 		context.Background(),
 		&vmproto.StateSyncGetSummaryRequest{
-			Key: key,
+			Key: uint64(key),
 		},
 	)
+	if err != nil {
+		return nil, err
+	}
 
-	return resp.Summary, err
+	hash, err := ids.ToID(hashing.ComputeHash256(resp.Hash))
+	return &block.Summary{
+		SummaryKey:   common.SummaryKey(resp.Key),
+		SummaryHash:  common.SummaryHash(hash),
+		ContentBytes: resp.Content,
+	}, err
 }
 
 func (vm *VMClient) StateSync(accepted []common.Summary) error {
 	requestedSummaries := make([]*vmproto.StateSyncGetLastSummaryResponse, len(accepted))
-	for k, v := range accepted {
-		requestedSummaries[k] = &vmproto.StateSyncGetLastSummaryResponse{}
-		requestedSummaries[k].Content = v
+	for i, sum := range accepted {
+		hash := sum.Hash()
+		requestedSummaries[i] = &vmproto.StateSyncGetLastSummaryResponse{
+			Key:     uint64(sum.Key()),
+			Hash:    hash[:],
+			Content: sum.Bytes(),
+		}
 	}
 	_, err := vm.client.StateSync(
 		context.Background(),

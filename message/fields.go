@@ -82,9 +82,9 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 	case SummaryBytes:
 		return wrappers.TryPackBytes
 	case MultiSummaryHashes:
-		return wrappers.TryPack2DBytes
+		return wrappers.TryPackHashes
 	case MultiSummaryKeys:
-		return wrappers.TryPack2DBytes
+		return wrappers.TryPackSummaryKeys
 	default:
 		return nil
 	}
@@ -134,9 +134,9 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 	case SummaryBytes:
 		return wrappers.TryUnpackBytes
 	case MultiSummaryHashes:
-		return wrappers.TryUnpack2DBytes
+		return wrappers.TryUnpackHashes
 	case MultiSummaryKeys:
-		return wrappers.TryUnpack2DBytes
+		return wrappers.TryUnpackSummaryKeys
 	default:
 		return nil
 	}

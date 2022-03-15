@@ -18,7 +18,7 @@ func (vm *blockVM) StateSyncEnabled() (bool, error) {
 
 func (vm *blockVM) StateSyncGetLastSummary() (common.Summary, error) {
 	if vm.ssVM == nil {
-		return common.Summary{}, common.ErrStateSyncableVMNotImplemented
+		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
 	start := vm.clock.Time()
@@ -29,17 +29,17 @@ func (vm *blockVM) StateSyncGetLastSummary() (common.Summary, error) {
 	return summary, err
 }
 
-func (vm *blockVM) StateSyncGetKeyHash(summary common.Summary) (common.SummaryKey, common.SummaryHash, error) {
+func (vm *blockVM) ParseSummary(summaryBytes []byte) (common.Summary, error) {
 	if vm.ssVM == nil {
-		return common.SummaryKey{}, common.SummaryHash{}, common.ErrStateSyncableVMNotImplemented
+		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	return vm.ssVM.StateSyncGetKeyHash(summary)
+	return vm.ssVM.ParseSummary(summaryBytes)
 }
 
 func (vm *blockVM) StateSyncGetSummary(key common.SummaryKey) (common.Summary, error) {
 	if vm.ssVM == nil {
-		return common.Summary{}, common.ErrStateSyncableVMNotImplemented
+		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
 	start := vm.clock.Time()

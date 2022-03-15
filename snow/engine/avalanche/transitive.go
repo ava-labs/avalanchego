@@ -263,8 +263,6 @@ func (t *Transitive) Notify(msg common.Message) error {
 		t.pendingTxs = append(t.pendingTxs, t.VM.PendingTxs()...)
 		t.metrics.pendingTxs.Set(float64(len(t.pendingTxs)))
 		return t.attemptToIssueTxs()
-	case common.StateSyncSkipped, common.StateSyncDone:
-		t.Ctx.Log.Warn("unexpected message %s received in avalanche engine. Dropped", msg)
 
 	case common.StopVertex:
 		// stop vertex doesn't have any txs, issue directly!

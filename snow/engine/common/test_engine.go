@@ -122,8 +122,8 @@ type EngineTest struct {
 	GetStateSummaryFrontierF       func(validatorID ids.ShortID, requestID uint32) error
 	StateSummaryFrontierF          func(validatorID ids.ShortID, requestID uint32, summary []byte) error
 	GetStateSummaryFrontierFailedF func(validatorID ids.ShortID, requestID uint32) error
-	GetAcceptedStateSummaryF       func(validatorID ids.ShortID, requestID uint32, keys [][]byte) error
-	AcceptedStateSummaryF          func(validatorID ids.ShortID, requestID uint32, hashes [][]byte) error
+	GetAcceptedStateSummaryF       func(validatorID ids.ShortID, requestID uint32, keys []SummaryKey) error
+	AcceptedStateSummaryF          func(validatorID ids.ShortID, requestID uint32, hashes []SummaryHash) error
 	GetAcceptedStateSummaryFailedF func(validatorID ids.ShortID, requestID uint32) error
 }
 
@@ -584,7 +584,7 @@ func (e *EngineTest) GetStateSummaryFrontierFailed(validatorID ids.ShortID, requ
 	return errGetStateSummaryFrontierFailed
 }
 
-func (e *EngineTest) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys [][]byte) error {
+func (e *EngineTest) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys []SummaryKey) error {
 	if e.GetAcceptedStateSummaryF != nil {
 		return e.GetAcceptedStateSummaryF(validatorID, requestID, keys)
 	}
@@ -594,7 +594,7 @@ func (e *EngineTest) GetAcceptedStateSummary(validatorID ids.ShortID, requestID 
 	return errGetAcceptedStateSummary
 }
 
-func (e *EngineTest) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, hashes [][]byte) error {
+func (e *EngineTest) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, hashes []SummaryHash) error {
 	if e.AcceptedStateSummaryF != nil {
 		return e.AcceptedStateSummaryF(validatorID, requestID, hashes)
 	}
