@@ -743,7 +743,7 @@ func (st *internalStateImpl) DeletePendingStaker(tx *Tx) {
 	st.deletedPendingStakers = append(st.deletedPendingStakers, tx)
 }
 
-func (st *internalStateImpl) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.ShortID]*ValidatorWeightDiff, error) {
+func (st *internalStateImpl) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error) {
 	prefixStruct := heightWithSubnet{
 		Height:   height,
 		SubnetID: subnetID,
@@ -755,16 +755,16 @@ func (st *internalStateImpl) GetValidatorWeightDiffs(height uint64, subnetID ids
 	prefixStr := string(prefixBytes)
 
 	if weightDiffsIntf, ok := st.validatorDiffsCache.Get(prefixStr); ok {
-		return weightDiffsIntf.(map[ids.ShortID]*ValidatorWeightDiff), nil
+		return weightDiffsIntf.(map[ids.NodeID]*ValidatorWeightDiff), nil
 	}
 
 	rawDiffDB := prefixdb.New(prefixBytes, st.validatorDiffsDB)
 	diffDB := linkeddb.NewDefault(rawDiffDB)
 	diffIter := diffDB.NewIterator()
 
-	weightDiffs := make(map[ids.ShortID]*ValidatorWeightDiff)
+	weightDiffs := make(map[ids.NodeID]*ValidatorWeightDiff)
 	for diffIter.Next() {
-		nodeID, err := ids.ToShortID(diffIter.Key())
+		nodeID, err := ids.ToNodeID(diffIter.Key())
 		if err != nil {
 			return nil, err
 		}
@@ -978,7 +978,7 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 
 		subnetDiffs, ok := weightDiffs[subnetID]
 		if !ok {
-			subnetDiffs = make(map[ids.ShortID]*ValidatorWeightDiff)
+			subnetDiffs = make(map[ids.NodeID]*ValidatorWeightDiff)
 			weightDiffs[subnetID] = subnetDiffs
 		}
 
@@ -1422,8 +1422,8 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 
 func (st *internalStateImpl) loadPendingValidators() error {
 	ps := &pendingStakerChainStateImpl{
-		validatorsByNodeID:      make(map[ids.ShortID]*UnsignedAddValidatorTx),
-		validatorExtrasByNodeID: make(map[ids.ShortID]*validatorImpl),
+		validatorsByNodeID:      make(map[ids.NodeID]*UnsignedAddValidatorTx),
+		validatorExtrasByNodeID: make(map[ids.NodeID]*validatorImpl),
 	}
 
 	validatorIt := st.pendingValidatorList.NewIterator()

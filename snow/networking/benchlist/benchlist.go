@@ -45,7 +45,7 @@ type Benchlist interface {
 // Data about a validator who is benched
 type benchData struct {
 	benchedUntil time.Time
-	validatorID  ids.ShortID
+	validatorID  ids.NodeID
 	index        int
 }
 
@@ -106,10 +106,10 @@ type benchlist struct {
 	// Validator ID --> Consecutive failure information
 	// [streaklock] must be held when touching [failureStreaks]
 	streaklock     sync.Mutex
-	failureStreaks map[ids.ShortID]failureStreak
+	failureStreaks map[ids.NodeID]failureStreak
 
 	// IDs of validators that are currently benched
-	benchlistSet ids.ShortSet
+	benchlistSet ids.NodeIDSet
 
 	// Min heap containing benched validators and their endtimes
 	// Pop() returns the next validator to leave
@@ -147,8 +147,8 @@ func NewBenchlist(
 	benchlist := &benchlist{
 		chainID:                chainID,
 		log:                    log,
-		failureStreaks:         make(map[ids.ShortID]failureStreak),
-		benchlistSet:           ids.ShortSet{},
+		failureStreaks:         make(map[ids.NodeID]failureStreak),
+		benchlistSet:           ids.NodeIDSet{},
 		benchable:              benchable,
 		vdrs:                   validators,
 		threshold:              threshold,

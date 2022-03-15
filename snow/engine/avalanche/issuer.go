@@ -119,7 +119,7 @@ func (i *issuer) Update() {
 	}
 
 	vdrList := vdrBag.List()
-	vdrSet := ids.NewShortSet(len(vdrList))
+	vdrSet := ids.NewNodeIDSet(len(vdrList))
 	vdrSet.Add(vdrList...)
 
 	i.t.RequestID++

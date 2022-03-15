@@ -32,10 +32,10 @@ type noEarlyTermPoll struct {
 }
 
 // Vote registers a response for this poll
-func (p *noEarlyTermPoll) Vote(vdr ids.ShortID, votes []ids.ID) {
-	count := p.polled.Count(vdr)
+func (p *noEarlyTermPoll) Vote(vdr ids.NodeID, votes []ids.ID) {
+	count := p.polled.Count(ids.ShortID(vdr))
 	// make sure that a validator can't respond multiple times
-	p.polled.Remove(vdr)
+	p.polled.Remove(ids.ShortID(vdr))
 
 	for i := 0; i < count; i++ {
 		// track the votes the validator responded with

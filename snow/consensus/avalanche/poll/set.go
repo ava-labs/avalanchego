@@ -107,7 +107,7 @@ func (s *set) Add(requestID uint32, vdrs ids.ShortBag) bool {
 
 // Vote registers the connections response to a query for [id]. If there was no
 // query, or the response has already be registered, nothing is performed.
-func (s *set) Vote(requestID uint32, vdr ids.ShortID, votes []ids.ID) []ids.UniqueBag {
+func (s *set) Vote(requestID uint32, vdr ids.NodeID, votes []ids.ID) []ids.UniqueBag {
 	pollHolderIntf, exists := s.polls.Get(requestID)
 	if !exists {
 		s.log.Verbo("dropping vote from %s to an unknown poll with requestID: %d",

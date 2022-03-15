@@ -119,7 +119,7 @@ type GetNodeIDReply struct {
 func (service *Info) GetNodeID(_ *http.Request, _ *struct{}, reply *GetNodeIDReply) error {
 	service.log.Debug("Info: GetNodeID called")
 
-	reply.NodeID = service.NodeID.PrefixedString(constants.NodeIDPrefix)
+	reply.NodeID = service.NodeID.String()
 	return nil
 }
 

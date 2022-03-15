@@ -29,12 +29,12 @@ func NewNoOpAcceptedFrontierHandler(log logging.Logger) AcceptedFrontierHandler 
 	return &noOpAcceptedFrontierHandler{log: log}
 }
 
-func (nop *noOpAcceptedFrontierHandler) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+func (nop *noOpAcceptedFrontierHandler) AcceptedFrontier(validatorID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 	nop.log.Debug("AcceptedFrontier(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
 
-func (nop *noOpAcceptedFrontierHandler) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
+func (nop *noOpAcceptedFrontierHandler) GetAcceptedFrontierFailed(validatorID ids.NodeID, requestID uint32) error {
 	nop.log.Debug("GetAcceptedFrontierFailed(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
@@ -47,12 +47,12 @@ func NewNoOpAcceptedHandler(log logging.Logger) AcceptedHandler {
 	return &noOpAcceptedHandler{log: log}
 }
 
-func (nop *noOpAcceptedHandler) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+func (nop *noOpAcceptedHandler) Accepted(validatorID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 	nop.log.Debug("Accepted(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
 
-func (nop *noOpAcceptedHandler) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
+func (nop *noOpAcceptedHandler) GetAcceptedFailed(validatorID ids.NodeID, requestID uint32) error {
 	nop.log.Debug("GetAcceptedFailed(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
@@ -65,12 +65,12 @@ func NewNoOpAncestorsHandler(log logging.Logger) AncestorsHandler {
 	return &noOpAncestorsHandler{log: log}
 }
 
-func (nop *noOpAncestorsHandler) Ancestors(validatorID ids.ShortID, requestID uint32, containers [][]byte) error {
+func (nop *noOpAncestorsHandler) Ancestors(validatorID ids.NodeID, requestID uint32, containers [][]byte) error {
 	nop.log.Debug("Ancestors(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
 
-func (nop *noOpAncestorsHandler) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) error {
+func (nop *noOpAncestorsHandler) GetAncestorsFailed(validatorID ids.NodeID, requestID uint32) error {
 	nop.log.Debug("GetAncestorsFailed(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
@@ -83,7 +83,7 @@ func NewNoOpPutHandler(log logging.Logger) PutHandler {
 	return &noOpPutHandler{log: log}
 }
 
-func (nop *noOpPutHandler) Put(vdr ids.ShortID, requestID uint32, blkBytes []byte) error {
+func (nop *noOpPutHandler) Put(vdr ids.NodeID, requestID uint32, blkBytes []byte) error {
 	if requestID == constants.GossipMsgRequestID {
 		nop.log.Verbo("Gossip Put(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
 	} else {
@@ -92,7 +92,7 @@ func (nop *noOpPutHandler) Put(vdr ids.ShortID, requestID uint32, blkBytes []byt
 	return nil
 }
 
-func (nop *noOpPutHandler) GetFailed(validatorID ids.ShortID, requestID uint32) error {
+func (nop *noOpPutHandler) GetFailed(validatorID ids.NodeID, requestID uint32) error {
 	nop.log.Debug("GetFailed(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
@@ -105,12 +105,12 @@ func NewNoOpQueryHandler(log logging.Logger) QueryHandler {
 	return &noOpQueryHandler{log: log}
 }
 
-func (nop *noOpQueryHandler) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
+func (nop *noOpQueryHandler) PullQuery(vdr ids.NodeID, requestID uint32, blkID ids.ID) error {
 	nop.log.Debug("PullQuery(%s, %d, %s) unhandled by this gear. Dropped.", vdr, requestID, blkID)
 	return nil
 }
 
-func (nop *noOpQueryHandler) PushQuery(vdr ids.ShortID, requestID uint32, blkBytes []byte) error {
+func (nop *noOpQueryHandler) PushQuery(vdr ids.NodeID, requestID uint32, blkBytes []byte) error {
 	nop.log.Debug("PushQuery(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
 	return nil
 }
@@ -123,12 +123,12 @@ func NewNoOpChitsHandler(log logging.Logger) ChitsHandler {
 	return &noOpChitsHandler{log: log}
 }
 
-func (nop *noOpChitsHandler) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) error {
+func (nop *noOpChitsHandler) Chits(vdr ids.NodeID, requestID uint32, votes []ids.ID) error {
 	nop.log.Debug("Chits(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
 	return nil
 }
 
-func (nop *noOpChitsHandler) QueryFailed(vdr ids.ShortID, requestID uint32) error {
+func (nop *noOpChitsHandler) QueryFailed(vdr ids.NodeID, requestID uint32) error {
 	nop.log.Debug("QueryFailed(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
 	return nil
 }

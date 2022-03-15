@@ -830,9 +830,9 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 	reply.Delegators = []interface{}{}
 
 	// Create set of nodeIDs
-	nodeIDs := ids.ShortSet{}
+	nodeIDs := ids.NodeIDSet{}
 	for _, nodeID := range args.NodeIDs {
-		nID, err := ids.ShortFromPrefixedString(nodeID, constants.NodeIDPrefix)
+		nID, err := ids.NodeIDFromString(nodeID)
 		if err != nil {
 			return err
 		}
@@ -855,7 +855,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			weight := json.Uint64(staker.Validator.Weight())
 			reply.Delegators = append(reply.Delegators, APIStaker{
 				TxID:        tx.ID(),
-				NodeID:      staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
+				NodeID:      staker.Validator.ID().String(),
 				StartTime:   json.Uint64(staker.StartTime().Unix()),
 				EndTime:     json.Uint64(staker.EndTime().Unix()),
 				StakeAmount: &weight,
@@ -876,7 +876,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			reply.Validators = append(reply.Validators, APIPrimaryValidator{
 				APIStaker: APIStaker{
 					TxID:        tx.ID(),
-					NodeID:      staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
+					NodeID:      staker.Validator.ID().String(),
 					StartTime:   json.Uint64(staker.StartTime().Unix()),
 					EndTime:     json.Uint64(staker.EndTime().Unix()),
 					StakeAmount: &weight,
@@ -895,7 +895,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			weight := json.Uint64(staker.Validator.Weight())
 			reply.Validators = append(reply.Validators, APIStaker{
 				TxID:      tx.ID(),
-				NodeID:    staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
+				NodeID:    staker.Validator.ID().String(),
 				StartTime: json.Uint64(staker.StartTime().Unix()),
 				EndTime:   json.Uint64(staker.EndTime().Unix()),
 				Weight:    &weight,
@@ -952,15 +952,15 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 		return fmt.Errorf("sampling errored with %w", err)
 	}
 
-	validatorIDs := make([]ids.ShortID, int(args.Size))
+	validatorIDs := make([]ids.NodeID, int(args.Size))
 	for i, vdr := range sample {
 		validatorIDs[i] = vdr.ID()
 	}
-	ids.SortShortIDs(validatorIDs)
+	ids.SortNodeIDs(validatorIDs)
 
 	reply.Validators = make([]string, int(args.Size))
 	for i, vdrID := range validatorIDs {
-		reply.Validators[i] = vdrID.PrefixedString(constants.NodeIDPrefix)
+		reply.Validators[i] = vdrID.String()
 	}
 	return nil
 }
@@ -1012,7 +1012,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 	if args.NodeID == "" {
 		nodeID = service.vm.ctx.NodeID // If omitted, use this node's ID
 	} else {
-		nID, err := ids.ShortFromPrefixedString(args.NodeID, constants.NodeIDPrefix)
+		nID, err := ids.NodeIDFromString(args.NodeID)
 		if err != nil {
 			return err
 		}
@@ -1119,7 +1119,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 	if args.NodeID == "" { // If ID unspecified, use this node's ID
 		nodeID = service.vm.ctx.NodeID
 	} else {
-		nID, err := ids.ShortFromPrefixedString(args.NodeID, constants.NodeIDPrefix)
+		nID, err := ids.NodeIDFromString(args.NodeID)
 		if err != nil {
 			return err
 		}
@@ -1222,7 +1222,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	}
 
 	// Parse the node ID
-	nodeID, err := ids.ShortFromPrefixedString(args.NodeID, constants.NodeIDPrefix)
+	nodeID, err := ids.NodeIDFromString(args.NodeID)
 	if err != nil {
 		return fmt.Errorf("error parsing nodeID: %q: %w", args.NodeID, err)
 	}
@@ -2234,7 +2234,7 @@ type GetMaxStakeAmountReply struct {
 // GetMaxStakeAmount returns the maximum amount of nAVAX staking to the named
 // node during the time period.
 func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmountArgs, reply *GetMaxStakeAmountReply) error {
-	nodeID, err := ids.ShortFromPrefixedString(args.NodeID, constants.NodeIDPrefix)
+	nodeID, err := ids.NodeIDFromString(args.NodeID)
 	if err != nil {
 		return fmt.Errorf("failed to parse nodeID %q due to: %w", args.NodeID, err)
 	}
@@ -2331,7 +2331,7 @@ func (service *Service) GetValidatorsAt(_ *http.Request, args *GetValidatorsAtAr
 
 	reply.Validators = make(map[string]uint64, len(validators))
 	for nodeID, weight := range validators {
-		reply.Validators[nodeID.PrefixedString(constants.NodeIDPrefix)] = weight
+		reply.Validators[nodeID.String()] = weight
 	}
 	return nil
 }

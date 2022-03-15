@@ -45,7 +45,7 @@ func (m *Manager) TimeoutDuration() time.Duration {
 // IsBenched returns true if messages to [nodeID] regarding [chainID]
 // should not be sent over the network and should immediately fail.
 func (m *Manager) IsBenched(nodeID ids.NodeID, chainID ids.ID) bool {
-	return m.benchlistMgr.IsBenched(validatorID, chainID)
+	return m.benchlistMgr.IsBenched(nodeID, chainID)
 }
 
 func (m *Manager) RegisterChain(ctx *snow.ConsensusContext) error {
@@ -85,8 +85,8 @@ func (m *Manager) RegisterResponse(
 	op message.Op,
 	latency time.Duration,
 ) {
-	m.metrics.Observe(validatorID, chainID, op, latency)
-	m.benchlistMgr.RegisterResponse(chainID, validatorID)
+	m.metrics.Observe(nodeID, chainID, op, latency)
+	m.benchlistMgr.RegisterResponse(chainID, nodeID)
 	m.tm.Remove(uniqueRequestID)
 }
 

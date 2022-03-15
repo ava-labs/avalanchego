@@ -55,7 +55,7 @@ type messageQueue struct {
 	cond   *sync.Cond
 	closed bool
 	// Node ID --> Messages this node has in [msgs]
-	nodeToUnprocessedMsgs map[ids.ShortID]int
+	nodeToUnprocessedMsgs map[ids.NodeID]int
 	// Unprocessed messages
 	msgs []message.InboundMessage
 }
@@ -73,7 +73,7 @@ func NewMessageQueue(
 		vdrs:                  vdrs,
 		cpuTracker:            cpuTracker,
 		cond:                  sync.NewCond(&sync.Mutex{}),
-		nodeToUnprocessedMsgs: make(map[ids.ShortID]int),
+		nodeToUnprocessedMsgs: make(map[ids.NodeID]int),
 	}
 	return m, m.metrics.initialize(metricsNamespace, metricsRegisterer, ops)
 }

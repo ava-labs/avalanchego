@@ -349,10 +349,10 @@ func (t *Transitive) issueFromByID(nodeID ids.NodeID, vtxID ids.ID) (bool, error
 	vtx, err := t.Manager.GetVtx(vtxID)
 	if err != nil {
 		// We don't have [vtxID]. Request it.
-		t.sendRequest(vdr, vtxID)
+		t.sendRequest(nodeID, vtxID)
 		return false, nil
 	}
-	return t.issueFrom(vdr, vtx)
+	return t.issueFrom(nodeID, vtx)
 }
 
 // issueFrom issues the branch ending with [vtx] to consensus.
@@ -386,7 +386,7 @@ func (t *Transitive) issueFrom(nodeID ids.NodeID, vtx avalanche.Vertex) (bool, e
 		for _, parent := range parents {
 			if !parent.Status().Fetched() {
 				// We don't have the parent. Request it.
-				t.sendRequest(vdr, parent.ID())
+				t.sendRequest(nodeID, parent.ID())
 				// We're missing an ancestor so we can't have issued the vtx in this method's argument
 				issued = false
 			} else {
@@ -558,11 +558,11 @@ func (t *Transitive) issueRepoll() {
 
 	vdrBag := ids.ShortBag{} // IDs of validators to be sampled
 	for _, vdr := range vdrs {
-		vdrBag.Add(vdr.ID())
+		vdrBag.Add(ids.ShortID(vdr.ID()))
 	}
 
 	vdrList := vdrBag.List()
-	vdrSet := ids.NewShortSet(len(vdrList))
+	vdrSet := ids.NewNodeIDSet(len(vdrList))
 	vdrSet.Add(vdrList...)
 
 	// Poll the network
@@ -622,7 +622,7 @@ func (t *Transitive) sendRequest(nodeID ids.NodeID, vtxID ids.ID) {
 		return
 	}
 	t.RequestID++
-	t.outstandingVtxReqs.Add(vdr, t.RequestID, vtxID) // Mark that there is an outstanding request for this vertex
-	t.Sender.SendGet(vdr, t.RequestID, vtxID)
+	t.outstandingVtxReqs.Add(nodeID, t.RequestID, vtxID) // Mark that there is an outstanding request for this vertex
+	t.Sender.SendGet(nodeID, t.RequestID, vtxID)
 	t.metrics.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len())) // Tracks performance statistics
 }

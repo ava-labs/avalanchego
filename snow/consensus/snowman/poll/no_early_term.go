@@ -27,17 +27,17 @@ type noEarlyTermPoll struct {
 }
 
 // Vote registers a response for this poll
-func (p *noEarlyTermPoll) Vote(vdr ids.ShortID, vote ids.ID) {
-	count := p.polled.Count(vdr)
+func (p *noEarlyTermPoll) Vote(vdr ids.NodeID, vote ids.ID) {
+	count := p.polled.Count(ids.ShortID(vdr))
 	// make sure that a validator can't respond multiple times
-	p.polled.Remove(vdr)
+	p.polled.Remove(ids.ShortID(vdr))
 
 	// track the votes the validator responded with
 	p.votes.AddCount(vote, count)
 }
 
 // Drop any future response for this poll
-func (p *noEarlyTermPoll) Drop(vdr ids.ShortID) { p.polled.Remove(vdr) }
+func (p *noEarlyTermPoll) Drop(vdr ids.NodeID) { p.polled.Remove(ids.ShortID(vdr)) }
 
 // Finished returns true when all validators have voted
 func (p *noEarlyTermPoll) Finished() bool {

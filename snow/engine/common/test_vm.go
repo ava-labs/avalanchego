@@ -191,7 +191,7 @@ func (vm *TestVM) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	return errAppGossip
 }
 
-func (vm *TestVM) Connected(id ids.ShortID, nodeVersion version.Application) error {
+func (vm *TestVM) Connected(id ids.NodeID, nodeVersion version.Application) error {
 	if vm.ConnectedF != nil {
 		return vm.ConnectedF(id, nodeVersion)
 	}
@@ -201,7 +201,7 @@ func (vm *TestVM) Connected(id ids.ShortID, nodeVersion version.Application) err
 	return nil
 }
 
-func (vm *TestVM) Disconnected(id ids.ShortID) error {
+func (vm *TestVM) Disconnected(id ids.NodeID) error {
 	if vm.DisconnectedF != nil {
 		return vm.DisconnectedF(id)
 	}

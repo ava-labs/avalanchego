@@ -36,18 +36,18 @@ type earlyTermNoTraversalPoll struct {
 }
 
 // Vote registers a response for this poll
-func (p *earlyTermNoTraversalPoll) Vote(vdr ids.ShortID, vote ids.ID) {
-	count := p.polled.Count(vdr)
+func (p *earlyTermNoTraversalPoll) Vote(vdr ids.NodeID, vote ids.ID) {
+	count := p.polled.Count(ids.ShortID(vdr))
 	// make sure that a validator can't respond multiple times
-	p.polled.Remove(vdr)
+	p.polled.Remove(ids.ShortID(vdr))
 
 	// track the votes the validator responded with
 	p.votes.AddCount(vote, count)
 }
 
 // Drop any future response for this poll
-func (p *earlyTermNoTraversalPoll) Drop(vdr ids.ShortID) {
-	p.polled.Remove(vdr)
+func (p *earlyTermNoTraversalPoll) Drop(vdr ids.NodeID) {
+	p.polled.Remove(ids.ShortID(vdr))
 }
 
 // Finished returns true when all validators have voted

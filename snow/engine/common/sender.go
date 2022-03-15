@@ -23,7 +23,7 @@ type Sender interface {
 type FrontierSender interface {
 	// SendGetAcceptedFrontier requests that every node in [nodeIDs] sends an
 	// AcceptedFrontier message.
-	SendGetAcceptedFrontier(nodeIDs ids.ShortSet, requestID uint32)
+	SendGetAcceptedFrontier(nodeIDs ids.NodeIDSet, requestID uint32)
 
 	// SendAcceptedFrontier responds to a AcceptedFrontier message with this
 	// engine's current accepted frontier.
@@ -41,7 +41,7 @@ type AcceptedSender interface {
 	// message with all the IDs in [containerIDs] that the node thinks are
 	// accepted.
 	SendGetAccepted(
-		nodeIDs ids.ShortSet,
+		nodeIDs ids.NodeIDSet,
 		requestID uint32,
 		containerIDs []ids.ID,
 	)
@@ -84,7 +84,7 @@ type QuerySender interface {
 	// This is the same as PullQuery, except that this message includes not only
 	// the ID of the container but also its body.
 	SendPushQuery(
-		nodeIDs ids.ShortSet,
+		nodeIDs ids.NodeIDSet,
 		requestID uint32,
 		containerID ids.ID,
 		container []byte,
@@ -92,7 +92,7 @@ type QuerySender interface {
 
 	// Request from the specified nodes their preferred frontier, given the
 	// existence of the specified container.
-	SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, containerID ids.ID)
+	SendPullQuery(nodeIDs ids.NodeIDSet, requestID uint32, containerID ids.ID)
 
 	// Send chits to the specified node
 	SendChits(nodeID ids.NodeID, requestID uint32, votes []ids.ID)
@@ -115,7 +115,7 @@ type AppSender interface {
 	// * An AppRequestFailed from nodeID with ID [requestID]
 	// Exactly one of the above messages will eventually be received per nodeID.
 	// A non-nil error should be considered fatal.
-	SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appRequestBytes []byte) error
+	SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, appRequestBytes []byte) error
 	// Send an application-level response to a request.
 	// This response must be in response to an AppRequest that the VM corresponding
 	// to this AppSender received from [nodeID] with ID [requestID].
@@ -124,5 +124,5 @@ type AppSender interface {
 	// Gossip an application-level message.
 	// A non-nil error should be considered fatal.
 	SendAppGossip(appGossipBytes []byte) error
-	SendAppGossipSpecific(nodeIDs ids.ShortSet, appGossipBytes []byte) error
+	SendAppGossipSpecific(nodeIDs ids.NodeIDSet, appGossipBytes []byte) error
 }

@@ -15,7 +15,7 @@ type ExternalSender interface {
 	// Send a message to a specific set of nodes
 	Send(
 		msg message.OutboundMessage,
-		nodeIDs ids.ShortSet,
+		nodeIDs ids.NodeIDSet,
 		subnetID ids.ID,
 		validatorOnly bool,
 	) ids.NodeIDSet

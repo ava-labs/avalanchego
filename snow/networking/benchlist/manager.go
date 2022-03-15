@@ -176,7 +176,7 @@ type noBenchlist struct{}
 func NewNoBenchlist() Manager { return &noBenchlist{} }
 
 func (noBenchlist) RegisterChain(*snow.ConsensusContext) error { return nil }
-func (noBenchlist) RegisterResponse(ids.ID, ids.ShortID)       {}
-func (noBenchlist) RegisterFailure(ids.ID, ids.ShortID)        {}
-func (noBenchlist) IsBenched(ids.ShortID, ids.ID) bool         { return false }
-func (noBenchlist) GetBenched(ids.ShortID) []ids.ID            { return []ids.ID{} }
+func (noBenchlist) RegisterResponse(ids.ID, ids.NodeID)        {}
+func (noBenchlist) RegisterFailure(ids.ID, ids.NodeID)         {}
+func (noBenchlist) IsBenched(ids.NodeID, ids.ID) bool          { return false }
+func (noBenchlist) GetBenched(ids.NodeID) []ids.ID             { return []ids.ID{} }
