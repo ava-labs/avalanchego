@@ -42,6 +42,11 @@ const (
 	AppRequest
 	AppResponse
 	AppGossip
+	// State sync
+	GetStateSummaryFrontier
+	StateSummaryFrontier
+	GetAcceptedStateSummary
+	AcceptedStateSummary
 
 	// Internal messages (External messages should be added above these):
 	GetAcceptedFrontierFailed
@@ -55,13 +60,7 @@ const (
 	Disconnected
 	Notify
 	GossipRequest
-
-	// State sync
-	GetStateSummaryFrontier
-	StateSummaryFrontier
 	GetStateSummaryFrontierFailed
-	GetAcceptedStateSummary
-	AcceptedStateSummary
 	GetAcceptedStateSummaryFailed
 )
 
@@ -82,6 +81,8 @@ var (
 		PushQuery,
 		PullQuery,
 		AppRequest,
+		GetStateSummaryFrontier,
+		GetAcceptedStateSummary,
 	}
 	ConsensusResponseOps = []Op{
 		AcceptedFrontier,
@@ -90,6 +91,8 @@ var (
 		Put,
 		Chits,
 		AppResponse,
+		StateSummaryFrontier,
+		AcceptedStateSummary,
 	}
 	// AppGossip is the only message that is sent unrequested without the
 	// expectation of a response
@@ -112,26 +115,12 @@ var (
 		Disconnected,
 		Notify,
 		GossipRequest,
-	}
-	ConsensusOps = append(ConsensusExternalOps, ConsensusInternalOps...)
-
-	StateSyncRequestOps = []Op{
-		GetStateSummaryFrontier,
-		GetAcceptedStateSummary,
-	}
-	StateSyncResponseOps = []Op{
-		StateSummaryFrontier,
-		AcceptedStateSummary,
-	}
-	StateSyncExternalOps = append(StateSyncRequestOps, StateSyncResponseOps...)
-	StateSyncInternalOps = []Op{
 		GetStateSummaryFrontierFailed,
 		GetAcceptedStateSummaryFailed,
 	}
-	StateSyncOps = append(StateSyncExternalOps, StateSyncInternalOps...)
+	ConsensusOps = append(ConsensusExternalOps, ConsensusInternalOps...)
 
 	ConsensusAndNetworkOps = append(ConsensusExternalOps, HandshakeOps...)
-	ExternalOps            = append(ConsensusAndNetworkOps, StateSyncExternalOps...)
 
 	SynchronousOps = []Op{
 		GetAcceptedFrontier,

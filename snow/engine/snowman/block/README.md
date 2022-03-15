@@ -2,7 +2,7 @@
 
 This brief document outlines the requirements and structure of StateSummaries, StateKeys and StateHashes for Snowman and Snowman++ VMs supporting state syncing.
 
-State syncing allows safe rebuilding the VM state at a given height without the need to download and re-execute the whole block history from that height down to genesis.
+State syncing allows safely rebuilding the VM state at a given height without the need to download and re-execute the whole block history from genesis.
 
 ## Supported operations and requirements
 
