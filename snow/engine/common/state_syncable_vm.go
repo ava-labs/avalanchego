@@ -16,13 +16,13 @@ var (
 
 // Summary represents the information needed for state sync processing
 type (
-	SummaryKey  uint64
-	SummaryHash ids.ID
+	SummaryKey uint64
+	SummaryID  ids.ID
 
 	Summary interface {
 		Bytes() []byte
 		Key() SummaryKey
-		Hash() SummaryHash
+		ID() SummaryID
 	}
 )
 

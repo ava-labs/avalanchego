@@ -148,7 +148,7 @@ type OutboundMsgBuilder interface {
 	AcceptedStateSummary(
 		chainID ids.ID,
 		requestID uint32,
-		hashes [][]byte,
+		summaryIDs [][]byte,
 	) (OutboundMessage, error)
 }
 
@@ -550,14 +550,14 @@ func (b *outMsgBuilder) GetAcceptedStateSummary(
 func (b *outMsgBuilder) AcceptedStateSummary(
 	chainID ids.ID,
 	requestID uint32,
-	hashes [][]byte,
+	summaryIDs [][]byte,
 ) (OutboundMessage, error) {
 	return b.c.Pack(
 		AcceptedStateSummary,
 		map[Field]interface{}{
-			ChainID:            chainID[:],
-			RequestID:          requestID,
-			MultiSummaryHashes: hashes,
+			ChainID:         chainID[:],
+			RequestID:       requestID,
+			MultiSummaryIDs: summaryIDs,
 		},
 		b.compress && AcceptedStateSummary.Compressible(), // AcceptedStateSummary messages may be compressed
 		false,

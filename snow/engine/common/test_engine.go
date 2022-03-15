@@ -123,7 +123,7 @@ type EngineTest struct {
 	StateSummaryFrontierF          func(validatorID ids.ShortID, requestID uint32, summary []byte) error
 	GetStateSummaryFrontierFailedF func(validatorID ids.ShortID, requestID uint32) error
 	GetAcceptedStateSummaryF       func(validatorID ids.ShortID, requestID uint32, keys []SummaryKey) error
-	AcceptedStateSummaryF          func(validatorID ids.ShortID, requestID uint32, hashes []SummaryHash) error
+	AcceptedStateSummaryF          func(validatorID ids.ShortID, requestID uint32, summaryIDs []SummaryID) error
 	GetAcceptedStateSummaryFailedF func(validatorID ids.ShortID, requestID uint32) error
 }
 
@@ -594,9 +594,9 @@ func (e *EngineTest) GetAcceptedStateSummary(validatorID ids.ShortID, requestID 
 	return errGetAcceptedStateSummary
 }
 
-func (e *EngineTest) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, hashes []SummaryHash) error {
+func (e *EngineTest) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaryIDs []SummaryID) error {
 	if e.AcceptedStateSummaryF != nil {
-		return e.AcceptedStateSummaryF(validatorID, requestID, hashes)
+		return e.AcceptedStateSummaryF(validatorID, requestID, summaryIDs)
 	}
 	if e.CantAcceptedStateSummary && e.T != nil {
 		e.T.Fatalf("Unexpectedly called AcceptedStateSummary")

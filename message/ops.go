@@ -231,7 +231,7 @@ var (
 		GetStateSummaryFrontier: {ChainID, RequestID, Deadline},
 		StateSummaryFrontier:    {ChainID, RequestID, SummaryBytes},
 		GetAcceptedStateSummary: {ChainID, RequestID, Deadline, MultiSummaryKeys},
-		AcceptedStateSummary:    {ChainID, RequestID, MultiSummaryHashes},
+		AcceptedStateSummary:    {ChainID, RequestID, MultiSummaryIDs},
 	}
 )
 

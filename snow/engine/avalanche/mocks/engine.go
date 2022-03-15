@@ -50,13 +50,13 @@ func (_m *Engine) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, co
 	return r0
 }
 
-// AcceptedStateSummary provides a mock function with given fields: validatorID, requestID, hashes
-func (_m *Engine) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, hashes []common.SummaryHash) error {
-	ret := _m.Called(validatorID, requestID, hashes)
+// AcceptedStateSummary provides a mock function with given fields: validatorID, requestID, summaryIDs
+func (_m *Engine) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaryIDs []common.SummaryID) error {
+	ret := _m.Called(validatorID, requestID, summaryIDs)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, []common.SummaryHash) error); ok {
-		r0 = rf(validatorID, requestID, hashes)
+	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, []common.SummaryID) error); ok {
+		r0 = rf(validatorID, requestID, summaryIDs)
 	} else {
 		r0 = ret.Error(0)
 	}

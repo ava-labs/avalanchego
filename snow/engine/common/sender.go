@@ -35,12 +35,12 @@ type StateSummarySender interface {
 type AcceptedStateSummarySender interface {
 	// SendGetAcceptedStateSummary requests that every node in [nodeIDs] sends an
 	// AcceptedStateSummary message with all the keys in [keys] that the node thinks are
-	// accepted, along with their [hashes].
+	// accepted, along with their [summaryIDs].
 	SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uint32, keys []SummaryKey)
 
 	// SendAcceptedStateSummary responds to a AcceptedStateSummary message with a
 	// set of summary keys that are accepted.
-	SendAcceptedStateSummary(nodeID ids.ShortID, requestID uint32, hashes []SummaryHash)
+	SendAcceptedStateSummary(nodeID ids.ShortID, requestID uint32, summaryIDs []SummaryID)
 }
 
 // FrontierSender defines how a consensus engine sends frontier messages to

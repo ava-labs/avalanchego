@@ -532,10 +532,10 @@ func (vm *VMClient) StateSyncGetLastSummary() (common.Summary, error) {
 		return nil, err
 	}
 
-	hash, err := ids.ToID(hashing.ComputeHash256(resp.Hash))
+	summaryID, err := ids.ToID(hashing.ComputeHash256(resp.SummaryId))
 	return &block.Summary{
 		SummaryKey:   common.SummaryKey(resp.Key),
-		SummaryHash:  common.SummaryHash(hash),
+		SummaryID:    common.SummaryID(summaryID),
 		ContentBytes: resp.Content,
 	}, err
 }
@@ -551,10 +551,10 @@ func (vm *VMClient) ParseSummary(summaryBytes []byte) (common.Summary, error) {
 		return nil, err
 	}
 
-	hash, err := ids.ToID(hashing.ComputeHash256(resp.Hash))
+	summaryID, err := ids.ToID(hashing.ComputeHash256(resp.SummaryId))
 	return &block.Summary{
 		SummaryKey:   common.SummaryKey(resp.Key),
-		SummaryHash:  common.SummaryHash(hash),
+		SummaryID:    common.SummaryID(summaryID),
 		ContentBytes: resp.Content,
 	}, err
 }
@@ -570,10 +570,10 @@ func (vm *VMClient) StateSyncGetSummary(key common.SummaryKey) (common.Summary, 
 		return nil, err
 	}
 
-	hash, err := ids.ToID(hashing.ComputeHash256(resp.Hash))
+	summaryID, err := ids.ToID(hashing.ComputeHash256(resp.SummaryId))
 	return &block.Summary{
 		SummaryKey:   common.SummaryKey(resp.Key),
-		SummaryHash:  common.SummaryHash(hash),
+		SummaryID:    common.SummaryID(summaryID),
 		ContentBytes: resp.Content,
 	}, err
 }
@@ -581,11 +581,11 @@ func (vm *VMClient) StateSyncGetSummary(key common.SummaryKey) (common.Summary, 
 func (vm *VMClient) StateSync(accepted []common.Summary) error {
 	requestedSummaries := make([]*vmproto.StateSyncGetLastSummaryResponse, len(accepted))
 	for i, sum := range accepted {
-		hash := sum.Hash()
+		summaryID := sum.ID()
 		requestedSummaries[i] = &vmproto.StateSyncGetLastSummaryResponse{
-			Key:     uint64(sum.Key()),
-			Hash:    hash[:],
-			Content: sum.Bytes(),
+			Key:       uint64(sum.Key()),
+			SummaryId: summaryID[:],
+			Content:   sum.Bytes(),
 		}
 	}
 	_, err := vm.client.StateSync(

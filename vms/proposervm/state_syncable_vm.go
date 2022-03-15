@@ -33,7 +33,7 @@ func init() {
 	errs := wrappers.Errs{}
 	errs.Add(
 		lc.RegisterType(&block.Summary{}),
-		lc.RegisterType(&common.SummaryHash{}),
+		lc.RegisterType(&common.SummaryID{}),
 		lc.RegisterType(&block.CoreSummaryContent{}),
 		lc.RegisterType(&block.ProposerSummaryContent{}),
 		stateSyncCodec.RegisterCodec(block.StateSyncDefaultKeysVersion, lc),
@@ -199,12 +199,12 @@ func (vm *VM) SetLastSummaryBlock(blkByte []byte) error {
 }
 
 func newSummary(key common.SummaryKey, content []byte) (common.Summary, error) {
-	hash, err := ids.ToID(hashing.ComputeHash256(content))
+	summaryID, err := ids.ToID(hashing.ComputeHash256(content))
 	return &block.Summary{
 		SummaryKey:   key,
-		SummaryHash:  common.SummaryHash(hash),
+		SummaryID:    common.SummaryID(summaryID),
 		ContentBytes: content,
-	}, fmt.Errorf("cannot compute summary hash: %w", err)
+	}, fmt.Errorf("cannot compute summary ID: %w", err)
 }
 
 func (vm *VM) buildProContentFrom(coreSummary common.Summary) (block.ProposerSummaryContent, error) {

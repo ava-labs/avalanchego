@@ -234,7 +234,7 @@ message StateSyncEnabledResponse {
 
 message StateSyncGetLastSummaryResponse {
     uint64 key = 1;
-    bytes hash = 2;
+    bytes summary_id = 2;
     bytes content = 3;
 }
 
@@ -244,7 +244,7 @@ message ParseSummaryRequest {
 
 message ParseSummaryResponse {
     uint64 key = 1;
-    bytes hash = 2;
+    bytes summary_id = 2;
     bytes content = 3;
 }
 
@@ -254,7 +254,7 @@ message StateSyncGetSummaryRequest {
 
 message StateSyncGetSummaryResponse {
     uint64 key = 1;
-    bytes hash = 2;
+    bytes summary_id = 2;
     bytes content = 3;
 }
 

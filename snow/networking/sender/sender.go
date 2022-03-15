@@ -372,18 +372,18 @@ func (s *Sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uin
 	}
 }
 
-func (s *Sender) SendAcceptedStateSummary(nodeID ids.ShortID, requestID uint32, summaryIDs []common.SummaryHash) {
-	hashesBytes := make([][]byte, len(summaryIDs))
-	encodeSummaryIDs(summaryIDs, hashesBytes)
+func (s *Sender) SendAcceptedStateSummary(nodeID ids.ShortID, requestID uint32, summaryIDs []common.SummaryID) {
+	summaryIDBytes := make([][]byte, len(summaryIDs))
+	encodeSummaryIDs(summaryIDs, summaryIDBytes)
 
 	if nodeID == s.ctx.NodeID {
-		inMsg := s.msgCreator.InboundAcceptedStateSummary(s.ctx.ChainID, requestID, hashesBytes, nodeID)
+		inMsg := s.msgCreator.InboundAcceptedStateSummary(s.ctx.ChainID, requestID, summaryIDBytes, nodeID)
 		go s.router.HandleInbound(inMsg)
 		return
 	}
 
 	// Create the outbound message.
-	outMsg, err := s.msgCreator.AcceptedStateSummary(s.ctx.ChainID, requestID, hashesBytes)
+	outMsg, err := s.msgCreator.AcceptedStateSummary(s.ctx.ChainID, requestID, summaryIDBytes)
 	if err != nil {
 		s.ctx.Log.Error(
 			"failed to build AcceptedStateSummary(%s, %d, %s): %s",
@@ -998,9 +998,9 @@ func (s *Sender) Accept(ctx *snow.ConsensusContext, containerID ids.ID, containe
 	return nil
 }
 
-func encodeSummaryIDs(summaryIDs []common.SummaryHash, result [][]byte) {
-	for i, containerID := range summaryIDs {
-		copy := containerID
+func encodeSummaryIDs(summaryIDs []common.SummaryID, result [][]byte) {
+	for i, summaryID := range summaryIDs {
+		copy := summaryID
 		result[i] = copy[:]
 	}
 }

@@ -71,13 +71,13 @@ func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uin
 		return nil
 	}
 
-	summaryIDs := make([]common.SummaryHash, 0, len(keys))
+	summaryIDs := make([]common.SummaryID, 0, len(keys))
 	for _, key := range keys {
 		summary, err := gh.ssVM.StateSyncGetSummary(key)
 		if err != nil {
 			continue
 		}
-		summaryIDs = append(summaryIDs, summary.Hash())
+		summaryIDs = append(summaryIDs, summary.ID())
 	}
 	gh.sender.SendAcceptedStateSummary(validatorID, requestID, summaryIDs)
 	return nil

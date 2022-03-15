@@ -355,8 +355,8 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.AcceptedStateSummary:
 		reqID := msg.Get(message.RequestID).(uint32)
-		hashes := msg.Get(message.MultiSummaryHashes).([]common.SummaryHash)
-		return engine.AcceptedStateSummary(nodeID, reqID, hashes)
+		summaryIDs := msg.Get(message.MultiSummaryIDs).([]common.SummaryID)
+		return engine.AcceptedStateSummary(nodeID, reqID, summaryIDs)
 
 	case message.GetAcceptedStateSummaryFailed:
 		reqID := msg.Get(message.RequestID).(uint32)

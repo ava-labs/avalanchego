@@ -14,13 +14,13 @@ const StateSyncDefaultKeysVersion = 0
 
 type Summary struct {
 	SummaryKey   common.SummaryKey
-	SummaryHash  common.SummaryHash
+	SummaryID    common.SummaryID
 	ContentBytes []byte
 }
 
-func (s *Summary) Bytes() []byte            { return s.ContentBytes }
-func (s *Summary) Key() common.SummaryKey   { return s.SummaryKey }
-func (s *Summary) Hash() common.SummaryHash { return s.SummaryHash }
+func (s *Summary) Bytes() []byte          { return s.ContentBytes }
+func (s *Summary) Key() common.SummaryKey { return s.SummaryKey }
+func (s *Summary) ID() common.SummaryID   { return s.SummaryID }
 
 type CoreSummaryContent struct {
 	BlkID   ids.ID `serialize:"true"`

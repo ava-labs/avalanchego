@@ -131,7 +131,7 @@ type InboundMsgBuilder interface {
 	InboundAcceptedStateSummary(
 		chainID ids.ID,
 		requestID uint32,
-		hashes [][]byte,
+		summaryIDs [][]byte,
 		nodeID ids.ShortID,
 	) InboundMessage
 }
@@ -450,15 +450,15 @@ func (b *inMsgBuilder) InboundGetAcceptedStateSummary(
 func (b *inMsgBuilder) InboundAcceptedStateSummary(
 	chainID ids.ID,
 	requestID uint32,
-	hashes [][]byte,
+	summaryIDs [][]byte,
 	nodeID ids.ShortID,
 ) InboundMessage {
 	return &inboundMessage{
 		op: AcceptedStateSummary,
 		fields: map[Field]interface{}{
-			ChainID:            chainID[:],
-			RequestID:          requestID,
-			MultiSummaryHashes: hashes,
+			ChainID:         chainID[:],
+			RequestID:       requestID,
+			MultiSummaryIDs: summaryIDs,
 		},
 		nodeID: nodeID,
 	}

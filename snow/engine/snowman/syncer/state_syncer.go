@@ -49,8 +49,8 @@ type stateSyncer struct {
 	frontierTracker
 	voteTracker
 
-	// hash --> (summary, weight)
-	weightedSummaries map[common.SummaryHash]weightedSummary
+	// summaryID --> (summary, weight)
+	weightedSummaries map[common.SummaryID]weightedSummary
 
 	// number of times the state sync has been attempted
 	attempts int
@@ -97,8 +97,8 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 	// even in case invalid summaries are received
 
 	if summary, err := ss.stateSyncVM.ParseSummary(summaryBytes); err == nil {
-		if _, exists := ss.weightedSummaries[summary.Hash()]; !exists {
-			ss.weightedSummaries[summary.Hash()] = weightedSummary{
+		if _, exists := ss.weightedSummaries[summary.ID()]; !exists {
+			ss.weightedSummaries[summary.ID()] = weightedSummary{
 				Summary: summary,
 			}
 		}
@@ -160,7 +160,7 @@ func (ss *stateSyncer) GetStateSummaryFrontierFailed(validatorID ids.ShortID, re
 }
 
 // StateSyncHandler interface implementation
-func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, hashes []common.SummaryHash) error {
+func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaryIDs []common.SummaryID) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("Received an Out-of-Sync Accepted - validator: %v - expectedRequestID: %v, requestID: %v",
@@ -180,8 +180,8 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 		weight = w
 	}
 
-	for _, hash := range hashes {
-		ws, ok := ss.weightedSummaries[hash]
+	for _, summaryID := range summaryIDs {
+		ws, ok := ss.weightedSummaries[summaryID]
 		if !ok {
 			// received vote for a unknown summary. Skipped
 			continue
@@ -193,7 +193,7 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 			newWeight = stdmath.MaxUint64
 		}
 		ws.weight = newWeight
-		ss.weightedSummaries[hash] = ws
+		ss.weightedSummaries[summaryID] = ws
 	}
 
 	if err := ss.sendGetAccepted(); err != nil {
@@ -251,7 +251,7 @@ func (ss *stateSyncer) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, re
 	// that they think none of the containers we sent them in GetAccepted are accepted
 	ss.markVoterFailed(validatorID)
 
-	return ss.AcceptedStateSummary(validatorID, requestID, []common.SummaryHash{})
+	return ss.AcceptedStateSummary(validatorID, requestID, []common.SummaryID{})
 }
 
 // Engine interface implementation
@@ -266,7 +266,7 @@ func (ss *stateSyncer) startup() error {
 	ss.started = true
 
 	// clear up messages trackers
-	ss.weightedSummaries = make(map[common.SummaryHash]weightedSummary)
+	ss.weightedSummaries = make(map[common.SummaryID]weightedSummary)
 	ss.frontierTracker.clear()
 	ss.voteTracker.clear()
 

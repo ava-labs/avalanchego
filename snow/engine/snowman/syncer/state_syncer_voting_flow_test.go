@@ -112,7 +112,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	fullVM.ParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
 		return &block.Summary{
 			SummaryKey:   key,
-			SummaryHash:  hash,
+			SummaryID:    summaryID,
 			ContentBytes: summaryBytes,
 		}, nil
 	}
@@ -150,7 +150,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	assert.False(syncer.hasSeederBeenContacted(responsiveBeaconID))
 
 	// valid summary is recorded
-	ws, ok := syncer.weightedSummaries[hash]
+	ws, ok := syncer.weightedSummaries[summaryID]
 	assert.True(ok)
 	assert.True(bytes.Equal(ws.Summary.Bytes(), summaryBytes))
 
@@ -280,7 +280,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	fullVM.ParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
 		return &block.Summary{
 			SummaryKey:   key,
-			SummaryHash:  hash,
+			SummaryID:    summaryID,
 			ContentBytes: summaryBytes,
 		}, nil
 	}
@@ -322,7 +322,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	fullVM.ParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
 		return &block.Summary{
 			SummaryKey:   key,
-			SummaryHash:  hash,
+			SummaryID:    summaryID,
 			ContentBytes: summaryBytes,
 		}, nil
 	}
@@ -385,7 +385,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	fullVM.ParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
 		return &block.Summary{
 			SummaryKey:   key,
-			SummaryHash:  hash,
+			SummaryID:    summaryID,
 			ContentBytes: summaryBytes,
 		}, nil
 	}
@@ -421,7 +421,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	assert.True(initiallyContactedVotersSize > 0)
 	assert.True(initiallyContactedVotersSize <= maxOutstandingStateSyncRequests)
 
-	_, found := syncer.weightedSummaries[hash]
+	_, found := syncer.weightedSummaries[summaryID]
 	assert.True(found)
 
 	// pick one of the voters that have been reached out
@@ -432,34 +432,34 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	assert.NoError(syncer.AcceptedStateSummary(
 		responsiveVoterID,
 		math.MaxInt32,
-		[]common.SummaryHash{hash},
+		[]common.SummaryID{summaryID},
 	))
 
 	// responsiveVoter still pending
 	assert.True(syncer.hasVoterBeenContacted(responsiveVoterID))
-	assert.True(syncer.weightedSummaries[hash].weight == 0)
+	assert.True(syncer.weightedSummaries[summaryID].weight == 0)
 
 	// check a response from unsolicited node is dropped
 	unsolicitedVoterID := ids.GenerateTestShortID()
 	assert.NoError(syncer.AcceptedStateSummary(
 		unsolicitedVoterID,
 		responsiveVoterReqID,
-		[]common.SummaryHash{hash},
+		[]common.SummaryID{summaryID},
 	))
-	assert.True(syncer.weightedSummaries[hash].weight == 0)
+	assert.True(syncer.weightedSummaries[summaryID].weight == 0)
 
 	// check a valid response is duly recorded
 	assert.NoError(syncer.AcceptedStateSummary(
 		responsiveVoterID,
 		responsiveVoterReqID,
-		[]common.SummaryHash{hash},
+		[]common.SummaryID{summaryID},
 	))
 
 	// responsiveBeacon not pending anymore
 	assert.False(syncer.hasSeederBeenContacted(responsiveVoterID))
 	voterWeight, found := beacons.GetWeight(responsiveVoterID)
 	assert.True(found)
-	assert.True(syncer.weightedSummaries[hash].weight == voterWeight)
+	assert.True(syncer.weightedSummaries[summaryID].weight == voterWeight)
 
 	// other listed voters are reached out
 	assert.True(
@@ -493,7 +493,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	fullVM.ParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
 		return &block.Summary{
 			SummaryKey:   key,
-			SummaryHash:  hash,
+			SummaryID:    summaryID,
 			ContentBytes: summaryBytes,
 		}, nil
 	}
@@ -529,7 +529,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	assert.True(initiallyContactedVotersSize > 0)
 	assert.True(initiallyContactedVotersSize <= maxOutstandingStateSyncRequests)
 
-	_, found := syncer.weightedSummaries[hash]
+	_, found := syncer.weightedSummaries[summaryID]
 	assert.True(found)
 
 	// pick one of the voters that have been reached out
@@ -540,9 +540,9 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	assert.NoError(syncer.AcceptedStateSummary(
 		responsiveVoterID,
 		responsiveVoterReqID,
-		[]common.SummaryHash{unknownHash},
+		[]common.SummaryID{unknownSummaryID},
 	))
-	_, found = syncer.weightedSummaries[unknownHash]
+	_, found = syncer.weightedSummaries[unknownSummaryID]
 	assert.False(found)
 
 	// check that responsiveVoter cannot cast another vote
@@ -550,9 +550,9 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	assert.NoError(syncer.AcceptedStateSummary(
 		responsiveVoterID,
 		responsiveVoterReqID,
-		[]common.SummaryHash{hash},
+		[]common.SummaryID{summaryID},
 	))
-	assert.True(syncer.weightedSummaries[hash].weight == 0)
+	assert.True(syncer.weightedSummaries[summaryID].weight == 0)
 
 	// other listed voters are reached out, even in the face of vote
 	// on unknown summary
@@ -587,7 +587,7 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	fullVM.ParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
 		return &block.Summary{
 			SummaryKey:   key,
-			SummaryHash:  hash,
+			SummaryID:    summaryID,
 			ContentBytes: summaryBytes,
 		}, nil
 	}
@@ -638,7 +638,7 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 			assert.NoError(syncer.AcceptedStateSummary(
 				voterID,
 				reqID,
-				[]common.SummaryHash{hash},
+				[]common.SummaryID{summaryID},
 			))
 			bw, _ := beacons.GetWeight(voterID)
 			cumulatedWeight += bw
@@ -682,7 +682,7 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 	fullVM.ParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
 		return &block.Summary{
 			SummaryKey:   key,
-			SummaryHash:  hash,
+			SummaryID:    summaryID,
 			ContentBytes: summaryBytes,
 		}, nil
 	}
@@ -740,7 +740,7 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 			assert.NoError(syncer.AcceptedStateSummary(
 				voterID,
 				reqID,
-				[]common.SummaryHash{hash},
+				[]common.SummaryID{summaryID},
 			))
 		}
 	}

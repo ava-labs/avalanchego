@@ -34,7 +34,7 @@ const (
 	Uptime                           // Used for Pong
 	SummaryBytes                     // Used for state sync
 	MultiSummaryKeys                 // Used for state sync
-	MultiSummaryHashes               // Used for state sync
+	MultiSummaryIDs                  // Used for state sync
 	VersionStruct                    // Used internally
 )
 
@@ -81,7 +81,7 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPackByte
 	case SummaryBytes:
 		return wrappers.TryPackBytes
-	case MultiSummaryHashes:
+	case MultiSummaryIDs:
 		return wrappers.TryPackHashes
 	case MultiSummaryKeys:
 		return wrappers.TryPackSummaryKeys
@@ -133,7 +133,7 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackByte
 	case SummaryBytes:
 		return wrappers.TryUnpackBytes
-	case MultiSummaryHashes:
+	case MultiSummaryIDs:
 		return wrappers.TryUnpackHashes
 	case MultiSummaryKeys:
 		return wrappers.TryUnpackSummaryKeys
@@ -186,7 +186,7 @@ func (f Field) String() string {
 		return "Uptime"
 	case SummaryBytes:
 		return "Summary"
-	case MultiSummaryHashes:
+	case MultiSummaryIDs:
 		return "MultiSummaryHashes"
 	case MultiSummaryKeys:
 		return "MultiSummaryKeys"

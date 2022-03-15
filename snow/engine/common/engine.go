@@ -59,7 +59,7 @@ type GetStateSummaryHandler interface {
 type StateSyncHandler interface {
 	StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summary []byte) error
 	GetStateSummaryFrontierFailed(validatorID ids.ShortID, requestID uint32) error
-	AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, hashes []SummaryHash) error
+	AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaryIDs []SummaryID) error
 	GetAcceptedStateSummaryFailed(validatorID ids.ShortID, requestID uint32) error
 }
 
