@@ -122,10 +122,11 @@ type network struct {
 	// connect to. An entry is added to this set when we first start attempting
 	// to connect to the peer. An entry is deleted from this set once we have
 	// finished the handshake.
-	trackedIPs      map[ids.ShortID]*trackedIP
-	connectingPeers peer.Set
-	connectedPeers  peer.Set
-	closing         bool
+	trackedIPs         map[ids.ShortID]*trackedIP
+	manuallyTrackedIDs ids.ShortSet
+	connectingPeers    peer.Set
+	connectedPeers     peer.Set
+	closing            bool
 
 	// router is notified about all peer [Connected] and [Disconnected] events
 	// as well as all non-handshake peer messages.
@@ -523,7 +524,8 @@ func (n *network) Dispatch() error {
 
 func (n *network) WantsConnection(nodeID ids.ShortID) bool {
 	return n.config.Validators.Contains(constants.PrimaryNetworkID, nodeID) ||
-		n.config.Beacons.Contains(nodeID)
+		n.config.Beacons.Contains(nodeID) ||
+		n.manuallyTrackedIDs.Contains(nodeID)
 }
 
 func (n *network) ManuallyTrack(nodeID ids.ShortID, ip utils.IPDesc) {
@@ -545,6 +547,7 @@ func (n *network) ManuallyTrack(nodeID ids.ShortID, ip utils.IPDesc) {
 			Timestamp: 0,
 		})
 		n.trackedIPs[nodeID] = tracked
+		n.manuallyTrackedIDs.Add(nodeID)
 		n.dial(n.onCloseCtx, nodeID, tracked)
 	}
 }

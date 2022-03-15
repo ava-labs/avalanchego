@@ -365,9 +365,7 @@ func (n *Node) Dispatch() error {
 	}
 	// Add state sync nodes to the peer network
 	for i, peerIP := range n.Config.StateSyncIPs {
-		if !peerIP.Equal(n.Config.IP.IP()) {
-			n.Net.ManuallyTrack(n.Config.StateSyncIDs[i], peerIP)
-		}
+		n.Net.ManuallyTrack(n.Config.StateSyncIDs[i], peerIP)
 	}
 
 	// Start P2P connections
