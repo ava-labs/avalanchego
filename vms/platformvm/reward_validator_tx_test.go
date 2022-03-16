@@ -201,7 +201,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 
 	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
-	vdrNodeID := ids.GenerateTestShortID()
+	vdrNodeID := ids.GenerateTestNodeID()
 	vdrTx, err := vm.newAddValidatorTx(
 		vm.MinValidatorStake, // stakeAmt
 		vdrStartTime,
@@ -306,7 +306,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 
 	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
-	vdrNodeID := ids.GenerateTestShortID()
+	vdrNodeID := ids.GenerateTestNodeID()
 	vdrTx, err := vm.newAddValidatorTx(
 		vm.MinValidatorStake, // stakeAmt
 		vdrStartTime,
@@ -574,7 +574,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	}
 
 	currentStakers := secondVM.internalState.CurrentStakerChainState()
-	_, err = currentStakers.GetValidator(keys[1].PublicKey().Address())
+	_, err = currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address()))
 	if err == nil {
 		t.Fatal("should have removed a genesis validator")
 	}
@@ -706,7 +706,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	}
 
 	currentStakers := vm.internalState.CurrentStakerChainState()
-	_, err = currentStakers.GetValidator(keys[1].PublicKey().Address())
+	_, err = currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address()))
 	if err == nil {
 		t.Fatal("should have removed a genesis validator")
 	}

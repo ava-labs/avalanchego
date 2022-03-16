@@ -573,7 +573,7 @@ func TestGetStake(t *testing.T) {
 	// Make sure this works for pending stakers
 	// Add a pending staker
 	stakeAmt = service.vm.MinValidatorStake + 54321
-	pendingStakerNodeID := ids.GenerateTestShortID()
+	pendingStakerNodeID := ids.GenerateTestNodeID()
 	pendingStakerEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
 	tx, err = service.vm.newAddValidatorTx(
 		stakeAmt,
@@ -682,7 +682,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		stakeAmt,
 		delegatorStartTime,
 		delegatorEndTime,
-		validatorNodeID,
+		ids.NodeID(validatorNodeID),
 		ids.GenerateTestShortID(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		keys[0].PublicKey().Address(), // change addr

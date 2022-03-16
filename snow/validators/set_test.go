@@ -13,10 +13,10 @@ import (
 )
 
 func TestSetSet(t *testing.T) {
-	vdr0 := NewValidator(ids.ShortEmpty, 1)
-	vdr1 := NewValidator(ids.ShortID{0xFF}, math.MaxInt64-1)
+	vdr0 := NewValidator(ids.EmptyNodeID, 1)
+	vdr1 := NewValidator(ids.NodeID{0xFF}, math.MaxInt64-1)
 	// Should be discarded, because it has a weight of 0
-	vdr2 := NewValidator(ids.ShortID{0xAA}, 0)
+	vdr2 := NewValidator(ids.NodeID{0xAA}, 0)
 
 	s := NewSet()
 	err := s.Set([]Validator{vdr0, vdr1, vdr2})
@@ -38,8 +38,8 @@ func TestSetSet(t *testing.T) {
 }
 
 func TestSamplerSample(t *testing.T) {
-	vdr0 := ids.GenerateTestShortID()
-	vdr1 := ids.GenerateTestShortID()
+	vdr0 := ids.GenerateTestNodeID()
+	vdr1 := ids.GenerateTestNodeID()
 
 	s := NewSet()
 	err := s.AddWeight(vdr0, 1)
@@ -76,8 +76,8 @@ func TestSamplerSample(t *testing.T) {
 }
 
 func TestSamplerDuplicate(t *testing.T) {
-	vdr0 := ids.GenerateTestShortID()
-	vdr1 := ids.GenerateTestShortID()
+	vdr0 := ids.GenerateTestNodeID()
+	vdr1 := ids.GenerateTestNodeID()
 
 	s := NewSet()
 	err := s.AddWeight(vdr0, 1)
@@ -96,7 +96,7 @@ func TestSamplerDuplicate(t *testing.T) {
 }
 
 func TestSamplerContains(t *testing.T) {
-	vdr := ids.GenerateTestShortID()
+	vdr := ids.GenerateTestNodeID()
 
 	s := NewSet()
 	err := s.AddWeight(vdr, 1)
@@ -113,8 +113,8 @@ func TestSamplerContains(t *testing.T) {
 }
 
 func TestSamplerString(t *testing.T) {
-	vdr0 := ids.ShortEmpty
-	vdr1 := ids.ShortID{
+	vdr0 := ids.EmptyNodeID
+	vdr1 := ids.NodeID{
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 	}
@@ -134,9 +134,9 @@ func TestSamplerString(t *testing.T) {
 }
 
 func TestSetWeight(t *testing.T) {
-	vdr0 := ids.ShortID{1}
+	vdr0 := ids.NodeID{1}
 	weight0 := uint64(93)
-	vdr1 := ids.ShortID{2}
+	vdr1 := ids.NodeID{2}
 	weight1 := uint64(123)
 
 	s := NewSet()
@@ -152,13 +152,13 @@ func TestSetWeight(t *testing.T) {
 }
 
 func TestSetSubsetWeight(t *testing.T) {
-	vdr0 := ids.ShortID{1}
+	vdr0 := ids.NodeID{1}
 	weight0 := uint64(93)
-	vdr1 := ids.ShortID{2}
+	vdr1 := ids.NodeID{2}
 	weight1 := uint64(123)
-	vdr2 := ids.ShortID{3}
+	vdr2 := ids.NodeID{3}
 	weight2 := uint64(810)
-	subset := ids.ShortSet{}
+	subset := ids.NodeIDSet{}
 	subset.Add(vdr0)
 	subset.Add(vdr1)
 
@@ -180,8 +180,8 @@ func TestSetSubsetWeight(t *testing.T) {
 }
 
 func TestSamplerMasked(t *testing.T) {
-	vdr0 := ids.ShortEmpty
-	vdr1 := ids.ShortID{
+	vdr0 := ids.EmptyNodeID
+	vdr1 := ids.NodeID{
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 	}
