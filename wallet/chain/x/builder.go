@@ -10,7 +10,6 @@ import (
 	stdcontext "context"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -437,7 +436,7 @@ func (b *builder) NewImportTx(
 	return &avm.ImportTx{
 		BaseTx: avm.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
+			BlockchainID: b.backend.BlockchainID(),
 			Ins:          inputs,
 			Outs:         outputs,
 			Memo:         ops.Memo(),

@@ -33,6 +33,7 @@ var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 		if !e2e.GetEnableWhitelistTxTests() {
 			ginkgo.Skip("whitelist vtx tests are disabled; skipping")
 		}
+
 		uris := e2e.GetURIs()
 		gomega.Expect(uris).ShouldNot(gomega.BeEmpty())
 
@@ -49,9 +50,10 @@ var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 		ginkgo.By("collect whitelist vtx metrics", func() {
 			walletURI := uris[0]
 
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			// 5-second is enough to fetch initial UTXOs for test cluster in "primary.NewWallet"
+			ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
 			var err error
-			wallet, err = primary.NewWallet(ctx, walletURI, keys)
+			wallet, err = primary.NewWalletFromURI(ctx, walletURI, keys)
 			cancel()
 			gomega.Expect(err).Should(gomega.BeNil())
 		})
@@ -115,7 +117,7 @@ var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 			tests.Outf("{{green}}amount to transfer:{{/}} %d\n", amount)
 
 			tests.Outf("{{blue}}issuing regular, virtuous transaction at %q{{/}}\n", uris[0])
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
 			_, err = ewoqWallet.X().IssueBaseTx(
 				[]*avax.TransferableOutput{{
 					Asset: avax.Asset{
@@ -248,7 +250,7 @@ var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 
 			amount := genRandUint64(ewoqPrevBalX)
 			tests.Outf("{{blue}}issuing regular, virtuous transaction at %q{{/}}\n", uris[0])
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
 			_, err = ewoqWallet.X().IssueBaseTx(
 				[]*avax.TransferableOutput{{
 					Asset: avax.Asset{
