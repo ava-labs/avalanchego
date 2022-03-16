@@ -14,7 +14,7 @@ func TestNoEarlyTermResults(t *testing.T) {
 
 	vdr1 := ids.ShortID{1} // k = 1
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(vdr1)
 
 	factory := NewNoEarlyTermFactory()
@@ -41,7 +41,7 @@ func TestNoEarlyTermString(t *testing.T) {
 	vdr1 := ids.ShortID{1}
 	vdr2 := ids.ShortID{2} // k = 2
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -67,7 +67,7 @@ func TestNoEarlyTermDropsDuplicatedVotes(t *testing.T) {
 	vdr1 := ids.ShortID{1}
 	vdr2 := ids.ShortID{2} // k = 2
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,

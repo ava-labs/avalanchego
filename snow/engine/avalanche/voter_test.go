@@ -27,7 +27,7 @@ func TestVotingFinishesWithAbandonedDep(t *testing.T) {
 	vdr2 := ids.ShortID{2}
 	vdr3 := ids.ShortID{3}
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -36,7 +36,7 @@ func TestVotingFinishesWithAbandonedDep(t *testing.T) {
 	// add poll for request 1
 	transitive.polls.Add(1, vdrs)
 
-	vdrs = ids.ShortBag{}
+	vdrs = ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr3,
@@ -119,7 +119,7 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 	vdr2 := ids.ShortID{2}
 	vdr3 := ids.ShortID{3}
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -128,7 +128,7 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 	// add poll for request 1
 	transitive.polls.Add(1, vdrs)
 
-	vdrs = ids.ShortBag{}
+	vdrs = ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr3,
@@ -137,7 +137,7 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 	// add poll for request 2
 	transitive.polls.Add(2, vdrs)
 
-	vdrs = ids.ShortBag{}
+	vdrs = ids.NodeIDBag{}
 	vdrs.Add(
 		vdr2,
 		vdr3,
@@ -254,7 +254,7 @@ func TestSharedDependency(t *testing.T) {
 	vdr2 := ids.ShortID{2}
 	vdr3 := ids.ShortID{3}
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -263,7 +263,7 @@ func TestSharedDependency(t *testing.T) {
 	// add poll for request 1
 	transitive.polls.Add(1, vdrs)
 
-	vdrs = ids.ShortBag{}
+	vdrs = ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr3,
@@ -272,7 +272,7 @@ func TestSharedDependency(t *testing.T) {
 	// add poll for request 2
 	transitive.polls.Add(2, vdrs)
 
-	vdrs = ids.ShortBag{}
+	vdrs = ids.NodeIDBag{}
 	vdrs.Add(
 		vdr2,
 		vdr3,

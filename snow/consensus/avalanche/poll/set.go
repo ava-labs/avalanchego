@@ -87,7 +87,7 @@ func NewSet(
 // Add to the current set of polls
 // Returns true if the poll was registered correctly and the network sample
 //         should be made.
-func (s *set) Add(requestID uint32, vdrs ids.ShortBag) bool {
+func (s *set) Add(requestID uint32, vdrs ids.NodeIDBag) bool {
 	if _, exists := s.polls.Get(requestID); exists {
 		s.log.Debug("dropping poll due to duplicated requestID: %d", requestID)
 		return false

@@ -55,12 +55,12 @@ func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 	vdrs := []ids.ShortID{vdr1, vdr2, vdr3}
 
 	// create two polls for the two vtxs
-	vdrBag := ids.ShortBag{}
+	vdrBag := ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added := s.Add(1, vdrBag)
 	assert.True(t, added)
 
-	vdrBag = ids.ShortBag{}
+	vdrBag = ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(2, vdrBag)
 	assert.True(t, added)
@@ -108,12 +108,12 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 	vdrs := []ids.ShortID{vdr1, vdr2, vdr3}
 
 	// create two polls for the two vtxs
-	vdrBag := ids.ShortBag{}
+	vdrBag := ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added := s.Add(1, vdrBag)
 	assert.True(t, added)
 
-	vdrBag = ids.ShortBag{}
+	vdrBag = ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(2, vdrBag)
 	assert.True(t, added)
@@ -161,17 +161,17 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	vdrs := []ids.ShortID{vdr1, vdr2, vdr3}
 
 	// create three polls for the two vtxs
-	vdrBag := ids.ShortBag{}
+	vdrBag := ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added := s.Add(1, vdrBag)
 	assert.True(t, added)
 
-	vdrBag = ids.ShortBag{}
+	vdrBag = ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(2, vdrBag)
 	assert.True(t, added)
 
-	vdrBag = ids.ShortBag{}
+	vdrBag = ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(3, vdrBag)
 	assert.True(t, added)
@@ -227,7 +227,7 @@ func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 	vdr1 := ids.ShortID{1}
 	vdr2 := ids.ShortID{2} // k = 2
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -272,7 +272,7 @@ func TestCreateAndFinishFailedPoll(t *testing.T) {
 	vdr1 := ids.ShortID{1}
 	vdr2 := ids.ShortID{2} // k = 2
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -310,7 +310,7 @@ func TestSetString(t *testing.T) {
 
 	vdr1 := ids.ShortID{1} // k = 1
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(vdr1)
 
 	expected := `current polls: (Size = 1)

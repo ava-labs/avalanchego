@@ -566,9 +566,9 @@ func (t *Transitive) pullQuery(blkID ids.ID) {
 		return
 	}
 
-	vdrBag := ids.ShortBag{}
+	vdrBag := ids.NodeIDBag{}
 	for _, vdr := range vdrs {
-		vdrBag.Add(ids.ShortID(vdr.ID()))
+		vdrBag.Add(vdr.ID())
 	}
 
 	t.RequestID++
@@ -589,9 +589,9 @@ func (t *Transitive) pushQuery(blk snowman.Block) {
 		return
 	}
 
-	vdrBag := ids.ShortBag{}
+	vdrBag := ids.NodeIDBag{}
 	for _, vdr := range vdrs {
-		vdrBag.Add(ids.ShortID(vdr.ID()))
+		vdrBag.Add(vdr.ID())
 	}
 
 	t.RequestID++

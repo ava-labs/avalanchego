@@ -16,7 +16,7 @@ func TestEarlyTermNoTraversalResults(t *testing.T) {
 
 	vdr1 := ids.ShortID{1} // k = 1
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(vdr1)
 
 	factory := NewEarlyTermNoTraversalFactory(alpha)
@@ -45,7 +45,7 @@ func TestEarlyTermNoTraversalString(t *testing.T) {
 	vdr1 := ids.ShortID{1}
 	vdr2 := ids.ShortID{2} // k = 2
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -73,7 +73,7 @@ func TestEarlyTermNoTraversalDropsDuplicatedVotes(t *testing.T) {
 	vdr1 := ids.ShortID{1}
 	vdr2 := ids.ShortID{2} // k = 2
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -107,7 +107,7 @@ func TestEarlyTermNoTraversalTerminatesEarly(t *testing.T) {
 	vdr4 := ids.ShortID{4}
 	vdr5 := ids.ShortID{5} // k = 5
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -151,7 +151,7 @@ func TestEarlyTermNoTraversalForSharedAncestor(t *testing.T) {
 	vdr3 := ids.ShortID{3}
 	vdr4 := ids.ShortID{4}
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -187,7 +187,7 @@ func TestEarlyTermNoTraversalWithFastDrops(t *testing.T) {
 	vdr2 := ids.ShortID{2}
 	vdr3 := ids.ShortID{3} // k = 3
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -215,7 +215,7 @@ func TestEarlyTermNoTraversalWithWeightedResponses(t *testing.T) {
 	vdr1 := ids.ShortID{2}
 	vdr2 := ids.ShortID{3}
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -246,7 +246,7 @@ func TestEarlyTermNoTraversalDropWithWeightedResponses(t *testing.T) {
 	vdr1 := ids.ShortID{1}
 	vdr2 := ids.ShortID{2}
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,

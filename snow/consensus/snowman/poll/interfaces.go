@@ -14,7 +14,7 @@ import (
 type Set interface {
 	fmt.Stringer
 
-	Add(requestID uint32, vdrs ids.ShortBag) bool
+	Add(requestID uint32, vdrs ids.NodeIDBag) bool
 	Vote(requestID uint32, vdr ids.NodeID, vote ids.ID) []ids.Bag
 	Drop(requestID uint32, vdr ids.NodeID) []ids.Bag
 	Len() int
@@ -32,5 +32,5 @@ type Poll interface {
 
 // Factory creates a new Poll
 type Factory interface {
-	New(vdrs ids.ShortBag) Poll
+	New(vdrs ids.NodeIDBag) Poll
 }

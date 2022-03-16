@@ -556,9 +556,9 @@ func (t *Transitive) issueRepoll() {
 		return
 	}
 
-	vdrBag := ids.ShortBag{} // IDs of validators to be sampled
+	vdrBag := ids.NodeIDBag{} // IDs of validators to be sampled
 	for _, vdr := range vdrs {
-		vdrBag.Add(ids.ShortID(vdr.ID()))
+		vdrBag.Add(vdr.ID())
 	}
 
 	vdrList := vdrBag.List()
