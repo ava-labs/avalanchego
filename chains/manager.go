@@ -834,6 +834,9 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
 	}
 
+	// Create state-syncer, bootstrapper and engine. Note that the Start callback
+	// for state-syncer and bootstrap must be wrapped to ensure proper initialization
+
 	// create state sync gear
 	stateSyncCfg, err := syncer.NewConfig(
 		commonCfg,
@@ -896,6 +899,8 @@ func (m *manager) createSnowmanChain(
 		ctx.Lock.Lock()
 		defer ctx.Lock.Unlock()
 		switch ctx.GetState() {
+		case snow.StateSyncing:
+			return stateSyncer.HealthCheck()
 		case snow.Bootstrapping:
 			return bootstrapper.HealthCheck()
 		case snow.NormalOp:
