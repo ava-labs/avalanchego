@@ -30,7 +30,7 @@ func fundAddressByGenesis(addrs []common.Address) (string, error) {
 	balance := big.NewInt(0xffffffffffffff)
 	genesis := &core.Genesis{
 		Difficulty: common.Big0,
-		GasLimit:   uint64(5000000),
+		GasLimit:   uint64(999999),
 	}
 	funds := make(map[common.Address]core.GenesisAccount)
 	for _, addr := range addrs {
@@ -43,6 +43,7 @@ func fundAddressByGenesis(addrs []common.Address) (string, error) {
 	genesis.Config = &params.ChainConfig{
 		ChainID:            params.TestChainConfig.ChainID,
 		SubnetEVMTimestamp: big.NewInt(0),
+		// TODO seems to be some default to 99999?
 	}
 
 	bytes, err := json.Marshal(genesis)

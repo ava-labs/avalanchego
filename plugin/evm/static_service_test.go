@@ -33,6 +33,7 @@ func TestBuildGenesis(t *testing.T) {
 	genesis.Config.FeeConfig = params.DefaultFeeConfig
 	testGasLimit := big.NewInt(999999)
 	genesis.Config.FeeConfig.GasLimit = testGasLimit
+	genesis.GasLimit = testGasLimit.Uint64()
 
 	args := &BuildGenesisArgs{GenesisData: genesis}
 	reply := &BuildGenesisReply{}
@@ -70,6 +71,7 @@ func TestDecodeGenesis(t *testing.T) {
 	genesis.Config.FeeConfig = params.DefaultFeeConfig
 	testGasLimit := big.NewInt(999999)
 	genesis.Config.FeeConfig.GasLimit = testGasLimit
+	genesis.GasLimit = testGasLimit.Uint64()
 
 	args := &BuildGenesisArgs{GenesisData: genesis}
 	reply := &BuildGenesisReply{}
