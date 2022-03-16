@@ -28,7 +28,7 @@ The C-Chain supports the following API namespaces:
 
 Only the `eth` namespace is enabled by default. 
 To enable the other namespaces see the instructions for passing in the `coreth-config` parameter to AvalancheGo: https://docs.avax.network/build/references/command-line-interface#plugins.
-Full documentation for the C-Chain's API can be found [here.](https://docs.avax.network/build/avalanchego-apis/contract-chain-c-chain-api)
+Full documentation for the C-Chain's API can be found [here.](https://docs.avax.network/build/avalanchego-apis/c-chain)
 
 ## Compatibility
 
