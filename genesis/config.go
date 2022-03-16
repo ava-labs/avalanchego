@@ -150,6 +150,10 @@ var (
 	// genesis.
 	FujiConfig Config
 
+	// ColumbusConfig is the config that should be used to generate the columbus
+	// genesis.
+	ColumbusConfig Config
+
 	// LocalConfig is the config that should be used to generate a local
 	// genesis.
 	LocalConfig Config
@@ -158,12 +162,14 @@ var (
 func init() {
 	unparsedMainnetConfig := UnparsedConfig{}
 	unparsedFujiConfig := UnparsedConfig{}
+	unparsedColumbusConfig := UnparsedConfig{}
 	unparsedLocalConfig := UnparsedConfig{}
 
 	errs := wrappers.Errs{}
 	errs.Add(
 		json.Unmarshal([]byte(mainnetGenesisConfigJSON), &unparsedMainnetConfig),
 		json.Unmarshal([]byte(fujiGenesisConfigJSON), &unparsedFujiConfig),
+		json.Unmarshal([]byte(columbusGenesisConfigJSON), &unparsedColumbusConfig),
 		json.Unmarshal([]byte(localGenesisConfigJSON), &unparsedLocalConfig),
 	)
 	if errs.Errored() {
@@ -177,6 +183,11 @@ func init() {
 	fujiConfig, err := unparsedFujiConfig.Parse()
 	errs.Add(err)
 	FujiConfig = fujiConfig
+
+	columbusConfig, err := unparsedColumbusConfig.Parse()
+	errs.Add(err)
+	ColumbusConfig = columbusConfig
+
 
 	localConfig, err := unparsedLocalConfig.Parse()
 	errs.Add(err)
@@ -193,6 +204,8 @@ func GetConfig(networkID uint32) *Config {
 		return &MainnetConfig
 	case constants.FujiID:
 		return &FujiConfig
+	case constants.ColumbusID:
+		return &ColumbusConfig
 	case constants.LocalID:
 		return &LocalConfig
 	default:
