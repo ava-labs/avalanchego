@@ -1,33 +1,39 @@
-# syntax=docker/dockerfile:experimental
-
-# ============= Setting up base Stage ================
-# Set required AVALANCHE_VERSION parameter in build image script
-ARG AVALANCHE_VERSION
-
 # ============= Compilation Stage ================
 FROM golang:1.17.4-buster AS builder
 RUN apt-get update && apt-get install -y --no-install-recommends bash=5.0-4 git=1:2.20.1-2+deb10u3 make=4.2.1-1.2 gcc=4:8.3.0-1 musl-dev=1.1.21-2 ca-certificates=20200601~deb10u2 linux-headers-amd64
 
-WORKDIR /build
+ARG AVALANCHE_VERSION
 
-# Copy avalanche dependencies first (intermediate docker image caching)
-# Copy avalanchego directory if present (for manual CI case, which uses local dependency)
-COPY go.mod go.sum avalanchego* ./
+RUN mkdir -p $GOPATH/src/github.com/ava-labs
+WORKDIR $GOPATH/src/github.com/ava-labs
 
-# Download avalanche dependencies using go mod
+RUN git clone -b $AVALANCHE_VERSION --single-branch https://github.com/ava-labs/avalanchego.git
+
+# Copy coreth repo into desired location
+COPY . coreth
+
+# Set the workdir to AvalancheGo and update coreth dependency to local version
+WORKDIR $GOPATH/src/github.com/ava-labs/avalanchego
+# Run go mod download here to improve caching of AvalancheGo specific depednencies
+RUN go mod download
+# Replace the coreth dependency
+RUN go mod edit -replace github.com/ava-labs/coreth=../coreth
 RUN go mod download
 
-# Copy the code into the container
-COPY . .
-
-# Pass in CORETH_COMMIT as an arg to allow the build script to set this externally
-ARG CORETH_COMMIT
-ARG CURRENT_BRANCH
-
-RUN export CORETH_COMMIT=$CORETH_COMMIT && export CURRENT_BRANCH=$CURRENT_BRANCH && ./scripts/build.sh /build/evm
+# Build the AvalancheGo binary with local version of coreth.
+RUN ./scripts/build_avalanche.sh
+# Create the plugins directory in the standard location so the build directory will be recognized
+# as valid.
+RUN mkdir build/plugins
 
 # ============= Cleanup Stage ================
-FROM avaplatform/avalanchego:$AVALANCHE_VERSION AS builtImage
+FROM debian:11-slim AS execution
 
-# Copy the evm binary into the correct location in the container
-COPY --from=builder /build/evm /avalanchego/build/plugins/evm
+# Maintain compatibility with previous images
+RUN mkdir -p /avalanchego/build
+WORKDIR /avalanchego/build
+
+# Copy the executables into the container
+COPY --from=builder /go/src/github.com/ava-labs/avalanchego/build .
+
+CMD [ "./avalanchego" ]
