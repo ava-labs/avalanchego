@@ -105,11 +105,11 @@ var (
 	}
 )
 
-func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []ids.ShortID, []*Config) {
+func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []ids.NodeID, []*Config) {
 	var (
 		dialer    = newTestDialer()
 		listeners = make([]*testListener, count)
-		nodeIDs   = make([]ids.ShortID, count)
+		nodeIDs   = make([]ids.NodeID, count)
 		configs   = make([]*Config, count)
 	)
 	for i := 0; i < count; i++ {
@@ -141,7 +141,7 @@ func newMessageCreator(t *testing.T) message.Creator {
 	return mc
 }
 
-func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.ShortID, []Network, *sync.WaitGroup) {
+func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.NodeID, []Network, *sync.WaitGroup) {
 	assert := assert.New(t)
 
 	dialer, listeners, nodeIDs, configs := newTestNetwork(t, len(handlers))
@@ -172,7 +172,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 		config.Beacons = beacons
 		config.Validators = vdrs
 
-		var connected ids.ShortSet
+		var connected ids.NodeIDSet
 		net, err := NewNetwork(
 			config,
 			msgCreator,
@@ -197,7 +197,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 						close(onAllConnected)
 					}
 				},
-				DisconnectedF: func(nodeID ids.ShortID) {
+				DisconnectedF: func(nodeID ids.NodeID) {
 					t.Logf("%s disconnected from %s", config.MyNodeID, nodeID)
 
 					globalLock.Lock()
@@ -271,7 +271,7 @@ func TestSend(t *testing.T) {
 	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
 	assert.NoError(err)
 
-	toSend := ids.ShortSet{}
+	toSend := ids.NodeIDSet{}
 	toSend.Add(nodeIDs[1])
 	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, false)
 	assert.EqualValues(toSend, sentTo)

@@ -29,7 +29,7 @@ func (_m *DAGVM) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	ret := _m.Called(nodeID, msg)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, []byte) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, []byte) error); ok {
 		r0 = rf(nodeID, msg)
 	} else {
 		r0 = ret.Error(0)
@@ -43,7 +43,7 @@ func (_m *DAGVM) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.T
 	ret := _m.Called(nodeID, requestID, deadline, request)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, time.Time, []byte) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32, time.Time, []byte) error); ok {
 		r0 = rf(nodeID, requestID, deadline, request)
 	} else {
 		r0 = ret.Error(0)
@@ -57,7 +57,7 @@ func (_m *DAGVM) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
 	ret := _m.Called(nodeID, requestID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32) error); ok {
 		r0 = rf(nodeID, requestID)
 	} else {
 		r0 = ret.Error(0)
@@ -71,7 +71,7 @@ func (_m *DAGVM) AppResponse(nodeID ids.NodeID, requestID uint32, response []byt
 	ret := _m.Called(nodeID, requestID, response)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, []byte) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32, []byte) error); ok {
 		r0 = rf(nodeID, requestID, response)
 	} else {
 		r0 = ret.Error(0)
@@ -81,11 +81,11 @@ func (_m *DAGVM) AppResponse(nodeID ids.NodeID, requestID uint32, response []byt
 }
 
 // Connected provides a mock function with given fields: id, nodeVersion
-func (_m *DAGVM) Connected(id ids.ShortID, nodeVersion version.Application) error {
+func (_m *DAGVM) Connected(id ids.NodeID, nodeVersion version.Application) error {
 	ret := _m.Called(id, nodeVersion)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, version.Application) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, version.Application) error); ok {
 		r0 = rf(id, nodeVersion)
 	} else {
 		r0 = ret.Error(0)
@@ -141,11 +141,11 @@ func (_m *DAGVM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) 
 }
 
 // Disconnected provides a mock function with given fields: id
-func (_m *DAGVM) Disconnected(id ids.ShortID) error {
+func (_m *DAGVM) Disconnected(id ids.NodeID) error {
 	ret := _m.Called(id)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID) error); ok {
 		r0 = rf(id)
 	} else {
 		r0 = ret.Error(0)

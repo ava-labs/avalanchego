@@ -23,9 +23,9 @@ func TestVotingFinishesWithAbandonedDep(t *testing.T) {
 	assert.NoError(t, transitive.Start( /*startReqID*/ 0))
 
 	// prepare 3 validators
-	vdr1 := ids.ShortID{1}
-	vdr2 := ids.ShortID{2}
-	vdr3 := ids.ShortID{3}
+	vdr1 := ids.NodeID{1}
+	vdr2 := ids.NodeID{2}
+	vdr3 := ids.NodeID{3}
 
 	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
@@ -115,9 +115,9 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 	assert.NoError(t, transitive.Start( /*startReqID*/ 0))
 
 	// prepare 3 validators
-	vdr1 := ids.ShortID{1}
-	vdr2 := ids.ShortID{2}
-	vdr3 := ids.ShortID{3}
+	vdr1 := ids.NodeID{1}
+	vdr2 := ids.NodeID{2}
+	vdr3 := ids.NodeID{3}
 
 	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
@@ -250,9 +250,9 @@ func TestSharedDependency(t *testing.T) {
 	assert.NoError(t, transitive.Start( /*startReqID*/ 0))
 
 	// prepare 3 validators
-	vdr1 := ids.ShortID{1}
-	vdr2 := ids.ShortID{2}
-	vdr3 := ids.ShortID{3}
+	vdr1 := ids.NodeID{1}
+	vdr2 := ids.NodeID{2}
+	vdr3 := ids.NodeID{3}
 
 	vdrs := ids.NodeIDBag{}
 	vdrs.Add(

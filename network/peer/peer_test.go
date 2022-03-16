@@ -36,7 +36,7 @@ type rawTestPeer struct {
 	config         *Config
 	conn           net.Conn
 	cert           *x509.Certificate
-	nodeID         ids.ShortID
+	nodeID         ids.NodeID
 	inboundMsgChan <-chan message.InboundMessage
 }
 

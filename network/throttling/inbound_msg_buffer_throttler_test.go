@@ -18,7 +18,7 @@ func TestMsgBufferThrottler(t *testing.T) {
 	throttler, err := newInboundMsgBufferThrottler("", prometheus.NewRegistry(), 3)
 	assert.NoError(err)
 
-	nodeID1, nodeID2 := ids.GenerateTestShortID(), ids.GenerateTestShortID()
+	nodeID1, nodeID2 := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	// Acquire shouldn't block for first 3
 	throttler.Acquire(nodeID1)
 	throttler.Acquire(nodeID1)
