@@ -23,11 +23,11 @@ type Engine struct {
 }
 
 // Accepted provides a mock function with given fields: validatorID, requestID, containerIDs
-func (_m *Engine) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+func (_m *Engine) Accepted(validatorID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 	ret := _m.Called(validatorID, requestID, containerIDs)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, []ids.ID) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32, []ids.ID) error); ok {
 		r0 = rf(validatorID, requestID, containerIDs)
 	} else {
 		r0 = ret.Error(0)
@@ -37,11 +37,11 @@ func (_m *Engine) Accepted(validatorID ids.ShortID, requestID uint32, containerI
 }
 
 // AcceptedFrontier provides a mock function with given fields: validatorID, requestID, containerIDs
-func (_m *Engine) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+func (_m *Engine) AcceptedFrontier(validatorID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 	ret := _m.Called(validatorID, requestID, containerIDs)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, []ids.ID) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32, []ids.ID) error); ok {
 		r0 = rf(validatorID, requestID, containerIDs)
 	} else {
 		r0 = ret.Error(0)
@@ -51,11 +51,11 @@ func (_m *Engine) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, co
 }
 
 // Ancestors provides a mock function with given fields: validatorID, requestID, containers
-func (_m *Engine) Ancestors(validatorID ids.ShortID, requestID uint32, containers [][]byte) error {
+func (_m *Engine) Ancestors(validatorID ids.NodeID, requestID uint32, containers [][]byte) error {
 	ret := _m.Called(validatorID, requestID, containers)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, [][]byte) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32, [][]byte) error); ok {
 		r0 = rf(validatorID, requestID, containers)
 	} else {
 		r0 = ret.Error(0)
@@ -69,7 +69,7 @@ func (_m *Engine) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	ret := _m.Called(nodeID, msg)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, []byte) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, []byte) error); ok {
 		r0 = rf(nodeID, msg)
 	} else {
 		r0 = ret.Error(0)
@@ -83,7 +83,7 @@ func (_m *Engine) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.
 	ret := _m.Called(nodeID, requestID, deadline, request)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, time.Time, []byte) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32, time.Time, []byte) error); ok {
 		r0 = rf(nodeID, requestID, deadline, request)
 	} else {
 		r0 = ret.Error(0)
@@ -97,7 +97,7 @@ func (_m *Engine) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
 	ret := _m.Called(nodeID, requestID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32) error); ok {
 		r0 = rf(nodeID, requestID)
 	} else {
 		r0 = ret.Error(0)
@@ -111,7 +111,7 @@ func (_m *Engine) AppResponse(nodeID ids.NodeID, requestID uint32, response []by
 	ret := _m.Called(nodeID, requestID, response)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, []byte) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32, []byte) error); ok {
 		r0 = rf(nodeID, requestID, response)
 	} else {
 		r0 = ret.Error(0)
@@ -121,11 +121,11 @@ func (_m *Engine) AppResponse(nodeID ids.NodeID, requestID uint32, response []by
 }
 
 // Chits provides a mock function with given fields: validatorID, requestID, containerIDs
-func (_m *Engine) Chits(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+func (_m *Engine) Chits(validatorID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 	ret := _m.Called(validatorID, requestID, containerIDs)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, []ids.ID) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32, []ids.ID) error); ok {
 		r0 = rf(validatorID, requestID, containerIDs)
 	} else {
 		r0 = ret.Error(0)
@@ -135,11 +135,11 @@ func (_m *Engine) Chits(validatorID ids.ShortID, requestID uint32, containerIDs 
 }
 
 // Connected provides a mock function with given fields: id, nodeVersion
-func (_m *Engine) Connected(id ids.ShortID, nodeVersion version.Application) error {
+func (_m *Engine) Connected(id ids.NodeID, nodeVersion version.Application) error {
 	ret := _m.Called(id, nodeVersion)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, version.Application) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, version.Application) error); ok {
 		r0 = rf(id, nodeVersion)
 	} else {
 		r0 = ret.Error(0)
@@ -165,11 +165,11 @@ func (_m *Engine) Context() *snow.ConsensusContext {
 }
 
 // Disconnected provides a mock function with given fields: id
-func (_m *Engine) Disconnected(id ids.ShortID) error {
+func (_m *Engine) Disconnected(id ids.NodeID) error {
 	ret := _m.Called(id)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID) error); ok {
 		r0 = rf(id)
 	} else {
 		r0 = ret.Error(0)
@@ -179,11 +179,11 @@ func (_m *Engine) Disconnected(id ids.ShortID) error {
 }
 
 // Get provides a mock function with given fields: validatorID, requestID, containerID
-func (_m *Engine) Get(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error {
+func (_m *Engine) Get(validatorID ids.NodeID, requestID uint32, containerID ids.ID) error {
 	ret := _m.Called(validatorID, requestID, containerID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, ids.ID) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32, ids.ID) error); ok {
 		r0 = rf(validatorID, requestID, containerID)
 	} else {
 		r0 = ret.Error(0)
@@ -193,11 +193,11 @@ func (_m *Engine) Get(validatorID ids.ShortID, requestID uint32, containerID ids
 }
 
 // GetAccepted provides a mock function with given fields: validatorID, requestID, containerIDs
-func (_m *Engine) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+func (_m *Engine) GetAccepted(validatorID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 	ret := _m.Called(validatorID, requestID, containerIDs)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, []ids.ID) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32, []ids.ID) error); ok {
 		r0 = rf(validatorID, requestID, containerIDs)
 	} else {
 		r0 = ret.Error(0)
@@ -207,11 +207,11 @@ func (_m *Engine) GetAccepted(validatorID ids.ShortID, requestID uint32, contain
 }
 
 // GetAcceptedFailed provides a mock function with given fields: validatorID, requestID
-func (_m *Engine) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
+func (_m *Engine) GetAcceptedFailed(validatorID ids.NodeID, requestID uint32) error {
 	ret := _m.Called(validatorID, requestID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32) error); ok {
 		r0 = rf(validatorID, requestID)
 	} else {
 		r0 = ret.Error(0)
@@ -221,11 +221,11 @@ func (_m *Engine) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) e
 }
 
 // GetAcceptedFrontier provides a mock function with given fields: validatorID, requestID
-func (_m *Engine) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
+func (_m *Engine) GetAcceptedFrontier(validatorID ids.NodeID, requestID uint32) error {
 	ret := _m.Called(validatorID, requestID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32) error); ok {
 		r0 = rf(validatorID, requestID)
 	} else {
 		r0 = ret.Error(0)
@@ -235,11 +235,11 @@ func (_m *Engine) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32)
 }
 
 // GetAcceptedFrontierFailed provides a mock function with given fields: validatorID, requestID
-func (_m *Engine) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
+func (_m *Engine) GetAcceptedFrontierFailed(validatorID ids.NodeID, requestID uint32) error {
 	ret := _m.Called(validatorID, requestID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32) error); ok {
 		r0 = rf(validatorID, requestID)
 	} else {
 		r0 = ret.Error(0)
@@ -249,11 +249,11 @@ func (_m *Engine) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID u
 }
 
 // GetAncestors provides a mock function with given fields: validatorID, requestID, containerID
-func (_m *Engine) GetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error {
+func (_m *Engine) GetAncestors(validatorID ids.NodeID, requestID uint32, containerID ids.ID) error {
 	ret := _m.Called(validatorID, requestID, containerID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, ids.ID) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32, ids.ID) error); ok {
 		r0 = rf(validatorID, requestID, containerID)
 	} else {
 		r0 = ret.Error(0)
@@ -263,11 +263,11 @@ func (_m *Engine) GetAncestors(validatorID ids.ShortID, requestID uint32, contai
 }
 
 // GetAncestorsFailed provides a mock function with given fields: validatorID, requestID
-func (_m *Engine) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) error {
+func (_m *Engine) GetAncestorsFailed(validatorID ids.NodeID, requestID uint32) error {
 	ret := _m.Called(validatorID, requestID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32) error); ok {
 		r0 = rf(validatorID, requestID)
 	} else {
 		r0 = ret.Error(0)
@@ -277,11 +277,11 @@ func (_m *Engine) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) 
 }
 
 // GetFailed provides a mock function with given fields: validatorID, requestID
-func (_m *Engine) GetFailed(validatorID ids.ShortID, requestID uint32) error {
+func (_m *Engine) GetFailed(validatorID ids.NodeID, requestID uint32) error {
 	ret := _m.Called(validatorID, requestID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32) error); ok {
 		r0 = rf(validatorID, requestID)
 	} else {
 		r0 = ret.Error(0)
@@ -386,11 +386,11 @@ func (_m *Engine) Notify(_a0 common.Message) error {
 }
 
 // PullQuery provides a mock function with given fields: validatorID, requestID, containerID
-func (_m *Engine) PullQuery(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error {
+func (_m *Engine) PullQuery(validatorID ids.NodeID, requestID uint32, containerID ids.ID) error {
 	ret := _m.Called(validatorID, requestID, containerID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, ids.ID) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32, ids.ID) error); ok {
 		r0 = rf(validatorID, requestID, containerID)
 	} else {
 		r0 = ret.Error(0)
@@ -400,11 +400,11 @@ func (_m *Engine) PullQuery(validatorID ids.ShortID, requestID uint32, container
 }
 
 // PushQuery provides a mock function with given fields: validatorID, requestID, container
-func (_m *Engine) PushQuery(validatorID ids.ShortID, requestID uint32, container []byte) error {
+func (_m *Engine) PushQuery(validatorID ids.NodeID, requestID uint32, container []byte) error {
 	ret := _m.Called(validatorID, requestID, container)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, []byte) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32, []byte) error); ok {
 		r0 = rf(validatorID, requestID, container)
 	} else {
 		r0 = ret.Error(0)
@@ -414,11 +414,11 @@ func (_m *Engine) PushQuery(validatorID ids.ShortID, requestID uint32, container
 }
 
 // Put provides a mock function with given fields: validatorID, requestID, container
-func (_m *Engine) Put(validatorID ids.ShortID, requestID uint32, container []byte) error {
+func (_m *Engine) Put(validatorID ids.NodeID, requestID uint32, container []byte) error {
 	ret := _m.Called(validatorID, requestID, container)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, []byte) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32, []byte) error); ok {
 		r0 = rf(validatorID, requestID, container)
 	} else {
 		r0 = ret.Error(0)
@@ -428,11 +428,11 @@ func (_m *Engine) Put(validatorID ids.ShortID, requestID uint32, container []byt
 }
 
 // QueryFailed provides a mock function with given fields: validatorID, requestID
-func (_m *Engine) QueryFailed(validatorID ids.ShortID, requestID uint32) error {
+func (_m *Engine) QueryFailed(validatorID ids.NodeID, requestID uint32) error {
 	ret := _m.Called(validatorID, requestID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32) error); ok {
 		r0 = rf(validatorID, requestID)
 	} else {
 		r0 = ret.Error(0)
