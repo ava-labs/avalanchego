@@ -6,8 +6,9 @@ package vertex
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestParseInvalid(t *testing.T) {
