@@ -81,6 +81,10 @@ func StartTestPeer(
 		return nil, err
 	}
 
+	ipDesc := utils.IPDesc{
+		IP:   net.IPv6zero,
+		Port: 0,
+	}
 	peer := Start(
 		&Config{
 			Metrics:              metrics,
@@ -88,20 +92,15 @@ func StartTestPeer(
 			Log:                  logging.NoLog{},
 			InboundMsgThrottler:  throttling.NewNoInboundThrottler(),
 			OutboundMsgThrottler: throttling.NewNoOutboundThrottler(),
-			Network: &testNetwork{
-				mc: mc,
-
-				networkID: networkID,
-				ip: utils.IPDesc{
-					IP:   net.IPv6zero,
-					Port: 0,
-				},
-				version: version.CurrentApp,
-				signer:  tlsCert.PrivateKey.(crypto.Signer),
-				subnets: ids.Set{},
-
-				uptime: 100,
-			},
+			Network: NewTestNetwork(
+				mc,
+				networkID,
+				ipDesc,
+				version.CurrentApp,
+				tlsCert.PrivateKey.(crypto.Signer),
+				ids.Set{},
+				100,
+			),
 			Router:               router,
 			VersionCompatibility: version.GetCompatibility(networkID),
 			VersionParser:        version.NewDefaultApplicationParser(),
