@@ -89,7 +89,6 @@ func buildGenesisTest(t *testing.T, genesisJSON string) []byte {
 		t.Fatalf("Problem unmarshaling genesis JSON: %s", err)
 	}
 	args := &BuildGenesisArgs{GenesisData: genesis}
-	fmt.Println(genesisJSON)
 	reply := &BuildGenesisReply{}
 	err := ss.BuildGenesis(nil, args, reply)
 	if err != nil {

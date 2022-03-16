@@ -43,7 +43,6 @@ func fundAddressByGenesis(addrs []common.Address) (string, error) {
 	genesis.Config = &params.ChainConfig{
 		ChainID:            params.TestChainConfig.ChainID,
 		SubnetEVMTimestamp: big.NewInt(0),
-		// TODO seems to be some default to 99999?
 	}
 
 	bytes, err := json.Marshal(genesis)
