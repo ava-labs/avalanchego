@@ -310,6 +310,12 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 			head.BaseFee = g.Config.GetFeeConfig().MinBaseFee
 		}
 	}
+	if g.Config.FeeConfig.GasLimit.Uint64() != head.GasLimit {
+		panic(fmt.Sprintf(
+			"gas limit in fee config (%d) does not match gas limit in header (%d)",
+			g.Config.FeeConfig.GasLimit, head.GasLimit,
+		))
+	}
 	statedb.Commit(false)
 	if err := statedb.Database().TrieDB().Commit(root, true, nil); err != nil {
 		panic(fmt.Sprintf("unable to commit genesis block: %v", err))
