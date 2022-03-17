@@ -404,10 +404,10 @@ func (mr *MockInternalStateMockRecorder) GetUptime(nodeID interface{}) *gomock.C
 }
 
 // GetValidatorWeightDiffs mocks base method.
-func (m *MockInternalState) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.ShortID]*ValidatorWeightDiff, error) {
+func (m *MockInternalState) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetValidatorWeightDiffs", height, subnetID)
-	ret0, _ := ret[0].(map[ids.ShortID]*ValidatorWeightDiff)
+	ret0, _ := ret[0].(map[ids.NodeID]*ValidatorWeightDiff)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

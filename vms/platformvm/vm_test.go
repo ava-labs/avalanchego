@@ -820,7 +820,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		defaultWeight,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
-		ids.NodeID(nodeID),
+		nodeID,
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty, // change addr
@@ -903,7 +903,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 		defaultWeight,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
-		ids.NodeID(nodeID),
+		nodeID,
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
 		ids.ShortEmpty, // change addr
@@ -1370,7 +1370,7 @@ func TestCreateSubnet(t *testing.T) {
 		defaultWeight,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
-		ids.NodeID(nodeID),
+		nodeID,
 		createSubnetTx.ID(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
