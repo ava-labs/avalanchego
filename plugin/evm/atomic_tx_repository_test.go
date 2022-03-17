@@ -192,7 +192,7 @@ func TestAtomicRepositoryReadWriteSingleTx(t *testing.T) {
 	}
 	txMap := make(map[uint64][]*Tx)
 
-	writeTxs(t, repo, 0, 100, constTxsPerHeight(1), txMap, nil)
+	writeTxs(t, repo, 1, 100, constTxsPerHeight(1), txMap, nil)
 	verifyTxs(t, repo, txMap)
 }
 
@@ -205,7 +205,7 @@ func TestAtomicRepositoryReadWriteMultipleTxs(t *testing.T) {
 	}
 	txMap := make(map[uint64][]*Tx)
 
-	writeTxs(t, repo, 0, 100, constTxsPerHeight(10), txMap, nil)
+	writeTxs(t, repo, 1, 100, constTxsPerHeight(10), txMap, nil)
 	verifyTxs(t, repo, txMap)
 }
 
@@ -215,7 +215,7 @@ func TestAtomicRepositoryPreAP5Migration(t *testing.T) {
 
 	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
 	txMap := make(map[uint64][]*Tx)
-	addTxs(t, codec, acceptedAtomicTxDB, 0, 100, 1, txMap, nil)
+	addTxs(t, codec, acceptedAtomicTxDB, 1, 100, 1, txMap, nil)
 	if err := db.Commit(); err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +240,7 @@ func TestAtomicRepositoryPostAP5Migration(t *testing.T) {
 
 	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
 	txMap := make(map[uint64][]*Tx)
-	addTxs(t, codec, acceptedAtomicTxDB, 0, 100, 1, txMap, nil)
+	addTxs(t, codec, acceptedAtomicTxDB, 1, 100, 1, txMap, nil)
 	addTxs(t, codec, acceptedAtomicTxDB, 100, 200, 10, txMap, nil)
 	if err := db.Commit(); err != nil {
 		t.Fatal(err)

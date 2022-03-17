@@ -33,7 +33,7 @@ func TestIteratorCanIterate(t *testing.T) {
 	// since each test transaction generates random ID for blockchainID we should get
 	// multiple blockchain IDs per block in the overall combined atomic operation map
 	operationsMap := make(map[uint64]map[ids.ID]*atomic.Requests)
-	writeTxs(t, repo, 0, lastAcceptedHeight, constTxsPerHeight(3), nil, operationsMap)
+	writeTxs(t, repo, 1, lastAcceptedHeight, constTxsPerHeight(3), nil, operationsMap)
 
 	// create an atomic trie
 	// on create it will initialize all the transactions from the above atomic repository
@@ -45,7 +45,7 @@ func TestIteratorCanIterate(t *testing.T) {
 	assert.NotEqual(t, common.Hash{}, lastCommittedHash1)
 	assert.EqualValues(t, 1000, lastCommittedHeight1)
 
-	verifyOperations(t, atomicTrie1, codec, lastCommittedHash1, 0, 1000, operationsMap)
+	verifyOperations(t, atomicTrie1, codec, lastCommittedHash1, 1, 1000, operationsMap)
 
 	// iterate on a new atomic trie to make sure there is no resident state affecting the data and the
 	// iterator
@@ -56,7 +56,7 @@ func TestIteratorCanIterate(t *testing.T) {
 	assert.NotEqual(t, common.Hash{}, lastCommittedHash2)
 	assert.EqualValues(t, 1000, lastCommittedHeight2)
 
-	verifyOperations(t, atomicTrie2, codec, lastCommittedHash1, 0, 1000, operationsMap)
+	verifyOperations(t, atomicTrie2, codec, lastCommittedHash1, 1, 1000, operationsMap)
 }
 
 func TestIteratorHandlesInvalidData(t *testing.T) {
@@ -70,7 +70,7 @@ func TestIteratorHandlesInvalidData(t *testing.T) {
 	// since each test transaction generates random ID for blockchainID we should get
 	// multiple blockchain IDs per block in the overall combined atomic operation map
 	operationsMap := make(map[uint64]map[ids.ID]*atomic.Requests)
-	writeTxs(t, repo, 0, lastAcceptedHeight, constTxsPerHeight(3), nil, operationsMap)
+	writeTxs(t, repo, 1, lastAcceptedHeight, constTxsPerHeight(3), nil, operationsMap)
 
 	// create an atomic trie
 	// on create it will initialize all the transactions from the above atomic repository
@@ -82,7 +82,7 @@ func TestIteratorHandlesInvalidData(t *testing.T) {
 	assert.NotEqual(t, common.Hash{}, lastCommittedHash)
 	assert.EqualValues(t, 1000, lastCommittedHeight)
 
-	verifyOperations(t, atomicTrie, codec, lastCommittedHash, 0, 1000, operationsMap)
+	verifyOperations(t, atomicTrie, codec, lastCommittedHash, 1, 1000, operationsMap)
 
 	// Add a random key-value pair to the atomic trie in order to test that the iterator correctly
 	// handles an error when it runs into an unexpected key-value pair in the trie.

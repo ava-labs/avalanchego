@@ -118,7 +118,7 @@ func TestAtomicTrieInitialize(t *testing.T) {
 				t.Fatal(err)
 			}
 			operationsMap := make(map[uint64]map[ids.ID]*atomic.Requests)
-			writeTxs(t, repo, 0, test.lastAcceptedHeight+1, test.numTxsPerBlock, nil, operationsMap)
+			writeTxs(t, repo, 1, test.lastAcceptedHeight+1, test.numTxsPerBlock, nil, operationsMap)
 
 			// Construct the atomic trie for the first time
 			atomicTrie1, err := newAtomicTrie(db, testSharedMemory(), nil, repo, codec, test.lastAcceptedHeight, test.commitInterval)
@@ -132,7 +132,7 @@ func TestAtomicTrieInitialize(t *testing.T) {
 			}
 
 			// Verify the operations up to the expected commit height
-			verifyOperations(t, atomicTrie1, codec, rootHash1, 0, test.expectedCommitHeight, operationsMap)
+			verifyOperations(t, atomicTrie1, codec, rootHash1, 1, test.expectedCommitHeight, operationsMap)
 
 			// Construct the atomic trie a second time and ensure that it produces the same hash
 			atomicTrie2, err := newAtomicTrie(versiondb.New(memdb.New()), testSharedMemory(), nil, repo, codec, test.lastAcceptedHeight, test.commitInterval)
@@ -167,7 +167,7 @@ func TestAtomicTrieInitialize(t *testing.T) {
 			assert.NotEqual(t, common.Hash{}, updatedRoot)
 
 			// Verify the operations up to the new expected commit height
-			verifyOperations(t, atomicTrie1, codec, updatedRoot, 0, updatedLastCommitHeight, operationsMap)
+			verifyOperations(t, atomicTrie1, codec, updatedRoot, 1, updatedLastCommitHeight, operationsMap)
 
 			// Generate a new atomic trie to compare the root against.
 			atomicTrie3, err := newAtomicTrie(versiondb.New(memdb.New()), testSharedMemory(), nil, repo, codec, nextCommitHeight, test.commitInterval)
@@ -188,7 +188,7 @@ func TestIndexerInitializesOnlyOnce(t *testing.T) {
 	repo, err := NewAtomicTxRepository(db, codec, lastAcceptedHeight)
 	assert.NoError(t, err)
 	operationsMap := make(map[uint64]map[ids.ID]*atomic.Requests)
-	writeTxs(t, repo, 0, lastAcceptedHeight+1, constTxsPerHeight(2), nil, operationsMap)
+	writeTxs(t, repo, 1, lastAcceptedHeight+1, constTxsPerHeight(2), nil, operationsMap)
 
 	// Initialize atomic repository
 	atomicTrie, err := newAtomicTrie(db, testSharedMemory(), nil, repo, codec, lastAcceptedHeight, 10 /*commitHeightInterval*/)
@@ -307,7 +307,7 @@ func TestAtomicTrieSkipsBonusBlocks(t *testing.T) {
 		t.Fatal(err)
 	}
 	operationsMap := make(map[uint64]map[ids.ID]*atomic.Requests)
-	writeTxs(t, repo, 0, lastAcceptedHeight, constTxsPerHeight(numTxsPerBlock), nil, operationsMap)
+	writeTxs(t, repo, 1, lastAcceptedHeight, constTxsPerHeight(numTxsPerBlock), nil, operationsMap)
 
 	bonusBlocks := map[uint64]ids.ID{
 		10: {},
@@ -327,7 +327,7 @@ func TestAtomicTrieSkipsBonusBlocks(t *testing.T) {
 	for height := range bonusBlocks {
 		delete(operationsMap, height)
 	}
-	verifyOperations(t, atomicTrie, codec, rootHash, 0, expectedCommitHeight, operationsMap)
+	verifyOperations(t, atomicTrie, codec, rootHash, 1, expectedCommitHeight, operationsMap)
 }
 
 func TestIndexingNilShouldNotImpactTrie(t *testing.T) {
@@ -488,7 +488,7 @@ func TestApplyToSharedMemory(t *testing.T) {
 			repo, err := NewAtomicTxRepository(db, codec, test.lastAcceptedHeight)
 			assert.NoError(t, err)
 			operationsMap := make(map[uint64]map[ids.ID]*atomic.Requests)
-			writeTxs(t, repo, 0, test.lastAcceptedHeight+1, constTxsPerHeight(2), nil, operationsMap)
+			writeTxs(t, repo, 1, test.lastAcceptedHeight+1, constTxsPerHeight(2), nil, operationsMap)
 
 			// Initialize atomic repository
 			sharedMemories := newSharedMemories(db, testCChainID, blockChainID)
@@ -550,7 +550,7 @@ func BenchmarkAtomicTrieInit(b *testing.B) {
 	// add 25000 * 3 = 75000 transactions
 	repo, err := NewAtomicTxRepository(db, codec, lastAcceptedHeight)
 	assert.NoError(b, err)
-	writeTxs(b, repo, 0, lastAcceptedHeight, constTxsPerHeight(3), nil, operationsMap)
+	writeTxs(b, repo, 1, lastAcceptedHeight, constTxsPerHeight(3), nil, operationsMap)
 
 	var atomicTrie AtomicTrie
 	var hash common.Hash
@@ -568,7 +568,7 @@ func BenchmarkAtomicTrieInit(b *testing.B) {
 	b.StopTimer()
 
 	// Verify operations
-	verifyOperations(b, atomicTrie, codec, hash, 0, lastAcceptedHeight, operationsMap)
+	verifyOperations(b, atomicTrie, codec, hash, 1, lastAcceptedHeight, operationsMap)
 }
 
 func BenchmarkAtomicTrieIterate(b *testing.B) {
