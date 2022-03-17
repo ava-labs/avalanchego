@@ -682,7 +682,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		stakeAmt,
 		delegatorStartTime,
 		delegatorEndTime,
-		ids.NodeID(validatorNodeID),
+		validatorNodeID,
 		ids.GenerateTestShortID(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		keys[0].PublicKey().Address(), // change addr
