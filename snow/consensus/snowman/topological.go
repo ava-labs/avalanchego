@@ -30,6 +30,7 @@ func (TopologicalFactory) New() Consensus { return &Topological{} }
 type Topological struct {
 	metrics.Latency
 	metrics.Polls
+	metrics.Height
 
 	// pollNumber is the number of times RecordPolls has been called
 	pollNumber uint64
@@ -90,12 +91,25 @@ func (ts *Topological) Initialize(ctx *snow.ConsensusContext, params snowball.Pa
 	if err := params.Verify(); err != nil {
 		return err
 	}
-	if err := ts.Latency.Initialize("blks", "block(s)", ctx.Log, "", ctx.Registerer); err != nil {
+
+	latencyMetrics, err := metrics.NewLatency("blks", "block(s)", ctx.Log, "", ctx.Registerer)
+	if err != nil {
 		return err
 	}
-	if err := ts.Polls.Initialize("", ctx.Registerer); err != nil {
+	ts.Latency = latencyMetrics
+
+	pollsMetrics, err := metrics.NewPolls("", ctx.Registerer)
+	if err != nil {
 		return err
 	}
+	ts.Polls = pollsMetrics
+
+	heightMetrics, err := metrics.NewHeight("", ctx.Registerer)
+	if err != nil {
+		return err
+	}
+	ts.Height = heightMetrics
+
 	ts.leaves = ids.Set{}
 	ts.kahnNodes = make(map[ids.ID]kahnNode)
 	ts.ctx = ctx
@@ -106,6 +120,9 @@ func (ts *Topological) Initialize(ctx *snow.ConsensusContext, params snowball.Pa
 		rootID: {sm: ts},
 	}
 	ts.tail = rootID
+
+	// Initially set the height to the last accepted block.
+	ts.Height.Accepted(ts.height)
 	return nil
 }
 
@@ -274,7 +291,7 @@ func (ts *Topological) Finalized() bool { return len(ts.blocks) == 1 }
 
 // HealthCheck returns information about the consensus health.
 func (ts *Topological) HealthCheck() (interface{}, error) {
-	numOutstandingBlks := ts.Latency.ProcessingLen()
+	numOutstandingBlks := ts.Latency.NumProcessing()
 	isOutstandingBlks := numOutstandingBlks <= ts.params.MaxOutstandingItems
 	healthy := isOutstandingBlks
 	details := map[string]interface{}{
@@ -548,14 +565,15 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 		return err
 	}
 
-	ts.Latency.Accepted(pref, ts.pollNumber)
-
 	// Because this is the newest accepted block, this is the new head.
 	ts.head = pref
 	ts.height = child.Height()
 	// Remove the decided block from the set of processing IDs, as its status
 	// now implies its preferredness.
 	ts.preferredIDs.Remove(pref)
+
+	ts.Latency.Accepted(pref, ts.pollNumber)
+	ts.Height.Accepted(ts.height)
 
 	// Because ts.blocks contains the last accepted block, we don't delete the
 	// block from the blocks map here.

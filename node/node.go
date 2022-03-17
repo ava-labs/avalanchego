@@ -716,7 +716,7 @@ func (n *Node) initVMs() error {
 	// register any vms that need to be installed as plugins from disk
 	_, failedVMs, err := n.VMRegistry.Reload()
 	for failedVM, err := range failedVMs {
-		n.Log.Error("failed to register %s: %w", failedVM, err)
+		n.Log.Error("failed to register %s: %s", failedVM, err)
 	}
 	return err
 }

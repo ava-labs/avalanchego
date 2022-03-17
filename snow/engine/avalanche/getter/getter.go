@@ -20,9 +20,9 @@ import (
 // Get requests are always served, regardless node state (bootstrapping or normal operations).
 var _ common.AllGetsServer = &getter{}
 
-func New(manager vertex.Manager, commonCfg common.Config) (common.AllGetsServer, error) {
+func New(storage vertex.Storage, commonCfg common.Config) (common.AllGetsServer, error) {
 	gh := &getter{
-		manager: manager,
+		storage: storage,
 		sender:  commonCfg.Sender,
 		cfg:     commonCfg,
 		log:     commonCfg.Ctx.Log,
@@ -39,7 +39,7 @@ func New(manager vertex.Manager, commonCfg common.Config) (common.AllGetsServer,
 }
 
 type getter struct {
-	manager vertex.Manager
+	storage vertex.Storage
 	sender  common.Sender
 	cfg     common.Config
 
@@ -47,16 +47,16 @@ type getter struct {
 	getAncestorsVtxs metric.Averager
 }
 
-func (gh *getter) GetAcceptedFrontier(nodeID ids.NodeID, requestID uint32) error {
-	acceptedFrontier := gh.manager.Edge()
-	gh.sender.SendAcceptedFrontier(nodeID, requestID, acceptedFrontier)
+func (gh *getter) GetAcceptedFrontier(validatorID ids.NodeID, requestID uint32) error {
+	acceptedFrontier := gh.storage.Edge()
+	gh.sender.SendAcceptedFrontier(validatorID, requestID, acceptedFrontier)
 	return nil
 }
 
 func (gh *getter) GetAccepted(nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, vtxID := range containerIDs {
-		if vtx, err := gh.manager.GetVtx(vtxID); err == nil && vtx.Status() == choices.Accepted {
+		if vtx, err := gh.storage.GetVtx(vtxID); err == nil && vtx.Status() == choices.Accepted {
 			acceptedVtxIDs = append(acceptedVtxIDs, vtxID)
 		}
 	}
@@ -67,7 +67,7 @@ func (gh *getter) GetAccepted(nodeID ids.NodeID, requestID uint32, containerIDs 
 func (gh *getter) GetAncestors(nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
 	startTime := time.Now()
 	gh.log.Verbo("GetAncestors(%s, %d, %s) called", nodeID, requestID, vtxID)
-	vertex, err := gh.manager.GetVtx(vtxID)
+	vertex, err := gh.storage.GetVtx(vtxID)
 	if err != nil || vertex.Status() == choices.Unknown {
 		gh.log.Verbo("dropping getAncestors")
 		return nil // Don't have the requested vertex. Drop message.
@@ -114,7 +114,7 @@ func (gh *getter) GetAncestors(nodeID ids.NodeID, requestID uint32, vtxID ids.ID
 
 func (gh *getter) Get(nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
 	// If this engine has access to the requested vertex, provide it
-	if vtx, err := gh.manager.GetVtx(vtxID); err == nil {
+	if vtx, err := gh.storage.GetVtx(vtxID); err == nil {
 		gh.sender.SendPut(nodeID, requestID, vtxID, vtx.Bytes())
 	}
 	return nil

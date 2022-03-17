@@ -32,7 +32,6 @@ type State interface {
 	avax.StatusState
 	avax.SingletonState
 	TxState
-
 	DeduplicateTx(tx *UniqueTx) *UniqueTx
 }
 
@@ -45,41 +44,30 @@ type state struct {
 	uniqueTxs cache.Deduplicator
 }
 
-func NewState(db database.Database, genesisCodec, codec codec.Manager) State {
-	utxoDB := prefixdb.New(utxoStatePrefix, db)
-	statusDB := prefixdb.New(statusStatePrefix, db)
-	singletonDB := prefixdb.New(singletonStatePrefix, db)
-	txDB := prefixdb.New(txStatePrefix, db)
-
-	return &state{
-		UTXOState:      avax.NewUTXOState(utxoDB, codec),
-		StatusState:    avax.NewStatusState(statusDB),
-		SingletonState: avax.NewSingletonState(singletonDB),
-		TxState:        NewTxState(txDB, genesisCodec),
-
-		uniqueTxs: &cache.EvictableLRU{
-			Size: txDeduplicatorSize,
-		},
-	}
+type StateConfig struct {
+	DB                  database.Database
+	GenesisCodec, Codec codec.Manager
+	Metrics             prometheus.Registerer
 }
 
-func NewMeteredState(db database.Database, genesisCodec, codec codec.Manager, metrics prometheus.Registerer) (State, error) {
-	utxoDB := prefixdb.New(utxoStatePrefix, db)
-	statusDB := prefixdb.New(statusStatePrefix, db)
-	singletonDB := prefixdb.New(singletonStatePrefix, db)
-	txDB := prefixdb.New(txStatePrefix, db)
+func NewState(config StateConfig) (State, error) {
+	utxoDB := prefixdb.New(utxoStatePrefix, config.DB)
+	statusDB := prefixdb.New(statusStatePrefix, config.DB)
+	singletonDB := prefixdb.New(singletonStatePrefix, config.DB)
+	txDB := prefixdb.New(txStatePrefix, config.DB)
 
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, codec, metrics)
+	utxoState, err := avax.NewMeteredUTXOState(utxoDB, config.Codec, config.Metrics)
 	if err != nil {
 		return nil, err
 	}
 
-	statusState, err := avax.NewMeteredStatusState(statusDB, metrics)
+	statusState, err := avax.NewMeteredStatusState(statusDB, config.Metrics)
 	if err != nil {
 		return nil, err
 	}
 
-	txState, err := NewMeteredTxState(txDB, genesisCodec, metrics)
+	txState, err := NewMeteredTxState(txDB, config.GenesisCodec, config.Metrics)
+
 	return &state{
 		UTXOState:      utxoState,
 		StatusState:    statusState,

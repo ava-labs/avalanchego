@@ -14,14 +14,18 @@ type Parser interface {
 	ParseVtx(vertex []byte) (avalanche.Vertex, error)
 }
 
-// Parse the provided vertex bytes into a stateless vertex
-func Parse(vertex []byte) (StatelessVertex, error) {
+// Parse parses the provided vertex bytes into a stateless vertex
+func Parse(bytes []byte) (StatelessVertex, error) {
 	vtx := innerStatelessVertex{}
-	version, err := c.Unmarshal(vertex, &vtx)
+	version, err := c.Unmarshal(bytes, &vtx)
+	if err != nil {
+		return nil, err
+	}
 	vtx.Version = version
+
 	return statelessVertex{
 		innerStatelessVertex: vtx,
-		id:                   hashing.ComputeHash256Array(vertex),
-		bytes:                vertex,
-	}, err
+		id:                   hashing.ComputeHash256Array(bytes),
+		bytes:                bytes,
+	}, nil
 }
