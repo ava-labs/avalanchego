@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
@@ -288,7 +287,7 @@ func (c *client) GetStakingAssetID(ctx context.Context, subnetID ids.ID) (ids.ID
 func (c *client) GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.ShortID) ([]interface{}, error) {
 	nodeIDsStr := []string{}
 	for _, nodeID := range nodeIDs {
-		nodeIDsStr = append(nodeIDsStr, nodeID.PrefixedString(constants.NodeIDPrefix))
+		nodeIDsStr = append(nodeIDsStr, nodeID.String())
 	}
 	res := &GetCurrentValidatorsReply{}
 	err := c.requester.SendRequest(ctx, "getCurrentValidators", &GetCurrentValidatorsArgs{
@@ -301,7 +300,7 @@ func (c *client) GetCurrentValidators(ctx context.Context, subnetID ids.ID, node
 func (c *client) GetPendingValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.ShortID) ([]interface{}, []interface{}, error) {
 	nodeIDsStr := []string{}
 	for _, nodeID := range nodeIDs {
-		nodeIDsStr = append(nodeIDsStr, nodeID.PrefixedString(constants.NodeIDPrefix))
+		nodeIDsStr = append(nodeIDsStr, nodeID.String())
 	}
 	res := &GetPendingValidatorsReply{}
 	err := c.requester.SendRequest(ctx, "getPendingValidators", &GetPendingValidatorsArgs{

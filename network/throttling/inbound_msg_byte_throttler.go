@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -237,7 +236,7 @@ func (t *inboundMsgByteThrottler) Release(msgSize uint64, nodeID ids.NodeID) {
 		msgIntf, exists := t.waitingToAcquire.Get(msgID)
 		if !exists {
 			// This should never happen
-			t.log.Warn("couldn't find message %s from %s%s", msgID, constants.NodeIDPrefix, nodeID)
+			t.log.Warn("couldn't find message %s from %s", msgID, nodeID)
 			break
 		}
 		// Give [msg] all the bytes we can

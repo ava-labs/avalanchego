@@ -323,8 +323,8 @@ func (n *network) Connected(nodeID ids.NodeID) {
 	peer, ok := n.connectingPeers.GetByID(nodeID)
 	if !ok {
 		n.peerConfig.Log.Error(
-			"unexpectedly connected to %s%s when not marked as attempting to connect",
-			constants.NodeIDPrefix, nodeID,
+			"unexpectedly connected to %s when not marked as attempting to connect",
+			nodeID,
 		)
 		n.peersLock.Unlock()
 		return
@@ -360,9 +360,8 @@ func (n *network) Track(ip utils.IPCertDesc) {
 	nodeID := peer.CertToID(ip.Cert)
 	if !n.config.AllowPrivateIPs && ip.IPDesc.IsPrivate() {
 		n.peerConfig.Log.Verbo(
-			"dropping suggested connected to %s%s because the ip (%s) is private",
-			constants.NodeIDPrefix, nodeID,
-			ip.IPDesc,
+			"dropping suggested connected to %s because the ip (%s) is private",
+			nodeID, ip.IPDesc,
 		)
 		return
 	}
@@ -853,8 +852,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 	if !n.AllowConnection(nodeID) {
 		_ = tlsConn.Close()
 		n.peerConfig.Log.Verbo(
-			"dropping undesired connection to %s%s",
-			constants.NodeIDPrefix, nodeID,
+			"dropping undesired connection to %s", nodeID,
 		)
 		return nil
 	}
@@ -865,8 +863,8 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 	if n.closing {
 		_ = tlsConn.Close()
 		n.peerConfig.Log.Verbo(
-			"dropping connection to %s%s because we are shutting down the p2p network",
-			constants.NodeIDPrefix, nodeID,
+			"dropping connection to %s because we are shutting down the p2p network",
+			nodeID,
 		)
 		return nil
 	}
@@ -874,8 +872,8 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 	if _, connecting := n.connectingPeers.GetByID(nodeID); connecting {
 		_ = tlsConn.Close()
 		n.peerConfig.Log.Verbo(
-			"dropping duplicate connection to %s%s because we are already connecting to it",
-			constants.NodeIDPrefix, nodeID,
+			"dropping duplicate connection to %s because we are already connecting to it",
+			nodeID,
 		)
 		return nil
 	}
@@ -883,16 +881,13 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 	if _, connected := n.connectedPeers.GetByID(nodeID); connected {
 		_ = tlsConn.Close()
 		n.peerConfig.Log.Verbo(
-			"dropping duplicate connection to %s%s because we are already connected to it",
-			constants.NodeIDPrefix, nodeID,
+			"dropping duplicate connection to %s because we are already connected to it",
+			nodeID,
 		)
 		return nil
 	}
 
-	n.peerConfig.Log.Verbo(
-		"starting handshake with %s%s",
-		constants.NodeIDPrefix, nodeID,
-	)
+	n.peerConfig.Log.Verbo("starting handshake with %s", nodeID)
 
 	peer := peer.Start(n.peerConfig, tlsConn, cert, nodeID)
 	n.connectingPeers.Add(peer)

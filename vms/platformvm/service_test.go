@@ -674,7 +674,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	// Add a delegator
 	stakeAmt := service.vm.MinDelegatorStake + 12345
-	validatorNodeID := keys[1].PublicKey().Address()
+	validatorNodeID := ids.NodeID(keys[1].PublicKey().Address())
 	delegatorStartTime := uint64(defaultValidateStartTime.Unix())
 	delegatorEndTime := uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix())
 
@@ -716,7 +716,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	found := false
 	for i := 0; i < len(response.Validators) && !found; i++ {
 		vdr := response.Validators[i].(APIPrimaryValidator)
-		if vdr.NodeID != validatorNodeID.PrefixedString(constants.NodeIDPrefix) {
+		if vdr.NodeID != validatorNodeID.String() {
 			continue
 		}
 		found = true

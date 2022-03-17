@@ -8,7 +8,6 @@ import (
 	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
@@ -65,7 +64,7 @@ func (us UnparsedStaker) Parse() (Staker, error) {
 		DelegationFee: us.DelegationFee,
 	}
 
-	nodeID, err := ids.ShortFromPrefixedString(us.NodeID, constants.NodeIDPrefix)
+	nodeID, err := ids.NodeIDFromString(us.NodeID)
 	if err != nil {
 		return s, err
 	}

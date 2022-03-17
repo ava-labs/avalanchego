@@ -264,9 +264,8 @@ func (p *peer) Send(msg message.OutboundMessage) bool {
 	// Acquire space on the outbound message queue, or drop [msg] if we can't.
 	if !p.OutboundMsgThrottler.Acquire(msg, p.id) {
 		p.Log.Debug(
-			"dropping %s message to %s%s due to rate-limiting",
-			msg.Op(),
-			constants.NodeIDPrefix, p.id,
+			"dropping %s message to %s due to rate-limiting",
+			msg.Op(), p.id,
 		)
 		p.Metrics.SendFailed(msg)
 		return false
@@ -280,9 +279,8 @@ func (p *peer) Send(msg message.OutboundMessage) bool {
 
 	if !p.canSend {
 		p.Log.Debug(
-			"dropping %s message to %s%s due to a closed connection",
-			msg.Op(),
-			constants.NodeIDPrefix, p.id,
+			"dropping %s message to %s due to a closed connection",
+			msg.Op(), p.id,
 		)
 		p.OutboundMsgThrottler.Release(msg, p.id)
 		p.Metrics.SendFailed(msg)
@@ -298,9 +296,8 @@ func (p *peer) StartClose() {
 	p.startClosingOnce.Do(func() {
 		if err := p.conn.Close(); err != nil {
 			p.Log.Debug(
-				"closing connection to %s%s resulted in an error: %s",
-				constants.NodeIDPrefix, p.id,
-				err,
+				"closing connection to %s resulted in an error: %s",
+				p.id, err,
 			)
 		}
 
@@ -364,9 +361,8 @@ func (p *peer) readMessages() {
 		// Time out and close connection if we can't read the message length
 		if err := p.conn.SetReadDeadline(p.nextTimeout()); err != nil {
 			p.Log.Verbo(
-				"error setting the connection read timeout on %s%s: %s",
-				constants.NodeIDPrefix, p.id,
-				err,
+				"error setting the connection read timeout on %s: %s",
+				p.id, err,
 			)
 			return
 		}
@@ -374,9 +370,8 @@ func (p *peer) readMessages() {
 		// Read the message length
 		if _, err := io.ReadFull(reader, msgLenBytes); err != nil {
 			p.Log.Verbo(
-				"error reading from %s%s: %s",
-				constants.NodeIDPrefix, p.id,
-				err,
+				"error reading from %s: %s",
+				p.id, err,
 			)
 			return
 		}
@@ -386,11 +381,7 @@ func (p *peer) readMessages() {
 
 		// Make sure the message length is valid.
 		if msgLen > constants.DefaultMaxMessageSize {
-			p.Log.Verbo(
-				"too large message length %d from %s%s",
-				msgLen,
-				constants.NodeIDPrefix, p.id,
-			)
+			p.Log.Verbo("too large message length %d from %s", msgLen, p.id)
 			return
 		}
 
@@ -411,9 +402,8 @@ func (p *peer) readMessages() {
 		// Time out and close connection if we can't read message
 		if err := p.conn.SetReadDeadline(p.nextTimeout()); err != nil {
 			p.Log.Verbo(
-				"error setting the connection read timeout on %s%s: %s",
-				constants.NodeIDPrefix, p.id,
-				err,
+				"error setting the connection read timeout on %s: %s",
+				p.id, err,
 			)
 			onFinishedHandling()
 			return
@@ -423,28 +413,24 @@ func (p *peer) readMessages() {
 		msgBytes := make([]byte, msgLen)
 		if _, err := io.ReadFull(reader, msgBytes); err != nil {
 			p.Log.Verbo(
-				"error reading from %s%s: %s",
-				constants.NodeIDPrefix, p.id,
-				err,
+				"error reading from %s: %s",
+				p.id, err,
 			)
 			onFinishedHandling()
 			return
 		}
 
 		p.Log.Verbo(
-			"parsing message from %s%s:\n%s",
-			constants.NodeIDPrefix, p.id,
-			formatting.DumpBytes(msgBytes),
+			"parsing message from %s:\n%s",
+			p.id, formatting.DumpBytes(msgBytes),
 		)
 
 		// Parse the message
 		msg, err := p.MessageCreator.Parse(msgBytes, p.id, onFinishedHandling)
 		if err != nil {
 			p.Log.Verbo(
-				"failed to parse message from %s%s: %s\n%s",
-				constants.NodeIDPrefix, p.id,
-				err,
-				formatting.DumpBytes(msgBytes),
+				"failed to parse message from %s: %s\n%s",
+				p.id, err, formatting.DumpBytes(msgBytes),
 			)
 
 			p.Metrics.FailedToParse.Inc()
@@ -505,9 +491,8 @@ func (p *peer) writeMessages() {
 
 		msgBytes := msg.Bytes()
 		p.Log.Verbo(
-			"sending message to %s%s:\n%s",
-			constants.NodeIDPrefix, p.id,
-			formatting.DumpBytes(msgBytes),
+			"sending message to %s:\n%s",
+			p.id, formatting.DumpBytes(msgBytes),
 		)
 
 		msgLen := uint32(len(msgBytes))
@@ -519,9 +504,8 @@ func (p *peer) writeMessages() {
 			reader.Reset(byteSlice)
 			if err := p.conn.SetWriteDeadline(p.nextTimeout()); err != nil {
 				p.Log.Verbo(
-					"error setting write deadline to %s%s due to: %s",
-					constants.NodeIDPrefix, p.id,
-					err,
+					"error setting write deadline to %s due to: %s",
+					p.id, err,
 				)
 				p.OutboundMsgThrottler.Release(msg, p.id)
 				msg.DecRef()
@@ -529,9 +513,8 @@ func (p *peer) writeMessages() {
 			}
 			if _, err := io.CopyN(writer, &reader, int64(len((byteSlice)))); err != nil {
 				p.Log.Verbo(
-					"error writing to %s%s due to: %s",
-					constants.NodeIDPrefix, p.id,
-					err,
+					"error writing to %s due to: %s",
+					p.id, err,
 				)
 				p.OutboundMsgThrottler.Release(msg, p.id)
 				msg.DecRef()
@@ -542,9 +525,8 @@ func (p *peer) writeMessages() {
 		// Make sure the peer got the entire message
 		if err := writer.Flush(); err != nil {
 			p.Log.Verbo(
-				"couldn't flush writer to %s%s: %s",
-				constants.NodeIDPrefix, p.id,
-				err,
+				"couldn't flush writer to %s: %s",
+				p.id, err,
 			)
 			p.OutboundMsgThrottler.Release(msg, p.id)
 			msg.DecRef()
@@ -574,8 +556,8 @@ func (p *peer) sendPings() {
 		case <-sendPingsTicker.C:
 			if !p.Network.AllowConnection(p.id) {
 				p.Log.Debug(
-					"disconnecting from peer %s%s because the peer's connection is no longer desired",
-					constants.NodeIDPrefix, p.id,
+					"disconnecting from peer %s because the peer's connection is no longer desired",
+					p.id,
 				)
 				return
 			}
@@ -583,10 +565,8 @@ func (p *peer) sendPings() {
 			if p.finishedHandshake.GetValue() {
 				if err := p.VersionCompatibility.Compatible(p.version); err != nil {
 					p.Log.Debug(
-						"disconnecting from peer %s%s version (%s) not compatible: %s",
-						constants.NodeIDPrefix, p.id,
-						p.version,
-						err,
+						"disconnecting from peer %s version (%s) not compatible: %s",
+						p.id, p.version, err,
 					)
 					return
 				}
@@ -623,9 +603,8 @@ func (p *peer) handle(msg message.InboundMessage) {
 	}
 	if !p.finishedHandshake.GetValue() {
 		p.Log.Debug(
-			"dropping %s from %s%s because handshake isn't finished",
-			op,
-			constants.NodeIDPrefix, p.id,
+			"dropping %s from %s because handshake isn't finished",
+			op, p.id,
 		)
 		msg.OnFinishedHandling()
 		return
@@ -654,19 +633,14 @@ func (p *peer) handlePong(msg message.InboundMessage) {
 
 func (p *peer) handleVersion(msg message.InboundMessage) {
 	if p.gotVersion.GetValue() {
-		p.Log.Verbo(
-			"dropping duplicated version message from %s%s",
-			constants.NodeIDPrefix, p.id,
-		)
+		p.Log.Verbo("dropping duplicated version message from %s", p.id)
 		return
 	}
 
 	if peerNetworkID := msg.Get(message.NetworkID).(uint32); peerNetworkID != p.NetworkID {
 		p.Log.Debug(
-			"networkID of %s%s (%d) doesn't match our's (%d)",
-			constants.NodeIDPrefix, p.id,
-			peerNetworkID,
-			p.NetworkID,
+			"networkID of %s (%d) doesn't match our's (%d)",
+			p.id, peerNetworkID, p.NetworkID,
 		)
 		p.StartClose()
 		return
@@ -677,17 +651,13 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 	if math.Abs(peerTime-myTime) > p.MaxClockDifference.Seconds() {
 		if p.Beacons.Contains(p.id) {
 			p.Log.Warn(
-				"beacon %s%s reports time (%d) that is too far out of sync with our's (%d)",
-				constants.NodeIDPrefix, p.id,
-				uint64(peerTime),
-				uint64(myTime),
+				"beacon %s reports time (%d) that is too far out of sync with our's (%d)",
+				p.id, uint64(peerTime), uint64(myTime),
 			)
 		} else {
 			p.Log.Debug(
-				"peer %s%s reports time (%d) that is too far out of sync with our's (%d)",
-				constants.NodeIDPrefix, p.id,
-				uint64(peerTime),
-				uint64(myTime),
+				"peer %s reports time (%d) that is too far out of sync with our's (%d)",
+				p.id, uint64(peerTime), uint64(myTime),
 			)
 		}
 		p.StartClose()
@@ -698,9 +668,8 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 	peerVersion, err := p.VersionParser.Parse(peerVersionStr)
 	if err != nil {
 		p.Log.Debug(
-			"version of %s%s could not be parsed: %s",
-			constants.NodeIDPrefix, p.id,
-			err,
+			"version of %s could not be parsed: %s",
+			p.id, err,
 		)
 		p.StartClose()
 		return
@@ -710,24 +679,20 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 	if p.VersionCompatibility.Version().Before(peerVersion) {
 		if p.Beacons.Contains(p.id) {
 			p.Log.Info(
-				"beacon %s%s attempting to connect with newer version %s. You may want to update your client",
-				constants.NodeIDPrefix, p.id,
-				peerVersion,
+				"beacon %s attempting to connect with newer version %s. You may want to update your client",
+				p.id, peerVersion,
 			)
 		} else {
 			p.Log.Debug(
-				"peer %s%s attempting to connect with newer version %s. You may want to update your client",
-				constants.NodeIDPrefix, p.id,
-				peerVersion,
+				"peer %s attempting to connect with newer version %s. You may want to update your client",
+				p.id, peerVersion,
 			)
 		}
 	}
 
 	if err := p.VersionCompatibility.Compatible(peerVersion); err != nil {
-		p.Log.Verbo("peer %s%s version (%s) not compatible: %s",
-			constants.NodeIDPrefix, p.id,
-			peerVersion,
-			err,
+		p.Log.Verbo("peer %s version (%s) not compatible: %s",
+			p.id, peerVersion, err,
 		)
 		p.StartClose()
 		return
@@ -739,9 +704,8 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 	versionTime := msg.Get(message.VersionTime).(uint64)
 	if float64(versionTime)-myTime > p.MaxClockDifference.Seconds() {
 		p.Log.Debug(
-			"peer %s%s attempting to connect with version timestamp (%d) too far in the future",
-			constants.NodeIDPrefix, p.id,
-			versionTime,
+			"peer %s attempting to connect with version timestamp (%d) too far in the future",
+			p.id, versionTime,
 		)
 		p.StartClose()
 		return
@@ -755,9 +719,8 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 		subnetID, err := ids.ToID(subnetIDBytes)
 		if err != nil {
 			p.Log.Debug(
-				"tracked subnet of %s%s could not be parsed: %s",
-				constants.NodeIDPrefix, p.id,
-				err,
+				"tracked subnet of %s could not be parsed: %s",
+				p.id, err,
 			)
 			p.StartClose()
 			return
@@ -776,9 +739,8 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 		Signature: msg.Get(message.SigBytes).([]byte),
 	}
 	if err := p.ip.verify(p.cert); err != nil {
-		p.Log.Debug("signature verification failed for %s%s: %s",
-			constants.NodeIDPrefix, p.id,
-			err,
+		p.Log.Debug("signature verification failed for %s: %s",
+			p.id, err,
 		)
 		p.StartClose()
 		return

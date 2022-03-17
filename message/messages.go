@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 var (
@@ -68,7 +67,7 @@ func (inMsg *inboundMessage) OnFinishedHandling() {
 
 func (inMsg *inboundMessage) String() string {
 	sb := strings.Builder{}
-	sb.WriteString(fmt.Sprintf("(Op: %s, NodeID: %s%s", inMsg.op, constants.NodeIDPrefix, inMsg.nodeID))
+	sb.WriteString(fmt.Sprintf("(Op: %s, NodeID: %s", inMsg.op, inMsg.nodeID))
 	if requestIDIntf, exists := inMsg.fields[RequestID]; exists {
 		sb.WriteString(fmt.Sprintf(", RequestID: %d", requestIDIntf.(uint32)))
 	}

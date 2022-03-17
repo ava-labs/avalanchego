@@ -191,8 +191,8 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 
 	genesisValidators := make([]APIPrimaryValidator, len(keys))
 	for i, key := range keys {
-		id := key.PublicKey().Address()
-		addr, err := formatting.FormatBech32(hrp, id.Bytes())
+		nodeID := ids.NodeID(key.PublicKey().Address())
+		addr, err := formatting.FormatBech32(hrp, nodeID.Bytes())
 		if err != nil {
 			panic(err)
 		}
@@ -200,7 +200,7 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 			APIStaker: APIStaker{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
-				NodeID:    id.PrefixedString(constants.NodeIDPrefix),
+				NodeID:    nodeID.String(),
 			},
 			RewardOwner: &APIOwner{
 				Threshold: 1,
@@ -266,8 +266,8 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 
 	genesisValidators := make([]APIPrimaryValidator, len(keys))
 	for i, key := range keys {
-		id := key.PublicKey().Address()
-		addr, err := formatting.FormatBech32(hrp, id.Bytes())
+		nodeID := ids.NodeID(key.PublicKey().Address())
+		addr, err := formatting.FormatBech32(hrp, nodeID.Bytes())
 		if err != nil {
 			panic(err)
 		}
@@ -275,7 +275,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 			APIStaker: APIStaker{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
-				NodeID:    id.PrefixedString(constants.NodeIDPrefix),
+				NodeID:    nodeID.String(),
 			},
 			RewardOwner: &APIOwner{
 				Threshold: 1,

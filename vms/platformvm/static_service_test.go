@@ -13,8 +13,8 @@ import (
 )
 
 func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
-	id := ids.ShortID{1, 2, 3}
-	nodeID := id.PrefixedString(constants.NodeIDPrefix)
+	id := ids.NodeID{1, 2, 3}
+	nodeID := id.String()
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	addr, err := formatting.FormatBech32(hrp, id.Bytes())
 	if err != nil {
@@ -60,10 +60,10 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 }
 
 func TestBuildGenesisInvalidAmount(t *testing.T) {
-	id := ids.ShortID{1, 2, 3}
-	nodeID := id.PrefixedString(constants.NodeIDPrefix)
+	nodeID := ids.NodeID{1, 2, 3}
+	nodeIDStr := nodeID.String()
 	hrp := constants.NetworkIDToHRP[testNetworkID]
-	addr, err := formatting.FormatBech32(hrp, id.Bytes())
+	addr, err := formatting.FormatBech32(hrp, nodeID.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 		APIStaker: APIStaker{
 			StartTime: 0,
 			EndTime:   15,
-			NodeID:    nodeID,
+			NodeID:    nodeIDStr,
 		},
 		RewardOwner: &APIOwner{
 			Threshold: 1,
@@ -107,10 +107,10 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 }
 
 func TestBuildGenesisInvalidEndtime(t *testing.T) {
-	id := ids.ShortID{1, 2, 3}
-	nodeID := id.PrefixedString(constants.NodeIDPrefix)
+	nodeID := ids.NodeID{1, 2, 3}
+	nodeIDStr := nodeID.String()
 	hrp := constants.NetworkIDToHRP[testNetworkID]
-	addr, err := formatting.FormatBech32(hrp, id.Bytes())
+	addr, err := formatting.FormatBech32(hrp, nodeID.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 		APIStaker: APIStaker{
 			StartTime: 0,
 			EndTime:   5,
-			NodeID:    nodeID,
+			NodeID:    nodeIDStr,
 		},
 		RewardOwner: &APIOwner{
 			Threshold: 1,
@@ -155,10 +155,10 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 }
 
 func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
-	id := ids.ShortID{1}
-	nodeID := id.PrefixedString(constants.NodeIDPrefix)
+	nodeID := ids.NodeID{1}
+	nodeIDStr := nodeID.String()
 	hrp := constants.NetworkIDToHRP[testNetworkID]
-	addr, err := formatting.FormatBech32(hrp, id.Bytes())
+	addr, err := formatting.FormatBech32(hrp, nodeID.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 		APIStaker: APIStaker{
 			StartTime: 0,
 			EndTime:   20,
-			NodeID:    nodeID,
+			NodeID:    nodeIDStr,
 		},
 		RewardOwner: &APIOwner{
 			Threshold: 1,
@@ -188,7 +188,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 		APIStaker: APIStaker{
 			StartTime: 3,
 			EndTime:   15,
-			NodeID:    nodeID,
+			NodeID:    nodeIDStr,
 		},
 		RewardOwner: &APIOwner{
 			Threshold: 1,
@@ -204,7 +204,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 		APIStaker: APIStaker{
 			StartTime: 1,
 			EndTime:   10,
-			NodeID:    nodeID,
+			NodeID:    nodeIDStr,
 		},
 		RewardOwner: &APIOwner{
 			Threshold: 1,
