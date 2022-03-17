@@ -200,11 +200,14 @@ func (vm *VM) SetLastSummaryBlock(blkByte []byte) error {
 
 func newSummary(key common.SummaryKey, content []byte) (common.Summary, error) {
 	summaryID, err := ids.ToID(hashing.ComputeHash256(content))
+	if err != nil {
+		return nil, fmt.Errorf("cannot compute summary ID: %w", err)
+	}
 	return &block.Summary{
 		SummaryKey:   key,
 		SummaryID:    common.SummaryID(summaryID),
 		ContentBytes: content,
-	}, fmt.Errorf("cannot compute summary ID: %w", err)
+	}, nil
 }
 
 func (vm *VM) buildProContentFrom(coreSummary common.Summary) (block.ProposerSummaryContent, error) {

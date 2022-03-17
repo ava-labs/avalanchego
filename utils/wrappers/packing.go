@@ -596,9 +596,9 @@ func TryPackSummaryKeys(p *Packer, valIntf interface{}) {
 
 func TryUnpackSummaryKeys(p *Packer) interface{} {
 	sliceSize := p.UnpackInt()
-	res := []uint64{}
+	res := make([]uint64, sliceSize)
 	for i := uint32(0); i < sliceSize && !p.Errored(); i++ {
-		res = append(res, p.UnpackLong())
+		res[i] = p.UnpackLong()
 	}
 	return res
 }

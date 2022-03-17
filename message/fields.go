@@ -187,7 +187,7 @@ func (f Field) String() string {
 	case SummaryBytes:
 		return "Summary"
 	case MultiSummaryIDs:
-		return "MultiSummaryHashes"
+		return "MultiSummaryIDs"
 	case MultiSummaryKeys:
 		return "MultiSummaryKeys"
 	case VersionStruct:
