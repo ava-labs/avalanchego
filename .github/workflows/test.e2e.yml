@@ -25,3 +25,6 @@ jobs:
       - name: Run e2e tests
         shell: bash
         run: scripts/tests.e2e.sh ./build/avalanchego
+      - name: Run e2e tests for whitelist vtx
+        shell: bash
+        run: ENABLE_WHITELIST_VTX_TESTS=true ./scripts/tests.e2e.sh ./build/avalanchego

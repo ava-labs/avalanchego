@@ -110,7 +110,10 @@ type network struct {
 
 	// ensures the close of the network only happens once.
 	closeOnce sync.Once
-	onClose   chan struct{}
+	// Cancelled on close
+	onCloseCtx context.Context
+	// Call [onCloseCtxCancel] to cancel [onCloseCtx] during close()
+	onCloseCtxCancel func()
 
 	sendFailRateCalculator math.Averager
 
@@ -189,6 +192,8 @@ func NewNetwork(
 	}
 
 	peerConfig := &peer.Config{
+		ReadBufferSize:       config.PeerReadBufferSize,
+		WriteBufferSize:      config.PeerWriteBufferSize,
 		Metrics:              peerMetrics,
 		MessageCreator:       msgCreator,
 		Log:                  log,
@@ -205,6 +210,7 @@ func NewNetwork(
 		PongTimeout:          config.PingPongTimeout,
 		MaxClockDifference:   config.MaxClockDifference,
 	}
+	onCloseCtx, cancel := context.WithCancel(context.Background())
 	n := &network{
 		config:     config,
 		peerConfig: peerConfig,
@@ -217,7 +223,8 @@ func NewNetwork(
 		serverUpgrader:              peer.NewTLSServerUpgrader(config.TLSConfig),
 		clientUpgrader:              peer.NewTLSClientUpgrader(config.TLSConfig),
 
-		onClose: make(chan struct{}),
+		onCloseCtx:       onCloseCtx,
+		onCloseCtxCancel: cancel,
 
 		sendFailRateCalculator: math.NewSyncAverager(math.NewAverager(
 			0,
@@ -386,7 +393,7 @@ func (n *network) Track(ip utils.IPCertDesc) {
 				Timestamp: ip.Time,
 			})
 			n.trackedIPs[nodeID] = tracked
-			n.dial(nodeID, tracked)
+			n.dial(n.onCloseCtx, nodeID, tracked)
 		}
 	} else if n.WantsConnection(nodeID) {
 		tracked := newTrackedIP(&peer.UnsignedIP{
@@ -394,7 +401,7 @@ func (n *network) Track(ip utils.IPCertDesc) {
 			Timestamp: ip.Time,
 		})
 		n.trackedIPs[nodeID] = tracked
-		n.dial(nodeID, tracked)
+		n.dial(n.onCloseCtx, nodeID, tracked)
 	}
 }
 
@@ -537,7 +544,7 @@ func (n *network) ManuallyTrack(nodeID ids.NodeID, ip utils.IPDesc) {
 			Timestamp: 0,
 		})
 		n.trackedIPs[nodeID] = tracked
-		n.dial(nodeID, tracked)
+		n.dial(n.onCloseCtx, nodeID, tracked)
 	}
 }
 
@@ -590,7 +597,7 @@ func (n *network) getPeers(
 		}
 
 		trackedSubnets := peer.TrackedSubnets()
-		if subnetID != constants.PrimaryNetworkID && !trackedSubnets.Contains(subnetID) {
+		if !trackedSubnets.Contains(subnetID) {
 			continue
 		}
 
@@ -676,7 +683,7 @@ func (n *network) disconnectedFromConnecting(nodeID ids.NodeID) {
 		if n.WantsConnection(nodeID) {
 			tracked := tracked.trackNewIP(tracked.ip)
 			n.trackedIPs[nodeID] = tracked
-			n.dial(nodeID, tracked)
+			n.dial(n.onCloseCtx, nodeID, tracked)
 		} else {
 			tracked.stopTracking()
 			delete(n.trackedIPs, nodeID)
@@ -698,7 +705,7 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
 	if n.WantsConnection(nodeID) {
 		tracked := newTrackedIP(&peer.IP().IP)
 		n.trackedIPs[nodeID] = tracked
-		n.dial(nodeID, tracked)
+		n.dial(n.onCloseCtx, nodeID, tracked)
 	} else {
 		delete(n.trackedIPs, nodeID)
 	}
@@ -726,7 +733,7 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
 // If initiating a connection to [ip] fails, then dial will reattempt. However,
 // there is a randomized exponential backoff to avoid spamming connection
 // attempts.
-func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
+func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip *trackedIP) {
 	go func() {
 		n.metrics.numTracked.Inc()
 		defer n.metrics.numTracked.Dec()
@@ -761,12 +768,11 @@ func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 			// to an already connected peer here. It does prevent unnecessary
 			// outbound connections. Additionally, because the peer would
 			// immediately drop a duplicated connection, this prevents any
-			// "connection reset by peer" errors from interfeering with the
+			// "connection reset by peer" errors from interfering with the
 			// later duplicated connection check.
 			if connecting || connected {
 				n.peerConfig.Log.Verbo(
-					"exiting attempt to dial %s%s as we are already connected",
-					nodeID,
+					"exiting attempt to dial %s as we are already connected", nodeID,
 				)
 				return
 			}
@@ -778,8 +784,7 @@ func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 				n.config.MaxReconnectDelay,
 			)
 
-			// TODO: specify dial timeout
-			conn, err := n.dialer.Dial(context.TODO(), ip.ip.IP)
+			conn, err := n.dialer.Dial(ctx, ip.ip.IP)
 			if err != nil {
 				n.peerConfig.Log.Verbo(
 					"failed to reach %s, attempting again in %s",
@@ -915,8 +920,8 @@ func (n *network) StartClose() {
 		n.peersLock.Lock()
 		defer n.peersLock.Unlock()
 
-		close(n.onClose)
 		n.closing = true
+		n.onCloseCtxCancel()
 
 		for nodeID, tracked := range n.trackedIPs {
 			tracked.stopTracking()
@@ -992,7 +997,7 @@ func (n *network) runTimers() {
 
 	for {
 		select {
-		case <-n.onClose:
+		case <-n.onCloseCtx.Done():
 			return
 		case <-gossipPeerlists.C:
 			validatorIPs := n.sampleValidatorIPs()

@@ -111,6 +111,8 @@ func NewMetrics(
 	return m, errs.Err
 }
 
+// Sent updates the metrics for having sent [msg] and removes a reference from
+// the [msg].
 func (m *Metrics) Sent(msg message.OutboundMessage) {
 	op := msg.Op()
 	msgMetrics := m.MessageMetrics[op]
@@ -144,6 +146,8 @@ func (m *Metrics) MultipleSendsFailed(op message.Op, count int) {
 	msgMetrics.NumFailed.Add(float64(count))
 }
 
+// SendFailed updates the metrics for having failed to send [msg] and removes a
+// reference from the [msg].
 func (m *Metrics) SendFailed(msg message.OutboundMessage) {
 	op := msg.Op()
 	msgMetrics := m.MessageMetrics[op]

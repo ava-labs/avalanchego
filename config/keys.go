@@ -88,6 +88,8 @@ const (
 	NetworkMaxClockDifferenceKey                = "network-max-clock-difference"
 	NetworkAllowPrivateIPsKey                   = "network-allow-private-ips"
 	NetworkRequireValidatorToConnectKey         = "network-require-validator-to-connect"
+	NetworkPeerReadBufferSizeKey                = "network-peer-read-buffer-size"
+	NetworkPeerWriteBufferSizeKey               = "network-peer-write-buffer-size"
 	BenchlistFailThresholdKey                   = "benchlist-fail-threshold"
 	BenchlistDurationKey                        = "benchlist-duration"
 	BenchlistMinFailingDurationKey              = "benchlist-min-failing-duration"
