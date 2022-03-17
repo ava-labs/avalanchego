@@ -63,6 +63,7 @@ func NewDefaultChain(t *testing.T) (*ETHChain, chan core.NewTxPoolHeadEvent, <-c
 		ConstantinopleBlock: big.NewInt(0),
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
+		FeeConfig:           params.DefaultFeeConfig,
 	}
 
 	config.Genesis = &core.Genesis{
@@ -70,7 +71,7 @@ func NewDefaultChain(t *testing.T) (*ETHChain, chan core.NewTxPoolHeadEvent, <-c
 		Nonce:      0,
 		Number:     0,
 		ExtraData:  hexutil.MustDecode("0x00"),
-		GasLimit:   100000000,
+		GasLimit:   chainConfig.FeeConfig.GasLimit.Uint64(),
 		Difficulty: big.NewInt(0),
 		Alloc:      core.GenesisAlloc{fundedKey.Address: core.GenesisAccount{Balance: initialBalance}},
 	}
