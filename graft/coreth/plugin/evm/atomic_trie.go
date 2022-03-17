@@ -218,6 +218,7 @@ func nearestCommitHeight(blockNumber uint64, commitInterval uint64) uint64 {
 // Iterating from the last indexed height to lastAcceptedBlockNumber, making a single commit at the
 // most recent height divisible by the commitInterval.
 // Subsequent updates to this trie are made using the Index call as blocks are accepted.
+// Note: this method assumes no atomic txs are applied at genesis.
 func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 	start := time.Now()
 	a.log.Info("initializing atomic trie", "lastAcceptedBlockNumber", lastAcceptedBlockNumber)
@@ -227,10 +228,8 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 	finalCommitHeight := nearestCommitHeight(lastAcceptedBlockNumber, a.commitHeightInterval)
 	uncommittedOpsMap := make(map[uint64]map[ids.ID]*atomic.Requests, lastAcceptedBlockNumber-finalCommitHeight)
 
-	heightBytes := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(heightBytes, a.lastCommittedHeight)
-	// iterate by height, from lastCommittedHeight to the lastAcceptedBlockNumber
-	iter := a.repo.IterateByHeight(heightBytes)
+	// iterate by height, from [a.lastCommittedHeight+1] to [lastAcceptedBlockNumber]
+	iter := a.repo.IterateByHeight(a.lastCommittedHeight + 1)
 	defer iter.Release()
 
 	preCommitBlockIndexed := 0

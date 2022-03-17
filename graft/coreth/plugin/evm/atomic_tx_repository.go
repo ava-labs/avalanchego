@@ -42,7 +42,7 @@ type AtomicTxRepository interface {
 	Write(height uint64, txs []*Tx) error
 	WriteBonus(height uint64, txs []*Tx) error
 
-	IterateByHeight([]byte) database.Iterator
+	IterateByHeight(uint64) database.Iterator
 
 	IsBonusBlocksRepaired() (bool, error)
 	MarkBonusBlocksRepaired(repairedEntries uint64) error
@@ -348,7 +348,12 @@ func (a *atomicTxRepository) appendTxToHeightIndex(heightBytes []byte, tx *Tx) e
 	return a.indexTxsAtHeight(heightBytes, txs)
 }
 
-func (a *atomicTxRepository) IterateByHeight(heightBytes []byte) database.Iterator {
+// IterateByHeight returns an iterator beginning at [height].
+// Note [height] must be greater than 0 since we assume there are no
+// atomic txs in genesis.
+func (a *atomicTxRepository) IterateByHeight(height uint64) database.Iterator {
+	heightBytes := make([]byte, wrappers.LongLen)
+	binary.BigEndian.PutUint64(heightBytes, height)
 	return a.acceptedAtomicTxByHeightDB.NewIteratorWithStart(heightBytes)
 }
 
