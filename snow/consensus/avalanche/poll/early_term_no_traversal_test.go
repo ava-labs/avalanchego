@@ -59,7 +59,7 @@ func TestEarlyTermNoTraversalString(t *testing.T) {
 	poll.Vote(vdr1, votes)
 
 	expected := `waiting on Bag: (Size = 1)
-    ID[BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp]: Count = 1
+    ID[NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp]: Count = 1
 received UniqueBag: (Size = 1)
     ID[SYXsAycDPUu4z2ZksJD5fh5nTDcH3vCFHnpcVye5XuJ2jArg]: Members = 0000000000000002`
 	if result := poll.String(); expected != result {

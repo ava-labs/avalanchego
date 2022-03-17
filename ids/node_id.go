@@ -10,9 +10,9 @@ import (
 
 const NodeIDPrefix = "NodeID-"
 
-type NodeID ShortID
-
 var EmptyNodeID = NodeID{}
+
+type NodeID ShortID
 
 func (id NodeID) String() string {
 	return ShortID(id).PrefixedString(NodeIDPrefix)

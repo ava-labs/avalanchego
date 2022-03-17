@@ -316,7 +316,7 @@ func TestSetString(t *testing.T) {
 	expected := `current polls: (Size = 1)
     RequestID 0:
         waiting on Bag: (Size = 1)
-            ID[6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt]: Count = 1
+            ID[NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt]: Count = 1
         received Bag: (Size = 0)`
 	if !s.Add(0, vdrs) {
 		t.Fatalf("Should have been able to add a new poll")
