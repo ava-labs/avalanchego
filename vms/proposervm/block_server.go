@@ -11,7 +11,6 @@ import (
 
 var _ indexer.BlockServer = &VM{}
 
-// GetFullPostForkBlock implements BlockServer interface
 // Note: this is a contention heavy call that should be avoided
 // for frequent/repeated indexer ops
 func (vm *VM) GetFullPostForkBlock(blkID ids.ID) (snowman.Block, error) {
@@ -21,7 +20,6 @@ func (vm *VM) GetFullPostForkBlock(blkID ids.ID) (snowman.Block, error) {
 	return vm.getPostForkBlock(blkID)
 }
 
-// Commit implements BlockServer interface
 func (vm *VM) Commit() error {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()

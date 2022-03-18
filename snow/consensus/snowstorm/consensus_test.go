@@ -628,7 +628,10 @@ func AddNonEmptyWhitelistTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
+	ctx := snow.DefaultConsensusContextTest()
+	reg := prometheus.NewRegistry()
+	ctx.Registerer = reg
+	err := graph.Initialize(ctx, params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -670,7 +673,7 @@ func AddNonEmptyWhitelistTest(t *testing.T, factory Factory) {
 	// when added, no conflict
 	stx5 := createTestTx(5)
 	stx5.InputIDsV = []ids.ID{stx5.IDV}
-	stx5.WhitelistIsV = true
+	stx5.HasWhitelistV = true
 	stx5.WhitelistV = ids.Set{
 		tx1.IDV: struct{}{},
 		tx2.IDV: struct{}{},
@@ -685,7 +688,7 @@ func AddNonEmptyWhitelistTest(t *testing.T, factory Factory) {
 	// tx6 is prev tx that spends E, so stx7.out = tx6
 	stx7 := createTestTx(7)
 	stx7.InputIDsV = []ids.ID{stx7.IDV}
-	stx7.WhitelistIsV = true
+	stx7.HasWhitelistV = true
 	stx7.WhitelistV = ids.Set{
 		tx1.IDV: struct{}{},
 		tx2.IDV: struct{}{},
@@ -701,6 +704,35 @@ func AddNonEmptyWhitelistTest(t *testing.T, factory Factory) {
 		if err := graph.Add(tx); err != nil {
 			t.Fatal(err)
 		}
+	}
+
+	// check if stop vertex has been issued but not accepted
+	ms, err := reg.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, mf := range ms {
+		name := mf.GetName()
+		if name != "whitelist_tx_accepted_count" {
+			continue
+		}
+		found = true
+		count := float64(0.0)
+		for _, m := range mf.GetMetric() {
+			cnt := m.GetCounter()
+			if cnt == nil {
+				continue
+			}
+			count = cnt.GetValue()
+			break
+		}
+		if count != 0.0 {
+			t.Fatalf("whitelist_tx_accepted_count expected 0, got %f", count)
+		}
+	}
+	if !found {
+		t.Fatal("metric 'whitelist_tx_accepted_count' not found")
 	}
 
 	vset1 := graph.Virtuous()
@@ -773,9 +805,9 @@ func AddWhitelistedVirtuousTest(t *testing.T, factory Factory) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		InputIDsV:    []ids.ID{ids.GenerateTestID()},
-		BytesV:       utils.RandomBytes(32),
-		WhitelistIsV: true,
+		InputIDsV:     []ids.ID{ids.GenerateTestID()},
+		BytesV:        utils.RandomBytes(32),
+		HasWhitelistV: true,
 	}
 
 	txs := []*TestTx{tx0, tx1}
@@ -828,9 +860,9 @@ func WhitelistConflictsTest(t *testing.T, factory Factory) {
 				AcceptV: nil,
 				StatusV: choices.Processing,
 			},
-			InputIDsV:    []ids.ID{txID},
-			WhitelistV:   nil,
-			WhitelistIsV: false,
+			InputIDsV:     []ids.ID{txID},
+			HasWhitelistV: false,
+			WhitelistV:    nil,
 		}
 		allTxs[i] = tx
 		if err := graph.Add(tx); err != nil {
@@ -851,8 +883,8 @@ func WhitelistConflictsTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		InputIDsV:     []ids.ID{wlTxID},
+		HasWhitelistV: true,
 		WhitelistV:    whitelist,
-		WhitelistIsV:  true,
 		WhitelistErrV: nil,
 	}
 	if err := graph.Add(wlTx); err != nil {

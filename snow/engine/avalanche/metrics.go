@@ -14,9 +14,9 @@ type metrics struct {
 	numVtxRequests, numPendingVts,
 	numMissingTxs, pendingTxs,
 	blockerVtxs, blockerTxs prometheus.Gauge
+	whitelistVtxIssueSuccess, whitelistVtxIssueFailure prometheus.Counter
 }
 
-// Initialize implements the Engine interface
 func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error {
 	errs := wrappers.Errs{}
 	m.bootstrapFinished = prometheus.NewGauge(prometheus.GaugeOpts{
@@ -54,6 +54,16 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		Name:      "blocker_txs",
 		Help:      "Number of transactions that are blocking other transactions from being issued because they haven't been issued",
 	})
+	m.whitelistVtxIssueSuccess = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "whitelist_vtx_issue_success",
+		Help:      "Number of DAG linearization request issued (pending, not necessarily accepted)",
+	})
+	m.whitelistVtxIssueFailure = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "whitelist_vtx_issue_failure",
+		Help:      "Number of DAG linearization request issue failed (verification failure)",
+	})
 
 	errs.Add(
 		reg.Register(m.bootstrapFinished),
@@ -63,6 +73,8 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		reg.Register(m.pendingTxs),
 		reg.Register(m.blockerVtxs),
 		reg.Register(m.blockerTxs),
+		reg.Register(m.whitelistVtxIssueSuccess),
+		reg.Register(m.whitelistVtxIssueFailure),
 	)
 	return errs.Err
 }

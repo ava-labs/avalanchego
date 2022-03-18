@@ -114,7 +114,8 @@ func (t *inboundMsgBufferThrottler) Release(nodeID ids.ShortID) {
 	if len(waiting) == 1 {
 		delete(t.awaitingAcquire, nodeID)
 	} else {
-		t.awaitingAcquire[nodeID] = t.awaitingAcquire[nodeID][1:]
+		waiting[0] = nil
+		t.awaitingAcquire[nodeID] = waiting[1:]
 	}
 }
 

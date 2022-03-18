@@ -13,7 +13,6 @@ type metrics struct {
 	numBenched, weightBenched prometheus.Gauge
 }
 
-// Initialize implements the Engine interface
 func (m *metrics) Initialize(registerer prometheus.Registerer) error {
 	m.numBenched = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "benchlist",

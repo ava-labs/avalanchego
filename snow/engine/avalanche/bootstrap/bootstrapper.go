@@ -106,7 +106,6 @@ type bootstrapper struct {
 	awaitingTimeout bool
 }
 
-// Clear implements common.Bootstrapable interface
 func (b *bootstrapper) Clear() error {
 	if err := b.VtxBlocked.Clear(); err != nil {
 		return err
@@ -201,7 +200,6 @@ func (b *bootstrapper) Ancestors(vdr ids.ShortID, requestID uint32, vtxs [][]byt
 	return b.process(processVertices...)
 }
 
-// GetAncestorsFailed implements the AncestorsHandler interface
 func (b *bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) error {
 	vtxID, ok := b.OutstandingRequests.Remove(vdr, requestID)
 	if !ok {
@@ -212,7 +210,6 @@ func (b *bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) err
 	return b.fetch(vtxID)
 }
 
-// Connected implements the InternalHandler interface.
 func (b *bootstrapper) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
 	if err := b.VM.Connected(nodeID, nodeVersion); err != nil {
 		return err
@@ -230,7 +227,6 @@ func (b *bootstrapper) Connected(nodeID ids.ShortID, nodeVersion version.Applica
 	return nil
 }
 
-// Disconnected implements the InternalHandler interface.
 func (b *bootstrapper) Disconnected(nodeID ids.ShortID) error {
 	if err := b.VM.Disconnected(nodeID); err != nil {
 		return err
@@ -239,7 +235,6 @@ func (b *bootstrapper) Disconnected(nodeID ids.ShortID) error {
 	return b.WeightTracker.RemoveWeightForNode(nodeID)
 }
 
-// Timeout implements the InternalHandler interface.
 func (b *bootstrapper) Timeout() error {
 	if !b.awaitingTimeout {
 		return errUnexpectedTimeout
@@ -252,19 +247,14 @@ func (b *bootstrapper) Timeout() error {
 	return b.finish()
 }
 
-// Gossip implements the InternalHandler interface.
 func (b *bootstrapper) Gossip() error { return nil }
 
-// Shutdown implements the InternalHandler interface.
 func (b *bootstrapper) Shutdown() error { return nil }
 
-// Notify implements the InternalHandler interface.
 func (b *bootstrapper) Notify(common.Message) error { return nil }
 
-// Context implements the common.Engine interface.
 func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
 
-// Start implements the common.Engine interface.
 func (b *bootstrapper) Start(startReqID uint32) error {
 	b.Ctx.Log.Info("Starting bootstrap...")
 	b.Ctx.SetState(snow.Bootstrapping)
@@ -277,7 +267,6 @@ func (b *bootstrapper) Start(startReqID uint32) error {
 	return b.Startup()
 }
 
-// HealthCheck implements the common.Engine interface.
 func (b *bootstrapper) HealthCheck() (interface{}, error) {
 	vmIntf, vmErr := b.VM.HealthCheck()
 	intf := map[string]interface{}{
@@ -287,7 +276,6 @@ func (b *bootstrapper) HealthCheck() (interface{}, error) {
 	return intf, vmErr
 }
 
-// GetVM implements the common.Engine interface.
 func (b *bootstrapper) GetVM() common.VM { return b.VM }
 
 // Add the vertices in [vtxIDs] to the set of vertices that we need to fetch,
@@ -441,7 +429,6 @@ func (b *bootstrapper) process(vtxs ...avalanche.Vertex) error {
 	return b.fetch()
 }
 
-// ForceAccepted implements common.Bootstrapable interface
 // ForceAccepted starts bootstrapping. Process the vertices in [accepterContainerIDs].
 func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	if err := b.VM.SetState(snow.Bootstrapping); err != nil {

@@ -12,7 +12,6 @@ import (
 
 var _ Block = &postForkBlock{}
 
-// postForkBlock implements proposervm.Block
 type postForkBlock struct {
 	block.SignedBlock
 	postForkCommonComponents

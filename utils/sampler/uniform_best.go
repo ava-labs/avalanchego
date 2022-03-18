@@ -11,10 +11,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
-var errNoValidUniformSamplers = errors.New("no valid uniform samplers found")
+var (
+	errNoValidUniformSamplers = errors.New("no valid uniform samplers found")
 
-// uniformBest implements the Uniform interface.
-//
+	_ Uniform = &uniformBest{}
+)
+
 // Sampling is performed by using another implementation of the Uniform
 // interface.
 //

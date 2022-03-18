@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/metervm"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
@@ -98,7 +99,6 @@ type Manager interface {
 
 	// Returns true iff the chain with the given ID exists and is finished bootstrapping
 	IsBootstrapped(ids.ID) bool
-
 	Shutdown()
 }
 
@@ -144,7 +144,7 @@ type ManagerConfig struct {
 	Validators                  validators.Manager // Validators validating on this chain
 	NodeID                      ids.ShortID        // The ID of this node
 	NetworkID                   uint32             // ID of the network this node is connected to
-	Server                      *server.Server     // Handles HTTP API calls
+	Server                      server.Server      // Handles HTTP API calls
 	Keystore                    keystore.Keystore
 	AtomicMemory                *atomic.Memory
 	AVAXAssetID                 ids.ID
@@ -164,9 +164,7 @@ type ManagerConfig struct {
 
 	ConsensusGossipFrequency time.Duration
 
-	AppGossipValidatorSize     int
-	AppGossipNonValidatorSize  int
-	GossipAcceptedFrontierSize int
+	GossipConfig sender.GossipConfig
 
 	// Max Time to spend fetching a container and its
 	// ancestors when responding to a GetAncestors
@@ -325,11 +323,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	if chainParams.ID != constants.PlatformChainID && vmID == constants.PlatformVMID {
 		return nil, errCreatePlatformVM
 	}
-
-	primaryAlias, err := m.PrimaryAlias(chainParams.ID)
-	if err != nil {
-		primaryAlias = chainParams.ID.String()
-	}
+	primaryAlias := m.PrimaryAliasOrDefault(chainParams.ID)
 
 	// Create the log and context of the chain
 	chainLog, err := m.LogFactory.MakeChain(primaryAlias)
@@ -491,7 +485,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	return chain, nil
 }
 
-// Implements Manager.AddRegistrant
 func (m *manager) AddRegistrant(r Registrant) { m.registrants = append(m.registrants, r) }
 
 func (m *manager) unblockChains() {
@@ -543,19 +536,26 @@ func (m *manager) createAvalancheChain(
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
+	gossipConfig := m.GossipConfig
+	if sbConfigs, ok := m.SubnetConfigs[ctx.SubnetID]; ok && ctx.SubnetID != constants.PrimaryNetworkID {
+		gossipConfig = sbConfigs.GossipConfig
+	}
+
 	// Passes messages from the consensus engine to the network
-	sender := sender.Sender{}
-	if err := sender.Initialize(
+	sender, err := sender.New(
 		ctx,
 		m.MsgCreator,
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
-		m.AppGossipValidatorSize,
-		m.AppGossipNonValidatorSize,
-		m.GossipAcceptedFrontierSize,
-	); err != nil {
+		gossipConfig,
+	)
+	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
+	}
+
+	if err := m.ConsensusEvents.RegisterChain(ctx.ChainID, "gossip", sender, false); err != nil { // Set up the event dipatcher
+		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 
 	chainConfig, err := m.getChainConfig(ctx.ChainID)
@@ -566,6 +566,18 @@ func (m *manager) createAvalancheChain(
 	if m.MeterVMEnabled {
 		vm = metervm.NewVertexVM(vm)
 	}
+
+	// Handles serialization/deserialization of vertices and also the
+	// persistence of vertices
+	vtxManager := state.NewSerializer(
+		state.SerializerConfig{
+			ChainID:             ctx.ChainID,
+			VM:                  vm,
+			DB:                  vertexDB,
+			Log:                 ctx.Log,
+			XChainMigrationTime: version.GetXChainMigrationTime(ctx.NetworkID),
+		},
+	)
 	if err := vm.Initialize(
 		ctx.Context,
 		vmDBManager,
@@ -574,15 +586,10 @@ func (m *manager) createAvalancheChain(
 		chainConfig.Config,
 		msgChan,
 		fxs,
-		&sender,
+		sender,
 	); err != nil {
 		return nil, fmt.Errorf("error during vm's Initialize: %w", err)
 	}
-
-	// Handles serialization/deserialization of vertices and also the
-	// persistence of vertices
-	vtxManager := &state.Serializer{}
-	vtxManager.Initialize(ctx.Context, vm, vertexDB)
 
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
@@ -609,7 +616,7 @@ func (m *manager) createAvalancheChain(
 		SampleK:                        sampleK,
 		StartupAlpha:                   (3*bootstrapWeight + 3) / 4,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
-		Sender:                         &sender,
+		Sender:                         sender,
 		Subnet:                         sb,
 		Timer:                          handler,
 		RetryBootstrap:                 m.RetryBootstrap,
@@ -665,10 +672,8 @@ func (m *manager) createAvalancheChain(
 	handler.SetConsensus(engine)
 
 	// Register health check for this chain
-	chainAlias, err := m.PrimaryAlias(ctx.ChainID)
-	if err != nil {
-		chainAlias = ctx.ChainID.String()
-	}
+	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
+
 	// Grab the context lock before calling the chain's health check
 	check := health.CheckerFunc(func() (interface{}, error) {
 		ctx.Lock.Lock()
@@ -690,7 +695,7 @@ func (m *manager) createAvalancheChain(
 		Name:    chainAlias,
 		Engine:  engine,
 		Handler: handler,
-	}, err
+	}, nil
 }
 
 // Create a linear chain using the Snowman consensus engine
@@ -727,19 +732,26 @@ func (m *manager) createSnowmanChain(
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
+	gossipConfig := m.GossipConfig
+	if sbConfigs, ok := m.SubnetConfigs[ctx.SubnetID]; ok && ctx.SubnetID != constants.PrimaryNetworkID {
+		gossipConfig = sbConfigs.GossipConfig
+	}
+
 	// Passes messages from the consensus engine to the network
-	sender := sender.Sender{}
-	if err := sender.Initialize(
+	sender, err := sender.New(
 		ctx,
 		m.MsgCreator,
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
-		m.AppGossipValidatorSize,
-		m.AppGossipNonValidatorSize,
-		m.GossipAcceptedFrontierSize,
-	); err != nil {
+		gossipConfig,
+	)
+	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
+	}
+
+	if err := m.ConsensusEvents.RegisterChain(ctx.ChainID, "gossip", sender, false); err != nil { // Set up the event dipatcher
+		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 
 	// first vm to be init is P-Chain once, which provides validator interface to all ProposerVMs
@@ -783,7 +795,7 @@ func (m *manager) createSnowmanChain(
 		chainConfig.Config,
 		msgChan,
 		fxs,
-		&sender,
+		sender,
 	); err != nil {
 		return nil, err
 	}
@@ -813,7 +825,7 @@ func (m *manager) createSnowmanChain(
 		SampleK:                        sampleK,
 		StartupAlpha:                   (3*bootstrapWeight + 3) / 4,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
-		Sender:                         &sender,
+		Sender:                         sender,
 		Subnet:                         sb,
 		Timer:                          handler,
 		RetryBootstrap:                 m.RetryBootstrap,
@@ -867,10 +879,7 @@ func (m *manager) createSnowmanChain(
 	handler.SetConsensus(engine)
 
 	// Register health checks
-	chainAlias, err := m.PrimaryAlias(ctx.ChainID)
-	if err != nil {
-		chainAlias = ctx.ChainID.String()
-	}
+	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
 
 	check := health.CheckerFunc(func() (interface{}, error) {
 		ctx.Lock.Lock()

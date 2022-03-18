@@ -9,16 +9,16 @@ import (
 )
 
 var (
-	convertEToBase2         = math.Log(2)
-	_               Meter   = &continuousMeter{}
-	_               Factory = &ContinuousFactory{}
+	convertEToBase2 = math.Log(2)
+
+	_ Factory = &ContinuousFactory{}
+	_ Meter   = &continuousMeter{}
 )
 
 // ContinuousFactory implements the Factory interface by returning a continuous
 // time meter.
 type ContinuousFactory struct{}
 
-// New implements the Factory interface.
 func (ContinuousFactory) New(halflife time.Duration) Meter {
 	return NewMeter(halflife)
 }

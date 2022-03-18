@@ -7,7 +7,6 @@ import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
@@ -22,10 +21,11 @@ type Client interface {
 	GetNetworkID(context.Context) (uint32, error)
 	GetNetworkName(context.Context) (string, error)
 	GetBlockchainID(context.Context, string) (ids.ID, error)
-	Peers(context.Context) ([]network.PeerInfo, error)
+	Peers(context.Context) ([]Peer, error)
 	IsBootstrapped(context.Context, string) (bool, error)
 	GetTxFee(context.Context) (*GetTxFeeResponse, error)
 	Uptime(context.Context) (*UptimeResponse, error)
+	GetVMs(context.Context) (map[ids.ID][]string, error)
 }
 
 // Client implementation for an Info API Client
@@ -78,7 +78,7 @@ func (c *client) GetBlockchainID(ctx context.Context, alias string) (ids.ID, err
 	return res.BlockchainID, err
 }
 
-func (c *client) Peers(ctx context.Context) ([]network.PeerInfo, error) {
+func (c *client) Peers(ctx context.Context) ([]Peer, error) {
 	res := &PeersReply{}
 	err := c.requester.SendRequest(ctx, "peers", struct{}{}, res)
 	return res.Peers, err
@@ -102,4 +102,10 @@ func (c *client) Uptime(ctx context.Context) (*UptimeResponse, error) {
 	res := &UptimeResponse{}
 	err := c.requester.SendRequest(ctx, "uptime", struct{}{}, res)
 	return res, err
+}
+
+func (c *client) GetVMs(ctx context.Context) (map[ids.ID][]string, error) {
+	res := &GetVMsReply{}
+	err := c.requester.SendRequest(ctx, "getVMs", struct{}{}, res)
+	return res.VMs, err
 }

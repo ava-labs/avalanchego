@@ -29,6 +29,9 @@ type HeightIndexer interface {
 	// Returns whether the height index is fully repaired.
 	IsRepaired() bool
 
+	// MarkRepaired marks indexing repaired
+	MarkRepaired()
+
 	// Resumes repairing of the height index from the checkpoint.
 	RepairHeightIndex(context.Context) error
 }
@@ -68,6 +71,10 @@ func (hi *heightIndexer) IsRepaired() bool {
 	return hi.jobDone.GetValue()
 }
 
+func (hi *heightIndexer) MarkRepaired() {
+	hi.jobDone.SetValue(true)
+}
+
 // RepairHeightIndex ensures the height -> proBlkID height block index is well formed.
 // Starting from the checkpoint, it will go back to snowman++ activation fork
 // or genesis. PreFork blocks will be handled by innerVM height index.
@@ -77,7 +84,7 @@ func (hi *heightIndexer) IsRepaired() bool {
 func (hi *heightIndexer) RepairHeightIndex(ctx context.Context) error {
 	startBlkID, err := hi.state.GetCheckpoint()
 	if err == database.ErrNotFound {
-		hi.jobDone.SetValue(true)
+		hi.MarkRepaired()
 		return nil // nothing to do
 	}
 	if err != nil {
@@ -130,7 +137,7 @@ func (hi *heightIndexer) doRepair(ctx context.Context, currentProBlkID ids.ID, c
 			if err := hi.state.DeleteCheckpoint(); err != nil {
 				return err
 			}
-			hi.jobDone.SetValue(true)
+			hi.MarkRepaired()
 
 			// it will commit on exit
 			hi.log.Info(

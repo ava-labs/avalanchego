@@ -8,11 +8,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 var (
 	errNilMetadata           = errors.New("nil metadata is not valid")
 	errMetadataNotInitialize = errors.New("metadata was never initialized and is not valid")
+
+	_ verify.Verifiable = &Metadata{}
 )
 
 type Metadata struct {
@@ -37,7 +40,6 @@ func (md *Metadata) UnsignedBytes() []byte { return md.unsignedBytes }
 // Bytes returns the binary representation of this data
 func (md *Metadata) Bytes() []byte { return md.bytes }
 
-// Verify implements the verify.Verifiable interface
 func (md *Metadata) Verify() error {
 	switch {
 	case md == nil:

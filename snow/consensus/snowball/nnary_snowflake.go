@@ -9,6 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+var _ NnarySnowflake = &nnarySnowflake{}
+
 // nnarySnowflake is the implementation of a snowflake instance with an
 // unbounded number of choices
 type nnarySnowflake struct {
@@ -35,17 +37,14 @@ type nnarySnowflake struct {
 	finalized bool
 }
 
-// Initialize implements the NnarySnowflake interface
 func (sf *nnarySnowflake) Initialize(betaVirtuous, betaRogue int, choice ids.ID) {
 	sf.nnarySlush.Initialize(choice)
 	sf.betaVirtuous = betaVirtuous
 	sf.betaRogue = betaRogue
 }
 
-// Add implements the NnarySnowflake interface
 func (sf *nnarySnowflake) Add(choice ids.ID) { sf.rogue = sf.rogue || choice != sf.preference }
 
-// RecordSuccessfulPoll implements the NnarySnowflake interface
 func (sf *nnarySnowflake) RecordSuccessfulPoll(choice ids.ID) {
 	if sf.finalized {
 		return // This instace is already decided.
@@ -64,10 +63,8 @@ func (sf *nnarySnowflake) RecordSuccessfulPoll(choice ids.ID) {
 	sf.nnarySlush.RecordSuccessfulPoll(choice)
 }
 
-// RecordUnsuccessfulPoll implements the NnarySnowflake interface
 func (sf *nnarySnowflake) RecordUnsuccessfulPoll() { sf.confidence = 0 }
 
-// Finalized implements the NnarySnowflake interface
 func (sf *nnarySnowflake) Finalized() bool { return sf.finalized }
 
 func (sf *nnarySnowflake) String() string {

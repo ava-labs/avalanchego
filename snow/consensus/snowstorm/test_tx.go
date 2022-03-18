@@ -8,6 +8,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
+var _ Tx = &TestTx{}
+
 // TestTx is a useful test tx
 type TestTx struct {
 	choices.TestDecidable
@@ -15,26 +17,16 @@ type TestTx struct {
 	DependenciesV    []Tx
 	DependenciesErrV error
 	InputIDsV        []ids.ID
+	HasWhitelistV    bool
 	WhitelistV       ids.Set
-	WhitelistIsV     bool
 	WhitelistErrV    error
 	VerifyV          error
 	BytesV           []byte
 }
 
-// Dependencies implements the Tx interface
 func (t *TestTx) Dependencies() ([]Tx, error) { return t.DependenciesV, t.DependenciesErrV }
-
-// InputIDs implements the Tx interface
-func (t *TestTx) InputIDs() []ids.ID { return t.InputIDsV }
-
-// Whitelist implements the Tx.Whitelister interface
-func (t *TestTx) Whitelist() (ids.Set, bool, error) {
-	return t.WhitelistV, t.WhitelistIsV, t.WhitelistErrV
-}
-
-// Verify implements the Tx interface
-func (t *TestTx) Verify() error { return t.VerifyV }
-
-// Bytes returns the bits
-func (t *TestTx) Bytes() []byte { return t.BytesV }
+func (t *TestTx) InputIDs() []ids.ID          { return t.InputIDsV }
+func (t *TestTx) HasWhitelist() bool          { return t.HasWhitelistV }
+func (t *TestTx) Whitelist() (ids.Set, error) { return t.WhitelistV, t.WhitelistErrV }
+func (t *TestTx) Verify() error               { return t.VerifyV }
+func (t *TestTx) Bytes() []byte               { return t.BytesV }

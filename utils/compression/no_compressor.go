@@ -3,6 +3,8 @@
 
 package compression
 
+var _ Compressor = &noCompressor{}
+
 type noCompressor struct{}
 
 // Compress returns [msg]

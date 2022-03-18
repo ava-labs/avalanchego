@@ -75,6 +75,10 @@ func (service *Service) IssueTx(r *http.Request, args *api.FormattedTx, reply *a
 	return nil
 }
 
+func (service *Service) IssueStopVertex(_ *http.Request, _ *struct{}, _ *struct{}) error {
+	return service.vm.issueStopVertex()
+}
+
 // GetTxStatusReply defines the GetTxStatus replies returned from the API
 type GetTxStatusReply struct {
 	Status choices.Status `json:"status"`
@@ -447,16 +451,10 @@ func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs
 	reply.Balances = make([]Balance, assetIDs.Len())
 	i := 0
 	for assetID := range assetIDs {
-		if alias, err := service.vm.PrimaryAlias(assetID); err == nil {
-			reply.Balances[i] = Balance{
-				AssetID: alias,
-				Balance: json.Uint64(balances[assetID]),
-			}
-		} else {
-			reply.Balances[i] = Balance{
-				AssetID: assetID.String(),
-				Balance: json.Uint64(balances[assetID]),
-			}
+		alias := service.vm.PrimaryAliasOrDefault(assetID)
+		reply.Balances[i] = Balance{
+			AssetID: alias,
+			Balance: json.Uint64(balances[assetID]),
 		}
 		i++
 	}

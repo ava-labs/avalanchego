@@ -34,7 +34,7 @@ type LinkedDB interface {
 }
 
 type linkedDB struct {
-	// lock ensure that this datastructure handles its thread safety correctly.
+	// lock ensure that this data structure handles its thread safety correctly.
 	lock sync.RWMutex
 
 	cacheLock sync.Mutex
@@ -363,7 +363,6 @@ type iterator struct {
 	err                    error
 }
 
-// Next implements the Iterator interface
 func (it *iterator) Next() bool {
 	// If the iterator has been exhausted, there is no next value.
 	if it.exhausted {

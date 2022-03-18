@@ -4,6 +4,7 @@
 package indexer
 
 import (
+	"errors"
 	"io"
 	"sync"
 	"testing"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -30,6 +32,8 @@ import (
 	smengmocks "github.com/ava-labs/avalanchego/snow/engine/snowman/mocks"
 )
 
+var _ server.PathAdder = &apiServerMock{}
+
 type apiServerMock struct {
 	timesCalled int
 	bases       []string
@@ -43,18 +47,20 @@ func (a *apiServerMock) AddRoute(_ *common.HTTPHandler, _ *sync.RWMutex, base, e
 	return nil
 }
 
+func (a *apiServerMock) AddAliases(string, ...string) error {
+	return errors.New("unimplemented")
+}
+
 // Test that newIndexer sets fields correctly
 func TestNewIndexer(t *testing.T) {
 	assert := assert.New(t)
-	ed := &triggers.EventDispatcher{}
-	ed.Initialize(logging.NoLog{})
 	config := Config{
 		IndexingEnabled:      true,
 		AllowIncompleteIndex: true,
 		Log:                  logging.NoLog{},
 		DB:                   memdb.New(),
-		ConsensusDispatcher:  ed,
-		DecisionDispatcher:   ed,
+		ConsensusDispatcher:  triggers.New(logging.NoLog{}),
+		DecisionDispatcher:   triggers.New(logging.NoLog{}),
 		APIServer:            &apiServerMock{},
 		ShutdownF:            func() {},
 	}
@@ -67,7 +73,7 @@ func TestNewIndexer(t *testing.T) {
 	assert.NotNil(idxr.log)
 	assert.NotNil(idxr.db)
 	assert.False(idxr.closed)
-	assert.NotNil(idxr.routeAdder)
+	assert.NotNil(idxr.pathAdder)
 	assert.True(idxr.indexingEnabled)
 	assert.True(idxr.allowIncompleteIndex)
 	assert.NotNil(idxr.blockIndices)
@@ -85,10 +91,6 @@ func TestNewIndexer(t *testing.T) {
 // Test that [hasRunBefore] is set correctly and that Shutdown is called on close
 func TestMarkHasRunAndShutdown(t *testing.T) {
 	assert := assert.New(t)
-	cd := &triggers.EventDispatcher{}
-	cd.Initialize(logging.NoLog{})
-	dd := &triggers.EventDispatcher{}
-	dd.Initialize(logging.NoLog{})
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
 	shutdown := &sync.WaitGroup{}
@@ -97,8 +99,8 @@ func TestMarkHasRunAndShutdown(t *testing.T) {
 		IndexingEnabled:     true,
 		Log:                 logging.NoLog{},
 		DB:                  db,
-		ConsensusDispatcher: cd,
-		DecisionDispatcher:  dd,
+		ConsensusDispatcher: triggers.New(logging.NoLog{}),
+		DecisionDispatcher:  triggers.New(logging.NoLog{}),
 		APIServer:           &apiServerMock{},
 		ShutdownF:           func() { shutdown.Done() },
 	}
@@ -125,10 +127,8 @@ func TestMarkHasRunAndShutdown(t *testing.T) {
 // some vertices
 func TestIndexer(t *testing.T) {
 	assert := assert.New(t)
-	cd := &triggers.EventDispatcher{}
-	cd.Initialize(logging.NoLog{})
-	dd := &triggers.EventDispatcher{}
-	dd.Initialize(logging.NoLog{})
+	cd := triggers.New(logging.NoLog{})
+	dd := triggers.New(logging.NoLog{})
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
 	config := Config{
@@ -431,18 +431,14 @@ func TestIndexer(t *testing.T) {
 func TestIncompleteIndex(t *testing.T) {
 	// Create an indexer with indexing disabled
 	assert := assert.New(t)
-	cd := &triggers.EventDispatcher{}
-	cd.Initialize(logging.NoLog{})
-	dd := &triggers.EventDispatcher{}
-	dd.Initialize(logging.NoLog{})
 	baseDB := memdb.New()
 	config := Config{
 		IndexingEnabled:      false,
 		AllowIncompleteIndex: false,
 		Log:                  logging.NoLog{},
 		DB:                   versiondb.New(baseDB),
-		ConsensusDispatcher:  cd,
-		DecisionDispatcher:   dd,
+		ConsensusDispatcher:  triggers.New(logging.NoLog{}),
+		DecisionDispatcher:   triggers.New(logging.NoLog{}),
 		APIServer:            &apiServerMock{},
 		ShutdownF:            func() {},
 	}
@@ -515,10 +511,6 @@ func TestIncompleteIndex(t *testing.T) {
 // Ensure we only index chains in the primary network
 func TestIgnoreNonDefaultChains(t *testing.T) {
 	assert := assert.New(t)
-	cd := &triggers.EventDispatcher{}
-	cd.Initialize(logging.NoLog{})
-	dd := &triggers.EventDispatcher{}
-	dd.Initialize(logging.NoLog{})
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
 	config := Config{
@@ -526,8 +518,8 @@ func TestIgnoreNonDefaultChains(t *testing.T) {
 		AllowIncompleteIndex: false,
 		Log:                  logging.NoLog{},
 		DB:                   db,
-		ConsensusDispatcher:  cd,
-		DecisionDispatcher:   dd,
+		ConsensusDispatcher:  triggers.New(logging.NoLog{}),
+		DecisionDispatcher:   triggers.New(logging.NoLog{}),
 		APIServer:            &apiServerMock{},
 		ShutdownF:            func() {},
 	}

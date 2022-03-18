@@ -42,7 +42,6 @@ type Bootstrapper interface {
 	Restart(reset bool) error
 }
 
-// bootstrapper implements the Handler interface.
 // It collects mechanisms common to both snowman and avalanche bootstrappers
 type bootstrapper struct {
 	Config
@@ -83,7 +82,6 @@ func NewCommonBootstrapper(config Config) Bootstrapper {
 	}
 }
 
-// AcceptedFrontier implements the AcceptedFrontierHandler interface.
 func (b *bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	// ignores any late responses
 	if requestID != b.Config.SharedCfg.RequestID {
@@ -148,7 +146,6 @@ func (b *bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 	return nil
 }
 
-// GetAcceptedFrontierFailed implements the AcceptedFrontierHandler interface.
 func (b *bootstrapper) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
 	// ignores any late responses
 	if requestID != b.Config.SharedCfg.RequestID {
@@ -165,7 +162,6 @@ func (b *bootstrapper) GetAcceptedFrontierFailed(validatorID ids.ShortID, reques
 	return b.AcceptedFrontier(validatorID, requestID, nil)
 }
 
-// Accepted implements the AcceptedHandler interface.
 func (b *bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	// ignores any late responses
 	if requestID != b.Config.SharedCfg.RequestID {
@@ -240,7 +236,6 @@ func (b *bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 	return b.Bootstrapable.ForceAccepted(accepted)
 }
 
-// GetAcceptedFailed implements the AcceptedHandler interface.
 func (b *bootstrapper) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
 	// ignores any late responses
 	if requestID != b.Config.SharedCfg.RequestID {

@@ -27,6 +27,7 @@ type AliaserWriter interface {
 type Aliaser interface {
 	AliaserReader
 	AliaserWriter
+	PrimaryAliasOrDefault(id ID) string
 }
 
 type aliaser struct {
@@ -65,6 +66,15 @@ func (a *aliaser) PrimaryAlias(id ID) (string, error) {
 	return aliases[0], nil
 }
 
+// PrimaryAliasOrDefault returns the first alias of [id], or ID string as default
+func (a *aliaser) PrimaryAliasOrDefault(id ID) string {
+	alias, err := a.PrimaryAlias(id)
+	if err != nil {
+		return id.String()
+	}
+	return alias
+}
+
 // Aliases returns the aliases of an ID
 func (a *aliaser) Aliases(id ID) ([]string, error) {
 	a.lock.RLock()
@@ -97,4 +107,26 @@ func (a *aliaser) RemoveAliases(id ID) {
 	for _, alias := range aliases {
 		delete(a.dealias, alias)
 	}
+}
+
+// GetRelevantAliases returns the aliases with the redundant identity alias
+// removed (each id is aliased to at least itself).
+func GetRelevantAliases(aliaser Aliaser, ids []ID) (map[ID][]string, error) {
+	result := make(map[ID][]string, len(ids))
+	for _, id := range ids {
+		aliases, err := aliaser.Aliases(id)
+		if err != nil {
+			return nil, err
+		}
+
+		// remove the redundant alias where alias = id.
+		relevantAliases := make([]string, 0, len(aliases)-1)
+		for _, alias := range aliases {
+			if alias != id.String() {
+				relevantAliases = append(relevantAliases, alias)
+			}
+		}
+		result[id] = relevantAliases
+	}
+	return result, nil
 }

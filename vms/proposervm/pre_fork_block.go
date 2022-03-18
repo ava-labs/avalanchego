@@ -15,7 +15,6 @@ import (
 
 var _ Block = &preForkBlock{}
 
-// preForkBlock implements proposervm.Block
 type preForkBlock struct {
 	snowman.Block
 	vm *VM

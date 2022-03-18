@@ -90,7 +90,6 @@ type user struct {
 	Data          []kvPair `serialize:"true"`
 }
 
-// keystore implements keystore management logic
 type keystore struct {
 	lock sync.Mutex
 	log  logging.Logger

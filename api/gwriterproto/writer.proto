@@ -2,16 +2,22 @@ syntax = "proto3";
 package gwriterproto;
 option go_package = "github.com/ava-labs/avalanchego/api/gwriterproto";
 
+// Writer see: io.Writer https://pkg.go.dev/io#Writer
+service Writer {
+    // Write writes len(p) bytes from p to the underlying data stream.
+    rpc Write(WriteRequest) returns (WriteResponse);
+}
+
 message WriteRequest {
+    // payload is the write request in bytes
     bytes payload = 1;
 }
 
 message WriteResponse {
+    // written is the length of payload in bytes
     int32 written = 1;
+    // error is an error message
     string error = 2;
+    // errored is true if an error has been set
     bool errored = 3;
-}
-
-service Writer {
-    rpc Write(WriteRequest) returns (WriteResponse);
 }

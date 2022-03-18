@@ -29,7 +29,6 @@ type Operation struct {
 	Op         FxOperation    `serialize:"true" json:"operation"`
 }
 
-// Verify implements the verify.Verifiable interface
 func (op *Operation) Verify(c codec.Manager) error {
 	switch {
 	case op == nil:
@@ -65,7 +64,7 @@ func (ops *innerSortOperation) Less(i, j int) bool {
 func (ops *innerSortOperation) Len() int      { return len(ops.ops) }
 func (ops *innerSortOperation) Swap(i, j int) { o := ops.ops; o[j], o[i] = o[i], o[j] }
 
-func sortOperations(ops []*Operation, c codec.Manager) {
+func SortOperations(ops []*Operation, c codec.Manager) {
 	sort.Sort(&innerSortOperation{ops: ops, codec: c})
 }
 

@@ -1,51 +1,51 @@
-// This file was taken from:
-// https://github.com/OpenBazaar/openbazaar-go/blob/master/core/ulimit_non_unix.go
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
 
-//go:build darwin || linux || netbsd || openbsd
-// +build darwin linux netbsd openbsd
+//go:build linux || netbsd || openbsd
+// +build linux netbsd openbsd
 
 package ulimit
 
 import (
 	"fmt"
-	"runtime"
 	"syscall"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-// Set the file descriptor limit
-func Set(limit uint64) error {
+const DefaultFDLimit = 32 * 1024
+
+// Set attempts to bump the Rlimit which has a soft (Cur) and a hard (Max) value.
+// The soft limit is what is used by the kernel to report EMFILE errors. The hard
+// limit is a secondary limit which the process can be bumped to without additional
+// privileges. Bumping the Max limit further would require superuser privileges.
+// If the current Max is below our recommendation we will warn on start.
+// see: http://0pointer.net/blog/file-descriptor-limits.html
+func Set(max uint64, log logging.Logger) error {
 	var rLimit syscall.Rlimit
 	err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit)
 	if err != nil {
 		return fmt.Errorf("error getting rlimit: %w", err)
 	}
 
-	oldMax := rLimit.Max
-	if rLimit.Cur < limit {
-		if rLimit.Max < limit {
-			rLimit.Max = limit
-		}
-		rLimit.Cur = limit
+	if max > rLimit.Max {
+		return fmt.Errorf("error fd-limit: (%d) greater than max: (%d)", max, rLimit.Max)
 	}
 
-	// If we're on darwin, work around the fact that Getrlimit reports the wrong
-	// value. See https://github.com/golang/go/issues/30401
-	if runtime.GOOS == "darwin" && rLimit.Cur > 10240 {
-		// The max file limit is 10240, even though the max returned by
-		// Getrlimit is 1<<63-1. This is OPEN_MAX in sys/syslimits.h.
-		rLimit.Max = 10240
-		rLimit.Cur = 10240
-	}
+	rLimit.Cur = max
 
-	// Try updating the limit. If it fails, try using the previous maximum
-	// instead of our new maximum. Not all users have permissions to increase
-	// the maximum.
+	// set new limit
 	if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit); err != nil {
-		rLimit.Max = oldMax
-		rLimit.Cur = oldMax
-		if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit); err != nil {
-			return fmt.Errorf("error setting ulimit: %w", err)
-		}
+		return fmt.Errorf("error setting fd-limit: %w", err)
+	}
+
+	// verify limit
+	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit); err != nil {
+		return fmt.Errorf("error getting rlimit: %w", err)
+	}
+
+	if rLimit.Cur < DefaultFDLimit {
+		log.Warn("fd-limit: (%d) is less than recommended: (%d) and could result in reduced performance", rLimit.Cur, DefaultFDLimit)
 	}
 
 	return nil

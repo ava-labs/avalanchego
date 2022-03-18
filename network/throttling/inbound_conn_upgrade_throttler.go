@@ -78,7 +78,6 @@ type ipAndTime struct {
 	cooldownElapsedAt time.Time
 }
 
-// inboundConnUpgradeThrottler implements InboundConnUpgradeThrottler
 type inboundConnUpgradeThrottler struct {
 	InboundConnUpgradeThrottlerConfig
 	log  logging.Logger

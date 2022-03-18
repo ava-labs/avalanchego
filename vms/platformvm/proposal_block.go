@@ -55,7 +55,6 @@ func (pb *ProposalBlock) Accept() error {
 	return nil
 }
 
-// Reject implements the snowman.Block interface
 func (pb *ProposalBlock) Reject() error {
 	pb.vm.ctx.Log.Verbo(
 		"Rejecting Proposal Block %s at height %d with parent %s",

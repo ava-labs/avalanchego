@@ -33,7 +33,6 @@ func (is *InitialState) InitCtx(ctx *snow.Context) {
 	}
 }
 
-// Verify implements the verify.Verifiable interface
 func (is *InitialState) Verify(c codec.Manager, numFxs int) error {
 	switch {
 	case is == nil:

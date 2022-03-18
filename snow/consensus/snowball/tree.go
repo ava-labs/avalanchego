@@ -11,14 +11,15 @@ import (
 )
 
 var (
-	_ node = &unaryNode{}
-	_ node = &binaryNode{}
+	_ Factory   = &TreeFactory{}
+	_ Consensus = &Tree{}
+	_ node      = &unaryNode{}
+	_ node      = &binaryNode{}
 )
 
 // TreeFactory implements Factory by returning a tree struct
 type TreeFactory struct{}
 
-// New implements Factory
 func (TreeFactory) New() Consensus { return &Tree{} }
 
 // Tree implements the snowball interface by using a modified patricia tree.
@@ -42,7 +43,6 @@ type Tree struct {
 	shouldReset bool
 }
 
-// Initialize implements the Consensus interface
 func (t *Tree) Initialize(params Parameters, choice ids.ID) {
 	t.params = params
 
@@ -57,10 +57,8 @@ func (t *Tree) Initialize(params Parameters, choice ids.ID) {
 	}
 }
 
-// Parameters implements the Consensus interface
 func (t *Tree) Parameters() Parameters { return t.params }
 
-// Add implements the Consensus interface
 func (t *Tree) Add(choice ids.ID) {
 	prefix := t.node.DecidedPrefix()
 	// Make sure that we haven't already decided against this new id
@@ -69,7 +67,6 @@ func (t *Tree) Add(choice ids.ID) {
 	}
 }
 
-// RecordPoll implements the Consensus interface
 func (t *Tree) RecordPoll(votes ids.Bag) {
 	// Get the assumed decided prefix of the root node.
 	decidedPrefix := t.node.DecidedPrefix()
@@ -87,7 +84,6 @@ func (t *Tree) RecordPoll(votes ids.Bag) {
 	t.shouldReset = false
 }
 
-// RecordUnsuccessfulPoll implements the Consensus interface
 func (t *Tree) RecordUnsuccessfulPoll() { t.shouldReset = true }
 
 func (t *Tree) String() string {

@@ -35,7 +35,6 @@ type StatelessVertex interface {
 	verify.Verifiable
 	ID() ids.ID
 	Bytes() []byte
-
 	Version() uint16
 	ChainID() ids.ID
 	StopVertex() bool
@@ -78,7 +77,9 @@ type innerStatelessVertex struct {
 }
 
 func (v innerStatelessVertex) Verify() error {
-	// TODO: allow stop vertex issuance
+	if v.Version == codecVersionWithStopVtx {
+		return v.verifyStopVertex()
+	}
 	return v.verify()
 }
 

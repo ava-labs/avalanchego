@@ -1,5 +1,120 @@
 # Release Notes
 
+## [v1.7.8](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.8)
+
+This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.
+
+### Networking
+
+- Fixed duplicate reference decrease when closing a peer.
+- Freed allocated message buffers immediately after sending.
+- Added `--network-peer-read-buffer-size` and `--network-peer-write-buffer-size` config options.
+- Moved peer IP signature verification to enable concurrent verifications.
+- Reduced the number of connection flushes when sending messages.
+- Canceled outbound connection requests on shutdown.
+- Reused dialer across multiple outbound connections.
+- Exported `NewTestNetwork` for easier external testing.
+
+### Coreth
+
+- Reduced log level of snapshot regeneration logs.
+- Enabled atomic tx replacement with higher gas fees.
+- Parallelized trie index re-generation.
+
+### Miscellaneous
+
+- Fixed incorrect `BlockchainID` usage in the X-chain `ImportTx` builder.
+- Fixed incorrect `OutputOwners` in the P-chain `ImportTx` builder.
+- Improved FD limit error logging and warnings.
+- Rounded bootstrapping ETAs to the nearest second.
+- Added gossip config support to the subnet configs.
+- Optimized various queue removals for improved memory freeing.
+- Added a basic X-chain E2E usage test to the new testing framework.
+
+## [v1.7.7](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.7)
+
+This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.
+
+### Networking
+
+- Refactored the networking library to track potential peers by nodeID rather than IP.
+- Separated peer connections from the mesh network implementation to simplify testing.
+- Fixed duplicate `Connected` messages bug.
+- Supported establishing outbound connections with peers reporting different inbound and outbound IPs.
+
+### Database
+
+- Disabled seek compaction in leveldb by default.
+
+### GRPC
+
+- Increased protocol version, this requires all plugin definitions to update their communication dependencies.
+- Merged services to be served using the same server when possible.
+- Implemented a fast path for simple HTTP requests.
+- Removed duplicated message definitions.
+- Improved error reporting around invalid plugins.
+
+### Coreth
+
+- Optimized FeeHistory API.
+- Added protection to prevent accidental corruption of archival node trie index.
+- Added capability to restore complete trie index on best effort basis.
+- Rounded up fastcache sizes to utilize all mmap'd memory in chunks of 64MB.
+
+### Configs
+
+- Removed `--inbound-connection-throttling-max-recent`
+- Renamed `--network-peer-list-size` to `--network-peer-list-num-validator-ips`
+- Removed `--network-peer-list-gossip-size`
+- Removed `--network-peer-list-staker-gossip-fraction`
+- Added `--network-peer-list-validator-gossip-size`
+- Added `--network-peer-list-non-validator-gossip-size`
+- Removed `--network-get-version-timeout`
+- Removed `--benchlist-peer-summary-enabled`
+- Removed `--peer-alias-timeout`
+
+### Miscellaneous
+
+- Fixed error reporting when making Avalanche chains that did not manually specify a primary alias.
+- Added beacon utils for easier programmatic handling of beacon nodes.
+- Resolved the default log directory on initialization to avoid additional error handling.
+- Added support to the chain state module to specify an arbitrary new accepted block.
+
+## [v1.7.6](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.6)
+
+This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.
+
+### Consensus
+
+- Introduced a new vertex type to support future `Avalanche` based network upgrades.
+- Added pending message metrics to the chain message queues.
+- Refactored event dispatchers to simplify dependencies and remove dead code.
+
+### PlatformVM
+
+- Added `json` encoding option to the `platform.getTx` call.
+- Added `platform.getBlock` API.
+- Cleaned up block building logic to be more modular and testable.
+
+### Coreth
+
+- Increased `FeeHistory` maximum historical limit to improve MetaMask UI on the C-Chain.
+- Enabled chain state metrics.
+- Migrated go-ethereum v1.10.16 changes.
+
+### Miscellaneous
+
+- Added the ability to load new VM plugins dynamically.
+- Implemented X-chain + P-chain wallet that can be used to build and sign transactions. Without providing a full node private keys.
+- Integrated e2e testing to the repo to avoid maintaining multiple synced repos.
+- Fixed `proposervm` height indexing check to correctly mark the indexer as repaired.
+- Introduced message throttling overrides to be used in future improvements to reliably send messages.
+- Introduced a cap on the client specified request deadline.
+- Increased the default `leveldb` open files limit to `1024`.
+- Documented the `leveldb` configurations.
+- Extended chain shutdown timeout.
+- Performed various cleanup passes.
+
 ## [v1.7.5](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.5)
 
 This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.

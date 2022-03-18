@@ -32,7 +32,6 @@ func (b *BootstrapableTest) Default(cant bool) {
 	b.CantForceAccepted = cant
 }
 
-// Clear implements the Bootstrapable interface
 func (b *BootstrapableTest) Clear() error {
 	if b.ClearF != nil {
 		return b.ClearF()
@@ -45,7 +44,6 @@ func (b *BootstrapableTest) Clear() error {
 	return nil
 }
 
-// ForceAccepted implements the Bootstrapable interface
 func (b *BootstrapableTest) ForceAccepted(containerIDs []ids.ID) error {
 	if b.ForceAcceptedF != nil {
 		return b.ForceAcceptedF(containerIDs)

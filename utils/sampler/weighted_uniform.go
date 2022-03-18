@@ -10,10 +10,12 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var errWeightsTooLarge = errors.New("total weight is too large")
+var (
+	errWeightsTooLarge = errors.New("total weight is too large")
 
-// weightedUniform implements the Weighted interface.
-//
+	_ Weighted = &weightedUniform{}
+)
+
 // Sampling is performed by indexing into the array to find the correct index.
 //
 // Initialization takes O(Sum(weights)) time. This results in an exponential

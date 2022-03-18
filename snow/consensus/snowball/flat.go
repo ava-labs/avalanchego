@@ -7,10 +7,14 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+var (
+	_ Factory   = &FlatFactory{}
+	_ Consensus = &Flat{}
+)
+
 // FlatFactory implements Factory by returning a flat struct
 type FlatFactory struct{}
 
-// New implements Factory
 func (FlatFactory) New() Consensus { return &Flat{} }
 
 // Flat is a naive implementation of a multi-choice snowball instance
@@ -22,16 +26,13 @@ type Flat struct {
 	params Parameters
 }
 
-// Initialize implements the Consensus interface
 func (f *Flat) Initialize(params Parameters, choice ids.ID) {
 	f.nnarySnowball.Initialize(params.BetaVirtuous, params.BetaRogue, choice)
 	f.params = params
 }
 
-// Parameters implements the Consensus interface
 func (f *Flat) Parameters() Parameters { return f.params }
 
-// RecordPoll implements the Consensus interface
 func (f *Flat) RecordPoll(votes ids.Bag) {
 	if pollMode, numVotes := votes.Mode(); numVotes >= f.params.Alpha {
 		f.RecordSuccessfulPoll(pollMode)

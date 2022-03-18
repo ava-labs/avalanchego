@@ -28,14 +28,13 @@ type EventDispatcher struct {
 	log  logging.Logger
 	// Chain ID --> Identifier --> handler
 	chainHandlers map[ids.ID]map[string]handler
-	handlers      map[string]interface{}
 }
 
-// Initialize creates the EventDispatcher's initial values
-func (ed *EventDispatcher) Initialize(log logging.Logger) {
-	ed.log = log
-	ed.chainHandlers = make(map[ids.ID]map[string]handler)
-	ed.handlers = make(map[string]interface{})
+func New(log logging.Logger) *EventDispatcher {
+	return &EventDispatcher{
+		log:           log,
+		chainHandlers: make(map[ids.ID]map[string]handler),
+	}
 }
 
 // Accept is called when a transaction or block is accepted.
@@ -44,17 +43,6 @@ func (ed *EventDispatcher) Initialize(log logging.Logger) {
 func (ed *EventDispatcher) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error {
 	ed.lock.Lock()
 	defer ed.lock.Unlock()
-
-	for id, handler := range ed.handlers {
-		handler, ok := handler.(snow.Acceptor)
-		if !ok {
-			continue
-		}
-
-		if err := handler.Accept(ctx, containerID, container); err != nil {
-			ed.log.Error("handler %s on chain %s errored while accepting %s: %s", id, ctx.ChainID, containerID, err)
-		}
-	}
 
 	events, exist := ed.chainHandlers[ctx.ChainID]
 	if !exist {
@@ -81,17 +69,6 @@ func (ed *EventDispatcher) Reject(ctx *snow.ConsensusContext, containerID ids.ID
 	ed.lock.Lock()
 	defer ed.lock.Unlock()
 
-	for id, handler := range ed.handlers {
-		handler, ok := handler.(snow.Rejector)
-		if !ok {
-			continue
-		}
-
-		if err := handler.Reject(ctx, containerID, container); err != nil {
-			ed.log.Error("unable to Reject on %s for chainID %s: %s", id, ctx.ChainID, err)
-		}
-	}
-
 	events, exist := ed.chainHandlers[ctx.ChainID]
 	if !exist {
 		return nil
@@ -113,17 +90,6 @@ func (ed *EventDispatcher) Reject(ctx *snow.ConsensusContext, containerID ids.ID
 func (ed *EventDispatcher) Issue(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error {
 	ed.lock.Lock()
 	defer ed.lock.Unlock()
-
-	for id, handler := range ed.handlers {
-		handler, ok := handler.(snow.Issuer)
-		if !ok {
-			continue
-		}
-
-		if err := handler.Issue(ctx, containerID, container); err != nil {
-			ed.log.Error("unable to Issue on %s for chainID %s: %s", id, ctx.ChainID, err)
-		}
-	}
 
 	events, exist := ed.chainHandlers[ctx.ChainID]
 	if !exist {
@@ -185,31 +151,5 @@ func (ed *EventDispatcher) DeregisterChain(chainID ids.ID, identifier string) er
 	} else {
 		delete(events, identifier)
 	}
-	return nil
-}
-
-// Register places a new handler into the system
-func (ed *EventDispatcher) Register(identifier string, handler interface{}) error {
-	ed.lock.Lock()
-	defer ed.lock.Unlock()
-
-	if _, exist := ed.handlers[identifier]; exist {
-		return fmt.Errorf("handler %s already exists", identifier)
-	}
-
-	ed.handlers[identifier] = handler
-	return nil
-}
-
-// Deregister removes a handler from the system
-func (ed *EventDispatcher) Deregister(identifier string) error {
-	ed.lock.Lock()
-	defer ed.lock.Unlock()
-
-	if _, exist := ed.handlers[identifier]; !exist {
-		return fmt.Errorf("handler %s already exists", identifier)
-	}
-
-	delete(ed.handlers, identifier)
 	return nil
 }

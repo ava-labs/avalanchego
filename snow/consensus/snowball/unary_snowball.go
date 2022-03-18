@@ -7,6 +7,8 @@ import (
 	"fmt"
 )
 
+var _ UnarySnowball = &unarySnowball{}
+
 // unarySnowball is the implementation of a unary snowball instance
 type unarySnowball struct {
 	// wrap the unary snowflake logic
@@ -16,13 +18,11 @@ type unarySnowball struct {
 	numSuccessfulPolls int
 }
 
-// RecordSuccessfulPoll implements the UnarySnowball interface
 func (sb *unarySnowball) RecordSuccessfulPoll() {
 	sb.numSuccessfulPolls++
 	sb.unarySnowflake.RecordSuccessfulPoll()
 }
 
-// Extend implements the UnarySnowball interface
 func (sb *unarySnowball) Extend(beta int, choice int) BinarySnowball {
 	bs := &binarySnowball{
 		binarySnowflake: binarySnowflake{
@@ -37,7 +37,6 @@ func (sb *unarySnowball) Extend(beta int, choice int) BinarySnowball {
 	return bs
 }
 
-// Clone implements the UnarySnowball interface
 func (sb *unarySnowball) Clone() UnarySnowball {
 	newSnowball := *sb
 	return &newSnowball

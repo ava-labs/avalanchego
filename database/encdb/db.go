@@ -52,7 +52,6 @@ func New(password []byte, db database.Database) (*Database, error) {
 	}, manager.RegisterCodec(codecVersion, c)
 }
 
-// Has implements the Database interface
 func (db *Database) Has(key []byte) (bool, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
@@ -63,7 +62,6 @@ func (db *Database) Has(key []byte) (bool, error) {
 	return db.db.Has(key)
 }
 
-// Get implements the Database interface
 func (db *Database) Get(key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
@@ -78,7 +76,6 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	return db.decrypt(encVal)
 }
 
-// Put implements the Database interface
 func (db *Database) Put(key, value []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
@@ -94,7 +91,6 @@ func (db *Database) Put(key, value []byte) error {
 	return db.db.Put(key, encValue)
 }
 
-// Delete implements the Database interface
 func (db *Database) Delete(key []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
@@ -105,7 +101,6 @@ func (db *Database) Delete(key []byte) error {
 	return db.db.Delete(key)
 }
 
-// NewBatch implements the Database interface
 func (db *Database) NewBatch() database.Batch {
 	return &batch{
 		Batch: db.db.NewBatch(),
@@ -113,22 +108,18 @@ func (db *Database) NewBatch() database.Batch {
 	}
 }
 
-// NewIterator implements the Database interface
 func (db *Database) NewIterator() database.Iterator {
 	return db.NewIteratorWithStartAndPrefix(nil, nil)
 }
 
-// NewIteratorWithStart implements the Database interface
 func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
 	return db.NewIteratorWithStartAndPrefix(start, nil)
 }
 
-// NewIteratorWithPrefix implements the Database interface
 func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 	return db.NewIteratorWithStartAndPrefix(nil, prefix)
 }
 
-// NewIteratorWithStartAndPrefix implements the Database interface
 func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
@@ -142,7 +133,6 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	}
 }
 
-// Stat implements the Database interface
 func (db *Database) Stat(stat string) (string, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
@@ -153,7 +143,6 @@ func (db *Database) Stat(stat string) (string, error) {
 	return db.db.Stat(stat)
 }
 
-// Compact implements the Database interface
 func (db *Database) Compact(start, limit []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
@@ -164,7 +153,6 @@ func (db *Database) Compact(start, limit []byte) error {
 	return db.db.Compact(start, limit)
 }
 
-// Close implements the Database interface
 func (db *Database) Close() error {
 	db.lock.Lock()
 	defer db.lock.Unlock()

@@ -88,7 +88,7 @@ func (tx *UnsignedAdvanceTimeTx) Execute(
 
 	// Only allow timestamp to move forward as far as the time of next staker
 	// set change time
-	nextStakerChangeTime, err := vm.nextStakerChangeTime(parentState)
+	nextStakerChangeTime, err := getNextStakerChangeTime(parentState)
 	if err != nil {
 		return nil, nil, err
 	}

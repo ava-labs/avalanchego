@@ -14,10 +14,14 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
+var (
+	_ Factory   = &TopologicalFactory{}
+	_ Consensus = &Topological{}
+)
+
 // TopologicalFactory implements Factory by returning a topological struct
 type TopologicalFactory struct{}
 
-// New implements Factory
 func (TopologicalFactory) New() Consensus { return &Topological{} }
 
 // Topological implements the Snowman interface by using a tree tracking the
@@ -26,6 +30,7 @@ func (TopologicalFactory) New() Consensus { return &Topological{} }
 type Topological struct {
 	metrics.Latency
 	metrics.Polls
+	metrics.Height
 
 	// pollNumber is the number of times RecordPolls has been called
 	pollNumber uint64
@@ -82,17 +87,29 @@ type votes struct {
 	votes ids.Bag
 }
 
-// Initialize implements the Snowman interface
 func (ts *Topological) Initialize(ctx *snow.ConsensusContext, params snowball.Parameters, rootID ids.ID, rootHeight uint64) error {
 	if err := params.Verify(); err != nil {
 		return err
 	}
-	if err := ts.Latency.Initialize("blks", "block(s)", ctx.Log, "", ctx.Registerer); err != nil {
+
+	latencyMetrics, err := metrics.NewLatency("blks", "block(s)", ctx.Log, "", ctx.Registerer)
+	if err != nil {
 		return err
 	}
-	if err := ts.Polls.Initialize("", ctx.Registerer); err != nil {
+	ts.Latency = latencyMetrics
+
+	pollsMetrics, err := metrics.NewPolls("", ctx.Registerer)
+	if err != nil {
 		return err
 	}
+	ts.Polls = pollsMetrics
+
+	heightMetrics, err := metrics.NewHeight("", ctx.Registerer)
+	if err != nil {
+		return err
+	}
+	ts.Height = heightMetrics
+
 	ts.leaves = ids.Set{}
 	ts.kahnNodes = make(map[ids.ID]kahnNode)
 	ts.ctx = ctx
@@ -103,16 +120,16 @@ func (ts *Topological) Initialize(ctx *snow.ConsensusContext, params snowball.Pa
 		rootID: {sm: ts},
 	}
 	ts.tail = rootID
+
+	// Initially set the height to the last accepted block.
+	ts.Height.Accepted(ts.height)
 	return nil
 }
 
-// Parameters implements the Snowman interface
 func (ts *Topological) Parameters() snowball.Parameters { return ts.params }
 
-// NumProcessing implements the Snowman interface
 func (ts *Topological) NumProcessing() int { return len(ts.blocks) - 1 }
 
-// Add implements the Snowman interface
 func (ts *Topological) Add(blk Block) error {
 	parentID := blk.Parent()
 
@@ -163,7 +180,6 @@ func (ts *Topological) Add(blk Block) error {
 	return nil
 }
 
-// Decided implements the Snowman interface
 func (ts *Topological) Decided(blk Block) bool {
 	// If the block is decided, then it must have been previously issued.
 	if blk.Status().Decided() {
@@ -174,7 +190,6 @@ func (ts *Topological) Decided(blk Block) bool {
 	return blk.Status() == choices.Processing && blk.Height() <= ts.height
 }
 
-// Processing implements the Snowman interface
 func (ts *Topological) Processing(blkID ids.ID) bool {
 	// The last accepted block is in the blocks map, so we first must ensure the
 	// requested block isn't the last accepted block.
@@ -187,7 +202,6 @@ func (ts *Topological) Processing(blkID ids.ID) bool {
 	return ok
 }
 
-// IsPreferred implements the Snowman interface
 func (ts *Topological) IsPreferred(blk Block) bool {
 	// If the block is accepted, then it must be transitively preferred.
 	if blk.Status() == choices.Accepted {
@@ -196,11 +210,8 @@ func (ts *Topological) IsPreferred(blk Block) bool {
 	return ts.preferredIDs.Contains(blk.ID())
 }
 
-// Preference implements the Snowman interface
 func (ts *Topological) Preference() ids.ID { return ts.tail }
 
-// RecordPoll implements the Snowman interface
-//
 // The votes bag contains at most K votes for blocks in the tree. If there is a
 // vote for a block that isn't in the tree, the vote is dropped.
 //
@@ -276,12 +287,11 @@ func (ts *Topological) RecordPoll(voteBag ids.Bag) error {
 	return nil
 }
 
-// Finalized implements the Snowman interface
 func (ts *Topological) Finalized() bool { return len(ts.blocks) == 1 }
 
 // HealthCheck returns information about the consensus health.
 func (ts *Topological) HealthCheck() (interface{}, error) {
-	numOutstandingBlks := ts.Latency.ProcessingLen()
+	numOutstandingBlks := ts.Latency.NumProcessing()
 	isOutstandingBlks := numOutstandingBlks <= ts.params.MaxOutstandingItems
 	healthy := isOutstandingBlks
 	details := map[string]interface{}{
@@ -555,14 +565,15 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 		return err
 	}
 
-	ts.Latency.Accepted(pref, ts.pollNumber)
-
 	// Because this is the newest accepted block, this is the new head.
 	ts.head = pref
 	ts.height = child.Height()
 	// Remove the decided block from the set of processing IDs, as its status
 	// now implies its preferredness.
 	ts.preferredIDs.Remove(pref)
+
+	ts.Latency.Accepted(pref, ts.pollNumber)
+	ts.Height.Accepted(ts.height)
 
 	// Because ts.blocks contains the last accepted block, we don't delete the
 	// block from the blocks map here.

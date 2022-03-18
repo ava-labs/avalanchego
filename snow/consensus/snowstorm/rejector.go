@@ -5,10 +5,12 @@ package snowstorm
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/events"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-// rejector implements Blockable
+var _ events.Blockable = &rejector{}
+
 type rejector struct {
 	g        *Directed
 	errs     *wrappers.Errs

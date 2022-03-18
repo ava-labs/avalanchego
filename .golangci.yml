@@ -58,3 +58,7 @@ linters-settings:
       - "all"
       - "-SA6002" # argument should be pointer-like to avoid allocation, for sync.Pool
       - "-SA1019" # deprecated packages e.g., golang.org/x/crypto/ripemd160
+  # https://golangci-lint.run/usage/linters#gosec
+  gosec:
+    excludes:
+      - G107 # https://securego.io/docs/rules/g107.html

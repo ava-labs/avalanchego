@@ -49,7 +49,7 @@ func TestShutdown(t *testing.T) {
 
 	chainRouter := ChainRouter{}
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
 	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Second, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
@@ -140,7 +140,7 @@ func TestShutdownTimesOut(t *testing.T) {
 
 	chainRouter := ChainRouter{}
 
-	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
 	err = chainRouter.Initialize(ids.ShortEmpty,
@@ -245,7 +245,7 @@ func TestRouterTimeout(t *testing.T) {
 	// Create a router
 	chainRouter := ChainRouter{}
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
 	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
@@ -365,7 +365,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 	// Create a router
 	chainRouter := ChainRouter{}
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
 	assert.NoError(t, err)
@@ -474,7 +474,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	// Create a router
 	chainRouter := ChainRouter{}
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
 	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())

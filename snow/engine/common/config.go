@@ -45,7 +45,6 @@ type Config struct {
 	SharedCfg *SharedConfig
 }
 
-// Context implements the Engine interface
 func (c *Config) Context() *snow.ConsensusContext { return c.Ctx }
 
 // IsBootstrapped returns true iff this chain is done bootstrapping

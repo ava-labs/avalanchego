@@ -34,8 +34,7 @@ type UTXOState interface {
 
 // UTXOReader is a thin wrapper around a database to provide fetching of UTXOs.
 type UTXOReader interface {
-	// GetUTXO attempts to load a utxo from storage.
-	GetUTXO(utxoID ids.ID) (*UTXO, error)
+	UTXOGetter
 
 	// UTXOIDs returns the slice of IDs associated with [addr], starting after
 	// [previous].
@@ -44,13 +43,19 @@ type UTXOReader interface {
 	UTXOIDs(addr []byte, previous ids.ID, limit int) ([]ids.ID, error)
 }
 
+// UTXOGetter is a thin wrapper around a database to provide fetching of a UTXO.
+type UTXOGetter interface {
+	// GetUTXO attempts to load a utxo.
+	GetUTXO(utxoID ids.ID) (*UTXO, error)
+}
+
 // UTXOWriter is a thin wrapper around a database to provide storage and
 // deletion of UTXOs.
 type UTXOWriter interface {
 	// PutUTXO saves the provided utxo to storage.
 	PutUTXO(utxoID ids.ID, utxo *UTXO) error
 
-	// DeleteUTXO deletes the provided utxo from storage.
+	// DeleteUTXO deletes the provided utxo.
 	DeleteUTXO(utxoID ids.ID) error
 }
 

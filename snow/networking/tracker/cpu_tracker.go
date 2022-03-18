@@ -12,9 +12,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/uptime"
 )
 
-const (
-	epsilon = 1e-9
-)
+const epsilon = 1e-9
+
+var _ TimeTracker = &cpuTracker{}
 
 // TimeTracker is an interface for tracking peers' usage of CPU Time
 type TimeTracker interface {
@@ -25,7 +25,6 @@ type TimeTracker interface {
 	Len() int
 }
 
-// cpuTracker implements TimeTracker
 type cpuTracker struct {
 	lock sync.Mutex
 

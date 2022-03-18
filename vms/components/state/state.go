@@ -17,7 +17,11 @@ import (
 
 const cacheSize = 1000
 
-var errWrongType = errors.New("value in the database was the wrong type")
+var (
+	errWrongType = errors.New("value in the database was the wrong type")
+
+	_ State = &state{}
+)
 
 // State is a key-value store where every value is associated with a "type ID".
 // Every different type of value must have its own type ID.
@@ -89,7 +93,6 @@ type state struct {
 	uniqueIDCaches map[uint64]*cache.LRU
 }
 
-// Implements State.RegisterType
 func (s *state) RegisterType(
 	typeID uint64,
 	marshal func(interface{}) ([]byte, error),
@@ -103,7 +106,6 @@ func (s *state) RegisterType(
 	return nil
 }
 
-// Implements State.Put
 func (s *state) Put(db database.Database, typeID uint64, key ids.ID, value interface{}) error {
 	marshaller, exists := s.marshallers[typeID]
 	if !exists {
@@ -127,7 +129,6 @@ func (s *state) Has(db database.Database, typeID uint64, key ids.ID) (bool, erro
 	return db.Has(key[:])
 }
 
-// Implements State.Get
 func (s *state) Get(db database.Database, typeID uint64, key ids.ID) (interface{}, error) {
 	unmarshal, exists := s.unmarshallers[typeID]
 	if !exists {

@@ -9,6 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+var _ Decidable = &TestDecidable{}
+
 // TestDecidable is a test Decidable
 type TestDecidable struct {
 	IDV              ids.ID
@@ -16,10 +18,8 @@ type TestDecidable struct {
 	StatusV          Status
 }
 
-// ID implements the Decidable interface
 func (d *TestDecidable) ID() ids.ID { return d.IDV }
 
-// Accept implements the Decidable interface
 func (d *TestDecidable) Accept() error {
 	switch d.StatusV {
 	case Unknown, Rejected:
@@ -31,7 +31,6 @@ func (d *TestDecidable) Accept() error {
 	}
 }
 
-// Reject implements the Decidable interface
 func (d *TestDecidable) Reject() error {
 	switch d.StatusV {
 	case Unknown, Accepted:
@@ -43,5 +42,4 @@ func (d *TestDecidable) Reject() error {
 	}
 }
 
-// Status implements the Decidable interface
 func (d *TestDecidable) Status() Status { return d.StatusV }

@@ -6,6 +6,8 @@ package sender
 import (
 	"fmt"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
@@ -13,8 +15,16 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/prometheus/client_golang/prometheus"
 )
+
+var _ snow.Acceptor = &Sender{}
+
+type GossipConfig struct {
+	AcceptedFrontierSize      uint `json:"gossipAcceptedFrontierSize"`
+	OnAcceptSize              uint `json:"gossipOnAcceptSize"`
+	AppGossipNonValidatorSize uint `json:"appGossipNonValidatorSize"`
+	AppGossipValidatorSize    uint `json:"appGossipValidatorSize"`
+}
 
 // Sender is a wrapper around an ExternalSender.
 // Messages to this node are put directly into [router] rather than
@@ -28,38 +38,31 @@ type Sender struct {
 	router     router.Router
 	timeouts   *timeout.Manager
 
-	appGossipValidatorSize     int
-	appGossipNonValidatorSize  int
-	gossipAcceptedFrontierSize int
+	gossipConfig GossipConfig
 
 	// Request message type --> Counts how many of that request
 	// have failed because the node was benched
 	failedDueToBench map[message.Op]prometheus.Counter
 }
 
-// Initialize this sender
-func (s *Sender) Initialize(
+func New(
 	ctx *snow.ConsensusContext,
 	msgCreator message.Creator,
 	sender ExternalSender,
 	router router.Router,
 	timeouts *timeout.Manager,
-	appGossipValidatorSize int,
-	appGossipNonValidatorSize int,
-	gossipAcceptedFrontierSize int,
-) error {
-	s.ctx = ctx
-	s.msgCreator = msgCreator
-	s.sender = sender
-	s.router = router
-	s.timeouts = timeouts
-	s.appGossipValidatorSize = appGossipValidatorSize
-	s.appGossipNonValidatorSize = appGossipNonValidatorSize
-	s.gossipAcceptedFrontierSize = gossipAcceptedFrontierSize
+	gossipConfig GossipConfig,
+) (*Sender, error) {
+	s := &Sender{
+		ctx:              ctx,
+		msgCreator:       msgCreator,
+		sender:           sender,
+		router:           router,
+		timeouts:         timeouts,
+		gossipConfig:     gossipConfig,
+		failedDueToBench: make(map[message.Op]prometheus.Counter, len(message.ConsensusRequestOps)),
+	}
 
-	// Register metrics
-	// Message type --> String representation for metrics
-	s.failedDueToBench = make(map[message.Op]prometheus.Counter, len(message.ConsensusRequestOps))
 	for _, op := range message.ConsensusRequestOps {
 		counter := prometheus.NewCounter(
 			prometheus.CounterOpts{
@@ -68,11 +71,11 @@ func (s *Sender) Initialize(
 			},
 		)
 		if err := ctx.Registerer.Register(counter); err != nil {
-			return fmt.Errorf("couldn't register metric for %s: %w", op, err)
+			return nil, fmt.Errorf("couldn't register metric for %s: %w", op, err)
 		}
 		s.failedDueToBench[op] = counter
 	}
-	return nil
+	return s, nil
 }
 
 // Context of this sender
@@ -771,7 +774,10 @@ func (s *Sender) SendAppGossip(appGossipBytes []byte) error {
 		s.ctx.Log.Verbo("message: %s", formatting.DumpBytes(appGossipBytes))
 	}
 
-	sentTo := s.sender.Gossip(outMsg, s.ctx.SubnetID, s.ctx.IsValidatorOnly(), s.appGossipValidatorSize, s.appGossipNonValidatorSize)
+	validatorSize := int(s.gossipConfig.AppGossipValidatorSize)
+	nonValidatorSize := int(s.gossipConfig.AppGossipNonValidatorSize)
+
+	sentTo := s.sender.Gossip(outMsg, s.ctx.SubnetID, s.ctx.IsValidatorOnly(), validatorSize, nonValidatorSize)
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to gossip AppGossip(%s)", s.ctx.ChainID)
 		s.ctx.Log.Verbo("failed message: %s", formatting.DumpBytes(appGossipBytes))
@@ -793,8 +799,34 @@ func (s *Sender) SendGossip(containerID ids.ID, container []byte) {
 		return
 	}
 
-	sentTo := s.sender.Gossip(outMsg, s.ctx.SubnetID, s.ctx.IsValidatorOnly(), 0, s.gossipAcceptedFrontierSize)
+	sentTo := s.sender.Gossip(outMsg, s.ctx.SubnetID, s.ctx.IsValidatorOnly(), 0, int(s.gossipConfig.AcceptedFrontierSize))
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to gossip GossipMsg(%s)", s.ctx.ChainID)
 	}
+}
+
+// Accept is called after every consensus decision
+func (s *Sender) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error {
+	if ctx.GetState() != snow.NormalOp {
+		// don't gossip during bootstrapping
+		return nil
+	}
+
+	s.ctx.Log.Verbo("Gossiping Accepted %s", containerID)
+	// Create the outbound message.
+	outMsg, err := s.msgCreator.Put(s.ctx.ChainID, constants.GossipMsgRequestID, containerID, container)
+	if err != nil {
+		s.ctx.Log.Error(
+			"failed to build Put message for gossip of accepted container with length %d: %s",
+			len(container),
+			err,
+		)
+		return nil
+	}
+
+	sentTo := s.sender.Gossip(outMsg, s.ctx.SubnetID, s.ctx.IsValidatorOnly(), 0, int(s.gossipConfig.OnAcceptSize))
+	if sentTo.Len() == 0 {
+		s.ctx.Log.Debug("failed to gossip GossipMsg(%s)", s.ctx.ChainID)
+	}
+	return nil
 }

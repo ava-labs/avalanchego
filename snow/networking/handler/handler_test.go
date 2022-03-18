@@ -22,7 +22,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	called := make(chan struct{})
 
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
@@ -102,7 +102,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
 	handlerIntf, err := New(
@@ -168,7 +168,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
 	handlerIntf, err := New(
@@ -226,7 +226,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true /*compressionEnabled*/, "dummyNamespace")
+	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
 	handler, err := New(

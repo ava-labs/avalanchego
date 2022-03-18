@@ -6,11 +6,14 @@ package avalanche
 import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 // Vertex is a collection of multiple transactions tied to other vertices
 type Vertex interface {
 	choices.Decidable
+	// Vertex verification should be performed before issuance.
+	verify.Verifiable
 	snowstorm.Whitelister
 
 	// Returns the vertices this vertex depends on

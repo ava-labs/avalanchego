@@ -13,7 +13,6 @@ type metrics struct {
 	numFetched, numDropped, numAccepted prometheus.Counter
 }
 
-// Initialize implements the Engine interface
 func (m *metrics) Initialize(
 	namespace string,
 	registerer prometheus.Registerer,

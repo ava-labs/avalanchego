@@ -157,6 +157,9 @@ type Client interface {
 	GetTx(ctx context.Context, txID ids.ID) ([]byte, error)
 	// GetTxStatus returns the status of the transaction corresponding to [txID]
 	GetTxStatus(ctx context.Context, txID ids.ID, includeReason bool) (*GetTxStatusResponse, error)
+	// AwaitTxDecided polls [GetTxStatus] until a status is returned that
+	// implies the tx may be decided.
+	AwaitTxDecided(ctx context.Context, txID ids.ID, includeReason bool, freq time.Duration) (*GetTxStatusResponse, error)
 	// GetStake returns the amount of nAVAX that [addresses] have cumulatively
 	// staked on the Primary Network.
 	GetStake(ctx context.Context, addrs []string) (*GetStakeReply, error)
@@ -175,6 +178,8 @@ type Client interface {
 	// GetValidatorsAt returns the weights of the validator set of a provided subnet
 	// at the specified height.
 	GetValidatorsAt(ctx context.Context, subnetID ids.ID, height uint64) (map[string]uint64, error)
+	// GetBlock returns the block with the given id.
+	GetBlock(ctx context.Context, blockID ids.ID) ([]byte, error)
 }
 
 // Client implementation for interacting with the P Chain endpoint
@@ -574,6 +579,27 @@ func (c *client) GetTxStatus(ctx context.Context, txID ids.ID, includeReason boo
 	return res, err
 }
 
+func (c *client) AwaitTxDecided(ctx context.Context, txID ids.ID, includeReason bool, freq time.Duration) (*GetTxStatusResponse, error) {
+	ticker := time.NewTicker(freq)
+	defer ticker.Stop()
+
+	for {
+		res, err := c.GetTxStatus(ctx, txID, includeReason)
+		if err == nil {
+			switch res.Status {
+			case status.Committed, status.Aborted, status.Dropped:
+				return res, nil
+			}
+		}
+
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+}
+
 func (c *client) GetStake(ctx context.Context, addrs []string) (*GetStakeReply, error) {
 	res := new(GetStakeReply)
 	err := c.requester.SendRequest(ctx, "getStake", &api.JSONAddresses{
@@ -635,4 +661,16 @@ func (c *client) GetValidatorsAt(ctx context.Context, subnetID ids.ID, height ui
 		Height:   json.Uint64(height),
 	}, res)
 	return res.Validators, err
+}
+
+func (c *client) GetBlock(ctx context.Context, blockID ids.ID) ([]byte, error) {
+	response := &api.FormattedBlock{}
+	if err := c.requester.SendRequest(ctx, "getBlock", &api.GetBlockArgs{
+		BlockID:  blockID,
+		Encoding: formatting.Hex,
+	}, response); err != nil {
+		return nil, err
+	}
+
+	return formatting.Decode(response.Encoding, response.Block)
 }

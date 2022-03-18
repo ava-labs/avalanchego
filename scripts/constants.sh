@@ -23,7 +23,8 @@ evm_path="$plugin_dir/evm"
 avalanchego_dockerhub_repo=${DOCKER_REPO:-"avalanchego"}
 
 # Current branch
-current_branch=$(git symbolic-ref -q --short HEAD || git describe --tags --exact-match)
+# TODO: fix "fatal: No names found, cannot describe anything" in github CI
+current_branch=$(git symbolic-ref -q --short HEAD || git describe --tags --exact-match || true)
 
 git_commit=${AVALANCHEGO_COMMIT:-$( git rev-list -1 HEAD )}
 

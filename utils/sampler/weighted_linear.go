@@ -9,13 +9,13 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
+var _ Weighted = &weightedLinear{}
+
 type weightedLinearElement struct {
 	cumulativeWeight uint64
 	index            int
 }
 
-// weightedLinear implements the Weighted interface.
-//
 // Sampling is performed by executing a linear search over the provided elements
 // in the order of their probabilistic occurrence.
 //

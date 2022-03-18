@@ -7,11 +7,14 @@ import (
 	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 var (
 	errNilAssetID   = errors.New("nil asset ID is not valid")
 	errEmptyAssetID = errors.New("empty asset ID is not valid")
+
+	_ verify.Verifiable = &Asset{}
 )
 
 type Asset struct {
@@ -21,7 +24,6 @@ type Asset struct {
 // AssetID returns the ID of the contained asset
 func (asset *Asset) AssetID() ids.ID { return asset.ID }
 
-// Verify implements the verify.Verifiable interface
 func (asset *Asset) Verify() error {
 	switch {
 	case asset == nil:
