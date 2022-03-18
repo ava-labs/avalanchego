@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/networking/sender"
 )
 
 var _ Subnet = &subnet{}
@@ -26,6 +27,8 @@ type Subnet interface {
 }
 
 type SubnetConfig struct {
+	sender.GossipConfig
+
 	// ValidatorOnly indicates that this Subnet's Chains are available to only subnet validators.
 	ValidatorOnly       bool                 `json:"validatorOnly"`
 	ConsensusParameters avalanche.Parameters `json:"consensusParameters"`

@@ -11,6 +11,15 @@ import (
 	runner_client "github.com/ava-labs/avalanche-network-runner/client"
 )
 
+const (
+	// Enough for primary.NewWallet to fetch initial UTXOs.
+	DefaultWalletCreationTimeout = 5 * time.Second
+
+	// Defines default tx confirmation timeout.
+	// Enough for test/custom networks.
+	DefaultConfirmTxTimeout = 10 * time.Second
+)
+
 var (
 	runnerMu     sync.RWMutex
 	runnerCli    runner_client.Client

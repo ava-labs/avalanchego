@@ -114,9 +114,11 @@ func (ta *Topological) Initialize(
 	ta.votes = ids.UniqueBag{}
 	ta.kahnNodes = make(map[ids.ID]kahnNode)
 
-	if err := ta.Latency.Initialize("vtx", "vertex/vertices", ctx.Log, "", ctx.Registerer); err != nil {
+	latencyMetrics, err := metrics.NewLatency("vtx", "vertex/vertices", ctx.Log, "", ctx.Registerer)
+	if err != nil {
 		return err
 	}
+	ta.Latency = latencyMetrics
 
 	ta.nodes = make(map[ids.ID]*transactionVertex, minMapSize)
 
@@ -266,7 +268,7 @@ func (ta *Topological) Finalized() bool { return ta.cg.Finalized() }
 
 // HealthCheck returns information about the consensus health.
 func (ta *Topological) HealthCheck() (interface{}, error) {
-	numOutstandingVtx := ta.Latency.ProcessingLen()
+	numOutstandingVtx := ta.Latency.NumProcessing()
 	isOutstandingVtx := numOutstandingVtx <= ta.params.MaxOutstandingItems
 	healthy := isOutstandingVtx
 	details := map[string]interface{}{

@@ -110,7 +110,10 @@ type network struct {
 
 	// ensures the close of the network only happens once.
 	closeOnce sync.Once
-	onClose   chan struct{}
+	// Cancelled on close
+	onCloseCtx context.Context
+	// Call [onCloseCtxCancel] to cancel [onCloseCtx] during close()
+	onCloseCtxCancel func()
 
 	sendFailRateCalculator math.Averager
 
@@ -189,6 +192,8 @@ func NewNetwork(
 	}
 
 	peerConfig := &peer.Config{
+		ReadBufferSize:       config.PeerReadBufferSize,
+		WriteBufferSize:      config.PeerWriteBufferSize,
 		Metrics:              peerMetrics,
 		MessageCreator:       msgCreator,
 		Log:                  log,
@@ -205,6 +210,7 @@ func NewNetwork(
 		PongTimeout:          config.PingPongTimeout,
 		MaxClockDifference:   config.MaxClockDifference,
 	}
+	onCloseCtx, cancel := context.WithCancel(context.Background())
 	n := &network{
 		config:     config,
 		peerConfig: peerConfig,
@@ -217,7 +223,8 @@ func NewNetwork(
 		serverUpgrader:              peer.NewTLSServerUpgrader(config.TLSConfig),
 		clientUpgrader:              peer.NewTLSClientUpgrader(config.TLSConfig),
 
-		onClose: make(chan struct{}),
+		onCloseCtx:       onCloseCtx,
+		onCloseCtxCancel: cancel,
 
 		sendFailRateCalculator: math.NewSyncAverager(math.NewAverager(
 			0,
@@ -358,11 +365,28 @@ func (n *network) AllowConnection(nodeID ids.ShortID) bool {
 
 func (n *network) Track(ip utils.IPCertDesc) {
 	nodeID := peer.CertToID(ip.Cert)
-	if !n.config.AllowPrivateIPs && ip.IPDesc.IsPrivate() {
-		n.peerConfig.Log.Verbo(
-			"dropping suggested connected to %s%s because the ip (%s) is private",
+
+	// Verify that we do want to attempt to make a connection to this peer
+	// before verifying that the IP has been correctly signed.
+	//
+	// This check only improves performance, as the values are recalculated once
+	// the lock is grabbed before actually attempting to connect to the peer.
+	if !n.shouldTrack(nodeID, ip) {
+		return
+	}
+
+	signedIP := peer.SignedIP{
+		IP: peer.UnsignedIP{
+			IP:        ip.IPDesc,
+			Timestamp: ip.Time,
+		},
+		Signature: ip.Signature,
+	}
+
+	if err := signedIP.Verify(ip.Cert); err != nil {
+		n.peerConfig.Log.Debug("signature verification failed for %s%s: %s",
 			constants.NodeIDPrefix, nodeID,
-			ip.IPDesc,
+			err,
 		)
 		return
 	}
@@ -387,7 +411,7 @@ func (n *network) Track(ip utils.IPCertDesc) {
 				Timestamp: ip.Time,
 			})
 			n.trackedIPs[nodeID] = tracked
-			n.dial(nodeID, tracked)
+			n.dial(n.onCloseCtx, nodeID, tracked)
 		}
 	} else if n.WantsConnection(nodeID) {
 		tracked := newTrackedIP(&peer.UnsignedIP{
@@ -395,7 +419,7 @@ func (n *network) Track(ip utils.IPCertDesc) {
 			Timestamp: ip.Time,
 		})
 		n.trackedIPs[nodeID] = tracked
-		n.dial(nodeID, tracked)
+		n.dial(n.onCloseCtx, nodeID, tracked)
 	}
 }
 
@@ -538,7 +562,7 @@ func (n *network) ManuallyTrack(nodeID ids.ShortID, ip utils.IPDesc) {
 			Timestamp: 0,
 		})
 		n.trackedIPs[nodeID] = tracked
-		n.dial(nodeID, tracked)
+		n.dial(n.onCloseCtx, nodeID, tracked)
 	}
 }
 
@@ -677,7 +701,7 @@ func (n *network) disconnectedFromConnecting(nodeID ids.ShortID) {
 		if n.WantsConnection(nodeID) {
 			tracked := tracked.trackNewIP(tracked.ip)
 			n.trackedIPs[nodeID] = tracked
-			n.dial(nodeID, tracked)
+			n.dial(n.onCloseCtx, nodeID, tracked)
 		} else {
 			tracked.stopTracking()
 			delete(n.trackedIPs, nodeID)
@@ -699,13 +723,41 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.ShortID) 
 	if n.WantsConnection(nodeID) {
 		tracked := newTrackedIP(&peer.IP().IP)
 		n.trackedIPs[nodeID] = tracked
-		n.dial(nodeID, tracked)
+		n.dial(n.onCloseCtx, nodeID, tracked)
 	} else {
 		delete(n.trackedIPs, nodeID)
 	}
 
 	n.metrics.numPeers.Dec()
 	n.metrics.disconnected.Inc()
+}
+
+func (n *network) shouldTrack(nodeID ids.ShortID, ip utils.IPCertDesc) bool {
+	if !n.config.AllowPrivateIPs && ip.IPDesc.IsPrivate() {
+		n.peerConfig.Log.Verbo(
+			"dropping suggested connected to %s%s because the ip (%s) is private",
+			constants.NodeIDPrefix, nodeID,
+			ip.IPDesc,
+		)
+		return false
+	}
+
+	n.peersLock.RLock()
+	defer n.peersLock.RUnlock()
+
+	_, connected := n.connectedPeers.GetByID(nodeID)
+	if connected {
+		// If I'm currently connected to [nodeID] then they will have told me
+		// how to connect to them in the future, and I don't need to attempt to
+		// connect to them now.
+		return false
+	}
+
+	tracked, isTracked := n.trackedIPs[nodeID]
+	if isTracked {
+		return tracked.ip.Timestamp < ip.Time
+	}
+	return n.WantsConnection(nodeID)
 }
 
 // dial will spin up a new goroutine and attempt to establish a connection with
@@ -727,7 +779,7 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.ShortID) 
 // If initiating a connection to [ip] fails, then dial will reattempt. However,
 // there is a randomized exponential backoff to avoid spamming connection
 // attempts.
-func (n *network) dial(nodeID ids.ShortID, ip *trackedIP) {
+func (n *network) dial(ctx context.Context, nodeID ids.ShortID, ip *trackedIP) {
 	go func() {
 		n.metrics.numTracked.Inc()
 		defer n.metrics.numTracked.Dec()
@@ -779,8 +831,7 @@ func (n *network) dial(nodeID ids.ShortID, ip *trackedIP) {
 				n.config.MaxReconnectDelay,
 			)
 
-			// TODO: specify dial timeout
-			conn, err := n.dialer.Dial(context.TODO(), ip.ip.IP)
+			conn, err := n.dialer.Dial(ctx, ip.ip.IP)
 			if err != nil {
 				n.peerConfig.Log.Verbo(
 					"failed to reach %s, attempting again in %s",
@@ -920,8 +971,8 @@ func (n *network) StartClose() {
 		n.peersLock.Lock()
 		defer n.peersLock.Unlock()
 
-		close(n.onClose)
 		n.closing = true
+		n.onCloseCtxCancel()
 
 		for nodeID, tracked := range n.trackedIPs {
 			tracked.stopTracking()
@@ -997,7 +1048,7 @@ func (n *network) runTimers() {
 
 	for {
 		select {
-		case <-n.onClose:
+		case <-n.onCloseCtx.Done():
 			return
 		case <-gossipPeerlists.C:
 			validatorIPs := n.sampleValidatorIPs()

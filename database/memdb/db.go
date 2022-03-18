@@ -253,7 +253,9 @@ func (it *iterator) Next() bool {
 	}
 	// Iterator already initialize, advance it
 	if len(it.keys) > 0 {
+		it.keys[0] = ""
 		it.keys = it.keys[1:]
+		it.values[0] = nil
 		it.values = it.values[1:]
 	}
 	return len(it.keys) > 0

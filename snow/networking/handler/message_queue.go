@@ -123,6 +123,7 @@ func (m *messageQueue) Pop() (message.InboundMessage, bool) {
 			m.log.Debug("canPop is false for all %d unprocessed messages", n)
 		}
 		msg := m.msgs[0]
+		m.msgs[0] = nil
 		nodeID := msg.NodeID()
 		// See if it's OK to process [msg] next
 		if m.canPop(msg) || i == n { // i should never == n but handle anyway as a fail-safe
