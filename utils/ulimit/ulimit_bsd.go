@@ -1,8 +1,8 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:build linux || netbsd || openbsd
-// +build linux netbsd openbsd
+//go:build freebsd
+// +build freebsd
 
 package ulimit
 
@@ -19,20 +19,23 @@ const DefaultFDLimit = 32 * 1024
 // The soft limit is what is used by the kernel to report EMFILE errors. The hard
 // limit is a secondary limit which the process can be bumped to without additional
 // privileges. Bumping the Max limit further would require superuser privileges.
-// If the current Max is below our recommendation we will warn on start.
+// If the value is below the recommendation warn on start.
 // see: http://0pointer.net/blog/file-descriptor-limits.html
 func Set(max uint64, log logging.Logger) error {
+	// Note: BSD Rlimit is type int64
+	// ref: https://cs.opensource.google/go/x/sys/+/b874c991:unix/ztypes_freebsd_amd64.go
+	bsdMax := int64(max)
 	var rLimit syscall.Rlimit
 	err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit)
 	if err != nil {
 		return fmt.Errorf("error getting rlimit: %w", err)
 	}
 
-	if max > rLimit.Max {
-		return fmt.Errorf("error fd-limit: (%d) greater than max: (%d)", max, rLimit.Max)
+	if bsdMax > rLimit.Max {
+		return fmt.Errorf("error fd-limit: (%d) greater than max: (%d)", limit, rLimit.Max)
 	}
 
-	rLimit.Cur = max
+	rLimit.Cur = bsdMax
 
 	// set new limit
 	if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit); err != nil {

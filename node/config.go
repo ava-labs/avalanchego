@@ -169,6 +169,9 @@ type Config struct {
 	// Plugin directory
 	PluginDir string `json:"pluginDir"`
 
+	// File Descriptor Limit
+	FdLimit uint64 `json:"fdLimit"`
+
 	// Consensus configuration
 	ConsensusParams avalanche.Parameters `json:"consensusParams"`
 

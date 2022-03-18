@@ -43,7 +43,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/storage"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/vms"
 )
 
@@ -1107,16 +1106,12 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	}
 
 	// File Descriptor Limit
-	fdLimit := v.GetUint64(FdLimitKey)
-	if err := ulimit.Set(fdLimit); err != nil {
-		return node.Config{}, fmt.Errorf("failed to set fd limit correctly due to: %w", err)
-	}
+	nodeConfig.FdLimit = v.GetUint64(FdLimitKey)
 
 	// Tx Fee
 	nodeConfig.TxFeeConfig = getTxFeeConfig(v, nodeConfig.NetworkID)
 
 	// Genesis Data
-
 	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = getGenesisData(v, nodeConfig.NetworkID)
 	if err != nil {
 		return node.Config{}, fmt.Errorf("unable to load genesis file: %w", err)
