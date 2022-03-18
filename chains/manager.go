@@ -536,6 +536,11 @@ func (m *manager) createAvalancheChain(
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
+	gossipConfig := m.GossipConfig
+	if sbConfigs, ok := m.SubnetConfigs[ctx.SubnetID]; ok && ctx.SubnetID != constants.PrimaryNetworkID {
+		gossipConfig = sbConfigs.GossipConfig
+	}
+
 	// Passes messages from the consensus engine to the network
 	sender, err := sender.New(
 		ctx,
@@ -543,7 +548,7 @@ func (m *manager) createAvalancheChain(
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
-		m.GossipConfig,
+		gossipConfig,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
@@ -727,6 +732,11 @@ func (m *manager) createSnowmanChain(
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
+	gossipConfig := m.GossipConfig
+	if sbConfigs, ok := m.SubnetConfigs[ctx.SubnetID]; ok && ctx.SubnetID != constants.PrimaryNetworkID {
+		gossipConfig = sbConfigs.GossipConfig
+	}
+
 	// Passes messages from the consensus engine to the network
 	sender, err := sender.New(
 		ctx,
@@ -734,7 +744,7 @@ func (m *manager) createSnowmanChain(
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
-		m.GossipConfig,
+		gossipConfig,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
