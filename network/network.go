@@ -365,11 +365,28 @@ func (n *network) AllowConnection(nodeID ids.ShortID) bool {
 
 func (n *network) Track(ip utils.IPCertDesc) {
 	nodeID := peer.CertToID(ip.Cert)
-	if !n.config.AllowPrivateIPs && ip.IPDesc.IsPrivate() {
-		n.peerConfig.Log.Verbo(
-			"dropping suggested connected to %s%s because the ip (%s) is private",
+
+	// Verify that we do want to attempt to make a connection to this peer
+	// before verifying that the IP has been correctly signed.
+	//
+	// This check only improves performance, as the values are recalculated once
+	// the lock is grabbed before actually attempting to connect to the peer.
+	if !n.shouldTrack(nodeID, ip) {
+		return
+	}
+
+	signedIP := peer.SignedIP{
+		IP: peer.UnsignedIP{
+			IP:        ip.IPDesc,
+			Timestamp: ip.Time,
+		},
+		Signature: ip.Signature,
+	}
+
+	if err := signedIP.Verify(ip.Cert); err != nil {
+		n.peerConfig.Log.Debug("signature verification failed for %s%s: %s",
 			constants.NodeIDPrefix, nodeID,
-			ip.IPDesc,
+			err,
 		)
 		return
 	}
@@ -713,6 +730,34 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.ShortID) 
 
 	n.metrics.numPeers.Dec()
 	n.metrics.disconnected.Inc()
+}
+
+func (n *network) shouldTrack(nodeID ids.ShortID, ip utils.IPCertDesc) bool {
+	if !n.config.AllowPrivateIPs && ip.IPDesc.IsPrivate() {
+		n.peerConfig.Log.Verbo(
+			"dropping suggested connected to %s%s because the ip (%s) is private",
+			constants.NodeIDPrefix, nodeID,
+			ip.IPDesc,
+		)
+		return false
+	}
+
+	n.peersLock.RLock()
+	defer n.peersLock.RUnlock()
+
+	_, connected := n.connectedPeers.GetByID(nodeID)
+	if connected {
+		// If I'm currently connected to [nodeID] then they will have told me
+		// how to connect to them in the future, and I don't need to attempt to
+		// connect to them now.
+		return false
+	}
+
+	tracked, isTracked := n.trackedIPs[nodeID]
+	if isTracked {
+		return tracked.ip.Timestamp < ip.Time
+	}
+	return n.WantsConnection(nodeID)
 }
 
 // dial will spin up a new goroutine and attempt to establish a connection with
