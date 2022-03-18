@@ -33,8 +33,6 @@ func (s *state) Vertex(id ids.ID) vertex.StatelessVertex {
 		err   error
 	)
 
-	defer s.dbCache.Put(id, vtx)
-
 	if vtxIntf, found := s.dbCache.Get(id); found {
 		vtx, _ = vtxIntf.(vertex.StatelessVertex)
 		return vtx
@@ -42,15 +40,18 @@ func (s *state) Vertex(id ids.ID) vertex.StatelessVertex {
 
 	if bytes, err = s.db.Get(id[:]); err != nil {
 		s.log.Verbo("Failed to get vertex %s from database due to %s", id, err)
+		s.dbCache.Put(id, nil)
 		return nil
 	}
 
 	if vtx, err = s.serializer.parseVertex(bytes); err != nil {
 		s.log.Error("Parsing failed on saved vertex. Prefixed key = %s, Bytes = %s due to %s",
 			id, formatting.DumpBytes(bytes), err)
+		s.dbCache.Put(id, nil)
 		return nil
 	}
 
+	s.dbCache.Put(id, vtx)
 	return vtx
 }
 
