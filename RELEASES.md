@@ -1,5 +1,36 @@
 # Release Notes
 
+## [v1.7.8](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.8)
+
+This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.
+
+### Networking
+
+- Fixed duplicate reference decrease when closing a peer.
+- Freed allocated message buffers immediately after sending.
+- Added `--network-peer-read-buffer-size` and `--network-peer-write-buffer-size` config options.
+- Moved peer IP signature verification to enable concurrent verifications.
+- Reduced the number of connection flushes when sending messages.
+- Canceled outbound connection requests on shutdown.
+- Reused dialer across multiple outbound connections.
+- Exported `NewTestNetwork` for easier external testing.
+
+### Coreth
+
+- Reduced log level of snapshot regeneration logs.
+- Enabled atomic tx replacement with higher gas fees.
+- Parallelized trie index re-generation.
+
+### Miscellaneous
+
+- Fixed incorrect `BlockchainID` usage in the X-chain `ImportTx` builder.
+- Fixed incorrect `OutputOwners` in the P-chain `ImportTx` builder.
+- Improved FD limit error logging and warnings.
+- Rounded bootstrapping ETAs to the nearest second.
+- Added gossip config support to the subnet configs.
+- Optimized various queue removals for improved memory freeing.
+- Added a basic X-chain E2E usage test to the new testing framework.
+
 ## [v1.7.7](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.7)
 
 This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.
