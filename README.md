@@ -16,7 +16,7 @@ The Subnet EVM runs in a separate process from the main AvalancheGo process and 
 ```
 [v0.1.0] AvalancheGo@v1.7.0-v1.7.4
 [v0.1.1-v0.1.2] AvalancheGo@v1.7.5-v1.7.6
-[v0.2.0] AvalancheGo@v1.7.7
+[v0.2.0] AvalancheGo@v1.7.7-v1.7.8
 ```
 
 ## API
@@ -670,7 +670,7 @@ Target Block Rate: 2s (Same as C-Chain)
 
 ```
 Network Name: WAGMI
-RPC URL: https://api.trywagmi.xyz/rpc
+RPC URL: https://api-wagmi.avax-test.network/rpc
 Chain ID: 11111
 Symbol: WGM
 ```
