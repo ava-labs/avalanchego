@@ -15,6 +15,7 @@ import (
 
 var _ Network = &testNetwork{}
 
+// testNetwork is a network definition for a TestPeer
 type testNetwork struct {
 	mc message.Creator
 
@@ -25,6 +26,27 @@ type testNetwork struct {
 	subnets   ids.Set
 
 	uptime uint8
+}
+
+// NewTestNetwork creates and returns a new TestNetwork
+func NewTestNetwork(
+	mc message.Creator,
+	networkID uint32,
+	ipDesc utils.IPDesc,
+	version version.Application,
+	signer crypto.Signer,
+	subnets ids.Set,
+	uptime uint8,
+) Network {
+	return &testNetwork{
+		mc:        mc,
+		networkID: networkID,
+		ip:        ipDesc,
+		version:   version,
+		signer:    signer,
+		subnets:   subnets,
+		uptime:    uptime,
+	}
 }
 
 func (n *testNetwork) Connected(ids.ShortID) {}

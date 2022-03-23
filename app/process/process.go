@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
+	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -68,6 +69,12 @@ func (p *process) Start() error {
 	log, err := logFactory.Make("main")
 	if err != nil {
 		logFactory.Close()
+		return err
+	}
+
+	// update fd limit
+	fdLimit := p.config.FdLimit
+	if err := ulimit.Set(fdLimit, log); err != nil {
 		return err
 	}
 
