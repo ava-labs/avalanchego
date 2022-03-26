@@ -298,9 +298,16 @@ type GetAssetDescriptionReply struct {
 func (service *Service) GetAssetDescription(_ *http.Request, args *GetAssetDescriptionArgs, reply *GetAssetDescriptionReply) error {
 	service.vm.ctx.Log.Debug("AVM: GetAssetDescription called with %s", args.AssetID)
 
-	assetID, err := service.vm.lookupAssetID(args.AssetID)
-	if err != nil {
-		return err
+	var assetID ids.ID
+	if args.AssetID == "" {
+		assetID = service.vm.feeAssetID
+	} else {
+		var err error
+
+		assetID, err = service.vm.lookupAssetID(args.AssetID)
+		if err != nil {
+			return err
+		}
 	}
 
 	tx := &UniqueTx{
