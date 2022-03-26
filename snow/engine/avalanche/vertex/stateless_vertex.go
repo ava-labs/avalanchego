@@ -35,7 +35,6 @@ type StatelessVertex interface {
 	verify.Verifiable
 	ID() ids.ID
 	Bytes() []byte
-
 	Version() uint16
 	ChainID() ids.ID
 	StopVertex() bool

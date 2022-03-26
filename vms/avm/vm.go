@@ -193,7 +193,14 @@ func (vm *VM) Initialize(
 
 	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, vm.codec)
 
-	state, err := NewMeteredState(vm.db, vm.genesisCodec, vm.codec, registerer)
+	state, err := NewState(
+		StateConfig{
+			DB:           vm.db,
+			GenesisCodec: vm.genesisCodec,
+			Codec:        vm.codec,
+			Metrics:      registerer,
+		},
+	)
 	if err != nil {
 		return err
 	}

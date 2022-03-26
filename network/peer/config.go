@@ -17,6 +17,10 @@ import (
 )
 
 type Config struct {
+	// Size, in bytes, of the buffer this peer reads messages into
+	ReadBufferSize int
+	// Size, in bytes, of the buffer this peer writes messages into
+	WriteBufferSize      int
 	Clock                mockable.Clock
 	Metrics              *Metrics
 	MessageCreator       message.Creator

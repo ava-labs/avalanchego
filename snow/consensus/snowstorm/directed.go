@@ -99,15 +99,23 @@ func (dg *Directed) Initialize(
 	dg.ctx = ctx
 	dg.params = params
 
-	if err := dg.Latency.Initialize("txs", "transaction(s)", ctx.Log, "", ctx.Registerer); err != nil {
-		return fmt.Errorf("failed to initialize latency metrics: %w", err)
+	latencyMetrics, err := metrics.NewLatency("txs", "transaction(s)", ctx.Log, "", ctx.Registerer)
+	if err != nil {
+		return fmt.Errorf("failed to create latency metrics: %w", err)
 	}
-	if err := dg.whitelistTxMetrics.Initialize("whitelist_tx", "whitelist transaction(s)", ctx.Log, "", ctx.Registerer); err != nil {
-		return fmt.Errorf("failed to initialize whitelist tx metrics: %w", err)
+	dg.Latency = latencyMetrics
+
+	whitelistTxMetrics, err := metrics.NewLatency("whitelist_tx", "whitelist transaction(s)", ctx.Log, "", ctx.Registerer)
+	if err != nil {
+		return fmt.Errorf("failed to create whitelist tx metrics: %w", err)
 	}
-	if err := dg.Polls.Initialize("", ctx.Registerer); err != nil {
-		return fmt.Errorf("failed to initialize poll metrics: %w", err)
+	dg.whitelistTxMetrics = whitelistTxMetrics
+
+	pollsMetrics, err := metrics.NewPolls("", ctx.Registerer)
+	if err != nil {
+		return fmt.Errorf("failed to create poll metrics: %w", err)
 	}
+	dg.Polls = pollsMetrics
 
 	dg.txs = make(map[ids.ID]*directedTx)
 	dg.utxos = make(map[ids.ID]ids.Set)
@@ -140,7 +148,7 @@ func (dg *Directed) Finalized() bool {
 
 // HealthCheck returns information about the consensus health.
 func (dg *Directed) HealthCheck() (interface{}, error) {
-	numOutstandingTxs := dg.Latency.ProcessingLen()
+	numOutstandingTxs := dg.Latency.NumProcessing()
 	isOutstandingTxs := numOutstandingTxs <= dg.params.MaxOutstandingItems
 	details := map[string]interface{}{
 		"outstandingTransactions": numOutstandingTxs,

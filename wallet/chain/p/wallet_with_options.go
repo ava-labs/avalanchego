@@ -35,6 +35,16 @@ func (w *walletWithOptions) Builder() Builder {
 	)
 }
 
+func (w *walletWithOptions) IssueBaseTx(
+	outputs []*avax.TransferableOutput,
+	options ...common.Option,
+) (ids.ID, error) {
+	return w.Wallet.IssueBaseTx(
+		outputs,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
 func (w *walletWithOptions) IssueAddValidatorTx(
 	validator *platformvm.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,

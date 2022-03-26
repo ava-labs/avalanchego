@@ -268,6 +268,7 @@ func (it *iterator) Next() bool {
 		return false
 	}
 	if len(it.data) > 1 {
+		it.data[0] = nil
 		it.data = it.data[1:]
 		return true
 	}

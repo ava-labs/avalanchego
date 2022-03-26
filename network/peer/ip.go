@@ -49,7 +49,7 @@ type SignedIP struct {
 	Signature []byte
 }
 
-func (ip *SignedIP) verify(cert *x509.Certificate) error {
+func (ip *SignedIP) Verify(cert *x509.Certificate) error {
 	return cert.CheckSignature(
 		cert.SignatureAlgorithm,
 		ip.IP.bytes(),

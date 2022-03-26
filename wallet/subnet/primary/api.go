@@ -7,12 +7,16 @@ import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/wallet/chain/p"
+	"github.com/ava-labs/avalanchego/wallet/chain/x"
 )
 
 const (
@@ -39,6 +43,67 @@ type UTXOClient interface {
 		startAddress,
 		startUTXOID string,
 	) ([][]byte, api.Index, error)
+}
+
+func FetchState(ctx context.Context, uri string, addrs ids.ShortSet) (p.Context, x.Context, UTXOs, error) {
+	infoClient := info.NewClient(uri)
+	xClient := avm.NewClient(uri, "X")
+
+	pCTX, err := p.NewContextFromClients(ctx, infoClient, xClient)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	pAddrs, err := FormatAddresses("P", pCTX.HRP(), addrs)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	xCTX, err := x.NewContextFromClients(ctx, infoClient, xClient)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	xAddrs, err := FormatAddresses("X", xCTX.HRP(), addrs)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	utxos := NewUTXOs()
+	chains := []struct {
+		id     ids.ID
+		client UTXOClient
+		codec  codec.Manager
+		addrs  []string
+	}{
+		{
+			id:     constants.PlatformChainID,
+			client: platformvm.NewClient(uri),
+			codec:  platformvm.Codec,
+			addrs:  pAddrs,
+		},
+		{
+			id:     xCTX.BlockchainID(),
+			client: xClient,
+			codec:  x.Codec,
+			addrs:  xAddrs,
+		},
+	}
+	for _, destinationChain := range chains {
+		for _, sourceChain := range chains {
+			err = AddAllUTXOs(
+				ctx,
+				utxos,
+				destinationChain.client,
+				destinationChain.codec,
+				sourceChain.id,
+				destinationChain.id,
+				destinationChain.addrs,
+			)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+		}
+	}
+	return pCTX, xCTX, utxos, nil
 }
 
 // FormatAddresses returns the string format of the provided address set for the

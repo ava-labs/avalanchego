@@ -43,7 +43,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/storage"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/vms"
 )
 
@@ -302,6 +301,15 @@ func getAdaptiveTimeoutConfig(v *viper.Viper) (timer.AdaptiveTimeoutConfig, erro
 	return config, nil
 }
 
+func getGossipConfig(v *viper.Viper) sender.GossipConfig {
+	return sender.GossipConfig{
+		AcceptedFrontierSize:      uint(v.GetUint32(ConsensusGossipAcceptedFrontierSizeKey)),
+		OnAcceptSize:              uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey)),
+		AppGossipNonValidatorSize: uint(v.GetUint32(AppGossipNonValidatorSizeKey)),
+		AppGossipValidatorSize:    uint(v.GetUint32(AppGossipValidatorSizeKey)),
+	}
+}
+
 func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, error) {
 	// Set the max number of recent inbound connections upgraded to be
 	// equal to the max number of inbound connections per second.
@@ -377,6 +385,8 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 		MaximumInboundMessageTimeout: v.GetDuration(NetworkMaximumInboundTimeoutKey),
 
 		RequireValidatorToConnect: v.GetBool(NetworkRequireValidatorToConnectKey),
+		PeerReadBufferSize:        int(v.GetUint(NetworkPeerReadBufferSizeKey)),
+		PeerWriteBufferSize:       int(v.GetUint(NetworkPeerWriteBufferSizeKey)),
 	}
 
 	switch {
@@ -899,16 +909,19 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]c
 		return nil, fmt.Errorf("unable to decode base64 content: %w", err)
 	}
 
-	// Note: no default values are loaded here. All Subnet parameters must be
-	// explicitly defined.
-	subnetConfigs := make(map[ids.ID]chains.SubnetConfig, len(subnetIDs))
+	// partially parse configs to be filled by defaults later
+	subnetConfigs := make(map[ids.ID]json.RawMessage, len(subnetIDs))
 	if err := json.Unmarshal(subnetConfigContent, &subnetConfigs); err != nil {
 		return nil, fmt.Errorf("could not unmarshal JSON: %w", err)
 	}
 
 	res := make(map[ids.ID]chains.SubnetConfig)
 	for _, subnetID := range subnetIDs {
-		if subnetConfig, ok := subnetConfigs[subnetID]; ok {
+		if rawSubnetConfigBytes, ok := subnetConfigs[subnetID]; ok {
+			subnetConfig := defaultSubnetConfig(v)
+			if err := json.Unmarshal(rawSubnetConfigBytes, &subnetConfig); err != nil {
+				return nil, err
+			}
 			if err := subnetConfig.ConsensusParameters.Valid(); err != nil {
 				return nil, err
 			}
@@ -982,6 +995,7 @@ func defaultSubnetConfig(v *viper.Viper) chains.SubnetConfig {
 	return chains.SubnetConfig{
 		ConsensusParameters: getConsensusConfig(v),
 		ValidatorOnly:       false,
+		GossipConfig:        getGossipConfig(v),
 	}
 }
 
@@ -1083,12 +1097,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 		return node.Config{}, err
 	}
 
-	nodeConfig.GossipConfig = sender.GossipConfig{
-		AcceptedFrontierSize:      uint(v.GetUint32(ConsensusGossipAcceptedFrontierSizeKey)),
-		OnAcceptSize:              uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey)),
-		AppGossipNonValidatorSize: uint(v.GetUint32(AppGossipNonValidatorSizeKey)),
-		AppGossipValidatorSize:    uint(v.GetUint32(AppGossipValidatorSizeKey)),
-	}
+	nodeConfig.GossipConfig = getGossipConfig(v)
 
 	// Benchlist
 	nodeConfig.BenchlistConfig, err = getBenchlistConfig(v, nodeConfig.ConsensusParams.Alpha, nodeConfig.ConsensusParams.K)
@@ -1097,16 +1106,12 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	}
 
 	// File Descriptor Limit
-	fdLimit := v.GetUint64(FdLimitKey)
-	if err := ulimit.Set(fdLimit); err != nil {
-		return node.Config{}, fmt.Errorf("failed to set fd limit correctly due to: %w", err)
-	}
+	nodeConfig.FdLimit = v.GetUint64(FdLimitKey)
 
 	// Tx Fee
 	nodeConfig.TxFeeConfig = getTxFeeConfig(v, nodeConfig.NetworkID)
 
 	// Genesis Data
-
 	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = getGenesisData(v, nodeConfig.NetworkID)
 	if err != nil {
 		return node.Config{}, fmt.Errorf("unable to load genesis file: %w", err)
