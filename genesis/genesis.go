@@ -185,14 +185,14 @@ func validateConfig(networkID uint32, config *Config) error {
 // 1) The ID of the new network. [networkID]
 // 2) The location of a custom genesis config to load. [filepath]
 //
-// If [filepath] is empty or the given network ID is Mainnet, Testnet, or Local, returns error.
+// If [filepath] is empty or the given network ID is Camino, Testnet, or Local, returns error.
 // If [filepath] is non-empty and networkID isn't Mainnet, Testnet, or Local,
 // loads the network genesis data from the config at [filepath].
 //
 // FromFile returns:
 // 1) The byte representation of the genesis state of the platform chain
 //    (ie the genesis state of the network)
-// 2) The asset ID of AVAX
+// 2) The asset ID of native token
 func FromFile(networkID uint32, filepath string) ([]byte, ids.ID, error) {
 	switch networkID {
 	case constants.MainnetID, constants.TestnetID, constants.LocalID:
@@ -233,7 +233,7 @@ func FromFile(networkID uint32, filepath string) ([]byte, ids.ID, error) {
 // FromFlag returns:
 // 1) The byte representation of the genesis state of the platform chain
 //    (ie the genesis state of the network)
-// 2) The asset ID of AVAX
+// 2) The asset ID of native token
 func FromFlag(networkID uint32, genesisContent string) ([]byte, ids.ID, error) {
 	switch networkID {
 	case constants.MainnetID, constants.TestnetID, constants.LocalID:

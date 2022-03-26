@@ -24,7 +24,7 @@ import (
 
 // Results of parsing the CLI
 var (
-	defaultNetworkName     = constants.MainnetName
+	defaultNetworkName     = constants.CaminoName
 	homeDir                = os.ExpandEnv("$HOME")
 	prefixedAppName        = fmt.Sprintf(".%s", constants.AppName)
 	defaultDataDir         = filepath.Join(homeDir, prefixedAppName)

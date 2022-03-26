@@ -5,21 +5,21 @@
 
 # Changes to the minimum golang version must also be replicated in
 # scripts/ansible/roles/golang_base/defaults/main.yml
-# scripts/build_avalanche.sh
+# scripts/build_camino.sh
 # scripts/local.Dockerfile (here)
 # Dockerfile
 # README.md
 # go.mod
 FROM golang:1.17.4-buster
 
-RUN mkdir -p /go/src/github.com/ava-labs
+RUN mkdir -p /go/src/github.com/chain4travel
 
-WORKDIR $GOPATH/src/github.com/ava-labs
-COPY avalanchego avalanchego
+WORKDIR $GOPATH/src/github.com/chain4travel
+COPY caminogo caminogo
 COPY coreth coreth
 
-WORKDIR $GOPATH/src/github.com/ava-labs/avalanchego
-RUN ./scripts/build_avalanche.sh
+WORKDIR $GOPATH/src/github.com/chain4travel/caminogo
+RUN ./scripts/build_camino.sh
 RUN ./scripts/build_coreth.sh ../coreth $PWD/build/plugins/evm
 
-RUN ln -sv $GOPATH/src/github.com/ava-labs/avalanche-byzantine/ /avalanchego
+RUN ln -sv $GOPATH/src/github.com/chain4travel/camino-byzantine/ /caminogo

@@ -4,25 +4,25 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Avalanchego root folder
-AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
+# Caminogo root folder
+CAMINO_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 # Load the versions
-source "$AVALANCHE_PATH"/scripts/versions.sh
+source "$CAMINO_PATH"/scripts/versions.sh
 # Load the constants
-source "$AVALANCHE_PATH"/scripts/constants.sh
+source "$CAMINO_PATH"/scripts/constants.sh
 
 # Download dependencies
 echo "Downloading dependencies..."
 go mod download
 
 # Build avalanchego
-"$AVALANCHE_PATH"/scripts/build_avalanche.sh
+"$CAMINO_PATH"/scripts/build_camino.sh
 
 # Build coreth
-"$AVALANCHE_PATH"/scripts/build_coreth.sh
+"$CAMINO_PATH"/scripts/build_coreth.sh
 
 # Exit build successfully if the binaries are created
-if [[ -f "$avalanchego_path" && -f "$evm_path" ]]; then
+if [[ -f "$caminogo_path" && -f "$evm_path" ]]; then
         echo "Build Successful"
         exit 0
 else
