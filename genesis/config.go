@@ -152,6 +152,10 @@ func (c *Config) InitialSupply() (uint64, error) {
 }
 
 var (
+	// CaminoConfig is the config that should be used to generate the camino
+	// mainnet genesis.
+	CaminoConfig Config
+
 	// ColumbusConfig is the config that should be used to generate the columbus
 	// genesis.
 	ColumbusConfig Config
@@ -162,17 +166,23 @@ var (
 )
 
 func init() {
+	unparsedCaminoConfig := UnparsedConfig{}
 	unparsedColumbusConfig := UnparsedConfig{}
 	unparsedLocalConfig := UnparsedConfig{}
 
 	errs := wrappers.Errs{}
 	errs.Add(
+		json.Unmarshal([]byte(caminoGenesisConfigJSON), &unparsedCaminoConfig),
 		json.Unmarshal([]byte(columbusGenesisConfigJSON), &unparsedColumbusConfig),
 		json.Unmarshal([]byte(localGenesisConfigJSON), &unparsedLocalConfig),
 	)
 	if errs.Errored() {
 		panic(errs.Err)
 	}
+
+	caminoConfig, err := unparsedCaminoConfig.Parse()
+	errs.Add(err)
+	CaminoConfig = caminoConfig
 
 	columbusConfig, err := unparsedColumbusConfig.Parse()
 	errs.Add(err)
@@ -189,6 +199,8 @@ func init() {
 
 func GetConfig(networkID uint32) *Config {
 	switch networkID {
+	case constants.CaminoID:
+		return &CaminoConfig
 	case constants.ColumbusID:
 		return &ColumbusConfig
 	case constants.LocalID:

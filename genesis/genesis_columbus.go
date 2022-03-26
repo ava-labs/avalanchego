@@ -73,7 +73,7 @@ var (
 				MaxConsumptionRate: .12 * reward.PercentDenominator,
 				MinConsumptionRate: .10 * reward.PercentDenominator,
 				MintingPeriod:      365 * 24 * time.Hour,
-				SupplyCap:          720 * units.MegaAvax,
+				SupplyCap:          1000 * units.MegaAvax,
 			},
 		},
 	}

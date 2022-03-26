@@ -195,7 +195,7 @@ func validateConfig(networkID uint32, config *Config) error {
 // 2) The asset ID of native token
 func FromFile(networkID uint32, filepath string) ([]byte, ids.ID, error) {
 	switch networkID {
-	case constants.MainnetID, constants.TestnetID, constants.LocalID:
+	case constants.MainnetID, constants.CaminoID, constants.TestnetID, constants.LocalID:
 		return nil, ids.ID{}, fmt.Errorf(
 			"cannot override genesis config for standard network %s (%d)",
 			constants.NetworkName(networkID),
@@ -236,7 +236,7 @@ func FromFile(networkID uint32, filepath string) ([]byte, ids.ID, error) {
 // 2) The asset ID of native token
 func FromFlag(networkID uint32, genesisContent string) ([]byte, ids.ID, error) {
 	switch networkID {
-	case constants.MainnetID, constants.TestnetID, constants.LocalID:
+	case constants.MainnetID, constants.CaminoID, constants.TestnetID, constants.LocalID:
 		return nil, ids.ID{}, fmt.Errorf(
 			"cannot override genesis config for standard network %s (%d)",
 			constants.NetworkName(networkID),
