@@ -433,7 +433,7 @@ func (p *peer) readMessages() {
 		}
 
 		p.Log.Verbo(
-			"parsing message from %s%s:\n%s",
+			"parsing message from %s%s: %s",
 			constants.NodeIDPrefix, p.id,
 			formatting.DumpBytes(msgBytes),
 		)
@@ -442,7 +442,7 @@ func (p *peer) readMessages() {
 		msg, err := p.MessageCreator.Parse(msgBytes, p.id, onFinishedHandling)
 		if err != nil {
 			p.Log.Verbo(
-				"failed to parse message from %s%s: %s\n%s",
+				"failed to parse message from %s%s: %s, %s",
 				constants.NodeIDPrefix, p.id,
 				err,
 				formatting.DumpBytes(msgBytes),
@@ -506,7 +506,7 @@ func (p *peer) writeMessages() {
 
 		msgBytes := msg.Bytes()
 		p.Log.Verbo(
-			"sending message to %s%s:\n%s",
+			"sending message to %s%s: %s",
 			constants.NodeIDPrefix, p.id,
 			formatting.DumpBytes(msgBytes),
 		)

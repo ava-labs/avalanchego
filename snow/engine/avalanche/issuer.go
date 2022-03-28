@@ -98,7 +98,7 @@ func (i *issuer) Update() {
 		return
 	}
 
-	i.t.Ctx.Log.Verbo("Adding vertex to consensus:\n%s", i.vtx)
+	i.t.Ctx.Log.Verbo("Adding vertex to consensus: %s", i.vtx)
 
 	// Add this vertex to consensus.
 	if err := i.t.Consensus.Add(i.vtx); err != nil {

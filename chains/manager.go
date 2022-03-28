@@ -232,9 +232,7 @@ func (m *manager) CreateChain(chain ChainParameters) {
 // creating the P-chain.
 func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	if m.StakingEnabled && chainParams.SubnetID != constants.PrimaryNetworkID && !m.WhitelistedSubnets.Contains(chainParams.SubnetID) {
-		m.Log.Debug("Skipped creating non-whitelisted chain:\n"+
-			"    ID: %s\n"+
-			"    VMID:%s",
+		m.Log.Debug("Skipped creating non-whitelisted chain: ID: %s, VMID: %s",
 			chainParams.ID,
 			chainParams.VMAlias,
 		)
@@ -248,9 +246,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 			alias)
 		return
 	}
-	m.Log.Info("creating chain:\n"+
-		"    ID: %s\n"+
-		"    VMID:%s",
+	m.Log.Info("creating chain ID: %s, VMID: %s",
 		chainParams.ID,
 		chainParams.VMAlias,
 	)

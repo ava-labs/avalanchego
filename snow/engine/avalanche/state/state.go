@@ -115,7 +115,7 @@ func (s *state) Edge(id ids.ID) []ids.ID {
 			s.dbCache.Put(id, frontier)
 			return frontier
 		}
-		s.log.Error("Parsing failed on saved ids.\nPrefixed key = %s\nBytes = %s",
+		s.log.Error("Parsing failed on saved ids. Prefixed key = %s Bytes = %s",
 			id,
 			formatting.DumpBytes(b))
 	}

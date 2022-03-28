@@ -796,7 +796,7 @@ func (n *Node) initAdminAPI() error {
 	if err != nil {
 		return fmt.Errorf("couldn't marshal config: %w", err)
 	}
-	n.Log.Info("node config:\n%s", configJSON)
+	n.Log.Info("node config: %s", configJSON)
 	if !n.Config.AdminAPIEnabled {
 		n.Log.Info("skipping admin API initialization because it has been disabled")
 		return nil

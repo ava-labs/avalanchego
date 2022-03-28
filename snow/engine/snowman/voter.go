@@ -52,7 +52,7 @@ func (v *voter) Update() {
 	for _, result := range results {
 		result := result
 
-		v.t.Ctx.Log.Debug("Finishing poll with:\n%s", &result)
+		v.t.Ctx.Log.Debug("Finishing poll with: %s", &result)
 		if err := v.t.Consensus.RecordPoll(result); err != nil {
 			v.t.errs.Add(err)
 		}

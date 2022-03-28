@@ -92,7 +92,7 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxBytes []byte) err
 	vtx, err := t.Manager.ParseVtx(vtxBytes)
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse vertex due to: %s", err)
-		t.Ctx.Log.Verbo("vertex:\n%s", formatting.DumpBytes(vtxBytes))
+		t.Ctx.Log.Verbo("vertex: %s", formatting.DumpBytes(vtxBytes))
 		return t.GetFailed(vdr, requestID)
 	}
 	if _, err := t.issueFrom(vdr, vtx); err != nil {
@@ -157,7 +157,7 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxBytes []byt
 	vtx, err := t.Manager.ParseVtx(vtxBytes)
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse vertex due to: %s", err)
-		t.Ctx.Log.Verbo("vertex:\n%s", formatting.DumpBytes(vtxBytes))
+		t.Ctx.Log.Verbo("vertex: %s", formatting.DumpBytes(vtxBytes))
 		return nil
 	}
 
