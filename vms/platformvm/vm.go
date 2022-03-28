@@ -376,6 +376,10 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	return blk, nil
 }
 
+func (vm *VM) GetFeeAssetID() ids.ID {
+	return vm.ctx.AVAXAssetID
+}
+
 func (vm *VM) GetBlock(blkID ids.ID) (snowman.Block, error) { return vm.getBlock(blkID) }
 
 func (vm *VM) getBlock(blkID ids.ID) (Block, error) {

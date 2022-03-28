@@ -180,6 +180,8 @@ type Client interface {
 	GetValidatorsAt(ctx context.Context, subnetID ids.ID, height uint64) (map[string]uint64, error)
 	// GetBlock returns the block with the given id.
 	GetBlock(ctx context.Context, blockID ids.ID) ([]byte, error)
+	// GetConfiguration returns genesis information of the primary network
+	GetConfiguration(ctx context.Context) (*GetConfigurationReply, error)
 }
 
 // Client implementation for interacting with the P Chain endpoint
@@ -673,4 +675,10 @@ func (c *client) GetBlock(ctx context.Context, blockID ids.ID) ([]byte, error) {
 	}
 
 	return formatting.Decode(response.Encoding, response.Block)
+}
+
+func (c *client) GetConfiguration(ctx context.Context) (*GetConfigurationReply, error) {
+	res := &GetConfigurationReply{}
+	err := c.requester.SendRequest(ctx, "getConfiguration", struct{}{}, res)
+	return res, err
 }

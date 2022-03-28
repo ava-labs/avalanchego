@@ -1846,45 +1846,16 @@ type GetBlockchainsResponse struct {
 	Blockchains []APIBlockchain `json:"blockchains"`
 }
 
-// GetBlockchains returns all of the blockchains that exist
-func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response *GetBlockchainsResponse) error {
-	service.vm.ctx.Log.Debug("Platform: GetBlockchains called")
-
-	subnets, err := service.vm.internalState.GetSubnets()
+func (service *Service) appendBlockchains(subnetID ids.ID, response *GetBlockchainsResponse) error {
+	chains, err := service.vm.internalState.GetChains(subnetID)
 	if err != nil {
-		return fmt.Errorf("couldn't retrieve subnets: %w", err)
+		return fmt.Errorf(
+			"couldn't retrieve chains for subnet %q: %w",
+			subnetID,
+			err,
+		)
 	}
 
-	response.Blockchains = []APIBlockchain{}
-	for _, subnet := range subnets {
-		subnetID := subnet.ID()
-		chains, err := service.vm.internalState.GetChains(subnetID)
-		if err != nil {
-			return fmt.Errorf(
-				"couldn't retrieve chains for subnet %q: %w",
-				subnetID,
-				err,
-			)
-		}
-
-		for _, chainTx := range chains {
-			chain, ok := chainTx.UnsignedTx.(*UnsignedCreateChainTx)
-			if !ok {
-				return errWrongTxType
-			}
-			response.Blockchains = append(response.Blockchains, APIBlockchain{
-				ID:       chain.ID(),
-				Name:     chain.ChainName,
-				SubnetID: subnetID,
-				VMID:     chain.VMID,
-			})
-		}
-	}
-
-	chains, err := service.vm.internalState.GetChains(constants.PrimaryNetworkID)
-	if err != nil {
-		return fmt.Errorf("couldn't retrieve subnets: %w", err)
-	}
 	for _, chainTx := range chains {
 		chain, ok := chainTx.UnsignedTx.(*UnsignedCreateChainTx)
 		if !ok {
@@ -1893,11 +1864,32 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 		response.Blockchains = append(response.Blockchains, APIBlockchain{
 			ID:       chain.ID(),
 			Name:     chain.ChainName,
-			SubnetID: constants.PrimaryNetworkID,
+			SubnetID: subnetID,
 			VMID:     chain.VMID,
 		})
 	}
+	return nil
+}
 
+// GetBlockchains returns all of the blockchains that exist
+func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response *GetBlockchainsResponse) error {
+	service.vm.ctx.Log.Debug("Platform: GetBlockchains called")
+
+	subnets, err := service.vm.internalState.GetSubnets()
+	if err != nil {
+		return fmt.Errorf("couldn't retrieve subnets: %w", err)
+	}
+	response.Blockchains = []APIBlockchain{}
+	for _, subnet := range subnets {
+		err = service.appendBlockchains(subnet.ID(), response)
+		if err != nil {
+			return err
+		}
+	}
+	err = service.appendBlockchains(constants.PrimaryNetworkID, response)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -2354,6 +2346,73 @@ func (service *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, respon
 	if err != nil {
 		return fmt.Errorf("couldn't encode block %s as string: %w", args.BlockID, err)
 	}
+
+	return nil
+}
+
+// GetConfigurationReply is the response from calling GetConfiguration.
+type GetConfigurationReply struct {
+	// The NetworkID
+	NetworkID json.Uint32 `json:"networkID"`
+	// The fee asset ID
+	AssetID ids.ID `json:"assetID"`
+	// The symbol of the fee asset ID
+	AssetSymbol string `json:"assetSymbol"`
+	// beech32HRP use in addresses
+	Hrp string `json:"hrp"`
+	// Primary network blockchains
+	Blockchains []APIBlockchain `json:"blockchains"`
+	// The minimum duration a validator has to stake
+	MinStakeDuration json.Uint64 `json:"minStakeDuration"`
+	// The maximum duration a validator can stake
+	MaxStakeDuration json.Uint64 `json:"maxStakeDuration"`
+	// The minimum amount of tokens one must bond to be a validator
+	MinValidatorStake json.Uint64 `json:"minValidatorStake"`
+	// The maximum amount of tokens bondable to a validator
+	MaxValidatorStake json.Uint64 `json:"maxValidatorStake"`
+	// The minimum delegation fee
+	MinDelegationFee json.Uint32 `json:"minDelegationFee"`
+	// Minimum stake, in nAVAX, that can be delegated on the primary network
+	MinDelegatorStake json.Uint64 `json:"minDelegatorStake"`
+	// The minimum consumption rate
+	MinConsumptionRate json.Uint64 `json:"minConsumptionRate"`
+	// The maximum consumption rate
+	MaxConsumptionRate json.Uint64 `json:"maxConsumptionRate"`
+	// The supply cap for the native tolen (AVAX)
+	SupplyCap json.Uint64 `json:"supplyCap"`
+}
+
+// GetMinStake returns the minimum staking amount in nAVAX.
+func (service *Service) GetConfiguration(_ *http.Request, _ *struct{}, reply *GetConfigurationReply) error {
+	service.vm.ctx.Log.Debug("Platform: GetConfiguration called")
+
+	// Fee Asset ID, NetworkID and HRP
+	reply.NetworkID = json.Uint32(service.vm.ctx.NetworkID)
+	reply.AssetID = service.vm.GetFeeAssetID()
+	reply.AssetSymbol = constants.TokenSymbol(service.vm.ctx.NetworkID)
+	reply.Hrp = constants.GetHRP(service.vm.ctx.NetworkID)
+
+	// Blockchains of the primary network
+	blockchains := &GetBlockchainsResponse{}
+	if err := service.appendBlockchains(constants.PrimaryNetworkID, blockchains); err != nil {
+		return err
+	}
+	reply.Blockchains = blockchains.Blockchains
+
+	// Staking information
+	reply.MinStakeDuration = json.Uint64(service.vm.MinStakeDuration)
+	reply.MaxStakeDuration = json.Uint64(service.vm.MaxStakeDuration)
+
+	reply.MaxValidatorStake = json.Uint64(service.vm.MaxValidatorStake)
+	reply.MinValidatorStake = json.Uint64(service.vm.MinValidatorStake)
+
+	reply.MinDelegationFee = json.Uint32(service.vm.MinDelegationFee)
+	reply.MinDelegatorStake = json.Uint64(service.vm.MinDelegatorStake)
+
+	reply.MinConsumptionRate = json.Uint64(service.vm.RewardConfig.MinConsumptionRate)
+	reply.MaxConsumptionRate = json.Uint64(service.vm.RewardConfig.MaxConsumptionRate)
+
+	reply.SupplyCap = json.Uint64(service.vm.RewardConfig.SupplyCap)
 
 	return nil
 }

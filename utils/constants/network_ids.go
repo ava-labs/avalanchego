@@ -128,3 +128,10 @@ func NetworkID(networkName string) (uint32, error) {
 	}
 	return uint32(id), nil
 }
+
+func IsActiveNetwork(networkID uint32) bool {
+	return networkID == MainnetID ||
+		networkID == FujiID ||
+		networkID == ColumbusID ||
+		networkID == CaminoID
+}
