@@ -27,16 +27,13 @@ GOARCH=$(go env GOARCH)
 GOOS=$(go env GOOS)
 NETWORK_RUNNER_VERSION=1.0.6
 DOWNLOAD_PATH=/tmp/avalanche-network-runner.tar.gz
-DOWNLOAD_URL=https://github.com/ava-labs/avalanche-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/avalanche-network-runner_${NETWORK_RUNNER_VERSION}_linux_amd64.tar.gz
-if [[ ${GOOS} == "darwin" ]]; then
-  DOWNLOAD_URL=https://github.com/ava-labs/avalanche-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/avalanche-network-runner_${NETWORK_RUNNER_VERSION}_darwin_amd64.tar.gz
-fi
+DOWNLOAD_URL="https://github.com/ava-labs/avalanche-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/avalanche-network-runner_${NETWORK_RUNNER_VERSION}_${GOOS}_${GOARCH}.tar.gz"
 
 rm -f ${DOWNLOAD_PATH}
 rm -f /tmp/avalanche-network-runner
 
 echo "downloading avalanche-network-runner ${NETWORK_RUNNER_VERSION} at ${DOWNLOAD_URL}"
-curl -L ${DOWNLOAD_URL} -o ${DOWNLOAD_PATH}
+curl --fail -L ${DOWNLOAD_URL} -o ${DOWNLOAD_PATH}
 
 echo "extracting downloaded avalanche-network-runner"
 tar xzvf ${DOWNLOAD_PATH} -C /tmp
