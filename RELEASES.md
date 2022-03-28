@@ -1,7 +1,11 @@
 # Release Notes
 
+## [v0.8.9](https://github.com/ava-labs/coreth/releases/tag/v0.8.9)
+
 ## [v0.8.8](https://github.com/ava-labs/coreth/releases/tag/v0.8.8)
 
+- Reduced log level of snapshot regeneration logs
+- Enabled atomic tx replacement with higher gas fees
 - Parallelize trie index re-generation
 
 ## [v0.8.7](https://github.com/ava-labs/coreth/releases/tag/v0.8.7)
