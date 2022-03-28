@@ -646,6 +646,12 @@ func (n *network) samplePeers(
 	return n.connectedPeers.Sample(
 		numValidatorsToSample+numNonValidatorsToSample,
 		func(p peer.Peer) bool {
+			// Only return non-validators that are tracking [subnetID]
+			trackedSubnets := p.TrackedSubnets()
+			if !trackedSubnets.Contains(subnetID) {
+				return false
+			}
+
 			if n.config.Validators.Contains(subnetID, p.ID()) {
 				numValidatorsToSample--
 				return numValidatorsToSample >= 0
