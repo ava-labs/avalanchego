@@ -42,6 +42,9 @@ echo "extracting downloaded avalanche-network-runner"
 tar xzvf ${DOWNLOAD_PATH} -C /tmp
 /tmp/avalanche-network-runner -h
 
+GOPATH="$(go env GOPATH)"
+PATH="${GOPATH}/bin:${PATH}"
+
 #################################
 echo "building e2e.test"
 # to install the ginkgo binary (required for test build and run)
