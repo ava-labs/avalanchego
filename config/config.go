@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"net"
 	"os"
@@ -166,7 +165,7 @@ func getAPIAuthConfig(v *viper.Viper) (node.APIAuthConfig, error) {
 		config.APIAuthPassword = v.GetString(APIAuthPasswordKey)
 	} else {
 		passwordFilePath := v.GetString(APIAuthPasswordFileKey) // picks flag value or default
-		passwordBytes, err := ioutil.ReadFile(passwordFilePath)
+		passwordBytes, err := os.ReadFile(passwordFilePath)
 		if err != nil {
 			return node.APIAuthConfig{}, fmt.Errorf("API auth password file %q failed to be read: %w", passwordFilePath, err)
 		}
@@ -208,7 +207,7 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 		}
 	case v.IsSet(HTTPSKeyFileKey):
 		httpsKeyFilepath := os.ExpandEnv(v.GetString(HTTPSKeyFileKey))
-		if httpsKey, err = ioutil.ReadFile(filepath.Clean(httpsKeyFilepath)); err != nil {
+		if httpsKey, err = os.ReadFile(filepath.Clean(httpsKeyFilepath)); err != nil {
 			return node.HTTPConfig{}, err
 		}
 	}
@@ -222,7 +221,7 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 		}
 	case v.IsSet(HTTPSCertFileKey):
 		httpsCertFilepath := os.ExpandEnv(v.GetString(HTTPSCertFileKey))
-		if httpsCert, err = ioutil.ReadFile(filepath.Clean(httpsCertFilepath)); err != nil {
+		if httpsCert, err = os.ReadFile(filepath.Clean(httpsCertFilepath)); err != nil {
 			return node.HTTPConfig{}, err
 		}
 	}
@@ -738,7 +737,7 @@ func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, e
 		}
 	} else if v.IsSet(DBConfigFileKey) {
 		path := os.ExpandEnv(v.GetString(DBConfigFileKey))
-		configBytes, err = ioutil.ReadFile(path)
+		configBytes, err = os.ReadFile(path)
 		if err != nil {
 			return node.DatabaseConfig{}, err
 		}
@@ -777,7 +776,7 @@ func getVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
 			return nil, nil
 		}
 
-		fileBytes, err = ioutil.ReadFile(aliasFilePath)
+		fileBytes, err = os.ReadFile(aliasFilePath)
 		if err != nil {
 			return nil, err
 		}
@@ -973,7 +972,7 @@ func readSubnetConfigs(subnetConfigPath string, subnetIDs []ids.ID, defaultSubne
 		}
 
 		// subnetConfigDir/subnetID.json
-		file, err := ioutil.ReadFile(filePath)
+		file, err := os.ReadFile(filePath)
 		if err != nil {
 			return nil, err
 		}
