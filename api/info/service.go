@@ -317,7 +317,7 @@ func (service *Info) GetVMs(_ *http.Request, _ *struct{}, reply *GetVMsReply) er
 	service.log.Debug("Info: GetVMs called")
 
 	// Fetch the VMs registered on this node.
-	vmIDs, err := service.VMManager.ListVMs()
+	vmIDs, err := service.VMManager.ListFactories()
 	if err != nil {
 		return err
 	}
