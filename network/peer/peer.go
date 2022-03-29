@@ -831,7 +831,7 @@ func (p *peer) handlePeerList(msg message.InboundMessage) {
 		close(p.onFinishHandshake)
 	}
 
-	ips := msg.Get(message.SignedPeers).([]utils.IPCertDesc)
+	ips := msg.Get(message.Peers).([]utils.IPCertDesc)
 	for _, ip := range ips {
 		p.Network.Track(ip)
 	}

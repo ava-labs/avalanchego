@@ -43,16 +43,16 @@ var (
 	}
 
 	// read dir results
-	oneValidVM = []fs.FileInfo{
+	oneValidVM = []fs.DirEntry{
 		directory,
 		registeredVM,
 	}
-	twoValidVMs = []fs.FileInfo{
+	twoValidVMs = []fs.DirEntry{
 		directory,
 		registeredVM,
 		unregisteredVM,
 	}
-	invalidVMs = []fs.FileInfo{
+	invalidVMs = []fs.DirEntry{
 		directory,
 		invalidVM,
 	}

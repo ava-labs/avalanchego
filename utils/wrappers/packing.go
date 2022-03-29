@@ -337,20 +337,6 @@ func TryUnpackByte(packer *Packer) interface{} {
 	return packer.UnpackByte()
 }
 
-// TryPackShort attempts to pack the value as a short
-func TryPackShort(packer *Packer, valIntf interface{}) {
-	if val, ok := valIntf.(uint16); ok {
-		packer.PackShort(val)
-	} else {
-		packer.Add(errBadType)
-	}
-}
-
-// TryUnpackShort attempts to unpack a value as a short
-func TryUnpackShort(packer *Packer) interface{} {
-	return packer.UnpackShort()
-}
-
 // TryPackInt attempts to pack the value as an int
 func TryPackInt(packer *Packer, valIntf interface{}) {
 	if val, ok := valIntf.(uint32); ok {
@@ -405,34 +391,6 @@ func TryPackHashes(packer *Packer, valIntf interface{}) {
 // TryUnpackHashes attempts to unpack the value as a list of 32-byte sequences
 func TryUnpackHashes(packer *Packer) interface{} {
 	return packer.UnpackFixedByteSlices(hashing.HashLen)
-}
-
-// TryPackAddr attempts to pack the value as a 20-byte sequence
-func TryPackAddr(packer *Packer, valIntf interface{}) {
-	if val, ok := valIntf.([]byte); ok {
-		packer.PackFixedBytes(val)
-	} else {
-		packer.Add(errBadType)
-	}
-}
-
-// TryUnpackAddr attempts to unpack the value as a 20-byte sequence
-func TryUnpackAddr(packer *Packer) interface{} {
-	return packer.UnpackFixedBytes(hashing.AddrLen)
-}
-
-// TryPackAddrList attempts to pack the value as a list of 20-byte sequences
-func TryPackAddrList(packer *Packer, valIntf interface{}) {
-	if val, ok := valIntf.([][]byte); ok {
-		packer.PackFixedByteSlices(val)
-	} else {
-		packer.Add(errBadType)
-	}
-}
-
-// TryUnpackAddrList attempts to unpack the value as a list of 20-byte sequences
-func TryUnpackAddrList(packer *Packer) interface{} {
-	return packer.UnpackFixedByteSlices(hashing.AddrLen)
 }
 
 // TryPackBytes attempts to pack the value as a list of bytes
@@ -491,59 +449,18 @@ func TryUnpackIP(packer *Packer) interface{} {
 	return packer.UnpackIP()
 }
 
-// TryPackIPList attempts to pack the value as an ip port pair list
-func TryPackIPList(packer *Packer, valIntf interface{}) {
-	if val, ok := valIntf.([]utils.IPDesc); ok {
-		packer.PackIPs(val)
-	} else {
-		packer.Add(errBadType)
-	}
-}
-
-// TryUnpackIPList attempts to unpack the value as an ip port pair list
-func TryUnpackIPList(packer *Packer) interface{} {
-	return packer.UnpackIPs()
-}
-
-func TryPackX509Certificate(packer *Packer, valIntf interface{}) {
-	if val, ok := valIntf.(*x509.Certificate); ok {
-		packer.PackX509Certificate(val)
-	} else {
-		packer.Add(errBadType)
-	}
-}
-
-func TryUnpackX509Certificate(packer *Packer) interface{} {
-	return packer.UnpackX509Certificate()
-}
-
 func (p *Packer) PackX509Certificate(cert *x509.Certificate) {
 	p.PackBytes(cert.Raw)
 }
 
 func (p *Packer) UnpackX509Certificate() *x509.Certificate {
 	b := p.UnpackBytes()
-	if len(b) == 0 {
-		return nil
-	}
 	cert, err := x509.ParseCertificate(b)
 	if err != nil {
 		p.Add(err)
 		return nil
 	}
 	return cert
-}
-
-func TryPackIPCert(packer *Packer, valIntf interface{}) {
-	if val, ok := valIntf.(utils.IPCertDesc); ok {
-		packer.PackIPCert(val)
-	} else {
-		packer.Add(errBadType)
-	}
-}
-
-func TryUnpackIPCert(packer *Packer) interface{} {
-	return packer.UnpackIPCert()
 }
 
 func (p *Packer) PackIPCert(ipCert utils.IPCertDesc) {

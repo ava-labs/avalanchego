@@ -6,7 +6,6 @@ package storage
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -38,7 +37,7 @@ func ReadFileWithName(parentDir string, fileNameNoExt string) ([]byte, error) {
 		// no file found, return nothing
 		return nil, nil
 	default:
-		return ioutil.ReadFile(files[0])
+		return os.ReadFile(files[0])
 	}
 }
 
