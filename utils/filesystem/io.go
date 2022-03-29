@@ -5,7 +5,7 @@ package filesystem
 
 import (
 	"io/fs"
-	"io/ioutil"
+	"os"
 )
 
 var _ Reader = reader{}
@@ -14,7 +14,7 @@ var _ Reader = reader{}
 type Reader interface {
 	// ReadDir reads a given directory.
 	// Returns the files in the directory.
-	ReadDir(string) ([]fs.FileInfo, error)
+	ReadDir(string) ([]fs.DirEntry, error)
 }
 
 type reader struct{}
@@ -24,7 +24,7 @@ func NewReader() Reader {
 	return reader{}
 }
 
-// This is just a wrapper around ioutil.ReadDir to make testing easier.
-func (reader) ReadDir(dirname string) ([]fs.FileInfo, error) {
-	return ioutil.ReadDir(dirname)
+// This is just a wrapper around os.ReadDir to make testing easier.
+func (reader) ReadDir(dirname string) ([]fs.DirEntry, error) {
+	return os.ReadDir(dirname)
 }

@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -582,7 +581,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 // setups config json file and writes content
 func setupConfigJSON(t *testing.T, rootPath string, value string) string {
 	configFilePath := filepath.Join(rootPath, "config.json")
-	assert.NoError(t, ioutil.WriteFile(configFilePath, []byte(value), 0o600))
+	assert.NoError(t, os.WriteFile(configFilePath, []byte(value), 0o600))
 	return configFilePath
 }
 
@@ -590,7 +589,7 @@ func setupConfigJSON(t *testing.T, rootPath string, value string) string {
 func setupFile(t *testing.T, path string, fileName string, value string) {
 	assert.NoError(t, os.MkdirAll(path, 0o700))
 	filePath := filepath.Join(path, fileName)
-	assert.NoError(t, ioutil.WriteFile(filePath, []byte(value), 0o600))
+	assert.NoError(t, os.WriteFile(filePath, []byte(value), 0o600))
 }
 
 func setupViperFlags() *viper.Viper {
