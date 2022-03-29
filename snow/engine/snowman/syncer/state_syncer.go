@@ -4,7 +4,6 @@
 package syncer
 
 import (
-	"sort"
 	"time"
 
 	stdmath "math"
@@ -183,7 +182,7 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 	for _, summaryID := range summaryIDs {
 		ws, ok := ss.weightedSummaries[summaryID]
 		if !ok {
-			// received vote for a unknown summary. Skipped
+			ss.Ctx.Log.Debug("Received a vote from %s for unknown summary %s. Skipped.", validatorID, summaryID)
 			continue
 		}
 		previousWeight := ws.weight
@@ -207,15 +206,13 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 
 	// We've received the filtered accepted frontier from every state sync validator
 	// Accept all containers that have a sufficient weight behind them
-	summaries := make(summaryWeightedList, 0, len(ss.weightedSummaries))
+	accepted := make([]common.Summary, 0, len(ss.weightedSummaries))
 	for _, ws := range ss.weightedSummaries {
 		if ws.weight < ss.Alpha {
 			continue
 		}
-		summaries = append(summaries, ws)
+		accepted = append(accepted, ws.Summary)
 	}
-	sort.Sort(sort.Reverse(summaries))
-	accepted := summaries.List()
 
 	// if we don't have enough weight for the state summary to be accepted then retry or fail the state sync
 	size := len(accepted)

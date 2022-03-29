@@ -15,21 +15,6 @@ type weightedSummary struct {
 	weight uint64
 }
 
-// We want to order summaries passed to VM by weight,
-// as a proxy of summary data availability
-type summaryWeightedList []weightedSummary
-
-func (swl summaryWeightedList) Len() int           { return len(swl) }
-func (swl summaryWeightedList) Less(i, j int) bool { return swl[i].weight < swl[j].weight }
-func (swl summaryWeightedList) Swap(i, j int)      { swl[i], swl[j] = swl[j], swl[i] }
-func (swl summaryWeightedList) List() []common.Summary {
-	res := make([]common.Summary, 0, len(swl))
-	for _, s := range swl {
-		res = append(res, s.Summary)
-	}
-	return res
-}
-
 type frontierTracker struct {
 	// Holds the beacons that were sampled for the accepted frontier
 	frontierSeeders validators.Set
