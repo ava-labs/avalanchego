@@ -178,7 +178,7 @@ var (
 		// Handshake:
 		// TODO: remove NodeID from the Version message
 		Version:  {NetworkID, NodeID, MyTime, IP, VersionStr, VersionTime, SigBytes, TrackedSubnets},
-		PeerList: {SignedPeers},
+		PeerList: {Peers},
 		Ping:     {},
 		Pong:     {Uptime},
 		// Bootstrapping:

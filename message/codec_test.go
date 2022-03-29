@@ -4,7 +4,6 @@
 package message
 
 import (
-	"crypto/x509"
 	"math"
 	"net"
 	"testing"
@@ -15,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
@@ -93,7 +93,10 @@ func TestCodecPackParseGzip(t *testing.T) {
 	c, err := NewCodecWithMemoryPool("", prometheus.DefaultRegisterer, 2*units.MiB, 10*time.Second)
 	assert.NoError(t, err)
 	id := ids.GenerateTestID()
-	cert := &x509.Certificate{}
+
+	tlsCert, err := staking.NewTLSCert()
+	assert.NoError(t, err)
+	cert := tlsCert.Leaf
 
 	msgs := []inboundMessage{
 		{
@@ -112,7 +115,7 @@ func TestCodecPackParseGzip(t *testing.T) {
 		{
 			op: PeerList,
 			fields: map[Field]interface{}{
-				SignedPeers: []utils.IPCertDesc{
+				Peers: []utils.IPCertDesc{
 					{
 						Cert:      cert,
 						IPDesc:    utils.IPDesc{IP: net.IPv4(1, 2, 3, 4)},

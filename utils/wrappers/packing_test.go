@@ -5,7 +5,6 @@ package wrappers
 
 import (
 	"bytes"
-	"crypto/x509"
 	"net"
 	"reflect"
 	"testing"
@@ -595,15 +594,13 @@ func TestPackX509Certificate(t *testing.T) {
 	assert.NoError(t, err)
 
 	p := Packer{MaxSize: 10000}
-	TryPackX509Certificate(&p, cert.Leaf)
+	p.PackX509Certificate(cert.Leaf)
 	assert.NoError(t, p.Err)
 
 	p.Offset = 0
-	unpackedCert := TryUnpackX509Certificate(&p)
+	unpackedCert := p.UnpackX509Certificate()
 
-	x509unpackedCert := unpackedCert.(*x509.Certificate)
-
-	assert.Equal(t, cert.Leaf.Raw, x509unpackedCert.Raw)
+	assert.Equal(t, cert.Leaf.Raw, unpackedCert.Raw)
 }
 
 func TestPackIPCert(t *testing.T) {
@@ -617,16 +614,15 @@ func TestPackIPCert(t *testing.T) {
 	}
 
 	p := Packer{MaxSize: 10000}
-	TryPackIPCert(&p, ipCert)
+	p.PackIPCert(ipCert)
 	assert.NoError(t, p.Err)
 
 	p.Offset = 0
-	unpackedIPCert := TryUnpackIPCert(&p)
-	resolvedUnpackedIPCert := unpackedIPCert.(utils.IPCertDesc)
+	unpackedIPCert := p.UnpackIPCert()
 
-	assert.Equal(t, ipCert.IPDesc, resolvedUnpackedIPCert.IPDesc)
-	assert.Equal(t, ipCert.Cert.Raw, resolvedUnpackedIPCert.Cert.Raw)
-	assert.Equal(t, ipCert.Signature, resolvedUnpackedIPCert.Signature)
+	assert.Equal(t, ipCert.IPDesc, unpackedIPCert.IPDesc)
+	assert.Equal(t, ipCert.Cert.Raw, unpackedIPCert.Cert.Raw)
+	assert.Equal(t, ipCert.Signature, unpackedIPCert.Signature)
 }
 
 func TestPackIPCertList(t *testing.T) {
