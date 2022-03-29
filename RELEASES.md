@@ -1,5 +1,17 @@
 # Release Notes
 
+## [v1.7.9](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.9)
+
+This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.
+
+### Updates
+
+- Improved subnet gossip to only send messages to nodes participating in that subnet.
+- Fixed inlined VM initialization to correctly register static APIs.
+- Added logging for file descriptor limit errors.
+- Removed dead code from network packer.
+- Improved logging of invalid hash length errors.
+
 ## [v1.7.8](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.8)
 
 This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.
