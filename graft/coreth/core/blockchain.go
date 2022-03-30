@@ -538,15 +538,18 @@ func (bc *BlockChain) Stop() {
 		return
 	}
 
-	// Stop senderCacher's goroutines
-	bc.senderCacher.Shutdown()
-
-	// Unsubscribe all subscriptions registered from blockchain.
-	bc.scope.Close()
-
+	log.Info("Shutting down state maanger")
 	if err := bc.stateManager.Shutdown(); err != nil {
 		log.Error("Failed to Shutdown state manager", "err", err)
 	}
+
+	// Stop senderCacher's goroutines
+	log.Info("Shutting down sender cacher")
+	bc.senderCacher.Shutdown()
+
+	// Unsubscribe all subscriptions registered from blockchain.
+	log.Info("Closing scope")
+	bc.scope.Close()
 
 	log.Info("Blockchain stopped")
 }
