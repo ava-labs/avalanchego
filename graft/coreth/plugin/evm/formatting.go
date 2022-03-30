@@ -51,11 +51,6 @@ func ParseEthAddress(addrStr string) (common.Address, error) {
 	return common.HexToAddress(addrStr), nil
 }
 
-// FormatEthAddress formats [addr] into a string
-func FormatEthAddress(addr common.Address) string {
-	return addr.Hex()
-}
-
 // GetEthAddress returns the ethereum address derived from [privKey]
 func GetEthAddress(privKey *crypto.PrivateKeySECP256K1R) common.Address {
 	return PublicKeyToEthAddress(privKey.PublicKey().(*crypto.PublicKeySECP256K1R))

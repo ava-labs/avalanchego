@@ -166,7 +166,7 @@ func (service *AvaxAPI) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 	}
 
 	// TODO: return eth address here
-	reply.Address = FormatEthAddress(GetEthAddress(sk))
+	reply.Address = GetEthAddress(sk).Hex()
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
