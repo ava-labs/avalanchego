@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/prque"
 	"github.com/ethereum/go-ethereum/event"
@@ -726,12 +727,22 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	if err := pool.CheckNonceOrdering(from, tx.Nonce()); err != nil {
 		return err
 	}
+
+	isTxAllowList := pool.chainconfig.IsTxAllowList(pool.currentHead.Number)
 	// Transactor should have enough funds to cover the costs
 	// cost == V + GP * GL
 	pool.currentStateLock.Lock()
 	if balance, cost := pool.currentState.GetBalance(from), tx.Cost(); balance.Cmp(cost) < 0 {
 		pool.currentStateLock.Unlock()
 		return fmt.Errorf("%w: address %s have (%d) want (%d)", ErrInsufficientFunds, from.Hex(), balance, cost)
+	}
+	// If the tx allow list is enabled, return an error if the from address is not allow listed.
+	if isTxAllowList {
+		txAllowListRole := precompile.GetTxAllowListStatus(pool.currentState, from)
+		if !txAllowListRole.IsEnabled() {
+			pool.currentStateLock.Unlock()
+			return fmt.Errorf("%w: %s", precompile.ErrSenderAddressNotAllowListed, from)
+		}
 	}
 	pool.currentStateLock.Unlock()
 	// Ensure the transaction has more gas than the basic tx fee.

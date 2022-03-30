@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -307,8 +308,16 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	homestead := st.evm.ChainConfig().IsHomestead(st.evm.Context.BlockNumber)
 	istanbul := st.evm.ChainConfig().IsIstanbul(st.evm.Context.BlockNumber)
 	subnetEVM := st.evm.ChainConfig().IsSubnetEVM(st.evm.Context.Time)
+	isTxAllowList := st.evm.ChainConfig().IsTxAllowList(st.evm.Context.Time)
 
 	contractCreation := msg.To() == nil
+
+	if isTxAllowList {
+		txAllowListRole := precompile.GetTxAllowListStatus(st.state, sender.Address())
+		if !txAllowListRole.IsEnabled() {
+			return nil, fmt.Errorf("%w: %s", precompile.ErrSenderAddressNotAllowListed, sender.Address())
+		}
+	}
 
 	// Check clauses 4-5, subtract intrinsic gas if everything is correct
 	gas, err := IntrinsicGas(st.data, st.msg.AccessList(), contractCreation, homestead, istanbul)
