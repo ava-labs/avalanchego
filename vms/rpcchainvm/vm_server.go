@@ -354,7 +354,7 @@ func (vm *VMServer) StateSync(ctx context.Context, req *vmproto.StateSyncRequest
 	return &emptypb.Empty{}, nil
 }
 
-func (vm *VMServer) GetStateSyncResult(context.Context, *emptypb.Empty) (*vmproto.GetStateSyncResultResponseResponse, error) {
+func (vm *VMServer) GetStateSyncResult(context.Context, *emptypb.Empty) (*vmproto.GetStateSyncResultResponse, error) {
 	ssVM, ok := vm.vm.(block.StateSyncableVM)
 	if !ok {
 		return nil, common.ErrStateSyncableVMNotImplemented
@@ -364,7 +364,7 @@ func (vm *VMServer) GetStateSyncResult(context.Context, *emptypb.Empty) (*vmprot
 	if err != nil {
 		return nil, err
 	}
-	return &vmproto.GetStateSyncResultResponseResponse{
+	return &vmproto.GetStateSyncResultResponse{
 		Bytes:  blkID[:],
 		Height: height,
 	}, nil

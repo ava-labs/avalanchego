@@ -144,9 +144,9 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 		coreSummaries = append(coreSummaries, coreSummary)
 
 		// Following state sync introduction, we update height -> blockID index
-		// with summaries content to, so to be able to resume state syncing in case
-		// of shutdown. Note that this changes slightly the index semantics as it
-		// is not guaranteed anymore that node hosts any block indexed.
+		// with summaries content in order to support resuming state sync in case
+		// of shutdown. Note that we won't download all the blocks associated with
+		// state summaries.
 		if err := vm.updateHeightIndex(uint64(summary.Key()), proContent.ProBlkID); err != nil {
 			return err
 		}

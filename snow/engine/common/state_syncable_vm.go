@@ -34,13 +34,10 @@ type StateSyncableVM interface {
 	// StateSyncEnabled indicates whether the state sync is enabled for this VM
 	StateSyncEnabled() (bool, error)
 
-	// A State sync may have been initiate in a previous node run. In such case
-	// GetOngoingStateSyncSummary allows retrieving the state summary for the ongoing
-	// state sync, so that network availability of the summary can be inspected. This allows
-	// StateSyncableVM to decide whether to continue syncing the same summary or restarting
-	// from a different one.
-	// GetOngoingStateSyncSummary should return ErrNoStateSyncOngoing is not previous
-	// state sync should be inspected.
+	// GetOngoingStateSyncSummary returns an in-progress state summary if it exists. This
+	// allows the engine to ask the network if the ongoing summary is still supported by the
+	// network. This simplifies the task of the StateSyncableVM to decide whether to
+	// continue an in-progress sync or start over.
 	GetOngoingStateSyncSummary() (Summary, error)
 
 	// StateSyncGetLastSummary returns latest Summary with an optional error
