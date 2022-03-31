@@ -54,7 +54,7 @@ type VMClient interface {
 	ParseSummary(ctx context.Context, in *ParseSummaryRequest, opts ...grpc.CallOption) (*ParseSummaryResponse, error)
 	StateSyncGetSummary(ctx context.Context, in *StateSyncGetSummaryRequest, opts ...grpc.CallOption) (*StateSyncGetSummaryResponse, error)
 	StateSync(ctx context.Context, in *StateSyncRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	GetLastSummaryBlockID(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncLastSummaryBlockIDResponse, error)
+	GetStateSyncResult(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncLastSummaryBlockIDResponse, error)
 	SetLastSummaryBlock(ctx context.Context, in *StateSyncSetLastSummaryBlockRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
@@ -336,9 +336,9 @@ func (c *vMClient) StateSync(ctx context.Context, in *StateSyncRequest, opts ...
 	return out, nil
 }
 
-func (c *vMClient) GetLastSummaryBlockID(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncLastSummaryBlockIDResponse, error) {
+func (c *vMClient) GetStateSyncResult(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncLastSummaryBlockIDResponse, error) {
 	out := new(StateSyncLastSummaryBlockIDResponse)
-	err := c.cc.Invoke(ctx, "/vmproto.VM/GetLastSummaryBlockID", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/GetStateSyncResult", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -389,7 +389,7 @@ type VMServer interface {
 	ParseSummary(context.Context, *ParseSummaryRequest) (*ParseSummaryResponse, error)
 	StateSyncGetSummary(context.Context, *StateSyncGetSummaryRequest) (*StateSyncGetSummaryResponse, error)
 	StateSync(context.Context, *StateSyncRequest) (*emptypb.Empty, error)
-	GetLastSummaryBlockID(context.Context, *emptypb.Empty) (*StateSyncLastSummaryBlockIDResponse, error)
+	GetStateSyncResult(context.Context, *emptypb.Empty) (*StateSyncLastSummaryBlockIDResponse, error)
 	SetLastSummaryBlock(context.Context, *StateSyncSetLastSummaryBlockRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedVMServer()
 }
@@ -488,8 +488,8 @@ func (UnimplementedVMServer) StateSyncGetSummary(context.Context, *StateSyncGetS
 func (UnimplementedVMServer) StateSync(context.Context, *StateSyncRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StateSync not implemented")
 }
-func (UnimplementedVMServer) GetLastSummaryBlockID(context.Context, *emptypb.Empty) (*StateSyncLastSummaryBlockIDResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetLastSummaryBlockID not implemented")
+func (UnimplementedVMServer) GetStateSyncResult(context.Context, *emptypb.Empty) (*StateSyncLastSummaryBlockIDResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetStateSyncResult not implemented")
 }
 func (UnimplementedVMServer) SetLastSummaryBlock(context.Context, *StateSyncSetLastSummaryBlockRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetLastSummaryBlock not implemented")
@@ -1047,20 +1047,20 @@ func _VM_StateSync_Handler(srv interface{}, ctx context.Context, dec func(interf
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VM_GetLastSummaryBlockID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _VM_GetStateSyncResult_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VMServer).GetLastSummaryBlockID(ctx, in)
+		return srv.(VMServer).GetStateSyncResult(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/vmproto.VM/GetLastSummaryBlockID",
+		FullMethod: "/vmproto.VM/GetStateSyncResult",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).GetLastSummaryBlockID(ctx, req.(*emptypb.Empty))
+		return srv.(VMServer).GetStateSyncResult(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1211,8 +1211,8 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _VM_StateSync_Handler,
 		},
 		{
-			MethodName: "GetLastSummaryBlockID",
-			Handler:    _VM_GetLastSummaryBlockID_Handler,
+			MethodName: "GetStateSyncResult",
+			Handler:    _VM_GetStateSyncResult_Handler,
 		},
 		{
 			MethodName: "SetLastSummaryBlock",

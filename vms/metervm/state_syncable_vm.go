@@ -63,13 +63,13 @@ func (vm *blockVM) StateSync(accepted []common.Summary) error {
 	return err
 }
 
-func (vm *blockVM) GetLastSummaryBlockID() (ids.ID, error) {
+func (vm *blockVM) GetStateSyncResult() (ids.ID, error) {
 	if vm.ssVM == nil {
 		return ids.Empty, common.ErrStateSyncableVMNotImplemented
 	}
 
 	start := vm.clock.Time()
-	blkID, err := vm.ssVM.GetLastSummaryBlockID()
+	blkID, err := vm.ssVM.GetStateSyncResult()
 	end := vm.clock.Time()
 	vm.stateSummaryMetrics.lastSummaryBlockID.Observe(float64(end.Sub(start)))
 

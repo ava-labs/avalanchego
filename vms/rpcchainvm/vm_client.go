@@ -597,8 +597,8 @@ func (vm *VMClient) StateSync(accepted []common.Summary) error {
 	return err
 }
 
-func (vm *VMClient) GetLastSummaryBlockID() (ids.ID, error) {
-	resp, err := vm.client.GetLastSummaryBlockID(context.Background(), &emptypb.Empty{})
+func (vm *VMClient) GetStateSyncResult() (ids.ID, error) {
+	resp, err := vm.client.GetStateSyncResult(context.Background(), &emptypb.Empty{})
 	if err != nil {
 		return ids.Empty, err
 	}

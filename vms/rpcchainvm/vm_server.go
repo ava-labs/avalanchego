@@ -335,13 +335,13 @@ func (vm *VMServer) StateSync(ctx context.Context, req *vmproto.StateSyncRequest
 	return &emptypb.Empty{}, nil
 }
 
-func (vm *VMServer) GetLastSummaryBlockID(context.Context, *emptypb.Empty) (*vmproto.StateSyncLastSummaryBlockIDResponse, error) {
+func (vm *VMServer) GetStateSyncResult(context.Context, *emptypb.Empty) (*vmproto.StateSyncLastSummaryBlockIDResponse, error) {
 	ssVM, ok := vm.vm.(block.StateSyncableVM)
 	if !ok {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	blkID, err := ssVM.GetLastSummaryBlockID()
+	blkID, err := ssVM.GetStateSyncResult()
 	if err != nil {
 		return nil, err
 	}

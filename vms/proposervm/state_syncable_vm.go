@@ -153,13 +153,13 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 	return ssVM.StateSync(coreSummaries)
 }
 
-func (vm *VM) GetLastSummaryBlockID() (ids.ID, error) {
+func (vm *VM) GetStateSyncResult() (ids.ID, error) {
 	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
 		return ids.Empty, common.ErrStateSyncableVMNotImplemented
 	}
 
-	coreBlkID, err := ssVM.GetLastSummaryBlockID()
+	coreBlkID, err := ssVM.GetStateSyncResult()
 	if err != nil {
 		return ids.Empty, err
 	}

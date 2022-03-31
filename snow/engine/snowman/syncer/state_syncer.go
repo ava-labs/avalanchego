@@ -354,7 +354,7 @@ func (ss *stateSyncer) Notify(msg common.Message) error {
 	case common.StateSyncDone:
 		// retrieve the blkID to request
 		var err error
-		ss.lastSummaryBlkID, err = ss.stateSyncVM.GetLastSummaryBlockID()
+		ss.lastSummaryBlkID, err = ss.stateSyncVM.GetStateSyncResult()
 		if err != nil {
 			ss.Ctx.Log.Warn("Could not retrieve last summary block ID to complete state sync. Err: %v", err)
 			return err
