@@ -199,7 +199,7 @@ func (b *outMsgBuilder) PeerList(peers []utils.IPCertDesc, bypassThrottling bool
 	return b.c.Pack(
 		PeerList,
 		map[Field]interface{}{
-			SignedPeers: peers,
+			Peers: peers,
 		},
 		b.compress && PeerList.Compressible(), // PeerList messages may be compressed
 		bypassThrottling,

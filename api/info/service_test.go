@@ -62,7 +62,7 @@ func TestGetVMsSuccess(t *testing.T) {
 	}
 
 	resources.mockLog.EXPECT().Debug(gomock.Any()).Times(1)
-	resources.mockVMManager.EXPECT().ListVMs().Times(1).Return(vmIDs, nil)
+	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(vmIDs, nil)
 	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(alias2, nil)
 
@@ -74,12 +74,12 @@ func TestGetVMsSuccess(t *testing.T) {
 }
 
 // Tests GetVMs if we fail to list our vms.
-func TestGetVMsVMsListVMsFails(t *testing.T) {
+func TestGetVMsVMsListFactoriesFails(t *testing.T) {
 	resources := initGetVMsTest(t)
 	defer resources.ctrl.Finish()
 
 	resources.mockLog.EXPECT().Debug(gomock.Any()).Times(1)
-	resources.mockVMManager.EXPECT().ListVMs().Times(1).Return(nil, errOops)
+	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(nil, errOops)
 
 	reply := GetVMsReply{}
 	err := resources.info.GetVMs(nil, nil, &reply)
@@ -98,7 +98,7 @@ func TestGetVMsGetAliasesFails(t *testing.T) {
 	alias1 := []string{id1.String(), "vm1-alias-1", "vm1-alias-2"}
 
 	resources.mockLog.EXPECT().Debug(gomock.Any()).Times(1)
-	resources.mockVMManager.EXPECT().ListVMs().Times(1).Return(vmIDs, nil)
+	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(vmIDs, nil)
 	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(nil, errOops)
 
