@@ -63,6 +63,14 @@ func (vm *blockVM) StateSync(accepted []common.Summary) error {
 	return err
 }
 
+func (vm *blockVM) GetOngoingStateSyncSummary() (common.Summary, error) {
+	if vm.ssVM == nil {
+		return nil, common.ErrStateSyncableVMNotImplemented
+	}
+
+	return vm.ssVM.GetOngoingStateSyncSummary()
+}
+
 func (vm *blockVM) GetStateSyncResult() (ids.ID, error) {
 	if vm.ssVM == nil {
 		return ids.Empty, common.ErrStateSyncableVMNotImplemented

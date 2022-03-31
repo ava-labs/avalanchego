@@ -94,7 +94,6 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 	// retrieve key for summary and register frontier;
 	// make sure next beacons are reached out
 	// even in case invalid summaries are received
-
 	if summary, err := ss.stateSyncVM.ParseSummary(summaryBytes); err == nil {
 		if _, exists := ss.weightedSummaries[summary.ID()]; !exists {
 			ss.weightedSummaries[summary.ID()] = weightedSummary{
@@ -273,6 +272,20 @@ func (ss *stateSyncer) startup() error {
 	}
 
 	ss.storeVoters(ss.StateSyncBeacons)
+
+	// check if there is an ongoing state sync; if so add its state summary
+	// to the frontier to request votes on
+	summary, err := ss.stateSyncVM.GetOngoingStateSyncSummary()
+	switch err {
+	case nil:
+		ss.weightedSummaries[summary.ID()] = weightedSummary{
+			Summary: summary,
+		}
+	case common.ErrNoStateSyncOngoing:
+		// nothing to add to frontiers
+	default:
+		return err
+	}
 
 	// initiate messages exchange
 	ss.attempts++

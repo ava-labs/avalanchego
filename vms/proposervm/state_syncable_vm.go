@@ -153,6 +153,15 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 	return ssVM.StateSync(coreSummaries)
 }
 
+func (vm *VM) GetOngoingStateSyncSummary() (common.Summary, error) {
+	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
+	if !ok {
+		return nil, common.ErrStateSyncableVMNotImplemented
+	}
+
+	return ssVM.GetOngoingStateSyncSummary()
+}
+
 func (vm *VM) GetStateSyncResult() (ids.ID, error) {
 	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
@@ -220,7 +229,7 @@ func (vm *VM) buildProContentFrom(coreSummary common.Summary) (block.ProposerSum
 		return block.ProposerSummaryContent{}, errWrongStateSyncVersion
 	}
 
-	// retrieve ProBlkID is available
+	// retrieve ProBlkID
 	proBlkID, err := vm.GetBlockIDAtHeight(coreContent.Height)
 	if err == database.ErrNotFound {
 		// we must have hit the snowman++ fork. Check it.

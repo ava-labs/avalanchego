@@ -253,6 +253,25 @@ func (vm *VMServer) StateSyncEnabled(context.Context, *emptypb.Empty) (*vmproto.
 	return &vmproto.StateSyncEnabledResponse{Enabled: response}, nil
 }
 
+func (vm *VMServer) GetOngoingStateSyncSummary(context.Context, *emptypb.Empty) (*vmproto.StateSyncGetOngoingStateSyncSummaryResponse, error) {
+	ssVM, ok := vm.vm.(block.StateSyncableVM)
+	if !ok {
+		return nil, common.ErrStateSyncableVMNotImplemented
+	}
+
+	summary, err := ssVM.GetOngoingStateSyncSummary()
+	if err != nil {
+		return nil, err
+	}
+
+	summaryID := ids.ID(summary.ID())
+	return &vmproto.StateSyncGetOngoingStateSyncSummaryResponse{
+		Key:       uint64(summary.Key()),
+		SummaryId: summaryID[:],
+		Content:   summary.Bytes(),
+	}, err
+}
+
 func (vm *VMServer) StateSyncGetLastSummary(ctx context.Context, empty *emptypb.Empty) (*vmproto.StateSyncGetLastSummaryResponse, error) {
 	ssVM, ok := vm.vm.(block.StateSyncableVM)
 	if !ok {

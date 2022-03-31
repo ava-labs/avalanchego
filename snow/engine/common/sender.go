@@ -39,7 +39,7 @@ type AcceptedStateSummarySender interface {
 	SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uint32, keys []SummaryKey)
 
 	// SendAcceptedStateSummary responds to a AcceptedStateSummary message with a
-	// set of summary keys that are accepted.
+	// set of summary ids that are accepted.
 	SendAcceptedStateSummary(nodeID ids.ShortID, requestID uint32, summaryIDs []SummaryID)
 }
 

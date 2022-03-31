@@ -34,6 +34,7 @@ service VM {
 
     // State sync
     rpc StateSyncEnabled(google.protobuf.Empty) returns (StateSyncEnabledResponse);
+    rpc GetOngoingStateSyncSummary(google.protobuf.Empty) returns (StateSyncGetOngoingStateSyncSummaryResponse);
     rpc StateSyncGetLastSummary(google.protobuf.Empty) returns (StateSyncGetLastSummaryResponse);
     rpc ParseSummary(ParseSummaryRequest) returns (ParseSummaryResponse);
     rpc StateSyncGetSummary(StateSyncGetSummaryRequest) returns (StateSyncGetSummaryResponse);
@@ -230,6 +231,12 @@ message GetBlockIDAtHeightResponse {
 // StateSyncableVM related messages
 message StateSyncEnabledResponse {
     bool enabled = 1;
+}
+
+message StateSyncGetOngoingStateSyncSummaryResponse {
+    uint64 key = 1;
+    bytes summary_id = 2;
+    bytes content = 3;
 }
 
 message StateSyncGetLastSummaryResponse {

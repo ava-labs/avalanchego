@@ -83,6 +83,10 @@ func buildTestsObjects(commonCfg *common.Config, t *testing.T) (
 	assert.True(t, ok)
 	assert.True(t, syncer.stateSyncVM != nil)
 
+	fullVM.GetOngoingStateSyncSummaryF = func() (common.Summary, error) {
+		return nil, common.ErrNoStateSyncOngoing
+	}
+
 	return syncer, fullVM, sender
 }
 

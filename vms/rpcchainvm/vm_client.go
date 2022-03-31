@@ -523,6 +523,20 @@ func (vm *VMClient) StateSyncEnabled() (bool, error) {
 	return resp.Enabled, nil
 }
 
+func (vm *VMClient) GetOngoingStateSyncSummary() (common.Summary, error) {
+	resp, err := vm.client.GetOngoingStateSyncSummary(context.Background(), &emptypb.Empty{})
+	if err != nil {
+		return nil, err
+	}
+
+	summaryID, err := ids.ToID(hashing.ComputeHash256(resp.SummaryId))
+	return &block.Summary{
+		SummaryKey:   common.SummaryKey(resp.Key),
+		SummaryID:    common.SummaryID(summaryID),
+		ContentBytes: resp.Content,
+	}, err
+}
+
 func (vm *VMClient) StateSyncGetLastSummary() (common.Summary, error) {
 	resp, err := vm.client.StateSyncGetLastSummary(
 		context.Background(),
