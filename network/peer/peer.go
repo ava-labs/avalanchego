@@ -764,7 +764,7 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 		},
 		Signature: msg.Get(message.SigBytes).([]byte),
 	}
-	if err := p.ip.verify(p.cert); err != nil {
+	if err := p.ip.Verify(p.cert); err != nil {
 		p.Log.Debug("signature verification failed for %s: %s",
 			p.id, err,
 		)
@@ -790,7 +790,7 @@ func (p *peer) handlePeerList(msg message.InboundMessage) {
 		close(p.onFinishHandshake)
 	}
 
-	ips := msg.Get(message.SignedPeers).([]utils.IPCertDesc)
+	ips := msg.Get(message.Peers).([]utils.IPCertDesc)
 	for _, ip := range ips {
 		p.Network.Track(ip)
 	}

@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -20,8 +19,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
 func TestGetChainConfigsFromFiles(t *testing.T) {
@@ -448,6 +445,20 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			},
 			errMessage: "",
 		},
+		"gossip config": {
+			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
+			givenJSON: `{"appGossipNonValidatorSize": 100 }`,
+			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				config, ok := given[id]
+				assert.True(ok)
+				assert.Equal(uint(100), config.AppGossipNonValidatorSize)
+				// must still respect defaults
+				assert.Equal(20, config.ConsensusParameters.K)
+				assert.Equal(uint(10), config.AppGossipValidatorSize)
+			},
+			errMessage: "",
+		},
 	}
 
 	for name, test := range tests {
@@ -475,91 +486,59 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 
 func TestGetSubnetConfigsFromFlags(t *testing.T) {
 	tests := map[string]struct {
-		cfgsMap    map[ids.ID]chains.SubnetConfig
+		givenJSON  string
 		testF      func(*assert.Assertions, map[ids.ID]chains.SubnetConfig)
 		errMessage string
 	}{
 		"no configs": {
-			cfgsMap: func() map[ids.ID]chains.SubnetConfig {
-				res := make(map[ids.ID]chains.SubnetConfig)
-				return res
-			}(),
+			givenJSON: `{}`,
 			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
 				assert.Empty(given)
 			},
 			errMessage: "",
 		},
 		"entry with no config": {
-			cfgsMap: func() map[ids.ID]chains.SubnetConfig {
-				res := make(map[ids.ID]chains.SubnetConfig)
-				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
-				res[id] = chains.SubnetConfig{}
-				return res
-			}(),
+			givenJSON: `{"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i":{}}`,
 			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
 				assert.True(len(given) == 1)
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
-				_, ok := given[id]
+				config, ok := given[id]
 				assert.True(ok)
+				// should respect defaults
+				assert.Equal(20, config.ConsensusParameters.K)
 			},
-			errMessage: "Fails the condition that: 1 < Parents",
 		},
 		"subnet is not whitelisted": {
-			cfgsMap: func() map[ids.ID]chains.SubnetConfig {
-				res := make(map[ids.ID]chains.SubnetConfig)
-				id, _ := ids.FromString("Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU")
-				res[id] = chains.SubnetConfig{ValidatorOnly: true}
-				return res
-			}(),
+			givenJSON: `{"Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU":{"validatorOnly":true}}`,
 			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
 				assert.Empty(given)
 			},
 		},
 		"invalid consensus parameters": {
-			cfgsMap: func() map[ids.ID]chains.SubnetConfig {
-				res := make(map[ids.ID]chains.SubnetConfig)
-				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
-				res[id] = chains.SubnetConfig{
-					ConsensusParameters: avalanche.Parameters{
-						Parents:   2,
-						BatchSize: 1,
-						Parameters: snowball.Parameters{
-							K:            111,
-							Alpha:        1234,
-							BetaVirtuous: 1,
-						},
-					},
+			givenJSON: `{
+				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
+					"consensusParameters": {
+						"k": 111,
+						"alpha": 1234
+					}
 				}
-				return res
-			}(),
+			}`,
 			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
 				assert.Empty(given)
 			},
 			errMessage: "fails the condition that: alpha <= k",
 		},
 		"correct config": {
-			cfgsMap: func() map[ids.ID]chains.SubnetConfig {
-				res := make(map[ids.ID]chains.SubnetConfig)
-				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
-				res[id] = chains.SubnetConfig{
-					ValidatorOnly: true,
-					ConsensusParameters: avalanche.Parameters{
-						Parents:   111,
-						BatchSize: 1,
-						Parameters: snowball.Parameters{
-							Alpha:                 20,
-							K:                     30,
-							BetaVirtuous:          5,
-							BetaRogue:             6,
-							ConcurrentRepolls:     6,
-							OptimalProcessing:     2,
-							MaxOutstandingItems:   2,
-							MaxItemProcessingTime: 2,
-						},
+			givenJSON: `{
+				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
+					"consensusParameters": {
+						"k": 30,
+						"alpha": 20,
+						"parents": 111
 					},
+					"validatorOnly": true
 				}
-				return res
-			}(),
+			}`,
 			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
@@ -567,8 +546,10 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				assert.Equal(true, config.ValidatorOnly)
 				assert.Equal(111, config.ConsensusParameters.Parents)
 				assert.Equal(20, config.ConsensusParameters.Alpha)
-				// must still respect defaults
 				assert.Equal(30, config.ConsensusParameters.K)
+				// must still respect defaults
+				assert.Equal(uint(10), config.AppGossipValidatorSize)
+				assert.Equal(1024, config.ConsensusParameters.MaxOutstandingItems)
 			},
 			errMessage: "",
 		},
@@ -579,17 +560,11 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			assert := assert.New(t)
 			subnetID, err := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 			assert.NoError(err)
-			cfgsMapBytes, err := json.Marshal(test.cfgsMap)
-			assert.NoError(err)
-			encodedFileContent := base64.StdEncoding.EncodeToString(cfgsMapBytes)
+			encodedFileContent := base64.StdEncoding.EncodeToString([]byte(test.givenJSON))
 
 			// build viper config
 			v := setupViperFlags()
 			v.Set(SubnetConfigContentKey, encodedFileContent)
-
-			// setup configs for default
-			v.Set(SnowAvalancheNumParentsKey, 1)
-			v.Set(SnowAvalancheBatchSizeKey, 1)
 
 			subnetConfigs, err := getSubnetConfigs(v, []ids.ID{subnetID})
 			if len(test.errMessage) > 0 {
@@ -606,7 +581,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 // setups config json file and writes content
 func setupConfigJSON(t *testing.T, rootPath string, value string) string {
 	configFilePath := filepath.Join(rootPath, "config.json")
-	assert.NoError(t, ioutil.WriteFile(configFilePath, []byte(value), 0o600))
+	assert.NoError(t, os.WriteFile(configFilePath, []byte(value), 0o600))
 	return configFilePath
 }
 
@@ -614,7 +589,7 @@ func setupConfigJSON(t *testing.T, rootPath string, value string) string {
 func setupFile(t *testing.T, path string, fileName string, value string) {
 	assert.NoError(t, os.MkdirAll(path, 0o700))
 	filePath := filepath.Join(path, fileName)
-	assert.NoError(t, ioutil.WriteFile(filePath, []byte(value), 0o600))
+	assert.NoError(t, os.WriteFile(filePath, []byte(value), 0o600))
 }
 
 func setupViperFlags() *viper.Viper {

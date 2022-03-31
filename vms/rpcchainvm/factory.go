@@ -6,7 +6,7 @@ package rpcchainvm
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"path/filepath"
 
@@ -79,10 +79,10 @@ func (f *factory) New(ctx *snow.Context) (interface{}, error) {
 			Level:  hclog.Info,
 		})
 	} else {
-		log.SetOutput(ioutil.Discard)
-		config.Stderr = ioutil.Discard
+		log.SetOutput(io.Discard)
+		config.Stderr = io.Discard
 		config.Logger = hclog.New(&hclog.LoggerOptions{
-			Output: ioutil.Discard,
+			Output: io.Discard,
 		})
 	}
 	client := plugin.NewClient(config)

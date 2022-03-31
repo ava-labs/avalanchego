@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"net"
 	"os"
@@ -43,7 +42,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/storage"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/vms"
 )
 
@@ -167,7 +165,7 @@ func getAPIAuthConfig(v *viper.Viper) (node.APIAuthConfig, error) {
 		config.APIAuthPassword = v.GetString(APIAuthPasswordKey)
 	} else {
 		passwordFilePath := v.GetString(APIAuthPasswordFileKey) // picks flag value or default
-		passwordBytes, err := ioutil.ReadFile(passwordFilePath)
+		passwordBytes, err := os.ReadFile(passwordFilePath)
 		if err != nil {
 			return node.APIAuthConfig{}, fmt.Errorf("API auth password file %q failed to be read: %w", passwordFilePath, err)
 		}
@@ -209,7 +207,7 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 		}
 	case v.IsSet(HTTPSKeyFileKey):
 		httpsKeyFilepath := os.ExpandEnv(v.GetString(HTTPSKeyFileKey))
-		if httpsKey, err = ioutil.ReadFile(filepath.Clean(httpsKeyFilepath)); err != nil {
+		if httpsKey, err = os.ReadFile(filepath.Clean(httpsKeyFilepath)); err != nil {
 			return node.HTTPConfig{}, err
 		}
 	}
@@ -223,7 +221,7 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 		}
 	case v.IsSet(HTTPSCertFileKey):
 		httpsCertFilepath := os.ExpandEnv(v.GetString(HTTPSCertFileKey))
-		if httpsCert, err = ioutil.ReadFile(filepath.Clean(httpsCertFilepath)); err != nil {
+		if httpsCert, err = os.ReadFile(filepath.Clean(httpsCertFilepath)); err != nil {
 			return node.HTTPConfig{}, err
 		}
 	}
@@ -300,6 +298,15 @@ func getAdaptiveTimeoutConfig(v *viper.Viper) (timer.AdaptiveTimeoutConfig, erro
 	}
 
 	return config, nil
+}
+
+func getGossipConfig(v *viper.Viper) sender.GossipConfig {
+	return sender.GossipConfig{
+		AcceptedFrontierSize:      uint(v.GetUint32(ConsensusGossipAcceptedFrontierSizeKey)),
+		OnAcceptSize:              uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey)),
+		AppGossipNonValidatorSize: uint(v.GetUint32(AppGossipNonValidatorSizeKey)),
+		AppGossipValidatorSize:    uint(v.GetUint32(AppGossipValidatorSizeKey)),
+	}
 }
 
 func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, error) {
@@ -730,7 +737,7 @@ func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, e
 		}
 	} else if v.IsSet(DBConfigFileKey) {
 		path := os.ExpandEnv(v.GetString(DBConfigFileKey))
-		configBytes, err = ioutil.ReadFile(path)
+		configBytes, err = os.ReadFile(path)
 		if err != nil {
 			return node.DatabaseConfig{}, err
 		}
@@ -769,7 +776,7 @@ func getVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
 			return nil, nil
 		}
 
-		fileBytes, err = ioutil.ReadFile(aliasFilePath)
+		fileBytes, err = os.ReadFile(aliasFilePath)
 		if err != nil {
 			return nil, err
 		}
@@ -901,16 +908,19 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]c
 		return nil, fmt.Errorf("unable to decode base64 content: %w", err)
 	}
 
-	// Note: no default values are loaded here. All Subnet parameters must be
-	// explicitly defined.
-	subnetConfigs := make(map[ids.ID]chains.SubnetConfig, len(subnetIDs))
+	// partially parse configs to be filled by defaults later
+	subnetConfigs := make(map[ids.ID]json.RawMessage, len(subnetIDs))
 	if err := json.Unmarshal(subnetConfigContent, &subnetConfigs); err != nil {
 		return nil, fmt.Errorf("could not unmarshal JSON: %w", err)
 	}
 
 	res := make(map[ids.ID]chains.SubnetConfig)
 	for _, subnetID := range subnetIDs {
-		if subnetConfig, ok := subnetConfigs[subnetID]; ok {
+		if rawSubnetConfigBytes, ok := subnetConfigs[subnetID]; ok {
+			subnetConfig := defaultSubnetConfig(v)
+			if err := json.Unmarshal(rawSubnetConfigBytes, &subnetConfig); err != nil {
+				return nil, err
+			}
 			if err := subnetConfig.ConsensusParameters.Valid(); err != nil {
 				return nil, err
 			}
@@ -962,7 +972,7 @@ func readSubnetConfigs(subnetConfigPath string, subnetIDs []ids.ID, defaultSubne
 		}
 
 		// subnetConfigDir/subnetID.json
-		file, err := ioutil.ReadFile(filePath)
+		file, err := os.ReadFile(filePath)
 		if err != nil {
 			return nil, err
 		}
@@ -984,6 +994,7 @@ func defaultSubnetConfig(v *viper.Viper) chains.SubnetConfig {
 	return chains.SubnetConfig{
 		ConsensusParameters: getConsensusConfig(v),
 		ValidatorOnly:       false,
+		GossipConfig:        getGossipConfig(v),
 	}
 }
 
@@ -1085,12 +1096,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 		return node.Config{}, err
 	}
 
-	nodeConfig.GossipConfig = sender.GossipConfig{
-		AcceptedFrontierSize:      uint(v.GetUint32(ConsensusGossipAcceptedFrontierSizeKey)),
-		OnAcceptSize:              uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey)),
-		AppGossipNonValidatorSize: uint(v.GetUint32(AppGossipNonValidatorSizeKey)),
-		AppGossipValidatorSize:    uint(v.GetUint32(AppGossipValidatorSizeKey)),
-	}
+	nodeConfig.GossipConfig = getGossipConfig(v)
 
 	// Benchlist
 	nodeConfig.BenchlistConfig, err = getBenchlistConfig(v, nodeConfig.ConsensusParams.Alpha, nodeConfig.ConsensusParams.K)
@@ -1099,16 +1105,12 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	}
 
 	// File Descriptor Limit
-	fdLimit := v.GetUint64(FdLimitKey)
-	if err := ulimit.Set(fdLimit); err != nil {
-		return node.Config{}, fmt.Errorf("failed to set fd limit correctly due to: %w", err)
-	}
+	nodeConfig.FdLimit = v.GetUint64(FdLimitKey)
 
 	// Tx Fee
 	nodeConfig.TxFeeConfig = getTxFeeConfig(v, nodeConfig.NetworkID)
 
 	// Genesis Data
-
 	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = getGenesisData(v, nodeConfig.NetworkID)
 	if err != nil {
 		return node.Config{}, fmt.Errorf("unable to load genesis file: %w", err)

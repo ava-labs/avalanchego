@@ -7,7 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -97,7 +97,7 @@ func (r *IFConfigResolver) Resolve() (net.IP, error) {
 	if err != nil {
 		return nil, err
 	}
-	ip, err := ioutil.ReadAll(resp.Body)
+	ip, err := io.ReadAll(resp.Body)
 	if err != nil {
 		// Drop any error to report the original error
 		_ = resp.Body.Close()
