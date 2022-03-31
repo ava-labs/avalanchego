@@ -186,7 +186,7 @@ func NewNetwork(
 		return nil, fmt.Errorf("initializing peer metrics failed with: %w", err)
 	}
 
-	metrics, err := newMetrics(config.Namespace, metricsRegisterer)
+	metrics, err := newMetrics(config.Namespace, metricsRegisterer, config.WhitelistedSubnets)
 	if err != nil {
 		return nil, fmt.Errorf("initializing network metrics failed with: %w", err)
 	}
@@ -346,8 +346,7 @@ func (n *network) Connected(nodeID ids.ShortID) {
 	n.connectedPeers.Add(peer)
 	n.peersLock.Unlock()
 
-	n.metrics.numPeers.Inc()
-	n.metrics.connected.Inc()
+	n.metrics.markConnected(peer)
 
 	peerVersion := peer.Version()
 	n.router.Connected(nodeID, peerVersion)
@@ -734,8 +733,7 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.ShortID) 
 		delete(n.trackedIPs, nodeID)
 	}
 
-	n.metrics.numPeers.Dec()
-	n.metrics.disconnected.Inc()
+	n.metrics.markDisconnected(peer)
 }
 
 func (n *network) shouldTrack(nodeID ids.ShortID, ip utils.IPCertDesc) bool {
