@@ -525,7 +525,13 @@ func (bc *BlockChain) Stop() {
 		return
 	}
 
+	log.Info("Shutting down state manager")
+	if err := bc.stateManager.Shutdown(); err != nil {
+		log.Error("Failed to Shutdown state manager", "err", err)
+	}
+
 	// Unsubscribe all subscriptions registered from blockchain.
+	log.Info("Closing subscriptions scope")
 	bc.scope.Close()
 	log.Info("Blockchain subscriptions closed")
 
@@ -533,10 +539,6 @@ func (bc *BlockChain) Stop() {
 	close(bc.quit)
 	bc.wg.Wait()
 	log.Info("Blockchain waitgroup stopped")
-
-	if err := bc.stateManager.Shutdown(); err != nil {
-		log.Error("Failed to Shutdown state manager", "err", err)
-	}
 
 	log.Info("Blockchain stopped")
 }
