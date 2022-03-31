@@ -50,6 +50,7 @@ var (
 	errNoAddresses                = errors.New("no addresses provided")
 	errNoKeys                     = errors.New("user has no keys or funds")
 	errNoPrimaryValidators        = errors.New("no default subnet validators")
+	errNoValidators               = errors.New("no subnet validators")
 	errCorruptedReason            = errors.New("tx validity corrupted")
 	errStartTimeTooSoon           = fmt.Errorf("start time must be at least %s in the future", minAddStakerDelay)
 	errStartTimeTooLate           = errors.New("start time is too far in the future")

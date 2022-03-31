@@ -141,7 +141,7 @@ func (vm *VM) Initialize(
 	}
 
 	// Initialize metrics as soon as possible
-	if err := vm.metrics.Initialize("", registerer); err != nil {
+	if err := vm.metrics.Initialize("", registerer, vm.WhitelistedSubnets); err != nil {
 		return err
 	}
 
@@ -584,21 +584,24 @@ func (vm *VM) Clock() *mockable.Clock { return &vm.clock }
 
 func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
 
-// Returns the percentage of the total stake on the Primary Network of nodes
-// connected to this node.
-func (vm *VM) getPercentConnected() (float64, error) {
-	vdrSet, exists := vm.Validators.GetValidators(constants.PrimaryNetworkID)
+// Returns the percentage of the total stake of the subnet connected to this
+// node.
+func (vm *VM) getPercentConnected(subnetID ids.ID) (float64, error) {
+	vdrSet, exists := vm.Validators.GetValidators(subnetID)
 	if !exists {
-		return 0, errNoPrimaryValidators
+		return 0, errNoValidators
 	}
 
-	vdrs := vdrSet.List()
+	vdrSetWeight := vdrSet.Weight()
+	if vdrSetWeight == 0 {
+		return 1, nil
+	}
 
 	var (
 		connectedStake uint64
 		err            error
 	)
-	for _, vdr := range vdrs {
+	for _, vdr := range vdrSet.List() {
 		if !vm.uptimeManager.IsConnected(vdr.ID()) {
 			continue // not connected to us --> don't include
 		}
@@ -607,5 +610,5 @@ func (vm *VM) getPercentConnected() (float64, error) {
 			return 0, err
 		}
 	}
-	return float64(connectedStake) / float64(vdrSet.Weight()), nil
+	return float64(connectedStake) / float64(vdrSetWeight), nil
 }
