@@ -22,18 +22,18 @@ type TestStateSyncableVM struct {
 
 	CantGetStateSyncResult, CantSetLastSummaryBlock bool
 
-	GetStateSyncResultF  func() (ids.ID, error)
+	GetStateSyncResultF  func() (ids.ID, uint64, error)
 	SetLastSummaryBlockF func([]byte) error
 }
 
-func (tss *TestStateSyncableVM) GetStateSyncResult() (ids.ID, error) {
+func (tss *TestStateSyncableVM) GetStateSyncResult() (ids.ID, uint64, error) {
 	if tss.GetStateSyncResultF != nil {
 		return tss.GetStateSyncResultF()
 	}
 	if tss.CantGetStateSyncResult && tss.T != nil {
 		tss.T.Fatalf("Unexpectedly called GetStateSyncResult")
 	}
-	return ids.Empty, errGetStateSyncResult
+	return ids.Empty, 0, errGetStateSyncResult
 }
 
 func (tss *TestStateSyncableVM) SetLastSummaryBlock(blkBytes []byte) error {

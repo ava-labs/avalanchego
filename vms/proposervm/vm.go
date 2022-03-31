@@ -77,10 +77,6 @@ type VM struct {
 	// timestamp if the last accepted block has been a PostForkOption block
 	// since having initialized the VM.
 	lastAcceptedTime time.Time
-
-	// pendingSummariesBlockIDMapping records innerVM and proposerVM blockIDs
-	// corresponding to the all summaries learned from validators.
-	pendingSummariesBlockIDMapping map[ids.ID]ids.ID
 }
 
 func New(

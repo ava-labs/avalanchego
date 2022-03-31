@@ -39,7 +39,7 @@ type StateSyncableVM interface {
 	// At the end of StateSync process, VM will have rebuilt the state of its blockchain
 	// up to a given height. However the block associated with that height may be not known
 	// to the VM yet. GetStateSyncResult allows retrival of this block from network
-	GetStateSyncResult() (ids.ID, error)
+	GetStateSyncResult() (ids.ID, uint64, error)
 
 	// SetLastSummaryBlock pass to VM the network-retrieved block associated with its last state summary
 	SetLastSummaryBlock([]byte) error

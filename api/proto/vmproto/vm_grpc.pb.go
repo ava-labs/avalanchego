@@ -55,7 +55,7 @@ type VMClient interface {
 	ParseSummary(ctx context.Context, in *ParseSummaryRequest, opts ...grpc.CallOption) (*ParseSummaryResponse, error)
 	StateSyncGetSummary(ctx context.Context, in *StateSyncGetSummaryRequest, opts ...grpc.CallOption) (*StateSyncGetSummaryResponse, error)
 	StateSync(ctx context.Context, in *StateSyncRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	GetStateSyncResult(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncLastSummaryBlockIDResponse, error)
+	GetStateSyncResult(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetStateSyncResultResponseResponse, error)
 	SetLastSummaryBlock(ctx context.Context, in *StateSyncSetLastSummaryBlockRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
@@ -346,8 +346,8 @@ func (c *vMClient) StateSync(ctx context.Context, in *StateSyncRequest, opts ...
 	return out, nil
 }
 
-func (c *vMClient) GetStateSyncResult(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncLastSummaryBlockIDResponse, error) {
-	out := new(StateSyncLastSummaryBlockIDResponse)
+func (c *vMClient) GetStateSyncResult(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetStateSyncResultResponseResponse, error) {
+	out := new(GetStateSyncResultResponseResponse)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/GetStateSyncResult", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -400,7 +400,7 @@ type VMServer interface {
 	ParseSummary(context.Context, *ParseSummaryRequest) (*ParseSummaryResponse, error)
 	StateSyncGetSummary(context.Context, *StateSyncGetSummaryRequest) (*StateSyncGetSummaryResponse, error)
 	StateSync(context.Context, *StateSyncRequest) (*emptypb.Empty, error)
-	GetStateSyncResult(context.Context, *emptypb.Empty) (*StateSyncLastSummaryBlockIDResponse, error)
+	GetStateSyncResult(context.Context, *emptypb.Empty) (*GetStateSyncResultResponseResponse, error)
 	SetLastSummaryBlock(context.Context, *StateSyncSetLastSummaryBlockRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedVMServer()
 }
@@ -502,7 +502,7 @@ func (UnimplementedVMServer) StateSyncGetSummary(context.Context, *StateSyncGetS
 func (UnimplementedVMServer) StateSync(context.Context, *StateSyncRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StateSync not implemented")
 }
-func (UnimplementedVMServer) GetStateSyncResult(context.Context, *emptypb.Empty) (*StateSyncLastSummaryBlockIDResponse, error) {
+func (UnimplementedVMServer) GetStateSyncResult(context.Context, *emptypb.Empty) (*GetStateSyncResultResponseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStateSyncResult not implemented")
 }
 func (UnimplementedVMServer) SetLastSummaryBlock(context.Context, *StateSyncSetLastSummaryBlockRequest) (*emptypb.Empty, error) {

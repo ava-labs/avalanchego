@@ -35,8 +35,8 @@ func TestAtStateSyncDoneLastSummaryBlockIsRequested(t *testing.T) {
 	// mock VM to return lastSummaryBlkID and be able to receive full block
 	lastSummaryBlkID := ids.ID{'b', 'l', 'k', 'I', 'D'}
 	fullVM.CantGetStateSyncResult = true
-	fullVM.GetStateSyncResultF = func() (ids.ID, error) {
-		return lastSummaryBlkID, nil
+	fullVM.GetStateSyncResultF = func() (ids.ID, uint64, error) {
+		return lastSummaryBlkID, 2022, nil
 	}
 	fullVM.CantSetLastSummaryBlock = true
 	fullVM.SetLastSummaryBlockF = func(b []byte) error { return nil }

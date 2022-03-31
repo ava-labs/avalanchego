@@ -39,7 +39,7 @@ service VM {
     rpc ParseSummary(ParseSummaryRequest) returns (ParseSummaryResponse);
     rpc StateSyncGetSummary(StateSyncGetSummaryRequest) returns (StateSyncGetSummaryResponse);
     rpc StateSync(StateSyncRequest) returns (google.protobuf.Empty);
-    rpc GetStateSyncResult(google.protobuf.Empty) returns (StateSyncLastSummaryBlockIDResponse);
+    rpc GetStateSyncResult(google.protobuf.Empty) returns (GetStateSyncResultResponseResponse);
     rpc SetLastSummaryBlock(StateSyncSetLastSummaryBlockRequest) returns (google.protobuf.Empty);
 }
 
@@ -269,8 +269,9 @@ message StateSyncRequest {
     repeated StateSyncGetLastSummaryResponse summaries = 1;
 }
 
-message StateSyncLastSummaryBlockIDResponse {
+message GetStateSyncResultResponseResponse {
     bytes bytes = 1;
+    uint64 height = 2;
 }
 
 message StateSyncSetLastSummaryBlockRequest {

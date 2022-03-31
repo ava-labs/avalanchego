@@ -71,17 +71,17 @@ func (vm *blockVM) GetOngoingStateSyncSummary() (common.Summary, error) {
 	return vm.ssVM.GetOngoingStateSyncSummary()
 }
 
-func (vm *blockVM) GetStateSyncResult() (ids.ID, error) {
+func (vm *blockVM) GetStateSyncResult() (ids.ID, uint64, error) {
 	if vm.ssVM == nil {
-		return ids.Empty, common.ErrStateSyncableVMNotImplemented
+		return ids.Empty, 0, common.ErrStateSyncableVMNotImplemented
 	}
 
 	start := vm.clock.Time()
-	blkID, err := vm.ssVM.GetStateSyncResult()
+	blkID, height, err := vm.ssVM.GetStateSyncResult()
 	end := vm.clock.Time()
 	vm.stateSummaryMetrics.lastSummaryBlockID.Observe(float64(end.Sub(start)))
 
-	return blkID, err
+	return blkID, height, err
 }
 
 func (vm *blockVM) SetLastSummaryBlock(blkBytes []byte) error {

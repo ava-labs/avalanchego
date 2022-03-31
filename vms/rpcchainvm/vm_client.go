@@ -611,13 +611,16 @@ func (vm *VMClient) StateSync(accepted []common.Summary) error {
 	return err
 }
 
-func (vm *VMClient) GetStateSyncResult() (ids.ID, error) {
+func (vm *VMClient) GetStateSyncResult() (ids.ID, uint64, error) {
 	resp, err := vm.client.GetStateSyncResult(context.Background(), &emptypb.Empty{})
 	if err != nil {
-		return ids.Empty, err
+		return ids.Empty, 0, err
 	}
 
-	return ids.ToID(resp.Bytes)
+	blkID, err := ids.ToID(resp.Bytes)
+	height := resp.Height
+
+	return blkID, height, err
 }
 
 func (vm *VMClient) SetLastSummaryBlock(blkByte []byte) error {
