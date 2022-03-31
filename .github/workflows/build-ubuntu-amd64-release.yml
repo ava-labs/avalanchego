@@ -123,7 +123,7 @@ jobs:
     steps:
       - name: Get the version
         id: get_version
-        run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3 | cut -c2-)
+        run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
       - uses: rubenesp87/semver-validation-action@0.0.6
         with:
           version: ${{ steps.get_version.outputs.VERSION }}
