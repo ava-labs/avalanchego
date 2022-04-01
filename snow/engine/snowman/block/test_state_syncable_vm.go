@@ -13,27 +13,27 @@ import (
 var (
 	_ StateSyncableVM = &TestStateSyncableVM{}
 
-	errGetLastSummaryBlockID = errors.New("unexpectedly called GetLastSummaryBlockID")
-	errSetLastSummaryBlock   = errors.New("unexpectedly called SetLastSummaryBlock")
+	errGetStateSyncResult  = errors.New("unexpectedly called GetStateSyncResult")
+	errSetLastSummaryBlock = errors.New("unexpectedly called SetLastSummaryBlock")
 )
 
 type TestStateSyncableVM struct {
 	common.TestStateSyncableVM
 
-	CantGetLastSummaryBlockID, CantSetLastSummaryBlock bool
+	CantGetStateSyncResult, CantSetLastSummaryBlock bool
 
-	GetLastSummaryBlockIDF func() (ids.ID, error)
-	SetLastSummaryBlockF   func([]byte) error
+	GetStateSyncResultF  func() (ids.ID, uint64, error)
+	SetLastSummaryBlockF func([]byte) error
 }
 
-func (tss *TestStateSyncableVM) GetLastSummaryBlockID() (ids.ID, error) {
-	if tss.GetLastSummaryBlockIDF != nil {
-		return tss.GetLastSummaryBlockIDF()
+func (tss *TestStateSyncableVM) GetStateSyncResult() (ids.ID, uint64, error) {
+	if tss.GetStateSyncResultF != nil {
+		return tss.GetStateSyncResultF()
 	}
-	if tss.CantGetLastSummaryBlockID && tss.T != nil {
-		tss.T.Fatalf("Unexpectedly called GetLastSummaryBlockID")
+	if tss.CantGetStateSyncResult && tss.T != nil {
+		tss.T.Fatalf("Unexpectedly called GetStateSyncResult")
 	}
-	return ids.Empty, errGetLastSummaryBlockID
+	return ids.Empty, 0, errGetStateSyncResult
 }
 
 func (tss *TestStateSyncableVM) SetLastSummaryBlock(blkBytes []byte) error {

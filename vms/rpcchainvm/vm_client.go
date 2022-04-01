@@ -523,6 +523,20 @@ func (vm *VMClient) StateSyncEnabled() (bool, error) {
 	return resp.Enabled, nil
 }
 
+func (vm *VMClient) GetOngoingStateSyncSummary() (common.Summary, error) {
+	resp, err := vm.client.GetOngoingStateSyncSummary(context.Background(), &emptypb.Empty{})
+	if err != nil {
+		return nil, err
+	}
+
+	summaryID, err := ids.ToID(hashing.ComputeHash256(resp.SummaryId))
+	return &block.Summary{
+		SummaryKey:   common.SummaryKey(resp.Key),
+		SummaryID:    common.SummaryID(summaryID),
+		ContentBytes: resp.Content,
+	}, err
+}
+
 func (vm *VMClient) StateSyncGetLastSummary() (common.Summary, error) {
 	resp, err := vm.client.StateSyncGetLastSummary(
 		context.Background(),
@@ -597,13 +611,16 @@ func (vm *VMClient) StateSync(accepted []common.Summary) error {
 	return err
 }
 
-func (vm *VMClient) GetLastSummaryBlockID() (ids.ID, error) {
-	resp, err := vm.client.GetLastSummaryBlockID(context.Background(), &emptypb.Empty{})
+func (vm *VMClient) GetStateSyncResult() (ids.ID, uint64, error) {
+	resp, err := vm.client.GetStateSyncResult(context.Background(), &emptypb.Empty{})
 	if err != nil {
-		return ids.Empty, err
+		return ids.Empty, 0, err
 	}
 
-	return ids.ToID(resp.Bytes)
+	blkID, err := ids.ToID(resp.Bytes)
+	height := resp.Height
+
+	return blkID, height, err
 }
 
 func (vm *VMClient) SetLastSummaryBlock(blkByte []byte) error {

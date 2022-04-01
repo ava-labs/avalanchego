@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -123,7 +122,6 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 	}
 
 	coreSummaries := make([]common.Summary, 0, len(accepted))
-	vm.pendingSummariesBlockIDMapping = make(map[ids.ID]ids.ID)
 	for _, summary := range accepted {
 		proContent := block.ProposerSummaryContent{}
 		ver, err := stateSyncCodec.Unmarshal(summary.Bytes(), &proContent)
@@ -145,30 +143,57 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 
 		coreSummaries = append(coreSummaries, coreSummary)
 
-		// record coreVm to proposerVM blockID mapping to be able to
-		// complete state-sync by requesting lastSummaryBlockID.
-		vm.pendingSummariesBlockIDMapping[proContent.CoreContent.BlkID] = proContent.ProBlkID
+		// Following state sync introduction, we update height -> blockID index
+		// with summaries content in order to support resuming state sync in case
+		// of shutdown. Note that we won't download all the blocks associated with
+		// state summaries.
+		if err := vm.updateHeightIndex(uint64(summary.Key()), proContent.ProBlkID); err != nil {
+			return err
+		}
 	}
 
 	return ssVM.StateSync(coreSummaries)
 }
 
-func (vm *VM) GetLastSummaryBlockID() (ids.ID, error) {
+func (vm *VM) GetOngoingStateSyncSummary() (common.Summary, error) {
 	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
-		return ids.Empty, common.ErrStateSyncableVMNotImplemented
+		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	coreBlkID, err := ssVM.GetLastSummaryBlockID()
+	coreSummary, err := ssVM.GetOngoingStateSyncSummary()
 	if err != nil {
-		return ids.Empty, err
+		return nil, err // including common.ErrNoStateSyncOngoing case
 	}
-	proBlkID, found := vm.pendingSummariesBlockIDMapping[coreBlkID]
+
+	proContent, err := vm.buildProContentFrom(coreSummary)
+	if err != nil {
+		return nil, fmt.Errorf("could not build proposerVm Summary from core one due to: %w", err)
+	}
+
+	proSummBytes, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, &proContent)
+	if err != nil {
+		return nil, fmt.Errorf("cannot marshal proposerVMKey due to: %w", err)
+	}
+	return newSummary(coreSummary.Key(), proSummBytes)
+}
+
+func (vm *VM) GetStateSyncResult() (ids.ID, uint64, error) {
+	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
+	if !ok {
+		return ids.Empty, 0, common.ErrStateSyncableVMNotImplemented
+	}
+
+	_, height, err := ssVM.GetStateSyncResult()
+	if err != nil {
+		return ids.Empty, 0, err
+	}
+	proBlkID, err := vm.GetBlockIDAtHeight(height)
+	if err != nil {
+		return ids.Empty, 0, errUnknownLastSummaryBlockID
+	}
 	vm.ctx.Log.Info("coreToProBlkID mapping found %v", proBlkID.String())
-	if !found {
-		return ids.Empty, errUnknownLastSummaryBlockID
-	}
-	return proBlkID, nil
+	return proBlkID, height, nil
 }
 
 func (vm *VM) SetLastSummaryBlock(blkByte []byte) error {
@@ -220,20 +245,8 @@ func (vm *VM) buildProContentFrom(coreSummary common.Summary) (block.ProposerSum
 		return block.ProposerSummaryContent{}, errWrongStateSyncVersion
 	}
 
-	// retrieve ProBlkID is available
+	// retrieve ProBlkID
 	proBlkID, err := vm.GetBlockIDAtHeight(coreContent.Height)
-	if err == database.ErrNotFound {
-		// we must have hit the snowman++ fork. Check it.
-		currentFork, err := vm.State.GetForkHeight()
-		if err != nil {
-			return block.ProposerSummaryContent{}, err
-		}
-		if coreContent.Height > currentFork {
-			return block.ProposerSummaryContent{}, err
-		}
-
-		proBlkID = coreContent.BlkID
-	}
 	if err != nil {
 		return block.ProposerSummaryContent{}, err
 	}

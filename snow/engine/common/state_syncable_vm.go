@@ -12,6 +12,7 @@ import (
 var (
 	ErrStateSyncableVMNotImplemented = errors.New("vm does not implement StateSyncableVM interface")
 	ErrUnknownStateSummary           = errors.New("state summary not found")
+	ErrNoStateSyncOngoing            = errors.New("no state sync ongoing")
 )
 
 // Summary represents the information needed for state sync processing
@@ -32,6 +33,12 @@ type (
 type StateSyncableVM interface {
 	// StateSyncEnabled indicates whether the state sync is enabled for this VM
 	StateSyncEnabled() (bool, error)
+
+	// GetOngoingStateSyncSummary returns an in-progress state summary if it exists. This
+	// allows the engine to ask the network if the ongoing summary is still supported by the
+	// network. This simplifies the task of the StateSyncableVM to decide whether to
+	// continue an in-progress sync or start over.
+	GetOngoingStateSyncSummary() (Summary, error)
 
 	// StateSyncGetLastSummary returns latest Summary with an optional error
 	StateSyncGetLastSummary() (Summary, error)
