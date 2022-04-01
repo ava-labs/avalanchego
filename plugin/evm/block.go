@@ -52,7 +52,6 @@ func (b *Block) Accept() error {
 func (b *Block) Reject() error {
 	b.status = choices.Rejected
 	log.Debug(fmt.Sprintf("Rejecting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
-
 	return b.vm.chain.Reject(b.ethBlock)
 }
 

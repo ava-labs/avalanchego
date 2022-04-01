@@ -4,6 +4,7 @@
 package message
 
 import (
+	"encoding/base64"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/utils"
@@ -12,24 +13,26 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestTxs(t *testing.T) {
+// TestMarshalTxs asserts that the structure or serialization logic hasn't changed, primarily to
+// ensure compatibility with the network.
+func TestMarshalTxs(t *testing.T) {
 	assert := assert.New(t)
 
+	base64EthTxGossip := "AAAAAAAAAAAABGJsYWg="
 	msg := []byte("blah")
-	builtMsg := Txs{
+	builtMsg := TxsGossip{
 		Txs: msg,
 	}
 	codec, err := BuildCodec()
 	assert.NoError(err)
-	builtMsgBytes, err := BuildMessage(codec, &builtMsg)
+	builtMsgBytes, err := BuildGossipMessage(codec, builtMsg)
 	assert.NoError(err)
-	assert.Equal(builtMsgBytes, builtMsg.Bytes())
+	assert.Equal(base64EthTxGossip, base64.StdEncoding.EncodeToString(builtMsgBytes))
 
-	parsedMsgIntf, err := ParseMessage(codec, builtMsgBytes)
+	parsedMsgIntf, err := ParseGossipMessage(codec, builtMsgBytes)
 	assert.NoError(err)
-	assert.Equal(builtMsgBytes, parsedMsgIntf.Bytes())
 
-	parsedMsg, ok := parsedMsgIntf.(*Txs)
+	parsedMsg, ok := parsedMsgIntf.(TxsGossip)
 	assert.True(ok)
 
 	assert.Equal(msg, parsedMsg.Txs)
@@ -38,12 +41,12 @@ func TestTxs(t *testing.T) {
 func TestTxsTooLarge(t *testing.T) {
 	assert := assert.New(t)
 
-	builtMsg := Txs{
+	builtMsg := TxsGossip{
 		Txs: utils.RandomBytes(1024 * units.KiB),
 	}
 	codec, err := BuildCodec()
 	assert.NoError(err)
-	_, err = BuildMessage(codec, &builtMsg)
+	_, err = BuildGossipMessage(codec, builtMsg)
 	assert.Error(err)
 }
 
@@ -53,6 +56,6 @@ func TestParseGibberish(t *testing.T) {
 	codec, err := BuildCodec()
 	assert.NoError(err)
 	randomBytes := utils.RandomBytes(256 * units.KiB)
-	_, err = ParseMessage(codec, randomBytes)
+	_, err = ParseGossipMessage(codec, randomBytes)
 	assert.Error(err)
 }

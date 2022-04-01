@@ -106,10 +106,10 @@ func TestMempoolTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 	seen := 0
 	sender.SendAppGossipF = func(gossipedBytes []byte) error {
 		if seen == 0 {
-			notifyMsgIntf, err := message.ParseMessage(vm.networkCodec, gossipedBytes)
+			notifyMsgIntf, err := message.ParseGossipMessage(vm.networkCodec, gossipedBytes)
 			assert.NoError(err)
 
-			requestMsg, ok := notifyMsgIntf.(*message.Txs)
+			requestMsg, ok := notifyMsgIntf.(message.TxsGossip)
 			assert.True(ok)
 			assert.NotEmpty(requestMsg.Txs)
 
@@ -123,10 +123,10 @@ func TestMempoolTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 			seen++
 			wg2.Done()
 		} else if seen == 1 {
-			notifyMsgIntf, err := message.ParseMessage(vm.networkCodec, gossipedBytes)
+			notifyMsgIntf, err := message.ParseGossipMessage(vm.networkCodec, gossipedBytes)
 			assert.NoError(err)
 
-			requestMsg, ok := notifyMsgIntf.(*message.Txs)
+			requestMsg, ok := notifyMsgIntf.(message.TxsGossip)
 			assert.True(ok)
 			assert.NotEmpty(requestMsg.Txs)
 
@@ -190,10 +190,10 @@ func TestMempoolTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 	sender.CantSendAppGossip = false
 	seen := map[common.Hash]struct{}{}
 	sender.SendAppGossipF = func(gossipedBytes []byte) error {
-		notifyMsgIntf, err := message.ParseMessage(vm.networkCodec, gossipedBytes)
+		notifyMsgIntf, err := message.ParseGossipMessage(vm.networkCodec, gossipedBytes)
 		assert.NoError(err)
 
-		requestMsg, ok := notifyMsgIntf.(*message.Txs)
+		requestMsg, ok := notifyMsgIntf.(message.TxsGossip)
 		assert.True(ok)
 		assert.NotEmpty(requestMsg.Txs)
 
@@ -263,10 +263,10 @@ func TestMempoolTxsAppGossipHandling(t *testing.T) {
 	// show that unknown subnet-evm hashes is requested
 	txBytes, err := rlp.EncodeToBytes([]*types.Transaction{tx})
 	assert.NoError(err)
-	msg := message.Txs{
+	msg := message.TxsGossip{
 		Txs: txBytes,
 	}
-	msgBytes, err := message.BuildMessage(vm.networkCodec, &msg)
+	msgBytes, err := message.BuildGossipMessage(vm.networkCodec, msg)
 	assert.NoError(err)
 
 	nodeID := ids.GenerateTestShortID()

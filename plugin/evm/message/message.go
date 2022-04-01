@@ -5,6 +5,7 @@ package message
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/codec"
 
@@ -23,41 +24,33 @@ const (
 )
 
 var (
-	_ Message = &Txs{}
+	_ GossipMessage = TxsGossip{}
 
 	errUnexpectedCodecVersion = errors.New("unexpected codec version")
 )
 
-type Message interface {
-	// Handle this message with the correct message handler
+type GossipMessage interface {
+	// types implementing GossipMessage should also implement fmt.Stringer for logging purposes.
+	fmt.Stringer
+
+	// Handle this gossip message with the gossip handler.
 	Handle(handler GossipHandler, nodeID ids.ShortID) error
-
-	// initialize should be called whenever a message is built or parsed
-	initialize([]byte)
-
-	// Bytes returns the binary representation of this message
-	//
-	// Bytes should only be called after being initialized
-	Bytes() []byte
 }
 
-type message []byte
-
-func (m *message) initialize(bytes []byte) { *m = bytes }
-func (m *message) Bytes() []byte           { return *m }
-
-type Txs struct {
-	message
-
+type TxsGossip struct {
 	Txs []byte `serialize:"true"`
 }
 
-func (msg *Txs) Handle(handler GossipHandler, nodeID ids.ShortID) error {
+func (msg TxsGossip) Handle(handler GossipHandler, nodeID ids.ShortID) error {
 	return handler.HandleTxs(nodeID, msg)
 }
 
-func ParseMessage(codec codec.Manager, bytes []byte) (Message, error) {
-	var msg Message
+func (msg TxsGossip) String() string {
+	return fmt.Sprintf("TxsGossip(Len=%d)", len(msg.Txs))
+}
+
+func ParseGossipMessage(codec codec.Manager, bytes []byte) (GossipMessage, error) {
+	var msg GossipMessage
 	version, err := codec.Unmarshal(bytes, &msg)
 	if err != nil {
 		return nil, err
@@ -65,12 +58,10 @@ func ParseMessage(codec codec.Manager, bytes []byte) (Message, error) {
 	if version != Version {
 		return nil, errUnexpectedCodecVersion
 	}
-	msg.initialize(bytes)
 	return msg, nil
 }
 
-func BuildMessage(codec codec.Manager, msg Message) ([]byte, error) {
+func BuildGossipMessage(codec codec.Manager, msg GossipMessage) ([]byte, error) {
 	bytes, err := codec.Marshal(Version, &msg)
-	msg.initialize(bytes)
 	return bytes, err
 }

@@ -254,14 +254,13 @@ func (n *pushGossiper) sendTxs(txs []*types.Transaction) error {
 	if err != nil {
 		return err
 	}
-	msg := message.Txs{
+	msg := message.TxsGossip{
 		Txs: txBytes,
 	}
-	msgBytes, err := message.BuildMessage(n.codec, &msg)
+	msgBytes, err := message.BuildGossipMessage(n.codec, msg)
 	if err != nil {
 		return err
 	}
-
 	log.Trace(
 		"gossiping eth txs",
 		"len(txs)", len(txs),
@@ -364,16 +363,16 @@ func NewGossipHandler(vm *VM) *GossipHandler {
 	}
 }
 
-func (h *GossipHandler) HandleTxs(nodeID ids.ShortID, msg *message.Txs) error {
+func (h *GossipHandler) HandleTxs(nodeID ids.ShortID, msg message.TxsGossip) error {
 	log.Trace(
-		"AppGossip called with Txs",
+		"AppGossip called with TxsGossip",
 		"peerID", nodeID,
 		"size(txs)", len(msg.Txs),
 	)
 
 	if len(msg.Txs) == 0 {
 		log.Trace(
-			"AppGossip received empty Txs Message",
+			"AppGossip received empty TxsGossip Message",
 			"peerID", nodeID,
 		)
 		return nil

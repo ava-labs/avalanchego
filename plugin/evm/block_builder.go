@@ -290,6 +290,7 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 					}
 				}
 			case <-b.shutdownChan:
+				b.buildBlockTimer.Stop()
 				return
 			}
 		}

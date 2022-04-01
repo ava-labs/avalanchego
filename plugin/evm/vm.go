@@ -193,6 +193,9 @@ func (vm *VM) Initialize(
 			return fmt.Errorf("failed to unmarshal config %s: %w", string(configBytes), err)
 		}
 	}
+	if err := vm.config.Validate(); err != nil {
+		return err
+	}
 	if b, err := json.Marshal(vm.config); err == nil {
 		log.Info("Initializing Subnet EVM VM", "Version", Version, "Config", string(b))
 	} else {
@@ -250,6 +253,9 @@ func (vm *VM) Initialize(
 	ethConfig.AllowUnprotectedTxs = vm.config.AllowUnprotectedTxs
 	ethConfig.Preimages = vm.config.Preimages
 	ethConfig.Pruning = vm.config.Pruning
+	ethConfig.PopulateMissingTries = vm.config.PopulateMissingTries
+	ethConfig.PopulateMissingTriesParallelism = vm.config.PopulateMissingTriesParallelism
+	ethConfig.AllowMissingTries = vm.config.AllowMissingTries
 	ethConfig.SnapshotAsync = vm.config.SnapshotAsync
 	ethConfig.SnapshotVerify = vm.config.SnapshotVerify
 	ethConfig.OfflinePruning = vm.config.OfflinePruning

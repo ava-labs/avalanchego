@@ -5,6 +5,7 @@ package message
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/codec"
 
@@ -13,12 +14,12 @@ import (
 
 // Request represents a Network request type
 type Request interface {
+	// Requests should implement String() for logging.
+	fmt.Stringer
+
 	// Handle allows `Request` to call respective methods on handler to handle
 	// this particular request type
 	Handle(ctx context.Context, nodeID ids.ShortID, requestID uint32, handler RequestHandler) ([]byte, error)
-
-	// Type returns user-friendly name for this object that can be used for logging
-	Type() string
 }
 
 // BytesToRequest unmarshals the given requestBytes into Request object
