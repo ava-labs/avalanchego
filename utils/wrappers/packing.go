@@ -500,7 +500,7 @@ func TryUnpackIPCertList(packer *Packer) interface{} {
 	return ips
 }
 
-func TryPackSummaryKeys(p *Packer, valIntf interface{}) {
+func TryPackUintSlice(p *Packer, valIntf interface{}) {
 	longList, ok := valIntf.([]uint64)
 	if !ok {
 		p.Add(errBadType)
@@ -512,11 +512,11 @@ func TryPackSummaryKeys(p *Packer, valIntf interface{}) {
 	}
 }
 
-func TryUnpackSummaryKeys(p *Packer) interface{} {
+func TryUnpackUintSlice(p *Packer) interface{} {
 	sliceSize := p.UnpackInt()
 	res := make([]uint64, sliceSize)
 	for i := uint32(0); i < sliceSize && !p.Errored(); i++ {
-		res[i] = p.UnpackLong()
+		res = append(res, p.UnpackLong())
 	}
 	return res
 }
