@@ -53,7 +53,7 @@ type ChainRouter struct {
 	// It is only safe to call [RegisterResponse] with the router lock held. Any
 	// other calls to the timeout manager with the router lock held could cause
 	// a deadlock because the timeout manager will call Benched and Unbenched.
-	timeoutManager *timeout.Manager
+	timeoutManager timeout.Manager
 
 	closeTimeout time.Duration
 	peers        map[ids.ShortID]version.Application
@@ -81,7 +81,7 @@ func (cr *ChainRouter) Initialize(
 	nodeID ids.ShortID,
 	log logging.Logger,
 	msgCreator message.Creator,
-	timeoutManager *timeout.Manager,
+	timeoutManager timeout.Manager,
 	closeTimeout time.Duration,
 	criticalChains ids.Set,
 	onFatal func(exitCode int),

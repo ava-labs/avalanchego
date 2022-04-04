@@ -29,8 +29,7 @@ func TestShutdown(t *testing.T) {
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
 	benchlist := benchlist.NewNoBenchlist()
-	tm := timeout.Manager{}
-	err = tm.Initialize(
+	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     time.Millisecond,
 			MinimumTimeout:     time.Millisecond,
@@ -52,7 +51,7 @@ func TestShutdown(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Second, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	shutdownCalled := make(chan struct{}, 1)
@@ -118,10 +117,9 @@ func TestShutdownTimesOut(t *testing.T) {
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
 	benchlist := benchlist.NewNoBenchlist()
-	tm := timeout.Manager{}
 	metrics := prometheus.NewRegistry()
 	// Ensure that the Ancestors request does not timeout
-	err = tm.Initialize(
+	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     time.Second,
 			MinimumTimeout:     500 * time.Millisecond,
@@ -146,7 +144,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	err = chainRouter.Initialize(ids.ShortEmpty,
 		logging.NoLog{},
 		mc,
-		&tm,
+		tm,
 		time.Millisecond,
 		ids.Set{},
 		nil,
@@ -224,8 +222,7 @@ func TestShutdownTimesOut(t *testing.T) {
 func TestRouterTimeout(t *testing.T) {
 	// Create a timeout manager
 	maxTimeout := 25 * time.Millisecond
-	tm := timeout.Manager{}
-	err := tm.Initialize(
+	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     10 * time.Millisecond,
 			MinimumTimeout:     10 * time.Millisecond,
@@ -248,7 +245,7 @@ func TestRouterTimeout(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, tm, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	// Create bootstrapper, engine and handler
@@ -344,8 +341,7 @@ func TestRouterTimeout(t *testing.T) {
 
 func TestRouterClearTimeouts(t *testing.T) {
 	// Create a timeout manager
-	tm := timeout.Manager{}
-	err := tm.Initialize(
+	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     3 * time.Second,
 			MinimumTimeout:     3 * time.Second,
@@ -369,7 +365,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.NoError(t, err)
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, tm, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	// Create bootstrapper, engine and handler
@@ -453,8 +449,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 func TestValidatorOnlyMessageDrops(t *testing.T) {
 	// Create a timeout manager
 	maxTimeout := 25 * time.Millisecond
-	tm := timeout.Manager{}
-	err := tm.Initialize(
+	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     10 * time.Millisecond,
 			MinimumTimeout:     10 * time.Millisecond,
@@ -477,7 +472,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, tm, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	// Create bootstrapper, engine and handler
