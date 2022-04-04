@@ -23,9 +23,9 @@ var (
 
 	beacons          validators.Set
 	summaryBytes     []byte
-	key              common.SummaryKey
-	summaryID        common.SummaryID
-	unknownSummaryID common.SummaryID
+	key              uint64
+	summaryID        ids.ID
+	unknownSummaryID ids.ID
 )
 
 type fullVM struct {
@@ -44,9 +44,9 @@ func init() {
 	}
 
 	summaryBytes = []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
-	key = common.SummaryKey(2022)
-	summaryID = common.SummaryID{'h', 'a', 's', 'h'}
-	unknownSummaryID = common.SummaryID{'g', 'a', 'r', 'b', 'a', 'g', 'e'}
+	key = uint64(2022)
+	summaryID = ids.ID{'h', 'a', 's', 'h'}
+	unknownSummaryID = ids.ID{'g', 'a', 'r', 'b', 'a', 'g', 'e'}
 }
 
 // helper to build

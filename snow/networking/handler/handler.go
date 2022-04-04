@@ -351,23 +351,13 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 	case message.GetAcceptedStateSummary:
 		reqID := msg.Get(message.RequestID).(uint32)
 		msgKeys := msg.Get(message.MultiSummaryKeys).([]uint64)
-		keys := make([]common.SummaryKey, len(msgKeys))
-		for i, key := range msgKeys {
-			keys[i] = common.SummaryKey(key)
-		}
+		keys := make([]uint64, len(msgKeys))
 		return engine.GetAcceptedStateSummary(nodeID, reqID, keys)
 
 	case message.AcceptedStateSummary:
 		reqID := msg.Get(message.RequestID).(uint32)
 		msgSummaryIDs := msg.Get(message.MultiSummaryIDs).([][]byte)
-		summaryIDs := make([]common.SummaryID, len(msgSummaryIDs))
-		for i, summaryID := range msgSummaryIDs {
-			id, err := ids.ToID(summaryID)
-			if err != nil {
-				return err
-			}
-			summaryIDs[i] = common.SummaryID(id)
-		}
+		summaryIDs := make([]ids.ID, len(msgSummaryIDs))
 		return engine.AcceptedStateSummary(nodeID, reqID, summaryIDs)
 
 	case message.GetAcceptedStateSummaryFailed:

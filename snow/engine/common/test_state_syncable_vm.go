@@ -30,7 +30,7 @@ type TestStateSyncableVM struct {
 	GetOngoingStateSyncSummaryF func() (Summary, error)
 	StateSyncGetLastSummaryF    func() (Summary, error)
 	ParseSummaryF               func(summaryBytes []byte) (Summary, error)
-	StateSyncGetSummaryF        func(SummaryKey) (Summary, error)
+	StateSyncGetSummaryF        func(uint64) (Summary, error)
 	StateSyncF                  func([]Summary) error
 }
 
@@ -74,7 +74,7 @@ func (tss *TestStateSyncableVM) ParseSummary(summaryBytes []byte) (Summary, erro
 	return nil, errParseSummary
 }
 
-func (tss *TestStateSyncableVM) StateSyncGetSummary(key SummaryKey) (Summary, error) {
+func (tss *TestStateSyncableVM) StateSyncGetSummary(key uint64) (Summary, error) {
 	if tss.StateSyncGetSummaryF != nil {
 		return tss.StateSyncGetSummaryF(key)
 	}

@@ -16,16 +16,11 @@ var (
 )
 
 // Summary represents the information needed for state sync processing
-type (
-	SummaryKey uint64
-	SummaryID  ids.ID
-
-	Summary interface {
-		Bytes() []byte
-		Key() SummaryKey
-		ID() SummaryID
-	}
-)
+type Summary interface {
+	Bytes() []byte
+	Key() uint64
+	ID() ids.ID
+}
 
 // StateSyncableVM represents functionalities to allow VMs to sync to a given state,
 // rather then boostrapping from genesis.
@@ -47,7 +42,7 @@ type StateSyncableVM interface {
 	ParseSummary(summaryBytes []byte) (Summary, error)
 
 	// StateSyncGetSummary retrieves the summary related to key, if available.
-	StateSyncGetSummary(SummaryKey) (Summary, error)
+	StateSyncGetSummary(summaryKey uint64) (Summary, error)
 
 	// StateSync is called with a list of valid summaries to sync from.
 	// These summaries were collected from peers and validated with validators.

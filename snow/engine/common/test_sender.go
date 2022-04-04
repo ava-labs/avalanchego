@@ -51,8 +51,8 @@ type SenderTest struct {
 
 	SendGetStateSummaryFrontierF func(ids.ShortSet, uint32)
 	SendStateSummaryFrontierF    func(ids.ShortID, uint32, []byte)
-	SendGetAcceptedStateSummaryF func(ids.ShortSet, uint32, []SummaryKey)
-	SendAcceptedStateSummaryF    func(ids.ShortID, uint32, []SummaryID)
+	SendGetAcceptedStateSummaryF func(ids.ShortSet, uint32, []uint64)
+	SendAcceptedStateSummaryF    func(ids.ShortID, uint32, []ids.ID)
 }
 
 // Default set the default callable value to [cant]
@@ -288,7 +288,7 @@ func (s *SenderTest) SendStateSummaryFrontier(validatorID ids.ShortID, requestID
 // SendGetAcceptedStateSummary calls SendGetAcceptedStateSummaryF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uint32, keys []SummaryKey) {
+func (s *SenderTest) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uint32, keys []uint64) {
 	if s.SendGetAcceptedStateSummaryF != nil {
 		s.SendGetAcceptedStateSummaryF(nodeIDs, requestID, keys)
 	} else if s.CantSendGetAcceptedStateSummary && s.T != nil {
@@ -299,7 +299,7 @@ func (s *SenderTest) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID
 // SendAcceptedStateSummary calls SendAcceptedStateSummaryF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) SendAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaryIDs []SummaryID) {
+func (s *SenderTest) SendAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaryIDs []ids.ID) {
 	if s.SendAcceptedStateSummaryF != nil {
 		s.SendAcceptedStateSummaryF(validatorID, requestID, summaryIDs)
 	} else if s.CantSendAcceptedStateSummary && s.T != nil {

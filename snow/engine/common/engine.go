@@ -53,13 +53,13 @@ type AllGetsServer interface {
 
 type GetStateSummaryHandler interface {
 	GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error
-	GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys []SummaryKey) error
+	GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys []uint64) error
 }
 
 type StateSyncHandler interface {
 	StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summary []byte) error
 	GetStateSummaryFrontierFailed(validatorID ids.ShortID, requestID uint32) error
-	AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaryIDs []SummaryID) error
+	AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaryIDs []ids.ID) error
 	GetAcceptedStateSummaryFailed(validatorID ids.ShortID, requestID uint32) error
 }
 

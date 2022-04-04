@@ -531,8 +531,8 @@ func (vm *VMClient) GetOngoingStateSyncSummary() (common.Summary, error) {
 
 	summaryID, err := ids.ToID(hashing.ComputeHash256(resp.SummaryId))
 	return &block.Summary{
-		SummaryKey:   common.SummaryKey(resp.Key),
-		SummaryID:    common.SummaryID(summaryID),
+		SummaryKey:   resp.Key,
+		SummaryID:    summaryID,
 		ContentBytes: resp.Content,
 	}, err
 }
@@ -548,8 +548,8 @@ func (vm *VMClient) StateSyncGetLastSummary() (common.Summary, error) {
 
 	summaryID, err := ids.ToID(hashing.ComputeHash256(resp.SummaryId))
 	return &block.Summary{
-		SummaryKey:   common.SummaryKey(resp.Key),
-		SummaryID:    common.SummaryID(summaryID),
+		SummaryKey:   resp.Key,
+		SummaryID:    summaryID,
 		ContentBytes: resp.Content,
 	}, err
 }
@@ -567,17 +567,17 @@ func (vm *VMClient) ParseSummary(summaryBytes []byte) (common.Summary, error) {
 
 	summaryID, err := ids.ToID(hashing.ComputeHash256(resp.SummaryId))
 	return &block.Summary{
-		SummaryKey:   common.SummaryKey(resp.Key),
-		SummaryID:    common.SummaryID(summaryID),
+		SummaryKey:   resp.Key,
+		SummaryID:    summaryID,
 		ContentBytes: resp.Content,
 	}, err
 }
 
-func (vm *VMClient) StateSyncGetSummary(key common.SummaryKey) (common.Summary, error) {
+func (vm *VMClient) StateSyncGetSummary(key uint64) (common.Summary, error) {
 	resp, err := vm.client.StateSyncGetSummary(
 		context.Background(),
 		&vmproto.StateSyncGetSummaryRequest{
-			Key: uint64(key),
+			Key: key,
 		},
 	)
 	if err != nil {
@@ -586,8 +586,8 @@ func (vm *VMClient) StateSyncGetSummary(key common.SummaryKey) (common.Summary, 
 
 	summaryID, err := ids.ToID(hashing.ComputeHash256(resp.SummaryId))
 	return &block.Summary{
-		SummaryKey:   common.SummaryKey(resp.Key),
-		SummaryID:    common.SummaryID(summaryID),
+		SummaryKey:   resp.Key,
+		SummaryID:    summaryID,
 		ContentBytes: resp.Content,
 	}, err
 }
@@ -597,7 +597,7 @@ func (vm *VMClient) StateSync(accepted []common.Summary) error {
 	for i, sum := range accepted {
 		summaryID := sum.ID()
 		requestedSummaries[i] = &vmproto.StateSyncGetLastSummaryResponse{
-			Key:       uint64(sum.Key()),
+			Key:       sum.Key(),
 			SummaryId: summaryID[:],
 			Content:   sum.Bytes(),
 		}

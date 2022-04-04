@@ -49,7 +49,7 @@ type stateSyncer struct {
 	voteTracker
 
 	// summaryID --> (summary, weight)
-	weightedSummaries map[common.SummaryID]weightedSummary
+	weightedSummaries map[ids.ID]weightedSummary
 
 	// number of times the state sync has been attempted
 	attempts int
@@ -74,7 +74,6 @@ func New(
 	}
 }
 
-// StateSyncHandler interface implementation
 func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summaryBytes []byte) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
@@ -142,7 +141,6 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 	return ss.sendGetAccepted()
 }
 
-// StateSyncHandler interface implementation
 func (ss *stateSyncer) GetStateSummaryFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
@@ -157,8 +155,7 @@ func (ss *stateSyncer) GetStateSummaryFrontierFailed(validatorID ids.ShortID, re
 	return ss.StateSummaryFrontier(validatorID, requestID, []byte{})
 }
 
-// StateSyncHandler interface implementation
-func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaryIDs []common.SummaryID) error {
+func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaryIDs []ids.ID) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("Received an Out-of-Sync Accepted - validator: %v - expectedRequestID: %v, requestID: %v",
@@ -234,7 +231,6 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 	return ss.stateSyncVM.StateSync(accepted)
 }
 
-// StateSyncHandler interface implementation
 func (ss *stateSyncer) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, requestID uint32) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
@@ -247,10 +243,9 @@ func (ss *stateSyncer) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, re
 	// that they think none of the containers we sent them in GetAccepted are accepted
 	ss.markVoterFailed(validatorID)
 
-	return ss.AcceptedStateSummary(validatorID, requestID, []common.SummaryID{})
+	return ss.AcceptedStateSummary(validatorID, requestID, []ids.ID{})
 }
 
-// Engine interface implementation
 func (ss *stateSyncer) Start(startReqID uint32) error {
 	ss.requestID = startReqID
 	ss.Ctx.SetState(snow.StateSyncing)
@@ -262,7 +257,7 @@ func (ss *stateSyncer) startup() error {
 	ss.started = true
 
 	// clear up messages trackers
-	ss.weightedSummaries = make(map[common.SummaryID]weightedSummary)
+	ss.weightedSummaries = make(map[ids.ID]weightedSummary)
 	ss.frontierTracker.clear()
 	ss.voteTracker.clear()
 
@@ -324,7 +319,7 @@ func (ss *stateSyncer) sendGetAccepted() error {
 		ss.Ctx.Log.Debug("sent %d more GetAcceptedStateSummary messages with %d more to send",
 			vdrs.Len(), ss.targetVoters.Len())
 
-		acceptedKeys := make([]common.SummaryKey, 0, len(ss.weightedSummaries))
+		acceptedKeys := make([]uint64, 0, len(ss.weightedSummaries))
 		for _, summary := range ss.weightedSummaries {
 			acceptedKeys = append(acceptedKeys, summary.Key())
 		}
@@ -335,22 +330,18 @@ func (ss *stateSyncer) sendGetAccepted() error {
 	return nil
 }
 
-// AppHandler interface implementation
 func (ss *stateSyncer) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
 	return ss.VM.AppRequest(nodeID, requestID, deadline, request)
 }
 
-// AppHandler interface implementation
 func (ss *stateSyncer) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
 	return ss.VM.AppResponse(nodeID, requestID, response)
 }
 
-// AppHandler interface implementation
 func (ss *stateSyncer) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 	return ss.VM.AppRequestFailed(nodeID, requestID)
 }
 
-// InternalHandler interface implementation
 func (ss *stateSyncer) Notify(msg common.Message) error {
 	// if state sync and bootstrap is done, we shouldn't receive StateSyncDone from the VM
 	ss.Ctx.Log.Verbo("snowman engine notified of %s from the vm", msg)
@@ -431,7 +422,6 @@ func (ss *stateSyncer) GetFailed(validatorID ids.ShortID, requestID uint32) erro
 	return ss.requestBlk(ss.lastSummaryBlkID)
 }
 
-// InternalHandler interface implementation
 func (ss *stateSyncer) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
 	if err := ss.VM.Connected(nodeID, nodeVersion); err != nil {
 		return err
@@ -449,7 +439,6 @@ func (ss *stateSyncer) Connected(nodeID ids.ShortID, nodeVersion version.Applica
 	return nil
 }
 
-// InternalHandler interface implementation
 func (ss *stateSyncer) Disconnected(nodeID ids.ShortID) error {
 	if err := ss.VM.Disconnected(nodeID); err != nil {
 		return err
@@ -486,7 +475,6 @@ func (ss *stateSyncer) HealthCheck() (interface{}, error) {
 	return intf, vmErr
 }
 
-// Engine interface implementation
 func (ss *stateSyncer) GetVM() common.VM { return ss.VM }
 
 func (ss *stateSyncer) IsEnabled() bool {

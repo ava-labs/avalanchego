@@ -264,9 +264,9 @@ func (vm *VMServer) GetOngoingStateSyncSummary(context.Context, *emptypb.Empty) 
 		return nil, err
 	}
 
-	summaryID := ids.ID(summary.ID())
+	summaryID := summary.ID()
 	return &vmproto.StateSyncGetOngoingStateSyncSummaryResponse{
-		Key:       uint64(summary.Key()),
+		Key:       summary.Key(),
 		SummaryId: summaryID[:],
 		Content:   summary.Bytes(),
 	}, err
@@ -283,9 +283,9 @@ func (vm *VMServer) StateSyncGetLastSummary(ctx context.Context, empty *emptypb.
 		return nil, err
 	}
 
-	summaryID := ids.ID(summary.ID())
+	summaryID := summary.ID()
 	return &vmproto.StateSyncGetLastSummaryResponse{
-		Key:       uint64(summary.Key()),
+		Key:       summary.Key(),
 		SummaryId: summaryID[:],
 		Content:   summary.Bytes(),
 	}, err
@@ -302,9 +302,9 @@ func (vm *VMServer) ParseSummary(ctx context.Context, req *vmproto.ParseSummaryR
 		return nil, err
 	}
 
-	summaryID := ids.ID(summary.ID())
+	summaryID := summary.ID()
 	return &vmproto.ParseSummaryResponse{
-		Key:       uint64(summary.Key()),
+		Key:       summary.Key(),
 		SummaryId: summaryID[:],
 		Content:   summary.Bytes(),
 	}, nil
@@ -316,14 +316,14 @@ func (vm *VMServer) StateSyncGetSummary(ctx context.Context, req *vmproto.StateS
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	summary, err := ssVM.StateSyncGetSummary(common.SummaryKey(req.Key))
+	summary, err := ssVM.StateSyncGetSummary(req.Key)
 	if err != nil {
 		return nil, err
 	}
 
-	summaryID := ids.ID(summary.ID())
+	summaryID := summary.ID()
 	return &vmproto.StateSyncGetSummaryResponse{
-		Key:       uint64(summary.Key()),
+		Key:       summary.Key(),
 		SummaryId: summaryID[:],
 		Content:   summary.Bytes(),
 	}, nil
@@ -342,8 +342,8 @@ func (vm *VMServer) StateSync(ctx context.Context, req *vmproto.StateSyncRequest
 			return nil, err
 		}
 		summaries[i] = &block.Summary{
-			SummaryKey:   common.SummaryKey(sum.Key),
-			SummaryID:    common.SummaryID(summaryID),
+			SummaryKey:   sum.Key,
+			SummaryID:    summaryID,
 			ContentBytes: sum.Content,
 		}
 	}

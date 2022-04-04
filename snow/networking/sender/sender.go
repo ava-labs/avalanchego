@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -317,7 +316,7 @@ func (s *Sender) SendStateSummaryFrontier(nodeID ids.ShortID, requestID uint32, 
 	}
 }
 
-func (s *Sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uint32, summKeys []common.SummaryKey) {
+func (s *Sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uint32, keys []uint64) {
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -330,9 +329,6 @@ func (s *Sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uin
 	for nodeID := range nodeIDs {
 		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.AcceptedStateSummary)
 	}
-
-	keys := make([]uint64, len(summKeys))
-	encodeSummaryKeys(summKeys, keys)
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Asynchronously to avoid deadlock.
@@ -354,7 +350,7 @@ func (s *Sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uin
 			"failed to build GetAcceptedStateSummary(%s, %d, %s): %s",
 			s.ctx.ChainID,
 			requestID,
-			summKeys,
+			keys,
 			err,
 		)
 	}
@@ -366,13 +362,13 @@ func (s *Sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uin
 				nodeID,
 				s.ctx.ChainID,
 				requestID,
-				summKeys,
+				keys,
 			)
 		}
 	}
 }
 
-func (s *Sender) SendAcceptedStateSummary(nodeID ids.ShortID, requestID uint32, summaryIDs []common.SummaryID) {
+func (s *Sender) SendAcceptedStateSummary(nodeID ids.ShortID, requestID uint32, summaryIDs []ids.ID) {
 	summaryIDBytes := make([][]byte, len(summaryIDs))
 	encodeSummaryIDs(summaryIDs, summaryIDBytes)
 
@@ -998,15 +994,9 @@ func (s *Sender) Accept(ctx *snow.ConsensusContext, containerID ids.ID, containe
 	return nil
 }
 
-func encodeSummaryIDs(summaryIDs []common.SummaryID, result [][]byte) {
+func encodeSummaryIDs(summaryIDs []ids.ID, result [][]byte) {
 	for i, summaryID := range summaryIDs {
 		copy := summaryID
 		result[i] = copy[:]
-	}
-}
-
-func encodeSummaryKeys(summaryKeys []common.SummaryKey, result []uint64) {
-	for i, key := range summaryKeys {
-		result[i] = uint64(key)
 	}
 }

@@ -32,7 +32,7 @@ func init() {
 	errs := wrappers.Errs{}
 	errs.Add(
 		lc.RegisterType(&block.Summary{}),
-		lc.RegisterType(&common.SummaryID{}),
+		lc.RegisterType(&ids.ID{}),
 		lc.RegisterType(&block.CoreSummaryContent{}),
 		lc.RegisterType(&block.ProposerSummaryContent{}),
 		stateSyncCodec.RegisterCodec(block.StateSyncDefaultKeysVersion, lc),
@@ -89,10 +89,10 @@ func (vm *VM) ParseSummary(summaryBytes []byte) (common.Summary, error) {
 		return nil, errWrongStateSyncVersion
 	}
 
-	return newSummary(common.SummaryKey(proContent.CoreContent.Height), summaryBytes)
+	return newSummary(proContent.CoreContent.Height, summaryBytes)
 }
 
-func (vm *VM) StateSyncGetSummary(key common.SummaryKey) (common.Summary, error) {
+func (vm *VM) StateSyncGetSummary(key uint64) (common.Summary, error) {
 	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
 	if !ok {
 		return nil, common.ErrStateSyncableVMNotImplemented
@@ -147,7 +147,7 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 		// with summaries content in order to support resuming state sync in case
 		// of shutdown. Note that we won't download all the blocks associated with
 		// state summaries.
-		if err := vm.updateHeightIndex(uint64(summary.Key()), proContent.ProBlkID); err != nil {
+		if err := vm.updateHeightIndex(summary.Key(), proContent.ProBlkID); err != nil {
 			return err
 		}
 	}
@@ -223,14 +223,14 @@ func (vm *VM) SetLastSummaryBlock(blkByte []byte) error {
 	return blk.conditionalAccept(false /*acceptcoreBlk*/)
 }
 
-func newSummary(key common.SummaryKey, content []byte) (common.Summary, error) {
+func newSummary(key uint64, content []byte) (common.Summary, error) {
 	summaryID, err := ids.ToID(hashing.ComputeHash256(content))
 	if err != nil {
 		return nil, fmt.Errorf("cannot compute summary ID: %w", err)
 	}
 	return &block.Summary{
 		SummaryKey:   key,
-		SummaryID:    common.SummaryID(summaryID),
+		SummaryID:    summaryID,
 		ContentBytes: content,
 	}, nil
 }

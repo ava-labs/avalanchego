@@ -65,13 +65,13 @@ func (gh *getter) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uin
 	return nil
 }
 
-func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys []common.SummaryKey) error {
+func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys []uint64) error {
 	if gh.ssVM == nil {
 		gh.log.Debug("State sync not supported. GetAcceptedStateSummary(%s, %d) dropped.", validatorID, requestID)
 		return nil
 	}
 
-	summaryIDs := make([]common.SummaryID, 0, len(keys))
+	summaryIDs := make([]ids.ID, 0, len(keys))
 	for _, key := range keys {
 		summary, err := gh.ssVM.StateSyncGetSummary(key)
 		if err != nil {
