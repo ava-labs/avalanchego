@@ -3,7 +3,7 @@
 # buf is required see:https://docs.buf.build/installation
 
 # any version changes here should also be bumped in Dockerfile.buf
-BUF_VERSION='1.1.0'
+BUF_VERSION='1.3.1'
 PROTOC_GEN_GO_VERSION='v1.27.1'
 PROTOC_GEN_GO_GRPC_VERSION='1.2.0'
 
@@ -34,6 +34,10 @@ fi
 
 # move to api directory
 cd $TARGET
+
+echo "Running protobuf fmt..."
+
+buf format -w
 
 echo "Running protobuf lint check..."
 
