@@ -11,13 +11,17 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
-var _ snow.Acceptor = &Sender{}
+var (
+	_ snow.Acceptor = &Sender{}
+	_ common.Sender = &Sender{}
+)
 
 type GossipConfig struct {
 	AcceptedFrontierSize      uint `json:"gossipAcceptedFrontierSize"`

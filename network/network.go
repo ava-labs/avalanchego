@@ -42,9 +42,9 @@ const (
 )
 
 var (
-	errNoPrimaryValidators = errors.New("no default subnet validators")
-
-	_ Network = &network{}
+	_                      sender.ExternalSender = &network{}
+	_                      Network               = &network{}
+	errNoPrimaryValidators                       = errors.New("no default subnet validators")
 )
 
 // Network defines the functionality of the networking library.
