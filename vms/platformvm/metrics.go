@@ -9,6 +9,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -17,9 +18,10 @@ import (
 var errUnknownBlockType = errors.New("unknown block type")
 
 type metrics struct {
-	percentConnected prometheus.Gauge
-	localStake       prometheus.Gauge
-	totalStake       prometheus.Gauge
+	percentConnected       prometheus.Gauge
+	subnetPercentConnected *prometheus.GaugeVec
+	localStake             prometheus.Gauge
+	totalStake             prometheus.Gauge
 
 	numAbortBlocks,
 	numAtomicBlocks,
@@ -67,12 +69,21 @@ func newTxMetrics(namespace string, name string) prometheus.Counter {
 func (m *metrics) Initialize(
 	namespace string,
 	registerer prometheus.Registerer,
+	whitelistedSubnets ids.Set,
 ) error {
 	m.percentConnected = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "percent_connected",
 		Help:      "Percent of connected stake",
 	})
+	m.subnetPercentConnected = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "percent_connected_subnet",
+			Help:      "Percent of connected subnet weight",
+		},
+		[]string{"subnetID"},
+	)
 	m.localStake = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "local_staked",
@@ -139,6 +150,7 @@ func (m *metrics) Initialize(
 		err,
 
 		registerer.Register(m.percentConnected),
+		registerer.Register(m.subnetPercentConnected),
 		registerer.Register(m.localStake),
 		registerer.Register(m.totalStake),
 
@@ -166,6 +178,12 @@ func (m *metrics) Initialize(
 		registerer.Register(m.validatorSetsHeightDiff),
 		registerer.Register(m.validatorSetsDuration),
 	)
+
+	// init subnet tracker metrics with whitelisted subnets
+	for subnetID := range whitelistedSubnets {
+		// initialize to 0
+		m.subnetPercentConnected.WithLabelValues(subnetID.String()).Set(0)
+	}
 	return errs.Err
 }
 

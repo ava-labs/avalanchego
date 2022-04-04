@@ -37,7 +37,7 @@ type Sender struct {
 	msgCreator message.Creator
 	sender     ExternalSender // Actually does the sending over the network
 	router     router.Router
-	timeouts   *timeout.Manager
+	timeouts   timeout.Manager
 
 	gossipConfig GossipConfig
 
@@ -51,7 +51,7 @@ func New(
 	msgCreator message.Creator,
 	sender ExternalSender,
 	router router.Router,
-	timeouts *timeout.Manager,
+	timeouts timeout.Manager,
 	gossipConfig GossipConfig,
 ) (*Sender, error) {
 	s := &Sender{
