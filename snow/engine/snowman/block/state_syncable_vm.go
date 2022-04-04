@@ -22,17 +22,6 @@ func (s *Summary) Bytes() []byte { return s.ContentBytes }
 func (s *Summary) Key() uint64   { return s.SummaryKey }
 func (s *Summary) ID() ids.ID    { return s.SummaryID }
 
-type CoreSummaryContent struct {
-	BlkID   ids.ID `serialize:"true"`
-	Height  uint64 `serialize:"true"`
-	Content []byte `serialize:"true"`
-}
-
-type ProposerSummaryContent struct {
-	ProBlkID    ids.ID             `serialize:"true"`
-	CoreContent CoreSummaryContent `serialize:"true"`
-}
-
 type StateSyncableVM interface {
 	common.StateSyncableVM
 

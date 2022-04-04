@@ -506,7 +506,7 @@ func (b *outMsgBuilder) GetStateSummaryFrontier(
 			RequestID: requestID,
 			Deadline:  uint64(deadline),
 		},
-		b.compress && GetStateSummaryFrontier.Compressible(), // GetStateSummaryFrontier messages may be compressed
+		GetStateSummaryFrontier.Compressible(), // GetStateSummaryFrontier messages can't be compressed
 		false,
 	)
 }
@@ -523,7 +523,7 @@ func (b *outMsgBuilder) StateSummaryFrontier(
 			RequestID:    requestID,
 			SummaryBytes: summary,
 		},
-		StateSummaryFrontier.Compressible(), // StateSummaryFrontier messages can't be compressed
+		b.compress && StateSummaryFrontier.Compressible(), // StateSummaryFrontier messages may be compressed
 		false,
 	)
 }
@@ -537,10 +537,10 @@ func (b *outMsgBuilder) GetAcceptedStateSummary(
 	return b.c.Pack(
 		GetAcceptedStateSummary,
 		map[Field]interface{}{
-			ChainID:          chainID[:],
-			RequestID:        requestID,
-			Deadline:         uint64(deadline),
-			MultiSummaryKeys: keys,
+			ChainID:     chainID[:],
+			RequestID:   requestID,
+			Deadline:    uint64(deadline),
+			SummaryKeys: keys,
 		},
 		b.compress && GetAcceptedStateSummary.Compressible(), // GetAcceptedStateSummary messages may be compressed
 		false,
@@ -555,9 +555,9 @@ func (b *outMsgBuilder) AcceptedStateSummary(
 	return b.c.Pack(
 		AcceptedStateSummary,
 		map[Field]interface{}{
-			ChainID:         chainID[:],
-			RequestID:       requestID,
-			MultiSummaryIDs: summaryIDs,
+			ChainID:    chainID[:],
+			RequestID:  requestID,
+			SummaryIDs: summaryIDs,
 		},
 		b.compress && AcceptedStateSummary.Compressible(), // AcceptedStateSummary messages may be compressed
 		false,

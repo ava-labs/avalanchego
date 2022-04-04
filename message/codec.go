@@ -71,14 +71,14 @@ func NewCodecWithMemoryPool(namespace string, metrics prometheus.Registerer, max
 				return make([]byte, 0, constants.DefaultByteSliceCap)
 			},
 		},
-		compressTimeMetrics:   make(map[Op]metric.Averager, len(ConsensusAndNetworkOps)),
-		decompressTimeMetrics: make(map[Op]metric.Averager, len(ConsensusAndNetworkOps)),
+		compressTimeMetrics:   make(map[Op]metric.Averager, len(ExternalOps)),
+		decompressTimeMetrics: make(map[Op]metric.Averager, len(ExternalOps)),
 		compressor:            compression.NewGzipCompressor(maxMessageSize),
 		maxMessageTimeout:     maxMessageTimeout,
 	}
 
 	errs := wrappers.Errs{}
-	for _, op := range ConsensusAndNetworkOps {
+	for _, op := range ExternalOps {
 		if !op.Compressible() {
 			continue
 		}

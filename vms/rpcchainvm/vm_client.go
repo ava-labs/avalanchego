@@ -38,7 +38,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
@@ -529,7 +528,7 @@ func (vm *VMClient) GetOngoingStateSyncSummary() (common.Summary, error) {
 		return nil, err
 	}
 
-	summaryID, err := ids.ToID(hashing.ComputeHash256(resp.SummaryId))
+	summaryID, err := ids.ToID(resp.SummaryId)
 	return &block.Summary{
 		SummaryKey:   resp.Key,
 		SummaryID:    summaryID,
@@ -546,7 +545,7 @@ func (vm *VMClient) StateSyncGetLastSummary() (common.Summary, error) {
 		return nil, err
 	}
 
-	summaryID, err := ids.ToID(hashing.ComputeHash256(resp.SummaryId))
+	summaryID, err := ids.ToID(resp.SummaryId)
 	return &block.Summary{
 		SummaryKey:   resp.Key,
 		SummaryID:    summaryID,
@@ -565,7 +564,7 @@ func (vm *VMClient) ParseSummary(summaryBytes []byte) (common.Summary, error) {
 		return nil, err
 	}
 
-	summaryID, err := ids.ToID(hashing.ComputeHash256(resp.SummaryId))
+	summaryID, err := ids.ToID(resp.SummaryId)
 	return &block.Summary{
 		SummaryKey:   resp.Key,
 		SummaryID:    summaryID,
@@ -584,7 +583,7 @@ func (vm *VMClient) StateSyncGetSummary(key uint64) (common.Summary, error) {
 		return nil, err
 	}
 
-	summaryID, err := ids.ToID(hashing.ComputeHash256(resp.SummaryId))
+	summaryID, err := ids.ToID(resp.SummaryId)
 	return &block.Summary{
 		SummaryKey:   resp.Key,
 		SummaryID:    summaryID,

@@ -120,7 +120,7 @@ var (
 	}
 	ConsensusOps = append(ConsensusExternalOps, ConsensusInternalOps...)
 
-	ConsensusAndNetworkOps = append(ConsensusExternalOps, HandshakeOps...)
+	ExternalOps = append(ConsensusExternalOps, HandshakeOps...)
 
 	SynchronousOps = []Op{
 		GetAcceptedFrontier,
@@ -230,8 +230,8 @@ var (
 		// State Sync
 		GetStateSummaryFrontier: {ChainID, RequestID, Deadline},
 		StateSummaryFrontier:    {ChainID, RequestID, SummaryBytes},
-		GetAcceptedStateSummary: {ChainID, RequestID, Deadline, MultiSummaryKeys},
-		AcceptedStateSummary:    {ChainID, RequestID, MultiSummaryIDs},
+		GetAcceptedStateSummary: {ChainID, RequestID, Deadline, SummaryKeys},
+		AcceptedStateSummary:    {ChainID, RequestID, SummaryIDs},
 	}
 )
 
@@ -239,7 +239,7 @@ func (op Op) Compressible() bool {
 	switch op {
 	case PeerList, Put, Ancestors,
 		PushQuery, AppRequest, AppResponse, AppGossip,
-		GetStateSummaryFrontier, GetAcceptedStateSummary, AcceptedStateSummary:
+		StateSummaryFrontier, GetAcceptedStateSummary, AcceptedStateSummary:
 		return true
 	default:
 		return false

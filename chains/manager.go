@@ -303,13 +303,19 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	// Start state-syncing if available or bootstrapping.
-	if stateSyncer := chain.Handler.StateSyncer(); stateSyncer != nil && stateSyncer.IsEnabled() {
-		// drop boostrap state from previous runs
-		if err = chain.Handler.Bootstrapper().Clear(); err == nil {
-			err = stateSyncer.Start(0)
+	// Start state-syncing if available; otherwise start bootstrapping.
+	stateSyncEnabled := false
+	if stateSyncer := chain.Handler.StateSyncer(); stateSyncer != nil {
+		stateSyncEnabled, err = stateSyncer.IsEnabled()
+		if err == nil && stateSyncEnabled {
+			// drop boostrap state from previous runs
+			if err = chain.Handler.Bootstrapper().Clear(); err == nil {
+				err = stateSyncer.Start(0)
+			}
 		}
-	} else {
+	}
+
+	if err != nil && !stateSyncEnabled {
 		err = chain.Handler.Bootstrapper().Start(0)
 	}
 

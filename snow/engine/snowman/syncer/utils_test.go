@@ -90,13 +90,6 @@ func buildTestsObjects(commonCfg *common.Config, t *testing.T) (
 	return syncer, fullVM, sender
 }
 
-func min(rhs, lhs int) int {
-	if rhs <= lhs {
-		return rhs
-	}
-	return lhs
-}
-
 func pickRandomFrom(population map[ids.ShortID]uint32) ids.ShortID {
 	rnd := rand.Intn(len(population)) // #nosec G404
 	res := ids.ShortEmpty

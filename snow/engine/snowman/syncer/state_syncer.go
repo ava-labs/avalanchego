@@ -477,20 +477,11 @@ func (ss *stateSyncer) HealthCheck() (interface{}, error) {
 
 func (ss *stateSyncer) GetVM() common.VM { return ss.VM }
 
-func (ss *stateSyncer) IsEnabled() bool {
+func (ss *stateSyncer) IsEnabled() (bool, error) {
 	if ss.stateSyncVM == nil {
 		// state sync is not implemented
-		return false
+		return false, nil
 	}
 
-	enabled, err := ss.stateSyncVM.StateSyncEnabled()
-	switch {
-	case err == common.ErrStateSyncableVMNotImplemented:
-		// nothing to do, state sync is not implemented
-		return false
-	case err != nil:
-		return false
-	default:
-		return enabled
-	}
+	return ss.stateSyncVM.StateSyncEnabled()
 }

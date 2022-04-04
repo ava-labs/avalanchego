@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	safeMath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -70,7 +71,7 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
 
 	// check that beacons are reached out for frontiers
-	assert.True(len(contactedFrontiersProviders) == min(beacons.Len(), maxOutstandingStateSyncRequests))
+	assert.True(len(contactedFrontiersProviders) == safeMath.Min(beacons.Len(), maxOutstandingStateSyncRequests))
 	for beaconID := range contactedFrontiersProviders {
 		// check that beacon is duly marked as reached out
 		assert.True(syncer.hasSeederBeenContacted(beaconID))

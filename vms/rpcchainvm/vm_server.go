@@ -35,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -337,7 +336,7 @@ func (vm *VMServer) StateSync(ctx context.Context, req *vmproto.StateSyncRequest
 
 	summaries := make([]common.Summary, len(req.Summaries))
 	for i, sum := range req.Summaries {
-		summaryID, err := ids.ToID(hashing.ComputeHash256(sum.SummaryId))
+		summaryID, err := ids.ToID(sum.SummaryId)
 		if err != nil {
 			return nil, err
 		}
