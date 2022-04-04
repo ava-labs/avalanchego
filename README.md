@@ -673,6 +673,7 @@ Network Name: WAGMI
 RPC URL: https://subnets.avax.network/wagmi/wagmi-chain-testnet/rpc
 Chain ID: 11111
 Symbol: WGM
+Explorer: https://subnets.avax.network/wagmi/wagmi-chain-testnet/explorer
 ```
 
 ![metamask_WAGMI](./imgs/metamask_WAGMI.png)
