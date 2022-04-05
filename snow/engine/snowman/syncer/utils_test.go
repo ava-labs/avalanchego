@@ -4,7 +4,6 @@
 package syncer
 
 import (
-	"math/rand"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -91,14 +90,10 @@ func buildTestsObjects(commonCfg *common.Config, t *testing.T) (
 }
 
 func pickRandomFrom(population map[ids.ShortID]uint32) ids.ShortID {
-	rnd := rand.Intn(len(population)) // #nosec G404
 	res := ids.ShortEmpty
 	for k := range population {
-		if rnd == 0 {
-			res = k
-			break
-		}
-		rnd--
+		res = k
+		break
 	}
 	return res
 }

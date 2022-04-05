@@ -68,7 +68,9 @@ func (vm *blockVM) Initialize(
 	if err := vm.blockMetrics.Initialize(supportsBatchedFetching, "", registerer); err != nil {
 		return err
 	}
-	if err := vm.stateSummaryMetrics.Initialize("", registerer); err != nil {
+
+	var err error
+	if vm.stateSummaryMetrics, err = newStateSummaryMetrics("", registerer); err != nil {
 		return err
 	}
 
