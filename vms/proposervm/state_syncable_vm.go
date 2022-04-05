@@ -30,7 +30,7 @@ const StateSummaryVersion = 0
 
 type ProposerSummaryContent struct {
 	ProBlkID    ids.ID `serialize:"true"`
-	CoreContent []byte `serialize:"true"` // TODO ABENEGIA: make explicit that this must implement common.Summary interface
+	CoreContent []byte `serialize:"true"`
 
 	proSummaryID ids.ID
 	proContent   []byte
@@ -142,7 +142,7 @@ func (vm *VM) StateSyncGetSummary(key uint64) (common.Summary, error) {
 	proBlkID, err := vm.GetBlockIDAtHeight(coreSummary.Key())
 	if err != nil {
 		// this should never happen, it's proVM being out of sync with coreVM
-		// TODO ABENEGIA: log it
+		vm.ctx.Log.Warn("core summary unknown to proposer VM. Block height index missing")
 		return nil, err
 	}
 
