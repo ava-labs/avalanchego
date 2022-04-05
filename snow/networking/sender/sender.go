@@ -19,8 +19,8 @@ import (
 )
 
 var (
-	_ snow.Acceptor = &Sender{}
-	_ common.Sender = &Sender{}
+	_ snow.Acceptor = &sender{}
+	_ common.Sender = &sender{}
 )
 
 type GossipConfig struct {
@@ -30,12 +30,12 @@ type GossipConfig struct {
 	AppGossipValidatorSize    uint `json:"appGossipValidatorSize"`
 }
 
-// Sender is a wrapper around an ExternalSender.
+// sender is a wrapper around an ExternalSender.
 // Messages to this node are put directly into [router] rather than
 // being sent over the network via the wrapped ExternalSender.
-// Sender registers outbound requests with [router] so that [router]
+// sender registers outbound requests with [router] so that [router]
 // fires a timeout if we don't get a response to the request.
-type Sender struct {
+type sender struct {
 	ctx        *snow.ConsensusContext
 	msgCreator message.Creator
 	sender     ExternalSender // Actually does the sending over the network
@@ -52,15 +52,15 @@ type Sender struct {
 func New(
 	ctx *snow.ConsensusContext,
 	msgCreator message.Creator,
-	sender ExternalSender,
+	externalSender ExternalSender,
 	router router.Router,
 	timeouts timeout.Manager,
 	gossipConfig GossipConfig,
-) (*Sender, error) {
-	s := &Sender{
+) (common.Sender, error) {
+	s := &sender{
 		ctx:              ctx,
 		msgCreator:       msgCreator,
-		sender:           sender,
+		sender:           externalSender,
 		router:           router,
 		timeouts:         timeouts,
 		gossipConfig:     gossipConfig,
@@ -83,9 +83,9 @@ func New(
 }
 
 // Context of this sender
-func (s *Sender) Context() *snow.ConsensusContext { return s.ctx }
+func (s *sender) Context() *snow.ConsensusContext { return s.ctx }
 
-func (s *Sender) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, requestID uint32) {
+func (s *sender) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, requestID uint32) {
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -125,7 +125,7 @@ func (s *Sender) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, requestID uint32)
 	}
 }
 
-func (s *Sender) SendAcceptedFrontier(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
+func (s *sender) SendAcceptedFrontier(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
 	// Sending this message to myself.
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundAcceptedFrontier(s.ctx.ChainID, requestID, containerIDs, nodeID)
@@ -160,7 +160,7 @@ func (s *Sender) SendAcceptedFrontier(nodeID ids.ShortID, requestID uint32, cont
 	}
 }
 
-func (s *Sender) SendGetAccepted(nodeIDs ids.ShortSet, requestID uint32, containerIDs []ids.ID) {
+func (s *sender) SendGetAccepted(nodeIDs ids.ShortSet, requestID uint32, containerIDs []ids.ID) {
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -212,7 +212,7 @@ func (s *Sender) SendGetAccepted(nodeIDs ids.ShortSet, requestID uint32, contain
 	}
 }
 
-func (s *Sender) SendAccepted(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
+func (s *sender) SendAccepted(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundAccepted(s.ctx.ChainID, requestID, containerIDs, nodeID)
 		go s.router.HandleInbound(inMsg)
@@ -245,7 +245,7 @@ func (s *Sender) SendAccepted(nodeID ids.ShortID, requestID uint32, containerIDs
 	}
 }
 
-func (s *Sender) SendGetAncestors(nodeID ids.ShortID, requestID uint32, containerID ids.ID) {
+func (s *sender) SendGetAncestors(nodeID ids.ShortID, requestID uint32, containerID ids.ID) {
 	s.ctx.Log.Verbo(
 		"Sending GetAncestors to node %s. RequestID: %d. ContainerID: %s",
 		nodeID.PrefixedString(constants.NodeIDPrefix),
@@ -306,7 +306,7 @@ func (s *Sender) SendGetAncestors(nodeID ids.ShortID, requestID uint32, containe
 // SendAncestors sends an Ancestors message to the consensus engine running on the specified chain
 // on the specified node.
 // The Ancestors message gives the recipient the contents of several containers.
-func (s *Sender) SendAncestors(nodeID ids.ShortID, requestID uint32, containers [][]byte) {
+func (s *sender) SendAncestors(nodeID ids.ShortID, requestID uint32, containers [][]byte) {
 	s.ctx.Log.Verbo("Sending Ancestors to node %s. RequestID: %d. NumContainers: %d", nodeID, requestID, len(containers))
 
 	// Create the outbound message.
@@ -337,7 +337,7 @@ func (s *Sender) SendAncestors(nodeID ids.ShortID, requestID uint32, containers 
 // chain to the specified node. The Get message signifies that this
 // consensus engine would like the recipient to send this consensus engine the
 // specified container.
-func (s *Sender) SendGet(nodeID ids.ShortID, requestID uint32, containerID ids.ID) {
+func (s *sender) SendGet(nodeID ids.ShortID, requestID uint32, containerID ids.ID) {
 	s.ctx.Log.Verbo(
 		"Sending Get to node %s. RequestID: %d. ContainerID: %s",
 		nodeID.PrefixedString(constants.NodeIDPrefix),
@@ -395,7 +395,7 @@ func (s *Sender) SendGet(nodeID ids.ShortID, requestID uint32, containerID ids.I
 // on the specified node.
 // The Put message signifies that this consensus engine is giving to the recipient
 // the contents of the specified container.
-func (s *Sender) SendPut(nodeID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) {
+func (s *sender) SendPut(nodeID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) {
 	s.ctx.Log.Verbo(
 		"Sending Put to node %s. RequestID: %d. ContainerID: %s",
 		nodeID.PrefixedString(constants.NodeIDPrefix),
@@ -436,7 +436,7 @@ func (s *Sender) SendPut(nodeID ids.ShortID, requestID uint32, containerID ids.I
 // on the specified nodes.
 // The PushQuery message signifies that this consensus engine would like each node to send
 // their preferred frontier given the existence of the specified container.
-func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, containerID ids.ID, container []byte) {
+func (s *sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, containerID ids.ID, container []byte) {
 	s.ctx.Log.Verbo(
 		"Sending PushQuery to nodes %v. RequestID: %d. ContainerID: %s",
 		nodeIDs,
@@ -521,7 +521,7 @@ func (s *Sender) SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, container
 // on the specified nodes.
 // The PullQuery message signifies that this consensus engine would like each node to send
 // their preferred frontier.
-func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, containerID ids.ID) {
+func (s *sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, containerID ids.ID) {
 	s.ctx.Log.Verbo(
 		"Sending PullQuery. RequestID: %d. ContainerID: %s",
 		requestID,
@@ -588,7 +588,7 @@ func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, container
 }
 
 // SendChits sends chits
-func (s *Sender) SendChits(nodeID ids.ShortID, requestID uint32, votes []ids.ID) {
+func (s *sender) SendChits(nodeID ids.ShortID, requestID uint32, votes []ids.ID) {
 	s.ctx.Log.Verbo(
 		"Sending Chits to node %s. RequestID: %d. Votes: %s",
 		nodeID.PrefixedString(constants.NodeIDPrefix),
@@ -633,7 +633,7 @@ func (s *Sender) SendChits(nodeID ids.ShortID, requestID uint32, votes []ids.ID)
 
 // SendAppRequest sends an application-level request to the given nodes.
 // The meaning of this request, and how it should be handled, is defined by the VM.
-func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appRequestBytes []byte) error {
+func (s *sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appRequestBytes []byte) error {
 	s.ctx.Log.Verbo(
 		"Sending AppRequest. RequestID: %d. Message: %s",
 		requestID,
@@ -713,7 +713,7 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 
 // SendAppResponse sends a response to an application-level request from the
 // given node
-func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte) error {
+func (s *sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte) error {
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundAppResponse(s.ctx.ChainID, requestID, appResponseBytes, nodeID)
 		go s.router.HandleInbound(inMsg)
@@ -749,7 +749,7 @@ func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appRespon
 	return nil
 }
 
-func (s *Sender) SendAppGossipSpecific(nodeIDs ids.ShortSet, appGossipBytes []byte) error {
+func (s *sender) SendAppGossipSpecific(nodeIDs ids.ShortSet, appGossipBytes []byte) error {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
 	if err != nil {
@@ -770,7 +770,7 @@ func (s *Sender) SendAppGossipSpecific(nodeIDs ids.ShortSet, appGossipBytes []by
 }
 
 // SendAppGossip sends an application-level gossip message.
-func (s *Sender) SendAppGossip(appGossipBytes []byte) error {
+func (s *sender) SendAppGossip(appGossipBytes []byte) error {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
 	if err != nil {
@@ -790,7 +790,7 @@ func (s *Sender) SendAppGossip(appGossipBytes []byte) error {
 }
 
 // SendGossip gossips the provided container
-func (s *Sender) SendGossip(containerID ids.ID, container []byte) {
+func (s *sender) SendGossip(containerID ids.ID, container []byte) {
 	s.ctx.Log.Verbo("Gossiping %s", containerID)
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.Put(s.ctx.ChainID, constants.GossipMsgRequestID, containerID, container)
@@ -810,7 +810,7 @@ func (s *Sender) SendGossip(containerID ids.ID, container []byte) {
 }
 
 // Accept is called after every consensus decision
-func (s *Sender) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error {
+func (s *sender) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error {
 	if ctx.GetState() != snow.NormalOp {
 		// don't gossip during bootstrapping
 		return nil
