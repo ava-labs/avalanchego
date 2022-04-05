@@ -488,6 +488,9 @@ type batchOption struct {
 
 // Batchs [txs] into vertices and issue them.
 func (t *Transitive) batch(txs []snowstorm.Tx, opt batchOption) ([]snowstorm.Tx, error) {
+	if len(txs) == 0 {
+		return nil, nil
+	}
 	if opt.limit && t.Params.OptimalProcessing <= t.Consensus.NumProcessing() {
 		return txs, nil
 	}
