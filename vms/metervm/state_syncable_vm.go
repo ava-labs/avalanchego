@@ -37,7 +37,7 @@ func (vm *blockVM) ParseSummary(summaryBytes []byte) (common.Summary, error) {
 	return vm.ssVM.ParseSummary(summaryBytes)
 }
 
-func (vm *blockVM) StateSyncGetSummary(key common.SummaryKey) (common.Summary, error) {
+func (vm *blockVM) StateSyncGetSummary(key uint64) (common.Summary, error) {
 	if vm.ssVM == nil {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}

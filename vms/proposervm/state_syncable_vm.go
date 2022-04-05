@@ -25,6 +25,17 @@ var (
 	errBadLastSummaryBlock       = errors.New("could not parse last summary block")
 )
 
+type CoreSummaryContent struct {
+	BlkID   ids.ID `serialize:"true"`
+	Height  uint64 `serialize:"true"`
+	Content []byte `serialize:"true"`
+}
+
+type ProposerSummaryContent struct {
+	ProBlkID    ids.ID             `serialize:"true"`
+	CoreContent CoreSummaryContent `serialize:"true"`
+}
+
 func init() {
 	lc := linearcodec.New(reflectcodec.DefaultTagName, math.MaxUint32)
 	stateSyncCodec = codec.NewManager(math.MaxInt32)
@@ -32,9 +43,9 @@ func init() {
 	errs := wrappers.Errs{}
 	errs.Add(
 		lc.RegisterType(&block.Summary{}),
-		lc.RegisterType(&common.SummaryID{}),
-		lc.RegisterType(&block.CoreSummaryContent{}),
-		lc.RegisterType(&block.ProposerSummaryContent{}),
+		lc.RegisterType(&ids.ID{}),
+		lc.RegisterType(&CoreSummaryContent{}),
+		lc.RegisterType(&ProposerSummaryContent{}),
 		stateSyncCodec.RegisterCodec(block.StateSyncDefaultKeysVersion, lc),
 	)
 	if err := errs.Err; err != nil {
@@ -43,22 +54,20 @@ func init() {
 }
 
 func (vm *VM) StateSyncEnabled() (bool, error) {
-	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
-	if !ok {
+	if vm.coreStateSyncVM == nil {
 		return false, common.ErrStateSyncableVMNotImplemented
 	}
 
-	return ssVM.StateSyncEnabled()
+	return vm.coreStateSyncVM.StateSyncEnabled()
 }
 
 func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
-	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
-	if !ok {
+	if vm.coreStateSyncVM == nil {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
 	// Extract core last state summary
-	vmSummary, err := ssVM.StateSyncGetLastSummary()
+	vmSummary, err := vm.coreStateSyncVM.StateSyncGetLastSummary()
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +89,7 @@ func (vm *VM) ParseSummary(summaryBytes []byte) (common.Summary, error) {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	proContent := block.ProposerSummaryContent{}
+	proContent := ProposerSummaryContent{}
 	ver, err := stateSyncCodec.Unmarshal(summaryBytes, &proContent)
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal ProposerSummaryContent due to: %w", err)
@@ -89,16 +98,15 @@ func (vm *VM) ParseSummary(summaryBytes []byte) (common.Summary, error) {
 		return nil, errWrongStateSyncVersion
 	}
 
-	return newSummary(common.SummaryKey(proContent.CoreContent.Height), summaryBytes)
+	return newSummary(proContent.CoreContent.Height, summaryBytes)
 }
 
-func (vm *VM) StateSyncGetSummary(key common.SummaryKey) (common.Summary, error) {
-	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
-	if !ok {
+func (vm *VM) StateSyncGetSummary(key uint64) (common.Summary, error) {
+	if vm.coreStateSyncVM == nil {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	coreSummary, err := ssVM.StateSyncGetSummary(key)
+	coreSummary, err := vm.coreStateSyncVM.StateSyncGetSummary(key)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve core summary due to: %w", err)
 	}
@@ -116,14 +124,13 @@ func (vm *VM) StateSyncGetSummary(key common.SummaryKey) (common.Summary, error)
 }
 
 func (vm *VM) StateSync(accepted []common.Summary) error {
-	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
-	if !ok {
+	if vm.coreStateSyncVM == nil {
 		return common.ErrStateSyncableVMNotImplemented
 	}
 
 	coreSummaries := make([]common.Summary, 0, len(accepted))
 	for _, summary := range accepted {
-		proContent := block.ProposerSummaryContent{}
+		proContent := ProposerSummaryContent{}
 		ver, err := stateSyncCodec.Unmarshal(summary.Bytes(), &proContent)
 		if err != nil {
 			return err
@@ -147,21 +154,20 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 		// with summaries content in order to support resuming state sync in case
 		// of shutdown. Note that we won't download all the blocks associated with
 		// state summaries.
-		if err := vm.updateHeightIndex(uint64(summary.Key()), proContent.ProBlkID); err != nil {
+		if err := vm.updateHeightIndex(summary.Key(), proContent.ProBlkID); err != nil {
 			return err
 		}
 	}
 
-	return ssVM.StateSync(coreSummaries)
+	return vm.coreStateSyncVM.StateSync(coreSummaries)
 }
 
 func (vm *VM) GetOngoingStateSyncSummary() (common.Summary, error) {
-	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
-	if !ok {
+	if vm.coreStateSyncVM == nil {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	coreSummary, err := ssVM.GetOngoingStateSyncSummary()
+	coreSummary, err := vm.coreStateSyncVM.GetOngoingStateSyncSummary()
 	if err != nil {
 		return nil, err // including common.ErrNoStateSyncOngoing case
 	}
@@ -179,12 +185,11 @@ func (vm *VM) GetOngoingStateSyncSummary() (common.Summary, error) {
 }
 
 func (vm *VM) GetStateSyncResult() (ids.ID, uint64, error) {
-	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
-	if !ok {
+	if vm.coreStateSyncVM == nil {
 		return ids.Empty, 0, common.ErrStateSyncableVMNotImplemented
 	}
 
-	_, height, err := ssVM.GetStateSyncResult()
+	_, height, err := vm.coreStateSyncVM.GetStateSyncResult()
 	if err != nil {
 		return ids.Empty, 0, err
 	}
@@ -197,8 +202,7 @@ func (vm *VM) GetStateSyncResult() (ids.ID, uint64, error) {
 }
 
 func (vm *VM) SetLastSummaryBlock(blkByte []byte) error {
-	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
-	if !ok {
+	if vm.coreStateSyncVM == nil {
 		return common.ErrStateSyncableVMNotImplemented
 	}
 
@@ -216,43 +220,43 @@ func (vm *VM) SetLastSummaryBlock(blkByte []byte) error {
 		return errBadLastSummaryBlock
 	}
 
-	if err := ssVM.SetLastSummaryBlock(coreBlkBytes); err != nil {
+	if err := vm.coreStateSyncVM.SetLastSummaryBlock(coreBlkBytes); err != nil {
 		return err
 	}
 
-	return blk.conditionalAccept(false /*acceptcoreBlk*/)
+	return blk.acceptOuterBlk()
 }
 
-func newSummary(key common.SummaryKey, content []byte) (common.Summary, error) {
+func newSummary(key uint64, content []byte) (common.Summary, error) {
 	summaryID, err := ids.ToID(hashing.ComputeHash256(content))
 	if err != nil {
 		return nil, fmt.Errorf("cannot compute summary ID: %w", err)
 	}
 	return &block.Summary{
 		SummaryKey:   key,
-		SummaryID:    common.SummaryID(summaryID),
+		SummaryID:    summaryID,
 		ContentBytes: content,
 	}, nil
 }
 
-func (vm *VM) buildProContentFrom(coreSummary common.Summary) (block.ProposerSummaryContent, error) {
-	coreContent := block.CoreSummaryContent{}
+func (vm *VM) buildProContentFrom(coreSummary common.Summary) (ProposerSummaryContent, error) {
+	coreContent := CoreSummaryContent{}
 	ver, err := stateSyncCodec.Unmarshal(coreSummary.Bytes(), &coreContent)
 	if err != nil {
-		return block.ProposerSummaryContent{}, err
+		return ProposerSummaryContent{}, err
 	}
 	if ver != block.StateSyncDefaultKeysVersion {
-		return block.ProposerSummaryContent{}, errWrongStateSyncVersion
+		return ProposerSummaryContent{}, errWrongStateSyncVersion
 	}
 
 	// retrieve ProBlkID
 	proBlkID, err := vm.GetBlockIDAtHeight(coreContent.Height)
 	if err != nil {
-		return block.ProposerSummaryContent{}, err
+		return ProposerSummaryContent{}, err
 	}
 
 	// Build ProposerSummaryContent
-	return block.ProposerSummaryContent{
+	return ProposerSummaryContent{
 		ProBlkID:    proBlkID,
 		CoreContent: coreContent,
 	}, nil

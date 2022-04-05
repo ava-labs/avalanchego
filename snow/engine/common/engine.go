@@ -51,15 +51,73 @@ type AllGetsServer interface {
 	GetHandler
 }
 
+// GetAcceptedFrontierHandler defines how a consensus engine reacts to a get
+// state sumaries messages from another validator. Functions only return fatal
+// errors.
 type GetStateSummaryHandler interface {
+	// Notify this engine of a request for the frontier of state summaries.
+	//
+	// The accepted frontier is the last state summary available locally.
+	//
+	// This function can be called by any validator. It is not safe to assume
+	// this message is utilizing a unique requestID.
+	//
+	// This engine should respond with an StateSummaryFrontier message with the same
+	// requestID, and the engine's current state summary frontier.
 	GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error
-	GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys []SummaryKey) error
+
+	// Notify this engine of a request to filter state summaries.
+	//
+	// This function can be called by any validator. It is not safe to assume
+	// this message is utilizing a unique requestID. However, the validatorID is
+	// assumed to be authenticated.
+	//
+	// This engine should respond with an AcceptedStateSummary message with the same
+	// requestID, and the subset of the state summaries that this node has locally available.
+	GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys []uint64) error
 }
 
+// StateSyncHandler defines how a consensus engine reacts to state summary
+// messages from other validators. Functions only return fatal errors.
 type StateSyncHandler interface {
+	// Notify this engine of a state summary frontier.
+	//
+	// This function can be called by any validator. It is not safe to assume
+	// this message is in response to a GetStateSummaryFrontier message, is
+	// utilizing a unique requestID, or that the summary bytes are from a valid
+	// state summary.
 	StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summary []byte) error
+
+	// Notify this engine that a get state summary frontier request it issued has
+	// failed.
+	//
+	// This function will be called if the engine sent a GetStateSummaryFrontier
+	// message that is not anticipated to be responded to. This could be because
+	// the recipient of the message is unknown or if the message request has
+	// timed out.
+	//
+	// The validatorID, and requestID, are assumed to be the same as those sent
+	// in the GetStateSummaryFrontier message.
 	GetStateSummaryFrontierFailed(validatorID ids.ShortID, requestID uint32) error
-	AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaryIDs []SummaryID) error
+
+	// Notify this engine of a set of state summaries.
+	//
+	// This function can be called by any validator. It is not safe to assume
+	// this message is in response to a GetAcceptedStateSummary message,
+	// is utilizing a unique requestID, or that the summaryIDs are a subset of the
+	// state summaries from a GetAcceptedStateSummary message.
+	AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaryIDs []ids.ID) error
+
+	// Notify this engine that a get accepted state summary request it issued has
+	// failed.
+	//
+	// This function will be called if the engine sent a GetAcceptedStateSummary
+	// message that is not anticipated to be responded to. This could be because
+	// the recipient of the message is unknown or if the message request has
+	// timed out.
+	//
+	// The validatorID, and requestID, are assumed to be the same as those sent
+	// in the GetAcceptedStateSummary message.
 	GetAcceptedStateSummaryFailed(validatorID ids.ShortID, requestID uint32) error
 }
 

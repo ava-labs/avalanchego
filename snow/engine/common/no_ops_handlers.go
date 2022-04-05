@@ -40,7 +40,7 @@ func (nop *noOpStateSyncHandler) GetStateSummaryFrontierFailed(validatorID ids.S
 	return nil
 }
 
-func (nop *noOpStateSyncHandler) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaryIDs []SummaryID) error {
+func (nop *noOpStateSyncHandler) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaryIDs []ids.ID) error {
 	nop.log.Debug("AcceptedStateSummary(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }

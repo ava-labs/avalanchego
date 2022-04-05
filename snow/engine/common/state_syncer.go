@@ -5,5 +5,5 @@ package common
 
 type StateSyncer interface {
 	Engine
-	IsEnabled() bool
+	IsEnabled() (bool, error)
 }

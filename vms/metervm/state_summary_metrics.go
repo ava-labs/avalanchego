@@ -17,15 +17,16 @@ type stateSummaryMetrics struct {
 	syncState metric.Averager
 }
 
-func (ssM *stateSummaryMetrics) Initialize(
-	namespace string,
-	reg prometheus.Registerer,
-) error {
-	errs := wrappers.Errs{}
+func newStateSummaryMetrics(namespace string, reg prometheus.Registerer) (stateSummaryMetrics, error) {
+	var (
+		errs = wrappers.Errs{}
+		ssM  = stateSummaryMetrics{}
+	)
+
 	ssM.lastSummary = newAverager(namespace, "last_summary", reg, &errs)
 	ssM.lastSummaryBlockID = newAverager(namespace, "last_summary_block_id", reg, &errs)
 	ssM.setLastSummaryBlockID = newAverager(namespace, "set_last_summary_block_id", reg, &errs)
 	ssM.isSummaryAccepted = newAverager(namespace, "summary_accepted", reg, &errs)
 	ssM.syncState = newAverager(namespace, "sync_state", reg, &errs)
-	return errs.Err
+	return ssM, errs.Err
 }

@@ -4,7 +4,6 @@
 package syncer
 
 import (
-	"math/rand"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -23,9 +22,9 @@ var (
 
 	beacons          validators.Set
 	summaryBytes     []byte
-	key              common.SummaryKey
-	summaryID        common.SummaryID
-	unknownSummaryID common.SummaryID
+	key              uint64
+	summaryID        ids.ID
+	unknownSummaryID ids.ID
 )
 
 type fullVM struct {
@@ -44,9 +43,9 @@ func init() {
 	}
 
 	summaryBytes = []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
-	key = common.SummaryKey(2022)
-	summaryID = common.SummaryID{'h', 'a', 's', 'h'}
-	unknownSummaryID = common.SummaryID{'g', 'a', 'r', 'b', 'a', 'g', 'e'}
+	key = uint64(2022)
+	summaryID = ids.ID{'h', 'a', 's', 'h'}
+	unknownSummaryID = ids.ID{'g', 'a', 'r', 'b', 'a', 'g', 'e'}
 }
 
 // helper to build
@@ -90,22 +89,11 @@ func buildTestsObjects(commonCfg *common.Config, t *testing.T) (
 	return syncer, fullVM, sender
 }
 
-func min(rhs, lhs int) int {
-	if rhs <= lhs {
-		return rhs
-	}
-	return lhs
-}
-
 func pickRandomFrom(population map[ids.ShortID]uint32) ids.ShortID {
-	rnd := rand.Intn(len(population)) // #nosec G404
 	res := ids.ShortEmpty
 	for k := range population {
-		if rnd == 0 {
-			res = k
-			break
-		}
-		rnd--
+		res = k
+		break
 	}
 	return res
 }

@@ -29,15 +29,14 @@ func (b *postForkOption) Timestamp() time.Time {
 }
 
 func (b *postForkOption) Accept() error {
-	return b.conditionalAccept(true /*acceptInnerBlk*/)
+	if err := b.acceptOuterBlk(); err != nil {
+		return err
+	}
+
+	return b.acceptInnerBlk()
 }
 
-// Following the introduction of state sync, we may need to
-// update last accepted block data for proposervm, without
-// propagating changes to innerVM. This is especially true for
-// the block associated with last state summary. conditionalAccept has
-// a boolean paramenter to control acceptance of inner blocks.
-func (b *postForkOption) conditionalAccept(acceptInnerBlk bool) error {
+func (b *postForkOption) acceptOuterBlk() error {
 	blkID := b.ID()
 	if err := b.vm.State.SetLastAccepted(blkID); err != nil {
 		return err
@@ -50,14 +49,13 @@ func (b *postForkOption) conditionalAccept(acceptInnerBlk bool) error {
 	}
 
 	delete(b.vm.verifiedBlocks, blkID)
-
-	if acceptInnerBlk {
-		// mark the inner block as accepted and all conflicting inner blocks as
-		// rejected
-		return b.vm.Tree.Accept(b.innerBlk)
-	}
-
 	return nil
+}
+
+func (b *postForkOption) acceptInnerBlk() error {
+	// mark the inner block as accepted and all conflicting inner blocks as
+	// rejected
+	return b.vm.Tree.Accept(b.innerBlk)
 }
 
 func (b *postForkOption) Reject() error {

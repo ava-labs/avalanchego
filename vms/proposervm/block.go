@@ -37,7 +37,14 @@ type Block interface {
 
 	getInnerBlk() snowman.Block
 
-	conditionalAccept(acceptInnerBlk bool) error
+	// Following the introduction of state sync, we may need to
+	// update last accepted block data for proposervm, without
+	// propagating changes to innerVM. This is especially true for
+	// the block associated with last state summary.
+	// acceptOuterBlk and acceptInnerBlk allow controlling acceptance
+	// of outer and inner block
+	acceptOuterBlk() error
+	acceptInnerBlk() error
 
 	verifyPreForkChild(child *preForkBlock) error
 	verifyPostForkChild(child *postForkBlock) error

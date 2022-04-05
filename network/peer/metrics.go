@@ -100,12 +100,12 @@ func NewMetrics(
 			Name:      "msgs_failed_to_parse",
 			Help:      "Number of messages that could not be parsed or were invalidly formed",
 		}),
-		MessageMetrics: make(map[message.Op]*MessageMetrics, len(message.ConsensusAndNetworkOps)),
+		MessageMetrics: make(map[message.Op]*MessageMetrics, len(message.ExternalOps)),
 	}
 
 	errs := wrappers.Errs{}
 	errs.Add(registerer.Register(m.FailedToParse))
-	for _, op := range message.ConsensusAndNetworkOps {
+	for _, op := range message.ExternalOps {
 		m.MessageMetrics[op] = NewMessageMetrics(op, namespace, registerer, &errs)
 	}
 	return m, errs.Err

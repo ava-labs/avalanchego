@@ -13,25 +13,14 @@ var _ common.Summary = &Summary{}
 const StateSyncDefaultKeysVersion = 0
 
 type Summary struct {
-	SummaryKey   common.SummaryKey
-	SummaryID    common.SummaryID
+	SummaryKey   uint64
+	SummaryID    ids.ID
 	ContentBytes []byte
 }
 
-func (s *Summary) Bytes() []byte          { return s.ContentBytes }
-func (s *Summary) Key() common.SummaryKey { return s.SummaryKey }
-func (s *Summary) ID() common.SummaryID   { return s.SummaryID }
-
-type CoreSummaryContent struct {
-	BlkID   ids.ID `serialize:"true"`
-	Height  uint64 `serialize:"true"`
-	Content []byte `serialize:"true"`
-}
-
-type ProposerSummaryContent struct {
-	ProBlkID    ids.ID             `serialize:"true"`
-	CoreContent CoreSummaryContent `serialize:"true"`
-}
+func (s *Summary) Bytes() []byte { return s.ContentBytes }
+func (s *Summary) Key() uint64   { return s.SummaryKey }
+func (s *Summary) ID() ids.ID    { return s.SummaryID }
 
 type StateSyncableVM interface {
 	common.StateSyncableVM

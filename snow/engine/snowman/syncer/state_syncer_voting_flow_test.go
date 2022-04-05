@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	safeMath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -70,7 +71,7 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
 
 	// check that beacons are reached out for frontiers
-	assert.True(len(contactedFrontiersProviders) == min(beacons.Len(), maxOutstandingStateSyncRequests))
+	assert.True(len(contactedFrontiersProviders) == safeMath.Min(beacons.Len(), maxOutstandingStateSyncRequests))
 	for beaconID := range contactedFrontiersProviders {
 		// check that beacon is duly marked as reached out
 		assert.True(syncer.hasSeederBeenContacted(beaconID))
@@ -329,7 +330,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 
 	contactedVoters := make(map[ids.ShortID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl []common.SummaryKey) {
+	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -392,7 +393,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 
 	contactedVoters := make(map[ids.ShortID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl []common.SummaryKey) {
+	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -432,7 +433,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	assert.NoError(syncer.AcceptedStateSummary(
 		responsiveVoterID,
 		math.MaxInt32,
-		[]common.SummaryID{summaryID},
+		[]ids.ID{summaryID},
 	))
 
 	// responsiveVoter still pending
@@ -444,7 +445,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	assert.NoError(syncer.AcceptedStateSummary(
 		unsolicitedVoterID,
 		responsiveVoterReqID,
-		[]common.SummaryID{summaryID},
+		[]ids.ID{summaryID},
 	))
 	assert.True(syncer.weightedSummaries[summaryID].weight == 0)
 
@@ -452,7 +453,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	assert.NoError(syncer.AcceptedStateSummary(
 		responsiveVoterID,
 		responsiveVoterReqID,
-		[]common.SummaryID{summaryID},
+		[]ids.ID{summaryID},
 	))
 
 	// responsiveBeacon not pending anymore
@@ -500,7 +501,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 
 	contactedVoters := make(map[ids.ShortID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl []common.SummaryKey) {
+	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -540,7 +541,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	assert.NoError(syncer.AcceptedStateSummary(
 		responsiveVoterID,
 		responsiveVoterReqID,
-		[]common.SummaryID{unknownSummaryID},
+		[]ids.ID{unknownSummaryID},
 	))
 	_, found = syncer.weightedSummaries[unknownSummaryID]
 	assert.False(found)
@@ -550,7 +551,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	assert.NoError(syncer.AcceptedStateSummary(
 		responsiveVoterID,
 		responsiveVoterReqID,
-		[]common.SummaryID{summaryID},
+		[]ids.ID{summaryID},
 	))
 	assert.True(syncer.weightedSummaries[summaryID].weight == 0)
 
@@ -594,7 +595,7 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 
 	contactedVoters := make(map[ids.ShortID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl []common.SummaryKey) {
+	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -638,7 +639,7 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 			assert.NoError(syncer.AcceptedStateSummary(
 				voterID,
 				reqID,
-				[]common.SummaryID{summaryID},
+				[]ids.ID{summaryID},
 			))
 			bw, _ := beacons.GetWeight(voterID)
 			cumulatedWeight += bw
@@ -689,7 +690,7 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 
 	contactedVoters := make(map[ids.ShortID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl []common.SummaryKey) {
+	sender.SendGetAcceptedStateSummaryF = func(ss ids.ShortSet, reqID uint32, sl []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -740,7 +741,7 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 			assert.NoError(syncer.AcceptedStateSummary(
 				voterID,
 				reqID,
-				[]common.SummaryID{summaryID},
+				[]ids.ID{summaryID},
 			))
 		}
 	}

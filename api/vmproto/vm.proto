@@ -8,41 +8,41 @@ import "io/prometheus/client/metrics.proto";
 option go_package = "github.com/ava-labs/avalanchego/api/vmproto";
 
 service VM {
-    rpc Initialize(InitializeRequest) returns (InitializeResponse);
-    rpc SetState(SetStateRequest) returns (google.protobuf.Empty);
-    rpc Shutdown(google.protobuf.Empty) returns (google.protobuf.Empty);
-    rpc CreateHandlers(google.protobuf.Empty) returns (CreateHandlersResponse);
-    rpc CreateStaticHandlers(google.protobuf.Empty) returns (CreateStaticHandlersResponse);
-    rpc Connected(ConnectedRequest) returns (google.protobuf.Empty);
-    rpc Disconnected(DisconnectedRequest) returns (google.protobuf.Empty);
-    rpc BuildBlock(google.protobuf.Empty) returns (BuildBlockResponse);
-    rpc ParseBlock(ParseBlockRequest) returns (ParseBlockResponse);
-    rpc GetBlock(GetBlockRequest) returns (GetBlockResponse);
-    rpc SetPreference(SetPreferenceRequest) returns (google.protobuf.Empty);
-    rpc Health(google.protobuf.Empty) returns (HealthResponse);
-    rpc Version(google.protobuf.Empty) returns (VersionResponse);
-    rpc AppRequest(AppRequestMsg) returns (google.protobuf.Empty);
-    rpc AppRequestFailed(AppRequestFailedMsg) returns (google.protobuf.Empty);
-    rpc AppResponse(AppResponseMsg) returns (google.protobuf.Empty);
-    rpc AppGossip(AppGossipMsg) returns (google.protobuf.Empty);
-    rpc Gather(google.protobuf.Empty) returns (GatherResponse);
-    rpc BlockVerify(BlockVerifyRequest) returns (BlockVerifyResponse);
-    rpc BlockAccept(BlockAcceptRequest) returns (google.protobuf.Empty);
-    rpc BlockReject(BlockRejectRequest) returns (google.protobuf.Empty);
-    rpc GetAncestors(GetAncestorsRequest) returns (GetAncestorsResponse);
-    rpc BatchedParseBlock(BatchedParseBlockRequest) returns (BatchedParseBlockResponse);
-    rpc VerifyHeightIndex(google.protobuf.Empty) returns (VerifyHeightIndexResponse);
-    rpc GetBlockIDAtHeight(GetBlockIDAtHeightRequest) returns (GetBlockIDAtHeightResponse);
+  rpc Initialize(InitializeRequest) returns (InitializeResponse);
+  rpc SetState(SetStateRequest) returns (google.protobuf.Empty);
+  rpc Shutdown(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc CreateHandlers(google.protobuf.Empty) returns (CreateHandlersResponse);
+  rpc CreateStaticHandlers(google.protobuf.Empty) returns (CreateStaticHandlersResponse);
+  rpc Connected(ConnectedRequest) returns (google.protobuf.Empty);
+  rpc Disconnected(DisconnectedRequest) returns (google.protobuf.Empty);
+  rpc BuildBlock(google.protobuf.Empty) returns (BuildBlockResponse);
+  rpc ParseBlock(ParseBlockRequest) returns (ParseBlockResponse);
+  rpc GetBlock(GetBlockRequest) returns (GetBlockResponse);
+  rpc SetPreference(SetPreferenceRequest) returns (google.protobuf.Empty);
+  rpc Health(google.protobuf.Empty) returns (HealthResponse);
+  rpc Version(google.protobuf.Empty) returns (VersionResponse);
+  rpc AppRequest(AppRequestMsg) returns (google.protobuf.Empty);
+  rpc AppRequestFailed(AppRequestFailedMsg) returns (google.protobuf.Empty);
+  rpc AppResponse(AppResponseMsg) returns (google.protobuf.Empty);
+  rpc AppGossip(AppGossipMsg) returns (google.protobuf.Empty);
+  rpc Gather(google.protobuf.Empty) returns (GatherResponse);
+  rpc BlockVerify(BlockVerifyRequest) returns (BlockVerifyResponse);
+  rpc BlockAccept(BlockAcceptRequest) returns (google.protobuf.Empty);
+  rpc BlockReject(BlockRejectRequest) returns (google.protobuf.Empty);
+  rpc GetAncestors(GetAncestorsRequest) returns (GetAncestorsResponse);
+  rpc BatchedParseBlock(BatchedParseBlockRequest) returns (BatchedParseBlockResponse);
+  rpc VerifyHeightIndex(google.protobuf.Empty) returns (VerifyHeightIndexResponse);
+  rpc GetBlockIDAtHeight(GetBlockIDAtHeightRequest) returns (GetBlockIDAtHeightResponse);
 
-    // State sync
-    rpc StateSyncEnabled(google.protobuf.Empty) returns (StateSyncEnabledResponse);
-    rpc GetOngoingStateSyncSummary(google.protobuf.Empty) returns (StateSyncGetOngoingStateSyncSummaryResponse);
-    rpc StateSyncGetLastSummary(google.protobuf.Empty) returns (StateSyncGetLastSummaryResponse);
-    rpc ParseSummary(ParseSummaryRequest) returns (ParseSummaryResponse);
-    rpc StateSyncGetSummary(StateSyncGetSummaryRequest) returns (StateSyncGetSummaryResponse);
-    rpc StateSync(StateSyncRequest) returns (google.protobuf.Empty);
-    rpc GetStateSyncResult(google.protobuf.Empty) returns (GetStateSyncResultResponse);
-    rpc SetLastSummaryBlock(StateSyncSetLastSummaryBlockRequest) returns (google.protobuf.Empty);
+  // State sync
+  rpc StateSyncEnabled(google.protobuf.Empty) returns (StateSyncEnabledResponse);
+  rpc GetOngoingStateSyncSummary(google.protobuf.Empty) returns (StateSyncGetOngoingStateSyncSummaryResponse);
+  rpc StateSyncGetLastSummary(google.protobuf.Empty) returns (StateSyncGetLastSummaryResponse);
+  rpc ParseSummary(ParseSummaryRequest) returns (ParseSummaryResponse);
+  rpc StateSyncGetSummary(StateSyncGetSummaryRequest) returns (StateSyncGetSummaryResponse);
+  rpc StateSync(StateSyncRequest) returns (google.protobuf.Empty);
+  rpc GetStateSyncResult(google.protobuf.Empty) returns (GetStateSyncResultResponse);
+  rpc SetLastSummaryBlock(StateSyncSetLastSummaryBlockRequest) returns (google.protobuf.Empty);
 }
 
 message InitializeRequest {
@@ -232,54 +232,55 @@ message GetBlockIDAtHeightResponse {
 
 // StateSyncableVM related messages
 message StateSyncEnabledResponse {
-    bool enabled = 1;
+  bool enabled = 1;
 }
 
 message StateSyncGetOngoingStateSyncSummaryResponse {
-    uint64 key = 1;
-    bytes summary_id = 2;
-    bytes content = 3;
+  uint64 key = 1;
+  bytes summary_id = 2;
+  bytes content = 3;
 }
 
 message StateSyncGetLastSummaryResponse {
-    uint64 key = 1;
-    bytes summary_id = 2;
-    bytes content = 3;
+  uint64 key = 1;
+  bytes summary_id = 2;
+  bytes content = 3;
 }
 
 message ParseSummaryRequest {
-  bytes summary = 1; 
+  bytes summary = 1;
 }
 
 message ParseSummaryResponse {
-    uint64 key = 1;
-    bytes summary_id = 2;
-    bytes content = 3;
+  uint64 key = 1;
+  bytes summary_id = 2;
+  bytes content = 3;
 }
 
 message StateSyncGetSummaryRequest {
-    uint64 key = 1;
+  uint64 key = 1;
 }
 
 message StateSyncGetSummaryResponse {
-    uint64 key = 1;
-    bytes summary_id = 2;
-    bytes content = 3;
+  uint64 key = 1;
+  bytes summary_id = 2;
+  bytes content = 3;
 }
 
 message StateSyncRequest {
-    repeated StateSyncGetLastSummaryResponse summaries = 1;
+  repeated StateSyncGetLastSummaryResponse summaries = 1;
 }
 
 message GetStateSyncResultResponse {
-    bytes bytes = 1;
-    uint64 height = 2;
+  bytes bytes = 1;
+  uint64 height = 2;
 }
 
 message StateSyncSetLastSummaryBlockRequest {
-    bytes bytes = 1;
+  bytes bytes = 1;
 }
 // end of StateSyncableVM related messages
+
 
 message GatherResponse {
   repeated io.prometheus.client.MetricFamily metric_families = 1;

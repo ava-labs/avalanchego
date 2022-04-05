@@ -38,7 +38,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
@@ -529,10 +528,10 @@ func (vm *VMClient) GetOngoingStateSyncSummary() (common.Summary, error) {
 		return nil, err
 	}
 
-	summaryID, err := ids.ToID(hashing.ComputeHash256(resp.SummaryId))
+	summaryID, err := ids.ToID(resp.SummaryId)
 	return &block.Summary{
-		SummaryKey:   common.SummaryKey(resp.Key),
-		SummaryID:    common.SummaryID(summaryID),
+		SummaryKey:   resp.Key,
+		SummaryID:    summaryID,
 		ContentBytes: resp.Content,
 	}, err
 }
@@ -546,10 +545,10 @@ func (vm *VMClient) StateSyncGetLastSummary() (common.Summary, error) {
 		return nil, err
 	}
 
-	summaryID, err := ids.ToID(hashing.ComputeHash256(resp.SummaryId))
+	summaryID, err := ids.ToID(resp.SummaryId)
 	return &block.Summary{
-		SummaryKey:   common.SummaryKey(resp.Key),
-		SummaryID:    common.SummaryID(summaryID),
+		SummaryKey:   resp.Key,
+		SummaryID:    summaryID,
 		ContentBytes: resp.Content,
 	}, err
 }
@@ -565,29 +564,29 @@ func (vm *VMClient) ParseSummary(summaryBytes []byte) (common.Summary, error) {
 		return nil, err
 	}
 
-	summaryID, err := ids.ToID(hashing.ComputeHash256(resp.SummaryId))
+	summaryID, err := ids.ToID(resp.SummaryId)
 	return &block.Summary{
-		SummaryKey:   common.SummaryKey(resp.Key),
-		SummaryID:    common.SummaryID(summaryID),
+		SummaryKey:   resp.Key,
+		SummaryID:    summaryID,
 		ContentBytes: resp.Content,
 	}, err
 }
 
-func (vm *VMClient) StateSyncGetSummary(key common.SummaryKey) (common.Summary, error) {
+func (vm *VMClient) StateSyncGetSummary(key uint64) (common.Summary, error) {
 	resp, err := vm.client.StateSyncGetSummary(
 		context.Background(),
 		&vmproto.StateSyncGetSummaryRequest{
-			Key: uint64(key),
+			Key: key,
 		},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	summaryID, err := ids.ToID(hashing.ComputeHash256(resp.SummaryId))
+	summaryID, err := ids.ToID(resp.SummaryId)
 	return &block.Summary{
-		SummaryKey:   common.SummaryKey(resp.Key),
-		SummaryID:    common.SummaryID(summaryID),
+		SummaryKey:   resp.Key,
+		SummaryID:    summaryID,
 		ContentBytes: resp.Content,
 	}, err
 }
@@ -597,7 +596,7 @@ func (vm *VMClient) StateSync(accepted []common.Summary) error {
 	for i, sum := range accepted {
 		summaryID := sum.ID()
 		requestedSummaries[i] = &vmproto.StateSyncGetLastSummaryResponse{
-			Key:       uint64(sum.Key()),
+			Key:       sum.Key(),
 			SummaryId: summaryID[:],
 			Content:   sum.Bytes(),
 		}

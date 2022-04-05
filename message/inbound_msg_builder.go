@@ -437,10 +437,10 @@ func (b *inMsgBuilder) InboundGetAcceptedStateSummary(
 	return &inboundMessage{
 		op: GetAcceptedStateSummary,
 		fields: map[Field]interface{}{
-			ChainID:          chainID[:],
-			RequestID:        requestID,
-			Deadline:         uint64(deadline),
-			MultiSummaryKeys: keys,
+			ChainID:     chainID[:],
+			RequestID:   requestID,
+			Deadline:    uint64(deadline),
+			SummaryKeys: keys,
 		},
 		nodeID:         nodeID,
 		expirationTime: received.Add(deadline),
@@ -456,9 +456,9 @@ func (b *inMsgBuilder) InboundAcceptedStateSummary(
 	return &inboundMessage{
 		op: AcceptedStateSummary,
 		fields: map[Field]interface{}{
-			ChainID:         chainID[:],
-			RequestID:       requestID,
-			MultiSummaryIDs: summaryIDs,
+			ChainID:    chainID[:],
+			RequestID:  requestID,
+			SummaryIDs: summaryIDs,
 		},
 		nodeID: nodeID,
 	}

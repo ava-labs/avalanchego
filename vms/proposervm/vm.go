@@ -50,6 +50,7 @@ type VM struct {
 	block.ChainVM
 	activationTime      time.Time
 	minimumPChainHeight uint64
+	coreStateSyncVM     block.StateSyncableVM
 
 	state.State
 	hIndexer                indexer.HeightIndexer
@@ -85,10 +86,12 @@ func New(
 	minimumPChainHeight uint64,
 	resetHeightIndex bool,
 ) *VM {
+	ssVM, _ := vm.(block.StateSyncableVM)
 	proVM := &VM{
 		ChainVM:             vm,
 		activationTime:      activationTime,
 		minimumPChainHeight: minimumPChainHeight,
+		coreStateSyncVM:     ssVM,
 	}
 
 	proVM.resetHeightIndexOngoing.SetValue(resetHeightIndex)
