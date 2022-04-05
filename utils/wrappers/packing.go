@@ -514,7 +514,7 @@ func TryPackUintSlice(p *Packer, valIntf interface{}) {
 
 func TryUnpackUintSlice(p *Packer) interface{} {
 	sliceSize := p.UnpackInt()
-	res := make([]uint64, sliceSize)
+	res := []uint64(nil)
 	for i := uint32(0); i < sliceSize && !p.Errored(); i++ {
 		res = append(res, p.UnpackLong())
 	}
