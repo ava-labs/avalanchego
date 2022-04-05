@@ -482,8 +482,6 @@ type batchOption struct {
 	// if [force], allow for a conflict to be issued, and force each tx to be issued
 	// otherwise, some txs may not be put into vertices that are issued.
 	force bool
-	// if [empty], always result in a new poll
-	empty bool
 	// if [limit], stop when "Params.OptimalProcessing <= Consensus.NumProcessing"
 	limit bool
 }
@@ -495,7 +493,6 @@ func (t *Transitive) batch(txs []snowstorm.Tx, opt batchOption) ([]snowstorm.Tx,
 	}
 	issuedTxs := ids.Set{}
 	consumed := ids.Set{}
-	issued := false
 	orphans := t.Consensus.Orphans()
 	start := 0
 	end := 0
@@ -513,7 +510,6 @@ func (t *Transitive) batch(txs []snowstorm.Tx, opt batchOption) ([]snowstorm.Tx,
 			}
 			start = end
 			consumed.Clear()
-			issued = true
 			overlaps = false
 		}
 
@@ -534,9 +530,6 @@ func (t *Transitive) batch(txs []snowstorm.Tx, opt batchOption) ([]snowstorm.Tx,
 
 	if end > start {
 		return txs[end:], t.issueBatch(txs[start:end])
-	}
-	if opt.empty && !issued {
-		t.issueRepoll()
 	}
 	return txs[end:], nil
 }
