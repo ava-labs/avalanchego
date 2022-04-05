@@ -12,15 +12,15 @@ var _ common.Summary = &Summary{}
 
 const StateSyncDefaultKeysVersion = 0
 
-type Summary struct {
-	SummaryKey   uint64 `serialize:"true"`
-	SummaryID    ids.ID `serialize:"true"`
-	ContentBytes []byte `serialize:"true"`
-}
+// type Summary struct {
+// 	SummaryKey   uint64
+// 	SummaryID    ids.ID
+// 	ContentBytes []byte `serialize:"true"`
+// }
 
-func (s *Summary) Bytes() []byte { return s.ContentBytes }
-func (s *Summary) Key() uint64   { return s.SummaryKey }
-func (s *Summary) ID() ids.ID    { return s.SummaryID }
+// func (s *Summary) Bytes() []byte { return s.ContentBytes }
+// func (s *Summary) Key() uint64   { return s.SummaryKey }
+// func (s *Summary) ID() ids.ID    { return s.SummaryID }
 
 type StateSyncableVM interface {
 	common.StateSyncableVM
