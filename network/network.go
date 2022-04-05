@@ -547,6 +547,8 @@ func (n *network) ManuallyTrack(nodeID ids.ShortID, ip utils.IPDesc) {
 	n.peersLock.Lock()
 	defer n.peersLock.Unlock()
 
+	n.manuallyTrackedIDs.Add(nodeID)
+
 	_, connected := n.connectedPeers.GetByID(nodeID)
 	if connected {
 		// If I'm currently connected to [nodeID] then they will have told me
@@ -562,7 +564,6 @@ func (n *network) ManuallyTrack(nodeID ids.ShortID, ip utils.IPDesc) {
 			Timestamp: 0,
 		})
 		n.trackedIPs[nodeID] = tracked
-		n.manuallyTrackedIDs.Add(nodeID)
 		n.dial(n.onCloseCtx, nodeID, tracked)
 	}
 }

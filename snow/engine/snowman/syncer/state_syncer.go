@@ -447,16 +447,15 @@ func (ss *stateSyncer) Disconnected(nodeID ids.ShortID) error {
 	return ss.WeightTracker.RemoveWeightForNode(nodeID)
 }
 
-// Gossip implements the InternalHandler interface.
 func (ss *stateSyncer) Gossip() error { return nil }
 
-// Shutdown implements the InternalHandler interface.
-func (ss *stateSyncer) Shutdown() error { return nil }
+func (ss *stateSyncer) Shutdown() error {
+	ss.Config.Ctx.Log.Info("shutting down state syncer")
+	return ss.VM.Shutdown()
+}
 
-// Context implements the common.Engine interface.
 func (ss *stateSyncer) Context() *snow.ConsensusContext { return ss.Config.Ctx }
 
-// IsBootstrapped implements the common.Engine interface.
 func (ss *stateSyncer) IsBootstrapped() bool { return ss.Ctx.GetState() == snow.NormalOp }
 
 // Halt implements the InternalHandler interface
@@ -465,7 +464,6 @@ func (ss *stateSyncer) Halt() {}
 // Timeout implements the InternalHandler interface
 func (ss *stateSyncer) Timeout() error { return nil }
 
-// HealthCheck implements the common.Engine interface.
 func (ss *stateSyncer) HealthCheck() (interface{}, error) {
 	vmIntf, vmErr := ss.VM.HealthCheck()
 	intf := map[string]interface{}{
