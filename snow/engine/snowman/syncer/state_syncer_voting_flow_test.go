@@ -111,7 +111,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseSummary = true
 	fullVM.ParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
-		return &block.Summary{
+		return &block.TestSummary{
 			SummaryKey:   key,
 			SummaryID:    summaryID,
 			ContentBytes: summaryBytes,
@@ -279,7 +279,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 
 	fullVM.CantParseSummary = true
 	fullVM.ParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
-		return &block.Summary{
+		return &block.TestSummary{
 			SummaryKey:   key,
 			SummaryID:    summaryID,
 			ContentBytes: summaryBytes,
@@ -321,7 +321,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseSummary = true
 	fullVM.ParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
-		return &block.Summary{
+		return &block.TestSummary{
 			SummaryKey:   key,
 			SummaryID:    summaryID,
 			ContentBytes: summaryBytes,
@@ -384,7 +384,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseSummary = true
 	fullVM.ParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
-		return &block.Summary{
+		return &block.TestSummary{
 			SummaryKey:   key,
 			SummaryID:    summaryID,
 			ContentBytes: summaryBytes,
@@ -492,7 +492,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseSummary = true
 	fullVM.ParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
-		return &block.Summary{
+		return &block.TestSummary{
 			SummaryKey:   key,
 			SummaryID:    summaryID,
 			ContentBytes: summaryBytes,
@@ -586,7 +586,7 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseSummary = true
 	fullVM.ParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
-		return &block.Summary{
+		return &block.TestSummary{
 			SummaryKey:   key,
 			SummaryID:    summaryID,
 			ContentBytes: summaryBytes,
@@ -681,7 +681,7 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseSummary = true
 	fullVM.ParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
-		return &block.Summary{
+		return &block.TestSummary{
 			SummaryKey:   key,
 			SummaryID:    summaryID,
 			ContentBytes: summaryBytes,

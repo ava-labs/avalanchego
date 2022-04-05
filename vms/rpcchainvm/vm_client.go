@@ -50,6 +50,7 @@ import (
 var (
 	errUnsupportedFXs = errors.New("unsupported feature extensions")
 
+	_ common.Summary             = &Summary{}
 	_ block.ChainVM              = &VMClient{}
 	_ block.BatchedChainVM       = &VMClient{}
 	_ block.HeightIndexedChainVM = &VMClient{}
@@ -62,6 +63,16 @@ const (
 	unverifiedCacheSize = 2048
 	bytesToIDCacheSize  = 2048
 )
+
+type Summary struct {
+	SummaryKey   uint64
+	SummaryID    ids.ID
+	ContentBytes []byte
+}
+
+func (s *Summary) Bytes() []byte { return s.ContentBytes }
+func (s *Summary) Key() uint64   { return s.SummaryKey }
+func (s *Summary) ID() ids.ID    { return s.SummaryID }
 
 // VMClient is an implementation of VM that talks over RPC.
 type VMClient struct {
@@ -529,7 +540,7 @@ func (vm *VMClient) GetOngoingStateSyncSummary() (common.Summary, error) {
 	}
 
 	summaryID, err := ids.ToID(resp.SummaryId)
-	return &block.Summary{
+	return &Summary{
 		SummaryKey:   resp.Key,
 		SummaryID:    summaryID,
 		ContentBytes: resp.Content,
@@ -546,7 +557,7 @@ func (vm *VMClient) StateSyncGetLastSummary() (common.Summary, error) {
 	}
 
 	summaryID, err := ids.ToID(resp.SummaryId)
-	return &block.Summary{
+	return &Summary{
 		SummaryKey:   resp.Key,
 		SummaryID:    summaryID,
 		ContentBytes: resp.Content,
@@ -565,7 +576,7 @@ func (vm *VMClient) ParseSummary(summaryBytes []byte) (common.Summary, error) {
 	}
 
 	summaryID, err := ids.ToID(resp.SummaryId)
-	return &block.Summary{
+	return &Summary{
 		SummaryKey:   resp.Key,
 		SummaryID:    summaryID,
 		ContentBytes: resp.Content,
@@ -584,7 +595,7 @@ func (vm *VMClient) StateSyncGetSummary(key uint64) (common.Summary, error) {
 	}
 
 	summaryID, err := ids.ToID(resp.SummaryId)
-	return &block.Summary{
+	return &Summary{
 		SummaryKey:   resp.Key,
 		SummaryID:    summaryID,
 		ContentBytes: resp.Content,

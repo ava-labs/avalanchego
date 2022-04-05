@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -26,6 +25,8 @@ var (
 	errUnknownLastSummaryBlockID = errors.New("could not retrieve blockID associated with last summary")
 	errBadLastSummaryBlock       = errors.New("could not parse last summary block")
 )
+
+const StateSummaryVersion = 0
 
 type ProposerSummaryContent struct {
 	ProBlkID    ids.ID `serialize:"true"`
@@ -48,7 +49,7 @@ func newSummary(proBlkID ids.ID, coreSummary common.Summary) (common.Summary, er
 		key: coreSummary.Key(), // note: this is not serialized
 	}
 
-	proContent, err := stateSyncCodec.Marshal(block.StateSyncDefaultKeysVersion, res)
+	proContent, err := stateSyncCodec.Marshal(StateSummaryVersion, res)
 	if err != nil {
 		return nil, fmt.Errorf("cannot marshal proposerVMKey due to: %w", err)
 	}
@@ -62,20 +63,6 @@ func newSummary(proBlkID ids.ID, coreSummary common.Summary) (common.Summary, er
 	return res, nil
 }
 
-// func (vm *VM) buildProContentFrom(coreSummary common.Summary) (ProposerSummaryContent, error) {
-// 	// retrieve ProBlkID
-// 	proBlkID, err := vm.GetBlockIDAtHeight(coreSummary.Key())
-// 	if err != nil {
-// 		return ProposerSummaryContent{}, err
-// 	}
-
-// 	// Build ProposerSummaryContent
-// 	return ProposerSummaryContent{
-// 		ProBlkID:    proBlkID,
-// 		CoreContent: coreSummary.Bytes(),
-// 	}, nil
-// }
-
 func init() {
 	lc := linearcodec.New(reflectcodec.DefaultTagName, math.MaxUint32)
 	stateSyncCodec = codec.NewManager(math.MaxInt32)
@@ -83,7 +70,7 @@ func init() {
 	errs := wrappers.Errs{}
 	errs.Add(
 		lc.RegisterType(&ProposerSummaryContent{}),
-		stateSyncCodec.RegisterCodec(block.StateSyncDefaultKeysVersion, lc),
+		stateSyncCodec.RegisterCodec(StateSummaryVersion, lc),
 	)
 	if err := errs.Err; err != nil {
 		panic(err)
@@ -129,7 +116,7 @@ func (vm *VM) ParseSummary(summaryBytes []byte) (common.Summary, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal ProposerSummaryContent due to: %w", err)
 	}
-	if ver != block.StateSyncDefaultKeysVersion {
+	if ver != StateSummaryVersion {
 		return nil, errWrongStateSyncVersion
 	}
 
@@ -174,7 +161,7 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 		if err != nil {
 			return err
 		}
-		if ver != block.StateSyncDefaultKeysVersion {
+		if ver != StateSummaryVersion {
 			return errWrongStateSyncVersion
 		}
 
