@@ -13,9 +13,9 @@ var _ common.Summary = &Summary{}
 const StateSyncDefaultKeysVersion = 0
 
 type Summary struct {
-	SummaryKey   uint64
-	SummaryID    ids.ID
-	ContentBytes []byte
+	SummaryKey   uint64 `serialize:"true"`
+	SummaryID    ids.ID `serialize:"true"`
+	ContentBytes []byte `serialize:"true"`
 }
 
 func (s *Summary) Bytes() []byte { return s.ContentBytes }

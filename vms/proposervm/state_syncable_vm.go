@@ -25,15 +25,9 @@ var (
 	errBadLastSummaryBlock       = errors.New("could not parse last summary block")
 )
 
-type CoreSummaryContent struct {
-	BlkID   ids.ID `serialize:"true"`
-	Height  uint64 `serialize:"true"`
-	Content []byte `serialize:"true"`
-}
-
 type ProposerSummaryContent struct {
-	ProBlkID    ids.ID             `serialize:"true"`
-	CoreContent CoreSummaryContent `serialize:"true"`
+	ProBlkID    ids.ID        `serialize:"true"`
+	CoreContent block.Summary `serialize:"true"`
 }
 
 func init() {
@@ -42,9 +36,6 @@ func init() {
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		lc.RegisterType(&block.Summary{}),
-		lc.RegisterType(&ids.ID{}),
-		lc.RegisterType(&CoreSummaryContent{}),
 		lc.RegisterType(&ProposerSummaryContent{}),
 		stateSyncCodec.RegisterCodec(block.StateSyncDefaultKeysVersion, lc),
 	)
@@ -98,7 +89,7 @@ func (vm *VM) ParseSummary(summaryBytes []byte) (common.Summary, error) {
 		return nil, errWrongStateSyncVersion
 	}
 
-	return newSummary(proContent.CoreContent.Height, summaryBytes)
+	return newSummary(proContent.CoreContent.Key(), summaryBytes)
 }
 
 func (vm *VM) StateSyncGetSummary(key uint64) (common.Summary, error) {
@@ -240,7 +231,7 @@ func newSummary(key uint64, content []byte) (common.Summary, error) {
 }
 
 func (vm *VM) buildProContentFrom(coreSummary common.Summary) (ProposerSummaryContent, error) {
-	coreContent := CoreSummaryContent{}
+	coreContent := block.Summary{}
 	ver, err := stateSyncCodec.Unmarshal(coreSummary.Bytes(), &coreContent)
 	if err != nil {
 		return ProposerSummaryContent{}, err
@@ -250,7 +241,7 @@ func (vm *VM) buildProContentFrom(coreSummary common.Summary) (ProposerSummaryCo
 	}
 
 	// retrieve ProBlkID
-	proBlkID, err := vm.GetBlockIDAtHeight(coreContent.Height)
+	proBlkID, err := vm.GetBlockIDAtHeight(coreContent.Key())
 	if err != nil {
 		return ProposerSummaryContent{}, err
 	}
