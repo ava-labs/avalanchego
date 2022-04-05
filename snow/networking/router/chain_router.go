@@ -15,6 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -29,7 +30,8 @@ import (
 var (
 	errUnknownChain = errors.New("received message for unknown chain")
 
-	_ Router = &ChainRouter{}
+	_ Router              = &ChainRouter{}
+	_ benchlist.Benchable = &ChainRouter{}
 )
 
 type requestEntry struct {

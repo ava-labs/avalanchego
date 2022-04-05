@@ -42,7 +42,7 @@ func TestSenderContext(t *testing.T) {
 	assert.NoError(t, err)
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(true)
-	sender, err := New(
+	senderIntf, err := New(
 		context,
 		msgCreator,
 		externalSender,
@@ -51,6 +51,8 @@ func TestSenderContext(t *testing.T) {
 		defaultGossipConfig,
 	)
 	assert.NoError(t, err)
+	sender := senderIntf.(*sender)
+
 	if res := sender.Context(); !reflect.DeepEqual(res, context) {
 		t.Fatalf("Got %#v, expected %#v", res, context)
 	}

@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 )
 
 const version = 0
@@ -16,7 +15,7 @@ const version = 0
 var c codec.Manager
 
 func init() {
-	lc := linearcodec.New(reflectcodec.DefaultTagName, math.MaxUint32)
+	lc := linearcodec.NewCustomMaxLength(math.MaxUint32)
 	c = codec.NewManager(math.MaxInt32)
 
 	err := c.RegisterCodec(version, lc)
