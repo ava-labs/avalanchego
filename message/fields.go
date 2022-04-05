@@ -81,7 +81,7 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 	case SummaryIDs:
 		return wrappers.TryPackHashes
 	case SummaryKeys:
-		return wrappers.TryPackUintSlice
+		return wrappers.TryPackUint64Slice
 	default:
 		return nil
 	}
@@ -131,7 +131,7 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 	case SummaryIDs:
 		return wrappers.TryUnpackHashes
 	case SummaryKeys:
-		return wrappers.TryUnpackUintSlice
+		return wrappers.TryUnpackUint64Slice
 	default:
 		return nil
 	}

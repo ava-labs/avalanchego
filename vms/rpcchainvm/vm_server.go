@@ -340,7 +340,7 @@ func (vm *VMServer) StateSync(ctx context.Context, req *vmproto.StateSyncRequest
 		if err != nil {
 			return nil, err
 		}
-		summaries[i] = &block.Summary{
+		summaries[i] = &Summary{
 			SummaryKey:   sum.Key,
 			SummaryID:    summaryID,
 			ContentBytes: sum.Content,

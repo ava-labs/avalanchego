@@ -11,11 +11,22 @@ import (
 )
 
 var (
+	_ common.Summary  = &TestSummary{}
 	_ StateSyncableVM = &TestStateSyncableVM{}
 
 	errGetStateSyncResult  = errors.New("unexpectedly called GetStateSyncResult")
 	errSetLastSummaryBlock = errors.New("unexpectedly called SetLastSummaryBlock")
 )
+
+type TestSummary struct {
+	SummaryKey   uint64
+	SummaryID    ids.ID
+	ContentBytes []byte
+}
+
+func (s *TestSummary) Bytes() []byte { return s.ContentBytes }
+func (s *TestSummary) Key() uint64   { return s.SummaryKey }
+func (s *TestSummary) ID() ids.ID    { return s.SummaryID }
 
 type TestStateSyncableVM struct {
 	common.TestStateSyncableVM
