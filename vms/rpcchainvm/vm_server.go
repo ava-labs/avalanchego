@@ -268,7 +268,8 @@ func (vm *VMServer) GetOngoingStateSyncSummary(context.Context, *emptypb.Empty) 
 		Key:       summary.Key(),
 		SummaryId: summaryID[:],
 		Content:   summary.Bytes(),
-	}, err
+		Err:       errorToErrCode[err],
+	}, errorToRPCError(err)
 }
 
 func (vm *VMServer) StateSyncGetLastSummary(ctx context.Context, empty *emptypb.Empty) (*vmproto.StateSyncGetLastSummaryResponse, error) {
