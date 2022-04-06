@@ -27,6 +27,26 @@ var (
 
 const StateSummaryVersion = 0
 
+func init() {
+	lc := linearcodec.NewCustomMaxLength(math.MaxUint32)
+	stateSyncCodec = codec.NewManager(math.MaxInt32)
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		lc.RegisterType(&ProposerSummaryContent{}),
+		stateSyncCodec.RegisterCodec(StateSummaryVersion, lc),
+	)
+	if err := errs.Err; err != nil {
+		panic(err)
+	}
+}
+
+// ProposerSummaryContent adds to its Core Summary the proposer block ID
+// associated with the summary. This allows retrieving the full block associated
+// with state summary once state syncing is done.
+// ProposerSummaryContent Key is summary block height and matches CoreSummaryContent key;
+// However ProposerSummaryContent ID is different from CoreSummaryContent ID
+// since it hashes ProBlkID along with Core Summary Bytes for full verification.
 type ProposerSummaryContent struct {
 	ProBlkID    ids.ID `serialize:"true"`
 	CoreContent []byte `serialize:"true"`
@@ -62,20 +82,6 @@ func newSummary(proBlkID ids.ID, coreSummary common.Summary) (common.Summary, er
 	return res, nil
 }
 
-func init() {
-	lc := linearcodec.NewCustomMaxLength(math.MaxUint32)
-	stateSyncCodec = codec.NewManager(math.MaxInt32)
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		lc.RegisterType(&ProposerSummaryContent{}),
-		stateSyncCodec.RegisterCodec(StateSummaryVersion, lc),
-	)
-	if err := errs.Err; err != nil {
-		panic(err)
-	}
-}
-
 func (vm *VM) StateSyncEnabled() (bool, error) {
 	if vm.coreStateSyncVM == nil {
 		return false, common.ErrStateSyncableVMNotImplemented
@@ -104,7 +110,8 @@ func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 	return newSummary(proBlkID, coreSummary)
 }
 
-// Note: it's important that ParseSummary do not use any index or state.
+// Note: it's important that ParseSummary do not use any index or state
+// to allow summaries being parsed also by freshly started node with no previous state.
 func (vm *VM) ParseSummary(summaryBytes []byte) (common.Summary, error) {
 	if vm.coreStateSyncVM == nil {
 		return nil, common.ErrStateSyncableVMNotImplemented
