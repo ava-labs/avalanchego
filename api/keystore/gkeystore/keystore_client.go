@@ -9,23 +9,24 @@ import (
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/ava-labs/avalanchego/api/keystore"
-	"github.com/ava-labs/avalanchego/api/proto/gkeystoreproto"
-	"github.com/ava-labs/avalanchego/api/proto/rpcdbproto"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/encdb"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
+
+	keystorepb "github.com/ava-labs/avalanchego/proto/pb/keystore"
+	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
 )
 
 var _ keystore.BlockchainKeystore = &Client{}
 
 // Client is a snow.Keystore that talks over RPC.
 type Client struct {
-	client gkeystoreproto.KeystoreClient
+	client keystorepb.KeystoreClient
 	broker *plugin.GRPCBroker
 }
 
 // NewClient returns a keystore instance connected to a remote keystore instance
-func NewClient(client gkeystoreproto.KeystoreClient, broker *plugin.GRPCBroker) *Client {
+func NewClient(client keystorepb.KeystoreClient, broker *plugin.GRPCBroker) *Client {
 	return &Client{
 		client: client,
 		broker: broker,
@@ -41,7 +42,7 @@ func (c *Client) GetDatabase(username, password string) (*encdb.Database, error)
 }
 
 func (c *Client) GetRawDatabase(username, password string) (database.Database, error) {
-	resp, err := c.client.GetDatabase(context.Background(), &gkeystoreproto.GetDatabaseRequest{
+	resp, err := c.client.GetDatabase(context.Background(), &keystorepb.GetDatabaseRequest{
 		Username: username,
 		Password: password,
 	})
@@ -54,6 +55,6 @@ func (c *Client) GetRawDatabase(username, password string) (database.Database, e
 		return nil, err
 	}
 
-	dbClient := rpcdb.NewClient(rpcdbproto.NewDatabaseClient(dbConn))
+	dbClient := rpcdb.NewClient(rpcdbpb.NewDatabaseClient(dbConn))
 	return dbClient, err
 }

@@ -10,7 +10,7 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
-	"github.com/ava-labs/avalanchego/api/proto/vmproto"
+	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
@@ -46,11 +46,11 @@ func New(vm block.ChainVM) plugin.Plugin {
 
 // GRPCServer registers a new GRPC server.
 func (p *vmPlugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server) error {
-	vmproto.RegisterVMServer(s, NewServer(p.vm, broker))
+	vmpb.RegisterVMServer(s, NewServer(p.vm, broker))
 	return nil
 }
 
 // GRPCClient returns a new GRPC client
 func (p *vmPlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
-	return NewClient(vmproto.NewVMClient(c), broker), nil
+	return NewClient(vmpb.NewVMClient(c), broker), nil
 }

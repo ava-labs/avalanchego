@@ -6,12 +6,13 @@ package rpcchainvm
 import (
 	"bytes"
 	"context"
-	j "encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"testing"
+
+	j "encoding/json"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
@@ -26,12 +27,12 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/ava-labs/avalanchego/api/proto/ghttpproto"
-	"github.com/ava-labs/avalanchego/api/proto/vmproto"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
+	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
+	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
 
@@ -199,20 +200,20 @@ func NewTestServer(vm TestVM, broker *plugin.GRPCBroker) *TestVMServer {
 }
 
 type TestVMServer struct {
-	vmproto.UnimplementedVMServer
+	vmpb.UnimplementedVMServer
 	vm     TestVM
 	broker *plugin.GRPCBroker
 
 	serverCloser grpcutils.ServerCloser
 }
 
-func (vm *TestVMServer) CreateHandlers(context.Context, *emptypb.Empty) (*vmproto.CreateHandlersResponse, error) {
+func (vm *TestVMServer) CreateHandlers(context.Context, *emptypb.Empty) (*vmpb.CreateHandlersResponse, error) {
 	handlers, err := vm.vm.CreateHandlers()
 	if err != nil {
 		return nil, err
 	}
 
-	resp := &vmproto.CreateHandlersResponse{}
+	resp := &vmpb.CreateHandlersResponse{}
 	for prefix, h := range handlers {
 		handler := h
 
@@ -221,11 +222,11 @@ func (vm *TestVMServer) CreateHandlers(context.Context, *emptypb.Empty) (*vmprot
 			opts = append(opts, serverOptions...)
 			server := grpc.NewServer(opts...)
 			vm.serverCloser.Add(server)
-			ghttpproto.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler, vm.broker))
+			httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler, vm.broker))
 			return server
 		})
 
-		resp.Handlers = append(resp.Handlers, &vmproto.Handler{
+		resp.Handlers = append(resp.Handlers, &vmpb.Handler{
 			Prefix:      prefix,
 			LockOptions: uint32(handler.LockOptions),
 			Server:      serverID,
@@ -235,13 +236,13 @@ func (vm *TestVMServer) CreateHandlers(context.Context, *emptypb.Empty) (*vmprot
 }
 
 type TestVMClient struct {
-	client vmproto.VMClient
+	client vmpb.VMClient
 	broker *plugin.GRPCBroker
 
 	conns []*grpc.ClientConn
 }
 
-func NewTestClient(client vmproto.VMClient, broker *plugin.GRPCBroker) *TestVMClient {
+func NewTestClient(client vmpb.VMClient, broker *plugin.GRPCBroker) *TestVMClient {
 	return &TestVMClient{
 		client: client,
 		broker: broker,
@@ -264,7 +265,7 @@ func (vm *TestVMClient) CreateHandlers() (map[string]*common.HTTPHandler, error)
 		vm.conns = append(vm.conns, conn)
 		handlers[handler.Prefix] = &common.HTTPHandler{
 			LockOptions: common.LockOption(handler.LockOptions),
-			Handler:     ghttp.NewClient(ghttpproto.NewHTTPClient(conn), vm.broker),
+			Handler:     ghttp.NewClient(httppb.NewHTTPClient(conn), vm.broker),
 		}
 	}
 	return handlers, nil

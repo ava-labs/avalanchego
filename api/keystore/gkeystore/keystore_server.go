@@ -11,19 +11,20 @@ import (
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/ava-labs/avalanchego/api/keystore"
-	"github.com/ava-labs/avalanchego/api/proto/gkeystoreproto"
-	"github.com/ava-labs/avalanchego/api/proto/rpcdbproto"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
+
+	keystorepb "github.com/ava-labs/avalanchego/proto/pb/keystore"
+	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
 )
 
-var _ gkeystoreproto.KeystoreServer = &Server{}
+var _ keystorepb.KeystoreServer = &Server{}
 
 // Server is a snow.Keystore that is managed over RPC.
 type Server struct {
-	gkeystoreproto.UnimplementedKeystoreServer
+	keystorepb.UnimplementedKeystoreServer
 	ks     keystore.BlockchainKeystore
 	broker *plugin.GRPCBroker
 }
@@ -38,8 +39,8 @@ func NewServer(ks keystore.BlockchainKeystore, broker *plugin.GRPCBroker) *Serve
 
 func (s *Server) GetDatabase(
 	_ context.Context,
-	req *gkeystoreproto.GetDatabaseRequest,
-) (*gkeystoreproto.GetDatabaseResponse, error) {
+	req *keystorepb.GetDatabaseRequest,
+) (*keystorepb.GetDatabaseResponse, error) {
 	db, err := s.ks.GetRawDatabase(req.Username, req.Password)
 	if err != nil {
 		return nil, err
@@ -57,10 +58,10 @@ func (s *Server) GetDatabase(
 		server := grpc.NewServer(opts...)
 		closer.closer.Add(server)
 		db := rpcdb.NewServer(&closer)
-		rpcdbproto.RegisterDatabaseServer(server, db)
+		rpcdbpb.RegisterDatabaseServer(server, db)
 		return server
 	})
-	return &gkeystoreproto.GetDatabaseResponse{DbServer: dbBrokerID}, nil
+	return &keystorepb.GetDatabaseResponse{DbServer: dbBrokerID}, nil
 }
 
 type dbCloser struct {

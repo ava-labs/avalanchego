@@ -13,18 +13,18 @@ import (
 
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 
-	"github.com/ava-labs/avalanchego/api/proto/ghttpproto"
+	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
 )
 
 func Errorf(code int, tmpl string, args ...interface{}) error {
-	return GetGRPCErrorFromHTTPResponse(&ghttpproto.HandleSimpleHTTPResponse{
+	return GetGRPCErrorFromHTTPResponse(&httppb.HandleSimpleHTTPResponse{
 		Code: int32(code),
 		Body: []byte(fmt.Sprintf(tmpl, args...)),
 	})
 }
 
 // GetGRPCErrorFromHTTPRespone takes an HandleSimpleHTTPResponse as input and returns a gRPC error.
-func GetGRPCErrorFromHTTPResponse(resp *ghttpproto.HandleSimpleHTTPResponse) error {
+func GetGRPCErrorFromHTTPResponse(resp *httppb.HandleSimpleHTTPResponse) error {
 	a, err := anypb.New(resp)
 	if err != nil {
 		return err
@@ -39,7 +39,7 @@ func GetGRPCErrorFromHTTPResponse(resp *ghttpproto.HandleSimpleHTTPResponse) err
 
 // GetHTTPResponseFromError takes an gRPC error as input and returns a gRPC
 // HandleSimpleHTTPResponse.
-func GetHTTPResponseFromError(err error) (*ghttpproto.HandleSimpleHTTPResponse, bool) {
+func GetHTTPResponseFromError(err error) (*httppb.HandleSimpleHTTPResponse, bool) {
 	s, ok := status.FromError(err)
 	if !ok {
 		return nil, false
@@ -50,7 +50,7 @@ func GetHTTPResponseFromError(err error) (*ghttpproto.HandleSimpleHTTPResponse, 
 		return nil, false
 	}
 
-	var resp ghttpproto.HandleSimpleHTTPResponse
+	var resp httppb.HandleSimpleHTTPResponse
 	if err := anypb.UnmarshalTo(status.Details[0], &resp, proto.UnmarshalOptions{}); err != nil {
 		return nil, false
 	}
@@ -59,10 +59,10 @@ func GetHTTPResponseFromError(err error) (*ghttpproto.HandleSimpleHTTPResponse, 
 }
 
 // GetHTTPHeader takes an http.Header as input and returns a slice of Header.
-func GetHTTPHeader(hs http.Header) []*ghttpproto.Element {
-	result := make([]*ghttpproto.Element, 0, len(hs))
+func GetHTTPHeader(hs http.Header) []*httppb.Element {
+	result := make([]*httppb.Element, 0, len(hs))
 	for k, vs := range hs {
-		result = append(result, &ghttpproto.Element{
+		result = append(result, &httppb.Element{
 			Key:    k,
 			Values: vs,
 		})
@@ -71,7 +71,7 @@ func GetHTTPHeader(hs http.Header) []*ghttpproto.Element {
 }
 
 // MergeHTTPHeader takes a slice of Header and merges with http.Header map.
-func MergeHTTPHeader(hs []*ghttpproto.Element, header http.Header) {
+func MergeHTTPHeader(hs []*httppb.Element, header http.Header) {
 	for _, h := range hs {
 		header[h.Key] = h.Values
 	}
