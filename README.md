@@ -670,12 +670,13 @@ Target Block Rate: 2s (Same as C-Chain)
 
 ```
 Network Name: WAGMI
-RPC URL: https://api-wagmi.avax-test.network/rpc
+RPC URL: https://subnets.avax.network/wagmi/wagmi-chain-testnet/rpc
 Chain ID: 11111
 Symbol: WGM
+Explorer: https://subnets.avax.network/wagmi/wagmi-chain-testnet/explorer
 ```
 
-![metamask](./imgs/metamask.png)
+![metamask_WAGMI](./imgs/metamask_WAGMI.png)
 
 ### Wrapped WAGMI
 
