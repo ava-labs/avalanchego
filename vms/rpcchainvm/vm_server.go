@@ -259,18 +259,21 @@ func (vm *VMServer) GetOngoingStateSyncSummary(context.Context, *emptypb.Empty) 
 	}
 
 	summary, err := ssVM.GetOngoingStateSyncSummary()
-	rpcErr := errorToRPCError(err)
-	if rpcErr != nil {
+	if rpcErr := errorToRPCError(err); rpcErr != nil {
 		return nil, rpcErr
 	}
 
-	summaryID := summary.ID()
-	return &vmproto.StateSyncGetOngoingStateSyncSummaryResponse{
-		Key:       summary.Key(),
-		SummaryId: summaryID[:],
-		Content:   summary.Bytes(),
-		Err:       errorToErrCode[err],
-	}, rpcErr
+	response := &vmproto.StateSyncGetOngoingStateSyncSummaryResponse{
+		Err: errorToErrCode[err],
+	}
+	// note: summary may be nil in case of ErrNoStateSyncOngoing
+	if summary != nil {
+		summaryID := summary.ID()
+		response.SummaryId = summaryID[:]
+		response.Key = summary.Key()
+		response.Content = summary.Bytes()
+	}
+	return response, nil
 }
 
 func (vm *VMServer) StateSyncGetLastSummary(ctx context.Context, empty *emptypb.Empty) (*vmproto.StateSyncGetLastSummaryResponse, error) {
