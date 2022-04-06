@@ -63,10 +63,7 @@ func (f *factory) makeLogger(config Config) (Logger, error) {
 	if _, ok := f.loggers[config.LoggerName]; ok {
 		return nil, fmt.Errorf("logger with name %q already exists", config.LoggerName)
 	}
-	l, err := newLog(config)
-	if err != nil {
-		return nil, err
-	}
+	l := newLog(config)
 	f.loggers[config.LoggerName] = l
 	return l, nil
 }
