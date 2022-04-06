@@ -587,14 +587,13 @@ func (vm *VMClient) ParseSummary(summaryBytes []byte) (common.Summary, error) {
 }
 
 func (vm *VMClient) StateSyncGetSummary(key uint64) (common.Summary, error) {
-	resp, err := vm.client.StateSyncGetSummary(
-		context.Background(),
-		&vmproto.StateSyncGetSummaryRequest{
-			Key: key,
-		},
-	)
+	req := &vmproto.StateSyncGetSummaryRequest{Key: key}
+	resp, err := vm.client.StateSyncGetSummary(context.Background(), req)
 	if err != nil {
 		return nil, err
+	}
+	if errCode := resp.Err; errCode != 0 {
+		return nil, errCodeToError[errCode]
 	}
 
 	summaryID, err := ids.ToID(resp.SummaryId)

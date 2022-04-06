@@ -40,6 +40,7 @@ type StateSyncableVM interface {
 	// allows the engine to ask the network if the ongoing summary is still supported by the
 	// network. This simplifies the task of the StateSyncableVM to decide whether to
 	// continue an in-progress sync or start over.
+	// Returns ErrNoStateSyncOngoing if no local state summary exists.
 	GetOngoingStateSyncSummary() (Summary, error)
 
 	// StateSyncGetLastSummary returns latest Summary with an optional error
@@ -49,6 +50,7 @@ type StateSyncableVM interface {
 	ParseSummary(summaryBytes []byte) (Summary, error)
 
 	// StateSyncGetSummary retrieves the summary related to key, if available.
+	// Returns ErrUnknownStateSummary if summary is not available
 	StateSyncGetSummary(summaryKey uint64) (Summary, error)
 
 	// StateSync is called with a list of valid summaries to sync from.

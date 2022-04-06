@@ -266,6 +266,7 @@ message StateSyncGetSummaryResponse {
   uint64 key = 1;
   bytes summary_id = 2;
   bytes content = 3;
+  uint32 err = 4;
 }
 
 message StateSyncRequest {

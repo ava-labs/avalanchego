@@ -141,7 +141,8 @@ func (vm *VM) StateSyncGetSummary(key uint64) (common.Summary, error) {
 
 	coreSummary, err := vm.coreStateSyncVM.StateSyncGetSummary(key)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve core summary due to: %w", err)
+		vm.ctx.Log.Info("could not retrieve core summary due to: %s", err)
+		return nil, err
 	}
 
 	// retrieve ProBlkID
@@ -149,7 +150,7 @@ func (vm *VM) StateSyncGetSummary(key uint64) (common.Summary, error) {
 	if err != nil {
 		// this should never happen, it's proVM being out of sync with coreVM
 		vm.ctx.Log.Warn("core summary unknown to proposer VM. Block height index missing")
-		return nil, err
+		return nil, common.ErrUnknownStateSummary
 	}
 
 	return newSummary(proBlkID, coreSummary)
