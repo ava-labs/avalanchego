@@ -14,6 +14,9 @@ var _ State = &lockedState{}
 // State allows the lookup of validator sets on specified subnets at the
 // requested P-chain height.
 type State interface {
+	// GetMinimumHeight returns the minimum height of the block still in the
+	// proposal window.
+	GetMinimumHeight() (uint64, error)
 	// GetCurrentHeight returns the current height of the P-chain.
 	GetCurrentHeight() (uint64, error)
 
@@ -35,6 +38,13 @@ func NewLockedState(lock sync.Locker, s State) State {
 	}
 }
 
+func (s *lockedState) GetMinimumHeight() (uint64, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.s.GetMinimumHeight()
+}
+
 func (s *lockedState) GetCurrentHeight() (uint64, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -53,6 +63,10 @@ type noState struct{}
 
 func NewNoState() State {
 	return &noState{}
+}
+
+func (s *noState) GetMinimumHeight() (uint64, error) {
+	return 0, nil
 }
 
 func (s *noState) GetCurrentHeight() (uint64, error) {
