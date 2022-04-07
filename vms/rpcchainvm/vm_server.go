@@ -263,23 +263,23 @@ func (vm *VMServer) StateSyncGetOngoingSummary(
 	}
 
 	summary, err := ssVM.StateSyncGetOngoingSummary()
-	if err == common.ErrNoStateSyncOngoing {
+	if err == nil {
+		summaryID := summary.ID()
+		response := &vmpb.StateSyncGetOngoingSummaryResponse{
+			Key:       summary.Key(),
+			SummaryId: summaryID[:],
+			Content:   summary.Bytes(),
+		}
+		return response, nil
+	}
+
+	rpcErr := errorToErrCode[err]
+	if rpcErr != 0 {
 		return &vmpb.StateSyncGetOngoingSummaryResponse{
 			Err: errorToErrCode[err],
 		}, nil
 	}
-	if err != nil {
-		return nil, err
-	}
-
-	summaryID := summary.ID()
-	response := &vmpb.StateSyncGetOngoingSummaryResponse{
-		Key:       summary.Key(),
-		SummaryId: summaryID[:],
-		Content:   summary.Bytes(),
-		Err:       errorToErrCode[err],
-	}
-	return response, nil
+	return nil, err
 }
 
 func (vm *VMServer) StateSyncGetLastSummary(
@@ -292,21 +292,22 @@ func (vm *VMServer) StateSyncGetLastSummary(
 	}
 
 	summary, err := ssVM.StateSyncGetLastSummary()
-	if err == common.ErrUnknownStateSummary {
+	if err == nil {
+		summaryID := summary.ID()
+		return &vmpb.StateSyncGetLastSummaryResponse{
+			Key:       summary.Key(),
+			SummaryId: summaryID[:],
+			Content:   summary.Bytes(),
+		}, nil
+	}
+
+	rpcErr := errorToErrCode[err]
+	if rpcErr != 0 {
 		return &vmpb.StateSyncGetLastSummaryResponse{
 			Err: errorToErrCode[err],
 		}, nil
 	}
-	if err != nil {
-		return nil, err
-	}
-
-	summaryID := summary.ID()
-	return &vmpb.StateSyncGetLastSummaryResponse{
-		Key:       summary.Key(),
-		SummaryId: summaryID[:],
-		Content:   summary.Bytes(),
-	}, err
+	return nil, err
 }
 
 func (vm *VMServer) StateSyncParseSummary(
@@ -341,23 +342,24 @@ func (vm *VMServer) StateSyncGetSummary(
 	}
 
 	summary, err := ssVM.StateSyncGetSummary(req.Key)
-	if err == common.ErrUnknownStateSummary {
+	if err == nil {
+		summaryID := summary.ID()
+		response := &vmpb.StateSyncGetSummaryResponse{
+			Key:       summary.Key(),
+			SummaryId: summaryID[:],
+			Content:   summary.Bytes(),
+			Err:       errorToErrCode[err],
+		}
+		return response, nil
+	}
+
+	rpcErr := errorToErrCode[err]
+	if rpcErr != 0 {
 		return &vmpb.StateSyncGetSummaryResponse{
 			Err: errorToErrCode[err],
 		}, nil
 	}
-	if err != nil {
-		return nil, err
-	}
-
-	summaryID := summary.ID()
-	response := &vmpb.StateSyncGetSummaryResponse{
-		Key:       summary.Key(),
-		SummaryId: summaryID[:],
-		Content:   summary.Bytes(),
-		Err:       errorToErrCode[err],
-	}
-	return response, nil
+	return nil, err
 }
 
 func (vm *VMServer) StateSync(ctx context.Context, req *vmpb.StateSyncRequest) (*emptypb.Empty, error) {

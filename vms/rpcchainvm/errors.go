@@ -13,20 +13,24 @@ var (
 	errCodeToError = map[uint32]error{
 		1: database.ErrClosed,
 		2: database.ErrNotFound,
+
 		3: block.ErrHeightIndexedVMNotImplemented,
 		4: block.ErrIndexIncomplete,
 
-		5: common.ErrUnknownStateSummary,
-		6: common.ErrNoStateSyncOngoing,
+		5: common.ErrStateSyncableVMNotImplemented,
+		6: common.ErrUnknownStateSummary,
+		7: common.ErrNoStateSyncOngoing,
 	}
 	errorToErrCode = map[error]uint32{
-		database.ErrClosed:                     1,
-		database.ErrNotFound:                   2,
+		database.ErrClosed:   1,
+		database.ErrNotFound: 2,
+
 		block.ErrHeightIndexedVMNotImplemented: 3,
 		block.ErrIndexIncomplete:               4,
 
-		common.ErrUnknownStateSummary: 5,
-		common.ErrNoStateSyncOngoing:  6,
+		common.ErrStateSyncableVMNotImplemented: 5,
+		common.ErrUnknownStateSummary:           6,
+		common.ErrNoStateSyncOngoing:            7,
 	}
 )
 
