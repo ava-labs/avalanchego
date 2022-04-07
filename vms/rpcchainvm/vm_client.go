@@ -558,6 +558,9 @@ func (vm *VMClient) StateSyncGetLastSummary() (common.Summary, error) {
 	if err != nil {
 		return nil, err
 	}
+	if errCode := resp.Err; errCode != 0 {
+		return nil, errCodeToError[errCode]
+	}
 
 	summaryID, err := ids.ToID(resp.SummaryId)
 	return &Summary{

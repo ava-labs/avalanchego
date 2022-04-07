@@ -44,6 +44,7 @@ type StateSyncableVM interface {
 	GetOngoingStateSyncSummary() (Summary, error)
 
 	// StateSyncGetLastSummary returns latest Summary with an optional error
+	// Returns ErrUnknownStateSummary if summary is not available
 	StateSyncGetLastSummary() (Summary, error)
 
 	// ParseSummary builds a Summary out of summaryBytes

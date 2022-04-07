@@ -90,6 +90,27 @@ func (vm *VM) StateSyncEnabled() (bool, error) {
 	return vm.coreStateSyncVM.StateSyncEnabled()
 }
 
+func (vm *VM) GetOngoingStateSyncSummary() (common.Summary, error) {
+	if vm.coreStateSyncVM == nil {
+		return nil, common.ErrStateSyncableVMNotImplemented
+	}
+
+	coreSummary, err := vm.coreStateSyncVM.GetOngoingStateSyncSummary()
+	if err != nil {
+		return nil, err // including common.ErrNoStateSyncOngoing case
+	}
+
+	// retrieve ProBlkID
+	proBlkID, err := vm.GetBlockIDAtHeight(coreSummary.Key())
+	if err != nil {
+		// this should never happen, it's proVM being out of sync with coreVM
+		vm.ctx.Log.Warn("core summary unknown to proposer VM. Block height index missing: %s", err)
+		return nil, common.ErrUnknownStateSummary
+	}
+
+	return newSummary(proBlkID, coreSummary)
+}
+
 func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 	if vm.coreStateSyncVM == nil {
 		return nil, common.ErrStateSyncableVMNotImplemented
@@ -104,7 +125,9 @@ func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 	// retrieve ProBlkID
 	proBlkID, err := vm.GetBlockIDAtHeight(coreSummary.Key())
 	if err != nil {
-		return nil, err
+		// this should never happen, it's proVM being out of sync with coreVM
+		vm.ctx.Log.Warn("core summary unknown to proposer VM. Block height index missing: %s", err)
+		return nil, common.ErrUnknownStateSummary
 	}
 
 	return newSummary(proBlkID, coreSummary)
@@ -149,7 +172,7 @@ func (vm *VM) StateSyncGetSummary(key uint64) (common.Summary, error) {
 	proBlkID, err := vm.GetBlockIDAtHeight(coreSummary.Key())
 	if err != nil {
 		// this should never happen, it's proVM being out of sync with coreVM
-		vm.ctx.Log.Warn("core summary unknown to proposer VM. Block height index missing")
+		vm.ctx.Log.Warn("core summary unknown to proposer VM. Block height index missing: %s", err)
 		return nil, common.ErrUnknownStateSummary
 	}
 
@@ -189,24 +212,6 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 	}
 
 	return vm.coreStateSyncVM.StateSync(coreSummaries)
-}
-
-func (vm *VM) GetOngoingStateSyncSummary() (common.Summary, error) {
-	if vm.coreStateSyncVM == nil {
-		return nil, common.ErrStateSyncableVMNotImplemented
-	}
-
-	coreSummary, err := vm.coreStateSyncVM.GetOngoingStateSyncSummary()
-	if err != nil {
-		return nil, err // including common.ErrNoStateSyncOngoing case
-	}
-
-	proBlkID, err := vm.GetBlockIDAtHeight(coreSummary.Key())
-	if err != nil {
-		return nil, err
-	}
-
-	return newSummary(proBlkID, coreSummary)
 }
 
 func (vm *VM) GetStateSyncResult() (ids.ID, uint64, error) {
