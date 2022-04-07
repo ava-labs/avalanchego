@@ -42,7 +42,7 @@ service VM {
   rpc StateSyncGetSummary(StateSyncGetSummaryRequest) returns (StateSyncGetSummaryResponse);
   rpc StateSync(StateSyncRequest) returns (StateSyncResponse);
   rpc StateSyncGetResult(google.protobuf.Empty) returns (StateSyncGetResultResponse);
-  rpc StateSyncSetLastSummaryBlock(StateSyncSetLastSummaryBlockRequest) returns (google.protobuf.Empty);
+  rpc StateSyncSetLastSummaryBlock(StateSyncSetLastSummaryBlockRequest) returns (StateSyncSetLastSummaryBlockResponse);
 }
 
 message InitializeRequest {
@@ -284,10 +284,15 @@ message StateSyncGetResultResponse {
   bytes bytes = 1;
   uint64 height = 2;
   string error_msg = 3;
+  uint32 err = 4;
 }
 
 message StateSyncSetLastSummaryBlockRequest {
   bytes bytes = 1;
+}
+
+message StateSyncSetLastSummaryBlockResponse {
+  uint32 err = 1;
 }
 // end of StateSyncableVM related messages
 

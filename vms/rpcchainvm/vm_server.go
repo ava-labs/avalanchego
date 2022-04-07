@@ -404,12 +404,18 @@ func (vm *VMServer) StateSync(ctx context.Context, req *vmpb.StateSyncRequest) (
 }
 
 func (vm *VMServer) StateSyncGetResult(context.Context, *emptypb.Empty) (*vmpb.StateSyncGetResultResponse, error) {
-	ssVM, ok := vm.vm.(block.StateSyncableVM)
-	if !ok {
-		return nil, common.ErrStateSyncableVMNotImplemented
+	var (
+		blkID  ids.ID
+		height uint64
+		err    error
+	)
+
+	if ssVM, ok := vm.vm.(block.StateSyncableVM); ok {
+		blkID, height, err = ssVM.StateSyncGetResult()
+	} else {
+		blkID, height, err = ids.Empty, 0, common.ErrStateSyncableVMNotImplemented
 	}
 
-	blkID, height, err := ssVM.StateSyncGetResult()
 	var errMsg string
 	if err != nil {
 		errMsg = err.Error()
@@ -418,16 +424,24 @@ func (vm *VMServer) StateSyncGetResult(context.Context, *emptypb.Empty) (*vmpb.S
 		Bytes:    blkID[:],
 		Height:   height,
 		ErrorMsg: errMsg,
-	}, nil
+		Err:      errorToErrCode[err],
+	}, errorToRPCError(err)
 }
 
-func (vm *VMServer) StateSyncSetLastSummaryBlock(ctx context.Context, req *vmpb.StateSyncSetLastSummaryBlockRequest) (*emptypb.Empty, error) {
-	ssVM, ok := vm.vm.(block.StateSyncableVM)
-	if !ok {
-		return nil, common.ErrStateSyncableVMNotImplemented
+func (vm *VMServer) StateSyncSetLastSummaryBlock(
+	ctx context.Context,
+	req *vmpb.StateSyncSetLastSummaryBlockRequest,
+) (*vmpb.StateSyncSetLastSummaryBlockResponse, error) {
+	var err error
+	if ssVM, ok := vm.vm.(block.StateSyncableVM); ok {
+		err = ssVM.StateSyncSetLastSummaryBlock(req.Bytes)
+	} else {
+		err = common.ErrStateSyncableVMNotImplemented
 	}
 
-	return &emptypb.Empty{}, ssVM.StateSyncSetLastSummaryBlock(req.Bytes)
+	return &vmpb.StateSyncSetLastSummaryBlockResponse{
+		Err: errorToErrCode[err],
+	}, errorToRPCError(err)
 }
 
 func (vm *VMServer) SetState(_ context.Context, stateReq *vmpb.SetStateRequest) (*emptypb.Empty, error) {
