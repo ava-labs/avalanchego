@@ -15,7 +15,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/ava-labs/avalanchego/api/proto/vmproto"
+	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
 
 var (
@@ -95,10 +95,10 @@ func NewTestVM(vm *TestSubnetVM) plugin.Plugin {
 }
 
 func (p *testVMPlugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server) error {
-	vmproto.RegisterVMServer(s, NewTestServer(p.vm, broker))
+	vmpb.RegisterVMServer(s, NewTestServer(p.vm, broker))
 	return nil
 }
 
 func (p *testVMPlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
-	return NewTestClient(vmproto.NewVMClient(c), broker), nil
+	return NewTestClient(vmpb.NewVMClient(c), broker), nil
 }

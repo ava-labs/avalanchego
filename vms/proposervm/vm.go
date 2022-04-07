@@ -32,9 +32,8 @@ import (
 const (
 	// minBlockDelay should be kept as whole seconds because block timestamps
 	// are only specific to the second.
-	minBlockDelay                = time.Second
-	checkIndexedFrequency        = 10 * time.Second
-	optimalHeightDelay    uint64 = 256
+	minBlockDelay         = time.Second
+	checkIndexedFrequency = 10 * time.Second
 )
 
 var (
@@ -569,13 +568,10 @@ func (vm *VM) notifyInnerBlockReady() {
 }
 
 func (vm *VM) optimalPChainHeight(minPChainHeight uint64) (uint64, error) {
-	currentPChainHeight, err := vm.ctx.ValidatorState.GetCurrentHeight()
+	minimumHeight, err := vm.ctx.ValidatorState.GetMinimumHeight()
 	if err != nil {
 		return 0, err
 	}
-	if currentPChainHeight < optimalHeightDelay {
-		return minPChainHeight, nil
-	}
-	optimalHeight := currentPChainHeight - optimalHeightDelay
-	return math.Max64(optimalHeight, minPChainHeight), nil
+
+	return math.Max64(minimumHeight, minPChainHeight), nil
 }

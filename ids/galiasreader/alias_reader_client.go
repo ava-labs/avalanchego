@@ -6,25 +6,26 @@ package galiasreader
 import (
 	"context"
 
-	"github.com/ava-labs/avalanchego/api/proto/galiasreaderproto"
 	"github.com/ava-labs/avalanchego/ids"
+
+	aliasreaderpb "github.com/ava-labs/avalanchego/proto/pb/aliasreader"
 )
 
 var _ ids.AliaserReader = &Client{}
 
 // Client implements alias lookups that talk over RPC.
 type Client struct {
-	client galiasreaderproto.AliasReaderClient
+	client aliasreaderpb.AliasReaderClient
 }
 
 // NewClient returns an alias lookup instance connected to a remote alias lookup
 // instance
-func NewClient(client galiasreaderproto.AliasReaderClient) *Client {
+func NewClient(client aliasreaderpb.AliasReaderClient) *Client {
 	return &Client{client: client}
 }
 
 func (c *Client) Lookup(alias string) (ids.ID, error) {
-	resp, err := c.client.Lookup(context.Background(), &galiasreaderproto.Alias{
+	resp, err := c.client.Lookup(context.Background(), &aliasreaderpb.Alias{
 		Alias: alias,
 	})
 	if err != nil {
@@ -34,7 +35,7 @@ func (c *Client) Lookup(alias string) (ids.ID, error) {
 }
 
 func (c *Client) PrimaryAlias(id ids.ID) (string, error) {
-	resp, err := c.client.PrimaryAlias(context.Background(), &galiasreaderproto.ID{
+	resp, err := c.client.PrimaryAlias(context.Background(), &aliasreaderpb.ID{
 		Id: id[:],
 	})
 	if err != nil {
@@ -44,7 +45,7 @@ func (c *Client) PrimaryAlias(id ids.ID) (string, error) {
 }
 
 func (c *Client) Aliases(id ids.ID) ([]string, error) {
-	resp, err := c.client.Aliases(context.Background(), &galiasreaderproto.ID{
+	resp, err := c.client.Aliases(context.Background(), &aliasreaderpb.ID{
 		Id: id[:],
 	})
 	if err != nil {

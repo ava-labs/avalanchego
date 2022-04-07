@@ -21,7 +21,7 @@ var _ WalletClient = &client{}
 // interface of an AVM wallet client for interacting with avm managed wallet on [chain]
 type WalletClient interface {
 	// IssueTx issues a transaction to a node and returns the TxID
-	IssueTx(ctx context.Context, tx []byte) (ids.ID, error)
+	IssueTx(ctx context.Context, tx []byte, options ...rpc.Option) (ids.ID, error)
 	// Send [amount] of [assetID] to address [to]
 	Send(
 		ctx context.Context,
@@ -32,6 +32,7 @@ type WalletClient interface {
 		assetID,
 		to,
 		memo string,
+		options ...rpc.Option,
 	) (ids.ID, error)
 	// SendMultiple sends a transaction from [user] funding all [outputs]
 	SendMultiple(
@@ -41,6 +42,7 @@ type WalletClient interface {
 		changeAddr string,
 		outputs []SendOutput,
 		memo string,
+		options ...rpc.Option,
 	) (ids.ID, error)
 }
 
@@ -56,7 +58,7 @@ func NewWalletClient(uri, chain string) WalletClient {
 	}
 }
 
-func (c *walletClient) IssueTx(ctx context.Context, txBytes []byte) (ids.ID, error) {
+func (c *walletClient) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Option) (ids.ID, error) {
 	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, txBytes)
 	if err != nil {
 		return ids.ID{}, err
@@ -65,7 +67,7 @@ func (c *walletClient) IssueTx(ctx context.Context, txBytes []byte) (ids.ID, err
 	err = c.requester.SendRequest(ctx, "issueTx", &api.FormattedTx{
 		Tx:       txStr,
 		Encoding: formatting.Hex,
-	}, res)
+	}, res, options...)
 	return res.TxID, err
 }
 
@@ -78,6 +80,7 @@ func (c *walletClient) Send(
 	assetID,
 	to,
 	memo string,
+	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest(ctx, "send", &SendArgs{
@@ -92,7 +95,7 @@ func (c *walletClient) Send(
 			To:      to,
 		},
 		Memo: memo,
-	}, res)
+	}, res, options...)
 	return res.TxID, err
 }
 
@@ -103,6 +106,7 @@ func (c *walletClient) SendMultiple(
 	changeAddr string,
 	outputs []SendOutput,
 	memo string,
+	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest(ctx, "sendMultiple", &SendMultipleArgs{
@@ -113,6 +117,6 @@ func (c *walletClient) SendMultiple(
 		},
 		Outputs: outputs,
 		Memo:    memo,
-	}, res)
+	}, res, options...)
 	return res.TxID, err
 }

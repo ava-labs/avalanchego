@@ -42,9 +42,9 @@ const (
 )
 
 var (
-	errNoPrimaryValidators = errors.New("no default subnet validators")
-
-	_ Network = &network{}
+	_                      sender.ExternalSender = &network{}
+	_                      Network               = &network{}
+	errNoPrimaryValidators                       = errors.New("no default subnet validators")
 )
 
 // Network defines the functionality of the networking library.
@@ -186,7 +186,7 @@ func NewNetwork(
 		return nil, fmt.Errorf("initializing peer metrics failed with: %w", err)
 	}
 
-	metrics, err := newMetrics(config.Namespace, metricsRegisterer)
+	metrics, err := newMetrics(config.Namespace, metricsRegisterer, config.WhitelistedSubnets)
 	if err != nil {
 		return nil, fmt.Errorf("initializing network metrics failed with: %w", err)
 	}
@@ -346,8 +346,7 @@ func (n *network) Connected(nodeID ids.NodeID) {
 	n.connectedPeers.Add(peer)
 	n.peersLock.Unlock()
 
-	n.metrics.numPeers.Inc()
-	n.metrics.connected.Inc()
+	n.metrics.markConnected(peer)
 
 	peerVersion := peer.Version()
 	n.router.Connected(nodeID, peerVersion)
@@ -731,8 +730,7 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
 		delete(n.trackedIPs, nodeID)
 	}
 
-	n.metrics.numPeers.Dec()
-	n.metrics.disconnected.Inc()
+	n.metrics.markDisconnected(peer)
 }
 
 func (n *network) shouldTrack(nodeID ids.NodeID, ip utils.IPCertDesc) bool {

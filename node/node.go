@@ -573,13 +573,13 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	)
 
 	// Manages network timeouts
-	timeoutManager := &timeout.Manager{}
-	if err := timeoutManager.Initialize(
+	timeoutManager, err := timeout.NewManager(
 		&n.Config.AdaptiveTimeoutConfig,
 		n.benchlistManager,
 		"requests",
 		n.MetricsRegisterer,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)

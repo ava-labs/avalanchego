@@ -15,3 +15,10 @@ func TestVectors(t *testing.T) {
 		test(c, t)
 	}
 }
+
+func TestMultipleTags(t *testing.T) {
+	for _, test := range codec.MultipleTagsTests {
+		c := New([]string{"tag1", "tag2"}, defaultMaxSliceLength)
+		test(c, t)
+	}
+}

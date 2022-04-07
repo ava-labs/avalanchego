@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -536,7 +535,7 @@ func VMGenesis(genesisBytes []byte, vmID ids.ID) (*platformvm.Tx, error) {
 }
 
 func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
-	c := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
+	c := linearcodec.NewCustomMaxLength(1 << 20)
 	m := codec.NewManager(math.MaxInt32)
 	errs := wrappers.Errs{}
 	errs.Add(

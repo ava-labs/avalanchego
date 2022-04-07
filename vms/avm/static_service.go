@@ -12,7 +12,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -191,7 +190,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 }
 
 func staticCodec() (codec.Manager, error) {
-	c := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
+	c := linearcodec.NewCustomMaxLength(1 << 20)
 	manager := codec.NewManager(math.MaxInt32)
 
 	errs := wrappers.Errs{}

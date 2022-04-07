@@ -19,7 +19,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -91,9 +90,10 @@ func NewIndexer(config Config) (Indexer, error) {
 		pathAdder:            config.APIServer,
 		shutdownF:            config.ShutdownF,
 	}
+
 	if err := indexer.codec.RegisterCodec(
 		codecVersion,
-		linearcodec.New(reflectcodec.DefaultTagName, math.MaxUint32),
+		linearcodec.NewCustomMaxLength(math.MaxUint32),
 	); err != nil {
 		return nil, fmt.Errorf("couldn't register codec: %w", err)
 	}

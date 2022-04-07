@@ -63,11 +63,11 @@ type genericCodec struct {
 }
 
 // New returns a new, concurrency-safe codec
-func New(typer TypeCodec, tagName string, maxSliceLen uint32) codec.Codec {
+func New(typer TypeCodec, tagNames []string, maxSliceLen uint32) codec.Codec {
 	return &genericCodec{
 		typer:       typer,
 		maxSliceLen: maxSliceLen,
-		fielder:     NewStructFielder(tagName, maxSliceLen),
+		fielder:     NewStructFielder(tagNames, maxSliceLen),
 	}
 }
 

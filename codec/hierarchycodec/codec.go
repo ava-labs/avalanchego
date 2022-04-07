@@ -50,19 +50,19 @@ type hierarchyCodec struct {
 }
 
 // New returns a new, concurrency-safe codec
-func New(tagName string, maxSliceLen uint32) Codec {
+func New(tagNames []string, maxSliceLen uint32) Codec {
 	hCodec := &hierarchyCodec{
 		currentGroupID: 0,
 		nextTypeID:     0,
 		typeIDToType:   map[typeID]reflect.Type{},
 		typeToTypeID:   map[reflect.Type]typeID{},
 	}
-	hCodec.Codec = reflectcodec.New(hCodec, tagName, maxSliceLen)
+	hCodec.Codec = reflectcodec.New(hCodec, tagNames, maxSliceLen)
 	return hCodec
 }
 
 // NewDefault returns a new codec with reasonable default values
-func NewDefault() Codec { return New(reflectcodec.DefaultTagName, defaultMaxSliceLength) }
+func NewDefault() Codec { return New([]string{reflectcodec.DefaultTagName}, defaultMaxSliceLength) }
 
 // SkipRegistrations some number of type IDs
 func (c *hierarchyCodec) SkipRegistrations(num int) {
