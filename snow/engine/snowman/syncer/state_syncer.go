@@ -93,7 +93,7 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 	// retrieve key for summary and register frontier;
 	// make sure next beacons are reached out
 	// even in case invalid summaries are received
-	if summary, err := ss.stateSyncVM.ParseSummary(summaryBytes); err == nil {
+	if summary, err := ss.stateSyncVM.StateSyncParseSummary(summaryBytes); err == nil {
 		if _, exists := ss.weightedSummaries[summary.ID()]; !exists {
 			ss.weightedSummaries[summary.ID()] = weightedSummary{
 				Summary: summary,
@@ -270,7 +270,7 @@ func (ss *stateSyncer) startup() error {
 
 	// check if there is an ongoing state sync; if so add its state summary
 	// to the frontier to request votes on
-	summary, err := ss.stateSyncVM.GetOngoingStateSyncSummary()
+	summary, err := ss.stateSyncVM.StateSyncGetOngoingSummary()
 	switch err {
 	case nil:
 		ss.weightedSummaries[summary.ID()] = weightedSummary{
@@ -358,7 +358,7 @@ func (ss *stateSyncer) Notify(msg common.Message) error {
 	case common.StateSyncDone:
 		// retrieve the blkID to request
 		var err error
-		ss.lastSummaryBlkID, _, err = ss.stateSyncVM.GetStateSyncResult()
+		ss.lastSummaryBlkID, _, err = ss.stateSyncVM.StateSyncGetResult()
 		if err != nil {
 			ss.Ctx.Log.Warn("Could not retrieve last summary block ID to complete state sync. Err: %v", err)
 			return err
@@ -396,7 +396,7 @@ func (ss *stateSyncer) Put(validatorID ids.ShortID, requestID uint32, container 
 		return nil
 	}
 
-	if err := ss.stateSyncVM.SetLastSummaryBlock(container); err != nil {
+	if err := ss.stateSyncVM.StateSyncSetLastSummaryBlock(container); err != nil {
 		ss.Ctx.Log.Warn("Could not accept last summary block, err :%v. Retrying block download.", err)
 		return ss.requestBlk(ss.lastSummaryBlkID)
 	}

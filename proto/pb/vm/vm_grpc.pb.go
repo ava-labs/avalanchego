@@ -50,13 +50,13 @@ type VMClient interface {
 	GetBlockIDAtHeight(ctx context.Context, in *GetBlockIDAtHeightRequest, opts ...grpc.CallOption) (*GetBlockIDAtHeightResponse, error)
 	// State sync
 	StateSyncEnabled(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncEnabledResponse, error)
-	GetOngoingStateSyncSummary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncGetOngoingStateSyncSummaryResponse, error)
+	StateSyncGetOngoingSummary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncGetOngoingSummaryResponse, error)
 	StateSyncGetLastSummary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncGetLastSummaryResponse, error)
-	ParseSummary(ctx context.Context, in *ParseSummaryRequest, opts ...grpc.CallOption) (*ParseSummaryResponse, error)
+	StateSyncParseSummary(ctx context.Context, in *StateSyncParseSummaryRequest, opts ...grpc.CallOption) (*StateSyncParseSummaryResponse, error)
 	StateSyncGetSummary(ctx context.Context, in *StateSyncGetSummaryRequest, opts ...grpc.CallOption) (*StateSyncGetSummaryResponse, error)
-	StateSync(ctx context.Context, in *StateSyncRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	GetStateSyncResult(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetStateSyncResultResponse, error)
-	SetLastSummaryBlock(ctx context.Context, in *StateSyncSetLastSummaryBlockRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	StateSync(ctx context.Context, in *StateSyncRequest, opts ...grpc.CallOption) (*StateSyncResponse, error)
+	StateSyncGetResult(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncGetResultResponse, error)
+	StateSyncSetLastSummaryBlock(ctx context.Context, in *StateSyncSetLastSummaryBlockRequest, opts ...grpc.CallOption) (*StateSyncSetLastSummaryBlockResponse, error)
 }
 
 type vMClient struct {
@@ -301,9 +301,9 @@ func (c *vMClient) StateSyncEnabled(ctx context.Context, in *emptypb.Empty, opts
 	return out, nil
 }
 
-func (c *vMClient) GetOngoingStateSyncSummary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncGetOngoingStateSyncSummaryResponse, error) {
-	out := new(StateSyncGetOngoingStateSyncSummaryResponse)
-	err := c.cc.Invoke(ctx, "/vm.VM/GetOngoingStateSyncSummary", in, out, opts...)
+func (c *vMClient) StateSyncGetOngoingSummary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncGetOngoingSummaryResponse, error) {
+	out := new(StateSyncGetOngoingSummaryResponse)
+	err := c.cc.Invoke(ctx, "/vm.VM/StateSyncGetOngoingSummary", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -319,9 +319,9 @@ func (c *vMClient) StateSyncGetLastSummary(ctx context.Context, in *emptypb.Empt
 	return out, nil
 }
 
-func (c *vMClient) ParseSummary(ctx context.Context, in *ParseSummaryRequest, opts ...grpc.CallOption) (*ParseSummaryResponse, error) {
-	out := new(ParseSummaryResponse)
-	err := c.cc.Invoke(ctx, "/vm.VM/ParseSummary", in, out, opts...)
+func (c *vMClient) StateSyncParseSummary(ctx context.Context, in *StateSyncParseSummaryRequest, opts ...grpc.CallOption) (*StateSyncParseSummaryResponse, error) {
+	out := new(StateSyncParseSummaryResponse)
+	err := c.cc.Invoke(ctx, "/vm.VM/StateSyncParseSummary", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -337,8 +337,8 @@ func (c *vMClient) StateSyncGetSummary(ctx context.Context, in *StateSyncGetSumm
 	return out, nil
 }
 
-func (c *vMClient) StateSync(ctx context.Context, in *StateSyncRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *vMClient) StateSync(ctx context.Context, in *StateSyncRequest, opts ...grpc.CallOption) (*StateSyncResponse, error) {
+	out := new(StateSyncResponse)
 	err := c.cc.Invoke(ctx, "/vm.VM/StateSync", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -346,18 +346,18 @@ func (c *vMClient) StateSync(ctx context.Context, in *StateSyncRequest, opts ...
 	return out, nil
 }
 
-func (c *vMClient) GetStateSyncResult(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetStateSyncResultResponse, error) {
-	out := new(GetStateSyncResultResponse)
-	err := c.cc.Invoke(ctx, "/vm.VM/GetStateSyncResult", in, out, opts...)
+func (c *vMClient) StateSyncGetResult(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncGetResultResponse, error) {
+	out := new(StateSyncGetResultResponse)
+	err := c.cc.Invoke(ctx, "/vm.VM/StateSyncGetResult", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *vMClient) SetLastSummaryBlock(ctx context.Context, in *StateSyncSetLastSummaryBlockRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, "/vm.VM/SetLastSummaryBlock", in, out, opts...)
+func (c *vMClient) StateSyncSetLastSummaryBlock(ctx context.Context, in *StateSyncSetLastSummaryBlockRequest, opts ...grpc.CallOption) (*StateSyncSetLastSummaryBlockResponse, error) {
+	out := new(StateSyncSetLastSummaryBlockResponse)
+	err := c.cc.Invoke(ctx, "/vm.VM/StateSyncSetLastSummaryBlock", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -395,13 +395,13 @@ type VMServer interface {
 	GetBlockIDAtHeight(context.Context, *GetBlockIDAtHeightRequest) (*GetBlockIDAtHeightResponse, error)
 	// State sync
 	StateSyncEnabled(context.Context, *emptypb.Empty) (*StateSyncEnabledResponse, error)
-	GetOngoingStateSyncSummary(context.Context, *emptypb.Empty) (*StateSyncGetOngoingStateSyncSummaryResponse, error)
+	StateSyncGetOngoingSummary(context.Context, *emptypb.Empty) (*StateSyncGetOngoingSummaryResponse, error)
 	StateSyncGetLastSummary(context.Context, *emptypb.Empty) (*StateSyncGetLastSummaryResponse, error)
-	ParseSummary(context.Context, *ParseSummaryRequest) (*ParseSummaryResponse, error)
+	StateSyncParseSummary(context.Context, *StateSyncParseSummaryRequest) (*StateSyncParseSummaryResponse, error)
 	StateSyncGetSummary(context.Context, *StateSyncGetSummaryRequest) (*StateSyncGetSummaryResponse, error)
-	StateSync(context.Context, *StateSyncRequest) (*emptypb.Empty, error)
-	GetStateSyncResult(context.Context, *emptypb.Empty) (*GetStateSyncResultResponse, error)
-	SetLastSummaryBlock(context.Context, *StateSyncSetLastSummaryBlockRequest) (*emptypb.Empty, error)
+	StateSync(context.Context, *StateSyncRequest) (*StateSyncResponse, error)
+	StateSyncGetResult(context.Context, *emptypb.Empty) (*StateSyncGetResultResponse, error)
+	StateSyncSetLastSummaryBlock(context.Context, *StateSyncSetLastSummaryBlockRequest) (*StateSyncSetLastSummaryBlockResponse, error)
 	mustEmbedUnimplementedVMServer()
 }
 
@@ -487,26 +487,26 @@ func (UnimplementedVMServer) GetBlockIDAtHeight(context.Context, *GetBlockIDAtHe
 func (UnimplementedVMServer) StateSyncEnabled(context.Context, *emptypb.Empty) (*StateSyncEnabledResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StateSyncEnabled not implemented")
 }
-func (UnimplementedVMServer) GetOngoingStateSyncSummary(context.Context, *emptypb.Empty) (*StateSyncGetOngoingStateSyncSummaryResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetOngoingStateSyncSummary not implemented")
+func (UnimplementedVMServer) StateSyncGetOngoingSummary(context.Context, *emptypb.Empty) (*StateSyncGetOngoingSummaryResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StateSyncGetOngoingSummary not implemented")
 }
 func (UnimplementedVMServer) StateSyncGetLastSummary(context.Context, *emptypb.Empty) (*StateSyncGetLastSummaryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StateSyncGetLastSummary not implemented")
 }
-func (UnimplementedVMServer) ParseSummary(context.Context, *ParseSummaryRequest) (*ParseSummaryResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ParseSummary not implemented")
+func (UnimplementedVMServer) StateSyncParseSummary(context.Context, *StateSyncParseSummaryRequest) (*StateSyncParseSummaryResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StateSyncParseSummary not implemented")
 }
 func (UnimplementedVMServer) StateSyncGetSummary(context.Context, *StateSyncGetSummaryRequest) (*StateSyncGetSummaryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StateSyncGetSummary not implemented")
 }
-func (UnimplementedVMServer) StateSync(context.Context, *StateSyncRequest) (*emptypb.Empty, error) {
+func (UnimplementedVMServer) StateSync(context.Context, *StateSyncRequest) (*StateSyncResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StateSync not implemented")
 }
-func (UnimplementedVMServer) GetStateSyncResult(context.Context, *emptypb.Empty) (*GetStateSyncResultResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetStateSyncResult not implemented")
+func (UnimplementedVMServer) StateSyncGetResult(context.Context, *emptypb.Empty) (*StateSyncGetResultResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StateSyncGetResult not implemented")
 }
-func (UnimplementedVMServer) SetLastSummaryBlock(context.Context, *StateSyncSetLastSummaryBlockRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SetLastSummaryBlock not implemented")
+func (UnimplementedVMServer) StateSyncSetLastSummaryBlock(context.Context, *StateSyncSetLastSummaryBlockRequest) (*StateSyncSetLastSummaryBlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StateSyncSetLastSummaryBlock not implemented")
 }
 func (UnimplementedVMServer) mustEmbedUnimplementedVMServer() {}
 
@@ -989,20 +989,20 @@ func _VM_StateSyncEnabled_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VM_GetOngoingStateSyncSummary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _VM_StateSyncGetOngoingSummary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VMServer).GetOngoingStateSyncSummary(ctx, in)
+		return srv.(VMServer).StateSyncGetOngoingSummary(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/vm.VM/GetOngoingStateSyncSummary",
+		FullMethod: "/vm.VM/StateSyncGetOngoingSummary",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).GetOngoingStateSyncSummary(ctx, req.(*emptypb.Empty))
+		return srv.(VMServer).StateSyncGetOngoingSummary(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1025,20 +1025,20 @@ func _VM_StateSyncGetLastSummary_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VM_ParseSummary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ParseSummaryRequest)
+func _VM_StateSyncParseSummary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StateSyncParseSummaryRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VMServer).ParseSummary(ctx, in)
+		return srv.(VMServer).StateSyncParseSummary(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/vm.VM/ParseSummary",
+		FullMethod: "/vm.VM/StateSyncParseSummary",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).ParseSummary(ctx, req.(*ParseSummaryRequest))
+		return srv.(VMServer).StateSyncParseSummary(ctx, req.(*StateSyncParseSummaryRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1079,38 +1079,38 @@ func _VM_StateSync_Handler(srv interface{}, ctx context.Context, dec func(interf
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VM_GetStateSyncResult_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _VM_StateSyncGetResult_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VMServer).GetStateSyncResult(ctx, in)
+		return srv.(VMServer).StateSyncGetResult(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/vm.VM/GetStateSyncResult",
+		FullMethod: "/vm.VM/StateSyncGetResult",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).GetStateSyncResult(ctx, req.(*emptypb.Empty))
+		return srv.(VMServer).StateSyncGetResult(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VM_SetLastSummaryBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _VM_StateSyncSetLastSummaryBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(StateSyncSetLastSummaryBlockRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VMServer).SetLastSummaryBlock(ctx, in)
+		return srv.(VMServer).StateSyncSetLastSummaryBlock(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/vm.VM/SetLastSummaryBlock",
+		FullMethod: "/vm.VM/StateSyncSetLastSummaryBlock",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).SetLastSummaryBlock(ctx, req.(*StateSyncSetLastSummaryBlockRequest))
+		return srv.(VMServer).StateSyncSetLastSummaryBlock(ctx, req.(*StateSyncSetLastSummaryBlockRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1227,16 +1227,16 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _VM_StateSyncEnabled_Handler,
 		},
 		{
-			MethodName: "GetOngoingStateSyncSummary",
-			Handler:    _VM_GetOngoingStateSyncSummary_Handler,
+			MethodName: "StateSyncGetOngoingSummary",
+			Handler:    _VM_StateSyncGetOngoingSummary_Handler,
 		},
 		{
 			MethodName: "StateSyncGetLastSummary",
 			Handler:    _VM_StateSyncGetLastSummary_Handler,
 		},
 		{
-			MethodName: "ParseSummary",
-			Handler:    _VM_ParseSummary_Handler,
+			MethodName: "StateSyncParseSummary",
+			Handler:    _VM_StateSyncParseSummary_Handler,
 		},
 		{
 			MethodName: "StateSyncGetSummary",
@@ -1247,12 +1247,12 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _VM_StateSync_Handler,
 		},
 		{
-			MethodName: "GetStateSyncResult",
-			Handler:    _VM_GetStateSyncResult_Handler,
+			MethodName: "StateSyncGetResult",
+			Handler:    _VM_StateSyncGetResult_Handler,
 		},
 		{
-			MethodName: "SetLastSummaryBlock",
-			Handler:    _VM_SetLastSummaryBlock_Handler,
+			MethodName: "StateSyncSetLastSummaryBlock",
+			Handler:    _VM_StateSyncSetLastSummaryBlock_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

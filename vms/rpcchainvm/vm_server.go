@@ -241,147 +241,207 @@ func (vm *VMServer) GetBlockIDAtHeight(ctx context.Context, req *vmpb.GetBlockID
 }
 
 func (vm *VMServer) StateSyncEnabled(context.Context, *emptypb.Empty) (*vmpb.StateSyncEnabledResponse, error) {
-	ssVM, ok := vm.vm.(block.StateSyncableVM)
-	if !ok {
-		return nil, common.ErrStateSyncableVMNotImplemented
+	var (
+		enabled bool
+		err     error
+	)
+
+	if ssVM, ok := vm.vm.(block.StateSyncableVM); ok {
+		enabled, err = ssVM.StateSyncEnabled()
+	} else {
+		err = common.ErrStateSyncableVMNotImplemented
 	}
 
-	response, err := ssVM.StateSyncEnabled()
-	if err != nil {
-		return nil, err
-	}
-	return &vmpb.StateSyncEnabledResponse{Enabled: response}, nil
+	return &vmpb.StateSyncEnabledResponse{
+		Enabled: enabled,
+		Err:     errorToErrCode[err],
+	}, errorToRPCError(err)
 }
 
-func (vm *VMServer) GetOngoingStateSyncSummary(context.Context, *emptypb.Empty) (*vmpb.StateSyncGetOngoingStateSyncSummaryResponse, error) {
-	ssVM, ok := vm.vm.(block.StateSyncableVM)
-	if !ok {
-		return nil, common.ErrStateSyncableVMNotImplemented
+func (vm *VMServer) StateSyncGetOngoingSummary(
+	context.Context,
+	*emptypb.Empty,
+) (*vmpb.StateSyncGetOngoingSummaryResponse, error) {
+	var (
+		summary common.Summary
+		err     error
+	)
+
+	if ssVM, ok := vm.vm.(block.StateSyncableVM); ok {
+		summary, err = ssVM.StateSyncGetOngoingSummary()
+	} else {
+		err = common.ErrStateSyncableVMNotImplemented
 	}
 
-	summary, err := ssVM.GetOngoingStateSyncSummary()
-	if rpcErr := errorToRPCError(err); rpcErr != nil {
-		return nil, rpcErr
-	}
-
-	response := &vmpb.StateSyncGetOngoingStateSyncSummaryResponse{
-		Err: errorToErrCode[err],
-	}
-	// note: summary may be nil in case of ErrNoStateSyncOngoing
-	if summary != nil {
+	if err == nil {
 		summaryID := summary.ID()
-		response.SummaryId = summaryID[:]
-		response.Key = summary.Key()
-		response.Content = summary.Bytes()
+		return &vmpb.StateSyncGetOngoingSummaryResponse{
+			Key:       summary.Key(),
+			SummaryId: summaryID[:],
+			Content:   summary.Bytes(),
+		}, nil
 	}
-	return response, nil
+
+	return &vmpb.StateSyncGetOngoingSummaryResponse{
+		Err: errorToErrCode[err],
+	}, errorToRPCError(err)
 }
 
-func (vm *VMServer) StateSyncGetLastSummary(ctx context.Context, empty *emptypb.Empty) (*vmpb.StateSyncGetLastSummaryResponse, error) {
-	ssVM, ok := vm.vm.(block.StateSyncableVM)
-	if !ok {
-		return nil, common.ErrStateSyncableVMNotImplemented
+func (vm *VMServer) StateSyncGetLastSummary(
+	ctx context.Context,
+	empty *emptypb.Empty,
+) (*vmpb.StateSyncGetLastSummaryResponse, error) {
+	var (
+		summary common.Summary
+		err     error
+	)
+
+	if ssVM, ok := vm.vm.(block.StateSyncableVM); ok {
+		summary, err = ssVM.StateSyncGetLastSummary()
+	} else {
+		err = common.ErrStateSyncableVMNotImplemented
 	}
 
-	summary, err := ssVM.StateSyncGetLastSummary()
-	if err != nil {
-		return nil, err
+	if err == nil {
+		summaryID := summary.ID()
+		return &vmpb.StateSyncGetLastSummaryResponse{
+			Key:       summary.Key(),
+			SummaryId: summaryID[:],
+			Content:   summary.Bytes(),
+		}, nil
 	}
 
-	summaryID := summary.ID()
 	return &vmpb.StateSyncGetLastSummaryResponse{
-		Key:       summary.Key(),
-		SummaryId: summaryID[:],
-		Content:   summary.Bytes(),
-	}, err
+		Err: errorToErrCode[err],
+	}, errorToRPCError(err)
 }
 
-func (vm *VMServer) ParseSummary(ctx context.Context, req *vmpb.ParseSummaryRequest) (*vmpb.ParseSummaryResponse, error) {
-	ssVM, ok := vm.vm.(block.StateSyncableVM)
-	if !ok {
-		return nil, common.ErrStateSyncableVMNotImplemented
+func (vm *VMServer) StateSyncParseSummary(
+	ctx context.Context,
+	req *vmpb.StateSyncParseSummaryRequest,
+) (*vmpb.StateSyncParseSummaryResponse, error) {
+	var (
+		summary common.Summary
+		err     error
+	)
+
+	if ssVM, ok := vm.vm.(block.StateSyncableVM); ok {
+		summary, err = ssVM.StateSyncParseSummary(req.Summary)
+	} else {
+		err = common.ErrStateSyncableVMNotImplemented
 	}
 
-	summary, err := ssVM.ParseSummary(req.Summary)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		summaryID := summary.ID()
+		return &vmpb.StateSyncParseSummaryResponse{
+			Key:       summary.Key(),
+			SummaryId: summaryID[:],
+			Content:   summary.Bytes(),
+		}, nil
 	}
 
-	summaryID := summary.ID()
-	return &vmpb.ParseSummaryResponse{
-		Key:       summary.Key(),
-		SummaryId: summaryID[:],
-		Content:   summary.Bytes(),
-	}, nil
+	return &vmpb.StateSyncParseSummaryResponse{
+		Err: errorToErrCode[err],
+	}, errorToRPCError(err)
 }
 
-func (vm *VMServer) StateSyncGetSummary(ctx context.Context, req *vmpb.StateSyncGetSummaryRequest) (*vmpb.StateSyncGetSummaryResponse, error) {
-	ssVM, ok := vm.vm.(block.StateSyncableVM)
-	if !ok {
-		return nil, common.ErrStateSyncableVMNotImplemented
+func (vm *VMServer) StateSyncGetSummary(
+	ctx context.Context,
+	req *vmpb.StateSyncGetSummaryRequest,
+) (*vmpb.StateSyncGetSummaryResponse, error) {
+	var (
+		summary common.Summary
+		err     error
+	)
+
+	if ssVM, ok := vm.vm.(block.StateSyncableVM); ok {
+		summary, err = ssVM.StateSyncGetSummary(req.Key)
+	} else {
+		err = common.ErrStateSyncableVMNotImplemented
 	}
 
-	summary, err := ssVM.StateSyncGetSummary(req.Key)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		summaryID := summary.ID()
+		return &vmpb.StateSyncGetSummaryResponse{
+			Key:       summary.Key(),
+			SummaryId: summaryID[:],
+			Content:   summary.Bytes(),
+		}, nil
 	}
 
-	summaryID := summary.ID()
 	return &vmpb.StateSyncGetSummaryResponse{
-		Key:       summary.Key(),
-		SummaryId: summaryID[:],
-		Content:   summary.Bytes(),
-	}, nil
+		Err: errorToErrCode[err],
+	}, errorToRPCError(err)
 }
 
-func (vm *VMServer) StateSync(ctx context.Context, req *vmpb.StateSyncRequest) (*emptypb.Empty, error) {
-	ssVM, ok := vm.vm.(block.StateSyncableVM)
-	if !ok {
-		return nil, common.ErrStateSyncableVMNotImplemented
-	}
+func (vm *VMServer) StateSync(ctx context.Context, req *vmpb.StateSyncRequest) (*vmpb.StateSyncResponse, error) {
+	var (
+		summaries = make([]common.Summary, len(req.Summaries))
+		err       error
+	)
 
-	summaries := make([]common.Summary, len(req.Summaries))
-	for i, sum := range req.Summaries {
-		summaryID, err := ids.ToID(sum.SummaryId)
-		if err != nil {
-			return nil, err
+	if ssVM, ok := vm.vm.(block.StateSyncableVM); ok {
+		for i, sum := range req.Summaries {
+			var summaryID ids.ID
+			summaryID, err = ids.ToID(sum.SummaryId)
+			if err != nil {
+				return nil, err
+			}
+			summaries[i] = &Summary{
+				SummaryKey:   sum.Key,
+				SummaryID:    summaryID,
+				ContentBytes: sum.Content,
+			}
 		}
-		summaries[i] = &Summary{
-			SummaryKey:   sum.Key,
-			SummaryID:    summaryID,
-			ContentBytes: sum.Content,
-		}
+		err = ssVM.StateSync(summaries)
+	} else {
+		err = common.ErrStateSyncableVMNotImplemented
 	}
-	err := ssVM.StateSync(summaries)
-	if err != nil {
-		return nil, err
-	}
-	return &emptypb.Empty{}, nil
+
+	return &vmpb.StateSyncResponse{
+		Err: errorToErrCode[err],
+	}, errorToRPCError(err)
 }
 
-func (vm *VMServer) GetStateSyncResult(context.Context, *emptypb.Empty) (*vmpb.GetStateSyncResultResponse, error) {
-	ssVM, ok := vm.vm.(block.StateSyncableVM)
-	if !ok {
-		return nil, common.ErrStateSyncableVMNotImplemented
+func (vm *VMServer) StateSyncGetResult(context.Context, *emptypb.Empty) (*vmpb.StateSyncGetResultResponse, error) {
+	var (
+		blkID  ids.ID
+		height uint64
+		err    error
+	)
+
+	if ssVM, ok := vm.vm.(block.StateSyncableVM); ok {
+		blkID, height, err = ssVM.StateSyncGetResult()
+	} else {
+		blkID, height, err = ids.Empty, 0, common.ErrStateSyncableVMNotImplemented
 	}
 
-	blkID, height, err := ssVM.GetStateSyncResult()
+	var errMsg string
 	if err != nil {
-		return nil, err
+		errMsg = err.Error()
 	}
-	return &vmpb.GetStateSyncResultResponse{
-		Bytes:  blkID[:],
-		Height: height,
-	}, nil
+	return &vmpb.StateSyncGetResultResponse{
+		Bytes:    blkID[:],
+		Height:   height,
+		ErrorMsg: errMsg,
+		Err:      errorToErrCode[err],
+	}, errorToRPCError(err)
 }
 
-func (vm *VMServer) SetLastSummaryBlock(ctx context.Context, req *vmpb.StateSyncSetLastSummaryBlockRequest) (*emptypb.Empty, error) {
-	ssVM, ok := vm.vm.(block.StateSyncableVM)
-	if !ok {
-		return nil, common.ErrStateSyncableVMNotImplemented
+func (vm *VMServer) StateSyncSetLastSummaryBlock(
+	ctx context.Context,
+	req *vmpb.StateSyncSetLastSummaryBlockRequest,
+) (*vmpb.StateSyncSetLastSummaryBlockResponse, error) {
+	var err error
+	if ssVM, ok := vm.vm.(block.StateSyncableVM); ok {
+		err = ssVM.StateSyncSetLastSummaryBlock(req.Bytes)
+	} else {
+		err = common.ErrStateSyncableVMNotImplemented
 	}
 
-	return &emptypb.Empty{}, ssVM.SetLastSummaryBlock(req.Bytes)
+	return &vmpb.StateSyncSetLastSummaryBlockResponse{
+		Err: errorToErrCode[err],
+	}, errorToRPCError(err)
 }
 
 func (vm *VMServer) SetState(_ context.Context, stateReq *vmpb.SetStateRequest) (*emptypb.Empty, error) {

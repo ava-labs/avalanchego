@@ -531,11 +531,14 @@ func (vm *VMClient) StateSyncEnabled() (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	if errCode := resp.Err; errCode != 0 {
+		return false, errCodeToError[errCode]
+	}
 	return resp.Enabled, nil
 }
 
-func (vm *VMClient) GetOngoingStateSyncSummary() (common.Summary, error) {
-	resp, err := vm.client.GetOngoingStateSyncSummary(context.Background(), &emptypb.Empty{})
+func (vm *VMClient) StateSyncGetOngoingSummary() (common.Summary, error) {
+	resp, err := vm.client.StateSyncGetOngoingSummary(context.Background(), &emptypb.Empty{})
 	if err != nil {
 		return nil, err
 	}
@@ -559,6 +562,9 @@ func (vm *VMClient) StateSyncGetLastSummary() (common.Summary, error) {
 	if err != nil {
 		return nil, err
 	}
+	if errCode := resp.Err; errCode != 0 {
+		return nil, errCodeToError[errCode]
+	}
 
 	summaryID, err := ids.ToID(resp.SummaryId)
 	return &Summary{
@@ -568,15 +574,18 @@ func (vm *VMClient) StateSyncGetLastSummary() (common.Summary, error) {
 	}, err
 }
 
-func (vm *VMClient) ParseSummary(summaryBytes []byte) (common.Summary, error) {
-	resp, err := vm.client.ParseSummary(
+func (vm *VMClient) StateSyncParseSummary(summaryBytes []byte) (common.Summary, error) {
+	resp, err := vm.client.StateSyncParseSummary(
 		context.Background(),
-		&vmpb.ParseSummaryRequest{
+		&vmpb.StateSyncParseSummaryRequest{
 			Summary: summaryBytes,
 		},
 	)
 	if err != nil {
 		return nil, err
+	}
+	if errCode := resp.Err; errCode != 0 {
+		return nil, errCodeToError[errCode]
 	}
 
 	summaryID, err := ids.ToID(resp.SummaryId)
@@ -588,14 +597,13 @@ func (vm *VMClient) ParseSummary(summaryBytes []byte) (common.Summary, error) {
 }
 
 func (vm *VMClient) StateSyncGetSummary(key uint64) (common.Summary, error) {
-	resp, err := vm.client.StateSyncGetSummary(
-		context.Background(),
-		&vmpb.StateSyncGetSummaryRequest{
-			Key: key,
-		},
-	)
+	req := &vmpb.StateSyncGetSummaryRequest{Key: key}
+	resp, err := vm.client.StateSyncGetSummary(context.Background(), req)
 	if err != nil {
 		return nil, err
+	}
+	if errCode := resp.Err; errCode != 0 {
+		return nil, errCodeToError[errCode]
 	}
 
 	summaryID, err := ids.ToID(resp.SummaryId)
@@ -616,34 +624,54 @@ func (vm *VMClient) StateSync(accepted []common.Summary) error {
 			Content:   sum.Bytes(),
 		}
 	}
-	_, err := vm.client.StateSync(
+	resp, err := vm.client.StateSync(
 		context.Background(),
 		&vmpb.StateSyncRequest{
 			Summaries: requestedSummaries,
 		},
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	if errCode := resp.Err; errCode != 0 {
+		return errCodeToError[errCode]
+	}
+	return nil
 }
 
-func (vm *VMClient) GetStateSyncResult() (ids.ID, uint64, error) {
-	resp, err := vm.client.GetStateSyncResult(context.Background(), &emptypb.Empty{})
+func (vm *VMClient) StateSyncGetResult() (ids.ID, uint64, error) {
+	resp, err := vm.client.StateSyncGetResult(context.Background(), &emptypb.Empty{})
+	if err != nil {
+		return ids.Empty, 0, err
+	}
+	if errCode := resp.Err; errCode != 0 {
+		return ids.Empty, 0, errCodeToError[errCode]
+	}
+
+	blkID, err := ids.ToID(resp.Bytes)
 	if err != nil {
 		return ids.Empty, 0, err
 	}
 
-	blkID, err := ids.ToID(resp.Bytes)
 	height := resp.Height
-
+	if len(resp.ErrorMsg) != 0 {
+		err = fmt.Errorf(resp.ErrorMsg)
+	}
 	return blkID, height, err
 }
 
-func (vm *VMClient) SetLastSummaryBlock(blkByte []byte) error {
-	_, err := vm.client.SetLastSummaryBlock(context.Background(),
+func (vm *VMClient) StateSyncSetLastSummaryBlock(blkByte []byte) error {
+	resp, err := vm.client.StateSyncSetLastSummaryBlock(context.Background(),
 		&vmpb.StateSyncSetLastSummaryBlockRequest{
 			Bytes: blkByte,
 		})
-
-	return err
+	if err != nil {
+		return err
+	}
+	if errCode := resp.Err; errCode != 0 {
+		return errCodeToError[errCode]
+	}
+	return nil
 }
 
 func (vm *VMClient) GetAncestors(
