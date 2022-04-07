@@ -623,9 +623,15 @@ func (h *handler) closeDispatcher() {
 		return
 	}
 
-	if err := h.engine.Shutdown(); err != nil {
+	currentEngine, err := h.getEngine()
+	if err == nil {
+		if err := currentEngine.Shutdown(); err != nil {
+			h.ctx.Log.Error("Error while shutting down the chain: %s", err)
+		}
+	} else {
 		h.ctx.Log.Error("Error while shutting down the chain: %s", err)
 	}
+
 	if h.onStopped != nil {
 		go h.onStopped()
 	}

@@ -249,7 +249,10 @@ func (b *bootstrapper) Timeout() error {
 
 func (b *bootstrapper) Gossip() error { return nil }
 
-func (b *bootstrapper) Shutdown() error { return nil }
+func (b *bootstrapper) Shutdown() error {
+	b.Ctx.Log.Info("shutting down bootstrapper")
+	return b.VM.Shutdown()
+}
 
 func (b *bootstrapper) Notify(common.Message) error { return nil }
 
