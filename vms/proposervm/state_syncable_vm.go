@@ -119,7 +119,7 @@ func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 	// Extract core last state summary
 	coreSummary, err := vm.coreStateSyncVM.StateSyncGetLastSummary()
 	if err != nil {
-		return nil, err
+		return nil, err // including common.ErrUnknownStateSummary case
 	}
 
 	// retrieve ProBlkID
@@ -165,7 +165,7 @@ func (vm *VM) StateSyncGetSummary(key uint64) (common.Summary, error) {
 	coreSummary, err := vm.coreStateSyncVM.StateSyncGetSummary(key)
 	if err != nil {
 		vm.ctx.Log.Info("could not retrieve core summary due to: %s", err)
-		return nil, err
+		return nil, err // including common.ErrUnknownStateSummary case
 	}
 
 	// retrieve ProBlkID

@@ -281,13 +281,21 @@ func (vm *VMServer) StateSyncGetOngoingSummary(
 	return response, nil
 }
 
-func (vm *VMServer) StateSyncGetLastSummary(ctx context.Context, empty *emptypb.Empty) (*vmproto.StateSyncGetLastSummaryResponse, error) {
+func (vm *VMServer) StateSyncGetLastSummary(
+	ctx context.Context,
+	empty *emptypb.Empty,
+) (*vmproto.StateSyncGetLastSummaryResponse, error) {
 	ssVM, ok := vm.vm.(block.StateSyncableVM)
 	if !ok {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
 	summary, err := ssVM.StateSyncGetLastSummary()
+	if err == common.ErrUnknownStateSummary {
+		return &vmproto.StateSyncGetLastSummaryResponse{
+			Err: errorToErrCode[err],
+		}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
