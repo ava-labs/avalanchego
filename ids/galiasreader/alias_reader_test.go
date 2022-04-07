@@ -7,15 +7,16 @@ import (
 	"net"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"golang.org/x/net/context"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
 
-	"github.com/stretchr/testify/assert"
-
-	"github.com/ava-labs/avalanchego/api/proto/galiasreaderproto"
 	"github.com/ava-labs/avalanchego/ids"
+
+	aliasreaderpb "github.com/ava-labs/avalanchego/proto/pb/aliasreader"
 )
 
 const (
@@ -28,7 +29,7 @@ func TestInterface(t *testing.T) {
 		listener := bufconn.Listen(bufSize)
 		server := grpc.NewServer()
 		w := ids.NewAliaser()
-		galiasreaderproto.RegisterAliasReaderServer(server, NewServer(w))
+		aliasreaderpb.RegisterAliasReaderServer(server, NewServer(w))
 		go func() {
 			if err := server.Serve(listener); err != nil {
 				t.Logf("Server exited with error: %v", err)
@@ -45,7 +46,7 @@ func TestInterface(t *testing.T) {
 		conn, err := grpc.DialContext(ctx, "", dialer, grpc.WithInsecure())
 		assert.NoError(err)
 
-		r := NewClient(galiasreaderproto.NewAliasReaderClient(conn))
+		r := NewClient(aliasreaderpb.NewAliasReaderClient(conn))
 		test(assert, r, w)
 
 		server.Stop()

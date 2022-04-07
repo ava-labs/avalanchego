@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package io.reader;
+
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/io/reader";
+
+// Reader is an io.Reader see: https://pkg.go.dev/io#Reader
+service Reader {
+  rpc Read(ReadRequest) returns (ReadResponse);
+}
+
+message ReadRequest {
+  // length is the request in bytes
+  int32 length = 1;
+}
+
+message ReadResponse {
+  // read is the payload in bytes
+  bytes read = 1;
+  // error is an error message
+  string error = 2;
+  // errored is true if an error has been set
+  bool errored = 3;
+}

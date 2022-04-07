@@ -6,16 +6,18 @@ package appsender
 import (
 	"context"
 
-	"github.com/ava-labs/avalanchego/api/proto/appsenderproto"
+	"google.golang.org/protobuf/types/known/emptypb"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"google.golang.org/protobuf/types/known/emptypb"
+
+	appsenderpb "github.com/ava-labs/avalanchego/proto/pb/appsender"
 )
 
-var _ appsenderproto.AppSenderServer = &Server{}
+var _ appsenderpb.AppSenderServer = &Server{}
 
 type Server struct {
-	appsenderproto.UnimplementedAppSenderServer
+	appsenderpb.UnimplementedAppSenderServer
 	appSender common.AppSender
 }
 
@@ -24,7 +26,7 @@ func NewServer(appSender common.AppSender) *Server {
 	return &Server{appSender: appSender}
 }
 
-func (s *Server) SendAppRequest(_ context.Context, req *appsenderproto.SendAppRequestMsg) (*emptypb.Empty, error) {
+func (s *Server) SendAppRequest(_ context.Context, req *appsenderpb.SendAppRequestMsg) (*emptypb.Empty, error) {
 	nodeIDs := ids.NewShortSet(len(req.NodeIds))
 	for _, nodeIDBytes := range req.NodeIds {
 		nodeID, err := ids.ToShortID(nodeIDBytes)
@@ -37,7 +39,7 @@ func (s *Server) SendAppRequest(_ context.Context, req *appsenderproto.SendAppRe
 	return &emptypb.Empty{}, err
 }
 
-func (s *Server) SendAppResponse(_ context.Context, req *appsenderproto.SendAppResponseMsg) (*emptypb.Empty, error) {
+func (s *Server) SendAppResponse(_ context.Context, req *appsenderpb.SendAppResponseMsg) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToShortID(req.NodeId)
 	if err != nil {
 		return nil, err
@@ -46,12 +48,12 @@ func (s *Server) SendAppResponse(_ context.Context, req *appsenderproto.SendAppR
 	return &emptypb.Empty{}, err
 }
 
-func (s *Server) SendAppGossip(_ context.Context, req *appsenderproto.SendAppGossipMsg) (*emptypb.Empty, error) {
+func (s *Server) SendAppGossip(_ context.Context, req *appsenderpb.SendAppGossipMsg) (*emptypb.Empty, error) {
 	err := s.appSender.SendAppGossip(req.Msg)
 	return &emptypb.Empty{}, err
 }
 
-func (s *Server) SendAppGossipSpecific(_ context.Context, req *appsenderproto.SendAppGossipSpecificMsg) (*emptypb.Empty, error) {
+func (s *Server) SendAppGossipSpecific(_ context.Context, req *appsenderpb.SendAppGossipSpecificMsg) (*emptypb.Empty, error) {
 	nodeIDs := ids.NewShortSet(len(req.NodeIds))
 	for _, nodeIDBytes := range req.NodeIds {
 		nodeID, err := ids.ToShortID(nodeIDBytes)

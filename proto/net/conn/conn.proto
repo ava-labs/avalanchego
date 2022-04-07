@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package net.conn;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/net/conn";
+
+// Conn is a net.Conn see: https://pkg.go.dev/net#Conn
+service Conn {
+  // Read reads data from the connection.
+  rpc Read(ReadRequest) returns (ReadResponse);
+  // Write writes data to the connection.
+  rpc Write(WriteRequest) returns (WriteResponse);
+  // Close closes the connection.
+  rpc Close(google.protobuf.Empty) returns (google.protobuf.Empty);
+  // SetDeadline sets the read and write deadlines associated
+  // with the connection.
+  rpc SetDeadline(SetDeadlineRequest) returns (google.protobuf.Empty);
+  // SetReadDeadline sets the deadline for future Read calls
+  // and any currently-blocked Read call.
+  rpc SetReadDeadline(SetDeadlineRequest) returns (google.protobuf.Empty);
+  // SetWriteDeadline sets the deadline for future Write calls
+  // and any currently-blocked Write call.
+  rpc SetWriteDeadline(SetDeadlineRequest) returns (google.protobuf.Empty);
+}
+
+message ReadRequest {
+  // length of the request in bytes
+  int32 length = 1;
+}
+
+message ReadResponse {
+  // read is the payload in bytes
+  bytes read = 1;
+  // error is an error message
+  string error = 2;
+  // errored is true if an error has been set
+  bool errored = 3;
+}
+
+message WriteRequest {
+  // payload is the write request in bytes
+  bytes payload = 1;
+}
+
+message WriteResponse {
+  // length of the response in bytes
+  int32 length = 1;
+  // error is an error message
+  string error = 2;
+  // errored is true if an error has been set
+  bool errored = 3;
+}
+
+message SetDeadlineRequest {
+  // time represents an instant in time in bytes
+  bytes time = 1;
+}
