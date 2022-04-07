@@ -36,19 +36,19 @@ type StateSyncableVM interface {
 	// StateSyncEnabled indicates whether the state sync is enabled for this VM
 	StateSyncEnabled() (bool, error)
 
-	// GetOngoingStateSyncSummary returns an in-progress state summary if it exists. This
+	// StateSyncGetOngoingSummary returns an in-progress state summary if it exists. This
 	// allows the engine to ask the network if the ongoing summary is still supported by the
 	// network. This simplifies the task of the StateSyncableVM to decide whether to
 	// continue an in-progress sync or start over.
 	// Returns ErrNoStateSyncOngoing if no local state summary exists.
-	GetOngoingStateSyncSummary() (Summary, error)
+	StateSyncGetOngoingSummary() (Summary, error)
 
 	// StateSyncGetLastSummary returns latest Summary with an optional error
 	// Returns ErrUnknownStateSummary if summary is not available
 	StateSyncGetLastSummary() (Summary, error)
 
-	// ParseSummary builds a Summary out of summaryBytes
-	ParseSummary(summaryBytes []byte) (Summary, error)
+	// StateSyncParseSummary builds a Summary out of summaryBytes
+	StateSyncParseSummary(summaryBytes []byte) (Summary, error)
 
 	// StateSyncGetSummary retrieves the summary related to key, if available.
 	// Returns ErrUnknownStateSummary if summary is not available

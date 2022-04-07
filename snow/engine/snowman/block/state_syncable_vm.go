@@ -13,11 +13,11 @@ type StateSyncableVM interface {
 
 	// VM State Sync process must run asynchronously; morever, once it is done,
 	// the full block associated with synced summary must be downloaded from
-	// the network. GetStateSyncResult returns
+	// the network. StateSyncGetResult returns
 	// height and ID of this block to allow its retrival from network
 	// error state of the whole StateSync process so far
-	GetStateSyncResult() (ids.ID, uint64, error)
+	StateSyncGetResult() (ids.ID, uint64, error)
 
-	// SetLastSummaryBlock pass to VM the network-retrieved block associated with its last state summary
-	SetLastSummaryBlock([]byte) error
+	// StateSyncSetLastSummaryBlock pass to VM the network-retrieved block associated with its last state summary
+	StateSyncSetLastSummaryBlock([]byte) error
 }

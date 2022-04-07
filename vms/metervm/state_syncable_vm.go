@@ -29,12 +29,12 @@ func (vm *blockVM) StateSyncGetLastSummary() (common.Summary, error) {
 	return summary, err
 }
 
-func (vm *blockVM) ParseSummary(summaryBytes []byte) (common.Summary, error) {
+func (vm *blockVM) StateSyncParseSummary(summaryBytes []byte) (common.Summary, error) {
 	if vm.ssVM == nil {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	return vm.ssVM.ParseSummary(summaryBytes)
+	return vm.ssVM.StateSyncParseSummary(summaryBytes)
 }
 
 func (vm *blockVM) StateSyncGetSummary(key uint64) (common.Summary, error) {
@@ -63,34 +63,34 @@ func (vm *blockVM) StateSync(accepted []common.Summary) error {
 	return err
 }
 
-func (vm *blockVM) GetOngoingStateSyncSummary() (common.Summary, error) {
+func (vm *blockVM) StateSyncGetOngoingSummary() (common.Summary, error) {
 	if vm.ssVM == nil {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	return vm.ssVM.GetOngoingStateSyncSummary()
+	return vm.ssVM.StateSyncGetOngoingSummary()
 }
 
-func (vm *blockVM) GetStateSyncResult() (ids.ID, uint64, error) {
+func (vm *blockVM) StateSyncGetResult() (ids.ID, uint64, error) {
 	if vm.ssVM == nil {
 		return ids.Empty, 0, common.ErrStateSyncableVMNotImplemented
 	}
 
 	start := vm.clock.Time()
-	blkID, height, err := vm.ssVM.GetStateSyncResult()
+	blkID, height, err := vm.ssVM.StateSyncGetResult()
 	end := vm.clock.Time()
 	vm.stateSummaryMetrics.lastSummaryBlockID.Observe(float64(end.Sub(start)))
 
 	return blkID, height, err
 }
 
-func (vm *blockVM) SetLastSummaryBlock(blkBytes []byte) error {
+func (vm *blockVM) StateSyncSetLastSummaryBlock(blkBytes []byte) error {
 	if vm.ssVM == nil {
 		return common.ErrStateSyncableVMNotImplemented
 	}
 
 	start := vm.clock.Time()
-	err := vm.ssVM.SetLastSummaryBlock(blkBytes)
+	err := vm.ssVM.StateSyncSetLastSummaryBlock(blkBytes)
 	end := vm.clock.Time()
 	vm.stateSummaryMetrics.setLastSummaryBlockID.Observe(float64(end.Sub(start)))
 
