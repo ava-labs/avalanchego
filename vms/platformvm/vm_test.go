@@ -430,7 +430,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-	appSender := &common.SenderTest{}
+	appSender := &common.SenderTest{T: t}
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func([]byte) error { return nil }
 	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
