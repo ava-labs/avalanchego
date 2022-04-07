@@ -51,7 +51,7 @@ func NewMockClient(response interface{}, err error) rpc.EndpointRequester {
 	}
 }
 
-func (mc *mockClient) SendRequest(ctx context.Context, method string, params interface{}, reply interface{}) error {
+func (mc *mockClient) SendRequest(ctx context.Context, method string, params interface{}, reply interface{}, options ...rpc.Option) error {
 	if mc.err != nil {
 		return mc.err
 	}
