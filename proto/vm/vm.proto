@@ -36,8 +36,12 @@ service VM {
 }
 
 message InitializeRequest {
-  // reserved fields ids have been removed and should not be reused
-  reserved 11 to 17;
+  // reserved for backward compatibility
+  // avalanchego <=v1.7.9 used the fields "11-19" as an id to
+  // identify the gRPC server address which served the messenger,
+  // keystore, shared memory, blockchain alias, subnet alias, and
+  // appSender services via the now removed service broker
+  reserved 11 to 19;
   uint32 network_id = 1;
   bytes subnet_id = 2;
   bytes chain_id = 3;
@@ -48,7 +52,10 @@ message InitializeRequest {
   bytes upgrade_bytes = 8;
   bytes config_bytes = 9;
   repeated VersionedDBServer db_servers = 10;
-  uint32 init_server = 18;
+  // server_addr is the address of the gRPC server which serves
+  // the messenger, keystore, shared memory, blockchain alias,
+  // subnet alias, and appSender services
+  string server_addr = 20;
 }
 
 message SetStateRequest {
@@ -65,8 +72,14 @@ message InitializeResponse {
 }
 
 message VersionedDBServer {
-  uint32 db_server = 1;
+  // reserved for backward compatibility
+  // avalanchego <=v1.7.9 used the field "1" as an id to identify the gRPC server
+  // address which served the Database service via the now removed service broker
+  reserved 1;
   string version = 2;
+  // server_addr is the address of the gRPC server which serves the
+  // Database service
+  string server_addr = 3;
 }
 
 message CreateHandlersResponse {
@@ -78,9 +91,15 @@ message CreateStaticHandlersResponse {
 }
 
 message Handler {
+  // reserved for backward compatibility
+  // avalanchego <=v1.7.9 used the field "3" as an id to identify the gRPC server
+  // address which served the HTTP service via the now removed service broker
+  reserved 3;
   string prefix = 1;
   uint32 lock_options = 2;
-  uint32 server = 3;
+  // server_addr is the address of the gRPC server which serves the
+  // HTTP service
+  string server_addr = 4;
 }
 
 message BuildBlockResponse {

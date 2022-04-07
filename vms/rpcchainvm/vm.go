@@ -45,12 +45,12 @@ func New(vm block.ChainVM) plugin.Plugin {
 }
 
 // GRPCServer registers a new GRPC server.
-func (p *vmPlugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server) error {
-	vmpb.RegisterVMServer(s, NewServer(p.vm, broker))
+func (p *vmPlugin) GRPCServer(_ *plugin.GRPCBroker, s *grpc.Server) error {
+	vmpb.RegisterVMServer(s, NewServer(p.vm))
 	return nil
 }
 
 // GRPCClient returns a new GRPC client
-func (p *vmPlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
-	return NewClient(vmpb.NewVMClient(c), broker), nil
+func (p *vmPlugin) GRPCClient(ctx context.Context, _ *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
+	return NewClient(vmpb.NewVMClient(c)), nil
 }

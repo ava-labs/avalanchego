@@ -67,7 +67,6 @@ const (
 type VMClient struct {
 	*chain.State
 	client vmpb.VMClient
-	broker *plugin.GRPCBroker
 	proc   *plugin.Client
 
 	messenger    *messenger.Server
@@ -84,10 +83,9 @@ type VMClient struct {
 }
 
 // NewClient returns a VM connected to a remote VM
-func NewClient(client vmpb.VMClient, broker *plugin.GRPCBroker) *VMClient {
+func NewClient(client vmpb.VMClient) *VMClient {
 	return &VMClient{
 		client: client,
-		broker: broker,
 	}
 }
 
@@ -117,25 +115,34 @@ func (vm *VMClient) Initialize(
 	versionedDBs := dbManager.GetDatabases()
 	versionedDBServers := make([]*vmpb.VersionedDBServer, len(versionedDBs))
 	for i, semDB := range versionedDBs {
-		dbBrokerID := vm.broker.NextId()
 		db := rpcdb.NewServer(semDB.Database)
-		go vm.broker.AcceptAndServe(dbBrokerID, vm.startDBServerFunc(db))
+		serverListener, err := grpcutils.NewListener()
+		if err != nil {
+			return err
+		}
+		serverAddr := serverListener.Addr().String()
+
+		go grpcutils.Serve(serverListener, vm.getDBServerFunc(db))
 		versionedDBServers[i] = &vmpb.VersionedDBServer{
-			DbServer: dbBrokerID,
-			Version:  semDB.Version.String(),
+			ServerAddr: serverAddr,
+			Version:    semDB.Version.String(),
 		}
 	}
 
 	vm.messenger = messenger.NewServer(toEngine)
-	vm.keystore = gkeystore.NewServer(ctx.Keystore, vm.broker)
+	vm.keystore = gkeystore.NewServer(ctx.Keystore)
 	vm.sharedMemory = gsharedmemory.NewServer(ctx.SharedMemory, dbManager.Current().Database)
 	vm.bcLookup = galiasreader.NewServer(ctx.BCLookup)
 	vm.snLookup = gsubnetlookup.NewServer(ctx.SNLookup)
 	vm.appSender = appsender.NewServer(appSender)
 
-	// start the gRPC init server
-	initServerID := vm.broker.NextId()
-	go vm.broker.AcceptAndServe(initServerID, vm.startInitServer)
+	serverListener, err := grpcutils.NewListener()
+	if err != nil {
+		return err
+	}
+	serverAddr := serverListener.Addr().String()
+
+	go grpcutils.Serve(serverListener, vm.getInitServer)
 
 	resp, err := vm.client.Initialize(context.Background(), &vmpb.InitializeRequest{
 		NetworkId:    ctx.NetworkID,
@@ -148,7 +155,7 @@ func (vm *VMClient) Initialize(
 		UpgradeBytes: upgradeBytes,
 		ConfigBytes:  configBytes,
 		DbServers:    versionedDBServers,
-		InitServer:   initServerID,
+		ServerAddr:   serverAddr,
 	})
 	if err != nil {
 		return err
@@ -213,9 +220,11 @@ func (vm *VMClient) Initialize(
 	return vm.ctx.Metrics.Register(multiGatherer)
 }
 
-func (vm *VMClient) startDBServerFunc(db rpcdbpb.DatabaseServer) func(opts []grpc.ServerOption) *grpc.Server { // #nolint
+func (vm *VMClient) getDBServerFunc(db rpcdbpb.DatabaseServer) func(opts []grpc.ServerOption) *grpc.Server { // #nolint
 	return func(opts []grpc.ServerOption) *grpc.Server {
-		opts = append(opts, serverOptions...)
+		if len(opts) == 0 {
+			opts = append(opts, grpcutils.DefaultServerOptions...)
+		}
 		server := grpc.NewServer(opts...)
 		vm.serverCloser.Add(server)
 
@@ -225,8 +234,10 @@ func (vm *VMClient) startDBServerFunc(db rpcdbpb.DatabaseServer) func(opts []grp
 	}
 }
 
-func (vm *VMClient) startInitServer(opts []grpc.ServerOption) *grpc.Server {
-	opts = append(opts, serverOptions...)
+func (vm *VMClient) getInitServer(opts []grpc.ServerOption) *grpc.Server {
+	if len(opts) == 0 {
+		opts = append(opts, grpcutils.DefaultServerOptions...)
+	}
 	server := grpc.NewServer(opts...)
 	vm.serverCloser.Add(server)
 
@@ -276,15 +287,15 @@ func (vm *VMClient) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 
 	handlers := make(map[string]*common.HTTPHandler, len(resp.Handlers))
 	for _, handler := range resp.Handlers {
-		conn, err := vm.broker.Dial(handler.Server)
+		clientConn, err := grpcutils.Dial(handler.ServerAddr)
 		if err != nil {
 			return nil, err
 		}
 
-		vm.conns = append(vm.conns, conn)
+		vm.conns = append(vm.conns, clientConn)
 		handlers[handler.Prefix] = &common.HTTPHandler{
 			LockOptions: common.LockOption(handler.LockOptions),
-			Handler:     ghttp.NewClient(httppb.NewHTTPClient(conn), vm.broker),
+			Handler:     ghttp.NewClient(httppb.NewHTTPClient(clientConn)),
 		}
 	}
 	return handlers, nil
@@ -298,15 +309,15 @@ func (vm *VMClient) CreateStaticHandlers() (map[string]*common.HTTPHandler, erro
 
 	handlers := make(map[string]*common.HTTPHandler, len(resp.Handlers))
 	for _, handler := range resp.Handlers {
-		conn, err := vm.broker.Dial(handler.Server)
+		clientConn, err := grpcutils.Dial(handler.ServerAddr)
 		if err != nil {
 			return nil, err
 		}
 
-		vm.conns = append(vm.conns, conn)
+		vm.conns = append(vm.conns, clientConn)
 		handlers[handler.Prefix] = &common.HTTPHandler{
 			LockOptions: common.LockOption(handler.LockOptions),
-			Handler:     ghttp.NewClient(httppb.NewHTTPClient(conn), vm.broker),
+			Handler:     ghttp.NewClient(httppb.NewHTTPClient(clientConn)),
 		}
 	}
 	return handlers, nil

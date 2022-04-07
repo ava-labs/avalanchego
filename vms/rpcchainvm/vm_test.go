@@ -217,19 +217,27 @@ func (vm *TestVMServer) CreateHandlers(context.Context, *emptypb.Empty) (*vmpb.C
 	for prefix, h := range handlers {
 		handler := h
 
-		serverID := vm.broker.NextId()
-		go vm.broker.AcceptAndServe(serverID, func(opts []grpc.ServerOption) *grpc.Server {
-			opts = append(opts, serverOptions...)
+		// start the http server
+		serverListener, err := grpcutils.NewListener()
+		if err != nil {
+			return nil, err
+		}
+		serverAddr := serverListener.Addr().String()
+
+		go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
+			if len(opts) == 0 {
+				opts = append(opts, grpcutils.DefaultServerOptions...)
+			}
 			server := grpc.NewServer(opts...)
 			vm.serverCloser.Add(server)
-			httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler, vm.broker))
+			httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler))
 			return server
 		})
 
 		resp.Handlers = append(resp.Handlers, &vmpb.Handler{
 			Prefix:      prefix,
 			LockOptions: uint32(handler.LockOptions),
-			Server:      serverID,
+			ServerAddr:  serverAddr,
 		})
 	}
 	return resp, nil
@@ -257,15 +265,15 @@ func (vm *TestVMClient) CreateHandlers() (map[string]*common.HTTPHandler, error)
 
 	handlers := make(map[string]*common.HTTPHandler, len(resp.Handlers))
 	for _, handler := range resp.Handlers {
-		conn, err := vm.broker.Dial(handler.Server)
+		clientConn, err := grpcutils.Dial(handler.ServerAddr)
 		if err != nil {
 			return nil, err
 		}
 
-		vm.conns = append(vm.conns, conn)
+		vm.conns = append(vm.conns, clientConn)
 		handlers[handler.Prefix] = &common.HTTPHandler{
 			LockOptions: common.LockOption(handler.LockOptions),
-			Handler:     ghttp.NewClient(httppb.NewHTTPClient(conn), vm.broker),
+			Handler:     ghttp.NewClient(httppb.NewHTTPClient(clientConn)),
 		}
 	}
 	return handlers, nil
