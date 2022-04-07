@@ -23,7 +23,7 @@ version_lt() {
 }
 
 if version_lt "$(go_version)" "$go_version_minimum"; then
-    echo "AvalancheGo requires Go >= $go_version_minimum, Go $(go_version) found." >&2
+    echo "SubnetEVM requires Go >= $go_version_minimum, Go $(go_version) found." >&2
     exit 1
 fi
 
