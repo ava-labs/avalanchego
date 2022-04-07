@@ -633,8 +633,14 @@ func (vm *VMClient) GetStateSyncResult() (ids.ID, uint64, error) {
 	}
 
 	blkID, err := ids.ToID(resp.Bytes)
-	height := resp.Height
+	if err != nil {
+		return ids.Empty, 0, err
+	}
 
+	height := resp.Height
+	if len(resp.ErrorMsg) != 0 {
+		err = fmt.Errorf(resp.ErrorMsg)
+	}
 	return blkID, height, err
 }
 

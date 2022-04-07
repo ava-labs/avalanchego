@@ -11,9 +11,11 @@ import (
 type StateSyncableVM interface {
 	common.StateSyncableVM
 
-	// At the end of StateSync process, VM will have rebuilt the state of its blockchain
-	// up to a given height. However the block associated with that height may be not known
-	// to the VM yet. GetStateSyncResult allows retrival of this block from network
+	// VM State Sync process must run asynchronously; morever, once it is done,
+	// the full block associated with synced summary must be downloaded from
+	// the network. GetStateSyncResult returns
+	// height and ID of this block to allow its retrival from network
+	// error state of the whole StateSync process so far
 	GetStateSyncResult() (ids.ID, uint64, error)
 
 	// SetLastSummaryBlock pass to VM the network-retrieved block associated with its last state summary

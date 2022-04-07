@@ -380,12 +380,14 @@ func (vm *VMServer) GetStateSyncResult(context.Context, *emptypb.Empty) (*vmprot
 	}
 
 	blkID, height, err := ssVM.GetStateSyncResult()
+	var errMsg string
 	if err != nil {
-		return nil, err
+		errMsg = err.Error()
 	}
 	return &vmproto.GetStateSyncResultResponse{
-		Bytes:  blkID[:],
-		Height: height,
+		Bytes:    blkID[:],
+		Height:   height,
+		ErrorMsg: errMsg,
 	}, nil
 }
 
