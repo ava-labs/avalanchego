@@ -59,8 +59,6 @@ func (NoLog) GetDisplayLevel() Level { return Off }
 
 func (NoLog) SetPrefix(string) {}
 
-func (NoLog) SetLoggingEnabled(bool) {}
-
 func (NoLog) SetDisplayingEnabled(bool) {}
 
 func (NoLog) SetContextualDisplayingEnabled(bool) {}
@@ -68,13 +66,15 @@ func (NoLog) SetContextualDisplayingEnabled(bool) {}
 // NoIOWriter is a mock Writer that does not write to any underlying source
 type NoIOWriter struct{}
 
-func (NoIOWriter) Initialize(Config) (int, error) { return 0, nil }
+func (NoIOWriter) Initialize(Config) {}
 
 func (NoIOWriter) Flush() error { return nil }
 
 func (NoIOWriter) Write(p []byte) (int, error) { return len(p), nil }
 
 func (NoIOWriter) WriteString(s string) (int, error) { return len(s), nil }
+
+func (NoIOWriter) GetCurrentSize() int { return 0 }
 
 func (NoIOWriter) Close() error { return nil }
 

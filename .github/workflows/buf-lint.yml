@@ -14,4 +14,4 @@ jobs:
       - uses: bufbuild/buf-setup-action@v1.3.1
       - uses: bufbuild/buf-lint-action@v1
         with:
-          input: 'api'
+          input: 'proto'

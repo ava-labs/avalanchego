@@ -259,18 +259,6 @@ func (mr *MockLoggerMockRecorder) SetLogLevel(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLogLevel", reflect.TypeOf((*MockLogger)(nil).SetLogLevel), arg0)
 }
 
-// SetLoggingEnabled mocks base method.
-func (m *MockLogger) SetLoggingEnabled(arg0 bool) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetLoggingEnabled", arg0)
-}
-
-// SetLoggingEnabled indicates an expected call of SetLoggingEnabled.
-func (mr *MockLoggerMockRecorder) SetLoggingEnabled(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLoggingEnabled", reflect.TypeOf((*MockLogger)(nil).SetLoggingEnabled), arg0)
-}
-
 // SetPrefix mocks base method.
 func (m *MockLogger) SetPrefix(arg0 string) {
 	m.ctrl.T.Helper()

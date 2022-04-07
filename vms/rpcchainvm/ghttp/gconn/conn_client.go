@@ -12,22 +12,23 @@ import (
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/ava-labs/avalanchego/api/proto/gconnproto"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+
+	connpb "github.com/ava-labs/avalanchego/proto/pb/net/conn"
 )
 
 var _ net.Conn = &Client{}
 
 // Client is an implementation of a connection that talks over RPC.
 type Client struct {
-	client  gconnproto.ConnClient
+	client  connpb.ConnClient
 	local   net.Addr
 	remote  net.Addr
 	toClose []io.Closer
 }
 
 // NewClient returns a connection connected to a remote connection
-func NewClient(client gconnproto.ConnClient, local, remote net.Addr, toClose ...io.Closer) *Client {
+func NewClient(client connpb.ConnClient, local, remote net.Addr, toClose ...io.Closer) *Client {
 	return &Client{
 		client:  client,
 		local:   local,
@@ -37,7 +38,7 @@ func NewClient(client gconnproto.ConnClient, local, remote net.Addr, toClose ...
 }
 
 func (c *Client) Read(p []byte) (int, error) {
-	resp, err := c.client.Read(context.Background(), &gconnproto.ReadRequest{
+	resp, err := c.client.Read(context.Background(), &connpb.ReadRequest{
 		Length: int32(len(p)),
 	})
 	if err != nil {
@@ -53,7 +54,7 @@ func (c *Client) Read(p []byte) (int, error) {
 }
 
 func (c *Client) Write(b []byte) (int, error) {
-	resp, err := c.client.Write(context.Background(), &gconnproto.WriteRequest{
+	resp, err := c.client.Write(context.Background(), &connpb.WriteRequest{
 		Payload: b,
 	})
 	if err != nil {
@@ -84,7 +85,7 @@ func (c *Client) SetDeadline(t time.Time) error {
 	if err != nil {
 		return err
 	}
-	_, err = c.client.SetDeadline(context.Background(), &gconnproto.SetDeadlineRequest{
+	_, err = c.client.SetDeadline(context.Background(), &connpb.SetDeadlineRequest{
 		Time: bytes,
 	})
 	return err
@@ -95,7 +96,7 @@ func (c *Client) SetReadDeadline(t time.Time) error {
 	if err != nil {
 		return err
 	}
-	_, err = c.client.SetReadDeadline(context.Background(), &gconnproto.SetDeadlineRequest{
+	_, err = c.client.SetReadDeadline(context.Background(), &connpb.SetDeadlineRequest{
 		Time: bytes,
 	})
 	return err
@@ -106,7 +107,7 @@ func (c *Client) SetWriteDeadline(t time.Time) error {
 	if err != nil {
 		return err
 	}
-	_, err = c.client.SetWriteDeadline(context.Background(), &gconnproto.SetDeadlineRequest{
+	_, err = c.client.SetWriteDeadline(context.Background(), &connpb.SetDeadlineRequest{
 		Time: bytes,
 	})
 	return err
